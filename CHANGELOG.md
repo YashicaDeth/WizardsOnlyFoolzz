@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026 09 12
+
+- **G4: the world finally changes at the outline.** The generated Ashbloom
+  shells now carry broken roof corners, pipes on all four faces, brackets,
+  vents, tanks, aerials and hanging sheets, with a deterministic lean and
+  settle per building. More importantly, the twenty-six identical bare boxes
+  beside the spawn—the shapes that actually dominated the player's view—are
+  now irregular wreck piles with varied mass and placement, dressed by the
+  same silhouette system. A rendered 1280x720 walking capture verified the
+  skyline and near-player treatment; `silhouette_test` verifies sixty generated
+  buildings, attached geometry and off-plumb transforms.
+
 ## 2026 09 11
 
 - **D4.2: race is a silhouette, not just a stat block.** Every race has carried
