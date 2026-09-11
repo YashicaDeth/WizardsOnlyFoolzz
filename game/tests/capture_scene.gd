@@ -83,6 +83,27 @@ func _ready() -> void:
 		scene._toggle_panel("map")
 		for _hold in 6:
 			await get_tree().process_frame
+	elif trigger == "bruise":
+		# Beat a body without opening it, so the shot shows bruising rather than
+		# blood: the stage that used to be invisible.
+		scene.yaw = 2.7
+		for step in 30:
+			scene.player_body.position = scene.player_body.position + Vector3(-0.42, 0, -0.2)
+			scene.player = scene.player_body.position + Vector3.UP * 0.6
+			await get_tree().physics_frame
+		var stand: Vector3 = scene.player + Vector3(sin(scene.yaw), 0, cos(scene.yaw)) * 3.0
+		stand.y = scene.player.y
+		scene._spawn_encounter_actor({"instance_id": "bruise_probe", "kind": "hostile"}, stand)
+		var subject: Dictionary = scene.encounter_actors.back()
+		subject.node.position = stand
+		subject.rig.gore = false
+		await get_tree().physics_frame
+		for blow in 3:
+			subject.rig.hit("left_arm", 20.0, 8.0, "blunt")
+			subject.rig.hit("torso", 26.0, 10.0, "blunt")
+			subject.rig.hit("head", 9.0, 6.0, "blunt")
+		for _hold in 20:
+			await get_tree().physics_frame
 	elif trigger == "gore":
 		# Stand a body in front of the camera and open it up, then let the blood
 		# fall so the shot shows what the floor looks like after a fight.

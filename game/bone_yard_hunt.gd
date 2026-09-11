@@ -57,6 +57,9 @@ var resolution_target := ""
 var living_map: Control
 var viscera_fx := true
 var enemy_rig: BaselineHuman
+var grapple_target := ""
+var grapple_advantage := 0.0
+var grapple_clock := 0.0
 var friend_rig: BaselineHuman
 var lock_target := ""
 var lock_screen := Vector2(-1, -1)
@@ -285,9 +288,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_M: _toggle_panel("map")
 			KEY_T: _toggle_panel("tree")
 			KEY_J: _toggle_artwork()
+			KEY_C: _start_grapple()
 			KEY_Z: _toggle_lock()
 			KEY_E: _interact()
-			KEY_SPACE: _dodge()
+			KEY_SPACE:
+				if not grapple_target.is_empty():
+					_break_grapple("YOU LET GO")
+				else:
+					_dodge()
 			KEY_Q: _use_prosthetic_surge()
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		yaw -= event.relative.x * 0.0026
@@ -320,6 +328,8 @@ func _physics_process(delta: float) -> void:
 	_update_encounter_actors(delta)
 	if misfire_director != null:
 		misfire_director.call("update_player_position", player)
+	if not grapple_target.is_empty():
+		_update_grapple(delta)
 	_steer_lock(delta)
 	_update_camera()
 	_update_hud()
@@ -330,8 +340,9 @@ func _physics_process(delta: float) -> void:
 func _update_player(delta: float) -> void:
 	if player_rig.is_downed() or player_rig.anatomy.dead:
 		return
-	# Standing over a downed body with the form open costs you your footwork.
-	if resolution_ui.visible:
+	# Standing over a downed body with the form open costs you your footwork,
+	# and so does having hold of someone.
+	if resolution_ui.visible or not grapple_target.is_empty():
 		player_body.velocity = Vector3.ZERO
 		return
 	var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
@@ -354,6 +365,9 @@ func _update_player(delta: float) -> void:
 
 func _attack(heavy := false) -> void:
 	if resolution_ui.visible or kill_cam.active or player_rig.is_downed() or player_rig.anatomy.dead:
+		return
+	# In a clinch the strike button is the press, not a swing.
+	if not grapple_target.is_empty():
 		return
 	if not panel_mode.is_empty():
 		return
@@ -1087,6 +1101,119 @@ func _steer_lock(delta: float) -> void:
 	pitch = lerpf(pitch, desired_pitch, clampf(delta * 5.0, 0.0, 1.0))
 	if camera != null and not camera.is_position_behind(node.global_position + Vector3.UP * 1.1):
 		lock_screen = camera.unproject_position(node.global_position + Vector3.UP * 1.1)
+
+
+## The clinch. Half Sword's register is bodies actually colliding, and this
+## combat had no equivalent: everything resolved at sword range or not at all,
+## so two people standing on top of each other just swung through one another.
+##
+## A grapple is a stamina contest at contact range. It costs a lot, it can be
+## lost, and winning it puts the other person in the downed window rather than
+## killing them — which makes it the unarmed route into the execute / spare /
+## recruit decision the game is built around.
+const GRAPPLE_RANGE := 2.5
+const GRAPPLE_DRAIN := 22.0
+
+
+func _grapple_candidate() -> Dictionary:
+	var forward := Vector3(sin(yaw), 0, cos(yaw)).normalized()
+	for actor in encounter_actors:
+		var node := actor.get("node") as Node3D
+		if node == null or not is_instance_valid(node) or bool(actor.get("dead", false)):
+			continue
+		if actor.anatomy.downed or str(actor.get("disposition", "hostile")) != "hostile":
+			continue
+		var toward := node.global_position - player
+		toward.y = 0.0
+		if toward.length() > GRAPPLE_RANGE:
+			continue
+		if forward.dot(toward.normalized()) < 0.25:
+			continue
+		return actor
+	return {}
+
+
+func _start_grapple() -> void:
+	if not grapple_target.is_empty() or resolution_ui.visible or kill_cam.active:
+		return
+	if player_rig.is_downed() or player_rig.anatomy.dead or stamina < 20.0:
+		prompt.text = "NOT ENOUGH LEFT IN YOU TO TAKE HOLD"
+		return
+	var actor := _grapple_candidate()
+	if actor.is_empty():
+		prompt.text = "NOTHING IN REACH TO GRAB"
+		return
+	grapple_target = str(actor.subject_id)
+	grapple_advantage = 0.0
+	grapple_clock = 0.0
+	strike_windup = -1.0
+	WorldHistory.record_event("grapple_started", {"subject_id": grapple_target, "location": HUNT_LOCATION})
+
+
+func _break_grapple(message := "") -> void:
+	grapple_target = ""
+	grapple_advantage = 0.0
+	if not message.is_empty():
+		prompt.text = message
+
+
+## Advantage runs from -1 to 1. The player pushes by holding the strike button;
+## the opponent pushes back with whatever their arms and their pain leave them.
+func _update_grapple(delta: float) -> void:
+	var actor := _actor_by_id(grapple_target)
+	if actor.is_empty() or bool(actor.get("dead", false)) or actor.anatomy.downed:
+		_break_grapple()
+		return
+	var node := actor.node as Node3D
+	var gap := player.distance_to(node.global_position)
+	if gap > GRAPPLE_RANGE + 1.2:
+		_break_grapple("THEY TORE FREE")
+		return
+	grapple_clock += delta
+
+	# Locked together: both bodies hold position and face each other, which is
+	# what makes a clinch read as a clinch rather than two people overlapping.
+	var toward := node.global_position - player
+	toward.y = 0.0
+	if toward.length() > 0.01:
+		yaw = atan2(toward.x, toward.z)
+	player_body.velocity = Vector3.ZERO
+	(node as CharacterBody3D).velocity = Vector3.ZERO
+	actor.attack_time = 0.0
+
+	var pushing := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_key_pressed(KEY_C)
+	var player_force: float = player_rig.anatomy.combat_ratio() * (1.35 if pushing else 0.3)
+	var their_force: float = float(actor.anatomy.combat_ratio()) * (1.0 - float(actor.anatomy.pain) * 0.006)
+	grapple_advantage = clampf(grapple_advantage + (player_force - their_force) * delta * 0.85, -1.0, 1.0)
+	stamina = maxf(0.0, stamina - (GRAPPLE_DRAIN if pushing else GRAPPLE_DRAIN * 0.35) * delta)
+	if stamina <= 0.0:
+		grapple_advantage -= delta * 0.9
+
+	prompt.text = "CLINCH / %s   [LMB] PRESS   [SPACE] BREAK   %+d" % [str(actor.display_name).to_upper(), roundi(grapple_advantage * 100.0)]
+
+	if grapple_advantage >= 1.0:
+		_finish_grapple(actor)
+	elif grapple_advantage <= -1.0:
+		# Losing a clinch is not merely failing to win one.
+		health = maxi(1, health - 11)
+		_wound_player(node.global_position, 16.0, "blunt")
+		player_body.velocity = (player - node.global_position).normalized() * 7.0
+		_break_grapple("THEY PUT YOU DOWN AND STEPPED BACK")
+
+
+## Winning drops them into the downed window rather than killing them. The
+## takedown itself is blunt trauma to the head and torso, so the body carries a
+## record of how it was beaten and the resolution form shows it.
+func _finish_grapple(actor: Dictionary) -> void:
+	var rig := actor.rig as BaselineHuman
+	rig.hit("head", 26.0, 18.0, "blunt")
+	rig.hit("torso", 30.0, 20.0, "blunt")
+	if not actor.anatomy.downed and not actor.anatomy.dead:
+		actor.anatomy.go_down()
+	WorldHistory.record_event("grapple_takedown", {"subject_id": str(actor.subject_id), "location": HUNT_LOCATION})
+	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": rig.snapshot()}, "anatomy_changed")
+	_break_grapple("%s IS ON THE GROUND — [E] DECIDE" % str(actor.display_name).to_upper())
+	attack_cooldown = 0.5
 
 
 func _toggle_panel(mode: String) -> void:

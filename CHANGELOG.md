@@ -2,6 +2,21 @@
 
 ## 2026 09 11
 
+- **Grappling.** Combat had no contact-range verb at all — everything resolved
+  at sword reach or not at all, so two people standing on top of each other
+  swung through one another. `C` takes hold of someone in front of you and
+  starts a stamina contest: hold the strike button to press, Space to let go.
+  Winning puts them in the **downed window alive** rather than killing them,
+  which makes the clinch the unarmed route into the execute / spare / recruit
+  decision the game is built around. Losing it hurts and throws you clear.
+  Covered by `tests/grapple_test.gd` (11 checks).
+- **Bruising.** Zone tint went straight from clean flesh to dark red, so a body
+  took a sustained beating and showed nothing until it was nearly ruined —
+  which is most of why blunt hits read as having no effect. Damage now arrives
+  as bruising first and only opens into blood below 55% of a zone's health.
+
+## 2026 09 11
+
 - **Scene changes are no longer hard cuts.** Every transition in the game
   swapped `.tscn` files with nothing covering it, which is most of why the game
   read as a set of dev tools rather than one place. `systems/interstitial.gd` is

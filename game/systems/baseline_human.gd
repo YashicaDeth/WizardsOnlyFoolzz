@@ -61,6 +61,10 @@ const ORGAN := Color("7a1a16")
 ## Below this share of a zone's health the bone has gone through the skin and
 ## stays gone: a compound fracture is a state of the body, not an effect.
 const FRACTURE_RATIO := 0.4
+## Above this share of a zone's health the damage reads as bruising; below it
+## the flesh has actually opened.
+const BRUISE_RATIO := 0.55
+const BRUISE_SKIN := Color("5c3550")
 ## Loose gore is capped across every body at once. Twelve drivers shedding
 ## unbounded blood in a pileup is a frame-rate bug, not atmosphere.
 const MAX_LIVE_GORE := 140
@@ -474,7 +478,18 @@ func _refresh_zone(zone_id: String) -> void:
 	var ceiling := float(AnatomyComponent.DEFAULT_ZONES[zone_id].health)
 	var ratio := clampf(float(zone.health) / maxf(ceiling, 1.0), 0.0, 1.0)
 	var prosthetic := anatomy.installed_parts.has(zone_id)
-	var tint := Color("8d9299") if prosthetic else _flesh.lerp(Color("3d0907"), 1.0 - ratio)
+	# Damage arrives as bruising long before it arrives as blood. Going straight
+	# from clean flesh to dark red meant a body took a beating and showed
+	# nothing until it was nearly ruined, which is most of why punches read as
+	# having no effect.
+	var tint := Color("8d9299")
+	if not prosthetic:
+		if ratio > BRUISE_RATIO:
+			var bruising := (1.0 - ratio) / maxf(1.0 - BRUISE_RATIO, 0.01)
+			tint = _flesh.lerp(BRUISE_SKIN, bruising * 0.85)
+		else:
+			var opened := 1.0 - ratio / maxf(BRUISE_RATIO, 0.01)
+			tint = _flesh.lerp(BRUISE_SKIN, 0.85).lerp(Color("3d0907"), opened)
 	part.material_override = _zone_material(zone_id, tint, "chrome" if prosthetic else "flesh")
 	# Bone shows through where the flesh has failed, without waiting for the
 	# limb to come off entirely.
