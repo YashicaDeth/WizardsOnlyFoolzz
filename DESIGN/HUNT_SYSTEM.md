@@ -126,6 +126,16 @@ Each step is playable on its own.
    entirely unused. Hand-rolling this a second time is the larger cost.
 6. **Distortion layer** on retellings, surfaced through the Wire and Compendium.
 
+## Territory
+
+Rivals hold territory, but not fortresses. Factions contest two separate
+things — **signal** (feeds, masts, presses, the chaotic media amalgamation) and
+**ground** (camps, towns, yards, raided Rust-style with a crew assembled from
+real bonds, debts and shared grudges). Signal control gates how grudges
+propagate, which couples this system directly to the territory game.
+
+Specified in `DESIGN/FACTIONS.md`.
+
 ## Boundary
 
 Do not reproduce Mordor's specific claimed architecture: its named hierarchy
