@@ -81,6 +81,20 @@ func _ready() -> void:
 			device.set_mode("WIRE")
 			for _hold in 60:
 				await get_tree().process_frame
+	elif trigger == "arsenal":
+		scene.third_person = true
+		scene._equip_weapon(1)
+		var forward := Vector3(sin(scene.yaw), 0, cos(scene.yaw)).normalized()
+		scene.player_body.position = Vector3(175, 0.9, 125)
+		scene.player = scene.player_body.position + Vector3.UP * 0.6
+		scene._spawn_encounter_actor({"instance_id": "capture_armed", "kind": "hostile", "summary": "weapons proof"}, scene.player + forward * 7.0)
+		var actor: Dictionary = scene.encounter_actors.back()
+		actor.node.position = scene.player + forward * 7.0 - Vector3.UP * 0.5
+		scene._update_camera()
+		scene.camera.global_position = scene.player - forward * 3.2 + Vector3.UP * 0.8
+		scene.camera.look_at(scene.player + Vector3.UP * 0.3)
+		for _hold in 30:
+			await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 
 	var image := get_viewport().get_texture().get_image()

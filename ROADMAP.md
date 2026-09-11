@@ -247,6 +247,14 @@ Greg's required next-slice order is now authoritative:
    2D-to-tilted-3D zoom, fog of war, sightings and filters. No Google imagery
    or copied interface.
 
+**Arsenal foundation completed 2026-09-11.** The hunter can equip a sword,
+shotgun or sidearm with 1–3, use with LMB/RMB and reload with R. Firearm traces
+are world-occluded and feed the struck BaselineHuman zone/organ state, so
+shotgun dismemberment is accumulated ballistic damage crossing a limb's real
+failure threshold. Magazines, reserves, spread, timing, knockback, downing,
+flight, death, persistence and history are live. Production weapon meshes,
+animation-driven handling, muzzle/impact treatment and enemy firearms remain.
+
 10. **Physical melee.** Half Sword's register — momentum-driven swings, real
     contact, unglamorous brutality and heavy dismemberment — but it has to
     actually *work*, which Half Sword's first-person control notably does not.

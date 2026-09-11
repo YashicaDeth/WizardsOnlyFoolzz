@@ -13,6 +13,7 @@ const WORLD_GENERATOR := preload("res://systems/ashbloom_world_generator.gd")
 const MISFIRE_DIRECTOR := preload("res://systems/reality_misfire_director.gd")
 const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
+const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 
 var player := Vector3(0, 1.5, 19)
 var yaw := PI
@@ -47,6 +48,8 @@ var resolution_ui: Control
 var resolution_target := ""
 var kill_cam: Control
 var voice_channel: Node
+var arsenal: Node
+var pending_attack: Dictionary = {}
 
 @onready var camera: Camera3D = $CameraRig/Camera3D
 @onready var title: Label = $HUD/Title
@@ -93,6 +96,10 @@ func _ready() -> void:
 	add_child(player_body)
 	player_body.position = player - Vector3.UP * 0.6
 	_build_player_rig()
+	arsenal = HUNTER_ARSENAL.new()
+	arsenal.name = "HunterArsenal"
+	player_body.add_child(arsenal)
+	arsenal.configure(player_rig)
 	WorldHistory.register_subject("inventory", {"items": []})
 	_spawn_friend()
 	_spawn_rival()
@@ -207,8 +214,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		_attack(true)
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
+			KEY_1: _equip_weapon(0)
+			KEY_2: _equip_weapon(1)
+			KEY_3: _equip_weapon(2)
+			KEY_R: _reload_weapon()
 			KEY_ESCAPE:
 				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 				if not panel_mode.is_empty():
@@ -253,6 +266,7 @@ func _physics_process(delta: float) -> void:
 		if strike_windup < 0.0:
 			_resolve_strike()
 	attack_cooldown = maxf(0.0, attack_cooldown - delta)
+	arsenal.tick(delta)
 	dodge_cooldown = maxf(0.0, dodge_cooldown - delta)
 	_update_player(delta)
 	_update_rival(delta)
@@ -283,18 +297,40 @@ func _update_player(delta: float) -> void:
 		_attack()
 
 
-func _attack() -> void:
+func _attack(heavy := false) -> void:
 	if resolution_ui.visible or kill_cam.active or player_rig.is_downed() or player_rig.anatomy.dead:
 		return
-	if not panel_mode.is_empty() or attack_cooldown > 0.0 or stamina < 18.0:
+	if not panel_mode.is_empty():
 		return
-	attack_cooldown = 0.72
-	stamina -= 18.0
-	strike_windup = 0.18
+	var report: Dictionary = arsenal.begin_attack(heavy)
+	if not bool(report.get("accepted", false)):
+		if str(report.get("reason", "")) == "empty":
+			prompt.text = "DRY / [R] RELOAD"
+		return
+	var cost := float(report.get("stamina", 0.0))
+	if stamina < cost:
+		# Refund a firearm round if a future ranged weapon gains a stamina cost.
+		if str(report.kind) == "firearm":
+			var rounds: Dictionary = arsenal.ammo[arsenal.current_id]
+			rounds.loaded = int(rounds.loaded) + 1
+			arsenal.ammo[arsenal.current_id] = rounds
+		return
+	stamina -= cost
+	attack_cooldown = arsenal.cooldown
+	pending_attack = report
+	if str(report.kind) == "firearm":
+		_resolve_firearm(report)
+		pending_attack = {}
+	else:
+		strike_windup = float(report.windup)
 
 
 func _resolve_strike() -> void:
-	if _attack_nearest_encounter_actor():
+	var report := pending_attack
+	if report.is_empty():
+		report = {"damage": 24.0, "impulse": 18.0, "damage_type": "cut", "range": 4.1, "weapon": "sword"}
+	pending_attack = {}
+	if _attack_nearest_encounter_actor(report):
 		return
 	if enemy == null or not enemy.visible or enemy_retreating:
 		return
@@ -322,7 +358,9 @@ func _resolve_strike() -> void:
 		_rival_retreats("You left Mara alive. She will return altered.")
 
 
-func _attack_nearest_encounter_actor() -> bool:
+func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
+	if attack.is_empty():
+		attack = {"damage": 24.0, "impulse": 18.0, "damage_type": "cut", "range": 4.1, "weapon": "sword"}
 	var nearest_index := -1
 	var nearest_distance := 99999.0
 	for index in encounter_actors.size():
@@ -336,7 +374,8 @@ func _attack_nearest_encounter_actor() -> bool:
 		if distance < nearest_distance:
 			nearest_distance = distance
 			nearest_index = index
-	if nearest_index < 0 or nearest_distance > 4.1:
+	var reach := float(attack.get("range", 4.1))
+	if nearest_index < 0 or nearest_distance > reach:
 		return false
 	var actor: Dictionary = encounter_actors[nearest_index]
 	var target: Node3D = actor.node as Node3D
@@ -352,16 +391,16 @@ func _attack_nearest_encounter_actor() -> bool:
 		# (event_count + index) % 6 — a round-robin, so aiming at a head and
 		# aiming at a knee produced the same sequence of wounds.
 		var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
-		result = rig.hit_at(player + look * clampf(nearest_distance, 0.6, 4.1), 24.0, 18.0, "cut")
+		result = rig.hit_at(player + look * clampf(nearest_distance, 0.6, reach), float(attack.damage), float(attack.impulse), str(attack.damage_type))
 		zone = str(result.get("zone", "torso"))
 	else:
-		result = anatomy.call("apply_hit", zone, 24.0, 18.0, "cut")
+		result = anatomy.call("apply_hit", zone, float(attack.damage), float(attack.impulse), str(attack.damage_type))
 	var organ_hit := str((result.get("organ", {}) as Dictionary).get("zone", ""))
 	if not organ_hit.is_empty() and bool((result.get("organ", {}) as Dictionary).get("ruptured", false)):
 		prompt.text = "%s IS OPENED UP" % str(actor.display_name).to_upper()
 	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": anatomy.call("snapshot")}, "anatomy_changed")
-	_spawn_blood(target.global_position + Vector3(0, 1.1, 0), 28)
-	WorldHistory.record_event("npc_anatomy_hit", {"subject_id": actor.subject_id, "zone": zone, "result": result, "location": HUNT_LOCATION})
+	_spawn_blood(target.global_position + Vector3(0, 1.1, 0), roundi(float(attack.damage)))
+	WorldHistory.record_event("npc_anatomy_hit", {"subject_id": actor.subject_id, "weapon": attack.weapon, "zone": zone, "result": result, "location": HUNT_LOCATION})
 	if bool(result.get("disabled", false)) and zone in ["left_arm", "right_arm", "left_leg", "right_leg"]:
 		_spawn_severed_part(target.global_position + Vector3(0, 1.0, 0), zone)
 	if anatomy.critical or anatomy.pain >= 68.0:
@@ -371,6 +410,92 @@ func _attack_nearest_encounter_actor() -> bool:
 	if anatomy.dead:
 		_kill_encounter_actor(nearest_index, "combat_trauma")
 	return true
+
+
+func _resolve_firearm(attack: Dictionary) -> void:
+	var forward := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+	var origin := camera.global_position + forward * 0.48
+	var impacts: Dictionary = {}
+	for direction in arsenal.shot_directions(forward, Vector3.UP):
+		var hit := _trace_actor(origin, direction, float(attack.range))
+		if hit.is_empty():
+			continue
+		var actor: Dictionary = hit.actor
+		var rig := actor.rig as BaselineHuman
+		var result := rig.hit_at(hit.position, float(attack.damage), float(attack.impulse), str(attack.damage_type))
+		var id := str(actor.subject_id)
+		if not impacts.has(id):
+			impacts[id] = {"actor": actor, "zones": [], "damage": 0.0, "ruptures": []}
+		var summary: Dictionary = impacts[id]
+		summary.zones.append(str(result.get("zone", "torso")))
+		summary.damage = float(summary.damage) + float(result.get("damage", 0.0))
+		var organ := result.get("organ", {}) as Dictionary
+		if bool(organ.get("ruptured", false)):
+			summary.ruptures.append(str(organ.get("zone", "internal")))
+		impacts[id] = summary
+		(actor.node as CharacterBody3D).velocity += direction * minf(6.0, float(attack.impulse) * 0.075)
+	for id in impacts:
+		var summary: Dictionary = impacts[id]
+		var actor: Dictionary = summary.actor
+		WorldHistory.update_subject(id, {"anatomy_state": actor.rig.snapshot()}, "anatomy_changed")
+		WorldHistory.record_event("firearm_anatomy_hit", {
+			"subject_id": id, "weapon": attack.weapon, "zones": summary.zones,
+			"damage": snappedf(float(summary.damage), 0.1), "ruptures": summary.ruptures,
+			"location": HUNT_LOCATION,
+		})
+		if actor.anatomy.dead:
+			_kill_encounter_actor(encounter_actors.find(actor), str(attack.weapon))
+		elif actor.anatomy.downed:
+			actor.state = "downed"
+		elif actor.anatomy.critical or actor.anatomy.pain >= 68.0:
+			actor.state = "fleeing"
+			actor.loot_at_risk = true
+	if impacts.is_empty():
+		prompt.text = "%s / MISS" % str(arsenal.current().label)
+	else:
+		prompt.text = "%s / %d BODY%s HIT" % [str(arsenal.current().label), impacts.size(), "IES" if impacts.size() != 1 else ""]
+	WorldHistory.record_event("weapon_fired", {"weapon": attack.weapon, "hits": impacts.keys(), "location": HUNT_LOCATION})
+
+
+func _trace_actor(origin: Vector3, direction: Vector3, distance: float) -> Dictionary:
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * distance)
+	query.exclude = _player_collision_exclusions()
+	query.collide_with_areas = true
+	query.collide_with_bodies = true
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return {}
+	var collider := hit.collider as Node
+	for actor in encounter_actors:
+		if not is_instance_valid(actor.node) or actor.anatomy.dead:
+			continue
+		var cursor := collider
+		while cursor != null:
+			if cursor == actor.node:
+				return {"actor": actor, "position": hit.position, "normal": hit.normal}
+			cursor = cursor.get_parent()
+	return {}
+
+
+func _player_collision_exclusions() -> Array[RID]:
+	var exclusions: Array[RID] = [player_body.get_rid()]
+	for zone_id in BaselineHuman.ZONES:
+		var hitbox := player_rig.get_node_or_null("%s_hitbox" % zone_id) as CollisionObject3D
+		if hitbox != null:
+			exclusions.append(hitbox.get_rid())
+	return exclusions
+
+
+func _equip_weapon(slot: int) -> void:
+	if arsenal.select_slot(slot):
+		pending_attack = {}
+		strike_windup = -1.0
+		prompt.text = "%s / READY" % str(arsenal.current().label)
+
+
+func _reload_weapon() -> void:
+	if arsenal.reload():
+		prompt.text = "%s / RELOADING" % str(arsenal.current().label)
 
 
 func _dodge() -> void:
@@ -824,6 +949,7 @@ func _update_hud() -> void:
 			"rival_status": WorldHistory.subject(HUNT_ID).get("status", "dormant"),
 			"menu_open": panel.visible or character_archive.visible or allusions_artwork.visible,
 			"menu_mode": panel_mode,
+			"weapon": arsenal.state() if arsenal != null else {},
 		})
 
 

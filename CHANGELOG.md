@@ -2,6 +2,18 @@
 
 ## 2026 09 11
 
+- Added a three-slot hunter arsenal: Ashline cleaver, five-shell Bone Yard 12G
+  and ten-round Mercy Nine. Number keys equip real procedural models on the
+  BaselineHuman right arm; firearms own magazines, reserve ammunition,
+  deterministic spread, cooldown and timed reloads.
+- Integrated firearm raycasts into the live Hunt. World geometry occludes fire;
+  pellets resolve against the struck NPC rig, apply zone/organ injury,
+  knockback, critical flight/downing/death, persistent anatomy and history.
+  Shotgun pellet accumulation can cross the existing limb-loss threshold—the
+  weapon does not fake a separate dismemberment effect.
+- Added compact HUD weapon/ammunition marks, dry/reload feedback,
+  `arsenal_test.gd` (11 checks) and `combat_integration_test.gd` (4 checks).
+
 - Repaired Hunt Grounds WASD at the convention boundary: Godot reports W as
   negative input Y, while the prior controller added that value to camera
   forward and therefore drove the hunter backward. A shared `HunterMotor` now
