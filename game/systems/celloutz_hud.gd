@@ -211,9 +211,11 @@ func _draw_integrity(viewport: Vector2) -> void:
 		]), tone if lit else INK * Color(1, 1, 1, 0.10))
 	draw_line(anchor + Vector2(12, 62), anchor + Vector2(plate_size.x - 12, 62), INK * Color(1, 1, 1, 0.14), 1.0)
 	# A5.5. Three figures, no sentence.
-	CellOutzType.draw_text(self, anchor + Vector2(12, 68), "SCR %04d" % roundi(displayed_score), 10.0, INK * Color(1, 1, 1, 0.7), 0.9)
-	CellOutzType.draw_text(self, anchor + Vector2(94, 68), "WRK %02d" % active_wreckers, 10.0, INK * Color(1, 1, 1, 0.7), 0.9)
-	CellOutzType.draw_text(self, anchor + Vector2(166, 68), "MEM %03d" % memory_count, 10.0, INK * Color(1, 1, 1, 0.7), 0.9)
+	# A1.4. Three readouts across one plate is exactly the tight column the
+	# condensed cut exists for; at full width they crowd the plate edge.
+	CellOutzType.draw_condensed(self, anchor + Vector2(12, 68), "SCR %04d" % roundi(displayed_score), 10.0, INK * Color(1, 1, 1, 0.7), 0.9)
+	CellOutzType.draw_condensed(self, anchor + Vector2(92, 68), "WRK %02d" % active_wreckers, 10.0, INK * Color(1, 1, 1, 0.7), 0.9)
+	CellOutzType.draw_condensed(self, anchor + Vector2(158, 68), "MEM %03d" % memory_count, 10.0, INK * Color(1, 1, 1, 0.7), 0.9)
 
 
 ## A5.2. The one Greg named. It was a diamond lamp and two lines of prose; it is

@@ -1,42 +1,81 @@
 class_name HandheldDevice
 extends Control
 
-## The Wire: a salvaged handheld that houses the Index, Map, Tree, internet and
-## inventory as modes on one object, replacing four unrelated fullscreen panels
-## bound to four keys.
+## The one object the interface lives inside.
 ##
-## It does not pause the world. Raising it is a physical act with a cost: the
-## player is holding a lit screen in a dark wasteland, and being attacked while
-## reading it is supposed to be a real risk.
+## C1. `DESIGN/IN_GAME_INTERNET.md` opens by naming the problem this solves:
+## *"The World Index (Tab), Living Map (M), Character Tree (T) and Allusions
+## artwork (J) are four unrelated fullscreen panels bound to four keys. Nothing
+## connects them."* Four keys, four looks, four ways of navigating, and no
+## reason for any of them to know about the others.
 ##
-## Specified in DESIGN/IN_GAME_INTERNET.md.
+## The earlier version of this file was the shell without the substance: it drew
+## a convincing piece of junk hardware and then filled its screen with
+## `_mode_lines()` — arrays of strings, one per mode, summarising panels that
+## already existed and were far better. That is the "boxes of text" failure
+## `DESIGN/INTERFACE_DIRECTION.md` now forbids outright, and it meant the device
+## was a *fifth* interface rather than the replacement for the other four.
+##
+## So the device now **hosts the real panels**. The World Index and the Living
+## Map are child controls sized into the screen aperture; the chassis draws
+## under them and the damage draws over them. Nothing is summarised and nothing
+## is duplicated.
+##
+## What the hardware adds, and why it is not just a frame:
+##
+## - **Raising it is a physical action and the world does not stop.** Nothing
+##   here pauses the tree. You are holding a lit screen in a dark place.
+## - **Condition is legible.** Dead pixels, cracks and scanlines sit *over* the
+##   hosted panel, so a damaged device genuinely costs you information rather
+##   than being decoration around a clean readout.
+
+const CellOutzType := preload("res://systems/celloutz_type.gd")
+const Grunge := preload("res://systems/celloutz_grunge.gd")
+const Motion := preload("res://systems/celloutz_motion.gd")
+const WORLD_INDEX := preload("res://systems/world_index.gd")
+const LIVING_MAP := preload("res://systems/living_map.gd")
+const WIRE_RADIO := preload("res://systems/wire_radio.gd")
 
 signal mode_changed(mode: String)
+signal lead_found(station: String)
 
-const MODES := ["INDEX", "MAP", "TREE", "WIRE", "CARRY"]
+## TREE and ALLUSIONS are not gone, they are *inside* INDEX — the Tree axis is
+## drawn on every dossier and the archive is a page rather than a mode. Listing
+## them again here would recreate the six-panel problem inside the fix for it.
+const MODES := ["INDEX", "MAP", "WIRE", "RADIO", "CARRY"]
 
 const CASE := Color("1b1713")
 const CASE_EDGE := Color("6d5a44")
 const SCREEN_BG := Color("07120f")
-const SCREEN_TEXT := Color("9ad8b4")
-const AMBER := Color("e8913a")
-const SIGNAL_TEAL := Color("35b7a7")
-const ALERT := Color("c8402e")
+const INK := Color("e6d4ac")
+const AMBER := Color("b0552a")
+const MOSS := Color("8a9a4a")
+const ALERT := Color("a8281a")
 
 var mode_index := 0
 var raised := 0.0
 var is_open := false
 var elapsed := 0.0
-var scroll := 0.0
+var condition := 0.78
+var radio: WireRadio
+
 var dead_pixels: Array[Vector2] = []
 var crack_lines: Array[PackedVector2Array] = []
-var condition := 0.78
+
+var _clip: Control
+var _overlay: Control
+var _index: Control
+var _map: Control
+var _device_rect := Rect2()
+var _screen_rect := Rect2()
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	visible = false
+	radio = WIRE_RADIO.new()
+
 	# Damage is fixed per device, not per frame: the same dead pixels and the
 	# same cracks every time you raise it, the way a real broken screen behaves.
 	var rng := RandomNumberGenerator.new()
@@ -51,13 +90,42 @@ func _ready() -> void:
 			cursor += Vector2(rng.randf_range(-0.16, 0.16), rng.randf_range(-0.2, 0.2))
 			line.append(cursor)
 		crack_lines.append(line)
+
+	# The aperture. Children are clipped to it, which is what lets a full panel
+	# be hosted inside a hole in a piece of hardware without spilling out of it.
+	_clip = Control.new()
+	_clip.name = "Aperture"
+	_clip.clip_contents = true
+	_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_clip)
+
+	_index = WORLD_INDEX.new()
+	_index.name = "IndexPanel"
+	_clip.add_child(_index)
+	_map = LIVING_MAP.new()
+	_map.name = "MapPanel"
+	_clip.add_child(_map)
+
+	# Added last so it draws over the hosted panels. A Control's own `_draw`
+	# runs before its children, so damage could not be painted from here.
+	_overlay = Control.new()
+	_overlay.name = "Damage"
+	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_overlay.draw.connect(_draw_damage)
+	add_child(_overlay)
 	set_process(true)
+
+
+## Handed the live world so the hosted panels and the radio read real state.
+func bind(generator: Node, director: Node, contacts: Callable) -> void:
+	if _map.has_method("bind"):
+		_map.bind(generator, director, contacts)
 
 
 func open_device() -> void:
 	is_open = true
 	visible = true
-	emit_signal("mode_changed", current_mode())
+	set_mode(current_mode())
 
 
 func close_device() -> void:
@@ -78,235 +146,262 @@ func current_mode() -> String:
 func cycle_mode(step: int) -> void:
 	if not is_open:
 		return
-	mode_index = wrapi(mode_index + step, 0, MODES.size())
-	scroll = 0.0
-	emit_signal("mode_changed", current_mode())
+	set_mode(MODES[wrapi(mode_index + step, 0, MODES.size())])
 
 
 func set_mode(mode: String) -> void:
 	var found := MODES.find(mode.to_upper())
-	if found >= 0:
-		mode_index = found
-		scroll = 0.0
-		emit_signal("mode_changed", current_mode())
+	if found < 0:
+		return
+	mode_index = found
+	# WIRE is not a separate surface — it is the index already open on its own
+	# page. Duplicating it would be the six-panel problem again in miniature.
+	if current_mode() == "WIRE" and "page" in _index:
+		_index.set("page", 2)
+	elif current_mode() == "INDEX" and "page" in _index and int(_index.get("page")) == 2:
+		_index.set("page", 0)
+	# Both hosted panels gate their own drawing on an open flag, so entering a
+	# mode has to open the panel as well as show it.
+	if current_mode() == "MAP" and _map.has_method("open_map"):
+		_map.open_map()
+	if current_mode() in ["INDEX", "WIRE"] and _index.has_method("open"):
+		_index.open()
+	mode_changed.emit(current_mode())
+
+
+## Where the character is standing, for the radio's reception.
+func stand_at(world_position: Vector2) -> void:
+	radio.stand_at(world_position)
 
 
 func _process(delta: float) -> void:
 	elapsed += delta
-	var target := 1.0 if is_open else 0.0
-	raised = move_toward(raised, target, delta * 4.2)
+	raised = Motion.blend(raised, delta, Motion.PANEL, is_open)
 	if raised <= 0.001 and not is_open:
 		visible = false
+		_clip.visible = false
 		return
+
+	# The aperture is laid out here rather than in `_draw`, because the hosted
+	# panels are real children and have to know their size before they render.
+	var device_size := Vector2(minf(size.x * 0.88, 1140.0), minf(size.y * 0.86, 640.0))
+	var resting := Vector2((size.x - device_size.x) * 0.5, size.y + 60.0)
+	var lifted := Vector2((size.x - device_size.x) * 0.5, (size.y - device_size.y) * 0.5)
+	_device_rect = Rect2(resting.lerp(lifted, Motion.ease_out(raised)), device_size)
+	_screen_rect = Rect2(_device_rect.position + Vector2(26, 62), _device_rect.size - Vector2(52, 104))
+	_clip.position = _screen_rect.position
+	_clip.size = _screen_rect.size
+	_clip.visible = true
+	_overlay.position = Vector2.ZERO
+	_overlay.size = size
+
+	var mode := current_mode()
+	var showing_index := mode == "INDEX" or mode == "WIRE"
+	_index.visible = showing_index
+	_map.visible = mode == "MAP"
+	if showing_index:
+		_index.size = _clip.size
+		_index.position = Vector2.ZERO
+		# The index normally owns the screen and draws its own cursor; inside the
+		# device the chassis is the frame, so it is told not to chase the mouse.
+		if "cursor_follows_mouse" in _index:
+			_index.set("cursor_follows_mouse", false)
+		if "show_cursor" in _index:
+			_index.set("show_cursor", false)
+	if _map.visible:
+		_map.size = _clip.size
+		_map.position = Vector2.ZERO
+
+	if mode == "RADIO":
+		var found := radio.hold(delta)
+		if found != "":
+			lead_found.emit(found)
+	_overlay.queue_redraw()
 	queue_redraw()
 
 
 func _draw() -> void:
 	if raised <= 0.001:
 		return
-	# Slides up from the lower edge as the character brings it to eye level.
-	var device_size := Vector2(minf(size.x * 0.46, 560.0), minf(size.y * 0.66, 520.0))
-	var resting := Vector2(size.x - device_size.x - 46.0, size.y + 40.0)
-	var lifted := Vector2(size.x - device_size.x - 46.0, size.y - device_size.y - 40.0)
-	var origin := resting.lerp(lifted, ease(raised, 0.38))
-	var device_rect := Rect2(origin, device_size)
 	var alpha := clampf(raised, 0.0, 1.0)
-
-	_draw_chassis(device_rect, alpha)
-	var screen_rect := Rect2(device_rect.position + Vector2(18, 46), device_rect.size - Vector2(36, 92))
-	_draw_screen(screen_rect, alpha)
-	_draw_tabs(device_rect, screen_rect, alpha)
-	_draw_status_strip(device_rect, screen_rect, alpha)
+	_draw_chassis(_device_rect, alpha)
+	draw_rect(_screen_rect, SCREEN_BG * Color(1, 1, 1, alpha))
+	# The modes with no hosted panel draw straight onto the screen.
+	var mode := current_mode()
+	if mode == "RADIO":
+		_draw_radio(_screen_rect, alpha)
+	elif mode == "CARRY":
+		_draw_carry(_screen_rect, alpha)
 
 
 func _draw_chassis(rect: Rect2, alpha: float) -> void:
-	draw_rect(rect.grow(4), Color("0a0806") * Color(1, 1, 1, 0.55 * alpha))
+	draw_rect(rect.grow(5), Color("0a0806") * Color(1, 1, 1, 0.6 * alpha))
 	draw_rect(rect, CASE * Color(1, 1, 1, alpha))
 	draw_rect(rect, CASE_EDGE * Color(1, 1, 1, 0.8 * alpha), false, 2)
-	# Cable-tied battery pack clamped to the side, because nothing here is stock.
-	var pack := Rect2(rect.position + Vector2(rect.size.x - 26, 62), Vector2(18, 74))
+	Grunge.stain(self, rect.position + rect.size * Vector2(0.12, 0.9), 120.0, 4409, Grunge.RUST, 0.10 * alpha)
+	Grunge.scratches(self, rect, 4411, 20)
+	# Cable-tied battery clamped to the side, because nothing here is stock.
+	var pack := Rect2(Vector2(rect.position.x + rect.size.x - 22, rect.position.y + 92), Vector2(16, rect.size.y - 180))
 	draw_rect(pack, Color("241c16") * Color(1, 1, 1, alpha))
 	draw_rect(pack, CASE_EDGE * Color(1, 1, 1, 0.5 * alpha), false, 1)
-	for tie in 2:
-		var y := pack.position.y + 16 + tie * 40
-		draw_line(Vector2(rect.position.x + rect.size.x - 32, y), Vector2(pack.end.x + 3, y), Color("100c0a") * Color(1, 1, 1, alpha), 3)
-	var font := ThemeDB.fallback_font
-	draw_string(font, rect.position + Vector2(18, 28), "CELLOUTZ", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, AMBER * Color(1, 1, 1, alpha))
-	draw_string(font, rect.position + Vector2(108, 28), "FIELD WIRE  MK-II  //  SALVAGED", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, CASE_EDGE * Color(1, 1, 1, 0.75 * alpha))
+	for tie in 3:
+		var y := pack.position.y + 22 + tie * (pack.size.y * 0.4)
+		draw_line(Vector2(rect.position.x + rect.size.x - 30, y), Vector2(pack.end.x + 3, y), Color("100c0a") * Color(1, 1, 1, alpha), 3)
+	CellOutzType.draw_stamped(self, rect.position + Vector2(26, 20), "CELLOUTZ", 19.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.3 * alpha), 1.6)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(190, 26), "FIELD WIRE MK-II // SALVAGED // NOT SERVICEABLE", 9.0, CASE_EDGE * Color(1, 1, 1, 0.8 * alpha), 0.8)
+	_draw_tabs(rect, alpha)
+	_draw_status(rect, alpha)
 
 
-func _draw_screen(rect: Rect2, alpha: float) -> void:
-	draw_rect(rect, SCREEN_BG * Color(1, 1, 1, alpha))
-	draw_rect(rect, SIGNAL_TEAL * Color(1, 1, 1, 0.35 * alpha), false, 1)
-	var font := ThemeDB.fallback_font
-
-	var lines := _mode_lines()
-	var line_height := 15.0
-	var top := rect.position.y + 20.0
-	for index in lines.size():
-		var y := top + index * line_height
-		if y > rect.end.y - 8.0:
-			break
-		var entry: Dictionary = lines[index]
-		var tint: Color = entry.get("color", SCREEN_TEXT)
-		draw_string(font, Vector2(rect.position.x + 12, y), str(entry.text), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 24, int(entry.get("size", 10)), tint * Color(1, 1, 1, alpha))
-
-	# Scanlines, then a slow refresh sweep, then the permanent damage.
-	for scan in range(0, int(rect.size.y), 3):
-		draw_line(Vector2(rect.position.x, rect.position.y + scan), Vector2(rect.end.x, rect.position.y + scan), Color(0, 0, 0, 0.16 * alpha), 1)
-	var sweep := fmod(elapsed * 42.0, rect.size.y)
-	draw_rect(Rect2(rect.position.x, rect.position.y + sweep, rect.size.x, 2), SIGNAL_TEAL * Color(1, 1, 1, 0.1 * alpha))
-	for pixel in dead_pixels:
-		draw_rect(Rect2(rect.position + pixel * rect.size, Vector2(2, 2)), Color(0, 0, 0, 0.85 * alpha))
-	for line in crack_lines:
-		var points := PackedVector2Array()
-		for point in line:
-			points.append(rect.position + point * rect.size)
-		draw_polyline(points, Color(0.85, 0.92, 0.9, 0.1 * alpha), 1.0)
-
-
-func _draw_tabs(device_rect: Rect2, screen_rect: Rect2, alpha: float) -> void:
-	var font := ThemeDB.fallback_font
-	var tab_width := screen_rect.size.x / float(MODES.size())
-	var y := screen_rect.end.y + 6.0
+func _draw_tabs(rect: Rect2, alpha: float) -> void:
+	var x := rect.position.x + 26.0
+	var y := rect.position.y + rect.size.y - 34.0
 	for index in MODES.size():
-		var tab := Rect2(screen_rect.position.x + index * tab_width, y, tab_width - 3.0, 22.0)
+		var label: String = MODES[index]
+		var width := CellOutzType.width(label, 11.0, 1.0) + 26.0
 		var active := index == mode_index
-		draw_rect(tab, (AMBER if active else Color("2a2118")) * Color(1, 1, 1, (0.85 if active else 0.7) * alpha))
-		draw_string(font, tab.position + Vector2(6, 15), MODES[index], HORIZONTAL_ALIGNMENT_LEFT, tab.size.x - 8, 8, (Color.BLACK if active else CASE_EDGE) * Color(1, 1, 1, alpha))
+		var tint: Color = AMBER if active else CASE_EDGE
+		var shape := PackedVector2Array([
+			Vector2(x, y), Vector2(x + width, y),
+			Vector2(x + width - 6, y + 22), Vector2(x + 6, y + 22),
+		])
+		if active:
+			draw_colored_polygon(shape, AMBER * Color(1, 1, 1, 0.22 * alpha))
+		var edge := shape.duplicate()
+		edge.append(shape[0])
+		draw_polyline(edge, tint * Color(1, 1, 1, alpha), 1.4)
+		CellOutzType.draw_text(self, Vector2(x + 13, y + 6), label, 11.0, (INK if active else tint) * Color(1, 1, 1, alpha), 1.0)
+		x += width + 8.0
 
 
-func _draw_status_strip(device_rect: Rect2, screen_rect: Rect2, alpha: float) -> void:
-	var font := ThemeDB.fallback_font
-	var y := device_rect.end.y - 12.0
-	# Condition drives the readout, so a damaged device advertises its own decay.
-	var battery := 0.35 + 0.45 * condition
-	for cell in 5:
-		var filled := float(cell) / 5.0 < battery
-		var cell_rect := Rect2(device_rect.position.x + 18 + cell * 11, y - 9, 8, 9)
-		draw_rect(cell_rect, (AMBER if filled else Color("2a2118")) * Color(1, 1, 1, alpha))
-	var bars := int(round(condition * 4.0))
-	for bar in 4:
-		var height := 3.0 + bar * 3.0
-		var bar_color := SIGNAL_TEAL if bar < bars else Color("2a2118")
-		draw_rect(Rect2(device_rect.position.x + 88 + bar * 7, y - height, 5, height), bar_color * Color(1, 1, 1, alpha))
-	draw_string(font, Vector2(device_rect.position.x + 128, y), "SIGNAL // ASHBLOOM RELAY", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, CASE_EDGE * Color(1, 1, 1, 0.8 * alpha))
-	draw_string(font, Vector2(device_rect.end.x - 96, y), "[TAB] MODE", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, CASE_EDGE * Color(1, 1, 1, 0.6 * alpha))
+func _draw_status(rect: Rect2, alpha: float) -> void:
+	var health := clampf(condition, 0.0, 1.0)
+	var tint: Color = ALERT if health < 0.35 else MOSS
+	var label := "CELL %02d%%" % roundi(health * 100.0)
+	var label_width := CellOutzType.width_condensed(label, 10.0, 0.9)
+	CellOutzType.draw_condensed(self, Vector2(rect.position.x + rect.size.x - 30 - label_width, rect.position.y + rect.size.y - 30), label, 10.0, tint * Color(1, 1, 1, alpha), 0.9)
+	for cell in 8:
+		var lit := float(cell) / 8.0 < health
+		var bar := Rect2(Vector2(rect.position.x + rect.size.x - 150 + cell * 9.0, rect.position.y + rect.size.y - 30), Vector2(6, 11))
+		draw_rect(bar, (tint if lit else CASE_EDGE * Color(1, 1, 1, 0.3)) * Color(1, 1, 1, alpha))
 
 
-func _mode_lines() -> Array:
-	match current_mode():
-		"MAP":
-			return _map_lines()
-		"TREE":
-			return _tree_lines()
-		"WIRE":
-			return _wire_lines()
-		"CARRY":
-			return _carry_lines()
-		_:
-			return _index_lines()
+## C1.5. Drawn by the overlay child so it lands on top of whatever panel is
+## hosted. A damaged device has to actually cost you information; damage painted
+## underneath the readout is a frame, not a fault.
+func _draw_damage() -> void:
+	if raised <= 0.001:
+		return
+	var alpha := clampf(raised, 0.0, 1.0)
+	var rect := _screen_rect
+	var wear := 1.0 - clampf(condition, 0.0, 1.0)
+	for scan in range(0, int(rect.size.y), 3):
+		_overlay.draw_line(Vector2(rect.position.x, rect.position.y + scan), Vector2(rect.end.x, rect.position.y + scan), Color(0, 0, 0, 0.12 * alpha), 1.0)
+	# Dead scanlines: whole rows that never light, not a shimmer.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5150
+	for band in int(wear * 9.0):
+		var y := rect.position.y + rng.randf() * rect.size.y
+		_overlay.draw_line(Vector2(rect.position.x, y), Vector2(rect.end.x, y), Color(0, 0, 0, 0.75 * alpha), rng.randf_range(1.0, 3.0))
+	for point in dead_pixels:
+		_overlay.draw_rect(Rect2(rect.position + Vector2(point.x * rect.size.x, point.y * rect.size.y), Vector2(2, 2)), Color(0, 0, 0, 0.8 * alpha))
+	for line in crack_lines:
+		var run := PackedVector2Array()
+		for point in line:
+			run.append(rect.position + Vector2(point.x * rect.size.x, point.y * rect.size.y))
+		_overlay.draw_polyline(run, Color(0, 0, 0, 0.66 * alpha), 2.4)
+		_overlay.draw_polyline(run, INK * Color(1, 1, 1, 0.10 * alpha), 1.0)
+	# The glass itself, over everything.
+	_overlay.draw_rect(rect, Color(0.55, 0.72, 0.62, 0.035 * alpha))
 
 
-func _index_lines() -> Array:
-	var lines: Array = [{"text": "WORLD INDEX", "color": AMBER, "size": 12}, {"text": "", "size": 6}]
-	var subjects := WorldHistory.all_subjects()
-	var shown := 0
-	for subject_id in subjects:
-		var subject: Dictionary = subjects[subject_id]
-		if str(subject.get("kind", "")) != "person":
-			continue
-		lines.append({"text": "%s  //  %s" % [str(subject.get("name", subject_id)).to_upper(), str(subject.get("status", "unknown"))], "size": 10})
-		var wounds: Array = subject.get("wounds", [])
-		if not wounds.is_empty():
-			lines.append({"text": "   %s" % ", ".join(PackedStringArray(wounds)), "color": ALERT, "size": 8})
-		shown += 1
-		if shown >= 8:
+# --- the two modes that have no hosted panel ------------------------------
+
+## A9.1. The dial: a real sweep with the band drawn under it, stations as ticks
+## whose height is how well they are actually coming in from where you stand.
+func _draw_radio(rect: Rect2, alpha: float) -> void:
+	var signal_state: Dictionary = radio.transmission()
+	CellOutzType.draw_stamped(self, rect.position + Vector2(24, 22), "FIELD RECEIVER", 18.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.3 * alpha), 1.4)
+	var dial := Rect2(rect.position + Vector2(24, 76), Vector2(rect.size.x - 48, 76))
+	draw_rect(dial, Color(0, 0, 0, 0.34 * alpha))
+	draw_rect(dial, CASE_EDGE * Color(1, 1, 1, 0.5 * alpha), false, 1.0)
+	# Band ticks every megahertz, taller every five.
+	var span := WireRadio.BAND_HIGH - WireRadio.BAND_LOW
+	var mark := WireRadio.BAND_LOW
+	while mark <= WireRadio.BAND_HIGH:
+		var x := dial.position.x + (mark - WireRadio.BAND_LOW) / span * dial.size.x
+		var tall := fmod(mark, 5.0) < 0.01
+		draw_line(Vector2(x, dial.end.y), Vector2(x, dial.end.y - (12.0 if tall else 6.0)), INK * Color(1, 1, 1, 0.25 * alpha), 1.0)
+		if tall:
+			CellOutzType.draw_condensed(self, Vector2(x - 9, dial.end.y + 4), "%d" % int(mark), 8.0, INK * Color(1, 1, 1, 0.35 * alpha), 0.6)
+		mark += 1.0
+	for station in radio.band():
+		var x := dial.position.x + (float(station.khz) - WireRadio.BAND_LOW) / span * dial.size.x
+		var reach := bool(station.in_reach)
+		var power := float(station.strength)
+		var tint: Color = MOSS if reach else CASE_EDGE
+		draw_line(Vector2(x, dial.end.y - 14), Vector2(x, dial.end.y - 14 - 40.0 * maxf(power, 0.12)), tint * Color(1, 1, 1, (0.35 + power * 0.65) * alpha), 3.0)
+		if power > 0.25:
+			CellOutzType.draw_condensed(self, Vector2(x - 40, dial.position.y + 6), str(station.name), 8.0, tint * Color(1, 1, 1, alpha), 0.6)
+	# The needle.
+	var needle_x := dial.position.x + (radio.khz - WireRadio.BAND_LOW) / span * dial.size.x
+	draw_line(Vector2(needle_x, dial.position.y - 6), Vector2(needle_x, dial.end.y + 2), ALERT * Color(1, 1, 1, alpha), 2.0)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(needle_x, dial.position.y - 6), Vector2(needle_x + 6, dial.position.y - 14), Vector2(needle_x - 6, dial.position.y - 14),
+	]), ALERT * Color(1, 1, 1, alpha))
+	CellOutzType.draw_text(self, rect.position + Vector2(24, 168), "%06.2f" % radio.khz, 26.0, INK * Color(1, 1, 1, alpha), 1.4)
+	# Measured off the readout rather than guessed: "088.60" at cap 26 runs to
+	# about 166px and the name was starting at 150.
+	var dial_width := CellOutzType.width("%06.2f" % radio.khz, 26.0, 1.4)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(24 + dial_width + 22, 178), str(signal_state.get("name", "CARRIER")), 11.0, MOSS * Color(1, 1, 1, alpha), 0.9)
+
+	# What is coming out of it. Worn type, scaled by how badly it is coming in -
+	# a weak signal is heard *wrongly*, not quietly.
+	var clarity := float(signal_state.get("strength", 0.0))
+	var body := str(signal_state.get("text", ""))
+	var wrapped := _wrap(body, 62)
+	var y := rect.position.y + 216.0
+	for line in wrapped:
+		CellOutzType.draw_worn(self, Vector2(rect.position.x + 24, y), str(line), 12.0, INK * Color(1, 1, 1, alpha), (1.0 - clarity) * 0.8, 0.9)
+		y += 22.0
+		if y > rect.end.y - 60.0:
 			break
-	if shown == 0:
-		lines.append({"text": "No indexed subjects.", "size": 10})
-	return lines
+	# A9.3. The lock, when a hook station is being held.
+	var progress: float = radio.lock_progress()
+	if progress > 0.01:
+		var bar := Rect2(Vector2(rect.position.x + 24, rect.end.y - 44), Vector2(rect.size.x - 48, 12))
+		draw_rect(bar, INK * Color(1, 1, 1, 0.10 * alpha))
+		draw_rect(Rect2(bar.position, Vector2(bar.size.x * progress, bar.size.y)), MOSS * Color(1, 1, 1, alpha))
+		CellOutzType.draw_condensed(self, Vector2(rect.position.x + 24, rect.end.y - 62), "HOLDING A LOCK", 9.0, MOSS * Color(1, 1, 1, alpha), 0.8)
 
 
-func _map_lines() -> Array:
-	return [
-		{"text": "LIVING MAP", "color": AMBER, "size": 12}, {"text": "", "size": 6},
-		{"text": "LIMBO // THE ASHBLOOM EXPANSE", "color": SIGNAL_TEAL, "size": 10}, {"text": "", "size": 4},
-		{"text": "[BONE YARD]  rusted quarry / Ashline ground", "size": 9},
-		{"text": "[BLACK MILE]  raider highway past the pylons", "size": 9},
-		{"text": "[SOFT ROT]  fungal forest, shifting paths", "size": 9},
-		{"text": "[OSSUARY]  sealed anatomy works below the ridge", "size": 9},
-		{"text": "[TUNNEL]  floodlit trade route under the quarry", "size": 9},
-		{"text": "", "size": 6},
-		{"text": "Coverage follows relays. No signal underground.", "color": CASE_EDGE, "size": 8},
-	]
-
-
-func _tree_lines() -> Array:
-	var lines: Array = [{"text": "CHARACTER TREE // AS ABOVE, SO BELOW", "color": AMBER, "size": 11}, {"text": "", "size": 6}]
-	var subjects := WorldHistory.all_subjects()
-	for subject_id in subjects:
-		var subject: Dictionary = subjects[subject_id]
-		if str(subject.get("kind", "")) != "person":
-			continue
-		var axis := WorldHistory.tree_alignment(subject)
-		var label := WorldHistory.tree_axis_label(axis)
-		var principle := WorldHistory.tree_descriptor(subject)
-		var tint := SIGNAL_TEAL if label == "ASCENT" else (ALERT if label == "DESCENT" else SCREEN_TEXT)
-		var suffix := " (%s)" % principle if not principle.is_empty() else ""
-		lines.append({"text": "%-16s %s%s" % [str(subject.get("name", subject_id)).to_upper(), label, suffix], "color": tint, "size": 9})
-		if lines.size() > 14:
-			break
-	return lines
-
-
-## Clout is the world's unreliable estimate of influence, derived from what the
-## Wire has actually reported about a subject rather than stored as a stat.
-func _wire_lines() -> Array:
-	var lines: Array = [{"text": "THE WIRE", "color": AMBER, "size": 12}, {"text": "", "size": 6}]
-	var subjects := WorldHistory.all_subjects()
-	for subject_id in subjects:
-		var subject: Dictionary = subjects[subject_id]
-		if str(subject.get("kind", "")) != "person":
-			continue
-		var elo := int(subject.get("elo", 1000))
-		var grudge := int(subject.get("grudge", 0))
-		var clout := maxi(0, (elo - 900) * 7 + grudge * 23)
-		var reachable := clout < 2600
-		lines.append({
-			"text": "@%s  %s likes" % [str(subject.get("name", subject_id)).to_lower().replace(" ", "_"), _compact(clout)],
-			"color": SCREEN_TEXT if reachable else CASE_EDGE, "size": 9,
-		})
-		lines.append({
-			"text": "   %s" % ("open to contact" if reachable else "does not answer mentions or DMs"),
-			"color": SIGNAL_TEAL if reachable else ALERT, "size": 8,
-		})
-		if lines.size() > 14:
-			break
-	lines.append({"text": "", "size": 6})
-	var recent := WorldHistory.recent_events(3)
-	for event in recent:
-		lines.append({"text": "// %s" % str(event.get("type", "")).replace("_", " "), "color": CASE_EDGE, "size": 8})
-	return lines
-
-
-func _carry_lines() -> Array:
-	var lines: Array = [{"text": "CARRY", "color": AMBER, "size": 12}, {"text": "", "size": 6}]
-	var items: Array = WorldHistory.subject("inventory").get("items", [])
+## C4 proper is its own segment; this is the honest minimum so CARRY is not an
+## empty tab — the inventory subject that already exists, listed as objects.
+func _draw_carry(rect: Rect2, alpha: float) -> void:
+	CellOutzType.draw_stamped(self, rect.position + Vector2(24, 22), "CARRIED", 18.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.3 * alpha), 1.4)
+	var inventory: Dictionary = WorldHistory.subject("inventory")
+	var items: Array = inventory.get("items", [])
 	if items.is_empty():
-		lines.append({"text": "Nothing but the clothes and the debt.", "color": CASE_EDGE, "size": 9})
-		return lines
-	var counts := {}
+		CellOutzType.draw_condensed(self, rect.position + Vector2(24, 70), "NOTHING ON YOU WORTH LISTING.", 12.0, INK * Color(1, 1, 1, 0.4 * alpha), 0.9)
+		return
+	var y := rect.position.y + 70.0
 	for item in items:
-		counts[item] = int(counts.get(item, 0)) + 1
-	for item in counts:
-		lines.append({"text": "%-28s x%d" % [str(item).to_upper(), int(counts[item])], "size": 9})
-	return lines
+		CellOutzType.draw_condensed(self, Vector2(rect.position.x + 24, y), str(item).to_upper(), 12.0, INK * Color(1, 1, 1, 0.85 * alpha), 0.9)
+		y += 24.0
+		if y > rect.end.y - 24.0:
+			break
 
 
-func _compact(value: int) -> String:
-	if value >= 1000000:
-		return "%.1fM" % (float(value) / 1000000.0)
-	if value >= 1000:
-		return "%.1fk" % (float(value) / 1000.0)
-	return str(value)
+func _wrap(text: String, width: int) -> Array:
+	var out: Array = []
+	var line := ""
+	for word in text.split(" "):
+		var candidate: String = word if line == "" else line + " " + word
+		if candidate.length() > width and line != "":
+			out.append(line)
+			line = word
+		else:
+			line = candidate
+	if line != "":
+		out.append(line)
+	return out

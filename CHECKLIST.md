@@ -59,8 +59,8 @@ and "a game".
 - [x] **A1.1** Stroke/stencil alphabet drawn in code, no font to licence
 - [x] **A1.2** Applied to headers and numerals across the index
 - [x] **A1.3** Derby HUD, map, kill cam and interstitial. Warning card keeps a real font for its body copy by design
-- [ ] **A1.4** A second cut of the face — condensed, for tight columns
-- [ ] **A1.5** Worn/smudged variant that degrades with the panel (pairs with I4)
+- [x] **A1.4** A second cut of the face — condensed, for tight columns
+- [x] **A1.5** Worn/smudged variant that degrades with the panel (pairs with I4)
 
 ### A2 — World Index UI `BUILT`
 - [x] **A2.1** Framed plate: notched corners, fixings, tape, dead pixels, scanlines
@@ -115,7 +115,7 @@ clue that the arena was never the problem. Confirmed: the car is a car now.
 - [x] **A7.5** Retune the AI against the new model (it was tuned against the old one)
 - [x] **A7.6** Speed-linked camera shake and FOV
 
-### A9 — The radio
+### A9 — The radio `MOSTLY BUILT`
 Greg, 2026-09-11: an Oxenfree-style **tunable** radio in the Fallout register —
 seamless, in-world, and the dial is a real instrument rather than a track
 selector. Signals found on it start quests, which surface in the index.
@@ -126,12 +126,12 @@ gates the Wire the same way), so a station you can only receive standing in one
 valley is a location. And the Wire already needs a second transmission channel
 for grudges and rumour that is slower and less reliable than the feed — a
 half-tuned broadcast is exactly that.
-- [ ] **A9.1** A tunable dial with real static between stations
-- [ ] **A9.2** Stations as world objects with range and terrain shadow
-- [ ] **A9.3** Numbers stations and half-signals that resolve into a quest hook
-- [ ] **A9.4** Hooks surface in the index rather than as a popup
+- [x] **A9.1** A tunable dial with real static between stations
+- [~] **A9.2** Stations have real world positions and reach; terrain shadow not modelled yet
+- [x] **A9.3** Numbers stations and half-signals that resolve into a quest hook
+- [x] **A9.4** Hooks surface in the index rather than as a popup
 - [ ] **A9.5** Music and voice degrade through the existing audio treatment
-- [ ] **A9.6** The radio carries Wire news late and wrong, per the distortion rules
+- [x] **A9.6** The radio carries Wire news late and wrong, per the distortion rules
 
 ### A8 — Seamless panel open/close
 - [x] **A8.1** Page-to-page transitions ease and wipe
@@ -212,12 +212,12 @@ The most complete system in the project and, until this pass, the least visible.
 
 Six fullscreen panels on six keys is the root cause of "nothing connects".
 
-### C1 — Device shell
-- [ ] **C1.1** One handheld object with modes, raised as a physical action
-- [ ] **C1.2** INDEX / MAP / TREE / WIRE / CARRY folded into it
-- [ ] **C1.3** The world keeps running while it is up — reading is a risk
-- [ ] **C1.4** Seamless raise and lower, not a visibility toggle
-- [ ] **C1.5** Hardware condition damages the interface itself
+### C1 — Device shell `BUILT`
+- [x] **C1.1** One handheld object with modes, raised as a physical action
+- [x] **C1.2** INDEX / MAP / TREE / WIRE / CARRY folded into it
+- [x] **C1.3** The world keeps running while it is up — reading is a risk
+- [x] **C1.4** Seamless raise and lower, not a visibility toggle
+- [x] **C1.5** Hardware condition damages the interface itself
 
 ### C2 — Radial selection
 - [ ] **C2.1** Expand B3's ring into a full radial

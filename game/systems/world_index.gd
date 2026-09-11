@@ -59,6 +59,9 @@ var cursor_at := Vector2(640, 360)
 ## Capture harnesses park the cursor deliberately; a headless run has no real
 ## pointer, so following one puts the drawn cursor at the canvas origin.
 var cursor_follows_mouse := true
+## Suppressed when the panel is hosted inside the handheld: the device owns the
+## frame there, and a second reticle floating in the aperture is just litter.
+var show_cursor := true
 var page_blend := 1.0
 var page_direction := 1.0
 ## A8.2. The panel is an object arriving, not a visibility flag.
@@ -142,6 +145,17 @@ func refresh() -> void:
 
 ## A2.7. Filtering happens here rather than at draw time so that selection,
 ## scrolling and the count all agree about how many rows exist.
+## A person, as opposed to a bookkeeping record. `WorldHistory` holds machine
+## subjects too - the inventory, the settings, the survey grid - and `kind`
+## defaults to "person" when absent while half the real registrations omit it.
+## So neither trusting the default nor requiring the field works: a subject is a
+## person if somebody gave it a name.
+func _is_person(subject: Dictionary) -> bool:
+	if str(subject.get("kind", "")) == "faction":
+		return false
+	return str(subject.get("name", "")) != ""
+
+
 func _matches(label: String, note: String) -> bool:
 	if search_query == "":
 		return true
@@ -155,7 +169,7 @@ func _rebuild_rail() -> void:
 		0, 3:
 			for subject_id in WorldHistory.all_subjects():
 				var subject: Dictionary = WorldHistory.subject(subject_id)
-				if str(subject.get("kind", "person")) != "person":
+				if not _is_person(subject):
 					continue
 				var person_label := str(subject.get("name", subject_id))
 				var person_note := str(subject.get("role", ""))
@@ -434,7 +448,8 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# The cursor is a physical thing in front of the screen, so it does not
 	# travel with the panel that is arriving behind it.
-	XrayCursor.draw(self, cursor_at, xray, elapsed)
+	if show_cursor:
+		XrayCursor.draw(self, cursor_at, xray, elapsed)
 
 
 ## The plate itself. Notched top-left and bottom-right so the outline is never a
@@ -617,6 +632,11 @@ func _draw_file(rect: Rect2) -> void:
 	var column := rect.size.x * 0.56
 	var right_x := rect.position.x + rect.size.x * 0.60
 	var right_width := rect.size.x * 0.40
+	# Hosted in the handheld the aperture is a good deal shorter than a full
+	# screen, and the fixed offsets below were written against the latter. In
+	# compact mode the relation graph gives up its space to the record, which is
+	# the block that cannot be dropped.
+	var compact := rect.size.y < 470.0
 
 	# The Tree axis. It exists, it is already computed, and nothing showed it.
 	var alignment: float = WorldHistory.tree_alignment(subject)
@@ -625,7 +645,7 @@ func _draw_file(rect: Rect2) -> void:
 	# Memory, set as a quotation rather than a field, because it is the one piece
 	# of a dossier that is somebody's account rather than a measurement.
 	var memory := str(subject.get("memory", ""))
-	var left_y := rect.position.y + 208.0
+	var left_y := rect.position.y + (188.0 if compact else 208.0)
 	if memory != "":
 		draw_line(Vector2(rect.position.x, left_y - 13), Vector2(rect.position.x + 3, left_y + 24), COPPER, 2.0)
 		for line in _wrap(memory, 54):
@@ -637,7 +657,7 @@ func _draw_file(rect: Rect2) -> void:
 	# and the edges the Hunt System propagates grudges along - so this is the
 	# closest thing the build currently has to a view of that machinery.
 	var relations: Dictionary = subject.get("relations", {})
-	if not relations.is_empty():
+	if not relations.is_empty() and not compact:
 		CellOutzType.draw_text(self, Vector2(rect.position.x, left_y), "KNOWN EDGES", 11.0, MOSS, 1.2)
 		draw_line(Vector2(rect.position.x, left_y + 17), Vector2(rect.position.x + column, left_y + 17), MOSS * Color(1, 1, 1, 0.3), 1.0)
 		left_y += 36.0
@@ -692,7 +712,7 @@ func _draw_file(rect: Rect2) -> void:
 		draw_string(font, Vector2(right_x, wy), "BLOOD %s" % blood.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, right_width, 11, INK * Color(1, 1, 1, 0.45))
 
 	# History, across the full width at the foot, wrapping into columns.
-	var hy := rect.position.y + rect.size.y - 76.0
+	var hy := maxf(left_y + 14.0, rect.position.y + rect.size.y - 76.0) if compact else rect.position.y + rect.size.y - 76.0
 	CellOutzType.draw_text(self, Vector2(rect.position.x, hy), "WHAT THE WORLD RECORDED", 11.0, MOSS, 1.2)
 	draw_line(Vector2(rect.position.x, hy + 17), Vector2(rect.position.x + rect.size.x, hy + 17), MOSS * Color(1, 1, 1, 0.3), 1.0)
 	var base_y := hy + 36.0

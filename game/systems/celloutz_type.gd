@@ -81,18 +81,29 @@ const GLYPHS := {
 
 ## Width of `text` at a given cap height, so callers can right-align or centre
 ## without guessing.
-static func width(text: String, cap_height: float, tracking := 0.0) -> float:
+## A1.4. The condensed cut. Not a separate alphabet - the same stencil squeezed
+## horizontally, which is what a real condensed cut of a grotesque is, and which
+## means the two faces cannot drift apart as glyphs are added.
+##
+## It exists because the display face at its natural width eats a column: three
+## data readouts across a plate is about all it fits, and the derby HUD and the
+## dossier both wanted five. Anything in a tight column gets this; headers keep
+## the full width, because that is where the character is.
+const CONDENSED := 0.68
+
+
+static func width(text: String, cap_height: float, tracking := 0.0, stretch := 1.0) -> float:
 	var scale := cap_height / GRID.y
-	var advance := GRID.x * scale + cap_height * 0.26 + tracking
+	var advance := GRID.x * scale * stretch + cap_height * 0.26 + tracking
 	return maxf(0.0, float(text.length()) * advance - (cap_height * 0.26 + tracking))
 
 
 ## Draws `text` with its cap line at `at.y` and its left edge at `at.x`.
 ## Returns the width drawn, so a caller can continue on the same line.
-static func draw_text(canvas: CanvasItem, at: Vector2, text: String, cap_height: float, color: Color, tracking := 0.0, weight := 0.0) -> float:
+static func draw_text(canvas: CanvasItem, at: Vector2, text: String, cap_height: float, color: Color, tracking := 0.0, weight := 0.0, stretch := 1.0) -> float:
 	var scale := cap_height / GRID.y
 	var thickness := weight if weight > 0.0 else maxf(1.0, cap_height * 0.13)
-	var advance := GRID.x * scale + cap_height * 0.26 + tracking
+	var advance := GRID.x * scale * stretch + cap_height * 0.26 + tracking
 	var cursor := at.x
 	for index in text.length():
 		var glyph := text.substr(index, 1).to_upper()
@@ -100,11 +111,63 @@ static func draw_text(canvas: CanvasItem, at: Vector2, text: String, cap_height:
 			for stroke in GLYPHS[glyph]:
 				var points := PackedVector2Array()
 				for point in stroke:
-					points.append(Vector2(at.x + float(point[0]) * scale, at.y + float(point[1]) * scale) + Vector2(cursor - at.x, 0.0))
+					points.append(Vector2(cursor + float(point[0]) * scale * stretch, at.y + float(point[1]) * scale))
 				if points.size() == 2:
 					canvas.draw_line(points[0], points[1], color, thickness)
 				else:
 					canvas.draw_polyline(points, color, thickness)
+		cursor += advance
+	return maxf(0.0, cursor - at.x - (cap_height * 0.26 + tracking))
+
+
+## The condensed cut, as a named call so tight columns do not each pick their own
+## squeeze factor and end up inconsistent.
+static func draw_condensed(canvas: CanvasItem, at: Vector2, text: String, cap_height: float, color: Color, tracking := 0.0) -> float:
+	return draw_text(canvas, at, text, cap_height, color, tracking, 0.0, CONDENSED)
+
+
+static func width_condensed(text: String, cap_height: float, tracking := 0.0) -> float:
+	return width(text, cap_height, tracking, CONDENSED)
+
+
+## A1.5. The worn cut: the same letterforms printed by something that is failing.
+##
+## `wear` runs 0 (clean) to 1 (barely legible). Strokes break into segments with
+## gaps, the segments jitter off the path, and the ink thins. Deterministic from
+## the text itself, so a given label wears the *same way* every frame - wear that
+## reshuffles is a flicker effect, not damage.
+##
+## This is the half of I4 that belongs to the typeface: a bleeding player's
+## readouts should be harder to read, and the honest way to do that is to damage
+## the printing rather than to fade the colour, which just looks like a filter.
+static func draw_worn(canvas: CanvasItem, at: Vector2, text: String, cap_height: float, color: Color, wear: float, tracking := 0.0, stretch := 1.0) -> float:
+	var damage := clampf(wear, 0.0, 1.0)
+	if damage <= 0.01:
+		return draw_text(canvas, at, text, cap_height, color, tracking, 0.0, stretch)
+	var scale := cap_height / GRID.y
+	var thickness := maxf(0.8, cap_height * 0.13 * lerpf(1.0, 0.55, damage))
+	var advance := GRID.x * scale * stretch + cap_height * 0.26 + tracking
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(text) & 0x7fffffff
+	var wander := cap_height * 0.09 * damage
+	var cursor := at.x
+	for index in text.length():
+		var glyph := text.substr(index, 1).to_upper()
+		if GLYPHS.has(glyph):
+			for stroke in GLYPHS[glyph]:
+				# Walk the stroke as segments rather than drawing it whole, so a
+				# gap can be opened anywhere along it.
+				for step in range(stroke.size() - 1):
+					var from := Vector2(cursor + float(stroke[step][0]) * scale * stretch, at.y + float(stroke[step][1]) * scale)
+					var to := Vector2(cursor + float(stroke[step + 1][0]) * scale * stretch, at.y + float(stroke[step + 1][1]) * scale)
+					var pieces := 3
+					for piece in pieces:
+						if rng.randf() < damage * 0.45:
+							continue
+						var a := from.lerp(to, float(piece) / float(pieces))
+						var b := from.lerp(to, float(piece + 1) / float(pieces))
+						var drift := Vector2(rng.randf_range(-wander, wander), rng.randf_range(-wander, wander))
+						canvas.draw_line(a + drift, b + drift, color * Color(1, 1, 1, lerpf(1.0, 0.62, damage)), thickness)
 		cursor += advance
 	return maxf(0.0, cursor - at.x - (cap_height * 0.26 + tracking))
 
