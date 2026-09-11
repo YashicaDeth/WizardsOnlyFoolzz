@@ -115,7 +115,7 @@ clue that the arena was never the problem. Confirmed: the car is a car now.
 - [x] **A7.5** Retune the AI against the new model (it was tuned against the old one)
 - [x] **A7.6** Speed-linked camera shake and FOV
 
-### A9 — The radio `MOSTLY BUILT`
+### A9 — The radio `BUILT`
 Greg, 2026-09-11: an Oxenfree-style **tunable** radio in the Fallout register —
 seamless, in-world, and the dial is a real instrument rather than a track
 selector. Signals found on it start quests, which surface in the index.
@@ -127,10 +127,10 @@ valley is a location. And the Wire already needs a second transmission channel
 for grudges and rumour that is slower and less reliable than the feed — a
 half-tuned broadcast is exactly that.
 - [x] **A9.1** A tunable dial with real static between stations
-- [~] **A9.2** Stations have real world positions and reach; terrain shadow not modelled yet
+- [x] **A9.2** Bowls cut hard (the quarry rim), buildings scatter, and the dial names the obstruction
 - [x] **A9.3** Numbers stations and half-signals that resolve into a quest hook
 - [x] **A9.4** Hooks surface in the index rather than as a popup
-- [ ] **A9.5** Music and voice degrade through the existing audio treatment
+- [x] **A9.5** A real bus: the band narrows, the drive climbs, the room opens and the carrier rises
 - [x] **A9.6** The radio carries Wire news late and wrong, per the distortion rules
 
 ### A8 — Seamless panel open/close

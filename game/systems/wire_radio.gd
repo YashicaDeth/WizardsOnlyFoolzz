@@ -49,6 +49,31 @@ const STATIONS := [
 	},
 ]
 
+## A9.2. Terrain shadow. Reception already depended on two axes — how close the
+## dial is and how close you are standing — and this is the third: what is
+## *between* you and the transmitter.
+##
+## Two kinds of obstruction, because they behave differently and the difference
+## is legible in play:
+##
+## - **Bowls.** Ground that is lower than its rim. Standing in the Bone Yard
+##   quarry, the rim is between you and everything outside it, and that is a
+##   hard shadow — the knife edge of real propagation. Walking up out of the pit
+##   should visibly bring stations in, which is a reason to move.
+## - **Buildings.** Many small blockers rather than one big one, so they scatter
+##   rather than cut. Crossing a dense district softens a signal; it does not
+##   kill it. These come from `AshbloomWorldGenerator.lots`, which already
+##   exists — the footprints are handed in rather than duplicated here.
+##
+## Metres of obstruction, not a boolean, so the answer degrades continuously and
+## the dial can say *why* a station is weak rather than only that it is.
+const BOWLS := [
+	{"at": Vector2(-155.0, 0.0), "radius": 96.0, "depth": 16.0, "name": "THE BONE YARD"},
+	{"at": Vector2(135.0, 40.0), "radius": 62.0, "depth": 22.0, "name": "THE OSSUARY, BELOW"},
+]
+## How many metres of building a signal survives before it is badly hurt.
+const SCATTER_DEPTH := 46.0
+
 const BAND_LOW := 86.0
 const BAND_HIGH := 124.0
 ## How far off a station's frequency you can sit and still hear it at all.
@@ -60,6 +85,9 @@ var khz := 88.6
 var listener := Vector2.ZERO
 var lock_seconds := 0.0
 var last_hook := ""
+## Building footprints in world XZ, handed in by whoever owns the generator.
+## Empty is a valid state: open ground shadows nothing.
+var occluders: Array = []
 
 
 func _init(start_khz := 88.6) -> void:
@@ -75,6 +103,80 @@ func stand_at(world_position: Vector2) -> void:
 	listener = world_position
 
 
+## A9.2. The town's footprints, from the generator that already produced them.
+func set_occluders(rects: Array) -> void:
+	occluders = rects
+
+
+## How much of the path from here to `target` runs through a bowl's rim or
+## through buildings, and what the dominant cause is. Returned together because
+## the interface wants to name the obstruction, not just apply it.
+func shadow(target: Vector2) -> Dictionary:
+	var loss := 1.0
+	var cause := ""
+	for bowl in BOWLS:
+		var centre: Vector2 = bowl.at
+		var radius := float(bowl.radius)
+		var inside_here := listener.distance_to(centre) < radius
+		var inside_there := target.distance_to(centre) < radius
+		if inside_here == inside_there:
+			# Both in the same pit, or both out of it: the rim is not between you.
+			continue
+		# How deep in the bowl the listener is, 0 at the rim and 1 at the floor.
+		var depth := 1.0 - clampf(listener.distance_to(centre) / radius, 0.0, 1.0)
+		if not inside_here:
+			depth = 1.0 - clampf(target.distance_to(centre) / radius, 0.0, 1.0)
+		var rim_loss := clampf(1.0 - depth * (float(bowl.depth) / 18.0), 0.06, 1.0)
+		if rim_loss < loss:
+			loss = rim_loss
+			cause = str(bowl.name)
+	var blocked := _building_metres(listener, target)
+	if blocked > 0.5:
+		var scatter := exp(-blocked / SCATTER_DEPTH)
+		loss *= scatter
+		if scatter < 0.7 and cause == "":
+			cause = "BUILT GROUND"
+	return {"loss": clampf(loss, 0.0, 1.0), "cause": cause, "blocked": blocked}
+
+
+## Metres of the segment that lie inside building footprints. Slab clipping per
+## rect rather than a march with samples: a march either misses thin buildings
+## or costs a hundred samples a frame to avoid it.
+func _building_metres(from: Vector2, to: Vector2) -> float:
+	if occluders.is_empty():
+		return 0.0
+	var direction := to - from
+	var length := direction.length()
+	if length < 0.01:
+		return 0.0
+	var total := 0.0
+	for rect in occluders:
+		var box: Rect2 = rect
+		var near := 0.0
+		var far := 1.0
+		var blocked := true
+		for axis in 2:
+			var origin := from[axis]
+			var delta := direction[axis]
+			var low := box.position[axis]
+			var high := box.position[axis] + box.size[axis]
+			if absf(delta) < 0.0001:
+				if origin < low or origin > high:
+					blocked = false
+					break
+				continue
+			var t1 := (low - origin) / delta
+			var t2 := (high - origin) / delta
+			near = maxf(near, minf(t1, t2))
+			far = minf(far, maxf(t1, t2))
+			if near > far:
+				blocked = false
+				break
+		if blocked and far > near:
+			total += (far - near) * length
+	return total
+
+
 ## How well a given station is coming in, 0 to 1, from *both* how close the dial
 ## is and how close you are standing. Two independent axes on purpose: a station
 ## you are tuned perfectly to is still noise if you are the wrong side of a hill.
@@ -88,7 +190,9 @@ func strength(station: Dictionary) -> float:
 	# A soft edge rather than a hard cutoff, so walking toward a transmitter is
 	# audible as it happens instead of snapping on at a boundary.
 	var place := clampf(1.0 - pow(distance / reach, 2.2), 0.0, 1.0)
-	return clampf(dial * place, 0.0, 1.0)
+	# A9.2. What is in the way, third axis alongside the dial and the distance.
+	var blocked := float(shadow(station.at as Vector2).get("loss", 1.0))
+	return clampf(dial * place * blocked, 0.0, 1.0)
 
 
 ## The station currently being received best, with its strength. Empty when the
@@ -115,12 +219,15 @@ func band() -> Array:
 	var out: Array = []
 	for station in STATIONS:
 		var distance := listener.distance_to(station.at as Vector2)
+		var blocked := shadow(station.at as Vector2)
 		out.append({
 			"khz": float(station.khz),
 			"name": str(station.name),
 			"kind": str(station.kind),
 			"strength": strength(station),
 			"in_reach": distance <= float(station.reach),
+			"shadow": float(blocked.get("loss", 1.0)),
+			"shadowed_by": str(blocked.get("cause", "")),
 		})
 	return out
 

@@ -38,6 +38,7 @@ const WIRE_RADIO := preload("res://systems/wire_radio.gd")
 const CARRY := preload("res://systems/carry.gd")
 const SIGNAL_FIELD := preload("res://systems/signal_field.gd")
 const RADIAL := preload("res://systems/radial_menu.gd")
+const RADIO_AUDIO := preload("res://systems/radio_audio.gd")
 
 signal mode_changed(mode: String)
 signal lead_found(station: String)
@@ -64,6 +65,7 @@ var radio: WireRadio
 var carry: Carry
 var signal_field: SignalField
 var radial: Control
+var radio_audio: Node
 
 var dead_pixels: Array[Vector2] = []
 var crack_lines: Array[PackedVector2Array] = []
@@ -126,6 +128,11 @@ func _ready() -> void:
 	radial = RADIAL.new()
 	radial.name = "Radial"
 	add_child(radial)
+	# A9.5. The receiver's own bus. Kept on the device rather than in the scene
+	# because the radio is a property of the thing you are holding.
+	radio_audio = RADIO_AUDIO.new()
+	radio_audio.name = "RadioAudio"
+	add_child(radio_audio)
 	set_process(true)
 
 
@@ -133,6 +140,10 @@ func _ready() -> void:
 func bind(generator: Node, director: Node, contacts: Callable) -> void:
 	if _map.has_method("bind"):
 		_map.bind(generator, director, contacts)
+	# A9.2. The town's footprints already exist on the generator; the radio
+	# borrows them rather than keeping a second copy that can drift.
+	if generator != null and "lots" in generator:
+		radio.set_occluders(generator.get("lots"))
 
 
 func open_device() -> void:
@@ -250,6 +261,9 @@ func _process(delta: float) -> void:
 		_map.position = Vector2.ZERO
 
 	carry.age(delta)
+	# The receiver is always running; what it sounds like follows reception.
+	var heard: Dictionary = radio.transmission()
+	radio_audio.tune_to(str(heard.get("kind", "static")), float(heard.get("strength", 0.0)) if mode == "RADIO" else 0.0)
 	if mode == "RADIO":
 		var found := radio.hold(delta)
 		if found != "":
