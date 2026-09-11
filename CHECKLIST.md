@@ -538,9 +538,9 @@ finished. Applies to everything below and to A5, A6, C1.
 - [ ] **I5.4** Posts and accounts
 
 ### I6 — The honest split on dark patterns
-- [ ] **I6.1** The Wire is deliberately hostile — infinite scroll, bait, variable reward
-- [ ] **I6.2** The player's own tools are the opposite
-- [ ] **I6.3** Make the contrast obvious enough to read as a joke
+- [x] **I6.1** The Wire is deliberately hostile — infinite scroll, bait, variable reward
+- [x] **I6.2** The player's own tools are the opposite
+- [x] **I6.3** Make the contrast obvious enough to read as a joke
 
 ---
 

@@ -683,3 +683,73 @@ func scroll(amount: float) -> float:
 
 func _handle(display_name: String) -> String:
 	return "@" + display_name.to_lower().replace(" ", "_").replace("'", "")
+
+
+## --- I6: the honest split on dark patterns --------------------------------
+##
+## The Wire is deliberately hostile and the player's own tools are deliberately
+## not, and the gap between them is the joke. Nothing here is a lecture: the
+## feed simply behaves the way feeds behave, and CARRY and the dossier behave
+## the way a tool you own behaves, and the contrast does the work.
+
+## Variable reward. Most pulls are filler; occasionally one carries something
+## the player can act on. The schedule is intermittent on purpose, because a
+## reliable feed would not be worth satirising.
+const REWARD_CHANCE := 0.17
+## What one more pull costs. Exposure is the currency the Wire actually takes.
+const PULL_EXPOSURE := 1
+
+var pulls := 0
+
+
+## I6.1. There is no last page. `page` only moves the seed, so the feed always
+## has more, and the longer the player scrolls the more of them they are
+## showing to people who are watching.
+func pull_feed(page: int, count: int = 14) -> Dictionary:
+	pulls += 1
+	var posts := feed(count, page * 977 + pulls)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = (page * 4391 + pulls * 13) & 0x7fffffff
+	var lead := {}
+	if rng.randf() < REWARD_CHANCE:
+		var voices := accounts_by_reach()
+		if not voices.is_empty():
+			var who: Dictionary = voices[rng.randi_range(0, voices.size() - 1)]
+			lead = {"subject_id": str(who.get("id", "")), "name": str(who.get("name", "")), "why": "someone said where they would be"}
+	# Scrolling is not free. Being in the feed is being seen in it.
+	exposure += PULL_EXPOSURE
+	strain = clampf(strain + 0.015, 0.0, 1.0)
+	return {
+		"posts": posts,
+		"lead": lead,
+		"exhausted": false,
+		"exposure": exposure,
+		"pulls": pulls,
+	}
+
+
+## I6.2. The contract the player's own tools keep, stated once so a panel can
+## show it and so nothing drifts. CARRY, the dossier and the index are finite,
+## complete, ordered and free — they never withhold, never reward at random and
+## never cost you anything to open.
+static func tool_contract() -> Dictionary:
+	return {
+		"finite": true,
+		"complete": true,
+		"ordered": true,
+		"costs_exposure": false,
+		"reward_schedule": "none",
+	}
+
+
+## I6.3. The same five properties for the Wire, so a panel can put the two
+## side by side and let the reader draw the conclusion. This is the joke, and
+## it only lands if it is legible rather than explained.
+func feed_contract() -> Dictionary:
+	return {
+		"finite": false,
+		"complete": false,
+		"ordered": false,
+		"costs_exposure": true,
+		"reward_schedule": "intermittent",
+	}
