@@ -489,6 +489,59 @@ func act(subject_id: String, action: String) -> Dictionary:
 
 ## Reciprocity, and the reason exposure is tracked at all. Past a threshold
 ## somebody runs the trace back and arrives where you are.
+## C3.4. A photograph posted to the Wire. This is the one publishable thing in
+## the game with something real behind it — `expose` needs leverage you happen
+## to hold and `fabricate` is a lie that might not stick, but a photograph
+## carries the actual state of an actual body, so it always lands.
+##
+## Which is exactly why it is dangerous. The picture is evidence of what
+## happened *and* evidence that you were standing close enough to take it, so
+## the reach it earns is paid for in exposure, and everyone depicted has a new
+## reason to know your name.
+func publish_photograph(photo: Dictionary) -> Dictionary:
+	var contents: Array = photo.get("contents", [])
+	if contents.is_empty():
+		return {"ok": false, "headline": "NOTHING IN FRAME", "detail": "YOU PHOTOGRAPHED AN EMPTY ROOM.", "reach": 0, "exposure": 0}
+	var carnage := 0
+	var named: Array[String] = []
+	for entry in contents:
+		var record: Dictionary = entry
+		named.append(str(record.get("subject_id", "")))
+		carnage += (record.get("severed", []) as Array).size() * 2
+		carnage += (record.get("ruptured", []) as Array).size()
+		if bool(record.get("dead", false)):
+			carnage += 2
+	var result := {
+		"ok": true,
+		"headline": "PUBLISHED / %d IN FRAME" % contents.size(),
+		"detail": distort(str(photo.get("caption", "")), 1),
+		"subjects": named,
+		# The worse the picture, the further it travels and the worse it is for
+		# you that it exists.
+		"reach": 60 + carnage * 45,
+		"exposure": 2 + carnage,
+		"grudge": 8 + carnage * 4,
+	}
+	strain += 0.6 + float(carnage) * 0.2
+	WorldHistory.record_event("photograph_published", {
+		"photo": str(photo.get("id", "")),
+		"subjects": named,
+		"carnage": carnage,
+		"location": str(photo.get("location", "")),
+	})
+	for subject_id in named:
+		if subject_id == "" or subject_id == "player":
+			continue
+		var subject := WorldHistory.subject(subject_id)
+		if subject.is_empty():
+			continue
+		WorldHistory.amend_subject(subject_id, {
+			"grudge": mini(100, int(subject.get("grudge", 0)) + int(result.grudge)),
+			"memory": "There is a picture of me like that, and everyone has seen it.",
+		})
+	return result
+
+
 func pending_trace() -> String:
 	if exposure < 8:
 		return ""

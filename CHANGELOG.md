@@ -2,6 +2,24 @@
 
 ## 2026 09 11
 
+- **Section C is closed. The camera takes evidence, not screenshots.** A
+  photograph here is not an image — it is a record of what was genuinely in
+  shot (Godot's own frustum test, so it agrees with what the player could see)
+  and what state those bodies were genuinely in, read straight off the rig the
+  fight happened to. Press **N**. The caption is generated from the contents, so
+  it can never claim something the body was not doing.
+  That is the whole reason it is a system: `FieldCamera.verify()` answers "does
+  this picture contain a severed arm / a ruptured heart / five separate bodies",
+  which is what E3 needs to make a ritual something you have to *go and do*
+  rather than a confirm button. Photographing one body five times is not five
+  bodies, and evidence about the wrong person does not count.
+  C3.4: a published photograph is the one thing on the Wire with something real
+  behind it — `expose` needs leverage you happen to hold and `fabricate` might
+  not stick, but a photograph always lands. Which is why it is dangerous: it is
+  evidence of what happened *and* that you were standing close enough to take
+  it, so the reach it earns is paid for in exposure, and everyone in frame gets
+  a new reason to know your name. New `camera_test` (20 checks); 23 suites green.
+
 - **Section B is closed. The X-ray looks at the world.** `xray_cursor.gd` said
   from the day it was written that seeing inside a body should be a constant
   available verb rather than a mode, and it was only ever true inside the

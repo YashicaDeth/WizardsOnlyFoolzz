@@ -360,6 +360,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			# H, not F: F has toggled the camera since the hunt was built, and a
 			# second KEY_F branch in this match is simply never reached.
 			KEY_H: _begin_extraction()
+			KEY_N: _take_photograph()
 			KEY_V:
 				if not grapple_target.is_empty():
 					_clinch_persuade()
@@ -1576,6 +1577,24 @@ func _update_grapple(delta: float) -> void:
 		_wound_player(node.global_position, 16.0, "blunt")
 		player_body.velocity = (player - node.global_position).normalized() * 7.0
 		_break_grapple("THEY PUT YOU DOWN AND STEPPED BACK")
+
+
+## C3.1. Raise the camera and take the picture. What gets stored is not an
+## image — it is what was actually in shot and what state those bodies were
+## actually in, which is what makes it evidence a ritual can be held to.
+func _take_photograph() -> Dictionary:
+	if not panel_mode.is_empty() or resolution_ui.visible:
+		return {}
+	var photo := FieldCamera.capture(camera, _all_rigs(), HUNT_LOCATION)
+	FieldCamera.store(photo)
+	WorldHistory.record_event("photograph_taken", {
+		"photo": str(photo.id),
+		"in_frame": (photo.contents as Array).size(),
+		"location": HUNT_LOCATION,
+	})
+	var count: int = (photo.contents as Array).size()
+	prompt.text = "PHOTOGRAPH / %s" % (str(photo.caption) if count > 0 else "NOTHING IN FRAME")
+	return photo
 
 
 ## Every body in the world that owns a rig, including the corpses the AI has
