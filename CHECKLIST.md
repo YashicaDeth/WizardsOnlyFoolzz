@@ -391,12 +391,13 @@ exist start talking to each other.
 Not code. The difference between "programmer art" and "a game".
 
 ### G1 — Greg's art as texture source
-**Blocked: needs the folder path.**
-- [ ] **G1.1** Locate and catalogue the source art
-- [ ] **G1.2** Cut, glitch and shade into a texture set
-- [ ] **G1.3** Body textures
-- [ ] **G1.4** Map plates and interface surfaces
-- [ ] **G1.5** Wire collage
+**Unblocked 2026-09-12.** Source: `Desktop/Art Collections`, 43 artworks.
+Read-only; everything derived lands in `game/art/derived/` via `tools/art_pipeline.py`.
+- [x] ~~**G1.1** Locate and catalogue the source art~~
+- [x] ~~**G1.2** Cut, glitch and shade into a texture set~~
+- [~] **G1.3** Body textures — 8 tiling sheets built; no material loads them yet
+- [~] **G1.4** Map plates and interface surfaces — 6 plates built; not yet on a panel
+- [~] **G1.5** Wire collage — 3 sheets built; the Wire page does not draw them yet
 
 ### G2 — The cars
 - [ ] **G2.1** Stripped chassis with exposed mechanism
