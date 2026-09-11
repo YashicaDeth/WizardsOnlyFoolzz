@@ -75,6 +75,26 @@ Nothing else is worth polishing until a ram feels like a ram.
    speed-linked camera shake and FOV, brake/scrape effects, and a decision on
    whether the upright angular lock stays (it currently prevents rolling).
 
+### Tier 1b — combat, added 2026-09-11
+
+10. **Physical melee.** Half Sword's register — momentum-driven swings, real
+    contact, unglamorous brutality and heavy dismemberment — but it has to
+    actually *work*, which Half Sword's first-person control notably does not.
+    Swing direction and force from input, weapon mass and reach mattering,
+    contact resolved against the anatomy zones that already exist.
+11. **Dodge and roll.** DS3/Elden Ring vocabulary — i-frames, stamina cost,
+    directional commitment — with more player control than either: cancel
+    windows, shorter recovery, and a step distinct from a full roll.
+12. **Seamless first/third person.** Not a camera toggle. Per Codex §19 the
+    perspective carries meaning: first person is Self/Perception, third is
+    Body/Spatial. The transition should be continuous, and combat must be fully
+    usable in both.
+13. **Weapons, limbs and organ upgrades.** HAVKER-MAN X-style bionics and
+    Cruelty Squad implants, but far more customisable. Every weapon, limb and
+    organ is a distinct part with its own trade-offs, compatibility and social
+    reading, feeding `anatomy_component.gd`'s existing cybernetics slots and the
+    prosthetic economy in `DESIGN/HUNT_SYSTEM.md`.
+
 ### Tier 2 — the opening Greg described
 
 4. **Opening sequence.** Wake in a dingy interior; forced to win the derby to
@@ -85,10 +105,27 @@ Nothing else is worth polishing until a ram feels like a ram.
    breathing and health readouts driven by the existing anatomy component
    (blood volume, pain, consciousness already exist and are unused by the HUD).
    Walking must not feel broken — this is a feel pass, not new systems.
-6. **Procedural interstitials.** Postal 2-register loading screens: trippy
-   screensaver anatomy, skeletons, X-ray plates, drawn in code from the same
-   primitives the dossier already uses. No copied assets, and it reinforces
-   the anatomy motif at every scene change.
+6. **Procedural interstitials and menus.** Postal 2-register loading screens:
+   trippy screensaver anatomy, skeletons, X-ray plates, drawn in code from the
+   same primitives the dossier and `kill_cam.gd` already use. The start and
+   pause menus move to the same register — crude, grimy, funny, closer to a
+   Postal 2 menu than to a clean engine front end.
+
+### Derby art pass — outstanding
+
+The toybox brief is superseded and the venue has been rescaled, regrimed and
+relit, but the authored geometry itself is unchanged. Still outstanding:
+
+- **The cars are karts.** `scrap_skiff.glb` is a smooth box silhouette. Per the
+  new direction they need stripped chassis, exposed mechanism, bone and sinew
+  lashings, fungal bloom in the wheel wells and dried spatter. This is Blender
+  work on `art/scrap_skiff_v1/`, not a material swap.
+- **Runtime regrime is a stopgap.** `WorldLook.REGRIME` remaps the old material
+  names at load. Re-exported assets should carry the biopunk palette natively
+  and simply stop matching those keys.
+- The pit still reads close to monochrome red. Contamination colour — spore
+  green, bruise purple — needs to arrive through authored surfaces, not only
+  through light colour.
 
 ### Tier 3 — systemic depth
 

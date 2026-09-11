@@ -6,8 +6,7 @@ extends Node
 ## silently discards the solver's collision response, which makes every ram read
 ## as weightless no matter how much damage it scores.
 
-const ARENA_LIMIT := 26.0
-
+var arena_limit := 26.0
 var vehicle: RigidBody3D
 var aggression := 1.0
 var skill := 1.0
@@ -34,7 +33,7 @@ func tick(delta: float, target_position: Vector3, active: bool) -> void:
 	wander_phase += delta * (0.7 + aggression * 0.5)
 	var destination := target_position
 	var from_centre := Vector3(vehicle.global_position.x, 0.0, vehicle.global_position.z)
-	if from_centre.length() > ARENA_LIMIT:
+	if from_centre.length() > arena_limit:
 		destination = Vector3.ZERO
 		recover_timer = 0.9
 	elif recover_timer > 0.0:

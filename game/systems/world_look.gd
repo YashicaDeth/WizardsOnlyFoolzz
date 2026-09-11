@@ -143,6 +143,50 @@ static func surface(color: Color, kind: String = "paint", variation_seed: int = 
 	return material
 
 
+## The authored kits were built to the superseded toybox brief, so their baked
+## materials read as bright salvage paint. Rather than block on re-exporting
+## every .blend, remap the known material names onto the biopunk palette at
+## load. Re-authored assets can simply stop matching these names.
+const REGRIME := {
+	"salvage_teal": {"color": "24332c", "kind": "rust"},
+	"celloutz_salvage_teal": {"color": "1f2b26", "kind": "rust"},
+	"bone_enamel": {"color": "6b6048", "kind": "bone"},
+	"tar_rubber": {"color": "14100f", "kind": "dirt"},
+	"smoked_glass": {"color": "121b1c", "kind": "chrome"},
+	"worn_copper": {"color": "50291a", "kind": "rust"},
+	"warning_orange": {"color": "7d3a16", "kind": "rust"},
+	"rusted_steel": {"color": "3d1c11", "kind": "rust"},
+	"burnt_steel": {"color": "17100c", "kind": "rust"},
+	"dirty_cream": {"color": "5c5137", "kind": "dirt"},
+	"quarry_concrete": {"color": "24201a", "kind": "dirt"},
+	"oil_asphalt": {"color": "100e0d", "kind": "dirt"},
+	"dead_forest": {"color": "1b241a", "kind": "dirt"},
+}
+
+
+static func regrime(root: Node, variation_seed: int = 0) -> int:
+	var changed := 0
+	var pending: Array[Node] = [root]
+	while not pending.is_empty():
+		var current: Node = pending.pop_back()
+		for child in current.get_children():
+			pending.append(child)
+		var mesh_instance := current as MeshInstance3D
+		if mesh_instance == null or mesh_instance.mesh == null:
+			continue
+		for surface in mesh_instance.mesh.get_surface_count():
+			var source: Material = mesh_instance.mesh.surface_get_material(surface)
+			if source == null:
+				continue
+			var key := source.resource_name.to_lower()
+			if not REGRIME.has(key):
+				continue
+			var entry: Dictionary = REGRIME[key]
+			mesh_instance.set_surface_override_material(surface, surface(Color(entry.color), str(entry.kind), variation_seed + surface))
+			changed += 1
+	return changed
+
+
 static func emissive(color: Color, energy: float) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color

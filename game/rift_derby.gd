@@ -1,6 +1,9 @@
 extends Node3D
 
-const ARENA_LIMIT := 29.0
+## The authored Bone Yard kit was modelled for a 29m bowl, which plays as a
+## playpen. The whole venue is scaled up together so the geometry still matches.
+const ARENA_SCALE := 1.85
+const ARENA_LIMIT := 29.0 * ARENA_SCALE
 const MAX_SPEED := 24.0
 const IMPACT_SPEED := 9.5
 const RIVAL_ID := "mara_voss"
@@ -116,12 +119,14 @@ func _build_world() -> void:
 	var authored_environment := BONE_YARD_ENVIRONMENT.instantiate()
 	authored_environment.name = "AuthoredBoneYard"
 	authored_environment.position.y = -0.12
+	authored_environment.scale = Vector3(ARENA_SCALE, ARENA_SCALE, ARENA_SCALE)
 	add_child(authored_environment)
+	WorldLook.regrime(authored_environment, 17)
 	_add_authored_environment_collision(authored_environment)
 	var floor := StaticBody3D.new()
 	var floor_collision := CollisionShape3D.new()
 	var floor_shape := BoxShape3D.new()
-	floor_shape.size = Vector3(76, 1.0, 76)
+	floor_shape.size = Vector3(76.0 * ARENA_SCALE, 1.0, 76.0 * ARENA_SCALE)
 	floor_collision.shape = floor_shape
 	floor_collision.position.y = -0.8
 	floor.add_child(floor_collision)
@@ -131,10 +136,10 @@ func _build_world() -> void:
 	for index in 8:
 		var light := OmniLight3D.new()
 		var angle := TAU * index / 8.0
-		light.position = Vector3(cos(angle) * 18.0, 7.5, sin(angle) * 18.0)
-		light.light_color = Color("ff8a3c") if index % 2 == 0 else Color("cdb389")
+		light.position = Vector3(cos(angle) * 18.0 * ARENA_SCALE, 7.5 * ARENA_SCALE, sin(angle) * 18.0 * ARENA_SCALE)
+		light.light_color = Color("ff8a3c") if index % 2 == 0 else Color("86a35c")
 		light.light_energy = 3.4
-		light.omni_range = 19.0
+		light.omni_range = 19.0 * ARENA_SCALE
 		light.omni_attenuation = 1.25
 		light.shadow_enabled = index % 4 == 0
 		add_child(light)
@@ -150,13 +155,14 @@ func _build_world() -> void:
 func _build_boat() -> void:
 	boat = VEHICLE.new()
 	boat.name = "MercyCountyWrecker"
-	boat.position = Vector3(0, 0.75, 12)
+	boat.position = Vector3(0, 0.75, 12.0 * ARENA_SCALE)
 	add_child(boat)
 	boat.impact.connect(_on_vehicle_impact)
 	var authored_skiff := SCRAP_SKIFF.instantiate()
 	authored_skiff.name = "AuthoredScrapSkiff"
 	authored_skiff.scale = Vector3(1.15, 1.15, 1.15)
 	boat.add_child(authored_skiff)
+	WorldLook.regrime(authored_skiff, 3)
 
 
 func _spawn_targets() -> void:
@@ -166,7 +172,7 @@ func _spawn_targets() -> void:
 
 func _create_wrecker(index: int) -> void:
 	var angle := TAU * index / 12.0 + 0.23
-	var lane := 13.5 if index % 2 == 0 else 17.0
+	var lane := (13.5 if index % 2 == 0 else 17.0) * ARENA_SCALE
 	# AI wreckers run the same chassis as the player. They are steered, never
 	# teleported, so a ram leaves them spinning instead of snapping back on the
 	# following frame.
@@ -182,6 +188,7 @@ func _create_wrecker(index: int) -> void:
 	ai_driver.name = "AIDriver"
 	target.add_child(ai_driver)
 	ai_driver.configure(target, index + 1)
+	ai_driver.arena_limit = ARENA_LIMIT * 0.9
 	var authored_skiff := SCRAP_SKIFF.instantiate()
 	authored_skiff.name = "ScrapVehicleShell"
 	authored_skiff.scale = Vector3(1.05, 1.05, 1.05)
@@ -190,6 +197,7 @@ func _create_wrecker(index: int) -> void:
 		authored_skiff.rotation.y = PI
 	if index == 0:
 		authored_skiff.scale *= 1.12
+	WorldLook.regrime(authored_skiff, index + 5)
 	_add_vehicle_damage_parts(target, index)
 	_add_driver_rig(target, index)
 	targets.append(target)
@@ -203,7 +211,7 @@ func _update_boat(delta: float) -> void:
 	speed = boat.signed_speed
 	boat_velocity = boat.linear_velocity
 	if boat.position.y < -10.0:
-		boat.recover(Vector3(0, 1.2, 12))
+		boat.recover(Vector3(0, 1.2, 12.0 * ARENA_SCALE))
 	if derby_audio != null:
 		derby_audio.call("update_engine", speed, throttle)
 
@@ -355,9 +363,9 @@ func _update_debris(delta: float) -> void:
 
 func _update_camera(delta: float) -> void:
 	var forward := -boat.global_transform.basis.z
-	var desired := boat.global_position - forward * 10.5 + Vector3.UP * 6.3
+	var desired := boat.global_position - forward * 14.5 + Vector3.UP * 7.4
 	camera.global_position = camera.global_position.lerp(desired, min(delta * 4.5, 1.0))
-	camera.look_at(boat.global_position + forward * 5.0 + Vector3.UP * 0.5)
+	camera.look_at(boat.global_position + forward * 8.0 + Vector3.UP * 1.2)
 
 
 func _update_hud() -> void:
@@ -408,8 +416,8 @@ func _reset_round() -> void:
 	integrity = 100
 	speed = 0.0
 	boat_velocity = Vector3.ZERO
-	boat.position = Vector3(0, 0.75, 12)
-	boat.recover(Vector3(0, 1.2, 12))
+	boat.position = Vector3(0, 0.75, 12.0 * ARENA_SCALE)
+	boat.recover(Vector3(0, 1.2, 12.0 * ARENA_SCALE))
 	_spawn_targets()
 	WorldHistory.record_event("derby_round_reset", {"venue": "rift_derby_quarry"})
 
@@ -448,12 +456,12 @@ func _add_vehicle_damage_parts(target: RigidBody3D, index: int) -> void:
 	var damage_root := Node3D.new()
 	damage_root.name = "DamageParts"
 	target.add_child(damage_root)
-	var color := Color("286b68") if index % 2 == 0 else Color("743021")
+	var color := Color("2b3328") if index % 2 == 0 else Color("3d1c11")
 	_add_damage_part(damage_root, "DoorLeft", Vector3(-1.38, 0.25, 0.15), Vector3(0.16, 0.82, 1.65), color)
 	_add_damage_part(damage_root, "DoorRight", Vector3(1.38, 0.25, 0.15), Vector3(0.16, 0.82, 1.65), color)
 	_add_damage_part(damage_root, "Hood", Vector3(0, 0.7, -1.55), Vector3(2.25, 0.16, 1.2), color.darkened(0.12))
-	_add_damage_part(damage_root, "BumperFront", Vector3(0, 0.0, -2.48), Vector3(2.65, 0.22, 0.25), Color("684a34"))
-	_add_damage_part(damage_root, "BumperRear", Vector3(0, 0.0, 2.48), Vector3(2.65, 0.22, 0.25), Color("684a34"))
+	_add_damage_part(damage_root, "BumperFront", Vector3(0, 0.0, -2.48), Vector3(2.65, 0.22, 0.25), Color("46331f"))
+	_add_damage_part(damage_root, "BumperRear", Vector3(0, 0.0, 2.48), Vector3(2.65, 0.22, 0.25), Color("46331f"))
 	for wheel_index in 4:
 		var x := -1.42 if wheel_index % 2 == 0 else 1.42
 		var z := -1.55 if wheel_index < 2 else 1.55
@@ -513,7 +521,7 @@ func _add_driver_rig(target: RigidBody3D, index: int) -> void:
 	driver.name = "DriverRig"
 	driver.position = Vector3(0, 0.25, 0.3)
 	target.add_child(driver)
-	_add_mesh_to(driver, CapsuleMesh.new(), Vector3(0, 0.55, 0), Color("8c6d50"), 0.0, Vector3.ZERO, "DriverBody")
+	_add_mesh_to(driver, CapsuleMesh.new(), Vector3(0, 0.55, 0), Color("6b5842"), 0.0, Vector3.ZERO, "DriverBody", "flesh", index + 2)
 	for zone_data in [{"name": "HeadHitbox", "position": Vector3(0, 1.45, 0), "size": Vector3(0.48, 0.48, 0.48), "zone": "head"}, {"name": "TorsoHitbox", "position": Vector3(0, 0.72, 0), "size": Vector3(0.7, 0.95, 0.45), "zone": "torso"}, {"name": "LegHitbox", "position": Vector3(0, 0.05, -0.2), "size": Vector3(0.65, 0.6, 0.5), "zone": "legs"}]:
 		var area := Area3D.new()
 		area.name = str(zone_data.name)
@@ -618,7 +626,7 @@ func _spawn_crowd() -> void:
 		spectator.name = "CrowdSilhouette_%02d" % index
 		var side := -1.0 if index % 2 == 0 else 1.0
 		var row := float((index / 2) % 4)
-		spectator.position = Vector3(-30.0 + float(index % 32) * 1.95, 2.0 + row * 0.85, side * (30.0 + row * 1.2))
+		spectator.position = Vector3((-30.0 + float(index % 32) * 1.95) * ARENA_SCALE, (2.0 + row * 0.85) * ARENA_SCALE, side * (30.0 + row * 1.2) * ARENA_SCALE)
 		spectator.set_meta("rest_y", spectator.position.y)
 		spectator.set_meta("phase", float(index) * 0.71)
 		add_child(spectator)

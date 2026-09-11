@@ -1,6 +1,20 @@
 # CellOutz visual direction
 
-CellOutz should feel like a battered toybox version of a roadside combat game: sun-bleached copper, teal salvage paint, dirty cream UI paper, black ink labels, floating debug-like ornaments, and a light grain pass. The world stays readable at a glance, while small props carry the grunge.
+**Superseded 2026-09-11.** The original brief called for "a battered toybox version of a roadside combat game" in sun-bleached copper and teal salvage paint. The Bone Yard kit and the scrap skiff were authored to that spec, which is exactly why they read as toys. The direction below replaces it. Existing assets are now provisional and scheduled for regrime.
+
+## Biopunk apocalyptic
+
+Wrecked, organic and wrong. The world is not a colourful salvage yard — it is an industrial corpse being reclaimed by something biological. Machines have been repaired with material that was recently alive; the line between vehicle, building and body is not clean anywhere.
+
+Palette: bone and nicotine, dried blood, oxidised iron, bruise purple, sickly fungal green, tar black. Colour arrives as **contamination**, not as paint — a bloom of spore green across a panel, a rust weep down a wall, arterial red where something bled. Saturated hues appear rarely and mean something when they do. No cheerful primaries, no clean teal, no toy plastic.
+
+Surfaces: nothing uniform, nothing new. Every panel carries rust bloom, weld scar, patch plate, biological staining or growth. Wet where it should be dry. Matte and chalked where it should be glossy. Readability comes from silhouette and value contrast rather than from bright local colour.
+
+Vehicles: the derby cars should look *grown into* rather than assembled — stripped chassis with exposed mechanism, bone and sinew lashings, grafted organic components, fungal bloom in the wheel wells, dried spatter no one washed off. A car that has killed people and shows it. They should not read as karts.
+
+Scale and space: the arena is a quarry, not a playpen. Distances should feel punishing, sightlines long, the far edge hazed out. Cramped geometry reads as a prototype level no matter how well lit.
+
+Reference register: Cruelty Squad's nauseating body-modification palette, Wrought Flesh's meat-and-organ industry, Kenshi's sun-destroyed wasteland, S.T.A.L.K.E.R.'s contamination, Half Sword's unglamorous physical brutality. Tonal references only.
 
 ## Asset drop format
 
