@@ -489,10 +489,10 @@ world holds what happened, each faction holds what it believes, and the Board
 holds what the *player* thinks — which is allowed to be wrong.
 
 ### L1 — The surface
-- [ ] **L1.1** Corkboard, pinned cards, string, pan and zoom
-- [ ] **L1.2** Populated from WorldHistory — people, factions, posts, parts, wounds
-- [ ] **L1.3** Made rather than rendered: tape, stains, marker, the derived art sheets
-- [ ] **L1.4** Legible from across the room as a shape, up close as cards
+- [x] **L1.1** Corkboard, pinned cards, string, pan and zoom
+- [x] **L1.2** Populated from WorldHistory — people, factions and events; posts and parts pending L2
+- [x] **L1.3** Made rather than rendered: tape, stains, marker, torn edges, pin holes
+- [x] **L1.4** Legible from across the room as a shape, up close as cards
 
 ### L2 — Pinning
 - [ ] **L2.1** The player pins what they choose, from the index, the camera and CARRY
@@ -511,12 +511,12 @@ holds what the *player* thinks — which is allowed to be wrong.
 - [ ] **L4.3** Being wrong has a price — the first screen where it does
 
 ### L6 — Theories, mainlines and endings
-- [ ] **L6.1** The board ships with authored theories already pinned, contradictory and unmarked
+- [x] **L6.1** The board ships with authored theories already pinned, contradictory and unmarked
 - [ ] **L6.2** A mainline theory followed far enough is an ending; E7's two routes are the first two
 - [ ] **L6.3** Sidelines are their own clusters, not smaller mainlines — some connect to two
 - [ ] **L6.4** Pre-placed theories read differently based on what the player actually did
 - [ ] **L6.5** Different people, places and factions per route — no converging on one dungeon
-- [ ] **L6.6** No quest state anywhere: what you are "on" is read out of WorldHistory
+- [x] **L6.6** No quest state anywhere: what you are "on" is read out of WorldHistory
 
 ### L5 — Career
 - [ ] **L5.1** Routes across the board are the progression
@@ -546,10 +546,10 @@ From `DESIGN/INTERFACE_DIRECTION.md`.
 The standing rule. If a screen's information could be a spreadsheet, it is not
 finished. Applies to everything below and to A5, A6, C1.
 - [x] ~~**I0.1** Applied to the World Index~~
-- [ ] **I0.2** Applied to the derby HUD — rejected 2026-09-12, see below
+- [x] **I0.2** Applied to the derby HUD — the rejected overlay is gone; the arena is the interface
 - [x] **I0.5** The handheld becomes a black cracked mirror you look *into*, jester on the back
-- [ ] **I0.6** Kill the HUNT SIGNAL corner plate — a rival arrives when they change, not permanently
-- [ ] **I0.7** Hull read off the car, not off a number in a corner
+- [x] **I0.6** Kill the HUNT SIGNAL corner plate — a rival arrives when they change, not permanently
+- [x] **I0.7** Hull read off the car, not off a number in a corner
 - [ ] **I0.8** The weapon well reworked
 - [ ] **I0.9** Cast display names reworked — ids stay, names change (blocked on Greg's list)
 - [x] **I0.3** Applied to the map — the key is deleted, marks read by shape, metadata is a title block

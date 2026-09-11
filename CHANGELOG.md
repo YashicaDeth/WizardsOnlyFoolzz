@@ -2,6 +2,27 @@
 
 ## 2026 09 12
 
+- **L1: the storyline is a wall now.** The one screen this project had not yet
+  built was the quest log, and a quest log is a list of text in a box — the
+  exact shape every other screen has been dragged out of. So there is no quest
+  state anywhere. The Board is cork, too much paper and red thread: five
+  authored mainline theories pinned from the start, contradictory, with nothing
+  marking which is true; the people and factions you have actually met as
+  photographs and filed records; what happened as torn cuttings with the name
+  that matters ringed in marker. Someone executed is crossed out. What the
+  player is "on" is which strings run where, read out of `WorldHistory` at the
+  moment the board opens. Read-only for now — pinning, strings as claims,
+  publishing and career routes are L2 through L5.
+
+- **I0.2/I0.6/I0.7: the derby gives the arena back.** The permanent driver
+  portrait, HUNT SIGNAL plate, numeric hull plate, radar, speed dial, impact
+  announcement, radio transcript and control ribbon have been removed from the
+  windscreen. The open pit channel still sounds and still enters world history;
+  it simply no longer becomes a subtitle box. Hull damage is now on the player
+  skiff itself: impacts deform its shell and tear off bumper, door, hood and
+  wheel pieces at real integrity thresholds. Round countdowns and results remain
+  because they are events, not furniture.
+
 - **I0.3: the map loses its key.** Along the bottom of the chart was a legend —
   seven coloured dots with words beside them — and a control strip, both set in
   the system fallback font Greg keeps pointing at. A mark that needs a key is a
