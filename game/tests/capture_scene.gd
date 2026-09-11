@@ -68,6 +68,45 @@ func _ready() -> void:
 			scene.resolution_ui._choose(0)
 		for hold in 20:
 			await get_tree().process_frame
+	elif trigger in ["map", "map_walked"]:
+		# Walk a route first so the survey has something charted to show; a fresh
+		# save would otherwise photograph an honestly, but uselessly, blank sheet.
+		if trigger == "map_walked":
+			# A route from the start out to the Ossuary district, so the sheet
+			# shows charted ground against unsurveyed ground rather than a blank.
+			var start := Vector3(0, 1.5, 19)
+			var finish := Vector3(135, 1.5, 0)
+			for step in 120:
+				var walk: Vector3 = start.lerp(finish, float(step) / 119.0)
+				scene.player = walk
+				scene.living_map.observe(walk, 1.9)
+		scene._toggle_panel("map")
+		for _hold in 6:
+			await get_tree().process_frame
+	elif trigger == "lock":
+		scene.yaw = 2.7
+		for step in 40:
+			scene.player_body.position = scene.player_body.position + Vector3(-0.42, 0, -0.2)
+			scene.player = scene.player_body.position + Vector3.UP * 0.6
+			await get_tree().physics_frame
+		var ahead: Vector3 = scene.player + Vector3(sin(scene.yaw), -0.6, cos(scene.yaw)) * 5.0
+		scene._spawn_encounter_actor({"instance_id": "lock_probe", "kind": "hostile"}, ahead)
+		scene.encounter_actors.back().node.position = ahead
+		scene._toggle_lock()
+		for _hold in 40:
+			await get_tree().physics_frame
+		for _draw_hold in 6:
+			await get_tree().process_frame
+	elif trigger == "walk":
+		# Move off the spawn so the shot is the travelling camera, not the
+		# vehicle the player has just climbed out of.
+		scene.yaw = 2.7
+		for step in 60:
+			scene.player_body.position = scene.player_body.position + Vector3(-0.42, 0, -0.2)
+			scene.player = scene.player_body.position + Vector3.UP * 0.6
+			await get_tree().physics_frame
+		for _hold in 10:
+			await get_tree().process_frame
 	elif trigger == "killcam":
 		var cam: Node = scene.get_node_or_null("HUD/KillCam")
 		if cam != null:

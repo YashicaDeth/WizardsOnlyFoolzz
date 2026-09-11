@@ -2,6 +2,50 @@
 
 ## 2026 09 11
 
+- **The Living Map is an actual map.** `M` opened five lines of hardcoded prose
+  describing districts that the player could not locate, reach or use. Replaced
+  with `systems/living_map.gd`, which draws the region that was really
+  generated: the three road spines, every building footprint from
+  `AshbloomWorldGenerator.lots`, the seeded Reality Misfires, live contacts
+  coloured by disposition, loot caches and the player's own heading cone.
+  Pan, zoom, recentre and a metre-accurate scale bar.
+- **The map is surveyed rather than given.** Walking charts the ground around
+  you; unwalked cells stay hatched and withhold the buildings and district names
+  on them. The survey persists through `WorldHistory` as `ashbloom_survey`, so
+  the chart a returning player opens is the one they earned. An unidentified
+  signal shows as a mark, not as the words "UNIDENTIFIED SIGNAL" repeated
+  eleven times across the sheet.
+- **Lock-on.** Third-person combat had no way to commit to a target, so a swing
+  at anyone circling you was guesswork — the "combat doesn't work" complaint.
+  `Z` or middle mouse locks the best candidate in front of the player, the wheel
+  cycles, the camera steers to hold the pair, the body turns to face them, a
+  reticle marks them, and **a locked target wins the strike over a nearer body**.
+  Lock breaks on death, distance or a second press.
+- **Third-person camera rebuilt to a Souls register.** It was parked 6.5 m dead
+  behind the head, unsmoothed, and aimed *at* the player — which cancelled any
+  shoulder offset and re-centred the body every frame, so it read as an RTS
+  chase cam. Now spring-damped, closer, over one shoulder, aimed parallel to the
+  look heading, and widening when locked so backing off a target frames both.
+- **The camera no longer ends up inside walls.** The obstruction test ran on the
+  *target* position and the smoothing then blended toward it, so the camera sat
+  inside geometry for every frame of the blend. The test now runs last, on the
+  position actually used.
+- **Melee aim landed on the wrong limb.** The hit resolved against a free
+  world-space point projected from the player, so the zone opened depended on
+  how far off-axis the target had drifted and how much higher it was standing —
+  a level swing at someone on a kerb opened an arm. Aim now selects *where on
+  the target's body* the blow lands. This was a real defect, found by
+  instrumenting the failing `opening_test` check rather than by reading it.
+- **Full-sheet panels own the screen.** The map, dossier and artwork were drawn
+  under the live field HUD, so every one of them read as a debug overlay with
+  the crest and control ribbon printed through it.
+- Added lock-on coverage to `tests/combat_integration_test.gd`, including the
+  case that matters: a body standing nearer than the locked one does not steal
+  the swing. Added `--trigger=map_walked`, `--trigger=walk` and
+  `--trigger=lock` to `tests/capture_scene.gd`. All nine suites pass.
+
+## 2026 09 11
+
 - Added a three-slot hunter arsenal: Ashline cleaver, five-shell Bone Yard 12G
   and ten-round Mercy Nine. Number keys equip real procedural models on the
   BaselineHuman right arm; firearms own magazines, reserve ammunition,

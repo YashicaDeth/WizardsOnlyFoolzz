@@ -14,6 +14,9 @@ const MISFIRE_DIRECTOR := preload("res://systems/reality_misfire_director.gd")
 const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
+const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
+const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
+const LIVING_MAP := preload("res://systems/living_map.gd")
 
 var player := Vector3(0, 1.5, 19)
 var yaw := PI
@@ -37,6 +40,11 @@ var loose_loot: Array[Node3D] = []
 var mara_encounter_number := 1
 var player_body: CharacterBody3D
 var player_rig: BaselineHuman
+var player_collider: CollisionShape3D
+var player_capsule: CapsuleShape3D
+var body_motion: Node
+var hunter_appearance: Node
+var crouching := false
 var strike_windup := -1.0
 var rival_attack_clock := 0.0
 var dodge_remaining := 0.0
@@ -46,6 +54,11 @@ var pathfinder = preload("res://systems/ashbloom_pathfinder.gd").new()
 var social_markers: Array[Node3D] = []
 var resolution_ui: Control
 var resolution_target := ""
+var living_map: Control
+var lock_target := ""
+var lock_screen := Vector2(-1, -1)
+var camera_position := Vector3.ZERO
+var camera_ready := false
 var kill_cam: Control
 var voice_channel: Node
 var arsenal: Node
@@ -74,6 +87,9 @@ func _ready() -> void:
 	resolution_ui.selected.connect(_resolve_downed)
 	resolution_ui.cancelled.connect(_resolution_cancelled)
 	resolution_ui.voice_capture_requested.connect(_voice_capture)
+	living_map = LIVING_MAP.new()
+	living_map.name = "LivingMap"
+	$HUD.add_child(living_map)
 	kill_cam = preload("res://systems/kill_cam.gd").new()
 	kill_cam.name = "KillCam"
 	$HUD.add_child(kill_cam)
@@ -86,12 +102,12 @@ func _ready() -> void:
 	_register_people()
 	player_body = CharacterBody3D.new()
 	player_body.name = "HunterController"
-	var collider := CollisionShape3D.new()
-	var capsule := CapsuleShape3D.new()
-	capsule.radius = 0.36
-	capsule.height = 1.8
-	collider.shape = capsule
-	player_body.add_child(collider)
+	player_collider = CollisionShape3D.new()
+	player_capsule = CapsuleShape3D.new()
+	player_capsule.radius = 0.36
+	player_capsule.height = 1.8
+	player_collider.shape = player_capsule
+	player_body.add_child(player_collider)
 	HUNTER_MOTOR.configure(player_body)
 	add_child(player_body)
 	player_body.position = player - Vector3.UP * 0.6
@@ -100,6 +116,11 @@ func _ready() -> void:
 	arsenal.name = "HunterArsenal"
 	player_body.add_child(arsenal)
 	arsenal.configure(player_rig)
+	body_motion = HUNTER_BODY_MOTION.new()
+	body_motion.name = "HunterBodyMotion"
+	player_body.add_child(body_motion)
+	body_motion.configure(player_rig)
+	body_motion.set_perspective(not third_person)
 	WorldHistory.register_subject("inventory", {"items": []})
 	_spawn_friend()
 	_spawn_rival()
@@ -119,11 +140,18 @@ func _build_player_rig() -> void:
 	# The capsule is centred on the controller origin, so drop the rig by half
 	# its height to stand the feet on the floor rather than mid-shin.
 	player_rig.position = Vector3(0, -0.9, 0)
-	var config := {"flesh": Color("7a6350"), "variation": 1, "blood": 5200.0}
+	var config := {
+		"flesh": Color("7a6350"), "variation": 1, "blood": 5200.0,
+		"cybernetics": {"right_arm": {"name": "salvaged torque arm", "armor": 0.22, "restores": 0.72}},
+	}
 	var saved: Dictionary = WorldHistory.subject("player")
 	if saved.get("anatomy_state") is Dictionary:
 		config["restore"] = saved.anatomy_state
 	player_rig.build("player", config)
+	hunter_appearance = HUNTER_APPEARANCE.new()
+	hunter_appearance.name = "HunterAppearance"
+	player_rig.add_child(hunter_appearance)
+	hunter_appearance.configure(player_rig)
 
 
 ## Damage to the player, routed through the body so it lands on a real zone,
@@ -135,6 +163,7 @@ func _wound_player(from: Vector3, damage: float, damage_type := "cut") -> void:
 	toward.y = 0.0
 	var aim := player_rig.global_position + Vector3(0, 1.1, 0) + toward.normalized() * 0.3
 	var result := player_rig.hit_at(aim, damage, damage * 0.8, damage_type)
+	hunter_appearance.sync_from_anatomy()
 	WorldHistory.update_subject("player", {"anatomy_state": player_rig.snapshot()}, "anatomy_changed")
 	WorldHistory.record_event("player_wounded", {
 		"zone": str(result.get("zone", "torso")),
@@ -214,6 +243,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_MIDDLE:
+		_toggle_lock()
+	if event is InputEventMouseButton and event.pressed and not lock_target.is_empty():
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_cycle_lock(1)
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_cycle_lock(-1)
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 		_attack(true)
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -228,6 +264,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					_toggle_panel(panel_mode)
 			KEY_F:
 				third_person = not third_person
+				body_motion.set_perspective(not third_person)
 				_update_camera()
 			KEY_G: handheld.toggle_device()
 			KEY_TAB:
@@ -239,6 +276,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_M: _toggle_panel("map")
 			KEY_T: _toggle_panel("tree")
 			KEY_J: _toggle_artwork()
+			KEY_Z: _toggle_lock()
 			KEY_E: _interact()
 			KEY_SPACE: _dodge()
 			KEY_Q: _use_prosthetic_surge()
@@ -273,8 +311,11 @@ func _physics_process(delta: float) -> void:
 	_update_encounter_actors(delta)
 	if misfire_director != null:
 		misfire_director.call("update_player_position", player)
+	_steer_lock(delta)
 	_update_camera()
 	_update_hud()
+	# Charted by walking, not by opening the map.
+	living_map.observe(player, yaw)
 
 
 func _update_player(delta: float) -> void:
@@ -286,13 +327,18 @@ func _update_player(delta: float) -> void:
 		return
 	var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var direction: Vector3 = HUNTER_MOTOR.wish_direction(move, yaw)
-	var sprinting := Input.is_action_pressed("sprint") and stamina > 1.0 and move.length() > 0.0
-	var speed := SPRINT_SPEED if sprinting else PLAYER_SPEED
+	crouching = Input.is_action_pressed("crouch") and dodge_remaining <= 0.0
+	var sprinting := Input.is_action_pressed("sprint") and not crouching and stamina > 1.0 and move.length() > 0.0
+	var speed := 3.4 if crouching else (SPRINT_SPEED if sprinting else PLAYER_SPEED)
+	player_capsule.height = move_toward(player_capsule.height, 1.2 if crouching else 1.8, delta * 4.0)
+	player_collider.position.y = (player_capsule.height - 1.8) * 0.5
 	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0)
 	if player_body.position.y < -10.0:
 		player_body.position = Vector3(0, 1.0, 19)
 	player = player_body.position + Vector3.UP * 0.6
 	stamina = clampf(stamina + (-26.0 if sprinting else 18.0) * delta, 0, 100)
+	body_motion.update(delta, player_body.velocity, player_body.is_on_floor(), sprinting, crouching, dodge_remaining > 0.0)
+	hunter_appearance.set_mouth(player_rig.anatomy.pain / 180.0, sin(pulse * 0.7) * player_rig.anatomy.pain / 100.0)
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		_attack()
 
@@ -318,7 +364,9 @@ func _attack(heavy := false) -> void:
 	stamina -= cost
 	attack_cooldown = arsenal.cooldown
 	pending_attack = report
+	body_motion.trigger_attack(maxf(float(report.get("windup", 0.0)), arsenal.cooldown * 0.62), str(report.kind))
 	if str(report.kind) == "firearm":
+		body_motion.trigger_recoil(float(report.impulse))
 		_resolve_firearm(report)
 		pending_attack = {}
 	else:
@@ -371,6 +419,12 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		if actor.anatomy.downed or str(actor.get("disposition", "hostile")) != "hostile":
 			continue
 		var distance := player.distance_to(node.global_position)
+		# A locked target wins regardless of who has wandered closer, which is
+		# the entire reason to have a lock.
+		if not lock_target.is_empty() and str(actor.subject_id) == lock_target:
+			nearest_distance = distance
+			nearest_index = index
+			break
 		if distance < nearest_distance:
 			nearest_distance = distance
 			nearest_index = index
@@ -391,7 +445,18 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		# (event_count + index) % 6 — a round-robin, so aiming at a head and
 		# aiming at a knee produced the same sequence of wounds.
 		var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
-		result = rig.hit_at(player + look * clampf(nearest_distance, 0.6, reach), float(attack.damage), float(attack.impulse), str(attack.damage_type))
+		# A melee swing connects with the body in front of you; what the aim
+		# chooses is *where on that body*. Resolving a free world-space point
+		# instead made the zone depend on how far off-axis or how much higher
+		# the target happened to be standing, so a level swing at someone on a
+		# kerb opened an arm when the player was looking at a head.
+		var along := player + look * clampf((target.global_position - player).dot(look), 0.6, reach)
+		var lateral := along - target.global_position
+		lateral.y = 0.0
+		if lateral.length() > 0.45:
+			lateral = lateral.normalized() * 0.45
+		var aim := target.global_position + Vector3(lateral.x, look.y * reach * 1.2, lateral.z)
+		result = rig.hit_at(aim, float(attack.damage), float(attack.impulse), str(attack.damage_type))
 		zone = str(result.get("zone", "torso"))
 	else:
 		result = anatomy.call("apply_hit", zone, float(attack.damage), float(attack.impulse), str(attack.damage_type))
@@ -495,6 +560,7 @@ func _equip_weapon(slot: int) -> void:
 
 func _reload_weapon() -> void:
 	if arsenal.reload():
+		body_motion.trigger_reload(float(arsenal.current().reload))
 		prompt.text = "%s / RELOADING" % str(arsenal.current().label)
 
 
@@ -524,6 +590,7 @@ func _use_prosthetic_surge() -> void:
 func _interact() -> void:
 	if not panel_mode.is_empty():
 		return
+	body_motion.trigger_interaction()
 	var downed := _nearest_downed()
 	if not downed.is_empty():
 		_open_resolution(downed)
@@ -889,11 +956,131 @@ func _rival_retreats(message: String) -> void:
 	prompt.text = message
 
 
+## Live contacts for the map, expressed as plain data so the map never reaches
+## into the hunt loop for them.
+func _map_contacts() -> Array:
+	var contacts: Array = []
+	for actor in encounter_actors:
+		var node := actor.get("node") as Node3D
+		if node == null or not is_instance_valid(node) or bool(actor.get("dead", false)):
+			continue
+		var state := str(actor.get("disposition", "hostile"))
+		if actor.get("anatomy") != null and bool(actor.anatomy.downed):
+			state = "downed"
+		contacts.append({"at": Vector2(node.global_position.x, node.global_position.z), "state": state, "name": str(actor.get("display_name", ""))})
+	for cache in loose_loot:
+		if is_instance_valid(cache):
+			contacts.append({"at": Vector2(cache.global_position.x, cache.global_position.z), "state": "loot", "name": ""})
+	if enemy != null and is_instance_valid(enemy) and enemy.visible and not enemy_retreating:
+		contacts.append({"at": Vector2(enemy.global_position.x, enemy.global_position.z), "state": "hostile", "name": "MARA VOSS"})
+	return contacts
+
+
+## Lock-on. The Souls verb the third person was missing: combat could only be
+## aimed with the free camera, so a swing at someone circling you was guesswork.
+## Locked, the camera holds the pair, the body faces the target and the strike
+## resolves against them rather than against whoever happens to be nearest.
+func _lock_node() -> Node3D:
+	if lock_target.is_empty():
+		return null
+	var actor := _actor_by_id(lock_target)
+	if not actor.is_empty():
+		var node := actor.node as Node3D
+		if is_instance_valid(node) and not bool(actor.get("dead", false)):
+			return node
+	if lock_target == HUNT_ID and enemy != null and is_instance_valid(enemy) and enemy.visible and not enemy_retreating:
+		return enemy
+	lock_target = ""
+	return null
+
+
+func _lock_candidates() -> Array:
+	var found: Array = []
+	for actor in encounter_actors:
+		var node := actor.get("node") as Node3D
+		if node == null or not is_instance_valid(node) or bool(actor.get("dead", false)):
+			continue
+		var gap: float = player.distance_to(node.global_position)
+		if gap <= 26.0:
+			found.append({"id": str(actor.subject_id), "node": node, "gap": gap})
+	if enemy != null and is_instance_valid(enemy) and enemy.visible and not enemy_retreating:
+		var mara_gap: float = player.distance_to(enemy.global_position)
+		if mara_gap <= 26.0:
+			found.append({"id": HUNT_ID, "node": enemy, "gap": mara_gap})
+	found.sort_custom(func(a, b): return float(a.gap) < float(b.gap))
+	return found
+
+
+func _toggle_lock() -> void:
+	if not lock_target.is_empty():
+		lock_target = ""
+		prompt.text = "LOCK RELEASED"
+		return
+	var candidates := _lock_candidates()
+	if candidates.is_empty():
+		prompt.text = "NOTHING TO LOCK"
+		return
+	# Prefer what the player is already looking at; fall back to the nearest.
+	var forward := Vector3(sin(yaw), 0, cos(yaw)).normalized()
+	var best: Dictionary = candidates[0]
+	var best_score := -2.0
+	for candidate in candidates:
+		var toward: Vector3 = (candidate.node.global_position - player)
+		toward.y = 0.0
+		var score: float = forward.dot(toward.normalized()) - float(candidate.gap) * 0.012
+		if score > best_score:
+			best_score = score
+			best = candidate
+	lock_target = str(best.id)
+	prompt.text = "LOCKED / %s" % lock_target.to_upper().replace("_", " ")
+
+
+func _cycle_lock(direction: int) -> void:
+	var candidates := _lock_candidates()
+	if candidates.size() < 2:
+		return
+	var index := 0
+	for position in candidates.size():
+		if str(candidates[position].id) == lock_target:
+			index = position
+			break
+	lock_target = str(candidates[(index + direction + candidates.size()) % candidates.size()].id)
+
+
+## Locked, the camera is steered rather than mouse-driven, which is what makes
+## circling a target readable. Mouse input still nudges it so it never feels
+## taken away from the player.
+func _steer_lock(delta: float) -> void:
+	var node := _lock_node()
+	lock_screen = Vector2(-1, -1)
+	if node == null:
+		return
+	if player.distance_to(node.global_position) > 30.0:
+		lock_target = ""
+		prompt.text = "LOCK LOST"
+		return
+	var toward := node.global_position - player
+	var desired_yaw := atan2(toward.x, toward.z)
+	var flat := Vector2(toward.x, toward.z).length()
+	var desired_pitch := clampf(-atan2(toward.y + 0.6, maxf(flat, 0.5)) - 0.06, -0.75, 0.42)
+	yaw = lerp_angle(yaw, desired_yaw, clampf(delta * 7.0, 0.0, 1.0))
+	pitch = lerpf(pitch, desired_pitch, clampf(delta * 5.0, 0.0, 1.0))
+	if camera != null and not camera.is_position_behind(node.global_position + Vector3.UP * 1.1):
+		lock_screen = camera.unproject_position(node.global_position + Vector3.UP * 1.1)
+
+
 func _toggle_panel(mode: String) -> void:
 	allusions_artwork.close_artwork()
 	panel_mode = "" if panel_mode == mode else mode
 	character_archive.visible = panel_mode == "tree"
-	panel.visible = not panel_mode.is_empty() and panel_mode != "tree"
+	# The map is a chart now, not a paragraph, so it owns its own surface.
+	living_map.visible = panel_mode == "map"
+	if living_map.visible:
+		living_map.open_map()
+	# The chart is a full sheet; the field labels underneath it are just noise.
+	for label in [title, status, vitals, prompt]:
+		label.visible = not living_map.visible
+	panel.visible = not panel_mode.is_empty() and panel_mode not in ["tree", "map"]
 	if character_archive.visible:
 		character_archive.open_archive(HUNT_ID)
 	else:
@@ -910,6 +1097,7 @@ func _toggle_artwork() -> void:
 	else:
 		panel.visible = false
 		character_archive.close_archive()
+		living_map.close_map()
 		panel_mode = "artwork"
 		allusions_artwork.open_artwork()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if panel_mode.is_empty() else Input.MOUSE_MODE_VISIBLE
@@ -918,9 +1106,7 @@ func _toggle_artwork() -> void:
 func _refresh_archive() -> void:
 	var mara := WorldHistory.subject(HUNT_ID)
 	var nix := WorldHistory.subject(FRIEND_ID)
-	if panel_mode == "map":
-		archive.text = "LIVING MAP // LIMBO: ASHBLOOM EXPANSE\n\n[BONE YARD] Rusted quarry / Ashline territory\n[BLACK MILE] Raider highway beyond the storm pylons\n[SOFT ROT] Irradiated fungal forest / shifting paths\n[OSSUARY] Sealed anatomy works below the ridge\n[TUNNEL] Floodlit trade route under the quarry\n\nThe map expands through witness accounts, tracks and surviving encounters."
-	elif panel_mode == "tree":
+	if panel_mode == "tree":
 		var player := WorldHistory.subject("player")
 		var player_axis := WorldHistory.tree_alignment(player)
 		var nix_axis := WorldHistory.tree_alignment(nix)
@@ -939,7 +1125,7 @@ func _update_hud() -> void:
 	title.text = "ALLUSIONS TO GRANDEUR // LIMBO: ASHBLOOM EXPANSE"
 	status.text = "WASD MOVE  SHIFT RUN  LMB STRIKE  SPACE DODGE  Q SURGE\nE INTERACT  TAB INDEX  M MAP  T TREE  J ALLUSIONS  F CAMERA"
 	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(HUNT_ID).get("status", "dormant")).to_upper()]
-	prompt.visible = not resolution_ui.visible
+	prompt.visible = not resolution_ui.visible and not living_map.visible
 	if panel.visible:
 		_refresh_archive()
 	if field_interface.has_method("set_state"):
@@ -947,14 +1133,16 @@ func _update_hud() -> void:
 			"health": health,
 			"stamina": stamina,
 			"rival_status": WorldHistory.subject(HUNT_ID).get("status", "dormant"),
-			"menu_open": panel.visible or character_archive.visible or allusions_artwork.visible,
+			"menu_open": panel.visible or character_archive.visible or allusions_artwork.visible or living_map.visible,
 			"menu_mode": panel_mode,
 			"weapon": arsenal.state() if arsenal != null else {},
+			"lock_screen": lock_screen,
 		})
 
 
 func _update_camera() -> void:
 	if resolution_ui != null and resolution_ui.visible:
+		camera.fov = 72.0
 		var subject := _actor_by_id(resolution_target)
 		if not subject.is_empty():
 			var focus: Vector3 = subject.node.global_position + Vector3.UP * 0.65
@@ -980,21 +1168,65 @@ func _update_camera() -> void:
 				player_head.visible = false
 			return
 	var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+	var physical_offset := Vector3.ZERO
+	if body_motion != null:
+		var local_offset: Vector3 = body_motion.camera_offset
+		var flat_forward := Vector3(sin(yaw), 0, cos(yaw))
+		var flat_right := Vector3(flat_forward.z, 0, -flat_forward.x)
+		physical_offset = flat_right * local_offset.x + Vector3.UP * local_offset.y + flat_forward * local_offset.z
+		camera.fov = 72.0 + body_motion.fov_add
 	if third_person:
-		var focus := player + Vector3.UP * 0.55
-		var desired := player - look * 6.5 + Vector3.UP * 1.4
+		# Souls framing rather than a chase cam parked behind the head: the body
+		# sits off-centre over one shoulder and low in frame, the rig is close
+		# enough to read a swing on, and the whole thing is spring-damped so it
+		# trails the player instead of snapping to a computed point each frame.
+		var locked := _lock_node()
+		var focus := player + Vector3.UP * 0.95
+		var shoulder := Vector3(cos(yaw), 0, -sin(yaw)) * 0.62
+		var distance := 4.4 if locked != null else 3.8
+		if locked != null:
+			# Framing holds the pair, so backing off a locked target widens the
+			# shot instead of losing them behind the player's own shoulder.
+			var gap: float = player.distance_to(locked.global_position)
+			distance = clampf(3.6 + gap * 0.22, 3.6, 6.2)
+			focus = focus.lerp(locked.global_position + Vector3.UP * 0.9, 0.32)
+		var desired := player - look * distance + Vector3.UP * 0.85 + shoulder + physical_offset * 0.35
+		if not camera_ready:
+			camera_position = desired
+			camera_ready = true
+		var responsiveness := 15.0 if locked != null else 11.0
+		camera_position = camera_position.lerp(desired, clampf(get_physics_process_delta_time() * responsiveness, 0.0, 1.0))
+		# The wall test is the last thing that happens, on the position actually
+		# used. Testing the *target* and then smoothing toward it let the camera
+		# sit inside a building for every frame of the blend, which is how the
+		# spawn view ended up as a wall of brown.
 		camera.global_position = HUNTER_MOTOR.collision_safe_camera(
 			get_world_3d().direct_space_state,
 			focus,
-			desired,
+			camera_position,
 			[player_body.get_rid()]
 		)
-		camera.look_at(player + look * 8.0 + Vector3.UP * 0.6)
+		if locked != null:
+			# Locked, the shot is about the pair, so aim between them.
+			camera.look_at(focus, Vector3.UP)
+		else:
+			# Unlocked, aim parallel to the look heading rather than at the
+			# player. Aiming *at* the player cancels the shoulder offset and
+			# re-centres the body, which is what made this read as a chase cam
+			# parked behind the head instead of an over-the-shoulder shot.
+			camera.look_at(camera.global_position + look * 12.0, Vector3.UP)
 	else:
-		camera.global_position = player
+		camera.global_position = player + physical_offset
 		camera.look_at(player + look * 12.0)
+	if body_motion != null:
+		camera.rotation.z += body_motion.camera_roll * (0.45 if third_person else 1.0)
 	if player_rig != null and is_instance_valid(player_rig):
-		player_rig.rotation.y = yaw + PI
+		var facing := yaw + PI
+		var locked_body := _lock_node()
+		if locked_body != null and third_person:
+			var toward := locked_body.global_position - player
+			facing = atan2(toward.x, toward.z) + PI
+		player_rig.rotation.y = lerp_angle(player_rig.rotation.y, facing, clampf(get_physics_process_delta_time() * 12.0, 0.0, 1.0))
 		# The first-person camera sits inside the skull, so the head would fill
 		# the view. Everything else stays on: looking down at your own ruined
 		# arm is the entire point of the player having a body.
@@ -1061,6 +1293,8 @@ func _build_expanse_systems() -> void:
 	add_child(misfire_director)
 	misfire_director.connect("misfire_triggered", _on_reality_misfire)
 	misfire_director.call("generate", 774013, Vector2(470, 370), 18)
+	if living_map != null:
+		living_map.bind(generated_world, misfire_director, _map_contacts)
 
 
 func _on_reality_misfire(encounter: Dictionary, at: Vector3) -> void:

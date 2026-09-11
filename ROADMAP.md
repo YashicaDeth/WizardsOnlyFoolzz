@@ -225,6 +225,62 @@ Sequencing, so this can be built without one enormous drop:
 - **The menu colour setting had never worked.** It wrote
   `ambient_light_color` on a sky-sourced environment, which does nothing.
 
+### Play-test feedback from Greg, 2026-09-11 — captured whole
+
+Fired in a burst mid-session. Recorded here in full rather than half-built, per
+the rule in §10 of the brief. Two were fixed the same session; the rest are
+sequenced below and none of them are dropped.
+
+**Fixed this session.**
+
+- **"The map is still broken."** It was: `M` opened five lines of hardcoded
+  prose describing districts. It is now `systems/living_map.gd`, a real chart
+  drawn from the generated world — actual road spines, actual building
+  footprints from `AshbloomWorldGenerator.lots`, the real Reality Misfire seeds,
+  live contacts, and the player's heading. Ground is **surveyed by walking**:
+  unwalked cells are hatched over and withhold what stands on them, and the
+  survey persists in `WorldHistory` as `ashbloom_survey`.
+- **"The third person is shit and not like DS3."** Three separate causes.
+  The camera was parked 6.5 m dead behind the head with no smoothing, so it
+  read as an RTS chase cam; there was **no lock-on at all**, so a swing at
+  anyone circling you was guesswork; and aiming *at* the player cancelled any
+  shoulder offset and re-centred the body every frame. Now: spring-damped
+  over-the-shoulder framing aimed parallel to the look heading, lock-on on
+  `Z` / middle mouse with wheel to cycle, the body turning to face a locked
+  target, and a reticle on the mark. A locked target also wins the strike over
+  a nearer body, which is the actual fix for "combat doesn't work".
+- **Melee aim was resolving against a free world-space point**, so the zone
+  opened depended on how far off-axis or how much higher the target stood. A
+  level swing at someone on a kerb opened an arm. Aim now chooses *where on the
+  body* the blow lands, relative to that body.
+
+**Still outstanding, in the order they should be taken.**
+
+1. **The derby crowds the player.** "After 5 to 10 seconds you get crowded by
+   like 10 NPCs all ramming." All twelve wreckers currently converge on the
+   player because the AI has no target selection beyond "the player". Needs
+   target spread across the pit, an engagement cap, and aggression that ramps
+   with the heat rather than starting at maximum. This is the single biggest
+   thing making the derby unplayable and should be taken next.
+2. **The derby arena is too small.** "The map for the derby is way too tiny."
+   The Bone Yard bowl was rescaled once but the drivable area still funnels
+   twelve cars into one collision soup, which compounds item 1.
+3. **Gore does not read in play.** The rig carries blood, fractures, spilled
+   organs and severed limbs, and the settings expose FULL/REDUCED/OFF, but Greg
+   is not seeing it during combat. Needs a play-verified pass: volume, lifetime,
+   spawn position relative to a moving body, and whether the default setting is
+   even landing on FULL.
+4. **The opening is "cool but kinda lacklustre."** `vat_chamber.tscn` works but
+   is under-directed — pacing, camera, sound and the handler's delivery.
+5. **The seams read as dev tools.** "The constant reset and switching worlds…
+   nothing seems seamless." Scene transitions are hard cuts between separate
+   `.tscn` files with no covering. Greg explicitly said he would **welcome
+   loading screens** here — the Postal 2-register procedural anatomy
+   interstitials already specified in Tier 2.6 are the answer, and they are now
+   blocking rather than cosmetic.
+6. **Player-facing reset keys and debug affordances** should come out of the
+   shipping input map or be gated behind a developer flag.
+
 ### Tier 1b — combat, added 2026-09-11
 
 **Movement prerequisite completed 2026-09-11.** The original Hunt controller

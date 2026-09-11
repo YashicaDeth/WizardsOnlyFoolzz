@@ -359,8 +359,8 @@ func _wreck_target(target: Node3D, impact_energy: int) -> void:
 		var color := Color("641611") if is_viscera else Color("6b5340")
 		mesh.material = _material(color, 0.0, "flesh" if is_viscera else "rust", index + 1)
 		chunk.mesh = mesh
-		chunk.global_position = target.global_position + Vector3(0, 0.8, 0)
 		add_child(chunk)
+		chunk.global_position = target.global_position + Vector3(0, 0.8, 0)
 		var outward := (chunk.global_position - boat.global_position).normalized()
 		debris.append({"node": chunk, "velocity": outward * (5.0 + index % 5) + Vector3.UP * (3.0 + index % 4), "life": 2.6})
 	targets.erase(target)
@@ -403,8 +403,8 @@ func _spawn_impact_debris(at: Vector3, direction: Vector3, count: int) -> void:
 		mesh.size = Vector3(0.16 + randf() * 0.2, 0.05 + randf() * 0.09, 0.14 + randf() * 0.18)
 		mesh.material = _material(Color("55402c") if index % 2 == 0 else Color("2b3328"), 0.0, "rust", index + 7)
 		shard.mesh = mesh
-		shard.global_position = at + Vector3(randf_range(-0.6, 0.6), 0.7 + randf() * 0.6, randf_range(-0.6, 0.6))
 		add_child(shard)
+		shard.global_position = at + Vector3(randf_range(-0.6, 0.6), 0.7 + randf() * 0.6, randf_range(-0.6, 0.6))
 		var spray := (direction + Vector3(randf_range(-0.7, 0.7), randf_range(0.4, 1.1), randf_range(-0.7, 0.7))).normalized()
 		debris.append({"node": shard, "velocity": spray * (4.0 + randf() * 5.0), "life": 1.8})
 
@@ -425,6 +425,9 @@ func _update_respawns(delta: float) -> void:
 
 func _update_debris(delta: float) -> void:
 	for piece in debris.duplicate():
+		if not is_instance_valid(piece.node) or not piece.node.is_inside_tree():
+			debris.erase(piece)
+			continue
 		piece.velocity.y -= 12.0 * delta
 		piece.node.position += piece.velocity * delta
 		piece.node.rotate(Vector3(1, 0.7, 0.3).normalized(), delta * 7.0)

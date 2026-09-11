@@ -39,5 +39,34 @@ func _ready() -> void:
 			wounded_zones.append(zone)
 	check(not wounded_zones.is_empty() and wounded_zones.all(func(zone): return BaselineHuman.ZONES.has(zone)), "firearm reports canonical anatomy zones %s" % str(wounded_zones))
 	check(WorldHistory.recent_events(12).any(func(event): return str(event.get("type", "")) == "weapon_fired"), "weapon discharge enters world history")
+
+	# Lock-on: the verb that makes third-person combat aimable at all.
+	hunt.third_person = true
+	hunt.lock_target = ""
+	# A fresh body: the shotgun target above may already be down or dead, and a
+	# lock is only ever offered on someone still standing.
+	var lock_at: Vector3 = hunt.player + Vector3(0, -0.5, 5)
+	hunt._spawn_encounter_actor({"instance_id": "lock_subject", "kind": "hostile"}, lock_at)
+	var locked_actor: Dictionary = hunt.encounter_actors.back()
+	locked_actor.node.position = lock_at
+	await get_tree().physics_frame
+	hunt._toggle_lock()
+	check(hunt.lock_target == str(locked_actor.subject_id), "lock acquires the nearby hostile (%s)" % hunt.lock_target)
+	hunt._steer_lock(0.5)
+	check(hunt.lock_screen.x >= 0.0, "locked target reports a reticle position")
+	# A second body closer to the player must not steal the swing.
+	var closer: Vector3 = hunt.player + Vector3(0.4, -0.5, 1.2)
+	hunt._spawn_encounter_actor({"instance_id": "lock_decoy", "kind": "hostile"}, closer)
+	var decoy: Dictionary = hunt.encounter_actors.back()
+	decoy.node.position = closer
+	var decoy_wounds: int = decoy.anatomy.wounds.size()
+	var locked_wounds: int = locked_actor.anatomy.wounds.size()
+	hunt._equip_weapon(0)
+	hunt._attack_nearest_encounter_actor({"damage": 20.0, "impulse": 10.0, "damage_type": "cut", "range": 9.0, "weapon": "cleaver"})
+	check(decoy.anatomy.wounds.size() == decoy_wounds, "a nearer body does not steal a locked strike")
+	check(locked_actor.anatomy.wounds.size() > locked_wounds, "the locked target takes the strike")
+	hunt._toggle_lock()
+	check(hunt.lock_target.is_empty(), "lock releases")
+
 	print("COMBAT_INTEGRATION_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

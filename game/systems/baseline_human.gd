@@ -150,6 +150,9 @@ func build(id: String, config: Dictionary = {}) -> void:
 	anatomy.configure(id, float(config.get("blood", 5000.0)), config.get("cybernetics", {}))
 	anatomy.organ_ruptured.connect(_on_organ_ruptured)
 	anatomy.went_down.connect(_on_went_down)
+	# Initial prosthetics must read on the mesh before the body is wounded.
+	for zone_id in ZONES:
+		_refresh_zone(zone_id)
 	if config.get("restore") is Dictionary:
 		anatomy.restore(config.restore)
 		if anatomy.downed:

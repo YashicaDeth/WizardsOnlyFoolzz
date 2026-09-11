@@ -109,6 +109,13 @@ func _ready() -> void:
 
 	# The player finally has a body rather than only a health integer.
 	check(hunt.player_rig is BaselineHuman, "the player has a baseline rig")
+	Input.action_press("crouch")
+	hunt._update_player(0.2)
+	Input.action_release("crouch")
+	check(hunt.player_capsule.height < 1.8 and hunt.player_collider.position.y < 0.0, "crouch lowers both capsule and centre without lifting the feet")
+	for stand_frame in 4:
+		hunt._update_player(0.2)
+	check(is_equal_approx(hunt.player_capsule.height, 1.8), "released crouch restores standing collision")
 	hunt.third_person = false
 	hunt._update_camera()
 	check(not hunt.player_rig.parts["head"].visible, "first person hides the player's own head")

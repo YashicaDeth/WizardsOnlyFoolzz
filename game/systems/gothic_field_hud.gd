@@ -19,6 +19,9 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
+var lock_screen := Vector2(-1, -1)
+
+
 func set_state(values: Dictionary) -> void:
 	health = float(values.get("health", health))
 	stamina = float(values.get("stamina", stamina))
@@ -26,6 +29,7 @@ func set_state(values: Dictionary) -> void:
 	menu_open = bool(values.get("menu_open", menu_open))
 	menu_mode = str(values.get("menu_mode", menu_mode)).to_upper()
 	weapon = values.get("weapon", weapon)
+	lock_screen = values.get("lock_screen", lock_screen)
 
 
 func _process(delta: float) -> void:
@@ -34,13 +38,19 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
+	# A full-sheet panel — the chart, the dossier, the artwork — owns the screen.
+	# Leaving the field furniture drawn over the top of it was the reason those
+	# panels always looked like a debug overlay instead of a thing you opened.
+	if menu_open:
+		if menu_mode not in ["MAP", "TREE", "ARTWORK"]:
+			_draw_full_archive_frame()
+		return
 	_draw_regal_vitals()
 	_draw_location_crest()
 	_draw_hunt_thread()
 	_draw_weapon()
+	_draw_lock_reticle()
 	_draw_controls()
-	if menu_open:
-		_draw_full_archive_frame()
 
 
 func _draw_regal_vitals() -> void:
@@ -134,3 +144,20 @@ func _draw_full_archive_frame() -> void:
 	for branch in 11:
 		var end := center + Vector2((branch - 5) * 52, -half.y + 62 + abs(branch - 5) * 13)
 		draw_line(root, end, TEAL * Color(1, 1, 1, 0.08), 1)
+
+
+## The lock reticle. Without a mark on the target the camera change alone leaves
+## the player guessing which of three bodies the swing is going to.
+func _draw_lock_reticle() -> void:
+	if menu_open or lock_screen.x < 0.0 or lock_screen.y < 0.0:
+		return
+	var pulse := 0.5 + 0.5 * sin(elapsed * 4.0)
+	var tint := Color("c81f16")
+	var radius := 15.0 + pulse * 3.0
+	for quadrant in 4:
+		var angle := TAU * float(quadrant) / 4.0 + PI * 0.25 + elapsed * 0.35
+		var at := lock_screen + Vector2.from_angle(angle) * radius
+		var tangent := Vector2.from_angle(angle + PI * 0.5) * 5.0
+		draw_line(at - tangent, at + tangent, tint, 2.0)
+	draw_circle(lock_screen, 2.2, tint * Color(1, 1, 1, 0.6 + pulse * 0.4))
+	draw_arc(lock_screen, radius + 7.0, 0.0, TAU, 26, tint * Color(1, 1, 1, 0.18), 1.0)
