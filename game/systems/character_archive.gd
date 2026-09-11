@@ -32,11 +32,86 @@ var last_pointer := Vector2.ZERO
 var elapsed := 0.0
 
 
+const ACID := Color("9bf01a")
+const MAGENTA := Color("ff2fa0")
+const BILE := Color("b8a12a")
+const BRUISE := Color("6a2d6e")
+const ARTERIAL := Color("c81f16")
+
+var tissue_texture: ImageTexture
+var interference_texture: ImageTexture
+
+
 func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	clip_contents = true
+	# Polygon UVs above 1.0 only repeat when the canvas item allows it, and the
+	# repetition is the whole point: tiled tissue reads as meat, a single
+	# stretched gradient reads as a diagram.
+	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	tissue_texture = _build_tissue_texture()
+	interference_texture = _build_interference_texture()
 	set_process(true)
+
+
+## Cellular noise at tile scale. Generated rather than authored so the dossier
+## carries no external texture dependency and still reads as wet organic matter
+## instead of flat vector shapes.
+func _build_tissue_texture() -> ImageTexture:
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_CELLULAR
+	noise.cellular_return_type = FastNoiseLite.RETURN_DISTANCE2_DIV
+	noise.cellular_jitter = 1.0
+	noise.frequency = 0.055
+	noise.fractal_octaves = 3
+	var vein := FastNoiseLite.new()
+	vein.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	vein.frequency = 0.021
+	var image := Image.create(128, 128, false, Image.FORMAT_RGBA8)
+	for y in 128:
+		for x in 128:
+			var cell := absf(noise.get_noise_2d(float(x), float(y)))
+			var streak := absf(vein.get_noise_2d(float(x) * 2.0, float(y)))
+			var wet := clampf(cell * 1.35 + streak * 0.4, 0.0, 1.0)
+			# Darker gaps between cells become the membrane lines.
+			var membrane := smoothstep(0.72, 0.98, cell)
+			var value := clampf(wet - membrane * 0.55, 0.0, 1.0)
+			image.set_pixel(x, y, Color(0.55 + value * 0.45, 0.2 + value * 0.35, 0.2 + value * 0.3, 1.0))
+	return ImageTexture.create_from_image(image)
+
+
+func _build_interference_texture() -> ImageTexture:
+	var image := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	for y in 64:
+		for x in 64:
+			var scan := 0.5 + 0.5 * sin(float(y) * 1.6)
+			var hashed := sin(float(x * 71 + y * 131)) * 43758.5453
+			var speckle := hashed - floorf(hashed)
+			var value := clampf(scan * 0.45 + speckle * 0.55, 0.0, 1.0)
+			image.set_pixel(x, y, Color(value, value, value, 0.5 + value * 0.5))
+	return ImageTexture.create_from_image(image)
+
+
+func _tiled_polygon(points: PackedVector2Array, color: Color, texture: Texture2D, tile_px: float) -> void:
+	var uvs := PackedVector2Array()
+	for point in points:
+		uvs.append(point / tile_px)
+	draw_colored_polygon(points, color, uvs, texture)
+
+
+func _limb(from: Vector2, to: Vector2, width: float) -> PackedVector2Array:
+	var direction := (to - from).normalized()
+	var side := Vector2(-direction.y, direction.x) * width * 0.5
+	return PackedVector2Array([from + side, to + side * 0.72, to - side * 0.72, from - side])
+
+
+func _disc(center: Vector2, radius_x: float, radius_y: float, segments: int = 18) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for index in segments:
+		var angle := TAU * float(index) / float(segments)
+		points.append(center + Vector2(cos(angle) * radius_x, sin(angle) * radius_y))
+	return points
 
 
 func open_archive(focus_id: String = "mara_voss") -> void:
@@ -240,35 +315,109 @@ func _rank_title(elo: int) -> String:
 
 func _draw_body_slice(rect: Rect2, xray: bool, subject: Dictionary) -> void:
 	var center := Vector2(rect.get_center().x, rect.position.y + 145)
-	var tissue := TEAL * Color(1, 1, 1, 0.18) if xray else Color("6c2823")
-	var bone := TEAL * Color(1, 1, 1, 0.75) if xray else Color("251315")
-	draw_circle(center + Vector2(0, -84), 25, tissue)
-	draw_rect(Rect2(center + Vector2(-27, -56), Vector2(54, 100)), tissue)
-	draw_line(center + Vector2(-24, -45), center + Vector2(-47, 34), tissue, 17)
-	draw_line(center + Vector2(24, -45), center + Vector2(47, 34), tissue, 17)
-	draw_line(center + Vector2(-16, 40), center + Vector2(-23, 103), tissue, 19)
-	draw_line(center + Vector2(16, 40), center + Vector2(23, 103), tissue, 19)
+	var pulse := 0.5 + 0.5 * sin(elapsed * 2.4)
+
+	# Repeating substrate under everything. Tiled interference on the scan side,
+	# tiled tissue on the meat side.
+	draw_texture_rect(interference_texture, rect, true, Color(1, 1, 1, 0.07 if xray else 0.045))
+
+	var skin_tint := TEAL * Color(1, 1, 1, 0.3) if xray else Color("5e241c")
+	# Shoulders wider than waist, tapered neck, ovoid skull: enough silhouette to
+	# read as a person before any detail lands on it.
+	var torso := PackedVector2Array([
+		center + Vector2(-20, -62), center + Vector2(20, -62),
+		center + Vector2(30, -48), center + Vector2(27, 2),
+		center + Vector2(20, 44), center + Vector2(-20, 44),
+		center + Vector2(-27, 2), center + Vector2(-30, -48),
+	])
+	_tiled_polygon(torso, skin_tint, tissue_texture, 46.0)
+	_tiled_polygon(_limb(center + Vector2(-25, -48), center + Vector2(-47, 36), 15), skin_tint, tissue_texture, 38.0)
+	_tiled_polygon(_limb(center + Vector2(25, -48), center + Vector2(47, 36), 15), skin_tint, tissue_texture, 38.0)
+	_tiled_polygon(_limb(center + Vector2(-13, 40), center + Vector2(-20, 104), 18), skin_tint, tissue_texture, 40.0)
+	_tiled_polygon(_limb(center + Vector2(13, 40), center + Vector2(20, 104), 18), skin_tint, tissue_texture, 40.0)
+	_tiled_polygon(_limb(center + Vector2(-7, -66), center + Vector2(-7, -56), 14), skin_tint, tissue_texture, 20.0)
+	_tiled_polygon(_disc(center + Vector2(0, -86), 21.0, 25.0), skin_tint, tissue_texture, 34.0)
+
 	if xray:
-		draw_line(center + Vector2(0, -55), center + Vector2(0, 46), bone, 4)
+		var bone := Color("d8e6c8")
+		# Viscera first, skeleton over it, so organs read as sitting inside the cage.
+		_draw_viscera(center, pulse)
+		draw_line(center + Vector2(0, -55), center + Vector2(0, 46), bone * Color(1, 1, 1, 0.85), 4)
 		for rib in 5:
-			var y := -38.0 + rib * 14.0
-			draw_arc(center + Vector2(0, y), 23 - rib * 1.5, 0.25, PI - 0.25, 14, bone, 2)
-		draw_circle(center + Vector2(-10, -22), 12, BLOOD * Color(1, 1, 1, 0.72))
-		draw_circle(center + Vector2(12, -23), 16, SPORE * Color(1, 1, 1, 0.5))
-		draw_colored_polygon(PackedVector2Array([center + Vector2(-16, 3), center + Vector2(12, 1), center + Vector2(17, 27), center + Vector2(-10, 33)]), Color("8a4428"))
+			var y := -40.0 + rib * 14.0
+			draw_arc(center + Vector2(0, y), 25 - rib * 1.6, 0.22, PI - 0.22, 16, bone * Color(1, 1, 1, 0.78), 2)
+			draw_arc(center + Vector2(0, y), 25 - rib * 1.6, PI + 0.22, TAU - 0.22, 16, bone * Color(1, 1, 1, 0.35), 1)
+		# Skull plate and jaw.
+		draw_arc(center + Vector2(0, -86), 22, PI, TAU, 20, bone * Color(1, 1, 1, 0.7), 2)
+		draw_line(center + Vector2(-13, -74), center + Vector2(13, -74), bone * Color(1, 1, 1, 0.5), 2)
+		_draw_capillaries(center)
 		var anatomy: Dictionary = subject.get("anatomy", {})
 		var cybernetics: Array = anatomy.get("cybernetics", [])
 		for index in cybernetics.size():
-			var module_pos := center + Vector2(30 if index % 2 == 0 else -30, -30 + index * 31)
-			draw_rect(Rect2(module_pos - Vector2(8, 6), Vector2(16, 12)), TEAL)
-			draw_line(module_pos, center, TEAL * Color(1, 1, 1, 0.45), 1)
+			var module_pos := center + Vector2(32 if index % 2 == 0 else -32, -30 + index * 31)
+			draw_rect(Rect2(module_pos - Vector2(9, 7), Vector2(18, 14)), MAGENTA * Color(1, 1, 1, 0.22))
+			draw_rect(Rect2(module_pos - Vector2(9, 7), Vector2(18, 14)), MAGENTA, false, 1.5)
+			draw_line(module_pos, center, MAGENTA * Color(1, 1, 1, 0.4), 1)
 		_draw_tree_alignment(rect, subject)
 	else:
+		# Bruising and discoloration blotches before the wounds themselves.
+		for index in 5:
+			var blotch := center + Vector2(sin(index * 2.7) * 26.0, -40.0 + index * 27.0)
+			draw_circle(blotch, 9.0 + float(index % 3) * 4.0, BRUISE * Color(1, 1, 1, 0.22))
 		var wounds: Array = subject.get("wounds", [])
 		for index in wounds.size():
 			var wound_pos := center + Vector2(-18 + index * 15, -20 + index * 26)
-			draw_line(wound_pos - Vector2(7, 7), wound_pos + Vector2(7, 7), BLOOD, 3)
-			draw_line(wound_pos + Vector2(7, -7), wound_pos - Vector2(7, 7), BLOOD, 2)
+			draw_circle(wound_pos, 8.0, Color("2b0806") * Color(1, 1, 1, 0.85))
+			draw_circle(wound_pos, 4.5, ARTERIAL)
+			# Ragged edge rather than a tidy cross.
+			for spur in 6:
+				var angle := TAU * spur / 6.0 + float(index)
+				var reach := 7.0 + fmod(float(spur * 13 + index * 7), 5.0)
+				draw_line(wound_pos, wound_pos + Vector2.from_angle(angle) * reach, ARTERIAL * Color(1, 1, 1, 0.75), 2)
+			# Run-off.
+			draw_line(wound_pos, wound_pos + Vector2(2, 16 + float(index % 3) * 9.0), Color("5e0f0b"), 3)
+
+	# Colour clash overlay: an acid pass that fights the base palette instead of
+	# harmonising with it.
+	draw_texture_rect(interference_texture, rect, true, (ACID if xray else MAGENTA) * Color(1, 1, 1, 0.05))
+
+
+func _draw_viscera(center: Vector2, pulse: float) -> void:
+	# Lungs.
+	_tiled_polygon(PackedVector2Array([
+		center + Vector2(-24, -46), center + Vector2(-6, -42),
+		center + Vector2(-8, -6), center + Vector2(-23, -10),
+	]), BRUISE * Color(1, 1, 1, 0.72), tissue_texture, 26.0)
+	_tiled_polygon(PackedVector2Array([
+		center + Vector2(24, -46), center + Vector2(6, -42),
+		center + Vector2(8, -6), center + Vector2(23, -10),
+	]), BRUISE * Color(1, 1, 1, 0.72), tissue_texture, 26.0)
+	# Heart, beating.
+	var heart := center + Vector2(-3, -26)
+	draw_circle(heart, 11.0 + pulse * 2.4, ARTERIAL * Color(1, 1, 1, 0.9))
+	draw_circle(heart + Vector2(5, -4), 7.0 + pulse * 1.6, ARTERIAL * Color(1, 1, 1, 0.75))
+	draw_circle(heart, 4.0, MAGENTA * Color(1, 1, 1, 0.5 + pulse * 0.4))
+	# Liver.
+	_tiled_polygon(PackedVector2Array([
+		center + Vector2(-18, 2), center + Vector2(14, 0),
+		center + Vector2(19, 24), center + Vector2(-12, 30),
+	]), BILE * Color(1, 1, 1, 0.6), tissue_texture, 30.0)
+	# Coiled intestine.
+	for coil in 7:
+		var t := float(coil) / 7.0
+		var loop_centre := center + Vector2(-14.0 + fmod(float(coil) * 9.0, 28.0), 30.0 + t * 14.0)
+		draw_arc(loop_centre, 7.0 + float(coil % 3) * 2.0, 0.0, TAU, 14, Color("9a5a3c") * Color(1, 1, 1, 0.8), 3)
+	draw_circle(center + Vector2(16, 12), 6.0, ACID * Color(1, 1, 1, 0.35))
+
+
+func _draw_capillaries(center: Vector2) -> void:
+	for branch in 9:
+		var angle := TAU * branch / 9.0 + 0.4
+		var start := center + Vector2.from_angle(angle) * 12.0
+		var mid := center + Vector2.from_angle(angle + 0.3) * 30.0
+		var tip := center + Vector2.from_angle(angle + 0.1) * 46.0
+		draw_polyline(PackedVector2Array([start, mid, tip]), ARTERIAL * Color(1, 1, 1, 0.3), 1.4)
+		draw_line(mid, mid + Vector2.from_angle(angle - 0.9) * 11.0, ARTERIAL * Color(1, 1, 1, 0.2), 1.0)
 
 
 ## The Deep X-ray doubles as an "as above, so below" reading: the same scan

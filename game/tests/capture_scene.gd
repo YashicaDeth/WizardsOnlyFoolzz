@@ -20,12 +20,27 @@ func _ready() -> void:
 		elif argument.begins_with("--frames="):
 			settle_frames = int(argument.trim_prefix("--frames="))
 
+	var archive_subject := ""
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--archive="):
+			archive_subject = argument.trim_prefix("--archive=")
+
 	var packed := load(scene_path)
 	if packed == null:
 		print("CAPTURE_FAILED: could not load ", scene_path)
 		get_tree().quit(1)
 		return
-	add_child(packed.instantiate())
+	var scene: Node = packed.instantiate()
+	add_child(scene)
+
+	if not archive_subject.is_empty():
+		await get_tree().process_frame
+		var archive: Node = scene.get_node_or_null("HUD/CharacterArchive")
+		if archive == null:
+			print("CAPTURE_FAILED: no HUD/CharacterArchive in ", scene_path)
+			get_tree().quit(1)
+			return
+		archive.open_archive(archive_subject)
 
 	# Procedural noise textures and the sky resolve over several frames; capturing
 	# immediately yields an untextured, unlit frame that misrepresents the look.

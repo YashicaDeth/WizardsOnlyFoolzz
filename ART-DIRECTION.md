@@ -28,3 +28,34 @@ Aim the satire at institutions and power — the factions, their doctrines, the 
 ## UI language
 
 The game HUD should borrow the rough menu energy of old PC action games while remaining CellOutz: chunky card panels, offset labels, tiny status chips, hand-drawn arrows, and floating scrap badges. Menus should be functional first; texture, grain, decals, and animated paper jitter are the finishing pass.
+
+### Density: the interface is a made object
+
+The target is not a clean engine HUD with a texture on it. It is an intricate, layered, hand-composited artefact — the kind of thing built up in Photoshop across dozens of layers — that happens to be functional. Interfaces have personality (Master Codex §29), so build them the way a person would build a poster.
+
+Layer vocabulary, roughly back to front:
+
+- **Substrate.** Scanned paper, carbon copy, receipt roll, photocopier grime, toner banding, a fold or a coffee ring. Never a flat fill.
+- **Print artefacts.** Halftone dots, misregistration, ink bleed, overprint where two colours cross, crop and registration marks in the margins.
+- **Structure.** Chunky card panels, rules, boxed tables, form fields that look stamped rather than drawn.
+- **Data.** The actual live numbers, set in the cleanest type on the page so readability survives everything under it.
+- **Annotation.** Someone else's handwriting: circled values, marker underlines, a crossed-out old figure with the new one beside it, initials, a date stamp.
+- **Physical residue.** Tape, staples, a curling sticker corner, a punch hole, a torn edge where a section was ripped away.
+- **Wear.** Grain, scratches, a scuff where a thumb sits, slight animated jitter so the paper is never perfectly still.
+
+Density is the point: serial numbers, barcodes, tiny legends, form codes, part numbers, footnotes nobody needs to read. Intricacy sells the world as one that existed before the player, and it gives the compendium and the Wire somewhere to hide detail. The discipline that keeps it from becoming noise: **the live data layer stays clean and high contrast, everything else is texture underneath it.** Readable at a glance, endless on inspection.
+
+Diegetic framing: the HUD is a CellOutz product someone installed in a salvaged car. It carries branding, a model number, damage, and a previous owner's modifications. Different factions and eras run different interface generations — a Choir of Marrow surgical readout should not look like an Ashline derby dash.
+
+### Placeholders that read as finished
+
+Every placeholder is art-directed to the final tone and then explicitly flagged as swappable. No grey boxes, no untextured primitives left to stand in for a look, no "we will style it later" — provisional work should already feel like the world, so the game can be judged honestly at any moment and so a missing asset is a quality decision rather than a hole.
+
+The working rule:
+
+- Provisional assets are authored to the real palette, wear level and register. If it ships in a screenshot, it looks intentional.
+- Every provisional asset is tracked, not remembered. Record it in the manifest with what it stands in for and what would replace it.
+- Replacement is a swap, not a rewrite. Keep the same material slots, socket names and scale so an authored `.glb` drops into the metadata the systems already reference (see the asset drop format above, and `DAMAGE-SYSTEM-CONCEPT.md` on named damage sockets).
+- Procedural now, authored later, same silhouette. The vector HUD, the generated audio and the primitive gore all exist to prove the system; each has an authored replacement path that must not require touching gameplay code.
+
+This is what "feels real but awaiting replacement" means in practice: the seams are in the pipeline and the manifest, never in the frame.
