@@ -345,9 +345,14 @@ func _draw_districts() -> void:
 		if not charted and not _chart.has_point(screen):
 			continue
 		var label := str(district.name) if charted else "UNSURVEYED SECTOR"
-		draw_string(ThemeDB.fallback_font, screen + Vector2(-radius * 0.5, -radius - 8.0), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, tint * Color(1, 1, 1, 0.9 if charted else 0.3))
+		# Held inside the sheet. A name that escapes the chart prints over the
+		# title and reads as a caption on the device instead of a place.
+		var name_at := screen + Vector2(-radius * 0.5, -radius - 18.0)
+		name_at.y = maxf(name_at.y, _chart.position.y + 8.0)
+		name_at.x = clampf(name_at.x, _chart.position.x + 8.0, _chart.end.x - CellOutzType.width_condensed(label.to_upper(), 11.0, 1.0) - 8.0)
+		CellOutzType.draw_condensed(self, name_at, label.to_upper(), 11.0, tint * Color(1, 1, 1, 0.9 if charted else 0.3), 1.0)
 		if charted:
-			draw_string(ThemeDB.fallback_font, screen + Vector2(-radius * 0.5, -radius + 5.0), str(district.note).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, INK * Color(1, 1, 1, 0.4))
+			CellOutzType.draw_condensed(self, name_at + Vector2(0, 14.0), str(district.note).to_upper(), 7.0, INK * Color(1, 1, 1, 0.4), 0.7)
 
 
 func _draw_misfires() -> void:
@@ -375,9 +380,9 @@ func _draw_misfires() -> void:
 		draw_line(screen - Vector2(3, 0), screen + Vector2(3, 0), tint, 1.0)
 		draw_line(screen - Vector2(0, 3), screen + Vector2(0, 3), tint, 1.0)
 		if not known:
-			draw_string(ThemeDB.fallback_font, screen + Vector2(-3, 4), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, tint * Color(1, 1, 1, 0.6))
+			CellOutzType.draw_condensed(self, screen + Vector2(-3, -4), "?", 8.0, tint * Color(1, 1, 1, 0.6), 0.6)
 			continue
-		draw_string(ThemeDB.fallback_font, screen + Vector2(11, 4), str(encounter.get("title", "?")), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, tint * Color(1, 1, 1, 0.85))
+		CellOutzType.draw_condensed(self, screen + Vector2(11, -4), str(encounter.get("title", "?")).to_upper(), 8.0, tint * Color(1, 1, 1, 0.85), 0.7)
 
 
 func _draw_contacts() -> void:
@@ -399,14 +404,32 @@ func _draw_contacts() -> void:
 			draw_rect(Rect2(screen - Vector2(3, 3), Vector2(6, 6)), tint * Color(1, 1, 1, 0.8))
 			continue
 		var beat := 0.5 + 0.5 * sin(clock * 4.0)
-		draw_circle(screen, 4.0, tint)
-		draw_arc(screen, 8.0 + beat * 4.0, 0.0, TAU, 14, tint * Color(1, 1, 1, 0.4 - beat * 0.2), 1.0)
-		if state == "downed":
-			draw_line(screen - Vector2(6, 6), screen + Vector2(6, 6), tint, 1.2)
-			draw_line(screen + Vector2(6, -6), screen + Vector2(-6, 6), tint, 1.2)
+		# I0.3. There used to be a key along the bottom of the page — seven
+		# coloured dots with words beside them — because every mark on the chart
+		# was the same dot in a different colour. A mark that needs a key is a
+		# mark that has not been drawn. These are told apart by shape, so the
+		# key could be deleted rather than restyled.
+		match state:
+			"hostile":
+				# Point down: a thing coming at you.
+				draw_colored_polygon(PackedVector2Array([
+					screen + Vector2(0, 5.5), screen + Vector2(-5.0, -4.0), screen + Vector2(5.0, -4.0),
+				]), tint)
+			"ally", "recruited":
+				# Closed ring with a centre: someone standing with you.
+				draw_arc(screen, 5.0, 0.0, TAU, 14, tint, 1.6)
+				draw_circle(screen, 2.0, tint)
+			"downed":
+				# Struck out.
+				draw_line(screen - Vector2(5.5, 5.5), screen + Vector2(5.5, 5.5), tint, 1.6)
+				draw_line(screen + Vector2(5.5, -5.5), screen + Vector2(-5.5, 5.5), tint, 1.6)
+			_:
+				# Open: neither yours nor after you yet.
+				draw_arc(screen, 4.6, 0.0, TAU, 14, tint, 1.4)
+		draw_arc(screen, 9.0 + beat * 4.0, 0.0, TAU, 14, tint * Color(1, 1, 1, 0.4 - beat * 0.2), 1.0)
 		var label := str(contact.get("name", ""))
 		if not label.is_empty():
-			draw_string(ThemeDB.fallback_font, screen + Vector2(9, -6), label.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, tint * Color(1, 1, 1, 0.9))
+			CellOutzType.draw_condensed(self, screen + Vector2(10, -10), label.to_upper(), 8.0, tint * Color(1, 1, 1, 0.9), 0.7)
 
 
 func _draw_player() -> void:
@@ -438,15 +461,39 @@ func _draw_frame() -> void:
 		var dy := -14.0 if corner.y > 0.5 else 14.0
 		draw_line(at, at + Vector2(dx, 0), ACID, 2.0)
 		draw_line(at, at + Vector2(0, dy), ACID, 2.0)
-	var font := ThemeDB.fallback_font
 	CellOutzType.draw_stamped(self, Vector2(26, 10), "LIVING MAP", 20.0, ACID, ARTERIAL * Color(1, 1, 1, 0.25), 3.4)
-	# Measured off the title rather than guessed at 150px, which printed the
-	# sheet line straight through the stamp.
-	var title_end := 26.0 + CellOutzType.width("LIVING MAP", 20.0, 3.4) + 24.0
-	draw_string(font, Vector2(title_end, 28), "LIMBO / THE ASHBLOOM EXPANSE   SHEET 01 OF 01   CELLOUTZ SURVEY", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, INK * Color(1, 1, 1, 0.55))
+	_draw_title_block()
+
+
+## I0.3. The sheet metadata used to be a single line of fallback-font text run
+## across the top of the page, which printed through the map's own district
+## labels and read as a status bar. A survey sheet does not have a status bar.
+## It has a title block in the corner of the paper: who surveyed it, which sheet
+## this is, how much of it was ever walked, and where the surveyor was standing
+## when they last put the pencil down.
+func _draw_title_block() -> void:
 	var charted := float(surveyed.size()) * CELL * CELL
 	var total := AshbloomWorldGenerator.REGION_SIZE.x * AshbloomWorldGenerator.REGION_SIZE.y
-	draw_string(font, Vector2(size.x - 330, 26), "SURVEYED %05.1f%%   E %+06.1f  N %+06.1f" % [clampf(charted / total, 0.0, 1.0) * 100.0, player_at.x, -player_at.y], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, SPORE)
+	var fraction := clampf(charted / total, 0.0, 1.0)
+	var block := Rect2(Vector2(_chart.end.x - 222.0, _chart.end.y - 92.0), Vector2(210.0, 80.0))
+	# Backed in paper, because it is printed on the sheet rather than floating
+	# above it, and the chart is allowed to run underneath.
+	draw_rect(block, PLATE * Color(1, 1, 1, 0.92))
+	draw_rect(block, INK * Color(1, 1, 1, 0.28), false, 1.0)
+	draw_line(block.position + Vector2(0, 20), block.position + Vector2(block.size.x, 20), INK * Color(1, 1, 1, 0.2), 1.0)
+	CellOutzType.draw_condensed(self, block.position + Vector2(9, 6), "CELLOUTZ SURVEY", 10.0, ACID * Color(1, 1, 1, 0.85), 0.9)
+	CellOutzType.draw_condensed(self, block.position + Vector2(9, 27), "LIMBO / THE ASHBLOOM EXPANSE", 8.0, INK * Color(1, 1, 1, 0.6), 0.7)
+	CellOutzType.draw_condensed(self, block.position + Vector2(9, 41), "SHEET 01 OF 01", 8.0, INK * Color(1, 1, 1, 0.45), 0.7)
+	# Walked ground as a filled bar. A percentage is a number you read; a bar
+	# that is mostly empty is a fact you feel, and this one is meant to shame.
+	var bar := Rect2(block.position + Vector2(9, 56), Vector2(block.size.x - 18.0, 7.0))
+	draw_rect(bar, INK * Color(1, 1, 1, 0.10))
+	draw_rect(Rect2(bar.position, Vector2(bar.size.x * fraction, bar.size.y)), SPORE * Color(1, 1, 1, 0.8))
+	draw_rect(bar, INK * Color(1, 1, 1, 0.2), false, 1.0)
+	CellOutzType.draw_condensed(self, block.position + Vector2(9, 67), "WALKED %0.1f%%" % (fraction * 100.0), 7.0, SPORE * Color(1, 1, 1, 0.75), 0.6)
+	var fix := "E %+0.0f  N %+0.0f" % [player_at.x, -player_at.y]
+	var fix_width := CellOutzType.width_condensed(fix, 7.0, 0.6)
+	CellOutzType.draw_condensed(self, block.position + Vector2(block.size.x - 9.0 - fix_width, 67), fix, 7.0, INK * Color(1, 1, 1, 0.5), 0.6)
 
 
 ## A6.1. A salvaged bezel: rolled plate, pipe runs down two edges, and fixings
@@ -532,9 +579,11 @@ func _draw_place_panel() -> void:
 		panel.position + Vector2(0, panel.size.y), panel.position + Vector2(0, 14),
 	]), Color(0.05, 0.04, 0.03, 0.95))
 	draw_rect(panel, ACID * Color(1, 1, 1, 0.45), false, 1.4)
-	var font := ThemeDB.fallback_font
 	CellOutzType.draw_stamped(self, panel.position + Vector2(14, 14), str(district.get("name", "UNNAMED")).to_upper(), 16.0, INK, ARTERIAL * Color(1, 1, 1, 0.3), 1.2)
-	draw_string(font, panel.position + Vector2(16, 54), str(district.get("note", "")), HORIZONTAL_ALIGNMENT_LEFT, panel.size.x - 32, 11, INK * Color(1, 1, 1, 0.7))
+	var note_y := 54.0
+	for line: String in _wrap_condensed(str(district.get("note", "")).to_upper(), panel.size.x - 32.0, 9.0, 0.7):
+		CellOutzType.draw_condensed(self, panel.position + Vector2(16, note_y), line, 9.0, INK * Color(1, 1, 1, 0.7), 0.7)
+		note_y += 13.0
 	var charted := is_surveyed(district.get("at", Vector2.ZERO))
 	var status := "SURVEYED" if charted else "UNWALKED \u2014 NO ROUTE"
 	CellOutzType.draw_text(self, panel.position + Vector2(14, 82), status, 10.0, SPORE if charted else ARTERIAL, 1.0)
@@ -546,8 +595,10 @@ func _draw_place_panel() -> void:
 		CellOutzType.draw_text(self, panel.position + Vector2(14, 126), "HOLD T TO TRAVEL", 9.0, INK * Color(1, 1, 1, 0.6), 1.0)
 
 
+## I0.3. What is left of the legend after the key was deleted: a scale bar,
+## which is an instrument rather than a list, and the controls written into the
+## margin at an angle, the way you write on the edge of a sheet you are holding.
 func _draw_legend() -> void:
-	var font := ThemeDB.fallback_font
 	var base := Vector2(26, size.y - 34)
 	draw_line(base + Vector2(0, -14), base + Vector2(size.x - 52, -14), INK * Color(1, 1, 1, 0.15), 1.0)
 	# Scale bar measured off the real zoom, so distances on the chart mean metres.
@@ -555,14 +606,33 @@ func _draw_legend() -> void:
 	draw_line(base, base + Vector2(bar, 0), INK, 2.0)
 	draw_line(base, base + Vector2(0, -5), INK, 2.0)
 	draw_line(base + Vector2(bar, 0), base + Vector2(bar, -5), INK, 2.0)
-	draw_string(font, base + Vector2(bar + 8, 4), "50 m", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK * Color(1, 1, 1, 0.7))
-	var entries := [
-		["YOU", SPORE], ["HOSTILE", ARTERIAL], ["DOWNED", BILE],
-		["ALLY", SPORE], ["CACHE", BONE], ["SIGNAL", SCAN], ["UNSURVEYED", INK * Color(1, 1, 1, 0.35)],
-	]
-	var cursor := base.x + bar + 70.0
-	for entry in entries:
-		draw_circle(Vector2(cursor, base.y - 4), 4.0, entry[1])
-		draw_string(font, Vector2(cursor + 9, base.y), str(entry[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, INK * Color(1, 1, 1, 0.6))
-		cursor += 30.0 + font.get_string_size(str(entry[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x
-	draw_string(font, Vector2(size.x - 300, size.y - 30), "DRAG PAN   WHEEL ZOOM   F RECENTRE   M CLOSE", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, ACID * Color(1, 1, 1, 0.6))
+	# Ticks at ten metres, because a bar with no divisions is a decoration.
+	for tick in range(1, 5):
+		var at := base + Vector2(bar * float(tick) / 5.0, 0)
+		draw_line(at, at + Vector2(0, -3), INK * Color(1, 1, 1, 0.6), 1.0)
+	CellOutzType.draw_condensed(self, base + Vector2(bar + 8, -8), "50 M", 8.0, INK * Color(1, 1, 1, 0.7), 0.7)
+	# Marginalia. Scrawled along the bottom edge at a slight angle, low enough
+	# in contrast to ignore once it is known, which is what a control hint is
+	# for. It is no longer a row of labels in a strip.
+	var scrawl := "DRAG TO PAN / WHEEL ZOOMS / F RECENTRES / M PUTS IT AWAY"
+	draw_set_transform(Vector2(size.x - 40.0 - CellOutzType.width_condensed(scrawl, 8.0, 0.8), size.y - 26.0), -0.028, Vector2.ONE)
+	CellOutzType.draw_condensed(self, Vector2.ZERO, scrawl, 8.0, ACID * Color(1, 1, 1, 0.45), 0.8)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## Wraps to the stencil's own measure. The fallback font had to go from this
+## screen as well — Greg named it directly, and a survey sheet set in a system
+## UI font is the tutorial look he keeps pointing at.
+func _wrap_condensed(text: String, width: float, cap_height: float, tracking: float) -> Array:
+	var lines: Array = []
+	var line := ""
+	for word: String in text.split(" ", false):
+		var candidate: String = word if line.is_empty() else line + " " + word
+		if CellOutzType.width_condensed(candidate, cap_height, tracking) > width and not line.is_empty():
+			lines.append(line)
+			line = word
+		else:
+			line = candidate
+	if not line.is_empty():
+		lines.append(line)
+	return lines

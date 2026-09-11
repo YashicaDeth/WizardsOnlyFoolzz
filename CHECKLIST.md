@@ -552,7 +552,7 @@ finished. Applies to everything below and to A5, A6, C1.
 - [ ] **I0.7** Hull read off the car, not off a number in a corner
 - [ ] **I0.8** The weapon well reworked
 - [ ] **I0.9** Cast display names reworked — ids stay, names change (blocked on Greg's list)
-- [ ] **I0.3** Applied to the map
+- [x] **I0.3** Applied to the map — the key is deleted, marks read by shape, metadata is a title block
 - [x] **I0.4** Applied to the handheld — CARRY draws what you took as objects in a bag, not rows
 
 ### I1 — Code as a material

@@ -2,6 +2,18 @@
 
 ## 2026 09 12
 
+- **I0.3: the map loses its key.** Along the bottom of the chart was a legend —
+  seven coloured dots with words beside them — and a control strip, both set in
+  the system fallback font Greg keeps pointing at. A mark that needs a key is a
+  mark that has not been drawn, so the marks were drawn instead: a hostile is a
+  triangle pointing at you, an ally a closed ring with a centre, a neutral an
+  open ring, a body struck out, a cache a square. The key could then be
+  deleted. Sheet metadata moved off the header strip — where it printed through
+  the district labels — into a title block in the corner of the paper, with the
+  walked fraction as a bar you can be ashamed of rather than a percentage you
+  read past. The controls are scrawled into the bottom margin at an angle. No
+  fallback font survives on this screen.
+
 - **I0.4: the CARRY page stops being a packing docket.** It was a literal
   spreadsheet — name, condition and weight in aligned columns, half the page
   blank — which is the one presentation that makes carrying pieces of people
