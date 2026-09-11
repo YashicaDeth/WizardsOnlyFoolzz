@@ -78,15 +78,18 @@ const WOUND_ZONE_WORDS := {
 var subject: Dictionary = {}
 var zone := "torso"
 var part_index := 0
+var hovered_part_index := -1
 var xray := false
 var lift := 0.0
 var elapsed := 0.0
+var viewer_dragging := false
 
 var _parts: Array = []
 var _viewer: SubViewport
 var _zone_rects: Dictionary = {}
 var _part_rects: Array = []
 var _lift_from := Rect2()
+var _stage_rect := Rect2()
 var _subject_id := ""
 
 
@@ -108,6 +111,7 @@ func set_subject(value: Dictionary) -> void:
 	_subject_id = incoming
 	zone = "torso"
 	part_index = 0
+	hovered_part_index = -1
 	_rebuild_parts()
 	_begin_lift()
 
@@ -124,15 +128,21 @@ func _rebuild_parts() -> void:
 	_parts.append({"kind": "limb", "id": zone, "zone": zone, "label": "FLESH", "note": "soft tissue"})
 	_parts.append({"kind": "bone", "id": zone, "zone": zone, "label": "BONE", "note": "structure"})
 	for organ_id in ORGANS_BY_ZONE.get(zone, []):
-		_parts.append({"kind": "organ", "id": organ_id, "zone": zone, "label": str(organ_id).replace("_", " ").to_upper(), "note": "organ"})
+		var organ_state: Dictionary = (_anatomy().get("organs", {}) as Dictionary).get(str(organ_id), {})
+		_parts.append({"kind": "organ", "id": organ_id, "zone": zone, "label": str(organ_id).replace("_", " ").to_upper(), "note": "organ", "ruptured": bool(organ_state.get("ruptured", false))})
 	for implant in _implants_in(zone):
 		_parts.append({"kind": "implant", "id": str(implant), "zone": zone, "label": str(implant).to_upper(), "note": "installed"})
 	part_index = clampi(part_index, 0, maxi(0, _parts.size() - 1))
+	hovered_part_index = -1
+
+
+func _anatomy() -> Dictionary:
+	return subject.get("anatomy_state", subject.get("anatomy", {}))
 
 
 func _implants_in(zone_id: String) -> Array:
 	var out: Array = []
-	var anatomy: Dictionary = subject.get("anatomy", {})
+	var anatomy: Dictionary = _anatomy()
 	for implant in anatomy.get("cybernetics", []):
 		if _zone_from_words(str(implant), IMPLANT_ZONE_WORDS) == zone_id:
 			out.append(str(implant))
@@ -156,7 +166,7 @@ func _zone_from_words(text: String, table: Dictionary) -> String:
 ## carries described wounds rather than simulated zones, so those are read too -
 ## a file that says "missing left eye" should inspect as a damaged head.
 func _condition_of(part: Dictionary) -> float:
-	var anatomy: Dictionary = subject.get("anatomy", {})
+	var anatomy: Dictionary = _anatomy()
 	var kind := str(part.get("kind", ""))
 	var part_zone := str(part.get("zone", "torso"))
 	if kind == "organ":
@@ -192,7 +202,8 @@ func _wound_penalty(zone_id: String) -> float:
 func selected_part() -> Dictionary:
 	if _parts.is_empty():
 		return {}
-	return _parts[clampi(part_index, 0, _parts.size() - 1)]
+	var selected := hovered_part_index if hovered_part_index >= 0 else part_index
+	return _parts[clampi(selected, 0, _parts.size() - 1)]
 
 
 # --- input -----------------------------------------------------------------
@@ -229,6 +240,45 @@ func handle_click(at: Vector2) -> bool:
 		if (_part_rects[index] as Rect2).has_point(at):
 			part_index = index
 			_begin_lift()
+			return true
+	return false
+
+
+## Hover is temporary inspection; click is commitment. Moving away restores the
+## pinned part without mutating selection, which keeps mouse and controller use
+## compatible rather than making hover secretly act like a click.
+func handle_pointer_motion(at: Vector2, relative: Vector2) -> bool:
+	if viewer_dragging:
+		_viewer.rotate_by(relative)
+		return true
+	var previous := hovered_part_index
+	hovered_part_index = -1
+	for index in _part_rects.size():
+		if (_part_rects[index] as Rect2).has_point(at):
+			hovered_part_index = index
+			break
+	if hovered_part_index != previous:
+		_begin_lift()
+		return true
+	return false
+
+
+func handle_mouse_button(at: Vector2, button: int, pressed: bool) -> bool:
+	if button == MOUSE_BUTTON_LEFT:
+		if not pressed and viewer_dragging:
+			viewer_dragging = false
+			return true
+		if pressed and _stage_rect.has_point(at):
+			viewer_dragging = true
+			return true
+		if pressed:
+			return handle_click(at)
+	if pressed and _stage_rect.has_point(at):
+		if button == MOUSE_BUTTON_WHEEL_UP:
+			_viewer.zoom_by(1.12)
+			return true
+		if button == MOUSE_BUTTON_WHEEL_DOWN:
+			_viewer.zoom_by(0.89)
 			return true
 	return false
 
@@ -360,7 +410,9 @@ func _draw_list(canvas: CanvasItem, rect: Rect2) -> void:
 	var y := rect.position.y + 40.0
 	for index in _parts.size():
 		var part: Dictionary = _parts[index]
-		var active := index == part_index
+		var pinned := index == part_index
+		var preview := index == hovered_part_index
+		var active := pinned or preview
 		var row := Rect2(Vector2(rect.position.x - 6, y - 14), Vector2(rect.size.x, 30))
 		_part_rects.append(row)
 		var condition := _condition_of(part)
@@ -371,6 +423,8 @@ func _draw_list(canvas: CanvasItem, rect: Rect2) -> void:
 				row.position + row.size - Vector2(18, 0), row.position + Vector2(0, row.size.y),
 			]), COPPER * Color(1, 1, 1, 0.17))
 			canvas.draw_line(row.position, row.position + Vector2(0, row.size.y), HOT, 2.5)
+		if pinned:
+			canvas.draw_circle(Vector2(row.position.x + row.size.x - 30, y - 4), 2.5, COPPER)
 		canvas.draw_string(font, Vector2(rect.position.x + 4, y), str(part.label), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 56, 12, INK if active else INK * Color(1, 1, 1, 0.72))
 		canvas.draw_string(font, Vector2(rect.position.x + 4, y + 12), str(part.note).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 56, 9, INK * Color(1, 1, 1, 0.34))
 		# A condition pip per row, so the list is scannable without reading it.
@@ -389,6 +443,7 @@ func _draw_stage(canvas: CanvasItem, rect: Rect2) -> void:
 	# The frame travels from the zone on the diagram to the stage. At lift 0 it
 	# is sitting on the body; at 1 it has arrived. Nothing cuts.
 	var target := Rect2(rect.position + Vector2(rect.size.x * 0.5 - 120.0, 24), Vector2(240, 240))
+	_stage_rect = target
 	var eased := 1.0 - pow(1.0 - clampf(lift, 0.0, 1.0), 3.0)
 	var frame := Rect2(
 		_lift_from.position.lerp(target.position, eased),
@@ -426,3 +481,4 @@ func _draw_stage(canvas: CanvasItem, rect: Rect2) -> void:
 		verdict = "NO TELEMETRY"
 	canvas.draw_string(font, Vector2(rect.position.x + 96, caption_y + 60), verdict, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 110, 13, tone)
 	canvas.draw_string(font, Vector2(rect.position.x, caption_y + 84), "IN %s" % str(ZONE_LABELS.get(str(part.zone), "")).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 10, INK * Color(1, 1, 1, 0.4))
+	canvas.draw_string(font, Vector2(rect.position.x, caption_y + 101), "HOVER PREVIEWS  ·  CLICK PINS  ·  DRAG TURNS  ·  WHEEL ZOOMS", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 9, COPPER * Color(1, 1, 1, 0.68))

@@ -213,6 +213,15 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
+## Pointer events aimed at this full-screen Control enter through `_gui_input`;
+## keyboard events still use `_unhandled_input`. Routing the mouse explicitly
+## is what makes BODY hover and direct specimen manipulation work in the game,
+## not only when their methods are called by a test.
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton or event is InputEventMouseMotion:
+		_unhandled_input(event)
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
@@ -270,6 +279,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 		get_viewport().set_input_as_handled()
 		queue_redraw()
+	elif event is InputEventMouseMotion and page == 3:
+		if _inspector.handle_pointer_motion(event.position, event.relative):
+			get_viewport().set_input_as_handled()
+			queue_redraw()
+	elif event is InputEventMouseButton and page == 3 and _inspector.handle_mouse_button(event.position, event.button_index, event.pressed):
+		get_viewport().set_input_as_handled()
+		queue_redraw()
 	elif event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT and XrayCursor.on_button(cursor_at, event.position):
 			_set_xray(not xray)
@@ -291,12 +307,6 @@ func _unhandled_input(event: InputEvent) -> void:
 					get_viewport().set_input_as_handled()
 					queue_redraw()
 					return
-		if event.button_index == MOUSE_BUTTON_LEFT and page == 3:
-			if not _inspector.handle_click(event.position):
-				return
-			get_viewport().set_input_as_handled()
-			queue_redraw()
-			return
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			feed_scroll += 42.0
 			if wire:

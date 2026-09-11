@@ -340,6 +340,10 @@ foundation in `baseline_human.gd` and `anatomy_component.gd`.
   already wired to behaviour. The 1.0 version is these reading as one body in
   play: a broken arm that changes a swing, a punctured lung that changes a
   sprint, blood loss the player watches happen to themselves.
+- **Specimen interaction is live.** The BODY page now separates hover preview
+  from pinned selection, supports direct drag/zoom, renders authored organ
+  silhouettes with wet tissue materials, and tears ruptured organs open in the
+  mesh. These interactions operate on the live 3D part rather than a modal.
 - **Dismemberment.** The first combat-verb slice is live: directional cut,
   shear and ballistic damage builds sever stress independently from limb health;
   crossing the threshold throws the real limb along the strike vector, leaves a

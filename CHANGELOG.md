@@ -2,6 +2,19 @@
 
 ## 2026 09 11
 
+- **The BODY specimen viewer is now handled, not watched.** Hover previews a
+  part without overwriting the pinned selection; click pins; dragging turns the
+  real viewport specimen and the wheel changes its inspection scale. Pointer
+  input now enters through the full-screen Control's actual GUI path.
+- Organs no longer share one sphere silhouette. Lungs have distinct lobes, the
+  liver is a broad wedge, bowel is a five-loop coil, the brain has hemispheres
+  and lobes, and the heart has ventricles, apex and vessels. Soft parts use
+  slick specular, clearcoat and subsurface response inside an opaque specimen
+  well. A rupture adds a physical cavity and pulled-away tissue flaps instead
+  of merely darkening the healthy mesh.
+- Added `body_inspector_test`; the full suite is now seventeen green suites and
+  the BODY capture was reviewed at 1280×720.
+
 - **A severed limb remains usable matter.** Whole limbs now enter the same
   identified chunk registry as tissue and implants, retaining owner, zone,
   condition and freshness. The player can pick one up with E, equip it from

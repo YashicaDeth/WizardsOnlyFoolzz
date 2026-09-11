@@ -28,15 +28,22 @@ const STEEL := Color("7d8894")
 var elapsed := 0.0
 var spin_speed := 0.7
 var condition := 1.0
+var view_rotation := Vector2.ZERO
+var zoom := 1.0
 
 var _pivot: Node3D
 var _spec := ""
+var _base_fit := 1.0
+var _ruptured := false
 
 
 func _ready() -> void:
 	size = Vector2i(240, 240)
 	own_world_3d = true
-	transparent_bg = true
+	# A black specimen well is intentional and lets Forward+ keep real SSS.
+	# Transparent subviewports disable subsurface scattering in Godot, which made
+	# a correctly configured wet material silently render like lacquered plastic.
+	transparent_bg = false
 	render_target_update_mode = SubViewport.UPDATE_ALWAYS
 
 	_pivot = Node3D.new()
@@ -69,8 +76,9 @@ func _ready() -> void:
 ## `part` is {kind, id, zone}. `state` carries the real condition so a ruptured
 ## organ and a healthy one do not look the same.
 func show_part(part: Dictionary, state: float) -> void:
-	var key := "%s:%s:%s" % [str(part.get("kind", "")), str(part.get("id", "")), str(part.get("zone", ""))]
 	condition = clampf(state, 0.0, 1.0)
+	_ruptured = bool(part.get("ruptured", false)) or (str(part.get("kind", "")) == "organ" and condition <= 0.05)
+	var key := "%s:%s:%s:%s" % [str(part.get("kind", "")), str(part.get("id", "")), str(part.get("zone", "")), str(_ruptured)]
 	if key == _spec:
 		_apply_condition()
 		return
@@ -105,16 +113,15 @@ func _build_organ(organ_id: String) -> void:
 			vertebra.material_override = _material(BONE, true)
 			_pivot.add_child(vertebra)
 		return
-	var organ := MeshInstance3D.new()
-	var mesh := SphereMesh.new()
-	mesh.radius = float(ORGAN_SIZES.get(organ_id, 0.07))
-	mesh.height = mesh.radius * 2.0
-	organ.mesh = mesh
-	organ.material_override = _material(Color(str(ORGAN_TINTS.get(organ_id, "7a1a16"))), false)
-	_pivot.add_child(organ)
-	# Lungs get a bronchial stub and the heart gets its vessels, because a bare
-	# sphere reads as a placeholder no matter what colour it is.
+	var tint := Color(str(ORGAN_TINTS.get(organ_id, "7a1a16")))
+	# These are deliberately authored composite silhouettes. Each organ has a
+	# recognisable outline before colour: lobed lungs, pear heart, wedge liver,
+	# coiled bowel and two-hemisphere brain. No generic sphere stands in for all.
 	if organ_id.ends_with("lung"):
+		var side := -1.0 if organ_id.begins_with("left") else 1.0
+		_ellipsoid("UpperLobe", Vector3(side * 0.018, 0.045, 0.0), Vector3(0.72, 1.20, 0.58), tint)
+		_ellipsoid("LowerLobe", Vector3(-side * 0.010, -0.050, 0.0), Vector3(0.92, 1.05, 0.66), tint.darkened(0.05), Vector3(0, 0, side * -0.16))
+		_ellipsoid("MedialLobe", Vector3(side * 0.030, -0.005, 0.038), Vector3(0.48, 0.78, 0.38), tint.lightened(0.04))
 		var stub := MeshInstance3D.new()
 		var tube := CylinderMesh.new()
 		tube.top_radius = 0.012
@@ -124,8 +131,12 @@ func _build_organ(organ_id: String) -> void:
 		stub.position = Vector3(0.0, 0.075, 0.0)
 		stub.rotation_degrees = Vector3(0, 0, 18 if organ_id.begins_with("left") else -18)
 		stub.material_override = _material(Color("6f3b39"), false)
+		stub.name = "Bronchus"
 		_pivot.add_child(stub)
 	elif organ_id == "heart":
+		_ellipsoid("LeftVentricle", Vector3(-0.025, 0.005, 0.0), Vector3(0.82, 1.10, 0.72), tint, Vector3(0, 0, -0.20))
+		_ellipsoid("RightVentricle", Vector3(0.030, 0.018, 0.005), Vector3(0.72, 0.96, 0.68), tint.darkened(0.08), Vector3(0, 0, 0.22))
+		_ellipsoid("Apex", Vector3(-0.006, -0.066, 0.0), Vector3(0.45, 0.78, 0.48), tint.darkened(0.12))
 		for offset in [Vector3(0.03, 0.06, 0.0), Vector3(-0.032, 0.055, 0.01)]:
 			var vessel := MeshInstance3D.new()
 			var tube := CylinderMesh.new()
@@ -136,7 +147,69 @@ func _build_organ(organ_id: String) -> void:
 			vessel.position = offset
 			vessel.rotation_degrees = Vector3(12, 0, 22 if offset.x > 0.0 else -20)
 			vessel.material_override = _material(Color("4d0b0a"), false)
+			vessel.name = "Vessel"
 			_pivot.add_child(vessel)
+	elif organ_id == "liver":
+		var wedge := CylinderMesh.new()
+		wedge.radial_segments = 3
+		wedge.top_radius = 0.075
+		wedge.bottom_radius = 0.115
+		wedge.height = 0.055
+		var liver := _piece(wedge, Vector3.ZERO, tint, false)
+		liver.name = "LiverWedge"
+		liver.scale = Vector3(1.35, 0.72, 0.76)
+		liver.rotation_degrees = Vector3(78, 8, -12)
+		_ellipsoid("LiverLobe", Vector3(0.050, -0.018, 0.012), Vector3(0.72, 0.36, 0.48), tint.darkened(0.06))
+	elif organ_id == "gut":
+		for index in 5:
+			var coil := TorusMesh.new()
+			coil.inner_radius = 0.020
+			coil.outer_radius = 0.058 + float(index % 2) * 0.007
+			coil.rings = 12
+			coil.ring_segments = 7
+			var loop := _piece(coil, Vector3(float(index % 2) * 0.058 - 0.028, 0.085 - float(index) * 0.043, 0.0), tint.lightened(float(index) * 0.015), false)
+			loop.name = "GutCoil%d" % index
+			loop.rotation_degrees = Vector3(72, 0, -8 + index * 5)
+	elif organ_id == "brain":
+		for side in [-1.0, 1.0]:
+			_ellipsoid("Hemisphere", Vector3(side * 0.038, 0.012, 0.0), Vector3(0.78, 0.92, 0.72), tint, Vector3(0, 0, side * 0.08))
+			for lobe_index in 3:
+				_ellipsoid("BrainLobe", Vector3(side * (0.034 + lobe_index * 0.008), 0.052 - lobe_index * 0.045, 0.045), Vector3(0.34, 0.30, 0.22), tint.lightened(0.05))
+	else:
+		_ellipsoid("Organ", Vector3.ZERO, Vector3.ONE, tint)
+	if _ruptured:
+		_add_rupture(organ_id)
+
+
+func _ellipsoid(piece_name: String, at: Vector3, shape: Vector3, tint: Color, rotation := Vector3.ZERO) -> MeshInstance3D:
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.072
+	mesh.height = 0.144
+	mesh.radial_segments = 16
+	mesh.rings = 8
+	var piece := _piece(mesh, at, tint, false)
+	piece.name = piece_name
+	piece.scale = shape
+	piece.rotation = rotation
+	return piece
+
+
+## A rupture changes silhouette: a dark cavity bites through the front and wet
+## flaps pull away from it. It is not merely the healthy mesh tinted darker.
+func _add_rupture(organ_id: String) -> void:
+	var cavity_mesh := SphereMesh.new()
+	cavity_mesh.radius = 0.040
+	cavity_mesh.height = 0.050
+	var cavity := _piece(cavity_mesh, Vector3(0.018, -0.005, 0.060), Color("130204"), false)
+	cavity.name = "RuptureCavity"
+	cavity.scale = Vector3(1.0, 0.72, 0.28)
+	for index in 4:
+		var flap_mesh := PrismMesh.new()
+		flap_mesh.size = Vector3(0.035, 0.012, 0.052)
+		var angle := TAU * float(index) / 4.0
+		var flap := _piece(flap_mesh, Vector3(cos(angle) * 0.045, sin(angle) * 0.032, 0.073), Color(str(ORGAN_TINTS.get(organ_id, "6d100e"))).darkened(0.18), false)
+		flap.name = "TornFlap%d" % index
+		flap.rotation = Vector3(sin(angle) * 0.45, cos(angle) * 0.32, angle)
 
 
 func _build_bone(zone_id: String) -> void:
@@ -198,6 +271,7 @@ func _piece(mesh: Mesh, at: Vector3, tint: Color, metallic: bool) -> MeshInstanc
 	piece.mesh = mesh
 	piece.position = at
 	piece.material_override = _material(tint, metallic)
+	piece.set_meta("base_color", tint)
 	_pivot.add_child(piece)
 	return piece
 
@@ -205,8 +279,14 @@ func _piece(mesh: Mesh, at: Vector3, tint: Color, metallic: bool) -> MeshInstanc
 func _material(tint: Color, hard: bool) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = tint
-	material.roughness = 0.42 if hard else 0.78
+	material.roughness = 0.42 if hard else 0.18
 	material.metallic = 0.35 if hard else 0.0
+	material.metallic_specular = 0.62 if hard else 0.86
+	if not hard:
+		material.clearcoat_enabled = true
+		material.clearcoat_roughness = 0.12
+		material.subsurf_scatter_enabled = true
+		material.subsurf_scatter_strength = 0.32
 	return material
 
 
@@ -220,7 +300,7 @@ func _apply_condition() -> void:
 		var material := piece.material_override as StandardMaterial3D
 		if material == null:
 			continue
-		var base: Color = material.albedo_color
+		var base: Color = piece.get_meta("base_color", material.albedo_color)
 		material.albedo_color = base.lerp(Color("221114"), (1.0 - condition) * 0.72)
 		material.emission_enabled = condition < 0.35
 		material.emission = Color("6d100e") * (1.0 - condition) * 0.4
@@ -236,16 +316,34 @@ func _fit() -> void:
 		if piece == null or piece.mesh == null:
 			continue
 		var box := piece.mesh.get_aabb()
-		var corner := (box.position + box.size).abs()
+		var corner := (box.position + box.size).abs() * piece.scale.abs()
 		var here := maxf(maxf(corner.x, corner.y), corner.z) + piece.position.length()
 		extent = maxf(extent, here)
 	if extent <= 0.0:
 		return
-	var scale_factor := 0.22 / extent
-	_pivot.scale = Vector3.ONE * scale_factor
+	_base_fit = 0.22 / extent
+	_apply_zoom()
+
+
+func rotate_by(pixel_delta: Vector2) -> void:
+	view_rotation.x += pixel_delta.x * 0.010
+	view_rotation.y = clampf(view_rotation.y + pixel_delta.y * 0.010, -1.15, 1.15)
+
+
+func zoom_by(factor: float) -> void:
+	zoom = clampf(zoom * factor, 0.62, 1.85)
+	_apply_zoom()
+
+
+func _apply_zoom() -> void:
+	_pivot.scale = Vector3.ONE * _base_fit * zoom
+
+
+func view_state() -> Dictionary:
+	return {"rotation": view_rotation, "zoom": zoom, "ruptured": _ruptured, "pieces": _pivot.get_child_count()}
 
 
 func _process(delta: float) -> void:
 	elapsed += delta
-	_pivot.rotation.y = elapsed * spin_speed
-	_pivot.rotation.x = sin(elapsed * 0.6) * 0.11
+	_pivot.rotation.y = elapsed * spin_speed + view_rotation.x
+	_pivot.rotation.x = sin(elapsed * 0.6) * 0.11 + view_rotation.y

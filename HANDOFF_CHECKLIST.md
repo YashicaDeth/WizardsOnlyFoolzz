@@ -110,12 +110,12 @@ zero size, a part rendered at a third scale because `queue_free` is deferred and
 the outgoing mesh was still being measured. Write a `tests/*_capture.gd` harness
 for anything visual and read the image.
 
-**Full suite** — 16 suites, all currently green. Run them all before claiming a
+**Full suite** — 17 suites, all currently green. Run them all before claiming a
 section is done:
 `arsenal_test`, `baseline_human_test`, `body_motion_test`,
 `combat_integration_test`, `derby_balance_test`, `gore_test`, `grapple_test`,
 `impact_test`, `opening_test`, `chunk_test`, `radio_test`, `resolution_test`,
-`wire_test`, `witness_test`, `sheet_test`, `icon_test`.
+`wire_test`, `witness_test`, `sheet_test`, `icon_test`, `body_inspector_test`.
 
 ## 5. The shape of the code
 
@@ -153,12 +153,12 @@ lives. The pieces you will touch most:
 `CHECKLIST.md` is the working document and is driven by segment id — say `B5.2`
 and build that segment. Status: `[x]` built and verified, `[~]` partial with the
 remainder named, `[ ]` not started. Completed lines are also struck through so
-progress scans visually. **121 of 253 segments done.**
+progress scans visually. **126 of 253 segments done.**
 
 | Section | Done | State |
 | --- | --- | --- |
 | **A** — visual pass, HUD, map, driving, radio | 53/53 | **complete** |
-| **B** — the body as centrepiece | 19/46 | B0 complete; B6.1–B6.4 built; B5 open |
+| **B** — the body as centrepiece | 24/46 | B0–B1 complete; B6.1–B6.4 built; B5 open |
 | **C** — the handheld | 17/21 | C1–C5 built, C3 camera open |
 | **D** — character creation in the vat | 25/29 | built bar cutscenes |
 | **E** — rituals, karma, the two ladders | 0/23 | designed, unbuilt |

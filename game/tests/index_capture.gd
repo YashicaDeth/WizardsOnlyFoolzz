@@ -32,7 +32,11 @@ func _seed() -> void:
 		"elo": 1180, "grudge": 41, "injury": "fractured left clavicle", "status": "active",
 		"memory": "You put her into the wall on the second lap and she has not forgotten the sound.",
 		"wounds": ["fractured left clavicle"],
-		"anatomy": {"blood_type": "O-RUST", "cybernetics": ["jaw telemetry nail", "left clavicle rail"]},
+		"anatomy": {
+			"blood_type": "O-RUST", "cybernetics": ["jaw telemetry nail", "left clavicle rail"],
+			"zones": {"torso": {"health": 31.0}},
+			"organs": {"heart": {"health": 0.0, "max_health": 35.0, "ruptured": true}},
+		},
 		"relations": {"player": {"kind": "hunts", "strength": 8}, "ashline_wreckers": {"kind": "command", "strength": 72}, "rook_sable": {"kind": "grudge", "strength": 31}},
 	})
 	WorldHistory.register_subject("ashline_wreckers", {

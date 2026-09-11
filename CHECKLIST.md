@@ -157,11 +157,11 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B1.1** Part viewer with real meshes from the rig's own tables~~
 - [x] ~~**B1.2** Lift-out from the diagram with a thread back to it, never a modal~~
 - [x] ~~**B1.3** Condition darkens the part itself, not just the caption~~
-- [ ] **B1.4** Hover to preview, click to pin — currently click-only
-- [ ] **B1.5** Authored organ silhouettes: lung lobes, liver wedge, gut coil, instead of spheres with attachments
-- [ ] **B1.6** Wet pass — subsurface and slick specular, so organs read as meat rather than plastic
-- [ ] **B1.7** Drag to rotate and scroll to zoom, instead of a fixed spin
-- [ ] **B1.8** Damage on the mesh: a ruptured organ is torn, not only darker
+- [x] ~~**B1.4** Hover to preview, click to pin — currently click-only~~
+- [x] ~~**B1.5** Authored organ silhouettes: lung lobes, liver wedge, gut coil, instead of spheres with attachments~~
+- [x] ~~**B1.6** Wet pass — subsurface and slick specular, so organs read as meat rather than plastic~~
+- [x] ~~**B1.7** Drag to rotate and scroll to zoom, instead of a fixed spin~~
+- [x] ~~**B1.8** Damage on the mesh: a ruptured organ is torn, not only darker~~
 
 ### B2 — Limbs and cybernetics, one verb `BUILT`
 - [x] ~~**B2.1** Flesh, bone, organs and hardware in one list, inspected identically~~
