@@ -106,3 +106,53 @@ already simulated, so they should be met the way any ranked subject is met.
 3. Does the player's half-and-half nature have a *mechanical* expression beyond
    starting at 0.0 — can both ends be climbed at once, or does committing to one
    close the other?
+
+## The hierarchy below — captured 2026-09-12
+
+Greg: *"4 horsemen, 7 deadly sins, lesser demons roaming the world, using the
+nemesis system, demon structure of the forts being created with the abstracted
+internet world."*
+
+Four tiers, and every one of them runs on machinery that already exists.
+
+| Tier | Who | Runs on |
+| --- | --- | --- |
+| **Leadership** | The Four Horsemen, rotating | F3 promotion into real vacancies |
+| **Princes** | The Seven Deadly Sins | `FACTION_TREE_AXIS` principles |
+| **Captains** | Named rivals like Mara | The Hunt System as built |
+| **Lesser demons** | Roaming, generated | F4.1 rivals born out of events |
+
+**The Sins are already half in the code.** `FACTION_TREE_AXIS` gives four
+descending factions a principle each — Ashline is Wrath, Black Mile is Greed,
+Soft Rot is Gluttony, the Choir of Marrow is Envy. Those are not decoration any
+more: each is the faction a Sin holds. **Pride, Lust and Sloth have no faction
+yet**, which is the gap to fill rather than a system to invent.
+
+### The forts are the internet, and that is the point
+
+This is the part that matters most and Greg got it right without being told.
+`DESIGN/FACTIONS.md` already replaced fortress capture with **signal
+territory** — feeds, masts, presses, accounts — contested by out-publishing,
+discrediting, hijacking, flooding or cutting. A demon hierarchy whose holdings
+are *signal* is not a fort assault loop; it is the alternative this project
+deliberately chose instead of one.
+
+So: a Sin does not hold a keep. It holds a channel. Wrath owns the feeds that
+make people angry; Greed owns the ones that sell; Sloth owns the dead forums
+nobody has closed. Taking one off them is an argument, a hijack or a cut mast,
+which is the play `FACTIONS.md` already specifies and which nobody else's game
+does.
+
+`HUNT_SYSTEM.md`'s boundary still stands and is easy to hold here: no named
+hierarchy tiers lifted from anyone, no fort assault structure, no
+follower/betrayal command layer. Tiers named after the Sins and holdings made of
+signal are this world's own.
+
+### Why this is strong rather than just big
+
+The four tiers give the Hunt System something it has never had: **a reason for
+promotion to matter**. Killing a lesser demon is noise. Killing a captain opens
+a post. Killing a Sin changes what an entire faction *is about*, because the
+principle is what the faction's axis and pricing already read from. And killing
+a Horseman changes who runs CellOutz, which is the run.
+

@@ -216,3 +216,35 @@ static func art_collage(canvas: CanvasItem, rect: Rect2, seed_value: int, alpha 
 		return false
 	canvas.draw_texture_rect(sheet, rect, false, Color(1, 1, 1, alpha))
 	return true
+
+
+## I4.2. The panel failing, drawn inside the panel's own rect rather than over
+## the frame. Dropout bands, a torn scan, and the plate ghosting against itself
+## — all of it clipped to the object, so it reads as this screen struggling and
+## not as the game applying a filter to your eyes.
+static func vital_interference(canvas: CanvasItem, rect: Rect2, level: float, clock: float, seed_value := 0) -> void:
+	if level <= 0.0:
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value * 7717 + 31
+
+	# Horizontal dropout. Count and height both climb with severity, so a
+	# scratch flickers and a haemorrhage tears the readout apart.
+	var bands := int(1.0 + level * 7.0)
+	for band in bands:
+		var drift := fposmod(clock * (18.0 + float(band) * 11.0) + rng.randf() * rect.size.y, rect.size.y)
+		var height := 1.0 + rng.randf() * (2.0 + level * 9.0)
+		var slip := (rng.randf() - 0.5) * level * 26.0
+		var strip := Rect2(rect.position.x + slip, rect.position.y + drift, rect.size.x, height)
+		canvas.draw_rect(strip.intersection(rect), Color(0, 0, 0, 0.12 + level * 0.4))
+
+	# The plate ghosting against itself, offset along the tear.
+	if level > 0.35:
+		var ghost := (level - 0.35) / 0.65
+		canvas.draw_rect(Rect2(rect.position + Vector2(ghost * 3.0, 0), rect.size), Color(0.78, 0.16, 0.12, 0.05 * ghost))
+		canvas.draw_rect(Rect2(rect.position - Vector2(ghost * 3.0, 0), rect.size), Color(0.16, 0.62, 0.58, 0.05 * ghost))
+
+	# Whatever is left of the backlight pulses at the rate of something failing.
+	if level > 0.6:
+		var flicker := absf(sin(clock * 11.0)) * (level - 0.6) / 0.4
+		canvas.draw_rect(rect, Color(0, 0, 0, 0.18 * flicker))

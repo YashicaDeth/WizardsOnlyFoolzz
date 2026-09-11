@@ -51,6 +51,9 @@ var page := 0
 var rail_index := 0
 var feed_scroll := 0.0
 var elapsed := 0.0
+## I1. The material the plate is cut out of, not a backdrop behind it.
+var _rain: Array = []
+var _rain_size := Vector2.ZERO
 var wire = null
 var posts: Array = []
 var last_action := ""
@@ -432,6 +435,16 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, viewport), GROUND * Color(1, 1, 1, opened))
 	draw_set_transform(viewport * 0.5 * (1.0 - plate_scale), 0.0, Vector2(plate_scale, plate_scale))
 	var plate := Rect2(Vector2(54, 44), viewport - Vector2(108, 88))
+	# I4. How well this reads is how well the person holding it is doing.
+	var failing: float = VitalitySignal.severity()
+	# I1.3. The rain is drawn first and the plate is punched out of it, so the
+	# readout is a hole in the material rather than a panel sitting on a
+	# wallpaper. I1.1 gives it the game's own words; I1.2 fails it with the body.
+	if _rain.is_empty() or not _rain_size.is_equal_approx(viewport):
+		_rain = CodeRain.build(viewport.x, viewport.y, 26.0, 4409)
+		_rain_size = viewport
+	CodeRain.advance(_rain, get_process_delta_time(), viewport.y)
+	CodeRain.draw_field(self, Rect2(Vector2.ZERO, viewport), _rain, MOSS, failing, elapsed, [plate])
 	_draw_plate(plate)
 	_draw_header(plate)
 	var body := Rect2(plate.position + Vector2(22, 122), plate.size - Vector2(44, 176))
@@ -456,6 +469,9 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if page_blend < 1.0:
 		_draw_page_wipe(panel, eased)
+	# Drawn last so it sits over the readout rather than under it, and bounded
+	# by the plate so it is the object failing, not the frame.
+	Grunge.vital_interference(self, plate, failing, elapsed, 5)
 	_draw_stamp(plate)
 	_draw_footer(plate)
 	_draw_gore(plate)

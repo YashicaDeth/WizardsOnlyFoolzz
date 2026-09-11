@@ -121,6 +121,11 @@ func _ready() -> void:
 	index.cursor_follows_mouse = false
 	# The fourth pass is the pyramid again with the X-ray on, because the skull
 	# state is the half of the icon that cannot be reviewed from the flesh shot.
+	# I4: one shot with the reader nearly gone, so the degradation is visible.
+	WorldHistory.register_subject("player", {"name": "THE HUNTER", "kind": "person"})
+	WorldHistory.update_subject("player", {"anatomy_state": {
+		"blood": 900.0, "blood_capacity": 5000.0, "pain": 88.0, "consciousness": 11.0,
+	}})
 	var pages := ["file", "pyramid", "wire", "pyramid_xray", "body", "body_organ", "body_xray"]
 	for page_index in pages.size():
 		index.page = [0, 1, 2, 1, 3, 3, 3][page_index]
