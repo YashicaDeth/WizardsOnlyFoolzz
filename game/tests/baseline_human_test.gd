@@ -25,6 +25,7 @@ func _ready() -> void:
 	_test_severing()
 	_test_prosthetic()
 	_test_gore()
+	_test_organs()
 	print("BASELINE_HUMAN_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
 
@@ -108,6 +109,82 @@ func _test_severing() -> void:
 	body.queue_free()
 
 
+func _test_organs() -> void:
+	var body := _rig()
+	var missing: Array[String] = []
+	for organ_id in AnatomyComponent.ORGANS:
+		if body.organ_parts.get(organ_id) == null:
+			missing.append(str(organ_id))
+	check(missing.is_empty(), "every organ has geometry inside its zone (missing %s)" % str(missing))
+	check(not body.organ_parts["heart"].visible, "organs are not visible from outside the body")
+
+	# A club breaks ribs. It does not perforate a liver — if blunt damage
+	# reached organs, every zone hit would be a lethal one.
+	for i in 6:
+		body.hit("torso", 30.0, 15.0, "blunt")
+	var blunt_ruptures := 0
+	for organ_id in body.anatomy.organs:
+		if not body.anatomy.organ_ok(organ_id):
+			blunt_ruptures += 1
+	check(blunt_ruptures == 0, "blunt damage leaves organs intact (%d ruptured)" % blunt_ruptures)
+	body.queue_free()
+
+	# Named organ, named consequence.
+	var gutted := _rig()
+	gutted.hit("torso", 90.0, 20.0, "cut", "gut")
+	check(not gutted.anatomy.organ_ok("gut"), "a blade through the gut ruptures the gut")
+	check(gutted.anatomy.organ_ok("heart"), "...and leaves the heart alone")
+	check(not gutted.anatomy.dead, "a gut wound is not instantly fatal")
+	var gut_bleed: float = gutted.anatomy.bleed_rate
+	gutted.queue_free()
+
+	var shot := _rig()
+	shot.hit("torso", 90.0, 20.0, "cut", "heart")
+	check(shot.anatomy.bleed_rate > gut_bleed, "a heart shot bleeds harder than a gut wound (%.1f vs %.1f)" % [shot.anatomy.bleed_rate, gut_bleed])
+	check(not shot.organ_parts["heart"].visible, "a ruptured organ leaves the body")
+	shot.queue_free()
+
+	var executed := _rig()
+	executed.hit("head", 90.0, 20.0, "cut", "brain")
+	check(executed.anatomy.dead, "destroying the brain kills outright")
+	executed.queue_free()
+
+	var broken := _rig()
+	var mobile_before: float = broken.anatomy.mobility_ratio()
+	broken.hit("torso", 90.0, 20.0, "cut", "spine")
+	check(broken.anatomy.mobility_ratio() < mobile_before * 0.4, "a severed spine floors mobility (%.2f -> %.2f)" % [mobile_before, broken.anatomy.mobility_ratio()])
+	broken.queue_free()
+
+	# The X-ray needs to see inside without opening anyone up.
+	var scanned := _rig()
+	scanned.reveal_organs(true)
+	check(scanned.organ_parts["liver"].visible, "the X-ray reveals organs")
+	check(scanned.get_node("torso").transparency > 0.0, "...by making the body translucent, not by removing it")
+	scanned.reveal_organs(false)
+	check(not scanned.organ_parts["liver"].visible, "and hides them again")
+	scanned.queue_free()
+
+	# Bodies remember which organ they lost, not just that they were hurt.
+	var donor := _rig()
+	donor.hit("torso", 90.0, 20.0, "cut", "liver")
+	var state: Dictionary = donor.snapshot()
+	donor.queue_free()
+	var heir := BaselineHuman.new()
+	add_child(heir)
+	heir.build("test_heir", {"restore": state})
+	check(not heir.anatomy.organ_ok("liver"), "a restored body still has the ruptured liver")
+	check(heir.anatomy.organ_ok("heart"), "...and still has everything it did not lose")
+	check(not heir.organ_parts["liver"].visible, "a restored missing organ is not rendered back in")
+	heir.queue_free()
+
+	# Saves written before organs existed must still load.
+	var legacy := BaselineHuman.new()
+	add_child(legacy)
+	legacy.build("test_legacy", {"restore": {"blood": 4000, "zones": {}, "wounds": []}})
+	check(legacy.anatomy.organs.size() == AnatomyComponent.ORGANS.size(), "a save with no organs migrates to a full set")
+	legacy.queue_free()
+
+
 func _test_gore() -> void:
 	BaselineHuman.live_gore = 0
 	var body := _rig()
@@ -127,8 +204,10 @@ func _test_gore() -> void:
 		body.hit("torso", 40.0, 20.0, "shear")
 	check(body.has_meta("gutted"), "a destroyed chest spills organs")
 	var spilled: int = BaselineHuman.live_gore
-	body.hit("torso", 40.0, 20.0, "shear")
-	check(BaselineHuman.live_gore <= spilled + 9, "organs spill once, not on every further hit")
+	# Blunt, so nothing new ruptures and only spray is added. A second full set
+	# of organs coming out of the same chest would mean the guard had failed.
+	body.hit("torso", 40.0, 20.0, "blunt")
+	check(BaselineHuman.live_gore <= spilled + 6, "the chest does not spill a second full set of organs")
 	for i in 12:
 		body.hit("right_arm", 40.0, 20.0, "shear")
 	check(body.get_node_or_null("right_arm_stump") != null, "a severed arm leaves exposed bone at the joint")

@@ -68,7 +68,20 @@ static var live_gore := 0
 ## rather than by a hotkey over the pit. 0 is handled by the `gore` flag.
 static var detail := 1.0
 
+## Organs are positioned relative to the zone that contains them, so the seated
+## and standing layouts both place them correctly without a second table.
+const ORGAN_LAYOUT := {
+	"brain": {"zone": "head", "at": Vector3(0, 0.01, 0), "size": 0.072, "tint": "9c8a86"},
+	"heart": {"zone": "torso", "at": Vector3(-0.05, 0.10, 0.03), "size": 0.060, "tint": "6d100e"},
+	"left_lung": {"zone": "torso", "at": Vector3(-0.12, 0.14, 0.0), "size": 0.076, "tint": "8a4d4a"},
+	"right_lung": {"zone": "torso", "at": Vector3(0.12, 0.14, 0.0), "size": 0.076, "tint": "8a4d4a"},
+	"liver": {"zone": "torso", "at": Vector3(0.08, -0.07, 0.02), "size": 0.070, "tint": "5a2015"},
+	"gut": {"zone": "torso", "at": Vector3(0.0, -0.18, 0.03), "size": 0.088, "tint": "8d7a52"},
+	"spine": {"zone": "torso", "at": Vector3(0.0, 0.0, -0.10), "size": 0.042, "tint": "cfc2a4"},
+}
+
 var anatomy: AnatomyComponent
+var organ_parts: Dictionary = {}
 var head_anchor: Node3D
 var subject_id := ""
 var parts: Dictionary = {}
@@ -116,6 +129,8 @@ func build(id: String, config: Dictionary = {}) -> void:
 		shape_node.shape = box
 		hitbox.add_child(shape_node)
 
+	_build_organs()
+
 	head_anchor = Node3D.new()
 	head_anchor.name = "HeadAnchor"
 	head_anchor.position = (layout.head as Dictionary).at + Vector3(0, 0.12, 0)
@@ -125,10 +140,14 @@ func build(id: String, config: Dictionary = {}) -> void:
 	anatomy.name = "Anatomy"
 	add_child(anatomy)
 	anatomy.configure(id, float(config.get("blood", 5000.0)), config.get("cybernetics", {}))
+	anatomy.organ_ruptured.connect(_on_organ_ruptured)
 	if config.get("restore") is Dictionary:
 		anatomy.restore(config.restore)
 		for zone_id in ZONES:
 			_refresh_zone(zone_id)
+		for organ_id in organ_parts:
+			if not anatomy.organ_ok(organ_id):
+				_hide_organ(str(organ_id))
 
 
 ## Where a blow actually landed, rather than a round-robin through the zone
@@ -147,9 +166,72 @@ func zone_nearest(global_point: Vector3) -> String:
 	return best
 
 
-func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt") -> Dictionary:
+## Organs hang off the zone that contains them, so they ride the body and both
+## the seated and standing layouts place them without a second table. They are
+## hidden until something opens the body or the X-ray asks to see them.
+func _build_organs() -> void:
+	for organ_id in ORGAN_LAYOUT:
+		var spec: Dictionary = ORGAN_LAYOUT[organ_id]
+		var host := parts.get(spec.zone) as Node3D
+		if host == null:
+			continue
+		var organ := MeshInstance3D.new()
+		organ.name = "organ_%s" % organ_id
+		var mesh := SphereMesh.new()
+		mesh.radius = float(spec.size)
+		mesh.height = float(spec.size) * (2.6 if organ_id == "spine" else 2.0)
+		mesh.material = WorldLook.surface(Color(str(spec.tint)), "bone" if organ_id == "spine" else "flesh", _variation + ORGAN_LAYOUT.keys().find(organ_id))
+		organ.mesh = mesh
+		organ.position = spec.at
+		organ.visible = false
+		host.add_child(organ)
+		organ_parts[organ_id] = organ
+
+
+## Which organ a blade actually reached. Without this, a torso hit is a torso
+## hit and the difference between a gut wound and a heart shot is invented.
+func organ_nearest(global_point: Vector3) -> String:
+	var best := ""
+	var best_distance := INF
+	for organ_id in organ_parts:
+		var organ := organ_parts[organ_id] as Node3D
+		if organ == null or not is_instance_valid(organ) or not organ.is_inside_tree():
+			continue
+		if not anatomy.organ_ok(organ_id):
+			continue
+		var distance: float = organ.global_position.distance_to(global_point)
+		if distance < best_distance:
+			best_distance = distance
+			best = str(organ_id)
+	return best
+
+
+func _organ_in_zone(zone_id: String) -> String:
+	var candidates: Array[String] = []
+	for organ_id in ORGAN_LAYOUT:
+		if str((ORGAN_LAYOUT[organ_id] as Dictionary).zone) == zone_id and anatomy.organ_ok(organ_id):
+			candidates.append(str(organ_id))
+	return candidates[randi() % candidates.size()] if not candidates.is_empty() else ""
+
+
+## Shows what is inside without cutting it open. The X-ray dossier drives this.
+func reveal_organs(revealed: bool) -> void:
+	for organ_id in organ_parts:
+		var organ := organ_parts[organ_id] as Node3D
+		if organ != null and is_instance_valid(organ) and anatomy.organ_ok(organ_id):
+			organ.visible = revealed
+	for zone_id in parts:
+		var part := parts[zone_id] as MeshInstance3D
+		if part != null and is_instance_valid(part) and not severed.has(zone_id):
+			part.transparency = 0.62 if revealed else 0.0
+
+
+func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "") -> Dictionary:
 	var zone := canonical_zone(zone_id)
-	var result := anatomy.apply_hit(zone, damage, impulse, damage_type)
+	var penetrates := damage_type in ["cut", "puncture", "ballistic", "shear"]
+	if penetrates and organ_id.is_empty():
+		organ_id = _organ_in_zone(zone)
+	var result := anatomy.apply_hit(zone, damage, impulse, damage_type, organ_id)
 	_refresh_zone(zone)
 	if gore and damage >= 5.0:
 		# Something that cuts opens you up; something that hits you bruises and
@@ -162,7 +244,48 @@ func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt")
 
 
 func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt") -> Dictionary:
-	return hit(zone_nearest(global_point), damage, impulse, damage_type)
+	var zone := zone_nearest(global_point)
+	var organ_id := ""
+	if damage_type in ["cut", "puncture", "ballistic", "shear"]:
+		organ_id = organ_nearest(global_point)
+		# The nearest organ overall can sit in a different zone than the nearest
+		# surface, so keep the two answers consistent with each other.
+		if not organ_id.is_empty() and str((ORGAN_LAYOUT[organ_id] as Dictionary).zone) != zone:
+			organ_id = _organ_in_zone(zone)
+	return hit(zone, damage, impulse, damage_type, organ_id)
+
+
+func _hide_organ(organ_id: String) -> void:
+	var organ := organ_parts.get(organ_id) as Node3D
+	if organ != null and is_instance_valid(organ):
+		organ.visible = false
+
+
+## A ruptured organ leaves the body. This is the difference between a torso hit
+## and a specific, legible wound the dossier can report afterwards.
+func _on_organ_ruptured(organ_id: String, _organ: Dictionary) -> void:
+	if not gore:
+		_hide_organ(organ_id)
+		return
+	var spec: Dictionary = ORGAN_LAYOUT.get(organ_id, {})
+	var organ := organ_parts.get(organ_id) as Node3D
+	var origin := organ.global_position if organ != null and is_instance_valid(organ) and organ.is_inside_tree() else _zone_origin("torso")
+	_hide_organ(organ_id)
+	_spray(origin, Vector3.UP, 12)
+	if spec.is_empty() or live_gore >= MAX_LIVE_GORE:
+		return
+	var root := _gore_root()
+	var loose_organ := MeshInstance3D.new()
+	var mesh := SphereMesh.new()
+	mesh.radius = float(spec.size) * 1.05
+	mesh.height = mesh.radius * 2.2
+	mesh.material = WorldLook.surface(Color(str(spec.tint)), "flesh", _variation + 21)
+	loose_organ.mesh = mesh
+	root.add_child(loose_organ)
+	loose_organ.global_position = origin
+	var spill := Vector3(randf_range(-1.0, 1.0), randf_range(0.2, 0.8), randf_range(-1.0, 1.0)).normalized()
+	_loose.append({"node": loose_organ, "velocity": spill * (2.2 + randf() * 2.4), "life": 9.0})
+	live_gore += 1
 
 
 func install_prosthetic(zone_id: String, part_data: Dictionary) -> void:

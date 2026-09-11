@@ -4,7 +4,22 @@ extends Node
 signal wounded(result: Dictionary)
 signal bleeding_changed(rate: float, blood_remaining: float)
 signal critical_state_started()
+signal organ_ruptured(organ_id: String, organ: Dictionary)
 signal died(cause: Dictionary)
+
+## Organs sit inside zones. A zone tracks whether a limb still works; an organ
+## decides how you die. The distinction matters because two torso hits of equal
+## damage should not be interchangeable — one through the gut leaves someone
+## bleeding for a minute, one through the heart does not leave them anything.
+const ORGANS := {
+	"brain": {"zone": "head", "health": 18.0, "bleed": 1.2, "fatal": true},
+	"heart": {"zone": "torso", "health": 26.0, "bleed": 3.4, "fatal": false},
+	"left_lung": {"zone": "torso", "health": 34.0, "bleed": 1.2, "fatal": false},
+	"right_lung": {"zone": "torso", "health": 34.0, "bleed": 1.2, "fatal": false},
+	"liver": {"zone": "torso", "health": 40.0, "bleed": 1.8, "fatal": false},
+	"gut": {"zone": "torso", "health": 52.0, "bleed": 0.9, "fatal": false},
+	"spine": {"zone": "torso", "health": 30.0, "bleed": 0.4, "fatal": false},
+}
 
 const DEFAULT_ZONES := {
 	"head": {"health": 45.0, "bleed": 0.75, "critical": true},
@@ -24,6 +39,7 @@ var consciousness := 100.0
 var dead := false
 var critical := false
 var zones: Dictionary = {}
+var organs: Dictionary = {}
 var installed_parts: Dictionary = {}
 var wounds: Array[Dictionary] = []
 
@@ -36,10 +52,15 @@ func configure(id: String, capacity: float = 5000.0, cybernetics: Dictionary = {
 	zones = DEFAULT_ZONES.duplicate(true)
 	for zone_id in zones:
 		zones[zone_id] = (zones[zone_id] as Dictionary).duplicate(true)
+	organs = {}
+	for organ_id in ORGANS:
+		var organ: Dictionary = (ORGANS[organ_id] as Dictionary).duplicate(true)
+		organ["ruptured"] = false
+		organs[organ_id] = organ
 	set_process(true)
 
 
-func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: String = "blunt") -> Dictionary:
+func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: String = "blunt", organ_id: String = "") -> Dictionary:
 	if dead:
 		return {"accepted": false, "reason": "dead"}
 	var resolved_zone := zone_id if zones.has(zone_id) else "torso"
@@ -67,11 +88,53 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 		wounds.pop_front()
 	if bool(zone.critical) and float(zone.health) <= 0.0:
 		_enter_critical()
+	# Only something that opens the body reaches what is inside it. A blunt hit
+	# breaks the ribs; it does not perforate the liver.
+	if penetrating and organs.has(organ_id):
+		wound["organ"] = damage_organ(organ_id, applied * 0.7)
 	var result := wound.duplicate(true)
 	result["blood_remaining"] = blood_remaining
 	result["pain"] = pain
 	wounded.emit(result)
 	return result
+
+
+func damage_organ(organ_id: String, amount: float) -> Dictionary:
+	if not organs.has(organ_id):
+		return {}
+	var organ: Dictionary = organs[organ_id]
+	if bool(organ.ruptured):
+		return organ
+	organ["health"] = maxf(0.0, float(organ.health) - amount)
+	if float(organ.health) <= 0.0:
+		organ["ruptured"] = true
+		bleed_rate += float(organ.bleed) * 14.0
+		pain = clampf(pain + 26.0, 0.0, 100.0)
+		organs[organ_id] = organ
+		organ_ruptured.emit(organ_id, organ)
+		_enter_critical()
+		if bool(organ.get("fatal", false)):
+			dead = true
+			died.emit({"type": "organ_destroyed", "organ": organ_id, "subject_id": subject_id})
+	organs[organ_id] = organ
+	return organ
+
+
+func organ_ok(organ_id: String) -> bool:
+	return not bool((organs.get(organ_id, {}) as Dictionary).get("ruptured", false))
+
+
+## A ruptured heart does not let you keep standing while you bleed out on a
+## normal clock, and a severed spine is not a limp.
+func _organ_consciousness_drain() -> float:
+	var drain := 0.0
+	if not organ_ok("heart"):
+		drain += 34.0
+	if not organ_ok("left_lung"):
+		drain += 9.0
+	if not organ_ok("right_lung"):
+		drain += 9.0
+	return drain
 
 
 func treat_wound(zone_id: String, quality: float) -> void:
@@ -88,6 +151,10 @@ func mobility_ratio() -> float:
 	var left: Dictionary = zones.get("left_leg", DEFAULT_ZONES.left_leg)
 	var right: Dictionary = zones.get("right_leg", DEFAULT_ZONES.right_leg)
 	var limb_ratio := (float(left.health) / 75.0 + float(right.health) / 75.0) * 0.5
+	# A severed spine is not a limp. It floors mobility below anything two bad
+	# legs can produce, and no amount of pain management brings it back.
+	if not organ_ok("spine"):
+		return 0.05
 	return clampf(limb_ratio * (1.0 - pain * 0.004), 0.18, 1.0)
 
 
@@ -107,6 +174,7 @@ func snapshot() -> Dictionary:
 		"critical": critical,
 		"dead": dead,
 		"zones": zones.duplicate(true),
+		"organs": organs.duplicate(true),
 		"wounds": wounds.duplicate(true),
 		"cybernetics": installed_parts.duplicate(true),
 	}
@@ -124,6 +192,12 @@ func restore(state: Dictionary) -> void:
 	for zone_id in zones:
 		if saved_zones.get(zone_id) is Dictionary:
 			zones[zone_id].merge(saved_zones[zone_id], true)
+	# Saves written before organs existed simply have none; the defaults built
+	# in configure() stand, which is the same migration rule as subjects.
+	var saved_organs: Dictionary = state.get("organs", {})
+	for organ_id in organs:
+		if saved_organs.get(organ_id) is Dictionary:
+			organs[organ_id].merge(saved_organs[organ_id], true)
 	wounds.clear()
 	for wound in state.get("wounds", []):
 		if wound is Dictionary:
@@ -134,7 +208,7 @@ func _process(delta: float) -> void:
 	if dead or bleed_rate <= 0.001:
 		return
 	blood_remaining = maxf(0.0, blood_remaining - bleed_rate * delta)
-	consciousness = clampf((blood_remaining / blood_capacity) * 120.0 - pain * 0.22, 0.0, 100.0)
+	consciousness = clampf((blood_remaining / blood_capacity) * 120.0 - pain * 0.22 - _organ_consciousness_drain(), 0.0, 100.0)
 	bleed_rate = maxf(0.0, bleed_rate - delta * 0.012)
 	bleeding_changed.emit(bleed_rate, blood_remaining)
 	if blood_remaining <= blood_capacity * 0.32:
