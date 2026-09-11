@@ -26,6 +26,7 @@ const CellOutzType := preload("res://systems/celloutz_type.gd")
 const WireNetScript := preload("res://systems/wire_net.gd")
 const Grunge := preload("res://systems/celloutz_grunge.gd")
 const XrayCursor := preload("res://systems/xray_cursor.gd")
+const Motion := preload("res://systems/celloutz_motion.gd")
 const SUBJECT_ICON := preload("res://systems/subject_icon.gd")
 const BODY_INSPECTOR := preload("res://systems/body_inspector.gd")
 
@@ -60,6 +61,24 @@ var cursor_at := Vector2(640, 360)
 var cursor_follows_mouse := true
 var page_blend := 1.0
 var page_direction := 1.0
+## A8.2. The panel is an object arriving, not a visibility flag.
+var open_blend := 0.0
+var closing := false
+## A8.3. The rail highlight travels to the row rather than teleporting onto it.
+var highlight_y := 0.0
+var rail_scroll := 0.0
+var rail_scroll_target := 0.0
+## A2.7. The index is searchable *and* incomplete, per the design.
+var search_active := false
+var search_query := ""
+## A3.5. Where each pyramid member was drawn, so one can be clicked through to.
+var _tier_rects: Array = []
+## A4.5/A4.6. The last contact attempt and the last action, held rather than
+## recomputed - see `_refresh_contact`.
+var _contact: Dictionary = {}
+var _contact_for := ""
+var _last_action: Dictionary = {}
+var _action_rects: Array = []
 var _icons: Array = []
 var _inspector: Node
 var _rail_cache: Array = []
@@ -99,12 +118,16 @@ func toggle() -> void:
 
 func open() -> void:
 	visible = true
+	closing = false
+	open_blend = 0.0
 	refresh()
 	queue_redraw()
 
 
+## A8.2. Closing runs the blend backwards and hides at the end of it, so the
+## panel leaves rather than vanishing. `_process` finishes the job.
 func close() -> void:
-	visible = false
+	closing = true
 
 
 ## Rebuilt on open rather than per frame: the Wire derives accounts from every
@@ -117,6 +140,15 @@ func refresh() -> void:
 	rail_index = clampi(rail_index, 0, maxi(0, _rail_cache.size() - 1))
 
 
+## A2.7. Filtering happens here rather than at draw time so that selection,
+## scrolling and the count all agree about how many rows exist.
+func _matches(label: String, note: String) -> bool:
+	if search_query == "":
+		return true
+	var needle := search_query.to_lower()
+	return label.to_lower().contains(needle) or note.to_lower().contains(needle)
+
+
 func _rebuild_rail() -> void:
 	_rail_cache.clear()
 	match page:
@@ -125,17 +157,24 @@ func _rebuild_rail() -> void:
 				var subject: Dictionary = WorldHistory.subject(subject_id)
 				if str(subject.get("kind", "person")) != "person":
 					continue
-				_rail_cache.append({"id": subject_id, "label": str(subject.get("name", subject_id)), "note": str(subject.get("role", ""))})
+				var person_label := str(subject.get("name", subject_id))
+				var person_note := str(subject.get("role", ""))
+				if _matches(person_label, person_note):
+					_rail_cache.append({"id": subject_id, "label": person_label, "note": person_note})
 		1:
 			for faction_id in wire.factions():
 				var faction: Dictionary = WorldHistory.subject(faction_id)
-				_rail_cache.append({"id": faction_id, "label": str(faction.get("name", faction_id)), "note": str(faction.get("threat", "UNKNOWN"))})
+				var faction_label := str(faction.get("name", faction_id))
+				var faction_note := str(faction.get("threat", "UNKNOWN"))
+				if _matches(faction_label, faction_note):
+					_rail_cache.append({"id": faction_id, "label": faction_label, "note": faction_note})
 		2:
 			for account in wire.accounts_by_reach():
 				var note := str(account.tier)
 				if str(account.id) == "player":
 					note += "  \u00b7  YOU"
-				_rail_cache.append({"id": str(account.id), "label": str(account.name), "note": note})
+				if _matches(str(account.name), note):
+					_rail_cache.append({"id": str(account.id), "label": str(account.name), "note": note})
 
 
 func _process(delta: float) -> void:
@@ -143,7 +182,14 @@ func _process(delta: float) -> void:
 		return
 	elapsed += delta
 	action_life = maxf(0.0, action_life - delta)
-	page_blend = minf(1.0, page_blend + delta * 4.4)
+	page_blend = Motion.blend(page_blend, delta, Motion.PANEL, true)
+	open_blend = Motion.blend(open_blend, delta, Motion.PANEL, not closing)
+	if closing and open_blend <= 0.0:
+		visible = false
+		closing = false
+		return
+	highlight_y = Motion.approach(highlight_y, float(rail_index), delta, Motion.SELECTION)
+	rail_scroll = Motion.approach(rail_scroll, rail_scroll_target, delta, Motion.SCROLL)
 	if cursor_follows_mouse:
 		cursor_at = get_global_mouse_position()
 	queue_redraw()
@@ -155,6 +201,27 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Arrow keys only, deliberately. WASD would drive the car underneath the
 	# panel: the chassis reads `Input.is_action_pressed` in `_physics_process`,
 	# which does not care that the event was marked handled here.
+	# A2.7. While the search field has focus it eats printable keys, otherwise
+	# typing "i" in a query would close the panel.
+	if search_active and event is InputEventKey and event.pressed:
+		if event.keycode == KEY_ESCAPE:
+			search_active = false
+			search_query = ""
+			_rebuild_rail()
+		elif event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+			search_active = false
+		elif event.keycode == KEY_BACKSPACE:
+			search_query = search_query.substr(0, maxi(0, search_query.length() - 1))
+			_rebuild_rail()
+		else:
+			var typed := char(event.unicode)
+			if typed.strip_edges() != "" and search_query.length() < 24:
+				search_query += typed
+				rail_index = 0
+				_rebuild_rail()
+		get_viewport().set_input_as_handled()
+		queue_redraw()
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_LEFT:
@@ -168,6 +235,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_TAB:
 				if page != 3 or not _inspector.handle_key(KEY_TAB):
 					return
+			KEY_ENTER, KEY_KP_ENTER:
+				# A4.5. Sending is an act, so it re-rolls deliberately rather
+				# than the panel re-rolling it behind your back every frame.
+				if page != 2 or _contact_for == "":
+					return
+				_refresh_contact(_contact_for, true)
+			KEY_SLASH:
+				search_active = true
 			KEY_X:
 				_set_xray(not xray)
 			KEY_1, KEY_2, KEY_3, KEY_4:
@@ -183,6 +258,21 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			queue_redraw()
 			return
+		if event.button_index == MOUSE_BUTTON_LEFT and page == 1:
+			# A3.5. Click a rank and read the person standing in it.
+			for row in _tier_rects:
+				if (row["rect"] as Rect2).has_point(event.position):
+					_jump_to_subject(str(row["id"]))
+					get_viewport().set_input_as_handled()
+					queue_redraw()
+					return
+		if event.button_index == MOUSE_BUTTON_LEFT and page == 2:
+			for row in _action_rects:
+				if (row["rect"] as Rect2).has_point(event.position):
+					_run_action(str(row["id"]))
+					get_viewport().set_input_as_handled()
+					queue_redraw()
+					return
 		if event.button_index == MOUSE_BUTTON_LEFT and page == 3:
 			if not _inspector.handle_click(event.position):
 				return
@@ -190,9 +280,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			queue_redraw()
 			return
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			feed_scroll = minf(feed_scroll + 42.0, maxf(0.0, float(posts.size()) * 80.0 - 320.0))
+			feed_scroll += 42.0
 			if wire:
 				wire.scroll(1.0)
+			# A4.7. It does not end. Reaching the bottom loads more, which is
+			# the mechanic the design asks for - the feed is meant to farm you,
+			# and a scroll bar that fills up is an exit sign.
+			if feed_scroll > maxf(0.0, float(posts.size()) * 80.0 - 360.0):
+				posts.append_array(wire.feed(10, posts.size()))
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			feed_scroll = maxf(0.0, feed_scroll - 42.0)
 		else:
@@ -239,6 +334,15 @@ func _subject_tone(subject: Dictionary) -> Color:
 	return COPPER
 
 
+## A3.5. Switching page *and* selection together, which the rail alone cannot do.
+func _jump_to_subject(subject_id: String) -> void:
+	_go_to_page(0, -1.0)
+	for index in _rail_cache.size():
+		if str((_rail_cache[index] as Dictionary).id) == subject_id:
+			rail_index = index
+			return
+
+
 func _set_xray(on: bool) -> void:
 	xray = on
 	for icon in _icons:
@@ -256,6 +360,27 @@ func _go_to_page(target: int, direction: float) -> void:
 	_rebuild_rail()
 
 
+## A2.8. The registry is wrong about some of what it holds. `DESIGN/IN_GAME_
+## INTERNET.md` and Codex §13 both make partial, late, manipulated or false
+## information a pillar, and an index that is quietly always correct undercuts
+## it. One field in roughly a third of files is disputed, deterministically, and
+## the panel shows the claim struck through with what is reported instead.
+const DISPUTED_ROLES := [
+	"claims the rank, holds no post",
+	"three people answer to this name",
+	"reported dead twice",
+	"this entry predates the flash",
+	"filed by someone with a grudge",
+]
+
+
+func _disputed_note(subject_id: String) -> String:
+	var mark := hash(subject_id + "dispute") % 100
+	if mark >= 34:
+		return ""
+	return str(DISPUTED_ROLES[mark % DISPUTED_ROLES.size()])
+
+
 func _selected() -> Dictionary:
 	if _rail_cache.is_empty():
 		return {}
@@ -270,7 +395,12 @@ func _draw() -> void:
 		viewport = get_viewport_rect().size
 	if viewport.x < 640.0 or viewport.y < 400.0:
 		return
-	draw_rect(Rect2(Vector2.ZERO, viewport), GROUND)
+	# A8.2. Everything except the cursor is drawn inside this transform, so the
+	# whole plate arrives as one object instead of each element animating itself.
+	var opened := Motion.ease_out(open_blend)
+	var plate_scale := lerpf(0.955, 1.0, opened)
+	draw_rect(Rect2(Vector2.ZERO, viewport), GROUND * Color(1, 1, 1, opened))
+	draw_set_transform(viewport * 0.5 * (1.0 - plate_scale), 0.0, Vector2(plate_scale, plate_scale))
 	var plate := Rect2(Vector2(54, 44), viewport - Vector2(108, 88))
 	_draw_plate(plate)
 	_draw_header(plate)
@@ -301,6 +431,9 @@ func _draw() -> void:
 	_draw_gore(plate)
 	_draw_screen_decay(plate)
 	Grunge.grain(self, plate, 907, 900)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# The cursor is a physical thing in front of the screen, so it does not
+	# travel with the panel that is arriving behind it.
 	XrayCursor.draw(self, cursor_at, xray, elapsed)
 
 
@@ -395,24 +528,62 @@ func _draw_header(plate: Rect2) -> void:
 func _draw_rail(rect: Rect2) -> void:
 	draw_line(rect.position + Vector2(rect.size.x + 8, 0), rect.position + Vector2(rect.size.x + 8, rect.size.y), INK * Color(1, 1, 1, 0.14), 1.0)
 	var heading: String = ["SUBJECTS", "FACTIONS", "ACCOUNTS", "BODIES"][page]
-	CellOutzType.draw_text(self, rect.position + Vector2(0, 0), heading, 12.0, MOSS, 1.4)
+	CellOutzType.draw_text(self, rect.position, heading, 12.0, MOSS, 1.4)
+	var total := "%02d" % _rail_cache.size()
+	var total_width := CellOutzType.width(total, 10.0, 0.8)
+	CellOutzType.draw_text(self, Vector2(rect.position.x + rect.size.x - 14 - total_width, rect.position.y + 2), total, 10.0, INK * Color(1, 1, 1, 0.4), 0.8)
 	draw_line(rect.position + Vector2(0, 18), rect.position + Vector2(rect.size.x - 14, 18), MOSS * Color(1, 1, 1, 0.35), 1.0)
+
+	# A2.7. A search field that looks like something scratched into the plate
+	# rather than a form input.
 	var font := ThemeDB.fallback_font
-	var y := rect.position.y + 36.0
+	var field := Rect2(rect.position + Vector2(0, 26), Vector2(rect.size.x - 14, 20))
+	if search_active or search_query != "":
+		draw_colored_polygon(PackedVector2Array([
+			field.position + Vector2(4, 0), field.position + Vector2(field.size.x, 0),
+			field.position + field.size - Vector2(4, 0), field.position + Vector2(0, field.size.y),
+		]), COPPER * Color(1, 1, 1, 0.14))
+		var caret := "_" if search_active and fmod(elapsed, 0.9) < 0.45 else ""
+		draw_string(font, field.position + Vector2(8, 14), "/ %s%s" % [search_query, caret], HORIZONTAL_ALIGNMENT_LEFT, field.size.x - 14, 12, INK)
+	else:
+		draw_string(font, field.position + Vector2(2, 14), "/ TO SEARCH", HORIZONTAL_ALIGNMENT_LEFT, field.size.x, 10, INK * Color(1, 1, 1, 0.26))
+
+	# A2.6. The rail was drawing every subject from a fixed origin, so a
+	# population past about twelve simply ran off the bottom of the plate and
+	# became unreachable. It scrolls now, and the scroll follows the selection.
+	var row_height := 34.0
+	var top := rect.position.y + 56.0
+	var visible_rows := int((rect.position.y + rect.size.y - top) / row_height)
+	rail_scroll_target = clampf(float(rail_index) - float(visible_rows) * 0.5, 0.0, maxf(0.0, float(_rail_cache.size() - visible_rows)))
+	var offset := rail_scroll * row_height
+
+	# A8.3. The highlight is drawn at its travelling position, not at the row.
+	if not _rail_cache.is_empty():
+		var marker_y := top + highlight_y * row_height - offset
+		if marker_y > top - row_height and marker_y < rect.position.y + rect.size.y:
+			draw_colored_polygon(PackedVector2Array([
+				Vector2(rect.position.x - 6, marker_y - 13), Vector2(rect.position.x + rect.size.x - 14, marker_y - 13),
+				Vector2(rect.position.x + rect.size.x - 20, marker_y + 15), Vector2(rect.position.x - 6, marker_y + 15),
+			]), COPPER * Color(1, 1, 1, 0.17))
+			draw_line(Vector2(rect.position.x - 6, marker_y - 13), Vector2(rect.position.x - 6, marker_y + 15), HOT, 2.5)
+
 	for index in _rail_cache.size():
-		if y > rect.position.y + rect.size.y - 18.0:
-			break
+		var y := top + float(index) * row_height - offset
+		if y < top - row_height or y > rect.position.y + rect.size.y - 8.0:
+			continue
 		var entry: Dictionary = _rail_cache[index]
 		var active := index == rail_index
-		if active:
-			draw_colored_polygon(PackedVector2Array([
-				Vector2(rect.position.x - 6, y - 13), Vector2(rect.position.x + rect.size.x - 14, y - 13),
-				Vector2(rect.position.x + rect.size.x - 20, y + 15), Vector2(rect.position.x - 6, y + 15),
-			]), COPPER * Color(1, 1, 1, 0.17))
-			draw_line(Vector2(rect.position.x - 6, y - 13), Vector2(rect.position.x - 6, y + 15), HOT, 2.5)
 		draw_string(font, Vector2(rect.position.x + 4, y), str(entry.label), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 26, 14, INK if active else INK * Color(1, 1, 1, 0.72))
 		draw_string(font, Vector2(rect.position.x + 4, y + 13), str(entry.note).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 26, 9, COPPER * Color(1, 1, 1, 0.8) if active else INK * Color(1, 1, 1, 0.34))
-		y += 34.0
+
+	# A scroll indicator, so it is obvious there is more than what is on screen.
+	if _rail_cache.size() > visible_rows:
+		var track_x := rect.position.x + rect.size.x - 10.0
+		draw_line(Vector2(track_x, top - 6), Vector2(track_x, rect.position.y + rect.size.y - 8), INK * Color(1, 1, 1, 0.10), 2.0)
+		var span := rect.size.y - 62.0
+		var thumb := span * clampf(float(visible_rows) / float(_rail_cache.size()), 0.08, 1.0)
+		var travel := (span - thumb) * clampf(rail_scroll / maxf(1.0, float(_rail_cache.size() - visible_rows)), 0.0, 1.0)
+		draw_line(Vector2(track_x, top - 6 + travel), Vector2(track_x, top - 6 + travel + thumb), COPPER * Color(1, 1, 1, 0.55), 2.0)
 
 
 # --- page one: the dossier -------------------------------------------------
@@ -605,10 +776,11 @@ func _draw_pyramid(rect: Rect2) -> void:
 	CellOutzType.draw_stamped(self, rect.position + Vector2(0, 4), str(data.name).to_upper(), 21.0, INK, HOT * Color(1, 1, 1, 0.3), 1.4)
 	draw_string(font, rect.position + Vector2(2, 38), "THREAT %s   ·   %s   ·   %d ON THE BOOKS" % [str(data.threat), str(data.territory).to_upper(), int(data.headcount)], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COPPER)
 	draw_string(font, rect.position + Vector2(2, 58), "\"%s\"" % str(data.doctrine), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 20, 12, INK * Color(1, 1, 1, 0.6))
+	_tier_rects.clear()
 
 	var tiers: Array = data.tiers
 	var top := rect.position.y + 84.0
-	var row_height := minf(64.0, (rect.size.y - 110.0) / float(maxi(1, tiers.size())))
+	var row_height := minf(56.0, (rect.size.y - 150.0) / float(maxi(1, tiers.size())))
 	for index in tiers.size():
 		var tier: Dictionary = tiers[index]
 		var members: Array = tier["members"]
@@ -658,6 +830,8 @@ func _draw_pyramid(rect: Rect2) -> void:
 			# The tier's lead member gets a turning head at the left edge of the
 			# row. Greg's ask: the people in the hierarchy should be present as
 			# objects, not as text in a table.
+			# A3.5. Remember where this row is so it can be clicked through to.
+			_tier_rects.append({"id": str((members[0] as Dictionary).id), "rect": Rect2(Vector2(cx - span * 0.5, y), Vector2(span, row_height - 8.0))})
 			var lead: Dictionary = members[0]
 			var icon_size := minf(row_height - 12.0, 48.0)
 			var has_icon := _draw_icon(index, str(lead.id), Rect2(Vector2(cx - span * 0.5 + 16, y + 4), Vector2(icon_size, icon_size)))
@@ -665,21 +839,86 @@ func _draw_pyramid(rect: Rect2) -> void:
 			draw_string(font, Vector2(text_x, y + 40), label, HORIZONTAL_ALIGNMENT_LEFT, room - icon_size - 10.0, 13, INK * Color(1, 1, 1, 0.88))
 			CellOutzType.draw_text(self, Vector2(cx + span * 0.5 - 18 - down_width, y + 30), downline, 10.0, SPORE * Color(1, 1, 1, 0.8), 0.9)
 
-	var fy := top + float(tiers.size()) * row_height + 12.0
+	# A3.7. The ladder is not just tiers - it is who brought whom in. Drawn from
+	# real ally and command edges between members of adjacent tiers, because the
+	# recruitment chain is the thing a pyramid scheme actually sells.
+	for index in range(1, tiers.size()):
+		var lower: Array = (tiers[index] as Dictionary)["members"]
+		var upper: Array = (tiers[index - 1] as Dictionary)["members"]
+		if lower.is_empty() or upper.is_empty():
+			continue
+		var recruit: Dictionary = lower[0]
+		var relations: Dictionary = WorldHistory.subject(str(recruit.id)).get("relations", {})
+		for sponsor in upper:
+			if not relations.has(str((sponsor as Dictionary).id)):
+				continue
+			var centre_x := rect.position.x + rect.size.x * 0.5
+			var lower_span := lerpf(rect.size.x * 0.46, rect.size.x * 0.96, float(index) / float(maxi(1, tiers.size() - 1)))
+			var upper_span := lerpf(rect.size.x * 0.46, rect.size.x * 0.96, float(index - 1) / float(maxi(1, tiers.size() - 1)))
+			var from_point := Vector2(centre_x - lower_span * 0.5, top + float(index) * row_height + 10.0)
+			var to_point := Vector2(centre_x - upper_span * 0.5, top + float(index - 1) * row_height + row_height - 16.0)
+			var elbow := minf(from_point.x, to_point.x) - 14.0
+			draw_polyline(PackedVector2Array([
+				from_point, Vector2(elbow, from_point.y), Vector2(elbow, to_point.y), to_point,
+			]), SPORE * Color(1, 1, 1, 0.75), 1.8)
+			draw_circle(to_point, 3.0, SPORE)
+			# Named, because "who brought you in" is the thing the pitch sells.
+			CellOutzType.draw_text(self, Vector2(elbow - 52.0, (from_point.y + to_point.y) * 0.5 - 5.0), "UPLINE", 8.0, SPORE * Color(1, 1, 1, 0.7), 0.8)
+			break
+
+	# A3.6. The register, pushed. This is a recruitment pitch printed on a
+	# hierarchy chart, and it should read like one.
+	var fy := top + float(tiers.size()) * row_height + 10.0
 	if fy < rect.position.y + rect.size.y - 16.0:
-		draw_string(font, Vector2(rect.position.x, fy + 12), "ADVANCEMENT IS BY REMEMBERED IMPACT. RECRUIT TWO AND YOUR POSITION IS SECURE.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 11, COPPER * Color(1, 1, 1, 0.62))
-		draw_string(font, Vector2(rect.position.x, fy + 28), "CELLOUTZ IS NOT RESPONSIBLE FOR POSITIONS HELD BY THE DECEASED.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 10, INK * Color(1, 1, 1, 0.32))
+		CellOutzType.draw_stamped(self, Vector2(rect.position.x, fy), "ADVANCEMENT OPPORTUNITY", 14.0, COPPER, HOT * Color(1, 1, 1, 0.3), 1.2)
+		draw_string(font, Vector2(rect.position.x, fy + 30), "RECRUIT TWO AND YOUR POSITION IS SECURE. RECRUIT FOUR AND YOUR POSITION IS THEIRS.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 11, INK * Color(1, 1, 1, 0.72))
+		var voice: String = "\"I came in on INTAKE owing a car. Eleven weeks later I own the people who sold it to me.\""
+		draw_string(font, Vector2(rect.position.x + 8, fy + 48), voice, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 16, 11, SPORE * Color(1, 1, 1, 0.72))
+		draw_string(font, Vector2(rect.position.x + 8, fy + 62), "— A SATISFIED EARNER, DECEASED", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 16, 9, INK * Color(1, 1, 1, 0.34))
+		draw_string(font, Vector2(rect.position.x, fy + 82), "CELLOUTZ IS NOT RESPONSIBLE FOR POSITIONS HELD BY THE DECEASED. BUY-IN IS NON-REFUNDABLE.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 9, INK * Color(1, 1, 1, 0.30))
 
 
 # --- page three: the Wire ---------------------------------------------------
+
+## A4.5. The contact attempt is resolved once and held, not recomputed.
+##
+## This was a real bug rather than a refactor: `_draw_wire` called
+## `wire.contact()` inside `_draw`, so every frame re-rolled the RNG - the reply
+## and the routes flickered - and every frame also added 0.6 to `strain`, which
+## meant simply *looking* at an account drained the player's attention at 36 a
+## second. The Wire is supposed to cost something to read; not that.
+const WIRE_ACTIONS := [
+	{"id": "observe", "label": "OBSERVE", "cost": "0", "note": "read them"},
+	{"id": "trace", "label": "TRACE", "cost": "1", "note": "find where they will be"},
+	{"id": "expose", "label": "EXPOSE", "cost": "2", "note": "publish something true"},
+	{"id": "fabricate", "label": "FABRICATE", "cost": "3-5", "note": "publish something false"},
+	{"id": "swarm", "label": "SWARM", "cost": "7", "note": "turn their own people on them"},
+]
+
+
+func _refresh_contact(subject_id: String, force := false) -> void:
+	if subject_id == _contact_for and not force:
+		return
+	_contact_for = subject_id
+	_last_action = {}
+	_contact = wire.contact(subject_id) if subject_id != "" else {}
+
+
+func _run_action(action: String) -> void:
+	if _contact_for == "":
+		return
+	_last_action = wire.act(_contact_for, action)
+	# An action changes standing, so whether they will read you changes with it.
+	_refresh_contact(_contact_for, true)
+
 
 func _draw_wire(rect: Rect2) -> void:
 	var font := ThemeDB.fallback_font
 	var entry := _selected()
 	var split := rect.size.x * 0.46
-	# Left of the split: the account you have selected, and whether it will
-	# answer you. Right: the feed, which is not sorted for your benefit.
+	_action_rects.clear()
 	if not entry.is_empty():
+		_refresh_contact(str(entry.id))
 		var account: Dictionary = wire.account(str(entry.id))
 		CellOutzType.draw_stamped(self, rect.position + Vector2(0, 4), str(account.get("name", "")).to_upper(), 18.0, INK, COPPER * Color(1, 1, 1, 0.28), 1.2)
 		draw_string(font, rect.position + Vector2(2, 34), str(account.get("handle", "")), HORIZONTAL_ALIGNMENT_LEFT, split, 12, MOSS)
@@ -689,54 +928,72 @@ func _draw_wire(rect: Rect2) -> void:
 				badge + Vector2(0, -9), badge + Vector2(9, 0), badge + Vector2(0, 9), badge + Vector2(-9, 0),
 			]), MOSS * Color(1, 1, 1, 0.85))
 			draw_string(font, badge + Vector2(-3, 4), "V", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.05, 0.05, 0.05))
-		_draw_icon(0, str(entry.id), Rect2(Vector2(rect.position.x + split - 116, rect.position.y + 36), Vector2(92, 92)))
 		CellOutzType.draw_text(self, rect.position + Vector2(0, 52), "REACH", 9.0, INK * Color(1, 1, 1, 0.45), 1.0)
 		CellOutzType.draw_text(self, rect.position + Vector2(0, 66), "%06d" % int(account.get("reach", 0)), 20.0, COPPER, 1.0)
 		CellOutzType.draw_text(self, rect.position + Vector2(146, 52), "TIER", 9.0, INK * Color(1, 1, 1, 0.45), 1.0)
 		CellOutzType.draw_text(self, rect.position + Vector2(146, 66), str(account.get("tier", "")), 16.0, BRUISE.lerp(INK, 0.4), 1.0)
+		_draw_icon(0, str(entry.id), Rect2(Vector2(rect.position.x + split - 116, rect.position.y + 36), Vector2(92, 92)))
 		draw_string(font, rect.position + Vector2(2, 104), "LAST SEEN %s" % str(account.get("last_seen", "")), HORIZONTAL_ALIGNMENT_LEFT, split, 11, INK * Color(1, 1, 1, 0.55))
 		var bought := int(account.get("manufactured", 0))
 		if bought > 0:
 			draw_string(font, rect.position + Vector2(2, 120), "ESTIMATED %d OF THAT WAS PURCHASED" % bought, HORIZONTAL_ALIGNMENT_LEFT, split, 10, HOT * Color(1, 1, 1, 0.7))
 
-		# The contact readout. This is the page's argument: the number is not a
-		# score, it is a door, and most doors are shut.
-		var attempt: Dictionary = wire.contact(str(entry.id))
-		var chance := float(attempt.get("chance", 0.0))
-		var cy := rect.position.y + 146.0
+		var chance := float(_contact.get("chance", 0.0))
+		var cy := rect.position.y + 140.0
 		draw_line(Vector2(rect.position.x, cy - 8), Vector2(rect.position.x + split - 20, cy - 8), INK * Color(1, 1, 1, 0.16), 1.0)
-		CellOutzType.draw_text(self, Vector2(rect.position.x, cy + 4), "WILL THEY READ YOU", 11.0, MOSS, 1.2)
-		# `cy` is already absolute - adding `rect.position` to it again put this
-		# meter 170px below the label it belongs to, at the bottom of the panel.
-		var bar := Rect2(Vector2(rect.position.x, cy + 26), Vector2(split - 40, 12))
+		CellOutzType.draw_text(self, Vector2(rect.position.x, cy), "WILL THEY READ YOU", 11.0, MOSS, 1.2)
+		var bar := Rect2(Vector2(rect.position.x, cy + 22), Vector2(split - 66, 12))
 		draw_rect(bar, INK * Color(1, 1, 1, 0.10))
 		draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(chance, 0.0, 1.0), bar.size.y)), HOT.lerp(SPORE, clampf(chance, 0.0, 1.0)))
 		draw_rect(bar, INK * Color(1, 1, 1, 0.22), false, 1.0)
 		CellOutzType.draw_text(self, Vector2(bar.position.x + bar.size.x + 8, bar.position.y), "%02d" % roundi(chance * 100.0), 12.0, INK, 0.8)
-		var ry := cy + 52.0
-		for route in attempt.get("routes", []):
-			draw_string(font, Vector2(rect.position.x + 2, ry + 12), "· %s" % str(route), HORIZONTAL_ALIGNMENT_LEFT, split - 20, 11, SPORE)
+		var ry := cy + 46.0
+		for route in _contact.get("routes", []):
+			draw_string(font, Vector2(rect.position.x + 2, ry + 12), "\u00b7 %s" % str(route), HORIZONTAL_ALIGNMENT_LEFT, split - 20, 11, SPORE)
 			ry += 15.0
-		if str(attempt.get("reason", "")) != "":
-			draw_string(font, Vector2(rect.position.x + 2, ry + 14), str(attempt.get("reason", "")), HORIZONTAL_ALIGNMENT_LEFT, split - 20, 11, HOT * Color(1, 1, 1, 0.85))
+		if str(_contact.get("reason", "")) != "":
+			draw_string(font, Vector2(rect.position.x + 2, ry + 14), str(_contact.get("reason", "")), HORIZONTAL_ALIGNMENT_LEFT, split - 20, 11, HOT * Color(1, 1, 1, 0.85))
 			ry += 18.0
-		elif str(attempt.get("reply", "")) != "":
-			draw_string(font, Vector2(rect.position.x + 2, ry + 14), "\"%s\"" % str(attempt.get("reply", "")), HORIZONTAL_ALIGNMENT_LEFT, split - 20, 12, INK)
+		elif str(_contact.get("reply", "")) != "":
+			draw_string(font, Vector2(rect.position.x + 2, ry + 14), "\"%s\"" % str(_contact.get("reply", "")), HORIZONTAL_ALIGNMENT_LEFT, split - 20, 12, INK)
 			ry += 20.0
-		var lever: String = wire.leverage(str(entry.id))
-		if lever != "":
-			draw_string(font, Vector2(rect.position.x + 2, ry + 16), "HELD AGAINST THEM: %s" % lever.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, split - 20, 10, BRUISE.lerp(INK, 0.5))
+		draw_string(font, Vector2(rect.position.x + 2, ry + 14), "[ENTER] SEND AGAIN", HORIZONTAL_ALIGNMENT_LEFT, split - 20, 10, COPPER * Color(1, 1, 1, 0.62))
 
-		# Your own exposure, because everything on this page works both ways.
-		var ey := rect.position.y + rect.size.y - 44.0
-		draw_line(Vector2(rect.position.x, ey - 10), Vector2(rect.position.x + split - 20, ey - 10), INK * Color(1, 1, 1, 0.16), 1.0)
-		CellOutzType.draw_text(self, Vector2(rect.position.x, ey + 2), "YOUR EXPOSURE", 10.0, HOT if wire.exposure >= 8 else INK * Color(1, 1, 1, 0.5), 1.1)
-		CellOutzType.draw_text(self, Vector2(rect.position.x + 150, ey - 2), "%02d" % wire.exposure, 16.0, HOT if wire.exposure >= 8 else INK, 0.8)
+		# A4.6. The active half, with its price on the button. The design is
+		# explicit that these must never ship before their costs work, so the
+		# cost is the most legible thing on the row.
+		var ay := rect.position.y + rect.size.y - 178.0
+		CellOutzType.draw_text(self, Vector2(rect.position.x, ay), "ACTIONS", 11.0, MOSS, 1.2)
+		draw_line(Vector2(rect.position.x, ay + 17), Vector2(rect.position.x + split - 20, ay + 17), MOSS * Color(1, 1, 1, 0.3), 1.0)
+		ay += 28.0
+		for action in WIRE_ACTIONS:
+			var row := Rect2(Vector2(rect.position.x, ay), Vector2(split - 24, 22))
+			_action_rects.append({"id": str(action.id), "rect": row})
+			var hot_row := row.has_point(cursor_at)
+			if hot_row:
+				draw_colored_polygon(PackedVector2Array([
+					row.position + Vector2(3, 0), row.position + Vector2(row.size.x, 0),
+					row.position + row.size - Vector2(3, 0), row.position + Vector2(0, row.size.y),
+				]), COPPER * Color(1, 1, 1, 0.18))
+			CellOutzType.draw_text(self, row.position + Vector2(6, 5), str(action.label), 11.0, INK if hot_row else INK * Color(1, 1, 1, 0.74), 1.0)
+			draw_string(font, row.position + Vector2(110, 15), str(action.note), HORIZONTAL_ALIGNMENT_LEFT, row.size.x - 168, 10, INK * Color(1, 1, 1, 0.38))
+			var cost := "+%s" % str(action.cost)
+			var cost_width := CellOutzType.width(cost, 10.0, 0.9)
+			CellOutzType.draw_text(self, Vector2(row.position.x + row.size.x - 8 - cost_width, row.position.y + 6), cost, 10.0, HOT * Color(1, 1, 1, 0.8), 0.9)
+			ay += 24.0
+
+		if not _last_action.is_empty():
+			var tone: Color = SPORE if bool(_last_action.get("ok", false)) else HOT
+			CellOutzType.draw_text(self, Vector2(rect.position.x, ay + 4), str(_last_action.get("headline", "")), 11.0, tone, 1.0)
+			draw_string(font, Vector2(rect.position.x + 2, ay + 30), str(_last_action.get("detail", "")), HORIZONTAL_ALIGNMENT_LEFT, split - 24, 11, INK * Color(1, 1, 1, 0.66))
+
+		var ey := rect.position.y + rect.size.y - 20.0
+		CellOutzType.draw_text(self, Vector2(rect.position.x, ey), "YOUR EXPOSURE", 10.0, HOT if wire.exposure >= 8 else INK * Color(1, 1, 1, 0.5), 1.1)
+		CellOutzType.draw_text(self, Vector2(rect.position.x + 150, ey - 4), "%02d" % wire.exposure, 16.0, HOT if wire.exposure >= 8 else INK, 0.8)
 		var trace: String = wire.pending_trace()
 		if trace != "":
-			draw_string(font, Vector2(rect.position.x + 2, ey + 26), "%s HAS YOUR PATTERN." % trace.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, split - 20, 11, HOT)
+			draw_string(font, Vector2(rect.position.x + 210, ey + 10), "%s HAS YOUR PATTERN." % trace.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, split - 20, 10, HOT)
 
-	# The feed.
 	var feed := Rect2(rect.position + Vector2(split + 16, 0), Vector2(rect.size.x - split - 16, rect.size.y))
 	draw_line(feed.position + Vector2(-10, 0), feed.position + Vector2(-10, feed.size.y), INK * Color(1, 1, 1, 0.14), 1.0)
 	CellOutzType.draw_text(self, feed.position, "THE WIRE", 12.0, COPPER, 1.4)
@@ -746,8 +1003,6 @@ func _draw_wire(rect: Rect2) -> void:
 	draw_line(feed.position + Vector2(0, 18), feed.position + Vector2(feed.size.x, 18), COPPER * Color(1, 1, 1, 0.3), 1.0)
 	var y := feed.position.y + 34.0 - feed_scroll
 	for post in posts:
-		# A post is 60px tall. Breaking on its *start* let the last one print
-		# through the footer and out of the plate entirely.
 		if y + 62.0 > feed.position.y + feed.size.y:
 			break
 		if y > feed.position.y + 20.0:

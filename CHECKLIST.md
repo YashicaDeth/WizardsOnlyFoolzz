@@ -58,7 +58,7 @@ and "a game".
 ### A1 — Display typeface `BUILT`
 - [x] **A1.1** Stroke/stencil alphabet drawn in code, no font to licence
 - [x] **A1.2** Applied to headers and numerals across the index
-- [ ] **A1.3** Applied to the derby HUD, map, kill cam, warning card, interstitial
+- [~] **A1.3** Derby HUD done. Map, kill cam, warning card and interstitial still on the default font
 - [ ] **A1.4** A second cut of the face — condensed, for tight columns
 - [ ] **A1.5** Worn/smudged variant that degrades with the panel (pairs with I4)
 
@@ -68,34 +68,34 @@ and "a game".
 - [x] **A2.3** The Tree axis, computed all along and never once shown
 - [x] **A2.4** KNOWN EDGES — the relation graph grudges propagate along
 - [x] **A2.5** Regrimed to Fallout/biopunk, cyan removed at the constant level
-- [ ] **A2.6** Rail scrolls — more than ~12 subjects currently runs off the plate
-- [ ] **A2.7** Search and filter, because the design says the index is incomplete *and* searchable
-- [ ] **A2.8** Entries that are wrong on purpose, per §13
+- [x] **A2.6** Rail scrolls — more than ~12 subjects currently runs off the plate
+- [x] **A2.7** Search and filter, because the design says the index is incomplete *and* searchable
+- [x] **A2.8** Entries that are wrong on purpose, per §13
 
 ### A3 — Rank pyramid `BUILT`
 - [x] **A3.1** Tiers from real command strength, not a template
 - [x] **A3.2** Buy-in, downline, OPPORTUNITY on an empty post
 - [x] **A3.3** Who is actually positioned to take a vacancy
 - [x] **A3.4** Spinning 3D head per occupied tier
-- [ ] **A3.5** Click a tier member to jump to their file
-- [ ] **A3.6** Push the MLM register harder — recruitment pitch copy, testimonials, a rank you can *buy*
-- [ ] **A3.7** Show the edges between tiers: who recruited whom
+- [x] **A3.5** Click a tier member to jump to their file
+- [x] **A3.6** Push the MLM register harder — recruitment pitch copy, testimonials, a rank you can *buy*
+- [x] **A3.7** Show the edges between tiers: who recruited whom
 
 ### A4 — Wire page `BUILT`
 - [x] **A4.1** Accounts derived from real subjects, reach that is not combat skill
 - [x] **A4.2** Whether they will read you, and why — routes, leverage, being hated
 - [x] **A4.3** Your own exposure and the trace that comes back
 - [x] **A4.4** The feed, interleaving real world history with the hostile register
-- [ ] **A4.5** Actually send a DM from the panel (the sim supports it; the UI does not)
-- [ ] **A4.6** Expose / fabricate / trace / swarm as buttons with their costs shown
-- [ ] **A4.7** Infinite scroll that actually farms you (I6)
+- [x] **A4.5** Actually send a DM from the panel (the sim supports it; the UI does not)
+- [x] **A4.6** Expose / fabricate / trace / swarm as buttons with their costs shown
+- [x] **A4.7** Infinite scroll that actually farms you (I6)
 
 ### A5 — Derby HUD corners
-- [ ] **A5.1** Hull integrity off the default font and onto the plate vocabulary
-- [ ] **A5.2** Hunt signal — the one you singled out — rebuilt
-- [ ] **A5.3** Damage bust and contact radar in the same language
-- [ ] **A5.4** Grunge pass: the HUD is a cab instrument, so it is filthy
-- [ ] **A5.5** Cut visible prose by ~60%, per the Tier 1b note
+- [x] **A5.1** Hull integrity off the default font and onto the plate vocabulary
+- [x] **A5.2** Hunt signal — the one you singled out — rebuilt
+- [x] **A5.3** Damage bust and contact radar in the same language
+- [x] **A5.4** Grunge pass: the HUD is a cab instrument, so it is filthy
+- [x] **A5.5** Cut visible prose by ~60%, per the Tier 1b note
 
 ### A6 — Living Map as an object
 - [ ] **A6.1** Salvaged bezel — pipes, rust plate, screws — around the chart
@@ -114,11 +114,29 @@ the car does not behave like a car in it.
 - [ ] **A7.5** Retune the AI against the new model (it was tuned against the old one)
 - [ ] **A7.6** Speed-linked camera shake and FOV
 
+### A9 — The radio
+Greg, 2026-09-11: an Oxenfree-style **tunable** radio in the Fallout register —
+seamless, in-world, and the dial is a real instrument rather than a track
+selector. Signals found on it start quests, which surface in the index.
+
+This earns its place rather than being a music player, for two reasons already
+in the design. Coverage is a **property of place** (`DESIGN/IN_GAME_INTERNET.md`
+gates the Wire the same way), so a station you can only receive standing in one
+valley is a location. And the Wire already needs a second transmission channel
+for grudges and rumour that is slower and less reliable than the feed — a
+half-tuned broadcast is exactly that.
+- [ ] **A9.1** A tunable dial with real static between stations
+- [ ] **A9.2** Stations as world objects with range and terrain shadow
+- [ ] **A9.3** Numbers stations and half-signals that resolve into a quest hook
+- [ ] **A9.4** Hooks surface in the index rather than as a popup
+- [ ] **A9.5** Music and voice degrade through the existing audio treatment
+- [ ] **A9.6** The radio carries Wire news late and wrong, per the distortion rules
+
 ### A8 — Seamless panel open/close
 - [x] **A8.1** Page-to-page transitions ease and wipe
-- [ ] **A8.2** Opening and closing the index itself still pops
-- [ ] **A8.3** Row selection redraws instantly instead of settling
-- [ ] **A8.4** One shared transition helper so nothing new cuts by default
+- [x] **A8.2** Opening and closing the index itself still pops
+- [x] **A8.3** Row selection redraws instantly instead of settling
+- [x] **A8.4** One shared transition helper so nothing new cuts by default
 
 ---
 
