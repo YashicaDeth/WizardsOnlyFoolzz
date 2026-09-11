@@ -100,20 +100,3 @@ theme_override_styles/panel = SubResource("StyleBox_panel")
 theme_override_colors/font_color = Color(0.96, 0.5, 0.32, 1)
 theme_override_font_sizes/font_size = 14
 
-[node name="WorldIndex" type="PanelContainer" parent="HUD"]
-visible = false
-offset_left = 390.0
-offset_top = 160.0
-offset_right = 890.0
-offset_bottom = 580.0
-theme_override_styles/panel = SubResource("StyleBox_panel")
-
-[node name="Margin" type="MarginContainer" parent="HUD/WorldIndex"]
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 20
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 20
-
-[node name="IndexText" type="Label" parent="HUD/WorldIndex/Margin"]
-theme_override_colors/font_color = Color(0.92, 0.76, 0.55, 1)
-theme_override_font_sizes/font_size = 17

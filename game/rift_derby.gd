@@ -30,6 +30,7 @@ const KILL_CAM := preload("res://systems/kill_cam.gd")
 const DAMAGE_PORTRAIT := preload("res://systems/damage_portrait.gd")
 const CAB_SCREENS := preload("res://systems/cab_screens.gd")
 const PIT_RADIO := preload("res://systems/pit_radio.gd")
+const WORLD_INDEX := preload("res://systems/world_index.gd")
 
 ## Authored props that fight the read at arena scale. Hidden rather than deleted
 ## from the kit, so a re-export can reinstate them deliberately.
@@ -67,8 +68,7 @@ var pit_radio: Control
 @onready var score_label: Label = $HUD/ScorePanel/Score
 @onready var mode_label: Label = $HUD/Mode
 @onready var rival_label: Label = $HUD/RivalPanel/Rival
-@onready var index_panel: PanelContainer = $HUD/WorldIndex
-@onready var index_text: Label = $HUD/WorldIndex/Margin/IndexText
+var world_index: Control
 @onready var dynamic_interface: Control = $HUD/DynamicInterface
 
 
@@ -96,6 +96,9 @@ func _ready() -> void:
 	damage_portrait.name = "DamagePortrait"
 	damage_portrait.position = Vector2(26, 22)
 	$HUD.add_child(damage_portrait)
+	world_index = WORLD_INDEX.new()
+	world_index.name = "WorldIndexPanel"
+	$HUD.add_child(world_index)
 	# The bust reports driver state; the old title block said nothing.
 	status.visible = false
 	score_label.visible = false
@@ -123,9 +126,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			_reset_round()
 		elif event.keycode == KEY_I:
 			index_open = not index_open
-			index_panel.visible = index_open
 			if index_open:
-				_refresh_world_index()
+				world_index.open()
+			else:
+				world_index.close()
 		elif event.keycode == KEY_E:
 			WorldHistory.record_event("player_left_derby_vehicle", {"venue": "rift_derby_quarry", "destination": "bone_yard_outskirts"})
 			Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
@@ -553,19 +557,12 @@ func _player_parts_lost() -> Array:
 	return boat.get_meta("detached_parts", [])
 
 
+## The index reads `WorldHistory` directly now. This used to assemble a list of
+## prose strings and push them into a `Label`, which is why it could only ever
+## show one rival: the panel had no access to anything it was not handed.
 func _refresh_world_index() -> void:
-	var rival := WorldHistory.subject(RIVAL_ID)
-	var memories := WorldHistory.recent_events(5)
-	var lines: Array[String] = [
-		"WORLD INDEX  //  BONE YARD FILE", "",
-		"MARA VOSS - %s" % str(rival.get("role", "unknown")).to_upper(),
-		"Faction: %s" % str(rival.get("faction", "unknown")),
-		"Condition: %s" % str(rival.get("injury", "unknown")),
-		"Memory: %s" % str(rival.get("memory", "no confirmed contact")), "", "RECENT HISTORY:"
-	]
-	for entry in memories:
-		lines.append("- %s" % str(entry.get("type", "unknown event")).replace("_", " "))
-	index_text.text = "\n".join(lines)
+	if world_index:
+		world_index.refresh()
 
 
 func _reset_round() -> void:

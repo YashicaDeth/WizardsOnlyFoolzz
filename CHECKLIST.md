@@ -9,7 +9,7 @@ on the list so it reads as a record rather than a wish.
 
 ---
 
-## A — The visual pass (in flight now)
+## A — The visual pass
 
 The game's systems have outgrown its interface. This is the shortest distance
 between "tutorial project" and "a game", and it is what Greg reacted to.
@@ -17,11 +17,12 @@ between "tutorial project" and "a game", and it is what Greg reacted to.
 | # | Item | What you get |
 | --- | --- | --- |
 | A1 | **Display typeface** — `DONE` | A drawn stencil face instead of Godot's default. |
-| A2 | **World Index UI** — *in flight* | The worst offender in the game rebuilt: real dossier, framed plate, display face. |
-| A3 | **Rank pyramid view** — *in flight* | Faction hierarchy as a recruitment pyramid, drawn from real subjects, with real vacancies. |
-| A4 | **Wire feed page** — *in flight* | The surviving internet playable: accounts, reach, DMs that go unread, the underbelly. |
+| A2 | **World Index UI** — `DONE` | The worst offender in the game rebuilt: real dossier, framed plate, display face. |
+| A3 | **Rank pyramid view** — `DONE` | Faction hierarchy as a recruitment pyramid, drawn from real subjects, with real vacancies. |
+| A4 | **Wire feed page** — `DONE` | The surviving internet playable: accounts, reach, DMs that go unread, the underbelly. |
 | A5 | **Derby HUD corners** | Hull integrity, hunt signal, damage bust and radar brought into the same language. |
 | A6 | **Living Map as an object** | The map in a salvaged bezel instead of a chart on black, with named travel points. |
+| A7 | **Derby driving model** | Greg: *"still not like a driveable wheel adapted suspension system"*. Per-wheel raycast suspension, load transfer and real contact patches, replacing the single-body arcade servo. This is the actual cause behind "the derby map is broken" - the venue reads wrong because the car does not behave like a car in it. Pairs with G2/G3. |
 
 ## B — Make the body the centrepiece
 
@@ -44,12 +45,16 @@ Six fullscreen panels on six keys is the root cause of "nothing connects."
 | # | Item | What you get |
 | --- | --- | --- |
 | C1 | **Device shell** | One junk handheld with modes, replacing Tab / M / T / J. Not a Pip-Boy. |
-| C2 | **Radial selection** | Circular menu with a custom cursor for weapons, cybernetics, modes, seals. |
+| C2 | **Radial selection** | Circular menu with a custom cursor for weapons, cybernetics, modes, seals. Greg 2026-09-11: Prototype / GTA-style **seamless time dilation** while the wheel is open, so selection never breaks out to a menu - and the slowdown must not soften the fight, because the difficulty target stays soulslike. The cursor also carries a clickable X-ray button (see B3). |
 | C3 | **Camera mode** | Photograph the world. Required by rituals; also just good. |
 | C4 | **CARRY** | The inventory that already exists, finally on screen. |
 | C5 | **Physical connectivity** | Masts, terminals, dead zones, and a cracked screen that eats the interface. |
 
 ## D — Character creation in the vat
+
+**Yes, this is on the list** - Greg asked. Races are D4 and the vat creator is
+D1-D8 below, with the whole design in `DESIGN/CHARACTER_CREATION.md`.
+
 
 Full design in `DESIGN/CHARACTER_CREATION.md`. Also fixes the under-directed
 opening.
