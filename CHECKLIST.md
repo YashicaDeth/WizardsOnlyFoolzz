@@ -446,9 +446,9 @@ probe actually says, so the next attempt does not start from scratch:
 - [ ] **G5.4** Per-layer gore sound (shares with B4.8)
 
 ### G6 — The opening, directed
-- [ ] **G6.1** Pacing and camera
-- [ ] **G6.2** Sound design
-- [ ] **G6.3** The handler's delivery (pairs with D3)
+- [x] ~~**G6.1** Pacing and camera~~
+- [x] ~~**G6.2** Sound design~~
+- [x] ~~**G6.3** The handler's delivery (pairs with D3)~~
 
 ---
 

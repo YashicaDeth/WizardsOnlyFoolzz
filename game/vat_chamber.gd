@@ -13,6 +13,8 @@ extends Node3D
 
 const OPENING := preload("res://systems/opening_director.gd")
 const ANATOMY := preload("res://systems/anatomy_component.gd")
+const VAT_INTAKE := preload("res://systems/vat_intake.gd")
+const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 
 const EYE_HEIGHT := 1.62
 const VAT_POSITION := Vector3(0, 0, 0)
@@ -24,8 +26,10 @@ var anatomy: Node
 var yaw := 0.0
 var pitch := 0.0
 var clock := 0.0
-var phase := "submerged"
+var phase := "intake"
 var can_move := false
+var intake: Control
+var opening_audio: Node
 var fluid: MeshInstance3D
 var vat_glass: MeshInstance3D
 var umbilicals: Array[Node3D] = []
@@ -50,12 +54,36 @@ const BEATS := [
 
 
 func _ready() -> void:
-	OPENING.advance("woke")
 	$WorldEnvironment.environment = WorldLook.environment("ossuary")
 	_build_chamber()
 	_build_vat()
 	_build_player()
+	_build_intake()
+	opening_audio = OPENING_AUDIO.new()
+	add_child(opening_audio)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+## G6.1/G6.3. Character creation was built but never connected to the opening:
+## a new game went straight from the front door to the glass breaking. The
+## handler now owns the first beat, and filing the sheet is what starts the
+## camera sequence rather than a timer running behind the form.
+func _build_intake() -> void:
+	intake = VAT_INTAKE.new()
+	intake.name = "Intake"
+	$HUD.add_child(intake)
+	intake.filed.connect(_on_intake_filed)
+
+
+func _on_intake_filed(_state: Dictionary) -> void:
+	if intake == null:
+		return
+	intake.queue_free()
+	intake = null
+	clock = 0.0
+	line_index = -1
+	phase = "submerged"
+	OPENING.advance("woke")
 	WorldHistory.record_event("opening_woke", {"location": "growing_floor"})
 
 
@@ -284,6 +312,8 @@ func _slab(dimensions: Vector3, at: Vector3, kind: String, color: Color) -> void
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if intake != null:
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
@@ -294,6 +324,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if phase == "intake":
+		if opening_audio != null:
+			opening_audio.set_phase("intake")
+		return
 	clock += delta
 	_update_beats()
 	_update_sequence(delta)
@@ -320,8 +354,10 @@ func _update_sequence(delta: float) -> void:
 			camera.rotation = Vector3(sin(clock * 0.7) * 0.09 - 0.1, sin(clock * 0.4) * 0.16, cos(clock * 0.55) * 0.07)
 			camera.fov = 92.0 + sin(clock * 1.6) * 3.5
 			player.position.y = 1.35 + sin(clock * 0.8) * 0.06
+			opening_audio.set_phase("submerged", t)
 			if clock >= 5.2:
 				phase = "voiding"
+				opening_audio.cue("drain")
 		"voiding":
 			# The column drops. You come down with it.
 			var t := clampf((clock - 5.2) / 3.4, 0.0, 1.0)
@@ -332,6 +368,7 @@ func _update_sequence(delta: float) -> void:
 			camera.fov = lerpf(92.0, 78.0, t)
 			player.position.y = lerpf(1.35, 0.95, ease(t, 0.6))
 			camera.rotation = Vector3(sin(clock * 0.9) * 0.06 * (1.0 - t) - 0.1 * (1.0 - t), sin(clock * 0.5) * 0.1 * (1.0 - t), 0)
+			opening_audio.set_phase("voiding", t)
 			if t >= 1.0:
 				_breach()
 		"floor":
@@ -349,6 +386,7 @@ func _update_sequence(delta: float) -> void:
 
 func _breach() -> void:
 	phase = "floor"
+	opening_audio.cue("glass")
 	vat_glass.visible = false
 	fluid.visible = false
 	for cable in umbilicals:
@@ -419,6 +457,7 @@ func _interact() -> void:
 	to_door.y = 0.0
 	if to_door.length() > 3.4:
 		return
+	opening_audio.cue("door")
 	OPENING.advance("entered_pit")
 	WorldHistory.update_subject("player", {"status": "racked for a heat"}, "opening_entered_pit")
 	WorldHistory.record_event("opening_entered_pit", {"location": "growing_floor"})

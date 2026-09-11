@@ -2,6 +2,19 @@
 
 ## 2026 09 12
 
+- **G6: the opening now starts where character creation actually happens.**
+  The handler's authored intake had never been connected to a new run, so the
+  game skipped the character sheet and began with the tank breaking on a timer.
+  The Growing Floor now opens on the clipboard, mirror and handler; the
+  decanting clock stays stopped while the player chooses, and filing the sheet
+  starts the submerged camera sequence. The existing contextual delivery and
+  modifier procedures therefore play in the game rather than only in tests.
+  A new opening sound bed separates the room hum and inside-body pulse, then
+  gives the drain, glass breach and pit door their own procedural cues. Three
+  rendered states verify intake, submerged wake and voiding. The new integration
+  suite passes 9 checks, the handler suite passes 22, and the 34-check opening
+  regression remains green.
+
 - **G4: the world finally changes at the outline.** The generated Ashbloom
   shells now carry broken roof corners, pipes on all four faces, brackets,
   vents, tanks, aerials and hanging sheets, with a deterministic lean and
