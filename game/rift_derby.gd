@@ -5,7 +5,6 @@ extends Node3D
 const ARENA_SCALE := 1.85
 const ARENA_LIMIT := 29.0 * ARENA_SCALE
 const MAX_SPEED := 24.0
-const IMPACT_SPEED := 9.5
 const RIVAL_ID := "mara_voss"
 const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const BONE_YARD_ENVIRONMENT := preload("res://art/bone_yard_environment.glb")
@@ -33,6 +32,7 @@ var respawn_queue: Array[Dictionary] = []
 var index_open := false
 var crowd_members: Array[Node3D] = []
 var crowd_reaction := 0.0
+var camera_shake := 0.0
 var disabled_count := 0
 var round_state := "countdown"
 var countdown := 3.0
@@ -270,13 +270,14 @@ func _wrecker_target_position(wrecker: Node3D) -> Vector3:
 	return closest
 
 
-func _on_vehicle_impact(other: Node, closing_speed: float) -> void:
+func _on_vehicle_impact(other: Node, closing_speed: float, self_share: float) -> void:
 	if round_state != "active" or not is_instance_valid(other):
 		return
+	_shake_camera(closing_speed)
 	if targets.has(other):
-		_damage_target(other, closing_speed)
+		_damage_target(other, closing_speed, self_share)
 	elif closing_speed > 7.0:
-		integrity = maxi(0, integrity - roundi(closing_speed * 0.3))
+		integrity = maxi(0, integrity - roundi(closing_speed * 0.4))
 		if pit_radio != null and closing_speed > 11.0:
 			pit_radio.transmit("hit_player")
 		derby_audio.play_impact(clampf(closing_speed / 24.0, 0.0, 1.0), boat.global_position, "heavy")
@@ -284,22 +285,29 @@ func _on_vehicle_impact(other: Node, closing_speed: float) -> void:
 			_finish_round("lost")
 
 
-func _damage_target(target: Node3D, collision_speed: float = 0.0) -> void:
+func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: float = 1.0) -> void:
 	if round_state != "active":
 		return
 	var now: int = Time.get_ticks_msec()
 	if now < int(target.get_meta("hit_ready_msec", 0)):
 		return
-	target.set_meta("hit_ready_msec", now + 650)
+	target.set_meta("hit_ready_msec", now + 520)
 	var impact_energy: int = roundi(collision_speed * 10.0)
-	var damage: int = clampi(roundi(collision_speed * 1.25), 5, 45)
+	# Damage rises with the square of closing speed so a committed ram strips
+	# panels on the first contact instead of the fifth, and the share of the
+	# closing speed each car brought decides which of them wears it.
+	var force := clampf(collision_speed / 18.0, 0.0, 1.8)
+	var energy := 10.0 + force * force * 46.0
+	var damage: int = clampi(roundi(energy * (0.35 + 0.65 * self_share)), 6, 95)
 	var target_integrity: int = maxi(0, int(target.get_meta("integrity", 100)) - damage)
 	target.set_meta("integrity", target_integrity)
 	score += damage * 5
-	integrity = max(0, integrity - roundi(collision_speed * 0.24))
+	integrity = maxi(0, integrity - clampi(roundi(energy * 0.22 * (0.35 + 0.65 * (1.0 - self_share))), 1, 34))
 	var impact_direction := (target.global_position - boat.global_position).normalized()
-	_update_wrecker_damage_visual(target, target_integrity)
+	_update_wrecker_damage_visual(target, target_integrity, impact_direction)
 	_update_detachable_parts(target, target_integrity, impact_direction)
+	if damage >= 28:
+		_spawn_impact_debris(target.global_position, impact_direction, mini(10, damage / 8))
 	# Once the bumper and hood are gone there is nothing between the player's
 	# front end and the cab, so a fast hit there reaches the driver directly.
 	var detached: Array = target.get_meta("detached_parts", [])
@@ -362,13 +370,37 @@ func _wreck_target(target: Node3D, impact_energy: int) -> void:
 		_finish_round("won")
 
 
-func _update_wrecker_damage_visual(target: Node3D, target_integrity: int) -> void:
+func _update_wrecker_damage_visual(target: Node3D, target_integrity: int, impact_direction := Vector3.ZERO) -> void:
 	var shell := target.get_node_or_null("ScrapVehicleShell") as Node3D
 	if shell == null:
 		return
-	var crush := clampf(float(100 - target_integrity) / 100.0, 0.0, 0.65)
-	shell.scale = Vector3(1.05 + crush * 0.08, 1.05 - crush * 0.16, 1.05 - crush * 0.06)
-	shell.rotation.z = sin(float(target_integrity) * 0.31) * crush * 0.08
+	var crush := clampf(float(100 - target_integrity) / 100.0, 0.0, 0.72)
+	shell.scale = Vector3(1.05 + crush * 0.1, 1.05 - crush * 0.2, 1.05 - crush * 0.08)
+	# Fold the shell away from the side the hit came from. Uniform scaling reads
+	# as a car shrinking; an asymmetric fold reads as a car taking a beating.
+	var local := target.global_transform.basis.inverse() * impact_direction
+	shell.rotation.z = clampf(-local.x, -1.0, 1.0) * crush * 0.22
+	shell.rotation.x = clampf(local.z, -1.0, 1.0) * crush * 0.16
+	shell.position = Vector3(local.x, 0.0, local.z) * crush * 0.18
+
+
+func _spawn_impact_debris(at: Vector3, direction: Vector3, count: int) -> void:
+	if debris.size() > 220:
+		return
+	for index in count:
+		var shard := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(0.16 + randf() * 0.2, 0.05 + randf() * 0.09, 0.14 + randf() * 0.18)
+		mesh.material = _material(Color("55402c") if index % 2 == 0 else Color("2b3328"), 0.0, "rust", index + 7)
+		shard.mesh = mesh
+		shard.global_position = at + Vector3(randf_range(-0.6, 0.6), 0.7 + randf() * 0.6, randf_range(-0.6, 0.6))
+		add_child(shard)
+		var spray := (direction + Vector3(randf_range(-0.7, 0.7), randf_range(0.4, 1.1), randf_range(-0.7, 0.7))).normalized()
+		debris.append({"node": shard, "velocity": spray * (4.0 + randf() * 5.0), "life": 1.8})
+
+
+func _shake_camera(closing_speed: float) -> void:
+	camera_shake = clampf(maxf(camera_shake, closing_speed / 22.0), 0.0, 1.35)
 
 
 func _update_respawns(delta: float) -> void:
@@ -393,9 +425,14 @@ func _update_debris(delta: float) -> void:
 
 
 func _update_camera(delta: float) -> void:
+	camera_shake = maxf(0.0, camera_shake - delta * 2.4)
 	var forward := -boat.global_transform.basis.z
 	var desired := boat.global_position - forward * 14.5 + Vector3.UP * 7.4
 	camera.global_position = camera.global_position.lerp(desired, min(delta * 4.5, 1.0))
+	if camera_shake > 0.0:
+		# Applied after the follow lerp; smoothing a jolt at 4.5/s erases it.
+		var beat := float(Time.get_ticks_msec()) * 0.001
+		camera.global_position += Vector3(sin(beat * 47.0), cos(beat * 61.0), sin(beat * 39.0)) * camera_shake * 0.7
 	camera.look_at(boat.global_position + forward * 8.0 + Vector3.UP * 1.2)
 
 
@@ -603,7 +640,7 @@ func _add_driver_rig(target: RigidBody3D, index: int) -> void:
 func _injure_driver(target: Node3D, damage: int, impact_direction: Vector3, ram_crush: bool = false) -> void:
 	if bool(target.get_meta("driver_dead", false)):
 		return
-	var transfer := 1.45 if ram_crush else 0.55
+	var transfer := 1.45 if ram_crush else 0.42
 	var driver_health := maxi(0, int(target.get_meta("driver_health", 100)) - roundi(damage * transfer))
 	target.set_meta("driver_health", driver_health)
 	var zone := "torso" if absf(impact_direction.z) > absf(impact_direction.x) else "head"
