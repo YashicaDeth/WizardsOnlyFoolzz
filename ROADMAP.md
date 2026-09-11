@@ -47,6 +47,9 @@ cybernetics, raider roads, stalker territories and buried anatomical industry.
 - Anatomy component: zone health, blood volume, bleed rate, pain,
   consciousness, treatment, limb disability, persistent snapshots.
 - Hostile escape behaviour, loot caches, collision-aware hunter, dodge, melee.
+- Shared camera-relative HunterMotor and movement lab: corrected WASD,
+  normalized diagonals, acceleration/braking, floor snap, slopes, directional
+  dodge, instant perspective switching and wall-safe third-person camera.
 - Authored Bone Yard environment kit (233 meshes) with selective collision.
 - Physical AI wreckers on the player's chassis, and the shared `WorldLook`
   environment/material system.
@@ -223,6 +226,26 @@ Sequencing, so this can be built without one enormous drop:
   `ambient_light_color` on a sky-sourced environment, which does nothing.
 
 ### Tier 1b — combat, added 2026-09-11
+
+**Movement prerequisite completed 2026-09-11.** The original Hunt controller
+interpreted `Input.get_vector`'s negative forward axis backwards, so W moved
+against the camera. `systems/hunter_motor.gd` is now the shared convention
+boundary and `tests/movement_lab.tscn` is the playable proving course. Its 11
+checks cover exact cardinal directions, camera yaw, diagonal normalization,
+floor snap, slope configuration, camera obstruction and physical travel.
+
+Greg's required next-slice order is now authoritative:
+
+1. WASD repair and movement lab — **done**.
+2. First-person body and locomotion: authored silhouette, face/hands/feet,
+   layered wounds/prosthetics/clothing, animation set, foot and weapon-hand IK.
+3. Physical first-person feel: breathing, shoulders, weight, restrained head
+   motion, footsteps, landing compression and animation-driven attacks.
+4. Concise HUD: cut visible prose by roughly 60%, two original font voices,
+   icons/meters/tooltips and gameplay-model 3D anatomy/equipment previews.
+5. Living Survey: the generated world rendered into original map tiles with
+   2D-to-tilted-3D zoom, fog of war, sightings and filters. No Google imagery
+   or copied interface.
 
 10. **Physical melee.** Half Sword's register — momentum-driven swings, real
     contact, unglamorous brutality and heavy dismemberment — but it has to

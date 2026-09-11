@@ -12,6 +12,7 @@ const ANATOMY_COMPONENT := preload("res://systems/anatomy_component.gd")
 const WORLD_GENERATOR := preload("res://systems/ashbloom_world_generator.gd")
 const MISFIRE_DIRECTOR := preload("res://systems/reality_misfire_director.gd")
 const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
+const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 
 var player := Vector3(0, 1.5, 19)
 var yaw := PI
@@ -88,6 +89,7 @@ func _ready() -> void:
 	capsule.height = 1.8
 	collider.shape = capsule
 	player_body.add_child(collider)
+	HUNTER_MOTOR.configure(player_body)
 	add_child(player_body)
 	player_body.position = player - Vector3.UP * 0.6
 	_build_player_rig()
@@ -211,7 +213,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 				if not panel_mode.is_empty():
 					_toggle_panel(panel_mode)
-			KEY_F: third_person = not third_person
+			KEY_F:
+				third_person = not third_person
+				_update_camera()
 			KEY_G: handheld.toggle_device()
 			KEY_TAB:
 				# The handheld owns Tab while raised: one object, modes on it.
@@ -267,18 +271,10 @@ func _update_player(delta: float) -> void:
 		player_body.velocity = Vector3.ZERO
 		return
 	var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-	var forward := Vector3(sin(yaw), 0, cos(yaw)).normalized()
-	var right := Vector3(forward.z, 0, -forward.x)
-	var direction := (right * move.x + forward * move.y).normalized()
+	var direction: Vector3 = HUNTER_MOTOR.wish_direction(move, yaw)
 	var sprinting := Input.is_action_pressed("sprint") and stamina > 1.0 and move.length() > 0.0
 	var speed := SPRINT_SPEED if sprinting else PLAYER_SPEED
-	var desired := direction * speed
-	if dodge_remaining > 0.0:
-		desired = dodge_direction * 16.0
-	player_body.velocity.x = move_toward(player_body.velocity.x, desired.x, 50.0 * delta)
-	player_body.velocity.z = move_toward(player_body.velocity.z, desired.z, 50.0 * delta)
-	player_body.velocity.y = -1.0 if player_body.is_on_floor() else player_body.velocity.y - 22.0 * delta
-	player_body.move_and_slide()
+	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0)
 	if player_body.position.y < -10.0:
 		player_body.position = Vector3(0, 1.0, 19)
 	player = player_body.position + Vector3.UP * 0.6
@@ -382,8 +378,8 @@ func _dodge() -> void:
 		return
 	dodge_cooldown = 0.75
 	stamina -= 25.0
-	var forward := Vector3(sin(yaw), 0, cos(yaw)).normalized()
-	dodge_direction = -forward
+	var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	dodge_direction = HUNTER_MOTOR.dodge_direction(move, yaw)
 	dodge_remaining = 0.28
 	WorldHistory.record_event("player_dodged", {"location": HUNT_LOCATION})
 
@@ -859,7 +855,14 @@ func _update_camera() -> void:
 			return
 	var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 	if third_person:
-		camera.global_position = player - look * 6.5 + Vector3.UP * 1.4
+		var focus := player + Vector3.UP * 0.55
+		var desired := player - look * 6.5 + Vector3.UP * 1.4
+		camera.global_position = HUNTER_MOTOR.collision_safe_camera(
+			get_world_3d().direct_space_state,
+			focus,
+			desired,
+			[player_body.get_rid()]
+		)
 		camera.look_at(player + look * 8.0 + Vector3.UP * 0.6)
 	else:
 		camera.global_position = player

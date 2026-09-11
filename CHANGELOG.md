@@ -2,6 +2,18 @@
 
 ## 2026 09 11
 
+- Repaired Hunt Grounds WASD at the convention boundary: Godot reports W as
+  negative input Y, while the prior controller added that value to camera
+  forward and therefore drove the hunter backward. A shared `HunterMotor` now
+  owns camera-relative direction, normalized diagonals, grounded acceleration,
+  air control, braking, gravity, floor snap and slope limits.
+- Directional dodge now follows held movement input, with a backward fallback.
+  First/third-person switching updates in the input frame, and the chase camera
+  ray-clamps toward the hunter around walls and concave corners.
+- Added the playable `movement_lab.tscn` course (door, curb, ramp and snag
+  corner) plus 11 automated checks covering direction, yaw, diagonal speed,
+  grounding, camera obstruction and physical forward travel.
+
 - Added the live downed-person confrontation: an obstruction-aware shoulder
   camera, compact choices tethered to the subject, and execute/spare/recruit
   outcomes while other actors and blood loss keep running.
