@@ -17,6 +17,64 @@ const CONTACT_LOCKOUT_MSEC := 520
 ## Grip is a friction limit, not a spring. Uncapped lateral correction cancels a
 ## side impact within one frame, which is what made every ram feel weightless.
 const MAX_LATERAL_GRIP := 11.5
+
+## --- A7: the suspension model -------------------------------------------
+##
+## Greg, repeatedly: *"the derby map is way too tiny"*, *"the map is pretty
+## broken"*, *"still not like a driveable wheel adapted suspension system"*. The
+## venue was re-authored twice against the first complaint and measured worse
+## both times, which was the clue: **the venue was never the problem.** The car
+## was a single rigid box held up by a physics material, driven by a central
+## force and turned by a yaw torque applied directly to the body. Nothing about
+## it behaved like a car, so no arena could feel right around it.
+##
+## What changes, and why each part matters:
+##
+## - **Four raycast wheels carry the body.** Forces are applied *at the wheel*
+##   rather than at the centre of mass, so weight transfer under brake, throttle
+##   and cornering falls out of the physics instead of being faked (A7.2).
+## - **Grip is per wheel and proportional to that wheel's load** (A7.3). A
+##   lightly loaded inside wheel lets go first, which is what makes a heavy car
+##   feel heavy.
+## - **Steering is tire force, not torque.** The front wheels point somewhere
+##   and the car rotates because of what they do to the ground. This is the
+##   fundamental change: the old model could not turn at a standstill because
+##   authority was scaled by speed, and that single decision was the root cause
+##   of three separate AI failures already recorded in ROADMAP.md.
+const WHEEL_ANCHORS := [
+	Vector3(-1.02, -0.35, -1.62), Vector3(1.02, -0.35, -1.62),
+	Vector3(-1.02, -0.35, 1.66), Vector3(1.02, -0.35, 1.66),
+]
+## Front wheels steer, rear wheels drive. A derby car is rear-wheel drive and
+## that is not a detail: it is why it can be kicked sideways.
+const FRONT_WHEELS := [0, 1]
+const REAR_WHEELS := [2, 3]
+const WHEEL_RADIUS := 0.30
+const SUSPENSION_REST := 0.35
+## Expressed as multiples of mass so the ride height does not change if the
+## chassis is ever made heavier or lighter.
+const SPRING_RATE := 26.0
+const SPRING_DAMP := 4.4
+## Roughly 30 degrees of lock.
+const MAX_STEER := 0.52
+## Coefficient of friction at the contact patch. Arcade-sticky on purpose.
+const TIRE_GRIP := 1.75
+const LATERAL_STIFFNESS := 5.2
+## A7.5. Tuned against the new model, not carried over from the old one. The
+## first pass at 6.4 asked for 1760N per rear wheel against a ~4700N grip
+## limit, so the car accelerated at about a third of the servo it replaced and
+## the AI stopped being able to land a blow at all - the balance test caught a
+## parked player taking zero damage across a full heat. At 18 the request sits
+## just over the limit, so acceleration is grip-limited with a little wheelspin,
+## which is both quicker and more honest than a force that always gets its way.
+const DRIVE_FORCE := 18.0
+const BRAKE_FORCE := 5.0
+const ROLLING_DRAG := 0.7
+## Cars lean and can be put onto two wheels, but a derby that ends with everyone
+## upside down is not a derby. This is A7.4's answer and it is deliberately a
+## soft limit rather than the old hard axis lock.
+const ANTI_ROLL := 5.5
+const UPRIGHT_RECOVERY := 2.2
 ## Drive and steering are both cut while stunned. The drive model is a strong
 ## servo targeting a speed and a heading, and at full authority it erases any
 ## perturbation an impact introduces before the next frame renders.
@@ -57,18 +115,29 @@ var stun := 0.0
 var contact_seconds := 0.0
 var stuck_seconds := 0.0
 var grind_side := 1.0
+## Per-wheel state, kept for the AI, the audio and the camera to read.
+var wheel_contacts := [false, false, false, false]
+var wheel_loads := [0.0, 0.0, 0.0, 0.0]
+var wheel_slip := 0.0
+var airborne := false
 
 func _ready() -> void:
 	mass = 1100.0
 	linear_damp = 0.15
-	angular_damp = 3.0
-	axis_lock_angular_x = true
-	axis_lock_angular_z = true
+	angular_damp = 1.6
+	# A7.4. The old model locked pitch and roll outright, which is why the car
+	# read as a slab on rails. The suspension now carries the body and an
+	# anti-roll term keeps it drivable, so it leans, dives and can be tipped -
+	# without the heat ending with twelve cars on their roofs.
+	axis_lock_angular_x = false
+	axis_lock_angular_z = false
 	continuous_cd = true
 	contact_monitor = true
 	max_contacts_reported = 8
 	var material := PhysicsMaterial.new()
-	material.friction = 0.25
+	# The body itself is nearly frictionless now. Grip belongs to the tires; a
+	# sliding box that also grips is two conflicting models fighting each other.
+	material.friction = 0.05
 	material.bounce = 0.22
 	physics_material_override = material
 	var collider := CollisionShape3D.new()
@@ -81,23 +150,95 @@ func _ready() -> void:
 	grind_side = 1.0 if get_instance_id() % 2 == 0 else -1.0
 
 func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
-	var forward := -state.transform.basis.z
-	var right := state.transform.basis.x
+	var transform := state.transform
+	var forward := -transform.basis.z
+	var right := transform.basis.x
+	var up := transform.basis.y
 	signed_speed = state.linear_velocity.dot(forward)
-	var lateral_speed := state.linear_velocity.dot(right)
 	stun = maxf(0.0, stun - state.step)
-	if enabled:
-		var grip := STUN_GRIP if stun > 0.0 else 1.0
-		var lateral_correction := clampf(lateral_speed * 5.0, -MAX_LATERAL_GRIP, MAX_LATERAL_GRIP)
-		state.apply_central_force(-right * lateral_correction * mass * grip)
-		if stun <= 0.0:
-			var target_speed := throttle * (DRIVE_SPEED if throttle >= 0.0 else REVERSE_SPEED)
-			var acceleration := clampf((target_speed - signed_speed) * 2.0, -14.0, 12.0)
-			state.apply_central_force(forward * acceleration * mass)
-			var yaw_target := -steering * clampf(absf(signed_speed) / 8.0, 0.0, 1.0) * 1.55 * signf(signed_speed)
-			state.apply_torque(Vector3.UP * (yaw_target - state.angular_velocity.y) * mass * 6.0)
-	else:
-		state.apply_central_force(-Vector3(state.linear_velocity.x, 0, state.linear_velocity.z) * mass * 5.0)
+
+	var space := get_world_3d().direct_space_state
+	var grounded := 0
+	var total_load := 0.0
+	wheel_slip = 0.0
+	var steer := clampf(-steering, -1.0, 1.0) * MAX_STEER
+	# Lock tightens with speed, the way a real rack loads up. Note this does not
+	# reduce *authority* at low speed the way the old servo did - at a standstill
+	# the wheels still point, they simply have nothing to push against yet.
+	steer *= lerpf(1.0, 0.45, clampf(absf(signed_speed) / DRIVE_SPEED, 0.0, 1.0))
+
+	for index in WHEEL_ANCHORS.size():
+		var anchor: Vector3 = WHEEL_ANCHORS[index]
+		var world_anchor := transform * anchor
+		var reach := SUSPENSION_REST + WHEEL_RADIUS
+		var query := PhysicsRayQueryParameters3D.create(world_anchor, world_anchor - up * reach)
+		query.exclude = [get_rid()]
+		var hit := space.intersect_ray(query)
+		if hit.is_empty():
+			wheel_contacts[index] = false
+			wheel_loads[index] = 0.0
+			continue
+		wheel_contacts[index] = true
+		grounded += 1
+
+		# `intersect_ray` returns the hit under "position"; there is no "point".
+		var contact: Vector3 = hit.position
+		var offset := contact - state.transform.origin
+		var point_velocity := state.linear_velocity + state.angular_velocity.cross(offset)
+
+		# --- suspension ---------------------------------------------------
+		var distance := world_anchor.distance_to(contact)
+		var compression := clampf(reach - distance, 0.0, SUSPENSION_REST)
+		var travel_speed := point_velocity.dot(up)
+		var spring := compression * SPRING_RATE * mass * 0.25
+		var damper := travel_speed * SPRING_DAMP * mass * 0.25
+		var load := maxf(0.0, spring - damper)
+		wheel_loads[index] = load
+		total_load += load
+		state.apply_force(up * load, offset)
+
+		# --- tire ---------------------------------------------------------
+		# Grip is a friction limit against this wheel's own load, which is what
+		# makes weight transfer matter rather than just look like it does.
+		var limit := load * TIRE_GRIP
+		var steered := forward if not FRONT_WHEELS.has(index) else forward.rotated(up, steer).normalized()
+		var lateral_axis := steered.cross(up).normalized()
+		var lateral_speed := point_velocity.dot(lateral_axis)
+		var lateral_force := clampf(-lateral_speed * LATERAL_STIFFNESS * mass * 0.25, -limit, limit)
+		if absf(lateral_speed) * LATERAL_STIFFNESS * mass * 0.25 > limit:
+			wheel_slip = maxf(wheel_slip, clampf(absf(lateral_speed) / 8.0, 0.0, 1.0))
+		state.apply_force(lateral_axis * lateral_force, offset)
+
+		var rolling := point_velocity.dot(steered)
+		var longitudinal := 0.0
+		if enabled and stun <= 0.0 and REAR_WHEELS.has(index):
+			var target := throttle * (DRIVE_SPEED if throttle >= 0.0 else REVERSE_SPEED)
+			if absf(throttle) > 0.05:
+				longitudinal = signf(target - rolling) * DRIVE_FORCE * mass * 0.25 * absf(throttle)
+				if absf(rolling) > absf(target):
+					longitudinal = 0.0
+			else:
+				longitudinal = -rolling * BRAKE_FORCE * mass * 0.25 * 0.2
+		elif not enabled:
+			longitudinal = -rolling * BRAKE_FORCE * mass * 0.25
+		longitudinal -= rolling * ROLLING_DRAG * mass * 0.25 * 0.1
+		longitudinal = clampf(longitudinal, -limit, limit)
+		state.apply_force(steered * longitudinal, offset)
+
+	airborne = grounded == 0
+
+	# --- anti-roll and self-righting --------------------------------------
+	# A7.4 in practice. Leaning is wanted; ending the heat on your roof is not.
+	if grounded > 0:
+		var lean := up.cross(Vector3.UP)
+		state.apply_torque(lean * ANTI_ROLL * mass * 0.5)
+	elif up.dot(Vector3.UP) < 0.2:
+		# On its back with no wheels down, nothing can recover it, so help.
+		var righting := up.cross(Vector3.UP)
+		state.apply_torque(righting * UPRIGHT_RECOVERY * mass)
+
+	# The stuck rule predates this rework and still earns its place: a wedged car
+	# has to be able to back itself out without the player reaching for a key.
 	if enabled and stun <= 0.0 and absf(throttle) > 0.25 and absf(signed_speed) < STUCK_SPEED:
 		stuck_seconds += state.step
 		if stuck_seconds >= STUCK_SECONDS:
@@ -106,6 +247,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		stuck_seconds = 0.0
 	_resolve_contacts(state)
 	previous_velocity = state.linear_velocity
+
 
 func _resolve_contacts(state: PhysicsDirectBodyState3D) -> void:
 	var now := Time.get_ticks_msec()

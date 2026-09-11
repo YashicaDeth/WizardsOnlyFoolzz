@@ -12,18 +12,21 @@ extends Control
 ## sessions; everything else is hatched over and unlabelled. Walking is what
 ## makes the map.
 
+const Grunge := preload("res://systems/celloutz_grunge.gd")
+const Motion := preload("res://systems/celloutz_motion.gd")
+
 const SURVEY_ID := "ashbloom_survey"
 const CELL := 22.0
 const SURVEY_RADIUS := 3
 
-const VOID := Color("060b09")
-const PLATE := Color("0a120e")
-const INK := Color("dce6ba")
-const ACID := Color("b4da48")
-const SPORE := Color("9bf01a")
-const ARTERIAL := Color("c81f16")
-const BILE := Color("b8a12a")
-const SCAN := Color("35b7a7")
+const VOID := Color("0a0806")
+const PLATE := Color("100c09")
+const INK := Color("e6d4ac")
+const ACID := Color("b0552a")
+const SPORE := Color("7f9440")
+const ARTERIAL := Color("a8281a")
+const BILE := Color("9a8c3f")
+const SCAN := Color("8a9a4a")
 const BONE := Color("ead4ad")
 
 const DISTRICTS := [
@@ -56,6 +59,13 @@ var surveyed: Dictionary = {}
 
 var _hatch: ImageTexture
 var _chart := Rect2()
+## A6.2/A6.3. Discovered places, the one under the cursor, and where travel is
+## being committed to.
+var _place_rects: Array = []
+var hovered_place := -1
+var selected_place := -1
+var travel_hold := 0.0
+signal travel_requested(place: Dictionary)
 
 
 func _ready() -> void:
@@ -127,14 +137,51 @@ func close_map() -> void:
 	visible = false
 
 
+func _handle_travel(delta: float) -> void:
+	if selected_place < 0:
+		travel_hold = 0.0
+		return
+	var district: Dictionary = DISTRICTS[selected_place]
+	if not is_surveyed(district.get("at", Vector2.ZERO)):
+		travel_hold = 0.0
+		return
+	if Input.is_key_pressed(KEY_T):
+		travel_hold = minf(1.0, travel_hold + delta * 0.85)
+		if travel_hold >= 1.0:
+			travel_requested.emit(district)
+			WorldHistory.record_event("map_travel", {"subject": "player", "place": str(district.get("name", ""))})
+			travel_hold = 0.0
+	else:
+		travel_hold = maxf(0.0, travel_hold - delta * 2.2)
+
+
 func _process(delta: float) -> void:
 	if not visible:
 		return
 	clock += delta
+	_handle_travel(delta)
 	queue_redraw()
 
 
+## Hover and selection for the place markers. Runs before the pan handling so
+## clicking a marker does not also start dragging the chart.
+func _place_under(point: Vector2) -> int:
+	for entry in _place_rects:
+		if (entry["rect"] as Rect2).has_point(point):
+			return int(entry["index"])
+	return -1
+
+
 func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		hovered_place = _place_under(event.position)
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		var found := _place_under(event.position)
+		if found >= 0:
+			selected_place = -1 if found == selected_place else found
+			travel_hold = 0.0
+			queue_redraw()
+			return
 	if not visible:
 		return
 	if event is InputEventMouseButton:
@@ -167,8 +214,21 @@ func _draw() -> void:
 	var margin := 26.0
 	_chart = Rect2(margin, margin + 34.0, size.x - margin * 2.0, size.y - margin * 2.0 - 74.0)
 
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.015, 0.025, 0.02, 0.93))
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.035, 0.026, 0.019, 0.94))
 	draw_rect(_chart, PLATE)
+	# A6.1. Grime under the plan, so the chart reads as printed on something.
+	Grunge.stain(self, _chart.position + _chart.size * Vector2(0.22, 0.74), 150.0, 611, Grunge.BILE, 0.05)
+	Grunge.stain(self, _chart.position + _chart.size * Vector2(0.78, 0.24), 170.0, 617, Grunge.RUST, 0.045)
+
+	# A6.5. Past a zoom threshold the plan lies back, so close inspection reads
+	# as leaning over a table rather than as a bigger flat chart. An affine
+	# transform cannot do true perspective, so this is a squash about a low
+	# horizon plus a fade at the far edge - which is what sells the tilt.
+	var tilt := clampf((zoom - 1.6) / 1.4, 0.0, 1.0)
+	if tilt > 0.0:
+		var horizon := _chart.position.y + _chart.size.y * 0.62
+		var squash := lerpf(1.0, 0.60, tilt)
+		draw_set_transform_matrix(Transform2D(Vector2(1.0, 0.0), Vector2(0.0, squash), Vector2(0.0, horizon * (1.0 - squash))))
 
 	_draw_grid()
 	_draw_roads()
@@ -180,8 +240,22 @@ func _draw() -> void:
 	_draw_misfires()
 	_draw_contacts()
 	_draw_player()
+	_draw_places()
+	if tilt > 0.0:
+		draw_set_transform_matrix(Transform2D.IDENTITY)
+		# The far edge falls away into haze, which an affine squash cannot do on
+		# its own and which is most of what makes a tilt legible.
+		var haze := _chart.size.y * 0.22 * tilt
+		var steps := 14
+		for band in steps:
+			var travel := float(band) / float(steps)
+			draw_rect(Rect2(_chart.position + Vector2(0, haze * travel), Vector2(_chart.size.x, haze / float(steps) + 1.0)), VOID * Color(1, 1, 1, (1.0 - travel) * 0.72 * tilt))
 	_draw_frame()
+	_draw_bezel()
 	_draw_legend()
+	if selected_place >= 0:
+		_draw_place_panel()
+	_draw_cracks()
 
 
 func _draw_grid() -> void:
@@ -365,11 +439,111 @@ func _draw_frame() -> void:
 		draw_line(at, at + Vector2(dx, 0), ACID, 2.0)
 		draw_line(at, at + Vector2(0, dy), ACID, 2.0)
 	var font := ThemeDB.fallback_font
-	CellOutzType.draw_stamped(self, Vector2(26, 12), "LIVING MAP", 20.0, ACID, ARTERIAL * Color(1, 1, 1, 0.25), 3.4)
-	draw_string(font, Vector2(150, 26), "LIMBO / THE ASHBLOOM EXPANSE   SHEET 01 OF 01   CELLOUTZ SURVEY", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, INK * Color(1, 1, 1, 0.55))
+	CellOutzType.draw_stamped(self, Vector2(26, 10), "LIVING MAP", 20.0, ACID, ARTERIAL * Color(1, 1, 1, 0.25), 3.4)
+	# Measured off the title rather than guessed at 150px, which printed the
+	# sheet line straight through the stamp.
+	var title_end := 26.0 + CellOutzType.width("LIVING MAP", 20.0, 3.4) + 24.0
+	draw_string(font, Vector2(title_end, 28), "LIMBO / THE ASHBLOOM EXPANSE   SHEET 01 OF 01   CELLOUTZ SURVEY", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, INK * Color(1, 1, 1, 0.55))
 	var charted := float(surveyed.size()) * CELL * CELL
 	var total := AshbloomWorldGenerator.REGION_SIZE.x * AshbloomWorldGenerator.REGION_SIZE.y
 	draw_string(font, Vector2(size.x - 330, 26), "SURVEYED %05.1f%%   E %+06.1f  N %+06.1f" % [clampf(charted / total, 0.0, 1.0) * 100.0, player_at.x, -player_at.y], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, SPORE)
+
+
+## A6.1. A salvaged bezel: rolled plate, pipe runs down two edges, and fixings
+## at the corners. `ART-DIRECTION.md` asks for the interface to be a made object
+## and the map was the clearest remaining case of a chart floating on black.
+func _draw_bezel() -> void:
+	var outer := Rect2(Vector2(10, 10), size - Vector2(20, 20))
+	var inner := _chart.grow(10.0)
+	# The bezel face, drawn as the ring between the two rectangles.
+	var face := PackedVector2Array([
+		outer.position, outer.position + Vector2(outer.size.x, 0), outer.position + outer.size, outer.position + Vector2(0, outer.size.y),
+	])
+	draw_colored_polygon(face, Color(0.09, 0.07, 0.055, 0.0))
+	for band in [outer, inner]:
+		draw_rect(band, ACID * Color(1, 1, 1, 0.35), false, 2.0)
+	# Pipe runs, because a salvaged housing has things bolted to the outside.
+	for pipe_x in [outer.position.x + 4.0, outer.position.x + outer.size.x - 4.0]:
+		draw_line(Vector2(pipe_x, outer.position.y + 30), Vector2(pipe_x, outer.position.y + outer.size.y - 30), Color(0.16, 0.12, 0.09), 7.0)
+		draw_line(Vector2(pipe_x - 2, outer.position.y + 30), Vector2(pipe_x - 2, outer.position.y + outer.size.y - 30), INK * Color(1, 1, 1, 0.10), 1.0)
+		for clamp_y in range(int(outer.position.y) + 60, int(outer.position.y + outer.size.y) - 40, 90):
+			draw_rect(Rect2(Vector2(pipe_x - 6, float(clamp_y)), Vector2(12, 7)), Color(0.22, 0.17, 0.12))
+	for corner: Vector2 in [Vector2(0, 0), Vector2(1, 0), Vector2(0, 1), Vector2(1, 1)]:
+		var at := inner.position + inner.size * corner
+		var inset := Vector2(12.0 if corner.x < 0.5 else -12.0, 12.0 if corner.y < 0.5 else -12.0)
+		draw_circle(at + inset, 4.0, Color(0.10, 0.08, 0.06))
+		draw_arc(at + inset, 4.0, 0, TAU, 12, INK * Color(1, 1, 1, 0.28), 1.0)
+		draw_line(at + inset + Vector2(-2.6, -2.6), at + inset + Vector2(2.6, 2.6), INK * Color(1, 1, 1, 0.30), 1.0)
+
+
+## A6.4. The screen is cracked and the cracks eat the chart. Fixed pattern, so
+## it is damage rather than an effect - and it occludes, which is the point:
+## the map withholds ground for a second reason beyond not having walked it.
+func _draw_cracks() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 8821
+	for strike in 2:
+		var origin := _chart.position + Vector2(rng.randf() * _chart.size.x, rng.randf() * _chart.size.y)
+		for branch in rng.randi_range(3, 5):
+			var heading := rng.randf() * TAU
+			var point := origin
+			var run := PackedVector2Array([point])
+			for step in rng.randi_range(4, 9):
+				heading += rng.randf_range(-0.5, 0.5)
+				point += Vector2(cos(heading), sin(heading)) * rng.randf_range(16.0, 54.0)
+				run.append(point)
+			draw_polyline(run, Color(0, 0, 0, 0.55), rng.randf_range(1.4, 2.6))
+			draw_polyline(run, INK * Color(1, 1, 1, 0.10), 1.0)
+
+
+## A6.2. Named places, drawn from the districts the generator already produces,
+## as things you point at rather than labels lying on the plan.
+func _draw_places() -> void:
+	_place_rects.clear()
+	for index in DISTRICTS.size():
+		var district: Dictionary = DISTRICTS[index]
+		var world_at: Vector2 = district.get("at", Vector2.ZERO)
+		var screen := _to_screen(world_at)
+		if not _chart.has_point(screen):
+			continue
+		var charted := is_surveyed(world_at)
+		var box := Rect2(screen - Vector2(9, 9), Vector2(18, 18))
+		_place_rects.append({"index": index, "rect": box, "at": world_at})
+		var tint: Color = SPORE if charted else INK * Color(1, 1, 1, 0.3)
+		if index == selected_place:
+			tint = ACID
+		var mark := PackedVector2Array([
+			screen + Vector2(0, -7), screen + Vector2(7, 0), screen + Vector2(0, 7), screen + Vector2(-7, 0), screen + Vector2(0, -7),
+		])
+		draw_polyline(mark, tint, 1.6)
+		if index == hovered_place or index == selected_place:
+			draw_arc(screen, 13.0 + sin(clock * 3.0) * 1.5, 0, TAU, 24, tint * Color(1, 1, 1, 0.6), 1.2)
+
+
+## A6.3. Travel, as a commitment rather than a click. Holding is deliberate: a
+## map that teleports you the instant you brush a marker is a fast-travel menu,
+## and this world is supposed to make you go places.
+func _draw_place_panel() -> void:
+	var district: Dictionary = DISTRICTS[selected_place]
+	var panel := Rect2(Vector2(size.x - 336, _chart.position.y + 16), Vector2(300, 150))
+	draw_colored_polygon(PackedVector2Array([
+		panel.position + Vector2(14, 0), panel.position + Vector2(panel.size.x, 0),
+		panel.position + panel.size - Vector2(0, 14), panel.position + panel.size - Vector2(14, 0),
+		panel.position + Vector2(0, panel.size.y), panel.position + Vector2(0, 14),
+	]), Color(0.05, 0.04, 0.03, 0.95))
+	draw_rect(panel, ACID * Color(1, 1, 1, 0.45), false, 1.4)
+	var font := ThemeDB.fallback_font
+	CellOutzType.draw_stamped(self, panel.position + Vector2(14, 14), str(district.get("name", "UNNAMED")).to_upper(), 16.0, INK, ARTERIAL * Color(1, 1, 1, 0.3), 1.2)
+	draw_string(font, panel.position + Vector2(16, 54), str(district.get("note", "")), HORIZONTAL_ALIGNMENT_LEFT, panel.size.x - 32, 11, INK * Color(1, 1, 1, 0.7))
+	var charted := is_surveyed(district.get("at", Vector2.ZERO))
+	var status := "SURVEYED" if charted else "UNWALKED \u2014 NO ROUTE"
+	CellOutzType.draw_text(self, panel.position + Vector2(14, 82), status, 10.0, SPORE if charted else ARTERIAL, 1.0)
+	if charted:
+		var bar := Rect2(panel.position + Vector2(14, 106), Vector2(panel.size.x - 28, 14))
+		draw_rect(bar, INK * Color(1, 1, 1, 0.10))
+		draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(travel_hold, 0.0, 1.0), bar.size.y)), ACID)
+		draw_rect(bar, INK * Color(1, 1, 1, 0.22), false, 1.0)
+		CellOutzType.draw_text(self, panel.position + Vector2(14, 126), "HOLD T TO TRAVEL", 9.0, INK * Color(1, 1, 1, 0.6), 1.0)
 
 
 func _draw_legend() -> void:

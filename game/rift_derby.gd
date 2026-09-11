@@ -494,14 +494,30 @@ func _update_debris(delta: float) -> void:
 			debris.erase(piece)
 
 
+## A7.6. The camera has to answer the new physics or the suspension work is
+## invisible from the driver's seat: speed pulls the frame back and widens the
+## lens, and a wheel letting go shakes it. Both read off the chassis rather than
+## off the input, so they respond to what the car is *doing*.
+const CAMERA_FOV_REST := 70.0
+const CAMERA_FOV_FLAT := 88.0
+
+
 func _update_camera(delta: float) -> void:
 	camera_shake = maxf(0.0, camera_shake - delta * 2.4)
 	var forward := -boat.global_transform.basis.z
-	var desired := boat.global_position - forward * 14.5 + Vector3.UP * 7.4
+	var pace := clampf(absf(float(boat.get("signed_speed"))) / 24.0, 0.0, 1.0)
+	# Further back and higher with speed, so the horizon opens up as it matters.
+	var desired := boat.global_position - forward * lerpf(13.0, 17.0, pace) + Vector3.UP * lerpf(6.8, 8.0, pace)
 	camera.global_position = camera.global_position.lerp(desired, min(delta * 4.5, 1.0))
+	camera.fov = lerpf(camera.fov, lerpf(CAMERA_FOV_REST, CAMERA_FOV_FLAT, pace * pace), min(delta * 3.0, 1.0))
+	# A wheel breaking traction is worth feeling. Small, continuous, and separate
+	# from the impact jolt so a slide does not read as a collision.
+	var slip := float(boat.get("wheel_slip"))
+	var beat := float(Time.get_ticks_msec()) * 0.001
+	if slip > 0.02:
+		camera.global_position += Vector3(sin(beat * 83.0), cos(beat * 71.0), 0.0) * slip * 0.09
 	if camera_shake > 0.0:
 		# Applied after the follow lerp; smoothing a jolt at 4.5/s erases it.
-		var beat := float(Time.get_ticks_msec()) * 0.001
 		camera.global_position += Vector3(sin(beat * 47.0), cos(beat * 61.0), sin(beat * 39.0)) * camera_shake * 0.7
 	camera.look_at(boat.global_position + forward * 8.0 + Vector3.UP * 1.2)
 

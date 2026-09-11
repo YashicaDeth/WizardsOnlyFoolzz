@@ -58,7 +58,7 @@ and "a game".
 ### A1 — Display typeface `BUILT`
 - [x] **A1.1** Stroke/stencil alphabet drawn in code, no font to licence
 - [x] **A1.2** Applied to headers and numerals across the index
-- [~] **A1.3** Derby HUD done. Map, kill cam, warning card and interstitial still on the default font
+- [x] **A1.3** Derby HUD, map, kill cam and interstitial. Warning card keeps a real font for its body copy by design
 - [ ] **A1.4** A second cut of the face — condensed, for tight columns
 - [ ] **A1.5** Worn/smudged variant that degrades with the panel (pairs with I4)
 
@@ -97,22 +97,23 @@ and "a game".
 - [x] **A5.4** Grunge pass: the HUD is a cab instrument, so it is filthy
 - [x] **A5.5** Cut visible prose by ~60%, per the Tier 1b note
 
-### A6 — Living Map as an object
-- [ ] **A6.1** Salvaged bezel — pipes, rust plate, screws — around the chart
-- [ ] **A6.2** Named discovered places with a description panel
-- [ ] **A6.3** Location-based travel
-- [ ] **A6.4** Cracked-screen occlusion over unsurveyed ground
-- [ ] **A6.5** 2D-to-tilted-3D zoom
+### A6 — Living Map as an object `BUILT`
+- [x] **A6.1** Salvaged bezel — pipes, rust plate, screws — around the chart
+- [x] **A6.2** Named discovered places with a description panel
+- [x] **A6.3** Location-based travel
+- [x] **A6.4** Cracked-screen occlusion over unsurveyed ground
+- [x] **A6.5** 2D-to-tilted-3D zoom
 
-### A7 — Derby driving model
-**The actual cause of "the derby map is broken".** The venue reads wrong because
-the car does not behave like a car in it.
-- [ ] **A7.1** Per-wheel raycast suspension replacing the single-body servo
-- [ ] **A7.2** Load transfer — weight moves under brake, throttle and steering
-- [ ] **A7.3** Real contact patches and per-wheel grip
-- [ ] **A7.4** Decide the upright angular lock: does a derby car roll?
-- [ ] **A7.5** Retune the AI against the new model (it was tuned against the old one)
-- [ ] **A7.6** Speed-linked camera shake and FOV
+### A7 — Derby driving model `BUILT`
+**This was the actual cause of "the derby map is broken".** The venue was
+re-authored twice against the complaint and measured worse both times — the
+clue that the arena was never the problem. Confirmed: the car is a car now.
+- [x] **A7.1** Per-wheel raycast suspension replacing the single-body servo
+- [x] **A7.2** Load transfer — weight moves under brake, throttle and steering
+- [x] **A7.3** Real contact patches and per-wheel grip
+- [x] **A7.4** Decide the upright angular lock: does a derby car roll?
+- [x] **A7.5** Retune the AI against the new model (it was tuned against the old one)
+- [x] **A7.6** Speed-linked camera shake and FOV
 
 ### A9 — The radio
 Greg, 2026-09-11: an Oxenfree-style **tunable** radio in the Fallout register —

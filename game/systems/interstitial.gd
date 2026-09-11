@@ -263,6 +263,8 @@ func _draw_specimen(centre: Vector2, scale: float) -> void:
 			screen.draw_arc(at, radius * 2.1 + throb * 5.0, 0.0, TAU, 20, tint * Color(1, 1, 1, 0.4 * alpha), 1.4)
 			var label_at := centre + Vector2(120.0 * scale, (entry[1] as Vector2).y * scale)
 			screen.draw_line(at, label_at - Vector2(6, 4), tint * Color(1, 1, 1, 0.4 * alpha), 1.0)
-			screen.draw_string(ThemeDB.fallback_font, label_at, str(entry[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, int(12 * scale * 0.5) + 8, tint * Color(1, 1, 1, alpha))
+			# A1.3. Organ callouts are stamps on a transit plate, so they are set
+			# in the display face rather than in the engine default.
+			CellOutzType.draw_text(screen, label_at - Vector2(0, 6.0 * scale * 0.5), str(entry[0]), 12.0 * scale * 0.5 + 4.0, tint * Color(1, 1, 1, alpha), 1.0)
 		else:
 			screen.draw_arc(at, radius, 0.0, TAU, 14, tint * Color(1, 1, 1, 0.28 * alpha), 1.2)
