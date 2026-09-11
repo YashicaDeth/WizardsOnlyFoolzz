@@ -2,6 +2,32 @@
 
 ## 2026 09 11
 
+- **You can rob a body now, and it costs something.** `systems/extraction.gd`
+  turns robbing into a dig rather than a loot roll: hardware sits at
+  `GoreChunks.Layer.CYBERNETIC` and an organ one layer above it, so reaching
+  either means going through everything on top — and a body you already opened
+  in the fight is faster, because `zone_depth` (B4.3) is subtracted from the
+  work. Hold **F** over anything downed or dead within reach. The tool decides
+  both speed and what survives the trip: bare hands are slow and ruin a third
+  of the part, a blade is quick and rough, a surgical kit is quick and clean.
+  The zone opens visibly while you work, so a half-finished dig reads on the
+  body instead of only in a meter. What comes out enters CARRY with its
+  condition and its **lien** — whose body it was — and can be installed into
+  your own through the same verb that fitted the arm you were decanted with,
+  at whatever condition you left it in. Somebody notices: the act routes
+  through `WitnessLedger`, a living owner's grudge jumps, and a part somebody
+  watched you cut out sells for 38% less, because the broker is pricing the
+  chance of being asked where it came from.
+  Two real bugs found on the way. Every Ashline body was carrying an implant
+  the catalogue could only call **"unknown hardware"** — the spawn config
+  passed `{"torso": {"armor": 0.18}}`, which was a complete implant before B2
+  made implants identities, and had been showing in the dossier ever since.
+  And the dig originally targeted whichever part the dictionary happened to
+  list first; it now ranks by what the Choir would actually pay (the same
+  model `Carry.sale_value` uses), with "how far in you already are" as the
+  tie-break. Covered by a new `extraction_test` (31 checks) plus live-Hunt
+  coverage in `combat_integration_test`; 19 suites green.
+
 - **B4 finished: chunks now carry their layer past the moment they land.**
   A zone remembers the deepest `GoreChunks.Layer` it has ever been cut to
   (`zone_depth`, already tracked for B4.3) and now shows it: an authored patch

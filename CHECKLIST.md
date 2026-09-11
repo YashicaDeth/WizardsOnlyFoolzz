@@ -190,14 +190,14 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B4.8** Per-layer impact sound — bone does not land like fat~~
 - [x] ~~**B4.9** Rot over time: flies, discolouration, smell as a gameplay signal~~
 
-### B5 — Rob cybernetics off a body
+### B5 — Rob cybernetics off a body `BUILT`
 **Unblocked by B4** — `GoreChunks.take()` already returns the identified part.
-- [ ] **B5.1** Interact with a downed or dead body to open the extraction view
-- [ ] **B5.2** Extraction requires reaching the right layer — you have to dig
-- [ ] **B5.3** The tool matters: bare hands, blade, or something surgical
-- [ ] **B5.4** Extracted part enters CARRY with its condition and its lien
-- [ ] **B5.5** Install a robbed part into yourself
-- [ ] **B5.6** Someone notices — the Choir price it, the owner remembers
+- [x] ~~**B5.1** Interact with a downed or dead body to open the extraction view~~
+- [x] ~~**B5.2** Extraction requires reaching the right layer — you have to dig~~
+- [x] ~~**B5.3** The tool matters: bare hands, blade, or something surgical~~
+- [x] ~~**B5.4** Extracted part enters CARRY with its condition and its lien~~
+- [x] ~~**B5.5** Install a robbed part into yourself~~
+- [x] ~~**B5.6** Someone notices — the Choir price it, the owner remembers~~
 
 ### B6 — Dismemberment as a combat verb
 - [x] ~~**B6.1** Severing exists on the rig with thrown limbs, stumps and exposed bone, driven by the strike direction~~

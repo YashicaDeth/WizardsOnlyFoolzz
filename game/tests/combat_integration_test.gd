@@ -112,5 +112,54 @@ func _ready() -> void:
 	var sale: Dictionary = hunt._sell_first_carried_part()
 	check(int(sale.get("price", 0)) > 0 and hunt.carried_limb_index == -1, "a broker can buy the same carried limb and unequip it cleanly")
 
+	# B5. A body with hardware in it is a thing you dig into, and the dig
+	# survives the body leaving the AI's books when it dies.
+	# The earlier _interact() left the resolution form open over a downed body,
+	# and digging while deciding someone's fate is refused by design.
+	hunt.resolution_ui.close_menu()
+	hunt.panel_mode = ""
+	var victim_at: Vector3 = hunt.player + Vector3(0, -0.5, 1.6)
+	hunt._spawn_encounter_actor({"instance_id": "rob_subject", "kind": "hostile"}, victim_at)
+	var victim: Dictionary = hunt.encounter_actors.back()
+	victim.node.position = victim_at
+	victim.rig.install_prosthetic("head", {"name": "rangefinder eye"})
+	await get_tree().physics_frame
+	check(hunt._nearest_robbable().is_empty(), "a body still standing is not robbable")
+	victim.anatomy.go_down()
+	await get_tree().physics_frame
+	check(str(hunt._nearest_robbable().get("subject_id", "")) == str(victim.subject_id), "a downed body within reach is")
+	# Ashline bodies also carry a torso plate, so the dig picks between two real
+	# implants rather than finding the only one there is.
+	hunt._begin_extraction()
+	var dug_zone := str(hunt.extraction_session.get("zone", ""))
+	check(victim.rig.anatomy.installed_parts.has(dug_zone), "F opens a dig into a zone that actually has hardware in it (%s)" % dug_zone)
+	var required: float = float(hunt.extraction_session.required)
+	hunt._update_extraction(required * 0.5, true)
+	check(not bool(hunt.extraction_session.get("complete", false)), "half the time does not finish it")
+	check(victim.rig.exposed_layer("head") > 0, "and the body is visibly opened partway while you work")
+	var carry_before_rob: int = hunt.handheld.carry.items.size()
+	hunt._update_extraction(required, true)
+	check(hunt.extraction_session.is_empty(), "finishing the dig closes the session")
+	check(hunt.handheld.carry.items.size() == carry_before_rob + 1, "and moves the part into CARRY")
+	var robbed: Dictionary = hunt.handheld.carry.items.back()
+	check(str(robbed.kind) == "cybernetic" and str(robbed.lien) == str(victim.subject_id), "the carried part remembers whose body it came out of")
+	check(not victim.rig.anatomy.installed_parts.has(dug_zone), "and the socket it came out of is empty")
+	check(int(WorldHistory.subject(str(victim.subject_id)).get("grudge", 0)) > 0, "a living owner remembers being robbed")
+	check(not Extraction.robbable_zones(victim.rig.anatomy.snapshot()).any(func(target): return str(target.zone) == dug_zone and str(target.kind) == "cybernetic"), "that socket is not offered again")
+
+	# The same verb works on a corpse the AI has already forgotten.
+	var corpse_at: Vector3 = hunt.player + Vector3(1.2, -0.5, 0.6)
+	hunt._spawn_encounter_actor({"instance_id": "corpse_subject", "kind": "hostile"}, corpse_at)
+	var corpse: Dictionary = hunt.encounter_actors.back()
+	corpse.node.position = corpse_at
+	corpse.rig.install_prosthetic("torso", {"name": "ceramic sternum"})
+	await get_tree().physics_frame
+	hunt._kill_encounter_actor(hunt.encounter_actors.find(corpse), "test")
+	check(not hunt.encounter_actors.has(corpse) and hunt.dead_bodies.size() > 0, "a killed body leaves the AI's books but stays in the world")
+	check(str(hunt._nearest_robbable().get("subject_id", "")) == str(corpse.subject_id), "and a corpse is still robbable")
+	hunt._begin_extraction()
+	hunt._update_extraction(float(hunt.extraction_session.required) + 0.1, true)
+	check(str((hunt.handheld.carry.items.back() as Dictionary).implant) == "ceramic sternum", "the corpse gives up its hardware")
+
 	print("COMBAT_INTEGRATION_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

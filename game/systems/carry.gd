@@ -21,6 +21,8 @@ extends RefCounted
 ##   worth nothing and then it is a problem. That is a clock on looting, and it
 ##   is what stops the Choir's economy being a vending machine.
 
+const ImplantCatalog := preload("res://systems/implant_catalog.gd")
+
 const SPOIL_SECONDS := 420.0
 ## Kilograms a body will carry before it starts costing movement. Deliberately
 ## low: this is a person with pockets, not a rucksack simulator.
@@ -86,6 +88,10 @@ func take_chunk(info: Dictionary) -> Dictionary:
 		"implant": str(info.get("implant", "")),
 		"whole_limb": bool(info.get("whole_limb", false)),
 		"condition": clampf(float(info.get("condition", 1.0)), 0.0, 1.0),
+		# B5.4: a robbed part keeps whose it was for as long as it exists. The
+		# Choir reads it to price the risk; the owner reads it to recognise it.
+		"lien": str(info.get("lien", "")),
+		"stolen": bool(info.get("stolen", false)),
 	}
 	items.append(item)
 	save_to_history()
@@ -117,7 +123,39 @@ func sale_value(item: Dictionary) -> int:
 	if base <= 0:
 		return 0
 	var condition := clampf(float(item.get("condition", 1.0)), 0.0, 1.0)
-	return maxi(1, roundi(float(base) * maxf(0.2, condition) * maxf(0.15, freshness(item))))
+	# B5.6. A part somebody watched you cut out is worth less, because the
+	# broker is pricing the chance of being asked where it came from. It is the
+	# cost of being seen rather than a morality tax.
+	var heat := 0.62 if bool(item.get("stolen", false)) else 1.0
+	return maxi(1, roundi(float(base) * maxf(0.2, condition) * maxf(0.15, freshness(item)) * heat))
+
+
+## B5.5. A robbed implant goes into your own body through the same verb that
+## installed the one you were decanted with. Condition travels with it: a part
+## you tore out with your hands works as badly for you as it would have for
+## anyone else.
+func install_into(index: int, rig: BaselineHuman) -> Dictionary:
+	if index < 0 or index >= items.size() or rig == null or not is_instance_valid(rig):
+		return {}
+	var item: Dictionary = items[index]
+	if str(item.get("kind", "")) != "cybernetic":
+		return {}
+	var implant_id := str(item.get("implant", item.get("label", ""))).to_lower()
+	var catalogue := ImplantCatalog.resolve(implant_id, str(item.get("zone", "torso")))
+	var maximum := maxf(1.0, float(catalogue.max_condition))
+	rig.install_prosthetic(str(catalogue.zone), {
+		"name": implant_id,
+		"condition": clampf(float(item.get("condition", 1.0)), 0.0, 1.0) * maximum,
+	})
+	items.remove_at(index)
+	save_to_history()
+	WorldHistory.record_event("implant_installed", {
+		"implant": implant_id,
+		"zone": str(catalogue.zone),
+		"condition": snappedf(float(item.get("condition", 1.0)), 0.01),
+		"lien": str(item.get("lien", "")),
+	})
+	return {"implant": implant_id, "zone": str(catalogue.zone), "condition": float(item.get("condition", 1.0))}
 
 
 func sell(index: int) -> Dictionary:

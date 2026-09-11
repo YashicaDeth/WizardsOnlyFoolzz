@@ -423,6 +423,16 @@ func exposed_layer(zone_id: String) -> int:
 	return int(zone_depth.get(canonical_zone(zone_id), 0))
 
 
+## Opens a zone to a given layer without a blow landing — what digging into a
+## body does (B5.2). Ratchets like `_shed_chunks` does, so an extraction can
+## never un-open something the fight already opened further.
+func mark_opened(zone_id: String, layer: int) -> int:
+	var zone := canonical_zone(zone_id)
+	zone_depth[zone] = maxi(int(zone_depth.get(zone, 0)), clampi(layer, 0, GoreChunks.Layer.CYBERNETIC))
+	_refresh_zone(zone)
+	return int(zone_depth[zone])
+
+
 func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt", hit_direction := Vector3.ZERO) -> Dictionary:
 	var zone := zone_nearest(global_point)
 	var organ_id := ""

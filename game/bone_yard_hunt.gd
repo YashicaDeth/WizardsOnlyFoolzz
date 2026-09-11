@@ -72,6 +72,12 @@ var arsenal: Node
 var pending_attack: Dictionary = {}
 var carried_limb_index := -1
 var carried_limb_model: MeshInstance3D
+## Bodies the fight is finished with. `_kill_encounter_actor` drops them out of
+## `encounter_actors` so the AI stops paying for them, but a corpse is still a
+## thing you can rob (B5), so it keeps its rig here rather than being forgotten.
+var dead_bodies: Array[Dictionary] = []
+var extraction_session: Dictionary = {}
+var witness_ledger := WitnessLedger.new()
 
 @onready var camera: Camera3D = $CameraRig/Camera3D
 @onready var title: Label = $HUD/Title
@@ -298,6 +304,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_C: _start_grapple()
 			KEY_Z: _toggle_lock()
 			KEY_E: _interact()
+			KEY_F: _begin_extraction()
 			KEY_SPACE:
 				if not grapple_target.is_empty():
 					_break_grapple("YOU LET GO")
@@ -333,6 +340,9 @@ func _physics_process(delta: float) -> void:
 	_update_player(delta)
 	_update_rival(delta)
 	_update_encounter_actors(delta)
+	_update_extraction(delta, Input.is_key_pressed(KEY_F))
+	# Reports walk home in real time; F1.3's window only exists if it ticks.
+	witness_ledger.tick(delta)
 	if misfire_director != null:
 		misfire_director.call("update_player_position", player)
 	if not grapple_target.is_empty():
@@ -701,6 +711,134 @@ func _interact() -> void:
 	prompt.text = "Nothing answers. Find Nix or follow the floodlights to the tunnel."
 
 
+## B5.1. A body you can open: downed and alive, or dead and still warm. The
+## resolution form (E) decides what happens to a person; this is the other
+## question you can ask a body, and it is held rather than pressed because
+## B5.2 says you have to dig.
+func _nearest_robbable(radius := 3.4) -> Dictionary:
+	var nearest: Dictionary = {}
+	var nearest_distance := radius
+	var candidates: Array = dead_bodies.duplicate()
+	for actor in encounter_actors:
+		if actor.get("rig") != null and actor.rig.is_downed():
+			candidates.append({"subject_id": str(actor.subject_id), "display_name": str(actor.display_name), "node": actor.node, "rig": actor.rig})
+	for body in candidates:
+		var node := body.get("node") as Node3D
+		var rig := body.get("rig") as BaselineHuman
+		if node == null or not is_instance_valid(node) or rig == null or not is_instance_valid(rig):
+			continue
+		if Extraction.robbable_zones(rig.anatomy.snapshot()).is_empty():
+			continue
+		var distance := player.distance_to(node.global_position)
+		if distance <= nearest_distance:
+			nearest_distance = distance
+			nearest = body
+	return nearest
+
+
+func _begin_extraction() -> void:
+	if not panel_mode.is_empty() or resolution_ui.visible:
+		return
+	var body := _nearest_robbable()
+	if body.is_empty():
+		prompt.text = "NOTHING WITHIN REACH WORTH OPENING"
+		extraction_session = {}
+		return
+	var rig := body.rig as BaselineHuman
+	var snapshot: Dictionary = rig.anatomy.snapshot()
+	var targets := Extraction.robbable_zones(snapshot, rig.zone_depth)
+	if targets.is_empty():
+		return
+	var target: Dictionary = targets[0]
+	var zone := str(target.zone)
+	# Resuming the same dig rather than restarting it: letting go of the key to
+	# deal with someone should not cost you the cut you already made.
+	if str(extraction_session.get("subject_id", "")) == str(body.subject_id) and str(extraction_session.get("zone", "")) == zone and not bool(extraction_session.get("complete", false)):
+		return
+	var tool := Extraction.tool_for(str(arsenal.current_id), handheld.carry.items)
+	extraction_session = Extraction.begin(str(body.subject_id), snapshot, zone, tool, rig.exposed_layer(zone), str(target.get("organ_id", "")))
+	if extraction_session.is_empty():
+		return
+	extraction_session["display_name"] = str(body.display_name)
+	body_motion.trigger_interaction()
+	prompt.text = "HOLD [F] // %s INTO %s WITH %s" % [
+		str(target.label).to_upper(), zone.replace("_", " ").to_upper(),
+		str(Extraction.profile(tool).label),
+	]
+
+
+## `holding` is passed in rather than polled here: whether the key is down is
+## the caller's business, and reading global Input inside the update made the
+## dig impossible to drive from a test.
+func _update_extraction(delta: float, holding: bool) -> void:
+	if extraction_session.is_empty():
+		return
+	var body := _robbable_by_id(str(extraction_session.subject_id))
+	if body.is_empty() or player.distance_to((body.node as Node3D).global_position) > 4.2:
+		extraction_session = {}
+		prompt.text = "THE DIG IS ABANDONED"
+		return
+	if not holding:
+		return
+	var rig := body.rig as BaselineHuman
+	Extraction.dig(extraction_session, delta)
+	# The zone opens while you work, so a half-finished dig is visible on the
+	# body rather than being a number in a meter nobody can see.
+	rig.mark_opened(str(extraction_session.zone), Extraction.reached_layer(extraction_session))
+	if not bool(extraction_session.complete):
+		prompt.text = "DIGGING // %d%%" % roundi(float(extraction_session.progress) / maxf(0.01, float(extraction_session.required)) * 100.0)
+		return
+	_finish_extraction(body)
+
+
+func _finish_extraction(body: Dictionary) -> void:
+	var rig := body.rig as BaselineHuman
+	var snapshot: Dictionary = rig.anatomy.snapshot()
+	var extracted := Extraction.extract(extraction_session, snapshot)
+	extraction_session = {}
+	if extracted.is_empty():
+		return
+	var owner_alive: bool = not rig.anatomy.dead
+	var seen := Extraction.notice(witness_ledger, extracted, (body.node as Node3D).global_position, _witness_candidates(), owner_alive, HUNT_LOCATION)
+	extracted["stolen"] = bool(seen.get("stolen", false))
+	Extraction.strip_from_rig(rig, extracted)
+	var carried: Dictionary = handheld.carry.take_chunk(extracted)
+	WorldHistory.update_subject(str(body.subject_id), {"anatomy_state": rig.snapshot()}, "robbed")
+	var witnesses: Array = seen.get("witnesses", [])
+	prompt.text = "%s TAKEN // %d%% // %s" % [
+		str(carried.label), roundi(float(carried.condition) * 100.0),
+		("SEEN BY %d" % witnesses.size()) if not witnesses.is_empty() else "NOBODY SAW",
+	]
+
+
+func _robbable_by_id(id: String) -> Dictionary:
+	for body in dead_bodies:
+		if str(body.subject_id) == id and is_instance_valid(body.get("node")):
+			return body
+	for actor in encounter_actors:
+		if str(actor.subject_id) == id and is_instance_valid(actor.get("node")):
+			return {"subject_id": id, "display_name": str(actor.display_name), "node": actor.node, "rig": actor.rig}
+	return {}
+
+
+## Who is present and able to report, as plain data — the shape
+## `WitnessLedger.witnesses_of` asks for, so the ledger never reaches into the
+## hunt loop for it.
+func _witness_candidates() -> Array:
+	var out: Array = []
+	for actor in encounter_actors:
+		var node := actor.get("node") as Node3D
+		if node == null or not is_instance_valid(node):
+			continue
+		out.append({
+			"id": str(actor.subject_id), "at": node.global_position,
+			"alive": not bool(actor.get("dead", false)) and not actor.anatomy.dead and not actor.anatomy.downed,
+		})
+	if friend != null and is_instance_valid(friend):
+		out.append({"id": FRIEND_ID, "at": friend.global_position, "alive": true})
+	return out
+
+
 func _nearest_takeable_chunk(radius: float) -> Node3D:
 	var nearest: Node3D
 	var nearest_distance := radius
@@ -955,6 +1093,10 @@ func _kill_encounter_actor(index: int, cause: String) -> void:
 	var label := node.get_node_or_null("Identity") as Label3D
 	if label != null:
 		label.text = "%s // DEAD\nLOOT DROPPED" % str(actor.display_name).to_upper()
+	dead_bodies.append({
+		"subject_id": str(actor.subject_id), "display_name": str(actor.display_name),
+		"node": node, "rig": actor.get("rig"),
+	})
 	encounter_actors.remove_at(index)
 
 func _actor_by_id(id: String) -> Dictionary:
@@ -1646,7 +1788,13 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> void:
 		"flesh": Color("70201c") if str(encounter.kind) == "hostile" else Color("586c3a"),
 		"variation": subject_id.length(),
 		"blood": 5200.0 if str(encounter.kind) == "boss" else 4300.0,
-		"cybernetics": {"torso": {"armor": 0.18}},
+		# Named, not just an armour number. Before B2 an implant *was* its armour
+		# value, so this passed an anonymous dictionary and every Ashline body
+		# ended up carrying a part the catalogue could only call "unknown
+		# hardware" — visible in the dossier and robbable as nothing in
+		# particular. The armour override keeps the encounter balance it was
+		# tuned with; the name gives it a zone, a condition and a real mesh.
+		"cybernetics": {"torso": {"name": "ceramic sternum", "armor": 0.18}},
 	}
 	if saved_actor.get("anatomy_state") is Dictionary:
 		rig_config["restore"] = saved_actor.anatomy_state
