@@ -24,6 +24,7 @@ func _ready() -> void:
 	_test_hit_geometry()
 	_test_severing()
 	_test_prosthetic()
+	_test_gore()
 	print("BASELINE_HUMAN_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
 
@@ -105,6 +106,51 @@ func _test_severing() -> void:
 		body.hit("torso", 40.0, 20.0, "blunt")
 	check(not body.severed.has("torso"), "a torso is never severed, however destroyed")
 	body.queue_free()
+
+
+func _test_gore() -> void:
+	BaselineHuman.live_gore = 0
+	var body := _rig()
+	# Two-sided: an undamaged limb has no bone showing.
+	check(body.get_node("left_leg").get_node_or_null("Fracture") == null, "a healthy limb has no fracture")
+	check(body._loose.is_empty(), "an untouched body has not bled")
+	body.hit("left_leg", 30.0, 12.0, "cut")
+	check(not body._loose.is_empty(), "a cut draws blood")
+	# A flesh wound is not a broken bone. The threshold has to mean something in
+	# both directions, so check it does not fire early either.
+	check(body.get_node("left_leg").get_node_or_null("Fracture") == null, "a leg at 60 percent is hurt, not broken")
+	body.hit("left_leg", 30.0, 12.0, "cut")
+	check(body.get_node("left_leg").get_node_or_null("Fracture") != null, "a leg past the fracture threshold puts bone through the skin")
+	# Torso opens up only once the chest is actually gone.
+	check(not body.has_meta("gutted"), "an intact chest holds its organs")
+	for i in 8:
+		body.hit("torso", 40.0, 20.0, "shear")
+	check(body.has_meta("gutted"), "a destroyed chest spills organs")
+	var spilled: int = BaselineHuman.live_gore
+	body.hit("torso", 40.0, 20.0, "shear")
+	check(BaselineHuman.live_gore <= spilled + 9, "organs spill once, not on every further hit")
+	for i in 12:
+		body.hit("right_arm", 40.0, 20.0, "shear")
+	check(body.get_node_or_null("right_arm_stump") != null, "a severed arm leaves exposed bone at the joint")
+	body.queue_free()
+
+	# The viscera toggle has to actually suppress it, not just dim it.
+	BaselineHuman.live_gore = 0
+	var clean := _rig()
+	clean.gore = false
+	for i in 10:
+		clean.hit("left_arm", 40.0, 20.0, "shear")
+	check(BaselineHuman.live_gore == 0, "viscera off spawns no gore at all (%d)" % BaselineHuman.live_gore)
+	check(clean.severed.has("left_arm"), "...but the limb is still lost — the simulation does not depend on the effect")
+	clean.queue_free()
+
+	# The cap is the difference between atmosphere and a frame-rate bug.
+	BaselineHuman.live_gore = 0
+	var bleeder := _rig()
+	for i in 60:
+		bleeder.hit("torso", 30.0, 10.0, "cut")
+	check(BaselineHuman.live_gore <= BaselineHuman.MAX_LIVE_GORE, "loose gore stays under the global cap (%d)" % BaselineHuman.live_gore)
+	bleeder.queue_free()
 
 
 func _test_prosthetic() -> void:

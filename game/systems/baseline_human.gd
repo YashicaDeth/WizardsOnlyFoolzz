@@ -52,15 +52,30 @@ const SEATED := {
 	"right_leg": {"at": Vector3(0.14, 0.34, -0.30), "size": Vector3(0.21, 0.26, 0.62)},
 }
 
+const BONE := Color("cfc2a4")
+const BLOOD := Color("6b0f0c")
+const BLOOD_DARK := Color("3d0907")
+const ORGAN := Color("7a1a16")
+## Below this share of a zone's health the bone has gone through the skin and
+## stays gone: a compound fracture is a state of the body, not an effect.
+const FRACTURE_RATIO := 0.4
+## Loose gore is capped across every body at once. Twelve drivers shedding
+## unbounded blood in a pileup is a frame-rate bug, not atmosphere.
+const MAX_LIVE_GORE := 140
+
+static var live_gore := 0
+
 var anatomy: AnatomyComponent
 var head_anchor: Node3D
 var subject_id := ""
 var parts: Dictionary = {}
 var severed: Array[String] = []
+var gore := true
 
 var _flesh := Color("6b5842")
 var _seated := false
 var _variation := 0
+var _loose: Array[Dictionary] = []
 
 
 static func canonical_zone(zone_id: String) -> String:
@@ -133,6 +148,11 @@ func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt")
 	var zone := canonical_zone(zone_id)
 	var result := anatomy.apply_hit(zone, damage, impulse, damage_type)
 	_refresh_zone(zone)
+	if gore and damage >= 5.0:
+		# Something that cuts opens you up; something that hits you bruises and
+		# breaks. The wet count follows from which one landed.
+		var penetrating := damage_type in ["cut", "puncture", "ballistic", "shear"]
+		_spray(_zone_origin(zone), Vector3.UP, clampi(roundi(damage / (5.5 if penetrating else 11.0)), 1, 9))
 	if bool(result.get("disabled", false)):
 		zone_disabled.emit(zone)
 	return result
@@ -197,9 +217,14 @@ func _refresh_zone(zone_id: String) -> void:
 	if mesh != null:
 		var tint := Color("8d9299") if prosthetic else _flesh.lerp(Color("3d0907"), 1.0 - ratio)
 		mesh.material = WorldLook.surface(tint, "chrome" if prosthetic else "flesh", _variation + ZONES.find(zone_id))
+	if gore and ratio < FRACTURE_RATIO and ratio > 0.0 and not prosthetic:
+		_add_fracture(zone_id)
 	if ratio <= 0.0 and LIMBS.has(zone_id) and not prosthetic:
 		if not severed.has(zone_id):
 			severed.append(zone_id)
+			if gore:
+				_add_stump(zone_id)
+				_spray(_zone_origin(zone_id), Vector3.UP, 14)
 		part.visible = false
 		var hitbox := get_node_or_null("%s_hitbox" % zone_id) as Area3D
 		if hitbox != null:
@@ -209,3 +234,124 @@ func _refresh_zone(zone_id: String) -> void:
 		var restored := get_node_or_null("%s_hitbox" % zone_id) as Area3D
 		if restored != null:
 			restored.monitorable = true
+		if prosthetic:
+			var old_fracture := part.get_node_or_null("Fracture")
+			if old_fracture != null:
+				old_fracture.queue_free()
+			var old_stump := get_node_or_null("%s_stump" % zone_id)
+			if old_stump != null:
+				old_stump.queue_free()
+	if gore and zone_id == "torso" and ratio <= 0.0:
+		_spill_guts()
+
+
+func _zone_origin(zone_id: String) -> Vector3:
+	var part := parts.get(zone_id) as Node3D
+	if part != null and is_instance_valid(part) and part.is_inside_tree():
+		return part.global_position
+	return global_position if is_inside_tree() else Vector3.ZERO
+
+
+## Gore lives in the world, not on the body, or a driver's blood would ride
+## along inside the cab while the car keeps moving.
+func _gore_root() -> Node:
+	if not is_inside_tree():
+		return self
+	var scene := get_tree().current_scene
+	return scene if scene != null else self
+
+
+func _spray(origin: Vector3, bias: Vector3, count: int) -> void:
+	var root := _gore_root()
+	for index in count:
+		if live_gore >= MAX_LIVE_GORE:
+			return
+		var drop := MeshInstance3D.new()
+		var blob := SphereMesh.new()
+		blob.radius = 0.026 + randf() * 0.046
+		blob.height = blob.radius * 2.0
+		blob.material = WorldLook.surface(BLOOD if index % 2 == 0 else BLOOD_DARK, "flesh", index + _variation)
+		drop.mesh = blob
+		root.add_child(drop)
+		drop.global_position = origin + Vector3(randf_range(-0.09, 0.09), randf_range(-0.09, 0.09), randf_range(-0.09, 0.09))
+		var spread := (bias.normalized() + Vector3(randf_range(-0.75, 0.75), randf_range(0.05, 0.7), randf_range(-0.75, 0.75))).normalized()
+		_loose.append({"node": drop, "velocity": spread * (1.9 + randf() * 3.6), "life": 1.3 + randf() * 1.0})
+		live_gore += 1
+
+
+## Organs leave the body once the chest does. They are heavier and wetter than
+## spray, so they fall short and stay put rather than misting.
+func _spill_guts() -> void:
+	if has_meta("gutted"):
+		return
+	set_meta("gutted", true)
+	var root := _gore_root()
+	var origin := _zone_origin("torso")
+	for index in 8:
+		if live_gore >= MAX_LIVE_GORE:
+			return
+		var organ := MeshInstance3D.new()
+		var blob := SphereMesh.new()
+		blob.radius = 0.075 + randf() * 0.07
+		blob.height = blob.radius * 2.0 * (1.2 + randf() * 0.9)
+		blob.material = WorldLook.surface(ORGAN.lerp(BLOOD_DARK, randf()), "flesh", index + _variation + 9)
+		organ.mesh = blob
+		root.add_child(organ)
+		organ.global_position = origin + Vector3(randf_range(-0.12, 0.12), randf_range(-0.1, 0.1), randf_range(-0.12, 0.12))
+		var spill := Vector3(randf_range(-1.0, 1.0), randf_range(-0.1, 0.35), randf_range(-1.0, 1.0)).normalized()
+		_loose.append({"node": organ, "velocity": spill * (0.8 + randf() * 1.7), "life": 6.0 + randf() * 3.0})
+		live_gore += 1
+
+
+## A compound fracture is permanent. It rides with the limb because it is part
+## of the limb now.
+func _add_fracture(zone_id: String) -> void:
+	var part := parts.get(zone_id) as Node3D
+	if part == null or not is_instance_valid(part) or part.has_node("Fracture"):
+		return
+	var shard := MeshInstance3D.new()
+	shard.name = "Fracture"
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(0.042, 0.15 + randf() * 0.11, 0.042)
+	mesh.material = WorldLook.surface(BONE, "bone", _variation + 4)
+	shard.mesh = mesh
+	shard.position = Vector3(randf_range(-0.05, 0.05), randf_range(-0.13, 0.13), 0.07)
+	shard.rotation = Vector3(randf_range(-0.8, 0.8), 0.0, randf_range(-1.0, 1.0))
+	part.add_child(shard)
+
+
+func _add_stump(zone_id: String) -> void:
+	if has_node("%s_stump" % zone_id):
+		return
+	var layout: Dictionary = SEATED if _seated else STANDING
+	var spec: Dictionary = layout[zone_id]
+	var stump := MeshInstance3D.new()
+	stump.name = "%s_stump" % zone_id
+	var mesh := CapsuleMesh.new()
+	mesh.radius = 0.058
+	mesh.height = 0.19
+	mesh.material = WorldLook.surface(BONE, "bone", _variation + 6)
+	stump.mesh = mesh
+	# Sit the exposed bone between the torso and where the limb used to be, so
+	# it reads as a joint rather than a floating spike.
+	stump.position = (spec.at as Vector3).lerp((layout.torso as Dictionary).at as Vector3, 0.45)
+	add_child(stump)
+
+
+func _process(delta: float) -> void:
+	if _loose.is_empty():
+		return
+	for index in range(_loose.size() - 1, -1, -1):
+		var piece: Dictionary = _loose[index]
+		var node := piece.node as Node3D
+		if node == null or not is_instance_valid(node):
+			_loose.remove_at(index)
+			live_gore = maxi(0, live_gore - 1)
+			continue
+		piece.velocity.y -= 11.0 * delta
+		node.global_position += piece.velocity * delta
+		piece.life -= delta
+		if piece.life <= 0.0:
+			node.queue_free()
+			_loose.remove_at(index)
+			live_gore = maxi(0, live_gore - 1)

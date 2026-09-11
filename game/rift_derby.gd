@@ -639,37 +639,44 @@ func _detach_vehicle_part(target: Node3D, part_name: String, impact_direction: V
 
 
 func _add_driver_rig(target: RigidBody3D, index: int) -> void:
-	var driver := Node3D.new()
+	var subject_id := RIVAL_ID if index == 0 else "derby_driver_%02d" % index
+	var driver := BaselineHuman.new()
 	driver.name = "DriverRig"
-	driver.position = Vector3(0, 0.25, 0.3)
+	driver.position = Vector3(0, -0.15, 0.25)
 	target.add_child(driver)
-	_add_mesh_to(driver, CapsuleMesh.new(), Vector3(0, 0.55, 0), Color("6b5842"), 0.0, Vector3.ZERO, "DriverBody", "flesh", index + 2)
-	for zone_data in [{"name": "HeadHitbox", "position": Vector3(0, 1.45, 0), "size": Vector3(0.48, 0.48, 0.48), "zone": "head"}, {"name": "TorsoHitbox", "position": Vector3(0, 0.72, 0), "size": Vector3(0.7, 0.95, 0.45), "zone": "torso"}, {"name": "LegHitbox", "position": Vector3(0, 0.05, -0.2), "size": Vector3(0.65, 0.6, 0.5), "zone": "legs"}]:
-		var area := Area3D.new()
-		area.name = str(zone_data.name)
-		area.position = zone_data.position
-		area.set_meta("body_zone", zone_data.zone)
-		driver.add_child(area)
-		var shape_node := CollisionShape3D.new()
-		var shape := BoxShape3D.new()
-		shape.size = zone_data.size
-		shape_node.shape = shape
-		area.add_child(shape_node)
-	target.set_meta("driver_health", 100)
-	target.set_meta("driver_subject", RIVAL_ID if index == 0 else "derby_driver_%02d" % index)
+	var config := {
+		"seated": true,
+		"flesh": Color("6b5842"),
+		"variation": index + 2,
+		"blood": 5600.0 if index == 0 else 5000.0,
+	}
+	# Bodies remember. A driver who left the last heat with a ruined arm starts
+	# this one with it, because the rig restores from their recorded anatomy.
+	var saved: Dictionary = WorldHistory.subject(subject_id)
+	if saved.get("anatomy_state") is Dictionary:
+		config["restore"] = saved.anatomy_state
+	driver.build(subject_id, config)
+	target.set_meta("driver_subject", subject_id)
 
 
 func _injure_driver(target: Node3D, damage: int, impact_direction: Vector3, ram_crush: bool = false) -> void:
-	if bool(target.get_meta("driver_dead", false)):
+	var rig := target.get_node_or_null("DriverRig") as BaselineHuman
+	if rig == null or rig.anatomy.dead:
 		return
 	var transfer := 1.45 if ram_crush else 0.42
-	var driver_health := maxi(0, int(target.get_meta("driver_health", 100)) - roundi(damage * transfer))
-	target.set_meta("driver_health", driver_health)
-	var zone := "torso" if absf(impact_direction.z) > absf(impact_direction.x) else "head"
 	var subject_id := str(target.get_meta("driver_subject", "unknown"))
-	WorldHistory.record_event("derby_driver_injured", {"subject_id": subject_id, "zone": zone, "damage": damage, "health": driver_health, "ram_crush": ram_crush})
+	# A front end through the cab takes the chest. Everything else lands where
+	# the geometry says it landed, rather than on a coin flip between two zones.
+	var zone := "torso" if ram_crush else rig.zone_nearest(rig.global_position + Vector3(0, 0.55, 0) - impact_direction * 0.5)
+	rig.gore = viscera_fx
+	rig.hit(zone, float(damage) * transfer, float(damage) * 2.0, "shear" if ram_crush else "blunt")
+	WorldHistory.record_event("derby_driver_injured", {
+		"subject_id": subject_id, "zone": zone, "damage": damage,
+		"blood": roundi(rig.anatomy.blood_remaining), "ram_crush": ram_crush,
+	})
+	WorldHistory.update_subject(subject_id, {"anatomy_state": rig.snapshot()}, "anatomy_changed")
 	if viscera_fx and damage >= 24:
-		var driver := target.get_node_or_null("DriverRig") as Node3D
+		var driver := rig as Node3D
 		if driver != null:
 			for index in (10 if ram_crush else 4):
 				var droplet := MeshInstance3D.new()
@@ -680,7 +687,9 @@ func _injure_driver(target: Node3D, damage: int, impact_direction: Vector3, ram_
 				droplet.mesh = mesh
 				droplet.position = driver.position + Vector3(randf_range(-0.4, 0.4), 1.0 + randf() * 0.5, randf_range(-0.3, 0.3))
 				target.add_child(droplet)
-	if driver_health <= 0:
+	# Losing the head or the chest kills outright; anything else has to bleed
+	# you out, which the anatomy component runs on its own clock.
+	if rig.anatomy.dead or rig.zone_health("head") <= 0.0 or rig.zone_health("torso") <= 0.0:
 		_crush_driver(target, subject_id, impact_direction, ram_crush)
 
 
@@ -689,16 +698,17 @@ func _injure_driver(target: Node3D, damage: int, impact_direction: Vector3, ram_
 func _crush_driver(target: Node3D, subject_id: String, impact_direction: Vector3, ram_crush: bool) -> void:
 	if bool(target.get_meta("is_rival", false)):
 		return
-	target.set_meta("driver_dead", true)
-	var driver := target.get_node_or_null("DriverRig") as Node3D
+	var driver := target.get_node_or_null("DriverRig") as BaselineHuman
 	var origin := target.global_position + Vector3(0, 1.1, 0)
 	if driver != null:
-		origin = driver.global_position + Vector3(0, 0.9, 0)
-		var body := driver.get_node_or_null("DriverBody") as MeshInstance3D
-		if body != null:
-			# Collapse the occupant into the crushed cab rather than deleting them.
-			body.scale = Vector3(1.25, 0.28, 1.1)
-			body.position.y -= 0.42
+		driver.anatomy.dead = true
+		origin = driver.head_anchor.global_position
+		# Collapse the occupant into the crushed cab rather than deleting them.
+		for zone_id in ["torso", "head"]:
+			var part := driver.parts.get(zone_id) as Node3D
+			if part != null and is_instance_valid(part):
+				part.scale = Vector3(1.25, 0.28, 1.1)
+				part.position.y -= 0.4
 	if viscera_fx:
 		for index in 26:
 			var chunk := MeshInstance3D.new()

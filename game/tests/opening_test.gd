@@ -90,6 +90,25 @@ func _ready() -> void:
 	check(derby.round_state == "countdown", "derby starts at countdown")
 	derby._physics_process(3.1)
 	check(derby.round_state == "active", "countdown starts active round")
+	var wrecker: Node3D = derby.targets[1]
+	var rig = wrecker.get_node_or_null("DriverRig")
+	check(rig is BaselineHuman, "derby drivers use the shared baseline rig")
+	var driver_subject := str(wrecker.get_meta("driver_subject", ""))
+	derby._injure_driver(wrecker, 60, Vector3(0, 0, 1), false)
+	var state: Dictionary = WorldHistory.subject(driver_subject).get("anatomy_state", {})
+	check(state.has("zones"), "a derby injury is recorded on the driver's subject")
+	var hurt: Array[String] = []
+	for zone_id in state.get("zones", {}):
+		if float(state.zones[zone_id].health) < float(AnatomyComponent.DEFAULT_ZONES[zone_id].health):
+			hurt.append(str(zone_id))
+	# Two-sided: the blow has to land somewhere real, and only there. Smearing
+	# across zones or vanishing into the torso are both failures.
+	check(hurt.size() == 1 and BaselineHuman.ZONES.has(hurt[0]), "the blow lands on exactly one canonical zone (%s)" % str(hurt))
+	# Bodies remember: rebuild that same driver and the wound is still on them.
+	derby._create_wrecker(1)
+	var rebuilt = (derby.targets.back() as Node3D).get_node_or_null("DriverRig")
+	check(rebuilt.zone_health(hurt[0]) < float(AnatomyComponent.DEFAULT_ZONES[hurt[0]].health), "a rebuilt driver still carries the wound on %s" % hurt[0])
+	check(rebuilt.zone_health("head") == float(AnatomyComponent.DEFAULT_ZONES.head.health) or hurt[0] == "head", "...and is not wounded anywhere they were not hit")
 	derby._finish_round("won")
 	derby._finish_round("lost")
 	check(derby.round_state == "won" and derby.mode_label.visible, "terminal derby result is stable and visible")

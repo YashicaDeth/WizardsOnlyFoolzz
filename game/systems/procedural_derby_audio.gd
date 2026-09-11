@@ -12,6 +12,14 @@ extends Node
 
 const REVERB_BUS := "DerbyQuarry"
 const IMPACT_VOICES := 6
+## The engine layers used to start at their driving volume the moment the scene
+## loaded, and update_engine only runs once the round goes active — so the whole
+## countdown played a full-level 41Hz rumble before anyone touched the throttle.
+## That was the boom on boot. They fade up to idle instead.
+const ENGINE_SILENT := -60.0
+const ENGINE_IDLE_LOW := -22.0
+const ENGINE_IDLE_HIGH := -40.0
+const WARM_UP_SECONDS := 0.9
 
 var engine_low: AudioStreamPlayer3D
 var engine_high: AudioStreamPlayer3D
@@ -20,14 +28,17 @@ var crowd_emitters: Array[AudioStreamPlayer3D] = []
 var impact_voices: Array[AudioStreamPlayer3D] = []
 var impact_streams: Dictionary = {}
 var next_voice := 0
+var warm_up := 0.0
+var target_low := ENGINE_IDLE_LOW
+var target_high := ENGINE_IDLE_HIGH
 
 
 func _ready() -> void:
 	_ensure_reverb_bus()
 	# Two engine layers crossfaded by load. One pitched sine reads as a mosquito;
 	# a rumble under a whine reads as a drivetrain.
-	engine_low = _positional("EngineLow", _make_wave("engine_low", 1.25, true), -16.0, 34.0)
-	engine_high = _positional("EngineHigh", _make_wave("engine_high", 0.9, true), -30.0, 28.0)
+	engine_low = _positional("EngineLow", _make_wave("engine_low", 1.25, true), ENGINE_SILENT, 34.0)
+	engine_high = _positional("EngineHigh", _make_wave("engine_high", 0.9, true), ENGINE_SILENT, 28.0)
 	engine_low.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_PHYSICS_STEP
 	engine_high.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_PHYSICS_STEP
 
@@ -65,6 +76,13 @@ func attach_engine_to(vehicle: Node3D) -> void:
 		vehicle.add_child(layer)
 
 
+func _process(delta: float) -> void:
+	if warm_up >= 1.0:
+		return
+	warm_up = minf(1.0, warm_up + delta / WARM_UP_SECONDS)
+	_apply_engine_volume()
+
+
 func update_engine(speed: float, throttle: float) -> void:
 	if engine_low == null:
 		return
@@ -72,9 +90,17 @@ func update_engine(speed: float, throttle: float) -> void:
 	var effort := clampf(load_ratio + absf(throttle) * 0.25, 0.0, 1.0)
 	engine_low.pitch_scale = clampf(0.7 + load_ratio * 0.55, 0.6, 1.4)
 	engine_high.pitch_scale = clampf(0.85 + load_ratio * 0.95, 0.8, 1.95)
-	engine_low.volume_db = lerpf(-22.0, -9.0, effort)
+	target_low = lerpf(ENGINE_IDLE_LOW, -9.0, effort)
 	# The whine only arrives under real load, so cruising and flooring it differ.
-	engine_high.volume_db = lerpf(-40.0, -13.0, pow(effort, 1.6))
+	target_high = lerpf(ENGINE_IDLE_HIGH, -13.0, pow(effort, 1.6))
+	_apply_engine_volume()
+
+
+func _apply_engine_volume() -> void:
+	if engine_low == null:
+		return
+	engine_low.volume_db = lerpf(ENGINE_SILENT, target_low, warm_up)
+	engine_high.volume_db = lerpf(ENGINE_SILENT, target_high, warm_up)
 
 
 func play_impact(intensity: float, at: Vector3 = Vector3.ZERO, material: String = "panel") -> void:
