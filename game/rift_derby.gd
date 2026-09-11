@@ -46,6 +46,11 @@ func _ready() -> void:
 	derby_audio = DERBY_AUDIO.new()
 	derby_audio.name = "DerbyAudio"
 	add_child(derby_audio)
+	derby_audio.attach_engine_to(boat)
+	var crowd_banks: Array = []
+	for index in range(0, crowd_members.size(), 16):
+		crowd_banks.append((crowd_members[index] as Node3D).position + Vector3(0, 1.5, 0))
+	derby_audio.seed_crowd(crowd_banks)
 	WorldHistory.register_subject(RIVAL_ID, {
 		"name": "Mara Voss", "role": "Bone Yard Captain", "faction": "Ashline Wreckers",
 		"elo": 1180, "grudge": 0, "injury": "none", "status": "active", "memory": "Watching the derby",
@@ -232,7 +237,7 @@ func _on_vehicle_impact(other: Node, closing_speed: float) -> void:
 		_damage_target(other, closing_speed)
 	elif closing_speed > 7.0:
 		integrity = maxi(0, integrity - roundi(closing_speed * 0.3))
-		derby_audio.play_impact(clampf(closing_speed / 24.0, 0.0, 1.0))
+		derby_audio.play_impact(clampf(closing_speed / 24.0, 0.0, 1.0), boat.global_position, "heavy")
 		if integrity <= 0:
 			_finish_round("lost")
 
@@ -253,10 +258,15 @@ func _damage_target(target: Node3D, collision_speed: float = 0.0) -> void:
 	var impact_direction := (target.global_position - boat.global_position).normalized()
 	_update_wrecker_damage_visual(target, target_integrity)
 	_update_detachable_parts(target, target_integrity, impact_direction)
-	_injure_driver(target, damage, impact_direction)
+	# Once the bumper and hood are gone there is nothing between the player's
+	# front end and the cab, so a fast hit there reaches the driver directly.
+	var detached: Array = target.get_meta("detached_parts", [])
+	var front_stripped: bool = detached.has("BumperFront") and detached.has("Hood")
+	var ram_crush: bool = front_stripped and collision_speed > 13.0
+	_injure_driver(target, damage, impact_direction, ram_crush)
 	crowd_reaction = clampf(crowd_reaction + damage / 22.0, 0.0, 2.0)
 	if derby_audio != null:
-		derby_audio.call("play_impact", clampf(float(damage) / 34.0, 0.0, 1.0))
+		derby_audio.call("play_impact", clampf(float(damage) / 34.0, 0.0, 1.0), target.global_position, "heavy" if ram_crush else "panel")
 	if dynamic_interface.has_method("announce_impact"):
 		dynamic_interface.announce_impact(damage, bool(target.get_meta("is_rival", false)))
 	WorldHistory.record_event("derby_vehicle_hit", {
@@ -514,15 +524,19 @@ func _add_driver_rig(target: RigidBody3D, index: int) -> void:
 	target.set_meta("driver_subject", RIVAL_ID if index == 0 else "derby_driver_%02d" % index)
 
 
-func _injure_driver(target: Node3D, damage: int, impact_direction: Vector3) -> void:
-	var driver_health := maxi(0, int(target.get_meta("driver_health", 100)) - roundi(damage * 0.55))
+func _injure_driver(target: Node3D, damage: int, impact_direction: Vector3, ram_crush: bool = false) -> void:
+	if bool(target.get_meta("driver_dead", false)):
+		return
+	var transfer := 1.45 if ram_crush else 0.55
+	var driver_health := maxi(0, int(target.get_meta("driver_health", 100)) - roundi(damage * transfer))
 	target.set_meta("driver_health", driver_health)
 	var zone := "torso" if absf(impact_direction.z) > absf(impact_direction.x) else "head"
-	WorldHistory.record_event("derby_driver_injured", {"subject_id": target.get_meta("driver_subject", "unknown"), "zone": zone, "damage": damage, "health": driver_health})
+	var subject_id := str(target.get_meta("driver_subject", "unknown"))
+	WorldHistory.record_event("derby_driver_injured", {"subject_id": subject_id, "zone": zone, "damage": damage, "health": driver_health, "ram_crush": ram_crush})
 	if viscera_fx and damage >= 24:
 		var driver := target.get_node_or_null("DriverRig") as Node3D
 		if driver != null:
-			for index in 4:
+			for index in (10 if ram_crush else 4):
 				var droplet := MeshInstance3D.new()
 				var mesh := SphereMesh.new()
 				mesh.radius = 0.05 + index * 0.012
@@ -531,6 +545,60 @@ func _injure_driver(target: Node3D, damage: int, impact_direction: Vector3) -> v
 				droplet.mesh = mesh
 				droplet.position = driver.position + Vector3(randf_range(-0.4, 0.4), 1.0 + randf() * 0.5, randf_range(-0.3, 0.3))
 				target.add_child(droplet)
+	if driver_health <= 0:
+		_crush_driver(target, subject_id, impact_direction, ram_crush)
+
+
+## The rival survives the derby by design: her Hunt Arc depends on escalating
+## encounters, so she is wounded and escapes rather than dying in a heat.
+func _crush_driver(target: Node3D, subject_id: String, impact_direction: Vector3, ram_crush: bool) -> void:
+	if bool(target.get_meta("is_rival", false)):
+		return
+	target.set_meta("driver_dead", true)
+	var driver := target.get_node_or_null("DriverRig") as Node3D
+	var origin := target.global_position + Vector3(0, 1.1, 0)
+	if driver != null:
+		origin = driver.global_position + Vector3(0, 0.9, 0)
+		var body := driver.get_node_or_null("DriverBody") as MeshInstance3D
+		if body != null:
+			# Collapse the occupant into the crushed cab rather than deleting them.
+			body.scale = Vector3(1.25, 0.28, 1.1)
+			body.position.y -= 0.42
+	if viscera_fx:
+		for index in 26:
+			var chunk := MeshInstance3D.new()
+			var wet := index % 3 != 0
+			if wet:
+				var blob := SphereMesh.new()
+				blob.radius = 0.05 + randf() * 0.07
+				blob.height = blob.radius * 2.0
+				blob.material = _material(Color("6b0f0c") if index % 2 == 0 else Color("3d0907"), 0.0, "flesh", index + 11)
+				chunk.mesh = blob
+			else:
+				var shard := BoxMesh.new()
+				shard.size = Vector3(0.09, 0.07, 0.12) + Vector3.ONE * randf() * 0.08
+				shard.material = _material(Color("7a6048"), 0.0, "bone", index + 5)
+				chunk.mesh = shard
+			chunk.global_position = origin
+			add_child(chunk)
+			var spray := Vector3(randf_range(-1.0, 1.0), randf_range(0.25, 1.0), randf_range(-1.0, 1.0)).normalized()
+			debris.append({"node": chunk, "velocity": spray * (3.5 + randf() * 6.5) + impact_direction * 4.5, "life": 3.4})
+	score += 220 if ram_crush else 140
+	crowd_reaction = 2.0
+	if derby_audio != null:
+		derby_audio.call("play_impact", 1.0, origin, "meat")
+	if dynamic_interface.has_method("announce_impact"):
+		dynamic_interface.announce_impact(999, false)
+	mode_label.visible = true
+	mode_label.text = "DRIVER CRUSHED IN THE CAB" if ram_crush else "DRIVER KILLED"
+	WorldHistory.update_subject(subject_id, {
+		"name": "Derby driver", "kind": "person", "status": "dead",
+		"memory": "Crushed in the cab of their own wrecker at the Bone Yard.",
+	}, "derby_driver_killed")
+	WorldHistory.record_event("derby_driver_crushed", {
+		"venue": "rift_derby_quarry", "subject_id": subject_id,
+		"target_id": target.name, "ram_crush": ram_crush,
+	})
 
 
 func _spawn_crowd() -> void:
