@@ -55,6 +55,7 @@ var social_markers: Array[Node3D] = []
 var resolution_ui: Control
 var resolution_target := ""
 var living_map: Control
+var natal_sigil: Control
 var viscera_fx := true
 var enemy_rig: BaselineHuman
 var grapple_target := ""
@@ -101,6 +102,9 @@ func _ready() -> void:
 	living_map = LIVING_MAP.new()
 	living_map.name = "LivingMap"
 	$HUD.add_child(living_map)
+	natal_sigil = preload("res://systems/natal_sigil.gd").new()
+	natal_sigil.name = "NatalSigil"
+	$HUD.add_child(natal_sigil)
 	kill_cam = preload("res://systems/kill_cam.gd").new()
 	kill_cam.name = "KillCam"
 	$HUD.add_child(kill_cam)
@@ -1237,9 +1241,18 @@ func _toggle_panel(mode: String) -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if panel_mode.is_empty() else Input.MOUSE_MODE_VISIBLE
 
 
+## `J` cycles the Allusions archive: the artwork study, then the natal sigil,
+## then closed. The sigil is the chaos-magick half of the same archive — the
+## Tree axis the dossier already reads on, drawn as a bound mark.
 func _toggle_artwork() -> void:
 	if allusions_artwork.visible:
 		allusions_artwork.close_artwork()
+		natal_sigil.open_chart()
+		panel_mode = "artwork"
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		return
+	if natal_sigil.visible:
+		natal_sigil.close_chart()
 		panel_mode = ""
 	else:
 		panel.visible = false

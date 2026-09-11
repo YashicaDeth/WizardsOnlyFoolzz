@@ -486,6 +486,39 @@ Recording the answer here so it does not have to be re-litigated each time:
   records on events is step one and is cheap. That is the work; it does not
   need a reference video.
 
+### The Wire social layer and the rank pyramid — captured 2026-09-11
+
+Greg wants the faction hierarchy screen and the in-game internet to be the same
+satirical object: ranks and a pyramid-scheme conspiracy register, plus social
+media stalking, DMing and harassment as *mechanics*, with an RNG of replies
+weighted by how "verified" or high-status an account is, and a dark-web
+underbelly beneath the ordinary feeds.
+
+Most of this is already specified and unbuilt rather than new:
+
+- `DESIGN/IN_GAME_INTERNET.md` already defines the Wire, the David Dees
+  paranoid-collage register, dead forums, bots arguing with bots, and a social
+  layer where actions against a rival each carry a real cost.
+- `DESIGN/FACTIONS.md` already defines **signal territory** — feeds, masts,
+  presses — taken by out-publishing, discrediting, hijacking, flooding or
+  cutting. A pyramid-scheme faction is a signal faction with a recruitment
+  mechanic attached, which the recruitment path out of the downed window
+  already produces.
+- `HUNT_SYSTEM.md` already defines promotion into real vacancies, which is the
+  rank pyramid's actual data.
+
+So the work is: **a rank view drawn from real subjects**, and **the Wire as a
+playable surface** — accounts with reach, replies weighted by status, and
+harassment/stalking as costed actions against fictional NPCs. Note the
+presentation must be original: a faction hierarchy is nobody's property, but
+Shadow of Mordor's specific presentation of one is, per the standing answer
+recorded above.
+
+**Not yet decided:** how the dark-web layer is gated. Coverage is already a
+property of *place* in the Wire design (no signal in the caves), so the natural
+answer is that the underbelly needs a physical access point rather than a menu
+toggle — but that is a design call for Greg.
+
 ### Tier 1b — combat, added 2026-09-11
 
 **Movement prerequisite completed 2026-09-11.** The original Hunt controller

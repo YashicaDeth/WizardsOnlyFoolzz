@@ -9,7 +9,7 @@ func _ready() -> void:
 	add_child(layer)
 	var sigil = preload("res://systems/natal_sigil.gd").new()
 	layer.add_child(sigil)
-	sigil.configure({"year": 1996, "month": 8, "day": 14, "hour": 9, "name": "GREG"})
+	sigil.open_chart()
 	sigil.open_chart()
 	for _settle in 120:
 		await get_tree().process_frame

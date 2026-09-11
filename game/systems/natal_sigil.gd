@@ -48,11 +48,13 @@ const SIGN_MARKS := [
 ]
 const BODIES := ["SOL", "LUNA", "MERCURY", "VENUS", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUNE", "PLUTO"]
 
-var birth_year := 1996
+## Greg's own chart, which is the point: the Allusions screen is his archive,
+## so the mark the game binds is his. 11 January 2007, small hours.
+var birth_year := 2007
 var birth_month := 1
-var birth_day := 1
-var birth_hour := 12
-var subject_name := "UNFILED"
+var birth_day := 11
+var birth_hour := 2
+var subject_name := "GREG"
 var clock := 0.0
 var placements: Array[Dictionary] = []
 var sigil_path := PackedVector2Array()
