@@ -105,26 +105,34 @@ func _ready() -> void:
 			out_dir = argument.trim_prefix("--out=")
 	WorldHistory.clear_history()
 	_seed()
+	# Pin the window: a run that inherits a maximised window captures a
+	# different layout to every previous shot and they stop being comparable.
+	get_window().size = Vector2i(1280, 720)
+	await get_tree().process_frame
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	var index: Control = WORLD_INDEX.new()
 	layer.add_child(index)
 	index.open()
+	index.cursor_follows_mouse = false
 	# The fourth pass is the pyramid again with the X-ray on, because the skull
 	# state is the half of the icon that cannot be reviewed from the flesh shot.
-	var pages := ["file", "pyramid", "wire", "pyramid_xray", "body", "body_organ"]
+	var pages := ["file", "pyramid", "wire", "pyramid_xray", "body", "body_organ", "body_xray"]
 	for page_index in pages.size():
-		index.page = [0, 1, 2, 1, 3, 3][page_index]
-		index.rail_index = [3, 0, 0, 0, 3, 2][page_index]
-		index.xray = page_index == 3
+		index.page = [0, 1, 2, 1, 3, 3, 3][page_index]
+		index.rail_index = [3, 0, 0, 0, 3, 2, 2][page_index]
+		index.xray = page_index == 3 or page_index == 6
 		for icon in index._icons:
 			icon.set_xray(index.xray)
 		index._rebuild_rail()
-		if page_index == 5:
+		if page_index >= 5:
 			# Mara Voss with the heart pulled out: the case the whole page is for.
 			index._inspector.set_subject(WorldHistory.subject("mara_voss"))
 			index._inspector.part_index = 2
 			index._inspector._begin_lift()
+		# Park the drawn cursor somewhere useful rather than wherever the real
+		# pointer happens to be in a headless run.
+		index.cursor_at = Vector2(468, 392) if index.page == 3 else Vector2(760, 300)
 		index.queue_redraw()
 		for _settle in 60:
 			await get_tree().process_frame

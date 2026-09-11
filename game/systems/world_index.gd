@@ -25,6 +25,7 @@ extends Control
 const CellOutzType := preload("res://systems/celloutz_type.gd")
 const WireNetScript := preload("res://systems/wire_net.gd")
 const Grunge := preload("res://systems/celloutz_grunge.gd")
+const XrayCursor := preload("res://systems/xray_cursor.gd")
 const SUBJECT_ICON := preload("res://systems/subject_icon.gd")
 const BODY_INSPECTOR := preload("res://systems/body_inspector.gd")
 
@@ -53,6 +54,10 @@ var last_action := ""
 var action_life := 0.0
 
 var xray := false
+var cursor_at := Vector2(640, 360)
+## Capture harnesses park the cursor deliberately; a headless run has no real
+## pointer, so following one puts the drawn cursor at the canvas origin.
+var cursor_follows_mouse := true
 var page_blend := 1.0
 var page_direction := 1.0
 var _icons: Array = []
@@ -139,6 +144,8 @@ func _process(delta: float) -> void:
 	elapsed += delta
 	action_life = maxf(0.0, action_life - delta)
 	page_blend = minf(1.0, page_blend + delta * 4.4)
+	if cursor_follows_mouse:
+		cursor_at = get_global_mouse_position()
 	queue_redraw()
 
 
@@ -162,9 +169,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				if page != 3 or not _inspector.handle_key(KEY_TAB):
 					return
 			KEY_X:
-				xray = not xray
-				for icon in _icons:
-					icon.set_xray(xray)
+				_set_xray(not xray)
 			KEY_1, KEY_2, KEY_3, KEY_4:
 				var target: int = event.keycode - KEY_1
 				_go_to_page(target, 1.0 if target > page else -1.0)
@@ -173,6 +178,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		queue_redraw()
 	elif event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT and XrayCursor.on_button(cursor_at, event.position):
+			_set_xray(not xray)
+			get_viewport().set_input_as_handled()
+			queue_redraw()
+			return
 		if event.button_index == MOUSE_BUTTON_LEFT and page == 3:
 			if not _inspector.handle_click(event.position):
 				return
@@ -227,6 +237,12 @@ func _subject_tone(subject: Dictionary) -> Color:
 	if alignment < -0.15:
 		return HOT
 	return COPPER
+
+
+func _set_xray(on: bool) -> void:
+	xray = on
+	for icon in _icons:
+		icon.set_xray(xray)
 
 
 func _go_to_page(target: int, direction: float) -> void:
@@ -285,6 +301,7 @@ func _draw() -> void:
 	_draw_gore(plate)
 	_draw_screen_decay(plate)
 	Grunge.grain(self, plate, 907, 900)
+	XrayCursor.draw(self, cursor_at, xray, elapsed)
 
 
 ## The plate itself. Notched top-left and bottom-right so the outline is never a
