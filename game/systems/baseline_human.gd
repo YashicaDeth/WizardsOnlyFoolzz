@@ -18,6 +18,8 @@ extends Node3D
 ## place to speak from.
 
 signal zone_disabled(zone_id: String)
+signal went_down()
+signal resolved(outcome: String)
 
 const ZONES := ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"]
 const LIMBS := ["left_arm", "right_arm", "left_leg", "right_leg"]
@@ -147,6 +149,7 @@ func build(id: String, config: Dictionary = {}) -> void:
 	add_child(anatomy)
 	anatomy.configure(id, float(config.get("blood", 5000.0)), config.get("cybernetics", {}))
 	anatomy.organ_ruptured.connect(_on_organ_ruptured)
+	anatomy.went_down.connect(_on_went_down)
 	if config.get("restore") is Dictionary:
 		anatomy.restore(config.restore)
 		for zone_id in ZONES:
@@ -302,6 +305,60 @@ func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type :=
 		if not organ_id.is_empty() and str((ORGAN_LAYOUT[organ_id] as Dictionary).zone) != zone:
 			organ_id = _organ_in_zone(zone)
 	return hit(zone, damage, impulse, damage_type, organ_id)
+
+
+func is_downed() -> bool:
+	return anatomy.downed and not anatomy.dead
+
+
+## Tips over the feet rather than moving the rig, because the owner controls
+## where the body sits — inside a cab, on a controller — and fighting them for
+## the position would put the body through the floor.
+func _on_went_down() -> void:
+	rotation.x = -PI * 0.46
+	went_down.emit()
+
+
+## The resolutions the downed window exists for. Each is a different answer to
+## the same question, and each leaves the world in a different state.
+func execute(method := "executed") -> void:
+	if anatomy.dead:
+		return
+	if method == "behead":
+		behead()
+		return
+	if gore:
+		_spray(_zone_origin("torso"), Vector3.UP, 16)
+	anatomy.finish(method)
+	resolved.emit(method)
+
+
+func behead() -> void:
+	if severed.has("head"):
+		return
+	var head := anatomy.zones.get("head", {}) as Dictionary
+	if not head.is_empty():
+		head["health"] = 0.0
+		anatomy.zones["head"] = head
+	severed.append("head")
+	if gore:
+		_throw_limb("head")
+		_spray(_zone_origin("head"), Vector3.UP, 24)
+	var part := parts.get("head") as Node3D
+	if part != null and is_instance_valid(part):
+		part.visible = false
+	anatomy.finish("beheaded")
+	resolved.emit("behead")
+
+
+## Sparing costs the winner nothing and leaves a living witness with a memory,
+## which is the expensive part.
+func spare() -> void:
+	if anatomy.dead:
+		return
+	anatomy.stabilise()
+	rotation.x = 0.0
+	resolved.emit("spared")
 
 
 func _hide_organ(organ_id: String) -> void:

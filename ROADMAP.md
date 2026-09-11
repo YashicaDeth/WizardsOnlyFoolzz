@@ -125,6 +125,63 @@ Fired mid-session, recorded here rather than half-built.
   anatomy component and no hit geometry, so `bone_yard_hunt.gd` picks a zone by
   round-robin rather than by where the blow landed. That is the next step.
 
+### Tier 1d — defeat, execution and subjugation, captured from Greg 2026-09-11
+
+The largest single design in the project so far. Recorded whole rather than
+half-built, because the parts only mean anything together.
+
+**The pillar is reciprocity.** Everything the player can do to another person can
+be done to the player. Greg's framing: *most games don't let the things you do to
+others happen to you.* This is already the stated rule for the Wire in
+`DESIGN/IN_GAME_INTERNET.md` — the satire only works from inside the system — and
+it now extends to the body. The player can be gored, dismembered, fitted with
+bionics they did not choose, shackled, conscripted and mind-stamped.
+
+**The keystone is a downed state, and nothing else here can be built first.**
+Today combatants die or flee. Both sides need *defeated but not dead*: dropped,
+disarmed, conscious enough to be looked at. Every branch below is a choice made
+in that window, so the window is the system. Build it before any of the rest.
+
+From the downed state, the resolution branches:
+
+- **Execute.** Behead, or take the limbs. The X-ray kill cam in
+  `systems/kill_cam.gd` already draws a plate with ribs fracturing in sequence
+  and organs rupturing on delays — the Sniper Elite register Greg is after is
+  largely built and is waiting for a trigger. Organs and a skeleton now exist
+  per body, so the plate can show the real one.
+- **Spare.** Leaves a living witness with a memory and a grudge, which is the
+  more expensive choice and should read that way.
+- **Recruit.** Consensual, earned through bonds or debts.
+- **Mind-stamp ("MK Ultra").** Non-consensual recruitment through the handheld:
+  a chip pressed into the brain, a psychedelic sequence of the subject's eyes
+  going wrong, and afterwards they are an asset listed on the phone. Reachable,
+  taskable, and remotely executable. This is a satire of technology and
+  ownership, which is the register `ART-DIRECTION.md` already sets.
+- **Targeted attack (VATS register).** Slowed, deliberate part selection feeding
+  the same zone and organ geometry the rig already carries. Fallout's pause is
+  the reference; the resolution is the anatomy we now have.
+
+**Losing.** Defeat should rarely be a reload. The player who goes down can be
+shackled, conscripted or stamped by whoever won — carrying that state into the
+world rather than reverting it. The alternative is to die deliberately: forfeit
+a large amount of carried loot and be re-decanted out of tar and nuclear oil,
+Uruk-hai style, which ties straight back to the Growing Floor the game already
+opens on. `vat_chamber.tscn` is the scene; the vat is already the birth.
+
+**Dialogue.** Both registers at once: prewritten choices, and proximity voice
+chat during cutscenes and in the middle of a fight. Stage 1 of the voice
+pipeline is unchanged and still buildable on its own.
+
+Sequencing, so this can be built without one enormous drop:
+
+1. Downed state on the rig, symmetric for player and NPC. Nothing else first.
+2. Resolution menu in that window: execute / spare / recruit.
+3. Kill cam wired to real zones and organs on execute.
+4. Player defeat routed to shackled rather than dead, plus the tar re-decanting.
+5. Mind-stamp and the asset list on the handheld.
+6. Targeted part selection.
+7. Voice at stage 1, then dialogue trees.
+
 ### Found while doing the above, 2026-09-11
 
 - **The derby had never worked as a fight.** The chassis scales steering

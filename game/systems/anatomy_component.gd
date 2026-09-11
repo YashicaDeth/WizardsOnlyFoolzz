@@ -5,6 +5,10 @@ signal wounded(result: Dictionary)
 signal bleeding_changed(rate: float, blood_remaining: float)
 signal critical_state_started()
 signal organ_ruptured(organ_id: String, organ: Dictionary)
+## Defeated but not dead. Every resolution the player can choose — execute,
+## spare, recruit, mind-stamp — happens inside this window, so the window is the
+## system. It is symmetric: the player goes down the same way anyone else does.
+signal went_down()
 signal died(cause: Dictionary)
 
 ## Organs sit inside zones. A zone tracks whether a limb still works; an organ
@@ -37,6 +41,7 @@ var bleed_rate := 0.0
 var pain := 0.0
 var consciousness := 100.0
 var dead := false
+var downed := false
 var critical := false
 var zones: Dictionary = {}
 var organs: Dictionary = {}
@@ -88,6 +93,9 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 		wounds.pop_front()
 	if bool(zone.critical) and float(zone.health) <= 0.0:
 		_enter_critical()
+		# Losing the head or the chest drops you. It does not kill you on its
+		# own, because what happens next is supposed to be someone's decision.
+		go_down()
 	# Only something that opens the body reaches what is inside it. A blunt hit
 	# breaks the ribs; it does not perforate the liver.
 	if penetrating and organs.has(organ_id):
@@ -118,6 +126,34 @@ func damage_organ(organ_id: String, amount: float) -> Dictionary:
 			died.emit({"type": "organ_destroyed", "organ": organ_id, "subject_id": subject_id})
 	organs[organ_id] = organ
 	return organ
+
+
+func go_down() -> void:
+	if downed or dead:
+		return
+	downed = true
+	_enter_critical()
+	went_down.emit()
+
+
+## Someone chose to leave them alive. Bleeding is packed, not healed — sparing a
+## person costs the winner nothing and leaves the world a witness.
+func stabilise() -> void:
+	if dead:
+		return
+	bleed_rate *= 0.12
+	pain = maxf(0.0, pain - 34.0)
+	consciousness = maxf(consciousness, 24.0)
+	downed = false
+	bleeding_changed.emit(bleed_rate, blood_remaining)
+
+
+func finish(cause: String) -> void:
+	if dead:
+		return
+	dead = true
+	downed = false
+	died.emit({"type": cause, "subject_id": subject_id, "wounds": wounds.duplicate(true)})
 
 
 func organ_ok(organ_id: String) -> bool:
@@ -173,6 +209,7 @@ func snapshot() -> Dictionary:
 		"consciousness": roundi(consciousness),
 		"critical": critical,
 		"dead": dead,
+		"downed": downed,
 		"zones": zones.duplicate(true),
 		"organs": organs.duplicate(true),
 		"wounds": wounds.duplicate(true),
@@ -188,6 +225,7 @@ func restore(state: Dictionary) -> void:
 	consciousness = clampf(float(state.get("consciousness", 100.0)), 0.0, 100.0)
 	critical = bool(state.get("critical", false))
 	dead = bool(state.get("dead", false))
+	downed = bool(state.get("downed", false))
 	var saved_zones: Dictionary = state.get("zones", {})
 	for zone_id in zones:
 		if saved_zones.get(zone_id) is Dictionary:
@@ -213,7 +251,10 @@ func _process(delta: float) -> void:
 	bleeding_changed.emit(bleed_rate, blood_remaining)
 	if blood_remaining <= blood_capacity * 0.32:
 		_enter_critical()
-	if blood_remaining <= 0.0 or consciousness <= 0.0:
+	if consciousness <= 0.0:
+		go_down()
+	# Running out of blood is the one thing nobody gets to decide about.
+	if blood_remaining <= 0.0:
 		dead = true
 		died.emit({"type": "bleed_out", "subject_id": subject_id, "wounds": wounds.duplicate(true)})
 

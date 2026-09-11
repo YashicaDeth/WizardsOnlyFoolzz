@@ -26,6 +26,7 @@ func _ready() -> void:
 	_test_prosthetic()
 	_test_gore()
 	_test_organs()
+	_test_downed()
 	print("BASELINE_HUMAN_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
 
@@ -107,6 +108,54 @@ func _test_severing() -> void:
 		body.hit("torso", 40.0, 20.0, "blunt")
 	check(not body.severed.has("torso"), "a torso is never severed, however destroyed")
 	body.queue_free()
+
+
+func _test_downed() -> void:
+	# The window every resolution happens inside. Two-sided throughout: going
+	# down must not be death, and death must not be survivable.
+	var body := _rig()
+	body.gore = false
+	check(not body.is_downed(), "an unhurt body is not down")
+	for i in 5:
+		body.hit("torso", 30.0, 12.0, "blunt")
+	check(body.is_downed(), "caving in the chest drops them")
+	check(not body.anatomy.dead, "...but dropping them is not killing them")
+	check(body.rotation.x < -0.1, "a downed body goes off its feet")
+
+	# Spared: alive, upright, and still carrying what was done to them.
+	body.spare()
+	check(not body.is_downed(), "sparing brings them back up")
+	check(not body.anatomy.dead, "a spared body is alive")
+	check(body.zone_health("torso") <= 0.0, "...and still wrecked — sparing is not healing")
+	body.queue_free()
+
+	var doomed := _rig()
+	doomed.gore = false
+	for i in 5:
+		doomed.hit("torso", 30.0, 12.0, "blunt")
+	doomed.execute("gutted")
+	check(doomed.anatomy.dead, "executing a downed body kills it")
+	check(not doomed.is_downed(), "an executed body is no longer merely down")
+	doomed.queue_free()
+
+	var headless := _rig()
+	headless.gore = false
+	for i in 5:
+		headless.hit("torso", 30.0, 12.0, "blunt")
+	headless.behead()
+	check(headless.severed.has("head"), "beheading takes the head")
+	check(not headless.parts["head"].visible, "a taken head stops rendering")
+	check(headless.anatomy.dead, "beheading is fatal")
+	headless.queue_free()
+
+	# Bleeding out is the one outcome nobody gets to decide about.
+	var bleeder := _rig()
+	bleeder.gore = false
+	bleeder.anatomy.bleed_rate = 60.0
+	bleeder.anatomy.blood_remaining = 1.0
+	bleeder.anatomy._process(1.0)
+	check(bleeder.anatomy.dead, "running out of blood kills regardless")
+	bleeder.queue_free()
 
 
 func _test_organs() -> void:
