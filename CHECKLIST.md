@@ -405,6 +405,30 @@ Read-only; everything derived lands in `game/art/derived/` via `tools/art_pipeli
 - [ ] **G2.3** Fungal bloom in the wheel wells, dried spatter
 - [ ] **G2.4** Re-export carrying the biopunk palette natively
 
+### G0 — The wreckers cannot land a hit `OPEN BUG`
+Found 2026-09-12 by measurement, not yet fixed. A parked player finishes a
+thirty-second heat on **full hull** across seven consecutive runs. What the
+probe actually says, so the next attempt does not start from scratch:
+
+- Cars in the open reach **12-14 m/s**, so this is not a speed or throttle
+  problem. Throttle on the car nearest the player sits at 0.72, which is
+  `closing * aggression` committing, not a floor.
+- The nearest wrecker never closes below **4.0-4.6 m** and mostly orbits at
+  5-6 m. Contact needs roughly 4.0 m centre to centre, so they are barely
+  touching, and `IMPACT_SPEED` is 4.0 m/s of *normal* closing — a car sliding
+  past tangentially at 6 m/s contributes almost none of it.
+- Two hypotheses were tried and measured wrong. Widening `GRIND_RANGE` to 5.4
+  made it worse (they peel off at 4.6-6.6 m, before ever touching). Reducing the
+  steering gain from 2.2 to 1.15 was a real fix for permanent cornering and is
+  kept, but did not by itself produce impacts.
+
+- [ ] **G0.1** Make a hunter's final approach a committed straight run rather
+      than an orbit — the gap it is steering toward is never zero
+- [ ] **G0.2** Re-check `IMPACT_SPEED` against the rebuilt chassis; 4.0 m/s of
+      normal closing may simply be unreachable now
+- [ ] **G0.3** Assert impacts fire, not just that hull drops, so this cannot
+      regress silently again
+
 ### G3 — The derby arena
 - [ ] **G3.1** Re-author the oval for a larger footprint
 - [ ] **G3.2** Retune the engagement cap against it together
@@ -427,6 +451,28 @@ Read-only; everything derived lands in `game/art/derived/` via `tools/art_pipeli
 - [ ] **G6.3** The handler's delivery (pairs with D3)
 
 ---
+
+## K — The cosmology
+Captured 2026-09-12, see `DESIGN/COSMOLOGY.md`. CellOutz is the demon faction
+below, wizardsonlyfoolz the mage collective above, the player a CellOut wizard
+half of each, hunting upward to force a hearing. The Four Horsemen rotate as
+CellOutz leadership. Both poles are already in `FACTION_TREE_AXIS`.
+
+### K1 — The two poles
+- [x] **K1.1** CellOutz and wizardsonlyfoolz on the Tree axis as the real ends
+- [ ] **K1.2** CellOutz written through the existing branding as deliberate, not coincidence
+- [ ] **K1.3** wizardsonlyfoolz given a presence — ranks, a Law, a Book, paid grades
+
+### K2 — The Four Horsemen
+- [ ] **K2.1** Four named subjects on the nemesis machinery, not health bars in rooms
+- [ ] **K2.2** Rotating succession: killing the one in power promotes the next (pairs with F3)
+- [ ] **K2.3** Who holds the post changes what CellOutz does, not just the name
+- [ ] **K2.4** The Horseman in power is what makes a run different (answers the roguelike question)
+
+### K3 — The player as half of each
+- [ ] **K3.1** Decide whether both ladders can be climbed at once or committing closes one
+- [ ] **K3.2** The opening reframed: CellOutz grew you, which is why the debt is in the meat
+- [ ] **K3.3** Getting God's attention as the actual win condition, written into world history
 
 ## H — Base building, reduced
 

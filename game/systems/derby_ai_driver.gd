@@ -32,7 +32,13 @@ const PASS_DISTANCE := 11.0
 ## Close enough to be touching, not merely nearby. Breaking off at conversation
 ## distance aborted the run before contact and left the pit unable to land a hit
 ## at all — measured as a parked player finishing a heat on full hull.
-const GRIND_RANGE := 3.9
+## Measured against the rebuilt chassis (A7), not the old rigid box. Two cars
+## in contact sit at about 4.0m centre to centre, so the original 3.9m never
+## fired. Widening it to 5.4 was worse and the measurement said so: wreckers
+## then peeled off at 4.6-6.6m, before ever touching, and orbited the player for
+## a whole heat. This sits just above real contact distance so the peel-off
+## breaks a genuine stalled shove and nothing else.
+const GRIND_RANGE := 4.2
 const GRIND_SPEED := 2.6
 
 var arena_limit := 26.0
@@ -127,7 +133,14 @@ func tick(delta: float, target_position: Vector3, active: bool) -> void:
 	# Imperfect aim: low-skill drivers drift wide and clip barriers, which is the
 	# behaviour that makes a derby pit feel populated rather than choreographed.
 	var wander := sin(wander_phase) * (1.0 - skill) * 0.55
-	var lateral := clampf(heading.dot(right) * 2.2 + wander, -1.0, 1.0)
+	# A7 fallout. A gain of 2.2 saturates this to full lock on anything past a
+	# few degrees off-axis, so with the rebuilt tire-steered chassis a wrecker
+	# cornered permanently and never straightened up: measured at throttle 0.72
+	# and under 2 m/s beside a parked player for a whole heat, while cars out in
+	# the open reached 14 m/s. The old yaw-torque chassis hid it because torque
+	# snapped the car round regardless. Proportional steering lets a car that is
+	# nearly lined up commit to the run instead of scrubbing speed in a turn.
+	var lateral := clampf(heading.dot(right) * 1.15 + wander, -1.0, 1.0)
 	var alignment := heading.dot(forward)
 
 	vehicle.steering = lateral
@@ -152,6 +165,6 @@ func tick(delta: float, target_position: Vector3, active: bool) -> void:
 		# off as the gap closed, so wreckers arrived at walking pace and never
 		# reached the impact threshold. A derby driver commits to the hit.
 		var floor_throttle := CREEP_THROTTLE
-		if vehicle.linear_velocity.length() < TURN_SPEED and absf(lateral) > 0.45:
+		if vehicle.linear_velocity.length() < TURN_SPEED and absf(lateral) > 0.75:
 			floor_throttle = TURN_THROTTLE
 		vehicle.throttle = maxf(floor_throttle, clampf(closing * aggression, 0.0, 1.0))

@@ -47,8 +47,12 @@ func _ready() -> void:
 	add_child(env)
 
 	camera = Camera3D.new()
-	camera.position = Vector3(0, 0, 3.4)
+	camera.position = Vector3(0, 0.35, 3.4)
 	camera.fov = 62.0
+	# Tilted up, so the horizon sits low and the frame is mostly sky and falling
+	# junk. Level, it put the ground across the bottom 45% of the menu doing
+	# nothing — the busiest part of the shot was empty dirt.
+	camera.rotation.x = deg_to_rad(11.0)
 	add_child(camera)
 
 	var key := OmniLight3D.new()
