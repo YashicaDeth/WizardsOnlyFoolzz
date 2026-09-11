@@ -333,6 +333,34 @@ func reveal_organs(revealed: bool) -> void:
 			part.transparency = 0.62 if revealed else 0.0
 
 
+## B3.4. Seeing into a body is not worth much if the shed in front of it still
+## wins the depth test — that is a highlight, not an X-ray. While the world
+## sweep has hold of this body its skeleton and organs draw over whatever is
+## between it and the viewer, and go back to behaving normally afterwards.
+func see_through(enabled: bool) -> void:
+	for zone_id in bones:
+		var frame := bones[zone_id] as Node3D
+		if frame == null or not is_instance_valid(frame):
+			continue
+		for piece in frame.get_children():
+			_set_depth_override(piece as MeshInstance3D, enabled)
+	for organ_id in organ_parts:
+		_set_depth_override(organ_parts[organ_id] as MeshInstance3D, enabled)
+
+
+func _set_depth_override(piece: MeshInstance3D, enabled: bool) -> void:
+	if piece == null or not is_instance_valid(piece):
+		return
+	var material := piece.material_override as StandardMaterial3D
+	if material == null and piece.mesh is PrimitiveMesh:
+		# Organs carry their material on the mesh rather than as an override.
+		material = (piece.mesh as PrimitiveMesh).material as StandardMaterial3D
+	if material == null:
+		return
+	material.no_depth_test = enabled
+	material.render_priority = 4 if enabled else 0
+
+
 func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "", hit_direction := Vector3.ZERO) -> Dictionary:
 	var zone := canonical_zone(zone_id)
 	if severed.has(zone) and not anatomy.installed_parts.has(zone):

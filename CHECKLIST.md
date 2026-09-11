@@ -174,10 +174,10 @@ The most complete system in the project and, until this pass, the least visible.
 ### B3 — The X-ray cursor `BUILT`
 - [x] ~~**B3.1** Brass ring, real button, skull mark, key and click through one path~~
 - [x] ~~**B3.2** Empty seats drawn, so it reads as the unfinished tool it is~~
-- [ ] **B3.3** Works in the world, not only inside the index
-- [ ] **B3.4** X-ray actually sees through world geometry and bodies at range
-- [ ] **B3.5** Own the pointer — hide the OS cursor
-- [ ] **B3.6** Hold to expand into the full radial (this is where B3 becomes C2)
+- [x] ~~**B3.3** Works in the world, not only inside the index~~
+- [x] ~~**B3.4** X-ray actually sees through world geometry and bodies at range~~
+- [x] ~~**B3.5** Own the pointer — hide the OS cursor~~
+- [x] ~~**B3.6** Hold to expand into the full radial (this is where B3 becomes C2)~~
 
 ### B4 — Chunk physics and layers `BUILT`
 - [x] ~~**B4.1** Identified chunks: layer, zone, subject, organ, implant~~

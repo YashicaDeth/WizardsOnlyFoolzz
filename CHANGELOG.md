@@ -2,6 +2,27 @@
 
 ## 2026 09 11
 
+- **Section B is closed. The X-ray looks at the world.** `xray_cursor.gd` said
+  from the day it was written that seeing inside a body should be a constant
+  available verb rather than a mode, and it was only ever true inside the
+  dossier, where the body in front of you is a diagram. Hold **B** in the hunt
+  and it sweeps the actual world: bodies within `RANGE` open up, fading toward
+  the edge rather than popping, and the revealed bone and organs **beat the
+  depth test** so they draw through the shed in front of them — a skeleton that
+  loses to a wall is a highlight, not an X-ray. Corpses the AI has stopped
+  tracking are included, since looking into what is left of somebody is most of
+  the point. Rigs are always put back, so the effect never leaks into the next
+  fight. Keep holding and the ring becomes the wheel: the empty seats drawn on
+  the cursor since B3.2 were always C2's radial, and now they open into it.
+  Panels hide the OS pointer, so the cursor the game draws is the only one.
+- **Found a bug that a green suite could not see.** `KEY_F` was bound twice in
+  the hunt's input match — it has toggled the camera since the hunt was built,
+  and B5's dig was added as a second `KEY_F` branch. The first branch wins, so
+  **the whole of B5 was unreachable from the keyboard** while every test passed,
+  because the tests call `_begin_extraction()` directly. The dig is on **H** now,
+  and `world_xray_test` parses the input match and fails on any duplicate key,
+  so the next one cannot hide.
+
 - **F2: grudges travel the edges that actually exist.** F1 built witnesses who
   walk home; what they did when they got there was write one line into their
   faction's file and stop. Now the story carries on from them, along the

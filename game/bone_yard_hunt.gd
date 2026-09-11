@@ -82,6 +82,12 @@ var carried_limb_model: MeshInstance3D
 var dead_bodies: Array[Dictionary] = []
 var extraction_session: Dictionary = {}
 var witness_ledger := WitnessLedger.new()
+## B3.3/B3.6. Hold G and you are looking through people; keep holding and the
+## ring the X-ray has always been one seat of opens into the full wheel.
+var xray_held := 0.0
+var xray_active := false
+## How long the button has to be down before the segment becomes the radial.
+const XRAY_HOLD_TO_WHEEL := 0.35
 
 @onready var camera: Camera3D = $CameraRig/Camera3D
 @onready var title: Label = $HUD/Title
@@ -351,7 +357,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_C: _start_grapple()
 			KEY_Z: _toggle_lock()
 			KEY_E: _interact()
-			KEY_F: _begin_extraction()
+			# H, not F: F has toggled the camera since the hunt was built, and a
+			# second KEY_F branch in this match is simply never reached.
+			KEY_H: _begin_extraction()
 			KEY_V:
 				if not grapple_target.is_empty():
 					_clinch_persuade()
@@ -393,7 +401,8 @@ func _physics_process(delta: float) -> void:
 	_update_player(delta)
 	_update_rival(delta)
 	_update_encounter_actors(delta)
-	_update_extraction(delta, Input.is_key_pressed(KEY_F))
+	_update_extraction(delta, Input.is_key_pressed(KEY_H))
+	_update_xray(delta, Input.is_key_pressed(KEY_B))
 	# Reports walk home in real time; F1.3's window only exists if it ticks.
 	witness_ledger.tick(delta)
 	if misfire_director != null:
@@ -832,7 +841,7 @@ func _begin_extraction() -> void:
 		return
 	extraction_session["display_name"] = str(body.display_name)
 	body_motion.trigger_interaction()
-	prompt.text = "HOLD [F] // %s INTO %s WITH %s" % [
+	prompt.text = "HOLD [H] // %s INTO %s WITH %s" % [
 		str(target.label).to_upper(), zone.replace("_", " ").to_upper(),
 		str(Extraction.profile(tool).label),
 	]
@@ -1553,7 +1562,7 @@ func _update_grapple(delta: float) -> void:
 	# F7.1. The hold is a negotiation you are winning, so it reports what it is
 	# currently worth rather than only how hard you are squeezing.
 	var offer := _clinch_options(actor)
-	prompt.text = "CLINCH / %s   %+d   [LMB] PRESS  [V] TALK  [X] LEAN  [F] TAKE  [SPACE] BREAK" % [
+	prompt.text = "CLINCH / %s   %+d   [LMB] PRESS  [V] TALK  [X] LEAN  [H] TAKE  [SPACE] BREAK" % [
 		str(actor.display_name).to_upper(), roundi(grapple_advantage * 100.0),
 	]
 	if bool(offer.surrender):
@@ -1567,6 +1576,48 @@ func _update_grapple(delta: float) -> void:
 		_wound_player(node.global_position, 16.0, "blunt")
 		player_body.velocity = (player - node.global_position).normalized() * 7.0
 		_break_grapple("THEY PUT YOU DOWN AND STEPPED BACK")
+
+
+## Every body in the world that owns a rig, including the corpses the AI has
+## stopped tracking — being able to look into what is left of somebody is most
+## of the point.
+func _all_rigs() -> Array:
+	var rigs: Array = []
+	for actor in encounter_actors:
+		if actor.get("rig") != null and is_instance_valid(actor.rig):
+			rigs.append(actor.rig)
+	for body in dead_bodies:
+		if body.get("rig") != null and is_instance_valid(body.rig):
+			rigs.append(body.rig)
+	if enemy_rig != null and is_instance_valid(enemy_rig):
+		rigs.append(enemy_rig)
+	if friend_rig != null and is_instance_valid(friend_rig):
+		rigs.append(friend_rig)
+	return rigs
+
+
+## B3.3, B3.4 and B3.6 in one place: the sweep, the range, and the point at
+## which holding the button stops being an X-ray and becomes the wheel.
+func _update_xray(delta: float, holding: bool) -> void:
+	if holding and panel_mode.is_empty() and not resolution_ui.visible:
+		xray_held += delta
+		if not xray_active:
+			xray_active = true
+			WorldHistory.record_event("xray_swept", {"location": HUNT_LOCATION})
+		var lit := WorldXray.sweep(player, _all_rigs(), true)
+		if xray_held >= XRAY_HOLD_TO_WHEEL and not handheld.radial.is_open:
+			# B3.6. This is where B3 becomes C2 — the empty seats on the cursor
+			# ring were always the rest of this wheel.
+			handheld.open_radial()
+		if not lit.is_empty():
+			prompt.text = "XRAY / %d BODIES IN REACH" % lit.size()
+		return
+	if xray_active:
+		xray_active = false
+		xray_held = 0.0
+		WorldXray.sweep(player, _all_rigs(), false)
+		if handheld.radial.is_open:
+			handheld.close_radial()
 
 
 ## What the current hold affords, asked in one place so the prompt, the input
@@ -1674,7 +1725,7 @@ func _toggle_panel(mode: String) -> void:
 		character_archive.close_archive()
 	if panel.visible:
 		_refresh_archive()
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if panel_mode.is_empty() else Input.MOUSE_MODE_VISIBLE
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if panel_mode.is_empty() else Input.MOUSE_MODE_HIDDEN
 
 
 ## `J` cycles the Allusions archive: the artwork study, then the natal sigil,
@@ -1696,7 +1747,7 @@ func _toggle_artwork() -> void:
 		living_map.close_map()
 		panel_mode = "artwork"
 		allusions_artwork.open_artwork()
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if panel_mode.is_empty() else Input.MOUSE_MODE_VISIBLE
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if panel_mode.is_empty() else Input.MOUSE_MODE_HIDDEN
 
 
 func _refresh_archive() -> void:
