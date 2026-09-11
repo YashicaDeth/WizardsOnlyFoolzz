@@ -105,6 +105,55 @@ func _ready() -> void:
 	rig.hit("torso", 4.0, 2.0, "blunt")
 	check(rig.exposed_layer("torso") >= before_depth, "and a lighter later blow never closes it back up")
 
+	# --- B4.5: the layer itself shows on the body, not just in the chunks it shed
+	# left_arm carries no implant on this rig, unlike torso, so the exposure
+	# mark reflects flesh being opened rather than being suppressed by hardware.
+	rig.hit("left_arm", 30.0, 10.0, "cut")
+	var arm_part: Node3D = rig.parts.left_arm
+	check(arm_part.get_node_or_null("LayerExposure") != null, "an opened zone carries a visible layer-exposure mark")
+	rig.install_prosthetic("left_arm", {"name": "ashline scrap arm"})
+	check(arm_part.get_node_or_null("LayerExposure") == null, "a prosthetic zone has no flesh layer to expose")
+
+	# --- B4.7: chunks are generated geometry, not engine primitives ----------
+	var mesh_rig := BaselineHuman.new()
+	add_child(mesh_rig)
+	mesh_rig.build("mesh_probe", {})
+	await get_tree().physics_frame
+	mesh_rig.hit("torso", 30.0, 10.0, "cut", "heart")
+	await get_tree().physics_frame
+	var authored := 0
+	var checked := 0
+	for chunk in GoreChunks.from_subject("mesh_probe"):
+		for child in chunk.get_children():
+			if child is MeshInstance3D:
+				checked += 1
+				if (child as MeshInstance3D).mesh is ArrayMesh:
+					authored += 1
+	check(checked > 0 and authored == checked, "every shed chunk carries authored geometry, not a primitive mesh (%d/%d)" % [authored, checked])
+
+	# --- B4.6: a chunk marks the ground it lands or rolls on -----------------
+	var splats_before: int = BaselineHuman.splats.size()
+	BaselineHuman.mark_ground_for_chunk(mesh_rig.get_world_3d(), mesh_rig.get_tree().current_scene, mesh_rig.global_position + Vector3.UP * 0.4, Vector3.DOWN, 0.3)
+	check(BaselineHuman.splats.size() == splats_before + 1, "a chunk landing leaves a mark on the ground it hit")
+
+	# --- B4.8: each layer has its own real, distinct impact voice ------------
+	var skin_voice := GoreChunks.impact_profile(GoreChunks.Layer.SKIN)
+	var bone_voice := GoreChunks.impact_profile(GoreChunks.Layer.BONE)
+	var hardware_voice := GoreChunks.impact_profile(GoreChunks.Layer.CYBERNETIC)
+	check(float(bone_voice.freq) > float(skin_voice.freq), "bone reads higher and sharper than skin")
+	check(float(hardware_voice.noise) < float(skin_voice.noise), "hardware rings cleaner than wet tissue")
+	GoreChunks.play_impact(mesh_rig, mesh_rig.global_position, GoreChunks.Layer.BONE)
+
+	# --- B4.9: rot is a real clock and a queryable gameplay signal -----------
+	var rot_target: Node = GoreChunks.from_subject("mesh_probe")[0]
+	check(GoreChunks.rot_ratio(rot_target) < 0.01, "a fresh chunk has not rotted")
+	var fresh_info: Dictionary = GoreChunks.identify(rot_target)
+	fresh_info["spawn_msec"] = Time.get_ticks_msec() - int(GoreChunks.ROT_SECONDS * 1000.0)
+	rot_target.set_meta("chunk", fresh_info)
+	check(GoreChunks.rot_ratio(rot_target) >= 1.0, "a chunk left long enough is fully rotted")
+	var scent := GoreChunks.scent_sources()
+	check(scent.any(func(source): return (source.position as Vector3).distance_to((rot_target as Node3D).global_position) < 0.01), "a rotten chunk becomes a queryable scent source")
+
 	# --- picking a piece up --------------------------------------------------
 	var target: Node = GoreChunks.from_subject("chunk_probe")[0]
 	var taken := GoreChunks.take(target)

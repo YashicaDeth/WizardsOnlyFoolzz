@@ -341,6 +341,11 @@ func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt",
 		var penetrating := damage_type in ["cut", "puncture", "ballistic", "shear"]
 		_spray(_zone_origin(zone), (direction * 0.55 + Vector3.UP).normalized(), clampi(roundi(damage / (2.1 if penetrating else 4.4)), 3, 26))
 		_shed_chunks(zone, damage, damage_type, organ_id, direction)
+		# _shed_chunks just raised zone_depth (B4.3); refresh again so the layer
+		# exposure mark (B4.5) reads the hit that just happened rather than the
+		# one before it.
+		if not did_sever:
+			_refresh_zone(zone)
 	if bool(result.get("disabled", false)):
 		zone_disabled.emit(zone)
 	return result
@@ -606,7 +611,11 @@ func _refresh_zone(zone_id: String) -> void:
 	# limb to come off entirely.
 	var bone := bones.get(zone_id) as Node3D
 	if bone != null and is_instance_valid(bone) and not _xray:
-		var exposed := ratio < FRACTURE_RATIO and not prosthetic
+		# A zone remembers the deepest layer it was ever cut to (B4.3), so bone
+		# that has already been shown through does not hide again just because
+		# a prosthetic or a lighter later hit raised the current health ratio.
+		var ever_to_bone := int(zone_depth.get(zone_id, 0)) >= GoreChunks.Layer.BONE
+		var exposed := (ratio < FRACTURE_RATIO or ever_to_bone) and not prosthetic
 		bone.visible = exposed
 		# Bone inside opaque flesh is bone nobody can see. Ruined flesh goes
 		# translucent so the skeleton under it actually reads.
@@ -634,6 +643,7 @@ func _refresh_zone(zone_id: String) -> void:
 				old_stump.queue_free()
 	if gore and zone_id == "torso" and ratio <= 0.0:
 		_spill_guts()
+	_update_layer_exposure(zone_id, prosthetic)
 
 
 func _zone_origin(zone_id: String) -> Vector3:
@@ -709,6 +719,37 @@ func _add_fracture(zone_id: String) -> void:
 	shard.position = Vector3(randf_range(-0.05, 0.05), randf_range(-0.13, 0.13), 0.07)
 	shard.rotation = Vector3(randf_range(-0.8, 0.8), 0.0, randf_range(-1.0, 1.0))
 	part.add_child(shard)
+
+
+## B4.5: the zone shows the deepest layer it has ever been cut to, on the body
+## itself rather than only in the chunks it shed. Skin, fat, muscle in order -
+## bone is handled separately above because a fracture already owns that read.
+## Reads `zone_depth`, the same ratchet `_shed_chunks` writes, so this survives
+## healing and reattachment exactly the way the remembered depth does.
+func _update_layer_exposure(zone_id: String, prosthetic: bool) -> void:
+	var part := parts.get(zone_id) as Node3D
+	if part == null or not is_instance_valid(part):
+		return
+	var mark := part.get_node_or_null("LayerExposure") as MeshInstance3D
+	var depth := int(zone_depth.get(zone_id, 0))
+	if prosthetic or severed.has(zone_id) or depth < GoreChunks.Layer.FAT:
+		if mark != null and is_instance_valid(mark):
+			# queue_free is deferred; remove_child makes it gone from the tree
+			# (and from get_node lookups) immediately rather than next idle frame.
+			part.remove_child(mark)
+			mark.queue_free()
+		return
+	if mark == null or not is_instance_valid(mark):
+		mark = MeshInstance3D.new()
+		mark.name = "LayerExposure"
+		var flap := BoxMesh.new()
+		flap.size = Vector3(0.10, 0.010, 0.13)
+		mark.mesh = flap
+		mark.position = Vector3(0.0, 0.02, 0.075)
+		part.add_child(mark)
+	var shown_depth := mini(depth, GoreChunks.Layer.MUSCLE)
+	var tint := Color(str(GoreChunks.LAYER_TINTS[shown_depth]))
+	mark.material_override = _zone_material(zone_id, tint, "flesh")
 
 
 ## A limb that comes off is the same geometry that was attached a moment ago,
@@ -874,7 +915,46 @@ static func clear_gore() -> void:
 ## hundred marks costs a handful of resources, not four hundred.
 static var _splat_pool: Array[ArrayMesh] = []
 
-func _splat_mesh(radius: float) -> ArrayMesh:
+## B4.6: a chunk from `GoreChunks` marks the ground the same way a blood drop
+## does, at the point it lands or while it is still rolling fast. A free
+## function rather than a method so `GoreChunks`, which is not a body, can call
+## it without needing an instance.
+static func mark_ground_for_chunk(world: World3D, root: Node, at: Vector3, velocity: Vector3, size: float) -> void:
+	if root == null or not root.is_inside_tree() or world == null or splats.size() > MAX_SPLATS * 2:
+		return
+	var space := world.direct_space_state
+	var heading := velocity.normalized() if velocity.length_squared() > 0.01 else Vector3.DOWN
+	var normal := Vector3.UP
+	var landed := Vector3(at.x, 0.02, at.z)
+	var query := PhysicsRayQueryParameters3D.create(at - heading * 0.35, at + heading * 1.6)
+	query.collide_with_areas = false
+	var hit := space.intersect_ray(query)
+	if hit.is_empty():
+		var down := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.4, at + Vector3.DOWN * 4.0)
+		down.collide_with_areas = false
+		hit = space.intersect_ray(down)
+	if not hit.is_empty():
+		landed = hit.position
+		normal = (hit.normal as Vector3).normalized()
+	var splat := MeshInstance3D.new()
+	splat.mesh = _splat_mesh(1.0)
+	splat.scale = Vector3.ONE * size
+	var up := normal
+	var side := up.cross(Vector3.FORWARD)
+	if side.length_squared() < 0.001:
+		side = up.cross(Vector3.RIGHT)
+	side = side.normalized()
+	var forward := up.cross(side).normalized()
+	splat.global_transform = Transform3D(Basis(side, forward, up).rotated(up, randf() * TAU), landed + normal * 0.014)
+	root.add_child(splat)
+	splats.append(splat)
+	while splats.size() > MAX_SPLATS:
+		var oldest: Node3D = splats.pop_front()
+		if is_instance_valid(oldest):
+			oldest.queue_free()
+
+
+static func _splat_mesh(radius: float) -> ArrayMesh:
 	if _splat_pool.size() >= 9:
 		return _splat_pool[randi() % _splat_pool.size()]
 	var rng := RandomNumberGenerator.new()

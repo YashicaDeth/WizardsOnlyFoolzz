@@ -2,6 +2,33 @@
 
 ## 2026 09 11
 
+- **B4 finished: chunks now carry their layer past the moment they land.**
+  A zone remembers the deepest `GoreChunks.Layer` it has ever been cut to
+  (`zone_depth`, already tracked for B4.3) and now shows it: an authored patch
+  tinted fat-yellow or muscle-red appears on the zone mesh itself once a blow
+  reaches that deep, and the existing bone-through-skin read now persists off
+  that same memory instead of only the current health ratio. Fixed a real
+  ordering bug on the way: `_refresh_zone` ran before `_shed_chunks` wrote the
+  new depth, so the mark was always one hit stale.
+  Every chunk shape (skin, fat, muscle, organ, hardware — bone already was)
+  is now `BodyMesh`-generated instead of a primitive Box/Sphere/Capsule.
+  Chunks mark the ground on landing and up to three times while still rolling
+  fast, reusing the blood-splat pool. Each layer gets its own short
+  procedurally synthesised impact voice (bone cracks high and clean, organs
+  are a low wet thud, hardware rings) via a new `AudioStreamGenerator` voice
+  in `GoreChunks.play_impact` — no sample library exists yet, so this is
+  honest about being a placeholder rather than silent; G5 replaces it with
+  authored, positional audio later. A chunk left alone for `ROT_SECONDS`
+  (4 minutes) darkens on a schedule, grows a couple of fly specks, and
+  becomes a queryable scent source (`GoreChunks.scent_sources()`) any future
+  AI can read.
+  Caught a real self-rescheduling-lambda bug while building this: a lambda
+  that reconnects itself by calling `.connect(its_own_variable)` captures
+  that variable by value at creation, i.e. before the assignment finishes, so
+  every reconnect after the first silently did nothing. Rewrote both
+  schedulers (ground-mark rolling, rot checkpoints) as `await` loops instead.
+  Full 18-suite headless run stays green.
+
 - **Implants and wounds are real parts with real zones.** `implant_catalog.gd`
   and `wound_catalog.gd` replace both keyword-guessing tables (`IMPLANT_ZONE_WORDS`
   and `WOUND_ZONE_WORDS` in `body_inspector.gd`) with authored data: eighteen

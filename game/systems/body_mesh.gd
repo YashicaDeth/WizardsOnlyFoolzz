@@ -150,6 +150,74 @@ static func vertebra() -> ArrayMesh:
 	], 8)
 
 
+## A torn membrane rather than a flat rectangle: skin does not come off with a
+## clean edge, so both long sides are jagged and the piece has real thickness.
+static func torn_flap(width: float, length: float, seed: int) -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var steps := 5
+	var top: Array[Vector3] = []
+	var bottom: Array[Vector3] = []
+	for step in steps + 1:
+		var x := lerpf(-width * 0.5, width * 0.5, float(step) / float(steps))
+		var jag := rng.randf_range(-0.3, 0.3) * length
+		top.append(Vector3(x, length * 0.5 + jag * 0.4, rng.randf_range(-0.006, 0.006)))
+		bottom.append(Vector3(x, -length * 0.5 + jag, rng.randf_range(-0.006, 0.006)))
+	for step in steps:
+		_tri(surface, bottom[step], top[step], bottom[step + 1])
+		_tri(surface, bottom[step + 1], top[step], top[step + 1])
+		_tri(surface, bottom[step], bottom[step + 1], top[step])
+		_tri(surface, bottom[step + 1], top[step + 1], top[step])
+	surface.generate_normals()
+	return surface.commit()
+
+
+## An irregular lump. Fat and loose organ tissue both stop reading as a bead of
+## paint the moment the outline is not a perfect sphere.
+static func lump(radius: float, seed: int, segments: int = 8) -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var rings := []
+	var ring_count := 5
+	for index in ring_count:
+		var t := float(index) / float(ring_count - 1)
+		var h := lerpf(-radius, radius, t)
+		var profile := sin(t * PI) * radius * rng.randf_range(0.78, 1.15)
+		rings.append(Vector3(h, profile, profile * rng.randf_range(0.82, 1.1)))
+	return revolve(rings, segments)
+
+
+## A twisted strand, tapered at both ends with an off-centre waist: the
+## difference between a torn muscle fibre and a hot-dog-shaped capsule.
+static func twisted_strand(length: float, radius: float, seed: int) -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var h := length * 0.5
+	return revolve([
+		Vector3(-h, radius * 0.15, radius * 0.15),
+		Vector3(-h * 0.6, radius * rng.randf_range(0.85, 1.1), radius * rng.randf_range(0.85, 1.1)),
+		Vector3(0.0, radius * rng.randf_range(0.55, 0.75), radius * rng.randf_range(0.55, 0.75)),
+		Vector3(h * 0.6, radius * rng.randf_range(0.85, 1.1), radius * rng.randf_range(0.85, 1.1)),
+		Vector3(h, radius * 0.15, radius * 0.15),
+	], 6)
+
+
+## Broken housing rather than a clean box: hardware that came off in a piece,
+## not off a workbench.
+static func hardware_shard(size: float, seed: int) -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var h := size * 0.5
+	return revolve([
+		Vector3(-h, size * 0.42, size * 0.30),
+		Vector3(-h * 0.4, size * 0.5, size * 0.36),
+		Vector3(h * 0.3, size * rng.randf_range(0.30, 0.46), size * 0.26),
+		Vector3(h, size * 0.1, size * 0.08),
+	], 5)
+
+
 static func _tri(surface: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
 	surface.add_vertex(a)
 	surface.add_vertex(b)

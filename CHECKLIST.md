@@ -184,11 +184,11 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B4.2** Depth from damage, damage type and how open the zone already was~~
 - [x] ~~**B4.3** Bodies remember how far they have been opened~~
 - [x] ~~**B4.4** Cap, recycle, `take()`, `from_subject()`~~
-- [ ] **B4.5** **Layer exposure on the zone mesh itself** — skin, then fat, then muscle, then bone, visible on the body
-- [ ] **B4.6** Chunks mark the ground where they land and where they roll
-- [ ] **B4.7** Authored chunk meshes instead of primitives
-- [ ] **B4.8** Per-layer impact sound — bone does not land like fat
-- [ ] **B4.9** Rot over time: flies, discolouration, smell as a gameplay signal
+- [x] ~~**B4.5** **Layer exposure on the zone mesh itself** — skin, then fat, then muscle, then bone, visible on the body~~
+- [x] ~~**B4.6** Chunks mark the ground where they land and where they roll~~
+- [x] ~~**B4.7** Authored chunk meshes instead of primitives~~
+- [x] ~~**B4.8** Per-layer impact sound — bone does not land like fat~~
+- [x] ~~**B4.9** Rot over time: flies, discolouration, smell as a gameplay signal~~
 
 ### B5 — Rob cybernetics off a body
 **Unblocked by B4** — `GoreChunks.take()` already returns the identified part.
