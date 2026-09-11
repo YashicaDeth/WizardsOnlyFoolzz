@@ -1,0 +1,34 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ERROR: Attempt to open script 'res://addons/godot_mcp/game_bridge/mcp_game_bridge.gd' resulted in error 'File not found'.
+   at: load_source_code (modules/gdscript/gdscript.cpp:1139)
+ERROR: Failed loading resource: res://addons/godot_mcp/game_bridge/mcp_game_bridge.gd.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Failed to instantiate an autoload, can't load from path: res://addons/godot_mcp/game_bridge/mcp_game_bridge.gd.
+   at: start (main/main.cpp:4533)
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2582)
+SCRIPT ERROR: Parse Error: Cannot infer the type of "index" variable because the value doesn't have a set type.
+   at: GDScript::reload (res://bone_yard_hunt.gd:718)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://tests/combat_integration_test.gd:16)
+SCRIPT ERROR: Parse Error: Cannot infer the type of "remaining" variable because the value doesn't have a set type.
+   at: GDScript::reload (res://bone_yard_hunt.gd:753)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://tests/combat_integration_test.gd:16)
+SCRIPT ERROR: Parse Error: Cannot infer the type of "broken" variable because the value doesn't have a set type.
+   at: GDScript::reload (res://bone_yard_hunt.gd:756)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://tests/combat_integration_test.gd:16)
+SCRIPT ERROR: Parse Error: Cannot infer the type of "index" variable because the value doesn't have a set type.
+   at: GDScript::reload (res://bone_yard_hunt.gd:772)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://tests/combat_integration_test.gd:16)
+ERROR: Failed to load script "res://bone_yard_hunt.gd" with error "Parse error".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:46)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://tests/combat_integration_test.gd:16)
+SCRIPT ERROR: Invalid access to property or key 'player_body' on a base object of type 'Node3D'.
+   at: _ready (res://tests/combat_integration_test.gd:20)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://tests/combat_integration_test.gd:20)

@@ -1,0 +1,35 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ERROR: Attempt to open script 'res://addons/godot_mcp/game_bridge/mcp_game_bridge.gd' resulted in error 'File not found'.
+   at: load_source_code (modules/gdscript/gdscript.cpp:1139)
+ERROR: Failed loading resource: res://addons/godot_mcp/game_bridge/mcp_game_bridge.gd.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Failed to instantiate an autoload, can't load from path: res://addons/godot_mcp/game_bridge/mcp_game_bridge.gd.
+   at: start (main/main.cpp:4533)
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2582)
+PASS the same cut goes deeper into an arm already opened (1 -> 4)
+PASS even a light cut breaks skin
+PASS heavy blunt trauma reaches bone without opening the body first
+PASS a light knock does not
+PASS depth is clamped at the deepest layer
+PASS a cut throws pieces (7)
+PASS including the skin it went through
+PASS and the muscle under it
+PASS every piece knows who it came off and from where (7 of 7)
+PASS a body with no implant sheds no hardware, however deep the hit
+PASS and no organ where the limb has none
+PASS but it does reach bone
+PASS a severed body zone enters the same identified chunk registry
+PASS the whole limb enters CARRY without losing its owner or zone
+PASS using a carried limb as a weapon degrades its condition
+PASS a whole limb receives a real condition-and-freshness sale price
+PASS selling the limb pays into the persistent rust-scrip wallet
+PASS the zone records its deepest breach (3)
+PASS and a lighter later blow never closes it back up
+PASS a piece can be picked up
+PASS and it carries its identity with it
+PASS the same piece cannot be taken twice
+PASS live chunks are capped (90)
+PASS OFF sheds nothing at all
+CHUNK_TEST_RESULT failures=0

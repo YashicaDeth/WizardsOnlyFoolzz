@@ -395,9 +395,9 @@ Not code. The difference between "programmer art" and "a game".
 Read-only; everything derived lands in `game/art/derived/` via `tools/art_pipeline.py`.
 - [x] ~~**G1.1** Locate and catalogue the source art~~
 - [x] ~~**G1.2** Cut, glitch and shade into a texture set~~
-- [~] **G1.3** Body textures — 8 tiling sheets built; no material loads them yet
-- [~] **G1.4** Map plates and interface surfaces — 6 plates built; not yet on a panel
-- [~] **G1.5** Wire collage — 3 sheets built; the Wire page does not draw them yet
+- [x] **G1.3** Body textures — on flesh materials as a detail layer over the contamination
+- [x] **G1.4** Map plates and interface surfaces — under the World Index plate
+- [x] **G1.5** Wire collage — printed under the Wire feed
 
 ### G2 — The cars
 - [ ] **G2.1** Stripped chassis with exposed mechanism

@@ -191,3 +191,28 @@ static func scrawl(canvas: CanvasItem, at: Vector2, width: float, lines: int, se
 			x += rng.randf_range(3.0, 7.0)
 		if stroke.size() >= 2:
 			canvas.draw_polyline(stroke, tint * Color(1, 1, 1, 0.55), 1.4)
+
+
+## G1.4. Greg's artwork as the substrate a panel is printed on.
+##
+## The interface already had a generated grain layer; this puts a real plate
+## under it at low alpha, so the paper a readout sits on is something he made
+## rather than noise. Drawn first, under everything, and skipped entirely when
+## the pipeline has not been run.
+static func art_substrate(canvas: CanvasItem, rect: Rect2, seed_value: int, alpha := 0.12) -> bool:
+	var plate: Texture2D = ArtSet.pick("plate", seed_value)
+	if plate == null:
+		return false
+	canvas.draw_texture_rect(plate, rect, false, Color(1, 1, 1, alpha))
+	return true
+
+
+## G1.5. The Wire's collage sheets. The surviving internet is described in
+## DESIGN/IN_GAME_INTERNET.md as paranoid hand-assembled collage, which is what
+## the pipeline builds out of the art — so the feed is printed over it.
+static func art_collage(canvas: CanvasItem, rect: Rect2, seed_value: int, alpha := 0.16) -> bool:
+	var sheet: Texture2D = ArtSet.pick("wire", seed_value)
+	if sheet == null:
+		return false
+	canvas.draw_texture_rect(sheet, rect, false, Color(1, 1, 1, alpha))
+	return true

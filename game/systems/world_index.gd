@@ -482,6 +482,9 @@ func _draw_plate(rect: Rect2) -> void:
 		rect.position + Vector2(0, notch),
 	])
 	draw_colored_polygon(body, SMOKE)
+	# G1.4. The plate Greg's artwork is printed on, under the grime and under
+	# everything else. Nothing changes when the art pipeline has not been run.
+	Grunge.art_substrate(self, rect, 7, 0.10)
 	# Grime goes down before anything else is printed on it, so the interface
 	# reads as ink on a dirty surface rather than dirt laid over a clean screen.
 	Grunge.stain(self, rect.position + rect.size * Vector2(0.16, 0.78), 96.0, 11, Grunge.BILE, 0.05)
@@ -964,6 +967,9 @@ func _run_action(action: String) -> void:
 
 func _draw_wire(rect: Rect2) -> void:
 	var font := ThemeDB.fallback_font
+	# G1.5. The Wire is described as paranoid hand-assembled collage, and the
+	# pipeline builds exactly that out of Greg's work. The feed prints over it.
+	Grunge.art_collage(self, rect, 3, 0.13)
 	var entry := _selected()
 	var split := rect.size.x * 0.46
 	_action_rects.clear()

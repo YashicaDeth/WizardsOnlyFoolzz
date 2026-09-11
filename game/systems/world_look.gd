@@ -219,6 +219,17 @@ static func _apply_grain(material: StandardMaterial3D, scale: float, strength: f
 	# the albedo now, at low resolution and unfiltered, per ART-DIRECTION.md:
 	# colour is contamination, not paint, and the target is PS1-era crunch.
 	material.albedo_texture = _contamination(kind, material.albedo_color, seed_value)
+	# G1.3. Greg's own artwork, as a detail layer over the procedural
+	# contamination rather than instead of it. Flesh only: the body is where a
+	# hand-made surface reads, and putting the same sheets on every wall would
+	# turn a texture set into wallpaper. Absent art changes nothing.
+	if kind == "flesh":
+		var sheet: Texture2D = ArtSet.pick("body", seed_value)
+		if sheet != null:
+			material.detail_enabled = true
+			material.detail_albedo = sheet
+			material.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+			material.detail_uv_layer = BaseMaterial3D.DETAIL_UV_1
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	# The tint now lives in the texture, so leave the multiplier neutral or the
 	# surface is coloured twice and goes muddy.
