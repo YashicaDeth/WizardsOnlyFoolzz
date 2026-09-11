@@ -68,12 +68,18 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
+## The damage portrait occupies the top-left corner in the derby, so the title
+## block is suppressed there rather than drawn underneath it.
+var show_title := true
+
+
 func _draw() -> void:
 	var viewport := size
 	if viewport.x < 400 or viewport.y < 300:
 		return
 	_draw_edge_frame(viewport)
-	_draw_title(viewport)
+	if show_title:
+		_draw_title(viewport)
 	_draw_speed_instrument(viewport)
 	_draw_integrity_instrument(viewport)
 	_draw_rival_signal(viewport)
@@ -143,7 +149,7 @@ func _draw_integrity_instrument(viewport: Vector2) -> void:
 
 
 func _draw_rival_signal(viewport: Vector2) -> void:
-	var anchor := Vector2(42, viewport.y - 160)
+	var anchor := Vector2(212, 34)
 	var font := ThemeDB.fallback_font
 	var signal_strength := float(rival_grudge) / 100.0
 	var jitter := Vector2(sin(elapsed * 19) * signal_strength * 3, cos(elapsed * 23) * signal_strength * 2)

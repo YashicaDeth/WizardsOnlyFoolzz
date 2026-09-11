@@ -13,6 +13,12 @@ const DERBY_AUDIO := preload("res://systems/procedural_derby_audio.gd")
 const VEHICLE := preload("res://systems/arcade_vehicle.gd")
 const AI_DRIVER := preload("res://systems/derby_ai_driver.gd")
 const KILL_CAM := preload("res://systems/kill_cam.gd")
+const DAMAGE_PORTRAIT := preload("res://systems/damage_portrait.gd")
+const CAB_SCREENS := preload("res://systems/cab_screens.gd")
+
+## Authored props that fight the read at arena scale. Hidden rather than deleted
+## from the kit, so a re-export can reinstate them deliberately.
+const SUPPRESSED_PROPS := ["launch_ramp_00", "launch_ramp_01", "launch_ramp_02"]
 
 var boat: Node3D
 var speed := 0.0
@@ -32,6 +38,8 @@ var countdown := 3.0
 var authored_collision_count := 0
 var derby_audio: Node
 var kill_cam: Control
+var damage_portrait: Control
+var cab_screens: Control
 
 @onready var camera: Camera3D = $Camera3D
 @onready var status: Label = $HUD/Status
@@ -55,6 +63,18 @@ func _ready() -> void:
 	kill_cam = KILL_CAM.new()
 	kill_cam.name = "KillCam"
 	$HUD.add_child(kill_cam)
+	cab_screens = CAB_SCREENS.new()
+	cab_screens.name = "CabScreens"
+	$HUD.add_child(cab_screens)
+	damage_portrait = DAMAGE_PORTRAIT.new()
+	damage_portrait.name = "DamagePortrait"
+	damage_portrait.position = Vector2(26, 22)
+	$HUD.add_child(damage_portrait)
+	# The bust reports driver state; the old title block said nothing.
+	status.visible = false
+	score_label.visible = false
+	if "show_title" in dynamic_interface:
+		dynamic_interface.set("show_title", false)
 	var crowd_banks: Array = []
 	for index in range(0, crowd_members.size(), 16):
 		crowd_banks.append((crowd_members[index] as Node3D).position + Vector3(0, 1.5, 0))
@@ -122,6 +142,7 @@ func _build_world() -> void:
 	authored_environment.scale = Vector3(ARENA_SCALE, ARENA_SCALE, ARENA_SCALE)
 	add_child(authored_environment)
 	WorldLook.regrime(authored_environment, 17)
+	_suppress_props(authored_environment)
 	_add_authored_environment_collision(authored_environment)
 	var floor := StaticBody3D.new()
 	var floor_collision := CollisionShape3D.new()
@@ -374,6 +395,22 @@ func _update_hud() -> void:
 	mode_label.text = ("VICTORY — ENTER: EXIT INTO ASHBLOOM" if round_state == "won" else "WRECKED — ENTER: CRAWL INTO ASHBLOOM" if round_state == "lost" else "VISCERA FX: %s  ·  RUST / OIL / BLOOD" % ("ON" if viscera_fx else "OFF"))
 	var rival := WorldHistory.subject(RIVAL_ID)
 	rival_label.text = "HUNT ARC  //  MARA VOSS\n%s  ·  GRUDGE %03d  ·  ELO %04d\n[I] WORLD INDEX" % [str(rival.get("status", "active")).to_upper(), int(rival.get("grudge", 0)), int(rival.get("elo", 1180))]
+	if cab_screens != null:
+		var contacts: Array = []
+		var forward := -boat.global_transform.basis.z
+		var right := boat.global_transform.basis.x
+		for target in targets:
+			if not is_instance_valid(target):
+				continue
+			var delta_position := target.global_position - boat.global_position
+			contacts.append({
+				"offset": Vector2(delta_position.dot(right), -delta_position.dot(forward)),
+				"integrity": int(target.get_meta("integrity", 100)),
+				"rival": bool(target.get_meta("is_rival", false)),
+			})
+		cab_screens.set_telemetry(integrity, _player_parts_lost(), contacts, ARENA_LIMIT)
+	if damage_portrait != null:
+		damage_portrait.set_damage(1.0 - clampf(float(integrity) / 100.0, 0.0, 1.0))
 	if dynamic_interface.has_method("set_telemetry"):
 		dynamic_interface.set_telemetry({
 			"speed": speed,
@@ -385,6 +422,22 @@ func _update_hud() -> void:
 			"rival_grudge": rival.get("grudge", 0),
 			"rival_elo": rival.get("elo", 1180),
 		})
+
+
+func _suppress_props(root: Node) -> void:
+	var pending: Array[Node] = [root]
+	while not pending.is_empty():
+		var current: Node = pending.pop_back()
+		for child in current.get_children():
+			pending.append(child)
+		if current is MeshInstance3D and SUPPRESSED_PROPS.has(current.name):
+			(current as MeshInstance3D).visible = false
+
+
+## The player's shed panels are tracked on the chassis the same way the AI cars
+## track theirs, so the dash schematic reads from real state.
+func _player_parts_lost() -> Array:
+	return boat.get_meta("detached_parts", [])
 
 
 func _refresh_world_index() -> void:
