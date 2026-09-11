@@ -75,22 +75,48 @@ Nothing else is worth polishing until a ram feels like a ram.
    speed-linked camera shake and FOV, brake/scrape effects, and a decision on
    whether the upright angular lock stays (it currently prevents rolling).
 
-### Tier 1a — impact feel, added 2026-09-11
+### Tier 1a — impact feel, added 2026-09-11, **completed 2026-09-11**
 
-**Highest priority.** Cars currently grind into each other at near-zero speed
-and stay there, which drains every collision of meaning.
+Cars ground into each other at near-zero speed and stayed there, draining every
+collision of meaning. Three causes, all in `arcade_vehicle.gd`, all fixed:
 
-- **Restitution.** `arcade_vehicle.gd` sets `PhysicsMaterial.bounce = 0.35`,
-  but sustained engine force overrides separation, so contact becomes a shove
-  rather than a hit. Give impacts real bounce-back: an impulse along the
-  contact normal scaled by closing speed, plus a brief throttle cut on both
-  vehicles so they actually part before re-engaging.
-- **Contact lockout.** After a registered impact, suppress re-collision scoring
-  and drive between the same pair for a beat, so ramming reads as discrete
-  blows instead of a continuous scrape.
-- **Destruction scaling.** Damage, part shedding and debris are currently far
-  too conservative for the closing speeds involved. A hard hit should visibly
-  deform and shed on the first contact, not the fifth.
+- **Grip was eating the hit.** The lateral tire force was an uncapped spring —
+  a car T-boned at 8 m/s generated 40 m/s² of counter-force and cancelled the
+  knock inside one frame. Grip is now a friction limit. This was the single
+  biggest cause and was not the one originally diagnosed here.
+- **Sustained drive turned contact into a shove**, so restitution never acted.
+  Drive and steering are now cut briefly on impact.
+- **Nothing broke a stalemate.** Two cars leaning on each other never reach the
+  impact threshold. A continuous repulsion force does not fix this — the drive
+  servo out-pushes it and re-closes the gap. After a sustained press the pair is
+  now kicked apart as a discrete event with a slew, so they part and re-engage
+  as a scored blow.
+- **Destruction scales with the square of closing speed**, so a committed ram
+  strips panels on the first contact. Impacts also carry a `self_share` so the
+  car that drove into the other wears the damage.
+- **No reset key.** Per Greg's play test, a wedged car backs itself out and the
+  heat resolves on a count rather than waiting on ENTER.
+
+Covered by `tests/impact_test.gd` (10 checks). Note the bounds are part of the
+contract: separation is asserted from both sides so a later tune cannot quietly
+turn the pit into pinball.
+
+### Tier 1a-next — captured from Greg 2026-09-11
+
+Fired mid-session, recorded here rather than half-built.
+
+- **Guns.** Ranged weapons alongside the melee work in Tier 1b — currently
+  nowhere in this plan. Needs a decision on whether firearms are common enough
+  to change encounter design, or scarce, jamming and mostly improvised, which
+  fits a world where nothing is new. Ammunition is an economy item either way.
+- **One baseline human model for every NPC.** This is the prerequisite hiding
+  underneath the gore, prosthetic and voice-chat ambitions: every person in the
+  world built from a single rig with the same named zones, so
+  `anatomy_component.gd` injuries, organ damage, amputation and limb
+  replacement apply universally instead of per-character. Without it, "bodies
+  remember" only works on hand-authored characters, and proximity voice has
+  nothing consistent to attach a speaking head to. Schedule this before Tier
+  1b.13 rather than after.
 
 ### Tier 1b — combat, added 2026-09-11
 

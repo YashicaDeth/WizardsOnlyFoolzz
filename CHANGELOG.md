@@ -2,6 +2,15 @@
 
 ## 2026 09 11
 
+- **Tier 1a impact feel.** Fixed the three causes of weightless rams in `arcade_vehicle.gd`: an uncapped lateral grip force that cancelled side impacts inside one frame (the dominant cause, and not the one originally diagnosed), sustained drive force turning contact into a shove, and nothing able to break a two-car stalemate. Grip is now a friction limit, drive and steering cut briefly on impact, and a sustained press kicks the pair apart as a discrete event with a slew.
+- Impacts now carry a `self_share`, so the car that drove into the other wears the damage rather than both splitting it evenly.
+- Destruction scales with the square of closing speed: a committed ram strips panels on the first contact. Added camera shake, panel debris and an asymmetric shell fold toward the hit.
+- **Removed the need for a reset key.** A car that cannot make progress backs itself out and swings clear, and the heat resolves on a visible count instead of waiting on ENTER. `R` still works during development but is no longer advertised in the HUD.
+- Added `tests/impact_test.gd` — 10 checks covering separation bounds in both directions, the grip cap, the contact lockout, the blame split, grind breakup and wall unstick.
+- Fixed `opening_test.gd` calling `_process` on the derby, which only defines `_physics_process`. It errored out and silently skipped its last three checks; all 19 now run and pass.
+- Captured from Greg: guns, and one baseline human rig for every NPC. The rig gates persistent injury, prosthetics, zone-matched gore and proximity voice, and is scheduled before the limb/organ work rather than after.
+- Added `web/index.html`, the CellOutz storefront for celloutz.xyz. No payment details are collected on the page by design; checkout belongs on a processor's own domain, and the order links are marked swap points.
+
 - Added exterior AStar routing around generated building footprints; encounter actors now use CharacterBody3D collision and route refresh intervals, including wounded flight.
 - Added timed close-range hostile attacks and dodge avoidance for encounter actors.
 - Added E interactions for friendly healing/bonds, currency-consuming trade and collectible testimony; persisted encounter resolutions and a 15-second encounter dispatch cooldown.
