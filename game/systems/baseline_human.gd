@@ -35,8 +35,8 @@ const ZONE_ALIASES := {
 const STANDING := {
 	"head": {"at": Vector3(0, 1.62, 0), "size": Vector3(0.26, 0.28, 0.26)},
 	"torso": {"at": Vector3(0, 1.12, 0), "size": Vector3(0.48, 0.66, 0.28)},
-	"left_arm": {"at": Vector3(-0.34, 1.12, 0), "size": Vector3(0.17, 0.62, 0.19)},
-	"right_arm": {"at": Vector3(0.34, 1.12, 0), "size": Vector3(0.17, 0.62, 0.19)},
+	"left_arm": {"at": Vector3(-0.235, 1.10, 0), "size": Vector3(0.17, 0.62, 0.19)},
+	"right_arm": {"at": Vector3(0.235, 1.10, 0), "size": Vector3(0.17, 0.62, 0.19)},
 	"left_leg": {"at": Vector3(-0.14, 0.42, 0), "size": Vector3(0.21, 0.84, 0.23)},
 	"right_leg": {"at": Vector3(0.14, 0.42, 0), "size": Vector3(0.21, 0.84, 0.23)},
 }
@@ -46,8 +46,8 @@ const STANDING := {
 const SEATED := {
 	"head": {"at": Vector3(0, 1.16, 0), "size": Vector3(0.26, 0.28, 0.26)},
 	"torso": {"at": Vector3(0, 0.74, 0), "size": Vector3(0.48, 0.60, 0.28)},
-	"left_arm": {"at": Vector3(-0.32, 0.76, -0.12), "size": Vector3(0.17, 0.52, 0.19)},
-	"right_arm": {"at": Vector3(0.32, 0.76, -0.12), "size": Vector3(0.17, 0.52, 0.19)},
+	"left_arm": {"at": Vector3(-0.225, 0.74, -0.12), "size": Vector3(0.17, 0.52, 0.19)},
+	"right_arm": {"at": Vector3(0.225, 0.74, -0.12), "size": Vector3(0.17, 0.52, 0.19)},
 	"left_leg": {"at": Vector3(-0.14, 0.34, -0.30), "size": Vector3(0.21, 0.26, 0.62)},
 	"right_leg": {"at": Vector3(0.14, 0.34, -0.30), "size": Vector3(0.21, 0.26, 0.62)},
 }
@@ -82,7 +82,9 @@ const ORGAN_LAYOUT := {
 
 var anatomy: AnatomyComponent
 var organ_parts: Dictionary = {}
+var bones: Dictionary = {}
 var head_anchor: Node3D
+var _xray := false
 var subject_id := ""
 var parts: Dictionary = {}
 var severed: Array[String] = []
@@ -113,7 +115,10 @@ func build(id: String, config: Dictionary = {}) -> void:
 		var part := MeshInstance3D.new()
 		part.name = zone_id
 		part.mesh = _zone_mesh(zone_id, spec.size)
+		part.material_override = _zone_material(zone_id, _flesh.lightened(0.06) if zone_id == "head" else _flesh)
 		part.position = spec.at
+		if _leg_points_forward(zone_id):
+			part.rotation.x = PI * 0.5
 		part.set_meta("rest_position", spec.at)
 		add_child(part)
 		parts[zone_id] = part
@@ -130,6 +135,7 @@ func build(id: String, config: Dictionary = {}) -> void:
 		hitbox.add_child(shape_node)
 
 	_build_organs()
+	_build_bones(layout)
 
 	head_anchor = Node3D.new()
 	head_anchor.name = "HeadAnchor"
@@ -214,12 +220,55 @@ func _organ_in_zone(zone_id: String) -> String:
 	return candidates[randi() % candidates.size()] if not candidates.is_empty() else ""
 
 
+## A skeleton under the flesh. It is what the X-ray reads, what shows through a
+## zone whose flesh has failed, and what is left sticking out of a stump.
+func _build_bones(layout: Dictionary) -> void:
+	for zone_id in ZONES:
+		var host := parts.get(zone_id) as Node3D
+		if host == null:
+			continue
+		var spec: Dictionary = layout[zone_id]
+		var frame := Node3D.new()
+		frame.name = "%s_bone" % zone_id
+		frame.visible = false
+		host.add_child(frame)
+		bones[zone_id] = frame
+		var length: float = (spec.size as Vector3).z if _leg_points_forward(zone_id) else (spec.size as Vector3).y
+		match zone_id:
+			"head":
+				_bone_piece(frame, BodyMesh.skull((spec.size as Vector3).y), Vector3.ZERO)
+			"torso":
+				# Spine first, then a cage hung off it. Seven vertebrae is not
+				# anatomy, it is enough to read as a spine at this scale.
+				for index in 7:
+					_bone_piece(frame, BodyMesh.vertebra(), Vector3(0, length * 0.42 - index * length * 0.14, -0.072))
+				for index in 5:
+					var rib := _bone_piece(frame, BodyMesh.arc_tube(0.148, 0.098, 0.011, PI * 0.12, PI * 0.88), Vector3(0, length * 0.30 - index * 0.052, -0.012))
+					rib.rotation.x = 0.14
+			_:
+				_bone_piece(frame, BodyMesh.long_bone(length * 0.92, 0.019), Vector3.ZERO)
+
+
+func _bone_piece(parent: Node3D, mesh: Mesh, at: Vector3) -> MeshInstance3D:
+	var piece := MeshInstance3D.new()
+	piece.mesh = mesh
+	piece.position = at
+	piece.material_override = _zone_material("torso", BONE, "bone")
+	parent.add_child(piece)
+	return piece
+
+
 ## Shows what is inside without cutting it open. The X-ray dossier drives this.
 func reveal_organs(revealed: bool) -> void:
+	_xray = revealed
 	for organ_id in organ_parts:
 		var organ := organ_parts[organ_id] as Node3D
 		if organ != null and is_instance_valid(organ) and anatomy.organ_ok(organ_id):
 			organ.visible = revealed
+	for zone_id in bones:
+		var bone := bones[zone_id] as Node3D
+		if bone != null and is_instance_valid(bone):
+			bone.visible = revealed or (not severed.has(zone_id) and zone_health(zone_id) < AnatomyComponent.DEFAULT_ZONES[zone_id].health * FRACTURE_RATIO)
 	for zone_id in parts:
 		var part := parts[zone_id] as MeshInstance3D
 		if part != null and is_instance_valid(part) and not severed.has(zone_id):
@@ -313,18 +362,34 @@ func zone_health(zone_id: String) -> float:
 	return float(zone.get("health", 0.0))
 
 
+## Proportioned geometry rather than primitives. A capsule cannot express the
+## difference between a chest and a forearm, and that difference is most of what
+## makes a body read as a body.
 func _zone_mesh(zone_id: String, size: Vector3) -> Mesh:
-	if zone_id == "head":
-		var skull := SphereMesh.new()
-		skull.radius = size.x * 0.5
-		skull.height = size.y
-		skull.material = WorldLook.surface(_flesh.lightened(0.06), "flesh", _variation + 3)
-		return skull
-	var limb := CapsuleMesh.new()
-	limb.radius = minf(size.x, size.z) * 0.5
-	limb.height = maxf(size.y, limb.radius * 2.0 + 0.01)
-	limb.material = WorldLook.surface(_flesh, "flesh", _variation + ZONES.find(zone_id))
-	return limb
+	var length := size.z if _leg_points_forward(zone_id) else size.y
+	match zone_id:
+		"head":
+			return BodyMesh.head(size.y)
+		"torso":
+			return BodyMesh.torso(size.y)
+		"left_arm", "right_arm":
+			return BodyMesh.arm(length)
+		_:
+			return BodyMesh.leg(length)
+
+
+## Seated legs run forward out of the hip rather than down from it, so the
+## generated limb is swept along Z instead of Y.
+func _leg_points_forward(zone_id: String) -> bool:
+	return _seated and zone_id.ends_with("_leg")
+
+
+func _zone_material(zone_id: String, tint: Color, kind := "flesh") -> StandardMaterial3D:
+	var material := WorldLook.surface(tint, kind, _variation + ZONES.find(zone_id))
+	# Generated surfaces are open where a limb has been taken off, and the
+	# insides are supposed to be visible when they are.
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return material
 
 
 ## Damage reads on the body itself: a zone darkens as it fails, and a limb that
@@ -339,16 +404,24 @@ func _refresh_zone(zone_id: String) -> void:
 	var ceiling := float(AnatomyComponent.DEFAULT_ZONES[zone_id].health)
 	var ratio := clampf(float(zone.health) / maxf(ceiling, 1.0), 0.0, 1.0)
 	var prosthetic := anatomy.installed_parts.has(zone_id)
-	var mesh := part.mesh as PrimitiveMesh
-	if mesh != null:
-		var tint := Color("8d9299") if prosthetic else _flesh.lerp(Color("3d0907"), 1.0 - ratio)
-		mesh.material = WorldLook.surface(tint, "chrome" if prosthetic else "flesh", _variation + ZONES.find(zone_id))
+	var tint := Color("8d9299") if prosthetic else _flesh.lerp(Color("3d0907"), 1.0 - ratio)
+	part.material_override = _zone_material(zone_id, tint, "chrome" if prosthetic else "flesh")
+	# Bone shows through where the flesh has failed, without waiting for the
+	# limb to come off entirely.
+	var bone := bones.get(zone_id) as Node3D
+	if bone != null and is_instance_valid(bone) and not _xray:
+		var exposed := ratio < FRACTURE_RATIO and not prosthetic
+		bone.visible = exposed
+		# Bone inside opaque flesh is bone nobody can see. Ruined flesh goes
+		# translucent so the skeleton under it actually reads.
+		part.transparency = clampf((FRACTURE_RATIO - ratio) / FRACTURE_RATIO, 0.0, 1.0) * 0.55 if exposed else 0.0
 	if gore and ratio < FRACTURE_RATIO and ratio > 0.0 and not prosthetic:
 		_add_fracture(zone_id)
 	if ratio <= 0.0 and LIMBS.has(zone_id) and not prosthetic:
 		if not severed.has(zone_id):
 			severed.append(zone_id)
 			if gore:
+				_throw_limb(zone_id)
 				_add_stump(zone_id)
 				_spray(_zone_origin(zone_id), Vector3.UP, 14)
 		part.visible = false
@@ -444,6 +517,45 @@ func _add_fracture(zone_id: String) -> void:
 	shard.position = Vector3(randf_range(-0.05, 0.05), randf_range(-0.13, 0.13), 0.07)
 	shard.rotation = Vector3(randf_range(-0.8, 0.8), 0.0, randf_range(-1.0, 1.0))
 	part.add_child(shard)
+
+
+## A limb that comes off is the same geometry that was attached a moment ago,
+## handed to the solver with the bone still in it. Hiding the mesh and calling it
+## dismemberment is the version that reads as a bug.
+func _throw_limb(zone_id: String) -> void:
+	var part := parts.get(zone_id) as MeshInstance3D
+	if part == null or not is_instance_valid(part) or not part.is_inside_tree():
+		return
+	if live_gore >= MAX_LIVE_GORE:
+		return
+	var limb := RigidBody3D.new()
+	limb.name = "%s_severed" % zone_id
+	limb.mass = 5.0
+	_gore_root().add_child(limb)
+	limb.global_transform = part.global_transform
+	var visual := MeshInstance3D.new()
+	visual.mesh = part.mesh
+	visual.material_override = part.material_override
+	limb.add_child(visual)
+	var bone := bones.get(zone_id) as Node3D
+	if bone != null and is_instance_valid(bone) and bone.get_child_count() > 0:
+		var stub := (bone.get_child(0) as MeshInstance3D).duplicate() as MeshInstance3D
+		stub.visible = true
+		limb.add_child(stub)
+	var shape_node := CollisionShape3D.new()
+	var shape := CapsuleShape3D.new()
+	var bounds := part.get_aabb()
+	shape.radius = maxf(0.05, minf(bounds.size.x, bounds.size.z) * 0.5)
+	shape.height = maxf(shape.radius * 2.0 + 0.01, bounds.size.y)
+	shape_node.shape = shape
+	limb.add_child(shape_node)
+	limb.apply_central_impulse(Vector3(randf_range(-1.6, 1.6), 2.6, randf_range(-1.6, 1.6)) * limb.mass)
+	limb.apply_torque_impulse(Vector3(randf_range(-3.0, 3.0), randf_range(-3.0, 3.0), randf_range(-3.0, 3.0)))
+	live_gore += 1
+	get_tree().create_timer(18.0).timeout.connect(func():
+		live_gore = maxi(0, live_gore - 1)
+		if is_instance_valid(limb):
+			limb.queue_free())
 
 
 func _add_stump(zone_id: String) -> void:
