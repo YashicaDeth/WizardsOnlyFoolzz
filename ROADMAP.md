@@ -450,6 +450,42 @@ Free-form construction stays available as a later addition on top of a claimed
 camp, if it is ever worth the cost. It should not be the way the feature is
 introduced.
 
+### Outstanding UI work Greg named, 2026-09-11
+
+From a play screenshot of the derby: *"the car and bottom left and top left and
+the hunt signal is aids and the hull integrity honestly I hate it all"*, and
+separately *"the world index needs a UI badly it looks shit"*. All correct, and
+all the same root cause — these were built before the project had a visual
+language, and now it has one (`celloutz_type.gd`, the framed-plate vocabulary,
+the contamination materials) they are the parts that have not been brought over.
+
+- **World Index** — a bare `PanelContainer` with a default-font `Label`. The
+  single worst offender in the game; it is a Godot default with text in it.
+- **Hull integrity, hunt signal, damage bust, contact radar** — the derby HUD
+  corners. They need the framed-object treatment and the display face.
+- **The derby arena and the cars.** The cars are still smooth boxes and the
+  venue still reads as a painted oval on a flat plane. This is the Blender work
+  already recorded under "Derby art pass"; no amount of shader work replaces it.
+
+### Nemesis / Shadow of Mordor — the standing answer, 2026-09-11
+
+Greg linked a Shadow of Mordor video and asked for it to be studied and added.
+Recording the answer here so it does not have to be re-litigated each time:
+
+- Videos cannot be watched by the agent, and a commercial game's code will not
+  be read — that request was made and declined earlier in the same session.
+- More importantly, **`DESIGN/HUNT_SYSTEM.md` is an entire document about not
+  doing this.** Warner Bros holds US Patent 10,926,179 on the Nemesis System,
+  in force into the mid-2030s, and that document already states deliberately
+  studying it to reproduce it is the most legally exposed thing this project
+  could build — on a game carrying Greg's real name.
+- **The experience he wants is not blocked, and is already designed.** The six
+  mechanisms in `HUNT_SYSTEM.md` — the wound as the memory, promotion into real
+  vacancies, grudges travelling along relation edges, distortion on retelling,
+  alignment drift, bonds on the same machinery — are largely *unbuilt*. Witness
+  records on events is step one and is cheap. That is the work; it does not
+  need a reference video.
+
 ### Tier 1b — combat, added 2026-09-11
 
 **Movement prerequisite completed 2026-09-11.** The original Hunt controller

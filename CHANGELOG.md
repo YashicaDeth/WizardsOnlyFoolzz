@@ -2,6 +2,21 @@
 
 ## 2026 09 11
 
+- **The Allusions screen becomes a natal sigil.** `systems/natal_sigil.gd`
+  draws a twelve-house wheel with hand-built sign glyphs, places the bodies
+  deterministically from a birth date, draws the classical aspects between
+  them, and then performs the actual chaos magick operation on the result:
+  strike out every repeated meeting point and bind what is left into one closed
+  mark. `DESIGN.md` §16 already put chaos magick in the world's rules and
+  `world_history.gd` already reads subjects on an Ascent/Limbo/Descent axis;
+  this is the drawing of both. Stated plainly on the plate and in the file:
+  it is symbolic, not an ephemeris.
+- Fixed the sign boundaries while building it — `SIGNS` starts at Aries, which
+  is the third month, so indexing it by `month - 1` put every date three signs
+  out and read 14 August as Libra. Checked against eight known dates.
+
+## 2026 09 11
+
 - **The game has a typeface.** Every interface in the project was set in
   `ThemeDB.fallback_font` — Godot's default UI face — which is the single
   loudest "unfinished engine project" signal there is, and Greg named it.
