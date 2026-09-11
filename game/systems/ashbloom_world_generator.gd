@@ -39,7 +39,7 @@ func _build_road(at: Vector3, dimensions: Vector3) -> void:
 	var mesh := MeshInstance3D.new()
 	var box := BoxMesh.new()
 	box.size = dimensions
-	box.material = _material(ROAD, 0.0)
+	box.material = _material(ROAD, 0.0, "dirt")
 	mesh.mesh = box
 	mesh.position = at
 	add_child(mesh)
@@ -88,12 +88,18 @@ func _add_wall(parent: Node3D, at: Vector3, dimensions: Vector3, color: Color) -
 	body.add_child(mesh_instance)
 
 
-func _material(color: Color, emission: float) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.metallic = 0.22
-	material.roughness = 0.86
+## The whole region was built with its own flat material function and never
+## touched `WorldLook` at all, so every wall, road and shell in the Ashbloom
+## was a single untextured colour. That — not the box geometry — is why the
+## region reads as a grey-box prototype: the same boxes with contaminated
+## surfaces on them read as a ruined town.
+var _surface_index := 0
+
+func _material(color: Color, emission: float, kind := "rust") -> StandardMaterial3D:
+	_surface_index += 1
+	var material: StandardMaterial3D = WorldLook.surface(color, kind, _surface_index)
 	material.emission_enabled = emission > 0.0
-	material.emission = color
-	material.emission_energy_multiplier = emission
+	if emission > 0.0:
+		material.emission = color
+		material.emission_energy_multiplier = emission
 	return material

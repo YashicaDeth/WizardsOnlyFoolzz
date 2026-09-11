@@ -2,6 +2,25 @@
 
 ## 2026 09 11
 
+- **Every albedo in the game was a flat colour.** `WorldLook.surface()` only
+  ever set a roughness texture, so no surface in the project had any albedo
+  detail at all — which is the real reason the world read as untextured
+  primitives regardless of how the geometry was built. Surfaces now carry a
+  generated contamination texture: blotching, vertical weeping, cellular grime,
+  panel seams, posterised to seven levels and sampled unfiltered for PS1-era
+  crunch. Cached hard, because a pit of twelve wreckers would otherwise build a
+  thousand of them.
+- **The Ashbloom region never used the material system at all.** The world
+  generator had its own flat `_material()` and never touched `WorldLook`, so
+  every wall, road and shell in the region was a single untextured colour. It
+  routes through `WorldLook.surface()` now.
+- **The region was drowning in its own fog.** 0.014 density with 0.88 ambient
+  washed everything past a few metres into one flat brown haze, hiding whatever
+  the materials produced. Density down to 0.005, ambient down, saturation and
+  contrast up — contamination colour is supposed to be the thing you notice.
+
+## 2026 09 11
+
 - **Grappling.** Combat had no contact-range verb at all — everything resolved
   at sword reach or not at all, so two people standing on top of each other
   swung through one another. `C` takes hold of someone in front of you and

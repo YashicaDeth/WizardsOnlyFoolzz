@@ -25,10 +25,16 @@ const PRESETS := {
 		"fog": "6f5340", "fog_density": 0.012, "volumetric": 0.012,
 		"ambient": 0.62, "saturation": 0.8, "contrast": 1.1, "exposure": 1.18,
 	},
+	# Fog was dense enough (0.014 with 0.88 ambient) to wash the region into one
+	# flat brown haze at any distance, which hid every surface the material
+	# system produces and is a large part of why the Ashbloom read as a
+	# grey-box prototype. The far edge still hazes out; the near field no
+	# longer does. Saturation up, because contamination colour is supposed to
+	# be the thing you notice.
 	"ashbloom": {
 		"zenith": "2c3026", "horizon": "94906a", "ground": "3a3828",
-		"fog": "6d7152", "fog_density": 0.014, "volumetric": 0.015,
-		"ambient": 0.88, "saturation": 0.82, "contrast": 1.07, "exposure": 1.25,
+		"fog": "6d7152", "fog_density": 0.005, "volumetric": 0.006,
+		"ambient": 0.72, "saturation": 1.02, "contrast": 1.16, "exposure": 1.12,
 	},
 	"ossuary": {
 		"zenith": "1d1722", "horizon": "6a5074", "ground": "2a2030",
@@ -113,30 +119,30 @@ static func surface(color: Color, kind: String = "paint", variation_seed: int = 
 		"rust":
 			material.metallic = 0.15
 			material.roughness = 0.92
-			_apply_grain(material, 2.4, 0.55)
+			_apply_grain(material, 0.32, 0.55, "rust", variation_seed)
 		"paint":
 			material.metallic = 0.3
 			material.roughness = 0.68
-			_apply_grain(material, 1.6, 0.4)
+			_apply_grain(material, 0.28, 0.4, "paint", variation_seed)
 		"chrome":
 			material.metallic = 0.85
 			material.roughness = 0.32
-			_apply_grain(material, 0.9, 0.22)
+			_apply_grain(material, 0.4, 0.22, "chrome", variation_seed)
 		"flesh":
 			material.metallic = 0.0
 			material.roughness = 0.42
 			material.rim_enabled = true
 			material.rim = 0.5
 			material.rim_tint = 0.6
-			_apply_grain(material, 5.5, 0.3)
+			_apply_grain(material, 2.2, 0.3, "flesh", variation_seed)
 		"bone":
 			material.metallic = 0.0
 			material.roughness = 0.74
-			_apply_grain(material, 3.2, 0.35)
+			_apply_grain(material, 1.4, 0.35, "bone", variation_seed)
 		"dirt":
 			material.metallic = 0.0
 			material.roughness = 0.97
-			_apply_grain(material, 1.1, 0.6)
+			_apply_grain(material, 0.22, 0.6, "dirt", variation_seed)
 		_:
 			material.metallic = 0.35
 			material.roughness = 0.6
@@ -201,12 +207,107 @@ static func emissive(color: Color, energy: float) -> StandardMaterial3D:
 ## Triplanar noise on roughness. Every mesh in the project is an untextured
 ## primitive with no UVs, so triplanar is the only way to break up a surface
 ## without authoring UV maps for procedurally generated geometry.
-static func _apply_grain(material: StandardMaterial3D, scale: float, strength: float) -> void:
+static func _apply_grain(material: StandardMaterial3D, scale: float, strength: float, kind := "paint", seed_value := 0) -> void:
 	material.uv1_triplanar = true
 	material.uv1_scale = Vector3(scale, scale, scale)
 	material.roughness_texture = _noise(scale)
 	material.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
 	material.roughness = clampf(material.roughness * (1.0 - strength * 0.25), 0.05, 1.0)
+	# Albedo was a flat colour on every surface in the game, with only roughness
+	# varying — which is the whole reason the world read as untextured
+	# primitives no matter how the geometry was built. Contamination arrives on
+	# the albedo now, at low resolution and unfiltered, per ART-DIRECTION.md:
+	# colour is contamination, not paint, and the target is PS1-era crunch.
+	material.albedo_texture = _contamination(kind, material.albedo_color, seed_value)
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	# The tint now lives in the texture, so leave the multiplier neutral or the
+	# surface is coloured twice and goes muddy.
+	material.albedo_color = Color(1, 1, 1, material.albedo_color.a)
+
+
+## A low-resolution, posterised, contaminated surface for one material kind.
+## Generated rather than authored so nothing here is an imported asset, and
+## cached hard: without the cache a pit of twelve wreckers would build a
+## thousand of these.
+static var _surface_cache: Dictionary = {}
+
+static func _contamination(kind: String, tint: Color, seed_value: int) -> ImageTexture:
+	var bucket := absi(seed_value) % 6
+	var key := "%s|%d|%d|%d|%d" % [kind, roundi(tint.r * 12), roundi(tint.g * 12), roundi(tint.b * 12), bucket]
+	if _surface_cache.has(key):
+		return _surface_cache[key]
+
+	var size := 96
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(key)
+	var blotch := FastNoiseLite.new()
+	blotch.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	blotch.frequency = 0.035
+	blotch.fractal_octaves = 3
+	blotch.seed = rng.randi()
+	var grime := FastNoiseLite.new()
+	grime.noise_type = FastNoiseLite.TYPE_CELLULAR
+	grime.cellular_return_type = FastNoiseLite.RETURN_DISTANCE2_DIV
+	grime.frequency = 0.11
+	grime.seed = rng.randi()
+
+	# What grows on, weeps down or stains this kind of surface.
+	var growth := Color("6d8a2a")
+	var stain := Color("2a1a12")
+	var bloom := 0.42
+	match kind:
+		"rust":
+			growth = Color("8a4a1c")
+			stain = Color("241109")
+			bloom = 0.62
+		"chrome":
+			growth = Color("4a5a5e")
+			stain = Color("13181a")
+			bloom = 0.3
+		"flesh":
+			growth = Color("7d3a3a")
+			stain = Color("2a0b10")
+			bloom = 0.34
+		"bone":
+			growth = Color("b8a870")
+			stain = Color("3a3018")
+			bloom = 0.3
+		"dirt":
+			growth = Color("5c5340")
+			stain = Color("1b1710")
+			bloom = 0.55
+
+	var image := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	for y in size:
+		for x in size:
+			var patch := absf(blotch.get_noise_2d(float(x), float(y)))
+			var cell := clampf(absf(grime.get_noise_2d(float(x), float(y))), 0.0, 1.0)
+			# Vertical weeping: whatever is on this surface has been running
+			# down it for years.
+			var weep := clampf(absf(blotch.get_noise_2d(float(x) * 3.4, float(y) * 0.32)), 0.0, 1.0)
+
+			var value := tint
+			value = value.lerp(growth, clampf(patch * bloom * 2.6, 0.0, 0.95))
+			value = value.lerp(stain, clampf(weep * 0.9 - 0.1, 0.0, 0.8))
+			value = value.darkened(cell * 0.52)
+			# Panel seams and patch plates: straight edges, because a wall that
+			# has been repaired has lines on it and pure noise never does.
+			if (x % 21 == 0 and patch > 0.18) or (y % 17 == 0 and patch > 0.3):
+				value = value.darkened(0.45)
+			# Posterise. Banding is the point: smooth gradients read as modern,
+			# and the brief asks for deliberately authored technical limits.
+			var steps := 7.0
+			value = Color(
+				roundf(value.r * steps) / steps,
+				roundf(value.g * steps) / steps,
+				roundf(value.b * steps) / steps,
+				1.0
+			)
+			image.set_pixel(x, y, value)
+
+	var texture := ImageTexture.create_from_image(image)
+	_surface_cache[key] = texture
+	return texture
 
 
 static func _noise(scale: float) -> NoiseTexture2D:

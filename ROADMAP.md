@@ -345,6 +345,42 @@ foundation in `baseline_human.gd` and `anatomy_component.gd`.
 Nothing here is scheduled yet. It sits behind the Tier 1b combat work because
 every item needs a fight that feels good to be legible inside.
 
+### Reference pass from Greg, 2026-09-11 — captured whole
+
+Greg sent screenshots from Postal 2, Half Sword, HAVKER-MAN X, Eternity Egg
+and Prototype. All five are already in `DESIGN.md`'s influence register as
+tonal references. What follows is the *transferable structure*, recorded so it
+is not lost; none of it is a licence to reproduce another game's UI, art or
+code, and a request to read a commercial game's source was declined.
+
+**The common thread across all five:** interfaces are made objects — framed,
+physical, built out of rendered 3D things rather than flat vector panels — and
+the world is carried by crunchy saturated surfaces rather than by geometry.
+This is what `ART-DIRECTION.md` already specifies under "the interface is a
+made object" and "PS1/PS2-era low-poly surrealism"; the project had simply not
+built it.
+
+- **A pre-game warning card.** Postal 2 register, CellOutz voice. Cheap, sets
+  the tone before anything else, and the game already has three violence tiers
+  to warn about.
+- **A 3D diegetic front end.** The menu as an object in a real scene the camera
+  moves around, rather than buttons on a backdrop.
+- **A violence-level selector as an authored opening choice**, replacing the
+  buried FULL/REDUCED/OFF text setting the game already has.
+- **A framed HUD and map.** Physical bezel — pipes, rust plate, screws — around
+  the live view, and the Living Map presented as a salvaged object rather than
+  a chart floating on black.
+- **Location-based travel** on the map: named discovered places with a
+  description panel, alongside the existing survey chart.
+- **Mutation and evolving cybernetics.** Prototype's third-person power fantasy
+  and Maneater's evolving mutations: cybernetics that *evolve* rather than being
+  installed once, organ and limb upgrades as a progression axis, and — by the
+  reciprocity pillar — the player getting gored and needing emergency
+  replacements. This extends the "1.0 body" note above and sits behind Tier 1b.
+- **Traversal:** running up buildings and walls.
+- **Weapon and cybernetic selection sliders**, and killing that flows without
+  breaking out to a menu.
+
 ### Tier 1b — combat, added 2026-09-11
 
 **Movement prerequisite completed 2026-09-11.** The original Hunt controller
