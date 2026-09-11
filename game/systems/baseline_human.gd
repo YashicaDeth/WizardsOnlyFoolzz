@@ -661,7 +661,7 @@ func _process(delta: float) -> void:
 		piece.life -= delta
 		if piece.life <= 0.0:
 			if bool(piece.get("splat", false)):
-				_land_splat(node.global_position, float(piece.get("size", 0.05)))
+				_land_splat(node.global_position, float(piece.get("size", 0.05)), piece.velocity)
 			node.queue_free()
 			_loose.remove_at(index)
 			live_gore = maxi(0, live_gore - 1)
@@ -670,20 +670,53 @@ func _process(delta: float) -> void:
 ## A landed drop becomes a flat mark on the ground that stays for the rest of
 ## the scene. Oldest marks are recycled rather than accumulating without bound,
 ## so the floor fills up and then stays full instead of costing more over time.
-func _land_splat(at: Vector3, size: float) -> void:
+func _land_splat(at: Vector3, size: float, velocity := Vector3.DOWN) -> void:
 	if not gore or detail <= 0.01:
 		return
 	var root := _gore_root()
-	if root == null:
+	if root == null or not is_inside_tree():
 		return
+
+	# Find what the drop actually hit. Stamping every mark onto the y=0 plane
+	# put blood under the floor in the derby, under ramps, and inside interiors
+	# — which is most of why the gore "hardly works" outside a flat test field.
+	# Blood now lands on the surface it reaches and lies along that surface, so
+	# it climbs walls and drapes over wreckage.
+	var space := get_world_3d().direct_space_state
+	var heading := velocity.normalized() if velocity.length_squared() > 0.01 else Vector3.DOWN
+	var normal := Vector3.UP
+	var landed := Vector3(at.x, 0.02, at.z)
+	var query := PhysicsRayQueryParameters3D.create(at - heading * 0.35, at + heading * 1.6)
+	query.collide_with_areas = false
+	var hit := space.intersect_ray(query)
+	if hit.is_empty():
+		# Nothing along the flight path: drop it straight down onto whatever is
+		# underneath, which is the common case for a drop that ran out of arc.
+		var down := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.4, at + Vector3.DOWN * 4.0)
+		down.collide_with_areas = false
+		hit = space.intersect_ray(down)
+	if not hit.is_empty():
+		landed = hit.position
+		normal = (hit.normal as Vector3).normalized()
 	var splat := MeshInstance3D.new()
 	splat.mesh = _splat_mesh(1.0)
 	splat.scale = Vector3.ONE * (size * (6.0 + randf() * 6.5))
 	# Flat to the ground and jittered, so a pool reads as spatter rather than as
 	# a row of identical stamps.
-	splat.rotation = Vector3(-PI * 0.5, randf() * TAU, 0.0)
 	root.add_child(splat)
-	splat.global_position = Vector3(at.x, 0.02 + randf() * 0.012, at.z)
+	# Lie along the surface, whatever its angle. A fixed -90 degree pitch only
+	# ever reads correctly on flat ground.
+	var up := normal
+	var side := up.cross(Vector3.FORWARD)
+	if side.length_squared() < 0.001:
+		side = up.cross(Vector3.RIGHT)
+	side = side.normalized()
+	var spin := randf() * TAU
+	var forward := up.cross(side).normalized()
+	splat.global_transform = Transform3D(
+		Basis(side, forward, up).rotated(up, spin),
+		landed + normal * (0.012 + randf() * 0.01)
+	)
 	splats.append(splat)
 	while splats.size() > MAX_SPLATS:
 		var oldest: Node3D = splats.pop_front()

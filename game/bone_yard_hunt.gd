@@ -56,6 +56,8 @@ var resolution_ui: Control
 var resolution_target := ""
 var living_map: Control
 var viscera_fx := true
+var enemy_rig: BaselineHuman
+var friend_rig: BaselineHuman
 var lock_target := ""
 var lock_screen := Vector2(-1, -1)
 var camera_position := Vector3.ZERO
@@ -395,12 +397,23 @@ func _resolve_strike() -> void:
 	var facing := Vector3(sin(yaw), 0, cos(yaw)).normalized().dot((enemy.global_position - player).normalized())
 	if facing < 0.18:
 		return
-	var body_zone := "torso"
-	if enemy_health < 55:
-		body_zone = "left arm"
-	if enemy_health < 28:
-		body_zone = "leg"
 	var damage := 22 if story_step > 0 else 15
+	# Mara's wounds used to be picked from her remaining health — "left arm"
+	# below 55, "leg" below 28 — so where the player aimed never mattered and
+	# nothing landed on her body. She has a rig now, so the blow resolves
+	# against it exactly the way it does for everyone else in the region.
+	var body_zone := "torso"
+	if enemy_rig != null and is_instance_valid(enemy_rig):
+		var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+		var along := player + look * clampf((enemy.global_position - player).dot(look), 0.6, 4.1)
+		var lateral := along - enemy.global_position
+		lateral.y = 0.0
+		if lateral.length() > 0.45:
+			lateral = lateral.normalized() * 0.45
+		var aim := enemy.global_position + Vector3(lateral.x, look.y * 4.1 * 1.2, lateral.z)
+		var wound := enemy_rig.hit_at(aim, float(damage), float(damage) * 0.8, "cut")
+		body_zone = str(wound.get("zone", "torso"))
+		WorldHistory.update_subject(HUNT_ID, {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
 	enemy_health = maxi(0, enemy_health - damage)
 	_spawn_blood(enemy.global_position + Vector3(0, 1.2, 0), damage)
 	WorldHistory.record_event("melee_body_hit", {"target": HUNT_ID, "body_zone": body_zone, "damage": damage, "location": HUNT_LOCATION})
@@ -1416,7 +1429,19 @@ func _spawn_loot_cache(at: Vector3, items: Array) -> void:
 func _spawn_friend() -> void:
 	friend = Node3D.new()
 	friend.position = Vector3(19, 1.0, 5)
-	_add_mesh_to(friend, CapsuleMesh.new(), Vector3(0, 1, 0), Color("376d68"), 0.0)
+	# Nix was a bare capsule while every procedurally spawned nobody in the
+	# region got a full anatomy rig. The two named characters in the game were
+	# the only two people in it without bodies.
+	friend_rig = BaselineHuman.new()
+	friend_rig.name = "Body"
+	friend_rig.position = Vector3(0, -0.95, 0)
+	friend.add_child(friend_rig)
+	friend_rig.gore = viscera_fx
+	var nix: Dictionary = WorldHistory.subject(FRIEND_ID)
+	var nix_config := {"flesh": Color("6f7a52"), "variation": 5, "blood": 5000.0}
+	if nix.get("anatomy_state") is Dictionary:
+		nix_config["restore"] = nix.anatomy_state
+	friend_rig.build(FRIEND_ID, nix_config)
 	var label := Label3D.new()
 	label.text = "NIX ARDEN\n[E] TALK"
 	label.position = Vector3(0, 3, 0)
@@ -1428,8 +1453,20 @@ func _spawn_friend() -> void:
 func _spawn_rival() -> void:
 	enemy = Node3D.new()
 	enemy.visible = false
-	_add_mesh_to(enemy, CapsuleMesh.new(), Vector3(0, 1, 0), Color("7a221a"), 0.0)
-	_add_mesh_to(enemy, BoxMesh.new(), Vector3(-0.55, 1.2, 0), Color("9d7f5c"), 0.2)
+	# Mara is the character the whole Hunt System exists to produce, and she was
+	# a capsule with a box stuck to her shoulder. On a real rig her recorded
+	# wounds and her replacement arm are *on her body*, which is the difference
+	# between "bodies remember" being a pillar and being a line in a dossier.
+	enemy_rig = BaselineHuman.new()
+	enemy_rig.name = "Body"
+	enemy_rig.position = Vector3(0, -1.15, 0)
+	enemy.add_child(enemy_rig)
+	enemy_rig.gore = viscera_fx
+	var mara_record: Dictionary = WorldHistory.subject(HUNT_ID)
+	var mara_config := {"flesh": Color("7a4a3a"), "variation": 2, "blood": 5400.0}
+	if mara_record.get("anatomy_state") is Dictionary:
+		mara_config["restore"] = mara_record.anatomy_state
+	enemy_rig.build(HUNT_ID, mara_config)
 	var label := Label3D.new()
 	label.text = "MARA VOSS // ASHLINE CAPTAIN"
 	label.position = Vector3(0, 3, 0)
@@ -1438,7 +1475,12 @@ func _spawn_rival() -> void:
 	var mara := WorldHistory.subject(HUNT_ID)
 	if not str(mara.get("next_adaptation", "")).is_empty():
 		label.text = "MARA VOSS // REBUILT ASHLINE CAPTAIN"
-		_add_mesh_to(enemy, CylinderMesh.new(), Vector3(-0.72, 1.15, 0), Color("c15d2d"), 0.25, Vector3(0.34, 0.85, 0.34))
+		# The industrial arm is now an actual prosthetic in the anatomy record,
+		# so it restores function, changes her combat ratio and shows on the rig
+		# rather than being a cylinder parented next to her.
+		enemy_rig.install_prosthetic("left_arm", {
+			"name": "Ashline industrial arm", "armor": 0.34, "restores": 0.82, "tint": Color("c15d2d"),
+		})
 		var altered_vehicle := SCRAP_SKIFF.instantiate()
 		altered_vehicle.name = "MarasRebuiltWrecker"
 		altered_vehicle.position = Vector3(4.0, -0.45, 1.8)

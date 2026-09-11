@@ -15,7 +15,10 @@ extends CanvasLayer
 
 signal arrived()
 
-const HOLD := 1.45
+## Floor on how long the plate stays up, so a fast load does not flash. The
+## upper bound is the load itself: the plate now waits on real progress from
+## ResourceLoader rather than on a fixed timer that knew nothing.
+const MIN_HOLD := 0.85
 const FADE := 0.36
 
 const VOID := Color("060b09")
@@ -47,6 +50,7 @@ var clock := 0.0
 var caption := ""
 var mutter := ""
 var destination := ""
+var progress := 0.0
 var _last_mutter := -1
 
 
@@ -79,14 +83,39 @@ func travel(scene_path: String, travel_caption: String = "") -> void:
 	screen.visible = true
 
 	var tree := get_tree()
+	progress = 0.0
+	# Start the load behind the fade, so the two overlap instead of queueing.
+	var requested := ResourceLoader.load_threaded_request(scene_path) == OK
 	await _fade(1.0)
-	var error := tree.change_scene_to_file(scene_path)
-	if error != OK:
-		push_error("Interstitial could not reach %s (%d)" % [scene_path, error])
-	# Hold on the plate so the swap is never visible as a stutter, and so the
-	# world gets a beat to say something before the player is standing in it.
+
 	var held := 0.0
-	while held < HOLD:
+	var packed: PackedScene = null
+	if requested:
+		var steps: Array = []
+		while true:
+			var status := ResourceLoader.load_threaded_get_status(scene_path, steps)
+			if not steps.is_empty():
+				progress = clampf(float(steps[0]), 0.0, 1.0)
+			if status == ResourceLoader.THREAD_LOAD_LOADED:
+				packed = ResourceLoader.load_threaded_get(scene_path)
+				break
+			if status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+				push_error("Interstitial could not load %s (status %d)" % [scene_path, status])
+				break
+			await tree.process_frame
+			held += tree.root.get_process_delta_time()
+	progress = 1.0
+	if packed != null:
+		tree.change_scene_to_packed(packed)
+	else:
+		# Threaded loading is the fast path, not the only one: a failure here
+		# must still put the player in the scene rather than stranding them on
+		# a loading screen forever.
+		var error := tree.change_scene_to_file(scene_path)
+		if error != OK:
+			push_error("Interstitial could not reach %s (%d)" % [scene_path, error])
+	# The floor exists so a cached scene does not flash the plate for two frames.
+	while held < MIN_HOLD:
 		await tree.process_frame
 		held += tree.root.get_process_delta_time()
 	await _fade(0.0)
@@ -101,6 +130,7 @@ func hold_open(plate_caption: String) -> void:
 	caption = plate_caption.to_upper()
 	mutter = MUTTERS[randi() % MUTTERS.size()]
 	clock = 0.0
+	progress = 0.0
 	screen.visible = true
 	await _fade(1.0)
 
@@ -148,12 +178,13 @@ func _draw_plate() -> void:
 		screen.draw_string(font, Vector2(44, size.y - 86), caption, HORIZONTAL_ALIGNMENT_LEFT, size.x - 88, 22, INK * Color(1, 1, 1, alpha))
 	screen.draw_string(font, Vector2(44, size.y - 58), mutter, HORIZONTAL_ALIGNMENT_LEFT, size.x - 88, 13, BILE * Color(1, 1, 1, 0.8 * alpha))
 
-	# A progress bar that is honest about knowing nothing.
+	# Real load progress, not a crawling barber pole. The bar used to know
+	# nothing and say so; it now reports what ResourceLoader actually reports.
 	var bar := Rect2(44, size.y - 42, size.x - 88, 6)
 	screen.draw_rect(bar, Color(0, 0, 0, 0.5 * alpha))
-	var crawl := fposmod(clock * 0.55, 1.0)
-	screen.draw_rect(Rect2(bar.position + Vector2(bar.size.x * crawl, 0), Vector2(bar.size.x * 0.22, bar.size.y)), ACID * Color(1, 1, 1, 0.75 * alpha))
+	screen.draw_rect(Rect2(bar.position, Vector2(bar.size.x * progress, bar.size.y)), ACID * Color(1, 1, 1, 0.8 * alpha))
 	screen.draw_rect(bar, INK * Color(1, 1, 1, 0.18 * alpha), false, 1.0)
+	screen.draw_string(font, Vector2(size.x - 92, size.y - 48), "%03d%%" % roundi(progress * 100.0), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ACID * Color(1, 1, 1, 0.8 * alpha))
 
 
 ## The specimen: a skeleton turning on the spot with its organs lit in sequence.
