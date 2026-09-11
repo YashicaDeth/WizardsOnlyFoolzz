@@ -261,9 +261,16 @@ func _process(delta: float) -> void:
 		_map.position = Vector2.ZERO
 
 	carry.age(delta)
-	# The receiver is always running; what it sounds like follows reception.
-	var heard: Dictionary = radio.transmission()
-	radio_audio.tune_to(str(heard.get("kind", "static")), float(heard.get("strength", 0.0)) if mode == "RADIO" else 0.0)
+	# You hear the receiver when you are holding it up and it is the thing you
+	# are looking at. This used to pass strength 0.0 for "off", which is not
+	# silence — it is a dead band, which is the loudest hiss the set makes — so
+	# the radio played flat out in every scene that owned a handheld, and kept
+	# playing after the player got out of the car.
+	if mode == "RADIO" and raised > 0.001:
+		var heard: Dictionary = radio.transmission()
+		radio_audio.tune_to(str(heard.get("kind", "static")), float(heard.get("strength", 0.0)))
+	else:
+		radio_audio.silence()
 	if mode == "RADIO":
 		var found := radio.hold(delta)
 		if found != "":

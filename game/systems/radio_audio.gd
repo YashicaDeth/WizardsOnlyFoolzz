@@ -35,10 +35,23 @@ const BEDS := {
 	"static": {"tone": 0.0, "grit": 1.0, "pulse": 0.0},
 }
 
+## Seconds to fade out when the radio is put away. Not a hard cut — every hard
+## cut in this game is a bug — but short enough that walking away from a set
+## silences it rather than trailing you.
+const FADE_OUT := 0.22
+
 var carrier: AudioStreamPlayer
 var station: AudioStreamPlayer
 var strength := 0.0
 var kind := "static"
+## Whether anybody is actually listening. This used to be implicit in
+## `strength`, which was exactly backwards: strength 0 is not silence, it is a
+## dead band, and a dead band is the *loudest* carrier hiss this thing makes.
+## So the receiver ran flat out in every scene that owned a handheld, including
+## after the player got out of the car.
+var listening := false
+
+var _gain := 0.0
 
 var _band: AudioEffectBandPassFilter
 var _drive: AudioEffectDistortion
@@ -52,8 +65,8 @@ func _ready() -> void:
 		_beds[bed] = _make_bed(str(bed))
 	carrier = _player("Carrier", _beds["static"])
 	station = _player("Station", _beds["wire"])
-	carrier.play()
-	station.play()
+	# Nothing plays until somebody tunes it. The players used to start in
+	# `_ready` and there was no stop path anywhere in the class.
 	set_process(true)
 
 
@@ -86,9 +99,12 @@ func _player(node_name: String, stream: AudioStream) -> AudioStreamPlayer:
 	return player
 
 
-## Called by whoever owns the radio, with the current reception.
+## Called by whoever owns the radio, with the current reception. Tuning is
+## listening: you are holding the set and turning the dial.
 func tune_to(station_kind: String, signal_strength: float) -> void:
 	strength = clampf(signal_strength, 0.0, 1.0)
+	listening = true
+	_gain = 1.0
 	var wanted: String = station_kind if BEDS.has(station_kind) else "static"
 	if wanted != kind:
 		kind = wanted
@@ -97,13 +113,33 @@ func tune_to(station_kind: String, signal_strength: float) -> void:
 			station.play()
 
 
-func _process(_delta: float) -> void:
+## Put it away. Called when the handheld is lowered or is on any other mode —
+## and by anything that leaves a set behind, like getting out of the car.
+func silence() -> void:
+	listening = false
+
+
+func _process(delta: float) -> void:
 	if _band == null:
 		return
+	if not listening:
+		_gain = maxf(0.0, _gain - delta / FADE_OUT)
+	if _gain <= 0.001:
+		# Genuinely stopped, not merely turned down: a looping stream left
+		# playing at -60dB is still a stream being mixed every frame forever.
+		if station.playing:
+			station.stop()
+		if carrier.playing:
+			carrier.stop()
+		return
+	if not station.playing:
+		station.play()
+	if not carrier.playing:
+		carrier.play()
 	# Crossfade. Carrier never leaves entirely, because a perfectly clean
 	# reception in this world would be the strangest thing on the band.
-	station.volume_db = linear_to_db(clampf(strength, 0.0, 1.0) * 0.85 + 0.02)
-	carrier.volume_db = linear_to_db(clampf(1.0 - strength, 0.05, 1.0) * 0.5)
+	station.volume_db = linear_to_db((clampf(strength, 0.0, 1.0) * 0.85 + 0.02) * _gain)
+	carrier.volume_db = linear_to_db(clampf(1.0 - strength, 0.05, 1.0) * 0.5 * _gain)
 	# A strong signal is wide; a weak one is a slot. 2600Hz down to a thin 900.
 	_band.cutoff_hz = lerpf(900.0, 2600.0, strength)
 	_band.resonance = lerpf(1.6, 0.6, strength)

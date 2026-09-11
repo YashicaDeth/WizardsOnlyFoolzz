@@ -107,5 +107,25 @@ func _ready() -> void:
 	audio.tune_to("music", 0.9)
 	check(audio.station.stream != numbers_stream, "a numbers station does not sound like the music one")
 
+	# --- the set can actually be turned off ---------------------------------
+	# It could not. Both players started in _ready on looping streams and there
+	# was no stop path in the class, and "off" was expressed as strength 0.0 —
+	# which is a dead band, the loudest carrier hiss it makes. So it blared in
+	# every scene that owned a handheld, including after leaving the car.
+	audio.tune_to("wire", 0.9)
+	audio._process(0.016)
+	check(audio.station.playing and audio.carrier.playing, "a tuned set is playing")
+	audio.silence()
+	var fading: float = audio.carrier.volume_db
+	audio._process(0.05)
+	check(audio.carrier.volume_db < fading, "letting go of it fades rather than cuts")
+	check(audio.station.playing, "and is still audible mid-fade")
+	for _frame in 20:
+		audio._process(0.05)
+	check(not audio.station.playing and not audio.carrier.playing, "and then the set is genuinely stopped, not just quiet")
+	audio.tune_to("wire", 0.9)
+	audio._process(0.016)
+	check(audio.station.playing, "picking it back up starts it again")
+
 	print("RADIO_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
