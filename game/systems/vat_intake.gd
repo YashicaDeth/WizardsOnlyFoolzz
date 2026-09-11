@@ -55,6 +55,14 @@ var row := 0
 var elapsed := 0.0
 var handler_line := 0
 var handler_life := 0.0
+## D3.4. What he is actually saying, and how long he sits with it. The line used
+## to be an index into a rota on a flat timer; it is now whatever the moment
+## called for, held for as long as that particular line is worth holding.
+var handler_says := ""
+## D8.3. A procedure in progress: the beats left to play, and the shot each one
+## wants. Input is suspended while it runs, because it is being done to you.
+var procedure: Array = []
+var shot := "tank"
 ## What he has just written down, which is not always what you chose.
 var transcript := ""
 var transcript_life := 0.0
@@ -69,9 +77,35 @@ func _ready() -> void:
 	_speak()
 
 
-func _speak() -> void:
-	handler_line = (handler_line + 1) % HANDLER_LINES.size()
-	handler_life = 5.0
+## D3.4. He answers the moment rather than reading down a list. The hold comes
+## with the line, so the pause after a mistranscription is not the pause after
+## ticking a box.
+func _speak(context: String = "idle") -> void:
+	handler_line += 1
+	var beat := IntakeDirection.line_for(context, handler_line)
+	handler_says = str(beat.line)
+	handler_life = float(beat.hold)
+
+
+## D8.3. Signing for something is a thing he does to you, on camera, saying what
+## it costs while he does it. Refusing gets its own beat, because declining is
+## the harder road and it should feel chosen rather than skipped.
+func _play_procedure(modifier_id: String, accepted: bool) -> void:
+	procedure = IntakeDirection.procedure(modifier_id, accepted)
+	if procedure.is_empty():
+		return
+	_advance_procedure()
+
+
+func _advance_procedure() -> void:
+	if procedure.is_empty():
+		shot = "tank"
+		_speak("chose")
+		return
+	var beat: Dictionary = procedure.pop_front()
+	handler_says = str(beat.get("line", ""))
+	handler_life = float(beat.get("hold", 2.6))
+	shot = str(beat.get("shot", "tank"))
 
 
 ## D3. He writes down what he *thinks* you said. Usually right, occasionally
@@ -86,8 +120,13 @@ func _transcribe(intent: String) -> void:
 	if rng.randf() < slip:
 		var wrong := ["YES", "NO", "DECLINED", "UNREADABLE", "SEE OVERLEAF", "N/A"]
 		transcript = "WROTE: %s" % wrong[rng.randi_range(0, wrong.size() - 1)]
+		# He knows. He is not going to fix it.
+		if procedure.is_empty():
+			_speak("slipped")
 	else:
 		transcript = "WROTE: %s" % intent.to_upper()
+		if procedure.is_empty():
+			_speak("chose")
 	transcript_life = 3.2
 
 
@@ -96,13 +135,22 @@ func _process(delta: float) -> void:
 	handler_life = maxf(0.0, handler_life - delta)
 	transcript_life = maxf(0.0, transcript_life - delta)
 	if handler_life <= 0.0:
-		_speak()
+		# A procedure runs itself to the end before he goes back to muttering.
+		if not procedure.is_empty():
+			_advance_procedure()
+		else:
+			_speak()
 	mirror_settle = Motion.approach(mirror_settle, 1.0 if page == 3 else 0.0, delta, Motion.PANEL)
 	queue_redraw()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	# D8.3. While he is putting something into you, you are not filling in a
+	# form. The scene runs to the end of its beats before it hands you back.
+	if not procedure.is_empty():
+		get_viewport().set_input_as_handled()
 		return
 	match event.keycode:
 		KEY_LEFT:
@@ -111,6 +159,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_RIGHT:
 			page = wrapi(page + 1, 0, PAGES.size())
 			row = 0
+			_speak("page")
 		KEY_UP:
 			row = maxi(0, row - 1)
 		KEY_DOWN:
@@ -170,11 +219,15 @@ func _commit() -> void:
 			_transcribe("BODY")
 		_:
 			var key := str(CharacterSheet.MODIFIERS.keys()[row])
-			if sheet.modifiers.has(key):
-				sheet.modifiers.erase(key)
-			else:
+			var accepted := not sheet.modifiers.has(key)
+			if accepted:
 				sheet.modifiers.append(key)
+			else:
+				sheet.modifiers.erase(key)
 			_transcribe(str((CharacterSheet.MODIFIERS[key] as Dictionary).name))
+			# D8.3. The flag is set either way; the difference is that you watch
+			# it happen to you.
+			_play_procedure(key, accepted)
 
 
 func _cycle(options: Array, current: String) -> String:
@@ -389,7 +442,7 @@ func _draw_handler(viewport: Vector2) -> void:
 		band.position + band.size - Vector2(10, 0), band.position + Vector2(0, band.size.y),
 	]), Color(0.03, 0.035, 0.03, 0.82))
 	CellOutzType.draw_condensed(self, band.position + Vector2(14, 12), "HANDLER", 9.0, COPPER, 0.7)
-	var line: String = HANDLER_LINES[handler_line]
+	var line: String = handler_says if handler_says != "" else HANDLER_LINES[handler_line % HANDLER_LINES.size()]
 	CellOutzType.draw_condensed(self, band.position + Vector2(14, 28), line.to_upper(), 11.0, INK * Color(1, 1, 1, clampf(handler_life, 0.0, 1.0) * 0.9), 0.8)
 	if transcript_life > 0.0:
 		CellOutzType.draw_condensed(self, band.position + Vector2(14, 50), transcript, 10.0, MOSS * Color(1, 1, 1, clampf(transcript_life, 0.0, 1.0)), 0.8)

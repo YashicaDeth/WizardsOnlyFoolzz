@@ -173,12 +173,17 @@ func _build_player_rig() -> void:
 	# The capsule is centred on the controller origin, so drop the rig by half
 	# its height to stand the feet on the floor rather than mid-shin.
 	player_rig.position = Vector3(0, -0.9, 0)
+	var saved: Dictionary = WorldHistory.subject("player")
+	# D4.2. The race you were decanted as is a silhouette, not just a stat block.
+	# A Marrow-Cut stands bigger than an Unreset, and until now every body in the
+	# world was the same size whatever the sheet said.
+	var race: Dictionary = CharacterSheet.RACES.get(str(saved.get("race", "decanted")), {})
 	var config := {
 		"flesh": Color("7a6350"), "variation": 1, "blood": 5200.0,
 		"gore": viscera_fx,
+		"build": float(race.get("build", 1.0)),
 		"cybernetics": {"right_arm": {"name": "salvaged torque arm", "armor": 0.22, "restores": 0.72}},
 	}
-	var saved: Dictionary = WorldHistory.subject("player")
 	if saved.get("anatomy_state") is Dictionary:
 		config["restore"] = saved.anatomy_state
 	player_rig.gore = viscera_fx

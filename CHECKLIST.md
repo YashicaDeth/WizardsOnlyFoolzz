@@ -265,11 +265,11 @@ under-directed opening.
 - [x] ~~**D3.1** Handler, clipboard, tube in your mouth so you cannot speak~~
 - [x] ~~**D3.2** Blink and twitch to answer~~
 - [x] ~~**D3.3** He writes down what he thinks you said~~
-- [ ] **D3.4** Pacing, camera and delivery (this is also G6)
+- [x] ~~**D3.4** Pacing, camera and delivery (this is also G6)~~
 
 ### D4 — Races `BUILT`
 - [x] ~~**D4.1** Six races as data: Decanted, Soft Rot, Marrow-Cut, Roadborn, Unreset, Lantern-Born~~
-- [~] **D4.2** Build factor is on the sheet; the rig does not read it yet
+- [x] ~~**D4.2** Build factor is on the sheet, and the rig reads it~~
 - [x] ~~**D4.3** Metabolism — what heals you, what poisons you~~
 - [x] ~~**D4.4** Social price: how each faction reads you~~
 - [x] ~~**D4.5** Baseline Tree pull per race~~
@@ -293,7 +293,7 @@ under-directed opening.
 ### D8 — Opt-in modifiers `BUILT`
 - [x] ~~**D8.1** Neural lace, mast tithe, full schedule as intake checkboxes~~
 - [x] ~~**D8.2** Each one actually works — and each one is also a handle on you~~
-- [ ] **D8.3** Short authored cutscene per choice — the one D item still untouched
+- [x] ~~**D8.3** Short authored cutscene per choice~~
 - [x] ~~**D8.4** Declining them is the harder difficulty~~
 
 ---

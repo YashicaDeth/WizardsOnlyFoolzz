@@ -2,6 +2,27 @@
 
 ## 2026 09 11
 
+- **D4.2: race is a silhouette, not just a stat block.** Every race has carried
+  a build factor since D4.1 and the rig never read it, so a Marrow-Cut and an
+  Unreset stood exactly the same height. `build()` now scales the zone layout —
+  offsets along with sizes, which is what keeps the feet on the floor, since the
+  legs sit at half their own height above the origin — and the organs, bones,
+  hitboxes and stumps all follow because they are all built from that layout.
+  The player rig reads the race off the filed sheet.
+- **D3.4 and D8.3: the intake is directed.** It collected everything it needed
+  and was delivered by a rota — six lines, five seconds each, in order, whether
+  you had just picked a race, been mistranscribed, or signed a socket into your
+  own skull. `intake_direction.gd` makes the delivery answer the moment, and the
+  hold comes with the line, so the pause after he gets your answer wrong is
+  longer than the pause after you tick a box.
+  Each opt-in modifier is now an authored procedure rather than a flag: he does
+  the thing to you across three beats, on three different cameras, saying what
+  it costs while he does it, and your input is suspended for exactly as long as
+  it runs — because it is being done *to* you. Refusing has its own beat too,
+  since D8.4 makes declining the harder road and it should feel chosen rather
+  than skipped. New `intake_direction_test` (22 checks); 24 suites green.
+  D5.4 stays open: whether the chart uses a real ephemeris is still Greg's call.
+
 - **Section C is closed. The camera takes evidence, not screenshots.** A
   photograph here is not an image — it is a record of what was genuinely in
   shot (Godot's own frustum test, so it agrees with what the player could see)

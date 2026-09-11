@@ -123,7 +123,12 @@ var sever_stress: Dictionary = {}
 ## how far it has been opened, not just how much health it has left.
 var zone_depth: Dictionary = {}
 var gore := true
+## D4.2. How big this body is, from the race on the sheet. Every body in the
+## world used to be exactly the same size whatever the sheet said, because the
+## factor existed and nothing read it.
+var build_factor := 1.0
 
+var _layout: Dictionary = {}
 var _flesh := Color("6b5842")
 var _seated := false
 var _variation := 0
@@ -152,7 +157,9 @@ func build(id: String, config: Dictionary = {}) -> void:
 	_seated = bool(config.get("seated", false))
 	_flesh = config.get("flesh", Color("6b5842")) as Color
 	_variation = int(config.get("variation", 0))
-	var layout: Dictionary = SEATED if _seated else STANDING
+	build_factor = clampf(float(config.get("build", 1.0)), 0.7, 1.4)
+	var layout := _scaled_layout(SEATED if _seated else STANDING)
+	_layout = layout
 
 	for zone_id in ZONES:
 		var spec: Dictionary = layout[zone_id]
@@ -230,6 +237,23 @@ func zone_nearest(global_point: Vector3) -> String:
 	return best
 
 
+## D4.2. Offsets scale along with sizes, which is what keeps the feet on the
+## floor: the legs sit at half their own height above the origin, so scaling
+## both grows the whole silhouette upward from the ground rather than sinking
+## a big body into it.
+func _scaled_layout(source: Dictionary) -> Dictionary:
+	if is_equal_approx(build_factor, 1.0):
+		return source.duplicate(true)
+	var out := {}
+	for zone_id in source:
+		var spec: Dictionary = source[zone_id]
+		out[zone_id] = {
+			"at": (spec.at as Vector3) * build_factor,
+			"size": (spec.size as Vector3) * build_factor,
+		}
+	return out
+
+
 ## Organs hang off the zone that contains them, so they ride the body and both
 ## the seated and standing layouts place them without a second table. They are
 ## hidden until something opens the body or the X-ray asks to see them.
@@ -242,11 +266,12 @@ func _build_organs() -> void:
 		var organ := MeshInstance3D.new()
 		organ.name = "organ_%s" % organ_id
 		var mesh := SphereMesh.new()
-		mesh.radius = float(spec.size)
-		mesh.height = float(spec.size) * (2.6 if organ_id == "spine" else 2.0)
+		# Organs are inside a body, so they are the size that body is.
+		mesh.radius = float(spec.size) * build_factor
+		mesh.height = mesh.radius * (2.6 if organ_id == "spine" else 2.0)
 		mesh.material = WorldLook.surface(Color(str(spec.tint)), "bone" if organ_id == "spine" else "flesh", _variation + ORGAN_LAYOUT.keys().find(organ_id))
 		organ.mesh = mesh
-		organ.position = spec.at
+		organ.position = (spec.at as Vector3) * build_factor
 		organ.visible = false
 		host.add_child(organ)
 		organ_parts[organ_id] = organ
@@ -854,7 +879,7 @@ func _throw_limb(zone_id: String, hit_direction := Vector3.ZERO) -> void:
 func _add_stump(zone_id: String) -> void:
 	if has_node("%s_stump" % zone_id):
 		return
-	var layout: Dictionary = SEATED if _seated else STANDING
+	var layout: Dictionary = _layout if not _layout.is_empty() else (SEATED if _seated else STANDING)
 	var spec: Dictionary = layout[zone_id]
 	var stump := MeshInstance3D.new()
 	stump.name = "%s_stump" % zone_id
