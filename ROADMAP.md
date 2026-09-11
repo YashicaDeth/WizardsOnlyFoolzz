@@ -109,14 +109,39 @@ Fired mid-session, recorded here rather than half-built.
   nowhere in this plan. Needs a decision on whether firearms are common enough
   to change encounter design, or scarce, jamming and mostly improvised, which
   fits a world where nothing is new. Ammunition is an economy item either way.
-- **One baseline human model for every NPC.** This is the prerequisite hiding
-  underneath the gore, prosthetic and voice-chat ambitions: every person in the
-  world built from a single rig with the same named zones, so
-  `anatomy_component.gd` injuries, organ damage, amputation and limb
-  replacement apply universally instead of per-character. Without it, "bodies
-  remember" only works on hand-authored characters, and proximity voice has
-  nothing consistent to attach a speaking head to. Schedule this before Tier
-  1b.13 rather than after.
+- **One baseline human model for every NPC — done 2026-09-11.**
+  `systems/baseline_human.gd`. The vocabulary was not merely unshared, it
+  actively disagreed: the derby tagged a driver hitbox `legs`, the hunt recorded
+  Mara's wounds as `left arm` and `leg`, and `anatomy_component.gd` resolves
+  anything it does not recognise to `torso` in silence — so a severed leg was
+  recorded as a chest wound and nothing downstream could tell. Derby drivers
+  skipped anatomy entirely and carried a loose `driver_health` int.
+  The rig owns the vocabulary, the hit geometry and the anatomy together, and
+  carries the gore: blood scaled by damage and by whether the weapon cuts or
+  breaks, permanent compound fractures, organs leaving a destroyed chest,
+  exposed bone at a severed joint. `head_anchor` is the consistent speaking
+  position proximity voice needs. Derby drivers are migrated; **the Hunt
+  Grounds encounter actors are not yet** — they are still bare capsules with an
+  anatomy component and no hit geometry, so `bone_yard_hunt.gd` picks a zone by
+  round-robin rather than by where the blow landed. That is the next step.
+
+### Found while doing the above, 2026-09-11
+
+- **The derby had never worked as a fight.** The chassis scales steering
+  authority by speed, so a stationary car cannot turn, and the AI set throttle
+  from `clampf(alignment, 0, 1)` — zero whenever a car was side-on to its
+  target. A car that ended up perpendicular could neither drive nor steer, ever.
+  Measured: the nearest wrecker sat at exactly 12.6m for thirty seconds while
+  the player took no damage. Compounding it, the charge term eased off as the
+  gap closed, so wreckers that did arrive came in at walking pace and never
+  reached the impact threshold. Both fixed; `tests/derby_balance_test.gd` now
+  bounds the pit from both sides so neither an inert nor a lethal pit passes.
+- **AI wreckers still cannot damage each other.** Only the player's chassis has
+  its `impact` signal connected, so the third of the pit that fights amongst
+  itself is theatre. Connecting every wrecker is cheap but changes pacing, so it
+  wants a balance pass rather than a one-line change.
+- **The menu colour setting had never worked.** It wrote
+  `ambient_light_color` on a sky-sourced environment, which does nothing.
 
 ### Tier 1b — combat, added 2026-09-11
 
