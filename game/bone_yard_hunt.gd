@@ -1921,10 +1921,33 @@ func _build_world() -> void:
 	floor_body.add_child(floor_collider)
 	add_child(floor_body)
 	_add_mesh(BoxMesh.new(), Vector3(0, 0, -24), Vector3(13, 5, 1.5), Color("2b2119"), 0.0)
+	# G4. This was twenty-six identical bare cubes on a regular nine-column grid,
+	# standing exactly where the player spawns — which is the real answer to
+	# "everything looks like boxes". The generated districts were dressed and
+	# settled while *these* sat in front of the camera being a spreadsheet made
+	# of geometry. They are wreck piles now: jittered off the grid, varied in
+	# mass, hung with junk and knocked off plumb.
+	var wreck_rng := RandomNumberGenerator.new()
+	wreck_rng.seed = 55117
 	for index in 26:
-		var x := -31.0 + float(index % 9) * 7.5
-		var z := -24.0 + float(index / 9) * 22.0
-		_add_mesh(BoxMesh.new(), Vector3(x, 1.1 + float(index % 3), z), Vector3(2.0 + float(index % 2), 2.0 + float(index % 4), 2.0), Color("3d291d"), 0.0)
+		var x := -31.0 + float(index % 9) * 7.5 + wreck_rng.randf_range(-3.4, 3.4)
+		var z := -24.0 + float(index / 9) * 22.0 + wreck_rng.randf_range(-6.5, 6.5)
+		var bulk := Vector3(
+			wreck_rng.randf_range(1.6, 4.8),
+			wreck_rng.randf_range(1.4, 5.6),
+			wreck_rng.randf_range(1.6, 4.4)
+		)
+		var pile := Node3D.new()
+		pile.position = Vector3(x, bulk.y * 0.5, z)
+		add_child(pile)
+		var core := MeshInstance3D.new()
+		var core_mesh := BoxMesh.new()
+		core_mesh.size = bulk
+		core_mesh.material = WorldLook.surface(Color("3d291d"), "rust", index + 7)
+		core.mesh = core_mesh
+		pile.add_child(core)
+		Silhouette.dress(pile, bulk, index + 31, Callable(WorldLook, "surface"))
+		Silhouette.settle(pile, index + 31)
 	# Vast readable landmarks: original fungal towers, shattered pylons and
 	# radioactive caps turn the former circular test pen into a traversable region.
 	for index in 72:
@@ -1937,7 +1960,19 @@ func _build_world() -> void:
 	for index in 34:
 		var side := -1.0 if index % 2 == 0 else 1.0
 		var pylon_pos := Vector3(side * (58 + (index % 5) * 25), 5, -155 + index * 9)
-		_add_mesh(BoxMesh.new(), pylon_pos, Vector3(2.2, 12 + index % 7, 2.2), Color("352b26"), 0.0)
+		# Pylons lean and carry crossarms rather than standing as plumb posts.
+		var pylon := Node3D.new()
+		pylon.position = pylon_pos
+		add_child(pylon)
+		var pylon_size := Vector3(2.2, 12 + index % 7, 2.2)
+		var shaft := MeshInstance3D.new()
+		var shaft_mesh := BoxMesh.new()
+		shaft_mesh.size = pylon_size
+		shaft_mesh.material = WorldLook.surface(Color("352b26"), "rust", index + 61)
+		shaft.mesh = shaft_mesh
+		pylon.add_child(shaft)
+		Silhouette.dress(pylon, pylon_size, index + 91, Callable(WorldLook, "surface"))
+		Silhouette.settle(pylon, index + 91)
 	for index in 9:
 		var lamp := OmniLight3D.new()
 		lamp.position = Vector3(-24 + index * 6, 6, -17 + (index % 2) * 23)

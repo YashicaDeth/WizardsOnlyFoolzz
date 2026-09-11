@@ -62,6 +62,11 @@ func _build_enterable_shell(at: Vector3, dimensions: Vector3, color: Color, sign
 	_add_wall(building, Vector3(half_x, dimensions.y * 0.5, 0), Vector3(wall_thickness, dimensions.y, dimensions.z), color)
 	_add_wall(building, Vector3(0, -0.12, 0), Vector3(dimensions.x, 0.22, dimensions.z), Color("211a16"))
 	_add_wall(building, Vector3(0, dimensions.y, 0), Vector3(dimensions.x + 0.7, 0.32, dimensions.z + 0.7), color.darkened(0.18))
+	# G4. Texture does not change an outline. A box with brilliant grime on it is
+	# still a box, and what reads at distance is the edge — so the edge gets
+	# broken, hung with junk, and knocked off plumb.
+	Silhouette.dress(building, dimensions, generated_buildings.size(), Callable(self, "_greeble_material"))
+	Silhouette.settle(building, generated_buildings.size())
 	var sign := Label3D.new()
 	sign.text = sign_text
 	sign.position = Vector3(0, dimensions.y * 0.72, half_z + 0.35)
@@ -94,6 +99,11 @@ func _add_wall(parent: Node3D, at: Vector3, dimensions: Vector3, color: Color) -
 ## region reads as a grey-box prototype: the same boxes with contaminated
 ## surfaces on them read as a ruined town.
 var _surface_index := 0
+
+## Adapter so `Silhouette` does not have to know about WorldLook.
+func _greeble_material(tint: Color, kind: String, seed_value: int) -> StandardMaterial3D:
+	return WorldLook.surface(tint, kind, seed_value)
+
 
 func _material(color: Color, emission: float, kind := "rust") -> StandardMaterial3D:
 	_surface_index += 1

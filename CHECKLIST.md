@@ -435,9 +435,9 @@ probe actually says, so the next attempt does not start from scratch:
 - [ ] **G3.3** Contamination colour through authored surfaces, not light
 
 ### G4 — Silhouettes
-- [ ] **G4.1** Bevels and broken corners on generated geometry
-- [ ] **G4.2** Greebles and attached junk
-- [ ] **G4.3** Leaning and settling, so nothing is plumb
+- [x] **G4.1** Bevels and broken corners on generated geometry
+- [x] **G4.2** Greebles and attached junk
+- [x] **G4.3** Leaning and settling, so nothing is plumb
 
 ### G5 — Sound rework
 - [~] **G5.1** Bus structure built and mixable (Master/Music/SFX/Ambience); routing still to do
