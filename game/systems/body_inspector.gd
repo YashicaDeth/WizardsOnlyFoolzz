@@ -19,13 +19,14 @@ extends Node
 
 const CellOutzType := preload("res://systems/celloutz_type.gd")
 const PART_VIEWER := preload("res://systems/part_viewer.gd")
+const Grunge := preload("res://systems/celloutz_grunge.gd")
 
-const INK := Color("f1d2a3")
-const COPPER := Color("f06428")
-const HOT := Color("ff2b18")
-const TEAL := Color("29b7a8")
-const SPORE := Color("7fb541")
-const BRUISE := Color("7a4a83")
+const INK := Color("e6d4ac")
+const COPPER := Color("b0552a")
+const HOT := Color("a8281a")
+const MOSS := Color("8a9a4a")
+const SPORE := Color("7f9440")
+const BRUISE := Color("6b3f6e")
 
 const ZONES := ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"]
 const ZONE_LABELS := {
@@ -264,10 +265,13 @@ func draw_into(canvas: CanvasItem, rect: Rect2) -> void:
 
 func _draw_diagram(canvas: CanvasItem, rect: Rect2) -> void:
 	var font := ThemeDB.fallback_font
-	CellOutzType.draw_text(canvas, rect.position, "THE BODY", 11.0, TEAL, 1.2)
-	canvas.draw_line(rect.position + Vector2(0, 17), rect.position + Vector2(rect.size.x, 17), TEAL * Color(1, 1, 1, 0.3), 1.0)
+	CellOutzType.draw_text(canvas, rect.position, "THE BODY", 11.0, MOSS, 1.2)
+	canvas.draw_line(rect.position + Vector2(0, 17), rect.position + Vector2(rect.size.x, 17), MOSS * Color(1, 1, 1, 0.3), 1.0)
 	var field := Rect2(rect.position + Vector2(0, 30), rect.size - Vector2(0, 30))
+	Grunge.stain(canvas, field.position + field.size * Vector2(0.74, 0.16), 52.0, 91, Grunge.BILE, 0.07)
+	Grunge.stain(canvas, field.position + field.size * Vector2(0.22, 0.88), 44.0, 97, Grunge.RUST, 0.06)
 	_silhouette(canvas, field)
+	Grunge.scrawl(canvas, field.position + Vector2(field.size.x * 0.62, field.size.y * 0.12), field.size.x * 0.34, 2, hash(_subject_id))
 	_zone_rects.clear()
 	for zone_id: String in ZONES:
 		var shape: Dictionary = ZONE_SHAPE[zone_id]
@@ -291,6 +295,10 @@ func _draw_diagram(canvas: CanvasItem, rect: Rect2) -> void:
 			canvas.draw_line(centre, tag, COPPER, 1.0)
 			canvas.draw_circle(tag, 2.5, COPPER)
 		if health < 0.99:
+			# Shaded in by hand, the way a medical form actually gets marked up,
+			# and then it runs - this is a chart that has been handled wet.
+			Grunge.hatch(canvas, Rect2(centre - half, half * 2.0), 5.0, Grunge.DRIED, 0.38 * (1.0 - health), hash(zone_id))
+			Grunge.run_down(canvas, centre + Vector2(half.x * 0.2, half.y * 0.6), (1.0 - health) * 46.0, hash(zone_id) + 3)
 			canvas.draw_string(font, centre + Vector2(-14, half.y + 11), "%d%%" % roundi(health * 100.0), HORIZONTAL_ALIGNMENT_CENTER, 30, 9, tone)
 	canvas.draw_string(font, Vector2(rect.position.x, rect.position.y + rect.size.y + 4), ZONE_LABELS.get(zone, "") + "  ·  TAB CYCLES", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 10, COPPER)
 
@@ -346,8 +354,8 @@ func _zone_polygon(zone_id: String, centre: Vector2, half: Vector2) -> PackedVec
 
 func _draw_list(canvas: CanvasItem, rect: Rect2) -> void:
 	var font := ThemeDB.fallback_font
-	CellOutzType.draw_text(canvas, rect.position, "PARTS", 11.0, TEAL, 1.2)
-	canvas.draw_line(rect.position + Vector2(0, 17), rect.position + Vector2(rect.size.x, 17), TEAL * Color(1, 1, 1, 0.3), 1.0)
+	CellOutzType.draw_text(canvas, rect.position, "PARTS", 11.0, MOSS, 1.2)
+	canvas.draw_line(rect.position + Vector2(0, 17), rect.position + Vector2(rect.size.x, 17), MOSS * Color(1, 1, 1, 0.3), 1.0)
 	_part_rects.clear()
 	var y := rect.position.y + 40.0
 	for index in _parts.size():

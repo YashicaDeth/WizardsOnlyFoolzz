@@ -24,6 +24,7 @@ extends Control
 
 const CellOutzType := preload("res://systems/celloutz_type.gd")
 const WireNetScript := preload("res://systems/wire_net.gd")
+const Grunge := preload("res://systems/celloutz_grunge.gd")
 const SUBJECT_ICON := preload("res://systems/subject_icon.gd")
 const BODY_INSPECTOR := preload("res://systems/body_inspector.gd")
 
@@ -31,14 +32,14 @@ const BODY_INSPECTOR := preload("res://systems/body_inspector.gd")
 ## So they are a pool the pages draw into by slot rather than one per row.
 const ICON_POOL := 6
 
-const INK := Color("f1d2a3")
-const COPPER := Color("f06428")
-const HOT := Color("ff2b18")
-const TEAL := Color("29b7a8")
-const SPORE := Color("7fb541")
-const BRUISE := Color("7a4a83")
-const SMOKE := Color(0.035, 0.019, 0.015, 0.94)
-const GROUND := Color(0.02, 0.012, 0.01, 0.86)
+const INK := Color("e6d4ac")
+const COPPER := Color("b0552a")
+const HOT := Color("a8281a")
+const MOSS := Color("8a9a4a")
+const SPORE := Color("7f9440")
+const BRUISE := Color("6b3f6e")
+const SMOKE := Color(0.042, 0.032, 0.024, 0.96)
+const GROUND := Color(0.035, 0.026, 0.019, 0.90)
 
 const PAGES := ["FILE", "PYRAMID", "WIRE", "BODY"]
 
@@ -279,8 +280,11 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if page_blend < 1.0:
 		_draw_page_wipe(panel, eased)
+	_draw_stamp(plate)
 	_draw_footer(plate)
+	_draw_gore(plate)
 	_draw_screen_decay(plate)
+	Grunge.grain(self, plate, 907, 900)
 
 
 ## The plate itself. Notched top-left and bottom-right so the outline is never a
@@ -297,6 +301,12 @@ func _draw_plate(rect: Rect2) -> void:
 		rect.position + Vector2(0, notch),
 	])
 	draw_colored_polygon(body, SMOKE)
+	# Grime goes down before anything else is printed on it, so the interface
+	# reads as ink on a dirty surface rather than dirt laid over a clean screen.
+	Grunge.stain(self, rect.position + rect.size * Vector2(0.16, 0.78), 96.0, 11, Grunge.BILE, 0.05)
+	Grunge.stain(self, rect.position + rect.size * Vector2(0.74, 0.20), 118.0, 27, Grunge.RUST, 0.042)
+	Grunge.stain(self, rect.position + rect.size * Vector2(0.50, 0.95), 78.0, 43, Grunge.SPORE, 0.038)
+	Grunge.scratches(self, rect, 61, 22)
 	var outline := body.duplicate()
 	outline.append(body[0])
 	draw_polyline(outline, COPPER * Color(1, 1, 1, 0.62), 2.0)
@@ -368,8 +378,8 @@ func _draw_header(plate: Rect2) -> void:
 func _draw_rail(rect: Rect2) -> void:
 	draw_line(rect.position + Vector2(rect.size.x + 8, 0), rect.position + Vector2(rect.size.x + 8, rect.size.y), INK * Color(1, 1, 1, 0.14), 1.0)
 	var heading: String = ["SUBJECTS", "FACTIONS", "ACCOUNTS", "BODIES"][page]
-	CellOutzType.draw_text(self, rect.position + Vector2(0, 0), heading, 12.0, TEAL, 1.4)
-	draw_line(rect.position + Vector2(0, 18), rect.position + Vector2(rect.size.x - 14, 18), TEAL * Color(1, 1, 1, 0.35), 1.0)
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 0), heading, 12.0, MOSS, 1.4)
+	draw_line(rect.position + Vector2(0, 18), rect.position + Vector2(rect.size.x - 14, 18), MOSS * Color(1, 1, 1, 0.35), 1.0)
 	var font := ThemeDB.fallback_font
 	var y := rect.position.y + 36.0
 	for index in _rail_cache.size():
@@ -403,7 +413,7 @@ func _draw_file(rect: Rect2) -> void:
 	# Four readings across the top. Numerals in the display face because they are
 	# what the eye goes to first.
 	var stats := [
-		{"label": "ELO", "value": "%04d" % int(subject.get("elo", 1000)), "tone": TEAL},
+		{"label": "ELO", "value": "%04d" % int(subject.get("elo", 1000)), "tone": MOSS},
 		{"label": "GRUDGE", "value": "%03d" % int(subject.get("grudge", 0)), "tone": HOT},
 		{"label": "BOND", "value": "%03d" % int(subject.get("bond", 0)), "tone": SPORE},
 		{"label": "REACH", "value": "%05d" % int((wire.account(str(entry.id)) as Dictionary).get("reach", 0)), "tone": BRUISE},
@@ -440,8 +450,8 @@ func _draw_file(rect: Rect2) -> void:
 	# closest thing the build currently has to a view of that machinery.
 	var relations: Dictionary = subject.get("relations", {})
 	if not relations.is_empty():
-		CellOutzType.draw_text(self, Vector2(rect.position.x, left_y), "KNOWN EDGES", 11.0, TEAL, 1.2)
-		draw_line(Vector2(rect.position.x, left_y + 17), Vector2(rect.position.x + column, left_y + 17), TEAL * Color(1, 1, 1, 0.3), 1.0)
+		CellOutzType.draw_text(self, Vector2(rect.position.x, left_y), "KNOWN EDGES", 11.0, MOSS, 1.2)
+		draw_line(Vector2(rect.position.x, left_y + 17), Vector2(rect.position.x + column, left_y + 17), MOSS * Color(1, 1, 1, 0.3), 1.0)
 		left_y += 36.0
 		for other in relations:
 			if left_y > rect.position.y + rect.size.y - 92.0:
@@ -463,8 +473,8 @@ func _draw_file(rect: Rect2) -> void:
 
 	# Right column: what is wrong with them, and what is bolted into them.
 	var wy := rect.position.y + 130.0
-	CellOutzType.draw_text(self, Vector2(right_x, wy), "CONDITION", 11.0, TEAL, 1.2)
-	draw_line(Vector2(right_x, wy + 17), Vector2(right_x + right_width, wy + 17), TEAL * Color(1, 1, 1, 0.3), 1.0)
+	CellOutzType.draw_text(self, Vector2(right_x, wy), "CONDITION", 11.0, MOSS, 1.2)
+	draw_line(Vector2(right_x, wy + 17), Vector2(right_x + right_width, wy + 17), MOSS * Color(1, 1, 1, 0.3), 1.0)
 	wy += 36.0
 	var condition := str(subject.get("injury", ""))
 	var lines: Array = []
@@ -495,8 +505,8 @@ func _draw_file(rect: Rect2) -> void:
 
 	# History, across the full width at the foot, wrapping into columns.
 	var hy := rect.position.y + rect.size.y - 76.0
-	CellOutzType.draw_text(self, Vector2(rect.position.x, hy), "WHAT THE WORLD RECORDED", 11.0, TEAL, 1.2)
-	draw_line(Vector2(rect.position.x, hy + 17), Vector2(rect.position.x + rect.size.x, hy + 17), TEAL * Color(1, 1, 1, 0.3), 1.0)
+	CellOutzType.draw_text(self, Vector2(rect.position.x, hy), "WHAT THE WORLD RECORDED", 11.0, MOSS, 1.2)
+	draw_line(Vector2(rect.position.x, hy + 17), Vector2(rect.position.x + rect.size.x, hy + 17), MOSS * Color(1, 1, 1, 0.3), 1.0)
 	var base_y := hy + 36.0
 	var shown := 0
 	for event in WorldHistory.recent_events(30):
@@ -543,7 +553,7 @@ func _wrap(text: String, width: int) -> Array:
 ## quietly throw that away.
 func _draw_axis(rect: Rect2, alignment: float, descriptor: String) -> void:
 	var font := ThemeDB.fallback_font
-	CellOutzType.draw_text(self, rect.position, "TREE AXIS", 10.0, TEAL, 1.2)
+	CellOutzType.draw_text(self, rect.position, "TREE AXIS", 10.0, MOSS, 1.2)
 	var track_y := rect.position.y + 30.0
 	var left := rect.position.x
 	var right := rect.position.x + rect.size.x - 12.0
@@ -590,7 +600,7 @@ func _draw_pyramid(rect: Rect2) -> void:
 		var cx := rect.position.x + rect.size.x * 0.5
 		var y := top + float(index) * row_height
 		var vacant := members.is_empty()
-		var accent: Color = HOT if vacant else [COPPER, COPPER, TEAL, TEAL, INK][mini(index, 4)]
+		var accent: Color = HOT if vacant else [COPPER, COPPER, MOSS, MOSS, INK][mini(index, 4)]
 		var shape := PackedVector2Array([
 			Vector2(cx - span * 0.5 + 10, y), Vector2(cx + span * 0.5 - 10, y),
 			Vector2(cx + span * 0.5, y + row_height - 8), Vector2(cx - span * 0.5, y + row_height - 8),
@@ -655,12 +665,12 @@ func _draw_wire(rect: Rect2) -> void:
 	if not entry.is_empty():
 		var account: Dictionary = wire.account(str(entry.id))
 		CellOutzType.draw_stamped(self, rect.position + Vector2(0, 4), str(account.get("name", "")).to_upper(), 18.0, INK, COPPER * Color(1, 1, 1, 0.28), 1.2)
-		draw_string(font, rect.position + Vector2(2, 34), str(account.get("handle", "")), HORIZONTAL_ALIGNMENT_LEFT, split, 12, TEAL)
+		draw_string(font, rect.position + Vector2(2, 34), str(account.get("handle", "")), HORIZONTAL_ALIGNMENT_LEFT, split, 12, MOSS)
 		if bool(account.get("verified", false)):
 			var badge := rect.position + Vector2(split - 30, 16)
 			draw_colored_polygon(PackedVector2Array([
 				badge + Vector2(0, -9), badge + Vector2(9, 0), badge + Vector2(0, 9), badge + Vector2(-9, 0),
-			]), TEAL * Color(1, 1, 1, 0.85))
+			]), MOSS * Color(1, 1, 1, 0.85))
 			draw_string(font, badge + Vector2(-3, 4), "V", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.05, 0.05, 0.05))
 		_draw_icon(0, str(entry.id), Rect2(Vector2(rect.position.x + split - 116, rect.position.y + 36), Vector2(92, 92)))
 		CellOutzType.draw_text(self, rect.position + Vector2(0, 52), "REACH", 9.0, INK * Color(1, 1, 1, 0.45), 1.0)
@@ -678,7 +688,7 @@ func _draw_wire(rect: Rect2) -> void:
 		var chance := float(attempt.get("chance", 0.0))
 		var cy := rect.position.y + 146.0
 		draw_line(Vector2(rect.position.x, cy - 8), Vector2(rect.position.x + split - 20, cy - 8), INK * Color(1, 1, 1, 0.16), 1.0)
-		CellOutzType.draw_text(self, Vector2(rect.position.x, cy + 4), "WILL THEY READ YOU", 11.0, TEAL, 1.2)
+		CellOutzType.draw_text(self, Vector2(rect.position.x, cy + 4), "WILL THEY READ YOU", 11.0, MOSS, 1.2)
 		# `cy` is already absolute - adding `rect.position` to it again put this
 		# meter 170px below the label it belongs to, at the bottom of the panel.
 		var bar := Rect2(Vector2(rect.position.x, cy + 26), Vector2(split - 40, 12))
@@ -732,7 +742,7 @@ func _draw_post(feed: Rect2, post: Dictionary, y: float) -> void:
 	var font := ThemeDB.fallback_font
 	var kind := str(post.get("kind", "doom"))
 	var tone: Color = {
-		"report": COPPER, "doom": INK, "wellness": TEAL, "collage": BRUISE,
+		"report": COPPER, "doom": INK, "wellness": MOSS, "collage": BRUISE,
 		"bait": INK, "bot": INK, "dead": INK, "lunch": SPORE, "underbelly": HOT,
 	}.get(kind, INK)
 	draw_line(Vector2(feed.position.x, y - 12), Vector2(feed.position.x + 2, y + 46), tone * Color(1, 1, 1, 0.55), 2.0)
@@ -743,7 +753,7 @@ func _draw_post(feed: Rect2, post: Dictionary, y: float) -> void:
 	# through the final letters of every verified name.
 	var cursor := feed.position.x + 12.0 + font.get_string_size(author, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 6.0
 	if bool(post.get("verified", false)):
-		draw_circle(Vector2(cursor + 4, y - 4), 3.5, TEAL * Color(1, 1, 1, 0.9))
+		draw_circle(Vector2(cursor + 4, y - 4), 3.5, MOSS * Color(1, 1, 1, 0.9))
 		cursor += 15.0
 	draw_string(font, Vector2(cursor, y), str(post.get("handle", "")), HORIZONTAL_ALIGNMENT_LEFT, feed.size.x - 40, 10, INK * Color(1, 1, 1, 0.35))
 	if kind == "underbelly":
@@ -802,6 +812,27 @@ func _draw_page_wipe(panel: Rect2, eased: float) -> void:
 		Vector2(x, panel.position.y - 14), Vector2(x - band, panel.position.y - 14),
 		Vector2(x - band, panel.position.y + panel.size.y), Vector2(x, panel.position.y + panel.size.y),
 	]), INK * Color(1, 1, 1, fade * 0.28))
+
+
+## Blood on the interface, not only in the world. The premise of the whole
+## object is that it is a physical thing carried around a place where people get
+## opened up, so it has been stood next to that happening. Fixed seeds: grime
+## that reshuffles every frame reads as an effect rather than as dirt.
+func _draw_gore(plate: Rect2) -> void:
+	Grunge.spatter(self, plate.position + Vector2(plate.size.x * 0.70, plate.size.y * 0.30), 5, 22, Vector2(0.9, 0.42))
+	Grunge.run_down(self, plate.position + Vector2(plate.size.x * 0.955, plate.size.y * 0.32), 88.0, 12)
+	Grunge.run_down(self, plate.position + Vector2(plate.size.x * 0.975, plate.size.y * 0.28), 46.0, 19)
+	Grunge.spatter(self, plate.position + Vector2(38, plate.size.y - 58), 31, 14, Vector2(-0.6, 0.7))
+	# A dry thumbprint smear where somebody with wet hands held it.
+	Grunge.stain(self, plate.position + Vector2(plate.size.x - 54, plate.size.y * 0.52), 26.0, 77, Grunge.DRIED, 0.20)
+
+
+## The stamp a clerk hit the page with, per page, because this is a processed
+## document in a system that does not care about the person it describes.
+func _draw_stamp(plate: Rect2) -> void:
+	var text: String = ["NO FIXED ABODE", "NO REFUNDS", "UNVERIFIED", "SPECIMEN"][page]
+	var tint: Color = [Grunge.DRIED, Grunge.RUST, Grunge.BILE, Grunge.DRIED][page]
+	Grunge.stamp(self, plate.position + Vector2(plate.size.x - 258, 92), text, 15.0, -0.16, tint, 300 + page)
 
 
 ## Scanlines, a fixed dead-pixel pattern and a slow horizontal tear. Cheap, and
