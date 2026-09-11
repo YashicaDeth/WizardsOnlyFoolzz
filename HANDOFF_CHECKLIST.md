@@ -1,7 +1,12 @@
 # Allusions to Grandeur — cold handoff
 
 Paste this whole file to a coding model starting work on this project. It
-assumes no prior conversation. Written 2026-09-11 at commit `138fe4f`.
+assumes no prior conversation. Rewritten 2026-09-12.
+
+**Branch `codex/b6-combat`, worktree
+`C:\Users\Greg\Documents\ChatGPT\AllusionsTooGrandeur Game\codex-b6-worktree`.**
+Sixteen commits ahead of `codex/game-planning`. Everything below is committed
+and the tree is clean.
 
 ---
 
@@ -31,8 +36,7 @@ organ-forward biopunk. A disembowelling and a petty argument about parking in th
 same thirty seconds. **Satire aims at institutions and power, never at real
 groups of people.**
 
-Working directory: `P:\GameDev\AllusionsTooGrandeur`. It is a git repository and
-**git is the handoff protocol** — commit after each increment that runs, never
+**Git is the handoff protocol.** Commit after each increment that runs; never
 leave the tree uncommitted between sessions.
 
 ## 2. Read these first
@@ -54,12 +58,12 @@ leave the tree uncommitted between sessions.
    a spreadsheet, it is not finished. This is rule I0 and it is absolute.
 3. **Every hard cut is a bug.** Panels arrive and leave; pages ease; parts leave
    diagrams rather than opening windows.
-4. **Satire targets institutions**, never a real group, a real person, or a real
-   company. Conspiracy modifiers are named fictionally (NEURALACE, the mast
-   tithe, the full schedule) and the joke is that *this world's* apocalypse made
-   the cranks right — never a claim about ours.
+4. **Satire targets institutions**, never a real group, person or company.
 5. **Verify before claiming.** Say what you actually checked and what you did
    not.
+6. **Greg's artwork is read-only.** The collection lives at
+   `C:\Users\Greg\Desktop\Art Collections`. Never write to it. Derived textures
+   go to `game/art/derived/` and are rebuildable.
 
 ## 4. How to run things — read this or lose an hour
 
@@ -69,77 +73,78 @@ Always set `TEMP`/`TMP` to `P:\GameDev\Temp` first.
 **Run one test:**
 ```
 $env:ATG_TEST_MODE='1'
-& <godot> --headless --path P:\GameDev\AllusionsTooGrandeur\game res://tests/<name>.tscn
+& <godot> --headless --path <worktree>\game res://tests/<name>.tscn
 ```
 
 **Capture a screen** (no `--headless`, it needs a renderer):
 ```
-& <godot> --path P:\GameDev\AllusionsTooGrandeur\game res://tests/<name>_capture.tscn
+& <godot> --path <worktree>\game res://tests/<name>_capture.tscn
 ```
 
-### Four traps that will cost you time
+### Traps that will cost you time
 
-1. **FMOD deadlocks headless runs.** The FMOD editor plugin is disabled but its
-   GDExtension still loads every run and fights for live-update port 9264 with
-   any open editor, retrying forever and starving the test's own stdout — the
-   run appears to hang. Fix: rename `game/addons/fmod/fmod.gdextension` (and its
-   `.uid`) to `.disabled`, and delete the fmod line from
-   `game/.godot/extension_list.cfg`. **This fix cannot be committed** —
-   `.gitignore` covers both paths — so a fresh checkout hits it again. With the
-   extension disabled, the addon's own tool scripts fail to parse on reimport;
-   that is harmless and expected.
-2. **A new `class_name` is invisible to headless runs** until the class cache is
+1. **A new `class_name` is invisible to headless runs** until the class cache is
    rebuilt. After adding one, run
    `& <godot> --headless --editor --quit --path ...\game` once.
-3. **GDScript infers `Variant` from dictionary and array lookups.** `var x := DICT[key]`
-   and `var x := ["a","b"][i]` are parse errors under this project's warning
-   settings. Write `var x: String = ...`. This has bitten roughly ten times.
-4. **Two text APIs, two origins.** `CellOutzType.draw_text` places a glyph's
+2. **GDScript infers `Variant` from dictionary, array and `load()` results.**
+   `var x := DICT[key]` and `var x := load(p).instantiate()` are parse errors
+   under this project's warning settings. Write `var x: String = ...`.
+3. **Two text APIs, two origins.** `CellOutzType.draw_text` places a glyph's
    **cap line** at its y and draws *down*; `draw_string` places the **baseline**
-   at its y and draws *up*. Mixing them without accounting for it causes
-   overlapping text, and it has caused it repeatedly. When placing body copy
-   under a stencil header at `y` with cap `c`, the baseline goes at about
-   `y + c + 14`.
+   at its y and draws *up*. Mixing them causes overlapping text.
+4. **`queue_free()` is deferred.** A node freed this frame still answers
+   `get_node_or_null()`. Use `remove_child()` first when the removal must be
+   visible immediately.
+5. **A self-rescheduling lambda captures by value.** `var f: Callable; f = func():
+   ... connect(f)` closes over `f`'s pre-assignment null, so every reconnect
+   after the first silently does nothing. Use an `await` loop instead.
+6. **`godot_mcp` and `fmod` are gitignored**, so a fresh worktree has neither.
+   The missing `MCPGameBridge` autoload errors on every run here and is harmless
+   — do **not** remove it from `project.godot`, it works in Greg's main checkout.
+7. **A script error means the test never reaches `get_tree().quit()`** and the
+   process spins forever. If a run hangs, look for a SCRIPT ERROR above it and
+   kill stray `Godot_v4.7.2*` processes.
 
 ### The workflow that actually catches bugs
 
 **Capture the screen and look at it.** Every visual bug in this project was
-found by looking at a PNG, not by reasoning about the code: a meter 170px out of
-place, names printing through each other, a panel drawing nothing because it had
-zero size, a part rendered at a third scale because `queue_free` is deferred and
-the outgoing mesh was still being measured. Write a `tests/*_capture.gd` harness
-for anything visual and read the image.
+found by reading a PNG, not by reasoning about code — including, this session, a
+blood splat three metres wide that 23 green suites never noticed. Write a
+`tests/*_capture.gd` harness for anything visual.
 
-**Full suite** — 17 suites, all currently green. Run them all before claiming a
+**Full suite — 24 suites, all currently green.** Run them all before claiming a
 section is done:
 `arsenal_test`, `baseline_human_test`, `body_motion_test`,
 `combat_integration_test`, `derby_balance_test`, `gore_test`, `grapple_test`,
 `impact_test`, `opening_test`, `chunk_test`, `radio_test`, `resolution_test`,
-`wire_test`, `witness_test`, `sheet_test`, `icon_test`, `body_inspector_test`.
+`wire_test`, `witness_test`, `sheet_test`, `icon_test`, `body_inspector_test`,
+`extraction_test`, `karma_test`, `clinch_test`, `propagation_test`,
+`world_xray_test`, `camera_test`, `intake_direction_test`.
 
 ## 5. The shape of the code
 
-~18,000 lines of GDScript across 75 files, `game/systems/` is where everything
-lives. The pieces you will touch most:
+`game/systems/` is where everything lives. The pieces you will touch most:
 
 | File | What it is |
 | --- | --- |
-| `world_history.gd` | **Autoload.** Events and subjects. The world's memory. Everything persists here. |
-| `baseline_human.gd` | The shared rig: zones, organs, bones, gore, severing. Every NPC and the player. |
-| `anatomy_component.gd` | Zone health, blood, bleed, pain, consciousness, organs, cybernetics. |
-| `gore_chunks.gd` | Identified pieces of people — layer, zone, subject, organ, implant. |
-| `world_index.gd` | Four-page index: dossier, rank pyramid, Wire, body inspector. |
+| `world_history.gd` | **Autoload.** Events, subjects, karma. The world's memory. `record_event` is news; `amend_subject` is a belief changing and records nothing. |
+| `baseline_human.gd` | The shared rig: zones, organs, bones, gore, severing, build factor, X-ray. Every NPC and the player. |
+| `anatomy_component.gd` | Zone health, blood, bleed, pain, consciousness, organs, implants. |
+| `gore_chunks.gd` | Identified pieces of people — layer, zone, subject, organ, implant, rot. |
+| `extraction.gd` | B5. Digging a part out of a body: depth, tool, condition, lien. |
+| `clinch.gd` | F7. What a held person will give you. Descent coerces, Ascent persuades. |
+| `witness_ledger.gd` | F1/F2. Who saw it, what factions learn, and how it travels the relation graph. |
+| `field_camera.gd` | C3. Photographs as evidence with verifiable contents. |
+| `world_xray.gd` | B3. The X-ray sweep in the world, through walls, at range. |
+| `intake_direction.gd` | D3.4/D8.3. How the intake is delivered and what signing costs. |
+| `world_index.gd` | The index: dossier, rank pyramid, Wire, body inspector. |
 | `handheld_device.gd` | The device that hosts the panels. Modes, not screens. |
-| `wire_net.gd` | The surviving internet: accounts, reach, replies, actions, exposure. |
-| `wire_radio.gd` | Tunable radio with terrain shadow. |
-| `witness_ledger.gd` | Who saw it, and what factions therefore know. |
-| `character_sheet.gd` | Races, traits, chart, instrument, modifiers. |
-| `arcade_vehicle.gd` | Four-wheel raycast suspension chassis. |
-| `celloutz_type.gd` | The display typeface, drawn in code. Regular, condensed, worn. |
-| `celloutz_grunge.gd` | Stains, spatter, stamps, grain, scratches, hatching. |
-| `celloutz_motion.gd` | Named easing rates. Nothing snaps. |
+| `wire_net.gd` | The surviving internet: accounts, reach, actions, photograph publishing. |
+| `carry.gd` | What you are carrying, with mass, spoilage, lien and install-into-self. |
+| `implant_catalog.gd` / `wound_catalog.gd` | Authored hardware and wounds. Names are identities, never parsed. |
+| `celloutz_type.gd` / `_grunge.gd` / `_motion.gd` | The display face, the dirt, the easing. Nothing snaps. |
 
-**Design rules that are already load-bearing in code:**
+**Design rules already load-bearing in code:**
 
 - Connectivity is a property of *place*. `signal_field.gd` decides the Wire's
   grade from where you stand. Never pass a constant grade.
@@ -147,80 +152,86 @@ lives. The pieces you will touch most:
   *known* (per faction, late, wrong). NPCs act on the second.
 - Reach is not combat skill. A terrifying fighter can have no audience.
 - A chunk, a carried part and a robbed implant are the same identified object.
+- **Harm is defined once**: `WorldHistory.event_karma()` is both what moves you
+  on the Tree and what the world holds against you. Do not add a second table.
 
-## 6. The checklist
+## 6. Where the checklist stands
 
-`CHECKLIST.md` is the working document and is driven by segment id — say `B5.2`
-and build that segment. Status: `[x]` built and verified, `[~]` partial with the
-remainder named, `[ ]` not started. Completed lines are also struck through so
-progress scans visually. **126 of 253 segments done.**
+**163 of 253 segments.** `CHECKLIST.md` is the working document, driven by
+segment id — say `E1.2` and build that segment.
 
 | Section | Done | State |
 | --- | --- | --- |
 | **A** — visual pass, HUD, map, driving, radio | 53/53 | **complete** |
-| **B** — the body as centrepiece | 24/46 | B0–B1 complete; B6.1–B6.4 built; B5 open |
-| **C** — the handheld | 17/21 | C1–C5 built, C3 camera open |
-| **D** — character creation in the vat | 25/29 | built bar cutscenes |
-| **E** — rituals, karma, the two ladders | 0/23 | designed, unbuilt |
-| **F** — the Hunt System | 3/21 | F1 witnesses built |
-| **G** — the look, art, sound | 0/22 | **G1 blocked on the art folder** |
+| **B** — the body as centrepiece | 46/46 | **complete** |
+| **C** — the handheld | 21/21 | **complete** |
+| **D** — character creation in the vat | 28/29 | complete bar D5.4 (Greg's call) |
+| **E** — rituals, karma, the two ladders | 1/23 | E1.1 built; the rest designed |
+| **F** — the Hunt System | 10/21 | F1, F2, F7 built |
+| **G** — the look, art, sound | 2/22 | G1.1/G1.2 built, G1.3–1.5 assets exist unwired |
 | **H** — base building, reduced | 0/5 | designed, unbuilt |
 | **I** — interface as its own medium | 2/23 | I0 applied to the index only |
 | **J** — infrastructure | 2/10 | FMOD documented, not dropped |
 
-### The critical path to something playable
+### Cheapest high-value work remaining
 
-Greg's measure: *"until it's sharper and sharper so that you can play the game."*
-**All seven foundation gates are now complete.** The last gate was:
+1. **E1.2 — factions price you by where you sit.** `FACTION_TREE_AXIS` already
+   holds every faction's own position on the axis and `tree_alignment()` already
+   returns yours; pricing is comparing the two. Perhaps 40 lines.
+2. **F3 — promotion into real vacancies.** The rank pyramid already draws
+   vacancies *and* computes who is positioned to fill one (A3.2, A3.3). A death
+   needs to trigger that machinery.
+3. **G1.3–G1.5 — wire the textures in.** The sheets exist in
+   `game/art/derived/`; no material or panel loads them yet.
+4. **F4.3 — the wound as the memory.** The rig already persists wounds and Mara
+   already carries `next_adaptation`.
 
-> ~~**B6.2–B6.3 — dismemberment as a combat verb.**~~ `DONE` Directional cut,
-> shear and ballistic force accumulates separately from health; crossing the
-> threshold takes the limb off during the fight. The NPC remains alive and
-> hostile, then attacks again with anatomy-driven lower damage and a slower
-> cadence. Blunt force can disable and fracture a limb but cannot detach it.
+### Genuinely expensive
 
-### Next most valuable after that
+**E2** (72 Goetic seals drawn in code), **E6** (drugs, minigames, economy),
+**I2** (per-site web layouts) and the rest of **G** are each multi-session.
 
-- **F7 — the clinch as a social verb.** Hold someone and talk: rob, abuse, or
-  persuade. Four systems that already exist start talking to each other.
-  Highest value per line of code in the whole list.
-- **B5 — rob cybernetics off a body.** Unblocked: `GoreChunks.take()` already
-  returns the identified part and `Carry` already accepts it.
-- **F2/F3 — grudges travelling real edges, promotion into real vacancies.** F1
-  built the substrate; the rank pyramid already displays the vacancies.
-- **E1 — karma from real events.** The Ascent/Descent axis exists, is computed,
-  is displayed, and drives nothing.
+## 7. Controls as they now stand
 
-## 7. Open questions — only Greg can answer
+WASD move, Shift sprint, Ctrl crouch, Space dodge (or break a clinch), LMB
+strike, RMB heavy, 1–3 weapons, 4 carried limb, R reload, F camera toggle,
+G handheld, Tab index/mode, M map, T tree, J artwork, Z lock, C clinch,
+E interact, **H dig/rob (hold)**, **B X-ray sweep (hold → radial)**,
+**N photograph**, **V talk in a clinch**, **X lean in a clinch**, Q surge.
 
-1. **Where is the art folder?** Blocks all of G1 — his own art, cut up and
-   glitched, as body textures, map plates and Wire collage. Largest available
-   upgrade to the look and it cannot start without the files.
+> **Check `_unhandled_input` before adding a key.** `KEY_F` was bound twice for
+> a whole session; the first branch wins in a `match`, so the entire B5 dig was
+> unreachable from the keyboard while every test passed, because tests call the
+> functions directly. `world_xray_test` now fails on any duplicate binding.
+
+## 8. Open questions — only Greg can answer
+
+1. **D5.4 — ephemeris or derived wheel?** The honest derived wheel is shipped.
+   Real planetary longitudes need a table.
 2. **celloutz.xyz — mirror the real site, or fictionalise it?** Blocks I3.
-3. **Ephemeris or derived wheel?** The chart currently derives a house wheel
-   from sun sign and birth time, which is honest and shipped. Real planetary
-   longitudes need an ephemeris table and are what "most accurate" means.
-4. **Guns: common, or scarce and improvised?** Built, undecided, changes
-   encounter design either way.
-5. **What persists between runs?** Roguelike structure was asked for, but
+3. **Guns: common, or scarce and improvised?** Built, undecided.
+4. **What persists between runs?** Roguelike structure was asked for, but
    "bodies remember" is a pillar. These pull against each other.
-6. **Does the chassis roll?** Pitch and roll are unlocked with an anti-roll term
-   and self-righting. Reversible if it plays badly.
+5. **Working title:** keep *Allusions to Grandeur*, or move to
+   **wizardsonlyfoolz**? Recorded as a candidate only; no identifiers renamed.
+6. ~~Where is the art folder?~~ **Answered 2026-09-12** — `Desktop/Art
+   Collections`, 43 artworks, catalogued.
 
-## 8. How Greg works
+## 9. How Greg works
 
 He fires ideas in bursts, often faster than they can be built, and he is right
 about the register far more often than not. The established protocol:
 
 - **Capture whole rather than half-build.** A large idea gets written into a
-  `DESIGN/*.md` in full, immediately, with the reasoning — then scheduled. This
-  is why the design docs exist and why nothing has been lost.
+  `DESIGN/*.md` in full, immediately, with the reasoning — then scheduled.
+- **One segment at a time.** Say a segment id, build it, test it, commit it.
+  Large "do everything" prompts produce shallow work that does not run; every
+  good increment in this project came from the segment loop.
 - **Say what is actually wrong.** When a complaint has a different root cause
   than the one stated, say so and fix the real one. "The derby map is broken"
-  was three separate complaints over two sessions; the map was never the
-  problem, the car was a rigid box with no suspension.
+  was three complaints over two sessions; the map was never the problem, the car
+  was a rigid box with no suspension. Likewise "the sound is blaring" was not a
+  mix problem — the radio had no stop path at all and had never been switchable.
 - **Commit messages explain the why**, including what was tried and rejected.
   They are the project's reasoning log.
-- **Flag a renaming rather than doing it silently.** One trait was renamed from
-  his phrasing to keep the satire off a real group; that was stated plainly, the
-  joke and the numbers kept.
+- **Flag a renaming rather than doing it silently.**
