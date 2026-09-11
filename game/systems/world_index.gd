@@ -91,6 +91,11 @@ var _contact: Dictionary = {}
 var _contact_for := ""
 var _last_action: Dictionary = {}
 var _action_rects: Array = []
+## I5. One list for everything the reader can point at that is not already a
+## dedicated control. Collected during the draw that puts it on screen, so a
+## thing is clickable exactly where it was printed and nothing has to keep a
+## second layout in sync.
+var _link_rects: Array = []
 var _icons: Array = []
 var _inspector: Node
 var _rail_cache: Array = []
@@ -297,6 +302,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			queue_redraw()
 			return
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			# I5. Everything printed is pointable. One list, checked before the
+			# page-specific controls so a link always wins over the surface
+			# underneath it.
+			for link in _link_rects:
+				if (link["rect"] as Rect2).has_point(event.position):
+					_follow_link(link)
+					get_viewport().set_input_as_handled()
+					queue_redraw()
+					return
 		if event.button_index == MOUSE_BUTTON_LEFT and page == 1:
 			# A3.5. Click a rank and read the person standing in it.
 			for row in _tier_rects:
@@ -414,6 +429,43 @@ func _disputed_note(subject_id: String) -> String:
 	return str(DISPUTED_ROLES[mark % DISPUTED_ROLES.size()])
 
 
+## I5.2-I5.4. Following a link never opens a window: it moves this panel to the
+## page that already shows the thing, which is rule 3 — parts leave diagrams
+## rather than spawning modals.
+func _follow_link(link: Dictionary) -> void:
+	match str(link.get("kind", "")):
+		"wound", "implant":
+			# Both live on the body, so both go to BODY with the right zone up.
+			page = 3
+			page_blend = 0.0
+			page_direction = 1.0
+			var zone := str(link.get("zone", ""))
+			if zone.is_empty():
+				zone = _zone_from_text(str(link.get("id", "")))
+			if _inspector != null and _inspector.has_method("focus_zone"):
+				_inspector.focus_zone(zone)
+		"account":
+			# _jump_to_subject lands on FILE by design, so select first and then
+			# put the reader on the Wire, which is where an account lives.
+			_jump_to_subject(str(link.get("id", "")))
+			_go_to_page(2, 1.0)
+		"faction":
+			page = 1
+			page_blend = 0.0
+			page_direction = 1.0
+
+
+## Wounds are recorded as prose, not as a zone id, so the link reads the zone
+## back out of the text. Names are identities and are never parsed for meaning
+## elsewhere; this is a lookup for where to point a camera, nothing more.
+func _zone_from_text(text: String) -> String:
+	var lowered := text.to_lower()
+	for zone in ["head", "torso", "left arm", "right arm", "left leg", "right leg"]:
+		if lowered.contains(zone):
+			return zone.replace(" ", "_")
+	return "torso"
+
+
 func _selected() -> Dictionary:
 	if _rail_cache.is_empty():
 		return {}
@@ -457,6 +509,7 @@ func _draw() -> void:
 	var eased := 1.0 - pow(1.0 - clampf(page_blend, 0.0, 1.0), 3.0)
 	var slide := (1.0 - eased) * page_direction * 46.0
 	draw_set_transform(Vector2(slide, 0.0), 0.0, Vector2.ONE)
+	_link_rects.clear()
 	match page:
 		0:
 			_draw_file(panel)
@@ -743,7 +796,13 @@ func _draw_file(rect: Rect2) -> void:
 	if lines.is_empty():
 		lines.append("no recorded damage")
 	for line in lines:
-		draw_string(font, Vector2(right_x, wy), "— %s" % str(line), HORIZONTAL_ALIGNMENT_LEFT, right_width, 12, HOT * Color(1, 1, 1, 0.9))
+		var wound_row := Rect2(right_x - 4, wy - 12, right_width, 17)
+		var wound_hot := wound_row.has_point(cursor_at)
+		if str(line) != "no recorded damage":
+			_link_rects.append({"kind": "wound", "id": str(line), "rect": wound_row})
+			if wound_hot:
+				draw_rect(wound_row, HOT * Color(1, 1, 1, 0.10))
+		draw_string(font, Vector2(right_x, wy), "— %s" % str(line), HORIZONTAL_ALIGNMENT_LEFT, right_width, 12, HOT * Color(1, 1, 1, 1.0 if wound_hot else 0.9))
 		wy += 17.0
 	var anatomy: Dictionary = subject.get("anatomy_state", subject.get("anatomy", {}))
 	var cybernetics := ImplantCatalog.list(anatomy.get("cybernetics", []))
@@ -753,7 +812,12 @@ func _draw_file(rect: Rect2) -> void:
 		draw_line(Vector2(right_x, wy + 17), Vector2(right_x + right_width, wy + 17), BRUISE * Color(1, 1, 1, 0.4), 1.0)
 		wy += 36.0
 		for part in cybernetics:
-			draw_string(font, Vector2(right_x, wy), "+ %s  %03d%%" % [str(part.name), roundi(float(part.condition) / maxf(1.0, float(part.max_condition)) * 100.0)], HORIZONTAL_ALIGNMENT_LEFT, right_width, 12, BRUISE.lerp(INK, 0.55))
+			var part_row := Rect2(right_x - 4, wy - 12, right_width, 17)
+			var part_hot := part_row.has_point(cursor_at)
+			_link_rects.append({"kind": "implant", "id": str(part.name), "zone": str(part.get("zone", "torso")), "rect": part_row})
+			if part_hot:
+				draw_rect(part_row, BRUISE * Color(1, 1, 1, 0.14))
+			draw_string(font, Vector2(right_x, wy), "+ %s  %03d%%" % [str(part.name), roundi(float(part.condition) / maxf(1.0, float(part.max_condition)) * 100.0)], HORIZONTAL_ALIGNMENT_LEFT, right_width, 12, BRUISE.lerp(INK, 0.8 if part_hot else 0.55))
 			wy += 17.0
 	var blood := str(anatomy.get("blood_type", ""))
 	if blood != "":
@@ -1091,7 +1155,16 @@ func _draw_post(feed: Rect2, post: Dictionary, y: float) -> void:
 	}.get(kind, INK)
 	draw_line(Vector2(feed.position.x, y - 12), Vector2(feed.position.x + 2, y + 46), tone * Color(1, 1, 1, 0.55), 2.0)
 	var author := str(post.get("author", "")).to_upper()
-	draw_string(font, Vector2(feed.position.x + 12, y), author, HORIZONTAL_ALIGNMENT_LEFT, feed.size.x - 110, 11, tone)
+	# I5.4. The name on a post is the account that wrote it.
+	var author_width: float = font.get_string_size(author, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+	var author_row := Rect2(feed.position.x + 10, y - 11, author_width + 8.0, 15)
+	var author_hot := author_row.has_point(cursor_at)
+	var post_subject := str(post.get("subject_id", post.get("author_id", "")))
+	if not post_subject.is_empty():
+		_link_rects.append({"kind": "account", "id": post_subject, "rect": author_row})
+		if author_hot:
+			draw_rect(author_row, tone * Color(1, 1, 1, 0.12))
+	draw_string(font, Vector2(feed.position.x + 12, y), author, HORIZONTAL_ALIGNMENT_LEFT, feed.size.x - 110, 11, tone * Color(1, 1, 1, 1.0 if author_hot else 0.88))
 	# Author, then the mark, then the handle - each measured off the last rather
 	# than guessed at. Backing the mark off the handle by a fixed 14px printed it
 	# through the final letters of every verified name.

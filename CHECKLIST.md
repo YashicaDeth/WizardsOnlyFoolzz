@@ -533,9 +533,9 @@ finished. Applies to everything below and to A5, A6, C1.
 
 ### I5 — Everything clickable and inspectable
 - [x] ~~**I5.1** Body parts~~
-- [ ] **I5.2** Wounds and implants from the dossier
-- [ ] **I5.3** People, factions and ranks
-- [ ] **I5.4** Posts and accounts
+- [x] **I5.2** Wounds and implants from the dossier
+- [x] **I5.3** People, factions and ranks
+- [x] **I5.4** Posts and accounts
 
 ### I6 — The honest split on dark patterns
 - [x] **I6.1** The Wire is deliberately hostile — infinite scroll, bait, variable reward

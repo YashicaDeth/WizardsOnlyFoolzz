@@ -173,6 +173,16 @@ func _wound_penalty(zone_id: String) -> float:
 	return clampf(1.0 - penalty, 0.05, 1.0)
 
 
+## I5.2. Point the inspector at a zone from outside — used when a wound or an
+## implant is clicked in the dossier, so following the link lands on the part it
+## names rather than on whatever was last selected.
+func focus_zone(zone_id: String) -> void:
+	if zone_id.is_empty():
+		return
+	zone = zone_id
+	_rebuild_parts()
+
+
 func selected_part() -> Dictionary:
 	if _parts.is_empty():
 		return {}
