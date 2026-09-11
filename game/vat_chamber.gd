@@ -423,7 +423,7 @@ func _interact() -> void:
 	WorldHistory.update_subject("player", {"status": "racked for a heat"}, "opening_entered_pit")
 	WorldHistory.record_event("opening_entered_pit", {"location": "growing_floor"})
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	get_tree().change_scene_to_file("res://rift_derby.tscn")
+	Interstitial.travel("res://rift_derby.tscn", "racked for the heat // debt is in the meat")
 
 
 func _update_hud() -> void:

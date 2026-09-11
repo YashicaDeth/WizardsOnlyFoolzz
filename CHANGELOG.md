@@ -2,6 +2,25 @@
 
 ## 2026 09 11
 
+- **Scene changes are no longer hard cuts.** Every transition in the game
+  swapped `.tscn` files with nothing covering it, which is most of why the game
+  read as a set of dev tools rather than one place. `systems/interstitial.gd` is
+  autoloaded so it survives the swap it covers, and all five transitions route
+  through it: menu to derby, menu to vat, vat to derby, and both derby exits
+  into the Hunt Grounds.
+- The plate is the interstitial register `ART-DIRECTION.md` and Tier 2.6 already
+  specified: a procedural skeleton turning on the spot — ribcage, skull with jaw
+  and sockets, clavicles, pelvis and jointed limbs — with its organs lighting
+  and naming themselves one at a time, over deadpan CellOutz transit paperwork
+  and a progress bar that admits it knows nothing. Drawn in code from the same
+  body plan the dossier, the resolution form and the kill cam use, so the
+  anatomy on the loading screen is the anatomy of the world.
+- The first version photographed as a scarecrow: centred rib arcs close into
+  hoops once the body turns face-on, and the limbs floated beside the spine
+  rather than hanging off it. Caught by looking at the capture.
+
+## 2026 09 11
+
 - **Gore now reads in play, and the floor remembers the fight.** Three separate
   causes. The Hunt Grounds **never applied the GORE setting at all** — that code
   lived only in the derby, so OFF did nothing once the player left the pit and

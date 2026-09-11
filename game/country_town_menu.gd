@@ -91,9 +91,9 @@ func _start_game() -> void:
 	# resumes at the pit rather than replaying the decanting.
 	var opening := preload("res://systems/opening_director.gd")
 	if opening.reached("entered_pit"):
-		get_tree().change_scene_to_file("res://rift_derby.tscn")
+		Interstitial.travel("res://rift_derby.tscn", "the bone yard // heat one")
 	else:
-		get_tree().change_scene_to_file("res://vat_chamber.tscn")
+		Interstitial.travel("res://vat_chamber.tscn", "the growing floor // decanting")
 
 
 func _open_settings() -> void:

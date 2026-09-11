@@ -306,14 +306,44 @@ sequenced below and none of them are dropped.
    the ground plane rather than on the geometry it actually hits.
 4. **The opening is "cool but kinda lacklustre."** `vat_chamber.tscn` works but
    is under-directed — pacing, camera, sound and the handler's delivery.
-5. **The seams read as dev tools.** "The constant reset and switching worlds…
-   nothing seems seamless." Scene transitions are hard cuts between separate
-   `.tscn` files with no covering. Greg explicitly said he would **welcome
-   loading screens** here — the Postal 2-register procedural anatomy
-   interstitials already specified in Tier 2.6 are the answer, and they are now
-   blocking rather than cosmetic.
+5. **The seams read as dev tools — first pass done 2026-09-11.** Every scene
+   change was a hard cut straight from one `.tscn` to another with nothing
+   covering it. `systems/interstitial.gd` is now an autoload (so it survives the
+   swap it is covering) and all five transitions route through it: menu -> derby,
+   menu -> vat, vat -> derby, and both derby -> Hunt Grounds exits. The plate is
+   the Tier 2.6 register — a procedural skeleton turning on the spot with its
+   organs lighting and naming themselves in sequence, deadpan CellOutz transit
+   paperwork, and a progress bar that admits it knows nothing.
+   Still outstanding here: the transitions are covered, not seamless, and there
+   is no streaming or preloading behind the plate — the hold is a fixed 1.45s
+   rather than actual load progress. Reset keys and other debug affordances are
+   still in the shipping input map (item 6).
 6. **Player-facing reset keys and debug affordances** should come out of the
    shipping input map or be gated behind a developer flag.
+
+### Captured from Greg 2026-09-11 — the 1.0 body
+
+Fired while looking at the 0.1. Recorded whole, not built: this is the full
+shape of the body system the project is aiming at, and most of it already has a
+foundation in `baseline_human.gd` and `anatomy_component.gd`.
+
+- **Bionics as real parts.** Not a stat bonus — a component with its own
+  condition, compatibility, maintenance cost and social reading, occupying a
+  zone the way a limb does. `install_prosthetic()` and the cybernetics slots
+  exist; what is missing is the part catalogue, the economy around it, and the
+  silhouette change on the rig.
+- **Bones, organs and blood as one continuous system.** Zone health, organ
+  rupture, bleed rate, fractures and blood volume all exist separately and are
+  already wired to behaviour. The 1.0 version is these reading as one body in
+  play: a broken arm that changes a swing, a punctured lung that changes a
+  sprint, blood loss the player watches happen to themselves.
+- **Dismemberment.** Severing exists on the rig with thrown limbs, stumps and
+  exposed bone. The 1.0 version is dismemberment as a *combat verb* rather than
+  a death effect — taking an arm mid-fight and having the fight continue with
+  that person still in it, which is what the downed state was built for.
+
+Nothing here is scheduled yet. It sits behind the Tier 1b combat work because
+every item needs a fight that feels good to be legible inside.
 
 ### Tier 1b — combat, added 2026-09-11
 

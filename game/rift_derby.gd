@@ -128,7 +128,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_refresh_world_index()
 		elif event.keycode == KEY_E:
 			WorldHistory.record_event("player_left_derby_vehicle", {"venue": "rift_derby_quarry", "destination": "bone_yard_outskirts"})
-			get_tree().change_scene_to_file("res://bone_yard_hunt.tscn")
+			Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
 		elif event.keycode == KEY_ENTER and round_state in ["won", "lost"]:
 			_leave_derby(round_state)
 
@@ -600,7 +600,7 @@ func _leave_derby(result: String) -> void:
 		return
 	leaving = true
 	WorldHistory.record_event("derby_result_accepted", {"result": result, "score": score, "disabled": disabled_count})
-	get_tree().change_scene_to_file("res://bone_yard_hunt.tscn")
+	Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
 
 
 func _finish_round(result: String) -> void:
