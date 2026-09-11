@@ -381,6 +381,39 @@ built it.
 - **Weapon and cybernetic selection sliders**, and killing that flows without
   breaking out to a menu.
 
+### The tutorial look — Greg, 2026-09-11
+
+His words: *"the boxes and squares of everything being super basic and almost
+tutorial level, same as the font"* and *"no more of this tutorial look"*. Two
+specific causes, both cheap relative to their impact, and the second has been
+hiding in plain sight all session:
+
+1. **Every interface in the game is set in Godot's default font.**
+   `ThemeDB.fallback_font` appears in the map, the resolution form, the kill
+   cam, the HUD, the warning card and the interstitial. Nothing announces
+   "engine default" louder, and every reference Greg sent has a distinctive
+   display face. Fix: a generated stroke/stencil display alphabet drawn in code
+   for headers and numerals, keeping a legible face for body copy. No font file
+   to licence, and the letterforms become part of the CellOutz identity.
+2. **Primitive silhouettes.** Boxes and capsules with no secondary form. The
+   contamination pass gave them surfaces; they still need bevels, greebles,
+   leaning, broken corners and attached junk so the *outline* stops reading as
+   a primitive. This is a generator change, not an authored-asset change.
+
+**Roguelike elements, also captured:** Greg wants the Hunt/nemesis system to
+carry roguelike structure — runs, escalating rivals, loot that matters per run.
+This sits with the Hunt System rework in Tier 3 rather than as a separate
+system, and needs a decision on what persists between runs versus what resets,
+given that "bodies remember" is a pillar.
+
+**The clinch as a social verb, captured:** Greg wants to hold someone in the
+grapple and *talk* to them — rob them, force them to take abuse, or persuade
+them to join. The clinch already exists and already resolves into the downed
+window; extending it into a hold-and-negotiate state connects grappling,
+dialogue, the resolution form and recruitment into one verb. This is the
+highest-value single feature in the captured list because four systems that
+already exist would start talking to each other.
+
 ### Tier 1b — combat, added 2026-09-11
 
 **Movement prerequisite completed 2026-09-11.** The original Hunt controller

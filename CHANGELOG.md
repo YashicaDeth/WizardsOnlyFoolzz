@@ -2,6 +2,19 @@
 
 ## 2026 09 11
 
+- **A front door.** The game opened straight onto a button column. It now opens
+  on a CellOutz product liability notice in the Postal 2 register — blunt, not
+  sorry — which is also where the violence tier is chosen. Those three tiers
+  already existed and were buried in a settings submenu nobody opens, which is
+  a strange place to keep the one setting the whole game is about. Shown once
+  per install; still changeable in settings afterwards.
+- **The menu is a scene now, not a backdrop.** `systems/front_door.gd` drops
+  meat-industry junk past the camera — organs, tins, bone, teeth, syringes,
+  paperwork — on the project's own materials, lit and tumbling. Generated
+  geometry, nothing imported.
+
+## 2026 09 11
+
 - **Every albedo in the game was a flat colour.** `WorldLook.surface()` only
   ever set a roughness texture, so no surface in the project had any albedo
   detail at all — which is the real reason the world read as untextured

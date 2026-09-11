@@ -1,6 +1,8 @@
 extends Node3D
 
 var wreck: Node3D
+var front_door: Node3D
+var warning_card: Control
 var menu_environment: Environment
 var ui_time := 0.0
 var menu_buttons: Array[Button] = []
@@ -12,6 +14,7 @@ var color_modes := ["CELLOUTZ COPPER", "SALVAGE TEAL", "NIGHT BLOOD"]
 var color_index := 0
 var gore_modes := ["FULL", "REDUCED", "OFF"]
 var gore_index := 0
+var gore_button: Button
 var vsync_enabled := true
 
 @onready var settings_panel: PanelContainer = $HUD/SettingsPanel
@@ -39,6 +42,36 @@ func _ready() -> void:
 		button.mouse_entered.connect(_focus_button.bind(button))
 		button.mouse_exited.connect(_unfocus_button.bind(button))
 	_build_gore_setting()
+	_build_front_door()
+
+
+## The front end is a scene with junk falling through it, and the first thing
+## the player is asked is what they are willing to look at. The violence tiers
+## already existed; they were buried in a settings submenu nobody opens, which
+## is a strange place to keep the one setting the whole game is about.
+func _build_front_door() -> void:
+	front_door = preload("res://systems/front_door.gd").new()
+	front_door.name = "FrontDoor"
+	add_child(front_door)
+	front_door.camera.current = true
+
+	warning_card = preload("res://systems/warning_card.gd").new()
+	warning_card.name = "WarningCard"
+	$HUD.add_child(warning_card)
+	warning_card.chosen.connect(_on_violence_chosen)
+	# Shown once per install. Returning players are not lectured twice; the
+	# tier stays changeable in settings.
+	if str(WorldHistory.subject("settings").get("violence_acknowledged", "")) == "yes":
+		warning_card.hide()
+	else:
+		warning_card.open_card()
+
+
+func _on_violence_chosen(mode: String) -> void:
+	WorldHistory.update_subject("settings", {"violence_acknowledged": "yes"}, "violence_acknowledged")
+	gore_index = maxi(0, gore_modes.find(mode))
+	if gore_button != null and is_instance_valid(gore_button):
+		gore_button.text = "GORE: %s" % mode
 
 
 ## Gore belongs in settings rather than on a hotkey over the pit. The choice is
@@ -55,6 +88,7 @@ func _build_gore_setting() -> void:
 	box.add_child(button)
 	box.move_child(button, box.get_child_count() - 2)
 	button.pressed.connect(_cycle_gore.bind(button))
+	gore_button = button
 
 
 func _cycle_gore(button: Button) -> void:
