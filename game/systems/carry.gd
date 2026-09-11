@@ -29,10 +29,10 @@ const CAPACITY := 28.0
 ## Per-layer mass and whether it rots. Bone and hardware keep; the wet layers
 ## do not.
 const LAYER_MASS := {
-	"skin": 0.3, "fat": 0.6, "muscle": 1.4, "bone": 1.1, "organ": 0.9, "cybernetic": 2.2,
+	"skin": 0.3, "fat": 0.6, "muscle": 1.4, "bone": 1.1, "organ": 0.9, "cybernetic": 2.2, "limb": 5.5,
 }
 const LAYER_PERISHES := {
-	"skin": true, "fat": true, "muscle": true, "bone": false, "organ": true, "cybernetic": false,
+	"skin": true, "fat": true, "muscle": true, "bone": false, "organ": true, "cybernetic": false, "limb": true,
 }
 
 var items: Array = []
@@ -66,7 +66,9 @@ func take_chunk(info: Dictionary) -> Dictionary:
 		return {}
 	var layer := str(info.get("layer_name", "muscle"))
 	var label := layer.to_upper()
-	if str(info.get("implant", "")) != "":
+	if bool(info.get("whole_limb", false)):
+		label = "SEVERED %s" % str(info.get("zone", "limb")).replace("_", " ").to_upper()
+	elif str(info.get("implant", "")) != "":
 		label = str(info.get("implant", "")).to_upper()
 	elif str(info.get("organ_id", "")) != "":
 		label = str(info.get("organ_id", "")).replace("_", " ").to_upper()
@@ -82,11 +84,55 @@ func take_chunk(info: Dictionary) -> Dictionary:
 		"zone": str(info.get("zone", "")),
 		"organ_id": str(info.get("organ_id", "")),
 		"implant": str(info.get("implant", "")),
+		"whole_limb": bool(info.get("whole_limb", false)),
+		"condition": clampf(float(info.get("condition", 1.0)), 0.0, 1.0),
 	}
 	items.append(item)
 	save_to_history()
 	WorldHistory.record_event("carried_part", {"subject": str(info.get("subject_id", "")), "part": label})
 	return item
+
+
+func first_index(kind: String) -> int:
+	for index in items.size():
+		if str((items[index] as Dictionary).get("kind", "")) == kind:
+			return index
+	return -1
+
+
+func damage_item(index: int, amount: float) -> float:
+	if index < 0 or index >= items.size():
+		return 0.0
+	var item: Dictionary = items[index]
+	item["condition"] = clampf(float(item.get("condition", 1.0)) - maxf(0.0, amount), 0.0, 1.0)
+	items[index] = item
+	save_to_history()
+	return float(item.condition)
+
+
+## The first economy seam. The Choir/Soft Rot price identity, remaining
+## condition and freshness; the wallet lives beside CARRY, not inside the item.
+func sale_value(item: Dictionary) -> int:
+	var base := int({"limb": 7, "organ": 12, "cybernetic": 24}.get(str(item.get("kind", "")), 0))
+	if base <= 0:
+		return 0
+	var condition := clampf(float(item.get("condition", 1.0)), 0.0, 1.0)
+	return maxi(1, roundi(float(base) * maxf(0.2, condition) * maxf(0.15, freshness(item))))
+
+
+func sell(index: int) -> Dictionary:
+	if index < 0 or index >= items.size():
+		return {}
+	var item: Dictionary = items[index]
+	var price := sale_value(item)
+	if price <= 0:
+		return {}
+	items.remove_at(index)
+	var inventory := WorldHistory.subject("inventory")
+	var wallet := int(inventory.get("rust_scrip", 0)) + price
+	WorldHistory.update_subject("inventory", {"items": items.duplicate(true), "rust_scrip": wallet}, "carried_part_sold")
+	WorldHistory.record_event("carried_part_sold", {"part": item.duplicate(true), "price": price, "currency": "rust_scrip"})
+	return {"item": item, "price": price, "wallet": wallet}
 
 
 func drop(index: int) -> Dictionary:

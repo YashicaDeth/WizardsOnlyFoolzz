@@ -741,12 +741,14 @@ func _throw_limb(zone_id: String, hit_direction := Vector3.ZERO) -> void:
 	shape.height = maxf(shape.radius * 2.0 + 0.01, bounds.size.y)
 	shape_node.shape = shape
 	limb.add_child(shape_node)
+	GoreChunks.register_whole_limb(limb, zone_id, anatomy.subject_id)
 	var launch := hit_direction.normalized() if hit_direction.length_squared() > 0.001 else Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)).normalized()
 	limb.apply_central_impulse((launch * 2.25 + Vector3.UP * 2.1) * limb.mass)
 	limb.apply_torque_impulse(Vector3(randf_range(-3.0, 3.0), randf_range(-3.0, 3.0), randf_range(-3.0, 3.0)))
 	live_gore += 1
-	get_tree().create_timer(18.0).timeout.connect(func():
+	get_tree().create_timer(90.0).timeout.connect(func():
 		live_gore = maxi(0, live_gore - 1)
+		GoreChunks.live.erase(limb)
 		if is_instance_valid(limb):
 			limb.queue_free())
 

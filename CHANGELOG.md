@@ -2,6 +2,20 @@
 
 ## 2026 09 11
 
+- **A severed limb remains usable matter.** Whole limbs now enter the same
+  identified chunk registry as tissue and implants, retaining owner, zone,
+  condition and freshness. The player can pick one up with E, equip it from
+  CARRY on slot 4, hit another combatant through the normal melee/anatomy
+  resolver, wear it out and sell it to a Soft Rot broker for persistent rust
+  scrip.
+- **The Index's people look injured.** Its pooled 3D heads now show missing
+  eyes as empty sockets and broken jaws as displaced geometry, while X-ray
+  still reveals the underlying skull. Five pooled heads now flank the selected
+  FILE entry without creating a viewport for every person in the world.
+- Added `icon_test`; the complete headless suite is now sixteen green suites.
+- Recorded **wizardsonlyfoolz** as a working-title candidate without renaming
+  project paths, executables or save-data identifiers.
+
 - **Dismemberment is now a combat verb.** Limb health and detachment are
   separate: blunt trauma can break and disable a limb without magically cutting
   it off, while directional cut, shear and ballistic hits build sever stress.

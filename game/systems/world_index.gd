@@ -592,8 +592,12 @@ func _draw_rail(rect: Rect2) -> void:
 			continue
 		var entry: Dictionary = _rail_cache[index]
 		var active := index == rail_index
-		draw_string(font, Vector2(rect.position.x + 4, y), str(entry.label), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 26, 14, INK if active else INK * Color(1, 1, 1, 0.72))
-		draw_string(font, Vector2(rect.position.x + 4, y + 13), str(entry.note).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 26, 9, COPPER * Color(1, 1, 1, 0.8) if active else INK * Color(1, 1, 1, 0.34))
+		var icon_slot := _file_rail_icon_slot(index)
+		var text_inset := 4.0
+		if icon_slot >= 0 and _draw_icon(icon_slot, str(entry.id), Rect2(Vector2(rect.position.x + 2, y - 12), Vector2(27, 27))):
+			text_inset = 35.0
+		draw_string(font, Vector2(rect.position.x + text_inset, y), str(entry.label), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - text_inset - 22, 14, INK if active else INK * Color(1, 1, 1, 0.72))
+		draw_string(font, Vector2(rect.position.x + text_inset, y + 13), str(entry.note).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - text_inset - 22, 9, COPPER * Color(1, 1, 1, 0.8) if active else INK * Color(1, 1, 1, 0.34))
 
 	# A scroll indicator, so it is obvious there is more than what is on screen.
 	if _rail_cache.size() > visible_rows:
@@ -603,6 +607,15 @@ func _draw_rail(rect: Rect2) -> void:
 		var thumb := span * clampf(float(visible_rows) / float(_rail_cache.size()), 0.08, 1.0)
 		var travel := (span - thumb) * clampf(rail_scroll / maxf(1.0, float(_rail_cache.size() - visible_rows)), 0.0, 1.0)
 		draw_line(Vector2(track_x, top - 6 + travel), Vector2(track_x, top - 6 + travel + thumb), COPPER * Color(1, 1, 1, 0.55), 2.0)
+
+
+## The FILE rail gets the five pooled heads surrounding selection; slot zero is
+## reserved for the larger dossier portrait. This keeps the six-viewport budget
+## while making the list people rather than another column of names.
+func _file_rail_icon_slot(index: int) -> int:
+	if page != 0 or abs(index - rail_index) > 2:
+		return -1
+	return 1 + index - (rail_index - 2)
 
 
 # --- page one: the dossier -------------------------------------------------

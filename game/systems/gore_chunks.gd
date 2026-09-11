@@ -52,6 +52,30 @@ const MAX_CHUNKS := 90
 static var live: Array[Node3D] = []
 
 
+## A severed limb is a chunk too, but it is an entire body zone rather than one
+## tissue layer. Registering it here gives CARRY, rituals and the economy the
+## same identity contract as every smaller piece.
+static func register_whole_limb(node: RigidBody3D, zone: String, subject_id: String) -> Dictionary:
+	if node == null or not is_instance_valid(node):
+		return {}
+	if live.size() >= MAX_CHUNKS:
+		_recycle_oldest()
+	var info := {
+		"layer": -1,
+		"layer_name": "limb",
+		"whole_limb": true,
+		"zone": zone,
+		"subject_id": subject_id,
+		"organ_id": "",
+		"implant": "",
+		"condition": 1.0,
+		"taken": false,
+	}
+	node.set_meta("chunk", info)
+	live.append(node)
+	return info
+
+
 ## How deep a blow reached, as a `Layer`. The zone's current condition is part of
 ## the answer — the second cut into the same arm goes further than the first,
 ## which is the whole reason a fight escalates visually.

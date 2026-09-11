@@ -70,6 +70,8 @@ var kill_cam: Control
 var voice_channel: Node
 var arsenal: Node
 var pending_attack: Dictionary = {}
+var carried_limb_index := -1
+var carried_limb_model: MeshInstance3D
 
 @onready var camera: Camera3D = $CameraRig/Camera3D
 @onready var title: Label = $HUD/Title
@@ -273,6 +275,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_1: _equip_weapon(0)
 			KEY_2: _equip_weapon(1)
 			KEY_3: _equip_weapon(2)
+			KEY_4: _equip_carried_limb()
 			KEY_R: _reload_weapon()
 			KEY_ESCAPE:
 				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -375,7 +378,7 @@ func _attack(heavy := false) -> void:
 		return
 	if not panel_mode.is_empty():
 		return
-	var report: Dictionary = arsenal.begin_attack(heavy)
+	var report: Dictionary = _begin_carried_limb_attack(heavy) if carried_limb_index >= 0 else arsenal.begin_attack(heavy)
 	if not bool(report.get("accepted", false)):
 		if str(report.get("reason", "")) == "empty":
 			prompt.text = "DRY / [R] RELOAD"
@@ -389,9 +392,11 @@ func _attack(heavy := false) -> void:
 			arsenal.ammo[arsenal.current_id] = rounds
 		return
 	stamina -= cost
-	attack_cooldown = arsenal.cooldown
+	attack_cooldown = float(report.get("cooldown", arsenal.cooldown))
 	pending_attack = report
-	body_motion.trigger_attack(maxf(float(report.get("windup", 0.0)), arsenal.cooldown * 0.62), str(report.kind))
+	body_motion.trigger_attack(maxf(float(report.get("windup", 0.0)), attack_cooldown * 0.62), str(report.kind))
+	if str(report.weapon) == "severed_limb":
+		_wear_carried_limb(bool(report.get("heavy", false)))
 	if str(report.kind) == "firearm":
 		body_motion.trigger_recoil(float(report.impulse))
 		_resolve_firearm(report)
@@ -594,6 +599,7 @@ func _player_collision_exclusions() -> Array[RID]:
 
 
 func _equip_weapon(slot: int) -> void:
+	_clear_carried_limb_model()
 	if arsenal.select_slot(slot):
 		pending_attack = {}
 		strike_windup = -1.0
@@ -601,6 +607,9 @@ func _equip_weapon(slot: int) -> void:
 
 
 func _reload_weapon() -> void:
+	if carried_limb_index >= 0:
+		prompt.text = "THAT IS AN ARM, NOT A GUN"
+		return
 	if arsenal.reload():
 		body_motion.trigger_reload(float(arsenal.current().reload))
 		prompt.text = "%s / RELOADING" % str(arsenal.current().label)
@@ -637,11 +646,21 @@ func _interact() -> void:
 	if not downed.is_empty():
 		_open_resolution(downed)
 		return
+	var chunk := _nearest_takeable_chunk(3.2)
+	if chunk != null:
+		var carried: Dictionary = handheld.carry.take_chunk(GoreChunks.take(chunk))
+		if not carried.is_empty():
+			prompt.text = "%s SECURED // [4] WIELD // CARRY %0.1f KG" % [str(carried.label), handheld.carry.total_mass()]
+			return
 	for marker in social_markers.duplicate():
 		if is_instance_valid(marker) and player.distance_to(marker.global_position) < 4.0:
 			var kind := str(marker.get_meta("kind"))
 			var inventory: Array = WorldHistory.subject("inventory").get("items", []).duplicate()
 			if kind == "trade":
+				var sold := _sell_first_carried_part()
+				if not sold.is_empty():
+					prompt.text = "SOFT ROT BROKER // %s BOUGHT FOR %d RUST SCRIP" % [str((sold.item as Dictionary).label), int(sold.price)]
+					return
 				if not inventory.has("rust scrip"):
 					prompt.text = "SOFT ROT BROKER: ONE RUST SCRIP FOR A FIELD DRESSING."
 					return
@@ -680,6 +699,86 @@ func _interact() -> void:
 		_begin_canonical_encounter()
 		return
 	prompt.text = "Nothing answers. Find Nix or follow the floodlights to the tunnel."
+
+
+func _nearest_takeable_chunk(radius: float) -> Node3D:
+	var nearest: Node3D
+	var nearest_distance := radius
+	for candidate in GoreChunks.live:
+		if not is_instance_valid(candidate) or bool(GoreChunks.identify(candidate).get("taken", false)):
+			continue
+		var distance := player.distance_to(candidate.global_position)
+		if distance <= nearest_distance:
+			nearest = candidate
+			nearest_distance = distance
+	return nearest
+
+
+func _equip_carried_limb() -> void:
+	var index: int = handheld.carry.first_index("limb")
+	if index < 0:
+		prompt.text = "CARRY HAS NO WHOLE LIMB"
+		return
+	_clear_carried_limb_model(false)
+	carried_limb_index = index
+	for model in arsenal.models.values():
+		(model as Node3D).visible = false
+	var item: Dictionary = handheld.carry.items[index]
+	carried_limb_model = MeshInstance3D.new()
+	carried_limb_model.name = "CarriedLimbWeapon"
+	carried_limb_model.mesh = BodyMesh.leg(0.82) if str(item.zone).ends_with("leg") else BodyMesh.arm(0.72)
+	carried_limb_model.material_override = WorldLook.surface(Color("6b3d34"), "flesh", 44)
+	carried_limb_model.position = Vector3(0.0, -0.48, 0.18)
+	carried_limb_model.rotation = Vector3(PI * 0.5, 0.0, -0.18)
+	(player_rig.parts.right_arm as Node3D).add_child(carried_limb_model)
+	prompt.text = "%s // IMPROVISED WEAPON // %d%%" % [str(item.label), roundi(float(item.condition) * 100.0)]
+
+
+func _begin_carried_limb_attack(heavy: bool) -> Dictionary:
+	if carried_limb_index < 0 or carried_limb_index >= handheld.carry.items.size() or attack_cooldown > 0.0:
+		return {"accepted": false, "reason": "busy"}
+	var item: Dictionary = handheld.carry.items[carried_limb_index]
+	return {
+		"accepted": true, "weapon": "severed_limb", "kind": "melee",
+		"damage": 31.0 if heavy else 21.0, "impulse": 34.0 if heavy else 24.0,
+		"damage_type": "blunt", "range": 3.25, "windup": 0.30 if heavy else 0.20,
+		"stamina": 24.0 if heavy else 14.0, "cooldown": 0.92 if heavy else 0.68,
+		"heavy": heavy, "carried_label": str(item.label),
+	}
+
+
+func _wear_carried_limb(heavy: bool) -> void:
+	if carried_limb_index < 0:
+		return
+	var remaining: float = handheld.carry.damage_item(carried_limb_index, 0.28 if heavy else 0.16)
+	if remaining > 0.0:
+		return
+	var broken: Dictionary = handheld.carry.drop(carried_limb_index)
+	WorldHistory.record_event("carried_limb_destroyed", {"item": broken, "location": HUNT_LOCATION})
+	_clear_carried_limb_model()
+	prompt.text = "THE IMPROVISED LIMB COMES APART"
+
+
+func _clear_carried_limb_model(show_arsenal := true) -> void:
+	if carried_limb_model != null and is_instance_valid(carried_limb_model):
+		carried_limb_model.queue_free()
+	carried_limb_model = null
+	carried_limb_index = -1
+	if show_arsenal:
+		arsenal._update_models()
+
+
+func _sell_first_carried_part() -> Dictionary:
+	var index: int = handheld.carry.first_index("limb")
+	if index < 0:
+		index = handheld.carry.first_index("organ")
+	if index < 0:
+		index = handheld.carry.first_index("cybernetic")
+	if index < 0:
+		return {}
+	if index == carried_limb_index:
+		_clear_carried_limb_model()
+	return handheld.carry.sell(index)
 
 
 func _begin_canonical_encounter() -> void:

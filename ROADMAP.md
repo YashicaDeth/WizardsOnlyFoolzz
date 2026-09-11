@@ -344,8 +344,10 @@ foundation in `baseline_human.gd` and `anatomy_component.gd`.
   shear and ballistic damage builds sever stress independently from limb health;
   crossing the threshold throws the real limb along the strike vector, leaves a
   stump, persists through save/load and keeps a surviving NPC in combat at a
-  reduced attack cadence and damage. Next are portable/sellable limbs, reciprocal
-  player dismemberment and deeper stump-specific movesets.
+  reduced attack cadence and damage. The thrown limb remains an identified world
+  chunk: E lifts it into CARRY, slot 4 equips it as a degrading blunt weapon and
+  a Soft Rot broker prices and buys that same persistent object. Next are
+  reciprocal player dismemberment and deeper stump-specific movesets.
 
 Nothing here is scheduled yet. It sits behind the Tier 1b combat work because
 every item needs a fight that feels good to be legible inside.

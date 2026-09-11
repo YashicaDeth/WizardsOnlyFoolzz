@@ -31,6 +31,7 @@ func _ready() -> void:
 
 	WorldHistory.clear_history()
 	WorldHistory.register_subject("settings", {"gore": "FULL"})
+	WorldHistory.register_subject("inventory", {"items": [], "rust_scrip": 0})
 	BaselineHuman.apply_gore_setting()
 	GoreChunks.clear()
 
@@ -81,6 +82,22 @@ func _ready() -> void:
 	check(not bare_layers.has(GoreChunks.Layer.CYBERNETIC), "a body with no implant sheds no hardware, however deep the hit")
 	check(not bare_layers.has(GoreChunks.Layer.ORGAN), "and no organ where the limb has none")
 	check(bare_layers.has(GoreChunks.Layer.BONE), "but it does reach bone")
+	var whole_limb: Node3D
+	for piece in GoreChunks.from_subject("bare_probe"):
+		if bool(GoreChunks.identify(piece).get("whole_limb", false)):
+			whole_limb = piece
+			break
+	check(whole_limb != null, "a severed body zone enters the same identified chunk registry")
+	var limb_info := GoreChunks.take(whole_limb)
+	var carry := Carry.new()
+	var carried_limb := carry.take_chunk(limb_info)
+	check(str(carried_limb.get("kind", "")) == "limb" and str(carried_limb.get("from", "")) == "bare_probe", "the whole limb enters CARRY without losing its owner or zone")
+	var condition_before := float(carried_limb.get("condition", 0.0))
+	check(carry.damage_item(0, 0.2) < condition_before, "using a carried limb as a weapon degrades its condition")
+	var quoted := carry.sale_value(carry.items[0])
+	var sold := carry.sell(0)
+	check(quoted > 0 and int(sold.get("price", 0)) == quoted, "a whole limb receives a real condition-and-freshness sale price")
+	check(int(WorldHistory.subject("inventory").get("rust_scrip", 0)) == quoted, "selling the limb pays into the persistent rust-scrip wallet")
 
 	# --- the body remembers how far it was opened ----------------------------
 	check(rig.exposed_layer("torso") >= GoreChunks.Layer.MUSCLE, "the zone records its deepest breach (%d)" % rig.exposed_layer("torso"))

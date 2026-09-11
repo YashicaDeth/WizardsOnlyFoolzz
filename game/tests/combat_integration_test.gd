@@ -90,5 +90,27 @@ func _ready() -> void:
 	hunt._update_encounter_actors(0.01)
 	check(hunt.health == player_health_before - hunt._actor_attack_damage(locked_actor), "the maimed actor actually continues attacking through the normal AI loop")
 
+	# The limb does not stop being real when it hits the ground. Pick it up through
+	# the Hunt interaction, equip it from CARRY, and strike with it.
+	var loose_limb := RigidBody3D.new()
+	hunt.add_child(loose_limb)
+	loose_limb.global_position = hunt.player
+	GoreChunks.register_whole_limb(loose_limb, "left_arm", "carry_victim")
+	var carry_before: int = hunt.handheld.carry.items.size()
+	hunt._interact()
+	check(hunt.handheld.carry.items.size() == carry_before + 1 and str(hunt.handheld.carry.items.back().kind) == "limb", "E picks the physical limb up into the real CARRY inventory")
+	hunt._equip_carried_limb()
+	check(hunt.carried_limb_index >= 0 and hunt.carried_limb_model != null, "slot 4 visibly equips the carried limb")
+	hunt.lock_target = str(locked_actor.subject_id)
+	hunt.attack_cooldown = 0.0
+	var target_wounds: int = locked_actor.anatomy.wounds.size()
+	var limb_condition: float = float(hunt.handheld.carry.items[hunt.carried_limb_index].condition)
+	hunt._attack()
+	hunt._resolve_strike()
+	check(locked_actor.anatomy.wounds.size() > target_wounds, "the severed limb hits an NPC through the normal melee resolver")
+	check(float(hunt.handheld.carry.items[hunt.carried_limb_index].condition) < limb_condition, "the improvised limb loses condition when swung")
+	var sale: Dictionary = hunt._sell_first_carried_part()
+	check(int(sale.get("price", 0)) > 0 and hunt.carried_limb_index == -1, "a broker can buy the same carried limb and unequip it cleanly")
+
 	print("COMBAT_INTEGRATION_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
