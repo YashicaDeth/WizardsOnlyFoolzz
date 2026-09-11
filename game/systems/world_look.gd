@@ -12,21 +12,28 @@ extends RefCounted
 ## low saturation, heavy value separation, fog for depth, and deliberately
 ## authored technical limitations rather than clean photorealism.
 
+## Authored albedo in the Bone Yard kit runs from 0.025 (oil_asphalt, dead_forest)
+## to about 0.3 (rusted_steel). Surfaces that dark need real light to read at all:
+## too little and the pit goes black, too much and the palette cooks to pastel.
+## These values are tuned against captures from tests/capture_scene.tscn.
 const PRESETS := {
+	# Cool zenith over a warm dust horizon. A single-hue sky drives a single-hue
+	# ambient, which flattens the whole frame into one amber wash; the cool fill
+	# is what lets the warm floodlights read as light rather than as tint.
 	"bone_yard": {
-		"zenith": "241612", "horizon": "8a5230", "ground": "3a2317",
-		"fog": "6b4429", "fog_density": 0.019, "volumetric": 0.018,
-		"ambient": 0.38, "saturation": 0.82, "contrast": 1.14,
+		"zenith": "2b2c34", "horizon": "9a6238", "ground": "3e2a1d",
+		"fog": "6f5340", "fog_density": 0.012, "volumetric": 0.012,
+		"ambient": 0.62, "saturation": 0.8, "contrast": 1.1, "exposure": 1.18,
 	},
 	"ashbloom": {
-		"zenith": "1b1d16", "horizon": "6d6b3e", "ground": "2b2a1d",
-		"fog": "586042", "fog_density": 0.024, "volumetric": 0.026,
-		"ambient": 0.34, "saturation": 0.78, "contrast": 1.16,
+		"zenith": "2c3026", "horizon": "94906a", "ground": "3a3828",
+		"fog": "6d7152", "fog_density": 0.014, "volumetric": 0.015,
+		"ambient": 0.88, "saturation": 0.82, "contrast": 1.07, "exposure": 1.25,
 	},
 	"ossuary": {
-		"zenith": "120d14", "horizon": "44304a", "ground": "1d151f",
-		"fog": "4a3550", "fog_density": 0.032, "volumetric": 0.038,
-		"ambient": 0.3, "saturation": 0.74, "contrast": 1.2,
+		"zenith": "1d1722", "horizon": "6a5074", "ground": "2a2030",
+		"fog": "5e466a", "fog_density": 0.02, "volumetric": 0.022,
+		"ambient": 0.72, "saturation": 0.78, "contrast": 1.1, "exposure": 1.2,
 	},
 }
 
@@ -42,7 +49,7 @@ static func environment(preset_name: String = "bone_yard") -> Environment:
 	sky_material.sky_horizon_color = Color(preset.horizon)
 	sky_material.ground_bottom_color = Color(preset.ground)
 	sky_material.ground_horizon_color = Color(preset.horizon).darkened(0.25)
-	sky_material.sky_energy_multiplier = 0.85
+	sky_material.sky_energy_multiplier = 1.15
 	sky_material.sun_angle_max = 48.0
 	var sky := Sky.new()
 	sky.sky_material = sky_material
@@ -65,14 +72,16 @@ static func environment(preset_name: String = "bone_yard") -> Environment:
 	env.volumetric_fog_albedo = Color(preset.fog)
 	env.volumetric_fog_emission = Color(preset.fog).darkened(0.7)
 
-	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 1.05
+	# ACES crushes the toe hard, which turned near-black authored albedo into an
+	# unreadable frame. Filmic keeps shadow detail at this exposure.
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.tonemap_exposure = float(preset.get("exposure", 1.25))
 	env.tonemap_white = 6.0
 
 	env.ssao_enabled = true
-	env.ssao_radius = 1.4
-	env.ssao_intensity = 2.6
-	env.ssao_power = 1.7
+	env.ssao_radius = 1.2
+	env.ssao_intensity = 1.8
+	env.ssao_power = 1.4
 
 	# Threshold keeps bloom on actual light sources instead of smearing every
 	# bright surface, which is what made the pastel pass read as plastic.
@@ -80,12 +89,12 @@ static func environment(preset_name: String = "bone_yard") -> Environment:
 	env.glow_intensity = 0.55
 	env.glow_strength = 0.95
 	env.glow_bloom = 0.08
-	env.glow_hdr_threshold = 1.15
+	env.glow_hdr_threshold = 1.0
 
 	env.adjustment_enabled = true
 	env.adjustment_saturation = float(preset.saturation)
 	env.adjustment_contrast = float(preset.contrast)
-	env.adjustment_brightness = 0.97
+	env.adjustment_brightness = 1.02
 	return env
 
 

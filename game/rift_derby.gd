@@ -123,15 +123,15 @@ func _build_world() -> void:
 		var angle := TAU * index / 8.0
 		light.position = Vector3(cos(angle) * 18.0, 7.5, sin(angle) * 18.0)
 		light.light_color = Color("ff8a3c") if index % 2 == 0 else Color("cdb389")
-		light.light_energy = 2.6
-		light.omni_range = 21.0
-		light.omni_attenuation = 1.6
+		light.light_energy = 3.4
+		light.omni_range = 19.0
+		light.omni_attenuation = 1.25
 		light.shadow_enabled = index % 4 == 0
 		add_child(light)
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-38, -34, 0)
 	sun.light_color = Color("ffcf9e")
-	sun.light_energy = 1.15
+	sun.light_energy = 1.6
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 120.0
 	add_child(sun)
