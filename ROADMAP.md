@@ -519,6 +519,39 @@ property of *place* in the Wire design (no signal in the caves), so the natural
 answer is that the underbelly needs a physical access point rather than a menu
 toggle — but that is a design call for Greg.
 
+### The Vat as character creation - captured 2026-09-11
+
+Greg's largest single capture since the downed state, and it closes the open
+"the opening is cool but kinda lacklustre" item by answering it with a system
+rather than a polish pass. Written whole in `DESIGN/CHARACTER_CREATION.md`.
+
+The shape: the vat *is* the creator. New Vegas' Doc Mitchell, except you have a
+feed tube in your mouth and cannot speak, so a handler fills in your intake form
+from your blinking and sometimes writes down the wrong thing. Four routes into
+a sheet - authored preset, random decanting, a real natal chart, or a
+personality instrument bent toward the dark triad - plus Project Zomboid trait
+budgeting, a mirror with sliders that lies because you are looking through goo,
+an under-the-skin editor choosing the skeleton and organ set the kill cam will
+later show, six races that are consequences of the Reset rather than fantasy
+species, and opt-in conspiracy modifiers (a neural lace, the mast tithe, the
+full schedule) where taking them is mechanically correct *and* hands the Wire a
+way to trace you.
+
+Two things in it are load-bearing beyond character creation:
+
+- **The chart produces numbers.** `natal_sigil.gd` already draws the wheel and
+  already holds Greg's own chart; what is missing is elements mapping to
+  attributes, modality to a commitment axis, and the ascendant to Wire clout.
+  Skyrim's standing stones is the named reference. **Open decision:** a derived
+  house wheel (buildable now) versus a real ephemeris table, which is what
+  "most accurate" actually means.
+- **The skill tree is the chart.** Progression walks the houses of your own
+  natal wheel, merging the `J` artwork archive, the sigil and the skill tree
+  into one object. Same unify-the-interface instinct as the handheld, and the
+  two should be built toward each other.
+
+Not scheduled until the Wire and HUD pass below lands.
+
 ### Tier 1b — combat, added 2026-09-11
 
 **Movement prerequisite completed 2026-09-11.** The original Hunt controller
