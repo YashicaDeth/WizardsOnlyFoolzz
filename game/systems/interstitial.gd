@@ -172,7 +172,7 @@ func _draw_plate() -> void:
 	var sweep := fposmod(clock * 260.0, size.y + 200.0) - 100.0
 	screen.draw_rect(Rect2(0, sweep, size.x, 46), SPORE * Color(1, 1, 1, 0.035 * alpha))
 
-	screen.draw_string(font, Vector2(44, 54), "CELLOUTZ TRANSIT", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, ACID * Color(1, 1, 1, alpha))
+	CellOutzType.draw_stamped(screen, Vector2(44, 36), "CELLOUTZ TRANSIT", 20.0, ACID * Color(1, 1, 1, alpha), ARTERIAL * Color(1, 1, 1, 0.3 * alpha), 3.2)
 	screen.draw_string(font, Vector2(44, 74), "SPECIMEN IN MOTION / DO NOT OPEN THE CASE", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK * Color(1, 1, 1, 0.45 * alpha))
 	if not caption.is_empty():
 		screen.draw_string(font, Vector2(44, size.y - 86), caption, HORIZONTAL_ALIGNMENT_LEFT, size.x - 88, 22, INK * Color(1, 1, 1, alpha))

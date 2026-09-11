@@ -14,16 +14,16 @@ config/name="AllusionsTooGrandeur"
 run/main_scene="res://country_town_menu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
+[audio]
+
+driver/enable_input=true
+
 [autoload]
 
 DialogueManager="*res://addons/dialogue_manager/dialogue_manager.gd"
 MCPGameBridge="res://addons/godot_mcp/game_bridge/mcp_game_bridge.gd"
 WorldHistory="*res://systems/world_history.gd"
 Interstitial="*res://systems/interstitial.gd"
-
-[audio]
-
-driver/enable_input=true
 
 [display]
 

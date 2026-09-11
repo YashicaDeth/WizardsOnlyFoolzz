@@ -365,7 +365,7 @@ func _draw_frame() -> void:
 		draw_line(at, at + Vector2(dx, 0), ACID, 2.0)
 		draw_line(at, at + Vector2(0, dy), ACID, 2.0)
 	var font := ThemeDB.fallback_font
-	draw_string(font, Vector2(26, 26), "LIVING MAP", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, ACID)
+	CellOutzType.draw_stamped(self, Vector2(26, 12), "LIVING MAP", 20.0, ACID, ARTERIAL * Color(1, 1, 1, 0.25), 3.4)
 	draw_string(font, Vector2(150, 26), "LIMBO / THE ASHBLOOM EXPANSE   SHEET 01 OF 01   CELLOUTZ SURVEY", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, INK * Color(1, 1, 1, 0.55))
 	var charted := float(surveyed.size()) * CELL * CELL
 	var total := AshbloomWorldGenerator.REGION_SIZE.x * AshbloomWorldGenerator.REGION_SIZE.y

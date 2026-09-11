@@ -24,7 +24,7 @@ const AI_DRIVER := preload("res://systems/derby_ai_driver.gd")
 ## the player from second one is what made the heat unplayable — measured at
 ## five cars inside nine metres with eight of twelve wedged motionless.
 const MAX_ENGAGED := 3
-const ENGAGE_RAMP := 22.0
+const ENGAGE_RAMP := 13.0
 const REASSIGN_EVERY := 2.6
 const KILL_CAM := preload("res://systems/kill_cam.gd")
 const DAMAGE_PORTRAIT := preload("res://systems/damage_portrait.gd")
@@ -288,7 +288,10 @@ func _update_wreckers(delta: float) -> void:
 ## than fixed at spawn, so pressure moves around the pit and no single car
 ## spends the whole heat welded to the player's door.
 func _assign_wrecker_roles() -> void:
-	var allowed := 1 + floori(clampf(active_seconds / ENGAGE_RAMP, 0.0, 1.0) * float(MAX_ENGAGED - 1))
+	# Starts at two, not one. A single hunter across a pit this size left a
+	# parked player untouched for a full thirty seconds on some runs — the cap
+	# is there to stop a pile-on, not to make the heat passive.
+	var allowed := 2 + floori(clampf(active_seconds / ENGAGE_RAMP, 0.0, 1.0) * float(MAX_ENGAGED - 2))
 	var live: Array[Node3D] = []
 	for target in targets:
 		if is_instance_valid(target):

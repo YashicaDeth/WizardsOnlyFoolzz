@@ -568,9 +568,7 @@ func _draw_halftone(rect: Rect2, strength: float) -> void:
 
 
 func _draw_header() -> void:
-	_tracked(Vector2(26, 22), "CELLOUTZ", 15, ACID, 3.0)
-	# Misregistration: the second plate never lines up on a dying press.
-	_tracked(Vector2(27, 23), "CELLOUTZ", 15, ARTERIAL * Color(1, 1, 1, 0.35), 3.0)
+	CellOutzType.draw_stamped(self, Vector2(26, 8), "CELLOUTZ", 16.0, ACID, ARTERIAL * Color(1, 1, 1, 0.35), 3.0)
 	_tracked(Vector2(112, 22), "FIELD TRIAGE / HUMAN DISPOSITION", 13, INK * Color(1, 1, 1, 0.8), 1.6)
 	_text(Vector2(DESIGN.x - 290, 22), "FORM 06-B   REV.C   SER %s" % serial, 11, INK * Color(1, 1, 1, 0.42))
 	_draw_barcode(Rect2(DESIGN.x - 92, 10, 66, 15))

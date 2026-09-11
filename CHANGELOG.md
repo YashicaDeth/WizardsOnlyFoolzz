@@ -2,6 +2,24 @@
 
 ## 2026 09 11
 
+- **The game has a typeface.** Every interface in the project was set in
+  `ThemeDB.fallback_font` — Godot's default UI face — which is the single
+  loudest "unfinished engine project" signal there is, and Greg named it.
+  `systems/celloutz_type.gd` is a stencil display alphabet built from stroke
+  paths on a 6x10 cap grid, in the register of something cut through a plate
+  with a torch. Nothing to licence, no atlas, scales to any size, and the
+  letterforms belong to the game. Headers, numerals and stamps use it; body
+  copy stays in a legible face.
+- The warning card, the Living Map, the transit plate and the resolution form
+  are set in it, including a double-struck out-of-register stamp for headers.
+- **Derby engagement retuned.** The cap made contact too rare: a parked player
+  finished thirty seconds untouched on some runs, which is the opposite failure
+  to the one being fixed. The ramp starts at two hunters rather than one and
+  reaches three in thirteen seconds. Measured over three consecutive runs: peak
+  crowding 3, hull 97, stable.
+
+## 2026 09 11
+
 - **A front door.** The game opened straight onto a button column. It now opens
   on a CellOutz product liability notice in the Postal 2 register — blunt, not
   sorry — which is also where the violence tier is chosen. Those three tiers

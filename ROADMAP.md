@@ -414,6 +414,42 @@ dialogue, the resolution form and recruitment into one verb. This is the
 highest-value single feature in the captured list because four systems that
 already exist would start talking to each other.
 
+### Base building — Greg's own doubt, and the call, 2026-09-11
+
+Greg: *"if there were to be a building aspect which I find might be excessive
+it would need to have the attention to detail of Valheim."* He is right on both
+halves, and the second half is what settles it.
+
+**Valheim's building is not a feature, it is a pillar.** Its structural
+integrity simulation — the thing everyone actually praises — plus snapping,
+piece tiers, weather decay and the comfort/rested loop that ties building back
+into survival, was core work for a team of five iterated over years. Bolted
+onto this project it would either be shallow (and Greg would hate it, because
+he has named the standard) or it would consume the combat and Hunt System work
+that the game's whole identity rests on. `DESIGN.md` §17 keeps it as a desire;
+this entry records the scope decision, not a silent drop.
+
+**The reduced version worth building instead, per non-negotiable 4.** What
+Valheim actually delivers is *attachment* — a place that is yours, that you
+return to, that shows what you have done. This project can produce that without
+a structural simulation, because it already has the machinery:
+
+- `DESIGN/FACTIONS.md` already specifies **ground territory**: camps, towns,
+  yards and roadhouses that are raided rather than besieged.
+- `WorldHistory` already persists subjects, and recruitment already produces
+  people who are loyal to the player.
+
+So: **claim and invest in a place, rather than place walls piece by piece.**
+Take a camp, and it becomes yours. The people recruited out of the downed
+window live there. What you spend on it changes what it produces, who it
+attracts and how it reads when you come back — and a raid can take it off you.
+That is Valheim's attachment and Rust's stakes, built out of systems that exist,
+and it costs a fraction of a build grid.
+
+Free-form construction stays available as a later addition on top of a claimed
+camp, if it is ever worth the cost. It should not be the way the feature is
+introduced.
+
 ### Tier 1b — combat, added 2026-09-11
 
 **Movement prerequisite completed 2026-09-11.** The original Hunt controller

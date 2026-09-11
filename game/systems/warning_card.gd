@@ -64,7 +64,9 @@ func _ready() -> void:
 		var tier: Dictionary = TIERS[index]
 		var button := Button.new()
 		button.name = str(tier.id)
-		button.text = "    %s" % str(tier.name)
+		# The label is drawn in the display face; the Button keeps the hit area,
+		# the focus handling and the keyboard support.
+		button.text = ""
 		button.position = Vector2(60, 372 + index * 58)
 		button.size = Vector2(760, 50)
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -157,8 +159,8 @@ func _draw() -> void:
 		draw_line(Vector2(4, row), Vector2(DESIGN.x - 4, row), Color(0, 0, 0, 0.17), 1.0)
 
 	var beat := 0.5 + 0.5 * sin(clock * 2.4)
-	draw_string(font, Vector2(60, 78), "WARNING", HORIZONTAL_ALIGNMENT_LEFT, -1, 46, ARTERIAL * Color(1, 1, 1, 0.75 + beat * 0.25))
-	draw_string(font, Vector2(60, 104), "CELLOUTZ CORPORATION / PRODUCT LIABILITY NOTICE 11-B", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, BILE)
+	CellOutzType.draw_stamped(self, Vector2(60, 40), "WARNING", 44.0, ARTERIAL * Color(1, 1, 1, 0.8 + beat * 0.2), ARTERIAL * Color(1, 1, 1, 0.2), 5.0)
+	CellOutzType.draw_text(self, Vector2(60, 96), "CELLOUTZ CORPORATION / LIABILITY NOTICE 11-B", 11.0, BILE, 1.4)
 	draw_line(Vector2(60, 118), Vector2(DESIGN.x - 60, 118), ARTERIAL * Color(1, 1, 1, 0.4), 1.0)
 
 	var line_y := 152.0
@@ -166,12 +168,14 @@ func _draw() -> void:
 		draw_string(font, Vector2(60, line_y), line, HORIZONTAL_ALIGNMENT_LEFT, DESIGN.x - 120, 15, INK * Color(1, 1, 1, 0.82))
 		line_y += 22.0
 
-	draw_string(font, Vector2(60, 344), "CHOOSE WHAT YOU ARE WILLING TO SEE", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ACID)
+	CellOutzType.draw_text(self, Vector2(60, 334), "CHOOSE WHAT YOU ARE WILLING TO SEE", 13.0, ACID, 2.2)
 	draw_string(font, Vector2(DESIGN.x - 60, 344), "1-3   ↑↓   ENTER", HORIZONTAL_ALIGNMENT_RIGHT, 0, 11, INK * Color(1, 1, 1, 0.4))
 
 	for index in buttons.size():
 		var row := buttons[index]
-		draw_string(font, row.position + Vector2(20, 32), "%02d" % (index + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, INK * Color(1, 1, 1, 0.38))
+		var accent_row := ARTERIAL if index == 2 else (ACID if index == 1 else INK)
+		CellOutzType.draw_text(self, row.position + Vector2(20, 18), "%02d" % (index + 1), 15.0, INK * Color(1, 1, 1, 0.4), 1.6)
+		CellOutzType.draw_text(self, row.position + Vector2(62, 15), str(TIERS[index].name), 21.0, accent_row * Color(1, 1, 1, 1.0 if index == highlighted else 0.78), 3.0)
 		if index == highlighted:
 			var accent := ARTERIAL if index == 2 else (ACID if index == 1 else INK)
 			var slide := 5.0 + sin(clock * 6.0) * 2.0
