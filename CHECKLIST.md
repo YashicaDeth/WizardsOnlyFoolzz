@@ -34,11 +34,11 @@ The most complete system in the project and the least visible.
 | # | Item | What you get |
 | --- | --- | --- |
 | B0 | **Spinning 3D head icons** `DONE` | Real head and real skull per subject, turning in place, X on for the X-ray. First working piece of Tier 1c. |
-| B1 | **Clickable 3D organs** | Hover a zone, the organ lifts *out of* the diagram and spins with its real condition. Never a modal. |
-| B2 | **Limbs and cybernetics inspect the same way** | One verb for the whole body. |
-| B3 | **The X-ray cursor** | Circular cursor with an X-ray button on it — see through anything, any time, as a constant verb. |
-| B4 | **Chunk physics and layers** | Skin, fat, muscle, blood, bone, organ, cybernetic as real pieces that know what they are. |
-| B5 | **Rob cybernetics off a body** | Dig through the layers to take the part. Looting as a physical act, not a menu transfer. |
+| B1 | **Clickable 3D organs** `DONE` | Hover a zone, the organ lifts *out of* the diagram and spins with its real condition. Never a modal. |
+| B2 | **Limbs and cybernetics inspect the same way** `DONE` | One verb for the whole body. |
+| B3 | **The X-ray cursor** `DONE` | Circular cursor with an X-ray button on it — see through anything, any time, as a constant verb. |
+| B4 | **Chunk physics and layers** `DONE` | Skin, fat, muscle, blood, bone, organ, cybernetic as real pieces that know what they are. |
+| B5 | **Rob cybernetics off a body** | Dig through the layers to take the part. Looting as a physical act, not a menu transfer. **Unblocked by B4** - `GoreChunks.take()` already returns the identified part. |
 | B6 | **Dismemberment as a combat verb** | Take an arm mid-fight and the fight continues with them still in it. |
 
 ## C — The handheld, and killing the six-panel problem

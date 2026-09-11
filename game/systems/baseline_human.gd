@@ -102,6 +102,9 @@ var _xray := false
 var subject_id := ""
 var parts: Dictionary = {}
 var severed: Array[String] = []
+## Deepest `GoreChunks.Layer` any blow has reached, per zone. A body remembers
+## how far it has been opened, not just how much health it has left.
+var zone_depth: Dictionary = {}
 var gore := true
 
 var _flesh := Color("6b5842")
@@ -119,6 +122,12 @@ static func canonical_zone(zone_id: String) -> String:
 
 func build(id: String, config: Dictionary = {}) -> void:
 	subject_id = id
+	# Default to the world's gore setting rather than to true. Every rig used to
+	# be born with gore on and every caller had to remember to turn it off - and
+	# one of them did not, which is how the Hunt Grounds shipped ignoring the
+	# setting entirely (recorded in ROADMAP.md). A caller that genuinely wants to
+	# override it can still pass `gore` in the config.
+	gore = bool(config.get("gore", apply_gore_setting()))
 	_seated = bool(config.get("seated", false))
 	_flesh = config.get("flesh", Color("6b5842")) as Color
 	_variation = int(config.get("variation", 0))
@@ -307,9 +316,42 @@ func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt",
 		# breaks. The wet count follows from which one landed.
 		var penetrating := damage_type in ["cut", "puncture", "ballistic", "shear"]
 		_spray(_zone_origin(zone), Vector3.UP, clampi(roundi(damage / (2.1 if penetrating else 4.4)), 3, 26))
+		_shed_chunks(zone, damage, damage_type, organ_id)
 	if bool(result.get("disabled", false)):
 		zone_disabled.emit(zone)
 	return result
+
+
+## Throws the layers a blow actually went through, with the pieces carrying
+## which person and which part of them they came off. Kept next to `_spray`
+## rather than inside `GoreChunks` because only the rig knows the zone geometry,
+## the installed hardware and how opened the zone already was.
+func _shed_chunks(zone: String, damage: float, damage_type: String, organ_id: String) -> void:
+	var maximum: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone, {}) as Dictionary).get("health", 100.0))
+	var ratio := clampf(zone_health(zone) / maxf(1.0, maximum), 0.0, 1.0)
+	var depth := GoreChunks.depth_for(damage, damage_type, ratio)
+	zone_depth[zone] = maxi(int(zone_depth.get(zone, 0)), depth)
+	var installed: Dictionary = anatomy.installed_parts.get(zone, {})
+	var origin := _zone_origin(zone)
+	# Away from the body's own centre line, so pieces leave the wound rather
+	# than falling straight through the torso they came out of.
+	var outward := (origin - global_position)
+	outward.y = 0.0
+	if outward.length() < 0.05:
+		outward = Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))
+	var heading := (outward.normalized() * 0.7 + Vector3.UP * 0.8).normalized()
+	GoreChunks.burst(self, origin, heading, {
+		"depth": depth,
+		"zone": zone,
+		"subject_id": anatomy.subject_id,
+		"organ_id": organ_id,
+		"implant": str(installed.get("name", installed.get("id", ""))),
+	}, detail)
+
+
+## How far into a zone this body has been opened, as a `GoreChunks.Layer`.
+func exposed_layer(zone_id: String) -> int:
+	return int(zone_depth.get(canonical_zone(zone_id), 0))
 
 
 func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt") -> Dictionary:
@@ -358,6 +400,8 @@ func behead() -> void:
 		head["health"] = 0.0
 		anatomy.zones["head"] = head
 	severed.append("head")
+	if gore:
+		_shed_chunks("head", 90.0, "shear", "brain")
 	if gore:
 		_throw_limb("head")
 		_spray(_zone_origin("head"), Vector3.UP, 24)

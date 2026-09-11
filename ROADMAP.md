@@ -738,6 +738,14 @@ again. Re-apply it locally, or take the plugin strategy's standing call and
 drop FMOD properly - it is 238MB, referenced by no script, and its own row in
 the table below already says "defer or drop".
 
+**Side effect of the fix, and it is harmless.** With the extension disabled, the
+addon's own editor scripts (`addons/fmod/tool/ui/*.gd`) fail to parse on a
+reimport because the FMOD types they reference no longer exist. The editor
+plugin is already disabled so nothing loads them at runtime, and game and test
+runs are unaffected - but the errors appear in every `--editor --quit` log and
+should not be mistaken for a new fault. Dropping the plugin outright removes
+them, which is the standing call anyway.
+
 **Second trap in the same area.** A new `class_name` global is not visible to a
 headless run until the class cache is rebuilt: `WireNet` parsed as an
 undeclared identifier until the project was reimported with
