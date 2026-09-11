@@ -506,7 +506,12 @@ From `DESIGN/INTERFACE_DIRECTION.md`.
 The standing rule. If a screen's information could be a spreadsheet, it is not
 finished. Applies to everything below and to A5, A6, C1.
 - [x] ~~**I0.1** Applied to the World Index~~
-- [ ] **I0.2** Applied to the derby HUD
+- [ ] **I0.2** Applied to the derby HUD — rejected 2026-09-12, see below
+- [x] **I0.5** The handheld becomes a black cracked mirror you look *into*, jester on the back
+- [ ] **I0.6** Kill the HUNT SIGNAL corner plate — a rival arrives when they change, not permanently
+- [ ] **I0.7** Hull read off the car, not off a number in a corner
+- [ ] **I0.8** The weapon well reworked
+- [ ] **I0.9** Cast display names reworked — ids stay, names change (blocked on Greg's list)
 - [ ] **I0.3** Applied to the map
 - [ ] **I0.4** Applied to the handheld
 

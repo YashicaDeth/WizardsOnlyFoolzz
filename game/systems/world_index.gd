@@ -496,7 +496,11 @@ func _draw() -> void:
 		_rain = CodeRain.build(viewport.x, viewport.y, 26.0, 4409)
 		_rain_size = viewport
 	CodeRain.advance(_rain, get_process_delta_time(), viewport.y)
-	CodeRain.draw_field(self, Rect2(Vector2.ZERO, viewport), _rain, MOSS, failing, elapsed, [plate])
+	# Contained to the margin around the plate rather than the whole viewport.
+	# Drawn full-bleed it escaped the World Index entirely when the index is
+	# hosted inside the handheld, and printed the game's vocabulary down the
+	# sides of the device case.
+	CodeRain.draw_field(self, plate.grow(46.0), _rain, MOSS, failing, elapsed, [plate])
 	_draw_plate(plate)
 	_draw_header(plate)
 	var body := Rect2(plate.position + Vector2(22, 122), plate.size - Vector2(44, 176))

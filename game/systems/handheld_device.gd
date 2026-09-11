@@ -284,7 +284,13 @@ func _draw() -> void:
 		return
 	var alpha := clampf(raised, 0.0, 1.0)
 	_draw_chassis(_device_rect, alpha)
-	draw_rect(_screen_rect, SCREEN_BG * Color(1, 1, 1, alpha))
+	# I0.5. The screen is glass, not a lit panel. Painting SCREEN_BG opaque put
+	# a green surface over the mirror and left the black showing only in the
+	# bezel, which is a case with a screen in it — the thing this is not. The
+	# tint is thin enough that the glass and the reader are still in there.
+	BlackMirror.draw_glass(self, _screen_rect, alpha, elapsed)
+	draw_rect(_screen_rect, SCREEN_BG * Color(1, 1, 1, 0.55 * alpha))
+	BlackMirror.draw_reflection(self, _screen_rect, alpha, elapsed, 0.42)
 	# The modes with no hosted panel draw straight onto the screen.
 	var mode := current_mode()
 	if mode == "RADIO":
@@ -295,8 +301,14 @@ func _draw() -> void:
 
 func _draw_chassis(rect: Rect2, alpha: float) -> void:
 	draw_rect(rect.grow(5), Color("0a0806") * Color(1, 1, 1, 0.6 * alpha))
-	draw_rect(rect, CASE * Color(1, 1, 1, alpha))
-	draw_rect(rect, CASE_EDGE * Color(1, 1, 1, 0.8 * alpha), false, 2)
+	# I0.5. Black glass first, not a case with a screen in it. Everything else
+	# on this device is depth added to the dark rather than ink printed on a
+	# panel — the difference between a thing you read and a thing you look into.
+	BlackMirror.draw_glass(self, rect, alpha, elapsed)
+	# The reader shows through most strongly where there is least to read, which
+	# is true of real glass and means the mirror asserts itself in the silences.
+	BlackMirror.draw_reflection(self, rect, alpha, elapsed, 0.55)
+	draw_rect(rect, CASE_EDGE * Color(1, 1, 1, 0.55 * alpha), false, 2)
 	Grunge.stain(self, rect.position + rect.size * Vector2(0.12, 0.9), 120.0, 4409, Grunge.RUST, 0.10 * alpha)
 	Grunge.scratches(self, rect, 4411, 20)
 	# Cable-tied battery clamped to the side, because nothing here is stock.
@@ -308,8 +320,14 @@ func _draw_chassis(rect: Rect2, alpha: float) -> void:
 		draw_line(Vector2(rect.position.x + rect.size.x - 30, y), Vector2(pack.end.x + 3, y), Color("100c0a") * Color(1, 1, 1, alpha), 3)
 	CellOutzType.draw_stamped(self, rect.position + Vector2(26, 20), "CELLOUTZ", 19.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.3 * alpha), 1.6)
 	CellOutzType.draw_condensed(self, rect.position + Vector2(190, 26), "FIELD WIRE MK-II // SALVAGED // NOT SERVICEABLE", 9.0, CASE_EDGE * Color(1, 1, 1, 0.8 * alpha), 0.8)
+	# The jester, pressed small into the bezel. It is on the back of the case;
+	# this is the edge of it showing round the side.
+	BlackMirror.draw_jester(self, Vector2(rect.end.x - 40, rect.position.y + 34), 26.0, 0.5 * alpha, elapsed)
 	_draw_tabs(rect, alpha)
 	_draw_status(rect, alpha)
+	# Cracks last, over the content: the damage is in front of what you are
+	# reading, because it is damage to the surface you are reading through.
+	BlackMirror.draw_cracks(self, rect, alpha, 90211, 0.85)
 
 
 func _draw_tabs(rect: Rect2, alpha: float) -> void:

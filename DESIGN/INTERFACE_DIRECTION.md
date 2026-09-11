@@ -120,3 +120,67 @@ combined per site with a seed. Not a browser engine, and no real HTML.
 - C1 (device shell) must be seamless in and out, not a visibility toggle.
 - A new **I** section covers the code-rain material, per-site web layouts, the
   state-driven panel degradation, and the celloutz.xyz integration.
+
+
+## Rejected and re-specified — Greg, 2026-09-12
+
+He looked at the derby HUD and the handheld and rejected most of it. Recording
+what was said and what it means, because A5 and C1 are both marked BUILT and
+that is now wrong.
+
+### The black mirror
+
+> *"the internet portal through the black mirror phone device with a jester
+> design on the back of the black cracked mirror you look into"*
+
+This replaces the handheld shell in `C1`. The device is **not a screen you
+read** — it is a black mirror you **look into**, and that difference should be
+visible in every pixel of it:
+
+- **Black glass, cracked.** The surface is dark and reflective before it is
+  informational. Content surfaces *in* the glass rather than being printed on
+  a panel. The existing dead-pixel and damage ideas stay, but as damage to a
+  mirror rather than to an LCD.
+- **A jester on the back.** The case carries a jester — this is a CellOutz
+  product and a fool's errand, and `wizardsonlyfoolz` is the collective above.
+  The joke lands twice.
+- **Looking into it is the verb.** You are not opening a menu; you are looking
+  at something that looks back. The reflection should be doing something —
+  your own face is in there, and the world behind you, and neither is
+  trustworthy.
+
+This is the strongest interface idea the project has and it should be built
+before more pages are added to the thing.
+
+### The derby HUD, rejected
+
+> *"the driving ui and the hull and the hunt signal bs i hate this hunt signal
+> and the uis in this screenshot suck"*
+
+Specifically:
+
+- **HUNT SIGNAL** — the panel goes. A rival's state does not need a permanent
+  corner readout with a needle and a grudge bar; it needs to arrive when it
+  changes and otherwise be absent. The information belongs in the world, in the
+  radio, or in the index the player chooses to open.
+- **HULL** — reads as a spreadsheet cell with a bar graph next to it. The car's
+  condition is already modelled per part; it should be read off the *car*, not
+  off a number in the corner.
+- **The weapon well** — needs rework.
+- **The driving UI generally** — the velocity dial and the corner plates are
+  competent and generic. They are not this world.
+
+### Names
+
+> *"rework the names and the mara voss"*
+
+The cast names are placeholders that have hardened by being used. `mara_voss`
+is a subject id in code and a name in fiction, and the two can be separated:
+ids stay, display names change. This is Greg's call and nothing should be
+renamed until he gives the list.
+
+### What this changes on the checklist
+
+`A5` and `C1` come back from BUILT. New segments are added under I0 rather than
+reopening A, because the rule being applied is I0's — no screen is a list of
+text in a box, and a corner plate with a number in it is exactly that.
