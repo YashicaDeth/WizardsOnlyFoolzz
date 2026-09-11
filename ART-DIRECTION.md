@@ -19,6 +19,12 @@ Do not send private account credentials. A shared folder or a zip of the asset p
 
 Gore reads as excessive and darkly funny rather than grimdark-serious, closer to Postal 2's over-the-top splatter than to restrained realism. Layer in a biopunk grossness on top of that — wet, organ-forward, wrong-looking interiors in the vein of Kenshi's persistent limb loss and Wrought Flesh's meat/organ handling, and Cruelty Squad's garish, nauseating body-modification aesthetic. Wounds and exposed anatomy should look authored and specific per zone (see `DAMAGE-SYSTEM-CONCEPT.md` and `game/systems/anatomy_component.gd`), not a single reused blood decal. These are tonal references only; no assets or code are extracted from them.
 
+## Comic register: grimy satire
+
+The world is crude, grimy and willing to offend — early South Park's blunt absurdism and Postal 2's deadpan social commentary, where the joke and the horror arrive in the same breath. Humour is load-bearing, not decoration: a disembowelling and a petty argument about parking should be able to happen in the same thirty seconds.
+
+Aim the satire at institutions and power — the factions, their doctrines, the surviving corporate internet, bureaucracy that outlived its purpose, the Sins-as-hierarchies already in `DESIGN.md`. That structure is already built for it: a rail-gang that runs tolls, an anatomical faith that rewrites allegiance through surgery, and a Wire feed reporting on the player are satirical targets with real mechanical teeth. Punching at systems is what gives this register its bite; slurs aimed at real groups are just noise, and they would flatten a world this specific into something generic.
+
 ## UI language
 
 The game HUD should borrow the rough menu energy of old PC action games while remaining CellOutz: chunky card panels, offset labels, tiny status chips, hand-drawn arrows, and floating scrap badges. Menus should be functional first; texture, grain, decals, and animated paper jitter are the finishing pass.
