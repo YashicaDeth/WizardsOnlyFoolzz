@@ -352,6 +352,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_Z: _toggle_lock()
 			KEY_E: _interact()
 			KEY_F: _begin_extraction()
+			KEY_V:
+				if not grapple_target.is_empty():
+					_clinch_persuade()
+			KEY_X:
+				if not grapple_target.is_empty():
+					_clinch_threaten()
 			KEY_SPACE:
 				if not grapple_target.is_empty():
 					_break_grapple("YOU LET GO")
@@ -778,6 +784,12 @@ func _nearest_robbable(radius := 3.4) -> Dictionary:
 	var nearest: Dictionary = {}
 	var nearest_distance := radius
 	var candidates: Array = dead_bodies.duplicate()
+	# F7.2. Somebody you have hold of is robbable while still on their feet and
+	# entirely awake for it, which is the version of this that costs karma.
+	if not grapple_target.is_empty():
+		var held := _actor_by_id(grapple_target)
+		if not held.is_empty() and bool(_clinch_options(held).rob):
+			candidates.append({"subject_id": str(held.subject_id), "display_name": str(held.display_name), "node": held.node, "rig": held.rig})
 	for actor in encounter_actors:
 		if actor.get("rig") != null and actor.rig.is_downed():
 			candidates.append({"subject_id": str(actor.subject_id), "display_name": str(actor.display_name), "node": actor.node, "rig": actor.rig})
@@ -1538,7 +1550,14 @@ func _update_grapple(delta: float) -> void:
 	if stamina <= 0.0:
 		grapple_advantage -= delta * 0.9
 
-	prompt.text = "CLINCH / %s   [LMB] PRESS   [SPACE] BREAK   %+d" % [str(actor.display_name).to_upper(), roundi(grapple_advantage * 100.0)]
+	# F7.1. The hold is a negotiation you are winning, so it reports what it is
+	# currently worth rather than only how hard you are squeezing.
+	var offer := _clinch_options(actor)
+	prompt.text = "CLINCH / %s   %+d   [LMB] PRESS  [V] TALK  [X] LEAN  [F] TAKE  [SPACE] BREAK" % [
+		str(actor.display_name).to_upper(), roundi(grapple_advantage * 100.0),
+	]
+	if bool(offer.surrender):
+		prompt.text = "%s IS GIVING UP — [V] TAKE THE SURRENDER" % str(actor.display_name).to_upper()
 
 	if grapple_advantage >= 1.0:
 		_finish_grapple(actor)
@@ -1548,6 +1567,78 @@ func _update_grapple(delta: float) -> void:
 		_wound_player(node.global_position, 16.0, "blunt")
 		player_body.velocity = (player - node.global_position).normalized() * 7.0
 		_break_grapple("THEY PUT YOU DOWN AND STEPPED BACK")
+
+
+## What the current hold affords, asked in one place so the prompt, the input
+## handler and the tests all read the same answer.
+func _clinch_options(actor: Dictionary) -> Dictionary:
+	return Clinch.options(
+		grapple_advantage,
+		actor.anatomy.call("snapshot"),
+		WorldHistory.subject(str(actor.subject_id)),
+		float(WorldHistory.subject("player").get("karma", 0.0)),
+	)
+
+
+## F7.2, talking. A player the world trusts can get something given to them;
+## one it fears cannot, and has to lean instead.
+func _clinch_persuade() -> void:
+	var actor := _actor_by_id(grapple_target)
+	if actor.is_empty():
+		return
+	var subject := WorldHistory.subject(str(actor.subject_id))
+	var result := Clinch.persuade(subject, grapple_advantage, actor.anatomy.call("snapshot"), float(WorldHistory.subject("player").get("karma", 0.0)))
+	_apply_clinch_result(actor, result, "persuaded")
+
+
+## F7.2, leaning on them. Reliable where persuasion is not, and it buys what it
+## gets with a grudge that outlives the hold.
+func _clinch_threaten() -> void:
+	var actor := _actor_by_id(grapple_target)
+	if actor.is_empty():
+		return
+	var subject := WorldHistory.subject(str(actor.subject_id))
+	var result := Clinch.threaten(subject, grapple_advantage, actor.anatomy.call("snapshot"), float(WorldHistory.subject("player").get("karma", 0.0)))
+	_apply_clinch_result(actor, result, "threatened")
+
+
+## One place where a clinch outcome is written into the record, so persuading
+## and threatening cannot drift apart in what they mean.
+func _apply_clinch_result(actor: Dictionary, result: Dictionary, verb: String) -> void:
+	var id := str(actor.subject_id)
+	var subject := WorldHistory.subject(id)
+	var changes := {}
+	if int(result.get("grudge", 0)) != 0:
+		changes["grudge"] = mini(100, int(subject.get("grudge", 0)) + int(result.get("grudge", 0)))
+	if int(result.get("bond", 0)) != 0:
+		changes["bond"] = mini(100, int(subject.get("bond", 0)) + int(result.get("bond", 0)))
+	if float(result.get("debt", 0.0)) > 0.0:
+		changes["debt_to_player"] = float(subject.get("debt_to_player", 0.0)) + float(result.debt)
+	if bool(result.get("consent", false)):
+		# F7.3. This is the seam into the downed window: `_accepts_recruitment`
+		# already reads consent and debt, and had no way of ever being given
+		# either. Talking somebody down in a clinch is that way.
+		changes["recruitment_consent"] = true
+	if bool(result.get("accepted", false)):
+		changes["memory"] = "The Hunter had hold of me and %s me into it." % verb
+	if not changes.is_empty():
+		WorldHistory.update_subject(id, changes, "clinch_%s" % verb)
+	WorldHistory.record_event("clinch_%s" % verb, {
+		"subject_id": id,
+		"accepted": bool(result.get("accepted", false)),
+		"advantage": snappedf(grapple_advantage, 0.01),
+		"location": HUNT_LOCATION,
+		"witnesses": witness_ledger.witnesses_of((actor.node as Node3D).global_position, _witness_candidates(), "player"),
+	})
+	var line := str(result.get("line", ""))
+	prompt.text = "%s: \"%s\"" % [str(actor.display_name).to_upper(), line] if line != "" else str(result.get("reason", ""))
+	# Giving up is not being knocked out: they go into the downed window awake,
+	# having decided, which is the state the resolution form was built for.
+	if bool(result.get("accepted", false)) and (bool(result.get("consent", false)) or bool(result.get("yields", false))):
+		if not actor.anatomy.downed and not actor.anatomy.dead:
+			actor.anatomy.go_down()
+		WorldHistory.update_subject(id, {"status": "surrendered", "anatomy_state": actor.rig.snapshot()}, "clinch_surrender")
+		_break_grapple("%s GIVES UP — [E] DECIDE" % str(actor.display_name).to_upper())
 
 
 ## Winning drops them into the downed window rather than killing them. The

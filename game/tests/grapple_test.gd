@@ -81,5 +81,49 @@ func _ready() -> void:
 	check(hunt.health < health_before, "losing a clinch hurts (%d -> %d)" % [health_before, hunt.health])
 	check(hunt.grapple_target.is_empty(), "a lost clinch releases")
 
+	# F7. The clinch is a social verb: you can talk to somebody you are holding,
+	# and what they agree to reaches the downed window afterwards.
+	var third: Vector3 = hunt.player + Vector3(0, 0, 1.3)
+	hunt._spawn_encounter_actor({"instance_id": "clinch_talk", "kind": "hostile"}, third)
+	var mark: Dictionary = hunt.encounter_actors.back()
+	mark.node.position = third
+	await get_tree().physics_frame
+	var mark_id := str(mark.subject_id)
+	check(not hunt._accepts_recruitment(WorldHistory.subject(mark_id)), "a stranger will not be recruited off the street")
+	# Held explicitly: which body `_start_grapple` picks out of a crowd is
+	# covered above, and what is under test here is the negotiation.
+	hunt.stamina = 100.0
+	hunt.grapple_target = mark_id
+	# A player the world trusts, with a real hold on a hurt body.
+	WorldHistory.update_subject("player", {"karma": 0.9}, "test_standing")
+	WorldHistory.update_subject(mark_id, {"bond": 40}, "test_bond")
+	mark.anatomy.pain = 70.0
+	hunt.grapple_advantage = 0.9
+	var offer: Dictionary = hunt._clinch_options(mark)
+	check(float(offer.persuasion) > float(offer.coercion), "standing makes talking the better verb here")
+	hunt._clinch_persuade()
+	var persuaded := WorldHistory.subject(mark_id)
+	check(float(persuaded.get("debt_to_player", 0.0)) > 0.0, "talking them down leaves them owing you")
+	check(hunt._accepts_recruitment(persuaded), "and that debt is what makes recruitment possible in the downed window")
+	check(hunt.grapple_target.is_empty(), "a surrender ends the hold")
+	check(mark.anatomy.downed and not mark.anatomy.dead, "they go down awake, having decided, rather than knocked out")
+
+	# Leaning on someone instead buys it with a grudge.
+	var fourth: Vector3 = hunt.player + Vector3(1.1, 0, 0.6)
+	hunt._spawn_encounter_actor({"instance_id": "clinch_lean", "kind": "hostile"}, fourth)
+	var leaned: Dictionary = hunt.encounter_actors.back()
+	leaned.node.position = fourth
+	await get_tree().physics_frame
+	var leaned_id := str(leaned.subject_id)
+	WorldHistory.update_subject("player", {"karma": -0.9}, "test_dread")
+	leaned.anatomy.pain = 70.0
+	hunt.stamina = 100.0
+	hunt.grapple_target = leaned_id
+	hunt.grapple_advantage = 0.9
+	var grudge_before := int(WorldHistory.subject(leaned_id).get("grudge", 0))
+	hunt._clinch_threaten()
+	check(int(WorldHistory.subject(leaned_id).get("grudge", 0)) > grudge_before, "leaning on them is remembered as a grudge")
+	check(WorldHistory.recent_events(6).any(func(event): return str(event.get("type", "")) == "clinch_threatened"), "and the act enters the record with whoever saw it")
+
 	print("GRAPPLE_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

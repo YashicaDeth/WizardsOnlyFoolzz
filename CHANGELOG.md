@@ -2,6 +2,25 @@
 
 ## 2026 09 11
 
+- **F7: the clinch is a conversation you are winning.** Holding somebody was
+  purely a wrestling match — press until they drop. Now the hold affords three
+  verbs, and which of them works depends on who you have become. **Descent
+  coerces, Ascent persuades**: a player the world is frightened of gets fast
+  compliance and pays for it in grudge; a player the world trusts gets things
+  given rather than taken. Someone in Limbo has neither and has to rely on the
+  grip itself. That is the Ascent/Descent axis doing real mechanical work in a
+  second place, one segment after E1.1 gave it any teeth at all.
+  **V** talks, **X** leans, **F** robs them where they stand — awake for it,
+  which is the version `Extraction` already prices as the expensive one. A
+  refusal is not neutral: you had hold of them and they said no, and they
+  remember. A strong yes writes consent and a debt, which is the seam into the
+  downed window — `_accepts_recruitment()` has always read consent and debt and
+  until now nothing in the game could ever give it either, so RECRUIT was an
+  option that existed and could not be reached. Surrender puts them into the
+  resolution form awake and having decided, rather than unconscious.
+  New `clinch.gd` and `clinch_test` (20 checks), plus live-Hunt coverage in
+  `grapple_test`; 20 suites green.
+
 - **E1.1: the Tree axis finally moves.** It has been computed, stored and drawn
   on the dossier since the index was built, and nothing but the faction you
   were born into ever changed it. Recorded acts now accumulate on it — executing

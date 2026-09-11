@@ -380,9 +380,9 @@ mechanisms and almost none are built.
 ### F7 — The clinch as a social verb
 **Highest value per line of code in the whole list** — four systems that already
 exist start talking to each other.
-- [ ] **F7.1** Hold-and-negotiate state out of the existing clinch
-- [ ] **F7.2** Rob, abuse or persuade from inside the hold
-- [ ] **F7.3** Feeds the downed-window resolution and recruitment
+- [x] ~~**F7.1** Hold-and-negotiate state out of the existing clinch~~
+- [x] ~~**F7.2** Rob, abuse or persuade from inside the hold~~
+- [x] ~~**F7.3** Feeds the downed-window resolution and recruitment~~
 
 ---
 
