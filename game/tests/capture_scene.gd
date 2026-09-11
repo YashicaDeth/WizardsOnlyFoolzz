@@ -21,9 +21,12 @@ func _ready() -> void:
 			settle_frames = int(argument.trim_prefix("--frames="))
 
 	var archive_subject := ""
+	var trigger := ""
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--archive="):
 			archive_subject = argument.trim_prefix("--archive=")
+		elif argument.begins_with("--trigger="):
+			trigger = argument.trim_prefix("--trigger=")
 
 	var packed := load(scene_path)
 	if packed == null:
@@ -50,6 +53,22 @@ func _ready() -> void:
 	# immediately yields an untextured, unlit frame that misrepresents the look.
 	for _index in settle_frames:
 		await get_tree().process_frame
+
+	# Effects that play out over time are fired late, then given frames to reach
+	# the moment worth photographing.
+	if trigger == "killcam":
+		var cam: Node = scene.get_node_or_null("HUD/KillCam")
+		if cam != null:
+			cam.trigger("DERBY DRIVER", "torso", Vector3(-1, 0, 0), "FRONT END THROUGH THE CAB")
+			for _hold in 48:
+				await get_tree().process_frame
+	elif trigger == "handheld":
+		var device: Node = scene.get_node_or_null("HUD/Handheld")
+		if device != null:
+			device.open_device()
+			device.set_mode("WIRE")
+			for _hold in 60:
+				await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 
 	var image := get_viewport().get_texture().get_image()

@@ -7,6 +7,7 @@ const SPRINT_SPEED := 12.0
 const HUNT_ID := "mara_voss"
 const FRIEND_ID := "nix_arden"
 const HUNT_LOCATION := "ashbloom_bone_yard"
+const HANDHELD := preload("res://systems/handheld_device.gd")
 const ANATOMY_COMPONENT := preload("res://systems/anatomy_component.gd")
 const WORLD_GENERATOR := preload("res://systems/ashbloom_world_generator.gd")
 const MISFIRE_DIRECTOR := preload("res://systems/reality_misfire_director.gd")
@@ -37,6 +38,7 @@ var strike_windup := -1.0
 var rival_attack_clock := 0.0
 var dodge_remaining := 0.0
 var dodge_direction := Vector3.ZERO
+var handheld: Control
 var pathfinder = preload("res://systems/ashbloom_pathfinder.gd").new()
 var social_markers: Array[Node3D] = []
 
@@ -54,6 +56,9 @@ var social_markers: Array[Node3D] = []
 
 func _ready() -> void:
 	_build_world()
+	handheld = HANDHELD.new()
+	handheld.name = "Handheld"
+	$HUD.add_child(handheld)
 	_build_expanse_systems()
 	_register_people()
 	player_body = CharacterBody3D.new()
@@ -149,7 +154,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				if not panel_mode.is_empty():
 					_toggle_panel(panel_mode)
 			KEY_F: third_person = not third_person
-			KEY_TAB: _toggle_panel("index")
+			KEY_G: handheld.toggle_device()
+			KEY_TAB:
+				# The handheld owns Tab while raised: one object, modes on it.
+				if handheld.is_open:
+					handheld.cycle_mode(1)
+				else:
+					_toggle_panel("index")
 			KEY_M: _toggle_panel("map")
 			KEY_T: _toggle_panel("tree")
 			KEY_J: _toggle_artwork()

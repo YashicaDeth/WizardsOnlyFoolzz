@@ -9,6 +9,7 @@ const BONE_YARD_ENVIRONMENT := preload("res://art/bone_yard_environment.glb")
 const DERBY_AUDIO := preload("res://systems/procedural_derby_audio.gd")
 const VEHICLE := preload("res://systems/arcade_vehicle.gd")
 const AI_DRIVER := preload("res://systems/derby_ai_driver.gd")
+const KILL_CAM := preload("res://systems/kill_cam.gd")
 
 var boat: Node3D
 var speed := 0.0
@@ -27,6 +28,7 @@ var round_state := "countdown"
 var countdown := 3.0
 var authored_collision_count := 0
 var derby_audio: Node
+var kill_cam: Control
 
 @onready var camera: Camera3D = $Camera3D
 @onready var status: Label = $HUD/Status
@@ -47,6 +49,9 @@ func _ready() -> void:
 	derby_audio.name = "DerbyAudio"
 	add_child(derby_audio)
 	derby_audio.attach_engine_to(boat)
+	kill_cam = KILL_CAM.new()
+	kill_cam.name = "KillCam"
+	$HUD.add_child(kill_cam)
 	var crowd_banks: Array = []
 	for index in range(0, crowd_members.size(), 16):
 		crowd_banks.append((crowd_members[index] as Node3D).position + Vector3(0, 1.5, 0))
@@ -591,6 +596,12 @@ func _crush_driver(target: Node3D, subject_id: String, impact_direction: Vector3
 		dynamic_interface.announce_impact(999, false)
 	mode_label.visible = true
 	mode_label.text = "DRIVER CRUSHED IN THE CAB" if ram_crush else "DRIVER KILLED"
+	if kill_cam != null:
+		var zone := "torso" if ram_crush else "head"
+		kill_cam.trigger(
+			"DERBY DRIVER", zone, impact_direction,
+			"FRONT END THROUGH THE CAB" if ram_crush else "IMPACT TRAUMA",
+		)
 	WorldHistory.update_subject(subject_id, {
 		"name": "Derby driver", "kind": "person", "status": "dead",
 		"memory": "Crushed in the cab of their own wrecker at the Bone Yard.",
