@@ -195,6 +195,50 @@ func tree_alignment(target: Dictionary) -> float:
 	return clampf(base * 0.65 + drift + karma, -1.0, 1.0)
 
 
+## E1.2. What a faction charges you, decided by how far their end of the Tree
+## is from yours.
+##
+## This is the consequence half of E1.1. Karma moves you on the axis; this is
+## the axis being *felt*. Nothing new is stored and nothing is displayed as a
+## number: `FACTION_TREE_AXIS` already holds where each faction sits and
+## `tree_alignment()` already says where you sit, so the price is the distance
+## between two numbers that both already existed.
+##
+## Deliberately not a reputation score. There is no per-faction standing to
+## grind, no bar to fill and no way to be liked by everyone — moving toward one
+## end of the axis moves you away from the other, and the Gate Lanterns paying
+## you well is the same fact as the Soft Rot refusing to deal.
+##
+## Returns a multiplier on the player's side of a trade: above 1.0 is
+## favourable, below is punitive. 0.0 means they will not deal at all.
+const FACTION_REFUSAL_DISTANCE := 1.45
+
+func faction_price_factor(faction_id: String, target: Dictionary = {}) -> float:
+	if not FACTION_TREE_AXIS.has(faction_id):
+		return 1.0
+	var theirs := float(FACTION_TREE_AXIS[faction_id].get("axis", 0.0))
+	var yours := tree_alignment(target)
+	var distance := absf(theirs - yours)
+	if distance >= FACTION_REFUSAL_DISTANCE:
+		return 0.0
+	# Kin rate through to a grudging one. The curve is gentle because a career
+	# is supposed to move this, not a single execution.
+	return clampf(1.2 - distance * 0.52, 0.45, 1.2)
+
+
+## The same comparison in words, for anything that has to say it out loud
+## without printing a coefficient.
+func faction_disposition(faction_id: String, target: Dictionary = {}) -> String:
+	var factor := faction_price_factor(faction_id, target)
+	if factor <= 0.0:
+		return "refuses"
+	if factor >= 1.08:
+		return "kin"
+	if factor >= 0.88:
+		return "trades"
+	return "grudging"
+
+
 func tree_descriptor(target: Dictionary) -> String:
 	var faction_id := str(target.get("faction_id", ""))
 	if FACTION_TREE_AXIS.has(faction_id):

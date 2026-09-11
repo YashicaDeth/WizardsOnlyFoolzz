@@ -175,3 +175,49 @@ visceral. That is the right place for it — it makes seeing through a body a
 Codex's "first person is Self/Perception" line has been pointing at all along,
 and it means the anatomy work is on screen whenever the player wants it instead
 of only at a kill.
+
+## The occult system is the world's own — direction from Greg, 2026-09-12
+
+His instruction: *"make the karma and magic system not based on Aleister
+Crowley's interpretation, and also purposefully bastardise Thelema and Thelemic
+symbols."*
+
+**The first half is settled and correct.** Nothing in E should read as a reskin
+of a real magical system. That is the originality non-negotiable applied to the
+occult layer, and it is already what E2.3 asks for: *original seals for what
+this world grew on its own*. Crowley's specific synthesis — his Tree
+attributions, his grade structure, his correspondences — is not the authority
+here and should not be the skeleton the ritual app hangs on.
+
+**The second half was argued once and the position is recorded here.** Straight
+parody of Thelema is the weaker version of what Greg actually wants, for three
+reasons:
+
+1. The satire pillar says **institutions and power, never a real group**. An
+   occult *order* — its grades, its initiation fees, its gatekeeping, its
+   prophet who was a fraud and its Book nobody finished — is an institution and
+   is fair game. Its adherents are a group of people and are not.
+2. An invented order is the project's own IP. A bastardised real one is
+   somebody else's furniture rearranged, which is the thing this project
+   refuses to do everywhere else.
+3. It is funnier. A specific, named, ridiculous order with its own Law and its
+   own fee schedule lands harder than a distorted reference the player has to
+   already know to get.
+
+**So the version being built:** take the *shape* — a Law stated in one line, a
+Book, grades you pay to climb, a founder whose biography does not survive
+checking, correspondences asserted with total confidence and no consistency —
+and fill it entirely with Ashbloom material. The Choir of Marrow already proves
+this works: an anatomical faith that rewrites allegiance through surgery is a
+real satirical target with mechanical teeth, and it is nobody's religion.
+
+**What stays public domain and usable:** the 72 Goetic seals of E2.2 come from
+the *Lesser Key of Solomon*, seventeenth century, genuinely out of copyright and
+not Crowley's work. They can be drawn as data. What should not be leaned on is
+Crowley's overlay on top of them.
+
+**Open for Greg:** the order needs a name, a Law and a founder. Until those
+exist E2 stays blocked on him rather than on engineering — the machinery
+(`celloutz_type` stroke register for seal drawing, `event_karma` for what a
+rite costs) is ready.
+

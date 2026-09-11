@@ -118,7 +118,11 @@ func damage_item(index: int, amount: float) -> float:
 
 ## The first economy seam. The Choir/Soft Rot price identity, remaining
 ## condition and freshness; the wallet lives beside CARRY, not inside the item.
-func sale_value(item: Dictionary) -> int:
+## `buyer_faction` is who is standing in front of you. E1.2: the same part is
+## worth different money to different people, because where they sit on the
+## Tree relative to you is the whole of their opinion of you. An empty buyer is
+## an anonymous broker who prices nothing but the meat.
+func sale_value(item: Dictionary, buyer_faction: String = "") -> int:
 	var base := int({"limb": 7, "organ": 12, "cybernetic": 24}.get(str(item.get("kind", "")), 0))
 	if base <= 0:
 		return 0
@@ -127,7 +131,13 @@ func sale_value(item: Dictionary) -> int:
 	# broker is pricing the chance of being asked where it came from. It is the
 	# cost of being seen rather than a morality tax.
 	var heat := 0.62 if bool(item.get("stolen", false)) else 1.0
-	return maxi(1, roundi(float(base) * maxf(0.2, condition) * maxf(0.15, freshness(item)) * heat))
+	var standing := 1.0
+	if not buyer_faction.is_empty():
+		standing = WorldHistory.faction_price_factor(buyer_faction, WorldHistory.subject("player"))
+		if standing <= 0.0:
+			# They will not deal with you at all. Zero is a refusal, not a price.
+			return 0
+	return maxi(1, roundi(float(base) * maxf(0.2, condition) * maxf(0.15, freshness(item)) * heat * standing))
 
 
 ## B5.5. A robbed implant goes into your own body through the same verb that
@@ -158,19 +168,23 @@ func install_into(index: int, rig: BaselineHuman) -> Dictionary:
 	return {"implant": implant_id, "zone": str(catalogue.zone), "condition": float(item.get("condition", 1.0))}
 
 
-func sell(index: int) -> Dictionary:
+func sell(index: int, buyer_faction: String = "") -> Dictionary:
 	if index < 0 or index >= items.size():
 		return {}
 	var item: Dictionary = items[index]
-	var price := sale_value(item)
+	var price := sale_value(item, buyer_faction)
 	if price <= 0:
+		# Either the part is worthless or this buyer will not take it from you.
+		# The caller needs to be able to tell those apart to say anything useful.
+		if not buyer_faction.is_empty() and WorldHistory.faction_price_factor(buyer_faction, WorldHistory.subject("player")) <= 0.0:
+			return {"refused": true, "faction": buyer_faction, "disposition": WorldHistory.faction_disposition(buyer_faction, WorldHistory.subject("player"))}
 		return {}
 	items.remove_at(index)
 	var inventory := WorldHistory.subject("inventory")
 	var wallet := int(inventory.get("rust_scrip", 0)) + price
 	WorldHistory.update_subject("inventory", {"items": items.duplicate(true), "rust_scrip": wallet}, "carried_part_sold")
-	WorldHistory.record_event("carried_part_sold", {"part": item.duplicate(true), "price": price, "currency": "rust_scrip"})
-	return {"item": item, "price": price, "wallet": wallet}
+	WorldHistory.record_event("carried_part_sold", {"part": item.duplicate(true), "price": price, "currency": "rust_scrip", "buyer_faction": buyer_faction})
+	return {"item": item, "price": price, "wallet": wallet, "faction": buyer_faction, "disposition": WorldHistory.faction_disposition(buyer_faction, WorldHistory.subject("player")) if not buyer_faction.is_empty() else ""}
 
 
 func drop(index: int) -> Dictionary:

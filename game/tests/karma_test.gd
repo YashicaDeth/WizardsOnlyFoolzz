@@ -82,5 +82,42 @@ func _ready() -> void:
 	check(is_equal_approx(float(WorldHistory.subject("player").get("karma", 0.0)), remembered), "and the act still counts after it falls out of the log")
 	check(WorldHistory.karma_from_history("player") > remembered, "even though the log itself has forgotten it")
 
+	# --- E1.2: the axis is felt, not just drawn ----------------------------
+	# Nothing new is stored. Where a faction sits and where you sit are both
+	# already known, and the price is the distance between them.
+	WorldHistory.clear_history()
+	WorldHistory.register_subject("player", {"name": "THE HUNTER", "kind": "person"})
+	var neutral_lantern := WorldHistory.faction_price_factor("gate_lanterns", WorldHistory.subject("player"))
+	var neutral_rot := WorldHistory.faction_price_factor("soft_rot", WorldHistory.subject("player"))
+	check(neutral_lantern > 0.0 and neutral_rot > 0.0, "a newcomer in Limbo can deal with either end")
+
+	# A career of executions drags you down the axis; the two ends must move
+	# in opposite directions, because there is no way to be liked by everyone.
+	for index in 16:
+		WorldHistory.record_event("npc_resolution", {"subject_id": "v%d" % index, "outcome": "execute", "actor": "player"})
+	var after_executions := WorldHistory.tree_alignment(WorldHistory.subject("player"))
+	var fallen_lantern := WorldHistory.faction_price_factor("gate_lanterns", WorldHistory.subject("player"))
+	var fallen_rot := WorldHistory.faction_price_factor("soft_rot", WorldHistory.subject("player"))
+	check(after_executions < 0.0, "a career of executions puts you under the line (%.2f)" % after_executions)
+	check(fallen_lantern < neutral_lantern, "the ascending faction likes you less for it")
+	check(fallen_rot > neutral_rot, "and the descending one likes you more, by the same fact")
+	check(WorldHistory.faction_disposition("soft_rot", WorldHistory.subject("player")) in ["kin", "trades"], "the Soft Rot will deal")
+
+	# Far enough apart and there is no price at all.
+	WorldHistory.register_subject("zealot", {"faction_id": "gate_lanterns", "bond": 90})
+	var zealot_refusal := WorldHistory.faction_price_factor("soft_rot", WorldHistory.subject("zealot"))
+	check(zealot_refusal == 0.0, "the opposite end refuses to deal rather than charging more")
+	check(WorldHistory.faction_disposition("soft_rot", WorldHistory.subject("zealot")) == "refuses", "and says so")
+
+	# And it reaches the trade, rather than being a spare function.
+	var carry = preload("res://systems/carry.gd").new()
+	add_child(carry)
+	var organ := {"kind": "organ", "label": "liver", "condition": 1.0}
+	var anonymous := carry.sale_value(organ)
+	var kin_price := carry.sale_value(organ, "soft_rot")
+	var cold_price := carry.sale_value(organ, "gate_lanterns")
+	check(anonymous > 0, "an anonymous broker still prices the meat (%d)" % anonymous)
+	check(kin_price >= cold_price, "your own end of the axis pays better (%d vs %d)" % [kin_price, cold_price])
+
 	print("KARMA_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
