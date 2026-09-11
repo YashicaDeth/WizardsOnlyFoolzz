@@ -15,6 +15,7 @@ const AI_DRIVER := preload("res://systems/derby_ai_driver.gd")
 const KILL_CAM := preload("res://systems/kill_cam.gd")
 const DAMAGE_PORTRAIT := preload("res://systems/damage_portrait.gd")
 const CAB_SCREENS := preload("res://systems/cab_screens.gd")
+const PIT_RADIO := preload("res://systems/pit_radio.gd")
 
 ## Authored props that fight the read at arena scale. Hidden rather than deleted
 ## from the kit, so a re-export can reinstate them deliberately.
@@ -40,6 +41,7 @@ var derby_audio: Node
 var kill_cam: Control
 var damage_portrait: Control
 var cab_screens: Control
+var pit_radio: Control
 
 @onready var camera: Camera3D = $Camera3D
 @onready var status: Label = $HUD/Status
@@ -66,6 +68,10 @@ func _ready() -> void:
 	cab_screens = CAB_SCREENS.new()
 	cab_screens.name = "CabScreens"
 	$HUD.add_child(cab_screens)
+	pit_radio = PIT_RADIO.new()
+	pit_radio.name = "PitRadio"
+	$HUD.add_child(pit_radio)
+	pit_radio.attach_audio(derby_audio)
 	damage_portrait = DAMAGE_PORTRAIT.new()
 	damage_portrait.name = "DamagePortrait"
 	damage_portrait.position = Vector2(26, 22)
@@ -271,6 +277,8 @@ func _on_vehicle_impact(other: Node, closing_speed: float) -> void:
 		_damage_target(other, closing_speed)
 	elif closing_speed > 7.0:
 		integrity = maxi(0, integrity - roundi(closing_speed * 0.3))
+		if pit_radio != null and closing_speed > 11.0:
+			pit_radio.transmit("hit_player")
 		derby_audio.play_impact(clampf(closing_speed / 24.0, 0.0, 1.0), boat.global_position, "heavy")
 		if integrity <= 0:
 			_finish_round("lost")
@@ -307,6 +315,8 @@ func _damage_target(target: Node3D, collision_speed: float = 0.0) -> void:
 		"venue": "rift_derby_quarry", "target_id": target.name, "damage": damage,
 		"target_integrity": target_integrity, "impact_energy": impact_energy,
 	})
+	if pit_radio != null:
+		pit_radio.transmit("took_hit" if damage < 30 else "player_winning")
 	if bool(target.get_meta("is_rival", false)):
 		var current := WorldHistory.subject(RIVAL_ID)
 		var grudge := mini(100, int(current.get("grudge", 0)) + 8)
@@ -667,6 +677,8 @@ func _crush_driver(target: Node3D, subject_id: String, impact_direction: Vector3
 		"name": "Derby driver", "kind": "person", "status": "dead",
 		"memory": "Crushed in the cab of their own wrecker at the Bone Yard.",
 	}, "derby_driver_killed")
+	if pit_radio != null:
+		pit_radio.transmit("death")
 	WorldHistory.record_event("derby_driver_crushed", {
 		"venue": "rift_derby_quarry", "subject_id": subject_id,
 		"target_id": target.name, "ram_crush": ram_crush,

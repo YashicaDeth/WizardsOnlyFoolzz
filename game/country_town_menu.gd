@@ -59,7 +59,13 @@ func _unfocus_button(button: Button) -> void:
 
 
 func _start_game() -> void:
-	get_tree().change_scene_to_file("res://rift_derby.tscn")
+	# A run that has not begun starts on the Growing Floor; one already under way
+	# resumes at the pit rather than replaying the decanting.
+	var opening := preload("res://systems/opening_director.gd")
+	if opening.reached("entered_pit"):
+		get_tree().change_scene_to_file("res://rift_derby.tscn")
+	else:
+		get_tree().change_scene_to_file("res://vat_chamber.tscn")
 
 
 func _open_settings() -> void:
