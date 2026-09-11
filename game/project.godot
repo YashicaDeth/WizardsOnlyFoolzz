@@ -20,6 +20,10 @@ DialogueManager="*res://addons/dialogue_manager/dialogue_manager.gd"
 MCPGameBridge="res://addons/godot_mcp/game_bridge/mcp_game_bridge.gd"
 WorldHistory="*res://systems/world_history.gd"
 
+[audio]
+
+driver/enable_input=true
+
 [display]
 
 window/size/viewport_width=1280

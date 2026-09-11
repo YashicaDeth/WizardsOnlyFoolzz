@@ -2,6 +2,22 @@
 
 ## 2026 09 11
 
+- Added the live downed-person confrontation: an obstruction-aware shoulder
+  camera, compact choices tethered to the subject, and execute/spare/recruit
+  outcomes while other actors and blood loss keep running.
+- Added consent-gated recruitment, persistent survivor memories, unique
+  resolution events, non-hostile spared/recruited states and single-drop
+  execution loot.
+- Connected execution to the real BaselineHuman anatomy snapshot. KillCam now
+  distinguishes all seven internals, highlights actual ruptures and restores
+  global time on completion, cancellation or removal while preserving its
+  existing derby call.
+- Added local hold-V proximity voice capture inside the confrontation. Raw
+  samples remain transient; duration/contact history persists and the reply
+  acknowledgement originates at the subject's head with an in-world subtitle.
+- Added `resolution_test.gd`: 30 checks for lifecycle, input, consent, voice,
+  world continuity, history, loot and kill-camera compatibility/time cleanup.
+
 - **One baseline human rig** (`systems/baseline_human.gd`) owns the zone vocabulary, hit geometry and anatomy for every person in the world. Fixes a silent defect: zone names that AnatomyComponent did not recognise resolved to `torso`, so the derby's `legs` hitbox and the hunt's `left arm` wounds were being recorded as chest wounds. Hits now resolve to where they landed rather than to a round-robin.
 - Derby drivers run the rig instead of a `driver_health` integer, and their injuries persist on their subject — a wrecker rebuilt after taking a leg wound still has it. "Bodies remember" now applies to a procedurally spawned nobody, not only to hand-authored characters.
 - **Gore on the rig**: blood scaled by damage and by whether the weapon cuts or breaks, permanent compound fractures, organs spilling from a destroyed chest, exposed bone at a severed joint. Capped globally and spawned into world space so a driver's blood does not ride inside a moving cab.

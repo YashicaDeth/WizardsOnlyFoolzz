@@ -42,6 +42,10 @@ var dodge_direction := Vector3.ZERO
 var handheld: Control
 var pathfinder = preload("res://systems/ashbloom_pathfinder.gd").new()
 var social_markers: Array[Node3D] = []
+var resolution_ui: Control
+var resolution_target := ""
+var kill_cam: Control
+var voice_channel: Node
 
 @onready var camera: Camera3D = $CameraRig/Camera3D
 @onready var title: Label = $HUD/Title
@@ -60,6 +64,20 @@ func _ready() -> void:
 	handheld = HANDHELD.new()
 	handheld.name = "Handheld"
 	$HUD.add_child(handheld)
+	resolution_ui = preload("res://systems/downed_resolution.gd").new()
+	resolution_ui.name = "DownedResolution"
+	$HUD.add_child(resolution_ui)
+	resolution_ui.selected.connect(_resolve_downed)
+	resolution_ui.cancelled.connect(_resolution_cancelled)
+	resolution_ui.voice_capture_requested.connect(_voice_capture)
+	kill_cam = preload("res://systems/kill_cam.gd").new()
+	kill_cam.name = "KillCam"
+	$HUD.add_child(kill_cam)
+	voice_channel = preload("res://systems/proximity_voice.gd").new()
+	voice_channel.name = "ProximityVoice"
+	add_child(voice_channel)
+	voice_channel.capture_finished.connect(_voice_captured)
+	voice_channel.capture_failed.connect(func(reason: String): resolution_ui.set_voice_state(reason))
 	_build_expanse_systems()
 	_register_people()
 	player_body = CharacterBody3D.new()
@@ -183,6 +201,8 @@ func _register_people() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if resolution_ui.visible or kill_cam.active:
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -211,6 +231,14 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if kill_cam.active:
+		return
+	# The resolution window does not stop the world. Standing over someone
+	# deciding what to do with them is supposed to be a risk, so everyone else
+	# keeps moving and the body under the form keeps bleeding — only the
+	# player's own combat input is suspended, in `_update_player` and `_attack`.
+	if resolution_ui.visible:
+		_update_resolution_window()
 	if not panel_mode.is_empty():
 		_update_hud()
 		return
@@ -232,6 +260,12 @@ func _physics_process(delta: float) -> void:
 
 
 func _update_player(delta: float) -> void:
+	if player_rig.is_downed() or player_rig.anatomy.dead:
+		return
+	# Standing over a downed body with the form open costs you your footwork.
+	if resolution_ui.visible:
+		player_body.velocity = Vector3.ZERO
+		return
 	var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var forward := Vector3(sin(yaw), 0, cos(yaw)).normalized()
 	var right := Vector3(forward.z, 0, -forward.x)
@@ -254,6 +288,8 @@ func _update_player(delta: float) -> void:
 
 
 func _attack() -> void:
+	if resolution_ui.visible or kill_cam.active or player_rig.is_downed() or player_rig.anatomy.dead:
+		return
 	if not panel_mode.is_empty() or attack_cooldown > 0.0 or stamina < 18.0:
 		return
 	attack_cooldown = 0.72
@@ -297,6 +333,8 @@ func _attack_nearest_encounter_actor() -> bool:
 		var actor: Dictionary = encounter_actors[index]
 		var node := actor.get("node") as Node3D
 		if node == null or not is_instance_valid(node) or bool(actor.get("dead", false)):
+			continue
+		if actor.anatomy.downed or str(actor.get("disposition", "hostile")) != "hostile":
 			continue
 		var distance := player.distance_to(node.global_position)
 		if distance < nearest_distance:
@@ -364,6 +402,10 @@ func _use_prosthetic_surge() -> void:
 
 func _interact() -> void:
 	if not panel_mode.is_empty():
+		return
+	var downed := _nearest_downed()
+	if not downed.is_empty():
+		_open_resolution(downed)
 		return
 	for marker in social_markers.duplicate():
 		if is_instance_valid(marker) and player.distance_to(marker.global_position) < 4.0:
@@ -471,6 +513,18 @@ func _update_encounter_actors(delta: float) -> void:
 		if anatomy.dead and not bool(actor.get("dead", false)):
 			_kill_encounter_actor(index, "bleed_out")
 			continue
+		if anatomy.downed:
+			(node as CharacterBody3D).velocity = Vector3.ZERO
+			actor.attack_time = 0.0
+			if str(actor.get("state", "")) != "downed":
+				actor.state = "downed"
+				WorldHistory.update_subject(str(actor.subject_id), {"status": "downed", "anatomy_state": actor.rig.snapshot()}, "npc_downed")
+			if player.distance_to(node.global_position) <= 4.0:
+				prompt.text = "[E] %s / DOWNED, ALIVE — DECIDE THEIR FATE" % str(actor.display_name).to_upper()
+			continue
+		if str(actor.get("disposition", "hostile")) != "hostile":
+			actor.attack_time = 0.0
+			continue
 		var offset := player - node.global_position
 		offset.y = 0
 		var distance := offset.length()
@@ -532,6 +586,173 @@ func _kill_encounter_actor(index: int, cause: String) -> void:
 	if label != null:
 		label.text = "%s // DEAD\nLOOT DROPPED" % str(actor.display_name).to_upper()
 	encounter_actors.remove_at(index)
+
+func _actor_by_id(id: String) -> Dictionary:
+	for actor in encounter_actors:
+		if str(actor.subject_id) == id and is_instance_valid(actor.node):
+			return actor
+	return {}
+
+func _nearest_downed() -> Dictionary:
+	var nearest: Dictionary = {}
+	var distance := 4.0
+	for actor in encounter_actors:
+		if is_instance_valid(actor.node) and actor.rig.is_downed():
+			var candidate: float = player.distance_to(actor.node.global_position)
+			if candidate <= distance:
+				distance = candidate
+				nearest = actor
+	return nearest
+
+func _accepts_recruitment(subject: Dictionary) -> bool:
+	return int(subject.get("bond", 0)) >= 20 or bool(subject.get("recruitment_consent", false)) or float(subject.get("debt_to_player", 0)) > 0
+
+
+func _recruitment_reason(subject: Dictionary) -> String:
+	if int(subject.get("grudge", 0)) >= 40:
+		return "They hate you too much to take the offer."
+	return "No bond, no debt, no reason to follow you."
+
+
+## Which zone the finishing blow goes into, and the organ inside it. Executing
+## someone reads as finishing the wound that dropped them rather than as a
+## generic heart shot, so the kill cam plate differs per victim.
+func _execution_target(actor: Dictionary) -> Array:
+	var worst := "torso"
+	var lowest := 2.0
+	for zone_id in AnatomyComponent.DEFAULT_ZONES:
+		var ceiling := float((AnatomyComponent.DEFAULT_ZONES[zone_id] as Dictionary).health)
+		var ratio: float = float(actor.rig.zone_health(zone_id)) / ceiling
+		if ratio < lowest:
+			lowest = ratio
+			worst = zone_id
+	if worst == "head":
+		return ["head", "brain"]
+	if worst in ["torso", "left_arm", "right_arm"]:
+		return ["torso", "heart"]
+	# A ruined leg is not where you finish someone; the spine is the nearest
+	# structure that ends it from behind a kneeling body.
+	return ["torso", "spine"]
+
+
+func _open_resolution(actor: Dictionary) -> void:
+	resolution_target = str(actor.subject_id)
+	strike_windup = -1.0
+	dodge_remaining = 0.0
+	player_body.velocity = Vector3.ZERO
+	if handheld.is_open:
+		handheld.close_device()
+	var identity := actor.node.get_node_or_null("Identity") as Label3D
+	if identity != null:
+		identity.visible = false
+	var subject := WorldHistory.subject(resolution_target)
+	resolution_ui.open_for(str(actor.display_name), actor.rig.snapshot(), {
+		"subject_id": resolution_target,
+		"role": str(subject.get("role", actor.get("disposition", "unfiled"))),
+		"recruit": _accepts_recruitment(subject),
+		"recruit_reason": _recruitment_reason(subject),
+	})
+	_update_resolution_window()
+
+
+func _resolution_cancelled() -> void:
+	var actor := _actor_by_id(resolution_target)
+	if not actor.is_empty():
+		var identity := actor.node.get_node_or_null("Identity") as Label3D
+		if identity != null:
+			identity.visible = true
+	voice_channel.cancel()
+	resolution_target = ""
+
+
+## Keeps the open form honest while the world runs underneath it: the readout
+## follows the real body, and the window closes itself if the subject dies of
+## their wounds or the player walks away mid-decision.
+func _update_resolution_window() -> void:
+	var target := _actor_by_id(resolution_target)
+	if target.is_empty() or not target.rig.is_downed():
+		resolution_ui.cancel_menu()
+		prompt.text = "THEY WERE DECIDED FOR YOU."
+		return
+	if player.distance_to(target.node.global_position) > 5.5:
+		resolution_ui.cancel_menu()
+		prompt.text = "OUT OF REACH / DECISION ABANDONED"
+		return
+	resolution_ui.anatomy = target.rig.snapshot()
+	resolution_ui.set_voice_state(voice_channel.status, voice_channel.level)
+	var head: Node3D = target.rig.head_anchor
+	var at: Vector3 = head.global_position if head != null and is_instance_valid(head) else target.node.global_position + Vector3.UP
+	if camera.is_position_behind(at):
+		resolution_ui.set_world_anchor(Vector2(-1, -1))
+	else:
+		resolution_ui.set_world_anchor(camera.unproject_position(at))
+
+
+func _resolve_downed(outcome: String) -> void:
+	voice_channel.cancel()
+	var actor := _actor_by_id(resolution_target)
+	resolution_target = ""
+	if actor.is_empty() or not actor.rig.is_downed() or player.distance_to(actor.node.global_position) > 5.5:
+		return
+	var identity := actor.node.get_node_or_null("Identity") as Label3D
+	if identity != null:
+		identity.visible = true
+	var id := str(actor.subject_id)
+	var subject := WorldHistory.subject(id)
+	if outcome == "recruit" and not _accepts_recruitment(subject):
+		return
+	if outcome not in ["execute", "spare", "recruit"]:
+		return
+	if outcome == "execute":
+		var finish := _execution_target(actor)
+		actor.rig.hit(str(finish[0]), 100.0, 30.0, "puncture", str(finish[1]))
+		actor.rig.execute()
+		var snapshot: Dictionary = actor.rig.snapshot()
+		WorldHistory.record_event("npc_resolution", {"subject_id": id, "outcome": outcome, "actor": "player", "zone": finish[0], "organ": finish[1], "anatomy_state": snapshot})
+		kill_cam.trigger(str(actor.display_name), str(finish[0]), actor.node.global_position - player, "EXECUTION / %s" % str(finish[1]).to_upper().replace("_", " "), snapshot)
+		_kill_encounter_actor(encounter_actors.find(actor), "execution")
+	else:
+		actor.rig.spare()
+		actor.state = "recruited" if outcome == "recruit" else "spared"
+		actor.disposition = "ally" if outcome == "recruit" else "neutral"
+		actor.attack_time = 0.0
+		var relations: Dictionary = subject.get("relations", {}).duplicate(true)
+		if outcome == "recruit":
+			relations["player"] = {"kind": "bond", "strength": maxi(20, int(subject.get("bond", 0))), "consensual": true}
+		WorldHistory.update_subject(id, {"status": actor.state, "disposition": actor.disposition, "relations": relations, "grudge": int(subject.get("grudge", 0)) + (5 if outcome == "spare" else 0), "memory": "The Hunter offered shelter; I agreed to join." if outcome == "recruit" else "The Hunter spared me. I remember the wounds.", "anatomy_state": actor.rig.snapshot()}, "npc_recruited" if outcome == "recruit" else "npc_spared")
+		WorldHistory.record_event("npc_resolution", {"subject_id": id, "outcome": outcome, "actor": "player", "witnesses": [id]})
+		misfire_director.resolve(str(actor.get("encounter_id", "")), actor.state)
+		var label := actor.node.get_node_or_null("Identity") as Label3D
+		if label != null:
+			label.text = "%s / %s" % [str(actor.display_name).to_upper(), str(actor.state).to_upper()]
+	prompt.text = "DISPOSITION RECORDED / " + outcome.to_upper()
+	attack_cooldown = 0.72
+
+
+func _voice_capture(holding: bool) -> void:
+	var actor := _actor_by_id(resolution_target)
+	if actor.is_empty() or player.distance_to(actor.node.global_position) > 5.5:
+		resolution_ui.set_voice_state("NO SUBJECT IN VOICE RANGE")
+		return
+	if holding:
+		voice_channel.begin(str(actor.subject_id), actor.rig.head_anchor)
+	else:
+		voice_channel.finish()
+
+
+func _voice_captured(subject_id: String, result: Dictionary) -> void:
+	var actor := _actor_by_id(subject_id)
+	if actor.is_empty() or not bool(result.get("sent", false)):
+		resolution_ui.set_voice_state(voice_channel.status)
+		return
+	var subject := WorldHistory.subject(subject_id)
+	var reply := "You have my attention. Make the offer." if _accepts_recruitment(subject) else "I heard you. It changes nothing yet."
+	if int(subject.get("grudge", 0)) >= 40:
+		reply = "I know your voice. I still hate you."
+	WorldHistory.record_event("proximity_voice_addressed", {"speaker": "player", "listener": subject_id, "duration": result.duration, "location": HUNT_LOCATION, "raw_audio_saved": false})
+	WorldHistory.update_subject(subject_id, {"last_voice_contact": WorldHistory.event_count(), "memory": "The Hunter spoke to me while I was downed."}, "voice_contact_remembered")
+	voice_channel.play_positional_acknowledgement(actor.rig.head_anchor)
+	resolution_ui.set_voice_state("VOICE RECEIVED / POSITIONAL REPLY", float(result.peak), reply)
 
 
 func _rival_retreats(message: String) -> void:
@@ -597,6 +818,7 @@ func _update_hud() -> void:
 	title.text = "ALLUSIONS TO GRANDEUR // LIMBO: ASHBLOOM EXPANSE"
 	status.text = "WASD MOVE  SHIFT RUN  LMB STRIKE  SPACE DODGE  Q SURGE\nE INTERACT  TAB INDEX  M MAP  T TREE  J ALLUSIONS  F CAMERA"
 	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(HUNT_ID).get("status", "dormant")).to_upper()]
+	prompt.visible = not resolution_ui.visible
 	if panel.visible:
 		_refresh_archive()
 	if field_interface.has_method("set_state"):
@@ -610,6 +832,31 @@ func _update_hud() -> void:
 
 
 func _update_camera() -> void:
+	if resolution_ui != null and resolution_ui.visible:
+		var subject := _actor_by_id(resolution_target)
+		if not subject.is_empty():
+			var focus: Vector3 = subject.node.global_position + Vector3.UP * 0.65
+			var away := player - focus
+			away.y = 0.0
+			if away.length_squared() < 0.01:
+				away = Vector3.BACK
+			away = away.normalized()
+			var shoulder := Vector3(-away.z, 0, away.x) * 1.05
+			var desired := player + away * 3.1 + shoulder * 0.85 + Vector3.UP * 1.55
+			var ray := PhysicsRayQueryParameters3D.create(focus, desired)
+			var excluded: Array[RID] = [player_body.get_rid()]
+			if subject.node is CollisionObject3D:
+				excluded.append((subject.node as CollisionObject3D).get_rid())
+			ray.exclude = excluded
+			var obstruction := get_world_3d().direct_space_state.intersect_ray(ray)
+			if not obstruction.is_empty():
+				desired = obstruction.position + (focus - obstruction.position).normalized() * 0.35
+			camera.global_position = desired
+			camera.look_at(focus, Vector3.UP)
+			var player_head := player_rig.parts.get("head") as Node3D
+			if player_head != null and is_instance_valid(player_head):
+				player_head.visible = false
+			return
 	var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 	if third_person:
 		camera.global_position = player - look * 6.5 + Vector3.UP * 1.4
@@ -741,6 +988,9 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> void:
 	var loot := ["Ashline toll teeth", "rust scrip"] if str(encounter.kind) == "hostile" else ["weather-heart filament", "dead god relay"]
 	encounter_actors.append({"subject_id": subject_id, "display_name": display_name, "node": actor, "rig": rig, "anatomy": anatomy, "state": "hunting", "disposition": "hostile", "speed": 3.7, "loot": loot, "loot_at_risk": false, "dead": false})
 	encounter_actors.back()["encounter_id"] = str(encounter.get("instance_id", ""))
+	if str(saved_actor.get("status", "")) in ["spared", "recruited"]:
+		encounter_actors.back().state = str(saved_actor.status)
+		encounter_actors.back().disposition = "ally" if str(saved_actor.status) == "recruited" else "neutral"
 	WorldHistory.register_subject(subject_id, {"name": display_name, "kind": "person", "role": str(encounter.kind), "elo": 1110 if str(encounter.kind) == "hostile" else 1510, "status": "encountered", "memory": summary_from(encounter), "wounds": [], "anatomy": anatomy.call("snapshot"), "relations": {"player": {"kind": "enemy", "strength": 35}}})
 
 

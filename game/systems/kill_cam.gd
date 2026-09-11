@@ -31,6 +31,8 @@ var impact_from := Vector2.LEFT
 var fragments: Array[Dictionary] = []
 var ruptures: Array[Dictionary] = []
 var caption := ""
+var anatomy_state: Dictionary = {}
+const ORGAN_POINTS := {"brain": Vector2(0, -86), "heart": Vector2(-5, -25), "left_lung": Vector2(-18, -35), "right_lung": Vector2(18, -35), "liver": Vector2(13, 5), "gut": Vector2(0, 27), "spine": Vector2(0, -5)}
 
 
 func _ready() -> void:
@@ -44,7 +46,7 @@ func _ready() -> void:
 
 ## `direction` is the impact heading in world space; only its horizontal sign is
 ## used, so the plate reads as struck from the side the player actually hit.
-func trigger(display_name: String, zone: String, direction: Vector3, label: String = "") -> void:
+func trigger(display_name: String, zone: String, direction: Vector3, label: String = "", snapshot: Dictionary = {}) -> void:
 	if active:
 		return
 	active = true
@@ -53,9 +55,33 @@ func trigger(display_name: String, zone: String, direction: Vector3, label: Stri
 	subject_name = display_name.to_upper()
 	impact_zone = zone
 	caption = label
+	anatomy_state = snapshot.duplicate(true)
 	impact_from = Vector2(signf(direction.x) if absf(direction.x) > 0.01 else -1.0, 0.0)
 	_seed_damage()
+	if not anatomy_state.is_empty():
+		_seed_anatomy()
 	Engine.time_scale = SLOW_SCALE
+
+func _seed_anatomy() -> void:
+	ruptures.clear()
+	if impact_zone != "torso":
+		fragments.clear()
+	for organ_id in ORGAN_POINTS:
+		var organ: Dictionary = anatomy_state.get("organs", {}).get(organ_id, {})
+		if organ.is_empty():
+			continue
+		ruptures.append({"id": organ_id, "at": ORGAN_POINTS[organ_id], "radius": 5.0 if organ_id == "spine" else 11.0, "color": BONE if organ_id == "spine" else BRUISE if "lung" in organ_id else BILE if organ_id in ["gut", "liver"] else ARTERIAL, "delay": 0.35 + ruptures.size() * 0.07, "ruptured": bool(organ.get("ruptured", false))})
+
+func cancel() -> void:
+	if not active:
+		return
+	active = false
+	visible = false
+	Engine.time_scale = 1.0
+	finished.emit()
+
+func _exit_tree() -> void:
+	cancel()
 
 
 func _seed_damage() -> void:
@@ -97,10 +123,7 @@ func _process(delta: float) -> void:
 	# Unscaled time, or the sequence would also be slowed by its own effect.
 	clock += delta / maxf(Engine.time_scale, 0.001)
 	if clock >= DURATION:
-		active = false
-		visible = false
-		Engine.time_scale = 1.0
-		emit_signal("finished")
+		cancel()
 		return
 	queue_redraw()
 
@@ -176,9 +199,15 @@ func _draw_fractures(fade: float) -> void:
 func _draw_ruptures(fade: float) -> void:
 	for rupture in ruptures:
 		var progress := clampf((clock - float(rupture.delay)) / 0.9, 0.0, 1.0)
+		if not bool(rupture.get("ruptured", true)):
+			progress = 0.0
 		var at: Vector2 = rupture.at
 		var base := float(rupture.radius)
 		var tint: Color = rupture.color
+		if rupture.has("id"):
+			var label_at := Vector2(53, -100 + ORGAN_POINTS.keys().find(rupture.id) * 24)
+			draw_line(at, label_at - Vector2(3, 4), tint * Color(1, 1, 1, 0.4 * fade), 0.5)
+			draw_string(ThemeDB.fallback_font, label_at, str(rupture.id).replace("_", " ").to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 7, BONE * Color(1, 1, 1, fade))
 		if progress <= 0.0:
 			draw_circle(at, base, tint * Color(1, 1, 1, 0.55 * fade))
 			continue

@@ -127,6 +127,28 @@ Fired mid-session, recorded here rather than half-built.
 
 ### Tier 1d — defeat, execution and subjugation, captured from Greg 2026-09-11
 
+**Resolution increment completed 2026-09-11.** Generic Hunt Grounds opponents
+now stop attacking and fleeing when the shared rig puts them down. At close
+range the camera moves into an obstruction-aware over-shoulder confrontation
+and three live, clickable choices stay tethered to the body while the rest of
+the encounter keeps running. Execute feeds the victim's real zone and organ
+snapshot into the X-ray camera and drops loot; spare stabilises without healing
+the wounds; recruit requires an existing bond, consent or recognised debt. All
+three write distinct histories. Mara still uses her authored retreat branch.
+
+The same interaction now has a local **hold-V proximity voice transport**. It
+captures microphone frames transiently, persists contact metadata without raw
+audio, and emits the reply from the subject's head anchor. Recognition and
+authored/TTS spoken replies remain the next voice stages; the current local
+fallback acknowledges the exchange positionally and carries an in-world
+subtitle.
+
+Greg's requested anatomy expansion is now explicit: sword, fist and gun
+contacts must all drive the same X-ray vocabulary, extended from the current
+six broad zones into hands/fingers and named bones, with fracture patterns,
+organ rupture and a richer authored blood/guts presentation. Do this by adding
+resolution to the shared rig rather than separate weapon-specific gore systems.
+
 The largest single design in the project so far. Recorded whole rather than
 half-built, because the parts only mean anything together.
 
@@ -175,8 +197,8 @@ pipeline is unchanged and still buildable on its own.
 Sequencing, so this can be built without one enormous drop:
 
 1. Downed state on the rig, symmetric for player and NPC. Nothing else first.
-2. Resolution menu in that window: execute / spare / recruit.
-3. Kill cam wired to real zones and organs on execute.
+2. Resolution interaction in that window: execute / spare / recruit. **Done for generic Hunt Grounds actors.**
+3. Kill cam wired to real zones and organs on execute. **Done for generic Hunt Grounds actors.**
 4. Player defeat routed to shackled rather than dead, plus the tar re-decanting.
 5. Mind-stamp and the asset list on the handheld.
 6. Targeted part selection.

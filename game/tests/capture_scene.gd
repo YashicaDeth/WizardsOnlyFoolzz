@@ -56,7 +56,19 @@ func _ready() -> void:
 
 	# Effects that play out over time are fired late, then given frames to reach
 	# the moment worth photographing.
-	if trigger == "killcam":
+	if trigger in ["resolution", "execution"]:
+		scene._spawn_encounter_actor({"instance_id": "capture_downed", "kind": "hostile"}, scene.player + Vector3(0, 0, 2))
+		var actor: Dictionary = scene.encounter_actors.back()
+		actor.node.position = scene.player + Vector3(0, 0, 2)
+		WorldHistory.update_subject(actor.subject_id, {"bond": 25})
+		for hit in 7:
+			actor.rig.hit("torso", 30, 10, "blunt")
+		scene._open_resolution(actor)
+		if trigger == "execution":
+			scene.resolution_ui._choose(0)
+		for hold in 20:
+			await get_tree().process_frame
+	elif trigger == "killcam":
 		var cam: Node = scene.get_node_or_null("HUD/KillCam")
 		if cam != null:
 			cam.trigger("DERBY DRIVER", "torso", Vector3(-1, 0, 0), "FRONT END THROUGH THE CAB")

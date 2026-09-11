@@ -152,6 +152,8 @@ func build(id: String, config: Dictionary = {}) -> void:
 	anatomy.went_down.connect(_on_went_down)
 	if config.get("restore") is Dictionary:
 		anatomy.restore(config.restore)
+		if anatomy.downed:
+			rotation.x = -PI * 0.46
 		for zone_id in ZONES:
 			_refresh_zone(zone_id)
 		for organ_id in organ_parts:
