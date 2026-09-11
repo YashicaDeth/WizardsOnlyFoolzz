@@ -1,0 +1,94 @@
+{
+  "verifiedAt": "2026-09-08T16:07:00.099Z",
+  "server": {
+    "name": "godot-mcp",
+    "title": "Godot MCP",
+    "version": "4.1.11",
+    "websiteUrl": "https://github.com/satelliteoflove/godot-mcp",
+    "description": "Eyes and hands in the Godot editor and the running game: scene and node editing, input injection, deterministic game-time control, and live runtime state for agent-driven playtesting."
+  },
+  "toolCount": 21,
+  "project": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"godot_version\":\"4.7.2-stable (official)\",\"main_scene\":\"res://connection_test.tscn\",\"name\":\"AllusionsTooGrandeur\",\"path\":\"P:/GameDev/AllusionsTooGrandeur/game/\"}"
+      }
+    ],
+    "structuredContent": {
+      "godot_version": "4.7.2-stable (official)",
+      "main_scene": "res://connection_test.tscn",
+      "name": "AllusionsTooGrandeur",
+      "path": "P:/GameDev/AllusionsTooGrandeur/game/"
+    }
+  },
+  "addon": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"connected\":true,\"server_version\":\"4.1.11\",\"server_build\":{\"mode\":\"packaged\",\"stale\":false,\"built_at\":\"2026-08-27T14:00:15.785Z\"},\"addon_version\":\"4.1.11\",\"versions_match\":true,\"project_path\":\"P:/GameDev/AllusionsTooGrandeur/game/\",\"project_name\":\"AllusionsTooGrandeur\",\"godot_version\":\"4.7.2-stable (official)\",\"recommendation\":null}"
+      }
+    ],
+    "structuredContent": {
+      "connected": true,
+      "server_version": "4.1.11",
+      "server_build": {
+        "mode": "packaged",
+        "stale": false,
+        "built_at": "2026-08-27T14:00:15.785Z"
+      },
+      "addon_version": "4.1.11",
+      "versions_match": true,
+      "project_path": "P:/GameDev/AllusionsTooGrandeur/game/",
+      "project_name": "AllusionsTooGrandeur",
+      "godot_version": "4.7.2-stable (official)",
+      "recommendation": null
+    }
+  },
+  "editor": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"camera\":{\"far\":4000.01000976563,\"forward\":{\"x\":-0.420735478401184,\"y\":-0.479425549507141,\"z\":-0.770151138305664},\"fov\":70.0100021362305,\"near\":0.0500000007450581,\"position\":{\"x\":1.68294203281403,\"y\":1.91770219802856,\"z\":3.08060455322266},\"projection\":\"perspective\",\"rotation\":{\"x\":-0.5,\"y\":0.5,\"z\":0}},\"current_scene\":\"res://connection_test.tscn\",\"godot_version\":\"4.7.2-stable (official)\",\"is_playing\":false,\"main_screen\":\"3D\",\"open_scenes\":[\"res://connection_test.tscn\"]}"
+      }
+    ],
+    "structuredContent": {
+      "camera": {
+        "far": 4000.01000976563,
+        "forward": {
+          "x": -0.420735478401184,
+          "y": -0.479425549507141,
+          "z": -0.770151138305664
+        },
+        "fov": 70.0100021362305,
+        "near": 0.0500000007450581,
+        "position": {
+          "x": 1.68294203281403,
+          "y": 1.91770219802856,
+          "z": 3.08060455322266
+        },
+        "projection": "perspective",
+        "rotation": {
+          "x": -0.5,
+          "y": 0.5,
+          "z": 0
+        }
+      },
+      "current_scene": "res://connection_test.tscn",
+      "godot_version": "4.7.2-stable (official)",
+      "is_playing": false,
+      "main_screen": "3D",
+      "open_scenes": [
+        "res://connection_test.tscn"
+      ]
+    }
+  },
+  "logs": {
+    "content": [
+      {
+        "type": "text",
+        "text": "No error messages (cursor 0)."
+      }
+    ]
+  }
+}

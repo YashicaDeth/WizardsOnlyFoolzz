@@ -1,0 +1,15 @@
+game/.godot/
+game/addons/godot_mcp/
+game/addons/fmod/
+game/addons/limboai/
+game/addons/terrain_3d/
+builds/
+setup/logs/
+*.tmp
+*.blend1
+*.blend2
+.DS_Store
+Thumbs.db
+
+game/reports/
+

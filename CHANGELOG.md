@@ -1,0 +1,53 @@
+# Changelog
+
+## 2026 09 11
+
+- Added exterior AStar routing around generated building footprints; encounter actors now use CharacterBody3D collision and route refresh intervals, including wounded flight.
+- Added timed close-range hostile attacks and dodge avoidance for encounter actors.
+- Added E interactions for friendly healing/bonds, currency-consuming trade and collectible testimony; persisted encounter resolutions and a 15-second encounter dispatch cooldown.
+- Expanded isolated behavioral validation to 18 passing assertions, including exterior obstacle avoidance, friendly resolution, trade, escaped-actor suppression and derby countdown/result transitions.
+- Navigation remains exterior-only and does not yet represent doors, furnishings or arbitrary terrain props. Visual/feel verification and production assets remain outstanding.
+
+- Audited previous completion claims and distinguished startup smoke checks from gameplay validation.
+- Added CharacterBody3D hunter movement, physical floor, collision-aware dodge, melee windup, attack cooldown and hidden-Mara hit rejection.
+- Moved artwork to J; menu input now suppresses attacks and releases the pointer.
+- Made loot collectible once into persistent inventory; added anatomy restoration and suppressed respawning dead/escaped actors.
+- Replaced random overlapping building positions with deterministic spaced lots; regeneration clears owned geometry.
+- Added visible derby countdown and stopped gameplay updates after terminal results.
+- Added isolated opening_test.tscn behavioral checks. Eleven assertions passed, including wall/door traversal, loot uniqueness, migration and bleeding treatment/death. Tests use ATG_TEST_MODE=1 and do not access campaign saves.
+
+## 2026 09 10
+
+- Named the first Limbo region **The Ashbloom Expanse** while retaining World Zero as the production milestone.
+- Added the Living Kinship Web: a zoomable/pannable relationship graph with ten seed subjects, procedural faces, faction links, ELO ranks and simultaneous Vessel/Deep X-ray dossiers.
+- Added save-safe subject schema migration so new anatomy and relationship fields do not erase old grudges, wounds, bonds or memories.
+- Added a reusable anatomy simulation foundation: zone health, blood volume, bleed rate, pain, consciousness, treatment, cybernetic armor, critical state and death snapshots.
+- Added hostile panic/escape/chase/loot behavior. Critical NPCs flee, continue bleeding, persist an escaped or dead state and drop a visible loot cache when caught.
+- Added stylised limb-disable debris and persistent severing events as a mechanical prototype; final anatomical meshes, constraints and animation remain an authored-art task.
+- Added deterministic Ashbloom generation with five settlement districts, collision-built enterable shells and more than forty interiors, plus crossing roads.
+- Added 18 seeded **Reality Misfires** with friendly, social, trade, mystery, bond, hostile and boss categories.
+- Added selective trimesh collision generation for major authored Bone Yard surfaces and structures.
+- Added 64 reactive crowd silhouettes, driver head/torso/leg hit areas, staged vehicle-part shedding and physics-driven detached doors, hood, bumpers and wheels.
+- Added derby victory/defeat states and an Enter-to-exit result flow.
+- Added runtime placeholder engine, collision, crowd and Ashbloom wind audio so the audio event path is functional before production recordings are selected.
+- Added Mara's conditional second encounter, rebuilt Wrecker, visible industrial prosthetic, increased health and two Ashline reinforcements.
+- Added a result-reactive CellOutz Wire report and history/grudge-reactive interactive Allusions artwork, opened with `A`.
+- Replaced the derby's static box HUD with a responsive CellOutz vector interface: animated edge framing, live speed arc, hull bar, score interpolation, Hunt signal waveform, impact shock-rings, kinetic event notices and a scalable control ribbon.
+- Added a restrained full-screen treatment with procedural grain, scanlines, vignette and chromatic separation. It reads the rendered scene directly and requires no copied texture assets.
+- Added a reusable animated main-menu layer with a living Tree motif, orbiting archive nodes, scanning title signal, pulse footer and eased button hover transitions.
+- Validated the main menu, derby and Bone Yard Hunt scenes after the UI pass with no scene, script or shader runtime errors.
+- Replaced the derby's generated empty-circle presentation with the first authored Bone Yard environment kit: 233 named Blender meshes covering the quarry bowl, oval lanes, grandstands, mechanic bays, faction banners, barriers, ramps, freight containers, salvage silhouettes, floodlight towers and the exit gate.
+- Added reproducible Blender source, an editable `.blend`, a Godot-ready GLB export and a 1280x720 review render. Integrated and validated the imported environment in the live derby scene.
+- Added the playable Bone Yard Outskirts transition: leave the derby vehicle with `E` and enter an explorable Hunt Grounds scene.
+- Added the first connected combat/Hunt Arc component: third/first-person camera, sprint stamina, melee range/facing checks, body-zone injuries, dodge, prosthetic surge, stylised blood debris, a friendly bond interaction, Mara's canonical first encounter and her persistent escape state.
+- Added three live data views to the Hunt Grounds: World Index (`Tab`), Living Map (`M`) and Character Tree (`T`). Each reads the same persistent world history rather than a separate quest state.
+- Added the first World Zero Hunt Arc: Bone Yard Captain Mara Voss now has a persistent identity, ELO, injury, grudge and encounter memory. Damaging her derby car writes a named consequence into world history.
+- Extended `WorldHistory` from an event log into a persistent subject ledger, suitable for characters, factions and later businesses to expose state without hard-wired dependencies.
+- Added the in-game World Index overlay (`I`) to inspect Mara's live record and recent history during the derby.
+- Fixed empty runtime mesh naming in the derby scene, removing the repeated Godot runtime errors during vehicle construction.
+- Added the original Rift Derby demolition prototype.
+- Added Forward Plus remaster presentation settings.
+- Restored verified Dialogue Manager, gdUnit4, Terrain3D, Proton Scatter and Codex bridge editor registration.
+- Added the persistent `WorldHistory` event service and recorded derby session, collision and reset events.
+- Reworked the derby from neon occult presentation to a rusted scrapyard tone with restrained lighting and dark-red impact debris.
+- Added active oval-track wrecker movement and converted the player vehicle into a wheeled demolition car.

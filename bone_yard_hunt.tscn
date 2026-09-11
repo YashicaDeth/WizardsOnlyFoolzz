@@ -1,0 +1,113 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://bone_yard_hunt.gd" id="1_script"]
+[ext_resource type="Script" path="res://systems/gothic_field_hud.gd" id="2_hud"]
+[ext_resource type="Shader" path="res://shaders/celloutz_screen.gdshader" id="3_screen"]
+[ext_resource type="Script" path="res://systems/character_archive.gd" id="4_archive"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_screen"]
+shader = ExtResource("3_screen")
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_panel"]
+bg_color = Color(0.035, 0.012, 0.008, 0.9)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.58, 0.16, 0.06, 0.9)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="BoneYardHunt" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[node name="CameraRig" type="Node3D" parent="."]
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+current = true
+fov = 72.0
+
+[node name="HUD" type="CanvasLayer" parent="."]
+[node name="ScreenTreatment" type="ColorRect" parent="HUD"]
+material = SubResource("ShaderMaterial_screen")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+[node name="FieldInterface" type="Control" parent="HUD"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_hud")
+[node name="Title" type="Label" parent="HUD"]
+visible = false
+offset_left = 28.0
+offset_top = 24.0
+offset_right = 950.0
+offset_bottom = 55.0
+theme_override_colors/font_color = Color(0.94, 0.45, 0.2, 1)
+theme_override_font_sizes/font_size = 22
+[node name="Status" type="Label" parent="HUD"]
+visible = false
+offset_left = 30.0
+offset_top = 58.0
+offset_right = 950.0
+offset_bottom = 105.0
+theme_override_colors/font_color = Color(0.9, 0.7, 0.52, 1)
+theme_override_font_sizes/font_size = 14
+[node name="VitalsPanel" type="PanelContainer" parent="HUD"]
+visible = false
+offset_left = 980.0
+offset_top = 24.0
+offset_right = 1250.0
+offset_bottom = 142.0
+theme_override_styles/panel = SubResource("StyleBox_panel")
+[node name="Vitals" type="Label" parent="HUD/VitalsPanel"]
+theme_override_colors/font_color = Color(0.95, 0.75, 0.54, 1)
+theme_override_font_sizes/font_size = 15
+[node name="Prompt" type="Label" parent="HUD"]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 80.0
+offset_top = -65.0
+offset_right = -80.0
+offset_bottom = -25.0
+theme_override_colors/font_color = Color(0.95, 0.55, 0.35, 1)
+theme_override_font_sizes/font_size = 17
+horizontal_alignment = 1
+[node name="ArchivePanel" type="PanelContainer" parent="HUD"]
+visible = false
+offset_left = 360.0
+offset_top = 188.0
+offset_right = 920.0
+offset_bottom = 555.0
+theme_override_styles/panel = SubResource("StyleBox_panel")
+[node name="Margin" type="MarginContainer" parent="HUD/ArchivePanel"]
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+[node name="Archive" type="Label" parent="HUD/ArchivePanel/Margin"]
+theme_override_colors/font_color = Color(0.93, 0.76, 0.57, 1)
+theme_override_font_sizes/font_size = 17
+
+[node name="CharacterArchive" type="Control" parent="HUD"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+script = ExtResource("4_archive")

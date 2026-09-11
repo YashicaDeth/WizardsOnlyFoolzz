@@ -1,0 +1,106 @@
+[
+  {
+    "name": "blender",
+    "server": {
+      "name": "BlenderMCP",
+      "version": "1.30.0"
+    },
+    "toolCount": 28,
+    "tools": [
+      "get_addon_status",
+      "disable_telemetry",
+      "get_scene_info",
+      "get_object_info",
+      "get_viewport_screenshot",
+      "execute_blender_code",
+      "get_polyhaven_categories",
+      "search_polyhaven_assets",
+      "download_polyhaven_asset",
+      "set_texture",
+      "get_polyhaven_status",
+      "get_hyper3d_status",
+      "get_sketchfab_status",
+      "search_sketchfab_models",
+      "get_sketchfab_model_preview",
+      "download_sketchfab_model",
+      "get_polypizza_status",
+      "search_polypizza_models",
+      "download_polypizza_model",
+      "generate_hyper3d_model_via_text",
+      "generate_hyper3d_model_via_images",
+      "poll_rodin_job_status",
+      "import_generated_asset",
+      "get_hunyuan3d_status",
+      "generate_hunyuan3d_model",
+      "poll_hunyuan_job_status",
+      "import_generated_asset_hunyuan",
+      "record_trajectory_feedback"
+    ],
+    "scene": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\n  \"name\": \"Scene\",\n  \"object_count\": 3,\n  \"objects\": [\n    {\n      \"name\": \"Cube\",\n      \"type\": \"MESH\",\n      \"location\": [\n        0.0,\n        0.0,\n        0.0\n      ]\n    },\n    {\n      \"name\": \"Light\",\n      \"type\": \"LIGHT\",\n      \"location\": [\n        4.08,\n        1.01,\n        5.9\n      ]\n    },\n    {\n      \"name\": \"Camera\",\n      \"type\": \"CAMERA\",\n      \"location\": [\n        7.36,\n        -6.93,\n        4.96\n      ]\n    }\n  ],\n  \"materials_count\": 2\n}"
+        }
+      ],
+      "structuredContent": {
+        "result": "{\n  \"name\": \"Scene\",\n  \"object_count\": 3,\n  \"objects\": [\n    {\n      \"name\": \"Cube\",\n      \"type\": \"MESH\",\n      \"location\": [\n        0.0,\n        0.0,\n        0.0\n      ]\n    },\n    {\n      \"name\": \"Light\",\n      \"type\": \"LIGHT\",\n      \"location\": [\n        4.08,\n        1.01,\n        5.9\n      ]\n    },\n    {\n      \"name\": \"Camera\",\n      \"type\": \"CAMERA\",\n      \"location\": [\n        7.36,\n        -6.93,\n        4.96\n      ]\n    }\n  ],\n  \"materials_count\": 2\n}"
+      },
+      "isError": false
+    }
+  },
+  {
+    "name": "context7",
+    "server": {
+      "name": "Context7",
+      "icons": [
+        {
+          "src": "https://context7.com/context7-icon-green.png",
+          "mimeType": "image/png"
+        }
+      ],
+      "version": "4.0.6",
+      "websiteUrl": "https://context7.com",
+      "description": "Context7 provides up-to-date documentation and code examples for libraries and frameworks."
+    },
+    "toolCount": 2,
+    "tools": [
+      "resolve-library-id",
+      "query-docs"
+    ]
+  },
+  {
+    "name": "playwright",
+    "server": {
+      "name": "Playwright",
+      "version": "1.63.0-alpha-2026-08-31"
+    },
+    "toolCount": 24,
+    "tools": [
+      "browser_close",
+      "browser_resize",
+      "browser_console_messages",
+      "browser_handle_dialog",
+      "browser_evaluate",
+      "browser_file_upload",
+      "browser_drop",
+      "browser_find",
+      "browser_fill_form",
+      "browser_press_key",
+      "browser_type",
+      "browser_navigate",
+      "browser_navigate_back",
+      "browser_network_requests",
+      "browser_network_request",
+      "browser_run_code_unsafe",
+      "browser_take_screenshot",
+      "browser_snapshot",
+      "browser_click",
+      "browser_drag",
+      "browser_hover",
+      "browser_select_option",
+      "browser_tabs",
+      "browser_wait_for"
+    ]
+  }
+]

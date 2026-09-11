@@ -1,0 +1,119 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://rift_derby.gd" id="1_script"]
+[ext_resource type="Script" path="res://systems/celloutz_hud.gd" id="2_hud"]
+[ext_resource type="Shader" path="res://shaders/celloutz_screen.gdshader" id="3_screen"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_screen"]
+shader = ExtResource("3_screen")
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_panel"]
+bg_color = Color(0.03, 0.006, 0.07, 0.8)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.52, 0.12, 0.06, 0.8)
+corner_radius_top_left = 9
+corner_radius_top_right = 9
+corner_radius_bottom_right = 9
+corner_radius_bottom_left = 9
+content_margin_left = 16.0
+content_margin_top = 12.0
+content_margin_right = 16.0
+content_margin_bottom = 12.0
+
+[node name="RiftDerby" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+current = true
+fov = 70.0
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="ScreenTreatment" type="ColorRect" parent="HUD"]
+material = SubResource("ShaderMaterial_screen")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="DynamicInterface" type="Control" parent="HUD"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_hud")
+
+[node name="Status" type="Label" parent="HUD"]
+visible = false
+offset_left = 30.0
+offset_top = 30.0
+offset_right = 700.0
+offset_bottom = 90.0
+theme_override_colors/font_color = Color(0.95, 0.55, 0.35, 1)
+theme_override_font_sizes/font_size = 17
+
+[node name="ScorePanel" type="PanelContainer" parent="HUD"]
+visible = false
+offset_left = 925.0
+offset_top = 28.0
+offset_right = 1252.0
+offset_bottom = 130.0
+theme_override_styles/panel = SubResource("StyleBox_panel")
+
+[node name="Score" type="Label" parent="HUD/ScorePanel"]
+theme_override_colors/font_color = Color(0.92, 0.76, 0.55, 1)
+theme_override_font_sizes/font_size = 16
+
+[node name="Mode" type="Label" parent="HUD"]
+visible = false
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 30.0
+offset_top = -46.0
+offset_right = -30.0
+offset_bottom = -20.0
+theme_override_colors/font_color = Color(0.8, 0.22, 0.12, 0.9)
+theme_override_font_sizes/font_size = 14
+horizontal_alignment = 1
+
+[node name="RivalPanel" type="PanelContainer" parent="HUD"]
+visible = false
+offset_left = 30.0
+offset_top = 590.0
+offset_right = 430.0
+offset_bottom = 684.0
+theme_override_styles/panel = SubResource("StyleBox_panel")
+
+[node name="Rival" type="Label" parent="HUD/RivalPanel"]
+theme_override_colors/font_color = Color(0.96, 0.5, 0.32, 1)
+theme_override_font_sizes/font_size = 14
+
+[node name="WorldIndex" type="PanelContainer" parent="HUD"]
+visible = false
+offset_left = 390.0
+offset_top = 160.0
+offset_right = 890.0
+offset_bottom = 580.0
+theme_override_styles/panel = SubResource("StyleBox_panel")
+
+[node name="Margin" type="MarginContainer" parent="HUD/WorldIndex"]
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="IndexText" type="Label" parent="HUD/WorldIndex/Margin"]
+theme_override_colors/font_color = Color(0.92, 0.76, 0.55, 1)
+theme_override_font_sizes/font_size = 17

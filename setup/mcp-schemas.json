@@ -1,0 +1,169 @@
+[
+  {
+    "name": "godot_editor_read",
+    "description": "Observe the editor and running game: get editor state (open scene, play state, camera, viewport), read the current node selection, pull editor log messages (with an incremental cursor) and stack traces, and capture lossless PNG screenshots of the running game or an editor viewport. Reach for it to check what the editor sees before and after a change; screenshot_game needs a running game, while every other action works in the bare editor. It changes nothing - to select nodes, run/stop/restart, or move the 2D viewport use godot_editor_edit; errors from the running game (not the editor process) come via minimal-godot-mcp's get_console_output when that companion server is installed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "get_state",
+            "get_selection",
+            "get_log_messages",
+            "get_stack_trace",
+            "screenshot_game",
+            "screenshot_editor"
+          ],
+          "description": "get_state: Get editor state: current scene, play state, version, camera, viewport\nget_selection: Get the currently selected nodes\nget_log_messages: Get errors and warnings from the EDITOR process - @tool script runtime errors, import failures, addon errors, and failures from editor-side operations (scene/resource edits, reloads). This is the feedback channel for editor-side changes: run it after a mutation to confirm it did not break the editor. It does NOT include errors from the running game - for those, use minimal-godot-mcp's get_console_output (game console via DAP). Filter by severity (errors-only = \"did my change break the editor?\") and use `since`/`cursor` to read only what is new; every response returns the current `cursor`, even when empty.\nget_stack_trace: Get the most recent error stack trace\nscreenshot_game: Capture a lossless PNG of the running game. Each frame persists in context every later turn and never decays, so reserve it for genuine APPEARANCE judgments (spacing, color, art, \"does it look right\"). For STRUCTURE or state — which control is focused, a label's text, whether a panel is visible, a node's anchors/size — read cheap text instead: godot_node_read (scene tree, node properties) or godot_runtime_state digest (live values), both ~free versus the hundreds of visual tokens a frame costs. Do not re-shoot a view that has not changed.\nscreenshot_editor: Capture a lossless PNG of an editor viewport. Same context cost as screenshot_game — the frame persists every later turn — so capture for appearance, not for structure/state you could read as cheap text via godot_node_read (scene tree, node properties) or godot_runtime_state."
+        },
+        "clear": {
+          "description": "Clear the editor error buffer after reading (for: get_log_messages)",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "Maximum number of messages to return (default: 50) (for: get_log_messages)",
+          "type": "integer",
+          "exclusiveMinimum": 0
+        },
+        "severity": {
+          "description": "Filter by severity: \"error\" drops warnings (the \"did anything actually break?\" check), \"warning\" returns only warnings, \"all\" (default) returns both. (for: get_log_messages)",
+          "type": "string",
+          "enum": [
+            "all",
+            "error",
+            "warning"
+          ]
+        },
+        "since": {
+          "description": "Return only messages newer than this cursor. Pass back the `cursor` from a prior response to see just what is new since then - the incremental check that avoids re-reading the whole buffer (0/omitted = from the beginning). (for: get_log_messages)",
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_width": {
+          "description": "for screenshot_game: Maximum width in pixels (default: 900). Cost scales with resolution (~1 visual token per 28x28px patch; a 900px 16:9 frame ≈ 600 tokens, a native 1080p frame ≈ 2700 on Opus). 640 is the legibility floor for chip-dense UI — still crisp; 512 is the edge and 384 breaks fine print — so drop toward 640 to roughly halve per-frame cost when you do not need the finest text, and raise above 900 only when detail is genuinely unreadable.; for screenshot_editor: Maximum width in pixels (default: 900). Cost scales with resolution (~1 visual token per 28x28px patch; a 900px 16:9 frame ≈ 600 tokens). 640 is the legibility floor for chip-dense UI (512 is the edge, 384 breaks fine print), so drop toward 640 to roughly halve per-frame cost when you do not need the finest text; raise above 900 only when detail is unreadable. (for: screenshot_game, screenshot_editor)",
+          "type": "integer"
+        },
+        "viewport": {
+          "description": "Which editor viewport to capture (for: screenshot_editor)",
+          "type": "string",
+          "enum": [
+            "2d",
+            "3d"
+          ]
+        }
+      },
+      "required": [
+        "action"
+      ]
+    },
+    "annotations": {
+      "title": "Editor Control (read)",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "godot_editor_edit",
+    "description": "Drive the editor: select a node, run or stop the project, restart the editor, rescan the filesystem to import assets written outside the editor, and center/zoom the 2D viewport. Use run with frozen=true as the deterministic-playtest entry point (game time holds at frame 0 until godot_game_time steps or thaws it). To test edited gameplay scripts just stop then run — the launched game loads .gd/.tscn fresh from disk; reserve restart for EDITOR-side staleness (edited @tool/addon code, a stale project.godot, or a cached .gdshader). For observation only (state, selection, logs, screenshots) use godot_editor_read instead; restart does not start a cold editor, so one must already be running.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "select",
+            "run",
+            "stop",
+            "restart",
+            "rescan",
+            "set_viewport_2d"
+          ],
+          "description": "select: Select a node in the editor\nrun: Run the project\nstop: Stop the running project\nrestart: Restart the editor, reloading project.godot (autoloads, input map), addon code, and plugins from disk. Use it for EDITOR-side staleness only: edited @tool/addon/plugin code, changed autoloads or input map, or a .gdshader the editor still renders from a cached compile. NOT needed to test edited gameplay scripts — a launched game loads .gd/.tscn fresh from disk, so godot_editor_edit stop then run already runs the new code. Fire-and-forget: the bridge drops and auto-reconnects within a few seconds. Does not start a cold editor - the editor must already be running.\nrescan: Rescan the project filesystem so the editor imports assets written to disk outside the editor (textures, audio, fonts, .tres) without a restart. Do this after writing a new asset and before opening or reloading a scene that references it; otherwise the resource loads empty because no .import exists yet. Returns once the scan and its imports have finished.\nset_viewport_2d: Center and/or zoom the 2D editor viewport. Pass at least one parameter; omitted parameters PRESERVE the current view (e.g. pass only zoom to zoom in on the current center). The addon reads the live viewport transform to fill in whatever you leave out."
+        },
+        "node_path": {
+          "type": "string",
+          "description": "Path to node to select (required for: select)"
+        },
+        "scene_path": {
+          "description": "Scene to run (optional, defaults to main scene) (for: run)",
+          "type": "string"
+        },
+        "frozen": {
+          "description": "Launch with game time frozen from frame 0 (gameplay never starts racing your latency). Use godot_game_time step/thaw to advance. (for: run)",
+          "type": "boolean"
+        },
+        "save": {
+          "description": "Save the project before restarting (default: true). Set false to discard unsaved editor changes. (for: restart)",
+          "type": "boolean"
+        },
+        "paths": {
+          "description": "res:// paths of existing assets to force through reimport after the scan (for assets whose bytes changed on disk). (for: rescan)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "center_x": {
+          "description": "X coordinate to center the 2D viewport on (omitted = keep current X) (for: set_viewport_2d)",
+          "type": "number"
+        },
+        "center_y": {
+          "description": "Y coordinate to center the 2D viewport on (omitted = keep current Y) (for: set_viewport_2d)",
+          "type": "number"
+        },
+        "zoom": {
+          "description": "Zoom level, e.g. 1.0 = 100%, 2.0 = 200% (omitted = keep current zoom) (for: set_viewport_2d)",
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "action"
+      ]
+    },
+    "annotations": {
+      "title": "Editor Control (edit)",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "godot_project",
+    "description": "Read project-level data from the editor: name, path, Godot version, and main scene (get_info), plus project settings including input mappings (get_settings). After editing project.godot as a file, use check_stale to detect whether the editor is still running stale autoloads or input map from before the edit; restart via godot_editor_edit to reload. Use addon_status to diagnose addon/server version skew when commands misbehave or the connection drops; it also reports whether the running server build is stale relative to its source checkout. For scene contents or node properties, use godot_node_read instead.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "get_info",
+            "get_settings",
+            "addon_status",
+            "check_stale"
+          ],
+          "description": "get_info: Get project name, path, version, and main scene\nget_settings: Get project settings\naddon_status: Check addon/server version compatibility, and whether the running server build is stale (source edited after the last npm run build)\ncheck_stale: Check whether project.godot was edited on disk after the editor loaded it, leaving the editor with stale autoloads / input map (and phantom \"Identifier not found\" errors in its log that do not exist at runtime). Returns the disk-vs-editor divergence; run godot_editor_edit restart to reload. Useful right after editing project.godot as a file."
+        },
+        "category": {
+          "description": "Settings category to filter by (use \"input\" for input mappings) (for: get_settings)",
+          "type": "string"
+        },
+        "include_builtin": {
+          "description": "Include built-in ui_* actions (with category=\"input\") (for: get_settings)",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "action"
+      ]
+    },
+    "annotations": {
+      "title": "Project Info",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  }
+]
