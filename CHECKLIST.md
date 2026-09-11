@@ -1,13 +1,52 @@
 # The checklist
 
-Greg asked for a list he can drive by number, because the design has outrun the
-build. **Say a number and I build that item.** Nothing here is lost — every line
-traces to a capture in `ROADMAP.md` or `DESIGN/`.
+The working document. The design has outrun the build, so this is how the build
+catches up: **in segments, one at a time, slowly and surely.**
 
-Ordered so each item makes the next one look and feel better. `DONE` items stay
-on the list so it reads as a record rather than a wish.
+## The goal
 
-Last rebuilt 2026-09-11, including everything captured so far.
+Greg: *"until it's sharper and sharper so that you can play the game."* That is
+the measure, and it is a better one than any feature count — every segment below
+is judged on whether it moves the build toward something you can sit down and
+play, not toward something that demos well.
+
+So the list carries a second reading. **Critical path to a playable loop**, in
+order, ignoring everything else:
+
+| Order | Segment | Why it is on the path |
+| --- | --- | --- |
+| 1 | **A7.1–A7.3** | Driving is the first thing the player does and it does not feel like driving. Everything in the derby is downstream of this. |
+| 2 | **A5.1–A5.3** | You cannot read your own state mid-heat. |
+| 3 | **C1.1–C1.2** | Six panels on six keys is the reason nothing connects. |
+| 4 | **B6.2–B6.3** | A fight that continues after a limb comes off is the combat identity. |
+| 5 | **F1.1–F1.2** | Witnesses are the cheapest step that makes the world remember. |
+| 6 | **D1.1–D2.2** | A character sheet, so a run is *yours*. |
+| 7 | **G6.1–G6.3** | The opening carries the first ten minutes. |
+
+Everything else is depth on top of that spine. When those seven are checked, the
+game is playable end to end and the rest is making it good.
+
+## How to drive this
+
+**Say a segment id and I build that segment.** `B5.2`. `A7.1`. That is the whole
+protocol. Nothing else needs to be typed.
+
+- Say a bare item id (`B5`) and I take its next unchecked segment.
+- Say `next` and I take the next unchecked segment in the section we are in.
+- Say `B` and I work down that whole section in order, checking off as I go.
+
+Segments are sized to be one sitting each: a thing that runs, is verified, gets
+captured if it is visual, and is committed on its own. If a segment turns out to
+be bigger than that when I open it, I split it and say so rather than sprawling.
+
+`[x]` is built and verified. `[~]` is partially there with the rest named
+underneath. `[ ]` is not started.
+
+**v2 convention:** when everything here is checked, the whole document gets
+reworked from scratch against what the game actually is at that point, rather
+than patched. This is v1.
+
+Last rebuilt 2026-09-11.
 
 ---
 
@@ -16,155 +55,456 @@ Last rebuilt 2026-09-11, including everything captured so far.
 The systems outgrew the interface. Shortest distance between "tutorial project"
 and "a game".
 
-| # | Item | What you get |
-| --- | --- | --- |
-| A1 | **Display typeface** `DONE` | A drawn stencil face instead of Godot's default. |
-| A2 | **World Index UI** `DONE` | The worst offender rebuilt: framed plate, real dossier, the Tree axis and the relation graph, both computed all along and never shown. |
-| A3 | **Rank pyramid** `DONE` | Faction hierarchy as a recruitment scheme, from real command strength, with real vacancies and who is positioned for them. |
-| A4 | **Wire page** `DONE` | Reach, tier, whether they will read you and why, leverage held, your own exposure, and the feed. |
-| A5 | **Derby HUD corners** | Hull integrity, hunt signal, damage bust, contact radar — the corners you hated, in the new language. Inherits the no-boxes rule (I0). |
-| A6 | **Living Map as an object** | The map in a salvaged bezel with named travel points, not a chart on black. |
-| A7 | **Derby driving model** | Per-wheel raycast suspension, load transfer, real contact patches, replacing the single-body arcade servo. **This is the actual cause of "the derby map is broken"** — the venue reads wrong because the car does not behave like a car in it. |
-| A8 | **Seamless panel open/close** | Opening the index still pops. Nothing in this game should cut. |
+### A1 — Display typeface `BUILT`
+- [x] **A1.1** Stroke/stencil alphabet drawn in code, no font to licence
+- [x] **A1.2** Applied to headers and numerals across the index
+- [ ] **A1.3** Applied to the derby HUD, map, kill cam, warning card, interstitial
+- [ ] **A1.4** A second cut of the face — condensed, for tight columns
+- [ ] **A1.5** Worn/smudged variant that degrades with the panel (pairs with I4)
+
+### A2 — World Index UI `BUILT`
+- [x] **A2.1** Framed plate: notched corners, fixings, tape, dead pixels, scanlines
+- [x] **A2.2** Real dossier — stats, condition, installed hardware, memory
+- [x] **A2.3** The Tree axis, computed all along and never once shown
+- [x] **A2.4** KNOWN EDGES — the relation graph grudges propagate along
+- [x] **A2.5** Regrimed to Fallout/biopunk, cyan removed at the constant level
+- [ ] **A2.6** Rail scrolls — more than ~12 subjects currently runs off the plate
+- [ ] **A2.7** Search and filter, because the design says the index is incomplete *and* searchable
+- [ ] **A2.8** Entries that are wrong on purpose, per §13
+
+### A3 — Rank pyramid `BUILT`
+- [x] **A3.1** Tiers from real command strength, not a template
+- [x] **A3.2** Buy-in, downline, OPPORTUNITY on an empty post
+- [x] **A3.3** Who is actually positioned to take a vacancy
+- [x] **A3.4** Spinning 3D head per occupied tier
+- [ ] **A3.5** Click a tier member to jump to their file
+- [ ] **A3.6** Push the MLM register harder — recruitment pitch copy, testimonials, a rank you can *buy*
+- [ ] **A3.7** Show the edges between tiers: who recruited whom
+
+### A4 — Wire page `BUILT`
+- [x] **A4.1** Accounts derived from real subjects, reach that is not combat skill
+- [x] **A4.2** Whether they will read you, and why — routes, leverage, being hated
+- [x] **A4.3** Your own exposure and the trace that comes back
+- [x] **A4.4** The feed, interleaving real world history with the hostile register
+- [ ] **A4.5** Actually send a DM from the panel (the sim supports it; the UI does not)
+- [ ] **A4.6** Expose / fabricate / trace / swarm as buttons with their costs shown
+- [ ] **A4.7** Infinite scroll that actually farms you (I6)
+
+### A5 — Derby HUD corners
+- [ ] **A5.1** Hull integrity off the default font and onto the plate vocabulary
+- [ ] **A5.2** Hunt signal — the one you singled out — rebuilt
+- [ ] **A5.3** Damage bust and contact radar in the same language
+- [ ] **A5.4** Grunge pass: the HUD is a cab instrument, so it is filthy
+- [ ] **A5.5** Cut visible prose by ~60%, per the Tier 1b note
+
+### A6 — Living Map as an object
+- [ ] **A6.1** Salvaged bezel — pipes, rust plate, screws — around the chart
+- [ ] **A6.2** Named discovered places with a description panel
+- [ ] **A6.3** Location-based travel
+- [ ] **A6.4** Cracked-screen occlusion over unsurveyed ground
+- [ ] **A6.5** 2D-to-tilted-3D zoom
+
+### A7 — Derby driving model
+**The actual cause of "the derby map is broken".** The venue reads wrong because
+the car does not behave like a car in it.
+- [ ] **A7.1** Per-wheel raycast suspension replacing the single-body servo
+- [ ] **A7.2** Load transfer — weight moves under brake, throttle and steering
+- [ ] **A7.3** Real contact patches and per-wheel grip
+- [ ] **A7.4** Decide the upright angular lock: does a derby car roll?
+- [ ] **A7.5** Retune the AI against the new model (it was tuned against the old one)
+- [ ] **A7.6** Speed-linked camera shake and FOV
+
+### A8 — Seamless panel open/close
+- [x] **A8.1** Page-to-page transitions ease and wipe
+- [ ] **A8.2** Opening and closing the index itself still pops
+- [ ] **A8.3** Row selection redraws instantly instead of settling
+- [ ] **A8.4** One shared transition helper so nothing new cuts by default
+
+---
 
 ## B — Make the body the centrepiece
 
-The most complete system in the project and the least visible.
+The most complete system in the project and, until this pass, the least visible.
 
-| # | Item | What you get |
-| --- | --- | --- |
-| B0 | **Spinning 3D head icons** `DONE` | Real head and real skull per subject, turning in place, X on for the X-ray. First working piece of Tier 1c. |
-| B1 | **Clickable 3D organs** `DONE` | Hover a zone, the organ lifts *out of* the diagram and spins with its real condition. Never a modal. |
-| B2 | **Limbs and cybernetics inspect the same way** `DONE` | One verb for the whole body. |
-| B3 | **The X-ray cursor** `DONE` | Circular cursor with an X-ray button on it — see through anything, any time, as a constant verb. |
-| B4 | **Chunk physics and layers** `DONE` | Skin, fat, muscle, blood, bone, organ, cybernetic as real pieces that know what they are. |
-| B5 | **Rob cybernetics off a body** | Dig through the layers to take the part. Looting as a physical act, not a menu transfer. **Unblocked by B4** - `GoreChunks.take()` already returns the identified part. |
-| B6 | **Dismemberment as a combat verb** | Take an arm mid-fight and the fight continues with them still in it. |
+### B0 — Spinning head icons `BUILT`
+- [x] **B0.1** Real head mesh and real skull mesh per subject
+- [x] **B0.2** X-ray state shows the actual anatomy, not a filter
+- [x] **B0.3** Tinted by Tree alignment, spin seeded per name
+- [ ] **B0.4** Head damage shows on the icon — missing eye, broken jaw
+- [ ] **B0.5** Icons on the FILE rail as well as the pyramid
+
+### B1 — Clickable 3D organs `BUILT`
+- [x] **B1.1** Part viewer with real meshes from the rig's own tables
+- [x] **B1.2** Lift-out from the diagram with a thread back to it, never a modal
+- [x] **B1.3** Condition darkens the part itself, not just the caption
+- [ ] **B1.4** Hover to preview, click to pin — currently click-only
+- [ ] **B1.5** Authored organ silhouettes: lung lobes, liver wedge, gut coil, instead of spheres with attachments
+- [ ] **B1.6** Wet pass — subsurface and slick specular, so organs read as meat rather than plastic
+- [ ] **B1.7** Drag to rotate and scroll to zoom, instead of a fixed spin
+- [ ] **B1.8** Damage on the mesh: a ruptured organ is torn, not only darker
+
+### B2 — Limbs and cybernetics, one verb `BUILT`
+- [x] **B2.1** Flesh, bone, organs and hardware in one list, inspected identically
+- [ ] **B2.2** **Implants become real parts with a real zone** — kills the keyword table that currently guesses where hardware sits
+- [ ] **B2.3** Implant condition tracked, so "NO TELEMETRY" becomes a number
+- [ ] **B2.4** Authored implant meshes per catalogue entry
+- [ ] **B2.5** Wounds carry a zone at authoring time — kills the second keyword table
+- [ ] **B2.6** Compare view: your part against theirs, which is the robbing decision
+
+### B3 — The X-ray cursor `BUILT`
+- [x] **B3.1** Brass ring, real button, skull mark, key and click through one path
+- [x] **B3.2** Empty seats drawn, so it reads as the unfinished tool it is
+- [ ] **B3.3** Works in the world, not only inside the index
+- [ ] **B3.4** X-ray actually sees through world geometry and bodies at range
+- [ ] **B3.5** Own the pointer — hide the OS cursor
+- [ ] **B3.6** Hold to expand into the full radial (this is where B3 becomes C2)
+
+### B4 — Chunk physics and layers `BUILT`
+- [x] **B4.1** Identified chunks: layer, zone, subject, organ, implant
+- [x] **B4.2** Depth from damage, damage type and how open the zone already was
+- [x] **B4.3** Bodies remember how far they have been opened
+- [x] **B4.4** Cap, recycle, `take()`, `from_subject()`
+- [ ] **B4.5** **Layer exposure on the zone mesh itself** — skin, then fat, then muscle, then bone, visible on the body
+- [ ] **B4.6** Chunks mark the ground where they land and where they roll
+- [ ] **B4.7** Authored chunk meshes instead of primitives
+- [ ] **B4.8** Per-layer impact sound — bone does not land like fat
+- [ ] **B4.9** Rot over time: flies, discolouration, smell as a gameplay signal
+
+### B5 — Rob cybernetics off a body
+**Unblocked by B4** — `GoreChunks.take()` already returns the identified part.
+- [ ] **B5.1** Interact with a downed or dead body to open the extraction view
+- [ ] **B5.2** Extraction requires reaching the right layer — you have to dig
+- [ ] **B5.3** The tool matters: bare hands, blade, or something surgical
+- [ ] **B5.4** Extracted part enters CARRY with its condition and its lien
+- [ ] **B5.5** Install a robbed part into yourself
+- [ ] **B5.6** Someone notices — the Choir price it, the owner remembers
+
+### B6 — Dismemberment as a combat verb
+- [~] **B6.1** Severing exists on the rig with thrown limbs, stumps and exposed bone — but only as a death effect
+- [ ] **B6.2** Sever from a directional blow crossing a limb threshold *mid-fight*
+- [ ] **B6.3** The fight continues with them still in it, fighting worse
+- [ ] **B6.4** The severed limb is a chunk: pick it up, carry it, sell it, hit someone with it
+- [ ] **B6.5** Reciprocity — the player is dismembered and keeps playing
+- [ ] **B6.6** Stump behaviour: bleed rate, one-armed movement and attacks
+
+---
 
 ## C — The handheld, and killing the six-panel problem
 
 Six fullscreen panels on six keys is the root cause of "nothing connects".
 
-| # | Item | What you get |
-| --- | --- | --- |
-| C1 | **Device shell** | One junk handheld with modes, replacing Tab / M / T / J. Seamless in and out. Not a Pip-Boy. |
-| C2 | **Radial selection** | Circular menu, custom cursor, for weapons, cybernetics, modes, seals. **Prototype / GTA-style seamless time dilation** while it is open, so selection never breaks out to a menu — and the slowdown must not soften the fight, because the difficulty target stays soulslike. |
-| C3 | **Camera mode** | Photograph the world. Required by rituals; also just good. |
-| C4 | **CARRY** | The inventory that already exists, finally on screen. |
-| C5 | **Physical connectivity** | Masts, terminals, dead zones, cracked screen eating the interface. |
+### C1 — Device shell
+- [ ] **C1.1** One handheld object with modes, raised as a physical action
+- [ ] **C1.2** INDEX / MAP / TREE / WIRE / CARRY folded into it
+- [ ] **C1.3** The world keeps running while it is up — reading is a risk
+- [ ] **C1.4** Seamless raise and lower, not a visibility toggle
+- [ ] **C1.5** Hardware condition damages the interface itself
+
+### C2 — Radial selection
+- [ ] **C2.1** Expand B3's ring into a full radial
+- [ ] **C2.2** Weapons, cybernetics, modes and seals on one input grammar
+- [ ] **C2.3** **Seamless time dilation while open** — Prototype/GTA register
+- [ ] **C2.4** The slowdown must not soften the fight; difficulty stays soulslike
+- [ ] **C2.5** Custom cursor art
+
+### C3 — Camera mode
+- [ ] **C3.1** Raise a camera, frame the world, take a photograph
+- [ ] **C3.2** Photographs are objects with contents that can be inspected
+- [ ] **C3.3** Verify what is in frame against real anatomy state (required by E3)
+- [ ] **C3.4** Photographs post to the Wire
+
+### C4 — CARRY
+- [ ] **C4.1** Surface the inventory subject that already exists
+- [ ] **C4.2** Chunks, organs and hardware carried as identified objects
+- [ ] **C4.3** Weight, spoilage and what a body will hold
+
+### C5 — Physical connectivity
+- [ ] **C5.1** Masts extend coverage; caves have none
+- [ ] **C5.2** Terminals as fixed access points
+- [ ] **C5.3** The underbelly needs a physical terminal, not a menu toggle
+- [ ] **C5.4** Cracked screen eats regions of the interface
+
+---
 
 ## D — Character creation in the vat
 
 **Races are D4.** Full design in `DESIGN/CHARACTER_CREATION.md`. Also fixes the
 under-directed opening.
 
-| # | Item | What you get |
-| --- | --- | --- |
-| D1 | **The sheet** | A real player subject built from data instead of a hardcoded dict. Everything below writes into it. |
-| D2 | **Traits and point budget** | Project Zomboid intake checkboxes. Every one hooks a system that already exists. |
-| D3 | **The intake scene** | Handler, clipboard, tube in your mouth so you cannot speak, blink to answer — and he writes down the wrong thing. |
-| D4 | **Races** | Six, all consequences of the Reset: Decanted, Soft Rot, Marrow-Cut, Roadborn, Unreset, Lantern-Born. Silhouette + metabolism + social price + Tree pull. |
-| D5 | **The chart route** | Real birth chart to real stats. Skyrim standing stones, done properly. |
-| D6 | **The instrument route** | Personality test that congratulates you on your dark triad scores and files the result. |
-| D7 | **The mirror** | Sliders, under-skin editing of the skeleton and organ set, and a preview that lies because you are under goo. |
-| D8 | **Opt-in modifiers** | Neural lace, mast tithe, full schedule. They work, and *that* is the problem. |
+### D1 — The sheet
+- [ ] **D1.1** A real player subject built from data, not a hardcoded dict
+- [ ] **D1.2** Everything below writes into it
+- [ ] **D1.3** Save and load it
+
+### D2 — Traits and point budget
+- [ ] **D2.1** Point budget: positives cost, negatives refund
+- [ ] **D2.2** The eight authored traits, each hooking a system that exists
+- [ ] **D2.3** CLERICAL ERROR — part of your sheet is wrong and you are not told which
+
+### D3 — The intake scene
+- [ ] **D3.1** Handler, clipboard, tube in your mouth so you cannot speak
+- [ ] **D3.2** Blink and twitch to answer
+- [ ] **D3.3** He writes down what he thinks you said
+- [ ] **D3.4** Pacing, camera and delivery (this is also G6)
+
+### D4 — Races
+- [ ] **D4.1** Six races as data: Decanted, Soft Rot, Marrow-Cut, Roadborn, Unreset, Lantern-Born
+- [ ] **D4.2** Silhouette change on the shared rig
+- [ ] **D4.3** Metabolism — what heals you, what poisons you
+- [ ] **D4.4** Social price: how each faction reads you
+- [ ] **D4.5** Baseline Tree pull per race
+
+### D5 — The chart route
+- [ ] **D5.1** Elements to attributes, modality to a commitment axis
+- [ ] **D5.2** Ascendant sets starting Wire reach
+- [ ] **D5.3** Ruling House as the Skyrim-standing-stone blessing
+- [ ] **D5.4** **Decide: derived wheel or real ephemeris?** (see open questions)
+
+### D6 — The instrument route
+- [ ] **D6.1** Original items on real axes — five-factor plus dark triad
+- [ ] **D6.2** Scoring that congratulates you on the wrong things
+- [ ] **D6.3** Output drives real stats, so honesty has consequences
+
+### D7 — The mirror
+- [ ] **D7.1** Sliders on a swing-arm mirror over the tank
+- [ ] **D7.2** The preview lies, because you are under goo
+- [ ] **D7.3** Under-skin editing: skeleton, organ set, blood type, grown-in hardware
+
+### D8 — Opt-in modifiers
+- [ ] **D8.1** Neural lace, mast tithe, full schedule as intake checkboxes
+- [ ] **D8.2** Each one actually works — and each one is also a handle on you
+- [ ] **D8.3** Short authored cutscene per choice
+- [ ] **D8.4** Declining them is the harder difficulty
+
+---
 
 ## E — The two ladders
 
 Full design in `DESIGN/RITUAL_AND_KARMA.md`. All of it hangs off the
 Ascent/Descent axis that already exists and is currently unused.
 
-| # | Item | What you get |
-| --- | --- | --- |
-| E1 | **Karma from real events** | The axis accumulating from recorded history, with factions pricing you by it. Not a morality slider. |
-| E2 | **The ritual app** | 72 Goetic seals plus original ones, drawn in code so they can animate, corrupt and burn. |
-| E3 | **Camera rituals** | Kill five, photograph the heads. The ritual checks the real anatomy of a real body in frame. |
-| E4 | **Temporary boosts, real costs** | Paid in blood, organs, limbs or standing. Never permanent, never free. |
-| E5 | **Ascent entities** | Angels and higher-frequency gods who wash away sins for positive quests. The nemesis code paths serve both ladders. |
-| E6 | **Drugs** | Preparation and consumption minigames, an economy, and the door to the entity layer. |
-| E7 | **Route endings** | Become a demon and sign the soul over, or climb far enough that the game continues. |
+### E1 — Karma from real events
+- [ ] **E1.1** The axis accumulates from recorded history
+- [ ] **E1.2** Factions price you by where you sit
+- [ ] **E1.3** Never a good/evil slider — read through the Tree view
+
+### E2 — The ritual app
+- [ ] **E2.1** Seal-drawing vocabulary in the `celloutz_type` stroke register
+- [ ] **E2.2** The 72 Goetic seals as data
+- [ ] **E2.3** Original seals for what this world grew on its own
+- [ ] **E2.4** Seals animate, corrupt and burn
+
+### E3 — Camera rituals
+- [ ] **E3.1** Ritual definitions: what must be done, what must be photographed
+- [ ] **E3.2** Verify the photograph against real anatomy (needs C3.3)
+- [ ] **E3.3** Rituals are playable, never a confirm button
+
+### E4 — Temporary boosts, real costs
+- [ ] **E4.1** Boosts are always temporary
+- [ ] **E4.2** Paid in blood, organs, limbs or standing
+- [ ] **E4.3** Escalating price on repeat
+
+### E5 — Ascent entities
+- [ ] **E5.1** Entities as subjects on the nemesis machinery, not a shop
+- [ ] **E5.2** Wash away sins for positive quests
+- [ ] **E5.3** The long route: climbing lets the game continue
+
+### E6 — Drugs
+- [ ] **E6.1** Substances with real body cost through the anatomy component
+- [ ] **E6.2** Preparation and consumption minigames
+- [ ] **E6.3** The door to the entity layer
+- [ ] **E6.4** Production and sale economy
+
+### E7 — Route endings
+- [ ] **E7.1** Become a demon; the soul is signed over
+- [ ] **E7.2** Climb far enough and keep playing
+- [ ] **E7.3** Both endings written into world history
+
+---
 
 ## F — The Hunt System becoming a system
 
 Today Mara is one hardcoded character. `DESIGN/HUNT_SYSTEM.md` has six
 mechanisms and almost none are built.
 
-| # | Item | What you get |
-| --- | --- | --- |
-| F1 | **Witness records on events** | Cheap, and everything downstream needs it. An unwitnessed act never enters faction knowledge. |
-| F2 | **Grudges travel real edges** | Knowledge propagates, decays, distorts. You can cut the transmission. |
-| F3 | **Promotion into real vacancies** | Kill a captain and someone who already existed takes the post — possibly a worse fighter with better connections, which is worse news. |
-| F4 | **Rivals generated from real events** | Not one authored character. This is what LimboAI is installed for and never used. |
-| F5 | **Player defeat routed to shackled** | Losing is not a reload. Tar re-decanting as the deliberate alternative. |
-| F6 | **Mind-stamp and the asset list** | Non-consensual recruitment, and the people you own listed on the handheld. |
-| F7 | **The clinch as a social verb** | Hold someone and talk: rob, abuse, or persuade. Four systems that already exist start talking to each other — highest value per line of code in the whole list. |
+### F1 — Witness records
+- [ ] **F1.1** Events record witnesses
+- [ ] **F1.2** An unwitnessed act never enters faction knowledge
+- [ ] **F1.3** Kill the witness before they report
+
+### F2 — Grudges travel real edges
+- [ ] **F2.1** Propagation along the relation graph the index already draws
+- [ ] **F2.2** Decay with distance
+- [ ] **F2.3** Distortion on each retelling
+- [ ] **F2.4** The Wire as a second, faster, less reliable carrier
+
+### F3 — Promotion into real vacancies
+- [ ] **F3.1** A death opens a real post (the pyramid already shows this)
+- [ ] **F3.2** The successor is someone who already existed
+- [ ] **F3.3** Rank weighs influence and debt, not combat skill
+
+### F4 — Rivals generated from real events
+- [ ] **F4.1** Rivals born out of what happened, not authored
+- [ ] **F4.2** Tactic adaptation — adopt LimboAI, currently unused
+- [ ] **F4.3** The wound as the memory
+
+### F5 — Player defeat routed to shackled
+- [ ] **F5.1** Losing is not a reload
+- [ ] **F5.2** Shackled, conscripted or stamped by whoever won
+- [ ] **F5.3** Deliberate death: forfeit loot, re-decant out of the tar
+
+### F6 — Mind-stamp and the asset list
+- [ ] **F6.1** Non-consensual recruitment through the handheld
+- [ ] **F6.2** Assets listed, taskable, remotely executable
+
+### F7 — The clinch as a social verb
+**Highest value per line of code in the whole list** — four systems that already
+exist start talking to each other.
+- [ ] **F7.1** Hold-and-negotiate state out of the existing clinch
+- [ ] **F7.2** Rob, abuse or persuade from inside the hold
+- [ ] **F7.3** Feeds the downed-window resolution and recruitment
+
+---
 
 ## G — The look
 
 Not code. The difference between "programmer art" and "a game".
 
-| # | Item | What you get |
-| --- | --- | --- |
-| G1 | **Greg's art as texture source** | The art folder and the celloutz.xyz gallery, cut up, glitched, shaded — body textures, map plates, Wire collage. **Blocked: needs the folder path.** |
-| G2 | **The cars** | Blender pass. Stripped chassis, exposed mechanism, bone and sinew lashings, bloom in the wheel wells. |
-| G3 | **The derby arena** | Re-author the oval larger and retune engagement against it. A constant multiplier does not do it — measured and reverted twice. |
-| G4 | **Silhouettes** | Bevels, greebles, leaning, broken corners, so outlines stop reading as primitives. |
-| G5 | **Sound rework** | Positional audio, engine layered by load, impact layers by material. Not blocked on FMOD — see J1. |
-| G6 | **The opening, directed** | Pacing, camera, sound, the handler's delivery. Pairs with D3. |
+### G1 — Greg's art as texture source
+**Blocked: needs the folder path.**
+- [ ] **G1.1** Locate and catalogue the source art
+- [ ] **G1.2** Cut, glitch and shade into a texture set
+- [ ] **G1.3** Body textures
+- [ ] **G1.4** Map plates and interface surfaces
+- [ ] **G1.5** Wire collage
+
+### G2 — The cars
+- [ ] **G2.1** Stripped chassis with exposed mechanism
+- [ ] **G2.2** Bone and sinew lashings
+- [ ] **G2.3** Fungal bloom in the wheel wells, dried spatter
+- [ ] **G2.4** Re-export carrying the biopunk palette natively
+
+### G3 — The derby arena
+- [ ] **G3.1** Re-author the oval for a larger footprint
+- [ ] **G3.2** Retune the engagement cap against it together
+- [ ] **G3.3** Contamination colour through authored surfaces, not light
+
+### G4 — Silhouettes
+- [ ] **G4.1** Bevels and broken corners on generated geometry
+- [ ] **G4.2** Greebles and attached junk
+- [ ] **G4.3** Leaning and settling, so nothing is plumb
+
+### G5 — Sound rework
+- [ ] **G5.1** Positional audio on `AudioStreamPlayer3D` with a reverb bus
+- [ ] **G5.2** Engine layered by load rather than one pitched sine
+- [ ] **G5.3** Impact layers by severity and material
+- [ ] **G5.4** Per-layer gore sound (shares with B4.8)
+
+### G6 — The opening, directed
+- [ ] **G6.1** Pacing and camera
+- [ ] **G6.2** Sound design
+- [ ] **G6.3** The handler's delivery (pairs with D3)
+
+---
 
 ## H — Base building, reduced
 
-Greg's own call: Valheim's building is a pillar built by five people over years,
+Your own call: Valheim's building is a pillar built by five people over years,
 and a shallow version is worse than none.
 
-| # | Item | What you get |
-| --- | --- | --- |
-| H1 | **Claim a camp** | Take a place and it is yours. Recruits live there. Investment changes what it produces and who it attracts. |
-| H2 | **It can be raided off you** | Valheim's attachment and Rust's stakes, out of systems that already exist. |
+### H1 — Claim a camp
+- [ ] **H1.1** Take a place and it is yours
+- [ ] **H1.2** Recruits from the downed window live there
+- [ ] **H1.3** Investment changes what it produces and who it attracts
+
+### H2 — It can be taken off you
+- [ ] **H2.1** Raids against a claimed place
+- [ ] **H2.2** Losing it is written into world history
+
+---
 
 ## I — The interface as its own medium
 
-New section, from `DESIGN/INTERFACE_DIRECTION.md`. This is the art direction for
-the UI layer specifically.
+From `DESIGN/INTERFACE_DIRECTION.md`.
 
-| # | Item | What you get |
-| --- | --- | --- |
-| I0 | **No screen is a list of text in a box** | The standing rule. If a screen's information could be a spreadsheet, it is not finished. Applies to A5, A6, C1 and everything after. |
-| I1 | **Code as a material** | Character rain carrying the game's own vocabulary — subject ids, event types, zone names — degrading where the body does. Not decoration. |
-| I2 | **The web is many worlds** | Neocities register: every site its own layout, tiled grounds, marquees, lying visitor counters, guestbooks with one entry, webrings into dead things. Authored in code from broken-web primitives, not a browser. |
-| I3 | **celloutz.xyz in-game** | Greg's own site as a reachable place on the Wire. **Blocked: needs a decision — mirror the real content, or a fictionalised in-world version?** |
-| I4 | **Panels degrade with the player** | Blood loss, pain, consciousness and Wire strain already exist as numbers and drive no UI. A bleeding player's index is harder to read. The Psychonauts lesson: the interface is part of the world's psychology. |
-| I5 | **Everything clickable and inspectable** | A wound, an organ, a cybernetic, a person, a rank, a post, an account — if it exists as an object, you can point at it and open it. |
-| I6 | **The honest split on dark patterns** | The Wire is *deliberately* hostile — infinite scroll, bait, variable reward — because that is the satire and it must work to land. The player's own tools are the opposite: readable, fast, no manufactured friction. The contrast is the point. |
+### I0 — No screen is a list of text in a box
+The standing rule. If a screen's information could be a spreadsheet, it is not
+finished. Applies to everything below and to A5, A6, C1.
+- [x] **I0.1** Applied to the World Index
+- [ ] **I0.2** Applied to the derby HUD
+- [ ] **I0.3** Applied to the map
+- [ ] **I0.4** Applied to the handheld
+
+### I1 — Code as a material
+- [ ] **I1.1** Character rain carrying the game's own vocabulary
+- [ ] **I1.2** Degrades where the body degrades
+- [ ] **I1.3** Used as a surface things are cut out of, not a backdrop
+
+### I2 — The web is many worlds
+- [ ] **I2.1** Broken-web primitives: tiled ground, marquee, counter, guestbook, webring, banner farm, popup
+- [ ] **I2.2** Per-site authored layouts, no two alike
+- [ ] **I2.3** Sites as locations — reachable from one terminal, and nowhere else
+- [ ] **I2.4** Dead sites: last post four years old, moderator deceased
+
+### I3 — celloutz.xyz in-game
+**Blocked: mirror the real content, or fictionalise it?**
+- [ ] **I3.1** Decide the approach
+- [ ] **I3.2** Build the site as a reachable place on the Wire
+
+### I4 — Panels degrade with the player
+- [ ] **I4.1** Blood loss, pain, consciousness and Wire strain drive the UI
+- [ ] **I4.2** A bleeding player's index is harder to read
+- [ ] **I4.3** Diegetic, never a post-process filter
+
+### I5 — Everything clickable and inspectable
+- [x] **I5.1** Body parts
+- [ ] **I5.2** Wounds and implants from the dossier
+- [ ] **I5.3** People, factions and ranks
+- [ ] **I5.4** Posts and accounts
+
+### I6 — The honest split on dark patterns
+- [ ] **I6.1** The Wire is deliberately hostile — infinite scroll, bait, variable reward
+- [ ] **I6.2** The player's own tools are the opposite
+- [ ] **I6.3** Make the contrast obvious enough to read as a joke
+
+---
 
 ## J — Infrastructure
 
 Unglamorous, and each one is currently costing real time.
 
-| # | Item | What you get |
-| --- | --- | --- |
-| J1 | **Drop FMOD properly** | 238MB, referenced by no script, and its GDExtension fights any open editor for a port and floods stderr until headless tests starve. Disabled locally, but `.gitignore` covers `game/addons/fmod/` so the fix cannot travel — every checkout hits it again. |
-| J2 | **Debug keys out of the shipping input map** | Reset keys and dev affordances still ship. |
-| J3 | **Adopt the installed plugins** | LimboAI for F4, Terrain3D + Proton Scatter for the Ashbloom exterior, Dialogue Manager when NPCs first speak. 415MB currently doing nothing. |
-| J4 | **Real loading behind the interstitial** | The plate covers a fixed 1.45s hold rather than actual load progress. Covered, not seamless. |
+### J1 — Drop FMOD properly
+- [x] **J1.1** Extension disabled locally; headless tests run again
+- [x] **J1.2** Written up in `ROADMAP.md`, since `.gitignore` stops the fix travelling
+- [ ] **J1.3** Remove the plugin outright — 238MB referenced by no script
+
+### J2 — Debug affordances out of the shipping build
+- [ ] **J2.1** Reset keys off the shipping input map
+- [ ] **J2.2** Dev-only gate for the rest
+
+### J3 — Adopt the installed plugins
+- [ ] **J3.1** LimboAI for F4.2
+- [ ] **J3.2** Terrain3D + Proton Scatter for the Ashbloom exterior
+- [ ] **J3.3** Dialogue Manager when NPCs first speak
+
+### J4 — Real loading behind the interstitial
+- [ ] **J4.1** Stream behind the plate instead of a fixed 1.45s hold
+- [ ] **J4.2** Progress bar that is telling the truth
 
 ---
 
-## Open questions — only Greg can answer these
+## Open questions — only you can answer these
 
-Blocking nothing, but they change what gets built.
+They block nothing else, but they change what gets built.
 
-1. **Where is the art folder?** Blocks G1, the single largest available upgrade
-   to the look.
+1. **Where is the art folder?** Blocks G1 entirely — the largest available
+   upgrade to the look.
 2. **celloutz.xyz — mirror or fictionalise?** Blocks I3.
-3. **Ephemeris or derived wheel?** "Most accurate" birth charts need real
-   planetary longitudes from a table. The sigil currently derives a wheel from
-   sun sign and birth time. Affects D5.
+3. **Ephemeris or derived wheel?** "Most accurate" charts need real planetary
+   longitudes from a table. Affects D5.4.
 4. **Guns: common, or scarce and improvised?** Changes encounter design either
    way. Built but undecided.
 5. **What persists between runs?** Roguelike structure was asked for, but
    "bodies remember" is a pillar. These pull against each other.
-6. **Does the chassis roll?** The upright angular lock stops cars rolling. Good
-   arcade feel, possibly wrong for a demolition derby. Affects A7.
-7. **How is the dark web gated?** Currently a physical terminal, since coverage
-   is already a property of place. Reversible.
+6. **Does the chassis roll?** Affects A7.4.
+7. **How is the dark web gated?** Currently a physical terminal. Reversible.
