@@ -86,6 +86,11 @@ func _register_people() -> void:
 		"wounds": ["spore-burned right lung"], "anatomy": {"blood_type": "A-ASH", "cybernetics": ["copper lung bellows", "dose counter"]},
 		"relations": {"player": {"kind": "saved", "strength": 22}, "moth_jerrow": {"kind": "ally", "strength": 35}},
 	})
+	WorldHistory.register_subject("gate_lanterns", {
+		"name": "Gate Lanterns", "kind": "faction", "role": "Ascending counter-order", "threat": "LOW", "territory": "Waystations between the tunnels and the surface",
+		"doctrine": "Carry a light for whoever comes after. A kept promise outlasts a kept grudge.",
+		"relations": {"nix_arden": {"kind": "command", "strength": 40}},
+	})
 	WorldHistory.register_subject(HUNT_ID, {
 		"name": "Mara Voss", "kind": "person", "role": "Bone Yard Captain", "faction": "Ashline Wreckers", "faction_id": "ashline_wreckers", "elo": 1180,
 		"grudge": 0, "injury": "none", "status": "active", "memory": "Watching the derby", "wounds": [],
@@ -511,7 +516,11 @@ func _refresh_archive() -> void:
 	if panel_mode == "map":
 		archive.text = "LIVING MAP // LIMBO: ASHBLOOM EXPANSE\n\n[BONE YARD] Rusted quarry / Ashline territory\n[BLACK MILE] Raider highway beyond the storm pylons\n[SOFT ROT] Irradiated fungal forest / shifting paths\n[OSSUARY] Sealed anatomy works below the ridge\n[TUNNEL] Floodlit trade route under the quarry\n\nThe map expands through witness accounts, tracks and surviving encounters."
 	elif panel_mode == "tree":
-		archive.text = "CHARACTER TREE // AS ABOVE SO BELOW\n\nPLAYER\n ├─ bond ─ NIX ARDEN (%d)\n └─ grudge ─ MARA VOSS (%d)\n              └─ faction ─ ASHLINE WRECKERS\n\nThe tree changes when history changes." % [int(nix.get("bond", 0)), int(mara.get("grudge", 0))]
+		var player := WorldHistory.subject("player")
+		var player_axis := WorldHistory.tree_alignment(player)
+		var nix_axis := WorldHistory.tree_alignment(nix)
+		var mara_axis := WorldHistory.tree_alignment(mara)
+		archive.text = "CHARACTER TREE // AS ABOVE SO BELOW\n\nPLAYER — %s\n ├─ bond ─ NIX ARDEN (%d) — %s\n └─ grudge ─ MARA VOSS (%d) — %s (%s)\n              └─ faction ─ ASHLINE WRECKERS\n\nThe axis reads the same standing shown on the Deep X-ray scan. The tree changes when history changes." % [WorldHistory.tree_axis_label(player_axis), int(nix.get("bond", 0)), WorldHistory.tree_axis_label(nix_axis), int(mara.get("grudge", 0)), WorldHistory.tree_axis_label(mara_axis), WorldHistory.tree_descriptor(mara)]
 	else:
 		var recent := WorldHistory.recent_events(7)
 		var derby_result := "LOCAL DRIVER WRECKS OUT; WALKS INTO ASHBLOOM" if WorldHistory.event_count("derby_round_lost") > 0 else "UNKNOWN DRIVER TAKES THE BONE YARD CROWN" if WorldHistory.event_count("derby_round_won") > 0 else "BONE YARD FEED REMAINS LIVE"

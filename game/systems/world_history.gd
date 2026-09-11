@@ -81,6 +81,45 @@ func relationship_strength(from_id: String, to_id: String) -> int:
 	return int(relation.get("strength", 0))
 
 
+## AS ABOVE, SO BELOW: every subject's standing on the vertical Tree between
+## the ascending and descending realms that flank Limbo. Faction birth sets a
+## baseline pull; a subject's own bonds and grudges drift them from it, so
+## rank and lineage are not destiny. Descending principles echo the Seven
+## Deadly Sins per the Master Codex; ascending principles are original
+## counterparts rather than a mirrored seven.
+const FACTION_TREE_AXIS := {
+	"ashline_wreckers": {"axis": -0.7, "principle": "Wrath"},
+	"black_mile": {"axis": -0.55, "principle": "Greed"},
+	"soft_rot": {"axis": -0.8, "principle": "Gluttony"},
+	"choir_of_marrow": {"axis": -0.65, "principle": "Envy"},
+	"gate_lanterns": {"axis": 0.6, "principle": "Charity"},
+}
+
+
+func tree_alignment(target: Dictionary) -> float:
+	var base := 0.0
+	var faction_id := str(target.get("faction_id", ""))
+	if FACTION_TREE_AXIS.has(faction_id):
+		base = float(FACTION_TREE_AXIS[faction_id].get("axis", 0.0))
+	var drift := clampf((float(target.get("bond", 0)) - float(target.get("grudge", 0))) / 140.0, -0.35, 0.35)
+	return clampf(base * 0.75 + drift, -1.0, 1.0)
+
+
+func tree_descriptor(target: Dictionary) -> String:
+	var faction_id := str(target.get("faction_id", ""))
+	if FACTION_TREE_AXIS.has(faction_id):
+		return str(FACTION_TREE_AXIS[faction_id].get("principle", ""))
+	return ""
+
+
+func tree_axis_label(value: float) -> String:
+	if value > 0.2:
+		return "ASCENT"
+	if value < -0.2:
+		return "DESCENT"
+	return "LIMBO"
+
+
 func update_subject(subject_id: String, changes: Dictionary, event_type: String = "subject_updated") -> Dictionary:
 	var updated := register_subject(subject_id, {})
 	for key in changes:

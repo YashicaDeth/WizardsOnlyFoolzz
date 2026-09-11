@@ -262,12 +262,36 @@ func _draw_body_slice(rect: Rect2, xray: bool, subject: Dictionary) -> void:
 			var module_pos := center + Vector2(30 if index % 2 == 0 else -30, -30 + index * 31)
 			draw_rect(Rect2(module_pos - Vector2(8, 6), Vector2(16, 12)), TEAL)
 			draw_line(module_pos, center, TEAL * Color(1, 1, 1, 0.45), 1)
+		_draw_tree_alignment(rect, subject)
 	else:
 		var wounds: Array = subject.get("wounds", [])
 		for index in wounds.size():
 			var wound_pos := center + Vector2(-18 + index * 15, -20 + index * 26)
 			draw_line(wound_pos - Vector2(7, 7), wound_pos + Vector2(7, 7), BLOOD, 3)
 			draw_line(wound_pos + Vector2(7, -7), wound_pos - Vector2(7, 7), BLOOD, 2)
+
+
+## The Deep X-ray doubles as an "as above, so below" reading: the same scan
+## that shows organs and cybernetics also shows where the subject currently
+## sits on the vertical Tree, so the body view and the metaphysical view are
+## one instrument rather than two unrelated panels.
+func _draw_tree_alignment(rect: Rect2, subject: Dictionary) -> void:
+	var axis_x := rect.end.x - 15
+	var top := rect.position.y + 16
+	var bottom := rect.end.y - 12
+	draw_line(Vector2(axis_x, top), Vector2(axis_x, bottom), TEAL * Color(1, 1, 1, 0.4), 2)
+	var font := ThemeDB.fallback_font
+	draw_string(font, Vector2(axis_x - 58, top - 3), "ASCENT", HORIZONTAL_ALIGNMENT_RIGHT, 52, 7, SPORE * Color(1, 1, 1, 0.75))
+	draw_string(font, Vector2(axis_x - 58, (top + bottom) * 0.5 + 3), "LIMBO", HORIZONTAL_ALIGNMENT_RIGHT, 52, 7, BONE * Color(1, 1, 1, 0.5))
+	draw_string(font, Vector2(axis_x - 58, bottom + 10), "DESCENT", HORIZONTAL_ALIGNMENT_RIGHT, 52, 7, BLOOD * Color(1, 1, 1, 0.75))
+	var alignment := WorldHistory.tree_alignment(subject)
+	var marker_y := lerpf(top, bottom, (1.0 - alignment) * 0.5)
+	var marker_color := SPORE if alignment > 0.2 else (BLOOD if alignment < -0.2 else BONE)
+	draw_circle(Vector2(axis_x, marker_y), 7.0, marker_color * Color(1, 1, 1, 0.28))
+	draw_circle(Vector2(axis_x, marker_y), 4.0, marker_color)
+	var descriptor := WorldHistory.tree_descriptor(subject)
+	if not descriptor.is_empty():
+		draw_string(font, Vector2(axis_x - 58, marker_y - 11), descriptor.to_upper(), HORIZONTAL_ALIGNMENT_RIGHT, 52, 8, marker_color)
 
 
 func _draw_faction_dossier(subject: Dictionary, panel_rect: Rect2) -> void:

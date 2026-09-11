@@ -8,6 +8,7 @@ const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const BONE_YARD_ENVIRONMENT := preload("res://art/bone_yard_environment.glb")
 const DERBY_AUDIO := preload("res://systems/procedural_derby_audio.gd")
 const VEHICLE := preload("res://systems/arcade_vehicle.gd")
+const AI_DRIVER := preload("res://systems/derby_ai_driver.gd")
 
 var boat: Node3D
 var speed := 0.0
@@ -101,18 +102,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _build_world() -> void:
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color("382015")
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("d29868")
-	environment.ambient_light_energy = 1.45
-	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	environment.glow_enabled = true
-	environment.glow_intensity = 0.08
-	environment.glow_strength = 0.1
-	environment.volumetric_fog_enabled = false
-	$WorldEnvironment.environment = environment
+	$WorldEnvironment.environment = WorldLook.environment("bone_yard")
 	var authored_environment := BONE_YARD_ENVIRONMENT.instantiate()
 	authored_environment.name = "AuthoredBoneYard"
 	authored_environment.position.y = -0.12
@@ -126,19 +116,24 @@ func _build_world() -> void:
 	floor_collision.position.y = -0.8
 	floor.add_child(floor_collision)
 	add_child(floor)
+	# Floodlights are pools of light in a dim pit, not a uniform wash. Two of the
+	# eight cast shadows: enough to anchor the wrecks without eight shadow maps.
 	for index in 8:
 		var light := OmniLight3D.new()
 		var angle := TAU * index / 8.0
-		light.position = Vector3(cos(angle) * 18.0, 4.0, sin(angle) * 18.0)
-		light.light_color = Color("ff6a22") if index % 2 == 0 else Color("d4bd83")
-		light.light_energy = 8.5
-		light.omni_range = 25.0
+		light.position = Vector3(cos(angle) * 18.0, 7.5, sin(angle) * 18.0)
+		light.light_color = Color("ff8a3c") if index % 2 == 0 else Color("cdb389")
+		light.light_energy = 2.6
+		light.omni_range = 21.0
+		light.omni_attenuation = 1.6
+		light.shadow_enabled = index % 4 == 0
 		add_child(light)
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-55, -20, 0)
-	sun.light_color = Color("ffe0bc")
-	sun.light_energy = 3.2
+	sun.rotation_degrees = Vector3(-38, -34, 0)
+	sun.light_color = Color("ffcf9e")
+	sun.light_energy = 1.15
 	sun.shadow_enabled = true
+	sun.directional_shadow_max_distance = 120.0
 	add_child(sun)
 
 
@@ -162,23 +157,21 @@ func _spawn_targets() -> void:
 func _create_wrecker(index: int) -> void:
 	var angle := TAU * index / 12.0 + 0.23
 	var lane := 13.5 if index % 2 == 0 else 17.0
-	var target := RigidBody3D.new()
+	# AI wreckers run the same chassis as the player. They are steered, never
+	# teleported, so a ram leaves them spinning instead of snapping back on the
+	# following frame.
+	var target := VEHICLE.new()
 	target.name = "MaraVoss_Wrecker" if index == 0 else "ScrapWrecker_%02d" % index
 	target.position = Vector3(cos(angle) * lane * 1.35, 0.8, sin(angle) * lane * 0.78)
-	target.mass = 1100.0
-	target.linear_damp = 1.8
-	target.angular_damp = 2.6
 	target.set_meta("integrity", 160 if index == 0 else 100)
 	target.set_meta("is_rival", index == 0)
 	target.set_meta("hit_ready_msec", 0)
 	target.set_meta("spawn_index", index)
-	target.set_meta("ai_speed", 5.5 + float(index % 4) * 0.9)
 	add_child(target)
-	var collision := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = Vector3(2.65, 1.3, 4.8)
-	collision.shape = shape
-	target.add_child(collision)
+	var ai_driver := AI_DRIVER.new()
+	ai_driver.name = "AIDriver"
+	target.add_child(ai_driver)
+	ai_driver.configure(target, index + 1)
 	var authored_skiff := SCRAP_SKIFF.instantiate()
 	authored_skiff.name = "ScrapVehicleShell"
 	authored_skiff.scale = Vector3(1.05, 1.05, 1.05)
@@ -207,15 +200,29 @@ func _update_boat(delta: float) -> void:
 
 func _update_wreckers(delta: float) -> void:
 	for target in targets:
-		if not is_instance_valid(target) or not target is RigidBody3D:
+		if not is_instance_valid(target):
 			continue
-		var position_2d := Vector2(target.position.x / 1.35, target.position.z / 0.78)
-		var tangent := Vector3(-position_2d.y * 1.35, 0.0, position_2d.x * 0.78).normalized()
-		var desired_velocity := tangent * float(target.get_meta("ai_speed", 6.0))
-		var rigid_target := target as RigidBody3D
-		rigid_target.linear_velocity = rigid_target.linear_velocity.lerp(desired_velocity, min(delta * 1.2, 1.0))
-		if rigid_target.global_position.distance_to(boat.global_position) < 6.0:
-			rigid_target.apply_central_force((boat.global_position - rigid_target.global_position).normalized() * 1300.0)
+		var ai_driver := target.get_node_or_null("AIDriver")
+		if ai_driver == null:
+			continue
+		ai_driver.tick(delta, _wrecker_target_position(target), round_state == "active")
+
+
+func _wrecker_target_position(wrecker: Node3D) -> Vector3:
+	# Most of the pit hunts the player; the rest pick fights with each other so
+	# the arena keeps moving even when the player hangs back.
+	if int(wrecker.get_meta("spawn_index", 0)) % 3 != 0:
+		return boat.global_position
+	var closest := boat.global_position
+	var closest_distance := 99999.0
+	for other in targets:
+		if other == wrecker or not is_instance_valid(other):
+			continue
+		var distance: float = wrecker.global_position.distance_to(other.global_position)
+		if distance < closest_distance:
+			closest_distance = distance
+			closest = other.global_position
+	return closest
 
 
 func _on_vehicle_impact(other: Node, closing_speed: float) -> void:
@@ -276,8 +283,9 @@ func _wreck_target(target: Node3D, impact_energy: int) -> void:
 		var chunk := MeshInstance3D.new()
 		var mesh := BoxMesh.new()
 		mesh.size = Vector3(0.22 + (index % 3) * 0.14, 0.22 + (index % 2) * 0.22, 0.22)
-		var color := Color("641611") if viscera_fx and index % 3 == 0 else Color("6b5340")
-		mesh.material = _material(color, 0.0)
+		var is_viscera := viscera_fx and index % 3 == 0
+		var color := Color("641611") if is_viscera else Color("6b5340")
+		mesh.material = _material(color, 0.0, "flesh" if is_viscera else "rust", index + 1)
 		chunk.mesh = mesh
 		chunk.global_position = target.global_position + Vector3(0, 0.8, 0)
 		add_child(chunk)
@@ -519,7 +527,7 @@ func _injure_driver(target: Node3D, damage: int, impact_direction: Vector3) -> v
 				var mesh := SphereMesh.new()
 				mesh.radius = 0.05 + index * 0.012
 				mesh.height = mesh.radius * 2.0
-				mesh.material = _material(Color("701310"), 0.0)
+				mesh.material = _material(Color("701310"), 0.0, "flesh", index + 3)
 				droplet.mesh = mesh
 				droplet.position = driver.position + Vector3(randf_range(-0.4, 0.4), 1.0 + randf() * 0.5, randf_range(-0.3, 0.3))
 				target.add_child(droplet)
@@ -535,7 +543,7 @@ func _spawn_crowd() -> void:
 		spectator.set_meta("rest_y", spectator.position.y)
 		spectator.set_meta("phase", float(index) * 0.71)
 		add_child(spectator)
-		_add_mesh_to(spectator, CapsuleMesh.new(), Vector3.ZERO, Color("150d0d") if index % 3 else Color("263a34"), 0.0, Vector3(0.42, 0.8, 0.42), "Body")
+		_add_mesh_to(spectator, CapsuleMesh.new(), Vector3.ZERO, Color("150d0d") if index % 3 else Color("263a34"), 0.0, Vector3(0.42, 0.8, 0.42), "Body", "dirt", index + 1)
 		crowd_members.append(spectator)
 
 
@@ -560,23 +568,18 @@ func _add_mesh(mesh: PrimitiveMesh, position_value: Vector3, scale_value: Vector
 	add_child(instance)
 
 
-func _add_mesh_to(parent: Node3D, mesh: PrimitiveMesh, position_value: Vector3, color: Color, emission: float, rotation_value := Vector3.ZERO, node_name := "") -> void:
+func _add_mesh_to(parent: Node3D, mesh: PrimitiveMesh, position_value: Vector3, color: Color, emission: float, rotation_value := Vector3.ZERO, node_name := "", kind := "rust", variation_seed := 0) -> void:
 	var instance := MeshInstance3D.new()
 	if not node_name.is_empty():
 		instance.name = node_name
 	instance.mesh = mesh
 	instance.position = position_value
 	instance.rotation = rotation_value
-	mesh.material = _material(color, emission)
+	mesh.material = _material(color, emission, kind, variation_seed)
 	parent.add_child(instance)
 
 
-func _material(color: Color, emission: float) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.metallic = 0.55
-	material.roughness = 0.3
-	material.emission_enabled = emission > 0.0
-	material.emission = color
-	material.emission_energy_multiplier = emission
-	return material
+func _material(color: Color, emission: float, kind: String = "rust", variation_seed: int = 0) -> StandardMaterial3D:
+	if emission > 0.0:
+		return WorldLook.emissive(color, emission)
+	return WorldLook.surface(color, kind, variation_seed)

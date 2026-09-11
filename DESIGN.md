@@ -62,6 +62,7 @@ These entries describe what Greg said he values; proposed extraction is labelled
 | HAVKER-MAN X | Confirmed title from the developer's Steam page; precise favourite features still to discuss. |
 | Cruelty Squad | Early reference for style, violence and the experimental blend. |
 | Older Silent Hill games | Early horror/atmosphere reference. |
+| Wrought Flesh | Biopunk organ/flesh-crafting body horror; grossness and internal-anatomy focus for the anatomy/gore system, not its crafting loop specifically. |
 
 ## Assistant proposals, not confirmed rules
 
