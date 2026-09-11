@@ -162,9 +162,8 @@ func _physics_process(delta: float) -> void:
 ## Gore is a settings choice now, not a hotkey over the pit. Read once at scene
 ## start so every body spawned in this heat agrees.
 func _apply_gore_setting() -> void:
-	var mode := str(WorldHistory.subject("settings").get("gore", "FULL"))
-	viscera_fx = mode != "OFF"
-	BaselineHuman.detail = 0.4 if mode == "REDUCED" else 1.0
+	BaselineHuman.clear_gore()
+	viscera_fx = BaselineHuman.apply_gore_setting()
 
 
 func _build_world() -> void:

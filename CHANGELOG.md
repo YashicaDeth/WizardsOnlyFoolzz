@@ -2,6 +2,31 @@
 
 ## 2026 09 11
 
+- **Gore now reads in play, and the floor remembers the fight.** Three separate
+  causes. The Hunt Grounds **never applied the GORE setting at all** — that code
+  lived only in the derby, so OFF did nothing once the player left the pit and
+  REDUCED leaked across as a static the hunt never reset. Blood **evaporated**
+  after about two seconds, so nothing ever accumulated. And a 24-damage sword
+  hit threw **four drops**.
+- Blood that lands is now a persistent spatter mark rather than a drop that
+  disappears: airborne blood stays capped for the frame rate, landed blood is a
+  flat mark with no simulation attached, capped at 420 and recycled
+  oldest-first. "Heaps of gore" is a property of the floor, not of the air.
+- The spatter is a ragged jittered fan with thrown fingers, not a quad. The
+  first version used quads and photographed as red confetti — four hard corners
+  and a straight edge read as tiles from every angle. The second version had no
+  vertex normals, so it had no defined lighting and rendered black under the
+  Ashbloom fog: a floor covered in blood that was invisible. Both were caught by
+  looking at the capture, not by a test.
+- Both scenes now read the setting through one shared
+  `BaselineHuman.apply_gore_setting()`, so the derby and the Hunt Grounds cannot
+  disagree about it again.
+- Added `tests/gore_test.gd` — 10 checks covering spray volume, blood landing
+  and persisting, both caps holding, and FULL/REDUCED/OFF actually meaning what
+  they say in the Hunt Grounds. Ten suites now pass.
+
+## 2026 09 11
+
 - **The derby no longer piles onto the player.** Measured first: five cars
   inside nine metres by twenty seconds, eight of twelve wedged motionless. Two
   thirds of the pit hunted the player permanently with no cap and no ramp, and

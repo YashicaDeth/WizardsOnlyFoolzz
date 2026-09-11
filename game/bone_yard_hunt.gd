@@ -55,6 +55,7 @@ var social_markers: Array[Node3D] = []
 var resolution_ui: Control
 var resolution_target := ""
 var living_map: Control
+var viscera_fx := true
 var lock_target := ""
 var lock_screen := Vector2(-1, -1)
 var camera_position := Vector3.ZERO
@@ -77,6 +78,11 @@ var pending_attack: Dictionary = {}
 
 
 func _ready() -> void:
+	# The gore setting was only ever applied in the derby, so OFF did nothing
+	# once the player walked into the Hunt Grounds and REDUCED leaked across as
+	# a static the hunt never reset.
+	BaselineHuman.clear_gore()
+	viscera_fx = BaselineHuman.apply_gore_setting()
 	_build_world()
 	handheld = HANDHELD.new()
 	handheld.name = "Handheld"
@@ -147,6 +153,7 @@ func _build_player_rig() -> void:
 	var saved: Dictionary = WorldHistory.subject("player")
 	if saved.get("anatomy_state") is Dictionary:
 		config["restore"] = saved.anatomy_state
+	player_rig.gore = viscera_fx
 	player_rig.build("player", config)
 	hunter_appearance = HUNTER_APPEARANCE.new()
 	hunter_appearance.name = "HunterAppearance"
@@ -1346,6 +1353,7 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> void:
 	}
 	if saved_actor.get("anatomy_state") is Dictionary:
 		rig_config["restore"] = saved_actor.anatomy_state
+	rig.gore = viscera_fx
 	rig.build(subject_id, rig_config)
 	var anatomy: Node = rig.anatomy
 	var loot := ["Ashline toll teeth", "rust scrip"] if str(encounter.kind) == "hostile" else ["weather-heart filament", "dead god relay"]

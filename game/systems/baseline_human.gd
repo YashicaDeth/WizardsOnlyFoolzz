@@ -64,8 +64,16 @@ const FRACTURE_RATIO := 0.4
 ## Loose gore is capped across every body at once. Twelve drivers shedding
 ## unbounded blood in a pileup is a frame-rate bug, not atmosphere.
 const MAX_LIVE_GORE := 140
+## Airborne blood is capped because twelve drivers shedding unbounded physics
+## blobs in a pileup is a frame-rate bug. Blood that has *landed* is a flat
+## splat with no simulation attached, so it can be far more numerous — and it
+## has to be, because a drop that evaporates two seconds after it leaves the
+## body means nothing ever accumulates and the fight leaves no trace. "Heaps of
+## gore" is a property of the floor, not of the air.
+const MAX_SPLATS := 420
 
 static var live_gore := 0
+static var splats: Array[Node3D] = []
 ## Scales every effect count at once, driven by the GORE setting in the menu
 ## rather than by a hotkey over the pit. 0 is handled by the `gore` flag.
 static var detail := 1.0
@@ -294,7 +302,7 @@ func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt",
 		# Something that cuts opens you up; something that hits you bruises and
 		# breaks. The wet count follows from which one landed.
 		var penetrating := damage_type in ["cut", "puncture", "ballistic", "shear"]
-		_spray(_zone_origin(zone), Vector3.UP, clampi(roundi(damage / (5.5 if penetrating else 11.0)), 1, 9))
+		_spray(_zone_origin(zone), Vector3.UP, clampi(roundi(damage / (2.1 if penetrating else 4.4)), 3, 26))
 	if bool(result.get("disabled", false)):
 		zone_disabled.emit(zone)
 	return result
@@ -536,7 +544,7 @@ func _spray(origin: Vector3, bias: Vector3, count: int) -> void:
 		root.add_child(drop)
 		drop.global_position = origin + Vector3(randf_range(-0.09, 0.09), randf_range(-0.09, 0.09), randf_range(-0.09, 0.09))
 		var spread := (bias.normalized() + Vector3(randf_range(-0.75, 0.75), randf_range(0.05, 0.7), randf_range(-0.75, 0.75))).normalized()
-		_loose.append({"node": drop, "velocity": spread * (1.9 + randf() * 3.6), "life": 1.3 + randf() * 1.0})
+		_loose.append({"node": drop, "velocity": spread * (1.9 + randf() * 3.6), "life": 1.3 + randf() * 1.0, "splat": true, "size": blob.radius})
 		live_gore += 1
 
 
@@ -652,6 +660,109 @@ func _process(delta: float) -> void:
 		node.global_position += piece.velocity * delta
 		piece.life -= delta
 		if piece.life <= 0.0:
+			if bool(piece.get("splat", false)):
+				_land_splat(node.global_position, float(piece.get("size", 0.05)))
 			node.queue_free()
 			_loose.remove_at(index)
 			live_gore = maxi(0, live_gore - 1)
+
+
+## A landed drop becomes a flat mark on the ground that stays for the rest of
+## the scene. Oldest marks are recycled rather than accumulating without bound,
+## so the floor fills up and then stays full instead of costing more over time.
+func _land_splat(at: Vector3, size: float) -> void:
+	if not gore or detail <= 0.01:
+		return
+	var root := _gore_root()
+	if root == null:
+		return
+	var splat := MeshInstance3D.new()
+	splat.mesh = _splat_mesh(1.0)
+	splat.scale = Vector3.ONE * (size * (6.0 + randf() * 6.5))
+	# Flat to the ground and jittered, so a pool reads as spatter rather than as
+	# a row of identical stamps.
+	splat.rotation = Vector3(-PI * 0.5, randf() * TAU, 0.0)
+	root.add_child(splat)
+	splat.global_position = Vector3(at.x, 0.02 + randf() * 0.012, at.z)
+	splats.append(splat)
+	while splats.size() > MAX_SPLATS:
+		var oldest: Node3D = splats.pop_front()
+		if is_instance_valid(oldest):
+			oldest.queue_free()
+
+
+## Both scenes read the GORE setting through here, so the Hunt Grounds and the
+## derby cannot disagree. They did: only the derby ever applied it, so OFF did
+## nothing once the player walked out of the pit, and REDUCED leaked across as a
+## static that the hunt never reset.
+static func apply_gore_setting() -> bool:
+	var mode := str(WorldHistory.subject("settings").get("gore", "FULL"))
+	detail = 0.4 if mode == "REDUCED" else 1.0
+	return mode != "OFF"
+
+
+static func clear_gore() -> void:
+	for splat in splats:
+		if is_instance_valid(splat):
+			splat.queue_free()
+	splats.clear()
+	live_gore = 0
+
+
+## Spatter, not tiles. A quad puts four hard corners and a straight edge on the
+## ground and reads as red confetti from any angle. This is a ragged fan with
+## jittered radii and a couple of thrown outliers, which is what a drop landing
+## at speed actually leaves. Meshes are pooled by variation so a floor of four
+## hundred marks costs a handful of resources, not four hundred.
+static var _splat_pool: Array[ArrayMesh] = []
+
+func _splat_mesh(radius: float) -> ArrayMesh:
+	if _splat_pool.size() >= 9:
+		return _splat_pool[randi() % _splat_pool.size()]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _splat_pool.size() * 7919 + 13
+	var points := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var steps := 15
+	var radii: Array[float] = []
+	for step in steps:
+		var jitter := rng.randf_range(0.45, 1.0)
+		# Every few points throw a long finger, so the outline has runs coming
+		# off it rather than being a fuzzy circle.
+		if step % 5 == 0:
+			jitter *= rng.randf_range(1.35, 2.1)
+		radii.append(jitter)
+	for step in steps:
+		var a := TAU * float(step) / float(steps)
+		var b := TAU * float(step + 1) / float(steps)
+		var ra: float = radii[step]
+		var rb: float = radii[(step + 1) % steps]
+		points.append(Vector3.ZERO)
+		points.append(Vector3(cos(a) * ra, sin(a) * ra, 0.0))
+		points.append(Vector3(cos(b) * rb, sin(b) * rb, 0.0))
+		# Without normals the surface has no defined lighting and renders black
+		# under the Ashbloom fog, which is how a floor of blood became invisible.
+		for _corner in 3:
+			normals.append(Vector3.BACK)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = points
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var material := StandardMaterial3D.new()
+	material.albedo_color = (BLOOD_DARK if _splat_pool.size() % 2 == 0 else BLOOD) * Color(1, 1, 1, 1)
+	material.albedo_color.a = 0.9
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	# Wet, and just self-lit enough to survive the region's fog and low key
+	# light without reading as neon.
+	material.roughness = 0.16
+	material.metallic = 0.0
+	material.emission_enabled = true
+	material.emission = BLOOD * Color(1, 1, 1, 1)
+	material.emission_energy_multiplier = 0.22
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mesh.surface_set_material(0, material)
+	_splat_pool.append(mesh)
+	return mesh

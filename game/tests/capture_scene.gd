@@ -83,6 +83,26 @@ func _ready() -> void:
 		scene._toggle_panel("map")
 		for _hold in 6:
 			await get_tree().process_frame
+	elif trigger == "gore":
+		# Stand a body in front of the camera and open it up, then let the blood
+		# fall so the shot shows what the floor looks like after a fight.
+		scene.yaw = 2.7
+		for step in 30:
+			scene.player_body.position = scene.player_body.position + Vector3(-0.42, 0, -0.2)
+			scene.player = scene.player_body.position + Vector3.UP * 0.6
+			await get_tree().physics_frame
+		var at: Vector3 = scene.player + Vector3(sin(scene.yaw), 0, cos(scene.yaw)) * 3.4
+		at.y = scene.player.y
+		scene._spawn_encounter_actor({"instance_id": "gore_probe", "kind": "hostile"}, at)
+		var victim: Dictionary = scene.encounter_actors.back()
+		victim.node.position = at
+		await get_tree().physics_frame
+		for blow in 14:
+			victim.rig.hit("torso" if blow % 2 == 0 else "left_arm", 26.0, 14.0, "cut")
+			for settle in 12:
+				await get_tree().physics_frame
+		for _hold in 30:
+			await get_tree().physics_frame
 	elif trigger == "lock":
 		scene.yaw = 2.7
 		for step in 40:

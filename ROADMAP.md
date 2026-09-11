@@ -289,11 +289,21 @@ sequenced below and none of them are dropped.
    Doing this properly means re-authoring the Bone Yard oval for a larger
    footprint and retuning the engagement cap against it together — the same
    Blender pass the cars need, not a constant change.
-3. **Gore does not read in play.** The rig carries blood, fractures, spilled
-   organs and severed limbs, and the settings expose FULL/REDUCED/OFF, but Greg
-   is not seeing it during combat. Needs a play-verified pass: volume, lifetime,
-   spawn position relative to a moving body, and whether the default setting is
-   even landing on FULL.
+3. **Gore does not read in play — fixed 2026-09-11.** Three causes, none of
+   them "the rig has no gore". The **Hunt Grounds never applied the GORE
+   setting at all** — `_apply_gore_setting()` existed only in `rift_derby.gd`,
+   so OFF did nothing once the player walked out of the pit and REDUCED leaked
+   across as a static the hunt never reset. Blood **evaporated**: every drop
+   had a life of about two seconds and left nothing behind, so a fight never
+   marked the ground. And the **spray was tiny** — a 24-damage sword hit threw
+   four drops. Blood that lands now becomes a persistent ragged spatter mark
+   that stays for the scene, capped at 420 and recycled oldest-first; sprays are
+   three to five times larger; and both scenes read the setting through one
+   shared `BaselineHuman.apply_gore_setting()`.
+   Covered by `tests/gore_test.gd` (10 checks) and captured. Two things worth
+   knowing for the next pass: the marks are flat ground-projected meshes, so
+   they do not climb walls or drape over bodies, and blood still only lands on
+   the ground plane rather than on the geometry it actually hits.
 4. **The opening is "cool but kinda lacklustre."** `vat_chamber.tscn` works but
    is under-directed — pacing, camera, sound and the handler's delivery.
 5. **The seams read as dev tools.** "The constant reset and switching worlds…
