@@ -353,10 +353,10 @@ mechanisms and almost none are built.
 - [x] ~~**F1.3** Kill the witness before they report~~
 
 ### F2 — Grudges travel real edges
-- [ ] **F2.1** Propagation along the relation graph the index already draws
-- [ ] **F2.2** Decay with distance
-- [ ] **F2.3** Distortion on each retelling
-- [ ] **F2.4** The Wire as a second, faster, less reliable carrier
+- [x] ~~**F2.1** Propagation along the relation graph the index already draws~~
+- [x] ~~**F2.2** Decay with distance~~
+- [x] ~~**F2.3** Distortion on each retelling~~
+- [x] ~~**F2.4** The Wire as a second, faster, less reliable carrier~~
 
 ### F3 — Promotion into real vacancies
 - [ ] **F3.1** A death opens a real post (the pyramid already shows this)

@@ -2,6 +2,31 @@
 
 ## 2026 09 11
 
+- **F2: grudges travel the edges that actually exist.** F1 built witnesses who
+  walk home; what they did when they got there was write one line into their
+  faction's file and stop. Now the story carries on from them, along the
+  relation graph the index has been drawing since A2.4 — and only along it, so
+  somebody with no edge to anyone never hears a thing. Distance is real:
+  every hop costs force, a weak acquaintance costs more than a close ally, and
+  below `FAINTEST` the story simply stops being worth repeating. Each retelling
+  is distorted again through `WireNet.distort()`, so it is a different story by
+  the second telling. The payload is the grudge: it is not assigned to whoever
+  the design says should hate you, it is **inherited across an edge that already
+  existed**, in proportion to how close they actually were to the person it
+  happened to. A close friend takes it nine times harder than someone who
+  barely knew them.
+  What counts as harm is read straight off E1.1's karma table, so the thing the
+  world holds against you is the same thing that moved you down the Tree —
+  one definition, not two that drift apart. Hearing you fired a gun is not a
+  reason to hate you.
+  F2.4: the Wire reaches people no friendship graph connects, arrives with no
+  walking time at all, and is distorted past the end of the hop ladder. It goes
+  further than friendship and is believed less, which is the trade.
+  Added `WorldHistory.amend_subject()` for changes that are not themselves news
+  — one more person hearing a rumour is a change in what somebody believes, and
+  recording every hop would flood the 500-entry log and evict the acts the
+  rumour is about. New `propagation_test` (18 checks); 21 suites green.
+
 - **F7: the clinch is a conversation you are winning.** Holding somebody was
   purely a wrestling match — press until they drop. Now the hold affords three
   verbs, and which of them works depends on who you have become. **Descent

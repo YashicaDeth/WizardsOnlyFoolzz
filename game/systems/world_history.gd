@@ -221,6 +221,21 @@ func update_subject(subject_id: String, changes: Dictionary, event_type: String 
 	return updated.duplicate(true)
 
 
+## A change that is not itself news. One more person hearing a rumour is not an
+## event in the world's history, it is a change in what somebody believes — and
+## recording every hop would flood a 500-entry log and evict the acts the
+## rumour is actually about. Used by F2's propagation.
+func amend_subject(subject_id: String, changes: Dictionary) -> Dictionary:
+	changes = _normalise_body_records(changes)
+	var updated := register_subject(subject_id, {})
+	for key in changes:
+		updated[key] = changes[key]
+	subjects[subject_id] = updated
+	_save_history()
+	subject_changed.emit(subject_id, updated.duplicate(true))
+	return updated.duplicate(true)
+
+
 ## Save-safe migration for the two authoring formats that used to be prose.
 ## Unknown legacy strings remain labelled but receive an explicit torso zone;
 ## nothing downstream performs fuzzy keyword inference.
