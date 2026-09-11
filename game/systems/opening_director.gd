@@ -1,0 +1,42 @@
+class_name OpeningDirector
+extends RefCounted
+
+## Tracks the opening run as world state rather than as scene-local flags, so
+## the sequence survives a save/load and every other system can read where the
+## player is in it. Stages advance forward only.
+##
+##   woke        -> conscious on the slab in the Cut Room
+##   entered_pit -> walked out to the derby under duress
+##   won_derby   -> earned the way out
+##   took_wire   -> picked up the handheld
+##   left_facility -> out into the Ashbloom Expanse
+
+const SUBJECT := "opening_run"
+const STAGES := ["none", "woke", "entered_pit", "won_derby", "took_wire", "left_facility"]
+
+
+static func stage() -> String:
+	return str(WorldHistory.subject(SUBJECT).get("stage", "none"))
+
+
+static func stage_index() -> int:
+	var found := STAGES.find(stage())
+	return found if found >= 0 else 0
+
+
+static func reached(target: String) -> bool:
+	var target_index := STAGES.find(target)
+	return target_index >= 0 and stage_index() >= target_index
+
+
+static func advance(target: String) -> void:
+	var target_index := STAGES.find(target)
+	if target_index < 0 or target_index <= stage_index():
+		return
+	WorldHistory.register_subject(SUBJECT, {"kind": "run", "stage": "none", "debt": 1})
+	WorldHistory.update_subject(SUBJECT, {"stage": target}, "opening_stage_%s" % target)
+
+
+## The player owns the handheld only after physically picking it up.
+static func has_wire() -> bool:
+	return reached("took_wire")

@@ -1,0 +1,441 @@
+extends Node3D
+
+## THE GROWING FLOOR — the opening.
+##
+## The player surfaces inside a vat: submerged, umbilicals in, fluid over the
+## glass, rows of other tanks receding into the dark. The tank voids, the glass
+## goes, and they land on the grating in a spreading puddle. From there they
+## walk the aisle to the pit and are put in a car.
+##
+## Biomechanical register per ART-DIRECTION.md: ribbed vertebral arches,
+## conduits that read as gut rather than pipe, wet everything. Built from
+## primitives on the biopunk palette — art-directed now, authored later.
+
+const OPENING := preload("res://systems/opening_director.gd")
+const ANATOMY := preload("res://systems/anatomy_component.gd")
+
+const EYE_HEIGHT := 1.62
+const VAT_POSITION := Vector3(0, 0, 0)
+const AISLE_LENGTH := 34.0
+
+var player: CharacterBody3D
+var camera: Camera3D
+var anatomy: Node
+var yaw := 0.0
+var pitch := 0.0
+var clock := 0.0
+var phase := "submerged"
+var can_move := false
+var fluid: MeshInstance3D
+var vat_glass: MeshInstance3D
+var umbilicals: Array[Node3D] = []
+var glass_shards: Array[Dictionary] = []
+var door_marker: Node3D
+var line_index := -1
+
+# 0 submerged, 1 voiding, 2 breach, 3 floor, 4 aisle
+const BEATS := [
+	{"at": 1.4, "text": "Something is in your throat. It is not yours."},
+	{"at": 5.2, "text": "TANK 0C-7 // CYCLE ABORTED — VOIDING"},
+	{"at": 9.6, "text": "HANDLER: \"That one's finished growing. Rack it for the heat.\""},
+	{"at": 14.5, "text": "HANDLER: \"Debt's in the meat, friend. Win a round and it's yours to keep.\""},
+	{"at": 19.0, "text": "Walk the aisle. The car is at the end of it."},
+]
+
+@onready var subtitle: Label = $HUD/Subtitle
+@onready var prompt: Label = $HUD/Prompt
+@onready var vitals: Label = $HUD/Vitals
+@onready var fade: ColorRect = $HUD/Fade
+@onready var submerge_tint: ColorRect = $HUD/Submerge
+
+
+func _ready() -> void:
+	OPENING.advance("woke")
+	$WorldEnvironment.environment = WorldLook.environment("ossuary")
+	_build_chamber()
+	_build_vat()
+	_build_player()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	WorldHistory.record_event("opening_woke", {"location": "growing_floor"})
+
+
+func _build_player() -> void:
+	player = CharacterBody3D.new()
+	player.name = "Player"
+	var collider := CollisionShape3D.new()
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = 0.34
+	capsule.height = 1.7
+	collider.shape = capsule
+	player.add_child(collider)
+	add_child(player)
+	player.position = VAT_POSITION + Vector3(0, 1.35, 0)
+
+	camera = Camera3D.new()
+	camera.fov = 88.0
+	player.add_child(camera)
+
+	anatomy = ANATOMY.new()
+	player.add_child(anatomy)
+	anatomy.call("configure", "player", 5000.0, {})
+	# Nobody comes out of a tank whole.
+	anatomy.call("apply_hit", "torso", 26.0, 0.0, "blunt")
+	anatomy.call("apply_hit", "head", 14.0, 0.0, "blunt")
+	WorldHistory.register_subject("player", {
+		"name": "THE HUNTER", "kind": "person", "role": "Unindexed survivor", "faction": "Unbound",
+		"elo": 1000, "grudge": 0, "status": "decanted", "wounds": ["tank scarring", "raw throat"],
+		"memory": "Came out of a tank on the Growing Floor owing somebody a heat.",
+	})
+
+	for index in 4:
+		var cable := _umbilical(index)
+		umbilicals.append(cable)
+
+
+func _umbilical(index: int) -> Node3D:
+	var root := Node3D.new()
+	add_child(root)
+	var angle := TAU * float(index) / 4.0 + 0.4
+	var anchor := VAT_POSITION + Vector3(cos(angle) * 0.62, 3.05, sin(angle) * 0.62)
+	var target := VAT_POSITION + Vector3(cos(angle) * 0.16, 1.45, sin(angle) * 0.16)
+	# Drawn as a chain of segments so it reads as gut, not as a straight pipe.
+	for segment in 7:
+		var t := float(segment) / 6.0
+		var point := anchor.lerp(target, t) + Vector3(sin(t * 5.0) * 0.07, 0, cos(t * 4.0) * 0.07)
+		var link := MeshInstance3D.new()
+		var mesh := SphereMesh.new()
+		mesh.radius = 0.055 - t * 0.018
+		mesh.height = mesh.radius * 2.2
+		mesh.material = WorldLook.surface(Color("4a3128") if segment % 2 == 0 else Color("38261f"), "flesh", index * 7 + segment)
+		link.mesh = mesh
+		link.position = point
+		root.add_child(link)
+	return root
+
+
+func _build_vat() -> void:
+	# The tank: a ribbed cylinder with a fluid column inside it.
+	vat_glass = MeshInstance3D.new()
+	var glass := CylinderMesh.new()
+	glass.top_radius = 0.95
+	glass.bottom_radius = 0.95
+	glass.height = 3.1
+	var glass_material := StandardMaterial3D.new()
+	glass_material.albedo_color = Color(0.38, 0.52, 0.44, 0.26)
+	glass_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glass_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	glass_material.metallic = 0.4
+	glass_material.roughness = 0.12
+	glass.material = glass_material
+	vat_glass.mesh = glass
+	vat_glass.position = VAT_POSITION + Vector3(0, 1.55, 0)
+	add_child(vat_glass)
+
+	fluid = MeshInstance3D.new()
+	var column := CylinderMesh.new()
+	column.top_radius = 0.9
+	column.bottom_radius = 0.9
+	column.height = 2.9
+	var fluid_material := StandardMaterial3D.new()
+	fluid_material.albedo_color = Color(0.16, 0.3, 0.2, 0.5)
+	fluid_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	fluid_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	fluid_material.emission_enabled = true
+	fluid_material.emission = Color(0.09, 0.2, 0.13)
+	fluid_material.emission_energy_multiplier = 0.7
+	column.material = fluid_material
+	fluid.mesh = column
+	fluid.position = VAT_POSITION + Vector3(0, 1.5, 0)
+	add_child(fluid)
+
+	# Ribbed collar and base: the tank is grown onto the floor, not bolted to it.
+	for rib in 9:
+		var height := 0.2 + float(rib) * 0.36
+		var ring := MeshInstance3D.new()
+		var torus := TorusMesh.new()
+		torus.inner_radius = 0.95
+		torus.outer_radius = 1.06 + (0.05 if rib % 3 == 0 else 0.0)
+		torus.material = WorldLook.surface(Color("2e2419") if rib % 2 == 0 else Color("241c15"), "bone", rib)
+		ring.mesh = torus
+		ring.position = VAT_POSITION + Vector3(0, height, 0)
+		ring.rotation_degrees = Vector3(90, 0, 0)
+		add_child(ring)
+
+	var glow := OmniLight3D.new()
+	glow.position = VAT_POSITION + Vector3(0, 1.6, 0)
+	glow.light_color = Color("6fd39a")
+	glow.light_energy = 3.4
+	glow.omni_range = 6.0
+	add_child(glow)
+
+
+func _build_chamber() -> void:
+	# Grated floor and a low wet ceiling.
+	_slab(Vector3(16.0, 0.4, AISLE_LENGTH + 8.0), Vector3(0, -0.2, -AISLE_LENGTH * 0.4), "dirt", Color("15120f"))
+	_slab(Vector3(16.0, 0.35, AISLE_LENGTH + 8.0), Vector3(0, 4.3, -AISLE_LENGTH * 0.4), "rust", Color("100d0b"))
+	_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(-7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
+	_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
+	_slab(Vector3(16.0, 4.4, 0.5), Vector3(0, 2.2, 3.6), "rust", Color("19140f"))
+
+	# Vertebral arches down the aisle. Repetition is the whole effect.
+	for bay in 11:
+		var z := 2.0 - float(bay) * 3.1
+		for side in [-1.0, 1.0]:
+			for vertebra in 5:
+				var t := float(vertebra) / 4.0
+				var arch := MeshInstance3D.new()
+				var bone := CapsuleMesh.new()
+				bone.radius = 0.17 - t * 0.05
+				bone.height = 0.55
+				bone.material = WorldLook.surface(Color("39301f").lerp(Color("241d14"), t), "bone", bay * 5 + vertebra)
+				arch.mesh = bone
+				arch.position = Vector3(side * (6.9 - t * 1.5), 0.5 + t * 3.3, z)
+				arch.rotation_degrees = Vector3(0, 0, side * (8.0 + t * 46.0))
+				add_child(arch)
+			# Conduit running the length, sagging between bays.
+			var gut := MeshInstance3D.new()
+			var tube := CylinderMesh.new()
+			tube.top_radius = 0.11
+			tube.bottom_radius = 0.13
+			tube.height = 3.1
+			tube.material = WorldLook.surface(Color("3a2a22"), "flesh", bay + 3)
+			gut.mesh = tube
+			gut.position = Vector3(side * 6.2, 3.55 + sin(float(bay)) * 0.12, z - 1.5)
+			gut.rotation_degrees = Vector3(90, 0, 0)
+			add_child(gut)
+
+		# Other tanks, most of them failed.
+		if bay > 0:
+			for side in [-1.0, 1.0]:
+				_dead_tank(Vector3(side * 4.4, 0, z), bay)
+
+		var strip := OmniLight3D.new()
+		strip.position = Vector3(0, 3.8, z)
+		strip.light_color = Color("7fbf95") if bay % 3 else Color("c0703a")
+		strip.light_energy = 1.5
+		strip.omni_range = 6.5
+		add_child(strip)
+
+	# The pit door at the far end.
+	door_marker = Node3D.new()
+	door_marker.position = Vector3(0, 0, -AISLE_LENGTH + 2.0)
+	add_child(door_marker)
+	_slab(Vector3(3.4, 3.4, 0.3), Vector3(0, 1.7, -AISLE_LENGTH + 1.6), "rust", Color("3d2a19"))
+	var exit_glow := OmniLight3D.new()
+	exit_glow.position = Vector3(0, 1.2, -AISLE_LENGTH + 2.6)
+	exit_glow.light_color = Color("ff8f3c")
+	exit_glow.light_energy = 5.5
+	exit_glow.omni_range = 8.0
+	add_child(exit_glow)
+
+
+func _dead_tank(at: Vector3, seed_value: int) -> void:
+	var shell := MeshInstance3D.new()
+	var cylinder := CylinderMesh.new()
+	cylinder.top_radius = 0.8
+	cylinder.bottom_radius = 0.8
+	cylinder.height = 2.8
+	var shell_material := StandardMaterial3D.new()
+	shell_material.albedo_color = Color(0.2, 0.26, 0.22, 0.4)
+	shell_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	shell_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	shell_material.roughness = 0.4
+	cylinder.material = shell_material
+	shell.mesh = cylinder
+	shell.position = at + Vector3(0, 1.4, 0)
+	add_child(shell)
+	# Whatever is inside is a silhouette and stays one.
+	var occupant := MeshInstance3D.new()
+	var body := CapsuleMesh.new()
+	body.radius = 0.26
+	body.height = 1.5 - float(seed_value % 3) * 0.2
+	body.material = WorldLook.surface(Color("241a16"), "flesh", seed_value)
+	occupant.mesh = body
+	occupant.position = at + Vector3(0, 1.1, 0)
+	occupant.rotation_degrees = Vector3(float(seed_value % 5) * 4.0, 0, float(seed_value % 7) * 3.0)
+	add_child(occupant)
+	for rib in 4:
+		var ring := MeshInstance3D.new()
+		var torus := TorusMesh.new()
+		torus.inner_radius = 0.8
+		torus.outer_radius = 0.88
+		torus.material = WorldLook.surface(Color("241d15"), "bone", seed_value + rib)
+		ring.mesh = torus
+		ring.position = at + Vector3(0, 0.3 + float(rib) * 0.8, 0)
+		ring.rotation_degrees = Vector3(90, 0, 0)
+		add_child(ring)
+
+
+func _slab(dimensions: Vector3, at: Vector3, kind: String, color: Color) -> void:
+	var body := StaticBody3D.new()
+	body.position = at
+	add_child(body)
+	var mesh_instance := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = dimensions
+	box.material = WorldLook.surface(color, kind, int(at.x * 31.0 + at.z * 17.0))
+	mesh_instance.mesh = box
+	body.add_child(mesh_instance)
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = dimensions
+	collision.shape = shape
+	body.add_child(collision)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
+		_interact()
+	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and phase != "submerged":
+		yaw -= event.relative.x * 0.0026
+		pitch = clampf(pitch - event.relative.y * 0.0024, -1.2, 1.0)
+
+
+func _physics_process(delta: float) -> void:
+	clock += delta
+	_update_beats()
+	_update_sequence(delta)
+	_update_shards(delta)
+	if can_move:
+		_update_movement(delta)
+	_update_hud()
+
+
+func _update_beats() -> void:
+	for index in BEATS.size():
+		if clock >= float(BEATS[index].at) and index > line_index:
+			line_index = index
+			subtitle.text = str(BEATS[index].text)
+
+
+func _update_sequence(delta: float) -> void:
+	match phase:
+		"submerged":
+			# Suspended, drifting, breathing something thicker than air.
+			var t := clampf(clock / 5.2, 0.0, 1.0)
+			fade.color.a = clampf(1.0 - clock / 2.2, 0.0, 1.0)
+			submerge_tint.color.a = 0.42
+			camera.rotation = Vector3(sin(clock * 0.7) * 0.09 - 0.1, sin(clock * 0.4) * 0.16, cos(clock * 0.55) * 0.07)
+			camera.fov = 92.0 + sin(clock * 1.6) * 3.5
+			player.position.y = 1.35 + sin(clock * 0.8) * 0.06
+			if clock >= 5.2:
+				phase = "voiding"
+		"voiding":
+			# The column drops. You come down with it.
+			var t := clampf((clock - 5.2) / 3.4, 0.0, 1.0)
+			var height := lerpf(2.9, 0.25, ease(t, 0.7))
+			fluid.mesh.height = height
+			fluid.position.y = height * 0.5
+			submerge_tint.color.a = lerpf(0.42, 0.0, t)
+			camera.fov = lerpf(92.0, 78.0, t)
+			player.position.y = lerpf(1.35, 0.95, ease(t, 0.6))
+			camera.rotation = Vector3(sin(clock * 0.9) * 0.06 * (1.0 - t) - 0.1 * (1.0 - t), sin(clock * 0.5) * 0.1 * (1.0 - t), 0)
+			if t >= 1.0:
+				_breach()
+		"floor":
+			# On hands and knees on the grating.
+			var t := clampf((clock - 8.6) / 4.2, 0.0, 1.0)
+			player.position.y = lerpf(0.62, EYE_HEIGHT, ease(t, 0.45))
+			camera.rotation = Vector3(lerpf(-0.95, 0.0, ease(t, 0.5)), 0, lerpf(0.22, 0.0, ease(t, 0.5)))
+			camera.fov = lerpf(78.0, 74.0, t) + sin(clock * 2.4) * (1.0 - t) * 4.0
+			if t >= 1.0:
+				phase = "aisle"
+				can_move = true
+				yaw = 0.0
+				pitch = 0.0
+
+
+func _breach() -> void:
+	phase = "floor"
+	vat_glass.visible = false
+	fluid.visible = false
+	for cable in umbilicals:
+		cable.queue_free()
+	umbilicals.clear()
+	WorldHistory.record_event("opening_tank_breached", {"tank": "0C-7"})
+	# Glass and fluid go outward across the grating.
+	for index in 22:
+		var shard := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(0.05 + randf() * 0.11, 0.02, 0.07 + randf() * 0.13)
+		var shard_material := StandardMaterial3D.new()
+		shard_material.albedo_color = Color(0.4, 0.55, 0.47, 0.5) if index % 3 else Color(0.12, 0.24, 0.16, 0.8)
+		shard_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mesh.material = shard_material
+		shard.mesh = mesh
+		shard.position = VAT_POSITION + Vector3(0, 1.1, 0)
+		add_child(shard)
+		var out := Vector3(randf_range(-1.0, 1.0), randf_range(0.1, 0.7), randf_range(-1.0, 1.0)).normalized()
+		glass_shards.append({"node": shard, "velocity": out * randf_range(2.5, 6.0), "life": 3.0})
+	# Spreading puddle.
+	var puddle := MeshInstance3D.new()
+	var disc := CylinderMesh.new()
+	disc.top_radius = 1.7
+	disc.bottom_radius = 1.7
+	disc.height = 0.02
+	disc.material = WorldLook.surface(Color("101a13"), "dirt", 4)
+	puddle.mesh = disc
+	puddle.position = VAT_POSITION + Vector3(0, 0.02, 0)
+	add_child(puddle)
+
+
+func _update_shards(delta: float) -> void:
+	for shard in glass_shards.duplicate():
+		shard.velocity.y -= 11.0 * delta
+		(shard.node as Node3D).position += (shard.velocity as Vector3) * delta
+		(shard.node as Node3D).rotate(Vector3(1, 0.6, 0.3).normalized(), delta * 6.0)
+		shard.life = float(shard.life) - delta
+		if float(shard.life) <= 0.0:
+			(shard.node as Node3D).queue_free()
+			glass_shards.erase(shard)
+
+
+func _update_movement(delta: float) -> void:
+	var input := Vector3(
+		Input.get_axis("move_left", "move_right"),
+		0.0,
+		Input.get_axis("move_forward", "move_back"),
+	)
+	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
+	var speed := 2.7 * float(anatomy.call("mobility_ratio"))
+	player.velocity.x = move_toward(player.velocity.x, direction.x * speed, 14.0 * delta)
+	player.velocity.z = move_toward(player.velocity.z, direction.z * speed, 14.0 * delta)
+	player.velocity.y = -2.0 if player.is_on_floor() else player.velocity.y - 18.0 * delta
+	player.move_and_slide()
+	player.rotation.y = yaw
+	camera.rotation = Vector3(pitch, 0, 0)
+	# A body that just came out of a tank does not walk well.
+	var stride := Vector2(player.velocity.x, player.velocity.z).length()
+	camera.position.y = sin(Time.get_ticks_msec() * 0.0055) * stride * 0.016
+	camera.rotation.z = sin(Time.get_ticks_msec() * 0.0027) * stride * 0.008
+
+
+func _interact() -> void:
+	if not can_move:
+		return
+	var to_door := door_marker.global_position - player.global_position
+	to_door.y = 0.0
+	if to_door.length() > 3.4:
+		return
+	OPENING.advance("entered_pit")
+	WorldHistory.update_subject("player", {"status": "racked for a heat"}, "opening_entered_pit")
+	WorldHistory.record_event("opening_entered_pit", {"location": "growing_floor"})
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	get_tree().change_scene_to_file("res://rift_derby.tscn")
+
+
+func _update_hud() -> void:
+	var snapshot: Dictionary = anatomy.call("snapshot")
+	vitals.text = "BLOOD %d%%   PAIN %02d   %s" % [
+		roundi(float(snapshot.blood) / maxf(1.0, float(snapshot.blood_capacity)) * 100.0),
+		int(snapshot.pain),
+		"DECANTED",
+	]
+	if not can_move:
+		prompt.text = ""
+		return
+	var to_door := door_marker.global_position - player.global_position
+	to_door.y = 0.0
+	prompt.text = "[E] INTO THE PIT" if to_door.length() <= 3.4 else "WASD MOVE   MOUSE LOOK   WALK THE AISLE"
