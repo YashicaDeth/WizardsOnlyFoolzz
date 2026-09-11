@@ -75,6 +75,23 @@ Nothing else is worth polishing until a ram feels like a ram.
    speed-linked camera shake and FOV, brake/scrape effects, and a decision on
    whether the upright angular lock stays (it currently prevents rolling).
 
+### Tier 1a — impact feel, added 2026-09-11
+
+**Highest priority.** Cars currently grind into each other at near-zero speed
+and stay there, which drains every collision of meaning.
+
+- **Restitution.** `arcade_vehicle.gd` sets `PhysicsMaterial.bounce = 0.35`,
+  but sustained engine force overrides separation, so contact becomes a shove
+  rather than a hit. Give impacts real bounce-back: an impulse along the
+  contact normal scaled by closing speed, plus a brief throttle cut on both
+  vehicles so they actually part before re-engaging.
+- **Contact lockout.** After a registered impact, suppress re-collision scoring
+  and drive between the same pair for a beat, so ramming reads as discrete
+  blows instead of a continuous scrape.
+- **Destruction scaling.** Damage, part shedding and debris are currently far
+  too conservative for the closing speeds involved. A hard hit should visibly
+  deform and shed on the first contact, not the fifth.
+
 ### Tier 1b — combat, added 2026-09-11
 
 10. **Physical melee.** Half Sword's register — momentum-driven swings, real
@@ -94,6 +111,23 @@ Nothing else is worth polishing until a ram feels like a ram.
     organ is a distinct part with its own trade-offs, compatibility and social
     reading, feeding `anatomy_component.gd`'s existing cybernetics slots and the
     prosthetic economy in `DESIGN/HUNT_SYSTEM.md`.
+
+### Tier 1c — the inspection interface, added 2026-09-11
+
+The dossier and the vehicle readout become one interaction pattern: a schematic
+you can point at, where the hovered part lifts out of the diagram as a real 3D
+object turning in place.
+
+- Hovering a zone on the body diagram pops that part — organ, limb, bone — out
+  of the flat schematic into a small 3D viewport beside it, rotating slowly,
+  showing its real condition from `anatomy_component.gd`.
+- The same pattern serves the car: hover a panel on the hull schematic and that
+  part lifts out as a turning 3D component with its own damage state.
+- The transition between flat diagram and popped 3D part is the interaction, so
+  it must be continuous — the part appears to leave the diagram, not to open a
+  window. No hard cuts, no separate modal.
+- This unifies the X-ray dossier, the cab hull screen and the upgrade interface
+  under one verb: point at a part, inspect the part.
 
 ### Tier 2 — the opening Greg described
 
