@@ -46,8 +46,8 @@ func _subject(at: Vector3, id: String, mode: int) -> void:
 	var body := BaselineHuman.new()
 	add_child(body)
 	body.position = at
-	body.gore = false
-	body.build(id, {"flesh": Color("7a6350"), "variation": mode * 3})
+	# Through the config: assigning `body.gore` here is overwritten by build().
+	body.build(id, {"flesh": Color("7a6350"), "variation": mode * 3, "gore": false})
 	match mode:
 		1:
 			# Enough damage to put bone through the skin on one side and take an

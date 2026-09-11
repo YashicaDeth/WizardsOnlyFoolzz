@@ -2,6 +2,25 @@
 
 ## 2026 09 11
 
+- **Blood is spatter again, not sheeting.** Every landed drop was leaving a mark
+  about three metres across, and with `MAX_SPLATS` at 420 a real fight buried
+  its own floor in overlapping red — which is what made the gore read as flat
+  translucent sheets rather than as a body coming apart. Two faults stacked:
+  `_splat_mesh()` accepted a `radius` and ignored it, generating a mesh already
+  ~2 units wide; and `_land_splat()` set `splat.scale` and then assigned
+  `global_transform` a line later, which overwrites the basis and silently
+  discarded that scale, so every mark rendered at 1:1 no matter what the caller
+  asked for. The size is now baked into the basis and the mesh honours its
+  radius. Widest landed mark went 2.50m → 0.74m, measured in `gore_test`.
+- **`rig.gore = false` now has to be said in the config.** Assigning it before
+  `build()` never worked — `build()` overwrites it from the world setting — so
+  `body_showcase` had been rendering three bodies that explicitly asked for no
+  gore while standing in it. Fixed there and at both Hunt rig sites, and the
+  line in `build()` says so now.
+- Added `showcase_capture`, because the body showcase could previously only be
+  looked at by running it and leaving a window open, which is how a fault this
+  visible went unnoticed.
+
 - **B6 closed: the player is a body too.** Losing a limb now works the same way
   in both directions. A severed zone opens a vessel — `STUMP_BLEED` adds the
   zone's own bleed rate 26× on top of whatever the blow itself did — so an

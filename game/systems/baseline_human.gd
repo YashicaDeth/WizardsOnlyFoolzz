@@ -83,6 +83,12 @@ const MAX_LIVE_GORE := 140
 ## body means nothing ever accumulates and the fight leaves no trace. "Heaps of
 ## gore" is a property of the floor, not of the air.
 const MAX_SPLATS := 420
+## How far a landed drop spreads, as a multiple of the drop's own radius. A
+## drop of blood makes a mark a few times its own size, not a puddle you could
+## lie down in: at the old multiplier (6–12.5x, against a mesh already about
+## two units across) every drop left a mark over three metres wide, so any
+## fight buried its own floor. Measured in `gore_test`.
+const SPLAT_SPREAD := 3.4
 
 static var live_gore := 0
 static var splats: Array[Node3D] = []
@@ -138,6 +144,10 @@ func build(id: String, config: Dictionary = {}) -> void:
 	# one of them did not, which is how the Hunt Grounds shipped ignoring the
 	# setting entirely (recorded in ROADMAP.md). A caller that genuinely wants to
 	# override it can still pass `gore` in the config.
+	# Pass `gore` in the config to override the world setting. Assigning
+	# `rig.gore` before calling build() does not work and never did — this line
+	# overwrites it — which is how a showcase scene that explicitly asked for a
+	# clean body ended up standing in three metres of blood.
 	gore = bool(config.get("gore", apply_gore_setting()))
 	_seated = bool(config.get("seated", false))
 	_flesh = config.get("flesh", Color("6b5842")) as Color
@@ -885,7 +895,7 @@ func _land_splat(at: Vector3, size: float, velocity := Vector3.DOWN) -> void:
 		normal = (hit.normal as Vector3).normalized()
 	var splat := MeshInstance3D.new()
 	splat.mesh = _splat_mesh(1.0)
-	splat.scale = Vector3.ONE * (size * (6.0 + randf() * 6.5))
+	var spread := size * SPLAT_SPREAD * (0.7 + randf() * 0.6)
 	# Flat to the ground and jittered, so a pool reads as spatter rather than as
 	# a row of identical stamps.
 	root.add_child(splat)
@@ -898,8 +908,12 @@ func _land_splat(at: Vector3, size: float, velocity := Vector3.DOWN) -> void:
 	side = side.normalized()
 	var spin := randf() * TAU
 	var forward := up.cross(side).normalized()
+	# The size has to be baked into the basis. Setting `splat.scale` and then
+	# assigning `global_transform` discards it — an orthonormal basis overwrites
+	# the scale — so every mark rendered at 1:1 whatever the caller asked for,
+	# which is roughly three metres of blood per landed drop.
 	splat.global_transform = Transform3D(
-		Basis(side, forward, up).rotated(up, spin),
+		Basis(side, forward, up).rotated(up, spin).scaled(Vector3.ONE * spread),
 		landed + normal * (0.012 + randf() * 0.01)
 	)
 	splats.append(splat)
@@ -957,14 +971,17 @@ static func mark_ground_for_chunk(world: World3D, root: Node, at: Vector3, veloc
 		normal = (hit.normal as Vector3).normalized()
 	var splat := MeshInstance3D.new()
 	splat.mesh = _splat_mesh(1.0)
-	splat.scale = Vector3.ONE * size
 	var up := normal
 	var side := up.cross(Vector3.FORWARD)
 	if side.length_squared() < 0.001:
 		side = up.cross(Vector3.RIGHT)
 	side = side.normalized()
 	var forward := up.cross(side).normalized()
-	splat.global_transform = Transform3D(Basis(side, forward, up).rotated(up, randf() * TAU), landed + normal * 0.014)
+	# Scale baked in, for the same reason as `_land_splat`.
+	splat.global_transform = Transform3D(
+		Basis(side, forward, up).rotated(up, randf() * TAU).scaled(Vector3.ONE * size),
+		landed + normal * 0.014
+	)
 	root.add_child(splat)
 	splats.append(splat)
 	while splats.size() > MAX_SPLATS:
@@ -982,13 +999,20 @@ static func _splat_mesh(radius: float) -> ArrayMesh:
 	var normals := PackedVector3Array()
 	var steps := 15
 	var radii: Array[float] = []
+	var widest := 0.0
 	for step in steps:
 		var jitter := rng.randf_range(0.45, 1.0)
 		# Every few points throw a long finger, so the outline has runs coming
 		# off it rather than being a fuzzy circle.
 		if step % 5 == 0:
 			jitter *= rng.randf_range(1.35, 2.1)
+		widest = maxf(widest, jitter)
 		radii.append(jitter)
+	# Normalised so `radius` means what it says. It used to be accepted and
+	# ignored, leaving the mesh whatever size the jitter happened to make it
+	# — up to 2.1 units — which the caller then scaled up again.
+	for index in radii.size():
+		radii[index] = radii[index] / maxf(0.001, widest) * radius
 	for step in steps:
 		var a := TAU * float(step) / float(steps)
 		var b := TAU * float(step + 1) / float(steps)

@@ -169,6 +169,7 @@ func _build_player_rig() -> void:
 	player_rig.position = Vector3(0, -0.9, 0)
 	var config := {
 		"flesh": Color("7a6350"), "variation": 1, "blood": 5200.0,
+		"gore": viscera_fx,
 		"cybernetics": {"right_arm": {"name": "salvaged torque arm", "armor": 0.22, "restores": 0.72}},
 	}
 	var saved: Dictionary = WorldHistory.subject("player")
@@ -1845,6 +1846,7 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> void:
 	var rig_config := {
 		"flesh": Color("70201c") if str(encounter.kind) == "hostile" else Color("586c3a"),
 		"variation": subject_id.length(),
+		"gore": viscera_fx,
 		"blood": 5200.0 if str(encounter.kind) == "boss" else 4300.0,
 		# Named, not just an armour number. Before B2 an implant *was* its armour
 		# value, so this passed an anonymous dictionary and every Ashline body

@@ -51,6 +51,22 @@ func _ready() -> void:
 	check(BaselineHuman.splats.size() <= BaselineHuman.MAX_SPLATS, "landed blood is capped (%d)" % BaselineHuman.splats.size())
 	check(BaselineHuman.live_gore <= BaselineHuman.MAX_LIVE_GORE, "airborne blood is capped (%d)" % BaselineHuman.live_gore)
 
+	# A drop of blood leaves a mark a few times its own size. It used to leave
+	# one over three metres wide - _splat_mesh accepted a radius and ignored it,
+	# so the mesh was already about two units across before the caller scaled it
+	# up by another 6-12.5x, and any real fight buried its own floor in red.
+	var widest := 0.0
+	var measured := 0
+	for splat in BaselineHuman.splats:
+		var mark := splat as MeshInstance3D
+		if mark == null or not is_instance_valid(mark) or mark.mesh == null:
+			continue
+		measured += 1
+		widest = maxf(widest, (mark.get_aabb().size * mark.global_transform.basis.get_scale()).length())
+	check(measured > 0, "there is landed blood to measure (%d marks)" % measured)
+	check(widest < 1.2, "a landed drop is spatter, not a puddle you could lie in (widest %.2fm)" % widest)
+	check(BaselineHuman._splat_mesh(1.0).get_aabb().size.x <= 2.01, "the splat mesh honours the radius it is given")
+
 	# OFF must actually mean off, in the Hunt Grounds and not only in the derby.
 	WorldHistory.update_subject("settings", {"gore": "OFF"})
 	check(not BaselineHuman.apply_gore_setting(), "OFF is reported as off")

@@ -285,7 +285,7 @@ static func _mark_ground(node: RigidBody3D) -> void:
 	var scene := node.get_tree().current_scene
 	if scene == null:
 		return
-	BaselineHuman.mark_ground_for_chunk(node.get_world_3d(), scene, node.global_position, node.linear_velocity, 0.4)
+	BaselineHuman.mark_ground_for_chunk(node.get_world_3d(), scene, node.global_position, node.linear_velocity, 0.22)
 
 
 ## Per-layer voice for a hit: skin thuds, bone cracks, hardware clinks. Data
