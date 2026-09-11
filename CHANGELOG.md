@@ -2,6 +2,18 @@
 
 ## 2026 09 12
 
+- **I0.4: the CARRY page stops being a packing docket.** It was a literal
+  spreadsheet — name, condition and weight in aligned columns, half the page
+  blank — which is the one presentation that makes carrying pieces of people
+  read as ordinary. The contents are drawn as objects in a bag now: organs as
+  lobed masses that dull as they spoil, bone pale and knuckled, a severed limb
+  tapered with the cut showing, implants machined flat, everything else a tied
+  sack. Each is sized by its real mass, stained when it is going off, ringed
+  and marked OWED when somebody holds a lien on it, and tagged with whose body
+  it came off. The bag swells as you fill it and its contents settle to the
+  floor, so the empty space sits under the slack mouth instead of reading as
+  rows nobody filled in.
+
 - **G0: the wreckers can finally hit the player.** The open bug was two faults
   stacked together. Hunters pursued the unreachable centre of the player's
   chassis until their steering became a tangent; inside twelve metres they now

@@ -489,8 +489,6 @@ func _draw_carry(rect: Rect2, alpha: float) -> void:
 	var load_text := "%0.1f / %0.0f KG" % [carry.total_mass(), Carry.CAPACITY]
 	var load_width := CellOutzType.width_condensed(load_text, 12.0, 0.9)
 	CellOutzType.draw_condensed(self, Vector2(rect.end.x - 26 - load_width, rect.position.y + 26), load_text, 12.0, tone * Color(1, 1, 1, alpha), 0.9)
-	# The burden bar runs past its own track when overloaded, which is a clearer
-	# read than clamping it and saying nothing.
 	var track := Rect2(rect.position + Vector2(24, 52), Vector2(rect.size.x - 48, 8))
 	draw_rect(track, INK * Color(1, 1, 1, 0.10 * alpha))
 	draw_rect(Rect2(track.position, Vector2(track.size.x * minf(burden, 1.0), track.size.y)), tone * Color(1, 1, 1, alpha))
@@ -500,24 +498,160 @@ func _draw_carry(rect: Rect2, alpha: float) -> void:
 	if carry.items.is_empty():
 		CellOutzType.draw_condensed(self, rect.position + Vector2(24, 88), "NOTHING ON YOU WORTH LISTING.", 12.0, INK * Color(1, 1, 1, 0.4 * alpha), 0.9)
 		return
-	var y := rect.position.y + 86.0
+
+	# I0.4. This was a spreadsheet: name, condition and weight in aligned
+	# columns with half the page blank. You are carrying pieces of people, and a
+	# packing manifest is the one presentation that makes that ordinary. They are
+	# drawn as objects in a bag now — sized by their real mass, shaped by what
+	# they are, tinted by how fresh they are, and tagged with whose they were.
+	var columns := 3
+	var rows := maxi(int(ceil(float(carry.items.size()) / float(columns))), 1)
+	var row_height := 108.0
+	var bag_bottom := rect.end.y - 42.0
+	var bag_top := maxf(rect.position.y + 72.0, bag_bottom - 96.0 - float(rows) * row_height)
+	var bag := Rect2(Vector2(rect.position.x + 24.0, bag_top), Vector2(rect.size.x - 48.0, bag_bottom - bag_top))
+	draw_rect(bag, Color(0, 0, 0, 0.22 * alpha))
+	draw_rect(bag, INK * Color(1, 1, 1, 0.10 * alpha), false, 1.0)
+	# A slack line across the top: the mouth of the bag, sagging under the load.
+	var sag := 6.0 + burden * 16.0
+	var mouth := PackedVector2Array()
+	for step in 13:
+		var t := float(step) / 12.0
+		mouth.append(bag.position + Vector2(bag.size.x * t, sin(t * PI) * sag))
+	draw_polyline(mouth, INK * Color(1, 1, 1, 0.22 * alpha), 1.5)
+	# Things settle to the bottom of a bag. Rows fill upward from the floor, so
+	# the empty space is under the slack mouth rather than below the contents
+	# like unused rows of a table.
+	var floor_y := bag.end.y - 58.0
+	var ceiling := bag.position.y + 40.0
+	if rows > 1:
+		row_height = minf(row_height, (floor_y - ceiling) / float(rows - 1))
+	var top_row := floor_y - float(rows - 1) * row_height
+	var spread := (bag.size.x - 120.0) / float(columns - 1)
+	var cell_width := spread - 14.0
 	for index in carry.items.size():
-		if y > rect.end.y - 30.0:
-			break
 		var item: Dictionary = carry.items[index]
 		var fresh: float = carry.freshness(item)
-		var row_tint: Color = MOSS.lerp(ALERT, 1.0 - fresh)
-		# A pip coloured by condition, so the list is scannable without reading.
-		draw_circle(Vector2(rect.position.x + 32, y - 4), 4.0, row_tint * Color(1, 1, 1, alpha))
-		CellOutzType.draw_condensed(self, Vector2(rect.position.x + 46, y - 9), str(item.get("label", "")), 12.0, INK * Color(1, 1, 1, 0.88 * alpha), 0.9)
+		var mass := clampf(float(item.get("mass", 0.5)), 0.1, 4.0)
+		# Carry files layer names as kinds, so a severed arm arrives as "muscle"
+		# with whole_limb set. Shape follows what the thing actually is.
+		var kind := str(item.get("kind", "goods"))
+		if bool(item.get("whole_limb", false)):
+			kind = "limb"
+		# Each object takes the room its mass earns rather than a fixed line.
+		var radius := 19.0 + mass * 13.0
+		if kind != "organ" and kind != "cybernetic" and kind != "bone" and kind != "limb":
+			radius = maxf(radius, 23.0)
+		var column := index % columns
+		var row := index / columns
+		var at := Vector2(bag.position.x + 60.0 + float(column) * spread, top_row + float(row) * row_height)
+		# Nothing in a bag sits on a grid. Nudged off it, deterministically.
+		at += Vector2(sin(float(index) * 2.7) * 13.0, cos(float(index) * 1.9) * 9.0)
+		at.y = clampf(at.y, ceiling, floor_y)
+		# A shadow underneath, so the thing is resting on something.
+		draw_colored_polygon(_ellipse_points(at + Vector2(0, radius * 0.92), radius * 0.95, radius * 0.22, 14), Color(0, 0, 0, 0.35 * alpha))
+		_draw_carried(at, radius, kind, fresh, str(item.get("lien", "")), alpha)
+		var label := _fit(str(item.get("label", "")).to_upper(), cell_width, 9.0, 0.7)
+		var label_width := CellOutzType.width_condensed(label, 9.0, 0.7)
+		CellOutzType.draw_condensed(self, at + Vector2(-label_width * 0.5, radius + 12.0), label, 9.0, INK * Color(1, 1, 1, 0.85 * alpha), 0.7)
 		var from := str(item.get("from", ""))
 		if from != "":
-			var origin := str(WorldHistory.subject(from).get("name", from)).to_upper()
-			CellOutzType.draw_condensed(self, Vector2(rect.position.x + 46, y + 6), "OFF %s" % origin, 8.0, INK * Color(1, 1, 1, 0.32 * alpha), 0.7)
-		var state: String = carry.condition_label(item)
-		CellOutzType.draw_condensed(self, Vector2(rect.end.x - 190, y - 9), state, 10.0, row_tint * Color(1, 1, 1, alpha), 0.8)
-		CellOutzType.draw_condensed(self, Vector2(rect.end.x - 90, y - 9), "%0.1f KG" % float(item.get("mass", 0.0)), 10.0, INK * Color(1, 1, 1, 0.55 * alpha), 0.8)
-		y += 30.0
+			# A tag on a short string, low and to the right of the thing it is
+			# tied to. Somebody's name on your property is a label somebody else
+			# tied on, and it has to read as belonging to that object.
+			var origin := _fit(str(WorldHistory.subject(from).get("name", from)).to_upper(), cell_width * 0.8, 7.0, 0.6)
+			var tag_width := CellOutzType.width_condensed(origin, 7.0, 0.6)
+			var tag := Rect2(at + Vector2(radius * 0.86, radius * 0.46), Vector2(tag_width + 11.0, 13.0))
+			var knot := at + Vector2(radius * 0.42, radius * 0.18)
+			if tag.end.x > bag.end.x - 8.0:
+				tag.position.x = at.x - radius * 0.86 - tag.size.x
+				knot = at + Vector2(-radius * 0.42, radius * 0.18)
+			draw_line(knot, tag.position + Vector2(tag.size.x * 0.5, 3), INK * Color(1, 1, 1, 0.3 * alpha), 1.0)
+			draw_rect(tag, Color("d9c49a") * Color(1, 1, 1, 0.13 * alpha))
+			draw_rect(tag, INK * Color(1, 1, 1, 0.22 * alpha), false, 1.0)
+			CellOutzType.draw_condensed(self, tag.position + Vector2(5, 3), origin, 7.0, Color("d9c49a") * Color(1, 1, 1, 0.7 * alpha), 0.6)
+
+
+## Trims a label to the room its own cell has. Nothing on this page is allowed
+## to run into its neighbour, which is what made the old columns necessary.
+static func _fit(text: String, width: float, cap_height: float, tracking: float) -> String:
+	if CellOutzType.width_condensed(text, cap_height, tracking) <= width:
+		return text
+	var trimmed := text
+	while trimmed.length() > 1 and CellOutzType.width_condensed(trimmed + ".", cap_height, tracking) > width:
+		trimmed = trimmed.substr(0, trimmed.length() - 1)
+	return trimmed.strip_edges() + "."
+
+
+static func _ellipse_points(centre: Vector2, radius_x: float, radius_y: float, segments: int) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for index in segments:
+		var angle := TAU * float(index) / float(segments)
+		points.append(centre + Vector2(cos(angle) * radius_x, sin(angle) * radius_y))
+	return points
+
+
+## Each kind of thing is a different shape, so a bag of parts can be read at a
+## glance without any of it being named.
+func _draw_carried(at: Vector2, radius: float, kind: String, fresh: float, lien: String, alpha: float) -> void:
+	var wet: Color = Color("7a1a16").lerp(Color("46402c"), 1.0 - fresh)
+	match kind:
+		"organ":
+			# Lobed and glistening while it is fresh, dull and shrunken when not.
+			for lobe in 3:
+				var offset := Vector2(cos(float(lobe) * 2.2) * radius * 0.28, sin(float(lobe) * 2.2) * radius * 0.22)
+				draw_circle(at + offset, radius * (0.72 - float(lobe) * 0.08), wet * Color(1, 1, 1, (0.55 + fresh * 0.35) * alpha))
+			draw_circle(at + Vector2(-radius * 0.22, -radius * 0.26), radius * 0.16, Color(1, 1, 1, 0.16 * fresh * alpha))
+		"limb":
+			# A tapered mass with bone showing at the cut.
+			draw_colored_polygon(PackedVector2Array([
+				at + Vector2(-radius * 0.38, -radius), at + Vector2(radius * 0.38, -radius * 0.86),
+				at + Vector2(radius * 0.26, radius), at + Vector2(-radius * 0.3, radius * 0.9),
+			]), wet * Color(1, 1, 1, (0.6 + fresh * 0.3) * alpha))
+			draw_circle(at + Vector2(0, -radius * 0.92), radius * 0.2, Color("cfc2a4") * Color(1, 1, 1, 0.8 * alpha))
+		"bone":
+			# Pale, hard, and the only thing in the bag that does not rot.
+			draw_colored_polygon(PackedVector2Array([
+				at + Vector2(-radius * 0.26, -radius), at + Vector2(radius * 0.26, -radius),
+				at + Vector2(radius * 0.2, radius * 0.9), at + Vector2(-radius * 0.2, radius * 0.9),
+			]), Color("cfc2a4") * Color(1, 1, 1, 0.72 * alpha))
+			for knuckle in [-1.0, 1.0]:
+				draw_circle(at + Vector2(-radius * 0.2, knuckle * radius * 0.94), radius * 0.22, Color("cfc2a4") * Color(1, 1, 1, 0.8 * alpha))
+				draw_circle(at + Vector2(radius * 0.2, knuckle * radius * 0.94), radius * 0.22, Color("cfc2a4") * Color(1, 1, 1, 0.8 * alpha))
+		"cybernetic":
+			# Machined: flat faces, a seam, a mounting lug.
+			draw_rect(Rect2(at - Vector2(radius * 0.62, radius * 0.5), Vector2(radius * 1.24, radius)), Color("8d9299") * Color(1, 1, 1, 0.62 * alpha))
+			draw_rect(Rect2(at - Vector2(radius * 0.62, radius * 0.5), Vector2(radius * 1.24, radius)), Color("c1642c") * Color(1, 1, 1, 0.5 * alpha), false, 1.0)
+			draw_line(at - Vector2(radius * 0.62, 0), at + Vector2(radius * 0.62, 0), Color("c1642c") * Color(1, 1, 1, 0.35 * alpha), 1.0)
+			draw_circle(at + Vector2(radius * 0.48, -radius * 0.34), radius * 0.1, Color("c1642c") * Color(1, 1, 1, 0.7 * alpha))
+		_:
+			# Anything else is a sack: heavy at the bottom, gathered and tied at
+			# the neck. A small tied rectangle read as a checkerboard, which is
+			# the one thing a bag of loot must not look like.
+			var body := PackedVector2Array()
+			for step in 15:
+				var angle := PI * (0.12 + 0.76 * float(step) / 14.0)
+				body.append(at + Vector2(cos(angle) * -radius * 0.86, radius * 0.34 + sin(angle) * radius * 0.7))
+			body.append(at + Vector2(radius * 0.2, -radius * 0.42))
+			body.append(at + Vector2(-radius * 0.2, -radius * 0.42))
+			draw_colored_polygon(body, Color("46402c") * Color(1, 1, 1, 0.62 * alpha))
+			# The neck, pinched by a tie, with the cloth flaring above it.
+			draw_line(at + Vector2(-radius * 0.26, -radius * 0.4), at + Vector2(radius * 0.26, -radius * 0.4), Color("6e6248") * Color(1, 1, 1, 0.6 * alpha), 3.0)
+			draw_colored_polygon(PackedVector2Array([
+				at + Vector2(-radius * 0.22, -radius * 0.42), at + Vector2(radius * 0.22, -radius * 0.42),
+				at + Vector2(radius * 0.4, -radius * 0.78), at + Vector2(-radius * 0.38, -radius * 0.74),
+			]), Color("3b3626") * Color(1, 1, 1, 0.55 * alpha))
+			# Two creases, so the cloth has weight in it.
+			draw_line(at + Vector2(-radius * 0.3, -radius * 0.1), at + Vector2(-radius * 0.16, radius * 0.6), INK * Color(1, 1, 1, 0.16 * alpha), 1.0)
+			draw_line(at + Vector2(radius * 0.22, -radius * 0.08), at + Vector2(radius * 0.3, radius * 0.52), INK * Color(1, 1, 1, 0.16 * alpha), 1.0)
+
+	# Spoilage reads as a stain under the thing rather than as a number.
+	if fresh < 0.7:
+		Grunge.stain(self, at + Vector2(0, radius * 0.7), radius * (1.4 - fresh), int(at.x), Grunge.DRIED, (0.7 - fresh) * 0.35 * alpha)
+	# A lien is somebody's claim on it, and it should be visible on the object.
+	if lien != "":
+		draw_arc(at, radius + 5.0, 0.0, TAU, 22, Color("b8a12a") * Color(1, 1, 1, 0.5 * alpha), 1.0)
+		CellOutzType.draw_condensed(self, at + Vector2(-radius, -radius - 16.0), "OWED", 7.0, Color("b8a12a") * Color(1, 1, 1, 0.75 * alpha), 0.6)
 
 
 func _wrap(text: String, width: int) -> Array:

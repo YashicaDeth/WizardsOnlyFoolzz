@@ -553,7 +553,7 @@ finished. Applies to everything below and to A5, A6, C1.
 - [ ] **I0.8** The weapon well reworked
 - [ ] **I0.9** Cast display names reworked — ids stay, names change (blocked on Greg's list)
 - [ ] **I0.3** Applied to the map
-- [ ] **I0.4** Applied to the handheld
+- [x] **I0.4** Applied to the handheld — CARRY draws what you took as objects in a bag, not rows
 
 ### I1 — Code as a material
 - [x] **I1.1** Character rain carrying the game's own vocabulary
