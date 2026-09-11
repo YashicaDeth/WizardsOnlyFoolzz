@@ -40,6 +40,12 @@ const GRIND_TRIGGER := 0.45
 const SHOVE_IMPULSE := 3.5
 const SHOVE_SPIN := 1.2
 const SHOVE_STUN := 0.35
+## Nobody in a derby sits still with the throttle buried. A car that cannot make
+## progress backs itself out and swings clear, so neither the player nor the pit
+## ever needs a reset key to get moving again.
+const STUCK_SPEED := 1.2
+const STUCK_SECONDS := 2.0
+const UNSTICK_IMPULSE := 4.5
 
 var throttle := 0.0
 var steering := 0.0
@@ -49,6 +55,7 @@ var contact_cooldowns: Dictionary = {}
 var signed_speed := 0.0
 var stun := 0.0
 var contact_seconds := 0.0
+var stuck_seconds := 0.0
 var grind_side := 1.0
 
 func _ready() -> void:
@@ -91,6 +98,12 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 			state.apply_torque(Vector3.UP * (yaw_target - state.angular_velocity.y) * mass * 6.0)
 	else:
 		state.apply_central_force(-Vector3(state.linear_velocity.x, 0, state.linear_velocity.z) * mass * 5.0)
+	if enabled and stun <= 0.0 and absf(throttle) > 0.25 and absf(signed_speed) < STUCK_SPEED:
+		stuck_seconds += state.step
+		if stuck_seconds >= STUCK_SECONDS:
+			_shunt_free(state, forward)
+	else:
+		stuck_seconds = 0.0
 	_resolve_contacts(state)
 	previous_velocity = state.linear_velocity
 
@@ -154,6 +167,14 @@ func _shove_off(state: PhysicsDirectBodyState3D, away: Vector3) -> void:
 	stun = maxf(stun, SHOVE_STUN)
 	contact_seconds = 0.0
 
+func _shunt_free(state: PhysicsDirectBodyState3D, forward: Vector3) -> void:
+	state.apply_central_impulse(-forward * signf(throttle) * UNSTICK_IMPULSE * mass)
+	if state.inverse_inertia.y > 0.0:
+		state.apply_torque_impulse(Vector3.UP * grind_side * SHOVE_SPIN / state.inverse_inertia.y)
+	stun = maxf(stun, SHOVE_STUN)
+	stuck_seconds = 0.0
+	contact_seconds = 0.0
+
 func recover(at: Vector3) -> void:
 	global_position = at
 	rotation = Vector3.ZERO
@@ -162,4 +183,5 @@ func recover(at: Vector3) -> void:
 	previous_velocity = Vector3.ZERO
 	stun = 0.0
 	contact_seconds = 0.0
+	stuck_seconds = 0.0
 	contact_cooldowns.clear()

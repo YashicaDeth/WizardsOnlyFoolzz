@@ -24,6 +24,7 @@ func _ready() -> void:
 	await _test_head_on()
 	await _test_grip_cap()
 	await _test_grind_breaks()
+	await _test_unstick()
 	print("IMPACT_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
 
@@ -103,6 +104,33 @@ func _test_grip_cap() -> void:
 	var lateral: float = car.linear_velocity.dot(car.global_transform.basis.x)
 	check(lateral > 6.5, "capped grip lets a side impact carry the car (%.1f m/s)" % lateral)
 	car.queue_free()
+	await _settle(2)
+
+
+func _test_unstick() -> void:
+	var wall := StaticBody3D.new()
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(24, 6, 2)
+	collision.shape = shape
+	wall.add_child(collision)
+	add_child(wall)
+	wall.global_position = Vector3(120, 1.5, -8)
+	var car := _spawn(Vector3(120, 0.75, -4.2), 0.0)
+	car.throttle = 1.0
+	# Let it bury itself in the wall first, so the baseline is the pinned
+	# position rather than where it started.
+	await _settle(60)
+	var pinned: float = car.global_position.z
+	var peak := pinned
+	for frame in 200:
+		await get_tree().physics_frame
+		peak = maxf(peak, car.global_position.z)
+	# Nose-in against a barrier used to mean pressing R. The chassis backs
+	# itself out now, so neither the pit nor the player ever stalls.
+	check(peak > pinned + 0.8, "a car nosed into a wall frees itself (pinned %.2f m, backed to %.2f m)" % [pinned, peak])
+	car.queue_free()
+	wall.queue_free()
 	await _settle(2)
 
 

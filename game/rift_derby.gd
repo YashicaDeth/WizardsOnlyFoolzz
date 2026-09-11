@@ -36,6 +36,8 @@ var camera_shake := 0.0
 var disabled_count := 0
 var round_state := "countdown"
 var countdown := 3.0
+var result_countdown := 0.0
+var leaving := false
 var authored_collision_count := 0
 var derby_audio: Node
 var kill_cam: Control
@@ -112,8 +114,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			WorldHistory.record_event("player_left_derby_vehicle", {"venue": "rift_derby_quarry", "destination": "bone_yard_outskirts"})
 			get_tree().change_scene_to_file("res://bone_yard_hunt.tscn")
 		elif event.keycode == KEY_ENTER and round_state in ["won", "lost"]:
-			WorldHistory.record_event("derby_result_accepted", {"result": round_state, "score": score, "disabled": disabled_count})
-			get_tree().change_scene_to_file("res://bone_yard_hunt.tscn")
+			_leave_derby(round_state)
 
 
 func _physics_process(delta: float) -> void:
@@ -128,7 +129,9 @@ func _physics_process(delta: float) -> void:
 			round_state = "active"
 		return
 	if round_state != "active":
+		_update_result(delta)
 		_update_debris(delta)
+		_update_camera(delta)
 		_update_hud()
 		return
 	_update_boat(delta)
@@ -437,9 +440,9 @@ func _update_camera(delta: float) -> void:
 
 
 func _update_hud() -> void:
-	status.text = "BONE YARD DERBY  //  %s\nWASD DRIVE  ·  R RESET  ·  V VISCERA FX  ·  I WORLD INDEX  ·  E LEAVE VEHICLE" % round_state.to_upper()
+	status.text = "BONE YARD DERBY  //  %s\nWASD DRIVE  ·  V VISCERA FX  ·  I WORLD INDEX  ·  E LEAVE VEHICLE" % round_state.to_upper()
 	score_label.text = "IMPACT SCORE  %05d\nHULL INTEGRITY  %03d%%\nACTIVE WRECKERS  %02d\nWORLD MEMORY  %03d" % [score, integrity, targets.size(), WorldHistory.event_count()]
-	mode_label.text = ("VICTORY — ENTER: EXIT INTO ASHBLOOM" if round_state == "won" else "WRECKED — ENTER: CRAWL INTO ASHBLOOM" if round_state == "lost" else "VISCERA FX: %s  ·  RUST / OIL / BLOOD" % ("ON" if viscera_fx else "OFF"))
+	mode_label.text = ("VICTORY  //  HAULED OUT TO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "won" else "WRECKED  //  DRAGGED INTO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "lost" else "VISCERA FX: %s  ·  RUST / OIL / BLOOD" % ("ON" if viscera_fx else "OFF"))
 	var rival := WorldHistory.subject(RIVAL_ID)
 	rival_label.text = "HUNT ARC  //  MARA VOSS\n%s  ·  GRUDGE %03d  ·  ELO %04d\n[I] WORLD INDEX" % [str(rival.get("status", "active")).to_upper(), int(rival.get("grudge", 0)), int(rival.get("elo", 1180))]
 	if cab_screens != null:
@@ -522,12 +525,31 @@ func _reset_round() -> void:
 	WorldHistory.record_event("derby_round_reset", {"venue": "rift_derby_quarry"})
 
 
+## The heat resolves on its own. Making the player press a key to acknowledge an
+## outcome the world already decided reads as a test harness, not a game.
+func _update_result(delta: float) -> void:
+	if leaving or not (round_state in ["won", "lost"]):
+		return
+	result_countdown = maxf(0.0, result_countdown - delta)
+	if result_countdown <= 0.0:
+		_leave_derby(round_state)
+
+
+func _leave_derby(result: String) -> void:
+	if leaving:
+		return
+	leaving = true
+	WorldHistory.record_event("derby_result_accepted", {"result": result, "score": score, "disabled": disabled_count})
+	get_tree().change_scene_to_file("res://bone_yard_hunt.tscn")
+
+
 func _finish_round(result: String) -> void:
 	if round_state != "active":
 		return
 	round_state = result
 	mode_label.visible = true
 	speed = 0.0
+	result_countdown = 5.0
 	respawn_queue.clear()
 	WorldHistory.record_event("derby_round_%s" % result, {"venue": "rift_derby_quarry", "score": score, "disabled": disabled_count, "integrity": integrity})
 

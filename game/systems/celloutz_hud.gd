@@ -180,7 +180,7 @@ func _draw_event_feed(viewport: Vector2) -> void:
 
 func _draw_control_ribbon(viewport: Vector2) -> void:
 	var font := ThemeDB.fallback_font
-	var text := "WASD DRIVE    [R] RESET    [V] VISCERA    [I] WORLD INDEX    [E] EXIT VEHICLE"
+	var text := "WASD DRIVE    [V] VISCERA    [I] WORLD INDEX    [E] EXIT VEHICLE"
 	var y := viewport.y - 28.0
 	draw_string(font, Vector2(viewport.x * 0.5 - 350, y), text, HORIZONTAL_ALIGNMENT_CENTER, 700, 12, INK * Color(1, 1, 1, 0.76))
 	draw_line(Vector2(viewport.x * 0.5 - 370, y + 8), Vector2(viewport.x * 0.5 + 370, y + 8), Color(0.95, 0.28, 0.08, 0.32), 1)
