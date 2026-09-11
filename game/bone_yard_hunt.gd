@@ -429,7 +429,7 @@ func _resolve_strike() -> void:
 		if lateral.length() > 0.45:
 			lateral = lateral.normalized() * 0.45
 		var aim := enemy.global_position + Vector3(lateral.x, look.y * 4.1 * 1.2, lateral.z)
-		var wound := enemy_rig.hit_at(aim, float(damage), float(damage) * 0.8, "cut")
+		var wound := enemy_rig.hit_at(aim, float(damage), float(damage) * 0.8, "cut", look)
 		body_zone = str(wound.get("zone", "torso"))
 		WorldHistory.update_subject(HUNT_ID, {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
 	enemy_health = maxi(0, enemy_health - damage)
@@ -494,7 +494,7 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		if lateral.length() > 0.45:
 			lateral = lateral.normalized() * 0.45
 		var aim := target.global_position + Vector3(lateral.x, look.y * reach * 1.2, lateral.z)
-		result = rig.hit_at(aim, float(attack.damage), float(attack.impulse), str(attack.damage_type))
+		result = rig.hit_at(aim, float(attack.damage), float(attack.impulse), str(attack.damage_type), look)
 		zone = str(result.get("zone", "torso"))
 	else:
 		result = anatomy.call("apply_hit", zone, float(attack.damage), float(attack.impulse), str(attack.damage_type))
@@ -504,9 +504,9 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": anatomy.call("snapshot")}, "anatomy_changed")
 	_spawn_blood(target.global_position + Vector3(0, 1.1, 0), roundi(float(attack.damage)))
 	WorldHistory.record_event("npc_anatomy_hit", {"subject_id": actor.subject_id, "weapon": attack.weapon, "zone": zone, "result": result, "location": HUNT_LOCATION})
-	if bool(result.get("disabled", false)) and zone in ["left_arm", "right_arm", "left_leg", "right_leg"]:
-		_spawn_severed_part(target.global_position + Vector3(0, 1.0, 0), zone)
-	if anatomy.critical or anatomy.pain >= 68.0:
+	if bool(result.get("severed", false)) and not anatomy.dead and not anatomy.downed:
+		_apply_maiming_state(actor, [zone], result.get("sever_direction", Vector3.ZERO))
+	elif anatomy.critical or anatomy.pain >= 68.0:
 		actor.state = "fleeing"
 		actor.loot_at_risk = true
 		prompt.text = "%s IS BLEEDING OUT AND ESCAPING — CHASE FOR THEIR LOOT OR LET THEM GO." % str(actor.display_name).to_upper()
@@ -525,16 +525,18 @@ func _resolve_firearm(attack: Dictionary) -> void:
 			continue
 		var actor: Dictionary = hit.actor
 		var rig := actor.rig as BaselineHuman
-		var result := rig.hit_at(hit.position, float(attack.damage), float(attack.impulse), str(attack.damage_type))
+		var result := rig.hit_at(hit.position, float(attack.damage), float(attack.impulse), str(attack.damage_type), direction)
 		var id := str(actor.subject_id)
 		if not impacts.has(id):
-			impacts[id] = {"actor": actor, "zones": [], "damage": 0.0, "ruptures": []}
+			impacts[id] = {"actor": actor, "zones": [], "damage": 0.0, "ruptures": [], "severed": []}
 		var summary: Dictionary = impacts[id]
 		summary.zones.append(str(result.get("zone", "torso")))
 		summary.damage = float(summary.damage) + float(result.get("damage", 0.0))
 		var organ := result.get("organ", {}) as Dictionary
 		if bool(organ.get("ruptured", false)):
 			summary.ruptures.append(str(organ.get("zone", "internal")))
+		if bool(result.get("severed", false)):
+			summary.severed.append(str(result.get("zone", "limb")))
 		impacts[id] = summary
 		(actor.node as CharacterBody3D).velocity += direction * minf(6.0, float(attack.impulse) * 0.075)
 	for id in impacts:
@@ -543,13 +545,15 @@ func _resolve_firearm(attack: Dictionary) -> void:
 		WorldHistory.update_subject(id, {"anatomy_state": actor.rig.snapshot()}, "anatomy_changed")
 		WorldHistory.record_event("firearm_anatomy_hit", {
 			"subject_id": id, "weapon": attack.weapon, "zones": summary.zones,
-			"damage": snappedf(float(summary.damage), 0.1), "ruptures": summary.ruptures,
+			"damage": snappedf(float(summary.damage), 0.1), "ruptures": summary.ruptures, "severed": summary.severed,
 			"location": HUNT_LOCATION,
 		})
 		if actor.anatomy.dead:
 			_kill_encounter_actor(encounter_actors.find(actor), str(attack.weapon))
 		elif actor.anatomy.downed:
 			actor.state = "downed"
+		elif not (summary.severed as Array).is_empty():
+			_apply_maiming_state(actor, summary.severed, forward)
 		elif actor.anatomy.critical or actor.anatomy.pain >= 68.0:
 			actor.state = "fleeing"
 			actor.loot_at_risk = true
@@ -754,6 +758,10 @@ func _update_encounter_actors(delta: float) -> void:
 		var offset := player - node.global_position
 		offset.y = 0
 		var distance := offset.length()
+		if str(actor.get("state", "idle")) == "maimed":
+			actor["maimed_remaining"] = maxf(0.0, float(actor.get("maimed_remaining", 0.0)) - delta)
+			if float(actor.maimed_remaining) <= 0.0:
+				actor.state = "hunting"
 		if str(actor.get("state", "idle")) == "fleeing":
 			var away := -offset.normalized() if distance > 0.1 else Vector3.FORWARD
 			_move_actor_on_route(actor, node.global_position + away * 40.0, delta)
@@ -766,13 +774,50 @@ func _update_encounter_actors(delta: float) -> void:
 			_move_actor_on_route(actor, player, delta)
 		elif distance <= 3.0:
 			actor["attack_time"] = float(actor.get("attack_time", 0.0)) + delta
-			if float(actor.attack_time) > 0.8:
+			var attack_cycle := _actor_attack_cycle(actor)
+			if float(actor.attack_time) > attack_cycle * 0.57:
 				prompt.text = "%s RAISES THEIR WEAPON" % str(actor.display_name).to_upper()
-			if float(actor.attack_time) >= 1.4:
+			if float(actor.attack_time) >= attack_cycle:
 				actor.attack_time = 0.0
 				if dodge_remaining <= 0.0:
-					health = maxi(1, health - 9)
-					_wound_player(node.global_position, 15.0, "cut")
+					health = maxi(1, health - _actor_attack_damage(actor))
+					_wound_player(node.global_position, maxf(5.0, 15.0 * _actor_combat_ratio(actor)), "cut")
+
+
+func _actor_combat_ratio(actor: Dictionary) -> float:
+	var anatomy := actor.get("anatomy") as AnatomyComponent
+	return anatomy.combat_ratio() if anatomy != null else 1.0
+
+
+func _actor_attack_cycle(actor: Dictionary) -> float:
+	return lerpf(2.4, 1.4, _actor_combat_ratio(actor))
+
+
+func _actor_attack_damage(actor: Dictionary) -> int:
+	return maxi(2, roundi(9.0 * _actor_combat_ratio(actor)))
+
+
+func _apply_maiming_state(actor: Dictionary, zones: Array, direction: Vector3) -> void:
+	if zones.is_empty() or actor.anatomy.dead or actor.anatomy.downed:
+		return
+	actor.state = "maimed"
+	actor["maimed_remaining"] = 2.4
+	actor["loot_at_risk"] = false
+	var ratio := _actor_combat_ratio(actor)
+	WorldHistory.update_subject(str(actor.subject_id), {
+		"status": "maimed_fighting",
+		"anatomy_state": actor.rig.snapshot(),
+		"memory": "Lost %s and kept fighting." % ", ".join(PackedStringArray(zones)),
+	}, "limb_severed_in_combat")
+	WorldHistory.record_event("limb_severed_in_combat", {
+		"subject_id": actor.subject_id,
+		"zones": zones.duplicate(),
+		"direction": direction,
+		"combat_ratio": snappedf(ratio, 0.01),
+		"alive": true,
+		"location": HUNT_LOCATION,
+	})
+	prompt.text = "%s LOSES %s — STILL FIGHTING AT %d%%" % [str(actor.display_name).to_upper(), str(zones[0]).replace("_", " ").to_upper(), roundi(ratio * 100.0)]
 
 func _move_actor_on_route(actor: Dictionary, destination: Vector3, delta: float) -> void:
 	var body := actor.node as CharacterBody3D
@@ -1536,20 +1581,6 @@ func _spawn_misfire_marker(title_text: String, summary: String, at: Vector3, kin
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.font_size = 24
 	marker.add_child(label)
-
-
-func _spawn_severed_part(at: Vector3, zone: String) -> void:
-	var part := MeshInstance3D.new()
-	var mesh := CapsuleMesh.new()
-	mesh.radius = 0.16
-	mesh.height = 0.72
-	mesh.material = _material(Color("6b1714"), 0.0)
-	part.mesh = mesh
-	part.position = at + Vector3(randf_range(-0.5, 0.5), 0.5, randf_range(-0.5, 0.5))
-	part.rotation = Vector3(randf(), randf(), randf())
-	add_child(part)
-	WorldHistory.record_event("limb_severed", {"zone": zone, "location": HUNT_LOCATION})
-	get_tree().create_timer(18.0).timeout.connect(part.queue_free)
 
 
 func _spawn_loot_cache(at: Vector3, items: Array) -> void:

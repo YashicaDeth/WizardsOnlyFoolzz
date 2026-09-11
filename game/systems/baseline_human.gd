@@ -18,11 +18,15 @@ extends Node3D
 ## place to speak from.
 
 signal zone_disabled(zone_id: String)
+signal limb_severed(zone_id: String, report: Dictionary)
 signal went_down()
 signal resolved(outcome: String)
 
 const ZONES := ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"]
 const LIMBS := ["left_arm", "right_arm", "left_leg", "right_leg"]
+const SEVERING_DAMAGE := ["cut", "shear", "ballistic"]
+const SEVER_THRESHOLD_RATIO := 0.85
+const SEVER_HEALTH_RATIO := 0.25
 
 ## Every loose spelling that existed at a call site, mapped onto the canonical
 ## zone. Kept so old saves and old events stay readable rather than resolving to
@@ -102,6 +106,9 @@ var _xray := false
 var subject_id := ""
 var parts: Dictionary = {}
 var severed: Array[String] = []
+## Cutting force accumulates separately from health. A club can destroy an arm,
+## but only a directional cutting/ballistic blow can take it off.
+var sever_stress: Dictionary = {}
 ## Deepest `GoreChunks.Layer` any blow has reached, per zone. A body remembers
 ## how far it has been opened, not just how much health it has left.
 var zone_depth: Dictionary = {}
@@ -175,7 +182,15 @@ func build(id: String, config: Dictionary = {}) -> void:
 	for zone_id in ZONES:
 		_refresh_zone(zone_id)
 	if config.get("restore") is Dictionary:
-		anatomy.restore(config.restore)
+		var restored: Dictionary = config.restore
+		anatomy.restore(restored)
+		severed.clear()
+		for zone_id in restored.get("severed", []):
+			var canonical := canonical_zone(str(zone_id))
+			if LIMBS.has(canonical) or canonical == "head":
+				severed.append(canonical)
+		sever_stress = (restored.get("sever_stress", {}) as Dictionary).duplicate(true)
+		zone_depth = (restored.get("zone_depth", {}) as Dictionary).duplicate(true)
 		if anatomy.downed:
 			rotation.x = -PI * 0.46
 		for zone_id in ZONES:
@@ -304,29 +319,77 @@ func reveal_organs(revealed: bool) -> void:
 			part.transparency = 0.62 if revealed else 0.0
 
 
-func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "") -> Dictionary:
+func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "", hit_direction := Vector3.ZERO) -> Dictionary:
 	var zone := canonical_zone(zone_id)
+	if severed.has(zone) and not anatomy.installed_parts.has(zone):
+		return {"accepted": false, "reason": "severed", "zone": zone, "severed": false}
 	var penetrates := damage_type in ["cut", "puncture", "ballistic", "shear"]
 	if penetrates and organ_id.is_empty():
 		organ_id = _organ_in_zone(zone)
 	var result := anatomy.apply_hit(zone, damage, impulse, damage_type, organ_id)
-	_refresh_zone(zone)
+	var direction := _resolved_hit_direction(zone, hit_direction)
+	var did_sever := _accumulate_sever_stress(zone, float(result.get("damage", 0.0)), damage_type, direction)
+	if did_sever:
+		_sever_zone(zone, direction, result)
+	else:
+		_refresh_zone(zone)
+	result["severed"] = did_sever
+	result["sever_stress"] = snappedf(float(sever_stress.get(zone, 0.0)), 0.1)
 	if gore and damage >= 5.0:
 		# Something that cuts opens you up; something that hits you bruises and
 		# breaks. The wet count follows from which one landed.
 		var penetrating := damage_type in ["cut", "puncture", "ballistic", "shear"]
-		_spray(_zone_origin(zone), Vector3.UP, clampi(roundi(damage / (2.1 if penetrating else 4.4)), 3, 26))
-		_shed_chunks(zone, damage, damage_type, organ_id)
+		_spray(_zone_origin(zone), (direction * 0.55 + Vector3.UP).normalized(), clampi(roundi(damage / (2.1 if penetrating else 4.4)), 3, 26))
+		_shed_chunks(zone, damage, damage_type, organ_id, direction)
 	if bool(result.get("disabled", false)):
 		zone_disabled.emit(zone)
 	return result
+
+
+func _resolved_hit_direction(zone: String, hit_direction: Vector3) -> Vector3:
+	if hit_direction.length_squared() > 0.001:
+		return hit_direction.normalized()
+	var outward := _zone_origin(zone) - global_position
+	outward.y = 0.0
+	return outward.normalized() if outward.length_squared() > 0.001 else Vector3.RIGHT
+
+
+func _accumulate_sever_stress(zone: String, damage: float, damage_type: String, direction: Vector3) -> bool:
+	if not LIMBS.has(zone) or anatomy.installed_parts.has(zone) or not SEVERING_DAMAGE.has(damage_type):
+		return false
+	var directionality := lerpf(0.35, 1.0, 1.0 - absf(direction.dot(Vector3.UP)))
+	var damage_weight := 1.35 if damage_type == "shear" else (0.75 if damage_type == "ballistic" else 1.0)
+	var stress := float(sever_stress.get(zone, 0.0)) + damage * damage_weight * directionality
+	sever_stress[zone] = stress
+	var ceiling := float(AnatomyComponent.DEFAULT_ZONES[zone].health)
+	var remaining_ratio := zone_health(zone) / maxf(1.0, ceiling)
+	return not severed.has(zone) and remaining_ratio <= SEVER_HEALTH_RATIO and stress >= ceiling * SEVER_THRESHOLD_RATIO
+
+
+func _sever_zone(zone: String, direction: Vector3, result: Dictionary) -> void:
+	if severed.has(zone):
+		return
+	var zone_state: Dictionary = anatomy.zones.get(zone, {})
+	if not zone_state.is_empty():
+		zone_state["health"] = 0.0
+		anatomy.zones[zone] = zone_state
+	severed.append(zone)
+	result["disabled"] = true
+	result["severed"] = true
+	result["sever_direction"] = direction
+	if gore:
+		_throw_limb(zone, direction)
+		_add_stump(zone)
+		_spray(_zone_origin(zone), (direction + Vector3.UP * 0.65).normalized(), 18)
+	_refresh_zone(zone)
+	limb_severed.emit(zone, result.duplicate(true))
 
 
 ## Throws the layers a blow actually went through, with the pieces carrying
 ## which person and which part of them they came off. Kept next to `_spray`
 ## rather than inside `GoreChunks` because only the rig knows the zone geometry,
 ## the installed hardware and how opened the zone already was.
-func _shed_chunks(zone: String, damage: float, damage_type: String, organ_id: String) -> void:
+func _shed_chunks(zone: String, damage: float, damage_type: String, organ_id: String, hit_direction := Vector3.ZERO) -> void:
 	var maximum: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone, {}) as Dictionary).get("health", 100.0))
 	var ratio := clampf(zone_health(zone) / maxf(1.0, maximum), 0.0, 1.0)
 	var depth := GoreChunks.depth_for(damage, damage_type, ratio)
@@ -339,7 +402,8 @@ func _shed_chunks(zone: String, damage: float, damage_type: String, organ_id: St
 	outward.y = 0.0
 	if outward.length() < 0.05:
 		outward = Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))
-	var heading := (outward.normalized() * 0.7 + Vector3.UP * 0.8).normalized()
+	var force_direction := hit_direction.normalized() if hit_direction.length_squared() > 0.001 else outward.normalized()
+	var heading := (force_direction * 0.7 + Vector3.UP * 0.8).normalized()
 	GoreChunks.burst(self, origin, heading, {
 		"depth": depth,
 		"zone": zone,
@@ -354,7 +418,7 @@ func exposed_layer(zone_id: String) -> int:
 	return int(zone_depth.get(canonical_zone(zone_id), 0))
 
 
-func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt") -> Dictionary:
+func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt", hit_direction := Vector3.ZERO) -> Dictionary:
 	var zone := zone_nearest(global_point)
 	var organ_id := ""
 	if damage_type in ["cut", "puncture", "ballistic", "shear"]:
@@ -363,7 +427,7 @@ func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type :=
 		# surface, so keep the two answers consistent with each other.
 		if not organ_id.is_empty() and str((ORGAN_LAYOUT[organ_id] as Dictionary).zone) != zone:
 			organ_id = _organ_in_zone(zone)
-	return hit(zone, damage, impulse, damage_type, organ_id)
+	return hit(zone, damage, impulse, damage_type, organ_id, hit_direction)
 
 
 func is_downed() -> bool:
@@ -466,12 +530,15 @@ func install_prosthetic(zone_id: String, part_data: Dictionary) -> void:
 		zone_state["health"] = maxf(float(zone_state.health), ceiling * clampf(restored, 0.0, 1.0))
 		anatomy.zones[zone] = zone_state
 	severed.erase(zone)
+	sever_stress.erase(zone)
 	_refresh_zone(zone)
 
 
 func snapshot() -> Dictionary:
 	var state := anatomy.snapshot()
 	state["severed"] = severed.duplicate()
+	state["sever_stress"] = sever_stress.duplicate(true)
+	state["zone_depth"] = zone_depth.duplicate(true)
 	return state
 
 
@@ -546,13 +613,9 @@ func _refresh_zone(zone_id: String) -> void:
 		part.transparency = clampf((FRACTURE_RATIO - ratio) / FRACTURE_RATIO, 0.0, 1.0) * 0.55 if exposed else 0.0
 	if gore and ratio < FRACTURE_RATIO and ratio > 0.0 and not prosthetic:
 		_add_fracture(zone_id)
-	if ratio <= 0.0 and LIMBS.has(zone_id) and not prosthetic:
-		if not severed.has(zone_id):
-			severed.append(zone_id)
-			if gore:
-				_throw_limb(zone_id)
-				_add_stump(zone_id)
-				_spray(_zone_origin(zone_id), Vector3.UP, 14)
+	if severed.has(zone_id) and not prosthetic:
+		if gore:
+			_add_stump(zone_id)
 		part.visible = false
 		var hitbox := get_node_or_null("%s_hitbox" % zone_id) as Area3D
 		if hitbox != null:
@@ -651,7 +714,7 @@ func _add_fracture(zone_id: String) -> void:
 ## A limb that comes off is the same geometry that was attached a moment ago,
 ## handed to the solver with the bone still in it. Hiding the mesh and calling it
 ## dismemberment is the version that reads as a bug.
-func _throw_limb(zone_id: String) -> void:
+func _throw_limb(zone_id: String, hit_direction := Vector3.ZERO) -> void:
 	var part := parts.get(zone_id) as MeshInstance3D
 	if part == null or not is_instance_valid(part) or not part.is_inside_tree():
 		return
@@ -678,7 +741,8 @@ func _throw_limb(zone_id: String) -> void:
 	shape.height = maxf(shape.radius * 2.0 + 0.01, bounds.size.y)
 	shape_node.shape = shape
 	limb.add_child(shape_node)
-	limb.apply_central_impulse(Vector3(randf_range(-1.6, 1.6), 2.6, randf_range(-1.6, 1.6)) * limb.mass)
+	var launch := hit_direction.normalized() if hit_direction.length_squared() > 0.001 else Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)).normalized()
+	limb.apply_central_impulse((launch * 2.25 + Vector3.UP * 2.1) * limb.mass)
 	limb.apply_torque_impulse(Vector3(randf_range(-3.0, 3.0), randf_range(-3.0, 3.0), randf_range(-3.0, 3.0)))
 	live_gore += 1
 	get_tree().create_timer(18.0).timeout.connect(func():

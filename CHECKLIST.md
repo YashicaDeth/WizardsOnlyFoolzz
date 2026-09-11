@@ -18,7 +18,7 @@ order, ignoring everything else:
 | 1 | ~~**A7.1–A7.3**~~ `DONE` | Driving is the first thing the player does and it does not feel like driving. Everything in the derby is downstream of this. |
 | 2 | ~~**A5.1–A5.3**~~ `DONE` | You cannot read your own state mid-heat. |
 | 3 | ~~**C1.1–C1.2**~~ `DONE` | Six panels on six keys is the reason nothing connects. |
-| 4 | **B6.2–B6.3** | A fight that continues after a limb comes off is the combat identity. |
+| 4 | ~~**B6.2–B6.3**~~ `DONE` | A fight that continues after a limb comes off is the combat identity. |
 | 5 | ~~**F1.1–F1.2**~~ `DONE` | Witnesses are the cheapest step that makes the world remember. |
 | 6 | ~~**D1.1–D2.2**~~ `DONE` | A character sheet, so a run is *yours*. |
 | 7 | **G6.1–G6.3** | The opening carries the first ten minutes. |
@@ -199,9 +199,9 @@ The most complete system in the project and, until this pass, the least visible.
 - [ ] **B5.6** Someone notices — the Choir price it, the owner remembers
 
 ### B6 — Dismemberment as a combat verb
-- [~] **B6.1** Severing exists on the rig with thrown limbs, stumps and exposed bone — but only as a death effect
-- [ ] **B6.2** Sever from a directional blow crossing a limb threshold *mid-fight*
-- [ ] **B6.3** The fight continues with them still in it, fighting worse
+- [x] **B6.1** Severing exists on the rig with thrown limbs, stumps and exposed bone, driven by the strike direction
+- [x] **B6.2** Sever from a directional blow crossing a limb threshold *mid-fight*
+- [x] **B6.3** The fight continues with them still in it, fighting worse
 - [ ] **B6.4** The severed limb is a chunk: pick it up, carry it, sell it, hit someone with it
 - [ ] **B6.5** Reciprocity — the player is dismembered and keeps playing
 - [ ] **B6.6** Stump behaviour: bleed rate, one-armed movement and attacks

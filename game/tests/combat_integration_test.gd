@@ -68,5 +68,27 @@ func _ready() -> void:
 	hunt._toggle_lock()
 	check(hunt.lock_target.is_empty(), "lock releases")
 
+	# B6 is not a detached-limb death animation. The live encounter actor loses
+	# the arm, remains hostile, and the same AI update uses its degraded anatomy
+	# to slow and weaken subsequent attacks.
+	var full_cycle: float = hunt._actor_attack_cycle(locked_actor)
+	var full_damage: int = hunt._actor_attack_damage(locked_actor)
+	locked_actor.rig.hit("right_arm", 44.0, 28.0, "cut", "", Vector3.RIGHT)
+	var sever: Dictionary = locked_actor.rig.hit("right_arm", 44.0, 28.0, "cut", "", Vector3.RIGHT)
+	check(bool(sever.get("severed", false)), "a directional blow severs a live encounter actor mid-fight")
+	hunt._apply_maiming_state(locked_actor, ["right_arm"], Vector3.RIGHT)
+	check(locked_actor.state == "maimed" and not locked_actor.anatomy.dead and not locked_actor.anatomy.downed, "the maimed actor remains alive, standing and hostile")
+	check(hunt._actor_attack_cycle(locked_actor) > full_cycle, "the one-armed fighter attacks more slowly")
+	check(hunt._actor_attack_damage(locked_actor) < full_damage, "the one-armed fighter hits less hard")
+	check(WorldHistory.recent_events(20).any(func(event): return str(event.get("type", "")) == "limb_severed_in_combat"), "mid-fight limb loss enters persistent world history")
+	for candidate in hunt.encounter_actors:
+		candidate.disposition = "friendly"
+	locked_actor.disposition = "hostile"
+	locked_actor.node.position = hunt.player + Vector3(0, -0.5, 2.0)
+	locked_actor.attack_time = hunt._actor_attack_cycle(locked_actor)
+	var player_health_before: int = hunt.health
+	hunt._update_encounter_actors(0.01)
+	check(hunt.health == player_health_before - hunt._actor_attack_damage(locked_actor), "the maimed actor actually continues attacking through the normal AI loop")
+
 	print("COMBAT_INTEGRATION_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

@@ -152,12 +152,12 @@ lives. The pieces you will touch most:
 
 `CHECKLIST.md` is the working document and is driven by segment id — say `B5.2`
 and build that segment. Status: `[x]` built and verified, `[~]` partial with the
-remainder named, `[ ]` not started. **113 of 253 segments done.**
+remainder named, `[ ]` not started. **118 of 253 segments done.**
 
 | Section | Done | State |
 | --- | --- | --- |
 | **A** — visual pass, HUD, map, driving, radio | 53/53 | **complete** |
-| **B** — the body as centrepiece | 13/46 | B0–B4 built, B5 and B6 open |
+| **B** — the body as centrepiece | 16/46 | B0–B4 and B6.1–B6.3 built; B5 open |
 | **C** — the handheld | 17/21 | C1–C5 built, C3 camera open |
 | **D** — character creation in the vat | 25/29 | built bar cutscenes |
 | **E** — rituals, karma, the two ladders | 0/23 | designed, unbuilt |
@@ -170,13 +170,13 @@ remainder named, `[ ]` not started. **113 of 253 segments done.**
 ### The critical path to something playable
 
 Greg's measure: *"until it's sharper and sharper so that you can play the game."*
-Six of seven done. **One left:**
+**All seven foundation gates are now complete.** The last gate was:
 
-> **B6.2–B6.3 — dismemberment as a combat verb.** Sever from a directional blow
-> crossing a limb threshold *mid-fight*, and the fight continues with them still
-> in it, fighting worse. Severing already exists on the rig with thrown limbs,
-> stumps and exposed bone — but only as a death effect. This is the combat
-> identity of the game and it is the last thing between here and a playable loop.
+> ~~**B6.2–B6.3 — dismemberment as a combat verb.**~~ `DONE` Directional cut,
+> shear and ballistic force accumulates separately from health; crossing the
+> threshold takes the limb off during the fight. The NPC remains alive and
+> hostile, then attacks again with anatomy-driven lower damage and a slower
+> cadence. Blunt force can disable and fracture a limb but cannot detach it.
 
 ### Next most valuable after that
 

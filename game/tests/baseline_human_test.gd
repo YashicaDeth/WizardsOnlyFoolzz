@@ -98,12 +98,46 @@ func _test_hit_geometry() -> void:
 
 
 func _test_severing() -> void:
+	# Health loss and detachment are intentionally separate. A club can ruin a
+	# limb, but it cannot behave like an invisible sword.
+	var broken := _rig()
+	broken.gore = false
+	for i in 4:
+		broken.hit("right_arm", 25.0, 20.0, "blunt", "", Vector3.RIGHT)
+	check(is_zero_approx(broken.zone_health("right_arm")), "blunt force can fully disable an arm")
+	check(not broken.severed.has("right_arm") and broken.parts.right_arm.visible, "...but a blunt-disabled arm remains attached")
+	broken.queue_free()
+
+	# A weak cut from the wrong angle can also disable without detaching. The
+	# direction is gameplay data, not decoration on the particle effect.
+	var lengthwise := _rig()
+	lengthwise.gore = false
+	lengthwise.hit("left_arm", 44.0, 28.0, "cut", "", Vector3.UP)
+	lengthwise.hit("left_arm", 44.0, 28.0, "cut", "", Vector3.UP)
+	check(not lengthwise.severed.has("left_arm"), "lengthwise cuts do not satisfy the cross-cut sever threshold")
+	lengthwise.queue_free()
+
 	var body := _rig()
-	for i in 12:
-		body.hit("right_arm", 40.0, 20.0, "shear")
-	check(body.severed.has("right_arm"), "a destroyed arm comes off")
+	body.gore = false
+	var combat_before := body.anatomy.combat_ratio()
+	var first := body.hit("right_arm", 44.0, 28.0, "cut", "", Vector3.RIGHT)
+	check(not bool(first.get("severed", false)), "the first directional sword blow wounds but does not detach")
+	var second := body.hit("right_arm", 44.0, 28.0, "cut", "", Vector3.RIGHT)
+	check(bool(second.get("severed", false)) and body.severed.has("right_arm"), "the cross-cut crossing the limb threshold severs mid-fight")
 	check(not (body.get_node("right_arm") as MeshInstance3D).visible, "a severed limb stops rendering")
+	check(not body.anatomy.dead and not body.anatomy.downed, "losing an arm leaves the person alive and still in the fight")
+	check(body.anatomy.combat_ratio() < combat_before, "arm loss reduces combat ability (%.2f -> %.2f)" % [combat_before, body.anatomy.combat_ratio()])
 	check(body.zone_nearest(body.to_global(Vector3(0.34, 1.12, 0))) != "right_arm", "a severed limb cannot be hit again")
+
+	var state := body.snapshot()
+	var restored := BaselineHuman.new()
+	add_child(restored)
+	restored.gore = false
+	restored.build("restored_amputee", {"restore": state, "gore": false})
+	check(restored.severed.has("right_arm") and not restored.parts.right_arm.visible, "save/load preserves the actual missing limb")
+	check(is_equal_approx(float(restored.sever_stress.get("right_arm", 0.0)), float(body.sever_stress.get("right_arm", 0.0))) and float(restored.sever_stress.get("right_arm", 0.0)) > 0.0, "save records accumulated sever stress")
+	restored.queue_free()
+
 	for i in 20:
 		body.hit("torso", 40.0, 20.0, "blunt")
 	check(not body.severed.has("torso"), "a torso is never severed, however destroyed")

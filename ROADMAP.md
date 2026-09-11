@@ -46,6 +46,9 @@ cybernetics, raider roads, stalker territories and buried anatomical industry.
 - Deterministic Ashbloom districts, 40+ enterable shells, 18 Reality Misfires.
 - Anatomy component: zone health, blood volume, bleed rate, pain,
   consciousness, treatment, limb disability, persistent snapshots.
+- Directional mid-fight severing: cut, shear and ballistic force build separate
+  sever stress, physical limbs inherit the blow direction, blunt-disabled limbs
+  remain attached, and one-armed NPCs continue fighting with reduced output.
 - Hostile escape behaviour, loot caches, collision-aware hunter, dodge, melee.
 - Shared camera-relative HunterMotor and movement lab: corrected WASD,
   normalized diagonals, acceleration/braking, floor snap, slopes, directional
@@ -337,10 +340,12 @@ foundation in `baseline_human.gd` and `anatomy_component.gd`.
   already wired to behaviour. The 1.0 version is these reading as one body in
   play: a broken arm that changes a swing, a punctured lung that changes a
   sprint, blood loss the player watches happen to themselves.
-- **Dismemberment.** Severing exists on the rig with thrown limbs, stumps and
-  exposed bone. The 1.0 version is dismemberment as a *combat verb* rather than
-  a death effect — taking an arm mid-fight and having the fight continue with
-  that person still in it, which is what the downed state was built for.
+- **Dismemberment.** The first combat-verb slice is live: directional cut,
+  shear and ballistic damage builds sever stress independently from limb health;
+  crossing the threshold throws the real limb along the strike vector, leaves a
+  stump, persists through save/load and keeps a surviving NPC in combat at a
+  reduced attack cadence and damage. Next are portable/sellable limbs, reciprocal
+  player dismemberment and deeper stump-specific movesets.
 
 Nothing here is scheduled yet. It sits behind the Tier 1b combat work because
 every item needs a fight that feels good to be legible inside.
@@ -577,8 +582,8 @@ Greg's required next-slice order is now authoritative:
 **Arsenal foundation completed 2026-09-11.** The hunter can equip a sword,
 shotgun or sidearm with 1–3, use with LMB/RMB and reload with R. Firearm traces
 are world-occluded and feed the struck BaselineHuman zone/organ state, so
-shotgun dismemberment is accumulated ballistic damage crossing a limb's real
-failure threshold. Magazines, reserves, spread, timing, knockback, downing,
+shotgun dismemberment is accumulated ballistic sever stress crossing a damaged
+limb's directional threshold. Magazines, reserves, spread, timing, knockback, downing,
 flight, death, persistence and history are live. Production weapon meshes,
 animation-driven handling, muzzle/impact treatment and enemy firearms remain.
 

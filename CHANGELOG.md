@@ -2,6 +2,19 @@
 
 ## 2026 09 11
 
+- **Dismemberment is now a combat verb.** Limb health and detachment are
+  separate: blunt trauma can break and disable a limb without magically cutting
+  it off, while directional cut, shear and ballistic hits build sever stress.
+  Crossing the threshold during a live fight throws the rig's real limb in the
+  blow direction, exposes the stump and persists both the missing part and sever
+  history through save/load.
+- A surviving amputee now stays hostile and continues through the normal Hunt
+  AI loop. `AnatomyComponent.combat_ratio()` directly slows its attack cadence
+  and reduces damage, while the maiming and follow-up state enter WorldHistory.
+- Expanded anatomy and live Hunt integration coverage to prove cross-cut versus
+  lengthwise cuts, blunt non-severing, persistence, survival and a real post-
+  amputation counterattack.
+
 - **The Allusions screen becomes a natal sigil.** `systems/natal_sigil.gd`
   draws a twelve-house wheel with hand-built sign glyphs, places the bodies
   deterministically from a birth date, draws the classical aspects between
