@@ -119,5 +119,19 @@ func _ready() -> void:
 	check(anonymous > 0, "an anonymous broker still prices the meat (%d)" % anonymous)
 	check(kin_price >= cold_price, "your own end of the axis pays better (%d vs %d)" % [kin_price, cold_price])
 
+	# --- the poles exist, per DESIGN/COSMOLOGY.md -------------------------
+	# The five original factions were the middle of the axis, not its ends, so
+	# nothing could sit convincingly at either pole. These two are the ends.
+	var below := WorldHistory.tree_alignment({"faction_id": "celloutz"})
+	var above := WorldHistory.tree_alignment({"faction_id": "wizardsonlyfoolz"})
+	var ashline := WorldHistory.tree_alignment({"faction_id": "ashline_wreckers"})
+	var lanterns := WorldHistory.tree_alignment({"faction_id": "gate_lanterns"})
+	check(below < ashline, "CellOutz sits below the descending factions (%.2f < %.2f)" % [below, ashline])
+	check(above > lanterns, "wizardsonlyfoolz sits above the ascending ones (%.2f > %.2f)" % [above, lanterns])
+	check(WorldHistory.tree_axis_label(below) == "DESCENT" and WorldHistory.tree_axis_label(above) == "ASCENT", "and the Tree reads each correctly")
+	# A born CellOut is refused by the collective, which is what having real
+	# poles is for.
+	check(WorldHistory.faction_price_factor("wizardsonlyfoolz", {"faction_id": "celloutz"}) == 0.0, "the far pole will not deal with the near one")
+
 	print("KARMA_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

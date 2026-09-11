@@ -416,7 +416,7 @@ Read-only; everything derived lands in `game/art/derived/` via `tools/art_pipeli
 - [ ] **G4.3** Leaning and settling, so nothing is plumb
 
 ### G5 — Sound rework
-- [ ] **G5.1** Positional audio on `AudioStreamPlayer3D` with a reverb bus
+- [~] **G5.1** Bus structure built and mixable (Master/Music/SFX/Ambience); routing still to do
 - [ ] **G5.2** Engine layered by load rather than one pitched sine
 - [ ] **G5.3** Impact layers by severity and material
 - [ ] **G5.4** Per-layer gore sound (shares with B4.8)

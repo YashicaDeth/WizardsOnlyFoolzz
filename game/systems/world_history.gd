@@ -103,6 +103,13 @@ const FACTION_TREE_AXIS := {
 	"soft_rot": {"axis": -0.8, "principle": "Gluttony"},
 	"choir_of_marrow": {"axis": -0.65, "principle": "Envy"},
 	"gate_lanterns": {"axis": 0.6, "principle": "Charity"},
+	# The two ends, per DESIGN/COSMOLOGY.md. The existing five were never the
+	# extremes of the axis — they are the middle of it, which is why nothing in
+	# the world could sit convincingly at either pole. CellOutz is the demon
+	# faction and has been branding the player's own interface since the first
+	# scene; wizardsonlyfoolz is the ascending collective.
+	"celloutz": {"axis": -0.95, "principle": "Ownership"},
+	"wizardsonlyfoolz": {"axis": 0.92, "principle": "Frequency"},
 }
 
 
