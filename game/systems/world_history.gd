@@ -32,6 +32,11 @@ func record_event(event_type: String, details: Dictionary = {}) -> Dictionary:
 	events.append(event)
 	if events.size() > MAX_EVENTS:
 		events.pop_front()
+	# E1.1. The act moves its author on the Tree before the write, so the saved
+	# file and the axis never disagree.
+	var weight := event_karma(event)
+	if not is_zero_approx(weight):
+		_accumulate_karma(event_actor(event), weight)
 	_save_history()
 	event_recorded.emit(event)
 	return event
@@ -101,13 +106,93 @@ const FACTION_TREE_AXIS := {
 }
 
 
+## E1.1. What a recorded act does to where its author sits on the Tree.
+##
+## Karma is not a new number and it is never shown as one — it is this axis,
+## which has existed and been drawn since the dossier was built, finally being
+## moved by what actually happened. `DESIGN/RITUAL_AND_KARMA.md`: *"Karma is
+## not a new number. It is the existing Ascent/Descent alignment made visible,
+## accumulated from real recorded events, and given consequences."*
+##
+## Sizes are deliberately small. A handful of executions moves you; a career
+## defines you. Nothing here is a good/evil slider and nothing announces
+## itself — it is read through the Tree view, per E1.3.
+const KARMA := {
+	"execute": -0.09,
+	"behead": -0.12,
+	"spare": 0.08,
+	"recruit": 0.05,
+	"rob_living": -0.07,
+	"rob_dead": -0.02,
+	"sell_part": -0.03,
+	"silence_witness": -0.11,
+	"maim": -0.03,
+	"kindness": 0.05,
+}
+
+
+## Which acts count, and for how much. Anything not named here is morally inert
+## — swinging, missing, driving, being hit — because a game that scored every
+## input would be a morality meter wearing this one's clothes.
+func event_karma(event: Dictionary) -> float:
+	var details: Dictionary = event.get("details", {})
+	match str(event.get("type", "")):
+		"npc_resolution":
+			return float(KARMA.get(str(details.get("outcome", "")), 0.0))
+		"part_extracted":
+			return float(KARMA.rob_living if bool(details.get("owner_alive", false)) else KARMA.rob_dead)
+		"carried_part_sold":
+			return float(KARMA.sell_part)
+		"report_cut":
+			return float(KARMA.silence_witness)
+		"limb_severed_in_combat":
+			return float(KARMA.maim)
+		"misfire_bond", "bond_strengthened", "npc_spared":
+			return float(KARMA.kindness)
+	return 0.0
+
+
+## Who answers for it. Most of these are the player's acts; an event that names
+## its own actor is believed.
+func event_actor(event: Dictionary) -> String:
+	return str((event.get("details", {}) as Dictionary).get("actor", "player"))
+
+
+## The running total, accumulated as acts are recorded rather than recomputed.
+## It has to be stored: `MAX_EVENTS` makes the log a rolling window, so the
+## oldest thing you did falls out of it, and a karma recomputed from the log
+## alone would quietly forgive you for it. The log is what happened recently;
+## this is what it made of you.
+func _accumulate_karma(subject_id: String, weight: float) -> void:
+	if subject_id == "" or not subjects.has(subject_id):
+		return
+	var stored: Dictionary = subjects[subject_id]
+	stored["karma"] = clampf(float(stored.get("karma", 0.0)) + weight, -1.0, 1.0)
+	subjects[subject_id] = stored
+	subject_changed.emit(subject_id, stored.duplicate(true))
+
+
+## Karma over the events still retained, for tests and for rebuilding a save
+## whose subjects predate the field. Not the authority — see `_accumulate_karma`.
+func karma_from_history(subject_id: String = "player") -> float:
+	var total := 0.0
+	for event in events:
+		if event_actor(event) == subject_id:
+			total += event_karma(event)
+	return clampf(total, -1.0, 1.0)
+
+
 func tree_alignment(target: Dictionary) -> float:
 	var base := 0.0
 	var faction_id := str(target.get("faction_id", ""))
 	if FACTION_TREE_AXIS.has(faction_id):
 		base = float(FACTION_TREE_AXIS[faction_id].get("axis", 0.0))
 	var drift := clampf((float(target.get("bond", 0)) - float(target.get("grudge", 0))) / 140.0, -0.35, 0.35)
-	return clampf(base * 0.75 + drift, -1.0, 1.0)
+	# Birth pulls less hard than it used to, because what you have done now has
+	# somewhere to go. Enough of a career overcomes the faction you were born
+	# into, which is the whole point of "rank and lineage are not destiny".
+	var karma := clampf(float(target.get("karma", 0.0)), -1.0, 1.0)
+	return clampf(base * 0.65 + drift + karma, -1.0, 1.0)
 
 
 func tree_descriptor(target: Dictionary) -> String:

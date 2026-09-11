@@ -304,7 +304,7 @@ Full design in `DESIGN/RITUAL_AND_KARMA.md`. All of it hangs off the
 Ascent/Descent axis that already exists and is currently unused.
 
 ### E1 — Karma from real events
-- [ ] **E1.1** The axis accumulates from recorded history
+- [x] ~~**E1.1** The axis accumulates from recorded history~~
 - [ ] **E1.2** Factions price you by where you sit
 - [ ] **E1.3** Never a good/evil slider — read through the Tree view
 

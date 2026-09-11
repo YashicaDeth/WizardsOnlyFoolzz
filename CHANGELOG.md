@@ -2,6 +2,21 @@
 
 ## 2026 09 11
 
+- **E1.1: the Tree axis finally moves.** It has been computed, stored and drawn
+  on the dossier since the index was built, and nothing but the faction you
+  were born into ever changed it. Recorded acts now accumulate on it — executing
+  someone who was already down, cutting hardware out of a body that was still
+  alive to feel it, selling the piece afterwards, and worst of all killing the
+  one witness who saw you. Sparing and recruiting climb back. Swinging, missing,
+  driving and being hit are inert, because a system that scored every input
+  would be a morality meter wearing this one's clothes. Birth pulls less hard
+  than it did, so roughly fourteen decent acts will carry an Ashline-born
+  killer across into Ascent — lineage is not destiny. No number is ever shown:
+  it is read through the Tree view as ASCENT / LIMBO / DESCENT, per E1.3.
+  The total is accumulated rather than recomputed, because `MAX_EVENTS` makes
+  the log a rolling window and a karma derived from the log alone would quietly
+  forgive the oldest thing you did. Covered by a new `karma_test` (16 checks).
+
 - **Blood is spatter again, not sheeting.** Every landed drop was leaving a mark
   about three metres across, and with `MAX_SPLATS` at 420 a real fight buried
   its own floor in overlapping red — which is what made the gore read as flat
