@@ -713,6 +713,36 @@ Failure handling is a design surface, not an error path: unrecognised speech
 should get an in-character non-answer, because a world of dead forums and
 half-working infrastructure is allowed to mishear.
 
+## Headless testing - FMOD blocks it, and the fix is not in git
+
+Found 2026-09-11 while trying to verify the Wire. Worth its own section because
+it costs an agent an hour if they do not know it.
+
+**Symptom.** A headless test run produces no output and never exits. It looks
+like the test is hanging on world generation. It is not.
+
+**Cause.** The FMOD *editor plugin* is disabled, but the FMOD **GDExtension
+still loads on every run**, initialises, and opens a live-update socket on port
+9264. With a Godot editor already open - the normal working setup - the second
+instance cannot bind that port and FMOD retries forever, flooding stderr and
+starving the test's own output. Three leaked `resolution_test` headless runs
+were found spinning on this, each having burned about 28 CPU-minutes.
+
+**Fix, applied locally.** Rename `game/addons/fmod/fmod.gdextension` (and its
+`.uid`) to `.disabled`, and delete the fmod line from
+`game/.godot/extension_list.cfg`. Headless runs then complete in seconds.
+
+**This fix does not travel.** `.gitignore` excludes both `game/addons/fmod/` and
+`game/.godot/`, so every fresh checkout and every other agent's tree hits it
+again. Re-apply it locally, or take the plugin strategy's standing call and
+drop FMOD properly - it is 238MB, referenced by no script, and its own row in
+the table below already says "defer or drop".
+
+**Second trap in the same area.** A new `class_name` global is not visible to a
+headless run until the class cache is rebuilt: `WireNet` parsed as an
+undeclared identifier until the project was reimported with
+`--headless --editor --quit`. Run that after adding any new `class_name`.
+
 ## Open technical risks
 
 - FMOD's GDExtension errors on load; the sound rework must not depend on it.
