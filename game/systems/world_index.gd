@@ -25,6 +25,7 @@ extends Control
 const CellOutzType := preload("res://systems/celloutz_type.gd")
 const WireNetScript := preload("res://systems/wire_net.gd")
 const SUBJECT_ICON := preload("res://systems/subject_icon.gd")
+const BODY_INSPECTOR := preload("res://systems/body_inspector.gd")
 
 ## Six live 3D heads is cheap; sixty would not be, and each icon owns a World3D.
 ## So they are a pool the pages draw into by slot rather than one per row.
@@ -39,7 +40,7 @@ const BRUISE := Color("7a4a83")
 const SMOKE := Color(0.035, 0.019, 0.015, 0.94)
 const GROUND := Color(0.02, 0.012, 0.01, 0.86)
 
-const PAGES := ["FILE", "PYRAMID", "WIRE"]
+const PAGES := ["FILE", "PYRAMID", "WIRE", "BODY"]
 
 var page := 0
 var rail_index := 0
@@ -54,6 +55,7 @@ var xray := false
 var page_blend := 1.0
 var page_direction := 1.0
 var _icons: Array = []
+var _inspector: Node
 var _rail_cache: Array = []
 var _dead_pixels: Array = []
 
@@ -72,6 +74,9 @@ func _ready() -> void:
 	rng.seed = 20260911
 	for index in 26:
 		_dead_pixels.append(Vector2(rng.randf(), rng.randf()))
+	_inspector = BODY_INSPECTOR.new()
+	_inspector.name = "BodyInspector"
+	add_child(_inspector)
 	for slot in ICON_POOL:
 		var icon: SubViewport = SUBJECT_ICON.new()
 		icon.name = "SubjectIcon%d" % slot
@@ -109,7 +114,7 @@ func refresh() -> void:
 func _rebuild_rail() -> void:
 	_rail_cache.clear()
 	match page:
-		0:
+		0, 3:
 			for subject_id in WorldHistory.all_subjects():
 				var subject: Dictionary = WorldHistory.subject(subject_id)
 				if str(subject.get("kind", "person")) != "person":
@@ -152,11 +157,14 @@ func _unhandled_input(event: InputEvent) -> void:
 				rail_index = maxi(0, rail_index - 1)
 			KEY_DOWN:
 				rail_index = mini(_rail_cache.size() - 1, rail_index + 1)
+			KEY_TAB:
+				if page != 3 or not _inspector.handle_key(KEY_TAB):
+					return
 			KEY_X:
 				xray = not xray
 				for icon in _icons:
 					icon.set_xray(xray)
-			KEY_1, KEY_2, KEY_3:
+			KEY_1, KEY_2, KEY_3, KEY_4:
 				var target: int = event.keycode - KEY_1
 				_go_to_page(target, 1.0 if target > page else -1.0)
 			_:
@@ -164,6 +172,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		queue_redraw()
 	elif event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT and page == 3:
+			if not _inspector.handle_click(event.position):
+				return
+			get_viewport().set_input_as_handled()
+			queue_redraw()
+			return
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			feed_scroll = minf(feed_scroll + 42.0, maxf(0.0, float(posts.size()) * 80.0 - 320.0))
 			if wire:
@@ -260,6 +274,8 @@ func _draw() -> void:
 			_draw_pyramid(panel)
 		2:
 			_draw_wire(panel)
+		3:
+			_draw_body(panel)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if page_blend < 1.0:
 		_draw_page_wipe(panel, eased)
@@ -351,7 +367,7 @@ func _draw_header(plate: Rect2) -> void:
 ## navigation models across three pages of one object was the old problem.
 func _draw_rail(rect: Rect2) -> void:
 	draw_line(rect.position + Vector2(rect.size.x + 8, 0), rect.position + Vector2(rect.size.x + 8, rect.size.y), INK * Color(1, 1, 1, 0.14), 1.0)
-	var heading: String = ["SUBJECTS", "FACTIONS", "ACCOUNTS"][page]
+	var heading: String = ["SUBJECTS", "FACTIONS", "ACCOUNTS", "BODIES"][page]
 	CellOutzType.draw_text(self, rect.position + Vector2(0, 0), heading, 12.0, TEAL, 1.4)
 	draw_line(rect.position + Vector2(0, 18), rect.position + Vector2(rect.size.x - 14, 18), TEAL * Color(1, 1, 1, 0.35), 1.0)
 	var font := ThemeDB.fallback_font
@@ -747,6 +763,20 @@ func _draw_post(feed: Rect2, post: Dictionary, y: float) -> void:
 		meta += "   \u00b7   %d RETELLINGS DEEP" % int(post.get("hops", 0))
 	draw_string(font, Vector2(feed.position.x + 12, y + 52), meta, HORIZONTAL_ALIGNMENT_LEFT, feed.size.x - 24, 9, INK * Color(1, 1, 1, 0.3))
 	draw_line(Vector2(feed.position.x + 12, y + 60), Vector2(feed.position.x + feed.size.x - 8, y + 60), INK * Color(1, 1, 1, 0.08), 1.0)
+
+
+# --- page four: the body ---------------------------------------------------
+
+## B1 and B2. The inspector owns its own state and its own 3D viewport and draws
+## into this canvas, so the plate chrome and the scanlines stay on top of it
+## rather than being covered by a child Control.
+func _draw_body(rect: Rect2) -> void:
+	var entry := _selected()
+	if entry.is_empty():
+		return
+	_inspector.set_subject(WorldHistory.subject(str(entry.id)))
+	_inspector.xray = xray
+	_inspector.draw_into(self, rect)
 
 
 # --- chrome ----------------------------------------------------------------

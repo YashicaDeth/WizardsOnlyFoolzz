@@ -112,16 +112,21 @@ func _ready() -> void:
 	index.open()
 	# The fourth pass is the pyramid again with the X-ray on, because the skull
 	# state is the half of the icon that cannot be reviewed from the flesh shot.
-	var pages := ["file", "pyramid", "wire", "pyramid_xray"]
+	var pages := ["file", "pyramid", "wire", "pyramid_xray", "body", "body_organ"]
 	for page_index in pages.size():
-		index.page = [0, 1, 2, 1][page_index]
-		index.rail_index = [3, 0, 0, 0][page_index]
+		index.page = [0, 1, 2, 1, 3, 3][page_index]
+		index.rail_index = [3, 0, 0, 0, 3, 2][page_index]
 		index.xray = page_index == 3
 		for icon in index._icons:
 			icon.set_xray(index.xray)
 		index._rebuild_rail()
+		if page_index == 5:
+			# Mara Voss with the heart pulled out: the case the whole page is for.
+			index._inspector.set_subject(WorldHistory.subject("mara_voss"))
+			index._inspector.part_index = 2
+			index._inspector._begin_lift()
 		index.queue_redraw()
-		for _settle in 6:
+		for _settle in 60:
 			await get_tree().process_frame
 		await RenderingServer.frame_post_draw
 		var image := get_viewport().get_texture().get_image()
