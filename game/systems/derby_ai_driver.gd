@@ -6,6 +6,9 @@ extends Node
 ## silently discards the solver's collision response, which makes every ram read
 ## as weightless no matter how much damage it scores.
 
+## Enough speed to retain steering authority, well under a committed charge.
+const CREEP_THROTTLE := 0.35
+
 var arena_limit := 26.0
 var vehicle: RigidBody3D
 var aggression := 1.0
@@ -64,5 +67,12 @@ func tick(delta: float, target_position: Vector3, active: bool) -> void:
 		vehicle.steering = -lateral
 	else:
 		var closing := clampf(alignment, 0.0, 1.0)
-		var charge := clampf(distance / 14.0, 0.35, 1.0)
-		vehicle.throttle = clampf(closing * charge * aggression, 0.0, 1.0)
+		# Never coast to a stop while turning. The chassis scales steering
+		# authority by speed, so a car side-on to its target had zero throttle
+		# from `closing` and therefore zero ability to turn back toward it — a
+		# permanent deadlock that left the pit standing still.
+		#
+		# There is deliberately no distance falloff. The old charge term eased
+		# off as the gap closed, so wreckers arrived at walking pace and never
+		# reached the impact threshold. A derby driver commits to the hit.
+		vehicle.throttle = maxf(CREEP_THROTTLE, clampf(closing * aggression, 0.0, 1.0))

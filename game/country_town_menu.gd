@@ -10,6 +10,8 @@ var render_scales := [1.0, 1.25, 1.5, 0.8]
 var render_scale_index := 0
 var color_modes := ["CELLOUTZ COPPER", "SALVAGE TEAL", "NIGHT BLOOD"]
 var color_index := 0
+var gore_modes := ["FULL", "REDUCED", "OFF"]
+var gore_index := 0
 var vsync_enabled := true
 
 @onready var settings_panel: PanelContainer = $HUD/SettingsPanel
@@ -31,8 +33,34 @@ func _ready() -> void:
 	$HUD/CellOutzSite.pressed.connect(_open_celloutz)
 	menu_buttons = [$HUD/Play, $HUD/Settings, $HUD/Quit, $HUD/CellOutzSite]
 	for button in menu_buttons:
+		# Every button shares offset_left, but the labels were centred inside
+		# their own differing widths, so the column read as ragged and broken.
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.mouse_entered.connect(_focus_button.bind(button))
 		button.mouse_exited.connect(_unfocus_button.bind(button))
+	_build_gore_setting()
+
+
+## Gore belongs in settings rather than on a hotkey over the pit. The choice is
+## stored as a subject so every scene reads the same answer, and so it survives
+## the run like anything else the world remembers.
+func _build_gore_setting() -> void:
+	WorldHistory.register_subject("settings", {"gore": "FULL"})
+	gore_index = maxi(0, gore_modes.find(str(WorldHistory.subject("settings").get("gore", "FULL"))))
+	var button := Button.new()
+	button.name = "Gore"
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.text = "GORE: %s" % gore_modes[gore_index]
+	var box := $HUD/SettingsPanel/VBox
+	box.add_child(button)
+	box.move_child(button, box.get_child_count() - 2)
+	button.pressed.connect(_cycle_gore.bind(button))
+
+
+func _cycle_gore(button: Button) -> void:
+	gore_index = (gore_index + 1) % gore_modes.size()
+	button.text = "GORE: %s" % gore_modes[gore_index]
+	WorldHistory.update_subject("settings", {"gore": gore_modes[gore_index]}, "settings_changed")
 
 
 func _process(delta: float) -> void:
@@ -130,19 +158,19 @@ func _toggle_vsync() -> void:
 	$HUD/SettingsPanel/VBox/VSync.text = "VSYNC: %s" % ("ON" if vsync_enabled else "OFF")
 
 
+## Swaps the whole WorldLook preset rather than tinting one ambient colour. On a
+## sky-sourced environment an ambient_light_color write does nothing at all,
+## which is why this setting used to appear to do nothing.
 func _cycle_color_grade() -> void:
 	color_index = (color_index + 1) % color_modes.size()
 	var mode: String = color_modes[color_index]
-	match mode:
-		"SALVAGE TEAL":
-			menu_environment.ambient_light_color = Color("4b8f86")
-			menu_environment.background_color = Color("061714")
-		"NIGHT BLOOD":
-			menu_environment.ambient_light_color = Color("7b1f1b")
-			menu_environment.background_color = Color("090206")
-		_:
-			menu_environment.ambient_light_color = Color("a8663d")
-			menu_environment.background_color = Color("231006")
+	var preset := "bone_yard"
+	if mode == "SALVAGE TEAL":
+		preset = "ashbloom"
+	elif mode == "NIGHT BLOOD":
+		preset = "ossuary"
+	menu_environment = WorldLook.environment(preset)
+	$WorldEnvironment.environment = menu_environment
 	$HUD/SettingsPanel/VBox/ColorGrade.text = "COLOR: %s" % mode
 
 
@@ -152,18 +180,11 @@ func _open_celloutz() -> void:
 
 
 func _build_country_town() -> void:
-	menu_environment = Environment.new()
-	menu_environment.background_mode = Environment.BG_COLOR
-	menu_environment.background_color = Color("110906")
-	menu_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	menu_environment.ambient_light_color = Color("4c2c19")
-	menu_environment.ambient_light_energy = 0.5
-	menu_environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	menu_environment.glow_enabled = true
-	menu_environment.glow_intensity = 0.45
-	menu_environment.volumetric_fog_enabled = true
-	menu_environment.volumetric_fog_density = 0.025
-	menu_environment.volumetric_fog_albedo = Color("5d4530")
+	# Was a hand-rolled Environment: a near-black background with a flat 0.5
+	# colour ambient and one spotlight, which rendered the whole town as an
+	# invisible dark mass. WorldLook is the shared look system the derby already
+	# uses, and it carries a real sky to light against.
+	menu_environment = WorldLook.environment("bone_yard")
 	$WorldEnvironment.environment = menu_environment
 	_add_mesh(BoxMesh.new(), Vector3(0, -0.5, 0), Vector3(70, 0.7, 70), Color("25170e"), 0.0)
 	_add_mesh(BoxMesh.new(), Vector3(4, -0.1, 5), Vector3(11, 0.15, 62), Color("241f1a"), 0.0)
@@ -199,6 +220,15 @@ func _build_country_town() -> void:
 	floodlight.light_energy = 7.0
 	floodlight.spot_range = 35.0
 	add_child(floodlight)
+	# One spotlight cannot light a town. The key light is what makes the
+	# buildings, road and wreck read as forms rather than silhouettes.
+	var sun := DirectionalLight3D.new()
+	sun.rotation_degrees = Vector3(-34, -38, 0)
+	sun.light_color = Color("ffcf9e")
+	sun.light_energy = 1.5
+	sun.shadow_enabled = true
+	sun.directional_shadow_max_distance = 90.0
+	add_child(sun)
 
 
 func _build_building(position_value: Vector3, size_value: Vector3, color: Color, sign_text: String) -> void:

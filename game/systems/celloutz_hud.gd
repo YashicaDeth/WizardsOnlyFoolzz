@@ -101,8 +101,6 @@ func _draw_edge_frame(viewport: Vector2) -> void:
 	for left in [margin, viewport.x - margin]:
 		draw_line(Vector2(left, margin), Vector2(left, margin + corner), color, 2.0)
 		draw_line(Vector2(left, viewport.y - margin - corner), Vector2(left, viewport.y - margin), color, 2.0)
-	var sweep_x := fmod(elapsed * 140.0, viewport.x + 300.0) - 150.0
-	draw_line(Vector2(sweep_x, 20), Vector2(sweep_x + 90, 20), Color(1, 0.35, 0.12, 0.6), 1.0)
 
 
 func _draw_title(viewport: Vector2) -> void:
@@ -132,37 +130,83 @@ func _draw_speed_instrument(viewport: Vector2) -> void:
 	draw_string(font, center + Vector2(-35, 28), "VELOCITY", HORIZONTAL_ALIGNMENT_CENTER, 70, 11, COPPER)
 
 
+## One plate for every readout. The HUD previously refused panels on principle
+## and the result was live data floating on the sky with nothing to read it
+## against. A panel is not the enemy of this look — an unshaped one is, so the
+## plate is notched and stamped rather than a rounded card.
+func _plate(at: Vector2, plate_size: Vector2, label: String, code: String, accent: Color) -> void:
+	var notch := 13.0
+	var body := PackedVector2Array([
+		at + Vector2(notch, 0),
+		at + Vector2(plate_size.x, 0),
+		at + Vector2(plate_size.x, plate_size.y - notch),
+		at + Vector2(plate_size.x - notch, plate_size.y),
+		at + Vector2(0, plate_size.y),
+		at + Vector2(0, notch),
+	])
+	draw_colored_polygon(body, SMOKE)
+	var outline := body.duplicate()
+	outline.append(body[0])
+	draw_polyline(outline, accent * Color(1, 1, 1, 0.5), 1.5)
+	# Title and form code sit on the accent strip so the data below never has to
+	# compete with its own label for contrast.
+	draw_colored_polygon(PackedVector2Array([
+		at + Vector2(notch, 0), at + Vector2(plate_size.x, 0),
+		at + Vector2(plate_size.x, 18), at + Vector2(0, 18), at + Vector2(0, notch),
+	]), accent * Color(1, 1, 1, 0.18))
+	draw_line(at + Vector2(0, 18), at + Vector2(plate_size.x, 18), accent * Color(1, 1, 1, 0.45), 1.0)
+	var font := ThemeDB.fallback_font
+	draw_string(font, at + Vector2(11, 14), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, accent)
+	draw_string(font, at + Vector2(0, 14), code, HORIZONTAL_ALIGNMENT_RIGHT, plate_size.x - 9, 9, INK * Color(1, 1, 1, 0.38))
+
+
 func _draw_integrity_instrument(viewport: Vector2) -> void:
-	var anchor := Vector2(viewport.x - 270, 42)
-	var width := 220.0
+	var plate_size := Vector2(250, 98)
+	var anchor := Vector2(viewport.x - plate_size.x - 30, 32)
 	var ratio := clampf(displayed_integrity / 100.0, 0, 1)
 	var tone := HOT.lerp(TEAL, ratio)
-	var shape := PackedVector2Array([
-		anchor, anchor + Vector2(width, 0), anchor + Vector2(width - 18, 16), anchor + Vector2(22, 16)
-	])
-	draw_colored_polygon(shape, SMOKE)
-	draw_polyline(PackedVector2Array([anchor + Vector2(7, 8), anchor + Vector2(7 + (width - 28) * ratio, 8)]), tone, 7.0)
+	_plate(anchor, plate_size, "HULL INTEGRITY", "CZ-88/H", tone)
 	var font := ThemeDB.fallback_font
-	draw_string(font, anchor + Vector2(0, 36), "HULL // %03d%%" % roundi(displayed_integrity), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, tone)
-	draw_string(font, anchor + Vector2(0, 57), "SCORE %06d    WRECKERS %02d" % [roundi(displayed_score), active_wreckers], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, INK)
-	draw_string(font, anchor + Vector2(0, 75), "WORLD MEMORY %03d" % memory_count, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK * Color(1, 1, 1, 0.65))
+	# The figure you read at a glance gets the size; everything else is legend.
+	draw_string(font, anchor + Vector2(12, 52), "%03d" % roundi(displayed_integrity), HORIZONTAL_ALIGNMENT_LEFT, -1, 29, tone)
+	draw_string(font, anchor + Vector2(62, 52), "%", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, tone * Color(1, 1, 1, 0.7))
+	# Segmented, because a derby hull fails in panels rather than on a smooth
+	# gradient — and a segment count is readable at a glance where a bar is not.
+	for index in 12:
+		var x := anchor.x + 92 + index * 12.0
+		var lit := float(index) / 12.0 < ratio
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(x, anchor.y + 34), Vector2(x + 9, anchor.y + 34),
+			Vector2(x + 6, anchor.y + 54), Vector2(x - 3, anchor.y + 54),
+		]), tone if lit else INK * Color(1, 1, 1, 0.11))
+	draw_line(anchor + Vector2(12, 64), anchor + Vector2(plate_size.x - 12, 64), INK * Color(1, 1, 1, 0.16), 1.0)
+	draw_string(font, anchor + Vector2(12, 80), "SCORE %06d    WRECKERS %02d    MEM %03d" % [roundi(displayed_score), active_wreckers, memory_count], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK * Color(1, 1, 1, 0.78))
 
 
 func _draw_rival_signal(viewport: Vector2) -> void:
-	var anchor := Vector2(212, 34)
+	var plate_size := Vector2(272, 90)
+	var anchor := Vector2(212, 30)
+	var strength := clampf(float(rival_grudge) / 100.0, 0.0, 1.0)
+	_plate(anchor, plate_size, "HUNT SIGNAL", "CZ-12/R", HOT)
 	var font := ThemeDB.fallback_font
-	var signal_strength := float(rival_grudge) / 100.0
-	var jitter := Vector2(sin(elapsed * 19) * signal_strength * 3, cos(elapsed * 23) * signal_strength * 2)
-	anchor += jitter
-	var diamond := PackedVector2Array([anchor + Vector2(18, 0), anchor + Vector2(36, 18), anchor + Vector2(18, 36), anchor + Vector2(0, 18)])
-	draw_colored_polygon(diamond, Color(0.32, 0.035, 0.02, 0.8))
-	draw_polyline(PackedVector2Array([diamond[0], diamond[1], diamond[2], diamond[3], diamond[0]]), HOT, 2.0)
-	draw_circle(anchor + Vector2(18, 18), 4 + sin(elapsed * 4) * 1.5, HOT)
-	draw_string(font, anchor + Vector2(49, 12), "HUNT SIGNAL // MARA VOSS", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, HOT)
-	draw_string(font, anchor + Vector2(49, 34), "%s   GRUDGE %03d   ELO %04d" % [rival_status, rival_grudge, rival_elo], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, INK)
-	for index in 10:
-		var height := 4.0 + float((rival_grudge + index * 13) % 17)
-		draw_line(anchor + Vector2(49 + index * 12, 52), anchor + Vector2(49 + index * 12, 52 - height), HOT * Color(1, 1, 1, 0.48), 4.0)
+	# Only the lamp jitters. Shaking the whole plate made the text shimmer,
+	# which is noise impersonating tension.
+	var lamp := anchor + Vector2(28, 46) + Vector2(sin(elapsed * 19.0), cos(elapsed * 23.0)) * strength * 2.0
+	var diamond := PackedVector2Array([lamp + Vector2(0, -13), lamp + Vector2(13, 0), lamp + Vector2(0, 13), lamp + Vector2(-13, 0)])
+	draw_colored_polygon(diamond, Color(0.32, 0.035, 0.02, 0.85))
+	var edge := diamond.duplicate()
+	edge.append(diamond[0])
+	draw_polyline(edge, HOT, 2.0)
+	draw_circle(lamp, 3.5 + sin(elapsed * 4.0) * 1.4 * (0.35 + strength), HOT)
+	draw_string(font, anchor + Vector2(52, 45), "MARA VOSS", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, INK)
+	draw_string(font, anchor + Vector2(52, 62), "%s    ELO %04d" % [rival_status, rival_elo], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK * Color(1, 1, 1, 0.66))
+	draw_string(font, anchor + Vector2(0, 45), "GRUDGE %03d" % rival_grudge, HORIZONTAL_ALIGNMENT_RIGHT, plate_size.x - 12, 13, HOT if strength > 0.5 else INK * Color(1, 1, 1, 0.85))
+	# A real meter: twenty ticks lit in proportion to the grudge. The previous
+	# bars were (grudge + index * 13) % 17 — motion shaped like data.
+	for index in 20:
+		var lit := float(index) / 20.0 < strength
+		var x := anchor.x + 52 + index * 10.0
+		draw_line(Vector2(x, anchor.y + 78), Vector2(x, anchor.y + 78 - (13.0 if lit else 5.0)), HOT if lit else INK * Color(1, 1, 1, 0.15), 3.0)
 
 
 func _draw_event_feed(viewport: Vector2) -> void:
@@ -180,10 +224,17 @@ func _draw_event_feed(viewport: Vector2) -> void:
 
 func _draw_control_ribbon(viewport: Vector2) -> void:
 	var font := ThemeDB.fallback_font
-	var text := "WASD DRIVE    [V] VISCERA    [I] WORLD INDEX    [E] EXIT VEHICLE"
-	var y := viewport.y - 28.0
-	draw_string(font, Vector2(viewport.x * 0.5 - 350, y), text, HORIZONTAL_ALIGNMENT_CENTER, 700, 12, INK * Color(1, 1, 1, 0.76))
-	draw_line(Vector2(viewport.x * 0.5 - 370, y + 8), Vector2(viewport.x * 0.5 + 370, y + 8), Color(0.95, 0.28, 0.08, 0.32), 1)
+	var text := "WASD DRIVE        [I] WORLD INDEX        [E] EXIT VEHICLE"
+	var width := 600.0
+	var x := viewport.x * 0.5 - width * 0.5
+	var y := viewport.y - 44.0
+	# The ribbon carried no ground either, so the controls washed out against
+	# whatever the pit happened to be doing behind them.
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(x - 18, y), Vector2(x + width + 18, y),
+		Vector2(x + width + 4, y + 23), Vector2(x - 4, y + 23),
+	]), SMOKE)
+	draw_string(font, Vector2(x, y + 16), text, HORIZONTAL_ALIGNMENT_CENTER, width, 12, INK * Color(1, 1, 1, 0.84))
 
 
 func _draw_particles(viewport: Vector2) -> void:

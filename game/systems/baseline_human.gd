@@ -64,6 +64,9 @@ const FRACTURE_RATIO := 0.4
 const MAX_LIVE_GORE := 140
 
 static var live_gore := 0
+## Scales every effect count at once, driven by the GORE setting in the menu
+## rather than by a hotkey over the pit. 0 is handled by the `gore` flag.
+static var detail := 1.0
 
 var anatomy: AnatomyComponent
 var head_anchor: Node3D
@@ -263,7 +266,7 @@ func _gore_root() -> Node:
 
 func _spray(origin: Vector3, bias: Vector3, count: int) -> void:
 	var root := _gore_root()
-	for index in count:
+	for index in maxi(1, roundi(count * detail)):
 		if live_gore >= MAX_LIVE_GORE:
 			return
 		var drop := MeshInstance3D.new()
@@ -287,7 +290,7 @@ func _spill_guts() -> void:
 	set_meta("gutted", true)
 	var root := _gore_root()
 	var origin := _zone_origin("torso")
-	for index in 8:
+	for index in maxi(2, roundi(8 * detail)):
 		if live_gore >= MAX_LIVE_GORE:
 			return
 		var organ := MeshInstance3D.new()

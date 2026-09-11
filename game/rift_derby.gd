@@ -56,6 +56,7 @@ var pit_radio: Control
 
 
 func _ready() -> void:
+	_apply_gore_setting()
 	_build_world()
 	_build_boat()
 	_spawn_targets()
@@ -103,8 +104,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_R:
 			_reset_round()
-		elif event.keycode == KEY_V:
-			viscera_fx = not viscera_fx
 		elif event.keycode == KEY_I:
 			index_open = not index_open
 			index_panel.visible = index_open
@@ -141,6 +140,14 @@ func _physics_process(delta: float) -> void:
 	_update_camera(delta)
 	_update_respawns(delta)
 	_update_hud()
+
+
+## Gore is a settings choice now, not a hotkey over the pit. Read once at scene
+## start so every body spawned in this heat agrees.
+func _apply_gore_setting() -> void:
+	var mode := str(WorldHistory.subject("settings").get("gore", "FULL"))
+	viscera_fx = mode != "OFF"
+	BaselineHuman.detail = 0.4 if mode == "REDUCED" else 1.0
 
 
 func _build_world() -> void:
@@ -440,9 +447,12 @@ func _update_camera(delta: float) -> void:
 
 
 func _update_hud() -> void:
-	status.text = "BONE YARD DERBY  //  %s\nWASD DRIVE  ·  V VISCERA FX  ·  I WORLD INDEX  ·  E LEAVE VEHICLE" % round_state.to_upper()
+	status.text = "BONE YARD DERBY  //  %s\nWASD DRIVE  ·  I WORLD INDEX  ·  E LEAVE VEHICLE" % round_state.to_upper()
 	score_label.text = "IMPACT SCORE  %05d\nHULL INTEGRITY  %03d%%\nACTIVE WRECKERS  %02d\nWORLD MEMORY  %03d" % [score, integrity, targets.size(), WorldHistory.event_count()]
-	mode_label.text = ("VICTORY  //  HAULED OUT TO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "won" else "WRECKED  //  DRAGGED INTO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "lost" else "VISCERA FX: %s  ·  RUST / OIL / BLOOD" % ("ON" if viscera_fx else "OFF"))
+	# Only speaks when it has something to say. Left visible during play it sat
+	# on top of the control ribbon repeating what the ribbon already showed.
+	mode_label.visible = round_state != "active"
+	mode_label.text = ("VICTORY  //  HAULED OUT TO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "won" else "WRECKED  //  DRAGGED INTO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "lost" else "")
 	var rival := WorldHistory.subject(RIVAL_ID)
 	rival_label.text = "HUNT ARC  //  MARA VOSS\n%s  ·  GRUDGE %03d  ·  ELO %04d\n[I] WORLD INDEX" % [str(rival.get("status", "active")).to_upper(), int(rival.get("grudge", 0)), int(rival.get("elo", 1180))]
 	if cab_screens != null:
