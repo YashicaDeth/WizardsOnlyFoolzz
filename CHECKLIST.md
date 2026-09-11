@@ -482,6 +482,38 @@ Four tiers, all on existing machinery. See `DESIGN/COSMOLOGY.md`.
 - [ ] **K3.2** The opening reframed: CellOutz grew you, which is why the debt is in the meat
 - [ ] **K3.3** Getting God's attention as the actual win condition, written into world history
 
+## L — The Board
+The storyline and career as a conspiracy pin board rather than a quest list.
+Captured 2026-09-12, see `DESIGN/THE_BOARD.md`. It is the third record: the
+world holds what happened, each faction holds what it believes, and the Board
+holds what the *player* thinks — which is allowed to be wrong.
+
+### L1 — The surface
+- [ ] **L1.1** Corkboard, pinned cards, string, pan and zoom
+- [ ] **L1.2** Populated from WorldHistory — people, factions, posts, parts, wounds
+- [ ] **L1.3** Made rather than rendered: tape, stains, marker, the derived art sheets
+- [ ] **L1.4** Legible from across the room as a shape, up close as cards
+
+### L2 — Pinning
+- [ ] **L2.1** The player pins what they choose, from the index, the camera and CARRY
+- [ ] **L2.2** Photographs from `field_camera.gd` pin with their verifiable contents
+- [ ] **L2.3** Nothing auto-pins except the first card
+
+### L3 — Strings are claims
+- [ ] **L3.1** Draw a connection between two pinned things
+- [ ] **L3.2** A string the world supports becomes a lead and opens work
+- [ ] **L3.3** A false string looks exactly as convincing as a true one
+- [ ] **L3.4** The player finds out by acting on it, not by a marker
+
+### L4 — Publishing a theory
+- [ ] **L4.1** A theory goes to the Wire through `expose` / `fabricate`
+- [ ] **L4.2** True published = discrediting; false published = fabrication, and it costs
+- [ ] **L4.3** Being wrong has a price — the first screen where it does
+
+### L5 — Career
+- [ ] **L5.1** Routes across the board are the progression
+- [ ] **L5.2** No quest list exists anywhere in the game
+
 ## H — Base building, reduced
 
 Your own call: Valheim's building is a pillar built by five people over years,
