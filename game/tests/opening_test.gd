@@ -7,6 +7,28 @@ func check(condition: bool, label: String) -> void:
 	if not condition:
 		failures.append(label)
 
+## Spawns a dummy directly in front, swings at the given pitch, and reports which
+## zone actually took the damage. Removed afterwards so the next probe is
+## unambiguous about which actor it hit.
+func _aim_wound(hunt, aim_pitch: float, tag: String) -> String:
+	hunt._spawn_encounter_actor({"instance_id": tag, "kind": "hostile", "summary": "aim probe"}, hunt.player + Vector3(0, 0, 2.2))
+	var actor: Dictionary = hunt.encounter_actors.back()
+	var rig = actor.rig
+	hunt.yaw = 0.0
+	hunt.pitch = aim_pitch
+	hunt._attack_nearest_encounter_actor()
+	var worst := ""
+	var worst_loss := 0.0
+	for zone_id in BaselineHuman.ZONES:
+		var loss: float = float(AnatomyComponent.DEFAULT_ZONES[zone_id].health) - rig.zone_health(zone_id)
+		if loss > worst_loss:
+			worst_loss = loss
+			worst = zone_id
+	(actor.node as Node3D).queue_free()
+	hunt.encounter_actors.erase(actor)
+	return worst
+
+
 func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		get_tree().quit(2)
@@ -84,6 +106,31 @@ func _ready() -> void:
 	var actor_count: int = hunt.encounter_actors.size()
 	hunt._spawn_encounter_actor(event, Vector3(0, 0, 50))
 	check(hunt.encounter_actors.size() == actor_count, "escaped actor cannot respawn")
+
+	# The player finally has a body rather than only a health integer.
+	check(hunt.player_rig is BaselineHuman, "the player has a baseline rig")
+	hunt.third_person = false
+	hunt._update_camera()
+	check(not hunt.player_rig.parts["head"].visible, "first person hides the player's own head")
+	check(hunt.player_rig.parts["left_arm"].visible, "...but keeps the body you look down at")
+	hunt.third_person = true
+	hunt._update_camera()
+	check(hunt.player_rig.parts["head"].visible, "third person shows the whole body")
+	hunt._wound_player(hunt.player + Vector3(0, 0, 2), 20.0, "cut")
+	var player_state: Dictionary = WorldHistory.subject("player").get("anatomy_state", {})
+	check(player_state.has("zones"), "player wounds are recorded on the player subject")
+	var player_hurt := 0
+	for zone_id in player_state.get("zones", {}):
+		if float(player_state.zones[zone_id].health) < float(AnatomyComponent.DEFAULT_ZONES[zone_id].health):
+			player_hurt += 1
+	check(player_hurt == 1, "a strike on the player lands on exactly one zone (%d)" % player_hurt)
+
+	# Aim, not a round-robin, decides the wound.
+	var high := _aim_wound(hunt, 0.85, "aim_high")
+	var low := _aim_wound(hunt, -0.85, "aim_low")
+	check(high != low, "where you look changes what you open (up %s, down %s)" % [high, low])
+	check(high in ["head", "torso"], "looking up wounds the upper body (%s)" % high)
+	check(low in ["left_leg", "right_leg"], "looking down wounds the legs (%s)" % low)
 	var derby = load("res://rift_derby.tscn").instantiate()
 	add_child(derby)
 	derby.set_physics_process(false)

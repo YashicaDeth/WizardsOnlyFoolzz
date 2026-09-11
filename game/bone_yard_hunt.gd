@@ -34,6 +34,7 @@ var encounter_actors: Array[Dictionary] = []
 var loose_loot: Array[Node3D] = []
 var mara_encounter_number := 1
 var player_body: CharacterBody3D
+var player_rig: BaselineHuman
 var strike_windup := -1.0
 var rival_attack_clock := 0.0
 var dodge_remaining := 0.0
@@ -71,11 +72,48 @@ func _ready() -> void:
 	player_body.add_child(collider)
 	add_child(player_body)
 	player_body.position = player - Vector3.UP * 0.6
+	_build_player_rig()
 	WorldHistory.register_subject("inventory", {"items": []})
 	_spawn_friend()
 	_spawn_rival()
 	_update_camera()
 	WorldHistory.record_event("player_entered_hunt_ground", {"location": HUNT_LOCATION, "hunt_id": HUNT_ID})
+
+
+## The player had no body at all — only a `health` integer, the same defect the
+## derby drivers carried. `health` stays the coarse survivability meter the loop
+## and HUD are balanced around; the rig records *where* the damage is, renders it
+## on the player's own limbs in first person, and persists it. Unifying the two
+## numbers means rebalancing the whole hunt loop and is tracked in ROADMAP.md.
+func _build_player_rig() -> void:
+	player_rig = BaselineHuman.new()
+	player_rig.name = "HunterBody"
+	player_body.add_child(player_rig)
+	# The capsule is centred on the controller origin, so drop the rig by half
+	# its height to stand the feet on the floor rather than mid-shin.
+	player_rig.position = Vector3(0, -0.9, 0)
+	var config := {"flesh": Color("7a6350"), "variation": 1, "blood": 5200.0}
+	var saved: Dictionary = WorldHistory.subject("player")
+	if saved.get("anatomy_state") is Dictionary:
+		config["restore"] = saved.anatomy_state
+	player_rig.build("player", config)
+
+
+## Damage to the player, routed through the body so it lands on a real zone,
+## bleeds from a real organ, and is still there next time.
+func _wound_player(from: Vector3, damage: float, damage_type := "cut") -> void:
+	if player_rig == null:
+		return
+	var toward := (from - player)
+	toward.y = 0.0
+	var aim := player_rig.global_position + Vector3(0, 1.1, 0) + toward.normalized() * 0.3
+	var result := player_rig.hit_at(aim, damage, damage * 0.8, damage_type)
+	WorldHistory.update_subject("player", {"anatomy_state": player_rig.snapshot()}, "anatomy_changed")
+	WorldHistory.record_event("player_wounded", {
+		"zone": str(result.get("zone", "torso")),
+		"organ": str((result.get("organ", {}) as Dictionary).get("zone", "")),
+		"location": HUNT_LOCATION,
+	})
 
 
 func _register_people() -> void:
@@ -271,10 +309,22 @@ func _attack_nearest_encounter_actor() -> bool:
 	var facing := Vector3(sin(yaw), 0, cos(yaw)).normalized().dot((target.global_position - player).normalized())
 	if facing < 0.12:
 		return false
-	var zones := ["torso", "left_arm", "right_arm", "left_leg", "right_leg", "head"]
-	var zone: String = zones[(WorldHistory.event_count("npc_anatomy_hit") + nearest_index) % zones.size()]
 	var anatomy: Node = actor.anatomy as Node
-	var result: Dictionary = anatomy.call("apply_hit", zone, 24.0, 18.0, "cut")
+	var rig := actor.get("rig") as BaselineHuman
+	var zone := "torso"
+	var result: Dictionary = {}
+	if rig != null and is_instance_valid(rig):
+		# Where you are looking decides what you open. The zone used to come from
+		# (event_count + index) % 6 — a round-robin, so aiming at a head and
+		# aiming at a knee produced the same sequence of wounds.
+		var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+		result = rig.hit_at(player + look * clampf(nearest_distance, 0.6, 4.1), 24.0, 18.0, "cut")
+		zone = str(result.get("zone", "torso"))
+	else:
+		result = anatomy.call("apply_hit", zone, 24.0, 18.0, "cut")
+	var organ_hit := str((result.get("organ", {}) as Dictionary).get("zone", ""))
+	if not organ_hit.is_empty() and bool((result.get("organ", {}) as Dictionary).get("ruptured", false)):
+		prompt.text = "%s IS OPENED UP" % str(actor.display_name).to_upper()
 	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": anatomy.call("snapshot")}, "anatomy_changed")
 	_spawn_blood(target.global_position + Vector3(0, 1.1, 0), 28)
 	WorldHistory.record_event("npc_anatomy_hit", {"subject_id": actor.subject_id, "zone": zone, "result": result, "location": HUNT_LOCATION})
@@ -399,6 +449,7 @@ func _update_rival(delta: float) -> void:
 			return
 		health = maxi(0, health - 7)
 		stamina = maxf(0, stamina - 12)
+		_wound_player(enemy.global_position, 17.0, "cut")
 		WorldHistory.record_event("rival_struck_player", {"rival": HUNT_ID, "location": HUNT_LOCATION})
 		if health <= 0:
 			health = 65
@@ -441,6 +492,7 @@ func _update_encounter_actors(delta: float) -> void:
 				actor.attack_time = 0.0
 				if dodge_remaining <= 0.0:
 					health = maxi(1, health - 9)
+					_wound_player(node.global_position, 15.0, "cut")
 
 func _move_actor_on_route(actor: Dictionary, destination: Vector3, delta: float) -> void:
 	var body := actor.node as CharacterBody3D
@@ -565,21 +617,21 @@ func _update_camera() -> void:
 	else:
 		camera.global_position = player
 		camera.look_at(player + look * 12.0)
+	if player_rig != null and is_instance_valid(player_rig):
+		player_rig.rotation.y = yaw + PI
+		# The first-person camera sits inside the skull, so the head would fill
+		# the view. Everything else stays on: looking down at your own ruined
+		# arm is the entire point of the player having a body.
+		var head := player_rig.parts.get("head") as Node3D
+		if head != null and is_instance_valid(head):
+			head.visible = third_person
 
 
 func _build_world() -> void:
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color("0b0908")
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("503022")
-	environment.ambient_light_energy = 0.7
-	environment.glow_enabled = true
-	environment.glow_intensity = 0.35
-	environment.volumetric_fog_enabled = true
-	environment.volumetric_fog_density = 0.024
-	environment.volumetric_fog_albedo = Color("586042")
-	$WorldEnvironment.environment = environment
+	# Was a hand-rolled Environment on a near-black background with a flat colour
+	# ambient, which rendered the Expanse as an unreadable brown murk — the same
+	# fault the menu had. The roadmap already listed this scene as un-migrated.
+	$WorldEnvironment.environment = WorldLook.environment("ashbloom")
 	_add_mesh(BoxMesh.new(), Vector3(0, -0.6, 0), Vector3(470, 1, 370), Color("17150f"), 0.0)
 	var floor_body := StaticBody3D.new()
 	var floor_collider := CollisionShape3D.new()
@@ -663,20 +715,31 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> void:
 	collision.shape = capsule
 	actor.add_child(collision)
 	add_child(actor)
-	_add_mesh_to(actor, CapsuleMesh.new(), Vector3(0, 1, 0), Color("70201c") if str(encounter.kind) == "hostile" else Color("586c3a"), 0.0)
 	var identity := Label3D.new()
 	identity.name = "Identity"
 	identity.text = "%s\nELO %04d" % [display_name.to_upper(), 1110 if str(encounter.kind) == "hostile" else 1510]
 	identity.position = Vector3(0, 3.1, 0)
 	identity.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	actor.add_child(identity)
-	var anatomy: Node = ANATOMY_COMPONENT.new()
-	actor.add_child(anatomy)
-	anatomy.call("configure", subject_id, 5200.0 if str(encounter.kind) == "boss" else 4300.0, {"torso": {"armor": 0.18}})
+	# Was a bare capsule with an anatomy component bolted on and no hit geometry
+	# at all, which is why melee had to pick a zone by round-robin. The rig gives
+	# them a real body to aim at.
+	var rig := BaselineHuman.new()
+	rig.name = "Body"
+	actor.add_child(rig)
+	rig.position = Vector3(0, -0.9, 0)
+	var rig_config := {
+		"flesh": Color("70201c") if str(encounter.kind) == "hostile" else Color("586c3a"),
+		"variation": subject_id.length(),
+		"blood": 5200.0 if str(encounter.kind) == "boss" else 4300.0,
+		"cybernetics": {"torso": {"armor": 0.18}},
+	}
 	if saved_actor.get("anatomy_state") is Dictionary:
-		anatomy.call("restore", saved_actor.anatomy_state)
+		rig_config["restore"] = saved_actor.anatomy_state
+	rig.build(subject_id, rig_config)
+	var anatomy: Node = rig.anatomy
 	var loot := ["Ashline toll teeth", "rust scrip"] if str(encounter.kind) == "hostile" else ["weather-heart filament", "dead god relay"]
-	encounter_actors.append({"subject_id": subject_id, "display_name": display_name, "node": actor, "anatomy": anatomy, "state": "hunting", "disposition": "hostile", "speed": 3.7, "loot": loot, "loot_at_risk": false, "dead": false})
+	encounter_actors.append({"subject_id": subject_id, "display_name": display_name, "node": actor, "rig": rig, "anatomy": anatomy, "state": "hunting", "disposition": "hostile", "speed": 3.7, "loot": loot, "loot_at_risk": false, "dead": false})
 	encounter_actors.back()["encounter_id"] = str(encounter.get("instance_id", ""))
 	WorldHistory.register_subject(subject_id, {"name": display_name, "kind": "person", "role": str(encounter.kind), "elo": 1110 if str(encounter.kind) == "hostile" else 1510, "status": "encountered", "memory": summary_from(encounter), "wounds": [], "anatomy": anatomy.call("snapshot"), "relations": {"player": {"kind": "enemy", "strength": 35}}})
 
