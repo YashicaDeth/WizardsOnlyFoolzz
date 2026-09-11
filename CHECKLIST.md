@@ -165,11 +165,11 @@ The most complete system in the project and, until this pass, the least visible.
 
 ### B2 — Limbs and cybernetics, one verb `BUILT`
 - [x] ~~**B2.1** Flesh, bone, organs and hardware in one list, inspected identically~~
-- [ ] **B2.2** **Implants become real parts with a real zone** — kills the keyword table that currently guesses where hardware sits
-- [ ] **B2.3** Implant condition tracked, so "NO TELEMETRY" becomes a number
-- [ ] **B2.4** Authored implant meshes per catalogue entry
-- [ ] **B2.5** Wounds carry a zone at authoring time — kills the second keyword table
-- [ ] **B2.6** Compare view: your part against theirs, which is the robbing decision
+- [x] ~~**B2.2** **Implants become real parts with a real zone** — kills the keyword table that currently guesses where hardware sits~~
+- [x] ~~**B2.3** Implant condition tracked, so "NO TELEMETRY" becomes a number~~
+- [x] ~~**B2.4** Authored implant meshes per catalogue entry~~
+- [x] ~~**B2.5** Wounds carry a zone at authoring time — kills the second keyword table~~
+- [x] ~~**B2.6** Compare view: your part against theirs, which is the robbing decision~~
 
 ### B3 — The X-ray cursor `BUILT`
 - [x] ~~**B3.1** Brass ring, real button, skull mark, key and click through one path~~

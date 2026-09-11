@@ -2,6 +2,22 @@
 
 ## 2026 09 11
 
+- **Implants and wounds are real parts with real zones.** `implant_catalog.gd`
+  and `wound_catalog.gd` replace both keyword-guessing tables (`IMPLANT_ZONE_WORDS`
+  and `WOUND_ZONE_WORDS` in `body_inspector.gd`) with authored data: eighteen
+  named implants each carry a zone, an armour value, a max condition and an
+  authored mesh profile; wounds carry a zone and a severity. Hardware now
+  degrades from hits to its zone — armour scales down with `implant_condition()`
+  — so "NO TELEMETRY" in the inspector is gone, replaced with a real percentage
+  that also shows on the World Index dossier. `part_viewer.gd` builds a distinct
+  silhouette per catalogue profile (optic, bellows, bone rail, spine cage, limb
+  drive, chest plate) instead of one randomised box. `body_inspector.gd` gained
+  `comparison()` — the selected part against the player's equivalent in the same
+  zone, rendered live in a second viewport with a ROB/KEEP verdict — closing out
+  B2 in full. `WorldHistory` migrates both formats on read/write so old prose
+  wounds and cybernetics lists convert once and stay converted through save/load.
+  Covered by 20 new checks in `body_inspector_test`; full 17-suite headless run
+  stays green.
 - **The BODY specimen viewer is now handled, not watched.** Hover previews a
   part without overwriting the pinned selection; click pins; dragging turns the
   real viewport specimen and the wheel changes its inspection scale. Pointer

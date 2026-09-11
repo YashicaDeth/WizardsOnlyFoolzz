@@ -1,5 +1,8 @@
 extends Node
 
+const ImplantCatalog := preload("res://systems/implant_catalog.gd")
+const WoundCatalog := preload("res://systems/wound_catalog.gd")
+
 signal event_recorded(event: Dictionary)
 signal subject_changed(subject_id: String, subject: Dictionary)
 
@@ -35,14 +38,16 @@ func record_event(event_type: String, details: Dictionary = {}) -> Dictionary:
 
 
 func register_subject(subject_id: String, initial_state: Dictionary) -> Dictionary:
+	initial_state = _normalise_body_records(initial_state)
 	if not subjects.has(subject_id):
 		subjects[subject_id] = initial_state.duplicate(true)
 		_save_history()
 	else:
 		# Save-safe schema migration: new authored fields are filled in without
 		# erasing injuries, grudges, bonds or memories earned in an older build.
-		var stored: Dictionary = subjects[subject_id]
-		var changed := false
+		var before: Dictionary = subjects[subject_id]
+		var stored: Dictionary = _normalise_body_records(before)
+		var changed := stored != before
 		for key in initial_state:
 			if not stored.has(key):
 				stored[key] = initial_state[key]
@@ -121,6 +126,7 @@ func tree_axis_label(value: float) -> String:
 
 
 func update_subject(subject_id: String, changes: Dictionary, event_type: String = "subject_updated") -> Dictionary:
+	changes = _normalise_body_records(changes)
 	var updated := register_subject(subject_id, {})
 	for key in changes:
 		updated[key] = changes[key]
@@ -128,6 +134,24 @@ func update_subject(subject_id: String, changes: Dictionary, event_type: String 
 	record_event(event_type, {"subject_id": subject_id, "changes": changes.duplicate(true)})
 	subject_changed.emit(subject_id, updated.duplicate(true))
 	return updated.duplicate(true)
+
+
+## Save-safe migration for the two authoring formats that used to be prose.
+## Unknown legacy strings remain labelled but receive an explicit torso zone;
+## nothing downstream performs fuzzy keyword inference.
+func _normalise_body_records(state: Dictionary) -> Dictionary:
+	var out := state.duplicate(true)
+	if out.has("wounds"):
+		out["wounds"] = WoundCatalog.list(out.wounds)
+	for anatomy_key in ["anatomy", "anatomy_state"]:
+		if out.get(anatomy_key) is Dictionary:
+			var anatomy: Dictionary = out[anatomy_key]
+			if anatomy.has("wounds"):
+				anatomy["wounds"] = WoundCatalog.list(anatomy.wounds)
+			if anatomy.has("cybernetics"):
+				anatomy["cybernetics"] = ImplantCatalog.list(anatomy.cybernetics)
+			out[anatomy_key] = anatomy
+	return out
 
 
 func recent_events(limit: int = 10) -> Array[Dictionary]:
@@ -166,6 +190,8 @@ func _load_history() -> void:
 		next_sequence = int(parsed.get("next_sequence", events.size() + 1))
 		if parsed.get("subjects", {}) is Dictionary:
 			subjects = (parsed.get("subjects", {}) as Dictionary).duplicate(true)
+			for subject_id in subjects:
+				subjects[subject_id] = _normalise_body_records(subjects[subject_id])
 
 
 func _save_history() -> void:

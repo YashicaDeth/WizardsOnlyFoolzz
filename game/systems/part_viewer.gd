@@ -21,6 +21,7 @@ const ORGAN_SIZES := {
 	"brain": 0.072, "heart": 0.060, "left_lung": 0.076, "right_lung": 0.076,
 	"liver": 0.070, "gut": 0.088, "spine": 0.042,
 }
+const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 const BONE := Color("cfc2a4")
 const FLESH := Color("9a6c5c")
 const STEEL := Color("7d8894")
@@ -97,7 +98,7 @@ func show_part(part: Dictionary, state: float) -> void:
 		"limb":
 			_build_limb(str(part.get("zone", "torso")))
 		"implant":
-			_build_implant(str(part.get("id", "")))
+			_build_implant(part)
 	_apply_condition()
 	_fit()
 
@@ -240,30 +241,89 @@ func _build_limb(zone_id: String) -> void:
 	_piece(mesh, Vector3.ZERO, FLESH, false)
 
 
-## No authored mesh exists for hardware yet, so it is assembled from primitives
-## with enough secondary form to stop reading as a box — which is the same note
-## `ROADMAP.md` already has open against the world geometry.
-func _build_implant(implant_id: String) -> void:
+## Hardware silhouettes come from the authored catalogue profile. Exact IDs
+## choose exact forms; the code never infers anatomy from a word in the name.
+func _build_implant(raw: Dictionary) -> void:
+	var implant := ImplantCatalog.resolve(raw)
+	var profile := str(implant.profile)
+	var tint := Color(str(implant.tint))
+	match profile:
+		"optic", "optic_spool":
+			var eye := SphereMesh.new()
+			eye.radius = 0.070
+			eye.height = 0.090
+			var lens := _piece(eye, Vector3(0, 0, 0.025), Color("5d9b91"), true)
+			lens.name = "OpticLens"
+			var bezel := TorusMesh.new()
+			bezel.inner_radius = 0.064
+			bezel.outer_radius = 0.088
+			var ring := _piece(bezel, Vector3(0, 0, 0.045), tint, true)
+			ring.name = "OpticBezel"
+			ring.rotation_degrees.x = 90
+			_hardware_pin("Spool", Vector3(0, -0.095, -0.02), 0.16, tint)
+		"bellows", "filter_stack":
+			for index in 4:
+				var disc := CylinderMesh.new()
+				disc.top_radius = 0.075 - index * 0.006
+				disc.bottom_radius = disc.top_radius
+				disc.height = 0.025
+				var plate := _piece(disc, Vector3(0, 0.075 - index * 0.050, 0), tint.darkened(index * 0.04), true)
+				plate.name = "BellowsPlate%d" % index
+			_hardware_pin("AirStem", Vector3(0, -0.12, 0), 0.12, Color("6c7367"))
+		"bone_rail", "meter", "digit_tool":
+			var rail_mesh := BoxMesh.new()
+			rail_mesh.size = Vector3(0.055, 0.30, 0.045)
+			var rail := _piece(rail_mesh, Vector3.ZERO, tint, true)
+			rail.name = "CalibratedRail"
+			for index in 4:
+				var bolt := SphereMesh.new()
+				bolt.radius = 0.014
+				bolt.height = 0.024
+				var fastener := _piece(bolt, Vector3(0, 0.105 - index * 0.07, 0.03), Color("c1aa72"), true)
+				fastener.name = "RailFastener%d" % index
+		"spine_cage", "pulse_cage", "surgical_crown":
+			for index in 5:
+				var arc := BodyMesh.arc_tube(0.10 + index * 0.009, 0.065, 0.009, PI * 0.08, PI * 0.92)
+				var brace := _piece(arc, Vector3(0, 0.13 - index * 0.065, 0), tint, true)
+				brace.name = "CageBrace%d" % index
+			_hardware_pin("CageSpine", Vector3(0, 0, -0.035), 0.36, tint.darkened(0.18))
+		"limb_drive", "industrial_limb", "scrap_limb", "joint_anchor", "joint_dial":
+			for side in [-1.0, 1.0]:
+				_hardware_pin("DriveStrut", Vector3(side * 0.042, 0.015, 0), 0.31, tint)
+			var joint_mesh := SphereMesh.new()
+			joint_mesh.radius = 0.065
+			joint_mesh.height = 0.095
+			var joint := _piece(joint_mesh, Vector3(0, -0.17, 0), tint.darkened(0.15), true)
+			joint.name = "DriveJoint"
+		"chest_plate", "organ_box", "regulator", "jaw_nail", "salvage", _:
+			var core := BoxMesh.new()
+			core.size = Vector3(0.15, 0.22, 0.075)
+			var housing := _piece(core, Vector3.ZERO, tint, true)
+			housing.name = "AuthoredHousing"
+			_hardware_pin("TelemetryPin", Vector3(0.055, 0, 0.055), 0.18, Color("caa96a"))
+			_hardware_pin("TelemetryPin", Vector3(-0.055, 0, 0.055), 0.18, Color("caa96a"))
+	# Every catalogue entry gets a stable identity plate and port count even when
+	# it shares its mechanical family with another part.
 	var rng := RandomNumberGenerator.new()
-	rng.seed = hash(implant_id) & 0x7fffffff
-	var core := BoxMesh.new()
-	core.size = Vector3(0.12, 0.20, 0.10)
-	_piece(core, Vector3.ZERO, STEEL, true)
-	for index in rng.randi_range(3, 5):
-		var ring := CylinderMesh.new()
-		ring.top_radius = 0.035 + rng.randf() * 0.02
-		ring.bottom_radius = ring.top_radius
-		ring.height = 0.018
-		var at := Vector3(rng.randf_range(-0.05, 0.05), 0.09 - float(index) * 0.045, 0.05)
-		var piece := _piece(ring, at, STEEL.darkened(0.2), true)
-		piece.rotation_degrees = Vector3(90, 0, rng.randf_range(-14, 14))
-	for index in 2:
-		var pin := CylinderMesh.new()
-		pin.top_radius = 0.008
-		pin.bottom_radius = 0.008
-		pin.height = 0.16
-		var pin_piece := _piece(pin, Vector3(0.055 if index == 0 else -0.055, 0.0, -0.03), Color("caa96a"), true)
-		pin_piece.rotation_degrees = Vector3(0, 0, 6.0 if index == 0 else -6.0)
+	rng.seed = hash(str(implant.id)) & 0x7fffffff
+	for index in 1 + rng.randi_range(0, 2):
+		var port := CylinderMesh.new()
+		port.top_radius = 0.010
+		port.bottom_radius = 0.014
+		port.height = 0.028
+		var socket := _piece(port, Vector3(rng.randf_range(-0.055, 0.055), rng.randf_range(-0.08, 0.08), 0.075), Color("332a24"), true)
+		socket.name = "IdentityPort%d" % index
+		socket.rotation_degrees.x = 90
+
+
+func _hardware_pin(piece_name: String, at: Vector3, length: float, tint: Color) -> MeshInstance3D:
+	var pin := CylinderMesh.new()
+	pin.top_radius = 0.009
+	pin.bottom_radius = 0.012
+	pin.height = length
+	var piece := _piece(pin, at, tint, true)
+	piece.name = piece_name
+	return piece
 
 
 func _piece(mesh: Mesh, at: Vector3, tint: Color, metallic: bool) -> MeshInstance3D:

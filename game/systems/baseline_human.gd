@@ -521,9 +521,9 @@ func _on_organ_ruptured(organ_id: String, _organ: Dictionary) -> void:
 
 func install_prosthetic(zone_id: String, part_data: Dictionary) -> void:
 	var zone := canonical_zone(zone_id)
-	anatomy.installed_parts[zone] = part_data.duplicate(true)
+	var installed := anatomy.install_part(zone, part_data)
 	# A replacement limb restores function; it does not restore the person.
-	var restored := float(part_data.get("restores", 0.6))
+	var restored := float(installed.get("restores", 0.6))
 	var zone_state: Dictionary = anatomy.zones.get(zone, {})
 	if not zone_state.is_empty():
 		var ceiling := float(AnatomyComponent.DEFAULT_ZONES[zone].health)

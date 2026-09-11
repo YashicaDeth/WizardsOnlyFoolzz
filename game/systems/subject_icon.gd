@@ -1,5 +1,7 @@
 extends SubViewport
 
+const WoundCatalog := preload("res://systems/wound_catalog.gd")
+
 ## A person's head, turning in place, with an X-ray state.
 ##
 ## Greg's note on the rank pyramid: *"i want the players or nemesis in the system
@@ -124,7 +126,7 @@ func set_subject(subject: Dictionary, tone: Color) -> void:
 	_head_material.albedo_color = _head_material.albedo_color.lerp(Color("6d1f16"), 1.0 - ratio)
 	var wound_text := ""
 	for wound in subject.get("wounds", []):
-		wound_text += " " + str(wound).to_lower()
+		wound_text += " " + WoundCatalog.label(wound).to_lower()
 	for wound in anatomy.get("wounds", []):
 		if wound is Dictionary and str(wound.get("zone", "")) == "head":
 			wound_text += " " + str(wound.get("type", ""))

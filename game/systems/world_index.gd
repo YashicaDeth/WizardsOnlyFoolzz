@@ -29,6 +29,8 @@ const XrayCursor := preload("res://systems/xray_cursor.gd")
 const Motion := preload("res://systems/celloutz_motion.gd")
 const SUBJECT_ICON := preload("res://systems/subject_icon.gd")
 const BODY_INSPECTOR := preload("res://systems/body_inspector.gd")
+const ImplantCatalog := preload("res://systems/implant_catalog.gd")
+const WoundCatalog := preload("res://systems/wound_catalog.gd")
 
 ## Six live 3D heads is cheap; sixty would not be, and each icon owns a World3D.
 ## So they are a pool the pages draw into by slot rather than one per row.
@@ -716,22 +718,23 @@ func _draw_file(rect: Rect2) -> void:
 	if condition != "" and condition != "none":
 		lines.append(condition)
 	for wound in subject.get("wounds", []):
-		if not lines.has(str(wound)):
-			lines.append(str(wound))
+		var wound_label := WoundCatalog.label(wound)
+		if not lines.has(wound_label):
+			lines.append(wound_label)
 	if lines.is_empty():
 		lines.append("no recorded damage")
 	for line in lines:
 		draw_string(font, Vector2(right_x, wy), "— %s" % str(line), HORIZONTAL_ALIGNMENT_LEFT, right_width, 12, HOT * Color(1, 1, 1, 0.9))
 		wy += 17.0
-	var anatomy: Dictionary = subject.get("anatomy", {})
-	var cybernetics: Array = anatomy.get("cybernetics", [])
+	var anatomy: Dictionary = subject.get("anatomy_state", subject.get("anatomy", {}))
+	var cybernetics := ImplantCatalog.list(anatomy.get("cybernetics", []))
 	if not cybernetics.is_empty():
 		wy += 18.0
 		CellOutzType.draw_text(self, Vector2(right_x, wy), "INSTALLED", 11.0, BRUISE.lerp(INK, 0.3), 1.2)
 		draw_line(Vector2(right_x, wy + 17), Vector2(right_x + right_width, wy + 17), BRUISE * Color(1, 1, 1, 0.4), 1.0)
 		wy += 36.0
 		for part in cybernetics:
-			draw_string(font, Vector2(right_x, wy), "+ %s" % str(part), HORIZONTAL_ALIGNMENT_LEFT, right_width, 12, BRUISE.lerp(INK, 0.55))
+			draw_string(font, Vector2(right_x, wy), "+ %s  %03d%%" % [str(part.name), roundi(float(part.condition) / maxf(1.0, float(part.max_condition)) * 100.0)], HORIZONTAL_ALIGNMENT_LEFT, right_width, 12, BRUISE.lerp(INK, 0.55))
 			wy += 17.0
 	var blood := str(anatomy.get("blood_type", ""))
 	if blood != "":

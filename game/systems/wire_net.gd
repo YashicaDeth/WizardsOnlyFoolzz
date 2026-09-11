@@ -1,6 +1,8 @@
 class_name WireNet
 extends RefCounted
 
+const WoundCatalog := preload("res://systems/wound_catalog.gd")
+
 ## The surviving internet, as a simulation rather than a screen.
 ##
 ## `DESIGN/IN_GAME_INTERNET.md` specifies the Wire in full and almost none of it
@@ -370,7 +372,7 @@ func leverage(subject_id: String) -> String:
 	var subject: Dictionary = WorldHistory.subject(subject_id)
 	var wounds: Array = subject.get("wounds", [])
 	if not wounds.is_empty():
-		return str(wounds[0])
+		return WoundCatalog.label(wounds[0])
 	var injury := str(subject.get("injury", "none"))
 	if injury != "none" and injury != "":
 		return injury

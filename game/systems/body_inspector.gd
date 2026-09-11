@@ -20,6 +20,8 @@ extends Node
 const CellOutzType := preload("res://systems/celloutz_type.gd")
 const PART_VIEWER := preload("res://systems/part_viewer.gd")
 const Grunge := preload("res://systems/celloutz_grunge.gd")
+const ImplantCatalog := preload("res://systems/implant_catalog.gd")
+const WoundCatalog := preload("res://systems/wound_catalog.gd")
 
 const INK := Color("e6d4ac")
 const COPPER := Color("b0552a")
@@ -52,29 +54,6 @@ const ZONE_SHAPE := {
 	"right_leg": {"at": Vector2(0.61, 0.73), "size": Vector2(0.13, 0.30)},
 }
 
-## Hardware in `WorldHistory` is authored as free text rather than as parts with
-## a zone, so where an implant sits is read out of its name. A stopgap, and it
-## is exactly what the "bionics as real parts" item in `ROADMAP.md` replaces:
-## once an implant is a component with a zone, this table goes.
-const IMPLANT_ZONE_WORDS := {
-	"jaw": "head", "eye": "head", "crown": "head", "skull": "head", "optic": "head",
-	"clavicle": "torso", "sternum": "torso", "lung": "torso", "spine": "torso",
-	"trachea": "torso", "liver": "torso", "pulse": "torso", "heart": "torso", "rib": "torso",
-	"arm": "left_arm", "thumb": "left_arm", "hand": "left_arm", "torque": "right_arm", "finger": "right_arm",
-	"ankle": "left_leg", "heel": "right_leg", "knee": "left_leg", "foot": "right_leg",
-}
-
-## Wounds are free text too, and the seeded cast is described rather than
-## simulated, so the same reading applies - otherwise a character the file says
-## is missing an eye inspects as undamaged.
-const WOUND_ZONE_WORDS := {
-	"eye": "head", "skull": "head", "jaw": "head", "ear": "head", "eardrum": "head",
-	"clavicle": "torso", "lung": "torso", "thoracic": "torso", "chest": "torso",
-	"sternum": "torso", "gut": "torso", "graft": "torso", "spine": "torso",
-	"hand": "right_arm", "arm": "left_arm", "finger": "right_arm", "fingertips": "right_arm",
-	"leg": "left_leg", "knee": "left_leg", "foot": "right_leg", "ankle": "left_leg",
-}
-
 var subject: Dictionary = {}
 var zone := "torso"
 var part_index := 0
@@ -86,6 +65,7 @@ var viewer_dragging := false
 
 var _parts: Array = []
 var _viewer: SubViewport
+var _compare_viewer: SubViewport
 var _zone_rects: Dictionary = {}
 var _part_rects: Array = []
 var _lift_from := Rect2()
@@ -97,6 +77,9 @@ func _ready() -> void:
 	_viewer = PART_VIEWER.new()
 	_viewer.name = "PartViewer"
 	add_child(_viewer)
+	_compare_viewer = PART_VIEWER.new()
+	_compare_viewer.name = "ComparisonViewer"
+	add_child(_compare_viewer)
 	set_process(true)
 
 
@@ -131,7 +114,11 @@ func _rebuild_parts() -> void:
 		var organ_state: Dictionary = (_anatomy().get("organs", {}) as Dictionary).get(str(organ_id), {})
 		_parts.append({"kind": "organ", "id": organ_id, "zone": zone, "label": str(organ_id).replace("_", " ").to_upper(), "note": "organ", "ruptured": bool(organ_state.get("ruptured", false))})
 	for implant in _implants_in(zone):
-		_parts.append({"kind": "implant", "id": str(implant), "zone": zone, "label": str(implant).to_upper(), "note": "installed"})
+		var part: Dictionary = implant.duplicate(true)
+		part["kind"] = "implant"
+		part["label"] = str(implant.name).to_upper()
+		part["note"] = "installed"
+		_parts.append(part)
 	part_index = clampi(part_index, 0, maxi(0, _parts.size() - 1))
 	hovered_part_index = -1
 
@@ -142,24 +129,10 @@ func _anatomy() -> Dictionary:
 
 func _implants_in(zone_id: String) -> Array:
 	var out: Array = []
-	var anatomy: Dictionary = _anatomy()
-	for implant in anatomy.get("cybernetics", []):
-		if _zone_from_words(str(implant), IMPLANT_ZONE_WORDS) == zone_id:
-			out.append(str(implant))
+	for implant in ImplantCatalog.list(_anatomy().get("cybernetics", [])):
+		if str(implant.zone) == zone_id:
+			out.append(implant)
 	return out
-
-
-func _zone_from_words(text: String, table: Dictionary) -> String:
-	var lower := text.to_lower()
-	# Longest match wins, so "eardrum" does not resolve through "ear" when both
-	# are present and pointing at different places.
-	var best := ""
-	var best_length := 0
-	for word in table:
-		if lower.contains(str(word)) and str(word).length() > best_length:
-			best = str(table[word])
-			best_length = str(word).length()
-	return best if best != "" else "torso"
 
 
 ## Real condition, from the real snapshot when there is one. The seeded cast
@@ -178,9 +151,7 @@ func _condition_of(part: Dictionary) -> float:
 			return clampf(float(organ.get("health", 30.0)) / maxf(1.0, float(organ.get("max_health", organ.get("health", 30.0)))), 0.0, 1.0)
 		return _wound_penalty(part_zone)
 	if kind == "implant":
-		# Hardware has no condition tracked yet. Reported as unknown rather than
-		# as perfect, because claiming a number that does not exist is worse.
-		return 0.82
+		return clampf(float(part.get("condition", 0.0)) / maxf(1.0, float(part.get("max_condition", 100.0))), 0.0, 1.0)
 	var zones: Dictionary = anatomy.get("zones", {})
 	var zone_state: Dictionary = zones.get(part_zone, {})
 	if not zone_state.is_empty():
@@ -191,11 +162,14 @@ func _condition_of(part: Dictionary) -> float:
 func _wound_penalty(zone_id: String) -> float:
 	var penalty := 0.0
 	for wound in subject.get("wounds", []):
-		if _zone_from_words(str(wound), WOUND_ZONE_WORDS) == zone_id:
-			penalty += 0.42
+		var record := WoundCatalog.resolve(wound)
+		if str(record.zone) == zone_id:
+			penalty += float(record.severity) * 0.72
 	var injury := str(subject.get("injury", ""))
-	if injury != "" and injury != "none" and _zone_from_words(injury, WOUND_ZONE_WORDS) == zone_id:
-		penalty += 0.42
+	if injury != "" and injury != "none":
+		var injury_record := WoundCatalog.resolve(injury)
+		if str(injury_record.zone) == zone_id:
+			penalty += float(injury_record.severity) * 0.72
 	return clampf(1.0 - penalty, 0.05, 1.0)
 
 
@@ -204,6 +178,40 @@ func selected_part() -> Dictionary:
 		return {}
 	var selected := hovered_part_index if hovered_part_index >= 0 else part_index
 	return _parts[clampi(selected, 0, _parts.size() - 1)]
+
+
+## One decision record for the robbing loop: the selected body part against the
+## player's equivalent. UI and extraction code can consume the same answer.
+func comparison() -> Dictionary:
+	var theirs := selected_part()
+	var player := WorldHistory.subject("player")
+	if theirs.is_empty() or player.is_empty() or str(player.get("name", "")) == _subject_id:
+		return {}
+	var ours := theirs.duplicate(true)
+	if str(theirs.kind) == "implant":
+		ours = {}
+		var player_anatomy: Dictionary = player.get("anatomy_state", player.get("anatomy", {}))
+		for implant in ImplantCatalog.list(player_anatomy.get("cybernetics", [])):
+			if str(implant.zone) == str(theirs.zone):
+				ours = implant.duplicate(true)
+				ours["kind"] = "implant"
+				break
+	var their_condition := _condition_of(theirs)
+	var our_condition := 0.0 if ours.is_empty() else _condition_for_subject(ours, player)
+	return {
+		"theirs": theirs, "ours": ours,
+		"their_condition": their_condition, "our_condition": our_condition,
+		"delta": their_condition - our_condition,
+		"decision": "ROB" if their_condition > our_condition + 0.08 else "KEEP",
+	}
+
+
+func _condition_for_subject(part: Dictionary, target: Dictionary) -> float:
+	var prior := subject
+	subject = target
+	var value := _condition_of(part)
+	subject = prior
+	return value
 
 
 # --- input -----------------------------------------------------------------
@@ -439,11 +447,22 @@ func _draw_stage(canvas: CanvasItem, rect: Rect2) -> void:
 		return
 	var condition := _condition_of(part)
 	_viewer.show_part(part, condition)
+	var compare := comparison()
 
 	# The frame travels from the zone on the diagram to the stage. At lift 0 it
 	# is sitting on the body; at 1 it has arrived. Nothing cuts.
-	var target := Rect2(rect.position + Vector2(rect.size.x * 0.5 - 120.0, 24), Vector2(240, 240))
+	var target := Rect2(rect.position + Vector2(rect.size.x - 220.0, 24), Vector2(210, 210))
 	_stage_rect = target
+	var compare_target := Rect2(rect.position + Vector2(2, 65), Vector2(118, 118))
+	if not compare.is_empty() and not (compare.ours as Dictionary).is_empty():
+		_compare_viewer.show_part(compare.ours, float(compare.our_condition))
+		canvas.draw_rect(compare_target, Color(0, 0, 0, 0.30))
+		canvas.draw_texture_rect(_compare_viewer.get_texture(), compare_target, false)
+		CellOutzType.draw_text(canvas, compare_target.position + Vector2(0, -18), "YOU %03d" % roundi(float(compare.our_condition) * 100.0), 9.0, MOSS, 1.0)
+	elif not compare.is_empty():
+		CellOutzType.draw_text(canvas, compare_target.position + Vector2(0, 20), "YOU: EMPTY", 9.0, HOT, 1.0)
+	if not compare.is_empty():
+		CellOutzType.draw_text(canvas, compare_target.position + Vector2(0, compare_target.size.y + 12), "%s  Δ%+03d" % [str(compare.decision), roundi(float(compare.delta) * 100.0)], 10.0, HOT if str(compare.decision) == "ROB" else MOSS, 1.0)
 	var eased := 1.0 - pow(1.0 - clampf(lift, 0.0, 1.0), 3.0)
 	var frame := Rect2(
 		_lift_from.position.lerp(target.position, eased),
@@ -477,8 +496,6 @@ func _draw_stage(canvas: CanvasItem, rect: Rect2) -> void:
 		verdict = "FAILING"
 	elif condition < 0.75:
 		verdict = "DAMAGED"
-	if str(part.kind) == "implant":
-		verdict = "NO TELEMETRY"
 	canvas.draw_string(font, Vector2(rect.position.x + 96, caption_y + 60), verdict, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 110, 13, tone)
 	canvas.draw_string(font, Vector2(rect.position.x, caption_y + 84), "IN %s" % str(ZONE_LABELS.get(str(part.zone), "")).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 10, INK * Color(1, 1, 1, 0.4))
 	canvas.draw_string(font, Vector2(rect.position.x, caption_y + 101), "HOVER PREVIEWS  ·  CLICK PINS  ·  DRAG TURNS  ·  WHEEL ZOOMS", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 9, COPPER * Color(1, 1, 1, 0.68))

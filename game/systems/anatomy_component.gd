@@ -1,6 +1,8 @@
 class_name AnatomyComponent
 extends Node
 
+const ImplantCatalog := preload("res://systems/implant_catalog.gd")
+
 signal wounded(result: Dictionary)
 signal bleeding_changed(rate: float, blood_remaining: float)
 signal critical_state_started()
@@ -49,11 +51,11 @@ var installed_parts: Dictionary = {}
 var wounds: Array[Dictionary] = []
 
 
-func configure(id: String, capacity: float = 5000.0, cybernetics: Dictionary = {}) -> void:
+func configure(id: String, capacity: float = 5000.0, cybernetics: Variant = {}) -> void:
 	subject_id = id
 	blood_capacity = maxf(100.0, capacity)
 	blood_remaining = blood_capacity
-	installed_parts = cybernetics.duplicate(true)
+	installed_parts = ImplantCatalog.by_zone(cybernetics)
 	zones = DEFAULT_ZONES.duplicate(true)
 	for zone_id in zones:
 		zones[zone_id] = (zones[zone_id] as Dictionary).duplicate(true)
@@ -70,7 +72,9 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 		return {"accepted": false, "reason": "dead"}
 	var resolved_zone := zone_id if zones.has(zone_id) else "torso"
 	var zone: Dictionary = zones[resolved_zone]
-	var armor := float((installed_parts.get(resolved_zone, {}) as Dictionary).get("armor", 0.0))
+	var installed: Dictionary = installed_parts.get(resolved_zone, {})
+	var hardware_ratio := implant_condition(resolved_zone)
+	var armor := float(installed.get("armor", 0.0)) * hardware_ratio
 	var applied := maxf(1.0, damage * (1.0 - clampf(armor, 0.0, 0.85)))
 	zone["health"] = maxf(0.0, float(zone.health) - applied)
 	zones[resolved_zone] = zone
@@ -88,6 +92,8 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 		"disabled": float(zone.health) <= 0.0,
 		"time_msec": Time.get_ticks_msec(),
 	}
+	if not installed.is_empty():
+		wound["implant_condition"] = damage_implant(resolved_zone, applied * (0.30 if penetrating else 0.16))
 	wounds.append(wound)
 	if wounds.size() > 24:
 		wounds.pop_front()
@@ -158,6 +164,28 @@ func finish(cause: String) -> void:
 
 func organ_ok(organ_id: String) -> bool:
 	return not bool((organs.get(organ_id, {}) as Dictionary).get("ruptured", false))
+
+
+func install_part(zone_id: String, part_data: Dictionary) -> Dictionary:
+	var part := ImplantCatalog.resolve(part_data, zone_id)
+	installed_parts[str(part.zone)] = part
+	return part.duplicate(true)
+
+
+func implant_condition(zone_id: String) -> float:
+	var part: Dictionary = installed_parts.get(zone_id, {})
+	if part.is_empty():
+		return 0.0
+	return clampf(float(part.get("condition", 0.0)) / maxf(1.0, float(part.get("max_condition", 100.0))), 0.0, 1.0)
+
+
+func damage_implant(zone_id: String, amount: float) -> float:
+	var part: Dictionary = installed_parts.get(zone_id, {})
+	if part.is_empty():
+		return 0.0
+	part["condition"] = maxf(0.0, float(part.get("condition", 0.0)) - maxf(0.0, amount))
+	installed_parts[zone_id] = part
+	return implant_condition(zone_id)
 
 
 ## A ruptured heart does not let you keep standing while you bleed out on a
@@ -236,6 +264,8 @@ func restore(state: Dictionary) -> void:
 	for organ_id in organs:
 		if saved_organs.get(organ_id) is Dictionary:
 			organs[organ_id].merge(saved_organs[organ_id], true)
+	if state.has("cybernetics"):
+		installed_parts = ImplantCatalog.by_zone(state.cybernetics)
 	wounds.clear()
 	for wound in state.get("wounds", []):
 		if wound is Dictionary:
