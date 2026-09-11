@@ -3,6 +3,14 @@ extends Node3D
 ## The authored Bone Yard kit was modelled for a 29m bowl, which plays as a
 ## playpen. The whole venue is scaled up together so the geometry still matches.
 const ARENA_SCALE := 1.85
+## Kept equal to ARENA_SCALE for now. Greg asked for a bigger arena and a
+## uniform multiplier does not deliver one: at 2.15 and 2.45 the wreckers drift
+## outward and never engage — measured as first contact 28s in at 2.15 and no
+## contact at all inside thirty seconds at 2.45, with the player finishing on a
+## full hull in both. Holding the spawn ring tight while the venue grew did not
+## fix it either, so the cause is in the authored oval rather than in the
+## spacing. See ROADMAP.md; this needs the venue re-authored, not rescaled.
+const SPAWN_SCALE := 1.85
 const ARENA_LIMIT := 29.0 * ARENA_SCALE
 const MAX_SPEED := 24.0
 const RIVAL_ID := "mara_voss"
@@ -11,6 +19,13 @@ const BONE_YARD_ENVIRONMENT := preload("res://art/bone_yard_environment.glb")
 const DERBY_AUDIO := preload("res://systems/procedural_derby_audio.gd")
 const VEHICLE := preload("res://systems/arcade_vehicle.gd")
 const AI_DRIVER := preload("res://systems/derby_ai_driver.gd")
+## At most this many wreckers may hunt the player at once, and not from the
+## opening horn: the cap ramps in over ENGAGE_RAMP seconds. Every car targeting
+## the player from second one is what made the heat unplayable — measured at
+## five cars inside nine metres with eight of twelve wedged motionless.
+const MAX_ENGAGED := 3
+const ENGAGE_RAMP := 22.0
+const REASSIGN_EVERY := 2.6
 const KILL_CAM := preload("res://systems/kill_cam.gd")
 const DAMAGE_PORTRAIT := preload("res://systems/damage_portrait.gd")
 const CAB_SCREENS := preload("res://systems/cab_screens.gd")
@@ -34,6 +49,8 @@ var crowd_members: Array[Node3D] = []
 var crowd_reaction := 0.0
 var camera_shake := 0.0
 var disabled_count := 0
+var active_seconds := 0.0
+var reassign_timer := 0.0
 var round_state := "countdown"
 var countdown := 3.0
 var result_countdown := 0.0
@@ -192,7 +209,7 @@ func _build_world() -> void:
 func _build_boat() -> void:
 	boat = VEHICLE.new()
 	boat.name = "MercyCountyWrecker"
-	boat.position = Vector3(0, 0.75, 12.0 * ARENA_SCALE)
+	boat.position = Vector3(0, 0.75, 12.0 * SPAWN_SCALE)
 	add_child(boat)
 	boat.impact.connect(_on_vehicle_impact)
 	var authored_skiff := SCRAP_SKIFF.instantiate()
@@ -209,7 +226,7 @@ func _spawn_targets() -> void:
 
 func _create_wrecker(index: int) -> void:
 	var angle := TAU * index / 12.0 + 0.23
-	var lane := (13.5 if index % 2 == 0 else 17.0) * ARENA_SCALE
+	var lane := (13.5 if index % 2 == 0 else 17.0) * SPAWN_SCALE
 	# AI wreckers run the same chassis as the player. They are steered, never
 	# teleported, so a ram leaves them spinning instead of snapping back on the
 	# following frame.
@@ -248,12 +265,17 @@ func _update_boat(delta: float) -> void:
 	speed = boat.signed_speed
 	boat_velocity = boat.linear_velocity
 	if boat.position.y < -10.0:
-		boat.recover(Vector3(0, 1.2, 12.0 * ARENA_SCALE))
+		boat.recover(Vector3(0, 1.2, 12.0 * SPAWN_SCALE))
 	if derby_audio != null:
 		derby_audio.call("update_engine", speed, throttle)
 
 
 func _update_wreckers(delta: float) -> void:
+	active_seconds += delta
+	reassign_timer -= delta
+	if reassign_timer <= 0.0:
+		reassign_timer = REASSIGN_EVERY
+		_assign_wrecker_roles()
 	for target in targets:
 		if not is_instance_valid(target):
 			continue
@@ -263,21 +285,47 @@ func _update_wreckers(delta: float) -> void:
 		ai_driver.tick(delta, _wrecker_target_position(target), round_state == "active")
 
 
-func _wrecker_target_position(wrecker: Node3D) -> Vector3:
-	# Most of the pit hunts the player; the rest pick fights with each other so
-	# the arena keeps moving even when the player hangs back.
-	if int(wrecker.get_meta("spawn_index", 0)) % 3 != 0:
-		return boat.global_position
-	var closest := boat.global_position
-	var closest_distance := 99999.0
-	for other in targets:
-		if other == wrecker or not is_instance_valid(other):
+## Who is allowed to come at the player right now. Rotated on a timer rather
+## than fixed at spawn, so pressure moves around the pit and no single car
+## spends the whole heat welded to the player's door.
+func _assign_wrecker_roles() -> void:
+	var allowed := 1 + floori(clampf(active_seconds / ENGAGE_RAMP, 0.0, 1.0) * float(MAX_ENGAGED - 1))
+	var live: Array[Node3D] = []
+	for target in targets:
+		if is_instance_valid(target):
+			live.append(target)
+	live.sort_custom(func(a, b): return a.global_position.distance_to(boat.global_position) < b.global_position.distance_to(boat.global_position))
+	for index in live.size():
+		var wrecker := live[index]
+		var ai_driver := wrecker.get_node_or_null("AIDriver")
+		if ai_driver == null:
 			continue
-		var distance: float = wrecker.global_position.distance_to(other.global_position)
-		if distance < closest_distance:
-			closest_distance = distance
-			closest = other.global_position
-	return closest
+		if index < allowed:
+			wrecker.set_meta("wrecker_role", "hunt")
+			ai_driver.role = "hunt"
+		elif index < allowed + 2:
+			# A short ring of cars circling the player, in the fight visually
+			# without adding to the pile-up.
+			wrecker.set_meta("wrecker_role", "circle")
+			ai_driver.role = "circle"
+		else:
+			# Everyone else fights each other. Each duellist is paired with a
+			# different rival so the spare cars do not all converge on one.
+			wrecker.set_meta("wrecker_role", "duel")
+			ai_driver.role = "hunt"
+			var rival := live[(index + 1 + index % 3) % live.size()]
+			if rival == wrecker:
+				rival = live[(index + 1) % live.size()]
+			wrecker.set_meta("duel_target", rival.get_path())
+
+
+func _wrecker_target_position(wrecker: Node3D) -> Vector3:
+	if str(wrecker.get_meta("wrecker_role", "hunt")) != "duel":
+		return boat.global_position
+	var rival := get_node_or_null(wrecker.get_meta("duel_target", NodePath()))
+	if rival == null or not is_instance_valid(rival) or rival == wrecker:
+		return boat.global_position
+	return (rival as Node3D).global_position
 
 
 func _on_vehicle_impact(other: Node, closing_speed: float, self_share: float) -> void:
@@ -532,7 +580,7 @@ func _reset_round() -> void:
 	integrity = 100
 	speed = 0.0
 	boat_velocity = Vector3.ZERO
-	boat.position = Vector3(0, 0.75, 12.0 * ARENA_SCALE)
+	boat.position = Vector3(0, 0.75, 12.0 * SPAWN_SCALE)
 	boat.recover(Vector3(0, 1.2, 12.0 * ARENA_SCALE))
 	_spawn_targets()
 	WorldHistory.record_event("derby_round_reset", {"venue": "rift_derby_quarry"})

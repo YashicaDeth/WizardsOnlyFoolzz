@@ -2,6 +2,35 @@
 
 ## 2026 09 11
 
+- **The derby no longer piles onto the player.** Measured first: five cars
+  inside nine metres by twenty seconds, eight of twelve wedged motionless. Two
+  thirds of the pit hunted the player permanently with no cap and no ramp, and
+  the "duellists" chased the nearest vehicle — which in a scrum is the player
+  again. At most three wreckers may now engage, the cap ramps in over the first
+  twenty-two seconds, roles rotate every 2.6s, two cars circle at range and the
+  rest are paired off against each other. Peak crowding 5 -> 2, cars moving
+  7-10 of 12 instead of wedging, and the pit hits *harder* (hull 83 vs 90)
+  because cars arrive with speed instead of grinding.
+- **Fixed a permanent three-point-turn deadlock in the derby AI.** A car pointed
+  away from its target alternated reverse and creep-forward at full lock, both
+  at about one metre per second, indefinitely: the nearest wrecker held 8.2m
+  from a parked player for thirty seconds while the player took no damage at
+  all. Reversing now commits for a minimum time with hysteresis on the exit, and
+  a slow car that needs to turn is given more throttle rather than less, because
+  the chassis scales steering authority by speed. This is the third instance of
+  that same root cause and it should be the first suspect next time.
+- **Wreckers break off instead of leaning.** A driver that stalls against its
+  target for two seconds peels away and comes back round, so contact reads as
+  discrete passes. The break-off triggers on an actual grind — close and slow —
+  not on mere proximity; an earlier six-metre threshold aborted runs before
+  contact and left a parked player finishing a heat on a full hull.
+- `tests/derby_balance_test.gd` now bounds crowding from both directions: never
+  more than four cars on the player, never zero. Attempts to enlarge the arena
+  by raising `ARENA_SCALE` were measured, found to empty the heat, and reverted;
+  the numbers and the reason are recorded in ROADMAP.md.
+
+## 2026 09 11
+
 - **The Living Map is an actual map.** `M` opened five lines of hardcoded prose
   describing districts that the player could not locate, reach or use. Replaced
   with `systems/living_map.gd`, which draws the region that was really

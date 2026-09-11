@@ -256,15 +256,39 @@ sequenced below and none of them are dropped.
 
 **Still outstanding, in the order they should be taken.**
 
-1. **The derby crowds the player.** "After 5 to 10 seconds you get crowded by
-   like 10 NPCs all ramming." All twelve wreckers currently converge on the
-   player because the AI has no target selection beyond "the player". Needs
-   target spread across the pit, an engagement cap, and aggression that ramps
-   with the heat rather than starting at maximum. This is the single biggest
-   thing making the derby unplayable and should be taken next.
-2. **The derby arena is too small.** "The map for the derby is way too tiny."
-   The Bone Yard bowl was rescaled once but the drivable area still funnels
-   twelve cars into one collision soup, which compounds item 1.
+1. **The derby crowds the player — fixed 2026-09-11.** Measured before
+   touching it: five cars inside nine metres by twenty seconds, with eight of
+   twelve wedged motionless. Two thirds of the pit hunted the player
+   permanently (`spawn_index % 3 != 0`) with no cap and no ramp, and the
+   remaining "duellists" chased the *nearest* vehicle, which in a scrum is the
+   player again. Now at most three may hunt at once, the cap ramps in over
+   twenty-two seconds, roles rotate every 2.6s so nobody is welded to the
+   player's door, two cars circle at range, and the rest are paired off against
+   named rivals. Re-measured: peak crowding 2, cars moving 7-10 of 12 instead
+   of wedging, hull 100 -> 83 over the same thirty seconds. Bounded from both
+   sides in `tests/derby_balance_test.gd`.
+   Found while doing it: **the AI had a permanent three-point-turn deadlock.**
+   A car pointed away from its target alternated reverse and creep-forward at
+   full lock, both around one metre per second, forever — the nearest wrecker
+   held 8.2m from a parked player for thirty seconds while the player took zero
+   damage. The chassis scales steering authority by speed, so creeping is the
+   worst possible response to facing the wrong way. Reversing now commits for a
+   minimum time with hysteresis on the exit, and a slow car that needs to turn
+   gets *more* throttle, not less. This is the third distinct instance of the
+   same root cause in `arcade_vehicle.gd`'s speed-scaled steering; the next
+   agent should suspect it first.
+2. **The derby arena is too small — attempted, reverted, needs authored work.**
+   "The map for the derby is way too tiny." A uniform `ARENA_SCALE` multiplier
+   does not deliver it and the measurements are unambiguous: at 2.15 first
+   contact came 28s into the heat with no damage landed inside thirty seconds,
+   and at 2.45 the wreckers never reached the player at all — in both cases the
+   nearest car *drifted outward* over time while eight to ten of twelve were
+   driving. Holding the spawn ring tight while only the venue grew did not fix
+   it, so the cause is in the authored oval, not in the spacing. `SPAWN_SCALE`
+   now exists as the seam for this and is deliberately equal to `ARENA_SCALE`.
+   Doing this properly means re-authoring the Bone Yard oval for a larger
+   footprint and retuning the engagement cap against it together — the same
+   Blender pass the cars need, not a constant change.
 3. **Gore does not read in play.** The rig carries blood, fractures, spilled
    organs and severed limbs, and the settings expose FULL/REDUCED/OFF, but Greg
    is not seeing it during combat. Needs a play-verified pass: volume, lifetime,
