@@ -40,6 +40,10 @@ func _ready() -> void:
 			print("CAPTURE_FAILED: no HUD/CharacterArchive in ", scene_path)
 			get_tree().quit(1)
 			return
+		# The host scene re-asserts archive visibility from panel_mode every frame,
+		# so opening the control alone is undone on the next tick.
+		if "panel_mode" in scene:
+			scene.set("panel_mode", "tree")
 		archive.open_archive(archive_subject)
 
 	# Procedural noise textures and the sky resolve over several frames; capturing

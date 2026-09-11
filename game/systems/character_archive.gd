@@ -40,6 +40,12 @@ const ARTERIAL := Color("c81f16")
 
 var tissue_texture: ImageTexture
 var interference_texture: ImageTexture
+var divider_ratio := 0.46
+var dragging_divider := false
+var body_view_rect := Rect2()
+var clip_active := false
+var clip_min_x := 0.0
+var clip_max_x := 0.0
 
 
 func _ready() -> void:
@@ -94,10 +100,31 @@ func _build_interference_texture() -> ImageTexture:
 
 
 func _tiled_polygon(points: PackedVector2Array, color: Color, texture: Texture2D, tile_px: float) -> void:
-	var uvs := PackedVector2Array()
-	for point in points:
-		uvs.append(point / tile_px)
-	draw_colored_polygon(points, color, uvs, texture)
+	for piece in _clip(points):
+		var uvs := PackedVector2Array()
+		for point in piece:
+			uvs.append(point / tile_px)
+		draw_colored_polygon(piece, color, uvs, texture)
+
+
+## Half-plane clip used by the scan divider. Returns the polygon untouched when
+## no clip is active, so the same drawing code serves both layers.
+func _clip(points: PackedVector2Array) -> Array:
+	if not clip_active:
+		return [points]
+	var bounds := PackedVector2Array([
+		Vector2(clip_min_x, -4000.0), Vector2(clip_max_x, -4000.0),
+		Vector2(clip_max_x, 4000.0), Vector2(clip_min_x, 4000.0),
+	])
+	return Geometry2D.intersect_polygons(points, bounds)
+
+
+func _clipped_disc(center: Vector2, radius: float, color: Color) -> void:
+	if not clip_active:
+		draw_circle(center, radius, color)
+		return
+	for piece in _clip(_disc(center, radius, radius, 14)):
+		draw_colored_polygon(piece, color)
 
 
 func _limb(from: Vector2, to: Vector2, width: float) -> PackedVector2Array:
@@ -117,6 +144,7 @@ func _disc(center: Vector2, radius_x: float, radius_y: float, segments: int = 18
 func open_archive(focus_id: String = "mara_voss") -> void:
 	selected_id = focus_id if graph_positions.has(focus_id) else "mara_voss"
 	visible = true
+	modulate.a = 0.0
 	queue_redraw()
 
 
@@ -129,6 +157,9 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	elapsed += delta
+	# Fade in rather than snap. The archive is meant to resolve like a scan
+	# acquiring signal, not appear like a dialog box.
+	modulate.a = move_toward(modulate.a, 1.0, delta * 3.2)
 	queue_redraw()
 
 
@@ -141,6 +172,15 @@ func _gui_input(event: InputEvent) -> void:
 			_zoom_at(event.position, 0.89)
 			accept_event()
 		elif event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed and body_view_rect.has_point(event.position):
+				dragging_divider = true
+				_move_divider(event.position)
+				accept_event()
+				return
+			if not event.pressed and dragging_divider:
+				dragging_divider = false
+				accept_event()
+				return
 			if event.pressed:
 				var hit := _node_at(event.position)
 				if not hit.is_empty():
@@ -157,11 +197,21 @@ func _gui_input(event: InputEvent) -> void:
 			dragging = event.pressed
 			last_pointer = event.position
 			accept_event()
+	elif event is InputEventMouseMotion and dragging_divider:
+		_move_divider(event.position)
+		accept_event()
 	elif event is InputEventMouseMotion and dragging:
 		pan += event.position - last_pointer
 		last_pointer = event.position
 		queue_redraw()
 		accept_event()
+
+
+func _move_divider(pointer: Vector2) -> void:
+	if body_view_rect.size.x <= 1.0:
+		return
+	divider_ratio = clampf((pointer.x - body_view_rect.position.x) / body_view_rect.size.x, 0.0, 1.0)
+	queue_redraw()
 
 
 func _zoom_at(pointer: Vector2, factor: float) -> void:
@@ -278,23 +328,36 @@ func _draw_dossier() -> void:
 func _draw_person_dossier(subject: Dictionary, panel_rect: Rect2) -> void:
 	var left := panel_rect.position.x
 	var top := panel_rect.position.y
-	var slice_width := (panel_rect.size.x - 58) * 0.5
-	var body_rect := Rect2(left + 18, top + 82, slice_width, 285)
-	var xray_rect := Rect2(body_rect.end.x + 22, top + 82, slice_width, 285)
-	draw_rect(body_rect, Color("1b0c0d"))
-	draw_rect(xray_rect, Color("071516"))
-	draw_rect(body_rect, COPPER * Color(1, 1, 1, 0.35), false, 1)
-	draw_rect(xray_rect, TEAL * Color(1, 1, 1, 0.45), false, 1)
+	# One large body, not two small panes. The scan is the centrepiece of the
+	# dossier, and the flesh reads through it rather than sitting beside it.
+	var body_rect := Rect2(left + 18, top + 74, panel_rect.size.x - 36, panel_rect.size.y - 250)
+	draw_rect(body_rect, Color("120709"))
+	draw_texture_rect(interference_texture, body_rect, true, Color(1, 1, 1, 0.06))
+	draw_rect(body_rect, COPPER * Color(1, 1, 1, 0.3), false, 1)
+
+	body_view_rect = body_rect
+	_draw_body_layers(body_rect, subject)
+	_draw_tree_alignment(body_rect, subject)
+
+	# The divider handle itself: a scan head parked on the body.
+	var divider_x := body_rect.position.x + body_rect.size.x * divider_ratio
+	draw_line(Vector2(divider_x, body_rect.position.y + 2), Vector2(divider_x, body_rect.end.y - 2), TEAL * Color(1, 1, 1, 0.85), 2)
+	draw_line(Vector2(divider_x + 2, body_rect.position.y + 2), Vector2(divider_x + 2, body_rect.end.y - 2), MAGENTA * Color(1, 1, 1, 0.35), 1)
+	var handle := Vector2(divider_x, body_rect.get_center().y)
+	draw_circle(handle, 13.0, Color("07171a"))
+	draw_arc(handle, 13.0, 0, TAU, 22, TEAL, 2)
+	draw_line(handle - Vector2(5, 0), handle + Vector2(5, 0), TEAL, 2)
+	draw_line(handle - Vector2(0, 5), handle + Vector2(0, 5), TEAL, 2)
+
 	var font := ThemeDB.fallback_font
-	draw_string(font, body_rect.position + Vector2(10, 19), "VESSEL", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, COPPER)
-	draw_string(font, xray_rect.position + Vector2(10, 19), "DEEP XRAY", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, TEAL)
-	_draw_body_slice(body_rect, false, subject)
-	_draw_body_slice(xray_rect, true, subject)
+	draw_string(font, body_rect.position + Vector2(12, 20), "VESSEL", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COPPER)
+	draw_string(font, Vector2(body_rect.end.x - 82, body_rect.position.y + 20), "DEEP XRAY", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, TEAL)
+	draw_string(font, Vector2(body_rect.position.x + 12, body_rect.end.y - 8), "DRAG THE SCAN HEAD", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, BONE * Color(1, 1, 1, 0.4))
 	var elo := int(subject.get("elo", 0))
 	var grudge := int(subject.get("grudge", 0))
 	var status := str(subject.get("status", "unknown")).to_upper()
 	var faction := str(subject.get("faction", "Unaffiliated"))
-	var info_y := body_rect.end.y + 30
+	var info_y := body_rect.end.y + 26
 	draw_string(font, Vector2(left + 22, info_y), "ELO %04d   %s   GRUDGE %03d" % [elo, _rank_title(elo), grudge], HORIZONTAL_ALIGNMENT_LEFT, panel_rect.size.x - 44, 12, BONE)
 	draw_string(font, Vector2(left + 22, info_y + 22), "FACTION // %s" % faction.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, panel_rect.size.x - 44, 10, SPORE)
 	draw_string(font, Vector2(left + 22, info_y + 43), "STATUS // %s   LASTING MEMORY" % status, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, COPPER)
@@ -313,15 +376,37 @@ func _rank_title(elo: int) -> String:
 	return "RANK: STRAY"
 
 
-func _draw_body_slice(rect: Rect2, xray: bool, subject: Dictionary) -> void:
-	var center := Vector2(rect.get_center().x, rect.position.y + 145)
+## Draws the flesh pass and the scan pass into the same space, crossfading by
+## opacity so the two readings occupy one body instead of two panels.
+## The scan sits underneath and the flesh is clipped over it, so dragging the
+## divider peels the body open rather than fading two panels against each other.
+func _draw_body_layers(rect: Rect2, subject: Dictionary) -> void:
+	var scale := clampf(minf(rect.size.x / 150.0, rect.size.y / 250.0), 0.6, 2.6)
+	var center := rect.get_center()
+	var local := Rect2(-rect.size * 0.5 / scale, rect.size / scale)
+	draw_set_transform(center, 0.0, Vector2(scale, scale))
+
+	clip_active = false
+	_draw_body_slice(local, true, subject, 1.0)
+
+	# Flesh covers everything left of the divider, in the body's local space.
+	var divider_local := (rect.position.x + rect.size.x * divider_ratio - center.x) / scale
+	clip_active = true
+	clip_min_x = local.position.x - 10.0
+	clip_max_x = divider_local
+	_draw_body_slice(local, false, subject, 1.0)
+	clip_active = false
+
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _draw_body_slice(rect: Rect2, xray: bool, subject: Dictionary, opacity: float = 1.0) -> void:
+	if opacity <= 0.01:
+		return
+	var center := Vector2.ZERO
 	var pulse := 0.5 + 0.5 * sin(elapsed * 2.4)
 
-	# Repeating substrate under everything. Tiled interference on the scan side,
-	# tiled tissue on the meat side.
-	draw_texture_rect(interference_texture, rect, true, Color(1, 1, 1, 0.07 if xray else 0.045))
-
-	var skin_tint := TEAL * Color(1, 1, 1, 0.3) if xray else Color("5e241c")
+	var skin_tint := TEAL * Color(1, 1, 1, 0.3 * opacity) if xray else Color("5e241c") * Color(1, 1, 1, opacity)
 	# Shoulders wider than waist, tapered neck, ovoid skull: enough silhouette to
 	# read as a person before any detail lands on it.
 	var torso := PackedVector2Array([
@@ -341,83 +426,85 @@ func _draw_body_slice(rect: Rect2, xray: bool, subject: Dictionary) -> void:
 	if xray:
 		var bone := Color("d8e6c8")
 		# Viscera first, skeleton over it, so organs read as sitting inside the cage.
-		_draw_viscera(center, pulse)
-		draw_line(center + Vector2(0, -55), center + Vector2(0, 46), bone * Color(1, 1, 1, 0.85), 4)
+		_draw_viscera(center, pulse, opacity)
+		draw_line(center + Vector2(0, -55), center + Vector2(0, 46), bone * Color(1, 1, 1, 0.85 * opacity), 4)
 		for rib in 5:
 			var y := -40.0 + rib * 14.0
-			draw_arc(center + Vector2(0, y), 25 - rib * 1.6, 0.22, PI - 0.22, 16, bone * Color(1, 1, 1, 0.78), 2)
-			draw_arc(center + Vector2(0, y), 25 - rib * 1.6, PI + 0.22, TAU - 0.22, 16, bone * Color(1, 1, 1, 0.35), 1)
+			draw_arc(center + Vector2(0, y), 25 - rib * 1.6, 0.22, PI - 0.22, 16, bone * Color(1, 1, 1, 0.78 * opacity), 2)
+			draw_arc(center + Vector2(0, y), 25 - rib * 1.6, PI + 0.22, TAU - 0.22, 16, bone * Color(1, 1, 1, 0.35 * opacity), 1)
 		# Skull plate and jaw.
-		draw_arc(center + Vector2(0, -86), 22, PI, TAU, 20, bone * Color(1, 1, 1, 0.7), 2)
-		draw_line(center + Vector2(-13, -74), center + Vector2(13, -74), bone * Color(1, 1, 1, 0.5), 2)
-		_draw_capillaries(center)
+		draw_arc(center + Vector2(0, -86), 22, PI, TAU, 20, bone * Color(1, 1, 1, 0.7 * opacity), 2)
+		draw_line(center + Vector2(-13, -74), center + Vector2(13, -74), bone * Color(1, 1, 1, 0.5 * opacity), 2)
+		_draw_capillaries(center, opacity)
 		var anatomy: Dictionary = subject.get("anatomy", {})
 		var cybernetics: Array = anatomy.get("cybernetics", [])
 		for index in cybernetics.size():
 			var module_pos := center + Vector2(32 if index % 2 == 0 else -32, -30 + index * 31)
-			draw_rect(Rect2(module_pos - Vector2(9, 7), Vector2(18, 14)), MAGENTA * Color(1, 1, 1, 0.22))
-			draw_rect(Rect2(module_pos - Vector2(9, 7), Vector2(18, 14)), MAGENTA, false, 1.5)
-			draw_line(module_pos, center, MAGENTA * Color(1, 1, 1, 0.4), 1)
-		_draw_tree_alignment(rect, subject)
+			draw_rect(Rect2(module_pos - Vector2(9, 7), Vector2(18, 14)), MAGENTA * Color(1, 1, 1, 0.22 * opacity))
+			draw_rect(Rect2(module_pos - Vector2(9, 7), Vector2(18, 14)), MAGENTA * Color(1, 1, 1, opacity), false, 1.5)
+			draw_line(module_pos, center, MAGENTA * Color(1, 1, 1, 0.4 * opacity), 1)
 	else:
 		# Bruising and discoloration blotches before the wounds themselves.
 		for index in 5:
 			var blotch := center + Vector2(sin(index * 2.7) * 26.0, -40.0 + index * 27.0)
-			draw_circle(blotch, 9.0 + float(index % 3) * 4.0, BRUISE * Color(1, 1, 1, 0.22))
+			_clipped_disc(blotch, 9.0 + float(index % 3) * 4.0, BRUISE * Color(1, 1, 1, 0.22 * opacity))
 		var wounds: Array = subject.get("wounds", [])
 		for index in wounds.size():
 			var wound_pos := center + Vector2(-18 + index * 15, -20 + index * 26)
-			draw_circle(wound_pos, 8.0, Color("2b0806") * Color(1, 1, 1, 0.85))
-			draw_circle(wound_pos, 4.5, ARTERIAL)
+			if clip_active and wound_pos.x > clip_max_x:
+				continue
+			_clipped_disc(wound_pos, 8.0, Color("2b0806") * Color(1, 1, 1, 0.85 * opacity))
+			_clipped_disc(wound_pos, 4.5, ARTERIAL * Color(1, 1, 1, opacity))
 			# Ragged edge rather than a tidy cross.
 			for spur in 6:
 				var angle := TAU * spur / 6.0 + float(index)
 				var reach := 7.0 + fmod(float(spur * 13 + index * 7), 5.0)
-				draw_line(wound_pos, wound_pos + Vector2.from_angle(angle) * reach, ARTERIAL * Color(1, 1, 1, 0.75), 2)
+				draw_line(wound_pos, wound_pos + Vector2.from_angle(angle) * reach, ARTERIAL * Color(1, 1, 1, 0.75 * opacity), 2)
 			# Run-off.
-			draw_line(wound_pos, wound_pos + Vector2(2, 16 + float(index % 3) * 9.0), Color("5e0f0b"), 3)
+			draw_line(wound_pos, wound_pos + Vector2(2, 16 + float(index % 3) * 9.0), Color("5e0f0b") * Color(1, 1, 1, opacity), 3)
 
 	# Colour clash overlay: an acid pass that fights the base palette instead of
-	# harmonising with it.
-	draw_texture_rect(interference_texture, rect, true, (ACID if xray else MAGENTA) * Color(1, 1, 1, 0.05))
+	# harmonising with it. Skipped while clipping so it cannot tint the scan side.
+	if not clip_active:
+		draw_texture_rect(interference_texture, rect, true, (ACID if xray else MAGENTA) * Color(1, 1, 1, 0.05 * opacity))
 
 
-func _draw_viscera(center: Vector2, pulse: float) -> void:
+func _draw_viscera(center: Vector2, pulse: float, opacity: float) -> void:
 	# Lungs.
 	_tiled_polygon(PackedVector2Array([
 		center + Vector2(-24, -46), center + Vector2(-6, -42),
 		center + Vector2(-8, -6), center + Vector2(-23, -10),
-	]), BRUISE * Color(1, 1, 1, 0.72), tissue_texture, 26.0)
+	]), BRUISE * Color(1, 1, 1, 0.72 * opacity), tissue_texture, 26.0)
 	_tiled_polygon(PackedVector2Array([
 		center + Vector2(24, -46), center + Vector2(6, -42),
 		center + Vector2(8, -6), center + Vector2(23, -10),
-	]), BRUISE * Color(1, 1, 1, 0.72), tissue_texture, 26.0)
+	]), BRUISE * Color(1, 1, 1, 0.72 * opacity), tissue_texture, 26.0)
 	# Heart, beating.
 	var heart := center + Vector2(-3, -26)
-	draw_circle(heart, 11.0 + pulse * 2.4, ARTERIAL * Color(1, 1, 1, 0.9))
-	draw_circle(heart + Vector2(5, -4), 7.0 + pulse * 1.6, ARTERIAL * Color(1, 1, 1, 0.75))
-	draw_circle(heart, 4.0, MAGENTA * Color(1, 1, 1, 0.5 + pulse * 0.4))
+	draw_circle(heart, 11.0 + pulse * 2.4, ARTERIAL * Color(1, 1, 1, 0.9 * opacity))
+	draw_circle(heart + Vector2(5, -4), 7.0 + pulse * 1.6, ARTERIAL * Color(1, 1, 1, 0.75 * opacity))
+	draw_circle(heart, 4.0, MAGENTA * Color(1, 1, 1, (0.5 + pulse * 0.4) * opacity))
 	# Liver.
 	_tiled_polygon(PackedVector2Array([
 		center + Vector2(-18, 2), center + Vector2(14, 0),
 		center + Vector2(19, 24), center + Vector2(-12, 30),
-	]), BILE * Color(1, 1, 1, 0.6), tissue_texture, 30.0)
+	]), BILE * Color(1, 1, 1, 0.6 * opacity), tissue_texture, 30.0)
 	# Coiled intestine.
 	for coil in 7:
 		var t := float(coil) / 7.0
 		var loop_centre := center + Vector2(-14.0 + fmod(float(coil) * 9.0, 28.0), 30.0 + t * 14.0)
-		draw_arc(loop_centre, 7.0 + float(coil % 3) * 2.0, 0.0, TAU, 14, Color("9a5a3c") * Color(1, 1, 1, 0.8), 3)
-	draw_circle(center + Vector2(16, 12), 6.0, ACID * Color(1, 1, 1, 0.35))
+		draw_arc(loop_centre, 7.0 + float(coil % 3) * 2.0, 0.0, TAU, 14, Color("9a5a3c") * Color(1, 1, 1, 0.8 * opacity), 3)
+	draw_circle(center + Vector2(16, 12), 6.0, ACID * Color(1, 1, 1, 0.35 * opacity))
 
 
-func _draw_capillaries(center: Vector2) -> void:
+func _draw_capillaries(center: Vector2, opacity: float) -> void:
 	for branch in 9:
 		var angle := TAU * branch / 9.0 + 0.4
 		var start := center + Vector2.from_angle(angle) * 12.0
 		var mid := center + Vector2.from_angle(angle + 0.3) * 30.0
 		var tip := center + Vector2.from_angle(angle + 0.1) * 46.0
-		draw_polyline(PackedVector2Array([start, mid, tip]), ARTERIAL * Color(1, 1, 1, 0.3), 1.4)
-		draw_line(mid, mid + Vector2.from_angle(angle - 0.9) * 11.0, ARTERIAL * Color(1, 1, 1, 0.2), 1.0)
+		draw_polyline(PackedVector2Array([start, mid, tip]), ARTERIAL * Color(1, 1, 1, 0.3 * opacity), 1.4)
+		draw_line(mid, mid + Vector2.from_angle(angle - 0.9) * 11.0, ARTERIAL * Color(1, 1, 1, 0.2 * opacity), 1.0)
 
 
 ## The Deep X-ray doubles as an "as above, so below" reading: the same scan
