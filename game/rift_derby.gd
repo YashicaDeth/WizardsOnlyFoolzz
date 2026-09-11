@@ -102,6 +102,9 @@ func _ready() -> void:
 	# The bust reports driver state; the old title block said nothing.
 	status.visible = false
 	score_label.visible = false
+	# A5.5. The last default-font label on the windscreen. The drawn hunt signal
+	# carries all three of its numbers, in the display face, as an instrument.
+	rival_label.visible = false
 	if "show_title" in dynamic_interface:
 		dynamic_interface.set("show_title", false)
 	var crowd_banks: Array = []
@@ -512,19 +515,21 @@ func _update_hud() -> void:
 	mode_label.text = ("VICTORY  //  HAULED OUT TO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "won" else "WRECKED  //  DRAGGED INTO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "lost" else "")
 	var rival := WorldHistory.subject(RIVAL_ID)
 	rival_label.text = "HUNT ARC  //  MARA VOSS\n%s  ·  GRUDGE %03d  ·  ELO %04d\n[I] WORLD INDEX" % [str(rival.get("status", "active")).to_upper(), int(rival.get("grudge", 0)), int(rival.get("elo", 1180))]
+	# Computed once for both readouts. It used to live inside the cab-screen
+	# branch, which is why the windscreen radar had no contacts to draw.
+	var contacts: Array = []
+	var forward := -boat.global_transform.basis.z
+	var right := boat.global_transform.basis.x
+	for target in targets:
+		if not is_instance_valid(target):
+			continue
+		var delta_position := target.global_position - boat.global_position
+		contacts.append({
+			"offset": Vector2(delta_position.dot(right), -delta_position.dot(forward)),
+			"integrity": int(target.get_meta("integrity", 100)),
+			"rival": bool(target.get_meta("is_rival", false)),
+		})
 	if cab_screens != null:
-		var contacts: Array = []
-		var forward := -boat.global_transform.basis.z
-		var right := boat.global_transform.basis.x
-		for target in targets:
-			if not is_instance_valid(target):
-				continue
-			var delta_position := target.global_position - boat.global_position
-			contacts.append({
-				"offset": Vector2(delta_position.dot(right), -delta_position.dot(forward)),
-				"integrity": int(target.get_meta("integrity", 100)),
-				"rival": bool(target.get_meta("is_rival", false)),
-			})
 		cab_screens.set_telemetry(integrity, _player_parts_lost(), contacts, ARENA_LIMIT)
 	if damage_portrait != null:
 		damage_portrait.set_damage(1.0 - clampf(float(integrity) / 100.0, 0.0, 1.0))
@@ -538,6 +543,10 @@ func _update_hud() -> void:
 			"rival_status": rival.get("status", "active"),
 			"rival_grudge": rival.get("grudge", 0),
 			"rival_elo": rival.get("elo", 1180),
+			# The radar needs the same contacts the cab screens already get. The
+			# data existed; the windscreen simply never received it.
+			"contacts": contacts,
+			"arena_limit": ARENA_LIMIT,
 		})
 
 
