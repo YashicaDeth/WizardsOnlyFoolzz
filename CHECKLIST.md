@@ -219,12 +219,12 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 - [x] **C1.4** Seamless raise and lower, not a visibility toggle
 - [x] **C1.5** Hardware condition damages the interface itself
 
-### C2 — Radial selection
-- [ ] **C2.1** Expand B3's ring into a full radial
-- [ ] **C2.2** Weapons, cybernetics, modes and seals on one input grammar
-- [ ] **C2.3** **Seamless time dilation while open** — Prototype/GTA register
-- [ ] **C2.4** The slowdown must not soften the fight; difficulty stays soulslike
-- [ ] **C2.5** Custom cursor art
+### C2 — Radial selection `BUILT`
+- [x] **C2.1** Expand B3's ring into a full radial
+- [x] **C2.2** Weapons, cybernetics, modes and seals on one input grammar
+- [x] **C2.3** **Seamless time dilation while open** — Prototype/GTA register
+- [x] **C2.4** The slowdown must not soften the fight; difficulty stays soulslike
+- [x] **C2.5** Custom cursor art
 
 ### C3 — Camera mode
 - [ ] **C3.1** Raise a camera, frame the world, take a photograph
@@ -232,16 +232,16 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 - [ ] **C3.3** Verify what is in frame against real anatomy state (required by E3)
 - [ ] **C3.4** Photographs post to the Wire
 
-### C4 — CARRY
-- [ ] **C4.1** Surface the inventory subject that already exists
-- [ ] **C4.2** Chunks, organs and hardware carried as identified objects
-- [ ] **C4.3** Weight, spoilage and what a body will hold
+### C4 — CARRY `BUILT`
+- [x] **C4.1** Surface the inventory subject that already exists
+- [x] **C4.2** Chunks, organs and hardware carried as identified objects
+- [x] **C4.3** Weight, spoilage and what a body will hold
 
-### C5 — Physical connectivity
-- [ ] **C5.1** Masts extend coverage; caves have none
-- [ ] **C5.2** Terminals as fixed access points
-- [ ] **C5.3** The underbelly needs a physical terminal, not a menu toggle
-- [ ] **C5.4** Cracked screen eats regions of the interface
+### C5 — Physical connectivity `BUILT`
+- [x] **C5.1** Masts extend coverage; caves have none
+- [x] **C5.2** Terminals as fixed access points
+- [x] **C5.3** The underbelly needs a physical terminal, not a menu toggle
+- [x] **C5.4** Cracked screen eats regions of the interface
 
 ---
 
@@ -526,4 +526,6 @@ They block nothing else, but they change what gets built.
 5. **What persists between runs?** Roguelike structure was asked for, but
    "bodies remember" is a pillar. These pull against each other.
 6. **Does the chassis roll?** Affects A7.4.
-7. **How is the dark web gated?** Currently a physical terminal. Reversible.
+7. ~~**How is the dark web gated?**~~ **Answered and built** — `signal_field.gd`
+   gates it on physically standing at a terminal. Reversible by changing one
+   table; the two terminals are in the Ossuary Works and the Communion.

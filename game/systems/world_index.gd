@@ -62,6 +62,10 @@ var cursor_follows_mouse := true
 ## Suppressed when the panel is hosted inside the handheld: the device owns the
 ## frame there, and a second reticle floating in the aperture is just litter.
 var show_cursor := true
+## C5. The Wire's reach is decided by where the player is standing, not by a
+## constant. Every caller used to pass SIGNAL_SURFACE, which made connectivity
+## unconditional and quietly turned the whole design back into a menu.
+var signal_grade := 1
 var page_blend := 1.0
 var page_direction := 1.0
 ## A8.2. The panel is an object arriving, not a visibility flag.
@@ -137,7 +141,7 @@ func close() -> void:
 ## subject and every event, which is not work to repeat sixty times a second for
 ## a panel whose data only changes when the world does.
 func refresh() -> void:
-	wire = WireNetScript.new(WireNetScript.SIGNAL_SURFACE)
+	wire = WireNetScript.new(signal_grade)
 	posts = wire.feed(20)
 	_rebuild_rail()
 	rail_index = clampi(rail_index, 0, maxi(0, _rail_cache.size() - 1))

@@ -35,6 +35,9 @@ const Motion := preload("res://systems/celloutz_motion.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const WIRE_RADIO := preload("res://systems/wire_radio.gd")
+const CARRY := preload("res://systems/carry.gd")
+const SIGNAL_FIELD := preload("res://systems/signal_field.gd")
+const RADIAL := preload("res://systems/radial_menu.gd")
 
 signal mode_changed(mode: String)
 signal lead_found(station: String)
@@ -58,6 +61,9 @@ var is_open := false
 var elapsed := 0.0
 var condition := 0.78
 var radio: WireRadio
+var carry: Carry
+var signal_field: SignalField
+var radial: Control
 
 var dead_pixels: Array[Vector2] = []
 var crack_lines: Array[PackedVector2Array] = []
@@ -75,6 +81,8 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	visible = false
 	radio = WIRE_RADIO.new()
+	carry = CARRY.new()
+	signal_field = SIGNAL_FIELD.new()
 
 	# Damage is fixed per device, not per frame: the same dead pixels and the
 	# same cracks every time you raise it, the way a real broken screen behaves.
@@ -113,6 +121,11 @@ func _ready() -> void:
 	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_overlay.draw.connect(_draw_damage)
 	add_child(_overlay)
+	# C2. The wheel lives outside the aperture: it is held in front of you, not
+	# displayed on the device, so it must not be clipped by the screen.
+	radial = RADIAL.new()
+	radial.name = "Radial"
+	add_child(radial)
 	set_process(true)
 
 
@@ -137,6 +150,26 @@ func toggle_device() -> void:
 		close_device()
 	else:
 		open_device()
+
+
+## C2. The wheel the player actually holds. The X-ray is a permanent segment
+## because `xray_cursor.gd` was deliberately built as one seat of a ring that
+## would grow, and this is that ring.
+func open_radial() -> void:
+	var wheel: Array = [
+		{"id": "xray", "label": "X-RAY", "kind": "xray", "note": "see through what you are looking at"},
+		{"id": "blade", "label": "BLADE", "kind": "blade", "note": "close, slow, opens people"},
+		{"id": "sidearm", "label": "SIDEARM", "kind": "gun", "note": "loud, and everyone hears it"},
+		{"id": "implant", "label": "IMPLANT", "kind": "implant", "note": "what is bolted into you"},
+		{"id": "seal", "label": "SEAL", "kind": "seal", "note": "nothing is free"},
+		{"id": "device", "label": "DEVICE", "kind": "mode", "note": "raise the handheld"},
+	]
+	radial.xray_on = bool(_index.get("xray")) if "xray" in _index else false
+	radial.open_wheel(wheel)
+
+
+func close_radial() -> void:
+	radial.close_wheel()
 
 
 func current_mode() -> String:
@@ -169,9 +202,13 @@ func set_mode(mode: String) -> void:
 	mode_changed.emit(current_mode())
 
 
-## Where the character is standing, for the radio's reception.
+## Where the character is standing. Reception, coverage and which parts of the
+## Wire exist are all read off this, per C5: connectivity is a property of place.
 func stand_at(world_position: Vector2) -> void:
 	radio.stand_at(world_position)
+	signal_field.stand_at(world_position)
+	if "signal_grade" in _index:
+		_index.set("signal_grade", signal_field.grade())
 
 
 func _process(delta: float) -> void:
@@ -212,6 +249,7 @@ func _process(delta: float) -> void:
 		_map.size = _clip.size
 		_map.position = Vector2.ZERO
 
+	carry.age(delta)
 	if mode == "RADIO":
 		var found := radio.hold(delta)
 		if found != "":
@@ -275,11 +313,36 @@ func _draw_tabs(rect: Rect2, alpha: float) -> void:
 
 
 func _draw_status(rect: Rect2, alpha: float) -> void:
+	# C5. Signal first, because it is the thing that decides whether half the
+	# device works, and "no signal" is useless without saying what would fix it.
+	var reading: Dictionary = signal_field.reading()
+	var grade := int(reading.get("grade", 0))
+	var bars := clampf(float(reading.get("strength", 0.0)), 0.0, 1.0)
+	var signal_tint: Color = ALERT if grade == SignalField.NONE else (MOSS if grade == SignalField.SURFACE else AMBER)
+	# On the header row, not the footer: the footer is the mode rail and the
+	# first placement printed the carrier name straight through the tabs.
+	var strip_x := rect.position.x + rect.size.x - 330.0
+	var strip_y := rect.position.y + 38.0
+	for bar in 4:
+		var lit := float(bar) / 4.0 < bars
+		var height := 4.0 + float(bar) * 3.0
+		draw_rect(Rect2(Vector2(strip_x + bar * 7.0, strip_y - height), Vector2(5, height)), (signal_tint if lit else CASE_EDGE * Color(1, 1, 1, 0.3)) * Color(1, 1, 1, alpha))
+	var label := str(reading.get("source", ""))
+	if grade == SignalField.UNDERBELLY:
+		label += "  //  DEEP"
+	elif grade == SignalField.NONE:
+		var carrier: Dictionary = signal_field.nearest_carrier()
+		if not carrier.is_empty():
+			label = "NO CARRIER \u2014 NEAREST %s, %dM" % [str(carrier.get("name", "")), int(carrier.get("distance", 0.0))]
+	CellOutzType.draw_condensed(self, Vector2(strip_x + 36.0, strip_y - 9.0), label, 9.0, signal_tint * Color(1, 1, 1, 0.85 * alpha), 0.7)
+
+	# Named apart from the signal label above: both live in this function now and
+	# GDScript will not take the same `var` twice in one scope.
 	var health := clampf(condition, 0.0, 1.0)
 	var tint: Color = ALERT if health < 0.35 else MOSS
-	var label := "CELL %02d%%" % roundi(health * 100.0)
-	var label_width := CellOutzType.width_condensed(label, 10.0, 0.9)
-	CellOutzType.draw_condensed(self, Vector2(rect.position.x + rect.size.x - 30 - label_width, rect.position.y + rect.size.y - 30), label, 10.0, tint * Color(1, 1, 1, alpha), 0.9)
+	var cell_label := "CELL %02d%%" % roundi(health * 100.0)
+	var cell_width := CellOutzType.width_condensed(cell_label, 10.0, 0.9)
+	CellOutzType.draw_condensed(self, Vector2(rect.position.x + rect.size.x - 30 - cell_width, rect.position.y + rect.size.y - 30), cell_label, 10.0, tint * Color(1, 1, 1, alpha), 0.9)
 	for cell in 8:
 		var lit := float(cell) / 8.0 < health
 		var bar := Rect2(Vector2(rect.position.x + rect.size.x - 150 + cell * 9.0, rect.position.y + rect.size.y - 30), Vector2(6, 11))
@@ -375,21 +438,47 @@ func _draw_radio(rect: Rect2, alpha: float) -> void:
 		CellOutzType.draw_condensed(self, Vector2(rect.position.x + 24, rect.end.y - 62), "HOLDING A LOCK", 9.0, MOSS * Color(1, 1, 1, alpha), 0.8)
 
 
-## C4 proper is its own segment; this is the honest minimum so CARRY is not an
-## empty tab — the inventory subject that already exists, listed as objects.
+## C4. The inventory that has existed in `WorldHistory` since the Hunt Grounds
+## were built and has never once been on screen. Drawn as objects with a mass, a
+## condition and a provenance, because B4 already produces parts that know which
+## person they came off and throwing that away at the point of carrying it would
+## break B5, the ritual camera and the organ trade all at once.
 func _draw_carry(rect: Rect2, alpha: float) -> void:
 	CellOutzType.draw_stamped(self, rect.position + Vector2(24, 22), "CARRIED", 18.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.3 * alpha), 1.4)
-	var inventory: Dictionary = WorldHistory.subject("inventory")
-	var items: Array = inventory.get("items", [])
-	if items.is_empty():
-		CellOutzType.draw_condensed(self, rect.position + Vector2(24, 70), "NOTHING ON YOU WORTH LISTING.", 12.0, INK * Color(1, 1, 1, 0.4 * alpha), 0.9)
+	var burden: float = carry.burden()
+	var tone: Color = ALERT if burden > 1.0 else MOSS
+	var load_text := "%0.1f / %0.0f KG" % [carry.total_mass(), Carry.CAPACITY]
+	var load_width := CellOutzType.width_condensed(load_text, 12.0, 0.9)
+	CellOutzType.draw_condensed(self, Vector2(rect.end.x - 26 - load_width, rect.position.y + 26), load_text, 12.0, tone * Color(1, 1, 1, alpha), 0.9)
+	# The burden bar runs past its own track when overloaded, which is a clearer
+	# read than clamping it and saying nothing.
+	var track := Rect2(rect.position + Vector2(24, 52), Vector2(rect.size.x - 48, 8))
+	draw_rect(track, INK * Color(1, 1, 1, 0.10 * alpha))
+	draw_rect(Rect2(track.position, Vector2(track.size.x * minf(burden, 1.0), track.size.y)), tone * Color(1, 1, 1, alpha))
+	if burden > 1.0:
+		draw_rect(Rect2(track.position + Vector2(0, -3), Vector2(track.size.x * clampf(burden - 1.0, 0.0, 1.0), 3)), ALERT * Color(1, 1, 1, alpha))
+
+	if carry.items.is_empty():
+		CellOutzType.draw_condensed(self, rect.position + Vector2(24, 88), "NOTHING ON YOU WORTH LISTING.", 12.0, INK * Color(1, 1, 1, 0.4 * alpha), 0.9)
 		return
-	var y := rect.position.y + 70.0
-	for item in items:
-		CellOutzType.draw_condensed(self, Vector2(rect.position.x + 24, y), str(item).to_upper(), 12.0, INK * Color(1, 1, 1, 0.85 * alpha), 0.9)
-		y += 24.0
-		if y > rect.end.y - 24.0:
+	var y := rect.position.y + 86.0
+	for index in carry.items.size():
+		if y > rect.end.y - 30.0:
 			break
+		var item: Dictionary = carry.items[index]
+		var fresh: float = carry.freshness(item)
+		var row_tint: Color = MOSS.lerp(ALERT, 1.0 - fresh)
+		# A pip coloured by condition, so the list is scannable without reading.
+		draw_circle(Vector2(rect.position.x + 32, y - 4), 4.0, row_tint * Color(1, 1, 1, alpha))
+		CellOutzType.draw_condensed(self, Vector2(rect.position.x + 46, y - 9), str(item.get("label", "")), 12.0, INK * Color(1, 1, 1, 0.88 * alpha), 0.9)
+		var from := str(item.get("from", ""))
+		if from != "":
+			var origin := str(WorldHistory.subject(from).get("name", from)).to_upper()
+			CellOutzType.draw_condensed(self, Vector2(rect.position.x + 46, y + 6), "OFF %s" % origin, 8.0, INK * Color(1, 1, 1, 0.32 * alpha), 0.7)
+		var state: String = carry.condition_label(item)
+		CellOutzType.draw_condensed(self, Vector2(rect.end.x - 190, y - 9), state, 10.0, row_tint * Color(1, 1, 1, alpha), 0.8)
+		CellOutzType.draw_condensed(self, Vector2(rect.end.x - 90, y - 9), "%0.1f KG" % float(item.get("mass", 0.0)), 10.0, INK * Color(1, 1, 1, 0.55 * alpha), 0.8)
+		y += 30.0
 
 
 func _wrap(text: String, width: int) -> Array:

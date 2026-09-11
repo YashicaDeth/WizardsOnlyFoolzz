@@ -57,6 +57,13 @@ func _ready() -> void:
 	# something to receive rather than carrier.
 	device.stand_at(Vector2(-150.0, 10.0))
 
+	# Carried parts, so CARRY has objects with provenance rather than an empty
+	# tab - taken as if they came off a real body, because that is how they do.
+	device.carry.take_chunk({"layer_name": "organ", "organ_id": "heart", "zone": "torso", "subject_id": "mara_voss"})
+	device.carry.take_chunk({"layer_name": "cybernetic", "implant": "jaw telemetry nail", "zone": "head", "subject_id": "mara_voss"})
+	device.carry.take_chunk({"layer_name": "bone", "zone": "left_arm", "subject_id": "mara_voss"})
+	device.carry.items[0]["age"] = 300.0
+
 	for mode in ["INDEX", "MAP", "RADIO", "CARRY", "WIRE"]:
 		device.set_mode(mode)
 		if mode == "RADIO":
@@ -71,4 +78,21 @@ func _ready() -> void:
 			get_tree().quit(1)
 			return
 		print("CAPTURED: ", path)
+
+	# The wheel, held up over the device.
+	device.set_mode("INDEX")
+	device.open_radial()
+	device.radial.centre = Vector2(640, 360)
+	device.radial.pointer = Vector2(640, 360) + Vector2(96, -60)
+	for _settle in 30:
+		await get_tree().process_frame
+	device.radial.pointer = Vector2(640, 360) + Vector2(96, -60)
+	device.radial._resolve_highlight()
+	device.radial.queue_redraw()
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var wheel_image := get_viewport().get_texture().get_image()
+	if wheel_image.save_png("%s/handheld_radial.png" % out_dir) == OK:
+		print("CAPTURED: %s/handheld_radial.png" % out_dir)
+	Engine.time_scale = 1.0
 	get_tree().quit()
