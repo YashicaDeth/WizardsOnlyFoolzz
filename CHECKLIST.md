@@ -15,12 +15,12 @@ order, ignoring everything else:
 
 | Order | Segment | Why it is on the path |
 | --- | --- | --- |
-| 1 | **A7.1–A7.3** | Driving is the first thing the player does and it does not feel like driving. Everything in the derby is downstream of this. |
-| 2 | **A5.1–A5.3** | You cannot read your own state mid-heat. |
-| 3 | **C1.1–C1.2** | Six panels on six keys is the reason nothing connects. |
+| 1 | ~~**A7.1–A7.3**~~ `DONE` | Driving is the first thing the player does and it does not feel like driving. Everything in the derby is downstream of this. |
+| 2 | ~~**A5.1–A5.3**~~ `DONE` | You cannot read your own state mid-heat. |
+| 3 | ~~**C1.1–C1.2**~~ `DONE` | Six panels on six keys is the reason nothing connects. |
 | 4 | **B6.2–B6.3** | A fight that continues after a limb comes off is the combat identity. |
-| 5 | **F1.1–F1.2** | Witnesses are the cheapest step that makes the world remember. |
-| 6 | **D1.1–D2.2** | A character sheet, so a run is *yours*. |
+| 5 | ~~**F1.1–F1.2**~~ `DONE` | Witnesses are the cheapest step that makes the world remember. |
+| 6 | ~~**D1.1–D2.2**~~ `DONE` | A character sheet, so a run is *yours*. |
 | 7 | **G6.1–G6.3** | The opening carries the first ten minutes. |
 
 Everything else is depth on top of that spine. When those seven are checked, the
@@ -250,50 +250,50 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 **Races are D4.** Full design in `DESIGN/CHARACTER_CREATION.md`. Also fixes the
 under-directed opening.
 
-### D1 — The sheet
-- [ ] **D1.1** A real player subject built from data, not a hardcoded dict
-- [ ] **D1.2** Everything below writes into it
-- [ ] **D1.3** Save and load it
+### D1 — The sheet `BUILT`
+- [x] **D1.1** A real player subject built from data, not a hardcoded dict
+- [x] **D1.2** Everything below writes into it
+- [x] **D1.3** Save and load it
 
-### D2 — Traits and point budget
-- [ ] **D2.1** Point budget: positives cost, negatives refund
-- [ ] **D2.2** The eight authored traits, each hooking a system that exists
-- [ ] **D2.3** CLERICAL ERROR — part of your sheet is wrong and you are not told which
+### D2 — Traits and point budget `BUILT`
+- [x] **D2.1** Point budget: positives cost, negatives refund
+- [x] **D2.2** The eight authored traits, each hooking a system that exists
+- [x] **D2.3** CLERICAL ERROR — part of your sheet is wrong and you are not told which
 
-### D3 — The intake scene
-- [ ] **D3.1** Handler, clipboard, tube in your mouth so you cannot speak
-- [ ] **D3.2** Blink and twitch to answer
-- [ ] **D3.3** He writes down what he thinks you said
+### D3 — The intake scene `BUILT`
+- [x] **D3.1** Handler, clipboard, tube in your mouth so you cannot speak
+- [x] **D3.2** Blink and twitch to answer
+- [x] **D3.3** He writes down what he thinks you said
 - [ ] **D3.4** Pacing, camera and delivery (this is also G6)
 
-### D4 — Races
-- [ ] **D4.1** Six races as data: Decanted, Soft Rot, Marrow-Cut, Roadborn, Unreset, Lantern-Born
-- [ ] **D4.2** Silhouette change on the shared rig
-- [ ] **D4.3** Metabolism — what heals you, what poisons you
-- [ ] **D4.4** Social price: how each faction reads you
-- [ ] **D4.5** Baseline Tree pull per race
+### D4 — Races `BUILT`
+- [x] **D4.1** Six races as data: Decanted, Soft Rot, Marrow-Cut, Roadborn, Unreset, Lantern-Born
+- [~] **D4.2** Build factor is on the sheet; the rig does not read it yet
+- [x] **D4.3** Metabolism — what heals you, what poisons you
+- [x] **D4.4** Social price: how each faction reads you
+- [x] **D4.5** Baseline Tree pull per race
 
-### D5 — The chart route
-- [ ] **D5.1** Elements to attributes, modality to a commitment axis
-- [ ] **D5.2** Ascendant sets starting Wire reach
-- [ ] **D5.3** Ruling House as the Skyrim-standing-stone blessing
-- [ ] **D5.4** **Decide: derived wheel or real ephemeris?** (see open questions)
+### D5 — The chart route `BUILT`
+- [x] **D5.1** Elements to attributes, modality to a commitment axis
+- [x] **D5.2** Ascendant sets starting Wire reach
+- [x] **D5.3** Ruling House as the Skyrim-standing-stone blessing
+- [~] **D5.4** Derived wheel shipped and honest about it. Ephemeris still the open call
 
-### D6 — The instrument route
-- [ ] **D6.1** Original items on real axes — five-factor plus dark triad
-- [ ] **D6.2** Scoring that congratulates you on the wrong things
-- [ ] **D6.3** Output drives real stats, so honesty has consequences
+### D6 — The instrument route `BUILT`
+- [x] **D6.1** Original items on real axes — five-factor plus dark triad
+- [x] **D6.2** Scoring that congratulates you on the wrong things
+- [x] **D6.3** Output drives real stats, so honesty has consequences
 
-### D7 — The mirror
-- [ ] **D7.1** Sliders on a swing-arm mirror over the tank
-- [ ] **D7.2** The preview lies, because you are under goo
-- [ ] **D7.3** Under-skin editing: skeleton, organ set, blood type, grown-in hardware
+### D7 — The mirror `BUILT`
+- [x] **D7.1** Sliders on a swing-arm mirror over the tank
+- [x] **D7.2** The preview lies, because you are under goo
+- [x] **D7.3** Under-skin editing: skeleton, organ set, blood type, grown-in hardware
 
-### D8 — Opt-in modifiers
-- [ ] **D8.1** Neural lace, mast tithe, full schedule as intake checkboxes
-- [ ] **D8.2** Each one actually works — and each one is also a handle on you
-- [ ] **D8.3** Short authored cutscene per choice
-- [ ] **D8.4** Declining them is the harder difficulty
+### D8 — Opt-in modifiers `BUILT`
+- [x] **D8.1** Neural lace, mast tithe, full schedule as intake checkboxes
+- [x] **D8.2** Each one actually works — and each one is also a handle on you
+- [ ] **D8.3** Short authored cutscene per choice — the one D item still untouched
+- [x] **D8.4** Declining them is the harder difficulty
 
 ---
 
@@ -346,10 +346,10 @@ Ascent/Descent axis that already exists and is currently unused.
 Today Mara is one hardcoded character. `DESIGN/HUNT_SYSTEM.md` has six
 mechanisms and almost none are built.
 
-### F1 — Witness records
-- [ ] **F1.1** Events record witnesses
-- [ ] **F1.2** An unwitnessed act never enters faction knowledge
-- [ ] **F1.3** Kill the witness before they report
+### F1 — Witness records `BUILT`
+- [x] **F1.1** Events record witnesses
+- [x] **F1.2** An unwitnessed act never enters faction knowledge
+- [x] **F1.3** Kill the witness before they report
 
 ### F2 — Grudges travel real edges
 - [ ] **F2.1** Propagation along the relation graph the index already draws
