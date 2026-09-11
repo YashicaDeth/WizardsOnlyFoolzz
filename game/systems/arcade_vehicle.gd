@@ -11,6 +11,11 @@ signal impact(other: Node, closing_speed: float, self_share: float)
 const DRIVE_SPEED := 24.0
 const REVERSE_SPEED := 10.0
 const IMPACT_SPEED := 4.0
+## The rebuilt suspended chassis absorbs some normal velocity before the body
+## contact is reported. Measured player-specific peaks are 3.39m/s during a
+## clean AI run, while barrier hits still reach well above four. Cars therefore
+## use the lower measured threshold; scenery keeps the old one.
+const VEHICLE_IMPACT_SPEED := 3.0
 ## Ramming reads as discrete blows rather than one long scrape: a pair that has
 ## just traded a hit cannot score again until this elapses.
 const CONTACT_LOCKOUT_MSEC := 520
@@ -107,6 +112,11 @@ const UNSTICK_IMPULSE := 4.5
 
 var throttle := 0.0
 var steering := 0.0
+## Highest normal closing speed seen at a real body contact. Kept as telemetry
+## so balance tests can distinguish "never touched" from "threshold too high".
+var max_contact_closing := 0.0
+var max_vehicle_contact_closing := 0.0
+var vehicle_contact_peaks: Dictionary = {}
 var enabled := false
 var previous_velocity := Vector3.ZERO
 var contact_cooldowns: Dictionary = {}
@@ -265,8 +275,13 @@ func _resolve_contacts(state: PhysicsDirectBodyState3D) -> void:
 			pressed += flat.normalized()
 		var other_velocity := state.get_contact_collider_velocity_at_position(index)
 		var closing := maxf(0.0, -(previous_velocity - other_velocity).dot(normal))
+		max_contact_closing = maxf(max_contact_closing, closing)
+		if other.get_script() == get_script():
+			max_vehicle_contact_closing = maxf(max_vehicle_contact_closing, closing)
+			vehicle_contact_peaks[other.get_instance_id()] = maxf(float(vehicle_contact_peaks.get(other.get_instance_id(), 0.0)), closing)
 		var id := other.get_instance_id()
-		if closing < IMPACT_SPEED or now < int(contact_cooldowns.get(id, 0)):
+		var impact_threshold := VEHICLE_IMPACT_SPEED if other.get_script() == get_script() else IMPACT_SPEED
+		if closing < impact_threshold or now < int(contact_cooldowns.get(id, 0)):
 			continue
 		contact_cooldowns[id] = now + CONTACT_LOCKOUT_MSEC
 		if side_on:

@@ -7,6 +7,8 @@ extends Node
 ## fight back.
 
 var failures: Array[String] = []
+var impacts := 0
+var strongest_impact := 0.0
 
 
 func check(condition: bool, label: String) -> void:
@@ -26,16 +28,24 @@ func _ready() -> void:
 	# free this node out from under the await.
 	derby.leaving = true
 	derby.round_state = "active"
-	var impacts := 0
-	var strongest_impact := 0.0
 	derby.boat.impact.connect(func(_other, closing_speed, _share):
 		impacts += 1
 		strongest_impact = maxf(strongest_impact, float(closing_speed)))
+	for wrecker in derby.targets:
+		wrecker.impact.connect(func(other, closing_speed, _share):
+			if other == derby.boat:
+				impacts += 1
+				strongest_impact = maxf(strongest_impact, float(closing_speed)))
 	var step := 1.0 / float(Engine.physics_ticks_per_second)
 	var seconds := 0.0
 	var samples: Array[String] = []
 	var next_sample := 0.0
 	var peak_crowding := 0
+	var approach_runs := 0
+	var contact_closing := 0.0
+	var vehicle_contact_closing := 0.0
+	var hunter_alignment := -1.0
+	var player_contact_closing := 0.0
 	while seconds < 30.0 and derby.round_state == "active":
 		await get_tree().physics_frame
 		seconds += step
@@ -58,12 +68,20 @@ func _ready() -> void:
 					crowding += 1
 				if str(target.get_meta("wrecker_role", "")) == "hunt":
 					hunters += 1
+					var hunter_driver = target.get_node_or_null("AIDriver")
+					if hunter_driver != null:
+						approach_runs = maxi(approach_runs, int(hunter_driver.final_approach_count))
+						hunter_alignment = maxf(hunter_alignment, float(hunter_driver.max_target_alignment))
+				var driver = target.get_node_or_null("AIDriver")
+				contact_closing = maxf(contact_closing, float(target.max_contact_closing))
+				vehicle_contact_closing = maxf(vehicle_contact_closing, float(target.max_vehicle_contact_closing))
+				player_contact_closing = maxf(player_contact_closing, float(target.vehicle_contact_peaks.get(derby.boat.get_instance_id(), 0.0)))
 				if target.linear_velocity.length() > 1.0:
 					moving += 1
 			peak_crowding = maxi(peak_crowding, crowding)
 			var nearest_ai = nearest_car.get_node_or_null("AIDriver") if nearest_car != null else null
 			var charge := float(nearest_ai.final_approach_timer) if nearest_ai != null else 0.0
-			var nearest_speed := nearest_car.linear_velocity.length() if nearest_car != null else 0.0
+			var nearest_speed: float = float(nearest_car.linear_velocity.length()) if nearest_car != null else 0.0
 			samples.append("%.0fs hull%d near%.1fm/%.1fms charge%.1f crowd%d hunt%d moving%d/%d" % [seconds, derby.integrity, nearest, nearest_speed, charge, crowding, hunters, moving, derby.targets.size()])
 			next_sample += 4.0
 	print("  hull over time -> ", " ".join(samples))
@@ -73,10 +91,15 @@ func _ready() -> void:
 	check(peak_crowding <= 4, "the pit never piles more than four cars on the player (peak %d)" % peak_crowding)
 	check(peak_crowding >= 1, "the pit still reaches the player (peak %d)" % peak_crowding)
 	check(seconds >= 12.0, "a swarmed idle player survives at least 12s (lasted %.1fs)" % seconds)
+	check(approach_runs >= 1, "hunters commit to a final approach (%d observed)" % approach_runs)
+	print("  hunter peak alignment -> %.3f" % hunter_alignment)
+	check(contact_closing > 0.0, "wreckers make physical chassis contact (peak normal closing %.1f m/s)" % contact_closing)
+	check(vehicle_contact_closing > 0.0, "wreckers contact another vehicle (peak normal closing %.1f m/s)" % vehicle_contact_closing)
+	print("  player-specific contact -> %.3f m/s" % player_contact_closing)
 	# G0.3. Hull loss is downstream and can come from another code path. Count
 	# the chassis signal itself so a no-contact pit cannot look green again.
 	check(impacts >= 1, "wreckers fire real impact signals (%d, strongest %.1f m/s)" % [impacts, strongest_impact])
-	check(strongest_impact >= 4.0, "a hunter reaches the chassis impact threshold (%.1f m/s)" % strongest_impact)
+	check(strongest_impact >= 3.0, "a hunter reaches the rebuilt chassis impact threshold (%.1f m/s)" % strongest_impact)
 	# The other side of the bound: if nothing can hurt a parked car, the pit has
 	# no teeth and the damage attribution has regressed the other way.
 	check(derby.integrity < 100, "a parked car still takes punishment (hull %d)" % derby.integrity)

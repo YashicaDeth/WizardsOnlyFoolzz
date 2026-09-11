@@ -2,6 +2,20 @@
 
 ## 2026 09 12
 
+- **G0: the wreckers can finally hit the player.** The open bug was two faults
+  stacked together. Hunters pursued the unreachable centre of the player's
+  chassis until their steering became a tangent; inside twelve metres they now
+  line up without wander, latch a point beyond the target and keep the throttle
+  down through the run. The rebuilt suspension then reported the clean player
+  contact at 3.39m/s normal closing—below the old 4.0 threshold—so car-to-car
+  impacts now use the measured 3.0 threshold while scenery keeps 4.0. Finally,
+  the derby listens to the attacking wrecker's contact signal as well as the
+  player's, because Godot need not report the useful normal on both bodies.
+  A parked thirty-second run now produces 16 real impact signals, a strongest
+  hit of 5.6m/s and 62% hull remaining instead of seven consecutive full-hull
+  finishes. The isolated ten-check chassis suite stays green; a rendered
+  capture records the first live AI hit at 95% hull.
+
 - **G6: the opening now starts where character creation actually happens.**
   The handler's authored intake had never been connected to a new run, so the
   game skipped the character sheet and began with the tank breaking on a timer.

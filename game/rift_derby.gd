@@ -242,8 +242,14 @@ func _create_wrecker(index: int) -> void:
 	target.set_meta("integrity", 160 if index == 0 else 100)
 	target.set_meta("is_rival", index == 0)
 	target.set_meta("hit_ready_msec", 0)
+	target.set_meta("player_hit_ready_msec", 0)
 	target.set_meta("spawn_index", index)
 	add_child(target)
+	# G0.2. Physics contacts are not guaranteed to report the useful closing
+	# normal on both bodies. A parked player often emitted nothing while the
+	# attacking wrecker measured a 17m/s vehicle contact. Listen to the attacker
+	# too, otherwise a clean AI ram can be physically real and mechanically mute.
+	target.impact.connect(_on_wrecker_impact.bind(target))
 	var ai_driver := AI_DRIVER.new()
 	ai_driver.name = "AIDriver"
 	target.add_child(ai_driver)
@@ -321,7 +327,7 @@ func _assign_wrecker_roles() -> void:
 			# Everyone else fights each other. Each duellist is paired with a
 			# different rival so the spare cars do not all converge on one.
 			wrecker.set_meta("wrecker_role", "duel")
-			ai_driver.role = "hunt"
+			ai_driver.role = "duel"
 			var rival := live[(index + 1 + index % 3) % live.size()]
 			if rival == wrecker:
 				rival = live[(index + 1) % live.size()]
@@ -350,6 +356,31 @@ func _on_vehicle_impact(other: Node, closing_speed: float, self_share: float) ->
 		derby_audio.play_impact(clampf(closing_speed / 24.0, 0.0, 1.0), boat.global_position, "heavy")
 		if integrity <= 0:
 			_finish_round("lost")
+
+
+func _on_wrecker_impact(other: Node, closing_speed: float, self_share: float, wrecker: Node3D) -> void:
+	if round_state != "active" or other != boat or not is_instance_valid(wrecker):
+		return
+	var now := Time.get_ticks_msec()
+	if now < int(wrecker.get_meta("player_hit_ready_msec", 0)):
+		return
+	wrecker.set_meta("player_hit_ready_msec", now + 520)
+	var attacker_share := clampf(self_share, 0.0, 1.0)
+	var damage := clampi(roundi(closing_speed * 0.55 * (0.4 + attacker_share * 0.6)), 1, 18)
+	integrity = maxi(0, integrity - damage)
+	_shake_camera(closing_speed)
+	if pit_radio != null and closing_speed > 11.0:
+		pit_radio.transmit("hit_player")
+	if derby_audio != null:
+		derby_audio.play_impact(clampf(closing_speed / 24.0, 0.0, 1.0), boat.global_position, "heavy")
+	WorldHistory.record_event("derby_player_impact", {
+		"attacker": wrecker.name,
+		"closing_speed": snappedf(closing_speed, 0.1),
+		"damage": damage,
+		"hull_after": integrity,
+	})
+	if integrity <= 0:
+		_finish_round("lost")
 
 
 func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: float = 1.0) -> void:

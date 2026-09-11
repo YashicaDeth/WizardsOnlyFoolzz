@@ -422,12 +422,12 @@ probe actually says, so the next attempt does not start from scratch:
   steering gain from 2.2 to 1.15 was a real fix for permanent cornering and is
   kept, but did not by itself produce impacts.
 
-- [ ] **G0.1** Make a hunter's final approach a committed straight run rather
-      than an orbit — the gap it is steering toward is never zero
-- [ ] **G0.2** Re-check `IMPACT_SPEED` against the rebuilt chassis; 4.0 m/s of
-      normal closing may simply be unreachable now
-- [ ] **G0.3** Assert impacts fire, not just that hull drops, so this cannot
-      regress silently again
+- [x] ~~**G0.1** Make a hunter's final approach a committed straight run rather
+      than an orbit — the gap it is steering toward is never zero~~
+- [x] ~~**G0.2** Re-check `IMPACT_SPEED` against the rebuilt chassis; 4.0 m/s of
+      normal closing may simply be unreachable now~~
+- [x] ~~**G0.3** Assert impacts fire, not just that hull drops, so this cannot
+      regress silently again~~
 
 ### G3 — The derby arena
 - [ ] **G3.1** Re-author the oval for a larger footprint
