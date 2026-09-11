@@ -40,6 +40,15 @@ const PASS_DISTANCE := 11.0
 ## breaks a genuine stalled shove and nothing else.
 const GRIND_RANGE := 4.2
 const GRIND_SPEED := 2.6
+## G0.1. Pure pursuit aims at the target's centre, but two chassis touch while
+## their centres are still about four metres apart. Near that unreachable point
+## the desired heading slews sideways every frame and the hunter orbits. Once a
+## reasonably aligned car enters this range it commits to a line *through* the
+## target instead, keeping a point beyond the other bumper as its destination.
+const FINAL_APPROACH_RANGE := 11.0
+const FINAL_APPROACH_ALIGNMENT := 0.62
+const FINAL_APPROACH_SECONDS := 1.35
+const FINAL_APPROACH_OVERSHOOT := 12.0
 
 var arena_limit := 26.0
 var vehicle: RigidBody3D
@@ -53,6 +62,8 @@ var press_timer := 0.0
 var reverse_timer := 0.0
 var break_off_timer := 0.0
 var break_off_heading := Vector3.FORWARD
+var final_approach_timer := 0.0
+var final_approach_heading := Vector3.FORWARD
 
 
 func configure(body: RigidBody3D, driver_seed: int) -> void:
@@ -74,6 +85,7 @@ func tick(delta: float, target_position: Vector3, active: bool) -> void:
 	wander_phase += delta * (0.7 + aggression * 0.5)
 	var destination := target_position
 	var from_centre := Vector3(vehicle.global_position.x, 0.0, vehicle.global_position.z)
+	final_approach_timer = maxf(0.0, final_approach_timer - delta)
 
 	# A derby hit should be a pass, not a shove held indefinitely. Once a driver
 	# has been on top of its target for PRESS_LIMIT it breaks off, drives clear
@@ -81,6 +93,7 @@ func tick(delta: float, target_position: Vector3, active: bool) -> void:
 	# applies to car-on-car contact, applied to intent rather than to physics.
 	var gap := Vector3(target_position.x - vehicle.global_position.x, 0.0, target_position.z - vehicle.global_position.z).length()
 	if break_off_timer > 0.0:
+		final_approach_timer = 0.0
 		break_off_timer -= delta
 		destination = vehicle.global_position + break_off_heading * PASS_DISTANCE
 		if break_off_timer <= 0.0:
@@ -105,6 +118,7 @@ func tick(delta: float, target_position: Vector3, active: bool) -> void:
 	# A circling driver keeps its distance and its speed up, so the cars waiting
 	# their turn still look like a moving pit instead of parked scenery.
 	if role == "circle" and break_off_timer <= 0.0:
+		final_approach_timer = 0.0
 		var offset := vehicle.global_position - target_position
 		offset.y = 0.0
 		if offset.length() < 0.5:
@@ -130,9 +144,22 @@ func tick(delta: float, target_position: Vector3, active: bool) -> void:
 	var forward := -vehicle.global_transform.basis.z
 	var right := vehicle.global_transform.basis.x
 	var heading := to_target / distance
+	var approach_alignment := heading.dot(forward)
+	if role == "hunt" and break_off_timer <= 0.0:
+		if final_approach_timer <= 0.0 and gap <= FINAL_APPROACH_RANGE and approach_alignment >= FINAL_APPROACH_ALIGNMENT:
+			final_approach_timer = FINAL_APPROACH_SECONDS
+			final_approach_heading = heading
+		if final_approach_timer > 0.0:
+			# The point stays beyond the target, so the steering gap cannot collapse
+			# to zero at bumper distance. This is a run, not another orbit.
+			destination = target_position + final_approach_heading * FINAL_APPROACH_OVERSHOOT
+			to_target = destination - vehicle.global_position
+			to_target.y = 0.0
+			distance = maxf(to_target.length(), 0.01)
+			heading = to_target / distance
 	# Imperfect aim: low-skill drivers drift wide and clip barriers, which is the
 	# behaviour that makes a derby pit feel populated rather than choreographed.
-	var wander := sin(wander_phase) * (1.0 - skill) * 0.55
+	var wander := 0.0 if final_approach_timer > 0.0 else sin(wander_phase) * (1.0 - skill) * 0.55
 	# A7 fallout. A gain of 2.2 saturates this to full lock on anything past a
 	# few degrees off-axis, so with the rebuilt tire-steered chassis a wrecker
 	# cornered permanently and never straightened up: measured at throttle 0.72

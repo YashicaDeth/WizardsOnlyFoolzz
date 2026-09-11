@@ -521,10 +521,10 @@ finished. Applies to everything below and to A5, A6, C1.
 - [x] **I1.3** Used as a surface things are cut out of, not a backdrop
 
 ### I2 — The web is many worlds
-- [ ] **I2.1** Broken-web primitives: tiled ground, marquee, counter, guestbook, webring, banner farm, popup
-- [ ] **I2.2** Per-site authored layouts, no two alike
-- [ ] **I2.3** Sites as locations — reachable from one terminal, and nowhere else
-- [ ] **I2.4** Dead sites: last post four years old, moderator deceased
+- [x] **I2.1** Broken-web primitives: tiled ground, marquee, counter, guestbook, webring, banner farm, popup
+- [x] **I2.2** Per-site authored layouts, no two alike
+- [x] **I2.3** Sites as locations — reachable from one terminal, and nowhere else
+- [x] **I2.4** Dead sites: last post four years old, moderator deceased
 
 ### I3 — celloutz.xyz in-game
 **Blocked: mirror the real content, or fictionalise it?**

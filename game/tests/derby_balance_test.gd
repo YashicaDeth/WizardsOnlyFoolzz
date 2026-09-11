@@ -26,6 +26,11 @@ func _ready() -> void:
 	# free this node out from under the await.
 	derby.leaving = true
 	derby.round_state = "active"
+	var impacts := 0
+	var strongest_impact := 0.0
+	derby.boat.impact.connect(func(_other, closing_speed, _share):
+		impacts += 1
+		strongest_impact = maxf(strongest_impact, float(closing_speed)))
 	var step := 1.0 / float(Engine.physics_ticks_per_second)
 	var seconds := 0.0
 	var samples: Array[String] = []
@@ -36,6 +41,7 @@ func _ready() -> void:
 		seconds += step
 		if seconds >= next_sample:
 			var nearest := 9999.0
+			var nearest_car: Node3D
 			var moving := 0
 			var crowding := 0
 			var hunters := 0
@@ -43,7 +49,9 @@ func _ready() -> void:
 				if not is_instance_valid(target):
 					continue
 				var gap: float = target.global_position.distance_to(derby.boat.global_position)
-				nearest = minf(nearest, gap)
+				if gap < nearest:
+					nearest = gap
+					nearest_car = target
 				# The crowding metric: how many cars are on top of the player at
 				# once. This is what "ten NPCs ramming you" actually measures.
 				if gap < 9.0:
@@ -53,7 +61,10 @@ func _ready() -> void:
 				if target.linear_velocity.length() > 1.0:
 					moving += 1
 			peak_crowding = maxi(peak_crowding, crowding)
-			samples.append("%.0fs hull%d near%.1fm crowd%d hunt%d moving%d/%d" % [seconds, derby.integrity, nearest, crowding, hunters, moving, derby.targets.size()])
+			var nearest_ai = nearest_car.get_node_or_null("AIDriver") if nearest_car != null else null
+			var charge := float(nearest_ai.final_approach_timer) if nearest_ai != null else 0.0
+			var nearest_speed := nearest_car.linear_velocity.length() if nearest_car != null else 0.0
+			samples.append("%.0fs hull%d near%.1fm/%.1fms charge%.1f crowd%d hunt%d moving%d/%d" % [seconds, derby.integrity, nearest, nearest_speed, charge, crowding, hunters, moving, derby.targets.size()])
 			next_sample += 4.0
 	print("  hull over time -> ", " ".join(samples))
 	print("  survived %.1fs, ended hull %d, wreckers disabled %d, peak crowding %d" % [seconds, derby.integrity, derby.disabled_count, peak_crowding])
@@ -62,6 +73,10 @@ func _ready() -> void:
 	check(peak_crowding <= 4, "the pit never piles more than four cars on the player (peak %d)" % peak_crowding)
 	check(peak_crowding >= 1, "the pit still reaches the player (peak %d)" % peak_crowding)
 	check(seconds >= 12.0, "a swarmed idle player survives at least 12s (lasted %.1fs)" % seconds)
+	# G0.3. Hull loss is downstream and can come from another code path. Count
+	# the chassis signal itself so a no-contact pit cannot look green again.
+	check(impacts >= 1, "wreckers fire real impact signals (%d, strongest %.1f m/s)" % [impacts, strongest_impact])
+	check(strongest_impact >= 4.0, "a hunter reaches the chassis impact threshold (%.1f m/s)" % strongest_impact)
 	# The other side of the bound: if nothing can hurt a parked car, the pit has
 	# no teeth and the damage attribution has regressed the other way.
 	check(derby.integrity < 100, "a parked car still takes punishment (hull %d)" % derby.integrity)
