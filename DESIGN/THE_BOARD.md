@@ -107,3 +107,38 @@ Step 1 is worth building on its own and proves the rest.
    a very strong consequence, and it makes the board a thing that can be *lost*.
 3. Does a wrong string ever get corrected, or does the player simply live with a
    board that is partly nonsense?
+
+
+## Mainline, sidelines and endings — added by Greg, 2026-09-12
+
+> *"mainline quests and sidequests different everything, and different mainline
+> theories that are different endings, with pre-placed theories that speculate
+> off choices of missions and quests"*
+
+This is the part that turns the Board from an interface into the structure of
+the game, so it is worth being precise about what it means:
+
+- **The board ships with theories already pinned.** Not blank. A set of authored
+  **mainline theories** are up there from the start — half-formed, contradictory,
+  and each one a different reading of the same world. They are speculation, not
+  quests, and nothing marks which is true.
+- **A mainline theory is an ending.** Following one far enough is how the game
+  ends, which means `E7`'s two routes are the *first two* of these rather than
+  the whole set. Signing yourself to CellOutz and climbing to force a hearing
+  are both theories about what this place is; there can be others.
+- **Sidelines are their own strings.** A sidequest is not a smaller mainline
+  quest — it is a separate cluster on the board that may or may not connect to
+  one. Some connect to two.
+- **Pre-placed theories react to what you did.** They speculate *off* the
+  player's actual choices: a theory about the Choir reads differently once you
+  have executed three of their surgeons, and the Board should say so without
+  being told which mission you are on.
+- **Different everything.** The routes should not converge on one dungeon with
+  three doors. Different people, places, factions and consequences per theory.
+
+The mechanical consequence: **there is no quest state anywhere.** What the
+player is "on" is which strings they have drawn and which theories those strings
+support, read out of `WorldHistory` at the moment the board is opened. That is
+why L5.2 says no quest list exists in the game — not as a stylistic preference,
+but because there is nothing for one to list.
+

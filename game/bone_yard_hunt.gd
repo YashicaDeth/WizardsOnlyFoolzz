@@ -21,6 +21,7 @@ const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
+const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 
 var player := Vector3(0, 1.5, 19)
 var yaw := PI
@@ -178,11 +179,23 @@ func _build_player_rig() -> void:
 	# A Marrow-Cut stands bigger than an Unreset, and until now every body in the
 	# world was the same size whatever the sheet said.
 	var race: Dictionary = CharacterSheet.RACES.get(str(saved.get("race", "decanted")), {})
+	# The intake collected a face, a wear level, a blood type and whatever you
+	# were grown with, and the body read none of it — every player walked out of
+	# the vat the same colour, the same blood, and wearing a hardcoded torque arm
+	# regardless of what the sheet said. Greg's report: "nothing with the
+	# character creation modelling gets made".
+	var appearance: Dictionary = saved.get("appearance", {})
+	var sheet_anatomy: Dictionary = saved.get("anatomy", {})
+	var wear := clampf(float(appearance.get("wear", 0.4)), 0.0, 1.0)
 	var config := {
-		"flesh": Color("7a6350"), "variation": 1, "blood": 5200.0,
+		# Face drives the rig's procedural variation, so two players with
+		# different faces are not the same generated head.
+		"variation": 1 + int(clampf(float(appearance.get("face", 0.5)), 0.0, 1.0) * 24.0),
+		"flesh": Color("7a6350").darkened(wear * 0.35),
+		"blood": _blood_volume(str(sheet_anatomy.get("blood_type", "O-RUST"))),
 		"gore": viscera_fx,
 		"build": float(race.get("build", 1.0)),
-		"cybernetics": {"right_arm": {"name": "salvaged torque arm", "armor": 0.22, "restores": 0.72}},
+		"cybernetics": _grown_cybernetics(sheet_anatomy),
 	}
 	if saved.get("anatomy_state") is Dictionary:
 		config["restore"] = saved.anatomy_state
@@ -192,6 +205,36 @@ func _build_player_rig() -> void:
 	hunter_appearance.name = "HunterAppearance"
 	player_rig.add_child(hunter_appearance)
 	hunter_appearance.configure(player_rig)
+
+
+## Blood type is a choice on the intake sheet, so it has to mean something.
+## Volumes are small differences rather than build-defining ones: a NULL carrier
+## bleeds out faster than an O-RUST and that is the whole of it.
+func _blood_volume(blood_type: String) -> float:
+	match blood_type:
+		"NULL": return 4200.0
+		"SAP": return 5800.0
+		"AB-": return 4900.0
+		"B-9": return 5100.0
+		"A-ASH": return 5000.0
+		_: return 5200.0
+
+
+## What you were grown with, rather than a hardcoded arm. An empty sheet still
+## gets the salvaged torque arm, because the opening hands you one either way
+## and a body with no history at all is not this game.
+func _grown_cybernetics(sheet_anatomy: Dictionary) -> Dictionary:
+	var grown: Dictionary = {}
+	var listed: Variant = sheet_anatomy.get("cybernetics", [])
+	for entry in ImplantCatalog.list(listed):
+		grown[str(entry.zone)] = {
+			"name": str(entry.name),
+			"armor": float(entry.get("armor", 0.1)),
+			"restores": 0.7,
+		}
+	if grown.is_empty():
+		grown["right_arm"] = {"name": "salvaged torque arm", "armor": 0.22, "restores": 0.72}
+	return grown
 
 
 ## Damage to the player, routed through the body so it lands on a real zone,

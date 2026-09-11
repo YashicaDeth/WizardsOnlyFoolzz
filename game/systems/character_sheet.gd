@@ -398,6 +398,9 @@ func apply_to_world() -> Dictionary:
 		"tree_pull": tree_pull(),
 		"reach_seed": starting_reach(),
 		"instrument": instrument.duplicate(),
+		# D. What you chose to look like was collected on the sheet and then
+		# never filed, so the body could not read it even in principle.
+		"appearance": appearance.duplicate(),
 		"anatomy": {
 			"blood_type": str(under_skin.get("blood", "O-RUST")),
 			"skeleton": str(under_skin.get("skeleton", "standard")),
