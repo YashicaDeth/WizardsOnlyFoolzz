@@ -24,6 +24,11 @@ extends Control
 
 const CellOutzType := preload("res://systems/celloutz_type.gd")
 const WireNetScript := preload("res://systems/wire_net.gd")
+const SUBJECT_ICON := preload("res://systems/subject_icon.gd")
+
+## Six live 3D heads is cheap; sixty would not be, and each icon owns a World3D.
+## So they are a pool the pages draw into by slot rather than one per row.
+const ICON_POOL := 6
 
 const INK := Color("f1d2a3")
 const COPPER := Color("f06428")
@@ -45,6 +50,10 @@ var posts: Array = []
 var last_action := ""
 var action_life := 0.0
 
+var xray := false
+var page_blend := 1.0
+var page_direction := 1.0
+var _icons: Array = []
 var _rail_cache: Array = []
 var _dead_pixels: Array = []
 
@@ -63,6 +72,11 @@ func _ready() -> void:
 	rng.seed = 20260911
 	for index in 26:
 		_dead_pixels.append(Vector2(rng.randf(), rng.randf()))
+	for slot in ICON_POOL:
+		var icon: SubViewport = SUBJECT_ICON.new()
+		icon.name = "SubjectIcon%d" % slot
+		add_child(icon)
+		_icons.append(icon)
 
 
 func toggle() -> void:
@@ -118,6 +132,7 @@ func _process(delta: float) -> void:
 		return
 	elapsed += delta
 	action_life = maxf(0.0, action_life - delta)
+	page_blend = minf(1.0, page_blend + delta * 4.4)
 	queue_redraw()
 
 
@@ -130,21 +145,20 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_LEFT:
-				page = (page + PAGES.size() - 1) % PAGES.size()
-				rail_index = 0
-				_rebuild_rail()
+				_go_to_page((page + PAGES.size() - 1) % PAGES.size(), -1.0)
 			KEY_RIGHT:
-				page = (page + 1) % PAGES.size()
-				rail_index = 0
-				_rebuild_rail()
+				_go_to_page((page + 1) % PAGES.size(), 1.0)
 			KEY_UP:
 				rail_index = maxi(0, rail_index - 1)
 			KEY_DOWN:
 				rail_index = mini(_rail_cache.size() - 1, rail_index + 1)
+			KEY_X:
+				xray = not xray
+				for icon in _icons:
+					icon.set_xray(xray)
 			KEY_1, KEY_2, KEY_3:
-				page = event.keycode - KEY_1
-				rail_index = 0
-				_rebuild_rail()
+				var target: int = event.keycode - KEY_1
+				_go_to_page(target, 1.0 if target > page else -1.0)
 			_:
 				return
 		get_viewport().set_input_as_handled()
@@ -160,6 +174,55 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		get_viewport().set_input_as_handled()
 		queue_redraw()
+
+
+## Binds a pooled icon to a subject and draws it at `rect`. Returns false when
+## the pool is exhausted so a caller can lay out around a missing icon rather
+## than assuming one is always there.
+func _draw_icon(slot: int, subject_id: String, rect: Rect2) -> bool:
+	if slot >= _icons.size():
+		return false
+	var icon: SubViewport = _icons[slot]
+	var subject: Dictionary = WorldHistory.subject(subject_id)
+	if subject.is_empty():
+		return false
+	icon.set_subject(subject, _subject_tone(subject))
+	icon.set_xray(xray)
+	# A frame under the icon, so it reads as a plate set into the panel rather
+	# than a floating render with a transparent background.
+	draw_rect(rect, Color(0, 0, 0, 0.35))
+	draw_texture_rect(icon.get_texture(), rect, false)
+	var corner := rect.size.x * 0.22
+	var accent := HOT if xray else COPPER
+	draw_polyline(PackedVector2Array([
+		rect.position + Vector2(0, corner), rect.position, rect.position + Vector2(corner, 0),
+	]), accent * Color(1, 1, 1, 0.7), 1.4)
+	draw_polyline(PackedVector2Array([
+		rect.position + rect.size - Vector2(0, corner), rect.position + rect.size, rect.position + rect.size - Vector2(corner, 0),
+	]), accent * Color(1, 1, 1, 0.7), 1.4)
+	return true
+
+
+## Colour a subject by where they sit on the Tree axis, so a row of icons is
+## already telling you something before you read a single word.
+func _subject_tone(subject: Dictionary) -> Color:
+	var alignment: float = WorldHistory.tree_alignment(subject)
+	if alignment > 0.15:
+		return SPORE
+	if alignment < -0.15:
+		return HOT
+	return COPPER
+
+
+func _go_to_page(target: int, direction: float) -> void:
+	if target == page:
+		return
+	page = target
+	page_direction = direction
+	page_blend = 0.0
+	rail_index = 0
+	feed_scroll = 0.0
+	_rebuild_rail()
 
 
 func _selected() -> Dictionary:
@@ -184,6 +247,12 @@ func _draw() -> void:
 	var rail := Rect2(body.position, Vector2(246, body.size.y))
 	var panel := Rect2(body.position + Vector2(262, 0), body.size - Vector2(262, 0))
 	_draw_rail(rail)
+	# Ease-out on the incoming page, offset along the direction of travel. The
+	# transform is pushed rather than every draw call being offset by hand, so
+	# the page functions stay unaware that they are mid-transition.
+	var eased := 1.0 - pow(1.0 - clampf(page_blend, 0.0, 1.0), 3.0)
+	var slide := (1.0 - eased) * page_direction * 46.0
+	draw_set_transform(Vector2(slide, 0.0), 0.0, Vector2.ONE)
 	match page:
 		0:
 			_draw_file(panel)
@@ -191,6 +260,9 @@ func _draw() -> void:
 			_draw_pyramid(panel)
 		2:
 			_draw_wire(panel)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if page_blend < 1.0:
+		_draw_page_wipe(panel, eased)
 	_draw_footer(plate)
 	_draw_screen_decay(plate)
 
@@ -325,6 +397,7 @@ func _draw_file(rect: Rect2) -> void:
 		CellOutzType.draw_text(self, Vector2(x, rect.position.y + 62), str(stat.label), 9.0, INK * Color(1, 1, 1, 0.45), 1.0)
 		CellOutzType.draw_text(self, Vector2(x, rect.position.y + 78), str(stat.value), 19.0, stat.tone, 1.0)
 		x += 108.0
+	_draw_icon(0, str(entry.id), Rect2(rect.position + Vector2(rect.size.x - 118, -10), Vector2(110, 110)))
 	draw_line(rect.position + Vector2(0, 112), rect.position + Vector2(rect.size.x, 112), INK * Color(1, 1, 1, 0.16), 1.0)
 
 	var column := rect.size.x * 0.56
@@ -492,12 +565,12 @@ func _draw_pyramid(rect: Rect2) -> void:
 
 	var tiers: Array = data.tiers
 	var top := rect.position.y + 84.0
-	var row_height := minf(52.0, (rect.size.y - 120.0) / float(maxi(1, tiers.size())))
+	var row_height := minf(64.0, (rect.size.y - 110.0) / float(maxi(1, tiers.size())))
 	for index in tiers.size():
 		var tier: Dictionary = tiers[index]
 		var members: Array = tier["members"]
 		# The width is the pyramid: narrow at the crown, wide at intake.
-		var span := lerpf(rect.size.x * 0.30, rect.size.x * 0.96, float(index) / float(maxi(1, tiers.size() - 1)))
+		var span := lerpf(rect.size.x * 0.46, rect.size.x * 0.96, float(index) / float(maxi(1, tiers.size() - 1)))
 		var cx := rect.position.x + rect.size.x * 0.5
 		var y := top + float(index) * row_height
 		var vacant := members.is_empty()
@@ -510,7 +583,8 @@ func _draw_pyramid(rect: Rect2) -> void:
 		var edge := shape.duplicate()
 		edge.append(shape[0])
 		draw_polyline(edge, accent * Color(1, 1, 1, 0.75), 1.4)
-		CellOutzType.draw_text(self, Vector2(cx - span * 0.5 + 18, y + 8), str(tier["rank"]), 11.0, accent, 1.2)
+		var rank_x := cx - span * 0.5 + (82.0 if not members.is_empty() else 18.0)
+		CellOutzType.draw_text(self, Vector2(rank_x, y + 8), str(tier["rank"]), 11.0, accent, 1.2)
 		var buy_in := "BUY-IN %d" % int(tier["buy_in"])
 		var buy_width := CellOutzType.width(buy_in, 9.0, 0.8)
 		CellOutzType.draw_text(self, Vector2(cx + span * 0.5 - 18 - buy_width, y + 9), buy_in, 9.0, INK * Color(1, 1, 1, 0.42), 0.8)
@@ -538,8 +612,15 @@ func _draw_pyramid(rect: Rect2) -> void:
 			while names.size() > 1 and font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x > room:
 				names.resize(names.size() - 1)
 				label = ", ".join(names) + "  +%d" % (members.size() - names.size())
-			draw_string(font, Vector2(cx - span * 0.5 + 18, y + 34), label, HORIZONTAL_ALIGNMENT_LEFT, room, 13, INK * Color(1, 1, 1, 0.88))
-			CellOutzType.draw_text(self, Vector2(cx + span * 0.5 - 18 - down_width, y + 27), downline, 10.0, SPORE * Color(1, 1, 1, 0.8), 0.9)
+			# The tier's lead member gets a turning head at the left edge of the
+			# row. Greg's ask: the people in the hierarchy should be present as
+			# objects, not as text in a table.
+			var lead: Dictionary = members[0]
+			var icon_size := minf(row_height - 12.0, 48.0)
+			var has_icon := _draw_icon(index, str(lead.id), Rect2(Vector2(cx - span * 0.5 + 16, y + 4), Vector2(icon_size, icon_size)))
+			var text_x := cx - span * 0.5 + (18.0 + icon_size + 10.0 if has_icon else 18.0)
+			draw_string(font, Vector2(text_x, y + 40), label, HORIZONTAL_ALIGNMENT_LEFT, room - icon_size - 10.0, 13, INK * Color(1, 1, 1, 0.88))
+			CellOutzType.draw_text(self, Vector2(cx + span * 0.5 - 18 - down_width, y + 30), downline, 10.0, SPORE * Color(1, 1, 1, 0.8), 0.9)
 
 	var fy := top + float(tiers.size()) * row_height + 12.0
 	if fy < rect.position.y + rect.size.y - 16.0:
@@ -565,6 +646,7 @@ func _draw_wire(rect: Rect2) -> void:
 				badge + Vector2(0, -9), badge + Vector2(9, 0), badge + Vector2(0, 9), badge + Vector2(-9, 0),
 			]), TEAL * Color(1, 1, 1, 0.85))
 			draw_string(font, badge + Vector2(-3, 4), "V", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.05, 0.05, 0.05))
+		_draw_icon(0, str(entry.id), Rect2(Vector2(rect.position.x + split - 116, rect.position.y + 36), Vector2(92, 92)))
 		CellOutzType.draw_text(self, rect.position + Vector2(0, 52), "REACH", 9.0, INK * Color(1, 1, 1, 0.45), 1.0)
 		CellOutzType.draw_text(self, rect.position + Vector2(0, 66), "%06d" % int(account.get("reach", 0)), 20.0, COPPER, 1.0)
 		CellOutzType.draw_text(self, rect.position + Vector2(146, 52), "TIER", 9.0, INK * Color(1, 1, 1, 0.45), 1.0)
@@ -673,9 +755,23 @@ func _draw_footer(plate: Rect2) -> void:
 	var font := ThemeDB.fallback_font
 	var y := plate.position.y + plate.size.y - 26.0
 	draw_line(Vector2(plate.position.x + 22, y - 14), Vector2(plate.position.x + plate.size.x - 22, y - 14), INK * Color(1, 1, 1, 0.14), 1.0)
-	draw_string(font, Vector2(plate.position.x + 24, y), "←/→ PAGE    ↑/↓ SELECT    WHEEL SCROLL    I CLOSE", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK * Color(1, 1, 1, 0.55))
+	draw_string(font, Vector2(plate.position.x + 24, y), "←/→ PAGE    ↑/↓ SELECT    WHEEL SCROLL    X X-RAY    I CLOSE", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK * Color(1, 1, 1, 0.55))
 	var note := "THIS REGISTRY IS INCOMPLETE AND PARTS OF IT ARE WRONG."
 	draw_string(font, Vector2(plate.position.x + 24, y), note, HORIZONTAL_ALIGNMENT_RIGHT, plate.size.x - 48, 10, COPPER * Color(1, 1, 1, 0.5))
+
+
+## The sweep that covers a page change. A salvaged screen redrawing itself does
+## not cut cleanly, it rolls - so the incoming page arrives behind a bar of
+## brightness travelling in the direction you asked it to go.
+func _draw_page_wipe(panel: Rect2, eased: float) -> void:
+	var x := panel.position.x + panel.size.x * eased if page_direction > 0.0 else panel.position.x + panel.size.x * (1.0 - eased)
+	var fade := (1.0 - eased) * 0.5
+	draw_line(Vector2(x, panel.position.y - 14), Vector2(x, panel.position.y + panel.size.y), COPPER * Color(1, 1, 1, 0.55 + fade), 2.0)
+	var band := 26.0 * page_direction
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(x, panel.position.y - 14), Vector2(x - band, panel.position.y - 14),
+		Vector2(x - band, panel.position.y + panel.size.y), Vector2(x, panel.position.y + panel.size.y),
+	]), INK * Color(1, 1, 1, fade * 0.28))
 
 
 ## Scanlines, a fixed dead-pixel pattern and a slow horizontal tear. Cheap, and

@@ -110,10 +110,15 @@ func _ready() -> void:
 	var index: Control = WORLD_INDEX.new()
 	layer.add_child(index)
 	index.open()
-	var pages := ["file", "pyramid", "wire"]
+	# The fourth pass is the pyramid again with the X-ray on, because the skull
+	# state is the half of the icon that cannot be reviewed from the flesh shot.
+	var pages := ["file", "pyramid", "wire", "pyramid_xray"]
 	for page_index in pages.size():
-		index.page = page_index
-		index.rail_index = [3, 0, 0][page_index]
+		index.page = [0, 1, 2, 1][page_index]
+		index.rail_index = [3, 0, 0, 0][page_index]
+		index.xray = page_index == 3
+		for icon in index._icons:
+			icon.set_xray(index.xray)
 		index._rebuild_rail()
 		index.queue_redraw()
 		for _settle in 6:
