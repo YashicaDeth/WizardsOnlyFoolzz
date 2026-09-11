@@ -204,8 +204,8 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B6.2** Sever from a directional blow crossing a limb threshold *mid-fight*~~
 - [x] ~~**B6.3** The fight continues with them still in it, fighting worse~~
 - [x] ~~**B6.4** The severed limb is a chunk: pick it up, carry it, sell it, hit someone with it~~
-- [ ] **B6.5** Reciprocity — the player is dismembered and keeps playing
-- [ ] **B6.6** Stump behaviour: bleed rate, one-armed movement and attacks
+- [x] ~~**B6.5** Reciprocity — the player is dismembered and keeps playing~~
+- [x] ~~**B6.6** Stump behaviour: bleed rate, one-armed movement and attacks~~
 
 ---
 

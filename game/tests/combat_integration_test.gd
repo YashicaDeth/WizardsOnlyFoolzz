@@ -161,5 +161,35 @@ func _ready() -> void:
 	hunt._update_extraction(float(hunt.extraction_session.required) + 0.1, true)
 	check(str((hunt.handheld.carry.items.back() as Dictionary).implant) == "ceramic sternum", "the corpse gives up its hardware")
 
+	# B6.5/B6.6. The player is a body on the same rig as everyone else, so what
+	# a lost limb does to an NPC it has to do to the player too.
+	hunt.player_rig.anatomy.bleed_rate = 0.0
+	# The player has taken real hits by this point in the scenario, so the
+	# baseline is whatever they have left rather than a pristine body.
+	var healthy_swing: float = hunt._player_swing_scale()
+	var healthy_speed: float = hunt._player_speed_scale()
+	var pristine := BaselineHuman.new()
+	hunt.add_child(pristine)
+	pristine.build("scale_reference", {})
+	await get_tree().physics_frame
+	check(is_equal_approx(pristine.anatomy.combat_ratio(), 1.0) and is_equal_approx(pristine.anatomy.mobility_ratio(), 1.0), "an unhurt body swings and runs at full")
+	hunt._equip_carried_limb()
+	var held_before: int = hunt.carried_limb_index
+	var player_sever: Dictionary = hunt.player_rig.hit("left_arm", 60.0, 30.0, "cut", "", Vector3.LEFT)
+	if not bool(player_sever.get("severed", false)):
+		player_sever = hunt.player_rig.hit("left_arm", 60.0, 30.0, "cut", "", Vector3.LEFT)
+	check(bool(player_sever.get("severed", false)) or hunt.player_rig.severed.has("left_arm"), "the player's own arm comes off on the same rule as everyone else's")
+	check(not hunt.player_rig.anatomy.dead, "and losing it does not kill them")
+	check(hunt.player_rig.anatomy.bleed_rate > 0.0, "a fresh stump bleeds (%0.2f mL/s)" % hunt.player_rig.anatomy.bleed_rate)
+	hunt._player_lost_limb("left_arm")
+	check(hunt._player_swing_scale() < healthy_swing, "a one-armed player hits softer")
+	check(WorldHistory.recent_events(10).any(func(event): return str(event.get("type", "")) == "player_limb_severed"), "the player's maiming enters world history like anyone else's")
+	if held_before >= 0:
+		check(hunt.carried_limb_index == -1, "the arm that was holding something drops it")
+	hunt.player_rig.hit("left_leg", 90.0, 30.0, "cut", "", Vector3.LEFT)
+	hunt.player_rig.hit("left_leg", 90.0, 30.0, "cut", "", Vector3.LEFT)
+	check(hunt._player_speed_scale() < healthy_speed, "and a wrecked leg slows the run")
+	check(hunt._player_speed_scale() >= 0.5, "but never below a speed you could still retreat at")
+
 	print("COMBAT_INTEGRATION_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

@@ -2,6 +2,18 @@
 
 ## 2026 09 11
 
+- **B6 closed: the player is a body too.** Losing a limb now works the same way
+  in both directions. A severed zone opens a vessel — `STUMP_BLEED` adds the
+  zone's own bleed rate 26× on top of whatever the blow itself did — so an
+  untreated stump is a clock measured in tens of seconds for anyone, the player
+  included. The player's swing and run are scaled off the same
+  `combat_ratio()` and `mobility_ratio()` the NPC AI has been using since B6.3,
+  floored at 55% so a maimed player can still retreat from the thing that
+  maimed them. Losing the arm that was holding something drops it, and the
+  maiming enters world history exactly the way an NPC's does. Until now the
+  player was the one body in the world that fought and ran precisely as well
+  with one leg as with two.
+
 - **You can rob a body now, and it costs something.** `systems/extraction.gd`
   turns robbing into a dig rather than a loot roll: hardware sits at
   `GoreChunks.Layer.CYBERNETIC` and an organ one layer above it, so reaching

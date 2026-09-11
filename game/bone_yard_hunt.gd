@@ -4,6 +4,10 @@ extends Node3D
 # Limbo is the realm; Ashbloom is this first irradiated region.
 const PLAYER_SPEED := 7.0
 const SPRINT_SPEED := 12.0
+## Worst case a wrecked body can move or swing at, as a share of healthy. The
+## soulslike register wants injury to hurt; it does not want a player who has
+## lost a leg to be unable to disengage from the thing that took it.
+const PLAYER_INJURY_FLOOR := 0.55
 const HUNT_ID := "mara_voss"
 const FRIEND_ID := "nix_arden"
 const HUNT_LOCATION := "ashbloom_bone_yard"
@@ -194,6 +198,48 @@ func _wound_player(from: Vector3, damage: float, damage_type := "cut") -> void:
 		"organ": str((result.get("organ", {}) as Dictionary).get("zone", "")),
 		"location": HUNT_LOCATION,
 	})
+	if bool(result.get("severed", false)):
+		_player_lost_limb(str(result.get("zone", "")))
+
+
+## How much of a healthy swing and a healthy run the player has left. Both read
+## the same ratios the NPC AI already uses, so "the fight continues with them
+## still in it, fighting worse" means the same thing whichever side of it you
+## are on.
+func _player_swing_scale() -> float:
+	return lerpf(PLAYER_INJURY_FLOOR, 1.0, player_rig.anatomy.combat_ratio())
+
+
+func _player_speed_scale() -> float:
+	return lerpf(PLAYER_INJURY_FLOOR, 1.0, player_rig.anatomy.mobility_ratio())
+
+
+## B6.5. Losing a limb is not a death and not a cutscene. The player keeps
+## playing, worse: the stump bleeds on the same clock everyone else's does, the
+## swing and the run are already scaled off the rig, and an arm that is gone
+## cannot hold what it was holding.
+func _player_lost_limb(zone: String) -> void:
+	if zone == "":
+		return
+	if zone.ends_with("_arm"):
+		# The hand that was carrying it is on the floor.
+		if carried_limb_index >= 0:
+			var dropped: Dictionary = handheld.carry.drop(carried_limb_index)
+			_clear_carried_limb_model()
+			WorldHistory.record_event("player_dropped_carried_part", {"item": dropped, "cause": "lost the arm holding it"})
+		arsenal.select_slot(0)
+	WorldHistory.update_subject("player", {
+		"anatomy_state": player_rig.snapshot(),
+		"memory": "Lost a %s in the Bone Yard and kept moving." % zone.replace("_", " "),
+	}, "player_maimed")
+	WorldHistory.record_event("player_limb_severed", {
+		"zone": zone,
+		"location": HUNT_LOCATION,
+		"combat_ratio": snappedf(player_rig.anatomy.combat_ratio(), 0.01),
+		"mobility_ratio": snappedf(player_rig.anatomy.mobility_ratio(), 0.01),
+		"alive": not player_rig.anatomy.dead,
+	})
+	prompt.text = "YOUR %s IS GONE — BLEEDING HARD, STILL STANDING" % zone.replace("_", " ").to_upper()
 
 
 func _register_people() -> void:
@@ -367,6 +413,12 @@ func _update_player(delta: float) -> void:
 	crouching = Input.is_action_pressed("crouch") and dodge_remaining <= 0.0
 	var sprinting := Input.is_action_pressed("sprint") and not crouching and stamina > 1.0 and move.length() > 0.0
 	var speed := 3.4 if crouching else (SPRINT_SPEED if sprinting else PLAYER_SPEED)
+	# B6.5. The rig has been recording where the player is hurt since it was
+	# built and nothing ever read it back, so the player was the one body in the
+	# world that fought and ran exactly as well with one leg as with two. Floored
+	# rather than scaled straight off `mobility_ratio`, because a game you cannot
+	# retreat from is a game that is over.
+	speed *= _player_speed_scale()
 	player_capsule.height = move_toward(player_capsule.height, 1.2 if crouching else 1.8, delta * 4.0)
 	player_collider.position.y = (player_capsule.height - 1.8) * 0.5
 	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0)
@@ -402,7 +454,13 @@ func _attack(heavy := false) -> void:
 			arsenal.ammo[arsenal.current_id] = rounds
 		return
 	stamina -= cost
-	attack_cooldown = float(report.get("cooldown", arsenal.cooldown))
+	# B6.5/B6.6. The same `combat_ratio` that already slows a one-armed NPC now
+	# slows the player's own swing and takes the weight out of it. Reciprocity is
+	# the whole point of B6: a fight that continues after a limb comes off has to
+	# continue that way in both directions.
+	var swing := _player_swing_scale()
+	report["damage"] = float(report.get("damage", 0.0)) * swing
+	attack_cooldown = float(report.get("cooldown", arsenal.cooldown)) / maxf(0.35, swing)
 	pending_attack = report
 	body_motion.trigger_attack(maxf(float(report.get("windup", 0.0)), attack_cooldown * 0.62), str(report.kind))
 	if str(report.weapon) == "severed_limb":

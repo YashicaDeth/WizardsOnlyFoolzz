@@ -27,6 +27,10 @@ const LIMBS := ["left_arm", "right_arm", "left_leg", "right_leg"]
 const SEVERING_DAMAGE := ["cut", "shear", "ballistic"]
 const SEVER_THRESHOLD_RATIO := 0.85
 const SEVER_HEALTH_RATIO := 0.25
+## Multiplier on a zone's own bleed rate when it is taken off entirely, rather
+## than merely destroyed. Tuned so an untreated stump is a clock measured in
+## tens of seconds, not minutes.
+const STUMP_BLEED := 26.0
 
 ## Every loose spelling that existed at a call site, mapped onto the canonical
 ## zone. Kept so old saves and old events stay readable rather than resolving to
@@ -382,6 +386,11 @@ func _sever_zone(zone: String, direction: Vector3, result: Dictionary) -> void:
 	result["disabled"] = true
 	result["severed"] = true
 	result["sever_direction"] = direction
+	# B6.6. An open stump is the fastest way to bleed out in this game. The blow
+	# that took the limb has already added its own wound bleed; this is the
+	# vessel that is now simply open, and it is why losing an arm and walking it
+	# off is not a survivable plan for anyone, the player included.
+	anatomy.bleed_rate += float(AnatomyComponent.DEFAULT_ZONES[zone].bleed) * STUMP_BLEED
 	if gore:
 		_throw_limb(zone, direction)
 		_add_stump(zone)
