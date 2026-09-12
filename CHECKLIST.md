@@ -689,7 +689,17 @@ and start being an object — and leaving your body should cost something.
 - [x] **M1.3** Both conditions read out of WorldHistory, neither stored
 - [x] **M1.4** Pressing the key early answers in the game's voice, never silently
 - [x] ~~**M1.5** The unlock itself is an event the player feels, not a quiet permission change~~ (found while building this: the unlock counter read a `"subject"` key no `npc_resolution` event has ever written — every writer uses `"subject_id"` — so M1.2's boss condition could never actually count a kill. Fixed alongside the felt event, since a stop+kick+line landing on a check that could never pass would have been silent forever.)
-- [ ] **M1.6** A first-person HUD that is diegetic — nothing floating in the corner
+- [~] **M1.6** A first-person HUD that is diegetic — nothing floating in the corner.
+      The vessel/breath vitals were their own plate in the top-left corner —
+      styled well, but structurally a second app widget with no relationship
+      to anything else in view, which is the literal complaint. Moved to hang
+      off the weapon well instead, with a sagging strap running from the vitals
+      crown into the torn mouth, so it now reads as a gauge built into the
+      gear in your hand rather than a corner readout — captured in
+      `game/captures/m1_6_field_hud_vitals.png`. The location crest (top
+      centre) and hunt thread (top right) still float independent of anything
+      in frame; both are world/rival broadcast rather than the player's own
+      body, so lower priority, but they are the honest remainder here.
 
 ### M2 — In the car
 **Deferred this session.** There is currently no first/third-person split in

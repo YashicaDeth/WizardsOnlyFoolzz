@@ -47,19 +47,35 @@ func _draw() -> void:
 		if menu_mode not in ["MAP", "TREE", "ARTWORK"]:
 			_draw_full_archive_frame()
 		return
-	_draw_regal_vitals()
 	_draw_location_crest()
 	_draw_hunt_thread()
 	_draw_weapon()
+	_draw_regal_vitals()
 	_draw_lock_reticle()
 	_draw_controls()
 
 
+## M1.6. This used to be its own plate in the top-left corner — a second
+## instrument with no relationship to anything else on screen, the exact
+## "floating in the corner" the design rule names. It now hangs off the same
+## rig as the weapon well: a strap runs from the vessel crown into the torn
+## mouth, so the vitals read as a gauge built into the gear in your hand
+## rather than an app widget checking in on you from outside the world.
 func _draw_regal_vitals() -> void:
-	var origin := Vector2(42, 44)
+	var mouth_center := Vector2(size.x - 126.0, size.y - 94.0)
+	var origin := mouth_center + Vector2(-540, -56)
 	var font := ThemeDB.fallback_font
 	var health_ratio := clampf(health / 100.0, 0, 1)
 	var stamina_ratio := clampf(stamina / 100.0, 0, 1)
+	# The strap: a worn cable, not a UI connector line — it sags and stitches
+	# the same way the mouth's own edge does.
+	var strap_start := origin + Vector2(58, 40)
+	var strap_end := mouth_center + Vector2(-112, -8)
+	var sag := 14 + sin(elapsed * 1.1) * 3
+	var strap := PackedVector2Array([strap_start, strap_start.lerp(strap_end, 0.5) + Vector2(0, sag), strap_end])
+	draw_polyline(strap, BONE * Color(1, 1, 1, 0.16), 3)
+	for knot in 3:
+		draw_circle(strap_start.lerp(strap_end, 0.22 + knot * 0.28) + Vector2(0, sag * sin(PI * (0.22 + knot * 0.28))), 2, COPPER * Color(1, 1, 1, 0.4))
 	# Crown and mirrored thorns make the meters read as an artefact, not app UI.
 	draw_arc(origin + Vector2(30, 31), 29, PI * 0.2, PI * 1.8, 30, BONE * Color(1, 1, 1, 0.6), 2)
 	for side in [-1.0, 1.0]:
