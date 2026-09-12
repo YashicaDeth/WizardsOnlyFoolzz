@@ -249,5 +249,42 @@ func _ready() -> void:
 			shot, WorldHistory.chaos_magick(), hunt.air.severity(), hunt.air.amount_ratio,
 		])
 
+	# A10.1 / A10.15. Framed by finding a bill rather than by guessing where one
+	# is: one building in three carries one, and the generator decides which.
+	var posted: Node3D = null
+	for building: Node3D in hunt.generated_world.generated_buildings:
+		if building.get_node_or_null("PostedBill") != null:
+			posted = building
+			break
+	if posted == null:
+		print("NO_BILLS")
+	else:
+		var bill := posted.get_node("PostedBill") as Node3D
+		var face := bill.global_position
+		WorldClock.set_hour(12.0)
+		hunt._update_day_night()
+		for _tick in 6:
+			await get_tree().physics_frame
+		# The camera is placed directly rather than by walking the player there.
+		# Teleporting a physics body into a district drops it, pushes it out of
+		# whatever it landed inside and leaves it metres from where it was put,
+		# so two attempts at this shot photographed the skyline instead. Nothing
+		# else in the harness needs the player moved for it, and this is the one
+		# frame that is about looking at a specific object.
+		# Paused before the camera is placed, because `_physics_process` calls
+		# `_update_camera()` sixty times a second and will have put the camera
+		# back where the player is standing before the frame is drawn.
+		get_tree().paused = true
+		hunt.camera.global_position = face + Vector3(0.75, 0.45, 3.1)
+		hunt.camera.look_at(face, Vector3.UP)
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/posted_bill.png" % out_dir)
+		get_tree().paused = false
+		var billed := 0
+		for building: Node3D in hunt.generated_world.generated_buildings:
+			if building.get_node_or_null("PostedBill") != null:
+				billed += 1
+		print("BILLS %d of %d buildings" % [billed, hunt.generated_world.generated_buildings.size()])
+
 	print("CAPTURE_DONE")
 	get_tree().quit()

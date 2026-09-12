@@ -101,6 +101,7 @@ func _build_enterable_shell(at: Vector3, dimensions: Vector3, color: Color, sign
 		_add_wall(building, Vector3(0, storey, half_z + 0.06), Vector3(dimensions.x * 0.96, 0.14, 0.12), color.darkened(0.36))
 		_add_wall(building, Vector3(half_x + 0.06, storey, 0), Vector3(0.12, 0.14, dimensions.z * 0.96), color.darkened(0.36))
 		storey += STOREY
+	_post_bill(building, dimensions, generated_buildings.size())
 	Silhouette.dress(building, dimensions, generated_buildings.size(), Callable(self, "_greeble_material"))
 	Silhouette.settle(building, generated_buildings.size())
 	var sign := Label3D.new()
@@ -152,3 +153,48 @@ func _material(color: Color, emission: float, kind := "rust") -> StandardMateria
 		material.emission = color
 		material.emission_energy_multiplier = emission
 	return material
+
+
+## A10.1 / A10.15. Greg's own collaged art, in the world as texture rather than
+## only on the index plates and the Wire, and posted rather than tiled.
+##
+## "With intent" is the part that decides how this is built. A sheet fed through
+## `_apply_grain()` as a triplanar detail layer would repeat across every wall
+## in the region, which turns a collage into wallpaper and says nothing. A bill
+## nailed up beside a door says somebody put it there — so it is a quad, at
+## reading height, on the face with the entrance in it, on one building in
+## three. The two thirds without one are what make the third mean anything.
+##
+## Absent art changes nothing, per `art_set.gd`: a worktree with no derived
+## sheets builds the same region it always did.
+func _post_bill(building: Node3D, dimensions: Vector3, seed_value: int) -> void:
+	if absi(seed_value) % 3 != 0:
+		return
+	var sheet: Texture2D = ArtSet.pick("plate", seed_value)
+	if sheet == null:
+		return
+	var bill := MeshInstance3D.new()
+	bill.name = "PostedBill"
+	var quad := QuadMesh.new()
+	# Roughly A1, the size a real posted bill is, and never scaled to the wall:
+	# a poster that grows with the building it is on is a decal, not an object.
+	quad.size = Vector2(0.62, 0.86)
+	var paper := StandardMaterial3D.new()
+	paper.albedo_texture = sheet
+	paper.roughness = 0.95
+	paper.metallic = 0.0
+	# Weathered down hard. This has been up a while, in the air A9 just filled
+	# with contamination, and a clean print would read as the newest thing in
+	# the region.
+	paper.albedo_color = Color(0.58, 0.55, 0.48)
+	paper.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	quad.material = paper
+	bill.mesh = quad
+	# Beside the door on the entrance face, at the height somebody would have
+	# reached to put it there.
+	var side := 1.0 if seed_value % 2 == 0 else -1.0
+	bill.position = Vector3(side * minf(dimensions.x * 0.3, 2.2), 1.62, dimensions.z * 0.5 + 0.26)
+	# Off square, because nobody posting a bill on a wall uses a spirit level.
+	bill.rotation.z = deg_to_rad(float((seed_value * 13) % 9) - 4.0)
+	bill.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	building.add_child(bill)

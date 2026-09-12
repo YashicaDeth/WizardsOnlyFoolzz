@@ -279,8 +279,8 @@ v8 made the player luminous and the air between them and everything else is stil
 
 ### A v10 — the tenth pass
 Nine passes of procedural surface, and none of it is Greg's own work. AP3.3: *"collaging my old and current art to use as textures intelligently"*.
-- [ ] **A10.1** `v10` Real collaged art from the collections folder, used as texture with intent
-- [ ] **A10.2** `v10` It sits inside the procedural system rather than replacing it
+- [x] **A10.1** `v10` Real collaged art from the collections folder, used as texture with intent — the pipeline has been laying down 34 derived sheets in `game/art/derived/` for three kinds, and until now they reached the index plates, the Wire and flesh detail: everywhere except the world the player walks through. They are posted bills now, on the district buildings. *With intent* is what decided the construction: a sheet fed through `_apply_grain()` as a triplanar detail layer would repeat across every wall in the region, which turns a collage into wallpaper and says nothing — so it is a quad at reading height, beside the door, on one building in three, sized like an actual bill rather than scaled to the wall (a poster that grows with its building is a decal, not an object), weathered down hard because it has been up a while in the air A9 just filled, and hung off square because nobody posting a bill uses a spirit level. The two thirds of buildings without one are what make the third mean anything. Verified at noon on a bill the harness found rather than one it assumed: 20 of 60 buildings carry one (`captures/a10_1_v10_posted_bill.png`)
+- [x] **A10.2** `v10` It sits inside the procedural system rather than replacing it — the bill is an object added to a building the generator built, not a texture that displaces what the material system produces: the wall underneath keeps its procedural contamination, its roughness and its emission from A5, and the bill sits on it the way a real one sits on a real wall. `art_set.gd`'s rule holds all the way through — a worktree with no derived sheets, or a pipeline nobody has run, generates exactly the region it always did, because `ArtSet.pick()` returning null means no bill rather than a missing texture
 
 - [ ] **A10.3** `v10` The hour changes every material, not just the sky
 - [ ] **A10.4** `v10` Nothing in the world is lit by an ambient term nobody chose
@@ -294,7 +294,7 @@ Nine passes of procedural surface, and none of it is Greg's own work. AP3.3: *"c
 - [ ] **A10.12** `v10` The look survives the quantum restart looking like itself
 - [ ] **A10.13** `v10` Every effect is one shader with dials rather than a new shader
 - [ ] **A10.14** `v10` Performance is part of the look: nothing here costs more than it earns
-- [ ] **A10.15** `v10` Greg's own collaged art is in the world as texture, used with intent
+- [x] **A10.15** `v10` Greg's own collaged art is in the world as texture, used with intent — the same requirement as A10.1, stated twice at opposite ends of the v10 list, and answered by the same build: posted bills on the district buildings. Left as its own line rather than folded into A10.1, since the version convention says a version is never deleted
 
 ## B — Make the body the centrepiece
 
