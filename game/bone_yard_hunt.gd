@@ -183,6 +183,21 @@ var enemy_rig: BaselineHuman
 var grapple_target := ""
 var grapple_advantage := 0.0
 var grapple_clock := 0.0
+## O3.3. Which limb the hold actually has. Set once, at the moment you take
+## hold, to whichever arm or leg is already worst off — the clinch had no
+## opinion about this at all before, so grabbing somebody was identical
+## whether their arm was fine or already broken. Leaning on the limb you
+## actually grabbed now saps their resistance harder than the generic
+## combat/mobility ratios already did, and costs that limb condition of its
+## own while you press it.
+var grapple_zone := ""
+const GRAPPLE_PRESSURE_INTERVAL := 0.4
+var grapple_pressure_clock := 0.0
+## Test hook: set true/false to force the press state `_update_grapple` reads,
+## since it is the one clinch input read as a raw button rather than an
+## action and there is no display server to raise a real one against in a
+## headless run. Leave null for real input to decide it, as normal play does.
+var grapple_pushing_override: Variant = null
 var friend_rig: BaselineHuman
 var lock_target := ""
 var lock_screen := Vector2(-1, -1)
@@ -2106,8 +2121,35 @@ func _start_grapple() -> void:
 	grapple_target = str(actor.subject_id)
 	grapple_advantage = 0.0
 	grapple_clock = 0.0
+	grapple_pressure_clock = 0.0
+	grapple_zone = _worst_limb(actor.anatomy as AnatomyComponent)
 	strike_windup = -1.0
-	WorldHistory.record_event("grapple_started", {"subject_id": grapple_target, "location": HUNT_LOCATION})
+	WorldHistory.record_event("grapple_started", {"subject_id": grapple_target, "zone": grapple_zone, "location": HUNT_LOCATION})
+
+
+## O3.3. Whichever limb is worst off right now, out of the four you could
+## plausibly grab somebody by. Ties resolve arm before leg, left before
+## right — an arbitrary but stable order, so the same body picks the same
+## limb twice rather than flickering between equally-hurt ones.
+func _worst_limb(anatomy: AnatomyComponent) -> String:
+	var worst := "right_arm"
+	var worst_ratio := 2.0
+	for zone_id in ["right_arm", "left_arm", "right_leg", "left_leg"]:
+		var ratio := _zone_health_ratio(anatomy, zone_id)
+		if ratio < worst_ratio:
+			worst_ratio = ratio
+			worst = zone_id
+	return worst
+
+
+## What fraction of max health one specific zone has left. Used both to pick
+## which limb a fresh grapple grabs (`_worst_limb`) and to weigh how much that
+## grip is worth once the hold is already running.
+func _zone_health_ratio(anatomy: AnatomyComponent, zone_id: String) -> float:
+	if anatomy == null or not AnatomyComponent.DEFAULT_ZONES.has(zone_id):
+		return 1.0
+	var max_health := float((AnatomyComponent.DEFAULT_ZONES[zone_id] as Dictionary).health)
+	return clampf(float((anatomy.zones.get(zone_id, {}) as Dictionary).get("health", max_health)) / maxf(1.0, max_health), 0.0, 1.0)
 
 
 ## O5.4. Somebody held in front of you is in the way of whatever is coming at
@@ -2203,19 +2245,37 @@ func _update_grapple(delta: float) -> void:
 		(node as CharacterBody3D).velocity = Vector3.ZERO
 	actor.attack_time = 0.0
 
-	var pushing := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_key_pressed(KEY_C)
+	# A real Input press cannot be raised headless, and this is the one clinch
+	# input read as a raw button rather than an action, so tests need a way in
+	# that does not depend on a display server existing.
+	var pushing: bool = grapple_pushing_override if grapple_pushing_override != null else (Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_key_pressed(KEY_C))
 	var player_force: float = player_rig.anatomy.combat_ratio() * (1.35 if pushing else 0.3)
-	var their_force: float = float(actor.anatomy.combat_ratio()) * (1.0 - float(actor.anatomy.pain) * 0.006)
+	# O3.3. combat_ratio() already softens their resistance for arm damage in
+	# general; this softens it further, specifically, for the one limb you
+	# actually have hold of. Grabbing somebody by the arm you already broke is
+	# not the same as grabbing them by the one that is fine.
+	var grip_zone_ratio := _zone_health_ratio(actor.anatomy as AnatomyComponent, grapple_zone)
+	var their_force: float = float(actor.anatomy.combat_ratio()) * (1.0 - float(actor.anatomy.pain) * 0.006) * lerpf(0.5, 1.0, grip_zone_ratio)
 	grapple_advantage = clampf(grapple_advantage + (player_force - their_force) * delta * 0.85, -1.0, 1.0)
 	stamina = maxf(0.0, stamina - (GRAPPLE_DRAIN if pushing else GRAPPLE_DRAIN * 0.35) * delta)
 	if stamina <= 0.0:
 		grapple_advantage -= delta * 0.9
 
+	# O3.3. Pressing the hold leans on the limb you actually grabbed — a real
+	# cost that lands on the same rig everything else damages, not a number
+	# only the clinch itself ever sees.
+	if pushing:
+		grapple_pressure_clock += delta
+		if grapple_pressure_clock >= GRAPPLE_PRESSURE_INTERVAL:
+			grapple_pressure_clock = 0.0
+			actor.rig.hit(grapple_zone, 3.0, 2.0, "blunt")
+
 	# F7.1. The hold is a negotiation you are winning, so it reports what it is
 	# currently worth rather than only how hard you are squeezing.
 	var offer := _clinch_options(actor)
-	prompt.text = "CLINCH / %s   %+d   [LMB] PRESS  [WASD] WALK THEM  [V] TALK  [X] LEAN  [H] TAKE  [SPACE] BREAK" % [
-		str(actor.display_name).to_upper(), roundi(grapple_advantage * 100.0),
+	var grip_note := " BY THE %s" % grapple_zone.replace("_", " ").to_upper() if grip_zone_ratio < 0.6 else ""
+	prompt.text = "CLINCH / %s%s   %+d   [LMB] PRESS  [WASD] WALK THEM  [V] TALK  [X] LEAN  [H] TAKE  [SPACE] BREAK" % [
+		str(actor.display_name).to_upper(), grip_note, roundi(grapple_advantage * 100.0),
 	]
 	if bool(offer.surrender):
 		prompt.text = "%s IS GIVING UP — [V] TAKE THE SURRENDER" % str(actor.display_name).to_upper()

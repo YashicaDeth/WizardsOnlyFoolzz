@@ -1022,7 +1022,22 @@ what that is rather than fixing another symptom.
       `wounds.has()`/`.append()` on a plain string were throwing silently in
       the console rather than failing loud enough to notice without a test.
 - [x] **O3.2** A damaged limb changes what that person can do, and now shows it — arms hang, legs trail, the body leans off the bad side
-- [ ] **O3.3** Grappling connects to it — hold, force, rob, recruit
+- [x] ~~**O3.3** Grappling connects to it — hold, force, rob, recruit~~ Rob and
+      recruit already did (F7.2 lets you rob somebody you are holding; F7's
+      persuade/threaten already read pain and fading consciousness). Hold and
+      force did not: the clinch's tug-of-war already softened resistance for
+      arm damage in general (`combat_ratio()`), but had no idea *which* limb
+      it actually had — grabbing an untouched arm and one already broken was
+      identical. `_start_grapple` now grabs whichever limb is worst off
+      (`grapple_zone`), that specific limb's own condition weakens their
+      resistance on top of the general figure, and pressing the hold (LMB)
+      now actually damages the limb being leveraged rather than only the
+      clinch's own private number. The prompt names the limb once it is
+      hurt enough to matter. Verified: `tests/grapple_zone_test.gd` (4
+      checks — the hold picks the worst limb, leverage through a broken one
+      measurably outpaces a whole one, and pressing it costs real zone
+      health), plus the existing grapple/clinch suite and opening/combat
+      integration tests all still pass.
 - [ ] **O3.4** Half Sword's lesson without Half Sword's code: the body is the weapon system
 
 ### O5 — The brawl
