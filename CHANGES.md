@@ -2,12 +2,29 @@
 
 The build record for **Wizards Only Fools**, newest first. Every entry is a real change with the reason it was made; the tag says which part of the game it touched.
 
-**245 changes** · **43,220 lines of game code** · **415 of 812 planned pieces built** across 46 areas
+**254 changes** · **44,670 lines of game code** · **429 of 1583 planned pieces built** across 46 areas
 
 ---
 
 ## 2026-09-12
 
+- **AQ: the godhead starts watching from the first hour**
+  "whilst in the game when you get taunted by it slowly builds up visibility and what it does and says". That sentence decides the whole design: it is not revealed, it accumulates. Which means this is not an endgame system that switches on late - it is present from the first hour, mostly as something you cannot quite see, getting clearer for reasons that are always your own fault.
+- **the motherboard - a seal burnt or bound into real copper** `factions and standing`
+  Greg: 'burn and bind seals should have their own animation based on real life, where the person's computer motherboard appears in 3D and the seals burn into the microscopic copper stuff as sigils on the board'. A printed circuit board is already a sigil, mass-produced by the million.
+- **AS4.2: chaos-magick is a level now, not a checklist line**
+  storm_weather.gd is next and needs a real cause to read rather than inventing its own ambience dial. WorldHistory.chaos_magick() is that cause: a completed ritual bumps it, and with nothing feeding it, it decays with a 180-in-world-minute half-life back toward zero. Mirrors the existing karma table's shape (a lookup of event type to weight) on purpose, so a storm becomes a readout of things that actually happened rather than a number nobody can trace.
+- **Another one 002**
+- **a blow is measured by how far the head travelled** `the body as weapon`
+  Wiring the arm turned up a tuning note - commitment() saturated at 1.0 on anything a real mouse does - and chasing it found two design faults underneath, which are worth recording because the failures are the design question.
+- **Agent D takes the room and the cloud** `look and feel`
+  Greg has a GPT-5 model joining for a stretch. AH is the right lane for it: the largest unbuilt idea in the project, self-contained, creating new files and only reading existing ones, so it cannot collide with B's shaders or C's charts.
+- **the arm is actually attached to the game now** `the body as weapon`
+  limb_momentum.gd passed ten checks this morning and was wired to nothing, which is the exact failure this project keeps repeating - M2 built a whole cab that only its own screenshot test ever instantiated. There is no Agent A, so I took it.
+- **fifteen on every letter, and one file to split them from** `vehicles`
+  Greg: "make v10 and a final rework file which has like 10 or 15+ high indetail features for the final version before the nodes get connected with my code... need to make every single letter from top to bottom have 15 on the final V".
+- **The ladder goes to v10, populated from the rework**
+  Greg: "do a rework up to v10 NOW with all the new mechanics i wrote in that note".
 - **gore chunks actually freeze during hitstop, verified and recorded** `combat feel`
   The code (GoreChunks.hold()/release(), called from bone_yard_hunt.gd's _physics_process whenever impact_feel.holding() is true) already closed this - a real freeze/resume scheme using RigidBody3D.freeze rather than a delta multiply, exactly what O2.7 v3's own explanation said gore would need - but CHECKLIST.md still had it unchecked, with O2.7 v3's own explanation paragraph orphaned under O2.8's line instead of its own, incorrectly implying gore was…
 - **The rework: the game finally knows what it is about**

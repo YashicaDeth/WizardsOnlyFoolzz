@@ -10,11 +10,11 @@ edit.** Change `CHECKLIST.md` and regenerate with
 | | |
 | --- | --- |
 | Segments | **1574** |
-| Built | **415** |
-| Open | **1159** |
+| Built | **429** |
+| Open | **1145** |
 | Sections | **46** |
 
-Version spread: **v1** 751, **v2** 48, **v3** 15, **v4** 15, **v5** 14, **v6** 14, **v7** 14, **v8** 14, **v9** 14, **v10** 675
+Version spread: **v1** 745, **v2** 54, **v3** 15, **v4** 15, **v5** 14, **v6** 14, **v7** 14, **v8** 14, **v9** 14, **v10** 675
 
 ---
 
@@ -325,12 +325,12 @@ Version spread: **v1** 751, **v2** 48, **v3** 15, **v4** 15, **v5** 14, **v6** 1
 - [x] `E2.3` Original seals for what this world grew on its own — ORIGINAL, six seals each tied to a real faction or AscentEntities entry already built (Choir of Marrow ×2, Soft Rot, CellOutz, and the two Ascent entities) rather than floating free of anything. Covered by tests/goetic_seals_test.gd (23 checks)
 - [x] `E2.4` Seals animate, corrupt and burn Three more celloutz_type.gd
 - [x] `E1.3` Never a good/evil slider — read through the Tree view
-- [x] `E2.2` The 72 Goetic seals as data
-- [ ] `E2.3` Original seals for what this world grew on its own
-- [ ] `E2.4` Seals animate, corrupt, burn and bind — Greg: "burn and bind seals should have their own animation based on real life, where the person's computer motherboard appears in 3D and the seals burn into the microscopic copper stuff as sigils on the board, like a full animation for it when a seal is burnt". The right image for this game's whole thesis: a printed circuit board is a sigil, drawn in copper, mass-produced. A burn traces itself into the copper and stays; a binding closes a loop on the board that was open. draw_seal_burning already exists in celloutz_type.gd and only ever ran in 2D — this is the 3D half
-- [ ] `E2.5` The board is a real board: traces, pads, silkscreen, a chip that reads as a chip
-- [ ] `E2.6` Burning is subtractive and binding is additive — one scars the copper, one completes a circuit
-- [ ] `E2.7` A bound seal keeps working while the board keeps power, and a burnt one is gone for the run
+- [x] `E2.2` `v2` The 72 Goetic seals as data Same item as above — see E2.2.
+- [x] `E2.3` `v2` Original seals for what this world grew on its own Same
+- [x] `E2.4` `v2` Seals animate, corrupt, burn and bind draw_seal_burning
+- [x] `E2.5` `v2` The board is a real board: traces, pads, silkscreen, a chip
+- [x] `E2.6` `v2` Burning is subtractive and binding is additive — one scars
+- [x] `E2.7` `v2` A bound seal keeps working while the board keeps power, and
 - [x] `E3.1` Ritual definitions: what must be done, what must be photographed — systems/ritual_app.gd's RITUALS: three rites (including Greg's own worked example, five gored heads), each keyed to a real seal from goetic_seals.gd and paying its reward through boons.gd — E2/E3/E4 as the one system RITUAL_AND_KARMA.md says they are, not three
 - [x] `E3.2` Verify the photograph against real anatomy — reuses the exact contents: [{severed, ruptured, dead}] shape wire_net.gd's publish_photograph() already verifies, rather than a second evidence system
 - [x] `E3.3` Rituals are playable, never a confirm button — attempt() takes no path to a reward without a photo argument that actually satisfies the requirement. Covered by tests/ritual_app_test.gd (13 checks)
@@ -1472,13 +1472,13 @@ Version spread: **v1** 751, **v2** 48, **v3** 15, **v4** 15, **v5** 14, **v6** 1
 ## AN — The body is the weapon
 
 - [x] `AN1.1` The spring-damper core, with mass, reach, fatigue and a real arm limit — limb_momentum.gd, ten checks
-- [ ] `AN1.2` Driven from the same mouse delta the camera turns by, plus the player's own velocity — walking into a blow counts
-- [ ] `AN1.3` The weapon is drawn where the physics put it, not where an animation says
-- [ ] `AN1.4` Damage asks commitment(). The weapon sets the ceiling; the player earns how much of it they get
-- [ ] `AN1.5` Mass and reach per weapon are the whole balance conversation now
-- [ ] `AN1.6` Fatigue comes off stamina, so a tired arm cannot hold a guard rather than being told it cannot
+- [x] `AN1.2` Driven from the same mouse delta the camera turns by, plus the player's own velocity — through a new apply_look() seam, because the mouse branch is gated on MOUSE_MODE_CAPTURED which a headless run can never be. A hard turn throws the weapon 0.397m off the anchor, against a 0.42m arm limit
+- [x] `AN1.3` The weapon is drawn where the physics put it — _pose_weapon() offsets the model off the rig's right arm, so the hand still animates and the weapon lags the hand. 0.155m of travel on a hard turn
+- [x] `AN1.4` Damage asks commitment() — calibrated and ready; the flag is still off per AN1.8. Getting here took three measures and the two failures are the design question. Peak head speed made a one-frame flick worth the same as a committed sweep. Peak of a smoothed head speed was no better — a hard sweep spends itself at full extension where the spring fights it, so it measured 2.16 against a gentler swing's 2.52, the wrong way round. What separates a blow from a twitch is how far the head travelled while moving, which is work done and multiplies speed by duration instead of discarding one. At a 3.9m reference: a slow look scores 0.00, tracking 0.19, a flick 0.48, a deliberate swing 0.46, a hard committed sweep 1.00. Flip momentum_damage in bone_yard_hunt.gd to put it on the damage number
+- [x] `AN1.5` Mass and reach per weapon — ARM_WEIGHTS: a cleaver 1.45kg at 0.62m, a shotgun 3.2, a sidearm 0.95, a severed limb 2.6, a bare hand 0.4. Re-carried whenever the held thing changes
+- [x] `AN1.6` Fatigue comes off stamina directly — a full player reads 0.00 and an empty one 1.00, so the guard degrades continuously rather than switching off at a threshold
 - [ ] `AN1.7` Firearms run through the same object — the barrel swivels toward where you look and carries past it
-- [ ] `AN1.8` The old swing system stays until this one is better, side by side behind a flag
+- [x] `AN1.8` The old swing stays authoritative, side by side — momentum_damage is false, so commitment() is computed and recorded on every blow but does not reach the damage number. Both systems see the same swings, which is what makes them comparable
 - [ ] `AN1.9` A grapple, a shove and a bare hand are the same object with a different mass
 - [ ] `AN2.1` A committed blow leaves you open in a way a flick does not (pairs with O5 footing)
 - [ ] `AN2.2` You can be disarmed, because a weapon you are barely holding is a weapon somebody can take
@@ -1577,11 +1577,11 @@ Version spread: **v1** 751, **v2** 48, **v3** 15, **v4** 15, **v5** 14, **v6** 1
 
 ## AQ — The godhead
 
-- [ ] `AQ1.1` It taunts you long before it is fightable
-- [ ] `AQ1.2` Visibility builds with what you have done, never on a timer
-- [ ] `AQ1.3` It summons you rather than being travelled to
+- [x] `AQ1.1` It taunts you long before it is fightable — godhead.gd speaks from 12% visibility, and what it says is chosen by the most recent thing you did that it noticed, so it is always commenting on the player rather than on the plot
+- [x] `AQ1.2` Visibility builds with what you have done, never on a timer — attention is summed off WorldHistory fresh on every read, nothing cached, nothing clocked. Forty melee blows draw 1.6; one god named draws 4.5. Tested: fifty frames of waiting move it by exactly nothing
+- [ ] `AQ1.3` It summons you rather than being travelled to — can_summon() gates on 150 attention, deliberately above the last visibility stage: being entirely present and being called are not the same event. The summons itself waits on AQ1.4's shadow realms
 - [ ] `AQ1.4` The shadow realms of the higher realms: the psychedelic register, earned not given (E6/E8 exist)
-- [ ] `AQ1.5` It teaches, and the teaching is the trap
+- [x] `AQ1.5` It teaches, and the teaching is the trap — every lesson is true, and following it genuinely helps. heed() is what accepting one costs: it adds directly to attention, so taking good advice is the fastest way to be seen. The trap is stated plainly rather than hidden, and refusing is recorded too, because refusing a true thing over who said it is its own cost
 - [ ] `AQ1.6` It is genuinely fightable, and the fight is not a damage race
 - [ ] `AQ1.7` Voice acting — Greg: "voice acting will also be in the game"
 - [ ] `AQ1.8` Siding with it is a real option with a real ending
