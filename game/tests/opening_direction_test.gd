@@ -34,5 +34,21 @@ func _ready() -> void:
 	opening._breach()
 	check(opening.opening_audio.played_cues.has("glass"), "the breach has its own sound event")
 
+	# K3.2. The opening reframed: CellOutz grew you, which is why the debt is
+	# in the meat. Checked as real scene content, not just prose in a design doc.
+	var beat_texts: Array = opening.BEATS.map(func(beat): return str(beat.text))
+	var celloutz_line := beat_texts.filter(func(text): return text.contains("CellOutz"))
+	check(not celloutz_line.is_empty(), "the handler's own dialogue names CellOutz as the one who grew you")
+	check(celloutz_line[0].contains("owns what it grew"), "and ties that directly to ownership of the debt")
+	var debt_index := -1
+	var celloutz_index := -1
+	for index in opening.BEATS.size():
+		var text := str(opening.BEATS[index].text)
+		if text.contains("Debt's in the meat"):
+			debt_index = index
+		if text.contains("CellOutz"):
+			celloutz_index = index
+	check(celloutz_index == debt_index + 1, "the reframe lands as the very next beat after the debt line, not buried elsewhere")
+
 	print("OPENING_DIRECTION_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
