@@ -3455,6 +3455,110 @@ The last rung. Fifteen statements that are true of the tree and the work when th
 - [ ] **AR10.14** `v10` The tree and the pyramid are one document
 - [ ] **AR10.15** `v10` Your route is readable by somebody else
 
+## AT — WETWIRE: the brain, the chip and the index
+
+`DESIGN/THE_BRAIN.md` is the document. Greg's substance and dimension design
+arrived as four things that are **one system**: a brain you open, a chip somebody
+put in it, the materia, and the planes it reaches.
+
+**You do not get to the planes except through the brain. You do not get through
+the brain without the chip. The chip is in your head because somebody put it
+there while you were captured (AP1.3).** The drugs are the only thing you can
+reach without permission, which is exactly why the institution cares about them.
+
+Naming: **WETWIRE** is the system, **MATERIA** the index inside it — two
+institutions naming the same object differently, which is already this game's
+central rule.
+
+- [ ] **AT1.1** The brain is a real organ at full detail, not an icon
+- [ ] **AT1.2** A CRT bent into the cortex, curved, showing the inside from inside
+- [ ] **AT1.3** It is an index you open and most of what is in it is optional
+- [ ] **AT1.4** Visceral: it is wet, the chip is bolted into wet tissue, and looking at it is uncomfortable
+- [ ] **AT1.5** The tower in it — the bloody wired chip — is the bridge to the network above
+- [ ] **AT1.6** The Wire seen from 5D is what that network is
+- [ ] **AT1.7** It is hardware somebody else installed: revocable, traceable, and it can find you
+- [ ] **AT1.8** Its radiation is what melts you at 8g and 9g — the thing connecting you is killing you
+
+## AU — The materia
+
+Every category, because Greg asked for every category: legal stimulants through
+to the deliriants, with new-world substances that only exist after the collapse.
+
+**The boundary, stated once and never again:** this portrays experiences,
+entities, consequences and costs — the register of a trip report, which is
+what Erowid and PsychonautWiki are *as writing*. It carries no dosages, routes,
+preparation or combinations. That line costs nothing: nobody ever found a trip
+report less frightening for omitting the milligrams, and the horror of datura is
+entirely in the account.
+
+- [ ] **AU1.1** Every class present: stimulant, cannabinoid, psychedelic, dissociative, deliriant, empathogen, depressant, opioid, research chemical, new-world
+- [ ] **AU1.2** A drug is an object — a baggie, a blister, a tab, a weight — carried, priced, stealable
+- [ ] **AU1.3** Strains differ. Two mushrooms are not one item with a number
+- [ ] **AU1.4** Everything costs: body, standing, time, and the godhead's attention
+- [ ] **AU1.5** Tolerance and comedown are tracked on the real clock
+- [ ] **AU1.6** Set and setting: the same substance in a safe room and in a tunnel are different experiences
+- [ ] **AU1.7** Deliriants are horror and must never read as fun
+- [ ] **AU1.8** Smoking is a real act: cigarettes, vapes, joints, spliffs, blunts, bongs, alien devices
+- [ ] **AU1.9** Caffeine is in the same system as everything else
+- [ ] **AU1.10** You can lace somebody, the world records it, and the law and the gods respond (AE1.4, AJ5)
+- [ ] **AU1.11** Research chemicals as easter eggs, from the real long tail
+- [ ] **AU1.12** New-world drugs made of what is left
+
+## AV — The planes
+
+Ten sephiroth plus the one that is not on the map, and four worlds as the
+registers each is seen in. Malkuth is 3D and the game is played there; the wizard
+eyes are 4D; the godhead is past Keter.
+
+**Da'ath is the good one** — real, unmapped, unreachable deliberately, and
+where the deliriants go.
+
+### AV1 — The ladder
+- [ ] **AV1.1** Twelve planes, named from the tradition, each one a real place
+- [ ] **AV1.2** Four worlds as registers rather than more planes
+- [ ] **AV1.3** Da'ath is not on the map and cannot be aimed at
+- [ ] **AV1.4** You petition a plane, you do not travel to it — a name, a seal, an offering, a licence to depart
+- [ ] **AV1.5** Each plane looks like itself, with more of Greg's art the higher it goes
+- [ ] **AV1.6** Hellscape and angelscape are one place in two registers, not two asset sets
+- [ ] **AV1.7** All of it runs on one shader with different dials (FINAL_V section 16)
+
+### AV2 — Altitude is the gate
+Greg: *"the higher you have to be to talk or even fight, conjure, evoke etc"*.
+**This is the mechanic the rest hangs off.**
+- [ ] **AV2.1** Seeing a plane, talking on it, conjuring on it and fighting on it are four rising floors
+- [ ] **AV2.2** The substance decides which door opens, not a menu
+- [ ] **AV2.3** Coming down mid-conversation is a real failure and the entity remembers it
+- [ ] **AV2.4** You cannot fight the godhead sober, and that is not a difficulty setting
+- [ ] **AV2.5** Sustaining altitude is its own problem, separate from reaching it
+
+### AV3 — They remember you
+- [ ] **AV3.1** Entities are subjects in WorldHistory like everybody else
+- [ ] **AV3.2** A relationship accumulates across trips
+- [ ] **AV3.3** Voice is distorted and clears with standing — the whole readout, no meter
+- [ ] **AV3.4** Mysterious means withholding, never vague
+- [ ] **AV3.5** They can be owed, and they collect (AR2.4)
+- [ ] **AV3.6** They disagree with each other the way the gods do about a kill
+- [ ] **AV3.7** Demonic and jesterish is the register; the jester is already on the handheld
+
+## AW — Commissioning
+
+Greg: *"help me make subsection lists on top of the checklist that show me how i
+can commission and call all my artist friends"*.
+
+**Each plane is a brief.** You are not asking for "some psychedelic art" —
+you are asking for *Gevurah, seen from Yetzirah*, at a stated size, for a stated
+use. That is a brief an artist can price, and a far better one than most
+freelance work they will be offered.
+
+- [ ] **AW1.1** One plane, one artist, one brief — twelve independent commissions
+- [ ] **AW1.2** Write the brief before asking: plane, register, size, format, use, and what it sits beside
+- [ ] **AW1.3** Licence agreed in writing before money moves — use, modification, and whether it survives a sale
+- [ ] **AW1.4** Credit in the game, on the cast page, not only in a readme
+- [ ] **AW1.5** Pay properly. They are friends, which is a reason for more paperwork, not less
+- [ ] **AW1.6** Take source files, not only exports
+- [ ] **AW1.7** Their work goes in as texture and material inside the procedural system, never replacing it
+- [ ] **AW1.8** A rejection or a redraw is budgeted for before the first commission goes out
+
 ## AS — Night, the lamp, and what you are wearing
 
 Greg: *"the light can become really warped at night and distorted. Phone has a %
