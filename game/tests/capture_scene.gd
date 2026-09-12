@@ -161,6 +161,13 @@ func _ready() -> void:
 			device.set_mode("WIRE")
 			for _hold in 60:
 				await get_tree().process_frame
+	elif trigger == "altered":
+		# E6/E8. Forced directly rather than routed through a real substance
+		# or meditation session, which need input this harness does not drive.
+		scene.player_rig.anatomy.consciousness = 30.0
+		scene._update_altered_perception()
+		for _hold in 6:
+			await get_tree().process_frame
 	elif trigger == "storm":
 		# AS4. Force the chaos-magick level up directly rather than waiting on
 		# a ritual, then force a strike so the shot lands mid-crawl instead of

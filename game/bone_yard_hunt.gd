@@ -735,6 +735,7 @@ func _physics_process(delta: float) -> void:
 	if storm_weather != null and is_instance_valid(storm_weather):
 		storm_weather.follow(player)
 		stamina = clampf(stamina - storm_weather.exposure_cost(delta), 0.0, 100.0)
+	_update_altered_perception()
 	# AS1.1/AS1.3. Energy tracks the same smooth `raised` blend the device
 	# itself uses, so the light does not snap on; it hard-zeroes at empty
 	# battery, so "can run out" (AS1.3) is an actual floor, not a long fade.
@@ -3163,6 +3164,33 @@ func _update_day_night() -> void:
 	# that this and a drug and a shadow realm should be one shader, not three.
 	if psychedelic != null and is_instance_valid(psychedelic):
 		psychedelic.set_dial("displacement_strength", (1.0 - daylight) * 0.02)
+
+
+## E6/E8. `substances.gd` and `meditation.gd` have both paid into
+## `anatomy_state.consciousness` since before either system existed, and
+## neither one has ever had anything on screen to show for it — the entire
+## cost was invisible. Perception distorting as consciousness fades is the
+## same shader at a different dial (FINAL_V.md §16's own argument), not a
+## fourth system: whatever actually caused the drop, a substance, a
+## meditation session, blood loss, the fiction does not care which, only the
+## player's own state does.
+##
+## Always sets every dial it owns, even back to zero, rather than only ever
+## pushing them up — `storm_weather.gd`'s lightning flash already taught this
+## build what happens to a value nothing ever resets: it freezes wherever it
+## last was instead of actually relaxing when the state that raised it passes.
+## `displacement_strength` is added to whatever `_update_day_night` just set
+## rather than overwriting it, since night and altered consciousness are two
+## real causes of the same dial and neither should erase the other.
+func _update_altered_perception() -> void:
+	if player_rig == null or not is_instance_valid(player_rig):
+		return
+	if psychedelic == null or not is_instance_valid(psychedelic):
+		return
+	var altered := 1.0 - clampf(player_rig.anatomy.consciousness / 100.0, 0.0, 1.0)
+	psychedelic.set_dial("displacement_strength", psychedelic.dial("displacement_strength") + altered * 0.05)
+	psychedelic.set_dial("chromatic_offset", altered * 0.012)
+	psychedelic.set_dial("kaleidoscope_segments", lerpf(0.0, 5.0, clampf(inverse_lerp(0.5, 1.0, altered), 0.0, 1.0)))
 
 
 func _build_expanse_systems() -> void:
