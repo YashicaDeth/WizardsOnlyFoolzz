@@ -1688,7 +1688,10 @@ func _nearest_robbable(radius := 3.4) -> Dictionary:
 		var rig := body.get("rig") as BaselineHuman
 		if node == null or not is_instance_valid(node) or rig == null or not is_instance_valid(rig):
 			continue
-		if Extraction.robbable_zones(rig.anatomy.snapshot()).is_empty():
+		# AU1.2. A body with nothing worth cutting open can still have
+		# something worth taking out of its pocket.
+		var has_substance: bool = not str(WorldHistory.subject(str(body.subject_id)).get("carried_substance", "")).is_empty()
+		if Extraction.robbable_zones(rig.anatomy.snapshot()).is_empty() and not has_substance:
 			continue
 		var distance := player.distance_to(node.global_position)
 		if distance <= nearest_distance:
@@ -1705,6 +1708,24 @@ func _begin_extraction() -> void:
 		prompt.text = "NOTHING WITHIN REACH WORTH OPENING"
 		extraction_session = {}
 		return
+	# AU1.2. A pocket, not a wound: checked and taken in one motion, before
+	# whatever the body's actual anatomy might also be worth digging for.
+	# The same key finishes the job on a second press if there is still a
+	# real dig left, rather than needing a control of its own to discover.
+	var carried_substance := str(WorldHistory.subject(str(body.subject_id)).get("carried_substance", ""))
+	if not carried_substance.is_empty():
+		var body_node := body.get("node") as Node3D
+		var at := body_node.global_position if body_node != null and is_instance_valid(body_node) else player
+		var witnesses := WitnessLedger.witnesses_of(at, _witness_candidates(), str(body.subject_id))
+		var item: Dictionary = handheld.carry.take_from_subject(str(body.subject_id))
+		if not item.is_empty():
+			witness_ledger.record("substance_stolen", {
+				"actor_id": "player", "target_id": str(body.subject_id), "substance_id": str(item.get("substance_id", "")),
+			}, witnesses)
+			prompt.text = "%s TAKEN FROM THEIR POCKET // %s" % [
+				str(item.get("label", "")), ("SEEN BY %d" % witnesses.size()) if not witnesses.is_empty() else "NOBODY SAW",
+			]
+			return
 	var rig := body.rig as BaselineHuman
 	var snapshot: Dictionary = rig.anatomy.snapshot()
 	var targets := Extraction.robbable_zones(snapshot, rig.zone_depth)
@@ -3056,6 +3077,7 @@ func _update_hud() -> void:
 			"health": health,
 			"stamina": stamina,
 			"rival_status": WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("status", "dormant"),
+			"rival_name": _captain_name(),
 			"menu_open": world_index.visible or character_archive.visible or allusions_artwork.visible or living_map.visible,
 			"menu_mode": panel_mode,
 			"weapon": arsenal.state() if arsenal != null else {},
