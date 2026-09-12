@@ -34,7 +34,7 @@ func _ready() -> void:
 	# and a resolution against someone the world already rated dangerous.
 	WorldHistory.record_event("melee_body_hit", {"target": "test_boss", "location": hunt.HUNT_LOCATION})
 	WorldHistory.register_subject("test_boss", {"name": "Test Boss", "kind": "person", "elo": 1200, "grudge": 0, "rival": true})
-	WorldHistory.record_event("execution", {"subject": "test_boss"})
+	WorldHistory.record_event("execution", {"subject_id": "test_boss"})
 	check(hunt.third_person_unlocked(), "the read itself is true once a rated kill lands")
 
 	var kick_before: Vector2 = hunt.impact_feel.kick

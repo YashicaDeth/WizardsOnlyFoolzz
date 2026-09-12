@@ -121,7 +121,11 @@ func _ready() -> void:
 	check(not hunt.player_rig.parts["head"].visible, "first person hides the player's own head")
 	check(hunt.player_rig.parts["left_arm"].visible, "...but keeps the body you look down at")
 	hunt.third_person = true
-	hunt._update_camera()
+	# M3. The switch is a blend now (perspective_blend), not a hard cut, so the
+	# head only reappears once it has actually slid past the halfway point —
+	# one call left it still mid-transition and reads as a false failure here.
+	for _settle in 30:
+		hunt._update_camera()
 	check(hunt.player_rig.parts["head"].visible, "third person shows the whole body")
 	hunt._wound_player(hunt.player + Vector3(0, 0, 2), 20.0, "cut")
 	var player_state: Dictionary = WorldHistory.subject("player").get("anatomy_state", {})

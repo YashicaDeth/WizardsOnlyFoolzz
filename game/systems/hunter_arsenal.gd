@@ -5,6 +5,8 @@ extends Node
 ## ammunition and the model in the hunter's real hand; BaselineHuman remains
 ## the authority for what a hit does to flesh, bone, organs and prosthetics.
 
+const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
+
 signal equipped(weapon_id: String)
 signal fired(weapon_id: String, report: Dictionary)
 signal reload_started(weapon_id: String)
@@ -167,15 +169,17 @@ func _update_models() -> void:
 func _build_weapon_model(weapon_id: String) -> Node3D:
 	var root := Node3D.new()
 	root.name = "%s_model" % weapon_id
-	root.position = Vector3(-0.093, -0.716, -0.673)
+	root.position = Vector3(-0.122, -0.226, -0.859)
 	# M4.4. This rotation used to be a small artistic tilt on top of an
 	# unrotated hand. The hand itself now carries a real first-person pose —
-	# hunter_body_motion.gd's arm_raise pitches right_arm ~65 degrees forward
-	# so it reads in frame at all — and every piece here is still authored
-	# against the old, unrotated arm. Left alone that pitch is inherited twice
-	# and the blade lies down across the view instead of standing in it, so
-	# this cancels the pose rotation before adding the same small tilt back.
-	root.rotation = Vector3(-1.14 - 0.12, 0.0, 0.08 + 0.04)
+	# hunter_body_motion.gd's arm_raise pitches right_arm forward so it reads
+	# in frame at all — and every piece here is still authored against the
+	# old, unrotated arm. Left alone that pitch is inherited twice and the
+	# blade lies down across the view instead of standing in it, so this
+	# cancels the pose rotation (kept as a read of the constant rather than a
+	# copied number, since a future retune of arm_raise would silently break a
+	# hand-copied value here) before adding the same small tilt back.
+	root.rotation = Vector3(-HUNTER_BODY_MOTION.FIRST_PERSON_ARM_RAISE - 0.12, 0.0, 0.08 + 0.04)
 	match weapon_id:
 		"sword":
 			_piece(root, "grip", Vector3(0, -0.02, 0), Vector3(0.055, 0.23, 0.055), Color("35261e"), "cloth")

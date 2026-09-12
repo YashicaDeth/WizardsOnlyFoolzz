@@ -732,15 +732,20 @@ image.
       before M4.1-M4.3 corrected the FOV and eye height, and sat entirely
       outside the frustum at the corrected numbers — verifiably invisible, not
       merely unconvincing. Re-solved against `right_arm`'s actual raised
-      first-person pose (`hunter_body_motion.gd`'s `arm_raise`) and given a
-      faint self-lit edge so it reads against the Expanse's own near-black
-      ground level. The cleaver reads clean — guard, grip and blade distinct,
-      angled like a held blade, captured in `game/captures/`. The shotgun and
-      sidearm are in frame and lit but their sub-pieces still read as stacked
-      blocks rather than a gun silhouette from this angle — their own local
-      `turn` values were never re-tuned against the same pose and are next.
-      Guarded by `tests/viewmodel_frame_test.gd` so this cannot silently go
-      off-frame again.
+      first-person pose and given a faint self-lit edge so it reads against the
+      Expanse's own near-black ground level. Two agents hit this the same
+      session from different angles — a shallower `arm_raise` on the arm
+      itself, and a counter-rotated weapon model on top of it — and the merge
+      landed both; the second pass caught that the counter-rotation had been
+      copied against the *old* `arm_raise` value and would have silently thrown
+      the weapon back out of frame, so it now reads `HUNTER_BODY_MOTION.FIRST_PERSON_ARM_RAISE`
+      instead of a second hand-copied number. The cleaver reads clean — guard,
+      grip and blade distinct, angled like a held blade, captured in
+      `game/captures/`. The shotgun and sidearm are in frame and lit but their
+      sub-pieces still read as stacked blocks rather than a gun silhouette from
+      this angle — their own local `turn` values were never re-tuned against
+      the same pose and are next. Guarded by `tests/viewmodel_frame_test.gd`
+      so the frustum regression cannot happen silently again.
 - [x] ~~**M4.5** The rules are the game's own and applied everywhere, not photographic realism~~ (the resolution/interrogation camera had its own bare `72.0` FOV with no relationship to the 78/63 pair M4.3 established; it now takes `THIRD_PERSON_FOV` since it is already the "look at the body from outside" register)
 
 ### M3 — The seam

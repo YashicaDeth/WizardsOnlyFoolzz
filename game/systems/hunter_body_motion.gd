@@ -7,6 +7,12 @@ extends Node
 
 signal foot_planted(side: String)
 
+## M4.4. How far the arm pitches forward for the first-person hold pose.
+## `hunter_arsenal.gd` reads this to counter-rotate its weapon models onto the
+## same arm, so it stays the single source of truth for the pitch rather than
+## a number copied into a second file.
+const FIRST_PERSON_ARM_RAISE := 0.62
+
 var rig: BaselineHuman
 var first_person := false
 var gait_phase := 0.0
@@ -121,7 +127,12 @@ func _pose(horizontal_speed: float, sprinting: bool, crouching: bool, dodging: b
 	# past the lens at FOV 78, where it read as a screen-filling black slab
 	# rather than a held weapon. A shallower raise keeps the arm in the lower
 	# third of frame the way a held weapon actually sits.
-	var arm_raise := 0.62 if first_person else 0.0
+	#
+	# hunter_arsenal.gd's weapon models are children of this same arm and
+	# counter-rotate this exact pitch to keep the blade standing in frame
+	# instead of lying flat across it, so this is a named constant rather
+	# than a magic number for a second file to fall silently out of sync with.
+	var arm_raise := FIRST_PERSON_ARM_RAISE if first_person else 0.0
 	var fp_spread := 0.045 if first_person else 0.0
 	_set_zone_pose("left_arm", Vector3(-fp_spread, -0.05 * crouch_blend, 0), Vector3(arm_swing + arm_raise, 0, 0.08))
 	_set_zone_pose("right_arm", Vector3(fp_spread, -0.05 * crouch_blend, 0), Vector3(-arm_swing + arm_raise, 0, -0.08))
