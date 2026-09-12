@@ -459,8 +459,14 @@ probe actually says, so the next attempt does not start from scratch:
 
 ### G5 — Sound rework
 - [x] **G5.1** Bus structure built, mixable, and everything actually routed through it
-- [ ] **G5.2** Engine layered by load rather than one pitched sine
-- [ ] **G5.3** Impact layers by severity and material
+- [x] ~~**G5.2** Engine layered by load rather than one pitched sine~~ A third
+      `engine_strain` layer joins the existing low/high pair, gated to only
+      exist above 72% effort so redline reads as a distinct band arriving
+      rather than a tone blending in continuously. Verified: `tests/audio_test.tscn` (G5.2 section)
+- [x] ~~**G5.3** Impact layers by severity and material~~ A shared low-end
+      `impact_body` layer stacks on top of the material voice once a hit
+      passes 50% intensity, so severity is heard as added weight rather than
+      the same one-shot played louder. Verified: `tests/audio_test.tscn` (G5.3 section)
 - [x] **G5.4** Per-layer gore sound — bone cracks, organs burst, cybernetics fault (shares with B4.8)
 
 ### G6 — The opening, directed

@@ -19,10 +19,15 @@ const IMPACT_VOICES := 6
 const ENGINE_SILENT := -60.0
 const ENGINE_IDLE_LOW := -22.0
 const ENGINE_IDLE_HIGH := -40.0
+## G5.2. The strain layer only exists above this fraction of full effort, so
+## it reads as a distinct band kicking in near redline rather than a third
+## tone crossfading continuously alongside the other two.
+const STRAIN_THRESHOLD := 0.72
 const WARM_UP_SECONDS := 0.9
 
 var engine_low: AudioStreamPlayer3D
 var engine_high: AudioStreamPlayer3D
+var engine_strain: AudioStreamPlayer3D
 var ambience_player: AudioStreamPlayer
 var crowd_emitters: Array[AudioStreamPlayer3D] = []
 var impact_voices: Array[AudioStreamPlayer3D] = []
@@ -31,19 +36,30 @@ var next_voice := 0
 var warm_up := 0.0
 var target_low := ENGINE_IDLE_LOW
 var target_high := ENGINE_IDLE_HIGH
+var target_strain := ENGINE_SILENT
 
 
 func _ready() -> void:
 	_ensure_reverb_bus()
-	# Two engine layers crossfaded by load. One pitched sine reads as a mosquito;
-	# a rumble under a whine reads as a drivetrain.
+	# G5.2. Three engine layers, each gated to its own load band rather than
+	# one pitched sine or two tones crossfaded across the whole range: a low
+	# rumble that is present at idle, a mid whine that rises with load, and a
+	# strain layer that only exists above STRAIN_THRESHOLD, where a real
+	# engine starts to sound like it is being asked for more than it wants to
+	# give. The band, not just the pitch, is what tells a cruise from a floor.
 	engine_low = _positional("EngineLow", _make_wave("engine_low", 1.25, true), ENGINE_SILENT, 34.0)
 	engine_high = _positional("EngineHigh", _make_wave("engine_high", 0.9, true), ENGINE_SILENT, 28.0)
+	engine_strain = _positional("EngineStrain", _make_wave("engine_strain", 0.7, true), ENGINE_SILENT, 30.0)
 	engine_low.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_PHYSICS_STEP
 	engine_high.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_PHYSICS_STEP
+	engine_strain.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_PHYSICS_STEP
 
 	for kind in ["panel", "glass", "heavy", "meat"]:
 		impact_streams[kind] = _make_wave(kind, 0.5, false)
+	# G5.3. A shared low-end layer that stacks on top of the material voice
+	# when a hit is severe, so severity is heard as added weight rather than
+	# only a louder copy of the same single sample.
+	impact_streams["body"] = _make_wave("impact_body", 0.6, false)
 	for index in IMPACT_VOICES:
 		var voice := _positional("ImpactVoice%d" % index, null, -6.0, 60.0)
 		impact_voices.append(voice)
@@ -58,6 +74,7 @@ func _ready() -> void:
 
 	engine_low.play()
 	engine_high.play()
+	engine_strain.play()
 	ambience_player.play()
 
 
@@ -71,7 +88,7 @@ func seed_crowd(positions: Array) -> void:
 
 
 func attach_engine_to(vehicle: Node3D) -> void:
-	for layer in [engine_low, engine_high]:
+	for layer in [engine_low, engine_high, engine_strain]:
 		if layer.get_parent() != null:
 			layer.get_parent().remove_child(layer)
 		vehicle.add_child(layer)
@@ -91,9 +108,15 @@ func update_engine(speed: float, throttle: float) -> void:
 	var effort := clampf(load_ratio + absf(throttle) * 0.25, 0.0, 1.0)
 	engine_low.pitch_scale = clampf(0.7 + load_ratio * 0.55, 0.6, 1.4)
 	engine_high.pitch_scale = clampf(0.85 + load_ratio * 0.95, 0.8, 1.95)
+	engine_strain.pitch_scale = clampf(1.05 + load_ratio * 0.5, 1.0, 1.6)
 	target_low = lerpf(ENGINE_IDLE_LOW, -9.0, effort)
 	# The whine only arrives under real load, so cruising and flooring it differ.
 	target_high = lerpf(ENGINE_IDLE_HIGH, -13.0, pow(effort, 1.6))
+	# G5.2. Its own band: silent below STRAIN_THRESHOLD, then rises fast, so it
+	# reads as the engine being asked for more than it wants to give rather
+	# than a third tone blended in across the whole range.
+	var strain := clampf((effort - STRAIN_THRESHOLD) / (1.0 - STRAIN_THRESHOLD), 0.0, 1.0)
+	target_strain = lerpf(ENGINE_SILENT, -7.0, strain * strain)
 	_apply_engine_volume()
 
 
@@ -102,7 +125,15 @@ func _apply_engine_volume() -> void:
 		return
 	engine_low.volume_db = lerpf(ENGINE_SILENT, target_low, warm_up)
 	engine_high.volume_db = lerpf(ENGINE_SILENT, target_high, warm_up)
+	engine_strain.volume_db = lerpf(ENGINE_SILENT, target_strain, warm_up)
 
+
+## G5.3. `material` picks what a hit sounds like; `intensity` decides whether
+## a second, shared low-end layer stacks under it. A light and a severe hit
+## on the same panel used to differ only by playing the same one-shot louder;
+## now a severe hit is audibly a heavier event, not just a bigger version of
+## the same one.
+const BODY_LAYER_THRESHOLD := 0.5
 
 func play_impact(intensity: float, at: Vector3 = Vector3.ZERO, material: String = "panel") -> void:
 	var voice := _free_voice()
@@ -117,6 +148,15 @@ func play_impact(intensity: float, at: Vector3 = Vector3.ZERO, material: String 
 	voice.volume_db = lerpf(-18.0, 0.0, strength)
 	voice.pitch_scale = randf_range(0.78, 1.12) * (0.86 if kind == "heavy" else 1.0)
 	voice.play()
+	if strength > BODY_LAYER_THRESHOLD:
+		var body_voice := _free_voice()
+		if body_voice != null and body_voice != voice:
+			var body_strength := (strength - BODY_LAYER_THRESHOLD) / (1.0 - BODY_LAYER_THRESHOLD)
+			body_voice.stream = impact_streams["body"]
+			body_voice.global_position = at
+			body_voice.volume_db = lerpf(-14.0, 4.0, body_strength)
+			body_voice.pitch_scale = randf_range(0.82, 0.98) - body_strength * 0.12
+			body_voice.play()
 	if strength > 0.55:
 		_react_crowd(strength)
 
@@ -190,6 +230,21 @@ func _make_wave(kind: String, duration: float, looping: bool) -> AudioStreamWAV:
 			"engine_high":
 				sample = sin(TAU * 146.0 * t) * 0.2 + sin(TAU * 219.0 * t) * 0.13
 				sample += (_hash_noise(frame) * 0.5 - 0.25) * 0.22
+			"engine_strain":
+				# G5.2. The redline layer: higher, harder-edged and dirtier than
+				# engine_high, so its arrival reads as strain rather than more of
+				# the same whine turned up.
+				sample = sin(TAU * 340.0 * t) * 0.22 + sin(TAU * 505.0 * t) * 0.16
+				sample = clampf(sample * 1.8, -0.85, 0.85)
+				sample += (_hash_noise(frame * 7) * 2.0 - 1.0) * 0.16
+			"impact_body":
+				# G5.3. A shared low-end thud with no material character of its
+				# own, meant to stack under a material voice on a severe hit
+				# rather than to be heard alone.
+				var body_env := exp(-t * 8.0)
+				sample = sin(TAU * 46.0 * t) * 0.6 * body_env
+				sample += sin(TAU * 24.0 * t) * 0.4 * exp(-t * 5.0)
+				sample += (_hash_noise(frame * 2) * 2.0 - 1.0) * 0.15 * body_env
 			"panel":
 				var panel_env := exp(-t * 13.0)
 				sample = (_hash_noise(frame) * 2.0 - 1.0) * 0.6 * panel_env

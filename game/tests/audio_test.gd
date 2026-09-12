@@ -4,6 +4,7 @@ extends Node
 ## mixer is invisible in a screenshot — it has to be asserted.
 
 const GoreChunks := preload("res://systems/gore_chunks.gd")
+const DerbyAudio := preload("res://systems/procedural_derby_audio.gd")
 
 var failures: Array[String] = []
 
@@ -103,6 +104,58 @@ func _ready() -> void:
 		for step in 900:
 			loudest = maxf(loudest, absf(GoreChunks.impact_sample(profile, float(step) / 22050.0, 1.0)))
 	_check(loudest <= 1.0, "no layer clips (peak %.3f)" % loudest)
+
+	print("")
+	print("G5.2 - engine layered by load, not one pitched sine")
+	var engine := DerbyAudio.new()
+	add_child(engine)
+	engine.warm_up = 1.0 # skip the fade-up so volumes read the target immediately
+	engine.update_engine(0.0, 0.0)
+	var idle_low: float = engine.engine_low.volume_db
+	var idle_high: float = engine.engine_high.volume_db
+	var idle_strain: float = engine.engine_strain.volume_db
+	var idle_pitch_low: float = engine.engine_low.pitch_scale
+	engine.update_engine(24.0, 1.0)
+	var floor_low: float = engine.engine_low.volume_db
+	var floor_high: float = engine.engine_high.volume_db
+	var floor_strain: float = engine.engine_strain.volume_db
+	var floor_pitch_low: float = engine.engine_low.pitch_scale
+	_check(floor_low > idle_low, "the low layer rises under load (%.1f -> %.1f dB)" % [idle_low, floor_low])
+	_check(floor_high > idle_high, "the high layer rises under load (%.1f -> %.1f dB)" % [idle_high, floor_high])
+	_check(floor_pitch_low > idle_pitch_low, "pitch itself also rises with load, on top of the layering")
+	_check(idle_strain <= DerbyAudio.ENGINE_SILENT + 0.5, "the strain layer stays silent at idle (%.1f dB)" % idle_strain)
+	_check(floor_strain > idle_strain + 15.0, "and arrives as a distinct band at full load (%.1f -> %.1f dB)" % [idle_strain, floor_strain])
+	engine.update_engine(10.0, 0.3)
+	var cruise_strain: float = engine.engine_strain.volume_db
+	_check(cruise_strain < floor_strain - 10.0, "cruising load does not already sound like redline (%.1f dB)" % cruise_strain)
+	engine.queue_free()
+
+	print("")
+	print("G5.3 - impact layers by severity and material")
+	var impacts := DerbyAudio.new()
+	add_child(impacts)
+	impacts.play_impact(0.15, Vector3.ZERO, "glass")
+	var light_stream: AudioStream = null
+	var light_voices := 0
+	for voice in impacts.impact_voices:
+		if voice.playing:
+			light_voices += 1
+			light_stream = voice.stream
+	_check(light_voices == 1, "a light hit uses a single voice (%d playing)" % light_voices)
+	_check(light_stream == impacts.impact_streams["glass"], "and it carries the material's own sound, not a generic one")
+	for voice in impacts.impact_voices:
+		voice.stop()
+	impacts.play_impact(0.95, Vector3.ZERO, "glass")
+	var heavy_voices := 0
+	var heavy_has_body := false
+	for voice in impacts.impact_voices:
+		if voice.playing:
+			heavy_voices += 1
+			if voice.stream == impacts.impact_streams["body"]:
+				heavy_has_body = true
+	_check(heavy_voices == 2, "a severe hit of the same material stacks a second layer (%d playing)" % heavy_voices)
+	_check(heavy_has_body, "and the added layer is the shared low-end body, not a second copy of the material voice")
+	impacts.queue_free()
 
 	print("")
 	if failures.is_empty():
