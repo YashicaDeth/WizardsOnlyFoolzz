@@ -306,7 +306,7 @@ Ascent/Descent axis that already exists and is currently unused.
 ### E1 — Karma from real events
 - [x] ~~**E1.1** The axis accumulates from recorded history~~
 - [x] **E1.2** Factions price you by where you sit
-- [ ] **E1.3** Never a good/evil slider — read through the Tree view
+- [x] ~~**E1.3** Never a good/evil slider — read through the Tree view~~
 
 ### E2 — The ritual app
 - [ ] **E2.1** Seal-drawing vocabulary in the `celloutz_type` stroke register
