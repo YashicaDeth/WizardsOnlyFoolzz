@@ -20,6 +20,9 @@ const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 const RIVAL_REGISTRY := preload("res://systems/rival_registry.gd")
+const DEFEAT_ROUTER := preload("res://systems/defeat_router.gd")
+const ASSET_NETWORK := preload("res://systems/asset_network.gd")
+const COMBAT_RESPONSE := preload("res://systems/combat_response.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
@@ -125,6 +128,7 @@ var arsenal: Node
 var pending_attack: Dictionary = {}
 var carried_limb_index := -1
 var carried_limb_model: MeshInstance3D
+var asset_network := ASSET_NETWORK.new()
 ## Bodies the fight is finished with. `_kill_encounter_actor` drops them out of
 ## `encounter_actors` so the AI stops paying for them, but a corpse is still a
 ## thing you can rob (B5), so it keeps its rig here rather than being forgotten.
@@ -428,6 +432,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if event.pressed:
+			_attack()
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_MIDDLE:
 		_toggle_lock()
 	if event is InputEventMouseButton and event.pressed and not lock_target.is_empty():
@@ -443,7 +449,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_2: _equip_weapon(1)
 			KEY_3: _equip_weapon(2)
 			KEY_4: _equip_carried_limb()
-			KEY_R: _reload_weapon()
+			KEY_R:
+				if handheld.is_open:
+					_cycle_asset_task()
+				else:
+					_reload_weapon()
 			KEY_ESCAPE:
 				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 				if not panel_mode.is_empty():
@@ -455,7 +465,10 @@ func _unhandled_input(event: InputEvent) -> void:
 					third_person = not third_person
 					body_motion.set_perspective(not third_person)
 					_update_camera()
-			KEY_G: handheld.toggle_device()
+			KEY_G:
+				handheld.toggle_device()
+				if handheld.is_open:
+					prompt.text = asset_network.roster_line() + " // [R] ISSUE NEXT ORDER"
 			KEY_TAB:
 				# The handheld owns Tab while raised: one object, modes on it.
 				if handheld.is_open:
@@ -484,6 +497,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				else:
 					_dodge()
 			KEY_Q: _use_prosthetic_surge()
+			KEY_K: _deliberate_redecant()
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		yaw -= event.relative.x * 0.0026
 		pitch = clamp(pitch - event.relative.y * 0.0024, -0.75, 0.42)
@@ -547,6 +561,9 @@ func _update_player(delta: float) -> void:
 	# rather than scaled straight off `mobility_ratio`, because a game you cannot
 	# retreat from is a game that is over.
 	speed *= _player_speed_scale()
+	# A melee press is one committed swing, not an automatic attack repeated by
+	# holding the mouse. You can still steer it, but not sprint through its tell.
+	speed *= COMBAT_RESPONSE.movement_scale(pending_attack, strike_windup)
 	player_capsule.height = move_toward(player_capsule.height, 1.2 if crouching else 1.8, delta * 4.0)
 	player_collider.position.y = (player_capsule.height - 1.8) * 0.5
 	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0)
@@ -556,8 +573,6 @@ func _update_player(delta: float) -> void:
 	stamina = clampf(stamina + (-26.0 if sprinting else 18.0) * delta, 0, 100)
 	body_motion.update(delta, player_body.velocity, player_body.is_on_floor(), sprinting, crouching, dodge_remaining > 0.0)
 	hunter_appearance.set_mouth(player_rig.anatomy.pain / 180.0, sin(pulse * 0.7) * player_rig.anatomy.pain / 100.0)
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		_attack()
 
 
 func _attack(heavy := false) -> void:
@@ -711,6 +726,8 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		actor.state = "fleeing"
 		actor.loot_at_risk = true
 		prompt.text = "%s IS BLEEDING OUT AND ESCAPING — CHASE FOR THEIR LOOT OR LET THEM GO." % str(actor.display_name).to_upper()
+	else:
+		_apply_combat_response(actor, attack, result)
 	if anatomy.dead:
 		_kill_encounter_actor(nearest_index, "combat_trauma")
 	return true
@@ -764,6 +781,8 @@ func _resolve_firearm(attack: Dictionary) -> void:
 		elif actor.anatomy.critical or actor.anatomy.pain >= 68.0:
 			actor.state = "fleeing"
 			actor.loot_at_risk = true
+		else:
+			_apply_combat_response(actor, attack, {"pain": actor.anatomy.pain})
 	if impacts.is_empty():
 		impact_feel.whiff()
 		prompt.text = "%s / MISS" % str(arsenal.current().label)
@@ -850,6 +869,11 @@ func _interact() -> void:
 	body_motion.trigger_interaction()
 	var downed := _nearest_downed()
 	if not downed.is_empty():
+		# F6.1. Raising the handheld changes E from an offer into an overwrite.
+		# The consensual resolution remains a different, plainly labelled act.
+		if handheld.is_open:
+			_mind_stamp(downed)
+			return
 		_open_resolution(downed)
 		return
 	var chunk := _nearest_takeable_chunk(3.2)
@@ -905,6 +929,38 @@ func _interact() -> void:
 		_begin_canonical_encounter()
 		return
 	prompt.text = "Nothing answers. Find Nix or follow the floodlights to the tunnel."
+
+
+func _mind_stamp(actor: Dictionary) -> void:
+	var subject_id := str(actor.get("subject_id", ""))
+	var stamped := asset_network.mind_stamp(subject_id, actor.rig.snapshot())
+	if stamped.is_empty():
+		prompt.text = "MIND-STAMP REFUSED // NO LIVING SUBJECT"
+		return
+	actor.rig.spare()
+	actor.state = "mind_stamped"
+	actor.disposition = "asset"
+	actor.attack_time = 0.0
+	var order := asset_network.task(subject_id, "observe", HUNT_LOCATION)
+	asset_network.execute_task(subject_id)
+	var label := actor.node.get_node_or_null("Identity") as Label3D
+	if label != null:
+		label.text = "%s / ASSET" % str(actor.display_name).to_upper()
+	prompt.text = "%s // %s" % [asset_network.roster_line(), str(order.command).to_upper()]
+
+
+func _cycle_asset_task() -> void:
+	var roster := asset_network.assets()
+	if roster.is_empty():
+		prompt.text = asset_network.roster_line()
+		return
+	var asset: Dictionary = roster[0]
+	var current: Dictionary = asset.get("remote_task", {})
+	var index := ASSET_NETWORK.TASKS.find(str(current.get("command", "")))
+	var command: String = ASSET_NETWORK.TASKS[(index + 1) % ASSET_NETWORK.TASKS.size()]
+	asset_network.task(str(asset.id), command, HUNT_LOCATION)
+	asset_network.execute_task(str(asset.id))
+	prompt.text = asset_network.roster_line() + " // REMOTE ORDER EXECUTING"
 
 
 ## B5.1. A body you can open: downed and alive, or dead and still warm. The
@@ -1163,12 +1219,36 @@ func _update_rival(delta: float) -> void:
 		_wound_player(enemy.global_position, 17.0, "cut")
 		WorldHistory.record_event("rival_struck_player", {"rival": HUNT_ID, "location": HUNT_LOCATION})
 		if health <= 0:
-			health = 65
-			player = Vector3(0, 1.5, 19)
-			player_body.position = player - Vector3.UP * 0.6
-			WorldHistory.record_event("player_recovered_by_nix", {"location": HUNT_LOCATION})
+			_route_player_defeat(HUNT_ID)
 	if enemy_health <= 25:
 		_rival_retreats("Mara escapes through the tunnel. Her next body will not be the same.")
+
+
+func _route_player_defeat(captor_id: String) -> void:
+	var result := DEFEAT_ROUTER.route(captor_id, HUNT_LOCATION)
+	health = 1
+	stamina = 0.0
+	enemy_retreating = true
+	if enemy != null:
+		enemy.visible = false
+	player = Vector3(-31.0, 1.5, 26.0)
+	player_body.position = player - Vector3.UP * 0.6
+	prompt.text = "%s // HELD AT %s // [K] DIE DELIBERATELY" % [str(result.outcome).to_upper(), str(result.destination).replace("_", " ").to_upper()]
+
+
+func _deliberate_redecant() -> void:
+	var result := DEFEAT_ROUTER.redecant()
+	if result.is_empty():
+		return
+	health = 65
+	stamina = 70.0
+	player_rig.anatomy.configure("player")
+	player_rig.restore({})
+	WorldHistory.amend_subject("player", {"anatomy_state": player_rig.snapshot()})
+	player = Vector3(0, 1.5, 19)
+	player_body.position = player - Vector3.UP * 0.6
+	enemy_retreating = true
+	prompt.text = "RE-DECANTED // THE TAR KEPT %d THINGS" % (result.forfeited as Array).size()
 
 
 func _update_encounter_actors(delta: float) -> void:
@@ -1190,6 +1270,13 @@ func _update_encounter_actors(delta: float) -> void:
 				WorldHistory.update_subject(str(actor.subject_id), {"status": "downed", "anatomy_state": actor.rig.snapshot()}, "npc_downed")
 			if player.distance_to(node.global_position) <= 4.0:
 				prompt.text = "[E] %s / DOWNED, ALIVE — DECIDE THEIR FATE" % str(actor.display_name).to_upper()
+			continue
+		if str(actor.get("state", "")) == "staggered":
+			actor["stagger_remaining"] = maxf(0.0, float(actor.get("stagger_remaining", 0.0)) - delta)
+			(node as CharacterBody3D).velocity = Vector3.ZERO
+			actor.attack_time = 0.0
+			if float(actor.stagger_remaining) <= 0.0:
+				actor.state = "hunting"
 			continue
 		if str(actor.get("disposition", "hostile")) != "hostile":
 			actor.attack_time = 0.0
@@ -1235,6 +1322,21 @@ func _actor_attack_cycle(actor: Dictionary) -> float:
 
 func _actor_attack_damage(actor: Dictionary) -> int:
 	return maxi(2, roundi(9.0 * _actor_combat_ratio(actor)))
+
+
+func _apply_combat_response(actor: Dictionary, attack: Dictionary, hit: Dictionary) -> void:
+	var response := COMBAT_RESPONSE.from_hit(attack, actor.anatomy, hit)
+	if not bool(response.staggered):
+		return
+	actor.state = "staggered"
+	actor["stagger_remaining"] = float(response.duration)
+	actor.attack_time = 0.0
+	WorldHistory.record_event("attack_interrupted", {
+		"actor": "player", "subject_id": actor.subject_id,
+		"weapon": attack.get("weapon", "unknown"), "severity": response.severity,
+		"location": HUNT_LOCATION,
+	})
+	prompt.text = "%s LOSES THEIR FOOTING // PRESS THE OPENING" % str(actor.display_name).to_upper()
 
 
 func _apply_maiming_state(actor: Dictionary, zones: Array, direction: Vector3) -> void:

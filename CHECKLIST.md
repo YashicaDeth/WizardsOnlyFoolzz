@@ -369,13 +369,13 @@ mechanisms and almost none are built.
 - [x] ~~**F4.3** The wound as the memory~~
 
 ### F5 — Player defeat routed to shackled
-- [ ] **F5.1** Losing is not a reload
-- [ ] **F5.2** Shackled, conscripted or stamped by whoever won
-- [ ] **F5.3** Deliberate death: forfeit loot, re-decant out of the tar
+- [x] ~~**F5.1** Losing is not a reload~~
+- [x] ~~**F5.2** Shackled, conscripted or stamped by whoever won~~
+- [x] ~~**F5.3** Deliberate death: forfeit loot, re-decant out of the tar~~
 
 ### F6 — Mind-stamp and the asset list
-- [ ] **F6.1** Non-consensual recruitment through the handheld
-- [ ] **F6.2** Assets listed, taskable, remotely executable
+- [x] ~~**F6.1** Non-consensual recruitment through the handheld~~
+- [x] ~~**F6.2** Assets listed, taskable, remotely executable~~
 
 ### F7 — The clinch as a social verb
 **Highest value per line of code in the whole list** — four systems that already
@@ -599,8 +599,8 @@ Unglamorous, and each one is currently costing real time.
 - [ ] **J1.3** Remove the plugin outright — 238MB referenced by no script
 
 ### J2 — Debug affordances out of the shipping build
-- [ ] **J2.1** Reset keys off the shipping input map
-- [ ] **J2.2** Dev-only gate for the rest
+- [x] ~~**J2.1** Reset keys off the shipping input map~~
+- [x] ~~**J2.2** Dev-only gate for the rest~~
 
 ### J3 — Adopt the installed plugins
 - [ ] **J3.1** LimboAI for F4.2
