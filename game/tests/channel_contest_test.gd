@@ -80,5 +80,20 @@ func _ready() -> void:
 	WorldHistory.amend_subject("vanity_row", {"signal_control": 40.0})
 	check(is_equal_approx(wire.signal_reach_factor("vanity_row"), 0.4), "a half-flooded-ish channel carries a rumour proportionally, not all-or-nothing")
 
+	# --- K4.6 v2: the Sin acts on the world — its own captain remembers ------
+	var grudge_before := int(WorldHistory.subject("cass_lumen").get("grudge", 0))
+	WorldHistory.amend_subject("vanity_row", {"signal_control": 100.0})
+	wire.contest_channel("vanity_row", "flood", "player")
+	var grudge_after_flood := int(WorldHistory.subject("cass_lumen").get("grudge", 0))
+	check(grudge_after_flood > grudge_before, "flooding Vanity Row's channel actually raises Cass Lumen's grudge (%d -> %d)" % [grudge_before, grudge_after_flood])
+
+	wire.contest_channel("vanity_row", "cut", "player", true)
+	var grudge_after_cut := int(WorldHistory.subject("cass_lumen").get("grudge", 0))
+	check(grudge_after_cut > grudge_after_flood, "and cutting the mast entirely is remembered harder than flooding it (%d > %d)" % [grudge_after_cut, grudge_after_flood])
+
+	var refused := wire.contest_channel("vanity_row", "hijack", "player", false)
+	check(not bool(refused.get("ok", false)), "a refused contest attempt")
+	check(int(WorldHistory.subject("cass_lumen").get("grudge", 0)) == grudge_after_cut, "does not also raise grudge — only a contest that actually landed is remembered")
+
 	print("CHANNEL_CONTEST_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
