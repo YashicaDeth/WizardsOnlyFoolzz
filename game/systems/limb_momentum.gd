@@ -62,7 +62,14 @@ var spin := Vector2.ZERO
 
 ## Peak head speed since the last time it was read. A blow is judged on its
 ## fastest moment, not on the speed at the frame contact happened to resolve.
-var _peak := 0.0
+## Below this the weapon is not swinging, it is being carried. Sag and the
+## spring settling both sit under it.
+const IDLE_SPEED := 0.9
+## How fast an abandoned swing stops counting, in metres of travel per second.
+const WORK_DECAY := 6.0
+## Metres the business end has travelled in this swing. See `advance` — this is
+## what a blow is worth, and `commitment()` is it against a reference.
+var _work := 0.0
 var _peak_decay := 0.0
 
 
@@ -110,20 +117,51 @@ func advance(delta: float, look_delta: Vector2, body_velocity := Vector3.ZERO, g
 	tilt.y = clampf(tilt.y, -1.25, 1.25)
 
 	# The arm has a length. Past it the weapon is not floppy, it has come off.
+	#
+	# AN1.4. What happens *at* that limit is the whole design, and the first
+	# version got it backwards. It discarded the outward velocity, which meant
+	# a hard committed sweep hit the limit early, lost its speed to the clamp,
+	# and measured **slower at the head than a gentler swing** — the exact
+	# inversion this system exists to prevent. Found by
+	# `tests/arm_calibration_test.gd`: 600 deg/s sustained 2.13 m/s against
+	# 300 deg/s sustaining 2.52.
+	#
+	# An arm at full extension does not stop. It starts rotating — the travel
+	# becomes a swing about the shoulder. So the outward component is
+	# *converted* into spin rather than thrown away, which is both what a body
+	# does and what makes a harder swing produce a faster head.
 	var stretch := at - anchor
 	if stretch.length() > 0.42:
-		at = anchor + stretch.normalized() * 0.42
-		velocity = velocity.slide(stretch.normalized()) * 0.6
+		var outward := stretch.normalized()
+		at = anchor + outward * 0.42
+		var radial := velocity.project(outward)
+		spin += Vector2(-radial.y, radial.x) * (2.6 / maxf(mass, 0.05))
+		velocity -= radial
 
+	# AN1.4. **Travel, not speed.** Two measures were tried before this one and
+	# both failed the same way, which is worth recording because the failure is
+	# the design question.
+	#
+	# Peak head speed made a single-frame flick worth exactly as much as a
+	# committed sweep, because both touch the same top speed. Peak of a smoothed
+	# head speed was not much better: a hard sweep spends most of itself at full
+	# extension where the spring is fighting it, so the smoothed signal never
+	# separated from a gentler swing (2.16 against 2.52 — the wrong way round).
+	#
+	# What actually distinguishes a blow from a twitch is **how far the business
+	# end travelled while it was moving**. That is work done, it is what a blow
+	# physically is, and it separates the gestures cleanly because it multiplies
+	# speed by duration instead of discarding one of them.
 	var speed := head_speed()
-	if speed > _peak:
-		_peak = speed
+	if speed > IDLE_SPEED:
+		_work += speed * eased
 		_peak_decay = 0.0
 	else:
-		# The peak is only worth remembering for as long as a blow lasts.
+		# A swing that has stopped stops counting, or standing still holding a
+		# weapon would slowly become the hardest blow in the game.
 		_peak_decay += eased
-		if _peak_decay > 0.22:
-			_peak = speed
+		if _peak_decay > 0.18:
+			_work = maxf(0.0, _work - eased * WORK_DECAY)
 
 
 ## How fast the business end is moving, metres per second. The tip travels
@@ -134,12 +172,17 @@ func head_speed() -> float:
 	return velocity.length() + from_spin
 
 
-## What that blow was worth, 0..1, against `reference` metres per second as a
-## solid committed swing. This is the number combat should ask for instead of a
-## constant on the weapon: the weapon sets the ceiling, the player decides how
-## much of it they earned.
-func commitment(reference := 7.0) -> float:
-	return clampf(_peak / maxf(reference, 0.1), 0.0, 1.0)
+## What that blow was worth, 0..1: metres the head travelled, against the
+## metres a committed sweep produces. The reference comes from measurement
+## rather than taste — `tests/arm_calibration_test.gd` drives five real
+## gestures through this and prints what each one accumulates. At 3.9 metres:
+## a slow look scores 0.00, tracking somebody 0.19, a flick 0.48, a deliberate
+## swing 0.46, and a hard committed sweep 1.00.
+##
+## This is the number combat asks for instead of a constant on the weapon: the
+## weapon sets the ceiling, the player decides how much of it they earned.
+func commitment(reference := 3.9) -> float:
+	return clampf(_work / maxf(reference, 0.01), 0.0, 1.0)
 
 
 ## Contact. The weapon stops on what it hit and the arm keeps going, which is
@@ -154,7 +197,7 @@ func strike(resistance := 0.6, normal := Vector3.FORWARD) -> void:
 	velocity = along * (1.0 - bite * 0.35) - into * (0.15 + bite * 0.55)
 	spin *= 1.0 - bite * 0.4
 	spin += Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * bite * 2.4
-	_peak = 0.0
+	_work = 0.0
 	_peak_decay = 0.0
 
 
@@ -163,7 +206,7 @@ func strike(resistance := 0.6, normal := Vector3.FORWARD) -> void:
 func whiff() -> void:
 	velocity *= 1.12
 	spin *= 1.15
-	_peak = 0.0
+	_work = 0.0
 
 
 ## Where to draw it. Offset and rotation in view space, for whatever is holding
