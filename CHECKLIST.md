@@ -156,15 +156,15 @@ image instead of on top of nothing.
 The technique already exists in this project — `xray_specimen.gd` renders a live
 3D scene into a SubViewport for the loading screen. This is that, pointed down.
 
-- [ ] **A10.1** A camera above the region, rendering the real world into the map
-- [ ] **A10.2** Its real colours and materials, not a palette applied to a chart
-- [ ] **A10.3** Tilts as you zoom, so top-down becomes oblique becomes street level
-- [ ] **A10.4** Street view is the same world at eye height, not a second asset
-- [ ] **A10.5** Unsurveyed ground is grey, desaturated and fogged; walking it brings the colour in — Greg: *"going from grey and discoloured and foggy to when you walk around colored and explored"*
+- [x] **A10.1** A camera in the player's own world, above the region, rendered into the map
+- [x] **A10.2** Its real colours and materials — terrain, contamination pools, roads, building footprints
+- [x] **A10.3** Tilts past a threshold as you zoom: top-down to oblique to street
+- [x] **A10.4** Street view is the same camera at the bottom of its descent, arriving at 1.68m
+- [x] **A10.5** Unwalked ground is grey and fogged, thinning at the edges of where you have been; walking brings the colour in
 - [ ] **A10.9** The reveal is worth watching — colour arrives as you walk rather than snapping on
-- [ ] **A10.6** The chart marks, roads and contacts draw over the image and still read
+- [x] **A10.6** The chart marks, districts, contacts and title block all still read over the image
 - [ ] **A10.7** It lives in the handheld's MAP page, so it is the black mirror looking down
-- [ ] **A10.8** It costs nothing when the map is closed — the viewport stops rendering
+- [x] **A10.8** UPDATE_DISABLED while the map is shut; one frame per open frame otherwise
 
 ### A6 — Living Map as an object `BUILT`
 - [x] ~~**A6.1** `v2` Salvaged bezel — pipes, rust plate, screws — around the chart~~

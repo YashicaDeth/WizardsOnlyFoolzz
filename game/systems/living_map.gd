@@ -335,6 +335,24 @@ func _draw_unwalked_veil() -> void:
 	var step := CELL * zoom
 	if step < 3.0:
 		return
+	# Ground beyond the cell grid is unknown too, and was showing through at full
+	# colour — which read as the edges of the map being its best-surveyed part.
+	# Veiled as four bands around the region rather than as one sheet over
+	# everything, because a sheet doubles up on the per-cell veil below and turns
+	# the surveyed region into the darkest thing on the chart.
+	var half_region := AshbloomWorldGenerator.REGION_SIZE * 0.5
+	var top_left := _to_screen(Vector2(-half_region.x, -half_region.y))
+	var bottom_right := _to_screen(Vector2(half_region.x, half_region.y))
+	var region := Rect2(top_left, bottom_right - top_left).abs()
+	var outside := Color(0.46, 0.47, 0.44, 0.86)
+	if region.position.y > _chart.position.y:
+		draw_rect(Rect2(_chart.position, Vector2(_chart.size.x, region.position.y - _chart.position.y)).intersection(_chart), outside)
+	if region.end.y < _chart.end.y:
+		draw_rect(Rect2(Vector2(_chart.position.x, region.end.y), Vector2(_chart.size.x, _chart.end.y - region.end.y)).intersection(_chart), outside)
+	if region.position.x > _chart.position.x:
+		draw_rect(Rect2(Vector2(_chart.position.x, region.position.y), Vector2(region.position.x - _chart.position.x, region.size.y)).intersection(_chart), outside)
+	if region.end.x < _chart.end.x:
+		draw_rect(Rect2(Vector2(region.end.x, region.position.y), Vector2(_chart.end.x - region.end.x, region.size.y)).intersection(_chart), outside)
 	var half := AshbloomWorldGenerator.REGION_SIZE * 0.5
 	var from := Vector2i(floori(-half.x / CELL) - 1, floori(-half.y / CELL) - 1)
 	var to := Vector2i(ceili(half.x / CELL) + 1, ceili(half.y / CELL) + 1)
@@ -351,8 +369,17 @@ func _draw_unwalked_veil() -> void:
 			for offset: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 				if surveyed.has("%d,%d" % [cx + offset.x, cy + offset.y]):
 					known += 1
-			var veil: float = lerpf(0.88, 0.42, clampf(float(known) / 4.0, 0.0, 1.0))
-			draw_rect(cell.intersection(_chart), Color(0.10, 0.11, 0.10, veil))
+			var veil: float = lerpf(0.86, 0.40, clampf(float(known) / 4.0, 0.0, 1.0))
+			var patch := cell.intersection(_chart)
+			# Greg asked for "grey and discoloured and foggy", and the first pass
+			# painted it near-black. Black hides the shape of what you have not
+			# been to; grey keeps the shape legible, which is what makes the
+			# unrevealed part pull at you rather than simply being absent.
+			draw_rect(patch, Color(0.46, 0.47, 0.44, veil))
+			# The fog: a soft sheet that thins toward ground you have walked, so
+			# the edge of the known reads as weather rather than as a mask.
+			if known > 0:
+				draw_rect(patch, Color(0.66, 0.68, 0.62, 0.07 * float(known)))
 
 
 func _draw_unsurveyed() -> void:
@@ -509,7 +536,7 @@ func _draw_player() -> void:
 	var screen := _to_screen(player_at)
 	if not _chart.has_point(screen):
 		return
-	# A facing cone, because a dot on a map cannot tell you which way you are
+	# A facing cone, because a mark on a map cannot tell you which way you are
 	# pointed and that is the one thing you open a map to find out.
 	var heading := Vector2(sin(player_yaw), cos(player_yaw))
 	var side := Vector2(-heading.y, heading.x)
@@ -518,11 +545,22 @@ func _draw_player() -> void:
 		screen,
 		screen + heading * 46.0 - side * 20.0,
 	]), SPORE * Color(1, 1, 1, 0.12))
+
+	# Greg: "make in the map it have the head icon instead of an arrow." An arrow
+	# is a cursor; a head is a person, and this map is a survey of a place full of
+	# people rather than a navigation aid. Drawn from above — the crown, with the
+	# jaw toward where you are looking, so it still reports facing.
+	var crown := 6.0
+	draw_circle(screen, crown, SPORE)
+	draw_circle(screen, crown * 0.62, VOID * Color(1, 1, 1, 0.55))
+	# The jaw, toward the heading.
 	draw_colored_polygon(PackedVector2Array([
-		screen + heading * 11.0,
-		screen - heading * 6.0 + side * 6.0,
-		screen - heading * 6.0 - side * 6.0,
+		screen + heading * crown * 1.55,
+		screen + side * crown * 0.52,
+		screen - side * crown * 0.52,
 	]), SPORE)
+	# Shoulders, so it reads as a body seen from above rather than a dot.
+	draw_line(screen - side * crown * 1.25, screen + side * crown * 1.25, SPORE * Color(1, 1, 1, 0.8), 2.2)
 	draw_arc(screen, 13.0 + sin(clock * 3.0) * 2.0, 0.0, TAU, 20, SPORE * Color(1, 1, 1, 0.5), 1.0)
 
 
