@@ -498,15 +498,21 @@ func load_from_world() -> bool:
 
 
 ## The decanting lottery. The vat gives you what it gives you.
+##
+## Found while proving N2 with a fixed seed: `pool.shuffle()` used to run
+## here, and `Array.shuffle()` draws from Godot's *global* RNG, not this
+## function's own seeded one — so the same seed produced a different build
+## depending on how much global random state other systems had already
+## burned through before this ran, not reproducibly at all. Each trait is
+## rolled independently regardless of order, so the shuffle was never doing
+## anything but that; removed rather than reimplemented.
 func randomise(seed_value: int = 0) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value if seed_value != 0 else Time.get_ticks_msec()
 	route = "random"
 	race = RACES.keys()[rng.randi_range(0, RACES.size() - 1)]
 	traits.clear()
-	var pool: Array = TRAITS.keys()
-	pool.shuffle()
-	for trait_id in pool:
+	for trait_id in TRAITS.keys():
 		if rng.randf() < 0.45:
 			toggle_trait(str(trait_id))
 	birth = {
