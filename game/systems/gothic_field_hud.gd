@@ -197,7 +197,7 @@ func _draw_weapon_silhouette(at: Vector2, weapon_id: String) -> void:
 
 func _draw_controls() -> void:
 	var font := ThemeDB.fallback_font
-	var controls := "1—3 ARMS   LMB USE   RMB HEAVY   R LOAD   SPACE DODGE   E ACT   F EYE"
+	var controls := "1—3 ARMS   LMB USE   RMB HEAVY   X GUARD   SPACE DODGE   E ACT   F EYE"
 	draw_string(font, Vector2(size.x * 0.5 - 370, size.y - 27), controls, HORIZONTAL_ALIGNMENT_CENTER, 740, 11, BONE * Color(1, 1, 1, 0.52))
 
 

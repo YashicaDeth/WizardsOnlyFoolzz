@@ -717,7 +717,7 @@ what that is rather than fixing another symptom.
 - [x] **O2.1** Cleaver windup 0.16s → 0.28s; a heavy blade is readable before it lands
 - [x] **O2.2** Hitstop, camera kick and shake on contact, scaled by the zone's own health
 - [x] **O2.3** A miss carries the weapon through and moves the camera; it never stops time
-- [ ] **O2.4** Blocking, parrying or evading is a real decision with a real window
+- [x] **O2.4** Hold X to guard; the first 0.18s is a parry. Three answers now, not one
 
 ### O3 — The body is the health bar
 - [ ] **O3.1** Damage lands on the limb you actually hit and stays there
@@ -747,7 +747,7 @@ hitpoints. `clinch_test.gd` and F7 already exist; this is the rest of it.
 - [ ] **O5.6** They fight the hold — a grapple you win instantly is not one
 - [ ] **O5.7** Off-balance is a real state for both of you; footing matters
 - [ ] **O5.8** Unarmed is viable and horrible, because the body is the weapon system
-- [ ] **O5.9** Everything here reads through the anatomy already built — a broken arm cannot hold you
+- [x] **O5.9** Proven on the guard first: two broken arms block badly, no arms cannot block at all
 
 ### O4 — Enemies that fight back
 - [ ] **O4.1** They read your commitment and punish it

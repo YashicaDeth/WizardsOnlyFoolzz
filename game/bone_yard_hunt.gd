@@ -77,6 +77,20 @@ const UNLOCK_BOSSES := 1
 var stamina := 100.0
 var health := 100
 var attack_cooldown := 0.0
+## O2.4. Guarding. Dodging already existed and was already consulted on
+## incoming damage, which made evasion real — but it was the *only* defensive
+## option, and one option is a reflex rather than a decision. A guard you hold
+## gives the player a second answer with a different shape: safer, slower, and
+## it costs you the initiative instead of costing you stamina in a burst.
+##
+## The first fraction of a second of raising it is a parry rather than a block,
+## which is where the decision actually lives: hold early and you are merely
+## safe, time it and you take the initiative back.
+var guarding := false
+var guard_raised := 0.0
+var guard_stamina_drain := 14.0
+const PARRY_WINDOW := 0.18
+const GUARD_DAMAGE_SCALE := 0.28
 var dodge_cooldown := 0.0
 var story_step := 0
 var panel_mode := ""
@@ -524,6 +538,18 @@ func _physics_process(delta: float) -> void:
 	attack_cooldown = maxf(0.0, attack_cooldown - delta)
 	arsenal.tick(delta)
 	dodge_cooldown = maxf(0.0, dodge_cooldown - delta)
+	# O2.4. Holding a guard up is work. It drains while raised so a guard cannot
+	# simply be left on, and it drops on its own when there is nothing left.
+	var wants_guard := Input.is_key_pressed(KEY_X) and panel_mode.is_empty() and not resolution_ui.visible
+	if wants_guard and guard_strength() > 0.0 and stamina > 1.0:
+		if not guarding:
+			guard_raised = 0.0
+		guarding = true
+		guard_raised += delta
+		stamina = maxf(0.0, stamina - guard_stamina_drain * delta)
+	else:
+		guarding = false
+		guard_raised = 0.0
 	_update_player(delta)
 	_update_rival(delta)
 	_update_encounter_actors(delta)
@@ -840,6 +866,47 @@ func _reload_weapon() -> void:
 		body_motion.trigger_reload(float(arsenal.current().reload))
 		# Reloading is visible as a cartridge travelling through the well.
 		prompt.text = ""
+
+
+## O2.4 / O5.9. How much guard the body can actually hold up, read from the arms
+## that would be holding it. A shattered forearm cannot block, which is the same
+## rule the brawl runs on: everything reads through the anatomy already built.
+func guard_strength() -> float:
+	if player_rig == null or not is_instance_valid(player_rig):
+		return 1.0
+	var arms := 0.0
+	var count := 0
+	for zone_id: String in ["left_arm", "right_arm"]:
+		if player_rig.severed.has(zone_id):
+			continue
+		var maximum: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone_id, {}) as Dictionary).get("health", 65.0))
+		arms += clampf(player_rig.zone_health(zone_id) / maxf(maximum, 1.0), 0.0, 1.0)
+		count += 1
+	if count == 0:
+		return 0.0
+	return clampf(arms / float(count), 0.0, 1.0)
+
+
+## Applied to anything that lands on the player while the guard is up. Returns
+## the surviving fraction of the damage, and whether it was parried — a parry is
+## the first moments of the guard and gives the initiative straight back.
+func guard_absorb(damage: float) -> Dictionary:
+	if not guarding:
+		return {"damage": damage, "blocked": false, "parried": false}
+	var parried := guard_raised <= PARRY_WINDOW
+	if parried:
+		# Nothing gets through a parry, and it costs the attacker instead of you.
+		impact_feel.strike(0.85, "cut", false)
+		prompt.text = "TURNED IT"
+		WorldHistory.record_event("player_parried", {"location": HUNT_LOCATION})
+		return {"damage": 0.0, "blocked": true, "parried": true}
+	# A block is not free: it scales with what the arms can actually hold, and
+	# the rest of it still arrives.
+	var through: float = damage * lerpf(1.0, GUARD_DAMAGE_SCALE, guard_strength())
+	stamina = maxf(0.0, stamina - damage * 0.45)
+	impact_feel.strike(0.3, "blunt", false)
+	WorldHistory.record_event("player_blocked", {"location": HUNT_LOCATION})
+	return {"damage": through, "blocked": true, "parried": false}
 
 
 func _dodge() -> void:
@@ -1309,7 +1376,16 @@ func _update_encounter_actors(delta: float) -> void:
 			if float(actor.attack_time) >= attack_cycle:
 				actor.attack_time = 0.0
 				if dodge_remaining <= 0.0:
-					health = maxi(1, health - _actor_attack_damage(actor))
+					# O2.4. Through the guard first. A parry takes none of it and
+					# hands the initiative back; a block takes the edge off and
+					# spends stamina instead of blood.
+					var incoming := float(_actor_attack_damage(actor))
+					var guarded: Dictionary = guard_absorb(incoming)
+					if bool(guarded.get("parried", false)):
+						# The attacker eats their own commitment.
+						actor["stagger"] = 0.85
+						actor["cooldown"] = maxf(float(actor.get("cooldown", 0.0)), 1.1)
+					health = maxi(1, health - roundi(float(guarded.get("damage", incoming))))
 					_wound_player(node.global_position, maxf(5.0, 15.0 * _actor_combat_ratio(actor)), "cut")
 
 
@@ -2060,7 +2136,7 @@ func _update_hud() -> void:
 		third_person_unlock_announced = true
 		_announce_third_person_unlock()
 	title.text = "WIZARDS ONLY FOOLS // LIMBO: ASHBLOOM EXPANSE"
-	status.text = "WASD MOVE  SHIFT RUN  LMB STRIKE  SPACE DODGE  Q SURGE\nE INTERACT  TAB INDEX  M MAP  T TREE  J ALLUSIONS  F CAMERA"
+	status.text = "WASD MOVE  SHIFT RUN  LMB STRIKE  X GUARD  SPACE DODGE  Q SURGE\nE INTERACT  TAB INDEX  M MAP  T TREE  J ALLUSIONS  F CAMERA"
 	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(HUNT_ID).get("status", "dormant")).to_upper()]
 	prompt.visible = not resolution_ui.visible and not living_map.visible and not world_index.visible
 	if field_interface.has_method("set_state"):
