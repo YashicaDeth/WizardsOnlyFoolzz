@@ -373,6 +373,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if event.pressed:
+			_attack()
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_MIDDLE:
 		_toggle_lock()
 	if event is InputEventMouseButton and event.pressed and not lock_target.is_empty():
@@ -497,6 +499,9 @@ func _update_player(delta: float) -> void:
 	# rather than scaled straight off `mobility_ratio`, because a game you cannot
 	# retreat from is a game that is over.
 	speed *= _player_speed_scale()
+	# A melee press is one committed swing, not an automatic attack repeated by
+	# holding the mouse. You can still steer it, but not sprint through its tell.
+	speed *= COMBAT_RESPONSE.movement_scale(pending_attack, strike_windup)
 	player_capsule.height = move_toward(player_capsule.height, 1.2 if crouching else 1.8, delta * 4.0)
 	player_collider.position.y = (player_capsule.height - 1.8) * 0.5
 	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0)
@@ -506,8 +511,6 @@ func _update_player(delta: float) -> void:
 	stamina = clampf(stamina + (-26.0 if sprinting else 18.0) * delta, 0, 100)
 	body_motion.update(delta, player_body.velocity, player_body.is_on_floor(), sprinting, crouching, dodge_remaining > 0.0)
 	hunter_appearance.set_mouth(player_rig.anatomy.pain / 180.0, sin(pulse * 0.7) * player_rig.anatomy.pain / 100.0)
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		_attack()
 
 
 func _attack(heavy := false) -> void:

@@ -6,6 +6,7 @@ extends RefCounted
 ## missing arms make somebody easier to interrupt because their body changed.
 
 const STAGGER_THRESHOLD := 24.0
+const MELEE_COMMITMENT_SPEED := 0.58
 
 static func from_hit(attack: Dictionary, anatomy: AnatomyComponent, hit: Dictionary) -> Dictionary:
 	var force := float(attack.get("impulse", 0.0))
@@ -20,3 +21,9 @@ static func from_hit(attack: Dictionary, anatomy: AnatomyComponent, hit: Diction
 		"duration": clampf(0.22 + (severity - STAGGER_THRESHOLD) * 0.018, 0.22, 1.05) if staggered else 0.0,
 		"interrupts_attack": staggered,
 	}
+
+
+static func movement_scale(pending_attack: Dictionary, windup_remaining: float) -> float:
+	if windup_remaining >= 0.0 and str(pending_attack.get("kind", "")) == "melee":
+		return MELEE_COMMITMENT_SPEED
+	return 1.0
