@@ -299,9 +299,9 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 ### C v2 — the second pass
 - [ ] **C1.6** `v2` The device is raised at one angle in one hand, every time
 - [ ] **C1.7** `v2` It can be dropped, and it can be taken off you
-- [ ] **C1.8** `v2` Physical wear accumulates across a run rather than being a damage state
-- [ ] **C2.6** `v2` Modes cycle; a player who knows the device should reach a mode directly
-- [ ] **C5.5** `v2` One crack pattern for every cracked screen in the game
+- [x] **C1.8** `v2` Wear accumulates in WorldHistory and only ever goes one way — a cracked screen does not heal
+- [x] **C2.6** `v2` F1-F5 reach a page directly; cycling is how you learn the device, not how you use one you know
+- [x] **C5.5** `v2` Cracks seeded from the device's own serial, at its real condition rather than a constant 0.85
 
 ## D — Character creation in the vat
 

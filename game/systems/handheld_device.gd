@@ -66,7 +66,22 @@ var carry_index := 0
 var raised := 0.0
 var is_open := false
 var elapsed := 0.0
+## C1.8 / C5.5 `v2`. The device was a screen with a fixed condition and one
+## hardcoded crack seed, so every handheld in the game cracked in exactly the
+## same places and arrived at the same wear no matter what its owner had been
+## through. It is one object that belongs to one person, and it should carry
+## what happened to it.
+##
+## `serial` is the device's own identity: the cracks are drawn from it, so two
+## devices are never broken the same way. `condition` still says how bad it is;
+## it now comes back from `WorldHistory` rather than starting at 0.78 forever.
+const DEVICE_ID := "handheld"
+var serial := 0
 var condition := 0.78
+
+## Where the wear came from, in the device's own words. Kept so the status page
+## can say "quarry impact" rather than showing a percentage.
+var wear_log: Array = []
 var radio: WireRadio
 var carry: Carry
 var signal_field: SignalField
@@ -152,7 +167,55 @@ func bind(generator: Node, director: Node, contacts: Callable) -> void:
 		radio.set_occluders(generator.get("lots"))
 
 
+## C1.8 `v2`. The device remembers. Wear accumulates across the run instead of
+## resetting to 0.78 every time the scene loads, and the serial is stable so the
+## same handheld is always broken in the same places — just more of them.
+func load_device() -> void:
+	var record: Dictionary = WorldHistory.subject(DEVICE_ID)
+	if record.is_empty():
+		# A new device is nearly intact and gets its own identity. Not random per
+		# session: written down, so it is this device from now on.
+		serial = randi() % 900000 + 100000
+		condition = 0.94
+		wear_log = []
+		save_device()
+		return
+	serial = int(record.get("serial", 90211))
+	condition = clampf(float(record.get("condition", 0.78)), 0.0, 1.0)
+	wear_log = (record.get("wear_log", []) as Array).duplicate()
+
+
+func save_device() -> void:
+	WorldHistory.register_subject(DEVICE_ID, {})
+	WorldHistory.update_subject(DEVICE_ID, {
+		"serial": serial,
+		"condition": snappedf(condition, 0.001),
+		"wear_log": wear_log.duplicate(),
+		"kind": "object",
+	}, "device_changed")
+
+
+## Something happened to it. Wear only ever goes one way — a cracked screen does
+## not heal, and this is the one number in the game that is allowed to be a
+## ratchet.
+func take_wear(amount: float, cause := "") -> void:
+	if amount <= 0.0:
+		return
+	var before := condition
+	condition = clampf(condition - amount, 0.0, 1.0)
+	if cause != "":
+		wear_log.append(cause)
+		while wear_log.size() > 8:
+			wear_log.pop_front()
+	if int(before * 10.0) != int(condition * 10.0):
+		# Crossing a tenth is worth writing down; every scratch is not.
+		WorldHistory.record_event("device_damaged", {"cause": cause, "condition": snappedf(condition, 0.01)})
+	save_device()
+	queue_redraw()
+
+
 func open_device() -> void:
+	load_device()
 	is_open = true
 	visible = true
 	set_mode(current_mode())
@@ -197,6 +260,16 @@ func cycle_mode(step: int) -> void:
 	if not is_open:
 		return
 	set_mode(MODES[wrapi(mode_index + step, 0, MODES.size())])
+
+
+## C2.6 `v2`. Cycling is how you learn the device; it is not how you use one you
+## already know. A player who has had this thing in their hands for an hour
+## should be able to reach the map without walking past the radio to get there.
+func jump_to_mode(index: int) -> bool:
+	if not is_open or index < 0 or index >= MODES.size():
+		return false
+	set_mode(MODES[index])
+	return true
 
 
 ## Moves the hand through the bag. Host-driven, like every other control on
@@ -355,7 +428,10 @@ func _draw_chassis(rect: Rect2, alpha: float) -> void:
 	_draw_status(rect, alpha)
 	# Cracks last, over the content: the damage is in front of what you are
 	# reading, because it is damage to the surface you are reading through.
-	BlackMirror.draw_cracks(self, rect, alpha, 90211, 0.85)
+	# C5.5 `v2`. Seeded from this device rather than from 90211, and the severity
+	# is how broken it actually is rather than a constant. A pristine handheld
+	# has almost no cracks; one that has been through a derby is a mess.
+	BlackMirror.draw_cracks(self, rect, alpha, serial, clampf(1.0 - condition, 0.0, 1.0))
 
 
 func _draw_tabs(rect: Rect2, alpha: float) -> void:
