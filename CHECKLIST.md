@@ -720,9 +720,28 @@ holds what the *player* thinks — which is allowed to be wrong.
 ### L6 — Theories, mainlines and endings
 - [x] **L6.1** The board ships with authored theories already pinned, contradictory and unmarked
 - [x] **L6.2** A mainline theory followed far enough is an ending; E7's two routes are the first two
-- [ ] **L6.3** Sidelines are their own clusters, not smaller mainlines — some connect to two
+- [x] ~~**L6.3** Sidelines are their own clusters, not smaller mainlines —
+      some connect to two~~ `leads()` (L3.2) has recorded every supported
+      string since the first pass, but nothing ever read them as anything —
+      each lead was its own isolated pair with no way to tell "a sideline in
+      its own right" from "a weak attempt at a mainline". `sideline_clusters()`
+      groups the lead graph by simple union-find: a cluster is whichever
+      theory ids one of its own nodes happens to be strung to, so a cluster
+      touching none is a pure side story, one is a lead feeding a single
+      mainline, and — the case named directly — a cluster genuinely strung
+      into two different mainlines reads as connecting to both rather than
+      being forced into one. No new content invented; this reads the graph
+      that stringing already built.
 - [x] **L6.4** Pre-placed theories read differently based on what the player actually did
-- [ ] **L6.5** Different people, places and factions per route — no converging on one dungeon
+- [x] ~~**L6.5** Different people, places and factions per route — no
+      converging on one dungeon~~ Audited rather than reworked, because the
+      five mainlines already held this: `THEORIES`' `supported_by`
+      vocabularies never share a token (so no single piece of evidence
+      satisfies two mainlines at once), no two of `ROUTES`' final stages
+      close on the same event type (so no one act ends two routes together),
+      and `LIVING_MAP.DISTRICTS` names five distinct places for the
+      `map_travel`-gated stages to happen in rather than one. Verified by a
+      real test rather than left as read-the-code: `tests/sideline_cluster_test.gd`.
 - [x] **L6.6** No quest state anywhere: what you are "on" is read out of WorldHistory
 
 ### L5 — Career

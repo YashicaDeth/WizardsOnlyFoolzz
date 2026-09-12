@@ -705,6 +705,63 @@ func leads() -> Array:
 	return (WorldHistory.subject(BOARD_ID).get("leads", []) as Array).duplicate()
 
 
+## L6.3 v2. Leads have existed since L3.2 — every supported string opens
+## one — but nothing ever asked what a set of them added up to, so every
+## lead read as its own dead end rather than as part of anything. A
+## sideline is not a smaller mainline: it is its own connected cluster of
+## leads, most of which never touch a theory at all, and the ones that do
+## are not required to touch only one. Grouped here by simple union-find
+## over `leads()`'s own from/to pairs — no new data, just reading the graph
+## that was always implicit in it.
+##
+## `mainlines` on a cluster is which of the five theories one of its own
+## nodes turned out to be strung to; a cluster with none is a pure side
+## story, one is a lead that feeds a single mainline, and two or more is
+## the case L6.3 named directly — a sideline that connects to two mainlines
+## rather than converging into one.
+func sideline_clusters() -> Array:
+	var owner: Dictionary = {}
+	var groups: Array = []
+	for lead: Dictionary in leads():
+		var from := str(lead.get("from", ""))
+		var to := str(lead.get("to", ""))
+		var from_group := int(owner.get(from, -1))
+		var to_group := int(owner.get(to, -1))
+		if from_group == -1 and to_group == -1:
+			var nodes: Array = [from, to]
+			groups.append(nodes)
+			owner[from] = groups.size() - 1
+			owner[to] = groups.size() - 1
+		elif to_group == -1:
+			(groups[from_group] as Array).append(to)
+			owner[to] = from_group
+		elif from_group == -1:
+			(groups[to_group] as Array).append(from)
+			owner[from] = to_group
+		elif from_group != to_group:
+			# Two previously separate clusters turn out to be the same one —
+			# a later string tying them together. Fold the smaller index's
+			# nodes into the other and leave an empty group behind rather
+			# than reindexing everything `owner` points at.
+			for node: String in (groups[to_group] as Array):
+				owner[node] = from_group
+			(groups[from_group] as Array).append_array(groups[to_group] as Array)
+			groups[to_group] = []
+	var theory_ids: Array = []
+	for theory: Dictionary in THEORIES:
+		theory_ids.append(str(theory["id"]))
+	var clusters: Array = []
+	for nodes: Array in groups:
+		if nodes.is_empty():
+			continue
+		var mainlines: Array = []
+		for node: String in nodes:
+			if theory_ids.has(node) and not mainlines.has(node):
+				mainlines.append(node)
+		clusters.append({"nodes": nodes, "mainlines": mainlines})
+	return clusters
+
+
 func _theory(ref: String) -> Dictionary:
 	for theory: Dictionary in THEORIES:
 		if str(theory["id"]) == ref:
