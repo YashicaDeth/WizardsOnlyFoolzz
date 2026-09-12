@@ -368,6 +368,105 @@ func factions() -> Array:
 	return listing
 
 
+# --- K4.4: signal territory ------------------------------------------------
+
+## "A Sin does not hold a keep. It holds a channel." — DESIGN/FACTIONS.md,
+## applied to whichever faction actually has a `channel` field (every Sin,
+## per `bone_yard_hunt.gd` and `cosmology_factions.gd`). `signal_control`
+## starts at 100 the first time a faction is contested at all, read fresh
+## from the subject each time rather than cached, so two contests in the same
+## session never disagree about where it started.
+const CONTEST_ACTIONS := ["out_publish", "discredit", "hijack", "flood", "cut"]
+
+
+func faction_signal_control(faction_id: String) -> float:
+	return float(WorldHistory.subject(faction_id).get("signal_control", 100.0))
+
+
+## The real reach standing behind a channel: every account already on that
+## faction's own roster, summed. Not the faction's own `reach` field — there
+## isn't one — so out-publishing a Sin means actually out-reaching the people
+## who make up its audience, not beating a number invented for this purpose.
+func _channel_reach(faction_id: String) -> float:
+	var total := 0.0
+	for entry in accounts_by_reach():
+		if str(entry.faction_id) == faction_id:
+			total += float(entry.reach)
+	return total
+
+
+## Real evidence, read off the same `trace`/`expose` actions `act()` already
+## implements — a faction cannot be discredited on nothing, and this file
+## does not invent a second evidence system to make the check real.
+func leverage_on_faction(faction_id: String) -> String:
+	for event in events_against_faction(faction_id):
+		if str(event.get("type", "")) in ["wire_trace", "wire_expose"]:
+			var target_id := str((event.get("details", {}) as Dictionary).get("subject", ""))
+			var target := WorldHistory.subject(target_id)
+			return "the pattern already traced on %s" % str(target.get("name", target_id))
+	return ""
+
+
+func events_against_faction(faction_id: String) -> Array:
+	var out: Array = []
+	for event in WorldHistory.events:
+		var target_id := str((event.get("details", {}) as Dictionary).get("subject", ""))
+		if str(WorldHistory.subject(target_id).get("faction_id", "")) == faction_id:
+			out.append(event)
+	return out
+
+
+## The five routes from DESIGN/FACTIONS.md, each a real requirement against
+## real state rather than a cost paid to a menu. `at_terminal` stands in for
+## the physical-access requirement the design calls out for hijack/cut —
+## whoever wires the world reads a player standing at a mast and passes it in.
+func contest_channel(faction_id: String, action: String, subject_id: String = "player", at_terminal: bool = false) -> Dictionary:
+	if not CONTEST_ACTIONS.has(action):
+		return {"ok": false, "reason": "UNKNOWN ACTION"}
+	var faction := WorldHistory.subject(faction_id)
+	if faction.is_empty() or str(faction.get("kind", "")) != "faction":
+		return {"ok": false, "reason": "NO SUCH FACTION"}
+	if str(faction.get("channel", "")).is_empty():
+		return {"ok": false, "reason": "THIS FACTION HOLDS NO CHANNEL TO CONTEST"}
+	var control := faction_signal_control(faction_id)
+	var result := {"ok": true, "headline": "", "detail": ""}
+	match action:
+		"out_publish":
+			var my_reach := float(player().get("reach", 40)) if subject_id == "player" else float(account(subject_id).get("reach", 40))
+			var their_reach := _channel_reach(faction_id)
+			if my_reach <= their_reach:
+				return {"ok": false, "reason": "YOUR REACH (%d) DOES NOT YET PASS THEIRS (%d)" % [int(my_reach), int(their_reach)]}
+			control = maxf(0.0, control - 12.0)
+			result.headline = "OUT-PUBLISHED"
+			result.detail = "SLOW AND NON-VIOLENT. IT WILL TAKE MORE THAN ONE PASS."
+		"discredit":
+			var held := leverage_on_faction(faction_id)
+			if held.is_empty():
+				return {"ok": false, "reason": "NOTHING TRUE TO DISCREDIT THEM WITH YET"}
+			control = maxf(0.0, control - 30.0)
+			result.headline = "DISCREDITED"
+			result.detail = held.to_upper()
+		"hijack":
+			if not at_terminal:
+				return {"ok": false, "reason": "NEEDS PHYSICAL ACCESS TO A TERMINAL OR MAST"}
+			control = maxf(0.0, control - 45.0)
+			result.headline = "CHANNEL HIJACKED"
+		"flood":
+			control = maxf(0.0, control - 8.0)
+			result.headline = "CHANNEL FLOODED"
+			result.detail = "A DENIAL MOVE. NOTHING PROPAGATES THROUGH IT NOW, YOURS INCLUDED."
+		"cut":
+			if not at_terminal:
+				return {"ok": false, "reason": "NEEDS PHYSICAL ACCESS TO THE MAST ITSELF"}
+			control = 0.0
+			result.headline = "MAST CUT"
+			result.detail = "COVERAGE IS GONE FOR EVERYONE HERE, INCLUDING YOU."
+	WorldHistory.amend_subject(faction_id, {"signal_control": control})
+	WorldHistory.record_event("channel_contested", {"faction_id": faction_id, "action": action, "subject_id": subject_id, "control_after": control})
+	result["control_after"] = control
+	return result
+
+
 # --- contact ---------------------------------------------------------------
 
 ## Whether a DM gets read, and what comes back.
