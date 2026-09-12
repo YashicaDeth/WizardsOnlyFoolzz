@@ -41,6 +41,18 @@ var kick := Vector2.ZERO
 var roll := 0.0
 var shake := 0.0
 
+## O2.5 `v2`. The first version stopped time with `Engine.time_scale`, which
+## works and is wrong: your cleaver landing froze every other fight in the
+## region, the traffic, the crowd and the weather along with it. Hitstop is
+## supposed to say *this blow met resistance* — a global freeze says *the world
+## paused for you*, which is a different and much cheaper feeling.
+##
+## Godot has no per-node time scale, so the local version is done the only way
+## it can be: the participants are named, and whoever ticks them multiplies
+## their own delta by `scale_for()`. Everything unnamed keeps running at full
+## speed. The camera kick and the shake were always local and are unchanged.
+var participants: Dictionary = {}
+
 var _stop_remaining := 0.0
 var _held := false
 ## Set by whoever else owns time in this scene. The kill cam already slows the
@@ -59,9 +71,13 @@ func _ready() -> void:
 ## own health, `kind` colours it, and `severed` is the one case that earns the
 ## longest stop because a limb coming off should be the heaviest thing in the
 ## game short of a kill.
-func strike(severity: float, kind := "cut", severed := false) -> void:
+func strike(severity: float, kind := "cut", severed := false, involved: Array = []) -> void:
 	if _busy():
 		return
+	# Who is in this exchange. Anything not named here carries on at full speed.
+	participants.clear()
+	for id in involved:
+		participants[str(id)] = true
 	var weight := clampf(severity, 0.0, 1.0)
 	var duration := STOP_GRAZE
 	if severed:
@@ -100,22 +116,41 @@ func _busy() -> bool:
 
 func _hold(duration: float) -> void:
 	_stop_remaining = maxf(_stop_remaining, duration)
+	_held = true
+
+
+## What a given body's delta should be multiplied by this frame. 1.0 for anybody
+## not in the exchange, which is the entire point of v2.
+func scale_for(id := "") -> float:
 	if not _held:
-		_held = true
-		Engine.time_scale = STOP_SCALE
+		return 1.0
+	if participants.is_empty():
+		# Named nobody: treat it as the player's own exchange, which is the
+		# common case for a swing that hit scenery.
+		return STOP_SCALE
+	return STOP_SCALE if participants.has(str(id)) else 1.0
+
+
+## True while a hit is being felt at all, for anything that needs to know
+## without caring who is in it.
+func holding() -> bool:
+	return _held
 
 
 func _process(delta: float) -> void:
 	# Counted in real seconds. Using the scaled delta to time a slowdown makes
 	# the slowdown last a fixed number of *frames* instead of a fixed duration,
 	# so it gets longer the harder it is working.
-	var real_delta := delta / maxf(Engine.time_scale, 0.001)
+	# v2: `delta` is already real time, because the engine clock is no longer
+	# being bent. That also removes the v1 trap where a slowdown timed with a
+	# scaled delta lasted a fixed number of frames rather than a fixed duration.
+	var real_delta := delta
 	if _held:
 		_stop_remaining -= real_delta
 		if _stop_remaining <= 0.0:
 			_held = false
 			_stop_remaining = 0.0
-			Engine.time_scale = 1.0
+			participants.clear()
 	# The kick springs back rather than decaying to nothing, so the camera
 	# settles past centre once instead of sliding home.
 	kick = kick.lerp(Vector2.ZERO, clampf(real_delta * 11.0, 0.0, 1.0))
@@ -137,6 +172,7 @@ func camera_offset() -> Vector2:
 ## time is held would otherwise leave the whole game in slow motion, which is
 ## the classic way this feature ships as a bug.
 func _exit_tree() -> void:
-	if _held:
-		Engine.time_scale = 1.0
-		_held = false
+	# v2 no longer touches the global clock, so there is nothing to restore —
+	# but the flag is cleared so anything still holding a reference reads 1.0.
+	_held = false
+	participants.clear()

@@ -1110,12 +1110,32 @@ func guard_strength() -> float:
 	return clampf(arms / float(count), 0.0, 1.0)
 
 
-## Applied to anything that lands on the player while the guard is up. Returns
-## the surviving fraction of the damage, and whether it was parried — a parry is
-## the first moments of the guard and gives the initiative straight back.
-func guard_absorb(damage: float) -> Dictionary:
+## O2.6. How far off your front the guard still holds. A guard raised toward
+## whatever you are looking at cannot also be covering your back — 100 degrees
+## either side of where you are actually facing, which is generous for a
+## frontal guard but still a real cone rather than a sphere.
+const GUARD_ARC_DOT := -0.17
+
+
+## Applied to anything that lands on the player while the guard is up.
+## `attacker_position` decides whether the guard was even facing the blow —
+## it used to hold equally in every direction, which meant there was no such
+## thing as flanking the player. Returns the surviving fraction of the
+## damage, and whether it was parried — a parry is the first moments of the
+## guard and gives the initiative straight back.
+func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF) -> Dictionary:
 	if not guarding:
 		return {"damage": damage, "blocked": false, "parried": false}
+	if attacker_position != Vector3.INF:
+		var facing := Vector3(sin(yaw), 0, cos(yaw))
+		var to_attacker := attacker_position - player
+		to_attacker.y = 0.0
+		if to_attacker.length_squared() > 0.001 and facing.dot(to_attacker.normalized()) < GUARD_ARC_DOT:
+			# Behind the arc the guard covers: it was never raised toward this,
+			# so it does nothing for it — the same blow a guard from the front
+			# would have turned goes through whole.
+			prompt.text = "STRUCK FROM OUTSIDE YOUR GUARD"
+			return {"damage": damage, "blocked": false, "parried": false}
 	var parried := guard_raised <= PARRY_WINDOW
 	if parried:
 		# Nothing gets through a parry, and it costs the attacker instead of you.
@@ -1670,7 +1690,7 @@ func _update_encounter_actors(delta: float) -> void:
 					# hands the initiative back; a block takes the edge off and
 					# spends stamina instead of blood.
 					var incoming := float(_actor_attack_damage(actor))
-					var guarded: Dictionary = guard_absorb(incoming)
+					var guarded: Dictionary = guard_absorb(incoming, node.global_position)
 					if bool(guarded.get("parried", false)):
 						# The attacker eats their own commitment. This wrote to
 						# "stagger" and "cooldown" — neither of which anything

@@ -23,66 +23,74 @@ func _ready() -> void:
 	add_child(feel)
 	await get_tree().process_frame
 
-	_check(is_equal_approx(Engine.time_scale, 1.0), "time runs normally before anything is hit")
+	_check(is_equal_approx(feel.scale_for("player"), 1.0), "time runs normally before anything is hit")
 
 	feel.strike(0.8, "cut", false)
-	_check(Engine.time_scale < 0.5, "a solid hit stops time (%.2f)" % Engine.time_scale)
+	_check(feel.scale_for("player") < 0.5, "a solid hit stops time for the one hit (%.2f)" % feel.scale_for("player"))
 	_check(feel.kick.length() > 0.0, "and kicks the camera")
 
 	# It has to come back on its own, and within a sane window.
 	var waited := 0.0
-	while Engine.time_scale < 1.0 and waited < 1.0:
+	while feel.holding() and waited < 1.0:
 		await get_tree().process_frame
 		waited += get_process_delta_time() / maxf(Engine.time_scale, 0.001)
-	_check(is_equal_approx(Engine.time_scale, 1.0), "and time comes back by itself")
+	_check(is_equal_approx(feel.scale_for("player"), 1.0), "and time comes back by itself")
 	_check(waited < 0.5, "within a fraction of a second, not a visible hitch (%.3fs)" % waited)
 
 	# Severity actually matters.
 	feel.strike(0.1, "cut", false)
 	var graze_kick: float = feel.kick.length()
 	await get_tree().process_frame
-	while Engine.time_scale < 1.0:
+	while feel.holding():
 		await get_tree().process_frame
 	feel.kick = Vector2.ZERO
 	feel.strike(1.0, "cut", true)
 	_check(feel.kick.length() > graze_kick, "a severing blow hits harder than a graze")
-	while Engine.time_scale < 1.0:
+	while feel.holding():
 		await get_tree().process_frame
 
 	# A bullet must not freeze the game on every shot.
 	feel.strike(0.9, "ballistic", false)
 	var ballistic_hold := 0.0
-	while Engine.time_scale < 1.0 and ballistic_hold < 1.0:
+	while feel.holding() and ballistic_hold < 1.0:
 		await get_tree().process_frame
 		ballistic_hold += get_process_delta_time() / maxf(Engine.time_scale, 0.001)
 	feel.strike(0.9, "cut", false)
 	var cut_hold := 0.0
-	while Engine.time_scale < 1.0 and cut_hold < 1.0:
+	while feel.holding() and cut_hold < 1.0:
 		await get_tree().process_frame
 		cut_hold += get_process_delta_time() / maxf(Engine.time_scale, 0.001)
 	_check(ballistic_hold < cut_hold, "a bullet stops time less than a blade (%.3f vs %.3f)" % [ballistic_hold, cut_hold])
+
+	# O2.5 v2. The exchange is between two bodies; the region is not in it.
+	feel.strike(0.9, "cut", false, ["player", "mara_voss"])
+	_check(feel.scale_for("mara_voss") < 0.5, "the body you hit slows (%.2f)" % feel.scale_for("mara_voss"))
+	_check(is_equal_approx(feel.scale_for("some_other_fight"), 1.0), "and every other fight in the region carries on at full speed")
+	_check(is_equal_approx(Engine.time_scale, 1.0), "the global clock is never touched")
+	while feel.holding():
+		await get_tree().process_frame
 
 	# O2.3. A miss moves the camera but never stops time — the absence is the
 	# feedback.
 	feel.kick = Vector2.ZERO
 	feel.whiff()
 	_check(feel.kick.length() > 0.0, "a miss still carries the weapon through")
-	_check(is_equal_approx(Engine.time_scale, 1.0), "but a miss never stops time")
+	_check(is_equal_approx(feel.scale_for("player"), 1.0), "but a miss never stops time")
 
 	# Something else owning time wins.
 	var owner_state := {"blocked": true}
 	feel.blocked_by = func() -> bool: return bool(owner_state["blocked"])
 	feel.strike(1.0, "cut", true)
-	_check(is_equal_approx(Engine.time_scale, 1.0), "an impact inside a kill cam does not fight it for time")
+	_check(is_equal_approx(feel.scale_for("player"), 1.0), "an impact inside a kill cam does not fight it for time")
 	owner_state["blocked"] = false
 
 	# And the scene can leave mid-hit without stranding the game in slow motion.
 	feel.strike(1.0, "cut", true)
-	_check(Engine.time_scale < 1.0, "time is held")
+	_check(feel.holding(), "time is held")
 	feel.queue_free()
 	await get_tree().process_frame
 	await get_tree().process_frame
-	_check(is_equal_approx(Engine.time_scale, 1.0), "and leaving the scene mid-hit restores it")
+	_check(is_equal_approx(feel.scale_for("player"), 1.0), "and leaving the scene mid-hit restores it")
 
 	print("")
 	if failures.is_empty():
