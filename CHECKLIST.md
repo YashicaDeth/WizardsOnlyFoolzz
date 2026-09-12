@@ -846,14 +846,29 @@ hitpoints. `clinch_test.gd` and F7 already exist; this is the rest of it.
 - [x] **O5.4** Robbed, spoken to, leaned on, walked where you want them, and held in the line of fire
 - [ ] **O5.5** Held and hurt is the pressure that makes recruitment possible (feeds F7 and E)
 - [x] **O5.6** Their force opposes yours, scaled by their own pain and arms
-- [ ] **O5.7** Off-balance is a real state for both of you; footing matters
+- [x] **O5.7** The player has footing now, not just the enemies — whiffing, blocking and being shoved all cost it
 - [ ] **O5.8** Unarmed is viable and horrible, because the body is the weapon system
 - [x] **O5.9** Proven on the guard first: two broken arms block badly, no arms cannot block at all
 
 ### O4 — Enemies that fight back
-- [ ] **O4.1** They read your commitment and punish it
-- [ ] **O4.2** They retreat, circle and group rather than walking at you
-- [ ] **O4.3** A wounded enemy fights differently from a fresh one
+- [x] ~~**O4.1** They read your commitment and punish it~~ A hostile already in
+      melee range presses its own attack clock at 2.2x while the player is
+      mid-windup (`strike_windup >= 0.0`) — a commitment you cannot cancel or
+      guard against invites being punished for it, rather than the enemy
+      ticking down on a clock indifferent to what you just did.
+- [x] ~~**O4.2** They retreat, circle and group rather than walking at you~~
+      Was a straight line to the same 3 m ring for every hostile at once,
+      which reads as a queue. Whoever does not already hold the melee opening
+      now orbits the player at a stand-off distance instead of stacking into
+      it, so a second and third attacker read as surrounding you rather than
+      waiting their turn. Retreat (fleeing on critical injury) already
+      existed; this was the missing half.
+- [x] ~~**O4.3** A wounded enemy fights differently from a fresh one~~ Already
+      true by construction — `_actor_attack_cycle`/`_actor_attack_damage` read
+      `anatomy.combat_ratio()`, so a maimed hostile already swings slower and
+      softer (`combat_integration_test.gd`: "the one-armed fighter attacks
+      more slowly" / "hits less hard") — just never checked off. Guarded by
+      the new `tests/enemy_ai_test.gd` (5 checks) for O4.1/O4.2.
 
 ## P — The demo
 

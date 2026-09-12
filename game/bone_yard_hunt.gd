@@ -96,6 +96,22 @@ var attack_cooldown := 0.0
 ## re-swinging the same side has to drag the blade back first. And **where the
 ## body was going**: stepping into a blow lends it your own mass, backing away
 ## takes it out again.
+## O5.7. Footing. Enemies have had a `staggered` state for a while; the player
+## has had nothing. That asymmetry is what makes a brawl read as a player
+## hitting statues rather than as two bodies leaning on each other — you could
+## over-commit, whiff, get blocked and take a shove, and still be standing
+## exactly as square as when you started.
+##
+## Footing is spent by things that should cost balance and recovers by standing
+## in it. Below `STUMBLE_AT` you are stumbling: the guard will not hold, the
+## swing has nothing behind it, and moving is a negotiation.
+var footing := 1.0
+const STUMBLE_AT := 0.3
+const FOOTING_RECOVERY := 0.55
+const FOOTING_WHIFF := 0.14
+const FOOTING_BLOCKED := 0.2
+const FOOTING_SHOVED := 0.34
+
 var swing_side := 1
 var last_swing_at := 0.0
 const SWING_CHAIN_WINDOW := 0.9
@@ -367,11 +383,12 @@ func _wound_player(from: Vector3, damage: float, damage_type := "cut") -> void:
 ## still in it, fighting worse" means the same thing whichever side of it you
 ## are on.
 func _player_swing_scale() -> float:
-	return lerpf(PLAYER_INJURY_FLOOR, 1.0, player_rig.anatomy.combat_ratio())
+	# O5.7. A blow thrown off your feet has your arm behind it and nothing else.
+	return lerpf(PLAYER_INJURY_FLOOR, 1.0, player_rig.anatomy.combat_ratio()) * lerpf(0.45, 1.0, clampf(footing, 0.0, 1.0))
 
 
 func _player_speed_scale() -> float:
-	return lerpf(PLAYER_INJURY_FLOOR, 1.0, player_rig.anatomy.mobility_ratio())
+	return lerpf(PLAYER_INJURY_FLOOR, 1.0, player_rig.anatomy.mobility_ratio()) * lerpf(0.6, 1.0, clampf(footing, 0.0, 1.0))
 
 
 ## B6.5. Losing a limb is not a death and not a cutscene. The player keeps
@@ -565,13 +582,17 @@ func _physics_process(delta: float) -> void:
 	attack_cooldown = maxf(0.0, attack_cooldown - delta)
 	arsenal.tick(delta)
 	dodge_cooldown = maxf(0.0, dodge_cooldown - delta)
+	# O5.7. You get your feet back by standing in them. Recovery is slower while
+	# sprinting, because running is not the same as being balanced.
+	var recovery := FOOTING_RECOVERY * (0.55 if Input.is_action_pressed("sprint") else 1.0)
+	footing = clampf(footing + recovery * delta, 0.0, 1.0)
 	# O2.4. Holding a guard up is work. It drains while raised so a guard cannot
 	# simply be left on, and it drops on its own when there is nothing left.
 	# X leans on somebody while a clinch is up, so the guard only claims the key
 	# when there is nobody in your hands. A control that does two things at once
 	# is worse than a control that does nothing.
 	var wants_guard := Input.is_key_pressed(KEY_X) and panel_mode.is_empty() and not resolution_ui.visible and grapple_target.is_empty()
-	if wants_guard and guard_strength() > 0.0 and stamina > 1.0:
+	if wants_guard and guard_strength() > 0.0 and stamina > 1.0 and not stumbling():
 		if not guarding:
 			guard_raised = 0.0
 		guarding = true
@@ -852,6 +873,9 @@ func _resolve_firearm(attack: Dictionary) -> void:
 			_apply_combat_response(actor, attack, {"pain": actor.anatomy.pain})
 	if impacts.is_empty():
 		impact_feel.whiff()
+		# O2.3 / O5.7. A miss was already free of damage; it is no longer free of
+		# balance. Swinging at air is how you end up on your heels.
+		lose_footing(FOOTING_WHIFF, "SWUNG AT NOTHING")
 		prompt.text = "%s / MISS" % str(arsenal.current().label)
 	else:
 		prompt.text = "%s / %d BODY%s HIT" % [str(arsenal.current().label), impacts.size(), "IES" if impacts.size() != 1 else ""]
@@ -905,6 +929,23 @@ func _reload_weapon() -> void:
 		body_motion.trigger_reload(float(arsenal.current().reload))
 		# Reloading is visible as a cartridge travelling through the well.
 		prompt.text = ""
+
+
+## O5.7. Something took your balance. Shoves, blocked blows and your own
+## over-commitment all land here rather than each inventing their own knock.
+func lose_footing(amount: float, reason := "") -> void:
+	var before := footing
+	footing = clampf(footing - amount, 0.0, 1.0)
+	if before >= STUMBLE_AT and footing < STUMBLE_AT:
+		# The moment it goes is the moment worth telling the player about.
+		impact_feel.strike(0.45, "blunt", false)
+		guarding = false
+		prompt.text = "OFF BALANCE" if reason.is_empty() else reason
+		WorldHistory.record_event("player_off_balance", {"location": HUNT_LOCATION, "reason": reason})
+
+
+func stumbling() -> bool:
+	return footing < STUMBLE_AT
 
 
 ## O5.1. What the swing is worth, given where the weapon was and where the body
@@ -983,6 +1024,8 @@ func guard_absorb(damage: float) -> Dictionary:
 		return {"damage": 0.0, "blocked": true, "parried": true}
 	# A block is not free: it scales with what the arms can actually hold, and
 	# the rest of it still arrives.
+	# Blocking is not standing still: the blow still moves you.
+	lose_footing(FOOTING_BLOCKED * clampf(damage / 20.0, 0.3, 1.6), "")
 	var through: float = damage * lerpf(1.0, GUARD_DAMAGE_SCALE, guard_strength())
 	stamina = maxf(0.0, stamina - damage * 0.45)
 	impact_feel.strike(0.3, "blunt", false)
@@ -2078,6 +2121,7 @@ func _update_grapple(delta: float) -> void:
 		health = maxi(1, health - 11)
 		_wound_player(node.global_position, 16.0, "blunt")
 		player_body.velocity = (player - node.global_position).normalized() * 7.0
+		lose_footing(FOOTING_SHOVED, "")
 		_break_grapple("THEY PUT YOU DOWN AND STEPPED BACK")
 
 
