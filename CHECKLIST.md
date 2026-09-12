@@ -2398,9 +2398,17 @@ already switches presets by place; nothing switches by time.
 
 - [x] **W1.1** A day cycle the world reads, not only the sky — `world_clock.gd`, a pure function of one persisted number rather than a sixth autoload. Hours, days, months, five named phases, a continuous daylight curve, and sleeping. 28 checks. Unblocks A9.7, W1.4, AB2.4, AJ4.3 and AL1.5, all of which were waiting on it without anybody noticing
 - [ ] **W1.2** Contamination has weather — it moves, it settles, it gets worse
-- [ ] **W1.3** Being caught out in it costs something
+- [x] **W1.3** Being caught out in it costs something — `storm_weather.gd`'s
+      `exposure_cost()`, drained from stamina in `_update_storm_exposure()`,
+      cut by a warm layer (AS3.3/AS4.5).
 - [ ] **W1.4** Factions keep hours; the Wire is busier at some of them
-- [ ] **W1.5** G7's exposure problem is a lighting *state* rather than a constant
+- [x] **W1.5** G7's exposure problem is a lighting *state* rather than a
+      constant — `_update_day_night()` drives the sun's energy/colour and the
+      base environment's ambient/exposure off `WorldClock.daylight()` every
+      frame instead of the fixed numbers `_build_world()` used to set once.
+      G7.1/G7.2 (whether spawn should read this dark at all, and near-field
+      contrast) are separate judgment calls this does not make, and the derby
+      (G7.3) was never touched.
 
 
 ### W v10 — the final pass
@@ -2837,7 +2845,14 @@ enforcement type figures who punish you for bad local karmic events."*
 The karma axis and the witness ledger already exist. Nobody has ever come to
 arrest anybody.
 
-- [ ] **AE1.1** Unseen is a real state with real inputs — light, noise, cover, distance
+- [x] **AE1.1** Unseen is a real state with real inputs — light, noise, cover,
+      distance — `perception.gd`'s `visibility()`, a pure function of all
+      four, and `bone_yard_hunt.gd`'s `_update_perception()` supplying real
+      values every frame against every live hostile (light from
+      `WorldClock.daylight()`/the handheld; noise from sprinting, the one
+      input with no other system behind it yet; cover from a real raycast).
+      Unblocks AS1.5 and AU1.10's AE1.4. `player_unseen`/`player_visibility`
+      are computed and correct but nothing reads them yet — see AE1.2/AE1.3.
 - [ ] **AE1.2** An unseen kill differs from a seen one, mechanically and in the record
 - [ ] **AE1.3** Assassination as a verb: reach somebody who does not know you are there
 - [ ] **AE1.4** Law figures respond to what was actually witnessed (`witness_ledger.gd`)
@@ -3661,17 +3676,22 @@ underneath either name.
       `is_lit()`/`battery` every frame, and lowering the device is the one
       thing that already drops `raised` below the lit threshold.
 - [ ] **AS1.5** Its light is what gives you away at night (pairs with
-      AE1.1) — genuinely blocked, not merely unstarted: AE1.1 ("unseen is a
-      real state with real inputs") does not exist yet, so there is no
-      detection system for the torch's light to be an input to. The hook
-      is real and ready — `light_radius()` returns `LAMP_RANGE` while lit
-      and `0.0` otherwise, the exact shape an `AE1.1` stealth check would
-      need to read — this is only waiting on that system existing.
-      Verified: `tests/handheld_battery_test.gd` (14 checks) plus
-      `tests/day_night_test.gd` and `tests/psychedelic_rig_test.gd`
-      (unrelated systems merged in alongside this, both still green), and
-      the full `opening_test.gd`/`combat_integration_test.gd` regression
-      suite.
+      AE1.1) — AE1.1 exists now: `perception.gd`/`_update_perception()`
+      genuinely read `handheld.is_lit()` as the light term in a live
+      `player_visibility`/`player_unseen` verdict against every hostile,
+      so the light really does raise how seen you are. Still not the full
+      claim: every hostile in `_update_encounter_actors()` spawns already
+      `"hunting"` — there is no unaware/idle state for `player_unseen` to
+      hold a hostile out of, so nothing yet decides *whether* a hostile
+      starts hunting off this verdict, only how exposed you'd be if one
+      already were. That is a real change to the encounter state machine,
+      deliberately not made in the same pass that built the verdict it
+      would read.
+      Verified: `tests/handheld_battery_test.gd` (14 checks),
+      `tests/perception_test.gd` and `tests/perception_integration_test.gd`
+      (light term traced end to end from `is_lit()` through a real
+      raycast against a real hostile), plus the full
+      `combat_integration_test.gd` regression suite.
 
 ### AS2 — Night
 - [x] **AS2.1** Light warps and distorts at night rather than dimming
