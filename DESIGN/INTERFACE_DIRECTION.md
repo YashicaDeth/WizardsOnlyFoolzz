@@ -184,3 +184,54 @@ renamed until he gives the list.
 `A5` and `C1` come back from BUILT. New segments are added under I0 rather than
 reopening A, because the rule being applied is I0's — no screen is a list of
 text in a box, and a corner plate with a number in it is exactly that.
+
+## The camera is progression — added by Greg, 2026-09-12
+
+> *"the game should start probably in first person with the insane fov style
+> cruelty squad ect with a interesting custom hud making seamless transition
+> into the abstract nature of the world"*
+>
+> *"you unlock third person once you get melee weapons and bossfights through
+> the nemesis system"*
+>
+> *"in the car a driving the wheel with one hand which is wasd and then making
+> it you hold a gun through shattered glass shooting out in first person
+> driving then you can also switch third person driving as you progress in the
+> derby"*
+
+This is one rule applied in two places, and it is worth stating as a rule
+because it changes what a camera *is* in this game.
+
+**First person is the default and third person is earned.** Not a preference in
+a settings menu — a thing the world grants you. The reasoning is that third
+person is the *abstract* view: the one where you stop being a person and start
+being an object you move around. This game is about a body, so leaving that body
+should cost something.
+
+### On foot
+
+- Start locked in first person at **FOV 106**. Uncomfortably wide, close to
+  everything, no comfortable distance from any of it.
+- Third person unlocks on two conditions, both read out of `WorldHistory` and
+  neither stored: you have **landed a melee blow**, and you have **put down
+  someone the world already considered dangerous** (elo ≥ 1100, grudge ≥ 30, or
+  flagged a rival by the Hunt System).
+- Pressing the key early is never a silent no. It answers in the game's voice.
+
+### In the car
+
+- One hand on the wheel — that is WASD. The other holds a gun.
+- You shoot **out through your own shattered windscreen**, in first person,
+  while driving. The glass is part of the frame and it degrades as you take
+  hits, so the view gets worse as the car does.
+- Third-person driving unlocks through **derby progress** specifically, not
+  through the on-foot condition. The two ladders are separate.
+
+### Why it is not just a camera toggle
+
+The HUD has to survive the transition, which is the hard part and the reason
+this is filed under interface rather than under camera work. A first-person HUD
+in this game is diegetic — the windscreen, the wheel, the gun in frame, the
+handheld held up — and a third-person HUD cannot be. The transition between them
+is where "seamless into the abstract nature of the world" is either delivered or
+lost, and no hard cut is acceptable (Rule 3).

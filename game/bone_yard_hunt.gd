@@ -22,12 +22,31 @@ const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 const RIVAL_REGISTRY := preload("res://systems/rival_registry.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
+const WORLD_INDEX := preload("res://systems/world_index.gd")
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 
 var player := Vector3(0, 1.5, 19)
 var yaw := PI
 var pitch := -0.12
-var third_person := true
+## Greg, 2026-09-12: *"the game should start probably in first person with the
+## insane fov style cruelty squad"* — *"you unlock third person once you get
+## melee weapons and bossfights through the nemesis system"*.
+##
+## So the camera is progression rather than a preference. You begin locked
+## inside your own head at a field of view wide enough to be uncomfortable, and
+## the game only lets you step outside yourself once you have earned it. That is
+## the right way round for this project: third person is the abstract view, the
+## one where you look at yourself as an object, and it should cost something.
+##
+## The condition is read out of `WorldHistory`, never stored — the same rule the
+## Board runs on, so there is nothing to get out of sync.
+var third_person := false
+## Cruelty Squad territory. A normal 70 reads as a corridor shooter; this reads
+## as being too close to everything, which is the point.
+const FIRST_PERSON_FOV := 106.0
+const THIRD_PERSON_FOV := 74.0
+## The two things that unlock it.
+const UNLOCK_BOSSES := 1
 var stamina := 100.0
 var health := 100
 var attack_cooldown := 0.0
@@ -62,6 +81,8 @@ var resolution_ui: Control
 var resolution_target := ""
 var living_map: Control
 var natal_sigil: Control
+## I0.1. The real index. Hunt Grounds was drawing its own text list instead.
+var world_index: Control
 var viscera_fx := true
 var enemy_rig: BaselineHuman
 var grapple_target := ""
@@ -125,6 +146,13 @@ func _ready() -> void:
 	natal_sigil = preload("res://systems/natal_sigil.gd").new()
 	natal_sigil.name = "NatalSigil"
 	$HUD.add_child(natal_sigil)
+	# I0.1. Every rework of the index went into `world_index.gd`, and this scene
+	# never used it: TAB opened a Label full of "- weapon fired" instead. That is
+	# why the tutorial look kept coming back no matter how many times the index
+	# was rebuilt — the rebuilt one was not the one the player was opening.
+	world_index = WORLD_INDEX.new()
+	world_index.name = "WorldIndex"
+	$HUD.add_child(world_index)
 	kill_cam = preload("res://systems/kill_cam.gd").new()
 	kill_cam.name = "KillCam"
 	$HUD.add_child(kill_cam)
@@ -390,9 +418,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				if not panel_mode.is_empty():
 					_toggle_panel(panel_mode)
 			KEY_F:
-				third_person = not third_person
-				body_motion.set_perspective(not third_person)
-				_update_camera()
+				if not third_person and not third_person_unlocked():
+					prompt.text = third_person_refusal()
+				else:
+					third_person = not third_person
+					body_motion.set_perspective(not third_person)
+					_update_camera()
 			KEY_G: handheld.toggle_device()
 			KEY_TAB:
 				# The handheld owns Tab while raised: one object, modes on it.
@@ -1792,6 +1823,35 @@ func _finish_grapple(actor: Dictionary) -> void:
 	attack_cooldown = 0.5
 
 
+## Whether the player has earned the outside view. Two conditions, both of them
+## things they did rather than flags somebody set: a melee weapon in hand, and a
+## named rival put down. The Hunt System supplies the second — a boss here means
+## somebody the world had already decided was dangerous.
+func third_person_unlocked() -> bool:
+	if WorldHistory.event_count("melee_body_hit") <= 0:
+		return false
+	# A boss is a rival the world already knew by name when you put them down.
+	var bosses := 0
+	for event: Dictionary in WorldHistory.events:
+		if str(event.get("type", "")) not in ["npc_resolution", "execution"]:
+			continue
+		var subject := str((event.get("details", {}) as Dictionary).get("subject", ""))
+		if subject == "":
+			continue
+		var record: Dictionary = WorldHistory.subject(subject)
+		if int(record.get("elo", 0)) >= 1100 or int(record.get("grudge", 0)) >= 30 or bool(record.get("rival", false)):
+			bosses += 1
+	return bosses >= UNLOCK_BOSSES
+
+
+## What the player is told when they press the key too early. Never a silent
+## refusal: a control that does nothing reads as a bug, and this one is content.
+func third_person_refusal() -> String:
+	if WorldHistory.event_count("melee_body_hit") <= 0:
+		return "YOU HAVE NOT PUT ANYTHING IN REACH YET. SWING AT SOMEBODY FIRST."
+	return "NOTHING HAS LOOKED BACK AT YOU YET. PUT DOWN SOMEONE WHO MATTERS."
+
+
 func _toggle_panel(mode: String) -> void:
 	allusions_artwork.close_artwork()
 	panel_mode = "" if panel_mode == mode else mode
@@ -1800,16 +1860,21 @@ func _toggle_panel(mode: String) -> void:
 	living_map.visible = panel_mode == "map"
 	if living_map.visible:
 		living_map.open_map()
-	# The chart is a full sheet; the field labels underneath it are just noise.
+	if panel_mode == "index":
+		world_index.open()
+	elif world_index.visible:
+		world_index.close()
+	# A full sheet, chart or index; the field labels underneath it are noise.
+	var covering: bool = living_map.visible or world_index.visible
 	for label in [title, status, vitals, prompt]:
-		label.visible = not living_map.visible
-	panel.visible = not panel_mode.is_empty() and panel_mode not in ["tree", "map"]
+		label.visible = not covering
+	# The old ArchivePanel is dead. It was a Label in a box and it is exactly
+	# what "no more of this tutorial look" was about.
+	panel.visible = false
 	if character_archive.visible:
 		character_archive.open_archive(HUNT_ID)
 	else:
 		character_archive.close_archive()
-	if panel.visible:
-		_refresh_archive()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if panel_mode.is_empty() else Input.MOUSE_MODE_HIDDEN
 
 
@@ -1835,37 +1900,17 @@ func _toggle_artwork() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if panel_mode.is_empty() else Input.MOUSE_MODE_HIDDEN
 
 
-func _refresh_archive() -> void:
-	var mara := WorldHistory.subject(HUNT_ID)
-	var nix := WorldHistory.subject(FRIEND_ID)
-	if panel_mode == "tree":
-		var player := WorldHistory.subject("player")
-		var player_axis := WorldHistory.tree_alignment(player)
-		var nix_axis := WorldHistory.tree_alignment(nix)
-		var mara_axis := WorldHistory.tree_alignment(mara)
-		archive.text = "CHARACTER TREE // AS ABOVE SO BELOW\n\nPLAYER — %s\n ├─ bond ─ NIX ARDEN (%d) — %s\n └─ grudge ─ MARA VOSS (%d) — %s (%s)\n              └─ faction ─ ASHLINE WRECKERS\n\nThe axis reads the same standing shown on the Deep X-ray scan. The tree changes when history changes." % [WorldHistory.tree_axis_label(player_axis), int(nix.get("bond", 0)), WorldHistory.tree_axis_label(nix_axis), int(mara.get("grudge", 0)), WorldHistory.tree_axis_label(mara_axis), WorldHistory.tree_descriptor(mara)]
-	else:
-		var recent := WorldHistory.recent_events(7)
-		var derby_result := "LOCAL DRIVER WRECKS OUT; WALKS INTO ASHBLOOM" if WorldHistory.event_count("derby_round_lost") > 0 else "UNKNOWN DRIVER TAKES THE BONE YARD CROWN" if WorldHistory.event_count("derby_round_won") > 0 else "BONE YARD FEED REMAINS LIVE"
-		var lines: Array[String] = ["WORLD INDEX // BONE YARD FILE", "", "CELLOUTZ WIRE // REACTIVE REPORT", derby_result, "Mara Voss response: %s" % str(mara.get("status", "unknown")), "", "MARA VOSS - %s" % str(mara.get("role", "unknown")).to_upper(), "Injury: %s" % str(mara.get("injury", "unknown")), "Memory: %s" % str(mara.get("memory", "unknown")), "", "RECENT HISTORY:"]
-		for event in recent:
-			lines.append("- %s" % str(event.get("type", "unknown")).replace("_", " "))
-		archive.text = "\n".join(lines)
-
-
 func _update_hud() -> void:
 	title.text = "ALLUSIONS TO GRANDEUR // LIMBO: ASHBLOOM EXPANSE"
 	status.text = "WASD MOVE  SHIFT RUN  LMB STRIKE  SPACE DODGE  Q SURGE\nE INTERACT  TAB INDEX  M MAP  T TREE  J ALLUSIONS  F CAMERA"
 	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(HUNT_ID).get("status", "dormant")).to_upper()]
-	prompt.visible = not resolution_ui.visible and not living_map.visible
-	if panel.visible:
-		_refresh_archive()
+	prompt.visible = not resolution_ui.visible and not living_map.visible and not world_index.visible
 	if field_interface.has_method("set_state"):
 		field_interface.set_state({
 			"health": health,
 			"stamina": stamina,
 			"rival_status": WorldHistory.subject(HUNT_ID).get("status", "dormant"),
-			"menu_open": panel.visible or character_archive.visible or allusions_artwork.visible or living_map.visible,
+			"menu_open": world_index.visible or character_archive.visible or allusions_artwork.visible or living_map.visible,
 			"menu_mode": panel_mode,
 			"weapon": arsenal.state() if arsenal != null else {},
 			"lock_screen": lock_screen,
@@ -1906,7 +1951,9 @@ func _update_camera() -> void:
 		var flat_forward := Vector3(sin(yaw), 0, cos(yaw))
 		var flat_right := Vector3(flat_forward.z, 0, -flat_forward.x)
 		physical_offset = flat_right * local_offset.x + Vector3.UP * local_offset.y + flat_forward * local_offset.z
-		camera.fov = 72.0 + body_motion.fov_add
+		# Wide inside your own head, ordinary outside it. The change between the
+		# two is itself the reward: stepping out is a relief.
+		camera.fov = (THIRD_PERSON_FOV if third_person else FIRST_PERSON_FOV) + body_motion.fov_add
 	if third_person:
 		# Souls framing rather than a chase cam parked behind the head: the body
 		# sits off-centre over one shoulder and low in frame, the rig is close
