@@ -139,6 +139,10 @@ func xray_findings() -> Array[String]:
 		var organ: Dictionary = organs[organ_id]
 		if bool(organ.get("ruptured", false)):
 			findings.append("INTERNAL BLEED · " + str(organ_id).replace("_", " ").to_upper())
+	var spine: Dictionary = organs.get("spine", {})
+	var damaged: Array = spine.get("vertebrae_damaged", [])
+	if not damaged.is_empty():
+		findings.append("SPINE · %d / %d VERTEBRAE DAMAGED" % [damaged.size(), AnatomyComponent.SPINE_VERTEBRAE])
 	return findings
 
 

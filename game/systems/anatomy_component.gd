@@ -26,6 +26,7 @@ const ORGANS := {
 	"gut": {"zone": "torso", "health": 52.0, "bleed": 0.9, "fatal": false},
 	"spine": {"zone": "torso", "health": 30.0, "bleed": 0.4, "fatal": false},
 }
+const SPINE_VERTEBRAE := 33
 
 const DEFAULT_ZONES := {
 	"head": {"health": 45.0, "bleed": 0.75, "critical": true},
@@ -71,6 +72,8 @@ func configure(id: String, capacity: float = 5000.0, cybernetics: Variant = {}) 
 	for organ_id in ORGANS:
 		var organ: Dictionary = (ORGANS[organ_id] as Dictionary).duplicate(true)
 		organ["ruptured"] = false
+		if organ_id == "spine":
+			organ["vertebrae_damaged"] = []
 		organs[organ_id] = organ
 	set_process(true)
 
@@ -140,6 +143,14 @@ func damage_organ(organ_id: String, amount: float) -> Dictionary:
 	var organ: Dictionary = organs[organ_id]
 	if bool(organ.ruptured):
 		return organ
+	if organ_id == "spine":
+		var damaged: Array = organ.get("vertebrae_damaged", []).duplicate()
+		var newly_damaged := clampi(ceili(amount / 5.0), 1, SPINE_VERTEBRAE)
+		for index in newly_damaged:
+			var vertebra := (damaged.size() + index) % SPINE_VERTEBRAE + 1
+			if not damaged.has(vertebra):
+				damaged.append(vertebra)
+		organ["vertebrae_damaged"] = damaged
 	organ["health"] = maxf(0.0, float(organ.health) - amount)
 	if float(organ.health) <= 0.0:
 		organ["ruptured"] = true
@@ -241,6 +252,10 @@ func xray_findings() -> Array[String]:
 	for organ_id in organs:
 		if bool((organs[organ_id] as Dictionary).get("ruptured", false)):
 			findings.append("INTERNAL BLEED: " + str(organ_id).replace("_", " ").to_upper())
+	var spine: Dictionary = organs.get("spine", {})
+	var damaged: Array = spine.get("vertebrae_damaged", [])
+	if not damaged.is_empty():
+		findings.append("SPINE: %d / %d VERTEBRAE DAMAGED" % [damaged.size(), SPINE_VERTEBRAE])
 	return findings
 
 
@@ -265,8 +280,11 @@ func mobility_ratio() -> float:
 	# legs can produce, and no amount of pain management brings it back.
 	if not organ_ok("spine"):
 		return 0.05
+	var spine: Dictionary = organs.get("spine", {})
+	var damaged_count := (spine.get("vertebrae_damaged", []) as Array).size()
+	var spine_ratio := 1.0 - float(damaged_count) / float(SPINE_VERTEBRAE)
 	var functional_pain := maxf(0.0, pain - FUNCTIONAL_PAIN)
-	return clampf(limb_ratio * (1.0 - functional_pain * 0.008), 0.18, 1.0)
+	return clampf(limb_ratio * lerpf(0.38, 1.0, spine_ratio) * (1.0 - functional_pain * 0.008), 0.18, 1.0)
 
 
 func combat_ratio() -> float:
