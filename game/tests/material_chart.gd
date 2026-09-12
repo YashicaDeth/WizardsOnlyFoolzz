@@ -23,6 +23,7 @@ const KINDS := [
 ]
 
 var environment: Environment
+var world_environment: WorldEnvironment
 var key_light: OmniLight3D
 var back_light: OmniLight3D
 
@@ -34,7 +35,7 @@ func _ready() -> void:
 			out_dir = argument.trim_prefix("--out=")
 	get_window().size = Vector2i(1280, 720)
 
-	var world_environment := WorldEnvironment.new()
+	world_environment = WorldEnvironment.new()
 	environment = WorldLook.environment("ashbloom")
 	# The chart is about what a surface does with a photon, so the air between
 	# the camera and the surface is turned off: the region's fog is dense enough
@@ -170,6 +171,46 @@ func _ready() -> void:
 			await get_tree().physics_frame
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/flame_melt_%s.png" % [out_dir, exposure[0]])
+	# A10.7. The same row under every preset the game has, after dark, with the
+	# palette reported as numbers rather than described. "Holds" has to mean
+	# something checkable: the mean hue of a frame, and how far the frame's
+	# saturation moves. A palette that holds is one where the region changes the
+	# temperature and the value without changing what family of colour the
+	# world is made of.
+	for preset_name: String in ["ashbloom", "bone_yard", "ossuary"]:
+		var region := WorldLook.environment(preset_name)
+		region.fog_enabled = false
+		region.volumetric_fog_enabled = false
+		region.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+		region.ambient_light_color = Color(0.32, 0.34, 0.3)
+		world_environment.environment = region
+		environment = region
+		WorldLook.apply_hour(region, 0.0, preset_name)
+		key_light.visible = true
+		back_light.visible = false
+		for _tick in 6:
+			await get_tree().physics_frame
+		await RenderingServer.frame_post_draw
+		var frame := get_viewport().get_texture().get_image()
+		frame.save_png("%s/palette_%s.png" % [out_dir, preset_name])
+		var hue := 0.0
+		var saturation := 0.0
+		var value := 0.0
+		var counted := 0.0
+		for y in range(120, 600, 8):
+			for x in range(80, 1200, 8):
+				var pixel := frame.get_pixel(x, y)
+				if pixel.v < 0.02:
+					continue
+				hue += pixel.h
+				saturation += pixel.s
+				value += pixel.v
+				counted += 1.0
+		if counted > 0.0:
+			print("PALETTE %s hue=%.3f sat=%.3f val=%.3f lit=%d" % [
+				preset_name, hue / counted, saturation / counted, value / counted, int(counted),
+			])
+
 	print("CHART_DONE")
 	get_tree().quit()
 
