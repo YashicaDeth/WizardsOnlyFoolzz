@@ -52,5 +52,13 @@ func _ready() -> void:
 	check(str(new_doctrine.get("doctrine", "")) != str(war_doctrine.get("doctrine", "")), "CellOutz's own doctrine actually changed with the succession, not just the name at the top")
 	check(str(new_doctrine.get("threat", "")) != "" , "and it still carries a real threat rating")
 
+	# --- K2.5 v2: the reigning Horseman has real behaviour of their own -----
+	var horseman_grudge_before := int(WorldHistory.subject(new_reign).get("grudge", 0))
+	wire.contest_channel("vanity_row", "cut", "player", true)
+	var horseman_grudge_after := int(WorldHistory.subject(new_reign).get("grudge", 0))
+	check(horseman_grudge_after > horseman_grudge_before, "attacking a Sin CellOutz commands actually raises the reigning Horseman's own grudge (%d -> %d)" % [horseman_grudge_before, horseman_grudge_after])
+	var captain_grudge_gain := int(WorldHistory.subject("cass_lumen").get("grudge", 0))
+	check(horseman_grudge_after - horseman_grudge_before < captain_grudge_gain, "but less than the Sin's own captain feels it directly — once removed, not the same hit")
+
 	print("THE_FOUR_HORSEMEN_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

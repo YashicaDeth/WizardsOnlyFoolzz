@@ -509,6 +509,18 @@ func _retaliate(faction_id: String, action: String, subject_id: String) -> void:
 		if str(captain.get("kind", "")) != "person":
 			continue
 		WorldHistory.update_subject(str(member_id), {"grudge": int(captain.get("grudge", 0)) + grudge_gain}, "channel_contest_remembered")
+	# K2.5 v2. "The Horsemen exist as subjects with no behaviour of their
+	# own." Whoever actually reigns notices an attack on any Sin CellOutz
+	# commands, not only that Sin's own captain — half the grudge, since it
+	# is once removed from them, but real: the same grudge field, so a
+	# Horseman who has accumulated enough of it is exactly as meetable as any
+	# other rival the Hunt System already produces.
+	var celloutz_relations: Dictionary = WorldHistory.subject("celloutz").get("relations", {})
+	if celloutz_relations.has(faction_id):
+		var reigning := TheFourHorsemen.current_reign()
+		if not reigning.is_empty():
+			var horseman := WorldHistory.subject(reigning)
+			WorldHistory.update_subject(reigning, {"grudge": int(horseman.get("grudge", 0)) + maxi(1, grudge_gain / 2)}, "channel_contest_remembered_by_horseman")
 
 
 ## FACTIONS.md's implementation order, step 7 ("coupling: signal control
