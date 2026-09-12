@@ -1,4 +1,4 @@
-# Allusions to Grandeur — cold handoff
+# Wizards Only Fools — cold handoff
 
 Paste this whole file to a coding model starting work on this project. It
 assumes no prior conversation. Rewritten 2026-09-12.
@@ -212,8 +212,10 @@ E interact, **H dig/rob (hold)**, **B X-ray sweep (hold → radial)**,
 3. **Guns: common, or scarce and improvised?** Built, undecided.
 4. **What persists between runs?** Roguelike structure was asked for, but
    "bodies remember" is a pillar. These pull against each other.
-5. **Working title:** keep *Allusions to Grandeur*, or move to
-   **wizardsonlyfoolz**? Recorded as a candidate only; no identifiers renamed.
+5. ~~**Working title:** keep *Allusions to Grandeur*, or move to
+   **wizardsonlyfoolz**?~~ **Answered 2026-09-12** — Greg calls it **Wizards
+   Only Fools**. In-game title cards and `config/name` updated; the repo path,
+   folder names and save-data identifiers keep the old name.
 6. ~~Where is the art folder?~~ **Answered 2026-09-12** — `Desktop/Art
    Collections`, 43 artworks, catalogued.
 

@@ -22,7 +22,7 @@ func _ready() -> void:
 	_build_monoliths()
 	_build_fog_lights()
 	_update_camera()
-	title.text = "ALLUSIONS TOO GRANDEUR"
+	title.text = "WIZARDS ONLY FOOLS"
 	subtitle.text = "THE VEIL GARDEN  ·  REMASTER PROTOTYPE\nWASD MOVE  ·  SHIFT RUN  ·  MOUSE LOOK  ·  F PERSPECTIVE"
 	reticle.text = "+"
 

@@ -110,6 +110,12 @@ const FACTION_TREE_AXIS := {
 	# scene; wizardsonlyfoolz is the ascending collective.
 	"celloutz": {"axis": -0.95, "principle": "Ownership"},
 	"wizardsonlyfoolz": {"axis": 0.92, "principle": "Frequency"},
+	# K4.1/K4.2. Pride, Lust and Sloth had no faction — the other four Sins were
+	# "half in the code" already, these three were not. Subjects registered in
+	# `systems/cosmology_factions.gd`.
+	"vanity_row": {"axis": -0.60, "principle": "Pride"},
+	"honeyvein": {"axis": -0.50, "principle": "Lust"},
+	"long_static": {"axis": -0.85, "principle": "Sloth"},
 }
 
 

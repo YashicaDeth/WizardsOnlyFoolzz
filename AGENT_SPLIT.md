@@ -173,4 +173,6 @@ None of these stop work, but each one changes what gets built:
 4. **celloutz.xyz** — mirror the real site, or fictionalise it? Blocks I3.
 5. **What persists between runs?** Roguelike structure and "bodies remember"
    pull against each other.
-6. Working title: keep *Allusions to Grandeur* or move to **wizardsonlyfoolz**?
+6. ~~Working title: keep *Allusions to Grandeur* or move to **wizardsonlyfoolz**?~~
+   **Answered 2026-09-12: *Wizards Only Fools***, per `CHECKLIST.md` open
+   question 8. Repo path and identifiers unchanged.

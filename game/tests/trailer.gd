@@ -86,7 +86,7 @@ func _spawn(tag: String, offset: Vector3) -> Dictionary:
 func _run() -> void:
 	await _hold(40)
 	scene.yaw = 2.7
-	await _say("ALLUSIONS TO GRANDEUR", "A CELLOUTZ WORLD  //  THE ASHBLOOM EXPANSE", 70)
+	await _say("WIZARDS ONLY FOOLS", "A CELLOUTZ WORLD  //  THE ASHBLOOM EXPANSE", 70)
 
 	# --- the world, and a body in it -------------------------------------
 	await _say("EVERY PERSON RUNS ONE RIG", "zones, organs, bones, blood — the player included", 40)
@@ -144,6 +144,6 @@ func _run() -> void:
 	await _say("THE MAP IS SURVEYED, NOT GIVEN", "walking is what charts it", 70)
 	scene._toggle_panel("map")
 
-	await _say("ALLUSIONS TO GRANDEUR", "wizardsonlyfoolz  //  celloutz.xyz", 80)
+	await _say("WIZARDS ONLY FOOLS", "wizardsonlyfoolz  //  celloutz.xyz", 80)
 	await _hold(30)
 	get_tree().quit()

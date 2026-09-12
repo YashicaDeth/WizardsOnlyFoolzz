@@ -29,9 +29,12 @@ merchandise since the first scene, and it reads as ordinary because a company
 is exactly what a modern hell would look like.
 
 `wizardsonlyfoolz` was previously recorded only as a candidate working title
-(open question 5). It is better used here — as the name of the ascending
-collective — than as the title of the game. That question stays open, but this
-is an argument for keeping *Allusions to Grandeur* on the cover.
+(open question 5), and this document argued for keeping it as the name of the
+ascending collective rather than the game's title, to avoid the two colliding.
+**Overruled by Greg, 2026-09-12: the game is titled *Wizards Only Fools*
+anyway.** The collision is a feature, not a bug — the cover names the club the
+player is locked out of and the demon brand (CellOutz) is the one stamped on
+everything they actually carry.
 
 ## The player
 

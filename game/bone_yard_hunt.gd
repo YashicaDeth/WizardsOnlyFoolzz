@@ -42,6 +42,13 @@ var pitch := -0.12
 ## The condition is read out of `WorldHistory`, never stored — the same rule the
 ## Board runs on, so there is nothing to get out of sync.
 var third_person := false
+## M1.5. `third_person_unlocked()` is a pure read of history, so it can flip
+## from false to true on any frame — usually the instant a boss-tier kill
+## resolves — with nobody pressing anything. Left alone that is a permission
+## quietly granted in the background: you would only ever find out by trying
+## the key. This edge-triggers once, off that same read, so the moment itself
+## gets a beat instead of waiting to be discovered.
+var third_person_unlock_announced := false
 ## M4.3. Wide, and deliberately so — but stated correctly, which the first pass
 ## was not. Godot's `Camera3D.fov` is the **vertical** angle (keep_aspect
 ## defaults to KEEP_HEIGHT), so the 106 written here first meant 134 degrees
@@ -1883,6 +1890,19 @@ func third_person_refusal() -> String:
 	return "NOTHING HAS LOOKED BACK AT YOU YET. PUT DOWN SOMEONE WHO MATTERS."
 
 
+## M1.5. Called the one frame the unlock condition first reads true. The prompt
+## line is the same voice as the refusal it replaces, the camera gets the kind
+## of jolt a real hit gets (through `impact_feel`, not a fresh effect system),
+## and the moment is written to history so the Board can pin it like anything
+## else that happened to the player, rather than it living only in a flag.
+func _announce_third_person_unlock() -> void:
+	prompt.text = "SOMETHING IN YOU STEPS BACK. [F] LEAVES YOUR OWN EYES NOW."
+	if impact_feel != null:
+		impact_feel.kick += Vector2(0, -1.0) * 0.05
+		impact_feel.shake = maxf(impact_feel.shake, 0.6)
+	WorldHistory.record_event("third_person_unlocked", {"location": HUNT_LOCATION})
+
+
 func _toggle_panel(mode: String) -> void:
 	allusions_artwork.close_artwork()
 	panel_mode = "" if panel_mode == mode else mode
@@ -1932,7 +1952,10 @@ func _toggle_artwork() -> void:
 
 
 func _update_hud() -> void:
-	title.text = "ALLUSIONS TO GRANDEUR // LIMBO: ASHBLOOM EXPANSE"
+	if not third_person_unlock_announced and third_person_unlocked():
+		third_person_unlock_announced = true
+		_announce_third_person_unlock()
+	title.text = "WIZARDS ONLY FOOLS // LIMBO: ASHBLOOM EXPANSE"
 	status.text = "WASD MOVE  SHIFT RUN  LMB STRIKE  SPACE DODGE  Q SURGE\nE INTERACT  TAB INDEX  M MAP  T TREE  J ALLUSIONS  F CAMERA"
 	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(HUNT_ID).get("status", "dormant")).to_upper()]
 	prompt.visible = not resolution_ui.visible and not living_map.visible and not world_index.visible

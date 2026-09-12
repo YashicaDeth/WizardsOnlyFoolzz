@@ -1,6 +1,9 @@
-# AllusionsTooGrandeur
+# Wizards Only Fools
 
-Working title. A single-player experimental action RPG, with one character crossing between two worlds. This folder is the source of truth for development.
+*(repo folder and internal identifiers remain `AllusionsTooGrandeur` — that
+was the working title before Greg named the game 2026-09-12.)* A
+single-player experimental action RPG, with one character crossing between
+two worlds. This folder is the source of truth for development.
 
 ## Setup status
 

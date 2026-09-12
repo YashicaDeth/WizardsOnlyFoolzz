@@ -1,4 +1,4 @@
-# Allusions to Grandeur — GPT-6 Astra production prompt
+# Wizards Only Fools — GPT-6 Astra production prompt
 
 Continue developing the existing Godot project at `P:\GameDev\AllusionsTooGrandeur`. Treat this as an implementation task, not a brainstorming response. Infer routine details, inspect the existing project before editing, preserve unrelated user work, and persist through implementation and proportionate validation. Do not stop after writing a plan. Do not chase arbitrary line counts; maximize working, connected, maintainable gameplay and visible quality.
 

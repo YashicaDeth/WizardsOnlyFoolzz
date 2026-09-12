@@ -1,4 +1,4 @@
-# Allusions to Grandeur — bounty-centred design update
+# Wizards Only Fools — bounty-centred design update
 
 ## Latest user direction - 9 September 2026
 

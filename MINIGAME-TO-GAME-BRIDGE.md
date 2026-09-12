@@ -1,6 +1,6 @@
 # From demolition minigame to the full game
 
-The minigame is becoming the first playable slice of the larger Allusions Too Grandeur structure.
+The minigame is becoming the first playable slice of the larger Wizards Only Fools structure.
 
 ## What already carries forward
 
