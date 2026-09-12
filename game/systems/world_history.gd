@@ -25,6 +25,11 @@ var subjects: Dictionary = {}
 ## that seed. It is generated once, it persists with everything else, and
 ## anything that wants a run to look like its own run mixes it in.
 var run_salt := 0
+## W1.1. Absolute minutes since this world began. The only number the clock
+## stores — `world_clock.gd` is a pure function of it, which is why that file is
+## not a sixth autoload. Starts in the late afternoon rather than at midnight, so
+## the first thing a new player meets is the light going.
+var world_minute := 16.5 * 60.0
 
 
 func _ready() -> void:
@@ -383,6 +388,9 @@ func _load_history() -> void:
 		# looks. Zero reads as "the old constant", so an old save keeps the
 		# grime it already had.
 		run_salt = int(parsed.get("run_salt", 0))
+		# W1.1. A save from before the clock existed opens in the late afternoon
+		# of its first day, the same as a new one, rather than at minute zero.
+		world_minute = float(parsed.get("world_minute", 16.5 * 60.0))
 
 
 func _save_history() -> void:
@@ -391,4 +399,10 @@ func _save_history() -> void:
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
 		return
-	file.store_string(JSON.stringify({"next_sequence": next_sequence, "events": events, "subjects": subjects, "run_salt": run_salt}))
+	file.store_string(JSON.stringify({
+		"next_sequence": next_sequence,
+		"events": events,
+		"subjects": subjects,
+		"run_salt": run_salt,
+		"world_minute": world_minute,
+	}))

@@ -174,6 +174,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# W1.1. A heat takes time out of the day like anything else does.
+	WorldClock.advance(delta)
 	boat.enabled = round_state == "active" and not index_open and not leaving_on_foot
 	fire_cooldown = maxf(0.0, fire_cooldown - delta)
 	if leaving_on_foot:

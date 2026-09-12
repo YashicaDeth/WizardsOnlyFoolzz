@@ -216,12 +216,12 @@ half-tuned broadcast is exactly that.
 A is sealed, which means the only way it improves now is a stated second pass.
 Everything below is a real weakness in what v1 shipped, not polish.
 
-- [ ] **A1.6** `v2` The stencil has no kerning pairs — every letter sits on the grid, so AV and TA gap
+- [x] **A1.6** `v2` The stencil has no kerning pairs — every letter sits on the grid, so AV and TA gap — fixed by measurement rather than a table: the face is cut into eight bands, and a pair closes by the smallest clearance any band has. AV, TA, AT and VA all close 1.56 grid units; HH, OO and MN close nothing, because vertical-sided letters have no hole. Correct by construction whenever a glyph is edited
 - [ ] **A2.9** `v2` One plate for every page; the dossier, the Wire and the pyramid should not be printed on the same substrate
-- [ ] **A5.6** `v2` Grunge is seeded per screen and identical every session — it should remember the run it is in
-- [ ] **A6.6** `v2` Dead pixels and scanlines are static; a failing panel flickers
+- [x] **A5.6** `v2` Grunge is seeded per screen and identical every session — it should remember the run it is in — `WorldHistory.run_salt`, generated once per save and mixed into every seed. Still perfectly still frame to frame; two runs simply wear differently. Old saves and test mode stay at zero on purpose
+- [x] **A6.6** `v2` Dead pixels and scanlines are static; a failing panel flickers — positions stay fixed, expression does not: each fault carries its own period, duty and phase, rows shear before they drop out, some pixels are stuck *on* rather than dead, and the backlight sags and drops. All of it off `condition`
 - [ ] **A7.7** `v2` Retune the chassis against authored arena geometry once G3.1 lands
-- [ ] **A9.7** `v2` Stations have a schedule — the dial is the same at 3am as at noon
+- [x] **A9.7** `v2` Stations have a schedule — the dial is the same at 3am as at noon — and it was blocked on the fact that this game had no time of day at all. `world_clock.gd` (W1.1) now exists and the dial is its first reader: noon is pit control and the numbers station, three in the morning is the preacher, the gate lantern loop and the numbers station. Off air is zero strength however close you stand, and the dial says when it comes back
 
 ## B — Make the body the centrepiece
 
@@ -1628,7 +1628,7 @@ being vehicles rather than set pieces.
 The Expanse has one lighting state, one fog density and no clock. `WorldLook`
 already switches presets by place; nothing switches by time.
 
-- [ ] **W1.1** A day cycle the world reads, not only the sky
+- [x] **W1.1** A day cycle the world reads, not only the sky — `world_clock.gd`, a pure function of one persisted number rather than a sixth autoload. Hours, days, months, five named phases, a continuous daylight curve, and sleeping. 28 checks. Unblocks A9.7, W1.4, AB2.4, AJ4.3 and AL1.5, all of which were waiting on it without anybody noticing
 - [ ] **W1.2** Contamination has weather — it moves, it settles, it gets worse
 - [ ] **W1.3** Being caught out in it costs something
 - [ ] **W1.4** Factions keep hours; the Wire is busier at some of them

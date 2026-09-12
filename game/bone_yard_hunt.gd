@@ -668,6 +668,10 @@ func _physics_process(delta: float) -> void:
 		_update_hud()
 		return
 	pulse += delta
+	# W1.1. The world keeps time, and exactly one place advances it — a clock
+	# that two scenes both wind runs at double speed the moment anybody
+	# builds a third.
+	WorldClock.advance(delta)
 	dodge_remaining = maxf(0.0, dodge_remaining - delta)
 	# O2.7 v3. scale_for() only ever reached the encounter loop's actor_delta —
 	# the player is the other half of every exchange they are in and kept

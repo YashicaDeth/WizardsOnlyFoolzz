@@ -26,26 +26,42 @@ const STATIONS := [
 		"khz": 88.6, "name": "BONE YARD PIT CONTROL", "kind": "wire",
 		"at": Vector2(-155.0, 0.0), "reach": 220.0,
 		"voice": "results, delays, and whose car is being cut up",
+		# A9.7 v2. Pit control is on while the pit is. It signs off after the
+		# last heat and comes back before the first.
+		"hours": [9.0, 23.0],
 	},
 	{
 		"khz": 97.2, "name": "THE FULL SCHEDULE", "kind": "preacher",
 		"at": Vector2(130.0, -122.0), "reach": 300.0,
 		"voice": "a man explaining what the masts are really for",
+		# The man with the theory about the masts keeps the hours you would
+		# expect a man with a theory about the masts to keep.
+		"hours": [22.0, 5.0],
 	},
 	{
 		"khz": 104.9, "name": "UNNAMED CARRIER", "kind": "numbers",
 		"at": Vector2(135.0, 0.0), "reach": 160.0,
 		"voice": "a woman reading five-digit groups, forever",
+		# No hours. "Forever" was already the joke and now it is also true —
+		# and it is what makes the others having hours legible, because there
+		# is one thing on the dial that never changes to measure them against.
+		"hours": [],
 	},
 	{
 		"khz": 112.4, "name": "SOFT ROT COMMUNION", "kind": "music",
 		"at": Vector2(130.0, -122.0), "reach": 260.0,
 		"voice": "something with too many strings, recorded in a cave",
+		# A communion keeps devotional hours: before dawn, and again at dusk.
+		"hours": [4.5, 8.0],
+		"second_hours": [18.0, 21.5],
 	},
 	{
 		"khz": 121.5, "name": "GATE LANTERN RELAY", "kind": "hook",
 		"at": Vector2(65.0, 115.0), "reach": 180.0,
 		"voice": "somebody asking for help by name, on a loop",
+		# A loop left running by people who are not there to switch it off runs
+		# at night, when there is nobody else on the band to drown it.
+		"hours": [20.0, 6.0],
 	},
 ]
 
@@ -200,7 +216,12 @@ func strength(station: Dictionary) -> float:
 func receiving() -> Dictionary:
 	var best: Dictionary = {}
 	var best_strength := 0.0
+	var at := WorldClock.hour()
 	for station in STATIONS:
+		# A9.7 v2. A station that is off air is not on the dial at all, so
+		# tuning to its frequency at four in the morning finds carrier.
+		if not on_air(station, at):
+			continue
 		var here := strength(station)
 		if here > best_strength:
 			best_strength = here
@@ -215,17 +236,74 @@ func receiving() -> Dictionary:
 ## Everything audible from here, for the dial to draw its ticks against. A
 ## station out of physical range is deliberately still listed at zero, because a
 ## dead marker on the dial is information: something transmits there, elsewhere.
+## A9.7 v2. Whether a station is transmitting at this hour.
+##
+## Greg: *"stations have a schedule — the dial is the same at 3am as at noon"*.
+## It was, because there was no such thing as 3am: the clock did not exist. It
+## does now (`world_clock.gd`), and the dial is the first thing to read it.
+##
+## A window that wraps past midnight is the normal case here rather than the
+## exception, so the comparison has to handle `[22.0, 5.0]` meaning "ten at night
+## until five in the morning" rather than "never".
+static func _within(window: Array, at: float) -> bool:
+	if window.size() < 2:
+		return false
+	var opens := float(window[0])
+	var closes := float(window[1])
+	if opens <= closes:
+		return at >= opens and at < closes
+	return at >= opens or at < closes
+
+
+## True when this station is on air. A station with no hours at all is always on,
+## which is the numbers station and is deliberate.
+static func on_air(station: Dictionary, at := -1.0) -> bool:
+	var hour: float = at if at >= 0.0 else WorldClock.hour()
+	var hours: Array = station.get("hours", [])
+	if hours.is_empty():
+		return true
+	if _within(hours, hour):
+		return true
+	return _within(station.get("second_hours", []), hour)
+
+
+## How long until this station comes back, in hours. Negative when it is already
+## on. The dial draws this, because "nothing there" and "nothing there *yet*"
+## are different pieces of information and the second one is a reason to come
+## back at a particular time.
+static func returns_in(station: Dictionary, at := -1.0) -> float:
+	var hour: float = at if at >= 0.0 else WorldClock.hour()
+	if on_air(station, hour):
+		return -1.0
+	var soonest := 25.0
+	for window: Array in [station.get("hours", []), station.get("second_hours", [])]:
+		if window.size() < 2:
+			continue
+		var opens := float(window[0])
+		var wait: float = opens - hour
+		if wait < 0.0:
+			wait += WorldClock.HOURS_PER_DAY
+		soonest = minf(soonest, wait)
+	return soonest if soonest < 25.0 else -1.0
+
+
 func band() -> Array:
 	var out: Array = []
+	var at := WorldClock.hour()
 	for station in STATIONS:
 		var distance := listener.distance_to(station.at as Vector2)
 		var blocked := shadow(station.at as Vector2)
+		var live := on_air(station, at)
 		out.append({
 			"khz": float(station.khz),
 			"name": str(station.name),
 			"kind": str(station.kind),
-			"strength": strength(station),
+			# A9.7 v2. Off air is zero strength however close you stand. The
+			# transmitter is not weak, it is switched off.
+			"strength": strength(station) if live else 0.0,
 			"in_reach": distance <= float(station.reach),
+			"on_air": live,
+			"returns_in": returns_in(station, at),
 			"shadow": float(blocked.get("loss", 1.0)),
 			"shadowed_by": str(blocked.get("cause", "")),
 		})
