@@ -219,6 +219,7 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B1.6** Wet pass — subsurface and slick specular, so organs read as meat rather than plastic~~
 - [x] ~~**B1.7** Drag to rotate and scroll to zoom, instead of a fixed spin~~
 - [x] ~~**B1.8** Damage on the mesh: a ruptured organ is torn, not only darker~~
+- [x] ~~**B1.9v2** Organs are authored shapes that never deform — a compressed lung should read as compressed~~
 
 ### B2 — Limbs and cybernetics, one verb `BUILT`
 - [x] ~~**B2.1** Flesh, bone, organs and hardware in one list, inspected identically~~
@@ -227,6 +228,7 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B2.4** Authored implant meshes per catalogue entry~~
 - [x] ~~**B2.5** Wounds carry a zone at authoring time — kills the second keyword table~~
 - [x] ~~**B2.6** Compare view: your part against theirs, which is the robbing decision~~
+- [x] ~~**B2.7v2** Pain is a number with no behaviour of its own: it should change how a body stands before it changes what it can do~~
 
 ### B3 — The X-ray cursor `BUILT`
 - [x] ~~**B3.1** Brass ring, real button, skull mark, key and click through one path~~
@@ -246,6 +248,8 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B4.7** Authored chunk meshes instead of primitives~~
 - [x] ~~**B4.8** Per-layer impact sound — bone does not land like fat~~
 - [x] ~~**B4.9** Rot over time: flies, discolouration, smell as a gameplay signal~~
+- [x] ~~**B4.10v2** Rot attracts something. Flies were shipped; nothing eats~~
+- [ ] **B4.11v2** Blood pools persist across a scene change, or they are set dressing
 
 ### B5 — Rob cybernetics off a body `BUILT`
 **Unblocked by B4** — `GoreChunks.take()` already returns the identified part.
@@ -265,6 +269,8 @@ The most complete system in the project and, until this pass, the least visible.
   - v1 — losing a limb ends the fight
   - v2 — the fight continues in both directions, and the stump bleeds on everyone's clock
 - [x] ~~**B6.6** Stump behaviour: bleed rate, one-armed movement and attacks~~
+- [x] ~~**B6.7v2** A fracture is binary. A compound fracture is a different injury and should look it~~
+- [x] ~~**B6.8v2** Internal bleeding is indistinguishable from external — the X-ray should be the only way to find it~~
 
 ---
 
@@ -420,6 +426,11 @@ Ascent/Descent axis that already exists and is currently unused.
       `draw_seal_burning` consumes strokes from a seeded front angle outward,
       the strokes still catching drawn ember-bright before they are gone
       rather than merely dimmed. All three in the gallery capture above.
+- [x] ~~**E1.3** Never a good/evil slider — read through the Tree view~~
+
+- [x] ~~**E2.2** The 72 Goetic seals as data~~
+- [ ] **E2.3** Original seals for what this world grew on its own
+- [ ] **E2.4** Seals animate, corrupt and burn
 
 ### E3 — Camera rituals
 - [x] **E3.1** Ritual definitions: what must be done, what must be photographed — `systems/ritual_app.gd`'s `RITUALS`: three rites (including Greg's own worked example, five gored heads), each keyed to a real seal from `goetic_seals.gd` and paying its reward through `boons.gd` — E2/E3/E4 as the one system `RITUAL_AND_KARMA.md` says they are, not three

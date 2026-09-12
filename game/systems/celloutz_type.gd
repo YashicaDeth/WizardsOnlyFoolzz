@@ -196,7 +196,6 @@ static func draw_stamped(canvas: CanvasItem, at: Vector2, text: String, cap_heig
 ## ending in either a hook or a small loop, and occasional chords connecting
 ## two points on the ring the way a pentagram's construction lines do. Same
 ## seed, same seal, always — a rite has to point at one mark and mean it.
-##
 ## Coordinates are normalised to a unit circle at the origin; `draw_seal` and
 ## its variants below scale and place it.
 const SEAL_RING_STEPS := 28
@@ -229,7 +228,6 @@ static func seal_strokes(seed_value: int, complexity: int = 6) -> Array:
 		if rng.randf() < 0.5:
 			# A hook: the spoke turns before it reaches the ring.
 			var hook_dir := direction.rotated(rng.randf_range(0.5, 1.1) * (1.0 if rng.randf() < 0.5 else -1.0))
-			strokes.append(PackedVector2Array([outer_point, outer_point + hook_dir * 0.16]))
 		else:
 			# A loop: a small closed ring at the spoke's end.
 			var loop := PackedVector2Array()
@@ -248,7 +246,6 @@ static func seal_strokes(seed_value: int, complexity: int = 6) -> Array:
 		var from_index := rng.randi() % anchors.size()
 		var span := 2 + rng.randi() % maxi(1, anchors.size() - 3)
 		var to_index := (from_index + span) % anchors.size()
-		strokes.append(PackedVector2Array([anchors[from_index], anchors[to_index]]))
 
 	# A small anchoring mark at the centre so the eye has a point of origin,
 	# rather than every spoke meeting at a bare gap.
@@ -271,7 +268,6 @@ static func draw_seal(canvas: CanvasItem, center: Vector2, radius: float, seed_v
 			points.append(center + point * radius)
 		if points.size() == 2:
 			canvas.draw_line(points[0], points[1], color, thickness)
-		else:
 			canvas.draw_polyline(points, color, thickness)
 
 
@@ -282,29 +278,17 @@ static func draw_seal(canvas: CanvasItem, center: Vector2, radius: float, seed_v
 ## a rite is a thing you complete, not a bar that fills.
 static func draw_seal_forming(canvas: CanvasItem, center: Vector2, radius: float, seed_value: int, color: Color, progress: float, complexity: int = 6, weight: float = 0.0) -> void:
 	var strokes := seal_strokes(seed_value, complexity)
-	var thickness := weight if weight > 0.0 else maxf(1.0, radius * 0.035)
 	var drawn := clampi(roundi(clampf(progress, 0.0, 1.0) * strokes.size()), 0, strokes.size())
 	var partial_t := fmod(clampf(progress, 0.0, 1.0) * strokes.size(), 1.0)
 	for index in drawn:
 		var stroke: PackedVector2Array = strokes[index]
-		var points := PackedVector2Array()
-		for point in stroke:
-			points.append(center + point * radius)
-		if points.size() == 2:
-			canvas.draw_line(points[0], points[1], color, thickness)
-		else:
-			canvas.draw_polyline(points, color, thickness)
 	# The stroke currently being laid down draws only as far as it has gotten.
 	if drawn < strokes.size() and partial_t > 0.01:
 		var live: PackedVector2Array = strokes[drawn]
 		var live_end := maxi(1, roundi(partial_t * float(live.size() - 1)))
-		var points := PackedVector2Array()
 		for index in live_end + 1:
 			points.append(center + live[index] * radius)
-		if points.size() == 2:
-			canvas.draw_line(points[0], points[1], color * Color(1, 1, 1, 0.8), thickness)
 		elif points.size() > 2:
-			canvas.draw_polyline(points, color * Color(1, 1, 1, 0.8), thickness)
 
 
 ## E2.4. The same corruption `draw_worn` applies to letterforms, on a seal
@@ -317,10 +301,8 @@ static func draw_seal_corrupted(canvas: CanvasItem, center: Vector2, radius: flo
 		draw_seal(canvas, center, radius, seed_value, color, complexity, weight)
 		return
 	var thickness := (weight if weight > 0.0 else maxf(1.0, radius * 0.035)) * lerpf(1.0, 0.6, damage)
-	var rng := RandomNumberGenerator.new()
 	rng.seed = (hash(seed_value) ^ 0x5eed) & 0x7fffffff
 	var wander := radius * 0.05 * damage
-	for stroke: PackedVector2Array in seal_strokes(seed_value, complexity):
 		for step in range(stroke.size() - 1):
 			var from := center + stroke[step] * radius
 			var to := center + stroke[step + 1] * radius
@@ -342,28 +324,39 @@ static func draw_seal_corrupted(canvas: CanvasItem, center: Vector2, radius: flo
 static func draw_seal_burning(canvas: CanvasItem, center: Vector2, radius: float, seed_value: int, color: Color, burn: float, front_angle: float = 0.0, complexity: int = 6, weight: float = 0.0) -> void:
 	var consumed := clampf(burn, 0.0, 1.0)
 	if consumed <= 0.01:
-		draw_seal(canvas, center, radius, seed_value, color, complexity, weight)
-		return
-	var thickness := weight if weight > 0.0 else maxf(1.0, radius * 0.035)
 	var ember := Color("dc5827")
 	var front := TAU * consumed
-	for stroke: PackedVector2Array in seal_strokes(seed_value, complexity):
 		var midpoint := Vector2.ZERO
-		for point in stroke:
 			midpoint += point
 		midpoint /= maxf(1.0, float(stroke.size()))
 		var stroke_angle := fposmod(midpoint.angle() - front_angle, TAU)
 		if stroke_angle < front:
 			# Already consumed — gone, not merely dim.
-			continue
-		var points := PackedVector2Array()
-		for point in stroke:
-			points.append(center + point * radius)
 		# Right at the front it is still catching — ember-bright rather than
 		# its normal colour — before it is gone on the next tick.
 		var at_front := stroke_angle < front + 0.55
 		var tone := ember if at_front else color
-		if points.size() == 2:
-			canvas.draw_line(points[0], points[1], tone, thickness)
-		else:
-			canvas.draw_polyline(points, tone, thickness)
+## E2.1. The ritual alphabet is made of the same cut strokes as the display
+## face. A seal is deliberately only geometry: its name, cost and meaning are
+## authored later in E2.2/E2.3, so this vocabulary cannot smuggle a real-world
+## occult system into the game.
+## `strokes` uses points in a centred -1..1 square. Keep intentional gaps as
+## separate strokes, exactly as GLYPHS does for stencil bridges.
+static func seal_stroke_points(stroke: Array, at: Vector2, radius: float, rotation := 0.0) -> PackedVector2Array:
+		if not point is Array or point.size() < 2:
+		var local := Vector2(float(point[0]), float(point[1])) * radius
+		points.append(at + local.rotated(rotation))
+	return points
+
+
+## Draw one mark from authored stroke paths. The doubled ghost makes it read as
+## a stamped, failing instrument rather than pristine diagram linework.
+	var ghost := color * Color(1.0, 1.0, 1.0, 0.22)
+	for stroke in strokes:
+		var points := seal_stroke_points(stroke, at, radius, rotation)
+		if points.size() < 2:
+		var offset := Vector2(radius * 0.035, radius * 0.025).rotated(rotation)
+			var echo := PackedVector2Array()
+			for point in points:
+				echo.append(point + offset)
+			canvas.draw_polyline(echo, ghost, thickness * 1.7)

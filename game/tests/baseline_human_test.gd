@@ -22,6 +22,7 @@ func _ready() -> void:
 	_test_legacy_names()
 	_test_damage_lands_where_aimed()
 	_test_hit_geometry()
+	_test_pain_posture()
 	_test_severing()
 	_test_prosthetic()
 	_test_gore()
@@ -50,6 +51,7 @@ func _test_rig_shape() -> void:
 	check(missing.is_empty(), "every canonical zone has a mesh and a tagged hitbox (missing %s)" % str(missing))
 	# Proximity voice needs one consistent place to speak from on any body.
 	check(body.head_anchor != null and body.head_anchor.position.y > 1.0, "rig exposes a head anchor for voice")
+	check((body.bones.torso as Node3D).get_child_count() >= BaselineHuman.SPINE_VERTEBRAE, "the torso rig carries all 33 vertebrae")
 	var seated := _rig(true)
 	check(seated.get_node_or_null("left_leg") != null, "a seated driver keeps the same zones, folded into the cab")
 	check(seated.head_anchor.position.y < body.head_anchor.position.y, "seated head sits lower than standing")
@@ -144,6 +146,19 @@ func _test_severing() -> void:
 	body.queue_free()
 
 
+func _test_pain_posture() -> void:
+	var body := _rig()
+	body.gore = false
+	var mobility_before := body.anatomy.mobility_ratio()
+	body.hit("torso", 24.0, 10.0, "blunt")
+	var posture := body.anatomy.posture()
+	check(str(posture.state) == "guarded" and float(posture.hunch) < 0.0, "ordinary pain produces a guarded posture before a performance penalty")
+	check(is_equal_approx(body.anatomy.mobility_ratio(), mobility_before), "guarded pain does not yet reduce mobility")
+	body._apply_pain_posture(1.0)
+	check(body.rotation.x < -0.01, "the rig visibly hunches when its anatomy reports pain")
+	body.queue_free()
+
+
 func _test_downed() -> void:
 	# The window every resolution happens inside. Two-sided throughout: going
 	# down must not be death, and death must not be survivable.
@@ -217,13 +232,15 @@ func _test_organs() -> void:
 	gutted.hit("torso", 90.0, 20.0, "cut", "gut")
 	check(not gutted.anatomy.organ_ok("gut"), "a blade through the gut ruptures the gut")
 	check(gutted.anatomy.organ_ok("heart"), "...and leaves the heart alone")
+	check(gutted.anatomy.has_internal_bleeding(), "a ruptured gut carries a hidden internal bleed in addition to any surface wound")
+	check(gutted.anatomy.xray_findings().has("INTERNAL BLEED: GUT"), "only an X-ray finding names the hidden bleed")
 	check(not gutted.anatomy.dead, "a gut wound is not instantly fatal")
 	var gut_bleed: float = gutted.anatomy.bleed_rate
 	gutted.queue_free()
 
 	var shot := _rig()
 	shot.hit("torso", 90.0, 20.0, "cut", "heart")
-	check(shot.anatomy.bleed_rate > gut_bleed, "a heart shot bleeds harder than a gut wound (%.1f vs %.1f)" % [shot.anatomy.bleed_rate, gut_bleed])
+	check(shot.anatomy.internal_bleed_rate > gutted.anatomy.internal_bleed_rate, "a heart shot bleeds harder inside than a gut wound (%.1f vs %.1f)" % [shot.anatomy.internal_bleed_rate, gutted.anatomy.internal_bleed_rate])
 	check(not shot.organ_parts["heart"].visible, "a ruptured organ leaves the body")
 	shot.queue_free()
 
@@ -274,13 +291,16 @@ func _test_gore() -> void:
 	# Two-sided: an undamaged limb has no bone showing.
 	check(body.get_node("left_leg").get_node_or_null("Fracture") == null, "a healthy limb has no fracture")
 	check(body._loose.is_empty(), "an untouched body has not bled")
-	body.hit("left_leg", 30.0, 12.0, "cut")
+	body.hit("left_leg", 30.0, 12.0, "blunt")
 	check(not body._loose.is_empty(), "a cut draws blood")
 	# A flesh wound is not a broken bone. The threshold has to mean something in
 	# both directions, so check it does not fire early either.
 	check(body.get_node("left_leg").get_node_or_null("Fracture") == null, "a leg at 60 percent is hurt, not broken")
-	body.hit("left_leg", 30.0, 12.0, "cut")
-	check(body.get_node("left_leg").get_node_or_null("Fracture") != null, "a leg past the fracture threshold puts bone through the skin")
+	body.hit("left_leg", 30.0, 12.0, "blunt")
+	check(body.anatomy.fracture_kind("left_leg") == "closed" and body.get_node("left_leg").get_node_or_null("Fracture") == null, "a blunt fracture is closed and remains under the skin")
+	body.hit("right_leg", 36.0, 12.0, "puncture")
+	body.hit("right_leg", 36.0, 12.0, "puncture")
+	check(body.anatomy.fracture_kind("right_leg") == "compound" and body.get_node("right_leg").get_node_or_null("Fracture") != null, "a penetrating fracture is a different injury and breaks through the skin")
 	# Torso opens up only once the chest is actually gone.
 	check(not body.has_meta("gutted"), "an intact chest holds its organs")
 	for i in 8:

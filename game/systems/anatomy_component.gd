@@ -40,6 +40,9 @@ var subject_id := ""
 var blood_capacity := 5000.0
 var blood_remaining := 5000.0
 var bleed_rate := 0.0
+## B6.8v2. This is deliberately separate from an open wound. The body loses
+## blood either way, but only an X-ray/anatomy inspection may name this source.
+var internal_bleed_rate := 0.0
 var pain := 0.0
 var consciousness := 100.0
 var dead := false
@@ -49,6 +52,11 @@ var zones: Dictionary = {}
 var organs: Dictionary = {}
 var installed_parts: Dictionary = {}
 var wounds: Array[Dictionary] = []
+
+## B2.7v2. Pain should announce itself through a guarded body before it turns
+## into an invisible performance debuff. This is deliberately above routine
+## combat pain: a person can be hurting, and visibly so, while still moving.
+const FUNCTIONAL_PAIN := 55.0
 
 
 func configure(id: String, capacity: float = 5000.0, cybernetics: Variant = {}) -> void:
@@ -92,6 +100,15 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 		"disabled": float(zone.health) <= 0.0,
 		"time_msec": Time.get_ticks_msec(),
 	}
+	# B6.7v2. A closed break and a compound break are not the same injury. The
+	# former is a disabled structure under intact skin; only a penetrating blow
+	# at fracture depth opens it to the world.
+	if resolved_zone in ["left_arm", "right_arm", "left_leg", "right_leg"] and float(zone.health) <= float(DEFAULT_ZONES[resolved_zone].health) * 0.40:
+		var fracture := "compound" if penetrating else "closed"
+		if str(zone.get("fracture", "")) != "compound":
+			zone["fracture"] = fracture
+			zones[resolved_zone] = zone
+		wound["fracture"] = fracture
 	if not installed.is_empty():
 		wound["implant_condition"] = damage_implant(resolved_zone, applied * (0.30 if penetrating else 0.16))
 	wounds.append(wound)
@@ -113,6 +130,10 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 	return result
 
 
+func fracture_kind(zone_id: String) -> String:
+	return str((zones.get(zone_id, {}) as Dictionary).get("fracture", ""))
+
+
 func damage_organ(organ_id: String, amount: float) -> Dictionary:
 	if not organs.has(organ_id):
 		return {}
@@ -122,7 +143,7 @@ func damage_organ(organ_id: String, amount: float) -> Dictionary:
 	organ["health"] = maxf(0.0, float(organ.health) - amount)
 	if float(organ.health) <= 0.0:
 		organ["ruptured"] = true
-		bleed_rate += float(organ.bleed) * 14.0
+		internal_bleed_rate += float(organ.bleed) * 14.0
 		pain = clampf(pain + 26.0, 0.0, 100.0)
 		organs[organ_id] = organ
 		organ_ruptured.emit(organ_id, organ)
@@ -211,6 +232,31 @@ func treat_wound(zone_id: String, quality: float) -> void:
 	bleeding_changed.emit(bleed_rate, blood_remaining)
 
 
+func has_internal_bleeding() -> bool:
+	return internal_bleed_rate > 0.01
+
+
+func xray_findings() -> Array[String]:
+	var findings: Array[String] = []
+	for organ_id in organs:
+		if bool((organs[organ_id] as Dictionary).get("ruptured", false)):
+			findings.append("INTERNAL BLEED: " + str(organ_id).replace("_", " ").to_upper())
+	return findings
+
+
+func posture() -> Dictionary:
+	var visual_pain := clampf(pain / FUNCTIONAL_PAIN, 0.0, 1.0)
+	var left_leg: Dictionary = zones.get("left_leg", DEFAULT_ZONES.left_leg)
+	var right_leg: Dictionary = zones.get("right_leg", DEFAULT_ZONES.right_leg)
+	var left_ratio := float(left_leg.health) / float(DEFAULT_ZONES.left_leg.health)
+	var right_ratio := float(right_leg.health) / float(DEFAULT_ZONES.right_leg.health)
+	return {
+		"state": "upright" if visual_pain < 0.12 else ("guarded" if visual_pain < 0.72 else "faltering"),
+		"hunch": -visual_pain * 0.085,
+		"lean": clampf((right_ratio - left_ratio) * 0.16, -0.16, 0.16),
+	}
+
+
 func mobility_ratio() -> float:
 	var left: Dictionary = zones.get("left_leg", DEFAULT_ZONES.left_leg)
 	var right: Dictionary = zones.get("right_leg", DEFAULT_ZONES.right_leg)
@@ -219,7 +265,8 @@ func mobility_ratio() -> float:
 	# legs can produce, and no amount of pain management brings it back.
 	if not organ_ok("spine"):
 		return 0.05
-	return clampf(limb_ratio * (1.0 - pain * 0.004), 0.18, 1.0)
+	var functional_pain := maxf(0.0, pain - FUNCTIONAL_PAIN)
+	return clampf(limb_ratio * (1.0 - functional_pain * 0.008), 0.18, 1.0)
 
 
 func combat_ratio() -> float:
@@ -233,6 +280,7 @@ func snapshot() -> Dictionary:
 		"blood": roundi(blood_remaining),
 		"blood_capacity": roundi(blood_capacity),
 		"bleed_rate": snappedf(bleed_rate, 0.01),
+		"internal_bleed_rate": snappedf(internal_bleed_rate, 0.01),
 		"pain": roundi(pain),
 		"consciousness": roundi(consciousness),
 		"critical": critical,
@@ -249,6 +297,7 @@ func restore(state: Dictionary) -> void:
 	blood_capacity = maxf(100.0, float(state.get("blood_capacity", blood_capacity)))
 	blood_remaining = clampf(float(state.get("blood", blood_capacity)), 0.0, blood_capacity)
 	bleed_rate = maxf(0.0, float(state.get("bleed_rate", 0.0)))
+	internal_bleed_rate = maxf(0.0, float(state.get("internal_bleed_rate", 0.0)))
 	pain = clampf(float(state.get("pain", 0.0)), 0.0, 100.0)
 	consciousness = clampf(float(state.get("consciousness", 100.0)), 0.0, 100.0)
 	critical = bool(state.get("critical", false))
@@ -273,11 +322,13 @@ func restore(state: Dictionary) -> void:
 
 
 func _process(delta: float) -> void:
-	if dead or bleed_rate <= 0.001:
+	var total_bleed := bleed_rate + internal_bleed_rate
+	if dead or total_bleed <= 0.001:
 		return
-	blood_remaining = maxf(0.0, blood_remaining - bleed_rate * delta)
+	blood_remaining = maxf(0.0, blood_remaining - total_bleed * delta)
 	consciousness = clampf((blood_remaining / blood_capacity) * 120.0 - pain * 0.22 - _organ_consciousness_drain(), 0.0, 100.0)
 	bleed_rate = maxf(0.0, bleed_rate - delta * 0.012)
+	internal_bleed_rate = maxf(0.0, internal_bleed_rate - delta * 0.006)
 	bleeding_changed.emit(bleed_rate, blood_remaining)
 	if blood_remaining <= blood_capacity * 0.32:
 		_enter_critical()

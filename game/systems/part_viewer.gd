@@ -36,6 +36,7 @@ var _pivot: Node3D
 var _spec := ""
 var _base_fit := 1.0
 var _ruptured := false
+var _compressed := false
 
 
 func _ready() -> void:
@@ -79,7 +80,8 @@ func _ready() -> void:
 func show_part(part: Dictionary, state: float) -> void:
 	condition = clampf(state, 0.0, 1.0)
 	_ruptured = bool(part.get("ruptured", false)) or (str(part.get("kind", "")) == "organ" and condition <= 0.05)
-	var key := "%s:%s:%s:%s" % [str(part.get("kind", "")), str(part.get("id", "")), str(part.get("zone", "")), str(_ruptured)]
+	_compressed = bool(part.get("compressed", false)) and not _ruptured
+	var key := "%s:%s:%s:%s:%s" % [str(part.get("kind", "")), str(part.get("id", "")), str(part.get("zone", "")), str(_ruptured), str(_compressed)]
 	if key == _spec:
 		_apply_condition()
 		return
@@ -92,7 +94,7 @@ func show_part(part: Dictionary, state: float) -> void:
 		child.queue_free()
 	match str(part.get("kind", "")):
 		"organ":
-			_build_organ(str(part.id))
+			_build_organ(str(part.id), _compressed)
 		"bone":
 			_build_bone(str(part.get("zone", "torso")))
 		"limb":
@@ -103,7 +105,7 @@ func show_part(part: Dictionary, state: float) -> void:
 	_fit()
 
 
-func _build_organ(organ_id: String) -> void:
+func _build_organ(organ_id: String, compressed := false) -> void:
 	if organ_id == "spine":
 		# A single sphere is a lie for a spine, and the rig already stacks real
 		# vertebrae for it, so this does the same rather than inventing a shape.
@@ -120,9 +122,19 @@ func _build_organ(organ_id: String) -> void:
 	# coiled bowel and two-hemisphere brain. No generic sphere stands in for all.
 	if organ_id.ends_with("lung"):
 		var side := -1.0 if organ_id.begins_with("left") else 1.0
-		_ellipsoid("UpperLobe", Vector3(side * 0.018, 0.045, 0.0), Vector3(0.72, 1.20, 0.58), tint)
-		_ellipsoid("LowerLobe", Vector3(-side * 0.010, -0.050, 0.0), Vector3(0.92, 1.05, 0.66), tint.darkened(0.05), Vector3(0, 0, side * -0.16))
-		_ellipsoid("MedialLobe", Vector3(side * 0.030, -0.005, 0.038), Vector3(0.48, 0.78, 0.38), tint.lightened(0.04))
+		if compressed:
+			# B1.9: do not scale a healthy lung into a flat one. A crushed lung is
+			# its own authored assembly: folded lobes, a rib imprint and a kinked
+			# bronchus. Condition only colours it; it never deforms this silhouette.
+			_ellipsoid("CollapsedUpperLobe", Vector3(side * 0.030, 0.038, 0.0), Vector3(0.84, 0.42, 0.66), tint.darkened(0.12), Vector3(0, 0, side * -0.28))
+			_ellipsoid("CollapsedLowerLobe", Vector3(-side * 0.014, -0.038, 0.006), Vector3(1.02, 0.34, 0.72), tint.darkened(0.20), Vector3(0, 0, side * 0.24))
+			var imprint := _piece(BodyMesh.arc_tube(0.080, 0.052, 0.010, PI * 0.12, PI * 0.88), Vector3(0, 0.0, 0.070), Color("3e1518"), false)
+			imprint.name = "RibImprint"
+			imprint.rotation_degrees = Vector3(88, 0, 0)
+		else:
+			_ellipsoid("UpperLobe", Vector3(side * 0.018, 0.045, 0.0), Vector3(0.72, 1.20, 0.58), tint)
+			_ellipsoid("LowerLobe", Vector3(-side * 0.010, -0.050, 0.0), Vector3(0.92, 1.05, 0.66), tint.darkened(0.05), Vector3(0, 0, side * -0.16))
+			_ellipsoid("MedialLobe", Vector3(side * 0.030, -0.005, 0.038), Vector3(0.48, 0.78, 0.38), tint.lightened(0.04))
 		var stub := MeshInstance3D.new()
 		var tube := CylinderMesh.new()
 		tube.top_radius = 0.012
@@ -400,7 +412,7 @@ func _apply_zoom() -> void:
 
 
 func view_state() -> Dictionary:
-	return {"rotation": view_rotation, "zoom": zoom, "ruptured": _ruptured, "pieces": _pivot.get_child_count()}
+	return {"rotation": view_rotation, "zoom": zoom, "ruptured": _ruptured, "compressed": _compressed, "pieces": _pivot.get_child_count()}
 
 
 func _process(delta: float) -> void:

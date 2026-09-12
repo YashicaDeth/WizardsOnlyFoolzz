@@ -31,6 +31,9 @@ const SEVER_HEALTH_RATIO := 0.25
 ## than merely destroyed. Tuned so an untreated stump is a clock measured in
 ## tens of seconds, not minutes.
 const STUMP_BLEED := 26.0
+## A human spine is authored as 33 vertebrae here. It is both the anatomical
+## count and a deliberate recurring number in the game's body language.
+const SPINE_VERTEBRAE := 33
 
 ## Every loose spelling that existed at a call site, mapped onto the canonical
 ## zone. Kept so old saves and old events stay readable rather than resolving to
@@ -323,10 +326,11 @@ func _build_bones(layout: Dictionary) -> void:
 			"head":
 				_bone_piece(frame, BodyMesh.skull((spec.size as Vector3).y), Vector3.ZERO)
 			"torso":
-				# Spine first, then a cage hung off it. Seven vertebrae is not
-				# anatomy, it is enough to read as a spine at this scale.
-				for index in 7:
-					_bone_piece(frame, BodyMesh.vertebra(), Vector3(0, length * 0.42 - index * length * 0.14, -0.072))
+				# The rig carries all 33 vertebrae, rather than a decorative handful.
+				# They stay legible as a continuous column at normal camera distance.
+				for index in SPINE_VERTEBRAE:
+					var fraction := float(index) / float(SPINE_VERTEBRAE - 1)
+					_bone_piece(frame, BodyMesh.vertebra(), Vector3(0, lerpf(length * 0.43, -length * 0.43, fraction), -0.072))
 				for index in 5:
 					var rib := _bone_piece(frame, BodyMesh.arc_tube(0.148, 0.098, 0.011, PI * 0.12, PI * 0.88), Vector3(0, length * 0.30 - index * 0.052, -0.012))
 					rib.rotation.x = 0.14
@@ -593,6 +597,18 @@ func _on_went_down() -> void:
 	went_down.emit()
 
 
+## B2.7v2. This uses the anatomy's shared posture answer, rather than making
+## every caller invent a limp. It is a visible state of the rig and therefore
+## applies equally to a rival, a derby driver, and the player body.
+func _apply_pain_posture(delta: float) -> void:
+	if anatomy == null or anatomy.downed or anatomy.dead:
+		return
+	var posture := anatomy.posture()
+	var ease := clampf(delta * 8.0, 0.0, 1.0)
+	rotation.x = lerpf(rotation.x, float(posture.hunch), ease)
+	rotation.z = lerpf(rotation.z, float(posture.lean), ease)
+
+
 ## The resolutions the downed window exists for. Each is a different answer to
 ## the same question, and each leaves the world in a different state.
 func execute(method := "executed") -> void:
@@ -761,12 +777,13 @@ func _refresh_zone(zone_id: String) -> void:
 		# that has already been shown through does not hide again just because
 		# a prosthetic or a lighter later hit raised the current health ratio.
 		var ever_to_bone := int(zone_depth.get(zone_id, 0)) >= GoreChunks.Layer.BONE
-		var exposed := (ratio < FRACTURE_RATIO or ever_to_bone) and not prosthetic
+		var compound := anatomy.fracture_kind(zone_id) == "compound"
+		var exposed := (compound or ever_to_bone) and not prosthetic
 		bone.visible = exposed
 		# Bone inside opaque flesh is bone nobody can see. Ruined flesh goes
 		# translucent so the skeleton under it actually reads.
 		part.transparency = clampf((FRACTURE_RATIO - ratio) / FRACTURE_RATIO, 0.0, 1.0) * 0.55 if exposed else 0.0
-	if gore and ratio < FRACTURE_RATIO and ratio > 0.0 and not prosthetic:
+	if gore and anatomy.fracture_kind(zone_id) == "compound" and ratio > 0.0 and not prosthetic:
 		_add_fracture(zone_id)
 	if severed.has(zone_id) and not prosthetic:
 		if gore:
@@ -959,6 +976,7 @@ func _add_stump(zone_id: String) -> void:
 
 
 func _process(delta: float) -> void:
+	_apply_pain_posture(delta)
 	if _loose.is_empty():
 		return
 	for index in range(_loose.size() - 1, -1, -1):

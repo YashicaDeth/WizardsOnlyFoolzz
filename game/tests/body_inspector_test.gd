@@ -48,6 +48,10 @@ func _ready() -> void:
 			},
 		},
 	})
+	check(inspector.xray_findings().is_empty(), "a ruptured organ remains absent from the ordinary body view")
+	inspector.xray = true
+	check(inspector.xray_findings().has("INTERNAL BLEED · HEART"), "X-ray inspection names the hidden bleed and its ruptured organ")
+	inspector.xray = false
 	inspector._part_rects = [Rect2(0, 0, 100, 30), Rect2(0, 32, 100, 30), Rect2(0, 64, 100, 30)]
 	inspector.part_index = 0
 	check(inspector.handle_pointer_motion(Vector2(10, 42), Vector2.ZERO) and inspector.hovered_part_index == 1, "hover previews a row without changing the pinned index")
@@ -64,6 +68,9 @@ func _ready() -> void:
 	var wet_piece := viewer._pivot.get_node("UpperLobe") as MeshInstance3D
 	var wet_material := wet_piece.material_override as StandardMaterial3D
 	check(wet_material.roughness < 0.3 and wet_material.clearcoat_enabled and wet_material.subsurf_scatter_enabled, "soft organs use a slick clearcoat and subsurface wet pass")
+	viewer.show_part({"kind": "organ", "id": "left_lung", "zone": "torso", "compressed": true}, 0.72)
+	check(bool(viewer.view_state().compressed) and has_piece(viewer, "CollapsedUpperLobe") and has_piece(viewer, "RibImprint"), "a compressed lung swaps to an authored collapsed silhouette rather than deforming the healthy lung")
+	check(not has_piece(viewer, "UpperLobe"), "the healthy lobe mesh is not merely scaled down")
 
 	viewer.show_part({"kind": "organ", "id": "liver", "zone": "torso"}, 1.0)
 	check(has_piece(viewer, "LiverWedge") and has_piece(viewer, "LiverLobe"), "the liver has a broad wedge and secondary lobe")
