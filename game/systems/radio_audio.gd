@@ -71,12 +71,11 @@ func _ready() -> void:
 
 
 func _ensure_bus() -> void:
-	var index := AudioServer.get_bus_index(BUS)
-	if index == -1:
-		index = AudioServer.bus_count
-		AudioServer.add_bus(index)
-		AudioServer.set_bus_name(index, BUS)
-		AudioServer.set_bus_send(index, "Master")
+	# G5.1. Sent to Master, so the radio ignored the SFX slider entirely.
+	AudioBus.ensure()
+	var existed := AudioServer.get_bus_index(BUS) != -1
+	var index := AudioBus.chain(BUS)
+	if not existed:
 		# Order matters: shape the band first, then drive what is left, then put
 		# it in a room. Driving before filtering makes mush rather than a radio.
 		AudioServer.add_bus_effect(index, AudioEffectBandPassFilter.new())

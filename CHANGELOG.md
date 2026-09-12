@@ -2,6 +2,28 @@
 
 ## 2026 09 12
 
+- **G5.1: the volume sliders were doing nothing.** Greg asked to fix the entire
+  game's sound, and the first thing measurement turned up was not a missing
+  effect — it was that the mixer was not connected to the game. `pause_gate.gd`
+  built Master / Music / SFX / Ambience and drove them from the settings screen,
+  and almost every sound went straight past all three: `DerbyQuarry` (engines,
+  impacts, crowd) sent to Master, `FieldRadio` sent to Master, and
+  `gore_chunks.gd` and `hunter_body_motion.gd` set no bus at all, which the
+  engine silently resolves to Master. A player could drag SFX to zero and the
+  derby would carry on at full volume. Only the opening was routed correctly,
+  which is exactly why it went unnoticed: the first thirty seconds mixed
+  properly and nothing after it did.
+  `audio_bus.gd` now owns the graph, and `ensure()` *repairs* as well as builds,
+  so a system that points its own chain at Master gets corrected rather than
+  quietly winning.
+- **G5.4: a layer is an event, not a filter setting.** Every layer used to be
+  the same burst at a different pitch. Bone now cracks — a hard transient with a
+  ring that outlives it. An organ bursts wet and its pitch falls as it empties.
+  A cybernetic faults, gated and detuned against itself so it sputters. The
+  organ was also pitched at 40 Hz, under the roll-off of every laptop speaker,
+  so the wettest sound in the game was reaching almost nobody; it sits at 96 Hz
+  now.
+
 - **L5 and L6: the career is the wall, and a theory can end the game.** Each
   theory is a route, and a route is a short list of conditions on the world —
   take something off a body and keep it; sell one and see who does not ask where

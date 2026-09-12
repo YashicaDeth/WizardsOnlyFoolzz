@@ -31,6 +31,8 @@ var step_voice: AudioStreamPlayer3D
 func configure(body_rig: BaselineHuman) -> void:
 	rig = body_rig
 	step_voice = AudioStreamPlayer3D.new()
+	# G5.1. Footsteps were on Master too.
+	AudioBus.route(step_voice, "Bodies")
 	step_voice.name = "Footsteps"
 	step_voice.stream = _footstep_stream()
 	step_voice.volume_db = -14.0

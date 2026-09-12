@@ -62,6 +62,9 @@ func _ready() -> void:
 ## routed to them yet; a player can turn the music off before a single stream
 ## has been authored.
 func _ensure_buses() -> void:
+	# G5.1. Repairs the graph as well as building it: systems that create their
+	# own effect chains used to point them straight at Master, around the mixer.
+	AudioBus.ensure()
 	for bus_name in BUSES:
 		if bus_name == "Master":
 			continue

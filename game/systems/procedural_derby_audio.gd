@@ -53,6 +53,7 @@ func _ready() -> void:
 	ambience_player.name = "AshbloomWind"
 	ambience_player.stream = _make_wave("wind", 2.8, true)
 	ambience_player.volume_db = -24.0
+	AudioBus.route(ambience_player, AudioBus.AMBIENCE)
 	add_child(ambience_player)
 
 	engine_low.play()
@@ -157,12 +158,14 @@ func _positional(player_name: String, stream: AudioStream, volume: float, max_di
 
 
 func _ensure_reverb_bus() -> void:
+	# G5.1. This used to send straight to Master, which meant the SFX slider did
+	# nothing to the engines, the impacts or the crowd — the loudest things in
+	# the game were the only ones outside the mixer.
+	AudioBus.ensure()
 	if AudioServer.get_bus_index(REVERB_BUS) != -1:
+		AudioBus.chain(REVERB_BUS)
 		return
-	var bus_index := AudioServer.bus_count
-	AudioServer.add_bus(bus_index)
-	AudioServer.set_bus_name(bus_index, REVERB_BUS)
-	AudioServer.set_bus_send(bus_index, "Master")
+	var bus_index := AudioBus.chain(REVERB_BUS)
 	var reverb := AudioEffectReverb.new()
 	reverb.room_size = 0.72
 	reverb.damping = 0.55

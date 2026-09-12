@@ -291,22 +291,69 @@ static func _mark_ground(node: RigidBody3D) -> void:
 ## Per-layer voice for a hit: skin thuds, bone cracks, hardware clinks. Data
 ## rather than a switch buried inside audio code, so the mapping is one place
 ## and G5's later positional-audio pass can read the same table.
+## G5.4. What each layer sounds like when something goes through it.
+##
+## The first pass gave every layer the same shape with different numbers on it,
+## so bone and organ were the same burst at different pitches. They are not the
+## same event. Bone **cracks** — a hard transient and then a ring that keeps
+## going after the hit. An organ **bursts** — wet, and the pitch falls as it
+## empties. A cybernetic **faults** — it sputters, because there is current in
+## it. `character` selects that behaviour; the numbers only colour it.
 static func impact_profile(layer: int) -> Dictionary:
 	match layer:
 		Layer.SKIN:
-			return {"freq": 90.0, "noise": 0.55, "decay": 6.0, "gain": 0.55}
+			return {"freq": 90.0, "noise": 0.55, "decay": 6.0, "gain": 0.55, "character": "slap"}
 		Layer.FAT:
-			return {"freq": 70.0, "noise": 0.75, "decay": 5.0, "gain": 0.6}
+			return {"freq": 70.0, "noise": 0.75, "decay": 5.0, "gain": 0.6, "character": "slap"}
 		Layer.MUSCLE:
-			return {"freq": 55.0, "noise": 0.65, "decay": 4.5, "gain": 0.65}
+			return {"freq": 55.0, "noise": 0.65, "decay": 4.5, "gain": 0.65, "character": "slap"}
 		Layer.BONE:
-			return {"freq": 620.0, "noise": 0.2, "decay": 10.0, "gain": 0.75}
+			return {"freq": 620.0, "noise": 0.2, "decay": 10.0, "gain": 0.75, "character": "crack"}
 		Layer.ORGAN:
-			return {"freq": 40.0, "noise": 0.85, "decay": 4.0, "gain": 0.5}
+			return {"freq": 96.0, "noise": 0.85, "decay": 4.0, "gain": 0.5, "character": "burst"}
 		Layer.CYBERNETIC:
-			return {"freq": 980.0, "noise": 0.08, "decay": 14.0, "gain": 0.7}
+			return {"freq": 980.0, "noise": 0.08, "decay": 14.0, "gain": 0.7, "character": "fault"}
 		_:
-			return {"freq": 90.0, "noise": 0.55, "decay": 6.0, "gain": 0.5}
+			return {"freq": 90.0, "noise": 0.55, "decay": 6.0, "gain": 0.5, "character": "slap"}
+
+
+## One frame of a layer's impact, as a pure function of time. Split out from the
+## buffer fill so a test can ask what bone sounds like without an audio device,
+## which is the only way any of this gets verified in a headless run.
+static func impact_sample(profile: Dictionary, t: float, noise: float) -> float:
+	var freq := float(profile.get("freq", 90.0))
+	var noise_mix := float(profile.get("noise", 0.5))
+	var decay := float(profile.get("decay", 6.0))
+	var gain := float(profile.get("gain", 0.5))
+	var envelope := exp(-decay * t)
+	var sample := 0.0
+	match str(profile.get("character", "slap")):
+		"crack":
+			# A hard transient in the first two milliseconds, then a ring that
+			# outlives it. That gap between the snap and the ring is the whole
+			# difference between breaking a bone and hitting meat.
+			var snap: float = noise * exp(-t * 900.0)
+			var ring: float = sin(TAU * freq * t) * exp(-decay * t) * 0.55
+			var body: float = sin(TAU * freq * 0.5 * t) * exp(-decay * 1.7 * t) * 0.3
+			sample = snap + ring + body
+		"burst":
+			# Wet, and falling: the pitch drops as the thing empties. Modulated
+			# so it gurgles rather than hums.
+			# Phase, not frequency: integrating a falling rate is what makes the
+			# pitch actually drop rather than simply start lower.
+			var fall: float = clampf(t * 5.0, 0.0, 1.0)
+			var falling: float = freq * (1.0 - 0.55 * fall)
+			var wet: float = sin(TAU * falling * t + sin(t * 180.0) * 2.4)
+			sample = (wet * (1.0 - noise_mix) + noise * noise_mix) * envelope
+		"fault":
+			# Current in it. Gated into bursts so it sputters instead of ringing
+			# like a bell, and detuned against itself so it beats.
+			var gate: float = 1.0 if fmod(t * 63.0, 1.0) < 0.55 else 0.18
+			var tone: float = sin(TAU * freq * t) * 0.6 + sin(TAU * freq * 1.007 * t) * 0.4
+			sample = (tone + noise * noise_mix) * envelope * gate
+		_:
+			sample = (sin(TAU * freq * t) * (1.0 - noise_mix) + noise * noise_mix) * envelope
+	return clampf(sample * gain, -1.0, 1.0)
 
 
 ## A short procedural burst rather than a sample library - nothing shipped yet
@@ -326,6 +373,9 @@ static func play_impact(host: Node3D, at: Vector3, layer: int) -> void:
 	player.stream = generator
 	player.unit_size = 5.0
 	player.max_distance = 26.0
+	# G5.1. No bus was set here, so the engine put every gore hit on Master and
+	# the SFX slider could not touch it.
+	AudioBus.route(player, "Gore")
 	scene.add_child(player)
 	player.global_position = at
 	player.play()
@@ -340,18 +390,10 @@ static func play_impact(host: Node3D, at: Vector3, layer: int) -> void:
 static func _fill_impact_buffer(playback: AudioStreamGeneratorPlayback, profile: Dictionary) -> void:
 	var rate := 22050.0
 	var frames := mini(playback.get_frames_available(), int(rate * 0.2))
-	var freq := float(profile.get("freq", 90.0))
-	var noise_mix := float(profile.get("noise", 0.5))
-	var decay := float(profile.get("decay", 6.0))
-	var gain := float(profile.get("gain", 0.5))
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	for index in frames:
-		var t := float(index) / rate
-		var envelope := exp(-decay * t)
-		var tone := sin(TAU * freq * t)
-		var noise := rng.randf_range(-1.0, 1.0)
-		var sample := (tone * (1.0 - noise_mix) + noise * noise_mix) * envelope * gain
+		var sample := impact_sample(profile, float(index) / rate, rng.randf_range(-1.0, 1.0))
 		playback.push_frame(Vector2(sample, sample))
 
 

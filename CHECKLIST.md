@@ -440,10 +440,10 @@ probe actually says, so the next attempt does not start from scratch:
 - [x] ~~**G4.3** Leaning and settling, so nothing is plumb~~
 
 ### G5 — Sound rework
-- [~] **G5.1** Bus structure built and mixable (Master/Music/SFX/Ambience); routing still to do
+- [x] **G5.1** Bus structure built, mixable, and everything actually routed through it
 - [ ] **G5.2** Engine layered by load rather than one pitched sine
 - [ ] **G5.3** Impact layers by severity and material
-- [ ] **G5.4** Per-layer gore sound (shares with B4.8)
+- [x] **G5.4** Per-layer gore sound — bone cracks, organs burst, cybernetics fault (shares with B4.8)
 
 ### G6 — The opening, directed
 - [x] ~~**G6.1** Pacing and camera~~
