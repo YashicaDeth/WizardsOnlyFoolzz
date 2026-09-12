@@ -162,6 +162,7 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B1.6** Wet pass — subsurface and slick specular, so organs read as meat rather than plastic~~
 - [x] ~~**B1.7** Drag to rotate and scroll to zoom, instead of a fixed spin~~
 - [x] ~~**B1.8** Damage on the mesh: a ruptured organ is torn, not only darker~~
+- [x] ~~**B1.9v2** Organs are authored shapes that never deform — a compressed lung should read as compressed~~
 
 ### B2 — Limbs and cybernetics, one verb `BUILT`
 - [x] ~~**B2.1** Flesh, bone, organs and hardware in one list, inspected identically~~
@@ -170,6 +171,7 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B2.4** Authored implant meshes per catalogue entry~~
 - [x] ~~**B2.5** Wounds carry a zone at authoring time — kills the second keyword table~~
 - [x] ~~**B2.6** Compare view: your part against theirs, which is the robbing decision~~
+- [ ] **B2.7v2** Pain is a number with no behaviour of its own: it should change how a body stands before it changes what it can do
 
 ### B3 — The X-ray cursor `BUILT`
 - [x] ~~**B3.1** Brass ring, real button, skull mark, key and click through one path~~
@@ -189,6 +191,8 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B4.7** Authored chunk meshes instead of primitives~~
 - [x] ~~**B4.8** Per-layer impact sound — bone does not land like fat~~
 - [x] ~~**B4.9** Rot over time: flies, discolouration, smell as a gameplay signal~~
+- [ ] **B4.10v2** Rot attracts something. Flies were shipped; nothing eats
+- [ ] **B4.11v2** Blood pools persist across a scene change, or they are set dressing
 
 ### B5 — Rob cybernetics off a body `BUILT`
 **Unblocked by B4** — `GoreChunks.take()` already returns the identified part.
@@ -206,6 +210,8 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B6.4** The severed limb is a chunk: pick it up, carry it, sell it, hit someone with it~~
 - [x] ~~**B6.5** Reciprocity — the player is dismembered and keeps playing~~
 - [x] ~~**B6.6** Stump behaviour: bleed rate, one-armed movement and attacks~~
+- [ ] **B6.7v2** A fracture is binary. A compound fracture is a different injury and should look it
+- [ ] **B6.8v2** Internal bleeding is indistinguishable from external — the X-ray should be the only way to find it
 
 ---
 

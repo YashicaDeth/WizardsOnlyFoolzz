@@ -112,7 +112,7 @@ func _rebuild_parts() -> void:
 	_parts.append({"kind": "bone", "id": zone, "zone": zone, "label": "BONE", "note": "structure"})
 	for organ_id in ORGANS_BY_ZONE.get(zone, []):
 		var organ_state: Dictionary = (_anatomy().get("organs", {}) as Dictionary).get(str(organ_id), {})
-		_parts.append({"kind": "organ", "id": organ_id, "zone": zone, "label": str(organ_id).replace("_", " ").to_upper(), "note": "organ", "ruptured": bool(organ_state.get("ruptured", false))})
+		_parts.append({"kind": "organ", "id": organ_id, "zone": zone, "label": str(organ_id).replace("_", " ").to_upper(), "note": "organ", "ruptured": bool(organ_state.get("ruptured", false)), "compressed": bool(organ_state.get("compressed", false))})
 	for implant in _implants_in(zone):
 		var part: Dictionary = implant.duplicate(true)
 		part["kind"] = "implant"
