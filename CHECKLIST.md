@@ -967,6 +967,168 @@ the game's own voice, not a fade to a store page.
 - [ ] **P5.4** Controls learnable without a tutorial screen — I0 still applies
 - [ ] **P5.5** The last pass is playing it, not reading it
 
+## Q — The Wire, deeper
+
+Greg: *"the social media stalking aspect cyberharassing dming ect with an rng of
+responding more verified higher accounts of the darkweb internet underbelly to
+the game exisit too"*.
+
+`wire_net.gd` has accounts, reach, exposure and five actions. What it does not
+have is the part Greg described: people you can actually reach out to, who
+answer or do not, and whose willingness depends on who you are to them.
+
+- [ ] **Q1.1** Direct messages — reach one account rather than publishing at everyone
+- [ ] **Q1.2** Whether they answer is a roll against reach, standing and what you have on them
+- [ ] **Q1.3** A verified account answers differently, and less often, than a nobody
+- [ ] **Q1.4** Stalking a feed is a way of finding somebody in the world, not flavour
+- [ ] **Q1.5** Harassment works and costs — it moves grudge, reach and exposure together
+- [ ] **Q1.6** The underbelly is reached by standing somewhere, as `signal_field.gd` already gates
+
+## R — Money
+
+The body economy exists in pieces: `carry.gd` prices a part, faction standing
+already refuses a deal outright, and liens already follow stolen goods. Nothing
+ties it together into a reason to get up in the morning.
+
+- [ ] **R1.1** One currency with a name and a reason — rust scrip, and who issues it
+- [ ] **R1.2** What a body is worth, by part, condition and whose it was
+- [ ] **R1.3** Buyers with their own appetites, so a market is a set of people and not a price
+- [ ] **R1.4** Debt you can be in, since `debt_to_player` already runs the other way
+- [ ] **R1.5** Prices move with what the world has been through
+
+## S — Speech
+
+`dialogue_manager` is installed and barely used, and Greg has twice asked for
+talking to be a real verb — *"you can also speak to them via voicechat"*, and
+the clinch already has TALK in it.
+
+- [ ] **S1.1** Conversation is a state you are in with a body, not a menu over the world
+- [ ] **S1.2** What they will say reads from what they know, not from a tree
+- [ ] **S1.3** Proximity voice already exists — make it carry something
+- [ ] **S1.4** Talking while holding somebody is different from talking to somebody free
+- [ ] **S1.5** Lines survive the fiction: nobody explains the cosmology at you
+
+## T — The run
+
+The open question that has been sitting unanswered longest: *"what persists
+between runs?"* Roguelike structure was asked for, and "bodies remember" is a
+pillar. They pull against each other and the game cannot have both untouched.
+
+- [ ] **T1.1** Decide it — blocked on Greg
+- [ ] **T1.2** Death is an event in the world rather than a reload
+- [ ] **T1.3** Something inherits: a body, a debt, a reputation, a wall of pins
+- [ ] **T1.4** What the world keeps is visible to the player before they risk it
+- [ ] **T1.5** A run has a shape — it starts, it escalates, it ends
+
+## U — Your own ladder
+
+Greg: *"how you can persuade them to join your ranks your own faction that you
+start through progressing and exploring around the map"*. E is the two ladders
+that already exist. This is the third one, which is yours.
+
+- [ ] **U1.1** Found something — a name, a mark, a first member
+- [ ] **U1.2** Recruits from the clinch and the downed window belong to it
+- [ ] **U1.3** It has standing on the same axis every other faction does
+- [ ] **U1.4** It can be attacked, and it can lose people
+- [ ] **U1.5** Rank inside it is somebody else's problem too — they have opinions
+
+## V — The road
+
+M2b covers cars as this world's horses. This is everything else about them
+being vehicles rather than set pieces.
+
+- [ ] **V1.1** A car is a thing with a condition, not a state you are in
+- [ ] **V1.2** Damage is physical and visible, and it changes how it drives
+- [ ] **V1.3** Fuel, or a reason a car is not infinite
+- [ ] **V1.4** Cars can be repaired, badly
+- [ ] **V1.5** Somebody else is driving one too, outside the derby
+
+## W — Weather and the hour
+
+The Expanse has one lighting state, one fog density and no clock. `WorldLook`
+already switches presets by place; nothing switches by time.
+
+- [ ] **W1.1** A day cycle the world reads, not only the sky
+- [ ] **W1.2** Contamination has weather — it moves, it settles, it gets worse
+- [ ] **W1.3** Being caught out in it costs something
+- [ ] **W1.4** Factions keep hours; the Wire is busier at some of them
+- [ ] **W1.5** G7's exposure problem is a lighting *state* rather than a constant
+
+## X — Performance
+
+Nothing in this project has ever been profiled. It is a solo build with one
+region, so it has not needed to be — which is exactly when the debt is cheap to
+pay.
+
+- [ ] **X1.1** Profile it, and write down the real numbers
+- [ ] **X1.2** A frame budget, stated, that the region is held to
+- [ ] **X1.3** The 238MB plugin referenced by no script (pairs with J1.3)
+- [ ] **X1.4** Bodies are the expensive thing — measure before optimising them
+- [ ] **X1.5** It has to hold up on a machine that is not Greg's
+
+## Y — Getting in
+
+The game currently assumes a player who already knows what it is. It has no
+options a person would actually reach for and no way in that is not "start".
+
+- [ ] **Y1.1** Controls are rebindable
+- [ ] **Y1.2** The violence tier from the warning card actually changes the build
+- [ ] **Y1.3** Text is legible at a normal viewing distance — the stencil is not free
+- [ ] **Y1.4** Colour is not the only carrier of meaning anywhere
+- [ ] **Y1.5** Somebody can put it down and come back a week later
+
+## Z — Shipping
+
+- [ ] **Z1.1** A build that runs from a clean folder on somebody else's machine
+- [ ] **Z1.2** Saves that survive the next version (`WorldHistory` migration already exists)
+- [ ] **Z1.3** A crash is a released crash — the last pass is playing it
+- [ ] **Z1.4** It has a name, a page and a way for one stranger to get it
+- [ ] **Z1.5** Greg decides what the first public thing actually is
+
+---
+
+# The remaster — after Z
+
+Greg, 2026-09-12: *"get the checklist to letter z in ideas then make it complete
+then remaster it in a new way where we combine all the ideas together like all
+the 5.0-5.9 etc but then all those link into this new checklist of the game
+mechanic being a true thing we can combine"*.
+
+**This list is organised by the order the work happened in, and that is the
+wrong shape for a finished game.** A-Z are development buckets: "the visual
+pass", "the handheld", "combat, reworked". They were the right way to build,
+because each one could be closed. They are not how the game actually works.
+
+The remaster re-cuts every closed segment by **mechanic**, so the numbered
+groups stop being jobs done in a row and start being the systems the player
+meets. What today is spread across five sections — O5.9 the arm that cannot
+hold a guard, B4 the anatomy that scores it, F7 the clinch that reads pain,
+E the standing that prices the deal, L the wall that pins the result — is one
+mechanic, and after the remaster it reads as one.
+
+Three rules for when it happens:
+
+1. **Nothing is rewritten.** A remastered entry points at the segments that
+   already built it. If a mechanic has no segments under it, it is not built,
+   and saying so is the point.
+2. **A mechanic earns a number only if it touches at least two sections.**
+   Anything that lives entirely inside one section was never cross-cutting and
+   stays where it is.
+3. **It happens after Z is closed, not before.** Re-cutting a list while items
+   are still being added produces a third list rather than a better one.
+
+The candidate mechanics, from what is already built:
+
+- **The body** — one rig, read by combat, the clinch, the guard, the vat, the
+  loading screen and the Board.
+- **The two records** — what happened, against what each faction believes.
+- **Standing** — one axis pricing deals, refusals, recruitment and endings.
+- **The hold** — the clinch as the seam between fighting, robbing, talking and
+  recruiting.
+- **The wall** — evidence, claims, leads, publication and the endings.
+- **The camera** — progression expressed as what you are allowed to see.
+- **Signal** — where you are standing deciding what you can reach.
+
 ## Open questions — only you can answer these
 
 They block nothing else, but they change what gets built.
