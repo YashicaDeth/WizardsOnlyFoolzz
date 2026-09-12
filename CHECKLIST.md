@@ -1335,6 +1335,16 @@ the clinch already has TALK in it.
 - [ ] **S1.4** Talking while holding somebody is different from talking to somebody free
 - [ ] **S1.5** Lines survive the fiction: nobody explains the cosmology at you
 
+### S2 — Talking to them out loud
+Greg, twice: *"the proximity chat AI voices and being able to speak to AI in
+game"*. `proximity_voice.gd` exists and already has a capture bus. Nothing has
+ever been said into it.
+- [ ] **S2.1** Speak, and be heard by whoever is close enough to hear it
+- [ ] **S2.2** They answer in a voice, positioned where their head is
+- [ ] **S2.3** What they say comes from what they know, not a response table
+- [ ] **S2.4** Talking while holding somebody is its own register (feeds O5.4 and F7)
+- [ ] **S2.5** Decide the cost and the privacy of this honestly before it ships
+
 ## T — The run
 
 The open question that has been sitting unanswered longest: *"what persists
@@ -1522,6 +1532,113 @@ where they are hit, and what comes off them stays.
 - [ ] **AB1.4** It reads through the gore system that already exists — `gore_chunks.gd` already breaks bodies into identified pieces
 - [ ] **AB1.5** A vehicle deforms rather than losing hit points (pairs with V1.2)
 - [ ] **AB1.6** Measure the cost before committing; X exists because nothing here has been profiled
+
+### AB2 — Damage the world keeps
+Greg: *"everything is measurably destroyable in the game and the environment
+system has a simple way to track that... dents on cars, dents on things, smashes
+on windows etc. They repair after a month in game."*
+
+The tracking is the feature. A world where everything breaks and nothing is
+recorded resets the moment you look away, and this project already has the
+ledger to avoid that.
+
+- [ ] **AB2.1** Every breakable thing has a condition the world can read, not a destroyed flag
+- [ ] **AB2.2** Damage is recorded against the place, in WorldHistory, like everything else
+- [ ] **AB2.3** Cheap to ask "how wrecked is this street" without walking it
+- [ ] **AB2.4** Repair happens over game time — a month, not a respawn
+- [ ] **AB2.5** Who repairs it is somebody: a holding nobody holds does not get fixed (pairs with AA)
+- [ ] **AB2.6** Dents, smashes and scoring are the common case; collapse is the rare one
+
+### AB3 — Raiding
+Greg: *"the raiding physics and world in that way with the destruction physics
+would be so integral it would be awesome."*
+
+Destruction with nothing to destroy for is a toy. Raiding is the verb that makes
+AB and AA the same system: you break a holding to take it.
+
+- [ ] **AB3.1** A place can be raided — entered against resistance, for something specific
+- [ ] **AB3.2** Breaking in is a real route: doors, walls, roofs, whatever gives first
+- [ ] **AB3.3** What you take is carried, priced and traceable (CARRY, liens, the Choir)
+- [ ] **AB3.4** The damage stays and the holding remembers who did it (AB2, AA2.4)
+- [ ] **AB3.5** Somebody raids you back — H1 gives the player a place to lose
+
+## AC — Fluid, weather and fire
+
+Greg: *"if water, rain, weather, lightning etc environments wherever possibly
+made to be built, the fluid physics would have to act similarly to the breaking
+of buildings... if there is fluid or that type of thing in the game then it needs
+to be very high in priority"* — and *"car engines and explosion physics being a
+part of the game, especially if some weapons got insanely enhanced."*
+
+The honest note first: **fluid simulation is the most expensive thing on this
+list.** Greg is right that it must be high priority *if it exists at all*,
+because half-done fluid reads worse than none — and that cuts both ways. AC1.1 is
+a real decision, not a formality.
+
+- [ ] **AC1.1** Decide whether this game has simulated fluid, or painted fluid done well
+- [ ] **AC1.2** If it exists it obeys the destruction rule: recorded, not decorative
+- [ ] **AC1.3** Rain wets surfaces and pools where the ground actually dips
+- [ ] **AC1.4** Blood joins the same system — B4 already tracks where it lands
+- [ ] **AC1.5** Lightning is a real light and a real sound, on the weather clock (W)
+- [ ] **AC1.6** Fire spreads on what will burn and stops on what will not
+- [ ] **AC1.7** Explosions move things, break things and hurt bodies through one path
+- [ ] **AC1.8** An engine can catch, and a car that catches is a bomb with a timer
+
+## AD — Movement, and being in first person
+
+Greg: *"right now we need the first person to be insanely comprehensive and have
+a good playable HUD, with movement physics, jumping around, building, wall
+running like Prototype after a while."* The priority he set.
+
+M covers which camera you are in and why. AD is what the body can do while you
+are in it.
+
+### AD1 — The body moves
+- [ ] **AD1.1** Jumping worth doing — height, arc and a landing that reads
+- [ ] **AD1.2** Vaulting and mantling: waist-high things stop being walls
+- [ ] **AD1.3** Wall running, earned the way third person is earned rather than given
+- [ ] **AD1.4** Climbing a building is a route, not a cutscene (Prototype's lesson)
+- [ ] **AD1.5** Momentum carries between moves — run into vault into climb is one motion
+- [ ] **AD1.6** All of it reads through the anatomy: a broken leg cannot vault
+
+### AD2 — The first-person HUD
+- [ ] **AD2.1** Diegetic: the hands, the weapon, the handheld, the windscreen (pairs with M1.6)
+- [ ] **AD2.2** Nothing floating in a corner that could be on an object instead
+- [ ] **AD2.3** Affordances along the bottom that say what you can do right now
+- [ ] **AD2.4** It survives the transition to third person without dissolving (M3.3)
+- [ ] **AD2.5** Readable while moving, which is when it is actually needed
+
+### AD3 — Builds that break the rules
+Greg: *"not to copy HAVKER-MAN X, but with the cybernetics and limb enhancements
+you should be able to viably, with melee, at some points fight people with
+grenade launchers and RPGs — through jumping on rockets, or cutting them in half,
+sniping them, through enhanced character builds."*
+
+The payoff for D, B2 and N: a body built far enough in one direction should be
+able to answer a rocket with a blade, and the game should let it.
+
+- [ ] **AD3.1** A melee build can close on a launcher and live — the distance is the puzzle
+- [ ] **AD3.2** Cybernetics change what movement is possible, not just the numbers
+- [ ] **AD3.3** A projectile is a physical thing that can be met, not a damage event
+- [ ] **AD3.4** Absurd answers are allowed when the build earned them
+- [ ] **AD3.5** Original to this game: the reference is the feeling, never the implementation
+
+## AE — Sneaking, assassination and the law
+
+Greg: *"assassination, executing and sneaking systems with the hostile and law
+enforcement type figures who punish you for bad local karmic events."*
+
+The karma axis and the witness ledger already exist. Nobody has ever come to
+arrest anybody.
+
+- [ ] **AE1.1** Unseen is a real state with real inputs — light, noise, cover, distance
+- [ ] **AE1.2** An unseen kill differs from a seen one, mechanically and in the record
+- [ ] **AE1.3** Assassination as a verb: reach somebody who does not know you are there
+- [ ] **AE1.4** Law figures respond to what was actually witnessed (`witness_ledger.gd`)
+- [ ] **AE1.5** Punishment is local: the holding remembers, and the holding sends them
+- [ ] **AE1.6** Karma is an axis, not a score — the law reads position, not "evil"
+- [ ] **AE1.7** Being hunted by the law is the Hunt System pointed back at you (F)
+
 
 ## Open questions — only you can answer these
 
