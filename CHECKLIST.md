@@ -730,6 +730,56 @@ what that is rather than fixing another symptom.
 - [ ] **O4.2** They retreat, circle and group rather than walking at you
 - [ ] **O4.3** A wounded enemy fights differently from a fresh one
 
+## P — The thirty-minute demo
+
+Greg, 2026-09-12: *"in the checklist the next big section needing to be added
+will be making the game a 30 minute demo seperate to the orignal version"*.
+
+**Separate build, not a slice with the doors locked.** That distinction is the
+whole section. A demo made by cutting content leaks its own absence — the player
+finds the locked doors, the dead-end systems and the half-explained cosmology,
+and concludes the game is thin. A demo made as its own thing is allowed to be
+complete at its own size, and this game has an unusual advantage there: a Hunter
+who walks out of the Expanse after one job is a whole story, because the world
+was never going to explain itself anyway.
+
+Thirty minutes is the constraint. Everything below is judged against whether a
+stranger, with no explanation and no patience, reaches an ending in half an
+hour and wants the rest.
+
+### P1 — Scope: what the demo actually is
+- [ ] **P1.1** One route through the world, start to finish, that ends deliberately
+- [ ] **P1.2** The body is the centrepiece — anatomy, gore, X-ray, a real killcam
+- [ ] **P1.3** One derby, one hunt, one resolution, one theory pinned and published
+- [ ] **P1.4** The handheld, the map and the Board all reachable and all doing something
+- [ ] **P1.5** Nothing in it is a locked door or a greyed-out button
+
+### P2 — It is its own build
+- [ ] **P2.1** A Godot export preset for the demo, separate from the full game
+- [ ] **P2.2** A `demo` feature tag the code can branch on, set at export
+- [ ] **P2.3** Demo saves live somewhere else entirely — a demo can never touch a real save
+- [ ] **P2.4** The full game keeps building unchanged from the same repository
+- [ ] **P2.5** One command produces both, so they cannot drift apart
+
+### P3 — The half hour
+- [ ] **P3.1** Playable within sixty seconds of launching; character creation is part of the game, not a gate
+- [ ] **P3.2** Measured, not estimated — a real run timed end to end
+- [ ] **P3.3** Nothing in it takes longer than it is worth: the second derby lap, the long walk, the third menu
+- [ ] **P3.4** It ends on something, and the ending is written into WorldHistory like any other
+
+### P4 — What a stranger needs
+- [ ] **P4.1** The controls are learnable without a tutorial screen (I0 still applies)
+- [ ] **P4.2** The first thirty seconds state the register — biopunk, cruel, funny
+- [ ] **P4.3** One moment engineered to be the thing they describe to somebody else
+- [ ] **P4.4** No dependence on the cosmology being understood; the Horsemen can stay off-screen
+- [ ] **P4.5** A failure state that is interesting rather than a reload
+
+### P5 — Shipping it
+- [ ] **P5.1** Runs on a machine that is not Greg's, from a clean folder
+- [ ] **P5.2** No debug affordances, no dev keys, no placeholder text (depends on J2)
+- [ ] **P5.3** Sound is mixed and the volume sliders work (G5 — done, verify in the build)
+- [ ] **P5.4** A crash in the demo is a released crash: the last pass is playing it, not reading it
+
 ## Open questions — only you can answer these
 
 They block nothing else, but they change what gets built.
