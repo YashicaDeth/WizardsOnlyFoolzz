@@ -965,7 +965,23 @@ what that is rather than fixing another symptom.
 - [x] **O2.4** Hold X to guard; the first 0.18s is a parry. Three answers now, not one
 
 ### O3 — The body is the health bar
-- [ ] **O3.1** Damage lands on the limb you actually hit and stays there
+- [x] ~~**O3.1** Damage lands on the limb you actually hit and stays there~~
+      True for generic hostiles all along (`anatomy.dead`/`downed` already
+      derive from real zone/blood state). The canonical Mara fight did not:
+      melee correctly wounded her rig, but the retreat/defeat threshold ran
+      off a separate flat `enemy_health` counter that only ever subtracted a
+      fixed number, and the prosthetic surge subtracted 30 from it without
+      touching her rig at all — the one attack in the fight that wounded
+      nothing you could see. `enemy_health` is now derived from
+      `_rig_health_ratio()`, a real average across all six zones, every time
+      a hit lands; the surge now wounds her the same way melee does. Verified:
+      a zone already at 0 pays out nothing further on a second hit, while
+      spreading damage to a fresh zone still costs her — `tests/rival_body_health_test.gd`
+      (8 checks). Found and fixed a second, unrelated bug on the way: her
+      `wounds` array had gone `TypedArray[Dictionary]` from another subject's
+      schema, so `.duplicate()` carried the stricter type over and
+      `wounds.has()`/`.append()` on a plain string were throwing silently in
+      the console rather than failing loud enough to notice without a test.
 - [x] **O3.2** A damaged limb changes what that person can do, and now shows it — arms hang, legs trail, the body leans off the bad side
 - [ ] **O3.3** Grappling connects to it — hold, force, rob, recruit
 - [ ] **O3.4** Half Sword's lesson without Half Sword's code: the body is the weapon system

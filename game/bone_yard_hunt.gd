@@ -141,7 +141,14 @@ var story_step := 0
 var panel_mode := ""
 var enemy: Node3D
 var friend: Node3D
+## O3.1. Was decremented by a flat number per hit regardless of where — or
+## even whether — the blow touched `enemy_rig`, which meant a fight resolved
+## by damage total rather than by where you actually put it. This is now
+## derived from her real zone health every time a hit lands, and does not
+## track any wound of its own, so a devastated zone genuinely stops paying
+## out and where you spread the damage decides how the fight goes.
 var enemy_health := 100
+var enemy_health_max := 100
 var enemy_retreating := false
 var pulse := 0.0
 var generated_world: Node3D
@@ -537,6 +544,12 @@ func _unhandled_input(event: InputEvent) -> void:
 					third_person = not third_person
 					body_motion.set_perspective(not third_person)
 					_update_camera()
+			# C2.6 v2. Straight to a page, for somebody who knows the device.
+			KEY_F1: handheld.jump_to_mode(0)
+			KEY_F2: handheld.jump_to_mode(1)
+			KEY_F3: handheld.jump_to_mode(2)
+			KEY_F4: handheld.jump_to_mode(3)
+			KEY_F5: handheld.jump_to_mode(4)
 			KEY_G:
 				handheld.toggle_device()
 				if handheld.is_open:
@@ -755,10 +768,19 @@ func _resolve_strike() -> void:
 		var wound := enemy_rig.hit_at(aim, float(damage), float(damage) * 0.8, "cut", look)
 		body_zone = str(wound.get("zone", "torso"))
 		WorldHistory.update_subject(HUNT_ID, {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
-	enemy_health = maxi(0, enemy_health - damage)
+	if enemy_rig != null and is_instance_valid(enemy_rig):
+		enemy_health = roundi(float(enemy_health_max) * _rig_health_ratio(enemy_rig))
+	else:
+		enemy_health = maxi(0, enemy_health - damage)
 	_spawn_blood(enemy.global_position + Vector3(0, 1.2, 0), damage)
 	WorldHistory.record_event("melee_body_hit", {"target": HUNT_ID, "body_zone": body_zone, "damage": damage, "location": HUNT_LOCATION})
-	var wounds: Array = WorldHistory.subject(HUNT_ID).get("wounds", []).duplicate()
+	# Untyped rebuild rather than .duplicate(): the stored array can already be
+	# a TypedArray[Dictionary] by the time some other subject touched "wounds"
+	# first, and .duplicate() carries that runtime type over — has()/append()
+	# with this plain string then fail the type check instead of just working.
+	var wounds: Array = []
+	for existing in WorldHistory.subject(HUNT_ID).get("wounds", []):
+		wounds.append(existing)
 	var wound := "cut %s" % body_zone
 	if not wounds.has(wound):
 		wounds.append(wound)
@@ -1107,7 +1129,16 @@ func _use_prosthetic_surge() -> void:
 	stamina -= 35.0
 	WorldHistory.record_event("prosthetic_surge_used", {"implant": "salvaged torque arm", "location": HUNT_LOCATION})
 	if enemy != null and not enemy_retreating and player.distance_to(enemy.global_position) < 7.0:
-		enemy_health = maxi(0, enemy_health - 30)
+		# O3.1. Used to subtract a flat 30 with no wound at all — the one
+		# attack in the fight that hit nothing you could ever see on her body.
+		if enemy_rig != null and is_instance_valid(enemy_rig):
+			var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+			var wound := enemy_rig.hit_at(enemy.global_position + Vector3.UP * 1.0, 30.0, 34.0, "blunt", look)
+			WorldHistory.update_subject(HUNT_ID, {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
+			WorldHistory.record_event("melee_body_hit", {"target": HUNT_ID, "body_zone": str(wound.get("zone", "torso")), "damage": 30, "location": HUNT_LOCATION})
+			enemy_health = roundi(float(enemy_health_max) * _rig_health_ratio(enemy_rig))
+		else:
+			enemy_health = maxi(0, enemy_health - 30)
 		_spawn_blood(enemy.global_position + Vector3(0, 1.0, 0), 30)
 		if enemy_health <= 0:
 			_rival_retreats("Mara's arm breaks. Her crew drag her into the tunnel.")
@@ -1436,7 +1467,8 @@ func _begin_canonical_encounter() -> void:
 	enemy.global_position = Vector3(0, 1.2, -16)
 	var mara := WorldHistory.subject(HUNT_ID)
 	mara_encounter_number = 2 if bool(mara.get("is_rival", false)) and not (mara.get("rival_adaptation", {}) as Dictionary).is_empty() else 1
-	enemy_health = 150 if mara_encounter_number == 2 else 100
+	enemy_health_max = 150 if mara_encounter_number == 2 else 100
+	enemy_health = enemy_health_max
 	WorldHistory.update_subject(HUNT_ID, {"status": "hunting", "encounter_number": mara_encounter_number, "memory": "Mara returned rebuilt to settle the Bone Yard debt." if mara_encounter_number == 2 else "Mara came to settle the Bone Yard debt."}, "hunt_arc_started")
 	WorldHistory.record_event("canonical_hunt_encounter_started", {"hunter": "player", "target": HUNT_ID, "location": HUNT_LOCATION, "encounter_number": mara_encounter_number})
 	if mara_encounter_number == 2:
@@ -1617,6 +1649,23 @@ func _update_encounter_actors(delta: float) -> void:
 func _actor_combat_ratio(actor: Dictionary) -> float:
 	var anatomy := actor.get("anatomy") as AnatomyComponent
 	return anatomy.combat_ratio() if anatomy != null else 1.0
+
+
+## O3.1. What fraction of a body is actually still standing, read off every
+## zone rather than only the arms (`combat_ratio`) or only the legs
+## (`mobility_ratio`) — the canonical Mara fight needed the whole picture
+## since a fighter who only ever gets hit in the torso is not "at full
+## strength" just because her limbs are untouched.
+func _rig_health_ratio(rig: BaselineHuman) -> float:
+	if rig == null or not is_instance_valid(rig):
+		return 0.0
+	var current := 0.0
+	var ceiling := 0.0
+	for zone_id in BaselineHuman.ZONES:
+		var max_health := float((AnatomyComponent.DEFAULT_ZONES[zone_id] as Dictionary).health)
+		ceiling += max_health
+		current += clampf(float((rig.anatomy.zones.get(zone_id, {}) as Dictionary).get("health", max_health)), 0.0, max_health)
+	return clampf(current / maxf(1.0, ceiling), 0.0, 1.0)
 
 
 func _actor_attack_cycle(actor: Dictionary) -> float:
