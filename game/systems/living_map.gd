@@ -358,28 +358,36 @@ func _draw_unwalked_veil() -> void:
 	var to := Vector2i(ceili(half.x / CELL) + 1, ceili(half.y / CELL) + 1)
 	for cx in range(from.x, to.x + 1):
 		for cy in range(from.y, to.y + 1):
-			if surveyed.has("%d,%d" % [cx, cy]):
-				continue
 			var at := _to_screen(Vector2(cx * CELL - CELL * 0.5, cy * CELL - CELL * 0.5))
 			var cell := Rect2(at, Vector2(step, step))
 			if not _chart.intersects(cell):
 				continue
-			# How much of this cell's surroundings you have walked.
-			var known := 0
-			for offset: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-				if surveyed.has("%d,%d" % [cx + offset.x, cy + offset.y]):
-					known += 1
-			var veil: float = lerpf(0.86, 0.40, clampf(float(known) / 4.0, 0.0, 1.0))
 			var patch := cell.intersection(_chart)
-			# Greg asked for "grey and discoloured and foggy", and the first pass
-			# painted it near-black. Black hides the shape of what you have not
-			# been to; grey keeps the shape legible, which is what makes the
-			# unrevealed part pull at you rather than simply being absent.
-			draw_rect(patch, Color(0.46, 0.47, 0.44, veil))
-			# The fog: a soft sheet that thins toward ground you have walked, so
-			# the edge of the known reads as weather rather than as a mask.
-			if known > 0:
-				draw_rect(patch, Color(0.66, 0.68, 0.62, 0.07 * float(known)))
+			# A10.9. The reveal arrives rather than snaps. A cell's clearness is
+			# its whole 3x3 neighbourhood rather than its own bit, so the boundary
+			# between walked and unwalked is a gradient instead of the staircase
+			# the first pass drew. Diagonals count for less, which is what keeps
+			# the falloff round instead of square.
+			var clearness := 0.0
+			var weight := 0.0
+			for dx in [-1, 0, 1]:
+				for dy in [-1, 0, 1]:
+					var w: float = 1.0 if dx == 0 and dy == 0 else (0.62 if dx == 0 or dy == 0 else 0.34)
+					weight += w
+					if surveyed.has("%d,%d" % [cx + dx, cy + dy]):
+						clearness += w
+			clearness = clampf(clearness / maxf(weight, 0.001), 0.0, 1.0)
+			if clearness >= 0.999:
+				continue
+			# Eased, so ground you have only glimpsed clears slowly and ground you
+			# have properly walked clears fast — the satisfying part is the last bit
+			# coming off, the way wiping a window is.
+			var veil := pow(1.0 - clearness, 1.45)
+			draw_rect(patch, Color(0.46, 0.47, 0.44, veil * 0.88))
+			# A breath of haze that lingers even on cleared ground, so the map never
+			# reads as a clean render of a place nobody has been to.
+			if clearness > 0.0 and clearness < 1.0:
+				draw_rect(patch, Color(0.70, 0.72, 0.66, 0.05 + clearness * 0.05))
 
 
 func _draw_unsurveyed() -> void:

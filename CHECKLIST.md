@@ -161,7 +161,7 @@ The technique already exists in this project — `xray_specimen.gd` renders a li
 - [x] **A10.3** Tilts past a threshold as you zoom: top-down to oblique to street
 - [x] **A10.4** Street view is the same camera at the bottom of its descent, arriving at 1.68m
 - [x] **A10.5** Unwalked ground is grey and fogged, thinning at the edges of where you have been; walking brings the colour in
-- [ ] **A10.9** The reveal is worth watching — colour arrives as you walk rather than snapping on
+- [x] **A10.9** The reveal is a gradient — clearness is read from the whole 3x3 neighbourhood, eased so the last of it comes off last
 - [x] **A10.6** The chart marks, districts, contacts and title block all still read over the image
 - [ ] **A10.7** It lives in the handheld's MAP page, so it is the black mirror looking down
 - [x] **A10.8** UPDATE_DISABLED while the map is shut; one frame per open frame otherwise
