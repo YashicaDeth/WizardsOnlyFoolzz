@@ -141,6 +141,11 @@ const KARMA := {
 	"silence_witness": -0.11,
 	"maim": -0.03,
 	"kindness": 0.05,
+	# E5.2. An Ascent entity washing accumulated Descent pull, per
+	# `systems/ascent_entities.gd`. Larger than any single act below zero can be,
+	# because it is deliberately rare — gated on the entity's attention, which is
+	# itself earned from a run of the acts above rather than bought.
+	"sin_washed": 0.12,
 }
 
 
@@ -162,6 +167,8 @@ func event_karma(event: Dictionary) -> float:
 			return float(KARMA.maim)
 		"misfire_bond", "bond_strengthened", "npc_spared":
 			return float(KARMA.kindness)
+		"sin_washed":
+			return float(KARMA.sin_washed)
 	return 0.0
 
 
