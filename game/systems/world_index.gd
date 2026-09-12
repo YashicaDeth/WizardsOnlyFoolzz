@@ -1334,9 +1334,17 @@ func _draw_pyramid_cone(rect: Rect2, faction_id: String, apex_up: bool, register
 		return lerpf(rect.size.x * 0.30, rect.size.x * 0.94, float(index) / float(maxi(1, tiers.size() - 1)))
 	# AI1.2. Tier 0 (the crown) sits at the cone's own outer edge; the last
 	# tier (intake) sits nearest the waist — whichever physical direction
-	# that is for this cone.
+	# that is for this cone. Found via a real capture, not assumed: the
+	# Ascent branch already measures from `band_top`, which reserves the
+	# header's own 54px above it — the Descent branch measured from
+	# `rect.end.y` directly instead of the equivalent `band_top +
+	# band_height`, so its crown (and often Inner Circle too) sat flush
+	# against the rect's own bottom edge, exactly where the header's two
+	# lines are drawn, and the two printed straight through each other on
+	# every faction with a populated Descent cone.
+	var band_bottom := band_top + band_height
 	var y_for := func(index: int) -> float:
-		return band_top + float(index) * row_height if apex_up else rect.end.y - float(index + 1) * row_height
+		return band_top + float(index) * row_height if apex_up else band_bottom - float(index + 1) * row_height
 	for index in tiers.size():
 		var tier: Dictionary = tiers[index]
 		var members: Array = tier["members"]
@@ -1397,15 +1405,31 @@ func _draw_pyramid_cone(rect: Rect2, faction_id: String, apex_up: bool, register
 			# charts are one document." Read straight off the same
 			# WorldHistory record pin_board.gd's own published() reads, so
 			# this and the Board agree because they are reading the same
-			# subject rather than because one calls the other. Squeezed
-			# onto the rank line's own free space rather than given a row
-			# of its own — it degrades to nothing rather than overlapping
-			# on the narrow crown tiers where there is no room for it.
+			# subject rather than because one calls the other.
+			#
+			# The marker itself rides the icon corner rather than free text
+			# on the rank line: a first pass put the tag there and a real
+			# capture showed why that fails exactly where it matters most —
+			# the crown tier is drawn narrowest of all of them (AI1.6's own
+			# "narrow at the crown" rule), so the one row a player is most
+			# likely to check a claim against is the one row guaranteed not
+			# to have text-width to spare. `icon_size` is fixed regardless
+			# of span, so a mark on it survives every tier width; the fuller
+			# text tag is drawn alongside it only when the row actually has
+			# the room.
 			var claims := _theories_naming(str(lead.id))
 			if not claims.is_empty():
 				var claim: Dictionary = claims[0]
+				var sound := bool(claim.get("sound", true))
+				# The icon pool is only six deep (ICON_POOL) - a row past
+				# that draws no icon at all, so the mark falls back to
+				# sitting just ahead of the name itself rather than
+				# floating over nothing.
+				var pin_at := Vector2(cx - span * 0.5 + 12.0 + icon_size - 4.0, floor_y - icon_size + 8.0) if has_icon else Vector2(text_x - 6.0, floor_y - 6.0)
+				draw_circle(pin_at, 4.5, PinBoardScript.MARKER)
+				draw_arc(pin_at, 4.5, 0.0, TAU, 12, PinBoardScript.THREAD, 1.2, true)
 				var tag := "• PINNED — %s" % str(claim.get("title", ""))
-				if not bool(claim.get("sound", true)):
+				if not sound:
 					tag = "• PINNED (UNSOUND) — %s" % str(claim.get("title", ""))
 				var rank_width := CellOutzType.width(str(tier["rank"]), 9.0, 1.0)
 				var tag_x := rank_x + rank_width + 10.0

@@ -3060,10 +3060,48 @@ the two cones. The player stands at the waist, where they touch.
       reads `tree_alignment()` live every draw, and which faction populates
       each cone is recomputed from real relation edges every time the page
       opens — nothing here is cached past a single reading.
-- [ ] **AI2.4** The Board's theories pin onto the pyramid - the two charts
-      are one document — not attempted this pass; a real cross-file
-      integration between `pin_board.gd` and this page, scoped out to keep
-      the shape rework itself reviewable on its own.
+- [x] ~~**AI2.4** The Board's theories pin onto the pyramid - the two
+      charts are one document~~ Reads straight off the exact WorldHistory
+      record `pin_board.gd`'s own `published()` already reads
+      (`WorldHistory.subject(PinBoard.BOARD_ID).published`) rather than
+      needing a live `PinBoard` instance handed to this page — the two
+      screens agree because they are reading the same subject, not because
+      one calls the other, which is the honest reading of "one document."
+      New `_theories_naming(subject_id)` in `world_index.gd` walks that
+      record newest-first and resolves each theory id back to its real
+      title via `PinBoard.THEORIES`. A named subject who is also a real
+      pyramid tier member now carries a small pin marker (`PinBoard.MARKER`/
+      `THREAD`, the Board's own thread-red, not a new colour invented for
+      this page) — anchored to the member's icon corner rather than free
+      text on the rank line, because a real capture showed exactly why that
+      first attempt fails on the one row it matters most: the crown tier is
+      drawn narrowest of all of them (AI1.6's own "narrow at the crown"
+      rule), so the row a player is most likely to check a claim against is
+      the row least likely to have text-width to spare. The icon is a fixed
+      size regardless of tier span, so the mark survives every width; a
+      fuller "PINNED — <TITLE>" text tag is drawn alongside it whenever the
+      row's own free space actually allows it. A retraction (L4.4 v2)
+      clears the pin for free, since a retracted theory is simply no longer
+      in the record either side reads. Verifying this for real caught a
+      second, unrelated, pre-existing bug in the same function: the Descent
+      cone's header text was measured from `rect.end.y` directly while its
+      band (and therefore its own tiers, per AI1.2's "outer edge" placement)
+      was correctly reserving 54px above that for the header — so on every
+      faction with a populated Descent cone, the header printed straight
+      through the Crown and Inner Circle rows. The Ascent cone never showed
+      it only because its own header math already measured from `band_top`
+      instead of the rect edge. Fixed by giving both cones the same
+      `band_bottom` the Ascent cone already effectively had. Verified:
+      `tests/pyramid_pin_test.gd` (new, headless, 8/8 — wired through the
+      real `PinBoard.pin()`/`lay_string()`/`publish()`/`retract()` calls
+      rather than hand-writing the WorldHistory shape, so the test proves
+      the two screens actually agree) and `tests/pyramid_pin_capture.gd`
+      (new, windowed) plus a fresh `double_pyramid_capture.gd` recapture,
+      which is what actually caught the header/crown overlap and then
+      confirmed it gone. Existing `double_pyramid_test`,
+      `sephiroth_tree_test`, `index_link_rebuild_test`, `index_wire_glow_test`,
+      `link_test`, `opening_test` and `combat_integration_test` regression
+      suites re-verified clean.
 - [ ] **AI2.5** Satire aims at institutions and never at congregations — a
       content/tone audit, not a code change; not verified this pass.
 - [x] ~~**AI2.6** Marginalia in the corners, the way the references carry
