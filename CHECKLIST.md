@@ -562,6 +562,23 @@ holds what the *player* thinks — which is allowed to be wrong.
 - [x] **L5.1** Routes across the board are the progression
 - [x] **L5.2** No quest list exists anywhere in the game
 
+## G7 — Exposure at the spawn
+
+Measured 2026-09-12 while chasing two near-black captures of Hunt Grounds.
+Camera, lights and environment all check out — the active camera is the player's,
+ten lights are present, the sun is at 1.4 and ambient at 0.72 — and the screen
+shader is not to blame either: average frame brightness is 0.134 with
+`HUD/ScreenTreatment` on and 0.148 with it off, a 9% difference. The Expanse is
+simply that dark from where the player spawns.
+
+That is a look decision rather than a bug, which is why it is filed here instead
+of under M, but 0.13 average is dark enough that structures a few metres away
+read as black shapes rather than as buildings.
+
+- [ ] **G7.1** Decide whether the spawn is meant to be this dark, or raise it
+- [ ] **G7.2** If it stays dark, the near field still has to read — contrast, not brightness
+- [ ] **G7.3** Check the same numbers at the districts and at the derby, not only at spawn
+
 ## H — Base building, reduced
 
 Your own call: Valheim's building is a pillar built by five people over years,
