@@ -34,6 +34,10 @@ uniform float tint_strength : hint_range(0.0, 1.0) = 0.14;
 // measured against it rather than against the shell's geometry, so the two
 // cannot drift apart.
 uniform float reach = 13.0;
+// A4.2. The cosine of a spot's outer angle, or -2 for a light that is a point.
+// Which measure is right depends on the shape of the volume the light fills,
+// and these are the only two shapes the game has.
+uniform float cone_edge = -2.0;
 
 varying vec3 world_position;
 
@@ -42,24 +46,37 @@ void vertex() {
 }
 
 void fragment() {
-	// How near this view ray passes the lamp itself, which is the only measure
-	// that behaves both outside the shell and inside it. Reading the chord
-	// through the sphere instead — the obvious choice, and the one tried first —
-	// is correct only from outside: standing among nine overlapping throws, every
-	// direction has a long chord, so the whole frame wobbles and the effect
-	// becomes the screen filter this segment exists to replace.
-	vec3 lamp_view = (VIEW_MATRIX * MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 	vec3 ray = normalize(VERTEX);
-	float along = dot(lamp_view, ray);
-	if (along <= 0.0) {
-		// The lamp is behind this ray. Air it is not lighting is air it does not bend.
-		discard;
+	float bend;
+	if (cone_edge > -1.5) {
+		// A4.2. A spot fills a cone, and the one spot in this game is the handheld,
+		// carried at the eye. From there the lit volume is not something the ray
+		// passes near — it is the direction the ray points, so the measure is the
+		// angle off the beam. A spot mounted out in the world would need the ray
+		// against the cone's actual volume; there is no such light, and writing
+		// that path now would be a second measure nothing exercises.
+		vec3 axis = normalize((VIEW_MATRIX * MODEL_MATRIX * vec4(0.0, 0.0, -1.0, 0.0)).xyz);
+		float lit = clamp((dot(ray, axis) - cone_edge) / max(1.0 - cone_edge, 0.001), 0.0, 1.0);
+		bend = lit * lit * amount;
+	} else {
+		// How near this view ray passes the lamp itself, which is the only measure
+		// that behaves both outside the shell and inside it. Reading the chord
+		// through the sphere instead — the obvious choice, and the one tried first —
+		// is correct only from outside: standing among nine overlapping throws,
+		// every direction has a long chord, so the whole frame wobbles and the
+		// effect becomes the screen filter this segment exists to replace.
+		vec3 lamp_view = (VIEW_MATRIX * MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+		float along = dot(lamp_view, ray);
+		if (along <= 0.0) {
+			// The lamp is behind this ray. Air it is not lighting is air it does not bend.
+			discard;
+		}
+		float miss = length(lamp_view - ray * along);
+		// Squared, because hot air does not have an edge — and it is what removes
+		// the shell's own silhouette, since the strength is already nothing there.
+		float radial = clamp(1.0 - miss / max(reach, 0.001), 0.0, 1.0);
+		bend = radial * radial * amount;
 	}
-	float miss = length(lamp_view - ray * along);
-	// Squared, because hot air does not have an edge — and it is what removes the
-	// shell's own silhouette, since the strength is already nothing out there.
-	float radial = clamp(1.0 - miss / max(reach, 0.001), 0.0, 1.0);
-	float bend = radial * radial * amount;
 	if (bend <= 0.001) {
 		discard;
 	}

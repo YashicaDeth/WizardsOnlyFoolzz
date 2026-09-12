@@ -30,6 +30,10 @@ const LIGHT_WARP_SHADER := preload("res://shaders/light_warp.gdshader")
 ## without walking the scene to find them. See `set_all`.
 const GROUP := "light_warp"
 
+## A4.2. How big a shell a carried light gets, in metres. Small enough that
+## only something touching the camera can come between the two.
+const CARRIED_SHELL := 0.6
+
 ## Shared across every shell. The texture is identical for all of them and the
 ## per-lamp variation comes from where the shell is in the world, so nine lamps
 ## cost one texture rather than nine.
@@ -44,10 +48,32 @@ var _material: ShaderMaterial
 ## `reach` defaults to the light's own range, because the whole claim this
 ## makes is that the distortion is that light's — a shell bigger than the throw
 ## would be bending air the lamp does not reach.
-static func attach(light: OmniLight3D, reach := -1.0) -> LightWarp:
+##
+## `join_group` is how a carried light opts out of the scene-wide day/night
+## sweep: the handheld's warp follows its battery rather than the hour, and a
+## light somebody is holding is not a light the world turned on.
+static func attach(light: Light3D, reach := -1.0, join_group := true) -> LightWarp:
 	var shell := LightWarp.new()
 	shell.name = "%s_warp" % light.name
-	var span: float = light.omni_range if reach <= 0.0 else reach
+	# A4.2. What the shell has to enclose depends on where the light is. A lamp
+	# out in the world is walked past, so its shell is its own throw. A light
+	# carried at the eye is never walked past at all, and a shell the size of its
+	# beam would be a sphere the camera sits deep inside — every wall between the
+	# two would cut the effect off at the depth test. So a carried light gets a
+	# small shell close in, where nothing but something touching your face can
+	# occlude it, and the cone measure in the shader does the shaping.
+	var cone_edge := -2.0
+	var span := reach
+	if light is SpotLight3D:
+		var spot := light as SpotLight3D
+		cone_edge = cos(deg_to_rad(minf(spot.spot_angle, 89.0)))
+		if span <= 0.0:
+			span = CARRIED_SHELL
+	elif light is OmniLight3D:
+		if span <= 0.0:
+			span = (light as OmniLight3D).omni_range
+	elif span <= 0.0:
+		span = 8.0
 	var mesh := SphereMesh.new()
 	# Authored as a unit sphere and scaled to the lamp's own throw, so the single
 	# number deciding how far the air bends is `omni_range` itself rather than a
@@ -65,12 +91,13 @@ static func attach(light: OmniLight3D, reach := -1.0) -> LightWarp:
 	# Drawn after the opaque world, so `hint_screen_texture` has a world in it.
 	shell.sorting_offset = -1.0
 	light.add_child(shell)
-	shell.add_to_group(GROUP)
-	shell._build_material(light.light_color, span)
+	if join_group:
+		shell.add_to_group(GROUP)
+	shell._build_material(light.light_color, span, cone_edge)
 	return shell
 
 
-func _build_material(lamp_color: Color, span: float) -> void:
+func _build_material(lamp_color: Color, span: float, cone_edge := -2.0) -> void:
 	_material = ShaderMaterial.new()
 	_material.shader = LIGHT_WARP_SHADER
 	_material.set_shader_parameter("noise_texture", _noise())
@@ -78,6 +105,7 @@ func _build_material(lamp_color: Color, span: float) -> void:
 	# cold light does not warp the air warm.
 	_material.set_shader_parameter("tint", Vector3(lamp_color.r, lamp_color.g, lamp_color.b))
 	_material.set_shader_parameter("reach", span)
+	_material.set_shader_parameter("cone_edge", cone_edge)
 	_material.set_shader_parameter("amount", 0.0)
 	material_override = _material
 

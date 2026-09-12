@@ -71,6 +71,39 @@ func _ready() -> void:
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/warp_%s.png" % [out_dir, exposure[0]])
 	get_tree().paused = false
+
+	# A4.1. Standing on the ground sixty metres out from the western settlement at
+	# 01:00 — the range somebody would actually be steering from. The standing
+	# shots say what one lamp does; this says whether there is light anywhere
+	# people live, and whether it is worth walking toward.
+	hunt.player_body.position = Vector3(-150, 2.0, 62)
+	hunt.yaw = PI
+	hunt.pitch = 0.02
+	for _tick in 2:
+		await get_tree().physics_frame
+	hunt._update_camera()
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("%s/region_night.png" % out_dir)
+	print("NIGHT_LIGHTS=", hunt.night_lights.size())
+
+	# A4.2. The handheld beam, off and on, from the same paused frame. The panel
+	# is faded out for the photograph only: raising the device is what lights the
+	# torch (`is_lit()` is `raised > 0.5`), and the device draws its screen over
+	# the frame, so both shots would otherwise be of the World Index again.
+	hunt.handheld.toggle_device()
+	hunt.yaw = PI
+	hunt.pitch = -0.06
+	for _tick in 30:
+		await get_tree().physics_frame
+	hunt.handheld.modulate.a = 0.0
+	get_tree().paused = true
+	for exposure: Array in [["off", 0.0], ["on", 1.0]]:
+		hunt.handheld_warp.set_amount(float(exposure[1]))
+		hunt._update_camera()
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/torch_%s.png" % [out_dir, exposure[0]])
+	get_tree().paused = false
+	print("TORCH_LIT=", hunt.handheld.torch_active(), " BEAM=", hunt.handheld_lamp.light_energy)
 	print("WARP_SHELLS=", get_tree().get_nodes_in_group(LightWarp.GROUP).size())
 	print("CAPTURE_DONE")
 	get_tree().quit()

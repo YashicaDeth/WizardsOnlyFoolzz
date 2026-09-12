@@ -255,6 +255,31 @@ var keys_card: Control
 ## camera rather than on `handheld` itself — `handheld` is a `Control`, drawn
 ## in the HUD layer, and has nothing to attach a `Light3D` to.
 var handheld_lamp: SpotLight3D
+## A4.2. The handheld beam's own warp shell, kept rather than looked up: it is
+## driven off the battery every frame and a per-frame group query for one node
+## would be a search for something this scene already has in hand.
+var handheld_warp: LightWarp
+
+## A4.1. The lights somebody in the pit actually paid for, written as places
+## rather than as a loop. The gate is the one the player walks in under and the
+## only one that casts shadows, since it is the only one close enough for a
+## shadow to be read as anything but cost.
+## A4.1. How hard a fixture glows after dark. One number, because a bulb that
+## is brighter than the light it stands in reads as a sticker on the frame.
+const BULB_GLOW := 5.0
+
+const GATE_LIGHTS := [
+	{"at": Vector3(-6, 6, -17), "color": "ec6d2e", "energy": 4.2, "reach": 15.0, "shadows": true},
+	{"at": Vector3(7, 6, 6), "color": "ec6d2e", "energy": 3.6, "reach": 14.0},
+	{"at": Vector3(0, 7, -54), "color": "e8a24a", "energy": 3.2, "reach": 18.0},
+	{"at": Vector3(2, 7, -96), "color": "c9722c", "energy": 3.0, "reach": 18.0},
+	{"at": Vector3(-31, 5, 18), "color": "d8552a", "energy": 2.6, "reach": 12.0},
+	{"at": Vector3(26, 5, -30), "color": "d8552a", "energy": 2.6, "reach": 12.0},
+]
+
+## A4.1. Every placed light, so `_update_day_night()` can put them out at dawn
+## without holding a second list of where they are.
+var night_lights: Array[OmniLight3D] = []
 ## AS2. Built once in `_build_world()`, driven every frame in
 ## `_update_day_night()` off `world_clock.gd` — it used to sit at one fixed
 ## angle and brightness no matter the hour, which is why W1.1 existing made no
@@ -376,6 +401,12 @@ func _ready() -> void:
 	handheld_lamp.rotation_degrees = Vector3(-6, 4, 0)
 	handheld_lamp.shadow_enabled = true
 	camera.add_child(handheld_lamp)
+	# A4.2. The handheld is a light like any other, so it warps the air like any
+	# other — and being the one you carry, it is the first warping most players
+	# will ever see. Out of the day/night group on purpose: this one answers its
+	# own battery in `_update_handheld_lamp()`, not the hour, because a light
+	# somebody is holding is not a light the world turned on.
+	handheld_warp = LightWarp.attach(handheld_lamp, -1.0, false)
 	resolution_ui = preload("res://systems/downed_resolution.gd").new()
 	resolution_ui.name = "DownedResolution"
 	$HUD.add_child(resolution_ui)
@@ -1628,6 +1659,9 @@ func _update_handheld_lamp(delta: float) -> void:
 	var lit: bool = handheld.has_method("torch_active") and handheld.torch_active()
 	handheld_lamp.visible = lit
 	if not lit:
+		# A4.2. Dark beam, still air.
+		if handheld_warp != null and is_instance_valid(handheld_warp):
+			handheld_warp.set_amount(0.0)
 		return
 	var charge: float = handheld.battery_percent() if handheld.has_method("battery_percent") else 1.0
 	var waver := 1.0 + sin(pulse * 11.0) * 0.03 * (1.0 + (1.0 - charge) * 2.5)
@@ -1636,6 +1670,11 @@ func _update_handheld_lamp(delta: float) -> void:
 		var gutter := 1.0 if fmod(pulse * (5.0 + (0.2 - charge) * 40.0), 1.0) > 0.5 else 0.0
 		waver *= 0.7 + 0.3 * gutter
 	handheld_lamp.light_energy = 9.0 * charge * waver
+	# A4.2. The air the beam bends answers the same battery the beam does, so a
+	# guttering torch bends it in the same stutter rather than holding a steady
+	# shimmer over a dying light.
+	if handheld_warp != null and is_instance_valid(handheld_warp):
+		handheld_warp.set_amount(clampf(handheld_lamp.light_energy / 9.0, 0.0, 1.0))
 
 
 ## AD1.2. Empty means "not vaultable", never a crash — every one of these
@@ -3580,23 +3619,63 @@ func _build_world() -> void:
 		pylon.add_child(shaft)
 		Silhouette.dress(pylon, pylon_size, index + 91, Callable(WorldLook, "surface"))
 		Silhouette.settle(pylon, index + 91)
-	for index in 9:
-		var lamp := OmniLight3D.new()
-		lamp.position = Vector3(-24 + index * 6, 6, -17 + (index % 2) * 23)
-		lamp.light_color = Color("ec6d2e")
-		lamp.light_energy = 3.5
-		lamp.omni_range = 13
-		add_child(lamp)
-		# A3.2. The air around each of these bends after dark; nothing else in the
-		# scene does. Attached at build rather than driven from a list, so a lamp
-		# cannot exist without its shell.
-		LightWarp.attach(lamp)
+	# A4.1. Light in this world is scarce and it belongs to something. These nine
+	# stood in an arithmetic row — `-24 + index * 6`, eight metres apart at the
+	# origin — which is the whole reason night read as one lit clearing in a black
+	# region rather than as a region at night. They are placed now: the pit gate
+	# somebody walks in through, two along the road out, and a pair over the
+	# wreck line. Fewer lamps, further apart, each on a thing that would have
+	# power.
+	for spot: Dictionary in GATE_LIGHTS:
+		_place_night_light(spot["at"], Color(spot["color"]), float(spot["energy"]), float(spot["reach"]), bool(spot.get("shadows", false)))
 	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-50, -25, 0)
 	sun.light_color = Color("c89572")
 	sun.light_energy = 1.4
 	sun.shadow_enabled = true
 	add_child(sun)
+
+
+## A4.1. One place a light is made, so every light in the region is in the same
+## system: it is recorded for the hour to drive, and it gets its warp shell
+## (A3.2) at birth rather than from a later sweep that could miss one.
+func _place_night_light(at: Vector3, color: Color, energy: float, reach: float, shadows := false, bulb_size := 0.4) -> OmniLight3D:
+	var lamp := OmniLight3D.new()
+	lamp.position = at
+	lamp.light_color = color
+	lamp.light_energy = energy
+	lamp.omni_range = reach
+	lamp.shadow_enabled = shadows
+	# The air here is bad enough to have volumetric fog in it, so a lamp should
+	# have a throw you can see from outside the circle it lights. This is the
+	# difference between a light and a lit patch of ground.
+	lamp.light_volumetric_fog_energy = 1.8
+	lamp.set_meta("night_energy", energy)
+	add_child(lamp)
+	# The fixture itself. A light with no visible source is only its effect on
+	# whatever it reaches, and at any distance through this fog that is nothing:
+	# the first build of A4.1 photographed a black region with five lights in it
+	# and five lights' worth of nothing to see. A lamp has a bulb.
+	var bulb := MeshInstance3D.new()
+	var bulb_mesh := SphereMesh.new()
+	bulb_mesh.radius = bulb_size
+	bulb_mesh.height = bulb_size * 2.0
+	bulb_mesh.radial_segments = 10
+	bulb_mesh.rings = 6
+	var glass := StandardMaterial3D.new()
+	glass.albedo_color = color
+	glass.emission_enabled = true
+	glass.emission = color
+	glass.emission_energy_multiplier = BULB_GLOW
+	glass.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bulb_mesh.material = glass
+	bulb.mesh = bulb_mesh
+	bulb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	lamp.add_child(bulb)
+	lamp.set_meta("glass", glass)
+	night_lights.append(lamp)
+	LightWarp.attach(lamp)
+	return lamp
 
 
 ## AS2. The sun and the base ambient used to be set once in `_build_world()`
@@ -3646,6 +3725,15 @@ func _update_day_night() -> void:
 	# invented here. A frame with no lamp in it is not warped at all, which is
 	# the whole difference between a property and a filter.
 	LightWarp.set_all(self, 1.0 - daylight)
+	# A4.1. Nothing here burns in daylight. Every lamp sat at a constant energy
+	# around the clock, which is invisible at noon and means night never has a
+	# moment of coming on. Each one keeps its own full value in `night_energy`,
+	# since a gate lamp and a district glow are not the same light turned down.
+	for light in night_lights:
+		if is_instance_valid(light):
+			light.light_energy = float(light.get_meta("night_energy", 3.5)) * (1.0 - daylight)
+			if light.has_meta("glass"):
+				(light.get_meta("glass") as StandardMaterial3D).emission_energy_multiplier = BULB_GLOW * (1.0 - daylight)
 
 
 func _build_expanse_systems() -> void:
@@ -3653,6 +3741,12 @@ func _build_expanse_systems() -> void:
 	generated_world.name = "ProceduralAshbloomDistricts"
 	add_child(generated_world)
 	generated_world.call("generate", 774013)
+	# A4.1. One light per settlement, read from the generator's own centres so a
+	# district that moves takes its light with it rather than leaving a lamp over
+	# empty ground. Wide and low: this is the glow you steer by from two hundred
+	# metres out across a dark region, not a lamp anybody reads under.
+	for centre: Vector3 in WORLD_GENERATOR.DISTRICT_CENTERS:
+		_place_night_light(centre + Vector3(0, 13, 0), Color("d8973f"), 9.0, 85.0, false, 1.6)
 	pathfinder.build(generated_world.lots)
 	misfire_director = MISFIRE_DIRECTOR.new()
 	misfire_director.name = "RealityMisfires"

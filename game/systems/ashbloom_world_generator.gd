@@ -6,6 +6,11 @@ const ROAD := Color("27221c")
 const WALLS := [Color("392a20"), Color("403326"), Color("2c3028"), Color("442722")]
 const SIGNS := ["EAT AT VANTA'S", "NO GODS OVER 8FT", "NIX FIX", "SOFT ROT MOTEL", "BLACK MILE TAX", "CELLOUTZ RELAY"]
 
+## The five settlements. Named here rather than inside `generate()` so anything
+## that needs to know where people live reads the same list the buildings are
+## built from — A4.1's district lights being the first such caller.
+const DISTRICT_CENTERS := [Vector3(-150, 0, -122), Vector3(130, 0, -122), Vector3(-155, 0, 0), Vector3(135, 0, 0), Vector3(65, 0, 115)]
+
 var generated_buildings: Array[Node3D] = []
 var lots: Array[Rect2] = []
 
@@ -23,8 +28,7 @@ func generate(seed_value: int = 774013) -> void:
 	_build_road(Vector3(0, -0.28, -72), Vector3(REGION_SIZE.x, 0.22, 15))
 	_build_road(Vector3(-112, -0.27, 74), Vector3(12, 0.22, 170))
 	for district in 5:
-		var centers := [Vector3(-150, 0, -122), Vector3(130, 0, -122), Vector3(-155, 0, 0), Vector3(135, 0, 0), Vector3(65, 0, 115)]
-		var district_center: Vector3 = centers[district]
+		var district_center: Vector3 = DISTRICT_CENTERS[district]
 		for lot in 8 + district * 2:
 			var offset := Vector3(float(lot % 4) * 24.0 - 36.0, 0, float(lot / 4) * 22.0 - 33.0)
 			var width := rng.randf_range(8.0, 17.0)
