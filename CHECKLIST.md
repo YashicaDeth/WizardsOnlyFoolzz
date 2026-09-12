@@ -1446,12 +1446,12 @@ the game exisit too"*.
 have is the part Greg described: people you can actually reach out to, who
 answer or do not, and whose willingness depends on who you are to them.
 
-- [ ] **Q1.1** Direct messages — reach one account rather than publishing at everyone
-- [ ] **Q1.2** Whether they answer is a roll against reach, standing and what you have on them
-- [ ] **Q1.3** A verified account answers differently, and less often, than a nobody
-- [ ] **Q1.4** Stalking a feed is a way of finding somebody in the world, not flavour
-- [ ] **Q1.5** Harassment works and costs — it moves grudge, reach and exposure together
-- [ ] **Q1.6** The underbelly is reached by standing somewhere, as `signal_field.gd` already gates
+- [x] **Q1.1** Direct messages — reach one account rather than publishing at everyone — audited rather than built: `wire_net.gd`'s `contact()` already does exactly this, was simply never credited here. Proven in `tests/wire_test.gd`
+- [x] **Q1.2** Whether they answer is a roll against reach, standing and what you have on them — `contact()`'s chance formula (reach ratio, broker/leverage routes, grudge), tested: a Crown is categorically unreachable, a peer answers far more readily, a rival who hates you reads everything
+- [x] **Q1.3** A verified account answers differently, and less often, than a nobody — `TIERS`' per-tier `answers` ceiling (CROWN 0.02 vs INTAKE 0.78), tested directly
+- [x] **Q1.4** Stalking a feed is a way of finding somebody in the world, not flavour — the one genuine gap. New `wire_net.gd`'s `locate()` reads the most recent event that actually names the subject and carries a real `location` (most of `bone_yard_hunt.gd`'s events already do) — refuses honestly with no invented tracker when nobody has recorded where they were, and prefers the most recent sighting over a stale one. Wired into `act()`'s `"observe"` result. Covered by `tests/wire_locate_test.gd` (8 checks)
+- [x] **Q1.5** Harassment works and costs — it moves grudge, reach and exposure together — `act()`'s `"swarm"`, tested: grudge, exposure and reach all move on the same real event
+- [x] **Q1.6** The underbelly is reached by standing somewhere, as `signal_field.gd` already gates — `SIGNAL_UNDERBELLY`/band routing, tested: a terminal reaches him, the surface cannot
 
 ## R — Money
 

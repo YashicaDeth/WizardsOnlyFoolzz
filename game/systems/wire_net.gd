@@ -711,6 +711,27 @@ func _reply_for(target: Dictionary, opener: String, answered: bool, rng: RandomN
 
 # --- actions ---------------------------------------------------------------
 
+## Q1.4. "Stalking a feed is a way of finding somebody in the world, not
+## flavour." Most events already carry a real `location` (`bone_yard_hunt.gd`
+## sets it on nearly everything it records) — this reads the most recent one
+## that actually names the subject, rather than inventing a tracker. Refuses
+## honestly when nobody has recorded where they were.
+func locate(subject_id: String) -> Dictionary:
+	for index in range(WorldHistory.events.size() - 1, -1, -1):
+		var event: Dictionary = WorldHistory.events[index]
+		var details: Dictionary = event.get("details", {})
+		if str(details.get("location", "")).is_empty():
+			continue
+		var names_subject := false
+		for key in ["subject", "subject_id", "target", "rival", "victim", "actor", "listener", "speaker"]:
+			if str(details.get(key, "")) == subject_id:
+				names_subject = true
+				break
+		if names_subject:
+			return {"ok": true, "location": str(details.location), "from_event": str(event.get("type", "")), "sequence": int(event.get("sequence", 0))}
+	return {"ok": false, "location": "", "reason": "NO RECORDED SIGHTING"}
+
+
 ## The active half of the social layer. Each returns a costed outcome and moves
 ## the player's exposure, because the design is explicit that these must never
 ## ship before their costs work or the whole thing reads as a toy.
@@ -727,6 +748,7 @@ func act(subject_id: String, action: String) -> Dictionary:
 		"observe":
 			result.headline = "WATCHING %s" % str(target.name).to_upper()
 			result.detail = "%s  ·  REACH %d  ·  %s" % [str(target.role).to_upper(), int(target.reach), str(target.last_seen)]
+			result["location"] = locate(subject_id)
 			strain += 0.4
 		"expose":
 			var held := leverage(subject_id)
