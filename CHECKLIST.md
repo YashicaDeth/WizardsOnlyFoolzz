@@ -171,6 +171,17 @@ half-tuned broadcast is exactly that.
 
 ---
 
+### A v2 — the second pass
+A is sealed, which means the only way it improves now is a stated second pass.
+Everything below is a real weakness in what v1 shipped, not polish.
+
+- [ ] **A1.6** `v2` The stencil has no kerning pairs — every letter sits on the grid, so AV and TA gap
+- [ ] **A2.9** `v2` One plate for every page; the dossier, the Wire and the pyramid should not be printed on the same substrate
+- [ ] **A5.6** `v2` Grunge is seeded per screen and identical every session — it should remember the run it is in
+- [ ] **A6.6** `v2` Dead pixels and scanlines are static; a failing panel flickers
+- [ ] **A7.7** `v2` Retune the chassis against authored arena geometry once G3.1 lands
+- [ ] **A9.7** `v2` Stations have a schedule — the dial is the same at 3am as at noon
+
 ## B — Make the body the centrepiece
 
 The most complete system in the project and, until this pass, the least visible.
@@ -240,6 +251,14 @@ The most complete system in the project and, until this pass, the least visible.
 
 ---
 
+### B v2 — the second pass
+- [ ] **B1.9** `v2` Organs are authored shapes that never deform — a compressed lung should read as compressed
+- [ ] **B4.10** `v2` Rot attracts something. Flies were shipped; nothing eats
+- [ ] **B4.11** `v2` Blood pools persist across a scene change, or they are set dressing
+- [ ] **B6.7** `v2` A fracture is binary. A compound fracture is a different injury and should look it
+- [ ] **B6.8** `v2` Internal bleeding is indistinguishable from external — the X-ray should be the only way to find it
+- [ ] **B2.7** `v2` Pain is a number with no behaviour of its own: it should change how a body stands before it changes what it can do
+
 ## C — The handheld, and killing the six-panel problem
 
 Six fullscreen panels on six keys is the root cause of "nothing connects".
@@ -276,6 +295,13 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 - [x] ~~**C5.4** Cracked screen eats regions of the interface~~
 
 ---
+
+### C v2 — the second pass
+- [ ] **C1.6** `v2` The device is raised at one angle in one hand, every time
+- [ ] **C1.7** `v2` It can be dropped, and it can be taken off you
+- [ ] **C1.8** `v2` Physical wear accumulates across a run rather than being a damage state
+- [ ] **C2.6** `v2` Modes cycle; a player who knows the device should reach a mode directly
+- [ ] **C5.5** `v2` One crack pattern for every cracked screen in the game
 
 ## D — Character creation in the vat
 
@@ -328,6 +354,13 @@ under-directed opening.
 - [x] ~~**D8.4** Declining them is the harder difficulty~~
 
 ---
+
+### D v2 — the second pass
+- [ ] **D3.5** `v2` The handler says the same things in the same order every decanting
+- [ ] **D4.6** `v2` Race is data the world reads, but the intake does not react to it out loud
+- [ ] **D2.4** `v2` CLERICAL ERROR is never discoverable — finding out which part of your sheet is wrong should be possible and should cost something
+- [ ] **D7.4** `v2` The mirror lies the same way every time; the lie should fit the body
+- [ ] **D8.5** `v2` Declining a modifier is the harder difficulty and the game never acknowledges it
 
 ## E — The two ladders
 
@@ -593,6 +626,13 @@ Four tiers, all on existing machinery. See `DESIGN/COSMOLOGY.md`.
 - [~] **K3.1** Decide whether both ladders can be climbed at once or committing closes one — answered by default rather than invented fresh: `route_endings.gd`'s own comment argues both stay climbable right up until one is actually finished, and finishing one then locks (verified: a subject who signs away and later drifts all the way back up on paper still reads as the demon ending). A default worth Greg confirming or overriding, not a closed question
 - [x] **K3.2** The opening reframed: CellOutz grew you, which is why the debt is in the meat — one line added to `vat_chamber.gd`'s `BEATS` (a pure clock-driven subtitle list, decoupled from the phase/movement logic it lives beside), landing as the very next beat after "Debt's in the meat, friend": *"CellOutz grew you. CellOutz owns what it grew. Read your own contract sometime."* Verified visually, not assumed: `tests/opening_capture.gd` now also captures this beat (`game/captures/opening_celloutz_reframe.png`, actually opened and read). `tests/opening_direction_test.gd` extended (3 checks) to assert the line exists, names CellOutz, and lands immediately after the debt line rather than buried elsewhere
 - [x] **K3.3** Getting God's attention as the actual win condition, written into world history — `RouteEndings.forced_gods_attention()` reads the Ascent ending already built (E7.2) as that moment, per `DESIGN/COSMOLOGY.md`'s own framing, rather than inventing a distinct God entity. Covered by `tests/route_endings_test.gd` (14 checks total)
+
+### K v2 — the second pass
+- [ ] **K2.5** `v2` The Horsemen exist as subjects with no behaviour of their own
+- [ ] **K4.6** `v2` The Sins are named and placed but do not act on the world
+- [ ] **K1.4** `v2` Both poles are real in the ledger and barely felt in the world — a player should know which one they are standing in
+- [ ] **K3.2** `v2` Nothing yet stops a player climbing both ladders at once
+- [ ] **K5.1** `v2` Lesser demons are rivals reread; they should eventually want something of their own
 
 ## L — The Board
 The storyline and career as a conspiracy pin board rather than a quest list.
