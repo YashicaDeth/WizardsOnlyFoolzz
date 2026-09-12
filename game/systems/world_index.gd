@@ -37,6 +37,7 @@ const WoundCatalog := preload("res://systems/wound_catalog.gd")
 const BrokenWeb := preload("res://systems/broken_web.gd")
 const BlackMirror := preload("res://systems/black_mirror.gd")
 const Sephiroth := preload("res://systems/sephiroth.gd")
+const PinBoardScript := preload("res://systems/pin_board.gd")
 
 ## Six live 3D heads is cheap; sixty would not be, and each icon owns a World3D.
 ## So they are a pool the pages draw into by slot rather than one per row.
@@ -1263,6 +1264,27 @@ func _strongest_ladder_faction(faction_ids: Array) -> String:
 	return best
 
 
+## AI2.4. Every published theory naming this subject, newest first — read
+## straight off `WorldHistory.subject(PinBoardScript.BOARD_ID).published`,
+## the exact record `pin_board.gd`'s own `published()` reads, rather than
+## needing a live `PinBoard` instance handed to this page. A theory that
+## has since been retracted (L4.4 v2) is simply no longer in that record,
+## so a retraction clears the pin here for free.
+func _theories_naming(subject_id: String) -> Array:
+	var record: Dictionary = WorldHistory.subject(PinBoardScript.BOARD_ID)
+	var out: Array = []
+	var published: Array = record.get("published", [])
+	for i in range(published.size() - 1, -1, -1):
+		var entry: Dictionary = published[i]
+		if str(entry.get("target", "")) != subject_id:
+			continue
+		for theory: Dictionary in PinBoardScript.THEORIES:
+			if str(theory.get("id", "")) == str(entry.get("theory", "")):
+				out.append({"title": str(theory.get("title", "")), "sound": bool(entry.get("sound", true))})
+				break
+	return out
+
+
 ## AI1. "Two pyramids meeting at a point. Upright above, inverted below. As
 ## above, so below" — not decoration, the two-axis system (AA) the game
 ## already has: an upper cone for whichever Ascent faction the player has
@@ -1371,6 +1393,26 @@ func _draw_pyramid_cone(rect: Rect2, faction_id: String, apex_up: bool, register
 			var text_x := cx - span * 0.5 + (14.0 + icon_size + 6.0 if has_icon else 14.0)
 			draw_string(font, Vector2(text_x, floor_y), label, HORIZONTAL_ALIGNMENT_LEFT, room, 11, INK * Color(1, 1, 1, 0.88))
 			CellOutzType.draw_text(self, Vector2(cx + span * 0.5 - 14 - down_width, floor_y - 8.0), downline, 8.0, SPORE * Color(1, 1, 1, 0.8), 0.7)
+			# AI2.4. "The Board's theories pin onto the pyramid — the two
+			# charts are one document." Read straight off the same
+			# WorldHistory record pin_board.gd's own published() reads, so
+			# this and the Board agree because they are reading the same
+			# subject rather than because one calls the other. Squeezed
+			# onto the rank line's own free space rather than given a row
+			# of its own — it degrades to nothing rather than overlapping
+			# on the narrow crown tiers where there is no room for it.
+			var claims := _theories_naming(str(lead.id))
+			if not claims.is_empty():
+				var claim: Dictionary = claims[0]
+				var tag := "• PINNED — %s" % str(claim.get("title", ""))
+				if not bool(claim.get("sound", true)):
+					tag = "• PINNED (UNSOUND) — %s" % str(claim.get("title", ""))
+				var rank_width := CellOutzType.width(str(tier["rank"]), 9.0, 1.0)
+				var tag_x := rank_x + rank_width + 10.0
+				var tag_width := CellOutzType.width(tag, 8.0, 0.7)
+				var buy_start := cx + span * 0.5 - 14 - buy_width
+				if tag_x + tag_width < buy_start - 6.0:
+					CellOutzType.draw_text(self, Vector2(tag_x, y + 4), tag, 8.0, PinBoardScript.THREAD, 0.7)
 
 	# A3.7. The ladder is not just tiers - it is who brought whom in. Drawn
 	# from real ally and command edges between members of adjacent tiers.
