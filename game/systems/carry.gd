@@ -99,6 +99,25 @@ func take_chunk(info: Dictionary) -> Dictionary:
 	return item
 
 
+## E6.4. A produced or bought substance, carried the same way a robbed part
+## is — same wallet, same `sale_value()`, same spoil clock — rather than a
+## second inventory only drugs live in.
+const SubstancesCatalog := preload("res://systems/substances.gd")
+
+
+func take_substance(substance_id: String) -> Dictionary:
+	if not SubstancesCatalog.CATALOG.has(substance_id):
+		return {}
+	var data: Dictionary = SubstancesCatalog.CATALOG[substance_id]
+	var item := {
+		"label": str(data.label).to_upper(), "kind": "substance", "substance_id": substance_id,
+		"mass": 0.2, "perishes": true, "age": 0.0, "condition": 1.0,
+	}
+	items.append(item)
+	save_to_history()
+	return item
+
+
 func first_index(kind: String) -> int:
 	for index in items.size():
 		if str((items[index] as Dictionary).get("kind", "")) == kind:
@@ -123,7 +142,7 @@ func damage_item(index: int, amount: float) -> float:
 ## Tree relative to you is the whole of their opinion of you. An empty buyer is
 ## an anonymous broker who prices nothing but the meat.
 func sale_value(item: Dictionary, buyer_faction: String = "") -> int:
-	var base := int({"limb": 7, "organ": 12, "cybernetic": 24}.get(str(item.get("kind", "")), 0))
+	var base := int({"limb": 7, "organ": 12, "cybernetic": 24, "substance": 3}.get(str(item.get("kind", "")), 0))
 	if base <= 0:
 		return 0
 	var condition := clampf(float(item.get("condition", 1.0)), 0.0, 1.0)
