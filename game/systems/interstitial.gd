@@ -21,11 +21,27 @@ signal arrived()
 const MIN_HOLD := 0.85
 const FADE := 0.36
 
-const VOID := Color("060b09")
-const INK := Color("dce6ba")
-const ACID := Color("b4da48")
-const SPORE := Color("9bf01a")
+## The plate used to be lit acid-green, which put the one screen standing
+## between every two places in the game into a register nothing else in it
+## uses — the hunt is rust and sodium, the dossier is paper and red stamp ink,
+## and what this screen is actually about is a body in transit. Green read as
+## sci-fi telemetry. It is blood now: the rain, the readout and the light
+## coming through the specimen are all arterial, the ground is a warm
+## near-black rather than a cold one, and BILE survives as the single
+## non-red note so the mutter line still separates from what is behind it.
+const VOID := Color("0a0504")
+const INK := Color("e9d5c6")
+## The hot readout: the title stamp, the progress bar, the percentage.
+const HOT := Color("e0442a")
+## What the plate transmits in — the rain, the sweep, the halation through the
+## body. Darker than HOT, so a screen full of it never competes with the few
+## things on the plate that are meant to be read.
+const HAEM := Color("b3231b")
 const ARTERIAL := Color("c81f16")
+## Stamp shadows. Was ARTERIAL, which was only legible while the foreground was
+## green; a red shadow under a red foreground is a blur, so the offset copy is
+## the near-black the plate is already drawn on.
+const SHADOW := Color("2a0806")
 const BILE := Color("b8a12a")
 const BRUISE := Color("6a2d6e")
 const BONE := Color("ead4ad")
@@ -52,6 +68,16 @@ var mutter := ""
 var destination := ""
 var progress := 0.0
 var _last_mutter := -1
+## AR. The seal belongs to the place you are going, not to the loading screen:
+## seeded off the destination path, so the same door always draws the same
+## sigil and two different doors never draw the same one. Re-seeded in `travel`
+## and `hold_open` rather than randomised per frame, because a mark that
+## reshuffles while you look at it is a noise effect, not a mark.
+var _seal_seed := 0
+## Blood on the glass of the transit plate. Built once at the first size the
+## screen reports and then left alone — a runnel that re-randomises every frame
+## is the same failure the handheld's cracks were fixed for.
+var _runnels: Array = []
 ## The 3D scan. Built on the first cover and kept, because rebuilding a rig per
 ## transition is exactly the hitch a loading screen exists to hide.
 var _specimen: XraySpecimen = null
@@ -87,6 +113,7 @@ func travel(scene_path: String, travel_caption: String = "") -> void:
 	destination = scene_path
 	caption = travel_caption.to_upper()
 	clock = 0.0
+	_seal_seed = hash(scene_path)
 	var pick := randi() % MUTTERS.size()
 	if pick == _last_mutter:
 		pick = (pick + 1) % MUTTERS.size()
@@ -145,6 +172,7 @@ func hold_open(plate_caption: String) -> void:
 	caption = plate_caption.to_upper()
 	mutter = MUTTERS[randi() % MUTTERS.size()]
 	clock = 0.0
+	_seal_seed = hash(plate_caption)
 	progress = 0.0
 	screen.visible = true
 	await _fade(1.0)
@@ -184,6 +212,12 @@ func _draw_plate() -> void:
 		return
 	screen.draw_rect(Rect2(Vector2.ZERO, size), VOID * Color(1, 1, 1, alpha))
 
+	# Behind the body, because the body is arriving *through* it. The seal is
+	# the loudest thing on the plate and the specimen still has to be readable
+	# over it, which is the whole reason it is drawn first and dim rather than
+	# over the top at full strength.
+	_draw_seal(Vector2(size.x * 0.5, size.y * 0.47), minf(size.x, size.y) * 0.42)
+
 	# The scan itself, composited large and centred. Drawn additively over the
 	# void so the film reads as light coming through a body rather than as a
 	# picture of one pasted on black.
@@ -195,13 +229,13 @@ func _draw_plate() -> void:
 			screen.draw_texture_rect(texture, frame, false, Color(1, 1, 1, alpha))
 			# A second pass, offset and dimmer: the film's own halation, which
 			# is what stops a rendered mesh looking like a rendered mesh.
-			screen.draw_texture_rect(texture, frame.grow(6.0), false, SPORE * Color(1, 1, 1, 0.16 * alpha))
+			screen.draw_texture_rect(texture, frame.grow(6.0), false, HAEM * Color(1, 1, 1, 0.22 * alpha))
 
 	# I1. The rain falls behind the readout and through the specimen, so the
 	# body is being *transmitted*. Holes are punched for everything printed.
 	if _rain.is_empty() and size.x > 1.0:
 		_rain = CodeRain.build(size.x, size.y, 34.0, 6101)
-	CodeRain.draw_field(screen, Rect2(Vector2.ZERO, size), _rain, SPORE * Color(1, 1, 1, alpha), 0.0, clock, [
+	CodeRain.draw_field(screen, Rect2(Vector2.ZERO, size), _rain, HAEM * Color(1, 1, 1, alpha), 0.0, clock, [
 		Rect2(30, 24, 520, 66),
 		Rect2(30, size.y - 100, size.x - 60, 76),
 	])
@@ -211,21 +245,135 @@ func _draw_plate() -> void:
 	for row in range(0, int(size.y), 3):
 		screen.draw_line(Vector2(0, row), Vector2(size.x, row), Color(0, 0, 0, 0.2 * alpha), 1.0)
 	var sweep := fposmod(clock * 260.0, size.y + 200.0) - 100.0
-	screen.draw_rect(Rect2(0, sweep, size.x, 46), SPORE * Color(1, 1, 1, 0.035 * alpha))
+	screen.draw_rect(Rect2(0, sweep, size.x, 46), HAEM * Color(1, 1, 1, 0.05 * alpha))
 
-	CellOutzType.draw_stamped(screen, Vector2(44, 36), "CELLOUTZ TRANSIT", 20.0, ACID * Color(1, 1, 1, alpha), ARTERIAL * Color(1, 1, 1, 0.3 * alpha), 3.2)
+	# Gore on the glass. Over the transmission and under the readout, because
+	# the readout is printed on the far side of the pane from whatever ran down
+	# this one.
+	_draw_runnels(size)
+
+	CellOutzType.draw_stamped(screen, Vector2(44, 36), "CELLOUTZ TRANSIT", 20.0, HOT * Color(1, 1, 1, alpha), SHADOW * Color(1, 1, 1, 0.75 * alpha), 3.2)
 	CellOutzType.draw_condensed(screen, Vector2(44, 64), "SPECIMEN IN MOTION / DO NOT OPEN THE CASE", 9.0, INK * Color(1, 1, 1, 0.45 * alpha), 0.8)
 	if not caption.is_empty():
-		CellOutzType.draw_stamped(screen, Vector2(44, size.y - 104), caption, 18.0, INK * Color(1, 1, 1, alpha), ARTERIAL * Color(1, 1, 1, 0.22 * alpha), 1.6)
+		CellOutzType.draw_stamped(screen, Vector2(44, size.y - 104), caption, 18.0, INK * Color(1, 1, 1, alpha), SHADOW * Color(1, 1, 1, 0.7 * alpha), 1.6)
 	CellOutzType.draw_condensed(screen, Vector2(44, size.y - 68), mutter, 10.0, BILE * Color(1, 1, 1, 0.8 * alpha), 0.8)
 
 	# Real load progress, not a crawling barber pole. The bar used to know
 	# nothing and say so; it now reports what ResourceLoader actually reports.
 	var bar := Rect2(44, size.y - 42, size.x - 88, 6)
 	screen.draw_rect(bar, Color(0, 0, 0, 0.5 * alpha))
-	screen.draw_rect(Rect2(bar.position, Vector2(bar.size.x * progress, bar.size.y)), ACID * Color(1, 1, 1, 0.8 * alpha))
+	screen.draw_rect(Rect2(bar.position, Vector2(bar.size.x * progress, bar.size.y)), HOT * Color(1, 1, 1, 0.9 * alpha))
 	screen.draw_rect(bar, INK * Color(1, 1, 1, 0.18 * alpha), false, 1.0)
-	CellOutzType.draw_condensed(screen, Vector2(size.x - 92, size.y - 58), "%03d%%" % roundi(progress * 100.0), 10.0, ACID * Color(1, 1, 1, 0.8 * alpha), 0.9)
+	CellOutzType.draw_condensed(screen, Vector2(size.x - 92, size.y - 58), "%03d%%" % roundi(progress * 100.0), 10.0, HOT * Color(1, 1, 1, 0.9 * alpha), 0.9)
+
+
+## The seal of the place you are arriving at.
+##
+## A goetic seal is a ring, a set of points bound to that ring, and a single
+## unbroken figure walking between them — so that is what this builds, rather
+## than a texture of one. `_seal_seed` picks how many points and the stride the
+## figure walks them in, which is the whole of why two destinations look
+## nothing alike: a 13-point ring walked 5 at a time and an 11-point ring
+## walked 4 at a time are different marks, not the same mark recoloured.
+##
+## Drawn as three passes of the same path — a wide dim bleed, the line itself,
+## and a node at every vertex — because one flat polyline reads as a diagram
+## and this is meant to read as something burnt onto the plate.
+func _draw_seal(centre: Vector2, radius: float) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _seal_seed
+	# Odd point counts only. An even ring walked at any stride closes early and
+	# leaves a figure that is two overlapping shapes instead of one continuous
+	# one, which is exactly the thing a seal is not allowed to be.
+	var sizes: Array[int] = [9, 11, 13, 15, 17]
+	var points: int = sizes[rng.randi() % sizes.size()]
+	# Coprime with `points` by construction, so the walk visits every vertex
+	# before it returns to the one it started on.
+	var stride: int = 2 + rng.randi() % int((points - 1) / 2.0 - 1.0)
+	while points % stride == 0:
+		stride += 1
+	var spin := clock * 0.16
+	var breath := 1.0 + sin(clock * 0.9) * 0.015
+
+	var vertex := func(index: int) -> Vector2:
+		var angle := spin - PI * 0.5 + TAU * float(index % points) / float(points)
+		return centre + Vector2(cos(angle), sin(angle)) * radius * breath
+
+	# The ring, and a second one inside it that the vertices actually sit on.
+	for band in [[1.0, 1.6, 0.5], [0.965, 1.0, 0.3], [0.62, 1.0, 0.22]]:
+		screen.draw_arc(centre, radius * breath * float(band[0]), 0.0, TAU, 96,
+			HAEM * Color(1, 1, 1, float(band[2]) * alpha), float(band[1]))
+
+	# Teeth around the outside, so the ring has a direction and a count.
+	for index: int in points * 3:
+		var angle := spin - PI * 0.5 + TAU * float(index) / float(points * 3)
+		var out := Vector2(cos(angle), sin(angle))
+		var long: bool = index % 3 == 0
+		screen.draw_line(centre + out * radius * breath,
+			centre + out * radius * breath * (1.055 if long else 1.025),
+			HAEM * Color(1, 1, 1, (0.55 if long else 0.28) * alpha), 1.8 if long else 1.0)
+
+	# The figure. One unbroken walk, closed back onto its first point.
+	var path := PackedVector2Array()
+	for step: int in points + 1:
+		path.append(vertex.call(step * stride))
+	screen.draw_polyline(path, ARTERIAL * Color(1, 1, 1, 0.20 * alpha), 11.0)
+	screen.draw_polyline(path, HOT * Color(1, 1, 1, 0.62 * alpha), 2.0)
+
+	# A node on every vertex, and a stroke out to the ring from each — the part
+	# that makes it look bound to the circle rather than drawn inside it.
+	for index: int in points:
+		var at: Vector2 = vertex.call(index)
+		screen.draw_circle(at, 3.4, HOT * Color(1, 1, 1, 0.7 * alpha))
+		screen.draw_circle(at, 1.5, INK * Color(1, 1, 1, 0.55 * alpha))
+		var out := (at - centre).normalized()
+		screen.draw_line(at, centre + out * radius * breath * 0.965,
+			HAEM * Color(1, 1, 1, 0.35 * alpha), 1.0)
+
+
+## Blood running down the inside of the transit plate.
+##
+## Seeded once per screen size rather than per frame: a runnel is a thing that
+## happened, and one that redraws itself somewhere else every frame is weather.
+## Each is a head, a tail that thins behind it, and a bead at the bottom, and
+## they crawl rather than fall — the plate is vertical glass, not open air.
+func _draw_runnels(size: Vector2) -> void:
+	if _runnels.is_empty():
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 4477
+		for index in 14:
+			_runnels.append({
+				"x": rng.randf(),
+				"from": rng.randf_range(-0.25, 0.35),
+				"length": rng.randf_range(0.10, 0.46),
+				"width": rng.randf_range(1.4, 5.2),
+				"speed": rng.randf_range(0.006, 0.028),
+				"alpha": rng.randf_range(0.25, 0.8),
+			})
+	for runnel: Dictionary in _runnels:
+		var x: float = float(runnel["x"]) * size.x
+		# Creeps and then stops, so the plate is not an endless drip loop.
+		var reach: float = float(runnel["length"]) * (1.0 - exp(-clock * float(runnel["speed"]) * 40.0))
+		var top: float = float(runnel["from"]) * size.y
+		var bottom: float = top + reach * size.y
+		if bottom <= 0.0:
+			continue
+		var width: float = float(runnel["width"])
+		var tint: float = float(runnel["alpha"]) * alpha
+		# The tail: thinner and dimmer the further it is from the head, drawn as
+		# a few segments rather than one line so it actually tapers.
+		for segment in 5:
+			var t0 := float(segment) / 5.0
+			var t1 := float(segment + 1) / 5.0
+			screen.draw_line(
+				Vector2(x, lerpf(maxf(top, 0.0), bottom, t0)),
+				Vector2(x, lerpf(maxf(top, 0.0), bottom, t1)),
+				ARTERIAL * Color(1, 1, 1, tint * lerpf(0.25, 1.0, t1)),
+				width * lerpf(0.35, 1.0, t1))
+		# The bead at the head of the run, which is where the mass ends up.
+		screen.draw_circle(Vector2(x, bottom), width * 0.85, ARTERIAL * Color(1, 1, 1, tint))
+		screen.draw_circle(Vector2(x - width * 0.25, bottom - width * 0.2), width * 0.3,
+			HOT * Color(1, 1, 1, tint * 0.5))
 
 
 ## The specimen: a skeleton turning on the spot with its organs lit in sequence.
