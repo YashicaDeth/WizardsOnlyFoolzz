@@ -105,16 +105,40 @@ func take_chunk(info: Dictionary) -> Dictionary:
 const SubstancesCatalog := preload("res://systems/substances.gd")
 
 
-func take_substance(substance_id: String) -> Dictionary:
+## AU1.2. `stolen` marks it the same way a robbed organ already is — B5.6's
+## "a part somebody watched you cut out is worth less" applies here through
+## the exact same `sale_value()` heat discount, not a second rule invented
+## for drugs specifically.
+func take_substance(substance_id: String, stolen := false) -> Dictionary:
 	if not SubstancesCatalog.CATALOG.has(substance_id):
 		return {}
 	var data: Dictionary = SubstancesCatalog.CATALOG[substance_id]
+	var form := str(data.get("form", "weight"))
 	var item := {
-		"label": str(data.label).to_upper(), "kind": "substance", "substance_id": substance_id,
-		"mass": 0.2, "perishes": true, "age": 0.0, "condition": 1.0,
+		"label": "%s (%s)" % [str(data.label).to_upper(), form.to_upper()], "kind": "substance",
+		"substance_id": substance_id, "form": form,
+		"mass": 0.2, "perishes": true, "age": 0.0, "condition": 1.0, "stolen": stolen,
 	}
 	items.append(item)
 	save_to_history()
+	return item
+
+
+## AU1.2. "It can be stolen off a body." A subject can carry one substance as
+## real data (`carried_substance`, the same shape `wounds`/`anatomy` already
+## live in) rather than a drug only ever existing once the player already has
+## it — taking it clears the subject's own copy, so it cannot be lifted twice,
+## and always sets `stolen`, the same as anything else taken off somebody who
+## did not hand it over.
+func take_from_subject(subject_id: String) -> Dictionary:
+	var subject := WorldHistory.subject(subject_id)
+	var substance_id := str(subject.get("carried_substance", ""))
+	if substance_id.is_empty():
+		return {}
+	var item := take_substance(substance_id, true)
+	if item.is_empty():
+		return item
+	WorldHistory.update_subject(subject_id, {"carried_substance": ""}, "robbed")
 	return item
 
 
@@ -153,8 +177,13 @@ func currency_reason() -> String:
 ## something more than the base rate says, drawn from what the faction
 ## already is (Choir of Marrow deals in anatomy, Vanity Row deals in
 ## augments) rather than an invented preference table.
+## AU1.2. "The Choir prices it." Choir of Marrow already deals in anatomy at
+## a premium; substance is added here rather than assumed, since a body-cult
+## pricing what its own members put in their bodies is exactly its lane —
+## priced above the anonymous-broker baseline but not as hungrily as the
+## anatomy it actually specialises in.
 const FACTION_APPETITES := {
-	"choir_of_marrow": {"organ": 1.5, "limb": 0.85},
+	"choir_of_marrow": {"organ": 1.5, "limb": 0.85, "substance": 1.2},
 	"vanity_row": {"cybernetic": 1.6, "organ": 0.8},
 	"honeyvein": {"substance": 1.4},
 	"black_mile": {"cybernetic": 1.15, "substance": 0.9},

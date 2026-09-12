@@ -56,6 +56,11 @@ cybernetics, raider roads, stalker territories and buried anatomical industry.
 - Authored Bone Yard environment kit (233 meshes) with selective collision.
 - Physical AI wreckers on the player's chassis, and the shared `WorldLook`
   environment/material system.
+- Camera-evidence rites: a photograph now checks real in-frame anatomy, files
+  its proof into world history, and never uses a separate accept/turn-in action.
+  The first authored proof is the documented five dead, destroyed heads in one
+  frame; the handheld displays the actual distinct-body evidence rather than a
+  kill count.
 
 ## Sequenced backlog
 

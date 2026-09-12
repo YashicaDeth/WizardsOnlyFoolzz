@@ -39,6 +39,7 @@ const CARRY := preload("res://systems/carry.gd")
 const SIGNAL_FIELD := preload("res://systems/signal_field.gd")
 const RADIAL := preload("res://systems/radial_menu.gd")
 const RADIO_AUDIO := preload("res://systems/radio_audio.gd")
+const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 
 ## L2.1. A part in the bag is worth putting on the wall. The handheld does not
 ## know the board exists — it hands the reference up, the way the index does.
@@ -49,7 +50,7 @@ signal lead_found(station: String)
 ## TREE and ALLUSIONS are not gone, they are *inside* INDEX — the Tree axis is
 ## drawn on every dossier and the archive is a page rather than a mode. Listing
 ## them again here would recreate the six-panel problem inside the fix for it.
-const MODES := ["INDEX", "MAP", "WIRE", "RADIO", "CARRY"]
+const MODES := ["INDEX", "MAP", "WIRE", "RADIO", "CARRY", "RITUAL"]
 
 const CASE := Color("1b1713")
 const CASE_EDGE := Color("6d5a44")
@@ -92,7 +93,6 @@ const BATTERY_RECHARGE_PER_SECOND := 1.0 / 1800.0
 ## shared by the light `bone_yard_hunt.gd` actually places in the world and by
 ## `light_radius()` below, so the two can never quietly disagree.
 const LAMP_RANGE := 14.0
-
 ## Where the wear came from, in the device's own words. Kept so the status page
 ## can say "quarry impact" rather than showing a percentage.
 var wear_log: Array = []
@@ -266,6 +266,7 @@ func load_device() -> void:
 		condition = 0.94
 		battery = 1.0
 		wear_log = []
+		battery = 1.0
 		save_device()
 		return
 	serial = int(record.get("serial", 90211))
@@ -275,6 +276,7 @@ func load_device() -> void:
 	battery = clampf(float(record.get("battery", 1.0)), 0.0, 1.0)
 	wear_log = (record.get("wear_log", []) as Array).duplicate()
 	impacts = (record.get("impacts", []) as Array).duplicate(true)
+	battery = clampf(float(record.get("battery", 1.0)), 0.0, 1.0)
 
 
 func save_device() -> void:
@@ -424,6 +426,11 @@ func set_mode(mode: String) -> void:
 		_map.open_map()
 	if current_mode() in ["INDEX", "WIRE"] and _index.has_method("open"):
 		_index.open()
+	if current_mode() == "RITUAL":
+		# A camera frame can outlive the version that first asked for it. Reconcile
+		# here rather than in `_draw`, so opening a page cannot award evidence more
+		# than once merely because it redraws at sixty frames per second.
+		RITUAL_LEDGER.reconcile_album()
 	mode_changed.emit(current_mode())
 
 
@@ -446,6 +453,9 @@ func _process(delta: float) -> void:
 	# so a fault does not restart its cycle every time the device comes up.
 	panel_clock += delta
 	_drive_backlight(delta)
+	# AS1.2/AS1.3. The cost of holding it up to see: the torch and the screen
+	# both burn charge while actually raised, not while pocketed, and it
+	# recharges — slower — while left alone. See `_drive_battery()`.
 	_drive_battery(delta)
 	raised = Motion.blend(raised, delta, Motion.PANEL, is_open)
 	if raised <= 0.001 and not is_open:
@@ -537,6 +547,8 @@ func _draw() -> void:
 		_draw_radio(_screen_rect, alpha)
 	elif mode == "CARRY":
 		_draw_carry(_screen_rect, alpha)
+	elif mode == "RITUAL":
+		_draw_ritual(_screen_rect, alpha)
 
 
 func _draw_chassis(rect: Rect2, alpha: float) -> void:
@@ -699,6 +711,18 @@ func is_lit() -> bool:
 	return raised > 0.5 and battery > 0.0
 
 
+## Same question, same answer — kept as a second name because
+## `bone_yard_hunt.gd`'s own light-driving function was already written
+## against it. One condition (`is_lit()`) underneath either name, so the two
+## can never quietly disagree about whether the torch is on.
+func torch_active() -> bool:
+	return is_lit()
+
+
+func battery_percent() -> float:
+	return battery
+
+
 ## AS1.5. How far the light reaches, for anything that wants to know whether
 ## it can see this device from where it stands — the hook AS1.5 ("its light is
 ## what gives you away at night") asks for. There is no perception/stealth
@@ -780,6 +804,72 @@ func _draw_damage() -> void:
 
 
 # --- the two modes that have no hosted panel ------------------------------
+
+## E3. The ritual page is a camera assignment, not a menu of powers. The five
+## positions around the aperture are real distinct bodies the current best
+## photograph has proved; taking a photograph is the only way they fill.
+func _draw_ritual(rect: Rect2, alpha: float) -> void:
+	CellOutzType.draw_stamped(self, rect.position + Vector2(24, 22), "EVIDENCE RITE", 18.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.3 * alpha), 1.4)
+	var pending: Array[Dictionary] = RITUAL_LEDGER.outstanding()
+	if pending.is_empty():
+		var filed_at := rect.get_center() + Vector2(0, -8)
+		draw_circle(filed_at, 58.0, MOSS * Color(1, 1, 1, 0.09 * alpha))
+		draw_arc(filed_at, 58.0, 0.0, TAU, 40, MOSS * Color(1, 1, 1, alpha), 2.0)
+		for tooth in 8:
+			var angle := TAU * float(tooth) / 8.0
+			var from := filed_at + Vector2.from_angle(angle) * 46.0
+			var to := filed_at + Vector2.from_angle(angle) * 66.0
+			draw_line(from, to, MOSS * Color(1, 1, 1, alpha), 2.0)
+		var filed_label := "ALL FILED"
+		var filed_width := CellOutzType.width(filed_label, 16.0, 1.0)
+		CellOutzType.draw_text(self, filed_at + Vector2(-filed_width * 0.5, 86.0), filed_label, 16.0, MOSS * Color(1, 1, 1, alpha), 1.0)
+		return
+
+	var ritual: Dictionary = pending[0]
+	var report: Dictionary = RITUAL_LEDGER.best_evidence(str(ritual.get("id", "")))
+	var reports: Array = report.get("requirements", []) as Array
+	var requirement_report: Dictionary = {}
+	if not reports.is_empty() and reports[0] is Dictionary:
+		requirement_report = reports[0]
+	var requirement: Dictionary = requirement_report.get("requirement", {}) as Dictionary
+	var matched: Array = requirement_report.get("matched", []) as Array
+	var needed := maxi(1, int(requirement_report.get("needed", requirement.get("count", 1))))
+
+	var title := str(ritual.get("label", "EVIDENCE"))
+	CellOutzType.draw_text(self, rect.position + Vector2(24, 64), title, 22.0, INK * Color(1, 1, 1, alpha), 1.0)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(25, 96), str(ritual.get("instruction", "")), 11.0, CASE_EDGE * Color(1, 1, 1, alpha), 0.8)
+
+	# A camera iris, then five head-shaped proof sockets. They are intentionally
+	# a composition rather than a row: the page reads as a thing you bring proof
+	# to, not as a checklist table.
+	var centre := rect.get_center() + Vector2(-rect.size.x * 0.17, 24.0)
+	var iris_radius := minf(86.0, rect.size.y * 0.21)
+	draw_circle(centre, iris_radius, Color(0, 0, 0, 0.35 * alpha))
+	draw_arc(centre, iris_radius, 0.0, TAU, 48, CASE_EDGE * Color(1, 1, 1, 0.65 * alpha), 2.0)
+	draw_arc(centre, iris_radius * 0.54, 0.0, TAU, 40, AMBER * Color(1, 1, 1, 0.35 * alpha), 1.3)
+	draw_circle(centre, iris_radius * 0.20, Color("030403") * Color(1, 1, 1, alpha))
+	for slot in needed:
+		var angle := -PI * 0.5 + TAU * float(slot) / float(needed)
+		var at := centre + Vector2.from_angle(angle) * iris_radius * 1.46
+		var filled := slot < matched.size()
+		var tint: Color = ALERT if filled else CASE_EDGE
+		draw_circle(at, 14.0, tint * Color(1, 1, 1, (0.42 if filled else 0.13) * alpha))
+		draw_arc(at, 14.0, 0.0, TAU, 14, tint * Color(1, 1, 1, alpha), 1.5)
+		# A skull-like proof marker, crossed out only once actual evidence has
+		# satisfied the same-body camera check.
+		draw_circle(at + Vector2(0, -2), 5.2, INK * Color(1, 1, 1, (0.65 if filled else 0.20) * alpha))
+		draw_line(at + Vector2(-5, 7), at + Vector2(5, 7), INK * Color(1, 1, 1, (0.65 if filled else 0.20) * alpha), 2.0)
+		if filled:
+			draw_line(at + Vector2(-7, -7), at + Vector2(7, 7), ALERT * Color(1, 1, 1, alpha), 1.6)
+			draw_line(at + Vector2(7, -7), at + Vector2(-7, 7), ALERT * Color(1, 1, 1, alpha), 1.6)
+
+	var counter := "%02d / %02d" % [matched.size(), needed]
+	var counter_width := CellOutzType.width(counter, 24.0, 1.0)
+	CellOutzType.draw_text(self, centre + Vector2(-counter_width * 0.5, 8.0), counter, 24.0, (ALERT if matched.size() < needed else MOSS) * Color(1, 1, 1, alpha), 1.0)
+	var proof_label := RITUAL_LEDGER.requirement_label(requirement)
+	var proof_width := CellOutzType.width_condensed(proof_label, 10.0, 0.7)
+	CellOutzType.draw_condensed(self, centre + Vector2(-proof_width * 0.5, iris_radius + 84.0), proof_label, 10.0, INK * Color(1, 1, 1, 0.72 * alpha), 0.7)
+	CellOutzType.draw_condensed(self, Vector2(rect.position.x + 24, rect.end.y - 42), "N / RECORD EVIDENCE", 10.0, AMBER * Color(1, 1, 1, alpha), 0.8)
 
 ## A9.1. The dial: a real sweep with the band drawn under it, stations as ticks
 ## whose height is how well they are actually coming in from where you stand.

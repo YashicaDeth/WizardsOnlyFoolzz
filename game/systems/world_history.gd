@@ -30,6 +30,13 @@ var run_salt := 0
 ## not a sixth autoload. Starts in the late afternoon rather than at midnight, so
 ## the first thing a new player meets is the light going.
 var world_minute := 16.5 * 60.0
+## Small persistent facts that are not events and not subjects — a flag set
+## once and read later. Kept deliberately narrow: if something belongs in the
+## event log it goes in the event log, because the log is what the Board, the
+## pyramid and every faction read. This is for state that is genuinely a
+## *current value* rather than a thing that happened, like which of the
+## godhead's lessons the player has accepted.
+var flags: Dictionary = {}
 
 ## AS4.2. How much magick is loose right now. Never authored directly — only
 ## ever bumped by something happening, per `CHAOS_MAGICK` below, and left to
@@ -70,6 +77,21 @@ func _ready() -> void:
 		run_salt = randi() | 1
 		_save_history()
 	CellOutzGrunge.remember_run(run_salt)
+
+
+## Read a flag, with a default for a save written before it existed. Every
+## caller must pass a sensible default rather than assuming presence — this
+## project has migrated its save format repeatedly and will again.
+func flag(key: String, fallback: Variant = null) -> Variant:
+	return flags.get(key, fallback)
+
+
+## Set one, and persist it. Writing immediately rather than at shutdown,
+## because a flag that only survives a clean quit is a flag that is lost
+## every time it matters most.
+func set_flag(key: String, value: Variant) -> void:
+	flags[key] = value
+	_save_history()
 
 
 func record_event(event_type: String, details: Dictionary = {}) -> Dictionary:
@@ -447,6 +469,8 @@ func _load_history() -> void:
 		# W1.1. A save from before the clock existed opens in the late afternoon
 		# of its first day, the same as a new one, rather than at minute zero.
 		world_minute = float(parsed.get("world_minute", 16.5 * 60.0))
+		if parsed.get("flags", {}) is Dictionary:
+			flags = (parsed.get("flags", {}) as Dictionary).duplicate(true)
 		# AS4.2. A save from before the storm system existed has nothing loose
 		# yet, which is the correct state for a world nothing has bumped.
 		chaos_magick_level = float(parsed.get("chaos_magick_level", 0.0))
@@ -465,6 +489,7 @@ func _save_history() -> void:
 		"subjects": subjects,
 		"run_salt": run_salt,
 		"world_minute": world_minute,
+		"flags": flags,
 		"chaos_magick_level": chaos_magick_level,
 		"chaos_magick_at_minute": chaos_magick_at_minute,
 	}))

@@ -31,6 +31,10 @@ incidents, one of which broke every run.
 
 ---
 
+*Four seats: B takes the night and the shaders, C takes the charts and the
+seals, D takes the room and the cloud. The opening (AP), the godhead (AQ) and
+the ballistics/arm work are mine — do not start on those.*
+
 # Agent B — the world at night, and the psychedelic pipeline
 
 Two jobs. The first is visible in ten minutes; the second is the thing the whole
@@ -156,6 +160,59 @@ are adding to its wall, not rebuilding it).
 
 ---
 
+# Agent D — the room, and the cloud you repair
+
+*(The fourth seat. Self-contained on purpose: this lane creates new files and
+reads existing ones, so it will not collide with B's shaders or C's charts.)*
+
+This is the single largest unbuilt idea in the project and it answers every item
+in AG2 — everything the first playtester could not find — far better than a
+tooltip ever would.
+
+> *"the black mirror is crazy… i want you to make it a room on the phone
+> somewhat, when you check the pinboard then you can be in a room with a massive
+> mirror on the wall and a bed, and then you can turn to the conspiracy quest
+> board, and then to your right you can look into like a neuralink or some cloud
+> connect thing and see the tutorial like a cloud software and its like 'remember
+> the cloud' and you repair the fragments of the cloud of archival information
+> which is the tutorial software parts"*
+
+**The tutorial is a place, and getting it is a mechanic.** You do not read help.
+You recover it, fragment by fragment, out of something that used to know
+everything and has been decaying since before you arrived.
+
+## AH1 — the room
+
+- **AH1.1–AH1.7** Opening the Board puts you *in* a room rather than on a screen.
+  A bed, a wall-sized mirror, one window's worth of light. Turn to the wall for
+  the Board — `game/systems/pin_board.gd` is built, works, and is bound to P; it
+  needs to be **on a wall** instead of filling the screen. Turn right for the
+  cloud terminal. Leaving is a movement, not a menu close (Rule 3).
+- **AH1.5** The mirror shows your body, current, with everything done to it.
+  `BaselineHuman` already renders exactly this for the dossier — reuse it, do not
+  rebuild it. This is also where AS3.4's clothes show up.
+
+## AH2 — REMEMBER THE CLOUD
+
+- **AH2.1–AH2.6** The cloud is an archive of everything the world used to know,
+  in fragments. A fragment is **repaired, not unlocked** — the verb is
+  restoration and it must cost something the player actually has. The archive is
+  visibly incomplete forever; you never finish it. It talks like cloud software
+  written by people who are now dead.
+
+## AH3 — the tutorial web
+
+- **AH3.1–AH3.8** A node web where the connections mean something, not a list.
+  Each node is a **CRT set — curved, scanlines, real tube falloff** — playing the
+  mechanic as a short *drawn* loop, with a paragraph in the game's voice
+  underneath and, critically, **the keys**. That last part is what AG2 was
+  actually asking for. Nodes unlock alongside the Board from what the player has
+  actually done; a locked one shows static and the shape of what is missing.
+
+`systems/celloutz_type.gd` has the display face, `code_rain.gd` the substrate,
+and `world_clock.gd` the hour if the room's light should change. **Do not import
+a font.** Do not touch anything in B's or C's lists.
+
 # How to cut a lane from the index
 
 `BUILD_INDEX.json` has every segment as a record with `section`, `version`,
@@ -176,8 +233,10 @@ Work the open `v1` items in your sections first, then the ladder in order.
 # Already done, do not redo
 
 The derby cab and instruments (AG3), blood on the lens, ballistics with casings
-and drop (AF1), `limb_momentum.gd` (AN1.1, built and tested, **not yet wired** —
-that is Agent A's when there is an Agent A), the world clock (W1.1), station
+and drop (AF1), `limb_momentum.gd` — **now wired** (AN1.2, AN1.3, AN1.5, AN1.6, AN1.8): a hard
+turn throws the weapon 0.397m off the anchor and the model is posed off the arm
+rather than off an animation. `momentum_damage` is deliberately off, so the old
+swing still owns the damage number, the world clock (W1.1), station
 schedules (A9.7 v2), kerning (A1.6 v2), run-salted grime (A5.6 v2), intermittent
 panel failure (A6.6 v2), the gore/hitstop hole, the map's frame cost, the
 satellite, and the sprint jitter.

@@ -226,10 +226,10 @@ func _draw_hunt_signal(viewport: Vector2) -> void:
 	draw_line(dish, dish + Vector2(cos(sweep), sin(sweep)) * 18.0, HOT * Color(1, 1, 1, 0.9), 2.0)
 	var blip := PI + strength * PI
 	draw_circle(dish + Vector2(cos(blip), sin(blip)) * 18.0, 2.6 + sin(elapsed * 5.0) * 0.9 * strength, HOT)
-	CellOutzType.draw_text(self, anchor + Vector2(62, 24), "MARA VOSS", 15.0, INK, 1.2)
+	CellOutzType.draw_text(self, anchor + Vector2(62, 24), "THE CAPTAIN", 15.0, INK, 1.2)
 	CellOutzType.draw_text(self, anchor + Vector2(62, 46), rival_status, 9.0, INK * Color(1, 1, 1, 0.6), 0.9)
 	# Right-aligned on the second band, not the first. Sharing a line with the
-	# name printed "GRUDGE 064" straight through "MARA VOSS".
+	# name printed "GRUDGE 064" straight through "THE CAPTAIN".
 	var grudge_text := "GRUDGE %03d" % rival_grudge
 	var grudge_width := CellOutzType.width(grudge_text, 11.0, 1.0)
 	CellOutzType.draw_text(self, anchor + Vector2(plate_size.x - 12 - grudge_width, 44), grudge_text, 11.0, HOT if strength > 0.5 else INK * Color(1, 1, 1, 0.8), 1.0)

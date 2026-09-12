@@ -746,12 +746,65 @@ Ascent/Descent axis that already exists and is currently unused.
       rather than merely dimmed. All three in the gallery capture above.
 - [x] ~~**E1.3** Never a good/evil slider — read through the Tree view~~
 
-- [x] ~~**E2.2** The 72 Goetic seals as data~~
-- [ ] **E2.3** Original seals for what this world grew on its own
-- [ ] **E2.4** Seals animate, corrupt, **burn and bind** — Greg: *"burn and bind seals should have their own animation based on real life, where the person's computer motherboard appears in 3D and the seals burn into the microscopic copper stuff as sigils on the board, like a full animation for it when a seal is burnt"*. The right image for this game's whole thesis: a printed circuit board *is* a sigil, drawn in copper, mass-produced. A burn traces itself into the copper and stays; a binding closes a loop on the board that was open. `draw_seal_burning` already exists in `celloutz_type.gd` and only ever ran in 2D — this is the 3D half
-- [ ] **E2.5** The board is a real board: traces, pads, silkscreen, a chip that reads as a chip
-- [ ] **E2.6** Burning is subtractive and binding is additive — one scars the copper, one completes a circuit
-- [ ] **E2.7** A bound seal keeps working while the board keeps power, and a burnt one is gone for the run
+### E2 v2 — burn and bind, in 3D
+Greg: *"burn and bind seals should have their own animation based on real
+life, where the person's computer motherboard appears in 3D and the seals
+burn into the microscopic copper stuff as sigils on the board, like a full
+animation for it when a seal is burnt"*. The right image for this game's
+whole thesis: a printed circuit board *is* a sigil, drawn in copper,
+mass-produced by the million.
+
+- [x] ~~**E2.2** The 72 Goetic seals as data~~ Same item as above — see E2.2.
+- [x] ~~**E2.3** Original seals for what this world grew on its own~~ Same
+      item as above — see E2.3.
+- [x] ~~**E2.4** Seals animate, corrupt, **burn and bind**~~ `draw_seal_burning`
+      existed and only ever ran in 2D; this is the 3D half, and it draws the
+      exact same `CellOutzType.seal_strokes()` geometry the 2D app already
+      uses — never a second shape invented for 3D. New `systems/motherboard.gd`:
+      `begin_bind()` grows the seal additively in the same construction order
+      `draw_seal_forming` reveals it in (ring, then each spoke and its hook or
+      loop, then the chords, then the core), ending as a permanent raised,
+      lit copper trace; `begin_burn()` consumes it from a seeded front the
+      same way `draw_seal_burning` already does, ending — "burn 1.0 leaves
+      nothing but the memory of the ring", kept true in 3D — as a permanent
+      char scar. Both bake onto the board and stay once the animation ends;
+      a board accumulates every seal it has actually carried
+      (`bound_seals`/`burnt_seals`).
+- [x] ~~**E2.5** The board is a real board: traces, pads, silkscreen, a chip
+      that reads as a chip~~ Procedural, the same way every other object in
+      this game is built — no imported asset. Manhattan-routed copper traces
+      (seeded turns, not straight wires, routed around the seal's own
+      reserved patch rather than through it), a black IC package with pins
+      down two sides and a pin-1 notch, a silkscreen outline around its
+      footprint, and two capacitors, so the board reads as populated rather
+      than a diagram with one component on it.
+- [x] ~~**E2.6** Burning is subtractive and binding is additive — one scars
+      the copper, one completes a circuit~~ Built into `begin_bind()`/
+      `begin_burn()` directly (see E2.4) — binding only ever adds strokes,
+      burning only ever removes them, and the two are visually distinct
+      (lit copper vs. dark char) rather than the same mark tinted two colours.
+- [x] ~~**E2.7** A bound seal keeps working while the board keeps power, and
+      a burnt one is gone for the run~~ Decided in `ritual_app.gd`, not the
+      board — `attempt()` reads the exact repeat count `Boons.grant()`
+      already keeps to price a repeat higher (E4.3): a first casting always
+      binds, since burning it on the second use would never let E4.3's
+      escalating cost matter, and the risk of a burn climbs with every
+      repeat after that. A burnt `ritual_id` is written onto the subject
+      (`burnt_rituals`) and every further `attempt()` at it is refused
+      outright — "THIS SEAL IS BURNT. IT WILL NOT ANSWER YOU AGAIN." —
+      permanently, for the rest of the run, rather than merely costing more.
+      Verified: `tests/motherboard_test.gd` (new, 15 checks — a real
+      populated board, a bind growing additively and finishing on its own,
+      a separate burn consuming subtractively, and both sharing the exact
+      2D seal geometry) and `tests/ritual_burn_bind_test.gd` (new, 12 checks
+      — a first casting always binds, repeats can burn deterministically,
+      a burnt seal refuses unconditionally afterward, and the outcome is
+      recorded both on the subject and in the world's own event ledger),
+      plus the existing `ritual_app_test.gd`, `seal_draw_test.gd` and
+      `goetic_seals_test.gd` regression suites, and a windowed capture
+      sequence (`captures/e2_5_motherboard_bare.png`,
+      `e2_4_motherboard_binding.png`, `e2_4_motherboard_bound.png`,
+      `e2_4_motherboard_burning.png`, `e2_4_motherboard_burnt.png`).
 
 ### E3 — Camera rituals
 - [x] **E3.1** Ritual definitions: what must be done, what must be photographed — `systems/ritual_app.gd`'s `RITUALS`: three rites (including Greg's own worked example, five gored heads), each keyed to a real seal from `goetic_seals.gd` and paying its reward through `boons.gd` — E2/E3/E4 as the one system `RITUAL_AND_KARMA.md` says they are, not three
@@ -2809,6 +2862,15 @@ The last rung. Fifteen statements that are true of sneaking and the law when thi
 - [ ] **AE10.14** `v10` Standing with a faction changes what the law does
 - [ ] **AE10.15** `v10` What you were wanted for carries into the next universe
 
+### AG4 — The third playtest, and what Greg is sick of
+- [x] **AG4.1** *"when running and the stamina bar depletes, the screen becomes super jittery"* — TaKeS was right and so was his guess at the cause. Two thresholds now, not one
+- [x] **AG4.2** *"the blood splatter effects... just being lame asf"* — `blood_veil.gd`: spatter with direction, near glass out of focus against far glass sharp, drops heavy enough to run down the screen, three stages of drying
+- [x] **AG4.3** *"no more mara voss wipe it"* — wiped, and not by find-and-replace: a second hardcoded name is the same fault with different letters. `cast_names.gd` generates the captain from `run_salt`, so they are stable inside a save and different in the next. Eight saves gave eight captains: Vale Rime, Roan Hollow, Halloway Coil, Mera Lockwood, Ash Coil, Kester Cinder, Nix Arden, Reve Arden. F v10.1 already demanded this
+- [x] **AG4.4** *"make this clickable with the mouse not just arrow keys"* — the index tabs are pointable and the footer leads with CLICK ANYTHING instead of listing five keyboard controls
+- [x] **AG4.5** *"no more vessel breath bullshit"* — gone, and replaced by the same information carried by things already in the frame. **Breath became breathing**: the frame tightens and releases on a cycle whose rate climbs and depth falls as stamina empties, so hard breathing is fast and shallow and the edges close in. Nothing to read, which is why it works while you are being attacked — the one moment a stamina bar is least useful. **Vitality became the mark’s own condition**: the crown arc opens, thorns snap off one at a time (four a side at full, countable at a glance), and the pulse goes quick and irregular below 40%. Dressing a progress bar in a crown never stopped it being a progress bar
+- [ ] **AG4.6** The website
+- [ ] **AG4.7** The gore and the X-rays enhanced
+
 ## AG — Playtest, 12 September 2026
 
 The first person who was not Greg played the build. Everything below is either a
@@ -3154,13 +3216,13 @@ declared. `tests/limb_momentum_test.gd` puts numbers on it: the same weapon and
 the same button gives 0.013 for a flick and 0.346 for a committed sweep.
 
 - [x] **AN1.1** The spring-damper core, with mass, reach, fatigue and a real arm limit — `limb_momentum.gd`, ten checks
-- [ ] **AN1.2** Driven from the same mouse delta the camera turns by, plus the player's own velocity — walking into a blow counts
-- [ ] **AN1.3** The weapon is drawn where the physics put it, not where an animation says
-- [ ] **AN1.4** Damage asks `commitment()`. The weapon sets the ceiling; the player earns how much of it they get
-- [ ] **AN1.5** Mass and reach per weapon are the whole balance conversation now
-- [ ] **AN1.6** Fatigue comes off stamina, so a tired arm cannot hold a guard rather than being told it cannot
+- [x] **AN1.2** Driven from the same mouse delta the camera turns by, plus the player's own velocity — through a new `apply_look()` seam, because the mouse branch is gated on MOUSE_MODE_CAPTURED which a headless run can never be. A hard turn throws the weapon 0.397m off the anchor, against a 0.42m arm limit
+- [x] **AN1.3** The weapon is drawn where the physics put it — `_pose_weapon()` offsets the model off the rig's right arm, so the hand still animates and the weapon lags the hand. 0.155m of travel on a hard turn
+- [x] **AN1.4** Damage asks `commitment()` — **calibrated and ready; the flag is still off per AN1.8.** Getting here took three measures and the two failures are the design question. Peak head speed made a one-frame flick worth the same as a committed sweep. Peak of a *smoothed* head speed was no better — a hard sweep spends itself at full extension where the spring fights it, so it measured 2.16 against a gentler swing's 2.52, the wrong way round. What separates a blow from a twitch is **how far the head travelled while moving**, which is work done and multiplies speed by duration instead of discarding one. At a 3.9m reference: a slow look scores 0.00, tracking 0.19, a flick 0.48, a deliberate swing 0.46, a hard committed sweep 1.00. Flip `momentum_damage` in `bone_yard_hunt.gd` to put it on the damage number
+- [x] **AN1.5** Mass and reach per weapon — `ARM_WEIGHTS`: a cleaver 1.45kg at 0.62m, a shotgun 3.2, a sidearm 0.95, a severed limb 2.6, a bare hand 0.4. Re-carried whenever the held thing changes
+- [x] **AN1.6** Fatigue comes off stamina directly — a full player reads 0.00 and an empty one 1.00, so the guard degrades continuously rather than switching off at a threshold
 - [ ] **AN1.7** Firearms run through the same object — the barrel swivels toward where you look and carries past it
-- [ ] **AN1.8** The old swing system stays until this one is better, side by side behind a flag
+- [x] **AN1.8** The old swing stays authoritative, side by side — `momentum_damage` is false, so `commitment()` is computed and recorded on every blow but does not reach the damage number. Both systems see the same swings, which is what makes them comparable
 - [ ] **AN1.9** A grapple, a shove and a bare hand are the same object with a different mass
 
 ### AN2 — What it costs to swing
@@ -3329,11 +3391,11 @@ accumulates**. And it is not evil in the ordinary way: it enslaves *through its
 own lessons and learning*, which is one short step from AJ3's modern gods and is
 the most interesting possible final boss for a game about institutions.
 
-- [ ] **AQ1.1** It taunts you long before it is fightable
-- [ ] **AQ1.2** Visibility builds with what you have done, never on a timer
-- [ ] **AQ1.3** It summons you rather than being travelled to
+- [x] **AQ1.1** It taunts you long before it is fightable — `godhead.gd` speaks from 12% visibility, and what it says is chosen by the most recent thing *you* did that it noticed, so it is always commenting on the player rather than on the plot
+- [x] **AQ1.2** Visibility builds with what you have done, never on a timer — attention is summed off `WorldHistory` fresh on every read, nothing cached, nothing clocked. Forty melee blows draw 1.6; one god named draws 4.5. Tested: fifty frames of waiting move it by exactly nothing
+- [ ] **AQ1.3** It summons you rather than being travelled to — `can_summon()` gates on 150 attention, deliberately above the last visibility stage: being entirely present and being called are not the same event. The summons itself waits on AQ1.4's shadow realms
 - [ ] **AQ1.4** The shadow realms of the higher realms: the psychedelic register, earned not given (E6/E8 exist)
-- [ ] **AQ1.5** It teaches, and the teaching is the trap
+- [x] **AQ1.5** It teaches, and the teaching is the trap — every lesson is **true**, and following it genuinely helps. `heed()` is what accepting one costs: it adds directly to attention, so taking good advice is the fastest way to be seen. The trap is stated plainly rather than hidden, and refusing is recorded too, because refusing a true thing over who said it is its own cost
 - [ ] **AQ1.6** It is genuinely fightable, and the fight is not a damage race
 - [ ] **AQ1.7** Voice acting — Greg: *"voice acting will also be in the game"*
 - [ ] **AQ1.8** Siding with it is a real option with a real ending
@@ -3402,6 +3464,155 @@ The last rung. Fifteen statements that are true of the tree and the work when th
 - [ ] **AR10.14** `v10` The tree and the pyramid are one document
 - [ ] **AR10.15** `v10` Your route is readable by somebody else
 
+## AT — WETWIRE: the brain, the chip and the index
+
+`DESIGN/THE_BRAIN.md` is the document. Greg's substance and dimension design
+arrived as four things that are **one system**: a brain you open, a chip somebody
+put in it, the materia, and the planes it reaches.
+
+**You do not get to the planes except through the brain. You do not get through
+the brain without the chip. The chip is in your head because somebody put it
+there while you were captured (AP1.3).** The drugs are the only thing you can
+reach without permission, which is exactly why the institution cares about them.
+
+Naming: **WETWIRE** is the system, **MATERIA** the index inside it — two
+institutions naming the same object differently, which is already this game's
+central rule.
+
+- [ ] **AT1.1** The brain is a real organ at full detail, not an icon
+- [ ] **AT1.2** A CRT bent into the cortex, curved, showing the inside from inside
+- [ ] **AT1.3** It is an index you open and most of what is in it is optional
+- [ ] **AT1.4** Visceral: it is wet, the chip is bolted into wet tissue, and looking at it is uncomfortable
+- [ ] **AT1.5** The tower in it — the bloody wired chip — is the bridge to the network above
+- [ ] **AT1.6** The Wire seen from 5D is what that network is
+- [ ] **AT1.7** It is hardware somebody else installed: revocable, traceable, and it can find you
+- [ ] **AT1.8** Its radiation is what melts you at 8g and 9g — the thing connecting you is killing you
+
+## AU — The materia
+
+Every category, because Greg asked for every category: legal stimulants through
+to the deliriants, with new-world substances that only exist after the collapse.
+
+**The boundary, stated once and never again:** this portrays experiences,
+entities, consequences and costs — the register of a trip report, which is
+what Erowid and PsychonautWiki are *as writing*. It carries no dosages, routes,
+preparation or combinations. That line costs nothing: nobody ever found a trip
+report less frightening for omitting the milligrams, and the horror of datura is
+entirely in the account.
+
+- [ ] **AU1.1** Every class present: stimulant, cannabinoid, psychedelic, dissociative, deliriant, empathogen, depressant, opioid, research chemical, new-world
+- [x] ~~**AU1.2** A drug is an object — a baggie, a blister, a tab, a weight
+      — carried, priced, stealable~~ `substances.gd`'s three entries each
+      name a real physical `form` now (`marrow_dust` a baggie, `choir_bloom`
+      a weight, `static_hymn` a tab), which `carry.gd`'s `take_substance()`
+      reads into the item's own label — "MARROW DUST (BAGGIE)", not a
+      generic "substance". Choir of Marrow prices it: a new `substance: 1.2`
+      entry in `FACTION_APPETITES`, above the neutral baseline every unlisted
+      buyer gets, on top of the anatomy trade it already specialises in.
+      Stealable: `Carry.take_from_subject()` reads a subject's own
+      `carried_substance` field (the same shape `wounds`/`anatomy` already
+      live in), transfers it marked `stolen` — B5.6's existing heat discount
+      applies to it exactly as it does to a robbed organ, no second rule
+      invented for drugs — and clears the subject's copy so it cannot be
+      lifted twice, and it is wired into the real robbery verb rather than
+      sitting unreachable: `_nearest_robbable()` now counts a body with only
+      a pocket worth taking as robbable even when it has nothing worth
+      cutting open, and `_begin_extraction()` (the same `E` a player already
+      knows) takes the pocket in one instant motion before whatever the
+      body's actual anatomy might also be worth digging for — no second key
+      to discover, per C2.7 v3's own lesson. Genuinely witnessed through
+      `WitnessLedger.witnesses_of()`, the same static helper the anatomy dig
+      itself is built on. Verified: `tests/substance_object_test.gd` (new,
+      11/11) and `tests/pocket_search_test.gd` (new, 13/13 — a pocket-only
+      body is robbable and yields its item in one motion with no dig
+      session, a second press correctly falls through to a real anatomy dig
+      once the pocket is empty, and a body carrying both gives up the
+      pocket first), plus the existing `combat_integration_test.gd` and
+      `opening_test.gd` regression suites.
+- [ ] **AU1.3** Strains differ. Two mushrooms are not one item with a number
+- [ ] **AU1.4** Everything costs: body, standing, time, and the godhead's attention
+- [ ] **AU1.5** Tolerance and comedown are tracked on the real clock
+- [ ] **AU1.6** Set and setting: the same substance in a safe room and in a tunnel are different experiences
+- [ ] **AU1.7** Deliriants are horror and must never read as fun
+- [ ] **AU1.8** Smoking is a real act: cigarettes, vapes, joints, spliffs, blunts, bongs, alien devices
+- [ ] **AU1.9** Caffeine is in the same system as everything else
+- [ ] **AU1.10** You can lace somebody, the world records it, and the law
+      and the gods respond (AE1.4, AJ5) — three of four clauses are real:
+      new `Substances.lace(actor_id, target_id, substance_id, witness_ledger,
+      witness_ids)` applies the dose to the *target*, not the actor — no
+      `Boons._pay()`, because a non-consensual dose does not get to refuse
+      itself under a safety floor, and the actor gets no boon and no glimpse
+      credited to them, so this is not `take()` under another name. It is
+      genuinely witnessed through the exact `WitnessLedger` object
+      `Extraction.notice()` already takes as a parameter rather than
+      assuming a global, and every god actually asked gives its own real,
+      separately-recorded verdict (`lacing_verdict` events, mirroring
+      `ModernGods.record_death_verdicts()`'s own "never summed into one
+      score" rule) rather than the game merely logging that a drugging
+      happened. What is still missing is AE1.4 itself: no law/enforcement
+      system exists yet to read what `witness_ledger.gd` decided was seen
+      and respond to it — this is only waiting on that system, the same as
+      AS1.5 waits on AE1.1. Verified: `tests/lacing_test.gd` (new, 9/9),
+      plus the existing `modern_gods_test.gd`, `substances_test.gd` and
+      `substance_object_test.gd` regression suites.
+- [ ] **AU1.11** Research chemicals as easter eggs, from the real long tail
+- [ ] **AU1.12** New-world drugs made of what is left
+
+## AV — The planes
+
+Ten sephiroth plus the one that is not on the map, and four worlds as the
+registers each is seen in. Malkuth is 3D and the game is played there; the wizard
+eyes are 4D; the godhead is past Keter.
+
+**Da'ath is the good one** — real, unmapped, unreachable deliberately, and
+where the deliriants go.
+
+### AV1 — The ladder
+- [ ] **AV1.1** Twelve planes, named from the tradition, each one a real place
+- [ ] **AV1.2** Four worlds as registers rather than more planes
+- [ ] **AV1.3** Da'ath is not on the map and cannot be aimed at
+- [ ] **AV1.4** You petition a plane, you do not travel to it — a name, a seal, an offering, a licence to depart
+- [ ] **AV1.5** Each plane looks like itself, with more of Greg's art the higher it goes
+- [ ] **AV1.6** Hellscape and angelscape are one place in two registers, not two asset sets
+- [ ] **AV1.7** All of it runs on one shader with different dials (FINAL_V section 16)
+
+### AV2 — Altitude is the gate
+Greg: *"the higher you have to be to talk or even fight, conjure, evoke etc"*.
+**This is the mechanic the rest hangs off.**
+- [ ] **AV2.1** Seeing a plane, talking on it, conjuring on it and fighting on it are four rising floors
+- [ ] **AV2.2** The substance decides which door opens, not a menu
+- [ ] **AV2.3** Coming down mid-conversation is a real failure and the entity remembers it
+- [ ] **AV2.4** You cannot fight the godhead sober, and that is not a difficulty setting
+- [ ] **AV2.5** Sustaining altitude is its own problem, separate from reaching it
+
+### AV3 — They remember you
+- [ ] **AV3.1** Entities are subjects in WorldHistory like everybody else
+- [ ] **AV3.2** A relationship accumulates across trips
+- [ ] **AV3.3** Voice is distorted and clears with standing — the whole readout, no meter
+- [ ] **AV3.4** Mysterious means withholding, never vague
+- [ ] **AV3.5** They can be owed, and they collect (AR2.4)
+- [ ] **AV3.6** They disagree with each other the way the gods do about a kill
+- [ ] **AV3.7** Demonic and jesterish is the register; the jester is already on the handheld
+
+## AW — Commissioning
+
+Greg: *"help me make subsection lists on top of the checklist that show me how i
+can commission and call all my artist friends"*.
+
+**Each plane is a brief.** You are not asking for "some psychedelic art" —
+you are asking for *Gevurah, seen from Yetzirah*, at a stated size, for a stated
+use. That is a brief an artist can price, and a far better one than most
+freelance work they will be offered.
+
+- [ ] **AW1.1** One plane, one artist, one brief — twelve independent commissions
+- [ ] **AW1.2** Write the brief before asking: plane, register, size, format, use, and what it sits beside
+- [ ] **AW1.3** Licence agreed in writing before money moves — use, modification, and whether it survives a sale
+- [ ] **AW1.4** Credit in the game, on the cast page, not only in a readme
+- [ ] **AW1.5** Pay properly. They are friends, which is a reason for more paperwork, not less
+- [ ] **AW1.6** Take source files, not only exports
+- [ ] **AW1.7** Their work goes in as texture and material inside the procedural system, never replacing it
+- [ ] **AW1.8** A rejection or a redraw is budgeted for before the first commission goes out
+
 ## AS — Night, the lamp, and what you are wearing
 
 Greg: *"the light can become really warped at night and distorted. Phone has a %
@@ -3412,14 +3623,52 @@ be integral, or at least a part of the world system, layers and strategy to
 everything."*
 
 ### AS1 — The handheld is a lamp
-- [x] **AS1.1** It throws real light into the world when it is in your hand
-- [x] **AS1.2** Holding it up to see is an action with a cost — that hand is busy
-- [x] **AS1.3** A battery percentage that runs down and can run out
-- [x] **AS1.4** Pocketing it is a movement and the light goes with it
-- [ ] **AS1.5** Its light is what gives you away at night (pairs with AE1.1) —
-      `light_radius()` exists on `handheld_device.gd` and is correct, but
-      nothing reads it: there is no AI perception/stealth system in the
-      project yet for it to feed. The hook is real; the consequence is not.
+Built twice in parallel (this session's own AS1 pass and a second
+implementation merged in from `agent-b`) and reconciled into one: the
+`SpotLight3D`/position/shadow framing is this pass's, the battery's
+drain-*and*-recharge economy, `LAMP_RANGE`/`light_radius()` hook and
+`is_lit()` naming are `agent-b`'s — kept as the more complete design.
+`torch_active()`/`battery_percent()` survive as aliases over `is_lit()`/
+`battery` so neither side's call sites had to change, one condition
+underneath either name.
+- [x] ~~**AS1.1** It throws real light into the world when it is in your
+      hand~~ A real `SpotLight3D` (`bone_yard_hunt.gd`'s `handheld_lamp`),
+      bolted to the camera rather than the world so it moves with wherever
+      you point it — "wave it around" — off-centre and angled the way a
+      phone actually sits in a raised hand, casting real shadows. Driven
+      entirely off `handheld.is_lit()`/`battery`, so the light and the
+      device it is bolted to can never disagree about whether it is on.
+- [x] ~~**AS1.2** Holding it up to see is an action with a cost — that hand
+      is busy~~ Already structurally true (raising the device takes over the
+      whole screen and suspends combat input) and now costs something
+      ongoing too: the torch burns real battery for as long as the device
+      is actually raised (`raised > 0.5`, not merely `is_open`, so the cost
+      tracks the same smooth blend the device's own raise animation uses).
+- [x] ~~**AS1.3** A battery percentage that runs down and can run out~~ The
+      status page's "CELL %" had been device *condition* wearing a
+      battery's name since C1 — real damage, not charge, so a device that
+      had never taken a hit still read a full battery forever. `battery`,
+      independent of `condition`, drains while raised and *recharges* while
+      pocketed (roughly four times slower than it drains — letting go is
+      relief, not an instant refill), and can reach exactly zero, at which
+      point `is_lit()` goes false and the real light in the world goes dark
+      with it — not merely dim.
+- [x] ~~**AS1.4** Pocketing it is a movement and the light goes with it~~
+      Falls out of AS1.1's own wiring: the light's energy is read fresh off
+      `is_lit()`/`battery` every frame, and lowering the device is the one
+      thing that already drops `raised` below the lit threshold.
+- [ ] **AS1.5** Its light is what gives you away at night (pairs with
+      AE1.1) — genuinely blocked, not merely unstarted: AE1.1 ("unseen is a
+      real state with real inputs") does not exist yet, so there is no
+      detection system for the torch's light to be an input to. The hook
+      is real and ready — `light_radius()` returns `LAMP_RANGE` while lit
+      and `0.0` otherwise, the exact shape an `AE1.1` stealth check would
+      need to read — this is only waiting on that system existing.
+      Verified: `tests/handheld_battery_test.gd` (14 checks) plus
+      `tests/day_night_test.gd` and `tests/psychedelic_rig_test.gd`
+      (unrelated systems merged in alongside this, both still green), and
+      the full `opening_test.gd`/`combat_integration_test.gd` regression
+      suite.
 
 ### AS2 — Night
 - [x] **AS2.1** Light warps and distorts at night rather than dimming
@@ -3452,11 +3701,12 @@ anvil crawlers, all the crazy red lighting-esque things."*
 
 ### AS v10 — the final pass
 The last rung. Fifteen statements that are true of night, the lamp and what you wear when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
-- [ ] **AS10.1** `v10` The handheld throws real light into the world
-- [ ] **AS10.2** `v10` Holding it up costs you the hand
-- [ ] **AS10.3** `v10` The battery runs down and can reach nothing
-- [ ] **AS10.4** `v10` Pocketing it is a movement and the light goes with it
-- [ ] **AS10.5** `v10` Its light is what gives you away at night
+- [x] ~~**AS10.1** `v10` The handheld throws real light into the world~~ See AS1.1.
+- [x] ~~**AS10.2** `v10` Holding it up costs you the hand~~ See AS1.2.
+- [x] ~~**AS10.3** `v10` The battery runs down and can reach nothing~~ See AS1.3.
+- [x] ~~**AS10.4** `v10` Pocketing it is a movement and the light goes with it~~ See AS1.4.
+- [ ] **AS10.5** `v10` Its light is what gives you away at night — see AS1.5;
+      blocked on AE1.1, which does not exist.
 - [ ] **AS10.6** `v10` Light warps and distorts at night rather than dimming
 - [ ] **AS10.7** `v10` Minimal lighting is the default and a light source is a decision
 - [ ] **AS10.8** `v10` Night is when the hauntings happen

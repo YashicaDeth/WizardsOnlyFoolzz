@@ -8,7 +8,9 @@ const SPRINT_SPEED := 12.0
 ## soulslike register wants injury to hurt; it does not want a player who has
 ## lost a leg to be unable to disengage from the thing that took it.
 const PLAYER_INJURY_FLOOR := 0.55
-const HUNT_ID := "mara_voss"
+## The person the hunt is about. Generated per save — see `cast_names.gd`.
+const CAPTAIN_SLOT := "derby_captain"
+const CAST := preload("res://systems/cast_names.gd")
 const FRIEND_ID := "nix_arden"
 const HUNT_LOCATION := "ashbloom_bone_yard"
 const HANDHELD := preload("res://systems/handheld_device.gd")
@@ -21,10 +23,8 @@ const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
 const STORM_WEATHER := preload("res://systems/storm_weather.gd")
 const PSYCHEDELIC_OSC := preload("res://systems/psychedelic_osc.gd")
-## AS1.1. Bright enough to actually read as a light source against
-## `world_look.gd`'s low-ambient presets rather than a glow nobody would notice.
-const HANDHELD_LAMP_ENERGY := 6.0
 const BALLISTICS := preload("res://systems/ballistics.gd")
+const LIMB_MOMENTUM := preload("res://systems/limb_momentum.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 const RIVAL_REGISTRY := preload("res://systems/rival_registry.gd")
@@ -38,6 +38,7 @@ const PIN_BOARD := preload("res://systems/pin_board.gd")
 const IMPACT_FEEL := preload("res://systems/impact_feel.gd")
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 const CARRION_SCAVENGER := preload("res://systems/carrion_scavenger.gd")
+const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 
 var player := Vector3(0, 1.5, 19)
 var yaw := PI
@@ -155,6 +156,21 @@ var guard_stamina_drain := 14.0
 var blood_veil: Control = null
 ## AF1. Rounds in flight, brass on the floor, holes in the walls.
 var ballistics: Node3D = null
+## AN1.2. The arm the weapon hangs off. Fed the same mouse delta the camera
+## turns by, so the weapon is thrown by you turning rather than by a curve.
+var arm: LimbMomentum = null
+## Mouse movement this frame, in radians, accumulated in `_unhandled_input` and
+## spent in `_physics_process`. It has to be a frame total rather than a
+## per-event value: a 1000Hz mouse delivers several motion events per frame and
+## handing the arm each one separately throws it several times as hard.
+var _look_delta := Vector2.ZERO
+## AN1.4/AN1.8. Whether `commitment()` reaches the damage number yet. The old
+## swing stays authoritative until the new one is demonstrably better, which is
+## a judgement to make with a controller in hand rather than in a commit.
+var momentum_damage := false
+## What the arm was worth at the moment of contact, kept so the HUD and the
+## record can read the blow that actually happened rather than the intent.
+var last_commitment := 0.0
 var winded := false
 ## How much stamina it takes to break into a run again after being winded. Well
 ## clear of the floor, so the two thresholds can never be crossed in one frame.
@@ -320,6 +336,12 @@ func _ready() -> void:
 	handheld_lamp.spot_range = HANDHELD.LAMP_RANGE
 	handheld_lamp.spot_angle = 34.0
 	handheld_lamp.spot_angle_attenuation = 1.6
+	# Kept from the other implementation of this: off-centre and slightly
+	# rotated, because a phone in a raised hand does not sit dead centre
+	# like a headlamp, and it casts shadows so the light has edges.
+	handheld_lamp.position = Vector3(0.16, -0.14, -0.15)
+	handheld_lamp.rotation_degrees = Vector3(-6, 4, 0)
+	handheld_lamp.shadow_enabled = true
 	camera.add_child(handheld_lamp)
 	resolution_ui = preload("res://systems/downed_resolution.gd").new()
 	resolution_ui.name = "DownedResolution"
@@ -352,6 +374,9 @@ func _ready() -> void:
 	# AG4.2. Under the pointer and over everything else in the world: blood on
 	# the lens sits between the player and the scene, not between the player
 	# and the panel they opened.
+	# AN1.2. The arm exists before the first swing does.
+	arm = LIMB_MOMENTUM.new()
+	_carry_current_weapon()
 	# AF1. Rounds and brass live in the world, not in the HUD.
 	ballistics = BALLISTICS.new()
 	add_child(ballistics)
@@ -421,7 +446,7 @@ func _ready() -> void:
 	_spawn_friend()
 	_spawn_rival()
 	_update_camera()
-	WorldHistory.record_event("player_entered_hunt_ground", {"location": HUNT_LOCATION, "hunt_id": HUNT_ID})
+	WorldHistory.record_event("player_entered_hunt_ground", {"location": HUNT_LOCATION, "hunt_id": CAST.id_for(CAPTAIN_SLOT)})
 
 
 ## The player had no body at all — only a `health` integer, the same defect the
@@ -565,7 +590,7 @@ func _register_people() -> void:
 		"name": "THE HUNTER", "kind": "person", "role": "Unindexed survivor", "faction": "Unbound",
 		"elo": 1000, "grudge": 0, "status": "awake", "memory": "The derby door opened into Limbo.",
 		"wounds": [], "anatomy": {"blood_type": "unresolved", "cybernetics": ["salvaged torque arm"]},
-		"relations": {FRIEND_ID: {"kind": "bond", "strength": 12}, HUNT_ID: {"kind": "grudge", "strength": 1}},
+		"relations": {FRIEND_ID: {"kind": "bond", "strength": 12}, CAST.id_for(CAPTAIN_SLOT): {"kind": "grudge", "strength": 1}},
 	})
 	WorldHistory.register_subject(FRIEND_ID, {
 		"name": "Nix Arden", "kind": "person", "role": "Scrap medic", "faction": "Gate Lanterns", "faction_id": "gate_lanterns",
@@ -578,8 +603,8 @@ func _register_people() -> void:
 		"doctrine": "Carry a light for whoever comes after. A kept promise outlasts a kept grudge.",
 		"relations": {"nix_arden": {"kind": "command", "strength": 40}},
 	})
-	WorldHistory.register_subject(HUNT_ID, {
-		"name": "Mara Voss", "kind": "person", "role": "Bone Yard Captain", "faction": "Ashline Wreckers", "faction_id": "ashline_wreckers", "elo": 1180,
+	CAST.ensure(CAPTAIN_SLOT, {
+		"elo": 1180,
 		"grudge": 0, "injury": "none", "status": "active", "memory": "Watching the derby", "wounds": [],
 		"anatomy": {"blood_type": "O-RUST", "cybernetics": ["jaw telemetry nail", "left clavicle rail"]},
 		"relations": {"player": {"kind": "hunts", "strength": 8}, "ashline_wreckers": {"kind": "command", "strength": 72}, "rook_sable": {"kind": "grudge", "strength": 31}},
@@ -587,13 +612,13 @@ func _register_people() -> void:
 	WorldHistory.register_subject("ashline_wreckers", {
 		"name": "Ashline Wreckers", "kind": "faction", "role": "Road murder syndicate", "threat": "SEVERE", "territory": "Bone Yard / Burnt Highway",
 		"doctrine": "Every machine is a coffin awaiting an owner. Rank is won by remembered impact.",
-		"relations": {"mara_voss": {"kind": "command", "strength": 72}, "rook_sable": {"kind": "enemy", "strength": 46}},
+		"relations": {"" + CAST.id_for(CAPTAIN_SLOT) + "": {"kind": "command", "strength": 72}, "rook_sable": {"kind": "enemy", "strength": 46}},
 	})
 	WorldHistory.register_subject("rook_sable", {
 		"name": "Rook Sable", "kind": "person", "role": "Rail-gang adjudicator", "faction": "Black Mile", "faction_id": "black_mile", "elo": 1325,
 		"grudge": 18, "status": "unlocated", "memory": "Paid three drivers to lose the same race.", "wounds": ["missing left eye"],
 		"anatomy": {"blood_type": "B-9", "cybernetics": ["rangefinder eye", "ceramic sternum"]},
-		"relations": {"mara_voss": {"kind": "grudge", "strength": 31}, "iris_coil": {"kind": "command", "strength": 61}},
+		"relations": {"" + CAST.id_for(CAPTAIN_SLOT) + "": {"kind": "grudge", "strength": 31}, "iris_coil": {"kind": "command", "strength": 61}},
 	})
 	WorldHistory.register_subject("iris_coil", {
 		"name": "Iris Coil", "kind": "person", "role": "Sporeline scout", "faction": "Black Mile", "faction_id": "black_mile", "elo": 1096,
@@ -622,7 +647,7 @@ func _register_people() -> void:
 		"name": "Doctor Vanta", "kind": "person", "role": "Relic anatomist", "faction": "Choir of Marrow", "faction_id": "choir_of_marrow", "elo": 1460,
 		"grudge": 0, "status": "rumoured", "memory": "A voice below the quarry is pricing Mara's replacement arm.", "wounds": [],
 		"anatomy": {"blood_type": "NULL", "cybernetics": ["six-finger surgical crown", "blackbox liver", "remote pulse cage"]},
-		"relations": {"choir_of_marrow": {"kind": "command", "strength": 83}, "mara_voss": {"kind": "known", "strength": 26}},
+		"relations": {"choir_of_marrow": {"kind": "command", "strength": 83}, "" + CAST.id_for(CAPTAIN_SLOT) + "": {"kind": "known", "strength": 26}},
 	})
 
 
@@ -707,8 +732,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_Q: _use_prosthetic_surge()
 			KEY_K: _deliberate_redecant()
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		yaw -= event.relative.x * 0.0026
-		pitch = clamp(pitch - event.relative.y * 0.0024, -0.75, 0.42)
+		apply_look(Vector2(event.relative.x * 0.0026, event.relative.y * 0.0024))
+
+
+## The captain's name, upper case, read off the record rather than written
+## into a string. Every label that used to carry a hardcoded captain name
+## calls this instead.
+func _captain_name() -> String:
+	var who: Dictionary = WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT))
+	return str(who.get("name", "THE CAPTAIN")).to_upper()
 
 
 func _physics_process(delta: float) -> void:
@@ -724,6 +756,7 @@ func _physics_process(delta: float) -> void:
 		_update_hud()
 		return
 	pulse += delta
+	_update_handheld_lamp(delta)
 	# W1.1. The world keeps time, and exactly one place advances it — a clock
 	# that two scenes both wind runs at double speed the moment anybody
 	# builds a third.
@@ -731,17 +764,13 @@ func _physics_process(delta: float) -> void:
 	_update_day_night()
 	_update_storm_exposure(delta)
 	_update_altered_perception()
-	# AS1.1/AS1.3. Energy tracks the same smooth `raised` blend the device
-	# itself uses, so the light does not snap on; it hard-zeroes at empty
-	# battery, so "can run out" (AS1.3) is an actual floor, not a long fade.
-	if handheld_lamp != null and is_instance_valid(handheld_lamp):
-		handheld_lamp.light_energy = (HANDHELD_LAMP_ENERGY * handheld.raised) if handheld.battery > 0.0 else 0.0
 	dodge_remaining = maxf(0.0, dodge_remaining - delta)
 	# O2.7 v3. scale_for() only ever reached the encounter loop's actor_delta —
 	# the player is the other half of every exchange they are in and kept
 	# ticking at full speed through their own hitstop, which is backwards: the
 	# whole point of a local freeze is that both bodies in contact feel it.
 	var player_delta: float = delta * impact_feel.scale_for("player")
+	_advance_arm(player_delta)
 	# O2.7 v4. And the gore. Greg: *"gore and chunk physics still run at full
 	# speed through a hit, so a limb can leave a body that has not moved
 	# yet"*. The rig's own spray and organs take the exchange's clock;
@@ -894,6 +923,87 @@ func _update_player(delta: float) -> void:
 	hunter_appearance.set_mouth(player_rig.anatomy.pain / 180.0, sin(pulse * 0.7) * player_rig.anatomy.pain / 100.0)
 
 
+## AN1.2. Where the camera turns, in radians, and the one seam the arm is
+## driven through. Split out of `_unhandled_input` because the mouse branch
+## there is gated on MOUSE_MODE_CAPTURED, which a headless run can never be —
+## so a test feeding it motion events was exercising nothing and passing on
+## the weapon's gravity sag. Same reason `lean_override` and
+## `grapple_pushing_override` exist.
+func apply_look(turn: Vector2) -> void:
+	yaw -= turn.x
+	pitch = clamp(pitch - turn.y, -0.75, 0.42)
+	# Accumulated rather than applied: several motion events arrive per frame
+	# and handing the arm each one separately throws it several times as hard.
+	_look_delta += turn
+
+
+## AN1.5. Mass and reach per weapon — the entire firearms-and-melee balance
+## conversation, expressed as two numbers rather than as a table of constants.
+## A bare hand is about 0.4kg, a cleaver 1.4, a sledge 6.
+const ARM_WEIGHTS := {
+	"sword": {"mass": 1.45, "reach": 0.62},
+	"shotgun": {"mass": 3.2, "reach": 0.5},
+	"sidearm": {"mass": 0.95, "reach": 0.22},
+	"severed_limb": {"mass": 2.6, "reach": 0.58},
+	"bare": {"mass": 0.4, "reach": 0.28},
+}
+
+
+func _carry_current_weapon() -> void:
+	if arm == null:
+		return
+	var id := "bare"
+	if bare_handed:
+		id = "bare"
+	elif carried_limb_index >= 0:
+		id = "severed_limb"
+	elif arsenal != null:
+		id = str(arsenal.current_id)
+	var spec: Dictionary = ARM_WEIGHTS.get(id, ARM_WEIGHTS["sword"])
+	if is_equal_approx(arm.mass, float(spec["mass"])):
+		return
+	arm.carry(float(spec["mass"]), float(spec["reach"]))
+
+
+## AN1.2/AN1.6. One call a frame. The arm is given what the player did — how far
+## they turned, how fast their body is moving, how much is left in them — and it
+## works out where the weapon ended up.
+func _advance_arm(step: float) -> void:
+	if arm == null:
+		return
+	_carry_current_weapon()
+	# AN1.6. A tired arm cannot hold the weapon where it wants it. Straight off
+	# stamina, so the guard degrades rather than being switched off at a
+	# threshold.
+	arm.fatigue = clampf(1.0 - stamina / 100.0, 0.0, 1.0)
+	# The body's own motion, in view space: walking into a blow counts.
+	var forward := Vector3(sin(yaw), 0.0, cos(yaw))
+	var right := Vector3(forward.z, 0.0, -forward.x)
+	var moving := player_body.velocity
+	arm.advance(step, _look_delta, Vector3(moving.dot(right), moving.y, -moving.dot(forward)))
+	_look_delta = Vector2.ZERO
+	_pose_weapon()
+
+
+## AN1.3. The weapon is drawn where the physics put it. The model hangs off the
+## rig's right arm, so this is a local offset on that node rather than a second
+## transform chain — the hand still animates, and the weapon lags the hand.
+func _pose_weapon() -> void:
+	if arsenal == null or arsenal.hand == null or not is_instance_valid(arsenal.hand):
+		return
+	var model: Node3D = arsenal.models.get(str(arsenal.current_id)) as Node3D
+	if model == null or not is_instance_valid(model):
+		return
+	var lag := arm.at - arm.anchor
+	if not model.has_meta("rest_position"):
+		model.set_meta("rest_position", model.position)
+	var rest: Vector3 = model.get_meta("rest_position")
+	# Scaled down from view space to hand space: the arm swings through 0.42m at
+	# full stretch and a weapon model that moved that far would leave the screen.
+	model.position = rest + lag * 0.38
+	model.rotation = Vector3(arm.tilt.x * 0.5, arm.tilt.y * 0.5, -arm.tilt.y * 0.3)
+
+
 func _attack(heavy := false) -> void:
 	if resolution_ui.visible or kill_cam.active or player_rig.is_downed() or player_rig.anatomy.dead:
 		return
@@ -935,6 +1045,16 @@ func _attack(heavy := false) -> void:
 	var swing := _player_swing_scale()
 	# O5.1. The body's own motion is part of the blow.
 	var momentum := swing_momentum(player_body.velocity)
+	# AN1.4. What the arm was actually doing, measured. Recorded either way so
+	# the two systems can be compared against the same swings; it only reaches
+	# the damage number when `momentum_damage` says so (AN1.8).
+	last_commitment = arm.commitment() if arm != null else 0.0
+	report["commitment"] = last_commitment
+	if momentum_damage and arm != null:
+		# The weapon sets the ceiling and the player earns how much of it they
+		# get. Floored well above zero: a game where a mistimed swing does
+		# nothing at all is a game that feels broken rather than demanding.
+		report["damage"] = float(report.get("damage", 0.0)) * lerpf(0.35, 1.35, last_commitment)
 	report["damage"] = float(report.get("damage", 0.0)) * swing * float(momentum["power"])
 	report["impulse"] = float(report.get("impulse", 0.0)) * float(momentum["power"])
 	report["momentum"] = momentum
@@ -954,15 +1074,26 @@ func _attack(heavy := false) -> void:
 
 func _resolve_strike() -> void:
 	var report := pending_attack
+	# AN2.1. Whatever happens next, the swing is spent. Landing bounces the
+	# weapon back off what stopped it; missing carries it through, which is why
+	# a miss costs footing.
+	var connected := false
 	if report.is_empty():
 		report = {"damage": 24.0, "impulse": 18.0, "damage_type": "cut", "range": 4.1, "weapon": "sword"}
 	pending_attack = {}
 	if _attack_nearest_encounter_actor(report):
+		if arm != null:
+			arm.strike(0.65, Vector3(sin(yaw), 0.0, cos(yaw)))
+		connected = true
 		return
 	if enemy == null or not enemy.visible or enemy_retreating:
+		if arm != null and not connected:
+			arm.whiff()
 		return
 	var distance := player.distance_to(enemy.global_position)
 	if distance > 4.1:
+		if arm != null and not connected:
+			arm.whiff()
 		return
 	var facing := Vector3(sin(yaw), 0, cos(yaw)).normalized().dot((enemy.global_position - player).normalized())
 	if facing < 0.18:
@@ -983,24 +1114,24 @@ func _resolve_strike() -> void:
 		var aim := enemy.global_position + Vector3(lateral.x, look.y * 4.1 * 1.2, lateral.z)
 		var wound := enemy_rig.hit_at(aim, float(damage), float(damage) * 0.8, "cut", look)
 		body_zone = str(wound.get("zone", "torso"))
-		WorldHistory.update_subject(HUNT_ID, {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
+		WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
 	if enemy_rig != null and is_instance_valid(enemy_rig):
 		enemy_health = roundi(float(enemy_health_max) * _rig_health_ratio(enemy_rig))
 	else:
 		enemy_health = maxi(0, enemy_health - damage)
 	_spawn_blood(enemy.global_position + Vector3(0, 1.2, 0), damage)
-	WorldHistory.record_event("melee_body_hit", {"target": HUNT_ID, "body_zone": body_zone, "damage": damage, "location": HUNT_LOCATION})
+	WorldHistory.record_event("melee_body_hit", {"target": CAST.id_for(CAPTAIN_SLOT), "body_zone": body_zone, "damage": damage, "location": HUNT_LOCATION})
 	# Untyped rebuild rather than .duplicate(): the stored array can already be
 	# a TypedArray[Dictionary] by the time some other subject touched "wounds"
 	# first, and .duplicate() carries that runtime type over — has()/append()
 	# with this plain string then fail the type check instead of just working.
 	var wounds: Array = []
-	for existing in WorldHistory.subject(HUNT_ID).get("wounds", []):
+	for existing in WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("wounds", []):
 		wounds.append(existing)
 	var wound := "cut %s" % body_zone
 	if not wounds.has(wound):
 		wounds.append(wound)
-	WorldHistory.update_subject(HUNT_ID, {"injury": wound, "wounds": wounds, "grudge": mini(100, int(WorldHistory.subject(HUNT_ID).get("grudge", 0)) + 14), "status": "fighting"}, "rival_injured")
+	WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"injury": wound, "wounds": wounds, "grudge": mini(100, int(WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("grudge", 0)) + 14), "status": "fighting"}, "rival_injured")
 	if enemy_health <= 0:
 		_rival_retreats("You left Mara alive. She will return altered.")
 
@@ -1395,6 +1526,28 @@ func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF) -> Di
 	return {"damage": through, "blocked": true, "parried": false}
 
 
+## AS1.1/AS1.3. Whether the torch is lit and how strong is entirely
+## `handheld.torch_active()`/`battery_percent()`'s call — this only paints
+## the result, so the device and the light bolted to it can never disagree
+## about whether it is on. AS2.1's "warps and distorts" gets a down payment
+## here too: a real torch on a device this beaten up does not hold perfectly
+## steady, and it should say so more as the charge that is running it drops.
+func _update_handheld_lamp(delta: float) -> void:
+	if handheld_lamp == null or not is_instance_valid(handheld_lamp):
+		return
+	var lit: bool = handheld.has_method("torch_active") and handheld.torch_active()
+	handheld_lamp.visible = lit
+	if not lit:
+		return
+	var charge: float = handheld.battery_percent() if handheld.has_method("battery_percent") else 1.0
+	var waver := 1.0 + sin(pulse * 11.0) * 0.03 * (1.0 + (1.0 - charge) * 2.5)
+	# Below a fifth of a charge it starts guttering rather than merely dimming.
+	if charge < 0.2:
+		var gutter := 1.0 if fmod(pulse * (5.0 + (0.2 - charge) * 40.0), 1.0) > 0.5 else 0.0
+		waver *= 0.7 + 0.3 * gutter
+	handheld_lamp.light_energy = 9.0 * charge * waver
+
+
 func _dodge() -> void:
 	if not panel_mode.is_empty() or dodge_cooldown > 0.0 or stamina < 25.0:
 		return
@@ -1417,8 +1570,8 @@ func _use_prosthetic_surge() -> void:
 		if enemy_rig != null and is_instance_valid(enemy_rig):
 			var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 			var wound := enemy_rig.hit_at(enemy.global_position + Vector3.UP * 1.0, 30.0, 34.0, "blunt", look)
-			WorldHistory.update_subject(HUNT_ID, {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
-			WorldHistory.record_event("melee_body_hit", {"target": HUNT_ID, "body_zone": str(wound.get("zone", "torso")), "damage": 30, "location": HUNT_LOCATION})
+			WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
+			WorldHistory.record_event("melee_body_hit", {"target": CAST.id_for(CAPTAIN_SLOT), "body_zone": str(wound.get("zone", "torso")), "damage": 30, "location": HUNT_LOCATION})
 			enemy_health = roundi(float(enemy_health_max) * _rig_health_ratio(enemy_rig))
 		else:
 			enemy_health = maxi(0, enemy_health - 30)
@@ -1549,7 +1702,10 @@ func _nearest_robbable(radius := 3.4) -> Dictionary:
 		var rig := body.get("rig") as BaselineHuman
 		if node == null or not is_instance_valid(node) or rig == null or not is_instance_valid(rig):
 			continue
-		if Extraction.robbable_zones(rig.anatomy.snapshot()).is_empty():
+		# AU1.2. A body with nothing worth cutting open can still have
+		# something worth taking out of its pocket.
+		var has_substance: bool = not str(WorldHistory.subject(str(body.subject_id)).get("carried_substance", "")).is_empty()
+		if Extraction.robbable_zones(rig.anatomy.snapshot()).is_empty() and not has_substance:
 			continue
 		var distance := player.distance_to(node.global_position)
 		if distance <= nearest_distance:
@@ -1566,6 +1722,24 @@ func _begin_extraction() -> void:
 		prompt.text = "NOTHING WITHIN REACH WORTH OPENING"
 		extraction_session = {}
 		return
+	# AU1.2. A pocket, not a wound: checked and taken in one motion, before
+	# whatever the body's actual anatomy might also be worth digging for.
+	# The same key finishes the job on a second press if there is still a
+	# real dig left, rather than needing a control of its own to discover.
+	var carried_substance := str(WorldHistory.subject(str(body.subject_id)).get("carried_substance", ""))
+	if not carried_substance.is_empty():
+		var body_node := body.get("node") as Node3D
+		var at := body_node.global_position if body_node != null and is_instance_valid(body_node) else player
+		var witnesses := WitnessLedger.witnesses_of(at, _witness_candidates(), str(body.subject_id))
+		var item: Dictionary = handheld.carry.take_from_subject(str(body.subject_id))
+		if not item.is_empty():
+			witness_ledger.record("substance_stolen", {
+				"actor_id": "player", "target_id": str(body.subject_id), "substance_id": str(item.get("substance_id", "")),
+			}, witnesses)
+			prompt.text = "%s TAKEN FROM THEIR POCKET // %s" % [
+				str(item.get("label", "")), ("SEEN BY %d" % witnesses.size()) if not witnesses.is_empty() else "NOBODY SAW",
+			]
+			return
 	var rig := body.rig as BaselineHuman
 	var snapshot: Dictionary = rig.anatomy.snapshot()
 	var targets := Extraction.robbable_zones(snapshot, rig.zone_depth)
@@ -1748,17 +1922,17 @@ func _begin_canonical_encounter() -> void:
 	enemy_retreating = false
 	enemy.visible = true
 	enemy.global_position = Vector3(0, 1.2, -16)
-	var mara := WorldHistory.subject(HUNT_ID)
+	var mara := WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT))
 	mara_encounter_number = 2 if bool(mara.get("is_rival", false)) and not (mara.get("rival_adaptation", {}) as Dictionary).is_empty() else 1
 	enemy_health_max = 150 if mara_encounter_number == 2 else 100
 	enemy_health = enemy_health_max
-	WorldHistory.update_subject(HUNT_ID, {"status": "hunting", "encounter_number": mara_encounter_number, "memory": "Mara returned rebuilt to settle the Bone Yard debt." if mara_encounter_number == 2 else "Mara came to settle the Bone Yard debt."}, "hunt_arc_started")
-	WorldHistory.record_event("canonical_hunt_encounter_started", {"hunter": "player", "target": HUNT_ID, "location": HUNT_LOCATION, "encounter_number": mara_encounter_number})
+	WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"status": "hunting", "encounter_number": mara_encounter_number, "memory": "Mara returned rebuilt to settle the Bone Yard debt." if mara_encounter_number == 2 else "Mara came to settle the Bone Yard debt."}, "hunt_arc_started")
+	WorldHistory.record_event("canonical_hunt_encounter_started", {"hunter": "player", "target": CAST.id_for(CAPTAIN_SLOT), "location": HUNT_LOCATION, "encounter_number": mara_encounter_number})
 	if mara_encounter_number == 2:
 		_spawn_ashline_reinforcements()
-		prompt.text = "SECOND HUNT // MARA VOSS: INDUSTRIAL ARM, REBUILT WRECKER, TWO ASHLINE KNIVES."
+		prompt.text = "SECOND HUNT // %s: INDUSTRIAL ARM, REBUILT WRECKER, TWO ASHLINE KNIVES." % _captain_name()
 	else:
-		prompt.text = "HUNT ARC: MARA VOSS has found you. Do not kill the story; make her remember."
+		prompt.text = "HUNT ARC: %s has found you. Do not kill the story; make them remember." % _captain_name()
 
 
 func _update_rival(delta: float) -> void:
@@ -1782,9 +1956,9 @@ func _update_rival(delta: float) -> void:
 		health = maxi(0, health - 7)
 		stamina = maxf(0, stamina - 12)
 		_wound_player(enemy.global_position, 17.0, "cut")
-		WorldHistory.record_event("rival_struck_player", {"rival": HUNT_ID, "location": HUNT_LOCATION})
+		WorldHistory.record_event("rival_struck_player", {"rival": CAST.id_for(CAPTAIN_SLOT), "location": HUNT_LOCATION})
 		if health <= 0:
-			_route_player_defeat(HUNT_ID)
+			_route_player_defeat(CAST.id_for(CAPTAIN_SLOT))
 	if enemy_health <= 25:
 		_rival_retreats("Mara escapes through the tunnel. Her next body will not be the same.")
 
@@ -2282,9 +2456,9 @@ func _rival_retreats(message: String) -> void:
 		return
 	enemy_retreating = true
 	enemy.visible = false
-	WorldHistory.update_subject(HUNT_ID, {"status": "escaped"}, "rival_survived_hunt")
-	WorldHistory.record_event("hunt_arc_first_beat_complete", {"target": HUNT_ID, "outcome": "escaped", "location": HUNT_LOCATION})
-	RIVAL_REGISTRY.consider(HUNT_ID)
+	WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"status": "escaped"}, "rival_survived_hunt")
+	WorldHistory.record_event("hunt_arc_first_beat_complete", {"target": CAST.id_for(CAPTAIN_SLOT), "outcome": "escaped", "location": HUNT_LOCATION})
+	RIVAL_REGISTRY.consider(CAST.id_for(CAPTAIN_SLOT))
 	prompt.text = message
 
 
@@ -2304,7 +2478,7 @@ func _map_contacts() -> Array:
 		if is_instance_valid(cache):
 			contacts.append({"at": Vector2(cache.global_position.x, cache.global_position.z), "state": "loot", "name": ""})
 	if enemy != null and is_instance_valid(enemy) and enemy.visible and not enemy_retreating:
-		contacts.append({"at": Vector2(enemy.global_position.x, enemy.global_position.z), "state": "hostile", "name": "MARA VOSS"})
+		contacts.append({"at": Vector2(enemy.global_position.x, enemy.global_position.z), "state": "hostile", "name": _captain_name()})
 	return contacts
 
 
@@ -2320,7 +2494,7 @@ func _lock_node() -> Node3D:
 		var node := actor.node as Node3D
 		if is_instance_valid(node) and not bool(actor.get("dead", false)):
 			return node
-	if lock_target == HUNT_ID and enemy != null and is_instance_valid(enemy) and enemy.visible and not enemy_retreating:
+	if lock_target == CAST.id_for(CAPTAIN_SLOT) and enemy != null and is_instance_valid(enemy) and enemy.visible and not enemy_retreating:
 		return enemy
 	lock_target = ""
 	return null
@@ -2338,7 +2512,7 @@ func _lock_candidates() -> Array:
 	if enemy != null and is_instance_valid(enemy) and enemy.visible and not enemy_retreating:
 		var mara_gap: float = player.distance_to(enemy.global_position)
 		if mara_gap <= 26.0:
-			found.append({"id": HUNT_ID, "node": enemy, "gap": mara_gap})
+			found.append({"id": CAST.id_for(CAPTAIN_SLOT), "node": enemy, "gap": mara_gap})
 	found.sort_custom(func(a, b): return float(a.gap) < float(b.gap))
 	return found
 
@@ -2627,8 +2801,17 @@ func _take_photograph() -> Dictionary:
 		"in_frame": (photo.contents as Array).size(),
 		"location": HUNT_LOCATION,
 	})
+	# E3.3. A rite is satisfied by doing the thing and recording it. The photo is
+	# submitted as it is taken; there is no separate acceptance screen or button
+	# that could make the evidence into a menu chore.
+	var ritual_result := RITUAL_LEDGER.submit_photo(photo)
+	var completed: Array = ritual_result.get("completed", []) as Array
 	var count: int = (photo.contents as Array).size()
-	prompt.text = "PHOTOGRAPH / %s" % (str(photo.caption) if count > 0 else "NOTHING IN FRAME")
+	if not completed.is_empty():
+		var ritual: Dictionary = completed[0]
+		prompt.text = "RITE FILED / %s" % str(ritual.get("label", "EVIDENCE ACCEPTED"))
+	else:
+		prompt.text = "PHOTOGRAPH / %s" % (str(photo.caption) if count > 0 else "NOTHING IN FRAME")
 	return photo
 
 
@@ -2859,7 +3042,7 @@ func _toggle_panel(mode: String) -> void:
 	# what "no more of this tutorial look" was about.
 	panel.visible = false
 	if character_archive.visible:
-		character_archive.open_archive(HUNT_ID)
+		character_archive.open_archive(CAST.id_for(CAPTAIN_SLOT))
 	else:
 		character_archive.close_archive()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if panel_mode.is_empty() else Input.MOUSE_MODE_HIDDEN
@@ -2896,14 +3079,19 @@ func _update_hud() -> void:
 		third_person_unlock_announced = true
 		_announce_third_person_unlock()
 	title.text = "WIZARDS ONLY FOOLS // LIMBO: ASHBLOOM EXPANSE"
-	status.text = "WASD MOVE  SHIFT RUN  LMB STRIKE  5 HANDS  X GUARD  SPACE DODGE  Q SURGE\nE INTERACT  TAB INDEX  M MAP  T TREE  J ALLUSIONS  F CAMERA"
-	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(HUNT_ID).get("status", "dormant")).to_upper()]
+	# I3. The second control strip is gone. `gothic_field_hud.gd` draws the one
+	# the player reads, in the game's own face, and it is contextual — this was
+	# a permanent list of every key in the game, in the engine default font,
+	# drawn on top of it.
+	status.visible = false
+	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("status", "dormant")).to_upper()]
 	prompt.visible = not resolution_ui.visible and not living_map.visible and not world_index.visible
 	if field_interface.has_method("set_state"):
 		field_interface.set_state({
 			"health": health,
 			"stamina": stamina,
-			"rival_status": WorldHistory.subject(HUNT_ID).get("status", "dormant"),
+			"rival_status": WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("status", "dormant"),
+			"rival_name": _captain_name(),
 			"menu_open": world_index.visible or character_archive.visible or allusions_artwork.visible or living_map.visible,
 			"menu_mode": panel_mode,
 			"weapon": arsenal.state() if arsenal != null else {},
@@ -3359,20 +3547,20 @@ func _spawn_rival() -> void:
 	enemy_rig.position = Vector3(0, -1.15, 0)
 	enemy.add_child(enemy_rig)
 	enemy_rig.gore = viscera_fx
-	var mara_record: Dictionary = WorldHistory.subject(HUNT_ID)
+	var mara_record: Dictionary = WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT))
 	var mara_config := {"flesh": Color("7a4a3a"), "variation": 2, "blood": 5400.0}
 	if mara_record.get("anatomy_state") is Dictionary:
 		mara_config["restore"] = mara_record.anatomy_state
-	enemy_rig.build(HUNT_ID, mara_config)
+	enemy_rig.build(CAST.id_for(CAPTAIN_SLOT), mara_config)
 	var label := Label3D.new()
-	label.text = "MARA VOSS // ASHLINE CAPTAIN"
+	label.text = "%s // ASHLINE CAPTAIN" % _captain_name()
 	label.position = Vector3(0, 3, 0)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	enemy.add_child(label)
-	var mara := WorldHistory.subject(HUNT_ID)
+	var mara := WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT))
 	var adaptation: Dictionary = mara.get("rival_adaptation", {})
 	if bool(mara.get("is_rival", false)) and not adaptation.is_empty():
-		label.text = "MARA VOSS // REBUILT ASHLINE CAPTAIN"
+		label.text = "%s // REBUILT ASHLINE CAPTAIN" % _captain_name()
 		# The industrial arm is now an actual prosthetic in the anatomy record,
 		# so it restores function, changes her combat ratio and shows on the rig
 		# rather than being a cylinder parented next to her.
