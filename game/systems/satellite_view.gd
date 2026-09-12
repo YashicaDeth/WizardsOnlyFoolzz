@@ -39,9 +39,14 @@ var clock := 0.0
 var descent := 0.0
 var heading := 0.0
 var centre := Vector3.ZERO
+var _air_settled := false
 
 
-static func make(world: World3D, resolution := Vector2i(768, 768)) -> SatelliteView:
+## 576 square rather than 768. The map draws it into a rectangle roughly a
+## thousand pixels wide and then covers a good part of it with chart marks, so
+## the extra 77% of pixels was buying nothing and costing a full extra render of
+## the region every time it was asked for.
+static func make(world: World3D, resolution := Vector2i(576, 576)) -> SatelliteView:
 	var view := SatelliteView.new()
 	view.size = resolution
 	view.transparent_bg = false
@@ -65,6 +70,39 @@ func _assemble() -> void:
 	# Not `current`: this camera belongs to its own viewport and must never
 	# steal the one the player is looking through.
 	add_child(camera)
+	_clear_the_air()
+
+
+## A10.4. The Ashbloom is a foggy place at head height, which is correct and is
+## most of how it looks. From two hundred metres up it means the entire region
+## is inside the fog and the satellite returns a flat grey sheet — which is what
+## the second playtest actually showed: *"sort of? I can tell theres somthing
+## behind it"*. There was something behind it; it was fog.
+##
+## A camera can carry its own `Environment`, which overrides the world's for
+## that camera alone. So the satellite gets the same sky, the same ambient and
+## the same tone mapping as the region — and no fog, because it is above it.
+## Nothing about how the player sees the world at ground level changes.
+func _clear_the_air() -> void:
+	var world_environment: Environment = null
+	if world_3d != null and world_3d.environment != null:
+		world_environment = world_3d.environment
+	var air: Environment = world_environment.duplicate() if world_environment != null else Environment.new()
+	air.fog_enabled = false
+	air.volumetric_fog_enabled = false
+	if world_environment == null:
+		air.background_mode = Environment.BG_COLOR
+		air.background_color = Color("1a1712")
+		air.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+		air.ambient_light_color = Color("6d6a58")
+		air.ambient_light_energy = 1.0
+	else:
+		# Lift the ambient a little. Overhead light on a region built to be lit
+		# from the side leaves the roofs correct and the streets between them
+		# unreadably dark, and a satellite picture whose streets are black is
+		# not a map.
+		air.ambient_light_energy = maxf(air.ambient_light_energy, 0.9)
+	camera.environment = air
 
 
 ## Called by the map each frame it is open. `at` is where the player is standing,
@@ -77,6 +115,12 @@ func observe(at: Vector3, look: float, zoom: float, delta: float) -> void:
 	descent = clampf(zoom, 0.0, 1.0)
 	if camera == null or not is_instance_valid(camera):
 		return
+	# The scene builds its own WorldEnvironment during `_ready`, which is often
+	# after this view was made, so the air is settled on first look rather than
+	# at construction.
+	if camera.environment == null or not _air_settled:
+		_clear_the_air()
+		_air_settled = world_3d != null and world_3d.environment != null
 
 	var height := lerpf(TOP_HEIGHT, STREET_HEIGHT, ease(descent, 2.2))
 	# A10.3. The tilt is the transition. Straight down until the camera is low
