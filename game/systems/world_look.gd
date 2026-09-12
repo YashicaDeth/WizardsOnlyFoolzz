@@ -175,18 +175,34 @@ static func surface(color: Color, kind: String = "paint", variation_seed: int = 
 		tint.h = fposmod(tint.h + drift * 0.015, 1.0)
 	material.albedo_color = tint
 
+	# A5.1. Up to v4 a kind was two scalars and a pattern, which is why every
+	# surface in the game answered a lamp with the same highlight: the world was
+	# one material wearing six colours. What separates these in life is *how* they
+	# return light — meat passes it through, brushed scrap smears it along the
+	# grain, glass lets it past, dirt gives none of it back — so that is what
+	# separates them here.
 	match kind:
 		"rust":
 			material.metallic = 0.15
 			material.roughness = 0.92
+			# Oxide is a mineral crust, not a metal surface: what specular it has is
+			# dull and colourless.
+			material.metallic_specular = 0.28
 			_apply_grain(material, 0.32, 0.55, "rust", variation_seed)
 		"paint":
 			material.metallic = 0.3
 			material.roughness = 0.68
+			material.metallic_specular = 0.45
 			_apply_grain(material, 0.28, 0.4, "paint", variation_seed)
 		"chrome":
 			material.metallic = 0.85
 			material.roughness = 0.32
+			# Scrap chrome was ground flat by somebody with a wheel, so its highlight
+			# is drawn out along the grain rather than sitting in a round spot. This is
+			# the single cue that separates salvaged plate from painted plate under one
+			# lamp.
+			material.anisotropy_enabled = true
+			material.anisotropy = 0.72
 			_apply_grain(material, 0.4, 0.22, "chrome", variation_seed)
 		"flesh":
 			material.metallic = 0.0
@@ -194,14 +210,54 @@ static func surface(color: Color, kind: String = "paint", variation_seed: int = 
 			material.rim_enabled = true
 			material.rim = 0.5
 			material.rim_tint = 0.6
+			# Meat is not opaque. A lamp behind a limb comes through it, which is the
+			# whole biopunk register and the one thing rim lighting only imitates.
+			material.subsurf_scatter_enabled = true
+			material.subsurf_scatter_strength = 0.6
+			material.subsurf_scatter_transmittance_enabled = true
+			material.subsurf_scatter_transmittance_color = Color(0.75, 0.18, 0.16)
+			# Depth and boost both matter: Godot's default transmittance depth
+			# lets light a few centimetres into a surface, which is right for a
+			# cheek and invisible on anything the size of a limb. A lamp behind
+			# a body in this game should show through it.
+			material.subsurf_scatter_transmittance_depth = 0.85
+			material.subsurf_scatter_transmittance_boost = 0.7
+			# And a backlight as well, which is the part that actually reads.
+			# Measured, not assumed: with an omni lamp behind it, transmittance
+			# alone photographed a black disc at every depth and boost tried —
+			# Godot computes it from the shadow map and it stays a near-surface
+			# effect. `backlight` is the engine's supported wrap-through and it
+			# is what makes a limb with a lamp behind it glow at all.
+			material.backlight_enabled = true
+			material.backlight = Color(0.46, 0.11, 0.09)
 			_apply_grain(material, 2.2, 0.3, "flesh", variation_seed)
 		"bone":
 			material.metallic = 0.0
 			material.roughness = 0.74
+			# Thin bone lights up from behind the way a lampshade does.
+			material.backlight_enabled = true
+			material.backlight = Color(0.32, 0.28, 0.2)
 			_apply_grain(material, 1.4, 0.35, "bone", variation_seed)
+		"glass":
+			# A5.1 names glass and the game had none: `smoked_glass` was remapped onto
+			# chrome, so every window in the world was a mirror. It is the only kind
+			# here that light goes *through*, and the refraction is deliberately small
+			# — this is filthy salvaged glazing, not a lens.
+			material.metallic = 0.0
+			material.roughness = 0.16
+			material.metallic_specular = 0.9
+			material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			material.albedo_color.a = 0.42
+			material.refraction_enabled = true
+			material.refraction_scale = 0.06
+			material.cull_mode = BaseMaterial3D.CULL_DISABLED
+			_apply_grain(material, 0.5, 0.18, "glass", variation_seed)
 		"dirt":
 			material.metallic = 0.0
 			material.roughness = 0.97
+			# Ash and spoil return almost nothing. Without this the ground carries a
+			# sheen under every lamp and reads as wet concrete.
+			material.metallic_specular = 0.08
 			_apply_grain(material, 0.22, 0.6, "dirt", variation_seed)
 		_:
 			material.metallic = 0.35
@@ -218,7 +274,7 @@ const REGRIME := {
 	"celloutz_salvage_teal": {"color": "1f2b26", "kind": "rust"},
 	"bone_enamel": {"color": "6b6048", "kind": "bone"},
 	"tar_rubber": {"color": "14100f", "kind": "dirt"},
-	"smoked_glass": {"color": "121b1c", "kind": "chrome"},
+	"smoked_glass": {"color": "121b1c", "kind": "glass"},
 	"worn_copper": {"color": "50291a", "kind": "rust"},
 	"warning_orange": {"color": "7d3a16", "kind": "rust"},
 	"rusted_steel": {"color": "3d1c11", "kind": "rust"},
@@ -270,15 +326,33 @@ static func emissive(color: Color, energy: float) -> StandardMaterial3D:
 static func _apply_grain(material: StandardMaterial3D, scale: float, strength: float, kind := "paint", seed_value := 0) -> void:
 	material.uv1_triplanar = true
 	material.uv1_scale = Vector3(scale, scale, scale)
-	material.roughness_texture = _noise(scale)
-	material.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
-	material.roughness = clampf(material.roughness * (1.0 - strength * 0.25), 0.05, 1.0)
+	var maps := _surface_maps(kind, material.albedo_color, seed_value)
 	# Albedo was a flat colour on every surface in the game, with only roughness
-	# varying — which is the whole reason the world read as untextured
-	# primitives no matter how the geometry was built. Contamination arrives on
-	# the albedo now, at low resolution and unfiltered, per ART-DIRECTION.md:
-	# colour is contamination, not paint, and the target is PS1-era crunch.
-	material.albedo_texture = _contamination(kind, material.albedo_color, seed_value)
+	# varying — which is the whole reason the world read as untextured primitives
+	# no matter how the geometry was built. Contamination arrives on the albedo
+	# now, at low resolution and unfiltered, per ART-DIRECTION.md: colour is
+	# contamination, not paint, and the target is PS1-era crunch.
+	material.albedo_texture = maps["albedo"]
+	# A5.2. And contamination stops being only a colour. Up to v4 the roughness
+	# map was `_noise(scale)` — unrelated noise, the same field for every kind —
+	# so a rust bloom and the clean steel beside it returned a lamp identically
+	# and the contamination was visible only as a stain in daylight. The map that
+	# decides where the growth is now also decides how that patch answers light:
+	# bloom is wet and takes a sharper highlight, and the bloom is the only part
+	# of the surface that emits, because the green in this world is alive.
+	material.roughness_texture = maps["response"]
+	material.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_ALPHA
+	material.roughness = clampf(material.roughness * (1.0 - strength * 0.25), 0.05, 1.0)
+	material.emission_enabled = true
+	material.emission_texture = maps["response"]
+	material.emission = Color(1, 1, 1)
+	# MULTIPLY, and not by taste: Godot's default emission operator is ADD,
+	# which computes `(emission + texture) * energy`. With a white emission
+	# colour that is a flat glow on every texel whether or not anything is
+	# growing there — the first build of this lit the entire world to mid grey
+	# and read as fog. Multiplied, the map alone decides what emits.
+	material.emission_operator = BaseMaterial3D.EMISSION_OP_MULTIPLY
+	material.emission_energy_multiplier = float(maps["glow"])
 	# G1.3. Greg's own artwork, as a detail layer over the procedural
 	# contamination rather than instead of it. Flesh only: the body is where a
 	# hand-made surface reads, and putting the same sheets on every wall would
@@ -292,17 +366,25 @@ static func _apply_grain(material: StandardMaterial3D, scale: float, strength: f
 			material.detail_uv_layer = BaseMaterial3D.DETAIL_UV_1
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	# The tint now lives in the texture, so leave the multiplier neutral or the
-	# surface is coloured twice and goes muddy.
+	# surface is coloured twice and goes muddy. The alpha is kept: glass carries
+	# its transparency there and the texture has none of its own.
 	material.albedo_color = Color(1, 1, 1, material.albedo_color.a)
 
 
-## A low-resolution, posterised, contaminated surface for one material kind.
-## Generated rather than authored so nothing here is an imported asset, and
-## cached hard: without the cache a pit of twelve wreckers would build a
-## thousand of these.
+## A low-resolution, posterised, contaminated surface for one material kind,
+## and the map of how that contamination answers light. Generated rather than
+## authored so nothing here is an imported asset, and cached hard: without the
+## cache a pit of twelve wreckers would build a thousand of these.
 static var _surface_cache: Dictionary = {}
 
-static func _contamination(kind: String, tint: Color, seed_value: int) -> ImageTexture:
+
+## A5.2. Returns `albedo` (the colour), `response` (RGB is what the bloom
+## emits, alpha is how rough that texel is) and `glow` (how hard this kind's
+## growth burns). One field decides all of it, which is the point: up to v4 the
+## contamination was painted into the albedo and the roughness came from
+## unrelated noise, so a bloom and the clean plate beside it returned a lamp
+## exactly alike and the contamination existed only in daylight, as a stain.
+static func _surface_maps(kind: String, tint: Color, seed_value: int) -> Dictionary:
 	var bucket := absi(seed_value) % 6
 	var key := "%s|%d|%d|%d|%d" % [kind, roundi(tint.r * 12), roundi(tint.g * 12), roundi(tint.b * 12), bucket]
 	if _surface_cache.has(key):
@@ -322,33 +404,46 @@ static func _contamination(kind: String, tint: Color, seed_value: int) -> ImageT
 	grime.frequency = 0.11
 	grime.seed = rng.randi()
 
-	# What grows on, weeps down or stains this kind of surface.
+	# What grows on, weeps down or stains this kind of surface, and how hard the
+	# growth burns once it is the only thing in the frame emitting.
 	var growth := Color("6d8a2a")
 	var stain := Color("2a1a12")
 	var bloom := 0.42
+	var glow := 0.5
 	match kind:
 		"rust":
 			growth = Color("8a4a1c")
 			stain = Color("241109")
 			bloom = 0.62
+			glow = 0.28
 		"chrome":
 			growth = Color("4a5a5e")
 			stain = Color("13181a")
 			bloom = 0.3
+			glow = 0.12
 		"flesh":
 			growth = Color("7d3a3a")
 			stain = Color("2a0b10")
 			bloom = 0.34
+			glow = 0.22
 		"bone":
 			growth = Color("b8a870")
 			stain = Color("3a3018")
 			bloom = 0.3
+			glow = 0.1
+		"glass":
+			growth = Color("3e5a46")
+			stain = Color("101614")
+			bloom = 0.34
+			glow = 0.18
 		"dirt":
 			growth = Color("5c5340")
 			stain = Color("1b1710")
 			bloom = 0.55
+			glow = 0.2
 
 	var image := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	var response := Image.create(size, size, false, Image.FORMAT_RGBA8)
 	for y in size:
 		for x in size:
 			var patch := absf(blotch.get_noise_2d(float(x), float(y)))
@@ -357,9 +452,11 @@ static func _contamination(kind: String, tint: Color, seed_value: int) -> ImageT
 			# down it for years.
 			var weep := clampf(absf(blotch.get_noise_2d(float(x) * 3.4, float(y) * 0.32)), 0.0, 1.0)
 
+			var living := clampf(patch * bloom * 2.6, 0.0, 0.95)
+			var weeping := clampf(weep * 0.9 - 0.1, 0.0, 0.8)
 			var value := tint
-			value = value.lerp(growth, clampf(patch * bloom * 2.6, 0.0, 0.95))
-			value = value.lerp(stain, clampf(weep * 0.9 - 0.1, 0.0, 0.8))
+			value = value.lerp(growth, living)
+			value = value.lerp(stain, weeping)
 			value = value.darkened(cell * 0.52)
 			# Panel seams and patch plates: straight edges, because a wall that
 			# has been repaired has lines on it and pure noise never does.
@@ -376,9 +473,22 @@ static func _contamination(kind: String, tint: Color, seed_value: int) -> ImageT
 			)
 			image.set_pixel(x, y, value)
 
-	var texture := ImageTexture.create_from_image(image)
-	_surface_cache[key] = texture
-	return texture
+			# The same field, read as a light response. Growth is wet, so it takes a
+			# tighter highlight than the dry plate around it; the multiplier can only
+			# reduce roughness, which is correct — nothing here is rougher than the
+			# material's own worst state. Only the living part emits, and it emits its
+			# own colour rather than a house green.
+			var slick := clampf(1.0 - living * 0.55, 0.3, 1.0)
+			var burn := living * living
+			response.set_pixel(x, y, Color(growth.r * burn, growth.g * burn, growth.b * burn, slick))
+
+	var maps := {
+		"albedo": ImageTexture.create_from_image(image),
+		"response": ImageTexture.create_from_image(response),
+		"glow": glow,
+	}
+	_surface_cache[key] = maps
+	return maps
 
 
 static func _noise(scale: float) -> NoiseTexture2D:
