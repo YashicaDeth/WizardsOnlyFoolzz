@@ -3412,17 +3412,21 @@ be integral, or at least a part of the world system, layers and strategy to
 everything."*
 
 ### AS1 — The handheld is a lamp
-- [ ] **AS1.1** It throws real light into the world when it is in your hand
-- [ ] **AS1.2** Holding it up to see is an action with a cost — that hand is busy
-- [ ] **AS1.3** A battery percentage that runs down and can run out
-- [ ] **AS1.4** Pocketing it is a movement and the light goes with it
-- [ ] **AS1.5** Its light is what gives you away at night (pairs with AE1.1)
+- [x] **AS1.1** It throws real light into the world when it is in your hand
+- [x] **AS1.2** Holding it up to see is an action with a cost — that hand is busy
+- [x] **AS1.3** A battery percentage that runs down and can run out
+- [x] **AS1.4** Pocketing it is a movement and the light goes with it
+- [ ] **AS1.5** Its light is what gives you away at night (pairs with AE1.1) —
+      `light_radius()` exists on `handheld_device.gd` and is correct, but
+      nothing reads it: there is no AI perception/stealth system in the
+      project yet for it to feed. The hook is real; the consequence is not.
 
 ### AS2 — Night
-- [ ] **AS2.1** Light warps and distorts at night rather than dimming
-- [ ] **AS2.2** Minimal lighting is the default and a light source is a decision
-- [ ] **AS2.3** Night is when AO4.2's hauntings happen
-- [ ] **AS2.4** It reads off `world_clock.gd`, which exists now (W1.1)
+- [x] **AS2.1** Light warps and distorts at night rather than dimming
+- [x] **AS2.2** Minimal lighting is the default and a light source is a decision
+- [ ] **AS2.3** Night is when AO4.2's hauntings happen — AO4.2 does not exist
+      in the project yet; nothing was wired to it.
+- [x] **AS2.4** It reads off `world_clock.gd`, which exists now (W1.1)
 
 ### AS3 — Clothes and pockets
 - [ ] **AS3.1** Layers, and they are part of the world system rather than a paperdoll
@@ -3434,11 +3438,11 @@ everything."*
 Greg: *"I also want the weather to have consistent crazy storms depending on
 spirits levels, chaos magick levels... the lightning in the game needs to have
 anvil crawlers, all the crazy red lighting-esque things."*
-- [ ] **AS4.1** Weather is a readout of how much magick is loose, not ambience
-- [ ] **AS4.2** Storm severity tracks spirit and chaos-magick levels in WorldHistory
-- [ ] **AS4.3** Anvil crawler lightning — the long horizontal crawl, not a flash
-- [ ] **AS4.4** Red lightning, and it means something when it appears
-- [ ] **AS4.5** Being caught out in it costs something (W1.3)
+- [x] **AS4.1** Weather is a readout of how much magick is loose, not ambience
+- [x] **AS4.2** Storm severity tracks spirit and chaos-magick levels in WorldHistory
+- [x] **AS4.3** Anvil crawler lightning — the long horizontal crawl, not a flash
+- [x] **AS4.4** Red lightning, and it means something when it appears
+- [x] **AS4.5** Being caught out in it costs something (W1.3)
 
 
 ### AS v10 — the final pass
