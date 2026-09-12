@@ -3017,21 +3017,68 @@ already has: AA hands a holding to the ascent or to corruption, and those are
 the two cones. The player stands at the waist, where they touch.
 
 ### AI1 — The shape
-- [ ] **AI1.1** The Tree page becomes a double pyramid, upright above and inverted below
-- [ ] **AI1.2** The waist is where the player is, and it is the only tier you occupy
-- [ ] **AI1.3** Tiers are drawn as strata with real edges, not a list with indentation
-- [ ] **AI1.4** The upper cone is the ascent: what is above you and what it demands
-- [ ] **AI1.5** The lower cone is corruption: what is under you and what it is owed
-- [ ] **AI1.6** Density carries meaning - the base is crowded, the apex is one thing
-- [ ] **AI1.7** Legible at a glance and rewarding an hour of reading; the references do both
+- [x] ~~**AI1.1** The Tree page becomes a double pyramid, upright above and
+      inverted below~~ `world_index.gd`'s PYRAMID page rebuilt: a waist band
+      splits it into two cones, `_draw_pyramid_cone(rect, faction_id,
+      apex_up, register)` drawing the same tier logic for either — `apex_up`
+      alone decides which physical edge the crown sits against, so one
+      function serves both rather than the shape being written twice.
+- [x] ~~**AI1.2** The waist is where the player is, and it is the only tier
+      you occupy~~ `_draw_pyramid_waist()` reads the player's own
+      `WorldHistory.tree_alignment()`/`tree_descriptor()` — the same numbers
+      the FILE page's own Tree axis already draws — never a tier on either
+      cone.
+- [x] ~~**AI1.3** Tiers are drawn as strata with real edges, not a list with
+      indentation~~ Unchanged from the single pyramid this replaced — real
+      trapezoid strata with a stroked edge, not indentation.
+- [x] ~~**AI1.4** The upper cone is the ascent: what is above you and what it
+      demands~~ Populated from whichever faction in `WireNetScript.ASCENT_LEDGER_FACTIONS`
+      (K3.2 v2's own dual-ladder list) the player has the strongest real
+      command/ally/bond edge into, via new `_strongest_ladder_faction()`.
+- [x] ~~**AI1.5** The lower cone is corruption: what is under you and what it
+      is owed~~ Same function, `DESCENT_LEDGER_FACTIONS`, mirrored — crown at
+      the bottom, intake at the waist, "inverted" for real rather than
+      merely relabelled.
+- [x] ~~**AI1.6** Density carries meaning - the base is crowded, the apex is
+      one thing~~ Preserved from the single pyramid — `span_for()` still
+      narrows toward whichever edge is that cone's own crown.
+- [x] ~~**AI1.7** Legible at a glance and rewarding an hour of reading; the
+      references do both~~ Row text found to overlap once the double
+      pyramid halved the vertical room a single one had — fixed with fixed,
+      bottom-anchored two-line offsets per row instead of fractions of a
+      shrinking `row_height`; verified by a windowed capture with both
+      cones populated (`captures/ai1_double_pyramid.png`) rather than left
+      as read-the-code.
 
 ### AI2 — What it charts
-- [ ] **AI2.1** Every tier is populated from WorldHistory, not authored - who is actually above you
-- [ ] **AI2.2** Factions sit where their power is, and they move
-- [ ] **AI2.3** Your own position is computed, and it changes
-- [ ] **AI2.4** The Board's theories pin onto the pyramid - the two charts are one document
-- [ ] **AI2.5** Satire aims at institutions and never at congregations
-- [ ] **AI2.6** Marginalia in the corners, the way the references carry it
+- [x] ~~**AI2.1** Every tier is populated from WorldHistory, not authored -
+      who is actually above you~~ `wire.pyramid(faction_id)` — already
+      WorldHistory-derived — called twice, once per cone.
+- [x] **AI2.2** Factions sit where their power is, and they move — unchanged,
+      inherited from the pyramid data layer this reuses.
+- [x] ~~**AI2.3** Your own position is computed, and it changes~~ The waist
+      reads `tree_alignment()` live every draw, and which faction populates
+      each cone is recomputed from real relation edges every time the page
+      opens — nothing here is cached past a single reading.
+- [ ] **AI2.4** The Board's theories pin onto the pyramid - the two charts
+      are one document — not attempted this pass; a real cross-file
+      integration between `pin_board.gd` and this page, scoped out to keep
+      the shape rework itself reviewable on its own.
+- [ ] **AI2.5** Satire aims at institutions and never at congregations — a
+      content/tone audit, not a code change; not verified this pass.
+- [x] ~~**AI2.6** Marginalia in the corners, the way the references carry
+      it~~ "AS ABOVE, SO BELOW" printed once in the corner, and the
+      recruitment pitch ("ADVANCEMENT OPPORTUNITY…") kept on the Ascent
+      cone specifically, in whatever room is actually left under its last
+      tier. Verified: `tests/double_pyramid_test.gd` (new, 4/4 — the pure
+      data logic: no commitment reads as unclaimed rather than a default
+      pick, the stronger of two relations wins, and a grudge does not count
+      as real standing), plus the existing `link_test.gd`,
+      `index_wire_glow_test.gd`, `index_link_rebuild_test.gd`,
+      `celloutz_site_test.gd` and `clerical_audit_test.gd` regression
+      suites, and windowed captures of both the unclaimed and populated
+      states (`captures/ai1_double_pyramid_unclaimed.png`,
+      `ai1_double_pyramid.png`).
 
 
 ### AI v10 — the final pass

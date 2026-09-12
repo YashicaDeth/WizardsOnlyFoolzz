@@ -1231,43 +1231,108 @@ func _draw_axis(rect: Rect2, alignment: float, descriptor: String) -> void:
 ## a dead officer leaves a real hole. So the satire is in the presentation
 ## (buy-in, downline, an OPPORTUNITY where a person used to be) while every
 ## number under it is read from `WorldHistory`.
+## AI2.1/AI2.3. Which faction in a ladder (`ASCENT_LEDGER_FACTIONS` or
+## `DESCENT_LEDGER_FACTIONS`, the same lists K3.2 v2 already prices dual
+## commitment against) the player actually has real, recorded standing in —
+## the strongest direct relation edge to any faction on that side, or empty
+## if they have not committed to that side of the axis at all yet. Nothing
+## authored: "who is above you" is read out of the same relation edges the
+## Wire already prices reach from.
+func _strongest_ladder_faction(faction_ids: Array) -> String:
+	var relations: Dictionary = WorldHistory.subject("player").get("relations", {})
+	var best := ""
+	var best_strength := -1
+	for faction_id in faction_ids:
+		var edge: Dictionary = relations.get(str(faction_id), {})
+		if not WireNetScript.INFLUENCE_KINDS.has(str(edge.get("kind", ""))):
+			continue
+		var strength := int(edge.get("strength", 0))
+		if strength > best_strength:
+			best_strength = strength
+			best = str(faction_id)
+	return best
+
+
+## AI1. "Two pyramids meeting at a point. Upright above, inverted below. As
+## above, so below" — not decoration, the two-axis system (AA) the game
+## already has: an upper cone for whichever Ascent faction the player has
+## real standing in, a lower cone for whichever Descent faction they do,
+## meeting at a waist that is always the player's own row (AI1.2) — never a
+## tier occupied on either ladder, because a player is never actually a
+## member of the thing charting them.
 func _draw_pyramid(rect: Rect2) -> void:
-	var entry := _selected()
-	var font := ThemeDB.fallback_font
-	if entry.is_empty():
-		draw_string(font, rect.position + Vector2(0, 20), "NO FACTION SELECTED.", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, INK * Color(1, 1, 1, 0.5))
-		return
-	var data: Dictionary = wire.pyramid(str(entry.id))
-	CellOutzType.draw_stamped(self, rect.position + Vector2(0, 4), str(data.name).to_upper(), 21.0, INK, HOT * Color(1, 1, 1, 0.3), 1.4)
-	draw_string(font, rect.position + Vector2(2, 38), "THREAT %s   ·   %s   ·   %d ON THE BOOKS" % [str(data.threat), str(data.territory).to_upper(), int(data.headcount)], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COPPER)
-	draw_string(font, rect.position + Vector2(2, 58), "\"%s\"" % str(data.doctrine), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 20, 12, INK * Color(1, 1, 1, 0.6))
 	_tier_rects.clear()
+	var ascent_id := _strongest_ladder_faction(WireNetScript.ASCENT_LEDGER_FACTIONS)
+	var descent_id := _strongest_ladder_faction(WireNetScript.DESCENT_LEDGER_FACTIONS)
+	var waist := Rect2(rect.position.x, rect.position.y + rect.size.y * 0.5 - 22.0, rect.size.x, 44.0)
+	var upper := Rect2(rect.position, Vector2(rect.size.x, waist.position.y - rect.position.y))
+	var lower := Rect2(Vector2(rect.position.x, waist.end.y), Vector2(rect.size.x, rect.end.y - waist.end.y))
+	_draw_pyramid_cone(upper, ascent_id, true, "THE ASCENT")
+	_draw_pyramid_cone(lower, descent_id, false, "CORRUPTION")
+	_draw_pyramid_waist(waist)
+	# AI2.6. Marginalia in the corners, the way the reference charts carry it —
+	# a motto printed once rather than repeated on every tier.
+	CellOutzType.draw_condensed(self, rect.position + Vector2(rect.size.x - 128, 4), "AS ABOVE, SO BELOW", 9.0, INK * Color(1, 1, 1, 0.32), 0.9)
+
+
+## One cone, upper or lower. `apex_up` decides which edge of `rect` the
+## crown sits against — the top for the Ascent cone, the bottom for the
+## Descent one, "inverted" the way the reference charts draw it — and every
+## row-position formula below reads off it, so the same tier-drawing logic
+## (shape, icon, recruitment lines, vacancy pitch) serves both cones rather
+## than being written twice.
+func _draw_pyramid_cone(rect: Rect2, faction_id: String, apex_up: bool, register: String) -> void:
+	var font := ThemeDB.fallback_font
+	var header_y := rect.position.y + (18.0 if apex_up else rect.size.y - 54.0)
+	if faction_id == "":
+		var placeholder := "NOTHING CLAIMED ON %s YET" % register
+		CellOutzType.draw_text(self, Vector2(rect.position.x, rect.position.y + rect.size.y * 0.5 - 6.0), placeholder, 12.0, INK * Color(1, 1, 1, 0.3), 1.0)
+		return
+	var data: Dictionary = wire.pyramid(faction_id)
+	CellOutzType.draw_stamped(self, Vector2(rect.position.x, header_y), str(data.name).to_upper(), 15.0, INK, HOT * Color(1, 1, 1, 0.28), 1.1)
+	draw_string(font, Vector2(rect.position.x + 2, header_y + 22), "%s   ·   THREAT %s   ·   %d ON THE BOOKS" % [register, str(data.threat), int(data.headcount)], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 20, 10, COPPER)
 
 	var tiers: Array = data.tiers
-	var top := rect.position.y + 84.0
-	var row_height := minf(56.0, (rect.size.y - 150.0) / float(maxi(1, tiers.size())))
+	var band_top := rect.position.y + (54.0 if apex_up else 6.0)
+	var band_height := rect.size.y - 60.0
+	var row_height := minf(48.0, band_height / float(maxi(1, tiers.size())))
+	# AI1.6. Density carries meaning: narrow at the crown, wide toward the
+	# waist, regardless of which physical edge the crown is drawn against.
+	var span_for := func(index: int) -> float:
+		return lerpf(rect.size.x * 0.30, rect.size.x * 0.94, float(index) / float(maxi(1, tiers.size() - 1)))
+	# AI1.2. Tier 0 (the crown) sits at the cone's own outer edge; the last
+	# tier (intake) sits nearest the waist — whichever physical direction
+	# that is for this cone.
+	var y_for := func(index: int) -> float:
+		return band_top + float(index) * row_height if apex_up else rect.end.y - float(index + 1) * row_height
 	for index in tiers.size():
 		var tier: Dictionary = tiers[index]
 		var members: Array = tier["members"]
-		# The width is the pyramid: narrow at the crown, wide at intake.
-		var span := lerpf(rect.size.x * 0.46, rect.size.x * 0.96, float(index) / float(maxi(1, tiers.size() - 1)))
+		var span: float = span_for.call(index)
 		var cx := rect.position.x + rect.size.x * 0.5
-		var y := top + float(index) * row_height
+		var y: float = y_for.call(index)
 		var vacant := members.is_empty()
 		var accent: Color = HOT if vacant else [COPPER, COPPER, MOSS, MOSS, INK][mini(index, 4)]
 		var shape := PackedVector2Array([
 			Vector2(cx - span * 0.5 + 10, y), Vector2(cx + span * 0.5 - 10, y),
-			Vector2(cx + span * 0.5, y + row_height - 8), Vector2(cx - span * 0.5, y + row_height - 8),
+			Vector2(cx + span * 0.5, y + row_height - 6), Vector2(cx - span * 0.5, y + row_height - 6),
 		])
 		draw_colored_polygon(shape, accent * Color(1, 1, 1, 0.10 if not vacant else 0.16))
 		var edge := shape.duplicate()
 		edge.append(shape[0])
 		draw_polyline(edge, accent * Color(1, 1, 1, 0.75), 1.4)
-		var rank_x := cx - span * 0.5 + (82.0 if not members.is_empty() else 18.0)
-		CellOutzType.draw_text(self, Vector2(rank_x, y + 8), str(tier["rank"]), 11.0, accent, 1.2)
+		# Two fixed lines regardless of how short `row_height` runs: a thin
+		# top line (rank, buy-in) and a bottom line anchored to the row's own
+		# floor (`draw_string`'s baseline convention draws upward from it),
+		# so the two can never collide the way fractions of a shrinking
+		# `row_height` did — the double pyramid halved the room a single one
+		# had, and the old offsets were tuned against the larger number.
+		var rank_x := cx - span * 0.5 + (66.0 if not members.is_empty() else 16.0)
+		CellOutzType.draw_text(self, Vector2(rank_x, y + 3), str(tier["rank"]), 9.0, accent, 1.0)
 		var buy_in := "BUY-IN %d" % int(tier["buy_in"])
-		var buy_width := CellOutzType.width(buy_in, 9.0, 0.8)
-		CellOutzType.draw_text(self, Vector2(cx + span * 0.5 - 18 - buy_width, y + 9), buy_in, 9.0, INK * Color(1, 1, 1, 0.42), 0.8)
+		var buy_width := CellOutzType.width(buy_in, 8.0, 0.7)
+		CellOutzType.draw_text(self, Vector2(cx + span * 0.5 - 14 - buy_width, y + 4), buy_in, 8.0, INK * Color(1, 1, 1, 0.42), 0.7)
+		var floor_y := y + row_height - 5.0
 		if vacant:
 			var claimant := ""
 			for vacancy in data.vacancies:
@@ -1276,71 +1341,85 @@ func _draw_pyramid(rect: Rect2) -> void:
 			var pitch := "OPPORTUNITY — POST UNFILLED"
 			if claimant != "":
 				pitch = "OPPORTUNITY — %s IS POSITIONED FOR IT" % claimant.to_upper()
-			draw_string(font, Vector2(cx - span * 0.5 + 18, y + 34), pitch, HORIZONTAL_ALIGNMENT_LEFT, span - 36, 12, HOT)
+			draw_string(font, Vector2(cx - span * 0.5 + 14, floor_y), pitch, HORIZONTAL_ALIGNMENT_LEFT, span - 28, 9, HOT)
 		else:
 			var names: Array = []
 			for member in members:
 				names.append(str((member as Dictionary).name))
 			var downline := "DOWNLINE %02d" % int(tier["downline"])
-			var down_width := CellOutzType.width(downline, 10.0, 0.9)
-			# The crown tier is the narrowest row and usually holds the longest
-			# names, so the room left after the downline figure has to be measured
-			# rather than assumed - a fixed 130px reservation printed "Dray Kell,
-			# the captain" straight through "DOWNLINE 02".
-			var room := span - 36.0 - down_width - 16.0
+			var down_width := CellOutzType.width(downline, 8.0, 0.7)
+			var icon_size := minf(row_height - 8.0, 30.0)
+			var room := span - 28.0 - down_width - 12.0 - icon_size
 			var label := ", ".join(names)
-			while names.size() > 1 and font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x > room:
+			while names.size() > 1 and font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x > room:
 				names.resize(names.size() - 1)
 				label = ", ".join(names) + "  +%d" % (members.size() - names.size())
-			# The tier's lead member gets a turning head at the left edge of the
-			# row. Greg's ask: the people in the hierarchy should be present as
-			# objects, not as text in a table.
 			# A3.5. Remember where this row is so it can be clicked through to.
-			_tier_rects.append({"id": str((members[0] as Dictionary).id), "rect": Rect2(Vector2(cx - span * 0.5, y), Vector2(span, row_height - 8.0))})
+			_tier_rects.append({"id": str((members[0] as Dictionary).id), "rect": Rect2(Vector2(cx - span * 0.5, y), Vector2(span, row_height - 6.0))})
 			var lead: Dictionary = members[0]
-			var icon_size := minf(row_height - 12.0, 48.0)
-			var has_icon := _draw_icon(index, str(lead.id), Rect2(Vector2(cx - span * 0.5 + 16, y + 4), Vector2(icon_size, icon_size)))
-			var text_x := cx - span * 0.5 + (18.0 + icon_size + 10.0 if has_icon else 18.0)
-			draw_string(font, Vector2(text_x, y + 40), label, HORIZONTAL_ALIGNMENT_LEFT, room - icon_size - 10.0, 13, INK * Color(1, 1, 1, 0.88))
-			CellOutzType.draw_text(self, Vector2(cx + span * 0.5 - 18 - down_width, y + 30), downline, 10.0, SPORE * Color(1, 1, 1, 0.8), 0.9)
+			var has_icon := _draw_icon(index, str(lead.id), Rect2(Vector2(cx - span * 0.5 + 12, floor_y - icon_size + 4.0), Vector2(icon_size, icon_size)))
+			var text_x := cx - span * 0.5 + (14.0 + icon_size + 6.0 if has_icon else 14.0)
+			draw_string(font, Vector2(text_x, floor_y), label, HORIZONTAL_ALIGNMENT_LEFT, room, 11, INK * Color(1, 1, 1, 0.88))
+			CellOutzType.draw_text(self, Vector2(cx + span * 0.5 - 14 - down_width, floor_y - 8.0), downline, 8.0, SPORE * Color(1, 1, 1, 0.8), 0.7)
 
-	# A3.7. The ladder is not just tiers - it is who brought whom in. Drawn from
-	# real ally and command edges between members of adjacent tiers, because the
-	# recruitment chain is the thing a pyramid scheme actually sells.
+	# A3.7. The ladder is not just tiers - it is who brought whom in. Drawn
+	# from real ally and command edges between members of adjacent tiers.
+	# "Adjacent" always means one step further from this cone's own crown,
+	# regardless of which physical direction that is.
 	for index in range(1, tiers.size()):
-		var lower: Array = (tiers[index] as Dictionary)["members"]
-		var upper: Array = (tiers[index - 1] as Dictionary)["members"]
-		if lower.is_empty() or upper.is_empty():
+		var outer: Array = (tiers[index - 1] as Dictionary)["members"]
+		var inner: Array = (tiers[index] as Dictionary)["members"]
+		if outer.is_empty() or inner.is_empty():
 			continue
-		var recruit: Dictionary = lower[0]
+		var recruit: Dictionary = inner[0]
 		var relations: Dictionary = WorldHistory.subject(str(recruit.id)).get("relations", {})
-		for sponsor in upper:
+		for sponsor in outer:
 			if not relations.has(str((sponsor as Dictionary).id)):
 				continue
 			var centre_x := rect.position.x + rect.size.x * 0.5
-			var lower_span := lerpf(rect.size.x * 0.46, rect.size.x * 0.96, float(index) / float(maxi(1, tiers.size() - 1)))
-			var upper_span := lerpf(rect.size.x * 0.46, rect.size.x * 0.96, float(index - 1) / float(maxi(1, tiers.size() - 1)))
-			var from_point := Vector2(centre_x - lower_span * 0.5, top + float(index) * row_height + 10.0)
-			var to_point := Vector2(centre_x - upper_span * 0.5, top + float(index - 1) * row_height + row_height - 16.0)
-			var elbow := minf(from_point.x, to_point.x) - 14.0
+			var inner_span: float = span_for.call(index)
+			var outer_span: float = span_for.call(index - 1)
+			var inner_y: float = y_for.call(index)
+			var outer_y: float = y_for.call(index - 1)
+			var from_point := Vector2(centre_x - inner_span * 0.5, inner_y + row_height * 0.5)
+			var to_point := Vector2(centre_x - outer_span * 0.5, outer_y + row_height * 0.5)
+			var elbow := minf(from_point.x, to_point.x) - 12.0
 			draw_polyline(PackedVector2Array([
 				from_point, Vector2(elbow, from_point.y), Vector2(elbow, to_point.y), to_point,
-			]), SPORE * Color(1, 1, 1, 0.75), 1.8)
-			draw_circle(to_point, 3.0, SPORE)
-			# Named, because "who brought you in" is the thing the pitch sells.
-			CellOutzType.draw_text(self, Vector2(elbow - 52.0, (from_point.y + to_point.y) * 0.5 - 5.0), "UPLINE", 8.0, SPORE * Color(1, 1, 1, 0.7), 0.8)
+			]), SPORE * Color(1, 1, 1, 0.75), 1.6)
+			draw_circle(to_point, 2.6, SPORE)
+			CellOutzType.draw_text(self, Vector2(elbow - 48.0, (from_point.y + to_point.y) * 0.5 - 5.0), "UPLINE", 7.0, SPORE * Color(1, 1, 1, 0.7), 0.7)
 			break
 
 	# A3.6. The register, pushed. This is a recruitment pitch printed on a
-	# hierarchy chart, and it should read like one.
-	var fy := top + float(tiers.size()) * row_height + 10.0
-	if fy < rect.position.y + rect.size.y - 16.0:
-		CellOutzType.draw_stamped(self, Vector2(rect.position.x, fy), "ADVANCEMENT OPPORTUNITY", 14.0, COPPER, HOT * Color(1, 1, 1, 0.3), 1.2)
-		draw_string(font, Vector2(rect.position.x, fy + 30), "RECRUIT TWO AND YOUR POSITION IS SECURE. RECRUIT FOUR AND YOUR POSITION IS THEIRS.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 11, INK * Color(1, 1, 1, 0.72))
-		var voice: String = "\"I came in on INTAKE owing a car. Eleven weeks later I own the people who sold it to me.\""
-		draw_string(font, Vector2(rect.position.x + 8, fy + 48), voice, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 16, 11, SPORE * Color(1, 1, 1, 0.72))
-		draw_string(font, Vector2(rect.position.x + 8, fy + 62), "— A SATISFIED EARNER, DECEASED", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 16, 9, INK * Color(1, 1, 1, 0.34))
-		draw_string(font, Vector2(rect.position.x, fy + 82), "CELLOUTZ IS NOT RESPONSIBLE FOR POSITIONS HELD BY THE DECEASED. BUY-IN IS NON-REFUNDABLE.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 9, INK * Color(1, 1, 1, 0.30))
+	# hierarchy chart, and it should read like one — only on the Ascent cone,
+	# where "advancement" is the institution's own pitch, and only if the
+	# space the double pyramid left this half actually has room for it.
+	if apex_up:
+		var last_bottom: float = y_for.call(tiers.size() - 1) + row_height
+		if last_bottom + 44.0 < rect.end.y:
+			CellOutzType.draw_stamped(self, Vector2(rect.position.x, last_bottom + 10.0), "ADVANCEMENT OPPORTUNITY", 11.0, COPPER, HOT * Color(1, 1, 1, 0.3), 1.0)
+			draw_string(font, Vector2(rect.position.x, last_bottom + 28.0), "RECRUIT TWO AND YOUR POSITION IS SECURE. RECRUIT FOUR AND IT IS THEIRS.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 9, INK * Color(1, 1, 1, 0.66))
+
+
+## AI1.2. The waist: always the player's own row, and it is the only tier
+## they occupy — a real reading of the same Tree axis the FILE page already
+## draws, not a second alignment number invented for this page.
+func _draw_pyramid_waist(rect: Rect2) -> void:
+	var font := ThemeDB.fallback_font
+	draw_rect(rect, COPPER * Color(1, 1, 1, 0.08))
+	draw_line(rect.position, rect.position + Vector2(rect.size.x, 0), COPPER * Color(1, 1, 1, 0.5), 1.2)
+	draw_line(Vector2(rect.position.x, rect.end.y), rect.end, COPPER * Color(1, 1, 1, 0.5), 1.2)
+	var alignment: float = WorldHistory.tree_alignment(WorldHistory.subject("player"))
+	var descriptor := str(WorldHistory.tree_descriptor(WorldHistory.subject("player")))
+	var stamp := "YOU STAND HERE"
+	var stamp_at := rect.position + Vector2(rect.size.x * 0.5 - 90, 6)
+	CellOutzType.draw_stamped(self, stamp_at, stamp, 13.0, COPPER, HOT * Color(1, 1, 1, 0.25), 1.4)
+	# Measured off the stamp itself rather than a fixed offset guessed against
+	# one string — "LIMBO" and "ASCENDANT" are not the same width, and a fixed
+	# gap printed the descriptor through the stamp's own last letters.
+	var stamp_width := CellOutzType.width(stamp, 13.0, 1.4)
+	draw_string(font, stamp_at + Vector2(stamp_width + 14.0, 13.0), "· %s (%.2f)" % [descriptor.to_upper(), alignment], HORIZONTAL_ALIGNMENT_LEFT, rect.end.x - (stamp_at.x + stamp_width + 14.0), 11, INK * Color(1, 1, 1, 0.7))
 
 
 # --- page three: the Wire ---------------------------------------------------
