@@ -297,5 +297,40 @@ func _ready() -> void:
 			await get_tree().physics_frame
 		print("MATERIAL_HOUR %02d glow=%.3f" % [int(hour), sample.emission_energy_multiplier])
 
+	# A10.14. What each of this pass's systems costs, measured rather than
+	# asserted, at the hour they all run at once: 01:00, with eleven lamps lit,
+	# their warp shells up, the air at full severity, the gods in the sky and
+	# the player burning.
+	#
+	# Toggled one at a time and restored in between, not stacked. The first
+	# build of this disabled each system on top of the last and reported a
+	# scene that got *slower* as things were switched off, which is what a
+	# cumulative measurement of a noisy monitor looks like.
+	WorldClock.set_hour(1.0)
+	hunt._update_day_night()
+	hunt.player_body.position = Vector3(-6, 0.9, -4)
+	for _tick in 30:
+		await get_tree().physics_frame
+
+	var budget := {}
+	for pass_name: String in ["all", "no_air", "no_warp", "no_flame", "all_again"]:
+		hunt.air.visible = pass_name != "no_air"
+		for warp_shell in get_tree().get_nodes_in_group(LightWarp.GROUP):
+			(warp_shell as Node3D).visible = pass_name != "no_warp"
+		var burning := hunt.flame.get_node_or_null("FlameMelt") as Node3D
+		if burning != null:
+			burning.visible = pass_name != "no_flame"
+		# Long settle: the first frames after a visibility change are spent
+		# rebuilding what was switched off and are not what it costs to run.
+		for _settle in 45:
+			await get_tree().process_frame
+		var total := 0.0
+		for _sample in 150:
+			await get_tree().process_frame
+			total += Performance.get_monitor(Performance.TIME_PROCESS) + Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)
+		budget[pass_name] = snappedf(total / 150.0 * 1000.0, 0.01)
+	print("BUDGET_MS %s" % [budget])
+	print("DRAW_CALLS %d" % Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+
 	print("CAPTURE_DONE")
 	get_tree().quit()
