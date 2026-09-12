@@ -280,6 +280,8 @@ const GATE_LIGHTS := [
 ## A4.1. Every placed light, so `_update_day_night()` can put them out at dawn
 ## without holding a second list of where they are.
 var night_lights: Array[OmniLight3D] = []
+## A7.1. Who is up, and the hour that decides it.
+var gods: Gods
 ## AS2. Built once in `_build_world()`, driven every frame in
 ## `_update_day_night()` off `world_clock.gd` — it used to sit at one fixed
 ## angle and brightness no matter the hour, which is why W1.1 existing made no
@@ -3557,6 +3559,15 @@ func _build_world() -> void:
 	# ambient, which rendered the Expanse as an unreadable brown murk — the same
 	# fault the menu had. The roadmap already listed this scene as un-migrated.
 	$WorldEnvironment.environment = WorldLook.environment("ashbloom")
+	# A7.1. The gods sit outside the firmament v6 broke open, so they are bound
+	# to the same sky material and driven by the same clock as everything else
+	# in A. `camera` is an `@onready`, which resolves before `_ready()` calls
+	# this, so it is safe to hand over here.
+	gods = Gods.new()
+	gods.name = "Gods"
+	add_child(gods)
+	gods.bind($WorldEnvironment.environment.sky.sky_material as ShaderMaterial, camera)
+	gods.god_seen.connect(_on_god_seen)
 	_add_mesh(BoxMesh.new(), Vector3(0, -0.6, 0), Vector3(470, 1, 370), Color("17150f"), 0.0)
 	var floor_body := StaticBody3D.new()
 	var floor_collider := CollisionShape3D.new()
@@ -3676,6 +3687,15 @@ func _place_night_light(at: Vector3, color: Color, energy: float, reach: float, 
 	night_lights.append(lamp)
 	LightWarp.attach(lamp)
 	return lamp
+
+
+## A7.2. A sighting is not decoration: `gods.gd` has already written it into
+## `WorldHistory` by the time this runs, and this is where the scene answers.
+## The line goes to the status readout rather than a bespoke banner, because the
+## one thing this world does with an omen is note it and carry on.
+func _on_god_seen(body: Dictionary) -> void:
+	if status != null and is_instance_valid(status):
+		status.text = "%s IS UP // %s" % [String(body.get("name", "SOMETHING")), WorldClock.long_stamp()]
 
 
 ## AS2. The sun and the base ambient used to be set once in `_build_world()`

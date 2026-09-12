@@ -38,6 +38,18 @@ uniform vec3 beyond : source_color = vec3(0.016, 0.019, 0.035);
 uniform vec3 shell_edge : source_color = vec3(0.62, 0.42, 0.24);
 uniform float star_density : hint_range(0.0, 1.0) = 0.55;
 
+// A7.1. Three slots for whichever gods are up, filled by `gods.gd` off
+// `WorldClock.hour()`. `place` is a direction with the body's angular radius in
+// w; `tint` is its colour with its strength in w, and a strength of zero is an
+// empty slot. Three separate pairs rather than an array because that is the
+// binding this engine version is least likely to surprise anybody with.
+uniform vec4 god0_place = vec4(0.0, 1.0, 0.0, 0.0);
+uniform vec4 god0_tint = vec4(0.0);
+uniform vec4 god1_place = vec4(0.0, 1.0, 0.0, 0.0);
+uniform vec4 god1_tint = vec4(0.0);
+uniform vec4 god2_place = vec4(0.0, 1.0, 0.0, 0.0);
+uniform vec4 god2_tint = vec4(0.0);
+
 
 // A cheap stable hash. Stars have to sit still in the sky: anything driven by
 // TIME or by screen position turns them into noise crawling over the dome.
@@ -59,6 +71,38 @@ float starfield(vec3 dir) {
 	// it instead of one uniform dusting.
 	float bright = smoothstep(0.99985, 1.0, hash13(cell * 1.7 + 11.0));
 	return point * 0.55 + bright * 2.2;
+}
+
+
+// A7.1. One god. Not a disc: a body with a limb that brightens toward its edge
+// and bands across it, so what is up there reads as a thing with a surface
+// rather than as a light source. The bands drift, slowly enough that standing
+// still is how you notice.
+vec3 god_body(vec3 dir, vec4 place, vec4 tint) {
+	float strength = tint.a;
+	if (strength <= 0.001) {
+		return vec3(0.0);
+	}
+	vec3 toward = normalize(place.xyz);
+	float radius = max(place.w, 0.0001);
+	float aim = dot(dir, toward);
+	float rim = cos(radius);
+	if (aim <= rim) {
+		// Outside the body itself, but not nothing: a god this close to the
+		// world lights the air around it.
+		float halo = exp(-(1.0 - aim) / max(radius * radius * 2.4, 1e-5));
+		return tint.rgb * halo * strength * 0.22;
+	}
+	// 1 at the centre of the face, 0 at the limb.
+	float across = (aim - rim) / max(1.0 - rim, 1e-5);
+	float edge = 1.0 - across;
+	// Bands, laid across the face along the axis it is not turning about.
+	vec3 local = normalize(dir - toward * aim);
+	float band = sin((across * 9.0 + local.y * 6.0) + TIME * 0.05);
+	float surface = 0.72 + 0.28 * band;
+	// The limb is brighter, which is what stops it reading as a flat circle.
+	float limb = 0.55 + 0.75 * pow(edge, 2.2);
+	return tint.rgb * strength * surface * limb;
 }
 
 
@@ -99,5 +143,14 @@ void sky() {
 	// enough to read at noon is a glow at one in the morning.
 	vec3 lit_edge = shell_edge * edge * (0.04 + energy * 0.96);
 
-	COLOR = mix(base, behind, crack) + lit_edge * (1.0 - crack);
+	vec3 dome = mix(base, behind, crack) + lit_edge * (1.0 - crack);
+
+	// A7.1. The gods sit outside the firmament, so they are added over the
+	// dome rather than mixed into it — including over the unbroken parts,
+	// because a thing that size is not hidden by a shell it is bigger than.
+	dome += god_body(dir, god0_place, god0_tint);
+	dome += god_body(dir, god1_place, god1_tint);
+	dome += god_body(dir, god2_place, god2_tint);
+
+	COLOR = dome;
 }

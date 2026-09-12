@@ -141,5 +141,28 @@ func _ready() -> void:
 
 	print("TORCH_LIT=", hunt.handheld.torch_active(), " BEAM=", hunt.handheld_lamp.light_energy)
 	print("WARP_SHELLS=", get_tree().get_nodes_in_group(LightWarp.GROUP).size())
+	# A7.1 / A7.2. Whoever is up at the hour, photographed from underneath, and
+	# then looked at long enough for the world to write it down.
+	for hour: float in [13.0, 2.0]:
+		WorldClock.set_hour(hour)
+		hunt._update_day_night()
+		var present := Gods.up_now(WorldClock.hour())
+		if present.is_empty():
+			print("NO_GODS_AT ", hour)
+			continue
+		var body: Dictionary = present[present.size() - 1]
+		var toward := Gods.direction(body)
+		hunt.yaw = atan2(toward.x, toward.z)
+		hunt.pitch = asin(toward.y)
+		# Long enough to cross SIGHTING_SECONDS, since the whole point of A7.2
+		# is that a glance while running does not count.
+		for _tick in 130:
+			await get_tree().process_frame
+		hunt._update_camera()
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/gods_%02d.png" % [out_dir, int(hour)])
+		print("GODS_AT %02d up=%d facing=%s seen=%d" % [
+			int(hour), present.size(), body["name"], WorldHistory.event_count("god_seen"),
+		])
 	print("CAPTURE_DONE")
 	get_tree().quit()

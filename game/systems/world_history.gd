@@ -55,6 +55,12 @@ var chaos_magick_at_minute := 0.0
 ## invented for each of them up front.
 const CHAOS_MAGICK := {
 	"ritual_completed": 0.16,
+	# A7.2. Seeing a god is an event with a consequence rather than a line in a
+	# log: it feeds the same charge a completed ritual does, at a third of the
+	# weight. Looking up is not a ritual, but it is not nothing either, and the
+	# once-per-god-per-day guard in `gods.gd` is what stops a clear night
+	# ratcheting this on its own.
+	"god_seen": 0.05,
 }
 
 ## Loses about half its charge every three in-world hours with nothing feeding
