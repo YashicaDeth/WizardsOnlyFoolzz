@@ -74,5 +74,11 @@ func _ready() -> void:
 	var contest_events := WorldHistory.events.filter(func(e): return str(e.get("type", "")) == "channel_contested")
 	check(contest_events.size() >= 3, "every successful contest is a real recorded event (%d)" % contest_events.size())
 
+	# --- FACTIONS.md step 7: the propagation-gating factor is a real 0-1 read
+	WorldHistory.amend_subject("vanity_row", {"signal_control": 0.0})
+	check(is_equal_approx(wire.signal_reach_factor("vanity_row"), 0.0), "a fully cut channel gates propagation down to nothing")
+	WorldHistory.amend_subject("vanity_row", {"signal_control": 40.0})
+	check(is_equal_approx(wire.signal_reach_factor("vanity_row"), 0.4), "a half-flooded-ish channel carries a rumour proportionally, not all-or-nothing")
+
 	print("CHANNEL_CONTEST_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

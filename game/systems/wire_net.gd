@@ -467,6 +467,16 @@ func contest_channel(faction_id: String, action: String, subject_id: String = "p
 	return result
 
 
+## FACTIONS.md's implementation order, step 7 ("coupling: signal control
+## gates grudge propagation"), from this side of the seam. Kept as a plain
+## 0-1 multiplier rather than a yes/no gate — a half-flooded channel should
+## carry a rumour half as far, not either the full distance or none of it —
+## so whoever wires F2's actual propagation (Codex's file) can multiply by
+## this rather than needing a second read of `signal_control`.
+func signal_reach_factor(faction_id: String) -> float:
+	return clampf(faction_signal_control(faction_id) / 100.0, 0.0, 1.0)
+
+
 # --- contact ---------------------------------------------------------------
 
 ## Whether a DM gets read, and what comes back.
