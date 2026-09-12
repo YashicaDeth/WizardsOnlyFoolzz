@@ -293,8 +293,16 @@ func points_left() -> int:
 	return BASE_POINTS - points_spent()
 
 
+## N1.3. "Overspending is possible and the game lets you do it." This used to
+## be the gate `toggle_trait()` enforced, which is exactly what made
+## overspending impossible — kept as `is_affordable()` below for whoever
+## wants to warn on a choice rather than block it.
 func can_take(trait_id: String) -> bool:
-	if traits.has(trait_id) or not TRAITS.has(trait_id):
+	return not traits.has(trait_id) and TRAITS.has(trait_id)
+
+
+func is_affordable(trait_id: String) -> bool:
+	if not can_take(trait_id):
 		return false
 	return points_left() - int((TRAITS[trait_id] as Dictionary).get("cost", 0)) >= 0
 
@@ -307,6 +315,27 @@ func toggle_trait(trait_id: String) -> bool:
 		return false
 	traits.append(trait_id)
 	return true
+
+
+# --- N2: broken runs, honestly labelled ------------------------------------
+
+## N2.4. Derived from the numbers a player actually chose, never an authored
+## "these traits are broken together" list — overspending on the same budget
+## every honest build respects is already the whole signal. Set to 1 rather
+## than something larger: today's roster only has two cost-3 traits and one
+## cost-1, so the maximum overspend reachable at all is 1 (take every
+## positive-cost trait, refund none of it) — a higher threshold would make
+## `is_broken_build()` unreachable rather than rare. Revisit upward as D8
+## grows the trait list.
+const BROKEN_OVERSPEND_THRESHOLD := 1
+
+
+func overspent_by() -> int:
+	return maxi(0, -points_left())
+
+
+func is_broken_build() -> bool:
+	return overspent_by() >= BROKEN_OVERSPEND_THRESHOLD
 
 
 # --- the numbers everything else reads -------------------------------------
@@ -401,6 +430,11 @@ func apply_to_world() -> Dictionary:
 		# D. What you chose to look like was collected on the sheet and then
 		# never filed, so the body could not read it even in principle.
 		"appearance": appearance.duplicate(),
+		# N2.1/N2.2. Marked at creation, in the game's own register rather
+		# than an error state — an overspent build reads as a run the game
+		# already knows is broken, not a mistake nobody flagged.
+		"broken_run": is_broken_build(),
+		"overspent_by": overspent_by(),
 		"anatomy": {
 			"blood_type": str(under_skin.get("blood", "O-RUST")),
 			"skeleton": str(under_skin.get("skeleton", "standard")),
@@ -416,6 +450,11 @@ func apply_to_world() -> Dictionary:
 		state = _mistranscribe(state)
 	WorldHistory.register_subject("player", state)
 	WorldHistory.update_subject("player", state, "sheet_filed")
+	# N2.2. Achievement-run register, not an error dialog: the event names
+	# the run broken and says so by how much, in the same voice as any other
+	# record the world keeps.
+	if bool(state.get("broken_run", false)):
+		WorldHistory.record_event("achievement_run_started", {"overspent_by": int(state.get("overspent_by", 0))})
 	return state
 
 

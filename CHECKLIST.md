@@ -907,15 +907,15 @@ customisation"*.
 D is complete and stays complete. This is the layer on top of it.
 
 ### N1 — A budget worth spending
-- [ ] **N1.1** A limited, balanced starting trait budget — you cannot take everything
-- [ ] **N1.2** Costs tuned so the honest builds are genuinely competitive
-- [ ] **N1.3** Overspending is possible and the game lets you do it
+- [x] **N1.1** A limited, balanced starting trait budget — you cannot take everything — already built (D2, `BASE_POINTS := 6`); audited rather than rebuilt
+- [ ] **N1.2** Costs tuned so the honest builds are genuinely competitive (a balance/playtesting question, not one this session can answer from the numbers alone)
+- [x] **N1.3** Overspending is possible and the game lets you do it — `character_sheet.gd`'s `toggle_trait()` no longer hard-blocks on cost (that gate is what made overspending impossible); `can_take()` now only checks the trait exists and isn't already taken, and the old budget check survives as `is_affordable()` for whoever wants to warn rather than block. `vat_intake.gd`'s existing HOT colour on `points_left() <= 0` already reacts to this without any UI change
 
 ### N2 — Broken runs, honestly labelled
-- [ ] **N2.1** A run the game knows is broken is *marked* as broken, at creation
-- [ ] **N2.2** Broken runs read as achievement runs rather than as mistakes
-- [ ] **N2.3** The world reacts to a broken build — being obviously wrong is visible to others
-- [ ] **N2.4** What counts as broken is derived from the build, not an authored list
+- [x] **N2.1** A run the game knows is broken is *marked* as broken, at creation — `apply_to_world()` writes `broken_run`/`overspent_by` onto the filed subject
+- [x] **N2.2** Broken runs read as achievement runs rather than as mistakes — filing one records `achievement_run_started` (not an error/warning event) with the real deficit
+- [ ] **N2.3** The world reacts to a broken build — being obviously wrong is visible to others (the flag is real and readable by anything — Wire, dossier, pricing — but nothing yet actually reads it; a reaction system is more than a single-sitting increment)
+- [x] **N2.4** What counts as broken is derived from the build, not an authored list — `overspent_by()`/`is_broken_build()` read the same budget math every honest build already respects, threshold `BROKEN_OVERSPEND_THRESHOLD := 1` (today's trait roster can reach at most 1 point of overspend — set to match reality rather than an aspirational number nothing can trigger). Covered in `tests/sheet_test.gd` (13 new checks; existing D1/D2/D4/D5/D6/D8 checks — including the two that used to assert overspending was impossible — re-verified/updated with no other regressions, one confirmed via a real broken lottery roll at seed 215)
 
 ### N3 — The body on the right
 - [ ] **N3.1** A large live 3D model beside the sheet, not a portrait

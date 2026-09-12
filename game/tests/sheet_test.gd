@@ -69,9 +69,27 @@ func _ready() -> void:
 	check(budget.toggle_trait("the_tube_stayed_in"), "a negative trait can be taken")
 	check(budget.points_left() > CharacterSheet.BASE_POINTS - 3, "and it refunds (%d left)" % budget.points_left())
 	check(budget.toggle_trait("famous_for_something"), "a third trait fits")
-	check(not budget.toggle_trait("no_pain_receptors") or budget.points_left() >= 0, "the budget is never overspent (%d left)" % budget.points_left())
 	check(budget.toggle_trait("hospital_strength"), "taking it again removes it")
 	check(not budget.traits.has("hospital_strength"), "and it is gone")
+
+	# --- N1.3: overspending is now possible, not blocked --------------------
+	# A fresh sheet, all three positive-cost traits, none of the refund ones —
+	# the only way to actually reach negative with today's roster (max spend
+	# 3+3+1=7 against a 6-point budget).
+	var overspender := CharacterSheet.new()
+	overspender.toggle_trait("hospital_strength")
+	overspender.toggle_trait("famous_for_something")
+	check(overspender.points_left() == 0, "exactly on budget after these two (%d left)" % overspender.points_left())
+	check(not overspender.is_affordable("no_pain_receptors"), "is_affordable() still says no at zero left")
+	check(overspender.toggle_trait("no_pain_receptors"), "but toggle_trait() lets you take it anyway")
+	check(overspender.points_left() == -1, "and the budget actually goes negative (%d left)" % overspender.points_left())
+
+	# --- N2: broken runs, honestly labelled, derived from the numbers -------
+	check(overspender.overspent_by() == 1, "overspent_by() reads the real deficit, not a flag")
+	check(overspender.is_broken_build(), "a build this overspent reads as broken")
+	var in_budget := CharacterSheet.new()
+	in_budget.toggle_trait("hospital_strength")
+	check(not in_budget.is_broken_build(), "a build within budget is not")
 
 	# --- traits and races move real numbers ----------------------------------
 	var plain := CharacterSheet.new()
@@ -137,11 +155,46 @@ func _ready() -> void:
 	check(differs, "CLERICAL ERROR makes the filed sheet disagree with the real one")
 	check(str(filed_wrong.get("transcription", "")) == "unverified", "and the record admits it is unverified")
 
-	# --- the lottery ----------------------------------------------------------
+	# --- the lottery ------------------------------------------------------
 	var lottery := CharacterSheet.new()
 	lottery.randomise(4242)
 	check(CharacterSheet.RACES.has(lottery.race), "a random decanting still produces a valid race")
-	check(lottery.points_left() >= 0, "and never an overspent budget (%d)" % lottery.points_left())
+	# N1.3/N2: the lottery calls toggle_trait() directly, same as a player
+	# would, so it can now land on a genuinely overspent, broken build —
+	# that is the point, not a bug to guard against. Sweep seeds rather than
+	# assert on one, since a single seed proves nothing about the shape of
+	# the possibility space.
+	var any_broken := false
+	var any_honest := false
+	for seed_value in range(1, 400):
+		var roll := CharacterSheet.new()
+		roll.randomise(seed_value)
+		if roll.is_broken_build():
+			any_broken = true
+			check(roll.overspent_by() == -roll.points_left(), "overspent_by() matches the actual deficit on a broken lottery roll (seed %d)" % seed_value)
+		else:
+			any_honest = true
+	check(any_broken, "the lottery can actually produce a broken, overspent build")
+	check(any_honest, "and can still produce an honest, in-budget one — it is not always broken")
+
+	# --- N2.1/N2.2: the filed sheet marks a broken run in the world's own record
+	WorldHistory.clear_history()
+	var broken_sheet := CharacterSheet.new()
+	broken_sheet.toggle_trait("hospital_strength")
+	broken_sheet.toggle_trait("famous_for_something")
+	broken_sheet.toggle_trait("no_pain_receptors")
+	var broken_filed := broken_sheet.apply_to_world()
+	check(bool(broken_filed.get("broken_run", false)), "an overspent sheet files as broken_run")
+	check(int(broken_filed.get("overspent_by", 0)) == 1, "and records the real deficit, not just true/false")
+	var achievement_events := WorldHistory.events.filter(func(e): return str(e.get("type", "")) == "achievement_run_started")
+	check(not achievement_events.is_empty(), "a broken run is recorded in the achievement-run register, not silently")
+
+	WorldHistory.clear_history()
+	var clean_sheet := CharacterSheet.new()
+	clean_sheet.toggle_trait("hospital_strength")
+	var clean_filed := clean_sheet.apply_to_world()
+	check(not bool(clean_filed.get("broken_run", false)), "an honest sheet does not file as broken")
+	check(WorldHistory.events.filter(func(e): return str(e.get("type", "")) == "achievement_run_started").is_empty(), "and records no achievement-run event")
 
 	print("SHEET_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
