@@ -20,6 +20,7 @@ const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
 const STORM_WEATHER := preload("res://systems/storm_weather.gd")
+const PSYCHEDELIC_OSC := preload("res://systems/psychedelic_osc.gd")
 ## AS1.1. Bright enough to actually read as a light source against
 ## `world_look.gd`'s low-ambient presets rather than a glow nobody would notice.
 const HANDHELD_LAMP_ENERGY := 6.0
@@ -381,6 +382,13 @@ func _ready() -> void:
 	psychedelic = PSYCHEDELIC_RIG.new()
 	psychedelic.name = "Psychedelic"
 	$HUD.add_child(psychedelic)
+	# DESIGN/FINAL_V.md §16, Path C. Frees itself immediately unless dev tools
+	# are on and `--osc` was actually asked for, so this costs nothing in a
+	# normal run — see `psychedelic_osc.gd`.
+	var osc := PSYCHEDELIC_OSC.new()
+	osc.name = "PsychedelicOSC"
+	add_child(osc)
+	osc.attach(psychedelic)
 	voice_channel = preload("res://systems/proximity_voice.gd").new()
 	voice_channel.name = "ProximityVoice"
 	add_child(voice_channel)
