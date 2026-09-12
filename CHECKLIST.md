@@ -142,6 +142,30 @@ and "a game".
 - [x] ~~**A5.4** Grunge pass: the HUD is a cab instrument, so it is filthy~~
 - [x] ~~**A5.5** Cut visible prose by ~60%, per the Tier 1b note~~
 
+### A10 — The map is the world, seen from above
+Greg, 2026-09-12: *"make the map an inbuilt satellite transferring from topview
+somewhat 3d with showing the maps color and what it looks like, then make it
+transferable into streetview and interwebbed into the phone black mirror tool"*.
+
+A6 built a survey **chart** — drawn, stencilled, surveyed by walking. This is the
+other thing a map can be: the actual region rendered from above, in its own
+colours, so what you are looking at is the world rather than a diagram of it.
+The two are not in competition. The chart marks stay; they sit on top of the
+image instead of on top of nothing.
+
+The technique already exists in this project — `xray_specimen.gd` renders a live
+3D scene into a SubViewport for the loading screen. This is that, pointed down.
+
+- [ ] **A10.1** A camera above the region, rendering the real world into the map
+- [ ] **A10.2** Its real colours and materials, not a palette applied to a chart
+- [ ] **A10.3** Tilts as you zoom, so top-down becomes oblique becomes street level
+- [ ] **A10.4** Street view is the same world at eye height, not a second asset
+- [ ] **A10.5** Unsurveyed ground is grey, desaturated and fogged; walking it brings the colour in — Greg: *"going from grey and discoloured and foggy to when you walk around colored and explored"*
+- [ ] **A10.9** The reveal is worth watching — colour arrives as you walk rather than snapping on
+- [ ] **A10.6** The chart marks, roads and contacts draw over the image and still read
+- [ ] **A10.7** It lives in the handheld's MAP page, so it is the black mirror looking down
+- [ ] **A10.8** It costs nothing when the map is closed — the viewport stops rendering
+
 ### A6 — Living Map as an object `BUILT`
 - [x] ~~**A6.1** `v2` Salvaged bezel — pipes, rust plate, screws — around the chart~~
   - v1 — a hand-rolled Environment per scene

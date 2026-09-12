@@ -26,6 +26,7 @@ const COMBAT_RESPONSE := preload("res://systems/combat_response.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
+const PIN_BOARD := preload("res://systems/pin_board.gd")
 const IMPACT_FEEL := preload("res://systems/impact_feel.gd")
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 const CARRION_SCAVENGER := preload("res://systems/carrion_scavenger.gd")
@@ -181,6 +182,10 @@ var living_map: Control
 var natal_sigil: Control
 ## I0.1. The real index. Hunt Grounds was drawing its own text list instead.
 var world_index: Control
+## L. The Board was built across twenty-odd segments and instantiated only in
+## tests — there has never been a key that opens it, which is why Greg could not
+## remember how to reach it. There is one now.
+var pin_board: Control
 ## O2.2. The moment of contact. There was none — see impact_feel.gd.
 var impact_feel: Node
 var viscera_fx := true
@@ -281,6 +286,9 @@ func _ready() -> void:
 	world_index = WORLD_INDEX.new()
 	world_index.name = "WorldIndex"
 	$HUD.add_child(world_index)
+	pin_board = PIN_BOARD.new()
+	pin_board.name = "PinBoard"
+	$HUD.add_child(pin_board)
 	impact_feel = IMPACT_FEEL.new()
 	# The kill cam already owns time deliberately; an impact inside one is part
 	# of its timing, not a competitor for it.
@@ -584,6 +592,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_M: _toggle_panel("map")
 			KEY_T: _toggle_panel("tree")
 			KEY_J: _toggle_artwork()
+			# L. The wall. It has existed since this morning and nothing opened it.
+			KEY_P: _toggle_panel("board")
 			KEY_C: _start_grapple()
 			KEY_Z: _toggle_lock()
 			KEY_E: _interact()
@@ -2641,8 +2651,12 @@ func _toggle_panel(mode: String) -> void:
 		world_index.open()
 	elif world_index.visible:
 		world_index.close()
+	if panel_mode == "board":
+		pin_board.open()
+	elif pin_board.visible:
+		pin_board.close()
 	# A full sheet, chart or index; the field labels underneath it are noise.
-	var covering: bool = living_map.visible or world_index.visible
+	var covering: bool = living_map.visible or world_index.visible or pin_board.visible
 	for label in [title, status, vitals, prompt]:
 		label.visible = not covering
 	# The old ArchivePanel is dead. It was a Label in a box and it is exactly
