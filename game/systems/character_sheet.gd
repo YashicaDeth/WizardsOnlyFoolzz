@@ -462,18 +462,36 @@ func _mistranscribe(state: Dictionary) -> Dictionary:
 	var wrong := state.duplicate(true)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(display_name + str(birth)) & 0x7fffffff
+	# D2.4 v2. Which field and what it actually was, kept rather than thrown
+	# away once the wrong value overwrites it — CLERICAL ERROR was previously
+	# undiscoverable in principle, because nothing anywhere still held the
+	# true answer to check the sheet against. Nested under its own key rather
+	# than surfaced as a top-level field, so reading the dossier normally
+	# still shows only the wrong sheet; something has to go looking, and
+	# `world_index.gd`'s AUDIT action is what that costs.
+	var field := ""
+	var true_value: Variant = null
 	match rng.randi_range(0, 3):
 		0:
 			var values: Dictionary = wrong["attributes"]
 			var key: String = ATTRIBUTES[rng.randi_range(0, ATTRIBUTES.size() - 1)]
+			field = "attributes.%s" % key
+			true_value = values[key]
 			values[key] = snappedf(maxf(1.0, float(values[key]) + rng.randf_range(-2.0, 2.0)), 0.1)
 		1:
+			field = "sun_sign"
+			true_value = wrong["sun_sign"]
 			wrong["sun_sign"] = SIGNS[rng.randi_range(0, 11)]
 		2:
+			field = "anatomy.blood_type"
+			true_value = (wrong["anatomy"] as Dictionary)["blood_type"]
 			(wrong["anatomy"] as Dictionary)["blood_type"] = ["A-ASH", "B-9", "AB-", "SAP", "NULL"][rng.randi_range(0, 4)]
 		_:
+			field = "race"
+			true_value = wrong["race"]
 			wrong["race"] = RACES.keys()[rng.randi_range(0, RACES.size() - 1)]
 	wrong["transcription"] = "unverified"
+	wrong["clerical_error"] = {"field": field, "true_value": true_value, "discovered": false}
 	return wrong
 
 

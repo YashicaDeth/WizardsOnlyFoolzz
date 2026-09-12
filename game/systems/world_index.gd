@@ -528,6 +528,16 @@ func _follow_link(link: Dictionary) -> void:
 			page = 1
 			page_blend = 0.0
 			page_direction = 1.0
+		"audit":
+			# D2.4 v2. A real Wire lookup, at the real cost every other one
+			# already has — not a free tooltip on your own dossier.
+			var result: Dictionary = wire.act("player", "audit")
+			if bool(result.get("ok", false)):
+				var record: Dictionary = WorldHistory.subject("player")
+				var clerical: Dictionary = (record.get("clerical_error", {}) as Dictionary).duplicate()
+				if not clerical.is_empty():
+					clerical["discovered"] = true
+					WorldHistory.update_subject("player", {"clerical_error": clerical}, "clerical_error_audited")
 		"site":
 			# I3.2. Toggled rather than one-way: clicking the same site again
 			# is how you leave it, the same as everything else this reader
@@ -624,6 +634,14 @@ func _file_link_rows(rect: Rect2, subject: Dictionary) -> Array:
 			var part_row := Rect2(right_x - 4, wy - 12, right_width, 17)
 			rows.append({"kind": "implant", "id": str(part.name), "zone": str(part.get("zone", "torso")), "rect": part_row})
 			wy += 17.0
+	if str(anatomy.get("blood_type", "")) != "":
+		wy += 14.0
+	# D2.4 v2. Mirrors `_draw_file`'s own clerical-error block exactly, the
+	# same reason every other row here mirrors its draw call.
+	var clerical: Dictionary = subject.get("clerical_error", {})
+	if not clerical.is_empty() and not bool(clerical.get("discovered", false)):
+		wy += 20.0
+		rows.append({"kind": "audit", "id": "player", "rect": Rect2(right_x - 4, wy - 12, right_width, 17)})
 	return rows
 
 
@@ -1059,6 +1077,22 @@ func _draw_file(rect: Rect2) -> void:
 	if blood != "":
 		wy += 14.0
 		draw_string(font, Vector2(right_x, wy), "BLOOD %s" % blood.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, right_width, 11, INK * Color(1, 1, 1, 0.45))
+	# D2.4 v2. CLERICAL ERROR was previously undiscoverable in principle — the
+	# true value was thrown away the instant the wrong one overwrote it.
+	# `_mistranscribe()` now keeps it; this is where it can be found, and
+	# AUDIT costs the same real exposure any other Wire lookup does rather
+	# than being a free tooltip.
+	var clerical: Dictionary = subject.get("clerical_error", {})
+	if not clerical.is_empty():
+		wy += 20.0
+		if bool(clerical.get("discovered", false)):
+			draw_string(font, Vector2(right_x, wy), "DISCREPANCY (%s): ACTUALLY %s" % [str(clerical.get("field", "")).to_upper(), str(clerical.get("true_value", "")).to_upper()], HORIZONTAL_ALIGNMENT_LEFT, right_width, 11, HOT)
+		else:
+			var audit_row := Rect2(right_x - 4, wy - 12, right_width, 17)
+			var audit_hot := audit_row.has_point(cursor_at)
+			if audit_hot:
+				draw_rect(audit_row, HOT * Color(1, 1, 1, 0.12))
+			draw_string(font, Vector2(right_x, wy), "PART OF THIS RECORD IS WRONG. AUDIT? (+1 EXPOSURE)", HORIZONTAL_ALIGNMENT_LEFT, right_width, 10, HOT * Color(1, 1, 1, 1.0 if audit_hot else 0.7))
 
 	# History, across the full width at the foot, wrapping into columns.
 	var hy := maxf(left_y + 14.0, rect.position.y + rect.size.y - 76.0) if compact else rect.position.y + rect.size.y - 76.0

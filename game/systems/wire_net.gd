@@ -752,6 +752,13 @@ func act(subject_id: String, action: String) -> Dictionary:
 				result.grudge = 12
 				result.exposure = 5
 				result.reach = -240
+		"audit":
+			# D2.4 v2. Pulling your own record, to check it against what you
+			# actually said at intake — a real lookup at a real, if small,
+			# price, not a free tooltip on your own dossier.
+			result.headline = "RECORD PULLED"
+			result.detail = "SOMEBODY IS GOING TO SEE THAT YOU LOOKED."
+			result.exposure = 1
 		"retract":
 			result.headline = "RETRACTED"
 			result.detail = "WALKED BACK IN PUBLIC. EVERYONE ALREADY SAW YOU SAY IT THE FIRST TIME."

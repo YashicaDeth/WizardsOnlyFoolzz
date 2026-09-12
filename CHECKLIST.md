@@ -406,7 +406,23 @@ under-directed opening.
 ### D v2 — the second pass
 - [ ] **D3.5** `v2` The handler says the same things in the same order every decanting
 - [ ] **D4.6** `v2` Race is data the world reads, but the intake does not react to it out loud
-- [ ] **D2.4** `v2` CLERICAL ERROR is never discoverable — finding out which part of your sheet is wrong should be possible and should cost something
+- [x] ~~**D2.4** `v2` CLERICAL ERROR is never discoverable — finding out
+      which part of your sheet is wrong should be possible and should cost
+      something~~ Was undiscoverable in principle, not just in practice:
+      `_mistranscribe()` overwrote one field with a wrong value and threw the
+      true one away in the same statement, so nothing anywhere still held
+      the answer to check the sheet against. It now keeps both — `field` and
+      `true_value`, nested under `clerical_error` rather than surfaced as a
+      top-level field, so a normal read of the dossier still shows only the
+      wrong sheet. `world_index.gd`'s FILE page offers a real AUDIT link
+      while it is undiscovered, which spends a real Wire lookup (new
+      `wire_net.gd` action, +1 exposure, same ledger as `expose`/`retract`)
+      rather than being a free tooltip, and reveals the discrepancy in place
+      once paid for. Verified: `tests/clerical_audit_test.gd` (new, 7/7),
+      plus the existing `link_test.gd`, `wire_test.gd`, `pin_test.gd` and
+      `pin_board_v2_test.gd` regression suites, and a before/after windowed
+      capture (`captures/d2_4_v2_clerical_before.png` /
+      `d2_4_v2_clerical_after.png`).
 - [ ] **D7.4** `v2` The mirror lies the same way every time; the lie should fit the body
 - [ ] **D8.5** `v2` Declining a modifier is the harder difficulty and the game never acknowledges it
 
@@ -447,7 +463,10 @@ Ascent/Descent axis that already exists and is currently unused.
 
 - [x] ~~**E2.2** The 72 Goetic seals as data~~
 - [ ] **E2.3** Original seals for what this world grew on its own
-- [ ] **E2.4** Seals animate, corrupt and burn
+- [ ] **E2.4** Seals animate, corrupt, **burn and bind** — Greg: *"burn and bind seals should have their own animation based on real life, where the person's computer motherboard appears in 3D and the seals burn into the microscopic copper stuff as sigils on the board, like a full animation for it when a seal is burnt"*. The right image for this game's whole thesis: a printed circuit board *is* a sigil, drawn in copper, mass-produced. A burn traces itself into the copper and stays; a binding closes a loop on the board that was open. `draw_seal_burning` already exists in `celloutz_type.gd` and only ever ran in 2D — this is the 3D half
+- [ ] **E2.5** The board is a real board: traces, pads, silkscreen, a chip that reads as a chip
+- [ ] **E2.6** Burning is subtractive and binding is additive — one scars the copper, one completes a circuit
+- [ ] **E2.7** A bound seal keeps working while the board keeps power, and a burnt one is gone for the run
 
 ### E3 — Camera rituals
 - [x] **E3.1** Ritual definitions: what must be done, what must be photographed — `systems/ritual_app.gd`'s `RITUALS`: three rites (including Greg's own worked example, five gored heads), each keyed to a real seal from `goetic_seals.gd` and paying its reward through `boons.gd` — E2/E3/E4 as the one system `RITUAL_AND_KARMA.md` says they are, not three
