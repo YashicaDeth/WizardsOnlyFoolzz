@@ -80,6 +80,8 @@ func current() -> Dictionary:
 
 func state() -> Dictionary:
 	var definition: Dictionary = current()
+	if definition.kind == "firearm":
+		_ensure_spare_magazines(current_id)
 	var rounds := ammo.get(current_id, {}) as Dictionary
 	return {
 		"id": current_id,
@@ -87,6 +89,10 @@ func state() -> Dictionary:
 		"kind": definition.kind,
 		"loaded": int(rounds.get("loaded", -1)),
 		"reserve": int(rounds.get("reserve", -1)),
+		# AF1.5. The bag as it actually is — a caller that wants to show
+		# discrete magazines (a half-full one looking different from a full
+		# one) has real data to draw from rather than one flattened number.
+		"spare_magazines": (rounds.get("spare_magazines", []) as Array).duplicate(),
 		"reloading": reload_remaining > 0.0,
 		"reload_ratio": reload_remaining / float(definition.get("reload", 1.0)) if reload_remaining > 0.0 else 0.0,
 	}
@@ -120,12 +126,46 @@ func begin_attack(heavy := false) -> Dictionary:
 	}
 
 
+## AF1.4/AF1.5. Reserve ammunition is real, discrete magazines, not one
+## abstract pool a mag tops itself up from. Seeded once, lazily, from the
+## authored `reserve` — full magazines until the last one, which carries
+## whatever is left over — so nothing about the starting loadout had to be
+## re-authored to gain this.
+func _ensure_spare_magazines(weapon_id: String) -> void:
+	var rounds: Dictionary = ammo[weapon_id]
+	if rounds.has("spare_magazines"):
+		return
+	var capacity := int(WEAPONS[weapon_id].magazine)
+	var remaining := int(rounds.get("reserve", 0))
+	var magazines: Array[int] = []
+	while remaining > 0 and capacity > 0:
+		var take := mini(capacity, remaining)
+		magazines.append(take)
+		remaining -= take
+	rounds["spare_magazines"] = magazines
+	ammo[weapon_id] = rounds
+
+
+## The one place `reserve` is written — kept as a live total alongside
+## `spare_magazines` rather than only ever computed in `state()`, so any
+## existing caller reading `ammo[weapon_id].reserve` directly (this file's
+## own tests included) never has to learn the new shape underneath it.
+func _sync_reserve(weapon_id: String) -> void:
+	var rounds: Dictionary = ammo[weapon_id]
+	var total := 0
+	for magazine in (rounds.spare_magazines as Array):
+		total += int(magazine)
+	rounds.reserve = total
+	ammo[weapon_id] = rounds
+
+
 func reload() -> bool:
 	var definition: Dictionary = current()
 	if definition.kind != "firearm" or reload_remaining > 0.0 or cooldown > 0.0:
 		return false
+	_ensure_spare_magazines(current_id)
 	var rounds: Dictionary = ammo[current_id]
-	if int(rounds.loaded) >= int(definition.magazine) or int(rounds.reserve) <= 0:
+	if int(rounds.loaded) >= int(definition.magazine) or (rounds.spare_magazines as Array).is_empty():
 		return false
 	reload_remaining = float(definition.reload)
 	reload_started.emit(current_id)
@@ -148,16 +188,34 @@ func shot_directions(forward: Vector3, up: Vector3) -> Array[Vector3]:
 	return result
 
 
+## AF1.4. The magazine actually leaves — whatever was still chambered in it
+## goes back into the bag as its own magazine rather than dissolving into one
+## abstract reserve number (AF1.5: a magazine dropped half-full is still
+## half-full later) — and a new one arrives: the fullest spare on hand, not
+## whichever happened to sit first in the bag. A full swap, not a top-up —
+## the old model let a nearly-full magazine "reload" for one round; a
+## physical magazine cannot.
 func _finish_reload() -> void:
 	var definition: Dictionary = current()
 	if definition.kind != "firearm":
 		return
 	var rounds: Dictionary = ammo[current_id]
-	var needed := int(definition.magazine) - int(rounds.loaded)
-	var moved := mini(needed, int(rounds.reserve))
-	rounds.loaded = int(rounds.loaded) + moved
-	rounds.reserve = int(rounds.reserve) - moved
+	var spares: Array = rounds.spare_magazines
+	if spares.is_empty():
+		return
+	var leaving := int(rounds.loaded)
+	if leaving > 0:
+		spares.append(leaving)
+	var best_index := 0
+	for index in spares.size():
+		if int(spares[index]) > int(spares[best_index]):
+			best_index = index
+	var incoming: int = spares[best_index]
+	spares.remove_at(best_index)
+	rounds.loaded = incoming
+	rounds.spare_magazines = spares
 	ammo[current_id] = rounds
+	_sync_reserve(current_id)
 	reload_finished.emit(current_id)
 
 
