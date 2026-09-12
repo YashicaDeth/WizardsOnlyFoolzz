@@ -103,6 +103,42 @@ func _ready() -> void:
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/torch_%s.png" % [out_dir, exposure[0]])
 	get_tree().paused = false
+	# A6.1 / A6.2. Looking up, which nothing in this harness had ever done: the
+	# break sits well above the horizon and every previous shot was framed at
+	# eye level, where the only sky in frame is the strip the fog eats.
+	# The device is left raised by the torch pair above and its panel covers the
+	# frame, so it is faded rather than toggled: toggling it here photographed
+	# the World Index with a corner of sky around it.
+	hunt.handheld.modulate.a = 0.0
+	hunt.player_body.position = Vector3(-6, 0.9, -4)
+	# Aimed at the break rather than at the sky and hoping. The fracture covers
+	# well under a percent of the dome by design, so a fixed heading photographs
+	# an intact sky and proves nothing; this reads the map the shader samples,
+	# finds the most broken texel in it, and turns the player to face it.
+	var fracture := WorldLook.firmament().get_image()
+	var best := 0.0
+	var best_yaw := 0.6
+	var best_pitch := 0.8
+	for y in fracture.get_height():
+		for x in fracture.get_width():
+			var amount := fracture.get_pixel(x, y).r
+			if amount > best:
+				best = amount
+				# Inverse of the shader's equirect mapping.
+				best_yaw = (float(x) / float(fracture.get_width()) - 0.5) * TAU
+				best_pitch = PI * 0.5 - float(y) / float(fracture.get_height()) * PI
+	print("BREAK_AT yaw=%.2f pitch=%.2f strength=%.2f" % [best_yaw, best_pitch, best])
+	hunt.yaw = best_yaw
+	hunt.pitch = best_pitch
+	for hour: float in [12.0, 1.0]:
+		WorldClock.set_hour(hour)
+		hunt._update_day_night()
+		for _tick in 8:
+			await get_tree().physics_frame
+		hunt._update_camera()
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/sky_%02d.png" % [out_dir, int(hour)])
+
 	print("TORCH_LIT=", hunt.handheld.torch_active(), " BEAM=", hunt.handheld_lamp.light_energy)
 	print("WARP_SHELLS=", get_tree().get_nodes_in_group(LightWarp.GROUP).size())
 	print("CAPTURE_DONE")

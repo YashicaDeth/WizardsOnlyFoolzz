@@ -3733,7 +3733,13 @@ func _update_day_night() -> void:
 		if is_instance_valid(light):
 			light.light_energy = float(light.get_meta("night_energy", 3.5)) * (1.0 - daylight)
 			if light.has_meta("glass"):
-				(light.get_meta("glass") as StandardMaterial3D).emission_energy_multiplier = BULB_GLOW * (1.0 - daylight)
+				var glass := light.get_meta("glass") as StandardMaterial3D
+				glass.emission_energy_multiplier = BULB_GLOW * (1.0 - daylight)
+				# And the albedo with it. The fixture is unshaded, which means
+				# it draws its own colour whatever the light is doing — so a
+				# lamp that was correctly off at noon still had a bright orange
+				# bulb hanging in the daylight.
+				glass.albedo_color = light.light_color * (1.0 - daylight)
 
 
 func _build_expanse_systems() -> void:

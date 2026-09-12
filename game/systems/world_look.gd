@@ -12,6 +12,8 @@ extends RefCounted
 ## low saturation, heavy value separation, fog for depth, and deliberately
 ## authored technical limitations rather than clean photorealism.
 
+const FIRMAMENT_SHADER := preload("res://shaders/firmament.gdshader")
+
 ## Authored albedo in the Bone Yard kit runs from 0.025 (oil_asphalt, dead_forest)
 ## to about 0.3 (rusted_steel). Surfaces that dark need real light to read at all:
 ## too little and the pit goes black, too much and the palette cooks to pastel.
@@ -50,13 +52,19 @@ static func environment(preset_name: String = "bone_yard") -> Environment:
 	var preset: Dictionary = PRESETS.get(preset_name, PRESETS.bone_yard)
 	var env := Environment.new()
 
-	var sky_material := ProceduralSkyMaterial.new()
-	sky_material.sky_top_color = Color(preset.zenith)
-	sky_material.sky_horizon_color = Color(preset.horizon)
-	sky_material.ground_bottom_color = Color(preset.ground)
-	sky_material.ground_horizon_color = Color(preset.horizon).darkened(0.25)
-	sky_material.sky_energy_multiplier = 1.15
-	sky_material.sun_angle_max = 48.0
+	# A6.1. The sky was a `ProceduralSkyMaterial` for five passes: a two-colour
+	# gradient, which is the one surface in this game that had never been asked
+	# to say anything, and the one thing a broken firmament cannot be.
+	var sky_material := ShaderMaterial.new()
+	sky_material.shader = FIRMAMENT_SHADER
+	sky_material.set_shader_parameter("zenith", Color(preset.zenith))
+	sky_material.set_shader_parameter("horizon", Color(preset.horizon))
+	sky_material.set_shader_parameter("ground", Color(preset.ground))
+	sky_material.set_shader_parameter("energy", 1.15)
+	sky_material.set_shader_parameter("firmament", firmament())
+	sky_material.set_shader_parameter("breach", float(preset.get("breach", 1.0)))
+	sky_material.set_shader_parameter("beyond", Color(preset.get("beyond", "04050a")))
+	sky_material.set_shader_parameter("shell_edge", Color(preset.get("shell_edge", "9e6a3c")))
 	var sky := Sky.new()
 	sky.sky_material = sky_material
 	env.background_mode = Environment.BG_SKY
@@ -132,8 +140,8 @@ static func apply_hour(env: Environment, daylight: float, preset_name: String = 
 	var lit := clampf(daylight, 0.0, 1.0)
 
 	var sky := env.sky
-	if sky != null and sky.sky_material is ProceduralSkyMaterial:
-		var sky_material := sky.sky_material as ProceduralSkyMaterial
+	if sky != null and sky.sky_material is ShaderMaterial:
+		var sky_material := sky.sky_material as ShaderMaterial
 		var zenith := Color(preset.zenith)
 		var horizon := Color(preset.horizon)
 		# Night is this sky with the sun taken out of it: the zenith goes
@@ -142,13 +150,16 @@ static func apply_hour(env: Environment, daylight: float, preset_name: String = 
 		# authored colours so retuning a preset cannot leave its night behind.
 		var night_zenith := zenith.darkened(0.86)
 		var night_horizon := horizon.darkened(0.82).lerp(zenith, 0.45)
-		sky_material.sky_top_color = night_zenith.lerp(zenith, lit)
-		sky_material.sky_horizon_color = night_horizon.lerp(horizon, lit)
-		sky_material.ground_horizon_color = sky_material.sky_horizon_color.darkened(0.25)
-		sky_material.ground_bottom_color = Color(preset.ground).darkened(lerpf(0.7, 0.0, lit))
+		sky_material.set_shader_parameter("zenith", night_zenith.lerp(zenith, lit))
+		sky_material.set_shader_parameter("horizon", night_horizon.lerp(horizon, lit))
+		sky_material.set_shader_parameter("ground", Color(preset.ground).darkened(lerpf(0.7, 0.0, lit)))
+		# A6.2. The stars behind the break are only there when the sky in front
+		# of them stops competing, which is the same reason you cannot see them
+		# through a lit window.
+		sky_material.set_shader_parameter("star_density", lerpf(0.85, 0.02, lit))
 		# The multiplier is what stopped the horizon ever going dark, because
 		# it held at its daylight value around the clock.
-		sky_material.sky_energy_multiplier = lerpf(0.07, 1.15, lit)
+		sky_material.set_shader_parameter("energy", lerpf(0.07, 1.15, lit))
 
 	# Fog is lit by the sky, so it has to move with it or the haze stays warm
 	# over a cold ground — which reads as smog at noon and as nothing at all at
@@ -160,6 +171,13 @@ static func apply_hour(env: Environment, daylight: float, preset_name: String = 
 	# Slightly denser after dark. Not for atmosphere: it is what keeps a lamp
 	# reading as a light with a throw rather than a bright dot, which is what
 	# A4.1 and A4.2 are going to hang off.
+	# A6.2. And the fog stops repainting the sky after dark. `fog_sky_affect`
+	# held at 0.6 around the clock, which put the haze colour over the whole
+	# dome at every hour — so the night sky photographed as a brown wash at
+	# roughly 0.15 whatever the sky's own energy was, and nothing behind the
+	# break could be seen through it. Fog is lit by the sun; with the sun gone
+	# there is nothing in the air to light.
+	env.fog_sky_affect = lerpf(0.12, 0.6, lit)
 	env.fog_density = float(preset.fog_density) * lerpf(1.45, 1.0, lit)
 	env.volumetric_fog_density = float(preset.volumetric) * lerpf(1.6, 1.0, lit)
 
@@ -489,6 +507,63 @@ static func _surface_maps(kind: String, tint: Color, seed_value: int) -> Diction
 	}
 	_surface_cache[key] = maps
 	return maps
+
+
+## A6.1. Where the sky is broken, as an equirectangular map: red is the
+## fracture itself, green the shell's broken edge around it.
+##
+## Sampled in three dimensions off the direction vector rather than in two off
+## the texel grid, which costs the same and removes both of the artefacts that
+## come free with an equirect map: the seam behind the player at yaw 0, and the
+## pinch at the poles where a two-dimensional field gets wrung out to a point.
+##
+## Generated, cached and never regenerated: the break is a fact about the world
+## and every scene that looks up is looking at the same one.
+static var _firmament_map: ImageTexture = null
+
+
+static func firmament() -> ImageTexture:
+	if _firmament_map != null:
+		return _firmament_map
+	var width := 384
+	var height := 192
+	# Cellular distance2-minus-distance1 is ~0 exactly along the boundary between
+	# two cells and rises inward, so the zero set of it is a web of joins — which
+	# is what a shattered shell is, and what no amount of ridged noise gives you.
+	var cells := FastNoiseLite.new()
+	cells.noise_type = FastNoiseLite.TYPE_CELLULAR
+	cells.cellular_return_type = FastNoiseLite.RETURN_DISTANCE2_SUB
+	cells.frequency = 0.9
+	cells.seed = 7741
+	# Where it is broken at all. Without this the whole dome crazes evenly, which
+	# reads as a texture on the sky rather than as damage to it.
+	var region := FastNoiseLite.new()
+	region.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	region.frequency = 0.55
+	region.fractal_octaves = 2
+	region.seed = 4013
+	var image := Image.create(width, height, false, Image.FORMAT_RGBA8)
+	for y in height:
+		var phi := float(y) / float(height) * PI
+		for x in width:
+			var theta := (float(x) / float(width) - 0.5) * TAU
+			var dir := Vector3(sin(phi) * sin(theta), cos(phi), sin(phi) * cos(theta))
+			var joint := absf(cells.get_noise_3d(dir.x * 8.0, dir.y * 8.0, dir.z * 8.0))
+			var open := smoothstep(0.12, 0.46, region.get_noise_3d(dir.x * 2.2, dir.y * 2.2, dir.z * 2.2))
+			# Kept off the ground and off the zenith: a tear you have to look up for,
+			# rather than one that meets the horizon all the way round.
+			var band := smoothstep(0.0, 0.25, dir.y) * (1.0 - smoothstep(0.65, 1.0, dir.y))
+			# Thresholds measured, not assumed. Godot's cellular
+			# distance2-minus-distance1 does not come down to zero on a cell
+			# boundary: over this sphere it runs 0.33 to 0.99, with half a
+			# percent of it below 0.50 and four percent below 0.60. The obvious
+			# `smoothstep(0.0, 0.05)` for "near the join" can therefore never
+			# fire, and the first build of this generated an empty map.
+			var crack := (1.0 - smoothstep(0.58, 0.645, joint)) * open * band
+			var edge := (1.0 - smoothstep(0.58, 0.76, joint)) * open * band
+			image.set_pixel(x, y, Color(crack, clampf(edge - crack, 0.0, 1.0), 0.0, 1.0))
+	_firmament_map = ImageTexture.create_from_image(image)
+	return _firmament_map
 
 
 static func _noise(scale: float) -> NoiseTexture2D:
