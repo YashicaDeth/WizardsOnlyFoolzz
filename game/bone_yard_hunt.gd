@@ -269,6 +269,7 @@ var vault_to := Vector3.ZERO
 ## since the wall the player is running along can curve or end mid-run.
 var wall_running_time := 0.0
 var wall_run_normal := Vector3.ZERO
+var wall_run_kickoff_queued := false
 var wall_run_unlock_announced := false
 var handheld: Control
 ## FINAL_V.md §16. The one screen-space layer AS2's night warp, and later the
@@ -305,6 +306,11 @@ const GATE_LIGHTS := [
 ## A4.1. Every placed light, so `_update_day_night()` can put them out at dawn
 ## without holding a second list of where they are.
 var night_lights: Array[OmniLight3D] = []
+## B2.1. How often the rig reports itself while somebody is reading it. Half a
+## second: fast enough that a wound appears on the chart while the chart is
+## open, slow enough that it is not a snapshot every frame of a body that
+## mostly is not changing.
+const BODY_RECORD_INTERVAL := 0.5
 ## A9.2. How fast the haze follows the air. Eased rather than set, because
 ## `_update_day_night()` writes the same value off the hour and the two would
 ## otherwise fight frame by frame.
@@ -315,6 +321,9 @@ var gods: Gods
 var flame: UndyingFlame
 ## A9.1. What is in the air between the player and everything else.
 var air: ContaminatedAir
+## B2.1. Counts down while the handheld is up, so the body chart the player is
+## reading is the body they are standing in.
+var body_record_timer := 0.0
 ## AS2. Built once in `_build_world()`, driven every frame in
 ## `_update_day_night()` off `world_clock.gd` — it used to sit at one fixed
 ## angle and brightness no matter the hour, which is why W1.1 existing made no
@@ -835,6 +844,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_SPACE:
 				if not grapple_target.is_empty():
 					_break_grapple("YOU LET GO")
+				elif wall_running_time > 0.0:
+					# AD1.3. Its own outcome, not routed through `_jump()` —
+					# that function refuses outright the instant it sees the
+					# player is not on the floor, which a wall run always
+					# is. Leaving a wall on purpose is a real push away from
+					# it, not a fall dressed up as one.
+					wall_run_kickoff_queued = true
 				else:
 					var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 					# AD1.2. Checked before the dodge/jump split, not after —
@@ -883,6 +899,7 @@ func _physics_process(delta: float) -> void:
 	_update_handheld_lamp(delta)
 	_update_flame()
 	_update_air()
+	_update_body_record(delta)
 	# W1.1. The world keeps time, and exactly one place advances it — a clock
 	# that two scenes both wind runs at double speed the moment anybody
 	# builds a third.
@@ -1003,6 +1020,41 @@ func _update_player(delta: float) -> void:
 			player_body.position = vault_to
 		player = player_body.position + Vector3.UP * 0.6
 		return
+	# AD1.3. Also a scripted takeover rather than something layered on top of
+	# HUNTER_MOTOR.move_body() — re-finding the wall every frame (it can
+	# curve or run out mid-attempt) and redirecting velocity along it, with
+	# only a fraction of real gravity rather than none, so a run reads as a
+	# body fighting to stay up rather than flight.
+	if wall_running_time > 0.0:
+		var move_input := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+		var wish: Vector3 = HUNTER_MOTOR.wish_direction(move_input, yaw)
+		var surface := _wall_run_surface(wish if not wish.is_zero_approx() else wall_run_normal.cross(Vector3.UP))
+		if surface.is_empty() or player_body.is_on_floor() or wall_run_kickoff_queued:
+			wall_running_time = 0.0
+		else:
+			wall_running_time = maxf(0.0, wall_running_time - delta)
+			wall_run_normal = surface.normal
+			var tangent: Vector3 = surface.tangent
+			var speed: float = maxf(Vector2(player_body.velocity.x, player_body.velocity.z).length(), WALL_RUN_MIN_SPEED)
+			var desired: Vector3 = tangent * speed
+			player_body.velocity.x = desired.x
+			player_body.velocity.z = desired.z
+			player_body.velocity.y -= HUNTER_MOTOR.GRAVITY * WALL_RUN_GRAVITY_SCALE * delta
+			player_body.move_and_slide()
+			player = player_body.position + Vector3.UP * 0.6
+			return
+		if wall_run_kickoff_queued:
+			# Kicking off, not merely falling off: a real impulse away from
+			# the wall and up, so leaving one on purpose (its own key,
+			# checked in `_unhandled_input` before the dodge/jump split)
+			# reads differently from simply running off the end of it.
+			wall_run_kickoff_queued = false
+			player_body.velocity += wall_run_normal * WALL_RUN_KICKOFF_OUT
+			player_body.velocity.y = WALL_RUN_KICKOFF_UP
+			WorldHistory.record_event("player_wall_run_kickoff", {"location": HUNT_LOCATION})
+			player_body.move_and_slide()
+			player = player_body.position + Vector3.UP * 0.6
+			return
 	# Standing over a downed body with the form open costs you your footwork,
 	# and so does having hold of someone.
 	if resolution_ui.visible or not grapple_target.is_empty():
@@ -1059,6 +1111,14 @@ func _update_player(delta: float) -> void:
 	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0, JUMP_IMPULSE if jumping else 0.0)
 	if jumping:
 		WorldHistory.record_event("player_jumped", {"location": HUNT_LOCATION})
+	# AD1.3. Starting a run needs no key at all — the body grabs the wall
+	# the instant it is airborne, fast, and next to one, the same way real
+	# momentum would. Only leaving one on purpose (the kickoff, above) is a
+	# deliberate act; falling into one is not.
+	if wall_running_time <= 0.0 and not player_body.is_on_floor() and not jumping:
+		var starting_surface := _wall_run_surface(direction if not direction.is_zero_approx() else HUNTER_MOTOR.wish_direction(Vector2(0, -1), yaw))
+		if not starting_surface.is_empty():
+			_begin_wall_run(starting_surface)
 	if player_body.position.y < -10.0:
 		player_body.position = Vector3(0, 1.0, 19)
 	player = player_body.position + Vector3.UP * 0.6
@@ -1788,6 +1848,56 @@ func _vault(landing: Vector3) -> void:
 	vault_to = landing
 	player_body.velocity = Vector3.ZERO
 	WorldHistory.record_event("player_vaulted", {"location": HUNT_LOCATION})
+
+
+## AD1.3. Looks to both sides rather than assuming which one, since the wall
+## that matters is whichever one the player is actually running alongside.
+## Empty means "no wall run here" for any of several honest reasons: not
+## earned yet, nothing within reach, or something within reach that AD1.2's
+## own vault would rather have handled — a low ledge fails the second cast
+## the same way a real wall fails `_vault_target()`'s high one.
+func _wall_run_surface(direction: Vector3) -> Dictionary:
+	if not wall_run_unlocked():
+		return {}
+	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty():
+		return {}
+	if direction.is_zero_approx():
+		return {}
+	var horizontal := Vector3(direction.x, 0.0, direction.z)
+	if horizontal.is_zero_approx():
+		return {}
+	horizontal = horizontal.normalized()
+	var speed := Vector2(player_body.velocity.x, player_body.velocity.z).length()
+	if speed < WALL_RUN_MIN_SPEED:
+		return {}
+	var space := get_world_3d().direct_space_state
+	var exclusions := _player_collision_exclusions()
+	var chest: Vector3 = player_body.position
+	for side in [Vector3(horizontal.z, 0.0, -horizontal.x), Vector3(-horizontal.z, 0.0, horizontal.x)]:
+		var near_query := PhysicsRayQueryParameters3D.create(chest, chest + side * WALL_RUN_REACH)
+		near_query.exclude = exclusions
+		var near_hit := space.intersect_ray(near_query)
+		if near_hit.is_empty():
+			continue
+		# It has to keep going well above where a vault would already have
+		# put the player on top of it, or this is a ledge, not a wall.
+		var high_from: Vector3 = player_body.position + Vector3.UP * (WALL_RUN_MIN_HEIGHT - 0.9)
+		var high_query := PhysicsRayQueryParameters3D.create(high_from, high_from + side * WALL_RUN_REACH)
+		high_query.exclude = exclusions
+		if space.intersect_ray(high_query).is_empty():
+			continue
+		var normal: Vector3 = near_hit.normal
+		var tangent: Vector3 = horizontal.slide(normal)
+		if tangent.is_zero_approx():
+			continue
+		return {"normal": normal, "tangent": tangent.normalized()}
+	return {}
+
+
+func _begin_wall_run(surface: Dictionary) -> void:
+	wall_running_time = WALL_RUN_DURATION
+	wall_run_normal = surface.normal
+	WorldHistory.record_event("player_wall_run_started", {"location": HUNT_LOCATION})
 
 
 func _dodge() -> void:
@@ -3231,6 +3341,27 @@ func third_person_unlocked() -> bool:
 	return bosses >= UNLOCK_BOSSES
 
 
+## AD1.3. "Earned the way third person is earned rather than given" — the
+## same shape as `third_person_unlocked()` just above, a real thing the
+## player did rather than a flag, counted straight off `player_vaulted`
+## (AD1.2's own event) since wall-running is the next rung of the same
+## traversal skill vaulting is, not a combat unlock like third person's own.
+func wall_run_unlocked() -> bool:
+	return WorldHistory.event_count("player_vaulted") >= WALL_RUN_UNLOCK_VAULTS
+
+
+## M1.5's pattern, not its wording: the moment the count crosses, not the
+## moment a key is pressed, because a passive movement skill has no key to
+## press early against — the body simply starts trusting the wall the
+## instant it has earned the right to.
+func _announce_wall_run_unlock() -> void:
+	prompt.text = "YOUR BODY TRUSTS THE WALL NOW. RUN AT ONE."
+	if impact_feel != null:
+		impact_feel.kick += Vector2(0, -1.0) * 0.05
+		impact_feel.shake = maxf(impact_feel.shake, 0.5)
+	WorldHistory.record_event("wall_run_unlocked", {"location": HUNT_LOCATION})
+
+
 ## M1.5. The unlock has to land as something that happened to the player, not
 ## a silent permission flip they only discover by trying the key. The moment
 ## the two conditions are both true — regardless of whether `F` is pressed
@@ -3426,6 +3557,9 @@ func _update_hud() -> void:
 	if not third_person_unlock_announced and third_person_unlocked():
 		third_person_unlock_announced = true
 		_announce_third_person_unlock()
+	if not wall_run_unlock_announced and wall_run_unlocked():
+		wall_run_unlock_announced = true
+		_announce_wall_run_unlock()
 	title.text = "WIZARDS ONLY FOOLS // LIMBO: ASHBLOOM EXPANSE"
 	# I3. The second control strip is gone. `gothic_field_hud.gd` draws the one
 	# the player reads, in the game's own face, and it is contextual — this was
@@ -3746,6 +3880,33 @@ func _update_flame() -> void:
 	if player_rig == null or not is_instance_valid(player_rig):
 		return
 	flame.set_condition(player_rig.anatomy.combat_ratio())
+
+
+## B2.1. The rig, kept current while the player is looking at it.
+##
+## `anatomy_state` was written in exactly two places — on taking a wound and on
+## being re-decanted — so the World Index's BODY page showed whatever the last
+## fight had left behind. Anything that changed the body without going through
+## `_take_damage()` (a limb picked up or dropped, an implant, a heal, a graft,
+## anything a future system does to the rig) simply never reached the chart:
+## the body was inspectable only under damage, which is this segment's
+## complaint in its own words.
+##
+## Amended rather than updated, because `update_subject()` records a history
+## event and a player standing still reading their own chart has not done
+## anything the world needs to remember. Only while the device is up, so a
+## closed handheld costs nothing.
+func _update_body_record(delta: float) -> void:
+	if handheld == null or not is_instance_valid(handheld) or not handheld.is_open:
+		body_record_timer = 0.0
+		return
+	if player_rig == null or not is_instance_valid(player_rig):
+		return
+	body_record_timer -= delta
+	if body_record_timer > 0.0:
+		return
+	body_record_timer = BODY_RECORD_INTERVAL
+	WorldHistory.amend_subject("player", {"anatomy_state": player_rig.snapshot()})
 
 
 ## A9.1 / A9.2. The volume follows the player in steps, and its severity is read

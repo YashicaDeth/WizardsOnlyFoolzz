@@ -375,7 +375,7 @@ The most complete system in the project and, until this pass, the least visible.
 
 ### B v2 — the second pass
 B built the most detailed body in the game and the player can only see it when it is being destroyed. The rework wants everything inspectable, *"with cybernetics and organs and bones visible"*.
-- [ ] **B2.1** `v2` The rig is inspectable at rest, not only under damage
+- [x] **B2.1** `v2` The rig is inspectable at rest, not only under damage — the complaint was exact. `anatomy_state` was written in two places, taking a wound and being re-decanted, so the World Index's BODY page showed whatever the last fight had left behind; anything that changed the body without going through `_take_damage()` — a limb picked up, an implant, a heal, a graft, anything a later system does to the rig — never reached the chart at all. The rig now reports itself every half second while the handheld is up, which is exactly when somebody is reading it, and not at all while it is shut. Amended rather than updated, because `update_subject()` writes a history event and a player standing still reading their own chart has not done anything the world needs to remember. Verified by damaging the anatomy through a path that does not report itself (`player_rig.hit()` direct, which is what every future body-changing system will look like) and watching the record: with the device open the chart follows the rig, and with it closed the same change writes nothing
 - [ ] **B2.2** `v2` Organs, bones and implants readable without opening anybody
 
 ### B v3 — the third pass

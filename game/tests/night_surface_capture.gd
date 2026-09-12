@@ -354,5 +354,34 @@ func _ready() -> void:
 		get_viewport().get_texture().get_image().save_png("%s/metre_%s.png" % [out_dir, surface_name])
 	get_tree().paused = false
 
+	# B2.1. Damage the rig by a path that does *not* report itself — `hit()`
+	# straight on the anatomy, which is what every future system that changes a
+	# body will look like — and see whether the chart the player is reading
+	# catches up. Before this, `anatomy_state` only ever moved when
+	# `_take_damage()` wrote it, so the answer was no.
+	if not hunt.handheld.is_open:
+		hunt.handheld.toggle_device()
+	for _tick in 20:
+		await get_tree().physics_frame
+	var before: Dictionary = (WorldHistory.subject("player").get("anatomy_state", {}) as Dictionary)
+	var before_hash := hash(before)
+	hunt.player_rig.hit("left_arm", 34.0, 0.0, "blunt")
+	for _tick in 60:
+		await get_tree().physics_frame
+	var after: Dictionary = (WorldHistory.subject("player").get("anatomy_state", {}) as Dictionary)
+	print("BODY_RECORD open=%s changed=%s empty_before=%s" % [
+		hunt.handheld.is_open, hash(after) != before_hash, before.is_empty(),
+	])
+	hunt.handheld.toggle_device()
+	for _tick in 20:
+		await get_tree().physics_frame
+	var closed_hash := hash((WorldHistory.subject("player").get("anatomy_state", {}) as Dictionary))
+	hunt.player_rig.hit("right_arm", 34.0, 0.0, "blunt")
+	for _tick in 60:
+		await get_tree().physics_frame
+	print("BODY_RECORD_CLOSED still=%s" % [
+		hash((WorldHistory.subject("player").get("anatomy_state", {}) as Dictionary)) == closed_hash,
+	])
+
 	print("CAPTURE_DONE")
 	get_tree().quit()
