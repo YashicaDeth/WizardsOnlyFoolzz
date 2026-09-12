@@ -4,6 +4,26 @@ extends Node3D
 # Limbo is the realm; Ashbloom is this first irradiated region.
 const PLAYER_SPEED := 7.0
 const SPRINT_SPEED := 12.0
+## AD1.1. Jumping worth doing. `HunterMotor.move_body()` already runs real
+## gravity, air acceleration and floor-stick every physics frame and nothing
+## ever gave it an upward velocity to work with — the whole vertical half of
+## a platformer was sitting there unused. Tuned against `HunterMotor.GRAVITY`
+## (22.0) for roughly a one-metre apex: `sqrt(2 * 22 * 1.0) ≈ 6.6`.
+const JUMP_IMPULSE := 6.6
+## AD1.2. "Waist-high things stop being walls." Three raycasts decide it: a
+## low one finds a real obstacle in front of the player at all, a high one
+## tells a low obstacle from a real wall, and a downward one finds exactly
+## where the thing's top actually is rather than guessing one fixed height
+## for every crate, rail and curb in the world. Scoped to obstacles a body
+## can plausibly get a hand on and be past a moment later — a real wall
+## keeps failing the high check and stays a wall (AD1.3's problem, not this
+## one's).
+const VAULT_MIN_TOP := 0.32
+const VAULT_MAX_TOP := 1.35
+const VAULT_REACH := 0.85
+const VAULT_FAR_SIDE := 0.55
+const VAULT_HEAD_CLEARANCE := 1.55
+const VAULT_DURATION := 0.34
 ## Worst case a wrecked body can move or swing at, as a share of healthy. The
 ## soulslike register wants injury to hurt; it does not want a player who has
 ## lost a leg to be unable to disengage from the thing that took it.
@@ -216,7 +236,19 @@ var crouching := false
 var strike_windup := -1.0
 var rival_attack_clock := 0.0
 var dodge_remaining := 0.0
+## AD1.1. Set on the keypress, consumed the next physics step. Not applied
+## directly in `_unhandled_input` — the impulse has to reach
+## `HunterMotor.move_body()` itself and ride the same `move_and_slide()` call
+## that will actually carry the body off the ground; see that function's own
+## comment for why a frame's delay either way stomps it back to the floor.
+var jump_queued := false
 var dodge_direction := Vector3.ZERO
+## AD1.2. How long is left of the current vault, counting down from
+## `VAULT_DURATION`; the body is not under normal movement control for as
+## long as this is positive (see `_update_player()`'s own early branch).
+var vaulting_time := 0.0
+var vault_from := Vector3.ZERO
+var vault_to := Vector3.ZERO
 var handheld: Control
 ## FINAL_V.md §16. The one screen-space layer AS2's night warp, and later the
 ## drugs and shadow realms, all reach for instead of building their own effect.
@@ -423,8 +455,6 @@ func _ready() -> void:
 	kill_cam = preload("res://systems/kill_cam.gd").new()
 	kill_cam.name = "KillCam"
 	$HUD.add_child(kill_cam)
-	# Last, so an engaged trip sits over everything else drawn this frame —
-	# inert and invisible until a dial is touched, per `psychedelic_rig.gd`.
 	psychedelic = PSYCHEDELIC_RIG.new()
 	psychedelic.name = "Psychedelic"
 	$HUD.add_child(psychedelic)
@@ -435,6 +465,7 @@ func _ready() -> void:
 	osc.name = "PsychedelicOSC"
 	add_child(osc)
 	osc.attach(psychedelic)
+	_order_hud_layers()
 	voice_channel = preload("res://systems/proximity_voice.gd").new()
 	voice_channel.name = "ProximityVoice"
 	add_child(voice_channel)
@@ -749,7 +780,23 @@ func _unhandled_input(event: InputEvent) -> void:
 				if not grapple_target.is_empty():
 					_break_grapple("YOU LET GO")
 				else:
-					_dodge()
+					var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+					# AD1.2. Checked before the dodge/jump split, not after —
+					# a waist-high thing in front of the player is exactly
+					# the situation a plain dodge or a plain jump both
+					# handle badly, and the whole point of AD1.2 is that
+					# pressing the traversal button should not require
+					# knowing which of the three you need.
+					var vault := _vault_target(HUNTER_MOTOR.wish_direction(move, yaw))
+					if not vault.is_empty():
+						_vault(vault.landing)
+					elif move.length() > 0.1:
+						# A dodge is a directional evasion; standing still
+						# and pressing space is not "dodge in place", it is
+						# a jump.
+						_dodge()
+					else:
+						_jump()
 			KEY_Q: _use_prosthetic_surge()
 			KEY_K: _deliberate_redecant()
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -885,6 +932,18 @@ func _update_carrion(delta: float) -> void:
 func _update_player(delta: float) -> void:
 	if player_rig.is_downed() or player_rig.anatomy.dead:
 		return
+	# AD1.2. Under scripted motion rather than normal control for the
+	# vault's short duration — the eased position itself is the whole
+	# animation, and normal gravity/floor-stick would just fight it.
+	if vaulting_time > 0.0:
+		vaulting_time = maxf(0.0, vaulting_time - delta)
+		var progress := 1.0 - vaulting_time / VAULT_DURATION
+		var eased := 1.0 - pow(1.0 - progress, 3.0)
+		player_body.position = vault_from.lerp(vault_to, eased)
+		if vaulting_time <= 0.0:
+			player_body.position = vault_to
+		player = player_body.position + Vector3.UP * 0.6
+		return
 	# Standing over a downed body with the form open costs you your footwork,
 	# and so does having hold of someone.
 	if resolution_ui.visible or not grapple_target.is_empty():
@@ -931,7 +990,16 @@ func _update_player(delta: float) -> void:
 	speed *= COMBAT_RESPONSE.movement_scale(pending_attack, strike_windup)
 	player_capsule.height = move_toward(player_capsule.height, 1.2 if crouching else 1.8, delta * 4.0)
 	player_collider.position.y = (player_capsule.height - 1.8) * 0.5
-	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0)
+	# AD1.1. Handed to move_body() rather than applied after it: is_on_floor()
+	# only turns false once a move_and_slide() has actually carried the body
+	# up off the ground, so an impulse set the frame after this one reads a
+	# still-grounded body and gets overwritten straight back to -FLOOR_STICK.
+	# The jump and the slide that proves it happen in the same physics step.
+	var jumping := jump_queued and player_body.is_on_floor()
+	jump_queued = false
+	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0, JUMP_IMPULSE if jumping else 0.0)
+	if jumping:
+		WorldHistory.record_event("player_jumped", {"location": HUNT_LOCATION})
 	if player_body.position.y < -10.0:
 		player_body.position = Vector3(0, 1.0, 19)
 	player = player_body.position + Vector3.UP * 0.6
@@ -1570,6 +1638,75 @@ func _update_handheld_lamp(delta: float) -> void:
 	handheld_lamp.light_energy = 9.0 * charge * waver
 
 
+## AD1.2. Empty means "not vaultable", never a crash — every one of these
+## rays is allowed to simply miss, because most things in front of the
+## player most of the time are not a low wall.
+func _vault_target(direction: Vector3) -> Dictionary:
+	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty():
+		return {}
+	if direction.is_zero_approx() or crouching or vaulting_time > 0.0:
+		return {}
+	if not player_body.is_on_floor():
+		return {}
+	var space := get_world_3d().direct_space_state
+	var exclusions := _player_collision_exclusions()
+	var feet: Vector3 = player_body.position + Vector3.UP * -0.9
+	var low_query := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * 0.4, feet + Vector3.UP * 0.4 + direction * VAULT_REACH)
+	low_query.exclude = exclusions
+	var low_hit := space.intersect_ray(low_query)
+	if low_hit.is_empty():
+		return {}
+	var high_query := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * VAULT_MAX_TOP, feet + Vector3.UP * VAULT_MAX_TOP + direction * VAULT_REACH)
+	high_query.exclude = exclusions
+	if not space.intersect_ray(high_query).is_empty():
+		# Something is still in the way above the vaultable band — a real
+		# wall, not an obstacle. AD1.3's problem, not this one's.
+		return {}
+	# Exactly where the top is, found rather than assumed: straight down at
+	# a point just past the low hit, in world height terms so the noisy Y of
+	# a hit against the obstacle's own front face never leaks into it.
+	var low_pos: Vector3 = low_hit.position
+	var probe_x: float = low_pos.x + direction.x * 0.1
+	var probe_z: float = low_pos.z + direction.z * 0.1
+	var top_query := PhysicsRayQueryParameters3D.create(
+		Vector3(probe_x, feet.y + VAULT_MAX_TOP + 0.2, probe_z),
+		Vector3(probe_x, feet.y + VAULT_MIN_TOP - 0.1, probe_z))
+	top_query.exclude = exclusions
+	var top_hit := space.intersect_ray(top_query)
+	if top_hit.is_empty():
+		return {}
+	var top_pos: Vector3 = top_hit.position
+	var obstacle_height: float = top_pos.y - feet.y
+	if obstacle_height < VAULT_MIN_TOP or obstacle_height > VAULT_MAX_TOP:
+		return {}
+	# The far side has to have a floor of its own and room to stand once
+	# there — a vault is landing past the thing, not standing on top of it.
+	var landing_x: float = low_pos.x + direction.x * VAULT_FAR_SIDE
+	var landing_z: float = low_pos.z + direction.z * VAULT_FAR_SIDE
+	var floor_query := PhysicsRayQueryParameters3D.create(
+		Vector3(landing_x, top_pos.y + 0.6, landing_z),
+		Vector3(landing_x, feet.y - 0.6, landing_z))
+	floor_query.exclude = exclusions
+	var floor_hit := space.intersect_ray(floor_query)
+	if floor_hit.is_empty():
+		return {}
+	var floor_pos: Vector3 = floor_hit.position
+	var landing: Vector3 = floor_pos + Vector3.UP * 0.05
+	var clearance_query := PhysicsRayQueryParameters3D.create(landing + Vector3.UP * 0.3, landing + Vector3.UP * VAULT_HEAD_CLEARANCE)
+	clearance_query.exclude = exclusions
+	if not space.intersect_ray(clearance_query).is_empty():
+		return {}
+	return {"landing": landing + Vector3.UP * 0.9}
+
+
+func _vault(landing: Vector3) -> void:
+	vaulting_time = VAULT_DURATION
+	vault_from = player_body.position
+	vault_to = landing
+	player_body.velocity = Vector3.ZERO
+	WorldHistory.record_event("player_vaulted", {"location": HUNT_LOCATION})
+
+
 func _dodge() -> void:
 	if not panel_mode.is_empty() or dodge_cooldown > 0.0 or stamina < 25.0:
 		return
@@ -1579,6 +1716,19 @@ func _dodge() -> void:
 	dodge_direction = HUNTER_MOTOR.dodge_direction(move, yaw)
 	dodge_remaining = 0.28
 	WorldHistory.record_event("player_dodged", {"location": HUNT_LOCATION})
+
+
+## AD1.1. Free rather than costing stamina like a dodge does — jumping is
+## basic traversal, not a combat maneuver, and B6.5's own injury floor
+## already answers "should a wrecked body be doing this" through
+## `_player_speed_scale()`'s effect on how far a jump actually carries.
+## Queued rather than applied here; see `jump_queued`'s own comment.
+func _jump() -> void:
+	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty():
+		return
+	if not player_body.is_on_floor():
+		return
+	jump_queued = true
 
 
 func _use_prosthetic_surge() -> void:
@@ -3037,6 +3187,39 @@ func _announce_third_person_unlock() -> void:
 	WorldHistory.record_event("third_person_unlocked", {"location": HUNT_LOCATION})
 
 
+## Which of the HUD's children are lens and which are interface.
+##
+## The derby's index is clean and the hunt's was not, which is the whole of
+## "the menus are broken once you get out of the car": this scene is the only
+## one that owns a blood veil and a psychedelic rig, and both were added to
+## `$HUD` *after* the index, the map, the board and the archive. A CanvasLayer
+## draws its children in tree order, so both were painting over every panel the
+## player opened. The trip is worse than the veil, because the shader samples
+## `hint_screen_texture` — everything drawn earlier in the frame — so an open
+## index was not merely tinted, it was displaced, and the page tabs ended up
+## somewhere other than where they are actually clickable.
+##
+## Neither effect is wrong to exist; both were simply in the wrong half of the
+## stack. Blood is on the lens and the warp is in the air, so both belong
+## between the player and the *world*. A panel is held in the hand, in front of
+## both. Ordering it here, once, rather than by moving the `add_child` calls
+## around, because the construction order above is grouped by what each thing
+## needs from what came before it, and that is a separate concern from what
+## ends up in front of what.
+func _order_hud_layers() -> void:
+	# Everything above the world and below the interface, in this order.
+	var lens: Array = [blood_veil, psychedelic]
+	# `ScreenTreatment` is authored as the first child and is world-level too,
+	# so the lens stacks directly on top of it rather than at index 0.
+	var treatment := $HUD.get_node_or_null("ScreenTreatment")
+	var slot: int = (treatment.get_index() + 1) if treatment != null else 0
+	for effect in lens:
+		if effect == null or not is_instance_valid(effect):
+			continue
+		$HUD.move_child(effect, slot)
+		slot += 1
+
+
 func _toggle_panel(mode: String) -> void:
 	allusions_artwork.close_artwork()
 	panel_mode = "" if panel_mode == mode else mode
@@ -3057,9 +3240,18 @@ func _toggle_panel(mode: String) -> void:
 	elif pin_board.visible:
 		pin_board.close()
 	# A full sheet, chart or index; the field labels underneath it are noise.
+	#
+	# `prompt` alone, because it is the only one of the four left alive. I3
+	# retired `title`, `status` and the vitals panel in favour of
+	# `gothic_field_hud.gd`, and the scene authors all three as `visible =
+	# false` — but this loop turned them back *on* every time a panel closed.
+	# `_update_hud` re-hides `status` each frame and says nothing about the
+	# other two, so opening the index once and shutting it left the old orange
+	# title and the old vitals box stuck over the real interface for the rest
+	# of the run. That is the interface "breaking once you get out of the car":
+	# nothing breaks on arrival, it breaks the first time you open a panel.
 	var covering: bool = living_map.visible or world_index.visible or pin_board.visible
-	for label in [title, status, vitals, prompt]:
-		label.visible = not covering
+	prompt.visible = not covering
 	# The old ArchivePanel is dead. It was a Label in a box and it is exactly
 	# what "no more of this tutorial look" was about.
 	panel.visible = false
@@ -3105,7 +3297,16 @@ func _update_hud() -> void:
 	# the player reads, in the game's own face, and it is contextual — this was
 	# a permanent list of every key in the game, in the engine default font,
 	# drawn on top of it.
+	#
+	# All three of the retired nodes are held down here rather than only
+	# `status`, so nothing that flips one of them on can leave it on. The
+	# panel is what carries the box, not the label inside it, which is why
+	# `vitals.get_parent()` is what gets hidden.
+	title.visible = false
 	status.visible = false
+	var vitals_panel := vitals.get_parent() as Control
+	if vitals_panel != null:
+		vitals_panel.visible = false
 	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("status", "dormant")).to_upper()]
 	prompt.visible = not resolution_ui.visible and not living_map.visible and not world_index.visible
 	if field_interface.has_method("set_state"):

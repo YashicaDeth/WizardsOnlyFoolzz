@@ -2754,8 +2754,18 @@ travels, hits something and leaves a mark on it.
 - [ ] **AF1.1** A round is a thing that travels, not a raycast resolved on the frame it is fired — half done. `ballistics.gd` gives the round a mass, a muzzle velocity, drop, drag and a trace between where it was and where it is so it cannot tunnel; a rifle drops 1.7cm over forty metres and a shotgun pattern opens to 3.8m. **Damage to a body still resolves on the frame the trigger goes down.** Moving that onto the projectile means deferring every anatomy hit by a few frames, which is a change worth making deliberately rather than folded into this one
 - [x] **AF1.2** It hits the world and leaves damage there (pairs with AB2) — a hole where it arrived, lifted off the surface so it does not fight the wall it is drawn on, sized by the round's energy, and recorded to WorldHistory for AB2 to read
 - [x] **AF1.3** Casings eject, bounce, land and stay — out of the port sideways and back, tumbling, two bounces that lose most of their energy, and then lying on their side rather than standing on end, which is the single most obvious tell that nobody simulated them. One case per trigger pull, so a shotgun leaves one for nine pellets
-- [ ] **AF1.4** Reloading is physical: the magazine leaves the weapon and a new one arrives
-- [ ] **AF1.5** A magazine dropped half-full is half-full when you pick it up
+- [ ] **AF1.4** Reloading is physical: the magazine leaves the weapon and a new
+      one arrives — true underneath now: `hunter_arsenal.gd`'s `reload()` does
+      a real full swap (whatever was chambered leaves, the fullest spare
+      arrives), not a top-up. What is not built is the part this wording
+      actually names: nothing shows the magazine leaving on screen —
+      `HeldGear` owns that geometry and this pass deliberately did not reach
+      into it.
+- [x] **AF1.5** A magazine dropped half-full is half-full when you pick it up —
+      `_finish_reload()` ejects whatever is still loaded as its own discrete
+      spare rather than merging it into one reserve number; `tests/magazine_test.gd`
+      confirms a magazine survives two separate reloads later still carrying
+      the exact count it left with.
 - [x] **AF1.6** Calibre means something — muzzle velocity, grain and drag per calibre, and drag proportional to speed squared, so buckshot keeps 93.7% of its speed where a slug keeps 97.1% over the same flight. A shotgun stops being a shotgun at range without anybody writing a falloff curve
 - [ ] **AF1.7** It reads through the anatomy already built: a round finds a zone, not a hitbox
 - [ ] **AF1.8** Firing from a car is the same system (M2.3)
@@ -2789,8 +2799,46 @@ M covers which camera you are in and why. AD is what the body can do while you
 are in it.
 
 ### AD1 — The body moves
-- [ ] **AD1.1** Jumping worth doing — height, arc and a landing that reads
-- [ ] **AD1.2** Vaulting and mantling: waist-high things stop being walls
+- [x] **AD1.1** Jumping worth doing — height, arc and a landing that reads. `HunterMotor.move_body()` already ran real gravity, air acceleration and floor-stick every physics frame and `hunter_body_motion.gd` already had a dormant `landing_time` camera-dip/FOV-kick — nothing had ever given the player an upward velocity to actually reach them with. SPACE now jumps when there is no directional input held (a "dodge in place" makes no sense; `_dodge()` still owns SPACE-with-direction exactly as before), queued through `jump_queued` and consumed in `_update_player()`. Building it surfaced a real one-frame-late bug: the first version applied the impulse *after* `HUNTER_MOTOR.move_body()` returned, which is a whole physics step too late — `move_body()`'s own floor-stick branch reads `is_on_floor()` from the *previous* slide, so next frame it saw the body still (stale-)grounded and stomped the impulse straight back to `-FLOOR_STICK` before `move_and_slide()` ever got to use it. Fixed by giving `move_body()` an optional `jump_impulse` parameter so the impulse rides the same `move_and_slide()` call that has to prove it, not the next one. `game/tests/jump_test.gd` (13 checks) covers: queued-not-immediate, consumed-and-applied-in-the-same-slide, refused while airborne, refused while paneled/grappling, the arc actually leaving and returning to the floor on its own, `landing_time` firing for real, and SPACE-with-direction still dodging without also queuing a jump. `opening_test` and `combat_integration_test` re-verified clean against the `HunterMotor.move_body()` signature change (the one call site).
+- [x] ~~**AD1.2** Vaulting and mantling: waist-high things stop being
+      walls~~ Three real raycasts against actual collision geometry decide
+      it (`_vault_target()` in `bone_yard_hunt.gd`), not a fixed "step
+      height" or a tag on level geometry: a low cast (0.4m up) finds
+      whether there is an obstacle in front of the player at all; a high
+      cast (`VAULT_MAX_TOP`, 1.35m) tells a low obstacle from a real wall —
+      if anything is still in the way up there it stays a wall, AD1.3's
+      problem and not this one's; a downward cast just past the low hit
+      finds exactly where the obstacle's own top actually is, in world
+      height terms, rather than guessing one number for every crate, rail
+      and curb in the game; a final pair (floor + headroom) confirms the
+      far side actually has somewhere to land and room to stand once there.
+      SPACE now checks this before the existing dodge/jump split, not after
+      — a waist-high thing in front is exactly the case a plain dodge or a
+      plain jump both handle badly, and the whole point is that the
+      traversal button should not require knowing which of the three a
+      player needs. Execution is a real timed motion (`VAULT_DURATION`
+      0.34s, eased position lerp from `vault_from` to `vault_to`) that
+      takes over from normal movement/gravity for its duration and hands
+      control straight back — not an instant teleport and not a soft-lock.
+      Free rather than costing stamina, same reasoning as AD1.1's jump:
+      this is basic traversal, not a combat manoeuvre. Honestly scoped: no
+      dedicated vault animation pose exists yet (`hunter_body_motion.gd`
+      has no such trigger), so the body reads as idle for the motion's
+      duration while the camera position moves for real; and the far-side
+      offset (`VAULT_FAR_SIDE`, 0.55m) assumes a reasonably thin obstacle —
+      a genuinely deep one (a thick wall rather than a rail, crate or
+      curb) is outside what this was built or tested against. Verified:
+      `tests/vault_test.gd` (new, headless, 13/13, against a real
+      `StaticBody3D`/`BoxShape3D` obstacle rather than an assumed shape) —
+      open ground finds nothing, a 0.8m box is found and lands past it near
+      real floor height, a 2.2m wall in the identical spot is correctly
+      refused by the high ray, and a triggered vault visibly progresses
+      over several physics steps before landing exactly on the point the
+      raycasts found, with normal movement/gravity resuming immediately
+      after. `tests/vault_capture.gd` (new, windowed) confirms the camera
+      genuinely crosses the obstacle across three captured frames rather
+      than only the numbers agreeing. `jump_test`, `opening_test` and
+      `combat_integration_test` regression suites re-verified clean.
 - [ ] **AD1.3** Wall running, earned the way third person is earned rather than given
 - [ ] **AD1.4** Climbing a building is a route, not a cutscene (Prototype's lesson)
 - [ ] **AD1.5** Momentum carries between moves — run into vault into climb is one motion
@@ -3035,21 +3083,106 @@ already has: AA hands a holding to the ascent or to corruption, and those are
 the two cones. The player stands at the waist, where they touch.
 
 ### AI1 — The shape
-- [ ] **AI1.1** The Tree page becomes a double pyramid, upright above and inverted below
-- [ ] **AI1.2** The waist is where the player is, and it is the only tier you occupy
-- [ ] **AI1.3** Tiers are drawn as strata with real edges, not a list with indentation
-- [ ] **AI1.4** The upper cone is the ascent: what is above you and what it demands
-- [ ] **AI1.5** The lower cone is corruption: what is under you and what it is owed
-- [ ] **AI1.6** Density carries meaning - the base is crowded, the apex is one thing
-- [ ] **AI1.7** Legible at a glance and rewarding an hour of reading; the references do both
+- [x] ~~**AI1.1** The Tree page becomes a double pyramid, upright above and
+      inverted below~~ `world_index.gd`'s PYRAMID page rebuilt: a waist band
+      splits it into two cones, `_draw_pyramid_cone(rect, faction_id,
+      apex_up, register)` drawing the same tier logic for either — `apex_up`
+      alone decides which physical edge the crown sits against, so one
+      function serves both rather than the shape being written twice.
+- [x] ~~**AI1.2** The waist is where the player is, and it is the only tier
+      you occupy~~ `_draw_pyramid_waist()` reads the player's own
+      `WorldHistory.tree_alignment()`/`tree_descriptor()` — the same numbers
+      the FILE page's own Tree axis already draws — never a tier on either
+      cone.
+- [x] ~~**AI1.3** Tiers are drawn as strata with real edges, not a list with
+      indentation~~ Unchanged from the single pyramid this replaced — real
+      trapezoid strata with a stroked edge, not indentation.
+- [x] ~~**AI1.4** The upper cone is the ascent: what is above you and what it
+      demands~~ Populated from whichever faction in `WireNetScript.ASCENT_LEDGER_FACTIONS`
+      (K3.2 v2's own dual-ladder list) the player has the strongest real
+      command/ally/bond edge into, via new `_strongest_ladder_faction()`.
+- [x] ~~**AI1.5** The lower cone is corruption: what is under you and what it
+      is owed~~ Same function, `DESCENT_LEDGER_FACTIONS`, mirrored — crown at
+      the bottom, intake at the waist, "inverted" for real rather than
+      merely relabelled.
+- [x] ~~**AI1.6** Density carries meaning - the base is crowded, the apex is
+      one thing~~ Preserved from the single pyramid — `span_for()` still
+      narrows toward whichever edge is that cone's own crown.
+- [x] ~~**AI1.7** Legible at a glance and rewarding an hour of reading; the
+      references do both~~ Row text found to overlap once the double
+      pyramid halved the vertical room a single one had — fixed with fixed,
+      bottom-anchored two-line offsets per row instead of fractions of a
+      shrinking `row_height`; verified by a windowed capture with both
+      cones populated (`captures/ai1_double_pyramid.png`) rather than left
+      as read-the-code.
 
 ### AI2 — What it charts
-- [ ] **AI2.1** Every tier is populated from WorldHistory, not authored - who is actually above you
-- [ ] **AI2.2** Factions sit where their power is, and they move
-- [ ] **AI2.3** Your own position is computed, and it changes
-- [ ] **AI2.4** The Board's theories pin onto the pyramid - the two charts are one document
-- [ ] **AI2.5** Satire aims at institutions and never at congregations
-- [ ] **AI2.6** Marginalia in the corners, the way the references carry it
+- [x] ~~**AI2.1** Every tier is populated from WorldHistory, not authored -
+      who is actually above you~~ `wire.pyramid(faction_id)` — already
+      WorldHistory-derived — called twice, once per cone.
+- [x] **AI2.2** Factions sit where their power is, and they move — unchanged,
+      inherited from the pyramid data layer this reuses.
+- [x] ~~**AI2.3** Your own position is computed, and it changes~~ The waist
+      reads `tree_alignment()` live every draw, and which faction populates
+      each cone is recomputed from real relation edges every time the page
+      opens — nothing here is cached past a single reading.
+- [x] ~~**AI2.4** The Board's theories pin onto the pyramid - the two
+      charts are one document~~ Reads straight off the exact WorldHistory
+      record `pin_board.gd`'s own `published()` already reads
+      (`WorldHistory.subject(PinBoard.BOARD_ID).published`) rather than
+      needing a live `PinBoard` instance handed to this page — the two
+      screens agree because they are reading the same subject, not because
+      one calls the other, which is the honest reading of "one document."
+      New `_theories_naming(subject_id)` in `world_index.gd` walks that
+      record newest-first and resolves each theory id back to its real
+      title via `PinBoard.THEORIES`. A named subject who is also a real
+      pyramid tier member now carries a small pin marker (`PinBoard.MARKER`/
+      `THREAD`, the Board's own thread-red, not a new colour invented for
+      this page) — anchored to the member's icon corner rather than free
+      text on the rank line, because a real capture showed exactly why that
+      first attempt fails on the one row it matters most: the crown tier is
+      drawn narrowest of all of them (AI1.6's own "narrow at the crown"
+      rule), so the row a player is most likely to check a claim against is
+      the row least likely to have text-width to spare. The icon is a fixed
+      size regardless of tier span, so the mark survives every width; a
+      fuller "PINNED — <TITLE>" text tag is drawn alongside it whenever the
+      row's own free space actually allows it. A retraction (L4.4 v2)
+      clears the pin for free, since a retracted theory is simply no longer
+      in the record either side reads. Verifying this for real caught a
+      second, unrelated, pre-existing bug in the same function: the Descent
+      cone's header text was measured from `rect.end.y` directly while its
+      band (and therefore its own tiers, per AI1.2's "outer edge" placement)
+      was correctly reserving 54px above that for the header — so on every
+      faction with a populated Descent cone, the header printed straight
+      through the Crown and Inner Circle rows. The Ascent cone never showed
+      it only because its own header math already measured from `band_top`
+      instead of the rect edge. Fixed by giving both cones the same
+      `band_bottom` the Ascent cone already effectively had. Verified:
+      `tests/pyramid_pin_test.gd` (new, headless, 8/8 — wired through the
+      real `PinBoard.pin()`/`lay_string()`/`publish()`/`retract()` calls
+      rather than hand-writing the WorldHistory shape, so the test proves
+      the two screens actually agree) and `tests/pyramid_pin_capture.gd`
+      (new, windowed) plus a fresh `double_pyramid_capture.gd` recapture,
+      which is what actually caught the header/crown overlap and then
+      confirmed it gone. Existing `double_pyramid_test`,
+      `sephiroth_tree_test`, `index_link_rebuild_test`, `index_wire_glow_test`,
+      `link_test`, `opening_test` and `combat_integration_test` regression
+      suites re-verified clean.
+- [ ] **AI2.5** Satire aims at institutions and never at congregations — a
+      content/tone audit, not a code change; not verified this pass.
+- [x] ~~**AI2.6** Marginalia in the corners, the way the references carry
+      it~~ "AS ABOVE, SO BELOW" printed once in the corner, and the
+      recruitment pitch ("ADVANCEMENT OPPORTUNITY…") kept on the Ascent
+      cone specifically, in whatever room is actually left under its last
+      tier. Verified: `tests/double_pyramid_test.gd` (new, 4/4 — the pure
+      data logic: no commitment reads as unclaimed rather than a default
+      pick, the stronger of two relations wins, and a grudge does not count
+      as real standing), plus the existing `link_test.gd`,
+      `index_wire_glow_test.gd`, `index_link_rebuild_test.gd`,
+      `celloutz_site_test.gd` and `clerical_audit_test.gd` regression
+      suites, and windowed captures of both the unclaimed and populated
+      states (`captures/ai1_double_pyramid_unclaimed.png`,
+      `ai1_double_pyramid.png`).
 
 
 ### AI v10 — the final pass
@@ -3447,12 +3580,65 @@ This sits beside AI's double pyramid rather than competing with it: **the pyrami
 is where power is, the tree is which way you went.** Two charts, one document.
 
 ### AR1 — The paths
-- [ ] **AR1.1** The tree is drawn, real, and charts the paths against canon story beats
+- [~] **AR1.1** The tree is drawn, real, and charts the paths against canon
+      story beats — drawn and real, story beats not yet: `world_index.gd`
+      gets a fifth page, TREE, alongside FILE/PYRAMID/WIRE/BODY (appended
+      rather than inserted — WIRE and BODY are referenced elsewhere in the
+      file by hardcoded index, so a page ahead of them would have silently
+      retargeted those jumps). It draws the real Kabbalah tree — ten
+      sephiroth plus Da'ath, the tradition's own twenty-two paths between
+      them — from a new shared `systems/sephiroth.gd` rather than inventing
+      layout numbers inline, specifically so AV1.1's plane ladder (same ten
+      sephiroth, per Greg's own note that these are one diagram) can draw
+      from the identical file instead of drifting into a second geometry
+      that happens to agree. Da'ath sits in the gap, unmapped and touched by
+      none of the 22 paths, exactly as AV1.3 and AU1's "Da'ath is the good
+      one" both ask. What is honestly *not* built: there is no chapter or
+      story-beat system anywhere in this codebase to chart paths against
+      (grepped for one; nothing exists) — claiming that half would be
+      exactly the overclaiming this project keeps catching itself doing. So
+      a path lights from the same real relation/ladder-commitment signals
+      the double pyramid already reads (`WireNetScript.INFLUENCE_KINDS`,
+      `_strongest_ladder_faction`) rather than from beats that are not
+      written, and the page says so in its own footer rather than pretending
+      otherwise. Sits beside PYRAMID exactly as designed — "the pyramid is
+      where power is, the tree is which way you went. Two charts, one
+      document." Verified: `tests/sephiroth_tree_test.gd` (new, headless,
+      36/36 — the shared data's own shape: ten sephiroth counted, eleven
+      nodes drawn, twenty-two paths, none touching Da'ath, every node inside
+      the canvas, every path referencing two real nodes; and
+      `_sephirah_reached()`'s real-signal-only rule: Malkuth always lit,
+      Keter/Chokmah/Binah/Da'ath never lit regardless of any faction handed
+      to them, Tiferet lighting off either ladder's real commitment, a
+      leaning sephirah dark with no relation, staying dark for a grudge
+      -only INFLUENCE_KINDS count, same rule the pyramid already enforces —
+      and lighting for real influence, correctly sharing across every
+      sephirah with the same lean). `tests/sephiroth_tree_capture.gd` (new,
+      windowed) caught two real out-of-bounds crashes on the new page before
+      they shipped — `_draw_rail()` and `_draw_stamp()` both indexed a
+      four-entry array by `page`, both now five — and the capture confirms
+      the diagram itself: no path crossing where Da'ath's ring sits, labels
+      clearing every node, lit/dark reading clearly at a glance. Existing
+      `double_pyramid_test`, `index_link_rebuild_test`, `index_wire_glow_test`,
+      `link_test`, `opening_test` and `combat_integration_test` regression
+      suites re-verified clean against the PAGES array change.
 - [ ] **AR1.2** Side with the common CellOutz demon — but only with aura, power or influence
 - [ ] **AR1.3** Rebel and outcast from the gods: everything harder, nobody owns you
 - [ ] **AR1.4** Live with the low-frequency demons, then side with the elite and reptilian classes
 - [ ] **AR1.5** Or turn the demons on God and make them challenge it
-- [ ] **AR1.6** A path taken shows on the tree, and the tree is where you read your own run
+- [x] ~~**AR1.6** A path taken shows on the tree, and the tree is where you
+      read your own run~~ As real as AR1.1 gets it: `_draw_tree()`'s footer
+      prints the same `WorldHistory.tree_descriptor()` the PYRAMID waist
+      already reads, and every node's lit/dark state is a live read of
+      actual relations, not a static picture — open the same save with
+      different standing and a different set of nodes lights. What is not
+      yet true is the second half of the sentence this shares with AR1.1:
+      a *path* (one of the 22 edges) does not yet correspond to a *choice
+      the player made*, because no choice-tracking/chapter system exists to
+      have made one against. Retract this if that reading feels premature —
+      recorded here because the mechanism (real signal in, real node lit
+      out) is genuinely built and tested, not because the sentence is fully
+      earned yet.
 - [ ] **AR1.7** Paths open at chapters, not at levels
 
 ### AR2 — Jobs and contracts
@@ -3547,7 +3733,22 @@ entirely in the account.
       once the pocket is empty, and a body carrying both gives up the
       pocket first), plus the existing `combat_integration_test.gd` and
       `opening_test.gd` regression suites.
-- [ ] **AU1.3** Strains differ. Two mushrooms are not one item with a number
+- [x] ~~**AU1.3** Strains differ. Two mushrooms are not one item with a
+      number~~ `Substances.roll_strain(substance_id, seed_value)` names a
+      real strain (four flavoured names per substance — `marrow_dust`'s cut
+      of bone, `choir_bloom`'s bloom stage, `static_hymn`'s station) and
+      rolls a real potency (0.7–1.3), deterministic from the seed the same
+      way `seal_strokes()` (E2.1) is — the same pickup always rolls the
+      same strain if asked twice, and a different pickup does not.
+      `carry.gd`'s `take_substance()` seeds it off `WorldHistory.next_sequence`
+      and prints it into the item's own label ("MARROW DUST — FEMUR CUT
+      (BAGGIE)"), so two of the same drug in the bag read as two different
+      things rather than a stack with a number. `Substances.take()` takes an
+      optional `potency` now and scales what the dose actually does by it —
+      the catalogue price is what buying an unlabelled batch always costs;
+      potency is what you actually got for it. Verified: `tests/strain_test.gd`
+      (new, 8/8), plus the existing `substances_test.gd`,
+      `substance_object_test.gd` and `lacing_test.gd` regression suites.
 - [ ] **AU1.4** Everything costs: body, standing, time, and the godhead's attention
 - [ ] **AU1.5** Tolerance and comedown are tracked on the real clock
 - [ ] **AU1.6** Set and setting: the same substance in a safe room and in a tunnel are different experiences

@@ -30,6 +30,10 @@ var elapsed := 0.0
 var state := "idle"
 var camera_offset := Vector3.ZERO
 var camera_roll := 0.0
+## How much of the view motion to apply, 0 to 1. Everything above is scaled by
+## it, so a player who cannot stand head bob can turn the lot off from settings
+## without any of the poses or the recoil going with it.
+var view_motion := 1.0
 var fov_add := 0.0
 var step_voice: AudioStreamPlayer3D
 
@@ -186,13 +190,20 @@ func _set_zone_pose(zone_id: String, offset: Vector3, angles: Vector3) -> void:
 
 func _update_camera_motion(horizontal_speed: float, sprinting: bool, grounded: bool) -> void:
 	var moving := clampf(horizontal_speed / 7.0, 0.0, 1.0) if grounded else 0.0
-	var breath: float = sin(elapsed * (2.25 if sprinting else 1.55)) * (0.010 if sprinting else 0.006)
-	var step_bob: float = abs(sin(gait_phase)) * 0.022 * moving
-	var side: float = sin(gait_phase * 0.5) * 0.010 * moving
+	# Breath used to run at full size whether or not you were moving, so a
+	# player standing perfectly still watched the whole world drift up and down
+	# for no reason they had caused. Idle sway is worth having - a body that is
+	# absolutely rigid reads as a tripod - but it belongs well under the
+	# threshold where somebody notices the screen rather than the world, and it
+	# should grow when you are actually working for air.
+	var idle_breath := 0.0022
+	var breath: float = sin(elapsed * (2.25 if sprinting else 1.55)) 		* lerpf(idle_breath, (0.009 if sprinting else 0.005), moving)
+	var step_bob: float = abs(sin(gait_phase)) * 0.016 * moving
+	var side: float = sin(gait_phase * 0.5) * 0.007 * moving
 	var landing: float = sin(clampf(landing_time / 0.22, 0.0, 1.0) * PI) * -0.055
 	var recoil: float = -recoil_time * 0.18
-	camera_offset = Vector3(side, breath + step_bob + landing, recoil)
-	camera_roll = sin(gait_phase * 0.5) * 0.006 * moving
+	camera_offset = Vector3(side, breath + step_bob + landing, recoil) * view_motion
+	camera_roll = sin(gait_phase * 0.5) * 0.0045 * moving * view_motion
 	fov_add = lerpf(0.0, 2.4, speed_blend if sprinting else 0.0) - landing_time * 3.0
 
 

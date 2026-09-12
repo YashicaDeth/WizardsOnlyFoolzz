@@ -114,9 +114,14 @@ func take_substance(substance_id: String, stolen := false) -> Dictionary:
 		return {}
 	var data: Dictionary = SubstancesCatalog.CATALOG[substance_id]
 	var form := str(data.get("form", "weight"))
+	# AU1.3. Seeded per pickup off the world's own event counter, so this
+	# exact baggie rolls the same strain if asked twice and the next one off
+	# a different body does not — two mushrooms are not one item with a
+	# number, they are two different numbers.
+	var strain := SubstancesCatalog.roll_strain(substance_id, WorldHistory.next_sequence)
 	var item := {
-		"label": "%s (%s)" % [str(data.label).to_upper(), form.to_upper()], "kind": "substance",
-		"substance_id": substance_id, "form": form,
+		"label": "%s — %s (%s)" % [str(data.label).to_upper(), str(strain.strain), form.to_upper()], "kind": "substance",
+		"substance_id": substance_id, "form": form, "strain": str(strain.strain), "potency": float(strain.potency),
 		"mass": 0.2, "perishes": true, "age": 0.0, "condition": 1.0, "stolen": stolen,
 	}
 	items.append(item)
