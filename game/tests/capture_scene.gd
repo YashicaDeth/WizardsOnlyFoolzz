@@ -161,6 +161,18 @@ func _ready() -> void:
 			device.set_mode("WIRE")
 			for _hold in 60:
 				await get_tree().process_frame
+	elif trigger == "radio":
+		var device: Node = scene.get_node_or_null("HUD/Handheld")
+		if device != null:
+			device.open_device()
+			device.set_mode("RADIO")
+			# Held long enough for a real audio device to actually mix and
+			# for the spectrum analyzer to have real samples to report on —
+			# a dummy/headless driver never processes DSP at all, which is
+			# exactly why this needed a real capture rather than a number
+			# printed from a headless run.
+			for _hold in 90:
+				await get_tree().process_frame
 	elif trigger == "altered":
 		# E6/E8. Forced directly rather than routed through a real substance
 		# or meditation session, which need input this harness does not drive.
