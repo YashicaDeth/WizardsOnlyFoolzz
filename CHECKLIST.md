@@ -517,7 +517,7 @@ mechanisms and almost none are built.
 
 ### F4 — Rivals generated from real events
 - [x] ~~**F4.1** Rivals born out of what happened, not authored~~
-- [ ] **F4.2** Tactic adaptation — adopt LimboAI, currently unused
+- [x] **F4.2** Tactic adaptation on LimboAI — a rival who lost an arm inside your reach now stands off at 7.5m
 - [x] ~~**F4.3** The wound as the memory~~
 
 ### F5 — Player defeat routed to shackled
@@ -849,7 +849,7 @@ Unglamorous, and each one is currently costing real time.
 - [x] ~~**J2.2** Dev-only gate for the rest~~
 
 ### J3 — Adopt the installed plugins
-- [ ] **J3.1** LimboAI for F4.2
+- [x] **J3.1** LimboAI adopted narrowly — for the layer that did not exist, not as a rewrite of AI that works
 - [ ] **J3.2** Terrain3D + Proton Scatter for the Ashbloom exterior
 - [ ] **J3.3** Dialogue Manager when NPCs first speak
 
@@ -1613,6 +1613,27 @@ a real decision, not a formality.
 - [ ] **AC1.6** Fire spreads on what will burn and stops on what will not
 - [ ] **AC1.7** Explosions move things, break things and hurt bodies through one path
 - [ ] **AC1.8** An engine can catch, and a car that catches is a bomb with a timer
+
+## AF — Guns, properly
+
+Greg, 2026-09-12: *"i have to make the combat system a part of the gun system and
+weapons, so bullet, weapon and firing are all realistic bullets and reload with
+the things"* — and *"bullets shells fall on the floor aggressively as the bullet
+destroys the map"*.
+
+`hunter_arsenal.gd` has damage, spread, pellets, magazines and a reload timer. It
+does not have a **bullet**: firing is a raycast and an ammo decrement. Everything
+Greg is describing needs the round to be a real object that leaves the weapon,
+travels, hits something and leaves a mark on it.
+
+- [ ] **AF1.1** A round is a thing that travels, not a raycast resolved on the frame it is fired
+- [ ] **AF1.2** It hits the world and leaves damage there (pairs with AB2)
+- [ ] **AF1.3** Casings eject, bounce, land and stay — the floor of a firefight reads as one
+- [ ] **AF1.4** Reloading is physical: the magazine leaves the weapon and a new one arrives
+- [ ] **AF1.5** A magazine dropped half-full is half-full when you pick it up
+- [ ] **AF1.6** Calibre means something — what a round does to a body and to a wall differ
+- [ ] **AF1.7** It reads through the anatomy already built: a round finds a zone, not a hitbox
+- [ ] **AF1.8** Firing from a car is the same system (M2.3)
 
 ## AD — Movement, and being in first person
 
