@@ -501,7 +501,7 @@ CellOutz leadership. Both poles are already in `FACTION_TREE_AXIS`.
 ### K1 — The two poles
 - [x] **K1.1** CellOutz and wizardsonlyfoolz on the Tree axis as the real ends
 - [x] **K1.2** CellOutz written through the existing branding as deliberate, not coincidence — both poles are now real registered `WorldHistory` subjects (`systems/cosmology_factions.gd`), not just table entries; CellOutz's doctrine and territory state the branding conceit directly ("the brand under every panel you have touched since the vat")
-- [ ] **K1.3** wizardsonlyfoolz given a presence — ranks, a Law, a Book, paid grades (blocked on Greg naming the order — E2)
+- [~] **K1.3** wizardsonlyfoolz given a presence — ranks, a Law, a Book, paid grades. Ranks/paid grades didn't need the blocked half: `wren_ashby`, paid into the bottom rank, gives `WireNet.pyramid("wizardsonlyfoolz")` a real headcount instead of an empty order, generically, the same machinery every Sin already uses. **Still blocked on Greg**: a Law, a Book and a founder (E2) — nothing here invents them
 
 ### K2 — The Four Horsemen
 - [ ] **K2.1** Four named subjects on the nemesis machinery, not health bars in rooms
