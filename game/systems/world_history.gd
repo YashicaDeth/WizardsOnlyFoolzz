@@ -12,12 +12,34 @@ const MAX_EVENTS := 500
 var events: Array[Dictionary] = []
 var next_sequence := 1
 var subjects: Dictionary = {}
+## A5.6 v2. The identity of this run.
+##
+## Greg: *"grunge is seeded per screen and identical every session - it should
+## remember the run it is in"*. Every drawn surface in the game derives its
+## damage from a constant written into the call site, so a panel's grime is the
+## same grime in every save anybody has ever loaded. Deterministic per frame is
+## correct and was the point; deterministic per *universe* was an accident.
+##
+## One number fixes it, and it is a number this project wants anyway: Greg has
+## also asked for "world seed creations at the start like terraria". This is
+## that seed. It is generated once, it persists with everything else, and
+## anything that wants a run to look like its own run mixes it in.
+var run_salt := 0
 
 
 func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") == "1":
+		# A5.6 v2. Harnesses keep salt zero on purpose. Every capture test in
+		# the project compares against a PNG somebody looked at, and a run
+		# that salts its own grime would make all of them disagree with
+		# themselves for a reason that is not a regression.
 		return
 	_load_history()
+	if run_salt == 0:
+		# First run in this save. The number is the world's, from here on.
+		run_salt = randi() | 1
+		_save_history()
+	CellOutzGrunge.remember_run(run_salt)
 
 
 func record_event(event_type: String, details: Dictionary = {}) -> Dictionary:
@@ -356,6 +378,11 @@ func _load_history() -> void:
 			subjects = (parsed.get("subjects", {}) as Dictionary).duplicate(true)
 			for subject_id in subjects:
 				subjects[subject_id] = _normalise_body_records(subjects[subject_id])
+		# A5.6 v2. A save written before this existed has no salt, and
+		# inventing one for it would change how somebody's existing world
+		# looks. Zero reads as "the old constant", so an old save keeps the
+		# grime it already had.
+		run_salt = int(parsed.get("run_salt", 0))
 
 
 func _save_history() -> void:
@@ -364,4 +391,4 @@ func _save_history() -> void:
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
 		return
-	file.store_string(JSON.stringify({"next_sequence": next_sequence, "events": events, "subjects": subjects}))
+	file.store_string(JSON.stringify({"next_sequence": next_sequence, "events": events, "subjects": subjects, "run_salt": run_salt}))

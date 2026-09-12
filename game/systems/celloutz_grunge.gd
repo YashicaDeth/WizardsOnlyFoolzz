@@ -31,6 +31,30 @@ const BILE := Color("9a8c3f")
 const BRUISE := Color("6b3f6e")
 const SOOT := Color("15110d")
 
+## A5.6 v2. Which run this grime belongs to.
+##
+## Every seed below is mixed with this before it is used, so a panel is still
+## perfectly stable frame to frame - which is the whole reason the seeds exist -
+## while two different runs wear differently. Left at zero the face is exactly
+## what it was, so a save from before this existed opens looking like itself.
+static var run_salt := 0
+
+
+## Called once at startup from whatever owns the run. Kept as a call rather than
+## a read of `WorldHistory` so this file stays a pure drawing helper with no
+## dependency on the autoload - the dossier, the Wire and the map all use it and
+## none of them should have to care where a number came from.
+static func remember_run(salt: int) -> void:
+	run_salt = salt
+
+
+## Mix. A plain XOR leaves adjacent call-site seeds adjacent, which shows up as
+## neighbouring panels wearing in visibly similar patterns, so this stirs.
+static func _mix(seed_value: int) -> int:
+	var mixed := seed_value ^ run_salt
+	mixed = (mixed ^ (mixed >> 13)) * 0x5bd1e995
+	return absi(mixed ^ (mixed >> 15))
+
 
 ## An irregular blot - damp, rust bloom, old coffee, something worse.
 ##
@@ -41,7 +65,7 @@ const SOOT := Color("15110d")
 ## mark soaked into it. Accumulated alpha gives a soft irregular edge for free.
 static func stain(canvas: CanvasItem, at: Vector2, radius: float, seed_value: int, tint: Color, alpha := 0.14) -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = seed_value
+	rng.seed = _mix(seed_value)
 	var blobs := 11
 	var per_blob := alpha / 2.6
 	for index in blobs:
@@ -59,7 +83,7 @@ static func stain(canvas: CanvasItem, at: Vector2, radius: float, seed_value: in
 ## this is a physical object in a place where people are opened up.
 static func spatter(canvas: CanvasItem, at: Vector2, seed_value: int, count: int, heading: Vector2, tint := DRIED) -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = seed_value
+	rng.seed = _mix(seed_value)
 	var direction := heading.normalized() if heading.length() > 0.01 else Vector2.RIGHT
 	for index in count:
 		var distance := rng.randf() * rng.randf() * 130.0
@@ -84,7 +108,7 @@ static func spatter(canvas: CanvasItem, at: Vector2, seed_value: int, count: int
 ## cheapest way to make an interface read as a document somebody processed.
 static func stamp(canvas: CanvasItem, at: Vector2, text: String, cap: float, angle: float, tint: Color, seed_value: int) -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = seed_value
+	rng.seed = _mix(seed_value)
 	var width := CellOutzType.width(text, cap, cap * 0.22)
 	canvas.draw_set_transform(at, angle, Vector2.ONE)
 	var box := Rect2(Vector2(-10, -cap * 0.55), Vector2(width + 20, cap * 2.1))
@@ -112,7 +136,7 @@ static func stamp(canvas: CanvasItem, at: Vector2, text: String, cap: float, ang
 ## Dust, grit and dead emulsion. Fixed per seed so it sits still.
 static func grain(canvas: CanvasItem, rect: Rect2, seed_value: int, density: int, tint := PAPER) -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = seed_value
+	rng.seed = _mix(seed_value)
 	for index in density:
 		var point := rect.position + Vector2(rng.randf() * rect.size.x, rng.randf() * rect.size.y)
 		var bright := rng.randf()
@@ -126,7 +150,7 @@ static func grain(canvas: CanvasItem, rect: Rect2, seed_value: int, density: int
 ## across it repeatedly in the same direction.
 static func scratches(canvas: CanvasItem, rect: Rect2, seed_value: int, count: int) -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = seed_value
+	rng.seed = _mix(seed_value)
 	for index in count:
 		var start := rect.position + Vector2(rng.randf() * rect.size.x, rng.randf() * rect.size.y)
 		var length := rng.randf_range(14.0, 130.0)
@@ -139,7 +163,7 @@ static func scratches(canvas: CanvasItem, rect: Rect2, seed_value: int, count: i
 ## way a medical form actually would — by someone shading it in with a pen.
 static func hatch(canvas: CanvasItem, bounds: Rect2, spacing: float, tint: Color, alpha: float, seed_value: int) -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = seed_value
+	rng.seed = _mix(seed_value)
 	var span := bounds.size.x + bounds.size.y
 	var offset := -bounds.size.y
 	while offset < bounds.size.x:
@@ -155,7 +179,7 @@ static func hatch(canvas: CanvasItem, bounds: Rect2, spacing: float, tint: Color
 ## not stay where it landed.
 static func run_down(canvas: CanvasItem, at: Vector2, length: float, seed_value: int, tint := DRIED) -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = seed_value
+	rng.seed = _mix(seed_value)
 	var width := rng.randf_range(1.6, 4.0)
 	var points_left := PackedVector2Array()
 	var points_right := PackedVector2Array()
@@ -181,7 +205,7 @@ static func run_down(canvas: CanvasItem, at: Vector2, length: float, seed_value:
 ## person who wrote it is dead.
 static func scrawl(canvas: CanvasItem, at: Vector2, width: float, lines: int, seed_value: int, tint := Color("2b2019")) -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = seed_value
+	rng.seed = _mix(seed_value)
 	for line in lines:
 		var y := at.y + float(line) * 11.0
 		var x := at.x
@@ -226,7 +250,7 @@ static func vital_interference(canvas: CanvasItem, rect: Rect2, level: float, cl
 	if level <= 0.0:
 		return
 	var rng := RandomNumberGenerator.new()
-	rng.seed = seed_value * 7717 + 31
+	rng.seed = _mix(seed_value) * 7717 + 31
 
 	# Horizontal dropout. Count and height both climb with severity, so a
 	# scratch flickers and a haemorrhage tears the readout apart.
