@@ -26,6 +26,7 @@ const COMBAT_RESPONSE := preload("res://systems/combat_response.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
+const CARRION_SCAVENGER := preload("res://systems/carrion_scavenger.gd")
 
 var player := Vector3(0, 1.5, 19)
 var yaw := PI
@@ -86,6 +87,7 @@ var asset_network := ASSET_NETWORK.new()
 ## `encounter_actors` so the AI stops paying for them, but a corpse is still a
 ## thing you can rob (B5), so it keeps its rig here rather than being forgotten.
 var dead_bodies: Array[Dictionary] = []
+var carrion_scavengers: Array[Node3D] = []
 var extraction_session: Dictionary = {}
 var witness_ledger := WitnessLedger.new()
 ## B3.3/B3.6. Hold G and you are looking through people; keep holding and the
@@ -465,6 +467,7 @@ func _physics_process(delta: float) -> void:
 	_update_player(delta)
 	_update_rival(delta)
 	_update_encounter_actors(delta)
+	_update_carrion(delta)
 	_update_extraction(delta, Input.is_key_pressed(KEY_H))
 	_update_xray(delta, Input.is_key_pressed(KEY_B))
 	# Reports walk home in real time; F1.3's window only exists if it ticks.
@@ -476,6 +479,35 @@ func _physics_process(delta: float) -> void:
 	_steer_lock(delta)
 	_update_camera()
 	_update_hud()
+
+
+## B4.10v2. The world notices unattended flesh. This is deliberately part of
+## the Hunt Grounds loop, not a test-only consumer: a scavenger is drawn to the
+## same rotten, identified chunks that the player could otherwise rob.
+func _update_carrion(delta: float) -> void:
+	for index in range(carrion_scavengers.size() - 1, -1, -1):
+		var scavenger := carrion_scavengers[index]
+		if scavenger == null or not is_instance_valid(scavenger):
+			carrion_scavengers.remove_at(index)
+			continue
+		scavenger._process(delta)
+	if not carrion_scavengers.is_empty() or GoreChunks.scent_sources().is_empty():
+		return
+	var carrion := CARRION_SCAVENGER.new()
+	carrion.name = "CarrionEater"
+	add_child(carrion)
+	carrion.global_position = player + Vector3(8.0, 0.0, -5.0)
+	var body := MeshInstance3D.new()
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.26
+	mesh.height = 0.62
+	body.mesh = mesh
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("4a3d20")
+	material.roughness = 0.9
+	body.material_override = material
+	carrion.add_child(body)
+	carrion_scavengers.append(carrion)
 	# Charted by walking, not by opening the map.
 	living_map.observe(player, yaw)
 

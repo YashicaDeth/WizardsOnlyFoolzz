@@ -43,6 +43,12 @@ func _ready() -> void:
 	check(BaselineHuman.splats.size() > 0, "blood that lands stays on the ground (%d marks)" % BaselineHuman.splats.size())
 	var remembered: Array = BaselineHuman.blood_records.get(BaselineHuman._blood_scene_key(get_tree().current_scene), [])
 	check(not remembered.is_empty(), "landed blood is retained as scene evidence, not only as a live mesh")
+	var carrion_food: Node = GoreChunks.from_subject(str(rig.anatomy.subject_id))[0]
+	var carrion_info: Dictionary = GoreChunks.identify(carrion_food)
+	carrion_info["spawn_msec"] = Time.get_ticks_msec() - int(GoreChunks.ROT_SECONDS * 1000.0)
+	carrion_food.set_meta("chunk", carrion_info)
+	hunt._update_carrion(0.1)
+	check(hunt.carrion_scavengers.size() == 1, "rotten Hunt Grounds flesh summons a visible carrion scavenger")
 	check(BaselineHuman.live_gore < sprayed, "airborne blood is still cleaned up")
 
 	# The floor fills and then stays full rather than growing without bound.
