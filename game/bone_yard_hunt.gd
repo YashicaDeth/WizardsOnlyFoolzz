@@ -131,6 +131,10 @@ var last_swing_at := 0.0
 const SWING_CHAIN_WINDOW := 0.9
 const SWING_REVERSE_PENALTY := 1.4
 const STEP_IN_BONUS := 0.55
+## O5.11 v2. Smaller than STEP_IN_BONUS on purpose: stepping into a target is
+## the dominant read of a committed swing, and arc alignment is a real but
+## secondary refinement of it, not a second axis worth as much as the first.
+const ARC_STEP_BONUS := 0.25
 
 var guarding := false
 var guard_raised := 0.0
@@ -1091,11 +1095,24 @@ func swing_momentum(heading: Vector3) -> Dictionary:
 	var look := Vector3(sin(yaw), 0.0, cos(yaw))
 	var flat := Vector3(heading.x, 0.0, heading.z)
 	var into := 0.0
+	# O5.11 v2. `swing_side` alternated every swing and was returned in this
+	# same dictionary already, but nothing ever read it — the bonus below
+	# only ever asked whether you stepped toward where you were looking, not
+	# whether you moved with the arc the weapon was actually travelling on.
+	# side == 1 is a rightward arc (left hand to right), -1 the reverse, which
+	# is the convention register_swing() has been silently keeping since the
+	# arc's own alternation was written.
+	var with_arc := 0.0
 	if flat.length() > 0.2:
-		into = clampf(flat.normalized().dot(look), -1.0, 1.0) * clampf(flat.length() / 6.0, 0.0, 1.0)
+		var normalized_flat := flat.normalized()
+		into = clampf(normalized_flat.dot(look), -1.0, 1.0) * clampf(flat.length() / 6.0, 0.0, 1.0)
+		var right := Vector3(look.z, 0.0, -look.x)
+		with_arc = clampf(normalized_flat.dot(right) * float(swing_side), -1.0, 1.0) * clampf(flat.length() / 6.0, 0.0, 1.0)
 	# Stepping in lends the blow your mass; backing away takes it out of the
-	# swing, and a blow thrown while retreating should feel like one.
-	var power := 1.0 + into * STEP_IN_BONUS
+	# swing, and a blow thrown while retreating should feel like one. Moving
+	# with the arc lends a smaller amount again — a real cut is carried by
+	# footwork on both axes, not only the one toward the target.
+	var power := 1.0 + into * STEP_IN_BONUS + with_arc * ARC_STEP_BONUS
 	var recovery := 1.0
 	var now := float(Time.get_ticks_msec()) * 0.001
 	var chained := (now - last_swing_at) <= SWING_CHAIN_WINDOW
@@ -1112,6 +1129,7 @@ func swing_momentum(heading: Vector3) -> Dictionary:
 		"side": swing_side,
 		"chained": chained,
 		"into": into,
+		"with_arc": with_arc,
 	}
 
 

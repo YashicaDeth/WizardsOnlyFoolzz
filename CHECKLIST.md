@@ -1134,7 +1134,22 @@ Opened because O2.5 closed at v2. A fault the v2 work itself created.
       to not exist. Verified: `tests/enemy_footing_test.gd` (8 checks), plus
       the full grapple/clinch suite, `enemy_ai_test`, `combat_integration_test`
       and `opening_test` all still pass.
-- [ ] **O5.11** `v2` Swing momentum reads the body's velocity and ignores where the weapon was actually pointed
+- [x] ~~**O5.11** `v2` Swing momentum reads the body's velocity and ignores
+      where the weapon was actually pointed~~ `swing_side` alternated every
+      swing and was already returned in `swing_momentum()`'s own dictionary,
+      but nothing anywhere compared it against how the player actually
+      moved — the bonus only ever asked whether you stepped toward where you
+      were looking. It now also reads the lateral component of your movement
+      against the arc's own direction: moving with the swing lends a further
+      `ARC_STEP_BONUS` (0.25, deliberately smaller than the 0.55 step-in
+      bonus — the forward read stays dominant), moving against it costs the
+      same back. A pure straight-in step with no lateral component is
+      unaffected either way, so this is additive rather than a retune of
+      what already worked. Verified: `tests/swing_arc_test.gd` (5 checks —
+      the same lateral step reads oppositely depending on which way the arc
+      is swinging, moving with it measurably outscores moving against it,
+      flipping the arc flips the sign, and a straight-in step is untouched),
+      plus the full combat suite still passes.
 - [x] ~~**O3.5** `v2` Nothing a body wears or has grown changes what a blow does
       to it — armour and plating are not in the resolution at all~~ Audited
       rather than built: `anatomy_component.gd`'s `apply_hit()` already reads
