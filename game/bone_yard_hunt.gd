@@ -3587,6 +3587,10 @@ func _build_world() -> void:
 		lamp.light_energy = 3.5
 		lamp.omni_range = 13
 		add_child(lamp)
+		# A3.2. The air around each of these bends after dark; nothing else in the
+		# scene does. Attached at build rather than driven from a list, so a lamp
+		# cannot exist without its shell.
+		LightWarp.attach(lamp)
 	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-50, -25, 0)
 	sun.light_color = Color("c89572")
@@ -3614,6 +3618,12 @@ func _update_day_night() -> void:
 	if env != null:
 		env.ambient_light_energy = lerpf(0.16, 0.72, daylight)
 		env.tonemap_exposure = lerpf(0.85, 1.18, daylight)
+		# A3.1. The sky and the fog move with the hour too. Without this the
+		# sun dimmed, the ground went black and the horizon stayed exactly as
+		# bright as it is at noon — verified by capture, the 01:00 and 12:00
+		# skies were identical. Kept in `world_look.gd` so the derby and the
+		# hunt cannot end up with two different nights.
+		WorldLook.apply_hour(env, daylight, "ashbloom")
 	# AS2.1 said "the light can become really warped at night and distorted",
 	# and this read it literally: every night pushed the psychedelic shader's
 	# displacement dial up, so a sober player walking around after dark got a
@@ -3629,6 +3639,13 @@ func _update_day_night() -> void:
 	# `substances.gd`, `meditation.gd` and the shadow realms to move — which is
 	# FINAL_V.md §16's own argument (one shader, many dials) applied properly
 	# rather than spent on the time of day.
+	#
+	# A3.2 is the same statement built where it does belong. The lamps bend the
+	# air around themselves, full after dark and nothing at midday, and the fade
+	# between the two is `daylight()`'s own dusk curve rather than a second one
+	# invented here. A frame with no lamp in it is not warped at all, which is
+	# the whole difference between a property and a filter.
+	LightWarp.set_all(self, 1.0 - daylight)
 
 
 func _build_expanse_systems() -> void:

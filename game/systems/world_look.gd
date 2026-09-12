@@ -104,6 +104,66 @@ static func environment(preset_name: String = "bone_yard") -> Environment:
 	return env
 
 
+## A3.1. The hour, applied to the whole look rather than to the sun alone.
+##
+## "Every surface A built is judged again after dark, not just dimmed." Judged
+## after dark, it turned out the world was not even dimmed — it was half dimmed.
+## `_update_day_night` drove the sun, the ambient energy and the exposure, and
+## nothing drove the sky. A capture at 01:00 and a capture at noon came back
+## with a pixel-identical horizon: at one in the morning the brightest thing in
+## frame was the sky, the ground under it was crushed to black, and the one real
+## sodium lamp in the shot read the same at both hours because it had a lit sky
+## to compete with. That is the whole reason nothing in section A has ever
+## looked like night: the surfaces were not failing, they were being asked to
+## sit under a midday backdrop with no light on them.
+##
+## So the sky, the fog and the volumetric fog move with the hour too, from the
+## preset's authored day values down to a night the preset derives rather than
+## declares — night is the same place with the light taken out of it, not a
+## second palette somebody would have to keep in agreement with the first.
+##
+## Takes `daylight` rather than reading `WorldClock` itself, so a caller
+## crossfading for its own reasons (a tunnel, the shadow realms, a capture that
+## wants a specific hour) uses the same mapping instead of writing a second one.
+static func apply_hour(env: Environment, daylight: float, preset_name: String = "bone_yard") -> void:
+	if env == null:
+		return
+	var preset: Dictionary = PRESETS.get(preset_name, PRESETS.bone_yard)
+	var lit := clampf(daylight, 0.0, 1.0)
+
+	var sky := env.sky
+	if sky != null and sky.sky_material is ProceduralSkyMaterial:
+		var sky_material := sky.sky_material as ProceduralSkyMaterial
+		var zenith := Color(preset.zenith)
+		var horizon := Color(preset.horizon)
+		# Night is this sky with the sun taken out of it: the zenith goes
+		# nearly black and keeps its hue, and the horizon loses the warm dust
+		# that only exists because something is lighting it. Derived from the
+		# authored colours so retuning a preset cannot leave its night behind.
+		var night_zenith := zenith.darkened(0.86)
+		var night_horizon := horizon.darkened(0.82).lerp(zenith, 0.45)
+		sky_material.sky_top_color = night_zenith.lerp(zenith, lit)
+		sky_material.sky_horizon_color = night_horizon.lerp(horizon, lit)
+		sky_material.ground_horizon_color = sky_material.sky_horizon_color.darkened(0.25)
+		sky_material.ground_bottom_color = Color(preset.ground).darkened(lerpf(0.7, 0.0, lit))
+		# The multiplier is what stopped the horizon ever going dark, because
+		# it held at its daylight value around the clock.
+		sky_material.sky_energy_multiplier = lerpf(0.07, 1.15, lit)
+
+	# Fog is lit by the sky, so it has to move with it or the haze stays warm
+	# over a cold ground — which reads as smog at noon and as nothing at all at
+	# one in the morning.
+	var fog := Color(preset.fog)
+	env.fog_light_color = fog.darkened(0.78).lerp(fog, lit)
+	env.volumetric_fog_albedo = env.fog_light_color
+	env.volumetric_fog_emission = env.fog_light_color.darkened(0.7)
+	# Slightly denser after dark. Not for atmosphere: it is what keeps a lamp
+	# reading as a light with a throw rather than a bright dot, which is what
+	# A4.1 and A4.2 are going to hang off.
+	env.fog_density = float(preset.fog_density) * lerpf(1.45, 1.0, lit)
+	env.volumetric_fog_density = float(preset.volumetric) * lerpf(1.6, 1.0, lit)
+
+
 static func surface(color: Color, kind: String = "paint", variation_seed: int = 0) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	var tint := color
