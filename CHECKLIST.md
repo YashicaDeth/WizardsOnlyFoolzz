@@ -3529,7 +3529,22 @@ entirely in the account.
       once the pocket is empty, and a body carrying both gives up the
       pocket first), plus the existing `combat_integration_test.gd` and
       `opening_test.gd` regression suites.
-- [ ] **AU1.3** Strains differ. Two mushrooms are not one item with a number
+- [x] ~~**AU1.3** Strains differ. Two mushrooms are not one item with a
+      number~~ `Substances.roll_strain(substance_id, seed_value)` names a
+      real strain (four flavoured names per substance — `marrow_dust`'s cut
+      of bone, `choir_bloom`'s bloom stage, `static_hymn`'s station) and
+      rolls a real potency (0.7–1.3), deterministic from the seed the same
+      way `seal_strokes()` (E2.1) is — the same pickup always rolls the
+      same strain if asked twice, and a different pickup does not.
+      `carry.gd`'s `take_substance()` seeds it off `WorldHistory.next_sequence`
+      and prints it into the item's own label ("MARROW DUST — FEMUR CUT
+      (BAGGIE)"), so two of the same drug in the bag read as two different
+      things rather than a stack with a number. `Substances.take()` takes an
+      optional `potency` now and scales what the dose actually does by it —
+      the catalogue price is what buying an unlabelled batch always costs;
+      potency is what you actually got for it. Verified: `tests/strain_test.gd`
+      (new, 8/8), plus the existing `substances_test.gd`,
+      `substance_object_test.gd` and `lacing_test.gd` regression suites.
 - [ ] **AU1.4** Everything costs: body, standing, time, and the godhead's attention
 - [ ] **AU1.5** Tolerance and comedown are tracked on the real clock
 - [ ] **AU1.6** Set and setting: the same substance in a safe room and in a tunnel are different experiences
