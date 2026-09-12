@@ -2,6 +2,22 @@
 
 ## 2026 09 12
 
+- **L2 and L3: the wall is yours, and it can be wrong.** L1 read the board out
+  of `WorldHistory`, which made it a view. It is now a thing one person made: a
+  new board has the authored theories on it — they were up when you found the
+  room — and exactly one card of your own. Everything else you put there
+  yourself, off the index, off a photograph, or off a part in your bag, which
+  keeps its provenance onto the wall. Cards are carried in the hand and placed
+  by clicking, moved by dragging, taken down by right-clicking, and the whole
+  arrangement persists.
+  Then L3, which is the part that makes it a game. Hold the middle button from
+  one card to another and you lay a string, and **a string is a claim**. One the
+  world bears out opens a lead. One it does not opens nothing and is drawn
+  identically — the thread carries no field the true one lacks, nothing on the
+  board consults the check, and you find out by acting on it. The ledger knows
+  which is which, because the ledger records what you did, not whether you were
+  right.
+
 - **L1: the storyline is a wall now.** The one screen this project had not yet
   built was the quest log, and a quest log is a list of text in a box — the
   exact shape every other screen has been dragged out of. So there is no quest

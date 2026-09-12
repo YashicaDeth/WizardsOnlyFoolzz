@@ -36,6 +36,29 @@ func _ready() -> void:
 	var board: Control = BOARD.new()
 	layer.add_child(board)
 	board.open()
+	# L2. The wall is the player's doing now, so the capture has to do what a
+	# player would: take things off the other screens and put them up.
+	for entry in [
+		["mara_voss", "photo"], ["dolan_kreeg", "photo"], ["sil_fenmark", "photo"],
+		["ashline_wreckers", "record"], ["choir_of_marrow", "record"], ["celloutz", "record"],
+		["event:0", "cutting"], ["event:2", "cutting"], ["event:3", "cutting"],
+		["part:HEART@mara_voss", "cutting"],
+	]:
+		board.pin(str(entry[0]), str(entry[1]))
+	# L3. And strings the player drew. Two of these the world bears out and two
+	# it does not, and the wall says nothing about which is which.
+	for link in [
+		["part:HEART@mara_voss", "theory_ownership"],
+		["mara_voss", "ashline_wreckers"],
+		["dolan_kreeg", "choir_of_marrow"],
+		["event:2", "theory_absent_god"],
+		["celloutz", "theory_inside"],
+		["sil_fenmark", "theory_frequency"],
+		["player", "theory_absent_god"],
+		["player", "theory_inside"],
+		["mara_voss", "theory_rotation"],
+	]:
+		board.lay_string(str(link[0]), str(link[1]))
 
 	for shot in [{"zoom": 1.0, "pan": Vector2.ZERO, "name": "board"}, {"zoom": 1.9, "pan": Vector2(240, 120), "name": "board_close"}]:
 		board.zoom = float(shot["zoom"])

@@ -1,5 +1,8 @@
 extends Control
 
+## L2.1. Something on this page is worth putting on the wall.
+signal pin_requested(ref: String, kind: String, title: String)
+
 ## The World Index, rebuilt as a made object.
 ##
 ## Greg's verdict on the old one was "the world index needs a UI badly it looks
@@ -269,6 +272,16 @@ func _unhandled_input(event: InputEvent) -> void:
 				rail_index = maxi(0, rail_index - 1)
 			KEY_DOWN:
 				rail_index = mini(_rail_cache.size() - 1, rail_index + 1)
+			KEY_P:
+				# L2.1. Take the selected record off the index and carry it to
+				# the wall. The index does not know the board exists — it hands
+				# the reference up and whoever owns both decides what happens,
+				# which keeps the two screens independent.
+				if rail_index >= 0 and rail_index < _rail_cache.size():
+					var row: Dictionary = _rail_cache[rail_index]
+					var subject: Dictionary = WorldHistory.subject(str(row["id"]))
+					var row_kind := "record" if str(subject.get("kind", "")) == "faction" else "photo"
+					pin_requested.emit(str(row["id"]), row_kind, str(row["label"]))
 			KEY_TAB:
 				if page != 3 or not _inspector.handle_key(KEY_TAB):
 					return

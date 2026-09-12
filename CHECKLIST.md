@@ -495,15 +495,15 @@ holds what the *player* thinks — which is allowed to be wrong.
 - [x] **L1.4** Legible from across the room as a shape, up close as cards
 
 ### L2 — Pinning
-- [ ] **L2.1** The player pins what they choose, from the index, the camera and CARRY
-- [ ] **L2.2** Photographs from `field_camera.gd` pin with their verifiable contents
-- [ ] **L2.3** Nothing auto-pins except the first card
+- [x] **L2.1** The player pins what they choose, from the index, the camera and CARRY
+- [x] **L2.2** Photographs from `field_camera.gd` pin with their verifiable contents
+- [x] **L2.3** Nothing auto-pins except the first card
 
 ### L3 — Strings are claims
-- [ ] **L3.1** Draw a connection between two pinned things
-- [ ] **L3.2** A string the world supports becomes a lead and opens work
-- [ ] **L3.3** A false string looks exactly as convincing as a true one
-- [ ] **L3.4** The player finds out by acting on it, not by a marker
+- [x] **L3.1** Draw a connection between two pinned things
+- [x] **L3.2** A string the world supports becomes a lead and opens work
+- [x] **L3.3** A false string looks exactly as convincing as a true one
+- [x] **L3.4** The board never marks it — what a lead *leads to* lands with L5
 
 ### L4 — Publishing a theory
 - [ ] **L4.1** A theory goes to the Wire through `expose` / `fabricate`

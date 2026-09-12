@@ -26,6 +26,10 @@ extends Control
 
 const Grunge := preload("res://systems/celloutz_grunge.gd")
 
+const FieldCamera := preload("res://systems/field_camera.gd")
+
+const BOARD_ID := "pin_board"
+
 const CORK := Color("6b4f31")
 const CORK_DARK := Color("4a3721")
 const PAPER := Color("d9cdb2")
@@ -48,6 +52,7 @@ const THEORIES := [
 		"claim": "NOBODY DIED HERE. THEY WERE REPOSSESSED.\nCHECK WHO HOLDS THE LIEN.",
 		"at": Vector2(-520, -300),
 		"pulls": ["faction", "part", "lien"],
+		"supported_by": ["lien", "part", "carried_part", "robbery"],
 	},
 	{
 		"id": "theory_frequency",
@@ -55,6 +60,7 @@ const THEORIES := [
 		"claim": "THE MASTS ARE NOT FOR TALKING.\nSOMETHING IS BEING CARRIED UP.",
 		"at": Vector2(120, -380),
 		"pulls": ["place", "signal"],
+		"supported_by": ["signal", "mast", "place"],
 	},
 	{
 		"id": "theory_absent_god",
@@ -62,6 +68,7 @@ const THEORIES := [
 		"claim": "YOU CANNOT GET HIS ATTENTION BY ASKING.\nSO MAKE SOMETHING HE HAS TO ANSWER FOR.",
 		"at": Vector2(-180, 120),
 		"pulls": ["event", "person"],
+		"supported_by": ["execution", "spare", "downed"],
 	},
 	{
 		"id": "theory_rotation",
@@ -69,6 +76,7 @@ const THEORIES := [
 		"claim": "THE LEADERSHIP CHANGES AND THE ORDERS DO NOT.\nTHEREFORE THE ORDERS ARE NOT THEIRS.",
 		"at": Vector2(520, -60),
 		"pulls": ["faction", "person"],
+		"supported_by": ["faction", "rank", "command"],
 	},
 	{
 		"id": "theory_inside",
@@ -76,6 +84,7 @@ const THEORIES := [
 		"claim": "THEY SELL YOU THE WIRE.\nTHEY SELL THEM YOUR NAME.",
 		"at": Vector2(200, 340),
 		"pulls": ["event", "faction"],
+		"supported_by": ["wire", "bounty", "hunt", "sold"],
 	},
 ]
 
@@ -95,6 +104,20 @@ class Card extends RefCounted:
 	var struck := false
 
 
+## L2. What the player has actually put on the wall: an array of
+## `{ref, kind, at, angle, seed}`. This is the save, and it is the only thing on
+## the board that is authored by the player rather than read out of the world.
+var pinned: Array = []
+## L2. What is in the player's hand, on its way to the wall. Pinning is a two
+## step act — take it off a screen, then choose where it goes — because putting
+## a photograph of somebody on your conspiracy wall should cost a decision.
+var holding: Dictionary = {}
+
+## L3. The strings the player has drawn. Each one is a claim: this connects to
+## that. The board keeps them exactly as drawn and says nothing about whether
+## they are true, because that is the mechanic.
+var strings: Array = []
+
 var cards: Array[Card] = []
 var threads: Array = []
 var pan := Vector2.ZERO
@@ -103,7 +126,14 @@ var clock := 0.0
 var open_blend := 0.0
 
 var _dragging := false
+var _moving := ""
+var _stringing := ""
 var _board_rect := Rect2()
+
+signal pinned_changed()
+signal strings_changed()
+## L3.2. Something the world bears out, which means there is work in it.
+signal lead_opened(from: String, to: String)
 
 
 func _ready() -> void:
@@ -124,9 +154,283 @@ func _fit() -> void:
 
 func open() -> void:
 	_fit()
+	load_board()
 	rebuild()
 	visible = true
 	open_blend = 0.0
+
+
+## The wall persists, because it is a thing in a room rather than a view. Kept
+## in `WorldHistory` alongside everything else so a save carries the player's
+## reading of the world and not only the world.
+func load_board() -> void:
+	var record: Dictionary = WorldHistory.subject(BOARD_ID)
+	if record.is_empty():
+		# L2.3. A new board is not blank and it is not full. The authored
+		# theories are up because they were on the wall when the player found
+		# it, and exactly one card is theirs: their own. Everything else is
+		# pinned by hand or it is not up at all.
+		pinned = [{"ref": "player", "kind": "photo", "at": Vector2(-60, 470), "angle": 0.02, "seed": 4711}]
+		strings = []
+		save_board()
+		return
+	strings.clear()
+	for row: Dictionary in record.get("strings", []):
+		strings.append({"from": str(row.get("from", "")), "to": str(row.get("to", "")), "seed": int(row.get("seed", 0))})
+	pinned.clear()
+	for entry: Dictionary in record.get("pinned", []):
+		var at: Variant = entry.get("at", Vector2.ZERO)
+		pinned.append({
+			"ref": str(entry.get("ref", "")),
+			"kind": str(entry.get("kind", "photo")),
+			# Saves come back through JSON, where a Vector2 arrives as an array.
+			"at": at if at is Vector2 else Vector2(float(at[0]), float(at[1])),
+			"angle": float(entry.get("angle", 0.0)),
+			"seed": int(entry.get("seed", 0)),
+		})
+
+
+func save_board() -> void:
+	var rows: Array = []
+	for entry: Dictionary in pinned:
+		var at: Vector2 = entry["at"]
+		rows.append({"ref": entry["ref"], "kind": entry["kind"], "at": [at.x, at.y], "angle": entry["angle"], "seed": entry["seed"]})
+	WorldHistory.update_subject(BOARD_ID, {"pinned": rows, "strings": strings.duplicate(true)}, "board_changed")
+
+
+## L2.1. Offered from the index, the camera and CARRY. Returns false when it is
+## already up, because a wall does not take the same photograph twice.
+func pin(ref: String, kind := "photo", at := Vector2.INF) -> bool:
+	if ref == "" or is_pinned(ref):
+		return false
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(ref)
+	pinned.append({
+		"ref": ref,
+		"kind": kind,
+		"at": at if at != Vector2.INF else _free_space(rng, ref),
+		"angle": rng.randf_range(-0.11, 0.11),
+		"seed": rng.randi(),
+	})
+	save_board()
+	rebuild()
+	pinned_changed.emit()
+	WorldHistory.record_event("board_pinned", {"subject": ref, "kind": kind})
+	return true
+
+
+## Taking something down is as much a claim as putting it up.
+func unpin(ref: String) -> bool:
+	for index in pinned.size():
+		if str((pinned[index] as Dictionary)["ref"]) == ref:
+			pinned.remove_at(index)
+			for thread in range(strings.size() - 1, -1, -1):
+				var row: Dictionary = strings[thread]
+				if str(row["from"]) == ref or str(row["to"]) == ref:
+					strings.remove_at(thread)
+			save_board()
+			rebuild()
+			pinned_changed.emit()
+			return true
+	return false
+
+
+## L3.1. Lays a string between two things on the wall. The board takes it without
+## comment. L3.3 is the whole design: a false string is drawn exactly like a
+## true one, nothing marks it, and the player finds out by acting on it.
+func lay_string(from: String, to: String) -> bool:
+	if from == "" or to == "" or from == to:
+		return false
+	if not _on_wall(from) or not _on_wall(to):
+		return false
+	for existing: Dictionary in strings:
+		var a := str(existing["from"])
+		var b := str(existing["to"])
+		if (a == from and b == to) or (a == to and b == from):
+			return false
+	strings.append({"from": from, "to": to, "seed": hash(from + to)})
+	save_board()
+	# L3.2. A string the world supports opens work. One that it does not is
+	# recorded exactly the same way, because the ledger holds what the player
+	# did, not whether they were right.
+	var supported := supports(from, to)
+	WorldHistory.record_event("board_string_drawn", {"subject": from, "target": to, "supported": supported})
+	if supported:
+		_open_lead(from, to)
+	rebuild()
+	strings_changed.emit()
+	return true
+
+
+func cut_string(from: String, to: String) -> bool:
+	for index in strings.size():
+		var row: Dictionary = strings[index]
+		var a := str(row["from"])
+		var b := str(row["to"])
+		if (a == from and b == to) or (a == to and b == from):
+			strings.remove_at(index)
+			save_board()
+			rebuild()
+			strings_changed.emit()
+			return true
+	return false
+
+
+## L3.2 / L3.3. Whether the world actually bears the connection out. This is
+## never shown on the board — it is only consulted when a lead would open, and
+## when the player goes and acts on the claim.
+func supports(from: String, to: String) -> bool:
+	var theory := _theory(from)
+	var other := to
+	if theory.is_empty():
+		theory = _theory(to)
+		other = from
+	if not theory.is_empty():
+		# Evidence supports a theory when the evidence is of the kind the theory
+		# says would bear it out. A carried heart supports "it is a debt"; a
+		# faction doctrine does not.
+		var tokens: Array = theory.get("supported_by", [])
+		var haystack := (other + " " + _describe(other)).to_lower()
+		for token: String in tokens:
+			if haystack.contains(token):
+				return true
+		return false
+	# Between two pieces of evidence: the world has to actually connect them.
+	if WorldHistory.relationship_strength(from, to) != 0 or WorldHistory.relationship_strength(to, from) != 0:
+		return true
+	var from_state: Dictionary = WorldHistory.subject(from)
+	var to_state: Dictionary = WorldHistory.subject(to)
+	if str(from_state.get("faction_id", "@")) == to or str(to_state.get("faction_id", "@")) == from:
+		return true
+	# A cutting or a part naming the other is a connection you can point at.
+	if _describe(from).to_lower().contains(to.to_lower()) or _describe(to).to_lower().contains(from.to_lower()):
+		return true
+	for event: Dictionary in WorldHistory.events:
+		var details: Dictionary = event.get("details", {})
+		var mentioned := false
+		var both := 0
+		for value: Variant in details.values():
+			var text := str(value)
+			if text == from or text == to:
+				both += 1
+				mentioned = true
+		if mentioned and both >= 2:
+			return true
+	return false
+
+
+## What a reference is, in words, for the support check. Deliberately the same
+## text the card shows, so a player reading the wall is reading what the check
+## reads.
+func _describe(ref: String) -> String:
+	if ref.begins_with("part:"):
+		return "carried_part part lien " + ref.substr(5).replace("@", " ")
+	if ref.begins_with("event:"):
+		var index := int(ref.substr(6))
+		if index >= 0 and index < WorldHistory.events.size():
+			var event: Dictionary = WorldHistory.events[index]
+			return str(event.get("type", "")) + " " + str((event.get("details", {}) as Dictionary).values())
+		return ""
+	if ref.begins_with("photo:"):
+		for frame: Dictionary in FieldCamera.album():
+			if str(frame.get("id", "")) == ref.substr(6):
+				return str(frame.get("caption", "")) + " " + str(frame.get("location", ""))
+		return ""
+	var state: Dictionary = WorldHistory.subject(ref)
+	var kind := str(state.get("kind", ""))
+	return "%s %s %s %s" % [kind, state.get("role", ""), state.get("doctrine", ""), state.get("faction_id", "")]
+
+
+## L3.2. A supported string opens work. Recorded as a lead on the board's own
+## subject rather than as quest state, because there is no quest state.
+func _open_lead(from: String, to: String) -> void:
+	var record: Dictionary = WorldHistory.subject(BOARD_ID)
+	var leads: Array = (record.get("leads", []) as Array).duplicate()
+	var lead := {"from": from, "to": to, "opened": WorldHistory.events.size()}
+	for existing: Dictionary in leads:
+		if str(existing.get("from", "")) == from and str(existing.get("to", "")) == to:
+			return
+	leads.append(lead)
+	WorldHistory.update_subject(BOARD_ID, {"leads": leads}, "lead_opened")
+	lead_opened.emit(from, to)
+
+
+func leads() -> Array:
+	return (WorldHistory.subject(BOARD_ID).get("leads", []) as Array).duplicate()
+
+
+func _theory(ref: String) -> Dictionary:
+	for theory: Dictionary in THEORIES:
+		if str(theory["id"]) == ref:
+			return theory
+	return {}
+
+
+func _on_wall(ref: String) -> bool:
+	return is_pinned(ref) or not _theory(ref).is_empty()
+
+
+func is_pinned(ref: String) -> bool:
+	for entry: Dictionary in pinned:
+		if str(entry["ref"]) == ref:
+			return true
+	return false
+
+
+## Held in the hand, from wherever the player took it. The wall does not accept
+## it until they say where it goes.
+func hold(ref: String, kind: String, title := "") -> void:
+	holding = {"ref": ref, "kind": kind, "title": title}
+
+
+func drop_held(at: Vector2) -> bool:
+	if holding.is_empty():
+		return false
+	var placed := pin(str(holding["ref"]), str(holding["kind"]), at)
+	holding = {}
+	return placed
+
+
+## Where a new card lands when the player has not said. Near the theory it bears
+## on, crowded rather than spaced: a conspiracy wall is dense, and maximising
+## clearance produced an evenly scattered grid that read as a gallery hang. It
+## only refuses a position that would bury another card outright.
+func _free_space(rng: RandomNumberGenerator, ref := "") -> Vector2:
+	var anchor := _pull_anchor(ref, rng)
+	var best := anchor
+	var best_score := -INF
+	for attempt in 32:
+		var candidate := anchor + Vector2(rng.randf_range(-250.0, 250.0), rng.randf_range(-180.0, 180.0))
+		var nearest := INF
+		for entry: Dictionary in pinned:
+			nearest = minf(nearest, (candidate - (entry["at"] as Vector2)).length())
+		for theory: Dictionary in THEORIES:
+			nearest = minf(nearest, (candidate - (theory["at"] as Vector2)).length())
+		# Close is good, on top of something is not. The peak sits just outside
+		# a card's own footprint, so paper overlaps at the corners the way it
+		# does on a real wall.
+		var score := -absf(nearest - 155.0)
+		if nearest < 92.0:
+			score -= 600.0
+		if score > best_score:
+			best_score = score
+			best = candidate
+	return best
+
+
+## The theory a new card gravitates to, so the wall grows in clusters that mean
+## something rather than filling left to right.
+func _pull_anchor(ref: String, rng: RandomNumberGenerator) -> Vector2:
+	var haystack := (ref + " " + _describe(ref)).to_lower()
+	for theory: Dictionary in THEORIES:
+		for token: String in theory.get("supported_by", []):
+			if haystack.contains(token):
+				return (theory["at"] as Vector2) + Vector2(0, 150)
+	var kind := str(WorldHistory.subject(ref).get("kind", ""))
+	for theory: Dictionary in THEORIES:
+		if (theory["pulls"] as Array).has(kind):
+			return (theory["at"] as Vector2) + Vector2(0, 150)
+	return Vector2(rng.randf_range(-400.0, 400.0), rng.randf_range(-280.0, 280.0))
 
 
 func close() -> void:
@@ -141,17 +445,17 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
-## Reads the wall out of what happened. Nothing here is quest state: subjects,
-## events and carried parts are the evidence, and the theories are speculation
-## laid over it. Called on every open, so the board is always the current
-## reading rather than a saved arrangement.
+## Builds the visible wall from two sources that must not be confused: the
+## authored theories, which were on the wall when the player found it, and the
+## cards the player pinned themselves. Nothing else appears. The board is not a
+## view of `WorldHistory` — it is what one person decided was worth keeping,
+## which is why it is allowed to be wrong.
 func rebuild() -> void:
 	cards.clear()
 	threads.clear()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 90210
 
-	var theory_cards: Dictionary = {}
 	for theory: Dictionary in THEORIES:
 		var card := Card.new()
 		card.id = str(theory["id"])
@@ -163,79 +467,83 @@ func rebuild() -> void:
 		card.seed_value = rng.randi()
 		card.angle = rng.randf_range(-0.035, 0.035)
 		cards.append(card)
-		theory_cards[str(theory["id"])] = card
 
-	# People and factions, from the ledger. Only what the player has actually
-	# met ends up on the wall, because this is their reading rather than an
-	# encyclopaedia.
-	var placed := 0
-	for subject_id: String in WorldHistory.all_subjects().keys():
-		var state: Dictionary = WorldHistory.subject(subject_id)
-		var kind := str(state.get("kind", ""))
-		if kind != "person" and kind != "faction":
+	for entry: Dictionary in pinned:
+		var card := _card_for(str(entry["ref"]), str(entry["kind"]), int(entry["seed"]))
+		if card == null:
 			continue
-		if subject_id == "player":
-			continue
-		var card := Card.new()
-		card.id = subject_id
-		card.kind = "photo" if kind == "person" else "record"
-		card.title = str(state.get("name", subject_id)).to_upper()
-		card.body = str(state.get("role", state.get("doctrine", ""))).to_upper()
-		card.struck = str(state.get("status", "")) in ["dead", "executed"]
-		card.seed_value = rng.randi()
-		card.size = Vector2(132, 148) if kind == "person" else Vector2(164, 92)
-		# Clustered around whichever theory wants this kind of evidence, so the
-		# wall has districts rather than a even scatter.
-		var anchor := _anchor_for(kind, rng)
-		card.at = anchor + Vector2(rng.randf_range(-230.0, 230.0), rng.randf_range(-190.0, 190.0))
-		card.angle = rng.randf_range(-0.10, 0.10)
-		card.tint = PAPER_COOL if kind == "faction" else PAPER
+		card.at = entry["at"]
+		card.angle = float(entry["angle"])
 		cards.append(card)
-		placed += 1
-		# One string from the evidence to the theory it is filed under. Step 3
-		# makes these the player's own claims; for now they are where the
-		# evidence sits, which is already an argument.
-		var theory_id := _theory_for(kind)
-		if theory_cards.has(theory_id):
-			threads.append({"from": card.id, "to": theory_id, "seed": rng.randi()})
-		if placed > 14:
-			break
 
-	# What happened, as cuttings. The event log is the one true record in the
-	# game and on this wall it is reduced to headlines, which is exactly the
-	# distortion the two-records rule is about.
-	var cut := 0
-	for event: Dictionary in WorldHistory.recent_events(8):
-		var card := Card.new()
-		card.id = "event:%d" % cut
+	# L3.3. Every string is drawn the same. Nothing here consults `supports()`,
+	# and that is deliberate: a wrong connection has to look exactly as
+	# convincing as a right one or the mechanic does not exist.
+	for row: Dictionary in strings:
+		threads.append({"from": str(row["from"]), "to": str(row["to"]), "seed": int(row["seed"])})
+
+
+## One pinned reference becomes one piece of paper. The reference decides what
+## kind of object it is — a person is a photograph, a faction a filed record, an
+## event a cutting, a carried part a label off the thing itself — because the
+## evidence on a wall is physical and came from somewhere.
+func _card_for(ref: String, kind: String, seed_value: int) -> Card:
+	var card := Card.new()
+	card.id = ref
+	card.kind = kind
+	card.seed_value = seed_value
+	if ref.begins_with("event:"):
+		var index := int(ref.substr(6))
+		var log: Array = WorldHistory.events
+		if index < 0 or index >= log.size():
+			return null
+		var event: Dictionary = log[index]
+		var details: Dictionary = event.get("details", {})
 		card.kind = "cutting"
 		card.title = str(event.get("type", "")).replace("_", " ").to_upper()
-		var details: Dictionary = event.get("details", {})
 		card.body = str(details.get("subject", details.get("rival", ""))).replace("_", " ").to_upper()
-		card.seed_value = rng.randi()
-		card.size = Vector2(rng.randf_range(120.0, 170.0), rng.randf_range(58.0, 84.0))
-		card.at = Vector2(rng.randf_range(-660.0, 660.0), rng.randf_range(-420.0, 440.0))
-		card.angle = rng.randf_range(-0.14, 0.14)
+		card.size = Vector2(152, 74)
 		card.tint = NEWSPRINT
-		cards.append(card)
-		if cut % 2 == 0:
-			threads.append({"from": card.id, "to": str(THEORIES[cut % THEORIES.size()]["id"]), "seed": rng.randi()})
-		cut += 1
-
-	# The player is the one card that is always up, bottom centre, because every
-	# theory on the wall is ultimately a theory about them.
-	var self_card := Card.new()
-	self_card.id = "player"
-	self_card.kind = "photo"
-	self_card.title = str(WorldHistory.subject("player").get("name", "THE HUNTER")).to_upper()
-	self_card.body = "ME"
-	self_card.at = Vector2(-60, 470)
-	self_card.size = Vector2(140, 158)
-	self_card.angle = 0.02
-	self_card.seed_value = 4711
-	cards.append(self_card)
-	for theory: Dictionary in THEORIES:
-		threads.append({"from": "player", "to": str(theory["id"]), "seed": rng.randi()})
+		return card
+	if ref.begins_with("photo:"):
+		# L2.2. A photograph carries its verifiable contents onto the wall. The
+		# caption is generated from what was in frame by `field_camera.gd`, so a
+		# picture on this board can never claim something the body was not
+		# doing — which is the one thing on a wall of speculation that is true.
+		var photo_id := ref.substr(6)
+		for frame: Dictionary in FieldCamera.album():
+			if str(frame.get("id", "")) != photo_id:
+				continue
+			card.kind = "photo"
+			card.title = str(frame.get("location", "UNRECORDED")).to_upper()
+			card.body = str(frame.get("caption", "")).to_upper()
+			card.size = Vector2(168, 164)
+			return card
+		return null
+	if ref.begins_with("part:"):
+		# L2.1. Pinned off CARRY. A part on the wall is a label with the weight
+		# and whose it was, because the part itself is in your bag.
+		var pieces: PackedStringArray = ref.substr(5).split("@")
+		card.kind = "cutting"
+		card.title = pieces[0].to_upper()
+		card.body = ("OFF " + str(WorldHistory.subject(pieces[1]).get("name", pieces[1]))).to_upper() if pieces.size() > 1 else ""
+		card.size = Vector2(146, 70)
+		card.tint = NEWSPRINT
+		return card
+	var state: Dictionary = WorldHistory.subject(ref)
+	if state.is_empty():
+		return null
+	var subject_kind := str(state.get("kind", "person"))
+	card.kind = "record" if subject_kind == "faction" else "photo"
+	card.title = str(state.get("name", ref)).to_upper()
+	card.body = str(state.get("role", state.get("doctrine", ""))).to_upper()
+	card.struck = str(state.get("status", "")) in ["dead", "executed"]
+	card.size = Vector2(164, 92) if subject_kind == "faction" else Vector2(132, 148)
+	card.tint = PAPER_COOL if subject_kind == "faction" else PAPER
+	if ref == "player":
+		card.body = "ME"
+		card.size = Vector2(140, 158)
+	return card
 
 
 func _anchor_for(kind: String, rng: RandomNumberGenerator) -> Vector2:
@@ -264,15 +572,91 @@ func _gui_input(event: InputEvent) -> void:
 		var button := event as InputEventMouseButton
 		match button.button_index:
 			MOUSE_BUTTON_LEFT:
-				_dragging = button.pressed
+				if button.pressed:
+					# Something in the hand goes on the wall where you clicked.
+					if not holding.is_empty():
+						drop_held(_to_board(button.position))
+						return
+					# Otherwise you have taken hold of a card, or of the wall.
+					_moving = _card_at(button.position)
+					_dragging = _moving == ""
+				else:
+					if _moving != "":
+						save_board()
+					_moving = ""
+					_dragging = false
+			MOUSE_BUTTON_MIDDLE:
+				# L3.1. Held from one card to another lays a string between
+				# them. Middle button so it never fights panning or moving.
+				if button.pressed:
+					_stringing = _card_at(button.position)
+				elif _stringing != "":
+					var landed := _card_at(button.position)
+					if landed != "" and landed != _stringing:
+						lay_string(_stringing, landed)
+					_stringing = ""
+			MOUSE_BUTTON_RIGHT:
+				# L2. Taken down. Theories are not the player's to remove.
+				if button.pressed:
+					var under := _card_at(button.position)
+					# A string under the cursor is cut before the card under it
+					# is taken down, because cutting is the smaller act.
+					if under != "" and _cut_any(under):
+						return
+					if under != "" and is_pinned(under):
+						unpin(under)
 			MOUSE_BUTTON_WHEEL_UP:
 				if button.pressed:
 					zoom = clampf(zoom * 1.12, 0.35, 2.4)
 			MOUSE_BUTTON_WHEEL_DOWN:
 				if button.pressed:
 					zoom = clampf(zoom / 1.12, 0.35, 2.4)
-	elif event is InputEventMouseMotion and _dragging:
-		pan += (event as InputEventMouseMotion).relative
+	elif event is InputEventMouseMotion:
+		var motion := event as InputEventMouseMotion
+		if _moving != "":
+			move_card(_moving, motion.relative / zoom)
+		elif _dragging:
+			pan += motion.relative
+
+
+## Cards are moved by hand, and where the player puts a thing on a wall is
+## itself a claim about what it sits near.
+func move_card(ref: String, by: Vector2) -> void:
+	for entry: Dictionary in pinned:
+		if str(entry["ref"]) == ref:
+			entry["at"] = (entry["at"] as Vector2) + by
+			rebuild()
+			return
+
+
+## Cuts every string running into a card. Used by the right button, so taking
+## a card down never leaves threads hanging off nothing.
+func _cut_any(ref: String) -> bool:
+	var cut := false
+	for index in range(strings.size() - 1, -1, -1):
+		var row: Dictionary = strings[index]
+		if str(row["from"]) == ref or str(row["to"]) == ref:
+			strings.remove_at(index)
+			cut = true
+	if cut:
+		save_board()
+		rebuild()
+		strings_changed.emit()
+	return cut
+
+
+func _card_at(screen: Vector2) -> String:
+	# Backwards, so the card on top of the pile is the one you grab.
+	for index in range(cards.size() - 1, -1, -1):
+		var card: Card = cards[index]
+		var at := _to_screen(card.at)
+		if Rect2(at - Vector2(card.size.x * 0.5, 0.0) * zoom, card.size * zoom).has_point(screen):
+			return card.id
+	return ""
+
+
+func _to_board(screen: Vector2) -> Vector2:
+	return (screen - _board_rect.get_center() - pan) / zoom
 
 
 func _to_screen(board: Vector2) -> Vector2:
@@ -297,6 +681,11 @@ func _draw() -> void:
 		if card.kind == "theory":
 			_draw_card(card)
 	_draw_wall_light()
+	_draw_held()
+	if _stringing != "":
+		var anchor := _find(_stringing)
+		if anchor != null:
+			draw_line(_to_screen(anchor.at), get_local_mouse_position(), THREAD * Color(1, 1, 1, 0.6), 2.0)
 
 
 ## Cork, not a brown rectangle. The grain is what stops it reading as a colour
@@ -442,9 +831,16 @@ func _draw_photo(body: Rect2, card: Card) -> void:
 	Grunge.grain(self, window, card.seed_value, 120, Color("9a9488"))
 	# Flash blow-out down one side, which is what a field photograph looks like.
 	draw_rect(Rect2(window.position, Vector2(window.size.x * 0.22, window.size.y)), Color(1, 1, 1, 0.05 * open_blend))
-	CellOutzType.draw_condensed(self, body.position + Vector2(8, body.size.y - 24 * zoom), card.title, 8.5 * zoom, INK * Color(1, 1, 1, 0.9 * open_blend), 0.7 * zoom)
+	CellOutzType.draw_condensed(self, body.position + Vector2(8 * zoom, body.size.y - 26 * zoom), card.title, 8.5 * zoom, INK * Color(1, 1, 1, 0.9 * open_blend), 0.7 * zoom)
 	if card.body != "":
-		CellOutzType.draw_condensed(self, body.position + Vector2(8, body.size.y - 13 * zoom), card.body, 6.5 * zoom, INK * Color(1, 1, 1, 0.5 * open_blend), 0.6 * zoom)
+		# Written on the border in pencil, wrapped, because a caption that runs
+		# off the photograph is a caption nobody wrote by hand.
+		var caption_y := body.size.y - 15.0 * zoom
+		for line: String in _wrap(card.body, body.size.x - 16.0 * zoom, 6.5 * zoom, 0.6 * zoom):
+			if caption_y > body.size.y - 2.0 * zoom:
+				break
+			CellOutzType.draw_condensed(self, body.position + Vector2(8 * zoom, caption_y), line, 6.5 * zoom, INK * Color(1, 1, 1, 0.55 * open_blend), 0.6 * zoom)
+			caption_y += 9.0 * zoom
 
 
 ## A headline torn out of something. Newsprint, a ragged edge, and a marker
@@ -505,6 +901,24 @@ func _draw_record(body: Rect2, card: Card) -> void:
 			tape_at + Vector2(-20, -7) * zoom, tape_at + Vector2(20, -7) * zoom,
 			tape_at + Vector2(18, 7) * zoom, tape_at + Vector2(-22, 7) * zoom,
 		]), Color("d8cfa8") * Color(1, 1, 1, 0.34 * open_blend))
+
+
+## What is in the player's hand, waiting for somewhere to go. Drawn under the
+## cursor, tilted, with a shadow well clear of the wall, because it is not on
+## the wall yet.
+func _draw_held() -> void:
+	if holding.is_empty():
+		return
+	var at := get_local_mouse_position()
+	var card_size := Vector2(132, 92)
+	draw_set_transform(at, 0.09, Vector2.ONE)
+	var body := Rect2(-card_size * 0.5, card_size)
+	draw_rect(Rect2(body.position + Vector2(9, 12), body.size), Color(0, 0, 0, 0.4))
+	draw_rect(body, PAPER)
+	draw_rect(body, INK * Color(1, 1, 1, 0.3), false, 1.0)
+	CellOutzType.draw_condensed(self, body.position + Vector2(8, 8), str(holding.get("title", holding["ref"])).to_upper(), 9.0, INK * Color(1, 1, 1, 0.9), 0.7)
+	CellOutzType.draw_condensed(self, body.position + Vector2(8, body.size.y - 18.0), "CLICK THE WALL", 7.0, MARKER * Color(1, 1, 1, 0.8), 0.6)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## A single bulb somewhere off to the left, because this is a room nobody has

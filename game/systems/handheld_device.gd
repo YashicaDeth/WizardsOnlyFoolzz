@@ -40,6 +40,9 @@ const SIGNAL_FIELD := preload("res://systems/signal_field.gd")
 const RADIAL := preload("res://systems/radial_menu.gd")
 const RADIO_AUDIO := preload("res://systems/radio_audio.gd")
 
+## L2.1. A part in the bag is worth putting on the wall. The handheld does not
+## know the board exists — it hands the reference up, the way the index does.
+signal pin_requested(ref: String, kind: String, title: String)
 signal mode_changed(mode: String)
 signal lead_found(station: String)
 
@@ -57,6 +60,9 @@ const MOSS := Color("8a9a4a")
 const ALERT := Color("a8281a")
 
 var mode_index := 0
+## Which thing in the bag is under the hand. The CARRY page had no selection at
+## all, which was fine when it was a table and is not now that it is objects.
+var carry_index := 0
 var raised := 0.0
 var is_open := false
 var elapsed := 0.0
@@ -191,6 +197,28 @@ func cycle_mode(step: int) -> void:
 	if not is_open:
 		return
 	set_mode(MODES[wrapi(mode_index + step, 0, MODES.size())])
+
+
+## Moves the hand through the bag. Host-driven, like every other control on
+## this device.
+func step_carry(by: int) -> void:
+	if carry.items.is_empty():
+		return
+	carry_index = posmod(carry_index + by, carry.items.size())
+	queue_redraw()
+
+
+## Offers the selected part to whoever owns the wall, with its provenance
+## attached, because a part on a conspiracy board is only evidence if it still
+## says whose it was.
+func pin_selected_part() -> bool:
+	if carry_index < 0 or carry_index >= carry.items.size():
+		return false
+	var item: Dictionary = carry.items[carry_index]
+	var label := str(item.get("label", "PART"))
+	var from := str(item.get("from", ""))
+	pin_requested.emit("part:%s@%s" % [label, from], "cutting", label)
+	return true
 
 
 func set_mode(mode: String) -> void:
@@ -548,6 +576,11 @@ func _draw_carry(rect: Rect2, alpha: float) -> void:
 		# Nothing in a bag sits on a grid. Nudged off it, deterministically.
 		at += Vector2(sin(float(index) * 2.7) * 13.0, cos(float(index) * 1.9) * 9.0)
 		at.y = clampf(at.y, ceiling, floor_y)
+		if index == posmod(carry_index, maxi(carry.items.size(), 1)):
+			# Under the hand. A ring of pencil round the thing, not a highlight
+			# box — this page has no boxes left in it.
+			draw_arc(at, radius + 11.0, 0.0, TAU, 26, AMBER * Color(1, 1, 1, (0.5 + 0.25 * sin(elapsed * 3.0)) * alpha), 1.4)
+			CellOutzType.draw_condensed(self, at + Vector2(-radius, -radius - 17.0), "P TO PIN", 7.0, AMBER * Color(1, 1, 1, 0.7 * alpha), 0.6)
 		# A shadow underneath, so the thing is resting on something.
 		draw_colored_polygon(_ellipse_points(at + Vector2(0, radius * 0.92), radius * 0.95, radius * 0.22, 14), Color(0, 0, 0, 0.35 * alpha))
 		_draw_carried(at, radius, kind, fresh, str(item.get("lien", "")), alpha)
