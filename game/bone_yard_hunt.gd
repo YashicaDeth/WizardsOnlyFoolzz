@@ -17,6 +17,7 @@ const WORLD_GENERATOR := preload("res://systems/ashbloom_world_generator.gd")
 const MISFIRE_DIRECTOR := preload("res://systems/reality_misfire_director.gd")
 const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
+const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 const RIVAL_REGISTRY := preload("res://systems/rival_registry.gd")
@@ -142,6 +143,9 @@ var guard_raised := 0.0
 var guard_stamina_drain := 14.0
 ## AG4.1. Out of breath. Set when stamina bottoms out, cleared only once enough
 ## has come back to be worth spending — see `_move_player`.
+## AG4.2. Blood on the lens. Fed by `_spawn_blood`, which every blood event in
+## the scene already goes through.
+var blood_veil: Control = null
 var winded := false
 ## How much stamina it takes to break into a run again after being winded. Well
 ## clear of the floor, so the two thresholds can never be crossed in one frame.
@@ -308,6 +312,11 @@ func _ready() -> void:
 	# handed the player an invisible cursor. One layer above all of them, drawn
 	# whenever a panel is up, fixes it for the Tree, the Board, the map and
 	# anything added later without each one having to remember.
+	# AG4.2. Under the pointer and over everything else in the world: blood on
+	# the lens sits between the player and the scene, not between the player
+	# and the panel they opened.
+	blood_veil = BLOOD_VEIL.new()
+	$HUD.add_child(blood_veil)
 	_pointer = Control.new()
 	_pointer.name = "Pointer"
 	_pointer.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -665,6 +674,17 @@ func _physics_process(delta: float) -> void:
 	# ticking at full speed through their own hitstop, which is backwards: the
 	# whole point of a local freeze is that both bodies in contact feel it.
 	var player_delta: float = delta * impact_feel.scale_for("player")
+	# O2.7 v4. And the gore. Greg: *"gore and chunk physics still run at full
+	# speed through a hit, so a limb can leave a body that has not moved
+	# yet"*. The rig's own spray and organs take the exchange's clock;
+	# severed limbs are RigidBodies the physics server owns, so they are
+	# frozen for the length of the hold and handed their velocity back.
+	if impact_feel.holding():
+		GoreChunks.hold()
+	else:
+		GoreChunks.release()
+	if player_rig != null and is_instance_valid(player_rig):
+		player_rig.motion_scale = impact_feel.scale_for("player")
 	if strike_windup >= 0.0:
 		strike_windup -= player_delta
 		if strike_windup < 0.0:
@@ -1723,6 +1743,12 @@ func _update_encounter_actors(delta: float) -> void:
 		# struck slows, the rest of the region does not notice. Named apart from
 		# `actor_delta` because GDScript will not let a local shadow a parameter.
 		var actor_delta: float = delta * impact_feel.scale_for(str(actor.get("subject_id", "")))
+		# O2.7 v4. Their rig animates and bleeds on the same clock their state
+		# machine runs on, so the spray coming out of somebody freezes with
+		# the body it is coming out of.
+		var actor_rig := actor.get("rig") as BaselineHuman
+		if actor_rig != null and is_instance_valid(actor_rig):
+			actor_rig.motion_scale = actor_delta / maxf(delta, 0.00001)
 		var node := actor.get("node") as Node3D
 		var anatomy: Node = actor.get("anatomy") as Node
 		if node == null or not is_instance_valid(node) or anatomy == null:
@@ -3200,6 +3226,7 @@ func _spawn_ashline_reinforcements() -> void:
 
 
 func _spawn_blood(at: Vector3, amount: int) -> void:
+	_wear_it(at, amount)
 	for index in mini(8, amount / 4):
 		var piece := MeshInstance3D.new()
 		var mesh := SphereMesh.new()
@@ -3211,6 +3238,38 @@ func _spawn_blood(at: Vector3, amount: int) -> void:
 		add_child(piece)
 		var timer := get_tree().create_timer(3.0 + randf())
 		timer.timeout.connect(piece.queue_free)
+
+
+## AG4.2. Greg: *"in the first person it has that blood splatter effects and
+## just generally in the game make that more integral or just do more instead of
+## just being lame asf"*.
+##
+## Every blood event in this scene goes through `_spawn_blood`, so this is the
+## one place that has to know: if it happened close enough and in front of you,
+## you are wearing some of it. Distance decides how much, and the direction from
+## the middle of the screen to wherever it happened decides which way the
+## spatter throws — so opening somebody on your left puts it on your left.
+func _wear_it(at: Vector3, amount: int) -> void:
+	if blood_veil == null or not is_instance_valid(blood_veil):
+		return
+	if camera == null or not is_instance_valid(camera):
+		return
+	var distance := camera.global_position.distance_to(at)
+	# Arm's reach is a faceful. Past four metres it is somebody else's problem.
+	if distance > 4.0:
+		return
+	var closeness := clampf(1.0 - (distance - 0.8) / 3.2, 0.0, 1.0)
+	var weight := clampf(float(amount) / 34.0, 0.15, 1.0)
+	var force := closeness * closeness * weight
+	if force <= 0.02:
+		return
+	var from := Vector2.ZERO
+	if not camera.is_position_behind(at):
+		var on_screen := camera.unproject_position(at)
+		var centre := blood_veil.size * 0.5
+		if on_screen.distance_to(centre) > 1.0:
+			from = (on_screen - centre).normalized()
+	blood_veil.call("splash", force, from)
 
 
 func _add_mesh(mesh: PrimitiveMesh, position_value: Vector3, scale_value: Vector3, color: Color, emission: float) -> void:

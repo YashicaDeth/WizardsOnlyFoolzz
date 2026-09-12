@@ -142,6 +142,17 @@ var _flesh := Color("6b5842")
 var _seated := false
 var _variation := 0
 var _loose: Array[Dictionary] = []
+## O2.7 v4. Greg: *"gore and chunk physics still run at full speed through a
+## hit, so a limb can leave a body that has not moved yet"*. Exactly right, and
+## it is the most visible hole left in the hitstop work — the whole effect is
+## that the blow met resistance, and it reads as a bug rather than as weight
+## when the spray from that blow sails away on schedule while the body it came
+## out of is standing still.
+##
+## The rig does not know the scene's `impact_feel` exists and should not. So it
+## carries a scale that whoever owns it sets, defaulting to 1.0, which means a
+## rig nobody is driving behaves exactly as it did before.
+var motion_scale := 1.0
 
 
 static func canonical_zone(zone_id: String) -> String:
@@ -1000,9 +1011,12 @@ func _add_stump(zone_id: String) -> void:
 
 
 func _process(delta: float) -> void:
-	_apply_pain_posture(delta)
+	# Everything this rig animates runs on the exchange's clock, not the world's.
+	var own_delta := delta * motion_scale
+	_apply_pain_posture(own_delta)
 	if _loose.is_empty():
 		return
+	delta = own_delta
 	for index in range(_loose.size() - 1, -1, -1):
 		var piece: Dictionary = _loose[index]
 		var node := piece.node as Node3D

@@ -2099,6 +2099,51 @@ to, the in-game one for the player.
 - [ ] **AM1.7** It reads as a tutorial somebody could learn the game from
 - [ ] **AM1.8** Generated from CHECKLIST.md, so it cannot go stale
 
+## AN — The body is the weapon
+
+Greg, to the playtester: *"i wanna make the hands kinda floppy... idk if you
+have played or seen the game halfsword, but the combat with the floppy arms as
+swords is so fun — i want to rework that system into something new but keeping
+that fun of the movement"*. TaKeS: *"the physics base fighting — like with
+shooting, the gun swivels with where you aim, and sorta moves around with the
+momentum"*.
+
+**Combat has been reworked four times and the complaint has never changed**,
+which usually means the diagnosis was wrong every time. It was. The problem was
+never the numbers, the windup, the hitstop or the animation. It is that LMB
+*plays a swing*. The player's entire contribution to a blow is the timing of one
+keypress, and no amount of tuning a thing you did not perform makes it feel like
+you performed it.
+
+The principle worth taking — and it is a principle about authorship, not about
+ragdolls, so none of anybody else's code is involved:
+
+> **The blow is something the player performs, not something they request.**
+
+`limb_momentum.gd` is the core and it is built: the weapon is a mass on the end
+of an arm, where you point is where the *anchor* goes, and the weapon lags,
+overshoots and swings through. `head_speed()` measures how fast the business end
+is genuinely travelling; `commitment()` turns that into 0..1. Measured, not
+declared. `tests/limb_momentum_test.gd` puts numbers on it: the same weapon and
+the same button gives 0.013 for a flick and 0.346 for a committed sweep.
+
+- [x] **AN1.1** The spring-damper core, with mass, reach, fatigue and a real arm limit — `limb_momentum.gd`, ten checks
+- [ ] **AN1.2** Driven from the same mouse delta the camera turns by, plus the player's own velocity — walking into a blow counts
+- [ ] **AN1.3** The weapon is drawn where the physics put it, not where an animation says
+- [ ] **AN1.4** Damage asks `commitment()`. The weapon sets the ceiling; the player earns how much of it they get
+- [ ] **AN1.5** Mass and reach per weapon are the whole balance conversation now
+- [ ] **AN1.6** Fatigue comes off stamina, so a tired arm cannot hold a guard rather than being told it cannot
+- [ ] **AN1.7** Firearms run through the same object — the barrel swivels toward where you look and carries past it
+- [ ] **AN1.8** The old swing system stays until this one is better, side by side behind a flag
+- [ ] **AN1.9** A grapple, a shove and a bare hand are the same object with a different mass
+
+### AN2 — What it costs to swing
+- [ ] **AN2.1** A committed blow leaves you open in a way a flick does not (pairs with O5 footing)
+- [ ] **AN2.2** You can be disarmed, because a weapon you are barely holding is a weapon somebody can take
+- [ ] **AN2.3** Hitting armour, bone or a wall answers differently through `strike()`
+- [ ] **AN2.4** The weapon's own condition rides on the same object — a bent blade swings wrong
+- [ ] **AN2.5** Two-handing changes the numbers, not just the pose
+
 ## AK — The agency that owns the sky
 
 Greg: *"maps like this and insane esoteric knowledge would be really cool, again

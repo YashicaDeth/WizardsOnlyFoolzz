@@ -228,6 +228,46 @@ static func _make_chunk(layer: int, zone: String, subject_id: String, info: Dict
 ##
 ## Everything that walks `live` calls this first. It is cheap: the list is
 ## capped at MAX_CHUNKS and the common case removes nothing.
+## O2.7 v4. A severed limb is a RigidBody, so it is moved by the physics server
+## rather than by anything this class steps — which is why it kept flying while
+## the body it left was frozen mid-blow.
+##
+## Freezing and restoring is the honest way to hold one: the velocity it had is
+## put back when the hold ends, so the piece resumes the arc it was on instead
+## of dropping out of the air. `Engine.time_scale` would also work and is
+## exactly what the local-hitstop design exists to avoid.
+static var _held_chunks: Array = []
+
+
+static func hold() -> void:
+	if not _held_chunks.is_empty():
+		return
+	prune()
+	for chunk in live:
+		var body := chunk as RigidBody3D
+		if body == null or body.freeze:
+			continue
+		_held_chunks.append({
+			"body": body,
+			"linear": body.linear_velocity,
+			"angular": body.angular_velocity,
+		})
+		body.freeze = true
+
+
+static func release() -> void:
+	for entry: Dictionary in _held_chunks:
+		var body := entry["body"] as RigidBody3D
+		if body == null or not is_instance_valid(body):
+			continue
+		body.freeze = false
+		# Put the arc back. Without this a limb stops dead in the air and then
+		# falls straight down, which is worse than not holding it at all.
+		body.linear_velocity = entry["linear"]
+		body.angular_velocity = entry["angular"]
+	_held_chunks.clear()
+
+
 static func prune() -> void:
 	var kept: Array[Node3D] = []
 	for chunk in live:
