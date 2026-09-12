@@ -914,7 +914,22 @@ finished. Applies to everything below and to A5, A6, C1.
       than leaves stale entries), plus the existing `tests/link_test.gd`
       (10/10) and a windowed capture confirming FILE and WIRE render
       identically to before.
-- [ ] **I0.10** `v2` Panels are hosted at one fixed size inside the handheld; a map you cannot lean into is a picture of a map
+- [x] ~~**I0.10** `v2` Panels are hosted at one fixed size inside the
+      handheld; a map you cannot lean into is a picture of a map~~
+      `device_size` was one clamp with nothing that ever moved it — the
+      World Index and the Living Map, however much detail either had to
+      show, always rendered into the same aperture. Holding `L` while a
+      hosted panel is open (`INDEX`/`MAP`/`WIRE` — `RADIO`/`CARRY` have no
+      hosted panel to gain anything from it) now eases the device up to
+      1.32x its resting size, clamped to the viewport; letting go eases it
+      back down. The hosted panel's own `.size` is already read off the
+      aperture every frame, so it renders into the larger space with no
+      separate change — the same Living Map, more of it, rather than a
+      zoomed screenshot of it. Verified: `tests/handheld_lean_test.gd` (new,
+      3/3 — holding grows it, releasing returns to rest, and a mode with
+      nothing to lean into does not grow at all) and a windowed capture
+      (`captures/i0_10_v2_handheld_map_resting.png` /
+      `i0_10_v2_handheld_map_leaned.png`) showing the same map at both sizes.
 - [x] ~~**I1.5** `v2` Code rain runs on screens that have not earned it — it
       is the substrate for the Wire, not decoration for every page~~ The
       World Index ran it full time behind FILE, PYRAMID and BODY as well as
