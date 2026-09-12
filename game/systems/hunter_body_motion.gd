@@ -117,14 +117,26 @@ func _pose(horizontal_speed: float, sprinting: bool, crouching: bool, dodging: b
 	var injury := 1.0 - rig.anatomy.mobility_ratio()
 	_set_zone_pose("left_leg", Vector3(0, -0.24 * crouch_blend, 0), Vector3(leg_swing + crouch_blend * 0.45, 0, injury * -0.12))
 	_set_zone_pose("right_leg", Vector3(0, -0.24 * crouch_blend, 0), Vector3(-leg_swing + crouch_blend * 0.45, 0, injury * 0.12))
-	var arm_raise := 1.14 if first_person else 0.0
+	# M4.4. Was 1.14 rad (65 degrees) — enough to swing the whole forearm box up
+	# past the lens at FOV 78, where it read as a screen-filling black slab
+	# rather than a held weapon. A shallower raise keeps the arm in the lower
+	# third of frame the way a held weapon actually sits.
+	var arm_raise := 0.62 if first_person else 0.0
 	var fp_spread := 0.045 if first_person else 0.0
 	_set_zone_pose("left_arm", Vector3(-fp_spread, -0.05 * crouch_blend, 0), Vector3(arm_swing + arm_raise, 0, 0.08))
 	_set_zone_pose("right_arm", Vector3(fp_spread, -0.05 * crouch_blend, 0), Vector3(-arm_swing + arm_raise, 0, -0.08))
 	var torso := rig.parts.get("torso") as Node3D
 	if torso != null:
 		var rest: Vector3 = torso.get_meta("rest_position", torso.position)
-		torso.position = rest + Vector3(0, sin(elapsed * 1.7) * 0.008 - crouch_blend * 0.22, 0)
+		# M4.1/M4.4. The eye sits only ~0.23 m above the torso's own top edge and
+		# the torso's front face is flush with the capsule centre the camera is
+		# measured from, so at FOV 78 the chest was close enough to read as a
+		# solid black slab under the chin rather than a body glimpsed below the
+		# chin. Nudging it back and down in first person only (never seen from
+		# outside, so third person and any future onlooker keep the real
+		# proportions) gives the eye the same clearance a real neck would.
+		var fp_recede := Vector3(0, -0.16, 0.28) if first_person else Vector3.ZERO
+		torso.position = rest + fp_recede + Vector3(0, sin(elapsed * 1.7) * 0.008 - crouch_blend * 0.22, 0)
 		torso.rotation = Vector3(crouch_blend * 0.18 + (0.30 if dodging else 0.0), 0, -gait * 0.025 * locomotion)
 	# Weapon actions layer over locomotion instead of replacing the body.
 	if attack_time > 0.0 and attack_duration > 0.0:

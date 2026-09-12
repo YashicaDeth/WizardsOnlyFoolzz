@@ -631,10 +631,17 @@ and start being an object — and leaving your body should cost something.
 - [x] **M1.2** Third person unlocks on a landed melee blow plus a dangerous rival put down
 - [x] **M1.3** Both conditions read out of WorldHistory, neither stored
 - [x] **M1.4** Pressing the key early answers in the game's voice, never silently
-- [ ] **M1.5** The unlock itself is an event the player feels, not a quiet permission change
+- [x] ~~**M1.5** The unlock itself is an event the player feels, not a quiet permission change~~ (found while building this: the unlock counter read a `"subject"` key no `npc_resolution` event has ever written — every writer uses `"subject_id"` — so M1.2's boss condition could never actually count a kill. Fixed alongside the felt event, since a stop+kick+line landing on a check that could never pass would have been silent forever.)
 - [ ] **M1.6** A first-person HUD that is diegetic — nothing floating in the corner
 
 ### M2 — In the car
+**Deferred this session.** There is currently no first/third-person split in
+`rift_derby.gd` at all — one fixed chase camera — so this is a feature build
+(seated view, a visible WASD hand, a held gun, a real glass object that cracks)
+rather than a tune, in a file Agent B owns for visuals and is actively
+changing. Starting it without coordinating risked either a merge collision or
+landing something half-verified. Flagging it here rather than doing it
+silently, per this session's brief.
 - [ ] **M2.1** First-person driving is the default
 - [ ] **M2.2** One hand on the wheel; that hand *is* WASD and it is visible
 - [ ] **M2.3** The other hand holds a gun, and you shoot out of your own car
@@ -660,13 +667,22 @@ for the game to function in its own universe in its own right"*.
 The FOV 106 default makes this urgent rather than cosmetic: at that width,
 distortion, scale and horizon errors that were invisible at 72 become the whole
 image.
-- [ ] **M4.1** Scale is consistent — a door, a car and a person agree about how big a person is
+- [x] ~~**M4.1** Scale is consistent — a door, a car and a person agree about how big a person is~~ (Mara's rebuilt wrecker prop in `bone_yard_hunt.gd` was scaled 0.78 against the same `scrap_skiff.glb` at 1.05-1.176 in `rift_derby.gd` — a third smaller for no reason other than which file spawned it. Matched to 1.15. Player and NPC rigs already share one capsule height, verified side by side in a third-person capture.)
 - [x] **M4.2** Eye at 1.68 m off a 1.8 m body, dropping exactly as far as a crouch shortens it
 - [x] **M4.3** FOV stated as the vertical angle Godot actually uses — ~110° across, not 134°
-- [ ] **M4.4** Weapon and hand framing hold up at the wide FOV without looking bolted on
-- [ ] **M4.5** The rules are the game's own and applied everywhere, not photographic realism
+- [x] ~~**M4.4** Weapon and hand framing hold up at the wide FOV without looking bolted on~~ (measured, not guessed: a capture showed the raised first-person arm and its weapon sitting ~0.5 m from the eye, which FOV 78 blew up into an unreadable dark mass across the lower half of the screen, and separately the torso's own top edge was only ~0.23 m below eye level with its front face flush with the camera. Shallower arm raise, the weapon anchored further out on the arm, and the torso nudged back and down in first person only — diffed against the original capture to confirm the geometry actually moved.)
+- [x] ~~**M4.5** The rules are the game's own and applied everywhere, not photographic realism~~ (the resolution/interrogation camera had its own bare `72.0` FOV with no relationship to the 78/63 pair M4.3 established; it now takes `THIRD_PERSON_FOV` since it is already the "look at the body from outside" register)
 
 ### M3 — The seam
+**Deferred this session**, for the same reason as M2: M3.1 and M3.2 both name
+transitions (into driving, out of the derby) that do not exist as a mechanism
+yet — the roadmap's own Tier 2 ("win the derby → exit the car → walk out of
+the facility → Ashbloom") is not built. M3.3's diegetic HUD is a real,
+smaller-scoped ask on its own; not attempted this session because the on-foot
+half (`gothic_field_hud.gd`) and the derby half (`cab_screens.gd` /
+`celloutz_hud.gd`) are two separate Control trees in two separate scenes today,
+and "survives every transition" cannot be answered honestly without M3.1/M3.2
+existing to transition through.
 - [ ] **M3.1** The opening cutscene transitions into first-person driving without a cut
 - [ ] **M3.2** The derby hands off to on-foot without a loading seam the player reads as one
 - [ ] **M3.3** The HUD survives every transition; a diegetic HUD cannot simply fade to a third-person one

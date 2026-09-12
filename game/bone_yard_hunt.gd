@@ -112,6 +112,17 @@ var lock_target := ""
 var lock_screen := Vector2(-1, -1)
 var camera_position := Vector3.ZERO
 var camera_ready := false
+## M1.5/M3. 0 = fully first person, 1 = fully third person. The toggle in
+## `_input` only sets the *target* (`third_person`); this is what the camera
+## transform actually reads every frame, so stepping outside your body is a
+## half-second slide rather than a teleport. Rule 3: every hard cut is a bug.
+var perspective_blend := 0.0
+const PERSPECTIVE_BLEND_RATE := 3.2
+## M1.5. Polled rather than hooked to every place a boss could theoretically
+## die, because the boss condition depends on faction state the Hunt System
+## mutates in more than one file. A once-a-second check against a one-shot
+## WorldHistory event is cheap and cannot miss the moment or refire it.
+var _unlock_feel_timer := 0.0
 var kill_cam: Control
 var voice_channel: Node
 var arsenal: Node
@@ -515,6 +526,10 @@ func _physics_process(delta: float) -> void:
 	if not grapple_target.is_empty():
 		_update_grapple(delta)
 	_steer_lock(delta)
+	_unlock_feel_timer -= delta
+	if _unlock_feel_timer <= 0.0:
+		_unlock_feel_timer = 1.0
+		_check_third_person_unlock_feel()
 	_update_camera()
 	_update_hud()
 	# Charted by walking, not by opening the map.
@@ -1862,17 +1877,40 @@ func third_person_unlocked() -> bool:
 	if WorldHistory.event_count("melee_body_hit") <= 0:
 		return false
 	# A boss is a rival the world already knew by name when you put them down.
+	# Was reading a `"subject"` key. Every `npc_resolution` this file records
+	# (the only two writers, both in `_resolve_downed`) writes `"subject_id"`,
+	# so this loop always found an empty string and never counted a single
+	# kill — third person could not unlock no matter what you did, and M1.2
+	# was checked off on the strength of the refusal message, not the unlock.
 	var bosses := 0
 	for event: Dictionary in WorldHistory.events:
 		if str(event.get("type", "")) not in ["npc_resolution", "execution"]:
 			continue
-		var subject := str((event.get("details", {}) as Dictionary).get("subject", ""))
+		var subject := str((event.get("details", {}) as Dictionary).get("subject_id", ""))
 		if subject == "":
 			continue
 		var record: Dictionary = WorldHistory.subject(subject)
 		if int(record.get("elo", 0)) >= 1100 or int(record.get("grudge", 0)) >= 30 or bool(record.get("rival", false)):
 			bosses += 1
 	return bosses >= UNLOCK_BOSSES
+
+
+## M1.5. The unlock has to land as something that happened to the player, not
+## a silent permission flip they only discover by trying the key. The moment
+## the two conditions are both true — regardless of whether `F` is pressed
+## yet — the world marks it the same way it marks a killing blow: a stop, a
+## kick, and a line of content. `third_person_unlock_felt` is recorded once
+## and only once, so replaying this scene, or the check re-running every
+## second, can never trigger the feeling twice.
+func _check_third_person_unlock_feel() -> void:
+	if WorldHistory.event_count("third_person_unlock_felt") > 0:
+		return
+	if not third_person_unlocked():
+		return
+	WorldHistory.record_event("third_person_unlock_felt", {"location": HUNT_LOCATION})
+	if impact_feel != null:
+		impact_feel.strike(0.85, "unlock", false)
+	prompt.text = "SOMETHING IN YOU STEPS BACK, LOOKING — [F] TO LEAVE YOUR BODY"
 
 
 ## What the player is told when they press the key too early. Never a silent
@@ -1950,7 +1988,12 @@ func _update_hud() -> void:
 
 func _update_camera() -> void:
 	if resolution_ui != null and resolution_ui.visible:
-		camera.fov = 72.0
+		# M4.5. Was a bare 72.0 — a third FOV value with no relationship to the
+		# 78/63 pair M4.3 stated, so this one external-framing shot would have
+		# quietly drifted out of scale the next time either constant was
+		# retuned. This view is already the "look at the body from outside"
+		# register, so it takes the third-person figure rather than its own.
+		camera.fov = THIRD_PERSON_FOV
 		var subject := _actor_by_id(resolution_target)
 		if not subject.is_empty():
 			var focus: Vector3 = subject.node.global_position + Vector3.UP * 0.65
@@ -1977,62 +2020,72 @@ func _update_camera() -> void:
 			return
 	var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 	var physical_offset := Vector3.ZERO
+	var fov_add := 0.0
 	if body_motion != null:
 		var local_offset: Vector3 = body_motion.camera_offset
 		var flat_forward := Vector3(sin(yaw), 0, cos(yaw))
 		var flat_right := Vector3(flat_forward.z, 0, -flat_forward.x)
 		physical_offset = flat_right * local_offset.x + Vector3.UP * local_offset.y + flat_forward * local_offset.z
-		# Wide inside your own head, ordinary outside it. The change between the
-		# two is itself the reward: stepping out is a relief.
-		camera.fov = (THIRD_PERSON_FOV if third_person else FIRST_PERSON_FOV) + body_motion.fov_add
-	if third_person:
-		# Souls framing rather than a chase cam parked behind the head: the body
-		# sits off-centre over one shoulder and low in frame, the rig is close
-		# enough to read a swing on, and the whole thing is spring-damped so it
-		# trails the player instead of snapping to a computed point each frame.
-		var locked := _lock_node()
-		var focus := player + Vector3.UP * 0.95
-		var shoulder := Vector3(cos(yaw), 0, -sin(yaw)) * 0.62
-		var distance := 4.4 if locked != null else 3.8
-		if locked != null:
-			# Framing holds the pair, so backing off a locked target widens the
-			# shot instead of losing them behind the player's own shoulder.
-			var gap: float = player.distance_to(locked.global_position)
-			distance = clampf(3.6 + gap * 0.22, 3.6, 6.2)
-			focus = focus.lerp(locked.global_position + Vector3.UP * 0.9, 0.32)
-		var desired := player - look * distance + Vector3.UP * 0.85 + shoulder + physical_offset * 0.35
-		if not camera_ready:
-			camera_position = desired
-			camera_ready = true
-		var responsiveness := 15.0 if locked != null else 11.0
-		camera_position = camera_position.lerp(desired, clampf(get_physics_process_delta_time() * responsiveness, 0.0, 1.0))
-		# The wall test is the last thing that happens, on the position actually
-		# used. Testing the *target* and then smoothing toward it let the camera
-		# sit inside a building for every frame of the blend, which is how the
-		# spawn view ended up as a wall of brown.
-		camera.global_position = HUNTER_MOTOR.collision_safe_camera(
-			get_world_3d().direct_space_state,
-			focus,
-			camera_position,
-			[player_body.get_rid()]
-		)
-		if locked != null:
-			# Locked, the shot is about the pair, so aim between them.
-			camera.look_at(focus, Vector3.UP)
-		else:
-			# Unlocked, aim parallel to the look heading rather than at the
-			# player. Aiming *at* the player cancels the shoulder offset and
-			# re-centres the body, which is what made this read as a chase cam
-			# parked behind the head instead of an over-the-shoulder shot.
-			camera.look_at(camera.global_position + look * 12.0, Vector3.UP)
-	else:
-		# M4.2. The eye, not the chest. Crouching lowers it by exactly as much as
-		# the body actually shortens, so the view and the collider agree.
-		var crouch_drop: float = (STANDING_HEIGHT - player_capsule.height) * 0.5
-		camera.global_position = player + Vector3.UP * (EYE_ABOVE_CENTRE - 0.6 - crouch_drop) + physical_offset
-		camera.look_at(player + look * 12.0)
+		fov_add = body_motion.fov_add
+	# M1.5/M3.3/Rule 3. Both poses are computed every frame, whichever one is
+	# "current" — the camera sits at a lerp between them driven by
+	# `perspective_blend` sliding toward whatever `third_person` asked for.
+	# This used to be an `if third_person: ... else: ...` that snapped the
+	# camera's position and FOV on the same frame the key was pressed, which
+	# is exactly the hard cut Rule 3 names as a bug. Wide inside your own
+	# head, ordinary outside it — the change between the two is the reward,
+	# and a reward you can watch happen reads better than one you only notice
+	# has already happened.
+	perspective_blend = move_toward(perspective_blend, 1.0 if third_person else 0.0, PERSPECTIVE_BLEND_RATE * get_physics_process_delta_time())
+	camera.fov = lerpf(FIRST_PERSON_FOV, THIRD_PERSON_FOV, perspective_blend) + fov_add
+
+	# M4.2. The eye, not the chest. Crouching lowers it by exactly as much as
+	# the body actually shortens, so the view and the collider agree.
+	var crouch_drop: float = (STANDING_HEIGHT - player_capsule.height) * 0.5
+	var fp_position := player + Vector3.UP * (EYE_ABOVE_CENTRE - 0.6 - crouch_drop) + physical_offset
+	var fp_target := fp_position + look * 12.0
+
+	# Souls framing rather than a chase cam parked behind the head: the body
+	# sits off-centre over one shoulder and low in frame, the rig is close
+	# enough to read a swing on, and the whole thing is spring-damped so it
+	# trails the player instead of snapping to a computed point each frame.
+	var locked := _lock_node()
+	var focus := player + Vector3.UP * 0.95
+	var shoulder := Vector3(cos(yaw), 0, -sin(yaw)) * 0.62
+	var distance := 4.4 if locked != null else 3.8
+	if locked != null:
+		# Framing holds the pair, so backing off a locked target widens the
+		# shot instead of losing them behind the player's own shoulder.
+		var gap: float = player.distance_to(locked.global_position)
+		distance = clampf(3.6 + gap * 0.22, 3.6, 6.2)
+		focus = focus.lerp(locked.global_position + Vector3.UP * 0.9, 0.32)
+	var desired := player - look * distance + Vector3.UP * 0.85 + shoulder + physical_offset * 0.35
+	if not camera_ready:
+		camera_position = desired
+		camera_ready = true
+	var responsiveness := 15.0 if locked != null else 11.0
+	camera_position = camera_position.lerp(desired, clampf(get_physics_process_delta_time() * responsiveness, 0.0, 1.0))
+	# The wall test is the last thing that happens, on the position actually
+	# used. Testing the *target* and then smoothing toward it let the camera
+	# sit inside a building for every frame of the blend, which is how the
+	# spawn view ended up as a wall of brown.
+	var tp_position := HUNTER_MOTOR.collision_safe_camera(
+		get_world_3d().direct_space_state,
+		focus,
+		camera_position,
+		[player_body.get_rid()]
+	)
+	# Locked, the shot is about the pair, so aim between them. Unlocked, aim
+	# parallel to the look heading rather than at the player — aiming *at*
+	# the player cancels the shoulder offset and re-centres the body, which
+	# is what made this read as a chase cam parked behind the head instead
+	# of an over-the-shoulder shot.
+	var tp_target := focus if locked != null else tp_position + look * 12.0
+
+	camera.global_position = fp_position.lerp(tp_position, perspective_blend)
+	camera.look_at(fp_target.lerp(tp_target, perspective_blend), Vector3.UP)
 	if body_motion != null:
-		camera.rotation.z += body_motion.camera_roll * (0.45 if third_person else 1.0)
+		camera.rotation.z += body_motion.camera_roll * lerpf(1.0, 0.45, perspective_blend)
 		# O2.2. The kick from whatever you just hit, applied here so the derby
 		# and the hunt can each carry it in their own rig's terms.
 		if impact_feel != null:
@@ -2048,11 +2101,13 @@ func _update_camera() -> void:
 			facing = atan2(toward.x, toward.z) + PI
 		player_rig.rotation.y = lerp_angle(player_rig.rotation.y, facing, clampf(get_physics_process_delta_time() * 12.0, 0.0, 1.0))
 		# The first-person camera sits inside the skull, so the head would fill
-		# the view. Everything else stays on: looking down at your own ruined
-		# arm is the entire point of the player having a body.
+		# the view. Fading this on the blend instead of the toggle means the
+		# head does not pop in or out at the instant nothing has visibly moved
+		# yet — it appears once the camera has actually pulled back far enough
+		# to have a reason to.
 		var head := player_rig.parts.get("head") as Node3D
 		if head != null and is_instance_valid(head):
-			head.visible = third_person
+			head.visible = perspective_blend > 0.5
 
 
 func _build_world() -> void:
@@ -2313,7 +2368,11 @@ func _spawn_rival() -> void:
 		altered_vehicle.name = "MarasRebuiltWrecker"
 		altered_vehicle.position = Vector3(4.0, -0.45, 1.8)
 		altered_vehicle.rotation.y = -0.7
-		altered_vehicle.scale = Vector3(0.78, 0.78, 0.78)
+		# M4.1. Was 0.78 — a third smaller than the same `scrap_skiff.glb` reads
+		# in `rift_derby.gd` (1.05-1.176 there, on the same 1.8 m human rig this
+		# scene also uses). Same asset, same person standing next to it, so it
+		# has to agree on how big a car is, not shrink because it changed files.
+		altered_vehicle.scale = Vector3(1.15, 1.15, 1.15)
 		enemy.add_child(altered_vehicle)
 	add_child(enemy)
 

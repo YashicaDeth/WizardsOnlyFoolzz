@@ -167,7 +167,12 @@ func _update_models() -> void:
 func _build_weapon_model(weapon_id: String) -> Node3D:
 	var root := Node3D.new()
 	root.name = "%s_model" % weapon_id
-	root.position = Vector3(0.02, -0.36, -0.16)
+	# M4.4. Was (0.02, -0.36, -0.16) — with the arm raised for first person
+	# that put the weapon roughly half a metre from the eye, which the wide
+	# FOV then blew up into an unreadable dark mass across the lower half of
+	# the screen. Further out and lower on the arm's own axis reads as a
+	# weapon held at a normal distance instead of one bolted to the lens.
+	root.position = Vector3(0.02, -0.62, -0.30)
 	root.rotation = Vector3(-0.12, 0.0, 0.04)
 	match weapon_id:
 		"sword":

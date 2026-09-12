@@ -2,6 +2,41 @@
 
 ## 2026 09 12
 
+- **M1.5/M4: the third-person unlock could never actually fire, the camera cut
+  hard on every perspective toggle, and the first-person weapon read as a dark
+  slab.** `third_person_unlocked()` counted a boss kill by reading a
+  `"subject"` key off `npc_resolution` events; every writer of that event uses
+  `"subject_id"`, so the loop always saw an empty string and the unlock
+  condition could not pass no matter how many named rivals were put down —
+  M1.2 was checked off on the strength of the refusal message, never the
+  actual unlock. Fixed, and paired with a felt moment (a hitstop-style kick
+  plus a line, recorded once through `WorldHistory` so it cannot refire): the
+  unlock is now something that happens to the player instead of a permission
+  flip discovered by trying the key. Separately, `_update_camera` used to
+  branch `if third_person: ... else: ...` and pick between two unrelated
+  camera transforms on the same frame the key was pressed — a hard cut, which
+  Rule 3 calls a bug. Both poses are computed every frame now and the camera
+  sits at a lerp between them driven by a blend factor, so stepping outside
+  your body is a half-second slide. Verified with a capture showing the
+  unlock line and camera kick landing together, and a headless run for
+  regressions. And a capture of the *default* first-person view — sword drawn,
+  arm raised — showed the raised arm and its weapon sitting roughly half a
+  metre from the eye, which FOV 78 blew up into a dark, unreadable mass across
+  the lower half of the screen; the torso's own top edge was separately only
+  ~0.23 m below eye level with its front face flush with the camera position.
+  Reduced the arm-raise angle, moved the weapon further out on the arm, and
+  pulled the torso back and down slightly in first person only (third person,
+  the only view anything else ever sees the player from, is untouched) — diffed
+  the before/after captures to confirm the geometry actually moved where
+  intended. Also matched a decorative wrecked car prop in the Bone Yard to the
+  same `scrap_skiff.glb` scale already established in the derby (was 0.78,
+  should have been ~1.15 — a third smaller for no reason but which file spawned
+  it), and pointed the resolution-window camera's stray `72.0` FOV at the same
+  `THIRD_PERSON_FOV` constant the rest of the perspective system already
+  shares. M2 (first-person driving) and M3 (the seam) are deferred this
+  session — see the notes left in `CHECKLIST.md`.
+
+
 - **M4: the wide FOV was a fisheye, and the eye was in the wrong place.** Two
   perspective faults, one of them introduced an hour earlier by me.
   Godot's `Camera3D.fov` is the **vertical** angle — `keep_aspect` defaults to
