@@ -22,6 +22,11 @@ const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
 const STORM_WEATHER := preload("res://systems/storm_weather.gd")
+const PERCEPTION := preload("res://systems/perception.gd")
+## AE1.1. Beyond this, nobody hunting the player needs a light/noise/cover
+## verdict at all — the same reason `storm_weather.gd`'s exposure only
+## starts mattering past a real severity, not from the first drop of rain.
+const PERCEPTION_MAX_RANGE := 30.0
 const PSYCHEDELIC_OSC := preload("res://systems/psychedelic_osc.gd")
 const BALLISTICS := preload("res://systems/ballistics.gd")
 const LIMB_MOMENTUM := preload("res://systems/limb_momentum.gd")
@@ -227,6 +232,15 @@ var sun: DirectionalLight3D
 ## AS4. Storms that answer the occult — severity is a read of
 ## `WorldHistory.chaos_magick()`, never authored here.
 var storm_weather: StormWeather
+## AE1.1. How loud the player is being right now, 0..1 — one of
+## `perception.gd`'s four real inputs. No noise system existed anywhere in
+## the project before this; sprinting is the one real, if simple, source of
+## it for a first pass.
+var player_noise := 0.0
+## AE1.1. The worst-case (most exposed) verdict against any live hostile
+## this frame, and the boolean AS1.5/AU1.10's AE1.4 were both waiting on.
+var player_visibility := 0.0
+var player_unseen := true
 var pathfinder = preload("res://systems/ashbloom_pathfinder.gd").new()
 var social_markers: Array[Node3D] = []
 var resolution_ui: Control
@@ -764,6 +778,7 @@ func _physics_process(delta: float) -> void:
 	_update_day_night()
 	_update_storm_exposure(delta)
 	_update_altered_perception()
+	_update_perception(delta)
 	dodge_remaining = maxf(0.0, dodge_remaining - delta)
 	# O2.7 v3. scale_for() only ever reached the encounter loop's actor_delta —
 	# the player is the other half of every exchange they are in and kept
@@ -3365,6 +3380,48 @@ func _update_storm_exposure(delta: float) -> void:
 	storm_weather.follow(player)
 	var warmth := float(Clothing.stats("player").get("warmth", 0.0))
 	stamina = clampf(stamina - storm_weather.exposure_cost(delta) * (1.0 - warmth), 0.0, 100.0)
+
+
+## AE1.1. "Unseen is a real state with real inputs — light, noise, cover,
+## distance." `perception.gd`'s `visibility()` is a pure function of those
+## four; this is what actually supplies them from the live world, against
+## every hostile still hunting, and keeps the worst (most exposed) verdict —
+## the one a hostile closest to noticing you would actually see.
+##
+## Noise is the one input with no existing system behind it anywhere in the
+## project: sprinting is a real, if simple, first source, decaying rather
+## than switching instantly so a sprint's noise does not vanish the exact
+## frame you stop. Light reads `WorldClock.daylight()` and the handheld's
+## own `is_lit()` — AS1.5's light_radius() hook finally has a caller. Cover
+## is one raycast per live hostile, the same exclude-both-ends convention
+## `_update_camera()`'s own obstruction check already uses: nothing in the
+## way reads as a clear sightline, anything else in the way reads as full
+## cover.
+func _update_perception(delta: float) -> void:
+	var sprinting_now := Input.is_action_pressed("sprint") and player_body.velocity.length() > 0.5
+	player_noise = move_toward(player_noise, 1.0 if sprinting_now else 0.0, delta * 2.0)
+
+	var light := clampf(maxf(WorldClock.daylight(), 0.9 if handheld.is_lit() else 0.0), 0.0, 1.0)
+	var target := player + Vector3.UP * 0.2
+
+	var worst := 0.0
+	for actor: Dictionary in encounter_actors:
+		if bool(actor.get("dead", false)):
+			continue
+		var hostile: Node3D = actor.get("node")
+		if hostile == null or not is_instance_valid(hostile):
+			continue
+		var eye := hostile.global_position + Vector3.UP * 1.5
+		var distance := eye.distance_to(target)
+		var excluded: Array[RID] = [player_body.get_rid()]
+		if hostile is CollisionObject3D:
+			excluded.append((hostile as CollisionObject3D).get_rid())
+		var query := PhysicsRayQueryParameters3D.create(eye, target)
+		query.exclude = excluded
+		var cover := 0.0 if get_world_3d().direct_space_state.intersect_ray(query).is_empty() else 1.0
+		worst = maxf(worst, PERCEPTION.visibility(light, player_noise, cover, distance, PERCEPTION_MAX_RANGE))
+	player_visibility = worst
+	player_unseen = worst < PERCEPTION.UNSEEN_THRESHOLD
 
 
 ## E6/E8. `substances.gd` and `meditation.gd` have both paid into
