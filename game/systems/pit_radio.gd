@@ -70,6 +70,9 @@ var speaker_bloom := 0.0
 var elapsed := 0.0
 var rng := RandomNumberGenerator.new()
 var audio: Node
+## The open channel remains audible and continues to drive world history, but
+## it is not a subtitle slab bolted over the collision view.
+var show_transcript := false
 
 
 func _ready() -> void:
@@ -119,6 +122,8 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
+	if not show_transcript:
+		return
 	var panel := Rect2(Vector2(size.x * 0.5 - 250.0, size.y - 214.0), Vector2(500.0, 92.0))
 	if messages.is_empty():
 		return

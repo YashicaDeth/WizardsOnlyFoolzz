@@ -27,8 +27,6 @@ const MAX_ENGAGED := 3
 const ENGAGE_RAMP := 13.0
 const REASSIGN_EVERY := 2.6
 const KILL_CAM := preload("res://systems/kill_cam.gd")
-const DAMAGE_PORTRAIT := preload("res://systems/damage_portrait.gd")
-const CAB_SCREENS := preload("res://systems/cab_screens.gd")
 const PIT_RADIO := preload("res://systems/pit_radio.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
 
@@ -59,8 +57,6 @@ var leaving := false
 var authored_collision_count := 0
 var derby_audio: Node
 var kill_cam: Control
-var damage_portrait: Control
-var cab_screens: Control
 var pit_radio: Control
 
 @onready var camera: Camera3D = $Camera3D
@@ -76,8 +72,10 @@ func _ready() -> void:
 	_apply_gore_setting()
 	_build_world()
 	_build_boat()
-	_spawn_targets()
-	_spawn_crowd()
+	if OS.get_environment("ATG_HUD_CAPTURE") != "1":
+		_spawn_targets()
+	if OS.get_environment("ATG_HUD_CAPTURE") != "1":
+		_spawn_crowd()
 	derby_audio = DERBY_AUDIO.new()
 	derby_audio.name = "DerbyAudio"
 	add_child(derby_audio)
@@ -85,21 +83,15 @@ func _ready() -> void:
 	kill_cam = KILL_CAM.new()
 	kill_cam.name = "KillCam"
 	$HUD.add_child(kill_cam)
-	cab_screens = CAB_SCREENS.new()
-	cab_screens.name = "CabScreens"
-	$HUD.add_child(cab_screens)
 	pit_radio = PIT_RADIO.new()
 	pit_radio.name = "PitRadio"
 	$HUD.add_child(pit_radio)
 	pit_radio.attach_audio(derby_audio)
-	damage_portrait = DAMAGE_PORTRAIT.new()
-	damage_portrait.name = "DamagePortrait"
-	damage_portrait.position = Vector2(26, 22)
-	$HUD.add_child(damage_portrait)
 	world_index = WORLD_INDEX.new()
 	world_index.name = "WorldIndexPanel"
 	$HUD.add_child(world_index)
-	# The bust reports driver state; the old title block said nothing.
+	# Outcome text is event-only. The portrait, radar, hull schematic and corner
+	# telemetry were rejected; the skiff now sheds its own panels instead.
 	status.visible = false
 	score_label.visible = false
 	# A5.5. The last default-font label on the windscreen. The drawn hunt signal
@@ -175,14 +167,18 @@ func _apply_gore_setting() -> void:
 
 func _build_world() -> void:
 	$WorldEnvironment.environment = WorldLook.environment("bone_yard")
-	var authored_environment := BONE_YARD_ENVIRONMENT.instantiate()
-	authored_environment.name = "AuthoredBoneYard"
-	authored_environment.position.y = -0.12
-	authored_environment.scale = Vector3(ARENA_SCALE, ARENA_SCALE, ARENA_SCALE)
-	add_child(authored_environment)
-	WorldLook.regrime(authored_environment, 17)
-	_suppress_props(authored_environment)
-	_add_authored_environment_collision(authored_environment)
+	if OS.get_environment("ATG_HUD_CAPTURE") != "1":
+		var authored_environment := BONE_YARD_ENVIRONMENT.instantiate()
+		authored_environment.name = "AuthoredBoneYard"
+		authored_environment.position.y = -0.12
+		authored_environment.scale = Vector3(ARENA_SCALE, ARENA_SCALE, ARENA_SCALE)
+		add_child(authored_environment)
+		WorldLook.regrime(authored_environment, 17)
+		_suppress_props(authored_environment)
+		# Deterministic harnesses do not need hundreds of static mesh faces
+		# rebuilt at startup; the simple arena floor below is sufficient.
+		if OS.get_environment("ATG_TEST_MODE") != "1":
+			_add_authored_environment_collision(authored_environment)
 	var floor := StaticBody3D.new()
 	var floor_collision := CollisionShape3D.new()
 	var floor_shape := BoxShape3D.new()
@@ -223,6 +219,7 @@ func _build_boat() -> void:
 	authored_skiff.scale = Vector3(1.15, 1.15, 1.15)
 	boat.add_child(authored_skiff)
 	WorldLook.regrime(authored_skiff, 3)
+	_add_vehicle_damage_parts(boat as RigidBody3D, 12)
 
 
 func _spawn_targets() -> void:
@@ -351,6 +348,7 @@ func _on_vehicle_impact(other: Node, closing_speed: float, self_share: float) ->
 		_damage_target(other, closing_speed, self_share)
 	elif closing_speed > 7.0:
 		integrity = maxi(0, integrity - roundi(closing_speed * 0.4))
+		_update_player_damage_visual(Vector3.ZERO)
 		if pit_radio != null and closing_speed > 11.0:
 			pit_radio.transmit("hit_player")
 		derby_audio.play_impact(clampf(closing_speed / 24.0, 0.0, 1.0), boat.global_position, "heavy")
@@ -368,6 +366,7 @@ func _on_wrecker_impact(other: Node, closing_speed: float, self_share: float, wr
 	var attacker_share := clampf(self_share, 0.0, 1.0)
 	var damage := clampi(roundi(closing_speed * 0.55 * (0.4 + attacker_share * 0.6)), 1, 18)
 	integrity = maxi(0, integrity - damage)
+	_update_player_damage_visual((boat.global_position - wrecker.global_position).normalized())
 	_shake_camera(closing_speed)
 	if pit_radio != null and closing_speed > 11.0:
 		pit_radio.transmit("hit_player")
@@ -402,6 +401,7 @@ func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: fl
 	score += damage * 5
 	integrity = maxi(0, integrity - clampi(roundi(energy * 0.22 * (0.35 + 0.65 * (1.0 - self_share))), 1, 34))
 	var impact_direction := (target.global_position - boat.global_position).normalized()
+	_update_player_damage_visual(-impact_direction)
 	_update_wrecker_damage_visual(target, target_integrity, impact_direction)
 	_update_detachable_parts(target, target_integrity, impact_direction)
 	if damage >= 28:
@@ -480,6 +480,18 @@ func _update_wrecker_damage_visual(target: Node3D, target_integrity: int, impact
 	shell.rotation.z = clampf(-local.x, -1.0, 1.0) * crush * 0.22
 	shell.rotation.x = clampf(local.z, -1.0, 1.0) * crush * 0.16
 	shell.position = Vector3(local.x, 0.0, local.z) * crush * 0.18
+
+
+func _update_player_damage_visual(impact_direction: Vector3) -> void:
+	_update_detachable_parts(boat, integrity, impact_direction)
+	var shell := boat.get_node_or_null("AuthoredScrapSkiff") as Node3D
+	if shell == null:
+		return
+	var crush := clampf(float(100 - integrity) / 100.0, 0.0, 0.55)
+	var local := boat.global_transform.basis.inverse() * impact_direction
+	shell.scale = Vector3(1.15 + crush * 0.05, 1.15 - crush * 0.16, 1.15 - crush * 0.05)
+	shell.rotation.z = clampf(-local.x, -1.0, 1.0) * crush * 0.16
+	shell.rotation.x = clampf(local.z, -1.0, 1.0) * crush * 0.10
 
 
 func _spawn_impact_debris(at: Vector3, direction: Vector3, count: int) -> void:
@@ -576,10 +588,6 @@ func _update_hud() -> void:
 			"integrity": int(target.get_meta("integrity", 100)),
 			"rival": bool(target.get_meta("is_rival", false)),
 		})
-	if cab_screens != null:
-		cab_screens.set_telemetry(integrity, _player_parts_lost(), contacts, ARENA_LIMIT)
-	if damage_portrait != null:
-		damage_portrait.set_damage(1.0 - clampf(float(integrity) / 100.0, 0.0, 1.0))
 	if dynamic_interface.has_method("set_telemetry"):
 		dynamic_interface.set_telemetry({
 			"speed": speed,
@@ -637,6 +645,14 @@ func _reset_round() -> void:
 	boat_velocity = Vector3.ZERO
 	boat.position = Vector3(0, 0.75, 12.0 * SPAWN_SCALE)
 	boat.recover(Vector3(0, 1.2, 12.0 * ARENA_SCALE))
+	var old_damage_parts := boat.get_node_or_null("DamageParts")
+	if old_damage_parts != null:
+		old_damage_parts.free()
+	_add_vehicle_damage_parts(boat as RigidBody3D, 12)
+	var player_shell := boat.get_node_or_null("AuthoredScrapSkiff") as Node3D
+	if player_shell != null:
+		player_shell.scale = Vector3(1.15, 1.15, 1.15)
+		player_shell.rotation = Vector3.ZERO
 	_spawn_targets()
 	WorldHistory.record_event("derby_round_reset", {"venue": "rift_derby_quarry"})
 

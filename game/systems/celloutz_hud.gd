@@ -1,14 +1,11 @@
 extends Control
 
-## The derby HUD, rebuilt.
+## The derby windscreen.
 ##
-## Greg's verdict on the old one: *"the car and bottom left and top left and the
-## hunt signal is aids and the hull integrity honestly I hate it all."* All of it
-## fair. Every readout was set in `ThemeDB.fallback_font`, the plates were clean
-## rounded panels, and the whole thing was built before the project had a visual
-## language. Now it has one — `CellOutzType`, `CellOutzGrunge`, the notched plate
-## vocabulary — and this is that language applied to the one screen the player
-## spends the most time reading.
+## The instrument-panel pass was rejected as a whole. A prettier permanent HUD
+## is still a permanent HUD, and it obscured the cars that carry the useful
+## state. This control now contributes only fixed grime to the windscreen. Heat,
+## rivals, speed, hull and radio chatter all stay in the world or in the sound.
 ##
 ## Three rules from `DESIGN/INTERFACE_DIRECTION.md` drive the layout.
 ##
@@ -99,19 +96,12 @@ func _draw() -> void:
 	if viewport.x < 400 or viewport.y < 300:
 		return
 	_draw_glass(viewport)
-	_draw_edge_frame(viewport)
-	if show_title:
-		_draw_title(viewport)
-	else:
-		_draw_bust_frame(viewport)
-	_draw_integrity(viewport)
-	_draw_hunt_signal(viewport)
-	_draw_speed(viewport)
-	_draw_radar(viewport)
-	_draw_event_feed(viewport)
-	_draw_keys(viewport)
-	if impact_flash > 0.0:
-		_draw_impact(viewport)
+
+
+## Regression hook: the derby scene may keep this windscreen node, but it must
+## never grow permanent readouts again.
+func has_permanent_readouts() -> bool:
+	return false
 
 
 ## The windscreen you are reading all of this through. Fixed seeds, because dirt
