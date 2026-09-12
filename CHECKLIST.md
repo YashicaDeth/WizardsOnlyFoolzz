@@ -31,9 +31,12 @@ The convention:
   written before the session ends, with its reason. A mechanic is never finished,
   only current. This is the ratchet Greg asked for: *"when they do a1v2 then
   make a v3 until maybe 10 or 9"*.
-- **v9 is the ceiling.** Not because a mechanic cannot improve past it, but
-  because a system with no end condition is a treadmill. Anything still earning
-  versions at v9 is the best thing in the game and should be left alone.
+- **v10 is the ceiling.** Greg: *"do a rework up to v10"*. Not because a
+  mechanic cannot improve past it, but because a system with no end condition
+  is a treadmill. Anything still earning versions at v10 is the best thing in
+  the game and should be left alone. The ladders that reach it are the ones the
+  rework gave ten real faults to; most sections stop far earlier and that is
+  still correct.
 - **Each version is built on the one before it.** `vN+1` addresses what `vN`
   actually produced or exposed — never a fresh idea that could have been done at
   v1. Greg: *"it improves and can only get made off its own previous v2 versions
@@ -238,6 +241,47 @@ Everything below is a real weakness in what v1 shipped, not polish.
 - [ ] **A7.7** `v2` Retune the chassis against authored arena geometry once G3.1 lands
 - [x] **A9.7** `v2` Stations have a schedule — the dial is the same at 3am as at noon — and it was blocked on the fact that this game had no time of day at all. `world_clock.gd` (W1.1) now exists and the dial is its first reader: noon is pit control and the numbers station, three in the morning is the preacher, the gate lantern loop and the numbers station. Off air is zero strength however close you stand, and the dial says when it comes back
 
+
+### A v3 — the third pass
+v2 fixed the face, the grime and the failing panels, and every one of those fixes was looked at in daylight. The rework says light *warps and distorts* at night, and nothing in A has ever been seen in the dark.
+- [ ] **A3.1** `v3` Every surface A built is judged again after dark, not just dimmed
+- [ ] **A3.2** `v3` Warping is a property of the light, not a post-process on the whole frame
+
+### A v4 — the fourth pass
+v3 made night look different and there was almost no light in it to warp. A world lit only by an environment has nothing for v3 to act on.
+- [ ] **A4.1** `v4` Real light sources in the world at night, few and placed
+- [ ] **A4.2** `v4` The handheld is one of them (AS1.1), and the first thing v3 warps
+
+### A v5 — the fifth pass
+v4 put light into the dark and every surface answered it identically. Greg: *"working shaders and reimbursing the biopunk touch"*.
+- [ ] **A5.1** `v5` Flesh, scrap, rust and glass answer light differently
+- [ ] **A5.2** `v5` Contamination reads as a material property rather than a tint
+
+### A v6 — the sixth pass
+v5 made the ground materially believable and left the sky a box. AO2.1 says the firmament is broken and it has never been drawn as broken.
+- [ ] **A6.1** `v6` The firmament is visibly broken rather than a gradient
+- [ ] **A6.2** `v6` What is behind the break is not just more sky
+
+### A v7 — the seventh pass
+v6 broke the sky open and put nothing behind it. AO2.2: a god for each planet, the moon and the sun, visible at certain hours.
+- [ ] **A7.1** `v7` The gods are up there and `WorldClock.hour()` decides when
+- [ ] **A7.2** `v7` Seeing one is an event the world records, not decoration
+
+### A v8 — the eighth pass
+v7 made the sky the most interesting thing on screen, which is wrong when the player is a spirit in bright flame (AP2.2).
+- [ ] **A8.1** `v8` The undying flame is a real shader on the player, not an overlay
+- [ ] **A8.2** `v8` It genuinely melts the frame around it rather than tinting it
+
+### A v9 — the ninth pass
+v8 made the player luminous and the air between them and everything else is still clean. Contamination has weather (W1.2) and A has never drawn it.
+- [ ] **A9.1** `v9` The air carries contamination that moves and settles
+- [ ] **A9.2** `v9` Storm severity from AS4.2 is visible in the air before it is audible
+
+### A v10 — the tenth pass
+Nine passes of procedural surface, and none of it is Greg's own work. AP3.3: *"collaging my old and current art to use as textures intelligently"*.
+- [ ] **A10.1** `v10` Real collaged art from the collections folder, used as texture with intent
+- [ ] **A10.2** `v10` It sits inside the procedural system rather than replacing it
+
 ## B — Make the body the centrepiece
 
 The most complete system in the project and, until this pass, the least visible.
@@ -313,6 +357,52 @@ The most complete system in the project and, until this pass, the least visible.
 - [~] **B6.9v3** The 33 vertebrae recur as a shared system: segmented trauma, X-ray diagnosis, posture and mobility consequences. Spine damage and X-ray count are built; broader ritual/cosmology recurrence remains open.
 
 ---
+
+
+### B v2 — the second pass
+B built the most detailed body in the game and the player can only see it when it is being destroyed. The rework wants everything inspectable, *"with cybernetics and organs and bones visible"*.
+- [ ] **B2.1** `v2` The rig is inspectable at rest, not only under damage
+- [ ] **B2.2** `v2` Organs, bones and implants readable without opening anybody
+
+### B v3 — the third pass
+v2 made the body legible and it is still only harmed by violence. Greg: *"there's like 9g or 8g that radiation really melts you"*.
+- [ ] **B3.1** `v3` Radiation is a damage path through the same anatomy
+- [ ] **B3.2** `v3` It melts rather than cuts, and the rig shows the difference
+
+### B v4 — the fourth pass
+v3 gave the body a second way to be ruined and no way to be chosen. The rework wants mods, piercings, tattoos and extensions.
+- [ ] **B4.1** `v4` Body mods, piercings and tattoos on the same rig
+- [ ] **B4.2** `v4` Head mutations, and they change how people react to you
+
+### B v5 — the fifth pass
+v4 made the body customisable and nothing in it does anything. The crystal ball goes *"in their arm or pocket"*.
+- [ ] **B5.1** `v5` A crystal ball carried in the arm or the pocket, and it is functional
+- [ ] **B5.2** `v5` What is installed in a limb is visible in that limb
+
+### B v6 — the sixth pass
+v5 put an object in a limb; AD3.2 wants cybernetics that change what movement is possible. Greg: limbs *"that shoot missiles, grapple"*.
+- [ ] **B6.1** `v6` Limbs that shoot and grapple, through the anatomy rather than around it
+- [ ] **B6.2** `v6` A grappling limb that is severed stops grappling
+
+### B v7 — the seventh pass
+v6 made the body a weapon platform wearing nothing. AS3.4: what you are wearing shows on the body the mirror renders.
+- [ ] **B7.1** `v7` Clothes and layers on the rig, affecting weather and radiation
+- [ ] **B7.2** `v7` Armour and cover are the same system, not a stat
+
+### B v8 — the eighth pass
+v8 of A gave the player a flame; B has never rendered the player as anything other than another body. AP2.1: the spirit cannot be banished by violence.
+- [ ] **B8.1** `v8` The rig survives what kills everybody else, visibly
+- [ ] **B8.2** `v8` What is left when a body fails but its spirit does not
+
+### B v9 — the ninth pass
+v8 made the player's body exceptional and they can still never look at it. AH1.5: the mirror in the room shows your body, current.
+- [ ] **B9.1** `v9` The mirror renders this rig live, with everything done to it
+- [ ] **B9.2** `v9` Including the things you cannot see on yourself in first person
+
+### B v10 — the tenth pass
+Nine passes on one body, and T1.1 now says the universe restarts and you do not.
+- [ ] **B10.1** `v10` The body is recognisably itself across a quantum restart
+- [ ] **B10.2** `v10` What it carries over is scars, not statistics
 
 ## C — The handheld, and killing the six-panel problem
 
@@ -395,6 +485,42 @@ work created or exposed, not a wish.
       regression suite and a windowed capture
       (`captures/c5_6_v3_impact_cracks.png`) showing cracks radiating from
       three different, deliberately separated impact points.
+
+
+### C v4 — the fourth pass
+v3 made the handheld a rich object that emits no light at all. Greg: *"having light coming off the phone when you have it in your hand"*.
+- [ ] **C4.1** `v4` It throws real light into the world when it is in your hand
+- [ ] **C4.2** `v4` Its own screen is what lights your hands, not a lamp bolted to it
+
+### C v5 — the fifth pass
+v4 made it a lamp, and a lamp that never runs out is a torch, not a resource. *"phone has a % possibly"*.
+- [ ] **C5.1** `v5` A battery percentage that runs down and can reach nothing
+- [ ] **C5.2** `v5` What it costs to keep the screen up is visible on the battery
+
+### C v6 — the sixth pass
+v5 gave the light a cost in charge and none in attention. Raising it should occupy you.
+- [ ] **C6.1** `v6` Holding it up is an action, and that hand is not available
+- [ ] **C6.2** `v6` Waving it to see around a corner is a real thing you do
+
+### C v7 — the seventh pass
+v6 made the lamp cost you something; it costs nobody else anything. AS1.5: its light is what gives you away at night.
+- [ ] **C7.1** `v7` Anything hunting you can see the light before it sees you
+- [ ] **C7.2** `v7` Using the map at night is a decision with a price
+
+### C v8 — the eighth pass
+v7 made carrying it tactical and putting it away instant. Rule 3: every hard cut is a bug.
+- [ ] **C8.1** `v8` Pocketing it is a movement and the light leaves with it
+- [ ] **C8.2** `v8` Pockets are real, and what is in them is in them (AS3.2)
+
+### C v9 — the ninth pass
+Eight passes on the front of an object nobody has ever turned over. The jester is on the back and has never been seen.
+- [ ] **C9.1** `v9` The back of the device, and the jester on it
+- [ ] **C9.2** `v9` Its condition shows on the shell, not only on the screen
+
+### C v10 — the tenth pass
+Greg, plainly: *"the entire blackmirror gui needs work"*. Nine passes on what the device *is* and none on how it reads.
+- [ ] **C10.1** `v10` The whole GUI re-authored as one thing rather than six pages
+- [ ] **C10.2** `v10` It is legible in the dark it now creates, which nothing before v4 had to be
 
 ## D — Character creation in the vat
 
@@ -804,6 +930,47 @@ Four tiers, all on existing machinery. See `DESIGN/COSMOLOGY.md`.
 - [x] **K3.2** `v2` Nothing yet stops a player climbing both ladders at once — real friction added, distinct from K3.1's answer: the Tree *axis* stays freely reversible until an ending locks it (deliberate), but `wire_net.gd`'s `_build_account()` now halves `reach` once a subject holds genuine command-relation weight (≥20 strength) in a Descent faction **and** in wizardsonlyfoolz *at the same time* — a small toe in the other ladder is not enough to trigger it, only real simultaneous standing on both. Covered in `tests/dual_ladder_test.gd` (3 checks, isolating the penalty by holding total influence constant and only varying the split)
 - [x] **K5.1** `v2` Lesser demons are rivals reread; they should eventually want something of their own — `systems/demon_ambition.gd`: a first version, derived from real state rather than an authored personality. A demon with a real, strong grudge (≥15) wants to settle it (a recorded escalation each time it's pursued); otherwise it wants patronage from whichever Sin's `signal_control` is currently *weakest* — tying K5.1 into K4.4/K4.6 as one story (weakening a Sin's channel makes it a target for opportunists, not just a number dropping). Succeeding at patronage actually grants the faction affiliation and graduates them out of `DemonHierarchy.is_lesser_demon()` for good — a demon reread upward by its own pursuit, on the same F3/promote_successor track a captain or even a Horseman already runs on. Covered in `tests/demon_ambition_test.gd` (14 checks)
 
+
+### K v3 — the third pass
+v2 deepened a cosmology with no apex. AQ: *"the one true godhead, being commenting and enslaving us all in its own lessons and learning, is the fightable true end game boss"*.
+- [ ] **K3.1** `v3` The godhead exists in the cosmology as its top, and is fightable
+- [ ] **K3.2** `v3` It enslaves through teaching, which is its whole character
+
+### K v4 — the fourth pass
+v3 named a final boss the player has no relationship with. It should not be revealed; it should accumulate.
+- [ ] **K4.1** `v4` It taunts long before it is reachable
+- [ ] **K4.2** `v4` Visibility builds from what you have done, never on a timer
+
+### K v5 — the fifth pass
+v4 made it present and left nowhere for it to take you. *"summons your conscious spirit in the shadow realms of the higher realms"*.
+- [ ] **K5.1** `v5` The shadow realms of the higher realms as a real destination
+- [ ] **K5.2** `v5` It summons you; you never travel there
+
+### K v6 — the sixth pass
+v5 built the top of the cosmology and the middle is empty. AO2.2: a god for each planet, the moon and the sun.
+- [ ] **K6.1** `v6` Planetary gods, and they are visible at their hours
+- [ ] **K6.2** `v6` They are not the godhead and they do not agree with it
+
+### K v7 — the seventh pass
+v6 populated the sky with powers and gave the player no way to stand toward any of them. AR1: the tree of life.
+- [ ] **K7.1** `v7` The tree is the map of the paths, drawn and readable
+- [ ] **K7.2** `v7` Paths open at canon story beats rather than at levels
+
+### K v8 — the eighth pass
+v7 let the player choose a path and every path still ends the same way.
+- [ ] **K8.1** `v8` Siding with the godhead is a real option with a real ending
+- [ ] **K8.2** `v8` So is turning the demons on it (AR1.5)
+
+### K v9 — the ninth pass
+Eight passes on who is above; AO2.3 says the seals broke and nobody has dealt with the consequence.
+- [ ] **K9.1** `v9` Every demon is observable because the seals are gone
+- [ ] **K9.2** `v9` Every sigil is live again, and capturable (AJ, AO2.4)
+
+### K v10 — the tenth pass
+Nine passes on one universe. T1.1 is answered: the universe restarts and you do not.
+- [ ] **K10.1** `v10` The cosmology is not identical in the next universe
+- [ ] **K10.2** `v10` What the godhead learned about you is the thing that carries
+
 ## L — The Board
 The storyline and career as a conspiracy pin board rather than a quest list.
 Captured 2026-09-12, see `DESIGN/THE_BOARD.md`. It is the third record: the
@@ -901,6 +1068,47 @@ holds what the *player* thinks — which is allowed to be wrong.
       and drives a yellowing wash across the whole wall plus a pin tint that
       shifts toward rust. Verified: `tests/pin_board_v2_test.gd` (15 checks
       across all five), plus `pin_test.gd` and `board_capture.gd` unaffected.
+
+
+### L v3 — the third pass
+v2 finished a board that is a screen you open. AH1.1: opening it should put you in a room.
+- [ ] **L3.1** `v3` The Board is on a wall in a room you are standing in
+- [ ] **L3.2** `v3` Turning to it is a movement, not a menu (Rule 3)
+
+### L v4 — the fourth pass
+v3 gave the Board a place and it still only holds what you noticed. Greg: *"unlocking the true world's canonical pinboard as the story beats that matter get hit"*.
+- [ ] **L4.1** `v4` A canonical layer that opens as real story beats land
+- [ ] **L4.2** `v4` What is canon and what is your theory are visibly different things
+
+### L v5 — the fifth pass
+v4 made the Board authoritative about the plot and silent about your path. AR1.6.
+- [ ] **L5.1** `v5` The tree of life pins onto the Board
+- [ ] **L5.2** `v5` Your own route through it is readable there
+
+### L v6 — the sixth pass
+v5 charted where you went and not who is above you. AI2.4: the two charts are one document.
+- [ ] **L6.1** `v6` The pyramid pins onto the same wall
+- [ ] **L6.2** `v6` A theory can connect a tier to a person to a holding
+
+### L v7 — the seventh pass
+v6 made the wall the whole world model, sourced only from you. AK2.3: the agency publishes too.
+- [ ] **L7.1** `v7` The agency's claims pin on like anybody else's
+- [ ] **L7.2** `v7` Some of it is true and the Board never says which
+
+### L v8 — the eighth pass
+v7 filled the wall with other people's claims and none of them have walls. 
+- [ ] **L8.1** `v8` Other people keep boards, and theirs disagree with yours
+- [ ] **L8.2** `v8` A board can be found, read, defaced or taken
+
+### L v9 — the ninth pass
+v8 made boards a thing the world has; yours still resets with the run.
+- [ ] **L9.1** `v9` The wall persists the way the ledger does
+- [ ] **L9.2** `v9` What you were wrong about stays pinned
+
+### L v10 — the tenth pass
+Nine passes making the Board the record. T1.1 says the universe restarts and you do not — so the Board is the only continuous thing.
+- [ ] **L10.1** `v10` The Board is what carries across a quantum restart
+- [ ] **L10.2** `v10` It is the save file, in the fiction and in fact
 
 ## G7 — Exposure at the spawn
 
@@ -1091,6 +1299,47 @@ finished. Applies to everything below and to A5, A6, C1.
       `captures/i1_5_v2_index_file_no_rain.png` /
       `i1_5_v2_index_wire_has_rain.png`.
 - [ ] **I4.3** `v2` Vitality degrades the panels uniformly; a specific wound should damage a specific part of what you are reading
+
+
+### I v3 — the third pass
+v2 made the screens their own medium and the medium is still six separate designs. Greg: *"the entire blackmirror gui needs work"*.
+- [ ] **I3.1** `v3` One GUI with one grammar, not a set of well-drawn pages
+- [ ] **I3.2** `v3` Moving between pages is movement, not a cut
+
+### I v4 — the fourth pass
+v3 unified the pages and the weapon is still configured in a list. Greg: *"the slide pops out into a menu if you press shift and lock it, expanding into the weapon customisation, maybe the circle in the middle and 4 boxes around it"*.
+- [ ] **I4.1** `v4` Shift pops the slide out and locks it into the customisation menu
+- [ ] **I4.2** `v4` A circle with four boxes around it, on the weapon itself
+
+### I v5 — the fifth pass
+v4 proved a screen can be an object you operate; the Wire is still a reader. *"a certain number of apps should exist and be playable"*.
+- [ ] **I5.1** `v5` Apps on the Wire that are genuinely playable
+- [ ] **I5.2** `v5` Some for fun, some load-bearing, same as the arcades in the map
+
+### I v6 — the sixth pass
+v5 put games on the phone and nothing social. The doom-scroll app is the satire this project has been circling.
+- [ ] **I6.1** `v6` A feed, and drone-zombie spammers dying on it who can be cleared
+- [ ] **I6.2** `v6` Clearing local feeds pays, and somebody is paying
+
+### I v7 — the seventh pass
+v6 made the phone a place people are; there is nowhere on it that holds what is true. *"also add Akashic records library"*.
+- [ ] **I7.1** `v7` The Akashic records as a reachable archive on the device
+- [ ] **I7.2** `v7` It disagrees with the Wire, and the game never arbitrates
+
+### I v8 — the eighth pass
+v7 made the device a library and it still only reads. The black mirror is a *cursed mirror* and nothing is ever evoked through it.
+- [ ] **I8.1** `v8` Evoke an entity through the mirror with the right information
+- [ ] **I8.2** `v8` Challenge a soul: free it, enslave it, or kill and revive it into suffering
+
+### I v9 — the ninth pass
+v8 made the device dangerous and most objects in the world still cannot be looked at. *"everything should be inspectable, everything in spectacle"*.
+- [ ] **I9.1** `v9` Anything in the world can be inspected properly, guns included
+- [ ] **I9.2** `v9` Inspection is the same grammar everywhere rather than per-object
+
+### I v10 — the tenth pass
+Nine passes designed in a lit room. C v4 made the device the main light source in the world.
+- [ ] **I10.1** `v10` Every screen re-judged as the only light in a dark place
+- [ ] **I10.2** `v10` What the screen throws onto your hands is part of the design
 
 ## J — Infrastructure
 
@@ -1506,6 +1755,42 @@ Opened because O2.5 closed at v2. A fault the v2 work itself created.
       exactly, a battered plate protects less than a fresh one of the same
       rating, and the player's own opening-hand torque arm is not exempt from
       any of it).
+
+
+### O v4 — the fourth pass
+Three passes tuned a swing the player does not perform. AN: LMB plays an animation and the player's whole contribution is the timing of one keypress.
+- [ ] **O4.1** `v4` `limb_momentum.gd` drives the weapon: it lags, overshoots and swings through
+- [ ] **O4.2** `v4` The weapon is drawn where the physics put it, not where an animation says
+
+### O v5 — the fifth pass
+v4 made the weapon physical and damage still reads a constant off it.
+- [ ] **O5.1** `v5` Damage asks `commitment()` — the weapon sets the ceiling, you earn it
+- [ ] **O5.2** `v5` A flick and a committed sweep are different blows from the same button
+
+### O v6 — the sixth pass
+v5 made a blow worth what you put in and a weapon you barely hold is still welded to your hand.
+- [ ] **O6.1** `v6` You can be disarmed, and so can they
+- [ ] **O6.2** `v6` Mass and reach become the whole balance conversation
+
+### O v7 — the seventh pass
+v6 finished the human fight. Greg: *"overhauling halfsword combat"* — and the grapple, the shove and the bare hand are still separate systems.
+- [ ] **O7.1** `v7` Grapple, shove and bare hands are the same object with a different mass
+- [ ] **O7.2** `v7` Two-handing changes the numbers rather than the pose
+
+### O v8 — the eighth pass
+Seven passes against people. AO4 fills this world with things that are not people.
+- [ ] **O8.1** `v8` Demons, greys and reptilians fight through the same system without being reskinned humans
+- [ ] **O8.2** `v8` Something with no anatomy still has somewhere to be hit
+
+### O v9 — the ninth pass
+v8 made everything fightable and the player can still lose the ordinary way. AP2: the spirit cannot be banished by violence.
+- [ ] **O9.1** `v9` Losing a fight is not dying, and the game has to mean that
+- [ ] **O9.2** `v9` What being beaten costs you instead
+
+### O v10 — the tenth pass
+Nine passes of a damage race, ending in a boss that must not be one. AQ1.6.
+- [ ] **O10.1** `v10` The godhead fight is not resolved by damage
+- [ ] **O10.2** `v10` Everything O built is present in it and none of it is sufficient
 
 ## P — The demo
 

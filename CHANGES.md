@@ -2,12 +2,23 @@
 
 The build record for **Wizards Only Fools**, newest first. Every entry is a real change with the reason it was made; the tag says which part of the game it touched.
 
-**239 changes** · **42,727 lines of game code** · **405 of 735 planned pieces built** across 41 areas
+**245 changes** · **43,220 lines of game code** · **415 of 812 planned pieces built** across 46 areas
 
 ---
 
 ## 2026-09-12
 
+- **gore chunks actually freeze during hitstop, verified and recorded** `combat feel`
+  The code (GoreChunks.hold()/release(), called from bone_yard_hunt.gd's _physics_process whenever impact_feel.holding() is true) already closed this - a real freeze/resume scheme using RigidBody3D.freeze rather than a delta multiply, exactly what O2.7 v3's own explanation said gore would need - but CHECKLIST.md still had it unchecked, with O2.7 v3's own explanation paragraph orphaned under O2.8's line instead of its own, incorrectly implying gore was…
+- **The rework: the game finally knows what it is about**
+  Greg sent eighteen pages. It is the first document in this project that answers why rather than what, and it settles four of the five questions that have been formally blocked on him.
+- **teach the F-keys, and crack the glass where it lands** `the handheld`
+  C2.7: jump_to_mode() has reached a page directly since C2.6 v2 and nothing on the device itself ever said so. Each tab now prints the F-key that jumps to it directly.
+- **Large update 001**
+- **the Wire prints on glass, not the same paper as the dossier** `look and feel`
+  _draw_plate() grimed the same paper substrate under FILE, PYRAMID, BODY and WIRE alike - one plate for every page meant one substrate for every page, and the Wire is not paper. The physical registry itself (the notched shape, the tabs, the tape) stays one shared object on purpose, since that is what A0's 'one made object' already asked for - only what it is printed on now differs. WIRE prints on black_mirror.gd's black glass (the same surface every…
+- **one currency with a real issuer, a market of people, and real debt** `rituals`
+  carry.gd's economy existed in pieces (sale_value priced by kind/condition/ stolen, faction standing already refused deals, liens already followed stolen goods) but nothing tied it into a reason to get up in the morning.
 - **a round becomes a thing that travels** `guns`
   Greg, twice: "the combat system apart of the gun system ect and weapons so bullet weapon and firing ect are all realistic bullets and reload with the things", and then "bullets shells fall on the floor aggressively as the bullet destroys the map".
 - **CHANGES.md: a build record somebody who is not us can read**
