@@ -497,12 +497,12 @@ The pairing is the point. A substance is fast, costs the body, and can reach the
 entity layer. Meditation is slow, costs only time, and reaches further inward
 than outward — and doing it anywhere dangerous is the whole risk.
 
-- [ ] **E8.1** Sit down and stop — a held state, not a button that grants a buff
-- [ ] **E8.2** It restores stamina faster than standing, and pays down pain rather than health
-- [ ] **E8.3** Interrupted is worse than never started — the world does not pause for it
-- [ ] **E8.4** Where you sit matters: signal, territory and who is nearby all read
-- [ ] **E8.5** Deep enough, it reaches the entity layer the way a door substance does — slower, cheaper, and it cannot be rushed
-- [ ] **E8.6** It is the only route that costs the body nothing, which is why it is slow
+- [x] **E8.1** Sit down and stop — a held state, not a button that grants a buff — `systems/meditation.gd`: `begin()`/`tick()`/`end()`, progress accumulated from the caller's own real elapsed time (same pattern `carry.gd`'s `age()` already uses) rather than a wall-clock read; refuses to restart on top of an existing session so a second call cannot silently hide an interruption
+- [x] **E8.2** It restores stamina faster than standing, and pays down pain rather than health — `PAIN_RATE` pays down `pain` on the same `anatomy_state` ledger `boons.gd`/`substances.gd` write into; stamina lives in a live movement component this file can't see, so `STAMINA_MULTIPLIER` (2.5x) is offered for whoever owns that value to apply rather than a second stamina field invented here
+- [x] **E8.3** Interrupted is worse than never started — `interrupt()` adds real pain (`shock`, scaled by how deep the session had gotten) distinct from `end()`'s clean, costless stop; verified a session interrupted at 20s ends up with *more* pain than a session that was never held at all
+- [x] **E8.4** Where you sit matters: signal, territory and who is nearby all read — `begin(subject_id, context)` records whatever the caller actually observed (signal grade, territory, nearby subjects) once, at the moment sitting down happened, rather than this file querying a live scene it cannot see
+- [x] **E8.5** Deep enough, it reaches the entity layer the way a door substance does — slower, cheaper, and it cannot be rushed — past `ENTITY_THRESHOLD_SECONDS` (60s of real accumulated time, never a single call), `tick()` calls the exact same `AscentEntities.glimpse()` a door substance does — no attention spent, no `wash()`
+- [x] **E8.6** It is the only route that costs the body nothing, which is why it is slow — verified: a tick that pays down pain leaves blood untouched, unlike every `Boons`/`Substances` grant. Covered by `tests/meditation_test.gd` (20 checks)
 - [x] **E6.3** The door to the entity layer — a "door" substance calls `AscentEntities.glimpse()`, a real recorded `entity_glimpsed` contact that costs nothing of the entity's attention and cannot be spent on `wash()` — distinct from `regard()`'s earned notice
 - [x] **E6.4** Production and sale economy — `carry.gd`'s `take_substance()` carries one the same way a robbed part is carried (same wallet, `sale_value()` now prices `kind: "substance"`, same spoil clock). Covered by `tests/substances_test.gd` (16 checks)
 
@@ -1494,12 +1494,12 @@ the game exisit too"*.
 have is the part Greg described: people you can actually reach out to, who
 answer or do not, and whose willingness depends on who you are to them.
 
-- [ ] **Q1.1** Direct messages — reach one account rather than publishing at everyone
-- [ ] **Q1.2** Whether they answer is a roll against reach, standing and what you have on them
-- [ ] **Q1.3** A verified account answers differently, and less often, than a nobody
-- [ ] **Q1.4** Stalking a feed is a way of finding somebody in the world, not flavour
-- [ ] **Q1.5** Harassment works and costs — it moves grudge, reach and exposure together
-- [ ] **Q1.6** The underbelly is reached by standing somewhere, as `signal_field.gd` already gates
+- [x] **Q1.1** Direct messages — reach one account rather than publishing at everyone — audited rather than built: `wire_net.gd`'s `contact()` already does exactly this, was simply never credited here. Proven in `tests/wire_test.gd`
+- [x] **Q1.2** Whether they answer is a roll against reach, standing and what you have on them — `contact()`'s chance formula (reach ratio, broker/leverage routes, grudge), tested: a Crown is categorically unreachable, a peer answers far more readily, a rival who hates you reads everything
+- [x] **Q1.3** A verified account answers differently, and less often, than a nobody — `TIERS`' per-tier `answers` ceiling (CROWN 0.02 vs INTAKE 0.78), tested directly
+- [x] **Q1.4** Stalking a feed is a way of finding somebody in the world, not flavour — the one genuine gap. New `wire_net.gd`'s `locate()` reads the most recent event that actually names the subject and carries a real `location` (most of `bone_yard_hunt.gd`'s events already do) — refuses honestly with no invented tracker when nobody has recorded where they were, and prefers the most recent sighting over a stale one. Wired into `act()`'s `"observe"` result. Covered by `tests/wire_locate_test.gd` (8 checks)
+- [x] **Q1.5** Harassment works and costs — it moves grudge, reach and exposure together — `act()`'s `"swarm"`, tested: grudge, exposure and reach all move on the same real event
+- [x] **Q1.6** The underbelly is reached by standing somewhere, as `signal_field.gd` already gates — `SIGNAL_UNDERBELLY`/band routing, tested: a terminal reaches him, the surface cannot
 
 ## R — Money
 
