@@ -299,14 +299,6 @@ The most complete system in the project and, until this pass, the least visible.
 
 ---
 
-### B v2 — the second pass
-- [ ] **B1.9** `v2` Organs are authored shapes that never deform — a compressed lung should read as compressed
-- [ ] **B4.10** `v2` Rot attracts something. Flies were shipped; nothing eats
-- [ ] **B4.11** `v2` Blood pools persist across a scene change, or they are set dressing
-- [ ] **B6.7** `v2` A fracture is binary. A compound fracture is a different injury and should look it
-- [ ] **B6.8** `v2` Internal bleeding is indistinguishable from external — the X-ray should be the only way to find it
-- [ ] **B2.7** `v2` Pain is a number with no behaviour of its own: it should change how a body stands before it changes what it can do
-
 ## C — The handheld, and killing the six-panel problem
 
 Six fullscreen panels on six keys is the root cause of "nothing connects".
