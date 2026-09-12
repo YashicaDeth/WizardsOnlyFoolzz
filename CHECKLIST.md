@@ -877,7 +877,25 @@ finished. Applies to everything below and to A5, A6, C1.
 ---
 
 ### I v2 — the second pass
-- [ ] **I1.4** `v2` The stencil is now used for body copy it was never drawn for — long paragraphs in a display face are hard to read and the warning card already knew that
+- [x] ~~**I1.4** `v2` The stencil is now used for body copy it was never
+      drawn for — long paragraphs in a display face are hard to read and the
+      warning card already knew that~~ The pin board's theory cards were the
+      clear offender: each theory's claim — two or three full sentences, the
+      one piece of text on the whole board a player actually has to read and
+      reason about to play L5/L6 at all — was set in `CellOutzType` at 8.5px
+      condensed, the same face as the card's own title. Split the same way
+      `warning_card.gd` and `world_index.gd`'s dossier memory already do: the
+      title (a handful of words, a header) stays in the stencil via
+      `CellOutzType.draw_condensed`; the claim now wraps and draws through
+      `draw_string` on a real font (`_wrap_font()`, new, the same word-wrap
+      as `_wrap()` measured against `ThemeDB.fallback_font` instead of the
+      display face). Every other short label on a card — captions, route
+      marginalia, a cutting's texture-not-words scrawl — is untouched; none
+      of those are a paragraph. Verified: the existing `pin_test.gd`,
+      `pin_board_v2_test.gd` and `sideline_cluster_test.gd` regression suites
+      still pass, plus a windowed capture
+      (`captures/i1_4_v2_theory_claims_real_font.png`) showing every claim
+      legible in a real font against the titles still in stencil.
 - [x] **I5.3** `v2` The rail is pointable — click a row to select it, hover to see where a click would land
 - [x] ~~**I5.2** `v2` Links are collected during `_draw` and exist nowhere
       else, so nothing but the paint loop can ask what is on screen~~

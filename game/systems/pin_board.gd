@@ -1280,11 +1280,20 @@ func _draw_theory(body: Rect2, card: Card) -> void:
 	var underline := body.position + Vector2(10 * zoom, 11.0 * zoom + cap * 1.35)
 	draw_line(underline, underline + Vector2(title_width, 0), MARKER * Color(1, 1, 1, 0.85 * open_blend), 2.0)
 	draw_line(underline + Vector2(2, 4), underline + Vector2(title_width - 6, 4), MARKER * Color(1, 1, 1, 0.5 * open_blend), 1.4)
-	var line_y := 42.0 * zoom
+	# I1.4 v2. The claim itself used to be set in the same condensed display
+	# face as the title — a display face at 8.5px doing the job of two or
+	# three full sentences, which is exactly what the warning card already
+	# knew not to do for its own paragraph. The title stays in the stencil
+	# because a header is a handful of words; the claim is the one thing on
+	# this card an actual player has to read and understand, so it is set in
+	# a real font the same way `world_index.gd`'s dossier memory is.
+	var claim_font := ThemeDB.fallback_font
+	var claim_size := 11.0 * zoom
+	var line_y := 44.0 * zoom
 	for paragraph: String in card.body.split("\n"):
-		for line: String in _wrap(paragraph, measure, 8.5 * zoom, 0.8 * zoom):
-			CellOutzType.draw_condensed(self, body.position + Vector2(10 * zoom, line_y), line, 8.5 * zoom, INK * Color(1, 1, 1, 0.85 * open_blend), 0.8 * zoom)
-			line_y += 13.0 * zoom
+		for line: String in _wrap_font(paragraph, measure, claim_size):
+			draw_string(claim_font, body.position + Vector2(10 * zoom, line_y), line, HORIZONTAL_ALIGNMENT_LEFT, measure, claim_size, INK * Color(1, 1, 1, 0.9 * open_blend))
+			line_y += 15.0 * zoom
 	# Somebody was not convinced.
 	CellOutzType.draw_condensed(self, body.end - Vector2(22, 26) * zoom, "?", 20.0 * zoom, MARKER * Color(1, 1, 1, 0.6 * open_blend), 0.0)
 	# L5.1. The route, written under the claim in the hand of somebody adding to
@@ -1462,6 +1471,25 @@ func _wrap(text: String, width: float, cap_height: float, tracking: float) -> Ar
 	for word: String in text.split(" ", false):
 		var candidate: String = word if line.is_empty() else line + " " + word
 		if CellOutzType.width_condensed(candidate, cap_height, tracking) > width and not line.is_empty():
+			lines.append(line)
+			line = word
+		else:
+			line = candidate
+	if not line.is_empty():
+		lines.append(line)
+	return lines
+
+
+## I1.4 v2. The same word-wrap as `_wrap()` above, measured against a real
+## font instead of the display face — for the one piece of text on a card
+## that is prose rather than a label.
+func _wrap_font(text: String, width: float, font_size: float) -> Array:
+	var font := ThemeDB.fallback_font
+	var lines: Array = []
+	var line := ""
+	for word: String in text.split(" ", false):
+		var candidate: String = word if line.is_empty() else line + " " + word
+		if font.get_string_size(candidate, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > width and not line.is_empty():
 			lines.append(line)
 			line = word
 		else:
