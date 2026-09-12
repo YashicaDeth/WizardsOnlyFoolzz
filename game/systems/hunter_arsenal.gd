@@ -166,58 +166,30 @@ func _update_models() -> void:
 		(models[weapon_id] as Node3D).visible = weapon_id == current_id
 
 
+## M4.4 / the first-person pass. This used to build each weapon out of three
+## `BoxMesh` primitives with hand-tuned counter-rotations cancelling the arm
+## pose, and every comment in it was about fighting that inheritance rather than
+## about the weapon. `HeldGear` owns the geometry now — swept sections with a
+## real edge on the blade and a real rake on the grip — so what is left here is
+## the one thing this file is actually the authority on: where in the hand it
+## goes.
+##
+## The counter-rotation stays and stays explained. `hunter_body_motion.gd`
+## pitches `right_arm` forward so the hand reads in frame at all, and a model
+## parented to that arm inherits the pitch a second time unless it is cancelled;
+## read from the constant rather than copied, so retuning the pose does not
+## quietly lay the blade down across the view again.
 func _build_weapon_model(weapon_id: String) -> Node3D:
 	var root := Node3D.new()
-	root.name = "%s_model" % weapon_id
+	root.name = "%s_mount" % weapon_id
 	root.position = Vector3(-0.122, -0.226, -0.859)
-	# M4.4. This rotation used to be a small artistic tilt on top of an
-	# unrotated hand. The hand itself now carries a real first-person pose —
-	# hunter_body_motion.gd's arm_raise pitches right_arm forward so it reads
-	# in frame at all — and every piece here is still authored against the
-	# old, unrotated arm. Left alone that pitch is inherited twice and the
-	# blade lies down across the view instead of standing in it, so this
-	# cancels the pose rotation (kept as a read of the constant rather than a
-	# copied number, since a future retune of arm_raise would silently break a
-	# hand-copied value here) before adding the same small tilt back.
-	root.rotation = Vector3(-HUNTER_BODY_MOTION.FIRST_PERSON_ARM_RAISE - 0.12, 0.0, 0.08 + 0.04)
-	match weapon_id:
-		"sword":
-			_piece(root, "grip", Vector3(0, -0.02, 0), Vector3(0.055, 0.23, 0.055), Color("35261e"), "cloth")
-			_piece(root, "guard", Vector3(0, -0.15, 0), Vector3(0.26, 0.035, 0.055), Color("8b6040"), "metal")
-			_piece(root, "blade", Vector3(0, -0.67, 0), Vector3(0.072, 1.02, 0.028), Color("999c93"), "metal", Vector3(0, 0, 0.035))
-		"shotgun":
-			# M4.4. These carried a shared -0.72 rad tilt authored for the old,
-			# unrotated hand — on top of root's own counter-rotation it compounded
-			# into three boxes pointing in three different directions and reading
-			# as one stacked blob rather than a gun. Chained straight down the
-			# same -Y axis the sword's blade uses, with no rotation of their own,
-			# it reads as one held shape the way the cleaver does.
-			_piece(root, "stock", Vector3(0, -0.06, 0.05), Vector3(0.11, 0.28, 0.12), Color("493429"), "wood")
-			_piece(root, "receiver", Vector3(0, -0.32, -0.02), Vector3(0.12, 0.30, 0.13), Color("4b4f4b"), "metal")
-			_piece(root, "barrel", Vector3(0, -0.66, -0.10), Vector3(0.065, 0.56, 0.065), Color("777c73"), "metal")
-		"sidearm":
-			_piece(root, "grip", Vector3(0, -0.06, 0.03), Vector3(0.09, 0.22, 0.08), Color("332b29"), "cloth")
-			_piece(root, "slide", Vector3(0, -0.30, -0.06), Vector3(0.09, 0.30, 0.075), Color("767a72"), "metal")
+	root.rotation = Vector3(-HUNTER_BODY_MOTION.FIRST_PERSON_ARM_RAISE - 0.12, 0.0, 0.12)
+	var gear := HeldGear.build_weapon(weapon_id)
+	# `HeldGear` builds muzzle-forward down -Z, which is where the camera looks.
+	# The arm mount is authored the other way round, from when the model was
+	# three boxes stacked down -Y, and the rest of the hunt's framing is tuned
+	# against that. Turned here rather than there, so the two conventions meet
+	# in one line instead of being argued about at every call site.
+	gear.rotation.y += PI
+	root.add_child(gear)
 	return root
-
-
-func _piece(parent: Node3D, piece_name: String, at: Vector3, dimensions: Vector3, tint: Color, kind: String, turn := Vector3.ZERO) -> void:
-	var visual := MeshInstance3D.new()
-	visual.name = piece_name
-	var mesh := BoxMesh.new()
-	mesh.size = dimensions
-	var material: StandardMaterial3D = WorldLook.surface(tint, kind, piece_name.hash())
-	# M4.4. The Ashbloom exterior crushes anything at hip height toward black —
-	# it is the same reason the ground itself reads near-black in every capture,
-	# not a broken material. A held weapon still has to read in that light, the
-	# way the anatomy rig's own rim treatment lets a body read against it, so it
-	# carries a faint self-lit edge rather than depending on the world's own key
-	# light to find it.
-	material.emission_enabled = true
-	material.emission = tint
-	material.emission_energy_multiplier = 0.4
-	mesh.material = material
-	visual.mesh = mesh
-	visual.position = at
-	visual.rotation = turn
-	parent.add_child(visual)
