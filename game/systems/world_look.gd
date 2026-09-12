@@ -177,9 +177,45 @@ static func apply_hour(env: Environment, daylight: float, preset_name: String = 
 	# roughly 0.15 whatever the sky's own energy was, and nothing behind the
 	# break could be seen through it. Fog is lit by the sun; with the sun gone
 	# there is nothing in the air to light.
+	_apply_hour_to_materials(lit)
 	env.fog_sky_affect = lerpf(0.12, 0.6, lit)
 	env.fog_density = float(preset.fog_density) * lerpf(1.45, 1.0, lit)
 	env.volumetric_fog_density = float(preset.volumetric) * lerpf(1.6, 1.0, lit)
+
+
+## A10.3. Every material the look system has made, weakly held, so the hour can
+## change all of them and a freed one can still be collected. Weak on purpose: a
+## strong reference here would keep every wrecker's flesh alive for the life of
+## the process.
+static var _hour_materials: Array = []
+## The last daylight the materials were set to, quantised. `apply_hour()` runs
+## every physics frame and walking several hundred materials at 60Hz to write
+## values that have not moved is the kind of cost A10.14 is about.
+static var _material_hour := -1.0
+
+
+## A10.3. What the hour does to a surface. The contamination is the living part
+## of every material in this game — A5.2 made it the only part that emits — and
+## living things that glow do it at night. In daylight the bloom is washed out
+## by the sun the way real bioluminescence is; after dark it is the only thing
+## on a wall giving anything back, which is what makes a lamp worth carrying
+## past a wall rather than only into a room.
+##
+## Quantised to fiftieths, so the walk happens a handful of times across a
+## sunset rather than sixty times a second.
+static func _apply_hour_to_materials(lit: float) -> void:
+	var step := snappedf(clampf(lit, 0.0, 1.0), 0.02)
+	if is_equal_approx(step, _material_hour):
+		return
+	_material_hour = step
+	var living: Array = []
+	for reference in _hour_materials:
+		var material: StandardMaterial3D = (reference as WeakRef).get_ref()
+		if material == null:
+			continue
+		living.append(reference)
+		material.emission_energy_multiplier = float(material.get_meta("day_glow", 0.3)) * lerpf(2.4, 0.45, step)
+	_hour_materials = living
 
 
 static func surface(color: Color, kind: String = "paint", variation_seed: int = 0) -> StandardMaterial3D:
@@ -371,6 +407,19 @@ static func _apply_grain(material: StandardMaterial3D, scale: float, strength: f
 	# and read as fog. Multiplied, the map alone decides what emits.
 	material.emission_operator = BaseMaterial3D.EMISSION_OP_MULTIPLY
 	material.emission_energy_multiplier = float(maps["glow"])
+	# A10.3. Registered so the hour can reach it. The sky, the fog and the
+	# lamps all moved with the clock from v3 onward and the surfaces underneath
+	# them did not — they were lit differently at midnight and were otherwise
+	# the same material they had been at noon.
+	material.set_meta("day_glow", float(maps["glow"]))
+	_hour_materials.append(weakref(material))
+	# Born at the current hour rather than at noon. `_apply_hour_to_materials()`
+	# only walks the registry when the hour has actually moved, so without this
+	# a wrecker spawned at one in the morning burns at its daylight value until
+	# something else changes the clock — measured, not guessed: a material made
+	# mid-run read 0.280 where every other surface in the scene read 0.672.
+	if _material_hour >= 0.0:
+		material.emission_energy_multiplier = float(maps["glow"]) * lerpf(2.4, 0.45, _material_hour)
 	# G1.3. Greg's own artwork, as a detail layer over the procedural
 	# contamination rather than instead of it. Flesh only: the body is where a
 	# hand-made surface reads, and putting the same sheets on every wall would

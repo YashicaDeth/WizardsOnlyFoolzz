@@ -286,5 +286,16 @@ func _ready() -> void:
 				billed += 1
 		print("BILLS %d of %d buildings" % [billed, hunt.generated_world.generated_buildings.size()])
 
+	# A10.3. The same wall at noon and at one in the morning, with the emission
+	# the surface itself carries read straight off a material rather than
+	# inferred from a picture.
+	var sample: StandardMaterial3D = WorldLook.surface(Color("3d1c11"), "rust", 5)
+	for hour: float in [12.0, 1.0]:
+		WorldClock.set_hour(hour)
+		hunt._update_day_night()
+		for _tick in 4:
+			await get_tree().physics_frame
+		print("MATERIAL_HOUR %02d glow=%.3f" % [int(hour), sample.emission_energy_multiplier])
+
 	print("CAPTURE_DONE")
 	get_tree().quit()
