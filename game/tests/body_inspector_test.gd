@@ -48,6 +48,10 @@ func _ready() -> void:
 			},
 		},
 	})
+	check(inspector.xray_findings().is_empty(), "a ruptured organ remains absent from the ordinary body view")
+	inspector.xray = true
+	check(inspector.xray_findings().has("INTERNAL BLEED · HEART"), "X-ray inspection names the hidden bleed and its ruptured organ")
+	inspector.xray = false
 	inspector._part_rects = [Rect2(0, 0, 100, 30), Rect2(0, 32, 100, 30), Rect2(0, 64, 100, 30)]
 	inspector.part_index = 0
 	check(inspector.handle_pointer_motion(Vector2(10, 42), Vector2.ZERO) and inspector.hovered_part_index == 1, "hover previews a row without changing the pinned index")

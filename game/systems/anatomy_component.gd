@@ -40,6 +40,9 @@ var subject_id := ""
 var blood_capacity := 5000.0
 var blood_remaining := 5000.0
 var bleed_rate := 0.0
+## B6.8v2. This is deliberately separate from an open wound. The body loses
+## blood either way, but only an X-ray/anatomy inspection may name this source.
+var internal_bleed_rate := 0.0
 var pain := 0.0
 var consciousness := 100.0
 var dead := false
@@ -135,7 +138,7 @@ func damage_organ(organ_id: String, amount: float) -> Dictionary:
 	organ["health"] = maxf(0.0, float(organ.health) - amount)
 	if float(organ.health) <= 0.0:
 		organ["ruptured"] = true
-		bleed_rate += float(organ.bleed) * 14.0
+		internal_bleed_rate += float(organ.bleed) * 14.0
 		pain = clampf(pain + 26.0, 0.0, 100.0)
 		organs[organ_id] = organ
 		organ_ruptured.emit(organ_id, organ)
@@ -224,6 +227,18 @@ func treat_wound(zone_id: String, quality: float) -> void:
 	bleeding_changed.emit(bleed_rate, blood_remaining)
 
 
+func has_internal_bleeding() -> bool:
+	return internal_bleed_rate > 0.01
+
+
+func xray_findings() -> Array[String]:
+	var findings: Array[String] = []
+	for organ_id in organs:
+		if bool((organs[organ_id] as Dictionary).get("ruptured", false)):
+			findings.append("INTERNAL BLEED: " + str(organ_id).replace("_", " ").to_upper())
+	return findings
+
+
 func mobility_ratio() -> float:
 	var left: Dictionary = zones.get("left_leg", DEFAULT_ZONES.left_leg)
 	var right: Dictionary = zones.get("right_leg", DEFAULT_ZONES.right_leg)
@@ -246,6 +261,7 @@ func snapshot() -> Dictionary:
 		"blood": roundi(blood_remaining),
 		"blood_capacity": roundi(blood_capacity),
 		"bleed_rate": snappedf(bleed_rate, 0.01),
+		"internal_bleed_rate": snappedf(internal_bleed_rate, 0.01),
 		"pain": roundi(pain),
 		"consciousness": roundi(consciousness),
 		"critical": critical,
@@ -262,6 +278,7 @@ func restore(state: Dictionary) -> void:
 	blood_capacity = maxf(100.0, float(state.get("blood_capacity", blood_capacity)))
 	blood_remaining = clampf(float(state.get("blood", blood_capacity)), 0.0, blood_capacity)
 	bleed_rate = maxf(0.0, float(state.get("bleed_rate", 0.0)))
+	internal_bleed_rate = maxf(0.0, float(state.get("internal_bleed_rate", 0.0)))
 	pain = clampf(float(state.get("pain", 0.0)), 0.0, 100.0)
 	consciousness = clampf(float(state.get("consciousness", 100.0)), 0.0, 100.0)
 	critical = bool(state.get("critical", false))
@@ -286,11 +303,13 @@ func restore(state: Dictionary) -> void:
 
 
 func _process(delta: float) -> void:
-	if dead or bleed_rate <= 0.001:
+	var total_bleed := bleed_rate + internal_bleed_rate
+	if dead or total_bleed <= 0.001:
 		return
-	blood_remaining = maxf(0.0, blood_remaining - bleed_rate * delta)
+	blood_remaining = maxf(0.0, blood_remaining - total_bleed * delta)
 	consciousness = clampf((blood_remaining / blood_capacity) * 120.0 - pain * 0.22 - _organ_consciousness_drain(), 0.0, 100.0)
 	bleed_rate = maxf(0.0, bleed_rate - delta * 0.012)
+	internal_bleed_rate = maxf(0.0, internal_bleed_rate - delta * 0.006)
 	bleeding_changed.emit(bleed_rate, blood_remaining)
 	if blood_remaining <= blood_capacity * 0.32:
 		_enter_critical()

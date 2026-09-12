@@ -211,7 +211,7 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B6.5** Reciprocity — the player is dismembered and keeps playing~~
 - [x] ~~**B6.6** Stump behaviour: bleed rate, one-armed movement and attacks~~
 - [x] ~~**B6.7v2** A fracture is binary. A compound fracture is a different injury and should look it~~
-- [ ] **B6.8v2** Internal bleeding is indistinguishable from external — the X-ray should be the only way to find it
+- [x] ~~**B6.8v2** Internal bleeding is indistinguishable from external — the X-ray should be the only way to find it~~
 
 ---
 

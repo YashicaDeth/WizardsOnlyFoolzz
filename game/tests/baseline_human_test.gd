@@ -217,13 +217,15 @@ func _test_organs() -> void:
 	gutted.hit("torso", 90.0, 20.0, "cut", "gut")
 	check(not gutted.anatomy.organ_ok("gut"), "a blade through the gut ruptures the gut")
 	check(gutted.anatomy.organ_ok("heart"), "...and leaves the heart alone")
+	check(gutted.anatomy.has_internal_bleeding(), "a ruptured gut carries a hidden internal bleed in addition to any surface wound")
+	check(gutted.anatomy.xray_findings().has("INTERNAL BLEED: GUT"), "only an X-ray finding names the hidden bleed")
 	check(not gutted.anatomy.dead, "a gut wound is not instantly fatal")
 	var gut_bleed: float = gutted.anatomy.bleed_rate
 	gutted.queue_free()
 
 	var shot := _rig()
 	shot.hit("torso", 90.0, 20.0, "cut", "heart")
-	check(shot.anatomy.bleed_rate > gut_bleed, "a heart shot bleeds harder than a gut wound (%.1f vs %.1f)" % [shot.anatomy.bleed_rate, gut_bleed])
+	check(shot.anatomy.internal_bleed_rate > gutted.anatomy.internal_bleed_rate, "a heart shot bleeds harder inside than a gut wound (%.1f vs %.1f)" % [shot.anatomy.internal_bleed_rate, gutted.anatomy.internal_bleed_rate])
 	check(not shot.organ_parts["heart"].visible, "a ruptured organ leaves the body")
 	shot.queue_free()
 

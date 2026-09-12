@@ -127,6 +127,21 @@ func _anatomy() -> Dictionary:
 	return subject.get("anatomy_state", subject.get("anatomy", {}))
 
 
+## B6.8v2. A rupture does not advertise itself through the ordinary specimen
+## view. The same saved anatomy state gains a diagnostic sentence only while
+## the dossier is deliberately in X-ray mode.
+func xray_findings() -> Array[String]:
+	var findings: Array[String] = []
+	if not xray:
+		return findings
+	var organs: Dictionary = _anatomy().get("organs", {})
+	for organ_id in organs:
+		var organ: Dictionary = organs[organ_id]
+		if bool(organ.get("ruptured", false)):
+			findings.append("INTERNAL BLEED · " + str(organ_id).replace("_", " ").to_upper())
+	return findings
+
+
 func _implants_in(zone_id: String) -> Array:
 	var out: Array = []
 	for implant in ImplantCatalog.list(_anatomy().get("cybernetics", [])):
@@ -329,6 +344,18 @@ func draw_into(canvas: CanvasItem, rect: Rect2) -> void:
 	_draw_diagram(canvas, diagram)
 	_draw_list(canvas, list)
 	_draw_stage(canvas, stage)
+	_draw_xray_findings(canvas, Rect2(stage.position + Vector2(0, stage.size.y - 24), Vector2(stage.size.x, 24)))
+
+
+func _draw_xray_findings(canvas: CanvasItem, rect: Rect2) -> void:
+	var findings := xray_findings()
+	if findings.is_empty():
+		return
+	var font := ThemeDB.fallback_font
+	var line_y := rect.position.y
+	for finding in findings:
+		canvas.draw_string(font, Vector2(rect.position.x, line_y), finding, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 10, HOT)
+		line_y -= 12.0
 
 
 func _draw_diagram(canvas: CanvasItem, rect: Rect2) -> void:
