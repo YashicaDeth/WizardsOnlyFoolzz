@@ -862,17 +862,31 @@ and start being an object — and leaving your body should cost something.
 - [x] **M1.3** Both conditions read out of WorldHistory, neither stored
 - [x] **M1.4** Pressing the key early answers in the game's voice, never silently
 - [x] ~~**M1.5** The unlock itself is an event the player feels, not a quiet permission change~~ (found while building this: the unlock counter read a `"subject"` key no `npc_resolution` event has ever written — every writer uses `"subject_id"` — so M1.2's boss condition could never actually count a kill. Fixed alongside the felt event, since a stop+kick+line landing on a check that could never pass would have been silent forever.)
-- [~] **M1.6** A first-person HUD that is diegetic — nothing floating in the corner.
-      The vessel/breath vitals were their own plate in the top-left corner —
-      styled well, but structurally a second app widget with no relationship
-      to anything else in view, which is the literal complaint. Moved to hang
-      off the weapon well instead, with a sagging strap running from the vitals
-      crown into the torn mouth, so it now reads as a gauge built into the
-      gear in your hand rather than a corner readout — captured in
-      `game/captures/m1_6_field_hud_vitals.png`. The location crest (top
-      centre) and hunt thread (top right) still float independent of anything
-      in frame; both are world/rival broadcast rather than the player's own
-      body, so lower priority, but they are the honest remainder here.
+- [x] ~~**M1.6** A first-person HUD that is diegetic — nothing floating in the
+      corner~~ The vessel/breath vitals were their own plate in the top-left
+      corner — styled well, but structurally a second app widget with no
+      relationship to anything else in view. Moved to hang off the weapon
+      well instead, with a sagging strap running from the vitals crown into
+      the torn mouth, so it reads as a gauge built into the gear in your hand
+      rather than a corner readout.
+
+      The location crest and hunt thread were the other two floating
+      fixtures — permanent regardless of whether there was anything current
+      to say, which I0.6 had already named and fixed on the derby's own
+      version of the hunt readout ("a rival arrives when they change, not
+      permanently") without the on-foot HUD ever getting the same treatment.
+      The hunt thread now draws nothing while the status is dormant, same
+      rule, same file finally. The location crest now announces an arrival
+      and clears itself over a few seconds rather than sitting there for the
+      rest of the session — honestly scoped: nothing currently feeds it a
+      real mid-session location change, so today this is a one-time arrival
+      card rather than a live travel readout, and building the latter is its
+      own future segment once something tracks which named place the player
+      is actually standing in. Verified: `tests/hud_transience_test.gd` (7
+      checks — starts with nothing to announce, a first location announces
+      and clears itself on its own, repeating the same location does not
+      re-trigger it, a genuinely new one does, and rival status reads and
+      normalises correctly), captured in `game/captures/m1_6_field_hud_vitals.png`.
 
 ### M2 — In the car
 **Deferred this session.** There is currently no first/third-person split in

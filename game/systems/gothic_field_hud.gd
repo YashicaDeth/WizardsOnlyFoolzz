@@ -15,6 +15,15 @@ var menu_open := false
 var menu_mode := ""
 var weapon := {}
 var elapsed := 0.0
+## M1.6. The location crest was a permanent banner for information that only
+## actually matters the moment it changes — I0.6 already killed the same
+## fixture on the derby HUD for the identical reason ("a rival arrives when
+## they change, not permanently"). This is the on-foot half of that same
+## rule: the crest announces an arrival and then gets out of the way rather
+## than sitting in the top corner for the rest of the session.
+const LOCATION_ANNOUNCE_TIME := 4.0
+var _location_seen := ""
+var location_announce := 0.0
 
 
 func _ready() -> void:
@@ -28,6 +37,10 @@ func set_state(values: Dictionary) -> void:
 	health = float(values.get("health", health))
 	stamina = float(values.get("stamina", stamina))
 	rival_status = str(values.get("rival_status", rival_status)).to_upper()
+	location = str(values.get("location", location))
+	if location != _location_seen:
+		_location_seen = location
+		location_announce = LOCATION_ANNOUNCE_TIME
 	menu_open = bool(values.get("menu_open", menu_open))
 	menu_mode = str(values.get("menu_mode", menu_mode)).to_upper()
 	weapon = values.get("weapon", weapon)
@@ -36,6 +49,7 @@ func set_state(values: Dictionary) -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	location_announce = maxf(0.0, location_announce - delta)
 	queue_redraw()
 
 
@@ -102,15 +116,30 @@ func _draw_filament(start: Vector2, width: float, ratio: float, color: Color) ->
 	draw_circle(start + Vector2(width * ratio, sin(ratio * PI * 6 + elapsed * 1.5) * 2), 3, color)
 
 
+## M1.6. Announces an arrival and then clears rather than sitting in the top
+## corner permanently — the same reasoning I0.6 already applied to the derby's
+## HUNT SIGNAL plate. Fades out over the last second of `location_announce`
+## instead of cutting, per Rule 3.
 func _draw_location_crest() -> void:
+	if location_announce <= 0.0:
+		return
+	var alpha := clampf(location_announce, 0.0, 1.0)
 	var font := ThemeDB.fallback_font
 	var center := Vector2(size.x * 0.5, 42)
-	draw_string(font, center + Vector2(-230, 0), "—  %s  —" % location, HORIZONTAL_ALIGNMENT_CENTER, 460, 16, BONE)
+	draw_string(font, center + Vector2(-230, 0), "—  %s  —" % location, HORIZONTAL_ALIGNMENT_CENTER, 460, 16, BONE * Color(1, 1, 1, alpha))
 	var pulse := 35 + sin(elapsed * 1.2) * 8
-	draw_line(center + Vector2(-pulse, 15), center + Vector2(pulse, 15), COPPER * Color(1, 1, 1, 0.5), 1)
+	draw_line(center + Vector2(-pulse, 15), center + Vector2(pulse, 15), COPPER * Color(1, 1, 1, 0.5 * alpha), 1)
 
 
+## M1.6. Was a permanent top-right fixture regardless of whether there was
+## anything to report — the same complaint I0.6 already answered for the
+## derby's own version of this exact readout ("a rival arrives when they
+## change, not permanently"). This is the on-foot half of that same rule:
+## nothing is drawn while the hunt is dormant, so the plate only exists while
+## it is actually true.
 func _draw_hunt_thread() -> void:
+	if rival_status == "DORMANT" or rival_status.is_empty():
+		return
 	var font := ThemeDB.fallback_font
 	var anchor := Vector2(size.x - 260, 48)
 	var eye := anchor + Vector2(205, 12)
