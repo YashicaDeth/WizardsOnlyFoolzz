@@ -364,9 +364,9 @@ mechanisms and almost none are built.
 - [x] ~~**F3.3** Rank weighs influence and debt, not combat skill~~
 
 ### F4 — Rivals generated from real events
-- [ ] **F4.1** Rivals born out of what happened, not authored
+- [x] ~~**F4.1** Rivals born out of what happened, not authored~~
 - [ ] **F4.2** Tactic adaptation — adopt LimboAI, currently unused
-- [ ] **F4.3** The wound as the memory
+- [x] ~~**F4.3** The wound as the memory~~
 
 ### F5 — Player defeat routed to shackled
 - [ ] **F5.1** Losing is not a reload
@@ -608,8 +608,8 @@ Unglamorous, and each one is currently costing real time.
 - [ ] **J3.3** Dialogue Manager when NPCs first speak
 
 ### J4 — Real loading behind the interstitial
-- [ ] **J4.1** Stream behind the plate instead of a fixed 1.45s hold
-- [ ] **J4.2** Progress bar that is telling the truth
+- [x] ~~**J4.1** Stream behind the plate instead of a fixed 1.45s hold~~
+- [x] ~~**J4.2** Progress bar that is telling the truth~~
 
 ---
 

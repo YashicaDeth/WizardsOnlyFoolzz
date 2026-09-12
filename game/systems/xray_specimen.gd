@@ -67,7 +67,9 @@ func _assemble(specimen_seed: int) -> void:
 	_radiograph(rig)
 
 	_camera = Camera3D.new()
-	_camera.position = Vector3(0, 0.88, 3.15)
+	# Lift the lens so the projected body sits lower on the square film; the
+	# 16:9 plate otherwise trims the crown while leaving empty room at the feet.
+	_camera.position = Vector3(0, 1.08, 3.15)
 	_camera.rotation_degrees = Vector3(-4.0, 0, 0)
 	_camera.fov = 42.0
 	add_child(_camera)

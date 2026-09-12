@@ -19,6 +19,7 @@ const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
+const RIVAL_REGISTRY := preload("res://systems/rival_registry.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
@@ -1059,7 +1060,7 @@ func _begin_canonical_encounter() -> void:
 	enemy.visible = true
 	enemy.global_position = Vector3(0, 1.2, -16)
 	var mara := WorldHistory.subject(HUNT_ID)
-	mara_encounter_number = 2 if not str(mara.get("next_adaptation", "")).is_empty() else 1
+	mara_encounter_number = 2 if bool(mara.get("is_rival", false)) and not (mara.get("rival_adaptation", {}) as Dictionary).is_empty() else 1
 	enemy_health = 150 if mara_encounter_number == 2 else 100
 	WorldHistory.update_subject(HUNT_ID, {"status": "hunting", "encounter_number": mara_encounter_number, "memory": "Mara returned rebuilt to settle the Bone Yard debt." if mara_encounter_number == 2 else "Mara came to settle the Bone Yard debt."}, "hunt_arc_started")
 	WorldHistory.record_event("canonical_hunt_encounter_started", {"hunter": "player", "target": HUNT_ID, "location": HUNT_LOCATION, "encounter_number": mara_encounter_number})
@@ -1137,6 +1138,7 @@ func _update_encounter_actors(delta: float) -> void:
 			if distance > 72.0:
 				misfire_director.resolve(str(actor.get("encounter_id", "")), "escaped")
 				WorldHistory.update_subject(str(actor.subject_id), {"status": "escaped", "memory": "Escaped the Hunter while bleeding.", "anatomy_state": anatomy.call("snapshot")}, "npc_escaped_bleeding")
+				RIVAL_REGISTRY.consider(str(actor.subject_id))
 				node.queue_free()
 				encounter_actors.remove_at(index)
 		elif str(actor.get("disposition", "hostile")) == "hostile" and distance < 24.0 and distance > 3.0:
@@ -1378,6 +1380,8 @@ func _resolve_downed(outcome: String) -> void:
 			relations["player"] = {"kind": "bond", "strength": maxi(20, int(subject.get("bond", 0))), "consensual": true}
 		WorldHistory.update_subject(id, {"status": actor.state, "disposition": actor.disposition, "relations": relations, "grudge": int(subject.get("grudge", 0)) + (5 if outcome == "spare" else 0), "memory": "The Hunter offered shelter; I agreed to join." if outcome == "recruit" else "The Hunter spared me. I remember the wounds.", "anatomy_state": actor.rig.snapshot()}, "npc_recruited" if outcome == "recruit" else "npc_spared")
 		WorldHistory.record_event("npc_resolution", {"subject_id": id, "outcome": outcome, "actor": "player", "witnesses": [id]})
+		if outcome == "spare":
+			RIVAL_REGISTRY.consider(id)
 		misfire_director.resolve(str(actor.get("encounter_id", "")), actor.state)
 		var label := actor.node.get_node_or_null("Identity") as Label3D
 		if label != null:
@@ -1417,11 +1421,9 @@ func _rival_retreats(message: String) -> void:
 		return
 	enemy_retreating = true
 	enemy.visible = false
-	var lasting_wounds: Array = WorldHistory.subject(HUNT_ID).get("wounds", []).duplicate()
-	if not lasting_wounds.has("fractured left arm"):
-		lasting_wounds.append("fractured left arm")
-	WorldHistory.update_subject(HUNT_ID, {"status": "escaped", "injury": "fractured left arm", "wounds": lasting_wounds, "next_adaptation": "industrial left-arm replacement", "memory": "You wounded Mara at the tunnel. She is seeking a replacement.", "elo": int(WorldHistory.subject(HUNT_ID).get("elo", 1180)) + 30}, "rival_survived_hunt")
+	WorldHistory.update_subject(HUNT_ID, {"status": "escaped"}, "rival_survived_hunt")
 	WorldHistory.record_event("hunt_arc_first_beat_complete", {"target": HUNT_ID, "outcome": "escaped", "location": HUNT_LOCATION})
+	RIVAL_REGISTRY.consider(HUNT_ID)
 	prompt.text = message
 
 
@@ -2211,14 +2213,14 @@ func _spawn_rival() -> void:
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	enemy.add_child(label)
 	var mara := WorldHistory.subject(HUNT_ID)
-	if not str(mara.get("next_adaptation", "")).is_empty():
+	var adaptation: Dictionary = mara.get("rival_adaptation", {})
+	if bool(mara.get("is_rival", false)) and not adaptation.is_empty():
 		label.text = "MARA VOSS // REBUILT ASHLINE CAPTAIN"
 		# The industrial arm is now an actual prosthetic in the anatomy record,
 		# so it restores function, changes her combat ratio and shows on the rig
 		# rather than being a cylinder parented next to her.
-		enemy_rig.install_prosthetic("left_arm", {
-			"name": "Ashline industrial arm", "armor": 0.34, "restores": 0.82, "tint": Color("c15d2d"),
-		})
+		if str(adaptation.get("kind", "")) == "prosthetic":
+			enemy_rig.install_prosthetic(str(adaptation.get("zone", "left_arm")), {"name": str(adaptation.get("item", "Ashline industrial limb")), "armor": 0.34, "restores": 0.82, "tint": Color("c15d2d")})
 		var altered_vehicle := SCRAP_SKIFF.instantiate()
 		altered_vehicle.name = "MarasRebuiltWrecker"
 		altered_vehicle.position = Vector3(4.0, -0.45, 1.8)

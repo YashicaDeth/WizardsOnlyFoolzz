@@ -39,6 +39,15 @@
   LISTENING reads "THREE AND NO ANSWER" after three executions and "SEVEN. HE
   WATCHED ALL OF THEM" after seven. The board never announces the change. The
   card simply says something else the next time it is opened.
+- **F4.1/F4.3: a rival is something that happened to a person.** The new
+  `RivalRegistry` searches the real event record for an existing person who was
+  harmed by the player and survived; escape or an authored boss label alone is
+  not enough. Their first harmful encounter remains their origin, emergence is
+  written back into WorldHistory exactly once, and nobody new is generated.
+  Their response comes from the persisted body: a severed limb asks for the
+  matching prosthetic, a ruptured organ for support around that organ, and the
+  worst surviving zone for armour. Mara's hardcoded `next_adaptation` string is
+  gone, and spared or bleeding escapees now enter the same general path.
 
 - **The loading screen is a real X-ray now.** Greg asked for *"3d visceral gore
   matrix loading screens and 3d organs bones xrays"*. The plate already had a
