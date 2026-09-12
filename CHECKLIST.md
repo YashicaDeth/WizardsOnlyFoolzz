@@ -309,10 +309,28 @@ Ascent/Descent axis that already exists and is currently unused.
 - [x] **E1.3** Never a good/evil slider — read through the Tree view. Audited rather than built: `character_archive.gd`'s `_draw_tree_alignment()` (~line 514) draws `tree_alignment()` only as a marker position between ASCENT/LIMBO/DESCENT labels — no code path in the dossier prints the number itself
 
 ### E2 — The ritual app
-- [ ] **E2.1** Seal-drawing vocabulary in the `celloutz_type` stroke register (Agent A's file — not touched here)
+- [x] ~~**E2.1** Seal-drawing vocabulary in the `celloutz_type` stroke register~~
+      `goetic_seals.gd` stayed data-only by design — per the originality
+      non-negotiable, the 72-name roster is free public-domain material but
+      the historical sigils themselves are not, so this does not reproduce
+      Mathers' seals. `seal_strokes(seed)` grows an original one instead: a
+      containment ring, seeded spokes each ending in a hook or a loop, and
+      chords between ring points the way a pentagram's own construction lines
+      cross it — deterministic from one integer, same seed always the same
+      mark. `draw_seal` places it; a seal for every Goetic number and every
+      original id actually draws something. Verified by `tests/seal_draw_test.gd`
+      (6 checks on the geometry itself) and a gallery capture at
+      `game/captures/e2_1_seal_gallery.png`.
 - [x] **E2.2** The 72 Goetic seals as data — `systems/goetic_seals.gd`'s `GOETIA` const, name/rank/number verified against a primary source rather than transcribed from memory (data only, per non-negotiable 1 — no drawing lives here)
 - [x] **E2.3** Original seals for what this world grew on its own — `ORIGINAL`, six seals each tied to a real faction or `AscentEntities` entry already built (Choir of Marrow ×2, Soft Rot, CellOutz, and the two Ascent entities) rather than floating free of anything. Covered by `tests/goetic_seals_test.gd` (23 checks)
-- [ ] **E2.4** Seals animate, corrupt and burn (rendering; Agent A's `celloutz_type` register once E2.1 exists)
+- [x] ~~**E2.4** Seals animate, corrupt and burn~~ Three more `celloutz_type.gd`
+      draws sharing the same generated strokes: `draw_seal_forming` reveals
+      them in construction order (ring, then each spoke, then its chords) for
+      a rite being drawn rather than a bar filling; `draw_seal_corrupted`
+      reuses `draw_worn`'s segment-and-gap damage on the seal's own strokes;
+      `draw_seal_burning` consumes strokes from a seeded front angle outward,
+      the strokes still catching drawn ember-bright before they are gone
+      rather than merely dimmed. All three in the gallery capture above.
 
 ### E3 — Camera rituals
 - [x] **E3.1** Ritual definitions: what must be done, what must be photographed — `systems/ritual_app.gd`'s `RITUALS`: three rites (including Greg's own worked example, five gored heads), each keyed to a real seal from `goetic_seals.gd` and paying its reward through `boons.gd` — E2/E3/E4 as the one system `RITUAL_AND_KARMA.md` says they are, not three

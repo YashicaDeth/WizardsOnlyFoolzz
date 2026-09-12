@@ -179,3 +179,191 @@ static func draw_worn(canvas: CanvasItem, at: Vector2, text: String, cap_height:
 static func draw_stamped(canvas: CanvasItem, at: Vector2, text: String, cap_height: float, color: Color, ghost: Color, tracking := 0.0) -> float:
 	draw_text(canvas, at + Vector2(cap_height * 0.06, cap_height * 0.05), text, cap_height, ghost, tracking)
 	return draw_text(canvas, at, text, cap_height, color, tracking)
+
+
+## E2.1. The seal-drawing vocabulary. `goetic_seals.gd` is data only by design
+## ("Data only. No stroke geometry, no drawing" — its own comment) because per
+## this project's non-negotiable on originality, the seal *roster* (72 names,
+## ranks and numbers out of Mathers' 1904 edition) is free public-domain
+## material, but the drawn glyphs are not: this project does not reproduce the
+## historical sigils, it grows its own in the same register the display face
+## already established — deterministic stroke paths, nothing raster, nothing
+## licensed.
+##
+## A seal is generated from one integer rather than authored 72 times over: a
+## containment ring (every grimoire seal sits inside or against one), a set of
+## spokes from the centre toward the ring at seeded angles and lengths, each
+## ending in either a hook or a small loop, and occasional chords connecting
+## two points on the ring the way a pentagram's construction lines do. Same
+## seed, same seal, always — a rite has to point at one mark and mean it.
+##
+## Coordinates are normalised to a unit circle at the origin; `draw_seal` and
+## its variants below scale and place it.
+const SEAL_RING_STEPS := 28
+
+
+static func seal_strokes(seed_value: int, complexity: int = 6) -> Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(seed_value) & 0x7fffffff
+	var strokes: Array = []
+
+	var ring := PackedVector2Array()
+	for step in SEAL_RING_STEPS + 1:
+		var angle := TAU * float(step) / float(SEAL_RING_STEPS)
+		ring.append(Vector2.from_angle(angle))
+	strokes.append(ring)
+
+	var spoke_count := maxi(3, complexity)
+	var anchors: Array[Vector2] = []
+	for spoke in spoke_count:
+		var angle: float = TAU * float(spoke) / float(spoke_count) + rng.randf_range(-0.22, 0.22)
+		var outer_radius := rng.randf_range(0.78, 1.0)
+		var inner_radius := rng.randf_range(0.0, 0.32)
+		var direction := Vector2.from_angle(angle)
+		var inner_point := direction * inner_radius
+		var outer_point := direction * outer_radius
+		anchors.append(direction * 0.95)
+		# A kink partway along reads as drawn rather than ruled with a straightedge.
+		var kink := inner_point.lerp(outer_point, rng.randf_range(0.35, 0.65)) + direction.orthogonal() * rng.randf_range(-0.09, 0.09)
+		strokes.append(PackedVector2Array([inner_point, kink, outer_point]))
+		if rng.randf() < 0.5:
+			# A hook: the spoke turns before it reaches the ring.
+			var hook_dir := direction.rotated(rng.randf_range(0.5, 1.1) * (1.0 if rng.randf() < 0.5 else -1.0))
+			strokes.append(PackedVector2Array([outer_point, outer_point + hook_dir * 0.16]))
+		else:
+			# A loop: a small closed ring at the spoke's end.
+			var loop := PackedVector2Array()
+			for step in 9:
+				loop.append(outer_point + Vector2.from_angle(TAU * float(step) / 8.0) * 0.07)
+			strokes.append(loop)
+
+	# Chords between non-adjacent anchors, the way a star's construction lines
+	# cross the circle they are inscribed in. Seeded count, never every pair —
+	# a seal that connects everything to everything reads as a diagram, not a
+	# glyph somebody actually draws.
+	var chord_count := mini(anchors.size(), 2 + int(rng.randf() * 3.0))
+	for _chord in chord_count:
+		if anchors.size() < 3:
+			break
+		var from_index := rng.randi() % anchors.size()
+		var span := 2 + rng.randi() % maxi(1, anchors.size() - 3)
+		var to_index := (from_index + span) % anchors.size()
+		strokes.append(PackedVector2Array([anchors[from_index], anchors[to_index]]))
+
+	# A small anchoring mark at the centre so the eye has a point of origin,
+	# rather than every spoke meeting at a bare gap.
+	if rng.randf() < 0.7:
+		var core := PackedVector2Array()
+		for step in 4:
+			core.append(Vector2.from_angle(TAU * float(step) / 3.0 + rng.randf_range(0.0, TAU)) * 0.1)
+		core.append(core[0])
+		strokes.append(core)
+
+	return strokes
+
+
+## Draws a seal generated from `seed_value` at `center`, scaled to `radius`.
+static func draw_seal(canvas: CanvasItem, center: Vector2, radius: float, seed_value: int, color: Color, complexity: int = 6, weight: float = 0.0) -> void:
+	var thickness := weight if weight > 0.0 else maxf(1.0, radius * 0.035)
+	for stroke: PackedVector2Array in seal_strokes(seed_value, complexity):
+		var points := PackedVector2Array()
+		for point in stroke:
+			points.append(center + point * radius)
+		if points.size() == 2:
+			canvas.draw_line(points[0], points[1], color, thickness)
+		else:
+			canvas.draw_polyline(points, color, thickness)
+
+
+## E2.4. A seal being drawn rather than sitting finished — `progress` 0 is a
+## bare circle, 1 is the whole mark. Strokes commit in the same order
+## `seal_strokes` builds them (ring, then each spoke and its hook or loop,
+## then the chords, then the core), and a stroke either exists or does not:
+## a rite is a thing you complete, not a bar that fills.
+static func draw_seal_forming(canvas: CanvasItem, center: Vector2, radius: float, seed_value: int, color: Color, progress: float, complexity: int = 6, weight: float = 0.0) -> void:
+	var strokes := seal_strokes(seed_value, complexity)
+	var thickness := weight if weight > 0.0 else maxf(1.0, radius * 0.035)
+	var drawn := clampi(roundi(clampf(progress, 0.0, 1.0) * strokes.size()), 0, strokes.size())
+	var partial_t := fmod(clampf(progress, 0.0, 1.0) * strokes.size(), 1.0)
+	for index in drawn:
+		var stroke: PackedVector2Array = strokes[index]
+		var points := PackedVector2Array()
+		for point in stroke:
+			points.append(center + point * radius)
+		if points.size() == 2:
+			canvas.draw_line(points[0], points[1], color, thickness)
+		else:
+			canvas.draw_polyline(points, color, thickness)
+	# The stroke currently being laid down draws only as far as it has gotten.
+	if drawn < strokes.size() and partial_t > 0.01:
+		var live: PackedVector2Array = strokes[drawn]
+		var live_end := maxi(1, roundi(partial_t * float(live.size() - 1)))
+		var points := PackedVector2Array()
+		for index in live_end + 1:
+			points.append(center + live[index] * radius)
+		if points.size() == 2:
+			canvas.draw_line(points[0], points[1], color * Color(1, 1, 1, 0.8), thickness)
+		elif points.size() > 2:
+			canvas.draw_polyline(points, color * Color(1, 1, 1, 0.8), thickness)
+
+
+## E2.4. The same corruption `draw_worn` applies to letterforms, on a seal
+## instead: strokes break into segments and gaps open along them, seeded from
+## the seal itself so a given mark corrupts the same way every time rather
+## than flickering.
+static func draw_seal_corrupted(canvas: CanvasItem, center: Vector2, radius: float, seed_value: int, color: Color, corruption: float, complexity: int = 6, weight: float = 0.0) -> void:
+	var damage := clampf(corruption, 0.0, 1.0)
+	if damage <= 0.01:
+		draw_seal(canvas, center, radius, seed_value, color, complexity, weight)
+		return
+	var thickness := (weight if weight > 0.0 else maxf(1.0, radius * 0.035)) * lerpf(1.0, 0.6, damage)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = (hash(seed_value) ^ 0x5eed) & 0x7fffffff
+	var wander := radius * 0.05 * damage
+	for stroke: PackedVector2Array in seal_strokes(seed_value, complexity):
+		for step in range(stroke.size() - 1):
+			var from := center + stroke[step] * radius
+			var to := center + stroke[step + 1] * radius
+			var pieces := 3
+			for piece in pieces:
+				if rng.randf() < damage * 0.5:
+					continue
+				var a := from.lerp(to, float(piece) / float(pieces))
+				var b := from.lerp(to, float(piece + 1) / float(pieces))
+				var drift := Vector2(rng.randf_range(-wander, wander), rng.randf_range(-wander, wander))
+				canvas.draw_line(a + drift, b + drift, color * Color(1, 1, 1, lerpf(1.0, 0.55, damage)), thickness)
+
+
+## E2.4. Burning: unlike corruption (which is a mark going bad while it sits
+## there), a burn has a direction — `front_angle` is where it started — and it
+## consumes rather than merely damages. Strokes on the near side of the front
+## are gone or charred; strokes ahead of it are untouched. `burn` 1.0 leaves
+## nothing but the memory of the ring.
+static func draw_seal_burning(canvas: CanvasItem, center: Vector2, radius: float, seed_value: int, color: Color, burn: float, front_angle: float = 0.0, complexity: int = 6, weight: float = 0.0) -> void:
+	var consumed := clampf(burn, 0.0, 1.0)
+	if consumed <= 0.01:
+		draw_seal(canvas, center, radius, seed_value, color, complexity, weight)
+		return
+	var thickness := weight if weight > 0.0 else maxf(1.0, radius * 0.035)
+	var ember := Color("dc5827")
+	var front := TAU * consumed
+	for stroke: PackedVector2Array in seal_strokes(seed_value, complexity):
+		var midpoint := Vector2.ZERO
+		for point in stroke:
+			midpoint += point
+		midpoint /= maxf(1.0, float(stroke.size()))
+		var stroke_angle := fposmod(midpoint.angle() - front_angle, TAU)
+		if stroke_angle < front:
+			# Already consumed — gone, not merely dim.
+			continue
+		var points := PackedVector2Array()
+		for point in stroke:
+			points.append(center + point * radius)
+		# Right at the front it is still catching — ember-bright rather than
+		# its normal colour — before it is gone on the next tick.
+		var at_front := stroke_angle < front + 0.55
+		var tone := ember if at_front else color
+		if points.size() == 2:
+			canvas.draw_line(points[0], points[1], tone, thickness)
+		else:
+			canvas.draw_polyline(points, tone, thickness)
