@@ -30,6 +30,28 @@ uniform float scroll : hint_range(0.0, 2.0) = 0.6;
 uniform float amount : hint_range(0.0, 1.0) = 1.0;
 uniform vec3 tint : source_color = vec3(1.0, 0.52, 0.22);
 uniform float tint_strength : hint_range(0.0, 1.0) = 0.14;
+
+// A10.13. The dials that make this one shader rather than two. A8.2 shipped a
+// second displacement shader for the undying flame that differed from this one
+// in four numbers and a direction — same measure, same screen sample, same
+// falloff shape — which is exactly the "every effect is a new shader" habit
+// this segment exists to stop. It is deleted; the flame sets these instead.
+//
+// `falloff` shapes how fast the effect dies away from the source: squared is
+// air off a lamp, cubed is tight around a body. `drag` pulls every sample
+// toward the top of the screen, which is the difference between a shimmer and
+// something melting. `field_scale` is how large the flow pattern reads in world
+// units — big and slow for heat, small and quick for a body coming apart.
+uniform float falloff : hint_range(1.0, 4.0) = 2.0;
+uniform float drag : hint_range(0.0, 2.0) = 0.0;
+uniform vec2 field_scale = vec2(0.31, 0.47);
+uniform vec2 field_rate = vec2(1.0, 1.0);
+// Light the tint adds rather than takes. A lamp bending air should not brighten
+// it, so this is zero for a lamp; a body failing should, or the displacement is
+// invisible on a dark frame, because a black pixel moved is still a black
+// pixel. One more dial rather than one more shader, which is the whole of
+// A10.13.
+uniform float tint_add : hint_range(0.0, 0.5) = 0.0;
 // The lamp's own throw, in metres, set from `omni_range`. The falloff is
 // measured against it rather than against the shell's geometry, so the two
 // cannot drift apart.
@@ -57,7 +79,7 @@ void fragment() {
 		// that path now would be a second measure nothing exercises.
 		vec3 axis = normalize((VIEW_MATRIX * MODEL_MATRIX * vec4(0.0, 0.0, -1.0, 0.0)).xyz);
 		float lit = clamp((dot(ray, axis) - cone_edge) / max(1.0 - cone_edge, 0.001), 0.0, 1.0);
-		bend = lit * lit * amount;
+		bend = pow(lit, falloff) * amount;
 	} else {
 		// How near this view ray passes the lamp itself, which is the only measure
 		// that behaves both outside the shell and inside it. Reading the chord
@@ -75,7 +97,7 @@ void fragment() {
 		// Squared, because hot air does not have an edge — and it is what removes
 		// the shell's own silhouette, since the strength is already nothing there.
 		float radial = clamp(1.0 - miss / max(reach, 0.001), 0.0, 1.0);
-		bend = radial * radial * amount;
+		bend = pow(radial, falloff) * amount;
 	}
 	if (bend <= 0.001) {
 		discard;
@@ -86,13 +108,15 @@ void fragment() {
 	// nine copies of one pattern. Each one now reads the part of the field it is
 	// standing in. Two samples at different rates, so the flow does not read as a
 	// single sheet of noise sliding past.
-	vec2 drift_a = vec2(TIME * scroll * 0.11, TIME * scroll * -0.19);
-	vec2 drift_b = vec2(TIME * scroll * -0.07, TIME * scroll * -0.31);
-	vec2 field = texture(noise_texture, world_position.xy * 0.31 + drift_a).rg
-		+ texture(noise_texture, world_position.zy * 0.47 + drift_b).rg;
+	vec2 drift_a = vec2(TIME * scroll * 0.11 * field_rate.x, TIME * scroll * -0.19 * field_rate.y);
+	vec2 drift_b = vec2(TIME * scroll * -0.07 * field_rate.x, TIME * scroll * -0.31 * field_rate.y);
+	vec2 field = texture(noise_texture, world_position.xy * field_scale.x + drift_a).rg
+		+ texture(noise_texture, world_position.zy * field_scale.y + drift_b).rg;
 	vec2 offset = (field - vec2(1.0)) * strength * bend;
+	// Upward, when something is melting rather than drifting.
+	offset.y -= strength * bend * drag;
 
 	vec3 lit = texture(screen_texture, SCREEN_UV + offset).rgb;
-	ALBEDO = mix(lit, lit * tint, tint_strength * bend);
+	ALBEDO = mix(lit, lit * tint, tint_strength * bend) + tint * tint_add * bend;
 	ALPHA = 1.0;
 }

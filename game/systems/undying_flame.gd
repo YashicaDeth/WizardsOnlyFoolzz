@@ -19,7 +19,11 @@ extends Node3D
 ## rather than an effect that happens to be on.
 
 const FLAME_SHADER := preload("res://shaders/undying_flame.gdshader")
-const MELT_SHADER := preload("res://shaders/flame_melt.gdshader")
+## A10.13. The melt is `light_warp.gdshader` with the dials turned, not a shader
+## of its own. It shipped as one — `flame_melt.gdshader`, which differed in four
+## numbers and a direction and was otherwise the same measure, the same screen
+## sample and the same falloff shape. That file is gone.
+const MELT_SHADER := preload("res://shaders/light_warp.gdshader")
 
 ## What the spirit shows at full health. Never zero: undying is not conditional.
 const FLOOR := 0.28
@@ -68,9 +72,23 @@ func ignite(rig: Node3D) -> void:
 	_shell.position = Vector3(0, 1.3, 0)
 	_melt = ShaderMaterial.new()
 	_melt.shader = MELT_SHADER
-	_melt.set_shader_parameter("melt_noise", _noise())
+	_melt.set_shader_parameter("noise_texture", _noise())
 	_melt.set_shader_parameter("reach", MELT_REACH)
 	_melt.set_shader_parameter("amount", FLOOR)
+	# The flame's settings of the shared dials. Cubed rather than squared, so it
+	# is tight around the body and gone by arm's length; dragged upward, which
+	# is what reads as melting instead of shimmering; an order more displacement
+	# than a lamp, because this is a frame failing rather than air moving; and a
+	# small, quick field, because a body coming apart is not weather.
+	_melt.set_shader_parameter("falloff", 3.0)
+	_melt.set_shader_parameter("drag", 0.75)
+	_melt.set_shader_parameter("strength", 0.055)
+	_melt.set_shader_parameter("field_scale", Vector2(0.9, 1.3))
+	_melt.set_shader_parameter("field_rate", Vector2(1.8, 2.6))
+	_melt.set_shader_parameter("tint", Vector3(1.0, 0.55, 0.22))
+	_melt.set_shader_parameter("tint_strength", 0.4)
+	_melt.set_shader_parameter("tint_add", 0.09)
+	_melt.set_shader_parameter("cone_edge", -2.0)
 	_shell.material_override = _melt
 	add_child(_shell)
 
