@@ -31,6 +31,17 @@ func _ready() -> void:
 
 
 var lock_screen := Vector2(-1, -1)
+## AD2.3. What the strip is currently allowed to offer. Set by whoever owns the
+## player, because this panel has no business knowing how a cooldown works.
+var bare := false
+var firearm := false
+var can_dodge := true
+var near_something := false
+var interact_verb := "act"
+## 0 shows the strip in full, 1 hides it. It goes away because the player has
+## plainly stopped needing it — the same rule the derby's dashboard placard
+## uses — rather than after a timer somebody chose.
+var familiar := 0.0
 
 
 func set_state(values: Dictionary) -> void:
@@ -44,11 +55,20 @@ func set_state(values: Dictionary) -> void:
 	menu_open = bool(values.get("menu_open", menu_open))
 	menu_mode = str(values.get("menu_mode", menu_mode)).to_upper()
 	weapon = values.get("weapon", weapon)
+	bare = bool(values.get("bare", bare))
+	firearm = str((weapon as Dictionary).get("kind", "")) == "firearm"
+	can_dodge = bool(values.get("can_dodge", can_dodge))
+	near_something = bool(values.get("near_something", near_something))
+	interact_verb = str(values.get("interact_verb", interact_verb))
 	lock_screen = values.get("lock_screen", lock_screen)
 
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	# Familiarity is earned by playing, not by waiting: it only climbs while the
+	# player is actually doing the things the strip is describing.
+	if not menu_open:
+		familiar = minf(1.0, familiar + delta * 0.0055)
 	location_announce = maxf(0.0, location_announce - delta)
 	queue_redraw()
 
@@ -240,10 +260,52 @@ func _draw_weapon_silhouette(at: Vector2, weapon_id: String) -> void:
 			draw_line(at + Vector2(-44, 24), at + Vector2(-62, 39), COPPER, 7.0)
 
 
+## AD2.3. What you can do *right now* — not every key in the game.
+##
+## This was a fixed string in `ThemeDB.fallback_font`, and `bone_yard_hunt.gd`
+## drew a second, different, longer one on top of it in the same font. Both are
+## gone. What is left is built per frame from real state, set in the display
+## face, and faded out once the player has stopped needing it.
+##
+## The rule for what belongs here: an affordance is listed when it would do
+## something if pressed. A key that is on cooldown, a weapon you are not holding
+## and a panel that is already open are not affordances.
 func _draw_controls() -> void:
-	var font := ThemeDB.fallback_font
-	var controls := "1—3 ARMS   LMB USE   RMB HEAVY   X GUARD   SPACE DODGE   E ACT   F EYE"
-	draw_string(font, Vector2(size.x * 0.5 - 370, size.y - 27), controls, HORIZONTAL_ALIGNMENT_CENTER, 740, 11, BONE * Color(1, 1, 1, 0.52))
+	if familiar >= 0.999:
+		return
+	var offers: Array = []
+	var held := str((weapon as Dictionary).get("label", ""))
+	if bare:
+		offers.append(["LMB", "STRIKE"])
+		offers.append(["X", "GUARD"])
+	elif firearm:
+		offers.append(["LMB", "FIRE"])
+		if int((weapon as Dictionary).get("loaded", 1)) <= 0:
+			offers.append(["R", "RELOAD"])
+	else:
+		offers.append(["LMB", held.to_upper() if held != "" else "STRIKE"])
+		offers.append(["RMB", "HEAVY"])
+		offers.append(["X", "GUARD"])
+	if can_dodge:
+		offers.append(["SPACE", "DODGE"])
+	if near_something:
+		offers.append(["E", str(interact_verb).to_upper()])
+	offers.append(["G", "DEVICE"])
+
+	# Laid out from the middle, so the strip grows symmetrically rather than
+	# sliding sideways every time an affordance appears or goes.
+	var gap := 26.0
+	var total := 0.0
+	for offer: Array in offers:
+		total += CellOutzType.width_condensed(str(offer[0]), 11.0, 2.0) + 6.0
+		total += CellOutzType.width_condensed(str(offer[1]), 10.0, 1.6) + gap
+	var cursor := size.x * 0.5 - total * 0.5
+	var fade := 1.0 - familiar
+	for offer: Array in offers:
+		var key := str(offer[0])
+		var verb := str(offer[1])
+		cursor += CellOutzType.draw_condensed(self, Vector2(cursor, size.y - 26.0), key, 11.0, Color(COPPER, 0.92 * fade), 2.0) + 6.0
+		cursor += CellOutzType.draw_condensed(self, Vector2(cursor, size.y - 26.0), verb, 10.0, Color(BONE, 0.55 * fade), 1.6) + gap
 
 
 func _draw_full_archive_frame() -> void:

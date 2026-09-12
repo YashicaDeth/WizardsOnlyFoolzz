@@ -120,6 +120,15 @@ var _action_rects: Array = []
 ## thing is clickable exactly where it was printed and nothing has to keep a
 ## second layout in sync.
 var _link_rects: Array = []
+## I5. Where the page tabs were drawn this frame, so they can be pointed at.
+## Collected during `_draw` the same way `_link_rects` and `_rail_rects` are —
+## a hit area derived from where something was actually painted cannot drift out
+## of step with it, which is the whole reason none of these are hand-authored.
+var _tab_rects: Array = []
+## Which tab the pointer is over, or -1. Hover is lighter than selection on
+## purpose: Greg, on the first pass at this, *"but not fully pressed like they
+## are when they are clicked"*.
+var tab_hover := -1
 ## I5 `v2`. The rail was arrow-keys-only: every row was drawn and none of them
 ## was ever a target, so a list of forty people could only be reached by holding
 ## Down. Greg: *"make it clickable its just too restrictive"*.
@@ -276,13 +285,34 @@ func _gui_input(event: InputEvent) -> void:
 ## paths, because mouse motion arrives through `_gui_input` or
 ## `_unhandled_input` depending on focus and filtering, and a hover that only
 ## works down one of them is a hover that works sometimes.
+## I5. Move to a page by pointing at it. Kept as its own call rather than
+## assigning `page` at the click site, because the arrow keys already do more
+## than assign — clamping and the WIRE glow both hang off a page change, and
+## a second path that skipped them would drift.
+func _turn_to_page(target: int) -> void:
+	var wanted := clampi(target, 0, PAGES.size() - 1)
+	if wanted == page:
+		return
+	page = wanted
+	page_blend = 0.0
+	queue_redraw()
+
+
 func _update_rail_hover(at: Vector2) -> void:
+	var was_tab := tab_hover
+	tab_hover = -1
+	for tab in _tab_rects:
+		if (tab["rect"] as Rect2).has_point(at):
+			tab_hover = int(tab["index"])
+			break
 	var was := rail_hover
 	rail_hover = -1
 	for row in _rail_rects:
 		if (row["rect"] as Rect2).has_point(at):
 			rail_hover = int(row["index"])
 			break
+	if was_tab != tab_hover:
+		queue_redraw()
 	if was != rail_hover:
 		queue_redraw()
 
@@ -370,6 +400,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			queue_redraw()
 			return
 		if event.button_index == MOUSE_BUTTON_LEFT:
+			# I5. The page tabs. Checked first because they sit above everything
+			# else and are the coarsest target on the page.
+			for tab in _tab_rects:
+				if (tab["rect"] as Rect2).has_point(event.position):
+					_turn_to_page(int(tab["index"]))
+					get_viewport().set_input_as_handled()
+					queue_redraw()
+					return
 			# I5 `v2`. The rail is pointable now. Checked before the link list,
 			# because a row is the coarser target and a link inside the dossier
 			# is never inside the rail.
@@ -578,6 +616,7 @@ func _selected() -> Dictionary:
 ## reads `_link_rects` instead of building it now.
 func _rebuild_links() -> void:
 	_link_rects.clear()
+	_tab_rects.clear()
 	match page:
 		0:
 			var entry := _selected()
@@ -862,13 +901,21 @@ func _draw_header(plate: Rect2) -> void:
 		var label: String = PAGES[index]
 		var width := CellOutzType.width(label, 13.0, 1.2) + 30.0
 		var active := index == page
-		var accent: Color = COPPER if active else INK * Color(1, 1, 1, 0.32)
+		# I5. The hit area comes from where the tab was painted, so it cannot
+		# drift out of step with the drawing the way a hand-authored rect does.
+		_tab_rects.append({"index": index, "rect": Rect2(tab_x, tab_y, width, 26.0)})
+		var hovered := index == tab_hover and not active
+		var accent: Color = COPPER if active else (INK * Color(1, 1, 1, 0.55) if hovered else INK * Color(1, 1, 1, 0.32))
 		var shape := PackedVector2Array([
 			Vector2(tab_x, tab_y), Vector2(tab_x + width, tab_y),
 			Vector2(tab_x + width - 7, tab_y + 26), Vector2(tab_x + 7, tab_y + 26),
 		])
 		if active:
 			draw_colored_polygon(shape, COPPER * Color(1, 1, 1, 0.20))
+		elif hovered:
+			# Greg on the first hover pass: "but not fully pressed like they are
+			# when they are clicked". A third of the selected fill.
+			draw_colored_polygon(shape, COPPER * Color(1, 1, 1, 0.07))
 		var edge := shape.duplicate()
 		edge.append(shape[0])
 		draw_polyline(edge, accent, 1.4)
@@ -1523,7 +1570,11 @@ func _draw_footer(plate: Rect2) -> void:
 	var font := ThemeDB.fallback_font
 	var y := plate.position.y + plate.size.y - 26.0
 	draw_line(Vector2(plate.position.x + 22, y - 14), Vector2(plate.position.x + plate.size.x - 22, y - 14), INK * Color(1, 1, 1, 0.14), 1.0)
-	draw_string(font, Vector2(plate.position.x + 24, y), "←/→ PAGE    ↑/↓ SELECT    WHEEL SCROLL    X X-RAY    I CLOSE", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK * Color(1, 1, 1, 0.55))
+	# I5. Lead with the pointer. The old line listed four keyboard controls and
+	# a wheel and never mentioned the mouse, which told a player reading it that
+	# clicking does not work here — and clicking has worked on the rail and on
+	# every printed link since I5 v2.
+	draw_string(font, Vector2(plate.position.x + 24, y), "CLICK ANYTHING    ←/→ PAGE    ↑/↓ SELECT    WHEEL SCROLL    X X-RAY    I CLOSE", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK * Color(1, 1, 1, 0.55))
 	var note := "THIS REGISTRY IS INCOMPLETE AND PARTS OF IT ARE WRONG."
 	draw_string(font, Vector2(plate.position.x + 24, y), note, HORIZONTAL_ALIGNMENT_RIGHT, plate.size.x - 48, 10, COPPER * Color(1, 1, 1, 0.5))
 
