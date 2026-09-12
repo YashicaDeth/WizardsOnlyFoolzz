@@ -24,6 +24,25 @@ const VAULT_REACH := 0.85
 const VAULT_FAR_SIDE := 0.55
 const VAULT_HEAD_CLEARANCE := 1.55
 const VAULT_DURATION := 0.34
+## AD1.3. "Earned the way third person is earned rather than given" —
+## `third_person_unlocked()` gates on real boss kills; this gates on real
+## traversal, tied to the mechanic it is a step up from rather than to
+## combat, since wall-running is a movement skill and vaulting is the
+## movement skill just before it. Counted straight off `player_vaulted`
+## (AD1.2's own event), not a new counter invented for this one.
+const WALL_RUN_UNLOCK_VAULTS := 3
+## How far sideways the wall can be and still count, how tall it has to
+## keep going to be a wall rather than something AD1.2 would have vaulted,
+## how fast the player has to already be moving to grab one, how long a
+## run lasts before gravity wins anyway, and how much gravity still applies
+## while it does — full weightlessness reads as flying, not running.
+const WALL_RUN_REACH := 0.9
+const WALL_RUN_MIN_HEIGHT := 1.7
+const WALL_RUN_MIN_SPEED := 4.0
+const WALL_RUN_DURATION := 1.1
+const WALL_RUN_GRAVITY_SCALE := 0.16
+const WALL_RUN_KICKOFF_UP := 5.2
+const WALL_RUN_KICKOFF_OUT := 5.0
 ## Worst case a wrecked body can move or swing at, as a share of healthy. The
 ## soulslike register wants injury to hurt; it does not want a player who has
 ## lost a leg to be unable to disengage from the thing that took it.
@@ -245,6 +264,12 @@ var dodge_direction := Vector3.ZERO
 var vaulting_time := 0.0
 var vault_from := Vector3.ZERO
 var vault_to := Vector3.ZERO
+## AD1.3. Positive for as long as the wall is still carrying the player;
+## re-checked and re-set every frame it runs rather than only at the start,
+## since the wall the player is running along can curve or end mid-run.
+var wall_running_time := 0.0
+var wall_run_normal := Vector3.ZERO
+var wall_run_unlock_announced := false
 var handheld: Control
 ## FINAL_V.md §16. The one screen-space layer AS2's night warp, and later the
 ## drugs and shadow realms, all reach for instead of building their own effect.

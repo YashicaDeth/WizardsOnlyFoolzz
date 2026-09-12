@@ -332,5 +332,27 @@ func _ready() -> void:
 	print("BUDGET_MS %s" % [budget])
 	print("DRAW_CALLS %d" % Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
 
+	# A10.6. Three square metres of this world at arm's length, chosen to be
+	# ordinary rather than photogenic: a wreck face, the ground somebody walks
+	# on, and a district wall. Paused for the same reason the bill shot is —
+	# `_update_camera()` puts the camera back sixty times a second.
+	WorldClock.set_hour(12.0)
+	hunt._update_day_night()
+	for _tick in 8:
+		await get_tree().physics_frame
+	get_tree().paused = true
+	var square_metres := {
+		"wreck": [Vector3(-6.0, 1.4, -14.0), Vector3(-6.0, 1.4, -17.0)],
+		"ground": [Vector3(-6.0, 1.1, -4.0), Vector3(-6.0, 0.0, -4.6)],
+		"wall": [Vector3(-150.0, 1.6, -119.0), Vector3(-150.0, 1.6, -122.0)],
+	}
+	for surface_name: String in square_metres:
+		var placement: Array = square_metres[surface_name]
+		hunt.camera.global_position = placement[0]
+		hunt.camera.look_at(placement[1], Vector3.UP)
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/metre_%s.png" % [out_dir, surface_name])
+	get_tree().paused = false
+
 	print("CAPTURE_DONE")
 	get_tree().quit()
