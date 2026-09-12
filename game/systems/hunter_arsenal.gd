@@ -240,13 +240,18 @@ func _update_models() -> void:
 func _build_weapon_model(weapon_id: String) -> Node3D:
 	var root := Node3D.new()
 	root.name = "%s_mount" % weapon_id
-	root.position = Vector3(0.055, -0.196, -0.742)
-	# Cancel the arm pose, then tip the blade a little below level. The extra
-	# half-turn that used to be here was wrong twice over: `HeldGear` already
-	# builds a weapon pointing down -Z, so turning it again aimed the blade back
-	# at the camera, and the arm's own forward pitch then stood it straight up
-	# through the middle of the screen.
-	root.rotation = Vector3(-HUNTER_BODY_MOTION.FIRST_PERSON_ARM_RAISE - 0.46, -0.26, 0.30)
+	root.position = Vector3(0.098, -0.232, -0.706)
+	# Cancel the arm pose. Exactly cancel it — no trim term on the end.
+	#
+	# Two passes tried to fix a floating, badly angled sword by retuning this
+	# line, and both made it worse, because the value here was never reaching
+	# the model: `bone_yard_hunt._pose_weapon` assigned `model.rotation` every
+	# frame from arm sway alone and discarded whatever was set at build time.
+	# With that fixed, the honest value is the pure cancellation — the arm is
+	# pitched forward by `FIRST_PERSON_ARM_RAISE` and undoing precisely that
+	# leaves the weapon level in view space, which is what the trim terms were
+	# groping toward while the real rotation was being thrown away.
+	root.rotation = Vector3(-HUNTER_BODY_MOTION.FIRST_PERSON_ARM_RAISE, -0.34, 0.32)
 	var gear := HeldGear.build_weapon(weapon_id)
 	# Hung off its grip rather than its origin. `HeldGear` builds each weapon
 	# around the shape of the object, so a sword's origin is where the guard

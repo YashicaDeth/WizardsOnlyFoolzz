@@ -2963,10 +2963,10 @@ this"*.
 
 ### AG2 — What he could not find
 The theme of the whole session, and it is a design fault rather than his.
-- [ ] **AG2.1** He could not find the Board; Greg could not remember the key either
-- [ ] **AG2.2** Nothing teaches the weapon wheel — Greg had to guess *"i think its holding b?"*
-- [ ] **AG2.3** *"press buttons probably"* is the current discovery mechanism for every panel
-- [ ] **AG2.4** The first-person HUD must say what can be pressed (AD2.3)
+- [x] ~~**AG2.1** He could not find the Board; Greg could not remember the key either~~ — F1 opens a keys card that names THE BOARD on P, in the group for things you carry. The card's rows are written by the scene rather than held in the card, so it cannot drift from what is actually bound (`systems/keys_card.gd`)
+- [x] ~~**AG2.2** Nothing teaches the weapon wheel — Greg had to guess *"i think its holding b?"*~~ — on the card as HOLD Q, and moved off B while fixing it: B is a stretch from WASD and this is a hold you are meant to move during. Greg: *"make the b slider change to like e or idk r or q"* — E is interact and R is reload, so Q
+- [x] ~~**AG2.3** *"press buttons probably"* is the current discovery mechanism for every panel~~ — the closed-state hint names the key in the corner and stops after two openings, because a permanent prompt for a help screen is the tutorial look arriving by the back door
+- [~] **AG2.4** The first-person HUD must say what can be pressed (AD2.3) — the contextual strip in `gothic_field_hud.gd` covers the verbs for what you are looking at, and the keys card covers the panels. What is still missing is the strip naming an affordance the moment it appears rather than only the weapon ones
 
 ### AG3 — The derby, second playtest
 Greg, in the seat: *"the derby thing is so whack rn no hud or hull not
@@ -2986,8 +2986,23 @@ game.
 - [ ] **AG3.2** The camera goes in the cab. M2 was built and never wired to anything
 - [ ] **AG3.3** Getting out of the car is something you watch happen, not a scene swap on E
 - [ ] **AG3.4** You can shoot through your own windscreen, and the glass keeps the holes
-- [ ] **AG3.5** Nothing in the derby says what any key does - the first thing AH has to fix
+- [x] ~~**AG3.5** Nothing in the derby says what any key does - the first thing AH has to fix~~ — the same card, with the derby's own rows: driving, the gun, and getting out. E CLIMB OUT is in it by name, which is the key every playtester has missed
 
+
+
+### AG4 — Demo build, 13 September 2026
+Greg sending the first build to friends, and reporting while it ran.
+- [x] **AG4.1** *"it crashes when you look at the body parts in the body section"* — a real crash with a cause worth naming. `character_sheet.gd` published `anatomy.organs` as a String naming the decanted organ set; everywhere else in the game `anatomy.organs` is a Dictionary of live organ states. The moment the player had a sheet, `body_inspector._condition_of` read "standard" where it required a Dictionary and threw from inside `_draw`, once per frame, in the index and the device both. The sheet writes `organ_set` now, `load_from_world` still reads the old key when what is under it is actually a String, and the inspector stops assigning straight into a typed Dictionary. `tests/organ_key_collision_test.gd`, 7 checks
+- [x] **AG4.2** *"the menus and indexes and tab buttons after you get out of the car"* — the hunt is the only scene owning a blood veil and a psychedelic rig, and both were added to `$HUD` after every panel, so both painted over the index, map and board. The shader samples the whole frame drawn so far, so an open index was not tinted, it was displaced, and the page tabs rendered somewhere other than where they were clickable. Ordered in `_order_hud_layers`
+- [x] **AG4.3** Opening any panel once and closing it left the retired orange HUD stuck over the real interface for the rest of the run — `_toggle_panel` turned `title`, `status` and the vitals box back on, and `_update_hud` re-hid only `status`
+- [x] **AG4.4** **FIX DEVICE SIZING** — both hosted panels were handed `_clip.size` as their own size, so the index laid itself out for a 1074x515 letterbox using measurements authored against 1280x720. Widths survived it, heights did not: the file page ran through the footer and the bottom of the plate was cut off. The panel now gets the viewport's size and is scaled to fit, so hosted and fullscreen are the same layout
+- [x] **AG4.5** The floating sword, third attempt and the first one that found the cause. Two passes retuned the mount and both made it worse, because the value was never reaching the model — `_pose_weapon` assigned `model.rotation` every frame from arm sway alone and discarded the counter-rotation `hunter_arsenal` writes to cancel the arm pitch. With the rest rotation cached the way the rest position already was, the honest value is the pure cancellation of `FIRST_PERSON_ARM_RAISE`
+- [x] **AG4.6** *"fixing the wobbly screen like you smoked weed or nicotine — even tho at the start you get a random drug"* — AS2.1 had nightfall driving the shader's displacement dial, so a sober player after dark had a permanently moving screen and the one state the shader exists to express stopped being legible. The hour no longer touches the dial; substances, meditation and the shadow realms own it
+- [x] **AG4.7** The transit plate was acid green, in a register nothing else in the game uses. Blood now, carrying the seal of the place you are arriving at — ring, point count and stride seeded off the destination path — with runnels down the glass
+- [ ] **AG4.8** *"i hate the look of this ui it looks ugly"* — the bottom-right cluster specifically, and the fonts generally. Greg wants boxes, dimensional HUD panels, and a grungier biopunk face throughout
+- [ ] **AG4.9** *"the hunt thing hardly works at all zero continuity"* — the Hunt System does not hold together across a session
+- [ ] **AG4.10** The map has to integrate the underground conspiracy network text file, and carry Greg's own art textures
+- [ ] **AG4.11** Save files: deletable, continuable, several of them, so somebody can keep a world and generate new stories in it
 
 ### AG v10 — the final pass
 The last rung. Fifteen statements that are true of the playtest record when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
