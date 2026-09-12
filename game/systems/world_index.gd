@@ -35,6 +35,7 @@ const BODY_INSPECTOR := preload("res://systems/body_inspector.gd")
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 const WoundCatalog := preload("res://systems/wound_catalog.gd")
 const BrokenWeb := preload("res://systems/broken_web.gd")
+const BlackMirror := preload("res://systems/black_mirror.gd")
 
 ## Six live 3D heads is cheap; sixty would not be, and each icon owns a World3D.
 ## So they are a pool the pages draw into by slot rather than one per row.
@@ -789,15 +790,29 @@ func _draw_plate(rect: Rect2) -> void:
 		rect.position + Vector2(0, notch),
 	])
 	draw_colored_polygon(body, SMOKE)
-	# G1.4. The plate Greg's artwork is printed on, under the grime and under
-	# everything else. Nothing changes when the art pipeline has not been run.
-	Grunge.art_substrate(self, rect, 7, 0.10)
-	# Grime goes down before anything else is printed on it, so the interface
-	# reads as ink on a dirty surface rather than dirt laid over a clean screen.
-	Grunge.stain(self, rect.position + rect.size * Vector2(0.16, 0.78), 96.0, 11, Grunge.BILE, 0.05)
-	Grunge.stain(self, rect.position + rect.size * Vector2(0.74, 0.20), 118.0, 27, Grunge.RUST, 0.042)
-	Grunge.stain(self, rect.position + rect.size * Vector2(0.50, 0.95), 78.0, 43, Grunge.SPORE, 0.038)
-	Grunge.scratches(self, rect, 61, 22)
+	# A2.9 v2. One plate for every page used to mean one *substrate* for every
+	# page — the dossier, the pyramid and the Wire all printed on the same
+	# grimed paper, when the Wire is not paper at all. The physical registry
+	# (this shape, the tabs, the tape) stays one shared object on purpose —
+	# that is what "one made object" (A0) actually asked for — but what it is
+	# printed *on* now differs: paper grime for FILE/PYRAMID/BODY, the same
+	# black glass `black_mirror.gd` already gives every other screen in the
+	# game for WIRE, since that page is reading the surviving internet and
+	# nothing else here is.
+	if PAGES[page] == "WIRE":
+		BlackMirror.draw_glass(self, rect, 1.0, elapsed)
+	else:
+		# G1.4. The plate Greg's artwork is printed on, under the grime and
+		# under everything else. Nothing changes when the art pipeline has
+		# not been run.
+		Grunge.art_substrate(self, rect, 7, 0.10)
+		# Grime goes down before anything else is printed on it, so the
+		# interface reads as ink on a dirty surface rather than dirt laid
+		# over a clean screen.
+		Grunge.stain(self, rect.position + rect.size * Vector2(0.16, 0.78), 96.0, 11, Grunge.BILE, 0.05)
+		Grunge.stain(self, rect.position + rect.size * Vector2(0.74, 0.20), 118.0, 27, Grunge.RUST, 0.042)
+		Grunge.stain(self, rect.position + rect.size * Vector2(0.50, 0.95), 78.0, 43, Grunge.SPORE, 0.038)
+		Grunge.scratches(self, rect, 61, 22)
 	var outline := body.duplicate()
 	outline.append(body[0])
 	draw_polyline(outline, COPPER * Color(1, 1, 1, 0.62), 2.0)

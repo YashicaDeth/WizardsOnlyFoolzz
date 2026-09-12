@@ -217,7 +217,22 @@ A is sealed, which means the only way it improves now is a stated second pass.
 Everything below is a real weakness in what v1 shipped, not polish.
 
 - [x] **A1.6** `v2` The stencil has no kerning pairs — every letter sits on the grid, so AV and TA gap — fixed by measurement rather than a table: the face is cut into eight bands, and a pair closes by the smallest clearance any band has. AV, TA, AT and VA all close 1.56 grid units; HH, OO and MN close nothing, because vertical-sided letters have no hole. Correct by construction whenever a glyph is edited
-- [ ] **A2.9** `v2` One plate for every page; the dossier, the Wire and the pyramid should not be printed on the same substrate
+- [x] ~~**A2.9** `v2` One plate for every page; the dossier, the Wire and the
+      pyramid should not be printed on the same substrate~~ `_draw_plate()`
+      grimed the same paper under FILE, PYRAMID, BODY and WIRE alike. The
+      physical registry (the notched shape, the tabs, the tape) stays one
+      shared object on purpose — that is what A0's "one made object" already
+      asked for — but WIRE now prints on `black_mirror.gd`'s black glass
+      instead of paper grime, since that page reads the surviving internet
+      and nothing else here is a screen. Verified:
+      `tests/index_substrate_test.gd` (new, 2/2 — samples the same patch of
+      the plate on FILE and on WIRE and confirms it is both visibly
+      different and darker; needs a real window, since headless rendering in
+      this environment reads back a blank frame), plus the existing
+      `index_wire_glow_test.gd`, `index_link_rebuild_test.gd`, `link_test.gd`,
+      `celloutz_site_test.gd` and `clerical_audit_test.gd` regression suites,
+      and a windowed capture (`captures/a2_9_v2_index_file_paper.png` /
+      `a2_9_v2_index_wire_glass.png`).
 - [x] **A5.6** `v2` Grunge is seeded per screen and identical every session — it should remember the run it is in — `WorldHistory.run_salt`, generated once per save and mixed into every seed. Still perfectly still frame to frame; two runs simply wear differently. Old saves and test mode stay at zero on purpose
 - [x] **A6.6** `v2` Dead pixels and scanlines are static; a failing panel flickers — positions stay fixed, expression does not: each fault carries its own period, duty and phase, rows shear before they drop out, some pixels are stuck *on* rather than dead, and the backlight sags and drops. All of it off `condition`
 - [ ] **A7.7** `v2` Retune the chassis against authored arena geometry once G3.1 lands
