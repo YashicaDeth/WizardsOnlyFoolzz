@@ -504,10 +504,12 @@ CellOutz leadership. Both poles are already in `FACTION_TREE_AXIS`.
 - [~] **K1.3** wizardsonlyfoolz given a presence — ranks, a Law, a Book, paid grades. Ranks/paid grades didn't need the blocked half: `wren_ashby`, paid into the bottom rank, gives `WireNet.pyramid("wizardsonlyfoolz")` a real headcount instead of an empty order, generically, the same machinery every Sin already uses. **Still blocked on Greg**: a Law, a Book and a founder (E2) — nothing here invents them
 
 ### K2 — The Four Horsemen
-- [ ] **K2.1** Four named subjects on the nemesis machinery, not health bars in rooms
-- [ ] **K2.2** Rotating succession: killing the one in power promotes the next (pairs with F3)
-- [ ] **K2.3** Who holds the post changes what CellOutz does, not just the name
-- [ ] **K2.4** The Horseman in power is what makes a run different (answers the roguelike question)
+Named by Greg 2026-09-12 — the traditional four, used directly. Built in
+`systems/the_four_horsemen.gd`.
+- [x] **K2.1** Four named subjects on the nemesis machinery, not health bars in rooms — War, Famine, Pestilence, Death, each a real `WorldHistory` person under CellOutz with their own grip on a real Sin (War/Ashline, Famine/Black Mile, Pestilence/Soft Rot, Death/Choir of Marrow) rather than a stat block
+- [x] **K2.2** Rotating succession: killing the one in power promotes the next (pairs with F3) — deliberately *not* scripted (non-negotiable 2): each Horseman's `loyalty`/`wealth` are real fields, their Sin-grip gives real influence, and `WireNet.promote_successor()`'s existing generic scoring decides who actually takes CROWN. Verified: killing War hands the post to Death, from the numbers alone, not a hardcoded order. Found and fixed along the way: neither `WireNet.promote_successor()` clearing a fallen holder's own `faction_rank`, nor `demon_hierarchy.gd`'s `tier()`, accounted for a dead subject still reading "CROWN" on paper — `current_reign()` and `tier()` now both check status
+- [x] **K2.3** Who holds the post changes what CellOutz does, not just the name — `current_doctrine()` reads whoever actually holds CROWN and returns *their* doctrine/threat variant of CellOutz's own "ownership, downward" line, not one static text
+- [x] **K2.4** The Horseman in power is what makes a run different (answers the roguelike question) — answered by K2.2/K2.3 together: succession is emergent per run and it actually changes what CellOutz's own doctrine reads as, verified in the same test. Covered by `tests/the_four_horsemen_test.gd` (21 checks)
 
 ### K4 — The hierarchy below
 Four tiers, all on existing machinery. See `DESIGN/COSMOLOGY.md`.

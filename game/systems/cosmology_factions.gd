@@ -16,17 +16,20 @@ extends Node
 ## write here is a brand-new subject; nothing existing is amended, so there is
 ## nothing to migrate and nothing to lose.
 ##
-## CellOutz's Horsemen deliberately have no name here — K2 is blocked on Greg
-## for that, and `WireNet.pyramid("celloutz")` already reads an empty CROWN
-## rank as a structural vacancy, which models "nobody knows who runs it yet"
-## for free. wizardsonlyfoolz deliberately holds no relation to `gate_lanterns`
-## — whether the Lanterns are part of the order or a rival is still an open
+## wizardsonlyfoolz deliberately holds no relation to `gate_lanterns` —
+## whether the Lanterns are part of the order or a rival is still an open
 ## question in `DESIGN/COSMOLOGY.md`, and picking an answer here would quietly
 ## resolve a decision that belongs to Greg.
+##
+## K2, the Four Horsemen: named by Greg 2026-09-12 (traditional names, not an
+## Ashbloom coinage) and seeded in `systems/the_four_horsemen.gd`, not here —
+## a rotating leadership on its own succession machinery is a distinct enough
+## concern from "these seven factions exist" to earn its own file.
 
 func _ready() -> void:
 	_seed()
 	AscentEntities.seed_entities()
+	TheFourHorsemen.seed_horsemen()
 
 
 func _seed() -> void:
