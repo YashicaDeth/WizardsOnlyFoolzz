@@ -194,11 +194,18 @@ func _build_world() -> void:
 	add_child(floor)
 	# Floodlights are pools of light in a dim pit, not a uniform wash. Two of the
 	# eight cast shadows: enough to anchor the wrecks without eight shadow maps.
+	# G3.3. These used to alternate orange and green per light, which painted
+	# whatever stood nearest whichever colour was overhead rather than letting
+	# the pit's own contamination read — the actual complaint behind "the pit
+	# reads close to monochrome": every surface was getting re-tinted twice.
+	# `regrime()` and `WorldLook.surface()` already carry the salvage-teal,
+	# rust and bloom colour on the materials themselves; a practical floodlight
+	# colour lets that stand instead of competing with it.
 	for index in 8:
 		var light := OmniLight3D.new()
 		var angle := TAU * index / 8.0
 		light.position = Vector3(cos(angle) * 18.0 * ARENA_SCALE, 7.5 * ARENA_SCALE, sin(angle) * 18.0 * ARENA_SCALE)
-		light.light_color = Color("ff8a3c") if index % 2 == 0 else Color("86a35c")
+		light.light_color = Color("e8d3ab")
 		light.light_energy = 3.4
 		light.omni_range = 19.0 * ARENA_SCALE
 		light.omni_attenuation = 1.25

@@ -448,9 +448,25 @@ probe actually says, so the next attempt does not start from scratch:
       regress silently again~~
 
 ### G3 — The derby arena
-- [ ] **G3.1** Re-author the oval for a larger footprint
-- [ ] **G3.2** Retune the engagement cap against it together
-- [ ] **G3.3** Contamination colour through authored surfaces, not light
+- [ ] **G3.1** Re-author the oval for a larger footprint — deliberately not
+      attempted this pass. `ARENA_SCALE` is already recorded as a dead end at
+      2.15 and 2.45 (wreckers drift outward and never engage), and the fix on
+      record is real level-design work on the authored bowl, not a code
+      change I can respond to based on a balance-test number. Doing it blind
+      risks re-breaking the G0 fix that took real measurement to land. Needs
+      either Greg's hands on the kit or an explicit go-ahead to reshape it
+      procedurally (e.g. a stadium/oval footprint instead of a bigger circle,
+      so opposite ends stay close enough to keep engaging).
+- [ ] **G3.2** Retune the engagement cap against it together — blocked on G3.1
+- [x] ~~**G3.3** Contamination colour through authored surfaces, not light~~
+      tint. The eight floodlights alternated orange/green per light, which
+      re-tinted whatever stood nearest them on top of whatever colour
+      `regrime()`/`WorldLook.surface()` already gave the surface — two
+      competing colour sources instead of one. Lights are now a single
+      practical warm-white; the pit's colour now comes from the authored
+      materials. Verified: `game/captures/g3_lights_neutral.png`, and
+      `tests/derby_balance_test.tscn` still 0 failures (lighting only, no
+      geometry or physics touched).
 
 ### G4 — Silhouettes
 - [x] ~~**G4.1** Bevels and broken corners on generated geometry~~
