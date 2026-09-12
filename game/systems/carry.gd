@@ -135,6 +135,62 @@ func damage_item(index: int, amount: float) -> float:
 	return float(item.condition)
 
 
+## R1.1. The currency named and given a reason: CellOutz, the same company
+## that grew the player, issues it — "ownership, downward" reaching all the
+## way to the coin, not just the body.
+const CURRENCY := "rust_scrip"
+const CURRENCY_ISSUER := "celloutz"
+
+
+func currency_reason() -> String:
+	var issuer := WorldHistory.subject(CURRENCY_ISSUER)
+	if issuer.is_empty():
+		return "Rust scrip. Issued by nobody in particular, which is its own kind of answer."
+	return "Rust scrip, issued by %s: %s" % [str(issuer.get("name", CURRENCY_ISSUER)), str(issuer.get("doctrine", ""))]
+
+
+## R1.3. "A market is a set of people, not a price." Each buyer wants
+## something more than the base rate says, drawn from what the faction
+## already is (Choir of Marrow deals in anatomy, Vanity Row deals in
+## augments) rather than an invented preference table.
+const FACTION_APPETITES := {
+	"choir_of_marrow": {"organ": 1.5, "limb": 0.85},
+	"vanity_row": {"cybernetic": 1.6, "organ": 0.8},
+	"honeyvein": {"substance": 1.4},
+	"black_mile": {"cybernetic": 1.15, "substance": 0.9},
+}
+
+
+func _appetite(buyer_faction: String, kind: String) -> float:
+	if buyer_faction.is_empty():
+		return 1.0
+	return float((FACTION_APPETITES.get(buyer_faction, {}) as Dictionary).get(kind, 1.0))
+
+
+## R1.5. "Prices move with what the world has been through." Read from real
+## market history rather than a clock: the more of a kind that has actually
+## sold recently, the less the next one is worth — a real glut, not a random
+## fluctuation. Floors at half rather than collapsing to nothing.
+const GLUT_WINDOW := 40
+const GLUT_STEP := 0.04
+
+
+func _market_glut(kind: String) -> float:
+	var recent := 0
+	var checked := 0
+	for index in range(WorldHistory.events.size() - 1, -1, -1):
+		if checked >= GLUT_WINDOW:
+			break
+		var event: Dictionary = WorldHistory.events[index]
+		if str(event.get("type", "")) != "carried_part_sold":
+			continue
+		checked += 1
+		var part: Dictionary = (event.get("details", {}) as Dictionary).get("part", {})
+		if str(part.get("kind", "")) == kind:
+			recent += 1
+	return clampf(1.0 - float(recent) * GLUT_STEP, 0.5, 1.0)
+
+
 ## The first economy seam. The Choir/Soft Rot price identity, remaining
 ## condition and freshness; the wallet lives beside CARRY, not inside the item.
 ## `buyer_faction` is who is standing in front of you. E1.2: the same part is
@@ -142,7 +198,8 @@ func damage_item(index: int, amount: float) -> float:
 ## Tree relative to you is the whole of their opinion of you. An empty buyer is
 ## an anonymous broker who prices nothing but the meat.
 func sale_value(item: Dictionary, buyer_faction: String = "") -> int:
-	var base := int({"limb": 7, "organ": 12, "cybernetic": 24, "substance": 3}.get(str(item.get("kind", "")), 0))
+	var kind := str(item.get("kind", ""))
+	var base := int({"limb": 7, "organ": 12, "cybernetic": 24, "substance": 3}.get(kind, 0))
 	if base <= 0:
 		return 0
 	var condition := clampf(float(item.get("condition", 1.0)), 0.0, 1.0)
@@ -156,7 +213,9 @@ func sale_value(item: Dictionary, buyer_faction: String = "") -> int:
 		if standing <= 0.0:
 			# They will not deal with you at all. Zero is a refusal, not a price.
 			return 0
-	return maxi(1, roundi(float(base) * maxf(0.2, condition) * maxf(0.15, freshness(item)) * heat * standing))
+	var appetite := _appetite(buyer_faction, kind)
+	var glut := _market_glut(kind)
+	return maxi(1, roundi(float(base) * maxf(0.2, condition) * maxf(0.15, freshness(item)) * heat * standing * appetite * glut))
 
 
 ## B5.5. A robbed implant goes into your own body through the same verb that
@@ -204,6 +263,51 @@ func sell(index: int, buyer_faction: String = "") -> Dictionary:
 	WorldHistory.update_subject("inventory", {"items": items.duplicate(true), "rust_scrip": wallet}, "carried_part_sold")
 	WorldHistory.record_event("carried_part_sold", {"part": item.duplicate(true), "price": price, "currency": "rust_scrip", "buyer_faction": buyer_faction})
 	return {"item": item, "price": price, "wallet": wallet, "faction": buyer_faction, "disposition": WorldHistory.faction_disposition(buyer_faction, WorldHistory.subject("player")) if not buyer_faction.is_empty() else ""}
+
+
+## R1.4. "Debt you can be in, since `debt_to_player` already runs the other
+## way." A faction's own opinion of you already reads through
+## `faction_price_factor`; this is the ledger a real consequence would read,
+## rather than a second morality system — carrying a real, growing number
+## rather than a flag.
+func debt_to(lender_faction: String) -> int:
+	var debts: Dictionary = WorldHistory.subject("inventory").get("player_debt", {})
+	return int(debts.get(lender_faction, 0))
+
+
+## Borrowing is real scrip added to the wallet now, in exchange for a real
+## debt recorded against a real faction — never conjured value with no
+## ledger behind it.
+func borrow(amount: int, lender_faction: String) -> Dictionary:
+	if amount <= 0 or lender_faction.is_empty():
+		return {"ok": false, "reason": "NOTHING TO BORROW"}
+	if WorldHistory.subject(lender_faction).is_empty():
+		return {"ok": false, "reason": "NO SUCH LENDER"}
+	var inventory := WorldHistory.subject("inventory")
+	var debts: Dictionary = (inventory.get("player_debt", {}) as Dictionary).duplicate(true)
+	debts[lender_faction] = int(debts.get(lender_faction, 0)) + amount
+	var wallet := int(inventory.get("rust_scrip", 0)) + amount
+	WorldHistory.update_subject("inventory", {"rust_scrip": wallet, "player_debt": debts}, "player_borrowed")
+	WorldHistory.record_event("player_borrowed", {"lender_faction": lender_faction, "amount": amount, "owed_after": debts[lender_faction]})
+	return {"ok": true, "wallet": wallet, "owed": int(debts[lender_faction])}
+
+
+## Paying down is capped at what is actually owed and what is actually in the
+## wallet — never a negative debt, never a wallet that goes below zero.
+func repay(amount: int, lender_faction: String) -> Dictionary:
+	var owed := debt_to(lender_faction)
+	if amount <= 0 or owed <= 0:
+		return {"ok": false, "reason": "NOTHING OWED"}
+	var inventory := WorldHistory.subject("inventory")
+	var wallet := int(inventory.get("rust_scrip", 0))
+	var paid := mini(amount, mini(owed, wallet))
+	if paid <= 0:
+		return {"ok": false, "reason": "NOTHING IN THE WALLET TO PAY IT WITH"}
+	var debts: Dictionary = (inventory.get("player_debt", {}) as Dictionary).duplicate(true)
+	debts[lender_faction] = owed - paid
+	WorldHistory.update_subject("inventory", {"rust_scrip": wallet - paid, "player_debt": debts}, "player_repaid")
+	WorldHistory.record_event("player_repaid", {"lender_faction": lender_faction, "amount": paid, "owed_after": debts[lender_faction]})
+	return {"ok": true, "paid": paid, "owed": int(debts[lender_faction]), "wallet": wallet - paid}
 
 
 func drop(index: int) -> Dictionary:

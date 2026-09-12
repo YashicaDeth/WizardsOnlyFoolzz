@@ -1560,11 +1560,11 @@ The body economy exists in pieces: `carry.gd` prices a part, faction standing
 already refuses a deal outright, and liens already follow stolen goods. Nothing
 ties it together into a reason to get up in the morning.
 
-- [ ] **R1.1** One currency with a name and a reason — rust scrip, and who issues it
-- [ ] **R1.2** What a body is worth, by part, condition and whose it was
-- [ ] **R1.3** Buyers with their own appetites, so a market is a set of people and not a price
-- [ ] **R1.4** Debt you can be in, since `debt_to_player` already runs the other way
-- [ ] **R1.5** Prices move with what the world has been through
+- [x] **R1.1** One currency with a name and a reason — rust scrip, and who issues it — `carry.gd`'s `currency_reason()` reads CellOutz's own real doctrine ("ownership, downward") as the reason, rather than an invented lore line
+- [x] **R1.2** What a body is worth, by part, condition and whose it was — audited: `sale_value()` already priced all three (base by kind, `condition`/`freshness`, and `stolen` heat); simply never credited here
+- [x] **R1.3** Buyers with their own appetites, so a market is a set of people and not a price — `FACTION_APPETITES`: the Choir pays more for an organ, Vanity Row pays more for a cybernetic, drawn from what each faction already is rather than an invented preference table
+- [x] **R1.4** Debt you can be in, since `debt_to_player` already runs the other way — `borrow()`/`repay()`/`debt_to()`: real scrip added to the wallet against a real, named debt to a real faction; repaying is capped at what is actually owed and what is actually in the wallet
+- [x] **R1.5** Prices move with what the world has been through — `_market_glut()` reads real recent `carried_part_sold` history: the more of a kind that has actually sold, the less the next one is worth, specific to that kind rather than a global crash. Covered by `tests/money_test.gd` (16 checks)
 
 ## S — Speech
 
