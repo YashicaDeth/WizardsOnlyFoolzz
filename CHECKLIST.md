@@ -813,6 +813,7 @@ finished. Applies to everything below and to A5, A6, C1.
 
 ### I v2 — the second pass
 - [ ] **I1.4** `v2` The stencil is now used for body copy it was never drawn for — long paragraphs in a display face are hard to read and the warning card already knew that
+- [x] **I5.3** `v2` The rail is pointable — click a row to select it, hover to see where a click would land
 - [ ] **I5.2** `v2` Links are collected during `_draw` and exist nowhere else, so nothing but the paint loop can ask what is on screen
 - [ ] **I0.10** `v2` Panels are hosted at one fixed size inside the handheld; a map you cannot lean into is a picture of a map
 - [ ] **I1.5** `v2` Code rain runs on screens that have not earned it — it is the substrate for the Wire, not decoration for every page

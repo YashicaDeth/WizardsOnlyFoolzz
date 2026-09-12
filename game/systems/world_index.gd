@@ -99,6 +99,18 @@ var _action_rects: Array = []
 ## thing is clickable exactly where it was printed and nothing has to keep a
 ## second layout in sync.
 var _link_rects: Array = []
+## I5 `v2`. The rail was arrow-keys-only: every row was drawn and none of them
+## was ever a target, so a list of forty people could only be reached by holding
+## Down. Greg: *"make it clickable its just too restrictive"*.
+##
+## Collected during `_draw` the same way `_link_rects` already is, because that
+## is where the layout actually exists — the rail scrolls, so a row's position is
+## not knowable anywhere else.
+var _rail_rects: Array = []
+## Which row the pointer is over. -1 for none. Separate from `rail_index`, which
+## is what is *selected*: hovering shows you where a click would land and
+## selecting is what a click does.
+var rail_hover := -1
 var _icons: Array = []
 var _inspector: Node
 var _rail_cache: Array = []
@@ -231,13 +243,32 @@ func _process(delta: float) -> void:
 ## is what makes BODY hover and direct specimen manipulation work in the game,
 ## not only when their methods are called by a test.
 func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_update_rail_hover((event as InputEventMouseMotion).position)
 	if event is InputEventMouseButton or event is InputEventMouseMotion:
 		_unhandled_input(event)
+
+
+## I5 `v2`. Which row the pointer is over. -1 for none. Called from both input
+## paths, because mouse motion arrives through `_gui_input` or
+## `_unhandled_input` depending on focus and filtering, and a hover that only
+## works down one of them is a hover that works sometimes.
+func _update_rail_hover(at: Vector2) -> void:
+	var was := rail_hover
+	rail_hover = -1
+	for row in _rail_rects:
+		if (row["rect"] as Rect2).has_point(at):
+			rail_hover = int(row["index"])
+			break
+	if was != rail_hover:
+		queue_redraw()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
+	if event is InputEventMouseMotion:
+		_update_rail_hover((event as InputEventMouseMotion).position)
 	# Arrow keys only, deliberately. WASD would drive the car underneath the
 	# panel: the chassis reads `Input.is_action_pressed` in `_physics_process`,
 	# which does not care that the event was marked handled here.
@@ -316,6 +347,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			queue_redraw()
 			return
 		if event.button_index == MOUSE_BUTTON_LEFT:
+			# I5 `v2`. The rail is pointable now. Checked before the link list,
+			# because a row is the coarser target and a link inside the dossier
+			# is never inside the rail.
+			for row in _rail_rects:
+				if (row["rect"] as Rect2).has_point(event.position):
+					rail_index = int(row["index"])
+					get_viewport().set_input_as_handled()
+					queue_redraw()
+					return
 			# I5. Everything printed is pointable. One list, checked before the
 			# page-specific controls so a link always wins over the surface
 			# underneath it.
@@ -687,12 +727,26 @@ func _draw_rail(rect: Rect2) -> void:
 			]), COPPER * Color(1, 1, 1, 0.17))
 			draw_line(Vector2(rect.position.x - 6, marker_y - 13), Vector2(rect.position.x - 6, marker_y + 15), HOT, 2.5)
 
+	_rail_rects.clear()
 	for index in _rail_cache.size():
 		var y := top + float(index) * row_height - offset
 		if y < top - row_height or y > rect.position.y + rect.size.y - 8.0:
 			continue
 		var entry: Dictionary = _rail_cache[index]
 		var active := index == rail_index
+		# The row's hit area, in the same place the row is actually painted.
+		var row_rect := Rect2(Vector2(rect.position.x - 6, y - 13), Vector2(rect.size.x - 8, row_height - 2.0))
+		_rail_rects.append({"index": index, "rect": row_rect})
+		# Hover is a lighter mark than selection on purpose: it says "this is
+		# where a click would land", not "this is what you are reading".
+		if index == rail_hover and not active:
+			draw_colored_polygon(PackedVector2Array([
+				Vector2(row_rect.position.x, row_rect.position.y),
+				Vector2(row_rect.end.x - 6, row_rect.position.y),
+				Vector2(row_rect.end.x - 12, row_rect.end.y),
+				Vector2(row_rect.position.x, row_rect.end.y),
+			]), COPPER * Color(1, 1, 1, 0.07))
+			draw_line(Vector2(row_rect.position.x, row_rect.position.y), Vector2(row_rect.position.x, row_rect.end.y), HOT * Color(1, 1, 1, 0.45), 1.4)
 		var icon_slot := _file_rail_icon_slot(index)
 		var text_inset := 4.0
 		if icon_slot >= 0 and _draw_icon(icon_slot, str(entry.id), Rect2(Vector2(rect.position.x + 2, y - 12), Vector2(27, 27))):
