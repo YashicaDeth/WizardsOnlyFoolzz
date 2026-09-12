@@ -280,10 +280,16 @@ const GATE_LIGHTS := [
 ## A4.1. Every placed light, so `_update_day_night()` can put them out at dawn
 ## without holding a second list of where they are.
 var night_lights: Array[OmniLight3D] = []
+## A9.2. How fast the haze follows the air. Eased rather than set, because
+## `_update_day_night()` writes the same value off the hour and the two would
+## otherwise fight frame by frame.
+const AIR_FOG_BLEND := 0.08
 ## A7.1. Who is up, and the hour that decides it.
 var gods: Gods
 ## A8.1. The spirit on the body, and the frame melting around it.
 var flame: UndyingFlame
+## A9.1. What is in the air between the player and everything else.
+var air: ContaminatedAir
 ## AS2. Built once in `_build_world()`, driven every frame in
 ## `_update_day_night()` off `world_clock.gd` — it used to sit at one fixed
 ## angle and brightness no matter the hour, which is why W1.1 existing made no
@@ -851,6 +857,7 @@ func _physics_process(delta: float) -> void:
 	pulse += delta
 	_update_handheld_lamp(delta)
 	_update_flame()
+	_update_air()
 	# W1.1. The world keeps time, and exactly one place advances it — a clock
 	# that two scenes both wind runs at double speed the moment anybody
 	# builds a third.
@@ -3578,6 +3585,11 @@ func _build_world() -> void:
 	add_child(gods)
 	gods.bind($WorldEnvironment.environment.sky.sky_material as ShaderMaterial, camera)
 	gods.god_seen.connect(_on_god_seen)
+	# A9.1. The air, which for nine passes was empty. Added to the scene rather
+	# than to the player so its particles live in world space and the player
+	# walks through them instead of towing them.
+	air = ContaminatedAir.new()
+	add_child(air)
 	_add_mesh(BoxMesh.new(), Vector3(0, -0.6, 0), Vector3(470, 1, 370), Color("17150f"), 0.0)
 	var floor_body := StaticBody3D.new()
 	var floor_collider := CollisionShape3D.new()
@@ -3709,6 +3721,23 @@ func _update_flame() -> void:
 	if player_rig == null or not is_instance_valid(player_rig):
 		return
 	flame.set_condition(player_rig.anatomy.combat_ratio())
+
+
+## A9.1 / A9.2. The volume follows the player in steps, and its severity is read
+## from the number AS4.2 says the storm will read — so when that segment builds
+## the storm, the air is already answering the same source rather than needing a
+## second one. `chaos_magick()` sits near zero on a quiet run and climbs with
+## rituals and with the gods A7 put in the sky.
+func _update_air() -> void:
+	if air == null or not is_instance_valid(air):
+		return
+	air.follow(player)
+	air.set_severity(clampf(WorldHistory.chaos_magick(), 0.0, 1.0))
+	var env: Environment = $WorldEnvironment.environment
+	if env != null:
+		# The haze thickens with it. Motes say there is something in the air;
+		# the fog is what makes the far side of the region disappear into it.
+		env.volumetric_fog_density = env.volumetric_fog_density * (1.0 - AIR_FOG_BLEND) 			+ float(WorldLook.PRESETS.ashbloom.volumetric) * (1.0 + air.severity() * 2.2) * AIR_FOG_BLEND
 
 
 ## A7.2. A sighting is not decoration: `gods.gd` has already written it into

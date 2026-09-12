@@ -220,5 +220,34 @@ func _ready() -> void:
 		get_viewport().get_texture().get_image().save_png("%s/melt_%s.png" % [out_dir, exposure[0]])
 	get_tree().paused = false
 
+	# A9.1 / A9.2. The air, calm and then at storm severity, from the same spot
+	# under the gate lamp — the one place a mote is lit well enough to be seen,
+	# which is the entire argument for lighting them rather than making them
+	# glow on their own.
+	hunt.third_person = false
+	hunt.body_motion.set_perspective(true)
+	hunt.player_body.position = Vector3(-6, 0.9, -10)
+	hunt.yaw = 0.0
+	hunt.pitch = 0.28
+	WorldClock.set_hour(1.0)
+	hunt._update_day_night()
+	# Raised through the world rather than by setting the dial: `_update_air()`
+	# reads `chaos_magick()` every physics frame, so anything written straight
+	# onto the node is gone by the next one — which is the system being right.
+	# Eight completed rituals is what a storm costs.
+	for shot: String in ["calm", "storm"]:
+		if shot == "storm":
+			for _ritual in 8:
+				WorldHistory.record_event("ritual_completed", {"source": "A9.2 capture"})
+		hunt.air.restart()
+		for _tick in 90:
+			await get_tree().physics_frame
+		hunt._update_camera()
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/air_%s.png" % [out_dir, shot])
+		print("AIR %s chaos=%.2f severity=%.2f ratio=%.2f" % [
+			shot, WorldHistory.chaos_magick(), hunt.air.severity(), hunt.air.amount_ratio,
+		])
+
 	print("CAPTURE_DONE")
 	get_tree().quit()
