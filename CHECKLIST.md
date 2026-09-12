@@ -369,8 +369,8 @@ mechanisms and almost none are built.
 - [x] ~~**F4.3** The wound as the memory~~
 
 ### F5 — Player defeat routed to shackled
-- [ ] **F5.1** Losing is not a reload
-- [ ] **F5.2** Shackled, conscripted or stamped by whoever won
+- [x] ~~**F5.1** Losing is not a reload~~
+- [x] ~~**F5.2** Shackled, conscripted or stamped by whoever won~~
 - [ ] **F5.3** Deliberate death: forfeit loot, re-decant out of the tar
 
 ### F6 — Mind-stamp and the asset list

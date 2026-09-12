@@ -2,6 +2,14 @@
 
 ## 2026 09 12
 
+- **F5.1/F5.2: losing belongs to the world now.** Mara no longer reduces the
+  player to zero and lets Nix silently restore 65 health. `DefeatRouter` records
+  who won, chooses the consequence from their faction, changes the persistent
+  player subject to shackled, stamped or conscripted, and moves play to that
+  faction's holding place without reloading the scene or erasing the fight.
+  Defeat and capture remain separate events, and the number of losses stays on
+  the player record.
+
 - **F4.1/F4.3: a rival is something that happened to a person.** The new
   `RivalRegistry` searches the real event record for an existing person who was
   harmed by the player and survived; escape or an authored boss label alone is

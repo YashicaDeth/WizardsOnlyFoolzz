@@ -20,6 +20,7 @@ const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 const RIVAL_REGISTRY := preload("res://systems/rival_registry.gd")
+const DEFEAT_ROUTER := preload("res://systems/defeat_router.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
@@ -1094,12 +1095,21 @@ func _update_rival(delta: float) -> void:
 		_wound_player(enemy.global_position, 17.0, "cut")
 		WorldHistory.record_event("rival_struck_player", {"rival": HUNT_ID, "location": HUNT_LOCATION})
 		if health <= 0:
-			health = 65
-			player = Vector3(0, 1.5, 19)
-			player_body.position = player - Vector3.UP * 0.6
-			WorldHistory.record_event("player_recovered_by_nix", {"location": HUNT_LOCATION})
+			_route_player_defeat(HUNT_ID)
 	if enemy_health <= 25:
 		_rival_retreats("Mara escapes through the tunnel. Her next body will not be the same.")
+
+
+func _route_player_defeat(captor_id: String) -> void:
+	var result := DEFEAT_ROUTER.route(captor_id, HUNT_LOCATION)
+	health = 1
+	stamina = 0.0
+	enemy_retreating = true
+	if enemy != null:
+		enemy.visible = false
+	player = Vector3(-31.0, 1.5, 26.0)
+	player_body.position = player - Vector3.UP * 0.6
+	prompt.text = "%s // HELD AT %s" % [str(result.outcome).to_upper(), str(result.destination).replace("_", " ").to_upper()]
 
 
 func _update_encounter_actors(delta: float) -> void:
