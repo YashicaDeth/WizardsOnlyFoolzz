@@ -862,7 +862,11 @@ func _physics_process(delta: float) -> void:
 	_update_encounter_actors(delta)
 	_update_carrion(delta)
 	_update_extraction(delta, Input.is_key_pressed(KEY_H))
-	_update_xray(delta, Input.is_key_pressed(KEY_B))
+	# Q, not B. B is a stretch away from WASD with the left hand, and this is a
+	# *hold* — you are meant to be moving while you do it. Greg: "make the b
+	# slider change to like e or idk r or q"; E is interact and R is reload, so
+	# Q is the one of the three that is actually free.
+	_update_xray(delta, Input.is_key_pressed(KEY_Q))
 	# Reports walk home in real time; F1.3's window only exists if it ticks.
 	witness_ledger.tick(delta)
 	if misfire_director != null:
@@ -1067,11 +1071,27 @@ func _pose_weapon() -> void:
 	var lag := arm.at - arm.anchor
 	if not model.has_meta("rest_position"):
 		model.set_meta("rest_position", model.position)
+	# The rest *rotation*, cached the same way the rest position already was.
+	#
+	# This line is the floating sword. The position below adds sway to an
+	# authored rest; the rotation used to simply be assigned, which threw away
+	# the counter-rotation `hunter_arsenal._build_weapon_model` writes — the one
+	# whose whole job is to cancel the arm pitch `hunter_body_motion` applies in
+	# first person, and which carries a comment explaining that it is read from
+	# `FIRST_PERSON_ARM_RAISE` so retuning the pose cannot lay the blade across
+	# the view. Every frame, that cancellation was discarded and replaced with a
+	# sway-only rotation, so the weapon inherited the full forward pitch of the
+	# arm and hung in the air at an angle nobody had chosen. Two passes at
+	# re-tuning the mount could not fix it, because the mount was not what was
+	# wrong.
+	if not model.has_meta("rest_rotation"):
+		model.set_meta("rest_rotation", model.rotation)
 	var rest: Vector3 = model.get_meta("rest_position")
+	var rest_rotation: Vector3 = model.get_meta("rest_rotation")
 	# Scaled down from view space to hand space: the arm swings through 0.42m at
 	# full stretch and a weapon model that moved that far would leave the screen.
 	model.position = rest + lag * 0.38
-	model.rotation = Vector3(arm.tilt.x * 0.5, arm.tilt.y * 0.5, -arm.tilt.y * 0.3)
+	model.rotation = rest_rotation + Vector3(arm.tilt.x * 0.5, arm.tilt.y * 0.5, -arm.tilt.y * 0.3)
 
 
 func _attack(heavy := false) -> void:
@@ -3195,7 +3215,7 @@ func _build_keys_card() -> void:
 			["4", "CARRIED LIMB"],
 			["5", "PUT THEM DOWN"],
 			["R", "RELOAD"],
-			["HOLD B", "X-RAY, THEN THE WHEEL"],
+			["HOLD Q", "X-RAY, THEN THE WHEEL"],
 		]},
 		{"group": "HANDS ON", "rows": [
 			["E", "INTERACT"],
@@ -3594,13 +3614,21 @@ func _update_day_night() -> void:
 	if env != null:
 		env.ambient_light_energy = lerpf(0.16, 0.72, daylight)
 		env.tonemap_exposure = lerpf(0.85, 1.18, daylight)
-	# AS2.1. "The light can become really warped at night and distorted" —
-	# read literally rather than built as its own effect. Night pushes the
-	# psychedelic shader's noise-displacement dial to a strength nobody would
-	# call a trip but a player will notice, per FINAL_V.md §16's own argument
-	# that this and a drug and a shadow realm should be one shader, not three.
-	if psychedelic != null and is_instance_valid(psychedelic):
-		psychedelic.set_dial("displacement_strength", (1.0 - daylight) * 0.02)
+	# AS2.1 said "the light can become really warped at night and distorted",
+	# and this read it literally: every night pushed the psychedelic shader's
+	# displacement dial up, so a sober player walking around after dark got a
+	# permanently moving screen. Greg, twice, unprompted: the trippy filter, and
+	# then "fixing the wobbly screen like you smoked weed or nicotine — even tho
+	# at the start you get a random drug."
+	#
+	# That second half is the actual design. The warp is what being on something
+	# looks like, and the game already hands you a substance at the start; if
+	# nightfall does it too then the one state the shader exists to express
+	# stops being legible, because the screen was already moving. So the hour no
+	# longer drives this dial at all. It is left where it is, for
+	# `substances.gd`, `meditation.gd` and the shadow realms to move — which is
+	# FINAL_V.md §16's own argument (one shader, many dials) applied properly
+	# rather than spent on the time of day.
 
 
 func _build_expanse_systems() -> void:
