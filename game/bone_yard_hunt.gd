@@ -551,7 +551,10 @@ func _physics_process(delta: float) -> void:
 	dodge_cooldown = maxf(0.0, dodge_cooldown - delta)
 	# O2.4. Holding a guard up is work. It drains while raised so a guard cannot
 	# simply be left on, and it drops on its own when there is nothing left.
-	var wants_guard := Input.is_key_pressed(KEY_X) and panel_mode.is_empty() and not resolution_ui.visible
+	# X leans on somebody while a clinch is up, so the guard only claims the key
+	# when there is nobody in your hands. A control that does two things at once
+	# is worse than a control that does nothing.
+	var wants_guard := Input.is_key_pressed(KEY_X) and panel_mode.is_empty() and not resolution_ui.visible and grapple_target.is_empty()
 	if wants_guard and guard_strength() > 0.0 and stamina > 1.0:
 		if not guarding:
 			guard_raised = 0.0
@@ -1335,7 +1338,26 @@ func _deliberate_redecant() -> void:
 	prompt.text = "RE-DECANTED // THE TAR KEPT %d THINGS" % (result.forfeited as Array).size()
 
 
+## O4.2. Whether somebody already has the melee opening this frame. Read once,
+## ahead of the per-actor loop, so a second and third hostile arriving at the
+## same time see the slot as taken and go to O4.2's orbit rather than every
+## actor checking a stale picture of its own making.
+func _melee_slot_taken() -> bool:
+	for actor: Dictionary in encounter_actors:
+		if str(actor.get("disposition", "hostile")) != "hostile":
+			continue
+		if str(actor.get("state", "")) in ["staggered", "fleeing", "downed"]:
+			continue
+		var node := actor.get("node") as Node3D
+		if node == null or not is_instance_valid(node):
+			continue
+		if player.distance_to(node.global_position) <= 3.0:
+			return true
+	return false
+
+
 func _update_encounter_actors(delta: float) -> void:
+	var melee_slot_taken := _melee_slot_taken()
 	for index in range(encounter_actors.size() - 1, -1, -1):
 		var actor: Dictionary = encounter_actors[index]
 		var node := actor.get("node") as Node3D
@@ -1382,9 +1404,24 @@ func _update_encounter_actors(delta: float) -> void:
 				node.queue_free()
 				encounter_actors.remove_at(index)
 		elif str(actor.get("disposition", "hostile")) == "hostile" and distance < 24.0 and distance > 3.0:
-			_move_actor_on_route(actor, player, delta)
+			# O4.2. A naive approach put every hostile in single file toward the
+			# same 3 m ring, which reads as a queue rather than a fight. Whoever
+			# does not already hold the melee opening orbits at a stand-off
+			# distance instead of stacking into it — the fight surrounds you
+			# rather than lining up for a turn.
+			if melee_slot_taken:
+				var start_angle := fposmod(float(hash(str(actor.get("subject_id", index)))), TAU)
+				actor["orbit_angle"] = fposmod(float(actor.get("orbit_angle", start_angle)) + delta * 0.5, TAU)
+				var orbit_point := player + Vector3(cos(actor.orbit_angle), 0, sin(actor.orbit_angle)) * 4.6
+				_move_actor_on_route(actor, orbit_point, delta)
+			else:
+				_move_actor_on_route(actor, player, delta)
 		elif distance <= 3.0:
-			actor["attack_time"] = float(actor.get("attack_time", 0.0)) + delta
+			# O4.1. A player mid-swing cannot cancel or guard, so an enemy who
+			# is actually watching presses that opening instead of ticking down
+			# on its own clock regardless of what you just committed to.
+			var pressing := 2.2 if strike_windup >= 0.0 else 1.0
+			actor["attack_time"] = float(actor.get("attack_time", 0.0)) + delta * pressing
 			var attack_cycle := _actor_attack_cycle(actor)
 			if float(actor.attack_time) > attack_cycle * 0.57:
 				prompt.text = "%s RAISES THEIR WEAPON" % str(actor.display_name).to_upper()
@@ -1851,6 +1888,50 @@ func _start_grapple() -> void:
 	WorldHistory.record_event("grapple_started", {"subject_id": grapple_target, "location": HUNT_LOCATION})
 
 
+## O5.4. Somebody held in front of you is in the way of whatever is coming at
+## you, which is the whole reason to hold a person rather than hit them. Returns
+## what is left of the damage after their body took it, and puts the wound on
+## them properly — this is not a damage reduction, it is somebody else being
+## shot.
+##
+## Deliberately indiscriminate: it does not check whether the shooter is an ally
+## or whether the player meant it. If you are holding a person and a bullet
+## arrives, it hits the person.
+func grapple_shield(damage: float, from: Vector3) -> Dictionary:
+	if grapple_target.is_empty():
+		return {"damage": damage, "shielded": false}
+	var actor := _actor_by_id(grapple_target)
+	if actor.is_empty() or actor.anatomy == null:
+		return {"damage": damage, "shielded": false}
+	var node := actor.node as Node3D
+	if node == null or not is_instance_valid(node):
+		return {"damage": damage, "shielded": false}
+	# Only if they are actually between you and it. Holding somebody behind you
+	# shields nothing.
+	var toward_threat := (from - player)
+	toward_threat.y = 0.0
+	var toward_body := (node.global_position - player)
+	toward_body.y = 0.0
+	if toward_threat.length() < 0.01 or toward_body.length() < 0.01:
+		return {"damage": damage, "shielded": false}
+	if toward_threat.normalized().dot(toward_body.normalized()) < 0.35:
+		return {"damage": damage, "shielded": false}
+	var rig := actor.get("rig") as BaselineHuman
+	if rig != null and is_instance_valid(rig):
+		var hit: Dictionary = rig.hit_at(node.global_position + Vector3.UP * 0.9, damage, 0.0, "ballistic", (node.global_position - from).normalized())
+		rig.favour_injuries()
+		if bool(hit.get("severed", false)):
+			impact_feel.strike(1.0, "cut", true)
+		else:
+			impact_feel.strike(clampf(damage / 60.0, 0.1, 1.0), "ballistic", false)
+	else:
+		actor.anatomy.apply_hit("torso", damage, 0.0, "ballistic")
+	WorldHistory.record_event("human_shield", {"subject": grapple_target, "damage": roundi(damage), "location": HUNT_LOCATION})
+	prompt.text = "%s TOOK IT FOR YOU" % str(actor.display_name).to_upper()
+	# A little still gets through — a body is cover, not a wall.
+	return {"damage": damage * 0.18, "shielded": true}
+
+
 func _break_grapple(message := "") -> void:
 	grapple_target = ""
 	grapple_advantage = 0.0
@@ -1878,8 +1959,26 @@ func _update_grapple(delta: float) -> void:
 	toward.y = 0.0
 	if toward.length() > 0.01:
 		yaw = atan2(toward.x, toward.z)
-	player_body.velocity = Vector3.ZERO
-	(node as CharacterBody3D).velocity = Vector3.ZERO
+	# O5.4. You can walk while holding somebody, and they come with you. Slowly,
+	# and more slowly the worse you are winning — dragging a person who is still
+	# fighting you is most of the work. This is what turns the clinch from a
+	# conversation into a position you can move.
+	var drag := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	var drag_speed := lerpf(0.9, 2.4, clampf(grapple_advantage * 0.5 + 0.5, 0.0, 1.0))
+	if drag.length() > 0.05 and stamina > 0.0:
+		var flat_forward := Vector3(sin(yaw), 0, cos(yaw))
+		var flat_right := Vector3(flat_forward.z, 0, -flat_forward.x)
+		var shove := (flat_right * drag.x + flat_forward * -drag.y).normalized() * drag_speed
+		player_body.velocity = shove
+		# They are dragged in front of you rather than pulled through you: the
+		# hold keeps its own spacing, which is what stops the two bodies from
+		# occupying the same metre.
+		var offset := (node.global_position - player).normalized() * 1.15
+		(node as CharacterBody3D).velocity = shove + (player + offset - node.global_position) * 4.0
+		stamina = maxf(0.0, stamina - GRAPPLE_DRAIN * 0.25 * delta)
+	else:
+		player_body.velocity = Vector3.ZERO
+		(node as CharacterBody3D).velocity = Vector3.ZERO
 	actor.attack_time = 0.0
 
 	var pushing := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_key_pressed(KEY_C)
@@ -1893,7 +1992,7 @@ func _update_grapple(delta: float) -> void:
 	# F7.1. The hold is a negotiation you are winning, so it reports what it is
 	# currently worth rather than only how hard you are squeezing.
 	var offer := _clinch_options(actor)
-	prompt.text = "CLINCH / %s   %+d   [LMB] PRESS  [V] TALK  [X] LEAN  [H] TAKE  [SPACE] BREAK" % [
+	prompt.text = "CLINCH / %s   %+d   [LMB] PRESS  [WASD] WALK THEM  [V] TALK  [X] LEAN  [H] TAKE  [SPACE] BREAK" % [
 		str(actor.display_name).to_upper(), roundi(grapple_advantage * 100.0),
 	]
 	if bool(offer.surrender):

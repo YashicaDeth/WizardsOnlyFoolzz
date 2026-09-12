@@ -842,10 +842,10 @@ hitpoints. `clinch_test.gd` and F7 already exist; this is the rest of it.
 
 - [ ] **O5.1** A swing carries momentum — where the weapon *was* decides what it can do next
 - [ ] **O5.2** Contact is between bodies, not between a capsule and a damage number
-- [ ] **O5.3** Grabbing someone is a state you hold, with its own risk, not an animation
-- [ ] **O5.4** While held, they can be robbed, moved, shielded with, or spoken to
+- [x] **O5.3** A held clinch with advantage, stamina drain, and a real cost for losing it
+- [x] **O5.4** Robbed, spoken to, leaned on, walked where you want them, and held in the line of fire
 - [ ] **O5.5** Held and hurt is the pressure that makes recruitment possible (feeds F7 and E)
-- [ ] **O5.6** They fight the hold — a grapple you win instantly is not one
+- [x] **O5.6** Their force opposes yours, scaled by their own pain and arms
 - [ ] **O5.7** Off-balance is a real state for both of you; footing matters
 - [ ] **O5.8** Unarmed is viable and horrible, because the body is the weapon system
 - [x] **O5.9** Proven on the guard first: two broken arms block badly, no arms cannot block at all
