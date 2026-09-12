@@ -198,17 +198,81 @@ func organ_ok(organ_id: String) -> bool:
 	return not bool((organs.get(organ_id, {}) as Dictionary).get("ruptured", false))
 
 
+## N5.2. What CellOutz puts in before you ever wake up. Not every zone —
+## "fills them" is what a factory build actually feels like, not "every slot
+## has something," and a limb or a leg staying open is what makes the ones
+## that are not read as deliberate. Each one is a real reason CellOutz would
+## want it there: the jaw nail hears what you say, the regulator can stop
+## your heart, the dose counter answers exactly why the warning is in its
+## voice rather than the game's.
+const FACTORY_LOADOUT := {
+	"head": "jaw telemetry nail",
+	"torso": "quiet-heart regulator",
+	"left_arm": "dose counter",
+}
+
+
+## N5.2/N5.6. Called once, at decanting — deliberately not from `configure()`
+## itself, so an NPC built from the same rig never gets a player-only
+## loadout it was never asked for. An empty zone left empty is not a bug: a
+## limb with nothing installed is a real, mechanically lesser condition
+## (N5.6) already, through `implant_condition()` simply having nothing to
+## report — no separate penalty needed for a gap already visible as one.
+func install_factory_loadout() -> void:
+	for zone_id in FACTORY_LOADOUT:
+		install_part(zone_id, {"id": str(FACTORY_LOADOUT[zone_id]), "locked": true})
+
+
 func install_part(zone_id: String, part_data: Dictionary) -> Dictionary:
 	var part := ImplantCatalog.resolve(part_data, zone_id)
 	installed_parts[str(part.zone)] = part
 	return part.duplicate(true)
 
 
-func implant_condition(zone_id: String) -> float:
+## N5.4. In CellOutz's own voice, not the game's — the warning belongs to the
+## faction that put the hardware in, not to a UI writing a generic refusal.
+const LOCKED_WARNING := "you don't want to go rogue yet, do you"
+
+
+## N5.2/N5.3. Locked means discouraged, never disabled: a first call against a
+## locked slot only warns, and the caller has to ask again with `confirmed`
+## actually true to make it happen — never a silent block. N5.7: what comes
+## back is shaped for `Carry.take_chunk()` directly, with a lien attached
+## (N5.7 again — a factory part was never yours), so a caller only has to pass
+## the result straight through rather than re-deriving the shape.
+func pull_part(zone_id: String, confirmed := false) -> Dictionary:
 	var part: Dictionary = installed_parts.get(zone_id, {})
+	if part.is_empty():
+		return {"ok": false, "reason": "EMPTY"}
+	if bool(part.get("locked", false)) and not confirmed:
+		return {"ok": false, "reason": "LOCKED", "warning": LOCKED_WARNING}
+	installed_parts.erase(zone_id)
+	WorldHistory.record_event("implant_pulled", {
+		"subject_id": subject_id, "zone": zone_id, "implant": str(part.get("id", "")),
+		"was_locked": bool(part.get("locked", false)),
+	})
+	return {
+		"ok": true,
+		"info": {
+			"subject_id": subject_id,
+			"zone": zone_id,
+			"implant": str(part.get("name", part.get("id", "hardware"))),
+			"condition": implant_condition_ratio(part),
+			# CellOutz put it there; CellOutz's claim on it does not end just
+			# because it is now in your hand instead of your body.
+			"lien": "celloutz",
+		},
+	}
+
+
+func implant_condition_ratio(part: Dictionary) -> float:
 	if part.is_empty():
 		return 0.0
 	return clampf(float(part.get("condition", 0.0)) / maxf(1.0, float(part.get("max_condition", 100.0))), 0.0, 1.0)
+
+
+func implant_condition(zone_id: String) -> float:
+	return implant_condition_ratio(installed_parts.get(zone_id, {}))
 
 
 func damage_implant(zone_id: String, amount: float) -> float:
