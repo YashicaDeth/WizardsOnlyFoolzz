@@ -1523,10 +1523,10 @@ between runs?"* Roguelike structure was asked for, and "bodies remember" is a
 pillar. They pull against each other and the game cannot have both untouched.
 
 - [ ] **T1.1** Decide it — blocked on Greg
-- [ ] **T1.2** Death is an event in the world rather than a reload
-- [ ] **T1.3** Something inherits: a body, a debt, a reputation, a wall of pins
-- [ ] **T1.4** What the world keeps is visible to the player before they risk it
-- [ ] **T1.5** A run has a shape — it starts, it escalates, it ends
+- [x] **T1.2** Death is an event in the world rather than a reload — `systems/run_lifecycle.gd`'s `record_death()`, deliberately built without guessing T1.1's answer: captures the real cause, where the run had reached (`OpeningDirector`), what was being carried (`Carry`), and where the subject stood on the axis (`tree_alignment()`) as one recorded `permanent_death` event, so whatever T1.3 eventually decides should inherit has real material to read from rather than needing a second record built later. Covered by `tests/run_lifecycle_test.gd` (10 checks)
+- [ ] **T1.3** Something inherits: a body, a debt, a reputation, a wall of pins (waits on T1.1)
+- [ ] **T1.4** What the world keeps is visible to the player before they risk it (waits on T1.1)
+- [ ] **T1.5** A run has a shape — it starts, it escalates, it ends (waits on T1.1)
 
 ## U — Your own ladder
 
@@ -1534,11 +1534,11 @@ Greg: *"how you can persuade them to join your ranks your own faction that you
 start through progressing and exploring around the map"*. E is the two ladders
 that already exist. This is the third one, which is yours.
 
-- [ ] **U1.1** Found something — a name, a mark, a first member
-- [ ] **U1.2** Recruits from the clinch and the downed window belong to it
-- [ ] **U1.3** It has standing on the same axis every other faction does
-- [ ] **U1.4** It can be attacked, and it can lose people
-- [ ] **U1.5** Rank inside it is somebody else's problem too — they have opinions
+- [x] **U1.1** Found something — a name, a mark, a first member — `systems/player_faction.gd`'s `found()`: the player becomes a real `WorldHistory` faction's founder, holding CROWN on the exact same rank machinery every other faction uses, with a real recorded `mark` rather than just a name. Refused if one already exists — there is only one
+- [x] **U1.2** Recruits from the clinch and the downed window belong to it — `recruit()`, an API offered for whoever wires the actual clinch/downed resolution (Codex's F5/F6 territory) to call, same relationship this file has to combat as `ritual_app.gd` has to the camera it doesn't hold
+- [x] **U1.3** It has standing on the same axis every other faction does — deliberately *not* a `FACTION_TREE_AXIS` entry (that table is authored, for the seven Sins and the two poles); `standing()` computes the real average `tree_alignment()` of whoever has actually joined, so recruiting someone who was climbing genuinely pulls the faction's own standing up
+- [x] **U1.4** It can be attacked, and it can lose people — `lose_member()` records the real reason (killed, walked away, whatever it was) rather than a silent disappearance, and actually drops them from the roster. The "attacked" half is combat wiring, not attempted here
+- [ ] **U1.5** Rank inside it is somebody else's problem too — they have opinions (needs members with individual reactions to rank changes — not attempted here). Covered in `tests/player_faction_test.gd` (19 checks)
 
 ## V — The road
 
