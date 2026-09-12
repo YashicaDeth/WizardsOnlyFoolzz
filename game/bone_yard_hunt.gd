@@ -23,6 +23,7 @@ const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
 const STORM_WEATHER := preload("res://systems/storm_weather.gd")
 const PERCEPTION := preload("res://systems/perception.gd")
+const GLITCH_SPIDER := preload("res://systems/glitch_spider.gd")
 ## AE1.1. Beyond this, nobody hunting the player needs a light/noise/cover
 ## verdict at all — the same reason `storm_weather.gd`'s exposure only
 ## starts mattering past a real severity, not from the first drop of rain.
@@ -232,6 +233,9 @@ var sun: DirectionalLight3D
 ## AS4. Storms that answer the occult — severity is a read of
 ## `WorldHistory.chaos_magick()`, never authored here.
 var storm_weather: StormWeather
+## PiFrac-DEV Studio's "Glitch Spider particle system" reference. The one
+## burst `_on_reality_misfire()` fires — see `glitch_spider.gd`.
+var glitch_spider: Node3D
 ## AE1.1. How loud the player is being right now, 0..1 — one of
 ## `perception.gd`'s four real inputs. No noise system existed anywhere in
 ## the project before this; sprinting is the one real, if simple, source of
@@ -398,6 +402,9 @@ func _ready() -> void:
 	storm_weather = STORM_WEATHER.new()
 	storm_weather.name = "StormWeather"
 	add_child(storm_weather)
+	glitch_spider = GLITCH_SPIDER.new()
+	glitch_spider.name = "GlitchSpider"
+	add_child(glitch_spider)
 	blood_veil = BLOOD_VEIL.new()
 	$HUD.add_child(blood_veil)
 	_pointer = Control.new()
@@ -3471,6 +3478,11 @@ func _on_reality_misfire(encounter: Dictionary, at: Vector3) -> void:
 	var title_text := str(encounter.get("title", "REALITY MISFIRE"))
 	var summary := str(encounter.get("summary", "Something impossible notices you."))
 	prompt.text = "REALITY MISFIRE // %s\n%s" % [title_text, summary]
+	# A system named "Reality Misfire" had never once made reality visibly
+	# misfire — a text prompt was the whole event. One burst, world-space and
+	# on the screen at once, rather than a fabricated new meaning for the name.
+	if glitch_spider != null and is_instance_valid(glitch_spider):
+		glitch_spider.trigger(at + Vector3.UP, player, psychedelic)
 	var kind := str(encounter.get("kind", "mystery"))
 	if kind in ["hostile", "boss"]:
 		_spawn_encounter_actor(encounter, at)

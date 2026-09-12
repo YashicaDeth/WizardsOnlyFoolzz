@@ -211,6 +211,10 @@ func _ready() -> void:
 		for _hold in 60:
 			scene._update_camera()
 			await get_tree().process_frame
+	elif trigger == "glitch_spider":
+		scene.glitch_spider.trigger(scene.player + Vector3(0, 0.3, -3), scene.player, scene.psychedelic)
+		for _hold in 6:
+			await get_tree().process_frame
 	elif trigger == "storm":
 		# AS4. Force the chaos-magick level up directly rather than waiting on
 		# a ritual, then force a strike so the shot lands mid-crawl instead of
