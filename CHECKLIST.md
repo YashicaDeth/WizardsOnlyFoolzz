@@ -746,12 +746,65 @@ Ascent/Descent axis that already exists and is currently unused.
       rather than merely dimmed. All three in the gallery capture above.
 - [x] ~~**E1.3** Never a good/evil slider — read through the Tree view~~
 
-- [x] ~~**E2.2** The 72 Goetic seals as data~~
-- [ ] **E2.3** Original seals for what this world grew on its own
-- [ ] **E2.4** Seals animate, corrupt, **burn and bind** — Greg: *"burn and bind seals should have their own animation based on real life, where the person's computer motherboard appears in 3D and the seals burn into the microscopic copper stuff as sigils on the board, like a full animation for it when a seal is burnt"*. The right image for this game's whole thesis: a printed circuit board *is* a sigil, drawn in copper, mass-produced. A burn traces itself into the copper and stays; a binding closes a loop on the board that was open. `draw_seal_burning` already exists in `celloutz_type.gd` and only ever ran in 2D — this is the 3D half
-- [ ] **E2.5** The board is a real board: traces, pads, silkscreen, a chip that reads as a chip
-- [ ] **E2.6** Burning is subtractive and binding is additive — one scars the copper, one completes a circuit
-- [ ] **E2.7** A bound seal keeps working while the board keeps power, and a burnt one is gone for the run
+### E2 v2 — burn and bind, in 3D
+Greg: *"burn and bind seals should have their own animation based on real
+life, where the person's computer motherboard appears in 3D and the seals
+burn into the microscopic copper stuff as sigils on the board, like a full
+animation for it when a seal is burnt"*. The right image for this game's
+whole thesis: a printed circuit board *is* a sigil, drawn in copper,
+mass-produced by the million.
+
+- [x] ~~**E2.2** The 72 Goetic seals as data~~ Same item as above — see E2.2.
+- [x] ~~**E2.3** Original seals for what this world grew on its own~~ Same
+      item as above — see E2.3.
+- [x] ~~**E2.4** Seals animate, corrupt, **burn and bind**~~ `draw_seal_burning`
+      existed and only ever ran in 2D; this is the 3D half, and it draws the
+      exact same `CellOutzType.seal_strokes()` geometry the 2D app already
+      uses — never a second shape invented for 3D. New `systems/motherboard.gd`:
+      `begin_bind()` grows the seal additively in the same construction order
+      `draw_seal_forming` reveals it in (ring, then each spoke and its hook or
+      loop, then the chords, then the core), ending as a permanent raised,
+      lit copper trace; `begin_burn()` consumes it from a seeded front the
+      same way `draw_seal_burning` already does, ending — "burn 1.0 leaves
+      nothing but the memory of the ring", kept true in 3D — as a permanent
+      char scar. Both bake onto the board and stay once the animation ends;
+      a board accumulates every seal it has actually carried
+      (`bound_seals`/`burnt_seals`).
+- [x] ~~**E2.5** The board is a real board: traces, pads, silkscreen, a chip
+      that reads as a chip~~ Procedural, the same way every other object in
+      this game is built — no imported asset. Manhattan-routed copper traces
+      (seeded turns, not straight wires, routed around the seal's own
+      reserved patch rather than through it), a black IC package with pins
+      down two sides and a pin-1 notch, a silkscreen outline around its
+      footprint, and two capacitors, so the board reads as populated rather
+      than a diagram with one component on it.
+- [x] ~~**E2.6** Burning is subtractive and binding is additive — one scars
+      the copper, one completes a circuit~~ Built into `begin_bind()`/
+      `begin_burn()` directly (see E2.4) — binding only ever adds strokes,
+      burning only ever removes them, and the two are visually distinct
+      (lit copper vs. dark char) rather than the same mark tinted two colours.
+- [x] ~~**E2.7** A bound seal keeps working while the board keeps power, and
+      a burnt one is gone for the run~~ Decided in `ritual_app.gd`, not the
+      board — `attempt()` reads the exact repeat count `Boons.grant()`
+      already keeps to price a repeat higher (E4.3): a first casting always
+      binds, since burning it on the second use would never let E4.3's
+      escalating cost matter, and the risk of a burn climbs with every
+      repeat after that. A burnt `ritual_id` is written onto the subject
+      (`burnt_rituals`) and every further `attempt()` at it is refused
+      outright — "THIS SEAL IS BURNT. IT WILL NOT ANSWER YOU AGAIN." —
+      permanently, for the rest of the run, rather than merely costing more.
+      Verified: `tests/motherboard_test.gd` (new, 15 checks — a real
+      populated board, a bind growing additively and finishing on its own,
+      a separate burn consuming subtractively, and both sharing the exact
+      2D seal geometry) and `tests/ritual_burn_bind_test.gd` (new, 12 checks
+      — a first casting always binds, repeats can burn deterministically,
+      a burnt seal refuses unconditionally afterward, and the outcome is
+      recorded both on the subject and in the world's own event ledger),
+      plus the existing `ritual_app_test.gd`, `seal_draw_test.gd` and
+      `goetic_seals_test.gd` regression suites, and a windowed capture
+      sequence (`captures/e2_5_motherboard_bare.png`,
+      `e2_4_motherboard_binding.png`, `e2_4_motherboard_bound.png`,
+      `e2_4_motherboard_burning.png`, `e2_4_motherboard_burnt.png`).
 
 ### E3 — Camera rituals
 - [x] **E3.1** Ritual definitions: what must be done, what must be photographed — `systems/ritual_app.gd`'s `RITUALS`: three rites (including Greg's own worked example, five gored heads), each keyed to a real seal from `goetic_seals.gd` and paying its reward through `boons.gd` — E2/E3/E4 as the one system `RITUAL_AND_KARMA.md` says they are, not three
