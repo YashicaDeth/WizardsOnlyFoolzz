@@ -79,12 +79,18 @@ static func draw_reflection(canvas: CanvasItem, rect: Rect2, alpha: float, clock
 ## Damage to a mirror: long forks from an impact point, not a grid of dead
 ## pixels. Deterministic from `seed_value`, so the same device is always broken
 ## in the same places.
-static func draw_cracks(canvas: CanvasItem, rect: Rect2, alpha: float, seed_value: int, severity: float) -> void:
+## C5.6 v3. `origin_norm` used to not exist at all — every device, every
+## impact, cracked from the exact same point (74%, 22% into the rect)
+## regardless of where anything actually happened to it. An impact should
+## crack the glass where it landed, so the caller now says where that was
+## (normalised 0..1 within `rect`); the old fixed point is only the default
+## for a caller that genuinely has no location to give.
+static func draw_cracks(canvas: CanvasItem, rect: Rect2, alpha: float, seed_value: int, severity: float, origin_norm := Vector2(0.74, 0.22)) -> void:
 	if severity <= 0.0:
 		return
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
-	var origin := rect.position + Vector2(rect.size.x * 0.74, rect.size.y * 0.22)
+	var origin := rect.position + rect.size * origin_norm
 	var forks := 3 + int(severity * 6.0)
 	for fork in forks:
 		var heading := rng.randf() * TAU

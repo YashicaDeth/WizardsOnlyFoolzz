@@ -82,6 +82,14 @@ var condition := 0.78
 ## Where the wear came from, in the device's own words. Kept so the status page
 ## can say "quarry impact" rather than showing a percentage.
 var wear_log: Array = []
+## C5.6 v3. Every impact used to crack the glass from the exact same
+## authored point (0.74, 0.22 into the rect) no matter what actually hit it
+## or where. Each entry is `{"at": Vector2, "severity": float}`, normalised
+## within the screen — a real record of where a real impact landed, capped
+## at the most recent few so the case does not accumulate an unreadable
+## spiderweb over a long run.
+var impacts: Array = []
+const MAX_IMPACTS := 5
 var radio: WireRadio
 var carry: Carry
 var signal_field: SignalField
@@ -248,6 +256,7 @@ func load_device() -> void:
 	serial = int(record.get("serial", 90211))
 	condition = clampf(float(record.get("condition", 0.78)), 0.0, 1.0)
 	wear_log = (record.get("wear_log", []) as Array).duplicate()
+	impacts = (record.get("impacts", []) as Array).duplicate(true)
 
 
 func save_device() -> void:
@@ -256,6 +265,7 @@ func save_device() -> void:
 		"serial": serial,
 		"condition": snappedf(condition, 0.001),
 		"wear_log": wear_log.duplicate(),
+		"impacts": impacts.duplicate(true),
 		"kind": "object",
 	}, "device_changed")
 
@@ -263,7 +273,14 @@ func save_device() -> void:
 ## Something happened to it. Wear only ever goes one way — a cracked screen does
 ## not heal, and this is the one number in the game that is allowed to be a
 ## ratchet.
-func take_wear(amount: float, cause := "") -> void:
+##
+## C5.6 v3. `impact_at`, normalised 0..1 within the screen, is where it
+## actually landed. A caller that genuinely has no location (an accumulated
+## wear tick rather than a single blow) can leave it unset — it still gets a
+## real, varied point instead of the one authored spot every crack used to
+## share, derived from the device and how many impacts it has already taken
+## rather than from `Vector2(-1,-1)` meaning "nowhere in particular".
+func take_wear(amount: float, cause := "", impact_at := Vector2(-1, -1)) -> void:
 	if amount <= 0.0:
 		return
 	var before := condition
@@ -272,6 +289,14 @@ func take_wear(amount: float, cause := "") -> void:
 		wear_log.append(cause)
 		while wear_log.size() > 8:
 			wear_log.pop_front()
+	var at := impact_at
+	if at.x < 0.0 or at.y < 0.0:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = (serial + impacts.size() * 7919 + hash(cause)) & 0x7fffffff
+		at = Vector2(rng.randf_range(0.2, 0.85), rng.randf_range(0.12, 0.7))
+	impacts.append({"at": at, "severity": amount})
+	while impacts.size() > MAX_IMPACTS:
+		impacts.pop_front()
 	if int(before * 10.0) != int(condition * 10.0):
 		# Crossing a tenth is worth writing down; every scratch is not.
 		WorldHistory.record_event("device_damaged", {"cause": cause, "condition": snappedf(condition, 0.01)})
@@ -521,7 +546,21 @@ func _draw_chassis(rect: Rect2, alpha: float) -> void:
 	# C5.5 `v2`. Seeded from this device rather than from 90211, and the severity
 	# is how broken it actually is rather than a constant. A pristine handheld
 	# has almost no cracks; one that has been through a derby is a mess.
-	BlackMirror.draw_cracks(self, rect, alpha, serial, clampf(1.0 - condition, 0.0, 1.0))
+	# C5.6 `v3`. One fork cluster per recorded impact, each radiating from
+	# where that particular hit actually landed rather than every crack in
+	# the game sharing one authored point. A device with no recorded impacts
+	# yet (an old save from before `impacts` existed, still carrying wear
+	# from the previous system) falls back to the one legacy cluster so it
+	# does not suddenly read as undamaged.
+	var overall := clampf(1.0 - condition, 0.0, 1.0)
+	if impacts.is_empty():
+		if overall > 0.0:
+			BlackMirror.draw_cracks(self, rect, alpha, serial, overall)
+	else:
+		for index in impacts.size():
+			var impact: Dictionary = impacts[index]
+			var severity := clampf(overall * (0.5 + float(impact.get("severity", 0.05)) * 4.0), 0.0, 1.0)
+			BlackMirror.draw_cracks(self, rect, alpha, serial + index * 101, severity, impact.get("at", Vector2(0.74, 0.22)))
 
 
 func _draw_tabs(rect: Rect2, alpha: float) -> void:
@@ -542,6 +581,12 @@ func _draw_tabs(rect: Rect2, alpha: float) -> void:
 		edge.append(shape[0])
 		draw_polyline(edge, tint * Color(1, 1, 1, alpha), 1.4)
 		CellOutzType.draw_text(self, Vector2(x + 13, y + 6), label, 11.0, (INK if active else tint) * Color(1, 1, 1, alpha), 1.0)
+		# C2.7 v3. jump_to_mode() has reached a page directly since C2.6 v2
+		# and nothing on the device itself ever said so — a control nobody
+		# discovers is a control nobody has. Printed on the tab it actually
+		# jumps to, the same register a real handheld prints a function key
+		# legend in.
+		CellOutzType.draw_condensed(self, Vector2(x + 6, y - 10), "F%d" % (index + 1), 8.0, tint * Color(1, 1, 1, 0.7 * alpha), 0.6)
 		x += width + 8.0
 
 

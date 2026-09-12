@@ -2,12 +2,16 @@
 
 The build record for **Wizards Only Fools**, newest first. Every entry is a real change with the reason it was made; the tag says which part of the game it touched.
 
-**237 changes** · **42,202 lines of game code** · **402 of 735 planned pieces built** across 41 areas
+**239 changes** · **42,727 lines of game code** · **405 of 735 planned pieces built** across 41 areas
 
 ---
 
 ## 2026-09-12
 
+- **a round becomes a thing that travels** `guns`
+  Greg, twice: "the combat system apart of the gun system ect and weapons so bullet weapon and firing ect are all realistic bullets and reload with the things", and then "bullets shells fall on the floor aggressively as the bullet destroys the map".
+- **CHANGES.md: a build record somebody who is not us can read**
+  Greg: "it would be super cool if you can get a working history of the versions and changelogs and updates on the code and the commits for my github page so my freinds can understand the changes instead of me just yapping about nothing".
 - **the game gets an hour** `weather and the hour, look and feel`
   A9.7 v2 was a small ask - "stations have a schedule; the dial is the same at 3am as at noon" - and turned out to be blocked on something nobody had noticed was missing: there is no time of day in this game. No clock, no day, no night, no hour anything can ask for. W1.1 has been sitting unticked with five separate things quietly depending on it. A9.7 stations keeping hours. W1.4 factions keeping hours. AB2.4 damage repairing over a month. AJ4.3 a…
 - **the panel fails intermittently instead of having failed** `look and feel`
