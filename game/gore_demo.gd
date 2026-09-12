@@ -61,6 +61,17 @@ const BLAST_REACH := 9.0
 ## Inside this fraction of the reach a blast shears rather than bruises, which
 ## is the line between losing an arm and being thrown across the room.
 const SHEAR_BAND := 0.45
+## Limbs first, head last.
+##
+## `AnatomyComponent` refuses every hit once the body is dead, and a penetrating
+## hit to the head ruptures a fatal organ. `BaselineHuman.ZONES` begins at the
+## head — so a blast big enough to kill resolved the kill on its first zone and
+## was turned away from the five that were left. Turned away silently, too:
+## `hit()` never checks whether the anatomy accepted, so every refused zone
+## still sprayed and still shed chunks. The room filled with gore, the body kept
+## every limb it had, and nothing anywhere said no. Order is the whole fix —
+## what comes off comes off before what kills.
+const BLAST_ORDER := ["left_arm", "right_arm", "left_leg", "right_leg", "torso", "head"]
 ## What the clock drops to on contact, and for how long in real seconds. Small
 ## on purpose: past about 150ms a hitstop reads as a frame drop, not as a hit.
 const HITSTOP_SCALE := 0.08
@@ -239,7 +250,11 @@ func _explode(at: Vector3, force: float) -> void:
 		# radius-and-damage number, so what comes off is what was actually
 		# there — and each zone is hit as itself, because one point in space
 		# resolves to one zone and that zone was always the torso.
-		for zone: String in BaselineHuman.ZONES:
+		for zone: String in BLAST_ORDER:
+			# There is nothing left to take off a corpse: the anatomy refuses a
+			# dead body, and carrying on only sheds chunks nobody paid for.
+			if rig.anatomy.dead:
+				break
 			var bite: float = force * falloff * randf_range(0.55, 1.3)
 			if bite < 6.0:
 				continue

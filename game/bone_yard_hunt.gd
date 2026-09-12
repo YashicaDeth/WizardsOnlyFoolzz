@@ -4,6 +4,12 @@ extends Node3D
 # Limbo is the realm; Ashbloom is this first irradiated region.
 const PLAYER_SPEED := 7.0
 const SPRINT_SPEED := 12.0
+## AD1.1. Jumping worth doing. `HunterMotor.move_body()` already runs real
+## gravity, air acceleration and floor-stick every physics frame and nothing
+## ever gave it an upward velocity to work with — the whole vertical half of
+## a platformer was sitting there unused. Tuned against `HunterMotor.GRAVITY`
+## (22.0) for roughly a one-metre apex: `sqrt(2 * 22 * 1.0) ≈ 6.6`.
+const JUMP_IMPULSE := 6.6
 ## Worst case a wrecked body can move or swing at, as a share of healthy. The
 ## soulslike register wants injury to hurt; it does not want a player who has
 ## lost a leg to be unable to disengage from the thing that took it.
@@ -211,6 +217,12 @@ var crouching := false
 var strike_windup := -1.0
 var rival_attack_clock := 0.0
 var dodge_remaining := 0.0
+## AD1.1. Set on the keypress, consumed the next physics step. Not applied
+## directly in `_unhandled_input` — `HunterMotor.move_body()` overwrites
+## `velocity.y` from `is_on_floor()` every physics frame, so an impulse
+## given anywhere but immediately after that call is stomped back to
+## `-FLOOR_STICK` before the body has actually left the ground.
+var jump_queued := false
 var dodge_direction := Vector3.ZERO
 var handheld: Control
 ## FINAL_V.md §16. The one screen-space layer AS2's night warp, and later the
@@ -715,8 +727,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_SPACE:
 				if not grapple_target.is_empty():
 					_break_grapple("YOU LET GO")
-				else:
+				elif Input.get_vector("move_left", "move_right", "move_forward", "move_back").length() > 0.1:
+					# A dodge is a directional evasion; standing still and
+					# pressing space is not "dodge in place", it is a jump.
 					_dodge()
+				else:
+					_jump()
 			KEY_Q: _use_prosthetic_surge()
 			KEY_K: _deliberate_redecant()
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -896,6 +912,14 @@ func _update_player(delta: float) -> void:
 	player_capsule.height = move_toward(player_capsule.height, 1.2 if crouching else 1.8, delta * 4.0)
 	player_collider.position.y = (player_capsule.height - 1.8) * 0.5
 	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0)
+	# AD1.1. After move_body(), not before: it overwrites velocity.y from
+	# is_on_floor() every physics frame, so an impulse applied any earlier is
+	# stomped back to -FLOOR_STICK before it ever left the ground.
+	if jump_queued:
+		jump_queued = false
+		if player_body.is_on_floor():
+			player_body.velocity.y = JUMP_IMPULSE
+			WorldHistory.record_event("player_jumped", {"location": HUNT_LOCATION})
 	if player_body.position.y < -10.0:
 		player_body.position = Vector3(0, 1.0, 19)
 	player = player_body.position + Vector3.UP * 0.6
@@ -1543,6 +1567,19 @@ func _dodge() -> void:
 	dodge_direction = HUNTER_MOTOR.dodge_direction(move, yaw)
 	dodge_remaining = 0.28
 	WorldHistory.record_event("player_dodged", {"location": HUNT_LOCATION})
+
+
+## AD1.1. Free rather than costing stamina like a dodge does — jumping is
+## basic traversal, not a combat maneuver, and B6.5's own injury floor
+## already answers "should a wrecked body be doing this" through
+## `_player_speed_scale()`'s effect on how far a jump actually carries.
+## Queued rather than applied here; see `jump_queued`'s own comment.
+func _jump() -> void:
+	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty():
+		return
+	if not player_body.is_on_floor():
+		return
+	jump_queued = true
 
 
 func _use_prosthetic_surge() -> void:
