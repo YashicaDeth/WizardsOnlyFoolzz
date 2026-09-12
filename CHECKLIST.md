@@ -3,6 +3,33 @@
 The working document. The design has outrun the build, so this is how the build
 catches up: **in segments, one at a time, slowly and surely.**
 
+## Versions — how a segment gets better after it is done
+
+Greg, 2026-09-12: *"make it so you can click and change the a1 to a1v2 and its a
+new set of things to reimprove upon the mechanics... up to v3 or v10 would be the
+go with this work system just recycling and reupgrading code over and over"*.
+
+**A tick is not a finish line, it is a version.** This project has already proved
+that: the World Index was marked done three separate times before Hunt Grounds
+actually opened the real one, and the combat has been "reworked" in four separate
+sessions. Binary done/not-done was lying, and versions are the honest shape.
+
+The convention:
+
+- A segment carries a version: `v1` the first time it works, `v2` after a pass
+  that materially improves it, and so on. **v10 is not a target.** Most segments
+  will stop at v1 or v2 and that is correct; a high version means a mechanic
+  earned repeated attention, not that somebody kept fiddling.
+- **A version is never deleted.** Each pass records what it was and why it moved,
+  so the history of a mechanic is readable from the segment itself.
+- **A new version needs a reason stated in one line.** "Polish" is not a reason.
+  "The screen the player actually opens was never the one we rebuilt" is.
+- A segment can go up a version without being reopened. Going *down* is not a
+  thing; if something breaks, that is a bug, not a version.
+- Unbuilt segments have no version. They are not v0 — they are nothing yet.
+
+Written as `v3 —` immediately after the code, with the passes listed under it.
+
 ## The goal
 
 Greg: *"until it's sharper and sharper so that you can play the game."* That is
@@ -99,7 +126,9 @@ and "a game".
 - [x] ~~**A5.5** Cut visible prose by ~60%, per the Tier 1b note~~
 
 ### A6 — Living Map as an object `BUILT`
-- [x] ~~**A6.1** Salvaged bezel — pipes, rust plate, screws — around the chart~~
+- [x] ~~**A6.1** `v2` Salvaged bezel — pipes, rust plate, screws — around the chart~~
+  - v1 — a hand-rolled Environment per scene
+  - v2 — one WorldLook preset system every scene goes through
 - [x] ~~**A6.2** Named discovered places with a description panel~~
 - [x] ~~**A6.3** Location-based travel~~
 - [x] ~~**A6.4** Cracked-screen occlusion over unsurveyed ground~~
@@ -204,7 +233,9 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B6.2** Sever from a directional blow crossing a limb threshold *mid-fight*~~
 - [x] ~~**B6.3** The fight continues with them still in it, fighting worse~~
 - [x] ~~**B6.4** The severed limb is a chunk: pick it up, carry it, sell it, hit someone with it~~
-- [x] ~~**B6.5** Reciprocity — the player is dismembered and keeps playing~~
+- [x] ~~**B6.5** `v2` Reciprocity — the player is dismembered and keeps playing~~
+  - v1 — losing a limb ends the fight
+  - v2 — the fight continues in both directions, and the stump bleeds on everyone's clock
 - [x] ~~**B6.6** Stump behaviour: bleed rate, one-armed movement and attacks~~
 
 ---
@@ -509,7 +540,9 @@ probe actually says, so the next attempt does not start from scratch:
 - [x] ~~**G4.3** Leaning and settling, so nothing is plumb~~
 
 ### G5 — Sound rework
-- [x] **G5.1** Bus structure built, mixable, and everything actually routed through it
+- [x] **G5.1** `v2` Bus structure built, mixable, and everything actually routed through it
+  - v1 — the four buses built and driven from the settings screen
+  - v2 — everything actually routed through them; ensure() repairs a chain that bypasses the mixer
 - [x] ~~**G5.2** Engine layered by load rather than one pitched sine~~ A third
       `engine_strain` layer joins the existing low/high pair, gated to only
       exist above 72% effort so redline reads as a distinct band arriving
@@ -518,7 +551,9 @@ probe actually says, so the next attempt does not start from scratch:
       `impact_body` layer stacks on top of the material voice once a hit
       passes 50% intensity, so severity is heard as added weight rather than
       the same one-shot played louder. Verified: `tests/audio_test.tscn` (G5.3 section)
-- [x] **G5.4** Per-layer gore sound — bone cracks, organs burst, cybernetics fault (shares with B4.8)
+- [x] **G5.4** `v2` Per-layer gore sound — bone cracks, organs burst, cybernetics fault (shares with B4.8)
+  - v1 — six layer profiles, one shape with different numbers
+  - v2 — a layer is an event: bone cracks, organs burst, cybernetics fault
 
 ### G6 — The opening, directed
 - [x] ~~**G6.1** Pacing and camera~~
@@ -566,7 +601,9 @@ world holds what happened, each faction holds what it believes, and the Board
 holds what the *player* thinks — which is allowed to be wrong.
 
 ### L1 — The surface
-- [x] **L1.1** Corkboard, pinned cards, string, pan and zoom
+- [x] **L1.1** `v2` Corkboard, pinned cards, string, pan and zoom
+  - v1 — the wall read out of WorldHistory, populated automatically
+  - v2 — the player pins it themselves; only the theories and one card are pre-placed
 - [x] **L1.2** Populated from WorldHistory — people, factions and events; posts and parts pending L2
 - [x] **L1.3** Made rather than rendered: tape, stains, marker, torn edges, pin holes
 - [x] **L1.4** Legible from across the room as a shape, up close as cards
@@ -639,15 +676,22 @@ From `DESIGN/INTERFACE_DIRECTION.md`.
 ### I0 — No screen is a list of text in a box
 The standing rule. If a screen's information could be a spreadsheet, it is not
 finished. Applies to everything below and to A5, A6, C1.
-- [x] ~~**I0.1** Applied to the World Index~~
+- [x] ~~**I0.1** `v3` Applied to the World Index~~
+  - v1 — built as one of six separate panels
+  - v2 — dragged out of the box: stencil type, code-rain substrate, pointable links
+  - v3 — Hunt Grounds finally opens the real one; the Label it had been opening is deleted
 - [x] **I0.2** Applied to the derby HUD — the rejected overlay is gone; the arena is the interface
 - [x] **I0.5** The handheld becomes a black cracked mirror you look *into*, jester on the back
 - [x] **I0.6** Kill the HUNT SIGNAL corner plate — a rival arrives when they change, not permanently
 - [x] **I0.7** Hull read off the car, not off a number in a corner
 - [x] **I0.8** The weapon well is a torn recess of gun, chambers and loose rounds — not a label/count row
 - [ ] **I0.9** Cast display names reworked — ids stay, names change (blocked on Greg's list)
-- [x] **I0.3** Applied to the map — the key is deleted, marks read by shape, metadata is a title block
-- [x] **I0.4** Applied to the handheld — CARRY draws what you took as objects in a bag, not rows
+- [x] **I0.3** `v2` Applied to the map — the key is deleted, marks read by shape, metadata is a title block
+  - v1 — a chart with a legend and a header strip, in the system font
+  - v2 — the key deleted, marks told apart by shape, metadata moved into a title block
+- [x] **I0.4** `v2` Applied to the handheld — CARRY draws what you took as objects in a bag, not rows
+  - v1 — name / condition / weight in aligned columns
+  - v2 — objects in a bag, sized by mass and tagged with whose they were
 
 ### I1 — Code as a material
 - [x] **I1.1** Character rain carrying the game's own vocabulary
@@ -773,7 +817,9 @@ distortion, scale and horizon errors that were invisible at 72 become the whole
 image.
 - [x] ~~**M4.1** Scale is consistent — a door, a car and a person agree about how big a person is~~ Doorways have a lintel at 2.15 m and walls are banded per storey, so the world states human scale in its geometry; separately, Mara's rebuilt wrecker prop in `bone_yard_hunt.gd` was scaled 0.78 against the same `scrap_skiff.glb` at 1.05-1.176 in `rift_derby.gd` — a third smaller for no reason other than which file spawned it — and is now matched to 1.15. Player and NPC rigs already share one capsule height, verified side by side in a third-person capture.
 - [x] **M4.2** Eye at 1.68 m off a 1.8 m body, dropping exactly as far as a crouch shortens it
-- [x] **M4.3** FOV stated as the vertical angle Godot actually uses — ~110° across, not 134°
+- [x] **M4.3** `v2` FOV stated as the vertical angle Godot actually uses — ~110° across, not 134°
+  - v1 — FOV raised to 106 for the Cruelty Squad register
+  - v2 — 106 was the vertical angle, so it meant 134 across. 78 is the ~110 actually wanted
 - [~] **M4.4** Weapon and hand framing hold up at the wide FOV without looking bolted on.
       Measured, not guessed: `hunter_arsenal.gd`'s weapon models were positioned
       before M4.1-M4.3 corrected the FOV and eye height, and sat entirely
@@ -872,7 +918,9 @@ what that is rather than fixing another symptom.
 
 ### O2 — Weight
 - [x] **O2.1** Cleaver windup 0.16s → 0.28s; a heavy blade is readable before it lands
-- [x] **O2.2** Hitstop, camera kick and shake on contact, scaled by the zone's own health
+- [x] **O2.2** `v2` Hitstop, camera kick and shake on contact, scaled by the zone's own health
+  - v1 — aim resolution, lock-on and gore fixed across three sessions
+  - v2 — measurement found the real fault: no hitstop existed anywhere in the game
 - [x] **O2.3** A miss carries the weapon through and moves the camera; it never stops time
 - [x] **O2.4** Hold X to guard; the first 0.18s is a parry. Three answers now, not one
 
