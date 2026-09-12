@@ -176,3 +176,73 @@ None of these stop work, but each one changes what gets built:
 6. ~~Working title: keep *Allusions to Grandeur* or move to **wizardsonlyfoolz**?~~
    **Answered 2026-09-12: *Wizards Only Fools***, per `CHECKLIST.md` open
    question 8. Repo path and identifiers unchanged.
+
+---
+
+# Update — 12 Sep 2026, evening
+
+The checklist has grown a great deal since this file was written. It now runs
+**A to Z and then AA, AB, AC, AD, AE, AF** — 32 sections, ~600 segments. Read
+`CHECKLIST.md` for the detail; what follows is only what changed about *who owns
+what* and *how work is now tracked*.
+
+## The version ladder — read this before picking anything up
+
+A tick is no longer a finish line. Every segment carries a version, and the rules
+are at the top of `CHECKLIST.md` under "Versions". The short form:
+
+- `v1` the first time it works, `v2` after a pass that materially improves it.
+- **Closing a version opens the next one.** When you tick `vN`, write `vN+1`
+  before you finish, with its reason, in one line.
+- **`vN+1` may only address what `vN` produced or exposed** — never a fresh idea
+  that could have been done at v1.
+- A version that cannot state a real fault is not written. A finished mechanic is
+  allowed to exist.
+- `v9` is the ceiling.
+
+A section's later passes live in a `### X v2 — the second pass` subsection at the
+end of that section. The published build sheet renders them as a V1/V2/V3 switch.
+
+## New sections, and who has them
+
+| Section | What | Owner |
+| --- | --- | --- |
+| **AA** The land takes a side | Holdings given to the ascent or to corruption; the map changes colour for good | **C** (it is E and K territory) |
+| **AB** Destruction | Everything breaks, the world keeps the damage, raiding is the verb | **B** |
+| **AC** Fluid, weather, fire | The most expensive section here. AC1.1 is deciding whether it exists at all | **B**, after AB |
+| **AD** Movement and first person | Greg's stated priority: jumping, vaulting, wall running, a diegetic HUD | **A** |
+| **AE** Sneaking and the law | Nobody has ever come to arrest anybody | **C** |
+| **AF** Guns, properly | A round is a raycast today. It needs to be a thing that travels | **A** |
+| **N5** The cybernetic slots | Factory hardware, locked, and a warning in CellOutz's voice | **A** |
+
+## What changed in the existing lanes
+
+- **F is effectively finished** at 20/21, and **F4.2 is now closed**: LimboAI is
+  adopted, narrowly, in `rival_tactics.gd`. It was used for the layer that did
+  not exist rather than as a rewrite of the encounter AI, which works. Do not
+  port the state machine into behaviour trees.
+- **K is sealed** at 14/14 and already has a v2 in progress.
+- **O has been through a complete second pass** — all five v2 items closed by
+  three agents working the list independently. It is at v3/v4 now.
+- **G is 21/24.** G2 landed; G3.1 (re-author the oval) is the blocker for
+  G3.2 and A7.7.
+- **Z1.1 is done**: the game exports. `P:\GameDev\build\windows\` holds a
+  working `WizardsOnlyFools.exe`. Zip that folder to give the game to somebody.
+
+## The rule that keeps costing us
+
+Three separate times today an agent has worked directly in
+`P:\GameDev\AllusionsTooGrandeur` rather than its own worktree. Once it left a
+half-finished merge in `hunter_arsenal.gd` that broke every run until it was
+resolved by hand. Once it produced good E and K work that had to be committed
+under somebody else's name. **Work in your own worktree.** If you are reading
+this and your prompt says you are Agent A, you are not — Agent A is a separate
+session in the Claude desktop app.
+
+## Still blocked on Greg
+
+1. The four **Horsemen's names** — blocks K2.
+2. **Cast display names** — blocks I0.9.
+3. **celloutz.xyz**: mirror or fictionalise — blocks I3.
+4. **What persists between runs** — blocks all of T, and shapes the demo.
+5. **AC1.1**: does this game have simulated fluid, or painted fluid done well?
