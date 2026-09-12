@@ -136,6 +136,40 @@ func _ready() -> void:
 	# what the contamination itself emits. A tint would photograph as nothing
 	# here, which is exactly what this map was up to v4.
 	await _shoot(out_dir, "chart_bloom", 0.0, false, false)
+
+	# A8.2. The melt, against the one flat backdrop this project has. In the
+	# Hunt Grounds every framing puts the player in front of a lit wreck pile
+	# that is soft and warm on its own, and a control frame with the shell
+	# hidden proved that smear was the scenery rather than the shader. Here the
+	# wall behind is a single dirt material with straight seams in it, so a
+	# displacement has something to displace that anybody can see move.
+	var burning := Node3D.new()
+	burning.position = Vector3(0, 0.35, 0)
+	add_child(burning)
+	var body := MeshInstance3D.new()
+	var body_mesh := SphereMesh.new()
+	body_mesh.radius = 0.62
+	body_mesh.height = 1.24
+	body_mesh.radial_segments = 48
+	body_mesh.rings = 24
+	body_mesh.material = WorldLook.surface(Color("7a3b34"), "flesh", 11)
+	body.mesh = body_mesh
+	burning.add_child(body)
+	var spirit := UndyingFlame.new()
+	burning.add_child(spirit)
+	spirit.ignite(burning)
+	# A body with nothing left, which is when the spirit is doing the most.
+	spirit.set_condition(0.0)
+	for index in KINDS.size():
+		get_child(4 + index * 2).visible = false
+	var melt_shell := spirit.get_node_or_null("FlameMelt") as MeshInstance3D
+	for exposure: Array in [["off", false], ["on", true]]:
+		if melt_shell != null:
+			melt_shell.visible = bool(exposure[1])
+		for _tick in 4:
+			await get_tree().physics_frame
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/flame_melt_%s.png" % [out_dir, exposure[0]])
 	print("CHART_DONE")
 	get_tree().quit()
 

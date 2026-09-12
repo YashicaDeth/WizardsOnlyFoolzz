@@ -164,5 +164,61 @@ func _ready() -> void:
 		print("GODS_AT %02d up=%d facing=%s seen=%d" % [
 			int(hour), present.size(), body["name"], WorldHistory.event_count("god_seen"),
 		])
+	# A8.1 / A8.2. The spirit, seen from outside the body — intact first, then
+	# with the body actually taken apart rather than the dial turned by hand,
+	# since the claim is that the flame reads the anatomy.
+	WorldClock.set_hour(1.0)
+	hunt._update_day_night()
+	hunt.third_person = true
+	hunt.body_motion.set_perspective(false)
+	hunt.player_body.position = Vector3(-6, 0.9, -4)
+	hunt.yaw = 0.6
+	hunt.pitch = 0.0
+	for _tick in 24:
+		await get_tree().physics_frame
+	hunt._update_camera()
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("%s/flame_intact.png" % out_dir)
+	print("FLAME_INTACT condition=%.2f" % hunt.player_rig.anatomy.combat_ratio())
+
+	for zone: String in ["left_arm", "right_arm", "torso", "left_leg", "head"]:
+		hunt.player_rig.hit(zone, 55.0, 0.0, "blunt")
+	for _tick in 16:
+		await get_tree().physics_frame
+	hunt._update_camera()
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("%s/flame_showing.png" % out_dir)
+	print("FLAME_WRECKED condition=%.2f" % hunt.player_rig.anatomy.combat_ratio())
+
+	# Control. The first melt build smeared half the frame and the obvious
+	# suspect was the shell, so the shell comes off and the same frame is shot
+	# again: whatever survives this was never A8.2's doing.
+	var shell := hunt.flame.get_node_or_null("FlameMelt") as MeshInstance3D
+	if shell != null:
+		shell.visible = false
+	for _tick in 8:
+		await get_tree().physics_frame
+	hunt._update_camera()
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("%s/flame_nomelt.png" % out_dir)
+	if shell != null:
+		shell.visible = true
+
+	# A8.2, isolated. The wrecked body against open sky rather than against a
+	# lit wreck pile: the first attempt at this shot framed a rusted heap that
+	# is soft and warm on its own, and the melt could not be told from it — a
+	# control frame with the shell hidden proved the smear was the scenery.
+	hunt.pitch = 0.32
+	for _tick in 10:
+		await get_tree().physics_frame
+	get_tree().paused = true
+	for exposure: Array in [["off", false], ["on", true]]:
+		if shell != null:
+			shell.visible = bool(exposure[1])
+		hunt._update_camera()
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/melt_%s.png" % [out_dir, exposure[0]])
+	get_tree().paused = false
+
 	print("CAPTURE_DONE")
 	get_tree().quit()

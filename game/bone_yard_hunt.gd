@@ -282,6 +282,8 @@ const GATE_LIGHTS := [
 var night_lights: Array[OmniLight3D] = []
 ## A7.1. Who is up, and the hour that decides it.
 var gods: Gods
+## A8.1. The spirit on the body, and the frame melting around it.
+var flame: UndyingFlame
 ## AS2. Built once in `_build_world()`, driven every frame in
 ## `_update_day_night()` off `world_clock.gd` — it used to sit at one fixed
 ## angle and brightness no matter the hour, which is why W1.1 existing made no
@@ -520,6 +522,13 @@ func _build_player_rig() -> void:
 	# The capsule is centred on the controller origin, so drop the rig by half
 	# its height to stand the feet on the floor rather than mid-shin.
 	player_rig.position = Vector3(0, -0.9, 0)
+	# A8.1. Lit at build, on the rig itself rather than on the camera or the
+	# HUD: what burns here is the body, and every previous attempt at this was
+	# an overlay that stayed exactly as bright when the body was not in frame.
+	flame = UndyingFlame.new()
+	flame.name = "UndyingFlame"
+	player_rig.add_child(flame)
+	flame.ignite(player_rig)
 	var saved: Dictionary = WorldHistory.subject("player")
 	# D4.2. The race you were decanted as is a silhouette, not just a stat block.
 	# A Marrow-Cut stands bigger than an Unreset, and until now every body in the
@@ -841,6 +850,7 @@ func _physics_process(delta: float) -> void:
 		return
 	pulse += delta
 	_update_handheld_lamp(delta)
+	_update_flame()
 	# W1.1. The world keeps time, and exactly one place advances it — a clock
 	# that two scenes both wind runs at double speed the moment anybody
 	# builds a third.
@@ -3687,6 +3697,18 @@ func _place_night_light(at: Vector3, color: Color, energy: float, reach: float, 
 	night_lights.append(lamp)
 	LightWarp.attach(lamp)
 	return lamp
+
+
+## A8.1 / A8.2. The spirit shows through as the body fails, which is the one
+## reading in this game that gets stronger the worse things are going. Driven
+## off the same `combat_ratio()` the damage model already keeps, so the flame
+## can never disagree with the body it is burning on.
+func _update_flame() -> void:
+	if flame == null or not is_instance_valid(flame):
+		return
+	if player_rig == null or not is_instance_valid(player_rig):
+		return
+	flame.set_condition(player_rig.anatomy.combat_ratio())
 
 
 ## A7.2. A sighting is not decoration: `gods.gd` has already written it into
