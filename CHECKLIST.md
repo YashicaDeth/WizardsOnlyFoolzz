@@ -322,9 +322,9 @@ Ascent/Descent axis that already exists and is currently unused.
 - [ ] **E2.4** Seals animate, corrupt and burn
 
 ### E3 — Camera rituals
-- [ ] **E3.1** Ritual definitions: what must be done, what must be photographed
-- [ ] **E3.2** Verify the photograph against real anatomy (needs C3.3)
-- [ ] **E3.3** Rituals are playable, never a confirm button
+- [x] **E3.1** Ritual definitions: what must be done, what must be photographed
+- [x] **E3.2** Verify the photograph against real anatomy (needs C3.3)
+- [x] **E3.3** Rituals are playable, never a confirm button
 
 ### E4 — Temporary boosts, real costs
 - [ ] **E4.1** Boosts are always temporary

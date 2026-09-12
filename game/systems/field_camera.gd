@@ -110,8 +110,11 @@ static func describe(contents: Array) -> String:
 ## a ritual is.
 ##
 ## Supported: `zone` with `state` of severed / destroyed / opened, `organ` with
-## ruptured, `state` of dead or downed, an optional `subject`, and a `count` of
-## how many separate bodies must satisfy it.
+## ruptured, `state` of dead or downed, optional `dead` / `downed` predicates,
+## an optional `subject`, and a `count` of how many separate bodies must satisfy
+## it. `all_of` combines claims on each *same* body before the distinct-subject
+## count is applied, so five dead people plus five damaged living people cannot
+## accidentally satisfy a request for five dead damaged people.
 static func verify(photo: Dictionary, requirement: Dictionary) -> Dictionary:
 	var matched: Array[String] = []
 	for entry in (photo.get("contents", []) as Array):
@@ -133,7 +136,16 @@ static func verify(photo: Dictionary, requirement: Dictionary) -> Dictionary:
 
 
 static func _satisfies(record: Dictionary, requirement: Dictionary) -> bool:
+	if requirement.has("all_of"):
+		for raw_part in requirement.get("all_of", []) as Array:
+			if not raw_part is Dictionary or not _satisfies(record, raw_part as Dictionary):
+				return false
+		return true
 	var state := str(requirement.get("state", ""))
+	if bool(requirement.get("dead", false)) and not bool(record.get("dead", false)):
+		return false
+	if bool(requirement.get("downed", false)) and not (bool(record.get("downed", false)) or bool(record.get("dead", false))):
+		return false
 	if state == "dead" and not bool(record.get("dead", false)):
 		return false
 	if state == "downed" and not (bool(record.get("downed", false)) or bool(record.get("dead", false))):

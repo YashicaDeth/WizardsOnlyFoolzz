@@ -27,6 +27,7 @@ const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 const CARRION_SCAVENGER := preload("res://systems/carrion_scavenger.gd")
+const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 
 var player := Vector3(0, 1.5, 19)
 var yaw := PI
@@ -1792,8 +1793,17 @@ func _take_photograph() -> Dictionary:
 		"in_frame": (photo.contents as Array).size(),
 		"location": HUNT_LOCATION,
 	})
+	# E3.3. A rite is satisfied by doing the thing and recording it. The photo is
+	# submitted as it is taken; there is no separate acceptance screen or button
+	# that could make the evidence into a menu chore.
+	var ritual_result := RITUAL_LEDGER.submit_photo(photo)
+	var completed: Array = ritual_result.get("completed", []) as Array
 	var count: int = (photo.contents as Array).size()
-	prompt.text = "PHOTOGRAPH / %s" % (str(photo.caption) if count > 0 else "NOTHING IN FRAME")
+	if not completed.is_empty():
+		var ritual: Dictionary = completed[0]
+		prompt.text = "RITE FILED / %s" % str(ritual.get("label", "EVIDENCE ACCEPTED"))
+	else:
+		prompt.text = "PHOTOGRAPH / %s" % (str(photo.caption) if count > 0 else "NOTHING IN FRAME")
 	return photo
 
 
@@ -1989,7 +1999,7 @@ func _refresh_archive() -> void:
 
 func _update_hud() -> void:
 	title.text = "ALLUSIONS TO GRANDEUR // LIMBO: ASHBLOOM EXPANSE"
-	status.text = "WASD MOVE  SHIFT RUN  LMB STRIKE  SPACE DODGE  Q SURGE\nE INTERACT  TAB INDEX  M MAP  T TREE  J ALLUSIONS  F CAMERA"
+	status.text = "WASD MOVE  SHIFT RUN  LMB STRIKE  SPACE DODGE  Q SURGE\nE INTERACT  G DEVICE  N CAMERA  F PERSPECTIVE  TAB INDEX"
 	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(HUNT_ID).get("status", "dormant")).to_upper()]
 	prompt.visible = not resolution_ui.visible and not living_map.visible
 	if panel.visible:
