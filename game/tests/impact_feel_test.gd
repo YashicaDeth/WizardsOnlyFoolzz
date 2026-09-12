@@ -87,10 +87,11 @@ func _ready() -> void:
 	# And the scene can leave mid-hit without stranding the game in slow motion.
 	feel.strike(1.0, "cut", true)
 	_check(feel.holding(), "time is held")
-	feel.queue_free()
+	remove_child(feel)
 	await get_tree().process_frame
-	await get_tree().process_frame
-	_check(is_equal_approx(feel.scale_for("player"), 1.0), "and leaving the scene mid-hit restores it")
+	_check(not feel.holding(), "and leaving the scene mid-hit releases it")
+	_check(is_equal_approx(feel.scale_for("player"), 1.0), "so nothing is left running slow")
+	feel.free()
 
 	print("")
 	if failures.is_empty():

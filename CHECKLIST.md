@@ -1095,8 +1095,13 @@ hitpoints. `clinch_test.gd` and F7 already exist; this is the rest of it.
       more slowly" / "hits less hard") — just never checked off. Guarded by
       the new `tests/enemy_ai_test.gd` (5 checks) for O4.1/O4.2.
 
+### O v3 — the third pass
+Opened because O2.5 closed at v2. A fault the v2 work itself created.
+
+- [ ] **O2.7** `v3` Only the encounter loop honours `scale_for()`; the player's own cooldowns, the rig animations and the gore still run at full speed during a hit they are part of
+
 ### O v2 — the second pass
-- [ ] **O2.5** `v2` Hitstop is global `Engine.time_scale`, so your blow freezes every other fight in the region too
+- [x] **O2.5** `v2` Hitstop is local — the two bodies in the exchange slow, the region does not. The global clock is never touched
 - [x] ~~**O2.6** `v2` The guard has no direction — it holds equally against
       something behind you~~ `guard_absorb()` never took an attacker position
       at all, so raising the guard toward whatever you were looking at
@@ -1129,7 +1134,20 @@ hitpoints. `clinch_test.gd` and F7 already exist; this is the rest of it.
       the full grapple/clinch suite, `enemy_ai_test`, `combat_integration_test`
       and `opening_test` all still pass.
 - [ ] **O5.11** `v2` Swing momentum reads the body's velocity and ignores where the weapon was actually pointed
-- [ ] **O3.5** `v2` Nothing a body wears or has grown changes what a blow does to it — armour and plating are not in the resolution at all
+- [x] ~~**O3.5** `v2` Nothing a body wears or has grown changes what a blow does
+      to it — armour and plating are not in the resolution at all~~ Audited
+      rather than built: `anatomy_component.gd`'s `apply_hit()` already reads
+      `installed.armor` scaled by the implant's own condition and reduces the
+      applied damage by it, on every rig — this was written this session
+      (B2.2/B2.3) and the claim simply predates it. This project's plating is
+      surgical rather than worn, which fits the register — a "ceramic
+      sternum" or a "load-bearing spine cage" out of `implant_catalog.gd` is
+      the armour, not a jacket. Verified rather than assumed:
+      `tests/armor_resolution_test.gd` (5 checks — a plated zone takes
+      measurably less damage, the reduction matches the plate's own rating
+      exactly, a battered plate protects less than a fresh one of the same
+      rating, and the player's own opening-hand torque arm is not exempt from
+      any of it).
 
 ## P — The demo
 
