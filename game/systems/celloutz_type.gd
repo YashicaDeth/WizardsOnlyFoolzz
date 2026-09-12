@@ -179,3 +179,41 @@ static func draw_worn(canvas: CanvasItem, at: Vector2, text: String, cap_height:
 static func draw_stamped(canvas: CanvasItem, at: Vector2, text: String, cap_height: float, color: Color, ghost: Color, tracking := 0.0) -> float:
 	draw_text(canvas, at + Vector2(cap_height * 0.06, cap_height * 0.05), text, cap_height, ghost, tracking)
 	return draw_text(canvas, at, text, cap_height, color, tracking)
+
+
+## E2.1. The ritual alphabet is made of the same cut strokes as the display
+## face. A seal is deliberately only geometry: its name, cost and meaning are
+## authored later in E2.2/E2.3, so this vocabulary cannot smuggle a real-world
+## occult system into the game.
+##
+## `strokes` uses points in a centred -1..1 square. Keep intentional gaps as
+## separate strokes, exactly as GLYPHS does for stencil bridges.
+static func seal_stroke_points(stroke: Array, at: Vector2, radius: float, rotation := 0.0) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for point in stroke:
+		if not point is Array or point.size() < 2:
+			continue
+		var local := Vector2(float(point[0]), float(point[1])) * radius
+		points.append(at + local.rotated(rotation))
+	return points
+
+
+## Draw one mark from authored stroke paths. The doubled ghost makes it read as
+## a stamped, failing instrument rather than pristine diagram linework.
+static func draw_seal(canvas: CanvasItem, at: Vector2, strokes: Array, radius: float, color: Color, rotation := 0.0, weight := 0.0) -> void:
+	var thickness := weight if weight > 0.0 else maxf(1.0, radius * 0.075)
+	var ghost := color * Color(1.0, 1.0, 1.0, 0.22)
+	for stroke in strokes:
+		var points := seal_stroke_points(stroke, at, radius, rotation)
+		if points.size() < 2:
+			continue
+		var offset := Vector2(radius * 0.035, radius * 0.025).rotated(rotation)
+		if points.size() == 2:
+			canvas.draw_line(points[0] + offset, points[1] + offset, ghost, thickness * 1.7)
+			canvas.draw_line(points[0], points[1], color, thickness)
+		else:
+			var echo := PackedVector2Array()
+			for point in points:
+				echo.append(point + offset)
+			canvas.draw_polyline(echo, ghost, thickness * 1.7)
+			canvas.draw_polyline(points, color, thickness)
