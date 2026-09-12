@@ -529,6 +529,18 @@ func _on_went_down() -> void:
 	went_down.emit()
 
 
+## B2.7v2. This uses the anatomy's shared posture answer, rather than making
+## every caller invent a limp. It is a visible state of the rig and therefore
+## applies equally to a rival, a derby driver, and the player body.
+func _apply_pain_posture(delta: float) -> void:
+	if anatomy == null or anatomy.downed or anatomy.dead:
+		return
+	var posture := anatomy.posture()
+	var ease := clampf(delta * 8.0, 0.0, 1.0)
+	rotation.x = lerpf(rotation.x, float(posture.hunch), ease)
+	rotation.z = lerpf(rotation.z, float(posture.lean), ease)
+
+
 ## The resolutions the downed window exists for. Each is a different answer to
 ## the same question, and each leaves the world in a different state.
 func execute(method := "executed") -> void:
@@ -896,6 +908,7 @@ func _add_stump(zone_id: String) -> void:
 
 
 func _process(delta: float) -> void:
+	_apply_pain_posture(delta)
 	if _loose.is_empty():
 		return
 	for index in range(_loose.size() - 1, -1, -1):

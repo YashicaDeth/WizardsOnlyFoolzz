@@ -22,6 +22,7 @@ func _ready() -> void:
 	_test_legacy_names()
 	_test_damage_lands_where_aimed()
 	_test_hit_geometry()
+	_test_pain_posture()
 	_test_severing()
 	_test_prosthetic()
 	_test_gore()
@@ -141,6 +142,19 @@ func _test_severing() -> void:
 	for i in 20:
 		body.hit("torso", 40.0, 20.0, "blunt")
 	check(not body.severed.has("torso"), "a torso is never severed, however destroyed")
+	body.queue_free()
+
+
+func _test_pain_posture() -> void:
+	var body := _rig()
+	body.gore = false
+	var mobility_before := body.anatomy.mobility_ratio()
+	body.hit("torso", 24.0, 10.0, "blunt")
+	var posture := body.anatomy.posture()
+	check(str(posture.state) == "guarded" and float(posture.hunch) < 0.0, "ordinary pain produces a guarded posture before a performance penalty")
+	check(is_equal_approx(body.anatomy.mobility_ratio(), mobility_before), "guarded pain does not yet reduce mobility")
+	body._apply_pain_posture(1.0)
+	check(body.rotation.x < -0.01, "the rig visibly hunches when its anatomy reports pain")
 	body.queue_free()
 
 

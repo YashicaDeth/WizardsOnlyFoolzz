@@ -171,7 +171,7 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B2.4** Authored implant meshes per catalogue entry~~
 - [x] ~~**B2.5** Wounds carry a zone at authoring time — kills the second keyword table~~
 - [x] ~~**B2.6** Compare view: your part against theirs, which is the robbing decision~~
-- [ ] **B2.7v2** Pain is a number with no behaviour of its own: it should change how a body stands before it changes what it can do
+- [x] ~~**B2.7v2** Pain is a number with no behaviour of its own: it should change how a body stands before it changes what it can do~~
 
 ### B3 — The X-ray cursor `BUILT`
 - [x] ~~**B3.1** Brass ring, real button, skull mark, key and click through one path~~

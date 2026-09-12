@@ -53,6 +53,11 @@ var organs: Dictionary = {}
 var installed_parts: Dictionary = {}
 var wounds: Array[Dictionary] = []
 
+## B2.7v2. Pain should announce itself through a guarded body before it turns
+## into an invisible performance debuff. This is deliberately above routine
+## combat pain: a person can be hurting, and visibly so, while still moving.
+const FUNCTIONAL_PAIN := 55.0
+
 
 func configure(id: String, capacity: float = 5000.0, cybernetics: Variant = {}) -> void:
 	subject_id = id
@@ -239,6 +244,19 @@ func xray_findings() -> Array[String]:
 	return findings
 
 
+func posture() -> Dictionary:
+	var visual_pain := clampf(pain / FUNCTIONAL_PAIN, 0.0, 1.0)
+	var left_leg: Dictionary = zones.get("left_leg", DEFAULT_ZONES.left_leg)
+	var right_leg: Dictionary = zones.get("right_leg", DEFAULT_ZONES.right_leg)
+	var left_ratio := float(left_leg.health) / float(DEFAULT_ZONES.left_leg.health)
+	var right_ratio := float(right_leg.health) / float(DEFAULT_ZONES.right_leg.health)
+	return {
+		"state": "upright" if visual_pain < 0.12 else ("guarded" if visual_pain < 0.72 else "faltering"),
+		"hunch": -visual_pain * 0.085,
+		"lean": clampf((right_ratio - left_ratio) * 0.16, -0.16, 0.16),
+	}
+
+
 func mobility_ratio() -> float:
 	var left: Dictionary = zones.get("left_leg", DEFAULT_ZONES.left_leg)
 	var right: Dictionary = zones.get("right_leg", DEFAULT_ZONES.right_leg)
@@ -247,7 +265,8 @@ func mobility_ratio() -> float:
 	# legs can produce, and no amount of pain management brings it back.
 	if not organ_ok("spine"):
 		return 0.05
-	return clampf(limb_ratio * (1.0 - pain * 0.004), 0.18, 1.0)
+	var functional_pain := maxf(0.0, pain - FUNCTIONAL_PAIN)
+	return clampf(limb_ratio * (1.0 - functional_pain * 0.008), 0.18, 1.0)
 
 
 func combat_ratio() -> float:
