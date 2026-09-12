@@ -2,6 +2,23 @@
 
 ## 2026 09 12
 
+- **M4: the wide FOV was a fisheye, and the eye was in the wrong place.** Two
+  perspective faults, one of them introduced an hour earlier by me.
+  Godot's `Camera3D.fov` is the **vertical** angle — `keep_aspect` defaults to
+  KEEP_HEIGHT — so writing 106 meant **134 degrees horizontal** at 16:9. That is
+  a fisheye lens rather than a wide one, and well past anything Cruelty Squad
+  does. The first-person FOV is 78 vertical now, which is the ~110 degrees
+  across that was actually wanted, and third person is 63 (~95 across). Keeping
+  the vertical angle fixed is also right for ultrawide: those monitors now show
+  more world at the sides instead of cropping the top off.
+  And the eye was never at eye height. The capsule is 1.8 m tall with its origin
+  at the centre, so the feet sit at -0.90 and the camera at +0.60 was looking out
+  from **1.50 m** — the eye line of somebody 1.6 m tall wearing a 1.8 m body. A
+  sixth of a metre of error on every judgement of scale the player makes, which
+  at a wide FOV reads as the world being slightly too big. It is 1.68 m now, and
+  it drops on a crouch by exactly as much as the body actually shortens, so the
+  view and the collider finally agree.
+
 - **G5.1: the volume sliders were doing nothing.** Greg asked to fix the entire
   game's sound, and the first thing measurement turned up was not a missing
   effect — it was that the mixer was not connected to the game. `pause_gate.gd`

@@ -42,10 +42,26 @@ var pitch := -0.12
 ## The condition is read out of `WorldHistory`, never stored — the same rule the
 ## Board runs on, so there is nothing to get out of sync.
 var third_person := false
-## Cruelty Squad territory. A normal 70 reads as a corridor shooter; this reads
-## as being too close to everything, which is the point.
-const FIRST_PERSON_FOV := 106.0
-const THIRD_PERSON_FOV := 74.0
+## M4.3. Wide, and deliberately so — but stated correctly, which the first pass
+## was not. Godot's `Camera3D.fov` is the **vertical** angle (keep_aspect
+## defaults to KEEP_HEIGHT), so the 106 written here first meant 134 degrees
+## horizontal at 16:9. That is a fisheye lens, not a wide lens, and it is well
+## past anything Cruelty Squad does.
+##
+## These are the vertical angles that produce the horizontal ones actually
+## wanted: 78 gives ~110 degrees across, 63 gives ~95. Keeping the vertical
+## angle fixed is also the correct choice for ultrawide monitors — they then
+## show *more* of the world at the sides rather than cropping off the top.
+const FIRST_PERSON_FOV := 78.0
+const THIRD_PERSON_FOV := 63.0
+
+## M4.2. Where the eye actually is. The capsule is 1.8 m tall with its origin at
+## the centre, so the feet are at -0.90 and the camera at +0.60 was looking out
+## from 1.50 m — the eye line of someone about 1.6 m tall wearing a 1.8 m body.
+## That is a sixth of a metre of error on every judgement of scale the player
+## makes, and at a wide FOV it reads as the world being slightly too big.
+const EYE_ABOVE_CENTRE := 0.78
+const STANDING_HEIGHT := 1.8
 ## The two things that unlock it.
 const UNLOCK_BOSSES := 1
 var stamina := 100.0
@@ -2010,7 +2026,10 @@ func _update_camera() -> void:
 			# parked behind the head instead of an over-the-shoulder shot.
 			camera.look_at(camera.global_position + look * 12.0, Vector3.UP)
 	else:
-		camera.global_position = player + physical_offset
+		# M4.2. The eye, not the chest. Crouching lowers it by exactly as much as
+		# the body actually shortens, so the view and the collider agree.
+		var crouch_drop: float = (STANDING_HEIGHT - player_capsule.height) * 0.5
+		camera.global_position = player + Vector3.UP * (EYE_ABOVE_CENTRE - 0.6 - crouch_drop) + physical_offset
 		camera.look_at(player + look * 12.0)
 	if body_motion != null:
 		camera.rotation.z += body_motion.camera_roll * (0.45 if third_person else 1.0)

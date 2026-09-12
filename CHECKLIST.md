@@ -661,8 +661,8 @@ The FOV 106 default makes this urgent rather than cosmetic: at that width,
 distortion, scale and horizon errors that were invisible at 72 become the whole
 image.
 - [ ] **M4.1** Scale is consistent — a door, a car and a person agree about how big a person is
-- [ ] **M4.2** The horizon and eye height are right for a standing body, not a floating camera
-- [ ] **M4.3** Near-field distortion at 106 is deliberate rather than accidental
+- [x] **M4.2** Eye at 1.68 m off a 1.8 m body, dropping exactly as far as a crouch shortens it
+- [x] **M4.3** FOV stated as the vertical angle Godot actually uses — ~110° across, not 134°
 - [ ] **M4.4** Weapon and hand framing hold up at the wide FOV without looking bolted on
 - [ ] **M4.5** The rules are the game's own and applied everywhere, not photographic realism
 
