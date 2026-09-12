@@ -3382,11 +3382,11 @@ accumulates**. And it is not evil in the ordinary way: it enslaves *through its
 own lessons and learning*, which is one short step from AJ3's modern gods and is
 the most interesting possible final boss for a game about institutions.
 
-- [ ] **AQ1.1** It taunts you long before it is fightable
-- [ ] **AQ1.2** Visibility builds with what you have done, never on a timer
-- [ ] **AQ1.3** It summons you rather than being travelled to
+- [x] **AQ1.1** It taunts you long before it is fightable — `godhead.gd` speaks from 12% visibility, and what it says is chosen by the most recent thing *you* did that it noticed, so it is always commenting on the player rather than on the plot
+- [x] **AQ1.2** Visibility builds with what you have done, never on a timer — attention is summed off `WorldHistory` fresh on every read, nothing cached, nothing clocked. Forty melee blows draw 1.6; one god named draws 4.5. Tested: fifty frames of waiting move it by exactly nothing
+- [ ] **AQ1.3** It summons you rather than being travelled to — `can_summon()` gates on 150 attention, deliberately above the last visibility stage: being entirely present and being called are not the same event. The summons itself waits on AQ1.4's shadow realms
 - [ ] **AQ1.4** The shadow realms of the higher realms: the psychedelic register, earned not given (E6/E8 exist)
-- [ ] **AQ1.5** It teaches, and the teaching is the trap
+- [x] **AQ1.5** It teaches, and the teaching is the trap — every lesson is **true**, and following it genuinely helps. `heed()` is what accepting one costs: it adds directly to attention, so taking good advice is the fastest way to be seen. The trap is stated plainly rather than hidden, and refusing is recorded too, because refusing a true thing over who said it is its own cost
 - [ ] **AQ1.6** It is genuinely fightable, and the fight is not a damage race
 - [ ] **AQ1.7** Voice acting — Greg: *"voice acting will also be in the game"*
 - [ ] **AQ1.8** Siding with it is a real option with a real ending
