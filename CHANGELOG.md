@@ -2,6 +2,20 @@
 
 ## 2026 09 12
 
+- **AG1.6 — the derby exit is under test, and it does not crash.** The one
+  playtest bug still open was a warning rather than an observation: the game
+  *might* die after a heat. It does not. `tests/derby_exit_test.gd` keeps itself
+  out of `current_scene` so the swap cannot free it, then runs the whole thing —
+  thirty-five seconds of driving, panels shed off the player's car, all eight
+  wreckers disabled through `_wreck_target`, outstanding fourteen-second detach
+  timers still pending, and a fully built arena (`ATG_FULL_ARENA=1` opts the
+  harness back into the 180 trimesh collisions test mode normally skips). Both
+  endings leave through the same door and both land in the Hunt Grounds intact,
+  verified by capture. Worth saying why this was never caught: every existing
+  derby test opens with `leaving = true` to stop the scene swap freeing the
+  harness mid-await, which meant the exit the player actually takes had never
+  been run by anything.
+
 - **M1.5/M4: the third-person unlock could never actually fire, the camera cut
   hard on every perspective toggle, and the first-person weapon read as a dark
   slab.** `third_person_unlocked()` counted a boss kill by reading a

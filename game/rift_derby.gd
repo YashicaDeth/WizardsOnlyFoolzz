@@ -180,7 +180,10 @@ func _build_world() -> void:
 		_suppress_props(authored_environment)
 		# Deterministic harnesses do not need hundreds of static mesh faces
 		# rebuilt at startup; the simple arena floor below is sufficient.
-		if OS.get_environment("ATG_TEST_MODE") != "1":
+		# AG1.6 is the exception: the question there is specifically whether
+		# tearing down a fully built arena kills the game, so that harness asks
+		# for the real one.
+		if OS.get_environment("ATG_TEST_MODE") != "1" or OS.get_environment("ATG_FULL_ARENA") == "1":
 			_add_authored_environment_collision(authored_environment)
 	var floor := StaticBody3D.new()
 	var floor_collision := CollisionShape3D.new()

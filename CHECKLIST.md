@@ -1773,7 +1773,7 @@ this"*.
 - [x] **AG1.3** A full bag was a wall of overlapping labels — identical parts now group with a count
 - [x] **AG1.4** SCREEN in settings, F11 anywhere, and it is restored at startup
 - [x] **AG1.5** It does — `register_subject` is save-safe, WorldHistory persists to disk, and `apply_gore_setting()` runs at startup in both the hunt and the derby
-- [ ] **AG1.6** He was warned it *"might crash"* after the derby. Find out whether it does
+- [x] **AG1.6** It does not. `tests/derby_exit_test.gd` drives a heat, sheds panels, wrecks all eight, leaves on both endings with a fully built arena, and lands in Ashbloom clean — every previous derby test had set `leaving = true` to stop the swap freeing the harness, so this path had never once been run
 - [x] **AG1.7** *"when I'm looking through the Tree section I can't see my mouse cursor"* — the OS pointer is hidden for every panel and only the index drew a replacement
 
 ### AG2 — What he could not find
