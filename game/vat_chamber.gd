@@ -43,6 +43,10 @@ const BEATS := [
 	{"at": 5.2, "text": "TANK 0C-7 // CYCLE ABORTED — VOIDING"},
 	{"at": 9.6, "text": "HANDLER: \"That one's finished growing. Rack it for the heat.\""},
 	{"at": 14.5, "text": "HANDLER: \"Debt's in the meat, friend. Win a round and it's yours to keep.\""},
+	# K3.2. "The opening reframed: CellOutz grew you, which is why the debt is
+	# in the meat" — DESIGN/COSMOLOGY.md. The line above already said the debt
+	# was in the meat; nothing before this said whose meat it started as.
+	{"at": 16.5, "text": "HANDLER: \"CellOutz grew you. CellOutz owns what it grew. Read your own contract sometime.\""},
 	{"at": 19.0, "text": "Walk the aisle. The car is at the end of it."},
 ]
 

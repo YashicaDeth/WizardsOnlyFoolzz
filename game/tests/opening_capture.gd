@@ -25,6 +25,13 @@ func _ready() -> void:
 		opening._physics_process(1.0 / 30.0)
 		await get_tree().process_frame
 	await _capture("%s/opening_voiding.png" % out_dir)
+
+	# K3.2. The CellOutz reframe beat, captured as it actually reads on
+	# screen rather than assumed correct because the string is right.
+	opening.clock = 16.6
+	opening._update_beats()
+	await get_tree().process_frame
+	await _capture("%s/opening_celloutz_reframe.png" % out_dir)
 	get_tree().quit()
 
 
