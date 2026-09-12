@@ -211,6 +211,41 @@ func _ready() -> void:
 				preset_name, hue / counted, saturation / counted, value / counted, int(counted),
 			])
 
+	# A10.10. The same wall at three distances, with "still reads" given a
+	# number: the standard deviation of luminance across a fixed window of the
+	# backdrop. A surface that only works up close collapses toward a flat
+	# colour as the mips take over, and a flat colour has no deviation.
+	world_environment.environment = environment
+	WorldLook.apply_hour(environment, 0.0, "ashbloom")
+	key_light.visible = true
+	back_light.visible = false
+	for ball_index in KINDS.size():
+		get_child(4 + ball_index * 2).visible = false
+	for distance: float in [2.5, 11.0, 44.0]:
+		camera.position = Vector3(0, 1.4, -4.2 + distance)
+		key_light.position = Vector3(-1.6, 2.4, -4.2 + distance * 0.5)
+		key_light.omni_range = maxf(9.0, distance * 1.6)
+		key_light.light_energy = 1.9 + distance * 0.22
+		for _tick in 6:
+			await get_tree().physics_frame
+		await RenderingServer.frame_post_draw
+		var frame := get_viewport().get_texture().get_image()
+		frame.save_png("%s/distance_%02d.png" % [out_dir, int(distance)])
+		var samples: Array[float] = []
+		for y in range(240, 420, 3):
+			for x in range(520, 760, 3):
+				var pixel := frame.get_pixel(x, y)
+				samples.append(pixel.r * 0.299 + pixel.g * 0.587 + pixel.b * 0.114)
+		var mean := 0.0
+		for sample in samples:
+			mean += sample
+		mean /= float(samples.size())
+		var deviation := 0.0
+		for sample in samples:
+			deviation += (sample - mean) * (sample - mean)
+		deviation = sqrt(deviation / float(samples.size()))
+		print("DISTANCE %05.1fm mean=%.4f deviation=%.4f" % [distance, mean, deviation])
+
 	print("CHART_DONE")
 	get_tree().quit()
 
