@@ -88,8 +88,32 @@ var signal_field: SignalField
 var radial: Control
 var radio_audio: Node
 
-var dead_pixels: Array[Vector2] = []
+## A6.6 v2. The faults, with their character.
+##
+## Greg: *"dead pixels and scanlines are static; a failing panel flickers"*.
+##
+## The first pass was right about the thing it was arguing against — damage that
+## reshuffles every frame reads as a noise effect rather than as a broken screen,
+## and that is why these were nailed down. But it over-corrected into the other
+## error: a panel with nothing but permanent faults is not failing, it has
+## already failed and settled. What a dying screen actually does is fail
+## *intermittently* — the same row, the same pixel, coming back and going again
+## on its own schedule.
+##
+## So the positions stay exactly as fixed as they were. What varies is whether
+## each fault is currently expressing itself, and every fault carries its own
+## period and duty cycle, seeded from the device. Two handhelds fail differently
+## and each one fails the same way every time you raise it.
+var dead_pixels: Array[Dictionary] = []
+var dead_rows: Array[Dictionary] = []
 var crack_lines: Array[PackedVector2Array] = []
+## Wall clock for the panel's faults. Runs whether or not the device is raised,
+## so a fault does not restart its cycle every time you look at it.
+var panel_clock := 0.0
+## The backlight, 0..1. Sags and dips on a failing panel and sits at 1 on a
+## healthy one — which is the difference between "this device is old" and "this
+## device is dying", and the player should be able to see which.
+var backlight := 1.0
 
 var _clip: Control
 var _overlay: Control
@@ -129,7 +153,31 @@ func _ready() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 90210
 	for index in 14:
-		dead_pixels.append(Vector2(rng.randf(), rng.randf()))
+		dead_pixels.append({
+			"at": Vector2(rng.randf(), rng.randf()),
+			# Most dead pixels are dead. A couple are stuck *on*, which is the
+			# more annoying failure and the one people actually notice.
+			"stuck_on": rng.randf() < 0.18,
+			# And a few are not committed either way yet.
+			"period": rng.randf_range(1.7, 11.0) if rng.randf() < 0.3 else 0.0,
+			"duty": rng.randf_range(0.35, 0.85),
+			"phase": rng.randf() * 40.0,
+		})
+	# The rows, seeded here rather than rebuilt inside `_draw_damage` from a
+	# fresh RandomNumberGenerator every frame — which is what the old code did,
+	# and why nothing about them could ever vary without varying everything.
+	for index in 9:
+		dead_rows.append({
+			"y": rng.randf(),
+			"weight": rng.randf_range(1.0, 3.0),
+			# Two thirds are simply gone. The rest come and go, and those are
+			# the ones that make the panel read as still failing.
+			"period": 0.0 if rng.randf() < 0.62 else rng.randf_range(0.8, 6.5),
+			"duty": rng.randf_range(0.3, 0.8),
+			"phase": rng.randf() * 30.0,
+			# A failing row often shears before it drops out entirely.
+			"shear": rng.randf_range(0.0, 0.05) if rng.randf() < 0.4 else 0.0,
+		})
 	for index in 3:
 		var start := Vector2(rng.randf(), rng.randf())
 		var line := PackedVector2Array([start])
@@ -346,6 +394,10 @@ func stand_at(world_position: Vector2) -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	# A6.6 v2. The panel keeps failing whether or not you are looking at it,
+	# so a fault does not restart its cycle every time the device comes up.
+	panel_clock += delta
+	_drive_backlight(delta)
 	raised = Motion.blend(raised, delta, Motion.PANEL, is_open)
 	if raised <= 0.001 and not is_open:
 		# C2 / playtest. The radial is a child of this device, so hiding the
@@ -533,6 +585,43 @@ func _draw_status(rect: Rect2, alpha: float) -> void:
 ## C1.5. Drawn by the overlay child so it lands on top of whatever panel is
 ## hosted. A damaged device has to actually cost you information; damage painted
 ## underneath the readout is a frame, not a fault.
+## A6.6 v2. What the backlight is doing. A sound panel holds at full and this
+## is a no-op; a failing one sags, breathes, and now and then drops hard for
+## a moment before coming back. Driven off `condition` so it is a symptom of
+## the device being wrecked rather than an effect somebody turned on.
+func _drive_backlight(delta: float) -> void:
+	var wear := 1.0 - clampf(condition, 0.0, 1.0)
+	if wear <= 0.02:
+		backlight = 1.0
+		return
+	# The steady state: a worn panel is simply dimmer.
+	var want := 1.0 - wear * 0.22
+	# A slow breath on top, too slow to read as an animation.
+	want -= absf(sin(panel_clock * 0.37)) * wear * 0.08
+	# And the dropouts. Rare, brief, and more frequent the worse it is.
+	var cycle: float = fmod(panel_clock, 9.0 - wear * 5.0)
+	if cycle < 0.09:
+		want -= wear * 0.55
+	# Recovery is quicker than the drop, which is what makes a dropout read
+	# as a fault rather than as a fade.
+	var rate: float = 9.0 if want > backlight else 34.0
+	backlight = move_toward(backlight, clampf(want, 0.05, 1.0), delta * rate)
+	if _overlay != null and is_instance_valid(_overlay):
+		_overlay.queue_redraw()
+
+
+## A6.6 v2. Whether a fault is currently expressing itself. A fault with no
+## period is permanent and always answers true; one with a period is on for
+## `duty` of each cycle. Square rather than smooth on purpose — a scanline does
+## not fade in, it is there or it is not.
+func _fault_live(fault: Dictionary) -> bool:
+	var period := float(fault.get("period", 0.0))
+	if period <= 0.0:
+		return true
+	var through: float = fmod(panel_clock + float(fault.get("phase", 0.0)), period) / period
+	return through < float(fault.get("duty", 0.6))
+
+
 func _draw_damage() -> void:
 	if raised <= 0.001:
 		return
@@ -541,14 +630,46 @@ func _draw_damage() -> void:
 	var wear := 1.0 - clampf(condition, 0.0, 1.0)
 	for scan in range(0, int(rect.size.y), 3):
 		_overlay.draw_line(Vector2(rect.position.x, rect.position.y + scan), Vector2(rect.end.x, rect.position.y + scan), Color(0, 0, 0, 0.12 * alpha), 1.0)
-	# Dead scanlines: whole rows that never light, not a shimmer.
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 5150
-	for band in int(wear * 9.0):
-		var y := rect.position.y + rng.randf() * rect.size.y
-		_overlay.draw_line(Vector2(rect.position.x, y), Vector2(rect.end.x, y), Color(0, 0, 0, 0.75 * alpha), rng.randf_range(1.0, 3.0))
-	for point in dead_pixels:
-		_overlay.draw_rect(Rect2(rect.position + Vector2(point.x * rect.size.x, point.y * rect.size.y), Vector2(2, 2)), Color(0, 0, 0, 0.8 * alpha))
+
+	# A6.6 v2. The backlight, before anything drawn on it. A sound panel sits at
+	# full and this does nothing; a failing one sags and occasionally drops
+	# further, which is the single most recognisable symptom of a screen on its
+	# way out and costs one rectangle.
+	if backlight < 0.999:
+		_overlay.draw_rect(rect, Color(0, 0, 0, (1.0 - backlight) * 0.5 * alpha))
+
+	# Dead rows: whole scanlines that never light. The positions are fixed for
+	# the life of the device; which of them are currently out is not.
+	var rows := int(wear * float(dead_rows.size()))
+	for index in mini(rows, dead_rows.size()):
+		var row: Dictionary = dead_rows[index]
+		if not _fault_live(row):
+			continue
+		var y: float = rect.position.y + float(row["y"]) * rect.size.y
+		var shear: float = float(row.get("shear", 0.0)) * rect.size.x
+		if shear > 0.0:
+			# A row on the way out tears sideways before it drops. Quantised, so
+			# it snaps between two offsets rather than sliding, which is what a
+			# failing ribbon connector actually looks like.
+			shear *= 1.0 if fmod(panel_clock * 7.0 + float(row["phase"]), 2.0) < 1.0 else -1.0
+		_overlay.draw_line(
+			Vector2(rect.position.x + shear, y),
+			Vector2(rect.end.x + shear, y),
+			Color(0, 0, 0, 0.75 * alpha),
+			float(row["weight"])
+		)
+
+	for pixel: Dictionary in dead_pixels:
+		if not _fault_live(pixel):
+			continue
+		var point: Vector2 = pixel["at"]
+		var cell := Rect2(rect.position + Vector2(point.x * rect.size.x, point.y * rect.size.y), Vector2(2, 2))
+		if bool(pixel.get("stuck_on", false)):
+			# Stuck on, not dead: a lit sub-pixel, which is brighter than
+			# anything the panel is meant to be showing.
+			_overlay.draw_rect(cell, Color(0.72, 0.86, 0.74, 0.9 * alpha))
+		else:
+			_overlay.draw_rect(cell, Color(0, 0, 0, 0.8 * alpha))
 	for line in crack_lines:
 		var run := PackedVector2Array()
 		for point in line:
