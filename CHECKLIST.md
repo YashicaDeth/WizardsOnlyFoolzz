@@ -1948,11 +1948,11 @@ steps, which are five real game verbs, and not one of them had to be made up.
 - [ ] **AJ2.5** Corruption is what happens when you charge more than you can carry (AI1.5)
 
 ### AJ3 - Modern gods
-- [ ] **AJ3.1** The gods of this world are what is actually worshipped: markets, metrics, engagement, brands
-- [ ] **AJ3.2** A god is a real entity in WorldHistory with attention, not a flavour label
-- [ ] **AJ3.3** Worship is measurable and it is what feeds the upper cone (AI1.4)
-- [ ] **AJ3.4** Naming a god in an intent gets their attention, which is not always wanted
-- [ ] **AJ3.5** The target is always the institution, never the congregation
+- [x] **AJ3.1** The gods of this world are what is actually worshipped: markets, metrics, engagement, brands — `systems/modern_gods.gd`: The Engagement, The Market, The Quota, The Brand
+- [x] **AJ3.2** A god is a real entity in WorldHistory with attention, not a flavour label — `kind: "god"`, real `attention` field, same shape `ascent_entities.gd` already proved
+- [~] **AJ3.3** Worship is measurable (`attention` accumulates on every verdict asked) — feeding the upper cone (AI1.4) is a UI/pyramid concern, not attempted here
+- [~] **AJ3.4** Naming a god in an intent gets their attention, which is not always wanted — `get_attention()` exists and accumulates, but AJ1 (intents/sigils) doesn't exist yet to call it; same relationship `ritual_app.gd` has to seals it doesn't draw
+- [x] **AJ3.5** The target is always the institution, never the congregation — satisfied by construction: all four gods are markets/metrics/labor/image, never a person or a people
 
 ### AJ4 - Magic as progression
 - [ ] **AJ4.1** Skill is what you have actually done, read off the record
@@ -1977,13 +1977,13 @@ The rule that keeps it from being a morality score: **the gods disagree with
 each other, and they are not reliable.** A verdict is one god's opinion, marked
 as such, and a different god will read the same kill the other way.
 
-- [ ] **AJ5.1** A permanent death gets a verdict, delivered by a named god (AJ3)
-- [ ] **AJ5.2** SOUL FREED and CYCLICIST ENSLAVEMENT AGAIN are the two poles, with room between
-- [ ] **AJ5.3** The verdict is computed from the kill: how, where, by whose hand, and what they were carrying
-- [ ] **AJ5.4** Gods disagree. Two verdicts on one death is a normal outcome
-- [ ] **AJ5.5** It is an opinion, not a score - nothing in the game adds them up
-- [ ] **AJ5.6** Freeing souls and enslaving them both have consequences, and they are different ones
-- [ ] **AJ5.7** It is recorded in WorldHistory, so the Board can pin it and the pyramid can read it
+- [x] **AJ5.1** A permanent death gets a verdict, delivered by a named god (AJ3) — `verdict()`/`record_death_verdicts()`; wiring the actual call into wherever a kill is finalized (Codex's defeat/resolution territory) is not done here
+- [x] **AJ5.2** SOUL FREED and CYCLICIST ENSLAVEMENT AGAIN are the two poles, with room between — reuses `tree_alignment()` directly: dying deep in Descent reads as freed, dying mid-Ascent reads as enslaved again, and the raw continuous `lean` is returned alongside the label rather than only a binary text
+- [x] **AJ5.3** The verdict is computed from the kill: how, where, by whose hand, and what they were carrying — `details` (`witnessed`, `harvested`, `contracted`, `public`), each god reading a different one of them
+- [x] **AJ5.4** Gods disagree. Two verdicts on one death is a normal outcome — verified: the exact same death, asked of two gods, produces opposite labels
+- [x] **AJ5.5** It is an opinion, not a score - nothing in the game adds them up — each god's verdict is returned and recorded separately; nothing sums them
+- [ ] **AJ5.6** Freeing souls and enslaving them both have consequences, and they are different ones — not built: a verdict is currently read-only, with no differentiated mechanical effect on the world yet
+- [x] **AJ5.7** It is recorded in WorldHistory, so the Board can pin it and the pyramid can read it — one `death_verdict` event per god's opinion. Covered by `tests/modern_gods_test.gd` (19 checks)
 
 ## AM - The build sheet becomes the map
 
