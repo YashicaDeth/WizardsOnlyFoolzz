@@ -186,6 +186,8 @@ var world_index: Control
 ## tests — there has never been a key that opens it, which is why Greg could not
 ## remember how to reach it. There is one now.
 var pin_board: Control
+## The cursor the game draws for itself while the OS one is hidden.
+var _pointer: Control
 ## O2.2. The moment of contact. There was none — see impact_feel.gd.
 var impact_feel: Node
 var viscera_fx := true
@@ -291,6 +293,20 @@ func _ready() -> void:
 	pin_board = PIN_BOARD.new()
 	pin_board.name = "PinBoard"
 	$HUD.add_child(pin_board)
+	# AG1.7, from the first playtest: "when I'm looking through the Tree section
+	# I can't see my mouse cursor." B3.5 hid the OS pointer so the game could own
+	# it, and then only the index ever drew a replacement — so every other panel
+	# handed the player an invisible cursor. One layer above all of them, drawn
+	# whenever a panel is up, fixes it for the Tree, the Board, the map and
+	# anything added later without each one having to remember.
+	_pointer = Control.new()
+	_pointer.name = "Pointer"
+	_pointer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_pointer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pointer.top_level = true
+	_pointer.draw.connect(_draw_pointer)
+	_pointer.visible = false
+	$HUD.add_child(_pointer)
 	impact_feel = IMPACT_FEEL.new()
 	# The kill cam already owns time deliberately; an impact inside one is part
 	# of its timing, not a competitor for it.
@@ -2688,6 +2704,8 @@ func _toggle_panel(mode: String) -> void:
 	else:
 		character_archive.close_archive()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if panel_mode.is_empty() else Input.MOUSE_MODE_HIDDEN
+	if _pointer != null and is_instance_valid(_pointer):
+		_pointer.visible = not panel_mode.is_empty()
 
 
 ## `J` cycles the Allusions archive: the artwork study, then the natal sigil,
@@ -2710,6 +2728,8 @@ func _toggle_artwork() -> void:
 		panel_mode = "artwork"
 		allusions_artwork.open_artwork()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if panel_mode.is_empty() else Input.MOUSE_MODE_HIDDEN
+	if _pointer != null and is_instance_valid(_pointer):
+		_pointer.visible = not panel_mode.is_empty()
 
 
 func _update_hud() -> void:
@@ -2854,6 +2874,22 @@ func _update_camera() -> void:
 		var head := player_rig.parts.get("head") as Node3D
 		if head != null and is_instance_valid(head):
 			head.visible = perspective_blend > 0.5
+
+
+## The pointer, in the project's own hand rather than the operating system's. A
+## ring with a bite out of it and a cross in the middle, so it reads on a dark
+## plate and over a photograph without a drop shadow.
+func _draw_pointer() -> void:
+	if _pointer == null or not is_instance_valid(_pointer):
+		return
+	var at := _pointer.get_local_mouse_position()
+	var brass := Color("c8a13a")
+	_pointer.draw_arc(at, 9.0, 0.55, TAU - 0.55, 22, brass, 1.6)
+	_pointer.draw_arc(at, 9.0, 0.55, TAU - 0.55, 22, Color(0, 0, 0, 0.5), 3.2)
+	_pointer.draw_arc(at, 9.0, 0.55, TAU - 0.55, 22, brass, 1.6)
+	for axis in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+		_pointer.draw_line(at + axis * 3.0, at + axis * 6.2, brass, 1.4)
+	_pointer.draw_circle(at, 1.6, brass)
 
 
 func _build_world() -> void:

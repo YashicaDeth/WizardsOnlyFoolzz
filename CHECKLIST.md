@@ -1739,9 +1739,10 @@ this"*.
 - [x] **AG1.1** The weapon wheel dilated time and drew nothing — the radial is a child of the handheld, and the handheld hides itself when lowered
 - [x] **AG1.2** Holding B looped: the wheel spent its own budget, committed whatever the pointer was over (*"it will play the shooting thing"*), then reopened because the key was still down
 - [x] **AG1.3** A full bag was a wall of overlapping labels — identical parts now group with a count
-- [ ] **AG1.4** *"idk if there's a full screen option"* — there is not
-- [ ] **AG1.5** Confirm the gore setting actually saves and reloads; he asked and nobody knows
+- [x] **AG1.4** SCREEN in settings, F11 anywhere, and it is restored at startup
+- [x] **AG1.5** It does — `register_subject` is save-safe, WorldHistory persists to disk, and `apply_gore_setting()` runs at startup in both the hunt and the derby
 - [ ] **AG1.6** He was warned it *"might crash"* after the derby. Find out whether it does
+- [x] **AG1.7** *"when I'm looking through the Tree section I can't see my mouse cursor"* — the OS pointer is hidden for every panel and only the index drew a replacement
 
 ### AG2 — What he could not find
 The theme of the whole session, and it is a design fault rather than his.
