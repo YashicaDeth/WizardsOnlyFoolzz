@@ -177,6 +177,15 @@ static func apply_hour(env: Environment, daylight: float, preset_name: String = 
 	# roughly 0.15 whatever the sky's own energy was, and nothing behind the
 	# break could be seen through it. Fog is lit by the sun; with the sun gone
 	# there is nothing in the air to light.
+	# A10.4. The ambient and the exposure belong to the hour and to the preset,
+	# and they are set here rather than by each scene. `bone_yard_hunt.gd` drove
+	# them with `lerpf(0.16, 0.72, ...)` and `lerpf(0.85, 1.18, ...)`: four
+	# numbers typed into a scene, two of which happened to match the Ashbloom
+	# preset and two of which matched nothing at all — so the Hunt Grounds were
+	# lit by a term nobody had chosen for them, and any scene that wanted the
+	# same night had to copy the same four numbers to get it.
+	env.ambient_light_energy = float(preset.ambient) * lerpf(0.22, 1.0, lit)
+	env.tonemap_exposure = float(preset.get("exposure", 1.25)) * lerpf(0.76, 1.0, lit)
 	_apply_hour_to_materials(lit)
 	env.fog_sky_affect = lerpf(0.12, 0.6, lit)
 	env.fog_density = float(preset.fog_density) * lerpf(1.45, 1.0, lit)

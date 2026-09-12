@@ -176,8 +176,10 @@ func _ready() -> void:
 
 func _shoot(out_dir: String, name: String, daylight: float, key: bool, back: bool) -> void:
 	WorldLook.apply_hour(environment, daylight, "ashbloom")
-	environment.ambient_light_energy = lerpf(0.05, 0.42, daylight)
-	environment.tonemap_exposure = lerpf(0.85, 1.18, daylight)
+	# A10.4. The hour sets these now, off the preset. The chart keeps its own
+	# ambient *source* (a flat colour instead of the sky) because it is a chart
+	# and the sky is not in it, but the level is the region's.
+	environment.ambient_light_color = Color(0.32, 0.34, 0.3)
 	key_light.visible = key
 	back_light.visible = back
 	for _tick in 4:

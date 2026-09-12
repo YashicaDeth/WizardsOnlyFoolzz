@@ -3766,8 +3766,6 @@ func _update_day_night() -> void:
 	sun.light_color = Color("39445a").lerp(Color("c89572"), daylight)
 	var env: Environment = $WorldEnvironment.environment
 	if env != null:
-		env.ambient_light_energy = lerpf(0.16, 0.72, daylight)
-		env.tonemap_exposure = lerpf(0.85, 1.18, daylight)
 		# A3.1. The sky and the fog move with the hour too. Without this the
 		# sun dimmed, the ground went black and the horizon stayed exactly as
 		# bright as it is at noon — verified by capture, the 01:00 and 12:00
