@@ -18,6 +18,7 @@ const MISFIRE_DIRECTOR := preload("res://systems/reality_misfire_director.gd")
 const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
+const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
 const BALLISTICS := preload("res://systems/ballistics.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
@@ -190,6 +191,9 @@ var rival_attack_clock := 0.0
 var dodge_remaining := 0.0
 var dodge_direction := Vector3.ZERO
 var handheld: Control
+## FINAL_V.md §16. The one screen-space layer AS2's night warp, and later the
+## drugs and shadow realms, all reach for instead of building their own effect.
+var psychedelic: Control
 var pathfinder = preload("res://systems/ashbloom_pathfinder.gd").new()
 var social_markers: Array[Node3D] = []
 var resolution_ui: Control
@@ -340,6 +344,11 @@ func _ready() -> void:
 	kill_cam = preload("res://systems/kill_cam.gd").new()
 	kill_cam.name = "KillCam"
 	$HUD.add_child(kill_cam)
+	# Last, so an engaged trip sits over everything else drawn this frame —
+	# inert and invisible until a dial is touched, per `psychedelic_rig.gd`.
+	psychedelic = PSYCHEDELIC_RIG.new()
+	psychedelic.name = "Psychedelic"
+	$HUD.add_child(psychedelic)
 	voice_channel = preload("res://systems/proximity_voice.gd").new()
 	voice_channel.name = "ProximityVoice"
 	add_child(voice_channel)
