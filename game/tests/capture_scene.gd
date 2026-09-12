@@ -161,6 +161,14 @@ func _ready() -> void:
 			device.set_mode("WIRE")
 			for _hold in 60:
 				await get_tree().process_frame
+	elif trigger == "lamp":
+		# AS1.1. Raised by hand rather than by key so the shot is deterministic:
+		# `raised` is a blended value, and holding the real key for an exact
+		# number of frames would make the brightness depend on frame timing.
+		scene.handheld.raised = 1.0
+		scene.handheld.battery = 1.0
+		for _hold in 4:
+			await get_tree().process_frame
 	elif trigger == "psychedelic":
 		# FINAL_V.md §16. Several dials at once, at a strength nobody would
 		# call subtle, so the shot proves the rig actually changes the frame

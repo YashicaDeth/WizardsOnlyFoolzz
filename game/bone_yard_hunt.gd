@@ -19,6 +19,9 @@ const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
+## AS1.1. Bright enough to actually read as a light source against
+## `world_look.gd`'s low-ambient presets rather than a glow nobody would notice.
+const HANDHELD_LAMP_ENERGY := 6.0
 const BALLISTICS := preload("res://systems/ballistics.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
@@ -194,6 +197,10 @@ var handheld: Control
 ## FINAL_V.md §16. The one screen-space layer AS2's night warp, and later the
 ## drugs and shadow realms, all reach for instead of building their own effect.
 var psychedelic: Control
+## AS1.1. The one real light the handheld throws into the world. Lives on the
+## camera rather than on `handheld` itself — `handheld` is a `Control`, drawn
+## in the HUD layer, and has nothing to attach a `Light3D` to.
+var handheld_lamp: SpotLight3D
 var pathfinder = preload("res://systems/ashbloom_pathfinder.gd").new()
 var social_markers: Array[Node3D] = []
 var resolution_ui: Control
@@ -291,6 +298,19 @@ func _ready() -> void:
 	handheld = HANDHELD.new()
 	handheld.name = "Handheld"
 	$HUD.add_child(handheld)
+	# AS1.1. Parented to the camera so it always points where the player is
+	# looking, the way a phone held up in front of you actually would. Range is
+	# `HandheldDevice.LAMP_RANGE` — the one constant AS1.5's `light_radius()`
+	# hook shares with it, so a stealth check reading that hook can never
+	# disagree with how far the light drawn here actually reaches.
+	handheld_lamp = SpotLight3D.new()
+	handheld_lamp.name = "HandheldLamp"
+	handheld_lamp.light_color = Color("cfe6d6")
+	handheld_lamp.light_energy = 0.0
+	handheld_lamp.spot_range = HANDHELD.LAMP_RANGE
+	handheld_lamp.spot_angle = 34.0
+	handheld_lamp.spot_angle_attenuation = 1.6
+	camera.add_child(handheld_lamp)
 	resolution_ui = preload("res://systems/downed_resolution.gd").new()
 	resolution_ui.name = "DownedResolution"
 	$HUD.add_child(resolution_ui)
@@ -688,6 +708,11 @@ func _physics_process(delta: float) -> void:
 	# that two scenes both wind runs at double speed the moment anybody
 	# builds a third.
 	WorldClock.advance(delta)
+	# AS1.1/AS1.3. Energy tracks the same smooth `raised` blend the device
+	# itself uses, so the light does not snap on; it hard-zeroes at empty
+	# battery, so "can run out" (AS1.3) is an actual floor, not a long fade.
+	if handheld_lamp != null and is_instance_valid(handheld_lamp):
+		handheld_lamp.light_energy = (HANDHELD_LAMP_ENERGY * handheld.raised) if handheld.battery > 0.0 else 0.0
 	dodge_remaining = maxf(0.0, dodge_remaining - delta)
 	# O2.7 v3. scale_for() only ever reached the encounter loop's actor_delta —
 	# the player is the other half of every exchange they are in and kept
@@ -853,6 +878,11 @@ func _attack(heavy := false) -> void:
 	if not grapple_target.is_empty():
 		return
 	if not panel_mode.is_empty():
+		return
+	# AS1.2. Holding the handheld up is a real cost, not a free extra hand —
+	# raised past the halfway point of its own blend is the same threshold
+	# `is_lit()` uses for the lamp, so a hand is busy exactly when the light is on.
+	if handheld.raised > 0.5:
 		return
 	var report: Dictionary = _begin_carried_limb_attack(heavy) if carried_limb_index >= 0 else arsenal.begin_attack(heavy)
 	if not bool(report.get("accepted", false)):
