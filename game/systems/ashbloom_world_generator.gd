@@ -45,6 +45,20 @@ func _build_road(at: Vector3, dimensions: Vector3) -> void:
 	add_child(mesh)
 
 
+## M4.1. The scale vocabulary, stated once so the whole region agrees with it.
+##
+## A doorway is the only object in an exterior that reliably tells the eye how
+## big a person is, and this generator did not have one: the "door" was a gap
+## between two wall segments running from the floor to the roof, so on an 8.5 m
+## shell the opening was 8.5 m tall. Nothing anywhere in the Expanse stated
+## human scale, which is why the boxes read as either enormous or tiny
+## depending on what the player last looked at — and at FOV 78 that ambiguity
+## is the whole image.
+const DOOR_HEIGHT := 2.15
+const STOREY := 3.0
+const PERSON_HEIGHT := 1.8
+
+
 func _build_enterable_shell(at: Vector3, dimensions: Vector3, color: Color, sign_text: String) -> void:
 	var building := Node3D.new()
 	building.name = "Enterable_%03d" % generated_buildings.size()
@@ -57,6 +71,16 @@ func _build_enterable_shell(at: Vector3, dimensions: Vector3, color: Color, sign
 	var door_width := minf(2.4, dimensions.x * 0.28)
 	_add_wall(building, Vector3(-half_x + (dimensions.x - door_width) * 0.25, dimensions.y * 0.5, half_z), Vector3((dimensions.x - door_width) * 0.5, dimensions.y, wall_thickness), color)
 	_add_wall(building, Vector3(half_x - (dimensions.x - door_width) * 0.25, dimensions.y * 0.5, half_z), Vector3((dimensions.x - door_width) * 0.5, dimensions.y, wall_thickness), color)
+	# M4.1. The lintel. Without it the doorway is a slot to the roof and the
+	# building states no scale at all.
+	var head := minf(DOOR_HEIGHT, dimensions.y - 0.6)
+	if dimensions.y > head + 0.3:
+		_add_wall(
+			building,
+			Vector3(0, head + (dimensions.y - head) * 0.5, half_z),
+			Vector3(door_width, dimensions.y - head, wall_thickness),
+			color
+		)
 	_add_wall(building, Vector3(0, dimensions.y * 0.5, -half_z), Vector3(dimensions.x, dimensions.y, wall_thickness), color)
 	_add_wall(building, Vector3(-half_x, dimensions.y * 0.5, 0), Vector3(wall_thickness, dimensions.y, dimensions.z), color)
 	_add_wall(building, Vector3(half_x, dimensions.y * 0.5, 0), Vector3(wall_thickness, dimensions.y, dimensions.z), color)
@@ -65,11 +89,22 @@ func _build_enterable_shell(at: Vector3, dimensions: Vector3, color: Color, sign
 	# G4. Texture does not change an outline. A box with brilliant grime on it is
 	# still a box, and what reads at distance is the edge — so the edge gets
 	# broken, hung with junk, and knocked off plumb.
+	# M4.1. Floor lines every three metres. A blank wall of any height reads as
+	# the same wall; banded, it reads as the number of storeys it actually is,
+	# which is the second thing after a door that states scale.
+	var storey := STOREY
+	while storey < dimensions.y - 0.4:
+		_add_wall(building, Vector3(0, storey, half_z + 0.06), Vector3(dimensions.x * 0.96, 0.14, 0.12), color.darkened(0.36))
+		_add_wall(building, Vector3(half_x + 0.06, storey, 0), Vector3(0.12, 0.14, dimensions.z * 0.96), color.darkened(0.36))
+		storey += STOREY
 	Silhouette.dress(building, dimensions, generated_buildings.size(), Callable(self, "_greeble_material"))
 	Silhouette.settle(building, generated_buildings.size())
 	var sign := Label3D.new()
 	sign.text = sign_text
-	sign.position = Vector3(0, dimensions.y * 0.72, half_z + 0.35)
+	# Just above the lintel, where a shop sign actually hangs. At 72% of the
+	# shell height it floated at a different altitude on every building and
+	# reinforced nothing.
+	sign.position = Vector3(0, minf(DOOR_HEIGHT + 0.55, dimensions.y - 0.4), half_z + 0.35)
 	sign.font_size = 28
 	sign.modulate = Color("e26a36")
 	sign.outline_size = 5

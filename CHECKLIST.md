@@ -660,7 +660,7 @@ for the game to function in its own universe in its own right"*.
 The FOV 106 default makes this urgent rather than cosmetic: at that width,
 distortion, scale and horizon errors that were invisible at 72 become the whole
 image.
-- [ ] **M4.1** Scale is consistent — a door, a car and a person agree about how big a person is
+- [x] **M4.1** Doorways have a lintel at 2.15 m and walls are banded per storey — the world states human scale now
 - [x] **M4.2** Eye at 1.68 m off a 1.8 m body, dropping exactly as far as a crouch shortens it
 - [x] **M4.3** FOV stated as the vertical angle Godot actually uses — ~110° across, not 134°
 - [ ] **M4.4** Weapon and hand framing hold up at the wide FOV without looking bolted on
@@ -747,6 +747,11 @@ They block nothing else, but they change what gets built.
 7. ~~**How is the dark web gated?**~~ **Answered and built** — `signal_field.gd`
    gates it on physically standing at a terminal. Reversible by changing one
    table; the two terminals are in the Ossuary Works and the Communion.
-8. **Working title:** keep *Allusions to Grandeur*, or move toward Greg's new
-   candidate **wizardsonlyfoolz**? Recorded as a candidate only; no project,
-   executable or save-data identifiers change until Greg makes the call.
+8. ~~**Working title:** keep *Allusions to Grandeur*, or move toward Greg's new
+   candidate **wizardsonlyfoolz**?~~ **Answered 2026-09-12: Greg calls it
+   *Wizards Only Fools***. `config/name` and every in-game title card
+   (opening, derby HUD, showcase, trailer) now read it. The repo path, folder
+   names and save-data identifiers keep *AllusionsTooGrandeur* — no reason to
+   break the working tree or the other agent's worktree over a display name.
+   `wizardsonlyfoolz` stays in-fiction as the ascending mage collective
+   (`DESIGN/COSMOLOGY.md`); the overlap with the cover title is intentional.
