@@ -28,6 +28,17 @@ const ORGANS := {
 }
 const SPINE_VERTEBRAE := 33
 
+## B3.1. Damage that melts rather than cuts. It is a family rather than a single
+## type because the caustic pools in the Ashbloom do the same thing to a body
+## that a hot zone does, over a different span.
+const MELTING := ["radiation", "caustic"]
+## B3.2. How much of a melting hit stays in the zone as dose, and how fast that
+## dose spends itself. Slow on purpose: the injury this segment describes is one
+## that is still happening after the fight it started in.
+const DOSE_SHARE := 0.55
+const DOSE_BURN_PER_SECOND := 0.9
+const DOSE_DECAY_PER_SECOND := 0.035
+
 const DEFAULT_ZONES := {
 	"head": {"health": 45.0, "bleed": 0.75, "critical": true},
 	"torso": {"health": 120.0, "bleed": 0.42, "critical": true},
@@ -36,6 +47,10 @@ const DEFAULT_ZONES := {
 	"left_leg": {"health": 75.0, "bleed": 0.62, "critical": false},
 	"right_leg": {"health": 75.0, "bleed": 0.62, "critical": false},
 }
+
+## B3.1. What each zone is still carrying, in dose points. Not a status flag: it
+## is spent down by `_process()` and it does damage the whole time it is there.
+var dose: Dictionary = {}
 
 var subject_id := ""
 var blood_capacity := 5000.0
@@ -90,7 +105,17 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 	zone["health"] = maxf(0.0, float(zone.health) - applied)
 	zones[resolved_zone] = zone
 	var penetrating := damage_type in ["cut", "puncture", "ballistic", "shear"]
-	var wound_bleed := applied * float(zone.bleed) * (0.075 if penetrating else 0.018)
+	# B3.2. A melting injury barely bleeds. It does not open a vessel, it ruins
+	# one — which is most of why it is more dangerous than the wound it looks
+	# like, and why a body can be lethally dosed with almost nothing running out
+	# of it.
+	var melting := damage_type in MELTING
+	var bleed_share := 0.018
+	if penetrating:
+		bleed_share = 0.075
+	elif melting:
+		bleed_share = 0.005
+	var wound_bleed := applied * float(zone.bleed) * bleed_share
 	if float(zone.health) <= 0.0:
 		wound_bleed *= 2.1
 	bleed_rate += wound_bleed
@@ -106,7 +131,11 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 	# B6.7v2. A closed break and a compound break are not the same injury. The
 	# former is a disabled structure under intact skin; only a penetrating blow
 	# at fracture depth opens it to the world.
-	if resolved_zone in ["left_arm", "right_arm", "left_leg", "right_leg"] and float(zone.health) <= float(DEFAULT_ZONES[resolved_zone].health) * 0.40:
+	# B3.2. Not for a melting injury. A dosed limb has not broken — there is
+	# less of it than there was, and a fracture is a statement about structure
+	# that survived. Reading "compound fracture" on a limb somebody irradiated
+	# is the rig telling the player the wrong story about what happened.
+	if not melting and resolved_zone in ["left_arm", "right_arm", "left_leg", "right_leg"] and float(zone.health) <= float(DEFAULT_ZONES[resolved_zone].health) * 0.40:
 		var fracture := "compound" if penetrating else "closed"
 		if str(zone.get("fracture", "")) != "compound":
 			zone["fracture"] = fracture
@@ -126,6 +155,21 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 	# breaks the ribs; it does not perforate the liver.
 	if penetrating and organs.has(organ_id):
 		wound["organ"] = damage_organ(organ_id, applied * 0.7)
+	# B3.1. Except this. Radiation does not need a way in — it goes through the
+	# skin, through the zone, and through everything the zone is carrying, which
+	# is the entire difference between being cut and being dosed. So it reaches
+	# every organ in the zone at once rather than the one a blade happened to
+	# find, and it leaves dose behind to go on doing it.
+	if melting:
+		wound["melted"] = true
+		var shared: Array = []
+		for organ_key in organs:
+			if str((organs[organ_key] as Dictionary).get("zone", "")) == resolved_zone:
+				damage_organ(organ_key, applied * 0.22)
+				shared.append(organ_key)
+		wound["organs_dosed"] = shared
+		dose[resolved_zone] = float(dose.get(resolved_zone, 0.0)) + applied * DOSE_SHARE
+		wound["dose"] = snappedf(float(dose[resolved_zone]), 0.1)
 	var result := wound.duplicate(true)
 	result["blood_remaining"] = blood_remaining
 	result["pain"] = pain
@@ -359,6 +403,11 @@ func combat_ratio() -> float:
 
 func snapshot() -> Dictionary:
 	return {
+		# B3.1. Dose travels with the body. A survivor who walked out of a hot
+		# zone is still being damaged by it in the next scene, which is the
+		# whole point of it being a path through the anatomy rather than an
+		# effect attached to a place.
+		"dose": dose.duplicate(true),
 		"blood": roundi(blood_remaining),
 		"blood_capacity": roundi(blood_capacity),
 		"bleed_rate": snappedf(bleed_rate, 0.01),
@@ -376,6 +425,7 @@ func snapshot() -> Dictionary:
 
 
 func restore(state: Dictionary) -> void:
+	dose = (state.get("dose", {}) as Dictionary).duplicate(true)
 	blood_capacity = maxf(100.0, float(state.get("blood_capacity", blood_capacity)))
 	blood_remaining = clampf(float(state.get("blood", blood_capacity)), 0.0, blood_capacity)
 	bleed_rate = maxf(0.0, float(state.get("bleed_rate", 0.0)))
@@ -404,8 +454,11 @@ func restore(state: Dictionary) -> void:
 
 
 func _process(delta: float) -> void:
+	if dead:
+		return
+	_burn_dose(delta)
 	var total_bleed := bleed_rate + internal_bleed_rate
-	if dead or total_bleed <= 0.001:
+	if total_bleed <= 0.001:
 		return
 	blood_remaining = maxf(0.0, blood_remaining - total_bleed * delta)
 	consciousness = clampf((blood_remaining / blood_capacity) * 120.0 - pain * 0.22 - _organ_consciousness_drain(), 0.0, 100.0)
@@ -420,6 +473,37 @@ func _process(delta: float) -> void:
 	if blood_remaining <= 0.0:
 		dead = true
 		died.emit({"type": "bleed_out", "subject_id": subject_id, "wounds": wounds.duplicate(true)})
+
+
+## B3.2. Dose spends itself into the body it is sitting in. This is the half a
+## cut does not have: a blade does its damage at the moment it lands and is
+## finished, and this goes on ruining the zone and everything inside it long
+## after whoever delivered it has walked away.
+func _burn_dose(delta: float) -> void:
+	if dose.is_empty():
+		return
+	var spent: Array = []
+	for zone_id in dose:
+		var remaining := float(dose[zone_id])
+		if remaining <= 0.01:
+			spent.append(zone_id)
+			continue
+		var burn := minf(remaining, DOSE_BURN_PER_SECOND * delta)
+		var zone: Dictionary = zones.get(zone_id, {})
+		if not zone.is_empty():
+			zone["health"] = maxf(0.0, float(zone.health) - burn)
+			zones[zone_id] = zone
+		for organ_key in organs:
+			if str((organs[organ_key] as Dictionary).get("zone", "")) == str(zone_id):
+				damage_organ(organ_key, burn * 0.3)
+		dose[zone_id] = maxf(0.0, remaining - burn - DOSE_DECAY_PER_SECOND * delta)
+	for zone_id in spent:
+		dose.erase(zone_id)
+
+
+## B3.2. How melted a zone reads, 0 to 1, for anything that draws it.
+func dose_ratio(zone_id: String) -> float:
+	return clampf(float(dose.get(zone_id, 0.0)) / 24.0, 0.0, 1.0)
 
 
 func _enter_critical() -> void:

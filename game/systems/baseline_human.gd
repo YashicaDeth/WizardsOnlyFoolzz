@@ -76,6 +76,10 @@ const FRACTURE_RATIO := 0.4
 ## the flesh has actually opened.
 const BRUISE_RATIO := 0.55
 const BRUISE_SKIN := Color("5c3550")
+## B3.2. What dose takes flesh toward: sallow, greenish and wet, which is
+## nothing like the purple a beating leaves. The two injuries have to be
+## tellable apart across a room.
+const MELTED_SKIN := Color("6e7a3c")
 ## Loose gore is capped across every body at once. Twelve drivers shedding
 ## unbounded blood in a pileup is a frame-rate bug, not atmosphere.
 const MAX_LIVE_GORE := 140
@@ -191,6 +195,9 @@ func build(id: String, config: Dictionary = {}) -> void:
 		if _leg_points_forward(zone_id):
 			part.rotation.x = PI * 0.5
 		part.set_meta("rest_position", spec.at)
+		# B3.2. What this limb is when nothing has happened to it, so a melting
+		# injury has something to take volume away from.
+		part.set_meta("rest_scale", part.scale)
 		add_child(part)
 		parts[zone_id] = part
 
@@ -784,7 +791,21 @@ func _refresh_zone(zone_id: String) -> void:
 		else:
 			var opened := 1.0 - ratio / maxf(BRUISE_RATIO, 0.01)
 			tint = _flesh.lerp(BRUISE_SKIN, 0.85).lerp(Color("3d0907"), opened)
+	# B3.2. A melting injury does not read as a bruise going dark. Dose takes
+	# the zone toward a wet, sallow green and takes the volume out of it — a
+	# dosed limb slumps rather than swells — so that a body somebody irradiated
+	# is distinguishable at a glance from a body somebody beat, which is the
+	# difference this segment asks the rig to show.
+	var dosed := anatomy.dose_ratio(zone_id) if anatomy.has_method("dose_ratio") else 0.0
+	if dosed > 0.0 and not prosthetic:
+		tint = tint.lerp(MELTED_SKIN, clampf(dosed * 1.35, 0.0, 0.9))
 	part.material_override = _zone_material(zone_id, tint, "chrome" if prosthetic else "flesh")
+	if dosed > 0.0 and not prosthetic:
+		var melted_material := part.material_override as StandardMaterial3D
+		# Wet where it is worst: what is left of the surface is running.
+		melted_material.roughness = clampf(melted_material.roughness - dosed * 0.45, 0.05, 1.0)
+		var rest: Vector3 = part.get_meta("rest_scale", Vector3.ONE)
+		part.scale = rest.lerp(rest * 0.82, clampf(dosed, 0.0, 1.0))
 	# Bone shows through where the flesh has failed, without waiting for the
 	# limb to come off entirely.
 	var bone := bones.get(zone_id) as Node3D

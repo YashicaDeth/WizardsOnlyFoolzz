@@ -380,8 +380,8 @@ B built the most detailed body in the game and the player can only see it when i
 
 ### B v3 — the third pass
 v2 made the body legible and it is still only harmed by violence. Greg: *"there's like 9g or 8g that radiation really melts you"*.
-- [ ] **B3.1** `v3` Radiation is a damage path through the same anatomy
-- [ ] **B3.2** `v3` It melts rather than cuts, and the rig shows the difference
+- [x] **B3.1** `v3` Radiation is a damage path through the same anatomy — not a status effect bolted on beside the body: it goes through `apply_hit()` with every other kind of harm, and differs in what it does rather than in where it lives. The model already split the world into penetrating and blunt — a blade reaches an organ, a fist breaks the ribs over it — and radiation belongs to neither, because it needs no way in. It reaches *every* organ in the zone at once rather than the one a blade happened to find, it barely bleeds (measured at 0.08 against a cut's 1.26 for the same 40 damage, which is why a body can be lethally dosed with almost nothing running out of it), and it leaves dose behind in the zone. Dose travels in the snapshot, so somebody who walked out of a hot zone is still being damaged by it in the next scene. `MELTING` is a family rather than a single type because the caustic pools do the same thing to a body over a different span. Verified by `tests/radiation_path_test.tscn` (new, 10/10), every claim measured against a cut of the same size as a control
+- [x] **B3.2** `v3` It melts rather than cuts, and the rig shows the difference — three ways, and each is a thing the player can see. It keeps working after the hit: `_burn_dose()` spends the dose into the zone and everything inside it every frame, which a blade never does — a cut is finished the moment it lands. It does not fracture: a dosed limb has not broken, there is simply less of it, and reading "compound fracture" on an irradiated arm would be the rig telling the wrong story. And it does not look like a beating — dose takes the flesh toward a wet sallow green rather than the purple of bruising, drops its roughness because what is left of the surface is running, and takes the volume out of the limb, so a dosed body slumps where a beaten one swells. Verified beside its control rather than alone: `tests/body_showcase.tscn` now stands four bodies in a row — intact, beaten, dosed with the same total damage, and opened under the X-ray — and photographs itself (`captures/b3_2_v3_dosed_beside_beaten.png`)
 
 ### B v4 — the fourth pass
 v3 gave the body a second way to be ruined and no way to be chosen. The rework wants mods, piercings, tattoos and extensions.
@@ -2905,7 +2905,42 @@ are in it.
       regression suites re-verified clean.
 - [ ] **AD1.4** Climbing a building is a route, not a cutscene (Prototype's lesson)
 - [ ] **AD1.5** Momentum carries between moves — run into vault into climb is one motion
-- [ ] **AD1.6** All of it reads through the anatomy: a broken leg cannot vault
+- [x] ~~**AD1.6** All of it reads through the anatomy: a broken leg cannot
+      vault~~ `AnatomyComponent.mobility_ratio()` already existed and
+      already gated running speed through B6.5's `_player_speed_scale()` —
+      this reads the exact same signal into all three AD1 verbs rather
+      than inventing a second injury number for traversal. One leg
+      destroyed outright (`health = 0`, the other untouched) reads
+      `mobility_ratio() = 0.5`, below the same `PLAYER_INJURY_FLOOR`
+      (0.55) B6.5 already draws its own line at — below it,
+      `_vault_target()` and `_wall_run_surface()` both refuse outright,
+      literally "a broken leg cannot vault." Above the floor, the read is
+      continuous rather than a single cliff: `_jump()`'s impulse is scaled
+      by `_player_speed_scale()` directly (reused whole, not recomputed,
+      so footing/stagger affects a jump's height exactly as it already
+      affects a step's speed), a permitted vault takes longer the worse
+      off the body is (`vault_duration`, tracked per-attempt rather than
+      against the flat constant, since a hobbled vault is deliberately
+      handed *more* time than a healthy one gets — the eased-lerp in
+      `_update_player()` was fixed to divide against this instead of the
+      constant it used to, or a hobbled vault's own progress maths would
+      have finished, and glitched, past 100% before the extra time was up),
+      and a permitted wall run holds for less of `WALL_RUN_DURATION` the
+      worse off the legs are. What the floor does not touch: B6.5's own
+      "never below a speed you could retreat at" promise — the gate is on
+      the three *advanced* verbs, not on the ability to move at all, so a
+      catastrophically hurt player can still walk, still jump (a smaller
+      jump, never no jump), just cannot vault or hold a wall until healed.
+      Verified: `tests/anatomy_traversal_test.gd` (new, headless, 11/11) —
+      a healthy body vaults freely and jumps at the full, unscaled impulse;
+      one leg destroyed drops mobility below the floor and both the vault
+      and the wall run a healthy body could make are refused outright,
+      while the jump still fires, visibly smaller, never zero; a bruised
+      -not-broken pair of legs (60/75 health each) clears the floor and
+      still gets a vault through, measurably slower than a healthy one's.
+      `wall_run_test`, `jump_test`, `vault_test`, `opening_test`,
+      `combat_integration_test` and `combat_response_test` regression
+      suites re-verified clean.
 
 ### AD2 — The first-person HUD
 - [ ] **AD2.1** Diegetic: the hands, the weapon, the handheld, the windscreen (pairs with M1.6)

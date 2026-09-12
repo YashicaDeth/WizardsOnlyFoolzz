@@ -264,6 +264,11 @@ var dodge_direction := Vector3.ZERO
 var vaulting_time := 0.0
 var vault_from := Vector3.ZERO
 var vault_to := Vector3.ZERO
+## AD1.6. The actual duration this specific vault was given, scaled by
+## anatomy at the moment it started — `vaulting_time` counts down against
+## this, never against the flat `VAULT_DURATION` constant, since a hobbled
+## vault is deliberately handed more than that.
+var vault_duration := VAULT_DURATION
 ## AD1.3. Positive for as long as the wall is still carrying the player;
 ## re-checked and re-set every frame it runs rather than only at the start,
 ## since the wall the player is running along can curve or end mid-run.
@@ -1013,7 +1018,7 @@ func _update_player(delta: float) -> void:
 	# animation, and normal gravity/floor-stick would just fight it.
 	if vaulting_time > 0.0:
 		vaulting_time = maxf(0.0, vaulting_time - delta)
-		var progress := 1.0 - vaulting_time / VAULT_DURATION
+		var progress := 1.0 - vaulting_time / vault_duration
 		var eased := 1.0 - pow(1.0 - progress, 3.0)
 		player_body.position = vault_from.lerp(vault_to, eased)
 		if vaulting_time <= 0.0:
@@ -1108,7 +1113,10 @@ func _update_player(delta: float) -> void:
 	# The jump and the slide that proves it happen in the same physics step.
 	var jumping := jump_queued and player_body.is_on_floor()
 	jump_queued = false
-	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0, JUMP_IMPULSE if jumping else 0.0)
+	# AD1.6. The same floor B6.5 already put under running speed and combat
+	# strength, not a new one invented for jumping — a hobbled body should
+	# leave the ground with a hobbled body's own jump, not a healthy one's.
+	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0, JUMP_IMPULSE * _player_speed_scale() if jumping else 0.0)
 	if jumping:
 		WorldHistory.record_event("player_jumped", {"location": HUNT_LOCATION})
 	# AD1.3. Starting a run needs no key at all — the body grabs the wall
@@ -1791,6 +1799,13 @@ func _vault_target(direction: Vector3) -> Dictionary:
 		return {}
 	if not player_body.is_on_floor():
 		return {}
+	# AD1.6. "A broken leg cannot vault" — literally: `mobility_ratio()`
+	# reads 0.5 for one leg destroyed and the other untouched, so the same
+	# `PLAYER_INJURY_FLOOR` (0.55) B6.5 already uses for how far a wrecked
+	# body can move or swing draws the line here too, rather than a second
+	# number invented for this one verb. Below it, this is a wall again.
+	if player_rig.anatomy.mobility_ratio() < PLAYER_INJURY_FLOOR:
+		return {}
 	var space := get_world_3d().direct_space_state
 	var exclusions := _player_collision_exclusions()
 	var feet: Vector3 = player_body.position + Vector3.UP * -0.9
@@ -1843,7 +1858,13 @@ func _vault_target(direction: Vector3) -> Dictionary:
 
 
 func _vault(landing: Vector3) -> void:
-	vaulting_time = VAULT_DURATION
+	# AD1.6. Cleared the gate in `_vault_target()`, so mobility here is
+	# somewhere in (PLAYER_INJURY_FLOOR, 1.0] rather than the full range —
+	# a body that can still vault at all takes longer over it the worse off
+	# it is, rather than clearing every obstacle at the same one healthy
+	# speed right up until the gate simply refuses it outright.
+	vault_duration = VAULT_DURATION * lerpf(1.6, 1.0, player_rig.anatomy.mobility_ratio())
+	vaulting_time = vault_duration
 	vault_from = player_body.position
 	vault_to = landing
 	player_body.velocity = Vector3.ZERO
@@ -1860,6 +1881,11 @@ func _wall_run_surface(direction: Vector3) -> Dictionary:
 	if not wall_run_unlocked():
 		return {}
 	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty():
+		return {}
+	# AD1.6. The same real floor `_vault_target()` gates on — a leg wrecked
+	# past this point cannot hold weight sideways against a wall any more
+	# than it can throw the body up and over one.
+	if player_rig.anatomy.mobility_ratio() < PLAYER_INJURY_FLOOR:
 		return {}
 	if direction.is_zero_approx():
 		return {}
@@ -1895,7 +1921,11 @@ func _wall_run_surface(direction: Vector3) -> Dictionary:
 
 
 func _begin_wall_run(surface: Dictionary) -> void:
-	wall_running_time = WALL_RUN_DURATION
+	# AD1.6. Cleared the gate in `_wall_run_surface()` already, so this is
+	# always shortening a run rather than ever lengthening past the healthy
+	# baseline — a body that can still hold a wall does not hold it as
+	# long the worse off it is.
+	wall_running_time = WALL_RUN_DURATION * lerpf(0.5, 1.0, player_rig.anatomy.mobility_ratio())
 	wall_run_normal = surface.normal
 	# Whatever vertical velocity got the player here (a jump, a fall) is not
 	# what a wall run is — leaving it alone let a fresh jump's own impulse
