@@ -989,6 +989,18 @@ func _throw_limb(zone_id: String, hit_direction := Vector3.ZERO) -> void:
 	visual.mesh = part.mesh
 	visual.material_override = part.material_override
 	limb.add_child(visual)
+	# B4.1. Whatever somebody had done to this limb goes with it. A tattoo and a
+	# piercing are on the arm, not on the person: the arm lands across the yard
+	# still carrying them, and the stump it left behind does not. This is the
+	# reason body mods are mounted on the zone meshes rather than painted into
+	# the flesh material — ink in a material would survive on a stump, which is
+	# the wrong story about what just happened.
+	for child in part.get_children():
+		if child is MeshInstance3D and (child as Node).has_meta("body_mod"):
+			var carried := (child as MeshInstance3D).duplicate() as MeshInstance3D
+			visual.add_child(carried)
+			carried.transform = (child as MeshInstance3D).transform
+			child.queue_free()
 	var bone := bones.get(zone_id) as Node3D
 	if bone != null and is_instance_valid(bone) and bone.get_child_count() > 0:
 		var stub := (bone.get_child(0) as MeshInstance3D).duplicate() as MeshInstance3D

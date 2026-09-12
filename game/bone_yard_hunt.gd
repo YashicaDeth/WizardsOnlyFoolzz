@@ -604,7 +604,8 @@ func _build_player_rig() -> void:
 	hunter_appearance = HUNTER_APPEARANCE.new()
 	hunter_appearance.name = "HunterAppearance"
 	player_rig.add_child(hunter_appearance)
-	hunter_appearance.configure(player_rig)
+	# B4.1. The sheet's marks travel with the appearance it already drives.
+	hunter_appearance.configure(player_rig, appearance)
 
 
 ## Blood type is a choice on the intake sheet, so it has to mean something.

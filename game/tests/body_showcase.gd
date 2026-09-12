@@ -30,16 +30,19 @@ func _ready() -> void:
 	ground.material_override = WorldLook.surface(Color("2a2030"), "dirt", 4)
 	add_child(ground)
 
-	_subject(Vector3(-1.6, 0, 0), "showcase_intact", 0)
-	_subject(Vector3(-0.55, 0, 0), "showcase_wrecked", 1)
+	_subject(Vector3(-2.1, 0, 0), "showcase_intact", 0)
+	_subject(Vector3(-1.05, 0, 0), "showcase_wrecked", 1)
 	# B3.2. Beside the beaten one on purpose. The claim is that a melting injury
 	# and a beating are tellable apart at a glance, and a shot of a dosed body
 	# on its own proves nothing about that — it has to stand next to the bruise.
-	_subject(Vector3(0.55, 0, 0), "showcase_dosed", 3)
-	_subject(Vector3(1.6, 0, 0), "showcase_xray", 2)
+	_subject(Vector3(0.0, 0, 0), "showcase_dosed", 3)
+	# B4.1 / B4.2. Inked, pierced and grown into something, so the marks and the
+	# mutations can be seen on a body rather than only counted in a test.
+	_subject(Vector3(1.05, 0, 0), "showcase_marked", 4)
+	_subject(Vector3(2.1, 0, 0), "showcase_xray", 2)
 
 	var camera := Camera3D.new()
-	camera.position = Vector3(0, 1.05, 3.1)
+	camera.position = Vector3(0, 1.05, 3.9)
 	camera.rotation_degrees = Vector3(-4, 0, 0)
 	camera.fov = 52.0
 	camera.current = true
@@ -70,6 +73,10 @@ func _subject(at: Vector3, id: String, mode: int) -> void:
 	body.position = at
 	# Through the config: assigning `body.gore` here is overwritten by build().
 	body.build(id, {"flesh": Color("7a6350"), "variation": mode * 3, "gore": false})
+	if mode == 4:
+		var look := HunterAppearance.new()
+		body.add_child(look)
+		look.configure(body, {"name": id, "ink": 0.95, "piercings": 0.9, "mutation": 0.85})
 	match mode:
 		1:
 			# Enough damage to put bone through the skin on one side and take an

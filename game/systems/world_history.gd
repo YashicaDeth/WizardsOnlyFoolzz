@@ -347,9 +347,19 @@ func faction_price_factor(faction_id: String, target: Dictionary = {}) -> float:
 	var distance := absf(theirs - yours)
 	if distance >= FACTION_REFUSAL_DISTANCE:
 		return 0.0
+	# B4.2. What somebody's head has become is the first thing anybody reads off
+	# them, before a reputation and long before a Tree axis. A mutation is not
+	# simply disliked, though: which way it lands depends on who is looking.
+	# Everything on the ascending side of the axis treats a changed body as
+	# contamination, and everything on the descending side treats it as somebody
+	# who got on with it — so the same face that costs you at a Gate Lantern
+	# stall is a credential in the Soft Rot. Derived from the faction's own axis
+	# rather than a second table of who tolerates what, so a faction that moves
+	# on the axis takes its opinion of mutation with it.
+	var marked := clampf(float((target.get("appearance", {}) as Dictionary).get("mutation", 0.0)), 0.0, 1.0)
 	# Kin rate through to a grudging one. The curve is gentle because a career
 	# is supposed to move this, not a single execution.
-	return clampf(1.2 - distance * 0.52, 0.45, 1.2)
+	return clampf(1.2 - distance * 0.52 - marked * theirs * 0.3, 0.45, 1.2)
 
 
 ## The same comparison in words, for anything that has to say it out loud
