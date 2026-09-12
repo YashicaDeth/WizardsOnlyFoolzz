@@ -518,9 +518,9 @@ Four tiers, all on existing machinery. See `DESIGN/COSMOLOGY.md`.
 - [x] **K4.5** Killing a Sin changes what its faction is about, because the principle drives its axis and pricing — already true for the original four by construction, and now verified true for the three new ones too (`faction_price_factor` reads any `FACTION_TREE_AXIS` entry generically)
 
 ### K3 — The player as half of each
-- [ ] **K3.1** Decide whether both ladders can be climbed at once or committing closes one
-- [ ] **K3.2** The opening reframed: CellOutz grew you, which is why the debt is in the meat
-- [ ] **K3.3** Getting God's attention as the actual win condition, written into world history
+- [~] **K3.1** Decide whether both ladders can be climbed at once or committing closes one — answered by default rather than invented fresh: `route_endings.gd`'s own comment argues both stay climbable right up until one is actually finished, and finishing one then locks (verified: a subject who signs away and later drifts all the way back up on paper still reads as the demon ending). A default worth Greg confirming or overriding, not a closed question
+- [ ] **K3.2** The opening reframed: CellOutz grew you, which is why the debt is in the meat (narrative rewrite of the built, polished `vat_chamber.tscn`/`opening_director.gd` sequence — not attempted here; needs a visual verification pass this session can't give it blind)
+- [x] **K3.3** Getting God's attention as the actual win condition, written into world history — `RouteEndings.forced_gods_attention()` reads the Ascent ending already built (E7.2) as that moment, per `DESIGN/COSMOLOGY.md`'s own framing, rather than inventing a distinct God entity. Covered by `tests/route_endings_test.gd` (14 checks total)
 
 ## L — The Board
 The storyline and career as a conspiracy pin board rather than a quest list.
