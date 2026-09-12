@@ -481,8 +481,34 @@ func contest_channel(faction_id: String, action: String, subject_id: String = "p
 			result.detail = "COVERAGE IS GONE FOR EVERYONE HERE, INCLUDING YOU."
 	WorldHistory.amend_subject(faction_id, {"signal_control": control})
 	WorldHistory.record_event("channel_contested", {"faction_id": faction_id, "action": action, "subject_id": subject_id, "control_after": control})
+	_retaliate(faction_id, action, subject_id)
 	result["control_after"] = control
 	return result
+
+
+## K4.6 v2. "The Sins are named and placed but do not act on the world" —
+## a Sin does not have to spawn a counter-raid to stop being furniture; its
+## own captain remembering who did this is enough to make it real, since
+## grudge is what the rest of the Hunt System (RivalRegistry, F2 propagation)
+## already reads. Scaled by how much the action actually cost the faction, so
+## cutting a mast is remembered harder than flooding it for an afternoon.
+const RETALIATION_GRUDGE := {
+	"out_publish": 6, "discredit": 10, "hijack": 15, "flood": 4, "cut": 20,
+}
+
+
+func _retaliate(faction_id: String, action: String, subject_id: String) -> void:
+	var grudge_gain := int(RETALIATION_GRUDGE.get(action, 0))
+	if grudge_gain <= 0 or subject_id.is_empty():
+		return
+	var relations: Dictionary = WorldHistory.subject(faction_id).get("relations", {})
+	for member_id in relations:
+		if str((relations[member_id] as Dictionary).get("kind", "")) != "command":
+			continue
+		var captain := WorldHistory.subject(str(member_id))
+		if str(captain.get("kind", "")) != "person":
+			continue
+		WorldHistory.update_subject(str(member_id), {"grudge": int(captain.get("grudge", 0)) + grudge_gain}, "channel_contest_remembered")
 
 
 ## FACTIONS.md's implementation order, step 7 ("coupling: signal control

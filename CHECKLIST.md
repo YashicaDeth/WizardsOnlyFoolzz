@@ -629,7 +629,7 @@ Four tiers, all on existing machinery. See `DESIGN/COSMOLOGY.md`.
 
 ### K v2 — the second pass
 - [ ] **K2.5** `v2` The Horsemen exist as subjects with no behaviour of their own
-- [ ] **K4.6** `v2` The Sins are named and placed but do not act on the world
+- [x] **K4.6** `v2` The Sins are named and placed but do not act on the world — `wire_net.gd`'s `contest_channel()` now retaliates: a successful contest raises the faction's own captain's real `grudge` toward whoever did it, scaled by how much it cost them (flood 4, out-publish 6, discredit 10, hijack 15, cut 20 — a mast cut is remembered harder than an afternoon of flooding). That grudge is not decorative — it is the exact field `RivalRegistry`/F2 propagation already reads, so a Sin acting on the world means a real future rival, not a scripted counter-raid. Only a contest that actually lands retaliates; a refusal does nothing. Covered in `tests/channel_contest_test.gd` (4 new checks, 19 total)
 - [ ] **K1.4** `v2` Both poles are real in the ledger and barely felt in the world — a player should know which one they are standing in
 - [ ] **K3.2** `v2` Nothing yet stops a player climbing both ladders at once
 - [ ] **K5.1** `v2` Lesser demons are rivals reread; they should eventually want something of their own
