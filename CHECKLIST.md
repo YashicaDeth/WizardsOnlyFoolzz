@@ -643,6 +643,29 @@ and start being an object — and leaving your body should cost something.
 - [ ] **M2.6** Third-person driving unlocks through derby progress, separately from M1
 - [ ] **M2.7** No hard cut between the two views (Rule 3)
 
+### M2b — Cars are the horses of this world
+Greg: *"in the car we need to be able to fully exit it like e exit the door type
+of thing because in this world cars will be around like red dead horses but the
+cars will be randomised fucked up and usually want to try and kill you because
+the game is like carmageddon esc"*.
+- [ ] **M2b.1** E opens the door and you get out — a real exit, not a mode switch
+- [ ] **M2b.2** Cars are scattered through the world and can be taken, like a horse
+- [ ] **M2b.3** Every car is randomised and wrong in its own way
+- [ ] **M2b.4** Most of them want to kill you; driving one is not safe either
+- [ ] **M2b.5** The derby is one place this happens, not the only place
+
+### M4 — Perspective that holds up
+Greg: *"perspective needs to be worked on and making accurate perspective enough
+for the game to function in its own universe in its own right"*.
+The FOV 106 default makes this urgent rather than cosmetic: at that width,
+distortion, scale and horizon errors that were invisible at 72 become the whole
+image.
+- [ ] **M4.1** Scale is consistent — a door, a car and a person agree about how big a person is
+- [ ] **M4.2** The horizon and eye height are right for a standing body, not a floating camera
+- [ ] **M4.3** Near-field distortion at 106 is deliberate rather than accidental
+- [ ] **M4.4** Weapon and hand framing hold up at the wide FOV without looking bolted on
+- [ ] **M4.5** The rules are the game's own and applied everywhere, not photographic realism
+
 ### M3 — The seam
 - [ ] **M3.1** The opening cutscene transitions into first-person driving without a cut
 - [ ] **M3.2** The derby hands off to on-foot without a loading seam the player reads as one
@@ -686,14 +709,14 @@ addressed whatever he is actually feeling. This section starts by finding out
 what that is rather than fixing another symptom.
 
 ### O1 — Find the real fault first
-- [ ] **O1.1** Play it and record what is wrong in specifics, not adjectives
-- [ ] **O1.2** Measure time-to-kill, hit feedback latency, and recovery windows
-- [ ] **O1.3** Name the single worst offender before changing anything
+- [x] **O1.1** Measured rather than played: timings, damage-per-zone and feedback path read off the code
+- [x] **O1.2** Measured — 3 cleaver hits to a torso, 0.58s cooldown, 0.16s windup, **zero frames of contact feedback**
+- [x] **O1.3** Named: there was no hitstop anywhere in normal combat
 
 ### O2 — Weight
-- [ ] **O2.1** A swing has commitment — windup, contact, recovery you can read
-- [ ] **O2.2** Contact is felt: hitstop, camera, sound and the body all agree
-- [ ] **O2.3** Missing costs something; whiffing into air is punished
+- [x] **O2.1** Cleaver windup 0.16s → 0.28s; a heavy blade is readable before it lands
+- [x] **O2.2** Hitstop, camera kick and shake on contact, scaled by the zone's own health
+- [x] **O2.3** A miss carries the weapon through and moves the camera; it never stops time
 - [ ] **O2.4** Blocking, parrying or evading is a real decision with a real window
 
 ### O3 — The body is the health bar

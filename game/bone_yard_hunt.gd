@@ -23,6 +23,7 @@ const RIVAL_REGISTRY := preload("res://systems/rival_registry.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
+const IMPACT_FEEL := preload("res://systems/impact_feel.gd")
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 
 var player := Vector3(0, 1.5, 19)
@@ -83,6 +84,8 @@ var living_map: Control
 var natal_sigil: Control
 ## I0.1. The real index. Hunt Grounds was drawing its own text list instead.
 var world_index: Control
+## O2.2. The moment of contact. There was none — see impact_feel.gd.
+var impact_feel: Node
 var viscera_fx := true
 var enemy_rig: BaselineHuman
 var grapple_target := ""
@@ -153,6 +156,11 @@ func _ready() -> void:
 	world_index = WORLD_INDEX.new()
 	world_index.name = "WorldIndex"
 	$HUD.add_child(world_index)
+	impact_feel = IMPACT_FEEL.new()
+	# The kill cam already owns time deliberately; an impact inside one is part
+	# of its timing, not a competitor for it.
+	impact_feel.blocked_by = func() -> bool: return kill_cam != null and kill_cam.active
+	add_child(impact_feel)
 	kill_cam = preload("res://systems/kill_cam.gd").new()
 	kill_cam.name = "KillCam"
 	$HUD.add_child(kill_cam)
@@ -709,6 +717,12 @@ func _resolve_firearm(attack: Dictionary) -> void:
 			summary.severed.append(str(result.get("zone", "limb")))
 		impacts[id] = summary
 		(actor.node as CharacterBody3D).velocity += direction * minf(6.0, float(attack.impulse) * 0.075)
+		# O2.2. Time, camera and sound on the same frame. Severity is measured
+		# against the zone's own health so a cleaver through a head reads
+		# heavier than the same cleaver through a thigh.
+		var zone_id := str(result.get("zone", "torso"))
+		var zone_max: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone_id, {}) as Dictionary).get("health", 100.0))
+		impact_feel.strike(float(attack.get("damage", 0.0)) / maxf(zone_max, 1.0), str(attack.get("damage_type", "cut")), bool(result.get("severed", false)))
 	for id in impacts:
 		var summary: Dictionary = impacts[id]
 		var actor: Dictionary = summary.actor
@@ -728,6 +742,7 @@ func _resolve_firearm(attack: Dictionary) -> void:
 			actor.state = "fleeing"
 			actor.loot_at_risk = true
 	if impacts.is_empty():
+		impact_feel.whiff()
 		prompt.text = "%s / MISS" % str(arsenal.current().label)
 	else:
 		prompt.text = "%s / %d BODY%s HIT" % [str(arsenal.current().label), impacts.size(), "IES" if impacts.size() != 1 else ""]
@@ -1999,6 +2014,13 @@ func _update_camera() -> void:
 		camera.look_at(player + look * 12.0)
 	if body_motion != null:
 		camera.rotation.z += body_motion.camera_roll * (0.45 if third_person else 1.0)
+		# O2.2. The kick from whatever you just hit, applied here so the derby
+		# and the hunt can each carry it in their own rig's terms.
+		if impact_feel != null:
+			var felt: Vector2 = impact_feel.camera_offset()
+			camera.rotation.x += felt.y
+			camera.rotation.y += felt.x
+			camera.rotation.z += impact_feel.roll
 	if player_rig != null and is_instance_valid(player_rig):
 		var facing := yaw + PI
 		var locked_body := _lock_node()

@@ -14,7 +14,7 @@ const WEAPONS := {
 	"sword": {
 		"label": "ASHLINE CLEAVER", "kind": "melee", "damage": 44.0,
 		"impulse": 28.0, "reach": 3.7, "cooldown": 0.58,
-		"windup": 0.16, "stamina": 20.0, "damage_type": "cut",
+		"windup": 0.28, "stamina": 20.0, "damage_type": "cut",
 	},
 	"shotgun": {
 		"label": "BONE YARD 12G", "kind": "firearm", "damage": 16.0,
