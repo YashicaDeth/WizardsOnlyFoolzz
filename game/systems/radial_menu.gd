@@ -80,6 +80,13 @@ func open_wheel(list: Array) -> void:
 ## Releasing commits whatever is under the pointer. Releasing on nothing is a
 ## deliberate cancel rather than an accident, which is why the dead zone in the
 ## middle is large.
+## Out of time, or interrupted. Closes without committing, because neither of
+## those is the player picking something.
+func cancel_wheel() -> void:
+	_committed = true
+	is_open = false
+
+
 func close_wheel() -> void:
 	if is_open and not _committed and highlighted >= 0 and highlighted < items.size():
 		_committed = true
@@ -95,7 +102,13 @@ func _process(delta: float) -> void:
 	if is_open:
 		budget = maxf(0.0, budget - real_delta)
 		if budget <= 0.0:
-			close_wheel()
+			# Playtest, 12 Sep: "if you're still holding it down it will play the
+			# shooting thing, then speeds back up then down again." Running the
+			# budget out was calling close_wheel(), which commits whatever the
+			# pointer happens to be over — so the wheel spent its own timer and
+			# then fired the weapon nobody chose. Expiry is a cancel, not a
+			# choice: you ran out of time, you did not decide anything.
+			cancel_wheel()
 	else:
 		budget = minf(BUDGET, budget + real_delta * (BUDGET / REFILL))
 	blend = Motion.blend(blend, real_delta, 7.0, is_open)

@@ -62,6 +62,13 @@ func _ready() -> void:
 	device.carry.take_chunk({"layer_name": "organ", "organ_id": "heart", "zone": "torso", "subject_id": "mara_voss"})
 	device.carry.take_chunk({"layer_name": "cybernetic", "implant": "jaw telemetry nail", "zone": "head", "subject_id": "mara_voss"})
 	device.carry.take_chunk({"layer_name": "bone", "zone": "left_arm", "subject_id": "mara_voss"})
+	# Playtest reproduction: the first player picked up everything on the ground.
+	for _spare in 11:
+		device.carry.take_chunk({"layer_name": "skin", "zone": "torso", "subject_id": "mara_voss"})
+	for _muscle in 7:
+		device.carry.take_chunk({"layer_name": "muscle", "zone": "left_leg", "subject_id": "mara_voss"})
+	for _bone in 4:
+		device.carry.take_chunk({"layer_name": "bone", "zone": "right_arm", "subject_id": "mara_voss"})
 	device.carry.items[0]["age"] = 300.0
 
 	for mode in ["INDEX", "MAP", "RADIO", "CARRY", "WIRE"]:

@@ -241,6 +241,8 @@ var witness_ledger := WitnessLedger.new()
 ## B3.3/B3.6. Hold G and you are looking through people; keep holding and the
 ## ring the X-ray has always been one seat of opens into the full wheel.
 var xray_held := 0.0
+## One wheel per hold. Set when a wheel opens, cleared when the key comes up.
+var wheel_spent := false
 var xray_active := false
 ## How long the button has to be down before the segment becomes the radial.
 const XRAY_HOLD_TO_WHEEL := 0.35
@@ -2482,7 +2484,12 @@ func _update_xray(delta: float, holding: bool) -> void:
 			xray_active = true
 			WorldHistory.record_event("xray_swept", {"location": HUNT_LOCATION})
 		var lit := WorldXray.sweep(player, _all_rigs(), true)
-		if xray_held >= XRAY_HOLD_TO_WHEEL and not handheld.radial.is_open:
+		# The second half of the same playtest bug: with B still held, the moment
+		# the wheel closed this reopened it, so the world slowed, fired, sped up
+		# and slowed again in a loop. One wheel per hold — the key has to come
+		# up before another one opens.
+		if xray_held >= XRAY_HOLD_TO_WHEEL and not handheld.radial.is_open and not wheel_spent:
+			wheel_spent = true
 			# B3.6. This is where B3 becomes C2 — the empty seats on the cursor
 			# ring were always the rest of this wheel.
 			handheld.open_radial()
@@ -2492,6 +2499,7 @@ func _update_xray(delta: float, holding: bool) -> void:
 	if xray_active:
 		xray_active = false
 		xray_held = 0.0
+		wheel_spent = false
 		WorldXray.sweep(player, _all_rigs(), false)
 		if handheld.radial.is_open:
 			handheld.close_radial()

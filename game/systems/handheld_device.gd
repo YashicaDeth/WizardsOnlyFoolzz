@@ -327,6 +327,15 @@ func _process(delta: float) -> void:
 	elapsed += delta
 	raised = Motion.blend(raised, delta, Motion.PANEL, is_open)
 	if raised <= 0.001 and not is_open:
+		# C2 / playtest. The radial is a child of this device, so hiding the
+		# device hid the wheel with it — holding B dilated time and drew
+		# nothing, which is exactly what the first playtester reported. The
+		# wheel is reachable without raising the handheld, so the device stays
+		# visible (though not raised) for as long as the wheel is up.
+		if radial != null and is_instance_valid(radial) and radial.is_open:
+			visible = true
+			_clip.visible = false
+			return
 		visible = false
 		_clip.visible = false
 		return
@@ -608,8 +617,31 @@ func _draw_carry(rect: Rect2, alpha: float) -> void:
 	# packing manifest is the one presentation that makes that ordinary. They are
 	# drawn as objects in a bag now — sized by their real mass, shaped by what
 	# they are, tinted by how fresh they are, and tagged with whose they were.
+	# Playtest, 12 Sep: the first player filled the bag and the page became a
+	# wall of overlapping labels. A bag with fourteen skin chunks in it is not
+	# fourteen things to a person carrying it — it is "skin, fourteen of them".
+	# Grouped by what they are and whose they were, so a full bag reads.
+	var groups: Array = []
+	var seen: Dictionary = {}
+	for item: Dictionary in carry.items:
+		var key := "%s|%s|%s" % [str(item.get("label", "")), str(item.get("from", "")), str(item.get("kind", ""))]
+		if seen.has(key):
+			var at: int = seen[key]
+			var group: Dictionary = groups[at]
+			group["count"] = int(group["count"]) + 1
+			group["mass"] = float(group["mass"]) + float(item.get("mass", 0.5))
+			# The group is as stale as its freshest member is not.
+			group["fresh"] = minf(float(group["fresh"]), carry.freshness(item))
+			continue
+		seen[key] = groups.size()
+		groups.append({
+			"item": item,
+			"count": 1,
+			"mass": float(item.get("mass", 0.5)),
+			"fresh": carry.freshness(item),
+		})
 	var columns := 3
-	var rows := maxi(int(ceil(float(carry.items.size()) / float(columns))), 1)
+	var rows := maxi(int(ceil(float(groups.size()) / float(columns))), 1)
 	var row_height := 108.0
 	var bag_bottom := rect.end.y - 42.0
 	var bag_top := maxf(rect.position.y + 72.0, bag_bottom - 96.0 - float(rows) * row_height)
@@ -633,10 +665,13 @@ func _draw_carry(rect: Rect2, alpha: float) -> void:
 	var top_row := floor_y - float(rows - 1) * row_height
 	var spread := (bag.size.x - 120.0) / float(columns - 1)
 	var cell_width := spread - 14.0
-	for index in carry.items.size():
-		var item: Dictionary = carry.items[index]
-		var fresh: float = carry.freshness(item)
-		var mass := clampf(float(item.get("mass", 0.5)), 0.1, 4.0)
+	for index in groups.size():
+		var group: Dictionary = groups[index]
+		var item: Dictionary = group["item"]
+		var count: int = int(group["count"])
+		var fresh: float = float(group["fresh"])
+		# A pile of ten reads bigger than one, but not ten times bigger.
+		var mass := clampf(float(group["mass"]) / maxf(sqrt(float(count)), 1.0), 0.1, 4.0)
 		# Carry files layer names as kinds, so a severed arm arrives as "muscle"
 		# with whole_limb set. Shape follows what the thing actually is.
 		var kind := str(item.get("kind", "goods"))
@@ -659,8 +694,15 @@ func _draw_carry(rect: Rect2, alpha: float) -> void:
 			CellOutzType.draw_condensed(self, at + Vector2(-radius, -radius - 17.0), "P TO PIN", 7.0, AMBER * Color(1, 1, 1, 0.7 * alpha), 0.6)
 		# A shadow underneath, so the thing is resting on something.
 		draw_colored_polygon(_ellipse_points(at + Vector2(0, radius * 0.92), radius * 0.95, radius * 0.22, 14), Color(0, 0, 0, 0.35 * alpha))
+		if count > 1:
+			for behind in mini(count - 1, 3):
+				var shove := Vector2(-4.0 - float(behind) * 3.0, -3.0 - float(behind) * 2.5)
+				_draw_carried(at + shove, radius * (0.94 - float(behind) * 0.05), kind, fresh, "", alpha * 0.45)
 		_draw_carried(at, radius, kind, fresh, str(item.get("lien", "")), alpha)
-		var label := _fit(str(item.get("label", "")).to_upper(), cell_width, 9.0, 0.7)
+		var shown := str(item.get("label", "")).to_upper()
+		if count > 1:
+			shown += "  x%d" % count
+		var label := _fit(shown, cell_width, 9.0, 0.7)
 		var label_width := CellOutzType.width_condensed(label, 9.0, 0.7)
 		CellOutzType.draw_condensed(self, at + Vector2(-label_width * 0.5, radius + 12.0), label, 9.0, INK * Color(1, 1, 1, 0.85 * alpha), 0.7)
 		var from := str(item.get("from", ""))

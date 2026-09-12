@@ -1692,6 +1692,34 @@ arrest anybody.
 - [ ] **AE1.7** Being hunted by the law is the Hunt System pointed back at you (F)
 
 
+## AG — Playtest, 12 September 2026
+
+The first person who was not Greg played the build. Everything below is either a
+bug he hit or something he said, quoted, because a playtester's own words are
+more useful than a summary of them.
+
+What worked, and is worth not breaking: the Living Map — *"oh shit, it shows
+where I've been"* and *"and fog of war"*; the downed-resolution window — *"ok
+they just fell down, and I could choose, omg"*; combat and gore; the handheld on
+G — *"is that the pip boy thing you talked about, I see index map radio and
+carry"*. His overall verdict was *"it's already so in-depth, I actually love
+this"*.
+
+### AG1 — Bugs he found
+- [x] **AG1.1** The weapon wheel dilated time and drew nothing — the radial is a child of the handheld, and the handheld hides itself when lowered
+- [x] **AG1.2** Holding B looped: the wheel spent its own budget, committed whatever the pointer was over (*"it will play the shooting thing"*), then reopened because the key was still down
+- [x] **AG1.3** A full bag was a wall of overlapping labels — identical parts now group with a count
+- [ ] **AG1.4** *"idk if there's a full screen option"* — there is not
+- [ ] **AG1.5** Confirm the gore setting actually saves and reloads; he asked and nobody knows
+- [ ] **AG1.6** He was warned it *"might crash"* after the derby. Find out whether it does
+
+### AG2 — What he could not find
+The theme of the whole session, and it is a design fault rather than his.
+- [ ] **AG2.1** He could not find the Board; Greg could not remember the key either
+- [ ] **AG2.2** Nothing teaches the weapon wheel — Greg had to guess *"i think its holding b?"*
+- [ ] **AG2.3** *"press buttons probably"* is the current discovery mechanism for every panel
+- [ ] **AG2.4** The first-person HUD must say what can be pressed (AD2.3)
+
 ## Open questions — only you can answer these
 
 They block nothing else, but they change what gets built.
