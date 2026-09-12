@@ -89,6 +89,75 @@ const THEORIES := [
 	},
 ]
 
+## L5 / L6.2. What following a theory actually consists of. Each stage is a
+## condition on the world, never a quest flag — `count` events of `event` type
+## must exist in `WorldHistory`, and that is the entire mechanism. The board can
+## therefore be opened at any moment and say where the player is without
+## anything having tracked them.
+##
+## The notes are written in the hand of somebody adding to their own wall later,
+## because that is what they are: a line added under the claim once the thing
+## turned out to be checkable.
+const ROUTES := {
+	"theory_ownership": [
+		{"note": "TAKE SOMETHING OFF A BODY AND KEEP IT", "event": "carried_part", "count": 1},
+		{"note": "SELL ONE. SEE WHO DOES NOT ASK WHERE IT CAME FROM", "event": "carried_part_sold", "count": 1},
+		{"note": "THREE. A PATTERN IS THREE", "event": "carried_part", "count": 3},
+		{"note": "PUT A NAME TO THE LIEN", "event": "board_string_drawn", "count": 4},
+	],
+	"theory_frequency": [
+		{"note": "STAND UNDER A MAST AND LISTEN", "event": "map_travel", "count": 1},
+		{"note": "PHOTOGRAPH WHAT IS UNDER IT", "event": "photograph_taken", "count": 1},
+		{"note": "PUBLISH ONE. WATCH WHAT ANSWERS", "event": "photograph_published", "count": 1},
+		{"note": "FOUR MASTS. THEY ARE NOT TALKING TO EACH OTHER", "event": "map_travel", "count": 4},
+	],
+	"theory_absent_god": [
+		{"note": "PUT SOMEONE DOWN AND DECIDE", "event": "npc_resolution", "count": 1},
+		{"note": "DO IT AGAIN. NOTHING HAPPENS", "event": "npc_resolution", "count": 3},
+		{"note": "MAKE IT LOUD ENOUGH TO BE HEARD", "event": "execution", "count": 3},
+		{"note": "STILL NOTHING. THAT IS THE ANSWER", "event": "execution", "count": 7},
+	],
+	"theory_rotation": [
+		{"note": "FIND WHO IS SITTING IN THE CHAIR", "event": "faction_post_filled", "count": 1},
+		{"note": "EMPTY IT", "event": "faction_post_vacated", "count": 1},
+		{"note": "WATCH IT FILL AGAIN", "event": "faction_post_filled", "count": 2},
+		{"note": "THE ORDERS DID NOT CHANGE", "event": "faction_post_vacated", "count": 3},
+	],
+	"theory_inside": [
+		{"note": "LET THEM SELL YOU THE WIRE", "event": "celloutz_site_opened", "count": 1},
+		{"note": "FIND YOUR OWN NAME ON IT", "event": "board_pinned", "count": 3},
+		{"note": "SELL SOMEBODY ELSE'S", "event": "carried_part_sold", "count": 2},
+		{"note": "YOU ARE THE PRODUCT AND THE SHOP", "event": "theory_published", "count": 1},
+	],
+}
+
+## L6.4. A theory does not say the same thing forever. Pre-placed speculation
+## reads differently once the player has done something that bears on it, and
+## the board never announces the change — the card simply says something else
+## the next time it is opened. The first reading whose condition is met wins, so
+## these are ordered strongest first.
+const READINGS := {
+	"theory_absent_god": [
+		{"event": "execution", "count": 7, "claim": "SEVEN. HE WATCHED ALL OF THEM.
+STOP ASKING. START BILLING."},
+		{"event": "execution", "count": 3, "claim": "THREE AND NO ANSWER.
+EITHER HE IS NOT THERE OR HE AGREES."},
+	],
+	"theory_ownership": [
+		{"event": "carried_part_sold", "count": 2, "claim": "YOU HAVE SOLD TWO NOW.
+SO WHO IS REPOSSESSING WHOM."},
+	],
+	"theory_inside": [
+		{"event": "board_pinned", "count": 6, "claim": "YOUR WALL IS THEIR FILING CABINET.
+WHO ELSE HAS SEEN THIS ROOM."},
+	],
+	"theory_rotation": [
+		{"event": "faction_post_vacated", "count": 2, "claim": "TWO CHAIRS EMPTIED AND REFILLED BY MORNING.
+SOMEBODY ELSE IS WRITING THE ORDERS."},
+	],
+}
+
+
 ## A card is a piece of paper on the wall. `kind` decides how it is drawn, not
 ## what it says — a photograph, a torn cutting, an index card and a filed record
 ## are different objects and should never share a template.
@@ -439,6 +508,18 @@ func _most_implicated(evidence: Array) -> String:
 		if ref.begins_with("part:") and ref.contains("@"):
 			people.append(ref.substr(ref.find("@") + 1))
 			continue
+		if ref.begins_with("event:"):
+			# A cutting names whoever it happened to. A theory held up by an
+			# execution is a theory about the person who was executed, and
+			# without this the board could not say who to publish against.
+			var index := int(ref.substr(6))
+			if index >= 0 and index < WorldHistory.events.size():
+				var details: Dictionary = (WorldHistory.events[index] as Dictionary).get("details", {})
+				for key: String in ["subject", "rival", "victim", "target", "actor"]:
+					var named := str(details.get(key, ""))
+					if named != "" and named != "player" and not WorldHistory.subject(named).is_empty():
+						people.append(named)
+			continue
 		var state: Dictionary = WorldHistory.subject(ref)
 		match str(state.get("kind", "")):
 			"faction":
@@ -478,6 +559,66 @@ func is_published(theory_id: String) -> bool:
 
 func published() -> Array:
 	return (WorldHistory.subject(BOARD_ID).get("published", []) as Array).duplicate()
+
+
+## L5.1. The progression, derived. Every route across the board, how far along
+## it the world says the player is, and whether it has been carried to an end.
+## Nothing here is stored — it is read out of `WorldHistory` at the moment it is
+## asked for, which is why L5.2 can be true: there is no quest list because
+## there is nothing for one to list.
+func career() -> Array:
+	var routes: Array = []
+	for theory: Dictionary in THEORIES:
+		routes.append(route(str(theory["id"])))
+	routes.sort_custom(func(a, b): return float(a["progress"]) > float(b["progress"]))
+	return routes
+
+
+func route(theory_id: String) -> Dictionary:
+	var stages: Array = []
+	var met := 0
+	for stage: Dictionary in ROUTES.get(theory_id, []):
+		var done := WorldHistory.event_count(str(stage["event"])) >= int(stage["count"])
+		if done:
+			met += 1
+		stages.append({"note": str(stage["note"]), "met": done})
+	var total := maxi(stages.size(), 1)
+	var out := is_published(theory_id)
+	var sound := false
+	for row: Dictionary in published():
+		if str(row.get("theory", "")) == theory_id:
+			sound = bool(row.get("sound", false))
+	return {
+		"theory": theory_id,
+		"stages": stages,
+		"met": met,
+		"total": stages.size(),
+		"progress": float(met) / float(total),
+		"published": out,
+		# L6.2. Walked to the end and made to stand up in public. That is an
+		# ending — E7's two routes are the first two of these rather than the
+		# whole set.
+		"ending": met == stages.size() and stages.size() > 0 and out and sound,
+	}
+
+
+## L6.2. Any route the player has actually carried all the way.
+func endings_reached() -> Array:
+	var reached: Array = []
+	for entry: Dictionary in career():
+		if bool(entry["ending"]):
+			reached.append(str(entry["theory"]))
+	return reached
+
+
+## L6.4. Which version of a theory is currently true to the player. The authored
+## claim is the fallback; anything they have done that bears on it overwrites
+## what the card says.
+func reading_of(theory_id: String) -> String:
+	for reading: Dictionary in READINGS.get(theory_id, []):
+		if WorldHistory.event_count(str(reading["event"])) >= int(reading["count"]):
+			return str(reading["claim"])
+	return str(_theory(theory_id).get("claim", ""))
 
 
 func leads() -> Array:
@@ -586,9 +727,10 @@ func rebuild() -> void:
 		card.id = str(theory["id"])
 		card.kind = "theory"
 		card.title = str(theory["title"])
-		card.body = str(theory["claim"])
+		# L6.4. Whatever the theory says *now*.
+		card.body = reading_of(str(theory["id"]))
 		card.at = theory["at"]
-		card.size = Vector2(240, 146)
+		card.size = Vector2(248, 182)
 		card.seed_value = rng.randi()
 		card.angle = rng.randf_range(-0.035, 0.035)
 		cards.append(card)
@@ -934,6 +1076,25 @@ func _draw_theory(body: Rect2, card: Card) -> void:
 			line_y += 13.0 * zoom
 	# Somebody was not convinced.
 	CellOutzType.draw_condensed(self, body.end - Vector2(22, 26) * zoom, "?", 20.0 * zoom, MARKER * Color(1, 1, 1, 0.6 * open_blend), 0.0)
+	# L5.1. The route, written under the claim in the hand of somebody adding to
+	# their own wall later. Stages that the world bears out are ticked and
+	# struck through; the rest are things still to do, written as instructions
+	# to oneself. This is the progression, and it is not a list in a box — it is
+	# marginalia on a card somebody wrote at four in the morning.
+	var walk := route(card.id)
+	var note_y := body.end.y - float((walk["stages"] as Array).size()) * 11.0 * zoom - 8.0 * zoom
+	for stage: Dictionary in walk["stages"]:
+		var met := bool(stage["met"])
+		var note := _fit_note(str(stage["note"]), body.size.x - 34.0 * zoom, 6.0 * zoom)
+		var at := body.position + Vector2(20.0 * zoom, note_y - body.position.y)
+		CellOutzType.draw_condensed(self, at, note, 6.0 * zoom, INK * Color(1, 1, 1, (0.42 if met else 0.7) * open_blend), 0.5 * zoom)
+		if met:
+			# Done, and struck out the way you strike out your own notes.
+			var width := CellOutzType.width_condensed(note, 6.0 * zoom, 0.5 * zoom)
+			draw_line(at + Vector2(-2, 4.0 * zoom), at + Vector2(width + 2.0, 3.0 * zoom), MARKER * Color(1, 1, 1, 0.7 * open_blend), 1.2)
+			CellOutzType.draw_condensed(self, at - Vector2(11.0 * zoom, 0), "X", 6.0 * zoom, MARKER * Color(1, 1, 1, 0.8 * open_blend), 0.0)
+		note_y += 11.0 * zoom
+
 	# L4. Out on the Wire. The stamp says it went out, never whether it held —
 	# the player learns that from what happens to them afterwards.
 	if is_published(card.id):
@@ -1061,6 +1222,17 @@ func _draw_wall_light() -> void:
 
 
 ## Wrapped to the stencil's own measure, so a claim stays on its card.
+## A route note is one line or it is nothing. Trimmed rather than wrapped,
+## because these are scrawled in a margin and a margin has one line in it.
+func _fit_note(text: String, width: float, cap_height: float) -> String:
+	if CellOutzType.width_condensed(text, cap_height, 0.5 * zoom) <= width:
+		return text
+	var trimmed := text
+	while trimmed.length() > 2 and CellOutzType.width_condensed(trimmed + "...", cap_height, 0.5 * zoom) > width:
+		trimmed = trimmed.substr(0, trimmed.length() - 1)
+	return trimmed.strip_edges() + "..."
+
+
 func _wrap(text: String, width: float, cap_height: float, tracking: float) -> Array:
 	var lines: Array = []
 	var line := ""

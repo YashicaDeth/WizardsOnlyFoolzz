@@ -512,15 +512,15 @@ holds what the *player* thinks — which is allowed to be wrong.
 
 ### L6 — Theories, mainlines and endings
 - [x] **L6.1** The board ships with authored theories already pinned, contradictory and unmarked
-- [ ] **L6.2** A mainline theory followed far enough is an ending; E7's two routes are the first two
+- [x] **L6.2** A mainline theory followed far enough is an ending; E7's two routes are the first two
 - [ ] **L6.3** Sidelines are their own clusters, not smaller mainlines — some connect to two
-- [ ] **L6.4** Pre-placed theories read differently based on what the player actually did
+- [x] **L6.4** Pre-placed theories read differently based on what the player actually did
 - [ ] **L6.5** Different people, places and factions per route — no converging on one dungeon
 - [x] **L6.6** No quest state anywhere: what you are "on" is read out of WorldHistory
 
 ### L5 — Career
-- [ ] **L5.1** Routes across the board are the progression
-- [ ] **L5.2** No quest list exists anywhere in the game
+- [x] **L5.1** Routes across the board are the progression
+- [x] **L5.2** No quest list exists anywhere in the game
 
 ## H — Base building, reduced
 

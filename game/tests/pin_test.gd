@@ -225,8 +225,83 @@ func _ready() -> void:
 	_check(out.size() == 2, "both publications are on the record")
 
 	print("")
+	print("L5 / L6 - routes, readings and endings")
+	WorldHistory.clear_history()
+	WorldHistory.register_subject("player", {"name": "THE HUNTER", "kind": "person"})
+	WorldHistory.register_subject("mara_voss", {"name": "Mara Voss", "kind": "person", "injury": "fractured left clavicle"})
+	board.load_board()
+	board.rebuild()
+
+	# L5.1. Every theory is a route, and the board can say where the player is
+	# on each without anything having tracked them.
+	var career: Array = board.career()
+	_check(career.size() == BOARD.THEORIES.size(), "every theory is a route (%d)" % career.size())
+	var fresh_progress := 0.0
+	for entry in career:
+		fresh_progress += float(entry["progress"])
+	_check(is_zero_approx(fresh_progress), "a player who has done nothing is nowhere on any route")
+
+	# Doing the thing the route asks for moves the route, with no quest state in
+	# between: the events are the progression.
+	WorldHistory.record_event("carried_part", {"subject": "mara_voss", "part": "HEART"})
+	var owed: Dictionary = board.route("theory_ownership")
+	_check(int(owed["met"]) == 1, "taking a part off a body advances IT IS A DEBT")
+	_check(bool((owed["stages"] as Array)[0]["met"]), "and it is the first stage that moved")
+	_check(not bool((owed["stages"] as Array)[2]["met"]), "the later stages have not")
+
+	WorldHistory.record_event("carried_part", {"subject": "mara_voss"})
+	WorldHistory.record_event("carried_part", {"subject": "mara_voss"})
+	_check(int(board.route("theory_ownership")["met"]) >= 2, "three parts is a pattern, and the route knows")
+
+	# L5.2. Nothing anywhere stores what the player is "on".
+	var stored: Dictionary = WorldHistory.subject(BOARD.BOARD_ID)
+	_check(not stored.has("quests") and not stored.has("active") and not stored.has("route"), "no quest state is stored on the board")
+	var recomputed: Dictionary = board.route("theory_ownership")
+	_check(int(recomputed["met"]) == int(board.route("theory_ownership")["met"]), "progress is derived the same way every time it is asked for")
+
+	# L6.4. A pre-placed theory reads differently once the player has acted.
+	var before_reading: String = board.reading_of("theory_absent_god")
+	for _kill in 3:
+		WorldHistory.record_event("execution", {"subject": "mara_voss"})
+	var after_reading: String = board.reading_of("theory_absent_god")
+	_check(before_reading != after_reading, "a theory reads differently after three executions")
+	_check(after_reading.contains("THREE"), "and it says so in its own voice: %s" % after_reading.split("
+")[0])
+	for _more in 4:
+		WorldHistory.record_event("execution", {"subject": "mara_voss"})
+	_check(board.reading_of("theory_absent_god").contains("SEVEN"), "and again at seven")
+	board.rebuild()
+	for card in board.cards:
+		if card.id == "theory_absent_god":
+			_check(str(card.body).contains("SEVEN"), "the card on the wall shows the current reading")
+
+	# L6.2. Walked to the end and made to stand up in public is an ending.
+	for _down in 3:
+		WorldHistory.record_event("npc_resolution", {"subject": "mara_voss"})
+	var walked: Dictionary = board.route("theory_absent_god")
+	_check(int(walked["met"]) == int(walked["total"]), "every stage of HE IS NOT LISTENING is met")
+	_check(not bool(walked["ending"]), "but walking it is not an ending on its own")
+	_check(board.endings_reached().is_empty(), "and no ending has been reached")
+	# Strung to an execution the player actually carried out, because that is
+	# what this theory says would bear it out. Mara stays on the wall as the
+	# person it is about.
+	var execution_ref := ""
+	for index in WorldHistory.events.size():
+		if str((WorldHistory.events[index] as Dictionary).get("type", "")) == "execution":
+			execution_ref = "event:%d" % index
+			break
+	board.pin("mara_voss", "photo")
+	board.pin(execution_ref, "cutting")
+	board.lay_string(execution_ref, "theory_absent_god")
+	var went_out: Dictionary = board.publish("theory_absent_god")
+	_check(bool(went_out.get("ok", false)) and bool(went_out.get("sound", false)), "it publishes, and soundly")
+	_check(bool(board.route("theory_absent_god")["ending"]), "a route walked to the end and published sound IS an ending")
+	_check(board.endings_reached().has("theory_absent_god"), "and the game knows which ending was reached")
+	_check(board.endings_reached().size() == 1, "only the route the player actually carried")
+
+	print("")
 	if failures.is_empty():
-		print("L2 + L3 + L4 PASS")
+		print("L2 + L3 + L4 + L5 + L6 PASS")
 	else:
 		print("FAIL: %d" % failures.size())
 		for failure in failures:

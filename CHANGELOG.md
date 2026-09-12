@@ -2,6 +2,22 @@
 
 ## 2026 09 12
 
+- **L5 and L6: the career is the wall, and a theory can end the game.** Each
+  theory is a route, and a route is a short list of conditions on the world —
+  take something off a body and keep it; sell one and see who does not ask where
+  it came from; three, because a pattern is three. Nothing tracks the player
+  through them. The board asks `WorldHistory` at the moment it opens, which is
+  what lets L5.2 be literally true: there is no quest list because there is
+  nothing for one to list. The stages are written under the claim as marginalia
+  in the hand of somebody adding to their own wall at four in the morning, and
+  struck out in marker once the world bears them out.
+  A route walked to the end and then published *sound* is an ending — E7's two
+  routes are the first two of these rather than the whole set.
+  And L6.4: a pre-placed theory does not say the same thing forever. HE IS NOT
+  LISTENING reads "THREE AND NO ANSWER" after three executions and "SEVEN. HE
+  WATCHED ALL OF THEM" after seven. The board never announces the change. The
+  card simply says something else the next time it is opened.
+
 - **The loading screen is a real X-ray now.** Greg asked for *"3d visceral gore
   matrix loading screens and 3d organs bones xrays"*. The plate already had a
   specimen, but it was drawn in 2D with a fake Y-squash standing in for
