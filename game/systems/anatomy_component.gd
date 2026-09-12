@@ -92,6 +92,15 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 		"disabled": float(zone.health) <= 0.0,
 		"time_msec": Time.get_ticks_msec(),
 	}
+	# B6.7v2. A closed break and a compound break are not the same injury. The
+	# former is a disabled structure under intact skin; only a penetrating blow
+	# at fracture depth opens it to the world.
+	if resolved_zone in ["left_arm", "right_arm", "left_leg", "right_leg"] and float(zone.health) <= float(DEFAULT_ZONES[resolved_zone].health) * 0.40:
+		var fracture := "compound" if penetrating else "closed"
+		if str(zone.get("fracture", "")) != "compound":
+			zone["fracture"] = fracture
+			zones[resolved_zone] = zone
+		wound["fracture"] = fracture
 	if not installed.is_empty():
 		wound["implant_condition"] = damage_implant(resolved_zone, applied * (0.30 if penetrating else 0.16))
 	wounds.append(wound)
@@ -111,6 +120,10 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 	result["pain"] = pain
 	wounded.emit(result)
 	return result
+
+
+func fracture_kind(zone_id: String) -> String:
+	return str((zones.get(zone_id, {}) as Dictionary).get("fracture", ""))
 
 
 func damage_organ(organ_id: String, amount: float) -> Dictionary:

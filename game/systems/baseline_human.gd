@@ -697,12 +697,13 @@ func _refresh_zone(zone_id: String) -> void:
 		# that has already been shown through does not hide again just because
 		# a prosthetic or a lighter later hit raised the current health ratio.
 		var ever_to_bone := int(zone_depth.get(zone_id, 0)) >= GoreChunks.Layer.BONE
-		var exposed := (ratio < FRACTURE_RATIO or ever_to_bone) and not prosthetic
+		var compound := anatomy.fracture_kind(zone_id) == "compound"
+		var exposed := (compound or ever_to_bone) and not prosthetic
 		bone.visible = exposed
 		# Bone inside opaque flesh is bone nobody can see. Ruined flesh goes
 		# translucent so the skeleton under it actually reads.
 		part.transparency = clampf((FRACTURE_RATIO - ratio) / FRACTURE_RATIO, 0.0, 1.0) * 0.55 if exposed else 0.0
-	if gore and ratio < FRACTURE_RATIO and ratio > 0.0 and not prosthetic:
+	if gore and anatomy.fracture_kind(zone_id) == "compound" and ratio > 0.0 and not prosthetic:
 		_add_fracture(zone_id)
 	if severed.has(zone_id) and not prosthetic:
 		if gore:
