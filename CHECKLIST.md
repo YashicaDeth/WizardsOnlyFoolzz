@@ -309,10 +309,10 @@ Ascent/Descent axis that already exists and is currently unused.
 - [x] **E1.3** Never a good/evil slider — read through the Tree view. Audited rather than built: `character_archive.gd`'s `_draw_tree_alignment()` (~line 514) draws `tree_alignment()` only as a marker position between ASCENT/LIMBO/DESCENT labels — no code path in the dossier prints the number itself
 
 ### E2 — The ritual app
-- [ ] **E2.1** Seal-drawing vocabulary in the `celloutz_type` stroke register
-- [ ] **E2.2** The 72 Goetic seals as data
-- [ ] **E2.3** Original seals for what this world grew on its own
-- [ ] **E2.4** Seals animate, corrupt and burn
+- [ ] **E2.1** Seal-drawing vocabulary in the `celloutz_type` stroke register (Agent A's file — not touched here)
+- [x] **E2.2** The 72 Goetic seals as data — `systems/goetic_seals.gd`'s `GOETIA` const, name/rank/number verified against a primary source rather than transcribed from memory (data only, per non-negotiable 1 — no drawing lives here)
+- [x] **E2.3** Original seals for what this world grew on its own — `ORIGINAL`, six seals each tied to a real faction or `AscentEntities` entry already built (Choir of Marrow ×2, Soft Rot, CellOutz, and the two Ascent entities) rather than floating free of anything. Covered by `tests/goetic_seals_test.gd` (23 checks)
+- [ ] **E2.4** Seals animate, corrupt and burn (rendering; Agent A's `celloutz_type` register once E2.1 exists)
 
 ### E3 — Camera rituals
 - [ ] **E3.1** Ritual definitions: what must be done, what must be photographed
