@@ -24,6 +24,8 @@ var _rain_process_material: ParticleProcessMaterial
 var _crawler: MeshInstance3D
 var _crawler_material: ShaderMaterial
 var _flash_light: OmniLight3D
+var _thunder: AudioStreamPlayer3D
+var _thunder_wave: AudioStreamWAV
 var _strike_clock := 0.0
 var _next_strike := 2.0
 var _strike_elapsed := -1.0
@@ -35,6 +37,7 @@ func _ready() -> void:
 	_build_rain()
 	_build_crawler()
 	_build_flash_light()
+	_build_thunder()
 	set_process(true)
 
 
@@ -97,6 +100,12 @@ func _strike(storm: float) -> void:
 	_crawler_material.set_shader_parameter("front", 0.0)
 	_crawler_material.set_shader_parameter("intensity", 1.0)
 	_strike_elapsed = 0.0
+	# AC1.5. "Lightning is a real light and a real sound" — the light half
+	# already existed; this is the other half. Pitched down and louder the
+	# worse the storm actually is, rather than one fixed clap every time.
+	_thunder.pitch_scale = _rng.randf_range(0.85, 1.15) * lerpf(1.1, 0.85, storm)
+	_thunder.volume_db = lerpf(-6.0, 4.0, storm)
+	_thunder.play()
 
 
 ## AS4.5. Zero below a real storm; a per-second drain above it. What that
@@ -162,3 +171,58 @@ func _build_flash_light() -> void:
 	_flash_light.omni_range = 140.0
 	_flash_light.light_energy = 0.0
 	add_child(_flash_light)
+
+
+## AC1.5. A crack and a long rumbling tail, generated the same way
+## `procedural_derby_audio.gd`'s `_make_wave` builds every other sound in the
+## project — no imported asset, and provisional the same way those are.
+func _build_thunder() -> void:
+	_thunder_wave = _make_thunder_wave()
+	_thunder = AudioStreamPlayer3D.new()
+	_thunder.name = "Thunder"
+	_thunder.stream = _thunder_wave
+	_thunder.unit_size = 60.0
+	_thunder.max_distance = 400.0
+	_thunder.position = Vector3(0, 40, 0)
+	add_child(_thunder)
+	AudioBus.ensure()
+	AudioBus.chain("Weather")
+	AudioBus.route(_thunder, "Weather")
+
+
+func _hash_noise(frame: int) -> float:
+	var value := sin(float(frame) * 12.9898) * 43758.5453
+	return value - floorf(value)
+
+
+func _make_thunder_wave() -> AudioStreamWAV:
+	var rate := 22050
+	var duration := 2.2
+	var frame_count := roundi(duration * rate)
+	var bytes := PackedByteArray()
+	bytes.resize(frame_count * 2)
+	for frame in frame_count:
+		var t := float(frame) / rate
+		# The crack: a short, bright noise burst in the first tenth of a
+		# second, gone almost as soon as it arrives.
+		var crack_env := exp(-t * 34.0)
+		var sample := (_hash_noise(frame) * 2.0 - 1.0) * 0.55 * crack_env
+		# The rumble: low, long, and built from a few close frequencies
+		# beating against each other rather than one clean tone, which is
+		# what keeps it from reading as a musical note.
+		var rumble_env := exp(-t * 1.1) * (1.0 - crack_env * 0.6)
+		sample += sin(TAU * 42.0 * t) * 0.4 * rumble_env
+		sample += sin(TAU * 57.0 * t) * 0.28 * rumble_env
+		sample += sin(TAU * 31.0 * t) * 0.22 * rumble_env
+		sample += (_hash_noise(frame * 3) * 2.0 - 1.0) * 0.1 * rumble_env
+		var value := clampi(roundi(clampf(sample, -1.0, 1.0) * 32760.0), -32768, 32767)
+		if value < 0:
+			value += 65536
+		bytes[frame * 2] = value & 0xff
+		bytes[frame * 2 + 1] = (value >> 8) & 0xff
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = rate
+	stream.stereo = false
+	stream.data = bytes
+	return stream

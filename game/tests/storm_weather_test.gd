@@ -49,6 +49,9 @@ func _ready() -> void:
 	storm._strike(severity)
 	check(float(storm._crawler_material.get_shader_parameter("intensity")) > 0.0, "a strike lights the crawler up")
 	check(storm._flash_light.light_energy > 0.0, "and flashes a real light, not just the shader")
+	check(storm._thunder.playing, "and a real sound plays alongside it (AC1.5)")
+	check(str(AudioBus.graph().get("Weather", "")) == AudioBus.AMBIENCE, "thunder is routed through the mixer's Weather chain, not straight to Master")
+	check(AudioBus.fully_routed(), "and the mixer graph as a whole still reaches Master through a bus the player can see")
 	var lit_energy: float = storm._flash_light.light_energy
 	for _tick in 60:
 		storm._process(0.1)
