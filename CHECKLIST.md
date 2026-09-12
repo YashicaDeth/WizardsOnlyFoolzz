@@ -306,7 +306,7 @@ Ascent/Descent axis that already exists and is currently unused.
 ### E1 — Karma from real events
 - [x] ~~**E1.1** The axis accumulates from recorded history~~
 - [x] **E1.2** Factions price you by where you sit
-- [ ] **E1.3** Never a good/evil slider — read through the Tree view
+- [x] **E1.3** Never a good/evil slider — read through the Tree view. Audited rather than built: `character_archive.gd`'s `_draw_tree_alignment()` (~line 514) draws `tree_alignment()` only as a marker position between ASCENT/LIMBO/DESCENT labels — no code path in the dossier prints the number itself
 
 ### E2 — The ritual app
 - [ ] **E2.1** Seal-drawing vocabulary in the `celloutz_type` stroke register
