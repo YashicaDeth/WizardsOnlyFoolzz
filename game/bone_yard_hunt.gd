@@ -21,6 +21,7 @@ const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 const RIVAL_REGISTRY := preload("res://systems/rival_registry.gd")
 const DEFEAT_ROUTER := preload("res://systems/defeat_router.gd")
+const ASSET_NETWORK := preload("res://systems/asset_network.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
@@ -79,6 +80,7 @@ var arsenal: Node
 var pending_attack: Dictionary = {}
 var carried_limb_index := -1
 var carried_limb_model: MeshInstance3D
+var asset_network := ASSET_NETWORK.new()
 ## Bodies the fight is finished with. `_kill_encounter_actor` drops them out of
 ## `encounter_actors` so the AI stops paying for them, but a corpse is still a
 ## thing you can rob (B5), so it keeps its rig here rather than being forgotten.
@@ -385,7 +387,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_2: _equip_weapon(1)
 			KEY_3: _equip_weapon(2)
 			KEY_4: _equip_carried_limb()
-			KEY_R: _reload_weapon()
+			KEY_R:
+				if handheld.is_open:
+					_cycle_asset_task()
+				else:
+					_reload_weapon()
 			KEY_ESCAPE:
 				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 				if not panel_mode.is_empty():
@@ -394,7 +400,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				third_person = not third_person
 				body_motion.set_perspective(not third_person)
 				_update_camera()
-			KEY_G: handheld.toggle_device()
+			KEY_G:
+				handheld.toggle_device()
+				if handheld.is_open:
+					prompt.text = asset_network.roster_line() + " // [R] ISSUE NEXT ORDER"
 			KEY_TAB:
 				# The handheld owns Tab while raised: one object, modes on it.
 				if handheld.is_open:
@@ -783,6 +792,11 @@ func _interact() -> void:
 	body_motion.trigger_interaction()
 	var downed := _nearest_downed()
 	if not downed.is_empty():
+		# F6.1. Raising the handheld changes E from an offer into an overwrite.
+		# The consensual resolution remains a different, plainly labelled act.
+		if handheld.is_open:
+			_mind_stamp(downed)
+			return
 		_open_resolution(downed)
 		return
 	var chunk := _nearest_takeable_chunk(3.2)
@@ -838,6 +852,38 @@ func _interact() -> void:
 		_begin_canonical_encounter()
 		return
 	prompt.text = "Nothing answers. Find Nix or follow the floodlights to the tunnel."
+
+
+func _mind_stamp(actor: Dictionary) -> void:
+	var subject_id := str(actor.get("subject_id", ""))
+	var stamped := asset_network.mind_stamp(subject_id, actor.rig.snapshot())
+	if stamped.is_empty():
+		prompt.text = "MIND-STAMP REFUSED // NO LIVING SUBJECT"
+		return
+	actor.rig.spare()
+	actor.state = "mind_stamped"
+	actor.disposition = "asset"
+	actor.attack_time = 0.0
+	var order := asset_network.task(subject_id, "observe", HUNT_LOCATION)
+	asset_network.execute_task(subject_id)
+	var label := actor.node.get_node_or_null("Identity") as Label3D
+	if label != null:
+		label.text = "%s / ASSET" % str(actor.display_name).to_upper()
+	prompt.text = "%s // %s" % [asset_network.roster_line(), str(order.command).to_upper()]
+
+
+func _cycle_asset_task() -> void:
+	var roster := asset_network.assets()
+	if roster.is_empty():
+		prompt.text = asset_network.roster_line()
+		return
+	var asset: Dictionary = roster[0]
+	var current: Dictionary = asset.get("remote_task", {})
+	var index := ASSET_NETWORK.TASKS.find(str(current.get("command", "")))
+	var command: String = ASSET_NETWORK.TASKS[(index + 1) % ASSET_NETWORK.TASKS.size()]
+	asset_network.task(str(asset.id), command, HUNT_LOCATION)
+	asset_network.execute_task(str(asset.id))
+	prompt.text = asset_network.roster_line() + " // REMOTE ORDER EXECUTING"
 
 
 ## B5.1. A body you can open: downed and alive, or dead and still warm. The

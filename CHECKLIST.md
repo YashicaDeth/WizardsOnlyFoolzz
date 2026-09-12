@@ -374,8 +374,8 @@ mechanisms and almost none are built.
 - [x] ~~**F5.3** Deliberate death: forfeit loot, re-decant out of the tar~~
 
 ### F6 — Mind-stamp and the asset list
-- [ ] **F6.1** Non-consensual recruitment through the handheld
-- [ ] **F6.2** Assets listed, taskable, remotely executable
+- [x] ~~**F6.1** Non-consensual recruitment through the handheld~~
+- [x] ~~**F6.2** Assets listed, taskable, remotely executable~~
 
 ### F7 — The clinch as a social verb
 **Highest value per line of code in the whole list** — four systems that already
