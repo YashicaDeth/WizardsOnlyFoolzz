@@ -128,7 +128,19 @@ the player will tell afterwards, using original mechanisms.
    one companion.
 4. **Raid consequences**: persistent destruction, economic disruption, survivor
    memory, Wire coverage.
-5. **Signal assets.** Attach channels to factions; make reach a tracked number.
-6. **Signal actions**: out-publish, discredit, hijack, flood, cut.
-7. **Coupling.** Signal control gates grudge propagation; raids generate the
-   events the channels report on.
+5. **Signal assets — built 2026-09-12.** Every Sin-faction now carries a
+   `channel` field (`cosmology_factions.gd`/`bone_yard_hunt.gd`) and a tracked
+   `signal_control` number, read fresh from the subject rather than cached
+   (`wire_net.gd`'s `faction_signal_control()`).
+6. **Signal actions — built 2026-09-12.** `wire_net.gd`'s `contest_channel()`:
+   out-publish, discredit, hijack, flood, cut, each a real requirement against
+   real state (reach, recorded evidence, physical access) rather than a cost
+   paid to a menu. See `CHECKLIST.md` K4.4.
+7. **Coupling.** Raids generating the events channels report on is still
+   Codex's F-territory and unbuilt. The other half — signal control gating
+   grudge propagation — has its read-only half built from this side:
+   `wire_net.gd`'s `signal_reach_factor(faction_id)` returns `signal_control`
+   as a 0-1 multiplier (a half-flooded channel carries a rumour half as far,
+   not all-or-nothing). Whoever wires F2's propagation multiplies by it rather
+   than reading `signal_control` a second way — an API offered, not an edit
+   made into `world_history.gd` or wherever F2 actually lives.

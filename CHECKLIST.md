@@ -309,15 +309,15 @@ Ascent/Descent axis that already exists and is currently unused.
 - [x] **E1.3** Never a good/evil slider — read through the Tree view. Audited rather than built: `character_archive.gd`'s `_draw_tree_alignment()` (~line 514) draws `tree_alignment()` only as a marker position between ASCENT/LIMBO/DESCENT labels — no code path in the dossier prints the number itself
 
 ### E2 — The ritual app
-- [ ] **E2.1** Seal-drawing vocabulary in the `celloutz_type` stroke register
-- [ ] **E2.2** The 72 Goetic seals as data
-- [ ] **E2.3** Original seals for what this world grew on its own
-- [ ] **E2.4** Seals animate, corrupt and burn
+- [ ] **E2.1** Seal-drawing vocabulary in the `celloutz_type` stroke register (Agent A's file — not touched here)
+- [x] **E2.2** The 72 Goetic seals as data — `systems/goetic_seals.gd`'s `GOETIA` const, name/rank/number verified against a primary source rather than transcribed from memory (data only, per non-negotiable 1 — no drawing lives here)
+- [x] **E2.3** Original seals for what this world grew on its own — `ORIGINAL`, six seals each tied to a real faction or `AscentEntities` entry already built (Choir of Marrow ×2, Soft Rot, CellOutz, and the two Ascent entities) rather than floating free of anything. Covered by `tests/goetic_seals_test.gd` (23 checks)
+- [ ] **E2.4** Seals animate, corrupt and burn (rendering; Agent A's `celloutz_type` register once E2.1 exists)
 
 ### E3 — Camera rituals
-- [ ] **E3.1** Ritual definitions: what must be done, what must be photographed
-- [ ] **E3.2** Verify the photograph against real anatomy (needs C3.3)
-- [ ] **E3.3** Rituals are playable, never a confirm button
+- [x] **E3.1** Ritual definitions: what must be done, what must be photographed — `systems/ritual_app.gd`'s `RITUALS`: three rites (including Greg's own worked example, five gored heads), each keyed to a real seal from `goetic_seals.gd` and paying its reward through `boons.gd` — E2/E3/E4 as the one system `RITUAL_AND_KARMA.md` says they are, not three
+- [x] **E3.2** Verify the photograph against real anatomy — reuses the exact `contents: [{severed, ruptured, dead}]` shape `wire_net.gd`'s `publish_photograph()` already verifies, rather than a second evidence system
+- [x] **E3.3** Rituals are playable, never a confirm button — `attempt()` takes no path to a reward without a `photo` argument that actually satisfies the requirement. Covered by `tests/ritual_app_test.gd` (13 checks)
 
 ### E4 — Temporary boosts, real costs
 - [x] **E4.1** Boosts are always temporary — `systems/boons.gd`: `grant()` refuses a zero-or-less duration outright, and `active_boons()` prunes anything past its own duration on every read, so there is no code path that grants a permanent effect
@@ -327,7 +327,7 @@ Ascent/Descent axis that already exists and is currently unused.
 ### E5 — Ascent entities
 - [x] **E5.1** Entities as subjects on the nemesis machinery, not a shop — `systems/ascent_entities.gd`: The Clear Frequency and The Still Ledger are real subjects under `wizardsonlyfoolz`, and `regard()` draws the same kind of conclusion `RivalRegistry.consider()` draws on the other axis (a pattern in the log, not a scripted appearance), reading recorded mercy instead of harm
 - [x] **E5.2** Wash away sins for positive quests — `wash()` is refused until an entity has actually noticed you, then spends that notice on success (a fresh run of mercy earns it again, never bought twice with the same acts). The "quest" standing in for E2/E3/E6 content that does not exist yet is the same one already used elsewhere: a real recorded pattern. `sin_washed` added to `KARMA`/`event_karma()` in `world_history.gd`. Covered by `tests/ascent_entities_test.gd` (13 checks)
-- [ ] **E5.3** The long route: climbing lets the game continue (needs E7's ending content to hand off to)
+- [x] **E5.3** The long route: climbing lets the game continue — `route_endings.gd` (E7.2) is that hand-off, now built: reaching it is named `ascended_continue`, not a terminal state, and nothing in `RouteEndings` ends the game either way
 
 ### E6 — Drugs
 - [x] **E6.1** Substances with real body cost through the anatomy component — `systems/substances.gd`: Marrow Dust, Choir Bloom and Static Hymn, each an Ashbloom-native thing (ground bone, a fungal graft, dead-mast feedback — non-negotiable 1, nothing renamed off a real drug), paying into the same `anatomy_state` ledger `boons.gd` already pays into
@@ -518,9 +518,9 @@ Four tiers, all on existing machinery. See `DESIGN/COSMOLOGY.md`.
 - [x] **K4.5** Killing a Sin changes what its faction is about, because the principle drives its axis and pricing — already true for the original four by construction, and now verified true for the three new ones too (`faction_price_factor` reads any `FACTION_TREE_AXIS` entry generically)
 
 ### K3 — The player as half of each
-- [ ] **K3.1** Decide whether both ladders can be climbed at once or committing closes one
-- [ ] **K3.2** The opening reframed: CellOutz grew you, which is why the debt is in the meat
-- [ ] **K3.3** Getting God's attention as the actual win condition, written into world history
+- [~] **K3.1** Decide whether both ladders can be climbed at once or committing closes one — answered by default rather than invented fresh: `route_endings.gd`'s own comment argues both stay climbable right up until one is actually finished, and finishing one then locks (verified: a subject who signs away and later drifts all the way back up on paper still reads as the demon ending). A default worth Greg confirming or overriding, not a closed question
+- [ ] **K3.2** The opening reframed: CellOutz grew you, which is why the debt is in the meat (narrative rewrite of the built, polished `vat_chamber.tscn`/`opening_director.gd` sequence — not attempted here; needs a visual verification pass this session can't give it blind)
+- [x] **K3.3** Getting God's attention as the actual win condition, written into world history — `RouteEndings.forced_gods_attention()` reads the Ascent ending already built (E7.2) as that moment, per `DESIGN/COSMOLOGY.md`'s own framing, rather than inventing a distinct God entity. Covered by `tests/route_endings_test.gd` (14 checks total)
 
 ## L — The Board
 The storyline and career as a conspiracy pin board rather than a quest list.

@@ -48,5 +48,24 @@ func _ready() -> void:
 	check(ascended == RouteEndings.ENDING_ASCENDANT, "and it is written as the ascendant ending")
 	check(RouteEndings.ending_of("zealot") == RouteEndings.ENDING_ASCENDANT, "ending_of() reads it back correctly")
 
+	# --- K3.3: the ascendant ending is the "forced God's attention" moment --
+	check(RouteEndings.forced_gods_attention("zealot"), "the ascendant ending reads as having forced God's attention")
+	check(not RouteEndings.forced_gods_attention("player"), "the demon ending does not")
+
+	# --- K3.1: the first ending reached locks; the other threshold is ignored
+	# once it has, which is the "committing to one closes the other" half of
+	# the answer this file's own comment argues for.
+	WorldHistory.clear_history()
+	WorldHistory.register_subject("reformed", {"name": "Reformed", "kind": "person"})
+	for i in 20:
+		WorldHistory.record_event("npc_resolution", {"subject_id": "early%d" % i, "outcome": "execute", "actor": "reformed"})
+	check(RouteEndings.check("reformed") == RouteEndings.ENDING_DEMON, "signs away first")
+	for i in 40:
+		WorldHistory.record_event("npc_resolution", {"subject_id": "late%d" % i, "outcome": "spare", "actor": "reformed"})
+	var drifted := WorldHistory.tree_alignment(WorldHistory.subject("reformed"))
+	var still_demon := RouteEndings.check("reformed")
+	check(drifted >= RouteEndings.ASCENDANT_THRESHOLD, "and genuinely drifts all the way back up on paper (%.2f)" % drifted)
+	check(still_demon == RouteEndings.ENDING_DEMON, "but the recorded ending does not silently flip to ascendant just because the axis crossed back")
+
 	print("ROUTE_ENDINGS_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

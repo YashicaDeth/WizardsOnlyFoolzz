@@ -22,6 +22,17 @@ extends RefCounted
 ## edit made here. E7.1/E7.2 are therefore real but incomplete: the state is
 ## reached and written truthfully, and nothing downstream reads it yet.
 
+## K3.1. "Decide whether both ladders can be climbed at once or committing
+## closes one" is answered by what is actually built here rather than
+## invented fresh: `tree_alignment()` itself never closes — nothing stops a
+## subject drifting back the other way after crossing a threshold — but
+## `check()`'s own lock does. The first ending reached is permanent
+## (`route_ending_recorded`), and every later crossing of the *other*
+## threshold is silently ignored by the early return above. So: both ladders
+## stay climbable right up until one is actually finished; finishing one
+## does close the other, but only at that moment, not before. This is a
+## default worth Greg confirming or overriding, not a claim that the
+## question is closed.
 const DEMON_THRESHOLD := -0.85
 const ASCENDANT_THRESHOLD := 0.85
 const ENDING_DEMON := "demon_signed"
@@ -54,3 +65,15 @@ static func _record(subject_id: String, ending: String, alignment: float) -> Str
 
 static func ending_of(subject_id: String = "player") -> String:
 	return str(WorldHistory.subject(subject_id).get("route_ending", ""))
+
+
+## K3.3. "Getting God's attention as the actual win condition, written into
+## world history" — DESIGN/COSMOLOGY.md already names the goal ("to fight
+## God, and to get his attention... a Hunter, and what is being hunted is
+## ultimately upward"); it does not name a distinct entity above
+## `wizardsonlyfoolz` to build. Rather than invent one, this reads the
+## Ascent ending already built here as that moment: climbing far enough to
+## finish the ladder *is* forcing the hearing. No new mechanic, just this
+## file's own ending named in the game's stated terms.
+static func forced_gods_attention(subject_id: String = "player") -> bool:
+	return ending_of(subject_id) == ENDING_ASCENDANT
