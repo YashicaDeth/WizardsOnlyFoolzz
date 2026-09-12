@@ -167,8 +167,15 @@ func _update_models() -> void:
 func _build_weapon_model(weapon_id: String) -> Node3D:
 	var root := Node3D.new()
 	root.name = "%s_model" % weapon_id
-	root.position = Vector3(0.02, -0.36, -0.16)
-	root.rotation = Vector3(-0.12, 0.0, 0.04)
+	root.position = Vector3(-0.093, -0.716, -0.673)
+	# M4.4. This rotation used to be a small artistic tilt on top of an
+	# unrotated hand. The hand itself now carries a real first-person pose —
+	# hunter_body_motion.gd's arm_raise pitches right_arm ~65 degrees forward
+	# so it reads in frame at all — and every piece here is still authored
+	# against the old, unrotated arm. Left alone that pitch is inherited twice
+	# and the blade lies down across the view instead of standing in it, so
+	# this cancels the pose rotation before adding the same small tilt back.
+	root.rotation = Vector3(-1.14 - 0.12, 0.0, 0.08 + 0.04)
 	match weapon_id:
 		"sword":
 			_piece(root, "grip", Vector3(0, -0.02, 0), Vector3(0.055, 0.23, 0.055), Color("35261e"), "cloth")
@@ -189,7 +196,17 @@ func _piece(parent: Node3D, piece_name: String, at: Vector3, dimensions: Vector3
 	visual.name = piece_name
 	var mesh := BoxMesh.new()
 	mesh.size = dimensions
-	mesh.material = WorldLook.surface(tint, kind, piece_name.hash())
+	var material: StandardMaterial3D = WorldLook.surface(tint, kind, piece_name.hash())
+	# M4.4. The Ashbloom exterior crushes anything at hip height toward black —
+	# it is the same reason the ground itself reads near-black in every capture,
+	# not a broken material. A held weapon still has to read in that light, the
+	# way the anatomy rig's own rim treatment lets a body read against it, so it
+	# carries a faint self-lit edge rather than depending on the world's own key
+	# light to find it.
+	material.emission_enabled = true
+	material.emission = tint
+	material.emission_energy_multiplier = 0.4
+	mesh.material = material
 	visual.mesh = mesh
 	visual.position = at
 	visual.rotation = turn

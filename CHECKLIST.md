@@ -663,7 +663,20 @@ image.
 - [x] **M4.1** Doorways have a lintel at 2.15 m and walls are banded per storey — the world states human scale now
 - [x] **M4.2** Eye at 1.68 m off a 1.8 m body, dropping exactly as far as a crouch shortens it
 - [x] **M4.3** FOV stated as the vertical angle Godot actually uses — ~110° across, not 134°
-- [ ] **M4.4** Weapon and hand framing hold up at the wide FOV without looking bolted on
+- [~] **M4.4** Weapon and hand framing hold up at the wide FOV without looking bolted on.
+      Measured, not guessed: `hunter_arsenal.gd`'s weapon models were positioned
+      before M4.1-M4.3 corrected the FOV and eye height, and sat entirely
+      outside the frustum at the corrected numbers — verifiably invisible, not
+      merely unconvincing. Re-solved against `right_arm`'s actual raised
+      first-person pose (`hunter_body_motion.gd`'s `arm_raise`) and given a
+      faint self-lit edge so it reads against the Expanse's own near-black
+      ground level. The cleaver reads clean — guard, grip and blade distinct,
+      angled like a held blade, captured in `game/captures/`. The shotgun and
+      sidearm are in frame and lit but their sub-pieces still read as stacked
+      blocks rather than a gun silhouette from this angle — their own local
+      `turn` values were never re-tuned against the same pose and are next.
+      Guarded by `tests/viewmodel_frame_test.gd` so this cannot silently go
+      off-frame again.
 - [ ] **M4.5** The rules are the game's own and applied everywhere, not photographic realism
 
 ### M3 — The seam
