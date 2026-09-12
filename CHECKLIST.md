@@ -608,8 +608,8 @@ Unglamorous, and each one is currently costing real time.
 - [ ] **J3.3** Dialogue Manager when NPCs first speak
 
 ### J4 — Real loading behind the interstitial
-- [ ] **J4.1** Stream behind the plate instead of a fixed 1.45s hold
-- [ ] **J4.2** Progress bar that is telling the truth
+- [x] ~~**J4.1** Stream behind the plate instead of a fixed 1.45s hold~~
+- [x] ~~**J4.2** Progress bar that is telling the truth~~
 
 ---
 
