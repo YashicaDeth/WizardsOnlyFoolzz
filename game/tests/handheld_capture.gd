@@ -85,6 +85,18 @@ func _ready() -> void:
 			get_tree().quit(1)
 			return
 		print("CAPTURED: ", path)
+		# I0.10 v2. The Living Map, leaned into - the same panel, hosted at a
+		# larger aperture, rather than a picture of a map at one fixed size.
+		if mode == "MAP":
+			device.lean_override = true
+			for _settle_lean in 45:
+				await get_tree().process_frame
+			await RenderingServer.frame_post_draw
+			var leaned_image := get_viewport().get_texture().get_image()
+			var leaned_path := "%s/handheld_map_leaned.png" % out_dir
+			if leaned_image.save_png(leaned_path) == OK:
+				print("CAPTURED: ", leaned_path)
+			device.lean_override = false
 
 	# The wheel, held up over the device.
 	device.set_mode("INDEX")

@@ -1961,6 +1961,54 @@ steps, which are five real game verbs, and not one of them had to be made up.
 - [ ] **AJ4.4** Every system in the game is reachable through a sigil, badly
 - [ ] **AJ4.5** The playground rule: the system should surprise its own author
 
+### AJ5 - The verdict on a kill
+Greg: *"the killing and fighting the npc system should be made so that if you
+kill some people permanently you get told by the gods if killing them was a good
+thing or if you forced them back into samsara, like 'soul freed' or 'cyclicist
+enslavement again...' - so its like freeing them of the shackles of the 3d
+world"*.
+
+This is the missing half of the resolution window - the one thing in the whole
+build the playtester reacted to hardest (*"ok they just fell down, and I could
+choose, omg"*). You already decide what happens to a body. Nothing ever tells
+you what it meant, and a game with an explicit cosmology owes the player that.
+
+The rule that keeps it from being a morality score: **the gods disagree with
+each other, and they are not reliable.** A verdict is one god's opinion, marked
+as such, and a different god will read the same kill the other way.
+
+- [ ] **AJ5.1** A permanent death gets a verdict, delivered by a named god (AJ3)
+- [ ] **AJ5.2** SOUL FREED and CYCLICIST ENSLAVEMENT AGAIN are the two poles, with room between
+- [ ] **AJ5.3** The verdict is computed from the kill: how, where, by whose hand, and what they were carrying
+- [ ] **AJ5.4** Gods disagree. Two verdicts on one death is a normal outcome
+- [ ] **AJ5.5** It is an opinion, not a score - nothing in the game adds them up
+- [ ] **AJ5.6** Freeing souls and enslaving them both have consequences, and they are different ones
+- [ ] **AJ5.7** It is recorded in WorldHistory, so the Board can pin it and the pyramid can read it
+
+## AM - The build sheet becomes the map
+
+Greg: *"this all links back to updating checklist ui and making a massive
+worldmap tree hierarchy of the game mechanics so its super vibe coded and in
+depth, highlighting visual examples of all the best mechanics, image examples
+and controls, and making it heavy on the tutorial - seamless understanding of
+the game's movement, crouching, sprinting, all the sliding movement aspects, the
+hand fighting, the weapons, shooting"*.
+
+The published sheet is a list of sections with tick boxes. It should be the same
+double-pyramid the game's own Tree page is becoming (AI), with every mechanic
+sitting where it belongs in the hierarchy, showing what it does and which key
+does it. One document, two renderings: this one for Greg and whoever he sends it
+to, the in-game one for the player.
+
+- [ ] **AM1.1** The sheet is a hierarchy, not a list of sections
+- [ ] **AM1.2** Same double-pyramid shape as AI, so the two never drift apart
+- [ ] **AM1.3** Every mechanic shows its controls
+- [ ] **AM1.4** Visual examples, not descriptions of visual examples
+- [ ] **AM1.5** Movement gets the depth Greg keeps asking for: crouch, sprint, slide, vault, wall run
+- [ ] **AM1.6** Hand fighting, weapons and shooting get the same
+- [ ] **AM1.7** It reads as a tutorial somebody could learn the game from
+- [ ] **AM1.8** Generated from CHECKLIST.md, so it cannot go stale
+
 ## AK - The agency that owns the sky
 
 Greg: *"maps like this and insane esoteric knowledge would be really cool, again

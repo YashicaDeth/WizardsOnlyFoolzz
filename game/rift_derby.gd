@@ -30,6 +30,7 @@ const KILL_CAM := preload("res://systems/kill_cam.gd")
 const PIT_RADIO := preload("res://systems/pit_radio.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
 const SILHOUETTE := preload("res://systems/silhouette.gd")
+const INTERIOR := preload("res://systems/vehicle_interior.gd")
 ## Matches the collider box in arcade_vehicle.gd's `_ready()`. Not read off
 ## the chassis at spawn time because the collider is built in `_ready()` too,
 ## so the shape does not exist yet on the frame the car is instanced.
@@ -60,6 +61,25 @@ var countdown := 3.0
 var result_countdown := 0.0
 var leaving := false
 var authored_collision_count := 0
+## AG3.2. The cab. M2 built all of this and nothing ever instantiated it outside
+## its own capture test, which is why the derby was still a chase camera looking
+## at a box with wheels.
+var interior: Node3D = null
+## Where you are sitting. Third person is the unlocked view, not the default —
+## M1 already made that the rule on foot and the derby never followed it.
+var in_cab := true
+## Where the driver is looking, relative to the car. You steer with the car and
+## aim independently of it, which is the whole point of having a gun in the
+## other hand.
+var aim_yaw := 0.0
+var aim_pitch := 0.0
+## AG3.3. Getting out takes a moment you can watch. 0 while seated, climbing to
+## 1 as the body leaves the car.
+var climbing_out := 0.0
+var leaving_on_foot := false
+var _cab_seat := Vector3.ZERO
+var fire_cooldown := 0.0
+var rounds_left := 12
 var derby_audio: Node
 var kill_cam: Control
 var pit_radio: Control
@@ -97,6 +117,8 @@ func _ready() -> void:
 	$HUD.add_child(world_index)
 	# Outcome text is event-only. The portrait, radar, hull schematic and corner
 	# telemetry were rejected; the skiff now sheds its own panels instead.
+	# AG3.2. The cab needs the pointer, because aiming is a thing you do with it.
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	status.visible = false
 	score_label.visible = false
 	# A5.5. The last default-font label on the windscreen. The drawn hunt signal
@@ -121,22 +143,45 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# AG3.4. Look and shoot. The car goes where you steer it; the gun goes where
+	# you look, which is a different number, and holding both at once badly is
+	# the texture Greg asked for.
+	if event is InputEventMouseMotion and in_cab and not index_open and not leaving_on_foot:
+		var motion := event as InputEventMouseMotion
+		aim_yaw = clampf(aim_yaw - motion.relative.x * 0.0022, -1.15, 1.15)
+		aim_pitch = clampf(aim_pitch - motion.relative.y * 0.0022, -0.5, 0.42)
+	if event is InputEventMouseButton and event.pressed and not leaving_on_foot:
+		var click := event as InputEventMouseButton
+		if click.button_index == MOUSE_BUTTON_LEFT and in_cab and not index_open:
+			_fire_from_cab()
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_I:
+		if event.keycode == KEY_ESCAPE:
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		elif event.keycode == KEY_R and in_cab:
+			_reload_cab_gun()
+		elif event.keycode == KEY_F:
+			_toggle_derby_view()
+		elif event.keycode == KEY_I:
 			index_open = not index_open
 			if index_open:
 				world_index.open()
 			else:
 				world_index.close()
 		elif event.keycode == KEY_E:
-			WorldHistory.record_event("player_left_derby_vehicle", {"venue": "rift_derby_quarry", "destination": "bone_yard_outskirts"})
-			Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
+			_begin_climbing_out()
 		elif event.keycode == KEY_ENTER and round_state in ["won", "lost"]:
 			_leave_derby(round_state)
 
 
 func _physics_process(delta: float) -> void:
-	boat.enabled = round_state == "active" and not index_open
+	boat.enabled = round_state == "active" and not index_open and not leaving_on_foot
+	fire_cooldown = maxf(0.0, fire_cooldown - delta)
+	if leaving_on_foot:
+		# AG3.3. Nothing else runs while the body is getting out. The heat is
+		# over for you the moment you open the door.
+		_update_climb_out(delta)
+		_update_hud()
+		return
 	if index_open:
 		return
 	if round_state == "countdown":
@@ -209,6 +254,9 @@ func _build_world() -> void:
 		light.light_color = Color("e8d3ab")
 		light.light_energy = 3.4
 		light.omni_range = 19.0 * ARENA_SCALE
+		# The pit lights the pit. A cabin has a roof and a floor and the arena's
+		# floodlights should not be reaching the inside of it.
+		light.light_cull_mask = 0xFFFFF & ~(1 << (INTERIOR.CAB_LAYER - 1))
 		light.omni_attenuation = 1.25
 		light.shadow_enabled = index % 4 == 0
 		add_child(light)
@@ -234,6 +282,42 @@ func _build_boat() -> void:
 	WorldLook.regrime(authored_skiff, 3)
 	_dress_vehicle_biopunk(boat, 3)
 	_add_vehicle_damage_parts(boat as RigidBody3D, 12)
+	# AG3.2. Sit the player in it. Parented to the chassis, so the cab rolls and
+	# pitches with the suspension for free — the interior does not need to know
+	# the physics exist.
+	interior = INTERIOR.new()
+	interior.name = "Cab"
+	boat.add_child(interior)
+	interior.build(3)
+	_cab_seat = INTERIOR.EYE
+	# Everything on the player's car that is not the cab goes on the bodywork
+	# layer, which the cab camera does not render. Done after the dressing so
+	# the generated greebles are caught too.
+	_on_bodywork_layer(boat)
+	_apply_view_masks()
+
+
+## The player's own bodywork. Only theirs — every other car in the pit stays on
+## the default layer, because you are supposed to see those from inside.
+const BODYWORK_LAYER := 2
+
+
+func _on_bodywork_layer(node: Node) -> void:
+	if node == interior:
+		return
+	if node is VisualInstance3D:
+		(node as VisualInstance3D).layers = 1 << (BODYWORK_LAYER - 1)
+	for child in node.get_children():
+		_on_bodywork_layer(child)
+
+
+## One camera, two things it is allowed to see. In the cab: everything except
+## your own bodywork. Outside it: everything except the cab.
+func _apply_view_masks() -> void:
+	var everything := 0xFFFFF
+	var bodywork := 1 << (BODYWORK_LAYER - 1)
+	var cab := 1 << (INTERIOR.CAB_LAYER - 1)
+	camera.cull_mask = (everything & ~bodywork) if in_cab else (everything & ~cab)
 
 
 func _spawn_targets() -> void:
@@ -560,8 +644,36 @@ const CAMERA_FOV_REST := 70.0
 const CAMERA_FOV_FLAT := 88.0
 
 
+## AG3.2. Two views, one of which has to be earned. M1 made third person the
+## thing you unlock on foot; the derby is the same body and the same rule.
+func _toggle_derby_view() -> void:
+	if in_cab and not _third_person_earned():
+		if pit_radio != null:
+			pit_radio.transmit("hit_player")
+		WorldHistory.record_event("derby_third_person_refused", {"venue": "rift_derby_quarry"})
+		return
+	in_cab = not in_cab
+	_apply_view_masks()
+	WorldHistory.record_event("derby_view_changed", {"view": "cab" if in_cab else "chase"})
+
+
+## The same condition the Hunt Grounds uses, read off the record rather than
+## duplicated as a flag: you have put a named rival down.
+func _third_person_earned() -> bool:
+	for event: Dictionary in WorldHistory.events:
+		if str(event.get("type", "")) != "npc_resolution":
+			continue
+		var details: Dictionary = event.get("details", {})
+		if str(details.get("resolution", "")) == "killed" and str(details.get("subject_id", "")) != "":
+			return true
+	return int(WorldHistory.subject(RIVAL_ID).get("grudge", 0)) >= 40
+
+
 func _update_camera(delta: float) -> void:
 	camera_shake = maxf(0.0, camera_shake - delta * 2.4)
+	if in_cab:
+		_update_cab_camera(delta)
+		return
 	var forward := -boat.global_transform.basis.z
 	var pace := clampf(absf(float(boat.get("signed_speed"))) / 24.0, 0.0, 1.0)
 	# Further back and higher with speed, so the horizon opens up as it matters.
@@ -580,7 +692,131 @@ func _update_camera(delta: float) -> void:
 	camera.look_at(boat.global_position + forward * 8.0 + Vector3.UP * 1.2)
 
 
+## The view from the seat. The camera is not following the car — it *is* in the
+## car, so every jolt the suspension takes arrives without being smoothed, which
+## is most of why a chase camera never feels like driving.
+func _update_cab_camera(_delta: float) -> void:
+	var seat := boat.global_transform * _cab_seat
+	camera.global_position = seat
+	# Look where the car looks, plus where the driver is looking. Multiplying in
+	# this order keeps the aim in car space, so a slide moves your aim with the
+	# car instead of leaving it pointing at the horizon.
+	var basis := boat.global_transform.basis * Basis(Vector3.UP, aim_yaw) * Basis(Vector3.RIGHT, aim_pitch)
+	camera.global_transform = Transform3D(basis.orthonormalized(), seat)
+	# M4.3. The first-person value, not the chase pair. Godot's fov is vertical,
+	# so 78 here is roughly 110 across at 16:9.
+	camera.fov = lerpf(camera.fov, 78.0, minf(_delta * 4.0, 1.0))
+	if camera_shake > 0.0:
+		var beat := float(Time.get_ticks_msec()) * 0.001
+		camera.global_position += Vector3(sin(beat * 47.0), cos(beat * 61.0), sin(beat * 39.0)) * camera_shake * 0.10
+	if interior != null and is_instance_valid(interior):
+		interior.drive(float(boat.get("steering")), float(boat.get("throttle")))
+
+
+## AG3.4. A round leaves the gun, goes through your own windscreen, and lands on
+## something. The glass keeps the hole for the rest of the heat.
+func _fire_from_cab() -> void:
+	if fire_cooldown > 0.0 or round_state != "active":
+		return
+	if rounds_left <= 0:
+		if derby_audio != null:
+			derby_audio.play_impact(0.05, boat.global_position, "light")
+		return
+	rounds_left -= 1
+	fire_cooldown = 0.16
+	# The hole goes where you were aiming, in glass-local terms.
+	if interior != null and is_instance_valid(interior):
+		interior.punch_through(Vector2(-aim_yaw / 1.15, aim_pitch / 0.5))
+	var from := camera.global_position
+	var along := -camera.global_transform.basis.z
+	var space := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(from + along * 1.4, from + along * 140.0)
+	query.exclude = [boat.get_rid()]
+	var hit := space.intersect_ray(query)
+	if derby_audio != null:
+		derby_audio.play_impact(0.55, boat.global_position, "light")
+	camera_shake = maxf(camera_shake, 0.16)
+	if hit.is_empty():
+		return
+	var struck: Node = hit.get("collider")
+	if struck != null and targets.has(struck):
+		# A bullet is not a ram. It does less, and it does it from further away,
+		# which is the trade the gun exists to offer.
+		_damage_target(struck as Node3D, 9.0, 1.0)
+		WorldHistory.record_event("derby_shot_landed", {"venue": "rift_derby_quarry", "target": struck.name})
+
+
+func _reload_cab_gun() -> void:
+	if rounds_left >= 12 or round_state != "active":
+		return
+	rounds_left = 12
+	fire_cooldown = 0.9
+	if derby_audio != null:
+		derby_audio.play_impact(0.12, boat.global_position, "light")
+
+
+## AG3.3. You climb out. Greg: *"not progressing out of the car animation"* —
+## pressing E used to swap the scene on the same frame, which reads as the game
+## closing rather than as you leaving.
+func _begin_climbing_out() -> void:
+	if leaving_on_foot or leaving:
+		return
+	leaving_on_foot = true
+	climbing_out = 0.0
+	if index_open:
+		index_open = false
+		world_index.close()
+	WorldHistory.record_event("player_left_derby_vehicle", {"venue": "rift_derby_quarry", "destination": "bone_yard_outskirts"})
+
+
+func _update_climb_out(delta: float) -> void:
+	climbing_out = minf(1.0, climbing_out + delta * 0.85)
+	# Out of the seat, through where the door is, and up onto your feet. Three
+	# points rather than a straight line, because a person leaving a car does
+	# not travel in one.
+	var seat := boat.global_transform * _cab_seat
+	var sill := boat.global_transform * Vector3(-1.55, 0.18, -0.06)
+	var standing := boat.global_transform * Vector3(-2.35, 0.52, 0.2)
+	var eased := ease(climbing_out, 0.72)
+	var at: Vector3 = seat.lerp(sill, minf(eased * 2.0, 1.0))
+	if eased > 0.5:
+		at = sill.lerp(standing, (eased - 0.5) * 2.0)
+	camera.global_position = at
+	# The head turns back toward the pit as you straighten up, so the last thing
+	# you see is what you are walking away from.
+	var look := boat.global_position + boat.global_transform.basis.z * lerpf(-6.0, 3.0, eased) + Vector3.UP * 1.1
+	camera.look_at(look, Vector3.UP)
+	camera.fov = lerpf(camera.fov, 70.0, minf(delta * 3.0, 1.0))
+	if climbing_out >= 0.3:
+		# Once you are out of the seat you are looking at your own car again, so
+		# the bodywork comes back and the cab goes away.
+		camera.cull_mask = 0xFFFFF & ~(1 << (INTERIOR.CAB_LAYER - 1))
+	if climbing_out >= 1.0 and not leaving:
+		leaving = true
+		Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
+
+
 func _update_hud() -> void:
+	# AG3.1. The instruments. These are the readouts `_ready` used to switch off
+	# outright; they live on the dashboard now, where you can look at them.
+	if interior != null and is_instance_valid(interior):
+		var rival_subject := WorldHistory.subject(RIVAL_ID)
+		var rival_running := false
+		for target in targets:
+			if is_instance_valid(target) and bool(target.get_meta("is_rival", false)):
+				rival_running = true
+				break
+		interior.report({
+			"hull": float(integrity),
+			"pace": clampf(absf(float(boat.get("signed_speed"))) / MAX_SPEED, 0.0, 1.0),
+			"impacts": score,
+			"wreckers_left": maxi(0, 8 - disabled_count),
+			"wreckers_total": 8,
+			"rival_grudge": int(rival_subject.get("grudge", 0)),
+			"rival_here": rival_running,
+			"rounds": rounds_left,
+			"rounds_full": 12,
+		})
 	status.text = "BONE YARD DERBY  //  %s\nWASD DRIVE  ·  I WORLD INDEX  ·  E LEAVE VEHICLE" % round_state.to_upper()
 	score_label.text = "IMPACT SCORE  %05d\nHULL INTEGRITY  %03d%%\nACTIVE WRECKERS  %02d\nWORLD MEMORY  %03d" % [score, integrity, targets.size(), WorldHistory.event_count()]
 	# Only speaks when it has something to say. Left visible during play it sat

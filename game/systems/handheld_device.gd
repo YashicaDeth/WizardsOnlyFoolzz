@@ -98,6 +98,23 @@ var _map: Control
 var _device_rect := Rect2()
 var _screen_rect := Rect2()
 
+## I0.10 v2. "Panels are hosted at one fixed size inside the handheld; a map
+## you cannot lean into is a picture of a map." `device_size` used to be a
+## single clamp with nothing that ever moved it — the World Index and the
+## Living Map, however much detail either one has to show, always rendered
+## into the same aperture. Held rather than toggled, because leaning in is
+## a posture, not a mode: letting go puts the device back exactly where it
+## was without a second keypress.
+##
+## `lean_override` exists for the same reason `bone_yard_hunt.gd`'s
+## `grapple_pushing_override` does — `Input.is_key_pressed` does not update
+## reliably in a headless test run, so a test sets this directly and
+## production code only falls back to the real key when it is null.
+var lean := 0.0
+var lean_override: Variant = null
+const LEAN_KEY := KEY_L
+const LEAN_SCALE := 1.32
+
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -342,7 +359,15 @@ func _process(delta: float) -> void:
 
 	# The aperture is laid out here rather than in `_draw`, because the hosted
 	# panels are real children and have to know their size before they render.
-	var device_size := Vector2(minf(size.x * 0.88, 1140.0), minf(size.y * 0.86, 640.0))
+	var base_size := Vector2(minf(size.x * 0.88, 1140.0), minf(size.y * 0.86, 640.0))
+	# I0.10 v2. Only worth doing while there is something to lean into — the
+	# radio and CARRY have no hosted panel to gain detail from, and leaning
+	# in on a fixed readout would just be a camera trick.
+	var leanable := is_open and current_mode() in ["INDEX", "MAP", "WIRE"]
+	var lean_key_held: bool = lean_override if lean_override != null else Input.is_key_pressed(LEAN_KEY)
+	lean = Motion.blend(lean, delta, Motion.PANEL, leanable and lean_key_held)
+	var leaned_size := base_size * lerpf(1.0, LEAN_SCALE, lean)
+	var device_size := Vector2(minf(leaned_size.x, size.x * 0.98), minf(leaned_size.y, size.y * 0.98))
 	var resting := Vector2((size.x - device_size.x) * 0.5, size.y + 60.0)
 	var lifted := Vector2((size.x - device_size.x) * 0.5, (size.y - device_size.y) * 0.5)
 	_device_rect = Rect2(resting.lerp(lifted, Motion.ease_out(raised)), device_size)
