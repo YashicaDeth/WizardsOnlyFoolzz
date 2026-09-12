@@ -633,13 +633,18 @@ func _physics_process(delta: float) -> void:
 		return
 	pulse += delta
 	dodge_remaining = maxf(0.0, dodge_remaining - delta)
+	# O2.7 v3. scale_for() only ever reached the encounter loop's actor_delta —
+	# the player is the other half of every exchange they are in and kept
+	# ticking at full speed through their own hitstop, which is backwards: the
+	# whole point of a local freeze is that both bodies in contact feel it.
+	var player_delta: float = delta * impact_feel.scale_for("player")
 	if strike_windup >= 0.0:
-		strike_windup -= delta
+		strike_windup -= player_delta
 		if strike_windup < 0.0:
 			_resolve_strike()
-	attack_cooldown = maxf(0.0, attack_cooldown - delta)
-	arsenal.tick(delta)
-	dodge_cooldown = maxf(0.0, dodge_cooldown - delta)
+	attack_cooldown = maxf(0.0, attack_cooldown - player_delta)
+	arsenal.tick(player_delta)
+	dodge_cooldown = maxf(0.0, dodge_cooldown - player_delta)
 	# O5.7. You get your feet back by standing in them. Recovery is slower while
 	# sprinting, because running is not the same as being balanced.
 	var recovery := FOOTING_RECOVERY * (0.55 if Input.is_action_pressed("sprint") else 1.0)
@@ -740,7 +745,12 @@ func _update_player(delta: float) -> void:
 		player_body.position = Vector3(0, 1.0, 19)
 	player = player_body.position + Vector3.UP * 0.6
 	stamina = clampf(stamina + (-26.0 if sprinting else 18.0) * delta, 0, 100)
-	body_motion.update(delta, player_body.velocity, player_body.is_on_floor(), sprinting, crouching, dodge_remaining > 0.0)
+	# O2.7 v3. Movement itself stays on the real clock — hitstop is not meant
+	# to take your feet out from under you — but the rig's own animation (the
+	# swing pose, the raised arm, the walk cycle) is the visible half of "the
+	# blow met resistance" and was still posing at full speed through it.
+	var animation_delta: float = delta * impact_feel.scale_for("player")
+	body_motion.update(animation_delta, player_body.velocity, player_body.is_on_floor(), sprinting, crouching, dodge_remaining > 0.0)
 	hunter_appearance.set_mouth(player_rig.anatomy.pain / 180.0, sin(pulse * 0.7) * player_rig.anatomy.pain / 100.0)
 
 

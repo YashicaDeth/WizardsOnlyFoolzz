@@ -1164,7 +1164,24 @@ hitpoints. `clinch_test.gd` and F7 already exist; this is the rest of it.
 ### O v3 — the third pass
 Opened because O2.5 closed at v2. A fault the v2 work itself created.
 
-- [ ] **O2.7** `v3` Only the encounter loop honours `scale_for()`; the player's own cooldowns, the rig animations and the gore still run at full speed during a hit they are part of
+- [~] **O2.7** `v3` Only the encounter loop honours `scale_for()`; the player's
+      own cooldowns, the rig animations and the gore still run at full speed
+      during a hit they are part of. Cooldowns and rig animation are fixed:
+      `attack_cooldown`, `dodge_cooldown`, `arsenal.tick()` and `strike_windup`
+      now tick against `delta * impact_feel.scale_for("player")`, and
+      `body_motion.update()` gets the same scaled delta for its own animation
+      clock — movement itself deliberately stays on the real clock, since
+      hitstop is not meant to take your feet out from under you, only the
+      weapon and the cooldowns behind it. Gore is not: chunks are real
+      `RigidBody3D` nodes integrated by the physics server directly, and
+      slowing a specific body's physics selectively needs either a custom
+      integrator or a freeze/resume scheme, not a delta multiply — genuinely
+      bigger scope than the other two, so named rather than faked with
+      something that would look worse than doing nothing. Verified:
+      `tests/hitstop_scope_test.gd` (5 checks — cooldowns and the rig's own
+      animation clock both tick at the real rate with no hit active, and
+      both slow to `STOP_SCALE` during the player's own hitstop), plus the
+      full combat/grapple regression suite still passes.
 
 ### O v2 — the second pass
 - [x] **O2.5** `v2` Hitstop is local — the two bodies in the exchange slow, the region does not. The global clock is never touched
