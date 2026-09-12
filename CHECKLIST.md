@@ -315,9 +315,9 @@ Ascent/Descent axis that already exists and is currently unused.
 - [ ] **E2.4** Seals animate, corrupt and burn (rendering; Agent A's `celloutz_type` register once E2.1 exists)
 
 ### E3 — Camera rituals
-- [ ] **E3.1** Ritual definitions: what must be done, what must be photographed
-- [ ] **E3.2** Verify the photograph against real anatomy (needs C3.3)
-- [ ] **E3.3** Rituals are playable, never a confirm button
+- [x] **E3.1** Ritual definitions: what must be done, what must be photographed — `systems/ritual_app.gd`'s `RITUALS`: three rites (including Greg's own worked example, five gored heads), each keyed to a real seal from `goetic_seals.gd` and paying its reward through `boons.gd` — E2/E3/E4 as the one system `RITUAL_AND_KARMA.md` says they are, not three
+- [x] **E3.2** Verify the photograph against real anatomy — reuses the exact `contents: [{severed, ruptured, dead}]` shape `wire_net.gd`'s `publish_photograph()` already verifies, rather than a second evidence system
+- [x] **E3.3** Rituals are playable, never a confirm button — `attempt()` takes no path to a reward without a `photo` argument that actually satisfies the requirement. Covered by `tests/ritual_app_test.gd` (13 checks)
 
 ### E4 — Temporary boosts, real costs
 - [x] **E4.1** Boosts are always temporary — `systems/boons.gd`: `grant()` refuses a zero-or-less duration outright, and `active_boons()` prunes anything past its own duration on every read, so there is no code path that grants a permanent effect

@@ -1,0 +1,97 @@
+class_name RitualApp
+extends RefCounted
+
+## E3. "The camera is the ritual instrument... rituals are completed by
+## photographing evidence... you are sent to do something, and you have to
+## bring back a picture of it." — DESIGN/RITUAL_AND_KARMA.md, citing Greg's
+## own worked example: kill five people and photograph their gored heads.
+##
+## E3.2 ("verify the photograph against real anatomy") reuses the exact photo
+## shape `wire_net.gd`'s `publish_photograph()` already defined and verifies
+## — `contents: [{subject_id, severed: [...], ruptured: [...], dead: bool}]`
+## — rather than inventing a second one. `_photo_matches()` is a read of that
+## same contract; nothing here decides what counts as evidence a second way.
+##
+## E3.3 ("never a confirm button"): there is no function that grants a rite's
+## reward without a `photo` argument that actually satisfies the
+## requirement — the photograph is the only door in.
+##
+## Rewards are `boons.gd` grants, on purpose: DESIGN/RITUAL_AND_KARMA.md's own
+## mapping puts "the demonic sigil ritual app" on the Descent route, "boons
+## are always temporary and paid in the body" — E2/E3 and E4 are one system,
+## not two, so a rite pays through the same ledger a drug or a boost does,
+## and free of charge inherits E4.3's escalating price on repeat.
+##
+## Every rite is keyed to a real seal from `goetic_seals.gd` — a name and
+## rank already verified against a primary source, or an original seal
+## already tied to a real faction — never a rite invented with no seal
+## standing behind it.
+
+const RITUALS := {
+	"rite_of_bael": {
+		"seal": "Bael", "label": "The First Rite",
+		"requirement": {"kind": "dead_count", "count": 1},
+		"stat": "pain_resist", "magnitude": 0.25, "duration": 90.0,
+		"cost_kind": "blood", "cost_amount": 260.0,
+	},
+	"rite_of_paimon": {
+		"seal": "Paimon", "label": "The Rite of Revealed Names",
+		"requirement": {"kind": "severed_count", "count": 3},
+		"stat": "combat_power", "magnitude": 0.35, "duration": 90.0,
+		"cost_kind": "organ", "cost_amount": 5.0, "cost_target": "liver",
+	},
+	"rite_of_the_filed_tooth": {
+		"seal": "The Filed Tooth", "label": "The Choir's Own Rite",
+		"requirement": {"kind": "gored_heads", "count": 5},
+		"stat": "combat_power", "magnitude": 0.6, "duration": 120.0,
+		"cost_kind": "limb", "cost_amount": 14.0, "cost_target": "left_arm",
+	},
+}
+
+
+static func _photo_matches(photo: Dictionary, requirement: Dictionary) -> bool:
+	var contents: Array = photo.get("contents", [])
+	var required := int(requirement.get("count", 1))
+	match str(requirement.get("kind", "")):
+		"dead_count":
+			var count := 0
+			for entry in contents:
+				if bool((entry as Dictionary).get("dead", false)):
+					count += 1
+			return count >= required
+		"severed_count":
+			var count := 0
+			for entry in contents:
+				count += ((entry as Dictionary).get("severed", []) as Array).size()
+			return count >= required
+		"gored_heads":
+			var count := 0
+			for entry in contents:
+				var record: Dictionary = entry
+				if not bool(record.get("dead", false)):
+					continue
+				var severed: Array = record.get("severed", [])
+				var ruptured: Array = record.get("ruptured", [])
+				if severed.has("head") or ruptured.has("head") or severed.has("brain") or ruptured.has("brain"):
+					count += 1
+			return count >= required
+	return false
+
+
+## The only door in. `photo` must be the same dictionary shape a real
+## in-world photograph produces; there is no path here that grants a reward
+## without one that actually satisfies `requirement`.
+static func attempt(ritual_id: String, photo: Dictionary, subject_id: String = "player") -> Dictionary:
+	if not RITUALS.has(ritual_id):
+		return {"ok": false, "reason": "NO SUCH RITE"}
+	var rite: Dictionary = RITUALS[ritual_id]
+	if not _photo_matches(photo, rite.requirement):
+		return {"ok": false, "reason": "THE PHOTOGRAPH DOES NOT SHOW WHAT THE RITE ASKS FOR"}
+	var granted := Boons.grant(
+		subject_id, ritual_id, str(rite.stat), float(rite.magnitude), float(rite.duration),
+		str(rite.cost_kind), float(rite.cost_amount), str(rite.get("cost_target", "")),
+	)
+	if not bool(granted.get("ok", false)):
+		return granted
+	WorldHistory.record_event("ritual_completed", {"subject_id": subject_id, "ritual_id": ritual_id, "seal": str(rite.seal)})
+	return {"ok": true, "ritual_id": ritual_id, "seal": str(rite.seal), "cost_paid": granted.cost_paid}
