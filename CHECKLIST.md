@@ -613,6 +613,100 @@ Unglamorous, and each one is currently costing real time.
 
 ---
 
+## M — The camera is progression
+
+Greg, 2026-09-12: *"the game should start probably in first person with the
+insane fov style cruelty squad"* / *"you unlock third person once you get melee
+weapons and bossfights through the nemesis system"* / *"in the car a driving the
+wheel with one hand which is wasd and then making it you hold a gun through
+shattered glass shooting out in first person driving then you can also switch
+third person driving as you progress in the derby"*.
+
+One rule in two places: first person is the default, third person is **earned**,
+because third person is the abstract view — the one where you stop being a body
+and start being an object — and leaving your body should cost something.
+
+### M1 — On foot
+- [x] **M1.1** Start locked in first person at FOV 106
+- [x] **M1.2** Third person unlocks on a landed melee blow plus a dangerous rival put down
+- [x] **M1.3** Both conditions read out of WorldHistory, neither stored
+- [x] **M1.4** Pressing the key early answers in the game's voice, never silently
+- [ ] **M1.5** The unlock itself is an event the player feels, not a quiet permission change
+- [ ] **M1.6** A first-person HUD that is diegetic — nothing floating in the corner
+
+### M2 — In the car
+- [ ] **M2.1** First-person driving is the default
+- [ ] **M2.2** One hand on the wheel; that hand *is* WASD and it is visible
+- [ ] **M2.3** The other hand holds a gun, and you shoot out of your own car
+- [ ] **M2.4** You shoot through your own windscreen, and the glass is really there
+- [ ] **M2.5** The glass degrades as the car takes hits — the view gets worse as you do
+- [ ] **M2.6** Third-person driving unlocks through derby progress, separately from M1
+- [ ] **M2.7** No hard cut between the two views (Rule 3)
+
+### M3 — The seam
+- [ ] **M3.1** The opening cutscene transitions into first-person driving without a cut
+- [ ] **M3.2** The derby hands off to on-foot without a loading seam the player reads as one
+- [ ] **M3.3** The HUD survives every transition; a diegetic HUD cannot simply fade to a third-person one
+
+## N — The vat, extended
+
+Greg, 2026-09-12: *"i love the current system of starting character creation
+traits ect, but there should be a limited like well balanced starting trait
+system still, obviously with more broken runs but then those are known they are a
+bit more broken and like achievement runs"* — and *"needing a bigger thing on the
+right showing the character 3d model changing parts face limbs full
+customisation"*.
+
+D is complete and stays complete. This is the layer on top of it.
+
+### N1 — A budget worth spending
+- [ ] **N1.1** A limited, balanced starting trait budget — you cannot take everything
+- [ ] **N1.2** Costs tuned so the honest builds are genuinely competitive
+- [ ] **N1.3** Overspending is possible and the game lets you do it
+
+### N2 — Broken runs, honestly labelled
+- [ ] **N2.1** A run the game knows is broken is *marked* as broken, at creation
+- [ ] **N2.2** Broken runs read as achievement runs rather than as mistakes
+- [ ] **N2.3** The world reacts to a broken build — being obviously wrong is visible to others
+- [ ] **N2.4** What counts as broken is derived from the build, not an authored list
+
+### N3 — The body on the right
+- [ ] **N3.1** A large live 3D model beside the sheet, not a portrait
+- [ ] **N3.2** It changes as you change: parts, face, limbs, build, wear
+- [ ] **N3.3** Full customisation reaches the same rig the world spawns (BaselineHuman)
+- [ ] **N3.4** Grown cybernetics and missing limbs show on it before you ever play
+- [ ] **N3.5** It is lit and framed as a specimen, in the vat's own language
+
+## O — Combat, reworked
+
+Greg has now said this in four separate sessions, which makes it the most
+repeated unresolved complaint in the project: *"the combat needs reworking"*.
+Previous passes fixed aim resolution, lock-on and gore, and none of them
+addressed whatever he is actually feeling. This section starts by finding out
+what that is rather than fixing another symptom.
+
+### O1 — Find the real fault first
+- [ ] **O1.1** Play it and record what is wrong in specifics, not adjectives
+- [ ] **O1.2** Measure time-to-kill, hit feedback latency, and recovery windows
+- [ ] **O1.3** Name the single worst offender before changing anything
+
+### O2 — Weight
+- [ ] **O2.1** A swing has commitment — windup, contact, recovery you can read
+- [ ] **O2.2** Contact is felt: hitstop, camera, sound and the body all agree
+- [ ] **O2.3** Missing costs something; whiffing into air is punished
+- [ ] **O2.4** Blocking, parrying or evading is a real decision with a real window
+
+### O3 — The body is the health bar
+- [ ] **O3.1** Damage lands on the limb you actually hit and stays there
+- [ ] **O3.2** A damaged limb changes what that person can do, visibly
+- [ ] **O3.3** Grappling connects to it — hold, force, rob, recruit
+- [ ] **O3.4** Half Sword's lesson without Half Sword's code: the body is the weapon system
+
+### O4 — Enemies that fight back
+- [ ] **O4.1** They read your commitment and punish it
+- [ ] **O4.2** They retreat, circle and group rather than walking at you
+- [ ] **O4.3** A wounded enemy fights differently from a fresh one
+
 ## Open questions — only you can answer these
 
 They block nothing else, but they change what gets built.
