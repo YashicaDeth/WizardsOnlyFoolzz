@@ -2743,8 +2743,18 @@ travels, hits something and leaves a mark on it.
 - [ ] **AF1.1** A round is a thing that travels, not a raycast resolved on the frame it is fired — half done. `ballistics.gd` gives the round a mass, a muzzle velocity, drop, drag and a trace between where it was and where it is so it cannot tunnel; a rifle drops 1.7cm over forty metres and a shotgun pattern opens to 3.8m. **Damage to a body still resolves on the frame the trigger goes down.** Moving that onto the projectile means deferring every anatomy hit by a few frames, which is a change worth making deliberately rather than folded into this one
 - [x] **AF1.2** It hits the world and leaves damage there (pairs with AB2) — a hole where it arrived, lifted off the surface so it does not fight the wall it is drawn on, sized by the round's energy, and recorded to WorldHistory for AB2 to read
 - [x] **AF1.3** Casings eject, bounce, land and stay — out of the port sideways and back, tumbling, two bounces that lose most of their energy, and then lying on their side rather than standing on end, which is the single most obvious tell that nobody simulated them. One case per trigger pull, so a shotgun leaves one for nine pellets
-- [ ] **AF1.4** Reloading is physical: the magazine leaves the weapon and a new one arrives
-- [ ] **AF1.5** A magazine dropped half-full is half-full when you pick it up
+- [ ] **AF1.4** Reloading is physical: the magazine leaves the weapon and a new
+      one arrives — true underneath now: `hunter_arsenal.gd`'s `reload()` does
+      a real full swap (whatever was chambered leaves, the fullest spare
+      arrives), not a top-up. What is not built is the part this wording
+      actually names: nothing shows the magazine leaving on screen —
+      `HeldGear` owns that geometry and this pass deliberately did not reach
+      into it.
+- [x] **AF1.5** A magazine dropped half-full is half-full when you pick it up —
+      `_finish_reload()` ejects whatever is still loaded as its own discrete
+      spare rather than merging it into one reserve number; `tests/magazine_test.gd`
+      confirms a magazine survives two separate reloads later still carrying
+      the exact count it left with.
 - [x] **AF1.6** Calibre means something — muzzle velocity, grain and drag per calibre, and drag proportional to speed squared, so buckshot keeps 93.7% of its speed where a slug keeps 97.1% over the same flight. A shotgun stops being a shotgun at range without anybody writing a falloff curve
 - [ ] **AF1.7** It reads through the anatomy already built: a round finds a zone, not a hitbox
 - [ ] **AF1.8** Firing from a car is the same system (M2.3)
