@@ -599,8 +599,8 @@ Unglamorous, and each one is currently costing real time.
 - [ ] **J1.3** Remove the plugin outright — 238MB referenced by no script
 
 ### J2 — Debug affordances out of the shipping build
-- [ ] **J2.1** Reset keys off the shipping input map
-- [ ] **J2.2** Dev-only gate for the rest
+- [x] ~~**J2.1** Reset keys off the shipping input map~~
+- [x] ~~**J2.2** Dev-only gate for the rest~~
 
 ### J3 — Adopt the installed plugins
 - [ ] **J3.1** LimboAI for F4.2

@@ -117,9 +117,7 @@ func _ready() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_R:
-			_reset_round()
-		elif event.keycode == KEY_I:
+		if event.keycode == KEY_I:
 			index_open = not index_open
 			if index_open:
 				world_index.open()
@@ -627,34 +625,6 @@ func _player_parts_lost() -> Array:
 func _refresh_world_index() -> void:
 	if world_index:
 		world_index.refresh()
-
-
-func _reset_round() -> void:
-	for target in targets:
-		if is_instance_valid(target):
-			target.queue_free()
-	targets.clear()
-	respawn_queue.clear()
-	disabled_count = 0
-	round_state = "active"
-	countdown = 3.0
-	round_state = "countdown"
-	score = 0
-	integrity = 100
-	speed = 0.0
-	boat_velocity = Vector3.ZERO
-	boat.position = Vector3(0, 0.75, 12.0 * SPAWN_SCALE)
-	boat.recover(Vector3(0, 1.2, 12.0 * ARENA_SCALE))
-	var old_damage_parts := boat.get_node_or_null("DamageParts")
-	if old_damage_parts != null:
-		old_damage_parts.free()
-	_add_vehicle_damage_parts(boat as RigidBody3D, 12)
-	var player_shell := boat.get_node_or_null("AuthoredScrapSkiff") as Node3D
-	if player_shell != null:
-		player_shell.scale = Vector3(1.15, 1.15, 1.15)
-		player_shell.rotation = Vector3.ZERO
-	_spawn_targets()
-	WorldHistory.record_event("derby_round_reset", {"venue": "rift_derby_quarry"})
 
 
 ## The heat resolves on its own. Making the player press a key to acknowledge an

@@ -1,5 +1,6 @@
 extends Node3D
 ## Original mechanical blockout. No retail maps, assets or game code.
+const DEV_AFFORDANCES := preload("res://systems/dev_affordances.gd")
 var arena: Node3D
 var player: CharacterBody3D
 var camera: Camera3D
@@ -79,9 +80,9 @@ func _ready():
 	make_ui()
 	start("derby", 7707)
 	show_menu()
-	if "--lab-smoke" in OS.get_cmdline_user_args():
+	if DEV_AFFORDANCES.accepts_command_line("--lab-smoke"):
 		call_deferred("smoke_test")
-	if "--lab-capture" in OS.get_cmdline_user_args():
+	if DEV_AFFORDANCES.accepts_command_line("--lab-capture"):
 		call_deferred("capture_preview")
 
 func material(color: Color, emission = false):
@@ -479,8 +480,10 @@ func _unhandled_input(event):
 			KEY_1: start("derby",run_seed)
 			KEY_2: start("world",run_seed)
 			KEY_ESCAPE: show_menu()
-			KEY_R: start(mode,run_seed)
-			KEY_N: start(mode,randi_range(1,999999))
+			KEY_R:
+				if DEV_AFFORDANCES.available(): start(mode,run_seed)
+			KEY_N:
+				if DEV_AFFORDANCES.available(): start(mode,randi_range(1,999999))
 			KEY_F: first_person = not first_person
 			KEY_E:
 				if mode=="world" and not menu.visible and not ended: interact()
