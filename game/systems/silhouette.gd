@@ -130,6 +130,126 @@ static func dress(parent: Node3D, dimensions: Vector3, seed_value: int, surface:
 	return added
 
 
+## G2.1-G2.3. The derby cars are an authored shell (bonnet, cabin, engine,
+## panels, rails per the glTF) but a clean shell at rest still reads as a
+## kart, for the same reason G4 already diagnosed for buildings: a smooth
+## surface reads as manufactured no matter what texture sits on it. This
+## hangs the same kind of attachment kit the buildings get, tuned for a
+## vehicle instead of a wall:
+##
+##   G2.1  exposed mechanism low and central, where a stripped car actually
+##         bares its guts, not on the roofline
+##   G2.2  bone struts lashed corner to corner like a repair that used
+##         whatever was on hand, with a sinew strap crossing each one
+##   G2.3  fungal bloom in the wheel wells (wet, shaded, never washed) and
+##         dried spatter on the flanks from the last thing this car hit
+##
+## Parented to the chassis body itself, not the scaled authored shell, so
+## `dimensions` and `wheel_positions` are real chassis-local metres and do
+## not have to track whatever scale the shell mesh happens to render at.
+## `wheel_positions` are the four suspension anchors the chassis already
+## carries — passed in rather than hard-coded so this stays a generic kit,
+## like `dress()` above.
+##
+## `include_spatter` defaults on but the derby turns it off for the AI
+## wreckers specifically: `tests/derby_balance_test.tscn` measured that
+## adding the dried-spatter patches to all twelve AI-driven cars reproducibly
+## zeroed every hunter-player impact for the full 30s heat (0 impacts, hull
+## unscratched) while the exact same patches on the player's own parked car,
+## and every other piece of this kit on the wreckers, measured clean. No
+## collision shape is involved anywhere in this kit, so the mechanism was not
+## found — only the reproduction. Rather than ship a silent regression against
+## the one system this project has already lost weeks to once, the feature is
+## gated here until someone can chase the real cause.
+static func dress_vehicle(parent: Node3D, dimensions: Vector3, wheel_positions: Array, seed_value: int, surface: Callable, include_spatter: bool = true) -> int:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value * 92821 + 41
+	var added := 0
+	var half_x := dimensions.x * 0.5
+	var half_y := dimensions.y * 0.5
+	var half_z := dimensions.z * 0.5
+
+	# --- G2.1: exposed mechanism ------------------------------------------
+	_block(parent, Vector3(0.0, -half_y * 0.15, -half_z * 0.55), Vector3(half_x * 0.85, dimensions.y * 0.42, dimensions.z * 0.3), Color("242424"), "chrome", rng.randi(), surface)
+	added += 1
+	for rib in rng.randi_range(3, 5):
+		var along := lerpf(-half_z * 0.7, half_z * 0.75, float(rib) / 4.0)
+		var pipe := _block(parent, Vector3(0.0, -half_y * 0.55, along), Vector3(0.14, 0.14, 0.5), Color("352a20"), "rust", rng.randi(), surface)
+		pipe.rotation.x = PI * 0.5
+		added += 1
+	# A ragged sill standing in for the door skin that has been cut away.
+	for side in [-1.0, 1.0]:
+		_block(parent, Vector3(side * half_x * 0.95, -half_y * 0.2, 0.0), Vector3(0.14, half_y * 0.5, dimensions.z * 0.55), Color("241f1a"), "rust", rng.randi(), surface)
+		added += 1
+
+	# --- G2.2: bone and sinew lashings -------------------------------------
+	# Corner to corner, because that is where a lashing actually has to run
+	# to hold a cracked panel down rather than sitting on it as ornament.
+	for lash in rng.randi_range(2, 4):
+		var from_corner := Vector3(half_x * (1.0 if lash % 2 == 0 else -1.0), half_y * 0.35, half_z * rng.randf_range(-0.9, 0.6))
+		var to_corner := Vector3(half_x * (-1.0 if lash % 2 == 0 else 1.0), half_y * 0.45, half_z * rng.randf_range(-0.5, 0.9))
+		var direction := to_corner - from_corner
+		var span := direction.length()
+		if span < 0.2:
+			continue
+		var mid := (from_corner + to_corner) * 0.5
+		var bone := _block(parent, mid, Vector3(span, 0.14, 0.14), Color("c8bc94"), "bone", rng.randi(), surface)
+		_orient_x(bone, direction / span)
+		added += 1
+		# The sinew: a darker, thinner strap crossing the bone at an angle,
+		# standing in for the actual lashing holding it down.
+		var sinew := _block(parent, mid + Vector3(0, 0.05, 0), Vector3(span * 0.88, 0.05, 0.22), Color("3a1410"), "flesh", rng.randi(), surface)
+		_orient_x(sinew, direction / span)
+		sinew.rotate_object_local(Vector3.RIGHT, deg_to_rad(14.0))
+		added += 1
+
+	# --- G2.3: fungal bloom in the wheel wells, dried spatter -------------
+	for wheel_position in wheel_positions:
+		var well: Vector3 = wheel_position
+		for lump in rng.randi_range(2, 3):
+			_sphere(parent, well + Vector3(rng.randf_range(-0.22, 0.22), rng.randf_range(0.05, 0.28), rng.randf_range(-0.22, 0.22)), 0.08 + rng.randf() * 0.09, Color("5a7a2c"), "dirt", rng.randi(), surface)
+			added += 1
+	# Dried spatter: flattened blotches on the flanks, as if something hit
+	# the panel and dried there rather than being painted on. See the
+	# docstring above — gated off the AI wreckers pending a real diagnosis.
+	if include_spatter:
+		for spatter in rng.randi_range(4, 7):
+			var side_sign := 1.0 if rng.randf() > 0.5 else -1.0
+			var at := Vector3(side_sign * half_x * rng.randf_range(0.85, 1.0), rng.randf_range(-half_y * 0.4, half_y * 0.6), rng.randf_range(-half_z * 0.8, half_z * 0.8))
+			var patch := _block(parent, at, Vector3(0.03, rng.randf_range(0.18, 0.4), rng.randf_range(0.14, 0.3)), Color("400e0a"), "flesh", rng.randi(), surface)
+			patch.rotation = Vector3(rng.randf_range(-0.2, 0.2), rng.randf_range(-0.3, 0.3), rng.randf_range(-0.2, 0.2))
+			added += 1
+
+	return added
+
+
+## Aligns a mesh's local +X axis (the long axis of a BoxMesh) onto a world
+## direction without going through Euler angles, which fall over whenever
+## the direction points anywhere near straight up.
+static func _orient_x(node: Node3D, x_axis: Vector3) -> void:
+	var up_reference := Vector3.UP
+	if absf(x_axis.dot(up_reference)) > 0.98:
+		up_reference = Vector3.FORWARD
+	var z_axis := x_axis.cross(up_reference).normalized()
+	var y_axis := z_axis.cross(x_axis).normalized()
+	node.transform.basis = Basis(x_axis, y_axis, z_axis)
+
+
+static func _sphere(parent: Node3D, at: Vector3, radius: float, tint: Color, kind: String, seed_value: int, surface: Callable) -> MeshInstance3D:
+	var mesh_instance := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = radius
+	sphere.height = radius * 2.0
+	sphere.radial_segments = 8
+	sphere.rings = 5
+	if surface.is_valid():
+		sphere.material = surface.call(tint, kind, seed_value)
+	mesh_instance.mesh = sphere
+	mesh_instance.position = at
+	parent.add_child(mesh_instance)
+	return mesh_instance
+
+
 static func _block(parent: Node3D, at: Vector3, size: Vector3, tint: Color, kind: String, seed_value: int, surface: Callable) -> MeshInstance3D:
 	var mesh_instance := MeshInstance3D.new()
 	var box := BoxMesh.new()

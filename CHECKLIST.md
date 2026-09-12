@@ -400,10 +400,28 @@ Read-only; everything derived lands in `game/art/derived/` via `tools/art_pipeli
 - [x] **G1.5** Wire collage — printed under the Wire feed
 
 ### G2 — The cars
-- [ ] **G2.1** Stripped chassis with exposed mechanism
-- [ ] **G2.2** Bone and sinew lashings
-- [ ] **G2.3** Fungal bloom in the wheel wells, dried spatter
-- [ ] **G2.4** Re-export carrying the biopunk palette natively
+- [x] ~~**G2.1** Stripped chassis with exposed mechanism~~ Procedural: an engine
+      block, driveshaft ribs and a cut-away sill hang low and central on the
+      chassis (`Silhouette.dress_vehicle`), so the silhouette bares mechanism
+      instead of reading as a smooth shell. Verified: `game/captures/g2_derby_cars.png`
+- [x] ~~**G2.2** Bone and sinew lashings~~ Bone struts run corner to corner
+      across the hull with a darker sinew strap crossing each one. Same capture.
+- [~] **G2.3** Fungal bloom in the wheel wells done and verified (same capture).
+      Dried spatter is built but currently only applied to the player's own
+      car — see the docstring on `Silhouette.dress_vehicle`:
+      `tests/derby_balance_test.tscn` measured that adding the spatter patches
+      to all twelve AI wreckers reproducibly zeroed every hunter-player impact
+      for a full 30s heat, while the identical patches on the parked player
+      car, and everything else in this kit on the wreckers, measured clean.
+      No collision shape is involved anywhere in the kit, so this was
+      reproduced and gated (`include_spatter` on `dress_vehicle`) rather than
+      root-caused — worth another agent's time before extending it to wreckers.
+- [ ] **G2.4** Re-export carrying the biopunk palette natively. Still needs
+      Greg's hands: `regrime()` already remaps the toybox material names in
+      `art/scrap_skiff.glb` onto the biopunk palette at load, and the kit
+      above adds procedural detail on top, but the base mesh itself (bonnet,
+      cabin, panels) is only reachable by re-exporting from
+      `art/scrap_skiff_v1/scrap_skiff.blend`.
 
 ### G0 — The wreckers cannot land a hit `OPEN BUG`
 Found 2026-09-12 by measurement, not yet fixed. A parked player finishes a
