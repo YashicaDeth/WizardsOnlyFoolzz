@@ -1046,6 +1046,27 @@ a model for every weapon.
 - [ ] **N4.5** Wounds, prosthetics and grown cybernetics show on the body here too
 - [ ] **N4.6** It is the same rig the world spawns, so what you see is what walks out
 
+### N5 — The slots, and what you are not supposed to touch
+Greg, 2026-09-12: *"in the UI of the inventory and character, having slots for
+all the spine and the body cybernetic organs being a thing that are locked at the
+start until you change them — unless you want to take it out, but it warns you
+saying 'you don't want to go rogue yet do you'."*
+
+This is the best expression of the game's own premise that has come up. The
+hardware in you is **not yours**. It was installed at intake, it is on CellOutz's
+inventory, and the sheet you filled in D8 already calls each opt-in modifier "a
+handle on you". Pulling one is the first genuinely disloyal act available to a
+player, and it should be possible from hour one and quietly discouraged.
+
+- [ ] **N5.1** A real slot per site — spine, skull, chest, each arm, each leg, the organ bays
+- [ ] **N5.2** Factory hardware fills them at decanting and is *locked*, not absent
+- [ ] **N5.3** Locked means discouraged, never disabled: the game warns and then lets you
+- [ ] **N5.4** The warning is in CellOutz's voice, not the game's — "you don't want to go rogue yet, do you"
+- [ ] **N5.5** Pulling one is recorded, and CellOutz standing reads it (E, `faction_price_factor`)
+- [ ] **N5.6** An empty slot is a real condition — the body works worse without what was in it
+- [ ] **N5.7** What you pull is a carried object with a lien on it, because it was never yours (B5.4)
+- [ ] **N5.8** Robbed and grown hardware fit the same slots — one vocabulary, per B2.1
+
 ## O — Combat, reworked
 
 Greg has now said this in four separate sessions, which makes it the most
