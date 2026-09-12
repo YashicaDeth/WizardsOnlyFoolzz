@@ -364,9 +364,9 @@ mechanisms and almost none are built.
 - [x] ~~**F3.3** Rank weighs influence and debt, not combat skill~~
 
 ### F4 — Rivals generated from real events
-- [ ] **F4.1** Rivals born out of what happened, not authored
+- [x] ~~**F4.1** Rivals born out of what happened, not authored~~
 - [ ] **F4.2** Tactic adaptation — adopt LimboAI, currently unused
-- [ ] **F4.3** The wound as the memory
+- [x] ~~**F4.3** The wound as the memory~~
 
 ### F5 — Player defeat routed to shackled
 - [ ] **F5.1** Losing is not a reload

@@ -62,8 +62,9 @@ simulation, not scripting:
 - the installed prosthetic changes her combat style, silhouette and ELO;
 - the World Index and her dossier update because they read the same record.
 
-This is the loop §21 of the Codex asks one Captain to prove. It is partially
-implemented today as `next_adaptation`.
+This is now the live F4 path. `RivalRegistry` reads the event record to decide
+whether an existing survivor became a rival, then derives their response from
+their persisted anatomy snapshot. There is no authored `next_adaptation` flag.
 
 ### 2. Promotion fills a real vacancy
 
