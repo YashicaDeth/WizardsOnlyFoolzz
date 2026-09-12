@@ -14,6 +14,7 @@ extends Control
 
 const Grunge := preload("res://systems/celloutz_grunge.gd")
 const Motion := preload("res://systems/celloutz_motion.gd")
+const SATELLITE := preload("res://systems/satellite_view.gd")
 
 const SURVEY_ID := "ashbloom_survey"
 const CELL := 22.0
@@ -50,6 +51,15 @@ var contacts_provider: Callable = Callable()
 var player_at := Vector2.ZERO
 var player_yaw := 0.0
 var zoom := 1.25
+
+## A10. The region seen from above, rendered from the world the player is
+## actually standing in. Null until a scene hands one over — the map still works
+## without it and simply draws its chart on a dark plate, which is what every
+## test and every scene with no 3D world gets.
+var satellite: SubViewport = null
+## 0 = high above, looking down. 1 = standing in the street. Driven by the same
+## zoom the chart already had, so there is one control rather than two.
+var descent := 0.0
 var pan := Vector2.ZERO
 var follow := true
 var dragging := false
@@ -126,6 +136,18 @@ func is_surveyed(at: Vector2) -> bool:
 	return surveyed.has("%d,%d" % [roundi(at.x / CELL), roundi(at.y / CELL)])
 
 
+## A10. Handed the world to look at. Called by whichever scene owns the region;
+## the map never goes looking for one, so a scene without a world simply does not
+## call this and nothing breaks.
+func attach_world(world: World3D) -> void:
+	if satellite != null and is_instance_valid(satellite):
+		return
+	if world == null:
+		return
+	satellite = SATELLITE.make(world)
+	add_child(satellite)
+
+
 func open_map() -> void:
 	visible = true
 	follow = true
@@ -133,7 +155,14 @@ func open_map() -> void:
 	queue_redraw()
 
 
+## A10.8. Nothing renders while the map is shut.
+func _sleep_satellite() -> void:
+	if satellite != null and is_instance_valid(satellite):
+		satellite.call("sleep")
+
+
 func close_map() -> void:
+	_sleep_satellite()
 	visible = false
 
 
@@ -216,6 +245,22 @@ func _draw() -> void:
 
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.035, 0.026, 0.019, 0.94))
 	draw_rect(_chart, PLATE)
+
+	# A10.1/A10.2. The region itself, under everything else. The chart's marks,
+	# roads and contacts still draw on top — what changes is what they draw on
+	# top *of*: the world in its own materials rather than a dark plate.
+	if satellite != null and is_instance_valid(satellite):
+		# Zoom already ran 0.6-3.0 for the chart; reuse it rather than inventing
+		# a second control the player has to learn.
+		descent = clampf(inverse_lerp(0.8, 2.8, zoom), 0.0, 1.0)
+		satellite.call("observe", Vector3(player_at.x, 0.0, player_at.y), player_yaw, descent, get_process_delta_time())
+		satellite.call("request_frame")
+		var image := satellite.get_texture()
+		if image != null:
+			draw_texture_rect(image, _chart, false, Color(1, 1, 1, 0.92))
+			# A10.5. Unwalked ground is greyed over the image rather than cut out
+			# of it, so the shape of what you have not been to is still legible.
+			_draw_unwalked_veil()
 	# A6.1. Grime under the plan, so the chart reads as printed on something.
 	Grunge.stain(self, _chart.position + _chart.size * Vector2(0.22, 0.74), 150.0, 611, Grunge.BILE, 0.05)
 	Grunge.stain(self, _chart.position + _chart.size * Vector2(0.78, 0.24), 170.0, 617, Grunge.RUST, 0.045)
@@ -282,6 +327,34 @@ func _draw_grid() -> void:
 
 ## Everything the player has never been near is hatched over. This is the whole
 ## reason the map is worth opening twice.
+## A10.5. The colour arrives as you walk. Everything you have not surveyed is
+## covered by a desaturating grey; ground next to somewhere you have been is
+## half-covered, because you have seen it from where you stood without having
+## stood in it.
+func _draw_unwalked_veil() -> void:
+	var step := CELL * zoom
+	if step < 3.0:
+		return
+	var half := AshbloomWorldGenerator.REGION_SIZE * 0.5
+	var from := Vector2i(floori(-half.x / CELL) - 1, floori(-half.y / CELL) - 1)
+	var to := Vector2i(ceili(half.x / CELL) + 1, ceili(half.y / CELL) + 1)
+	for cx in range(from.x, to.x + 1):
+		for cy in range(from.y, to.y + 1):
+			if surveyed.has("%d,%d" % [cx, cy]):
+				continue
+			var at := _to_screen(Vector2(cx * CELL - CELL * 0.5, cy * CELL - CELL * 0.5))
+			var cell := Rect2(at, Vector2(step, step))
+			if not _chart.intersects(cell):
+				continue
+			# How much of this cell's surroundings you have walked.
+			var known := 0
+			for offset: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				if surveyed.has("%d,%d" % [cx + offset.x, cy + offset.y]):
+					known += 1
+			var veil: float = lerpf(0.88, 0.42, clampf(float(known) / 4.0, 0.0, 1.0))
+			draw_rect(cell.intersection(_chart), Color(0.10, 0.11, 0.10, veil))
+
+
 func _draw_unsurveyed() -> void:
 	var step := CELL * zoom
 	if step < 3.0:

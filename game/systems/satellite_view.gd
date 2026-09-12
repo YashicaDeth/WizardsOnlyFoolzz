@@ -1,0 +1,120 @@
+class_name SatelliteView
+extends SubViewport
+
+## A10. The map, as the world seen from above.
+##
+## Greg: *"make the map an inbuilt satellite transferring from topview somewhat
+## 3d with showing the maps color and what it looks like, then make it
+## transferable into streetview"* — and the part that turns it from a renderer
+## into a mechanic: *"going from grey and discoloured and foggy to when you walk
+## around colored and explored"*.
+##
+## A6 built a survey **chart**: drawn, stencilled, and honest about being a
+## drawing. This is the other thing a map can be, and the two are not in
+## competition — the chart's marks, roads and contacts still draw on top. What
+## changes is what they draw on top *of*: the actual region, in its own
+## materials, instead of a dark plate.
+##
+## The whole thing is one camera in the scene the player is standing in, so
+## there is no second copy of the world to keep in step. Zooming does not scale
+## a picture; it flies the camera down. Past a threshold it tilts, and the map
+## becomes street level — which is why there is no separate street view mode.
+## It is the same camera at the bottom of its own descent.
+
+## How high the camera sits at each end of the zoom. The top is high enough to
+## hold a district, the bottom is eye height for a standing body — the same
+## 1.68m the player's own camera uses, so arriving at the bottom of the zoom
+## looks like standing there.
+const TOP_HEIGHT := 210.0
+const STREET_HEIGHT := 1.68
+
+## Where the tilt starts. Above this the camera looks straight down; below it,
+## it rolls forward until it is looking at the horizon.
+const TILT_BEGINS := 0.55
+
+var camera: Camera3D
+var clock := 0.0
+
+## 0 = all the way up, looking down. 1 = standing in the street.
+var descent := 0.0
+var heading := 0.0
+var centre := Vector3.ZERO
+
+
+static func make(world: World3D, resolution := Vector2i(768, 768)) -> SatelliteView:
+	var view := SatelliteView.new()
+	view.size = resolution
+	view.transparent_bg = false
+	# A10.8. Nothing renders until somebody asks for a frame. A satellite that
+	# runs while the map is shut is a second render of the whole region, every
+	# frame, for nobody.
+	view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	# The player's own world, not a copy: one region, one set of bodies, one
+	# truth about where everything is.
+	view.world_3d = world
+	view.own_world_3d = false
+	view._assemble()
+	return view
+
+
+func _assemble() -> void:
+	camera = Camera3D.new()
+	camera.name = "SatelliteCamera"
+	camera.fov = 62.0
+	camera.far = 2200.0
+	# Not `current`: this camera belongs to its own viewport and must never
+	# steal the one the player is looking through.
+	add_child(camera)
+
+
+## Called by the map each frame it is open. `at` is where the player is standing,
+## `look` is the direction they are facing, and `zoom` is 0..1 from the map's own
+## control — so the map keeps owning the input and this owns the geometry.
+func observe(at: Vector3, look: float, zoom: float, delta: float) -> void:
+	clock += delta
+	centre = at
+	heading = look
+	descent = clampf(zoom, 0.0, 1.0)
+	if camera == null or not is_instance_valid(camera):
+		return
+
+	var height := lerpf(TOP_HEIGHT, STREET_HEIGHT, ease(descent, 2.2))
+	# A10.3. The tilt is the transition. Straight down until the camera is low
+	# enough for a roof to have a side, then it rolls forward to the horizon —
+	# which is what makes "somewhat 3D" arrive on its own rather than being a
+	# separate view the player has to ask for.
+	var tilt := 0.0
+	if descent > TILT_BEGINS:
+		tilt = inverse_lerp(TILT_BEGINS, 1.0, descent)
+	var pitch := lerpf(-90.0, -4.0, ease(tilt, 1.6))
+
+	# Backed off along the facing as it tilts, so the player's own position stays
+	# in frame rather than sliding under the camera.
+	var facing := Vector3(sin(heading), 0.0, cos(heading))
+	var back := facing * lerpf(0.0, 6.0, tilt)
+	camera.global_position = Vector3(at.x, 0.0, at.z) - back + Vector3.UP * height
+	camera.rotation = Vector3(deg_to_rad(pitch), heading, 0.0)
+
+
+## A10.8. One frame, on request. The map calls this while it is open and stops
+## calling it when it closes, and the viewport costs nothing in between.
+func request_frame() -> void:
+	render_target_update_mode = SubViewport.UPDATE_ONCE
+
+
+func sleep() -> void:
+	render_target_update_mode = SubViewport.UPDATE_DISABLED
+
+
+## A10.5. How much colour a piece of ground has earned. Unwalked ground is grey,
+## discoloured and fogged; walking it brings the colour in. Returned rather than
+## applied, so the map can decide how to paint it — this class knows about
+## geometry, not about the survey.
+static func reveal_tint(surveyed: bool, neighbours: int) -> Color:
+	if surveyed:
+		return Color(1, 1, 1, 1)
+	# Ground next to somewhere you have walked is half-known: you have seen it
+	# from where you stood, without having stood in it.
+	var edge := clampf(float(neighbours) / 4.0, 0.0, 1.0)
+	var grey := lerpf(0.16, 0.52, edge)
+	return Color(grey, grey * 1.04, grey * 0.92, 1.0)

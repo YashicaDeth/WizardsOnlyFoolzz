@@ -2646,6 +2646,9 @@ func _toggle_panel(mode: String) -> void:
 	# The map is a chart now, not a paragraph, so it owns its own surface.
 	living_map.visible = panel_mode == "map"
 	if living_map.visible:
+		# A10. The map looks at the region the player is standing in, so it is
+		# handed this scene's world rather than building one of its own.
+		living_map.attach_world(get_world_3d())
 		living_map.open_map()
 	if panel_mode == "index":
 		world_index.open()

@@ -1456,6 +1456,73 @@ The candidate mechanics, from what is already built:
 - **The camera** — progression expressed as what you are allowed to see.
 - **Signal** — where you are standing deciding what you can reach.
 
+## AA — The land takes a side
+
+Greg, 2026-09-12: *"walking around it is like cleaning a massive window,
+satisfying, like Elden Ring's map exploration pushing you to explore and cast
+light or darkness upon areas like in Shadow of Mordor too — but you get to
+choose, in the states or splits of the map, to give the lands to the ascended
+wizard religious chaos magicians, or choose to send the lands to corruption,
+destroying the map and the towns and decreasing weather quality, natural things
+etc."*
+
+This is the largest idea in the project and it connects almost everything
+already built. A10 makes the map the world seen from above. **AA makes it
+something you change.** The region splits into holdings; each one can be given
+upward to wizardsonlyfoolz or downward to CellOutz corruption; and the choice is
+visible from the air, permanently, in the colour of the ground.
+
+It is worth being explicit about why this fits rather than being a bolt-on:
+`FACTION_TREE_AXIS` already runs from CellOutz at -0.95 to wizardsonlyfoolz at
++0.92, `signal_field.gd` already divides the world into places with their own
+reach, and the survey already tracks what the player has walked. The pieces are
+in; nothing has ever asked the player to *use* them on a map.
+
+### AA1 — Cleaning the window
+- [ ] **AA1.1** Revealing ground is the satisfying part, not the admin — it should feel like wiping glass
+- [ ] **AA1.2** Colour arrives with weight: a revealed holding is a small event, not a tick
+- [ ] **AA1.3** What is still grey pulls at you — the unrevealed shape is legible enough to want
+- [ ] **AA1.4** Reveal is per holding, not per metre, so it arrives in satisfying pieces
+
+### AA2 — The split
+- [ ] **AA2.1** The region divides into named holdings with their own edges
+- [ ] **AA2.2** A holding can be given to the ascent or given to corruption
+- [ ] **AA2.3** Giving it is an act with a cost, not a menu choice
+- [ ] **AA2.4** A holding remembers who took it and when (WorldHistory, like everything else)
+- [ ] **AA2.5** Neither side is the good one; the karma axis already refuses that framing
+
+### AA3 — What the land becomes
+- [ ] **AA3.1** Ascended ground: colour, light, weather clearing, things growing back
+- [ ] **AA3.2** Corrupted ground: the towns go, the weather worsens, the natural things fail
+- [ ] **AA3.3** The change is visible from the satellite view at a glance
+- [ ] **AA3.4** It is visible on foot too — the same ground, walked
+- [ ] **AA3.5** Corruption spreads on its own if nothing holds it
+- [ ] **AA3.6** Ties to W: weather quality is a per-holding number, not a global one
+
+### AA4 — Consequence
+- [ ] **AA4.1** Who lives there reacts — a corrupted holding loses its people
+- [ ] **AA4.2** Factions care: taking ground moves standing on both ladders
+- [ ] **AA4.3** The Board can pin a holding, so a theory can be about land
+- [ ] **AA4.4** An ending can be reached through the map rather than through a person
+
+## AB — Destruction
+
+Greg: *"a system like Teardown could be next level for destruction physics and
+gore meshes within the game"*.
+
+Recorded as the idea it is rather than as a plan. Teardown's voxel destruction is
+a whole engine discipline and this is a solo Godot project, so the honest first
+question is not "how do we build that" but "what does this game actually need
+from it" — and the answer is probably narrower and more achievable: things break
+where they are hit, and what comes off them stays.
+
+- [ ] **AB1.1** Decide the scope honestly before building anything — full voxel destruction is not a feature, it is a second project
+- [ ] **AB1.2** Structures break where they are struck rather than swapping to a damaged model
+- [ ] **AB1.3** Debris is real, persists, and can be stood on or thrown
+- [ ] **AB1.4** It reads through the gore system that already exists — `gore_chunks.gd` already breaks bodies into identified pieces
+- [ ] **AB1.5** A vehicle deforms rather than losing hit points (pairs with V1.2)
+- [ ] **AB1.6** Measure the cost before committing; X exists because nothing here has been profiled
+
 ## Open questions — only you can answer these
 
 They block nothing else, but they change what gets built.
