@@ -81,16 +81,27 @@ func _seed() -> void:
 		"territory": "Wherever a mast points up instead of down. Mostly rumour.",
 		"channel": "A guild feed that will not verify you, no matter what you send it.",
 		"doctrine": "Frequency is rank, and rank is bought in ways nobody will name to your face.",
+		# K1.3. The Law, the Book and the founder — drafted and approved by
+		# Greg 2026-09-12. The founder's biography deliberately does not
+		# survive checking: `founder_biographies` holds all three official,
+		# mutually exclusive versions the order itself publishes, side by
+		# side, on purpose.
+		"founder": "Orrin Vail, \"the First Frequency\"",
+		"founder_biographies": [
+			"Ascended bodily from a collapsed relay tower at the Flash.",
+			"A pre-Flash telecoms engineer who \"tuned in\" while fixing a substation and never came back down.",
+			"Never existed at all — the name is a rotating title held by whoever currently pays enough to answer to it.",
+		],
+		"law": "There is no static, only those who have not yet paid to stop hearing it.",
+		"book": "The Unbroken Transmission — a rotating subscription of pamphlets, revised whenever someone senior enough complains, so no two members' copies fully agree.",
 		"relations": {},
 	})
-	# K1.3. "Ranks... paid grades" does not need the order's still-blocked
-	# Law/Book/founder (E2) — WireNet.pyramid() already prices rank generically
-	# once a faction has a real member. One real member, deliberately at the
-	# bottom: nobody has been promoted, they have simply paid to be counted,
-	# which is the doctrine already stated above made concrete rather than a
-	# hierarchy this file would be inventing.
+	# "Ranks... paid grades" does not need the founder/Law/Book above to work
+	# mechanically — `WireNet.pyramid()` already prices rank generically once
+	# a faction has a real member. One real member, deliberately at the
+	# bottom: nobody has been promoted, they have simply paid to be counted.
 	WorldHistory.register_subject("wren_ashby", {
-		"name": "Wren Ashby", "kind": "person", "role": "Paid into the first grade, still unverified",
+		"name": "Wren Ashby", "kind": "person", "role": "Paid into Static, still unverified",
 		"faction": "wizardsonlyfoolz", "faction_id": "wizardsonlyfoolz", "elo": 950,
 		"grudge": 0, "status": "waiting", "memory": "Sent the fee three times before anything answered.",
 		"wounds": [], "anatomy": {"blood_type": "O-", "cybernetics": []}, "relations": {},
