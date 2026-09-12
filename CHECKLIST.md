@@ -387,13 +387,6 @@ under-directed opening.
 - [ ] **D7.4** `v2` The mirror lies the same way every time; the lie should fit the body
 - [ ] **D8.5** `v2` Declining a modifier is the harder difficulty and the game never acknowledges it
 
-### O v2 — the second pass
-- [ ] **O2.5** `v2` Hitstop is global `Engine.time_scale`, so your blow freezes every other fight in the region too
-- [ ] **O2.6** `v2` The guard has no direction — it holds equally against something behind you
-- [ ] **O5.10** `v2` Footing is the player's alone; enemies use the older `staggered` state, so the two bodies in a brawl run on different systems
-- [ ] **O5.11** `v2` Swing momentum reads the body's velocity and ignores where the weapon was actually pointed
-- [ ] **O3.5** `v2` Nothing a body wears or has grown changes what a blow does to it — armour and plating are not in the resolution at all
-
 ## E — The two ladders
 
 Full design in `DESIGN/RITUAL_AND_KARMA.md`. All of it hangs off the
@@ -1075,6 +1068,13 @@ hitpoints. `clinch_test.gd` and F7 already exist; this is the rest of it.
       softer (`combat_integration_test.gd`: "the one-armed fighter attacks
       more slowly" / "hits less hard") — just never checked off. Guarded by
       the new `tests/enemy_ai_test.gd` (5 checks) for O4.1/O4.2.
+
+### O v2 — the second pass
+- [ ] **O2.5** `v2` Hitstop is global `Engine.time_scale`, so your blow freezes every other fight in the region too
+- [ ] **O2.6** `v2` The guard has no direction — it holds equally against something behind you
+- [ ] **O5.10** `v2` Footing is the player's alone; enemies use the older `staggered` state, so the two bodies in a brawl run on different systems
+- [ ] **O5.11** `v2` Swing momentum reads the body's velocity and ignores where the weapon was actually pointed
+- [ ] **O3.5** `v2` Nothing a body wears or has grown changes what a blow does to it — armour and plating are not in the resolution at all
 
 ## P — The demo
 
