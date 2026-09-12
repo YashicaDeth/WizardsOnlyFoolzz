@@ -115,6 +115,8 @@ var head_anchor: Node3D
 var _xray := false
 var subject_id := ""
 var parts: Dictionary = {}
+## Resting positions, captured lazily so `favour_injuries()` is idempotent.
+var _rest_heights: Dictionary = {}
 var severed: Array[String] = []
 ## Cutting force accumulates separately from health. A club can destroy an arm,
 ## but only a directional cutting/ballistic blow can take it off.
@@ -515,6 +517,68 @@ func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type :=
 		if not organ_id.is_empty() and str((ORGAN_LAYOUT[organ_id] as Dictionary).zone) != zone:
 			organ_id = _organ_in_zone(zone)
 	return hit(zone, damage, impulse, damage_type, organ_id, hit_direction)
+
+
+## O3.2. An injured body has to *look* injured.
+##
+## The mechanics of limb damage were already in: `mobility_ratio()` slows a
+## broken leg and `combat_ratio()` weakens a broken arm, and both have driven
+## movement and damage for a while. But nothing showed until a limb actually
+## came off, so in every ordinary fight — which is nearly all of them — a man
+## with a shattered forearm stood exactly like a man who had just walked in.
+## The anatomy was doing real work the player could not see, which is the same
+## as it not happening.
+##
+## This poses the rig off the anatomy: a hurt arm hangs and the shoulder drops,
+## a hurt leg takes less weight and the body leans off it, and someone losing
+## consciousness stops holding their head up. Called whenever damage lands, not
+## per frame — it is a pose, not an animation.
+func favour_injuries() -> void:
+	if anatomy == null:
+		return
+	for zone_id: String in ["left_arm", "right_arm"]:
+		var part := parts.get(zone_id) as Node3D
+		if part == null or not is_instance_valid(part) or severed.has(zone_id):
+			continue
+		var hurt := 1.0 - _zone_fraction(zone_id)
+		var side := -1.0 if zone_id == "left_arm" else 1.0
+		# The arm hangs: it rotates out and down, and the whole limb drops.
+		part.rotation.z = side * hurt * 0.55
+		part.position.y = _rest_y(zone_id) - hurt * 0.11
+	for zone_id: String in ["left_leg", "right_leg"]:
+		var part := parts.get(zone_id) as Node3D
+		if part == null or not is_instance_valid(part) or severed.has(zone_id):
+			continue
+		var hurt := 1.0 - _zone_fraction(zone_id)
+		# A leg that cannot take weight trails, and the body sinks toward the
+		# good side rather than standing square.
+		part.rotation.x = hurt * 0.3
+		part.position.y = _rest_y(zone_id) - hurt * 0.06
+	var torso := parts.get("torso") as Node3D
+	if torso != null and is_instance_valid(torso):
+		# Leaning off whichever leg hurts more. This is the one that reads at
+		# distance, because a silhouette that is not plumb is visibly wrong.
+		var lean := (_zone_fraction("right_leg") - _zone_fraction("left_leg")) * 0.18
+		torso.rotation.z = lean
+	var head := parts.get("head") as Node3D
+	if head != null and is_instance_valid(head):
+		var fading := clampf(1.0 - anatomy.consciousness / 100.0, 0.0, 1.0)
+		head.rotation.x = fading * 0.42
+		head.rotation.z = fading * 0.2
+
+
+func _zone_fraction(zone_id: String) -> float:
+	var maximum: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone_id, {}) as Dictionary).get("health", 100.0))
+	return clampf(zone_health(zone_id) / maxf(maximum, 1.0), 0.0, 1.0)
+
+
+## Where a part sits when nothing is wrong with it, remembered the first time it
+## is asked so repeated posing cannot drift the body downward.
+func _rest_y(zone_id: String) -> float:
+	if not _rest_heights.has(zone_id):
+		var part := parts.get(zone_id) as Node3D
+		_rest_heights[zone_id] = part.position.y if part != null and is_instance_valid(part) else 0.0
+	return float(_rest_heights[zone_id])
 
 
 func is_downed() -> bool:

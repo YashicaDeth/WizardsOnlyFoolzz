@@ -721,7 +721,7 @@ what that is rather than fixing another symptom.
 
 ### O3 — The body is the health bar
 - [ ] **O3.1** Damage lands on the limb you actually hit and stays there
-- [ ] **O3.2** A damaged limb changes what that person can do, visibly
+- [x] **O3.2** A damaged limb changes what that person can do, and now shows it — arms hang, legs trail, the body leans off the bad side
 - [ ] **O3.3** Grappling connects to it — hold, force, rob, recruit
 - [ ] **O3.4** Half Sword's lesson without Half Sword's code: the body is the weapon system
 

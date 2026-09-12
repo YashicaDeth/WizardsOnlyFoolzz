@@ -763,6 +763,8 @@ func _resolve_firearm(attack: Dictionary) -> void:
 		var zone_id := str(result.get("zone", "torso"))
 		var zone_max: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone_id, {}) as Dictionary).get("health", 100.0))
 		impact_feel.strike(float(attack.get("damage", 0.0)) / maxf(zone_max, 1.0), str(attack.get("damage_type", "cut")), bool(result.get("severed", false)))
+		if actor.rig != null and is_instance_valid(actor.rig):
+			actor.rig.favour_injuries()
 	for id in impacts:
 		var summary: Dictionary = impacts[id]
 		var actor: Dictionary = summary.actor
