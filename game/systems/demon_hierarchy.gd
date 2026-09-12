@@ -57,7 +57,7 @@ static func is_lesser_demon(subject_id: String) -> bool:
 
 ## A faction's own `relations` already say who commands it (the same edge
 ## `WireNet.pyramid()` sorts on) — reused rather than re-deciding rank from a
-## second field, so seeded captains like Mara Voss read correctly without
+## second field, so seeded captains like the captain read correctly without
 ## needing an explicit `faction_rank` nobody wrote for them.
 static func _commands_own_faction(subject_id: String, faction_id: String) -> bool:
 	var relations: Dictionary = WorldHistory.subject(faction_id).get("relations", {})

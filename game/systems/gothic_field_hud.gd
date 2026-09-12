@@ -165,7 +165,7 @@ func _draw_hunt_thread() -> void:
 	var eye := anchor + Vector2(205, 12)
 	draw_arc(eye, 16, 0, TAU, 24, COPPER * Color(1, 1, 1, 0.45), 2)
 	draw_circle(eye, 4 + sin(elapsed * 3.1), BLOOD)
-	draw_string(font, anchor, "HUNT // MARA VOSS", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COPPER)
+	draw_string(font, anchor, "HUNT // THE CAPTAIN", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COPPER)
 	draw_string(font, anchor + Vector2(0, 21), rival_status, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, BONE * Color(1, 1, 1, 0.65))
 
 

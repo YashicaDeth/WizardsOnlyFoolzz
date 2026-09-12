@@ -2862,6 +2862,15 @@ The last rung. Fifteen statements that are true of sneaking and the law when thi
 - [ ] **AE10.14** `v10` Standing with a faction changes what the law does
 - [ ] **AE10.15** `v10` What you were wanted for carries into the next universe
 
+### AG4 — The third playtest, and what Greg is sick of
+- [x] **AG4.1** *"when running and the stamina bar depletes, the screen becomes super jittery"* — TaKeS was right and so was his guess at the cause. Two thresholds now, not one
+- [x] **AG4.2** *"the blood splatter effects... just being lame asf"* — `blood_veil.gd`: spatter with direction, near glass out of focus against far glass sharp, drops heavy enough to run down the screen, three stages of drying
+- [x] **AG4.3** *"no more mara voss wipe it"* — wiped, and not by find-and-replace: a second hardcoded name is the same fault with different letters. `cast_names.gd` generates the captain from `run_salt`, so they are stable inside a save and different in the next. Eight saves gave eight captains: Vale Rime, Roan Hollow, Halloway Coil, Mera Lockwood, Ash Coil, Kester Cinder, Nix Arden, Reve Arden. F v10.1 already demanded this
+- [x] **AG4.4** *"make this clickable with the mouse not just arrow keys"* — the index tabs are pointable and the footer leads with CLICK ANYTHING instead of listing five keyboard controls
+- [ ] **AG4.5** *"no more vessel breath bullshit"* — the two filament readouts in the field HUD
+- [ ] **AG4.6** The website
+- [ ] **AG4.7** The gore and the X-rays enhanced
+
 ## AG — Playtest, 12 September 2026
 
 The first person who was not Greg played the build. Everything below is either a

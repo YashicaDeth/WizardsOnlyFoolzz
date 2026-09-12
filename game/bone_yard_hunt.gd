@@ -8,7 +8,9 @@ const SPRINT_SPEED := 12.0
 ## soulslike register wants injury to hurt; it does not want a player who has
 ## lost a leg to be unable to disengage from the thing that took it.
 const PLAYER_INJURY_FLOOR := 0.55
-const HUNT_ID := "mara_voss"
+## The person the hunt is about. Generated per save — see `cast_names.gd`.
+const CAPTAIN_SLOT := "derby_captain"
+const CAST := preload("res://systems/cast_names.gd")
 const FRIEND_ID := "nix_arden"
 const HUNT_LOCATION := "ashbloom_bone_yard"
 const HANDHELD := preload("res://systems/handheld_device.gd")
@@ -432,7 +434,7 @@ func _ready() -> void:
 	_spawn_friend()
 	_spawn_rival()
 	_update_camera()
-	WorldHistory.record_event("player_entered_hunt_ground", {"location": HUNT_LOCATION, "hunt_id": HUNT_ID})
+	WorldHistory.record_event("player_entered_hunt_ground", {"location": HUNT_LOCATION, "hunt_id": CAST.id_for(CAPTAIN_SLOT)})
 
 
 ## The player had no body at all — only a `health` integer, the same defect the
@@ -576,7 +578,7 @@ func _register_people() -> void:
 		"name": "THE HUNTER", "kind": "person", "role": "Unindexed survivor", "faction": "Unbound",
 		"elo": 1000, "grudge": 0, "status": "awake", "memory": "The derby door opened into Limbo.",
 		"wounds": [], "anatomy": {"blood_type": "unresolved", "cybernetics": ["salvaged torque arm"]},
-		"relations": {FRIEND_ID: {"kind": "bond", "strength": 12}, HUNT_ID: {"kind": "grudge", "strength": 1}},
+		"relations": {FRIEND_ID: {"kind": "bond", "strength": 12}, CAST.id_for(CAPTAIN_SLOT): {"kind": "grudge", "strength": 1}},
 	})
 	WorldHistory.register_subject(FRIEND_ID, {
 		"name": "Nix Arden", "kind": "person", "role": "Scrap medic", "faction": "Gate Lanterns", "faction_id": "gate_lanterns",
@@ -589,8 +591,8 @@ func _register_people() -> void:
 		"doctrine": "Carry a light for whoever comes after. A kept promise outlasts a kept grudge.",
 		"relations": {"nix_arden": {"kind": "command", "strength": 40}},
 	})
-	WorldHistory.register_subject(HUNT_ID, {
-		"name": "Mara Voss", "kind": "person", "role": "Bone Yard Captain", "faction": "Ashline Wreckers", "faction_id": "ashline_wreckers", "elo": 1180,
+	CAST.ensure(CAPTAIN_SLOT, {
+		"elo": 1180,
 		"grudge": 0, "injury": "none", "status": "active", "memory": "Watching the derby", "wounds": [],
 		"anatomy": {"blood_type": "O-RUST", "cybernetics": ["jaw telemetry nail", "left clavicle rail"]},
 		"relations": {"player": {"kind": "hunts", "strength": 8}, "ashline_wreckers": {"kind": "command", "strength": 72}, "rook_sable": {"kind": "grudge", "strength": 31}},
@@ -598,13 +600,13 @@ func _register_people() -> void:
 	WorldHistory.register_subject("ashline_wreckers", {
 		"name": "Ashline Wreckers", "kind": "faction", "role": "Road murder syndicate", "threat": "SEVERE", "territory": "Bone Yard / Burnt Highway",
 		"doctrine": "Every machine is a coffin awaiting an owner. Rank is won by remembered impact.",
-		"relations": {"mara_voss": {"kind": "command", "strength": 72}, "rook_sable": {"kind": "enemy", "strength": 46}},
+		"relations": {"" + CAST.id_for(CAPTAIN_SLOT) + "": {"kind": "command", "strength": 72}, "rook_sable": {"kind": "enemy", "strength": 46}},
 	})
 	WorldHistory.register_subject("rook_sable", {
 		"name": "Rook Sable", "kind": "person", "role": "Rail-gang adjudicator", "faction": "Black Mile", "faction_id": "black_mile", "elo": 1325,
 		"grudge": 18, "status": "unlocated", "memory": "Paid three drivers to lose the same race.", "wounds": ["missing left eye"],
 		"anatomy": {"blood_type": "B-9", "cybernetics": ["rangefinder eye", "ceramic sternum"]},
-		"relations": {"mara_voss": {"kind": "grudge", "strength": 31}, "iris_coil": {"kind": "command", "strength": 61}},
+		"relations": {"" + CAST.id_for(CAPTAIN_SLOT) + "": {"kind": "grudge", "strength": 31}, "iris_coil": {"kind": "command", "strength": 61}},
 	})
 	WorldHistory.register_subject("iris_coil", {
 		"name": "Iris Coil", "kind": "person", "role": "Sporeline scout", "faction": "Black Mile", "faction_id": "black_mile", "elo": 1096,
@@ -633,7 +635,7 @@ func _register_people() -> void:
 		"name": "Doctor Vanta", "kind": "person", "role": "Relic anatomist", "faction": "Choir of Marrow", "faction_id": "choir_of_marrow", "elo": 1460,
 		"grudge": 0, "status": "rumoured", "memory": "A voice below the quarry is pricing Mara's replacement arm.", "wounds": [],
 		"anatomy": {"blood_type": "NULL", "cybernetics": ["six-finger surgical crown", "blackbox liver", "remote pulse cage"]},
-		"relations": {"choir_of_marrow": {"kind": "command", "strength": 83}, "mara_voss": {"kind": "known", "strength": 26}},
+		"relations": {"choir_of_marrow": {"kind": "command", "strength": 83}, "" + CAST.id_for(CAPTAIN_SLOT) + "": {"kind": "known", "strength": 26}},
 	})
 
 
@@ -719,6 +721,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_K: _deliberate_redecant()
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		apply_look(Vector2(event.relative.x * 0.0026, event.relative.y * 0.0024))
+
+
+## The captain's name, upper case, read off the record rather than written
+## into a string. Every label that used to carry a hardcoded captain name
+## calls this instead.
+func _captain_name() -> String:
+	var who: Dictionary = WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT))
+	return str(who.get("name", "THE CAPTAIN")).to_upper()
 
 
 func _physics_process(delta: float) -> void:
@@ -1090,24 +1100,24 @@ func _resolve_strike() -> void:
 		var aim := enemy.global_position + Vector3(lateral.x, look.y * 4.1 * 1.2, lateral.z)
 		var wound := enemy_rig.hit_at(aim, float(damage), float(damage) * 0.8, "cut", look)
 		body_zone = str(wound.get("zone", "torso"))
-		WorldHistory.update_subject(HUNT_ID, {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
+		WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
 	if enemy_rig != null and is_instance_valid(enemy_rig):
 		enemy_health = roundi(float(enemy_health_max) * _rig_health_ratio(enemy_rig))
 	else:
 		enemy_health = maxi(0, enemy_health - damage)
 	_spawn_blood(enemy.global_position + Vector3(0, 1.2, 0), damage)
-	WorldHistory.record_event("melee_body_hit", {"target": HUNT_ID, "body_zone": body_zone, "damage": damage, "location": HUNT_LOCATION})
+	WorldHistory.record_event("melee_body_hit", {"target": CAST.id_for(CAPTAIN_SLOT), "body_zone": body_zone, "damage": damage, "location": HUNT_LOCATION})
 	# Untyped rebuild rather than .duplicate(): the stored array can already be
 	# a TypedArray[Dictionary] by the time some other subject touched "wounds"
 	# first, and .duplicate() carries that runtime type over — has()/append()
 	# with this plain string then fail the type check instead of just working.
 	var wounds: Array = []
-	for existing in WorldHistory.subject(HUNT_ID).get("wounds", []):
+	for existing in WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("wounds", []):
 		wounds.append(existing)
 	var wound := "cut %s" % body_zone
 	if not wounds.has(wound):
 		wounds.append(wound)
-	WorldHistory.update_subject(HUNT_ID, {"injury": wound, "wounds": wounds, "grudge": mini(100, int(WorldHistory.subject(HUNT_ID).get("grudge", 0)) + 14), "status": "fighting"}, "rival_injured")
+	WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"injury": wound, "wounds": wounds, "grudge": mini(100, int(WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("grudge", 0)) + 14), "status": "fighting"}, "rival_injured")
 	if enemy_health <= 0:
 		_rival_retreats("You left Mara alive. She will return altered.")
 
@@ -1546,8 +1556,8 @@ func _use_prosthetic_surge() -> void:
 		if enemy_rig != null and is_instance_valid(enemy_rig):
 			var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 			var wound := enemy_rig.hit_at(enemy.global_position + Vector3.UP * 1.0, 30.0, 34.0, "blunt", look)
-			WorldHistory.update_subject(HUNT_ID, {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
-			WorldHistory.record_event("melee_body_hit", {"target": HUNT_ID, "body_zone": str(wound.get("zone", "torso")), "damage": 30, "location": HUNT_LOCATION})
+			WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
+			WorldHistory.record_event("melee_body_hit", {"target": CAST.id_for(CAPTAIN_SLOT), "body_zone": str(wound.get("zone", "torso")), "damage": 30, "location": HUNT_LOCATION})
 			enemy_health = roundi(float(enemy_health_max) * _rig_health_ratio(enemy_rig))
 		else:
 			enemy_health = maxi(0, enemy_health - 30)
@@ -1877,17 +1887,17 @@ func _begin_canonical_encounter() -> void:
 	enemy_retreating = false
 	enemy.visible = true
 	enemy.global_position = Vector3(0, 1.2, -16)
-	var mara := WorldHistory.subject(HUNT_ID)
+	var mara := WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT))
 	mara_encounter_number = 2 if bool(mara.get("is_rival", false)) and not (mara.get("rival_adaptation", {}) as Dictionary).is_empty() else 1
 	enemy_health_max = 150 if mara_encounter_number == 2 else 100
 	enemy_health = enemy_health_max
-	WorldHistory.update_subject(HUNT_ID, {"status": "hunting", "encounter_number": mara_encounter_number, "memory": "Mara returned rebuilt to settle the Bone Yard debt." if mara_encounter_number == 2 else "Mara came to settle the Bone Yard debt."}, "hunt_arc_started")
-	WorldHistory.record_event("canonical_hunt_encounter_started", {"hunter": "player", "target": HUNT_ID, "location": HUNT_LOCATION, "encounter_number": mara_encounter_number})
+	WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"status": "hunting", "encounter_number": mara_encounter_number, "memory": "Mara returned rebuilt to settle the Bone Yard debt." if mara_encounter_number == 2 else "Mara came to settle the Bone Yard debt."}, "hunt_arc_started")
+	WorldHistory.record_event("canonical_hunt_encounter_started", {"hunter": "player", "target": CAST.id_for(CAPTAIN_SLOT), "location": HUNT_LOCATION, "encounter_number": mara_encounter_number})
 	if mara_encounter_number == 2:
 		_spawn_ashline_reinforcements()
-		prompt.text = "SECOND HUNT // MARA VOSS: INDUSTRIAL ARM, REBUILT WRECKER, TWO ASHLINE KNIVES."
+		prompt.text = "SECOND HUNT // %s: INDUSTRIAL ARM, REBUILT WRECKER, TWO ASHLINE KNIVES." % _captain_name()
 	else:
-		prompt.text = "HUNT ARC: MARA VOSS has found you. Do not kill the story; make her remember."
+		prompt.text = "HUNT ARC: %s has found you. Do not kill the story; make them remember." % _captain_name()
 
 
 func _update_rival(delta: float) -> void:
@@ -1911,9 +1921,9 @@ func _update_rival(delta: float) -> void:
 		health = maxi(0, health - 7)
 		stamina = maxf(0, stamina - 12)
 		_wound_player(enemy.global_position, 17.0, "cut")
-		WorldHistory.record_event("rival_struck_player", {"rival": HUNT_ID, "location": HUNT_LOCATION})
+		WorldHistory.record_event("rival_struck_player", {"rival": CAST.id_for(CAPTAIN_SLOT), "location": HUNT_LOCATION})
 		if health <= 0:
-			_route_player_defeat(HUNT_ID)
+			_route_player_defeat(CAST.id_for(CAPTAIN_SLOT))
 	if enemy_health <= 25:
 		_rival_retreats("Mara escapes through the tunnel. Her next body will not be the same.")
 
@@ -2411,9 +2421,9 @@ func _rival_retreats(message: String) -> void:
 		return
 	enemy_retreating = true
 	enemy.visible = false
-	WorldHistory.update_subject(HUNT_ID, {"status": "escaped"}, "rival_survived_hunt")
-	WorldHistory.record_event("hunt_arc_first_beat_complete", {"target": HUNT_ID, "outcome": "escaped", "location": HUNT_LOCATION})
-	RIVAL_REGISTRY.consider(HUNT_ID)
+	WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"status": "escaped"}, "rival_survived_hunt")
+	WorldHistory.record_event("hunt_arc_first_beat_complete", {"target": CAST.id_for(CAPTAIN_SLOT), "outcome": "escaped", "location": HUNT_LOCATION})
+	RIVAL_REGISTRY.consider(CAST.id_for(CAPTAIN_SLOT))
 	prompt.text = message
 
 
@@ -2433,7 +2443,7 @@ func _map_contacts() -> Array:
 		if is_instance_valid(cache):
 			contacts.append({"at": Vector2(cache.global_position.x, cache.global_position.z), "state": "loot", "name": ""})
 	if enemy != null and is_instance_valid(enemy) and enemy.visible and not enemy_retreating:
-		contacts.append({"at": Vector2(enemy.global_position.x, enemy.global_position.z), "state": "hostile", "name": "MARA VOSS"})
+		contacts.append({"at": Vector2(enemy.global_position.x, enemy.global_position.z), "state": "hostile", "name": _captain_name()})
 	return contacts
 
 
@@ -2449,7 +2459,7 @@ func _lock_node() -> Node3D:
 		var node := actor.node as Node3D
 		if is_instance_valid(node) and not bool(actor.get("dead", false)):
 			return node
-	if lock_target == HUNT_ID and enemy != null and is_instance_valid(enemy) and enemy.visible and not enemy_retreating:
+	if lock_target == CAST.id_for(CAPTAIN_SLOT) and enemy != null and is_instance_valid(enemy) and enemy.visible and not enemy_retreating:
 		return enemy
 	lock_target = ""
 	return null
@@ -2467,7 +2477,7 @@ func _lock_candidates() -> Array:
 	if enemy != null and is_instance_valid(enemy) and enemy.visible and not enemy_retreating:
 		var mara_gap: float = player.distance_to(enemy.global_position)
 		if mara_gap <= 26.0:
-			found.append({"id": HUNT_ID, "node": enemy, "gap": mara_gap})
+			found.append({"id": CAST.id_for(CAPTAIN_SLOT), "node": enemy, "gap": mara_gap})
 	found.sort_custom(func(a, b): return float(a.gap) < float(b.gap))
 	return found
 
@@ -2997,7 +3007,7 @@ func _toggle_panel(mode: String) -> void:
 	# what "no more of this tutorial look" was about.
 	panel.visible = false
 	if character_archive.visible:
-		character_archive.open_archive(HUNT_ID)
+		character_archive.open_archive(CAST.id_for(CAPTAIN_SLOT))
 	else:
 		character_archive.close_archive()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if panel_mode.is_empty() else Input.MOUSE_MODE_HIDDEN
@@ -3039,13 +3049,13 @@ func _update_hud() -> void:
 	# a permanent list of every key in the game, in the engine default font,
 	# drawn on top of it.
 	status.visible = false
-	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(HUNT_ID).get("status", "dormant")).to_upper()]
+	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("status", "dormant")).to_upper()]
 	prompt.visible = not resolution_ui.visible and not living_map.visible and not world_index.visible
 	if field_interface.has_method("set_state"):
 		field_interface.set_state({
 			"health": health,
 			"stamina": stamina,
-			"rival_status": WorldHistory.subject(HUNT_ID).get("status", "dormant"),
+			"rival_status": WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("status", "dormant"),
 			"menu_open": world_index.visible or character_archive.visible or allusions_artwork.visible or living_map.visible,
 			"menu_mode": panel_mode,
 			"weapon": arsenal.state() if arsenal != null else {},
@@ -3456,20 +3466,20 @@ func _spawn_rival() -> void:
 	enemy_rig.position = Vector3(0, -1.15, 0)
 	enemy.add_child(enemy_rig)
 	enemy_rig.gore = viscera_fx
-	var mara_record: Dictionary = WorldHistory.subject(HUNT_ID)
+	var mara_record: Dictionary = WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT))
 	var mara_config := {"flesh": Color("7a4a3a"), "variation": 2, "blood": 5400.0}
 	if mara_record.get("anatomy_state") is Dictionary:
 		mara_config["restore"] = mara_record.anatomy_state
-	enemy_rig.build(HUNT_ID, mara_config)
+	enemy_rig.build(CAST.id_for(CAPTAIN_SLOT), mara_config)
 	var label := Label3D.new()
-	label.text = "MARA VOSS // ASHLINE CAPTAIN"
+	label.text = "%s // ASHLINE CAPTAIN" % _captain_name()
 	label.position = Vector3(0, 3, 0)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	enemy.add_child(label)
-	var mara := WorldHistory.subject(HUNT_ID)
+	var mara := WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT))
 	var adaptation: Dictionary = mara.get("rival_adaptation", {})
 	if bool(mara.get("is_rival", false)) and not adaptation.is_empty():
-		label.text = "MARA VOSS // REBUILT ASHLINE CAPTAIN"
+		label.text = "%s // REBUILT ASHLINE CAPTAIN" % _captain_name()
 		# The industrial arm is now an actual prosthetic in the anatomy record,
 		# so it restores function, changes her combat ratio and shows on the rig
 		# rather than being a cylinder parented next to her.

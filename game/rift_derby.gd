@@ -13,7 +13,13 @@ const ARENA_SCALE := 1.85
 const SPAWN_SCALE := 1.85
 const ARENA_LIMIT := 29.0 * ARENA_SCALE
 const MAX_SPEED := 24.0
-const RIVAL_ID := "mara_voss"
+## The derby captain. Generated per save rather than named here — a second
+## hardcoded name is the same problem with different letters, and F v10.1
+## already says a rival is made by what happened rather than spawned as one.
+## Resolved through `CastNames`, which seeds off `WorldHistory.run_salt`, so
+## the captain is stable inside a save and different in the next.
+const CAPTAIN_SLOT := "derby_captain"
+const CAST := preload("res://systems/cast_names.gd")
 const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const BONE_YARD_ENVIRONMENT := preload("res://art/bone_yard_environment.glb")
 const DERBY_AUDIO := preload("res://systems/procedural_derby_audio.gd")
@@ -130,8 +136,7 @@ func _ready() -> void:
 	for index in range(0, crowd_members.size(), 16):
 		crowd_banks.append((crowd_members[index] as Node3D).position + Vector3(0, 1.5, 0))
 	derby_audio.seed_crowd(crowd_banks)
-	WorldHistory.register_subject(RIVAL_ID, {
-		"name": "Mara Voss", "role": "Bone Yard Captain", "faction": "Ashline Wreckers",
+	CAST.ensure(CAPTAIN_SLOT, {
 		"elo": 1180, "grudge": 0, "injury": "none", "status": "active", "memory": "Watching the derby",
 	})
 	WorldHistory.record_event("derby_session_started", {
@@ -525,10 +530,10 @@ func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: fl
 	if pit_radio != null:
 		pit_radio.transmit("took_hit" if damage < 30 else "player_winning")
 	if bool(target.get_meta("is_rival", false)):
-		var current := WorldHistory.subject(RIVAL_ID)
+		var current := WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT))
 		var grudge := mini(100, int(current.get("grudge", 0)) + 8)
 		var injury := "bruised ribs" if target_integrity > 0 else "fractured left arm"
-		WorldHistory.update_subject(RIVAL_ID, {
+		WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {
 			"grudge": grudge, "injury": injury, "elo": int(current.get("elo", 1180)) + 12,
 			"status": "injured" if target_integrity <= 0 else "engaged",
 			"memory": "You rammed her Wrecker at the Bone Yard.",
@@ -668,7 +673,7 @@ func _third_person_earned() -> bool:
 		var details: Dictionary = event.get("details", {})
 		if str(details.get("resolution", "")) == "killed" and str(details.get("subject_id", "")) != "":
 			return true
-	return int(WorldHistory.subject(RIVAL_ID).get("grudge", 0)) >= 40
+	return int(WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("grudge", 0)) >= 40
 
 
 func _update_camera(delta: float) -> void:
@@ -802,7 +807,7 @@ func _update_hud() -> void:
 	# AG3.1. The instruments. These are the readouts `_ready` used to switch off
 	# outright; they live on the dashboard now, where you can look at them.
 	if interior != null and is_instance_valid(interior):
-		var rival_subject := WorldHistory.subject(RIVAL_ID)
+		var rival_subject := WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT))
 		var rival_running := false
 		for target in targets:
 			if is_instance_valid(target) and bool(target.get_meta("is_rival", false)):
@@ -825,8 +830,8 @@ func _update_hud() -> void:
 	# on top of the control ribbon repeating what the ribbon already showed.
 	mode_label.visible = round_state != "active"
 	mode_label.text = ("VICTORY  //  HAULED OUT TO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "won" else "WRECKED  //  DRAGGED INTO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "lost" else "")
-	var rival := WorldHistory.subject(RIVAL_ID)
-	rival_label.text = "HUNT ARC  //  MARA VOSS\n%s  ·  GRUDGE %03d  ·  ELO %04d\n[I] WORLD INDEX" % [str(rival.get("status", "active")).to_upper(), int(rival.get("grudge", 0)), int(rival.get("elo", 1180))]
+	var rival := WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT))
+	rival_label.text = "HUNT ARC  //  %s\n%s  ·  GRUDGE %03d  ·  ELO %04d\n[I] WORLD INDEX" % [str(rival.get("name", "THE CAPTAIN")).to_upper(), str(rival.get("status", "active")).to_upper(), int(rival.get("grudge", 0)), int(rival.get("elo", 1180))]
 	# Computed once for both readouts. It used to live inside the cab-screen
 	# branch, which is why the windscreen radar had no contacts to draw.
 	var contacts: Array = []
@@ -1010,7 +1015,7 @@ func _detach_vehicle_part(target: Node3D, part_name: String, impact_direction: V
 
 
 func _add_driver_rig(target: RigidBody3D, index: int) -> void:
-	var subject_id := RIVAL_ID if index == 0 else "derby_driver_%02d" % index
+	var subject_id := CAST.id_for(CAPTAIN_SLOT) if index == 0 else "derby_driver_%02d" % index
 	var driver := BaselineHuman.new()
 	driver.name = "DriverRig"
 	driver.position = Vector3(0, -0.15, 0.25)

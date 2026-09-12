@@ -1,5 +1,9 @@
 extends Control
 
+## The derby captain is generated per save (`cast_names.gd`), so this panel
+## resolves who it is rather than defaulting to a name written in here.
+const CAST := preload("res://systems/cast_names.gd")
+
 ## The Living Kinship Web is an original, data-driven rival/friend archive.
 ## It reads the same persistent subjects as combat, so wounds, rank and memory
 ## are not decorative menu copy: the dossier changes after encounters.
@@ -15,7 +19,6 @@ const INK := Color("180b0d")
 var graph_positions := {
 	"player": Vector2(0, 0),
 	"nix_arden": Vector2(-260, -120),
-	"mara_voss": Vector2(275, -95),
 	"ashline_wreckers": Vector2(515, 75),
 	"rook_sable": Vector2(690, -80),
 	"iris_coil": Vector2(735, 130),
@@ -24,7 +27,7 @@ var graph_positions := {
 	"choir_of_marrow": Vector2(255, 240),
 	"doctor_vanta": Vector2(495, 330),
 }
-var selected_id := "mara_voss"
+var selected_id := "derby_captain"
 var zoom := 0.82
 var pan := Vector2(70, 255)
 var dragging := false
@@ -141,8 +144,11 @@ func _disc(center: Vector2, radius_x: float, radius_y: float, segments: int = 18
 	return points
 
 
-func open_archive(focus_id: String = "mara_voss") -> void:
-	selected_id = focus_id if graph_positions.has(focus_id) else "mara_voss"
+## Defaults to whoever the derby captain is this save rather than to a name
+## written in here. Empty means "the captain", resolved at the call.
+func open_archive(focus_id: String = "") -> void:
+	var fallback := CAST.id_for("derby_captain")
+	selected_id = focus_id if graph_positions.has(focus_id) else fallback
 	visible = true
 	modulate.a = 0.0
 	queue_redraw()

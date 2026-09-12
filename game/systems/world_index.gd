@@ -1286,7 +1286,7 @@ func _draw_pyramid(rect: Rect2) -> void:
 			# The crown tier is the narrowest row and usually holds the longest
 			# names, so the room left after the downline figure has to be measured
 			# rather than assumed - a fixed 130px reservation printed "Dray Kell,
-			# Mara Voss" straight through "DOWNLINE 02".
+			# the captain" straight through "DOWNLINE 02".
 			var room := span - 36.0 - down_width - 16.0
 			var label := ", ".join(names)
 			while names.size() > 1 and font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x > room:
