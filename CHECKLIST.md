@@ -844,7 +844,7 @@ hitpoints. `clinch_test.gd` and F7 already exist; this is the rest of it.
 - [x] **O5.2** Melee resolves against BaselineHuman zones by geometry — it was already true, now verified
 - [x] **O5.3** A held clinch with advantage, stamina drain, and a real cost for losing it
 - [x] **O5.4** Robbed, spoken to, leaned on, walked where you want them, and held in the line of fire
-- [ ] **O5.5** Held and hurt is the pressure that makes recruitment possible (feeds F7 and E)
+- [x] **O5.5** Already true via F7 — pain and fading consciousness feed the hold, the hold feeds consent, consent is what recruitment reads. Verified end to end rather than assumed
 - [x] **O5.6** Their force opposes yours, scaled by their own pain and arms
 - [x] **O5.7** The player has footing now, not just the enemies — whiffing, blocking and being shoved all cost it
 - [x] **O5.8** Press 5 to put the weapons down — 42 dps against a cleaver's 76, at 1.55m of reach
