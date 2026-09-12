@@ -725,6 +725,30 @@ what that is rather than fixing another symptom.
 - [ ] **O3.3** Grappling connects to it — hold, force, rob, recruit
 - [ ] **O3.4** Half Sword's lesson without Half Sword's code: the body is the weapon system
 
+### O5 — The brawl
+
+Greg has raised this more than any other combat idea: *"if the combat has
+grappling too like halfsword you can hold them and say things force them to take
+your abuse and thats how you can rob or aggress some npcs and also how you can
+persuade them to join your ranks"*.
+
+It has only ever been one line on this list, which is why it keeps coming back.
+The register is Half Sword's — unglamorous, physical, off-balance — and the
+implementation is emphatically **not** Half Sword's: no reading their code, no
+reproducing their control scheme. What is being taken is the *lesson*, which is
+that a fight between two bodies is about weight and leverage rather than about
+hitpoints. `clinch_test.gd` and F7 already exist; this is the rest of it.
+
+- [ ] **O5.1** A swing carries momentum — where the weapon *was* decides what it can do next
+- [ ] **O5.2** Contact is between bodies, not between a capsule and a damage number
+- [ ] **O5.3** Grabbing someone is a state you hold, with its own risk, not an animation
+- [ ] **O5.4** While held, they can be robbed, moved, shielded with, or spoken to
+- [ ] **O5.5** Held and hurt is the pressure that makes recruitment possible (feeds F7 and E)
+- [ ] **O5.6** They fight the hold — a grapple you win instantly is not one
+- [ ] **O5.7** Off-balance is a real state for both of you; footing matters
+- [ ] **O5.8** Unarmed is viable and horrible, because the body is the weapon system
+- [ ] **O5.9** Everything here reads through the anatomy already built — a broken arm cannot hold you
+
 ### O4 — Enemies that fight back
 - [ ] **O4.1** They read your commitment and punish it
 - [ ] **O4.2** They retreat, circle and group rather than walking at you
