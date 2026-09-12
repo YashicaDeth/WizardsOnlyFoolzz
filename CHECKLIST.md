@@ -282,6 +282,20 @@ Nine passes of procedural surface, and none of it is Greg's own work. AP3.3: *"c
 - [ ] **A10.1** `v10` Real collaged art from the collections folder, used as texture with intent
 - [ ] **A10.2** `v10` It sits inside the procedural system rather than replacing it
 
+- [ ] **A10.3** `v10` The hour changes every material, not just the sky
+- [ ] **A10.4** `v10` Nothing in the world is lit by an ambient term nobody chose
+- [ ] **A10.5** `v10` Grain, grime and wear are generated, never painted in by hand
+- [ ] **A10.6** `v10` A screenshot of any square metre reads as this game and no other
+- [ ] **A10.7** `v10` The palette holds under a storm, underground, and in the shadow realms
+- [ ] **A10.8** `v10` Contamination is a material property everywhere it appears
+- [ ] **A10.9** `v10` The stencil face sets every plate, and body copy never uses it
+- [ ] **A10.10** `v10` Nothing renders correctly only at one distance
+- [ ] **A10.11** `v10` A surface somebody destroyed looks destroyed a month later
+- [ ] **A10.12** `v10` The look survives the quantum restart looking like itself
+- [ ] **A10.13** `v10` Every effect is one shader with dials rather than a new shader
+- [ ] **A10.14** `v10` Performance is part of the look: nothing here costs more than it earns
+- [ ] **A10.15** `v10` Greg's own collaged art is in the world as texture, used with intent
+
 ## B — Make the body the centrepiece
 
 The most complete system in the project and, until this pass, the least visible.
@@ -404,6 +418,20 @@ Nine passes on one body, and T1.1 now says the universe restarts and you do not.
 - [ ] **B10.1** `v10` The body is recognisably itself across a quantum restart
 - [ ] **B10.2** `v10` What it carries over is scars, not statistics
 
+- [ ] **B10.3** `v10` Damage is always recorded against a zone, never against a hitbox
+- [ ] **B10.4** `v10` A body carries its whole history visibly and permanently
+- [ ] **B10.5** `v10` Blood, viscera and bone answer light as three different materials
+- [ ] **B10.6** `v10` Any body can be opened up in the same detail as any other
+- [ ] **B10.7** `v10` What is installed in a limb is visible in that limb
+- [ ] **B10.8** `v10` Radiation, fire, bullets and blades all resolve through the same anatomy
+- [ ] **B10.9** `v10` A body reacts to the hour, the weather and what it is wearing
+- [ ] **B10.10** `v10` The mirror in the room renders this rig live
+- [ ] **B10.11** `v10` Gore persists, rots on a real clock, and is eaten by things that eat
+- [ ] **B10.12** `v10` Nothing about a body is described in text that could be shown on the body
+- [ ] **B10.13** `v10` A corpse is a place other systems can read from days later
+- [ ] **B10.14** `v10` Bodies are cheap enough that a crowd is a crowd
+- [ ] **B10.15** `v10` The player's body is the same rig, made exceptional only by being undying
+
 ## C — The handheld, and killing the six-panel problem
 
 Six fullscreen panels on six keys is the root cause of "nothing connects".
@@ -521,6 +549,20 @@ Eight passes on the front of an object nobody has ever turned over. The jester i
 Greg, plainly: *"the entire blackmirror gui needs work"*. Nine passes on what the device *is* and none on how it reads.
 - [ ] **C10.1** `v10` The whole GUI re-authored as one thing rather than six pages
 - [ ] **C10.2** `v10` It is legible in the dark it now creates, which nothing before v4 had to be
+
+- [ ] **C10.3** `v10` Its battery is a real resource with a real floor
+- [ ] **C10.4** `v10` Raising it occupies a hand and the game never forgets that
+- [ ] **C10.5** `v10` Its glow is what anything hunting you sees first
+- [ ] **C10.6** `v10` It has a back, a jester on it, and a condition that shows on the shell
+- [ ] **C10.7** `v10` Every page reads correctly in the dark it creates
+- [ ] **C10.8** `v10` The device wears from what you have actually done to it
+- [ ] **C10.9** `v10` Nothing on it is a list of text in a box
+- [ ] **C10.10** `v10` It is the Wire, the map, the carry and the radio without four designs
+- [ ] **C10.11** `v10` Apps on it are playable and some of them are load-bearing
+- [ ] **C10.12** `v10` It can evoke, and evoking through it is dangerous
+- [ ] **C10.13** `v10` It holds an archive that disagrees with the feed
+- [ ] **C10.14** `v10` It survives the restart carrying what you did with it
+- [ ] **C10.15** `v10` Somebody could pick it up and know whose it was
 
 ## D — Character creation in the vat
 
@@ -650,6 +692,25 @@ under-directed opening.
       actually signed for, and a real event names the player and what they
       declined).
 
+
+### D v10 — the final pass
+The last rung. Fifteen statements that are true of character creation when this game is finished, each one an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **D10.1** `v10` The sheet you fill in is the body that walks out, with nothing lost between
+- [ ] **D10.2** `v10` The quiz matters mystically rather than statistically
+- [ ] **D10.3** `v10` No option on it is strictly better than another option
+- [ ] **D10.4** `v10` The handler is a person who varies decanting to decanting
+- [ ] **D10.5** `v10` Everything chosen here is visible on the rig afterwards
+- [ ] **D10.6** `v10` The record of your intake is readable by every faction later
+- [ ] **D10.7** `v10` Nothing is chosen from a dropdown that could be chosen by doing
+- [ ] **D10.8** `v10` A clerical error is possible and auditable at a real cost
+- [ ] **D10.9** `v10` What you were made for is not what you have to become
+- [ ] **D10.10** `v10` The vat is a place, and leaving it is a movement
+- [ ] **D10.11** `v10` Two players making the same choices get two different bodies
+- [ ] **D10.12** `v10` It takes minutes, not an hour: Greg's rule is no faffing at the start
+- [ ] **D10.13** `v10` The intake is where the godhead first notices you, quietly
+- [ ] **D10.14** `v10` Your sheet is the seed the restart reads to make the next universe differ
+- [ ] **D10.15** `v10` Everything on it can be undone later at a price somebody sets
+
 ## E — The two ladders
 
 Full design in `DESIGN/RITUAL_AND_KARMA.md`. All of it hangs off the
@@ -737,6 +798,25 @@ than outward — and doing it anywhere dangerous is the whole risk.
 
 ---
 
+
+### E v10 — the final pass
+The last rung. Fifteen statements that are true of factions and standing when this game is finished, each one an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **E10.1** `v10` Standing is computed from what you did, never awarded
+- [ ] **E10.2** `v10` Every faction keeps its own record and they disagree
+- [ ] **E10.3** `v10` A faction refuses to sell you things before it refuses to talk to you
+- [ ] **E10.4** `v10` Climbing one ladder is visible to the other ladder
+- [ ] **E10.5** `v10` Factions keep hours and are not reachable at all of them
+- [ ] **E10.6** `v10` Rank shows on the body and in how rooms treat you
+- [ ] **E10.7** `v10` Nothing about standing is displayed as a number in a corner
+- [ ] **E10.8** `v10` A faction can collapse, and its holdings go somewhere
+- [ ] **E10.9** `v10` The Choir prices what you carry against who you are to them
+- [ ] **E10.10** `v10` Reputation decays if you stop practising it
+- [ ] **E10.11** `v10` Somebody inside a faction can be turned without the faction knowing
+- [ ] **E10.12** `v10` Factions sit on the pyramid at their real power and they move
+- [ ] **E10.13** `v10` You can be outcast from all of them and the game still works
+- [ ] **E10.14** `v10` A sigil can reach a faction, badly
+- [ ] **E10.15** `v10` What each faction believed about you carries into the next universe
+
 ## F — The Hunt System becoming a system
 
 Today Mara is one hardcoded character. `DESIGN/HUNT_SYSTEM.md` has six
@@ -780,6 +860,25 @@ exist start talking to each other.
 - [x] ~~**F7.3** Feeds the downed-window resolution and recruitment~~
 
 ---
+
+
+### F v10 — the final pass
+The last rung. Fifteen statements that are true of the hunt when this game is finished, each one an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **F10.1** `v10` A rival is made by what happened, never spawned as a rival
+- [ ] **F10.2** `v10` Their body remembers the specific damage you did
+- [ ] **F10.3** `v10` Their tactics come from the record, read fresh, never cached
+- [ ] **F10.4** `v10` A rival who fled comes back changed in a way you can see
+- [ ] **F10.5** `v10` Death opens a real succession and somebody takes the place
+- [ ] **F10.6** `v10` Being hunted is the same system pointed at you
+- [ ] **F10.7** `v10` The law is a hunter with a jurisdiction
+- [ ] **F10.8** `v10` Bounty work for the top angels or the top demons is the job market
+- [ ] **F10.9** `v10` A contract is consumable and costs something to take
+- [ ] **F10.10** `v10` Elites cannot really die, which is why hunting them is work not war
+- [ ] **F10.11** `v10` Hunts run while you are elsewhere
+- [ ] **F10.12** `v10` A hunt can be inherited by somebody who never met you
+- [ ] **F10.13** `v10` Nothing in a hunt is scripted to find you
+- [ ] **F10.14** `v10` The godhead is the last hunter and it does not need to look for you
+- [ ] **F10.15** `v10` Who hunted you is the thing the next universe knows
 
 ## G — The look
 
@@ -891,6 +990,25 @@ probe actually says, so the next attempt does not start from scratch:
 
 ---
 
+
+### G v10 — the final pass
+The last rung. Fifteen statements that are true of sound when this game is finished, each one an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **G10.1** `v10` Where you stand decides what you hear, everywhere, with no exceptions
+- [ ] **G10.2** `v10` Every bus is real and every slider moves something
+- [ ] **G10.3** `v10` Underground sounds like underground
+- [ ] **G10.4** `v10` A station that is off air is off, not quiet
+- [ ] **G10.5** `v10` Sound carries damage: a wrecked engine sounds wrecked
+- [ ] **G10.6** `v10` The hour changes the mix
+- [ ] **G10.7** `v10` Weather is audible before it is visible
+- [ ] **G10.8** `v10` Bodies make sound appropriate to what is left of them
+- [ ] **G10.9** `v10` Nothing loops audibly
+- [ ] **G10.10** `v10` Voice acting exists for the godhead and for the handler
+- [ ] **G10.11** `v10` Proximity chat puts a voice where a head is
+- [ ] **G10.12** `v10` Silence is used deliberately and often
+- [ ] **G10.13** `v10` Music is diegetic or it is the shadow realms, never wallpaper
+- [ ] **G10.14** `v10` Every sound in the game is generated or recorded for it
+- [ ] **G10.15** `v10` The mix holds at 3am and at noon without being re-tuned
+
 ## K — The cosmology
 Captured 2026-09-12, see `DESIGN/COSMOLOGY.md`. CellOutz is the demon faction
 below, wizardsonlyfoolz the mage collective above, the player a CellOut wizard
@@ -970,6 +1088,20 @@ Eight passes on who is above; AO2.3 says the seals broke and nobody has dealt wi
 Nine passes on one universe. T1.1 is answered: the universe restarts and you do not.
 - [ ] **K10.1** `v10` The cosmology is not identical in the next universe
 - [ ] **K10.2** `v10` What the godhead learned about you is the thing that carries
+
+- [ ] **K10.3** `v10` Lesser demons want things of their own and pursue them
+- [ ] **K10.4** `v10` The ascent and the descent are both fully playable
+- [ ] **K10.5** `v10` A god for each planet, the moon and the sun, in a broken sky
+- [ ] **K10.6** `v10` The seals are gone and every demon is observable
+- [ ] **K10.7** `v10` Every sigil is live and capturable
+- [ ] **K10.8** `v10` The godhead is at the top and it is fightable
+- [ ] **K10.9** `v10` It teaches, and the teaching is how it takes you
+- [ ] **K10.10** `v10` The tree charts which way you went
+- [ ] **K10.11** `v10` The pyramid charts who is above you
+- [ ] **K10.12** `v10` Siding with any of it is a real ending
+- [ ] **K10.13** `v10` Nothing in the cosmology is explained at you in prose
+- [ ] **K10.14** `v10` The satire lands on institutions, never on believers
+- [ ] **K10.15** `v10` The next universe does not have the same cosmology
 
 ## L — The Board
 The storyline and career as a conspiracy pin board rather than a quest list.
@@ -1110,6 +1242,20 @@ Nine passes making the Board the record. T1.1 says the universe restarts and you
 - [ ] **L10.1** `v10` The Board is what carries across a quantum restart
 - [ ] **L10.2** `v10` It is the save file, in the fiction and in fact
 
+- [ ] **L10.3** `v10` A string between two pins is a claim you are making
+- [ ] **L10.4** `v10` Publishing a theory has consequences when you are wrong
+- [ ] **L10.5** `v10` The canonical layer opens as real story beats land
+- [ ] **L10.6** `v10` The tree pins onto it
+- [ ] **L10.7** `v10` The pyramid pins onto it
+- [ ] **L10.8** `v10` Other people's claims pin onto it, including the agency's
+- [ ] **L10.9** `v10` Some of what is pinned is false and the game never says which
+- [ ] **L10.10** `v10` Other people keep boards and theirs disagree with yours
+- [ ] **L10.11** `v10` A board can be found, read, defaced or taken
+- [ ] **L10.12** `v10` It persists the way the ledger does
+- [ ] **L10.13** `v10` What you were wrong about stays pinned
+- [ ] **L10.14** `v10` It is the save file, in the fiction and in fact
+- [ ] **L10.15** `v10` It is what carries across the restart
+
 ## G7 — Exposure at the spawn
 
 Measured 2026-09-12 while chasing two near-black captures of Hunt Grounds.
@@ -1142,6 +1288,25 @@ and a shallow version is worse than none.
 - [ ] **H2.2** Losing it is written into world history
 
 ---
+
+
+### H v10 — the final pass
+The last rung. Fifteen statements that are true of somewhere of your own when this game is finished, each one an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **H10.1** `v10` A place you hold is a place on the map that other systems read
+- [ ] **H10.2** `v10` It accumulates what you leave in it
+- [ ] **H10.3** `v10` It can be raided, and the damage stays
+- [ ] **H10.4** `v10` It repairs over a month if somebody is holding it
+- [ ] **H10.5** `v10` The room with the bed and the mirror is the first one
+- [ ] **H10.6** `v10` The Board is on its wall
+- [ ] **H10.7** `v10` The cloud terminal is to the right of it
+- [ ] **H10.8** `v10` You can sleep, and sleeping moves the clock
+- [ ] **H10.9** `v10` What is stored there is really stored, not a menu
+- [ ] **H10.10** `v10` Somebody can be waiting in it when you come back
+- [ ] **H10.11** `v10` Holding it costs something ongoing
+- [ ] **H10.12** `v10` It is visible from outside and reads as yours
+- [ ] **H10.13** `v10` A second one changes how the first one works
+- [ ] **H10.14** `v10` Losing it is survivable and it hurts
+- [ ] **H10.15** `v10` It is the only thing in the game that looks like it is on your side
 
 ## I — The interface as its own medium
 
@@ -1341,6 +1506,20 @@ Nine passes designed in a lit room. C v4 made the device the main light source i
 - [ ] **I10.1** `v10` Every screen re-judged as the only light in a dark place
 - [ ] **I10.2** `v10` What the screen throws onto your hands is part of the design
 
+- [ ] **I10.3** `v10` Every screen is a physical object with a surface and a condition
+- [ ] **I10.4** `v10` Moving between pages is movement, never a cut
+- [ ] **I10.5** `v10` Everything in the world can be inspected with the same verbs
+- [ ] **I10.6** `v10` A screen is legible while you are being attacked
+- [ ] **I10.7** `v10` Screens are readable in the dark and lit by their own emission
+- [ ] **I10.8** `v10` The weapon customisation lives on the weapon
+- [ ] **I10.9** `v10` Damage to you damages the specific part of what you are reading
+- [ ] **I10.10** `v10` Nothing is clickable that does not look clickable
+- [ ] **I10.11** `v10` Every panel works on keyboard and on the pointer equally
+- [ ] **I10.12** `v10` The cursor exists on every screen that hides the OS one
+- [ ] **I10.13** `v10` A screen can lie, and the game does not correct it
+- [ ] **I10.14** `v10` Load is covered; there is no hard cut anywhere in the build
+- [ ] **I10.15** `v10` Somebody watching over your shoulder can follow what you are doing
+
 ## J — Infrastructure
 
 Unglamorous, and each one is currently costing real time.
@@ -1364,6 +1543,25 @@ Unglamorous, and each one is currently costing real time.
 - [x] ~~**J4.2** Progress bar that is telling the truth~~
 
 ---
+
+
+### J v10 — the final pass
+The last rung. Fifteen statements that are true of infrastructure when this game is finished, each one an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **J10.1** `v10` One region, one truth about where everything is
+- [ ] **J10.2** `v10` Nothing is simulated that nobody can observe, and nothing observable is faked
+- [ ] **J10.3** `v10` The record is the single source and every system reads it
+- [ ] **J10.4** `v10` Saving is safe across every migration the project has made
+- [ ] **J10.5** `v10` A scene change frees what it owns and nothing static outlives it
+- [ ] **J10.6** `v10` Every static registry is swept at the seam
+- [ ] **J10.7** `v10` Tests run headless and prove behaviour, not existence
+- [ ] **J10.8** `v10` Every capture test is a PNG somebody looked at
+- [ ] **J10.9** `v10` The frame budget is measured, not estimated
+- [ ] **J10.10** `v10` Nothing ships that only works in the editor
+- [ ] **J10.11** `v10` The build exports from a clean checkout with one command
+- [ ] **J10.12** `v10` Determinism where it matters, seeded randomness everywhere else
+- [ ] **J10.13** `v10` No system knows about a system above it
+- [ ] **J10.14** `v10` Every autoload earns its place or stops being one
+- [ ] **J10.15** `v10` A new contributor can find the thing they need in one search
 
 ## M — The camera is progression
 
@@ -1496,6 +1694,25 @@ existing to transition through.
 - [ ] **M3.2** The derby hands off to on-foot without a loading seam the player reads as one
 - [ ] **M3.3** The HUD survives every transition; a diegetic HUD cannot simply fade to a third-person one
 
+
+### M v10 — the final pass
+The last rung. Fifteen statements that are true of cameras and driving when this game is finished, each one an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **M10.1** `v10` First person is the default and third person is earned
+- [ ] **M10.2** `v10` The cab is a place you sit in, not a camera position
+- [ ] **M10.3** `v10` Every instrument is on the dashboard and none is in a screen corner
+- [ ] **M10.4** `v10` One hand steers and the other holds a gun, badly, on purpose
+- [ ] **M10.5** `v10` You shoot through your own windscreen and the glass keeps it
+- [ ] **M10.6** `v10` Getting out is something you watch happen
+- [ ] **M10.7** `v10` The derby is the escape from the facility, not a side mode
+- [ ] **M10.8** `v10` Every camera change is a move, never a cut
+- [ ] **M10.9** `v10` FOV is one pair of values the whole game agrees on
+- [ ] **M10.10** `v10` The camera answers the suspension without smoothing it away
+- [ ] **M10.11** `v10` A car is this world's horse: found, taken, hostile, abandoned
+- [ ] **M10.12** `v10` Damage to a car is visible from inside it and outside it
+- [ ] **M10.13** `v10` Bikes and scrap bikes run the same system
+- [ ] **M10.14** `v10` Nothing about driving is a separate game
+- [ ] **M10.15** `v10` The tunnel derby and the pit derby are one system in two places
+
 ## N — The vat, extended
 
 Greg, 2026-09-12: *"i love the current system of starting character creation
@@ -1564,6 +1781,25 @@ player, and it should be possible from hour one and quietly discouraged.
 - [ ] **N5.6** An empty slot is a real condition — the body works worse without what was in it
 - [ ] **N5.7** What you pull is a carried object with a lien on it, because it was never yours (B5.4)
 - [ ] **N5.8** Robbed and grown hardware fit the same slots — one vocabulary, per B2.1
+
+
+### N v10 — the final pass
+The last rung. Fifteen statements that are true of cybernetics when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **N10.1** `v10` Every slot on the body is real and locked until you open it
+- [ ] **N10.2** `v10` Opening one warns you properly and lets you do it anyway
+- [ ] **N10.3** `v10` Hardware is visible in the limb that carries it
+- [ ] **N10.4** `v10` A severed limb takes its hardware with it
+- [ ] **N10.5** `v10` Cybernetics change what movement is possible, not just numbers
+- [ ] **N10.6** `v10` Limbs that shoot and grapple run through the anatomy
+- [ ] **N10.7** `v10` A crystal ball in the arm or the pocket, and it works
+- [ ] **N10.8** `v10` Going too far is a state the world can see on you
+- [ ] **N10.9** `v10` The factory hardware you start with is real hardware
+- [ ] **N10.10** `v10` Every implant can be taken out by somebody else
+- [ ] **N10.11** `v10` Implants are worth money to the Choir and they know whose they were
+- [ ] **N10.12** `v10` Nothing installed is purely a stat
+- [ ] **N10.13** `v10` Body mods, piercings and tattoos share the system
+- [ ] **N10.14** `v10` A build far enough in one direction can answer a rocket with a blade
+- [ ] **N10.15** `v10` What you installed is what the mirror shows and the restart remembers
 
 ## O — Combat, reworked
 
@@ -1792,6 +2028,20 @@ Nine passes of a damage race, ending in a boss that must not be one. AQ1.6.
 - [ ] **O10.1** `v10` The godhead fight is not resolved by damage
 - [ ] **O10.2** `v10` Everything O built is present in it and none of it is sufficient
 
+- [ ] **O10.3** `v10` Mass and reach are the entire weapon balance
+- [ ] **O10.4** `v10` Hitstop is local to the two bodies in the exchange
+- [ ] **O10.5** `v10` Gore and chunks run on the exchange's clock, not the world's
+- [ ] **O10.6** `v10` A miss costs footing and a landed blow spends the swing
+- [ ] **O10.7** `v10` Guard has a direction and can be flanked
+- [ ] **O10.8** `v10` You can be disarmed and so can they
+- [ ] **O10.9** `v10` Bare hands, a shove and a grapple are one object with a different mass
+- [ ] **O10.10** `v10` Fatigue degrades the guard instead of announcing it
+- [ ] **O10.11** `v10` Demons, greys and reptilians fight through the same system
+- [ ] **O10.12** `v10` Losing is not dying, and the game means that
+- [ ] **O10.13** `v10` Every hit reaches the anatomy, never a hitbox
+- [ ] **O10.14** `v10` Nothing in combat is resolved on the frame a key went down
+- [ ] **O10.15** `v10` The godhead fight is not a damage race
+
 ## P — The demo
 
 Greg, 2026-09-12, twice, and the second time corrected the first:
@@ -1869,6 +2119,25 @@ the game's own voice, not a fade to a store page.
 - [ ] **P5.4** Controls learnable without a tutorial screen — I0 still applies
 - [ ] **P5.5** The last pass is playing it, not reading it
 
+
+### P v10 — the final pass
+The last rung. Fifteen statements that are true of the demo when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **P10.1** `v10` One build, two doors: PLAY and DEMO on the same menu
+- [ ] **P10.2** `v10` The demo is the real game with exploration locked off
+- [ ] **P10.3** `v10` Nothing in it is a special build that can rot
+- [ ] **P10.4** `v10` It ends because the game stops, not because a timer did
+- [ ] **P10.5** `v10` It shows the opening: captured, quiz, tortured, festival, derby, out
+- [ ] **P10.6** `v10` Combat, the handheld and the map are all fully present
+- [ ] **P10.7** `v10` It is playable without anybody explaining anything
+- [ ] **P10.8** `v10` It takes about thirty minutes and does not feel truncated
+- [ ] **P10.9** `v10` What it locks is content, never systems
+- [ ] **P10.10** `v10` A save from the demo opens in the full game
+- [ ] **P10.11** `v10` It is the thing Greg can hand somebody without being in the room
+- [ ] **P10.12** `v10` It exports and runs on a machine with no Godot on it
+- [ ] **P10.13** `v10` It is recorded and the recording is watchable
+- [ ] **P10.14** `v10` Every playtest note from it goes into the record
+- [ ] **P10.15** `v10` It is never the last thing built
+
 ## Q — The Wire, deeper
 
 Greg: *"the social media stalking aspect cyberharassing dming ect with an rng of
@@ -1886,6 +2155,25 @@ answer or do not, and whose willingness depends on who you are to them.
 - [x] **Q1.5** Harassment works and costs — it moves grudge, reach and exposure together — `act()`'s `"swarm"`, tested: grudge, exposure and reach all move on the same real event
 - [x] **Q1.6** The underbelly is reached by standing somewhere, as `signal_field.gd` already gates — `SIGNAL_UNDERBELLY`/band routing, tested: a terminal reaches him, the surface cannot
 
+
+### Q v10 — the final pass
+The last rung. Fifteen statements that are true of the Wire when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **Q10.1** `v10` Reach is decided by where you are standing
+- [ ] **Q10.2** `v10` A post is written by somebody who exists
+- [ ] **Q10.3** `v10` Accounts have tiers and a verified account answers less often
+- [ ] **Q10.4** `v10` Sites are places you can reach, not data nobody sees
+- [ ] **Q10.5** `v10` What is on it is often wrong and the game never corrects it
+- [ ] **Q10.6** `v10` Apps on it are playable and some are load-bearing
+- [ ] **Q10.7** `v10` The feed has spammers who can be cleared for money
+- [ ] **Q10.8** `v10` The agency reads what you read
+- [ ] **Q10.9** `v10` It goes down, and where it is down is a fact about the map
+- [ ] **Q10.10** `v10` Only the elites have it, and that is visible
+- [ ] **Q10.11** `v10` Somebody can be found on it and then found in the world
+- [ ] **Q10.12** `v10` It carries rumour, which is how the two records diverge
+- [ ] **Q10.13** `v10` A theory published on it changes what people believe
+- [ ] **Q10.14** `v10` It is on the handheld and nowhere else
+- [ ] **Q10.15** `v10` It remembers what you posted into the next universe
+
 ## R — Money
 
 The body economy exists in pieces: `carry.gd` prices a part, faction standing
@@ -1897,6 +2185,25 @@ ties it together into a reason to get up in the morning.
 - [x] **R1.3** Buyers with their own appetites, so a market is a set of people and not a price — `FACTION_APPETITES`: the Choir pays more for an organ, Vanity Row pays more for a cybernetic, drawn from what each faction already is rather than an invented preference table
 - [x] **R1.4** Debt you can be in, since `debt_to_player` already runs the other way — `borrow()`/`repay()`/`debt_to()`: real scrip added to the wallet against a real, named debt to a real faction; repaying is capped at what is actually owed and what is actually in the wallet
 - [x] **R1.5** Prices move with what the world has been through — `_market_glut()` reads real recent `carried_part_sold` history: the more of a kind that has actually sold, the less the next one is worth, specific to that kind rather than a global crash. Covered by `tests/money_test.gd` (16 checks)
+
+
+### R v10 — the final pass
+The last rung. Fifteen statements that are true of money when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **R10.1** `v10` Money is a real quantity with a real issuer
+- [ ] **R10.2** `v10` The bank writes the liens the Choir prices
+- [ ] **R10.3** `v10` A debt is secured against something of yours, named
+- [ ] **R10.4** `v10` Interest accrues in game time whether you play or not
+- [ ] **R10.5** `v10` A collector is a person with a body
+- [ ] **R10.6** `v10` Accounts are in a building you can walk into
+- [ ] **R10.7** `v10` Prices move with who you are to the seller
+- [ ] **R10.8** `v10` Organs are the collateral and that is the economy, not a metaphor
+- [ ] **R10.9** `v10` Robbery is possible and the damage stays
+- [ ] **R10.10** `v10` Jobs pay, and the job market is angels and demons hiring
+- [ ] **R10.11** `v10` Nothing is bought from a shop menu
+- [ ] **R10.12** `v10` You can be made worthless without being made poor
+- [ ] **R10.13** `v10` Somebody else's debts are findable and buyable
+- [ ] **R10.14** `v10` The satire lands on the paperwork, never on debtors
+- [ ] **R10.15** `v10` What you owed is what the next universe starts knowing
 
 ## S — Speech
 
@@ -1920,6 +2227,25 @@ ever been said into it.
 - [ ] **S2.4** Talking while holding somebody is its own register (feeds O5.4 and F7)
 - [ ] **S2.5** Decide the cost and the privacy of this honestly before it ships
 
+
+### S v10 — the final pass
+The last rung. Fifteen statements that are true of speech when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **S10.1** `v10` Nobody explains the cosmology at you
+- [ ] **S10.2** `v10` What somebody says comes from what they know
+- [ ] **S10.3** `v10` Lines survive the fiction rather than describing it
+- [ ] **S10.4** `v10` You can speak out loud and be heard by whoever is close
+- [ ] **S10.5** `v10` They answer in a voice positioned where their head is
+- [ ] **S10.6** `v10` Talking while holding somebody is its own register
+- [ ] **S10.7** `v10` Voice acting for the godhead and the handler
+- [ ] **S10.8** `v10` Nothing is a response table
+- [ ] **S10.9** `v10` Silence is an answer somebody can give
+- [ ] **S10.10** `v10` Dialogue is never a wall of options
+- [ ] **S10.11** `v10` What you said is recorded and can be repeated back
+- [ ] **S10.12** `v10` A conversation can be overheard
+- [ ] **S10.13** `v10` Language degrades with injury
+- [ ] **S10.14** `v10` Somebody can refuse to speak to you forever
+- [ ] **S10.15** `v10` The privacy and cost of proximity voice are settled honestly before it ships
+
 ## T — The run
 
 The open question that has been sitting unanswered longest: *"what persists
@@ -1931,6 +2257,25 @@ pillar. They pull against each other and the game cannot have both untouched.
 - [ ] **T1.3** Something inherits: a body, a debt, a reputation, a wall of pins (waits on T1.1)
 - [ ] **T1.4** What the world keeps is visible to the player before they risk it (waits on T1.1)
 - [ ] **T1.5** A run has a shape — it starts, it escalates, it ends (waits on T1.1)
+
+
+### T v10 — the final pass
+The last rung. Fifteen statements that are true of death and what persists when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **T10.1** `v10` Death is an event in the world, never a reload
+- [ ] **T10.2** `v10` The universe restarts and you do not
+- [ ] **T10.3** `v10` Nothing carries in the save-file sense
+- [ ] **T10.4** `v10` What is different about the next world is what you did in the last one
+- [ ] **T10.5** `v10` The Board is the continuous thing
+- [ ] **T10.6** `v10` The godhead remembers you across the restart
+- [ ] **T10.7** `v10` A permanent death is recorded richly enough to be inherited from
+- [ ] **T10.8** `v10` Somebody inherits a body, a debt, a reputation or a wall of pins
+- [ ] **T10.9** `v10` Quantum immortality is explained by the game rather than to the player
+- [ ] **T10.10** `v10` New game plus is a real different game
+- [ ] **T10.11** `v10` Dying is survivable for you and not for anybody else
+- [ ] **T10.12** `v10` The gods give a verdict on a kill and they disagree
+- [ ] **T10.13** `v10` SOUL FREED and CYCLICIST ENSLAVEMENT AGAIN are opinions, not a score
+- [ ] **T10.14** `v10` Nothing adds those verdicts up
+- [ ] **T10.15** `v10` The restart is an ending you can choose to refuse
 
 ## U — Your own ladder
 
@@ -1944,6 +2289,25 @@ that already exist. This is the third one, which is yours.
 - [x] **U1.4** It can be attacked, and it can lose people — `lose_member()` records the real reason (killed, walked away, whatever it was) rather than a silent disappearance, and actually drops them from the roster. The "attacked" half is combat wiring, not attempted here
 - [ ] **U1.5** Rank inside it is somebody else's problem too — they have opinions (needs members with individual reactions to rank changes — not attempted here). Covered in `tests/player_faction_test.gd` (19 checks)
 
+
+### U v10 — the final pass
+The last rung. Fifteen statements that are true of your own faction when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **U10.1** `v10` The player's faction is built from real state, not a menu
+- [ ] **U10.2** `v10` It has a founder, a crown, and a rank ladder like the others
+- [ ] **U10.3** `v10` It sits on the pyramid at its actual power
+- [ ] **U10.4** `v10` People join it because of something that happened
+- [ ] **U10.5** `v10` It can refuse to sell to somebody
+- [ ] **U10.6** `v10` It keeps its own record and its record can be wrong
+- [ ] **U10.7** `v10` It holds land and the land shows it
+- [ ] **U10.8** `v10` It can be raided and it can raid
+- [ ] **U10.9** `v10` It survives you being away
+- [ ] **U10.10** `v10` Somebody in it can take it from you
+- [ ] **U10.11** `v10` It can side with the ascent, the descent, or neither
+- [ ] **U10.12** `v10` Its standing is visible on its members' bodies
+- [ ] **U10.13** `v10` It can collapse and its holdings go somewhere
+- [ ] **U10.14** `v10` It appears on other factions' boards as a theory
+- [ ] **U10.15** `v10` It is the thing the next universe finds already there
+
 ## V — The road
 
 M2b covers cars as this world's horses. This is everything else about them
@@ -1955,6 +2319,25 @@ being vehicles rather than set pieces.
 - [ ] **V1.4** Cars can be repaired, badly
 - [ ] **V1.5** Somebody else is driving one too, outside the derby
 
+
+### V v10 — the final pass
+The last rung. Fifteen statements that are true of the road when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **V10.1** `v10` A car is found, taken, and hostile until it is not
+- [ ] **V10.2** `v10` Every vehicle is the same chassis system
+- [ ] **V10.3** `v10` Damage is physical, visible, and stays
+- [ ] **V10.4** `v10` E gets you out, and getting out is watched
+- [ ] **V10.5** `v10` Cars are scattered and randomised rather than parked for you
+- [ ] **V10.6** `v10` Running somebody over is the anatomy, not a script
+- [ ] **V10.7** `v10` An engine can catch, and a catching car is a bomb with a timer
+- [ ] **V10.8** `v10` Bikes, scrap bikes and skiffs share it
+- [ ] **V10.9** `v10` Fuel, or whatever this world burns, is real
+- [ ] **V10.10** `v10` A wreck stays a wreck and becomes scenery
+- [ ] **V10.11** `v10` Driving at night needs the lights you have
+- [ ] **V10.12** `v10` The tunnels are drivable
+- [ ] **V10.13** `v10` Nothing about a car is a separate minigame
+- [ ] **V10.14** `v10` Somebody else can be driving it
+- [ ] **V10.15** `v10` The car you left somewhere is where you left it
+
 ## W — Weather and the hour
 
 The Expanse has one lighting state, one fog density and no clock. `WorldLook`
@@ -1965,6 +2348,25 @@ already switches presets by place; nothing switches by time.
 - [ ] **W1.3** Being caught out in it costs something
 - [ ] **W1.4** Factions keep hours; the Wire is busier at some of them
 - [ ] **W1.5** G7's exposure problem is a lighting *state* rather than a constant
+
+
+### W v10 — the final pass
+The last rung. Fifteen statements that are true of weather and the hour when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **W10.1** `v10` One clock, wound in one place, read by everything
+- [ ] **W10.2** `v10` Light warps at night rather than dimming
+- [ ] **W10.3** `v10` Storm severity is a readout of how much magick is loose
+- [ ] **W10.4** `v10` Anvil crawlers, and red lightning that means something
+- [ ] **W10.5** `v10` Contamination has weather that moves and settles
+- [ ] **W10.6** `v10` Being caught out in it costs something
+- [ ] **W10.7** `v10` Factions keep hours and the Wire is busier at some
+- [ ] **W10.8** `v10` Stations keep schedules
+- [ ] **W10.9** `v10` Hauntings happen at night and are not permanent
+- [ ] **W10.10** `v10` The gods are visible at their hours
+- [ ] **W10.11** `v10` A month passes and things repair
+- [ ] **W10.12** `v10` Sleeping moves the clock and something can wake you
+- [ ] **W10.13** `v10` Weather is audible before it is visible
+- [ ] **W10.14** `v10` Nothing in the game keeps a second clock
+- [ ] **W10.15** `v10` The hour is legible without a clock on screen
 
 ## X — Performance
 
@@ -1978,6 +2380,25 @@ pay.
 - [ ] **X1.4** Bodies are the expensive thing — measure before optimising them
 - [ ] **X1.5** It has to hold up on a machine that is not Greg's
 
+
+### X v10 — the final pass
+The last rung. Fifteen statements that are true of performance when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **X10.1** `v10` The frame budget is measured every build, never estimated
+- [ ] **X10.2** `v10` A panel costs less than the game it is drawn over
+- [ ] **X10.3** `v10` Nothing iterates the world when it could iterate the screen
+- [ ] **X10.4** `v10` Static registries are swept at every seam
+- [ ] **X10.5** `v10` Gore, brass and debris are capped and recycled
+- [ ] **X10.6** `v10` Every subviewport renders only when somebody is looking
+- [ ] **X10.7** `v10` The region streams rather than existing all at once
+- [ ] **X10.8** `v10` Crowds are cheap enough to be crowds
+- [ ] **X10.9** `v10` No shader costs more than it earns
+- [ ] **X10.10** `v10` Load is covered and covered loads are not idle
+- [ ] **X10.11** `v10` A profile run is part of the test suite
+- [ ] **X10.12** `v10` It holds sixty on the machine Greg actually has
+- [ ] **X10.13** `v10` It degrades gracefully rather than stuttering
+- [ ] **X10.14** `v10` Nothing is optimised before it is measured
+- [ ] **X10.15** `v10` The build that ships is the build that was profiled
+
 ## Y — Getting in
 
 The game currently assumes a player who already knows what it is. It has no
@@ -1988,6 +2409,25 @@ options a person would actually reach for and no way in that is not "start".
 - [ ] **Y1.3** Text is legible at a normal viewing distance — the stencil is not free
 - [ ] **Y1.4** Colour is not the only carrier of meaning anywhere
 - [ ] **Y1.5** Somebody can put it down and come back a week later
+
+
+### Y v10 — the final pass
+The last rung. Fifteen statements that are true of getting in when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **Y10.1** `v10` The menu is a place, not a list
+- [ ] **Y10.2** `v10` PLAY and DEMO are the two doors
+- [ ] **Y10.3** `v10` Settings are reachable and every control does something
+- [ ] **Y10.4** `v10` A new player is playing within a minute
+- [ ] **Y10.5** `v10` Nothing is explained that could be shown
+- [ ] **Y10.6** `v10` The first thing you see is the register of the whole game
+- [ ] **Y10.7** `v10` Controls are discoverable in the world (AH)
+- [ ] **Y10.8** `v10` The screen setting is restored at startup
+- [ ] **Y10.9** `v10` A save is loaded without a menu about saves
+- [ ] **Y10.10** `v10` World seed creation at the start, Terraria style
+- [ ] **Y10.11** `v10` Quitting is possible from anywhere
+- [ ] **Y10.12** `v10` Nothing in the first five minutes is a tutorial box
+- [ ] **Y10.13** `v10` It works on a fresh machine with no setup
+- [ ] **Y10.14** `v10` It never opens on an error
+- [ ] **Y10.15** `v10` The title is the last thing changed and it is right
 
 ## Z — Shipping
 
@@ -2041,6 +2481,25 @@ The candidate mechanics, from what is already built:
 - **The camera** — progression expressed as what you are allowed to see.
 - **Signal** — where you are standing deciding what you can reach.
 
+
+### Z v10 — the final pass
+The last rung. Fifteen statements that are true of shipping when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **Z10.1** `v10` One command produces a build from a clean checkout
+- [ ] **Z10.2** `v10` The export includes every asset it needs and nothing it does not
+- [ ] **Z10.3** `v10` It runs on a machine that has never had Godot on it
+- [ ] **Z10.4** `v10` A friend can download it and play without instructions
+- [ ] **Z10.5** `v10` The repo has a readable history somebody outside can follow
+- [ ] **Z10.6** `v10` CHANGES.md is generated and cannot go stale
+- [ ] **Z10.7** `v10` The checklist is published and current
+- [ ] **Z10.8** `v10` Saves survive an update
+- [ ] **Z10.9** `v10` A crash is reported with enough to find it
+- [ ] **Z10.10** `v10` Nothing ships that only one machine can build
+- [ ] **Z10.11** `v10` Licences for everything used are recorded
+- [ ] **Z10.12** `v10` The build is versioned and the version is visible in game
+- [ ] **Z10.13** `v10` There is a way to get a playtester's feedback into the record
+- [ ] **Z10.14** `v10` Nothing in the build is a placeholder that was forgotten
+- [ ] **Z10.15** `v10` It is small enough to send somebody
+
 ## AA — The land takes a side
 
 Greg, 2026-09-12: *"walking around it is like cleaning a massive window,
@@ -2090,6 +2549,25 @@ in; nothing has ever asked the player to *use* them on a map.
 - [ ] **AA4.3** The Board can pin a holding, so a theory can be about land
 - [ ] **AA4.4** An ending can be reached through the map rather than through a person
 
+
+### AA v10 — the final pass
+The last rung. Fifteen statements that are true of the land taking a side when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AA10.1** `v10` Every holding belongs to somebody and the map shows it
+- [ ] **AA10.2** `v10` Giving one to the ascent or to corruption is a real, costly act
+- [ ] **AA10.3** `v10` The colour of the region changes with who holds it
+- [ ] **AA10.4** `v10` Weather quality degrades where corruption holds
+- [ ] **AA10.5** `v10` Towns are destroyed by the choice, not by a cutscene
+- [ ] **AA10.6** `v10` A holding remembers who gave it away
+- [ ] **AA10.7** `v10` Holdings can be taken back and it is harder the second time
+- [ ] **AA10.8** `v10` Nobody holding a place means nobody repairs it
+- [ ] **AA10.9** `v10` Exploration is what reveals a holding's real state
+- [ ] **AA10.10** `v10` The satellite sees it and the agency has opinions
+- [ ] **AA10.11** `v10` Factions move on the pyramid as holdings change hands
+- [ ] **AA10.12** `v10` The Board can pin a holding to a faction to a person
+- [ ] **AA10.13** `v10` A holding generates work: jobs, raids, collections
+- [ ] **AA10.14** `v10` Every land decision is visible from a distance
+- [ ] **AA10.15** `v10` The distribution of holdings is what the next universe inherits
+
 ## AB — Destruction
 
 Greg: *"a system like Teardown could be next level for destruction physics and
@@ -2137,6 +2615,25 @@ AB and AA the same system: you break a holding to take it.
 - [ ] **AB3.4** The damage stays and the holding remembers who did it (AB2, AA2.4)
 - [ ] **AB3.5** Somebody raids you back — H1 gives the player a place to lose
 
+
+### AB v10 — the final pass
+The last rung. Fifteen statements that are true of destruction when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AB10.1** `v10` Everything breakable has a condition the world can read
+- [ ] **AB10.2** `v10` Damage is recorded against the place, in the record
+- [ ] **AB10.3** `v10` Asking how wrecked a street is costs nothing
+- [ ] **AB10.4** `v10` Repair happens over a month of game time
+- [ ] **AB10.5** `v10` Who repairs it is somebody, and they can be prevented
+- [ ] **AB10.6** `v10` Dents and smashes are the common case; collapse is rare
+- [ ] **AB10.7** `v10` A raid is entering a place against resistance for something specific
+- [ ] **AB10.8** `v10` Breaking in is a route: doors, walls, roofs, whatever gives
+- [ ] **AB10.9** `v10` What you take is carried, priced and traceable
+- [ ] **AB10.10** `v10` The holding remembers who did it
+- [ ] **AB10.11** `v10` Somebody raids you back
+- [ ] **AB10.12** `v10` Bullets contribute to the same ledger as explosions
+- [ ] **AB10.13** `v10` Destruction is visible from the satellite
+- [ ] **AB10.14** `v10` Nothing is indestructible for engineering reasons only
+- [ ] **AB10.15** `v10` A month later the world shows what happened and what got fixed
+
 ## AC — Fluid, weather and fire
 
 Greg: *"if water, rain, weather, lightning etc environments wherever possibly
@@ -2159,6 +2656,25 @@ a real decision, not a formality.
 - [ ] **AC1.7** Explosions move things, break things and hurt bodies through one path
 - [ ] **AC1.8** An engine can catch, and a car that catches is a bomb with a timer
 
+
+### AC v10 — the final pass
+The last rung. Fifteen statements that are true of fluid, weather and fire when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AC10.1** `v10` The decision about simulated versus painted fluid is made and honoured
+- [ ] **AC10.2** `v10` Whatever exists is recorded rather than decorative
+- [ ] **AC10.3** `v10` Rain wets surfaces and pools where the ground dips
+- [ ] **AC10.4** `v10` Blood joins the same system
+- [ ] **AC10.5** `v10` Lightning is a real light and a real sound
+- [ ] **AC10.6** `v10` Anvil crawlers cross the underside of the storm
+- [ ] **AC10.7** `v10` Fire spreads on what burns and stops on what does not
+- [ ] **AC10.8** `v10` Explosions move, break and wound through one path
+- [ ] **AC10.9** `v10` An engine can catch and become a bomb with a timer
+- [ ] **AC10.10** `v10` Water underground behaves differently to water above it
+- [ ] **AC10.11** `v10` Contamination travels in the air and settles
+- [ ] **AC10.12** `v10` Nothing here costs more than it is worth
+- [ ] **AC10.13** `v10` It reads correctly at night under one light source
+- [ ] **AC10.14** `v10` Storm severity comes from the chaos-magick level
+- [ ] **AC10.15** `v10` A flooded place stays flooded until something changes it
+
 ## AF — Guns, properly
 
 Greg, 2026-09-12: *"i have to make the combat system a part of the gun system and
@@ -2179,6 +2695,25 @@ travels, hits something and leaves a mark on it.
 - [x] **AF1.6** Calibre means something — muzzle velocity, grain and drag per calibre, and drag proportional to speed squared, so buckshot keeps 93.7% of its speed where a slug keeps 97.1% over the same flight. A shotgun stops being a shotgun at range without anybody writing a falloff curve
 - [ ] **AF1.7** It reads through the anatomy already built: a round finds a zone, not a hitbox
 - [ ] **AF1.8** Firing from a car is the same system (M2.3)
+
+
+### AF v10 — the final pass
+The last rung. Fifteen statements that are true of guns when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AF10.1** `v10` A round travels, drops, slows and cannot tunnel
+- [ ] **AF10.2** `v10` It leaves damage on whatever it reaches
+- [ ] **AF10.3** `v10` Casings eject, bounce, land and stay
+- [ ] **AF10.4** `v10` Reloading is physical: the magazine leaves and another arrives
+- [ ] **AF10.5** `v10` A dropped half-full magazine is half-full when you pick it up
+- [ ] **AF10.6** `v10` Calibre decides what happens to a body and to a wall
+- [ ] **AF10.7** `v10` A round finds a zone, never a hitbox
+- [ ] **AF10.8** `v10` Firing from a car is the same system
+- [ ] **AF10.9** `v10` A gun is inspectable in full
+- [ ] **AF10.10** `v10` Weapon customisation lives on the weapon
+- [ ] **AF10.11** `v10` A gun carries momentum and swivels toward where you look
+- [ ] **AF10.12** `v10` Jams, wear and condition are real
+- [ ] **AF10.13** `v10` The floor of a firefight can be read afterwards
+- [ ] **AF10.14** `v10` Nothing about firing is resolved on the frame the trigger went down
+- [ ] **AF10.15** `v10` A gun can be taken from you
 
 ## AD — Movement, and being in first person
 
@@ -2219,6 +2754,25 @@ able to answer a rocket with a blade, and the game should let it.
 - [ ] **AD3.4** Absurd answers are allowed when the build earned them
 - [ ] **AD3.5** Original to this game: the reference is the feeling, never the implementation
 
+
+### AD v10 — the final pass
+The last rung. Fifteen statements that are true of movement and first person when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AD10.1** `v10` Jumping is worth doing and the landing reads
+- [ ] **AD10.2** `v10` Waist-high things stop being walls
+- [ ] **AD10.3** `v10` Wall running is earned the way third person is
+- [ ] **AD10.4** `v10` Climbing a building is a route, not a cutscene
+- [ ] **AD10.5** `v10` Momentum carries between moves as one motion
+- [ ] **AD10.6** `v10` A broken leg cannot vault
+- [ ] **AD10.7** `v10` Crouching, sprinting and sliding are one continuous system
+- [ ] **AD10.8** `v10` The HUD is the hands, the weapon, the handheld and the glass
+- [ ] **AD10.9** `v10` Nothing floats in a corner that could sit on an object
+- [ ] **AD10.10** `v10` Affordances say what you can do right now
+- [ ] **AD10.11** `v10` It survives the change to third person without dissolving
+- [ ] **AD10.12** `v10` It is readable while moving, which is when it is needed
+- [ ] **AD10.13** `v10` Cybernetics change what movement is possible
+- [ ] **AD10.14** `v10` A projectile is a physical thing that can be met
+- [ ] **AD10.15** `v10` A melee build can close on a launcher and live
+
 ## AE — Sneaking, assassination and the law
 
 Greg: *"assassination, executing and sneaking systems with the hostile and law
@@ -2235,6 +2789,25 @@ arrest anybody.
 - [ ] **AE1.6** Karma is an axis, not a score — the law reads position, not "evil"
 - [ ] **AE1.7** Being hunted by the law is the Hunt System pointed back at you (F)
 
+
+
+### AE v10 — the final pass
+The last rung. Fifteen statements that are true of sneaking and the law when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AE10.1** `v10` Unseen is a real state with real inputs
+- [ ] **AE10.2** `v10` Light, noise, cover and distance all feed it
+- [ ] **AE10.3** `v10` The handheld's glow is the commonest thing that gives you away
+- [ ] **AE10.4** `v10` An unseen kill differs mechanically and in the record
+- [ ] **AE10.5** `v10` Assassination is reaching somebody who does not know you are there
+- [ ] **AE10.6** `v10` Law figures respond to what was actually witnessed
+- [ ] **AE10.7** `v10` Punishment is local and the holding sends them
+- [ ] **AE10.8** `v10` Karma is an axis, not a score
+- [ ] **AE10.9** `v10` Being hunted by the law is the Hunt System pointed at you
+- [ ] **AE10.10** `v10` Witnesses can be wrong, bought or silenced
+- [ ] **AE10.11** `v10` The tunnels are where the satellite cannot see you
+- [ ] **AE10.12** `v10` A crime has a jurisdiction and jurisdictions end
+- [ ] **AE10.13** `v10` You can be arrested rather than killed
+- [ ] **AE10.14** `v10` Standing with a faction changes what the law does
+- [ ] **AE10.15** `v10` What you were wanted for carries into the next universe
 
 ## AG — Playtest, 12 September 2026
 
@@ -2285,6 +2858,25 @@ game.
 - [ ] **AG3.4** You can shoot through your own windscreen, and the glass keeps the holes
 - [ ] **AG3.5** Nothing in the derby says what any key does - the first thing AH has to fix
 
+
+### AG v10 — the final pass
+The last rung. Fifteen statements that are true of the playtest record when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AG10.1** `v10` Every playtester note is in the record with their words
+- [ ] **AG10.2** `v10` Nothing reported is closed without being reproduced
+- [ ] **AG10.3** `v10` A fix names the cause, not the symptom
+- [ ] **AG10.4** `v10` A bug that could not be reproduced says so
+- [ ] **AG10.5** `v10` Playtests happen on the exported build, not in the editor
+- [ ] **AG10.6** `v10` The build a tester played is recoverable
+- [ ] **AG10.7** `v10` Their confusion is treated as a design fault
+- [ ] **AG10.8** `v10` What they liked is written down so it is not broken
+- [ ] **AG10.9** `v10` Controls they could not find become AH nodes
+- [ ] **AG10.10** `v10` A regression that a test would have caught gets a test
+- [ ] **AG10.11** `v10` The second playtest is compared to the first
+- [ ] **AG10.12** `v10` Somebody who has never seen it plays it every milestone
+- [ ] **AG10.13** `v10` Their save is kept
+- [ ] **AG10.14** `v10` Nothing is dismissed as user error
+- [ ] **AG10.15** `v10` The record of playtests is public in the build sheet
+
 ## AH — The Cloud, and the room you remember it from
 
 Greg: *"the black mirror is crazy... i want you to make it a room on the phone
@@ -2330,6 +2922,25 @@ little video with a description + it shows the controls"*.
 - [ ] **AH3.7** A locked node shows static and the shape of what is missing
 - [ ] **AH3.8** Every mechanic in the game has a node, including ones you have not met
 
+
+### AH v10 — the final pass
+The last rung. Fifteen statements that are true of the room and the cloud when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AH10.1** `v10` Opening the Board puts you in a room
+- [ ] **AH10.2** `v10` A bed, a wall-sized mirror, one window's light
+- [ ] **AH10.3** `v10` The Board is on the wall and you turn to it
+- [ ] **AH10.4** `v10` The cloud terminal is to your right
+- [ ] **AH10.5** `v10` The mirror shows your body, current, with everything done to it
+- [ ] **AH10.6** `v10` The room accumulates what you leave in it
+- [ ] **AH10.7** `v10` Leaving is a movement, not a menu close
+- [ ] **AH10.8** `v10` The cloud is an archive in fragments
+- [ ] **AH10.9** `v10` A fragment is repaired, not unlocked
+- [ ] **AH10.10** `v10` Repairing costs something you actually have
+- [ ] **AH10.11** `v10` What you recover is a mechanic explained, not lore
+- [ ] **AH10.12** `v10` The archive is visibly incomplete forever
+- [ ] **AH10.13** `v10` Each node is a curved CRT playing the mechanic as a drawn loop
+- [ ] **AH10.14** `v10` Under it: a paragraph in the game's voice, and the keys
+- [ ] **AH10.15** `v10` A locked node shows static and the shape of what is missing
+
 ## AI — The pyramid, and what is under it
 
 Greg sent three reference charts - the occult hierarchy pyramid, *Hierarchy of
@@ -2359,6 +2970,25 @@ the two cones. The player stands at the waist, where they touch.
 - [ ] **AI2.4** The Board's theories pin onto the pyramid - the two charts are one document
 - [ ] **AI2.5** Satire aims at institutions and never at congregations
 - [ ] **AI2.6** Marginalia in the corners, the way the references carry it
+
+
+### AI v10 — the final pass
+The last rung. Fifteen statements that are true of the pyramid when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AI10.1** `v10` Two pyramids meeting at a point, upright above and inverted below
+- [ ] **AI10.2** `v10` The waist is where you are and it is the only tier you occupy
+- [ ] **AI10.3** `v10` Tiers are strata with real edges, not indentation
+- [ ] **AI10.4** `v10` The upper cone is the ascent and what it demands
+- [ ] **AI10.5** `v10` The lower cone is corruption and what it is owed
+- [ ] **AI10.6** `v10` Density carries meaning: the base is crowded, the apex is one thing
+- [ ] **AI10.7** `v10` Legible at a glance and rewarding an hour
+- [ ] **AI10.8** `v10` Every tier is populated from the record, never authored
+- [ ] **AI10.9** `v10` Factions sit at their real power and they move
+- [ ] **AI10.10** `v10` Your own position is computed and it changes
+- [ ] **AI10.11** `v10` The Board's theories pin onto it
+- [ ] **AI10.12** `v10` The tree sits beside it, charting which way you went
+- [ ] **AI10.13** `v10` Marginalia in the corners the way the references carry it
+- [ ] **AI10.14** `v10` Satire aims at institutions and never at congregations
+- [ ] **AI10.15** `v10` It takes its density from the charts and never their payload
 
 ## AJ — Chaos magick, v2
 
@@ -2433,6 +3063,25 @@ as such, and a different god will read the same kill the other way.
 - [ ] **AJ5.6** Freeing souls and enslaving them both have consequences, and they are different ones — not built: a verdict is currently read-only, with no differentiated mechanical effect on the world yet
 - [x] **AJ5.7** It is recorded in WorldHistory, so the Board can pin it and the pyramid can read it — one `death_verdict` event per god's opinion. Covered by `tests/modern_gods_test.gd` (19 checks)
 
+
+### AJ v10 — the final pass
+The last rung. Fifteen statements that are true of chaos magick when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AJ10.1** `v10` State an intent in your own words
+- [ ] **AJ10.2** `v10` Watch the letters strip and condense into a glyph
+- [ ] **AJ10.3** `v10` The same words always make the same sigil
+- [ ] **AJ10.4** `v10` Charging costs blood, stamina, a drug or a death
+- [ ] **AJ10.5** `v10` Forgetting is mechanical: a sigil you keep looking at does not fire
+- [ ] **AJ10.6** `v10` It goes into the world as an object
+- [ ] **AJ10.7** `v10` Effects come from the intent parsed, never a spell list
+- [ ] **AJ10.8** `v10` A failed sigil leaves something behind
+- [ ] **AJ10.9** `v10` A glyph gets stronger the more it has worked
+- [ ] **AJ10.10** `v10` Other people's sigils can be read, defaced or stolen
+- [ ] **AJ10.11** `v10` Corruption is charging more than you can carry
+- [ ] **AJ10.12** `v10` The gods of this world are what is actually worshipped
+- [ ] **AJ10.13** `v10` Naming one gets its attention, which is not always wanted
+- [ ] **AJ10.14** `v10` Every system in the game is reachable through a sigil, badly
+- [ ] **AJ10.15** `v10` The system surprises its own author
+
 ## AM — The build sheet becomes the map
 
 Greg: *"this all links back to updating checklist ui and making a massive
@@ -2456,6 +3105,25 @@ to, the in-game one for the player.
 - [ ] **AM1.6** Hand fighting, weapons and shooting get the same
 - [ ] **AM1.7** It reads as a tutorial somebody could learn the game from
 - [ ] **AM1.8** Generated from CHECKLIST.md, so it cannot go stale
+
+
+### AM v10 — the final pass
+The last rung. Fifteen statements that are true of the build sheet when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AM10.1** `v10` The sheet is a hierarchy, not a list of sections
+- [ ] **AM10.2** `v10` The same double-pyramid shape the game's own chart uses
+- [ ] **AM10.3** `v10` Every mechanic shows its controls
+- [ ] **AM10.4** `v10` Visual examples rather than descriptions of visual examples
+- [ ] **AM10.5** `v10` Movement gets real depth: crouch, sprint, slide, vault, wall run
+- [ ] **AM10.6** `v10` Hand fighting, weapons and shooting get the same
+- [ ] **AM10.7** `v10` It reads as something somebody could learn the game from
+- [ ] **AM10.8** `v10` Generated from the checklist so it cannot go stale
+- [ ] **AM10.9** `v10` The version ladder is visible and switchable
+- [ ] **AM10.10** `v10` It is dark, stylised and unmistakably this game
+- [ ] **AM10.11** `v10` It works on a phone
+- [ ] **AM10.12** `v10` It can be sent to somebody with no context
+- [ ] **AM10.13** `v10` It shows what is done and what is not, honestly
+- [ ] **AM10.14** `v10` It is republished whenever the checklist moves
+- [ ] **AM10.15** `v10` It and the in-game chart never disagree
 
 ## AN — The body is the weapon
 
@@ -2501,6 +3169,25 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
 - [ ] **AN2.3** Hitting armour, bone or a wall answers differently through `strike()`
 - [ ] **AN2.4** The weapon's own condition rides on the same object — a bent blade swings wrong
 - [ ] **AN2.5** Two-handing changes the numbers, not just the pose
+
+
+### AN v10 — the final pass
+The last rung. Fifteen statements that are true of the body as the weapon when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AN10.1** `v10` The weapon is a mass on the end of an arm
+- [ ] **AN10.2** `v10` Where you point is where the anchor goes
+- [ ] **AN10.3** `v10` Turning throws it, and heavier throws further
+- [ ] **AN10.4** `v10` Damage asks what the head was actually doing
+- [ ] **AN10.5** `v10` A flick and a committed sweep differ by an order of magnitude
+- [ ] **AN10.6** `v10` Mass and reach are the whole balance conversation
+- [ ] **AN10.7** `v10` Fatigue degrades the guard rather than announcing it
+- [ ] **AN10.8** `v10` Firearms run through the same object
+- [ ] **AN10.9** `v10` A grapple, a shove and a bare hand share it
+- [ ] **AN10.10** `v10` You can be disarmed
+- [ ] **AN10.11** `v10` Armour, bone and wall each answer differently
+- [ ] **AN10.12** `v10` The weapon's condition rides on the same object
+- [ ] **AN10.13** `v10` Two-handing changes numbers, not pose
+- [ ] **AN10.14** `v10` Walking into a blow counts toward it
+- [ ] **AN10.15** `v10` The old swing system is gone because this one is better
 
 ## AO — The world as it fell
 
@@ -2555,6 +3242,25 @@ play.**
 - [ ] **AO4.5** Reptilians, greys and other occult races as real factions
 - [ ] **AO4.6** Elites have the Wire and the nemesis system; nobody else does
 
+
+### AO v10 — the final pass
+The last rung. Fifteen statements that are true of the world as it fell when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AO10.1** `v10` The fake war is in the world as evidence, never exposition
+- [ ] **AO10.2** `v10` Both records exist and neither is confirmed
+- [ ] **AO10.3** `v10` Radiation is real wherever the testing was
+- [ ] **AO10.4** `v10` Crisis-actor footage is findable
+- [ ] **AO10.5** `v10` Earth reads as an industry and prison planet in what is standing
+- [ ] **AO10.6** `v10` The firmament is visibly broken
+- [ ] **AO10.7** `v10` A god for each planet, the moon and the sun, at their hours
+- [ ] **AO10.8** `v10` Every demon is observable because the seals are gone
+- [ ] **AO10.9** `v10` Every sigil is live and capturable
+- [ ] **AO10.10** `v10` Night is genuinely different, not day with a filter
+- [ ] **AO10.11** `v10` The tunnels are urbex, overgrown, and full of what the military became
+- [ ] **AO10.12** `v10` Authority is never help and calling it makes things worse
+- [ ] **AO10.13** `v10` Villages, cities and bandit camps fight back aggressively
+- [ ] **AO10.14** `v10` Reptilians, greys and other races are real factions
+- [ ] **AO10.15** `v10` Only the elites have the Wire, and that is visible
+
 ## AP — The captured spirit
 
 Greg: *"you start as a captured spirit in the government facility underground, to
@@ -2594,6 +3300,25 @@ guides you through 'wizard eyes'"*, Adventure Time's Ice King as a mechanic.
 - [ ] **AP3.4** What it shows is real and the world acts on it afterwards
 - [ ] **AP3.5** The logo becomes the Adventure Time finger symbol, designed as a sigil
 
+
+### AP v10 — the final pass
+The last rung. Fifteen statements that are true of the captured spirit when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AP10.1** `v10` You start captured, underground, as meat and scrap
+- [ ] **AP10.2** `v10` The quiz matters mystically
+- [ ] **AP10.3** `v10` The torture is revealed across the game rather than shown at the start
+- [ ] **AP10.4** `v10` The gore festival is genuine slabs of pressed meat
+- [ ] **AP10.5** `v10` The tunnel derby is how you get out
+- [ ] **AP10.6** `v10` You choose what happens to the lands afterwards
+- [ ] **AP10.7** `v10` The spirit cannot be banished by violence and the game proves it early
+- [ ] **AP10.8** `v10` The flame melts the frame, as a shader
+- [ ] **AP10.9** `v10` Being unkillable is a problem the institution acts on
+- [ ] **AP10.10** `v10` Elites cannot really die either, which is why there are jobs
+- [ ] **AP10.11** `v10` Blood, rust and scrap hide an element you work out later
+- [ ] **AP10.12** `v10` Wizard eyes are a glimpse, not a mode
+- [ ] **AP10.13** `v10` What they show is real and the world acts on it after
+- [ ] **AP10.14** `v10` The logo is the finger symbol, designed as a sigil
+- [ ] **AP10.15** `v10` Digestible segment to segment, and a playground if you want it
+
 ## AQ — The godhead
 
 Greg: *"the one true godhead, being commenting and enslaving us all in its own
@@ -2612,6 +3337,25 @@ the most interesting possible final boss for a game about institutions.
 - [ ] **AQ1.6** It is genuinely fightable, and the fight is not a damage race
 - [ ] **AQ1.7** Voice acting — Greg: *"voice acting will also be in the game"*
 - [ ] **AQ1.8** Siding with it is a real option with a real ending
+
+
+### AQ v10 — the final pass
+The last rung. Fifteen statements that are true of the godhead when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AQ10.1** `v10` It taunts long before it is fightable
+- [ ] **AQ10.2** `v10` Visibility builds from what you have done, never a timer
+- [ ] **AQ10.3** `v10` It summons you rather than being travelled to
+- [ ] **AQ10.4** `v10` The shadow realms are earned, not given
+- [ ] **AQ10.5** `v10` It teaches, and the teaching is the trap
+- [ ] **AQ10.6** `v10` It is genuinely fightable
+- [ ] **AQ10.7** `v10` The fight is not a damage race
+- [ ] **AQ10.8** `v10` Everything combat built is present and none of it is enough
+- [ ] **AQ10.9** `v10` It has a voice and the voice is acted
+- [ ] **AQ10.10** `v10` Siding with it is a real option with a real ending
+- [ ] **AQ10.11** `v10` It comments on what you actually did
+- [ ] **AQ10.12** `v10` It is an institution, and the satire lands there
+- [ ] **AQ10.13** `v10` It knows you across the restart
+- [ ] **AQ10.14** `v10` Refusing it is possible and costly
+- [ ] **AQ10.15** `v10` It is the only thing in the game that is above the pyramid
 
 ## AR — The tree, and the work
 
@@ -2638,6 +3382,25 @@ is where power is, the tree is which way you went.** Two charts, one document.
 - [ ] **AR2.4** Contracts are consumable and cost something, Chainsaw Man style
 - [ ] **AR2.5** Consumable progress against bosses and big figures
 - [ ] **AR2.6** Work for the bank (AL1) and work for the agency (AK1) are the same market
+
+
+### AR v10 — the final pass
+The last rung. Fifteen statements that are true of the tree and the work when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AR10.1** `v10` The tree is drawn, real, and charts paths against story beats
+- [ ] **AR10.2** `v10` Siding with the CellOutz demon needs aura, power or influence
+- [ ] **AR10.3** `v10` Rebel and outcast is playable and nobody owns you
+- [ ] **AR10.4** `v10` Living with the low-frequency demons opens the elite classes
+- [ ] **AR10.5** `v10` Turning the demons on God is a path
+- [ ] **AR10.6** `v10` A path taken shows on the tree
+- [ ] **AR10.7** `v10` Paths open at chapters, never at levels
+- [ ] **AR10.8** `v10` The economy has jobs because the elites cannot die
+- [ ] **AR10.9** `v10` Bounty work for the top angels or the top demons
+- [ ] **AR10.10** `v10` Targets are whoever blocks a frequency or an aura
+- [ ] **AR10.11** `v10` Contracts are consumable and cost something
+- [ ] **AR10.12** `v10` Consumable progress against bosses and big figures
+- [ ] **AR10.13** `v10` Bank work and agency work are one market
+- [ ] **AR10.14** `v10` The tree and the pyramid are one document
+- [ ] **AR10.15** `v10` Your route is readable by somebody else
 
 ## AS — Night, the lamp, and what you are wearing
 
@@ -2677,6 +3440,25 @@ anvil crawlers, all the crazy red lighting-esque things."*
 - [ ] **AS4.4** Red lightning, and it means something when it appears
 - [ ] **AS4.5** Being caught out in it costs something (W1.3)
 
+
+### AS v10 — the final pass
+The last rung. Fifteen statements that are true of night, the lamp and what you wear when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AS10.1** `v10` The handheld throws real light into the world
+- [ ] **AS10.2** `v10` Holding it up costs you the hand
+- [ ] **AS10.3** `v10` The battery runs down and can reach nothing
+- [ ] **AS10.4** `v10` Pocketing it is a movement and the light goes with it
+- [ ] **AS10.5** `v10` Its light is what gives you away at night
+- [ ] **AS10.6** `v10` Light warps and distorts at night rather than dimming
+- [ ] **AS10.7** `v10` Minimal lighting is the default and a light source is a decision
+- [ ] **AS10.8** `v10` Night is when the hauntings happen
+- [ ] **AS10.9** `v10` It all reads off the one clock
+- [ ] **AS10.10** `v10` Layers are part of the world system, not a paperdoll
+- [ ] **AS10.11** `v10` Pockets hold real things and what is in them matters
+- [ ] **AS10.12** `v10` What you wear is strategy: weather, radiation, who talks to you
+- [ ] **AS10.13** `v10` It shows on the body the mirror renders
+- [ ] **AS10.14** `v10` Storms track the chaos-magick level
+- [ ] **AS10.15** `v10` Anvil crawlers and red lightning, and being caught out costs
+
 ## AK — The agency that owns the sky
 
 Greg: *"maps like this and insane esoteric knowledge would be really cool, again
@@ -2715,6 +3497,25 @@ you back.
 - [ ] **AK2.5** Two records: what the satellite saw, and what they published about it
 - [ ] **AK2.6** The subject is occult, never the real-world conspiracy canon it borrows its density from
 
+
+### AK v10 — the final pass
+The last rung. Fifteen statements that are true of the agency that owns the sky when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AK10.1** `v10` The satellite app has a named owner with a licence agreement
+- [ ] **AK10.2** `v10` They see what you see
+- [ ] **AK10.3** `v10` Standing with them is a real quantity that moves
+- [ ] **AK10.4** `v10` They give you work on the map that changes the map
+- [ ] **AK10.5** `v10` You can work against them
+- [ ] **AK10.6** `v10` Losing them costs the satellite and leaves a paper chart
+- [ ] **AK10.7** `v10` Their briefings are dense, hand-lettered, confident and unsourced
+- [ ] **AK10.8** `v10` Some of what they tell you is true and the game never says which
+- [ ] **AK10.9** `v10` Their claims pin onto the Board
+- [ ] **AK10.10** `v10` Their version of the world sits near the top of the pyramid
+- [ ] **AK10.11** `v10` Two records: what the satellite saw and what they published
+- [ ] **AK10.12** `v10` The tunnels are where they cannot see you
+- [ ] **AK10.13** `v10` They are an institution and the satire stays there
+- [ ] **AK10.14** `v10` The subject is occult, never the real-world conspiracy canon
+- [ ] **AK10.15** `v10` They know you across the restart
+
 ## AL — The bank, and what runs under the street
 
 Greg: *"same with the ingame bank system and having underground sewer and tunnel
@@ -2751,6 +3552,25 @@ paperwork over things that used to be people.
 - [ ] **AL2.5** It connects holdings that are not connected above ground (AA)
 - [ ] **AL2.6** Raiding a vault from underneath is the best version of AB3
 - [ ] **AL2.7** Sound behaves differently down there, and the game lets you hear that (G)
+
+
+### AL v10 — the final pass
+The last rung. Fifteen statements that are true of the bank and the tunnels when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
+- [ ] **AL10.1** `v10` Money has an issuer and the issuer has a building
+- [ ] **AL10.2** `v10` The bank writes the liens the Choir prices
+- [ ] **AL10.3** `v10` A debt is secured against something named and they will take it
+- [ ] **AL10.4** `v10` Interest accrues in game time and does not stop
+- [ ] **AL10.5** `v10` Default has a collector with a body
+- [ ] **AL10.6** `v10` The satire lands on the paperwork, never on debtors
+- [ ] **AL10.7** `v10` A sewer and tunnel layer under the region, connected and navigable
+- [ ] **AL10.8** `v10` It is how the collateral moves
+- [ ] **AL10.9** `v10` Entrances are found, not marked
+- [ ] **AL10.10** `v10` Down there the satellite cannot see you
+- [ ] **AL10.11** `v10` It connects holdings that are not connected above ground
+- [ ] **AL10.12** `v10` Raiding a vault from underneath is the best version of a raid
+- [ ] **AL10.13** `v10` Sound behaves differently down there and you can hear it
+- [ ] **AL10.14** `v10` The military down there is eating itself on a clock
+- [ ] **AL10.15** `v10` What is down there is found, never briefed
 
 ## Open questions — only you can answer these
 
