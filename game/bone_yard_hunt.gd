@@ -201,6 +201,11 @@ var psychedelic: Control
 ## camera rather than on `handheld` itself — `handheld` is a `Control`, drawn
 ## in the HUD layer, and has nothing to attach a `Light3D` to.
 var handheld_lamp: SpotLight3D
+## AS2. Built once in `_build_world()`, driven every frame in
+## `_update_day_night()` off `world_clock.gd` — it used to sit at one fixed
+## angle and brightness no matter the hour, which is why W1.1 existing made no
+## visible difference until this read off it.
+var sun: DirectionalLight3D
 var pathfinder = preload("res://systems/ashbloom_pathfinder.gd").new()
 var social_markers: Array[Node3D] = []
 var resolution_ui: Control
@@ -708,6 +713,7 @@ func _physics_process(delta: float) -> void:
 	# that two scenes both wind runs at double speed the moment anybody
 	# builds a third.
 	WorldClock.advance(delta)
+	_update_day_night()
 	# AS1.1/AS1.3. Energy tracks the same smooth `raised` blend the device
 	# itself uses, so the light does not snap on; it hard-zeroes at empty
 	# battery, so "can run out" (AS1.3) is an actual floor, not a long fade.
@@ -3102,12 +3108,40 @@ func _build_world() -> void:
 		lamp.light_energy = 3.5
 		lamp.omni_range = 13
 		add_child(lamp)
-	var sun := DirectionalLight3D.new()
+	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-50, -25, 0)
 	sun.light_color = Color("c89572")
 	sun.light_energy = 1.4
 	sun.shadow_enabled = true
 	add_child(sun)
+
+
+## AS2. The sun and the base ambient used to be set once in `_build_world()`
+## and never touched again — a fixed 1.4-energy noon that never dimmed no
+## matter how many hours `world_clock.gd` had actually advanced. Driven every
+## physics frame instead, off `WorldClock.daylight()` alone rather than the
+## raw hour, so anything already using `daylight()` as its single source of
+## "how lit is it right now" — this included — can never quietly disagree.
+func _update_day_night() -> void:
+	if sun == null or not is_instance_valid(sun):
+		return
+	var daylight := WorldClock.daylight()
+	# AS2.2. Minimal lighting is the default night settles to; full daylight
+	# is the brief exception at the top of the curve, not the baseline dusk
+	# fades down from.
+	sun.light_energy = lerpf(0.08, 1.4, daylight)
+	sun.light_color = Color("39445a").lerp(Color("c89572"), daylight)
+	var env: Environment = $WorldEnvironment.environment
+	if env != null:
+		env.ambient_light_energy = lerpf(0.16, 0.72, daylight)
+		env.tonemap_exposure = lerpf(0.85, 1.18, daylight)
+	# AS2.1. "The light can become really warped at night and distorted" —
+	# read literally rather than built as its own effect. Night pushes the
+	# psychedelic shader's noise-displacement dial to a strength nobody would
+	# call a trip but a player will notice, per FINAL_V.md §16's own argument
+	# that this and a drug and a shadow realm should be one shader, not three.
+	if psychedelic != null and is_instance_valid(psychedelic):
+		psychedelic.set_dial("displacement_strength", (1.0 - daylight) * 0.02)
 
 
 func _build_expanse_systems() -> void:

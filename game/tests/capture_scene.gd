@@ -161,6 +161,13 @@ func _ready() -> void:
 			device.set_mode("WIRE")
 			for _hold in 60:
 				await get_tree().process_frame
+	elif trigger == "night":
+		# AS2. Forced rather than waited for — a real night is 24 real minutes
+		# away at the default clock rate, per world_clock.gd.
+		WorldClock.set_hour(2.0)
+		scene._update_day_night()
+		for _hold in 4:
+			await get_tree().process_frame
 	elif trigger == "lamp":
 		# AS1.1. Raised by hand rather than by key so the shot is deterministic:
 		# `raised` is a blended value, and holding the real key for an exact
