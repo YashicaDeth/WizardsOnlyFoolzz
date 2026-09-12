@@ -98,3 +98,17 @@ static func wash(entity_id: String, subject_id: String = "player") -> Dictionary
 		"wash_count": int(entity.get("wash_count", 0)) + 1,
 	})
 	return {"ok": true, "karma_after": float(WorldHistory.subject(subject_id).get("karma", 0.0))}
+
+
+## E6.3. "Substances are the access verb for the entity layer... reached by
+## taking something, not by finding an altar." A glimpse is not `regard()` —
+## it costs nothing of the entity's attention and cannot be spent on `wash()`.
+## It is a real recorded contact for whatever reads history later (a ritual,
+## a line of dialogue), earned by the body cost `systems/substances.gd`
+## already charged to get here rather than by anything this function checks.
+static func glimpse(entity_id: String, subject_id: String = "player") -> Dictionary:
+	var entity := WorldHistory.subject(entity_id)
+	if entity.is_empty() or str(entity.get("kind", "")) != "entity":
+		return {}
+	WorldHistory.record_event("entity_glimpsed", {"entity_id": entity_id, "subject_id": subject_id})
+	return entity

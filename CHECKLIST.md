@@ -330,10 +330,10 @@ Ascent/Descent axis that already exists and is currently unused.
 - [ ] **E5.3** The long route: climbing lets the game continue (needs E7's ending content to hand off to)
 
 ### E6 — Drugs
-- [ ] **E6.1** Substances with real body cost through the anatomy component
-- [ ] **E6.2** Preparation and consumption minigames
-- [ ] **E6.3** The door to the entity layer
-- [ ] **E6.4** Production and sale economy
+- [x] **E6.1** Substances with real body cost through the anatomy component — `systems/substances.gd`: Marrow Dust, Choir Bloom and Static Hymn, each an Ashbloom-native thing (ground bone, a fungal graft, dead-mast feedback — non-negotiable 1, nothing renamed off a real drug), paying into the same `anatomy_state` ledger `boons.gd` already pays into
+- [ ] **E6.2** Preparation and consumption minigames (UI; not attempted here)
+- [x] **E6.3** The door to the entity layer — a "door" substance calls `AscentEntities.glimpse()`, a real recorded `entity_glimpsed` contact that costs nothing of the entity's attention and cannot be spent on `wash()` — distinct from `regard()`'s earned notice
+- [x] **E6.4** Production and sale economy — `carry.gd`'s `take_substance()` carries one the same way a robbed part is carried (same wallet, `sale_value()` now prices `kind: "substance"`, same spoil clock). Covered by `tests/substances_test.gd` (16 checks)
 
 ### E7 — Route endings
 - [ ] **E7.1** Become a demon; the soul is signed over
