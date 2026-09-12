@@ -95,6 +95,10 @@ const SPLAT_SPREAD := 3.4
 
 static var live_gore := 0
 static var splats: Array[Node3D] = []
+## Meshes belong to the loaded scene; evidence does not. Keep a compact record
+## keyed by scene so revisiting a place redraws its blood without carrying old
+## nodes across the scene boundary.
+static var blood_records: Dictionary = {}
 ## Scales every effect count at once, driven by the GORE setting in the menu
 ## rather than by a hotkey over the pit. 0 is handled by the `gore` flag.
 static var detail := 1.0
@@ -988,6 +992,7 @@ func _land_splat(at: Vector3, size: float, velocity := Vector3.DOWN) -> void:
 		landed + normal * (0.012 + randf() * 0.01)
 	)
 	splats.append(splat)
+	_remember_blood(root, splat)
 	while splats.size() > MAX_SPLATS:
 		var oldest: Node3D = splats.pop_front()
 		if is_instance_valid(oldest):
@@ -1009,6 +1014,7 @@ static func clear_gore() -> void:
 		if is_instance_valid(splat):
 			splat.queue_free()
 	splats.clear()
+	blood_records.clear()
 	live_gore = 0
 
 
@@ -1055,10 +1061,43 @@ static func mark_ground_for_chunk(world: World3D, root: Node, at: Vector3, veloc
 	)
 	root.add_child(splat)
 	splats.append(splat)
+	_remember_blood(root, splat)
 	while splats.size() > MAX_SPLATS:
 		var oldest: Node3D = splats.pop_front()
 		if is_instance_valid(oldest):
 			oldest.queue_free()
+
+
+static func _blood_scene_key(root: Node) -> String:
+	var path := str(root.scene_file_path)
+	return path if not path.is_empty() else str(root.name)
+
+
+static func _remember_blood(root: Node, splat: MeshInstance3D) -> void:
+	var key := _blood_scene_key(root)
+	var records: Array = blood_records.get(key, [])
+	records.append({"transform": splat.global_transform})
+	while records.size() > MAX_SPLATS:
+		records.pop_front()
+	blood_records[key] = records
+
+
+static func restore_blood(root: Node) -> int:
+	if root == null or not root.is_inside_tree():
+		return 0
+	var restored := 0
+	for record in blood_records.get(_blood_scene_key(root), []):
+		var splat := MeshInstance3D.new()
+		splat.mesh = _splat_mesh(1.0)
+		var material := StandardMaterial3D.new()
+		material.albedo_color = BLOOD_DARK
+		material.roughness = 0.92
+		splat.material_override = material
+		splat.global_transform = record.transform
+		root.add_child(splat)
+		splats.append(splat)
+		restored += 1
+	return restored
 
 
 static func _splat_mesh(radius: float) -> ArrayMesh:

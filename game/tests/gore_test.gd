@@ -41,6 +41,8 @@ func _ready() -> void:
 	for step in 40:
 		rig._process(0.1)
 	check(BaselineHuman.splats.size() > 0, "blood that lands stays on the ground (%d marks)" % BaselineHuman.splats.size())
+	var remembered: Array = BaselineHuman.blood_records.get(BaselineHuman._blood_scene_key(get_tree().current_scene), [])
+	check(not remembered.is_empty(), "landed blood is retained as scene evidence, not only as a live mesh")
 	check(BaselineHuman.live_gore < sprayed, "airborne blood is still cleaned up")
 
 	# The floor fills and then stays full rather than growing without bound.

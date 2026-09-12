@@ -126,6 +126,8 @@ func travel(scene_path: String, travel_caption: String = "") -> void:
 		var error := tree.change_scene_to_file(scene_path)
 		if error != OK:
 			push_error("Interstitial could not reach %s (%d)" % [scene_path, error])
+	await tree.process_frame
+	BaselineHuman.restore_blood(tree.current_scene)
 	# The floor exists so a cached scene does not flash the plate for two frames.
 	while held < MIN_HOLD:
 		await tree.process_frame
