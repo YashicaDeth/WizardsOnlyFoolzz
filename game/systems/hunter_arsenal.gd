@@ -186,12 +186,18 @@ func _build_weapon_model(weapon_id: String) -> Node3D:
 			_piece(root, "guard", Vector3(0, -0.15, 0), Vector3(0.26, 0.035, 0.055), Color("8b6040"), "metal")
 			_piece(root, "blade", Vector3(0, -0.67, 0), Vector3(0.072, 1.02, 0.028), Color("999c93"), "metal", Vector3(0, 0, 0.035))
 		"shotgun":
-			_piece(root, "stock", Vector3(0, -0.04, 0.10), Vector3(0.12, 0.36, 0.13), Color("493429"), "wood", Vector3(-0.72, 0, 0))
-			_piece(root, "receiver", Vector3(0, -0.24, -0.10), Vector3(0.13, 0.34, 0.14), Color("4b4f4b"), "metal", Vector3(-0.72, 0, 0))
-			_piece(root, "barrel", Vector3(0, -0.55, -0.42), Vector3(0.075, 0.74, 0.075), Color("777c73"), "metal", Vector3(-0.72, 0, 0))
+			# M4.4. These carried a shared -0.72 rad tilt authored for the old,
+			# unrotated hand — on top of root's own counter-rotation it compounded
+			# into three boxes pointing in three different directions and reading
+			# as one stacked blob rather than a gun. Chained straight down the
+			# same -Y axis the sword's blade uses, with no rotation of their own,
+			# it reads as one held shape the way the cleaver does.
+			_piece(root, "stock", Vector3(0, -0.06, 0.05), Vector3(0.11, 0.28, 0.12), Color("493429"), "wood")
+			_piece(root, "receiver", Vector3(0, -0.32, -0.02), Vector3(0.12, 0.30, 0.13), Color("4b4f4b"), "metal")
+			_piece(root, "barrel", Vector3(0, -0.66, -0.10), Vector3(0.065, 0.56, 0.065), Color("777c73"), "metal")
 		"sidearm":
-			_piece(root, "grip", Vector3(0, -0.06, 0), Vector3(0.10, 0.24, 0.09), Color("332b29"), "cloth", Vector3(0.28, 0, 0))
-			_piece(root, "slide", Vector3(0, -0.22, -0.10), Vector3(0.11, 0.35, 0.09), Color("767a72"), "metal", Vector3(-0.72, 0, 0))
+			_piece(root, "grip", Vector3(0, -0.06, 0.03), Vector3(0.09, 0.22, 0.08), Color("332b29"), "cloth")
+			_piece(root, "slide", Vector3(0, -0.30, -0.06), Vector3(0.09, 0.30, 0.075), Color("767a72"), "metal")
 	return root
 
 

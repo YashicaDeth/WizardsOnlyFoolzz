@@ -930,6 +930,19 @@ image.
       this angle — their own local `turn` values were never re-tuned against
       the same pose and are next. Guarded by `tests/viewmodel_frame_test.gd`
       so the frustum regression cannot happen silently again.
+
+      Follow-up: the shotgun and sidearm pieces carried a shared -0.72 rad
+      tilt authored for the old, unrotated hand — on top of `root`'s own
+      counter-rotation it compounded into boxes pointing three different
+      directions, reading as one stacked blob. Rechained straight down the
+      same -Y axis the cleaver's own blade uses, with no rotation of their
+      own; both now read as one coherent two-part held shape (a lighter
+      barrel/slide over a darker stock/grip) rather than an ambiguous block —
+      real progress, though neither is unmistakably gun-shaped at a glance
+      the way the cleaver reads as a blade. Getting the rest of the way there
+      is proportions and silhouette work (a longer, thinner barrel; a stock
+      angled off the receiver) rather than another transform bug, so it is
+      left here rather than force-finished. Recaptured in `game/captures/`.
 - [x] ~~**M4.5** The rules are the game's own and applied everywhere, not photographic realism~~ (the resolution/interrogation camera had its own bare `72.0` FOV with no relationship to the 78/63 pair M4.3 established; it now takes `THIRD_PERSON_FOV` since it is already the "look at the body from outside" register)
 
 ### M3 — The seam
