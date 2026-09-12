@@ -854,9 +854,38 @@ finished. Applies to everything below and to A5, A6, C1.
 - [x] **I2.4** Dead sites: last post four years old, moderator deceased
 
 ### I3 — celloutz.xyz in-game
-**Blocked: mirror the real content, or fictionalise it?**
-- [ ] **I3.1** Decide the approach
-- [ ] **I3.2** Build the site as a reachable place on the Wire
+
+- [x] ~~**I3.1** Decide the approach~~ Was blocked on "mirror the real
+      content, or fictionalise it?" — asked Greg directly rather than
+      guessing, since `country_town_menu.gd` already `OS.shell_open`s the
+      real, live `celloutz.xyz`, so this was never a purely fictional call.
+      Answer: fictionalise it. The in-game version is CellOutz-the-corporation
+      (the company that makes the handheld and the Wire itself), not a
+      reproduction of the real page.
+- [x] ~~**I3.2** Build the site as a reachable place on the Wire~~
+      `broken_web.gd` (I2) already had the whole catalogue-of-sites machinery
+      built — `SITES`, `reachable_from(emitter_id)`, `draw_site()` — and a
+      `celloutz_support` entry, but nothing anywhere in the game ever called
+      any of it; I2's own "reachable" was never actually reachable by a
+      player. Added a `celloutz_store` entry with its own new `storefront`
+      layout (a product grid and a cart — I2.2 forbids reusing "corporate",
+      which the support site already has) and wired the whole system into a
+      real screen: `SignalField.reading()` now reports the emitter's own
+      `id`, `handheld_device.gd` forwards it to the hosted World Index the
+      same way it already forwards `signal_grade`, and the WIRE page prints
+      a "SITES IN RANGE" strip from `BrokenWeb.reachable_from()` as real
+      links (`_site_link_rows()`, feeding `_rebuild_links()` the same way
+      every other link on that screen does per I5.2 v2) that open the site
+      full-panel and close the same way any other link does — click again.
+      This also retroactively makes I2.3 true for the first time: every
+      `broken_web.gd` site, not only the new one, is now reachable from
+      wherever it claims to be and nowhere else. Verified:
+      `tests/celloutz_site_test.gd` (new, 15/15 — the data layer, the signal
+      field naming its own emitter, and the World Index actually surfacing
+      and following the link), plus the existing `link_test.gd`,
+      `index_wire_glow_test.gd` and `index_link_rebuild_test.gd` regression
+      suites, and a windowed capture
+      (`captures/i3_wire_sites_in_range.png`, `i3_celloutz_storefront.png`).
 
 ### I4 — Panels degrade with the player
 - [x] **I4.1** Blood loss, pain, consciousness and Wire strain drive the UI

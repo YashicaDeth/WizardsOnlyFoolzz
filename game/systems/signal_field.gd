@@ -69,11 +69,15 @@ func reading() -> Dictionary:
 	for zone in DEAD_ZONES:
 		if at.distance_to(zone.at as Vector2) <= float(zone.reach):
 			# A lace is a receiver, not a miracle. Underground is underground.
-			return {"grade": NONE, "source": str(zone.name), "kind": "dead", "strength": 0.0}
+			return {"grade": NONE, "source": str(zone.name), "kind": "dead", "strength": 0.0, "id": ""}
 	var best_grade := NONE
 	var best_strength := 0.0
 	var source := "NO CARRIER"
 	var kind := "none"
+	# I3.2. The emitter's own id, so `BrokenWeb.reachable_from()` can ask
+	# "what is reachable from exactly where I am standing" instead of every
+	# caller re-deriving it from `source`'s display name.
+	var emitter_id := ""
 	for emitter in EMITTERS:
 		var distance := at.distance_to(emitter.at as Vector2)
 		var reach := float(emitter.reach)
@@ -86,9 +90,10 @@ func reading() -> Dictionary:
 			best_strength = strength
 			source = str(emitter.name)
 			kind = str(emitter.kind)
+			emitter_id = str(emitter.id)
 	if best_grade == NONE and laced:
-		return {"grade": SURFACE, "source": "NEURALACE", "kind": "lace", "strength": 0.45}
-	return {"grade": best_grade, "source": source, "kind": kind, "strength": best_strength}
+		return {"grade": SURFACE, "source": "NEURALACE", "kind": "lace", "strength": 0.45, "id": ""}
+	return {"grade": best_grade, "source": source, "kind": kind, "strength": best_strength, "id": emitter_id}
 
 
 func grade() -> int:
