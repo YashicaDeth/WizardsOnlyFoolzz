@@ -400,10 +400,28 @@ Read-only; everything derived lands in `game/art/derived/` via `tools/art_pipeli
 - [x] **G1.5** Wire collage — printed under the Wire feed
 
 ### G2 — The cars
-- [ ] **G2.1** Stripped chassis with exposed mechanism
-- [ ] **G2.2** Bone and sinew lashings
-- [ ] **G2.3** Fungal bloom in the wheel wells, dried spatter
-- [ ] **G2.4** Re-export carrying the biopunk palette natively
+- [x] ~~**G2.1** Stripped chassis with exposed mechanism~~ Procedural: an engine
+      block, driveshaft ribs and a cut-away sill hang low and central on the
+      chassis (`Silhouette.dress_vehicle`), so the silhouette bares mechanism
+      instead of reading as a smooth shell. Verified: `game/captures/g2_derby_cars.png`
+- [x] ~~**G2.2** Bone and sinew lashings~~ Bone struts run corner to corner
+      across the hull with a darker sinew strap crossing each one. Same capture.
+- [~] **G2.3** Fungal bloom in the wheel wells done and verified (same capture).
+      Dried spatter is built but currently only applied to the player's own
+      car — see the docstring on `Silhouette.dress_vehicle`:
+      `tests/derby_balance_test.tscn` measured that adding the spatter patches
+      to all twelve AI wreckers reproducibly zeroed every hunter-player impact
+      for a full 30s heat, while the identical patches on the parked player
+      car, and everything else in this kit on the wreckers, measured clean.
+      No collision shape is involved anywhere in the kit, so this was
+      reproduced and gated (`include_spatter` on `dress_vehicle`) rather than
+      root-caused — worth another agent's time before extending it to wreckers.
+- [ ] **G2.4** Re-export carrying the biopunk palette natively. Still needs
+      Greg's hands: `regrime()` already remaps the toybox material names in
+      `art/scrap_skiff.glb` onto the biopunk palette at load, and the kit
+      above adds procedural detail on top, but the base mesh itself (bonnet,
+      cabin, panels) is only reachable by re-exporting from
+      `art/scrap_skiff_v1/scrap_skiff.blend`.
 
 ### G0 — The wreckers cannot land a hit `OPEN BUG`
 Found 2026-09-12 by measurement, not yet fixed. A parked player finishes a
@@ -430,9 +448,25 @@ probe actually says, so the next attempt does not start from scratch:
       regress silently again~~
 
 ### G3 — The derby arena
-- [ ] **G3.1** Re-author the oval for a larger footprint
-- [ ] **G3.2** Retune the engagement cap against it together
-- [ ] **G3.3** Contamination colour through authored surfaces, not light
+- [ ] **G3.1** Re-author the oval for a larger footprint — deliberately not
+      attempted this pass. `ARENA_SCALE` is already recorded as a dead end at
+      2.15 and 2.45 (wreckers drift outward and never engage), and the fix on
+      record is real level-design work on the authored bowl, not a code
+      change I can respond to based on a balance-test number. Doing it blind
+      risks re-breaking the G0 fix that took real measurement to land. Needs
+      either Greg's hands on the kit or an explicit go-ahead to reshape it
+      procedurally (e.g. a stadium/oval footprint instead of a bigger circle,
+      so opposite ends stay close enough to keep engaging).
+- [ ] **G3.2** Retune the engagement cap against it together — blocked on G3.1
+- [x] ~~**G3.3** Contamination colour through authored surfaces, not light~~
+      tint. The eight floodlights alternated orange/green per light, which
+      re-tinted whatever stood nearest them on top of whatever colour
+      `regrime()`/`WorldLook.surface()` already gave the surface — two
+      competing colour sources instead of one. Lights are now a single
+      practical warm-white; the pit's colour now comes from the authored
+      materials. Verified: `game/captures/g3_lights_neutral.png`, and
+      `tests/derby_balance_test.tscn` still 0 failures (lighting only, no
+      geometry or physics touched).
 
 ### G4 — Silhouettes
 - [x] ~~**G4.1** Bevels and broken corners on generated geometry~~
@@ -441,8 +475,14 @@ probe actually says, so the next attempt does not start from scratch:
 
 ### G5 — Sound rework
 - [x] **G5.1** Bus structure built, mixable, and everything actually routed through it
-- [ ] **G5.2** Engine layered by load rather than one pitched sine
-- [ ] **G5.3** Impact layers by severity and material
+- [x] ~~**G5.2** Engine layered by load rather than one pitched sine~~ A third
+      `engine_strain` layer joins the existing low/high pair, gated to only
+      exist above 72% effort so redline reads as a distinct band arriving
+      rather than a tone blending in continuously. Verified: `tests/audio_test.tscn` (G5.2 section)
+- [x] ~~**G5.3** Impact layers by severity and material~~ A shared low-end
+      `impact_body` layer stacks on top of the material voice once a hit
+      passes 50% intensity, so severity is heard as added weight rather than
+      the same one-shot played louder. Verified: `tests/audio_test.tscn` (G5.3 section)
 - [x] **G5.4** Per-layer gore sound — bone cracks, organs burst, cybernetics fault (shares with B4.8)
 
 ### G6 — The opening, directed

@@ -29,6 +29,11 @@ const REASSIGN_EVERY := 2.6
 const KILL_CAM := preload("res://systems/kill_cam.gd")
 const PIT_RADIO := preload("res://systems/pit_radio.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
+const SILHOUETTE := preload("res://systems/silhouette.gd")
+## Matches the collider box in arcade_vehicle.gd's `_ready()`. Not read off
+## the chassis at spawn time because the collider is built in `_ready()` too,
+## so the shape does not exist yet on the frame the car is instanced.
+const CHASSIS_DIMENSIONS := Vector3(2.65, 1.3, 4.8)
 
 ## Authored props that fight the read at arena scale. Hidden rather than deleted
 ## from the kit, so a re-export can reinstate them deliberately.
@@ -187,11 +192,18 @@ func _build_world() -> void:
 	add_child(floor)
 	# Floodlights are pools of light in a dim pit, not a uniform wash. Two of the
 	# eight cast shadows: enough to anchor the wrecks without eight shadow maps.
+	# G3.3. These used to alternate orange and green per light, which painted
+	# whatever stood nearest whichever colour was overhead rather than letting
+	# the pit's own contamination read — the actual complaint behind "the pit
+	# reads close to monochrome": every surface was getting re-tinted twice.
+	# `regrime()` and `WorldLook.surface()` already carry the salvage-teal,
+	# rust and bloom colour on the materials themselves; a practical floodlight
+	# colour lets that stand instead of competing with it.
 	for index in 8:
 		var light := OmniLight3D.new()
 		var angle := TAU * index / 8.0
 		light.position = Vector3(cos(angle) * 18.0 * ARENA_SCALE, 7.5 * ARENA_SCALE, sin(angle) * 18.0 * ARENA_SCALE)
-		light.light_color = Color("ff8a3c") if index % 2 == 0 else Color("86a35c")
+		light.light_color = Color("e8d3ab")
 		light.light_energy = 3.4
 		light.omni_range = 19.0 * ARENA_SCALE
 		light.omni_attenuation = 1.25
@@ -217,6 +229,7 @@ func _build_boat() -> void:
 	authored_skiff.scale = Vector3(1.15, 1.15, 1.15)
 	boat.add_child(authored_skiff)
 	WorldLook.regrime(authored_skiff, 3)
+	_dress_vehicle_biopunk(boat, 3)
 	_add_vehicle_damage_parts(boat as RigidBody3D, 12)
 
 
@@ -259,6 +272,7 @@ func _create_wrecker(index: int) -> void:
 	if index == 0:
 		authored_skiff.scale *= 1.12
 	WorldLook.regrime(authored_skiff, index + 5)
+	_dress_vehicle_biopunk(target, index + 5, false)
 	_add_vehicle_damage_parts(target, index)
 	_add_driver_rig(target, index)
 	targets.append(target)
@@ -674,6 +688,20 @@ func _add_authored_environment_collision(root_node: Node) -> void:
 				(current as MeshInstance3D).create_trimesh_collision()
 				authored_collision_count += 1
 	WorldHistory.record_event("authored_collision_built", {"venue": "rift_derby_quarry", "mesh_count": authored_collision_count})
+
+
+## G2.1-G2.3. `regrime()` only ever remaps the toybox material names already
+## baked into the glTF, which is a colour fix. It cannot add a strut, a bloom
+## or a scab, because there is nothing in the authored mesh to remap onto
+## one. Silhouette's vehicle kit hangs those on afterward, parented to the
+## chassis body itself so the greebles sit in real chassis-local metres
+## regardless of whatever scale the authored shell renders at.
+func _dress_vehicle_biopunk(target: Node3D, seed_value: int, include_spatter: bool = true) -> void:
+	SILHOUETTE.dress_vehicle(target, CHASSIS_DIMENSIONS, VEHICLE.WHEEL_ANCHORS, seed_value, Callable(self, "_vehicle_surface"), include_spatter)
+
+
+func _vehicle_surface(tint: Color, kind: String, seed_value: int) -> StandardMaterial3D:
+	return WorldLook.surface(tint, kind, seed_value)
 
 
 func _add_vehicle_damage_parts(target: RigidBody3D, index: int) -> void:
