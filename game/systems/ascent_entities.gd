@@ -40,7 +40,7 @@ const ENTITIES := {
 }
 
 
-static func seed() -> void:
+static func seed_entities() -> void:
 	for entity_id in ENTITIES:
 		var data: Dictionary = ENTITIES[entity_id]
 		WorldHistory.register_subject(entity_id, {
@@ -67,7 +67,7 @@ static func regard(entity_id: String, subject_id: String = "player") -> Dictiona
 	for event in WorldHistory.events:
 		if int(event.get("sequence", 0)) <= since:
 			continue
-		if event_actor(event) != subject_id:
+		if WorldHistory.event_actor(event) != subject_id:
 			continue
 		var event_type := str(event.get("type", ""))
 		var outcome := str((event.get("details", {}) as Dictionary).get("outcome", ""))

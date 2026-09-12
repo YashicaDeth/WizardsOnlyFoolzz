@@ -23,7 +23,7 @@ func _ready() -> void:
 		return
 	WorldHistory.clear_history()
 	WorldHistory.register_subject("player", {"name": "THE HUNTER", "kind": "person"})
-	AscentEntities.seed()
+	AscentEntities.seed_entities()
 
 	var seeded := WorldHistory.subject("clear_frequency")
 	check(str(seeded.get("kind", "")) == "entity", "The Clear Frequency is registered as an entity")
@@ -64,7 +64,7 @@ func _ready() -> void:
 	check(bool(WorldHistory.subject("clear_frequency").get("has_noticed", false)), "a fresh run of mercy earns it again")
 
 	# --- re-seeding is migration-safe, never erases earned attention --------
-	AscentEntities.seed()
+	AscentEntities.seed_entities()
 	check(bool(WorldHistory.subject("clear_frequency").get("has_noticed", false)), "re-seeding does not quietly reset earned attention")
 
 	print("ASCENT_ENTITIES_TEST_RESULT failures=", failures.size())

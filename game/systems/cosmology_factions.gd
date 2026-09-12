@@ -26,7 +26,7 @@ extends Node
 
 func _ready() -> void:
 	_seed()
-	AscentEntities.seed()
+	AscentEntities.seed_entities()
 
 
 func _seed() -> void:

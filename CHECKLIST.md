@@ -325,9 +325,9 @@ Ascent/Descent axis that already exists and is currently unused.
 - [ ] **E4.3** Escalating price on repeat
 
 ### E5 — Ascent entities
-- [ ] **E5.1** Entities as subjects on the nemesis machinery, not a shop
-- [ ] **E5.2** Wash away sins for positive quests
-- [ ] **E5.3** The long route: climbing lets the game continue
+- [x] **E5.1** Entities as subjects on the nemesis machinery, not a shop — `systems/ascent_entities.gd`: The Clear Frequency and The Still Ledger are real subjects under `wizardsonlyfoolz`, and `regard()` draws the same kind of conclusion `RivalRegistry.consider()` draws on the other axis (a pattern in the log, not a scripted appearance), reading recorded mercy instead of harm
+- [x] **E5.2** Wash away sins for positive quests — `wash()` is refused until an entity has actually noticed you, then spends that notice on success (a fresh run of mercy earns it again, never bought twice with the same acts). The "quest" standing in for E2/E3/E6 content that does not exist yet is the same one already used elsewhere: a real recorded pattern. `sin_washed` added to `KARMA`/`event_karma()` in `world_history.gd`. Covered by `tests/ascent_entities_test.gd` (13 checks)
+- [ ] **E5.3** The long route: climbing lets the game continue (needs E7's ending content to hand off to)
 
 ### E6 — Drugs
 - [ ] **E6.1** Substances with real body cost through the anatomy component
