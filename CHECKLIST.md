@@ -1494,10 +1494,10 @@ between runs?"* Roguelike structure was asked for, and "bodies remember" is a
 pillar. They pull against each other and the game cannot have both untouched.
 
 - [ ] **T1.1** Decide it — blocked on Greg
-- [ ] **T1.2** Death is an event in the world rather than a reload
-- [ ] **T1.3** Something inherits: a body, a debt, a reputation, a wall of pins
-- [ ] **T1.4** What the world keeps is visible to the player before they risk it
-- [ ] **T1.5** A run has a shape — it starts, it escalates, it ends
+- [x] **T1.2** Death is an event in the world rather than a reload — `systems/run_lifecycle.gd`'s `record_death()`, deliberately built without guessing T1.1's answer: captures the real cause, where the run had reached (`OpeningDirector`), what was being carried (`Carry`), and where the subject stood on the axis (`tree_alignment()`) as one recorded `permanent_death` event, so whatever T1.3 eventually decides should inherit has real material to read from rather than needing a second record built later. Covered by `tests/run_lifecycle_test.gd` (10 checks)
+- [ ] **T1.3** Something inherits: a body, a debt, a reputation, a wall of pins (waits on T1.1)
+- [ ] **T1.4** What the world keeps is visible to the player before they risk it (waits on T1.1)
+- [ ] **T1.5** A run has a shape — it starts, it escalates, it ends (waits on T1.1)
 
 ## U — Your own ladder
 
