@@ -89,6 +89,37 @@ func rebuild() -> void:
 		_accounts[subject_id] = _build_account(subject_id, subject)
 
 
+## K3.2 v2. "Nothing yet stops a player climbing both ladders at once." K3.1's
+## own answer left the *axis* (`tree_alignment()`) freely reversible right up
+## until an ending actually locks it, deliberately — this is a different
+## claim, about real standing rather than the axis: nothing charged for
+## holding genuine command-relation weight in a Descent faction and in
+## wizardsonlyfoolz *at the same time*. Real friction rather than a hard
+## block, same register as `Boons`/`Substances`: reach is halved once both
+## sides are genuinely being climbed at once, not merely touched in passing.
+const DESCENT_LEDGER_FACTIONS := ["celloutz", "ashline_wreckers", "black_mile", "soft_rot", "choir_of_marrow", "vanity_row", "honeyvein", "long_static"]
+const ASCENT_LEDGER_FACTIONS := ["wizardsonlyfoolz"]
+const DUAL_LADDER_THRESHOLD := 20
+const DUAL_LADDER_PENALTY := 0.5
+
+
+func _ladder_commitment(relations: Dictionary, faction_ids: Array) -> int:
+	var total := 0
+	for other in relations:
+		var edge: Dictionary = relations[other]
+		if faction_ids.has(str(other)) and INFLUENCE_KINDS.has(str(edge.get("kind", ""))):
+			total += int(edge.get("strength", 0))
+	return total
+
+
+func _ladder_split_penalty(relations: Dictionary) -> float:
+	var descent := _ladder_commitment(relations, DESCENT_LEDGER_FACTIONS)
+	var ascent := _ladder_commitment(relations, ASCENT_LEDGER_FACTIONS)
+	if descent >= DUAL_LADDER_THRESHOLD and ascent >= DUAL_LADDER_THRESHOLD:
+		return DUAL_LADDER_PENALTY
+	return 1.0
+
+
 func _build_account(subject_id: String, subject: Dictionary) -> Dictionary:
 	var influence := 0
 	var relations: Dictionary = subject.get("relations", {})
@@ -103,6 +134,7 @@ func _build_account(subject_id: String, subject: Dictionary) -> Dictionary:
 	var skill_reach := maxi(0, elo - 950) / 6
 	var manufactured := _manufactured(subject_id, subject)
 	var reach := 40 + influence * 46 + coverage * 120 + skill_reach + manufactured
+	reach = int(float(reach) * _ladder_split_penalty(relations))
 	var tier := _tier_for(reach)
 	return {
 		"id": subject_id,
