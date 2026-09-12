@@ -756,8 +756,7 @@ supposed to feel like too much, and then end.
 - [ ] **P1.1** A curated route through the *real* game, not a separate map
 - [ ] **P1.2** The best features front-loaded: anatomy, gore, X-ray killcam, the derby, the Board
 - [ ] **P1.3** Generous rather than careful — it should feel like a full game while it lasts
-- [ ] **P1.4** Nothing in it is a locked door or a greyed-out button
-- [ ] **P1.5** No dependence on the cosmology being understood; the Horsemen stay off-screen
+- [ ] **P1.4** No dependence on the cosmology being understood; the Horsemen stay off-screen
 
 ### P2 — Two doors, one build
 - [ ] **P2.1** PLAY and DEMO sit side by side on the main menu
@@ -765,6 +764,25 @@ supposed to feel like too much, and then end.
 - [ ] **P2.3** Demo saves are their own slot and can never touch a real save
 - [ ] **P2.4** Any feature the demo shows is the real feature, running the real code
 - [ ] **P2.5** Starting DEMO from the menu is one click, with no configuration in between
+
+### P2b — The edges of the demo
+
+Greg: *"more exploration would be locked off and features in the demo but then
+in the mainline its playable"*.
+
+So the demo **is** gated — but the gate has to be the world refusing you rather
+than the build missing content. That distinction is everything: a greyed-out
+button says the game is unfinished, while a road nobody will let you down says
+the game is bigger than you. This project is unusually well set up for the
+second one, because the systems that gate things already exist and are already
+diegetic.
+
+- [ ] **P2b.1** Locked regions are refused by the world, never by a disabled control
+- [ ] **P2b.2** Refusals reuse systems that already exist — signal grade, faction standing, a road nobody will open
+- [ ] **P2b.3** A refusal names what is on the other side, so the player knows what they are missing
+- [ ] **P2b.4** Locked features are absent, not visibly disabled — no ghost buttons
+- [ ] **P2b.5** Everything locked in the demo is genuinely playable in the mainline; nothing is locked because it is unbuilt
+- [ ] **P2b.6** The same code path serves both — the mainline does not get a second implementation
 
 ### P3 — The wall
 The part that makes it a demo rather than a trial. It is a designed moment, in
