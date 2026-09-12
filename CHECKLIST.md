@@ -310,7 +310,7 @@ Ascent/Descent axis that already exists and is currently unused.
 
 ### E2 — The ritual app
 - [x] ~~**E2.1** Seal-drawing vocabulary in the `celloutz_type` stroke register~~
-- [ ] **E2.2** The 72 Goetic seals as data
+- [x] ~~**E2.2** The 72 Goetic seals as data~~
 - [ ] **E2.3** Original seals for what this world grew on its own
 - [ ] **E2.4** Seals animate, corrupt and burn
 
