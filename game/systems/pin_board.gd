@@ -174,10 +174,22 @@ class Card extends RefCounted:
 	var struck := false
 
 
+## L2.6 v2. Was uncapped, which meant the wall could never actually fill up —
+## and a wall that cannot fill up has no cost to using, so every photograph
+## and every cutting went up because there was never a reason not to. Five
+## theories already occupy the wall by default; forty pinned cards on top of
+## that is a genuinely dense board, the point past which a real cork board
+## runs out of room rather than an arbitrary throttle.
+const MAX_PINNED := 40
+
 ## L2. What the player has actually put on the wall: an array of
 ## `{ref, kind, at, angle, seed}`. This is the save, and it is the only thing on
 ## the board that is authored by the player rather than read out of the world.
 var pinned: Array = []
+## L2.6 v2. Why the last `pin()` call failed, for whoever is showing the
+## player a reason rather than a silent no. Cleared on the next attempt,
+## successful or not, so it never reports a refusal from three tries ago.
+var last_refusal := ""
 ## L2. What is in the player's hand, on its way to the wall. Pinning is a two
 ## step act — take it off a screen, then choose where it goes — because putting
 ## a photograph of somebody on your conspiracy wall should cost a decision.
@@ -224,12 +236,39 @@ func _fit() -> void:
 	size = get_viewport_rect().size
 
 
+## L1.6 v2. How many events the world has recorded without the player looking
+## at the wall — read off `WorldHistory` the same way everything else on this
+## board is, rather than a wall-clock timestamp that would behave strangely
+## across saves. `neglect` is that count normalised to 0-1 against
+## `NEGLECT_EVENTS`, and it drives the yellowing wash, the rusted pins and the
+## thicker dust across the cork in `_draw_cork`/`_draw_card`.
+const NEGLECT_EVENTS := 180.0
+var neglect := 0.0
+
 func open() -> void:
 	_fit()
 	load_board()
+	_measure_neglect()
 	rebuild()
 	visible = true
 	open_blend = 0.0
+
+
+## Compares the event count now against the count the last visit left behind,
+## then immediately writes today's count as the new baseline — so the board
+## visibly aged for *this* visit, and the clock resets rather than aging
+## again next time for the same gap.
+func _measure_neglect() -> void:
+	var record: Dictionary = WorldHistory.subject(BOARD_ID)
+	var last_visit_events := int(record.get("last_visit_events", WorldHistory.events.size()))
+	var gap := maxi(0, WorldHistory.events.size() - last_visit_events)
+	neglect = clampf(float(gap) / NEGLECT_EVENTS, 0.0, 1.0)
+	# amend_subject, not update_subject: opening your own board is not news
+	# the world recorded, and update_subject logging a "board_visited" event
+	# here would count against itself — every visit would inflate the count
+	# the next visit measures against, ageing the wall by a little even
+	# across two visits back to back with nothing happening between them.
+	WorldHistory.amend_subject(BOARD_ID, {"last_visit_events": WorldHistory.events.size()})
 
 
 ## The wall persists, because it is a thing in a room rather than a view. Kept
@@ -273,7 +312,11 @@ func save_board() -> void:
 ## L2.1. Offered from the index, the camera and CARRY. Returns false when it is
 ## already up, because a wall does not take the same photograph twice.
 func pin(ref: String, kind := "photo", at := Vector2.INF) -> bool:
+	last_refusal = ""
 	if ref == "" or is_pinned(ref):
+		return false
+	if pinned.size() >= MAX_PINNED:
+		last_refusal = "THE WALL IS FULL. TAKE SOMETHING DOWN FIRST."
 		return false
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(ref)
@@ -743,11 +786,23 @@ func rebuild() -> void:
 		card.angle = float(entry["angle"])
 		cards.append(card)
 
-	# L3.3. Every string is drawn the same. Nothing here consults `supports()`,
-	# and that is deliberate: a wrong connection has to look exactly as
-	# convincing as a right one or the mechanic does not exist.
+	# L3.3. Every string is drawn the same *until the player has actually found
+	# out otherwise*. Nothing here consults `supports()` — a wrong connection
+	# still has to look exactly as convincing as a right one while it is only
+	# a guess, or the mechanic does not exist. L3.5 v2 is narrower: a string
+	# that held up a theory the player *published* and that came back as a
+	# fabrication is no longer a guess, it is a recorded outcome the world
+	# already answered — and there was no way to look back and see which
+	# claims those were.
+	var unsound: Array[String] = []
+	for row: Dictionary in published():
+		if not bool(row.get("sound", true)):
+			unsound.append(str(row.get("theory", "")))
 	for row: Dictionary in strings:
-		threads.append({"from": str(row["from"]), "to": str(row["to"]), "seed": int(row["seed"])})
+		var from := str(row["from"])
+		var to := str(row["to"])
+		var disproved := unsound.has(from) or unsound.has(to)
+		threads.append({"from": from, "to": to, "seed": int(row["seed"]), "disproved": disproved})
 
 
 ## One pinned reference becomes one piece of paper. The reference decides what
@@ -948,6 +1003,7 @@ func _draw() -> void:
 		if card.kind == "theory":
 			_draw_card(card)
 	_draw_wall_light()
+	_draw_neglect()
 	_draw_held()
 	if _stringing != "":
 		var anchor := _find(_stringing)
@@ -995,19 +1051,77 @@ func _draw_thread(thread: Dictionary) -> void:
 	var a := _to_screen(from.at + from.size * 0.5 * zoom * 0.0)
 	var b := _to_screen(to.at + to.size * 0.5 * zoom * 0.0)
 	var sag := (b - a).length() * 0.06
+	# L1.5 v2. A straight sag between two points reads fine on an empty board
+	# and as scribble on a crowded one — the point of a route is to be
+	# readable, and a line that cuts through three unrelated cards on its way
+	# is not. Bowed away from whichever pinned card the straight line would
+	# have crossed hardest, the way an actual piece of string pinned at both
+	# ends and dressed by hand gets routed around what is in its way.
+	var detour := _thread_detour(a, b)
 	var points := PackedVector2Array()
 	for step in 15:
 		var t := float(step) / 14.0
 		var point := a.lerp(b, t)
+		point += detour * (sin(t * PI))
 		point.y += sin(t * PI) * sag
 		points.append(point)
 	# The shadow the thread throws on the cork, so it sits off the surface.
 	var shadow := PackedVector2Array()
 	for point: Vector2 in points:
 		shadow.append(point + Vector2(2.0, 3.0))
+	# L3.5 v2. A string that held up a theory the player actually published
+	# and watched come back as a fabrication is not a guess any more — it is
+	# a recorded outcome, and there was no way to look back and see which
+	# claims those were. Chalked over rather than removed: the player drew
+	# it, and a wall does not erase your own bad calls, it marks them.
+	var disproved := bool(thread.get("disproved", false))
+	var tone := Color("8a8478") if disproved else THREAD
 	draw_polyline(shadow, Color(0, 0, 0, 0.28 * open_blend), 2.0)
-	draw_polyline(points, THREAD * Color(1, 1, 1, 0.85 * open_blend), 2.0)
-	draw_polyline(points, Color(1, 0.6, 0.5, 0.12 * open_blend), 1.0)
+	draw_polyline(points, tone * Color(1, 1, 1, (0.55 if disproved else 0.85) * open_blend), 2.0)
+	if not disproved:
+		draw_polyline(points, Color(1, 0.6, 0.5, 0.12 * open_blend), 1.0)
+	else:
+		var mid := points[7]
+		var perp := (points[8] - points[6]).orthogonal().normalized() * 9.0
+		draw_line(mid - perp, mid + perp, MARKER * Color(1, 1, 1, 0.75 * open_blend), 2.4)
+		draw_line(mid - perp.rotated(PI * 0.5), mid + perp.rotated(PI * 0.5), MARKER * Color(1, 1, 1, 0.75 * open_blend), 2.4)
+
+
+## Where a thread bows to clear the pinned card it would otherwise cut
+## through worst. Only pinned cards are checked — the five authored theories
+## are large and central by design, and every route already runs threads
+## into them on purpose, so routing around them would just bow every string
+## on the board toward the same handful of empty patches.
+func _thread_detour(a: Vector2, b: Vector2) -> Vector2:
+	var mid := a.lerp(b, 0.5)
+	var length := (b - a).length()
+	if length < 1.0:
+		return Vector2.ZERO
+	var direction := (b - a) / length
+	var normal := direction.orthogonal()
+	var worst := 0.0
+	var worst_side := 0.0
+	for card: Card in cards:
+		if card.kind == "theory":
+			continue
+		var at := _to_screen(card.at)
+		var half := card.size * zoom * 0.5
+		var to_card := at - a
+		var along := to_card.dot(direction)
+		if along <= 0.0 or along >= length:
+			continue
+		var closest := a + direction * along
+		var offset := at - closest
+		var side := offset.dot(normal)
+		var penetration := maxf(half.x, half.y) * 0.8 - absf(side)
+		if penetration > worst:
+			worst = penetration
+			worst_side = side
+	if worst <= 0.0:
+		return Vector2.ZERO
+	# Bow away from the card, not into it, and only as far as clearing it.
+	var push := worst + 26.0
+	return normal * (-signf(worst_side) if worst_side != 0.0 else 1.0) * push
 
 
 func _find(card_id: String) -> Card:
@@ -1042,9 +1156,12 @@ func _draw_card(card: Card) -> void:
 		draw_line(body.position, body.end, MARKER * Color(1, 1, 1, 0.8 * open_blend), 4.0)
 		draw_line(body.position + Vector2(body.size.x, 0), body.position + Vector2(0, body.size.y), MARKER * Color(1, 1, 1, 0.8 * open_blend), 4.0)
 	# The pin, at the top, which is the point everything else rotated about.
+	# L1.6 v2. Rusts with the same neglect the wash does — a pin nobody has
+	# touched in a while does not stay bright brass.
+	var pin_tint := PIN.lerp(Color("6b3a1c"), neglect * 0.75)
 	draw_circle(Vector2(1.5 * zoom, 8.0 * zoom), 6.0 * zoom, Color(0, 0, 0, 0.35 * open_blend))
-	draw_circle(Vector2(0, 6.0 * zoom), 5.0 * zoom, PIN * Color(1, 1, 1, open_blend))
-	draw_circle(Vector2(-1.4 * zoom, 4.6 * zoom), 1.8 * zoom, Color(1, 1, 1, 0.5 * open_blend))
+	draw_circle(Vector2(0, 6.0 * zoom), 5.0 * zoom, pin_tint * Color(1, 1, 1, open_blend))
+	draw_circle(Vector2(-1.4 * zoom, 4.6 * zoom), 1.8 * zoom, Color(1, 1, 1, (0.5 - neglect * 0.3) * open_blend))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -1209,6 +1326,18 @@ func _draw_held() -> void:
 	CellOutzType.draw_condensed(self, body.position + Vector2(8, 8), str(holding.get("title", holding["ref"])).to_upper(), 9.0, INK * Color(1, 1, 1, 0.9), 0.7)
 	CellOutzType.draw_condensed(self, body.position + Vector2(8, body.size.y - 18.0), "CLICK THE WALL", 7.0, MARKER * Color(1, 1, 1, 0.8), 0.6)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## L1.6 v2. A wash over the whole wall, proportional to how long the player
+## has been away from it in world time. Paper yellows and cork dulls under
+## it uniformly — this is the room aging, not any one card — which is what
+## sells "you have not been in here for a while" over "somebody tinted the
+## screen".
+func _draw_neglect() -> void:
+	if neglect <= 0.01:
+		return
+	draw_rect(_board_rect, Color("6b5420") * Color(1, 1, 1, neglect * 0.22))
+	draw_rect(_board_rect, Color(0, 0, 0, neglect * 0.10))
 
 
 ## A single bulb somewhere off to the left, because this is a room nobody has

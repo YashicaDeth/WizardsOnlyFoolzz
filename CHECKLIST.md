@@ -730,11 +730,41 @@ holds what the *player* thinks — which is allowed to be wrong.
 - [x] **L5.2** No quest list exists anywhere in the game
 
 ### L v2 — the second pass
-- [ ] **L1.5** `v2` Strings pass straight through cards rather than round them, so a crowded wall reads as scribble
-- [ ] **L2.6** `v2` Nothing limits pinning, so the wall can never fill up — and a wall that cannot fill up has no cost to using
-- [ ] **L3.5** `v2` A string you drew and later disproved stays exactly as convincing; there is no way to look back and see which claims were wrong
-- [ ] **L4.4** `v2` A published theory cannot be amended or withdrawn, which makes publishing a one-way door rather than a position
-- [ ] **L1.6** `v2` The board never ages. Paper yellows, pins rust, and a wall you have not touched in a week should say so
+- [x] ~~**L1.5** `v2` Strings pass straight through cards rather than round
+      them, so a crowded wall reads as scribble~~ `_thread_detour()` checks
+      the straight line against every pinned card (theories excluded — they
+      are large, central and every route already runs a string into one on
+      purpose) and bows the thread away from whichever one it would have cut
+      through worst. Geometric only, never consults `supports()`, so L3.3
+      still holds: a wrong connection detours around the same furniture a
+      right one does.
+- [x] ~~**L2.6** `v2` Nothing limits pinning, so the wall can never fill up —
+      and a wall that cannot fill up has no cost to using~~ `MAX_PINNED` (40,
+      on top of the five theories) is a real cap now; `pin()` refuses past it
+      and sets `last_refusal` to a real line for whatever UI shows it.
+- [x] ~~**L3.5** `v2` A string you drew and later disproved stays exactly as
+      convincing; there is no way to look back and see which claims were
+      wrong~~ Narrower than L3.3, which stays intact: a string is only ever
+      marked once the theory it holds up was actually *published* and came
+      back a fabrication — a recorded outcome the player has legitimately
+      learned in play, not the board volunteering the truth early. Drawn
+      chalked-grey with a strike mark rather than removed, because the wall
+      does not erase your own bad calls.
+- [x] ~~**L4.4** `v2` A published theory cannot be amended or withdrawn, which
+      makes publishing a one-way door rather than a position~~ `retract()`
+      pulls a theory back off the record at a real cost (2 exposure, 6
+      grudge on whoever it named, through the same Wire object `publish()`
+      already uses) so it can be re-published later — walking back a public
+      claim now costs something instead of being structurally impossible.
+- [x] ~~**L1.6** `v2` The board never ages. Paper yellows, pins rust, and a
+      wall you have not touched in a week should say so~~ `neglect` reads the
+      gap in `WorldHistory.events.size()` since the last time the board was
+      opened (via `amend_subject`, deliberately not `update_subject` —
+      visiting your own wall is not news the world recorded, and logging it
+      as an event would inflate the count the next visit measures against)
+      and drives a yellowing wash across the whole wall plus a pin tint that
+      shifts toward rust. Verified: `tests/pin_board_v2_test.gd` (15 checks
+      across all five), plus `pin_test.gd` and `board_capture.gd` unaffected.
 
 ## G7 — Exposure at the spawn
 

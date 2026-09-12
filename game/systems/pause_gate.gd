@@ -53,6 +53,7 @@ func _ready() -> void:
 	add_child(screen)
 	screen.visible = false
 	_ensure_buses()
+	_restore_screen()
 	_apply_mix()
 	set_process(true)
 
@@ -111,6 +112,29 @@ func _cycle_gore() -> void:
 	BaselineHuman.apply_gore_setting()
 
 
+## AG1.4. Whether the window is filling the screen. Read from the window rather
+## than from the saved value, so the row tells the truth even if something else
+## changed it — a settings screen that disagrees with the window is worse than
+## none.
+func _fullscreen() -> bool:
+	return DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]
+
+
+func _set_fullscreen(on: bool) -> void:
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_WINDOWED)
+	WorldHistory.register_subject(SETTINGS_ID, {})
+	WorldHistory.update_subject(SETTINGS_ID, {"fullscreen": on}, "screen_setting_changed")
+
+
+## Applied once at startup, because a setting that is saved and never reapplied
+## is a setting that does not work.
+func _restore_screen() -> void:
+	var stored: Dictionary = WorldHistory.subject(SETTINGS_ID)
+	if not stored.has("fullscreen"):
+		return
+	_set_fullscreen(bool(stored["fullscreen"]))
+
+
 ## Rows are rebuilt each frame the plate is open, because their labels carry
 ## live values. The row list is the menu — there is no scene to keep in sync.
 func _build_rows() -> void:
@@ -123,7 +147,18 @@ func _build_rows() -> void:
 	for bus_name in BUSES:
 		_rows.append({"id": "vol_%s" % bus_name, "label": bus_name.to_upper(), "value": "%03d" % roundi(_volume(bus_name) * 100.0), "slider": true})
 	_rows.append({"id": "gore", "label": "VIOLENCE", "value": _gore_mode()})
+	# AG1.4, from the first playtest: "idk if there's a full screen option." There
+	# was not. It belongs beside the other settings rather than in a key nobody
+	# is told about, and it persists like everything else here.
+	_rows.append({"id": "screen", "label": "SCREEN", "value": "FULL" if _fullscreen() else "WINDOWED"})
 	_rows.append({"id": "back", "label": "BACK", "value": ""})
+
+
+## F11 is the key every player already tries before looking for a setting.
+func _unhandled_key_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).keycode == KEY_F11:
+		_set_fullscreen(not _fullscreen())
+		get_viewport().set_input_as_handled()
 
 
 func toggle() -> void:
@@ -186,6 +221,8 @@ func _nudge(direction: int) -> void:
 		_set_volume(bus_name, _volume(bus_name) + 0.1 * float(direction))
 	elif id == "gore":
 		_cycle_gore()
+	elif id == "screen":
+		_set_fullscreen(not _fullscreen())
 
 
 func _activate() -> void:

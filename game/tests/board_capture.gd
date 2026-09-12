@@ -62,6 +62,11 @@ func _ready() -> void:
 	# L4. One of these went out on the Wire. The stamp says it was published,
 	# never whether it held.
 	board.publish("theory_ownership")
+	# L3.5 v2. mara_voss carries nothing theory_rotation's own supported_by
+	# list recognises, so this comes back a fabrication — the one string this
+	# capture can show actually marked as a claim the player has since found
+	# out was wrong, rather than a guess still sitting there unresolved.
+	board.publish("theory_rotation")
 
 	for shot in [{"zoom": 1.0, "pan": Vector2.ZERO, "name": "board"}, {"zoom": 1.9, "pan": Vector2(240, 120), "name": "board_close"}]:
 		board.zoom = float(shot["zoom"])
