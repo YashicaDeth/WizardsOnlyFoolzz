@@ -191,7 +191,7 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B4.7** Authored chunk meshes instead of primitives~~
 - [x] ~~**B4.8** Per-layer impact sound — bone does not land like fat~~
 - [x] ~~**B4.9** Rot over time: flies, discolouration, smell as a gameplay signal~~
-- [ ] **B4.10v2** Rot attracts something. Flies were shipped; nothing eats
+- [x] ~~**B4.10v2** Rot attracts something. Flies were shipped; nothing eats~~
 - [ ] **B4.11v2** Blood pools persist across a scene change, or they are set dressing
 
 ### B5 — Rob cybernetics off a body `BUILT`

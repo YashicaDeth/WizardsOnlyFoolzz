@@ -51,6 +51,7 @@ func _test_rig_shape() -> void:
 	check(missing.is_empty(), "every canonical zone has a mesh and a tagged hitbox (missing %s)" % str(missing))
 	# Proximity voice needs one consistent place to speak from on any body.
 	check(body.head_anchor != null and body.head_anchor.position.y > 1.0, "rig exposes a head anchor for voice")
+	check((body.bones.torso as Node3D).get_child_count() >= BaselineHuman.SPINE_VERTEBRAE, "the torso rig carries all 33 vertebrae")
 	var seated := _rig(true)
 	check(seated.get_node_or_null("left_leg") != null, "a seated driver keeps the same zones, folded into the cab")
 	check(seated.head_anchor.position.y < body.head_anchor.position.y, "seated head sits lower than standing")

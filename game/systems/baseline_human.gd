@@ -31,6 +31,9 @@ const SEVER_HEALTH_RATIO := 0.25
 ## than merely destroyed. Tuned so an untreated stump is a clock measured in
 ## tens of seconds, not minutes.
 const STUMP_BLEED := 26.0
+## A human spine is authored as 33 vertebrae here. It is both the anatomical
+## count and a deliberate recurring number in the game's body language.
+const SPINE_VERTEBRAE := 33
 
 ## Every loose spelling that existed at a call site, mapped onto the canonical
 ## zone. Kept so old saves and old events stay readable rather than resolving to
@@ -321,10 +324,11 @@ func _build_bones(layout: Dictionary) -> void:
 			"head":
 				_bone_piece(frame, BodyMesh.skull((spec.size as Vector3).y), Vector3.ZERO)
 			"torso":
-				# Spine first, then a cage hung off it. Seven vertebrae is not
-				# anatomy, it is enough to read as a spine at this scale.
-				for index in 7:
-					_bone_piece(frame, BodyMesh.vertebra(), Vector3(0, length * 0.42 - index * length * 0.14, -0.072))
+				# The rig carries all 33 vertebrae, rather than a decorative handful.
+				# They stay legible as a continuous column at normal camera distance.
+				for index in SPINE_VERTEBRAE:
+					var fraction := float(index) / float(SPINE_VERTEBRAE - 1)
+					_bone_piece(frame, BodyMesh.vertebra(), Vector3(0, lerpf(length * 0.43, -length * 0.43, fraction), -0.072))
 				for index in 5:
 					var rib := _bone_piece(frame, BodyMesh.arc_tube(0.148, 0.098, 0.011, PI * 0.12, PI * 0.88), Vector3(0, length * 0.30 - index * 0.052, -0.012))
 					rib.rotation.x = 0.14

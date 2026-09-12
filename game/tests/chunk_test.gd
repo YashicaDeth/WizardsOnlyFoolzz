@@ -1,5 +1,7 @@
 extends Node
 
+const CarrionScavenger := preload("res://systems/carrion_scavenger.gd")
+
 ## B4. The claim is not "blood comes out" — it is that what comes out is a set
 ## of identified pieces that know which layer, which zone and which person they
 ## came from, because B5 (robbing cybernetics), camera rituals and the organ
@@ -153,6 +155,13 @@ func _ready() -> void:
 	check(GoreChunks.rot_ratio(rot_target) >= 1.0, "a chunk left long enough is fully rotted")
 	var scent := GoreChunks.scent_sources()
 	check(scent.any(func(source): return (source.position as Vector3).distance_to((rot_target as Node3D).global_position) < 0.01), "a rotten chunk becomes a queryable scent source")
+	# --- B4.10: a creature answers the scent, but does not erase all evidence --
+	var scavenger := CarrionScavenger.new()
+	add_child(scavenger)
+	scavenger.global_position = (rot_target as Node3D).global_position + Vector3(0.1, 0.0, 0.0)
+	scavenger._process(1.0)
+	check(not GoreChunks.live.has(rot_target), "a carrion scavenger follows rot and consumes the flesh")
+	check(not CarrionScavenger.can_eat(GoreChunks.from_subject("bare_probe").filter(func(piece): return int(GoreChunks.identify(piece).get("layer", -1)) == GoreChunks.Layer.BONE)[0]), "scavengers leave bone behind for the world to read")
 
 	# --- picking a piece up --------------------------------------------------
 	var target: Node = GoreChunks.from_subject("chunk_probe")[0]
