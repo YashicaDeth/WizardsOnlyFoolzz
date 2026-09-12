@@ -1826,14 +1826,34 @@ inventory, and the sheet you filled in D8 already calls each opt-in modifier "a
 handle on you". Pulling one is the first genuinely disloyal act available to a
 player, and it should be possible from hour one and quietly discouraged.
 
-- [ ] **N5.1** A real slot per site — spine, skull, chest, each arm, each leg, the organ bays
-- [ ] **N5.2** Factory hardware fills them at decanting and is *locked*, not absent
-- [ ] **N5.3** Locked means discouraged, never disabled: the game warns and then lets you
-- [ ] **N5.4** The warning is in CellOutz's voice, not the game's — "you don't want to go rogue yet, do you"
-- [ ] **N5.5** Pulling one is recorded, and CellOutz standing reads it (E, `faction_price_factor`)
-- [ ] **N5.6** An empty slot is a real condition — the body works worse without what was in it
-- [ ] **N5.7** What you pull is a carried object with a lien on it, because it was never yours (B5.4)
-- [ ] **N5.8** Robbed and grown hardware fit the same slots — one vocabulary, per B2.1
+- [ ] **N5.1** A real slot per site — spine, skull, chest, each arm, each leg, the
+      organ bays — `installed_parts` is still keyed by `BaselineHuman`'s six
+      anatomy zones, so torso covers spine, chest and the organ bays as one
+      slot rather than several. Splitting that out is a real data-model
+      change on its own, not attempted here.
+- [x] **N5.2** Factory hardware fills them at decanting and is *locked*, not
+      absent — `install_factory_loadout()`, three real zones (head, torso,
+      left arm), each with a real reason CellOutz put it there.
+- [x] **N5.3** Locked means discouraged, never disabled: the game warns and
+      then lets you — `pull_part(zone_id, confirmed)`: a first call against a
+      locked slot only warns; the same call with `confirmed` true is what
+      actually pulls it.
+- [x] **N5.4** The warning is in CellOutz's voice, not the game's — "you don't
+      want to go rogue yet, do you" — `AnatomyComponent.LOCKED_WARNING`.
+- [ ] **N5.5** Pulling one is recorded, and CellOutz standing reads it (E,
+      `faction_price_factor`) — the pull is recorded (`implant_pulled`
+      events), but nothing yet moves it against `tree_alignment()`/CellOutz
+      standing specifically.
+- [x] **N5.6** An empty slot is a real condition — the body works worse without
+      what was in it — genuinely mechanical: `apply_hit()` already scales
+      incoming damage by `installed_parts[zone].armor * implant_condition()`,
+      so an emptied slot takes more damage, not merely reports a zero.
+- [x] **N5.7** What you pull is a carried object with a lien on it, because it
+      was never yours (B5.4) — `pull_part()`'s successful result is shaped for
+      `Carry.take_chunk()` directly, `lien: "celloutz"` attached, verified
+      accepted by a real `Carry` instance.
+- [ ] **N5.8** Robbed and grown hardware fit the same slots — one vocabulary,
+      per B2.1 — not touched this pass.
 
 
 ### N v10 — the final pass
