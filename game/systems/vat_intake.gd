@@ -55,6 +55,15 @@ var row := 0
 var elapsed := 0.0
 var handler_line := 0
 var handler_life := 0.0
+## D3.5 v2. `line_for()` indexes each pool with `handler_line % pool.size()`,
+## and `handler_line` used to start at zero every single decanting — so the
+## first idle line was always the same line, then the same second one, in
+## the same order, forever. Rolled once per scene rather than per moment, so
+## which line starts each pool varies decanting to decanting while a single
+## intake still plays the same way twice if replayed (the property the file's
+## own doc actually asks for — determinism within a sitting, not across new
+## characters).
+var line_offset := 0
 ## D3.4. What he is actually saying, and how long he sits with it. The line used
 ## to be an index into a rota on a flat timer; it is now whatever the moment
 ## called for, held for as long as that particular line is worth holding.
@@ -73,6 +82,9 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	sheet = SHEET.new()
+	var offset_rng := RandomNumberGenerator.new()
+	offset_rng.randomize()
+	line_offset = offset_rng.randi()
 	set_process(true)
 	_speak()
 
@@ -82,7 +94,7 @@ func _ready() -> void:
 ## ticking a box.
 func _speak(context: String = "idle") -> void:
 	handler_line += 1
-	var beat := IntakeDirection.line_for(context, handler_line)
+	var beat := IntakeDirection.line_for(context, handler_line + line_offset)
 	handler_says = str(beat.line)
 	handler_life = float(beat.hold)
 
@@ -111,7 +123,12 @@ func _advance_procedure() -> void:
 ## D3. He writes down what he *thinks* you said. Usually right, occasionally
 ## not, and with CLERICAL ERROR taken it is a coin toss — the trait does not add
 ## the behaviour, it makes the behaviour worse.
-func _transcribe(intent: String) -> void:
+## D4.6 v2. `success_context` is what he says when it goes down clean — the
+## generic "chose" pool by default, or something that actually answers what
+## was just picked (a race, currently) when one is given. A slip still gets
+## "slipped" regardless: getting your paperwork wrong is not the moment for
+## him to have an opinion about who you are.
+func _transcribe(intent: String, success_context: String = "chose") -> void:
 	var slip := 0.12
 	if sheet.traits.has("clerical_error"):
 		slip = 0.5
@@ -126,7 +143,7 @@ func _transcribe(intent: String) -> void:
 	else:
 		transcript = "WROTE: %s" % intent.to_upper()
 		if procedure.is_empty():
-			_speak("chose")
+			_speak(success_context)
 	transcript_life = 3.2
 
 
@@ -197,7 +214,9 @@ func _commit() -> void:
 			_transcribe(ROUTES[row])
 		1:
 			sheet.race = str(CharacterSheet.RACES.keys()[row])
-			_transcribe(str((CharacterSheet.RACES[sheet.race] as Dictionary).name))
+			# D4.6 v2. He reacts to what you actually picked rather than
+			# saying the same "noted" he says for anything else on the form.
+			_transcribe(str((CharacterSheet.RACES[sheet.race] as Dictionary).name), "race_" + sheet.race)
 		2:
 			var trait_id := str(CharacterSheet.TRAITS.keys()[row])
 			if sheet.toggle_trait(trait_id):

@@ -404,8 +404,35 @@ under-directed opening.
 ---
 
 ### D v2 — the second pass
-- [ ] **D3.5** `v2` The handler says the same things in the same order every decanting
-- [ ] **D4.6** `v2` Race is data the world reads, but the intake does not react to it out loud
+- [x] ~~**D3.5** `v2` The handler says the same things in the same order
+      every decanting~~ `_speak()` indexed every `IntakeDirection` pool with
+      `handler_line % pool.size()`, and `handler_line` always started at
+      zero — so the first idle line was the same line every decanting, then
+      the same second, forever, in the same order. A `line_offset` rolled
+      once per scene in `_ready()` now shifts every pool's index, so which
+      line starts each context varies decanting to decanting, while
+      `IntakeDirection.line_for()` itself stays exactly as deterministic as
+      `intake_direction_test.gd` already proved — the same moment in the
+      same decanting still plays the same way twice, which is the property
+      the file's own doc actually asks for.
+- [x] ~~**D4.6** `v2` Race is data the world reads, but the intake does not
+      react to it out loud~~ Picking a race called `_transcribe()` with no
+      way to say anything but the generic "chose" pool ("Noted." / "Fine.
+      That's what I'll put.") — the same reaction ticking any other box on
+      the form gets. `_transcribe()` now takes an optional
+      `success_context`, and the RACE page passes `"race_" + sheet.race`,
+      landing on six new authored lines in `intake_direction.gd` (one per
+      race, each actually naming what that race is and what it costs
+      socially) instead of the generic pool. A mistranscription still gets
+      "slipped" regardless — getting the paperwork wrong is not the moment
+      for him to have an opinion about who you are.
+      Verified: `tests/intake_variance_test.gd` (new, 4/4 — two decantings
+      with different offsets hear a different first line, the same moment
+      replayed in one decanting still matches, all six races get a genuinely
+      distinct reaction, and at least some of those are the race-specific
+      lines rather than the generic fallback), plus the existing
+      `intake_direction_test.gd` (22/22) regression suite and a windowed
+      capture confirming the RACE page still renders correctly.
 - [x] ~~**D2.4** `v2` CLERICAL ERROR is never discoverable — finding out
       which part of your sheet is wrong should be possible and should cost
       something~~ Was undiscoverable in principle, not just in practice:

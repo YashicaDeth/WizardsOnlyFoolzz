@@ -76,6 +76,28 @@ const LINES := {
 	"refused": [
 		{"line": "No budget. You get what the vat gave you.", "hold": 3.0},
 	],
+	# D4.6 v2. Race was data the world read — build factor, metabolism,
+	# social price, the Tree pull — and the intake never once said so out
+	# loud. He has an opinion on every one of these, because a man who has
+	# processed four hundred bodies has seen this exact one before.
+	"race_decanted": [
+		{"line": "Vat-grown, straight down the middle. Don't take it personal, everyone in this room is.", "hold": 3.6},
+	],
+	"race_soft_rot": [
+		{"line": "Spore graft. Keep that quiet near the Ossuary crowd, they'll clock it before you sit down.", "hold": 3.8},
+	],
+	"race_marrow_cut": [
+		{"line": "Somebody rewrote your bones to buy your allegiance. Somebody still holds the receipt for that.", "hold": 3.8},
+	],
+	"race_roadborn": [
+		{"line": "Cyber since you were small enough to fit the rig. You'll read a bumper better than a face.", "hold": 3.8},
+	],
+	"race_unreset": [
+		{"line": "Before the flash. I have processed four hundred of these and never once had one admit it.", "hold": 4.0},
+	],
+	"race_lantern_born": [
+		{"line": "Gate Lantern stock, raised to the Ascent. That'll open doors up top and close them in the Yard.", "hold": 3.8},
+	],
 }
 
 
