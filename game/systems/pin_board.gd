@@ -218,6 +218,8 @@ signal strings_changed()
 signal lead_opened(from: String, to: String)
 ## L4. A theory left the wall and went out on the Wire.
 signal theory_published(theory_id: String, result: Dictionary)
+## L4.4 v2.
+signal theory_retracted(theory_id: String, result: Dictionary)
 
 
 func _ready() -> void:
@@ -521,6 +523,41 @@ func publish(theory_id: String, wire: Object = null) -> Dictionary:
 		WorldHistory.update_subject(BOARD_ID, {"published": out}, "theory_published")
 		WorldHistory.record_event("theory_published", {"subject": target, "theory": theory_id, "sound": sound})
 		theory_published.emit(theory_id, result)
+		rebuild()
+	return result
+
+
+## L4.4 v2. Publishing was a one-way door — no way to walk a claim back once
+## it was out, so a theory that turned out wrong (or one the player simply
+## changed their mind about) sat on the record forever with no cost and no
+## remedy. `retract()` pulls it back off the record through the same Wire
+## object `publish()` posts through, at the same kind of real price
+## everything else on the Wire has: 2 exposure, 6 grudge on whoever it named
+## (through `WireNetScript.act`'s own `"retract"` case, not hand-rolled here,
+## so it goes through the same ledger and the same reciprocity rules as
+## everything else). Once retracted a theory is no longer `is_published()`,
+## so it can be strung and published again if the player finds better
+## evidence — retraction is a position you can hold, not a reset button.
+func retract(theory_id: String, wire: Object = null) -> Dictionary:
+	var record: Dictionary = WorldHistory.subject(BOARD_ID)
+	var out: Array = (record.get("published", []) as Array).duplicate()
+	var index := -1
+	for i in out.size():
+		if str((out[i] as Dictionary).get("theory", "")) == theory_id:
+			index = i
+			break
+	if index == -1:
+		return {"ok": false, "headline": "NOTHING TO RETRACT", "detail": "YOU NEVER PUBLISHED THAT."}
+	var target := str((out[index] as Dictionary).get("target", ""))
+	var net: Object = wire if wire != null else WireNetScript.new(WireNetScript.SIGNAL_UNDERBELLY)
+	var result: Dictionary = net.act(target, "retract")
+	result["theory"] = theory_id
+	result["target"] = target
+	if bool(result.get("ok", false)):
+		out.remove_at(index)
+		WorldHistory.update_subject(BOARD_ID, {"published": out}, "theory_retracted")
+		WorldHistory.record_event("theory_retracted", {"subject": target, "theory": theory_id})
+		theory_retracted.emit(theory_id, result)
 		rebuild()
 	return result
 

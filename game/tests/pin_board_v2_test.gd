@@ -90,6 +90,20 @@ func _ready() -> void:
 	var blocked_detour: Vector2 = board._thread_detour(Vector2(0, 360), Vector2(1280, 360))
 	_check(blocked_detour.length() > 1.0, "a line straight through a pinned card gets a real detour (%.1f)" % blocked_detour.length())
 
+	print("L4.4 v2 - a published theory can be retracted")
+	_check(board.is_published("theory_rotation"), "theory_rotation is still on the record from the section above")
+	var bad_retract: Dictionary = board.retract("theory_absent_god")
+	_check(not bool(bad_retract.get("ok", true)), "retracting a theory that was never published is refused")
+	var retract_result: Dictionary = board.retract("theory_rotation")
+	_check(bool(retract_result.get("ok", false)), "retracting a published theory succeeds (%s)" % str(retract_result.get("detail", "")))
+	_check(not board.is_published("theory_rotation"), "the retracted theory is no longer published")
+	_check(int(retract_result.get("exposure", 0)) > 0 and int(retract_result.get("grudge", 0)) > 0, "walking it back costs real exposure and grudge, not nothing")
+	# mara_voss is still pinned and still strung to theory_rotation from the
+	# L3.5 section above — retract() only pulled the publish record, not the
+	# string, so the same evidence can carry a second publish.
+	var republish: Dictionary = board.publish("theory_rotation")
+	_check(bool(republish.get("ok", false)), "a retracted theory can be published again on the same evidence")
+
 	print("L1.6 v2 - the board ages when the player has been away")
 	# Establishes today's event count as the baseline first — the test has
 	# already recorded events above just setting up its own fixtures, and

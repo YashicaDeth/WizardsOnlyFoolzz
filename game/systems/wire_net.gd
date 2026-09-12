@@ -720,6 +720,11 @@ func act(subject_id: String, action: String) -> Dictionary:
 				result.grudge = 12
 				result.exposure = 5
 				result.reach = -240
+		"retract":
+			result.headline = "RETRACTED"
+			result.detail = "WALKED BACK IN PUBLIC. EVERYONE ALREADY SAW YOU SAY IT THE FIRST TIME."
+			result.grudge = 6
+			result.exposure = 2
 		"trace":
 			var pattern := rng.randi_range(0, 3)
 			result.headline = "PATTERN ON %s" % str(target.name).to_upper()
