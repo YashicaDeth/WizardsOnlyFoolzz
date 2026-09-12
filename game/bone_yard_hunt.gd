@@ -19,6 +19,7 @@ const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
+const STORM_WEATHER := preload("res://systems/storm_weather.gd")
 ## AS1.1. Bright enough to actually read as a light source against
 ## `world_look.gd`'s low-ambient presets rather than a glow nobody would notice.
 const HANDHELD_LAMP_ENERGY := 6.0
@@ -206,6 +207,9 @@ var handheld_lamp: SpotLight3D
 ## angle and brightness no matter the hour, which is why W1.1 existing made no
 ## visible difference until this read off it.
 var sun: DirectionalLight3D
+## AS4. Storms that answer the occult — severity is a read of
+## `WorldHistory.chaos_magick()`, never authored here.
+var storm_weather: StormWeather
 var pathfinder = preload("res://systems/ashbloom_pathfinder.gd").new()
 var social_markers: Array[Node3D] = []
 var resolution_ui: Control
@@ -351,6 +355,9 @@ func _ready() -> void:
 	ballistics = BALLISTICS.new()
 	add_child(ballistics)
 	ballistics.round_hit.connect(_on_round_hit)
+	storm_weather = STORM_WEATHER.new()
+	storm_weather.name = "StormWeather"
+	add_child(storm_weather)
 	blood_veil = BLOOD_VEIL.new()
 	$HUD.add_child(blood_veil)
 	_pointer = Control.new()
@@ -714,6 +721,12 @@ func _physics_process(delta: float) -> void:
 	# builds a third.
 	WorldClock.advance(delta)
 	_update_day_night()
+	# AS4.5. Being caught out in it costs something — stamina here, rather
+	# than a new damage type, so a storm is a real cost without touching the
+	# anatomy/wound systems a weather pass has no business reaching into.
+	if storm_weather != null and is_instance_valid(storm_weather):
+		storm_weather.follow(player)
+		stamina = clampf(stamina - storm_weather.exposure_cost(delta), 0.0, 100.0)
 	# AS1.1/AS1.3. Energy tracks the same smooth `raised` blend the device
 	# itself uses, so the light does not snap on; it hard-zeroes at empty
 	# battery, so "can run out" (AS1.3) is an actual floor, not a long fade.

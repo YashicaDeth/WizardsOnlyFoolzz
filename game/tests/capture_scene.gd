@@ -161,6 +161,22 @@ func _ready() -> void:
 			device.set_mode("WIRE")
 			for _hold in 60:
 				await get_tree().process_frame
+	elif trigger == "storm":
+		# AS4. Force the chaos-magick level up directly rather than waiting on
+		# a ritual, then force a strike so the shot lands mid-crawl instead of
+		# on whatever random tick the storm's own clock would have picked.
+		WorldHistory.chaos_magick_level = 0.95
+		WorldHistory.chaos_magick_at_minute = WorldClock.minutes()
+		WorldClock.set_hour(1.0)
+		scene._update_day_night()
+		var storm: Node3D = scene.storm_weather
+		storm._process(0.1)
+		storm._strike(storm.severity())
+		if "--red" in OS.get_cmdline_user_args():
+			storm._crawler_material.set_shader_parameter("red", true)
+		for _hold in 6:
+			storm._process(0.05)
+			await get_tree().process_frame
 	elif trigger == "night":
 		# AS2. Forced rather than waited for — a real night is 24 real minutes
 		# away at the default clock rate, per world_clock.gd.
