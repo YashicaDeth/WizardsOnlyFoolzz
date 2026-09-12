@@ -3514,13 +3514,20 @@ entirely in the account.
       live in), transfers it marked `stolen` — B5.6's existing heat discount
       applies to it exactly as it does to a robbed organ, no second rule
       invented for drugs — and clears the subject's copy so it cannot be
-      lifted twice. Not yet wired into the extraction dig UI itself
-      (`_begin_extraction()`/`_finish_extraction()` in `bone_yard_hunt.gd`
-      still only offer anatomy, not a body's pockets) — the object, the
-      pricing and the theft mechanic are real and tested; surfacing a
-      pocket search as a player-facing action alongside the anatomy dig is
-      the remaining step. Verified: `tests/substance_object_test.gd` (new,
-      11/11), plus the existing `combat_integration_test.gd` and
+      lifted twice, and it is wired into the real robbery verb rather than
+      sitting unreachable: `_nearest_robbable()` now counts a body with only
+      a pocket worth taking as robbable even when it has nothing worth
+      cutting open, and `_begin_extraction()` (the same `E` a player already
+      knows) takes the pocket in one instant motion before whatever the
+      body's actual anatomy might also be worth digging for — no second key
+      to discover, per C2.7 v3's own lesson. Genuinely witnessed through
+      `WitnessLedger.witnesses_of()`, the same static helper the anatomy dig
+      itself is built on. Verified: `tests/substance_object_test.gd` (new,
+      11/11) and `tests/pocket_search_test.gd` (new, 13/13 — a pocket-only
+      body is robbable and yields its item in one motion with no dig
+      session, a second press correctly falls through to a real anatomy dig
+      once the pocket is empty, and a body carrying both gives up the
+      pocket first), plus the existing `combat_integration_test.gd` and
       `opening_test.gd` regression suites.
 - [ ] **AU1.3** Strains differ. Two mushrooms are not one item with a number
 - [ ] **AU1.4** Everything costs: body, standing, time, and the godhead's attention
