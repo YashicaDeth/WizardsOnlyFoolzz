@@ -3492,7 +3492,27 @@ report less frightening for omitting the milligrams, and the horror of datura is
 entirely in the account.
 
 - [ ] **AU1.1** Every class present: stimulant, cannabinoid, psychedelic, dissociative, deliriant, empathogen, depressant, opioid, research chemical, new-world
-- [ ] **AU1.2** A drug is an object — a baggie, a blister, a tab, a weight — carried, priced, stealable
+- [x] ~~**AU1.2** A drug is an object — a baggie, a blister, a tab, a weight
+      — carried, priced, stealable~~ `substances.gd`'s three entries each
+      name a real physical `form` now (`marrow_dust` a baggie, `choir_bloom`
+      a weight, `static_hymn` a tab), which `carry.gd`'s `take_substance()`
+      reads into the item's own label — "MARROW DUST (BAGGIE)", not a
+      generic "substance". Choir of Marrow prices it: a new `substance: 1.2`
+      entry in `FACTION_APPETITES`, above the neutral baseline every unlisted
+      buyer gets, on top of the anatomy trade it already specialises in.
+      Stealable: `Carry.take_from_subject()` reads a subject's own
+      `carried_substance` field (the same shape `wounds`/`anatomy` already
+      live in), transfers it marked `stolen` — B5.6's existing heat discount
+      applies to it exactly as it does to a robbed organ, no second rule
+      invented for drugs — and clears the subject's copy so it cannot be
+      lifted twice. Not yet wired into the extraction dig UI itself
+      (`_begin_extraction()`/`_finish_extraction()` in `bone_yard_hunt.gd`
+      still only offer anatomy, not a body's pockets) — the object, the
+      pricing and the theft mechanic are real and tested; surfacing a
+      pocket search as a player-facing action alongside the anatomy dig is
+      the remaining step. Verified: `tests/substance_object_test.gd` (new,
+      11/11), plus the existing `combat_integration_test.gd` and
+      `opening_test.gd` regression suites.
 - [ ] **AU1.3** Strains differ. Two mushrooms are not one item with a number
 - [ ] **AU1.4** Everything costs: body, standing, time, and the godhead's attention
 - [ ] **AU1.5** Tolerance and comedown are tracked on the real clock
@@ -3500,7 +3520,25 @@ entirely in the account.
 - [ ] **AU1.7** Deliriants are horror and must never read as fun
 - [ ] **AU1.8** Smoking is a real act: cigarettes, vapes, joints, spliffs, blunts, bongs, alien devices
 - [ ] **AU1.9** Caffeine is in the same system as everything else
-- [ ] **AU1.10** You can lace somebody, the world records it, and the law and the gods respond (AE1.4, AJ5)
+- [ ] **AU1.10** You can lace somebody, the world records it, and the law
+      and the gods respond (AE1.4, AJ5) — three of four clauses are real:
+      new `Substances.lace(actor_id, target_id, substance_id, witness_ledger,
+      witness_ids)` applies the dose to the *target*, not the actor — no
+      `Boons._pay()`, because a non-consensual dose does not get to refuse
+      itself under a safety floor, and the actor gets no boon and no glimpse
+      credited to them, so this is not `take()` under another name. It is
+      genuinely witnessed through the exact `WitnessLedger` object
+      `Extraction.notice()` already takes as a parameter rather than
+      assuming a global, and every god actually asked gives its own real,
+      separately-recorded verdict (`lacing_verdict` events, mirroring
+      `ModernGods.record_death_verdicts()`'s own "never summed into one
+      score" rule) rather than the game merely logging that a drugging
+      happened. What is still missing is AE1.4 itself: no law/enforcement
+      system exists yet to read what `witness_ledger.gd` decided was seen
+      and respond to it — this is only waiting on that system, the same as
+      AS1.5 waits on AE1.1. Verified: `tests/lacing_test.gd` (new, 9/9),
+      plus the existing `modern_gods_test.gd`, `substances_test.gd` and
+      `substance_object_test.gd` regression suites.
 - [ ] **AU1.11** Research chemicals as easter eggs, from the real long tail
 - [ ] **AU1.12** New-world drugs made of what is left
 

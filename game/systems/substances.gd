@@ -18,20 +18,25 @@ extends RefCounted
 
 const AnatomyComponent := preload("res://systems/anatomy_component.gd")
 
+## AU1.2. "A drug is an object — a baggie, a blister, a tab, a weight." Each
+## entry now names which of those it actually is, read by `carry.gd`'s
+## `take_substance()` so the item that lands in the bag looks like the thing
+## it is rather than a generic "substance" kind — the same way a chunk in
+## CARRY already knows it is a limb and not just meat.
 const CATALOG := {
 	"marrow_dust": {
 		"label": "Marrow Dust", "role": "Ground cortical bone, cut and smoked",
-		"cost_kind": "blood", "cost_amount": 220.0,
+		"form": "baggie", "cost_kind": "blood", "cost_amount": 220.0,
 		"pain_relief": 30.0, "consciousness_cost": 6.0, "door": false,
 	},
 	"choir_bloom": {
 		"label": "Choir Bloom", "role": "A fungal graft the Choir cultivates for exactly this",
-		"cost_kind": "organ", "cost_target": "liver", "cost_amount": 4.5,
+		"form": "weight", "cost_kind": "organ", "cost_target": "liver", "cost_amount": 4.5,
 		"pain_relief": 0.0, "consciousness_cost": 18.0, "door": true,
 	},
 	"static_hymn": {
 		"label": "Static Hymn", "role": "A dead mast's feedback, inhaled off a cracked speaker cone",
-		"cost_kind": "limb", "cost_target": "head", "cost_amount": 6.0,
+		"form": "tab", "cost_kind": "limb", "cost_target": "head", "cost_amount": 6.0,
 		"pain_relief": 0.0, "consciousness_cost": 26.0, "door": true,
 	},
 }
@@ -62,6 +67,54 @@ static func take(subject_id: String, substance_id: String) -> Dictionary:
 	if bool(data.get("door", false)):
 		result["glimpsed"] = _glimpse_one(subject_id, substance_id)
 	return result
+
+
+## AU1.10. "You can lace somebody." Not `take()` under another name: the
+## target never consents and never pays through `Boons._pay()` — a
+## non-consensual dose does not get to refuse itself under a safety floor,
+## it just happens — and the actor gets nothing structural back, no boon, no
+## glimpse credited to them. What the actor gets instead is a real witness
+## record and a real disagreement: `witness_ledger` (when given one, the
+## same object `Extraction.notice()` already takes as a parameter rather
+## than assuming a global) decides who actually saw it, and the gods each
+## give their own verdict on it exactly the way a death already gets one —
+## the game records what happened; it does not congratulate whoever did it.
+static func lace(actor_id: String, target_id: String, substance_id: String, witness_ledger: Object = null, witness_ids: Array = []) -> Dictionary:
+	if not CATALOG.has(substance_id):
+		return {"ok": false, "reason": "NO SUCH SUBSTANCE"}
+	var target := WorldHistory.subject(target_id)
+	if target.is_empty():
+		return {"ok": false, "reason": "NO SUCH TARGET"}
+	var data: Dictionary = CATALOG[substance_id]
+	var anatomy: Dictionary = target.get("anatomy_state", {})
+	anatomy["pain"] = clampf(float(anatomy.get("pain", 0.0)) - float(data.pain_relief), 0.0, 100.0)
+	anatomy["consciousness"] = clampf(float(anatomy.get("consciousness", 100.0)) - float(data.consciousness_cost), 0.0, 100.0)
+	WorldHistory.amend_subject(target_id, {"anatomy_state": anatomy})
+	var details := {"actor_id": actor_id, "target_id": target_id, "substance_id": substance_id}
+	var event: Dictionary
+	if witness_ledger != null and witness_ledger.has_method("record"):
+		event = witness_ledger.record("subject_laced", details, witness_ids)
+	else:
+		event = WorldHistory.record_event("subject_laced", details)
+	# AJ5.4/AJ5.7. Two verdicts on one act is the normal outcome here too,
+	# never averaged — each god's own opinion, attributed to its own name,
+	# the same as `ModernGods.record_death_verdicts()` already does for a
+	# kill. Reimplemented rather than called through, since that function is
+	# named and shaped for a death specifically and this is not one.
+	var verdicts: Array = []
+	for god_id in ModernGods.GODS.keys():
+		var result: Dictionary = ModernGods.verdict(str(god_id), target_id, {"witnessed": witness_ids.size()})
+		if result.is_empty():
+			continue
+		verdicts.append(result)
+		WorldHistory.record_event("lacing_verdict", {
+			"actor_id": actor_id, "target_id": target_id, "god_id": str(god_id),
+			"label": result.label, "lean": result.lean,
+		})
+	return {
+		"ok": true, "event_sequence": int(event.get("sequence", -1)),
+		"witnessed_by": witness_ids.size(), "verdicts": verdicts,
+	}
 
 
 ## The one currently-buildable half of E6.3: which entity a door-substance
