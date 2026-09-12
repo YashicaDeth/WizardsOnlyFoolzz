@@ -2704,7 +2704,10 @@ a real decision, not a formality.
 - [ ] **AC1.2** If it exists it obeys the destruction rule: recorded, not decorative
 - [ ] **AC1.3** Rain wets surfaces and pools where the ground actually dips
 - [ ] **AC1.4** Blood joins the same system — B4 already tracks where it lands
-- [ ] **AC1.5** Lightning is a real light and a real sound, on the weather clock (W)
+- [x] **AC1.5** Lightning is a real light and a real sound, on the weather clock (W) —
+      `storm_weather.gd`: a real `OmniLight3D` flash plus a generated thunder
+      crack-and-rumble, severity-scaled, on `world_clock.gd`'s own clock via
+      `WorldHistory.chaos_magick()`. Fluid/fire (AC1.1-1.4, 1.6-1.8) untouched.
 - [ ] **AC1.6** Fire spreads on what will burn and stops on what will not
 - [ ] **AC1.7** Explosions move things, break things and hurt bodies through one path
 - [ ] **AC1.8** An engine can catch, and a car that catches is a bomb with a timer
