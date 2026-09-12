@@ -22,6 +22,7 @@ const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 const RIVAL_REGISTRY := preload("res://systems/rival_registry.gd")
 const DEFEAT_ROUTER := preload("res://systems/defeat_router.gd")
 const ASSET_NETWORK := preload("res://systems/asset_network.gd")
+const COMBAT_RESPONSE := preload("res://systems/combat_response.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
@@ -660,6 +661,8 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		actor.state = "fleeing"
 		actor.loot_at_risk = true
 		prompt.text = "%s IS BLEEDING OUT AND ESCAPING — CHASE FOR THEIR LOOT OR LET THEM GO." % str(actor.display_name).to_upper()
+	else:
+		_apply_combat_response(actor, attack, result)
 	if anatomy.dead:
 		_kill_encounter_actor(nearest_index, "combat_trauma")
 	return true
@@ -707,6 +710,8 @@ func _resolve_firearm(attack: Dictionary) -> void:
 		elif actor.anatomy.critical or actor.anatomy.pain >= 68.0:
 			actor.state = "fleeing"
 			actor.loot_at_risk = true
+		else:
+			_apply_combat_response(actor, attack, {"pain": actor.anatomy.pain})
 	if impacts.is_empty():
 		prompt.text = "%s / MISS" % str(arsenal.current().label)
 	else:
@@ -1194,6 +1199,13 @@ func _update_encounter_actors(delta: float) -> void:
 			if player.distance_to(node.global_position) <= 4.0:
 				prompt.text = "[E] %s / DOWNED, ALIVE — DECIDE THEIR FATE" % str(actor.display_name).to_upper()
 			continue
+		if str(actor.get("state", "")) == "staggered":
+			actor["stagger_remaining"] = maxf(0.0, float(actor.get("stagger_remaining", 0.0)) - delta)
+			(node as CharacterBody3D).velocity = Vector3.ZERO
+			actor.attack_time = 0.0
+			if float(actor.stagger_remaining) <= 0.0:
+				actor.state = "hunting"
+			continue
 		if str(actor.get("disposition", "hostile")) != "hostile":
 			actor.attack_time = 0.0
 			continue
@@ -1238,6 +1250,21 @@ func _actor_attack_cycle(actor: Dictionary) -> float:
 
 func _actor_attack_damage(actor: Dictionary) -> int:
 	return maxi(2, roundi(9.0 * _actor_combat_ratio(actor)))
+
+
+func _apply_combat_response(actor: Dictionary, attack: Dictionary, hit: Dictionary) -> void:
+	var response := COMBAT_RESPONSE.from_hit(attack, actor.anatomy, hit)
+	if not bool(response.staggered):
+		return
+	actor.state = "staggered"
+	actor["stagger_remaining"] = float(response.duration)
+	actor.attack_time = 0.0
+	WorldHistory.record_event("attack_interrupted", {
+		"actor": "player", "subject_id": actor.subject_id,
+		"weapon": attack.get("weapon", "unknown"), "severity": response.severity,
+		"location": HUNT_LOCATION,
+	})
+	prompt.text = "%s LOSES THEIR FOOTING // PRESS THE OPENING" % str(actor.display_name).to_upper()
 
 
 func _apply_maiming_state(actor: Dictionary, zones: Array, direction: Vector3) -> void:
