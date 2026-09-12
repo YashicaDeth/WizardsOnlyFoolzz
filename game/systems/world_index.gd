@@ -36,6 +36,7 @@ const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 const WoundCatalog := preload("res://systems/wound_catalog.gd")
 const BrokenWeb := preload("res://systems/broken_web.gd")
 const BlackMirror := preload("res://systems/black_mirror.gd")
+const Sephiroth := preload("res://systems/sephiroth.gd")
 
 ## Six live 3D heads is cheap; sixty would not be, and each icon owns a World3D.
 ## So they are a pool the pages draw into by slot rather than one per row.
@@ -50,7 +51,10 @@ const BRUISE := Color("6b3f6e")
 const SMOKE := Color(0.042, 0.032, 0.024, 0.96)
 const GROUND := Color(0.035, 0.026, 0.019, 0.90)
 
-const PAGES := ["FILE", "PYRAMID", "WIRE", "BODY"]
+## AR1.1. Appended rather than inserted — WIRE and BODY's hardcoded page
+## indices (2 and 3) are referenced elsewhere in this file by number, and a
+## new page ahead of them would silently retarget those jumps.
+const PAGES := ["FILE", "PYRAMID", "WIRE", "BODY", "TREE"]
 
 var page := 0
 var rail_index := 0
@@ -797,6 +801,8 @@ func _draw() -> void:
 			_draw_wire(panel)
 		3:
 			_draw_body(panel)
+		4:
+			_draw_tree(panel)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if page_blend < 1.0:
 		_draw_page_wipe(panel, eased)
@@ -930,7 +936,11 @@ func _draw_header(plate: Rect2) -> void:
 ## navigation models across three pages of one object was the old problem.
 func _draw_rail(rect: Rect2) -> void:
 	draw_line(rect.position + Vector2(rect.size.x + 8, 0), rect.position + Vector2(rect.size.x + 8, rect.size.y), INK * Color(1, 1, 1, 0.14), 1.0)
-	var heading: String = ["SUBJECTS", "FACTIONS", "ACCOUNTS", "BODIES"][page]
+	# AR1.1. TREE has no rail-selectable list of its own — it is one diagram,
+	# not a set of rows to page through — so the rail stays present (the
+	# frame reads as one made object, not four with a fifth bolted on) but
+	# empty, same as any other page would with nothing matching a search.
+	var heading: String = ["SUBJECTS", "FACTIONS", "ACCOUNTS", "BODIES", "PATHS"][page]
 	CellOutzType.draw_text(self, rect.position, heading, 12.0, MOSS, 1.4)
 	var total := "%02d" % _rail_cache.size()
 	var total_width := CellOutzType.width(total, 10.0, 0.8)
@@ -1422,6 +1432,87 @@ func _draw_pyramid_waist(rect: Rect2) -> void:
 	draw_string(font, stamp_at + Vector2(stamp_width + 14.0, 13.0), "· %s (%.2f)" % [descriptor.to_upper(), alignment], HORIZONTAL_ALIGNMENT_LEFT, rect.end.x - (stamp_at.x + stamp_width + 14.0), 11, INK * Color(1, 1, 1, 0.7))
 
 
+# --- page four: the tree of life ---------------------------------------------
+
+## AR1 / AV1. "The tree is which way you went" beside "the pyramid is where
+## power is" — two charts, one document (AR's own framing), drawn from
+## `sephiroth.gd` so this and any future plane-ladder panel (AV1.1) converge
+## on one diagram rather than two that happen to agree.
+##
+## There is no chapter/story-beat system in this codebase yet for a path to
+## actually open at (AR1.1, AR1.7) — grepping for one turns up nothing, and
+## claiming it here would be exactly the overclaiming this project keeps
+## catching itself doing. So a path is "lit" from the real relationship and
+## ladder-commitment signals the double pyramid already reads
+## (`WireNetScript.INFLUENCE_KINDS`, `_strongest_ladder_faction`) rather than
+## from beats that do not exist — a true reading of standing today, openly
+## short of AR1.1's full "against canon story beats, chapters" claim.
+func _draw_tree(rect: Rect2) -> void:
+	var font := ThemeDB.fallback_font
+	var ascent_id := _strongest_ladder_faction(WireNetScript.ASCENT_LEDGER_FACTIONS)
+	var descent_id := _strongest_ladder_faction(WireNetScript.DESCENT_LEDGER_FACTIONS)
+	var margin := Vector2(rect.size.x * 0.18, 10.0)
+	var span: Vector2 = rect.size - margin * 2.0 - Vector2(0, 40.0)
+	var point_for := func(node_id: String) -> Vector2:
+		var normalized: Vector2 = Sephiroth.POSITIONS[node_id]
+		return rect.position + margin + Vector2(normalized.x * span.x, normalized.y * span.y)
+	var reached := {}
+	for node_id in Sephiroth.node_ids():
+		reached[node_id] = _sephirah_reached(node_id, ascent_id, descent_id)
+	for path in Sephiroth.PATHS:
+		var from_id: String = path[0]
+		var to_id: String = path[1]
+		var lit: bool = reached[from_id] and reached[to_id]
+		var accent: Color = COPPER * Color(1, 1, 1, 0.85) if lit else INK * Color(1, 1, 1, 0.20)
+		draw_line(point_for.call(from_id), point_for.call(to_id), accent, 1.8 if lit else 1.0)
+	for node_id in Sephiroth.node_ids():
+		var at: Vector2 = point_for.call(node_id)
+		var is_daath: bool = node_id == "daath"
+		var lit: bool = reached[node_id]
+		if is_daath:
+			# Unmapped on purpose: a ring rather than a filled node, and no
+			# path in Sephiroth.PATHS reaches it — AV1.3 and AU1's "Da'ath is
+			# the good one" note both mean this literally, not just visually.
+			draw_arc(at, 9.0, 0.0, TAU, 20, BRUISE * Color(1, 1, 1, 0.6), 1.4, true)
+		else:
+			var accent: Color = MOSS if lit else INK * Color(1, 1, 1, 0.4)
+			draw_circle(at, 5.0 if lit else 3.6, accent * Color(1, 1, 1, 0.9 if lit else 0.5))
+			draw_arc(at, 9.0, 0.0, TAU, 20, accent, 1.4, true)
+		var label: String = Sephiroth.NAMES[node_id]
+		var label_width := CellOutzType.width(label, 9.0, 0.8)
+		var label_above: bool = node_id in ["chokmah", "binah", "chesed", "gevurah", "netzach", "hod"]
+		var label_y := at.y - 18.0 if label_above else at.y + 14.0
+		var label_accent: Color = BRUISE if is_daath else (INK if lit else INK * Color(1, 1, 1, 0.45))
+		CellOutzType.draw_text(self, Vector2(at.x - label_width * 0.5, label_y), label, 9.0, label_accent, 0.8)
+	var descriptor: String = WorldHistory.tree_descriptor(WorldHistory.subject("player"))
+	var footer_y := rect.position.y + rect.size.y - 30.0
+	draw_string(font, Vector2(rect.position.x, footer_y), "YOUR STANDING: %s" % descriptor.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 11, INK * Color(1, 1, 1, 0.7))
+	draw_string(font, Vector2(rect.position.x, footer_y + 16.0), "PATHS OPEN AT CANON CHAPTERS — NONE ARE WRITTEN YET, SO THIS READS STANDING INSTEAD (AR1.1, AR1.7)", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 9, HOT * Color(1, 1, 1, 0.55))
+	CellOutzType.draw_condensed(self, rect.position + Vector2(rect.size.x - 168, 4), "TEN SEPHIROTH, ONE ABYSS", 9.0, INK * Color(1, 1, 1, 0.32), 0.9)
+
+
+## A node is "reached" off real, already-tracked state — never off a beat
+## that has not been written. Malkuth is where the player already is;
+## Keter/Chokmah/Binah/Da'ath stay dark on purpose (the godhead and the two
+## pre-institutional heights are not reachable by any signal this game
+## tracks yet); Tiferet reads the same ascent/descent commitment the double
+## pyramid computes rather than a faction lookup of its own, since "balance"
+## is exactly that — some real standing on either ladder, not a specific one.
+func _sephirah_reached(node_id: String, ascent_id: String, descent_id: String) -> bool:
+	if node_id == "malkuth":
+		return true
+	if node_id in ["keter", "chokmah", "binah", "daath"]:
+		return false
+	if node_id == "tiferet":
+		return ascent_id != "" or descent_id != ""
+	var faction_id: String = Sephiroth.LEANING_FACTION.get(node_id, "")
+	if faction_id.is_empty():
+		return false
+	var relations: Dictionary = WorldHistory.subject("player").get("relations", {})
+	var edge: Dictionary = relations.get(faction_id, {})
+	return WireNetScript.INFLUENCE_KINDS.has(str(edge.get("kind", "")))
+
+
 # --- page three: the Wire ---------------------------------------------------
 
 ## A4.5. The contact attempt is resolved once and held, not recomputed.
@@ -1688,8 +1779,8 @@ func _draw_gore(plate: Rect2) -> void:
 ## The stamp a clerk hit the page with, per page, because this is a processed
 ## document in a system that does not care about the person it describes.
 func _draw_stamp(plate: Rect2) -> void:
-	var text: String = ["NO FIXED ABODE", "NO REFUNDS", "UNVERIFIED", "SPECIMEN"][page]
-	var tint: Color = [Grunge.DRIED, Grunge.RUST, Grunge.BILE, Grunge.DRIED][page]
+	var text: String = ["NO FIXED ABODE", "NO REFUNDS", "UNVERIFIED", "SPECIMEN", "UNCHARTED"][page]
+	var tint: Color = [Grunge.DRIED, Grunge.RUST, Grunge.BILE, Grunge.DRIED, Grunge.BILE][page]
 	Grunge.stamp(self, plate.position + Vector2(plate.size.x - 258, 92), text, 15.0, -0.16, tint, 300 + page)
 
 

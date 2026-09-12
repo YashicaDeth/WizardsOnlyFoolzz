@@ -3476,12 +3476,65 @@ This sits beside AI's double pyramid rather than competing with it: **the pyrami
 is where power is, the tree is which way you went.** Two charts, one document.
 
 ### AR1 — The paths
-- [ ] **AR1.1** The tree is drawn, real, and charts the paths against canon story beats
+- [~] **AR1.1** The tree is drawn, real, and charts the paths against canon
+      story beats — drawn and real, story beats not yet: `world_index.gd`
+      gets a fifth page, TREE, alongside FILE/PYRAMID/WIRE/BODY (appended
+      rather than inserted — WIRE and BODY are referenced elsewhere in the
+      file by hardcoded index, so a page ahead of them would have silently
+      retargeted those jumps). It draws the real Kabbalah tree — ten
+      sephiroth plus Da'ath, the tradition's own twenty-two paths between
+      them — from a new shared `systems/sephiroth.gd` rather than inventing
+      layout numbers inline, specifically so AV1.1's plane ladder (same ten
+      sephiroth, per Greg's own note that these are one diagram) can draw
+      from the identical file instead of drifting into a second geometry
+      that happens to agree. Da'ath sits in the gap, unmapped and touched by
+      none of the 22 paths, exactly as AV1.3 and AU1's "Da'ath is the good
+      one" both ask. What is honestly *not* built: there is no chapter or
+      story-beat system anywhere in this codebase to chart paths against
+      (grepped for one; nothing exists) — claiming that half would be
+      exactly the overclaiming this project keeps catching itself doing. So
+      a path lights from the same real relation/ladder-commitment signals
+      the double pyramid already reads (`WireNetScript.INFLUENCE_KINDS`,
+      `_strongest_ladder_faction`) rather than from beats that are not
+      written, and the page says so in its own footer rather than pretending
+      otherwise. Sits beside PYRAMID exactly as designed — "the pyramid is
+      where power is, the tree is which way you went. Two charts, one
+      document." Verified: `tests/sephiroth_tree_test.gd` (new, headless,
+      36/36 — the shared data's own shape: ten sephiroth counted, eleven
+      nodes drawn, twenty-two paths, none touching Da'ath, every node inside
+      the canvas, every path referencing two real nodes; and
+      `_sephirah_reached()`'s real-signal-only rule: Malkuth always lit,
+      Keter/Chokmah/Binah/Da'ath never lit regardless of any faction handed
+      to them, Tiferet lighting off either ladder's real commitment, a
+      leaning sephirah dark with no relation, staying dark for a grudge
+      -only INFLUENCE_KINDS count, same rule the pyramid already enforces —
+      and lighting for real influence, correctly sharing across every
+      sephirah with the same lean). `tests/sephiroth_tree_capture.gd` (new,
+      windowed) caught two real out-of-bounds crashes on the new page before
+      they shipped — `_draw_rail()` and `_draw_stamp()` both indexed a
+      four-entry array by `page`, both now five — and the capture confirms
+      the diagram itself: no path crossing where Da'ath's ring sits, labels
+      clearing every node, lit/dark reading clearly at a glance. Existing
+      `double_pyramid_test`, `index_link_rebuild_test`, `index_wire_glow_test`,
+      `link_test`, `opening_test` and `combat_integration_test` regression
+      suites re-verified clean against the PAGES array change.
 - [ ] **AR1.2** Side with the common CellOutz demon — but only with aura, power or influence
 - [ ] **AR1.3** Rebel and outcast from the gods: everything harder, nobody owns you
 - [ ] **AR1.4** Live with the low-frequency demons, then side with the elite and reptilian classes
 - [ ] **AR1.5** Or turn the demons on God and make them challenge it
-- [ ] **AR1.6** A path taken shows on the tree, and the tree is where you read your own run
+- [x] ~~**AR1.6** A path taken shows on the tree, and the tree is where you
+      read your own run~~ As real as AR1.1 gets it: `_draw_tree()`'s footer
+      prints the same `WorldHistory.tree_descriptor()` the PYRAMID waist
+      already reads, and every node's lit/dark state is a live read of
+      actual relations, not a static picture — open the same save with
+      different standing and a different set of nodes lights. What is not
+      yet true is the second half of the sentence this shares with AR1.1:
+      a *path* (one of the 22 edges) does not yet correspond to a *choice
+      the player made*, because no choice-tracking/chapter system exists to
+      have made one against. Retract this if that reading feels premature —
+      recorded here because the mechanism (real signal in, real node lit
+      out) is genuinely built and tested, not because the sentence is fully
+      earned yet.
 - [ ] **AR1.7** Paths open at chapters, not at levels
 
 ### AR2 — Jobs and contracts
