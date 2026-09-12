@@ -57,6 +57,13 @@ var elapsed := 0.0
 ## I1. The material the plate is cut out of, not a backdrop behind it.
 var _rain: Array = []
 var _rain_size := Vector2.ZERO
+## I1.5 v2. The rain used to run full time behind every page — FILE, PYRAMID
+## and BODY included — which is exactly backwards: it is the substrate the
+## Wire is printed on, not decoration this index owed every screen just for
+## being open. Eased rather than snapped so it still reads as one continuous
+## material bleeding through at the seam, instead of a light switching on
+## the instant PAGES[page] == "WIRE".
+var _wire_glow := 0.0
 var wire = null
 var posts: Array = []
 var last_action := ""
@@ -226,6 +233,7 @@ func _process(delta: float) -> void:
 	elapsed += delta
 	action_life = maxf(0.0, action_life - delta)
 	page_blend = Motion.blend(page_blend, delta, Motion.PANEL, true)
+	_wire_glow = Motion.blend(_wire_glow, delta, Motion.PANEL, PAGES[page] == "WIRE")
 	open_blend = Motion.blend(open_blend, delta, Motion.PANEL, not closing)
 	if closing and open_blend <= 0.0:
 		visible = false
@@ -545,15 +553,19 @@ func _draw() -> void:
 	# I1.3. The rain is drawn first and the plate is punched out of it, so the
 	# readout is a hole in the material rather than a panel sitting on a
 	# wallpaper. I1.1 gives it the game's own words; I1.2 fails it with the body.
-	if _rain.is_empty() or not _rain_size.is_equal_approx(viewport):
-		_rain = CodeRain.build(viewport.x, viewport.y, 26.0, 4409)
-		_rain_size = viewport
-	CodeRain.advance(_rain, get_process_delta_time(), viewport.y)
-	# Contained to the margin around the plate rather than the whole viewport.
-	# Drawn full-bleed it escaped the World Index entirely when the index is
-	# hosted inside the handheld, and printed the game's vocabulary down the
-	# sides of the device case.
-	CodeRain.draw_field(self, plate.grow(46.0), _rain, MOSS, failing, elapsed, [plate])
+	if _wire_glow > 0.01:
+		if _rain.is_empty() or not _rain_size.is_equal_approx(viewport):
+			_rain = CodeRain.build(viewport.x, viewport.y, 26.0, 4409)
+			_rain_size = viewport
+		CodeRain.advance(_rain, get_process_delta_time(), viewport.y)
+		# Contained to the margin around the plate rather than the whole
+		# viewport. Drawn full-bleed it escaped the World Index entirely when
+		# the index is hosted inside the handheld, and printed the game's
+		# vocabulary down the sides of the device case.
+		# I1.5 v2. Only the WIRE page earns this any more — FILE, PYRAMID and
+		# BODY are a dossier, a career chart and an anatomy, not a network,
+		# and the rain used to run behind all three regardless.
+		CodeRain.draw_field(self, plate.grow(46.0), _rain, MOSS * Color(1, 1, 1, _wire_glow), failing, elapsed, [plate])
 	_draw_plate(plate)
 	_draw_header(plate)
 	var body := Rect2(plate.position + Vector2(22, 122), plate.size - Vector2(44, 176))

@@ -881,7 +881,20 @@ finished. Applies to everything below and to A5, A6, C1.
 - [x] **I5.3** `v2` The rail is pointable — click a row to select it, hover to see where a click would land
 - [ ] **I5.2** `v2` Links are collected during `_draw` and exist nowhere else, so nothing but the paint loop can ask what is on screen
 - [ ] **I0.10** `v2` Panels are hosted at one fixed size inside the handheld; a map you cannot lean into is a picture of a map
-- [ ] **I1.5** `v2` Code rain runs on screens that have not earned it — it is the substrate for the Wire, not decoration for every page
+- [x] ~~**I1.5** `v2` Code rain runs on screens that have not earned it — it
+      is the substrate for the Wire, not decoration for every page~~ The
+      World Index ran it full time behind FILE, PYRAMID and BODY as well as
+      WIRE — a dossier, a career chart and an anatomy are not a network, and
+      the rain used to fall behind all three regardless. `_wire_glow` eases
+      toward 1 only while `PAGES[page] == "WIRE"` and back to 0 on every
+      other page, folded into the rain's own tint alpha so it fades as one
+      continuous material rather than switching on and off. `interstitial.gd`
+      keeps its rain deliberately — that screen's own premise is a
+      transmission ("CELLOUTZ TRANSIT", the body "in motion"), so the rain
+      there is the Wire's vocabulary being earned on purpose, not decoration.
+      Verified: `tests/index_wire_glow_test.gd` (3/3) plus
+      `captures/i1_5_v2_index_file_no_rain.png` /
+      `i1_5_v2_index_wire_has_rain.png`.
 - [ ] **I4.3** `v2` Vitality degrades the panels uniformly; a specific wound should damage a specific part of what you are reading
 
 ## J — Infrastructure
