@@ -161,6 +161,16 @@ func _ready() -> void:
 			device.set_mode("WIRE")
 			for _hold in 60:
 				await get_tree().process_frame
+	elif trigger == "unlock":
+		# M1.5 proof. Satisfies `third_person_unlocked()`'s two real conditions
+		# directly through WorldHistory — a melee hit landed, and a subject the
+		# world already rated dangerous put down — rather than staging a full
+		# fight, then lets the per-second poll in `_physics_process` catch it.
+		WorldHistory.record_event("melee_body_hit", {"target": "capture_boss", "body_zone": "torso", "damage": 20, "location": "ashbloom_bone_yard"})
+		WorldHistory.register_subject("capture_boss", {"name": "Capture Boss", "elo": 1200})
+		WorldHistory.record_event("npc_resolution", {"subject_id": "capture_boss", "outcome": "execute", "actor": "player"})
+		for _hold in 90:
+			await get_tree().physics_frame
 	elif trigger == "arsenal":
 		scene.third_person = true
 		scene._equip_weapon(1)
