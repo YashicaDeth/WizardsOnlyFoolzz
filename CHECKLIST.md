@@ -2848,7 +2848,61 @@ are in it.
       genuinely crosses the obstacle across three captured frames rather
       than only the numbers agreeing. `jump_test`, `opening_test` and
       `combat_integration_test` regression suites re-verified clean.
-- [ ] **AD1.3** Wall running, earned the way third person is earned rather than given
+- [x] ~~**AD1.3** Wall running, earned the way third person is earned
+      rather than given~~ `wall_run_unlocked()` in `bone_yard_hunt.gd`
+      mirrors `third_person_unlocked()`'s own shape exactly — a real thing
+      the player did, not a flag, read live off `WorldHistory` rather than
+      cached — but ties the count to `player_vaulted` (AD1.2's own event,
+      `WALL_RUN_UNLOCK_VAULTS = 3`) instead of boss kills, because
+      wall-running is the next rung of the traversal skill vaulting already
+      is, not a combat unlock. Unlocking is announced the same way third
+      person's is (`_announce_wall_run_unlock()`, checked in `_update_hud()`
+      the frame the count first crosses, an `impact_feel` kick, a
+      `wall_run_unlocked` WorldHistory event, a prompt line), not a silent
+      permission flip.
+      \
+      The run itself needs no key to start: `_wall_run_surface()` looks to
+      both sides of the player whenever they are airborne and moving fast
+      enough (`WALL_RUN_MIN_SPEED`), with a near cast finding a wall within
+      reach and a second, higher cast (`WALL_RUN_MIN_HEIGHT`) confirming it
+      keeps going — a short ledge fails that second cast and is left to
+      AD1.2's own vault instead of being double-handled. Redirects velocity
+      along the wall's own face every frame (re-found, not cached, so a
+      wall that curves or ends mid-run is read honestly) under a fraction
+      of real gravity (`WALL_RUN_GRAVITY_SCALE`) rather than none, so it
+      reads as a body fighting to stay up rather than flight. SPACE while
+      running is a real kickoff — checked ahead of the dodge/jump split
+      entirely, since `_jump()` refuses outright the instant it sees the
+      player is not on the floor, which a wall run always is — pushing the
+      body away from the wall and up with its own impulse rather than a
+      plain fall dressed up as one.
+      \
+      Building the test surfaced a real tuning bug: a fresh jump's vertical
+      velocity was carried straight into the run unchanged, so a run begun
+      right off a jump kept climbing under reduced gravity for its entire
+      duration and sailed straight up past the top of the wall instead of
+      tracking level along it. Fixed in `_begin_wall_run()` by capping
+      (never zeroing — catching an already-falling body should still read
+      as momentum) the vertical velocity a run starts with.
+      \
+      Verified: `tests/wall_run_test.gd` (new, headless, 16/16, against
+      real `StaticBody3D` walls rather than assumed shapes) — the unlock
+      threshold is exact and reads live off real events; a tall wall is
+      found and its tangent genuinely lies along the wall's own face; a
+      1.0m ledge correctly fails the height check and falls to the vault
+      instead; a triggered run travels real distance over real time while
+      staying flush to the wall; and a kickoff consumes its own request,
+      ends the run, and leaves with a real upward component. Getting the
+      test to a genuinely airborne starting state surfaced the same
+      one-frame floor-snap gotcha AD1.1's own jump test had already named —
+      solved the same way, by riding the real, already-proven `_jump()`
+      path rather than fighting `move_and_slide()`'s snap by hand.
+      `tests/wall_run_capture.gd` (new, windowed) confirms the camera
+      genuinely travels along the wall and is genuinely thrown clear of it
+      on kickoff, across three captured frames, and that the unlock prompt
+      really reaches the HUD rather than only the WorldHistory record.
+      `jump_test`, `vault_test`, `opening_test` and `combat_integration_test`
+      regression suites re-verified clean.
 - [ ] **AD1.4** Climbing a building is a route, not a cutscene (Prototype's lesson)
 - [ ] **AD1.5** Momentum carries between moves — run into vault into climb is one motion
 - [ ] **AD1.6** All of it reads through the anatomy: a broken leg cannot vault

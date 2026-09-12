@@ -84,10 +84,29 @@ func _ready() -> void:
 	await get_tree().physics_frame
 
 	print("AD1.3 - triggering one actually redirects the body along the wall, and a kickoff actually leaves it")
-	var run_wall := _make_wall(Vector3(0, 1.4, 19) + side * 0.9, Vector3(0.4, 3.0, 4.0))
+	# Long enough that running off the end of it is not what stops this
+	# attempt — a 4m wall at 8 m/s runs out in a quarter of a second, which
+	# is a real and correct way for a run to end (AD1.3's own "it can curve
+	# or run out mid-attempt") but is not what this particular check means
+	# to exercise.
+	var run_wall := _make_wall(Vector3(0, 1.4, 19) + side * 0.9, Vector3(0.4, 3.0, 40.0))
 	add_child(run_wall)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
+	# A wall run only ever starts while airborne (see `_update_player()`'s
+	# own start-detection, right after move_body()) — on the ground is
+	# exactly the case that must never latch a run. A real jump is what
+	# gets the live attempt genuinely off the floor: setting `velocity.y`
+	# by hand and calling `_update_player()` once is not enough on its own
+	# — one step's worth of upward travel sits inside `floor_snap_length`
+	# and `move_and_slide()` simply snaps it straight back (AD1.1's own
+	# jump bug, in miniature), so this rides the same real, already-proven
+	# `_jump()` -> `jump_queued` path instead of fighting the snap by hand.
+	hunt._jump()
+	hunt._update_player(1.0 / 60.0)
+	hunt.player_body.velocity.x = forward.x * 8.0
+	hunt.player_body.velocity.z = forward.z * 8.0
+	check(not hunt.player_body.is_on_floor(), "airborne for the live attempt, same as a real jump or run-off-a-ledge would leave it")
 	var start: Dictionary = hunt._wall_run_surface(forward)
 	check(not start.is_empty(), "found again for the live attempt")
 	if not start.is_empty():

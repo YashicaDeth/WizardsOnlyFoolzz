@@ -1897,6 +1897,13 @@ func _wall_run_surface(direction: Vector3) -> Dictionary:
 func _begin_wall_run(surface: Dictionary) -> void:
 	wall_running_time = WALL_RUN_DURATION
 	wall_run_normal = surface.normal
+	# Whatever vertical velocity got the player here (a jump, a fall) is not
+	# what a wall run is — leaving it alone let a fresh jump's own impulse
+	# carry straight through, rocketing the body up past the top of the
+	# wall over the run's own duration instead of tracking roughly level
+	# along it. Capped rather than zeroed, so stepping onto one already
+	# falling still reads as catching momentum, not a hard reset.
+	player_body.velocity.y = minf(player_body.velocity.y, 1.0)
 	WorldHistory.record_event("player_wall_run_started", {"location": HUNT_LOCATION})
 
 
