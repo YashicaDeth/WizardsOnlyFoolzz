@@ -10,6 +10,20 @@ const SPRINT_SPEED := 12.0
 ## a platformer was sitting there unused. Tuned against `HunterMotor.GRAVITY`
 ## (22.0) for roughly a one-metre apex: `sqrt(2 * 22 * 1.0) ≈ 6.6`.
 const JUMP_IMPULSE := 6.6
+## AD1.2. "Waist-high things stop being walls." Three raycasts decide it: a
+## low one finds a real obstacle in front of the player at all, a high one
+## tells a low obstacle from a real wall, and a downward one finds exactly
+## where the thing's top actually is rather than guessing one fixed height
+## for every crate, rail and curb in the world. Scoped to obstacles a body
+## can plausibly get a hand on and be past a moment later — a real wall
+## keeps failing the high check and stays a wall (AD1.3's problem, not this
+## one's).
+const VAULT_MIN_TOP := 0.32
+const VAULT_MAX_TOP := 1.35
+const VAULT_REACH := 0.85
+const VAULT_FAR_SIDE := 0.55
+const VAULT_HEAD_CLEARANCE := 1.55
+const VAULT_DURATION := 0.34
 ## Worst case a wrecked body can move or swing at, as a share of healthy. The
 ## soulslike register wants injury to hurt; it does not want a player who has
 ## lost a leg to be unable to disengage from the thing that took it.
@@ -224,6 +238,12 @@ var dodge_remaining := 0.0
 ## comment for why a frame's delay either way stomps it back to the floor.
 var jump_queued := false
 var dodge_direction := Vector3.ZERO
+## AD1.2. How long is left of the current vault, counting down from
+## `VAULT_DURATION`; the body is not under normal movement control for as
+## long as this is positive (see `_update_player()`'s own early branch).
+var vaulting_time := 0.0
+var vault_from := Vector3.ZERO
+var vault_to := Vector3.ZERO
 var handheld: Control
 ## FINAL_V.md §16. The one screen-space layer AS2's night warp, and later the
 ## drugs and shadow realms, all reach for instead of building their own effect.
@@ -727,12 +747,24 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_SPACE:
 				if not grapple_target.is_empty():
 					_break_grapple("YOU LET GO")
-				elif Input.get_vector("move_left", "move_right", "move_forward", "move_back").length() > 0.1:
-					# A dodge is a directional evasion; standing still and
-					# pressing space is not "dodge in place", it is a jump.
-					_dodge()
 				else:
-					_jump()
+					var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+					# AD1.2. Checked before the dodge/jump split, not after —
+					# a waist-high thing in front of the player is exactly
+					# the situation a plain dodge or a plain jump both
+					# handle badly, and the whole point of AD1.2 is that
+					# pressing the traversal button should not require
+					# knowing which of the three you need.
+					var vault := _vault_target(HUNTER_MOTOR.wish_direction(move, yaw))
+					if not vault.is_empty():
+						_vault(vault.landing)
+					elif move.length() > 0.1:
+						# A dodge is a directional evasion; standing still
+						# and pressing space is not "dodge in place", it is
+						# a jump.
+						_dodge()
+					else:
+						_jump()
 			KEY_Q: _use_prosthetic_surge()
 			KEY_K: _deliberate_redecant()
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
@@ -864,6 +896,18 @@ func _update_carrion(delta: float) -> void:
 
 func _update_player(delta: float) -> void:
 	if player_rig.is_downed() or player_rig.anatomy.dead:
+		return
+	# AD1.2. Under scripted motion rather than normal control for the
+	# vault's short duration — the eased position itself is the whole
+	# animation, and normal gravity/floor-stick would just fight it.
+	if vaulting_time > 0.0:
+		vaulting_time = maxf(0.0, vaulting_time - delta)
+		var progress := 1.0 - vaulting_time / VAULT_DURATION
+		var eased := 1.0 - pow(1.0 - progress, 3.0)
+		player_body.position = vault_from.lerp(vault_to, eased)
+		if vaulting_time <= 0.0:
+			player_body.position = vault_to
+		player = player_body.position + Vector3.UP * 0.6
 		return
 	# Standing over a downed body with the form open costs you your footwork,
 	# and so does having hold of someone.
@@ -1557,6 +1601,75 @@ func _update_handheld_lamp(delta: float) -> void:
 		var gutter := 1.0 if fmod(pulse * (5.0 + (0.2 - charge) * 40.0), 1.0) > 0.5 else 0.0
 		waver *= 0.7 + 0.3 * gutter
 	handheld_lamp.light_energy = 9.0 * charge * waver
+
+
+## AD1.2. Empty means "not vaultable", never a crash — every one of these
+## rays is allowed to simply miss, because most things in front of the
+## player most of the time are not a low wall.
+func _vault_target(direction: Vector3) -> Dictionary:
+	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty():
+		return {}
+	if direction.is_zero_approx() or crouching or vaulting_time > 0.0:
+		return {}
+	if not player_body.is_on_floor():
+		return {}
+	var space := get_world_3d().direct_space_state
+	var exclusions := _player_collision_exclusions()
+	var feet: Vector3 = player_body.position + Vector3.UP * -0.9
+	var low_query := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * 0.4, feet + Vector3.UP * 0.4 + direction * VAULT_REACH)
+	low_query.exclude = exclusions
+	var low_hit := space.intersect_ray(low_query)
+	if low_hit.is_empty():
+		return {}
+	var high_query := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * VAULT_MAX_TOP, feet + Vector3.UP * VAULT_MAX_TOP + direction * VAULT_REACH)
+	high_query.exclude = exclusions
+	if not space.intersect_ray(high_query).is_empty():
+		# Something is still in the way above the vaultable band — a real
+		# wall, not an obstacle. AD1.3's problem, not this one's.
+		return {}
+	# Exactly where the top is, found rather than assumed: straight down at
+	# a point just past the low hit, in world height terms so the noisy Y of
+	# a hit against the obstacle's own front face never leaks into it.
+	var low_pos: Vector3 = low_hit.position
+	var probe_x: float = low_pos.x + direction.x * 0.1
+	var probe_z: float = low_pos.z + direction.z * 0.1
+	var top_query := PhysicsRayQueryParameters3D.create(
+		Vector3(probe_x, feet.y + VAULT_MAX_TOP + 0.2, probe_z),
+		Vector3(probe_x, feet.y + VAULT_MIN_TOP - 0.1, probe_z))
+	top_query.exclude = exclusions
+	var top_hit := space.intersect_ray(top_query)
+	if top_hit.is_empty():
+		return {}
+	var top_pos: Vector3 = top_hit.position
+	var obstacle_height: float = top_pos.y - feet.y
+	if obstacle_height < VAULT_MIN_TOP or obstacle_height > VAULT_MAX_TOP:
+		return {}
+	# The far side has to have a floor of its own and room to stand once
+	# there — a vault is landing past the thing, not standing on top of it.
+	var landing_x: float = low_pos.x + direction.x * VAULT_FAR_SIDE
+	var landing_z: float = low_pos.z + direction.z * VAULT_FAR_SIDE
+	var floor_query := PhysicsRayQueryParameters3D.create(
+		Vector3(landing_x, top_pos.y + 0.6, landing_z),
+		Vector3(landing_x, feet.y - 0.6, landing_z))
+	floor_query.exclude = exclusions
+	var floor_hit := space.intersect_ray(floor_query)
+	if floor_hit.is_empty():
+		return {}
+	var floor_pos: Vector3 = floor_hit.position
+	var landing: Vector3 = floor_pos + Vector3.UP * 0.05
+	var clearance_query := PhysicsRayQueryParameters3D.create(landing + Vector3.UP * 0.3, landing + Vector3.UP * VAULT_HEAD_CLEARANCE)
+	clearance_query.exclude = exclusions
+	if not space.intersect_ray(clearance_query).is_empty():
+		return {}
+	return {"landing": landing + Vector3.UP * 0.9}
+
+
+func _vault(landing: Vector3) -> void:
+	vaulting_time = VAULT_DURATION
+	vault_from = player_body.position
+	vault_to = landing
+	player_body.velocity = Vector3.ZERO
+	WorldHistory.record_event("player_vaulted", {"location": HUNT_LOCATION})
 
 
 func _dodge() -> void:

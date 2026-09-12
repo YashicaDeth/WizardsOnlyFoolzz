@@ -2779,7 +2779,45 @@ are in it.
 
 ### AD1 — The body moves
 - [x] **AD1.1** Jumping worth doing — height, arc and a landing that reads. `HunterMotor.move_body()` already ran real gravity, air acceleration and floor-stick every physics frame and `hunter_body_motion.gd` already had a dormant `landing_time` camera-dip/FOV-kick — nothing had ever given the player an upward velocity to actually reach them with. SPACE now jumps when there is no directional input held (a "dodge in place" makes no sense; `_dodge()` still owns SPACE-with-direction exactly as before), queued through `jump_queued` and consumed in `_update_player()`. Building it surfaced a real one-frame-late bug: the first version applied the impulse *after* `HUNTER_MOTOR.move_body()` returned, which is a whole physics step too late — `move_body()`'s own floor-stick branch reads `is_on_floor()` from the *previous* slide, so next frame it saw the body still (stale-)grounded and stomped the impulse straight back to `-FLOOR_STICK` before `move_and_slide()` ever got to use it. Fixed by giving `move_body()` an optional `jump_impulse` parameter so the impulse rides the same `move_and_slide()` call that has to prove it, not the next one. `game/tests/jump_test.gd` (13 checks) covers: queued-not-immediate, consumed-and-applied-in-the-same-slide, refused while airborne, refused while paneled/grappling, the arc actually leaving and returning to the floor on its own, `landing_time` firing for real, and SPACE-with-direction still dodging without also queuing a jump. `opening_test` and `combat_integration_test` re-verified clean against the `HunterMotor.move_body()` signature change (the one call site).
-- [ ] **AD1.2** Vaulting and mantling: waist-high things stop being walls
+- [x] ~~**AD1.2** Vaulting and mantling: waist-high things stop being
+      walls~~ Three real raycasts against actual collision geometry decide
+      it (`_vault_target()` in `bone_yard_hunt.gd`), not a fixed "step
+      height" or a tag on level geometry: a low cast (0.4m up) finds
+      whether there is an obstacle in front of the player at all; a high
+      cast (`VAULT_MAX_TOP`, 1.35m) tells a low obstacle from a real wall —
+      if anything is still in the way up there it stays a wall, AD1.3's
+      problem and not this one's; a downward cast just past the low hit
+      finds exactly where the obstacle's own top actually is, in world
+      height terms, rather than guessing one number for every crate, rail
+      and curb in the game; a final pair (floor + headroom) confirms the
+      far side actually has somewhere to land and room to stand once there.
+      SPACE now checks this before the existing dodge/jump split, not after
+      — a waist-high thing in front is exactly the case a plain dodge or a
+      plain jump both handle badly, and the whole point is that the
+      traversal button should not require knowing which of the three a
+      player needs. Execution is a real timed motion (`VAULT_DURATION`
+      0.34s, eased position lerp from `vault_from` to `vault_to`) that
+      takes over from normal movement/gravity for its duration and hands
+      control straight back — not an instant teleport and not a soft-lock.
+      Free rather than costing stamina, same reasoning as AD1.1's jump:
+      this is basic traversal, not a combat manoeuvre. Honestly scoped: no
+      dedicated vault animation pose exists yet (`hunter_body_motion.gd`
+      has no such trigger), so the body reads as idle for the motion's
+      duration while the camera position moves for real; and the far-side
+      offset (`VAULT_FAR_SIDE`, 0.55m) assumes a reasonably thin obstacle —
+      a genuinely deep one (a thick wall rather than a rail, crate or
+      curb) is outside what this was built or tested against. Verified:
+      `tests/vault_test.gd` (new, headless, 13/13, against a real
+      `StaticBody3D`/`BoxShape3D` obstacle rather than an assumed shape) —
+      open ground finds nothing, a 0.8m box is found and lands past it near
+      real floor height, a 2.2m wall in the identical spot is correctly
+      refused by the high ray, and a triggered vault visibly progresses
+      over several physics steps before landing exactly on the point the
+      raycasts found, with normal movement/gravity resuming immediately
+      after. `tests/vault_capture.gd` (new, windowed) confirms the camera
+      genuinely crosses the obstacle across three captured frames rather
+      than only the numbers agreeing. `jump_test`, `opening_test` and
+      `combat_integration_test` regression suites re-verified clean.
 - [ ] **AD1.3** Wall running, earned the way third person is earned rather than given
 - [ ] **AD1.4** Climbing a building is a route, not a cutscene (Prototype's lesson)
 - [ ] **AD1.5** Momentum carries between moves — run into vault into climb is one motion
