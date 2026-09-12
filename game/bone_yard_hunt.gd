@@ -218,10 +218,10 @@ var strike_windup := -1.0
 var rival_attack_clock := 0.0
 var dodge_remaining := 0.0
 ## AD1.1. Set on the keypress, consumed the next physics step. Not applied
-## directly in `_unhandled_input` — `HunterMotor.move_body()` overwrites
-## `velocity.y` from `is_on_floor()` every physics frame, so an impulse
-## given anywhere but immediately after that call is stomped back to
-## `-FLOOR_STICK` before the body has actually left the ground.
+## directly in `_unhandled_input` — the impulse has to reach
+## `HunterMotor.move_body()` itself and ride the same `move_and_slide()` call
+## that will actually carry the body off the ground; see that function's own
+## comment for why a frame's delay either way stomps it back to the floor.
 var jump_queued := false
 var dodge_direction := Vector3.ZERO
 var handheld: Control
@@ -911,15 +911,16 @@ func _update_player(delta: float) -> void:
 	speed *= COMBAT_RESPONSE.movement_scale(pending_attack, strike_windup)
 	player_capsule.height = move_toward(player_capsule.height, 1.2 if crouching else 1.8, delta * 4.0)
 	player_collider.position.y = (player_capsule.height - 1.8) * 0.5
-	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0)
-	# AD1.1. After move_body(), not before: it overwrites velocity.y from
-	# is_on_floor() every physics frame, so an impulse applied any earlier is
-	# stomped back to -FLOOR_STICK before it ever left the ground.
-	if jump_queued:
-		jump_queued = false
-		if player_body.is_on_floor():
-			player_body.velocity.y = JUMP_IMPULSE
-			WorldHistory.record_event("player_jumped", {"location": HUNT_LOCATION})
+	# AD1.1. Handed to move_body() rather than applied after it: is_on_floor()
+	# only turns false once a move_and_slide() has actually carried the body
+	# up off the ground, so an impulse set the frame after this one reads a
+	# still-grounded body and gets overwritten straight back to -FLOOR_STICK.
+	# The jump and the slide that proves it happen in the same physics step.
+	var jumping := jump_queued and player_body.is_on_floor()
+	jump_queued = false
+	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0, JUMP_IMPULSE if jumping else 0.0)
+	if jumping:
+		WorldHistory.record_event("player_jumped", {"location": HUNT_LOCATION})
 	if player_body.position.y < -10.0:
 		player_body.position = Vector3(0, 1.0, 19)
 	player = player_body.position + Vector3.UP * 0.6
