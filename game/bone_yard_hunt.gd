@@ -736,7 +736,9 @@ func _equip_weapon(slot: int) -> void:
 	if arsenal.select_slot(slot):
 		pending_attack = {}
 		strike_windup = -1.0
-		prompt.text = "%s / READY" % str(arsenal.current().label)
+		# The ammo well and the model in the player's hand already show the new
+		# weapon. A persistent READY subtitle duplicated both of them.
+		prompt.text = ""
 
 
 func _reload_weapon() -> void:
@@ -745,7 +747,8 @@ func _reload_weapon() -> void:
 		return
 	if arsenal.reload():
 		body_motion.trigger_reload(float(arsenal.current().reload))
-		prompt.text = "%s / RELOADING" % str(arsenal.current().label)
+		# Reloading is visible as a cartridge travelling through the well.
+		prompt.text = ""
 
 
 func _dodge() -> void:

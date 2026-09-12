@@ -18,7 +18,7 @@ func _ready() -> void:
 	WorldHistory.register_subject("player", {"name": "THE HUNTER", "kind": "person", "role": "Unindexed survivor"})
 	WorldHistory.register_subject("mara_voss", {
 		"name": "Mara Voss", "kind": "person", "role": "Bone Yard Captain",
-		"faction_id": "ashline_wreckers", "status": "active",
+		"faction_id": "ashline_wreckers", "status": "active", "injury": "fractured left clavicle",
 	})
 	WorldHistory.register_subject("dolan_kreeg", {"name": "Dolan Kreeg", "kind": "person", "role": "Choir surgeon", "status": "executed"})
 	WorldHistory.register_subject("sil_fenmark", {"name": "Sil Fenmark", "kind": "person", "role": "Signal runner", "status": "active"})
@@ -59,6 +59,9 @@ func _ready() -> void:
 		["mara_voss", "theory_rotation"],
 	]:
 		board.lay_string(str(link[0]), str(link[1]))
+	# L4. One of these went out on the Wire. The stamp says it was published,
+	# never whether it held.
+	board.publish("theory_ownership")
 
 	for shot in [{"zoom": 1.0, "pan": Vector2.ZERO, "name": "board"}, {"zoom": 1.9, "pan": Vector2(240, 120), "name": "board_close"}]:
 		board.zoom = float(shot["zoom"])

@@ -27,6 +27,7 @@ extends Control
 const Grunge := preload("res://systems/celloutz_grunge.gd")
 
 const FieldCamera := preload("res://systems/field_camera.gd")
+const WireNetScript := preload("res://systems/wire_net.gd")
 
 const BOARD_ID := "pin_board"
 
@@ -134,6 +135,8 @@ signal pinned_changed()
 signal strings_changed()
 ## L3.2. Something the world bears out, which means there is work in it.
 signal lead_opened(from: String, to: String)
+## L4. A theory left the wall and went out on the Wire.
+signal theory_published(theory_id: String, result: Dictionary)
 
 
 func _ready() -> void:
@@ -353,6 +356,128 @@ func _open_lead(from: String, to: String) -> void:
 	leads.append(lead)
 	WorldHistory.update_subject(BOARD_ID, {"leads": leads}, "lead_opened")
 	lead_opened.emit(from, to)
+
+
+## L4.1. A theory goes out on the Wire through the actions that already exist:
+## `expose` if every string holding it up is one the world bears out, and
+## `fabricate` if any of them is not.
+##
+## L4.3 is the whole point, and it only works because of L3.3. The player
+## cannot tell which of those two they are about to do. They believe the theory
+## — they built it — and the board has never told them which strings are real.
+## Publishing is the act that finds out, in public, at the Wire's own prices:
+## `expose` costs 2 exposure and takes reach off the target, `fabricate` costs
+## 3 and rolls, and a fabrication that does not hold costs 5 and comes back
+## onto the player's own account.
+func publish(theory_id: String, wire: Object = null) -> Dictionary:
+	var theory := _theory(theory_id)
+	if theory.is_empty():
+		return {"ok": false, "headline": "NOT A THEORY", "detail": ""}
+	if is_published(theory_id):
+		return {"ok": false, "headline": "ALREADY OUT", "detail": "YOU ONLY GET TO SAY IT ONCE."}
+	var evidence := strung_to(theory_id)
+	if evidence.is_empty():
+		return {"ok": false, "headline": "NOTHING HOLDING IT UP", "detail": "STRING SOMETHING TO IT FIRST."}
+
+	# L4.2. Every string has to hold. One bad connection makes the whole thing a
+	# fabrication, which is how publishing actually works: the weakest claim in
+	# a story is the one that gets checked.
+	var sound := true
+	for ref: String in evidence:
+		if not supports(ref, theory_id):
+			sound = false
+			break
+
+	var target := _most_implicated(evidence)
+	if target == "":
+		return {"ok": false, "headline": "NOBODY TO PUBLISH AGAINST", "detail": "A THEORY NEEDS SOMEONE IN IT."}
+	var net: Object = wire if wire != null else WireNetScript.new(WireNetScript.SIGNAL_UNDERBELLY)
+	var result: Dictionary = net.act(target, "expose" if sound else "fabricate")
+	# Being right is not the same as being able to prove it. A sound theory
+	# about somebody you hold nothing on does not go out, and the game should
+	# say so in those words rather than swallowing it.
+	if sound and not bool(result.get("ok", true)):
+		result["headline"] = "RIGHT, AND YOU CANNOT PROVE IT"
+		result["detail"] = "YOU HOLD NOTHING ON %s THAT ANYONE ELSE CAN CHECK." % str(WorldHistory.subject(target).get("name", target)).to_upper()
+	result["theory"] = theory_id
+	result["sound"] = sound
+	result["target"] = target
+	if bool(result.get("ok", false)):
+		var record: Dictionary = WorldHistory.subject(BOARD_ID)
+		var out: Array = (record.get("published", []) as Array).duplicate()
+		out.append({"theory": theory_id, "sound": sound, "target": target})
+		WorldHistory.update_subject(BOARD_ID, {"published": out}, "theory_published")
+		WorldHistory.record_event("theory_published", {"subject": target, "theory": theory_id, "sound": sound})
+		theory_published.emit(theory_id, result)
+		rebuild()
+	return result
+
+
+## Everything the player has strung to a theory. This is the theory's evidence,
+## and it is whatever they decided it was.
+func strung_to(theory_id: String) -> Array:
+	var refs: Array = []
+	for row: Dictionary in strings:
+		if str(row["to"]) == theory_id:
+			refs.append(str(row["from"]))
+		elif str(row["from"]) == theory_id:
+			refs.append(str(row["to"]))
+	return refs
+
+
+## Who the theory is actually about. The Wire has accounts for people and not
+## for institutions, which is right — you do not reply to a faction, you name
+## somebody in it. So a faction in the evidence resolves to a person who stands
+## in it, and a person you already have something on is preferred, because that
+## is the one an `expose` can actually be built from.
+func _most_implicated(evidence: Array) -> String:
+	var people: Array = []
+	var factions: Array = []
+	for ref: String in evidence:
+		if ref == "player":
+			continue
+		if ref.begins_with("part:") and ref.contains("@"):
+			people.append(ref.substr(ref.find("@") + 1))
+			continue
+		var state: Dictionary = WorldHistory.subject(ref)
+		match str(state.get("kind", "")):
+			"faction":
+				factions.append(ref)
+			"person":
+				people.append(ref)
+		var named := str(state.get("faction_id", ""))
+		if named != "":
+			factions.append(named)
+	# Somebody standing in one of the named factions.
+	for faction_id: String in factions:
+		for subject_id: String in WorldHistory.all_subjects().keys():
+			if subject_id == "player":
+				continue
+			var state: Dictionary = WorldHistory.subject(subject_id)
+			if str(state.get("faction_id", "")) == faction_id:
+				people.append(subject_id)
+	var fallback := ""
+	for subject_id: String in people:
+		if WorldHistory.subject(subject_id).is_empty():
+			continue
+		if fallback == "":
+			fallback = subject_id
+		# Someone you have something on. A true story needs a true detail.
+		var state: Dictionary = WorldHistory.subject(subject_id)
+		if not (state.get("wounds", []) as Array).is_empty() or str(state.get("injury", "none")) not in ["none", ""]:
+			return subject_id
+	return fallback
+
+
+func is_published(theory_id: String) -> bool:
+	for row: Dictionary in WorldHistory.subject(BOARD_ID).get("published", []):
+		if str((row as Dictionary).get("theory", "")) == theory_id:
+			return true
+	return false
+
+
+func published() -> Array:
+	return (WorldHistory.subject(BOARD_ID).get("published", []) as Array).duplicate()
 
 
 func leads() -> Array:
@@ -809,6 +934,10 @@ func _draw_theory(body: Rect2, card: Card) -> void:
 			line_y += 13.0 * zoom
 	# Somebody was not convinced.
 	CellOutzType.draw_condensed(self, body.end - Vector2(22, 26) * zoom, "?", 20.0 * zoom, MARKER * Color(1, 1, 1, 0.6 * open_blend), 0.0)
+	# L4. Out on the Wire. The stamp says it went out, never whether it held —
+	# the player learns that from what happens to them afterwards.
+	if is_published(card.id):
+		Grunge.stamp(self, body.get_center() + Vector2(0, body.size.y * 0.18), "PUBLISHED", 13.0 * zoom, -0.14, MARKER * Color(1, 1, 1, 0.5 * open_blend), card.seed_value)
 
 
 ## A person, as a photograph. Dark backing, a bad print, a name written on the

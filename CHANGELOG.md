@@ -2,6 +2,28 @@
 
 ## 2026 09 12
 
+- **L4: publishing a theory, and the bill for being wrong.** A theory goes out
+  on the Wire through the actions that already existed — `expose` if every
+  string holding it up is one the world bears out, `fabricate` if any single one
+  is not. The weakest claim in a story is the one that gets checked, so one bad
+  connection makes the whole thing a fabrication. The player cannot tell which
+  they are about to do: they built the theory, they believe it, and the board
+  has never marked a string true or false. Publishing is how they find out, in
+  public, at the Wire's own prices — an expose costs 2 exposure and takes reach
+  off the target; a fabrication costs 3, rolls, and if it does not hold costs 5
+  and comes back onto the player's own account.
+  One case found while wiring it and worth keeping: a sound theory about
+  somebody you hold nothing on does not go out at all. The game says RIGHT, AND
+  YOU CANNOT PROVE IT, which is its own kind of punishment.
+  A published theory is stamped PUBLISHED. The stamp never says whether it held.
+
+- **I0.8: ammunition becomes an object in the field HUD.** The weapon row and
+  `loaded / reserve` counter are gone. The lower corner is now a torn leather
+  recess holding the silhouette of the weapon in your actual hand, live rounds
+  fanned through physical chambers, punched holes for spent rounds and a loose
+  reserve pile. Reloading lifts a cartridge through the well instead of printing
+  RELOADING, and the cleaver reports its state through nicks in the edge.
+
 - **L2 and L3: the wall is yours, and it can be wrong.** L1 read the board out
   of `WorldHistory`, which made it a view. It is now a thing one person made: a
   new board has the authored theories on it — they were up when you found the

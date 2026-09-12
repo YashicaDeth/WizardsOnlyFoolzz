@@ -506,9 +506,9 @@ holds what the *player* thinks — which is allowed to be wrong.
 - [x] **L3.4** The board never marks it — what a lead *leads to* lands with L5
 
 ### L4 — Publishing a theory
-- [ ] **L4.1** A theory goes to the Wire through `expose` / `fabricate`
-- [ ] **L4.2** True published = discrediting; false published = fabrication, and it costs
-- [ ] **L4.3** Being wrong has a price — the first screen where it does
+- [x] **L4.1** A theory goes to the Wire through `expose` / `fabricate`
+- [x] **L4.2** True published = discrediting; false published = fabrication, and it costs
+- [x] **L4.3** Being wrong has a price — the first screen where it does
 
 ### L6 — Theories, mainlines and endings
 - [x] **L6.1** The board ships with authored theories already pinned, contradictory and unmarked
@@ -550,7 +550,7 @@ finished. Applies to everything below and to A5, A6, C1.
 - [x] **I0.5** The handheld becomes a black cracked mirror you look *into*, jester on the back
 - [x] **I0.6** Kill the HUNT SIGNAL corner plate — a rival arrives when they change, not permanently
 - [x] **I0.7** Hull read off the car, not off a number in a corner
-- [ ] **I0.8** The weapon well reworked
+- [x] **I0.8** The weapon well is a torn recess of gun, chambers and loose rounds — not a label/count row
 - [ ] **I0.9** Cast display names reworked — ids stay, names change (blocked on Greg's list)
 - [x] **I0.3** Applied to the map — the key is deleted, marks read by shape, metadata is a title block
 - [x] **I0.4** Applied to the handheld — CARRY draws what you took as objects in a bag, not rows

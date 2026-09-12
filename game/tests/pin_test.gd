@@ -20,8 +20,12 @@ func _check(condition: bool, what: String) -> void:
 func _ready() -> void:
 	WorldHistory.clear_history()
 	WorldHistory.register_subject("player", {"name": "THE HUNTER", "kind": "person"})
-	WorldHistory.register_subject("mara_voss", {"name": "Mara Voss", "kind": "person", "role": "Bone Yard Captain"})
-	WorldHistory.register_subject("dolan_kreeg", {"name": "Dolan Kreeg", "kind": "person", "status": "executed"})
+	WorldHistory.register_subject("mara_voss", {
+	"name": "Mara Voss", "kind": "person", "role": "Bone Yard Captain",
+	"faction_id": "ashline_wreckers", "injury": "fractured left clavicle",
+})
+	WorldHistory.register_subject("dolan_kreeg", {"name": "Dolan Kreeg", "kind": "person", "status": "executed", "faction_id": "choir_of_marrow"})
+	WorldHistory.register_subject("choir_of_marrow", {"name": "Choir of Marrow", "kind": "faction", "doctrine": "The body is a congregation"})
 	WorldHistory.register_subject("ashline_wreckers", {"name": "Ashline Wreckers", "kind": "faction", "doctrine": "Rank is won by remembered impact"})
 	WorldHistory.record_event("derby_round_won", {"subject": "player"})
 
@@ -171,8 +175,58 @@ func _ready() -> void:
 	_check(board.strings.size() == kept, "strings survive a reload (%d)" % kept)
 
 	print("")
+	print("L4 - publishing a theory")
+	# A theory nothing holds up cannot go out.
+	var bare: Dictionary = board.publish("theory_rotation")
+	_check(not bool(bare.get("ok", true)), "a theory with no evidence strung to it cannot be published")
+
+	# A sound theory: every string into it is one the world bears out.
+	board.pin("part:HEART@mara_voss", "cutting")
+	board.pin("mara_voss", "photo")
+	board.lay_string("part:HEART@mara_voss", "theory_ownership")
+	_check(board.strung_to("theory_ownership").size() > 0, "the theory knows what is holding it up")
+	var sound: Dictionary = board.publish("theory_ownership")
+	_check(bool(sound.get("ok", false)), "a theory can be published")
+	_check(bool(sound.get("sound", false)), "one built only on supported strings is sound")
+	_check(str(sound.get("headline", "")).contains("PUBLISHED AGAINST"), "and goes out as an expose: %s" % str(sound.get("headline", "")))
+	_check(int(sound.get("exposure", 0)) > 0, "publishing costs exposure")
+	_check(int(sound.get("reach", 0)) < 0, "and takes reach off the target")
+	_check(board.is_published("theory_ownership"), "the wall remembers it went out")
+	_check(not bool(board.publish("theory_ownership").get("ok", true)), "and it cannot go out twice")
+
+	# L4.2 / L4.3. One bad string makes the whole thing a fabrication, and the
+	# player had no way of knowing which string that was.
+	board.lay_string("dolan_kreeg", "theory_inside")
+	board.lay_string("ashline_wreckers", "theory_inside")
+	var shaky := false
+	for ref in board.strung_to("theory_inside"):
+		if not board.supports(str(ref), "theory_inside"):
+			shaky = true
+	_check(shaky, "at least one string into this theory is not borne out")
+	var wrong: Dictionary = board.publish("theory_inside")
+	_check(bool(wrong.get("ok", false)), "it publishes anyway, because the player believes it")
+	_check(not bool(wrong.get("sound", true)), "but it goes out unsound")
+	_check(str(wrong.get("headline", "")) == "FABRICATION PUBLISHED", "as a fabrication: %s" % str(wrong.get("headline", "")))
+	_check(int(wrong.get("exposure", 0)) >= 3, "which costs more exposure than the truth did (%d)" % int(wrong.get("exposure", 0)))
+
+	# L4.3. The board never said which it would be.
+	_check(not board.strings.any(func(row): return (row as Dictionary).has("sound")), "no string was ever marked sound or unsound")
+
+	# Being right is not the same as being able to prove it.
+	WorldHistory.register_subject("quiet_man", {"name": "The Quiet Man", "kind": "person", "role": "Downed at the gate and never named"})
+	board.pin("quiet_man", "photo")
+	board.lay_string("quiet_man", "theory_absent_god")
+	var unprovable: Dictionary = board.publish("theory_absent_god")
+	_check(not bool(unprovable.get("ok", true)), "a sound theory about someone you hold nothing on does not go out")
+	_check(str(unprovable.get("headline", "")) == "RIGHT, AND YOU CANNOT PROVE IT", "and the game says so in those words")
+	_check(not board.is_published("theory_absent_god"), "and it is not on the record")
+
+	var out: Array = board.published()
+	_check(out.size() == 2, "both publications are on the record")
+
+	print("")
 	if failures.is_empty():
-		print("L2 + L3 PASS")
+		print("L2 + L3 + L4 PASS")
 	else:
 		print("FAIL: %d" % failures.size())
 		for failure in failures:

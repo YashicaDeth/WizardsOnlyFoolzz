@@ -1,5 +1,7 @@
 extends Control
 
+const CellOutzType := preload("res://systems/celloutz_type.gd")
+
 const BONE := Color("ead4ad")
 const BLOOD := Color("a81716")
 const COPPER := Color("dc5827")
@@ -105,17 +107,92 @@ func _draw_hunt_thread() -> void:
 func _draw_weapon() -> void:
 	if weapon.is_empty():
 		return
-	var font := ThemeDB.fallback_font
-	var at := Vector2(size.x - 292, size.y - 83)
-	draw_line(at, at + Vector2(236, 0), BONE * Color(1, 1, 1, 0.18), 1)
-	draw_string(font, at + Vector2(0, 20), str(weapon.get("label", "UNARMED")), HORIZONTAL_ALIGNMENT_LEFT, 200, 13, COPPER)
-	if int(weapon.get("loaded", -1)) >= 0:
-		var rounds := "%02d / %02d" % [int(weapon.loaded), int(weapon.reserve)]
-		draw_string(font, at + Vector2(160, 20), rounds, HORIZONTAL_ALIGNMENT_RIGHT, 76, 13, BONE)
-		for shell in int(weapon.get("loaded", 0)):
-			draw_rect(Rect2(at + Vector2(shell * 13, 31), Vector2(8, 16)), COPPER if not bool(weapon.get("reloading", false)) else TEAL)
-	else:
-		draw_string(font, at + Vector2(0, 42), "MELEE", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, BONE * Color(1, 1, 1, 0.55))
+	var weapon_id := str(weapon.get("id", "sword"))
+	var center := Vector2(size.x - 126.0, size.y - 94.0)
+	# A torn leather recess rather than a fourth corner panel. Its contents are
+	# objects: the held weapon, live cartridges and the loose reserve beneath it.
+	var mouth := PackedVector2Array([
+		center + Vector2(-112, -16), center + Vector2(-93, -54),
+		center + Vector2(-22, -69), center + Vector2(63, -57),
+		center + Vector2(108, -21), center + Vector2(99, 34),
+		center + Vector2(41, 55), center + Vector2(-55, 51),
+		center + Vector2(-103, 25), center + Vector2(-112, -16),
+	])
+	draw_colored_polygon(mouth, Color(0.025, 0.012, 0.009, 0.68))
+	draw_polyline(mouth, BONE * Color(1, 1, 1, 0.13), 1.2)
+	for stitch in 9:
+		var angle := lerpf(PI * 1.08, PI * 1.92, float(stitch) / 8.0)
+		var stitch_at := center + Vector2.from_angle(angle) * Vector2(104, 56)
+		draw_line(stitch_at - Vector2(3, 1), stitch_at + Vector2(3, 1), COPPER * Color(1, 1, 1, 0.34), 1.0)
+
+	_draw_weapon_silhouette(center + Vector2(28, -8), weapon_id)
+	var loaded := int(weapon.get("loaded", -1))
+	if loaded < 0:
+		# The cleaver's state is its edge. Nicks replace the meaningless MELEE row.
+		for nick in 4:
+			var nick_at := center + Vector2(-58 + nick * 10, 17 + nick * 2)
+			draw_line(nick_at, nick_at + Vector2(4, 5), BLOOD * Color(1, 1, 1, 0.65), 1.5)
+		return
+
+	var capacity := 5 if weapon_id == "shotgun" else 10
+	var reloading := bool(weapon.get("reloading", false))
+	var cartridge_tone := TEAL if reloading else COPPER
+	# Chambers arc around the weapon. Empty chambers remain as punched holes, so
+	# the player reads what is missing without parsing a fraction.
+	for chamber in capacity:
+		var angle := lerpf(PI * 0.80, PI * 1.64, float(chamber) / maxf(1.0, capacity - 1.0))
+		var shell_at := center + Vector2.from_angle(angle) * Vector2(78, 43)
+		_draw_cartridge(shell_at, angle + PI * 0.5, cartridge_tone, chamber < loaded, weapon_id == "shotgun")
+
+	var reserve := int(weapon.get("reserve", 0))
+	var pile_count := clampi(ceili(float(reserve) / (5.0 if weapon_id == "sidearm" else 3.0)), 0, 10)
+	for loose in pile_count:
+		var row := loose / 5
+		var loose_at := center + Vector2(-42 + (loose % 5) * 10, 34 - row * 7)
+		_draw_cartridge(loose_at, -0.18 + (loose % 3) * 0.12, BONE * Color(1, 1, 1, 0.58), true, weapon_id == "shotgun", 0.68)
+	var reserve_mark := "×%02d" % reserve
+	CellOutzType.draw_condensed(self, center + Vector2(17, 29), reserve_mark, 9.0, BONE * Color(1, 1, 1, 0.46), 0.8)
+	if reloading:
+		var reload_ratio := clampf(float(weapon.get("reload_ratio", 0.0)), 0.0, 1.0)
+		var lift := center + Vector2(-18, 29).lerp(center + Vector2(-9, -19), 1.0 - reload_ratio)
+		_draw_cartridge(lift, -0.2, TEAL, true, weapon_id == "shotgun")
+
+
+func _draw_cartridge(at: Vector2, angle: float, tone: Color, live: bool, wide: bool, scale_factor := 1.0) -> void:
+	var length := (15.0 if wide else 11.0) * scale_factor
+	var width := (5.2 if wide else 3.5) * scale_factor
+	var along := Vector2.from_angle(angle)
+	var across := along.orthogonal()
+	if not live:
+		draw_circle(at, width * 0.55, BONE * Color(1, 1, 1, 0.10))
+		draw_arc(at, width * 0.75, 0, TAU, 8, BONE * Color(1, 1, 1, 0.18), 1.0)
+		return
+	var points := PackedVector2Array([
+		at - along * length * 0.5 - across * width,
+		at + along * length * 0.36 - across * width,
+		at + along * length * 0.5,
+		at + along * length * 0.36 + across * width,
+		at - along * length * 0.5 + across * width,
+	])
+	draw_colored_polygon(points, tone)
+	draw_line(at - along * length * 0.35 - across * width, at - along * length * 0.35 + across * width, BONE * Color(1, 1, 1, 0.38), 1.0)
+
+
+func _draw_weapon_silhouette(at: Vector2, weapon_id: String) -> void:
+	var dark := Color(0.02, 0.012, 0.01, 0.94)
+	match weapon_id:
+		"shotgun":
+			draw_colored_polygon(PackedVector2Array([at + Vector2(-52, 8), at + Vector2(-39, -5), at + Vector2(27, -9), at + Vector2(51, -4), at + Vector2(52, 2), at + Vector2(-29, 7), at + Vector2(-42, 18)]), dark)
+			draw_line(at + Vector2(-22, 5), at + Vector2(-12, 24), COPPER * Color(1, 1, 1, 0.58), 5.0)
+			draw_line(at + Vector2(25, -6), at + Vector2(54, -3), BONE * Color(1, 1, 1, 0.44), 2.0)
+		"sidearm":
+			draw_colored_polygon(PackedVector2Array([at + Vector2(-30, -10), at + Vector2(35, -10), at + Vector2(39, 1), at + Vector2(5, 6), at + Vector2(-2, 31), at + Vector2(-23, 28), at + Vector2(-17, 4), at + Vector2(-31, 1)]), dark)
+			draw_line(at + Vector2(-25, -6), at + Vector2(31, -6), BONE * Color(1, 1, 1, 0.34), 2.0)
+		_:
+			var blade := PackedVector2Array([at + Vector2(-53, 18), at + Vector2(24, -29), at + Vector2(51, -34), at + Vector2(29, -10), at + Vector2(-46, 25)])
+			draw_colored_polygon(blade, dark)
+			draw_polyline(blade, BONE * Color(1, 1, 1, 0.36), 1.2)
+			draw_line(at + Vector2(-44, 24), at + Vector2(-62, 39), COPPER, 7.0)
 
 
 func _draw_controls() -> void:
