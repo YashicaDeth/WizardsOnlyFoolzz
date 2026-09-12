@@ -18,6 +18,7 @@ const MISFIRE_DIRECTOR := preload("res://systems/reality_misfire_director.gd")
 const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
+const BALLISTICS := preload("res://systems/ballistics.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 const RIVAL_REGISTRY := preload("res://systems/rival_registry.gd")
@@ -146,6 +147,8 @@ var guard_stamina_drain := 14.0
 ## AG4.2. Blood on the lens. Fed by `_spawn_blood`, which every blood event in
 ## the scene already goes through.
 var blood_veil: Control = null
+## AF1. Rounds in flight, brass on the floor, holes in the walls.
+var ballistics: Node3D = null
 var winded := false
 ## How much stamina it takes to break into a run again after being winded. Well
 ## clear of the floor, so the two thresholds can never be crossed in one frame.
@@ -315,6 +318,10 @@ func _ready() -> void:
 	# AG4.2. Under the pointer and over everything else in the world: blood on
 	# the lens sits between the player and the scene, not between the player
 	# and the panel they opened.
+	# AF1. Rounds and brass live in the world, not in the HUD.
+	ballistics = BALLISTICS.new()
+	add_child(ballistics)
+	ballistics.round_hit.connect(_on_round_hit)
 	blood_veil = BLOOD_VEIL.new()
 	$HUD.add_child(blood_veil)
 	_pointer = Control.new()
@@ -1009,11 +1016,37 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	return true
 
 
+## AF1.2. Where a round that missed everybody ended up. The world keeps the
+## hole (the projectile draws that itself) and the record keeps the fact,
+## which is what AB2 will read when destruction is tracked properly.
+func _on_round_hit(hit: Dictionary) -> void:
+	var struck: Variant = hit.get("collider")
+	if struck != null and struck is Node and (struck as Node).is_in_group("actor_body"):
+		return
+	WorldHistory.record_event("round_struck_world", {
+		"calibre": str(hit.get("calibre", "")),
+		"energy": snappedf(float(hit.get("energy", 0.0)), 0.01),
+		"shooter": str(hit.get("shooter", "")),
+		"location": HUNT_LOCATION,
+	})
+
+
 func _resolve_firearm(attack: Dictionary) -> void:
 	var forward := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 	var origin := camera.global_position + forward * 0.48
 	var impacts: Dictionary = {}
-	for direction in arsenal.shot_directions(forward, Vector3.UP):
+	var directions: Array[Vector3] = arsenal.shot_directions(forward, Vector3.UP)
+	# AF1. The visible round. Damage to a body still resolves below on the
+	# frame it is fired — moving that onto the projectile means deferring
+	# every anatomy hit by a few frames and is a change worth making on its
+	# own rather than folded into this one (AF1.1 stays open). What this
+	# buys now is everything the raycast could never do: a round you can
+	# see travel, a hole where it went wide, and brass on the floor.
+	if ballistics != null and is_instance_valid(ballistics):
+		var calibre := "buck" if directions.size() > 1 else "pistol"
+		for direction in directions:
+			ballistics.fire(origin, direction, calibre, 0.0, 1, "player")
+	for direction in directions:
 		var hit := _trace_actor(origin, direction, float(attack.range))
 		if hit.is_empty():
 			continue
