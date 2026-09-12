@@ -205,6 +205,24 @@ func player() -> Dictionary:
 const RANKS := ["CROWN", "INNER CIRCLE", "PROMOTER", "EARNER", "INTAKE"]
 const DEAD_STATUSES := ["dead", "executed", "killed"]
 
+## K1.3. The pyramid's own rank names are MLM-register on purpose for the
+## seven Sin-factions, and wrong for an ascending order that talks about
+## itself in signal terms — "Frequency is rank" is the doctrine, so the
+## grades should sound like it. Display-only: the buy-in math, the tiering
+## and `promote_successor()` all still run on `RANKS` underneath: this is
+## never a second rank system, only what a panel would print for it.
+const FACTION_RANK_LABELS := {
+	"wizardsonlyfoolz": {
+		"CROWN": "Clear", "INNER CIRCLE": "Harmonic", "PROMOTER": "Sideband",
+		"EARNER": "Carrier", "INTAKE": "Static",
+	},
+}
+
+
+func rank_label(faction_id: String, generic_rank: String) -> String:
+	var aliases: Dictionary = FACTION_RANK_LABELS.get(faction_id, {})
+	return str(aliases.get(generic_rank, generic_rank))
+
 
 func pyramid(faction_id: String) -> Dictionary:
 	var faction: Dictionary = WorldHistory.subject(faction_id)

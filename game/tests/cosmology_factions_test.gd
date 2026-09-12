@@ -49,21 +49,40 @@ func _ready() -> void:
 	check(pyramid.headcount >= 1, "Vanity Row has a real member, not an empty faction (%d)" % pyramid.headcount)
 	check(str(pyramid.doctrine) != "No stated doctrine.", "the pyramid reads Vanity Row's real doctrine")
 
+	# This test only seeds cosmology_factions.gd, not the_four_horsemen.gd
+	# (its own test covers that) — so from here CellOutz genuinely has no
+	# CROWN holder yet, and the pyramid should say so honestly rather than
+	# hide it.
 	var celloutz_pyramid := wire.pyramid("celloutz")
 	var crown_empty := (celloutz_pyramid.tiers[0].members as Array).is_empty()
-	check(crown_empty, "CellOutz's CROWN rank is genuinely empty — the Horsemen are not named yet")
+	check(crown_empty, "CellOutz's CROWN rank reads empty when nobody has been seeded into it")
 	var crown_vacancy: bool = celloutz_pyramid.vacancies.any(func(v): return str((v as Dictionary).get("rank", "")) == "CROWN")
 	check(crown_vacancy, "and the pyramid surfaces that as a real vacancy rather than hiding it")
 
 	var neutral := WorldHistory.faction_price_factor("honeyvein", {"faction_id": ""})
 	check(neutral > 0.0, "a newcomer can still deal with a brand-new Sin faction")
 
-	# --- K1.3: wizardsonlyfoolz has real ranks/paid grades without needing
-	# the still-blocked Law/Book/founder content -----------------------------
+	# --- K1.3: wizardsonlyfoolz has real ranks/paid grades ------------------
 	check(str(WorldHistory.subject("wren_ashby").get("faction_id", "")) == "wizardsonlyfoolz", "wren_ashby actually belongs to wizardsonlyfoolz")
 	var wof_pyramid := wire.pyramid("wizardsonlyfoolz")
 	check(wof_pyramid.headcount >= 1, "wizardsonlyfoolz has a real member, not an empty order (%d)" % wof_pyramid.headcount)
 	check((wof_pyramid.tiers[4].members as Array).size() >= 1, "and they sit at the bottom rank, paid in rather than promoted")
+
+	# --- K1.3: the Law, the Book and the founder ----------------------------
+	var wof_subject := WorldHistory.subject("wizardsonlyfoolz")
+	check(str(wof_subject.get("law", "")) != "", "the order has a real one-line Law")
+	check(str(wof_subject.get("book", "")) != "", "and a real Book")
+	var biographies: Array = wof_subject.get("founder_biographies", [])
+	check(biographies.size() >= 2, "the founder has multiple official biographies (%d)" % biographies.size())
+	var unique_bios := {}
+	for bio in biographies:
+		unique_bios[str(bio)] = true
+	check(unique_bios.size() == biographies.size(), "and they are all different from each other — the founder's biography genuinely does not survive checking")
+
+	# --- K1.3: the order's own grade vocabulary, on the same buy-in math ----
+	check(wire.rank_label("wizardsonlyfoolz", "INTAKE") == "Static", "the bottom grade reads as Static, not the generic MLM label")
+	check(wire.rank_label("wizardsonlyfoolz", "CROWN") == "Clear", "and the top reads as Clear")
+	check(wire.rank_label("ashline_wreckers", "INTAKE") == "INTAKE", "a Sin-faction keeps the generic label — this is not a second rank system replacing theirs")
 
 	# --- migration is safe: seeding twice must not duplicate or erase -------
 	var before_relations: Dictionary = WorldHistory.subject("celloutz").get("relations", {})

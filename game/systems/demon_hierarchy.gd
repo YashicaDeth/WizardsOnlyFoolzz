@@ -38,8 +38,10 @@ static func tier(subject_id: String) -> String:
 	if kind != "person":
 		return ""
 	# K2.2. A person actually holding CellOutz's CROWN rank is a Horseman —
-	# whoever WireNet.promote_successor() puts there, whenever Greg names them.
-	if str(subject.get("faction_id", "")) == LEADERSHIP_FACTION and str(subject.get("faction_rank", "")) == "CROWN":
+	# whoever WireNet.promote_successor() puts there. Dead does not clear a
+	# fallen holder's own faction_rank field (nothing downstream needed it
+	# to), so a corpse still reading "CROWN" on paper does not still count.
+	if str(subject.get("faction_id", "")) == LEADERSHIP_FACTION and str(subject.get("faction_rank", "")) == "CROWN" and not WireNet.DEAD_STATUSES.has(str(subject.get("status", "")).to_lower()):
 		return TIER_LEADERSHIP
 	var faction_id := str(subject.get("faction_id", ""))
 	if SIN_FACTIONS.has(faction_id) and _commands_own_faction(subject_id, faction_id):
