@@ -1164,7 +1164,8 @@ hitpoints. `clinch_test.gd` and F7 already exist; this is the rest of it.
 ### O v3 — the third pass
 Opened because O2.5 closed at v2. A fault the v2 work itself created.
 
-- [~] **O2.7** `v3` Only the encounter loop honours `scale_for()`; the player's
+- [x] **O2.7** `v3` The player's windup, cooldowns, arsenal and rig animation all tick on their own scaled clock — both bodies in contact feel the freeze
+- [ ] **O2.8** `v4` Gore and chunk physics still run at full speed through a hit, so a limb can leave a body that has not moved yet
       own cooldowns, the rig animations and the gore still run at full speed
       during a hit they are part of. Cooldowns and rig animation are fixed:
       `attack_cooldown`, `dodge_cooldown`, `arsenal.tick()` and `strike_windup`
