@@ -22,6 +22,7 @@ func configure(body_rig: BaselineHuman, appearance: Dictionary = {}) -> void:
 	_build_prosthetic_readout()
 	_build_body_mods()
 	_build_head_mutations()
+	_build_worn_layers()
 	sync_from_anatomy()
 
 
@@ -167,6 +168,31 @@ func _build_feet() -> void:
 		var leg := rig.parts[zone_id] as Node3D
 		_box(leg, "%s_Boot" % zone_id, Vector3(side * 0.006, -0.455, -0.075), Vector3(0.12, 0.09, 0.23), Color("25231f"), "cloth")
 		_box(leg, "%s_Toecap" % zone_id, Vector3(side * 0.006, -0.455, -0.17), Vector3(0.125, 0.07, 0.07), Color("655b4e"), "metal")
+
+
+## B7.1. The coat this rig has always had, plus whatever else the body is
+## actually wearing. The built-in pieces stay: they are this character's own
+## clothes, and a garment list is what they put on over them.
+func _build_worn_layers() -> void:
+	var worn: Array = marks.get("worn", [])
+	if worn.is_empty():
+		return
+	for zone_id in Garments.covered_zones(worn):
+		var zone := rig.parts.get(zone_id) as Node3D
+		if zone == null:
+			continue
+		var over: Dictionary = Garments.shielding(worn, zone_id)
+		var layer := _box(
+			zone,
+			"Worn_%s" % zone_id,
+			Vector3(0, 0, -0.02),
+			Vector3(0.3, 0.42, 0.06) if zone_id == "torso" else Vector3(0.14, 0.3, 0.05),
+			# Heavier shielding reads heavier: a lead wrap is not a coat and
+			# should not look like one across a yard.
+			Color("2a2722").lerp(Color("6b6a5e"), float(over.shield)),
+			"rust" if float(over.plate) > 0.25 else "paint",
+		)
+		layer.set_meta("worn_layer", zone_id)
 
 
 func _build_clothing() -> void:

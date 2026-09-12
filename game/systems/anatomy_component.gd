@@ -38,6 +38,10 @@ const MELTING := ["radiation", "caustic"]
 const DOSE_SHARE := 0.55
 const DOSE_BURN_PER_SECOND := 0.9
 const DOSE_DECAY_PER_SECOND := 0.035
+## B7.1. How fast a storm doses an uncovered zone. Slow enough to be weather
+## rather than an attack: a bad night out in it is survivable and costs you
+## something, and staying out in it is not.
+const EXPOSURE_DOSE_PER_SECOND := 0.42
 
 const DEFAULT_ZONES := {
 	"head": {"health": 45.0, "bleed": 0.75, "critical": true},
@@ -47,6 +51,15 @@ const DEFAULT_ZONES := {
 	"left_leg": {"health": 75.0, "bleed": 0.62, "critical": false},
 	"right_leg": {"health": 75.0, "bleed": 0.62, "critical": false},
 }
+
+## B7.1. What this body has on. Names from `Garments.CATALOGUE`; an empty list
+## is somebody standing in the Ashbloom in their skin, which the weather and the
+## radiation path both treat exactly as badly as that sounds.
+var worn: Array = []
+## B7.2. How much of each zone is behind something right now, 0 to 1, written by
+## whatever knows about the world's geometry. Cover and armour resolve to one
+## figure, so there is no armour stat for a wall to disagree with.
+var cover: Dictionary = {}
 
 ## B3.1. What each zone is still carrying, in dose points. Not a status flag: it
 ## is spent down by `_process()` and it does damage the whole time it is there.
@@ -101,7 +114,18 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 	var installed: Dictionary = installed_parts.get(resolved_zone, {})
 	var hardware_ratio := implant_condition(resolved_zone)
 	var armor := float(installed.get("armor", 0.0)) * hardware_ratio
-	var applied := maxf(1.0, damage * (1.0 - clampf(armor, 0.0, 0.85)))
+	# B7.1 / B7.2. What is over this zone: what it is wearing, plus what it is
+	# behind. Melting damage is stopped by shielding and ordinary damage by
+	# plate, which is the difference between a lead wrap and a scrap plate and
+	# the reason they are separate numbers on a garment rather than one
+	# "protection" figure that would have to lie about one of them.
+	var over := Garments.with_cover(
+		Garments.shielding(worn, resolved_zone),
+		float(cover.get(resolved_zone, 0.0)),
+	)
+	var melting_type := damage_type in MELTING
+	var layered := float(over.shield) if melting_type else float(over.plate)
+	var applied := maxf(1.0, damage * (1.0 - clampf(armor, 0.0, 0.85)) * (1.0 - layered))
 	zone["health"] = maxf(0.0, float(zone.health) - applied)
 	zones[resolved_zone] = zone
 	var penetrating := damage_type in ["cut", "puncture", "ballistic", "shear"]
@@ -408,6 +432,7 @@ func snapshot() -> Dictionary:
 		# whole point of it being a path through the anatomy rather than an
 		# effect attached to a place.
 		"dose": dose.duplicate(true),
+		"worn": worn.duplicate(),
 		"blood": roundi(blood_remaining),
 		"blood_capacity": roundi(blood_capacity),
 		"bleed_rate": snappedf(bleed_rate, 0.01),
@@ -426,6 +451,7 @@ func snapshot() -> Dictionary:
 
 func restore(state: Dictionary) -> void:
 	dose = (state.get("dose", {}) as Dictionary).duplicate(true)
+	worn = (state.get("worn", []) as Array).duplicate()
 	blood_capacity = maxf(100.0, float(state.get("blood_capacity", blood_capacity)))
 	blood_remaining = clampf(float(state.get("blood", blood_capacity)), 0.0, blood_capacity)
 	bleed_rate = maxf(0.0, float(state.get("bleed_rate", 0.0)))
@@ -499,6 +525,23 @@ func _burn_dose(delta: float) -> void:
 		dose[zone_id] = maxf(0.0, remaining - burn - DOSE_DECAY_PER_SECOND * delta)
 	for zone_id in spent:
 		dose.erase(zone_id)
+
+
+## B7.1. Standing in it. A contaminated storm doses a body through the air
+## rather than by hitting it, so this is not a wound and makes none: it is the
+## same dose B3 introduced, arriving slowly, on the zones nothing is covering.
+## A sealed garment is the difference between walking through weather and
+## breathing it.
+func expose(severity: float, delta: float) -> void:
+	var bad := clampf(severity, 0.0, 1.0)
+	if bad <= 0.05 or dead:
+		return
+	for zone_id in zones:
+		var sealed := float(Garments.shielding(worn, str(zone_id)).seal)
+		var taken := bad * (1.0 - sealed) * EXPOSURE_DOSE_PER_SECOND * delta
+		if taken <= 0.0:
+			continue
+		dose[zone_id] = float(dose.get(zone_id, 0.0)) + taken
 
 
 ## B3.2. How melted a zone reads, 0 to 1, for anything that draws it.

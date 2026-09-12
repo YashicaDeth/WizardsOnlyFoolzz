@@ -3957,6 +3957,12 @@ func _update_air() -> void:
 		return
 	air.follow(player)
 	air.set_severity(clampf(WorldHistory.chaos_magick(), 0.0, 1.0))
+	# B7.1. Standing in it costs something. The air doses whatever it is
+	# touching, and what the player is wearing decides how much of it gets
+	# through — which is what makes a filter mask a decision rather than a
+	# cosmetic.
+	if player_rig != null and is_instance_valid(player_rig):
+		player_rig.anatomy.expose(air.severity(), get_physics_process_delta_time())
 	var env: Environment = $WorldEnvironment.environment
 	if env != null:
 		# The haze thickens with it. Motes say there is something in the air;
