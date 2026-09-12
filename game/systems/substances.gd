@@ -42,16 +42,50 @@ const CATALOG := {
 }
 
 
+## AU1.3. "Two mushrooms are not one item with a number." Flavour names per
+## substance, seeded per pickup rather than authored once — a real strain
+## identity (`roll_strain()`) rather than a generic label with a condition
+## percentage next to it, which is all `carry.gd`'s other perishables get.
+const STRAIN_NAMES := {
+	"marrow_dust": ["FEMUR CUT", "RIB CUT", "SKULL CUT", "SPINE CUT"],
+	"choir_bloom": ["FIRST BLOOM", "SECOND BLOOM", "GRAVE BLOOM", "WET BLOOM"],
+	"static_hymn": ["CARRIER TONE", "DEAD AIR", "NUMBERS CUT", "FEEDBACK LOOP"],
+}
+const POTENCY_RANGE := Vector2(0.7, 1.3)
+
+
+## Deterministic from `seed_value` — the same pickup rolls the same strain
+## every time it is asked, the same guarantee `seal_strokes()` (E2.1) makes
+## for a seal. `potency` scales the effect at the point of use rather than
+## the cost to acquire it: a weak batch still costs what the catalogue says,
+## it just does less for you, which is the whole risk of buying unlabelled
+## drugs off whoever is selling this week.
+static func roll_strain(substance_id: String, seed_value: int) -> Dictionary:
+	var names: Array = STRAIN_NAMES.get(substance_id, ["UNMARKED BATCH"])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(substance_id + str(seed_value)) & 0x7fffffff
+	return {
+		"strain": str(names[rng.randi() % names.size()]),
+		"potency": rng.randf_range(POTENCY_RANGE.x, POTENCY_RANGE.y),
+	}
+
+
 ## E6.1. Pays into the exact same `anatomy_state` shape `boons.gd` already
 ## pays boosts into — one body ledger, not two. Refused rather than lethal,
 ## same as `Boons`: `_pay()` already refuses under its own floors.
-static func take(subject_id: String, substance_id: String) -> Dictionary:
+##
+## AU1.3. `potency` scales what it actually does to you, so a weak batch and
+## a strong one costing the same body price is the point — the price was
+## paid for whatever you thought you were getting.
+static func take(subject_id: String, substance_id: String, potency: float = 1.0) -> Dictionary:
 	if not CATALOG.has(substance_id):
 		return {"ok": false, "reason": "NO SUCH SUBSTANCE"}
 	var subject := WorldHistory.subject(subject_id)
 	if subject.is_empty():
 		return {"ok": false, "reason": "NO SUCH SUBJECT"}
-	var data: Dictionary = CATALOG[substance_id]
+	var data: Dictionary = CATALOG[substance_id].duplicate()
+	data["pain_relief"] = float(data.pain_relief) * potency
+	data["consciousness_cost"] = float(data.consciousness_cost) * potency
 	var payment := Boons._pay(subject_id, str(data.cost_kind), float(data.cost_amount), str(data.get("cost_target", "")))
 	if not bool(payment.get("ok", false)):
 		return payment

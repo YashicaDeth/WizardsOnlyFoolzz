@@ -9,12 +9,12 @@ edit.** Change `CHECKLIST.md` and regenerate with
 
 | | |
 | --- | --- |
-| Segments | **1574** |
-| Built | **429** |
-| Open | **1145** |
-| Sections | **46** |
+| Segments | **1628** |
+| Built | **443** |
+| Open | **1185** |
+| Sections | **50** |
 
-Version spread: **v1** 745, **v2** 54, **v3** 15, **v4** 15, **v5** 14, **v6** 14, **v7** 14, **v8** 14, **v9** 14, **v10** 675
+Version spread: **v1** 799, **v2** 54, **v3** 15, **v4** 15, **v5** 14, **v6** 14, **v7** 14, **v8** 14, **v9** 14, **v10** 675
 
 ---
 
@@ -1294,6 +1294,13 @@ Version spread: **v1** 745, **v2** 54, **v3** 15, **v4** 15, **v5** 14, **v6** 1
 - [ ] `AE10.13` `v10` You can be arrested rather than killed
 - [ ] `AE10.14` `v10` Standing with a faction changes what the law does
 - [ ] `AE10.15` `v10` What you were wanted for carries into the next universe
+- [x] `AG4.1` "when running and the stamina bar depletes, the screen becomes super jittery" — TaKeS was right and so was his guess at the cause. Two thresholds now, not one
+- [x] `AG4.2` "the blood splatter effects... just being lame asf" — blood_veil.gd: spatter with direction, near glass out of focus against far glass sharp, drops heavy enough to run down the screen, three stages of drying
+- [x] `AG4.3` "no more mara voss wipe it" — wiped, and not by find-and-replace: a second hardcoded name is the same fault with different letters. cast_names.gd generates the captain from run_salt, so they are stable inside a save and different in the next. Eight saves gave eight captains: Vale Rime, Roan Hollow, Halloway Coil, Mera Lockwood, Ash Coil, Kester Cinder, Nix Arden, Reve Arden. F v10.1 already demanded this
+- [x] `AG4.4` "make this clickable with the mouse not just arrow keys" — the index tabs are pointable and the footer leads with CLICK ANYTHING instead of listing five keyboard controls
+- [x] `AG4.5` "no more vessel breath bullshit" — gone, and replaced by the same information carried by things already in the frame. Breath became breathing: the frame tightens and releases on a cycle whose rate climbs and depth falls as stamina empties, so hard breathing is fast and shallow and the edges close in. Nothing to read, which is why it works while you are being attacked — the one moment a stamina bar is least useful. Vitality became the mark’s own condition: the crown arc opens, thorns snap off one at a time (four a side at full, countable at a glance), and the pulse goes quick and irregular below 40%. Dressing a progress bar in a crown never stopped it being a progress bar
+- [ ] `AG4.6` The website
+- [ ] `AG4.7` The gore and the X-rays enhanced
 
 ## AG — Playtest, 12 September 2026
 
@@ -1632,13 +1639,72 @@ Version spread: **v1** 745, **v2** 54, **v3** 15, **v4** 15, **v5** 14, **v6** 1
 - [ ] `AR10.14` `v10` The tree and the pyramid are one document
 - [ ] `AR10.15` `v10` Your route is readable by somebody else
 
+## AT — WETWIRE: the brain, the chip and the index
+
+- [ ] `AT1.1` The brain is a real organ at full detail, not an icon
+- [ ] `AT1.2` A CRT bent into the cortex, curved, showing the inside from inside
+- [ ] `AT1.3` It is an index you open and most of what is in it is optional
+- [ ] `AT1.4` Visceral: it is wet, the chip is bolted into wet tissue, and looking at it is uncomfortable
+- [ ] `AT1.5` The tower in it — the bloody wired chip — is the bridge to the network above
+- [ ] `AT1.6` The Wire seen from 5D is what that network is
+- [ ] `AT1.7` It is hardware somebody else installed: revocable, traceable, and it can find you
+- [ ] `AT1.8` Its radiation is what melts you at 8g and 9g — the thing connecting you is killing you
+
+## AU — The materia
+
+- [ ] `AU1.1` Every class present: stimulant, cannabinoid, psychedelic, dissociative, deliriant, empathogen, depressant, opioid, research chemical, new-world
+- [x] `AU1.2` A drug is an object — a baggie, a blister, a tab, a weight
+- [ ] `AU1.3` Strains differ. Two mushrooms are not one item with a number
+- [ ] `AU1.4` Everything costs: body, standing, time, and the godhead's attention
+- [ ] `AU1.5` Tolerance and comedown are tracked on the real clock
+- [ ] `AU1.6` Set and setting: the same substance in a safe room and in a tunnel are different experiences
+- [ ] `AU1.7` Deliriants are horror and must never read as fun
+- [ ] `AU1.8` Smoking is a real act: cigarettes, vapes, joints, spliffs, blunts, bongs, alien devices
+- [ ] `AU1.9` Caffeine is in the same system as everything else
+- [ ] `AU1.10` You can lace somebody, the world records it, and the law
+- [ ] `AU1.11` Research chemicals as easter eggs, from the real long tail
+- [ ] `AU1.12` New-world drugs made of what is left
+
+## AV — The planes
+
+- [ ] `AV1.1` Twelve planes, named from the tradition, each one a real place
+- [ ] `AV1.2` Four worlds as registers rather than more planes
+- [ ] `AV1.3` Da'ath is not on the map and cannot be aimed at
+- [ ] `AV1.4` You petition a plane, you do not travel to it — a name, a seal, an offering, a licence to depart
+- [ ] `AV1.5` Each plane looks like itself, with more of Greg's art the higher it goes
+- [ ] `AV1.6` Hellscape and angelscape are one place in two registers, not two asset sets
+- [ ] `AV1.7` All of it runs on one shader with different dials (FINAL_V section 16)
+- [ ] `AV2.1` Seeing a plane, talking on it, conjuring on it and fighting on it are four rising floors
+- [ ] `AV2.2` The substance decides which door opens, not a menu
+- [ ] `AV2.3` Coming down mid-conversation is a real failure and the entity remembers it
+- [ ] `AV2.4` You cannot fight the godhead sober, and that is not a difficulty setting
+- [ ] `AV2.5` Sustaining altitude is its own problem, separate from reaching it
+- [ ] `AV3.1` Entities are subjects in WorldHistory like everybody else
+- [ ] `AV3.2` A relationship accumulates across trips
+- [ ] `AV3.3` Voice is distorted and clears with standing — the whole readout, no meter
+- [ ] `AV3.4` Mysterious means withholding, never vague
+- [ ] `AV3.5` They can be owed, and they collect (AR2.4)
+- [ ] `AV3.6` They disagree with each other the way the gods do about a kill
+- [ ] `AV3.7` Demonic and jesterish is the register; the jester is already on the handheld
+
+## AW — Commissioning
+
+- [ ] `AW1.1` One plane, one artist, one brief — twelve independent commissions
+- [ ] `AW1.2` Write the brief before asking: plane, register, size, format, use, and what it sits beside
+- [ ] `AW1.3` Licence agreed in writing before money moves — use, modification, and whether it survives a sale
+- [ ] `AW1.4` Credit in the game, on the cast page, not only in a readme
+- [ ] `AW1.5` Pay properly. They are friends, which is a reason for more paperwork, not less
+- [ ] `AW1.6` Take source files, not only exports
+- [ ] `AW1.7` Their work goes in as texture and material inside the procedural system, never replacing it
+- [ ] `AW1.8` A rejection or a redraw is budgeted for before the first commission goes out
+
 ## AS — Night, the lamp, and what you are wearing
 
-- [ ] `AS1.1` It throws real light into the world when it is in your hand
-- [ ] `AS1.2` Holding it up to see is an action with a cost — that hand is busy
-- [ ] `AS1.3` A battery percentage that runs down and can run out
-- [ ] `AS1.4` Pocketing it is a movement and the light goes with it
-- [ ] `AS1.5` Its light is what gives you away at night (pairs with AE1.1)
+- [x] `AS1.1` It throws real light into the world when it is in your
+- [x] `AS1.2` Holding it up to see is an action with a cost — that hand
+- [x] `AS1.3` A battery percentage that runs down and can run out The
+- [x] `AS1.4` Pocketing it is a movement and the light goes with it
+- [ ] `AS1.5` Its light is what gives you away at night (pairs with
 - [ ] `AS2.1` Light warps and distorts at night rather than dimming
 - [ ] `AS2.2` Minimal lighting is the default and a light source is a decision
 - [ ] `AS2.3` Night is when AO4.2's hauntings happen
@@ -1652,11 +1718,11 @@ Version spread: **v1** 745, **v2** 54, **v3** 15, **v4** 15, **v5** 14, **v6** 1
 - [ ] `AS4.3` Anvil crawler lightning — the long horizontal crawl, not a flash
 - [ ] `AS4.4` Red lightning, and it means something when it appears
 - [ ] `AS4.5` Being caught out in it costs something (W1.3)
-- [ ] `AS10.1` `v10` The handheld throws real light into the world
-- [ ] `AS10.2` `v10` Holding it up costs you the hand
-- [ ] `AS10.3` `v10` The battery runs down and can reach nothing
-- [ ] `AS10.4` `v10` Pocketing it is a movement and the light goes with it
-- [ ] `AS10.5` `v10` Its light is what gives you away at night
+- [x] `AS10.1` `v10` The handheld throws real light into the world See AS1.1.
+- [x] `AS10.2` `v10` Holding it up costs you the hand See AS1.2.
+- [x] `AS10.3` `v10` The battery runs down and can reach nothing See AS1.3.
+- [x] `AS10.4` `v10` Pocketing it is a movement and the light goes with it See AS1.4.
+- [ ] `AS10.5` `v10` Its light is what gives you away at night — see AS1.5;
 - [ ] `AS10.6` `v10` Light warps and distorts at night rather than dimming
 - [ ] `AS10.7` `v10` Minimal lighting is the default and a light source is a decision
 - [ ] `AS10.8` `v10` Night is when the hauntings happen

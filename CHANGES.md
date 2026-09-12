@@ -2,14 +2,37 @@
 
 The build record for **Wizards Only Fools**, newest first. Every entry is a real change with the reason it was made; the tag says which part of the game it touched.
 
-**254 changes** · **44,670 lines of game code** · **429 of 1583 planned pieces built** across 46 areas
+**266 changes** · **46,379 lines of game code** · **443 of 1637 planned pieces built** across 50 areas
 
 ---
 
 ## 2026-09-12
 
+- **VESSEL and BREATH stop being two labelled bars** `playtest fixes`
+  Greg: "no more vessel breath bullshit". He is right, and the reason is I0 rather than taste - two horizontal meters with words over them are an app widget in a costume, and the crown and thorns drawn around them were an attempt to make a progress bar read as an artefact. Dressing a bar does not stop it being a bar.
+- **Wipe Mara Voss: the captain is generated per save**
+  Greg: "no more mara voss wipe it". She has been the Bone Yard captain in every screenshot and every run since the derby was built, because she is a string in two files.
+- **AU1.2 and AU1.10: a drug is an object, and lacing has a real ledger behind it**
+  AU1.2: substances.gd's three entries each name a real physical form now (marrow_dust a baggie, choir_bloom a weight, static_hymn a tab), read by carry.gd's take_substance() into the item's own label rather than a generic 'substance' kind. Choir of Marrow prices it (a new substance appetite in FACTION_APPETITES, above the neutral baseline, on top of the anatomy trade it already specialises in). Stealable: Carry.take_from_subject() reads a subject's own…
+- **WETWIRE: the brain, the materia, the planes, and who you owe**
+  Four things arrived in one message and they are one system, which is why this is a document rather than four sections written separately. You do not get to the planes except through the brain; you do not get through the brain without the chip; and the chip is in your head because somebody put it there while you were captured. The drugs are the only thing you can reach without permission, which is exactly why the institution cares about them.
+- **003**
+  bigger better newer
+- **AS1: the handheld is a real lamp, with a real battery**
+  Greg: 'having light coming off the phone when you have it in your hand, then you can wave it around or pocket it'.
+- **AS2: the world finally has a night, not just a clock nobody reads**
+  The sun and base ambient were set once in _build_world() and never touched again — a fixed 1.4-energy noon regardless of how many hours world_clock.gd said had passed. _update_day_night() now runs every physics frame, driving the sun's energy and colour and the base environment's ambient/exposure off WorldClock.daylight() alone, so anything else already treating daylight() as the one "how lit is it" number can never disagree with what the sky is…
+- **AS1: the handheld is a lamp now, and the light costs something**
+  battery: a real number that drains only while actually raised (about eight minutes of continuous use) and recharges roughly four times slower while pocketed, so raising it stays a decision instead of becoming a permanent one-way ratchet like condition already is. The existing "CELL XX%" gauge on the device's own screen was already drawn as a battery readout but wired to `condition` (screen wear); redirected it to the real thing it looks like.
+- **COMMANDS.md: every command and prompt in one place**
+  Greg: 'tell me all the commands and prompts i can send to all you my boys'. Asked twice, so it gets a file rather than a message that scrolls away.
+- **the index tabs are clickable, and one control strip instead of two** `screens`
+  Greg, with a screenshot: "make this clickable with the mouse not just arrow keys".
+- **FINAL_V.md §16, build items 1-2: one shader, six dials, and a real feedback loop**
+  psychedelic.gdshader: palette LUT, kaleidoscope fold, feedback, chromatic separation, noise displacement, beat-locked cuts, all neutral by default. psychedelic_rig.gd wraps it and stays fully inert — display hidden, echo viewport disabled — until something actually sets a dial, so wiring it into bone_yard_hunt.tscn's HUD costs nothing while unused. Downstream of this, AS2's night warp, the drugs, the meditation and the shadow realms are meant to be…
 - **AQ: the godhead starts watching from the first hour**
   "whilst in the game when you get taunted by it slowly builds up visibility and what it does and says". That sentence decides the whole design: it is not revealed, it accumulates. Which means this is not an endgame system that switches on late - it is present from the first hour, mostly as something you cannot quite see, getting clearer for reasons that are always your own fault.
+- **make camera rituals verifiable actions** `factions and standing`
 - **the motherboard - a seal burnt or bound into real copper** `factions and standing`
   Greg: 'burn and bind seals should have their own animation based on real life, where the person's computer motherboard appears in 3D and the seals burn into the microscopic copper stuff as sigils on the board'. A printed circuit board is already a sigil, mass-produced by the million.
 - **AS4.2: chaos-magick is a level now, not a checklist line**
