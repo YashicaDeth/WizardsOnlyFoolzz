@@ -3429,10 +3429,15 @@ everything."*
 - [x] **AS2.4** It reads off `world_clock.gd`, which exists now (W1.1)
 
 ### AS3 — Clothes and pockets
-- [ ] **AS3.1** Layers, and they are part of the world system rather than a paperdoll
-- [ ] **AS3.2** Pockets hold real things and what is in them matters
-- [ ] **AS3.3** What you are wearing is strategy: weather, radiation, who talks to you
-- [ ] **AS3.4** It shows on the body the mirror renders (AH1.5, N)
+- [x] **AS3.1** Layers, and they are part of the world system rather than a paperdoll
+- [x] **AS3.2** Pockets hold real things and what is in them matters
+- [ ] **AS3.3** What you are wearing is strategy: weather, radiation, who talks to you —
+      weather and faction standing are real (a layer cuts storm exposure and
+      moves tree_alignment()); radiation has no stat anywhere in the project
+      yet to reduce.
+- [ ] **AS3.4** It shows on the body the mirror renders (AH1.5, N) — the coat
+      itself is real and tinted per layer, visible on the body right now; the
+      literal mirror this item names is not built anywhere in the project yet.
 
 ### AS4 — Storms that answer the occult
 Greg: *"I also want the weather to have consistent crazy storms depending on
