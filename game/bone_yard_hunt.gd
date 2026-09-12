@@ -19,6 +19,7 @@ const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
 const BALLISTICS := preload("res://systems/ballistics.gd")
+const LIMB_MOMENTUM := preload("res://systems/limb_momentum.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 const RIVAL_REGISTRY := preload("res://systems/rival_registry.gd")
@@ -149,6 +150,21 @@ var guard_stamina_drain := 14.0
 var blood_veil: Control = null
 ## AF1. Rounds in flight, brass on the floor, holes in the walls.
 var ballistics: Node3D = null
+## AN1.2. The arm the weapon hangs off. Fed the same mouse delta the camera
+## turns by, so the weapon is thrown by you turning rather than by a curve.
+var arm: LimbMomentum = null
+## Mouse movement this frame, in radians, accumulated in `_unhandled_input` and
+## spent in `_physics_process`. It has to be a frame total rather than a
+## per-event value: a 1000Hz mouse delivers several motion events per frame and
+## handing the arm each one separately throws it several times as hard.
+var _look_delta := Vector2.ZERO
+## AN1.4/AN1.8. Whether `commitment()` reaches the damage number yet. The old
+## swing stays authoritative until the new one is demonstrably better, which is
+## a judgement to make with a controller in hand rather than in a commit.
+var momentum_damage := false
+## What the arm was worth at the moment of contact, kept so the HUD and the
+## record can read the blow that actually happened rather than the intent.
+var last_commitment := 0.0
 var winded := false
 ## How much stamina it takes to break into a run again after being winded. Well
 ## clear of the floor, so the two thresholds can never be crossed in one frame.
@@ -318,6 +334,9 @@ func _ready() -> void:
 	# AG4.2. Under the pointer and over everything else in the world: blood on
 	# the lens sits between the player and the scene, not between the player
 	# and the panel they opened.
+	# AN1.2. The arm exists before the first swing does.
+	arm = LIMB_MOMENTUM.new()
+	_carry_current_weapon()
 	# AF1. Rounds and brass live in the world, not in the HUD.
 	ballistics = BALLISTICS.new()
 	add_child(ballistics)
@@ -658,8 +677,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_Q: _use_prosthetic_surge()
 			KEY_K: _deliberate_redecant()
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		yaw -= event.relative.x * 0.0026
-		pitch = clamp(pitch - event.relative.y * 0.0024, -0.75, 0.42)
+		apply_look(Vector2(event.relative.x * 0.0026, event.relative.y * 0.0024))
 
 
 func _physics_process(delta: float) -> void:
@@ -685,6 +703,7 @@ func _physics_process(delta: float) -> void:
 	# ticking at full speed through their own hitstop, which is backwards: the
 	# whole point of a local freeze is that both bodies in contact feel it.
 	var player_delta: float = delta * impact_feel.scale_for("player")
+	_advance_arm(player_delta)
 	# O2.7 v4. And the gore. Greg: *"gore and chunk physics still run at full
 	# speed through a hit, so a limb can leave a body that has not moved
 	# yet"*. The rig's own spray and organs take the exchange's clock;
@@ -837,6 +856,87 @@ func _update_player(delta: float) -> void:
 	hunter_appearance.set_mouth(player_rig.anatomy.pain / 180.0, sin(pulse * 0.7) * player_rig.anatomy.pain / 100.0)
 
 
+## AN1.2. Where the camera turns, in radians, and the one seam the arm is
+## driven through. Split out of `_unhandled_input` because the mouse branch
+## there is gated on MOUSE_MODE_CAPTURED, which a headless run can never be —
+## so a test feeding it motion events was exercising nothing and passing on
+## the weapon's gravity sag. Same reason `lean_override` and
+## `grapple_pushing_override` exist.
+func apply_look(turn: Vector2) -> void:
+	yaw -= turn.x
+	pitch = clamp(pitch - turn.y, -0.75, 0.42)
+	# Accumulated rather than applied: several motion events arrive per frame
+	# and handing the arm each one separately throws it several times as hard.
+	_look_delta += turn
+
+
+## AN1.5. Mass and reach per weapon — the entire firearms-and-melee balance
+## conversation, expressed as two numbers rather than as a table of constants.
+## A bare hand is about 0.4kg, a cleaver 1.4, a sledge 6.
+const ARM_WEIGHTS := {
+	"sword": {"mass": 1.45, "reach": 0.62},
+	"shotgun": {"mass": 3.2, "reach": 0.5},
+	"sidearm": {"mass": 0.95, "reach": 0.22},
+	"severed_limb": {"mass": 2.6, "reach": 0.58},
+	"bare": {"mass": 0.4, "reach": 0.28},
+}
+
+
+func _carry_current_weapon() -> void:
+	if arm == null:
+		return
+	var id := "bare"
+	if bare_handed:
+		id = "bare"
+	elif carried_limb_index >= 0:
+		id = "severed_limb"
+	elif arsenal != null:
+		id = str(arsenal.current_id)
+	var spec: Dictionary = ARM_WEIGHTS.get(id, ARM_WEIGHTS["sword"])
+	if is_equal_approx(arm.mass, float(spec["mass"])):
+		return
+	arm.carry(float(spec["mass"]), float(spec["reach"]))
+
+
+## AN1.2/AN1.6. One call a frame. The arm is given what the player did — how far
+## they turned, how fast their body is moving, how much is left in them — and it
+## works out where the weapon ended up.
+func _advance_arm(step: float) -> void:
+	if arm == null:
+		return
+	_carry_current_weapon()
+	# AN1.6. A tired arm cannot hold the weapon where it wants it. Straight off
+	# stamina, so the guard degrades rather than being switched off at a
+	# threshold.
+	arm.fatigue = clampf(1.0 - stamina / 100.0, 0.0, 1.0)
+	# The body's own motion, in view space: walking into a blow counts.
+	var forward := Vector3(sin(yaw), 0.0, cos(yaw))
+	var right := Vector3(forward.z, 0.0, -forward.x)
+	var moving := player_body.velocity
+	arm.advance(step, _look_delta, Vector3(moving.dot(right), moving.y, -moving.dot(forward)))
+	_look_delta = Vector2.ZERO
+	_pose_weapon()
+
+
+## AN1.3. The weapon is drawn where the physics put it. The model hangs off the
+## rig's right arm, so this is a local offset on that node rather than a second
+## transform chain — the hand still animates, and the weapon lags the hand.
+func _pose_weapon() -> void:
+	if arsenal == null or arsenal.hand == null or not is_instance_valid(arsenal.hand):
+		return
+	var model: Node3D = arsenal.models.get(str(arsenal.current_id)) as Node3D
+	if model == null or not is_instance_valid(model):
+		return
+	var lag := arm.at - arm.anchor
+	if not model.has_meta("rest_position"):
+		model.set_meta("rest_position", model.position)
+	var rest: Vector3 = model.get_meta("rest_position")
+	# Scaled down from view space to hand space: the arm swings through 0.42m at
+	# full stretch and a weapon model that moved that far would leave the screen.
+	model.position = rest + lag * 0.38
+	model.rotation = Vector3(arm.tilt.x * 0.5, arm.tilt.y * 0.5, -arm.tilt.y * 0.3)
+
+
 func _attack(heavy := false) -> void:
 	if resolution_ui.visible or kill_cam.active or player_rig.is_downed() or player_rig.anatomy.dead:
 		return
@@ -873,6 +973,16 @@ func _attack(heavy := false) -> void:
 	var swing := _player_swing_scale()
 	# O5.1. The body's own motion is part of the blow.
 	var momentum := swing_momentum(player_body.velocity)
+	# AN1.4. What the arm was actually doing, measured. Recorded either way so
+	# the two systems can be compared against the same swings; it only reaches
+	# the damage number when `momentum_damage` says so (AN1.8).
+	last_commitment = arm.commitment() if arm != null else 0.0
+	report["commitment"] = last_commitment
+	if momentum_damage and arm != null:
+		# The weapon sets the ceiling and the player earns how much of it they
+		# get. Floored well above zero: a game where a mistimed swing does
+		# nothing at all is a game that feels broken rather than demanding.
+		report["damage"] = float(report.get("damage", 0.0)) * lerpf(0.35, 1.35, last_commitment)
 	report["damage"] = float(report.get("damage", 0.0)) * swing * float(momentum["power"])
 	report["impulse"] = float(report.get("impulse", 0.0)) * float(momentum["power"])
 	report["momentum"] = momentum
@@ -892,15 +1002,26 @@ func _attack(heavy := false) -> void:
 
 func _resolve_strike() -> void:
 	var report := pending_attack
+	# AN2.1. Whatever happens next, the swing is spent. Landing bounces the
+	# weapon back off what stopped it; missing carries it through, which is why
+	# a miss costs footing.
+	var connected := false
 	if report.is_empty():
 		report = {"damage": 24.0, "impulse": 18.0, "damage_type": "cut", "range": 4.1, "weapon": "sword"}
 	pending_attack = {}
 	if _attack_nearest_encounter_actor(report):
+		if arm != null:
+			arm.strike(0.65, Vector3(sin(yaw), 0.0, cos(yaw)))
+		connected = true
 		return
 	if enemy == null or not enemy.visible or enemy_retreating:
+		if arm != null and not connected:
+			arm.whiff()
 		return
 	var distance := player.distance_to(enemy.global_position)
 	if distance > 4.1:
+		if arm != null and not connected:
+			arm.whiff()
 		return
 	var facing := Vector3(sin(yaw), 0, cos(yaw)).normalized().dot((enemy.global_position - player).normalized())
 	if facing < 0.18:

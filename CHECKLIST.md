@@ -3154,13 +3154,13 @@ declared. `tests/limb_momentum_test.gd` puts numbers on it: the same weapon and
 the same button gives 0.013 for a flick and 0.346 for a committed sweep.
 
 - [x] **AN1.1** The spring-damper core, with mass, reach, fatigue and a real arm limit — `limb_momentum.gd`, ten checks
-- [ ] **AN1.2** Driven from the same mouse delta the camera turns by, plus the player's own velocity — walking into a blow counts
-- [ ] **AN1.3** The weapon is drawn where the physics put it, not where an animation says
-- [ ] **AN1.4** Damage asks `commitment()`. The weapon sets the ceiling; the player earns how much of it they get
-- [ ] **AN1.5** Mass and reach per weapon are the whole balance conversation now
-- [ ] **AN1.6** Fatigue comes off stamina, so a tired arm cannot hold a guard rather than being told it cannot
+- [x] **AN1.2** Driven from the same mouse delta the camera turns by, plus the player's own velocity — through a new `apply_look()` seam, because the mouse branch is gated on MOUSE_MODE_CAPTURED which a headless run can never be. A hard turn throws the weapon 0.397m off the anchor, against a 0.42m arm limit
+- [x] **AN1.3** The weapon is drawn where the physics put it — `_pose_weapon()` offsets the model off the rig's right arm, so the hand still animates and the weapon lags the hand. 0.155m of travel on a hard turn
+- [ ] **AN1.4** Damage asks `commitment()`. The weapon sets the ceiling; the player earns how much of it they get — **computed and recorded, not yet applied.** `last_commitment` is on every attack report and in the event record; flipping `momentum_damage` scales damage by `lerpf(0.35, 1.35, commitment)`. Left off deliberately per AN1.8, and one tuning note from the wiring: a fast mouse saturates `commitment()` at 1.0, so the 7.0 m/s reference wants raising before the flag goes on
+- [x] **AN1.5** Mass and reach per weapon — `ARM_WEIGHTS`: a cleaver 1.45kg at 0.62m, a shotgun 3.2, a sidearm 0.95, a severed limb 2.6, a bare hand 0.4. Re-carried whenever the held thing changes
+- [x] **AN1.6** Fatigue comes off stamina directly — a full player reads 0.00 and an empty one 1.00, so the guard degrades continuously rather than switching off at a threshold
 - [ ] **AN1.7** Firearms run through the same object — the barrel swivels toward where you look and carries past it
-- [ ] **AN1.8** The old swing system stays until this one is better, side by side behind a flag
+- [x] **AN1.8** The old swing stays authoritative, side by side — `momentum_damage` is false, so `commitment()` is computed and recorded on every blow but does not reach the damage number. Both systems see the same swings, which is what makes them comparable
 - [ ] **AN1.9** A grapple, a shove and a bare hand are the same object with a different mass
 
 ### AN2 — What it costs to swing
