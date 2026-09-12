@@ -22,7 +22,11 @@ static func can_eat(chunk: Node) -> bool:
 
 
 func _process(delta: float) -> void:
-	if target == null or not is_instance_valid(target) or not can_eat(target) or GoreChunks.rot_ratio(target) < 0.5:
+	# Same ordering rule as `scent_sources`: validity first, because
+	# `rot_ratio` takes a typed Node and a freed one fails at the call.
+	if target == null or not is_instance_valid(target):
+		target = _best_scent()
+	elif not can_eat(target) or GoreChunks.rot_ratio(target) < 0.5:
 		target = _best_scent()
 	if target == null:
 		return
@@ -38,6 +42,8 @@ func _best_scent() -> Node3D:
 	var nearest: Node3D
 	var best_distance := INF
 	for chunk in GoreChunks.live:
+		if not is_instance_valid(chunk):
+			continue
 		if not can_eat(chunk) or GoreChunks.rot_ratio(chunk) < 0.5:
 			continue
 		var candidate := chunk as Node3D

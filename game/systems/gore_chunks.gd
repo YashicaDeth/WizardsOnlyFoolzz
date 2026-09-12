@@ -219,6 +219,24 @@ static func _make_chunk(layer: int, zone: String, subject_id: String, info: Dict
 	return body
 
 
+## AG1.6 follow-on. `live` is static, so it outlives the scene that filled it.
+## Leaving the derby frees every chunk in the pit and leaves this array holding
+## that many dangling entries, which the Hunt Grounds then inherits — and the
+## first thing on the far side to walk the list hands a freed object to a typed
+## parameter and throws. The scene swap is exactly where a static registry has
+## to be swept, and nothing was sweeping it.
+##
+## Everything that walks `live` calls this first. It is cheap: the list is
+## capped at MAX_CHUNKS and the common case removes nothing.
+static func prune() -> void:
+	var kept: Array[Node3D] = []
+	for chunk in live:
+		if is_instance_valid(chunk):
+			kept.append(chunk)
+	if kept.size() != live.size():
+		live = kept
+
+
 ## What this piece is. Returns empty for anything that is not a chunk, so
 ## callers can test a raycast hit without checking the class first.
 static func identify(node: Node) -> Dictionary:
@@ -244,6 +262,7 @@ static func take(node: Node) -> Dictionary:
 ## Everything currently on the floor that came off a given person. Rituals and
 ## the loot pass both want to ask this.
 static func from_subject(subject_id: String) -> Array:
+	prune()
 	var out: Array = []
 	for chunk in live:
 		var info := identify(chunk)
@@ -413,11 +432,18 @@ static func rot_ratio(node: Node) -> float:
 ## a position and a strength, for whichever system wants to react to it - an
 ## AI that avoids it, one that is drawn to it, a future survival meter.
 static func scent_sources() -> Array[Dictionary]:
+	prune()
 	var out: Array[Dictionary] = []
 	for chunk in live:
+		# Validity is checked *before* the call, not inside it. `rot_ratio` takes
+		# a typed `Node`, and GDScript rejects a freed object at the call site —
+		# so a guard in the callee never runs and the old ordering here threw
+		# once per stale chunk per frame.
+		if not is_instance_valid(chunk) or not chunk.is_inside_tree():
+			continue
 		var ratio := rot_ratio(chunk)
-		if ratio > 0.5 and is_instance_valid(chunk) and (chunk as Node3D).is_inside_tree():
-			out.append({"position": (chunk as Node3D).global_position, "strength": ratio})
+		if ratio > 0.5:
+			out.append({"position": chunk.global_position, "strength": ratio})
 	return out
 
 
@@ -479,3 +505,10 @@ static func clear() -> void:
 		if is_instance_valid(chunk):
 			chunk.queue_free()
 	live.clear()
+
+
+## A chunk that has been freed by something other than this class — a scene
+## swap, most of the time — should not still be counted against the cap.
+static func live_count() -> int:
+	prune()
+	return live.size()
