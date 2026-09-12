@@ -847,7 +847,7 @@ hitpoints. `clinch_test.gd` and F7 already exist; this is the rest of it.
 - [ ] **O5.5** Held and hurt is the pressure that makes recruitment possible (feeds F7 and E)
 - [x] **O5.6** Their force opposes yours, scaled by their own pain and arms
 - [x] **O5.7** The player has footing now, not just the enemies — whiffing, blocking and being shoved all cost it
-- [ ] **O5.8** Unarmed is viable and horrible, because the body is the weapon system
+- [x] **O5.8** Press 5 to put the weapons down — 42 dps against a cleaver's 76, at 1.55m of reach
 - [x] **O5.9** Proven on the guard first: two broken arms block badly, no arms cannot block at all
 
 ### O4 — Enemies that fight back

@@ -105,6 +105,19 @@ var attack_cooldown := 0.0
 ## Footing is spent by things that should cost balance and recovers by standing
 ## in it. Below `STUMBLE_AT` you are stumbling: the guard will not hold, the
 ## swing has nothing behind it, and moving is a negotiation.
+## O5.8. Bare hands. The arsenal hands the player three weapons at spawn and
+## never takes them away, so "unarmed" was not a state this game could be in —
+## which makes "the body is the weapon system" a claim the build could not
+## actually support. Pressing 5 puts the weapons down.
+##
+## Viable and horrible, in those words. **Viable**: fast, cheap in stamina, and
+## it reads through the same anatomy, footing and momentum every other blow
+## does, so a fit body in a good stance is genuinely dangerous with nothing in
+## its hands. **Horrible**: a third of the reach of a cleaver, so you have to
+## stand inside somebody to use it, and it breaks rather than opens — no cuts,
+## no severing, just blunt damage to a face at arm's length.
+var bare_handed := false
+
 var footing := 1.0
 const STUMBLE_AT := 0.3
 const FOOTING_RECOVERY := 0.55
@@ -507,6 +520,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_2: _equip_weapon(1)
 			KEY_3: _equip_weapon(2)
 			KEY_4: _equip_carried_limb()
+			KEY_5: _put_the_weapons_down()
 			KEY_R:
 				if handheld.is_open:
 					_cycle_asset_task()
@@ -682,6 +696,13 @@ func _attack(heavy := false) -> void:
 	# slows the player's own swing and takes the weight out of it. Reciprocity is
 	# the whole point of B6: a fight that continues after a limb comes off has to
 	# continue that way in both directions.
+	if bare_handed:
+		var fists := bare_hand_attack(bool(report.get("heavy", false)))
+		if not bool(fists.get("accepted", false)):
+			if str(fists.get("reason", "")) == "no arms":
+				prompt.text = "NOTHING LEFT TO SWING"
+			return
+		report = fists
 	var swing := _player_swing_scale()
 	# O5.1. The body's own motion is part of the blow.
 	var momentum := swing_momentum(player_body.velocity)
@@ -911,7 +932,43 @@ func _player_collision_exclusions() -> Array[RID]:
 	return exclusions
 
 
+## O5.8. Put everything down. Not a weapon slot — the absence of one.
+func _put_the_weapons_down() -> void:
+	_clear_carried_limb_model()
+	bare_handed = true
+	pending_attack = {}
+	strike_windup = -1.0
+	prompt.text = "HANDS"
+
+
+## What a punch is worth. Kept beside the arsenal's own table rather than inside
+## it, because bare hands are not a weapon the player owns — they are what is
+## left when they own nothing.
+func bare_hand_attack(heavy := false) -> Dictionary:
+	if attack_cooldown > 0.0:
+		return {"accepted": false, "reason": "busy"}
+	# O5.9. Thrown by an arm. If both arms are gone there is nothing to throw.
+	if guard_strength() <= 0.0:
+		return {"accepted": false, "reason": "no arms"}
+	return {
+		"accepted": true, "weapon": "hands", "kind": "melee",
+		# Low, but not a tickle — and it stacks with a step-in and good footing
+		# the same way a cleaver does.
+		"damage": 17.0 if heavy else 11.0,
+		"impulse": 16.0 if heavy else 9.0,
+		"damage_type": "blunt",
+		# A third of a cleaver's reach. This is the horrible part: you have to be
+		# inside their arms to land it, which is also where they can hold you.
+		"range": 1.55,
+		"windup": 0.20 if heavy else 0.09,
+		"stamina": 9.0 if heavy else 4.0,
+		"cooldown": 0.42 if heavy else 0.26,
+		"heavy": heavy,
+	}
+
+
 func _equip_weapon(slot: int) -> void:
+	bare_handed = false
 	_clear_carried_limb_model()
 	if arsenal.select_slot(slot):
 		pending_attack = {}
@@ -2390,7 +2447,7 @@ func _update_hud() -> void:
 		third_person_unlock_announced = true
 		_announce_third_person_unlock()
 	title.text = "WIZARDS ONLY FOOLS // LIMBO: ASHBLOOM EXPANSE"
-	status.text = "WASD MOVE  SHIFT RUN  LMB STRIKE  X GUARD  SPACE DODGE  Q SURGE\nE INTERACT  TAB INDEX  M MAP  T TREE  J ALLUSIONS  F CAMERA"
+	status.text = "WASD MOVE  SHIFT RUN  LMB STRIKE  5 HANDS  X GUARD  SPACE DODGE  Q SURGE\nE INTERACT  TAB INDEX  M MAP  T TREE  J ALLUSIONS  F CAMERA"
 	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(HUNT_ID).get("status", "dormant")).to_upper()]
 	prompt.visible = not resolution_ui.visible and not living_map.visible and not world_index.visible
 	if field_interface.has_method("set_state"):
