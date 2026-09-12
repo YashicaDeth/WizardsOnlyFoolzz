@@ -31,6 +31,31 @@ var run_salt := 0
 ## the first thing a new player meets is the light going.
 var world_minute := 16.5 * 60.0
 
+## AS4.2. How much magick is loose right now. Never authored directly — only
+## ever bumped by something happening, per `CHAOS_MAGICK` below, and left to
+## settle afterward. `storm_weather.gd` reads this as the storm's real cause
+## rather than the storm being ambience that happens to look occult.
+##
+## Stored as the level as of `chaos_magick_at_minute`; `chaos_magick()` is the
+## one anything outside this file should call, because it applies the decay
+## that has happened since.
+var chaos_magick_level := 0.0
+var chaos_magick_at_minute := 0.0
+
+## What bumps it, and by how much. Ritual work is the only source at the
+## moment this was written — the honest answer for a system this new is that
+## the table grows as other occult acts get recorded, not that one was
+## invented for each of them up front.
+const CHAOS_MAGICK := {
+	"ritual_completed": 0.16,
+}
+
+## Loses about half its charge every three in-world hours with nothing feeding
+## it. Slow enough that a storm a ritual kicked off is still building when the
+## ritual's own smoke has cleared; fast enough that a quiet run settles back to
+## nothing instead of the level ratcheting up forever.
+const CHAOS_MAGICK_HALF_LIFE_MINUTES := 180.0
+
 
 func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") == "1":
@@ -64,6 +89,9 @@ func record_event(event_type: String, details: Dictionary = {}) -> Dictionary:
 	var weight := event_karma(event)
 	if not is_zero_approx(weight):
 		_accumulate_karma(event_actor(event), weight)
+	var chaos := event_chaos_magick(event)
+	if not is_zero_approx(chaos):
+		_bump_chaos_magick(chaos)
 	_save_history()
 	event_recorded.emit(event)
 	return event
@@ -217,6 +245,29 @@ func _accumulate_karma(subject_id: String, weight: float) -> void:
 	stored["karma"] = clampf(float(stored.get("karma", 0.0)) + weight, -1.0, 1.0)
 	subjects[subject_id] = stored
 	subject_changed.emit(subject_id, stored.duplicate(true))
+
+
+## Which acts feed the storm, and by how much. Mirrors `event_karma`'s shape on
+## purpose — same lookup-table pattern, different table.
+func event_chaos_magick(event: Dictionary) -> float:
+	return float(CHAOS_MAGICK.get(str(event.get("type", "")), 0.0))
+
+
+func _bump_chaos_magick(amount: float) -> void:
+	chaos_magick_level = clampf(chaos_magick() + amount, 0.0, 1.0)
+	chaos_magick_at_minute = WorldClock.minutes()
+
+
+## AS4.2. The level right now, decayed for however much game-time has passed
+## since it was last touched. This, never `chaos_magick_level` directly, is
+## what a storm should read.
+func chaos_magick() -> float:
+	if chaos_magick_level <= 0.0:
+		return 0.0
+	var elapsed := maxf(WorldClock.minutes() - chaos_magick_at_minute, 0.0)
+	if elapsed <= 0.0:
+		return clampf(chaos_magick_level, 0.0, 1.0)
+	return clampf(chaos_magick_level * pow(0.5, elapsed / CHAOS_MAGICK_HALF_LIFE_MINUTES), 0.0, 1.0)
 
 
 ## Karma over the events still retained, for tests and for rebuilding a save
@@ -391,6 +442,10 @@ func _load_history() -> void:
 		# W1.1. A save from before the clock existed opens in the late afternoon
 		# of its first day, the same as a new one, rather than at minute zero.
 		world_minute = float(parsed.get("world_minute", 16.5 * 60.0))
+		# AS4.2. A save from before the storm system existed has nothing loose
+		# yet, which is the correct state for a world nothing has bumped.
+		chaos_magick_level = float(parsed.get("chaos_magick_level", 0.0))
+		chaos_magick_at_minute = float(parsed.get("chaos_magick_at_minute", world_minute))
 
 
 func _save_history() -> void:
@@ -405,4 +460,6 @@ func _save_history() -> void:
 		"subjects": subjects,
 		"run_salt": run_salt,
 		"world_minute": world_minute,
+		"chaos_magick_level": chaos_magick_level,
+		"chaos_magick_at_minute": chaos_magick_at_minute,
 	}))
