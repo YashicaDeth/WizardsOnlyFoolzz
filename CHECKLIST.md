@@ -371,7 +371,7 @@ mechanisms and almost none are built.
 ### F5 — Player defeat routed to shackled
 - [x] ~~**F5.1** Losing is not a reload~~
 - [x] ~~**F5.2** Shackled, conscripted or stamped by whoever won~~
-- [ ] **F5.3** Deliberate death: forfeit loot, re-decant out of the tar
+- [x] ~~**F5.3** Deliberate death: forfeit loot, re-decant out of the tar~~
 
 ### F6 — Mind-stamp and the asset list
 - [ ] **F6.1** Non-consensual recruitment through the handheld

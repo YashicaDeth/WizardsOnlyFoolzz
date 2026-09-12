@@ -2,6 +2,13 @@
 
 ## 2026 09 12
 
+- **F5.3: captivity has an ugly exit.** A shackled, stamped or conscripted
+  player can deliberately die and be re-decanted from the tar. Everything in
+  CARRY is forfeited to the captor, while currency, identity, character sheet,
+  defeat count and the discarded body's anatomy remain in the record. The new
+  body is playable immediately; deliberate death and re-decanting are separate
+  historical facts and the option cannot be used outside captivity.
+
 - **F5.1/F5.2: losing belongs to the world now.** Mara no longer reduces the
   player to zero and lets Nix silently restore 65 health. `DefeatRouter` records
   who won, chooses the consequence from their faction, changes the persistent

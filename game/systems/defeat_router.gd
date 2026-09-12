@@ -33,6 +33,31 @@ static func route(captor_id: String, location: String) -> Dictionary:
 	return state
 
 
+static func redecant() -> Dictionary:
+	var player := WorldHistory.subject("player")
+	if str(player.get("status", "")) not in ["shackled", "stamped", "conscripted"]:
+		return {}
+	var inventory := WorldHistory.subject("inventory")
+	var forfeited: Array = (inventory.get("items", []) as Array).duplicate(true)
+	var old_body: Dictionary = (player.get("anatomy_state", {}) as Dictionary).duplicate(true)
+	WorldHistory.amend_subject("inventory", {"items": []})
+	var result := {
+		"status": "redecanted",
+		"captor_id": "",
+		"captor_faction": "",
+		"held_at": "",
+		"previous_body": old_body,
+		"anatomy_state": {},
+		"redecants": int(player.get("redecants", 0)) + 1,
+		"memory": "Died deliberately in captivity and came back out of the tar empty-handed.",
+	}
+	WorldHistory.amend_subject("player", result)
+	WorldHistory.record_event("player_deliberate_death", {"subject_id": "player", "forfeited": forfeited, "held_at": player.get("held_at", "")})
+	WorldHistory.record_event("player_redecanted", {"subject_id": "player", "body_number": result.redecants + 1, "retained_identity": true})
+	result["forfeited"] = forfeited
+	return result
+
+
 static func _destination(faction_id: String, fallback: String) -> String:
 	match faction_id:
 		"ashline_wreckers": return "ashline_shackle_pit"

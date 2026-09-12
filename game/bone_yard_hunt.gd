@@ -423,6 +423,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				else:
 					_dodge()
 			KEY_Q: _use_prosthetic_surge()
+			KEY_K: _deliberate_redecant()
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		yaw -= event.relative.x * 0.0026
 		pitch = clamp(pitch - event.relative.y * 0.0024, -0.75, 0.42)
@@ -1109,7 +1110,22 @@ func _route_player_defeat(captor_id: String) -> void:
 		enemy.visible = false
 	player = Vector3(-31.0, 1.5, 26.0)
 	player_body.position = player - Vector3.UP * 0.6
-	prompt.text = "%s // HELD AT %s" % [str(result.outcome).to_upper(), str(result.destination).replace("_", " ").to_upper()]
+	prompt.text = "%s // HELD AT %s // [K] DIE DELIBERATELY" % [str(result.outcome).to_upper(), str(result.destination).replace("_", " ").to_upper()]
+
+
+func _deliberate_redecant() -> void:
+	var result := DEFEAT_ROUTER.redecant()
+	if result.is_empty():
+		return
+	health = 65
+	stamina = 70.0
+	player_rig.anatomy.configure("player")
+	player_rig.restore({})
+	WorldHistory.amend_subject("player", {"anatomy_state": player_rig.snapshot()})
+	player = Vector3(0, 1.5, 19)
+	player_body.position = player - Vector3.UP * 0.6
+	enemy_retreating = true
+	prompt.text = "RE-DECANTED // THE TAR KEPT %d THINGS" % (result.forfeited as Array).size()
 
 
 func _update_encounter_actors(delta: float) -> void:
