@@ -41,6 +41,16 @@ func _seed_population() -> void:
 		"name": "Ashline Wreckers", "kind": "faction", "role": "Road murder syndicate", "threat": "SEVERE",
 		"territory": "Bone Yard / Burnt Highway", "doctrine": "Rank is won by remembered impact.",
 	})
+	WorldHistory.register_subject("rook_sable", {
+		"name": "Rook Sable", "kind": "person", "role": "Toll collector", "faction": "Ashline Wreckers", "faction_id": "ashline_wreckers",
+		"elo": 900, "status": "active", "wealth": 30,
+		"relations": {"ashline_wreckers": {"kind": "command", "strength": 48}},
+	})
+	WorldHistory.register_subject("grit_maw", {
+		"name": "Grit Maw", "kind": "person", "role": "Pit bruiser", "faction": "Ashline Wreckers", "faction_id": "ashline_wreckers",
+		"elo": 1500, "status": "active", "wealth": 500,
+		"relations": {"ashline_wreckers": {"kind": "known", "strength": 4}, "rook_sable": {"kind": "owes", "strength": 20}},
+	})
 	WorldHistory.register_subject("iris_coil", {
 		"name": "Iris Coil", "kind": "person", "role": "Sporeline scout", "faction": "Black Mile", "faction_id": "black_mile",
 		"elo": 1096, "grudge": 0, "status": "roaming", "wounds": ["glass scars"],
@@ -133,6 +143,23 @@ func _ready() -> void:
 	check(top_rank == "CROWN", "command strength puts Mara at the top of her own faction, not ELO (got %s)" % top_rank)
 	check(int((ashline.tiers[0] as Dictionary)["downline"]) >= 0, "downline counts everyone strictly beneath")
 	check(not (ashline.vacancies as Array).is_empty(), "empty posts are reported as vacancies")
+
+	# --- a death opens a post and an existing person takes it ----------------
+	var population_before := WorldHistory.all_subjects().size()
+	WorldHistory.update_subject("mara_voss", {"status": "dead"}, "npc_killed")
+	var succession := WireNet.new(WireNet.SIGNAL_SURFACE)
+	var vacancy := succession.open_vacancy("mara_voss")
+	check(str(vacancy.get("rank", "")) == "CROWN" and str(vacancy.get("former", "")) == "mara_voss", "a captain's death opens her actual Crown post")
+	var opened := succession.pyramid("ashline_wreckers")
+	check((opened.vacancies as Array).any(func(v): return str((v as Dictionary).get("former", "")) == "mara_voss"), "the saved vacancy is visible in the pyramid before succession")
+	var successor := succession.promote_successor("ashline_wreckers", "CROWN")
+	check(str(successor.get("name", "")) == "Rook Sable", "connections and debt promote Rook over the stronger bruiser")
+	check(int(successor.get("elo", 0)) < int(WorldHistory.subject("grit_maw").get("elo", 0)), "combat skill did not decide the post")
+	check(str(successor.get("faction_rank", "")) == "CROWN", "the successor owns the real rank after promotion")
+	check(WorldHistory.all_subjects().size() == population_before, "succession generated nobody new")
+	check((WorldHistory.subject("ashline_wreckers").get("vacant_posts", []) as Array).is_empty(), "filling the post removes the saved vacancy")
+	var succession_events := WorldHistory.recent_events(4)
+	check(succession_events.any(func(e): return str((e as Dictionary).get("type", "")) == "faction_post_vacated") and succession_events.any(func(e): return str((e as Dictionary).get("type", "")) == "faction_post_filled"), "vacancy and promotion remain separate historical facts")
 
 	# --- actions cost, and reciprocity accrues -------------------------------
 	var clean := WireNet.new(WireNet.SIGNAL_SURFACE)

@@ -359,9 +359,9 @@ mechanisms and almost none are built.
 - [x] ~~**F2.4** The Wire as a second, faster, less reliable carrier~~
 
 ### F3 — Promotion into real vacancies
-- [ ] **F3.1** A death opens a real post (the pyramid already shows this)
-- [ ] **F3.2** The successor is someone who already existed
-- [ ] **F3.3** Rank weighs influence and debt, not combat skill
+- [x] ~~**F3.1** A death opens a real post (the pyramid already shows this)~~
+- [x] ~~**F3.2** The successor is someone who already existed~~
+- [x] ~~**F3.3** Rank weighs influence and debt, not combat skill~~
 
 ### F4 — Rivals generated from real events
 - [ ] **F4.1** Rivals born out of what happened, not authored

@@ -2,6 +2,15 @@
 
 ## 2026 09 12
 
+- **F3: death leaves a chair empty before somebody takes it.** Killing a ranked
+  faction member now writes a persistent vacancy into the faction and records
+  it as its own historical fact. On the following idle turn, the best existing
+  candidate takes the actual rank; nobody is generated to fill the gap. The
+  succession score deliberately ignores combat ELO and instead weighs reach,
+  loyalty, wealth and leverage from real debt relations, so the better-connected
+  weaker fighter can inherit command. The rank pyramid excludes the dead,
+  exposes the saved vacancy and names the claimant while that gap exists.
+
 - **L4: publishing a theory, and the bill for being wrong.** A theory goes out
   on the Wire through the actions that already existed — `expose` if every
   string holding it up is one the world bears out, `fabricate` if any single one

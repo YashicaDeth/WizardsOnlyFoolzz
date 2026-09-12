@@ -198,11 +198,12 @@ func player() -> Dictionary:
 ## downline, and the top is structurally unreachable.
 ##
 ## The data underneath it is real — command relation strength is the ladder, and
-## a dead ranked subject leaves a genuine vacancy, which is
-## `DESIGN/HUNT_SYSTEM.md`'s promotion mechanic surfaced as a view before the
-## promotion itself is built. The presentation is original: a faction hierarchy
-## is nobody's property, but another game's specific way of drawing one is.
+## a dead ranked subject leaves a genuine vacancy, which is filled from the
+## existing faction roster by the promotion machinery below. The presentation
+## is original: a faction hierarchy is nobody's property, but another game's
+## specific way of drawing one is.
 const RANKS := ["CROWN", "INNER CIRCLE", "PROMOTER", "EARNER", "INTAKE"]
+const DEAD_STATUSES := ["dead", "executed", "killed"]
 
 
 func pyramid(faction_id: String) -> Dictionary:
@@ -210,25 +211,18 @@ func pyramid(faction_id: String) -> Dictionary:
 	var members: Array = []
 	for key in _accounts:
 		var account: Dictionary = _accounts[key]
-		if str(account.faction_id) == faction_id:
+		if str(account.faction_id) == faction_id and not DEAD_STATUSES.has(str(account.status).to_lower()):
 			members.append(account)
 	members.sort_custom(func(a, b): return int(a.influence) > int(b.influence))
 	var tiers: Array = []
 	for index in RANKS.size():
 		tiers.append({"rank": RANKS[index], "members": [], "buy_in": int(pow(3.0, float(RANKS.size() - index)) * 40.0)})
 	for member in members:
-		var slot := 0
-		var influence := int(member.influence)
-		if influence >= 70:
-			slot = 0
-		elif influence >= 45:
-			slot = 1
-		elif influence >= 25:
-			slot = 2
-		elif influence >= 10:
-			slot = 3
-		else:
-			slot = 4
+		var subject := WorldHistory.subject(str(member.id))
+		var explicit_rank := str(subject.get("faction_rank", ""))
+		var slot := RANKS.find(explicit_rank)
+		if slot < 0:
+			slot = _influence_rank_index(int(member.influence))
 		tiers[slot]["members"].append(member)
 	# Downline is what the pitch is actually selling, so it is counted honestly:
 	# everybody strictly beneath you in your own faction.
@@ -236,11 +230,14 @@ func pyramid(faction_id: String) -> Dictionary:
 	for index in range(tiers.size() - 1, -1, -1):
 		tiers[index]["downline"] = running
 		running += (tiers[index]["members"] as Array).size()
-	var vacancies: Array = []
+	var vacancies: Array = (faction.get("vacant_posts", []) as Array).duplicate(true)
 	for index in tiers.size():
-		if (tiers[index]["members"] as Array).is_empty() and index < RANKS.size() - 1:
+		if (tiers[index]["members"] as Array).is_empty() and index < RANKS.size() - 1 and not vacancies.any(func(v): return str((v as Dictionary).get("rank", "")) == str(RANKS[index])):
 			var claimant := _claimant(tiers, index)
-			vacancies.append({"rank": RANKS[index], "claimant": claimant})
+			vacancies.append({"rank": RANKS[index], "claimant": claimant, "structural": true})
+	for vacancy in vacancies:
+		if not (vacancy as Dictionary).has("claimant"):
+			vacancy["claimant"] = _best_successor(faction_id, str(vacancy.get("former", ""))).get("name", "")
 	return {
 		"id": faction_id,
 		"name": str(faction.get("name", faction_id)),
@@ -251,6 +248,103 @@ func pyramid(faction_id: String) -> Dictionary:
 		"vacancies": vacancies,
 		"headcount": members.size(),
 	}
+
+
+func _influence_rank_index(influence: int) -> int:
+	if influence >= 70:
+		return 0
+	if influence >= 45:
+		return 1
+	if influence >= 25:
+		return 2
+	if influence >= 10:
+		return 3
+	return 4
+
+
+## F3. A death creates a saved post on the faction itself. It is not inferred
+## later from an empty drawing slot, so quitting between the death and the
+## succession cannot silently heal the hierarchy.
+func open_vacancy(subject_id: String) -> Dictionary:
+	var fallen := WorldHistory.subject(subject_id)
+	var faction_id := str(fallen.get("faction_id", ""))
+	if fallen.is_empty() or faction_id.is_empty():
+		return {}
+	var account_data := _accounts.get(subject_id, _build_account(subject_id, fallen)) as Dictionary
+	var rank := str(fallen.get("faction_rank", ""))
+	if not RANKS.has(rank):
+		rank = str(RANKS[_influence_rank_index(int(account_data.get("influence", 0)))])
+	var faction := WorldHistory.subject(faction_id)
+	var vacancies: Array = (faction.get("vacant_posts", []) as Array).duplicate(true)
+	for existing in vacancies:
+		if str((existing as Dictionary).get("former", "")) == subject_id:
+			return existing
+	var vacancy := {"rank": rank, "former": subject_id, "opened_sequence": WorldHistory.next_sequence}
+	vacancies.append(vacancy)
+	WorldHistory.amend_subject(faction_id, {"vacant_posts": vacancies})
+	WorldHistory.record_event("faction_post_vacated", {"faction_id": faction_id, "rank": rank, "former": subject_id})
+	return vacancy
+
+
+## Fill one saved vacancy with a person who was already present. ELO is
+## deliberately absent from the score: connections, loyalty, wealth and debt
+## decide office; fighting decides whether the office-holder survives it.
+func promote_successor(faction_id: String, rank: String = "") -> Dictionary:
+	var faction := WorldHistory.subject(faction_id)
+	var vacancies: Array = (faction.get("vacant_posts", []) as Array).duplicate(true)
+	var vacancy_index := -1
+	for index in vacancies.size():
+		if rank.is_empty() or str((vacancies[index] as Dictionary).get("rank", "")) == rank:
+			vacancy_index = index
+			break
+	if vacancy_index < 0:
+		return {}
+	var vacancy: Dictionary = vacancies[vacancy_index]
+	var successor := _best_successor(faction_id, str(vacancy.get("former", "")))
+	if successor.is_empty():
+		return {}
+	var subject_id := str(successor.id)
+	var subject := WorldHistory.subject(subject_id)
+	WorldHistory.update_subject(subject_id, {
+		"faction_rank": str(vacancy.rank),
+		"previous_role": str(subject.get("role", "unindexed")),
+		"role": "%s of %s" % [str(vacancy.rank).capitalize(), str(faction.get("name", faction_id))],
+	}, "faction_member_promoted")
+	vacancies.remove_at(vacancy_index)
+	WorldHistory.amend_subject(faction_id, {"vacant_posts": vacancies})
+	WorldHistory.record_event("faction_post_filled", {
+		"faction_id": faction_id, "rank": vacancy.rank, "former": vacancy.get("former", ""),
+		"successor": subject_id, "influence": successor.influence, "loyalty": successor.loyalty,
+		"debt_leverage": successor.debt_leverage, "wealth": successor.wealth,
+	})
+	rebuild()
+	return WorldHistory.subject(subject_id)
+
+
+func _best_successor(faction_id: String, excluded_id: String) -> Dictionary:
+	var candidates: Array = []
+	for subject in WorldHistory.subjects_in_faction(faction_id):
+		var subject_id := str(subject.id)
+		if subject_id == excluded_id or DEAD_STATUSES.has(str(subject.get("status", "")).to_lower()):
+			continue
+		var account_data := _accounts.get(subject_id, _build_account(subject_id, subject)) as Dictionary
+		var relations: Dictionary = subject.get("relations", {})
+		var faction_edge: Dictionary = relations.get(faction_id, {})
+		var loyalty := int(subject.get("loyalty", 0)) + (int(faction_edge.get("strength", 0)) if str(faction_edge.get("kind", "")) in ["command", "ally", "bond", "known"] else 0)
+		var debt_leverage := 0
+		for other in WorldHistory.subjects_in_faction(faction_id):
+			var edge: Dictionary = (other.get("relations", {}) as Dictionary).get(subject_id, {})
+			if str(edge.get("kind", "")) in ["owes", "debt"]:
+				debt_leverage += int(edge.get("strength", 0))
+		var wealth := int(subject.get("wealth", subject.get("scrip", 0)))
+		var score := int(account_data.get("influence", 0)) * 4 + loyalty * 3 + debt_leverage * 2 + wealth / 10
+		candidates.append({
+			"id": subject_id, "name": str(subject.get("name", subject_id)), "score": score,
+			"influence": int(account_data.get("influence", 0)), "loyalty": loyalty,
+			"debt_leverage": debt_leverage, "wealth": wealth,
+		})
+	candidates.sort_custom(func(a, b): return int(a.score) > int(b.score) if int(a.score) != int(b.score) else str(a.id) < str(b.id))
+	return candidates[0] if not candidates.is_empty() else {}
 
 
 ## Who takes an empty post. Per the Hunt System this is not a generated

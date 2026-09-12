@@ -1220,6 +1220,12 @@ func _kill_encounter_actor(index: int, cause: String) -> void:
 	var node := actor.node as Node3D
 	var anatomy: Node = actor.anatomy as Node
 	WorldHistory.update_subject(str(actor.subject_id), {"status": "dead", "memory": "The Hunter caught them before escape.", "anatomy_state": anatomy.call("snapshot")}, "npc_killed")
+	var succession := WireNet.new(WireNet.SIGNAL_SURFACE)
+	var vacancy := succession.open_vacancy(str(actor.subject_id))
+	if not vacancy.is_empty():
+		# The vacancy is written first and remains a separate historical fact;
+		# succession resolves on the following idle turn from the existing roster.
+		call_deferred("_fill_faction_vacancy", str(WorldHistory.subject(str(actor.subject_id)).get("faction_id", "")), str(vacancy.rank))
 	WorldHistory.record_event("loot_dropped", {"subject_id": actor.subject_id, "items": actor.loot, "cause": cause})
 	_spawn_loot_cache(node.global_position, actor.loot)
 	var label := node.get_node_or_null("Identity") as Label3D
@@ -1230,6 +1236,13 @@ func _kill_encounter_actor(index: int, cause: String) -> void:
 		"node": node, "rig": actor.get("rig"),
 	})
 	encounter_actors.remove_at(index)
+
+
+func _fill_faction_vacancy(faction_id: String, rank: String) -> void:
+	if faction_id.is_empty():
+		return
+	var succession := WireNet.new(WireNet.SIGNAL_SURFACE)
+	succession.promote_successor(faction_id, rank)
 
 func _actor_by_id(id: String) -> Dictionary:
 	for actor in encounter_actors:
