@@ -145,6 +145,15 @@ Godot: `P:/GameDev/Tools/Godot-4.7.2/Godot_v4.7.2-stable_win64_console.exe`
 Set `TEMP`/`TMP` to `P:/GameDev/Temp` and `ATG_TEST_MODE=1` so you never touch
 real saves.
 
+**Always pass `--position 2240,320` on any run that opens a window.** Greg's
+second monitor starts at (1920, 208); without this the engine takes over the
+primary display and interrupts whatever he is watching. Headless runs do not
+need it. A full visual capture therefore looks like:
+
+```
+TEMP=P:/GameDev/Temp TMP=P:/GameDev/Temp ATG_TEST_MODE=1   Godot_v4.7.2-stable_win64.exe --path game   --resolution 1280x720 --position 2240,320   res://tests/<capture>.tscn -- --out=P:/GameDev/Temp
+```
+
 - **Runtime errors:**
   `--headless --path game res://<scene>.tscn --quit-after 400`
 - **Visuals:** headless renders nothing. Use `res://tests/capture_scene.tscn`,

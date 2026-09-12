@@ -2,6 +2,24 @@
 
 ## 2026 09 12
 
+- **The loading screen is a real X-ray now.** Greg asked for *"3d visceral gore
+  matrix loading screens and 3d organs bones xrays"*. The plate already had a
+  specimen, but it was drawn in 2D with a fake Y-squash standing in for
+  rotation, and no 2D approximation gets the thing that actually sells a
+  radiograph: **accumulation**. Where two structures overlap the film is
+  brighter, and a ribcage seen through its own far side is the whole look.
+  `xray_specimen.gd` renders a live `BaselineHuman` into a SubViewport with
+  organs revealed and every surface overridden to unshaded additive with depth
+  testing off — so bone prints bright, organs print warm, soft tissue barely
+  registers, and the skeleton reads straight through it. It is the game's own
+  rig, which means an organ on the loading screen is an organ you can rupture
+  in the world. It turns on a table and breathes.
+  The code rain falls through it, holes punched for the readout. Two things
+  fixed on the way: the plate was still set in the system fallback font, and
+  `code_rain.gd` was printing every word in the game **backwards** — GLUTTONY
+  read YNOTTULG, because the glyph was indexed forward from a head that falls
+  downward. That one was wrong on every screen the rain appears on.
+
 - **F3: death leaves a chair empty before somebody takes it.** Killing a ranked
   faction member now writes a persistent vacancy into the faction and records
   it as its own historical fact. On the following idle turn, the best existing

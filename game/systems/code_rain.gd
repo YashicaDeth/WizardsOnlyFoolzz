@@ -87,6 +87,9 @@ static func draw_field(canvas: CanvasItem, rect: Rect2, columns: Array, tint: Co
 			# The head of the column is bright and the tail falls away, which is
 			# what makes it read as falling rather than as a static grid.
 			var fade := 1.0 - float(index) / float(maxi(letters, 1))
-			var glyph: String = column.word.substr(index, 1)
+			# Counted back from the end so the word reads top to bottom the way
+			# it is written. Indexing forward from the falling head printed
+			# every word in the game reversed.
+			var glyph: String = column.word.substr(letters - 1 - index, 1)
 			var wobble := VitalitySignal.jitter(level, column.seed_value + index, clock)
 			CellOutzType.draw_text(canvas, at + wobble, glyph, 11.0, tint * Color(1, 1, 1, (0.10 + fade * 0.5) * VitalitySignal.ink(level)), 0.0)

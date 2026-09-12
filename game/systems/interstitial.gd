@@ -52,6 +52,10 @@ var mutter := ""
 var destination := ""
 var progress := 0.0
 var _last_mutter := -1
+## The 3D scan. Built on the first cover and kept, because rebuilding a rig per
+## transition is exactly the hitch a loading screen exists to hide.
+var _specimen: XraySpecimen = null
+var _rain: Array = []
 
 
 func _ready() -> void:
@@ -66,11 +70,19 @@ func _ready() -> void:
 	screen.visible = false
 
 
+func _ensure_specimen() -> void:
+	if _specimen != null and is_instance_valid(_specimen):
+		return
+	_specimen = XraySpecimen.make(randi())
+	add_child(_specimen)
+
+
 ## Cover the screen, swap, hold, uncover. Callers await this and then stop
 ## touching the old scene, because by then it is gone.
 func travel(scene_path: String, travel_caption: String = "") -> void:
 	if travelling:
 		return
+	_ensure_specimen()
 	travelling = true
 	destination = scene_path
 	caption = travel_caption.to_upper()
@@ -127,6 +139,7 @@ func travel(scene_path: String, travel_caption: String = "") -> void:
 ## Raise the plate without changing scene. Used by the visual check, and by any
 ## caller that needs to cover a load happening in place rather than a swap.
 func hold_open(plate_caption: String) -> void:
+	_ensure_specimen()
 	caption = plate_caption.to_upper()
 	mutter = MUTTERS[randi() % MUTTERS.size()]
 	clock = 0.0
@@ -148,6 +161,15 @@ func _fade(target: float) -> void:
 
 
 func _process(delta: float) -> void:
+	if _specimen != null and is_instance_valid(_specimen):
+		if alpha > 0.01:
+			_specimen.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+			_specimen.advance(delta)
+		else:
+			# Nothing is looking at it between transitions.
+			_specimen.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	if not _rain.is_empty() and alpha > 0.01:
+		CodeRain.advance(_rain, delta, screen.size.y)
 	if not screen.visible:
 		return
 	clock += delta
@@ -158,12 +180,29 @@ func _draw_plate() -> void:
 	var size := screen.size
 	if alpha <= 0.01 or size.x < 1.0:
 		return
-	var font := ThemeDB.fallback_font
 	screen.draw_rect(Rect2(Vector2.ZERO, size), VOID * Color(1, 1, 1, alpha))
 
-	var centre := Vector2(size.x * 0.5, size.y * 0.52)
-	var scale := clampf(minf(size.x / 1280.0, size.y / 720.0), 0.5, 1.6) * 2.1
-	_draw_specimen(centre, scale)
+	# The scan itself, composited large and centred. Drawn additively over the
+	# void so the film reads as light coming through a body rather than as a
+	# picture of one pasted on black.
+	if _specimen != null and is_instance_valid(_specimen):
+		var texture := _specimen.get_texture()
+		if texture != null:
+			var span := minf(size.x, size.y) * 1.02
+			var frame := Rect2(Vector2(size.x * 0.5 - span * 0.5, size.y * 0.47 - span * 0.5), Vector2(span, span))
+			screen.draw_texture_rect(texture, frame, false, Color(1, 1, 1, alpha))
+			# A second pass, offset and dimmer: the film's own halation, which
+			# is what stops a rendered mesh looking like a rendered mesh.
+			screen.draw_texture_rect(texture, frame.grow(6.0), false, SPORE * Color(1, 1, 1, 0.16 * alpha))
+
+	# I1. The rain falls behind the readout and through the specimen, so the
+	# body is being *transmitted*. Holes are punched for everything printed.
+	if _rain.is_empty() and size.x > 1.0:
+		_rain = CodeRain.build(size.x, size.y, 34.0, 6101)
+	CodeRain.draw_field(screen, Rect2(Vector2.ZERO, size), _rain, SPORE * Color(1, 1, 1, alpha), 0.0, clock, [
+		Rect2(30, 24, 520, 66),
+		Rect2(30, size.y - 100, size.x - 60, 76),
+	])
 
 	# Scan banding over the whole plate, so the image reads as something being
 	# transmitted rather than something being displayed.
@@ -173,10 +212,10 @@ func _draw_plate() -> void:
 	screen.draw_rect(Rect2(0, sweep, size.x, 46), SPORE * Color(1, 1, 1, 0.035 * alpha))
 
 	CellOutzType.draw_stamped(screen, Vector2(44, 36), "CELLOUTZ TRANSIT", 20.0, ACID * Color(1, 1, 1, alpha), ARTERIAL * Color(1, 1, 1, 0.3 * alpha), 3.2)
-	screen.draw_string(font, Vector2(44, 74), "SPECIMEN IN MOTION / DO NOT OPEN THE CASE", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK * Color(1, 1, 1, 0.45 * alpha))
+	CellOutzType.draw_condensed(screen, Vector2(44, 64), "SPECIMEN IN MOTION / DO NOT OPEN THE CASE", 9.0, INK * Color(1, 1, 1, 0.45 * alpha), 0.8)
 	if not caption.is_empty():
-		screen.draw_string(font, Vector2(44, size.y - 86), caption, HORIZONTAL_ALIGNMENT_LEFT, size.x - 88, 22, INK * Color(1, 1, 1, alpha))
-	screen.draw_string(font, Vector2(44, size.y - 58), mutter, HORIZONTAL_ALIGNMENT_LEFT, size.x - 88, 13, BILE * Color(1, 1, 1, 0.8 * alpha))
+		CellOutzType.draw_stamped(screen, Vector2(44, size.y - 104), caption, 18.0, INK * Color(1, 1, 1, alpha), ARTERIAL * Color(1, 1, 1, 0.22 * alpha), 1.6)
+	CellOutzType.draw_condensed(screen, Vector2(44, size.y - 68), mutter, 10.0, BILE * Color(1, 1, 1, 0.8 * alpha), 0.8)
 
 	# Real load progress, not a crawling barber pole. The bar used to know
 	# nothing and say so; it now reports what ResourceLoader actually reports.
@@ -184,7 +223,7 @@ func _draw_plate() -> void:
 	screen.draw_rect(bar, Color(0, 0, 0, 0.5 * alpha))
 	screen.draw_rect(Rect2(bar.position, Vector2(bar.size.x * progress, bar.size.y)), ACID * Color(1, 1, 1, 0.8 * alpha))
 	screen.draw_rect(bar, INK * Color(1, 1, 1, 0.18 * alpha), false, 1.0)
-	screen.draw_string(font, Vector2(size.x - 92, size.y - 48), "%03d%%" % roundi(progress * 100.0), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ACID * Color(1, 1, 1, 0.8 * alpha))
+	CellOutzType.draw_condensed(screen, Vector2(size.x - 92, size.y - 58), "%03d%%" % roundi(progress * 100.0), 10.0, ACID * Color(1, 1, 1, 0.8 * alpha), 0.9)
 
 
 ## The specimen: a skeleton turning on the spot with its organs lit in sequence.
