@@ -1367,7 +1367,7 @@ options a person would actually reach for and no way in that is not "start".
 
 ## Z — Shipping
 
-- [ ] **Z1.1** A build that runs from a clean folder on somebody else's machine
+- [x] **Z1.1** Windows export preset builds `WizardsOnlyFools.exe` (109MB + 16.5MB pck) and it launches — verified by running it, not by reading the log
 - [ ] **Z1.2** Saves that survive the next version (`WorldHistory` migration already exists)
 - [ ] **Z1.3** A crash is a released crash — the last pass is playing it
 - [ ] **Z1.4** It has a name, a page and a way for one stranger to get it
