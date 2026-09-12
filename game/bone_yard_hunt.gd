@@ -429,11 +429,10 @@ func _ready() -> void:
 	kill_cam = preload("res://systems/kill_cam.gd").new()
 	kill_cam.name = "KillCam"
 	$HUD.add_child(kill_cam)
-	# Last, so an engaged trip sits over everything else drawn this frame —
-	# inert and invisible until a dial is touched, per `psychedelic_rig.gd`.
 	psychedelic = PSYCHEDELIC_RIG.new()
 	psychedelic.name = "Psychedelic"
 	$HUD.add_child(psychedelic)
+	_order_hud_layers()
 	voice_channel = preload("res://systems/proximity_voice.gd").new()
 	voice_channel.name = "ProximityVoice"
 	add_child(voice_channel)
@@ -3152,6 +3151,39 @@ func _announce_third_person_unlock() -> void:
 	WorldHistory.record_event("third_person_unlocked", {"location": HUNT_LOCATION})
 
 
+## Which of the HUD's children are lens and which are interface.
+##
+## The derby's index is clean and the hunt's was not, which is the whole of
+## "the menus are broken once you get out of the car": this scene is the only
+## one that owns a blood veil and a psychedelic rig, and both were added to
+## `$HUD` *after* the index, the map, the board and the archive. A CanvasLayer
+## draws its children in tree order, so both were painting over every panel the
+## player opened. The trip is worse than the veil, because the shader samples
+## `hint_screen_texture` — everything drawn earlier in the frame — so an open
+## index was not merely tinted, it was displaced, and the page tabs ended up
+## somewhere other than where they are actually clickable.
+##
+## Neither effect is wrong to exist; both were simply in the wrong half of the
+## stack. Blood is on the lens and the warp is in the air, so both belong
+## between the player and the *world*. A panel is held in the hand, in front of
+## both. Ordering it here, once, rather than by moving the `add_child` calls
+## around, because the construction order above is grouped by what each thing
+## needs from what came before it, and that is a separate concern from what
+## ends up in front of what.
+func _order_hud_layers() -> void:
+	# Everything above the world and below the interface, in this order.
+	var lens: Array = [blood_veil, psychedelic]
+	# `ScreenTreatment` is authored as the first child and is world-level too,
+	# so the lens stacks directly on top of it rather than at index 0.
+	var treatment := $HUD.get_node_or_null("ScreenTreatment")
+	var slot: int = (treatment.get_index() + 1) if treatment != null else 0
+	for effect in lens:
+		if effect == null or not is_instance_valid(effect):
+			continue
+		$HUD.move_child(effect, slot)
+		slot += 1
+
+
 func _toggle_panel(mode: String) -> void:
 	allusions_artwork.close_artwork()
 	panel_mode = "" if panel_mode == mode else mode
@@ -3172,9 +3204,18 @@ func _toggle_panel(mode: String) -> void:
 	elif pin_board.visible:
 		pin_board.close()
 	# A full sheet, chart or index; the field labels underneath it are noise.
+	#
+	# `prompt` alone, because it is the only one of the four left alive. I3
+	# retired `title`, `status` and the vitals panel in favour of
+	# `gothic_field_hud.gd`, and the scene authors all three as `visible =
+	# false` — but this loop turned them back *on* every time a panel closed.
+	# `_update_hud` re-hides `status` each frame and says nothing about the
+	# other two, so opening the index once and shutting it left the old orange
+	# title and the old vitals box stuck over the real interface for the rest
+	# of the run. That is the interface "breaking once you get out of the car":
+	# nothing breaks on arrival, it breaks the first time you open a panel.
 	var covering: bool = living_map.visible or world_index.visible or pin_board.visible
-	for label in [title, status, vitals, prompt]:
-		label.visible = not covering
+	prompt.visible = not covering
 	# The old ArchivePanel is dead. It was a Label in a box and it is exactly
 	# what "no more of this tutorial look" was about.
 	panel.visible = false
@@ -3220,7 +3261,16 @@ func _update_hud() -> void:
 	# the player reads, in the game's own face, and it is contextual — this was
 	# a permanent list of every key in the game, in the engine default font,
 	# drawn on top of it.
+	#
+	# All three of the retired nodes are held down here rather than only
+	# `status`, so nothing that flips one of them on can leave it on. The
+	# panel is what carries the box, not the label inside it, which is why
+	# `vitals.get_parent()` is what gets hidden.
+	title.visible = false
 	status.visible = false
+	var vitals_panel := vitals.get_parent() as Control
+	if vitals_panel != null:
+		vitals_panel.visible = false
 	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("status", "dormant")).to_upper()]
 	prompt.visible = not resolution_ui.visible and not living_map.visible and not world_index.visible
 	if field_interface.has_method("set_state"):

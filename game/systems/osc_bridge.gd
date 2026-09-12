@@ -252,6 +252,44 @@ static func _be_double(data: PackedByteArray, at: int) -> float:
 	return flipped.decode_double(0)
 
 
+
+## Point the other way as well: where this game reports its own state to.
+##
+## The bridge started as TD driving Godot, which is the half that collapses the
+## iteration loop. The other half is worth as much and costs four lines: a patch
+## that can read the game's own audio bands, the player's blood loss and what is
+## happening in the pit can be built to *react* to a fight rather than to run
+## alongside one. That is the difference between a visual and a readout.
+var _reply := PacketPeerUDP.new()
+var _replying := false
+
+
+## Start reporting to a patch. TouchDesigner listens on 10000 by default.
+func report_to(host := "127.0.0.1", to_port := 10000) -> bool:
+	if _reply.set_dest_address(host, to_port) != OK:
+		push_warning("OSCBridge: cannot reach %s:%d to report to." % [host, to_port])
+		return false
+	_replying = true
+	return true
+
+
+## One message out. Silently does nothing until `report_to()` has been called,
+## because a game that has not been asked to report should not be sending
+## packets at anybody.
+func send(address: String, args: Array = []) -> void:
+	if not _replying:
+		return
+	_reply.put_packet(encode(address, args))
+
+
+## Everything on a dial-bearing node, in one go — the common case, since what a
+## patch usually wants is all of it every frame rather than one value.
+func send_all(prefix: String, values: Dictionary) -> void:
+	if not _replying:
+		return
+	for key: String in values:
+		_reply.put_packet(encode("%s/%s" % [prefix, key], [float(values[key])]))
+
 # ------------------------------------------------------------------ the other way
 ## Build a packet. Godot does not need to send OSC to play the game, but a
 ## bridge you cannot send through is a bridge you cannot test, and TD is just as

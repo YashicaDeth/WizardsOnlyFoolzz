@@ -42,8 +42,42 @@ func _ready() -> void:
 		button.mouse_entered.connect(_focus_button.bind(button))
 		button.mouse_exited.connect(_unfocus_button.bind(button))
 	_build_gore_setting()
+	_build_sandbox_door()
 	_build_front_door()
 
+
+
+## A way in to the gore sandbox from the front end.
+##
+## The menu could reach the derby and the decanting floor and nothing else, so
+## the most complete system in the project - anatomy, severing, chunks, the
+## X-ray - had no door on it at all and anyone handed a build would never find
+## it. For a demo somebody sends to a friend that is the whole thing missing.
+##
+## Built in code rather than added to the scene so the column stays one source
+## of truth about its own spacing: the new row is the Play button copied, and
+## everything below it moves down by exactly one row height.
+func _build_sandbox_door() -> void:
+	var play: Button = $HUD/Play
+	var row: float = play.offset_bottom - play.offset_top + 8.0
+	for button: Button in [$HUD/Settings, $HUD/Quit, $HUD/CellOutzSite]:
+		button.offset_top += row
+		button.offset_bottom += row
+	# Flags cleared on purpose: `duplicate()` copies signal connections by
+	# default, and a copy of Play that is still wired to `_start_game` would send
+	# anyone who pressed it to the decanting floor instead.
+	var sandbox := play.duplicate(0) as Button
+	sandbox.name = "Sandbox"
+	sandbox.text = "GORE SANDBOX"
+	sandbox.offset_top = play.offset_top + row
+	sandbox.offset_bottom = play.offset_bottom + row
+	sandbox.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	$HUD.add_child(sandbox)
+	sandbox.pressed.connect(func() -> void:
+		Interstitial.travel("res://gore_demo.tscn", "the sandbox // seven of them"))
+	sandbox.mouse_entered.connect(_focus_button.bind(sandbox))
+	sandbox.mouse_exited.connect(_unfocus_button.bind(sandbox))
+	menu_buttons.append(sandbox)
 
 ## The front end is a scene with junk falling through it, and the first thing
 ## the player is asked is what they are willing to look at. The violence tiers

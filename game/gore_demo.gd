@@ -435,9 +435,24 @@ func _unhandled_input(event: InputEvent) -> void:
 		match event.keycode:
 			KEY_R: _reset()
 			KEY_X: _set_xray(not xray)
-			KEY_ESCAPE: Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+			KEY_ESCAPE: _step_out()
 			KEY_F: _explode(camera.global_position + Vector3(0, 0.4, 0), 92.0)
 
+
+
+## Escape twice to leave. The first press gives the mouse back, which is what
+## somebody wants nine times out of ten; the second actually goes. A sandbox
+## handed to a stranger with no way out of it but Alt+F4 is not a demo.
+func _step_out() -> void:
+	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		_note("ESCAPE AGAIN TO LEAVE")
+		return
+	Engine.time_scale = 1.0
+	if Engine.has_singleton("Interstitial") or get_node_or_null("/root/Interstitial") != null:
+		Interstitial.travel("res://country_town_menu.tscn", "back out of it")
+	else:
+		get_tree().change_scene_to_file("res://country_town_menu.tscn")
 
 ## Two calls, not one. `reveal_organs()` shows the organs and the skeleton and
 ## makes the flesh translucent; `see_through()` puts them in front of whatever

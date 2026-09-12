@@ -182,14 +182,20 @@ func _update_models() -> void:
 func _build_weapon_model(weapon_id: String) -> Node3D:
 	var root := Node3D.new()
 	root.name = "%s_mount" % weapon_id
-	root.position = Vector3(-0.122, -0.226, -0.859)
-	root.rotation = Vector3(-HUNTER_BODY_MOTION.FIRST_PERSON_ARM_RAISE - 0.12, 0.0, 0.12)
+	root.position = Vector3(0.055, -0.196, -0.742)
+	# Cancel the arm pose, then tip the blade a little below level. The extra
+	# half-turn that used to be here was wrong twice over: `HeldGear` already
+	# builds a weapon pointing down -Z, so turning it again aimed the blade back
+	# at the camera, and the arm's own forward pitch then stood it straight up
+	# through the middle of the screen.
+	root.rotation = Vector3(-HUNTER_BODY_MOTION.FIRST_PERSON_ARM_RAISE - 0.46, -0.26, 0.30)
 	var gear := HeldGear.build_weapon(weapon_id)
-	# `HeldGear` builds muzzle-forward down -Z, which is where the camera looks.
-	# The arm mount is authored the other way round, from when the model was
-	# three boxes stacked down -Y, and the rest of the hunt's framing is tuned
-	# against that. Turned here rather than there, so the two conventions meet
-	# in one line instead of being argued about at every call site.
-	gear.rotation.y += PI
+	# Hung off its grip rather than its origin. `HeldGear` builds each weapon
+	# around the shape of the object, so a sword's origin is where the guard
+	# meets the blade and not where a hand closes; mounted at the origin that
+	# puts most of a metre of blade on the wrong side of the fist.
+	var grip := gear.get_node_or_null("anchor_grip") as Node3D
+	if grip != null:
+		gear.position = -(gear.transform.basis * grip.position)
 	root.add_child(gear)
 	return root
