@@ -80,6 +80,18 @@ func _seed() -> void:
 		"doctrine": "Frequency is rank, and rank is bought in ways nobody will name to your face.",
 		"relations": {},
 	})
+	# K1.3. "Ranks... paid grades" does not need the order's still-blocked
+	# Law/Book/founder (E2) — WireNet.pyramid() already prices rank generically
+	# once a faction has a real member. One real member, deliberately at the
+	# bottom: nobody has been promoted, they have simply paid to be counted,
+	# which is the doctrine already stated above made concrete rather than a
+	# hierarchy this file would be inventing.
+	WorldHistory.register_subject("wren_ashby", {
+		"name": "Wren Ashby", "kind": "person", "role": "Paid into the first grade, still unverified",
+		"faction": "wizardsonlyfoolz", "faction_id": "wizardsonlyfoolz", "elo": 950,
+		"grudge": 0, "status": "waiting", "memory": "Sent the fee three times before anything answered.",
+		"wounds": [], "anatomy": {"blood_type": "O-", "cybernetics": []}, "relations": {},
+	})
 
 
 ## One Sin-faction plus the one captain who currently holds it, in the same

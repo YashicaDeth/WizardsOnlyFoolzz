@@ -58,6 +58,13 @@ func _ready() -> void:
 	var neutral := WorldHistory.faction_price_factor("honeyvein", {"faction_id": ""})
 	check(neutral > 0.0, "a newcomer can still deal with a brand-new Sin faction")
 
+	# --- K1.3: wizardsonlyfoolz has real ranks/paid grades without needing
+	# the still-blocked Law/Book/founder content -----------------------------
+	check(str(WorldHistory.subject("wren_ashby").get("faction_id", "")) == "wizardsonlyfoolz", "wren_ashby actually belongs to wizardsonlyfoolz")
+	var wof_pyramid := wire.pyramid("wizardsonlyfoolz")
+	check(wof_pyramid.headcount >= 1, "wizardsonlyfoolz has a real member, not an empty order (%d)" % wof_pyramid.headcount)
+	check((wof_pyramid.tiers[4].members as Array).size() >= 1, "and they sit at the bottom rank, paid in rather than promoted")
+
 	# --- migration is safe: seeding twice must not duplicate or erase -------
 	var before_relations: Dictionary = WorldHistory.subject("celloutz").get("relations", {})
 	CosmologyFactions._seed()
