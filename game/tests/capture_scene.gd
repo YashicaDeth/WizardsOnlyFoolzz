@@ -161,6 +161,39 @@ func _ready() -> void:
 			device.set_mode("WIRE")
 			for _hold in 60:
 				await get_tree().process_frame
+	elif trigger == "night":
+		# AS2. Forced rather than waited for — a real night is 24 real minutes
+		# away at the default clock rate, per world_clock.gd.
+		WorldClock.set_hour(2.0)
+		scene._update_day_night()
+		for _hold in 4:
+			await get_tree().process_frame
+	elif trigger == "lamp":
+		# AS1.1. Raised by hand rather than by key so the shot is deterministic:
+		# `raised` is a blended value, and holding the real key for an exact
+		# number of frames would make the brightness depend on frame timing.
+		scene.handheld.raised = 1.0
+		scene.handheld.battery = 1.0
+		for _hold in 4:
+			await get_tree().process_frame
+	elif trigger == "psychedelic":
+		# FINAL_V.md §16. Several dials at once, at a strength nobody would
+		# call subtle, so the shot proves the rig actually changes the frame
+		# rather than merely failing to crash.
+		var rig: Node = scene.get_node_or_null("HUD/Psychedelic")
+		if rig != null:
+			# Every dial at once, at a strength nobody would call subtle, so one
+			# capture proves the whole shader — feedback included, the one
+			# effect that previously hit a same-frame GPU texture hazard.
+			rig.set_dial("kaleidoscope_segments", 5.0)
+			rig.set_dial("chromatic_offset", 0.006)
+			rig.set_dial("displacement_strength", 0.03)
+			rig.set_dial("lut_strength", 0.4)
+			rig.set_dial("feedback_strength", 0.45)
+			rig.set_dial("feedback_zoom", 1.05)
+			rig.set_dial("feedback_spin", 0.3)
+			for _hold in 20:
+				await get_tree().process_frame
 	elif trigger == "unlock":
 		# M1.5 proof. Satisfies `third_person_unlocked()`'s two real conditions
 		# directly through WorldHistory — a melee hit landed, and a subject the

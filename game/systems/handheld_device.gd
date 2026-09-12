@@ -79,16 +79,19 @@ const DEVICE_ID := "handheld"
 var serial := 0
 var condition := 0.78
 
-## AS1.3. The status page has printed a "CELL %" readout since C1, and it
-## was `condition` under a battery's name — structural damage and charge are
-## not the same thing, and a device that has never taken a hit still runs a
-## torch down to nothing. This is the real, independent number: it drains
-## while the device is actually held up doing something (AS1.2 — that hand
-## is busy and the torch is burning charge), not while it sits closed in a
-## pocket, and it can reach zero.
+## AS1.3. A real resource, not a torch that never runs out. Full charge is
+## about eight real minutes of continuously holding it up — long enough that
+## raising it to see is a genuine decision (AS1.2), short enough that a run
+## with the device up for most of a fight actually costs something. Recharges
+## only while pocketed, and roughly four times slower than it drains, so
+## letting go is relief but not an instant refill.
 var battery := 1.0
-const BATTERY_DRAIN_PER_SECOND := 1.0 / 600.0
-
+const BATTERY_DRAIN_PER_SECOND := 1.0 / 480.0
+const BATTERY_RECHARGE_PER_SECOND := 1.0 / 1800.0
+## AS1.1/AS1.5. How far the lamp throws light when it is lit. One constant
+## shared by the light `bone_yard_hunt.gd` actually places in the world and by
+## `light_radius()` below, so the two can never quietly disagree.
+const LAMP_RANGE := 14.0
 ## Where the wear came from, in the device's own words. Kept so the status page
 ## can say "quarry impact" rather than showing a percentage.
 var wear_log: Array = []
@@ -260,12 +263,16 @@ func load_device() -> void:
 		# session: written down, so it is this device from now on.
 		serial = randi() % 900000 + 100000
 		condition = 0.94
+		battery = 1.0
 		wear_log = []
 		battery = 1.0
 		save_device()
 		return
 	serial = int(record.get("serial", 90211))
 	condition = clampf(float(record.get("condition", 0.78)), 0.0, 1.0)
+	# AS1.3. A save from before the battery existed opens full rather than
+	# empty — the honest read of "nobody has ever drained this yet".
+	battery = clampf(float(record.get("battery", 1.0)), 0.0, 1.0)
 	wear_log = (record.get("wear_log", []) as Array).duplicate()
 	impacts = (record.get("impacts", []) as Array).duplicate(true)
 	battery = clampf(float(record.get("battery", 1.0)), 0.0, 1.0)
@@ -276,9 +283,9 @@ func save_device() -> void:
 	WorldHistory.update_subject(DEVICE_ID, {
 		"serial": serial,
 		"condition": snappedf(condition, 0.001),
+		"battery": snappedf(battery, 0.001),
 		"wear_log": wear_log.duplicate(),
 		"impacts": impacts.duplicate(true),
-		"battery": snappedf(battery, 0.001),
 		"kind": "object",
 	}, "device_changed")
 
@@ -317,20 +324,6 @@ func take_wear(amount: float, cause := "", impact_at := Vector2(-1, -1)) -> void
 	queue_redraw()
 
 
-## AS1.1/AS1.5. Whether the torch should actually be lit right now, and how
-## strong — read by whoever owns the 3D light itself (`bone_yard_hunt.gd`;
-## this Control has no 3D presence of its own), so the light and the device
-## it is bolted to can never disagree about whether it is on. Dead at zero
-## charge rather than merely dim, because "can run out" (AS1.3) has to mean
-## the light actually goes out, not fade forever.
-func torch_active() -> bool:
-	return is_open and battery > 0.0
-
-
-func battery_percent() -> float:
-	return battery
-
-
 func open_device() -> void:
 	load_device()
 	is_open = true
@@ -340,6 +333,10 @@ func open_device() -> void:
 
 func close_device() -> void:
 	is_open = false
+	# AS1.3. The natural checkpoint for a number that otherwise only changes a
+	# little every frame — saving on every tick it drains would mean writing
+	# the whole history file to disk sixty times a second for nothing.
+	save_device()
 
 
 func toggle_device() -> void:
@@ -446,15 +443,14 @@ func stand_at(world_position: Vector2) -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
-	# AS1.2/AS1.3. The cost of holding it up to see: the torch and the screen
-	# both burn charge while the device is actually open, not while it sits
-	# closed in a pocket, and it is real enough to reach zero.
-	if is_open and battery > 0.0:
-		battery = maxf(0.0, battery - BATTERY_DRAIN_PER_SECOND * delta)
 	# A6.6 v2. The panel keeps failing whether or not you are looking at it,
 	# so a fault does not restart its cycle every time the device comes up.
 	panel_clock += delta
 	_drive_backlight(delta)
+	# AS1.2/AS1.3. The cost of holding it up to see: the torch and the screen
+	# both burn charge while actually raised, not while pocketed, and it
+	# recharges — slower — while left alone. See `_drive_battery()`.
+	_drive_battery(delta)
 	raised = Motion.blend(raised, delta, Motion.PANEL, is_open)
 	if raised <= 0.001 and not is_open:
 		# C2 / playtest. The radial is a child of this device, so hiding the
@@ -646,9 +642,11 @@ func _draw_status(rect: Rect2, alpha: float) -> void:
 			label = "NO CARRIER \u2014 NEAREST %s, %dM" % [str(carrier.get("name", "")), int(carrier.get("distance", 0.0))]
 	CellOutzType.draw_condensed(self, Vector2(strip_x + 36.0, strip_y - 9.0), label, 9.0, signal_tint * Color(1, 1, 1, 0.85 * alpha), 0.7)
 
-	# AS1.3. This read `condition` under a battery's name — structural damage
-	# and charge are not the same number, and a device that has never taken a
-	# hit still ran its torch down to nothing. `battery` is the real one.
+	# Named apart from the signal label above: both live in this function now and
+	# GDScript will not take the same `var` twice in one scope.
+	# AS1.3. This readout is labelled "CELL" and drawn as a battery gauge, but
+	# read `condition` — the screen's own physical wear, already shown through
+	# cracks and backlight sag — until there was a real charge to show instead.
 	var charge := clampf(battery, 0.0, 1.0)
 	var tint: Color = ALERT if charge < 0.35 else MOSS
 	var cell_label := "CELL %02d%%" % roundi(charge * 100.0)
@@ -686,6 +684,45 @@ func _drive_backlight(delta: float) -> void:
 	backlight = move_toward(backlight, clampf(want, 0.05, 1.0), delta * rate)
 	if _overlay != null and is_instance_valid(_overlay):
 		_overlay.queue_redraw()
+
+
+## AS1.3. Runs down only while actually held up; trickles back only while
+## pocketed, and far slower than it drains. `raised` rather than `is_open` on
+## purpose — the blend already models the device settling into your hand, and
+## the light should not snap on at full draw the instant the key is pressed.
+func _drive_battery(delta: float) -> void:
+	if raised > 0.5:
+		battery = clampf(battery - BATTERY_DRAIN_PER_SECOND * delta, 0.0, 1.0)
+	else:
+		battery = clampf(battery + BATTERY_RECHARGE_PER_SECOND * delta, 0.0, 1.0)
+
+
+## AS1.1. Whether the lamp is actually throwing light right now — raised
+## enough to count as held up, and with something left to give it.
+func is_lit() -> bool:
+	return raised > 0.5 and battery > 0.0
+
+
+## Same question, same answer — kept as a second name because
+## `bone_yard_hunt.gd`'s own light-driving function was already written
+## against it. One condition (`is_lit()`) underneath either name, so the two
+## can never quietly disagree about whether the torch is on.
+func torch_active() -> bool:
+	return is_lit()
+
+
+func battery_percent() -> float:
+	return battery
+
+
+## AS1.5. How far the light reaches, for anything that wants to know whether
+## it can see this device from where it stands — the hook AS1.5 ("its light is
+## what gives you away at night") asks for. There is no perception/stealth
+## system in the project yet to wire this into; it exists so one can read it
+## the day it does, rather than that system inventing its own answer to
+## "is the player lit right now".
+func light_radius() -> float:
+	return LAMP_RANGE if is_lit() else 0.0
 
 
 ## A6.6 v2. Whether a fault is currently expressing itself. A fault with no

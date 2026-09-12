@@ -18,6 +18,10 @@ const MISFIRE_DIRECTOR := preload("res://systems/reality_misfire_director.gd")
 const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
+const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
+## AS1.1. Bright enough to actually read as a light source against
+## `world_look.gd`'s low-ambient presets rather than a glow nobody would notice.
+const HANDHELD_LAMP_ENERGY := 6.0
 const BALLISTICS := preload("res://systems/ballistics.gd")
 const LIMB_MOMENTUM := preload("res://systems/limb_momentum.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
@@ -206,11 +210,18 @@ var rival_attack_clock := 0.0
 var dodge_remaining := 0.0
 var dodge_direction := Vector3.ZERO
 var handheld: Control
-## AS1.1. The handheld is a lamp: a real light in the world when it is in
-## your hand, not a screen glow that stops at the device's own edge. Bolted
-## to the camera rather than the world, the way an actual phone light moves
-## with whatever you point it at ("wave it around").
-var handheld_light: SpotLight3D
+## FINAL_V.md §16. The one screen-space layer AS2's night warp, and later the
+## drugs and shadow realms, all reach for instead of building their own effect.
+var psychedelic: Control
+## AS1.1. The one real light the handheld throws into the world. Lives on the
+## camera rather than on `handheld` itself — `handheld` is a `Control`, drawn
+## in the HUD layer, and has nothing to attach a `Light3D` to.
+var handheld_lamp: SpotLight3D
+## AS2. Built once in `_build_world()`, driven every frame in
+## `_update_day_night()` off `world_clock.gd` — it used to sit at one fixed
+## angle and brightness no matter the hour, which is why W1.1 existing made no
+## visible difference until this read off it.
+var sun: DirectionalLight3D
 var pathfinder = preload("res://systems/ashbloom_pathfinder.gd").new()
 var social_markers: Array[Node3D] = []
 var resolution_ui: Control
@@ -308,19 +319,25 @@ func _ready() -> void:
 	handheld = HANDHELD.new()
 	handheld.name = "Handheld"
 	$HUD.add_child(handheld)
-	# AS1.1. Bolted to the camera, low and slightly off-centre the way a phone
-	# actually sits in a raised hand, not dead-centre like a headlamp.
-	handheld_light = SpotLight3D.new()
-	handheld_light.name = "HandheldLight"
-	handheld_light.light_color = Color("d8ecd0")
-	handheld_light.spot_range = 10.0
-	handheld_light.spot_angle = 34.0
-	handheld_light.spot_angle_attenuation = 1.6
-	handheld_light.shadow_enabled = true
-	handheld_light.visible = false
-	handheld_light.position = Vector3(0.16, -0.14, -0.15)
-	handheld_light.rotation_degrees = Vector3(-6, 4, 0)
-	camera.add_child(handheld_light)
+	# AS1.1. Parented to the camera so it always points where the player is
+	# looking, the way a phone held up in front of you actually would. Range is
+	# `HandheldDevice.LAMP_RANGE` — the one constant AS1.5's `light_radius()`
+	# hook shares with it, so a stealth check reading that hook can never
+	# disagree with how far the light drawn here actually reaches.
+	handheld_lamp = SpotLight3D.new()
+	handheld_lamp.name = "HandheldLamp"
+	handheld_lamp.light_color = Color("cfe6d6")
+	handheld_lamp.light_energy = 0.0
+	handheld_lamp.spot_range = HANDHELD.LAMP_RANGE
+	handheld_lamp.spot_angle = 34.0
+	handheld_lamp.spot_angle_attenuation = 1.6
+	# Kept from the other implementation of this: off-centre and slightly
+	# rotated, because a phone in a raised hand does not sit dead centre
+	# like a headlamp, and it casts shadows so the light has edges.
+	handheld_lamp.position = Vector3(0.16, -0.14, -0.15)
+	handheld_lamp.rotation_degrees = Vector3(-6, 4, 0)
+	handheld_lamp.shadow_enabled = true
+	camera.add_child(handheld_lamp)
 	resolution_ui = preload("res://systems/downed_resolution.gd").new()
 	resolution_ui.name = "DownedResolution"
 	$HUD.add_child(resolution_ui)
@@ -377,6 +394,11 @@ func _ready() -> void:
 	kill_cam = preload("res://systems/kill_cam.gd").new()
 	kill_cam.name = "KillCam"
 	$HUD.add_child(kill_cam)
+	# Last, so an engaged trip sits over everything else drawn this frame —
+	# inert and invisible until a dial is touched, per `psychedelic_rig.gd`.
+	psychedelic = PSYCHEDELIC_RIG.new()
+	psychedelic.name = "Psychedelic"
+	$HUD.add_child(psychedelic)
 	voice_channel = preload("res://systems/proximity_voice.gd").new()
 	voice_channel.name = "ProximityVoice"
 	add_child(voice_channel)
@@ -711,11 +733,12 @@ func _physics_process(delta: float) -> void:
 		_update_hud()
 		return
 	pulse += delta
-	_update_handheld_light(delta)
+	_update_handheld_lamp(delta)
 	# W1.1. The world keeps time, and exactly one place advances it — a clock
 	# that two scenes both wind runs at double speed the moment anybody
 	# builds a third.
 	WorldClock.advance(delta)
+	_update_day_night()
 	dodge_remaining = maxf(0.0, dodge_remaining - delta)
 	# O2.7 v3. scale_for() only ever reached the encounter loop's actor_delta —
 	# the player is the other half of every exchange they are in and kept
@@ -963,6 +986,11 @@ func _attack(heavy := false) -> void:
 	if not grapple_target.is_empty():
 		return
 	if not panel_mode.is_empty():
+		return
+	# AS1.2. Holding the handheld up is a real cost, not a free extra hand —
+	# raised past the halfway point of its own blend is the same threshold
+	# `is_lit()` uses for the lamp, so a hand is busy exactly when the light is on.
+	if handheld.raised > 0.5:
 		return
 	var report: Dictionary = _begin_carried_limb_attack(heavy) if carried_limb_index >= 0 else arsenal.begin_attack(heavy)
 	if not bool(report.get("accepted", false)):
@@ -1479,11 +1507,11 @@ func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF) -> Di
 ## about whether it is on. AS2.1's "warps and distorts" gets a down payment
 ## here too: a real torch on a device this beaten up does not hold perfectly
 ## steady, and it should say so more as the charge that is running it drops.
-func _update_handheld_light(delta: float) -> void:
-	if handheld_light == null or not is_instance_valid(handheld_light):
+func _update_handheld_lamp(delta: float) -> void:
+	if handheld_lamp == null or not is_instance_valid(handheld_lamp):
 		return
 	var lit: bool = handheld.has_method("torch_active") and handheld.torch_active()
-	handheld_light.visible = lit
+	handheld_lamp.visible = lit
 	if not lit:
 		return
 	var charge: float = handheld.battery_percent() if handheld.has_method("battery_percent") else 1.0
@@ -1492,7 +1520,7 @@ func _update_handheld_light(delta: float) -> void:
 	if charge < 0.2:
 		var gutter := 1.0 if fmod(pulse * (5.0 + (0.2 - charge) * 40.0), 1.0) > 0.5 else 0.0
 		waver *= 0.7 + 0.3 * gutter
-	handheld_light.light_energy = 9.0 * charge * waver
+	handheld_lamp.light_energy = 9.0 * charge * waver
 
 
 func _dodge() -> void:
@@ -3229,12 +3257,40 @@ func _build_world() -> void:
 		lamp.light_energy = 3.5
 		lamp.omni_range = 13
 		add_child(lamp)
-	var sun := DirectionalLight3D.new()
+	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-50, -25, 0)
 	sun.light_color = Color("c89572")
 	sun.light_energy = 1.4
 	sun.shadow_enabled = true
 	add_child(sun)
+
+
+## AS2. The sun and the base ambient used to be set once in `_build_world()`
+## and never touched again — a fixed 1.4-energy noon that never dimmed no
+## matter how many hours `world_clock.gd` had actually advanced. Driven every
+## physics frame instead, off `WorldClock.daylight()` alone rather than the
+## raw hour, so anything already using `daylight()` as its single source of
+## "how lit is it right now" — this included — can never quietly disagree.
+func _update_day_night() -> void:
+	if sun == null or not is_instance_valid(sun):
+		return
+	var daylight := WorldClock.daylight()
+	# AS2.2. Minimal lighting is the default night settles to; full daylight
+	# is the brief exception at the top of the curve, not the baseline dusk
+	# fades down from.
+	sun.light_energy = lerpf(0.08, 1.4, daylight)
+	sun.light_color = Color("39445a").lerp(Color("c89572"), daylight)
+	var env: Environment = $WorldEnvironment.environment
+	if env != null:
+		env.ambient_light_energy = lerpf(0.16, 0.72, daylight)
+		env.tonemap_exposure = lerpf(0.85, 1.18, daylight)
+	# AS2.1. "The light can become really warped at night and distorted" —
+	# read literally rather than built as its own effect. Night pushes the
+	# psychedelic shader's noise-displacement dial to a strength nobody would
+	# call a trip but a player will notice, per FINAL_V.md §16's own argument
+	# that this and a drug and a shadow realm should be one shader, not three.
+	if psychedelic != null and is_instance_valid(psychedelic):
+		psychedelic.set_dial("displacement_strength", (1.0 - daylight) * 0.02)
 
 
 func _build_expanse_systems() -> void:
