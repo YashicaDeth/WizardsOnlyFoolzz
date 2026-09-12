@@ -854,9 +854,38 @@ finished. Applies to everything below and to A5, A6, C1.
 - [x] **I2.4** Dead sites: last post four years old, moderator deceased
 
 ### I3 — celloutz.xyz in-game
-**Blocked: mirror the real content, or fictionalise it?**
-- [ ] **I3.1** Decide the approach
-- [ ] **I3.2** Build the site as a reachable place on the Wire
+
+- [x] ~~**I3.1** Decide the approach~~ Was blocked on "mirror the real
+      content, or fictionalise it?" — asked Greg directly rather than
+      guessing, since `country_town_menu.gd` already `OS.shell_open`s the
+      real, live `celloutz.xyz`, so this was never a purely fictional call.
+      Answer: fictionalise it. The in-game version is CellOutz-the-corporation
+      (the company that makes the handheld and the Wire itself), not a
+      reproduction of the real page.
+- [x] ~~**I3.2** Build the site as a reachable place on the Wire~~
+      `broken_web.gd` (I2) already had the whole catalogue-of-sites machinery
+      built — `SITES`, `reachable_from(emitter_id)`, `draw_site()` — and a
+      `celloutz_support` entry, but nothing anywhere in the game ever called
+      any of it; I2's own "reachable" was never actually reachable by a
+      player. Added a `celloutz_store` entry with its own new `storefront`
+      layout (a product grid and a cart — I2.2 forbids reusing "corporate",
+      which the support site already has) and wired the whole system into a
+      real screen: `SignalField.reading()` now reports the emitter's own
+      `id`, `handheld_device.gd` forwards it to the hosted World Index the
+      same way it already forwards `signal_grade`, and the WIRE page prints
+      a "SITES IN RANGE" strip from `BrokenWeb.reachable_from()` as real
+      links (`_site_link_rows()`, feeding `_rebuild_links()` the same way
+      every other link on that screen does per I5.2 v2) that open the site
+      full-panel and close the same way any other link does — click again.
+      This also retroactively makes I2.3 true for the first time: every
+      `broken_web.gd` site, not only the new one, is now reachable from
+      wherever it claims to be and nowhere else. Verified:
+      `tests/celloutz_site_test.gd` (new, 15/15 — the data layer, the signal
+      field naming its own emitter, and the World Index actually surfacing
+      and following the link), plus the existing `link_test.gd`,
+      `index_wire_glow_test.gd` and `index_link_rebuild_test.gd` regression
+      suites, and a windowed capture
+      (`captures/i3_wire_sites_in_range.png`, `i3_celloutz_storefront.png`).
 
 ### I4 — Panels degrade with the player
 - [x] **I4.1** Blood loss, pain, consciousness and Wire strain drive the UI
@@ -1832,7 +1861,7 @@ The theme of the whole session, and it is a design fault rather than his.
 - [ ] **AG2.3** *"press buttons probably"* is the current discovery mechanism for every panel
 - [ ] **AG2.4** The first-person HUD must say what can be pressed (AD2.3)
 
-### AG3 - The derby, second playtest
+### AG3 — The derby, second playtest
 Greg, in the seat: *"the derby thing is so whack rn no hud or hull not
 progressing out of the car animation no shooting through first person no
 direction of controls"*. All four are real and all four are the same mistake.
@@ -1852,7 +1881,7 @@ game.
 - [ ] **AG3.4** You can shoot through your own windscreen, and the glass keeps the holes
 - [ ] **AG3.5** Nothing in the derby says what any key does - the first thing AH has to fix
 
-## AH - The Cloud, and the room you remember it from
+## AH — The Cloud, and the room you remember it from
 
 Greg: *"the black mirror is crazy... i want you to make it a room on the phone
 somewhat, when you check the pinboard then you can be in a room with a massive
@@ -1867,7 +1896,7 @@ This is the answer to all of AG2 and it is a far better answer than a tooltip.
 you recover it, fragment by fragment, out of a thing that used to know
 everything and has been decaying since before you arrived.
 
-### AH1 - The room
+### AH1 — The room
 - [ ] **AH1.1** Opening the Board puts you in a room rather than on a screen
 - [ ] **AH1.2** A bed, a mirror the size of the wall, and the light of one window
 - [ ] **AH1.3** Turn to the wall and the Board is there - the corkboard already built (L)
@@ -1876,7 +1905,7 @@ everything and has been decaying since before you arrived.
 - [ ] **AH1.6** The room is yours and it accumulates - what you leave in it stays
 - [ ] **AH1.7** Leaving is a movement, not a menu close
 
-### AH2 - REMEMBER THE CLOUD
+### AH2 — REMEMBER THE CLOUD
 - [ ] **AH2.1** The cloud is an archive of everything the world used to know, in fragments
 - [ ] **AH2.2** A fragment is repaired, not unlocked - the verb is restoration
 - [ ] **AH2.3** Repairing one costs something the player actually has
@@ -1884,7 +1913,7 @@ everything and has been decaying since before you arrived.
 - [ ] **AH2.5** The archive is visibly incomplete forever - you never finish it
 - [ ] **AH2.6** It talks like cloud software written by people who are now dead
 
-### AH3 - The tutorial web
+### AH3 — The tutorial web
 Greg: *"a big node web tutorial that slowly gets unlocked alongside the board...
 a little CRT TV animation and its curved on the TV of the game mechanic as a
 little video with a description + it shows the controls"*.
@@ -1897,7 +1926,7 @@ little video with a description + it shows the controls"*.
 - [ ] **AH3.7** A locked node shows static and the shape of what is missing
 - [ ] **AH3.8** Every mechanic in the game has a node, including ones you have not met
 
-## AI - The pyramid, and what is under it
+## AI — The pyramid, and what is under it
 
 Greg sent three reference charts - the occult hierarchy pyramid, *Hierarchy of
 the Old World*, and the gods/demigods/mortals stack - with one instruction:
@@ -1910,7 +1939,7 @@ below** - which is not decoration here, it is the two-axis system the game
 already has: AA hands a holding to the ascent or to corruption, and those are
 the two cones. The player stands at the waist, where they touch.
 
-### AI1 - The shape
+### AI1 — The shape
 - [ ] **AI1.1** The Tree page becomes a double pyramid, upright above and inverted below
 - [ ] **AI1.2** The waist is where the player is, and it is the only tier you occupy
 - [ ] **AI1.3** Tiers are drawn as strata with real edges, not a list with indentation
@@ -1919,7 +1948,7 @@ the two cones. The player stands at the waist, where they touch.
 - [ ] **AI1.6** Density carries meaning - the base is crowded, the apex is one thing
 - [ ] **AI1.7** Legible at a glance and rewarding an hour of reading; the references do both
 
-### AI2 - What it charts
+### AI2 — What it charts
 - [ ] **AI2.1** Every tier is populated from WorldHistory, not authored - who is actually above you
 - [ ] **AI2.2** Factions sit where their power is, and they move
 - [ ] **AI2.3** Your own position is computed, and it changes
@@ -1927,7 +1956,7 @@ the two cones. The player stands at the waist, where they touch.
 - [ ] **AI2.5** Satire aims at institutions and never at congregations
 - [ ] **AI2.6** Marginalia in the corners, the way the references carry it
 
-## AJ - Chaos magick, v2
+## AJ — Chaos magick, v2
 
 Greg: *"the magic system using sigils and the new and improved chaos magick v2,
 name work in progress, but a sigil and magic system app or whatever
@@ -1947,7 +1976,7 @@ Why chaos magick is the right tradition to build on rather than an invented one:
 letters, condense what is left into a glyph, charge it, forget it. Five real
 steps, which are five real game verbs, and not one of them had to be made up.
 
-### AJ1 - Making a sigil
+### AJ1 — Making a sigil
 - [ ] **AJ1.1** State an intent, in the player's own words
 - [ ] **AJ1.2** The letters are stripped and condensed on screen - you watch it become a glyph
 - [ ] **AJ1.3** The glyph is deterministic from the intent: the same words make the same sigil, always
@@ -1955,28 +1984,28 @@ steps, which are five real game verbs, and not one of them had to be made up.
 - [ ] **AJ1.5** Forgetting is mechanical: a charged sigil you keep looking at does not fire
 - [ ] **AJ1.6** It goes into the world as an object - scratched, burned, carried or worn
 
-### AJ2 - What a sigil does
+### AJ2 — What a sigil does
 - [ ] **AJ2.1** Effects come from the intent, parsed, not from a spell list
 - [ ] **AJ2.2** A sigil can fail, and a failed one leaves something behind
 - [ ] **AJ2.3** The same glyph gets stronger the more it has worked
 - [ ] **AJ2.4** Other people's sigils exist in the world and can be read, defaced or stolen
 - [ ] **AJ2.5** Corruption is what happens when you charge more than you can carry (AI1.5)
 
-### AJ3 - Modern gods
+### AJ3 — Modern gods
 - [x] **AJ3.1** The gods of this world are what is actually worshipped: markets, metrics, engagement, brands — `systems/modern_gods.gd`: The Engagement, The Market, The Quota, The Brand
 - [x] **AJ3.2** A god is a real entity in WorldHistory with attention, not a flavour label — `kind: "god"`, real `attention` field, same shape `ascent_entities.gd` already proved
 - [~] **AJ3.3** Worship is measurable (`attention` accumulates on every verdict asked) — feeding the upper cone (AI1.4) is a UI/pyramid concern, not attempted here
 - [~] **AJ3.4** Naming a god in an intent gets their attention, which is not always wanted — `get_attention()` exists and accumulates, but AJ1 (intents/sigils) doesn't exist yet to call it; same relationship `ritual_app.gd` has to seals it doesn't draw
 - [x] **AJ3.5** The target is always the institution, never the congregation — satisfied by construction: all four gods are markets/metrics/labor/image, never a person or a people
 
-### AJ4 - Magic as progression
+### AJ4 — Magic as progression
 - [ ] **AJ4.1** Skill is what you have actually done, read off the record
 - [ ] **AJ4.2** No skill tree - the pyramid (AI) is the tree, and you climb it
 - [ ] **AJ4.3** A practice you stop practising decays
 - [ ] **AJ4.4** Every system in the game is reachable through a sigil, badly
 - [ ] **AJ4.5** The playground rule: the system should surprise its own author
 
-### AJ5 - The verdict on a kill
+### AJ5 — The verdict on a kill
 Greg: *"the killing and fighting the npc system should be made so that if you
 kill some people permanently you get told by the gods if killing them was a good
 thing or if you forced them back into samsara, like 'soul freed' or 'cyclicist
@@ -2000,7 +2029,7 @@ as such, and a different god will read the same kill the other way.
 - [ ] **AJ5.6** Freeing souls and enslaving them both have consequences, and they are different ones — not built: a verdict is currently read-only, with no differentiated mechanical effect on the world yet
 - [x] **AJ5.7** It is recorded in WorldHistory, so the Board can pin it and the pyramid can read it — one `death_verdict` event per god's opinion. Covered by `tests/modern_gods_test.gd` (19 checks)
 
-## AM - The build sheet becomes the map
+## AM — The build sheet becomes the map
 
 Greg: *"this all links back to updating checklist ui and making a massive
 worldmap tree hierarchy of the game mechanics so its super vibe coded and in
@@ -2024,7 +2053,7 @@ to, the in-game one for the player.
 - [ ] **AM1.7** It reads as a tutorial somebody could learn the game from
 - [ ] **AM1.8** Generated from CHECKLIST.md, so it cannot go stale
 
-## AK - The agency that owns the sky
+## AK — The agency that owns the sky
 
 Greg: *"maps like this and insane esoteric knowledge would be really cool, again
 linking back to the satellite and map part, but i wanted to add a satanic or
@@ -2045,7 +2074,7 @@ nobody, which makes it a feature rather than a relationship. Give it a landlord
 and every map interaction becomes a transaction with something that is watching
 you back.
 
-### AK1 - Whose satellite it is
+### AK1 — Whose satellite it is
 - [ ] **AK1.1** The satellite app has an owner, named, with a logo and a licence agreement
 - [ ] **AK1.2** They see what you see - using the map is being seen using the map
 - [ ] **AK1.3** Standing with them is a real quantity and it moves
@@ -2054,7 +2083,7 @@ you back.
 - [ ] **AK1.6** Losing them costs the satellite: back to a paper chart (A10 degrades, it does not vanish)
 - [ ] **AK1.7** They are an institution and the satire stays pointed at institutions
 
-### AK2 - The esoteric chart register
+### AK2 — The esoteric chart register
 - [ ] **AK2.1** Their briefings read like the charts: dense, hand-lettered, confident, unsourced
 - [ ] **AK2.2** Some of what they tell you is true, and the game never says which
 - [ ] **AK2.3** Their claims pin onto the Board like anybody else's (L)
@@ -2062,7 +2091,7 @@ you back.
 - [ ] **AK2.5** Two records: what the satellite saw, and what they published about it
 - [ ] **AK2.6** The subject is occult, never the real-world conspiracy canon it borrows its density from
 
-## AL - The bank, and what runs under the street
+## AL — The bank, and what runs under the street
 
 Greg: *"same with the ingame bank system and having underground sewer and tunnel
 networks alluding to trafficking and global conspiracys are really cool"* -
@@ -2081,7 +2110,7 @@ game already simulates, the bank is the institution that made that trade
 legitimate, and the conspiracy is the ordinary one - an institution doing
 paperwork over things that used to be people.
 
-### AL1 - The bank
+### AL1 — The bank
 - [ ] **AL1.1** Money exists as a real quantity with a real issuer
 - [ ] **AL1.2** The bank writes the liens the Choir already prices (CARRY, B)
 - [ ] **AL1.3** A debt is secured against something of yours, named, and they will take it
@@ -2090,7 +2119,7 @@ paperwork over things that used to be people.
 - [ ] **AL1.6** They are an institution: the satire lands on the paperwork, not on debtors
 - [ ] **AL1.7** Default has a collector, and the collector is a person with a body (F)
 
-### AL2 - The network under it
+### AL2 — The network under it
 - [ ] **AL2.1** A sewer and tunnel layer under the region, connected and navigable
 - [ ] **AL2.2** It is how the collateral moves - the organ trade has a route
 - [ ] **AL2.3** Entrances are found, not marked: a grate you noticed is a route you own

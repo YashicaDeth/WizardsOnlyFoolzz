@@ -34,6 +34,7 @@ const SUBJECT_ICON := preload("res://systems/subject_icon.gd")
 const BODY_INSPECTOR := preload("res://systems/body_inspector.gd")
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 const WoundCatalog := preload("res://systems/wound_catalog.gd")
+const BrokenWeb := preload("res://systems/broken_web.gd")
 
 ## Six live 3D heads is cheap; sixty would not be, and each icon owns a World3D.
 ## So they are a pool the pages draw into by slot rather than one per row.
@@ -66,6 +67,18 @@ var _rain_size := Vector2.ZERO
 var _wire_glow := 0.0
 var wire = null
 var posts: Array = []
+
+## I3.2. celloutz.xyz — and everything else `broken_web.gd` catalogued and
+## nothing ever surfaced — as reachable places on the Wire rather than data
+## nobody could reach. `current_emitter_id` is set by whoever is driving this
+## panel (`handheld_device.gd`, via `stand_at()`) from the same
+## `SignalField.reading()` that already decides `signal_grade`; empty means
+## no emitter in range, which correctly reads as no sites either.
+var current_emitter_id := ""
+## Non-empty while the player is reading one of `BrokenWeb`'s sites instead of
+## the normal WIRE page. A link like any other — set by `_follow_link`,
+## cleared by clicking it again.
+var viewing_site := ""
 var last_action := ""
 var action_life := 0.0
 
@@ -515,6 +528,12 @@ func _follow_link(link: Dictionary) -> void:
 			page = 1
 			page_blend = 0.0
 			page_direction = 1.0
+		"site":
+			# I3.2. Toggled rather than one-way: clicking the same site again
+			# is how you leave it, the same as everything else this reader
+			# treats as a link rather than a modal.
+			var id := str(link.get("id", ""))
+			viewing_site = "" if viewing_site == id else id
 
 
 ## Wounds are recorded as prose, not as a zone id, so the link reads the zone
@@ -555,6 +574,7 @@ func _rebuild_links() -> void:
 				_link_rects.append_array(_file_link_rows(_panel_rect(), WorldHistory.subject(str(entry.id))))
 		2:
 			_link_rects.append_array(_wire_link_rows(_panel_rect()))
+			_link_rects.append_array(_site_link_rows(_panel_rect()))
 
 
 ## The FILE/PYRAMID/WIRE/BODY content rect, exactly as `_draw()` derives it
@@ -604,6 +624,33 @@ func _file_link_rows(rect: Rect2, subject: Dictionary) -> Array:
 			var part_row := Rect2(right_x - 4, wy - 12, right_width, 17)
 			rows.append({"kind": "implant", "id": str(part.name), "zone": str(part.get("zone", "torso")), "rect": part_row})
 			wy += 17.0
+	return rows
+
+
+## I3.2. The click target for a site — either the row of sites reachable from
+## `current_emitter_id` (see `_draw_wire`'s own "SITES IN RANGE" strip, which
+## this mirrors the geometry of exactly, for the same reason `_file_link_rows`
+## mirrors `_draw_file`), or, while one is open, the header strip that closes
+## it and returns to the normal WIRE page.
+func _site_link_rows(rect: Rect2) -> Array:
+	if rect.size == Vector2.ZERO:
+		return []
+	if viewing_site != "":
+		return [{"kind": "site", "id": viewing_site, "rect": Rect2(rect.position, Vector2(rect.size.x, 20))}]
+	if current_emitter_id.is_empty():
+		return []
+	var reachable: Array = BrokenWeb.reachable_from(current_emitter_id)
+	if reachable.is_empty():
+		return []
+	var split := rect.size.x * 0.46
+	var feed := Rect2(rect.position + Vector2(split + 16, 0), Vector2(rect.size.x - split - 16, rect.size.y))
+	var rows: Array = []
+	var sx := feed.position.x
+	for site_entry: Dictionary in reachable:
+		var label := "[%s]" % str(site_entry.get("url", "")).to_upper()
+		var w := CellOutzType.width_condensed(label, 9.0, 0.7)
+		rows.append({"kind": "site", "id": str(site_entry.get("id", "")), "rect": Rect2(Vector2(sx, feed.position.y + 26), Vector2(w, 14))})
+		sx += w + 14.0
 	return rows
 
 
@@ -1236,6 +1283,17 @@ func _run_action(action: String) -> void:
 
 func _draw_wire(rect: Rect2) -> void:
 	var font := ThemeDB.fallback_font
+	# I3.2. A site is a place, not a post — reading one replaces this whole
+	# page rather than living inside the feed, the same way `_draw_theory`
+	# replaces a photograph rather than annotating it.
+	if viewing_site != "":
+		var visiting: Dictionary = BrokenWeb.site(viewing_site)
+		if visiting.is_empty():
+			viewing_site = ""
+		else:
+			BrokenWeb.draw_site(self, rect, visiting, elapsed)
+			draw_string(font, rect.position + Vector2(4, 14), "%s   ·   CLICK TO RETURN TO THE WIRE" % str(visiting.get("url", "")).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 8, 10, Color(1, 1, 1, 0.5))
+			return
 	# G1.5. The Wire is described as paranoid hand-assembled collage, and the
 	# pipeline builds exactly that out of Greg's work. The feed prints over it.
 	Grunge.art_collage(self, rect, 3, 0.13)
@@ -1326,7 +1384,22 @@ func _draw_wire(rect: Rect2) -> void:
 	var strain_width := CellOutzType.width(strain_label, 10.0, 0.8)
 	CellOutzType.draw_text(self, Vector2(feed.position.x + feed.size.x - strain_width, feed.position.y + 2), strain_label, 10.0, BRUISE.lerp(HOT, clampf(wire.strain / 40.0, 0, 1)), 0.8)
 	draw_line(feed.position + Vector2(0, 18), feed.position + Vector2(feed.size.x, 18), COPPER * Color(1, 1, 1, 0.3), 1.0)
-	var y := feed.position.y + 34.0 - feed_scroll
+	# I3.2. celloutz.xyz and anything else `broken_web.gd` catalogued at
+	# wherever the player is actually standing — reachable rather than
+	# authored data nobody could get to. Empty here almost everywhere on
+	# purpose: I2.3 is that a site lives at one place and nowhere else.
+	var reachable: Array = BrokenWeb.reachable_from(current_emitter_id) if current_emitter_id != "" else []
+	var feed_top := 34.0
+	if not reachable.is_empty():
+		CellOutzType.draw_condensed(self, feed.position + Vector2(0, 22), "SITES IN RANGE", 9.0, SPORE, 0.8)
+		var sx := feed.position.x
+		for site_entry: Dictionary in reachable:
+			var label := "[%s]" % str(site_entry.get("url", "")).to_upper()
+			var w := CellOutzType.width_condensed(label, 9.0, 0.7)
+			CellOutzType.draw_condensed(self, Vector2(sx, feed.position.y + 34), label, 9.0, Color("9fd0e6"), 0.7)
+			sx += w + 14.0
+		feed_top = 50.0
+	var y := feed.position.y + feed_top - feed_scroll
 	for post in posts:
 		if y + 62.0 > feed.position.y + feed.size.y:
 			break

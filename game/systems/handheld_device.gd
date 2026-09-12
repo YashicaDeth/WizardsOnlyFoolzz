@@ -338,6 +338,10 @@ func stand_at(world_position: Vector2) -> void:
 	signal_field.stand_at(world_position)
 	if "signal_grade" in _index:
 		_index.set("signal_grade", signal_field.grade())
+	# I3.2. Which BrokenWeb sites are reachable is a property of exactly where
+	# the player is standing, the same as signal itself.
+	if "current_emitter_id" in _index:
+		_index.set("current_emitter_id", str(signal_field.reading().get("id", "")))
 
 
 func _process(delta: float) -> void:

@@ -90,6 +90,25 @@ const SITES := [
 		],
 	},
 	{
+		# I3. celloutz.xyz, fictionalised rather than mirrored — Greg's own
+		# real site, "has that kinda style without the gore"
+		# (`DESIGN/INTERFACE_DIRECTION.md`), reimagined as the storefront of
+		# the corporation that makes the handheld and the Wire itself. Alive
+		# rather than dead (`last_post` tracks `NOW_YEAR`) — unlike every
+		# other site here, somebody is still funding this one.
+		"id": "celloutz_store", "title": "CELLOUTZ",
+		"url": "celloutz.xyz", "layout": "storefront",
+		"requires": "ossuary_terminal", "palette": "corporate",
+		"last_post": NOW_YEAR, "moderator": "", "moderator_dead": false,
+		"strap": "Field-tested hardware for a body that is going to lose eventually.",
+		"lines": [
+			"FIELD WIRE MK-II, SALVAGED-GRADE ......... 340 SCRIP",
+			"PROSTHETIC SURGE KIT, ONE USE ............ 210 SCRIP",
+			"REPLACEMENT LUNG, CIVILIAN GRADE ......... 610 SCRIP",
+			"FIELD JACKET, UNBRANDED .................... 45 SCRIP",
+		],
+	},
+	{
 		"id": "nix_ring", "title": "SCRAP MEDICS WEBRING",
 		"url": "~nix/ring", "layout": "webring",
 		"requires": "tunnel_mast", "palette": "moss",
@@ -309,6 +328,33 @@ static func draw_site(canvas: CanvasItem, rect: Rect2, entry: Dictionary, clock:
 				canvas.draw_string(font, Vector2(rect.position.x + 16, cy), str(line), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 220, 13, ink)
 				cy += 26.0
 			popup(canvas, Rect2(rect.position + Vector2(40, rect.size.y - 120), Vector2(230, 92)), "A MESSAGE", "you have been selected. do not close this window.", ARTERIAL)
+		"storefront":
+			# I3. A product grid and a cart, not a ticket list — this is the
+			# site that sold you the thing that is now failing, and it is
+			# the tidiest page in the whole catalogue because tidy is what
+			# a company with a marketing budget looks like. No two sites
+			# share a layout (I2.2); "corporate" already spent its ticket
+			# list on `celloutz_support`.
+			canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x, 40)), accent * Color(1, 1, 1, 0.18))
+			CellOutzType.draw_stamped(canvas, rect.position + Vector2(16, 10), str(entry.title), 18.0, accent, ARTERIAL * Color(1, 1, 1, 0.2), 2.4)
+			CellOutzType.draw_condensed(canvas, Vector2(rect.end.x - 78, rect.position.y + 16), "CART (0)", 10.0, ink * Color(1, 1, 1, 0.7), 0.8)
+			canvas.draw_string(font, rect.position + Vector2(16, 58), str(entry.strap), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32, 12, ink * Color(1, 1, 1, 0.75))
+			var columns := 2
+			var tile_size := Vector2((rect.size.x - 44.0) / float(columns), 66.0)
+			for index in lines.size():
+				var column := index % columns
+				var row := index / columns
+				var tile := Rect2(rect.position + Vector2(16 + column * (tile_size.x + 12), 78 + row * (tile_size.y + 12)), tile_size)
+				if tile.end.y > rect.end.y - 16.0:
+					break
+				canvas.draw_rect(tile, ink * Color(1, 1, 1, 0.05))
+				canvas.draw_rect(tile, accent * Color(1, 1, 1, 0.35), false, 1.0)
+				var thumb := Rect2(tile.position + Vector2(8, 8), Vector2(tile.size.y - 16, tile.size.y - 16))
+				canvas.draw_rect(thumb, ink * Color(1, 1, 1, 0.09))
+				canvas.draw_rect(thumb, ink * Color(1, 1, 1, 0.25), false, 1.0)
+				canvas.draw_string(font, tile.position + Vector2(tile.size.y, 22), str(lines[index]), HORIZONTAL_ALIGNMENT_LEFT, tile.size.x - tile.size.y - 10, 10, ink * Color(1, 1, 1, 0.85))
+				CellOutzType.draw_condensed(canvas, tile.position + Vector2(tile.size.y, tile.size.y - 22), "ADD TO CART", 8.0, link, 0.7)
+			CellOutzType.draw_condensed(canvas, Vector2(rect.position.x + 14, rect.end.y - 16), "SUBSCRIBE FOR 4% OFF YOUR FIRST REPOSSESSION", 9.0, ink * Color(1, 1, 1, 0.5), 0.5)
 		"corporate":
 			# Flat, tidy, and saying nothing. The only site here built by people
 			# who were paid, which is why it is the emptiest.

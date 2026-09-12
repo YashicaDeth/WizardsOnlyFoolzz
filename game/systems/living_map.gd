@@ -60,6 +60,8 @@ var satellite: SubViewport = null
 ## 0 = high above, looking down. 1 = standing in the street. Driven by the same
 ## zoom the chart already had, so there is one control rather than two.
 var descent := 0.0
+## Counts down to the next satellite render. See `_draw`.
+var _satellite_due := 0.0
 var pan := Vector2.ZERO
 var follow := true
 var dragging := false
@@ -231,6 +233,43 @@ func _gui_input(event: InputEvent) -> void:
 		pan = Vector2.ZERO
 
 
+## Greg, on the second playtest: *"the map is incredibly laggy right now"*.
+##
+## Both grid passes — the unwalked veil and the unsurveyed hatch — walked every
+## cell in the whole region on every redraw, formatted a `"%d,%d"` string per
+## cell to look it up, ran `_to_screen` on it, built a Rect2 and then threw
+## almost all of them away because they were off the chart. At CELL = 22 over
+## the Ashbloom that is thousands of cells a frame to draw a few hundred.
+##
+## `_to_screen` is a translate and a scale, so it inverts exactly. Deriving the
+## cell range from the chart rectangle means the loops only ever touch cells
+## that can actually be seen, which is the same picture for a fraction of the
+## work — and the cost now scales with the window instead of with the world.
+func _to_world(screen: Vector2) -> Vector2:
+	var origin := _chart.get_center() + pan
+	var anchor := player_at if follow else Vector2.ZERO
+	return (screen - origin) / maxf(zoom, 0.0001) + anchor
+
+
+## The inclusive cell range covering the chart, with a one-cell margin so a cell
+## straddling the edge is still drawn.
+func _visible_cells() -> Dictionary:
+	var top_left := _to_world(_chart.position)
+	var bottom_right := _to_world(_chart.end)
+	var half := AshbloomWorldGenerator.REGION_SIZE * 0.5
+	# Clamped to the region: there is nothing to say about ground the world does
+	# not have, and an unclamped range at low zoom is unbounded.
+	var from := Vector2i(
+		maxi(floori(minf(top_left.x, bottom_right.x) / CELL) - 1, floori(-half.x / CELL) - 1),
+		maxi(floori(minf(top_left.y, bottom_right.y) / CELL) - 1, floori(-half.y / CELL) - 1)
+	)
+	var to := Vector2i(
+		mini(ceili(maxf(top_left.x, bottom_right.x) / CELL) + 1, ceili(half.x / CELL) + 1),
+		mini(ceili(maxf(top_left.y, bottom_right.y) / CELL) + 1, ceili(half.y / CELL) + 1)
+	)
+	return {"from": from, "to": to}
+
+
 func _to_screen(world: Vector2) -> Vector2:
 	var origin := _chart.get_center() + pan
 	var anchor := player_at if follow else Vector2.ZERO
@@ -254,10 +293,20 @@ func _draw() -> void:
 		# a second control the player has to learn.
 		descent = clampf(inverse_lerp(0.8, 2.8, zoom), 0.0, 1.0)
 		satellite.call("observe", Vector3(player_at.x, 0.0, player_at.y), player_yaw, descent, get_process_delta_time())
-		satellite.call("request_frame")
+		# A whole second render of the region, at 768 square, is not something to
+		# do sixty times a second for a picture nobody is animating. Asked for at
+		# about twenty, which is indistinguishable while panning and a third of
+		# the cost. The texture persists between frames, so the map still draws
+		# a satellite image on every one of them.
+		_satellite_due -= get_process_delta_time()
+		if _satellite_due <= 0.0:
+			_satellite_due = 1.0 / 20.0
+			satellite.call("request_frame")
 		var image := satellite.get_texture()
 		if image != null:
-			draw_texture_rect(image, _chart, false, Color(1, 1, 1, 0.92))
+			# Full strength. At 0.92 it was being mixed with the plate below
+			# it before the chart had even started drawing over the top.
+			draw_texture_rect(image, _chart, false, Color(1, 1, 1, 1.0))
 			# A10.5. Unwalked ground is greyed over the image rather than cut out
 			# of it, so the shape of what you have not been to is still legible.
 			_draw_unwalked_veil()
@@ -275,7 +324,10 @@ func _draw() -> void:
 		var squash := lerpf(1.0, 0.60, tilt)
 		draw_set_transform_matrix(Transform2D(Vector2(1.0, 0.0), Vector2(0.0, squash), Vector2(0.0, horizon * (1.0 - squash))))
 
-	_draw_grid()
+	# A10.4. Over a live image the grid is a reference overlay and belongs at
+	# overlay weight; on paper it is the chart itself.
+	if not _satellite_live():
+		_draw_grid()
 	_draw_roads()
 	_draw_lots()
 	# Over the plan, not under it: unwalked ground is supposed to withhold what
@@ -394,9 +446,9 @@ func _draw_unsurveyed() -> void:
 	var step := CELL * zoom
 	if step < 3.0:
 		return
-	var half := AshbloomWorldGenerator.REGION_SIZE * 0.5
-	var from := Vector2i(floori(-half.x / CELL) - 1, floori(-half.y / CELL) - 1)
-	var to := Vector2i(ceili(half.x / CELL) + 1, ceili(half.y / CELL) + 1)
+	var span: Dictionary = _visible_cells()
+	var from: Vector2i = span["from"]
+	var to: Vector2i = span["to"]
 	for cx in range(from.x, to.x + 1):
 		for cy in range(from.y, to.y + 1):
 			if surveyed.has("%d,%d" % [cx, cy]):
@@ -421,6 +473,20 @@ func _draw_roads() -> void:
 		draw_rect(strip.intersection(_chart), BILE * Color(1, 1, 1, 0.18), false, 1.0)
 
 
+## A10.4. Second playtest, TaKeS on the map: *"sort of? I can tell theres
+## somthing behind it"*. Exactly right, and the diagnosis is in the sentence —
+## the satellite renders, and then the chart draws its whole symbol set on top
+## in solid fills, so the region is behind an opaque plan of itself.
+##
+## A chart over a photograph is an annotation layer. Every fill below thins to
+## an outline while there is a real image underneath, and goes back to being a
+## drawn plan the moment there is not — the paper chart is still the fallback
+## when no scene has handed the map a world, and it has to stay legible on its
+## own.
+func _satellite_live() -> bool:
+	return satellite != null and is_instance_valid(satellite) and satellite.get_texture() != null
+
+
 func _draw_lots() -> void:
 	if world_generator == null or not is_instance_valid(world_generator):
 		return
@@ -436,6 +502,11 @@ func _draw_lots() -> void:
 			continue
 		var charted := is_surveyed(rect.get_center())
 		var tint := BONE if charted else INK
+		if _satellite_live():
+			# The building is already there to look at. All the chart adds is
+			# that somebody surveyed it, which is a line, not a block.
+			draw_rect(plan, tint * Color(1, 1, 1, 0.62 if charted else 0.16), false, 1.0)
+			continue
 		draw_rect(plan, tint * Color(1, 1, 1, 0.16 if charted else 0.05))
 		draw_rect(plan, tint * Color(1, 1, 1, 0.6 if charted else 0.14), false, 1.0)
 

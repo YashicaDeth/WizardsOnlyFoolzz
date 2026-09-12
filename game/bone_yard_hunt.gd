@@ -140,6 +140,15 @@ const ARC_STEP_BONUS := 0.25
 var guarding := false
 var guard_raised := 0.0
 var guard_stamina_drain := 14.0
+## AG4.1. Out of breath. Set when stamina bottoms out, cleared only once enough
+## has come back to be worth spending — see `_move_player`.
+var winded := false
+## How much stamina it takes to break into a run again after being winded. Well
+## clear of the floor, so the two thresholds can never be crossed in one frame.
+const SPRINT_RECOVER := 22.0
+## The speed the legs are actually doing, as opposed to the speed being asked
+## for. Smoothed, so a gait change is a change rather than a jump.
+var _gait_speed := 0.0
 const PARRY_WINDOW := 0.18
 const GUARD_DAMAGE_SCALE := 0.28
 var dodge_cooldown := 0.0
@@ -745,8 +754,33 @@ func _update_player(delta: float) -> void:
 	var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var direction: Vector3 = HUNTER_MOTOR.wish_direction(move, yaw)
 	crouching = Input.is_action_pressed("crouch") and dodge_remaining <= 0.0
-	var sprinting := Input.is_action_pressed("sprint") and not crouching and stamina > 1.0 and move.length() > 0.0
+	# AG4.1. TaKeS, second playtest: *"when running and the stamina bar depletes,
+	# the screen becomes super jittery — i assume since its trying to set it to
+	# the run speed, then checks to see if the stamina is low"*. That is exactly
+	# the bug, and exactly the cause.
+	#
+	# The flag was gated on `stamina > 1.0`, and the same frame spends 26/s while
+	# sprinting and recovers 18/s while not. At the bottom of the bar that is a
+	# loop: over the line, sprint, drop under the line, walk, recover over the
+	# line, sprint — flipping every two or three frames, taking the movement
+	# speed and the animation state with it.
+	#
+	# One threshold cannot express "running out of breath"; two can. You sprint
+	# until there is nothing left, and then you are winded until you have got a
+	# real amount of it back. No oscillation is possible because the two
+	# thresholds cannot both be crossed in the same frame, and it is a better
+	# mechanic than the one it replaces.
+	var wants_sprint := Input.is_action_pressed("sprint") and not crouching and move.length() > 0.0
+	if winded and stamina >= SPRINT_RECOVER:
+		winded = false
+	elif not winded and stamina <= 0.5:
+		winded = true
+	var sprinting := wants_sprint and not winded
 	var speed := 3.4 if crouching else (SPRINT_SPEED if sprinting else PLAYER_SPEED)
+	# AD1.5. And even a legitimate change of gait is eased into rather than
+	# stepped, so starting and stopping a run reads as a body doing it.
+	_gait_speed = move_toward(_gait_speed, speed, delta * 26.0)
+	speed = _gait_speed
 	# B6.5. The rig has been recording where the player is hurt since it was
 	# built and nothing ever read it back, so the player was the one body in the
 	# world that fought and ran exactly as well with one leg as with two. Floored
