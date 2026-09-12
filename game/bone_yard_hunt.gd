@@ -206,6 +206,11 @@ var rival_attack_clock := 0.0
 var dodge_remaining := 0.0
 var dodge_direction := Vector3.ZERO
 var handheld: Control
+## AS1.1. The handheld is a lamp: a real light in the world when it is in
+## your hand, not a screen glow that stops at the device's own edge. Bolted
+## to the camera rather than the world, the way an actual phone light moves
+## with whatever you point it at ("wave it around").
+var handheld_light: SpotLight3D
 var pathfinder = preload("res://systems/ashbloom_pathfinder.gd").new()
 var social_markers: Array[Node3D] = []
 var resolution_ui: Control
@@ -303,6 +308,19 @@ func _ready() -> void:
 	handheld = HANDHELD.new()
 	handheld.name = "Handheld"
 	$HUD.add_child(handheld)
+	# AS1.1. Bolted to the camera, low and slightly off-centre the way a phone
+	# actually sits in a raised hand, not dead-centre like a headlamp.
+	handheld_light = SpotLight3D.new()
+	handheld_light.name = "HandheldLight"
+	handheld_light.light_color = Color("d8ecd0")
+	handheld_light.spot_range = 10.0
+	handheld_light.spot_angle = 34.0
+	handheld_light.spot_angle_attenuation = 1.6
+	handheld_light.shadow_enabled = true
+	handheld_light.visible = false
+	handheld_light.position = Vector3(0.16, -0.14, -0.15)
+	handheld_light.rotation_degrees = Vector3(-6, 4, 0)
+	camera.add_child(handheld_light)
 	resolution_ui = preload("res://systems/downed_resolution.gd").new()
 	resolution_ui.name = "DownedResolution"
 	$HUD.add_child(resolution_ui)
@@ -693,6 +711,7 @@ func _physics_process(delta: float) -> void:
 		_update_hud()
 		return
 	pulse += delta
+	_update_handheld_light(delta)
 	# W1.1. The world keeps time, and exactly one place advances it — a clock
 	# that two scenes both wind runs at double speed the moment anybody
 	# builds a third.
@@ -1452,6 +1471,28 @@ func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF) -> Di
 	impact_feel.strike(0.3, "blunt", false)
 	WorldHistory.record_event("player_blocked", {"location": HUNT_LOCATION})
 	return {"damage": through, "blocked": true, "parried": false}
+
+
+## AS1.1/AS1.3. Whether the torch is lit and how strong is entirely
+## `handheld.torch_active()`/`battery_percent()`'s call — this only paints
+## the result, so the device and the light bolted to it can never disagree
+## about whether it is on. AS2.1's "warps and distorts" gets a down payment
+## here too: a real torch on a device this beaten up does not hold perfectly
+## steady, and it should say so more as the charge that is running it drops.
+func _update_handheld_light(delta: float) -> void:
+	if handheld_light == null or not is_instance_valid(handheld_light):
+		return
+	var lit: bool = handheld.has_method("torch_active") and handheld.torch_active()
+	handheld_light.visible = lit
+	if not lit:
+		return
+	var charge: float = handheld.battery_percent() if handheld.has_method("battery_percent") else 1.0
+	var waver := 1.0 + sin(pulse * 11.0) * 0.03 * (1.0 + (1.0 - charge) * 2.5)
+	# Below a fifth of a charge it starts guttering rather than merely dimming.
+	if charge < 0.2:
+		var gutter := 1.0 if fmod(pulse * (5.0 + (0.2 - charge) * 40.0), 1.0) > 0.5 else 0.0
+		waver *= 0.7 + 0.3 * gutter
+	handheld_light.light_energy = 9.0 * charge * waver
 
 
 func _dodge() -> void:
@@ -2955,7 +2996,11 @@ func _update_hud() -> void:
 		third_person_unlock_announced = true
 		_announce_third_person_unlock()
 	title.text = "WIZARDS ONLY FOOLS // LIMBO: ASHBLOOM EXPANSE"
-	status.text = "WASD MOVE  SHIFT RUN  LMB STRIKE  5 HANDS  X GUARD  SPACE DODGE  Q SURGE\nE INTERACT  TAB INDEX  M MAP  T TREE  J ALLUSIONS  F CAMERA"
+	# I3. The second control strip is gone. `gothic_field_hud.gd` draws the one
+	# the player reads, in the game's own face, and it is contextual — this was
+	# a permanent list of every key in the game, in the engine default font,
+	# drawn on top of it.
+	status.visible = false
 	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(HUNT_ID).get("status", "dormant")).to_upper()]
 	prompt.visible = not resolution_ui.visible and not living_map.visible and not world_index.visible
 	if field_interface.has_method("set_state"):

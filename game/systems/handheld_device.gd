@@ -79,6 +79,16 @@ const DEVICE_ID := "handheld"
 var serial := 0
 var condition := 0.78
 
+## AS1.3. The status page has printed a "CELL %" readout since C1, and it
+## was `condition` under a battery's name — structural damage and charge are
+## not the same thing, and a device that has never taken a hit still runs a
+## torch down to nothing. This is the real, independent number: it drains
+## while the device is actually held up doing something (AS1.2 — that hand
+## is busy and the torch is burning charge), not while it sits closed in a
+## pocket, and it can reach zero.
+var battery := 1.0
+const BATTERY_DRAIN_PER_SECOND := 1.0 / 600.0
+
 ## Where the wear came from, in the device's own words. Kept so the status page
 ## can say "quarry impact" rather than showing a percentage.
 var wear_log: Array = []
@@ -251,12 +261,14 @@ func load_device() -> void:
 		serial = randi() % 900000 + 100000
 		condition = 0.94
 		wear_log = []
+		battery = 1.0
 		save_device()
 		return
 	serial = int(record.get("serial", 90211))
 	condition = clampf(float(record.get("condition", 0.78)), 0.0, 1.0)
 	wear_log = (record.get("wear_log", []) as Array).duplicate()
 	impacts = (record.get("impacts", []) as Array).duplicate(true)
+	battery = clampf(float(record.get("battery", 1.0)), 0.0, 1.0)
 
 
 func save_device() -> void:
@@ -266,6 +278,7 @@ func save_device() -> void:
 		"condition": snappedf(condition, 0.001),
 		"wear_log": wear_log.duplicate(),
 		"impacts": impacts.duplicate(true),
+		"battery": snappedf(battery, 0.001),
 		"kind": "object",
 	}, "device_changed")
 
@@ -302,6 +315,20 @@ func take_wear(amount: float, cause := "", impact_at := Vector2(-1, -1)) -> void
 		WorldHistory.record_event("device_damaged", {"cause": cause, "condition": snappedf(condition, 0.01)})
 	save_device()
 	queue_redraw()
+
+
+## AS1.1/AS1.5. Whether the torch should actually be lit right now, and how
+## strong — read by whoever owns the 3D light itself (`bone_yard_hunt.gd`;
+## this Control has no 3D presence of its own), so the light and the device
+## it is bolted to can never disagree about whether it is on. Dead at zero
+## charge rather than merely dim, because "can run out" (AS1.3) has to mean
+## the light actually goes out, not fade forever.
+func torch_active() -> bool:
+	return is_open and battery > 0.0
+
+
+func battery_percent() -> float:
+	return battery
 
 
 func open_device() -> void:
@@ -419,6 +446,11 @@ func stand_at(world_position: Vector2) -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	# AS1.2/AS1.3. The cost of holding it up to see: the torch and the screen
+	# both burn charge while the device is actually open, not while it sits
+	# closed in a pocket, and it is real enough to reach zero.
+	if is_open and battery > 0.0:
+		battery = maxf(0.0, battery - BATTERY_DRAIN_PER_SECOND * delta)
 	# A6.6 v2. The panel keeps failing whether or not you are looking at it,
 	# so a fault does not restart its cycle every time the device comes up.
 	panel_clock += delta
@@ -614,15 +646,16 @@ func _draw_status(rect: Rect2, alpha: float) -> void:
 			label = "NO CARRIER \u2014 NEAREST %s, %dM" % [str(carrier.get("name", "")), int(carrier.get("distance", 0.0))]
 	CellOutzType.draw_condensed(self, Vector2(strip_x + 36.0, strip_y - 9.0), label, 9.0, signal_tint * Color(1, 1, 1, 0.85 * alpha), 0.7)
 
-	# Named apart from the signal label above: both live in this function now and
-	# GDScript will not take the same `var` twice in one scope.
-	var health := clampf(condition, 0.0, 1.0)
-	var tint: Color = ALERT if health < 0.35 else MOSS
-	var cell_label := "CELL %02d%%" % roundi(health * 100.0)
+	# AS1.3. This read `condition` under a battery's name — structural damage
+	# and charge are not the same number, and a device that has never taken a
+	# hit still ran its torch down to nothing. `battery` is the real one.
+	var charge := clampf(battery, 0.0, 1.0)
+	var tint: Color = ALERT if charge < 0.35 else MOSS
+	var cell_label := "CELL %02d%%" % roundi(charge * 100.0)
 	var cell_width := CellOutzType.width_condensed(cell_label, 10.0, 0.9)
 	CellOutzType.draw_condensed(self, Vector2(rect.position.x + rect.size.x - 30 - cell_width, rect.position.y + rect.size.y - 30), cell_label, 10.0, tint * Color(1, 1, 1, alpha), 0.9)
 	for cell in 8:
-		var lit := float(cell) / 8.0 < health
+		var lit := float(cell) / 8.0 < charge
 		var bar := Rect2(Vector2(rect.position.x + rect.size.x - 150 + cell * 9.0, rect.position.y + rect.size.y - 30), Vector2(6, 11))
 		draw_rect(bar, (tint if lit else CASE_EDGE * Color(1, 1, 1, 0.3)) * Color(1, 1, 1, alpha))
 

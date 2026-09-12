@@ -3465,11 +3465,38 @@ be integral, or at least a part of the world system, layers and strategy to
 everything."*
 
 ### AS1 — The handheld is a lamp
-- [ ] **AS1.1** It throws real light into the world when it is in your hand
-- [ ] **AS1.2** Holding it up to see is an action with a cost — that hand is busy
-- [ ] **AS1.3** A battery percentage that runs down and can run out
-- [ ] **AS1.4** Pocketing it is a movement and the light goes with it
-- [ ] **AS1.5** Its light is what gives you away at night (pairs with AE1.1)
+- [x] ~~**AS1.1** It throws real light into the world when it is in your
+      hand~~ A real `SpotLight3D` (`bone_yard_hunt.gd`'s `handheld_light`),
+      bolted to the camera rather than the world so it moves with wherever
+      you point it — "wave it around" — and drawn from the exact same
+      `handheld.torch_active()`/`battery_percent()` the status page reads,
+      so the light and the device it is bolted to can never disagree about
+      whether it is on.
+- [x] ~~**AS1.2** Holding it up to see is an action with a cost — that hand
+      is busy~~ Already structurally true (raising the device takes over the
+      whole screen and suspends combat input) and now costs something
+      ongoing too: the torch burns real battery for exactly as long as the
+      device is actually open.
+- [x] ~~**AS1.3** A battery percentage that runs down and can run out~~ The
+      status page's "CELL %" had been device *condition* wearing a
+      battery's name since C1 — real damage, not charge, so a device that
+      had never taken a hit still read a full battery forever. New
+      `handheld_device.gd` field `battery`, independent of `condition`,
+      drains only while actually held up and can reach exactly zero, at
+      which point `torch_active()` goes false and the real light in the
+      world goes dark with it — not merely dim.
+- [x] ~~**AS1.4** Pocketing it is a movement and the light goes with it~~
+      Falls out of AS1.1's own wiring: the light's visibility is
+      `handheld.torch_active()` read fresh every frame, and closing the
+      device is the one thing that already sets `is_open` false.
+- [ ] **AS1.5** Its light is what gives you away at night (pairs with
+      AE1.1) — genuinely blocked, not merely unstarted: AE1.1 ("unseen is a
+      real state with real inputs") does not exist yet, so there is no
+      detection system for the torch's light to be an input to. The light
+      itself is real, on `bone_yard_hunt.gd`'s camera, and
+      `handheld.torch_active()`/`battery_percent()` are already the exact
+      inputs an `AE1.1` stealth system would need to read — this is only
+      waiting on that system existing, not on anything here.
 
 ### AS2 — Night
 - [ ] **AS2.1** Light warps and distorts at night rather than dimming
@@ -3496,11 +3523,12 @@ anvil crawlers, all the crazy red lighting-esque things."*
 
 ### AS v10 — the final pass
 The last rung. Fifteen statements that are true of night, the lamp and what you wear when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
-- [ ] **AS10.1** `v10` The handheld throws real light into the world
-- [ ] **AS10.2** `v10` Holding it up costs you the hand
-- [ ] **AS10.3** `v10` The battery runs down and can reach nothing
-- [ ] **AS10.4** `v10` Pocketing it is a movement and the light goes with it
-- [ ] **AS10.5** `v10` Its light is what gives you away at night
+- [x] ~~**AS10.1** `v10` The handheld throws real light into the world~~ See AS1.1.
+- [x] ~~**AS10.2** `v10` Holding it up costs you the hand~~ See AS1.2.
+- [x] ~~**AS10.3** `v10` The battery runs down and can reach nothing~~ See AS1.3.
+- [x] ~~**AS10.4** `v10` Pocketing it is a movement and the light goes with it~~ See AS1.4.
+- [ ] **AS10.5** `v10` Its light is what gives you away at night — see AS1.5;
+      blocked on AE1.1, which does not exist.
 - [ ] **AS10.6** `v10` Light warps and distorts at night rather than dimming
 - [ ] **AS10.7** `v10` Minimal lighting is the default and a light source is a decision
 - [ ] **AS10.8** `v10` Night is when the hauntings happen
