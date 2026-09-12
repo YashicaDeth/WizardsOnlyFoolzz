@@ -729,12 +729,7 @@ func _physics_process(delta: float) -> void:
 	# builds a third.
 	WorldClock.advance(delta)
 	_update_day_night()
-	# AS4.5. Being caught out in it costs something — stamina here, rather
-	# than a new damage type, so a storm is a real cost without touching the
-	# anatomy/wound systems a weather pass has no business reaching into.
-	if storm_weather != null and is_instance_valid(storm_weather):
-		storm_weather.follow(player)
-		stamina = clampf(stamina - storm_weather.exposure_cost(delta), 0.0, 100.0)
+	_update_storm_exposure(delta)
 	_update_altered_perception()
 	# AS1.1/AS1.3. Energy tracks the same smooth `raised` blend the device
 	# itself uses, so the light does not snap on; it hard-zeroes at empty
@@ -3164,6 +3159,24 @@ func _update_day_night() -> void:
 	# that this and a drug and a shadow realm should be one shader, not three.
 	if psychedelic != null and is_instance_valid(psychedelic):
 		psychedelic.set_dial("displacement_strength", (1.0 - daylight) * 0.02)
+
+
+## AS4.5/AS3.3. Being caught out in a real storm costs something — stamina
+## here, rather than a new damage type, so this stays a real cost without
+## reaching into the anatomy/wound systems a weather pass has no business
+## touching. AS3.3: what you are wearing is strategy, so a real layer's
+## warmth cuts a real storm's cost — applied here, not inside
+## storm_weather.gd itself, since the weather does not know or care who is
+## standing in it, only the one getting rained on does. Split out from
+## `_physics_process` (the same reason `_update_day_night` and
+## `_update_altered_perception` already are) so a test can call it directly
+## without first satisfying every earlier gate in that function.
+func _update_storm_exposure(delta: float) -> void:
+	if storm_weather == null or not is_instance_valid(storm_weather):
+		return
+	storm_weather.follow(player)
+	var warmth := float(Clothing.stats("player").get("warmth", 0.0))
+	stamina = clampf(stamina - storm_weather.exposure_cost(delta) * (1.0 - warmth), 0.0, 100.0)
 
 
 ## E6/E8. `substances.gd` and `meditation.gd` have both paid into

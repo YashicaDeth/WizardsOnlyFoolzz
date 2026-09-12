@@ -191,6 +191,15 @@ func _ready() -> void:
 		scene._update_day_night()
 		for _hold in 4:
 			await get_tree().process_frame
+	elif trigger == "clothing":
+		# AS3.4. Third-person so the coat itself is actually in frame — first
+		# person never sees the torso at all.
+		scene.third_person = true
+		Clothing.wear("player", "lead_vest")
+		scene.hunter_appearance.sync_from_clothing()
+		for _hold in 60:
+			scene._update_camera()
+			await get_tree().process_frame
 	elif trigger == "lamp":
 		# AS1.1. Raised by hand rather than by key so the shot is deterministic:
 		# `raised` is a blended value, and holding the real key for an exact

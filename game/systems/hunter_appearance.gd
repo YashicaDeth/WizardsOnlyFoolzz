@@ -49,12 +49,34 @@ func _build_feet() -> void:
 		_box(leg, "%s_Toecap" % zone_id, Vector3(side * 0.006, -0.455, -0.17), Vector3(0.125, 0.07, 0.07), Color("655b4e"), "metal")
 
 
+## AS3.4. The coat's own colour now comes from whatever layer `clothing.gd`
+## says this subject is wearing rather than one constant every body in the
+## game shared — real on the body in the ordinary camera right now, whatever
+## a not-yet-built literal mirror elsewhere in the project would also show.
 func _build_clothing() -> void:
 	var torso := rig.parts.torso as Node3D
-	_box(torso, "Coat_Front", Vector3(0, -0.06, -0.105), Vector3(0.34, 0.50, 0.045), Color("29271f"), "cloth")
-	_box(torso, "Collar_L", Vector3(-0.09, 0.24, -0.12), Vector3(0.12, 0.16, 0.035), Color("494034"), "cloth", Vector3(0, 0, -0.28))
-	_box(torso, "Collar_R", Vector3(0.085, 0.21, -0.12), Vector3(0.11, 0.20, 0.035), Color("382b28"), "cloth", Vector3(0, 0, 0.28))
+	var tint := Color(str(Clothing.stats(rig.anatomy.subject_id).get("tint", "29271f")))
+	_box(torso, "Coat_Front", Vector3(0, -0.06, -0.105), Vector3(0.34, 0.50, 0.045), tint, "cloth")
+	_box(torso, "Collar_L", Vector3(-0.09, 0.24, -0.12), Vector3(0.12, 0.16, 0.035), tint.darkened(0.18), "cloth", Vector3(0, 0, -0.28))
+	_box(torso, "Collar_R", Vector3(0.085, 0.21, -0.12), Vector3(0.11, 0.20, 0.035), tint.darkened(0.32), "cloth", Vector3(0, 0, 0.28))
 	_box(torso, "Torque_Strap", Vector3(0.08, 0.02, -0.136), Vector3(0.055, 0.56, 0.025), Color("8a4426"), "metal", Vector3(0, 0, -0.28))
+
+
+## AS3.4. For a layer worn mid-scene rather than at the moment the body was
+## first built — re-tints the same pieces `_build_clothing()` already made
+## rather than rebuilding the coat from scratch.
+func sync_from_clothing() -> void:
+	var tint := Color(str(Clothing.stats(rig.anatomy.subject_id).get("tint", "29271f")))
+	var pairs := {
+		"Coat_Front": tint,
+		"Collar_L": tint.darkened(0.18),
+		"Collar_R": tint.darkened(0.32),
+	}
+	for piece_name: String in pairs:
+		var piece := details.get(piece_name) as MeshInstance3D
+		if piece == null or piece.mesh == null:
+			continue
+		piece.mesh.material = WorldLook.surface(pairs[piece_name], "cloth", piece_name.hash())
 
 
 func _build_prosthetic_readout() -> void:

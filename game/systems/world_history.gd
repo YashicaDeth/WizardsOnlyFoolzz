@@ -290,7 +290,12 @@ func tree_alignment(target: Dictionary) -> float:
 	# somewhere to go. Enough of a career overcomes the faction you were born
 	# into, which is the whole point of "rank and lineage are not destiny".
 	var karma := clampf(float(target.get("karma", 0.0)), -1.0, 1.0)
-	return clampf(base * 0.65 + drift + karma, -1.0, 1.0)
+	# AS3.3. What you are wearing is strategy: `clothing.gd`'s wear() writes a
+	# layer's own bias straight onto the subject, the same way karma already
+	# lives here, so it reads correctly for every existing caller of this
+	# function without any of them needing to change what they pass in.
+	var clothing_bias := clampf(float(target.get("clothing_bias", 0.0)), -0.15, 0.15)
+	return clampf(base * 0.65 + drift + karma + clothing_bias, -1.0, 1.0)
 
 
 ## E1.2. What a faction charges you, decided by how far their end of the Tree
