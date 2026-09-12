@@ -730,55 +730,64 @@ what that is rather than fixing another symptom.
 - [ ] **O4.2** They retreat, circle and group rather than walking at you
 - [ ] **O4.3** A wounded enemy fights differently from a fresh one
 
-## P — The thirty-minute demo
+## P — The demo
 
-Greg, 2026-09-12: *"in the checklist the next big section needing to be added
-will be making the game a 30 minute demo seperate to the orignal version"*.
+Greg, 2026-09-12, twice, and the second time corrected the first:
 
-**Separate build, not a slice with the doors locked.** That distinction is the
-whole section. A demo made by cutting content leaks its own absence — the player
-finds the locked doors, the dead-end systems and the half-explained cosmology,
-and concludes the game is thin. A demo made as its own thing is allowed to be
-complete at its own size, and this game has an unusual advantage there: a Hunter
-who walks out of the Expanse after one job is a whole story, because the world
-was never going to explain itself anyway.
+> *"the next big section needing to be added will be making the game a 30 minute
+> demo seperate to the orignal version"*
+>
+> *"i want the demo to be a massive playable game like havker man x but edging
+> the best and funnest features then in the demo we can make a bit where the
+> game stops and its seperate to the press play in the main menu but same game
+> just a demo version would be more helpful"*
 
-Thirty minutes is the constraint. Everything below is judged against whether a
-stranger, with no explanation and no patience, reaches an ending in half an
-hour and wants the rest.
+**One build. Two doors.** The main menu offers PLAY and DEMO, and they run the
+same game out of the same executable. That is the whole architecture, and it is
+better than a separate export for the reason Greg gave: one thing to maintain,
+one thing to test, nothing to drift.
 
-### P1 — Scope: what the demo actually is
-- [ ] **P1.1** One route through the world, start to finish, that ends deliberately
-- [ ] **P1.2** The body is the centrepiece — anatomy, gore, X-ray, a real killcam
-- [ ] **P1.3** One derby, one hunt, one resolution, one theory pinned and published
-- [ ] **P1.4** The handheld, the map and the Board all reachable and all doing something
-- [ ] **P1.5** Nothing in it is a locked door or a greyed-out button
+And the demo is **not a cut-down game**. It is the game with its best hour
+pushed to the front — generous, loud, showing off — that then **stops on
+purpose**. A demo that feels thin is a demo that cut things. This one is
+supposed to feel like too much, and then end.
 
-### P2 — It is its own build
-- [ ] **P2.1** A Godot export preset for the demo, separate from the full game
-- [ ] **P2.2** A `demo` feature tag the code can branch on, set at export
-- [ ] **P2.3** Demo saves live somewhere else entirely — a demo can never touch a real save
-- [ ] **P2.4** The full game keeps building unchanged from the same repository
-- [ ] **P2.5** One command produces both, so they cannot drift apart
+### P1 — What the demo route is
+- [ ] **P1.1** A curated route through the *real* game, not a separate map
+- [ ] **P1.2** The best features front-loaded: anatomy, gore, X-ray killcam, the derby, the Board
+- [ ] **P1.3** Generous rather than careful — it should feel like a full game while it lasts
+- [ ] **P1.4** Nothing in it is a locked door or a greyed-out button
+- [ ] **P1.5** No dependence on the cosmology being understood; the Horsemen stay off-screen
 
-### P3 — The half hour
-- [ ] **P3.1** Playable within sixty seconds of launching; character creation is part of the game, not a gate
-- [ ] **P3.2** Measured, not estimated — a real run timed end to end
-- [ ] **P3.3** Nothing in it takes longer than it is worth: the second derby lap, the long walk, the third menu
-- [ ] **P3.4** It ends on something, and the ending is written into WorldHistory like any other
+### P2 — Two doors, one build
+- [ ] **P2.1** PLAY and DEMO sit side by side on the main menu
+- [ ] **P2.2** A single runtime flag distinguishes them — no second export preset
+- [ ] **P2.3** Demo saves are their own slot and can never touch a real save
+- [ ] **P2.4** Any feature the demo shows is the real feature, running the real code
+- [ ] **P2.5** Starting DEMO from the menu is one click, with no configuration in between
 
-### P4 — What a stranger needs
-- [ ] **P4.1** The controls are learnable without a tutorial screen (I0 still applies)
-- [ ] **P4.2** The first thirty seconds state the register — biopunk, cruel, funny
-- [ ] **P4.3** One moment engineered to be the thing they describe to somebody else
-- [ ] **P4.4** No dependence on the cosmology being understood; the Horsemen can stay off-screen
+### P3 — The wall
+The part that makes it a demo rather than a trial. It is a designed moment, in
+the game's own voice, not a fade to a store page.
+- [ ] **P3.1** The game stops at an authored point, deliberately and visibly
+- [ ] **P3.2** The stop is in the register — CellOutz would bill you for it
+- [ ] **P3.3** It arrives *after* a win, not in the middle of one
+- [ ] **P3.4** What the player loses by stopping is made concrete: the wall names what was next
+- [ ] **P3.5** The stop is written into WorldHistory like any other ending
+
+### P4 — The half hour
+- [ ] **P4.1** Playable within sixty seconds of launching
+- [ ] **P4.2** Measured, not estimated — a real run timed end to end
+- [ ] **P4.3** Nothing in it outstays its welcome: the second derby lap, the long walk, the third menu
+- [ ] **P4.4** One moment engineered to be the thing a player describes to somebody else
 - [ ] **P4.5** A failure state that is interesting rather than a reload
 
 ### P5 — Shipping it
 - [ ] **P5.1** Runs on a machine that is not Greg's, from a clean folder
 - [ ] **P5.2** No debug affordances, no dev keys, no placeholder text (depends on J2)
-- [ ] **P5.3** Sound is mixed and the volume sliders work (G5 — done, verify in the build)
-- [ ] **P5.4** A crash in the demo is a released crash: the last pass is playing it, not reading it
+- [ ] **P5.3** Sound mixed and the sliders working in the built game, not just in the editor
+- [ ] **P5.4** Controls learnable without a tutorial screen — I0 still applies
+- [ ] **P5.5** The last pass is playing it, not reading it
 
 ## Open questions — only you can answer these
 
