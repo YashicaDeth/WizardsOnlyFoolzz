@@ -168,6 +168,37 @@ func _ready() -> void:
 		scene._update_altered_perception()
 		for _hold in 6:
 			await get_tree().process_frame
+	elif trigger == "portrait_art":
+		var portrait: GPUParticles3D = preload("res://systems/particle_portrait.gd").new()
+		add_child(portrait)
+		portrait.position = Vector3(0, 1.6, -2.5)
+		portrait.set_source_from_art("body", 22, 56, 56)
+		portrait.set_dial("spread", 1.6)
+		portrait.set_dial("depth_scale", 0.4)
+		var cam := Camera3D.new()
+		add_child(cam)
+		cam.position = Vector3(0, 1.6, 0)
+		cam.look_at(portrait.position, Vector3.UP)
+		cam.current = true
+		for _hold in 20:
+			await get_tree().process_frame
+	elif trigger == "portrait_spirit":
+		# Third person and held: a first-person camera sits essentially
+		# inside the cloud's own origin (it is centred on the player's own
+		# body) and _update_camera() resets any manual override every
+		# physics frame regardless, the same lesson AS3.4's capture needed.
+		var target: Node3D = scene.player_rig
+		scene.third_person = true
+		var portrait: GPUParticles3D = preload("res://systems/particle_portrait.gd").new()
+		scene.add_child(portrait)
+		portrait.global_position = target.global_position
+		portrait.set_dial("spread", 1.8)
+		portrait.set_dial("depth_scale", 0.5)
+		portrait.set_dial("glitch", 0.05)
+		portrait.follow_node(target, 64, 64, Vector2i(256, 256))
+		for _hold in 60:
+			scene._update_camera()
+			await get_tree().process_frame
 	elif trigger == "storm":
 		# AS4. Force the chaos-magick level up directly rather than waiting on
 		# a ritual, then force a strike so the shot lands mid-crawl instead of
