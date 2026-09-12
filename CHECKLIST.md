@@ -1422,24 +1422,26 @@ hitpoints. `clinch_test.gd` and F7 already exist; this is the rest of it.
 Opened because O2.5 closed at v2. A fault the v2 work itself created.
 
 - [x] **O2.7** `v3` The player's windup, cooldowns, arsenal and rig animation all tick on their own scaled clock — both bodies in contact feel the freeze
-- [ ] **O2.8** `v4` Gore and chunk physics still run at full speed through a hit, so a limb can leave a body that has not moved yet
-      own cooldowns, the rig animations and the gore still run at full speed
-      during a hit they are part of. Cooldowns and rig animation are fixed:
-      `attack_cooldown`, `dodge_cooldown`, `arsenal.tick()` and `strike_windup`
-      now tick against `delta * impact_feel.scale_for("player")`, and
-      `body_motion.update()` gets the same scaled delta for its own animation
-      clock — movement itself deliberately stays on the real clock, since
-      hitstop is not meant to take your feet out from under you, only the
-      weapon and the cooldowns behind it. Gore is not: chunks are real
-      `RigidBody3D` nodes integrated by the physics server directly, and
-      slowing a specific body's physics selectively needs either a custom
-      integrator or a freeze/resume scheme, not a delta multiply — genuinely
-      bigger scope than the other two, so named rather than faked with
-      something that would look worse than doing nothing. Verified:
-      `tests/hitstop_scope_test.gd` (5 checks — cooldowns and the rig's own
-      animation clock both tick at the real rate with no hit active, and
-      both slow to `STOP_SCALE` during the player's own hitstop), plus the
-      full combat/grapple regression suite still passes.
+- [x] ~~**O2.8** `v4` Gore and chunk physics still run at full speed through
+      a hit, so a limb can leave a body that has not moved yet~~ O2.7 v3
+      explicitly named this out of scope: chunks are real `RigidBody3D`
+      nodes the physics server integrates directly, and a `delta`
+      multiply — which is all a scaled clock can offer — cannot reach that.
+      `GoreChunks.hold()`/`release()` closes it with the freeze/resume scheme
+      O2.7 v3 called for instead of faking: `hold()` (called from
+      `bone_yard_hunt.gd`'s `_physics_process` whenever `impact_feel.holding()`
+      is true) saves each live chunk's velocity and sets `RigidBody3D.freeze
+      = true`, which removes it from physics simulation entirely rather than
+      approximating a slowdown; `release()` un-freezes and hands the saved
+      velocity straight back, so a severed limb continues its arc instead of
+      stopping dead and dropping straight down. Idempotent while already
+      held, so a hold spanning several frames does not overwrite the saved
+      velocity with whatever it decayed to mid-freeze. Verified:
+      `tests/gore_hitstop_test.gd` (new, 6/6 — a chunk is actually frozen
+      rather than slowed, its velocity and spin are restored exactly on
+      release, and a repeated hold call does not double-freeze or clobber
+      the saved state), plus the existing `hitstop_scope_test.gd` (5/5)
+      regression suite.
 
 ### O v2 — the second pass
 - [x] **O2.5** `v2` Hitstop is local — the two bodies in the exchange slow, the region does not. The global clock is never touched
