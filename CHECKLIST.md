@@ -1098,7 +1098,24 @@ hitpoints. `clinch_test.gd` and F7 already exist; this is the rest of it.
 ### O v2 — the second pass
 - [ ] **O2.5** `v2` Hitstop is global `Engine.time_scale`, so your blow freezes every other fight in the region too
 - [ ] **O2.6** `v2` The guard has no direction — it holds equally against something behind you
-- [ ] **O5.10** `v2` Footing is the player's alone; enemies use the older `staggered` state, so the two bodies in a brawl run on different systems
+- [x] ~~**O5.10** `v2` Footing is the player's alone; enemies use the older
+      `staggered` state, so the two bodies in a brawl run on different
+      systems~~ Enemies now carry the same `footing` meter, recovered every
+      tick the same way. Every landed hit chips it on `response.severity`'s
+      own scale rather than only doing something once the old hard-stagger
+      threshold was crossed; a stumbling enemy cannot wind up a fresh attack
+      (the same "the guard will not hold" rule the player's own footing
+      already enforced, now on the other side); attack cycle and damage both
+      soften further while off balance, on top of what `combat_ratio()`
+      already costs them. Found the actual reason a parry "eating their own
+      commitment" never did anything: it wrote to `actor["stagger"]` and
+      `actor["cooldown"]`, and nothing anywhere ever read either field — a
+      parry cost the enemy nothing beyond the damage it already blocked. It
+      now costs real footing instead. The old binary `staggered` lock stays
+      for genuinely heavy hits; footing is the meter underneath it that used
+      to not exist. Verified: `tests/enemy_footing_test.gd` (8 checks), plus
+      the full grapple/clinch suite, `enemy_ai_test`, `combat_integration_test`
+      and `opening_test` all still pass.
 - [ ] **O5.11** `v2` Swing momentum reads the body's velocity and ignores where the weapon was actually pointed
 - [ ] **O3.5** `v2` Nothing a body wears or has grown changes what a blow does to it — armour and plating are not in the resolution at all
 

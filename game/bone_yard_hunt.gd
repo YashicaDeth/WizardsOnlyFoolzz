@@ -906,7 +906,14 @@ func _resolve_firearm(attack: Dictionary) -> void:
 		# heavier than the same cleaver through a thigh.
 		var zone_id := str(result.get("zone", "torso"))
 		var zone_max: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone_id, {}) as Dictionary).get("health", 100.0))
-		impact_feel.strike(float(attack.get("damage", 0.0)) / maxf(zone_max, 1.0), str(attack.get("damage_type", "cut")), bool(result.get("severed", false)))
+		impact_feel.strike(
+			float(attack.get("damage", 0.0)) / maxf(zone_max, 1.0),
+			str(attack.get("damage_type", "cut")),
+			bool(result.get("severed", false)),
+			# O2.5 v2. Only the two of you are in this. Everyone else in the
+			# region keeps fighting at full speed.
+			["player", str(actor.subject_id)]
+		)
 		if actor.rig != null and is_instance_valid(actor.rig):
 			actor.rig.favour_injuries()
 	for id in impacts:
@@ -1570,6 +1577,10 @@ func _update_encounter_actors(delta: float) -> void:
 	var melee_slot_taken := _melee_slot_taken()
 	for index in range(encounter_actors.size() - 1, -1, -1):
 		var actor: Dictionary = encounter_actors[index]
+		# O2.5 v2. Each body runs on its own clock during a hit: the one that was
+		# struck slows, the rest of the region does not notice. Named apart from
+		# `actor_delta` because GDScript will not let a local shadow a parameter.
+		var actor_delta: float = delta * impact_feel.scale_for(str(actor.get("subject_id", "")))
 		var node := actor.get("node") as Node3D
 		var anatomy: Node = actor.get("anatomy") as Node
 		if node == null or not is_instance_valid(node) or anatomy == null:
@@ -1578,6 +1589,10 @@ func _update_encounter_actors(delta: float) -> void:
 		if anatomy.dead and not bool(actor.get("dead", false)):
 			_kill_encounter_actor(index, "bleed_out")
 			continue
+		# O5.10 v2. Recovers regardless of state, same as the player's own —
+		# standing in a stagger is still standing, and balance comes back on
+		# its own rather than only when the fight lets up.
+		actor["footing"] = clampf(_actor_footing(actor) + FOOTING_RECOVERY * actor_delta, 0.0, 1.0)
 		if anatomy.downed:
 			(node as CharacterBody3D).velocity = Vector3.ZERO
 			actor.attack_time = 0.0
@@ -1588,7 +1603,7 @@ func _update_encounter_actors(delta: float) -> void:
 				prompt.text = "[E] %s / DOWNED, ALIVE — DECIDE THEIR FATE" % str(actor.display_name).to_upper()
 			continue
 		if str(actor.get("state", "")) == "staggered":
-			actor["stagger_remaining"] = maxf(0.0, float(actor.get("stagger_remaining", 0.0)) - delta)
+			actor["stagger_remaining"] = maxf(0.0, float(actor.get("stagger_remaining", 0.0)) - actor_delta)
 			(node as CharacterBody3D).velocity = Vector3.ZERO
 			actor.attack_time = 0.0
 			if float(actor.stagger_remaining) <= 0.0:
@@ -1601,12 +1616,12 @@ func _update_encounter_actors(delta: float) -> void:
 		offset.y = 0
 		var distance := offset.length()
 		if str(actor.get("state", "idle")) == "maimed":
-			actor["maimed_remaining"] = maxf(0.0, float(actor.get("maimed_remaining", 0.0)) - delta)
+			actor["maimed_remaining"] = maxf(0.0, float(actor.get("maimed_remaining", 0.0)) - actor_delta)
 			if float(actor.maimed_remaining) <= 0.0:
 				actor.state = "hunting"
 		if str(actor.get("state", "idle")) == "fleeing":
 			var away := -offset.normalized() if distance > 0.1 else Vector3.FORWARD
-			_move_actor_on_route(actor, node.global_position + away * 40.0, delta)
+			_move_actor_on_route(actor, node.global_position + away * 40.0, actor_delta)
 			if distance > 72.0:
 				misfire_director.resolve(str(actor.get("encounter_id", "")), "escaped")
 				WorldHistory.update_subject(str(actor.subject_id), {"status": "escaped", "memory": "Escaped the Hunter while bleeding.", "anatomy_state": anatomy.call("snapshot")}, "npc_escaped_bleeding")
@@ -1627,21 +1642,24 @@ func _update_encounter_actors(delta: float) -> void:
 				# which is why it spiralled straight into the player instead
 				# of settling into orbit.
 				var start_angle := fposmod(float(hash(str(actor.get("subject_id", index)))), TAU)
-				actor["orbit_angle"] = fposmod(float(actor.get("orbit_angle", start_angle)) + delta * 0.15, TAU)
+				actor["orbit_angle"] = fposmod(float(actor.get("orbit_angle", start_angle)) + actor_delta * 0.15, TAU)
 				# Wider than the stand-off actually needs to read at, because the
 				# route itself only ever lands on a 2 m pathfinding grid cell —
 				# a tight radius rounds down into the same ring it is meant to
 				# avoid often enough to be the whole bug again.
 				var orbit_point := player + Vector3(cos(actor.orbit_angle), 0, sin(actor.orbit_angle)) * 6.5
-				_move_actor_on_route(actor, orbit_point, delta)
+				_move_actor_on_route(actor, orbit_point, actor_delta)
 			else:
-				_move_actor_on_route(actor, player, delta)
-		elif distance <= 3.0:
+				_move_actor_on_route(actor, player, actor_delta)
+		elif distance <= 3.0 and not _actor_stumbling(actor):
 			# O4.1. A player mid-swing cannot cancel or guard, so an enemy who
 			# is actually watching presses that opening instead of ticking down
 			# on its own clock regardless of what you just committed to.
+			# O5.10 v2. A stumbling fighter cannot wind up an attack at all —
+			# the same "the guard will not hold" rule the player's own footing
+			# already enforces, on the other side of the fight.
 			var pressing := 2.2 if strike_windup >= 0.0 else 1.0
-			actor["attack_time"] = float(actor.get("attack_time", 0.0)) + delta * pressing
+			actor["attack_time"] = float(actor.get("attack_time", 0.0)) + actor_delta * pressing
 			var attack_cycle := _actor_attack_cycle(actor)
 			if float(actor.attack_time) > attack_cycle * 0.57:
 				prompt.text = "%s RAISES THEIR WEAPON" % str(actor.display_name).to_upper()
@@ -1654,9 +1672,11 @@ func _update_encounter_actors(delta: float) -> void:
 					var incoming := float(_actor_attack_damage(actor))
 					var guarded: Dictionary = guard_absorb(incoming)
 					if bool(guarded.get("parried", false)):
-						# The attacker eats their own commitment.
-						actor["stagger"] = 0.85
-						actor["cooldown"] = maxf(float(actor.get("cooldown", 0.0)), 1.1)
+						# The attacker eats their own commitment. This wrote to
+						# "stagger" and "cooldown" — neither of which anything
+						# ever read — so a parry cost the enemy nothing beyond
+						# the damage it already blocked. Real footing loss now.
+						_actor_lose_footing(actor, 0.45, "%s LOSES THEIR FOOTING // PRESS THE OPENING" % str(actor.display_name).to_upper())
 					health = maxi(1, health - roundi(float(guarded.get("damage", incoming))))
 					_wound_player(node.global_position, maxf(5.0, 15.0 * _actor_combat_ratio(actor)), "cut")
 
@@ -1664,6 +1684,34 @@ func _update_encounter_actors(delta: float) -> void:
 func _actor_combat_ratio(actor: Dictionary) -> float:
 	var anatomy := actor.get("anatomy") as AnatomyComponent
 	return anatomy.combat_ratio() if anatomy != null else 1.0
+
+
+## O5.10 v2. Enemies had the older binary `staggered` lock and nothing else —
+## a hit either interrupted them outright or left no mark on their poise at
+## all. The player has had a continuous `footing` meter since O5.7 that whiffs,
+## blocks and shoves all chip away at, with real consequences below
+## `STUMBLE_AT` rather than a fixed lockout window. Same meter, same constants,
+## now on both bodies in the fight rather than one.
+func _actor_footing(actor: Dictionary) -> float:
+	return float(actor.get("footing", 1.0))
+
+
+func _actor_stumbling(actor: Dictionary) -> bool:
+	return _actor_footing(actor) < STUMBLE_AT
+
+
+func _actor_lose_footing(actor: Dictionary, amount: float, reason := "") -> void:
+	var before := _actor_footing(actor)
+	actor["footing"] = clampf(before - amount, 0.0, 1.0)
+	if before >= STUMBLE_AT and float(actor.footing) < STUMBLE_AT:
+		# The moment it goes, not the ongoing state, is the one worth a beat —
+		# the player gets the same treatment in lose_footing().
+		var node := actor.get("node") as Node3D
+		if node != null and is_instance_valid(node):
+			(node as CharacterBody3D).velocity = Vector3.ZERO
+		actor.attack_time = 0.0
+		if not reason.is_empty():
+			prompt.text = reason
 
 
 ## O3.1. What fraction of a body is actually still standing, read off every
@@ -1684,15 +1732,23 @@ func _rig_health_ratio(rig: BaselineHuman) -> float:
 
 
 func _actor_attack_cycle(actor: Dictionary) -> float:
-	return lerpf(2.4, 1.4, _actor_combat_ratio(actor))
+	# O5.10 v2. Off-balance on top of whatever their arms already cost them —
+	# a fighter who is barely standing winds up slower than their combat_ratio
+	# alone would say, the same way a player who is stumbling swings softer.
+	return lerpf(2.4, 1.4, _actor_combat_ratio(actor)) * lerpf(1.6, 1.0, _actor_footing(actor))
 
 
 func _actor_attack_damage(actor: Dictionary) -> int:
-	return maxi(2, roundi(9.0 * _actor_combat_ratio(actor)))
+	return maxi(2, roundi(9.0 * _actor_combat_ratio(actor) * lerpf(0.55, 1.0, _actor_footing(actor))))
 
 
 func _apply_combat_response(actor: Dictionary, attack: Dictionary, hit: Dictionary) -> void:
 	var response := COMBAT_RESPONSE.from_hit(attack, actor.anatomy, hit)
+	# O5.10 v2. Every landed hit costs footing on its own scale — this used to
+	# leave no mark at all below the stagger threshold, so a fighter chipped
+	# by three medium blows fought exactly as well as one who had taken none,
+	# right up until the fourth one crossed the line.
+	_actor_lose_footing(actor, clampf(float(response.severity) / COMBAT_RESPONSE.STAGGER_THRESHOLD * 0.3, 0.05, 0.5))
 	if not bool(response.staggered):
 		return
 	actor.state = "staggered"
