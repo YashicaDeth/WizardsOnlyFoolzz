@@ -105,6 +105,21 @@
   LISTENING reads "THREE AND NO ANSWER" after three executions and "SEVEN. HE
   WATCHED ALL OF THEM" after seven. The board never announces the change. The
   card simply says something else the next time it is opened.
+- **E3: camera rites are actions, not forms.** The camera already stored what
+  was genuinely in frame and how each body was damaged; it now files that
+  evidence against a real ritual definition the instant the picture is taken.
+  The first definition is Greg's worked example: one frame containing five
+  *distinct* dead bodies with destroyed heads. It is deliberately a compound
+  per-body check — five dead intact bodies plus five living destroyed heads do
+  not pass it. A completed rite preserves the exact photo snapshot in world
+  history, emits one completion event, and cannot be paid twice by resubmitting
+  it. Older photographs reconcile when the new RITUAL page is opened, because
+  evidence remains evidence after the task that wanted it is added. The page is
+  an iris with real proof sockets and **N / RECORD EVIDENCE**, not a claim
+  button. `ritual_test` verifies repeated-body rejection, same-body composite
+  matching, completion persistence, one-time completion, and old-album
+  reconciliation; `camera_test` remains green.
+
 - **F5.3: captivity has an ugly exit.** A shackled, stamped or conscripted
   player can deliberately die and be re-decanted from the tar. Everything in
   CARRY is forfeited to the captor, while currency, identity, character sheet,

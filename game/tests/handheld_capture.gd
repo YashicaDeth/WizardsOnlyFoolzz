@@ -71,7 +71,7 @@ func _ready() -> void:
 		device.carry.take_chunk({"layer_name": "bone", "zone": "right_arm", "subject_id": "mara_voss"})
 	device.carry.items[0]["age"] = 300.0
 
-	for mode in ["INDEX", "MAP", "RADIO", "CARRY", "WIRE"]:
+	for mode in ["INDEX", "MAP", "RADIO", "CARRY", "RITUAL", "WIRE"]:
 		device.set_mode(mode)
 		if mode == "RADIO":
 			device.radio.khz = 88.6

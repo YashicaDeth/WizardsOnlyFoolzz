@@ -3569,38 +3569,52 @@ be integral, or at least a part of the world system, layers and strategy to
 everything."*
 
 ### AS1 — The handheld is a lamp
+Built twice in parallel (this session's own AS1 pass and a second
+implementation merged in from `agent-b`) and reconciled into one: the
+`SpotLight3D`/position/shadow framing is this pass's, the battery's
+drain-*and*-recharge economy, `LAMP_RANGE`/`light_radius()` hook and
+`is_lit()` naming are `agent-b`'s — kept as the more complete design.
+`torch_active()`/`battery_percent()` survive as aliases over `is_lit()`/
+`battery` so neither side's call sites had to change, one condition
+underneath either name.
 - [x] ~~**AS1.1** It throws real light into the world when it is in your
-      hand~~ A real `SpotLight3D` (`bone_yard_hunt.gd`'s `handheld_light`),
+      hand~~ A real `SpotLight3D` (`bone_yard_hunt.gd`'s `handheld_lamp`),
       bolted to the camera rather than the world so it moves with wherever
-      you point it — "wave it around" — and drawn from the exact same
-      `handheld.torch_active()`/`battery_percent()` the status page reads,
-      so the light and the device it is bolted to can never disagree about
-      whether it is on.
+      you point it — "wave it around" — off-centre and angled the way a
+      phone actually sits in a raised hand, casting real shadows. Driven
+      entirely off `handheld.is_lit()`/`battery`, so the light and the
+      device it is bolted to can never disagree about whether it is on.
 - [x] ~~**AS1.2** Holding it up to see is an action with a cost — that hand
       is busy~~ Already structurally true (raising the device takes over the
       whole screen and suspends combat input) and now costs something
-      ongoing too: the torch burns real battery for exactly as long as the
-      device is actually open.
+      ongoing too: the torch burns real battery for as long as the device
+      is actually raised (`raised > 0.5`, not merely `is_open`, so the cost
+      tracks the same smooth blend the device's own raise animation uses).
 - [x] ~~**AS1.3** A battery percentage that runs down and can run out~~ The
       status page's "CELL %" had been device *condition* wearing a
       battery's name since C1 — real damage, not charge, so a device that
-      had never taken a hit still read a full battery forever. New
-      `handheld_device.gd` field `battery`, independent of `condition`,
-      drains only while actually held up and can reach exactly zero, at
-      which point `torch_active()` goes false and the real light in the
-      world goes dark with it — not merely dim.
+      had never taken a hit still read a full battery forever. `battery`,
+      independent of `condition`, drains while raised and *recharges* while
+      pocketed (roughly four times slower than it drains — letting go is
+      relief, not an instant refill), and can reach exactly zero, at which
+      point `is_lit()` goes false and the real light in the world goes dark
+      with it — not merely dim.
 - [x] ~~**AS1.4** Pocketing it is a movement and the light goes with it~~
-      Falls out of AS1.1's own wiring: the light's visibility is
-      `handheld.torch_active()` read fresh every frame, and closing the
-      device is the one thing that already sets `is_open` false.
+      Falls out of AS1.1's own wiring: the light's energy is read fresh off
+      `is_lit()`/`battery` every frame, and lowering the device is the one
+      thing that already drops `raised` below the lit threshold.
 - [ ] **AS1.5** Its light is what gives you away at night (pairs with
       AE1.1) — genuinely blocked, not merely unstarted: AE1.1 ("unseen is a
       real state with real inputs") does not exist yet, so there is no
-      detection system for the torch's light to be an input to. The light
-      itself is real, on `bone_yard_hunt.gd`'s camera, and
-      `handheld.torch_active()`/`battery_percent()` are already the exact
-      inputs an `AE1.1` stealth system would need to read — this is only
-      waiting on that system existing, not on anything here.
+      detection system for the torch's light to be an input to. The hook
+      is real and ready — `light_radius()` returns `LAMP_RANGE` while lit
+      and `0.0` otherwise, the exact shape an `AE1.1` stealth check would
+      need to read — this is only waiting on that system existing.
+      Verified: `tests/handheld_battery_test.gd` (14 checks) plus
+      `tests/day_night_test.gd` and `tests/psychedelic_rig_test.gd`
+      (unrelated systems merged in alongside this, both still green), and
+      the full `opening_test.gd`/`combat_integration_test.gd` regression
+      suite.
 
 ### AS2 — Night
 - [ ] **AS2.1** Light warps and distorts at night rather than dimming
