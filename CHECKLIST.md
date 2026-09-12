@@ -450,8 +450,34 @@ under-directed opening.
       `pin_board_v2_test.gd` regression suites, and a before/after windowed
       capture (`captures/d2_4_v2_clerical_before.png` /
       `d2_4_v2_clerical_after.png`).
-- [ ] **D7.4** `v2` The mirror lies the same way every time; the lie should fit the body
-- [ ] **D8.5** `v2` Declining a modifier is the harder difficulty and the game never acknowledges it
+- [x] ~~**D7.4** `v2` The mirror lies the same way every time; the lie should
+      fit the body~~ The wobble was four universal constants — every
+      character's mirror distorted with the exact same waveform regardless
+      of what was on the sheet. `_mirror_distortion()` reads real data
+      instead: race's own `build` factor damps the amplitude, the chosen
+      skeleton sets rigidity (plated/dense barely move, hollow swims), and
+      race shifts the wobble's phase so two races do not only differ in size
+      but in how they actually distort. Deterministic per sheet — the same
+      character lies the same way twice, which is still the point.
+      Verified: `tests/intake_body_test.gd` (new, part of a 6/6 suite shared
+      with D8.5 v2) plus a side-by-side windowed capture
+      (`captures/d7_4_v2_mirror_plated.png` / `d7_4_v2_mirror_hollow.png`)
+      showing a plated Roadborn's near-still silhouette against a
+      hollow-skeleton Unreset's visibly irregular one.
+- [x] ~~**D8.5** `v2` Declining a modifier is the harder difficulty and the
+      game never acknowledges it~~ A modifier absent from `sheet.modifiers`
+      read identically whether it was actively refused or simply never
+      offered — there was no fact anywhere distinguishing "chose the hard
+      way" from "there was no choice". `apply_to_world()` now records which
+      modifiers were declined onto the sheet itself and, the same way N2.2
+      already acknowledges an overspent build, as a real `modifiers_declined`
+      WorldHistory event naming the player — which surfaces automatically in
+      `world_index.gd`'s existing "WHAT THE WORLD RECORDED" section with no
+      new UI needed, since that section already lists any event mentioning
+      the subject. Verified: `tests/intake_body_test.gd` (new, 6/6 total —
+      the sheet records exactly the declined set and excludes the one
+      actually signed for, and a real event names the player and what they
+      declined).
 
 ## E — The two ladders
 

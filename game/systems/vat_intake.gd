@@ -414,6 +414,25 @@ func _draw_schedule(rect: Rect2, ink: Color, y: float) -> void:
 		y += 42.0
 
 
+## D7.4 v2. The wobble used to be four universal constants — every character's
+## mirror lied with the exact same waveform regardless of what was actually on
+## the sheet. This reads real data instead: `build` (how heavy the race runs)
+## damps the wobble, and the skeleton choice sets how rigid the silhouette
+## reads — a plated or dense skeleton barely moves, a hollow one swims. Race
+## also shifts the wobble's phase, so two characters of different races are
+## not only sized differently but actually distort differently.
+func _mirror_distortion() -> Dictionary:
+	var race_data: Dictionary = CharacterSheet.RACES.get(sheet.race, CharacterSheet.RACES.decanted)
+	var build := float(race_data.get("build", 1.0))
+	var rigidity: float = {"standard": 1.0, "dense": 0.55, "hollow": 1.7, "plated": 0.4}.get(str(sheet.under_skin.get("skeleton", "standard")), 1.0)
+	var scale := rigidity / maxf(0.4, build)
+	return {
+		"amplitude": 0.06 * scale,
+		"amplitude2": 0.04 * scale,
+		"phase": float(hash(sheet.race) % 1000) * 0.001 * TAU,
+	}
+
+
 ## D7. A mirror on a swing arm, and the face in it is not quite yours yet.
 func _draw_mirror(rect: Rect2) -> void:
 	var arm_from := Vector2(rect.position.x - 40, rect.position.y - 30)
@@ -428,10 +447,12 @@ func _draw_mirror(rect: Rect2) -> void:
 	var centre := rect.position + rect.size * Vector2(0.5, 0.44)
 	var radius := rect.size.x * 0.30
 	var setting := float(sheet.appearance.get("face", 0.5))
+	var distortion := _mirror_distortion()
+	var phase: float = distortion.phase
 	var points := PackedVector2Array()
 	for index in 30:
 		var angle := TAU * float(index) / 30.0
-		var wobble := 1.0 + sin(angle * 3.0 + elapsed * 1.3) * 0.06 + sin(angle * 5.0 - elapsed * 0.9) * 0.04
+		var wobble := 1.0 + sin(angle * 3.0 + elapsed * 1.3 + phase) * float(distortion.amplitude) + sin(angle * 5.0 - elapsed * 0.9 + phase) * float(distortion.amplitude2)
 		var jaw := 1.0 + cos(angle) * (setting - 0.5) * 0.28
 		points.append(centre + Vector2(sin(angle) * radius * wobble * jaw, -cos(angle) * radius * 1.22 * wobble))
 	draw_colored_polygon(points, Color(0.42, 0.33, 0.29, 0.55))

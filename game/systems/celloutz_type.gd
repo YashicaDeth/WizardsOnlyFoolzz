@@ -94,10 +94,110 @@ const GLYPHS := {
 const CONDENSED := 0.68
 
 
+## A1.6 v2. Kerning.
+##
+## Every letter sat on the 6-unit grid and took the same advance, which is what a
+## stencil plate does and what a typeface must not: `AV` and `TA` open a hole you
+## can see from across the room, because two diagonals leaning away from each
+## other leave a triangle of white that the flat advance does nothing about.
+##
+## The usual fix is a hand-built table of pairs. That is the wrong tool here —
+## the glyphs are stroke data in this file and they get edited, so a table would
+## be a second description of the letterforms that silently goes out of date the
+## first time somebody moves a vertex.
+##
+## So this measures instead. For a pair, the face is cut into horizontal bands;
+## in each band it finds how far right the left glyph actually reaches and how
+## far left the right glyph actually starts, and the pair closes by the smallest
+## clearance any band has — down to a floor, so letters touch but never collide.
+## Optical kerning, derived from the letterforms themselves, correct by
+## construction whenever a glyph changes.
+
+## Bands down the cap height. Eight is enough to catch a diagonal without paying
+## for resolution nobody can see.
+const KERN_BANDS := 8
+## The white that must survive between two letters, in grid units. Below this the
+## face stops reading as cut metal and starts reading as a ligature.
+const KERN_CLEARANCE := 1.15
+## No pair closes by more than this, whatever the measurement says. `L` followed
+## by a full stop would otherwise close almost the entire advance.
+const KERN_LIMIT := 2.1
+
+static var _kern_cache: Dictionary = {}
+static var _edge_cache: Dictionary = {}
+
+
+## Per band: how far right this glyph reaches, and how far left it starts.
+## -1 in a band means the glyph has nothing at that height at all, which is the
+## case that produces the big holes and the case a flat advance cannot see.
+static func _edges(glyph: String) -> Array:
+	if _edge_cache.has(glyph):
+		return _edge_cache[glyph]
+	var rightmost := []
+	var leftmost := []
+	for _band in KERN_BANDS:
+		rightmost.append(-1.0)
+		leftmost.append(-1.0)
+	if GLYPHS.has(glyph):
+		for stroke in GLYPHS[glyph]:
+			# Sample along each segment rather than only at its vertices: a
+			# diagonal's midpoint is exactly what needs measuring and there is
+			# no vertex there.
+			for index in range(stroke.size() - 1):
+				var from := Vector2(float(stroke[index][0]), float(stroke[index][1]))
+				var to := Vector2(float(stroke[index + 1][0]), float(stroke[index + 1][1]))
+				var steps := maxi(2, ceili(from.distance_to(to) * 2.0))
+				for step in steps + 1:
+					var point := from.lerp(to, float(step) / float(steps))
+					var band := clampi(floori(point.y / GRID.y * float(KERN_BANDS)), 0, KERN_BANDS - 1)
+					if rightmost[band] < 0.0 or point.x > rightmost[band]:
+						rightmost[band] = point.x
+					if leftmost[band] < 0.0 or point.x < leftmost[band]:
+						leftmost[band] = point.x
+	var edges := [rightmost, leftmost]
+	_edge_cache[glyph] = edges
+	return edges
+
+
+## How much to pull `right` toward `left`, in grid units.
+static func kern(left: String, right: String) -> float:
+	if left.is_empty() or right.is_empty():
+		return 0.0
+	var key := left + right
+	if _kern_cache.has(key):
+		return _kern_cache[key]
+	var closable := KERN_LIMIT
+	var touching := false
+	var left_edges: Array = _edges(left)
+	var right_edges: Array = _edges(right)
+	for band in KERN_BANDS:
+		var reach: float = left_edges[0][band]
+		var start: float = right_edges[1][band]
+		# A band where either glyph has no ink cannot constrain the pair — which
+		# is precisely why AV closes: at the top A has nothing on its right and
+		# at the bottom V has nothing on its left, and no band has both.
+		if reach < 0.0 or start < 0.0:
+			continue
+		touching = true
+		var gap := (GRID.x - reach) + start
+		closable = minf(closable, maxf(gap - KERN_CLEARANCE, 0.0))
+	if not touching:
+		# Two glyphs that never share a band at all — a space, mostly. Leave the
+		# advance alone rather than collapsing the word.
+		closable = 0.0
+	_kern_cache[key] = closable
+	return closable
+
+
 static func width(text: String, cap_height: float, tracking := 0.0, stretch := 1.0) -> float:
 	var scale := cap_height / GRID.y
 	var advance := GRID.x * scale * stretch + cap_height * 0.26 + tracking
-	return maxf(0.0, float(text.length()) * advance - (cap_height * 0.26 + tracking))
+	var total := float(text.length()) * advance - (cap_height * 0.26 + tracking)
+	# A1.6 v2. Measurement has to agree with drawing or every right-aligned
+	# readout in the game drifts by however much the kerning closed.
+	for index in range(1, text.length()):
+		total -= kern(text.substr(index - 1, 1).to_upper(), text.substr(index, 1).to_upper()) * scale * stretch
+	return maxf(0.0, total)
 
 
 ## Draws `text` with its cap line at `at.y` and its left edge at `at.x`.
@@ -107,8 +207,13 @@ static func draw_text(canvas: CanvasItem, at: Vector2, text: String, cap_height:
 	var thickness := weight if weight > 0.0 else maxf(1.0, cap_height * 0.13)
 	var advance := GRID.x * scale * stretch + cap_height * 0.26 + tracking
 	var cursor := at.x
+	var previous := ""
 	for index in text.length():
 		var glyph := text.substr(index, 1).to_upper()
+		# A1.6 v2. Close the pair before setting the letter, not after.
+		if not previous.is_empty():
+			cursor -= kern(previous, glyph) * scale * stretch
+		previous = glyph
 		if GLYPHS.has(glyph):
 			for stroke in GLYPHS[glyph]:
 				var points := PackedVector2Array()
@@ -153,8 +258,13 @@ static func draw_worn(canvas: CanvasItem, at: Vector2, text: String, cap_height:
 	rng.seed = hash(text) & 0x7fffffff
 	var wander := cap_height * 0.09 * damage
 	var cursor := at.x
+	var previous := ""
 	for index in text.length():
 		var glyph := text.substr(index, 1).to_upper()
+		# A1.6 v2. Close the pair before setting the letter, not after.
+		if not previous.is_empty():
+			cursor -= kern(previous, glyph) * scale * stretch
+		previous = glyph
 		if GLYPHS.has(glyph):
 			for stroke in GLYPHS[glyph]:
 				# Walk the stroke as segments rather than drawing it whole, so a

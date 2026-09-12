@@ -448,8 +448,25 @@ func apply_to_world() -> Dictionary:
 	# §13's pillar pointed at the player's own record.
 	if traits.has("clerical_error"):
 		state = _mistranscribe(state)
+	# D8.5 v2. D8.4 made declining a modifier the harder road, and the intake
+	# scene gives a decline its own beat (D8.3) — but that beat plays once,
+	# in the tank, and nothing after it ever knew you had taken the harder
+	# road. A modifier absent from `modifiers` reads identically whether it
+	# was actively refused or simply never offered; there was no fact
+	# anywhere that distinguished "chose the hard way" from "there was no
+	# choice". Recorded the same way N2.2 acknowledges an overspent build —
+	# a real event in the world's own register — so it surfaces wherever
+	# anything else naming the player does, `world_index.gd`'s FILE page
+	# included, with no new UI required.
+	var declined: Array = []
+	for key in MODIFIERS.keys():
+		if not modifiers.has(str(key)):
+			declined.append(str(key))
+	state["declined_modifiers"] = declined
 	WorldHistory.register_subject("player", state)
 	WorldHistory.update_subject("player", state, "sheet_filed")
+	if not declined.is_empty():
+		WorldHistory.record_event("modifiers_declined", {"subject": "player", "declined": declined})
 	# N2.2. Achievement-run register, not an error dialog: the event names
 	# the run broken and says so by how much, in the same voice as any other
 	# record the world keeps.
