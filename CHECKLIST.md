@@ -27,6 +27,23 @@ The convention:
 - A segment can go up a version without being reopened. Going *down* is not a
   thing; if something breaks, that is a bug, not a version.
 - Unbuilt segments have no version. They are not v0 — they are nothing yet.
+- **Closing a version opens the next one.** When `vN` is ticked, `vN+1` is
+  written before the session ends, with its reason. A mechanic is never finished,
+  only current. This is the ratchet Greg asked for: *"when they do a1v2 then
+  make a v3 until maybe 10 or 9"*.
+- **v9 is the ceiling.** Not because a mechanic cannot improve past it, but
+  because a system with no end condition is a treadmill. Anything still earning
+  versions at v9 is the best thing in the game and should be left alone.
+- **Each version is built on the one before it.** `vN+1` addresses what `vN`
+  actually produced or exposed — never a fresh idea that could have been done at
+  v1. Greg: *"it improves and can only get made off its own previous v2 versions
+  getting better and better."* If a fault existed before `vN`, it belongs at the
+  version that introduced it, not bolted onto the newest one. This is what stops
+  the ladder becoming a wish list with numbers on it.
+- The ratchet has one guard, and it is the whole reason it does not become
+  noise: **a version that cannot state a real fault is not written.** If the
+  next pass has nothing to fix, the segment stops there and that is a finished
+  mechanic, which is allowed.
 
 Written as `v3 —` immediately after the code, with the passes listed under it.
 
@@ -303,6 +320,14 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 - [x] **C2.6** `v2` F1-F5 reach a page directly; cycling is how you learn the device, not how you use one you know
 - [x] **C5.5** `v2` Cracks seeded from the device's own serial, at its real condition rather than a constant 0.85
 
+### C v3 — the third pass
+Opened because C1.8, C2.6 and C5.5 closed at v2. Each entry is a fault the v2
+work created or exposed, not a wish.
+
+- [ ] **C1.9** `v3` Wear is only visible on the screen you are reading; the device in your hand looks new from the outside
+- [ ] **C2.7** `v3` Direct page access exists and nothing ever teaches it — a control nobody discovers is a control nobody has
+- [ ] **C5.6** `v3` Cracks are per-device but still radiate from one authored origin; an impact should crack the glass where it landed
+
 ## D — Character creation in the vat
 
 **Races are D4.** Full design in `DESIGN/CHARACTER_CREATION.md`. Also fixes the
@@ -361,6 +386,13 @@ under-directed opening.
 - [ ] **D2.4** `v2` CLERICAL ERROR is never discoverable — finding out which part of your sheet is wrong should be possible and should cost something
 - [ ] **D7.4** `v2` The mirror lies the same way every time; the lie should fit the body
 - [ ] **D8.5** `v2` Declining a modifier is the harder difficulty and the game never acknowledges it
+
+### O v2 — the second pass
+- [ ] **O2.5** `v2` Hitstop is global `Engine.time_scale`, so your blow freezes every other fight in the region too
+- [ ] **O2.6** `v2` The guard has no direction — it holds equally against something behind you
+- [ ] **O5.10** `v2` Footing is the player's alone; enemies use the older `staggered` state, so the two bodies in a brawl run on different systems
+- [ ] **O5.11** `v2` Swing momentum reads the body's velocity and ignores where the weapon was actually pointed
+- [ ] **O3.5** `v2` Nothing a body wears or has grown changes what a blow does to it — armour and plating are not in the resolution at all
 
 ## E — The two ladders
 
@@ -676,6 +708,13 @@ holds what the *player* thinks — which is allowed to be wrong.
 - [x] **L5.1** Routes across the board are the progression
 - [x] **L5.2** No quest list exists anywhere in the game
 
+### L v2 — the second pass
+- [ ] **L1.5** `v2` Strings pass straight through cards rather than round them, so a crowded wall reads as scribble
+- [ ] **L2.6** `v2` Nothing limits pinning, so the wall can never fill up — and a wall that cannot fill up has no cost to using
+- [ ] **L3.5** `v2` A string you drew and later disproved stays exactly as convincing; there is no way to look back and see which claims were wrong
+- [ ] **L4.4** `v2` A published theory cannot be amended or withdrawn, which makes publishing a one-way door rather than a position
+- [ ] **L1.6** `v2` The board never ages. Paper yellows, pins rust, and a wall you have not touched in a week should say so
+
 ## G7 — Exposure at the spawn
 
 Measured 2026-09-12 while chasing two near-black captures of Hunt Grounds.
@@ -766,6 +805,13 @@ finished. Applies to everything below and to A5, A6, C1.
 - [x] **I6.3** Make the contrast obvious enough to read as a joke
 
 ---
+
+### I v2 — the second pass
+- [ ] **I1.4** `v2` The stencil is now used for body copy it was never drawn for — long paragraphs in a display face are hard to read and the warning card already knew that
+- [ ] **I5.2** `v2` Links are collected during `_draw` and exist nowhere else, so nothing but the paint loop can ask what is on screen
+- [ ] **I0.10** `v2` Panels are hosted at one fixed size inside the handheld; a map you cannot lean into is a picture of a map
+- [ ] **I1.5** `v2` Code rain runs on screens that have not earned it — it is the substrate for the Wire, not decoration for every page
+- [ ] **I4.3** `v2` Vitality degrades the panels uniformly; a specific wound should damage a specific part of what you are reading
 
 ## J — Infrastructure
 
