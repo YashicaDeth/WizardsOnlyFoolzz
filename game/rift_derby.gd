@@ -37,6 +37,7 @@ const PIT_RADIO := preload("res://systems/pit_radio.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
 const SILHOUETTE := preload("res://systems/silhouette.gd")
 const INTERIOR := preload("res://systems/vehicle_interior.gd")
+const KEYS_CARD := preload("res://systems/keys_card.gd")
 ## Matches the collider box in arcade_vehicle.gd's `_ready()`. Not read off
 ## the chassis at spawn time because the collider is built in `_ready()` too,
 ## so the shape does not exist yet on the frame the car is instanced.
@@ -83,6 +84,8 @@ var aim_pitch := 0.0
 ## 1 as the body leaves the car.
 var climbing_out := 0.0
 var leaving_on_foot := false
+## AG3.5. What can be pressed, when somebody asks.
+var keys_card: Control
 var _cab_seat := Vector3.ZERO
 var fire_cooldown := 0.0
 var rounds_left := 12
@@ -121,6 +124,29 @@ func _ready() -> void:
 	world_index = WORLD_INDEX.new()
 	world_index.name = "WorldIndexPanel"
 	$HUD.add_child(world_index)
+	# AG3.5. "Nothing in the derby says what any key does." The status line names
+	# three of them and the other six were folded into a sentence nobody reads
+	# while a wrecker is coming at them.
+	keys_card = KEYS_CARD.new()
+	keys_card.name = "KeysCard"
+	$HUD.add_child(keys_card)
+	keys_card.configure("F1", [
+		{"group": "DRIVING", "rows": [
+			["WASD", "DRIVE"],
+			["MOUSE", "AIM THE GUN"],
+			["F", "CAB / CHASE VIEW"],
+		]},
+		{"group": "THE GUN", "rows": [
+			["LMB", "FIRE FROM THE CAB"],
+			["R", "RELOAD"],
+		]},
+		{"group": "GETTING OUT", "rows": [
+			["E", "CLIMB OUT OF THE CAR"],
+			["ENTER", "ACCEPT THE RESULT"],
+			["I", "WORLD INDEX"],
+			["ESC", "RELEASE THE MOUSE"],
+		]},
+	])
 	# Outcome text is event-only. The portrait, radar, hull schematic and corner
 	# telemetry were rejected; the skiff now sheds its own panels instead.
 	# AG3.2. The cab needs the pointer, because aiming is a thing you do with it.
@@ -172,6 +198,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				world_index.open()
 			else:
 				world_index.close()
+		elif event.keycode == KEY_F1:
+			keys_card.toggle()
 		elif event.keycode == KEY_E:
 			_begin_climbing_out()
 		elif event.keycode == KEY_ENTER and round_state in ["won", "lost"]:

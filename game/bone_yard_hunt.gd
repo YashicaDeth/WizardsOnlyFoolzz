@@ -41,6 +41,7 @@ const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
+const KEYS_CARD := preload("res://systems/keys_card.gd")
 ## AS1.1. Bright enough to actually read as a light source against
 ## `world_look.gd`'s low-ambient presets rather than a glow nobody would notice.
 const HANDHELD_LAMP_ENERGY := 6.0
@@ -248,6 +249,8 @@ var handheld: Control
 ## FINAL_V.md §16. The one screen-space layer AS2's night warp, and later the
 ## drugs and shadow realms, all reach for instead of building their own effect.
 var psychedelic: Control
+## AG2. What can be pressed, when somebody asks.
+var keys_card: Control
 ## AS1.1. The one real light the handheld throws into the world. Lives on the
 ## camera rather than on `handheld` itself — `handheld` is a `Control`, drawn
 ## in the HUD layer, and has nothing to attach a `Light3D` to.
@@ -432,6 +435,10 @@ func _ready() -> void:
 	psychedelic = PSYCHEDELIC_RIG.new()
 	psychedelic.name = "Psychedelic"
 	$HUD.add_child(psychedelic)
+	keys_card = KEYS_CARD.new()
+	keys_card.name = "KeysCard"
+	$HUD.add_child(keys_card)
+	_build_keys_card()
 	_order_hud_layers()
 	voice_channel = preload("res://systems/proximity_voice.gd").new()
 	voice_channel.name = "ProximityVoice"
@@ -710,7 +717,16 @@ func _unhandled_input(event: InputEvent) -> void:
 					body_motion.set_perspective(not third_person)
 					_update_camera()
 			# C2.6 v2. Straight to a page, for somebody who knows the device.
-			KEY_F1: handheld.jump_to_mode(0)
+			#
+			# AG2. F1 is the key somebody who does *not* know it will press, so
+			# it opens the keys card unless the device is actually up — the same
+			# rule Tab already runs on: the handheld owns its function keys
+			# while it is raised, and nothing else while it is pocketed.
+			KEY_F1:
+				if handheld.is_open:
+					handheld.jump_to_mode(0)
+				else:
+					keys_card.toggle()
 			KEY_F2: handheld.jump_to_mode(1)
 			KEY_F3: handheld.jump_to_mode(2)
 			KEY_F4: handheld.jump_to_mode(3)
@@ -3149,6 +3165,57 @@ func _announce_third_person_unlock() -> void:
 		impact_feel.kick += Vector2(0, -1.0) * 0.05
 		impact_feel.shake = maxf(impact_feel.shake, 0.6)
 	WorldHistory.record_event("third_person_unlocked", {"location": HUNT_LOCATION})
+
+
+## AG2. The card's contents, written here rather than inside the card, because
+## this scene is the only thing that knows what this scene binds. A card that
+## held its own table would go stale the first time a key moved and nobody would
+## find out until a playtester could not find the Board again.
+##
+## Grouped by what the player is trying to do, not by keyboard row. The Board is
+## in here by name because AG2.1 is specifically that nobody — including Greg —
+## could remember it existed, and holding B is in here because AG2.2 is
+## specifically that the wheel teaches itself to nobody.
+func _build_keys_card() -> void:
+	keys_card.configure("F1", [
+		{"group": "MOVING", "rows": [
+			["WASD", "MOVE"],
+			["SHIFT", "SPRINT"],
+			["CTRL", "CROUCH"],
+			["SPACE", "JUMP / VAULT / DODGE"],
+			["F", "FIRST / THIRD PERSON"],
+		]},
+		{"group": "FIGHTING", "rows": [
+			["LMB", "ATTACK"],
+			["RMB", "HEAVY"],
+			["HOLD X", "GUARD"],
+			["Z", "LOCK ON"],
+			["WHEEL", "CYCLE TARGET"],
+			["1 2 3", "SWORD / SHOTGUN / PISTOL"],
+			["4", "CARRIED LIMB"],
+			["5", "PUT THEM DOWN"],
+			["R", "RELOAD"],
+			["HOLD B", "X-RAY, THEN THE WHEEL"],
+		]},
+		{"group": "HANDS ON", "rows": [
+			["E", "INTERACT"],
+			["C", "GRAPPLE"],
+			["V", "PERSUADE"],
+			["X", "THREATEN"],
+			["H", "EXTRACTION"],
+			["N", "PHOTOGRAPH"],
+		]},
+		{"group": "WHAT YOU CARRY", "rows": [
+			["G", "THE DEVICE"],
+			["TAB", "WORLD INDEX"],
+			["M", "LIVING MAP"],
+			["T", "CHARACTER TREE"],
+			["P", "THE BOARD"],
+			["J", "ALLUSIONS / SIGIL"],
+			["HOLD L", "LEAN INTO THE SCREEN"],
+			["ESC", "CLOSE"],
+		]},
+	])
 
 
 ## Which of the HUD's children are lens and which are interface.

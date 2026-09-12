@@ -162,7 +162,16 @@ func _condition_of(part: Dictionary) -> float:
 	var kind := str(part.get("kind", ""))
 	var part_zone := str(part.get("zone", "torso"))
 	if kind == "organ":
-		var organs: Dictionary = anatomy.get("organs", {})
+		# Typed through a Variant rather than assigned straight into a
+		# `Dictionary`, and the reason is a real crash: `character_sheet.gd`
+		# used to publish a String under this key, so the moment the player had
+		# a sheet this line threw — from inside `_draw`, once per frame, which
+		# is what reads as the panel crashing rather than as one bad field. The
+		# sheet now writes `organ_set` instead, and this stays defensive because
+		# the cost is one check and the failure mode is the whole index going
+		# down while somebody is looking at it.
+		var organs_field: Variant = anatomy.get("organs", {})
+		var organs: Dictionary = organs_field if organs_field is Dictionary else {}
 		var organ: Dictionary = organs.get(str(part.id), {})
 		if not organ.is_empty():
 			if bool(organ.get("ruptured", false)):

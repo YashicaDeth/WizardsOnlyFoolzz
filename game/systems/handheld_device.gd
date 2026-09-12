@@ -498,8 +498,7 @@ func _process(delta: float) -> void:
 	_index.visible = showing_index
 	_map.visible = mode == "MAP"
 	if showing_index:
-		_index.size = _clip.size
-		_index.position = Vector2.ZERO
+		_fit_into_aperture(_index)
 		# The index normally owns the screen and draws its own cursor; inside the
 		# device the chassis is the frame, so it is told not to chase the mouse.
 		if "cursor_follows_mouse" in _index:
@@ -507,8 +506,7 @@ func _process(delta: float) -> void:
 		if "show_cursor" in _index:
 			_index.set("show_cursor", false)
 	if _map.visible:
-		_map.size = _clip.size
-		_map.position = Vector2.ZERO
+		_fit_into_aperture(_map)
 
 	carry.age(delta)
 	# You hear the receiver when you are holding it up and it is the thing you
@@ -1157,3 +1155,27 @@ func _wrap(text: String, width: int) -> Array:
 	if line != "":
 		out.append(line)
 	return out
+
+
+## Sized and scaled, not squashed.
+##
+## Both hosted panels were being handed `_clip.size` as their own size, which
+## meant the World Index laid itself out for a 1074x515 letterbox using
+## measurements authored against a 1280x720 screen. Widths mostly survived that;
+## heights did not, which is why the file page's body text ran straight through
+## the footer strip and the bottom of the plate was cut off by the aperture.
+##
+## The panel is given the size it was designed for — the viewport's, so the
+## hosted panel and the fullscreen one are the *same* layout rather than two
+## that have to be kept in agreement — and then scaled down to fit inside the
+## aperture, letterboxed on whichever axis has room left over. A screen you are
+## holding at arm's length should read as the same document, smaller. It should
+## not read as the same document with its margins eaten.
+func _fit_into_aperture(panel: Control) -> void:
+	var design := get_viewport_rect().size
+	if design.x <= 1.0 or design.y <= 1.0:
+		design = Vector2(1280, 720)
+	panel.size = design
+	var fit := minf(_clip.size.x / design.x, _clip.size.y / design.y)
+	panel.scale = Vector2(fit, fit)
+	panel.position = (_clip.size - design * fit) * 0.5
