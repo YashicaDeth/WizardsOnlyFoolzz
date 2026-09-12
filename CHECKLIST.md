@@ -879,7 +879,23 @@ finished. Applies to everything below and to A5, A6, C1.
 ### I v2 — the second pass
 - [ ] **I1.4** `v2` The stencil is now used for body copy it was never drawn for — long paragraphs in a display face are hard to read and the warning card already knew that
 - [x] **I5.3** `v2` The rail is pointable — click a row to select it, hover to see where a click would land
-- [ ] **I5.2** `v2` Links are collected during `_draw` and exist nowhere else, so nothing but the paint loop can ask what is on screen
+- [x] ~~**I5.2** `v2` Links are collected during `_draw` and exist nowhere
+      else, so nothing but the paint loop can ask what is on screen~~
+      `_link_rects` was rebuilt as a side effect of `_draw_file`/`_draw_post`
+      every paint and thrown away — a click arriving before the first frame
+      had drawn read an empty list, and nothing but the renderer could ever
+      ask what was pointable. `_rebuild_links()` now runs from `_process()`
+      instead, reading the same layout through two new pure functions
+      (`_file_link_rows`, `_wire_link_rows`) that compute rects with no
+      draw_* calls attached, and `_panel_rect()` so the FILE/WIRE panel
+      bounds are derived once instead of copied between `_draw()` and the
+      new pass. `_draw()` now reads `_link_rects` instead of building it.
+      Verified: `tests/index_link_rebuild_test.gd` (new, 5/5 — proves
+      `_process()` alone populates real wound/implant links with no `_draw()`
+      call in between, and that switching to a link-less page clears rather
+      than leaves stale entries), plus the existing `tests/link_test.gd`
+      (10/10) and a windowed capture confirming FILE and WIRE render
+      identically to before.
 - [ ] **I0.10** `v2` Panels are hosted at one fixed size inside the handheld; a map you cannot lean into is a picture of a map
 - [x] ~~**I1.5** `v2` Code rain runs on screens that have not earned it — it
       is the substrate for the Wire, not decoration for every page~~ The
@@ -1782,6 +1798,225 @@ The theme of the whole session, and it is a design fault rather than his.
 - [ ] **AG2.2** Nothing teaches the weapon wheel — Greg had to guess *"i think its holding b?"*
 - [ ] **AG2.3** *"press buttons probably"* is the current discovery mechanism for every panel
 - [ ] **AG2.4** The first-person HUD must say what can be pressed (AD2.3)
+
+### AG3 - The derby, second playtest
+Greg, in the seat: *"the derby thing is so whack rn no hud or hull not
+progressing out of the car animation no shooting through first person no
+direction of controls"*. All four are real and all four are the same mistake.
+
+`rift_derby.gd:_ready` contains, in order, `status.visible = false`,
+`score_label.visible = false` and `rival_label.visible = false`, with a comment
+saying the hull is read off the car instead. I0 said *no screen is a list of
+text in a box*; it got applied as *no information*, which is not the same
+sentence. And `vehicle_interior.gd` - the cab, the wheel, the gun hand, the
+windscreen, the whole of M2 - is instantiated by **nothing but its own capture
+test**. It was ticked on the strength of a screenshot and never wired to the
+game.
+
+- [x] **AG3.1** The readouts come back, as instruments in the binnacle rather than corner plates - `dash_cluster.gd`
+- [ ] **AG3.2** The camera goes in the cab. M2 was built and never wired to anything
+- [ ] **AG3.3** Getting out of the car is something you watch happen, not a scene swap on E
+- [ ] **AG3.4** You can shoot through your own windscreen, and the glass keeps the holes
+- [ ] **AG3.5** Nothing in the derby says what any key does - the first thing AH has to fix
+
+## AH - The Cloud, and the room you remember it from
+
+Greg: *"the black mirror is crazy... i want you to make it a room on the phone
+somewhat, when you check the pinboard then you can be in a room with a massive
+mirror on the wall and a bed, and then you can turn to the conspiracy quest
+board, and then to your right you can look into like a neuralink or some cloud
+connect thing and see the tutorial like a cloud software and its like 'remember
+the cloud' and you repair the fragments of the cloud of archival information
+which is the tutorial software parts"*.
+
+This is the answer to all of AG2 and it is a far better answer than a tooltip.
+**The tutorial is a place, and getting it is a mechanic.** You do not read help;
+you recover it, fragment by fragment, out of a thing that used to know
+everything and has been decaying since before you arrived.
+
+### AH1 - The room
+- [ ] **AH1.1** Opening the Board puts you in a room rather than on a screen
+- [ ] **AH1.2** A bed, a mirror the size of the wall, and the light of one window
+- [ ] **AH1.3** Turn to the wall and the Board is there - the corkboard already built (L)
+- [ ] **AH1.4** Turn right and the cloud terminal is there
+- [ ] **AH1.5** The mirror shows your body, current, with everything done to it (pairs with N)
+- [ ] **AH1.6** The room is yours and it accumulates - what you leave in it stays
+- [ ] **AH1.7** Leaving is a movement, not a menu close
+
+### AH2 - REMEMBER THE CLOUD
+- [ ] **AH2.1** The cloud is an archive of everything the world used to know, in fragments
+- [ ] **AH2.2** A fragment is repaired, not unlocked - the verb is restoration
+- [ ] **AH2.3** Repairing one costs something the player actually has
+- [ ] **AH2.4** What you recover is a real game mechanic explained, not lore
+- [ ] **AH2.5** The archive is visibly incomplete forever - you never finish it
+- [ ] **AH2.6** It talks like cloud software written by people who are now dead
+
+### AH3 - The tutorial web
+Greg: *"a big node web tutorial that slowly gets unlocked alongside the board...
+a little CRT TV animation and its curved on the TV of the game mechanic as a
+little video with a description + it shows the controls"*.
+- [ ] **AH3.1** A node web, not a list - the connections mean something
+- [ ] **AH3.2** Each node is a CRT set, curved, with scanlines and a real tube falloff
+- [ ] **AH3.3** The screen plays the mechanic as a short loop, drawn rather than recorded
+- [ ] **AH3.4** Under it: what it is, in one paragraph, in the game's voice
+- [ ] **AH3.5** And the keys, which is the part AG2 was actually asking for
+- [ ] **AH3.6** Nodes unlock alongside the Board, from what you have actually done
+- [ ] **AH3.7** A locked node shows static and the shape of what is missing
+- [ ] **AH3.8** Every mechanic in the game has a node, including ones you have not met
+
+## AI - The pyramid, and what is under it
+
+Greg sent three reference charts - the occult hierarchy pyramid, *Hierarchy of
+the Old World*, and the gods/demigods/mortals stack - with one instruction:
+*"the pyramid structure in the tab map and everything needs to be rework with
+this inspiration... also the pyramids should be like upside down and then up
+top"*.
+
+Two pyramids meeting at a point. Upright above, inverted below. **As above, so
+below** - which is not decoration here, it is the two-axis system the game
+already has: AA hands a holding to the ascent or to corruption, and those are
+the two cones. The player stands at the waist, where they touch.
+
+### AI1 - The shape
+- [ ] **AI1.1** The Tree page becomes a double pyramid, upright above and inverted below
+- [ ] **AI1.2** The waist is where the player is, and it is the only tier you occupy
+- [ ] **AI1.3** Tiers are drawn as strata with real edges, not a list with indentation
+- [ ] **AI1.4** The upper cone is the ascent: what is above you and what it demands
+- [ ] **AI1.5** The lower cone is corruption: what is under you and what it is owed
+- [ ] **AI1.6** Density carries meaning - the base is crowded, the apex is one thing
+- [ ] **AI1.7** Legible at a glance and rewarding an hour of reading; the references do both
+
+### AI2 - What it charts
+- [ ] **AI2.1** Every tier is populated from WorldHistory, not authored - who is actually above you
+- [ ] **AI2.2** Factions sit where their power is, and they move
+- [ ] **AI2.3** Your own position is computed, and it changes
+- [ ] **AI2.4** The Board's theories pin onto the pyramid - the two charts are one document
+- [ ] **AI2.5** Satire aims at institutions and never at congregations
+- [ ] **AI2.6** Marginalia in the corners, the way the references carry it
+
+## AJ - Chaos magick, v2
+
+Greg: *"the magic system using sigils and the new and improved chaos magick v2,
+name work in progress, but a sigil and magic system app or whatever
+intertwined... a magic system through the game or inbuilt progress of skills
+that within the magic its kind of a playground for ideas, and if we built a
+perfect magic system it would be insanely cool, and the occult influence being
+based off real world everything would be sick, especially with getting modern
+gods that are worshipped"*.
+
+`celloutz_type.gd` already carries `seal_strokes`, `draw_seal`,
+`draw_seal_forming`, `draw_seal_corrupted` and `draw_seal_burning` - a complete
+procedural sigil engine that has only ever drawn decoration. This section points
+it at a mechanic.
+
+Why chaos magick is the right tradition to build on rather than an invented one:
+**sigilisation is already a procedure.** State the intent, strip the repeating
+letters, condense what is left into a glyph, charge it, forget it. Five real
+steps, which are five real game verbs, and not one of them had to be made up.
+
+### AJ1 - Making a sigil
+- [ ] **AJ1.1** State an intent, in the player's own words
+- [ ] **AJ1.2** The letters are stripped and condensed on screen - you watch it become a glyph
+- [ ] **AJ1.3** The glyph is deterministic from the intent: the same words make the same sigil, always
+- [ ] **AJ1.4** Charging costs something real - blood, stamina, a drug, a death
+- [ ] **AJ1.5** Forgetting is mechanical: a charged sigil you keep looking at does not fire
+- [ ] **AJ1.6** It goes into the world as an object - scratched, burned, carried or worn
+
+### AJ2 - What a sigil does
+- [ ] **AJ2.1** Effects come from the intent, parsed, not from a spell list
+- [ ] **AJ2.2** A sigil can fail, and a failed one leaves something behind
+- [ ] **AJ2.3** The same glyph gets stronger the more it has worked
+- [ ] **AJ2.4** Other people's sigils exist in the world and can be read, defaced or stolen
+- [ ] **AJ2.5** Corruption is what happens when you charge more than you can carry (AI1.5)
+
+### AJ3 - Modern gods
+- [ ] **AJ3.1** The gods of this world are what is actually worshipped: markets, metrics, engagement, brands
+- [ ] **AJ3.2** A god is a real entity in WorldHistory with attention, not a flavour label
+- [ ] **AJ3.3** Worship is measurable and it is what feeds the upper cone (AI1.4)
+- [ ] **AJ3.4** Naming a god in an intent gets their attention, which is not always wanted
+- [ ] **AJ3.5** The target is always the institution, never the congregation
+
+### AJ4 - Magic as progression
+- [ ] **AJ4.1** Skill is what you have actually done, read off the record
+- [ ] **AJ4.2** No skill tree - the pyramid (AI) is the tree, and you climb it
+- [ ] **AJ4.3** A practice you stop practising decays
+- [ ] **AJ4.4** Every system in the game is reachable through a sigil, badly
+- [ ] **AJ4.5** The playground rule: the system should surprise its own author
+
+## AK - The agency that owns the sky
+
+Greg: *"maps like this and insane esoteric knowledge would be really cool, again
+linking back to the satellite and map part, but i wanted to add a satanic or
+evil version of NASA that owns your phone's satellite app and you have to do
+things on the map too for them or against them to change the map"*, with the
+*Great Awakening* chart attached as the register to aim at - and then,
+immediately after: *"not as much qanon shit but just black magick ect and chaos
+magick"*. That second message is the one that governs. What is worth taking
+from those charts is the **density**: hand-lettered, unsourced, confident,
+thousands of connections drawn by somebody who was certain. What is not worth
+taking is the payload - the named-people accusations and the trafficking
+material, which is somebody's real-world harm rather than a game's texture. So
+the chart look stays and the subject becomes the occult: black magick, chaos
+magick, and an agency that treats both as procurement.
+
+This is the missing owner of A10. The satellite view works and belongs to
+nobody, which makes it a feature rather than a relationship. Give it a landlord
+and every map interaction becomes a transaction with something that is watching
+you back.
+
+### AK1 - Whose satellite it is
+- [ ] **AK1.1** The satellite app has an owner, named, with a logo and a licence agreement
+- [ ] **AK1.2** They see what you see - using the map is being seen using the map
+- [ ] **AK1.3** Standing with them is a real quantity and it moves
+- [ ] **AK1.4** They give you work, on the map, and the work changes the map
+- [ ] **AK1.5** You can work against them, and the sky gets worse for you when you do
+- [ ] **AK1.6** Losing them costs the satellite: back to a paper chart (A10 degrades, it does not vanish)
+- [ ] **AK1.7** They are an institution and the satire stays pointed at institutions
+
+### AK2 - The esoteric chart register
+- [ ] **AK2.1** Their briefings read like the charts: dense, hand-lettered, confident, unsourced
+- [ ] **AK2.2** Some of what they tell you is true, and the game never says which
+- [ ] **AK2.3** Their claims pin onto the Board like anybody else's (L)
+- [ ] **AK2.4** Their version of the world sits on the pyramid, near the top (AI2.1)
+- [ ] **AK2.5** Two records: what the satellite saw, and what they published about it
+- [ ] **AK2.6** The subject is occult, never the real-world conspiracy canon it borrows its density from
+
+## AL - The bank, and what runs under the street
+
+Greg: *"same with the ingame bank system and having underground sewer and tunnel
+networks alluding to trafficking and global conspiracys are really cool"* -
+read alongside his correction one message later, *"not as much qanon shit but
+just black magick ect and chaos magick"*.
+
+Taken together the brief is clear, and the game already has the honest version
+of it. **This world's contraband is bodies, and that is not an allegation, it is
+the economy the game has been running since B.** CARRY holds organs. The Choir
+prices them. Liens are debts secured against parts of people. A bank in this
+world is not a metaphor for anything - it is the institution that writes those
+liens, and the tunnels are how the collateral moves.
+
+So: no real-world trafficking allegory. The tunnels serve the organ trade the
+game already simulates, the bank is the institution that made that trade
+legitimate, and the conspiracy is the ordinary one - an institution doing
+paperwork over things that used to be people.
+
+### AL1 - The bank
+- [ ] **AL1.1** Money exists as a real quantity with a real issuer
+- [ ] **AL1.2** The bank writes the liens the Choir already prices (CARRY, B)
+- [ ] **AL1.3** A debt is secured against something of yours, named, and they will take it
+- [ ] **AL1.4** Accounts, in a building, that you can walk into and rob
+- [ ] **AL1.5** Interest accrues in game time, and it does not stop while you are away
+- [ ] **AL1.6** They are an institution: the satire lands on the paperwork, not on debtors
+- [ ] **AL1.7** Default has a collector, and the collector is a person with a body (F)
+
+### AL2 - The network under it
+- [ ] **AL2.1** A sewer and tunnel layer under the region, connected and navigable
+- [ ] **AL2.2** It is how the collateral moves - the organ trade has a route
+- [ ] **AL2.3** Entrances are found, not marked: a grate you noticed is a route you own
+- [ ] **AL2.4** Down there the satellite cannot see you (AK1.2), which is the point
+- [ ] **AL2.5** It connects holdings that are not connected above ground (AA)
+- [ ] **AL2.6** Raiding a vault from underneath is the best version of AB3
+- [ ] **AL2.7** Sound behaves differently down there, and the game lets you hear that (G)
 
 ## Open questions — only you can answer these
 

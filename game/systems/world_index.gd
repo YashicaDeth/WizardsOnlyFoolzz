@@ -243,6 +243,7 @@ func _process(delta: float) -> void:
 	rail_scroll = Motion.approach(rail_scroll, rail_scroll_target, delta, Motion.SCROLL)
 	if cursor_follows_mouse:
 		cursor_at = get_global_mouse_position()
+	_rebuild_links()
 	queue_redraw()
 
 
@@ -533,6 +534,105 @@ func _selected() -> Dictionary:
 	return _rail_cache[clampi(rail_index, 0, _rail_cache.size() - 1)]
 
 
+## I5.2 v2. `_link_rects` used to exist only as a side effect of the FILE and
+## WIRE draw passes — the layout that decides what is clickable was
+## recomputed every paint and thrown away straight after, so nothing but the
+## paint loop could ever ask what was currently on screen. A click arriving
+## before the first frame had drawn read an empty list, and there was no way
+## for anything else — a test, a tooltip, an accessibility pass — to find out
+## what was pointable without forcing a redraw and waiting on one.
+##
+## Pulled into its own pass, called from `_process()` so the list is current
+## every frame regardless of whether a redraw actually happened, using
+## `_panel_rect()`'s own layout math rather than duplicating it — `_draw()`
+## reads `_link_rects` instead of building it now.
+func _rebuild_links() -> void:
+	_link_rects.clear()
+	match page:
+		0:
+			var entry := _selected()
+			if not entry.is_empty():
+				_link_rects.append_array(_file_link_rows(_panel_rect(), WorldHistory.subject(str(entry.id))))
+		2:
+			_link_rects.append_array(_wire_link_rows(_panel_rect()))
+
+
+## The FILE/PYRAMID/WIRE/BODY content rect, exactly as `_draw()` derives it
+## from the current viewport — pulled out so `_rebuild_links()` can ask the
+## same question `_draw()` does without drawing anything.
+func _panel_rect() -> Rect2:
+	var viewport := size
+	if viewport.x < 640.0 or viewport.y < 400.0:
+		viewport = get_viewport_rect().size
+	if viewport.x < 640.0 or viewport.y < 400.0:
+		return Rect2()
+	var plate := Rect2(Vector2(54, 44), viewport - Vector2(108, 88))
+	var body := Rect2(plate.position + Vector2(22, 122), plate.size - Vector2(44, 176))
+	return Rect2(body.position + Vector2(262, 0), body.size - Vector2(262, 0))
+
+
+## The wound and implant rows `_draw_file` prints down its right column,
+## as plain layout with no drawing attached — the same row heights and
+## offsets `_draw_file` paints against, kept in the one place instead of two.
+func _file_link_rows(rect: Rect2, subject: Dictionary) -> Array:
+	if rect.size == Vector2.ZERO or subject.is_empty():
+		return []
+	var right_x := rect.position.x + rect.size.x * 0.60
+	var right_width := rect.size.x * 0.40
+	var rows: Array = []
+	var wy := rect.position.y + 130.0 + 36.0
+	var condition := str(subject.get("injury", ""))
+	var lines: Array = []
+	if condition != "" and condition != "none":
+		lines.append(condition)
+	for wound in subject.get("wounds", []):
+		var wound_label := WoundCatalog.label(wound)
+		if not lines.has(wound_label):
+			lines.append(wound_label)
+	if lines.is_empty():
+		lines.append("no recorded damage")
+	for line in lines:
+		var wound_row := Rect2(right_x - 4, wy - 12, right_width, 17)
+		if str(line) != "no recorded damage":
+			rows.append({"kind": "wound", "id": str(line), "rect": wound_row})
+		wy += 17.0
+	var anatomy: Dictionary = subject.get("anatomy_state", subject.get("anatomy", {}))
+	var cybernetics := ImplantCatalog.list(anatomy.get("cybernetics", []))
+	if not cybernetics.is_empty():
+		wy += 18.0 + 36.0
+		for part in cybernetics:
+			var part_row := Rect2(right_x - 4, wy - 12, right_width, 17)
+			rows.append({"kind": "implant", "id": str(part.name), "zone": str(part.get("zone", "torso")), "rect": part_row})
+			wy += 17.0
+	return rows
+
+
+## The author row above every post in the feed `_draw_wire`/`_draw_post`
+## print — the click target for I5.4. Uses the same font measurement
+## `_draw_post` does, which is a resource query rather than a draw call, so
+## it is exactly as safe to run outside the paint loop as inside it.
+func _wire_link_rows(rect: Rect2) -> Array:
+	if rect.size == Vector2.ZERO or wire == null:
+		return []
+	var font := ThemeDB.fallback_font
+	var split := rect.size.x * 0.46
+	var feed := Rect2(rect.position + Vector2(split + 16, 0), Vector2(rect.size.x - split - 16, rect.size.y))
+	var rows: Array = []
+	var y := feed.position.y + 34.0 - feed_scroll
+	for post: Dictionary in posts:
+		if y + 62.0 > feed.position.y + feed.size.y:
+			break
+		if y > feed.position.y + 20.0:
+			var author := str(post.get("author", "")).to_upper()
+			var author_width: float = font.get_string_size(author, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+			var author_row := Rect2(feed.position.x + 10, y - 11, author_width + 8.0, 15)
+			var post_subject := str(post.get("subject_id", post.get("author_id", "")))
+			if not post_subject.is_empty():
+				rows.append({"kind": "account", "id": post_subject, "rect": author_row})
+		y += 80.0
+	return rows
+
+
 # --- drawing ---------------------------------------------------------------
 
 func _draw() -> void:
@@ -570,7 +670,9 @@ func _draw() -> void:
 	_draw_header(plate)
 	var body := Rect2(plate.position + Vector2(22, 122), plate.size - Vector2(44, 176))
 	var rail := Rect2(body.position, Vector2(246, body.size.y))
-	var panel := Rect2(body.position + Vector2(262, 0), body.size - Vector2(262, 0))
+	# Same layout `_panel_rect()` derives independently for `_rebuild_links()`
+	# — read from there rather than recomputed twice so the two can never drift.
+	var panel := _panel_rect()
 	_draw_rail(rail)
 	# Ease-out on the incoming page, offset along the direction of travel. The
 	# transform is pushed rather than every draw call being offset by hand, so
@@ -578,7 +680,9 @@ func _draw() -> void:
 	var eased := 1.0 - pow(1.0 - clampf(page_blend, 0.0, 1.0), 3.0)
 	var slide := (1.0 - eased) * page_direction * 46.0
 	draw_set_transform(Vector2(slide, 0.0), 0.0, Vector2.ONE)
-	_link_rects.clear()
+	# I5.2 v2. No longer cleared here — `_rebuild_links()` (called from
+	# `_process()`) owns `_link_rects` now, so it stays valid between frames
+	# instead of only existing for the instant this draw call is on the stack.
 	match page:
 		0:
 			_draw_file(panel)
@@ -882,7 +986,9 @@ func _draw_file(rect: Rect2) -> void:
 		var wound_row := Rect2(right_x - 4, wy - 12, right_width, 17)
 		var wound_hot := wound_row.has_point(cursor_at)
 		if str(line) != "no recorded damage":
-			_link_rects.append({"kind": "wound", "id": str(line), "rect": wound_row})
+			# I5.2 v2. No longer appended here — `_file_link_rows()` (read by
+			# `_rebuild_links()`) already put this exact rect in `_link_rects`
+			# this frame, from the same math.
 			if wound_hot:
 				draw_rect(wound_row, HOT * Color(1, 1, 1, 0.10))
 		draw_string(font, Vector2(right_x, wy), "— %s" % str(line), HORIZONTAL_ALIGNMENT_LEFT, right_width, 12, HOT * Color(1, 1, 1, 1.0 if wound_hot else 0.9))
@@ -897,7 +1003,7 @@ func _draw_file(rect: Rect2) -> void:
 		for part in cybernetics:
 			var part_row := Rect2(right_x - 4, wy - 12, right_width, 17)
 			var part_hot := part_row.has_point(cursor_at)
-			_link_rects.append({"kind": "implant", "id": str(part.name), "zone": str(part.get("zone", "torso")), "rect": part_row})
+			# I5.2 v2. Already in `_link_rects` via `_file_link_rows()`.
 			if part_hot:
 				draw_rect(part_row, BRUISE * Color(1, 1, 1, 0.14))
 			draw_string(font, Vector2(right_x, wy), "+ %s  %03d%%" % [str(part.name), roundi(float(part.condition) / maxf(1.0, float(part.max_condition)) * 100.0)], HORIZONTAL_ALIGNMENT_LEFT, right_width, 12, BRUISE.lerp(INK, 0.8 if part_hot else 0.55))
@@ -1244,7 +1350,7 @@ func _draw_post(feed: Rect2, post: Dictionary, y: float) -> void:
 	var author_hot := author_row.has_point(cursor_at)
 	var post_subject := str(post.get("subject_id", post.get("author_id", "")))
 	if not post_subject.is_empty():
-		_link_rects.append({"kind": "account", "id": post_subject, "rect": author_row})
+		# I5.2 v2. Already in `_link_rects` via `_wire_link_rows()`.
 		if author_hot:
 			draw_rect(author_row, tone * Color(1, 1, 1, 0.12))
 	draw_string(font, Vector2(feed.position.x + 12, y), author, HORIZONTAL_ALIGNMENT_LEFT, feed.size.x - 110, 11, tone * Color(1, 1, 1, 1.0 if author_hot else 0.88))
