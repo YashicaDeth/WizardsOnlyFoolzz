@@ -350,6 +350,23 @@ Ascent/Descent axis that already exists and is currently unused.
 ### E6 — Drugs
 - [x] **E6.1** Substances with real body cost through the anatomy component — `systems/substances.gd`: Marrow Dust, Choir Bloom and Static Hymn, each an Ashbloom-native thing (ground bone, a fungal graft, dead-mast feedback — non-negotiable 1, nothing renamed off a real drug), paying into the same `anatomy_state` ledger `boons.gd` already pays into
 - [ ] **E6.2** Preparation and consumption minigames (UI; not attempted here)
+
+### E8 — Sitting still
+Greg, 2026-09-12: *"with the stamina and health a meditation or psychedelic drug
+part should be apart of it"*. E6 built the substances — Marrow Dust, Choir Bloom,
+Static Hymn, and the door to the entity layer. This is the other half of the same
+idea: the thing you do when you have no drugs and no time, which is stop.
+
+The pairing is the point. A substance is fast, costs the body, and can reach the
+entity layer. Meditation is slow, costs only time, and reaches further inward
+than outward — and doing it anywhere dangerous is the whole risk.
+
+- [ ] **E8.1** Sit down and stop — a held state, not a button that grants a buff
+- [ ] **E8.2** It restores stamina faster than standing, and pays down pain rather than health
+- [ ] **E8.3** Interrupted is worse than never started — the world does not pause for it
+- [ ] **E8.4** Where you sit matters: signal, territory and who is nearby all read
+- [ ] **E8.5** Deep enough, it reaches the entity layer the way a door substance does — slower, cheaper, and it cannot be rushed
+- [ ] **E8.6** It is the only route that costs the body nothing, which is why it is slow
 - [x] **E6.3** The door to the entity layer — a "door" substance calls `AscentEntities.glimpse()`, a real recorded `entity_glimpsed` contact that costs nothing of the entity's attention and cannot be spent on `wash()` — distinct from `regard()`'s earned notice
 - [x] **E6.4** Production and sale economy — `carry.gd`'s `take_substance()` carries one the same way a robbed part is carried (same wallet, `sale_value()` now prices `kind: "substance"`, same spoil clock). Covered by `tests/substances_test.gd` (16 checks)
 
@@ -820,6 +837,25 @@ D is complete and stays complete. This is the layer on top of it.
 - [ ] **N3.3** Full customisation reaches the same rig the world spawns (BaselineHuman)
 - [ ] **N3.4** Grown cybernetics and missing limbs show on it before you ever play
 - [ ] **N3.5** It is lit and framed as a specimen, in the vat's own language
+
+### N4 — The equipment screen
+Greg, 2026-09-12: *"i want a hyperdetailed ui showing the player model equiping
+weapons and its like fallout with a image or model on the right in 3d but all
+things have models and little descriptions — right now you dont have to go that
+far with descriptions"*.
+
+The same live rig N3 puts beside the character sheet, put beside the inventory
+instead: what you are carrying, what is in your hands, and a body that changes
+when you change it. The technology is already built — `xray_specimen.gd` renders
+a live `BaselineHuman` into a SubViewport, and `hunter_arsenal.gd` already builds
+a model for every weapon.
+
+- [ ] **N4.1** A live 3D body on the right, not an icon
+- [ ] **N4.2** Equipping a weapon puts it in that body's hand, visibly
+- [ ] **N4.3** Every item has a model rather than a name in a row (I0 applies)
+- [ ] **N4.4** A short description per item — one line, in the game's voice, not a stat block
+- [ ] **N4.5** Wounds, prosthetics and grown cybernetics show on the body here too
+- [ ] **N4.6** It is the same rig the world spawns, so what you see is what walks out
 
 ## O — Combat, reworked
 
