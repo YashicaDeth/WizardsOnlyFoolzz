@@ -38,11 +38,14 @@ func _ready() -> void:
 	_subject(Vector3(0.0, 0, 0), "showcase_dosed", 3)
 	# B4.1 / B4.2. Inked, pierced and grown into something, so the marks and the
 	# mutations can be seen on a body rather than only counted in a test.
-	_subject(Vector3(1.05, 0, 0), "showcase_marked", 4)
-	_subject(Vector3(2.1, 0, 0), "showcase_xray", 2)
+	_subject(Vector3(0.55, 0, 0), "showcase_marked", 4)
+	# B5.2. Hardware in four limbs, including B5.1's ball, because an implant
+	# nobody can see is the state that segment is fixing.
+	_subject(Vector3(1.6, 0, 0), "showcase_installed", 5)
+	_subject(Vector3(2.65, 0, 0), "showcase_xray", 2)
 
 	var camera := Camera3D.new()
-	camera.position = Vector3(0, 1.05, 3.9)
+	camera.position = Vector3(0, 1.05, 4.6)
 	camera.rotation_degrees = Vector3(-4, 0, 0)
 	camera.fov = 52.0
 	camera.current = true
@@ -73,6 +76,13 @@ func _subject(at: Vector3, id: String, mode: int) -> void:
 	body.position = at
 	# Through the config: assigning `body.gore` here is overwritten by build().
 	body.build(id, {"flesh": Color("7a6350"), "variation": mode * 3, "gore": false})
+	if mode == 5:
+		for fitting: Array in [
+			["left_arm", "scrying ball"], ["right_arm", "ashline industrial arm"],
+			["torso", "ceramic sternum"], ["head", "rangefinder eye"],
+		]:
+			body.anatomy.install_part(str(fitting[0]), {"name": str(fitting[1])})
+			body._refresh_zone(str(fitting[0]))
 	if mode == 4:
 		var look := HunterAppearance.new()
 		body.add_child(look)

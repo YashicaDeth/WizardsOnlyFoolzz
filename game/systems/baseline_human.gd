@@ -791,6 +791,7 @@ func _refresh_zone(zone_id: String) -> void:
 		else:
 			var opened := 1.0 - ratio / maxf(BRUISE_RATIO, 0.01)
 			tint = _flesh.lerp(BRUISE_SKIN, 0.85).lerp(Color("3d0907"), opened)
+	_show_installed(zone_id, prosthetic)
 	# B3.2. A melting injury does not read as a bruise going dark. Dose takes
 	# the zone toward a wet, sallow green and takes the volume out of it — a
 	# dosed limb slumps rather than swells — so that a body somebody irradiated
@@ -1288,3 +1289,74 @@ static func _splat_mesh(radius: float) -> ArrayMesh:
 	mesh.surface_set_material(0, material)
 	_splat_pool.append(mesh)
 	return mesh
+
+
+## B5.2. What is installed in a limb, visible in that limb.
+##
+## The catalogue has carried a `profile` and a `tint` for every implant since it
+## was written and nothing ever drew either: a prosthetic arm was the same arm
+## with a chrome material on it, so twenty distinct pieces of hardware were
+## indistinguishable from each other and from a clean limb somebody had polished.
+## Each one is a shape now, mounted in the zone it was installed in, so a body
+## you are looking at tells you what is in it — which is also what makes B5.1's
+## ball something you can see somebody carrying.
+##
+## Rebuilt rather than updated, because an implant that is pulled has to leave,
+## and one piece of geometry per zone is cheap enough to make that the simple
+## path.
+func _show_installed(zone_id: String, prosthetic: bool) -> void:
+	var part := parts.get(zone_id) as MeshInstance3D
+	if part == null or not is_instance_valid(part):
+		return
+	var existing := part.get_node_or_null("InstalledHardware")
+	if existing != null:
+		existing.queue_free()
+	if not prosthetic:
+		return
+	var installed: Dictionary = anatomy.installed_parts.get(zone_id, {})
+	if installed.is_empty():
+		return
+	var hardware := MeshInstance3D.new()
+	hardware.name = "InstalledHardware"
+	hardware.mesh = _implant_mesh(str(installed.get("profile", "")))
+	hardware.material_override = _zone_material(zone_id, Color(str(installed.get("tint", "9a8f7c"))), "chrome")
+	# Proud of the surface rather than buried in it: an implant nobody can see
+	# is the state this segment is fixing.
+	hardware.position = Vector3(0, 0, -0.055)
+	hardware.set_meta("installed", str(installed.get("name", "")))
+	hardware.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	part.add_child(hardware)
+
+
+## The shape of a piece of hardware, by the profile the catalogue already gives
+## it. Deliberately blunt forms — this reads at arm's length on a body in
+## motion, not in a cutaway.
+func _implant_mesh(profile: String) -> Mesh:
+	match profile:
+		"orb":
+			var orb := SphereMesh.new()
+			orb.radius = 0.055
+			orb.height = 0.11
+			return orb
+		"optic", "optic_spool":
+			var lens := CylinderMesh.new()
+			lens.top_radius = 0.028
+			lens.bottom_radius = 0.034
+			lens.height = 0.03
+			return lens
+		"meter", "joint_dial", "digit_tool":
+			var dial := BoxMesh.new()
+			dial.size = Vector3(0.07, 0.05, 0.02)
+			return dial
+		"bone_rail", "spine_cage", "chest_plate", "pulse_cage":
+			var plate := BoxMesh.new()
+			plate.size = Vector3(0.19, 0.12, 0.03)
+			return plate
+		"industrial_limb", "scrap_limb", "limb_drive":
+			var drive := BoxMesh.new()
+			drive.size = Vector3(0.1, 0.17, 0.05)
+			return drive
+		_:
+			var block := BoxMesh.new()
+			block.size = Vector3(0.08, 0.07, 0.03)
+			return block
