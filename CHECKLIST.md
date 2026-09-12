@@ -1097,7 +1097,19 @@ hitpoints. `clinch_test.gd` and F7 already exist; this is the rest of it.
 
 ### O v2 — the second pass
 - [ ] **O2.5** `v2` Hitstop is global `Engine.time_scale`, so your blow freezes every other fight in the region too
-- [ ] **O2.6** `v2` The guard has no direction — it holds equally against something behind you
+- [x] ~~**O2.6** `v2` The guard has no direction — it holds equally against
+      something behind you~~ `guard_absorb()` never took an attacker position
+      at all, so raising the guard toward whatever you were looking at
+      somehow also covered your back — there was no such thing as flanking
+      the player. It now takes the attacker's position and checks it against
+      a real frontal arc (100° either side of where you are actually facing);
+      outside that arc the blow goes through whole, as if the guard was
+      never there for it, because it wasn't. The one existing call site
+      already had the attacker's node in scope. Verified:
+      `tests/guard_direction_test.gd` (4 checks — front still blocks, directly
+      behind goes through untouched, and a call with no attacker position at
+      all keeps the old always-blocks behaviour for backward compatibility),
+      plus the full combat/grapple/clinch suite still passes.
 - [x] ~~**O5.10** `v2` Footing is the player's alone; enemies use the older
       `staggered` state, so the two bodies in a brawl run on different
       systems~~ Enemies now carry the same `footing` meter, recovered every
