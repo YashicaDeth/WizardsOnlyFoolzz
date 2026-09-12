@@ -156,6 +156,10 @@ func _test_pain_posture() -> void:
 	check(is_equal_approx(body.anatomy.mobility_ratio(), mobility_before), "guarded pain does not yet reduce mobility")
 	body._apply_pain_posture(1.0)
 	check(body.rotation.x < -0.01, "the rig visibly hunches when its anatomy reports pain")
+	var spine_before := body.anatomy.mobility_ratio()
+	body.anatomy.damage_organ("spine", 10.0)
+	check(body.anatomy.xray_findings().any(func(finding): return str(finding).contains("33 VERTEBRAE")), "spinal damage is counted against the body's 33 vertebrae")
+	check(body.anatomy.mobility_ratio() < spine_before, "partial spinal damage changes mobility before the spine is destroyed")
 	body.queue_free()
 
 
