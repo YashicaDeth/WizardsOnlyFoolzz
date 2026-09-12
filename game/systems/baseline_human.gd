@@ -332,7 +332,8 @@ func _build_bones(layout: Dictionary) -> void:
 				# They stay legible as a continuous column at normal camera distance.
 				for index in SPINE_VERTEBRAE:
 					var fraction := float(index) / float(SPINE_VERTEBRAE - 1)
-					_bone_piece(frame, BodyMesh.vertebra(), Vector3(0, lerpf(length * 0.43, -length * 0.43, fraction), -0.072))
+					var vertebra := _bone_piece(frame, BodyMesh.vertebra(), Vector3(0, lerpf(length * 0.43, -length * 0.43, fraction), -0.072))
+					vertebra.set_meta("vertebra", index + 1)
 				for index in 5:
 					var rib := _bone_piece(frame, BodyMesh.arc_tube(0.148, 0.098, 0.011, PI * 0.12, PI * 0.88), Vector3(0, length * 0.30 - index * 0.052, -0.012))
 					rib.rotation.x = 0.14
@@ -747,6 +748,25 @@ func _refresh_zone(zone_id: String) -> void:
 	if gore and zone_id == "torso" and ratio <= 0.0:
 		_spill_guts()
 	_update_layer_exposure(zone_id, prosthetic)
+	if zone_id == "torso":
+		_refresh_spine_vertebrae()
+
+
+## The X-ray has 33 actual pieces to colour. A damaged vertebra changes from
+## bone to hot fracture tone, so the diagnostic number and the body agree.
+func _refresh_spine_vertebrae() -> void:
+	var frame := bones.get("torso") as Node3D
+	if frame == null or anatomy == null:
+		return
+	var spine: Dictionary = anatomy.organs.get("spine", {})
+	var damaged: Array = spine.get("vertebrae_damaged", [])
+	for piece in frame.get_children():
+		if not piece.has_meta("vertebra"):
+			continue
+		var vertebra := int(piece.get_meta("vertebra"))
+		var mesh := piece as MeshInstance3D
+		if mesh != null:
+			mesh.material_override = _zone_material("torso", Color("b94a32") if damaged.has(vertebra) else BONE, "bone")
 
 
 func _zone_origin(zone_id: String) -> Vector3:
