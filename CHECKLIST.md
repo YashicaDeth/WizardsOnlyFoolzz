@@ -840,8 +840,8 @@ reproducing their control scheme. What is being taken is the *lesson*, which is
 that a fight between two bodies is about weight and leverage rather than about
 hitpoints. `clinch_test.gd` and F7 already exist; this is the rest of it.
 
-- [ ] **O5.1** A swing carries momentum — where the weapon *was* decides what it can do next
-- [ ] **O5.2** Contact is between bodies, not between a capsule and a damage number
+- [x] **O5.1** Stepping into a blow lends it your mass; retreating takes it out. The arc alternates sides on its own
+- [x] **O5.2** Melee resolves against BaselineHuman zones by geometry — it was already true, now verified
 - [x] **O5.3** A held clinch with advantage, stamina drain, and a real cost for losing it
 - [x] **O5.4** Robbed, spoken to, leaned on, walked where you want them, and held in the line of fire
 - [ ] **O5.5** Held and hurt is the pressure that makes recruitment possible (feeds F7 and E)

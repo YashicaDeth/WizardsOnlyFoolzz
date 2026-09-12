@@ -86,6 +86,22 @@ var attack_cooldown := 0.0
 ## The first fraction of a second of raising it is a parry rather than a block,
 ## which is where the decision actually lives: hold early and you are merely
 ## safe, time it and you take the initiative back.
+## O5.1. A swing has to come from somewhere. Until now every blow was identical
+## regardless of what the body was doing when it was thrown: the same damage
+## standing still, backpedalling, or running somebody down. That is what makes
+## melee read as a button rather than as a weight on the end of an arm.
+##
+## Two things carry the momentum. **Where the weapon was**: swings alternate
+## sides on their own, so continuing the natural arc is quick and cheap while
+## re-swinging the same side has to drag the blade back first. And **where the
+## body was going**: stepping into a blow lends it your own mass, backing away
+## takes it out again.
+var swing_side := 1
+var last_swing_at := 0.0
+const SWING_CHAIN_WINDOW := 0.9
+const SWING_REVERSE_PENALTY := 1.4
+const STEP_IN_BONUS := 0.55
+
 var guarding := false
 var guard_raised := 0.0
 var guard_stamina_drain := 14.0
@@ -646,8 +662,13 @@ func _attack(heavy := false) -> void:
 	# the whole point of B6: a fight that continues after a limb comes off has to
 	# continue that way in both directions.
 	var swing := _player_swing_scale()
-	report["damage"] = float(report.get("damage", 0.0)) * swing
-	attack_cooldown = float(report.get("cooldown", arsenal.cooldown)) / maxf(0.35, swing)
+	# O5.1. The body's own motion is part of the blow.
+	var momentum := swing_momentum(player_body.velocity)
+	report["damage"] = float(report.get("damage", 0.0)) * swing * float(momentum["power"])
+	report["impulse"] = float(report.get("impulse", 0.0)) * float(momentum["power"])
+	report["momentum"] = momentum
+	register_swing()
+	attack_cooldown = float(report.get("cooldown", arsenal.cooldown)) / maxf(0.35, swing) * float(momentum["recovery"])
 	pending_attack = report
 	body_motion.trigger_attack(maxf(float(report.get("windup", 0.0)), attack_cooldown * 0.62), str(report.kind))
 	if str(report.weapon) == "severed_limb":
@@ -884,6 +905,48 @@ func _reload_weapon() -> void:
 		body_motion.trigger_reload(float(arsenal.current().reload))
 		# Reloading is visible as a cartridge travelling through the well.
 		prompt.text = ""
+
+
+## O5.1. What the swing is worth, given where the weapon was and where the body
+## was going. Returns the multiplier on damage and the multiplier on recovery,
+## so a committed step-in hits harder and a dragged-back reversal costs time.
+##
+## `heading` is the direction the player is actually travelling; the dot against
+## where they are looking is the whole of "did you step into it".
+func swing_momentum(heading: Vector3) -> Dictionary:
+	var look := Vector3(sin(yaw), 0.0, cos(yaw))
+	var flat := Vector3(heading.x, 0.0, heading.z)
+	var into := 0.0
+	if flat.length() > 0.2:
+		into = clampf(flat.normalized().dot(look), -1.0, 1.0) * clampf(flat.length() / 6.0, 0.0, 1.0)
+	# Stepping in lends the blow your mass; backing away takes it out of the
+	# swing, and a blow thrown while retreating should feel like one.
+	var power := 1.0 + into * STEP_IN_BONUS
+	var recovery := 1.0
+	var now := float(Time.get_ticks_msec()) * 0.001
+	var chained := (now - last_swing_at) <= SWING_CHAIN_WINDOW
+	if chained:
+		# The arc continues on its own. Alternating is free; the alternative is
+		# hauling the weapon back through the arc it just finished.
+		recovery *= 1.0
+	else:
+		# Cold start from rest: no stored momentum to spend.
+		power *= 0.88
+	return {
+		"power": clampf(power, 0.5, 1.7),
+		"recovery": recovery,
+		"side": swing_side,
+		"chained": chained,
+		"into": into,
+	}
+
+
+## Records that a swing happened, and flips the arc for the next one. Called
+## after the swing is thrown rather than when it lands, because the arc has
+## moved whether or not it hit anything.
+func register_swing() -> void:
+	swing_side = -swing_side
+	last_swing_at = float(Time.get_ticks_msec()) * 0.001
 
 
 ## O2.4 / O5.9. How much guard the body can actually hold up, read from the arms
@@ -1410,9 +1473,19 @@ func _update_encounter_actors(delta: float) -> void:
 			# distance instead of stacking into it — the fight surrounds you
 			# rather than lining up for a turn.
 			if melee_slot_taken:
+				# Slow enough that the actor's own move speed (3.7 m/s) can
+				# still close the gap to the target ring while tracking it —
+				# at 6.5 m radius, 0.5 rad/s asked for 3.25 m/s of tangential
+				# speed alone, leaving almost nothing to actually get there,
+				# which is why it spiralled straight into the player instead
+				# of settling into orbit.
 				var start_angle := fposmod(float(hash(str(actor.get("subject_id", index)))), TAU)
-				actor["orbit_angle"] = fposmod(float(actor.get("orbit_angle", start_angle)) + delta * 0.5, TAU)
-				var orbit_point := player + Vector3(cos(actor.orbit_angle), 0, sin(actor.orbit_angle)) * 4.6
+				actor["orbit_angle"] = fposmod(float(actor.get("orbit_angle", start_angle)) + delta * 0.15, TAU)
+				# Wider than the stand-off actually needs to read at, because the
+				# route itself only ever lands on a 2 m pathfinding grid cell —
+				# a tight radius rounds down into the same ring it is meant to
+				# avoid often enough to be the whole bug again.
+				var orbit_point := player + Vector3(cos(actor.orbit_angle), 0, sin(actor.orbit_angle)) * 6.5
 				_move_actor_on_route(actor, orbit_point, delta)
 			else:
 				_move_actor_on_route(actor, player, delta)
