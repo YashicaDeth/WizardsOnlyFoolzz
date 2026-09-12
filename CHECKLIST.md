@@ -363,8 +363,38 @@ Opened because C1.8, C2.6 and C5.5 closed at v2. Each entry is a fault the v2
 work created or exposed, not a wish.
 
 - [ ] **C1.9** `v3` Wear is only visible on the screen you are reading; the device in your hand looks new from the outside
-- [ ] **C2.7** `v3` Direct page access exists and nothing ever teaches it — a control nobody discovers is a control nobody has
-- [ ] **C5.6** `v3` Cracks are per-device but still radiate from one authored origin; an impact should crack the glass where it landed
+- [x] ~~**C2.7** `v3` Direct page access exists and nothing ever teaches it —
+      a control nobody discovers is a control nobody has~~ `jump_to_mode()`
+      has reached a page directly since C2.6 v2 and nothing on the device
+      itself ever said so. Each tab in `_draw_tabs()` now prints the F-key
+      that jumps straight to it — "F1" over INDEX through "F5" over CARRY —
+      the same register a real handheld prints a function-key legend in,
+      rather than a control the player can only ever stumble onto by cycling
+      through with Tab. Verified: a windowed capture
+      (`captures/c2_7_v3_tab_key_hints.png`) showing the legend printed and
+      matching `bone_yard_hunt.gd`'s actual `KEY_F1`.."KEY_F5" bindings.
+- [x] ~~**C5.6** `v3` Cracks are per-device but still radiate from one
+      authored origin; an impact should crack the glass where it landed~~
+      `BlackMirror.draw_cracks()` always forked from the exact same point
+      (74%, 22% into the rect) for every device and every impact. It now
+      takes an origin, defaulting to that same point only for a caller with
+      no location to give; `handheld_device.gd` records each impact's actual
+      location (`impacts`, capped at 5, persisted the same way `wear_log`
+      already is), and `_draw_chassis` draws one crack cluster per recorded
+      impact from its own point rather than one shared authored origin. An
+      impact with a genuinely unknown location (an accumulated tick rather
+      than a single blow) still lands on a varied point instead of the one
+      shared spot. `take_wear()` itself is not yet called from anywhere in
+      the game — that wiring is a separate, larger gap this does not close —
+      so this is the mechanism working correctly, verified directly rather
+      than through real gameplay impacts. Verified:
+      `tests/handheld_impact_test.gd` (new, 7/7 — a given location is used
+      exactly, two unlocated impacts land on different points and neither is
+      the old authored one, the impact list is capped, and it survives a
+      save/load round trip), plus the existing `handheld_lean_test.gd`
+      regression suite and a windowed capture
+      (`captures/c5_6_v3_impact_cracks.png`) showing cracks radiating from
+      three different, deliberately separated impact points.
 
 ## D — Character creation in the vat
 
@@ -1609,7 +1639,7 @@ The open question that has been sitting unanswered longest: *"what persists
 between runs?"* Roguelike structure was asked for, and "bodies remember" is a
 pillar. They pull against each other and the game cannot have both untouched.
 
-- [ ] **T1.1** Decide it — blocked on Greg
+- [x] **T1.1** **Answered by the rework.** Greg: *"quantum immortality deaths or restarts in other universes — but that's a new game + end game feature"*. So: nothing carries in the save-file sense. **The universe restarts and you do not.** You are the constant and the world is the variable, which is the only answer consistent with AP2 (the spirit cannot be banished) and it turns T1.3's inheritance question into a much better one — not *what did I keep*, but *what is different about this world because a previous one had me in it*
 - [x] **T1.2** Death is an event in the world rather than a reload — `systems/run_lifecycle.gd`'s `record_death()`, deliberately built without guessing T1.1's answer: captures the real cause, where the run had reached (`OpeningDirector`), what was being carried (`Carry`), and where the subject stood on the axis (`tree_alignment()`) as one recorded `permanent_death` event, so whatever T1.3 eventually decides should inherit has real material to read from rather than needing a second record built later. Covered by `tests/run_lifecycle_test.gd` (10 checks)
 - [ ] **T1.3** Something inherits: a body, a debt, a reputation, a wall of pins (waits on T1.1)
 - [ ] **T1.4** What the world keeps is visible to the player before they risk it (waits on T1.1)
@@ -2184,6 +2214,181 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
 - [ ] **AN2.3** Hitting armour, bone or a wall answers differently through `strike()`
 - [ ] **AN2.4** The weapon's own condition rides on the same object — a bent blade swings wrong
 - [ ] **AN2.5** Two-handing changes the numbers, not just the pose
+
+## AO — The world as it fell
+
+`DESIGN/THE_REWORK.md` is the full document. This section is the part of it that
+has to become code.
+
+The setting was never written down until now, and the load-bearing fact is
+perfect for a game whose central rule is already *two records: what happened, and
+what each faction believes*. **The nuclear war is fake.** Greg: *"'nuclear'
+unknown testing facilities on site that produce such high levels of radiation,
+they have been theorised to have been fake nuclear attacks as no footage exists,
+although gore and crisis actors news segments"*. What actually fell it was an
+alien apocalypse — *"an attack on the industry and prison planet by a freed
+colony, although many theorise its the government still living in the deep tunnel
+networks"*.
+
+Earth is an industry and prison planet. Somebody who escaped came back for it.
+The official story is a lie told by people still alive underneath the place they
+lied about.
+
+### AO1 — The record and the lie
+- [ ] **AO1.1** The fake war is in the world as evidence, not as exposition
+- [ ] **AO1.2** Both records exist: what the alien apocalypse did, and what was published about it
+- [ ] **AO1.3** Radiation is real wherever the testing was, whatever caused it (8g melts you)
+- [ ] **AO1.4** Crisis-actor footage is findable, and the game never confirms it
+- [ ] **AO1.5** Earth reads as an industry and prison planet in what is standing, not in a log
+
+### AO2 — The sky
+- [ ] **AO2.1** The firmament is broken and it is visibly broken
+- [ ] **AO2.2** A god for each planet, the moon and the sun, visible at certain hours (W1.1 exists now)
+- [ ] **AO2.3** The seals broke at the end of the world: every demon is observable
+- [ ] **AO2.4** Every sigil is live again — **and capturable** (pairs with AJ)
+- [ ] **AO2.5** Night is genuinely different, not day with a filter
+
+### AO3 — The tunnels
+Greg: *"urbex, overgrown, Outlast-esque, covered in blood, gore, horrors, as the
+military have gone cannibalistic and blood thirsty with greed of power, slowly
+dismantling themselves as you play, as the authority in the game is no help"*.
+The detail that makes it: **they are eating themselves on a clock while you
+play.**
+- [ ] **AO3.1** A connected tunnel layer under the region (shares AL2's network)
+- [ ] **AO3.2** Overgrown and urbex rather than clean corridors
+- [ ] **AO3.3** The military down there degrades over game time whether or not you are watching
+- [ ] **AO3.4** Authority is never help — calling it makes things worse
+- [ ] **AO3.5** What is down there is found, not briefed
+
+### AO4 — Who else is out here
+- [ ] **AO4.1** Villages, cities and bandit camps fight back aggressively
+- [ ] **AO4.2** Areas can be haunted at night, and it is not permanent
+- [ ] **AO4.3** Demons, spirits and jinn infest parts of the map and move
+- [ ] **AO4.4** Random alien craft doing things that are not for you
+- [ ] **AO4.5** Reptilians, greys and other occult races as real factions
+- [ ] **AO4.6** Elites have the Wire and the nemesis system; nobody else does
+
+## AP — The captured spirit
+
+Greg: *"you start as a captured spirit in the government facility underground, to
+be meat for the elites and scrap"* — and the thing that makes you a problem:
+*"they see the essence of his spirit as it can't be banished by torturing,
+killing, violence — it stays in pure bright flames that are vibrant and melt
+the game's screen... the character's spirit is undying, so the government wants
+to enslave you"*.
+
+**You are not powerful, you are unkillable, which is worse for everyone.** That
+is a far better premise than a strong protagonist, and it explains why an
+institution that could simply shoot you spends the game trying to own you
+instead.
+
+### AP1 — The opening, in order
+- [ ] **AP1.1** Captured, underground, as meat and scrap — not as a hero
+- [ ] **AP1.2** The quiz, and it matters mystically (D already builds the sheet)
+- [ ] **AP1.3** Experimented on and tortured, revealed across the game rather than shown at the start
+- [ ] **AP1.4** The gore festival: *"genuine slabs of pressed meat"*
+- [ ] **AP1.5** The underground tunnel derby — reptilians, aliens, bunker AI dwellers, and you execute them
+- [ ] **AP1.6** Out, and choosing what happens to the lands (hands over to AA)
+- [ ] **AP1.7** Digestible segment to segment, and a playground if you want it
+
+### AP2 — Undying
+- [ ] **AP2.1** The spirit cannot be banished by violence, and the game proves this to you early
+- [ ] **AP2.2** Bright vibrant flame that melts the screen itself — a real shader, not an overlay
+- [ ] **AP2.3** Being unkillable is a problem for the institution, and they act on it
+- [ ] **AP2.4** Elites cannot really die either, which is why the economy has jobs instead of wars
+- [ ] **AP2.5** Blood, rust and scrap have joined in alchemy, hiding an element you work out later
+
+### AP3 — Wizard eyes
+Greg: *"your spirit kinda just guides you based around blood, the stars, and
+guides you through 'wizard eyes'"*, Adventure Time's Ice King as a mechanic.
+- [ ] **AP3.1** Usable every so often, not held — it is a glimpse, not a mode
+- [ ] **AP3.2** Highlights spirits, ghosts and phantoms that are otherwise not there
+- [ ] **AP3.3** Abstract rather than literal, collaged from Greg's own art as textures
+- [ ] **AP3.4** What it shows is real and the world acts on it afterwards
+- [ ] **AP3.5** The logo becomes the Adventure Time finger symbol, designed as a sigil
+
+## AQ — The godhead
+
+Greg: *"the one true godhead, being commenting and enslaving us all in its own
+lessons and learning, is the fightable true end game boss"*.
+
+The best thing about it is how it arrives. It is not revealed — **it
+accumulates**. And it is not evil in the ordinary way: it enslaves *through its
+own lessons and learning*, which is one short step from AJ3's modern gods and is
+the most interesting possible final boss for a game about institutions.
+
+- [ ] **AQ1.1** It taunts you long before it is fightable
+- [ ] **AQ1.2** Visibility builds with what you have done, never on a timer
+- [ ] **AQ1.3** It summons you rather than being travelled to
+- [ ] **AQ1.4** The shadow realms of the higher realms: the psychedelic register, earned not given (E6/E8 exist)
+- [ ] **AQ1.5** It teaches, and the teaching is the trap
+- [ ] **AQ1.6** It is genuinely fightable, and the fight is not a damage race
+- [ ] **AQ1.7** Voice acting — Greg: *"voice acting will also be in the game"*
+- [ ] **AQ1.8** Siding with it is a real option with a real ending
+
+## AR — The tree, and the work
+
+Not a morality slider — **a diagram**. Greg: *"it be a big Kabbalah type tree
+of life or Nordic tree of life diagram for the different paths, when they occur in
+the canon story beats, chapters"*.
+
+This sits beside AI's double pyramid rather than competing with it: **the pyramid
+is where power is, the tree is which way you went.** Two charts, one document.
+
+### AR1 — The paths
+- [ ] **AR1.1** The tree is drawn, real, and charts the paths against canon story beats
+- [ ] **AR1.2** Side with the common CellOutz demon — but only with aura, power or influence
+- [ ] **AR1.3** Rebel and outcast from the gods: everything harder, nobody owns you
+- [ ] **AR1.4** Live with the low-frequency demons, then side with the elite and reptilian classes
+- [ ] **AR1.5** Or turn the demons on God and make them challenge it
+- [ ] **AR1.6** A path taken shows on the tree, and the tree is where you read your own run
+- [ ] **AR1.7** Paths open at chapters, not at levels
+
+### AR2 — Jobs and contracts
+- [ ] **AR2.1** A real economy with jobs, because the elites cannot die and war is pointless
+- [ ] **AR2.2** Bounty work for the top angels or the top demons
+- [ ] **AR2.3** Targets are whoever is blocking a frequency or an aura — not "bad guys"
+- [ ] **AR2.4** Contracts are consumable and cost something, Chainsaw Man style
+- [ ] **AR2.5** Consumable progress against bosses and big figures
+- [ ] **AR2.6** Work for the bank (AL1) and work for the agency (AK1) are the same market
+
+## AS — Night, the lamp, and what you are wearing
+
+Greg: *"the light can become really warped at night and distorted. Phone has a %
+possibly, or just really minimal lighting, and you can wave it around showing
+lighting — as well as having light coming off the phone when you have it in
+your hand, then you can wave it around or pocket it... pockets and clothes should
+be integral, or at least a part of the world system, layers and strategy to
+everything."*
+
+### AS1 — The handheld is a lamp
+- [ ] **AS1.1** It throws real light into the world when it is in your hand
+- [ ] **AS1.2** Holding it up to see is an action with a cost — that hand is busy
+- [ ] **AS1.3** A battery percentage that runs down and can run out
+- [ ] **AS1.4** Pocketing it is a movement and the light goes with it
+- [ ] **AS1.5** Its light is what gives you away at night (pairs with AE1.1)
+
+### AS2 — Night
+- [ ] **AS2.1** Light warps and distorts at night rather than dimming
+- [ ] **AS2.2** Minimal lighting is the default and a light source is a decision
+- [ ] **AS2.3** Night is when AO4.2's hauntings happen
+- [ ] **AS2.4** It reads off `world_clock.gd`, which exists now (W1.1)
+
+### AS3 — Clothes and pockets
+- [ ] **AS3.1** Layers, and they are part of the world system rather than a paperdoll
+- [ ] **AS3.2** Pockets hold real things and what is in them matters
+- [ ] **AS3.3** What you are wearing is strategy: weather, radiation, who talks to you
+- [ ] **AS3.4** It shows on the body the mirror renders (AH1.5, N)
+
+### AS4 — Storms that answer the occult
+Greg: *"I also want the weather to have consistent crazy storms depending on
+spirits levels, chaos magick levels... the lightning in the game needs to have
+anvil crawlers, all the crazy red lighting-esque things."*
+- [ ] **AS4.1** Weather is a readout of how much magick is loose, not ambience
+- [ ] **AS4.2** Storm severity tracks spirit and chaos-magick levels in WorldHistory
+- [ ] **AS4.3** Anvil crawler lightning — the long horizontal crawl, not a flash
+- [ ] **AS4.4** Red lightning, and it means something when it appears
+- [ ] **AS4.5** Being caught out in it costs something (W1.3)
 
 ## AK — The agency that owns the sky
 
