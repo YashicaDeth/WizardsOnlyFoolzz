@@ -1,5 +1,7 @@
 extends Node3D
 
+const Quantum := preload("res://systems/quantum_saves.gd")
+
 var wreck: Node3D
 var front_door: Node3D
 var warning_card: Control
@@ -17,6 +19,9 @@ var gore_index := 0
 var gore_button: Button
 var vsync_enabled := true
 var intro_veil: ColorRect
+var branch_panel: PanelContainer
+var branch_list: VBoxContainer
+var branch_creating := false
 
 @onready var settings_panel: PanelContainer = $HUD/SettingsPanel
 @onready var effects_button: Button = $HUD/SettingsPanel/VBox/Effects
@@ -24,7 +29,7 @@ var intro_veil: ColorRect
 
 func _ready() -> void:
 	_build_country_town()
-	$HUD/Play.pressed.connect(_start_game)
+	$HUD/Play.pressed.connect(_open_continue_runs)
 	$HUD/Settings.pressed.connect(_open_settings)
 	$HUD/Quit.pressed.connect(get_tree().quit)
 	$HUD/SettingsPanel/VBox/Back.pressed.connect(_close_settings)
@@ -43,7 +48,7 @@ func _ready() -> void:
 		button.mouse_entered.connect(_focus_button.bind(button))
 		button.mouse_exited.connect(_unfocus_button.bind(button))
 	_build_gore_setting()
-	_build_sandbox_door()
+	_build_run_doors()
 	_build_front_door()
 	_play_title_sequence()
 
@@ -92,20 +97,31 @@ func _play_title_sequence() -> void:
 ## Built in code rather than added to the scene so the column stays one source
 ## of truth about its own spacing: the new row is the Play button copied, and
 ## everything below it moves down by exactly one row height.
-func _build_sandbox_door() -> void:
+func _build_run_doors() -> void:
 	var play: Button = $HUD/Play
 	var row: float = play.offset_bottom - play.offset_top + 8.0
 	for button: Button in [$HUD/Settings, $HUD/Quit, $HUD/CellOutzSite]:
-		button.offset_top += row
-		button.offset_bottom += row
+		button.offset_top += row * 2.0
+		button.offset_bottom += row * 2.0
+	var new_game := play.duplicate(0) as Button
+	new_game.name = "NewGame"
+	new_game.text = "NEW GAME  //  SPLIT THE WORLD"
+	new_game.offset_top = play.offset_top + row
+	new_game.offset_bottom = play.offset_bottom + row
+	new_game.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	$HUD.add_child(new_game)
+	new_game.pressed.connect(_open_new_game)
+	new_game.mouse_entered.connect(_focus_button.bind(new_game))
+	new_game.mouse_exited.connect(_unfocus_button.bind(new_game))
+	menu_buttons.append(new_game)
 	# Flags cleared on purpose: `duplicate()` copies signal connections by
 	# default, and a copy of Play that is still wired to `_start_game` would send
 	# anyone who pressed it to the decanting floor instead.
 	var sandbox := play.duplicate(0) as Button
 	sandbox.name = "Sandbox"
 	sandbox.text = "GORE SANDBOX"
-	sandbox.offset_top = play.offset_top + row
-	sandbox.offset_bottom = play.offset_bottom + row
+	sandbox.offset_top = play.offset_top + row * 2.0
+	sandbox.offset_bottom = play.offset_bottom + row * 2.0
 	sandbox.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	$HUD.add_child(sandbox)
 	sandbox.pressed.connect(func() -> void:
@@ -113,6 +129,92 @@ func _build_sandbox_door() -> void:
 	sandbox.mouse_entered.connect(_focus_button.bind(sandbox))
 	sandbox.mouse_exited.connect(_unfocus_button.bind(sandbox))
 	menu_buttons.append(sandbox)
+	_build_branch_panel()
+
+
+func _build_branch_panel() -> void:
+	branch_panel = PanelContainer.new()
+	branch_panel.name = "QuantumBranches"
+	branch_panel.set_anchors_preset(Control.PRESET_CENTER)
+	branch_panel.offset_left = -236.0
+	branch_panel.offset_top = -166.0
+	branch_panel.offset_right = 236.0
+	branch_panel.offset_bottom = 166.0
+	branch_panel.visible = false
+	branch_panel.z_index = 30
+	var skin := StyleBoxFlat.new()
+	skin.bg_color = Color("160706f2")
+	skin.border_color = Color("9e2817")
+	skin.set_border_width_all(2)
+	skin.corner_radius_top_left = 8
+	skin.corner_radius_top_right = 8
+	skin.corner_radius_bottom_left = 8
+	skin.corner_radius_bottom_right = 8
+	skin.shadow_color = Color("000000cc")
+	skin.shadow_size = 18
+	branch_panel.add_theme_stylebox_override("panel", skin)
+	$HUD.add_child(branch_panel)
+	branch_list = VBoxContainer.new()
+	branch_list.add_theme_constant_override("separation", 8)
+	branch_panel.add_child(branch_list)
+
+
+func _open_continue_runs() -> void:
+	_open_branch_picker(false)
+
+
+func _open_new_game() -> void:
+	_open_branch_picker(true)
+
+
+func _open_branch_picker(creating: bool) -> void:
+	branch_creating = creating
+	for child in branch_list.get_children():
+		child.queue_free()
+	var heading := Label.new()
+	heading.text = "QUANTUM IMMORTALITY // %s" % ("BIRTH A WORLD" if creating else "CHOOSE A SURVIVING WORLD")
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.add_theme_font_size_override("font_size", 16)
+	heading.add_theme_color_override("font_color", Color("e3a070"))
+	branch_list.add_child(heading)
+	var subhead := Label.new()
+	subhead.text = "DEATH IS A RECORD. THE OTHER BRANCHES REMAIN."
+	subhead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subhead.add_theme_font_size_override("font_size", 11)
+	subhead.add_theme_color_override("font_color", Color("a85b43"))
+	branch_list.add_child(subhead)
+	for entry in Quantum.slots():
+		var slot := int(entry.slot)
+		var button := Button.new()
+		button.custom_minimum_size = Vector2(430, 44)
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.add_theme_font_size_override("font_size", 16)
+		var occupied := bool(entry.occupied)
+		if creating:
+			button.text = "  [%d]  %s" % [slot + 1, "OVERWRITE // %s" % entry.label if occupied else "UNWRITTEN WORLD"]
+		else:
+			button.text = "  [%d]  %s" % [slot + 1, str(entry.label) if occupied else "NO SURVIVING WORLD"]
+			button.disabled = not occupied
+		button.pressed.connect(_choose_branch.bind(slot))
+		branch_list.add_child(button)
+	var cancel := Button.new()
+	cancel.text = "RETURN TO THE STREET"
+	cancel.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cancel.pressed.connect(func() -> void: branch_panel.hide())
+	branch_list.add_child(cancel)
+	branch_panel.show()
+
+
+func _choose_branch(slot: int) -> void:
+	if branch_creating:
+		var created := Quantum.begin_new(slot, "WORLD %02d" % (slot + 1))
+		if created.is_empty():
+			return
+	else:
+		if not Quantum.enter(slot):
+			return
+	branch_panel.hide()
+	_start_game()
 
 ## The front end is a scene with junk falling through it, and the first thing
 ## the player is asked is what they are willing to look at. The violence tiers
