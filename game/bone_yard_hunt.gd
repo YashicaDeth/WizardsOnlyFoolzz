@@ -24,6 +24,25 @@ const VAULT_REACH := 0.85
 const VAULT_FAR_SIDE := 0.55
 const VAULT_HEAD_CLEARANCE := 1.55
 const VAULT_DURATION := 0.34
+## AD1.3. "Earned the way third person is earned rather than given" —
+## `third_person_unlocked()` gates on real boss kills; this gates on real
+## traversal, tied to the mechanic it is a step up from rather than to
+## combat, since wall-running is a movement skill and vaulting is the
+## movement skill just before it. Counted straight off `player_vaulted`
+## (AD1.2's own event), not a new counter invented for this one.
+const WALL_RUN_UNLOCK_VAULTS := 3
+## How far sideways the wall can be and still count, how tall it has to
+## keep going to be a wall rather than something AD1.2 would have vaulted,
+## how fast the player has to already be moving to grab one, how long a
+## run lasts before gravity wins anyway, and how much gravity still applies
+## while it does — full weightlessness reads as flying, not running.
+const WALL_RUN_REACH := 0.9
+const WALL_RUN_MIN_HEIGHT := 1.7
+const WALL_RUN_MIN_SPEED := 4.0
+const WALL_RUN_DURATION := 1.1
+const WALL_RUN_GRAVITY_SCALE := 0.16
+const WALL_RUN_KICKOFF_UP := 5.2
+const WALL_RUN_KICKOFF_OUT := 5.0
 ## Worst case a wrecked body can move or swing at, as a share of healthy. The
 ## soulslike register wants injury to hurt; it does not want a player who has
 ## lost a leg to be unable to disengage from the thing that took it.
@@ -245,6 +264,18 @@ var dodge_direction := Vector3.ZERO
 var vaulting_time := 0.0
 var vault_from := Vector3.ZERO
 var vault_to := Vector3.ZERO
+## AD1.6. The actual duration this specific vault was given, scaled by
+## anatomy at the moment it started — `vaulting_time` counts down against
+## this, never against the flat `VAULT_DURATION` constant, since a hobbled
+## vault is deliberately handed more than that.
+var vault_duration := VAULT_DURATION
+## AD1.3. Positive for as long as the wall is still carrying the player;
+## re-checked and re-set every frame it runs rather than only at the start,
+## since the wall the player is running along can curve or end mid-run.
+var wall_running_time := 0.0
+var wall_run_normal := Vector3.ZERO
+var wall_run_kickoff_queued := false
+var wall_run_unlock_announced := false
 var handheld: Control
 ## FINAL_V.md §16. The one screen-space layer AS2's night warp, and later the
 ## drugs and shadow realms, all reach for instead of building their own effect.
@@ -255,6 +286,49 @@ var keys_card: Control
 ## camera rather than on `handheld` itself — `handheld` is a `Control`, drawn
 ## in the HUD layer, and has nothing to attach a `Light3D` to.
 var handheld_lamp: SpotLight3D
+## A4.2. The handheld beam's own warp shell, kept rather than looked up: it is
+## driven off the battery every frame and a per-frame group query for one node
+## would be a search for something this scene already has in hand.
+var handheld_warp: LightWarp
+
+## A4.1. The lights somebody in the pit actually paid for, written as places
+## rather than as a loop. The gate is the one the player walks in under and the
+## only one that casts shadows, since it is the only one close enough for a
+## shadow to be read as anything but cost.
+## A4.1. How hard a fixture glows after dark. One number, because a bulb that
+## is brighter than the light it stands in reads as a sticker on the frame.
+const BULB_GLOW := 5.0
+
+const GATE_LIGHTS := [
+	{"at": Vector3(-6, 6, -17), "color": "ec6d2e", "energy": 4.2, "reach": 15.0, "shadows": true},
+	{"at": Vector3(7, 6, 6), "color": "ec6d2e", "energy": 3.6, "reach": 14.0},
+	{"at": Vector3(0, 7, -54), "color": "e8a24a", "energy": 3.2, "reach": 18.0},
+	{"at": Vector3(2, 7, -96), "color": "c9722c", "energy": 3.0, "reach": 18.0},
+	{"at": Vector3(-31, 5, 18), "color": "d8552a", "energy": 2.6, "reach": 12.0},
+	{"at": Vector3(26, 5, -30), "color": "d8552a", "energy": 2.6, "reach": 12.0},
+]
+
+## A4.1. Every placed light, so `_update_day_night()` can put them out at dawn
+## without holding a second list of where they are.
+var night_lights: Array[OmniLight3D] = []
+## B2.1. How often the rig reports itself while somebody is reading it. Half a
+## second: fast enough that a wound appears on the chart while the chart is
+## open, slow enough that it is not a snapshot every frame of a body that
+## mostly is not changing.
+const BODY_RECORD_INTERVAL := 0.5
+## A9.2. How fast the haze follows the air. Eased rather than set, because
+## `_update_day_night()` writes the same value off the hour and the two would
+## otherwise fight frame by frame.
+const AIR_FOG_BLEND := 0.08
+## A7.1. Who is up, and the hour that decides it.
+var gods: Gods
+## A8.1. The spirit on the body, and the frame melting around it.
+var flame: UndyingFlame
+## A9.1. What is in the air between the player and everything else.
+var air: ContaminatedAir
+## B2.1. Counts down while the handheld is up, so the body chart the player is
+## reading is the body they are standing in.
+var body_record_timer := 0.0
 ## AS2. Built once in `_build_world()`, driven every frame in
 ## `_update_day_night()` off `world_clock.gd` — it used to sit at one fixed
 ## angle and brightness no matter the hour, which is why W1.1 existing made no
@@ -376,6 +450,12 @@ func _ready() -> void:
 	handheld_lamp.rotation_degrees = Vector3(-6, 4, 0)
 	handheld_lamp.shadow_enabled = true
 	camera.add_child(handheld_lamp)
+	# A4.2. The handheld is a light like any other, so it warps the air like any
+	# other — and being the one you carry, it is the first warping most players
+	# will ever see. Out of the day/night group on purpose: this one answers its
+	# own battery in `_update_handheld_lamp()`, not the hour, because a light
+	# somebody is holding is not a light the world turned on.
+	handheld_warp = LightWarp.attach(handheld_lamp, -1.0, false)
 	resolution_ui = preload("res://systems/downed_resolution.gd").new()
 	resolution_ui.name = "DownedResolution"
 	$HUD.add_child(resolution_ui)
@@ -487,6 +567,13 @@ func _build_player_rig() -> void:
 	# The capsule is centred on the controller origin, so drop the rig by half
 	# its height to stand the feet on the floor rather than mid-shin.
 	player_rig.position = Vector3(0, -0.9, 0)
+	# A8.1. Lit at build, on the rig itself rather than on the camera or the
+	# HUD: what burns here is the body, and every previous attempt at this was
+	# an overlay that stayed exactly as bright when the body was not in frame.
+	flame = UndyingFlame.new()
+	flame.name = "UndyingFlame"
+	player_rig.add_child(flame)
+	flame.ignite(player_rig)
 	var saved: Dictionary = WorldHistory.subject("player")
 	# D4.2. The race you were decanted as is a silhouette, not just a stat block.
 	# A Marrow-Cut stands bigger than an Unreset, and until now every body in the
@@ -517,7 +604,8 @@ func _build_player_rig() -> void:
 	hunter_appearance = HUNTER_APPEARANCE.new()
 	hunter_appearance.name = "HunterAppearance"
 	player_rig.add_child(hunter_appearance)
-	hunter_appearance.configure(player_rig)
+	# B4.1. The sheet's marks travel with the appearance it already drives.
+	hunter_appearance.configure(player_rig, appearance)
 
 
 ## Blood type is a choice on the intake sheet, so it has to mean something.
@@ -762,6 +850,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_SPACE:
 				if not grapple_target.is_empty():
 					_break_grapple("YOU LET GO")
+				elif wall_running_time > 0.0:
+					# AD1.3. Its own outcome, not routed through `_jump()` —
+					# that function refuses outright the instant it sees the
+					# player is not on the floor, which a wall run always
+					# is. Leaving a wall on purpose is a real push away from
+					# it, not a fall dressed up as one.
+					wall_run_kickoff_queued = true
 				else:
 					var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 					# AD1.2. Checked before the dodge/jump split, not after —
@@ -808,6 +903,9 @@ func _physics_process(delta: float) -> void:
 		return
 	pulse += delta
 	_update_handheld_lamp(delta)
+	_update_flame()
+	_update_air()
+	_update_body_record(delta)
 	# W1.1. The world keeps time, and exactly one place advances it — a clock
 	# that two scenes both wind runs at double speed the moment anybody
 	# builds a third.
@@ -921,13 +1019,48 @@ func _update_player(delta: float) -> void:
 	# animation, and normal gravity/floor-stick would just fight it.
 	if vaulting_time > 0.0:
 		vaulting_time = maxf(0.0, vaulting_time - delta)
-		var progress := 1.0 - vaulting_time / VAULT_DURATION
+		var progress := 1.0 - vaulting_time / vault_duration
 		var eased := 1.0 - pow(1.0 - progress, 3.0)
 		player_body.position = vault_from.lerp(vault_to, eased)
 		if vaulting_time <= 0.0:
 			player_body.position = vault_to
 		player = player_body.position + Vector3.UP * 0.6
 		return
+	# AD1.3. Also a scripted takeover rather than something layered on top of
+	# HUNTER_MOTOR.move_body() — re-finding the wall every frame (it can
+	# curve or run out mid-attempt) and redirecting velocity along it, with
+	# only a fraction of real gravity rather than none, so a run reads as a
+	# body fighting to stay up rather than flight.
+	if wall_running_time > 0.0:
+		var move_input := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+		var wish: Vector3 = HUNTER_MOTOR.wish_direction(move_input, yaw)
+		var surface := _wall_run_surface(wish if not wish.is_zero_approx() else wall_run_normal.cross(Vector3.UP))
+		if surface.is_empty() or player_body.is_on_floor() or wall_run_kickoff_queued:
+			wall_running_time = 0.0
+		else:
+			wall_running_time = maxf(0.0, wall_running_time - delta)
+			wall_run_normal = surface.normal
+			var tangent: Vector3 = surface.tangent
+			var speed: float = maxf(Vector2(player_body.velocity.x, player_body.velocity.z).length(), WALL_RUN_MIN_SPEED)
+			var desired: Vector3 = tangent * speed
+			player_body.velocity.x = desired.x
+			player_body.velocity.z = desired.z
+			player_body.velocity.y -= HUNTER_MOTOR.GRAVITY * WALL_RUN_GRAVITY_SCALE * delta
+			player_body.move_and_slide()
+			player = player_body.position + Vector3.UP * 0.6
+			return
+		if wall_run_kickoff_queued:
+			# Kicking off, not merely falling off: a real impulse away from
+			# the wall and up, so leaving one on purpose (its own key,
+			# checked in `_unhandled_input` before the dodge/jump split)
+			# reads differently from simply running off the end of it.
+			wall_run_kickoff_queued = false
+			player_body.velocity += wall_run_normal * WALL_RUN_KICKOFF_OUT
+			player_body.velocity.y = WALL_RUN_KICKOFF_UP
+			WorldHistory.record_event("player_wall_run_kickoff", {"location": HUNT_LOCATION})
+			player_body.move_and_slide()
+			player = player_body.position + Vector3.UP * 0.6
+			return
 	# Standing over a downed body with the form open costs you your footwork,
 	# and so does having hold of someone.
 	if resolution_ui.visible or not grapple_target.is_empty():
@@ -981,9 +1114,20 @@ func _update_player(delta: float) -> void:
 	# The jump and the slide that proves it happen in the same physics step.
 	var jumping := jump_queued and player_body.is_on_floor()
 	jump_queued = false
-	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0, JUMP_IMPULSE if jumping else 0.0)
+	# AD1.6. The same floor B6.5 already put under running speed and combat
+	# strength, not a new one invented for jumping — a hobbled body should
+	# leave the ground with a hobbled body's own jump, not a healthy one's.
+	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0, JUMP_IMPULSE * _player_speed_scale() if jumping else 0.0)
 	if jumping:
 		WorldHistory.record_event("player_jumped", {"location": HUNT_LOCATION})
+	# AD1.3. Starting a run needs no key at all — the body grabs the wall
+	# the instant it is airborne, fast, and next to one, the same way real
+	# momentum would. Only leaving one on purpose (the kickoff, above) is a
+	# deliberate act; falling into one is not.
+	if wall_running_time <= 0.0 and not player_body.is_on_floor() and not jumping:
+		var starting_surface := _wall_run_surface(direction if not direction.is_zero_approx() else HUNTER_MOTOR.wish_direction(Vector2(0, -1), yaw))
+		if not starting_surface.is_empty():
+			_begin_wall_run(starting_surface)
 	if player_body.position.y < -10.0:
 		player_body.position = Vector3(0, 1.0, 19)
 	player = player_body.position + Vector3.UP * 0.6
@@ -1628,6 +1772,9 @@ func _update_handheld_lamp(delta: float) -> void:
 	var lit: bool = handheld.has_method("torch_active") and handheld.torch_active()
 	handheld_lamp.visible = lit
 	if not lit:
+		# A4.2. Dark beam, still air.
+		if handheld_warp != null and is_instance_valid(handheld_warp):
+			handheld_warp.set_amount(0.0)
 		return
 	var charge: float = handheld.battery_percent() if handheld.has_method("battery_percent") else 1.0
 	var waver := 1.0 + sin(pulse * 11.0) * 0.03 * (1.0 + (1.0 - charge) * 2.5)
@@ -1636,6 +1783,11 @@ func _update_handheld_lamp(delta: float) -> void:
 		var gutter := 1.0 if fmod(pulse * (5.0 + (0.2 - charge) * 40.0), 1.0) > 0.5 else 0.0
 		waver *= 0.7 + 0.3 * gutter
 	handheld_lamp.light_energy = 9.0 * charge * waver
+	# A4.2. The air the beam bends answers the same battery the beam does, so a
+	# guttering torch bends it in the same stutter rather than holding a steady
+	# shimmer over a dying light.
+	if handheld_warp != null and is_instance_valid(handheld_warp):
+		handheld_warp.set_amount(clampf(handheld_lamp.light_energy / 9.0, 0.0, 1.0))
 
 
 ## AD1.2. Empty means "not vaultable", never a crash — every one of these
@@ -1647,6 +1799,13 @@ func _vault_target(direction: Vector3) -> Dictionary:
 	if direction.is_zero_approx() or crouching or vaulting_time > 0.0:
 		return {}
 	if not player_body.is_on_floor():
+		return {}
+	# AD1.6. "A broken leg cannot vault" — literally: `mobility_ratio()`
+	# reads 0.5 for one leg destroyed and the other untouched, so the same
+	# `PLAYER_INJURY_FLOOR` (0.55) B6.5 already uses for how far a wrecked
+	# body can move or swing draws the line here too, rather than a second
+	# number invented for this one verb. Below it, this is a wall again.
+	if player_rig.anatomy.mobility_ratio() < PLAYER_INJURY_FLOOR:
 		return {}
 	var space := get_world_3d().direct_space_state
 	var exclusions := _player_collision_exclusions()
@@ -1700,11 +1859,83 @@ func _vault_target(direction: Vector3) -> Dictionary:
 
 
 func _vault(landing: Vector3) -> void:
-	vaulting_time = VAULT_DURATION
+	# AD1.6. Cleared the gate in `_vault_target()`, so mobility here is
+	# somewhere in (PLAYER_INJURY_FLOOR, 1.0] rather than the full range —
+	# a body that can still vault at all takes longer over it the worse off
+	# it is, rather than clearing every obstacle at the same one healthy
+	# speed right up until the gate simply refuses it outright.
+	vault_duration = VAULT_DURATION * lerpf(1.6, 1.0, player_rig.anatomy.mobility_ratio())
+	vaulting_time = vault_duration
 	vault_from = player_body.position
 	vault_to = landing
 	player_body.velocity = Vector3.ZERO
 	WorldHistory.record_event("player_vaulted", {"location": HUNT_LOCATION})
+
+
+## AD1.3. Looks to both sides rather than assuming which one, since the wall
+## that matters is whichever one the player is actually running alongside.
+## Empty means "no wall run here" for any of several honest reasons: not
+## earned yet, nothing within reach, or something within reach that AD1.2's
+## own vault would rather have handled — a low ledge fails the second cast
+## the same way a real wall fails `_vault_target()`'s high one.
+func _wall_run_surface(direction: Vector3) -> Dictionary:
+	if not wall_run_unlocked():
+		return {}
+	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty():
+		return {}
+	# AD1.6. The same real floor `_vault_target()` gates on — a leg wrecked
+	# past this point cannot hold weight sideways against a wall any more
+	# than it can throw the body up and over one.
+	if player_rig.anatomy.mobility_ratio() < PLAYER_INJURY_FLOOR:
+		return {}
+	if direction.is_zero_approx():
+		return {}
+	var horizontal := Vector3(direction.x, 0.0, direction.z)
+	if horizontal.is_zero_approx():
+		return {}
+	horizontal = horizontal.normalized()
+	var speed := Vector2(player_body.velocity.x, player_body.velocity.z).length()
+	if speed < WALL_RUN_MIN_SPEED:
+		return {}
+	var space := get_world_3d().direct_space_state
+	var exclusions := _player_collision_exclusions()
+	var chest: Vector3 = player_body.position
+	for side in [Vector3(horizontal.z, 0.0, -horizontal.x), Vector3(-horizontal.z, 0.0, horizontal.x)]:
+		var near_query := PhysicsRayQueryParameters3D.create(chest, chest + side * WALL_RUN_REACH)
+		near_query.exclude = exclusions
+		var near_hit := space.intersect_ray(near_query)
+		if near_hit.is_empty():
+			continue
+		# It has to keep going well above where a vault would already have
+		# put the player on top of it, or this is a ledge, not a wall.
+		var high_from: Vector3 = player_body.position + Vector3.UP * (WALL_RUN_MIN_HEIGHT - 0.9)
+		var high_query := PhysicsRayQueryParameters3D.create(high_from, high_from + side * WALL_RUN_REACH)
+		high_query.exclude = exclusions
+		if space.intersect_ray(high_query).is_empty():
+			continue
+		var normal: Vector3 = near_hit.normal
+		var tangent: Vector3 = horizontal.slide(normal)
+		if tangent.is_zero_approx():
+			continue
+		return {"normal": normal, "tangent": tangent.normalized()}
+	return {}
+
+
+func _begin_wall_run(surface: Dictionary) -> void:
+	# AD1.6. Cleared the gate in `_wall_run_surface()` already, so this is
+	# always shortening a run rather than ever lengthening past the healthy
+	# baseline — a body that can still hold a wall does not hold it as
+	# long the worse off it is.
+	wall_running_time = WALL_RUN_DURATION * lerpf(0.5, 1.0, player_rig.anatomy.mobility_ratio())
+	wall_run_normal = surface.normal
+	# Whatever vertical velocity got the player here (a jump, a fall) is not
+	# what a wall run is — leaving it alone let a fresh jump's own impulse
+	# carry straight through, rocketing the body up past the top of the
+	# wall over the run's own duration instead of tracking roughly level
+	# along it. Capped rather than zeroed, so stepping onto one already
+	# falling still reads as catching momentum, not a hard reset.
+	player_body.velocity.y = minf(player_body.velocity.y, 1.0)
+	WorldHistory.record_event("player_wall_run_started", {"location": HUNT_LOCATION})
 
 
 func _dodge() -> void:
@@ -3148,6 +3379,27 @@ func third_person_unlocked() -> bool:
 	return bosses >= UNLOCK_BOSSES
 
 
+## AD1.3. "Earned the way third person is earned rather than given" — the
+## same shape as `third_person_unlocked()` just above, a real thing the
+## player did rather than a flag, counted straight off `player_vaulted`
+## (AD1.2's own event) since wall-running is the next rung of the same
+## traversal skill vaulting is, not a combat unlock like third person's own.
+func wall_run_unlocked() -> bool:
+	return WorldHistory.event_count("player_vaulted") >= WALL_RUN_UNLOCK_VAULTS
+
+
+## M1.5's pattern, not its wording: the moment the count crosses, not the
+## moment a key is pressed, because a passive movement skill has no key to
+## press early against — the body simply starts trusting the wall the
+## instant it has earned the right to.
+func _announce_wall_run_unlock() -> void:
+	prompt.text = "YOUR BODY TRUSTS THE WALL NOW. RUN AT ONE."
+	if impact_feel != null:
+		impact_feel.kick += Vector2(0, -1.0) * 0.05
+		impact_feel.shake = maxf(impact_feel.shake, 0.5)
+	WorldHistory.record_event("wall_run_unlocked", {"location": HUNT_LOCATION})
+
+
 ## M1.5. The unlock has to land as something that happened to the player, not
 ## a silent permission flip they only discover by trying the key. The moment
 ## the two conditions are both true — regardless of whether `F` is pressed
@@ -3343,6 +3595,9 @@ func _update_hud() -> void:
 	if not third_person_unlock_announced and third_person_unlocked():
 		third_person_unlock_announced = true
 		_announce_third_person_unlock()
+	if not wall_run_unlock_announced and wall_run_unlocked():
+		wall_run_unlock_announced = true
+		_announce_wall_run_unlock()
 	title.text = "WIZARDS ONLY FOOLS // LIMBO: ASHBLOOM EXPANSE"
 	# I3. The second control strip is gone. `gothic_field_hud.gd` draws the one
 	# the player reads, in the game's own face, and it is contextual — this was
@@ -3518,6 +3773,20 @@ func _build_world() -> void:
 	# ambient, which rendered the Expanse as an unreadable brown murk — the same
 	# fault the menu had. The roadmap already listed this scene as un-migrated.
 	$WorldEnvironment.environment = WorldLook.environment("ashbloom")
+	# A7.1. The gods sit outside the firmament v6 broke open, so they are bound
+	# to the same sky material and driven by the same clock as everything else
+	# in A. `camera` is an `@onready`, which resolves before `_ready()` calls
+	# this, so it is safe to hand over here.
+	gods = Gods.new()
+	gods.name = "Gods"
+	add_child(gods)
+	gods.bind($WorldEnvironment.environment.sky.sky_material as ShaderMaterial, camera)
+	gods.god_seen.connect(_on_god_seen)
+	# A9.1. The air, which for nine passes was empty. Added to the scene rather
+	# than to the player so its particles live in world space and the player
+	# walks through them instead of towing them.
+	air = ContaminatedAir.new()
+	add_child(air)
 	_add_mesh(BoxMesh.new(), Vector3(0, -0.6, 0), Vector3(470, 1, 370), Color("17150f"), 0.0)
 	var floor_body := StaticBody3D.new()
 	var floor_collider := CollisionShape3D.new()
@@ -3580,19 +3849,134 @@ func _build_world() -> void:
 		pylon.add_child(shaft)
 		Silhouette.dress(pylon, pylon_size, index + 91, Callable(WorldLook, "surface"))
 		Silhouette.settle(pylon, index + 91)
-	for index in 9:
-		var lamp := OmniLight3D.new()
-		lamp.position = Vector3(-24 + index * 6, 6, -17 + (index % 2) * 23)
-		lamp.light_color = Color("ec6d2e")
-		lamp.light_energy = 3.5
-		lamp.omni_range = 13
-		add_child(lamp)
+	# A4.1. Light in this world is scarce and it belongs to something. These nine
+	# stood in an arithmetic row — `-24 + index * 6`, eight metres apart at the
+	# origin — which is the whole reason night read as one lit clearing in a black
+	# region rather than as a region at night. They are placed now: the pit gate
+	# somebody walks in through, two along the road out, and a pair over the
+	# wreck line. Fewer lamps, further apart, each on a thing that would have
+	# power.
+	for spot: Dictionary in GATE_LIGHTS:
+		_place_night_light(spot["at"], Color(spot["color"]), float(spot["energy"]), float(spot["reach"]), bool(spot.get("shadows", false)))
 	sun = DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-50, -25, 0)
 	sun.light_color = Color("c89572")
 	sun.light_energy = 1.4
 	sun.shadow_enabled = true
 	add_child(sun)
+
+
+## A4.1. One place a light is made, so every light in the region is in the same
+## system: it is recorded for the hour to drive, and it gets its warp shell
+## (A3.2) at birth rather than from a later sweep that could miss one.
+func _place_night_light(at: Vector3, color: Color, energy: float, reach: float, shadows := false, bulb_size := 0.4) -> OmniLight3D:
+	var lamp := OmniLight3D.new()
+	lamp.position = at
+	lamp.light_color = color
+	lamp.light_energy = energy
+	lamp.omni_range = reach
+	lamp.shadow_enabled = shadows
+	# The air here is bad enough to have volumetric fog in it, so a lamp should
+	# have a throw you can see from outside the circle it lights. This is the
+	# difference between a light and a lit patch of ground.
+	lamp.light_volumetric_fog_energy = 1.8
+	lamp.set_meta("night_energy", energy)
+	add_child(lamp)
+	# The fixture itself. A light with no visible source is only its effect on
+	# whatever it reaches, and at any distance through this fog that is nothing:
+	# the first build of A4.1 photographed a black region with five lights in it
+	# and five lights' worth of nothing to see. A lamp has a bulb.
+	var bulb := MeshInstance3D.new()
+	var bulb_mesh := SphereMesh.new()
+	bulb_mesh.radius = bulb_size
+	bulb_mesh.height = bulb_size * 2.0
+	bulb_mesh.radial_segments = 10
+	bulb_mesh.rings = 6
+	var glass := StandardMaterial3D.new()
+	glass.albedo_color = color
+	glass.emission_enabled = true
+	glass.emission = color
+	glass.emission_energy_multiplier = BULB_GLOW
+	glass.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bulb_mesh.material = glass
+	bulb.mesh = bulb_mesh
+	bulb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	lamp.add_child(bulb)
+	lamp.set_meta("glass", glass)
+	night_lights.append(lamp)
+	LightWarp.attach(lamp)
+	return lamp
+
+
+## A8.1 / A8.2. The spirit shows through as the body fails, which is the one
+## reading in this game that gets stronger the worse things are going. Driven
+## off the same `combat_ratio()` the damage model already keeps, so the flame
+## can never disagree with the body it is burning on.
+func _update_flame() -> void:
+	if flame == null or not is_instance_valid(flame):
+		return
+	if player_rig == null or not is_instance_valid(player_rig):
+		return
+	flame.set_condition(player_rig.anatomy.combat_ratio())
+
+
+## B2.1. The rig, kept current while the player is looking at it.
+##
+## `anatomy_state` was written in exactly two places — on taking a wound and on
+## being re-decanted — so the World Index's BODY page showed whatever the last
+## fight had left behind. Anything that changed the body without going through
+## `_take_damage()` (a limb picked up or dropped, an implant, a heal, a graft,
+## anything a future system does to the rig) simply never reached the chart:
+## the body was inspectable only under damage, which is this segment's
+## complaint in its own words.
+##
+## Amended rather than updated, because `update_subject()` records a history
+## event and a player standing still reading their own chart has not done
+## anything the world needs to remember. Only while the device is up, so a
+## closed handheld costs nothing.
+func _update_body_record(delta: float) -> void:
+	if handheld == null or not is_instance_valid(handheld) or not handheld.is_open:
+		body_record_timer = 0.0
+		return
+	if player_rig == null or not is_instance_valid(player_rig):
+		return
+	body_record_timer -= delta
+	if body_record_timer > 0.0:
+		return
+	body_record_timer = BODY_RECORD_INTERVAL
+	WorldHistory.amend_subject("player", {"anatomy_state": player_rig.snapshot()})
+
+
+## A9.1 / A9.2. The volume follows the player in steps, and its severity is read
+## from the number AS4.2 says the storm will read — so when that segment builds
+## the storm, the air is already answering the same source rather than needing a
+## second one. `chaos_magick()` sits near zero on a quiet run and climbs with
+## rituals and with the gods A7 put in the sky.
+func _update_air() -> void:
+	if air == null or not is_instance_valid(air):
+		return
+	air.follow(player)
+	air.set_severity(clampf(WorldHistory.chaos_magick(), 0.0, 1.0))
+	# B7.1. Standing in it costs something. The air doses whatever it is
+	# touching, and what the player is wearing decides how much of it gets
+	# through — which is what makes a filter mask a decision rather than a
+	# cosmetic.
+	if player_rig != null and is_instance_valid(player_rig):
+		player_rig.anatomy.expose(air.severity(), get_physics_process_delta_time())
+	var env: Environment = $WorldEnvironment.environment
+	if env != null:
+		# The haze thickens with it. Motes say there is something in the air;
+		# the fog is what makes the far side of the region disappear into it.
+		env.volumetric_fog_density = env.volumetric_fog_density * (1.0 - AIR_FOG_BLEND) 			+ float(WorldLook.PRESETS.ashbloom.volumetric) * (1.0 + air.severity() * 2.2) * AIR_FOG_BLEND
+
+
+## A7.2. A sighting is not decoration: `gods.gd` has already written it into
+## `WorldHistory` by the time this runs, and this is where the scene answers.
+## The line goes to the status readout rather than a bespoke banner, because the
+## one thing this world does with an omen is note it and carry on.
+func _on_god_seen(body: Dictionary) -> void:
+	if status != null and is_instance_valid(status):
+		status.text = "%s IS UP // %s" % [String(body.get("name", "SOMETHING")), WorldClock.long_stamp()]
 
 
 ## AS2. The sun and the base ambient used to be set once in `_build_world()`
@@ -3612,8 +3996,12 @@ func _update_day_night() -> void:
 	sun.light_color = Color("39445a").lerp(Color("c89572"), daylight)
 	var env: Environment = $WorldEnvironment.environment
 	if env != null:
-		env.ambient_light_energy = lerpf(0.16, 0.72, daylight)
-		env.tonemap_exposure = lerpf(0.85, 1.18, daylight)
+		# A3.1. The sky and the fog move with the hour too. Without this the
+		# sun dimmed, the ground went black and the horizon stayed exactly as
+		# bright as it is at noon — verified by capture, the 01:00 and 12:00
+		# skies were identical. Kept in `world_look.gd` so the derby and the
+		# hunt cannot end up with two different nights.
+		WorldLook.apply_hour(env, daylight, "ashbloom")
 	# AS2.1 said "the light can become really warped at night and distorted",
 	# and this read it literally: every night pushed the psychedelic shader's
 	# displacement dial up, so a sober player walking around after dark got a
@@ -3629,6 +4017,28 @@ func _update_day_night() -> void:
 	# `substances.gd`, `meditation.gd` and the shadow realms to move — which is
 	# FINAL_V.md §16's own argument (one shader, many dials) applied properly
 	# rather than spent on the time of day.
+	#
+	# A3.2 is the same statement built where it does belong. The lamps bend the
+	# air around themselves, full after dark and nothing at midday, and the fade
+	# between the two is `daylight()`'s own dusk curve rather than a second one
+	# invented here. A frame with no lamp in it is not warped at all, which is
+	# the whole difference between a property and a filter.
+	LightWarp.set_all(self, 1.0 - daylight)
+	# A4.1. Nothing here burns in daylight. Every lamp sat at a constant energy
+	# around the clock, which is invisible at noon and means night never has a
+	# moment of coming on. Each one keeps its own full value in `night_energy`,
+	# since a gate lamp and a district glow are not the same light turned down.
+	for light in night_lights:
+		if is_instance_valid(light):
+			light.light_energy = float(light.get_meta("night_energy", 3.5)) * (1.0 - daylight)
+			if light.has_meta("glass"):
+				var glass := light.get_meta("glass") as StandardMaterial3D
+				glass.emission_energy_multiplier = BULB_GLOW * (1.0 - daylight)
+				# And the albedo with it. The fixture is unshaded, which means
+				# it draws its own colour whatever the light is doing — so a
+				# lamp that was correctly off at noon still had a bright orange
+				# bulb hanging in the daylight.
+				glass.albedo_color = light.light_color * (1.0 - daylight)
 
 
 func _build_expanse_systems() -> void:
@@ -3636,6 +4046,12 @@ func _build_expanse_systems() -> void:
 	generated_world.name = "ProceduralAshbloomDistricts"
 	add_child(generated_world)
 	generated_world.call("generate", 774013)
+	# A4.1. One light per settlement, read from the generator's own centres so a
+	# district that moves takes its light with it rather than leaving a lamp over
+	# empty ground. Wide and low: this is the glow you steer by from two hundred
+	# metres out across a dark region, not a lamp anybody reads under.
+	for centre: Vector3 in WORLD_GENERATOR.DISTRICT_CENTERS:
+		_place_night_light(centre + Vector3(0, 13, 0), Color("d8973f"), 9.0, 85.0, false, 1.6)
 	pathfinder.build(generated_world.lots)
 	misfire_director = MISFIRE_DIRECTOR.new()
 	misfire_director.name = "RealityMisfires"

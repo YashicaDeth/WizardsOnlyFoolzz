@@ -22,6 +22,9 @@ const ENTRIES := {
 	"blackbox liver": {"zone": "torso", "profile": "organ_box", "armor": 0.16, "max_condition": 110.0, "tint": "403a35"},
 	"remote pulse cage": {"zone": "torso", "profile": "pulse_cage", "armor": 0.20, "max_condition": 126.0, "tint": "725247"},
 	"ashline industrial arm": {"zone": "left_arm", "profile": "industrial_limb", "armor": 0.34, "max_condition": 180.0, "tint": "c15d2d"},
+	# B5.1. Carried in the arm. The pocket version is the same object in
+	# `carry.gd`; what it does is in `crystal_ball.gd` and does not care which.
+	"scrying ball": {"zone": "left_arm", "profile": "orb", "armor": 0.02, "max_condition": 40.0, "tint": "9fb6c4"},
 	"ashline scrap arm": {"zone": "left_arm", "profile": "scrap_limb", "armor": 0.20, "max_condition": 110.0, "tint": "9d542e"},
 }
 

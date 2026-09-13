@@ -12,6 +12,8 @@ extends RefCounted
 ## low saturation, heavy value separation, fog for depth, and deliberately
 ## authored technical limitations rather than clean photorealism.
 
+const FIRMAMENT_SHADER := preload("res://shaders/firmament.gdshader")
+
 ## Authored albedo in the Bone Yard kit runs from 0.025 (oil_asphalt, dead_forest)
 ## to about 0.3 (rusted_steel). Surfaces that dark need real light to read at all:
 ## too little and the pit goes black, too much and the palette cooks to pastel.
@@ -50,13 +52,19 @@ static func environment(preset_name: String = "bone_yard") -> Environment:
 	var preset: Dictionary = PRESETS.get(preset_name, PRESETS.bone_yard)
 	var env := Environment.new()
 
-	var sky_material := ProceduralSkyMaterial.new()
-	sky_material.sky_top_color = Color(preset.zenith)
-	sky_material.sky_horizon_color = Color(preset.horizon)
-	sky_material.ground_bottom_color = Color(preset.ground)
-	sky_material.ground_horizon_color = Color(preset.horizon).darkened(0.25)
-	sky_material.sky_energy_multiplier = 1.15
-	sky_material.sun_angle_max = 48.0
+	# A6.1. The sky was a `ProceduralSkyMaterial` for five passes: a two-colour
+	# gradient, which is the one surface in this game that had never been asked
+	# to say anything, and the one thing a broken firmament cannot be.
+	var sky_material := ShaderMaterial.new()
+	sky_material.shader = FIRMAMENT_SHADER
+	sky_material.set_shader_parameter("zenith", Color(preset.zenith))
+	sky_material.set_shader_parameter("horizon", Color(preset.horizon))
+	sky_material.set_shader_parameter("ground", Color(preset.ground))
+	sky_material.set_shader_parameter("energy", 1.15)
+	sky_material.set_shader_parameter("firmament", firmament())
+	sky_material.set_shader_parameter("breach", float(preset.get("breach", 1.0)))
+	sky_material.set_shader_parameter("beyond", Color(preset.get("beyond", "04050a")))
+	sky_material.set_shader_parameter("shell_edge", Color(preset.get("shell_edge", "9e6a3c")))
 	var sky := Sky.new()
 	sky.sky_material = sky_material
 	env.background_mode = Environment.BG_SKY
@@ -104,6 +112,121 @@ static func environment(preset_name: String = "bone_yard") -> Environment:
 	return env
 
 
+## A3.1. The hour, applied to the whole look rather than to the sun alone.
+##
+## "Every surface A built is judged again after dark, not just dimmed." Judged
+## after dark, it turned out the world was not even dimmed — it was half dimmed.
+## `_update_day_night` drove the sun, the ambient energy and the exposure, and
+## nothing drove the sky. A capture at 01:00 and a capture at noon came back
+## with a pixel-identical horizon: at one in the morning the brightest thing in
+## frame was the sky, the ground under it was crushed to black, and the one real
+## sodium lamp in the shot read the same at both hours because it had a lit sky
+## to compete with. That is the whole reason nothing in section A has ever
+## looked like night: the surfaces were not failing, they were being asked to
+## sit under a midday backdrop with no light on them.
+##
+## So the sky, the fog and the volumetric fog move with the hour too, from the
+## preset's authored day values down to a night the preset derives rather than
+## declares — night is the same place with the light taken out of it, not a
+## second palette somebody would have to keep in agreement with the first.
+##
+## Takes `daylight` rather than reading `WorldClock` itself, so a caller
+## crossfading for its own reasons (a tunnel, the shadow realms, a capture that
+## wants a specific hour) uses the same mapping instead of writing a second one.
+static func apply_hour(env: Environment, daylight: float, preset_name: String = "bone_yard") -> void:
+	if env == null:
+		return
+	var preset: Dictionary = PRESETS.get(preset_name, PRESETS.bone_yard)
+	var lit := clampf(daylight, 0.0, 1.0)
+
+	var sky := env.sky
+	if sky != null and sky.sky_material is ShaderMaterial:
+		var sky_material := sky.sky_material as ShaderMaterial
+		var zenith := Color(preset.zenith)
+		var horizon := Color(preset.horizon)
+		# Night is this sky with the sun taken out of it: the zenith goes
+		# nearly black and keeps its hue, and the horizon loses the warm dust
+		# that only exists because something is lighting it. Derived from the
+		# authored colours so retuning a preset cannot leave its night behind.
+		var night_zenith := zenith.darkened(0.86)
+		var night_horizon := horizon.darkened(0.82).lerp(zenith, 0.45)
+		sky_material.set_shader_parameter("zenith", night_zenith.lerp(zenith, lit))
+		sky_material.set_shader_parameter("horizon", night_horizon.lerp(horizon, lit))
+		sky_material.set_shader_parameter("ground", Color(preset.ground).darkened(lerpf(0.7, 0.0, lit)))
+		# A6.2. The stars behind the break are only there when the sky in front
+		# of them stops competing, which is the same reason you cannot see them
+		# through a lit window.
+		sky_material.set_shader_parameter("star_density", lerpf(0.85, 0.02, lit))
+		# The multiplier is what stopped the horizon ever going dark, because
+		# it held at its daylight value around the clock.
+		sky_material.set_shader_parameter("energy", lerpf(0.07, 1.15, lit))
+
+	# Fog is lit by the sky, so it has to move with it or the haze stays warm
+	# over a cold ground — which reads as smog at noon and as nothing at all at
+	# one in the morning.
+	var fog := Color(preset.fog)
+	env.fog_light_color = fog.darkened(0.78).lerp(fog, lit)
+	env.volumetric_fog_albedo = env.fog_light_color
+	env.volumetric_fog_emission = env.fog_light_color.darkened(0.7)
+	# Slightly denser after dark. Not for atmosphere: it is what keeps a lamp
+	# reading as a light with a throw rather than a bright dot, which is what
+	# A4.1 and A4.2 are going to hang off.
+	# A6.2. And the fog stops repainting the sky after dark. `fog_sky_affect`
+	# held at 0.6 around the clock, which put the haze colour over the whole
+	# dome at every hour — so the night sky photographed as a brown wash at
+	# roughly 0.15 whatever the sky's own energy was, and nothing behind the
+	# break could be seen through it. Fog is lit by the sun; with the sun gone
+	# there is nothing in the air to light.
+	# A10.4. The ambient and the exposure belong to the hour and to the preset,
+	# and they are set here rather than by each scene. `bone_yard_hunt.gd` drove
+	# them with `lerpf(0.16, 0.72, ...)` and `lerpf(0.85, 1.18, ...)`: four
+	# numbers typed into a scene, two of which happened to match the Ashbloom
+	# preset and two of which matched nothing at all — so the Hunt Grounds were
+	# lit by a term nobody had chosen for them, and any scene that wanted the
+	# same night had to copy the same four numbers to get it.
+	env.ambient_light_energy = float(preset.ambient) * lerpf(0.22, 1.0, lit)
+	env.tonemap_exposure = float(preset.get("exposure", 1.25)) * lerpf(0.76, 1.0, lit)
+	_apply_hour_to_materials(lit)
+	env.fog_sky_affect = lerpf(0.12, 0.6, lit)
+	env.fog_density = float(preset.fog_density) * lerpf(1.45, 1.0, lit)
+	env.volumetric_fog_density = float(preset.volumetric) * lerpf(1.6, 1.0, lit)
+
+
+## A10.3. Every material the look system has made, weakly held, so the hour can
+## change all of them and a freed one can still be collected. Weak on purpose: a
+## strong reference here would keep every wrecker's flesh alive for the life of
+## the process.
+static var _hour_materials: Array = []
+## The last daylight the materials were set to, quantised. `apply_hour()` runs
+## every physics frame and walking several hundred materials at 60Hz to write
+## values that have not moved is the kind of cost A10.14 is about.
+static var _material_hour := -1.0
+
+
+## A10.3. What the hour does to a surface. The contamination is the living part
+## of every material in this game — A5.2 made it the only part that emits — and
+## living things that glow do it at night. In daylight the bloom is washed out
+## by the sun the way real bioluminescence is; after dark it is the only thing
+## on a wall giving anything back, which is what makes a lamp worth carrying
+## past a wall rather than only into a room.
+##
+## Quantised to fiftieths, so the walk happens a handful of times across a
+## sunset rather than sixty times a second.
+static func _apply_hour_to_materials(lit: float) -> void:
+	var step := snappedf(clampf(lit, 0.0, 1.0), 0.02)
+	if is_equal_approx(step, _material_hour):
+		return
+	_material_hour = step
+	var living: Array = []
+	for reference in _hour_materials:
+		var material: StandardMaterial3D = (reference as WeakRef).get_ref()
+		if material == null:
+			continue
+		living.append(reference)
+		material.emission_energy_multiplier = float(material.get_meta("day_glow", 0.3)) * lerpf(2.4, 0.45, step)
+	_hour_materials = living
+
+
 static func surface(color: Color, kind: String = "paint", variation_seed: int = 0) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	var tint := color
@@ -115,18 +238,34 @@ static func surface(color: Color, kind: String = "paint", variation_seed: int = 
 		tint.h = fposmod(tint.h + drift * 0.015, 1.0)
 	material.albedo_color = tint
 
+	# A5.1. Up to v4 a kind was two scalars and a pattern, which is why every
+	# surface in the game answered a lamp with the same highlight: the world was
+	# one material wearing six colours. What separates these in life is *how* they
+	# return light — meat passes it through, brushed scrap smears it along the
+	# grain, glass lets it past, dirt gives none of it back — so that is what
+	# separates them here.
 	match kind:
 		"rust":
 			material.metallic = 0.15
 			material.roughness = 0.92
+			# Oxide is a mineral crust, not a metal surface: what specular it has is
+			# dull and colourless.
+			material.metallic_specular = 0.28
 			_apply_grain(material, 0.32, 0.55, "rust", variation_seed)
 		"paint":
 			material.metallic = 0.3
 			material.roughness = 0.68
+			material.metallic_specular = 0.45
 			_apply_grain(material, 0.28, 0.4, "paint", variation_seed)
 		"chrome":
 			material.metallic = 0.85
 			material.roughness = 0.32
+			# Scrap chrome was ground flat by somebody with a wheel, so its highlight
+			# is drawn out along the grain rather than sitting in a round spot. This is
+			# the single cue that separates salvaged plate from painted plate under one
+			# lamp.
+			material.anisotropy_enabled = true
+			material.anisotropy = 0.72
 			_apply_grain(material, 0.4, 0.22, "chrome", variation_seed)
 		"flesh":
 			material.metallic = 0.0
@@ -134,14 +273,54 @@ static func surface(color: Color, kind: String = "paint", variation_seed: int = 
 			material.rim_enabled = true
 			material.rim = 0.5
 			material.rim_tint = 0.6
+			# Meat is not opaque. A lamp behind a limb comes through it, which is the
+			# whole biopunk register and the one thing rim lighting only imitates.
+			material.subsurf_scatter_enabled = true
+			material.subsurf_scatter_strength = 0.6
+			material.subsurf_scatter_transmittance_enabled = true
+			material.subsurf_scatter_transmittance_color = Color(0.75, 0.18, 0.16)
+			# Depth and boost both matter: Godot's default transmittance depth
+			# lets light a few centimetres into a surface, which is right for a
+			# cheek and invisible on anything the size of a limb. A lamp behind
+			# a body in this game should show through it.
+			material.subsurf_scatter_transmittance_depth = 0.85
+			material.subsurf_scatter_transmittance_boost = 0.7
+			# And a backlight as well, which is the part that actually reads.
+			# Measured, not assumed: with an omni lamp behind it, transmittance
+			# alone photographed a black disc at every depth and boost tried —
+			# Godot computes it from the shadow map and it stays a near-surface
+			# effect. `backlight` is the engine's supported wrap-through and it
+			# is what makes a limb with a lamp behind it glow at all.
+			material.backlight_enabled = true
+			material.backlight = Color(0.46, 0.11, 0.09)
 			_apply_grain(material, 2.2, 0.3, "flesh", variation_seed)
 		"bone":
 			material.metallic = 0.0
 			material.roughness = 0.74
+			# Thin bone lights up from behind the way a lampshade does.
+			material.backlight_enabled = true
+			material.backlight = Color(0.32, 0.28, 0.2)
 			_apply_grain(material, 1.4, 0.35, "bone", variation_seed)
+		"glass":
+			# A5.1 names glass and the game had none: `smoked_glass` was remapped onto
+			# chrome, so every window in the world was a mirror. It is the only kind
+			# here that light goes *through*, and the refraction is deliberately small
+			# — this is filthy salvaged glazing, not a lens.
+			material.metallic = 0.0
+			material.roughness = 0.16
+			material.metallic_specular = 0.9
+			material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			material.albedo_color.a = 0.42
+			material.refraction_enabled = true
+			material.refraction_scale = 0.06
+			material.cull_mode = BaseMaterial3D.CULL_DISABLED
+			_apply_grain(material, 0.5, 0.18, "glass", variation_seed)
 		"dirt":
 			material.metallic = 0.0
 			material.roughness = 0.97
+			# Ash and spoil return almost nothing. Without this the ground carries a
+			# sheen under every lamp and reads as wet concrete.
+			material.metallic_specular = 0.08
 			_apply_grain(material, 0.22, 0.6, "dirt", variation_seed)
 		_:
 			material.metallic = 0.35
@@ -158,7 +337,7 @@ const REGRIME := {
 	"celloutz_salvage_teal": {"color": "1f2b26", "kind": "rust"},
 	"bone_enamel": {"color": "6b6048", "kind": "bone"},
 	"tar_rubber": {"color": "14100f", "kind": "dirt"},
-	"smoked_glass": {"color": "121b1c", "kind": "chrome"},
+	"smoked_glass": {"color": "121b1c", "kind": "glass"},
 	"worn_copper": {"color": "50291a", "kind": "rust"},
 	"warning_orange": {"color": "7d3a16", "kind": "rust"},
 	"rusted_steel": {"color": "3d1c11", "kind": "rust"},
@@ -210,15 +389,46 @@ static func emissive(color: Color, energy: float) -> StandardMaterial3D:
 static func _apply_grain(material: StandardMaterial3D, scale: float, strength: float, kind := "paint", seed_value := 0) -> void:
 	material.uv1_triplanar = true
 	material.uv1_scale = Vector3(scale, scale, scale)
-	material.roughness_texture = _noise(scale)
-	material.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
-	material.roughness = clampf(material.roughness * (1.0 - strength * 0.25), 0.05, 1.0)
+	var maps := _surface_maps(kind, material.albedo_color, seed_value)
 	# Albedo was a flat colour on every surface in the game, with only roughness
-	# varying — which is the whole reason the world read as untextured
-	# primitives no matter how the geometry was built. Contamination arrives on
-	# the albedo now, at low resolution and unfiltered, per ART-DIRECTION.md:
-	# colour is contamination, not paint, and the target is PS1-era crunch.
-	material.albedo_texture = _contamination(kind, material.albedo_color, seed_value)
+	# varying — which is the whole reason the world read as untextured primitives
+	# no matter how the geometry was built. Contamination arrives on the albedo
+	# now, at low resolution and unfiltered, per ART-DIRECTION.md: colour is
+	# contamination, not paint, and the target is PS1-era crunch.
+	material.albedo_texture = maps["albedo"]
+	# A5.2. And contamination stops being only a colour. Up to v4 the roughness
+	# map was `_noise(scale)` — unrelated noise, the same field for every kind —
+	# so a rust bloom and the clean steel beside it returned a lamp identically
+	# and the contamination was visible only as a stain in daylight. The map that
+	# decides where the growth is now also decides how that patch answers light:
+	# bloom is wet and takes a sharper highlight, and the bloom is the only part
+	# of the surface that emits, because the green in this world is alive.
+	material.roughness_texture = maps["response"]
+	material.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_ALPHA
+	material.roughness = clampf(material.roughness * (1.0 - strength * 0.25), 0.05, 1.0)
+	material.emission_enabled = true
+	material.emission_texture = maps["response"]
+	material.emission = Color(1, 1, 1)
+	# MULTIPLY, and not by taste: Godot's default emission operator is ADD,
+	# which computes `(emission + texture) * energy`. With a white emission
+	# colour that is a flat glow on every texel whether or not anything is
+	# growing there — the first build of this lit the entire world to mid grey
+	# and read as fog. Multiplied, the map alone decides what emits.
+	material.emission_operator = BaseMaterial3D.EMISSION_OP_MULTIPLY
+	material.emission_energy_multiplier = float(maps["glow"])
+	# A10.3. Registered so the hour can reach it. The sky, the fog and the
+	# lamps all moved with the clock from v3 onward and the surfaces underneath
+	# them did not — they were lit differently at midnight and were otherwise
+	# the same material they had been at noon.
+	material.set_meta("day_glow", float(maps["glow"]))
+	_hour_materials.append(weakref(material))
+	# Born at the current hour rather than at noon. `_apply_hour_to_materials()`
+	# only walks the registry when the hour has actually moved, so without this
+	# a wrecker spawned at one in the morning burns at its daylight value until
+	# something else changes the clock — measured, not guessed: a material made
+	# mid-run read 0.280 where every other surface in the scene read 0.672.
+	if _material_hour >= 0.0:
+		material.emission_energy_multiplier = float(maps["glow"]) * lerpf(2.4, 0.45, _material_hour)
 	# G1.3. Greg's own artwork, as a detail layer over the procedural
 	# contamination rather than instead of it. Flesh only: the body is where a
 	# hand-made surface reads, and putting the same sheets on every wall would
@@ -232,17 +442,25 @@ static func _apply_grain(material: StandardMaterial3D, scale: float, strength: f
 			material.detail_uv_layer = BaseMaterial3D.DETAIL_UV_1
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	# The tint now lives in the texture, so leave the multiplier neutral or the
-	# surface is coloured twice and goes muddy.
+	# surface is coloured twice and goes muddy. The alpha is kept: glass carries
+	# its transparency there and the texture has none of its own.
 	material.albedo_color = Color(1, 1, 1, material.albedo_color.a)
 
 
-## A low-resolution, posterised, contaminated surface for one material kind.
-## Generated rather than authored so nothing here is an imported asset, and
-## cached hard: without the cache a pit of twelve wreckers would build a
-## thousand of these.
+## A low-resolution, posterised, contaminated surface for one material kind,
+## and the map of how that contamination answers light. Generated rather than
+## authored so nothing here is an imported asset, and cached hard: without the
+## cache a pit of twelve wreckers would build a thousand of these.
 static var _surface_cache: Dictionary = {}
 
-static func _contamination(kind: String, tint: Color, seed_value: int) -> ImageTexture:
+
+## A5.2. Returns `albedo` (the colour), `response` (RGB is what the bloom
+## emits, alpha is how rough that texel is) and `glow` (how hard this kind's
+## growth burns). One field decides all of it, which is the point: up to v4 the
+## contamination was painted into the albedo and the roughness came from
+## unrelated noise, so a bloom and the clean plate beside it returned a lamp
+## exactly alike and the contamination existed only in daylight, as a stain.
+static func _surface_maps(kind: String, tint: Color, seed_value: int) -> Dictionary:
 	var bucket := absi(seed_value) % 6
 	var key := "%s|%d|%d|%d|%d" % [kind, roundi(tint.r * 12), roundi(tint.g * 12), roundi(tint.b * 12), bucket]
 	if _surface_cache.has(key):
@@ -262,33 +480,46 @@ static func _contamination(kind: String, tint: Color, seed_value: int) -> ImageT
 	grime.frequency = 0.11
 	grime.seed = rng.randi()
 
-	# What grows on, weeps down or stains this kind of surface.
+	# What grows on, weeps down or stains this kind of surface, and how hard the
+	# growth burns once it is the only thing in the frame emitting.
 	var growth := Color("6d8a2a")
 	var stain := Color("2a1a12")
 	var bloom := 0.42
+	var glow := 0.5
 	match kind:
 		"rust":
 			growth = Color("8a4a1c")
 			stain = Color("241109")
 			bloom = 0.62
+			glow = 0.28
 		"chrome":
 			growth = Color("4a5a5e")
 			stain = Color("13181a")
 			bloom = 0.3
+			glow = 0.12
 		"flesh":
 			growth = Color("7d3a3a")
 			stain = Color("2a0b10")
 			bloom = 0.34
+			glow = 0.22
 		"bone":
 			growth = Color("b8a870")
 			stain = Color("3a3018")
 			bloom = 0.3
+			glow = 0.1
+		"glass":
+			growth = Color("3e5a46")
+			stain = Color("101614")
+			bloom = 0.34
+			glow = 0.18
 		"dirt":
 			growth = Color("5c5340")
 			stain = Color("1b1710")
 			bloom = 0.55
+			glow = 0.2
 
 	var image := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	var response := Image.create(size, size, false, Image.FORMAT_RGBA8)
 	for y in size:
 		for x in size:
 			var patch := absf(blotch.get_noise_2d(float(x), float(y)))
@@ -297,9 +528,11 @@ static func _contamination(kind: String, tint: Color, seed_value: int) -> ImageT
 			# down it for years.
 			var weep := clampf(absf(blotch.get_noise_2d(float(x) * 3.4, float(y) * 0.32)), 0.0, 1.0)
 
+			var living := clampf(patch * bloom * 2.6, 0.0, 0.95)
+			var weeping := clampf(weep * 0.9 - 0.1, 0.0, 0.8)
 			var value := tint
-			value = value.lerp(growth, clampf(patch * bloom * 2.6, 0.0, 0.95))
-			value = value.lerp(stain, clampf(weep * 0.9 - 0.1, 0.0, 0.8))
+			value = value.lerp(growth, living)
+			value = value.lerp(stain, weeping)
 			value = value.darkened(cell * 0.52)
 			# Panel seams and patch plates: straight edges, because a wall that
 			# has been repaired has lines on it and pure noise never does.
@@ -316,9 +549,79 @@ static func _contamination(kind: String, tint: Color, seed_value: int) -> ImageT
 			)
 			image.set_pixel(x, y, value)
 
-	var texture := ImageTexture.create_from_image(image)
-	_surface_cache[key] = texture
-	return texture
+			# The same field, read as a light response. Growth is wet, so it takes a
+			# tighter highlight than the dry plate around it; the multiplier can only
+			# reduce roughness, which is correct — nothing here is rougher than the
+			# material's own worst state. Only the living part emits, and it emits its
+			# own colour rather than a house green.
+			var slick := clampf(1.0 - living * 0.55, 0.3, 1.0)
+			var burn := living * living
+			response.set_pixel(x, y, Color(growth.r * burn, growth.g * burn, growth.b * burn, slick))
+
+	var maps := {
+		"albedo": ImageTexture.create_from_image(image),
+		"response": ImageTexture.create_from_image(response),
+		"glow": glow,
+	}
+	_surface_cache[key] = maps
+	return maps
+
+
+## A6.1. Where the sky is broken, as an equirectangular map: red is the
+## fracture itself, green the shell's broken edge around it.
+##
+## Sampled in three dimensions off the direction vector rather than in two off
+## the texel grid, which costs the same and removes both of the artefacts that
+## come free with an equirect map: the seam behind the player at yaw 0, and the
+## pinch at the poles where a two-dimensional field gets wrung out to a point.
+##
+## Generated, cached and never regenerated: the break is a fact about the world
+## and every scene that looks up is looking at the same one.
+static var _firmament_map: ImageTexture = null
+
+
+static func firmament() -> ImageTexture:
+	if _firmament_map != null:
+		return _firmament_map
+	var width := 384
+	var height := 192
+	# Cellular distance2-minus-distance1 is ~0 exactly along the boundary between
+	# two cells and rises inward, so the zero set of it is a web of joins — which
+	# is what a shattered shell is, and what no amount of ridged noise gives you.
+	var cells := FastNoiseLite.new()
+	cells.noise_type = FastNoiseLite.TYPE_CELLULAR
+	cells.cellular_return_type = FastNoiseLite.RETURN_DISTANCE2_SUB
+	cells.frequency = 0.9
+	cells.seed = 7741
+	# Where it is broken at all. Without this the whole dome crazes evenly, which
+	# reads as a texture on the sky rather than as damage to it.
+	var region := FastNoiseLite.new()
+	region.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	region.frequency = 0.55
+	region.fractal_octaves = 2
+	region.seed = 4013
+	var image := Image.create(width, height, false, Image.FORMAT_RGBA8)
+	for y in height:
+		var phi := float(y) / float(height) * PI
+		for x in width:
+			var theta := (float(x) / float(width) - 0.5) * TAU
+			var dir := Vector3(sin(phi) * sin(theta), cos(phi), sin(phi) * cos(theta))
+			var joint := absf(cells.get_noise_3d(dir.x * 8.0, dir.y * 8.0, dir.z * 8.0))
+			var open := smoothstep(0.12, 0.46, region.get_noise_3d(dir.x * 2.2, dir.y * 2.2, dir.z * 2.2))
+			# Kept off the ground and off the zenith: a tear you have to look up for,
+			# rather than one that meets the horizon all the way round.
+			var band := smoothstep(0.0, 0.25, dir.y) * (1.0 - smoothstep(0.65, 1.0, dir.y))
+			# Thresholds measured, not assumed. Godot's cellular
+			# distance2-minus-distance1 does not come down to zero on a cell
+			# boundary: over this sphere it runs 0.33 to 0.99, with half a
+			# percent of it below 0.50 and four percent below 0.60. The obvious
+			# `smoothstep(0.0, 0.05)` for "near the join" can therefore never
+			# fire, and the first build of this generated an empty map.
+			var crack := (1.0 - smoothstep(0.58, 0.645, joint)) * open * band
+			var edge := (1.0 - smoothstep(0.58, 0.76, joint)) * open * band
+			image.set_pixel(x, y, Color(crack, clampf(edge - crack, 0.0, 1.0), 0.0, 1.0))
+	_firmament_map = ImageTexture.create_from_image(image)
+	return _firmament_map
 
 
 static func _noise(scale: float) -> NoiseTexture2D:
