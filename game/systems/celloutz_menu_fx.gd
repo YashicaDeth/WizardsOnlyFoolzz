@@ -30,7 +30,9 @@ func _draw() -> void:
 ## screen.  This is drawn under the type so it reads like something stamped in
 ## wet rust on the camera glass: imperfect rings, a six-point ward and drips.
 func _draw_blood_sigil() -> void:
-	var center := Vector2(size.x * 0.67, size.y * 0.42)
+	# Kept clear of the title card: this is the middle-right ritual wound in the
+	# image, not another mark competing with the logo.
+	var center := Vector2(size.x * 0.79, size.y * 0.52)
 	var radius := minf(size.x, size.y) * 0.205
 	var breathe := 0.78 + sin(elapsed * 1.15) * 0.14
 	var blood := Color("a91517") * Color(1, 1, 1, 0.45 * breathe)

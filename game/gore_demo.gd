@@ -54,6 +54,9 @@ const BALLISTICS := preload("res://systems/ballistics.gd")
 const IMPACT_FEEL := preload("res://systems/impact_feel.gd")
 const CellOutzType := preload("res://systems/celloutz_type.gd")
 const SUBSTANCE_STATION := preload("res://systems/substance_station.gd")
+const SUBSTANCES := preload("res://systems/substances.gd")
+const SUBSTANCE_EXPERIENCE := preload("res://systems/substance_experience.gd")
+const SMOKEABLES := preload("res://systems/smokeables.gd")
 
 const BODY_COUNT := 7
 const ARENA := 26.0
@@ -81,6 +84,7 @@ const HITSTOP_BLAST := 0.13
 ## Held slow motion. The dial this scene exists to turn.
 const SLOW_SCALE := 0.14
 const TRACE_RANGE := 90.0
+const SANDBOX_SUBJECT := "sandbox_player"
 
 var camera: Camera3D
 var bodies: Array = []
@@ -109,9 +113,14 @@ var note_life := 0.0
 
 
 var station: Node3D
+var carried_substances: Array[Dictionary] = []
+var handheld: HandheldDevice
 
 
 func _ready() -> void:
+	# The sandbox player has the same persisted body ledger a main-game dose
+	# charges.  There is no free, sandbox-only consumption path.
+	WorldHistory.register_subject(SANDBOX_SUBJECT, {"name": "SANDBOX WITNESS", "kind": "person", "anatomy_state": {}})
 	_build_room()
 	_build_camera()
 	impact_feel = IMPACT_FEEL.new()
@@ -126,6 +135,7 @@ func _ready() -> void:
 	station.position = Vector3(0.0, 0.0, 4.2)
 	add_child(station)
 	station.build()
+	station.taken.connect(_on_station_taken)
 	for index in BODY_COUNT:
 		_spawn_body(index)
 	_build_hud()
@@ -445,10 +455,52 @@ func _unhandled_input(event: InputEvent) -> void:
 			_explode(at, 58.0)
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
+			KEY_E: _take_station_item()
+			KEY_G:
+				if handheld != null:
+					handheld.toggle_device()
+			KEY_1: _use_carried(0)
+			KEY_2: _use_carried(1)
+			KEY_3: _use_carried(2)
+			KEY_4: _use_carried(3)
 			KEY_R: _reset()
 			KEY_X: _set_xray(not xray)
 			KEY_ESCAPE: _step_out()
 			KEY_F: _explode(camera.global_position + Vector3(0, 0.4, 0), 92.0)
+
+
+func _take_station_item() -> void:
+	if station == null:
+		return
+	var taken: Dictionary = station.take_nearest(eye)
+	if taken.is_empty():
+		_note("NO SUBSTANCE WITHIN REACH")
+		return
+	# The signal appends the actual data; this only narrates the physical action.
+	_note("TAKEN // %s" % str(taken.get("label", "UNMARKED")))
+
+
+func _on_station_taken(entry: Dictionary) -> void:
+	carried_substances.append(entry.duplicate(true))
+
+
+func _use_carried(index: int) -> void:
+	if index < 0 or index >= carried_substances.size():
+		_note("CARRY SLOT EMPTY")
+		return
+	var item: Dictionary = carried_substances[index]
+	var result: Dictionary = {}
+	if str(item.get("kind", "")) == "substance":
+		result = SUBSTANCES.take(SANDBOX_SUBJECT, str(item.get("id", "")), 1.0)
+		if bool(result.get("ok", false)):
+			SUBSTANCE_EXPERIENCE.begin(SANDBOX_SUBJECT, str(item.get("id", "")), Time.get_ticks_msec() * 0.001, 1.0)
+	else:
+		result = SMOKEABLES.hit(SANDBOX_SUBJECT, str(item.get("id", "")), 0.55, Time.get_ticks_msec() * 0.001)
+	if bool(result.get("ok", false)):
+		carried_substances.remove_at(index)
+		_note("DOSE BEGUN // %s" % str(item.get("label", item.get("id", ""))))
+	else:
+		_note("DOSE REFUSED // %s" % str(result.get("reason", "BODY LEDGER")))
 
 
 
@@ -533,6 +585,10 @@ func _build_hud() -> void:
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.draw.connect(_paint_hud)
 	layer.add_child(hud)
+	# Same damaged CellOutz hardware as the Hunt, not a sandbox text panel.
+	handheld = HandheldDevice.new()
+	handheld.name = "SandboxHandheld"
+	layer.add_child(handheld)
 
 
 func _paint_hud() -> void:
@@ -546,7 +602,7 @@ func _paint_hud() -> void:
 
 	var keys := [
 		["LMB", "SHOOT"], ["RMB", "BLAST THERE"], ["F", "BLAST HERE"],
-		["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["R", "RESET"], ["WASD", "MOVE"],
+		["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["E", "TAKE"], ["1-4", "USE"], ["G", "DEVICE"], ["R", "RESET"], ["WASD", "MOVE"],
 	]
 	var x := 26.0
 	for pair: Array in keys:
@@ -572,6 +628,13 @@ func _paint_hud() -> void:
 		var width := CellOutzType.width_condensed(line, 11.0, 2.0)
 		CellOutzType.draw_condensed(hud, Vector2(right_edge - width, y), line, 11.0, acid * Color(1, 1, 1, 0.8), 2.0)
 		y += 18.0
+	var carry_line := "CARRY  "
+	for index in carried_substances.size():
+		carry_line += "%d:%s  " % [index + 1, str((carried_substances[index] as Dictionary).get("id", "?")).to_upper()]
+	if carried_substances.is_empty():
+		carry_line += "EMPTY // [E] AT THE STATION"
+	var carry_width := CellOutzType.width_condensed(carry_line, 10.0, 1.8)
+	CellOutzType.draw_condensed(hud, Vector2(right_edge - carry_width, y + 10.0), carry_line, 10.0, bone * Color(1, 1, 1, 0.62), 1.8)
 
 	if xray:
 		var tag := "X-RAY"

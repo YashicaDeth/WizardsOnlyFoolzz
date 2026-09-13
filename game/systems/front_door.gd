@@ -75,8 +75,8 @@ func _ready() -> void:
 	add_child(key)
 	var fill := OmniLight3D.new()
 	fill.position = Vector3(3.8, 4.0, -2.0)
-	fill.light_color = Color("334a92")
-	fill.light_energy = 3.4
+	fill.light_color = Color("57151b")
+	fill.light_energy = 2.8
 	fill.omni_range = 18.0
 	add_child(fill)
 
