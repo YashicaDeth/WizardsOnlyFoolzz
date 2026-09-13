@@ -2509,7 +2509,29 @@ being vehicles rather than set pieces.
       itself, which V1.2's visible/physical damage and V1.4's repair both need
       as their foundation. Chassis tuning constants (`DRIVE_FORCE`, `TIRE_GRIP`,
       etc.) were left untouched — A7.7 already gates a retune on G3.1 landing.
-- [ ] **V1.2** Damage is physical and visible, and it changes how it drives
+- [x] **V1.2** ~~Damage is physical and visible, and it changes how it drives~~
+      The visible half already existed — `_update_player_damage_visual` and
+      `_update_detachable_parts` crush the shell and shed panels as integrity
+      drops. The "changes how it drives" half did not: `_integrate_forces`
+      read the same `TIRE_GRIP` regardless of condition, so a car on its last
+      few points of hull cornered, braked and accelerated exactly like a fresh
+      one. `ArcadeVehicle.handling_fraction()` (V1.1's `condition_fraction()`,
+      lerped against `MIN_HANDLING_AT_ZERO_INTEGRITY`) now scales the one grip
+      `limit` that already clamps cornering force, drive force and braking
+      force together, so a single number degrades all three rather than
+      needing three separate terms. A wrecked-out car still keeps half its
+      grip rather than going to zero, since a car at zero integrity is already
+      ending the round, not still being driven through the corner.
+      Verified: `tests/vehicle_handling_test.gd` — a chassis damaged to 30%
+      integrity measurably puts down less speed under identical throttle and
+      turns in less under identical steering, exercised through the real
+      `_integrate_forces` physics rather than a read of the constant.
+      `tests/derby_exit_test.gd` still runs a full heat end to end afterward.
+      Still open: the degradation is a single linear grip scalar, not
+      per-system (a chassis with two wheels barely loaded from a hard
+      side-impact should list and pull, not just grip less all over) — that
+      finer-grained model belongs with the panel/wheel-loss work in V10.2/V10.6
+      rather than this first pass.
 - [ ] **V1.3** Fuel, or a reason a car is not infinite
 - [ ] **V1.4** Cars can be repaired, badly
 - [ ] **V1.5** Somebody else is driving one too, outside the derby
