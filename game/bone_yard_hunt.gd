@@ -278,6 +278,15 @@ var dodge_direction := Vector3.ZERO
 var vaulting_time := 0.0
 var vault_from := Vector3.ZERO
 var vault_to := Vector3.ZERO
+## AD1.5. The horizontal speed the body was carrying the instant it left
+## the ground for this vault, handed straight back the moment the lerp
+## ends. A vault is a scripted position takeover, not a physics flight, so
+## `player_body.velocity` sits unread for its whole duration; without this,
+## it also sat unread at zero, and normal movement's own `move_toward`
+## acceleration had to rebuild a run from a dead stop on the far side of
+## every single obstacle — a stutter this segment's own wording names
+## directly ("run into vault... is one motion").
+var vault_entry_velocity := Vector3.ZERO
 ## AD1.6. The actual duration this specific vault was given, scaled by
 ## anatomy at the moment it started — `vaulting_time` counts down against
 ## this, never against the flat `VAULT_DURATION` constant, since a hobbled
@@ -298,6 +307,12 @@ var wall_run_unlock_announced := false
 var climbing_time := 0.0
 var climb_direction := Vector3.ZERO
 var climb_normal := Vector3.ZERO
+## AD1.5. The run speed the climb itself replaced — while climbing,
+## `player_body.velocity`'s horizontal part is only ever the small press
+## into the wall, not the sprint that got the player here, so a mantle
+## chained straight off it (see the `climbing_time` block) hands that back
+## to `_vault()` instead, the same way a running vault would.
+var climb_entry_speed := 0.0
 var climb_unlock_announced := false
 var handheld: Control
 ## FINAL_V.md §16. The one screen-space layer AS2's night warp, and later the
@@ -1060,6 +1075,10 @@ func _update_player(delta: float) -> void:
 		player_body.position = vault_from.lerp(vault_to, eased)
 		if vaulting_time <= 0.0:
 			player_body.position = vault_to
+			# AD1.5. Handed back rather than left at the zero `_vault()`
+			# set it to — the run this vault interrupted keeps going on
+			# the far side instead of rebuilding from a standing start.
+			player_body.velocity = vault_entry_velocity
 		player = player_body.position + Vector3.UP * 0.6
 		return
 	# AD1.4. A scripted takeover the same way the vault above is — real
@@ -1075,9 +1094,14 @@ func _update_player(delta: float) -> void:
 		var mantle := _vault_target(climb_direction, false)
 		if not mantle.is_empty():
 			climbing_time = 0.0
+			# AD1.5. `_vault()` is about to capture `player_body.velocity` as
+			# what the far side lands with; left alone that would be the
+			# climb loop's own small into-the-wall vector, not the run that
+			# led into the climb in the first place.
+			player_body.velocity = climb_direction * climb_entry_speed
 			_vault(mantle.landing)
 			return
-		var still_climbing := _climb_wall(climb_direction)
+		var still_climbing := _climb_wall(climb_direction, false)
 		if still_climbing.is_empty() or stamina <= 0.0:
 			# The wall ran out, curved away, or the body is spent. Falling
 			# is the honest outcome — there is no ledge to catch and no
@@ -1973,6 +1997,9 @@ func _vault(landing: Vector3) -> void:
 	vaulting_time = vault_duration
 	vault_from = player_body.position
 	vault_to = landing
+	# AD1.5. Captured before the zero below erases it — whatever speed got
+	# the player to this obstacle is what they land with on the far side.
+	vault_entry_velocity = Vector3(player_body.velocity.x, 0.0, player_body.velocity.z)
 	player_body.velocity = Vector3.ZERO
 	WorldHistory.record_event("player_vaulted", {"location": HUNT_LOCATION})
 
@@ -2031,7 +2058,20 @@ func _wall_run_surface(direction: Vector3) -> Dictionary:
 ## obstacle scanner, casting straight ahead instead of `_wall_run_surface()`'s
 ## sideways pair, since a climb is a wall the player is facing, not one
 ## they are running alongside.
-func _climb_wall(direction: Vector3) -> Dictionary:
+## AD1.4/AD1.5. `require_tall` is the whole fix for a real race the mantle
+## chain exposed: the initial trigger and the per-frame "is the wall still
+## there" recheck used to share this one function outright, and both the
+## high check here and `_vault_target()`'s own top band key off the exact
+## same `VAULT_MAX_TOP` line relative to the player's current height. A
+## climb closing in on a ledge crosses that line once — the frame it does,
+## the high check here can go empty (correctly: there is no longer a wall
+## above the vault band) on the *same* frame `_vault_target()`'s own
+## discrete top-scan is a hair outside its band and also returns empty,
+## and the climb ended in a fall a tick before the mantle it was chaining
+## into would have fired. The per-frame recheck (`false`) only needs to
+## know a wall is still within reach at all; deciding "too tall to vault"
+## is a question this function only needs to answer once, at the start.
+func _climb_wall(direction: Vector3, require_tall: bool = true) -> Dictionary:
 	if not climb_unlocked():
 		return {}
 	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty():
@@ -2055,6 +2095,8 @@ func _climb_wall(direction: Vector3) -> Dictionary:
 	var low_hit := space.intersect_ray(low_query)
 	if low_hit.is_empty():
 		return {}
+	if not require_tall:
+		return {"normal": low_hit.normal}
 	# Nothing above the vaultable band means this is `_vault_target()`'s
 	# obstacle, not this one's — a crate gets stepped over, not climbed.
 	var high_query := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * VAULT_MAX_TOP, feet + Vector3.UP * VAULT_MAX_TOP + horizontal * CLIMB_REACH)
@@ -2087,6 +2129,9 @@ func _begin_climb(direction: Vector3, normal: Vector3) -> void:
 	climbing_time = CLIMB_MAX_DURATION * lerpf(0.5, 1.0, player_rig.anatomy.mobility_ratio())
 	climb_direction = Vector3(direction.x, 0.0, direction.z).normalized()
 	climb_normal = normal
+	# AD1.5. Recorded before the climb loop overwrites velocity every frame
+	# with its own small into-the-wall vector.
+	climb_entry_speed = maxf(WALL_RUN_MIN_SPEED, Vector2(player_body.velocity.x, player_body.velocity.z).length())
 	player_body.velocity.y = maxf(player_body.velocity.y, 0.0)
 	WorldHistory.record_event("player_climb_started", {"location": HUNT_LOCATION})
 

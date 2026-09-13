@@ -2999,7 +2999,47 @@ are in it.
       climb nothing. `vault_test`, `wall_run_test`, `jump_test`,
       `anatomy_traversal_test`, `opening_test` and `combat_integration_test`
       regression suites re-verified clean.
-- [ ] **AD1.5** Momentum carries between moves — run into vault into climb is one motion
+- [x] ~~**AD1.5** Momentum carries between moves — run into vault into climb
+      is one motion~~ Real, measured gaps closed rather than a restatement
+      of AD1.4's own claim. A vault is a scripted position takeover —
+      `player_body.velocity` sits unread for its whole duration — and it
+      was being zeroed at the start and left there, so `HunterMotor`'s own
+      `move_toward()` acceleration had to rebuild a run from a dead stop on
+      the far side of every single obstacle: a real stutter, not a feeling.
+      `_vault()` now captures the horizontal velocity the instant it is
+      called and hands it straight back the moment the lerp ends, so the
+      run a vault interrupted keeps going on the far side instead of
+      re-accelerating from zero. The same gap existed one layer up: a climb
+      that chains into AD1.4's mantle was handing `_vault()` the climb
+      loop's own small into-the-wall vector instead of the sprint that led
+      into the climb, so `_begin_climb()` records that entry speed and the
+      mantle hand-off restores it before `_vault()` captures it.
+      \
+      Verifying this exposed a real bug in AD1.4 itself, not just AD1.5:
+      the per-frame "is the wall still there" recheck during a climb was
+      reusing the same too-tall-to-vault high check the *initial* trigger
+      needs, and that check keys off the exact height line
+      `_vault_target()`'s own mantle detection does — a climb closing in on
+      a ledge could cross that line and lose the high check on the very
+      frame the mantle should have taken over, ending in a fall instead.
+      `_climb_wall()` takes a `require_tall` parameter now: `true` for the
+      one-time initial decision (is this a wall or a crate), `false` for
+      the ongoing recheck, which only needs to know a wall is still within
+      reach at all. AD1.4's own test had also been passing on a fallback
+      that accepted "climbed at all" as good enough without a real mantle
+      actually landing anywhere — there was no roof built for it to land
+      on. Both `climb_test.gd` and the new coverage below now build one and
+      require the real thing.
+      \
+      Verified by `tests/momentum_carry_test.gd` (new, headless, 9/9):
+      landing speed after a vault (8.00) matches entry speed, not a
+      rebuilt fraction of it; the run speed a climb replaces is genuinely
+      recorded; and speed on the far side of a full climb-into-mantle chain
+      still reflects the sprint that led into it. `climb_test.gd` re-tightened
+      to require the mantle it chains into actually lands (13/13, still
+      clean). `vault_test`, `wall_run_test`, `jump_test`,
+      `anatomy_traversal_test`, `opening_test` and `combat_integration_test`
+      regression suites re-verified clean.
 - [x] ~~**AD1.6** All of it reads through the anatomy: a broken leg cannot
       vault~~ `AnatomyComponent.mobility_ratio()` already existed and
       already gated running speed through B6.5's `_player_speed_scale()` —

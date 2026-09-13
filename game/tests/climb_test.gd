@@ -83,6 +83,11 @@ func _ready() -> void:
 	print("AD1.4/AD1.5 - triggering one actually ascends, and chains into a mantle with no key pressed for either half")
 	var climb_wall := _make_wall(Vector3(0, 1.5, 19.5), Vector3(2.0, 3.0, 0.4))
 	add_child(climb_wall)
+	# A wall with nothing to land on top of is not a mantle a real building
+	# would offer either — this is the roof `_vault_target()`'s own floor
+	# query is looking for, flush with the wall's own top.
+	var roof := _make_wall(Vector3(0, 2.9, 21.0), Vector3(4.0, 0.2, 4.0))
+	add_child(roof)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	var start: Dictionary = hunt._climb_wall(forward)
@@ -95,10 +100,16 @@ func _ready() -> void:
 		for _tick in 90:
 			hunt._update_player(1.0 / 60.0)
 			if hunt.climbing_time <= 0.0:
-				mantled = hunt.vaulting_time > 0.0 or hunt.player_body.position.y > before_y + 1.0
+				mantled = hunt.vaulting_time > 0.0
 				break
-		check(mantled, "the climb ends by chaining into the mantle once a ledge is within reach, not by getting stuck against the wall")
-		check(hunt.player_body.position.y > before_y, "real vertical travel happened, not a teleport to the top")
+		check(mantled, "the climb ends by chaining into a real mantle once a ledge is within reach, not merely by running out of climb")
+		if mantled:
+			for _tick in 40:
+				hunt._update_player(1.0 / 60.0)
+				if hunt.vaulting_time <= 0.0:
+					break
+			check(hunt.vaulting_time <= 0.0, "...and the mantle itself actually finishes")
+			check(hunt.player_body.position.y > before_y, "real vertical travel happened, not a teleport to the top")
 
 	print("AD1.4 - a wall that disappears mid-climb is falling, not a soft-lock")
 	climb_wall.queue_free()
