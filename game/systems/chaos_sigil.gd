@@ -97,6 +97,18 @@ const EFFECT_DURATION := 180.0
 const EFFECT_COST_KIND := "standing"
 const EFFECT_COST := 4.0
 
+## AJ4.1/AJ4.3. "Skill is what you have actually done, read off the record"
+## and "a practice you stop practising decays." No second stat this file has
+## to keep synchronised with the real one — `skill_level()` counts genuine
+## `sigil_resolved` events for a family, the same events `resolve()` already
+## writes, inside a real trailing window of `WorldClock` time. Nothing prunes
+## old workings on purpose; they simply age out of the window on their own,
+## which is what "stop practising and it decays" actually means read
+## literally — no decay tick, no cron, just a window that moves. AJ4.2's "no
+## skill tree" follows from this directly: there is no second progression
+## structure here for the pyramid (AI) to compete with, only a count.
+const SKILL_DECAY_HOURS := 168.0
+
 
 static func condense(intent: String) -> String:
 	var upper := intent.to_upper()
@@ -281,7 +293,7 @@ static func resolve(sigil: Dictionary, subject_id: String = "player") -> Diction
 		resolved["result"] = "misfired"
 		return {"ok": true, "sigil": resolved, "result": "misfired", "family": family}
 	_bump_potency(subject_id, seed)
-	WorldHistory.record_event("sigil_resolved", {"subject_id": subject_id, "seed": seed, "family": family, "stat": stat, "magnitude": magnitude, "potency": potency + 1})
+	WorldHistory.record_event("sigil_resolved", {"subject_id": subject_id, "seed": seed, "family": family, "stat": stat, "magnitude": magnitude, "potency": potency + 1, "world_minute": WorldClock.minutes()})
 	resolved["result"] = "resolved"
 	resolved["family"] = family
 	return {"ok": true, "sigil": resolved, "result": "resolved", "family": family, "magnitude": magnitude}
@@ -310,6 +322,27 @@ static func _bump_potency(subject_id: String, seed: int) -> void:
 	var table: Dictionary = subject.get("sigil_potency", {}).duplicate(true)
 	table[str(seed)] = int(table.get(str(seed), 0)) + 1
 	WorldHistory.amend_subject(subject_id, {"sigil_potency": table})
+
+
+## AJ4.1/AJ4.3. A subject's real skill in one family: how many times they
+## have actually resolved a sigil into it, inside the last `SKILL_DECAY_HOURS`
+## of world time. Never authored, never a value anything grants directly —
+## the only way this number moves is `resolve()` genuinely succeeding.
+static func skill_level(subject_id: String, family: String) -> int:
+	var now := WorldClock.minutes()
+	var count := 0
+	for event in WorldHistory.events:
+		if str(event.get("type", "")) != "sigil_resolved":
+			continue
+		var details: Dictionary = event.get("details", {})
+		if str(details.get("subject_id", "")) != subject_id:
+			continue
+		if str(details.get("family", "")) != family:
+			continue
+		var at := float(details.get("world_minute", -INF))
+		if now - at <= SKILL_DECAY_HOURS * WorldClock.MINUTES_PER_HOUR:
+			count += 1
+	return count
 
 
 ## AJ1.6. Puts a charged sigil into the world as a real, findable object —

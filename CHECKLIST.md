@@ -2073,11 +2073,11 @@ Covered by `tests/chaos_sigil_resolve_test.gd` (19 checks) and `tests/chaos_sigi
 - [x] **AJ3.5** The target is always the institution, never the congregation — satisfied by construction: all four gods are markets/metrics/labor/image, never a person or a people
 
 ### AJ4 — Magic as progression
-- [ ] **AJ4.1** Skill is what you have actually done, read off the record
-- [ ] **AJ4.2** No skill tree - the pyramid (AI) is the tree, and you climb it
-- [ ] **AJ4.3** A practice you stop practising decays
-- [ ] **AJ4.4** Every system in the game is reachable through a sigil, badly
-- [ ] **AJ4.5** The playground rule: the system should surprise its own author
+- [x] **AJ4.1** Skill is what you have actually done, read off the record — `ChaosSigil.skill_level(subject_id, family)` counts real `sigil_resolved` events for that family, the exact events `resolve()` already writes — no second stat invented anywhere that this file would have to keep in sync with the real one
+- [x] **AJ4.2** No skill tree - the pyramid (AI) is the tree, and you climb it — true by construction rather than a separate decision to enforce: `skill_level()` is a count over real history, not a node graph with its own state, so there is no second progression structure for AI's pyramid to compete with
+- [x] **AJ4.3** A practice you stop practising decays — `skill_level()` only counts within a trailing `SKILL_DECAY_HOURS` (168, a week of `world_clock.gd` time, W1.1). Nothing prunes old workings on a timer; they simply age out of the window on their own, which is what "stop practising and it decays" means read literally. Covered by `tests/chaos_sigil_skill_test.gd` (8 checks)
+- [ ] **AJ4.4** Every system in the game is reachable through a sigil, badly — out of scope this pass: genuinely reaching "every system" means integrating sigils into systems other lanes own, which is exactly what the six-lane split exists to prevent without an API request
+- [ ] **AJ4.5** The playground rule: the system should surprise its own author — a qualitative playtesting judgment, not a line a test can verify from inside the engine
 
 ### AJ5 — The verdict on a kill
 Greg: *"the killing and fighting the npc system should be made so that if you
