@@ -2797,7 +2797,52 @@ does not have a **bullet**: firing is a raycast and an ammo decrement. Everythin
 Greg is describing needs the round to be a real object that leaves the weapon,
 travels, hits something and leaves a mark on it.
 
-- [ ] **AF1.1** A round is a thing that travels, not a raycast resolved on the frame it is fired — half done. `ballistics.gd` gives the round a mass, a muzzle velocity, drop, drag and a trace between where it was and where it is so it cannot tunnel; a rifle drops 1.7cm over forty metres and a shotgun pattern opens to 3.8m. **Damage to a body still resolves on the frame the trigger goes down.** Moving that onto the projectile means deferring every anatomy hit by a few frames, which is a change worth making deliberately rather than folded into this one
+- [x] ~~**AF1.1** A round is a thing that travels, not a raycast resolved on
+      the frame it is fired~~ The other half, closed deliberately rather
+      than folded into the pass that opened it. `_resolve_firearm()` no
+      longer calls `hit_at()` itself; it fires each round with its damage,
+      impulse and type riding along as a `payload`, and `Ballistics` hands
+      that back on `round_hit` (a body or the world) or a new
+      `round_expired` (out of range or below the world) — the three ways a
+      round's own fate actually gets decided, none of them the frame the
+      trigger went down. `_resolve_body_hit()` is what used to run inline;
+      it now runs whenever a round actually reaches somebody, however many
+      frames later that turns out to be.
+      \
+      Two real bugs surfaced building this, both now fixed rather than
+      only found: `_on_round_hit()`'s own body/world split gated on
+      `is_in_group("actor_body")`, a group nothing in this codebase has
+      ever assigned — dead code that had silently discarded every body hit
+      `Ballistics` ever reported, replaced with the same collider-to-actor
+      walk `_trace_actor()` already proved. And the round's own raycast
+      set `collide_with_areas = false`, while every zone hitbox
+      (`baseline_human.gd`) is an `Area3D` — a round could not have reached
+      a body through this path at all until that flipped to `true`.
+      \
+      Honestly scoped rather than silently changed: a shotgun's nine
+      pellets no longer land as one pre-batched `firearm_anatomy_hit` —
+      each is its own real impact on its own frame now, because they no
+      longer arrive as one. `weapon_fired` itself stays eager (the trigger
+      going down is not an anatomy question); the hit/miss HUD line and
+      the whiff/footing consequence of a clean miss wait for the first
+      pellet to connect, or for every pellet to have missed, so a stray
+      pellet sailing into open air cannot hold the feedback of an already-landed
+      hit hostage.
+      \
+      Verified by `tests/deferred_damage_test.gd` (new, 7/7): a shot at a
+      real 20m distance wounds nobody and writes no `firearm_anatomy_hit`
+      the instant `_attack()` returns, `weapon_fired` is recorded anyway,
+      and the wound and its event both land only once the round has had
+      real time to cross the distance — on a real canonical zone, same as
+      an instant hit would have landed on. A shotgun blast is confirmed to
+      write more than one `firearm_anatomy_hit`, proving the per-pellet
+      claim rather than assuming it. `combat_integration_test` and
+      `zone_precision_test` amended to await the round's own travel time
+      before reading a wound that no longer exists on the old schedule —
+      both, plus `ballistics_test`, `firearm_momentum_test`,
+      `vault_test`, `wall_run_test`, `jump_test`, `climb_test`,
+      `momentum_carry_test`, `anatomy_traversal_test` and `opening_test`,
+      re-verified clean
 - [x] **AF1.2** It hits the world and leaves damage there (pairs with AB2) — a hole where it arrived, lifted off the surface so it does not fight the wall it is drawn on, sized by the round's energy, and recorded to WorldHistory for AB2 to read
 - [x] **AF1.3** Casings eject, bounce, land and stay — out of the port sideways and back, tumbling, two bounces that lose most of their energy, and then lying on their side rather than standing on end, which is the single most obvious tell that nobody simulated them. One case per trigger pull, so a shotgun leaves one for nine pellets
 - [x] **AF1.4** Reloading is physical: the magazine leaves the weapon and a new

@@ -26,6 +26,12 @@ extends Node3D
 ## bounce, not a physics body per round.
 
 signal round_hit(hit: Dictionary)
+## AF1.1. The other half of a round having a real existence: something has to
+## know when one *stopped* existing without ever arriving anywhere — out of
+## range, or below the world — so a caller waiting to find out whether a shot
+## connected is not left waiting forever. `payload` is echoed back exactly as
+## given to `fire()`; empty for anything that did not ask to be told.
+signal round_expired(payload: Dictionary)
 
 ## Calibres, and what each one is for. These are the whole balance conversation
 ## for firearms the same way mass and reach are for melee (AN1.5).
@@ -90,7 +96,14 @@ func _ready() -> void:
 ## Fire. `from` and `along` are world space, `calibre` keys `CALIBRES`, `spread`
 ## is in radians and `count` is how many projectiles leave the barrel — which is
 ## the only difference between a pistol and a shotgun in this system.
-func fire(from: Vector3, along: Vector3, calibre := "pistol", spread := 0.0, count := 1, shooter := "") -> void:
+## AF1.1. `payload` is the round's own memory of what it was fired to do —
+## damage, impulse, damage type, whoever's trigger this was for — carried on
+## the round rather than resolved here, so whatever it eventually hits (or
+## fails to) is what decides when that damage actually happens, not the frame
+## the trigger went down. Ballistics does not know what a payload means and
+## never reads it; it only ever hands it back, on `round_hit` or
+## `round_expired`, to whoever is listening.
+func fire(from: Vector3, along: Vector3, calibre := "pistol", spread := 0.0, count := 1, shooter := "", payload := {}) -> void:
 	var spec: Dictionary = CALIBRES.get(calibre, CALIBRES["pistol"])
 	for index in count:
 		if rounds.size() >= MAX_ROUNDS:
@@ -118,6 +131,7 @@ func fire(from: Vector3, along: Vector3, calibre := "pistol", spread := 0.0, cou
 			"spec": spec,
 			"travelled": 0.0,
 			"shooter": shooter,
+			"payload": payload,
 		})
 	_eject(from, along, calibre)
 
@@ -185,13 +199,26 @@ func _step_rounds(delta: float) -> void:
 		round_data["travelled"] = float(round_data["travelled"]) + (at - round_data["was"]).length()
 
 		var query := PhysicsRayQueryParameters3D.create(round_data["was"], at)
-		query.collide_with_areas = false
+		# AF1.1. A body's own zones are `Area3D` hitboxes (`baseline_human.gd`),
+		# not physics bodies — this traced only bodies before, which is exactly
+		# why nothing fired at a person could ever actually reach one through
+		# here. `_trace_actor()`'s own instant raycast has collided with areas
+		# from the start; this one has to now, or a round can travel forever
+		# and land on nobody.
+		query.collide_with_areas = true
+		query.collide_with_bodies = true
 		var hit := space.intersect_ray(query)
 		if not hit.is_empty():
 			_land(round_data, hit)
 			_retire_round(index)
 			continue
 		if float(round_data["travelled"]) > MAX_RANGE or at.y < -30.0:
+			# AF1.1. Ran out of world before it ran out of flight — still a real
+			# outcome for whoever fired it, and the only one of the three ways a
+			# round can stop existing that `_land()` never sees.
+			var expired_payload: Dictionary = round_data.get("payload", {})
+			if not expired_payload.is_empty():
+				round_expired.emit(expired_payload)
 			_retire_round(index)
 			continue
 		var node := round_data["node"] as Node3D
@@ -219,6 +246,7 @@ func _land(round_data: Dictionary, hit: Dictionary) -> void:
 		"energy": energy,
 		"penetration": float(spec["penetration"]),
 		"shooter": round_data["shooter"],
+		"payload": round_data.get("payload", {}),
 	}
 	_mark(at, normal, energy)
 	round_hit.emit(report)

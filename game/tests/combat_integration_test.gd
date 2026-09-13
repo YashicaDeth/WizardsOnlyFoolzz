@@ -31,6 +31,12 @@ func _ready() -> void:
 	var shell_before := int(hunt.arsenal.ammo.shotgun.loaded)
 	hunt._attack()
 	check(int(hunt.arsenal.ammo.shotgun.loaded) == shell_before - 1, "live Hunt input fires a chambered shotgun shell")
+	# AF1.1. Damage now resolves when the round actually lands, not on the
+	# frame the trigger went down — `hunt.set_physics_process(false)` above
+	# only stops `hunt`'s own callback; `ballistics`, a real child node with
+	# its own `_physics_process`, still steps on every one of these.
+	for _tick in 10:
+		await get_tree().physics_frame
 	check(actor.anatomy.wounds.size() > 0, "live pellets resolve against the NPC BaselineHuman")
 	var wounded_zones: Array[String] = []
 	for wound in actor.anatomy.wounds:
@@ -38,7 +44,12 @@ func _ready() -> void:
 		if not wounded_zones.has(zone):
 			wounded_zones.append(zone)
 	check(not wounded_zones.is_empty() and wounded_zones.all(func(zone): return BaselineHuman.ZONES.has(zone)), "firearm reports canonical anatomy zones %s" % str(wounded_zones))
-	check(WorldHistory.recent_events(12).any(func(event): return str(event.get("type", "")) == "weapon_fired"), "weapon discharge enters world history")
+	# AF1.1. Nine pellets now each carry their own real hit — nine
+	# `firearm_anatomy_hit`/`anatomy_changed` events for one shotgun blast
+	# where there used to be one batched pair — so the single `weapon_fired`
+	# this pull records is easily buried in that pellet-level detail within
+	# a 12-event window; widened rather than special-cased around it.
+	check(WorldHistory.recent_events(24).any(func(event): return str(event.get("type", "")) == "weapon_fired"), "weapon discharge enters world history")
 
 	# Lock-on: the verb that makes third-person combat aimable at all.
 	hunt.third_person = true

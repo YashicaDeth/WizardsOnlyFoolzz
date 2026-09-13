@@ -61,6 +61,11 @@ func _fire_at_zone(target_zone: String) -> Array[String]:
 
 	hunt._equip_weapon(2) # sidearm: one pellet, 0.008 spread — as close to a laser as this arsenal has
 	hunt._attack()
+	# AF1.1. The round travels now — a few real physics frames, not the
+	# frame the trigger went down, before the wound this test checks for
+	# actually lands.
+	for _tick in 10:
+		await get_tree().physics_frame
 	var zones: Array[String] = []
 	for wound in actor.anatomy.wounds:
 		var zone := str(wound.get("zone", ""))

@@ -211,6 +211,14 @@ var guard_stamina_drain := 14.0
 var blood_veil: Control = null
 ## AF1. Rounds in flight, brass on the floor, holes in the walls.
 var ballistics: Node3D = null
+## AF1.1. One trigger pull's worth of rounds still in flight, keyed by an
+## id unique to that pull. A pellet lands on a body, lands on the world, or
+## runs out of range — `_settle_shot()` counts down `remaining` regardless
+## of which, and the miss/hit feedback (and the aggregate `weapon_fired`
+## record) fires once, when the last pellet's fate is actually known,
+## rather than on the frame the trigger went down.
+var _shot_counter := 0
+var _pending_shots: Dictionary = {}
 ## AN1.2. The arm the weapon hangs off. Fed the same mouse delta the camera
 ## turns by, so the weapon is thrown by you turning rather than by a curve.
 var arm: LimbMomentum = null
@@ -537,6 +545,7 @@ func _ready() -> void:
 	ballistics = BALLISTICS.new()
 	add_child(ballistics)
 	ballistics.round_hit.connect(_on_round_hit)
+	ballistics.round_expired.connect(_on_round_expired)
 	blood_veil = BLOOD_VEIL.new()
 	$HUD.add_child(blood_veil)
 	_pointer = Control.new()
@@ -1567,12 +1576,19 @@ func _melee_resistance(zone: String, result: Dictionary) -> float:
 	return clampf(base + absorbed * 0.35, 0.0, 0.95)
 
 
-## AF1.2. Where a round that missed everybody ended up. The world keeps the
-## hole (the projectile draws that itself) and the record keeps the fact,
-## which is what AB2 will read when destruction is tracked properly.
+## AF1.1/AF1.2. Where a round ended up. The world keeps the hole (the
+## projectile draws that itself) and the record keeps the fact — and, if the
+## round hit a body, this is now also the *only* place the shot that fired it
+## finds out. `_resolve_firearm()` no longer resolves anatomy damage itself;
+## it fires a round with its damage riding along as `payload` and waits.
 func _on_round_hit(hit: Dictionary) -> void:
 	var struck: Variant = hit.get("collider")
-	if struck != null and struck is Node and (struck as Node).is_in_group("actor_body"):
+	var payload: Dictionary = hit.get("payload", {})
+	# AF1.7's own lookup, not a group membership no code in this project ever
+	# assigns — a body's zones are `Area3D` hitboxes (`baseline_human.gd`),
+	# walked up to whichever encounter actor actually owns the one this round
+	# reached, exactly the way `_trace_actor()`'s instant raycast already did.
+	if struck != null and struck is Node and _resolve_body_hit(struck as Node, hit, payload):
 		return
 	WorldHistory.record_event("round_struck_world", {
 		"calibre": str(hit.get("calibre", "")),
@@ -1580,87 +1596,175 @@ func _on_round_hit(hit: Dictionary) -> void:
 		"shooter": str(hit.get("shooter", "")),
 		"location": HUNT_LOCATION,
 	})
+	if not payload.is_empty():
+		_settle_shot(int(payload.get("shot_id", 0)), false)
+
+
+## AF1.1. A round that ran out of range or fell out of the world without ever
+## arriving anywhere — still a real outcome, not a hit `Ballistics` swallowed.
+func _on_round_expired(payload: Dictionary) -> void:
+	if not payload.is_empty():
+		_settle_shot(int(payload.get("shot_id", 0)), false)
+
+
+## AF1.1. What used to happen inline in `_resolve_firearm()`, the instant the
+## trigger went down, now happens here — whenever `Ballistics` reports that
+## *this* round actually reached a body, however many frames after it was
+## fired that turns out to be. One round, one hit, one event: a shotgun's
+## pellets no longer land as a single pre-batched summary, because they no
+## longer arrive as one — each is its own real impact now, on its own frame.
+func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bool:
+	var shot_id := int(payload.get("shot_id", 0))
+	var actor := Dictionary()
+	for candidate in encounter_actors:
+		if not is_instance_valid(candidate.node) or candidate.anatomy.dead:
+			continue
+		var cursor: Node = struck
+		while cursor != null:
+			if cursor == candidate.node:
+				actor = candidate
+				break
+			cursor = cursor.get_parent()
+		if not actor.is_empty():
+			break
+	if actor.is_empty():
+		# Not an actor at all — the caller's own world-hit branch settles
+		# this pellet as a miss; settling it here too would count it twice.
+		return false
+	var direction: Vector3 = hit.get("direction", Vector3.FORWARD)
+	var rig := actor.rig as BaselineHuman
+	var damage := float(payload.get("damage", 0.0))
+	var impulse := float(payload.get("impulse", 0.0))
+	var damage_type := str(payload.get("damage_type", "ballistic"))
+	var weapon := str(payload.get("weapon", "firearm"))
+	var result := rig.hit_at(hit.get("position", actor.node.global_position), damage, impulse, damage_type, direction)
+	var zones: Array[String] = [str(result.get("zone", "torso"))]
+	var severed: Array[String] = []
+	var ruptures: Array[String] = []
+	var organ := result.get("organ", {}) as Dictionary
+	if bool(organ.get("ruptured", false)):
+		ruptures.append(str(organ.get("zone", "internal")))
+	if bool(result.get("severed", false)):
+		severed.append(str(result.get("zone", "limb")))
+	(actor.node as CharacterBody3D).velocity += direction * minf(6.0, impulse * 0.075)
+	# O2.2. Time, camera and sound on the same frame the round actually lands,
+	# same as a melee blow gets. Severity is measured against the zone's own
+	# health so a round through a head reads heavier than the same round
+	# through a thigh.
+	var zone_id := str(result.get("zone", "torso"))
+	var zone_max: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone_id, {}) as Dictionary).get("health", 100.0))
+	impact_feel.strike(
+		damage / maxf(zone_max, 1.0),
+		damage_type,
+		bool(result.get("severed", false)),
+		# O2.5 v2. Only the two of you are in this. Everyone else in the
+		# region keeps fighting at full speed.
+		["player", str(actor.subject_id)]
+	)
+	if actor.rig != null and is_instance_valid(actor.rig):
+		actor.rig.favour_injuries()
+	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": actor.rig.snapshot()}, "anatomy_changed")
+	WorldHistory.record_event("firearm_anatomy_hit", {
+		"subject_id": actor.subject_id, "weapon": weapon, "zones": zones,
+		"damage": snappedf(float(result.get("damage", 0.0)), 0.1), "ruptures": ruptures, "severed": severed,
+		"location": HUNT_LOCATION,
+	})
+	var fake_attack := {"damage": damage, "impulse": impulse, "damage_type": damage_type, "weapon": weapon, "heavy": bool(payload.get("heavy", false))}
+	if actor.anatomy.dead:
+		_kill_encounter_actor(encounter_actors.find(actor), weapon)
+	elif actor.anatomy.downed:
+		actor.state = "downed"
+	elif not severed.is_empty():
+		_apply_maiming_state(actor, severed, direction)
+	elif actor.anatomy.critical or actor.anatomy.pain >= 68.0:
+		actor.state = "fleeing"
+		actor.loot_at_risk = true
+	else:
+		_apply_combat_response(actor, fake_attack, {"pain": actor.anatomy.pain})
+	_settle_shot(shot_id, true, str(actor.subject_id))
+	return true
+
+
+## AF1.1. One trigger pull can fire several rounds (a shotgun's pellets),
+## each resolving on its own real frame as it lands, hits the world, or runs
+## out of range. The pull's own hit/miss feedback — the HUD line, and the
+## whiff and footing loss on a clean miss — decides itself the instant the
+## first pellet connects, or once every pellet has missed; `weapon_fired`
+## itself is not an anatomy question and is recorded eagerly, back in
+## `_resolve_firearm()`, the moment the trigger actually goes down.
+func _settle_shot(shot_id: int, hit_body: bool, subject_id := "") -> void:
+	if not _pending_shots.has(shot_id):
+		return
+	var shot: Dictionary = _pending_shots[shot_id]
+	shot.remaining = int(shot.remaining) - 1
+	if hit_body:
+		(shot.hit_ids as Array).append(subject_id)
+	_pending_shots[shot_id] = shot
+	# A clean miss has to wait for every pellet to actually miss before it is
+	# one — but a shotgun's spread means some pellets can sail on well past
+	# the ones that connected, into open air with no wall behind the target
+	# to end their flight quickly. A hit does not need to wait on them: the
+	# instant one pellet connects the shot already has an answer, and the
+	# stragglers still land their own real damage through `_resolve_body_hit`
+	# — they just no longer hold up the HUD line and the `weapon_fired`
+	# record waiting to hear from them.
+	if not hit_body and int(shot.remaining) > 0:
+		return
+	_pending_shots.erase(shot_id)
+	var hit_ids: Array = shot.hit_ids
+	if hit_ids.is_empty():
+		impact_feel.whiff()
+		# O2.3 / O5.7. A miss was already free of damage; it is no longer free of
+		# balance. Swinging at air is how you end up on your heels.
+		lose_footing(FOOTING_WHIFF, "SWUNG AT NOTHING")
+		prompt.text = "%s / MISS" % str(shot.label)
+	else:
+		prompt.text = "%s / %d BODY%s HIT" % [str(shot.label), hit_ids.size(), "IES" if hit_ids.size() != 1 else ""]
 
 
 func _resolve_firearm(attack: Dictionary) -> void:
 	var forward := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 	var origin := camera.global_position + forward * 0.48
-	var impacts: Dictionary = {}
 	var directions: Array[Vector3] = arsenal.shot_directions(forward, Vector3.UP)
-	# AF1. The visible round. Damage to a body still resolves below on the
-	# frame it is fired — moving that onto the projectile means deferring
-	# every anatomy hit by a few frames and is a change worth making on its
-	# own rather than folded into this one (AF1.1 stays open). What this
-	# buys now is everything the raycast could never do: a round you can
-	# see travel, a hole where it went wide, and brass on the floor.
-	if ballistics != null and is_instance_valid(ballistics):
-		var calibre := "buck" if directions.size() > 1 else "pistol"
-		for direction in directions:
-			ballistics.fire(origin, direction, calibre, 0.0, 1, "player")
+	# AF1.1. A round is a thing that travels, and now so is what it does: the
+	# damage payload rides on the round itself and is only ever spent when
+	# `_on_round_hit()`/`_on_round_expired()` reports that round's own real
+	# outcome, a few frames from now — never here, on the frame the trigger
+	# went down. `_resolve_body_hit()`, `_on_round_hit()`'s world branch and
+	# `_on_round_expired()` are the three ways a pellet's fate gets decided;
+	# `_settle_shot()` is where the pull as a whole finds out.
+	_shot_counter += 1
+	var shot_id := _shot_counter
+	_pending_shots[shot_id] = {
+		"weapon": str(attack.weapon),
+		"label": str(arsenal.current().label),
+		"remaining": directions.size(),
+		"hit_ids": [],
+	}
+	if ballistics == null or not is_instance_valid(ballistics):
+		# No projectile system to hand this to, and so no round that could
+		# ever report back and settle it — a shot that never happened rather
+		# than one stuck pending forever.
+		_pending_shots.erase(shot_id)
+		return
+	var calibre := "buck" if directions.size() > 1 else "pistol"
 	for direction in directions:
-		var hit := _trace_actor(origin, direction, float(attack.range))
-		if hit.is_empty():
-			continue
-		var actor: Dictionary = hit.actor
-		var rig := actor.rig as BaselineHuman
-		var result := rig.hit_at(hit.position, float(attack.damage), float(attack.impulse), str(attack.damage_type), direction)
-		var id := str(actor.subject_id)
-		if not impacts.has(id):
-			impacts[id] = {"actor": actor, "zones": [], "damage": 0.0, "ruptures": [], "severed": []}
-		var summary: Dictionary = impacts[id]
-		summary.zones.append(str(result.get("zone", "torso")))
-		summary.damage = float(summary.damage) + float(result.get("damage", 0.0))
-		var organ := result.get("organ", {}) as Dictionary
-		if bool(organ.get("ruptured", false)):
-			summary.ruptures.append(str(organ.get("zone", "internal")))
-		if bool(result.get("severed", false)):
-			summary.severed.append(str(result.get("zone", "limb")))
-		impacts[id] = summary
-		(actor.node as CharacterBody3D).velocity += direction * minf(6.0, float(attack.impulse) * 0.075)
-		# O2.2. Time, camera and sound on the same frame. Severity is measured
-		# against the zone's own health so a cleaver through a head reads
-		# heavier than the same cleaver through a thigh.
-		var zone_id := str(result.get("zone", "torso"))
-		var zone_max: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone_id, {}) as Dictionary).get("health", 100.0))
-		impact_feel.strike(
-			float(attack.get("damage", 0.0)) / maxf(zone_max, 1.0),
-			str(attack.get("damage_type", "cut")),
-			bool(result.get("severed", false)),
-			# O2.5 v2. Only the two of you are in this. Everyone else in the
-			# region keeps fighting at full speed.
-			["player", str(actor.subject_id)]
-		)
-		if actor.rig != null and is_instance_valid(actor.rig):
-			actor.rig.favour_injuries()
-	for id in impacts:
-		var summary: Dictionary = impacts[id]
-		var actor: Dictionary = summary.actor
-		WorldHistory.update_subject(id, {"anatomy_state": actor.rig.snapshot()}, "anatomy_changed")
-		WorldHistory.record_event("firearm_anatomy_hit", {
-			"subject_id": id, "weapon": attack.weapon, "zones": summary.zones,
-			"damage": snappedf(float(summary.damage), 0.1), "ruptures": summary.ruptures, "severed": summary.severed,
-			"location": HUNT_LOCATION,
-		})
-		if actor.anatomy.dead:
-			_kill_encounter_actor(encounter_actors.find(actor), str(attack.weapon))
-		elif actor.anatomy.downed:
-			actor.state = "downed"
-		elif not (summary.severed as Array).is_empty():
-			_apply_maiming_state(actor, summary.severed, forward)
-		elif actor.anatomy.critical or actor.anatomy.pain >= 68.0:
-			actor.state = "fleeing"
-			actor.loot_at_risk = true
-		else:
-			_apply_combat_response(actor, attack, {"pain": actor.anatomy.pain})
-	if impacts.is_empty():
-		impact_feel.whiff()
-		# O2.3 / O5.7. A miss was already free of damage; it is no longer free of
-		# balance. Swinging at air is how you end up on your heels.
-		lose_footing(FOOTING_WHIFF, "SWUNG AT NOTHING")
-		prompt.text = "%s / MISS" % str(arsenal.current().label)
-	else:
-		prompt.text = "%s / %d BODY%s HIT" % [str(arsenal.current().label), impacts.size(), "IES" if impacts.size() != 1 else ""]
-	WorldHistory.record_event("weapon_fired", {"weapon": attack.weapon, "hits": impacts.keys(), "location": HUNT_LOCATION})
+		var payload := {
+			"shot_id": shot_id,
+			"damage": float(attack.damage),
+			"impulse": float(attack.impulse),
+			"damage_type": str(attack.damage_type),
+			"weapon": str(attack.weapon),
+			"heavy": bool(attack.get("heavy", false)),
+		}
+		ballistics.fire(origin, direction, calibre, 0.0, 1, "player", payload)
+	# The trigger going down is not an anatomy question — it happens here,
+	# on this frame, same as it always did. What it hit is a separate record
+	# (`firearm_anatomy_hit`/`round_struck_world`, both per-pellet, both
+	# already deferred to when each round actually lands) rather than a
+	# "hits" list bolted onto this one, which would otherwise have to wait
+	# on whichever pellet takes longest to resolve.
+	WorldHistory.record_event("weapon_fired", {"weapon": attack.weapon, "location": HUNT_LOCATION})
 
 
 func _trace_actor(origin: Vector3, direction: Vector3, distance: float) -> Dictionary:
