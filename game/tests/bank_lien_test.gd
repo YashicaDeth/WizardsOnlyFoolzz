@@ -94,5 +94,22 @@ func _ready() -> void:
 	WorldClock.pass_time(24.0)
 	check(old_save_account.debt_to("choir_of_marrow") == 52, "interest begins only after that honest migration point")
 
+	print("AL1.7 - default sends a named person, not an invisible debit")
+	WorldHistory.clear_history()
+	WorldHistory.world_minute = 0.0
+	WorldHistory.register_subject("player", {"name": "THE HUNTER", "kind": "person"})
+	WorldHistory.register_subject("choir_of_marrow", {"name": "Choir of Marrow", "kind": "faction"})
+	var defaulted := Carry.new()
+	defaulted.take_chunk({"layer_name": "organ", "organ_id": "liver", "condition": 1.0})
+	check(bool(defaulted.borrow_against(40, "choir_of_marrow", 0).get("ok", false)), "the default has real collateral for a collector to visit")
+	var visit := defaulted.send_collector("choir_of_marrow")
+	var collector_id := str(visit.get("collector_id", ""))
+	var collector := WorldHistory.subject(collector_id)
+	check(bool(visit.get("ok", false)) and not collector_id.is_empty(), "a default records the person who came to collect")
+	check(str(collector.get("kind", "")) == "person" and str(collector.get("body_kind", "")) == "BaselineHuman", "the collector is a person with a real body type")
+	var collector_anatomy: Dictionary = collector.get("anatomy_state", {})
+	check(not (collector_anatomy.get("zones", {}) as Dictionary).is_empty(), "the collector body carries the normal anatomy snapshot")
+	check(WorldHistory.event_count("debt_collector_visited") == 1, "the visit is part of world history")
+
 	print("BANK_LIEN_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

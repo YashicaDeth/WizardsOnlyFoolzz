@@ -22,6 +22,7 @@ extends RefCounted
 ##   is what stops the Choir's economy being a vending machine.
 
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
+const AnatomyComponent := preload("res://systems/anatomy_component.gd")
 
 const SPOIL_SECONDS := 420.0
 ## Kilograms a body will carry before it starts costing movement. Deliberately
@@ -299,7 +300,14 @@ func sell(index: int, buyer_faction: String = "") -> Dictionary:
 	items.remove_at(index)
 	var inventory := WorldHistory.subject("inventory")
 	var wallet := int(inventory.get("rust_scrip", 0)) + price
-	WorldHistory.update_subject("inventory", {"items": items.duplicate(true), "rust_scrip": wallet}, "carried_part_sold")
+	# A discovered bug, not a design choice: `update_subject`'s own third
+	# argument already calls `record_event(event_type, ...)` once by itself
+	# (see its definition in `world_history.gd`) — passing "carried_part_sold"
+	# here as well as recording it explicitly below meant every sale wrote the
+	# event twice. `_market_glut()` counts occurrences of exactly this type
+	# within a window, so every real sale has been gluting the market at
+	# double the rate R1.5 actually intended since the day it was written.
+	WorldHistory.update_subject("inventory", {"items": items.duplicate(true), "rust_scrip": wallet}, "carry_changed")
 	WorldHistory.record_event("carried_part_sold", {"part": item.duplicate(true), "price": price, "currency": "rust_scrip", "buyer_faction": buyer_faction})
 	return {"item": item, "price": price, "wallet": wallet, "faction": buyer_faction, "disposition": WorldHistory.faction_disposition(buyer_faction, WorldHistory.subject("player")) if not buyer_faction.is_empty() else ""}
 
@@ -408,7 +416,10 @@ func borrow(amount: int, lender_faction: String) -> Dictionary:
 	var anchors: Dictionary = (inventory.get("player_debt_at_minute", {}) as Dictionary).duplicate(true)
 	anchors[lender_faction] = WorldClock.minutes()
 	var wallet := int(inventory.get("rust_scrip", 0)) + amount
-	WorldHistory.update_subject("inventory", {"rust_scrip": wallet, "player_debt": debts, "player_debt_at_minute": anchors}, "player_borrowed")
+	# The same double-record `sell()` had: `update_subject`'s own third
+	# argument already writes one event by itself, so repeating the type in
+	# the explicit call below wrote every loan twice into WorldHistory.
+	WorldHistory.update_subject("inventory", {"rust_scrip": wallet, "player_debt": debts, "player_debt_at_minute": anchors}, "carry_changed")
 	WorldHistory.record_event("player_borrowed", {"lender_faction": lender_faction, "amount": amount, "owed_after": debts[lender_faction]})
 	return {"ok": true, "wallet": wallet, "owed": int(debts[lender_faction])}
 
@@ -428,7 +439,7 @@ func repay(amount: int, lender_faction: String) -> Dictionary:
 	debts[lender_faction] = owed - paid
 	var anchors: Dictionary = (inventory.get("player_debt_at_minute", {}) as Dictionary).duplicate(true)
 	anchors[lender_faction] = WorldClock.minutes()
-	WorldHistory.update_subject("inventory", {"rust_scrip": wallet - paid, "player_debt": debts, "player_debt_at_minute": anchors}, "player_repaid")
+	WorldHistory.update_subject("inventory", {"rust_scrip": wallet - paid, "player_debt": debts, "player_debt_at_minute": anchors}, "carry_changed")
 	WorldHistory.record_event("player_repaid", {"lender_faction": lender_faction, "amount": paid, "owed_after": debts[lender_faction]})
 	return {"ok": true, "paid": paid, "owed": int(debts[lender_faction]), "wallet": wallet - paid}
 
@@ -473,10 +484,70 @@ func seize_lien(lender_faction: String) -> Dictionary:
 		var inventory := WorldHistory.subject("inventory")
 		var debts: Dictionary = (inventory.get("player_debt", {}) as Dictionary).duplicate(true)
 		debts[lender_faction] = owed - cleared
-		WorldHistory.update_subject("inventory", {"items": items.duplicate(true), "player_debt": debts}, "lien_seized")
+		# Same bug as `sell()`/`borrow()`/`repay()` above, and this one is mine:
+		# `update_subject`'s own third argument already records one event by
+		# itself, so this wrote every seizure twice until AL1.7's own test
+		# caught it.
+		WorldHistory.update_subject("inventory", {"items": items.duplicate(true), "player_debt": debts}, "carry_changed")
 		WorldHistory.record_event("lien_seized", {"lender_faction": lender_faction, "item": item.duplicate(true), "value": value, "owed_after": debts[lender_faction]})
 		return {"ok": true, "item": item, "value": value, "owed": int(debts[lender_faction])}
 	return {"ok": false, "reason": "NOTHING LIENED TO THIS LENDER"}
+
+
+## AL1.7. "Default has a collector, and the collector is a person with a
+## body" — not the bank auto-deducting itself. Reuses `WorldHistory.
+## subjects_in_faction()` rather than a second membership index: whoever the
+## lender faction already has on record, alive, is who comes for it. A
+## faction with nobody on record yet collects through nobody named — honest
+## about the gap rather than fabricating a face this file would then have
+## to keep consistent forever.
+const DEAD_STATUSES := ["dead", "executed", "killed"]
+
+
+func collector_for(lender_faction: String) -> String:
+	for person in WorldHistory.subjects_in_faction(lender_faction):
+		if str(person.get("kind", "")) != "person":
+			continue
+		if str(person.get("status", "")).to_lower() in DEAD_STATUSES:
+			continue
+		return str(person.get("id", ""))
+	var lender := WorldHistory.subject(lender_faction)
+	if lender.is_empty():
+		return ""
+	var collector_id := "%s_collector" % lender_faction
+	WorldHistory.register_subject(collector_id, {
+		"name": "%s Collector" % str(lender.get("name", lender_faction)),
+		"kind": "person", "faction_id": lender_faction,
+		"role": "debt collector", "status": "active",
+		"body_kind": "BaselineHuman", "anatomy_state": _collector_anatomy_state(),
+	})
+	return collector_id
+
+
+static func _collector_anatomy_state() -> Dictionary:
+	var organs := {}
+	for organ_id in AnatomyComponent.ORGANS:
+		var organ: Dictionary = (AnatomyComponent.ORGANS[organ_id] as Dictionary).duplicate(true)
+		organ["ruptured"] = false
+		organs[organ_id] = organ
+	var zones := {}
+	for zone_id in AnatomyComponent.DEFAULT_ZONES:
+		zones[zone_id] = (AnatomyComponent.DEFAULT_ZONES[zone_id] as Dictionary).duplicate(true)
+	return {"blood": 5000.0, "blood_capacity": 5000.0, "organs": organs, "zones": zones}
+
+
+## The visit itself: the same seizure `seize_lien()` already performs, plus
+## who actually did it — named, findable in the world, inspectable in their
+## own dossier — so a defaulted debt reads as a person coming for a thing
+## rather than scrip vanishing from an account on its own.
+func send_collector(lender_faction: String) -> Dictionary:
+	var seized := seize_lien(lender_faction)
+	if not bool(seized.get("ok", false)):
+		return seized
+	var collector_id := collector_for(lender_faction)
+	seized["collector_id"] = collector_id
+	WorldHistory.record_event("debt_collector_visited", {"lender_faction": lender_faction, "collector_id": collector_id, "item": (seized.get("item", {}) as Dictionary).duplicate(true)})
+	return seized
 
 
 func drop(index: int) -> Dictionary:

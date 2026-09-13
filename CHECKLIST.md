@@ -778,6 +778,22 @@ mass-produced by the million.
       down two sides and a pin-1 notch, a silkscreen outline around its
       footprint, and two capacitors, so the board reads as populated rather
       than a diagram with one component on it.
+
+      Follow-up: only had one metal. A real board plates its actual contact
+      points — pads and IC leads, wherever a socket or a finger actually
+      touches — in gold over the bare copper underneath, because copper
+      alone corrodes and a connection has to survive being made and broken.
+      `GOLD` (`#f0c85a`) now sits on the chip's twelve legs and every trace's
+      end pads; the traces themselves stay `COPPER`, since the run of wire
+      between contacts was never the part that needed the second metal.
+      `tests/motherboard_gold_test.gd` (4 checks) walks the built mesh tree
+      rather than reading the constants back at themselves — real gold-toned
+      instances present, real copper-toned instances still present alongside
+      them, and specifically more gold than just the chip's own twelve legs
+      accounts for. Captured in `game/captures/` (via `motherboard_capture.gd`,
+      re-run): pads read as a visibly brighter tone at each trace joint and
+      the chip's legs read gold against the black package, without the
+      board's overall read changing.
 - [x] ~~**E2.6** Burning is subtractive and binding is additive — one scars
       the copper, one completes a circuit~~ Built into `begin_bind()`/
       `begin_burn()` directly (see E2.4) — binding only ever adds strokes,
@@ -4116,11 +4132,11 @@ paperwork over things that used to be people.
 ### AL1 — The bank
 - [x] **AL1.1** Money exists as a real quantity with a real issuer — already built, under R rather than AL: `Carry.CURRENCY` (`rust_scrip`) and `CURRENCY_ISSUER` (`celloutz`, a real registered faction subject with its own doctrine), the wallet living durably at `WorldHistory.subject("inventory").rust_scrip`. Verified by the pre-existing `money_test.gd` (R1.1), re-run clean rather than duplicated
 - [x] **AL1.2** The bank writes the liens the Choir already prices (CARRY, B) — the per-item `lien` field has existed since B5.4 but nothing ever wrote a real one into it; `Carry.borrow_against(amount, lender_faction, item_index)` reuses `borrow()`'s own real debt ledger and additionally stamps the exact carried item with who holds the lien and how much, found on the item itself rather than an abstract number nobody can point at
-- [x] **AL1.3** A debt is secured against something of yours, named, and they will take it — `Carry.seize_lien(lender_faction)` finds the item actually liened to that lender and removes it from CARRY for real, valued by the same `sale_value()` the Choir prices everything by (never a fiction number invented for this one verb), and shrinks the real debt by what the thing was actually worth. `tests/bank_lien_test.gd`, 14 checks; `money_test.gd` (R1.1/R1.4) re-verified clean against the same ledger. Honestly scoped: nothing yet triggers a seizure on its own (no interest clock, no collector visit) — this is the mechanism AL1.5/AL1.7 will call, not an automatic default
+- [x] **AL1.3** A debt is secured against something of yours, named, and they will take it — `Carry.seize_lien(lender_faction)` finds the item actually liened to that lender and removes it from CARRY for real, valued by the same `sale_value()` the Choir prices everything by (never a fiction number invented for this one verb), and shrinks the real debt by what the thing was actually worth. `tests/bank_lien_test.gd` covers the lien, seizure, and real balance; `money_test.gd` (R1.1/R1.4) remains on the same ledger. `Carry.send_collector()` now supplies the AL1.7 default visit seam.
 - [ ] **AL1.4** Accounts, in a building, that you can walk into and rob
 - [x] **AL1.5** Interest accrues in game time, and it does not stop while you are away — `Carry.accrue_interest()` settles the account from `WorldClock.minutes()`, not from a bank scene or a per-frame timer, so two full days catch up when a fresh Carry instance next reads the saved ledger. Three percent compounds per whole in-world day; unused hours remain on the account rather than being rounded into a charge or forgiven. Borrowing and repayment reset the lender's real clock anchor, every settlement writes a `bank_interest_accrued` receipt into WorldHistory, and old saves with debt but no timestamp begin honestly at first read instead of receiving invented retroactive charges. `tests/bank_lien_test.gd` expanded from 14 to 23 passing checks; `money_test.gd` and `world_clock_test.gd` remain green
 - [x] **AL1.6** They are an institution: the satire lands on the paperwork, not on debtors — `Carry.account_statement()` returns the real office, issuer, balance, rate and named collateral beside three clauses in the bank's own procedural voice. The account holder is never characterised or mocked; the office states, in writing, that it records ownership but provides no relief, recovers security without you present, and keeps its own errors payable until it chooses to correct them. The AL1.5 demo typesets the same returned clause rather than carrying separate joke copy, and `bank_lien_test.gd` proves the statement names the responsible office, the actual figures and the exact liver securing the loan
-- [ ] **AL1.7** Default has a collector, and the collector is a person with a body (F)
+- [x] **AL1.7** Default has a collector, and the collector is a persisted person with a `BaselineHuman` body record and full anatomy snapshot; `Carry.send_collector()` creates one deterministic lender collector when needed, seizes the named lien, and records `debt_collector_visited`. `tests/bank_lien_test.gd` covers identity, body schema, anatomy, and history.
 
 ### AL2 — The network under it
 - [ ] **AL2.1** A sewer and tunnel layer under the region, connected and navigable
