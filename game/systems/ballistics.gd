@@ -252,6 +252,14 @@ func _land(round_data: Dictionary, hit: Dictionary) -> void:
 	round_hit.emit(report)
 
 
+## AN2.3. The same scar a round leaves, for whatever else in this game hits a
+## wall hard enough to mark it — a melee swing meeting stone rather than an
+## actor, currently. Public because that caller is not a round in flight and
+## has no `_land()` of its own to route through.
+func mark_impact(at: Vector3, normal: Vector3, energy: float) -> void:
+	_mark(at, normal, energy)
+
+
 ## The hole. Small, dark, slightly irregular, and permanent for the scene —
 ## which is the whole of "the bullet destroys the map" that can be afforded
 ## before AB's destruction pass lands properly.

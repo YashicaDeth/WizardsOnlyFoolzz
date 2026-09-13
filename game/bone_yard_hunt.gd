@@ -1505,6 +1505,20 @@ func _resolve_strike() -> void:
 			arm.strike(_last_melee_resistance, Vector3(sin(yaw), 0.0, cos(yaw)))
 		connected = true
 		return
+	var wall_hit := _attack_wall(float(report.get("range", 4.1)))
+	if not wall_hit.is_empty():
+		# AN2.3. The half that stayed open: a wall answers too, harder than
+		# any body zone, and takes the same kind of edge off the weapon
+		# armour already does (AN2.4) — a blade stopped dead by stone should
+		# not come away in the same condition a clean miss leaves it in.
+		if arm != null:
+			arm.strike(WALL_MELEE_RESISTANCE, wall_hit.normal)
+		_wear_current_weapon(str(report.get("weapon", "")), 1.0)
+		ballistics.mark_impact(wall_hit.position, wall_hit.normal, float(report.get("damage", 24.0)) * 0.05)
+		WorldHistory.record_event("melee_struck_wall", {"weapon": str(report.get("weapon", "")), "location": HUNT_LOCATION})
+		prompt.text = "STEEL ON STONE"
+		connected = true
+		return
 	if enemy == null or not enemy.visible or enemy_retreating:
 		if arm != null and not connected:
 			arm.whiff()
@@ -1640,6 +1654,11 @@ const MELEE_RESISTANCE_BASE := {
 	"head": 0.72, "torso": 0.55,
 	"left_arm": 0.48, "right_arm": 0.48, "left_leg": 0.5, "right_leg": 0.5,
 }
+
+## AN2.3. The half the note above left open: a wall, unlike bone, does not
+## flex or bleed, so it sits above every zone `MELEE_RESISTANCE_BASE` names —
+## harder than even an armoured skull.
+const WALL_MELEE_RESISTANCE := 0.85
 
 func _melee_resistance(zone: String, result: Dictionary) -> float:
 	var base: float = MELEE_RESISTANCE_BASE.get(zone, 0.55)
@@ -1874,6 +1893,24 @@ func _trace_actor(origin: Vector3, direction: Vector3, distance: float) -> Dicti
 				return {"actor": actor, "position": hit.position, "normal": hit.normal}
 			cursor = cursor.get_parent()
 	return {}
+
+
+## AN2.3. The half `_resolve_strike()` used to leave open: `_attack_nearest_encounter_actor()`
+## can only ever see an actor, so a swing that met a wall instead had nothing
+## to report and read back as a whiff. `collide_with_areas` stays false rather
+## than mirroring `_trace_actor()` — every zone hitbox in this game is an
+## `Area3D` (AF1.1's own finding), so leaving areas out of the query entirely
+## is what keeps a body from ever being mistaken for a wall here.
+func _attack_wall(reach: float) -> Dictionary:
+	var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+	var query := PhysicsRayQueryParameters3D.create(player, player + look * reach)
+	query.exclude = _player_collision_exclusions()
+	query.collide_with_areas = false
+	query.collide_with_bodies = true
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return {}
+	return {"position": hit.position, "normal": hit.normal}
 
 
 func _player_collision_exclusions() -> Array[RID]:
