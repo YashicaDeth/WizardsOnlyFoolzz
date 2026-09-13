@@ -344,6 +344,52 @@ func repay(amount: int, lender_faction: String) -> Dictionary:
 	return {"ok": true, "paid": paid, "owed": int(debts[lender_faction]), "wallet": wallet - paid}
 
 
+## AL1.2. The bank does not lend against nothing. `borrow()` already writes a
+## real debt against a real lender; this is the other half — a real lien
+## written onto one exact carried item, named and found on inspection,
+## rather than an abstract number nobody can point at. Reuses `borrow()`'s
+## own ledger instead of a second one: the lien is which real item secures
+## a slice of the same real debt.
+func borrow_against(amount: int, lender_faction: String, item_index: int) -> Dictionary:
+	if item_index < 0 or item_index >= items.size():
+		return {"ok": false, "reason": "NOTHING TO SECURE IT AGAINST"}
+	var result := borrow(amount, lender_faction)
+	if not bool(result.get("ok", false)):
+		return result
+	var item: Dictionary = items[item_index]
+	item["lien"] = "%s // %d %s" % [str(WorldHistory.subject(lender_faction).get("name", lender_faction)).to_upper(), amount, CURRENCY]
+	item["lien_holder"] = lender_faction
+	items[item_index] = item
+	save_to_history()
+	WorldHistory.record_event("bank_lien_written", {"lender_faction": lender_faction, "amount": amount, "item": item.duplicate(true)})
+	result["item"] = item
+	return result
+
+
+## AL1.3. "A debt secured against something of yours, named, and they will
+## take it" — literally: default has no separate penalty invented for it,
+## the bank simply takes the exact thing the lien named. Valued at the same
+## `sale_value()` the Choir prices everything by, never a fiction number
+## invented for this one verb, so a good part clears more debt than a
+## battered one the same way selling it honestly would.
+func seize_lien(lender_faction: String) -> Dictionary:
+	for index in items.size():
+		var item: Dictionary = items[index]
+		if str(item.get("lien_holder", "")) != lender_faction:
+			continue
+		var value := sale_value(item, lender_faction)
+		items.remove_at(index)
+		var owed := debt_to(lender_faction)
+		var cleared := mini(value, owed)
+		var inventory := WorldHistory.subject("inventory")
+		var debts: Dictionary = (inventory.get("player_debt", {}) as Dictionary).duplicate(true)
+		debts[lender_faction] = owed - cleared
+		WorldHistory.update_subject("inventory", {"items": items.duplicate(true), "player_debt": debts}, "lien_seized")
+		WorldHistory.record_event("lien_seized", {"lender_faction": lender_faction, "item": item.duplicate(true), "value": value, "owed_after": debts[lender_faction]})
+		return {"ok": true, "item": item, "value": value, "owed": int(debts[lender_faction])}
+	return {"ok": false, "reason": "NOTHING LIENED TO THIS LENDER"}
+
+
 func drop(index: int) -> Dictionary:
 	if index < 0 or index >= items.size():
 		return {}

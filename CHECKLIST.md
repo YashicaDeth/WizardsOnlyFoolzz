@@ -4114,9 +4114,9 @@ legitimate, and the conspiracy is the ordinary one - an institution doing
 paperwork over things that used to be people.
 
 ### AL1 — The bank
-- [ ] **AL1.1** Money exists as a real quantity with a real issuer
-- [ ] **AL1.2** The bank writes the liens the Choir already prices (CARRY, B)
-- [ ] **AL1.3** A debt is secured against something of yours, named, and they will take it
+- [x] **AL1.1** Money exists as a real quantity with a real issuer — already built, under R rather than AL: `Carry.CURRENCY` (`rust_scrip`) and `CURRENCY_ISSUER` (`celloutz`, a real registered faction subject with its own doctrine), the wallet living durably at `WorldHistory.subject("inventory").rust_scrip`. Verified by the pre-existing `money_test.gd` (R1.1), re-run clean rather than duplicated
+- [x] **AL1.2** The bank writes the liens the Choir already prices (CARRY, B) — the per-item `lien` field has existed since B5.4 but nothing ever wrote a real one into it; `Carry.borrow_against(amount, lender_faction, item_index)` reuses `borrow()`'s own real debt ledger and additionally stamps the exact carried item with who holds the lien and how much, found on the item itself rather than an abstract number nobody can point at
+- [x] **AL1.3** A debt is secured against something of yours, named, and they will take it — `Carry.seize_lien(lender_faction)` finds the item actually liened to that lender and removes it from CARRY for real, valued by the same `sale_value()` the Choir prices everything by (never a fiction number invented for this one verb), and shrinks the real debt by what the thing was actually worth. `tests/bank_lien_test.gd`, 14 checks; `money_test.gd` (R1.1/R1.4) re-verified clean against the same ledger. Honestly scoped: nothing yet triggers a seizure on its own (no interest clock, no collector visit) — this is the mechanism AL1.5/AL1.7 will call, not an automatic default
 - [ ] **AL1.4** Accounts, in a building, that you can walk into and rob
 - [ ] **AL1.5** Interest accrues in game time, and it does not stop while you are away
 - [ ] **AL1.6** They are an institution: the satire lands on the paperwork, not on debtors
