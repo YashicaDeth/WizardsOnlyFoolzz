@@ -21,10 +21,55 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	if size.x < 400:
 		return
+	_draw_blood_sigil()
+	_draw_hud_frame()
 	_draw_tree()
 	_draw_title_signal()
 	_draw_archive_nodes()
 	_draw_footer()
+
+
+## The menu needs a mark that belongs to the world, not another stock loading
+## screen.  This is drawn under the type so it reads like something stamped in
+## wet rust on the camera glass: imperfect rings, a six-point ward and drips.
+func _draw_blood_sigil() -> void:
+	var center := Vector2(size.x * 0.67, size.y * 0.42)
+	var radius := minf(size.x, size.y) * 0.205
+	var breathe := 0.78 + sin(elapsed * 1.15) * 0.14
+	var blood := Color("a91517") * Color(1, 1, 1, 0.45 * breathe)
+	var old_ring := Color("47100e") * Color(1, 1, 1, 0.34)
+	draw_arc(center + Vector2(3, -2), radius * 1.03, -0.18, TAU - 0.36, 86, old_ring, 4.0)
+	draw_arc(center, radius, 0.09, TAU - 0.22, 96, blood, 2.25)
+	draw_arc(center, radius * 0.58, -0.34, TAU - 0.7, 72, blood * Color(1, 1, 1, 0.72), 1.5)
+	var points := PackedVector2Array()
+	for index in 7:
+		var angle := -PI * 0.5 + float(index) * TAU / 6.0
+		points.append(center + Vector2(cos(angle), sin(angle)) * radius * 0.86)
+	for index in 6:
+		draw_line(points[index], points[(index + 2) % 6], blood, 1.5, true)
+		draw_circle(points[index], 3.2 + sin(elapsed * 2.0 + index) * 0.75, blood)
+		var drip := 16.0 + float((index * 13) % 29)
+		if index % 2 == 0:
+			draw_line(points[index] + Vector2(0, 5), points[index] + Vector2(2, drip), blood * Color(1, 1, 1, 0.72), 2.0)
+			draw_circle(points[index] + Vector2(2, drip + 3), 2.2, blood)
+	# Scar-like crosshairs give the sigil a surgical, inspected quality.
+	draw_line(center + Vector2(-radius * 0.28, 0), center + Vector2(radius * 0.28, 0), blood, 1.0)
+	draw_line(center + Vector2(0, -radius * 0.28), center + Vector2(0, radius * 0.28), blood, 1.0)
+
+
+func _draw_hud_frame() -> void:
+	var edge := Color("c8502a") * Color(1, 1, 1, 0.48)
+	var dim := Color("e8b477") * Color(1, 1, 1, 0.22)
+	var margin := 18.0
+	var corner := 54.0
+	# Broken corners keep the overlay from becoming a generic rectangle.
+	for flip_x in [-1.0, 1.0]:
+		for flip_y in [-1.0, 1.0]:
+			var pivot := Vector2(margin if flip_x < 0.0 else size.x - margin, margin if flip_y < 0.0 else size.y - margin)
+			draw_line(pivot, pivot + Vector2(corner * flip_x, 0), edge, 1.5)
+			draw_line(pivot, pivot + Vector2(0, corner * flip_y), edge, 1.5)
+	draw_string(ThemeDB.fallback_font, Vector2(size.x - 220, 45), "MERCY COUNTY // LIVE FEED", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, dim)
+	draw_string(ThemeDB.fallback_font, Vector2(size.x - 220, 62), "BIOHAZARD: UNRESOLVED", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, edge)
 
 
 func _draw_tree() -> void:

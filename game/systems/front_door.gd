@@ -24,10 +24,15 @@ const BRUISE := Color("6a2d6e")
 ## The junk that falls past the camera. Meat industry, failed medicine and the
 ## paperwork of both — the three things the Ashbloom actually runs on.
 const DEBRIS := [
-	{"kind": "organ", "tint": "7a1a16", "size": 0.34},
-	{"kind": "organ", "tint": "5e2430", "size": 0.28},
+	{"kind": "organ", "tint": "7a1a16", "size": 0.42},
+	{"kind": "organ", "tint": "5e2430", "size": 0.34},
+	{"kind": "heart", "tint": "8d1b1d", "size": 0.36},
+	{"kind": "liver", "tint": "572625", "size": 0.44},
 	{"kind": "tin", "tint": "8a7430", "size": 0.3},
 	{"kind": "tin", "tint": "46523a", "size": 0.26},
+	{"kind": "vial", "tint": "4f8f7b", "size": 0.25},
+	{"kind": "capsule", "tint": "d1a842", "size": 0.23},
+	{"kind": "blister", "tint": "a9a8a0", "size": 0.32},
 	{"kind": "bone", "tint": "cfc2a4", "size": 0.42},
 	{"kind": "bone", "tint": "b8ab88", "size": 0.3},
 	{"kind": "paper", "tint": "c9c2a0", "size": 0.38},
@@ -75,7 +80,7 @@ func _ready() -> void:
 func _build_debris() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 90211
-	for index in 46:
+	for index in 66:
 		var spec: Dictionary = DEBRIS[index % DEBRIS.size()]
 		var piece := MeshInstance3D.new()
 		piece.mesh = _junk_mesh(str(spec.kind), float(spec.size) * rng.randf_range(0.7, 1.4))
@@ -92,6 +97,11 @@ func _build_debris() -> void:
 			"spin": Vector3(rng.randf_range(-1.4, 1.4), rng.randf_range(-1.4, 1.4), rng.randf_range(-1.4, 1.4)),
 			"drift": rng.randf_range(0.0, TAU),
 		}
+		# Organs should never fall as perfect fruit.  A slightly asymmetric body
+		# and a different scale per chunk sells soft tissue before the player is
+		# even close enough to inspect it.
+		if spec.kind in ["organ", "heart", "liver"]:
+			piece.scale = Vector3(rng.randf_range(0.72, 1.2), rng.randf_range(0.9, 1.42), rng.randf_range(0.68, 1.16))
 		pieces.append(state)
 		piece.position = state.origin
 
@@ -100,11 +110,25 @@ func _junk_mesh(kind: String, size: float) -> Mesh:
 	match kind:
 		"organ":
 			var organ := SphereMesh.new()
-			organ.radius = size * 0.5
-			organ.height = size * 1.5
-			organ.radial_segments = 7
-			organ.rings = 4
+			organ.radius = size * 0.56
+			organ.height = size * 1.72
+			organ.radial_segments = 12
+			organ.rings = 8
 			return organ
+		"heart":
+			var heart := SphereMesh.new()
+			heart.radius = size * 0.56
+			heart.height = size * 1.42
+			heart.radial_segments = 12
+			heart.rings = 8
+			return heart
+		"liver":
+			var liver := SphereMesh.new()
+			liver.radius = size * 0.72
+			liver.height = size * 0.82
+			liver.radial_segments = 12
+			liver.rings = 6
+			return liver
 		"tin":
 			var tin := CylinderMesh.new()
 			tin.top_radius = size * 0.42
@@ -129,6 +153,23 @@ func _junk_mesh(kind: String, size: float) -> Mesh:
 			syringe.height = size * 1.8
 			syringe.radial_segments = 6
 			return syringe
+		"vial":
+			var vial := CylinderMesh.new()
+			vial.top_radius = size * 0.13
+			vial.bottom_radius = size * 0.18
+			vial.height = size * 1.65
+			vial.radial_segments = 10
+			return vial
+		"capsule":
+			var capsule := CapsuleMesh.new()
+			capsule.radius = size * 0.2
+			capsule.height = size * 1.55
+			capsule.radial_segments = 10
+			return capsule
+		"blister":
+			var blister := BoxMesh.new()
+			blister.size = Vector3(size * 1.45, size * 0.72, size * 0.09)
+			return blister
 		_:
 			var paper := BoxMesh.new()
 			paper.size = Vector3(size, size * 1.3, 0.01)
