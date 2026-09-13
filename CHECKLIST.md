@@ -3359,12 +3359,18 @@ are in it.
       suites re-verified clean.
 
 ### AD2 — The first-person HUD
-- [ ] **AD2.1** Diegetic: the hands, the weapon, the handheld, the windscreen
-      (pairs with M1.6) — three of four, not four. The hands and weapon are
-      a real held viewmodel (M4), and the handheld is a real device raised
-      into a real hand (`handheld_device.gd`, all of Section C). The
-      windscreen names M2, which does not exist yet — there is no in-car
-      first-person to be diegetic about until that lands
+- [x] ~~**AD2.1** Diegetic: the hands, the weapon, the handheld, the windscreen~~
+      (pairs with M1.6) — four of four now, not three. This line's own note
+      said the windscreen "names M2, which does not exist yet" — stale by
+      the time anyone read it again: M2 (`## M — The camera is progression`)
+      is fully built and verified above this line in the same file
+      (`M2.4`/`M2.5`), the same way that section's own header note already
+      caught itself out once. The hands and weapon are a real held
+      viewmodel (M4); the handheld is a real device raised into a real hand
+      (`handheld_device.gd`, Section C); the windscreen is a real `BoxMesh`
+      plane you shoot through and that degrades under hits (`M2.4`/`M2.5`,
+      `vehicle_interior.gd`). All four are real geometry a camera looks at,
+      not a HUD icon standing in for one
 - [x] ~~**AD2.2** Nothing floating in a corner that could be on an object
       instead~~ Not built here — cross-ticked against what M1.6 and AG4.5
       already did in `gothic_field_hud.gd`, unrelated to this pass and
@@ -3430,7 +3436,7 @@ The last rung. Fifteen statements that are true of movement and first person whe
 - [x] **AD10.5** `v10` Momentum carries between moves as one motion — See AD1.5: a vault captures and restores real horizontal velocity rather than zeroing it, `momentum_carry_test.gd` (9/9). Re-verified clean this pass.
 - [x] **AD10.6** `v10` A broken leg cannot vault — See AD1.6: `mobility_ratio()` below `PLAYER_INJURY_FLOOR` refuses vault and wall run outright, `anatomy_traversal_test.gd` (11/11). Re-verified clean this pass.
 - [ ] **AD10.7** `v10` Crouching, sprinting and sliding are one continuous system — Not built. No AD1 line ever covered crouching or sliding; sprinting exists (`B6.5`'s speed scale) but there is no crouch or slide verb to be continuous with it.
-- [ ] **AD10.8** `v10` The HUD is the hands, the weapon, the handheld and the glass — **Not fully true.** AD2.1 is three of four: the hands/weapon (M4) and the handheld (Section C) are real, but the windscreen names M2, which does not exist yet.
+- [x] ~~**AD10.8**~~ `v10` The HUD is the hands, the weapon, the handheld and the glass — true, now that AD2.1 above is: hands/weapon (M4), handheld (Section C) and the windscreen (M2.4/M2.5, real geometry you shoot through and that degrades) are all real, all diegetic, none of them a HUD icon standing in for the thing itself.
 - [x] **AD10.9** `v10` Nothing floats in a corner that could sit on an object — See AD2.2: the vitals gauge hangs off the weapon well by a visible cable rather than sitting alone; confirmed again by eye against `captures/ad2_4_field_hud_first_person.png` and `_third_person.png` while verifying AD10.11 below.
 - [ ] **AD10.10** `v10` Affordances say what you can do right now — **Not fully true**, per AD2.3's own note: the bottom strip shows current verbs but does not announce a *new* one the moment it becomes available. `gothic_field_hud.gd` is Lane 5's file.
 - [x] **AD10.11** `v10` It survives the change to third person without dissolving — See AD2.4. Opened and looked at both again rather than taking the old note on faith: `captures/ad2_4_field_hud_first_person.png` and `_third_person.png` show the identical location crest, hunt thread, vitals-and-weapon gauge and bottom strip over two genuinely different camera positions.
