@@ -3786,20 +3786,39 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
       `tests/disarm_test.gd` — a fresh grip survives a hard hit, an exhausted
       one gives the weapon up to a hard hit but not a light one, drawing
       again re-arms, and a carried limb is not double-counted.
-- [~] **AN2.3** Hitting armour, bone or a wall answers differently through
-      `strike()` — armour and bone, not the wall yet. `apply_hit()` now
-      reports `absorbed`, the real fraction of a blow armour and garments
-      just stopped; `_melee_resistance(zone, result)` turns that plus a
-      per-zone bone-density base (head firmer than a limb, armour raises
-      either) into what `arm.strike()` actually feels, replacing a flat
-      `0.65` on every connecting blow. A wall is still not a thing a swing
-      can hit at all — `_resolve_strike()` only ever recognises "connected
-      with an actor" or "hit nothing," so that half stays open rather than
-      being declared done. Verified: `tests/melee_resistance_test.gd` (new)
-      — a skull answers harder than a ribcage, which answers harder than a
-      limb, armour raises whichever zone it sits on further, and a real
-      swing through an armoured NPC measurably answers harder than the same
-      swing through an unarmoured one.
+- [x] ~~**AN2.3** Hitting armour, bone or a wall answers differently through
+      `strike()`~~ Armour and bone closed first; this pass closes the wall.
+      `apply_hit()` reports `absorbed`, the real fraction of a blow armour
+      and garments just stopped; `_melee_resistance(zone, result)` turns
+      that plus a per-zone bone-density base (head firmer than a limb,
+      armour raises either) into what `arm.strike()` actually feels,
+      replacing a flat `0.65` on every connecting blow. A wall was still not
+      a thing a swing could hit at all — `_resolve_strike()` only ever
+      recognised "connected with an actor" or "hit nothing," because
+      `_attack_nearest_encounter_actor()` has no concept of anything that
+      isn't one. `_attack_wall()` is the missing third outcome: a raycast
+      along the same look direction the aim already uses, `collide_with_areas`
+      held false rather than mirrored from `_trace_actor()`'s own query,
+      since AF1.1 already established every zone hitbox in this game is an
+      `Area3D` — excluding areas entirely is what keeps a body from ever
+      being misread as a wall here. A wall answers at `WALL_MELEE_RESISTANCE`
+      (0.85), above every zone in `MELEE_RESISTANCE_BASE` including an
+      armoured skull, wears the weapon the same way meeting armour already
+      does (AN2.4, at the maximum `absorbed` a wall does not flex or give),
+      and leaves the same scar a bullet does — `Ballistics.mark_impact()`,
+      a one-line public wrapper around the round's own `_mark()`, since a
+      melee swing is not a round in flight and has no `_land()` to route
+      through. Verified: `tests/melee_resistance_test.gd` (armour and bone,
+      unchanged, still clean) plus new `tests/wall_strike_test.gd` (8
+      checks) — a swing thrown at open air still carries through and gains
+      speed exactly as a whiff always has, wears nothing, and records
+      nothing; the same swing thrown at a real `StaticBody3D` wall is
+      measured stopping dead and bouncing back (+4.00 m/s into -2.47 rather
+      than whiffing up to +4.48), wears the sword the same swing through
+      nothing never did, and records `melee_struck_wall` exactly once.
+      `weapon_condition_test`, `disarm_test`, `combat_integration_test`,
+      `zone_precision_test`, `ballistics_test` and `opening_test` regression
+      suites re-verified clean.
 - [x] **AN2.4** The weapon's own condition rides on the same object — a bent
       blade swings wrong — `HunterArsenal.wear_weapon()` (lazy, like `ammo`:
       missing means unworn) takes something off the edge on every connecting
@@ -3813,7 +3832,31 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
       condition and stiffness, a connecting hit wears both down immediately,
       the same hit through real plate wears more than the same hit through
       nothing, and throwing a fist does not touch the sword sitting unused.
-- [ ] **AN2.5** Two-handing changes the numbers, not just the pose
+- [ ] **AN2.5** Two-handing changes the numbers, not just the pose — not
+      built, diagnosed. `held_gear.gd`'s own `GRIPS` table already carries
+      `reach` and `damage_type` per grip, and its header comment names
+      exactly this claim: *"`reach` and `damage_type` are here rather than
+      on the weapon because they are properties of how it is being held.
+      Half-swording shortens your reach and turns a cut into a thrust, and
+      that is the whole reason anybody ever did it."* Nothing outside
+      `held_gear.gd` reads either field — confirmed by grep, not assumed.
+      `half_sword`'s own `reach` (0.62) already differs meaningfully from
+      `one_hand`/`two_hand` (both 1.0, not yet differentiated from each
+      other); `damage_type` shifts from `cut` to `puncture` on the same
+      switch. `hold(grip_name)` is real and callable — "the verb behind
+      half-swording: nothing is drawn or sheathed, the hands move" — but no
+      code path in the live game ever calls it: `hunter_arsenal.gd` only
+      calls `HeldGear.build_weapon()` once, as a model factory, and keeps
+      no persistent `HeldGear` instance whose `grip` a player action could
+      change. Wiring this for real needs three things, in order: (1) a
+      live `HeldGear` instance `_carry_current_weapon()` can hold onto
+      rather than a one-shot model, (2) an input that calls `hold()` on it
+      for weapons where a grip choice makes sense (the sword has three:
+      `one_hand`, `two_hand`, `half_sword`), and (3) `arm.reach` and the
+      swing's own `damage_type` reading the active grip's numbers instead
+      of the flat `ARM_WEIGHTS` entry. Left here rather than half-built
+      under time pressure with another agent already mid-edit in
+      `bone_yard_hunt.gd`
 
 
 ### AN v10 — the final pass
