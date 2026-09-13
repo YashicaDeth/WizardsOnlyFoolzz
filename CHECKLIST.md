@@ -770,6 +770,35 @@ mass-produced by the million.
       char scar. Both bake onto the board and stay once the animation ends;
       a board accumulates every seal it has actually carried
       (`bound_seals`/`burnt_seals`).
+
+      Follow-up: "each and every" named a cutscene that did not exist —
+      `begin_burn`/`begin_bind` took one seed and ran one animation, and all
+      72 `GoeticSeals.GOETIA` entries existed only as data. `begin_full_sequence(mode,
+      per_seal_duration)` is a director on top of that, not new drawing
+      machinery: it walks the roster in Mathers' own listed order, seeding
+      each demon's shape off `hash()` of its own name, and the instant one
+      seal's own real bake completes it chains straight into the next —
+      `sequence_seal_started`/`sequence_finished` are the two signals a
+      cutscene or subtitle track hooks into. `tests/motherboard_sequence_test.gd`
+      (10 checks) drives it end to end: all 72 genuinely start and bake, in
+      the right order, with 72 distinct seeds, `sequence_finished` firing
+      exactly once, and a second call restarting cleanly from Bael rather
+      than layering two queues.
+
+      Captured both ways rather than assumed: burning's permanent mark is
+      deliberately minimal by E2.7's own rule ("burn 1.0 leaves nothing but
+      the memory of the ring"), and that is just as true stacked 72 deep as
+      it is for one — `e2_4_motherboard_sequence_burn_finished.png` reads as
+      barely more than a single burnt seal, which is honest rather than a
+      fault in the director. Binding does not share that limit: every
+      stroke of every one of the 72 stays as permanent lit copper, and
+      `e2_4_motherboard_sequence_bind_finished.png` is a dense, legible tangle
+      of 72 overlaid seals — the far stronger image if a cutscene wants "each
+      and every" to actually read as all of them. `e2_4_motherboard_sequence_live.png`
+      is one demon caught mid-burn, confirming the individual live animation
+      inside the sequence looks exactly like the single-seal version already
+      on file. Which mode the finished cutscene actually uses is a direction
+      call, not something decided here.
 - [x] ~~**E2.5** The board is a real board: traces, pads, silkscreen, a chip
       that reads as a chip~~ Procedural, the same way every other object in
       this game is built — no imported asset. Manhattan-routed copper traces
