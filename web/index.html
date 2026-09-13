@@ -73,6 +73,29 @@ body {
 .reg::after  { top: 7px; left: 0; height: 1px; width: 16px; }
 .reg.tl { left: 10px; top: 10px; } .reg.tr { right: 10px; top: 10px; }
 
+/* ---- switch: the bridge to WizardsOnlyFoolz ---------------------------- */
+
+.switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--bone-mid);
+  margin-bottom: 14px;
+}
+.switch a {
+  color: var(--rot);
+  text-decoration: none;
+  border: 1px solid var(--edge);
+  padding: 6px 12px;
+  transition: background .12s linear, color .12s linear;
+}
+.switch a:hover, .switch a:focus-visible { background: var(--rot); color: var(--tar); }
+
 /* ---- masthead ---------------------------------------------------------- */
 
 .masthead {
@@ -378,6 +401,12 @@ footer .terms { max-width: 46ch; }
 <div class="sheet">
   <span class="reg tl" aria-hidden="true"></span>
   <span class="reg tr" aria-hidden="true"></span>
+
+  <nav class="switch">
+    <span>DESCENT REGISTER · OWNERSHIP</span>
+    <!-- [SWAP] once wizardsonlyfoolz.net resolves, point straight at it. -->
+    <a href="wizardsonlyfoolz.html">ASCEND ↺</a>
+  </nav>
 
   <header class="masthead">
     <h1 class="wordmark">CELL<em>OUTZ</em></h1>

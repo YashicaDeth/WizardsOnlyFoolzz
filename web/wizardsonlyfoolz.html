@@ -1,0 +1,523 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WizardsOnlyFoolz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;700;900&family=Archivo:wght@400;500;600&family=Courier+Prime:wght@400;700&display=swap">
+
+<style>
+/* WizardsOnlyFoolz — the Ascent side of the same world CellOutz sells out of.
+   Same substrate as celloutz.xyz (same fonts, same construction), pushed to
+   the other end of the Tree: cool instead of hot, a mark that draws itself
+   instead of a wordmark that overprints.
+
+   SWAP POINTS, all marked with [SWAP]:
+     - .switch a[href] — points at wizardsonlyfoolz.net once that domain
+       exists; today it silently falls back to itself, which is correct
+       behaviour for a link with nowhere real to go yet.
+     - #discord-embed — needs a real Discord server ID (see comment there).
+     - #codex-embed — needs a real repo/board ID for the bug codex.
+   No accounts, payments or personal data are collected on this page. */
+
+:root {
+  --void:     #07080b;
+  --case:     #0e1116;
+  --case-hi:  #161b22;
+  --bone:     #f1d2a3;
+  --pale:     #e7ecf1;
+  --pale-dim: #a7b3c0;
+  --frequency:#7fe3d8;
+  --high:     #cfe8ff;
+  --rule:     #202733;
+  --edge:     #2c3644;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--pale);
+  font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(207,232,255,.04) 1px, transparent 0),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px);
+  background-size: 4px 4px, 100% 3px;
+  animation: drift 11s linear infinite;
+}
+@keyframes drift { to { background-position: 0 0, 0 60px; } }
+
+/* A slow aurora behind everything — the "higher frequency" the lore keeps
+   naming, never a spotlight, always at the edge of the frame. */
+.aurora {
+  position: fixed;
+  inset: -20%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 0%, rgba(127,227,216,.10), transparent 60%),
+    radial-gradient(ellipse 50% 35% at 85% 15%, rgba(207,232,255,.08), transparent 60%);
+  filter: blur(2px);
+  animation: sway 22s ease-in-out infinite alternate;
+}
+@keyframes sway {
+  from { transform: translateY(-2%) rotate(0deg); }
+  to   { transform: translateY(2%) rotate(1.2deg); }
+}
+@media (prefers-reduced-motion: reduce) { .grain, .aurora { animation: none; } }
+
+.sheet {
+  position: relative;
+  z-index: 1;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 34px 30px 80px;
+}
+
+/* ---- switch: the bridge back to CellOutz ------------------------------- */
+
+.switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--pale-dim);
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 14px;
+}
+.switch a {
+  color: var(--frequency);
+  text-decoration: none;
+  border: 1px solid var(--edge);
+  padding: 6px 12px;
+  transition: background .12s linear, color .12s linear;
+}
+.switch a:hover, .switch a:focus-visible { background: var(--frequency); color: var(--void); }
+
+/* ---- hero: the mark that draws itself ---------------------------------- */
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 64px 10px 40px;
+}
+
+.mark {
+  width: min(46vw, 300px);
+  height: min(46vw, 300px);
+  overflow: visible;
+}
+.mark path {
+  fill: none;
+  stroke: var(--bone);
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mark .ring path { stroke: var(--pale); }
+
+/* Every stroke is drawn once, in sequence — the ring first (the boundary a
+   seal like this always has one of), then the spine top to bottom. Lengths
+   are approximate per path; a slightly-wrong length just changes how far
+   through the draw the last visible segment sits, which reads as texture
+   rather than a bug. */
+.mark path {
+  stroke-dasharray: 900;
+  stroke-dashoffset: 900;
+  animation: draw 1.6s cubic-bezier(.3,.9,.2,1) forwards;
+}
+.mark .ring path:nth-child(1) { animation-delay: .05s; }
+.mark .ring path:nth-child(2) { animation-delay: .35s; }
+.mark .spine path:nth-child(1) { animation-delay: .75s; }
+.mark .spine path:nth-child(2) { animation-delay: .95s; }
+.mark .spine path:nth-child(3) { animation-delay: 1.05s; }
+.mark .spine path:nth-child(4) { animation-delay: 1.15s; }
+.mark .spine path:nth-child(5) { animation-delay: 1.25s; }
+.mark .spine path:nth-child(6) { animation-delay: 1.35s; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+
+/* The finished mark breathes very slightly — never spins, never pulses hard.
+   A seal that is *watching* rather than performing. */
+.mark { animation: settle 1.6s linear forwards; }
+.mark g.live { animation: breathe 7s ease-in-out 1.8s infinite; transform-origin: center; }
+@keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.018); } }
+@media (prefers-reduced-motion: reduce) {
+  .mark path { animation: none; stroke-dashoffset: 0; }
+  .mark g.live { animation: none; }
+}
+
+.wordwrap { margin-top: 26px; overflow: hidden; }
+.word {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-weight: 900;
+  font-size: clamp(30px, 7vw, 64px);
+  letter-spacing: .06em;
+  margin: 0;
+  color: var(--pale);
+  display: flex;
+  justify-content: center;
+}
+.word span {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(.25em);
+  animation: rise .5s cubic-bezier(.2,.7,.2,1) forwards;
+}
+/* Staggered per letter, starting once the mark has mostly drawn itself. */
+.word span:nth-child(1)  { animation-delay: 1.55s; }
+.word span:nth-child(2)  { animation-delay: 1.60s; }
+.word span:nth-child(3)  { animation-delay: 1.65s; }
+.word span:nth-child(4)  { animation-delay: 1.70s; }
+.word span:nth-child(5)  { animation-delay: 1.75s; }
+.word span:nth-child(6)  { animation-delay: 1.80s; }
+.word span:nth-child(7)  { animation-delay: 1.85s; }
+.word span:nth-child(8)  { animation-delay: 1.90s; }
+.word span:nth-child(9)  { animation-delay: 1.95s; }
+.word span:nth-child(10) { animation-delay: 2.00s; }
+.word span:nth-child(11) { animation-delay: 2.05s; }
+.word span:nth-child(12) { animation-delay: 2.10s; }
+.word span:nth-child(13) { animation-delay: 2.15s; }
+.word span:nth-child(14) { animation-delay: 2.20s; }
+.word span:nth-child(15) { animation-delay: 2.25s; }
+.word span:nth-child(16) { animation-delay: 2.30s; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .word span { animation: none; opacity: 1; transform: none; } }
+
+.tagline {
+  margin: 14px 0 0;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 12px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--frequency);
+  opacity: 0;
+  animation: rise .6s ease-out 2.5s forwards;
+}
+@media (prefers-reduced-motion: reduce) { .tagline { animation: none; opacity: 1; } }
+
+/* ---- doctrine ----------------------------------------------------------- */
+
+.doctrine {
+  display: grid;
+  grid-template-columns: minmax(0,1.2fr) minmax(220px,.8fr);
+  gap: 30px;
+  margin-top: 30px;
+  padding-bottom: 34px;
+  border-bottom: 1px solid var(--rule);
+}
+@media (max-width: 780px) { .doctrine { grid-template-columns: 1fr; } }
+.eyebrow {
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--frequency);
+  margin: 0 0 10px;
+}
+.doctrine h2 {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-weight: 700;
+  font-size: clamp(28px, 4.4vw, 44px);
+  line-height: 1;
+  margin: 0 0 14px;
+}
+.doctrine p { margin: 0 0 14px; max-width: 60ch; color: var(--pale-dim); }
+.doctrine p.lede { color: var(--pale); font-size: 16.5px; }
+.card {
+  border: 1px solid var(--rule);
+  background: var(--case);
+  padding: 20px;
+}
+.card h3 {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-size: 20px;
+  margin: 0 0 8px;
+}
+.card p { margin: 0; color: var(--pale-dim); font-size: 13.5px; }
+
+/* ---- community / bug codex ---------------------------------------------- */
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 50px 0 20px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+.section-head h3 {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-weight: 700;
+  font-size: 28px;
+  margin: 0;
+}
+.section-head .count {
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  color: var(--pale-dim);
+}
+
+.community {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+@media (max-width: 780px) { .community { grid-template-columns: 1fr; } }
+
+.panel {
+  border: 1px solid var(--rule);
+  background: var(--case);
+  display: flex;
+  flex-direction: column;
+}
+.panel-head {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.panel-head h4 {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-size: 20px;
+  margin: 0;
+}
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--frequency);
+  box-shadow: 0 0 0 0 rgba(127,227,216,.6);
+  animation: ping 2.4s ease-out infinite;
+}
+@keyframes ping {
+  0%   { box-shadow: 0 0 0 0 rgba(127,227,216,.5); }
+  70%  { box-shadow: 0 0 0 8px rgba(127,227,216,0); }
+  100% { box-shadow: 0 0 0 0 rgba(127,227,216,0); }
+}
+.panel-body { padding: 18px; flex: 1; }
+.panel-body p { margin: 0 0 12px; color: var(--pale-dim); font-size: 13.5px; }
+
+.embed-slot {
+  border: 1px dashed var(--edge);
+  background: var(--case-hi);
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: var(--pale-dim);
+}
+.embed-slot code {
+  display: block;
+  margin-top: 8px;
+  color: var(--frequency);
+  font-size: 10.5px;
+  word-break: break-word;
+}
+
+.cta {
+  display: inline-block;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--void);
+  background: var(--frequency);
+  padding: 9px 16px;
+  border: 1px solid var(--frequency);
+  transition: background .12s linear, color .12s linear;
+}
+.cta:hover, .cta:focus-visible { background: var(--high); border-color: var(--high); }
+.cta.ghost { background: transparent; color: var(--frequency); }
+.cta.ghost:hover, .cta.ghost:focus-visible { background: var(--frequency); color: var(--void); }
+
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.tag {
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border: 1px solid var(--edge);
+  color: var(--pale-dim);
+}
+
+footer {
+  margin-top: 54px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 14px 30px;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--pale-dim);
+}
+footer a { color: var(--frequency); }
+</style>
+
+<div class="grain" aria-hidden="true"></div>
+<div class="aurora" aria-hidden="true"></div>
+
+<div class="sheet">
+
+  <nav class="switch">
+    <span>ASCENT REGISTER · FREQUENCY UNCONFIRMED</span>
+    <!-- [SWAP] once wizardsonlyfoolz.net resolves, point straight at it.
+         Left self-referential until then, which is a working link either way. -->
+    <a href="index.html">↺ SWITCH TO CELLOUTZ.XYZ</a>
+  </nav>
+
+  <header class="hero">
+    <svg class="mark" viewBox="0 0 300 300" role="img" aria-label="The WizardsOnlyFoolz mark">
+      <g class="live">
+        <g class="ring">
+          <path d="M 124.12 53.41 A 100 100 0 0 1 248.48 132.64" />
+          <path d="M 248.48 167.36 A 100 100 0 1 1 92.64 68.08" />
+        </g>
+        <g class="spine">
+          <path d="M 150 150 L 150 210" />
+          <path d="M 150 150 L 108 90" />
+          <path d="M 150 150 L 192 90" />
+          <path d="M 150 150 L 122 168" />
+          <path d="M 150 150 L 118 192" />
+          <path d="M 150 150 L 182 192" />
+        </g>
+      </g>
+    </svg>
+    <div class="wordwrap">
+      <p class="word" aria-label="WIZARDSONLYFOOLZ">
+        <span>W</span><span>I</span><span>Z</span><span>A</span><span>R</span><span>D</span><span>S</span><span>O</span><span>N</span><span>L</span><span>Y</span><span>F</span><span>O</span><span>O</span><span>L</span><span>Z</span>
+      </p>
+    </div>
+    <p class="tagline">The Ascent route · same world, opposite sign</p>
+  </header>
+
+  <section class="doctrine">
+    <div>
+      <p class="eyebrow">What this is</p>
+      <h2>CellOutz owns you. This is the other end of the same axis.</h2>
+      <p class="lede">Every subject in Allusions to Grandeur sits somewhere on
+        one line between two poles. CellOutz — Ownership — is the branding on
+        the handheld in your hand from the first scene. WizardsOnlyFoolz is
+        the far end of it: Frequency, the ascending collective, reached the
+        long way rather than bought.</p>
+      <p>Nothing here is sold. There is no shop, no standing order, no SKU.
+        What lives on this page is the community side of the project — where
+        people who are actually playing it talk to the people building it.</p>
+    </div>
+    <div class="card">
+      <h3>Two sites, one Tree</h3>
+      <p>celloutz.xyz is the storefront: the catalogue, the merch, the
+        pre-order. wizardsonlyfoolz.net (soon) is the commons: the Discord,
+        the bug codex, the people. The switch above always goes to the other
+        one — that is the whole feature.</p>
+    </div>
+  </section>
+
+  <div class="section-head">
+    <h3>The commons</h3>
+    <span class="count">monitored · open to anyone who plays it</span>
+  </div>
+
+  <div class="community">
+
+    <div class="panel">
+      <div class="panel-head">
+        <h4>Live chat &amp; voice</h4>
+        <span class="live-dot" aria-hidden="true"></span>
+      </div>
+      <div class="panel-body">
+        <p>A real Discord-shaped room: text channels, a voice call you can
+          drop into, and someone actually reading it. This is where "I want
+          to collaborate" or "here's a clip of a bug" starts.</p>
+        <!-- [SWAP] Discord's own widget needs a real server ID with the
+             widget enabled (Server Settings → Widget). Once you have one:
+             <iframe src="https://discord.com/widget?id=YOUR_SERVER_ID&theme=dark"
+               width="100%" height="360" allowtransparency="true"
+               frameborder="0" sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts">
+             </iframe> -->
+        <div class="embed-slot" id="discord-embed">
+          DISCORD WIDGET NOT WIRED YET<br>
+          <code>needs: Server Settings → Widget → Enable → paste Server ID here</code>
+        </div>
+        <p style="margin-top:12px">
+          <a class="cta" href="#" id="discord-invite">Join the call</a>
+          <!-- [SWAP] href="#" → your real invite link, e.g. https://discord.gg/xxxxxxx -->
+        </p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h4>The bug codex</h4>
+      </div>
+      <div class="panel-body">
+        <p>A running record, not a comment section: what broke, what it
+          looked like, and whether it's fixed. Built for people finding this
+          from Instagram or a friend's screen recording, not just for other
+          developers.</p>
+        <!-- [SWAP] The lightest real option is GitHub Issues on a public
+             repo, embedded as a board. Two ways in, pick one:
+             1) Point straight at Issues: https://github.com/YOUR_ORG/YOUR_REPO/issues
+             2) Embed a live board with giscus (github.com/giscus/giscus) —
+                it turns this page's comments into repo Discussions, free,
+                no server to run. -->
+        <div class="embed-slot" id="codex-embed">
+          BUG BOARD NOT WIRED YET<br>
+          <code>needs: a public repo (or a form) to point this at</code>
+        </div>
+        <p style="margin-top:12px">
+          <a class="cta ghost" href="#" id="codex-link">Post a bug or an idea</a>
+          <!-- [SWAP] href="#" → your issues board / feedback form -->
+        </p>
+        <div class="tags">
+          <span class="tag">Bug</span>
+          <span class="tag">Feedback</span>
+          <span class="tag">Idea</span>
+          <span class="tag">Collab</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    <div style="max-width:46ch">
+      <b>WHO THIS IS FOR.</b> Playtesters, people who found a clip of the
+      game somewhere, anyone who wants to build something on top of it.
+      Nobody needs an account to read; posting needs a Discord login, which
+      is the only account this page ever asks for.
+    </div>
+    <div>
+      WIZARDSONLYFOOLZ · <a href="wizardsonlyfoolz.html">wizardsonlyfoolz.net</a><br>
+      A CellOutz world, seen from the other pole.<br>
+      <a href="index.html">← back to celloutz.xyz</a>
+    </div>
+  </footer>
+</div>
