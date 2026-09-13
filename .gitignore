@@ -4,6 +4,7 @@ game/addons/fmod/
 game/addons/limboai/
 game/addons/terrain_3d/
 builds/
+build/
 setup/logs/
 *.tmp
 *.blend1
