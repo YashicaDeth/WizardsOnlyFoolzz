@@ -51,8 +51,30 @@ func _ready() -> void:
 
 	# Procedural noise textures and the sky resolve over several frames; capturing
 	# immediately yields an untextured, unlit frame that misrepresents the look.
+	#
+	# The clock is pinned while that happens, and this is not a nicety. Settling
+	# is counted in *frames*, and a heavy scene spends real seconds on each one
+	# while it generates a region and compiles shaders. `WorldClock` advances at
+	# one game-minute per real second, so a 240-frame settle on the Hunt Grounds
+	# took about three and a half real minutes and moved the world three and a
+	# half *hours* — 16:30 walked to 19:52, and the shot came back at dusk with
+	# the sun down at 0.35 energy. Every long capture of a live scene has been
+	# photographing a later time of day than the one it was asked for, and a
+	# capture that quietly ages the world is worse than no capture: it produces
+	# confident, wrong conclusions about how the game looks.
+	# Pinned to a *known* hour rather than to whatever the world happens to hold.
+	# `world_minute` persists between runs, so a run of captures walks it forward
+	# and every shot lands later in the day than the one before it — which is how
+	# the Hunt Grounds came back at 19:52 and got written up as a lighting bug.
+	# A capture that is not reproducible cannot be evidence of anything.
+	var pinned := WorldClock.OPENING_MINUTE
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--hour="):
+			pinned = float(argument.trim_prefix("--hour=")) * 60.0
 	for _index in settle_frames:
+		WorldHistory.world_minute = pinned
 		await get_tree().process_frame
+	WorldHistory.world_minute = pinned
 
 	# Effects that play out over time are fired late, then given frames to reach
 	# the moment worth photographing.
@@ -226,5 +248,7 @@ func _ready() -> void:
 		print("CAPTURE_FAILED: save_png returned ", error)
 		get_tree().quit(1)
 		return
+	print("shot at hour %.2f (%s), daylight %.3f" % [
+		WorldClock.hour(), WorldClock.phase(), WorldClock.daylight()])
 	print("CAPTURED: ", out_path, " ", image.get_width(), "x", image.get_height())
 	get_tree().quit()
