@@ -68,10 +68,30 @@ order, ignoring everything else:
 | 4 | ~~**B6.2–B6.3**~~ `DONE` | A fight that continues after a limb comes off is the combat identity. |
 | 5 | ~~**F1.1–F1.2**~~ `DONE` | Witnesses are the cheapest step that makes the world remember. |
 | 6 | ~~**D1.1–D2.2**~~ `DONE` | A character sheet, so a run is *yours*. |
-| 7 | **G6.1–G6.3** | The opening carries the first ten minutes. |
+| 7 | ~~**G6.1–G6.3**~~ `DONE` | The opening carries the first ten minutes. |
 
 Everything else is depth on top of that spine. When those seven are checked, the
 game is playable end to end and the rest is making it good.
+
+**All seven are now checked, and this table was the last thing to find out.**
+It sat with row 7 open while G6.1, G6.2 and G6.3 had been struck through in
+section G — a hand-maintained view of something that kept moving underneath it,
+which is the same failure mode as any cached value nobody invalidates. Before
+trusting a row here, check the section it names; this table is a summary, and
+the sections are the source.
+
+`tests/loop_smoke_test.tscn` is what checks the claim rather than restating it.
+It reads the scene graph out of the source at run time — every transition goes
+through `Interstitial.travel`, so the whole graph is one regex away — and
+asserts that every door leads to a scene that exists and loads, and that a
+stranger can reach the hunt from the front door. It found one thing:
+
+> **`bone_yard_hunt.gd` has no exit transition of any kind.** You can enter the
+> Bone Yard and the only way out is the pause gate, which abandons the run
+> rather than finishing it. The spine reaches the game; it does not yet come
+> back. That is downstream of T, which is blocked on *what persists between
+> runs* — so this is a known gap rather than an oversight, and it is the first
+> thing the demo (P) will hit.
 
 ## How to drive this
 
@@ -2350,6 +2370,13 @@ The last rung. Fifteen statements that are true of speech when this game is fini
 - [ ] **S10.15** `v10` The privacy and cost of proximity voice are settled honestly before it ships
 
 ## T — The run
+
+⚠ Added 13 September 2026 by `tests/loop_smoke_test.tscn`: **the run has no
+ending in the scene graph at all.** Not "the ending is unsatisfying" — there is
+no `Interstitial.travel` out of `bone_yard_hunt.gd`, so the only exit is the
+pause gate. Whatever answer T's blocking question gets, an ending transition is
+the first thing that has to exist, because P cannot demo a loop that does not
+close.
 
 The open question that has been sitting unanswered longest: *"what persists
 between runs?"* Roguelike structure was asked for, and "bodies remember" is a
