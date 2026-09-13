@@ -395,8 +395,8 @@ v4 made the body customisable and nothing in it does anything. The crystal ball 
 
 ### B v6 — the sixth pass
 v5 put an object in a limb; AD3.2 wants cybernetics that change what movement is possible. Greg: limbs *"that shoot missiles, grapple"*.
-- [ ] **B6.1** `v6` Limbs that shoot and grapple, through the anatomy rather than around it
-- [ ] **B6.2** `v6` A grappling limb that is severed stops grappling
+- [x] **B6.1** `v6` Limbs that shoot and grapple, through the anatomy rather than around it — the clinch was a pure number that read only the *held* body's pain, so a player with both arms on the floor gripped exactly as well as a whole one. `Clinch` now resolves both jobs against the same zones `apply_hit` damages: `limb_condition` reads an arm out of the anatomy, `usable_limbs` says what can be given a job, and `free_limbs` / `can_shoot` / `gun_steadiness` say what is left over. A hand on somebody is not on a weapon, and a one-armed player has to choose. Twenty-two assertions in `tests/clinch_limb_test.gd`
+- [x] **B6.2** `v6` A grappling limb that is severed stops grappling — the arms are a *ceiling* on the hold rather than a term added to it, so maximum advantage on an unconscious body is still no hold at all from a body with nothing left to hold with. Severance needed no new flag: a zone at or below zero health and a zone `Extraction` has removed from the dictionary are the same comparison. A compound fracture still grips at `FRACTURED_GRIP`, because the structure is what failed and the hand on the end still closes
 
 ### B v7 — the seventh pass
 v6 made the body a weapon platform wearing nothing. AS3.4: what you are wearing shows on the body the mirror renders.
