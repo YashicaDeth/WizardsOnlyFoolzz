@@ -1360,8 +1360,24 @@ read as black shapes rather than as buildings.
       `P:/GameDev/Temp`, not archived — floor markings identical, no colour
       regression against G3.3's neutral-light fix) and re-ran
       `tests/derby_balance_test.tscn`: still 0 failures.
-- [ ] **G7.3** Check the same numbers at the districts and at the derby, not
-      only at spawn — not measured this pass.
+- [x] ~~**G7.3** Check the same numbers at the districts and at the derby, not
+      only at spawn~~ Same sampling as the original G7 finding (average
+      frame brightness, every 8th pixel), run against all five
+      `AshbloomWorldGenerator.DISTRICT_CENTERS` and against `rift_derby.tscn`.
+      Districts read **darker** than spawn, not lighter: 0.0958-0.1106 across
+      the five, against spawn's 0.134-0.148. The derby is the outlier in the
+      other direction at 0.1851 — G3.3's neutral floodlights actually light
+      the pit. Looked at the captures, not just the number: the district
+      streets are narrow lot-to-lot canyons (`ashbloom_world_generator.gd`'s
+      8-17m-wide lots a few metres apart), so there is far less open sky for
+      G7.2's rim trick to catch than the bone yard's open field the original
+      fix was shot against — the road is the same `"dirt"`/rim material
+      either way, it just has less horizon in view. Not a second instance of
+      G7.2's bug, and not something a material change fixes: it is G7.1's
+      question again, one level down — is a lot-to-lot street meant to read
+      this dark. Left to Greg alongside G7.1. Verified:
+      `game/captures/g7_3_district_3.png` (district 3, the one with the
+      tower silhouette — the darkest of the five), `game/captures/g7_3_derby.png`.
 
 ## H — Base building, reduced
 
