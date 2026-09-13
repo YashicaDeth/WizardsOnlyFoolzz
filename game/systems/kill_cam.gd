@@ -155,11 +155,14 @@ func _draw() -> void:
 
 	# A1.3. Headers and the stamp in the display face; the caption stays in a
 	# real font because a stencil alphabet is for stamps, not sentences.
-	var font := ThemeDB.fallback_font
 	CellOutzType.draw_stamped(self, plate.position + Vector2(18, 16), subject_name.to_upper(), 19.0, BONE * Color(1, 1, 1, fade), ARTERIAL * Color(1, 1, 1, 0.3 * fade), 1.4)
 	CellOutzType.draw_text(self, plate.position + Vector2(18, 44), "LETHAL // %s" % impact_zone.to_upper().replace("_", " "), 10.0, ARTERIAL * Color(1, 1, 1, fade), 1.0)
 	if not caption.is_empty():
-		draw_string(font, Vector2(plate.position.x + 18, plate.end.y - 22), caption, HORIZONTAL_ALIGNMENT_LEFT, plate.size.x - 36, 11, ACID * Color(1, 1, 1, 0.85 * fade))
+		# The name above this is stamped in CellOutzType and the zone under it is
+		# set in it; the caption between them was the one line on the plate still
+		# in the engine's fallback face.
+		CellOutzType.draw_condensed(self, Vector2(plate.position.x + 18, plate.end.y - 30), caption,
+			9.0, ACID * Color(1, 1, 1, 0.85 * fade), 1.0)
 	for scan in range(0, int(plate.size.y), 3):
 		draw_line(Vector2(plate.position.x, plate.position.y + scan), Vector2(plate.end.x, plate.position.y + scan), Color(0, 0, 0, 0.14 * fade), 1)
 

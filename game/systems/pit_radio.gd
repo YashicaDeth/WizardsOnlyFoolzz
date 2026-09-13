@@ -136,12 +136,16 @@ func _draw() -> void:
 			var hole := grille.position + Vector2(7 + column * 9, 7 + row * 9)
 			draw_circle(hole, 2.2, HOT * Color(1, 1, 1, 0.2 + speaker_bloom * 0.7))
 
-	var font := ThemeDB.fallback_font
 	var y := panel.position.y
 	for index in messages.size():
 		var message: Dictionary = messages[index]
 		var age := clampf(float(message.life) / 7.5, 0.0, 1.0)
 		var alpha := clampf(age * 2.4, 0.0, 1.0)
-		draw_string(font, Vector2(panel.position.x, y), "%s:" % str(message.speaker), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, HOT * Color(1, 1, 1, alpha))
-		draw_string(font, Vector2(panel.position.x + 108, y), str(message.line), HORIZONTAL_ALIGNMENT_LEFT, panel.size.x - 108, 12, PHOSPHOR * Color(1, 1, 1, alpha * 0.92))
+		# Radio chatter, in the voice the rest of the cab speaks in. `draw_string`
+		# takes a baseline and `CellOutzType` a top-left, so both lines lift by
+		# their cap to sit where they already sat.
+		CellOutzType.draw_condensed(self, Vector2(panel.position.x, y - 9.0), "%s:" % str(message.speaker),
+			9.0, HOT * Color(1, 1, 1, alpha), 1.1)
+		CellOutzType.draw_condensed(self, Vector2(panel.position.x + 108, y - 9.0), str(message.line),
+			9.0, PHOSPHOR * Color(1, 1, 1, alpha * 0.92), 1.1)
 		y += 21.0

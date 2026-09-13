@@ -248,5 +248,8 @@ func _draw_plate() -> void:
 	CellOutzType.draw_stamped(self, Vector2(44, 36), "NATAL SIGIL", 22.0, ACID, ARTERIAL * Color(1, 1, 1, 0.3), 3.4)
 	CellOutzType.draw_text(self, Vector2(44, 76), "%s / SUN IN %s" % [subject_name, sun_sign()], 13.0, INK * Color(1, 1, 1, 0.7), 1.8)
 	CellOutzType.draw_text(self, Vector2(44, 98), "%04d-%02d-%02d  BOUND %02d MEETINGS" % [birth_year, birth_month, birth_day, sigil_path.size()], 11.0, BILE * Color(1, 1, 1, 0.6), 1.4)
-	draw_string(ThemeDB.fallback_font, Vector2(44, size.y - 40), "Symbolic chart. Placements are derived from the date, not from an ephemeris.", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK * Color(1, 1, 1, 0.3))
+	# Sits directly above a line already set in CellOutzType, which made the
+	# mismatch on this one plainer than most.
+	CellOutzType.draw_condensed(self, Vector2(44, size.y - 49), "SYMBOLIC CHART. PLACEMENTS ARE DERIVED FROM THE DATE, NOT FROM AN EPHEMERIS.",
+		9.0, INK * Color(1, 1, 1, 0.3), 1.0)
 	CellOutzType.draw_text(self, Vector2(44, size.y - 26), "J  RETURN", 11.0, ACID * Color(1, 1, 1, 0.55), 2.0)
