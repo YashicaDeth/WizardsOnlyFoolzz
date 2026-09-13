@@ -61,12 +61,15 @@ func _ready() -> void:
 	var shed := 0
 	for wrecker in derby.targets:
 		if is_instance_valid(wrecker):
-			shed += (wrecker.get_meta("detached_parts", []) as Array).size()
-	shed += (derby.boat.get_meta("detached_parts", []) as Array).size()
+			shed += wrecker.detached_parts.size()
+	shed += derby.boat.detached_parts.size()
 	print("panels shed during the heat: ", shed, " // score ", derby.score, " // disabled ", derby.disabled_count)
-	# `_detach_vehicle_part` hangs a 14 second SceneTree timer on a node the swap
-	# is about to free, and a SceneTree timer outlives the scene that made it.
-	# Make sure at least one is outstanding when we leave.
+	# AB1.1/AB1.3. A shed panel now registers with `GoreChunks` instead of
+	# hanging its own 14 second SceneTree timer — but it is still a node
+	# parented under the derby, and `GoreChunks.live` is a static registry the
+	# swap does not clear on its own. Make sure at least one is outstanding in
+	# both places when we leave, so this keeps proving the scene the registry
+	# lives in going away does not take the registry down with it (AG1.6).
 	derby._detach_vehicle_part(derby.boat, "DoorLeft", Vector3(0, 0, -1))
 	derby._detach_vehicle_part(derby.boat, "Hood", Vector3(0, 0, -1))
 	await tree.physics_frame
