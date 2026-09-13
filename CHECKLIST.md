@@ -783,6 +783,9 @@ mass-produced by the million.
       `begin_burn()` directly (see E2.4) — binding only ever adds strokes,
       burning only ever removes them, and the two are visually distinct
       (lit copper vs. dark char) rather than the same mark tinted two colours.
+- [x] **E2.8** `v3` The board has two metals — copper is the etched trace, gold is plating, and plating goes exactly where something has to make contact: the edge connector's fourteen fingers and the chip's legs. Greg asked for *"copper and gold wiring"* and the board had only copper, which also meant a seal arriving somewhere new had no way to say so in the material
+- [x] **E2.9** `v3` Each and every one of the seventy-two is infused into the chip, not left on the board — `begin_procession()` walks the Ars Goetia in traditional order, seeding each seal off its own number times 7919 so Bael and Agares are not neighbours and the same demon is the same glyph every run. A seal burns in as before, then the same geometry collapses into the chip, copper going in and gold arriving. Seventy-two burns would have been seventy-two overlapping scars on one patch; seventy-two infusions leave a chip whose legs sit brighter the more it holds. Rendered in `tests/infusion_capture.gd`
+- [x] **E2.10** `v3` The seal's reserved patch is reserved from everything, not only from routing — two capacitors sat inside `SEAL_RADIUS` and every seal ever drawn went straight through them
 - [x] ~~**E2.7** A bound seal keeps working while the board keeps power, and
       a burnt one is gone for the run~~ Decided in `ritual_app.gd`, not the
       board — `attempt()` reads the exact repeat count `Boons.grant()`
