@@ -963,6 +963,7 @@ func _physics_process(delta: float) -> void:
 	_update_player(delta)
 	_update_rival(delta)
 	_update_encounter_actors(delta)
+	_maintain_roamers(delta)
 	_update_carrion(delta)
 	_update_extraction(delta, Input.is_key_pressed(KEY_H))
 	# Q, not B. B is a stretch away from WASD with the left hand, and this is a
@@ -4092,6 +4093,12 @@ func _build_expanse_systems() -> void:
 	misfire_director.call("generate", 774013, Vector2(470, 370), 18)
 	if living_map != null:
 		living_map.bind(generated_world, misfire_director, _map_contacts)
+	# The region is inhabited on arrival rather than filling in over the first
+	# two minutes. Half the target standing at the start, the rest arriving on
+	# the ordinary interval, so walking out of the gate finds a populated world
+	# without every one of them appearing in the same breath.
+	for _initial in int(ROAMER_TARGET * 0.5):
+		_spawn_roamer(true)
 
 
 func _on_reality_misfire(encounter: Dictionary, at: Vector3) -> void:
@@ -4111,7 +4118,12 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> void:
 	var saved_actor := WorldHistory.subject(subject_id)
 	if str(saved_actor.get("status", "")) in ["dead", "escaped"]:
 		return
-	var display_name := "Ashline Tollkeeper" if str(encounter.kind) == "hostile" else "Dead Weather Saint"
+	# The encounter may name its own body. Misfires do not and keep the authored
+	# pair below; roamers do, because fourteen identical "Ashline Tollkeeper"s
+	# standing around a region is a spawn table with the seams showing.
+	var default_name := "Ashline Tollkeeper" if str(encounter.kind) == "hostile" else "Dead Weather Saint"
+	var display_name := str(encounter.get("display_name", default_name))
+	var elo := int(encounter.get("elo", 1110 if str(encounter.kind) == "hostile" else 1510))
 	var actor := CharacterBody3D.new()
 	actor.name = subject_id
 	actor.position = pathfinder.safe_position(at + Vector3.UP)
@@ -4124,7 +4136,7 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> void:
 	add_child(actor)
 	var identity := Label3D.new()
 	identity.name = "Identity"
-	identity.text = "%s\nELO %04d" % [display_name.to_upper(), 1110 if str(encounter.kind) == "hostile" else 1510]
+	identity.text = "%s\nELO %04d" % [display_name.to_upper(), elo]
 	identity.position = Vector3(0, 3.1, 0)
 	identity.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	actor.add_child(identity)
@@ -4159,7 +4171,136 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> void:
 	if str(saved_actor.get("status", "")) in ["spared", "recruited"]:
 		encounter_actors.back().state = str(saved_actor.status)
 		encounter_actors.back().disposition = "ally" if str(saved_actor.status) == "recruited" else "neutral"
-	WorldHistory.register_subject(subject_id, {"name": display_name, "kind": "person", "role": str(encounter.kind), "elo": 1110 if str(encounter.kind) == "hostile" else 1510, "status": "encountered", "memory": summary_from(encounter), "wounds": [], "anatomy": anatomy.call("snapshot"), "relations": {"player": {"kind": "enemy", "strength": 35}}})
+	WorldHistory.register_subject(subject_id, {"name": display_name, "kind": "person", "role": str(encounter.kind), "elo": elo, "status": "encountered", "memory": summary_from(encounter), "wounds": [], "anatomy": anatomy.call("snapshot"), "relations": {"player": {"kind": "enemy", "strength": 35}}})
+
+
+## The Hunt Grounds had no standing population at all. Every hostile in the
+## region came out of `_on_reality_misfire`, and the misfire table rolls
+## `hostile`+`boss` at 26 of 100 across 18 one-shot encounters — about four
+## fights in a 470x370 m region, each of which never came back once it
+## resolved. The AI underneath was never the problem: hunting, orbiting, the
+## melee slot, fleeing at a bleed-out, footing and stagger were all built and
+## all worked. There was simply nobody in the world to run them.
+##
+## So: a maintained roaming population, spawned through the exact same
+## `_spawn_encounter_actor` every misfire uses, which is what gets them a real
+## anatomy rig, real loot, a real WorldHistory subject and the same AI rather
+## than a second, thinner "ambient enemy" that would drift out of step with it.
+const ROAMER_TARGET := 14
+## Never spawn inside the player's own view distance. A body that appears out
+## of nothing forty metres ahead is worse than an empty region.
+const ROAMER_MIN_SPAWN_RANGE := 55.0
+const ROAMER_MAX_SPAWN_RANGE := 130.0
+## Beyond this a roamer is genuinely on the other side of the region, so it is
+## recycled rather than kept ticking — the population follows the player around
+## the map instead of pooling wherever they happened to start.
+const ROAMER_CULL_RANGE := 230.0
+## One at a time, not a burst. The region refills at the rate a fight empties
+## it, which reads as a place people keep walking into rather than a wave.
+const ROAMER_SPAWN_INTERVAL := 7.0
+var _roamer_clock := 0.0
+var _roamer_serial := 0
+## Advanced on every attempt, successful or not. Seeding the placement RNG off
+## `_roamer_serial` alone deadlocked the population: the serial only moves when
+## a body is actually placed, so the first attempt that found nowhere valid
+## re-rolled the identical eight candidates on every subsequent interval and the
+## region stayed permanently one short. Counted separately so a failed attempt
+## still changes the dice.
+var _roamer_attempt := 0
+
+
+## How many living hostiles are actually still standing. Downed and dead bodies
+## stay in the world (they are lootable, robbable and part of the record) but
+## they are not opposition any more, so they do not hold a slot shut.
+func _living_hostiles() -> int:
+	var standing := 0
+	for actor in encounter_actors:
+		if bool(actor.get("dead", false)):
+			continue
+		if str(actor.get("disposition", "hostile")) != "hostile":
+			continue
+		var anatomy: Node = actor.get("anatomy") as Node
+		if anatomy == null or anatomy.dead or anatomy.downed:
+			continue
+		standing += 1
+	return standing
+
+
+func _maintain_roamers(delta: float) -> void:
+	if pathfinder == null or generated_world == null or not is_instance_valid(generated_world):
+		return
+	_cull_distant_roamers()
+	_roamer_clock += delta
+	if _roamer_clock < ROAMER_SPAWN_INTERVAL:
+		return
+	_roamer_clock = 0.0
+	if _living_hostiles() >= ROAMER_TARGET:
+		return
+	_spawn_roamer()
+
+
+## Only roamers are recycled. A misfire's own body is part of an encounter the
+## player was sent to and is left exactly where it was put.
+func _cull_distant_roamers() -> void:
+	for index in range(encounter_actors.size() - 1, -1, -1):
+		var actor: Dictionary = encounter_actors[index]
+		if not str(actor.get("encounter_id", "")).begins_with("roamer_"):
+			continue
+		if bool(actor.get("dead", false)):
+			continue
+		var node := actor.get("node") as Node3D
+		if node == null or not is_instance_valid(node):
+			continue
+		if player.distance_to(node.global_position) < ROAMER_CULL_RANGE:
+			continue
+		node.queue_free()
+		encounter_actors.remove_at(index)
+
+
+## Somewhere in the districts, far enough out to walk into rather than watch
+## arrive. Ringed off a district centre rather than off the player, so the
+## population sits where the world actually is instead of orbiting the camera.
+## `anywhere` is the initial fill: at world build the player is at the gate and
+## four of the five districts are two hundred metres off, so the follow-the-
+## player ceiling that keeps later respawns nearby would seed exactly one
+## district and leave the rest of the region empty. The floor still applies —
+## nothing is ever placed inside the player's own view, seeding or not.
+func _spawn_roamer(anywhere: bool = false) -> void:
+	_roamer_attempt += 1
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("roamer:%d:%d" % [WorldHistory.run_salt, _roamer_attempt])
+	var centres: Array = WORLD_GENERATOR.DISTRICT_CENTERS
+	var at := Vector3.ZERO
+	var placed := false
+	# A handful of tries rather than a loop that can never end: if every
+	# district is currently too close to the player, this frame simply does not
+	# spawn and the next interval tries again.
+	for attempt in 8:
+		var centre: Vector3 = centres[rng.randi() % centres.size()]
+		var angle := rng.randf() * TAU
+		var radius := rng.randf_range(12.0, 46.0)
+		var candidate := centre + Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
+		var reach := player.distance_to(candidate)
+		if reach < ROAMER_MIN_SPAWN_RANGE:
+			continue
+		if not anywhere and reach > ROAMER_MAX_SPAWN_RANGE:
+			continue
+		at = candidate
+		placed = true
+		break
+	if not placed:
+		return
+	_roamer_serial += 1
+	# Their own name and their own standing, off the same generator the derby
+	# captain comes from, so a roamer reads as somebody rather than as a copy.
+	var who: Dictionary = CastNames.person("roamer_%d_%d" % [WorldHistory.run_salt, _roamer_serial])
+	_spawn_encounter_actor({
+		"instance_id": "roamer_%d" % _roamer_serial,
+		"kind": "hostile",
+		"display_name": str(who.get("name", "Ashline Tollkeeper")),
+		"elo": 980 + (rng.randi() % 420),
+		"summary": "%s works the %s roads and did not expect company." % [str(who.get("role", "collector")), str(who.get("faction", "Ashline"))],
+	}, at)
 
 
 func summary_from(encounter: Dictionary) -> String:
