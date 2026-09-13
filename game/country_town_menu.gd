@@ -16,6 +16,7 @@ var gore_modes := ["FULL", "REDUCED", "OFF"]
 var gore_index := 0
 var gore_button: Button
 var vsync_enabled := true
+var intro_veil: ColorRect
 
 @onready var settings_panel: PanelContainer = $HUD/SettingsPanel
 @onready var effects_button: Button = $HUD/SettingsPanel/VBox/Effects
@@ -44,6 +45,39 @@ func _ready() -> void:
 	_build_gore_setting()
 	_build_sandbox_door()
 	_build_front_door()
+	_play_title_sequence()
+
+
+## The title arrives as a sequence rather than sitting on top of a live menu
+## on frame one.  The logo gets the first clear read; the street and controls
+## only come in after it has landed.
+func _play_title_sequence() -> void:
+	intro_veil = ColorRect.new()
+	intro_veil.name = "ColdOpenVeil"
+	intro_veil.color = Color("080305")
+	intro_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	intro_veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	intro_veil.z_index = 20
+	$HUD.add_child(intro_veil)
+	$HUD/Title.modulate.a = 0.0
+	$HUD/Presents.modulate.a = 0.0
+	$HUD/Algiz.modulate.a = 0.0
+	$HUD/Title.scale = Vector2(0.90, 0.90)
+	for button in menu_buttons:
+		button.modulate.a = 0.0
+	var tween := create_tween()
+	tween.tween_interval(0.22)
+	tween.tween_property(intro_veil, "color:a", 0.14, 0.55).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property($HUD/Presents, "modulate:a", 0.95, 0.32)
+	tween.tween_property($HUD/Algiz, "modulate:a", 1.0, 0.18)
+	tween.parallel().tween_property($HUD/Title, "modulate:a", 1.0, 0.36)
+	tween.parallel().tween_property($HUD/Title, "scale", Vector2.ONE, 0.52).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(intro_veil, "color:a", 0.0, 0.72)
+	for button in menu_buttons:
+		tween.parallel().tween_property(button, "modulate:a", 1.0, 0.32)
+	tween.tween_callback(func() -> void:
+		if is_instance_valid(intro_veil):
+			intro_veil.queue_free())
 
 
 

@@ -317,6 +317,11 @@ func _junk_mesh(kind: String, size: float) -> Mesh:
 
 func _process(delta: float) -> void:
 	clock += delta
+	# The shot breathes as the title sequence runs: a slow, almost imperceptible
+	# push makes the street feel observed rather than like a paused level.
+	if camera != null:
+		camera.position.z = 7.6 - minf(clock, 7.0) * 0.075
+		camera.position.y = 1.55 + sin(clock * 0.42) * 0.045
 	for piece in pieces:
 		var node := piece.node as Node3D
 		if not is_instance_valid(node):
