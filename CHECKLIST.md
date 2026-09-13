@@ -2417,7 +2417,25 @@ The Expanse has one lighting state, one fog density and no clock. `WorldLook`
 already switches presets by place; nothing switches by time.
 
 - [x] **W1.1** A day cycle the world reads, not only the sky — `world_clock.gd`, a pure function of one persisted number rather than a sixth autoload. Hours, days, months, five named phases, a continuous daylight curve, and sleeping. 28 checks. Unblocks A9.7, W1.4, AB2.4, AJ4.3 and AL1.5, all of which were waiting on it without anybody noticing
-- [ ] **W1.2** Contamination has weather — it moves, it settles, it gets worse
+- [~] **W1.2** Contamination has weather — it moves, it settles, it gets worse.
+      `systems/contaminated_air.gd` built, same shape as `storm_weather.gd`:
+      a pure `severity()` off `WorldClock.day()` (climbs over an 18-day
+      horizon so a lived-in save reads as worse before the month turns over)
+      plus a `WorldHistory.chaos_magick()` contribution — the ecology and the
+      occult are the same rot in this world's own words. Two particle layers
+      off that one number: an upper haze that drifts on a slowly-turning wind
+      ("moves"), and a ground layer that barely answers the wind and stays
+      low ("settles"). 9 checks in `tests/contaminated_air_test.gd`; visual
+      rig at `tests/contaminated_air_capture.gd` (not a real scene — nothing
+      in the project owns a camera/floor/sun for this system to stand next
+      to) shows both layers actually rendering at forced-worst severity:
+      `game/captures/w1_2_contaminated_air.png`.
+      Not done: nothing instantiates this in the running game yet. The one
+      place it belongs is `bone_yard_hunt.gd` (`storm_weather` is built and
+      `.follow()`-ed there the exact same way, at `_ready()`/`_update_*`),
+      which Lane 2 does not own — needs that lane to add the same three lines
+      `storm_weather` already gets. Left at `[~]` rather than closed for that
+      reason, not because the system itself is unfinished.
 - [x] **W1.3** Being caught out in it costs something — `storm_weather.gd`'s
       `exposure_cost()`, drained from stamina in `_update_storm_exposure()`,
       cut by a warm layer (AS3.3/AS4.5).
