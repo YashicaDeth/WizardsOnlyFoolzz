@@ -43,6 +43,20 @@ const WALL_RUN_DURATION := 1.1
 const WALL_RUN_GRAVITY_SCALE := 0.16
 const WALL_RUN_KICKOFF_UP := 5.2
 const WALL_RUN_KICKOFF_OUT := 5.0
+## AD1.4. A wall too tall for `_vault_target()`'s own high check, dead ahead
+## rather than to the side — the third rung of the same ladder vaulting and
+## wall-running already are. Gated on real kickoffs rather than a new
+## invented counter, since climbing is what wall-running was training for.
+## Duration is a real cap, not a promise of free climbing to any height —
+## the honest route up a tall building chains a climb into a mantle the
+## instant one comes within reach, same as `_wall_run_surface()`'s own wall
+## running into `_vault_target()` never needed a run system that could climb
+## forever either.
+const CLIMB_UNLOCK_KICKOFFS := 2
+const CLIMB_REACH := 0.85
+const CLIMB_SPEED := 5.4
+const CLIMB_MAX_DURATION := 2.6
+const CLIMB_STAMINA_DRAIN := 30.0
 ## Worst case a wrecked body can move or swing at, as a share of healthy. The
 ## soulslike register wants injury to hurt; it does not want a player who has
 ## lost a leg to be unable to disengage from the thing that took it.
@@ -276,6 +290,15 @@ var wall_running_time := 0.0
 var wall_run_normal := Vector3.ZERO
 var wall_run_kickoff_queued := false
 var wall_run_unlock_announced := false
+## AD1.4. Positive for as long as the wall is still there to climb;
+## re-checked every frame the same way `wall_running_time` is, and the
+## direction it started with is what both the re-check and the mid-climb
+## mantle attempt read, since the player is not steering sideways off a
+## climb the way they can steer along a wall run.
+var climbing_time := 0.0
+var climb_direction := Vector3.ZERO
+var climb_normal := Vector3.ZERO
+var climb_unlock_announced := false
 var handheld: Control
 ## FINAL_V.md §16. The one screen-space layer AS2's night warp, and later the
 ## drugs and shadow realms, all reach for instead of building their own effect.
@@ -1034,6 +1057,40 @@ func _update_player(delta: float) -> void:
 			player_body.position = vault_to
 		player = player_body.position + Vector3.UP * 0.6
 		return
+	# AD1.4. A scripted takeover the same way the vault above is — real
+	# gravity and floor-stick would fight straight vertical motion exactly
+	# as they would a lerp.
+	if climbing_time > 0.0:
+		# AD1.5. The climb does not stop to ask: `_vault_target()` is read
+		# from wherever the climb has actually got to, `false` waiving its
+		# own on-floor gate since a body mid-climb is airborne against a
+		# wall by definition. The instant a ledge is within reach it hands
+		# straight into the identical scripted mantle a running vault would
+		# use — one motion, not two verbs meeting at a seam.
+		var mantle := _vault_target(climb_direction, false)
+		if not mantle.is_empty():
+			climbing_time = 0.0
+			_vault(mantle.landing)
+			return
+		var still_climbing := _climb_wall(climb_direction)
+		if still_climbing.is_empty() or stamina <= 0.0:
+			# The wall ran out, curved away, or the body is spent. Falling
+			# is the honest outcome — there is no ledge to catch and no
+			# cutscene papering over it.
+			climbing_time = 0.0
+		else:
+			climbing_time = maxf(0.0, climbing_time - delta)
+			climb_normal = still_climbing.normal
+			stamina = clampf(stamina - CLIMB_STAMINA_DRAIN * delta, 0, 100)
+			# AD1.6. Pressed lightly into the wall so the body reads as
+			# climbing it rather than floating in front of it, at a speed
+			# the same `mobility_ratio()` floor every other traversal verb
+			# already answers to scales down.
+			player_body.velocity = -climb_normal * 0.6
+			player_body.velocity.y = CLIMB_SPEED * lerpf(0.6, 1.0, player_rig.anatomy.mobility_ratio())
+			player_body.move_and_slide()
+			player = player_body.position + Vector3.UP * 0.6
+			return
 	# AD1.3. Also a scripted takeover rather than something layered on top of
 	# HUNTER_MOTOR.move_body() — re-finding the wall every frame (it can
 	# curve or run out mid-attempt) and redirecting velocity along it, with
@@ -1136,6 +1193,16 @@ func _update_player(delta: float) -> void:
 		var starting_surface := _wall_run_surface(direction if not direction.is_zero_approx() else HUNTER_MOTOR.wish_direction(Vector2(0, -1), yaw))
 		if not starting_surface.is_empty():
 			_begin_wall_run(starting_surface)
+	# AD1.4. Also needs no key — the Prototype reference is a body that runs
+	# at a building and keeps going up it, not one that stops to press
+	# something first. Unlike the wall run above, this fires from the
+	# ground too: the whole point is a sprint straight into a wall turning
+	# into a climb with no seam, not only a jump that happened to land
+	# against one.
+	if climbing_time <= 0.0 and wall_running_time <= 0.0 and vaulting_time <= 0.0 and sprinting and move.length() > 0.1:
+		var climb_start := _climb_wall(direction)
+		if not climb_start.is_empty():
+			_begin_climb(direction, climb_start.normal)
 	if player_body.position.y < -10.0:
 		player_body.position = Vector3(0, 1.0, 19)
 	player = player_body.position + Vector3.UP * 0.6
@@ -1801,12 +1868,17 @@ func _update_handheld_lamp(delta: float) -> void:
 ## AD1.2. Empty means "not vaultable", never a crash — every one of these
 ## rays is allowed to simply miss, because most things in front of the
 ## player most of the time are not a low wall.
-func _vault_target(direction: Vector3) -> Dictionary:
+## AD1.4. `require_floor` waives its own on-floor gate for exactly one
+## caller: the mid-climb mantle check in `_update_player()`, where the body
+## is airborne against a wall by definition and the ledge it is reaching
+## for is not on the ground either. Every other caller — the SPACE-pressed
+## vault a walking player takes over a crate — keeps the gate, unchanged.
+func _vault_target(direction: Vector3, require_floor: bool = true) -> Dictionary:
 	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty():
 		return {}
 	if direction.is_zero_approx() or crouching or vaulting_time > 0.0:
 		return {}
-	if not player_body.is_on_floor():
+	if require_floor and not player_body.is_on_floor():
 		return {}
 	# AD1.6. "A broken leg cannot vault" — literally: `mobility_ratio()`
 	# reads 0.5 for one leg destroyed and the other untouched, so the same
@@ -1927,6 +1999,71 @@ func _wall_run_surface(direction: Vector3) -> Dictionary:
 			continue
 		return {"normal": normal, "tangent": tangent.normalized()}
 	return {}
+
+
+## AD1.4. `_vault_target()`'s own low/high pair already says "a wall too
+## tall to vault" — this reuses exactly that shape rather than a second
+## obstacle scanner, casting straight ahead instead of `_wall_run_surface()`'s
+## sideways pair, since a climb is a wall the player is facing, not one
+## they are running alongside.
+func _climb_wall(direction: Vector3) -> Dictionary:
+	if not climb_unlocked():
+		return {}
+	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty():
+		return {}
+	if direction.is_zero_approx() or stamina <= 0.0:
+		return {}
+	# AD1.6. The same real floor every other traversal verb answers to — a
+	# leg wrecked past this point cannot hold weight against a wall any
+	# more than it can throw the body up and over one.
+	if player_rig.anatomy.mobility_ratio() < PLAYER_INJURY_FLOOR:
+		return {}
+	var horizontal := Vector3(direction.x, 0.0, direction.z)
+	if horizontal.is_zero_approx():
+		return {}
+	horizontal = horizontal.normalized()
+	var space := get_world_3d().direct_space_state
+	var exclusions := _player_collision_exclusions()
+	var feet: Vector3 = player_body.position + Vector3.UP * -0.9
+	var low_query := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * 0.4, feet + Vector3.UP * 0.4 + horizontal * CLIMB_REACH)
+	low_query.exclude = exclusions
+	var low_hit := space.intersect_ray(low_query)
+	if low_hit.is_empty():
+		return {}
+	# Nothing above the vaultable band means this is `_vault_target()`'s
+	# obstacle, not this one's — a crate gets stepped over, not climbed.
+	var high_query := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * VAULT_MAX_TOP, feet + Vector3.UP * VAULT_MAX_TOP + horizontal * CLIMB_REACH)
+	high_query.exclude = exclusions
+	if space.intersect_ray(high_query).is_empty():
+		return {}
+	return {"normal": low_hit.normal}
+
+
+## AD1.4. `wall_run_unlocked()`'s own pattern one rung further up the same
+## ladder — climbing is what wall-running was training the body for, so it
+## is gated on a real kickoff rather than a fresh counter invented for it.
+func climb_unlocked() -> bool:
+	return WorldHistory.event_count("player_wall_run_kickoff") >= CLIMB_UNLOCK_KICKOFFS
+
+
+func _announce_climb_unlock() -> void:
+	prompt.text = "YOUR BODY CAN CLIMB NOW. RUN AT SOMETHING TALL."
+	if impact_feel != null:
+		impact_feel.kick += Vector2(0, -1.0) * 0.05
+		impact_feel.shake = maxf(impact_feel.shake, 0.5)
+	WorldHistory.record_event("climb_unlocked", {"location": HUNT_LOCATION})
+
+
+## AD1.4/AD1.6. Duration scaled the same way `_vault()`/`_begin_wall_run()`
+## already scale theirs — cleared the gate in `_climb_wall()`, so mobility
+## here is always somewhere a climb is still possible at all, just a
+## shorter or slower one the worse off the body is.
+func _begin_climb(direction: Vector3, normal: Vector3) -> void:
+	climbing_time = CLIMB_MAX_DURATION * lerpf(0.5, 1.0, player_rig.anatomy.mobility_ratio())
+	climb_direction = Vector3(direction.x, 0.0, direction.z).normalized()
+	climb_normal = normal
+	player_body.velocity.y = maxf(player_body.velocity.y, 0.0)
+	WorldHistory.record_event("player_climb_started", {"location": HUNT_LOCATION})
 
 
 func _begin_wall_run(surface: Dictionary) -> void:
@@ -3606,6 +3743,9 @@ func _update_hud() -> void:
 	if not wall_run_unlock_announced and wall_run_unlocked():
 		wall_run_unlock_announced = true
 		_announce_wall_run_unlock()
+	if not climb_unlock_announced and climb_unlocked():
+		climb_unlock_announced = true
+		_announce_climb_unlock()
 	title.text = "WIZARDS ONLY FOOLS // LIMBO: ASHBLOOM EXPANSE"
 	# I3. The second control strip is gone. `gothic_field_hud.gd` draws the one
 	# the player reads, in the game's own face, and it is contextual — this was

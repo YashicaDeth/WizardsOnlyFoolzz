@@ -2941,7 +2941,52 @@ are in it.
       really reaches the HUD rather than only the WorldHistory record.
       `jump_test`, `vault_test`, `opening_test` and `combat_integration_test`
       regression suites re-verified clean.
-- [ ] **AD1.4** Climbing a building is a route, not a cutscene (Prototype's lesson)
+- [x] ~~**AD1.4** Climbing a building is a route, not a cutscene (Prototype's
+      lesson)~~ `_climb_wall()` is `_vault_target()`'s own low/high pair —
+      a hit within reach at foot height, and something still there above
+      the vaultable band — reused rather than a second obstacle scanner,
+      cast straight ahead instead of `_wall_run_surface()`'s sideways pair,
+      since a climb is a wall the player is facing, not one they are
+      running alongside. Needs no key, the same way starting a wall run
+      does not: a sprint into a wall too tall to vault becomes a climb with
+      no seam, on the ground or in the air, because the Prototype reference
+      is a body that runs at a building and keeps going up it, not one
+      that stops to ask first. Earned one rung past wall-running — gated on
+      `player_wall_run_kickoff`, the same shape `wall_run_unlocked()`
+      already uses one rung down — because climbing is what wall-running
+      was training the body for.
+      \
+      The "route, not a cutscene" half is the design decision: the climb
+      is re-found every frame exactly the way a wall run is, so a wall
+      that ends or curves away mid-climb drops the body into a real fall
+      rather than freezing it against nothing, and the instant a ledge
+      comes within reach — read straight off `_vault_target()`, its own
+      on-floor gate waived for this one caller since a climbing body is
+      airborne against a wall by definition — it hands straight into the
+      identical scripted mantle a running vault would use. AD1.5's own
+      claim before AD1.5 is properly built: climbing does not stop to ask
+      before becoming a vault, it just becomes one. Gated the same real
+      floor every other traversal verb answers to (`PLAYER_INJURY_FLOOR`
+      via `mobility_ratio()`), and duration and speed both shorten for a
+      hobbled body the same way `_vault()`/`_begin_wall_run()`'s own
+      already do, rather than a body that can still climb at all being
+      refused the healthy baseline right up until it cannot climb.
+      Honestly scoped: this is a timed climb with a real cap
+      (`CLIMB_MAX_DURATION`), not free climbing to any height a building
+      happens to be — a wall taller than the cap affords runs out and
+      drops the player, which is the honest outcome rather than a
+      cutscene papering over a height nobody built for. Verified:
+      `tests/climb_test.gd` (new, headless, 13/13, against real
+      `StaticBody3D` walls) — the unlock threshold is exact and reads live
+      off real events; a 3m wall dead ahead is found and its normal
+      genuinely points back out of the wall; a 0.8m box is correctly left
+      to `_vault_target()` instead of being double-handled; a triggered
+      climb travels real vertical distance over real time and then chains
+      into a real mantle with no key pressed for either half; and a wall
+      that disappears mid-climb ends the climb rather than continuing to
+      climb nothing. `vault_test`, `wall_run_test`, `jump_test`,
+      `anatomy_traversal_test`, `opening_test` and `combat_integration_test`
+      regression suites re-verified clean.
 - [ ] **AD1.5** Momentum carries between moves — run into vault into climb is one motion
 - [x] ~~**AD1.6** All of it reads through the anatomy: a broken leg cannot
       vault~~ `AnatomyComponent.mobility_ratio()` already existed and
