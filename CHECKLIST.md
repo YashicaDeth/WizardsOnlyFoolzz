@@ -1595,6 +1595,36 @@ Unglamorous, and each one is currently costing real time.
 - [x] ~~**J4.1** Stream behind the plate instead of a fixed 1.45s hold~~
 - [x] ~~**J4.2** Progress bar that is telling the truth~~
 
+### J5 — The debugger panel tells the truth
+128 entries in the Debugger on a clean boot. None of them were a bug in the
+game, which is exactly the problem: a panel that is always red is a panel
+nobody reads, and a real error has nowhere to appear.
+- [x] **J5.1** FMOD's tool scripts stop being parsed — `game/addons/fmod/.gdignore`.
+      J1.1 disabled the extension, but the addon's fourteen `.gd` files stayed in
+      the filesystem, so every reload re-reported 46 parse errors for
+      `FmodServer`, `FmodBank`, `FmodEventDescription` and the rest — native
+      classes that the disabled `.gdextension` never registers. Every single
+      parse error in the project was one of these; nothing in `game/` and nothing
+      in `dialogue_manager` produced one. **Local-only until J1.3**, because
+      `.gitignore:3` stops the fix travelling.
+- [x] **J5.2** 24 shadowed and confusable locals renamed. Fourteen were
+      `CONFUSABLE_LOCAL_DECLARATION` — the same name declared in an inner block
+      and again in the parent below it, which is the class of warning that
+      precedes a real aliasing bug (`wound_catalog.gd`'s two `result`s,
+      `bone_yard_hunt.gd`'s two `actor`s inside and after the same loop). Ten were
+      locals or parameters shadowing a method of their own class: `hit`,
+      `leads`, `account`, `grade`, `stage`, `album`, `severity`, `grip`.
+- [x] **J5.3** 12 unused parameters underscore-prefixed, which is the Godot
+      convention for "deliberately ignored" rather than deleted, since the
+      signatures are called positionally elsewhere.
+- [x] **J5.4** 16 integer divisions annotated `@warning_ignore("integer_division")`.
+      Every one was checked and every one was deliberate — grid rows, id digits,
+      halving a point budget. The annotation says so at the site, which leaves the
+      warning live for the next one that is not.
+- [ ] **J5.5** A test that fails when the count goes back up — the warnings are
+      editor-only diagnostics and appear in no headless run, so nothing currently
+      stops them accumulating again
+
 ---
 
 
@@ -2689,6 +2719,24 @@ AB and AA the same system: you break a holding to take it.
 - [ ] **AB3.5** Somebody raids you back — H1 gives the player a place to lose
 
 
+### AB5 — Destruction that lines up with the map
+Greg: *"making destruction physics finally that line up with full map"*.
+
+The gap named here is not that things do not break — it is that what breaks and
+what the world thinks is there are two different records. A wall that has been
+blown open still blocks the pathfinder, still reads as cover, still occludes on
+the map. Destruction has to write back into the same region record everything
+else reads (J10.3), or it stays a particle effect.
+- [ ] **AB5.1** A destroyed piece of geometry updates the collision the player
+      and the AI actually use
+- [ ] **AB5.2** `ashbloom_pathfinder.gd` re-routes through a new hole
+- [ ] **AB5.3** The satellite view and the map show the damage (A10, AK)
+- [ ] **AB5.4** Cover and line-of-sight are recomputed, so a blown wall stops
+      being cover for both sides
+- [ ] **AB5.5** Damage persists in `world_history.gd` and is there when you
+      come back (Lane 4 owns the field — ask, do not add)
+- [ ] **AB5.6** It holds at region scale, not only in a test room
+
 ### AB v10 — the final pass
 The last rung. Fifteen statements that are true of destruction when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
 - [ ] **AB10.1** `v10` Everything breakable has a condition the world can read
@@ -2779,6 +2827,17 @@ travels, hits something and leaves a mark on it.
 - [ ] **AF1.7** It reads through the anatomy already built: a round finds a zone, not a hitbox
 - [ ] **AF1.8** Firing from a car is the same system (M2.3)
 
+
+### AF6 — The range
+The gore sandbox is where a weapon is learned (AU3.5). Same room, same bodies,
+same reset — a range that is a place rather than a menu of guns.
+- [ ] **AF6.1** Every weapon in `hunter_arsenal.gd` is physically present and
+      pick-up-able in the shed
+- [ ] **AF6.2** Bullets are readable here: drop, drag, travel time, penetration
+      shown against real bodies at real distances (AF2)
+- [ ] **AF6.3** The reset restores the bodies without restarting the scene
+- [ ] **AF6.4** What you learn transfers — the range uses the live ballistics
+      and the live arsenal, never a demo copy of either
 
 ### AF v10 — the final pass
 The last rung. Fifteen statements that are true of guns when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
@@ -3490,6 +3549,33 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
 - [ ] **AN2.5** Two-handing changes the numbers, not just the pose
 
 
+### AN6 — Dismemberment, at the reference standard
+Greg: *"we really need to work on the dismemberment and gore and make it more
+like RDR2 and Half Sword"*, and *"body destruction — example shooting a hole in
+someone's stomach and their organs falling onto the floor"*.
+
+Those two references pull in different directions and both are wanted. **RDR2**
+is authored damage: a small number of exact, beautiful wound states, keyed to
+the weapon and the angle, that always read correctly. **Half Sword** is
+simulated: the mesh genuinely comes apart wherever the edge went, and it is
+ugly and specific and never the same twice. The resolution is that the *skeleton
+and the organs* are simulated and the *surface* is authored — a hole is a real
+opening with real contents behind it, and what the wound looks like at its rim
+is art, not noise.
+- [ ] **AN6.1** A wound is an opening with depth, not a decal — you can see in
+- [ ] **AN6.2** Organs are separate bodies behind that opening and fall out
+      under physics when the cavity is breached
+- [ ] **AN6.3** Fallen organs persist, can be picked up, and are the same
+      objects `carry.gd` and the vat already understand
+- [ ] **AN6.4** Severing is at joints and through them — Half Sword's lesson is
+      that a cut that lands between two joints still has to do something
+- [ ] **AN6.5** Weapon and angle decide the wound shape, RDR2's lesson
+- [ ] **AN6.6** The rig survives it — a body missing a torso section is still
+      animating, still falling, still a thing that was alive
+- [ ] **AN6.7** Written up as instructions: the mesh layout, the rig, and the
+      naming a new body has to follow to be destructible (nothing bespoke)
+- [ ] **AN6.8** It runs at the frame budget with several bodies opened at once (X)
+
 ### AN v10 — the final pass
 The last rung. Fifteen statements that are true of the body as the weapon when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
 - [ ] **AN10.1** `v10` The weapon is a mass on the end of an arm
@@ -3560,6 +3646,45 @@ play.**
 - [ ] **AO4.4** Random alien craft doing things that are not for you
 - [ ] **AO4.5** Reptilians, greys and other occult races as real factions
 - [ ] **AO4.6** Elites have the Wire and the nemesis system; nobody else does
+
+### AO5 — Encounters
+AO4.4 was one line. Greg's reference board, 13 September 2026: Apollo surface
+frames with the reseau crosses still on them, the Ben Rich *"locked up in black
+projects"* quote over a wall of black-triangle photographs, a crop-formation
+typology chart, the Zeta Reticuli binary-in-crops pages, a 4chan dead man's
+switch about a damaged station orbiting Ganymede — and the same Ganymede claim
+again, three images later, as a SpongeBob meme. Source folder is
+`C:/Users/Greg/Desktop/UfoFunny`, **read-only, same rule as Art Collections**.
+Nine video files in it have not been watched by anybody on this side yet.
+
+The board is one register and the register is not "aliens". **Every item claims
+to be an instrument's record.** Reseau crosses on a Hasselblad frame, a patent
+number in an address bar, coordinates on an IR survey, 8-bit ASCII laid out in
+wheat, a mapping tile, a signal Juno detected on a stated date. Nothing is a
+painting; everything is a readout. And what makes each one persuasive is the
+same thing every time: **a redaction.** The black rectangle over Virgo, the tile
+blacked out by every mapping provider at once, the scrubbed server, the guarded
+vault. The missing piece is the evidence.
+
+That is this game's central rule — two records — arriving as an image rather
+than a doctrine, and it gives an encounter a shape that is not a cutscene.
+- [ ] **AO5.1** A craft is an instrument record, never a set piece — you get a
+      readout of it (satellite, handheld, photograph) and never a scripted camera
+- [ ] **AO5.2** The redaction is the evidence: what the satellite refuses to
+      show you is how you find the place (pairs with AK1.2 and AK10.12)
+- [ ] **AO5.3** A dead map — one region blacked out across every source you
+      own, and it is a real place you can walk to
+- [ ] **AO5.4** Crop formations as a second seal alphabet, drawn at field scale
+      in the world and catalogued the way `goetic_seals.gd` catalogues the
+      Goetia. E2.1's stroke register already draws this shape language
+- [ ] **AO5.5** Craft are photographable with the field camera, and the
+      photograph is the thing other people argue with (F, L)
+- [ ] **AO5.6** The same event exists twice — as somebody's terrified account
+      and as a joke about it — and the game never says which came first
+- [ ] **AO5.7** Some of the craft are ours. Black projects, not visitors, and
+      nothing in the game ever settles which is which
+- [ ] **AO5.8** The footage register is the found kind: grain, a wrong aspect,
+      a filename that is already a joke
 
 
 ### AO v10 — the final pass
@@ -3798,6 +3923,48 @@ central rule.
 - [ ] **AT1.7** It is hardware somebody else installed: revocable, traceable, and it can find you
 - [ ] **AT1.8** Its radiation is what melts you at 8g and 9g — the thing connecting you is killing you
 
+### AT2 — The brain is the file system
+Greg: *"the inventory system with the brain that's a file system of the entire
+game's info index with drug experiences and other stuff like story quests
+tutorial game info within the files"*.
+
+This collapses four things nobody had a home for — inventory, codex, quest log,
+tutorial — into the organ AT1 already says you open. There is no menu because
+the brain is the menu, and WETWIRE/MATERIA is already the naming for exactly
+this (two institutions, one index).
+- [ ] **AT2.1** Inventory is read from the brain, not from a separate bag screen
+- [ ] **AT2.2** Story, canon and quests are files in the same index
+- [ ] **AT2.3** The tutorial lives in there as recallable files, not as a
+      first-run overlay you can never see again
+- [ ] **AT2.4** Every drug experience files itself as a record you can reopen
+- [ ] **AT2.5** Most of it is optional and the index says so (AT1.3)
+- [ ] **AT2.6** What the chip put there is distinguishable from what you put
+      there — and you cannot delete the chip's files (AT1.7)
+
+### AT3 — The viewer: the orb, the CRT, and detective mode
+Greg: *"visual nodes of the brain neural networks visualised in TouchDesigner 3D
+visuals with a CRT TV or node or circular orb magician's orb showing the
+example"* — and the thing it shows is *"no matter if it's like a cutscene
+storage and/or visual tutorial demonstration with controls and/or if it's the
+story and canon pinboard theory showing and highlighting the key elements from
+the cutscene playing it back in your head in a detective style mode"*.
+
+One object plays back everything. That is the item here, and it is worth more
+than any of the three uses on their own: a cutscene, a control tutorial and a
+piece of evidence all arrive through the same glass, so remembering, learning
+and theorising are the same verb. `crystal_ball.gd` already exists and is the
+obvious body for it.
+- [ ] **AT3.1** A single viewer object in the brain — orb or CRT, chosen once
+- [ ] **AT3.2** It plays cutscenes back rather than the game taking the camera
+- [ ] **AT3.3** It plays control tutorials, with the inputs shown on it
+- [ ] **AT3.4** It plays evidence, and highlights the key elements in frame
+- [ ] **AT3.5** Detective mode: scrub a remembered scene and pull elements out
+      of it onto the Board (L)
+- [ ] **AT3.6** The index around it is a node graph of the neural net, not a
+      list — nodes and edges you move through
+- [ ] **AT3.7** TouchDesigner authors the node visuals, Godot renders them
+      (FINAL_V §16 — TD is the lab, never the runtime)
+
 ## AU — The materia
 
 Every category, because Greg asked for every category: legal stimulants through
@@ -3882,6 +4049,153 @@ entirely in the account.
       `substance_object_test.gd` regression suites.
 - [ ] **AU1.11** Research chemicals as easter eggs, from the real long tail
 - [ ] **AU1.12** New-world drugs made of what is left
+
+### AU3 — The garage
+Greg, 13 September 2026: *"in the gore box it can be the place where there is
+every drug experimentation there, you're in a dingy not open garage or shed with
+drugs setup as well as people you can kill and reset"*.
+
+The gore sandbox stops being a dev scene and becomes a place. That is the whole
+move: it already has bodies, a reset, and the psychedelic rig wired to it, so it
+is the cheapest room in the game to make real — and a shed you took something in
+is a better tutorial for what a substance does than any readout of it.
+- [ ] **AU3.1** A shed, not a void — enclosed, dingy, lit by what is in it
+- [x] **AU3.2a** The objects themselves exist — all four carried forms
+      (baggie, weight, blotter tab, blister card) and the shed's own kit
+      (rolling tray, grinder, lighter, ashtray, scales), procedural at real
+      scale in `systems/substance_objects.gd`. AU1.2 has been ticked since the
+      data carried a `form` per pickup, but a baggie of Marrow Dust and a
+      pressed weight of Choir Bloom were the same invisible nothing in the bag,
+      which is the failure that line was written against. The contents colour
+      comes from the substance and everything else comes from the form, so two
+      substances in baggies still read as two different baggies
+      (`tests/substance_objects_capture.tscn`, three sheets looked at)
+- [ ] **AU3.2** Every substance in AU is physically set out in the room and
+      takeable, not chosen from a list
+- [ ] **AU3.3** The bodies stay killable and the reset stays instant — this is
+      where you learn what a thing does, so it has to be repeatable
+- [ ] **AU3.4** Taking something here drives `psychedelic_rig.gd` through the
+      same dials the game uses, never a separate demo path
+- [ ] **AU3.5** It doubles as the weapons range (AF) — same room, same bodies
+- [ ] **AU3.6** Reachable in the real world, not only from a dev menu
+
+### AU4 — What a state actually looks like
+The rig can reach eleven named states and nothing in the game names them.
+`tests/psy_reel_capture.gd` photographs all eleven; `tools/psy_dials.py` drives
+them live over OSC with no TouchDesigner install.
+- [ ] **AU4.1** Each substance maps to a curve through those states over time,
+      not to one fixed dial set
+- [ ] **AU4.2** Come-up, peak, trails, come-down are phases with durations
+- [ ] **AU4.3** A bad trip is reachable and is not just "more"
+- [ ] **AU4.4** Feedback is clamped so a deep trail reads as a trail rather
+      than converging on flat grey (see the note in `psy_reel_capture.gd`)
+- [ ] **AU4.5** Tolerance and repeat use move the curve, the way E4.3 moves a
+      rite's price
+
+
+
+### AU7 — Smoking is a real act
+AU1.8 named the devices and nothing built them. Greg, 13 September 2026: *"make
+a cigarette vape model then a bong and spliff joint all smokeable that you can
+click or press a bind to satisfyingly hit and get an observable buzz"*.
+
+The obvious implementation is the wrong one. `use_item()` that subtracts a
+charge and adds a buff is not an act, it is a transaction with an animation in
+front of it. What makes smoking feel like anything is that **you hold it**, and
+holding longer is both better and worse - so the input is press-and-hold, the
+output is a curve with a sweet spot you can overshoot, and each device puts that
+spot somewhere different. That single number is the whole difference between the
+objects: a cigarette is nearly impossible to get wrong, a bong nearly impossible
+to get right.
+- [x] **AU7.1** Five objects built from primitives at real scale - cigarette
+      84mm, vape, spliff 98mm, joint, bong 300mm (`systems/smokeables.gd`)
+- [x] **AU7.2** A draw is press-and-hold with a weak / clean / harsh grade, and
+      the punishment is reserved for greed - a short draw is thin, never
+      punished (`tests/smokeables_test.gd`, 47 checks)
+- [x] **AU7.3** Harshness is paid into `anatomy_state` where every other body
+      cost is paid, never into a private cough counter
+- [x] **AU7.4** The buzz is a real short dose on `substance_experience.gd`'s own
+      curve, so smoked and swallowed cannot drift into two systems
+- [x] **AU7.5** Lit ends are real `OmniLight3D`s, so a cigarette in the dark is
+      a light source and gives you away (pairs with AS)
+- [ ] **AU7.6** The bind: press-and-hold wired to real input, with the hold
+      readable on screen while it happens (I0 - a gauge is an object)
+- [ ] **AU7.7** Exhale: smoke that leaves you and drifts, on `contaminated_air`'s
+      particle work rather than a second system (Lane 2 owns it - ask)
+- [ ] **AU7.8** Charges burn down visibly - a cigarette gets shorter, a bong
+      bowl empties, a vape's tank window drops
+- [ ] **AU7.9** Held in the hand through `held_gear.gd`'s anchors, and the bong
+      takes both hands, so smoking one costs you your weapon
+- [ ] **AU7.10** Passing one to somebody is a real act with a real meaning (S)
+
+### AU5 — The effect taxonomy
+Greg: *"use erowid and drug wiki to make accurate models and usage of each drug
+and read forums and indexes on the effects to individually visualise each
+drug"*.
+
+The rig has twelve dials and they are all *operations* — kaleidoscope, feedback,
+chromatic, cut. None of them is an *effect* anybody actually reports. That is
+the gap: you cannot author a substance out of "kaleidoscope 6" any more than you
+can paint a face out of "brush 4". `contact_entities.gd`'s `CHANNELS` is the
+first pass at the real vocabulary — drift, tracer, symmetry, recursion, acuity,
+depth, colour, cut, autonomy — and each one needs to become something the rig
+can do rather than something a comment describes.
+
+⚠ Scope, so nobody has to guess later: this is perceptual grammar for a
+renderer, used the way a painter uses anatomy. The substances are this world's
+inventions. Nothing here is a description of obtaining or taking anything real,
+and no checklist item below should become one.
+- [ ] **AU5.1** Drift — surfaces breathe, flow and morph without changing what
+      they are. The rig has no such operation; displacement is not it
+- [ ] **AU5.2** Acuity — detail sharpens past what the eye resolves, which is
+      the effect most often described and the one nothing in the pipeline does
+- [ ] **AU5.3** Recursion — a shape containing a smaller copy of itself, as
+      geometry rather than as a feedback artefact
+- [ ] **AU5.4** Depth — distance stops agreeing with size, per object
+- [ ] **AU5.5** Colour rotation independent of what is lit
+- [ ] **AU5.6** Each channel is a dial on `psychedelic_rig.gd` with a name a
+      person would use, so a substance is authored in effects, not in operations
+- [ ] **AU5.7** A sourced pass: the per-substance channel mix checked against
+      the documented phenomenology rather than written from memory
+- [ ] **AU5.8** TouchDesigner authors each channel and Godot renders it —
+      FINAL_V §16 stands, TD is the lab and never the runtime
+- [ ] **AU5.9** `tools/psy_dials.py` grows a channel mode so the lab is driven
+      in the same vocabulary the game authors in
+
+### AU6 — Contact
+Greg: *"with entities in some drugs make appear and catalog it so we can start
+storyboarding higher dimension entities like dmt baphomet jesters or just dmt
+elves"*.
+
+AT already says the drugs are the only door you can reach without permission,
+and until now that door opened onto an org chart — `_glimpse_one()` returned a
+random `AscentEntities` id, which are the wizardsonlyfoolz lower ranks.
+`contact_entities.gd` is the encounter instead: five entries, each with `form`,
+`does`, `regard`, `leaves` and a `storyboard` note, because "an indescribable
+presence" is not something anybody can draw.
+
+The rule that governs the whole catalogue: **nothing here has a quest.** An
+entity that hands out objectives is a vendor in a costume. The strongest entry
+is the one that proves it — the Carrier Choir has not noticed you and never
+will, which is what makes autonomy and attention two different things.
+- [x] **AU6.1** A catalogue that survives being drawn — five entities, every
+      one with a concrete form, an action, a regard, and what it leaves behind
+      (`systems/contact_entities.gd`, `tests/contact_entities_test.gd`, 40 checks)
+- [x] **AU6.2** Contact is earned, never bought: a weak dose reaches nobody, and
+      tolerance closes the door the way it flattens the curve (AU4.5)
+- [x] **AU6.3** Deterministic per subject, substance and dose count, so a save
+      is reproducible and a storyboard can be re-derived
+- [ ] **AU6.4** The Horned Auditor reads the player's real `world_history.gd`
+      entry and holds a finger on it — the payload is a fact about this run
+- [ ] **AU6.5** The Carrier Choir's frequency reaches `wire_radio.gd`, making it
+      the only contact with a consequence outside the trip (Lane 4 owns it)
+- [ ] **AU6.6** The One In The Marrow moves the player's own hands a half beat
+      early — no new model, the horror is entirely in the timing (Lane 1 owns
+      the motor; ask for the lead, do not reach into it)
+- [ ] **AU6.7** Each entity is built out of the AU5 channels it names rather
+      than modelled and faded in
+- [ ] **AU6.8** Storyboard frames for all five, captured and looked at
+- [ ] **AU6.9** The planes they belong to become real places (AV)
 
 ## AV — The planes
 
@@ -4057,6 +4371,37 @@ This is the missing owner of A10. The satellite view works and belongs to
 nobody, which makes it a feature rather than a relationship. Give it a landlord
 and every map interaction becomes a transaction with something that is watching
 you back.
+
+**Source note, 13 September 2026.** The register to aim at is no longer the
+*Great Awakening* chart. Greg brought the *NASA's 666 Numbers* flat-earth
+infographic, which is the same density — hand-lettered, confident, unsourced,
+red underlines — with none of the payload AK2.6 was written to keep out. It
+names no real people and accuses nobody; it is arithmetic about the
+gravitational constant and the nautical mile. It also arrives pre-sorted into
+the three kinds AK2.2 needs, which is why it is worth more than a mood board:
+
+- **True.** Newton's apple, 1666. Earth's circumference, 21,600 nautical miles.
+- **Tautology.** Eight inches *is* 0.666 feet. A nautical mile *is* one minute
+  of arc. True, and empty.
+- **False.** G is 6.674, not 6.66. Equatorial rotation is 1,674 km/h, not 1,666.
+
+A briefing built that way is verifiable in part, unfalsifiable in part and wrong
+in part, with nothing marking which is which — and `pin_board.gd`'s existing
+expose/fabricate split (L4.1) resolves it with no new machinery.
+
+**And it hands over the mechanic.** Every hit in that chart is a rounding toward
+a target: 18.506 becomes 18.5 so the product can read 66,600. So the app rounds.
+Every coordinate, bearing, distance and altitude the satellite gives you is
+nudged — small, consistent, always toward their signature, never wrong enough to
+get you killed. That collapses three items into one discovery: they see what you
+see and they also stamp it (AK1.2), working against them coarsens the rounding
+before it takes the sky away (AK1.5), and the paper chart you fall back to is
+unrounded, so your first true bearing is the moment you find out (AK1.6). The
+licence agreement nobody reads is where the numbers are declared, which makes
+AK1.1 and AK2.1 the same object.
+
+⚠ The rounding belongs in Lane 4's readout layer, not in Lane 5's
+`handheld_device.gd` screen, or E2's two-implementations problem happens again.
 
 ### AK1 — Whose satellite it is
 - [ ] **AK1.1** The satellite app has an owner, named, with a logo and a licence agreement
