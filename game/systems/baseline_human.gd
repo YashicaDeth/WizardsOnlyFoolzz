@@ -76,6 +76,10 @@ const FRACTURE_RATIO := 0.4
 ## the flesh has actually opened.
 const BRUISE_RATIO := 0.55
 const BRUISE_SKIN := Color("5c3550")
+## B3.2. What dose takes flesh toward: sallow, greenish and wet, which is
+## nothing like the purple a beating leaves. The two injuries have to be
+## tellable apart across a room.
+const MELTED_SKIN := Color("6e7a3c")
 ## Loose gore is capped across every body at once. Twelve drivers shedding
 ## unbounded blood in a pileup is a frame-rate bug, not atmosphere.
 const MAX_LIVE_GORE := 140
@@ -191,6 +195,9 @@ func build(id: String, config: Dictionary = {}) -> void:
 		if _leg_points_forward(zone_id):
 			part.rotation.x = PI * 0.5
 		part.set_meta("rest_position", spec.at)
+		# B3.2. What this limb is when nothing has happened to it, so a melting
+		# injury has something to take volume away from.
+		part.set_meta("rest_scale", part.scale)
 		add_child(part)
 		parts[zone_id] = part
 
@@ -784,7 +791,22 @@ func _refresh_zone(zone_id: String) -> void:
 		else:
 			var opened := 1.0 - ratio / maxf(BRUISE_RATIO, 0.01)
 			tint = _flesh.lerp(BRUISE_SKIN, 0.85).lerp(Color("3d0907"), opened)
+	_show_installed(zone_id, prosthetic)
+	# B3.2. A melting injury does not read as a bruise going dark. Dose takes
+	# the zone toward a wet, sallow green and takes the volume out of it — a
+	# dosed limb slumps rather than swells — so that a body somebody irradiated
+	# is distinguishable at a glance from a body somebody beat, which is the
+	# difference this segment asks the rig to show.
+	var dosed := anatomy.dose_ratio(zone_id) if anatomy.has_method("dose_ratio") else 0.0
+	if dosed > 0.0 and not prosthetic:
+		tint = tint.lerp(MELTED_SKIN, clampf(dosed * 1.35, 0.0, 0.9))
 	part.material_override = _zone_material(zone_id, tint, "chrome" if prosthetic else "flesh")
+	if dosed > 0.0 and not prosthetic:
+		var melted_material := part.material_override as StandardMaterial3D
+		# Wet where it is worst: what is left of the surface is running.
+		melted_material.roughness = clampf(melted_material.roughness - dosed * 0.45, 0.05, 1.0)
+		var rest: Vector3 = part.get_meta("rest_scale", Vector3.ONE)
+		part.scale = rest.lerp(rest * 0.82, clampf(dosed, 0.0, 1.0))
 	# Bone shows through where the flesh has failed, without waiting for the
 	# limb to come off entirely.
 	var bone := bones.get(zone_id) as Node3D
@@ -968,6 +990,18 @@ func _throw_limb(zone_id: String, hit_direction := Vector3.ZERO) -> void:
 	visual.mesh = part.mesh
 	visual.material_override = part.material_override
 	limb.add_child(visual)
+	# B4.1. Whatever somebody had done to this limb goes with it. A tattoo and a
+	# piercing are on the arm, not on the person: the arm lands across the yard
+	# still carrying them, and the stump it left behind does not. This is the
+	# reason body mods are mounted on the zone meshes rather than painted into
+	# the flesh material — ink in a material would survive on a stump, which is
+	# the wrong story about what just happened.
+	for child in part.get_children():
+		if child is MeshInstance3D and (child as Node).has_meta("body_mod"):
+			var carried := (child as MeshInstance3D).duplicate() as MeshInstance3D
+			visual.add_child(carried)
+			carried.transform = (child as MeshInstance3D).transform
+			child.queue_free()
 	var bone := bones.get(zone_id) as Node3D
 	if bone != null and is_instance_valid(bone) and bone.get_child_count() > 0:
 		var stub := (bone.get_child(0) as MeshInstance3D).duplicate() as MeshInstance3D
@@ -1255,3 +1289,74 @@ static func _splat_mesh(radius: float) -> ArrayMesh:
 	mesh.surface_set_material(0, material)
 	_splat_pool.append(mesh)
 	return mesh
+
+
+## B5.2. What is installed in a limb, visible in that limb.
+##
+## The catalogue has carried a `profile` and a `tint` for every implant since it
+## was written and nothing ever drew either: a prosthetic arm was the same arm
+## with a chrome material on it, so twenty distinct pieces of hardware were
+## indistinguishable from each other and from a clean limb somebody had polished.
+## Each one is a shape now, mounted in the zone it was installed in, so a body
+## you are looking at tells you what is in it — which is also what makes B5.1's
+## ball something you can see somebody carrying.
+##
+## Rebuilt rather than updated, because an implant that is pulled has to leave,
+## and one piece of geometry per zone is cheap enough to make that the simple
+## path.
+func _show_installed(zone_id: String, prosthetic: bool) -> void:
+	var part := parts.get(zone_id) as MeshInstance3D
+	if part == null or not is_instance_valid(part):
+		return
+	var existing := part.get_node_or_null("InstalledHardware")
+	if existing != null:
+		existing.queue_free()
+	if not prosthetic:
+		return
+	var installed: Dictionary = anatomy.installed_parts.get(zone_id, {})
+	if installed.is_empty():
+		return
+	var hardware := MeshInstance3D.new()
+	hardware.name = "InstalledHardware"
+	hardware.mesh = _implant_mesh(str(installed.get("profile", "")))
+	hardware.material_override = _zone_material(zone_id, Color(str(installed.get("tint", "9a8f7c"))), "chrome")
+	# Proud of the surface rather than buried in it: an implant nobody can see
+	# is the state this segment is fixing.
+	hardware.position = Vector3(0, 0, -0.055)
+	hardware.set_meta("installed", str(installed.get("name", "")))
+	hardware.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	part.add_child(hardware)
+
+
+## The shape of a piece of hardware, by the profile the catalogue already gives
+## it. Deliberately blunt forms — this reads at arm's length on a body in
+## motion, not in a cutaway.
+func _implant_mesh(profile: String) -> Mesh:
+	match profile:
+		"orb":
+			var orb := SphereMesh.new()
+			orb.radius = 0.055
+			orb.height = 0.11
+			return orb
+		"optic", "optic_spool":
+			var lens := CylinderMesh.new()
+			lens.top_radius = 0.028
+			lens.bottom_radius = 0.034
+			lens.height = 0.03
+			return lens
+		"meter", "joint_dial", "digit_tool":
+			var dial := BoxMesh.new()
+			dial.size = Vector3(0.07, 0.05, 0.02)
+			return dial
+		"bone_rail", "spine_cage", "chest_plate", "pulse_cage":
+			var plate := BoxMesh.new()
+			plate.size = Vector3(0.19, 0.12, 0.03)
+			return plate
+		"industrial_limb", "scrap_limb", "limb_drive":
+			var drive := BoxMesh.new()
+			drive.size = Vector3(0.1, 0.17, 0.05)
+			return drive
+		_:
+			var block := BoxMesh.new()
+			block.size = Vector3(0.08, 0.07, 0.03)
+			return block

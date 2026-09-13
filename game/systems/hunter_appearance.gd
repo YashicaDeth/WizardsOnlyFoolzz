@@ -6,16 +6,137 @@ extends Node
 
 var rig: BaselineHuman
 var details: Dictionary = {}
+## B4.1. What this particular person chose to do to themselves, as filed by the
+## character sheet. Empty means an unmarked body, which is a choice somebody
+## made rather than a default the rig falls back to.
+var marks: Dictionary = {}
 
 
-func configure(body_rig: BaselineHuman) -> void:
+func configure(body_rig: BaselineHuman, appearance: Dictionary = {}) -> void:
 	rig = body_rig
+	marks = appearance
 	_build_face()
 	_build_hands()
 	_build_feet()
 	_build_clothing()
 	_build_prosthetic_readout()
+	_build_body_mods()
+	_build_head_mutations()
+	_build_worn_layers()
 	sync_from_anatomy()
+
+
+## B4.2. What has grown on this head, and how much of it.
+##
+## On the head specifically, because that is what anybody looks at and what
+## `faction_price_factor()` now reads: a mutation in this game is not a stat, it
+## is a face people can see, and the same face that costs you at a Gate Lantern
+## stall is a credential in the Soft Rot. Growths first, then the second pair of
+## eyes, then the horn — so that a small mutation is a lump and a large one is
+## unmistakably not human any more, rather than everything arriving at once.
+func _build_head_mutations() -> void:
+	var mutation := clampf(float(marks.get("mutation", 0.0)), 0.0, 1.0)
+	if mutation <= 0.0:
+		return
+	var head := rig.parts.get("head") as Node3D
+	if head == null:
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("mutation|%s|%.3f" % [str(marks.get("name", "")), mutation])
+	var growths := 1 + int(mutation * 5.0)
+	for growth in growths:
+		var lump := _sphere(
+			head,
+			"Growth_%d" % growth,
+			Vector3(
+				rng.randf_range(-0.07, 0.07),
+				rng.randf_range(-0.02, 0.09),
+				rng.randf_range(-0.09, 0.05),
+			),
+			Vector3.ONE * (0.018 + rng.randf() * 0.03 * mutation),
+			Color("6e7a3c").lerp(Color("8da442"), rng.randf()),
+			"flesh",
+		)
+		lump.set_meta("mutation", "growth")
+	if mutation > 0.45:
+		var extra := _sphere(head, "Eye_Third", Vector3(rng.randf_range(-0.03, 0.03), 0.075, -0.1), Vector3(0.024, 0.02, 0.012), Color("d1d5ac"), "bone")
+		extra.set_meta("mutation", "eye")
+		var pupil := _sphere(head, "Pupil_Third", Vector3(rng.randf_range(-0.03, 0.03), 0.075, -0.112), Vector3(0.007, 0.009, 0.005), Color("12090a"), "dirt")
+		pupil.set_meta("mutation", "eye")
+	if mutation > 0.75:
+		var horn := _box(head, "Horn", Vector3(0.04, 0.1, -0.02), Vector3(0.02, 0.09, 0.02), Color("b8a870"), "bone", Vector3(-18, 0, 12))
+		horn.set_meta("mutation", "horn")
+
+
+## B4.1. Piercings and tattoos, on the same rig as everything else.
+##
+## They are mounted on the zone meshes rather than painted into the flesh
+## material, for the reason B6 already established about limbs: a mark on an arm
+## has to leave with the arm. A tattoo in the material would survive the limb
+## coming off and turn up on a stump, and a piercing in a texture could not be
+## torn out.
+##
+## Seeded from the sheet, so the same character is marked the same way every run
+## and two players are not marked alike. Nobody is marked by accident: a sheet
+## that asked for nothing gets a body with nothing on it.
+func _build_body_mods() -> void:
+	var ink := clampf(float(marks.get("ink", 0.0)), 0.0, 1.0)
+	var metal := clampf(float(marks.get("piercings", 0.0)), 0.0, 1.0)
+	if ink <= 0.0 and metal <= 0.0:
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("%s|%.3f|%.3f" % [str(marks.get("name", "")), ink, metal])
+
+	# Piercings first, because they sit on the face and the ears where a tattoo
+	# would not go, and because a face is what anybody looks at.
+	var head := rig.parts.get("head") as Node3D
+	if head != null and metal > 0.0:
+		var studs := 1 + int(metal * 6.0)
+		for stud in studs:
+			var side := -1.0 if stud % 2 == 0 else 1.0
+			var height := 0.04 - float(stud) * 0.028
+			var ring := _sphere(
+				head,
+				"Piercing_%d" % stud,
+				Vector3(side * (0.055 + rng.randf() * 0.02), height, -0.09 - rng.randf() * 0.02),
+				Vector3.ONE * (0.012 + rng.randf() * 0.008),
+				Color("cdbfa4"),
+				"chrome",
+			)
+			ring.set_meta("body_mod", "piercing")
+
+	if ink <= 0.0:
+		return
+	# Ink goes on the big surfaces, in Greg's own collage where there is any —
+	# A10.1's argument about intent applies exactly here, since a tattoo is the
+	# one place in a game where somebody else's art is supposed to be on a body.
+	var sheet: Texture2D = ArtSet.pick("body", int(ink * 997.0))
+	for zone_id in ["torso", "left_arm", "right_arm", "left_leg", "right_leg"]:
+		var zone := rig.parts.get(zone_id) as Node3D
+		if zone == null:
+			continue
+		if rng.randf() > ink:
+			continue
+		var patch := MeshInstance3D.new()
+		patch.name = "Tattoo_%s" % zone_id
+		var quad := QuadMesh.new()
+		quad.size = Vector2(0.11 + rng.randf() * 0.06, 0.15 + rng.randf() * 0.08)
+		var skin_ink := StandardMaterial3D.new()
+		if sheet != null:
+			skin_ink.albedo_texture = sheet
+		# Under the skin rather than on it: ink sits in flesh, so it takes the
+		# flesh's own light response and never reads as a sticker.
+		skin_ink.albedo_color = Color(0.20, 0.15, 0.17, 0.86)
+		skin_ink.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		skin_ink.roughness = 0.86
+		skin_ink.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		quad.material = skin_ink
+		patch.mesh = quad
+		patch.position = Vector3(rng.randf_range(-0.03, 0.03), rng.randf_range(-0.06, 0.06), -0.075)
+		patch.rotation.z = rng.randf_range(-0.4, 0.4)
+		patch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		patch.set_meta("body_mod", "tattoo")
+		zone.add_child(patch)
 
 
 func _build_face() -> void:
@@ -53,6 +174,38 @@ func _build_feet() -> void:
 ## says this subject is wearing rather than one constant every body in the
 ## game shared — real on the body in the ordinary camera right now, whatever
 ## a not-yet-built literal mirror elsewhere in the project would also show.
+##
+## `clothing.gd` (AS3, one worn layer, faction/weather strategy) and
+## `garments.gd` (B7, a stackable list, combat shielding `apply_hit()` reads)
+## are two different systems answering two different questions, not one
+## renamed — `_build_clothing()` below draws the first, `_build_worn_layers()`
+## draws the second, and a body can carry both at once.
+
+## B7.1. The coat this rig has always had, plus whatever else the body is
+## actually wearing. The built-in pieces stay: they are this character's own
+## clothes, and a garment list is what they put on over them.
+func _build_worn_layers() -> void:
+	var worn: Array = marks.get("worn", [])
+	if worn.is_empty():
+		return
+	for zone_id in Garments.covered_zones(worn):
+		var zone := rig.parts.get(zone_id) as Node3D
+		if zone == null:
+			continue
+		var over: Dictionary = Garments.shielding(worn, zone_id)
+		var layer := _box(
+			zone,
+			"Worn_%s" % zone_id,
+			Vector3(0, 0, -0.02),
+			Vector3(0.3, 0.42, 0.06) if zone_id == "torso" else Vector3(0.14, 0.3, 0.05),
+			# Heavier shielding reads heavier: a lead wrap is not a coat and
+			# should not look like one across a yard.
+			Color("2a2722").lerp(Color("6b6a5e"), float(over.shield)),
+			"rust" if float(over.plate) > 0.25 else "paint",
+		)
+		layer.set_meta("worn_layer", zone_id)
+
+
 func _build_clothing() -> void:
 	var torso := rig.parts.torso as Node3D
 	var tint := Color(str(Clothing.stats(rig.anatomy.subject_id).get("tint", "29271f")))

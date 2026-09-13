@@ -438,7 +438,17 @@ func apply_to_world() -> Dictionary:
 		"anatomy": {
 			"blood_type": str(under_skin.get("blood", "O-RUST")),
 			"skeleton": str(under_skin.get("skeleton", "standard")),
-			"organs": str(under_skin.get("organs", "standard")),
+			# Named `organ_set`, not `organs`, and the rename is the whole fix
+			# for a crash rather than tidiness. `anatomy.organs` is a Dictionary
+			# of live organ states everywhere else in the game — in
+			# `anatomy_component.gd`, `extraction.gd`, `kill_cam.gd`,
+			# `downed_resolution.gd` and the body inspector — and this is a
+			# String naming which organ set you were decanted with. Two
+			# different things under one key in one dictionary: the moment the
+			# player had a sheet, the index's BODY page read "standard" where it
+			# required a Dictionary and threw from inside `_draw`, every frame,
+			# in the index and in the device both.
+			"organ_set": str(under_skin.get("organs", "standard")),
 			"cybernetics": grown,
 		},
 		"relations": {},
@@ -527,7 +537,13 @@ func load_from_world() -> bool:
 	var anatomy: Dictionary = state.get("anatomy", {})
 	under_skin["blood"] = str(anatomy.get("blood_type", "O-RUST"))
 	under_skin["skeleton"] = str(anatomy.get("skeleton", "standard"))
-	under_skin["organs"] = str(anatomy.get("organs", "standard"))
+	# Reads the new key, and falls back to the old one only when what is under
+	# it is actually a String — a subject saved before the rename carries the
+	# sheet's spelling, one saved after may legitimately carry the simulation's
+	# Dictionary there, and `str()` of that would load a body as garbage.
+	var legacy_organs: Variant = anatomy.get("organs", "standard")
+	under_skin["organs"] = str(anatomy.get("organ_set",
+		legacy_organs if legacy_organs is String else "standard"))
 	under_skin["grown_with"] = (anatomy.get("cybernetics", []) as Array).duplicate()
 	return true
 

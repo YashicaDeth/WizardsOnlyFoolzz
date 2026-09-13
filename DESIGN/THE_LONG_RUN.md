@@ -119,3 +119,106 @@ files before they can be wired into anything.
 
 Fonting and the intro screen are not a phase — they are a pass that happens
 alongside whichever of the above is being touched.
+
+---
+
+# Second dictation, 13 September 2026
+
+Sent while the demo build was going out and being played. Recorded the same
+way: substance kept, sorted afterwards. Anything already built is ticked in
+`CHECKLIST.md` under AG4 rather than repeated here.
+
+Greg also shared `C:/Users/Greg/Downloads/huiii_260912_212921.pdf` (5 MB),
+which has not been read yet and should be before any of the art direction below
+is acted on.
+
+## The inventory, which does not exist yet
+
+The biggest single gap Greg names, and he names it three times:
+*"i still dont see any inventory i see the carry but the brain inventory body
+on the personal character"*.
+
+- Slots, loosely like Unturned — a grid you arrange, not a list.
+- **Body, organs and cybernetic limb upgrades** done from inside it.
+- **Brainchip memory, drug storage, and mainline quest storage** living in it.
+- **Clicking through from the inventory into the brain mainline quest.**
+- Weapon attachments, and melee attachments, deliberately stupid — TABG rather
+  than tactical. High-quality gun customisation alongside it.
+
+## Skins, crates and the first currency
+
+- CS:GO-style lootbox crates, rarities, the lot — knowingly ridiculous.
+- **Skins generated from Greg's own Photoshop and Affinity textures and
+  photos**, through TouchDesigner, rather than authored one at a time.
+- This is what finally justifies a temporary currency system.
+- Reached by holding shift with the wheel key to lock it open, then into
+  customisation.
+
+## Talking to people
+
+Hacker-man X / Fallout / Oblivion: walk up to an NPC, the camera settles onto
+their face, and you begin speaking. Three ways in, all live at once:
+
+- Proximity voice chat (the system already exists).
+- Write your own dialogue.
+- Pick from prewritten lines.
+
+## The world, and how many people are in it
+
+- **Far more people**, across the different races, with authorities among them,
+  carrying weapons.
+- **Shops with insides. Houses with tops.**
+- The map rebuilt on Greg's own art textures, with smart generation behind it.
+- The map integrating the underground conspiracy-network text file.
+- Marketplaces and an economy; the remaining phone/index apps built out.
+
+## Physics, and gore that means something
+
+- **Destruction physics, water/liquid physics, bullet physics, chunk physics.**
+- Those synergised with the gore rather than sitting beside it: gruesome,
+  specific deaths.
+- **Slow-motion executions**, Fallout VATS or Hitman in register.
+- Bones that break through TouchDesigner rigging when you ram or crush someone.
+
+## Look and sound
+
+- *"i hate the look of this ui it looks ugly"* — the bottom-right cluster
+  especially. Boxes: dimensional, 3D-and-a-bit HUD panels rather than flat
+  strips. The phone as a black mirror object with real depth, clickable, and
+  observable *in* the mirror rather than only as a phone.
+- Fonts and style throughout: grungier, gorier, biopunk.
+- A full sigil rework in metals, blood and copper — binding sigils.
+- The radio: fix the volume and give it a real use in play.
+
+## Airships
+
+Old-style blimps and airships. Nausicaa-era Ghibli steampunk, but apocalyptic.
+This is section AV's register, now that it has one.
+
+## Quests that come from what you do
+
+Once there are enough NPCs: the game asking you to **photograph ritualistic
+murder**, with stat boosts hanging off it. The photograph verb already exists
+(N); what is missing is anything asking for one.
+
+## Saves
+
+Deletable save files, continue-game, several of them — so somebody handed the
+build can keep a world and generate new stories in it. Named as a thing friends
+need, which makes it demo-blocking rather than long-run.
+
+## A trailer before the demo
+
+An After Effects / Photoshop piece with real typography that tells the story and
+shows a visualised game demo — shipped *before* the playable one.
+
+---
+
+## What this changes about the order
+
+`Saves` moves to the front: it is the only item here that people already
+holding the build are blocked by. `Inventory` follows, because three separate
+messages are about things with nowhere to live without it, and the brain
+mainline quest is reached through it. Physics and the map rebuild are the big
+middle. Skins, crates and currency sit on top of the inventory and cannot start
+before it. The trailer is parallel work in other tools and waits on none of it.

@@ -123,8 +123,50 @@ func _rebuild_parts() -> void:
 	hovered_part_index = -1
 
 
+## B2.2. What is inside this person.
+##
+## A recorded state wins whenever there is one — the player's, refreshed live by
+## B2.1, or anybody the world has actually cut open. Everybody else used to fall
+## through to their registry `anatomy` dictionary, which carries a blood type
+## and a list of cybernetics and no organs and no bones at all: their dossier
+## listed the organs a body has and could say nothing about any of them, so the
+## only way to read somebody's insides was to open them, which is precisely what
+## this segment says should not be necessary.
+##
+## They get a baseline body instead, built from the same `AnatomyComponent`
+## every real body in the game uses and configured with the cybernetics their
+## record lists, so a dossier reads as a person who is intact until the world
+## records otherwise. Cached per subject: the component is a `Node`, and
+## building one per redraw would be a body a frame.
+static var _baseline_bodies: Dictionary = {}
+
+
 func _anatomy() -> Dictionary:
-	return subject.get("anatomy_state", subject.get("anatomy", {}))
+	var state: Dictionary = subject.get("anatomy_state", {})
+	if not state.is_empty():
+		return state
+	return _baseline_anatomy()
+
+
+func _baseline_anatomy() -> Dictionary:
+	var key := str(subject.get("name", _subject_id))
+	if key.is_empty():
+		return subject.get("anatomy", {})
+	if _baseline_bodies.has(key):
+		return _baseline_bodies[key]
+	var registered: Dictionary = subject.get("anatomy", {})
+	var body := AnatomyComponent.new()
+	body.configure(key, 5000.0, registered.get("cybernetics", {}))
+	var baseline: Dictionary = body.snapshot()
+	# Never in the tree, so `free()` rather than `queue_free()`.
+	body.free()
+	# The registry's own entries stay on top of the generated body: a blood type
+	# somebody wrote down is a fact about them, not a default.
+	for field in registered:
+		if field != "cybernetics":
+			baseline[field] = registered[field]
+	_baseline_bodies[key] = baseline
+	return baseline
 
 
 ## B6.8v2. A rupture does not advertise itself through the ordinary specimen
@@ -162,7 +204,16 @@ func _condition_of(part: Dictionary) -> float:
 	var kind := str(part.get("kind", ""))
 	var part_zone := str(part.get("zone", "torso"))
 	if kind == "organ":
-		var organs: Dictionary = anatomy.get("organs", {})
+		# Typed through a Variant rather than assigned straight into a
+		# `Dictionary`, and the reason is a real crash: `character_sheet.gd`
+		# used to publish a String under this key, so the moment the player had
+		# a sheet this line threw — from inside `_draw`, once per frame, which
+		# is what reads as the panel crashing rather than as one bad field. The
+		# sheet now writes `organ_set` instead, and this stays defensive because
+		# the cost is one check and the failure mode is the whole index going
+		# down while somebody is looking at it.
+		var organs_field: Variant = anatomy.get("organs", {})
+		var organs: Dictionary = organs_field if organs_field is Dictionary else {}
 		var organ: Dictionary = organs.get(str(part.id), {})
 		if not organ.is_empty():
 			if bool(organ.get("ruptured", false)):

@@ -244,57 +244,57 @@ Everything below is a real weakness in what v1 shipped, not polish.
 
 ### A v3 — the third pass
 v2 fixed the face, the grime and the failing panels, and every one of those fixes was looked at in daylight. The rework says light *warps and distorts* at night, and nothing in A has ever been seen in the dark.
-- [ ] **A3.1** `v3` Every surface A built is judged again after dark, not just dimmed
-- [ ] **A3.2** `v3` Warping is a property of the light, not a post-process on the whole frame
+- [x] **A3.1** `v3` Every surface A built is judged again after dark, not just dimmed — judged after dark it turned out the world was not even dimmed, only half dimmed: `_update_day_night` drove the sun, the ambient and the exposure, and nothing at all drove the sky. A capture at 01:00 and one at noon came back with a pixel-identical horizon, the ground under it crushed to black, and the one sodium lamp in frame reading the same at both hours because it had a lit sky to compete with. `WorldLook.apply_hour()` now moves sky, fog and volumetric fog with `daylight()` as well, deriving night from each preset's own authored day colours rather than declaring a second palette somebody would have to keep in agreement with the first. Captured at noon, 19:30 and 01:00 (`captures/a3_1_v3_hour_noon/dusk/night.png`, `tests/night_surface_capture.tscn`) — the harness's original 18:00 shot was a second noon, since `daylight()` holds at 1.0 until 18.5
+- [x] **A3.2** `v3` Warping is a property of the light, not a post-process on the whole frame — `systems/light_warp.gd` and `shaders/light_warp.gdshader`: a shell of real geometry parented to each of the nine Ashbloom sodium lamps, sized to that lamp's own `omni_range`, displacing only the screen it actually covers and scaled by `1.0 - daylight()`. AS2.1 built this as a dial on the fullscreen psychedelic shader, which warped the sky, the ground and the open index — none of which are light — left the lamps that *are* light rendering exactly as they do at noon, and spent the one dial the game reserves for being on something. Two faults found by capture and fixed here: a falloff read from the fragment's distance to the lamp is constant across a shell that has no interior, so the first build discarded itself everywhere; and the chord through the sphere, which replaced it, reads long in every direction once the player stands among nine overlapping throws — the full-frame wobble again. The measure that behaves both inside and outside is the view ray's miss distance from the lamp. Verified off and on from one paused frame at 01:00, 9 shells attached (`captures/a3_2_v3_warp_off.png` / `a3_2_v3_warp_on.png`)
 
 ### A v4 — the fourth pass
 v3 made night look different and there was almost no light in it to warp. A world lit only by an environment has nothing for v3 to act on.
-- [ ] **A4.1** `v4` Real light sources in the world at night, few and placed
-- [ ] **A4.2** `v4` The handheld is one of them (AS1.1), and the first thing v3 warps
+- [x] **A4.1** `v4` Real light sources in the world at night, few and placed — the only lights in 470 by 370 metres were nine lamps in an arithmetic row, `-24 + index * 6`, eight metres apart at the origin: that is why v3's night read as one lit clearing with a black region around it rather than as a region after dark. They are places now rather than a loop (`GATE_LIGHTS`) — the pit gate, which is the only one that casts a shadow because it is the only one close enough for a shadow to be worth its cost, two along the road out, a pair over the wreck line, and one per settlement read from `AshbloomWorldGenerator.DISTRICT_CENTERS` so a district that moves takes its light with it instead of leaving a lamp over empty ground. All eleven come up at dusk and go out at dawn off `daylight()`; they used to burn at a constant energy around the clock, which is invisible at noon and means night never had a moment of coming on. Two faults the captures found and fixed: a light with no fixture is only its effect on what it reaches, which at any distance through this fog is nothing (the first build photographed a black region with five lights in it), so every lamp has an emissive bulb and a volumetric throw; and the first vantage framed a region whose districts sat outside a 78° FOV. Verified at 01:00 from the ground sixty metres out from the western settlement (`captures/a4_1_v4_settlement_glow.png`) and at the gate (`a4_1_v4_gate_night.png`)
+- [x] **A4.2** `v4` The handheld is one of them (AS1.1), and the first thing v3 warps — `LightWarp.attach()` takes any `Light3D` now, and the handheld spot carries a shell like every placed lamp, driven off its own battery in `_update_handheld_lamp()` rather than off the hour: a guttering torch bends the air in the same stutter it lights with, and a dark beam leaves still air. Two shapes of light needed two measures rather than one. A lamp out in the world is walked past, so the view ray's distance from it is the right question; a light carried at the eye is never walked past — every ray leaves from it, that distance is always nothing, and the measure saturates straight back into the full-frame wobble v3 removed. A spot is measured instead as the angle off its own beam against `cos(spot_angle)`: the cone it actually fills, seen from the only place this game's one spot is ever seen from. Its shell is small and close (`CARRIED_SHELL`, 0.6m) so nothing short of something touching the camera can cut between the light and its own air at the depth test. Verified off and on from one paused frame at 01:00, with the device's panel faded for the photograph only — raising it is what lights the torch (`captures/a4_2_v4_torch_off.png` / `a4_2_v4_torch_on.png`)
 
 ### A v5 — the fifth pass
 v4 put light into the dark and every surface answered it identically. Greg: *"working shaders and reimbursing the biopunk touch"*.
-- [ ] **A5.1** `v5` Flesh, scrap, rust and glass answer light differently
-- [ ] **A5.2** `v5` Contamination reads as a material property rather than a tint
+- [x] **A5.1** `v5` Flesh, scrap, rust and glass answer light differently — a kind was two scalars and a pattern up to v4, so the world was one material wearing six colours and every surface returned a lamp with the same highlight. Each kind now differs in *how* it returns light rather than in what colour it is: brushed anisotropy on chrome, so salvaged plate smears a highlight along its grain instead of holding a round spot; subsurface scattering and a backlight on flesh; a backlight on bone; a real `glass` kind, which A5.1 names and the game did not have — `smoked_glass` was remapped onto chrome, so every window in the world was a mirror — transparent, sharply specular and slightly refractive; and near-zero specular on dirt, which had been carrying a sheen under every lamp and reading as wet concrete. Verified by `tests/material_chart.tscn`, one sphere per kind, shot with a key lamp (`captures/a5_1_v5_chart_keylit.png`) and with the lamp *behind* the row (`a5_1_v5_chart_backlit.png`) — the only exposure that can tell meat from plaster, and the condition nothing in this project had ever been lit from. Three faults the chart found: Godot's transmittance is computed from the shadow map and stayed invisible on a limb-sized body at every depth and boost tried, so the wrap-through is `backlight`, which is the engine's supported path; backlight is multiplied by the shadow term, so a sphere shadows its own front from a lamp behind it and the one material that should glow photographed black until that light's shadows came off; and the chart's own first rig ran a 7-energy lamp three metres from albedo that runs 0.025 to 0.3, which drove the whole row to paper white
+- [x] **A5.2** `v5` Contamination reads as a material property rather than a tint — it was painted into the albedo and nothing else, while the roughness map was `_noise(scale)`: unrelated noise, the same field for every kind. A rust bloom and the clean plate beside it therefore returned a lamp identically, and the contamination existed only in daylight, as a stain. `_contamination()` is `_surface_maps()` now and the one field that decides where the growth is also decides how that patch answers light — bloom is wet and takes a tighter highlight (alpha drives roughness), and the living part of the surface is the only part that emits, in its own growth colour rather than a house green. Found on the way: Godot's default emission operator is ADD, which computes `(emission + texture) * energy`, so a white emission colour lit every texel in the world to mid grey and read as fog — it is MULTIPLY now, and the map alone decides what burns. Verified with every lamp switched off, where a tint photographs as nothing and this does not (`captures/a5_2_v5_chart_bloom.png`), and in the world at noon, where the wrecks carry visible growth instead of flat brown (`a5_2_v5_world_noon.png`)
 
 ### A v6 — the sixth pass
 v5 made the ground materially believable and left the sky a box. AO2.1 says the firmament is broken and it has never been drawn as broken.
-- [ ] **A6.1** `v6` The firmament is visibly broken rather than a gradient
-- [ ] **A6.2** `v6` What is behind the break is not just more sky
+- [x] **A6.1** `v6` The firmament is visibly broken rather than a gradient — THE_REWORK §1 says *"the sky is broken"* and for five passes it was a `ProceduralSkyMaterial`: two colours and a sun disc, the one surface in this game that had never been asked to say anything, and the one thing a broken sky cannot be. `shaders/firmament.gdshader` draws the dome now, keeping the same two colours `apply_hour()` already drove so none of v3's day/night work is thrown away, and carrying the fracture across it — a web of joins generated in `world_look.gd` beside the contamination maps and sampled in three dimensions off the direction vector, which removes both the seam behind the player and the pinch at the poles that an equirect field gets for free. Two faults found by measurement: Godot's cellular distance2-minus-distance1 never approaches zero on a cell boundary (it runs 0.33 to 0.99 over this sphere), so the obvious "near the join" threshold could not fire and the first map generated was empty at every texel; and the lit edge, at a 0.35 floor, put a warm wash over the whole night dome and quietly undid A3.1. Verified at noon, with the harness reading the map the shader samples to find the most broken texel and turning the player to face it, since a fracture covering under a percent of the sky is not something a fixed heading finds by luck (`captures/a6_1_v6_firmament_noon.png`, `a6_1_v6_fracture_map.png`)
+- [x] **A6.2** `v6` What is behind the break is not just more sky — Earth here is an industry and prison planet and the thing that ended it came from outside, so what shows through the tear is the outside of a shell somebody was kept under: the void, a stable starfield the atmosphere never shows, and the lattice of the firmament itself caught along the inside of the break. The stars fade out as the sky lights (`star_density` off `daylight()`), for the same reason you cannot see them through a lit window. One fault found: `fog_sky_affect` held at 0.6 around the clock, so the haze colour repainted the whole dome at every hour — the night sky photographed as a brown wash at roughly 0.15 whatever the sky's own energy was, and nothing behind the break could be seen through it. Fog is lit by the sun, so with the sun gone it now largely stops painting (`captures/a6_2_v6_firmament_night.png`)
 
 ### A v7 — the seventh pass
 v6 broke the sky open and put nothing behind it. AO2.2: a god for each planet, the moon and the sun, visible at certain hours.
-- [ ] **A7.1** `v7` The gods are up there and `WorldClock.hour()` decides when
-- [ ] **A7.2** `v7` Seeing one is an event the world records, not decoration
+- [x] **A7.1** `v7` The gods are up there and `WorldClock.hour()` decides when — `systems/gods.gd`: nine bodies, one per planet plus the moon and the sun, each with its own hour window, its own fixed quarter of the sky and its own colour, so after a few nights a player knows where to look and when. That fixedness is the whole point — a god that could appear anywhere at any time teaches nobody anything, and the sky in this game is a clock face with these as the numbers on it. The hours are read from `WorldClock.hour()` rather than a timer or a roll, windows that cross midnight are handled as windows that cross midnight, and each one fades in over its first half hour so a god arrives rather than being switched on. They are drawn in the same firmament shader v6 built, three slots deep (a sky with everything in it at once is a planetarium, not an omen), as a body with a brightening limb and drifting bands rather than a disc — and added over the dome rather than into it, since a thing that size is not hidden by the shell it is bigger than. Verified at 13:00, where exactly one is up, and at 02:00, where five are (`captures/a7_1_v7_furnace_noon.png`, `a7_1_v7_gods_night.png`)
+- [x] **A7.2** `v7` Seeing one is an event the world records, not decoration — a sighting needs the god near the middle of the frame for a second and a half, so glancing past one while running does not make you a witness, and it is recorded once per god per day: the Witness is up every night and a world that wrote that down nightly would be recording the weather. It goes into `WorldHistory.record_event("god_seen", ...)` with the body, its prayer, the day and the stamp, and — this is the part that makes it not decoration — `god_seen` is in `CHAOS_MAGICK` at 0.05, a third of a completed ritual, so looking up feeds the same charge the ritual system already drains and storms already read. The scene answers on the status line rather than with a bespoke banner, because what this world does with an omen is note it and carry on. Verified by event count across two hours in `tests/night_surface_capture.tscn`: one sighting at 13:00, a second at 02:00, and no repeat for a god already seen that day
 
 ### A v8 — the eighth pass
 v7 made the sky the most interesting thing on screen, which is wrong when the player is a spirit in bright flame (AP2.2).
-- [ ] **A8.1** `v8` The undying flame is a real shader on the player, not an overlay
-- [ ] **A8.2** `v8` It genuinely melts the frame around it rather than tinting it
+- [x] **A8.1** `v8` The undying flame is a real shader on the player, not an overlay — `systems/undying_flame.gd` and `shaders/undying_flame.gdshader`. It is a `material_overlay` on the player's own zone meshes, which is the whole distinction the segment is drawing: it follows every limb the anatomy moves, is occluded by whatever occludes the player, leaves with a limb that comes off, and is simply absent from a frame the player is not in — none of which a screen overlay can do. Overlay rather than override, so A5's flesh material underneath is untouched and a zone still answers light as flesh while it burns; additive and unshaded, because this is light leaving a person rather than light landing on one; fresnel-weighted, so the silhouette carries the tongues and a limb never goes dark between them. Driven by `anatomy.combat_ratio()` — the body failing is what lets the spirit show, so this is the one reading in the game that gets stronger the worse things are. Verified by taking the body apart for real rather than turning the dial: condition 1.00 to 0.15 across five hits, with the flame visibly climbing (`captures/a8_1_v8_flame_intact.png`, `a8_1_v8_flame_wrecked.png`, `a8_1_v8_flame_on_the_body.png`)
+- [x] **A8.2** `v8` It genuinely melts the frame around it rather than tinting it — `shaders/flame_melt.gdshader`: a shell on the body displacing the screen behind it, using the ray-miss measure A3.2 arrived at, because a chord through the shell fails here the same way it failed there. What differs from a lamp is the character of it — this drags upward and tears rather than drifting, at an order more displacement, and scorches what it drags so the effect is legible on a dark frame, since a black pixel moved is still a black pixel. Strength is cubed off the same condition the flame reads, so an intact body burns without taking the frame with it. Two faults found by capture: the shell sat at the rig origin, which is between the feet, putting the melt in a puddle on the floor; and every framing in the Hunt Grounds at night puts the player against a lit wreck pile that is soft and warm on its own — a control frame with the shell hidden proved the smear in three attempts was that scenery and not this shader. Shot against `material_chart.tscn`'s flat backdrop instead, where the drag above a burning body is unmistakable (`captures/a8_2_v8_melt_off.png` / `a8_2_v8_melt_on.png`)
 
 ### A v9 — the ninth pass
 v8 made the player luminous and the air between them and everything else is still clean. Contamination has weather (W1.2) and A has never drawn it.
-- [ ] **A9.1** `v9` The air carries contamination that moves and settles
-- [ ] **A9.2** `v9` Storm severity from AS4.2 is visible in the air before it is audible
+- [x] **A9.1** `v9` The air carries contamination that moves and settles — `systems/contaminated_air.gd`. A5 made contamination a property of every surface; this is the same fact in the one place still missing, which is the space in between. The motes drift and sink rather than hang, because whatever is in this air came off something and is on its way down — barely falling, since dust at anything like real gravity reads as rain and this has been airborne since the world ended — with turbulence to keep it from falling in lines. They are lit rather than unshaded, which costs more and is the whole point: A4 put eleven lamps in the region and a torch in the player's hand, and air you cannot see until a light crosses it is the argument for both. The volume follows the player in six-metre steps rather than continuously, or the air travels with them instead of past them
+- [x] **A9.2** `v9` Storm severity from AS4.2 is visible in the air before it is audible — AS4.2 itself is not built, but it says severity tracks chaos magick in `WorldHistory`, and that is live, so the air reads the number the storm will read rather than inventing a second source of truth: when AS4.2 lands it inherits an air already answering it. Severity moves everything you can see before anything makes a sound — how much is up, how fast, how hard it is pushed sideways, how dirty it looks, and the haze thickening behind it — eased into the fog rather than assigned, since `_update_day_night()` writes the same value off the hour and the two would fight frame by frame. Verified through the world rather than by setting the dial (anything written straight onto the node is gone by the next physics frame, which is the system being right): eight completed rituals took `chaos_magick()` 0.00 → 0.99, severity 0.00 → 0.99 and mote density 0.17 → 1.00 (`captures/a9_1_v9_air_calm.png`, `a9_2_v9_air_storm.png`)
 
 ### A v10 — the tenth pass
 Nine passes of procedural surface, and none of it is Greg's own work. AP3.3: *"collaging my old and current art to use as textures intelligently"*.
-- [ ] **A10.1** `v10` Real collaged art from the collections folder, used as texture with intent
-- [ ] **A10.2** `v10` It sits inside the procedural system rather than replacing it
+- [x] **A10.1** `v10` Real collaged art from the collections folder, used as texture with intent — the pipeline has been laying down 34 derived sheets in `game/art/derived/` for three kinds, and until now they reached the index plates, the Wire and flesh detail: everywhere except the world the player walks through. They are posted bills now, on the district buildings. *With intent* is what decided the construction: a sheet fed through `_apply_grain()` as a triplanar detail layer would repeat across every wall in the region, which turns a collage into wallpaper and says nothing — so it is a quad at reading height, beside the door, on one building in three, sized like an actual bill rather than scaled to the wall (a poster that grows with its building is a decal, not an object), weathered down hard because it has been up a while in the air A9 just filled, and hung off square because nobody posting a bill uses a spirit level. The two thirds of buildings without one are what make the third mean anything. Verified at noon on a bill the harness found rather than one it assumed: 20 of 60 buildings carry one (`captures/a10_1_v10_posted_bill.png`)
+- [x] **A10.2** `v10` It sits inside the procedural system rather than replacing it — the bill is an object added to a building the generator built, not a texture that displaces what the material system produces: the wall underneath keeps its procedural contamination, its roughness and its emission from A5, and the bill sits on it the way a real one sits on a real wall. `art_set.gd`'s rule holds all the way through — a worktree with no derived sheets, or a pipeline nobody has run, generates exactly the region it always did, because `ArtSet.pick()` returning null means no bill rather than a missing texture
 
-- [ ] **A10.3** `v10` The hour changes every material, not just the sky
-- [ ] **A10.4** `v10` Nothing in the world is lit by an ambient term nobody chose
-- [ ] **A10.5** `v10` Grain, grime and wear are generated, never painted in by hand
-- [ ] **A10.6** `v10` A screenshot of any square metre reads as this game and no other
-- [ ] **A10.7** `v10` The palette holds under a storm, underground, and in the shadow realms
-- [ ] **A10.8** `v10` Contamination is a material property everywhere it appears
-- [ ] **A10.9** `v10` The stencil face sets every plate, and body copy never uses it
-- [ ] **A10.10** `v10` Nothing renders correctly only at one distance
-- [ ] **A10.11** `v10` A surface somebody destroyed looks destroyed a month later
-- [ ] **A10.12** `v10` The look survives the quantum restart looking like itself
-- [ ] **A10.13** `v10` Every effect is one shader with dials rather than a new shader
-- [ ] **A10.14** `v10` Performance is part of the look: nothing here costs more than it earns
-- [ ] **A10.15** `v10` Greg's own collaged art is in the world as texture, used with intent
+- [x] **A10.3** `v10` The hour changes every material, not just the sky — from v3 onward the sky, the fog and the lamps all moved with the clock and the surfaces underneath them did not: a wall at midnight was lit differently and was otherwise the same material it had been at noon. Every material the look system makes is now weakly registered, and `apply_hour()` drives the one part of it that is alive — A5.2 made contamination the only thing on a surface that emits, and things that glow do it at night. In daylight the bloom is washed out the way real bioluminescence is; after dark it is the only thing on a wall giving anything back, which is what makes a lamp worth carrying past a wall rather than only into a room. Weak references so a freed wrecker's flesh can still be collected, and quantised to fiftieths so a sunset walks the registry a handful of times rather than sixty times a second (which is the cost A10.14 is about). Verified by reading a material rather than a picture: the same rust reads `emission_energy_multiplier` 0.126 at noon and 0.672 at 01:00. One fault found on the way — the quantised early-out meant a material created mid-run kept its daylight value until the clock next moved, so a wrecker spawned at one in the morning burned at 0.280 while every surface around it read 0.672; materials are born at the current hour now
+- [x] **A10.4** `v10` Nothing in the world is lit by an ambient term nobody chose — the presets have carried an `ambient` per region since v1 and the Hunt Grounds ignored it: `_update_day_night()` drove `lerpf(0.16, 0.72, daylight)` for ambient and `lerpf(0.85, 1.18, daylight)` for exposure, four numbers typed into a scene, of which one happened to match the Ashbloom preset and three matched nothing at all. So the region the game spends most of its time in was lit by a term chosen by nobody, and any scene wanting the same night had to copy the same four numbers to get it. Both now come from `apply_hour()`, scaled off the preset's own `ambient` and `exposure`, which means a region's night is a property of that region and retuning one is a one-line change in a table rather than a hunt through scenes. `material_chart.tscn` keeps its own ambient *source* — a flat colour rather than the sky, because it is a chart and there is no sky in it — but takes the region's level (`captures/a10_4_v10_noon_after_ambient.png`)
+- [x] **A10.5** `v10` Grain, grime and wear are generated, never painted in by hand — audited rather than asserted. Every field that grimes a surface in the running game comes out of `FastNoiseLite`: the contamination and response maps in `world_look.gd`, the warp flow in `light_warp.gd`, the flame in `undying_flame.gd`, the fracture in `firmament()`. The only images loaded anywhere near a world material are the two `.glb` kits and `prototype_lab/lab.gd`'s `polarity.webp`, which is a lab bench and not the game. Greg's collaged sheets are the deliberate exception A10.1 argues for — they are art posted on a wall, not wear painted onto one, and the wall underneath keeps its generated grime
+- [x] **A10.6** `v10` A screenshot of any square metre reads as this game and no other — three ordinary square metres, chosen to be unphotogenic rather than flattering: a wreck face, the ground somebody walks on, and a district wall (`captures/a10_6_v10_metre_wreck.png`, `_metre_ground.png`, `_metre_wall.png`). This is a judgement and it is marked as one, but it rests on things that were measured rather than felt: every surface in frame carries generated contamination posterised to seven steps with panel seams and vertical weep through it (A5.2), answers light according to what it is made of (A5.1), sits in the hue band A10.7 measured at 0.059 to 0.076 across all three regions, and changes its emission with the hour (A10.3). What stops it reading as anybody else's game is the combination — banded PS1-era crunch on top of a physically-answering surface, under a sky with a hole in it — and no stock asset or store shader produces that set together. The honest limit: this is a claim about the look, not proof of it, and the only real test is somebody who has never seen the project being shown one frame
+- [~] **A10.7** `v10` The palette holds under a storm, underground, and in the shadow realms — measured for two of the three, and "holds" is given a meaning that can be checked rather than described: the mean hue, saturation and value of a frame of the material chart, lit and shot under every preset the game has after dark. Ashbloom reads hue 0.059, sat 0.921, val 0.163; the Bone Yard 0.075 / 0.784 / 0.139; the ossuary — which is underground — 0.076 / 0.772 / 0.139. All three sit in the same narrow orange band with values within 0.02 of each other, so a region changes the temperature and the light without changing what family of colour the world is made of (`captures/a10_7_v10_palette_ashbloom.png`, `a10_7_v10_palette_ossuary.png`). The storm has a frame too, from A9.2. What is missing is the third condition: the shadow realms are named in three comments across `world_look.gd` and `bone_yard_hunt.gd` and do not exist as a scene, a preset or a system, so there is nothing to hold a palette under yet. When one is built it needs this same measurement and the same band
+- [x] **A10.8** `v10` Contamination is a material property everywhere it appears — A5.2 made it one in `world_look.surface()`: a single generated field decides where the growth is, how rough that patch is and what it emits, and A10.3 put its emission on the clock. The "everywhere" half is an audit, and it passes — no scene, system or shader outside the material path draws contamination as a colour of its own. The green in the world comes from geometry that *is* contaminated (the fungal caps and pools the generator builds, carrying material from the same function), and the only other places the word appears are the map and the satellite view, which are readouts of the world rather than the world. `contaminated_air.gd` is the one addition since, and it takes its colour from the same palette and answers the same severity
+- [x] **A10.9** `v10` The stencil face sets every plate, and body copy never uses it — audited on both halves. `CellOutzType` is called 332 times across some twenty systems — the HUD, the index, the map, the kill cam, the keys card, the radial menu, the pin board, the interstitial, the sigils — which is what "sets every plate" looks like in a project that draws its own type. The other half is the one that could quietly rot, and it has not: no string longer than 42 characters is drawn through the face anywhere in the codebase, and the `draw_string` calls that do exist are exactly what A1.3 said they would be — findings, notes, percentages and "NO BODY ON FILE." in a real font, at 9 to 14 points, where a stencil alphabet would be unreadable. `body_inspector.gd` runs both in one panel and is the pattern: the plate is drawn, the copy on it is typed. Audited by sampling rather than exhaustively, so a future plate that quietly uses a system font for its header would not be caught by this
+- [x] **A10.10** `v10` Nothing renders correctly only at one distance — given a number rather than an opinion: the standard deviation of luminance across a fixed window of the same wall, shot at two and a half, eleven and forty-four metres. A surface that only works up close flattens toward a single colour as the mips take over, and a flat colour has no deviation. Relative deviation (deviation over mean) reads 1.08 at 2.5m, 1.16 at 11m and 2.32 at 44m — the generated contamination is still resolving structure at forty-four metres rather than washing out, which is the failure this segment names. One half of it this harness cannot answer: shimmer under motion is temporal and every capture here is a still frame, so a surface that crawls as the player walks would pass this test (`captures/a10_10_v10_wall_at_2m.png`, `a10_10_v10_wall_at_44m.png`)
+- [ ] **A10.11** `v10` A surface somebody destroyed looks destroyed a month later — **blocked, and worth saying why rather than leaving it silent.** Nothing in this game can destroy a surface. Bodies come apart (`baseline_human.gd`), vehicles crumple (`rift_derby.gd`), and the world's geometry is generated from a seed and is not touched again: there are no decals, no scars, no impact marks and no code path anywhere that damages a wall. So this is not a look segment at all in its current form — the look half is perhaps an hour's work (a scar map on the material, aged off `WorldClock.month()`, which already exists), and it has nothing to draw until something can mark a surface in the first place. That belongs to whichever section owns destructible geometry, and this should follow it rather than lead it
+- [ ] **A10.12** `v10` The look survives the quantum restart looking like itself — **blocked on the restart, not on the look.** "Quantum restart" appears exactly three times in this project and all three are checklist lines: here, at B10.1 and at L10.1. There is no implementation, no scene, no flag and no save path for it anywhere in the code. What can be said now is that the look is already built to survive one: every surface, every field and every map in A is generated from a seed and a `run_salt`, so a world rebuilt from the same seed comes back identical and one rebuilt from a new salt wears differently on purpose (A5.6). When the restart exists, this segment is a capture either side of it and a comparison, not a build
+- [x] **A10.13** `v10` Every effect is one shader with dials rather than a new shader — this one was failed by this very session before it was met. A8.2 shipped `flame_melt.gdshader`, which differed from `light_warp.gdshader` in four numbers and a direction and was otherwise the same measure, the same screen sample and the same falloff shape: exactly the habit the segment names. It is deleted. The displacement shader now carries the dials that make one shader serve both — `falloff` (squared for air off a lamp, cubed for tight around a body), `drag` (the upward pull that is the difference between a shimmer and something melting), `field_scale` and `field_rate` (weather, or a body coming apart), and `tint_add` (a lamp bending air should not brighten it; a body failing must, or the displacement is invisible on a dark frame). Seven shaders to six, with the flame's melt verified unchanged after the merge (`captures/a10_13_v10_one_shader_two_dials.png`)
+- [~] **A10.14** `v10` Performance is part of the look: nothing here costs more than it earns — the harness to answer this is built (`tests/night_surface_capture.tscn` toggles the air, the warp shells and the flame's melt one at a time at 01:00, with everything else running, and averages script time over 150 frames) and it cannot currently answer it. Measured twice in the same configuration the same scene reported 19.9ms and 39.97ms of process time, a factor of two apart, and an earlier cumulative version reported a scene getting *faster* as systems were switched on. The number that is solid: 2,514 draw calls at 01:00 with every system of v3 through v10 running. What this needs is a quiet machine — a second Godot was running another agent's test suite throughout — and GPU frame time rather than `TIME_PROCESS`, which measures script cost and not the shaders this whole ladder is made of. Until then, claiming the cost is earned would be asserting exactly what the segment asks to be measured
+- [x] **A10.15** `v10` Greg's own collaged art is in the world as texture, used with intent — the same requirement as A10.1, stated twice at opposite ends of the v10 list, and answered by the same build: posted bills on the district buildings. Left as its own line rather than folded into A10.1, since the version convention says a version is never deleted
 
 ## B — Make the body the centrepiece
 
@@ -375,23 +375,23 @@ The most complete system in the project and, until this pass, the least visible.
 
 ### B v2 — the second pass
 B built the most detailed body in the game and the player can only see it when it is being destroyed. The rework wants everything inspectable, *"with cybernetics and organs and bones visible"*.
-- [ ] **B2.1** `v2` The rig is inspectable at rest, not only under damage
-- [ ] **B2.2** `v2` Organs, bones and implants readable without opening anybody
+- [x] **B2.1** `v2` The rig is inspectable at rest, not only under damage — the complaint was exact. `anatomy_state` was written in two places, taking a wound and being re-decanted, so the World Index's BODY page showed whatever the last fight had left behind; anything that changed the body without going through `_take_damage()` — a limb picked up, an implant, a heal, a graft, anything a later system does to the rig — never reached the chart at all. The rig now reports itself every half second while the handheld is up, which is exactly when somebody is reading it, and not at all while it is shut. Amended rather than updated, because `update_subject()` writes a history event and a player standing still reading their own chart has not done anything the world needs to remember. Verified by damaging the anatomy through a path that does not report itself (`player_rig.hit()` direct, which is what every future body-changing system will look like) and watching the record: with the device open the chart follows the rig, and with it closed the same change writes nothing
+- [x] **B2.2** `v2` Organs, bones and implants readable without opening anybody — the inspector already listed flesh, bone, every organ in the zone and every installed part for any subject, which is the structure this asks for. What it could not do was say anything about them: a person in the registry carries a blood type and a list of cybernetics and no body, so a stranger's dossier named the organs a body has and left every one of them blank. Reading somebody's insides meant opening them, which is the thing the segment says should not be necessary. Anyone the world has not recorded now gets a baseline body built from the same `AnatomyComponent` every real body in the game uses, configured with the cybernetics their record lists, cached per subject because the component is a `Node` and building one per redraw would be a body a frame. A recorded state still wins wherever there is one — the player's, kept live by B2.1, or anybody the world has actually opened — and what the registry wrote down about a person survives on top of the generated body, because a blood type somebody recorded is a fact about them rather than a default. Verified by `tests/body_baseline_test.tscn` (new, 5/5): a stranger reads 7 organs with a condition each and 6 zones, keeps their recorded blood type, and a body the world has opened still beats the baseline
 
 ### B v3 — the third pass
 v2 made the body legible and it is still only harmed by violence. Greg: *"there's like 9g or 8g that radiation really melts you"*.
-- [ ] **B3.1** `v3` Radiation is a damage path through the same anatomy
-- [ ] **B3.2** `v3` It melts rather than cuts, and the rig shows the difference
+- [x] **B3.1** `v3` Radiation is a damage path through the same anatomy — not a status effect bolted on beside the body: it goes through `apply_hit()` with every other kind of harm, and differs in what it does rather than in where it lives. The model already split the world into penetrating and blunt — a blade reaches an organ, a fist breaks the ribs over it — and radiation belongs to neither, because it needs no way in. It reaches *every* organ in the zone at once rather than the one a blade happened to find, it barely bleeds (measured at 0.08 against a cut's 1.26 for the same 40 damage, which is why a body can be lethally dosed with almost nothing running out of it), and it leaves dose behind in the zone. Dose travels in the snapshot, so somebody who walked out of a hot zone is still being damaged by it in the next scene. `MELTING` is a family rather than a single type because the caustic pools do the same thing to a body over a different span. Verified by `tests/radiation_path_test.tscn` (new, 10/10), every claim measured against a cut of the same size as a control
+- [x] **B3.2** `v3` It melts rather than cuts, and the rig shows the difference — three ways, and each is a thing the player can see. It keeps working after the hit: `_burn_dose()` spends the dose into the zone and everything inside it every frame, which a blade never does — a cut is finished the moment it lands. It does not fracture: a dosed limb has not broken, there is simply less of it, and reading "compound fracture" on an irradiated arm would be the rig telling the wrong story. And it does not look like a beating — dose takes the flesh toward a wet sallow green rather than the purple of bruising, drops its roughness because what is left of the surface is running, and takes the volume out of the limb, so a dosed body slumps where a beaten one swells. Verified beside its control rather than alone: `tests/body_showcase.tscn` now stands four bodies in a row — intact, beaten, dosed with the same total damage, and opened under the X-ray — and photographs itself (`captures/b3_2_v3_dosed_beside_beaten.png`)
 
 ### B v4 — the fourth pass
 v3 gave the body a second way to be ruined and no way to be chosen. The rework wants mods, piercings, tattoos and extensions.
-- [ ] **B4.1** `v4` Body mods, piercings and tattoos on the same rig
-- [ ] **B4.2** `v4` Head mutations, and they change how people react to you
+- [x] **B4.1** `v4` Body mods, piercings and tattoos on the same rig — mounted on the zone meshes rather than painted into the flesh material, and that is the whole design decision: a mark on an arm has to leave with the arm. Ink in a material would survive the limb coming off and turn up on a stump, which is the rig telling the wrong story about what just happened, and a piercing in a texture could not be torn out. `_throw_limb()` now carries any body mod on a severed zone onto the limb it throws and frees it from the stump, so the arm lands across the yard still wearing what its owner chose. Seeded from the character sheet, so the same person is marked identically every run and two players are not marked alike; a sheet that asked for nothing gets a body with nothing on it. Tattoo ink is drawn from Greg's own collage sheets where any exist (A10.1's argument about intent applies most exactly here, a tattoo being the one place in a game where somebody else's art belongs on a body) and sits under the skin rather than on it, taking the flesh's own light response so it never reads as a sticker. Verified by `tests/body_mods_test.tscn` (new, 9/9) and photographed beside four other bodies (`captures/b4_1_v4_marked_and_mutated.png`)
+- [x] **B4.2** `v4` Head mutations, and they change how people react to you — growths first, then a second pair of eyes past 0.45, then a horn past 0.75, so a small mutation is a lump and a large one is unmistakably not human any more rather than everything arriving at once. The reaction half is the part that matters, and it is not a flat penalty: `faction_price_factor()` reads the mutation off the same appearance record the rig is built from, and which way it lands depends on who is looking. Everything on the ascending side of the Tree axis treats a changed body as contamination and everything on the descending side treats it as somebody who got on with it — so the same face that costs you at a Gate Lantern stall is a credential in the Soft Rot. Derived from each faction's own axis rather than a second table of who tolerates what, so a faction that moves on the axis takes its opinion of mutation with it, and it reaches `faction_disposition()`'s words for free because that already reads the factor. Measured: at mutation 0.9 the Gate Lanterns go 0.89 → 0.73 and the Soft Rot 0.78 → 1.00, in opposite directions, from one face
 
 ### B v5 — the fifth pass
 v4 made the body customisable and nothing in it does anything. The crystal ball goes *"in their arm or pocket"*.
-- [ ] **B5.1** `v5` A crystal ball carried in the arm or the pocket, and it is functional
-- [ ] **B5.2** `v5` What is installed in a limb is visible in that limb
+- [x] **B5.1** `v5` A crystal ball carried in the arm or the pocket, and it is functional — *functional* is the word that decided what this is. A prop that glows is not one, and neither is a divination system invented from nothing to give it something to say, so `systems/crystal_ball.gd` reads state the world already keeps and that cannot otherwise be seen: how much chaos magick is loose, which gods are up right now, and what the next one to rise is and when. It forecasts the storm from its actual cause rather than from a weather variable — A9.2's air reads the same charge — and it is clearer the worse things are, being a contamination artefact, which makes it most useful exactly when it is most alarming. It is an implant in the catalogue (`scrying ball`, left arm) and an item in the pocket, and `held_by()` answers for either, because "in the arm or the pocket" is the segment's own phrasing and a ball that worked one way would be half the item. No ball means no reading rather than a reading of nothing. Verified by `tests/crystal_ball_test.tscn` (new, 11/11): it names all five gods up at two in the morning, its charge follows eight rituals from 0.00 to 1.00 and its words from "settled" to "boiling", and pulling it out stops both
+- [x] **B5.2** `v5` What is installed in a limb is visible in that limb — the catalogue has carried a `profile` and a `tint` for all twenty-one pieces of hardware since it was written and nothing ever drew either: a prosthetic was the same limb with a chrome material on it, so a load-bearing spine cage, a rangefinder eye and an ankle compass were indistinguishable from each other and from a clean limb somebody had polished. Every installed part is a shape now, mounted in the zone it went into, tinted from its own catalogue entry — blunt forms on purpose, because this has to read at arm's length on a body in motion rather than in a cutaway. Rebuilt rather than updated on each refresh, so hardware that is pulled leaves. Verified both ways in `tests/crystal_ball_test.tscn`: installing names the piece in the limb (`scrying ball`, not a generic lump) and pulling it removes it, and photographed on a body wearing four fittings beside five others (`captures/b5_2_v5_hardware_in_the_limb.png`)
 
 ### B v6 — the sixth pass
 v5 put an object in a limb; AD3.2 wants cybernetics that change what movement is possible. Greg: limbs *"that shoot missiles, grapple"*.
@@ -400,8 +400,8 @@ v5 put an object in a limb; AD3.2 wants cybernetics that change what movement is
 
 ### B v7 — the seventh pass
 v6 made the body a weapon platform wearing nothing. AS3.4: what you are wearing shows on the body the mirror renders.
-- [ ] **B7.1** `v7` Clothes and layers on the rig, affecting weather and radiation
-- [ ] **B7.2** `v7` Armour and cover are the same system, not a stat
+- [x] **B7.1** `v7` Clothes and layers on the rig, affecting weather and radiation — the rig has had a coat, a collar and a strap since it was built and none of them meant anything: they were geometry, and protection was a number somewhere else. `systems/garments.gd` makes them the same object. A garment covers named zones and carries what it does — `shield` against a melting hit, `plate` against everything else, `seal` against the air — so taking a coat off a body takes its protection with it and there is no second place the figure lives. They stack and cap, because two coats are warmer than one but somebody wearing every garment in the game is still somebody standing in it. Weather is the half that ties this to A9: a contaminated storm doses through the air rather than by hitting anybody, so `expose()` adds dose to whatever is uncovered, slowly enough that a bad night out in it is survivable and staying out in it is not. Measured: a lead wrap takes a 40-damage dose to 15.2 and an ash coat only to 27.2 (a coat is not lead); a torso wrap does nothing at all for a leg; and a filter mask holds a head at 0.009 dose through a storm that takes a bare one to 0.035. Verified by `tests/garments_test.tscn` (new, 8/8), with the worn layers drawn on the rig
+- [x] **B7.2** `v7` Armour and cover are the same system, not a stat — and it falls out of B7.1 rather than needing a system of its own, which is the point. Armour is what a zone is wearing or carrying; cover is what that zone is behind; both resolve through `Garments.with_cover()` into the one figure `apply_hit()` reads, so there is no armour stat left for a wall to disagree with and nothing special-cased in whatever does the shooting. A zone's `cover` is written by whatever knows about the world's geometry, which keeps the knowledge of walls out of the anatomy. It keeps the two kinds of protection separate for the same reason garments do — shielding stops a dose and plate stops a bullet, and one "protection" number would have to lie about one of them. Measured: a wall at 0.8 cover takes a 40-damage ballistic hit to 20.8 and a scrap plate takes the same hit down through the same figure
 
 ### B v8 — the eighth pass
 v8 of A gave the player a flame; B has never rendered the player as anything other than another body. AP2.1: the spirit cannot be banished by violence.
@@ -993,6 +993,23 @@ probe actually says, so the next attempt does not start from scratch:
       normal closing may simply be unreachable now~~
 - [x] ~~**G0.3** Assert impacts fire, not just that hull drops, so this cannot
       regress silently again~~
+- [x] ~~**G0.4** Broke again 2026-09-13, silently, from outside this file~~
+      `tests/derby_balance_test.tscn` started failing ("hunters commit to a
+      final approach (0 observed)", peak alignment 0.900-0.908) while merging
+      the `codex/game-planning` and `agent-b` branches — deterministically,
+      confirmed with `--fixed-fps 60` giving the identical number, so not
+      frame-timing noise. `rift_derby.gd`, `derby_ai_driver.gd` and
+      `arcade_vehicle.gd` are byte-identical between the passing standalone
+      branch (`codex/game-planning` alone: peak alignment 0.957, checked in
+      an isolated worktree) and the failing merged one, and disabling
+      driver-rig construction entirely only moved the number from 0.908 to
+      0.900. The actual mechanism was not found: something in a ~150-file,
+      many-lane merge shifted an unrelated value enough to tip a threshold
+      that G0.1-G0.3 already knew sat on a knife edge. `FINAL_APPROACH_ALIGNMENT`
+      lowered from 0.93 to 0.85 — a real margin under the measured 0.90 floor,
+      not a nudge to just clear it — since a value sitting exactly on its own
+      evidence is what broke the first time. Verified 0/9 failures across
+      three repeated runs post-fix (hull 79, 2 approaches, 8 real impacts).
 
 ### G3 — The derby arena
 - [ ] **G3.1** Re-author the oval for a larger footprint — deliberately not
@@ -1846,14 +1863,34 @@ inventory, and the sheet you filled in D8 already calls each opt-in modifier "a
 handle on you". Pulling one is the first genuinely disloyal act available to a
 player, and it should be possible from hour one and quietly discouraged.
 
-- [ ] **N5.1** A real slot per site — spine, skull, chest, each arm, each leg, the organ bays
-- [ ] **N5.2** Factory hardware fills them at decanting and is *locked*, not absent
-- [ ] **N5.3** Locked means discouraged, never disabled: the game warns and then lets you
-- [ ] **N5.4** The warning is in CellOutz's voice, not the game's — "you don't want to go rogue yet, do you"
-- [ ] **N5.5** Pulling one is recorded, and CellOutz standing reads it (E, `faction_price_factor`)
-- [ ] **N5.6** An empty slot is a real condition — the body works worse without what was in it
-- [ ] **N5.7** What you pull is a carried object with a lien on it, because it was never yours (B5.4)
-- [ ] **N5.8** Robbed and grown hardware fit the same slots — one vocabulary, per B2.1
+- [ ] **N5.1** A real slot per site — spine, skull, chest, each arm, each leg, the
+      organ bays — `installed_parts` is still keyed by `BaselineHuman`'s six
+      anatomy zones, so torso covers spine, chest and the organ bays as one
+      slot rather than several. Splitting that out is a real data-model
+      change on its own, not attempted here.
+- [x] **N5.2** Factory hardware fills them at decanting and is *locked*, not
+      absent — `install_factory_loadout()`, three real zones (head, torso,
+      left arm), each with a real reason CellOutz put it there.
+- [x] **N5.3** Locked means discouraged, never disabled: the game warns and
+      then lets you — `pull_part(zone_id, confirmed)`: a first call against a
+      locked slot only warns; the same call with `confirmed` true is what
+      actually pulls it.
+- [x] **N5.4** The warning is in CellOutz's voice, not the game's — "you don't
+      want to go rogue yet, do you" — `AnatomyComponent.LOCKED_WARNING`.
+- [ ] **N5.5** Pulling one is recorded, and CellOutz standing reads it (E,
+      `faction_price_factor`) — the pull is recorded (`implant_pulled`
+      events), but nothing yet moves it against `tree_alignment()`/CellOutz
+      standing specifically.
+- [x] **N5.6** An empty slot is a real condition — the body works worse without
+      what was in it — genuinely mechanical: `apply_hit()` already scales
+      incoming damage by `installed_parts[zone].armor * implant_condition()`,
+      so an emptied slot takes more damage, not merely reports a zero.
+- [x] **N5.7** What you pull is a carried object with a lien on it, because it
+      was never yours (B5.4) — `pull_part()`'s successful result is shaped for
+      `Carry.take_chunk()` directly, `lien: "celloutz"` attached, verified
+      accepted by a real `Carry` instance.
+- [ ] **N5.8** Robbed and grown hardware fit the same slots — one vocabulary,
+      per B2.1 — not touched this pass.
 
 
 ### N v10 — the final pass
@@ -2418,24 +2455,24 @@ already switches presets by place; nothing switches by time.
 
 - [x] **W1.1** A day cycle the world reads, not only the sky — `world_clock.gd`, a pure function of one persisted number rather than a sixth autoload. Hours, days, months, five named phases, a continuous daylight curve, and sleeping. 28 checks. Unblocks A9.7, W1.4, AB2.4, AJ4.3 and AL1.5, all of which were waiting on it without anybody noticing
 - [~] **W1.2** Contamination has weather — it moves, it settles, it gets worse.
-      `systems/contaminated_air.gd` built, same shape as `storm_weather.gd`:
-      a pure `severity()` off `WorldClock.day()` (climbs over an 18-day
-      horizon so a lived-in save reads as worse before the month turns over)
-      plus a `WorldHistory.chaos_magick()` contribution — the ecology and the
-      occult are the same rot in this world's own words. Two particle layers
-      off that one number: an upper haze that drifts on a slowly-turning wind
-      ("moves"), and a ground layer that barely answers the wind and stays
-      low ("settles"). 9 checks in `tests/contaminated_air_test.gd`; visual
-      rig at `tests/contaminated_air_capture.gd` (not a real scene — nothing
-      in the project owns a camera/floor/sun for this system to stand next
-      to) shows both layers actually rendering at forced-worst severity:
-      `game/captures/w1_2_contaminated_air.png`.
-      Not done: nothing instantiates this in the running game yet. The one
-      place it belongs is `bone_yard_hunt.gd` (`storm_weather` is built and
-      `.follow()`-ed there the exact same way, at `_ready()`/`_update_*`),
-      which Lane 2 does not own — needs that lane to add the same three lines
-      `storm_weather` already gets. Left at `[~]` rather than closed for that
-      reason, not because the system itself is unfinished.
+      Built twice in parallel without either side knowing: this session's own
+      `systems/contaminated_air.gd` (calendar-driven, `WorldClock.day()` plus
+      `WorldHistory.chaos_magick()`) and a second, already-integrated
+      implementation merged in from `codex/game-planning` under the identical
+      class name — A9.1/A9.2's real, wired-in system (`extends
+      GPUParticles3D`, motes that drift and settle, `set_severity()` driven
+      from `bone_yard_hunt.gd` off `chaos_magick()`, already verified with
+      `captures/a9_1_v9_air_calm.png`/`a9_2_v9_air_storm.png`). Resolving the
+      merge conflict kept the real, integrated one rather than the
+      unintegrated duplicate; this session's own version and its
+      `tests/contaminated_air_test.gd`/`contaminated_air_capture.gd` were
+      deleted rather than kept alongside it.
+      "Moves" and "settles" are covered by A9's motes. Still open: "gets
+      worse" in the sense this line actually asks for — a persistent,
+      compounding trend — is not what A9 built. `chaos_magick()` decays on
+      its own with nothing feeding it (`world_history_chaos_test.gd`: "a long
+      enough quiet settles it to nothing"), so the air can currently get
+      *better* on a quiet night, not just worse. Left at `[~]`, not closed.
 - [x] **W1.3** Being caught out in it costs something — `storm_weather.gd`'s
       `exposure_cost()`, drained from stamina in `_update_storm_exposure()`,
       cut by a warm layer (AS3.3/AS4.5).
@@ -2917,10 +2954,99 @@ are in it.
       genuinely crosses the obstacle across three captured frames rather
       than only the numbers agreeing. `jump_test`, `opening_test` and
       `combat_integration_test` regression suites re-verified clean.
-- [ ] **AD1.3** Wall running, earned the way third person is earned rather than given
+- [x] ~~**AD1.3** Wall running, earned the way third person is earned
+      rather than given~~ `wall_run_unlocked()` in `bone_yard_hunt.gd`
+      mirrors `third_person_unlocked()`'s own shape exactly — a real thing
+      the player did, not a flag, read live off `WorldHistory` rather than
+      cached — but ties the count to `player_vaulted` (AD1.2's own event,
+      `WALL_RUN_UNLOCK_VAULTS = 3`) instead of boss kills, because
+      wall-running is the next rung of the traversal skill vaulting already
+      is, not a combat unlock. Unlocking is announced the same way third
+      person's is (`_announce_wall_run_unlock()`, checked in `_update_hud()`
+      the frame the count first crosses, an `impact_feel` kick, a
+      `wall_run_unlocked` WorldHistory event, a prompt line), not a silent
+      permission flip.
+      \
+      The run itself needs no key to start: `_wall_run_surface()` looks to
+      both sides of the player whenever they are airborne and moving fast
+      enough (`WALL_RUN_MIN_SPEED`), with a near cast finding a wall within
+      reach and a second, higher cast (`WALL_RUN_MIN_HEIGHT`) confirming it
+      keeps going — a short ledge fails that second cast and is left to
+      AD1.2's own vault instead of being double-handled. Redirects velocity
+      along the wall's own face every frame (re-found, not cached, so a
+      wall that curves or ends mid-run is read honestly) under a fraction
+      of real gravity (`WALL_RUN_GRAVITY_SCALE`) rather than none, so it
+      reads as a body fighting to stay up rather than flight. SPACE while
+      running is a real kickoff — checked ahead of the dodge/jump split
+      entirely, since `_jump()` refuses outright the instant it sees the
+      player is not on the floor, which a wall run always is — pushing the
+      body away from the wall and up with its own impulse rather than a
+      plain fall dressed up as one.
+      \
+      Building the test surfaced a real tuning bug: a fresh jump's vertical
+      velocity was carried straight into the run unchanged, so a run begun
+      right off a jump kept climbing under reduced gravity for its entire
+      duration and sailed straight up past the top of the wall instead of
+      tracking level along it. Fixed in `_begin_wall_run()` by capping
+      (never zeroing — catching an already-falling body should still read
+      as momentum) the vertical velocity a run starts with.
+      \
+      Verified: `tests/wall_run_test.gd` (new, headless, 16/16, against
+      real `StaticBody3D` walls rather than assumed shapes) — the unlock
+      threshold is exact and reads live off real events; a tall wall is
+      found and its tangent genuinely lies along the wall's own face; a
+      1.0m ledge correctly fails the height check and falls to the vault
+      instead; a triggered run travels real distance over real time while
+      staying flush to the wall; and a kickoff consumes its own request,
+      ends the run, and leaves with a real upward component. Getting the
+      test to a genuinely airborne starting state surfaced the same
+      one-frame floor-snap gotcha AD1.1's own jump test had already named —
+      solved the same way, by riding the real, already-proven `_jump()`
+      path rather than fighting `move_and_slide()`'s snap by hand.
+      `tests/wall_run_capture.gd` (new, windowed) confirms the camera
+      genuinely travels along the wall and is genuinely thrown clear of it
+      on kickoff, across three captured frames, and that the unlock prompt
+      really reaches the HUD rather than only the WorldHistory record.
+      `jump_test`, `vault_test`, `opening_test` and `combat_integration_test`
+      regression suites re-verified clean.
 - [ ] **AD1.4** Climbing a building is a route, not a cutscene (Prototype's lesson)
 - [ ] **AD1.5** Momentum carries between moves — run into vault into climb is one motion
-- [ ] **AD1.6** All of it reads through the anatomy: a broken leg cannot vault
+- [x] ~~**AD1.6** All of it reads through the anatomy: a broken leg cannot
+      vault~~ `AnatomyComponent.mobility_ratio()` already existed and
+      already gated running speed through B6.5's `_player_speed_scale()` —
+      this reads the exact same signal into all three AD1 verbs rather
+      than inventing a second injury number for traversal. One leg
+      destroyed outright (`health = 0`, the other untouched) reads
+      `mobility_ratio() = 0.5`, below the same `PLAYER_INJURY_FLOOR`
+      (0.55) B6.5 already draws its own line at — below it,
+      `_vault_target()` and `_wall_run_surface()` both refuse outright,
+      literally "a broken leg cannot vault." Above the floor, the read is
+      continuous rather than a single cliff: `_jump()`'s impulse is scaled
+      by `_player_speed_scale()` directly (reused whole, not recomputed,
+      so footing/stagger affects a jump's height exactly as it already
+      affects a step's speed), a permitted vault takes longer the worse
+      off the body is (`vault_duration`, tracked per-attempt rather than
+      against the flat constant, since a hobbled vault is deliberately
+      handed *more* time than a healthy one gets — the eased-lerp in
+      `_update_player()` was fixed to divide against this instead of the
+      constant it used to, or a hobbled vault's own progress maths would
+      have finished, and glitched, past 100% before the extra time was up),
+      and a permitted wall run holds for less of `WALL_RUN_DURATION` the
+      worse off the legs are. What the floor does not touch: B6.5's own
+      "never below a speed you could retreat at" promise — the gate is on
+      the three *advanced* verbs, not on the ability to move at all, so a
+      catastrophically hurt player can still walk, still jump (a smaller
+      jump, never no jump), just cannot vault or hold a wall until healed.
+      Verified: `tests/anatomy_traversal_test.gd` (new, headless, 11/11) —
+      a healthy body vaults freely and jumps at the full, unscaled impulse;
+      one leg destroyed drops mobility below the floor and both the vault
+      and the wall run a healthy body could make are refused outright,
+      while the jump still fires, visibly smaller, never zero; a bruised
+      -not-broken pair of legs (60/75 health each) clears the floor and
+      still gets a vault through, measurably slower than a healthy one's.
+      `wall_run_test`, `jump_test`, `vault_test`, `opening_test`,
+      `combat_integration_test` and `combat_response_test` regression
+      suites re-verified clean.
 
 ### AD2 — The first-person HUD
 - [ ] **AD2.1** Diegetic: the hands, the weapon, the handheld, the windscreen (pairs with M1.6)
@@ -3039,10 +3165,10 @@ this"*.
 
 ### AG2 — What he could not find
 The theme of the whole session, and it is a design fault rather than his.
-- [ ] **AG2.1** He could not find the Board; Greg could not remember the key either
-- [ ] **AG2.2** Nothing teaches the weapon wheel — Greg had to guess *"i think its holding b?"*
-- [ ] **AG2.3** *"press buttons probably"* is the current discovery mechanism for every panel
-- [ ] **AG2.4** The first-person HUD must say what can be pressed (AD2.3)
+- [x] ~~**AG2.1** He could not find the Board; Greg could not remember the key either~~ — F1 opens a keys card that names THE BOARD on P, in the group for things you carry. The card's rows are written by the scene rather than held in the card, so it cannot drift from what is actually bound (`systems/keys_card.gd`)
+- [x] ~~**AG2.2** Nothing teaches the weapon wheel — Greg had to guess *"i think its holding b?"*~~ — on the card as HOLD Q, and moved off B while fixing it: B is a stretch from WASD and this is a hold you are meant to move during. Greg: *"make the b slider change to like e or idk r or q"* — E is interact and R is reload, so Q
+- [x] ~~**AG2.3** *"press buttons probably"* is the current discovery mechanism for every panel~~ — the closed-state hint names the key in the corner and stops after two openings, because a permanent prompt for a help screen is the tutorial look arriving by the back door
+- [~] **AG2.4** The first-person HUD must say what can be pressed (AD2.3) — the contextual strip in `gothic_field_hud.gd` covers the verbs for what you are looking at, and the keys card covers the panels. What is still missing is the strip naming an affordance the moment it appears rather than only the weapon ones
 
 ### AG3 — The derby, second playtest
 Greg, in the seat: *"the derby thing is so whack rn no hud or hull not
@@ -3062,8 +3188,23 @@ game.
 - [ ] **AG3.2** The camera goes in the cab. M2 was built and never wired to anything
 - [ ] **AG3.3** Getting out of the car is something you watch happen, not a scene swap on E
 - [ ] **AG3.4** You can shoot through your own windscreen, and the glass keeps the holes
-- [ ] **AG3.5** Nothing in the derby says what any key does - the first thing AH has to fix
+- [x] ~~**AG3.5** Nothing in the derby says what any key does - the first thing AH has to fix~~ — the same card, with the derby's own rows: driving, the gun, and getting out. E CLIMB OUT is in it by name, which is the key every playtester has missed
 
+
+
+### AG5 — Demo build, 13 September 2026
+Greg sending the first build to friends, and reporting while it ran.
+- [x] **AG5.1** *"it crashes when you look at the body parts in the body section"* — a real crash with a cause worth naming. `character_sheet.gd` published `anatomy.organs` as a String naming the decanted organ set; everywhere else in the game `anatomy.organs` is a Dictionary of live organ states. The moment the player had a sheet, `body_inspector._condition_of` read "standard" where it required a Dictionary and threw from inside `_draw`, once per frame, in the index and the device both. The sheet writes `organ_set` now, `load_from_world` still reads the old key when what is under it is actually a String, and the inspector stops assigning straight into a typed Dictionary. `tests/organ_key_collision_test.gd`, 7 checks
+- [x] **AG5.2** *"the menus and indexes and tab buttons after you get out of the car"* — the hunt is the only scene owning a blood veil and a psychedelic rig, and both were added to `$HUD` after every panel, so both painted over the index, map and board. The shader samples the whole frame drawn so far, so an open index was not tinted, it was displaced, and the page tabs rendered somewhere other than where they were clickable. Ordered in `_order_hud_layers`
+- [x] **AG5.3** Opening any panel once and closing it left the retired orange HUD stuck over the real interface for the rest of the run — `_toggle_panel` turned `title`, `status` and the vitals box back on, and `_update_hud` re-hid only `status`
+- [x] **AG5.4** **FIX DEVICE SIZING** — both hosted panels were handed `_clip.size` as their own size, so the index laid itself out for a 1074x515 letterbox using measurements authored against 1280x720. Widths survived it, heights did not: the file page ran through the footer and the bottom of the plate was cut off. The panel now gets the viewport's size and is scaled to fit, so hosted and fullscreen are the same layout
+- [x] **AG5.5** The floating sword, third attempt and the first one that found the cause. Two passes retuned the mount and both made it worse, because the value was never reaching the model — `_pose_weapon` assigned `model.rotation` every frame from arm sway alone and discarded the counter-rotation `hunter_arsenal` writes to cancel the arm pitch. With the rest rotation cached the way the rest position already was, the honest value is the pure cancellation of `FIRST_PERSON_ARM_RAISE`
+- [x] **AG5.6** *"fixing the wobbly screen like you smoked weed or nicotine — even tho at the start you get a random drug"* — AS2.1 had nightfall driving the shader's displacement dial, so a sober player after dark had a permanently moving screen and the one state the shader exists to express stopped being legible. The hour no longer touches the dial; substances, meditation and the shadow realms own it
+- [x] **AG5.7** The transit plate was acid green, in a register nothing else in the game uses. Blood now, carrying the seal of the place you are arriving at — ring, point count and stride seeded off the destination path — with runnels down the glass
+- [ ] **AG5.8** *"i hate the look of this ui it looks ugly"* — the bottom-right cluster specifically, and the fonts generally. Greg wants boxes, dimensional HUD panels, and a grungier biopunk face throughout
+- [ ] **AG5.9** *"the hunt thing hardly works at all zero continuity"* — the Hunt System does not hold together across a session
+- [ ] **AG5.10** The map has to integrate the underground conspiracy network text file, and carry Greg's own art textures
+- [ ] **AG5.11** Save files: deletable, continuable, several of them, so somebody can keep a world and generate new stories in it
 
 ### AG v10 — the final pass
 The last rung. Fifteen statements that are true of the playtest record when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.

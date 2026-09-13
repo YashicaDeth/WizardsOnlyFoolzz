@@ -46,7 +46,24 @@ const GRIND_SPEED := 2.6
 ## reasonably aligned car enters this range it commits to a line *through* the
 ## target instead, keeping a point beyond the other bumper as its destination.
 const FINAL_APPROACH_RANGE := 12.0
-const FINAL_APPROACH_ALIGNMENT := 0.93
+## Found sitting right on a cliff edge while merging the codex/game-planning
+## and agent-b branches together: `tests/derby_balance_test.tscn` passes on
+## either branch alone (peak alignment 0.957 on codex/game-planning alone) but
+## fails on the merge every time, deterministically, with peak alignment
+## capped at 0.900-0.908 — confirmed with `--fixed-fps 60` giving the exact
+## same number, so it is not frame-timing noise, and confirmed against a
+## worktree of codex/game-planning alone to rule out a pre-existing bug there.
+## Ruled out as the cause: rift_derby.gd, this file and arcade_vehicle.gd are
+## byte-identical between the passing and failing configurations, and
+## disabling driver-rig construction entirely only moves the number from
+## 0.908 to 0.900 — nowhere near the 0.957 the standalone branch reaches. The
+## actual mechanism was not found despite that; 0.93 sat close enough to
+## whatever shifted that unrelated growth elsewhere in a ~150-file merge was
+## enough to tip it. Lowered with a real margin below the measured 0.90 floor
+## rather than nudged to just clear it, since the whole history of this
+## constant (see G0 above) is that a value sitting exactly on its own evidence
+## breaks again the next time anything nearby moves.
+const FINAL_APPROACH_ALIGNMENT := 0.85
 const FINAL_APPROACH_SECONDS := 1.6
 const FINAL_APPROACH_OVERSHOOT := 16.0
 
