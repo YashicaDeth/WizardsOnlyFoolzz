@@ -1,6 +1,47 @@
 class_name HunterAppearance
 extends Node
 
+const HELD_GEAR := preload("res://systems/held_gear.gd")
+
+
+## Greg: *"the gore in the gore sandbox is not up to date with the gore in the
+## main game"*. It was not, and the reason was that the hunt styled its people
+## and the sandbox did not: `bone_yard_hunt.gd` grew a private
+## `_style_world_rig()` giving every combatant a face, wear, ink, piercings and
+## a real cleaver on the hand, while `gore_demo.gd` called `BaselineHuman.build`
+## and stopped, so the range was full of bare mannequins and anything learned
+## there was learned against a body the game does not actually contain.
+##
+## One implementation, called from both, so they cannot drift apart again. The
+## look is derived from the identity rather than randomised, so the same person
+## is the same person in the hunt, in the sandbox and on a later run.
+static func style_world_rig(rig: BaselineHuman, identity: String, armed: bool) -> void:
+	if rig == null or not is_instance_valid(rig):
+		return
+	var seed: int = abs(hash(identity))
+	var look := HunterAppearance.new()
+	look.name = "WorldAppearance"
+	rig.add_child(look)
+	look.configure(rig, {
+		"name": identity,
+		"wear": 0.32 + float(seed % 38) / 100.0,
+		"ink": 0.20 + float((seed / 11) % 50) / 100.0,
+		"piercings": 0.15 + float((seed / 31) % 35) / 100.0,
+		"mutation": (0.22 + float((seed / 7) % 35) / 100.0) if armed else 0.08,
+	})
+	if not armed:
+		return
+	var arm := rig.parts.get("right_arm") as Node3D
+	if arm == null:
+		return
+	var weapon := HELD_GEAR.build_weapon("sword")
+	weapon.name = "HeldAshlineCleaver"
+	# The grip sits at the wrist, with the edge projected forward of the body;
+	# it is parented to the arm so a severed arm takes its weapon with it.
+	weapon.position = Vector3(0.0, -0.34, -0.07)
+	weapon.rotation = Vector3(-PI * 0.48, 0.12, 0.0)
+	arm.add_child(weapon)
+
 ## Replaceable procedural hero detail mounted directly on BaselineHuman zones.
 ## These names are the contract for later authored meshes and blend shapes.
 

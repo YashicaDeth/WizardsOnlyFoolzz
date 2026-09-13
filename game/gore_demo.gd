@@ -225,6 +225,14 @@ func _spawn_body(index: int) -> void:
 		"blood": 4300.0,
 		"cybernetics": {"torso": {"name": "ceramic sternum", "armor": 0.18}},
 	})
+	# Greg: *"the gore in the gore sandbox is not up to date with the gore in the
+	# main game"*. The bodies here were bare rigs while the hunt gave every
+	# person a face, wear, ink, piercings and a real cleaver on the hand, so the
+	# range was a room of mannequins and anything you learned about a weapon here
+	# was learned against a body the game does not contain. Same call the hunt
+	# makes, so the two cannot drift apart again. Odd bodies come armed, which is
+	# also what makes the range a place a fight could start rather than a rack.
+	HunterAppearance.style_world_rig(rig, "demo_body_%d" % index, index % 2 == 1)
 	if xray:
 		rig.reveal_organs(true)
 		rig.see_through(true)
