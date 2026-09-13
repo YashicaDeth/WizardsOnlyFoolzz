@@ -2159,7 +2159,20 @@ v4 made the weapon physical and damage still reads a constant off it.
 
 ### O v6 — the sixth pass
 v5 made a blow worth what you put in and a weapon you barely hold is still welded to your hand.
-- [ ] **O6.1** `v6` You can be disarmed, and so can they
+- [x] **O6.1** `v6` You can be disarmed, and so can they — an encounter actor
+      has no `arm`/`LimbMomentum` object for AN2.2's own trigger to read, but
+      it already has the same shape of number in `footing` (O5.10 v2's "same
+      meter, same constants, now on both bodies"). Barely standing (below
+      `STUMBLE_AT`) and hit hard enough to stagger takes the weapon, through
+      `_apply_combat_response()`; footing recovering back past that same
+      line gives it back. Disarmed attacks run through the identical
+      `_actor_attack_damage()`/`_actor_attack_cycle()` everything else
+      already reads, scaled down — low but not a tickle, the same ratio
+      bare hands hit for against the player's own cleaver — rather than a
+      second combat system. Verified: `tests/npc_disarm_test.gd` (new) — a
+      solid stance survives a hit that would disarm a barely-standing one; a
+      real WorldHistory event is recorded; disarmed hits measurably softer
+      and faster; footing recovering past the line hands the grip back.
 - [ ] **O6.2** `v6` Mass and reach become the whole balance conversation
 
 ### O v7 — the seventh pass

@@ -190,6 +190,16 @@ const FOOTING_RECOVERY := 0.55
 const FOOTING_WHIFF := 0.14
 const FOOTING_BLOCKED := 0.2
 const FOOTING_SHOVED := 0.34
+## O6.1. "You can be disarmed, and so can they" — AN2.2 built the player's
+## own half off `arm.fatigue`; an encounter actor has no arm object, but it
+## already has the same shape of number in `footing` (O5.10 v2's own "same
+## meter, same constants, now on both bodies"). Barely standing (below the
+## line a stumble already uses) and hit hard enough to stagger is the NPC
+## reading of "barely held and hit hard"; footing recovering back past the
+## same line is them getting a grip on it again, the same way stamina
+## recovering lets the player draw a weapon back out.
+const NPC_UNARMED_DAMAGE_SCALE := 0.35
+const NPC_UNARMED_CYCLE_SCALE := 0.7
 ## AN2.1. Scales `last_commitment` (0..1) into a footing cost paid the instant
 ## a swing is thrown, hit or miss — a flick costs about what a whiff already
 ## does; a hard committed sweep costs as much as being shoved. Whiffing still
@@ -2882,6 +2892,11 @@ func _update_encounter_actors(delta: float) -> void:
 		# standing in a stagger is still standing, and balance comes back on
 		# its own rather than only when the fight lets up.
 		actor["footing"] = clampf(_actor_footing(actor) + FOOTING_RECOVERY * actor_delta, 0.0, 1.0)
+		# O6.1. A grip regained rather than a weapon regained — the same
+		# threshold that took it decides when it comes back.
+		if bool(actor.get("disarmed", false)) and float(actor.footing) >= STUMBLE_AT:
+			actor["disarmed"] = false
+			prompt.text = "%s RECOVERS THEIR GRIP" % str(actor.display_name).to_upper()
 		if anatomy.downed:
 			(node as CharacterBody3D).velocity = Vector3.ZERO
 			actor.attack_time = 0.0
@@ -3024,11 +3039,17 @@ func _actor_attack_cycle(actor: Dictionary) -> float:
 	# O5.10 v2. Off-balance on top of whatever their arms already cost them —
 	# a fighter who is barely standing winds up slower than their combat_ratio
 	# alone would say, the same way a player who is stumbling swings softer.
-	return lerpf(2.4, 1.4, _actor_combat_ratio(actor)) * lerpf(1.6, 1.0, _actor_footing(actor))
+	# O6.1. A fist comes back faster than a weapon does — the same reason the
+	# player's own bare-hand attacks run at a shorter cooldown than a cleaver.
+	var unarmed := NPC_UNARMED_CYCLE_SCALE if bool(actor.get("disarmed", false)) else 1.0
+	return lerpf(2.4, 1.4, _actor_combat_ratio(actor)) * lerpf(1.6, 1.0, _actor_footing(actor)) * unarmed
 
 
 func _actor_attack_damage(actor: Dictionary) -> int:
-	return maxi(2, roundi(9.0 * _actor_combat_ratio(actor) * lerpf(0.55, 1.0, _actor_footing(actor))))
+	# O6.1. Low, but not a tickle — the same ratio bare hands hit for against
+	# the player's own cleaver (11 of 44 is a hair under a third).
+	var unarmed := NPC_UNARMED_DAMAGE_SCALE if bool(actor.get("disarmed", false)) else 1.0
+	return maxi(1, roundi(9.0 * unarmed * _actor_combat_ratio(actor) * lerpf(0.55, 1.0, _actor_footing(actor))))
 
 
 func _apply_combat_response(actor: Dictionary, attack: Dictionary, hit: Dictionary) -> void:
@@ -3038,6 +3059,13 @@ func _apply_combat_response(actor: Dictionary, attack: Dictionary, hit: Dictiona
 	# by three medium blows fought exactly as well as one who had taken none,
 	# right up until the fourth one crossed the line.
 	_actor_lose_footing(actor, clampf(float(response.severity) / COMBAT_RESPONSE.STAGGER_THRESHOLD * 0.3, 0.05, 0.5))
+	# O6.1. The other half of AN2.2: hit hard enough to stagger them while
+	# they are already barely standing, and the weapon goes the same way a
+	# barely-held one does in the player's own hand.
+	if not bool(actor.get("disarmed", false)) and bool(response.staggered) and _actor_footing(actor) < STUMBLE_AT:
+		actor["disarmed"] = true
+		WorldHistory.record_event("npc_disarmed", {"subject_id": actor.subject_id, "location": HUNT_LOCATION})
+		prompt.text = "%s'S GRIP GIVES OUT" % str(actor.display_name).to_upper()
 	if not bool(response.staggered):
 		return
 	actor.state = "staggered"
