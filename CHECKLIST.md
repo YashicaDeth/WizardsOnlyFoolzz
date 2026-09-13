@@ -3002,7 +3002,7 @@ Greg sending the first build to friends, and reporting while it ran.
 - [ ] **AG5.8** *"i hate the look of this ui it looks ugly"* — the bottom-right cluster specifically, and the fonts generally. Greg wants boxes, dimensional HUD panels, and a grungier biopunk face throughout
 - [ ] **AG5.9** *"the hunt thing hardly works at all zero continuity"* — the Hunt System does not hold together across a session
 - [ ] **AG5.10** The map has to integrate the underground conspiracy network text file, and carry Greg's own art textures
-- [ ] **AG5.11** Save files: deletable, continuable, several of them, so somebody can keep a world and generate new stories in it
+- [x] **AG5.11** Save files: deletable, continuable, several of them, so somebody can keep a world and generate new stories in it — `WorldHistory` gains `active_slot_id`/`slot_manifest` and `create_slot`/`load_slot`/`delete_slot`/`list_slots`. `SAVE_PATH` stays the untouched legacy file every editor run and headless test always used; a slot is a layer the front-end opts into by setting `active_slot_id`, at which point `_current_path()` redirects load/save at `user://saves/<id>.json` with its own `manifest.json` row. A save from before this existed surfaces as a "Continue" slot the first time `list_slots` runs rather than becoming invisible. `tests/save_slots_test.gd`, 17 checks. Front-end menu wiring (an actual save-select screen) is not built yet — this is the machinery underneath it
 
 ### AG v10 — the final pass
 The last rung. Fifteen statements that are true of the playtest record when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
