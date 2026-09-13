@@ -3146,6 +3146,31 @@ everything and has been decaying since before you arrived.
 - [ ] **AH1.6** The room is yours and it accumulates - what you leave in it stays
 - [ ] **AH1.7** Leaving is a movement, not a menu close
 
+Greg, 2026-09-13, which changes what the room *is* rather than adding to it:
+*"menus or idk index inside the phone maybe like a trapped menu inside the phone
+of a 3d modelled version of my room or using photos."*
+
+Two things follow, and the second is the bigger one. **It is a specific room**,
+not a bedroom — the poster wall is the reference photograph in
+`Art Collections`: Taxi Driver, End of Evangelion, Nausicaä, Mononoke, Silent
+Hill 2, Apocalypse Now, Dark Souls, Postal 2, Vault-Tec, the GTA map, two
+SHADOW WIZARDS sheets and the money-gang print above them, visionary panels
+filling the corner, and a persian rug across the ceiling. That wall is where
+this game's references actually come from, so putting it behind the glass is
+the game admitting what it is made of. And **the index lives there too** — not
+just the tutorial. This is house rule I0 taken to its end: no screen is a list
+of text in a box, and the last screens that still are lists stop being screens
+at all.
+
+"Trapped" is the word worth keeping. You are holding a phone, and inside the
+phone is the room you are sitting in, holding the phone.
+
+- [ ] **AH1.8** The room is a real one — the poster wall, not a generic bedroom
+- [ ] **AH1.9** Every page of the handheld is somewhere in the room; the INDEX is a place you turn to, not a list
+- [ ] **AH1.10** Built from photographs rather than modelled where that reads better — projected planes and depth from the corner, not a scanned mesh
+- [ ] **AH1.11** You are in the room, holding the phone, which contains the room. The recursion is on purpose and is visible in the mirror
+- [ ] **AH1.12** The wall accumulates: what the run does to you gets pinned up there, so the reference wall becomes a record (pairs with AH1.6)
+
 ### AH2 — REMEMBER THE CLOUD
 - [ ] **AH2.1** The cloud is an archive of everything the world used to know, in fragments
 - [ ] **AH2.2** A fragment is repaired, not unlocked - the verb is restoration
