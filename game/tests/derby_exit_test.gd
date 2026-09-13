@@ -86,7 +86,7 @@ func _ready() -> void:
 	check(derby.disabled_count >= 8, "eight wreckers go down")
 	# Either ending leaves through the same door. Thirty-five seconds of being
 	# rammed will often finish the player first, and that is a heat ending too.
-	print("the heat ended: ", derby.round_state, " // integrity ", derby.boat.integrity)
+	print("the heat ended: ", derby.round_state, " // integrity ", derby.integrity)
 	check(derby.round_state in ["won", "lost"], "the heat finishes on its own")
 
 	# Run the five second result countdown out in real frames, exactly as a

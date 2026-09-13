@@ -1,4 +1,3 @@
-class_name ArcadeVehicle
 extends RigidBody3D
 
 ## Upright arcade chassis. Solver contacts handle momentum and restitution;
@@ -8,34 +7,6 @@ extends RigidBody3D
 ## and the AI wreckers run the same chassis, and a throttle cut applied from a
 ## driver script is overwritten on that driver's next tick.
 signal impact(other: Node, closing_speed: float, self_share: float)
-
-## V1.1. A car is a thing with a condition, not a state you are in. Before this
-## the player's hull lived in a bare `var integrity` on `rift_derby.gd` — reset
-## to 100 every time the encounter script itself was reset — while every AI
-## wrecker carried the same number as loose `set_meta("integrity", ...)` on the
-## node. Two different bolt-ons for the same fact, and neither one belonged to
-## the car: a heat that ended and restarted lost the number entirely because it
-## was never the vehicle's to keep. It lives here now, once, so the player's
-## chassis and every wrecker's chassis carry it the same way.
-var max_integrity: int = 100
-var integrity: int = 100
-
-func set_max_integrity(value: int) -> void:
-	max_integrity = maxi(1, value)
-	integrity = max_integrity
-
-## Returns the integrity remaining after the hit, so callers that already
-## branch on the post-damage number (ending a round, say) do not have to read
-## the field back separately.
-func apply_damage(amount: int) -> int:
-	integrity = clampi(integrity - maxi(0, amount), 0, max_integrity)
-	return integrity
-
-func condition_fraction() -> float:
-	return float(integrity) / float(max_integrity)
-
-func is_wrecked() -> bool:
-	return integrity <= 0
 
 const DRIVE_SPEED := 24.0
 const REVERSE_SPEED := 10.0

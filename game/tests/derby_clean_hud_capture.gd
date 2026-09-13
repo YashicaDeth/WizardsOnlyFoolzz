@@ -14,7 +14,7 @@ func _ready() -> void:
 	await get_tree().physics_frame
 	derby.leaving = true
 	derby.round_state = "active"
-	derby.boat.integrity = 38
+	derby.integrity = 38
 	derby._update_player_damage_visual(Vector3(1.0, 0.0, -0.4).normalized())
 	derby._update_hud()
 	for _frame in 8:

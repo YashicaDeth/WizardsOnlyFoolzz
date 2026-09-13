@@ -2543,35 +2543,7 @@ The last rung. Fifteen statements that are true of your own faction when this ga
 M2b covers cars as this world's horses. This is everything else about them
 being vehicles rather than set pieces.
 
-- [x] **V1.1** ~~A car is a thing with a condition, not a state you are in~~
-      Before this, the player's hull was a bare `var integrity` on
-      `rift_derby.gd` itself — reset to 100 every time the encounter script
-      reset, which made it a fact about the heat rather than a fact about the
-      car — while every AI wrecker carried the identical number as loose
-      `set_meta("integrity", ...)` on the node. Two different bolt-ons for the
-      same thing, and neither one belonged to the vehicle. `arcade_vehicle.gd`
-      (now `class_name ArcadeVehicle`, since `rift_derby.gd` needed a real type
-      to declare `boat`/`targets` against) carries `integrity`, `max_integrity`,
-      `apply_damage()`, `condition_fraction()` and `is_wrecked()` directly, so
-      the player's chassis and every wrecker's chassis — the rival's authored
-      160 included — hold their own condition the same way. Verified:
-      `tests/vehicle_condition_test.gd` — two vehicle instances hold condition
-      independently, an authored max survives being read back off the object,
-      damage clamps at both ends, and the encounter script's own `boat` and a
-      spawned wrecker are proven to be the same chassis class rather than two
-      different tracking schemes. `tests/derby_exit_test.gd` and
-      `tests/derby_balance_test.gd` still pass end to end through a full heat
-      after the retype (two balance-test failures on hunter approach commitment
-      and pit-crowding cap are pre-existing and unrelated — reproduced
-      identically against the pre-change code).
-      Still open: condition does not yet persist *across* heats or scenes —
-      each new `rift_derby.tscn` load still builds a fresh `ArcadeVehicle` at
-      full health, because there is no open-world car to carry it between
-      encounters yet (that's V10.1/V10.5). This segment only moves the fact off
-      the encounter script and off loose metadata and onto the vehicle object
-      itself, which V1.2's visible/physical damage and V1.4's repair both need
-      as their foundation. Chassis tuning constants (`DRIVE_FORCE`, `TIRE_GRIP`,
-      etc.) were left untouched — A7.7 already gates a retune on G3.1 landing.
+- [ ] **V1.1** A car is a thing with a condition, not a state you are in
 - [ ] **V1.2** Damage is physical and visible, and it changes how it drives
 - [ ] **V1.3** Fuel, or a reason a car is not infinite
 - [ ] **V1.4** Cars can be repaired, badly

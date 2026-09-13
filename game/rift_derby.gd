@@ -47,12 +47,13 @@ const CHASSIS_DIMENSIONS := Vector3(2.65, 1.3, 4.8)
 ## from the kit, so a re-export can reinstate them deliberately.
 const SUPPRESSED_PROPS := ["launch_ramp_00", "launch_ramp_01", "launch_ramp_02"]
 
-var boat: ArcadeVehicle
+var boat: Node3D
 var speed := 0.0
 var boat_velocity := Vector3.ZERO
 var score := 0
+var integrity := 100
 var viscera_fx := true
-var targets: Array[ArcadeVehicle] = []
+var targets: Array[Node3D] = []
 var debris: Array[Dictionary] = []
 var respawn_queue: Array[Dictionary] = []
 var index_open := false
@@ -368,7 +369,7 @@ func _create_wrecker(index: int) -> void:
 	var target := VEHICLE.new()
 	target.name = "MaraVoss_Wrecker" if index == 0 else "ScrapWrecker_%02d" % index
 	target.position = Vector3(cos(angle) * lane * 1.35, 0.8, sin(angle) * lane * 0.78)
-	target.set_max_integrity(160 if index == 0 else 100)
+	target.set_meta("integrity", 160 if index == 0 else 100)
 	target.set_meta("is_rival", index == 0)
 	target.set_meta("hit_ready_msec", 0)
 	target.set_meta("player_hit_ready_msec", 0)
@@ -478,14 +479,14 @@ func _on_vehicle_impact(other: Node, closing_speed: float, self_share: float) ->
 		return
 	_shake_camera(closing_speed)
 	if targets.has(other):
-		_damage_target(other as ArcadeVehicle, closing_speed, self_share)
+		_damage_target(other, closing_speed, self_share)
 	elif closing_speed > 7.0:
-		boat.apply_damage(roundi(closing_speed * 0.4))
+		integrity = maxi(0, integrity - roundi(closing_speed * 0.4))
 		_update_player_damage_visual(Vector3.ZERO)
 		if pit_radio != null and closing_speed > 11.0:
 			pit_radio.transmit("hit_player")
 		derby_audio.play_impact(clampf(closing_speed / 24.0, 0.0, 1.0), boat.global_position, "heavy")
-		if boat.is_wrecked():
+		if integrity <= 0:
 			_finish_round("lost")
 
 
@@ -498,7 +499,7 @@ func _on_wrecker_impact(other: Node, closing_speed: float, self_share: float, wr
 	wrecker.set_meta("player_hit_ready_msec", now + 520)
 	var attacker_share := clampf(self_share, 0.0, 1.0)
 	var damage := clampi(roundi(closing_speed * 0.55 * (0.4 + attacker_share * 0.6)), 1, 18)
-	boat.apply_damage(damage)
+	integrity = maxi(0, integrity - damage)
 	_update_player_damage_visual((boat.global_position - wrecker.global_position).normalized())
 	_shake_camera(closing_speed)
 	if pit_radio != null and closing_speed > 11.0:
@@ -509,13 +510,13 @@ func _on_wrecker_impact(other: Node, closing_speed: float, self_share: float, wr
 		"attacker": wrecker.name,
 		"closing_speed": snappedf(closing_speed, 0.1),
 		"damage": damage,
-		"hull_after": boat.integrity,
+		"hull_after": integrity,
 	})
-	if boat.is_wrecked():
+	if integrity <= 0:
 		_finish_round("lost")
 
 
-func _damage_target(target: ArcadeVehicle, collision_speed: float = 0.0, self_share: float = 1.0) -> void:
+func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: float = 1.0) -> void:
 	if round_state != "active":
 		return
 	var now: int = Time.get_ticks_msec()
@@ -529,9 +530,10 @@ func _damage_target(target: ArcadeVehicle, collision_speed: float = 0.0, self_sh
 	var force := clampf(collision_speed / 18.0, 0.0, 1.8)
 	var energy := 10.0 + force * force * 46.0
 	var damage: int = clampi(roundi(energy * (0.35 + 0.65 * self_share)), 6, 95)
-	var target_integrity: int = target.apply_damage(damage)
+	var target_integrity: int = maxi(0, int(target.get_meta("integrity", 100)) - damage)
+	target.set_meta("integrity", target_integrity)
 	score += damage * 5
-	boat.apply_damage(clampi(roundi(energy * 0.22 * (0.35 + 0.65 * (1.0 - self_share))), 1, 34))
+	integrity = maxi(0, integrity - clampi(roundi(energy * 0.22 * (0.35 + 0.65 * (1.0 - self_share))), 1, 34))
 	var impact_direction := (target.global_position - boat.global_position).normalized()
 	_update_player_damage_visual(-impact_direction)
 	_update_wrecker_damage_visual(target, target_integrity, impact_direction)
@@ -566,7 +568,7 @@ func _damage_target(target: ArcadeVehicle, collision_speed: float = 0.0, self_sh
 		}, "rival_memory_formed")
 	if target_integrity <= 0:
 		_wreck_target(target, impact_energy)
-	if boat.is_wrecked():
+	if integrity <= 0:
 		_finish_round("lost")
 
 
@@ -593,7 +595,7 @@ func _wreck_target(target: Node3D, impact_energy: int) -> void:
 		"vehicle": "rift_skiff",
 		"target_id": target.name,
 		"impact_energy": impact_energy,
-		"remaining_integrity": boat.integrity,
+		"remaining_integrity": integrity,
 		"score_after_impact": score,
 	})
 	if disabled_count >= 8:
@@ -615,11 +617,11 @@ func _update_wrecker_damage_visual(target: Node3D, target_integrity: int, impact
 
 
 func _update_player_damage_visual(impact_direction: Vector3) -> void:
-	_update_detachable_parts(boat, boat.integrity, impact_direction)
+	_update_detachable_parts(boat, integrity, impact_direction)
 	var shell := boat.get_node_or_null("AuthoredScrapSkiff") as Node3D
 	if shell == null:
 		return
-	var crush := clampf(1.0 - boat.condition_fraction(), 0.0, 0.55)
+	var crush := clampf(float(100 - integrity) / 100.0, 0.0, 0.55)
 	var local := boat.global_transform.basis.inverse() * impact_direction
 	shell.scale = Vector3(1.15 + crush * 0.05, 1.15 - crush * 0.16, 1.15 - crush * 0.05)
 	shell.rotation.z = clampf(-local.x, -1.0, 1.0) * crush * 0.16
@@ -840,7 +842,7 @@ func _update_hud() -> void:
 				rival_running = true
 				break
 		interior.report({
-			"hull": float(boat.integrity),
+			"hull": float(integrity),
 			"pace": clampf(absf(float(boat.get("signed_speed"))) / MAX_SPEED, 0.0, 1.0),
 			"impacts": score,
 			"wreckers_left": maxi(0, 8 - disabled_count),
@@ -851,7 +853,7 @@ func _update_hud() -> void:
 			"rounds_full": 12,
 		})
 	status.text = "BONE YARD DERBY  //  %s\nWASD DRIVE  ·  I WORLD INDEX  ·  E LEAVE VEHICLE" % round_state.to_upper()
-	score_label.text = "IMPACT SCORE  %05d\nHULL INTEGRITY  %03d%%\nACTIVE WRECKERS  %02d\nWORLD MEMORY  %03d" % [score, boat.integrity, targets.size(), WorldHistory.event_count()]
+	score_label.text = "IMPACT SCORE  %05d\nHULL INTEGRITY  %03d%%\nACTIVE WRECKERS  %02d\nWORLD MEMORY  %03d" % [score, integrity, targets.size(), WorldHistory.event_count()]
 	# Only speaks when it has something to say. Left visible during play it sat
 	# on top of the control ribbon repeating what the ribbon already showed.
 	mode_label.visible = round_state != "active"
@@ -869,14 +871,14 @@ func _update_hud() -> void:
 		var delta_position := target.global_position - boat.global_position
 		contacts.append({
 			"offset": Vector2(delta_position.dot(right), -delta_position.dot(forward)),
-			"integrity": target.integrity,
+			"integrity": int(target.get_meta("integrity", 100)),
 			"rival": bool(target.get_meta("is_rival", false)),
 		})
 	if dynamic_interface.has_method("set_telemetry"):
 		dynamic_interface.set_telemetry({
 			"speed": speed,
 			"score": score,
-			"integrity": boat.integrity,
+			"integrity": integrity,
 			"active_wreckers": targets.size(),
 			"memory_count": WorldHistory.event_count(),
 			"rival_status": rival.get("status", "active"),
@@ -939,7 +941,7 @@ func _finish_round(result: String) -> void:
 	speed = 0.0
 	result_countdown = 5.0
 	respawn_queue.clear()
-	WorldHistory.record_event("derby_round_%s" % result, {"venue": "rift_derby_quarry", "score": score, "disabled": disabled_count, "integrity": boat.integrity})
+	WorldHistory.record_event("derby_round_%s" % result, {"venue": "rift_derby_quarry", "score": score, "disabled": disabled_count, "integrity": integrity})
 
 
 func _add_authored_environment_collision(root_node: Node) -> void:
