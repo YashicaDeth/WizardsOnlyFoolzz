@@ -45,6 +45,13 @@ const BLOOD_COST_PER_LETTER := 40.0
 ## accumulating regardless.
 const FORGET_HOURS := 6.0
 
+## AJ1.6. "It goes into the world as an object - scratched, burned, carried
+## or worn." Four real media, not a flag on the sigil's own dictionary — an
+## inscription becomes its own `WorldHistory` subject (`kind: "sigil_object"`)
+## so it can be found, stood next to, defaced or stolen later (AJ2.4) the
+## same way any other physical thing in this world already can be.
+const MEDIA := ["scratched", "burned", "carried", "worn"]
+
 
 static func condense(intent: String) -> String:
 	var upper := intent.to_upper()
@@ -164,3 +171,36 @@ static func fire(sigil: Dictionary) -> Dictionary:
 	fired["fired"] = true
 	WorldHistory.record_event("sigil_fired", {"subject_id": str(sigil.get("subject_id", "")), "intent": str(sigil.get("intent", "")), "seed": int(sigil.get("seed", 0))})
 	return {"ok": true, "sigil": fired}
+
+
+## AJ1.6. Puts a charged sigil into the world as a real, findable object —
+## not a second copy of the dictionary living only in whatever screen made
+## it. `object_id` is deterministic per maker (`sigil_objects_made` counts up
+## on their own subject) so two calls never collide, and the same intent can
+## legitimately go into the world twice over in different media — scratched
+## into one door and worn as a mark are not the same act. Requires the sigil
+## to have actually been charged first; there is no path here that puts an
+## un-charged intent into the world as though it were real.
+static func inscribe(sigil: Dictionary, subject_id: String, medium: String, location_id: String = "") -> Dictionary:
+	if not bool(sigil.get("charged", false)):
+		return {"ok": false, "reason": "NOTHING CHARGED TO PUT INTO THE WORLD"}
+	if not MEDIA.has(medium):
+		return {"ok": false, "reason": "NO SUCH MEDIUM"}
+	var maker := WorldHistory.subject(subject_id)
+	if maker.is_empty():
+		return {"ok": false, "reason": "NO SUCH SUBJECT"}
+	var made := int(maker.get("sigil_objects_made", 0))
+	var object_id := "sigil_object:%s:%d" % [subject_id, made]
+	WorldHistory.register_subject(object_id, {
+		"kind": "sigil_object",
+		"maker": subject_id,
+		"intent": str(sigil.get("intent", "")),
+		"condensed": str(sigil.get("condensed", "")),
+		"seed": int(sigil.get("seed", 0)),
+		"medium": medium,
+		"location_id": location_id,
+		"defaced": false,
+	})
+	WorldHistory.amend_subject(subject_id, {"sigil_objects_made": made + 1})
+	WorldHistory.record_event("sigil_inscribed", {"subject_id": subject_id, "object_id": object_id, "medium": medium, "seed": int(sigil.get("seed", 0))})
+	return {"ok": true, "object_id": object_id}
