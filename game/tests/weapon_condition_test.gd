@@ -16,6 +16,18 @@ func check(condition: bool, label: String) -> void:
 		failures.append(label)
 
 
+## AN2.5 landed alongside this test: a weapon on `GRIP_CYCLE` also carries its
+## current grip's own `control` multiplier on top of condition. Read live
+## rather than hardcoded, so a retuned grip value cannot make this test lie
+## about what "full stiffness" actually means.
+func expected_stiffness(hunt, weapon_id: String, condition: float) -> float:
+	var base: float = hunt.WEAPON_BASE_STIFFNESS * lerpf(0.45, 1.0, condition)
+	if hunt.GRIP_CYCLE.has(weapon_id):
+		var grip_spec: Dictionary = HeldGear.GRIPS.get(hunt.current_grip, {})
+		base *= float(grip_spec.get("control", 1.0))
+	return base
+
+
 func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		get_tree().quit(2)
@@ -29,7 +41,7 @@ func _ready() -> void:
 	hunt._equip_weapon(0)
 	hunt._carry_current_weapon()
 	check(is_equal_approx(hunt.arsenal.weapon_condition("sword"), 1.0), "a fresh sword starts at full condition")
-	check(is_equal_approx(hunt.arm.stiffness, hunt.WEAPON_BASE_STIFFNESS), "and swings at full stiffness")
+	check(is_equal_approx(hunt.arm.stiffness, expected_stiffness(hunt, "sword", 1.0)), "and swings at full stiffness (%.2f)" % hunt.arm.stiffness)
 
 	hunt.player_body.position = Vector3(175, 0.9, 125)
 	hunt.player = hunt.player_body.position + Vector3.UP * 0.6
@@ -44,7 +56,7 @@ func _ready() -> void:
 	hunt._attack_nearest_encounter_actor({"damage": 20.0, "impulse": 10.0, "damage_type": "cut", "range": 9.0, "weapon": "sword"})
 	var after_bare: float = hunt.arsenal.weapon_condition("sword")
 	check(after_bare < 1.0, "a connecting hit actually wears the sword (%.4f)" % after_bare)
-	check(is_equal_approx(hunt.arm.stiffness, hunt.WEAPON_BASE_STIFFNESS * lerpf(0.45, 1.0, after_bare)), "and the arm's real stiffness reflects that condition immediately")
+	check(is_equal_approx(hunt.arm.stiffness, expected_stiffness(hunt, "sword", after_bare)), "and the arm's real stiffness reflects that condition immediately")
 
 	# The same blow through real plate wears it further than the bare hit did.
 	var wear_from_bare_hit: float = 1.0 - after_bare
