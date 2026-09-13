@@ -1314,6 +1314,11 @@ const ARM_WEIGHTS := {
 }
 
 
+## AN2.4. A weapon's own base stiffness before condition takes anything off
+## it — `LimbMomentum.carry()`'s own former default, named here because a
+## worn weapon now needs a real number to be worn *from*.
+const WEAPON_BASE_STIFFNESS := 58.0
+
 func _carry_current_weapon() -> void:
 	if arm == null:
 		return
@@ -1325,9 +1330,14 @@ func _carry_current_weapon() -> void:
 	elif arsenal != null:
 		id = str(arsenal.current_id)
 	var spec: Dictionary = ARM_WEIGHTS.get(id, ARM_WEIGHTS["sword"])
-	if is_equal_approx(arm.mass, float(spec["mass"])):
+	# AN2.4. Bare hands and a carried limb are not entries in the arsenal's own
+	# condition table — `weapon_condition` reads 1.0 for anything it has never
+	# heard of, which is exactly "unworn" and asks for nothing special here.
+	var condition: float = arsenal.weapon_condition(id) if arsenal != null else 1.0
+	var target_stiffness := WEAPON_BASE_STIFFNESS * lerpf(0.45, 1.0, condition)
+	if is_equal_approx(arm.mass, float(spec["mass"])) and is_equal_approx(arm.stiffness, target_stiffness):
 		return
-	arm.carry(float(spec["mass"]), float(spec["reach"]))
+	arm.carry(float(spec["mass"]), float(spec["reach"]), target_stiffness)
 
 
 ## AN1.2/AN1.6. One call a frame. The arm is given what the player did — how far
@@ -1580,6 +1590,7 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	else:
 		result = anatomy.call("apply_hit", zone, float(attack.damage), float(attack.impulse), str(attack.damage_type))
 	_last_melee_resistance = _melee_resistance(zone, result)
+	_wear_current_weapon(str(attack.get("weapon", "")), float(result.get("absorbed", 0.0)))
 	var organ_hit := str((result.get("organ", {}) as Dictionary).get("zone", ""))
 	if not organ_hit.is_empty() and bool((result.get("organ", {}) as Dictionary).get("ruptured", false)):
 		prompt.text = "%s IS OPENED UP" % str(actor.display_name).to_upper()
@@ -1614,6 +1625,24 @@ func _melee_resistance(zone: String, result: Dictionary) -> float:
 	var base: float = MELEE_RESISTANCE_BASE.get(zone, 0.55)
 	var absorbed := float(result.get("absorbed", 0.0))
 	return clampf(base + absorbed * 0.35, 0.0, 0.95)
+
+
+## AN2.4. Every connecting hit takes something off the edge; hitting whatever
+## the blow's own `absorbed` says was resistant (armour, bone) takes more —
+## a blade that keeps meeting plate dulls faster than one that keeps meeting
+## an unarmoured back. Bare hands and a carried limb are not in the arsenal's
+## own catalog, so this is a no-op for both; the limb already wears through
+## `_wear_carried_limb` instead. `_carry_current_weapon()` is called
+## immediately rather than left for next frame's `_advance_arm`, so the
+## degraded stiffness is real the instant the hit lands, not one frame late.
+const WEAPON_WEAR_BASE := 0.01
+const WEAPON_WEAR_ABSORBED := 0.05
+
+func _wear_current_weapon(weapon_id: String, absorbed: float) -> void:
+	if arsenal == null or not HunterArsenal.WEAPONS.has(weapon_id):
+		return
+	arsenal.wear_weapon(WEAPON_WEAR_BASE + absorbed * WEAPON_WEAR_ABSORBED, weapon_id)
+	_carry_current_weapon()
 
 
 ## AF1.1/AF1.2. Where a round ended up. The world keeps the hole (the

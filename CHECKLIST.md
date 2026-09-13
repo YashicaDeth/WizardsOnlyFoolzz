@@ -3704,7 +3704,19 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
       limb, armour raises whichever zone it sits on further, and a real
       swing through an armoured NPC measurably answers harder than the same
       swing through an unarmoured one.
-- [ ] **AN2.4** The weapon's own condition rides on the same object — a bent blade swings wrong
+- [x] **AN2.4** The weapon's own condition rides on the same object — a bent
+      blade swings wrong — `HunterArsenal.wear_weapon()` (lazy, like `ammo`:
+      missing means unworn) takes something off the edge on every connecting
+      melee hit, more when the blow's own `absorbed` (AN2.3) says it met
+      armour or bone. `_carry_current_weapon()` reads that condition back
+      into a real, lower `arm_stiffness` on `LimbMomentum.carry()` — a worn
+      weapon is genuinely wobblier through the same arm, not a number on a
+      sheet. Bare hands and a carried limb are outside it entirely; the limb
+      already had its own wear mechanic. Verified:
+      `tests/weapon_condition_test.gd` — a fresh sword starts at full
+      condition and stiffness, a connecting hit wears both down immediately,
+      the same hit through real plate wears more than the same hit through
+      nothing, and throwing a fist does not touch the sword sitting unused.
 - [ ] **AN2.5** Two-handing changes the numbers, not just the pose
 
 

@@ -41,6 +41,10 @@ var ammo := {
 	"shotgun": {"loaded": 5, "reserve": 25},
 	"sidearm": {"loaded": 10, "reserve": 50},
 }
+## AN2.4. Missing means unworn — a weapon starts at full condition and this
+## dict only ever gains an entry the first time something actually wears it,
+## the same lazy shape `ammo` above would use if a fresh magazine were free.
+var condition: Dictionary = {}
 var models: Dictionary = {}
 var hand: Node3D
 
@@ -122,6 +126,22 @@ func select_slot(slot: int) -> bool:
 
 func current() -> Dictionary:
 	return WEAPONS[current_id]
+
+
+## AN2.4. 1.0 is unworn and new; 0.0 has nothing left to give.
+func weapon_condition(id: String = "") -> float:
+	return float(condition.get(id if id != "" else current_id, 1.0))
+
+
+## What connecting with something actually costs the edge, calibre or firing
+## pin — never healed here, the same one-way rule `implant_condition` and a
+## carried limb's own wear already run on. Returns the value left so a caller
+## can react to it (`_carry_current_weapon`) without a second lookup.
+func wear_weapon(amount: float, id: String = "") -> float:
+	var key := id if id != "" else current_id
+	var value := clampf(weapon_condition(key) - maxf(0.0, amount), 0.0, 1.0)
+	condition[key] = value
+	return value
 
 
 func state() -> Dictionary:
