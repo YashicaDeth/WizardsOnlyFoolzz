@@ -1322,9 +1322,29 @@ That is a look decision rather than a bug, which is why it is filed here instead
 of under M, but 0.13 average is dark enough that structures a few metres away
 read as black shapes rather than as buildings.
 
-- [ ] **G7.1** Decide whether the spawn is meant to be this dark, or raise it
-- [ ] **G7.2** If it stays dark, the near field still has to read — contrast, not brightness
-- [ ] **G7.3** Check the same numbers at the districts and at the derby, not only at spawn
+- [ ] **G7.1** Decide whether the spawn is meant to be this dark, or raise it —
+      still Greg's call, not touched.
+- [x] ~~**G7.2** If it stays dark, the near field still has to read — contrast,
+      not brightness~~ The `"dirt"` material kind (`WorldLook.surface()`) is
+      `oil_asphalt`/`dead_forest`/`quarry_concrete`-dark (0.03-0.09 albedo) at
+      0.97 roughness with no rim — a flat ground plane facing mostly away from
+      the low sun and a dark zenith has nothing to reflect, so it goes solid
+      black regardless of ambient energy. Gave it the same rim trick `"flesh"`
+      already uses (`rim_enabled`, `rim` 0.3, `rim_tint` 0.75): grazing angles
+      now pick up the horizon glow that was already lighting the mid-ground
+      buildings, so the near field reads as a lit surface with a gradient
+      instead of a black hole. Global exposure/ambient untouched, so nothing
+      else in frame changes. Verified: `game/captures/g7_2_ground_rim_before.png`
+      vs `g7_2_ground_rim_after.png` (Hunt Grounds spawn) — foreground ground
+      now carries a visible warm gradient instead of flat black. Checked for
+      collateral: `dirt` is also every asphalt surface `regrime()` produces, so
+      re-shot the derby pit floor before/after
+      (`game/captures/g3_lights_before_rim.png`/`_after_rim.png` in
+      `P:/GameDev/Temp`, not archived — floor markings identical, no colour
+      regression against G3.3's neutral-light fix) and re-ran
+      `tests/derby_balance_test.tscn`: still 0 failures.
+- [ ] **G7.3** Check the same numbers at the districts and at the derby, not
+      only at spawn — not measured this pass.
 
 ## H — Base building, reduced
 
