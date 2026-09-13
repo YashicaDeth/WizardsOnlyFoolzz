@@ -30,14 +30,32 @@ be read cold.
 
 ## The allocation at a glance
 
-| Lane | Name | Sections | Open |
-| --- | --- | --- | --- |
-| **1** | The body and the hand | B, M, O, V, AD, AF, AN | 167 |
-| **2** | The look | A, G, G7, H, W, X, AB, AC, AS | 164 |
-| **3** | The cosmology and the law | E, K, AA, AE, AI, AJ, AQ, AU, AV | 201 |
-| **4** | The spine and the economy | F, J, Q, R, T, U, AK, AL, AR | 180 |
-| **5** | The screens and the voice | C, D, I, L, N, S, Y, AM, AT | 212 |
-| **6** | The demo and what ships | P, Z, AG, AH, AO, AP, AW | 198 |
+| Lane | Name | Sections | Open | Worktree | Branch |
+| --- | --- | --- | --- | --- | --- |
+| **1** | The body and the hand | B, M, O, V, AD, AF, AN | 167 | `P:\GameDev\atg-agent-a-help` | `agent-a-help` |
+| **2** | The look | A, G, G7, H, W, X, AB, AC, AS | 164 | `P:\GameDev\atg-agent-b` | `agent-b` |
+| **3** | The cosmology and the law | E, K, AA, AE, AI, AJ, AQ, AU, AV | 201 | `P:\GameDev\atg-agent-c` | `agent-c` |
+| **4** | The spine and the economy | F, J, Q, R, T, U, AK, AL, AR | 180 | `P:\GameDev\atg-sol-agent-1` | `codex/sol-agent-1` |
+| **5** | The screens and the voice | C, D, I, L, N, S, Y, AM, AT | 212 | `P:\GameDev\atg-sol-agent-2` | `codex/sol-agent-2` |
+| **6** | The demo and what ships | P, Z, AG, AH, AO, AP, AW | 198 | `P:\GameDev\atg-merge-check` | `integration-check-agent-a` |
+
+**The worktree column is not advisory.** On 13 September three agents were in
+`atg-agent-a-help` at once, all on AG5.11. Nothing was lost only because the
+work was already committed. Before your first edit, run `pwd` and confirm you
+are in the tree on your row. If another agent is already there, stop and say so.
+
+Two trees hold uncommitted work that is not yours to touch:
+
+- `atg-controls-ui` (`codex/controls-ui-repair`) — **21 uncommitted files**, the
+  FINAL_V §16 shader build. That is Lane 2 material; Lane 2 should get it
+  committed on its own branch before starting anything new.
+- `atg-merge-check` — 3 uncommitted files. Lane 6 inherits this tree; commit or
+  discard them deliberately, do not sweep them into the first commit.
+
+**Every tree shows ~120-143 dirty files that are pure `.import` churn** — Godot
+rewrites them on open. This is exactly why `git add -A` is banned here: a
+blanket add in any tree sweeps 140 regenerated files plus whatever another agent
+left in flight. Stage by path, always.
 
 ---
 
