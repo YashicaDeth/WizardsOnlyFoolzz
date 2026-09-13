@@ -73,6 +73,7 @@ const DEFEAT_ROUTER := preload("res://systems/defeat_router.gd")
 const ASSET_NETWORK := preload("res://systems/asset_network.gd")
 const COMBAT_RESPONSE := preload("res://systems/combat_response.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
+const HELD_GEAR := preload("res://systems/held_gear.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
 const PIN_BOARD := preload("res://systems/pin_board.gd")
@@ -4164,6 +4165,7 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> void:
 		rig_config["restore"] = saved_actor.anatomy_state
 	rig.gore = viscera_fx
 	rig.build(subject_id, rig_config)
+	_style_world_rig(rig, subject_id, str(encounter.kind) == "hostile")
 	var anatomy: Node = rig.anatomy
 	var loot := ["Ashline toll teeth", "rust scrip"] if str(encounter.kind) == "hostile" else ["weather-heart filament", "dead god relay"]
 	encounter_actors.append({"subject_id": subject_id, "display_name": display_name, "node": actor, "rig": rig, "anatomy": anatomy, "state": "hunting", "disposition": "hostile", "speed": 3.7, "loot": loot, "loot_at_risk": false, "dead": false})
@@ -4353,6 +4355,7 @@ func _spawn_friend() -> void:
 	if nix.get("anatomy_state") is Dictionary:
 		nix_config["restore"] = nix.anatomy_state
 	friend_rig.build(FRIEND_ID, nix_config)
+	_style_world_rig(friend_rig, FRIEND_ID, false)
 	var label := Label3D.new()
 	label.text = "NIX ARDEN\n[E] TALK"
 	label.position = Vector3(0, 3, 0)
@@ -4378,6 +4381,7 @@ func _spawn_rival() -> void:
 	if mara_record.get("anatomy_state") is Dictionary:
 		mara_config["restore"] = mara_record.anatomy_state
 	enemy_rig.build(CAST.id_for(CAPTAIN_SLOT), mara_config)
+	_style_world_rig(enemy_rig, CAST.id_for(CAPTAIN_SLOT), true)
 	var label := Label3D.new()
 	label.text = "%s // ASHLINE CAPTAIN" % _captain_name()
 	label.position = Vector3(0, 3, 0)
@@ -4403,6 +4407,36 @@ func _spawn_rival() -> void:
 		altered_vehicle.scale = Vector3(1.15, 1.15, 1.15)
 		enemy.add_child(altered_vehicle)
 	add_child(enemy)
+
+
+## Every person uses the same anatomy rig as the player, but they also need a
+## face, clothing, hands and something visibly held. A combatant carrying a
+## real cleaver on their hand is legible before a hitbox or a health bar ever
+## explains what they are doing; the body and the rules now agree.
+func _style_world_rig(rig: BaselineHuman, identity: String, armed: bool) -> void:
+	var seed: int = abs(hash(identity))
+	var look := HUNTER_APPEARANCE.new()
+	look.name = "WorldAppearance"
+	rig.add_child(look)
+	look.configure(rig, {
+		"name": identity,
+		"wear": 0.32 + float(seed % 38) / 100.0,
+		"ink": 0.20 + float((seed / 11) % 50) / 100.0,
+		"piercings": 0.15 + float((seed / 31) % 35) / 100.0,
+		"mutation": (0.22 + float((seed / 7) % 35) / 100.0) if armed else 0.08,
+	})
+	if not armed:
+		return
+	var arm := rig.parts.get("right_arm") as Node3D
+	if arm == null:
+		return
+	var weapon := HELD_GEAR.build_weapon("sword")
+	weapon.name = "HeldAshlineCleaver"
+	# The grip sits at the wrist, with the edge projected forward of the body;
+	# it is parented to the arm so a severed arm takes its weapon with it.
+	weapon.position = Vector3(0.0, -0.34, -0.07)
+	weapon.rotation = Vector3(-PI * 0.48, 0.12, 0.0)
+	arm.add_child(weapon)
 
 
 func _spawn_ashline_reinforcements() -> void:
