@@ -87,5 +87,77 @@ func _ready() -> void:
 	# --- tolerance reaches through the device --------------------------------
 	check(SX.tolerance("player", "choir_bloom") == 1, "a smoked dose counts toward tolerance like any other")
 
+	# --- AU7.8: it burns down, and the burn is derived from the charges -------
+	for device_id: String in SMOKEABLES.CATALOG:
+		var charges := float((SMOKEABLES.CATALOG[device_id] as Dictionary)["charges"])
+		check(is_equal_approx(SMOKEABLES.spend_per_hit(device_id), 1.0 / charges),
+			"%s spends exactly one of its own charges per hit" % device_id)
+
+	var fresh: Node3D = SMOKEABLES.build("cigarette", 0.0)
+	var stub: Node3D = SMOKEABLES.build("cigarette", 1.0)
+	var fresh_length: float = ((fresh.get_meta("parts") as Dictionary)["body"] as MeshInstance3D).mesh.height
+	var stub_length: float = ((stub.get_meta("parts") as Dictionary)["body"] as MeshInstance3D).mesh.height
+	check(stub_length < fresh_length * 0.4, "a spent cigarette is visibly shorter than a fresh one")
+	check(stub_length > 0.0, "and never burns away to nothing - you stub it out")
+
+	# Monotonic, because a thing that got longer partway through would be a bug
+	# nobody would think to look for.
+	var previous := fresh_length + 1.0
+	for step in 9:
+		var at := float(step) / 8.0
+		SMOKEABLES.set_spent(fresh, at)
+		var now: float = ((fresh.get_meta("parts") as Dictionary)["body"] as MeshInstance3D).mesh.height
+		check(now <= previous, "burning from %.2f never makes it longer" % at)
+		previous = now
+	check(is_equal_approx(SMOKEABLES.spent_of(fresh), 1.0), "and the object remembers how spent it is")
+
+	var tank_full: Node3D = SMOKEABLES.build("vape", 0.0)
+	var tank_dry: Node3D = SMOKEABLES.build("vape", 1.0)
+	var full_z: float = ((tank_full.get_meta("parts") as Dictionary)["tank"] as MeshInstance3D).mesh.size.z
+	var dry_z: float = ((tank_dry.get_meta("parts") as Dictionary)["tank"] as MeshInstance3D).mesh.size.z
+	check(dry_z < full_z * 0.2, "a dead vape's tank window has dropped")
+
+	var bowl_packed: Node3D = SMOKEABLES.build("bong", 0.0)
+	var bowl_ashed: Node3D = SMOKEABLES.build("bong", 1.0)
+	var packed_tint: Color = (((bowl_packed.get_meta("parts") as Dictionary)["pack"] as MeshInstance3D).material_override as StandardMaterial3D).albedo_color
+	var ashed_tint: Color = (((bowl_ashed.get_meta("parts") as Dictionary)["pack"] as MeshInstance3D).material_override as StandardMaterial3D).albedo_color
+	check(ashed_tint != packed_tint, "a spent bowl has gone to ash rather than staying green")
+
+	# --- AU7.6 under I0: the gauge is the object ------------------------------
+	# Nothing is drawn on a screen, so what a test can check is that the object
+	# itself changes, measurably, with how long the button has been down.
+	var held_light: OmniLight3D = (fresh.get_meta("parts") as Dictionary)["light"]
+	var held_coal: MeshInstance3D = (fresh.get_meta("parts") as Dictionary)["coal"]
+	var coal_material: StandardMaterial3D = held_coal.material_override
+	SMOKEABLES.set_draw(fresh, 0.0)
+	var rest_energy := coal_material.emission_energy_multiplier
+	var rest_throw := held_light.light_energy
+	SMOKEABLES.set_draw(fresh, 1.0)
+	check(coal_material.emission_energy_multiplier > rest_energy, "drawing brightens the coal")
+	check(held_light.light_energy > rest_throw, "and it throws more light while you do it")
+	var sweet_hue := coal_material.emission
+	SMOKEABLES.set_draw(fresh, 1.6)
+	check(coal_material.emission != sweet_hue,
+		"past the sweet spot the cherry changes colour rather than only getting brighter")
+	check(coal_material.emission.b > sweet_hue.b,
+		"specifically it goes whiter, which is a different signal and not more of the same one")
+
+	# The fix this test exists to hold: rest is one value, not two.
+	var built_at_rest: Node3D = SMOKEABLES.build("cigarette", 0.0)
+	var released: Node3D = SMOKEABLES.build("cigarette", 0.0)
+	SMOKEABLES.set_draw(released, 1.2)
+	SMOKEABLES.set_draw(released, 0.0)
+	var a_rest: StandardMaterial3D = ((built_at_rest.get_meta("parts") as Dictionary)["coal"] as MeshInstance3D).material_override
+	var b_rest: StandardMaterial3D = ((released.get_meta("parts") as Dictionary)["coal"] as MeshInstance3D).material_override
+	check(is_equal_approx(a_rest.emission_energy_multiplier, b_rest.emission_energy_multiplier),
+		"one off the table and one just released look identical - rest has a single definition")
+
+	check(is_equal_approx(SMOKEABLES.draw_heat("cigarette", 1.6), 1.0),
+		"holding for the ideal is exactly heat 1.0, so the gauge and the grade agree")
+	check(SMOKEABLES.draw_heat("bong", 1.6) < 1.0, "and the bong wants longer before it reads full")
+
+	for node in [fresh, stub, tank_full, tank_dry, bowl_packed, bowl_ashed, built_at_rest, released]:
+		(node as Node3D).free()
+
 	print("SMOKEABLES_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

@@ -176,7 +176,10 @@ const CARD_TIP := Color("bfae8c")
 const PLASTIC := Color("1d1f21")
 
 
-static func build(device_id: String) -> Node3D:
+## `spent` is 0 at the shop and 1 when it is finished. AU7.8: a cigarette that
+## stays 84mm through nine draws is a prop, not an object, and the single
+## clearest tell that a thing is being used up is that it gets shorter.
+static func build(device_id: String, spent := 0.0) -> Node3D:
 	var root := Node3D.new()
 	root.name = device_id
 	match device_id:
@@ -186,7 +189,127 @@ static func build(device_id: String) -> Node3D:
 		"vape": _build_vape(root)
 		"bong": _build_bong(root)
 		_: return root
+	set_spent(root, spent)
+	# Rest is whatever `set_draw` says rest is. The builder used to carry its own
+	# coal brightness as well, which meant a cigarette straight off the table and
+	# one somebody had just stopped drawing on were visibly different objects.
+	set_draw(root, 0.0)
 	return root
+
+
+## What one clean draw consumes. Falls straight out of the charge count the
+## catalogue already carries, rather than being a second number that has to be
+## kept in agreement with it.
+static func spend_per_hit(device_id: String) -> float:
+	var device: Dictionary = CATALOG.get(device_id, {})
+	if device.is_empty():
+		return 0.0
+	return 1.0 / maxf(float(device["charges"]), 1.0)
+
+
+## AU7.8. Burn it down. Drives the parts the builder stashed rather than
+## rebuilding, because this runs while somebody is holding the button.
+static func set_spent(node: Node3D, spent: float) -> void:
+	if node == null or not node.has_meta("parts"):
+		return
+	var parts: Dictionary = node.get_meta("parts")
+	var burn := clampf(spent, 0.0, 1.0)
+	node.set_meta("spent", burn)
+	match str(parts.get("kind", "")):
+		"rolled": _spend_rolled(parts, burn)
+		"vape": _spend_vape(parts, burn)
+		"bong": _spend_bong(parts, burn)
+
+
+static func spent_of(node: Node3D) -> float:
+	return float(node.get_meta("spent", 0.0)) if node != null else 0.0
+
+
+static func _spend_rolled(parts: Dictionary, burn: float) -> void:
+	var full := float(parts["length"])
+	var filter_length := float(parts["filter"])
+	# It never burns to nothing - you stub it out with a finger of paper left,
+	# which is also what stops the coal reaching the filter and the geometry
+	# from inverting.
+	var live := lerpf(full, filter_length + 0.008, burn)
+	var body_length := maxf(live - filter_length, 0.001)
+	var body: MeshInstance3D = parts["body"]
+	var mesh: CylinderMesh = body.mesh
+	mesh.height = body_length
+	body.position = Vector3(0, 0, -body_length * 0.5 - filter_length)
+	for key: String in ["packed_end", "ash", "coal", "light"]:
+		var part: Node3D = parts[key]
+		var offset := float(parts["%s_offset" % key])
+		part.position = Vector3(0, 0, -live + offset)
+
+
+static func _spend_vape(parts: Dictionary, burn: float) -> void:
+	# The tank window is the only part of a vape anybody looks at, so it is the
+	# only part that has to report anything.
+	var tank: MeshInstance3D = parts["tank"]
+	var mesh: BoxMesh = tank.mesh
+	var full := float(parts["tank_height"])
+	mesh.size = Vector3(mesh.size.x, mesh.size.y, maxf(full * (1.0 - burn), 0.0008))
+	tank.position = Vector3(
+		float(parts["tank_x"]), float(parts["tank_y"]),
+		float(parts["tank_z"]) - (full - mesh.size.z) * 0.5,
+	)
+
+
+static func _spend_bong(parts: Dictionary, burn: float) -> void:
+	# A bowl does not shrink, it goes to ash and sinks.
+	var pack: MeshInstance3D = parts["pack"]
+	var mesh: CylinderMesh = pack.mesh
+	var full := float(parts["pack_height"])
+	mesh.height = maxf(full * (1.0 - burn * 0.7), 0.001)
+	var material: StandardMaterial3D = pack.material_override
+	material.albedo_color = Color("5c6330").lerp(ASH.darkened(0.35), burn)
+
+
+## AU7.6, under I0. The hold has to be readable while it happens, and I0 says no
+## screen is a list of text in a box - "the arena is the interface". So the
+## gauge is **the object**: the cherry runs up the paper, the coal brightens,
+## the ash collar grows, and the light it throws grows with it. Nothing is drawn
+## on the screen at all, which also means it reads the same in first person,
+## over a shoulder, and in somebody else's hands across the room.
+##
+## `heat` is 0 at rest and 1 at the sweet spot; it keeps climbing past 1 into
+## the harsh band, and that overshoot is what the object shows you before the
+## cough tells you.
+static func set_draw(node: Node3D, heat: float) -> void:
+	if node == null or not node.has_meta("parts"):
+		return
+	var parts: Dictionary = node.get_meta("parts")
+	if str(parts.get("kind", "")) != "rolled":
+		if str(parts.get("kind", "")) == "vape":
+			var led: MeshInstance3D = parts["led"]
+			var glow: StandardMaterial3D = led.material_override
+			glow.emission_energy_multiplier = lerpf(0.4, 5.0, clampf(heat, 0.0, 1.0))
+		return
+	var climb := clampf(heat, 0.0, 1.6)
+	var coal: MeshInstance3D = parts["coal"]
+	var ember: StandardMaterial3D = coal.material_override
+	# Past the sweet spot it stops getting brighter and starts getting whiter,
+	# which is what an over-pulled cherry actually does and is a different
+	# signal rather than more of the same one.
+	ember.emission = COAL.lerp(Color("ffd9a0"), clampf(climb - 1.0, 0.0, 1.0))
+	ember.emission_energy_multiplier = lerpf(1.4, 7.5, clampf(climb, 0.0, 1.0))
+	var light: OmniLight3D = parts["light"]
+	light.light_energy = lerpf(0.22, 1.5, clampf(climb, 0.0, 1.0))
+	light.omni_range = lerpf(0.28, 0.62, clampf(climb, 0.0, 1.0))
+	var ash: MeshInstance3D = parts["ash"]
+	var ash_mesh: CylinderMesh = ash.mesh
+	ash_mesh.height = lerpf(0.006, 0.016, clampf(climb, 0.0, 1.0))
+
+
+## What `set_draw` should be fed, given how long the button has been down. Split
+## out so a HUD, a test and an NPC can all ask the same question without any of
+## them re-deriving the curve.
+static func draw_heat(device_id: String, held: float) -> float:
+	var device: Dictionary = CATALOG.get(device_id, {})
+	if device.is_empty():
+		return 0.0
+	return held / maxf(float(device["draw_ideal"]), 0.01)
 
 
 ## One shape covers cigarette, spliff and joint - they differ in length, girth
@@ -252,6 +375,17 @@ static func _build_rolled(root: Node3D, length: float, mouth_radius: float, burn
 	light.position = Vector3(0, 0, -length)
 	root.add_child(light)
 
+	# Everything `set_spent` and `set_draw` move, with each part's offset from
+	# the burning end recorded once here. Storing the offsets rather than
+	# recomputing them means the two functions cannot disagree with the builder
+	# about where the cherry is.
+	root.set_meta("parts", {
+		"kind": "rolled", "length": length, "filter": filter_length,
+		"body": body, "packed_end": packed_end, "ash": ash, "coal": coal, "light": light,
+		"packed_end_offset": 0.002, "ash_offset": 0.007, "coal_offset": -0.001, "light_offset": 0.0,
+	})
+	root.set_meta("spent", 0.0)
+
 
 static func _build_vape(root: Node3D) -> void:
 	# A slab, because that is what they are. Rounded by a second, inset slab
@@ -298,6 +432,12 @@ static func _build_vape(root: Node3D) -> void:
 	led.position = Vector3(0, 0.0057, 0.030)
 	led.name = "led"
 	root.add_child(led)
+
+	root.set_meta("parts", {
+		"kind": "vape", "tank": tank, "led": led,
+		"tank_height": 0.020, "tank_x": 0.0, "tank_y": 0.0, "tank_z": -0.024,
+	})
+	root.set_meta("spent", 0.0)
 
 
 static func _build_bong(root: Node3D) -> void:
@@ -353,6 +493,9 @@ static func _build_bong(root: Node3D) -> void:
 	var ring := _cylinder(0.0505, 0.004, RESIN, 0.9)
 	ring.position = Vector3(0, 0.033, 0)
 	root.add_child(ring)
+
+	root.set_meta("parts", {"kind": "bong", "pack": packed, "pack_height": 0.008})
+	root.set_meta("spent", 0.0)
 
 
 ## --- primitives ----------------------------------------------------------
