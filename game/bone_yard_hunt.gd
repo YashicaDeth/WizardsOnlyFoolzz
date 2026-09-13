@@ -1557,6 +1557,26 @@ func _resolve_strike() -> void:
 	if report.is_empty():
 		report = {"damage": 24.0, "impulse": 18.0, "damage_type": "cut", "range": 4.1, "weapon": "sword"}
 	pending_attack = {}
+	# AD3.3. A round crossing the arc is a physical thing that can be met.
+	# Checked before anything else the swing could reach, because a round in
+	# the path is the most immediate thing in it — and because a build that
+	# answers a shot with a blade has to be allowed to, or "the distance is
+	# the puzzle" (AD3.1) has no answer available to it at all.
+	if ballistics != null and is_instance_valid(ballistics):
+		var reach := float(report.get("range", 4.1))
+		var facing_now := Vector3(sin(yaw), 0.0, cos(yaw)).normalized()
+		var met: int = ballistics.intercept_near(player + facing_now * reach * 0.6, reach * 0.5, str(report.get("weapon", "")))
+		if met > 0:
+			if arm != null:
+				arm.strike(ROUND_MELEE_RESISTANCE, -facing_now)
+			# Less than the stone of a wall (AN2.4) and more than air: meeting
+			# an edge against something small and fast marks the edge.
+			_wear_current_weapon(str(report.get("weapon", "")), 0.6)
+			WorldHistory.record_event("melee_met_round", {
+				"weapon": str(report.get("weapon", "")), "rounds": met, "location": HUNT_LOCATION,
+			})
+			prompt.text = "CUT IT OUT OF THE AIR" if met == 1 else "CUT %d OF THEM OUT OF THE AIR" % met
+			return
 	if _attack_nearest_encounter_actor(report):
 		if arm != null:
 			# AN2.3. Set by the call above, from what that specific blow actually
@@ -1718,6 +1738,10 @@ const MELEE_RESISTANCE_BASE := {
 ## flex or bleed, so it sits above every zone `MELEE_RESISTANCE_BASE` names —
 ## harder than even an armoured skull.
 const WALL_MELEE_RESISTANCE := 0.85
+## AD3.3. What meeting a round feels like through the arm. Below stone —
+## a bullet is small and gives — but well above air, because something that
+## fast stopping against an edge is a real jolt, not a whiff.
+const ROUND_MELEE_RESISTANCE := 0.55
 
 func _melee_resistance(zone: String, result: Dictionary) -> float:
 	var base: float = MELEE_RESISTANCE_BASE.get(zone, 0.55)

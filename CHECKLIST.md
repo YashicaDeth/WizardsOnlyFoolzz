@@ -3449,7 +3449,43 @@ able to answer a rocket with a blade, and the game should let it.
 
 - [ ] **AD3.1** A melee build can close on a launcher and live — the distance is the puzzle
 - [ ] **AD3.2** Cybernetics change what movement is possible, not just the numbers
-- [ ] **AD3.3** A projectile is a physical thing that can be met, not a damage event
+- [x] ~~**AD3.3** A projectile is a physical thing that can be met, not a damage event~~
+      AF1.1 already made a round an object that travels, with two ways its
+      flight could end: arriving somewhere (`round_hit`) or running out of
+      world (`round_expired`). Neither is *being met* — until now a round
+      could only ever be dodged, never answered, which is what made AD3.1's
+      "answer a rocket with a blade" unexpressible rather than merely
+      unbalanced. `Ballistics.intercept_near(position, radius, by)` is the
+      third outcome: something reaches into the flight path and takes the
+      round out of the air, emitting its own `round_intercepted` (carrying
+      the shooter, the payload that now never arrives, and the energy it
+      still had left) and deliberately *not* `round_hit`/`round_expired`,
+      so a caller waiting on either to learn whether a shot connected is
+      never told the wrong thing by a third outcome dressed as one of them.
+      Position-and-radius rather than an index because the caller is a
+      swing — it knows where and when it landed, not which of `MAX_ROUNDS`
+      entries that is.
+      Wired into the real move, not left as an API nothing calls:
+      `_resolve_strike()` checks the arc for rounds *before* anything else
+      the swing could reach, answers through the arm at its own
+      `ROUND_MELEE_RESISTANCE` (below stone, well above air), takes a real
+      bite out of the edge (AN2.4), and records `melee_met_round`.
+      Verified: `tests/intercept_test.gd` (25 checks) — a round is taken
+      out of the air and genuinely gone; the interception is its own signal
+      carrying shooter/payload/remaining energy; `round_hit` and
+      `round_expired` both stay silent for it; a swing nowhere near it takes
+      nothing and reports no phantom; reach is a real distance (a miss at
+      3m, a connect at 0.4m); a zero reach meets nothing; all nine pellets
+      of a shotgun are nine separately-met objects; and — driven through
+      `_resolve_strike()` itself in a real instantiated Hunt Grounds — a
+      real swing takes a real round out of the air and the world records it
+      exactly once, while a swing at empty air records nothing. Ten
+      existing melee/ballistics tests re-verified clean.
+      Still open: nothing yet *fires* anything worth meeting — there is no
+      launcher or rocket in `hunter_arsenal.gd` (AD3.1's own gap), so today
+      this answers a bullet rather than the RPG the section is really
+      about. The primitive is the part that was missing; the weapon that
+      makes it dramatic is AD3.1's, not this line's.
 - [ ] **AD3.4** Absurd answers are allowed when the build earned them
 - [ ] **AD3.5** Original to this game: the reference is the feeling, never the implementation
 
