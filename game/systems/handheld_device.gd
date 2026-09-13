@@ -68,6 +68,11 @@ const ALERT := Color("a8281a")
 const HAND_SHADOW := Color("160d0a")
 const HAND_SKIN := Color("4a271d")
 const SCREEN_SPILL := Color("9bd4b0")
+## C10.1 first seam. The authored Index and Map are 16:9 documents. Radio,
+## Carry and Ritual used to draw across the mirror's wider physical glass,
+## making the content origin and usable height jump when the mode changed.
+## The glass stays wide; one centred working aperture now belongs to the device.
+const PAGE_ASPECT := 16.0 / 9.0
 
 var mode_index := 0
 ## Which thing in the bag is under the hand. The CARRY page had no selection at
@@ -163,6 +168,7 @@ var _index: Control
 var _map: Control
 var _device_rect := Rect2()
 var _screen_rect := Rect2()
+var _page_rect := Rect2()
 
 ## I0.10 v2. "Panels are hosted at one fixed size inside the handheld; a map
 ## you cannot lean into is a picture of a map." `device_size` used to be a
@@ -609,8 +615,9 @@ func _process(delta: float) -> void:
 		Vector2(turned_width, _device_rect.size.y)
 	)
 	_screen_rect = Rect2(_turned_rect.position + Vector2(26, 62), _turned_rect.size - Vector2(52, 104))
-	_clip.position = _screen_rect.position
-	_clip.size = Vector2(maxf(_screen_rect.size.x, 1.0), maxf(_screen_rect.size.y, 1.0))
+	_page_rect = _aspect_fit(_screen_rect, PAGE_ASPECT)
+	_clip.position = _page_rect.position
+	_clip.size = Vector2(maxf(_page_rect.size.x, 1.0), maxf(_page_rect.size.y, 1.0))
 	var front_visible := not showing_back() and _screen_rect.size.x > 2.0
 	_clip.visible = front_visible
 	_overlay.position = Vector2.ZERO
@@ -674,11 +681,11 @@ func _draw() -> void:
 	# The modes with no hosted panel draw straight onto the screen.
 	var mode := current_mode()
 	if mode == "RADIO":
-		_draw_radio(_screen_rect, alpha)
+		_draw_radio(_page_rect, alpha)
 	elif mode == "CARRY":
-		_draw_carry(_screen_rect, alpha)
+		_draw_carry(_page_rect, alpha)
 	elif mode == "RITUAL":
-		_draw_ritual(_screen_rect, alpha)
+		_draw_ritual(_page_rect, alpha)
 
 
 ## C4.2 `v4`. One answer for how much light the glass itself is giving off.
@@ -1038,6 +1045,7 @@ func _draw_damage() -> void:
 	var alpha := clampf(raised, 0.0, 1.0)
 	var rect := _screen_rect
 	var wear := 1.0 - clampf(condition, 0.0, 1.0)
+	_draw_page_registration(alpha)
 	for scan in range(0, int(rect.size.y), 3):
 		_overlay.draw_line(Vector2(rect.position.x, rect.position.y + scan), Vector2(rect.end.x, rect.position.y + scan), Color(0, 0, 0, 0.12 * alpha), 1.0)
 
@@ -1107,7 +1115,28 @@ func _draw_damage() -> void:
 	_overlay.draw_rect(rect, Color(0.55, 0.72, 0.62, 0.035 * alpha))
 
 
-# --- the two modes that have no hosted panel ------------------------------
+## The same calibration edge survives every app. It is deliberately lighter
+## than the internal frames authored by Index and Map: this marks the device's
+## aperture, while those marks still describe the document or chart inside it.
+func _draw_page_registration(alpha: float) -> void:
+	if _page_rect.size.x <= 2.0 or _page_rect.size.y <= 2.0:
+		return
+	var edge := CASE_EDGE * Color(1, 1, 1, 0.42 * alpha)
+	_overlay.draw_rect(_page_rect, edge, false, 1.0)
+	var corner := 13.0
+	for at in [
+		_page_rect.position,
+		Vector2(_page_rect.end.x, _page_rect.position.y),
+		_page_rect.end,
+		Vector2(_page_rect.position.x, _page_rect.end.y),
+	]:
+		var inward_x := 1.0 if at.x == _page_rect.position.x else -1.0
+		var inward_y := 1.0 if at.y == _page_rect.position.y else -1.0
+		_overlay.draw_line(at, at + Vector2(corner * inward_x, 0), AMBER * Color(1, 1, 1, 0.62 * alpha), 1.4)
+		_overlay.draw_line(at, at + Vector2(0, corner * inward_y), AMBER * Color(1, 1, 1, 0.62 * alpha), 1.4)
+
+
+# --- the three modes that have no hosted panel ----------------------------
 
 ## E3. The ritual page is a camera assignment, not a menu of powers. The five
 ## positions around the aperture are real distinct bodies the current best
@@ -1485,3 +1514,14 @@ func _fit_into_aperture(panel: Control) -> void:
 	var fit := minf(_clip.size.x / design.x, _clip.size.y / design.y)
 	panel.scale = Vector2(fit, fit)
 	panel.position = (_clip.size - design * fit) * 0.5
+
+
+static func _aspect_fit(outer: Rect2, aspect: float) -> Rect2:
+	if outer.size.x <= 0.0 or outer.size.y <= 0.0 or aspect <= 0.0:
+		return Rect2(outer.position, Vector2.ZERO)
+	var fitted := outer.size
+	if fitted.x / fitted.y > aspect:
+		fitted.x = fitted.y * aspect
+	else:
+		fitted.y = fitted.x / aspect
+	return Rect2(outer.position + (outer.size - fitted) * 0.5, fitted)

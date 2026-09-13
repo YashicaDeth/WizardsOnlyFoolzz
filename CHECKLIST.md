@@ -567,6 +567,7 @@ Eight passes on the front of an object nobody has ever turned over. The jester i
 ### C v10 — the tenth pass
 Greg, plainly: *"the entire blackmirror gui needs work"*. Nine passes on what the device *is* and none on how it reads.
 - [ ] **C10.1** `v10` The whole GUI re-authored as one thing rather than six pages
+  - First narrow seam: Index/Wire and Map were 16:9 documents letterboxed inside the mirror, while Radio/Carry/Ritual used the full wide glass. All six now occupy one centred 16:9 working aperture with the same device-owned registration edge. This does not claim the line; their internal frames and interaction grammar still need unifying. `tests/handheld_aperture_test.gd`; six inspected captures at `captures/c10_1_aperture_{index,map,wire,radio,carry,ritual}.png`
 - [ ] **C10.2** `v10` It is legible in the dark it now creates, which nothing before v4 had to be
 
 - [ ] **C10.3** `v10` Its battery is a real resource with a real floor
