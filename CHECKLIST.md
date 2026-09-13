@@ -3820,12 +3820,20 @@ curved CRT, the wet — is untouched and its three boxes stay open below, honest
       in place and pointed at. But nothing models it at "full detail" and
       nobody has looked at a brain in this build. Ticking it would be a claim
       about a mesh that does not exist.
-- [ ] **AT1.2** A CRT bent into the cortex, curved, showing the inside from inside
-      — **not attempted.** This is a shader and a curved mesh. `BrainIndex`
-      gives it everything it would need to draw (`FOLDERS`, `listing()`,
-      `folder_counts()`, `reach()`), and deliberately returns `[SEALED]` rows
-      rather than hiding them so a screen has something to show for what you
-      have not remembered. The screen itself is unbuilt.
+- [x] ~~**AT1.2** A CRT bent into the cortex, curved, showing the inside from
+      inside~~ `PartViewer` now builds an eleven-segment convex phosphor mesh
+      between the brain hemispheres, with cortex continuing behind it and two
+      tissue lips overlapping its side rails; turning the existing live
+      specimen exposes the bend rather than rotating a flat UI card. Its
+      emissive texture is a nested viewport driven by `BrainIndex.listing()`,
+      `folder_counts()` and `reach()`, and the inspected 1280×720 capture
+      `captures/at1_2_curved_cortex_crt.png` visibly reads
+      `CORTEX:/TRAUMA`, `REACH 04D`, and two `[SEALED]` rows from inside the
+      organ. `brain_crt_test.gd` holds the geometry at 24 vertices, checks the
+      centre bows more than 0.01 units beyond its edges, proves the material is
+      fed by a live `ViewportTexture`, and proves the display leaves when the
+      specimen changes away from brain. This does **not** claim AT1.1's
+      full-detail organ or AT1.4's bloody implant; both remain open.
 - [x] ~~**AT1.3** It is an index you open and most of what is in it is
       optional~~ The mind is a filesystem: `BrainIndex.FOLDERS` is fourteen
       real regions (MEMORY, PASSWORDS, COMBAT, PEOPLE, PLACES, DREAMS,
