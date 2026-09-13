@@ -2910,15 +2910,22 @@ where they are hit, and what comes off them stays.
       a hypothetical one — which is also exactly what AB1.4 already named
       ("It reads through the gore system that already exists") before AB1.1
       had said so out loud. AB1.5 ("a vehicle deforms rather than losing hit
-      points") is that migration plus V1.1/V1.2's `ArcadeVehicle.integrity`/
-      `condition_fraction()`, which already exist and already drive handling
-      — deformation should read off the same one number a car's own driving
-      already answers to, not a third, separately-tracked figure.
+      points") is that migration, ideally reading off one real
+      condition/integrity figure on the chassis rather than a third,
+      separately-tracked number — V1.1/V1.2 would give that figure real
+      teeth (driving degrading with damage) if and when Lane 2 builds it.
       No code changed for this entry on purpose: this is the decision AB1.1
       asked for, not an implementation of AB1.2+. Structures (AB1.2) have no
       existing system to compare against yet — walls and windows have never
       been struck-and-broken anywhere in the project — which is real,
       separate work the migration above does not shortcut.
+      Lane note: `rift_derby.gd` and `systems/arcade_vehicle.gd` are Lane 2's
+      file family per `LANE.md` ("chassis and visuals... you own the inside
+      of the car, they own the outside of it"), not Lane 1's. A same-day
+      attempt at AB1.3/AB1.4/AB1.5 and at V1.1-V1.4 was built, tested passing,
+      and then fully reverted on discovering that boundary — this entry
+      records the scope decision for whoever does own that file family to
+      execute, not a claim that Lane 1 built or will build it.
 - [ ] **AB1.2** Structures break where they are struck rather than swapping to a damaged model
 - [ ] **AB1.3** Debris is real, persists, and can be stood on or thrown
 - [ ] **AB1.4** It reads through the gore system that already exists — `gore_chunks.gd` already breaks bodies into identified pieces
