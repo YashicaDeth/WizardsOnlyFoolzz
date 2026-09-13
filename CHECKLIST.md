@@ -470,7 +470,7 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 ---
 
 ### C v2 — the second pass
-- [ ] **C1.6** `v2` The device is raised at one angle in one hand, every time
+- [~] **C1.6** `v2` The device is raised at one angle in one hand, every time — the position half is real: `_device_rect` used to rise dead-centre and perfectly upright, which reads as a menu appearing rather than an object somebody is holding. It now rises to a fixed off-centre point (`HELD_OFFSET_X`), eased in with `raised` itself, deterministic — no per-raise randomness. The angle half was built and reverted: `radial` (the selection wheel, C2) is a child of this same `Control`, so rotating `self` dragged the wheel's own fixed screen-centre geometry along with the phone's tilt — visually confirmed broken in a capture before being pulled back out. A real tilt needs the chassis+screen moved into their own rotated sub-container first, with `radial` staying a sibling rather than a descendant of it — left as the named next step rather than guessed at further. Verified: `handheld_lean_test`/`handheld_impact_test`/`device_wear_test`/`handheld_battery_test` all re-run clean, and a fresh `handheld_capture` shows the offset device beside an unmoved, correctly screen-centred radial wheel
 - [ ] **C1.7** `v2` It can be dropped, and it can be taken off you
 - [x] **C1.8** `v2` Wear accumulates in WorldHistory and only ever goes one way — a cracked screen does not heal
 - [x] **C2.6** `v2` F1-F5 reach a page directly; cycling is how you learn the device, not how you use one you know

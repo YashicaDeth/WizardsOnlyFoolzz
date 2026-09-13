@@ -67,6 +67,12 @@ var carry_index := 0
 var raised := 0.0
 var is_open := false
 var elapsed := 0.0
+## C1.6 `v2`. "Raised at one angle in one hand, every time." `_device_rect`
+## used to rise dead-centre — a menu appearing, not an object somebody is
+## holding. One fixed offset, eased in with `raised` itself rather than a
+## separate timer, so the same hand brings it up to the same place every
+## time: no per-raise randomness, no drift.
+const HELD_OFFSET_X := 0.045
 ## C1.8 / C5.5 `v2`. The device was a screen with a fixed condition and one
 ## hardcoded crack seed, so every handheld in the game cracked in exactly the
 ## same places and arrived at the same wear no matter what its owner had been
@@ -484,7 +490,16 @@ func _process(delta: float) -> void:
 	var leaned_size := base_size * lerpf(1.0, LEAN_SCALE, lean)
 	var device_size := Vector2(minf(leaned_size.x, size.x * 0.98), minf(leaned_size.y, size.y * 0.98))
 	var resting := Vector2((size.x - device_size.x) * 0.5, size.y + 60.0)
-	var lifted := Vector2((size.x - device_size.x) * 0.5, (size.y - device_size.y) * 0.5)
+	# C1.6 `v2`. Off-centre rather than dead middle — held to one side, the way
+	# an arm actually brings a phone up in front of you rather than floating it
+	# on the camera's own axis. A visual tilt (`HANDHELD_TILT`, unused for now)
+	# was tried and reverted: `radial` — the selection wheel — is a child of
+	# this same Control, added before this rect existed, and rotating `self`
+	# would have dragged the wheel's own fixed screen-centre geometry along
+	# with the phone's tilt. The offset alone needs none of that, since every
+	# consumer (`_screen_rect`, `_clip`, `_overlay`) is positioned from this
+	# rect explicitly rather than through the node's transform.
+	var lifted := Vector2((size.x - device_size.x) * 0.5 + size.x * HELD_OFFSET_X, (size.y - device_size.y) * 0.5)
 	_device_rect = Rect2(resting.lerp(lifted, Motion.ease_out(raised)), device_size)
 	_screen_rect = Rect2(_device_rect.position + Vector2(26, 62), _device_rect.size - Vector2(52, 104))
 	_clip.position = _screen_rect.position
