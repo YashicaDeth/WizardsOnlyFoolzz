@@ -3665,7 +3665,17 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
 - [ ] **AN1.9** A grapple, a shove and a bare hand are the same object with a different mass
 
 ### AN2 — What it costs to swing
-- [ ] **AN2.1** A committed blow leaves you open in a way a flick does not (pairs with O5 footing)
+- [x] **AN2.1** A committed blow leaves you open in a way a flick does not
+      (pairs with O5 footing) — `FOOTING_COMMITTED_SWING` scales
+      `last_commitment` (already measured for AN1.4/AN1.8) straight into
+      `lose_footing()`, paid the instant the swing is thrown rather than on
+      whether it connects: a flick costs nothing, a fully committed sweep
+      costs as much as being shoved (O5's `FOOTING_SHOVED`). Firearms are
+      excluded — `arm.commitment()` still measures barrel drift for AN1.7,
+      which is not the same thing as being off balance. Verified:
+      `tests/footing_test.gd` — a forced full-commitment swing measurably
+      costs footing, a zero-commitment one does not, and firing a gun with
+      the same forced commitment costs none at all.
 - [ ] **AN2.2** You can be disarmed, because a weapon you are barely holding is a weapon somebody can take
 - [~] **AN2.3** Hitting armour, bone or a wall answers differently through
       `strike()` — armour and bone, not the wall yet. `apply_hit()` now

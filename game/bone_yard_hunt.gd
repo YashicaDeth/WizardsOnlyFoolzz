@@ -190,6 +190,12 @@ const FOOTING_RECOVERY := 0.55
 const FOOTING_WHIFF := 0.14
 const FOOTING_BLOCKED := 0.2
 const FOOTING_SHOVED := 0.34
+## AN2.1. Scales `last_commitment` (0..1) into a footing cost paid the instant
+## a swing is thrown, hit or miss — a flick costs about what a whiff already
+## does; a hard committed sweep costs as much as being shoved. Whiffing still
+## adds its own `FOOTING_WHIFF` on top, so a committed swing that also misses
+## pays for both, which is the whole point: a flick has nothing to lose twice.
+const FOOTING_COMMITTED_SWING := 0.32
 
 var swing_side := 1
 var last_swing_at := 0.0
@@ -1397,6 +1403,12 @@ func _attack(heavy := false) -> void:
 	# the damage number when `momentum_damage` says so (AN1.8).
 	last_commitment = arm.commitment() if arm != null else 0.0
 	report["commitment"] = last_commitment
+	# AN2.1. Committing to a heavy blow leaves you open whether or not it
+	# lands — the vulnerability is in throwing it, not in missing with it.
+	# Firearms carry no such wind-up; `arm.commitment()` still measures barrel
+	# drift for AN1.7, and that is not the same thing as being off balance.
+	if str(report.get("kind", "")) != "firearm" and last_commitment > 0.0:
+		lose_footing(last_commitment * FOOTING_COMMITTED_SWING, "")
 	if momentum_damage and arm != null:
 		# The weapon sets the ceiling and the player earns how much of it they
 		# get. Floored well above zero: a game where a mistimed swing does
