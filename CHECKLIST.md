@@ -166,7 +166,7 @@ The technique already exists in this project — `xray_specimen.gd` renders a li
 - [x] **A10.5** Unwalked ground is grey and fogged, thinning at the edges of where you have been; walking brings the colour in
 - [x] **A10.9** The reveal is a gradient — clearness is read from the whole 3x3 neighbourhood, eased so the last of it comes off last
 - [x] **A10.6** The chart marks, districts, contacts and title block all still read over the image
-- [ ] **A10.7** It lives in the handheld's MAP page, so it is the black mirror looking down
+- [x] **A10.7** It lives in the handheld's MAP page, so it is the black mirror looking down — the satellite was built and worked anywhere a scene called `LivingMap.attach_world` itself. The device never did: `HandheldDevice.bind` passed the generator to the map's own `bind` and stopped, so reaching the map through the thing you actually hold left `satellite` null, `_satellite_ready()` false, and the mirror drawing the A6 chart on a dark plate while the satellite worked fine everywhere else. One call, and nothing said so. `_attach_map_world()` now hands the world down at `bind` and retries on every page open, because a device built before its region has no world to take yet. Leaving MAP also calls `close_map()` — A10.8 was true of the map and not of the device, which only ever set `visible`, so the camera kept rendering behind the WIRE page. Nine assertions in `tests/handheld_satellite_test.gd`
 - [x] **A10.8** UPDATE_DISABLED while the map is shut; one frame per open frame otherwise
 
 ### A6 — Living Map as an object `BUILT`
