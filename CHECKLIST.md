@@ -2049,9 +2049,9 @@ letters, condense what is left into a glyph, charge it, forget it. Five real
 steps, which are five real game verbs, and not one of them had to be made up.
 
 ### AJ1 — Making a sigil
-- [ ] **AJ1.1** State an intent, in the player's own words
-- [ ] **AJ1.2** The letters are stripped and condensed on screen - you watch it become a glyph
-- [ ] **AJ1.3** The glyph is deterministic from the intent: the same words make the same sigil, always
+- [~] **AJ1.1** State an intent, in the player's own words — `ChaosSigil.seal_for(intent)` accepts any free text and is the only door in; no screen asks for one yet (that entry point is Lane 5's — a text field on the handheld's RITUAL page, or wherever this gets hosted)
+- [~] **AJ1.2** The letters are stripped and condensed on screen - you watch it become a glyph — `ChaosSigil.condense()` is the real procedure (drop non-letters, keep only the first occurrence of each, drop vowels once consonants survive so a vowel-only intent never condenses to nothing) and `ChaosSigil.draw()` renders the result through `celloutz_type.gd`'s existing seal engine unmodified. The *watching it happen* half — an animated letters-collapsing-into-a-glyph transition — is not built; this produces the finished mark, not the transition into it
+- [x] **AJ1.3** The glyph is deterministic from the intent: the same words make the same sigil, always — seeded off the condensed letters rather than the raw text, so case and whitespace noise never change the mark. `tests/chaos_sigil_test.gd` (11 checks) and a windowed `chaos_sigil_capture` (three different intents, three genuinely different marks, `chaos_sigil_gallery.png`) verify both the seed math and the actual drawn output
 - [ ] **AJ1.4** Charging costs something real - blood, stamina, a drug, a death
 - [ ] **AJ1.5** Forgetting is mechanical: a charged sigil you keep looking at does not fire
 - [ ] **AJ1.6** It goes into the world as an object - scratched, burned, carried or worn
