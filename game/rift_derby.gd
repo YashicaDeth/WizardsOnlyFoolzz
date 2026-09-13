@@ -394,7 +394,7 @@ func _create_wrecker(index: int) -> void:
 	if index == 0:
 		authored_skiff.scale *= 1.12
 	WorldLook.regrime(authored_skiff, index + 5)
-	_dress_vehicle_biopunk(target, index + 5, false)
+	_dress_vehicle_biopunk(target, index + 5)
 	_add_vehicle_damage_parts(target, index)
 	_add_driver_rig(target, index)
 	targets.append(target)
@@ -970,8 +970,8 @@ func _add_authored_environment_collision(root_node: Node) -> void:
 ## one. Silhouette's vehicle kit hangs those on afterward, parented to the
 ## chassis body itself so the greebles sit in real chassis-local metres
 ## regardless of whatever scale the authored shell renders at.
-func _dress_vehicle_biopunk(target: Node3D, seed_value: int, include_spatter: bool = true) -> void:
-	SILHOUETTE.dress_vehicle(target, CHASSIS_DIMENSIONS, VEHICLE.WHEEL_ANCHORS, seed_value, Callable(self, "_vehicle_surface"), include_spatter)
+func _dress_vehicle_biopunk(target: Node3D, seed_value: int) -> void:
+	SILHOUETTE.dress_vehicle(target, CHASSIS_DIMENSIONS, VEHICLE.WHEEL_ANCHORS, seed_value, Callable(self, "_vehicle_surface"))
 
 
 func _vehicle_surface(tint: Color, kind: String, seed_value: int) -> StandardMaterial3D:

@@ -151,17 +151,24 @@ static func dress(parent: Node3D, dimensions: Vector3, seed_value: int, surface:
 ## carries — passed in rather than hard-coded so this stays a generic kit,
 ## like `dress()` above.
 ##
-## `include_spatter` defaults on but the derby turns it off for the AI
-## wreckers specifically: `tests/derby_balance_test.tscn` measured that
-## adding the dried-spatter patches to all twelve AI-driven cars reproducibly
-## zeroed every hunter-player impact for the full 30s heat (0 impacts, hull
-## unscratched) while the exact same patches on the player's own parked car,
-## and every other piece of this kit on the wreckers, measured clean. No
-## collision shape is involved anywhere in this kit, so the mechanism was not
-## found — only the reproduction. Rather than ship a silent regression against
-## the one system this project has already lost weeks to once, the feature is
-## gated here until someone can chase the real cause.
-static func dress_vehicle(parent: Node3D, dimensions: Vector3, wheel_positions: Array, seed_value: int, surface: Callable, include_spatter: bool = true) -> int:
+## G2.3 diagnosis, 2026-09-12: dried spatter was gated off the AI wreckers
+## because `tests/derby_balance_test.tscn` measured that adding these patches
+## to all twelve AI-driven cars reproducibly zeroed every hunter-player impact
+## for the full 30s heat, while the same patches on the parked player car
+## measured clean. No collision shape exists anywhere in this kit, so the
+## mechanism was never found, only the reproduction.
+##
+## Re-run 2026-09-13 with spatter re-enabled on all twelve wreckers, 3
+## consecutive headless runs of the same test: 0 failures each time, real
+## impacts fired (2, strongest 4.2 m/s), hull dropped to 95 — identical to the
+## baseline with spatter gated off. The regression does not reproduce against
+## the current chassis. The likely cause is not this kit: `FINAL_APPROACH_ALIGNMENT`
+## was lowered from 0.93 to a real margin under its measured floor after this
+## gate was written (see G0.4 in CHECKLIST.md), and that value was already
+## on record as sitting on a knife edge where an unrelated change could tip
+## it. Spatter is unconditional again below; if a future change reopens this,
+## suspect the approach-alignment margin before this kit.
+static func dress_vehicle(parent: Node3D, dimensions: Vector3, wheel_positions: Array, seed_value: int, surface: Callable) -> int:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value * 92821 + 41
 	var added := 0
@@ -211,14 +218,13 @@ static func dress_vehicle(parent: Node3D, dimensions: Vector3, wheel_positions: 
 			added += 1
 	# Dried spatter: flattened blotches on the flanks, as if something hit
 	# the panel and dried there rather than being painted on. See the
-	# docstring above — gated off the AI wreckers pending a real diagnosis.
-	if include_spatter:
-		for spatter in rng.randi_range(4, 7):
-			var side_sign := 1.0 if rng.randf() > 0.5 else -1.0
-			var at := Vector3(side_sign * half_x * rng.randf_range(0.85, 1.0), rng.randf_range(-half_y * 0.4, half_y * 0.6), rng.randf_range(-half_z * 0.8, half_z * 0.8))
-			var patch := _block(parent, at, Vector3(0.03, rng.randf_range(0.18, 0.4), rng.randf_range(0.14, 0.3)), Color("400e0a"), "flesh", rng.randi(), surface)
-			patch.rotation = Vector3(rng.randf_range(-0.2, 0.2), rng.randf_range(-0.3, 0.3), rng.randf_range(-0.2, 0.2))
-			added += 1
+	# docstring above — was gated off the AI wreckers, re-enabled 2026-09-13.
+	for spatter in rng.randi_range(4, 7):
+		var side_sign := 1.0 if rng.randf() > 0.5 else -1.0
+		var at := Vector3(side_sign * half_x * rng.randf_range(0.85, 1.0), rng.randf_range(-half_y * 0.4, half_y * 0.6), rng.randf_range(-half_z * 0.8, half_z * 0.8))
+		var patch := _block(parent, at, Vector3(0.03, rng.randf_range(0.18, 0.4), rng.randf_range(0.14, 0.3)), Color("400e0a"), "flesh", rng.randi(), surface)
+		patch.rotation = Vector3(rng.randf_range(-0.2, 0.2), rng.randf_range(-0.3, 0.3), rng.randf_range(-0.2, 0.2))
+		added += 1
 
 	return added
 

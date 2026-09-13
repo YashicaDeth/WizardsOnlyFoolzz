@@ -953,16 +953,26 @@ Read-only; everything derived lands in `game/art/derived/` via `tools/art_pipeli
       instead of reading as a smooth shell. Verified: `game/captures/g2_derby_cars.png`
 - [x] ~~**G2.2** Bone and sinew lashings~~ Bone struts run corner to corner
       across the hull with a darker sinew strap crossing each one. Same capture.
-- [~] **G2.3** Fungal bloom in the wheel wells done and verified (same capture).
-      Dried spatter is built but currently only applied to the player's own
-      car — see the docstring on `Silhouette.dress_vehicle`:
-      `tests/derby_balance_test.tscn` measured that adding the spatter patches
-      to all twelve AI wreckers reproducibly zeroed every hunter-player impact
-      for a full 30s heat, while the identical patches on the parked player
-      car, and everything else in this kit on the wreckers, measured clean.
-      No collision shape is involved anywhere in the kit, so this was
-      reproduced and gated (`include_spatter` on `dress_vehicle`) rather than
-      root-caused — worth another agent's time before extending it to wreckers.
+- [x] ~~**G2.3** Fungal bloom in the wheel wells and dried spatter on the
+      flanks~~ Spatter was gated off the AI wreckers pending diagnosis (see
+      history below); re-tested 2026-09-13 and restored to all twelve.
+      Verified: `tests/derby_balance_test.tscn`, 3 consecutive headless runs,
+      0 failures each (real impacts fired, 2 at strongest 4.2 m/s, hull 95 —
+      identical to the gated baseline), and a close probe capture inspected
+      directly (dark maroon flank blotches render cleanly, no z-fighting or
+      stray geometry). `include_spatter` parameter removed from
+      `Silhouette.dress_vehicle` / `_dress_vehicle_biopunk` since it is
+      unconditional again.
+      History: found 2026-09-12 — adding the spatter patches to all twelve AI
+      wreckers reproducibly zeroed every hunter-player impact for a full 30s
+      heat, while the identical patches on the parked player car, and
+      everything else in this kit on the wreckers, measured clean. No
+      collision shape is involved anywhere in the kit, so it was reproduced
+      and gated rather than root-caused. It does not reproduce against the
+      current chassis; the leading suspect is `FINAL_APPROACH_ALIGNMENT`
+      (G0.4), lowered from a value already on record as sitting on a knife
+      edge, after this gate was written — not this kit. If a future change
+      reopens this, check that margin before re-gating spatter.
 - [ ] **G2.4** Re-export carrying the biopunk palette natively. Still needs
       Greg's hands: `regrime()` already remaps the toybox material names in
       `art/scrap_skiff.glb` onto the biopunk palette at load, and the kit
