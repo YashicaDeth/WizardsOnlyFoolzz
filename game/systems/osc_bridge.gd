@@ -142,14 +142,14 @@ static func _parse_into(data: PackedByteArray, from: int, to: int, out: Array[Di
 	if _read_string(data, from, to).get("text", "") == "#bundle":
 		# Header, then a 64-bit timetag, then sized elements. Timetags are
 		# ignored: TouchDesigner sends immediates and nothing here schedules.
-		var at := from + 16
-		while at + 4 <= to:
-			var size := _be_s32(data, at)
-			at += 4
-			if size <= 0 or at + size > to:
+		var element_at := from + 16
+		while element_at + 4 <= to:
+			var size := _be_s32(data, element_at)
+			element_at += 4
+			if size <= 0 or element_at + size > to:
 				return
-			_parse_into(data, at, at + size, out)
-			at += size
+			_parse_into(data, element_at, element_at + size, out)
+			element_at += size
 		return
 
 	var address := _read_string(data, from, to)

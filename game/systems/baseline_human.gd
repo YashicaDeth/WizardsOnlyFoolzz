@@ -1090,16 +1090,16 @@ func _land_splat(at: Vector3, size: float, velocity := Vector3.DOWN) -> void:
 	var landed := Vector3(at.x, 0.02, at.z)
 	var query := PhysicsRayQueryParameters3D.create(at - heading * 0.35, at + heading * 1.6)
 	query.collide_with_areas = false
-	var hit := space.intersect_ray(query)
-	if hit.is_empty():
+	var ground_hit := space.intersect_ray(query)
+	if ground_hit.is_empty():
 		# Nothing along the flight path: drop it straight down onto whatever is
 		# underneath, which is the common case for a drop that ran out of arc.
 		var down := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.4, at + Vector3.DOWN * 4.0)
 		down.collide_with_areas = false
-		hit = space.intersect_ray(down)
-	if not hit.is_empty():
-		landed = hit.position
-		normal = (hit.normal as Vector3).normalized()
+		ground_hit = space.intersect_ray(down)
+	if not ground_hit.is_empty():
+		landed = ground_hit.position
+		normal = (ground_hit.normal as Vector3).normalized()
 	var splat := MeshInstance3D.new()
 	splat.mesh = _splat_mesh(1.0)
 	var spread := size * SPLAT_SPREAD * (0.7 + randf() * 0.6)
@@ -1170,14 +1170,14 @@ static func mark_ground_for_chunk(world: World3D, root: Node, at: Vector3, veloc
 	var landed := Vector3(at.x, 0.02, at.z)
 	var query := PhysicsRayQueryParameters3D.create(at - heading * 0.35, at + heading * 1.6)
 	query.collide_with_areas = false
-	var hit := space.intersect_ray(query)
-	if hit.is_empty():
+	var ground_hit := space.intersect_ray(query)
+	if ground_hit.is_empty():
 		var down := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.4, at + Vector3.DOWN * 4.0)
 		down.collide_with_areas = false
-		hit = space.intersect_ray(down)
-	if not hit.is_empty():
-		landed = hit.position
-		normal = (hit.normal as Vector3).normalized()
+		ground_hit = space.intersect_ray(down)
+	if not ground_hit.is_empty():
+		landed = ground_hit.position
+		normal = (ground_hit.normal as Vector3).normalized()
 	var splat := MeshInstance3D.new()
 	splat.mesh = _splat_mesh(1.0)
 	var up := normal

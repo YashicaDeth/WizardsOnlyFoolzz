@@ -158,14 +158,14 @@ func _draw_edge_frame(viewport: Vector2) -> void:
 		draw_line(Vector2(left, viewport.y - margin - corner), Vector2(left, viewport.y - margin), color, 2.0)
 
 
-func _draw_title(viewport: Vector2) -> void:
+func _draw_title(_viewport: Vector2) -> void:
 	CellOutzType.draw_stamped(self, Vector2(44, 36), "BONE YARD", 22.0, COPPER, HOT * Color(1, 1, 1, 0.3), 1.6)
 	CellOutzType.draw_text(self, Vector2(46, 66), "MERCY COUNTY LIVE COLLISION FEED", 9.0, INK * Color(1, 1, 1, 0.42), 0.8)
 
 
 ## A5.3. The damage bust is a 3D viewport owned by another node; this is the
 ## bezel it sits in, so it stops reading as a render floating on the sky.
-func _draw_bust_frame(viewport: Vector2) -> void:
+func _draw_bust_frame(_viewport: Vector2) -> void:
 	var frame := Rect2(Vector2(22, 18), Vector2(150, 178))
 	draw_colored_polygon(PackedVector2Array([
 		frame.position + Vector2(12, 0), frame.position + Vector2(frame.size.x, 0),
@@ -210,7 +210,7 @@ func _draw_integrity(viewport: Vector2) -> void:
 
 ## A5.2. The one Greg named. It was a diamond lamp and two lines of prose; it is
 ## now a signal-strength instrument, because that is what a hunt signal is.
-func _draw_hunt_signal(viewport: Vector2) -> void:
+func _draw_hunt_signal(_viewport: Vector2) -> void:
 	var plate_size := Vector2(250, 78)
 	var anchor := Vector2(196, 26)
 	var strength := clampf(float(rival_grudge) / 100.0, 0.0, 1.0)

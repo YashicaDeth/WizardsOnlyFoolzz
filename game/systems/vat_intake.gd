@@ -354,7 +354,7 @@ func _row_mark(ink: Color, at: Vector2, active: bool, ticked: bool) -> void:
 		draw_line(at + Vector2(-12, 5.5), at + Vector2(-4, 5.5), HOT, 2.0)
 
 
-func _draw_routes(rect: Rect2, ink: Color, y: float) -> void:
+func _draw_routes(_rect: Rect2, ink: Color, y: float) -> void:
 	for index in ROUTES.size():
 		var label: String = ROUTES[index]
 		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.route == label.to_lower())
@@ -364,7 +364,7 @@ func _draw_routes(rect: Rect2, ink: Color, y: float) -> void:
 		y += 26.0
 
 
-func _draw_races(rect: Rect2, ink: Color, y: float) -> void:
+func _draw_races(_rect: Rect2, ink: Color, y: float) -> void:
 	var keys: Array = CharacterSheet.RACES.keys()
 	for index in keys.size():
 		var data: Dictionary = CharacterSheet.RACES[keys[index]]
@@ -388,7 +388,7 @@ func _draw_traits(rect: Rect2, ink: Color, y: float) -> void:
 		y += 24.0
 
 
-func _draw_body(rect: Rect2, ink: Color, y: float) -> void:
+func _draw_body(_rect: Rect2, ink: Color, y: float) -> void:
 	var rows := [
 		["BLOOD", str(sheet.under_skin.get("blood", "O-RUST"))],
 		["SKELETON", str(sheet.under_skin.get("skeleton", "standard")).to_upper()],
@@ -403,7 +403,7 @@ func _draw_body(rect: Rect2, ink: Color, y: float) -> void:
 	CellOutzType.draw_condensed(self, Vector2(30, y + 10), "WHAT IS UNDER THE SKIN IS WHAT THEY WILL FIND.", 8.0, ink * Color(1, 1, 1, 0.42), 0.7)
 
 
-func _draw_schedule(rect: Rect2, ink: Color, y: float) -> void:
+func _draw_schedule(_rect: Rect2, ink: Color, y: float) -> void:
 	var keys: Array = CharacterSheet.MODIFIERS.keys()
 	for index in keys.size():
 		var data: Dictionary = CharacterSheet.MODIFIERS[keys[index]]

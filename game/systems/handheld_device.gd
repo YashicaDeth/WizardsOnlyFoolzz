@@ -814,9 +814,9 @@ func _draw_ritual(rect: Rect2, alpha: float) -> void:
 		draw_circle(filed_at, 58.0, MOSS * Color(1, 1, 1, 0.09 * alpha))
 		draw_arc(filed_at, 58.0, 0.0, TAU, 40, MOSS * Color(1, 1, 1, alpha), 2.0)
 		for tooth in 8:
-			var angle := TAU * float(tooth) / 8.0
-			var from := filed_at + Vector2.from_angle(angle) * 46.0
-			var to := filed_at + Vector2.from_angle(angle) * 66.0
+			var tooth_angle := TAU * float(tooth) / 8.0
+			var from := filed_at + Vector2.from_angle(tooth_angle) * 46.0
+			var to := filed_at + Vector2.from_angle(tooth_angle) * 66.0
 			draw_line(from, to, MOSS * Color(1, 1, 1, alpha), 2.0)
 		var filed_label := "ALL FILED"
 		var filed_width := CellOutzType.width(filed_label, 16.0, 1.0)
@@ -963,12 +963,12 @@ func _draw_carry(rect: Rect2, alpha: float) -> void:
 	for item: Dictionary in carry.items:
 		var key := "%s|%s|%s" % [str(item.get("label", "")), str(item.get("from", "")), str(item.get("kind", ""))]
 		if seen.has(key):
-			var at: int = seen[key]
-			var group: Dictionary = groups[at]
-			group["count"] = int(group["count"]) + 1
-			group["mass"] = float(group["mass"]) + float(item.get("mass", 0.5))
+			var existing_index: int = seen[key]
+			var existing_group: Dictionary = groups[existing_index]
+			existing_group["count"] = int(existing_group["count"]) + 1
+			existing_group["mass"] = float(existing_group["mass"]) + float(item.get("mass", 0.5))
 			# The group is as stale as its freshest member is not.
-			group["fresh"] = minf(float(group["fresh"]), carry.freshness(item))
+			existing_group["fresh"] = minf(float(existing_group["fresh"]), carry.freshness(item))
 			continue
 		seen[key] = groups.size()
 		groups.append({
@@ -1019,6 +1019,7 @@ func _draw_carry(rect: Rect2, alpha: float) -> void:
 		if kind != "organ" and kind != "cybernetic" and kind != "bone" and kind != "limb":
 			radius = maxf(radius, 23.0)
 		var column := index % columns
+		@warning_ignore("integer_division")
 		var row := index / columns
 		var at := Vector2(bag.position.x + 60.0 + float(column) * spread, top_row + float(row) * row_height)
 		# Nothing in a bag sits on a grid. Nudged off it, deterministically.

@@ -348,7 +348,7 @@ func _update_beats() -> void:
 			subtitle.text = str(BEATS[index].text)
 
 
-func _update_sequence(delta: float) -> void:
+func _update_sequence(_delta: float) -> void:
 	match phase:
 		"submerged":
 			# Suspended, drifting, breathing something thicker than air.

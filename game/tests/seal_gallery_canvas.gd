@@ -13,6 +13,7 @@ func _draw() -> void:
 	var cell := Vector2(size.x / columns, gallery_height / 2.0)
 	for index in seal_seeds.size():
 		var col := index % columns
+		@warning_ignore("integer_division")
 		var row := index / columns
 		var center := Vector2(cell.x * (col + 0.5), cell.y * (row + 0.5))
 		var radius := minf(cell.x, cell.y) * 0.36

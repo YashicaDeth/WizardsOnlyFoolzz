@@ -123,6 +123,7 @@ func _process_capture() -> void:
 	var peak := 0.0
 	# Sample enough points to drive a responsive meter without walking a huge
 	# buffer every render frame.
+	@warning_ignore("integer_division")
 	var stride := maxi(1, buffer.size() / 96)
 	for index in range(0, buffer.size(), stride):
 		var stereo: Vector2 = buffer[index]

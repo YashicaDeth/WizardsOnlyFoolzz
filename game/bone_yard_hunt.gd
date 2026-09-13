@@ -1041,8 +1041,8 @@ func _update_player(delta: float) -> void:
 			wall_running_time = maxf(0.0, wall_running_time - delta)
 			wall_run_normal = surface.normal
 			var tangent: Vector3 = surface.tangent
-			var speed: float = maxf(Vector2(player_body.velocity.x, player_body.velocity.z).length(), WALL_RUN_MIN_SPEED)
-			var desired: Vector3 = tangent * speed
+			var wall_speed: float = maxf(Vector2(player_body.velocity.x, player_body.velocity.z).length(), WALL_RUN_MIN_SPEED)
+			var desired: Vector3 = tangent * wall_speed
 			player_body.velocity.x = desired.x
 			player_body.velocity.z = desired.z
 			player_body.velocity.y -= HUNTER_MOTOR.GRAVITY * WALL_RUN_GRAVITY_SCALE * delta
@@ -1346,8 +1346,8 @@ func _resolve_strike() -> void:
 		if lateral.length() > 0.45:
 			lateral = lateral.normalized() * 0.45
 		var aim := enemy.global_position + Vector3(lateral.x, look.y * 4.1 * 1.2, lateral.z)
-		var wound := enemy_rig.hit_at(aim, float(damage), float(damage) * 0.8, "cut", look)
-		body_zone = str(wound.get("zone", "torso"))
+		var hit_record := enemy_rig.hit_at(aim, float(damage), float(damage) * 0.8, "cut", look)
+		body_zone = str(hit_record.get("zone", "torso"))
 		WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
 	if enemy_rig != null and is_instance_valid(enemy_rig):
 		enemy_health = roundi(float(enemy_health_max) * _rig_health_ratio(enemy_rig))
@@ -1376,16 +1376,16 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	var nearest_index := -1
 	var nearest_distance := 99999.0
 	for index in encounter_actors.size():
-		var actor: Dictionary = encounter_actors[index]
-		var node := actor.get("node") as Node3D
-		if node == null or not is_instance_valid(node) or bool(actor.get("dead", false)):
+		var candidate: Dictionary = encounter_actors[index]
+		var node := candidate.get("node") as Node3D
+		if node == null or not is_instance_valid(node) or bool(candidate.get("dead", false)):
 			continue
-		if actor.anatomy.downed or str(actor.get("disposition", "hostile")) != "hostile":
+		if candidate.anatomy.downed or str(candidate.get("disposition", "hostile")) != "hostile":
 			continue
 		var distance := player.distance_to(node.global_position)
 		# A locked target wins regardless of who has wandered closer, which is
 		# the entire reason to have a lock.
-		if not lock_target.is_empty() and str(actor.subject_id) == lock_target:
+		if not lock_target.is_empty() and str(candidate.subject_id) == lock_target:
 			nearest_distance = distance
 			nearest_index = index
 			break
@@ -1766,7 +1766,7 @@ func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF) -> Di
 ## about whether it is on. AS2.1's "warps and distorts" gets a down payment
 ## here too: a real torch on a device this beaten up does not hold perfectly
 ## steady, and it should say so more as the charge that is running it drops.
-func _update_handheld_lamp(delta: float) -> void:
+func _update_handheld_lamp(_delta: float) -> void:
 	if handheld_lamp == null or not is_instance_valid(handheld_lamp):
 		return
 	var lit: bool = handheld.has_method("torch_active") and handheld.torch_active()
@@ -2019,8 +2019,8 @@ func _interact() -> void:
 				prompt.text = "TRADE COMPLETE // FIELD DRESSING ACQUIRED"
 			elif kind in ["friendly", "bond"]:
 				health = mini(100, health + 25)
-				var bond := int(WorldHistory.subject(FRIEND_ID).get("bond", 0))
-				WorldHistory.update_subject(FRIEND_ID, {"bond": bond + 5}, "misfire_bond")
+				var friend_bond := int(WorldHistory.subject(FRIEND_ID).get("bond", 0))
+				WorldHistory.update_subject(FRIEND_ID, {"bond": friend_bond + 5}, "misfire_bond")
 				prompt.text = "A SMALL KINDNESS // BODY RESTORED; NIX HEARS OF IT."
 			else:
 				inventory.append("impossible testimony")
@@ -3638,24 +3638,24 @@ func _update_camera() -> void:
 		camera.fov = THIRD_PERSON_FOV
 		var subject := _actor_by_id(resolution_target)
 		if not subject.is_empty():
-			var focus: Vector3 = subject.node.global_position + Vector3.UP * 0.65
-			var away := player - focus
+			var subject_focus: Vector3 = subject.node.global_position + Vector3.UP * 0.65
+			var away := player - subject_focus
 			away.y = 0.0
 			if away.length_squared() < 0.01:
 				away = Vector3.BACK
 			away = away.normalized()
-			var shoulder := Vector3(-away.z, 0, away.x) * 1.05
-			var desired := player + away * 3.1 + shoulder * 0.85 + Vector3.UP * 1.55
-			var ray := PhysicsRayQueryParameters3D.create(focus, desired)
+			var subject_shoulder := Vector3(-away.z, 0, away.x) * 1.05
+			var subject_desired := player + away * 3.1 + subject_shoulder * 0.85 + Vector3.UP * 1.55
+			var ray := PhysicsRayQueryParameters3D.create(subject_focus, subject_desired)
 			var excluded: Array[RID] = [player_body.get_rid()]
 			if subject.node is CollisionObject3D:
 				excluded.append((subject.node as CollisionObject3D).get_rid())
 			ray.exclude = excluded
 			var obstruction := get_world_3d().direct_space_state.intersect_ray(ray)
 			if not obstruction.is_empty():
-				desired = obstruction.position + (focus - obstruction.position).normalized() * 0.35
-			camera.global_position = desired
-			camera.look_at(focus, Vector3.UP)
+				subject_desired = obstruction.position + (subject_focus - obstruction.position).normalized() * 0.35
+			camera.global_position = subject_desired
+			camera.look_at(subject_focus, Vector3.UP)
 			var player_head := player_rig.parts.get("head") as Node3D
 			if player_head != null and is_instance_valid(player_head):
 				player_head.visible = false
@@ -3807,6 +3807,7 @@ func _build_world() -> void:
 	wreck_rng.seed = 55117
 	for index in 26:
 		var x := -31.0 + float(index % 9) * 7.5 + wreck_rng.randf_range(-3.4, 3.4)
+		@warning_ignore("integer_division")
 		var z := -24.0 + float(index / 9) * 22.0 + wreck_rng.randf_range(-6.5, 6.5)
 		var bulk := Vector3(
 			wreck_rng.randf_range(1.6, 4.8),
@@ -4240,6 +4241,7 @@ func _spawn_ashline_reinforcements() -> void:
 
 func _spawn_blood(at: Vector3, amount: int) -> void:
 	_wear_it(at, amount)
+	@warning_ignore("integer_division")
 	for index in mini(8, amount / 4):
 		var piece := MeshInstance3D.new()
 		var mesh := SphereMesh.new()

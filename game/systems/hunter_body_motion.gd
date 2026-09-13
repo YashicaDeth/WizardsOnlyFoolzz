@@ -118,7 +118,7 @@ func _choose_state(horizontal_speed: float, grounded: bool, sprinting: bool, cro
 		state = "idle"
 
 
-func _pose(horizontal_speed: float, sprinting: bool, crouching: bool, dodging: bool) -> void:
+func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: bool) -> void:
 	var gait := sin(gait_phase)
 	var opposite := sin(gait_phase + PI)
 	var locomotion := clampf(horizontal_speed / 7.0, 0.0, 1.0)

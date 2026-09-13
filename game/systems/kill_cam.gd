@@ -95,6 +95,7 @@ func _seed_damage() -> void:
 	# wave crossing the body rather than everything failing at once.
 	for rib in 6:
 		var side := -1.0 if rib % 2 == 0 else 1.0
+		@warning_ignore("integer_division")
 		var height := -46.0 + float(rib / 2) * 17.0
 		fragments.append({
 			"origin": Vector2(side * 17.0, height),

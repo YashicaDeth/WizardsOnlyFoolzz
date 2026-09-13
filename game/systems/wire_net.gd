@@ -207,10 +207,10 @@ func _last_seen(subject_id: String, subject: Dictionary) -> String:
 func accounts_by_reach() -> Array:
 	var listing: Array = []
 	for key in _accounts:
-		var account: Dictionary = _accounts[key]
-		if int(account.band) > signal_grade:
+		var entry: Dictionary = _accounts[key]
+		if int(entry.band) > signal_grade:
 			continue
-		listing.append(account)
+		listing.append(entry)
 	listing.sort_custom(func(a, b): return int(a.reach) > int(b.reach))
 	return listing
 
@@ -260,9 +260,9 @@ func pyramid(faction_id: String) -> Dictionary:
 	var faction: Dictionary = WorldHistory.subject(faction_id)
 	var members: Array = []
 	for key in _accounts:
-		var account: Dictionary = _accounts[key]
-		if str(account.faction_id) == faction_id and not DEAD_STATUSES.has(str(account.status).to_lower()):
-			members.append(account)
+		var entry: Dictionary = _accounts[key]
+		if str(entry.faction_id) == faction_id and not DEAD_STATUSES.has(str(entry.status).to_lower()):
+			members.append(entry)
 	members.sort_custom(func(a, b): return int(a.influence) > int(b.influence))
 	var tiers: Array = []
 	for index in RANKS.size():
@@ -387,6 +387,7 @@ func _best_successor(faction_id: String, excluded_id: String) -> Dictionary:
 			if str(edge.get("kind", "")) in ["owes", "debt"]:
 				debt_leverage += int(edge.get("strength", 0))
 		var wealth := int(subject.get("wealth", subject.get("scrip", 0)))
+		@warning_ignore("integer_division")
 		var score := int(account_data.get("influence", 0)) * 4 + loyalty * 3 + debt_leverage * 2 + wealth / 10
 		candidates.append({
 			"id": subject_id, "name": str(subject.get("name", subject_id)), "score": score,
@@ -552,6 +553,7 @@ func _retaliate(faction_id: String, action: String, subject_id: String) -> void:
 		var reigning := TheFourHorsemen.current_reign()
 		if not reigning.is_empty():
 			var horseman := WorldHistory.subject(reigning)
+			@warning_ignore("integer_division")
 			WorldHistory.update_subject(reigning, {"grudge": int(horseman.get("grudge", 0)) + maxi(1, grudge_gain / 2)}, "channel_contest_remembered_by_horseman")
 
 
@@ -981,7 +983,7 @@ func feed(count: int = 14, seed_offset: int = 0) -> Array:
 	return posts
 
 
-func _report_post(event: Dictionary, rng: RandomNumberGenerator, voices: Array) -> Dictionary:
+func _report_post(event: Dictionary, rng: RandomNumberGenerator, _voices: Array) -> Dictionary:
 	var event_type := str(event.get("type", "unknown")).replace("_", " ")
 	var body := "CELLOUTZ WIRE // %s" % event_type.to_upper()
 	var hops := rng.randi_range(1, 3)

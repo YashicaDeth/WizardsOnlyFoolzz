@@ -422,17 +422,17 @@ static func _build_shotgun(root: Node3D) -> void:
 		rib.material_override = _wood(Color("35241a"), index + 40)
 		root.add_child(rib)
 
-	var grip := MeshInstance3D.new()
-	grip.name = "grip"
-	grip.mesh = _sweep([
+	var grip_mesh := MeshInstance3D.new()
+	grip_mesh.name = "grip"
+	grip_mesh.mesh = _sweep([
 		{"at": 0.0, "width": 0.038, "depth": 0.046},
 		{"at": 0.060, "width": 0.036, "depth": 0.050},
 		{"at": 0.125, "width": 0.034, "depth": 0.044},
 	], 0.5)
-	grip.rotation = Vector3(PI * 0.5 + 0.42, 0, 0)
-	grip.position = Vector3(0, -0.052, -0.030)
-	grip.material_override = _wood(Color("3d2a1e"), 29)
-	root.add_child(grip)
+	grip_mesh.rotation = Vector3(PI * 0.5 + 0.42, 0, 0)
+	grip_mesh.position = Vector3(0, -0.052, -0.030)
+	grip_mesh.material_override = _wood(Color("3d2a1e"), 29)
+	root.add_child(grip_mesh)
 
 	var stock := MeshInstance3D.new()
 	stock.name = "stock"

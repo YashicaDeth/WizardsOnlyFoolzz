@@ -415,6 +415,7 @@ func ruptured_organs() -> Array:
 
 func _serial_for(id: String) -> String:
 	var value := absi(id.hash())
+	@warning_ignore("integer_division")
 	return "%03d-%03d-%02d" % [value % 997, (value / 997) % 887, (value / 91) % 71]
 
 

@@ -30,6 +30,7 @@ func generate(seed_value: int = 774013) -> void:
 	for district in 5:
 		var district_center: Vector3 = DISTRICT_CENTERS[district]
 		for lot in 8 + district * 2:
+			@warning_ignore("integer_division")
 			var offset := Vector3(float(lot % 4) * 24.0 - 36.0, 0, float(lot / 4) * 22.0 - 33.0)
 			var width := rng.randf_range(8.0, 17.0)
 			var depth := rng.randf_range(7.0, 15.0)

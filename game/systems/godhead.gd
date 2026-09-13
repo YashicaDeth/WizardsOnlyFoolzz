@@ -158,17 +158,17 @@ static func visibility() -> float:
 		return 0.0
 	var shown := 0.0
 	for index in STAGES.size():
-		var stage: Dictionary = STAGES[index]
-		if drawn < float(stage["at"]):
+		var stage_data: Dictionary = STAGES[index]
+		if drawn < float(stage_data["at"]):
 			break
-		shown = float(stage["shows"])
+		shown = float(stage_data["shows"])
 		# Interpolate toward the next stage rather than stepping, so it creeps.
 		if index + 1 < STAGES.size():
 			var nxt: Dictionary = STAGES[index + 1]
-			var span := float(nxt["at"]) - float(stage["at"])
+			var span := float(nxt["at"]) - float(stage_data["at"])
 			if span > 0.0:
-				var through := clampf((drawn - float(stage["at"])) / span, 0.0, 1.0)
-				shown = lerpf(float(stage["shows"]), float(nxt["shows"]), through)
+				var through := clampf((drawn - float(stage_data["at"])) / span, 0.0, 1.0)
+				shown = lerpf(float(stage_data["shows"]), float(nxt["shows"]), through)
 	return clampf(shown, 0.0, 1.0)
 
 

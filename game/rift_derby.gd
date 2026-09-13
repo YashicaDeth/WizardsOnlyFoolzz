@@ -400,7 +400,7 @@ func _create_wrecker(index: int) -> void:
 	targets.append(target)
 
 
-func _update_boat(delta: float) -> void:
+func _update_boat(_delta: float) -> void:
 	var throttle := Input.get_axis("move_back", "move_forward")
 	var steering := Input.get_axis("move_left", "move_right")
 	boat.throttle = throttle
@@ -539,6 +539,7 @@ func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: fl
 	_update_wrecker_damage_visual(target, target_integrity, impact_direction)
 	_update_detachable_parts(target, target_integrity, impact_direction)
 	if damage >= 28:
+		@warning_ignore("integer_division")
 		_spawn_impact_debris(target.global_position, impact_direction, mini(10, damage / 8))
 	# Once the bumper and hood are gone there is nothing between the player's
 	# front end and the cab, so a fast hit there reaches the driver directly.
@@ -1163,6 +1164,7 @@ func _spawn_crowd() -> void:
 		var spectator := Node3D.new()
 		spectator.name = "CrowdSilhouette_%02d" % index
 		var side := -1.0 if index % 2 == 0 else 1.0
+		@warning_ignore("integer_division")
 		var row := float((index / 2) % 4)
 		spectator.position = Vector3((-30.0 + float(index % 32) * 1.95) * ARENA_SCALE, (2.0 + row * 0.85) * ARENA_SCALE, side * (30.0 + row * 1.2) * ARENA_SCALE)
 		spectator.set_meta("rest_y", spectator.position.y)

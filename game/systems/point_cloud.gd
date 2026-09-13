@@ -93,7 +93,9 @@ func from_image(image: Image, across := 180, size := Vector2(4.0, 4.0)) -> void:
 	var down := maxi(1, int(round(float(across) * aspect)))
 	across = maxi(1, across)
 	while across * down > MAX_POINTS:
+		@warning_ignore("integer_division")
 		across = maxi(1, across / 2)
+		@warning_ignore("integer_division")
 		down = maxi(1, down / 2)
 
 	# The picture is the colour source directly: the grid and the texels line up

@@ -1183,6 +1183,7 @@ func _draw_file(rect: Rect2) -> void:
 				names = true
 		if not names:
 			continue
+		@warning_ignore("integer_division")
 		var col := shown / 3
 		var row := shown % 3
 		var ex := rect.position.x + float(col) * rect.size.x * 0.34

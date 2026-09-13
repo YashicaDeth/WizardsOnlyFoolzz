@@ -343,6 +343,7 @@ static func draw_site(canvas: CanvasItem, rect: Rect2, entry: Dictionary, clock:
 			var tile_size := Vector2((rect.size.x - 44.0) / float(columns), 66.0)
 			for index in lines.size():
 				var column := index % columns
+				@warning_ignore("integer_division")
 				var row := index / columns
 				var tile := Rect2(rect.position + Vector2(16 + column * (tile_size.x + 12), 78 + row * (tile_size.y + 12)), tile_size)
 				if tile.end.y > rect.end.y - 16.0:

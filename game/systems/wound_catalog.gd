@@ -23,11 +23,11 @@ const ENTRIES := {
 
 static func resolve(raw: Variant) -> Dictionary:
 	if raw is Dictionary:
-		var result: Dictionary = raw.duplicate(true)
-		result["label"] = str(result.get("label", result.get("type", "wound")))
-		result["zone"] = str(result.get("zone", "torso"))
-		result["severity"] = clampf(float(result.get("severity", 0.4)), 0.0, 1.0)
-		return result
+		var shaped: Dictionary = raw.duplicate(true)
+		shaped["label"] = str(shaped.get("label", shaped.get("type", "wound")))
+		shaped["zone"] = str(shaped.get("zone", "torso"))
+		shaped["severity"] = clampf(float(shaped.get("severity", 0.4)), 0.0, 1.0)
+		return shaped
 	var wound_id := str(raw).to_lower()
 	var result: Dictionary = (ENTRIES.get(wound_id, {"zone": "torso", "type": "legacy", "severity": 0.4}) as Dictionary).duplicate(true)
 	result["id"] = wound_id

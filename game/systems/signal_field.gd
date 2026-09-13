@@ -84,9 +84,9 @@ func reading() -> Dictionary:
 		if distance > reach:
 			continue
 		var strength := clampf(1.0 - pow(distance / reach, 1.8), 0.0, 1.0)
-		var grade := int(emitter.grade)
-		if grade > best_grade or (grade == best_grade and strength > best_strength):
-			best_grade = grade
+		var emitter_grade := int(emitter.grade)
+		if emitter_grade > best_grade or (emitter_grade == best_grade and strength > best_strength):
+			best_grade = emitter_grade
 			best_strength = strength
 			source = str(emitter.name)
 			kind = str(emitter.kind)

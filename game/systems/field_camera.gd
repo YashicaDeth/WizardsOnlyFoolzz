@@ -173,12 +173,12 @@ static func _satisfies(record: Dictionary, requirement: Dictionary) -> bool:
 ## The album. Photographs persist like everything else, so one taken before a
 ## ritual existed can still satisfy it later.
 static func store(photo: Dictionary) -> Dictionary:
-	var album: Array = (WorldHistory.subject("photographs").get("frames", []) as Array).duplicate()
-	album.append(photo)
-	while album.size() > 40:
-		album.pop_front()
+	var stored: Array = (WorldHistory.subject("photographs").get("frames", []) as Array).duplicate()
+	stored.append(photo)
+	while stored.size() > 40:
+		stored.pop_front()
 	WorldHistory.register_subject("photographs", {"kind": "album", "frames": []})
-	WorldHistory.amend_subject("photographs", {"frames": album})
+	WorldHistory.amend_subject("photographs", {"frames": stored})
 	return photo
 
 

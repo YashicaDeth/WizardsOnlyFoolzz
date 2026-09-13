@@ -94,8 +94,8 @@ func _init() -> void:
 ## A9.2. `severity` is 0 to 1. Everything it touches is something you can see
 ## before anything makes a sound: how much is up, how fast it is going, how hard
 ## it is being pushed around, and how dirty it looks doing it.
-func set_severity(severity: float) -> void:
-	_severity = clampf(severity, 0.0, 1.0)
+func set_severity(level: float) -> void:
+	_severity = clampf(level, 0.0, 1.0)
 	amount_ratio = lerpf(float(CALM_MOTES) / float(STORM_MOTES), 1.0, _severity)
 	speed_scale = lerpf(1.0, 2.6, _severity)
 	if _process_material != null:

@@ -462,13 +462,13 @@ func _describe(ref: String) -> String:
 ## subject rather than as quest state, because there is no quest state.
 func _open_lead(from: String, to: String) -> void:
 	var record: Dictionary = WorldHistory.subject(BOARD_ID)
-	var leads: Array = (record.get("leads", []) as Array).duplicate()
+	var existing_leads: Array = (record.get("leads", []) as Array).duplicate()
 	var lead := {"from": from, "to": to, "opened": WorldHistory.events.size()}
-	for existing: Dictionary in leads:
+	for existing: Dictionary in existing_leads:
 		if str(existing.get("from", "")) == from and str(existing.get("to", "")) == to:
 			return
-	leads.append(lead)
-	WorldHistory.update_subject(BOARD_ID, {"leads": leads}, "lead_opened")
+	existing_leads.append(lead)
+	WorldHistory.update_subject(BOARD_ID, {"leads": existing_leads}, "lead_opened")
 	lead_opened.emit(from, to)
 
 
@@ -596,9 +596,9 @@ func _most_implicated(evidence: Array) -> String:
 			if index >= 0 and index < WorldHistory.events.size():
 				var details: Dictionary = (WorldHistory.events[index] as Dictionary).get("details", {})
 				for key: String in ["subject", "rival", "victim", "target", "actor"]:
-					var named := str(details.get(key, ""))
-					if named != "" and named != "player" and not WorldHistory.subject(named).is_empty():
-						people.append(named)
+					var referenced := str(details.get(key, ""))
+					if referenced != "" and referenced != "player" and not WorldHistory.subject(referenced).is_empty():
+						people.append(referenced)
 			continue
 		var state: Dictionary = WorldHistory.subject(ref)
 		match str(state.get("kind", "")):
@@ -614,8 +614,8 @@ func _most_implicated(evidence: Array) -> String:
 		for subject_id: String in WorldHistory.all_subjects().keys():
 			if subject_id == "player":
 				continue
-			var state: Dictionary = WorldHistory.subject(subject_id)
-			if str(state.get("faction_id", "")) == faction_id:
+			var candidate_state: Dictionary = WorldHistory.subject(subject_id)
+			if str(candidate_state.get("faction_id", "")) == faction_id:
 				people.append(subject_id)
 	var fallback := ""
 	for subject_id: String in people:
