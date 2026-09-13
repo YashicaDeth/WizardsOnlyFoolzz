@@ -248,6 +248,17 @@ func _physics_process(delta: float) -> void:
 		mode_label.text = "DISABLE EIGHT WRECKERS // %d" % maxi(1, ceili(countdown))
 		if countdown <= 0.0:
 			round_state = "active"
+		# Greg: *"the cars in the derby ... you still cant shoot ... there no car
+		# hud"*. This branch returned here, before the camera and the instruments
+		# had run, so the whole countdown — the first thing anybody sees on
+		# entering the derby — was rendered from wherever the scene happened to
+		# leave the camera, which is the world origin, twenty-two metres from the
+		# car. No cab, no wheel, no binnacle, no round count, and a view down the
+		# track from nobody's eye. The gun and the cluster were never broken;
+		# they were behind the camera. You spend a countdown sitting in the car,
+		# so the countdown is rendered from inside it.
+		_update_camera(delta)
+		_update_hud()
 		return
 	if round_state != "active":
 		_update_result(delta)
@@ -885,7 +896,11 @@ func _update_hud() -> void:
 	# Only speaks when it has something to say. Left visible during play it sat
 	# on top of the control ribbon repeating what the ribbon already showed.
 	mode_label.visible = round_state != "active"
-	mode_label.text = ("VICTORY  //  HAULED OUT TO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "won" else "WRECKED  //  DRAGGED INTO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "lost" else "")
+	# The countdown case is here rather than only in `_physics_process`: now that
+	# the countdown runs the HUD (so the player can see the cab they are sitting
+	# in), this line runs during it too and used to blank the objective straight
+	# back out on the same frame it was set.
+	mode_label.text = ("VICTORY  //  HAULED OUT TO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "won" else "WRECKED  //  DRAGGED INTO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "lost" else "DISABLE EIGHT WRECKERS  //  %d" % maxi(1, ceili(countdown)) if round_state == "countdown" else "")
 	var rival := WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT))
 	rival_label.text = "HUNT ARC  //  %s\n%s  ·  GRUDGE %03d  ·  ELO %04d\n[I] WORLD INDEX" % [str(rival.get("name", "THE CAPTAIN")).to_upper(), str(rival.get("status", "active")).to_upper(), int(rival.get("grudge", 0)), int(rival.get("elo", 1180))]
 	# Computed once for both readouts. It used to live inside the cab-screen
