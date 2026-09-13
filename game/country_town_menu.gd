@@ -136,8 +136,8 @@ func _process(delta: float) -> void:
 	if wreck != null:
 		wreck.rotate_y(delta * 0.28)
 		wreck.position.y = 4.4 + sin(Time.get_ticks_msec() * 0.0014) * 0.22
-	$HUD/Title.position.x = 46.0 + sin(ui_time * 0.72) * 4.0
-	$HUD/SubTitle.modulate.a = 0.72 + sin(ui_time * 2.1) * 0.18
+	$HUD/Title.position.y = sin(ui_time * 0.72) * 2.0
+	$HUD/Algiz.modulate.a = 0.72 + sin(ui_time * 2.1) * 0.18
 
 
 func _focus_button(button: Button) -> void:

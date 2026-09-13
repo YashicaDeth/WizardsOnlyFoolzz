@@ -46,34 +46,38 @@ var pieces: Array[Dictionary] = []
 var street_actors: Array[Dictionary] = []
 var floor_sigils: Array[Node3D] = []
 var relics: Array[Dictionary] = []
+var ram_car: Node3D
+var impact_dummy: Node3D
 var camera: Camera3D
 
 
 func _ready() -> void:
 	var env := WorldEnvironment.new()
 	env.environment = WorldLook.environment("ossuary")
+	# The opening is night, not a sunlit brown editor floor.  The very low hour
+	# lets the practical red and indigo lights sculpt the street.
+	WorldLook.apply_hour(env.environment, 0.08, "ossuary")
 	add_child(env)
 
 	camera = Camera3D.new()
-	camera.position = Vector3(0, 0.35, 3.4)
-	camera.fov = 62.0
-	# Tilted up, so the horizon sits low and the frame is mostly sky and falling
-	# junk. Level, it put the ground across the bottom 45% of the menu doing
-	# nothing — the busiest part of the shot was empty dirt.
-	camera.rotation.x = deg_to_rad(11.0)
+	camera.position = Vector3(0, 1.55, 7.6)
+	camera.fov = 50.0
+	# A composed, low telephoto street view.  It puts the fight in the centre and
+	# holds the ruined block behind it instead of aiming down at empty ground.
+	camera.rotation.x = deg_to_rad(5.0)
 	add_child(camera)
 
 	var key := OmniLight3D.new()
-	key.position = Vector3(1.6, 1.4, 2.6)
-	key.light_color = Color("ffd8a0")
-	key.light_energy = 4.2
-	key.omni_range = 12.0
+	key.position = Vector3(-1.5, 3.0, 0.3)
+	key.light_color = Color("d12520")
+	key.light_energy = 7.2
+	key.omni_range = 16.0
 	add_child(key)
 	var fill := OmniLight3D.new()
-	fill.position = Vector3(-2.0, -0.8, 1.8)
-	fill.light_color = SPORE
-	fill.light_energy = 2.4
-	fill.omni_range = 10.0
+	fill.position = Vector3(3.8, 4.0, -2.0)
+	fill.light_color = Color("334a92")
+	fill.light_energy = 3.4
+	fill.omni_range = 18.0
 	add_child(fill)
 
 	_build_debris()
@@ -86,11 +90,11 @@ func _ready() -> void:
 ## staged rather than a physics simulation; this is a front door, so it must
 ## read immediately and never spend menu-frame budget on a whole AI world.
 func _build_living_ashbloom() -> void:
-	_add_set_piece(BoxMesh.new(), Vector3(0, -1.2, -5.2), Vector3(15.0, 0.22, 13.0), Color("21100e"), "rust", 0)
-	_add_set_piece(BoxMesh.new(), Vector3(0, -1.06, -5.2), Vector3(3.1, 0.025, 12.0), Color("4a3023"), "rust", 2)
+	_add_set_piece(BoxMesh.new(), Vector3(0, -1.2, -5.2), Vector3(15.0, 0.22, 13.0), Color("0e0d16"), "rust", 0)
+	_add_set_piece(BoxMesh.new(), Vector3(0, -1.06, -5.2), Vector3(3.1, 0.025, 12.0), Color("211722"), "rust", 2)
 	# Broken side buildings frame the street without covering its actors.
-	_add_set_piece(BoxMesh.new(), Vector3(-5.8, 0.2, -6.4), Vector3(2.2, 2.6, 4.4), Color("351815"), "rust", 5)
-	_add_set_piece(BoxMesh.new(), Vector3(5.7, 0.05, -7.3), Vector3(2.5, 2.3, 3.5), Color("2d1c17"), "rust", 7)
+	_add_set_piece(BoxMesh.new(), Vector3(-5.8, 0.2, -6.4), Vector3(2.2, 2.6, 4.4), Color("20121d"), "rust", 5)
+	_add_set_piece(BoxMesh.new(), Vector3(5.7, 0.05, -7.3), Vector3(2.5, 2.3, 3.5), Color("171521"), "rust", 7)
 	for x in [-0.85, 0.85]:
 		_add_set_piece(BoxMesh.new(), Vector3(x, -1.00, -5.2), Vector3(0.08, 0.035, 10.0), Color("c46a2e"), "rust", 12 + int(x * 4.0))
 	_build_floor_gore_and_sigils()
@@ -102,6 +106,7 @@ func _build_living_ashbloom() -> void:
 	_spawn_actor(Vector3(2.8, -0.52, -6.4), Color("77533b"), 4.4, false)
 	_spawn_actor(Vector3(-1.9, -0.52, -8.8), Color("3c6670"), 5.6, false)
 	_build_relics()
+	_build_ram_vignette()
 
 
 func _add_set_piece(mesh: PrimitiveMesh, at: Vector3, scale_value: Vector3, tint: Color, surface_kind: String, seed: int) -> MeshInstance3D:
@@ -136,33 +141,19 @@ func _build_floor_gore_and_sigils() -> void:
 
 
 func _spawn_actor(at: Vector3, tint: Color, phase: float, fighting: bool) -> void:
-	var body := Node3D.new()
+	# The menu population uses the same six-zone BaselineHuman rig as the
+	# player and live combat.  These are not capsule stand-ins: their anatomy,
+	# severing vocabulary and world material are the game's own body contract.
+	var body := BaselineHuman.new()
+	body.build("frontdoor_%d" % int(phase * 100.0), {"flesh": tint, "variation": int(phase * 13.0), "gore": true, "build": 0.9})
 	body.position = at
 	add_child(body)
-	var torso := CapsuleMesh.new()
-	torso.radius = 0.18
-	torso.height = 0.82
-	torso.radial_segments = 8
-	var torso_mesh := MeshInstance3D.new()
-	torso_mesh.mesh = torso
-	torso_mesh.position.y = 0.42
-	torso.material = WorldLook.surface(tint, "flesh", int(phase * 11.0))
-	body.add_child(torso_mesh)
-	var head := SphereMesh.new()
-	head.radius = 0.18
-	head.height = 0.34
-	head.radial_segments = 8
-	var head_mesh := MeshInstance3D.new()
-	head_mesh.mesh = head
-	head_mesh.position = Vector3(0, 0.96, 0)
-	head.material = WorldLook.surface(Color("a76d54"), "flesh", int(phase * 17.0))
-	body.add_child(head_mesh)
 	# A crude held blade gives the two central figures a readable exchange.
 	var blade := BoxMesh.new()
 	blade.size = Vector3(0.055, 0.5, 0.055)
 	var weapon := MeshInstance3D.new()
 	weapon.mesh = blade
-	weapon.position = Vector3(0.22, 0.55, 0)
+	weapon.position = Vector3(0.34, 1.05, 0)
 	weapon.rotation.z = -0.65
 	blade.material = WorldLook.surface(Color("c8baa3"), "bone", int(phase * 23.0))
 	body.add_child(weapon)
@@ -182,6 +173,39 @@ func _build_relics() -> void:
 		orb.position = Vector3(-3.5 + index * 2.15, 0.25 + (index % 2) * 0.42, -7.2 + (index % 3) * 0.7)
 		add_child(orb)
 		relics.append({"node": orb, "origin": orb.position, "phase": float(index) * 1.4})
+
+
+## A short, repeating vehicle beat previews the game's consequences without
+## replacing the actual derby.  The body is a separate loose model so the car
+## never has to fake a collision by moving an NPC controller through a wall.
+func _build_ram_vignette() -> void:
+	ram_car = Node3D.new()
+	add_child(ram_car)
+	var shell := _add_piece_to(ram_car, BoxMesh.new(), Vector3.ZERO, Vector3(1.1, 0.36, 0.55), Color("7d251d"), "rust", 141)
+	shell.position.y = -0.67
+	for side in [-0.4, 0.4]:
+		var wheel := _add_piece_to(ram_car, CylinderMesh.new(), Vector3(side, -0.88, 0.0), Vector3(0.18, 0.11, 0.18), Color("181312"), "rust", 143 + int(side * 10.0))
+		wheel.rotation.x = PI * 0.5
+	impact_dummy = Node3D.new()
+	impact_dummy.position = Vector3(0.55, -0.56, -5.55)
+	add_child(impact_dummy)
+	var limb := _add_piece_to(impact_dummy, CapsuleMesh.new(), Vector3(0, 0.25, 0), Vector3(0.16, 0.7, 0.16), Color("78251f"), "flesh", 150)
+	limb.rotation.z = PI * 0.5
+	var skull := _add_piece_to(impact_dummy, SphereMesh.new(), Vector3(0.42, 0.36, 0), Vector3(0.2, 0.2, 0.2), Color("a76d54"), "flesh", 151)
+	# A small existing pool makes the repeated impact read as violent rather
+	# than slapstick, without adding any UI explanation.
+	var pool := _add_set_piece(CylinderMesh.new(), Vector3(0.85, -1.02, -5.55), Vector3(0.42, 0.01, 0.24), Color("741714"), "flesh", 152)
+	pool.rotation.y = 0.32
+
+
+func _add_piece_to(parent: Node3D, mesh: PrimitiveMesh, at: Vector3, scale_value: Vector3, tint: Color, surface_kind: String, seed: int) -> MeshInstance3D:
+	var item := MeshInstance3D.new()
+	item.mesh = mesh
+	item.position = at
+	item.scale = scale_value
+	mesh.material = WorldLook.surface(tint, surface_kind, seed)
+	parent.add_child(item)
+	return item
 
 
 func _build_debris() -> void:
@@ -322,3 +346,10 @@ func _process(delta: float) -> void:
 		if is_instance_valid(item):
 			item.position = (relic.origin as Vector3) + Vector3(0, sin(clock * 1.5 + float(relic.phase)) * 0.18, 0)
 			item.rotate_y(delta * 0.72)
+	if is_instance_valid(ram_car) and is_instance_valid(impact_dummy):
+		var ram_phase := fposmod(clock * 0.42, 1.0)
+		ram_car.position = Vector3(lerpf(-7.2, 6.6, ram_phase), 0, -5.55)
+		# The dummy rests, launches at the hit, then settles back into the pool.
+		var launch := clampf((ram_phase - 0.49) * 4.1, 0.0, 1.0)
+		impact_dummy.position = Vector3(0.55 + launch * 1.9, -0.56 + sin(launch * PI) * 1.05, -5.55 + launch * 0.72)
+		impact_dummy.rotation = Vector3(launch * 5.4, launch * 1.8, launch * 4.7)

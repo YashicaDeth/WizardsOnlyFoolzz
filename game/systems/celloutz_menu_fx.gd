@@ -23,7 +23,6 @@ func _draw() -> void:
 		return
 	_draw_blood_sigil()
 	_draw_hud_frame()
-	_draw_title_signal()
 	_draw_footer()
 
 
