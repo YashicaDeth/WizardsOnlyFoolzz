@@ -499,7 +499,7 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 Opened because C1.8, C2.6 and C5.5 closed at v2. Each entry is a fault the v2
 work created or exposed, not a wish.
 
-- [ ] **C1.9** `v3` Wear is only visible on the screen you are reading; the device in your hand looks new from the outside
+- [x] ~~**C1.9** `v3` Wear is only visible on the screen you are reading; the device in your hand looks new from the outside~~ The real crack system (C5.5/C5.6 — seeded from the device's own `serial`, one fork cluster per recorded impact) drew across the *whole* `_device_rect` — chassis and bezel included — so a battered handheld never actually looked new from the outside; the case just wore along with the glass. Moved out of `_draw_chassis` (which no longer draws any cracks at all) into `_draw_damage()` on `_overlay`, rescoped to `_screen_rect` alone. Drawing on `_overlay` rather than `self` also fixes something C1.9 exposed in passing: `_overlay` is the topmost child, so cracks now genuinely sit over the hosted INDEX/MAP/WIRE panel too, not just over RADIO/CARRY/RITUAL's own directly-drawn content the way they effectively did before. Verified: `handheld_lean_test`/`handheld_impact_test`/`device_wear_test`/`handheld_battery_test`/`device_possession_test` all re-run clean, and a heavy-wear capture (two located impacts, condition down to 0.25) shows a spider-webbed screen behind an entirely undamaged logo, tabs, signal readout and battery gauge
 - [x] ~~**C2.7** `v3` Direct page access exists and nothing ever teaches it —
       a control nobody discovers is a control nobody has~~ `jump_to_mode()`
       has reached a page directly since C2.6 v2 and nothing on the device

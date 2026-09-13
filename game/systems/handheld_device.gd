@@ -674,26 +674,12 @@ func _draw_chassis(rect: Rect2, alpha: float) -> void:
 	BlackMirror.draw_jester(self, Vector2(rect.end.x - 40, rect.position.y + 34), 26.0, 0.5 * alpha, elapsed)
 	_draw_tabs(rect, alpha)
 	_draw_status(rect, alpha)
-	# Cracks last, over the content: the damage is in front of what you are
-	# reading, because it is damage to the surface you are reading through.
-	# C5.5 `v2`. Seeded from this device rather than from 90211, and the severity
-	# is how broken it actually is rather than a constant. A pristine handheld
-	# has almost no cracks; one that has been through a derby is a mess.
-	# C5.6 `v3`. One fork cluster per recorded impact, each radiating from
-	# where that particular hit actually landed rather than every crack in
-	# the game sharing one authored point. A device with no recorded impacts
-	# yet (an old save from before `impacts` existed, still carrying wear
-	# from the previous system) falls back to the one legacy cluster so it
-	# does not suddenly read as undamaged.
-	var overall := clampf(1.0 - condition, 0.0, 1.0)
-	if impacts.is_empty():
-		if overall > 0.0:
-			BlackMirror.draw_cracks(self, rect, alpha, serial, overall)
-	else:
-		for index in impacts.size():
-			var impact: Dictionary = impacts[index]
-			var severity := clampf(overall * (0.5 + float(impact.get("severity", 0.05)) * 4.0), 0.0, 1.0)
-			BlackMirror.draw_cracks(self, rect, alpha, serial + index * 101, severity, impact.get("at", Vector2(0.74, 0.22)))
+	# C1.9 `v3`. Cracks used to end here, drawn across the whole chassis rect —
+	# which meant the case and bezel wore too, and "the device in your hand
+	# looks new from the outside" was never true. They are drawn in
+	# `_draw_damage()` now, scoped to `_screen_rect` alone and on `_overlay`
+	# (the topmost layer, over hosted panels and all), so wear is legible only
+	# on the glass you are actually reading through — never on the case itself.
 
 
 func _draw_tabs(rect: Rect2, alpha: float) -> void:
@@ -896,6 +882,23 @@ func _draw_damage() -> void:
 			run.append(rect.position + Vector2(point.x * rect.size.x, point.y * rect.size.y))
 		_overlay.draw_polyline(run, Color(0, 0, 0, 0.66 * alpha), 2.4)
 		_overlay.draw_polyline(run, INK * Color(1, 1, 1, 0.10 * alpha), 1.0)
+	# C1.9 `v3`. The real crack system (C5.5/C5.6 — seeded from this device's
+	# own `serial`, one fork cluster per recorded impact rather than the fixed
+	# three lines above), moved here from `_draw_chassis` and rescoped to
+	# `rect` — `_screen_rect`, not the whole device — so a battered handheld
+	# still looks like an intact piece of hardware in your hand and only
+	# gives up the damage once you are actually reading its screen. Drawn on
+	# `_overlay`, the topmost layer, so it is genuinely over the hosted panel
+	# in INDEX/MAP/WIRE too, not just over RADIO/CARRY/RITUAL's own content.
+	var overall := clampf(1.0 - condition, 0.0, 1.0)
+	if impacts.is_empty():
+		if overall > 0.0:
+			BlackMirror.draw_cracks(_overlay, rect, alpha, serial, overall)
+	else:
+		for index in impacts.size():
+			var impact: Dictionary = impacts[index]
+			var severity := clampf(overall * (0.5 + float(impact.get("severity", 0.05)) * 4.0), 0.0, 1.0)
+			BlackMirror.draw_cracks(_overlay, rect, alpha, serial + index * 101, severity, impact.get("at", Vector2(0.74, 0.22)))
 	# The glass itself, over everything.
 	_overlay.draw_rect(rect, Color(0.55, 0.72, 0.62, 0.035 * alpha))
 
