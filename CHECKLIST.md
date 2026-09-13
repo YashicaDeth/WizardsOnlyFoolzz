@@ -2620,26 +2620,7 @@ being vehicles rather than set pieces.
       that belongs with the cluster's own next real pass, not this one. There
       is also no way to refill a tank in play yet — `refuel()` exists and is
       tested, but nothing calls it.
-- [x] **V1.4** ~~Cars can be repaired, badly~~
-      `ArcadeVehicle.repair()` puts hull back on the gauge like `refuel()`
-      tops up the tank, but the "badly" is load-bearing: every call also
-      shaves `max_integrity` down by `REPAIR_CEILING_LOSS` (5% of the current
-      ceiling), so a repair heals the number on today's gauge while quietly
-      lowering tomorrow's. A car welded back together three times sits at a
-      genuinely lower ceiling than one that was never hit, even when both read
-      full — there is no way to launder damage away for free by repairing
-      in a loop.
-      Verified: `tests/vehicle_repair_test.gd` — a single repair both restores
-      condition and immediately costs the ceiling something; three
-      damage/repair cycles leave a measurably lower max than a fresh chassis;
-      current condition never exceeds the (now-lower) ceiling; and forty
-      cycles of full damage and full repair degrade the ceiling without ever
-      driving it to zero or negative.
-      Still open: same gap as V1.3's `refuel()` — `repair()` exists and is
-      tested but nothing in the game calls it yet, since there is no pit stop,
-      garage, or scavenged-parts location anywhere in the world. That is real
-      content work (a place, a cost, a reason to go there) rather than a
-      mechanics gap, and belongs with V10's fuller pass rather than this one.
+- [ ] **V1.4** Cars can be repaired, badly
 - [ ] **V1.5** Somebody else is driving one too, outside the derby
 
 
