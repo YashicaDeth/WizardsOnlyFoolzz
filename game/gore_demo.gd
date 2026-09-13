@@ -618,8 +618,12 @@ func _paint_hud() -> void:
 	hud.draw_line(Vector2(size.x - 18, 18), Vector2(size.x - 18, 104), frame * Color(1, 1, 1, 0.82), 2.0)
 	hud.draw_line(Vector2(18, size.y - 18), Vector2(250, size.y - 18), frame * Color(1, 1, 1, 0.55), 2.0)
 	hud.draw_line(Vector2(size.x - 18, size.y - 18), Vector2(size.x - 250, size.y - 18), frame * Color(1, 1, 1, 0.55), 2.0)
-	CellOutzType.draw_text(hud, Vector2(26, 34), "GORE SANDBOX", 20.0, bone * Color(1, 1, 1, 0.85), 2.0)
-	CellOutzType.draw_condensed(hud, Vector2(26, 54), "WIZARDS ONLY FOOLS  //  NOTHING HERE IS A MOCK-UP", 9.0, bone * Color(1, 1, 1, 0.4), 2.2)
+	# `CellOutzType.draw_text` takes the top-left and `cap_height` is the cap, so
+	# a 20-cap title at y=34 ends at y=54 and the strapline started at exactly
+	# y=54 — no gap at all, and the title's own 2.6px stroke then ran straight
+	# through the line below it. Set on a real leading instead.
+	CellOutzType.draw_text(hud, Vector2(26, 32), "GORE SANDBOX", 20.0, bone * Color(1, 1, 1, 0.85), 2.0)
+	CellOutzType.draw_condensed(hud, Vector2(26, 62), "WIZARDS ONLY FOOLS  //  NOTHING HERE IS A MOCK-UP", 9.0, bone * Color(1, 1, 1, 0.4), 2.2)
 
 	var keys := [
 		["LMB", "SHOOT"], ["RMB", "BLAST THERE"], ["F", "BLAST HERE"],

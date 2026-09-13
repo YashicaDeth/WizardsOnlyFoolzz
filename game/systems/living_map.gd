@@ -845,7 +845,11 @@ func _draw_legend() -> void:
 	# in contrast to ignore once it is known, which is what a control hint is
 	# for. It is no longer a row of labels in a strip.
 	var scrawl := "DRAG TO PAN / WHEEL ZOOMS / F RECENTRES / M PUTS IT AWAY"
-	draw_set_transform(Vector2(size.x - 40.0 - CellOutzType.width_condensed(scrawl, 8.0, 0.8), size.y - 26.0), -0.028, Vector2.ONE)
+	# Ends clear of the keys card, which draws its own closed-state hint at
+	# `size.x - 128` on this exact same baseline (`keys_card.gd:96`). Ending at
+	# `size.x - 40` put this straight through it, so the one corner of the screen
+	# that is nothing but control hints had two of them stacked on each other.
+	draw_set_transform(Vector2(size.x - 152.0 - CellOutzType.width_condensed(scrawl, 8.0, 0.8), size.y - 26.0), -0.028, Vector2.ONE)
 	CellOutzType.draw_condensed(self, Vector2.ZERO, scrawl, 8.0, ACID * Color(1, 1, 1, 0.45), 0.8)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
