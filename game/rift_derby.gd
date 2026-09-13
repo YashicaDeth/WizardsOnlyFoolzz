@@ -38,6 +38,12 @@ const WORLD_INDEX := preload("res://systems/world_index.gd")
 const SILHOUETTE := preload("res://systems/silhouette.gd")
 const INTERIOR := preload("res://systems/vehicle_interior.gd")
 const KEYS_CARD := preload("res://systems/keys_card.gd")
+const DAMAGE_PORTRAIT := preload("res://systems/damage_portrait.gd")
+
+## The bezel `celloutz_hud.gd` draws for the driver, in its own coordinates, so
+## the bust lands inside the frame instead of beside it. Kept next to the
+## preload rather than buried in `_ready` because the two have to agree.
+const DRIVER_BUST_FRAME := Rect2(Vector2(22, 18), Vector2(150, 178))
 ## Matches the collider box in arcade_vehicle.gd's `_ready()`. Not read off
 ## the chassis at spawn time because the collider is built in `_ready()` too,
 ## so the shape does not exist yet on the frame the car is instanced.
@@ -100,6 +106,7 @@ var pit_radio: Control
 @onready var rival_label: Label = $HUD/RivalPanel/Rival
 var world_index: Control
 @onready var dynamic_interface: Control = $HUD/DynamicInterface
+var driver_bust: SubViewportContainer
 
 
 func _ready() -> void:
@@ -124,6 +131,22 @@ func _ready() -> void:
 	world_index = WORLD_INDEX.new()
 	world_index.name = "WorldIndexPanel"
 	$HUD.add_child(world_index)
+	# Greg: *"there no car hud for hull parts or character model in top right"*.
+	# `celloutz_hud.gd` has drawn the bezel for a driver bust since A5.3, with a
+	# comment saying the bust is "a 3D viewport owned by another node" — and
+	# `DamagePortrait` was written, and then never instantiated anywhere in the
+	# project, so every run has drawn an empty frame labelled DRIVER. It is owned
+	# here now, and sits inside the bezel rather than next to it.
+	driver_bust = DAMAGE_PORTRAIT.new()
+	driver_bust.name = "DriverBust"
+	driver_bust.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	$HUD.add_child(driver_bust)
+	# After the add, not before: `DamagePortrait._ready()` sets a 168-square
+	# minimum, which silently widens anything sized ahead of it back out past
+	# the bezel.
+	driver_bust.custom_minimum_size = Vector2.ZERO
+	driver_bust.position = DRIVER_BUST_FRAME.position
+	driver_bust.size = DRIVER_BUST_FRAME.size
 	# AG3.5. "Nothing in the derby says what any key does." The status line names
 	# three of them and the other six were folded into a sentence nobody reads
 	# while a wrecker is coming at them.
@@ -853,6 +876,10 @@ func _update_hud() -> void:
 			"rounds": rounds_left,
 			"rounds_full": 12,
 		})
+	# The bust takes the damage the car takes, which is what makes it a readout
+	# rather than an ornament.
+	if driver_bust != null and is_instance_valid(driver_bust):
+		driver_bust.call("set_damage", clampf(1.0 - float(integrity) / 100.0, 0.0, 1.0))
 	status.text = "BONE YARD DERBY  //  %s\nWASD DRIVE  ·  I WORLD INDEX  ·  E LEAVE VEHICLE" % round_state.to_upper()
 	score_label.text = "IMPACT SCORE  %05d\nHULL INTEGRITY  %03d%%\nACTIVE WRECKERS  %02d\nWORLD MEMORY  %03d" % [score, integrity, targets.size(), WorldHistory.event_count()]
 	# Only speaks when it has something to say. Left visible during play it sat

@@ -33,6 +33,12 @@ func _ready() -> void:
 	viewport = SubViewport.new()
 	viewport.size = Vector2i(168, 168)
 	viewport.transparent_bg = true
+	# Its own world, or the bust is composited over whatever 3D scene the HUD
+	# happens to be hanging in front of — in the derby that meant the quarry's
+	# own ground and grandstand showing up behind the driver's head, inside a
+	# bezel, which reads as a bug rather than as a portrait. The rig and the two
+	# lights below are the entire contents of this world by design.
+	viewport.own_world_3d = true
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	viewport.disable_3d = false
 	add_child(viewport)
