@@ -4059,7 +4059,22 @@ The gore sandbox stops being a dev scene and becomes a place. That is the whole
 move: it already has bodies, a reset, and the psychedelic rig wired to it, so it
 is the cheapest room in the game to make real — and a shed you took something in
 is a better tutorial for what a substance does than any readout of it.
-- [ ] **AU3.1** A shed, not a void — enclosed, dingy, lit by what is in it
+- [x] **AU3.1** A shed, not a void — enclosed, dingy, lit by what is in it —
+      `systems/shed.gd`, 3.2m by 2.4m, which is a real shed rather than a room
+      pretending to be one: you can touch both walls, and that is doing more
+      work than any texture, because the reason a shed feels like a shed is that
+      it is too small for what is in it. Corrugated sheets at the metric a real
+      one comes in (0.76m wide, 76mm corrugation), every panel nudged a degree
+      or two off true, studs behind, a roof with a fall on it, and a door
+      standing open because it always is. **One bulb on a flex is the entire
+      lighting design** and the only emitter in the file — which is the point of
+      putting the drugs somewhere enclosed: a carried lamp (AS) and a lit
+      cigarette (AU7.5) are the only other light that will ever be in here, so
+      you choose between seeing and having a free hand. Deterministic from a
+      seed, the same guarantee `roll_strain()` makes, because a room that
+      re-rolls its own dents on every load is a room nobody can learn.
+      Verified from inside at eye height, not from outside the box
+      (`tests/shed_capture.tscn`, three frames looked at)
 - [x] **AU3.2a** The objects themselves exist — all four carried forms
       (baggie, weight, blotter tab, blister card) and the shed's own kit
       (rolling tray, grinder, lighter, ashtray, scales), procedural at real
