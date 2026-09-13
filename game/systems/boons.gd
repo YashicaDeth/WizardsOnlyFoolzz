@@ -104,6 +104,16 @@ static func _default_anatomy_state() -> Dictionary:
 	return {"blood": 5000.0, "blood_capacity": 5000.0, "organs": organs, "zones": zones}
 
 
+## AJ1.4. Exposed so a cost paid in the body is one real ledger, not one per
+## system that wants to charge something real — chaos magick's sigil-charging
+## spends against the exact same anatomy state a boon already does, rather
+## than a second body this file would have to keep consistent with the first.
+static func pay(subject_id: String, cost_kind: String, amount: float, cost_target: String = "") -> Dictionary:
+	if not COST_KINDS.has(cost_kind):
+		return {"ok": false, "reason": "UNKNOWN COST KIND"}
+	return _pay(subject_id, cost_kind, amount, cost_target)
+
+
 static func _pay(subject_id: String, cost_kind: String, amount: float, cost_target: String) -> Dictionary:
 	var subject := WorldHistory.subject(subject_id)
 	var anatomy: Dictionary = subject.get("anatomy_state", {})

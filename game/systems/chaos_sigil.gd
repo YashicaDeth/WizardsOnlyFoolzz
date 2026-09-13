@@ -23,8 +23,16 @@ extends RefCounted
 ## "AWE") would otherwise condense to nothing, so vowels are only dropped
 ## when consonants survive to replace them — the glyph is never empty.
 const CellOutzType := preload("res://systems/celloutz_type.gd")
+const Boons := preload("res://systems/boons.gd")
 
 const VOWELS := ["A", "E", "I", "O", "U"]
+## AJ1.4. "Charging costs something real." Blood is the oldest cost in the
+## actual tradition — a blood sigil is not an invented mechanic, it is the
+## most literal reading of the source material available. Scaled by the
+## condensed glyph's own length rather than a flat number, so a longer,
+## more demanding intent costs more the same way a heavier ask should —
+## never a fiction number unrelated to what was actually stated.
+const BLOOD_COST_PER_LETTER := 40.0
 
 
 static func condense(intent: String) -> String:
@@ -81,3 +89,23 @@ static func draw(canvas: CanvasItem, center: Vector2, radius: float, intent: Str
 	if seal.is_empty():
 		return
 	CellOutzType.draw_seal(canvas, center, radius, int(seal.seed), color, complexity, weight)
+
+
+## AJ1.4. Spends real blood through the same ledger `boons.gd` already pays
+## from — refused outright, the same as a boon would be, if the body does
+## not have it to give. A charged sigil is a real, timestamped fact about
+## the subject who made it, not a flag on an object nobody else can read.
+static func charge(intent: String, subject_id: String = "player") -> Dictionary:
+	var sigil := seal_for(intent)
+	if sigil.is_empty():
+		return {"ok": false, "reason": "NOTHING STATED TO CHARGE"}
+	var cost := BLOOD_COST_PER_LETTER * maxf(1.0, float(str(sigil.condensed).length()))
+	var payment := Boons.pay(subject_id, "blood", cost)
+	if not bool(payment.get("ok", false)):
+		return payment
+	sigil["charged"] = true
+	sigil["subject_id"] = subject_id
+	sigil["cost_kind"] = "blood"
+	sigil["cost_paid"] = cost
+	WorldHistory.record_event("sigil_charged", {"subject_id": subject_id, "intent": sigil.intent, "seed": sigil.seed, "cost_kind": "blood", "cost_paid": cost})
+	return {"ok": true, "sigil": sigil}
