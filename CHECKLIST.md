@@ -4187,19 +4187,19 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
 
 ### AN v10 — the final pass
 The last rung. Fifteen statements that are true of the body as the weapon when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
-- [ ] **AN10.1** `v10` The weapon is a mass on the end of an arm
-- [ ] **AN10.2** `v10` Where you point is where the anchor goes
-- [ ] **AN10.3** `v10` Turning throws it, and heavier throws further
-- [ ] **AN10.4** `v10` Damage asks what the head was actually doing
-- [ ] **AN10.5** `v10` A flick and a committed sweep differ by an order of magnitude
-- [ ] **AN10.6** `v10` Mass and reach are the whole balance conversation
-- [ ] **AN10.7** `v10` Fatigue degrades the guard rather than announcing it
-- [ ] **AN10.8** `v10` Firearms run through the same object
-- [ ] **AN10.9** `v10` A grapple, a shove and a bare hand share it
-- [ ] **AN10.10** `v10` You can be disarmed
-- [ ] **AN10.11** `v10` Armour, bone and wall each answer differently
-- [ ] **AN10.12** `v10` The weapon's condition rides on the same object
-- [ ] **AN10.13** `v10` Two-handing changes numbers, not pose
+- [x] **AN10.1** `v10` The weapon is a mass on the end of an arm — See AN1.1: the spring-damper core, `limb_momentum.gd`, ten checks.
+- [x] **AN10.2** `v10` Where you point is where the anchor goes — See AN1.2: `anchor` is a fixed offset in view space, so it turns with the camera by construction; a hard turn throws the weapon 0.397m off it, against a 0.42m arm limit.
+- [x] **AN10.3** `v10` Turning throws it, and heavier throws further — See AN1.1/AN1.2: `limb_momentum_test.gd` throws the identical turn at a 0.5kg and a 6.0kg arm and measures the heavier one lagging further off-anchor every time.
+- [ ] **AN10.4** `v10` Damage asks what the head was actually doing — **Not true yet.** `commitment()` is calibrated and computed on every blow (AN1.4) but `momentum_damage` is still `false` (AN1.8, deliberately — "both systems see the same swings, which is what makes them comparable"); live damage still comes from the old swing. Flipping it is a real balance decision, not a bugfix, and stays Greg's call rather than this pass's.
+- [ ] **AN10.5** `v10` A flick and a committed sweep differ by an order of magnitude — **Not verified as stated.** The section's own intro quotes 0.013 vs 0.346 (~27x) but that figure does not reproduce: `limb_momentum_test.gd` currently measures flick 0.000 vs sweep 0.082, and `arm_calibration_test.gd`'s raw travel is 1.86m vs 3.96m (~2.1x) — neither a stale quote nor a live number I can currently reproduce support "an order of magnitude" cleanly enough to tick this without inventing the gap away. Left open rather than resolved on a guess.
+- [x] **AN10.6** `v10` Mass and reach are the whole balance conversation — See AN1.5: `ARM_WEIGHTS` carries every weapon's own mass and reach and nothing else changes when the held thing does.
+- [x] **AN10.7** `v10` Fatigue degrades the guard rather than announcing it — See AN1.6: fatigue reads straight off stamina into the spring's own stiffness, continuous rather than a threshold flip.
+- [x] **AN10.8** `v10` Firearms run through the same object — See AN1.7/`firearm_momentum_test.gd`: the sword, shotgun and sidearm all re-carry `LimbMomentum` with their own mass and reach and all three visibly displace off rest pose under an identical turn.
+- [x] **AN10.9** `v10` A grapple, a shove and a bare hand share it — See AN1.9/`grapple_mass_test.gd`: `grapple` and `shove` are real `ARM_WEIGHTS` entries the arm's mass switches to and from live.
+- [x] **AN10.10** `v10` You can be disarmed — See AN2.2/`disarm_test.gd`: a hard hit on a fatigued grip genuinely puts the weapon down.
+- [x] **AN10.11** `v10` Armour, bone and wall each answer differently — See AN2.3/`melee_resistance_test.gd`/`wall_strike_test.gd`: armour, per-zone bone density and a wall's own `WALL_MELEE_RESISTANCE` each feed `strike()` a different number.
+- [x] **AN10.12** `v10` The weapon's condition rides on the same object — See AN2.4/`weapon_condition_test.gd`: a worn weapon reads back into `LimbMomentum` as lower `arm_stiffness`, not a separate stat.
+- [x] **AN10.13** `v10` Two-handing changes numbers, not pose — See AN2.5/`two_handing_test.gd`: cycling grip measurably changes reach, control and damage type from the identical weapon.
 - [x] **AN10.14** `v10` Walking into a blow counts toward it — `_advance_arm()` has read `player_body.velocity` into `LimbMomentum.advance()`'s `body_velocity` parameter since AN1.2 shipped, with the comment already on the line ("a step forward is real force and the game should not be the only place that is untrue"), but nothing had ever exercised it through the real hunt loop with a moving body: `limb_momentum_test.gd` drives the arm in isolation with a hand-picked vector, `firearm_momentum_test.gd` holds the player still, and `arm_calibration_test.gd`'s one "walking into it" gesture changes the turn rate at the same time it changes body speed, so it cannot show what walking alone is worth. Honestly scoped once measured: `advance()` sums the body's velocity into the weapon's regardless of which way either points, so it cannot tell a charge from a retreat — only that the body moved counts, not specifically that it moved forward. Verified by `tests/walking_into_blow_test.gd` (new, 3/3) through the real `_advance_arm()` the game calls every physics frame: a turn too weak to register as a blow at all on a still body (`commitment() = 0.000`, below `IDLE_SPEED`) becomes a real one (0.033) the instant the identical turn is thrown while the body is moving, and a body moving the other way counts too (0.039). `limb_momentum_test`, `arm_calibration_test`, `firearm_momentum_test`, `footing_test`, `combat_integration_test` and `opening_test` regression suites re-verified clean.
 - [ ] **AN10.15** `v10` The old swing system is gone because this one is better
 
