@@ -43,6 +43,9 @@ const DEBRIS := [
 
 var clock := 0.0
 var pieces: Array[Dictionary] = []
+var street_actors: Array[Dictionary] = []
+var floor_sigils: Array[Node3D] = []
+var relics: Array[Dictionary] = []
 var camera: Camera3D
 
 
@@ -74,7 +77,111 @@ func _ready() -> void:
 	add_child(fill)
 
 	_build_debris()
+	_build_living_ashbloom()
 	set_process(true)
+
+
+## The first shot is a real place now: a small block of Ashbloom with people
+## crossing it and two scavengers fighting in the centre.  It is deliberately
+## staged rather than a physics simulation; this is a front door, so it must
+## read immediately and never spend menu-frame budget on a whole AI world.
+func _build_living_ashbloom() -> void:
+	_add_set_piece(BoxMesh.new(), Vector3(0, -1.2, -5.2), Vector3(15.0, 0.22, 13.0), Color("21100e"), "rust", 0)
+	_add_set_piece(BoxMesh.new(), Vector3(0, -1.06, -5.2), Vector3(3.1, 0.025, 12.0), Color("4a3023"), "rust", 2)
+	# Broken side buildings frame the street without covering its actors.
+	_add_set_piece(BoxMesh.new(), Vector3(-5.8, 0.2, -6.4), Vector3(2.2, 2.6, 4.4), Color("351815"), "rust", 5)
+	_add_set_piece(BoxMesh.new(), Vector3(5.7, 0.05, -7.3), Vector3(2.5, 2.3, 3.5), Color("2d1c17"), "rust", 7)
+	for x in [-0.85, 0.85]:
+		_add_set_piece(BoxMesh.new(), Vector3(x, -1.00, -5.2), Vector3(0.08, 0.035, 10.0), Color("c46a2e"), "rust", 12 + int(x * 4.0))
+	_build_floor_gore_and_sigils()
+	# Two fighters read as a conflict at a glance; the others give the road a
+	# population and move on different loops.
+	_spawn_actor(Vector3(-0.72, -0.52, -4.6), Color("9a3026"), 0.0, true)
+	_spawn_actor(Vector3(0.62, -0.52, -4.8), Color("6d8c67"), 1.7, true)
+	_spawn_actor(Vector3(-2.9, -0.52, -7.8), Color("564238"), 2.9, false)
+	_spawn_actor(Vector3(2.8, -0.52, -6.4), Color("77533b"), 4.4, false)
+	_spawn_actor(Vector3(-1.9, -0.52, -8.8), Color("3c6670"), 5.6, false)
+	_build_relics()
+
+
+func _add_set_piece(mesh: PrimitiveMesh, at: Vector3, scale_value: Vector3, tint: Color, surface_kind: String, seed: int) -> MeshInstance3D:
+	var item := MeshInstance3D.new()
+	item.mesh = mesh
+	item.position = at
+	item.scale = scale_value
+	mesh.material = WorldLook.surface(tint, surface_kind, seed)
+	add_child(item)
+	return item
+
+
+func _build_floor_gore_and_sigils() -> void:
+	for index in 17:
+		var x := sin(float(index) * 4.7) * 4.3
+		var z := -3.2 - fposmod(float(index) * 2.39, 7.4)
+		var stain := _add_set_piece(CylinderMesh.new(), Vector3(x, -1.025, z), Vector3(0.14 + float(index % 4) * 0.09, 0.01, 0.08 + float(index % 3) * 0.07), Color("5f1715"), "flesh", index + 30)
+		stain.rotation.y = float(index) * 0.72
+	for index in 3:
+		var ring := MeshInstance3D.new()
+		var torus := TorusMesh.new()
+		torus.inner_radius = 0.34 + index * 0.06
+		torus.outer_radius = 0.38 + index * 0.06
+		torus.rings = 20
+		torus.ring_segments = 8
+		torus.material = WorldLook.surface(Color("9b241d"), "flesh", 65 + index)
+		ring.mesh = torus
+		ring.position = Vector3(-2.8 + index * 2.75, -0.99, -4.2 - index * 1.55)
+		ring.rotation.x = PI * 0.5
+		add_child(ring)
+		floor_sigils.append(ring)
+
+
+func _spawn_actor(at: Vector3, tint: Color, phase: float, fighting: bool) -> void:
+	var body := Node3D.new()
+	body.position = at
+	add_child(body)
+	var torso := CapsuleMesh.new()
+	torso.radius = 0.18
+	torso.height = 0.82
+	torso.radial_segments = 8
+	var torso_mesh := MeshInstance3D.new()
+	torso_mesh.mesh = torso
+	torso_mesh.position.y = 0.42
+	torso.material = WorldLook.surface(tint, "flesh", int(phase * 11.0))
+	body.add_child(torso_mesh)
+	var head := SphereMesh.new()
+	head.radius = 0.18
+	head.height = 0.34
+	head.radial_segments = 8
+	var head_mesh := MeshInstance3D.new()
+	head_mesh.mesh = head
+	head_mesh.position = Vector3(0, 0.96, 0)
+	head.material = WorldLook.surface(Color("a76d54"), "flesh", int(phase * 17.0))
+	body.add_child(head_mesh)
+	# A crude held blade gives the two central figures a readable exchange.
+	var blade := BoxMesh.new()
+	blade.size = Vector3(0.055, 0.5, 0.055)
+	var weapon := MeshInstance3D.new()
+	weapon.mesh = blade
+	weapon.position = Vector3(0.22, 0.55, 0)
+	weapon.rotation.z = -0.65
+	blade.material = WorldLook.surface(Color("c8baa3"), "bone", int(phase * 23.0))
+	body.add_child(weapon)
+	street_actors.append({"node": body, "origin": at, "phase": phase, "fighting": fighting, "weapon": weapon})
+
+
+func _build_relics() -> void:
+	for index in 4:
+		var orb := MeshInstance3D.new()
+		var sphere := SphereMesh.new()
+		sphere.radius = 0.24
+		sphere.height = 0.48
+		sphere.radial_segments = 12
+		sphere.rings = 8
+		sphere.material = WorldLook.surface(Color("6a3c83"), "flesh", 100 + index)
+		orb.mesh = sphere
+		orb.position = Vector3(-3.5 + index * 2.15, 0.25 + (index % 2) * 0.42, -7.2 + (index % 3) * 0.7)
+		add_child(orb)
+		relics.append({"node": orb, "origin": orb.position, "phase": float(index) * 1.4})
 
 
 func _build_debris() -> void:
@@ -192,3 +299,26 @@ func _process(delta: float) -> void:
 			origin.z
 		)
 		node.rotation += (piece.spin as Vector3) * delta
+	for state in street_actors:
+		var actor := state.node as Node3D
+		if not is_instance_valid(actor):
+			continue
+		var phase := clock * (1.8 if bool(state.fighting) else 0.7) + float(state.phase)
+		var origin: Vector3 = state.origin
+		if bool(state.fighting):
+			actor.position = origin + Vector3(sin(phase) * 0.22, abs(sin(phase * 2.0)) * 0.08, cos(phase) * 0.12)
+			actor.rotation.y = sin(phase * 0.7) * 1.1
+			(state.weapon as Node3D).rotation.z = -0.35 + sin(phase * 3.0) * 0.85
+		else:
+			actor.position = origin + Vector3(sin(phase) * 0.78, abs(sin(phase * 2.0)) * 0.04, cos(phase) * 0.32)
+			actor.rotation.y = cos(phase) * 0.65
+	for index in floor_sigils.size():
+		var sigil := floor_sigils[index]
+		if is_instance_valid(sigil):
+			sigil.rotation.z += delta * (0.18 + index * 0.045)
+			sigil.position.y = -0.99 + sin(clock * 1.4 + index) * 0.025
+	for relic in relics:
+		var item := relic.node as Node3D
+		if is_instance_valid(item):
+			item.position = (relic.origin as Vector3) + Vector3(0, sin(clock * 1.5 + float(relic.phase)) * 0.18, 0)
+			item.rotate_y(delta * 0.72)
