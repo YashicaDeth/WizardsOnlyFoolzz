@@ -26,6 +26,12 @@ const ENTRIES := {
 	# `carry.gd`; what it does is in `crystal_ball.gd` and does not care which.
 	"scrying ball": {"zone": "left_arm", "profile": "orb", "armor": 0.02, "max_condition": 40.0, "tint": "9fb6c4"},
 	"ashline scrap arm": {"zone": "left_arm", "profile": "scrap_limb", "armor": 0.20, "max_condition": 110.0, "tint": "9d542e"},
+	# AT1.5/AT1.7. The tower. It is in the head, it is somebody else's, and it
+	# is on this list rather than in a field of its own so that every body
+	# panel already finds it and pulling it is the same operation as pulling
+	# anything else. `brain_index.gd` owns what it does; this owns what it is.
+	# Armour 0.0 on purpose: it protects nothing. It is only a way in.
+	"wetwire chip": {"zone": "head", "profile": "wetwire_tower", "armor": 0.0, "max_condition": 70.0, "tint": "6b2a2a"},
 }
 
 

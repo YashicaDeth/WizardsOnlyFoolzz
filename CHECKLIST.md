@@ -3809,14 +3809,130 @@ Naming: **WETWIRE** is the system, **MATERIA** the index inside it — two
 institutions naming the same object differently, which is already this game's
 central rule.
 
+`systems/brain_index.gd` (`BrainIndex`) is the logic half of this section, held
+by `tests/brain_index_test.gd` at 72 checks. The render half — the organ, the
+curved CRT, the wet — is untouched and its three boxes stay open below, honestly.
+
 - [ ] **AT1.1** The brain is a real organ at full detail, not an icon
+      — **not attempted.** `BaselineHuman` already has a `brain` organ in the
+      `head` zone with health, bleed and a `fatal` flag, and `brain_index.gd`
+      doses *that* organ rather than a new one, so the data this item needs is
+      in place and pointed at. But nothing models it at "full detail" and
+      nobody has looked at a brain in this build. Ticking it would be a claim
+      about a mesh that does not exist.
 - [ ] **AT1.2** A CRT bent into the cortex, curved, showing the inside from inside
-- [ ] **AT1.3** It is an index you open and most of what is in it is optional
+      — **not attempted.** This is a shader and a curved mesh. `BrainIndex`
+      gives it everything it would need to draw (`FOLDERS`, `listing()`,
+      `folder_counts()`, `reach()`), and deliberately returns `[SEALED]` rows
+      rather than hiding them so a screen has something to show for what you
+      have not remembered. The screen itself is unbuilt.
+- [x] ~~**AT1.3** It is an index you open and most of what is in it is
+      optional~~ The mind is a filesystem: `BrainIndex.FOLDERS` is fourteen
+      real regions (MEMORY, PASSWORDS, COMBAT, PEOPLE, PLACES, DREAMS,
+      MATERIA, ENTITIES, TRAUMA, SKILLS, RITUALS, LANGUAGES, ARCHIVED SELVES,
+      UNKNOWN) and `ENTRIES` twenty-two files inside them. "Most of it is
+      optional" is measured rather than asserted — `optional_ratio()` returns
+      0.86 and the test holds it above 0.8; exactly three entries are not
+      optional and they are the three the game cannot run without (who you
+      are, what is in your head, that you bleed).
+      **The part that makes it a mechanic rather than a skill tree:** an entry
+      is sealed behind a *keyword*, and `unlock()` refuses any keyword the
+      subject has no lived evidence for. Evidence is counted by reading
+      `WorldHistory.events` — the same "draw the conclusion from the log"
+      shape `ascent_entities.gd`'s `regard()` uses — so the fourteen keywords
+      are earned by things that already happen elsewhere in the game:
+      `player_captured` opens RESTRAINT, three `npc_resolution`/`spare` opens
+      MERCY, `substance_taken` on a given `substance_id` opens that drug's
+      entry, `ritual_completed` opens SEAL, `player_redecanted` opens
+      REDECANT. An NPC can say the word at you and it opens nothing: the
+      refusal reads "YOU KNOW THE WORD. YOU DO NOT KNOW WHAT IT MEANS YET."
+      That is remembering, not buying, stated as a refusal. Unlocking a
+      keyword opens *every* entry under it at once, because remembering is not
+      one file, it is the whole afternoon. Sealed entries are still **listed**
+      (as `[SEALED]`), which is the difference between an index and an
+      inventory. Two keywords — `DA'ATH` and `THE NINTH BODY` — have no rule
+      at all and can never be opened by any play; they are the UNKNOWN folder,
+      and the test asserts no amount of history produces evidence for them.
+      *Still open:* nothing draws this yet (AT1.2), the twenty-two entries are
+      a first pass rather than a full write, and nothing in the shipping game
+      calls `unlock()` from a real interaction yet.
 - [ ] **AT1.4** Visceral: it is wet, the chip is bolted into wet tissue, and looking at it is uncomfortable
-- [ ] **AT1.5** The tower in it — the bloody wired chip — is the bridge to the network above
+      — **not attempted, and deliberately not half-ticked.** The chip is now
+      genuinely *in tissue* rather than being a flag: `install_chip()` appends
+      a real `wetwire chip` implant (new `implant_catalog.gd` entry, `head`
+      zone, `armor: 0.0` because it protects nothing) to the same
+      `anatomy_state.cybernetics` list every other implant is on, so the body
+      panels find it and pulling it is the same operation as pulling anything
+      else. But "wet" and "uncomfortable to look at" are claims about a
+      render, and nobody has looked at it. Open.
+- [x] ~~**AT1.5** The tower in it — the bloody wired chip — is the bridge to
+      the network above~~ Stated as a number rather than a sentence.
+      `BrainIndex.PLANES` is the full ladder from `DESIGN/THE_BRAIN.md` §3
+      (Malkuth 3D through Keter 12D, Da'ath off the map), `FREE_PLANE = 4`,
+      and `bridge()` is the **only** door to a plane above it. Without the
+      chip, 5D and up refuse with "NOTHING IN YOUR HEAD TO REACH WITH"; 4D —
+      the wizard eyes — opens for anybody and records `via_chip: false`, which
+      is the design's "the only higher plane you see for free" made
+      mechanical. `reach()` returns 4 unwired and 12 wired, and entries
+      carry a `plane` floor, so the ENTITIES entry at Tiferet and the
+      LANGUAGES entry at Hod are unreadable without the bridge even after
+      their keyword has been remembered — the memory is yours, the altitude
+      is the chip's. *Still open:* the substances are not yet what raises you
+      to a plane (§5b's "altitude is the gate" — `bridge()` currently takes
+      the plane as a parameter and trusts its caller), and nothing above 8D
+      has content behind it.
 - [ ] **AT1.6** The Wire seen from 5D is what that network is
-- [ ] **AT1.7** It is hardware somebody else installed: revocable, traceable, and it can find you
-- [ ] **AT1.8** Its radiation is what melts you at 8g and 9g — the thing connecting you is killing you
+      — **half built, and half is not a tick.** `wire_from_above()` exists and
+      is tested: it gates on `bridge(5)`, then reaches for the *same*
+      `WireNet` accounts the ground-level Wire already has and re-ranks them
+      by `WorldHistory.tree_alignment()` instead of by reach. That is the
+      structurally correct reading of "the Wire seen from 5D *is* that
+      network" — no second dataset, the same people ordered by what they are
+      rather than by how loud they are — and with the chip revoked there is no
+      view from above at all. What is missing is the whole point of the item:
+      "the posts are being made by something else". That is writing and a
+      shader, and until the feed reads differently up there this is a re-sort,
+      not a plane. Left open.
+- [x] ~~**AT1.7** It is hardware somebody else installed: revocable,
+      traceable, and it can find you~~ All three, mechanically, in
+      `brain_index.gd`. **Somebody else's:** `install_chip()` takes an
+      `owner_faction` (default `celloutz`) and an installer, records
+      `wetwire_installed`, and refuses to install twice — AP1.3's "while you
+      were captured" has an owner attached to it now. **Revocable:**
+      `revoke(reason)` is the owner's call, drops `reach()` to 4, and shuts
+      every plane-gated entry with *their* reason quoted back at you
+      ("REVOKED: UNPAID SUBSCRIPTION") rather than a generic failure. The
+      distinction the test pins hardest: revocation does **not** touch
+      `wetwire_opened` — the memories are yours and the network is theirs, and
+      ground-level entries still read with the chip dead. **Traceable:**
+      `trace_level()` is not a counter on the subject, it is derived by
+      counting `wetwire_bridged` events with `via_chip: true` since the last
+      `wetwire_went_dark`, so the trail is read off the log like everything
+      else here and 4D leaves none. **It can find you:** at `TRACE_FIX = 5`
+      crossings `locate()` returns the real place of your last crossing with a
+      confidence and records `wetwire_traced`, so whoever the owner sends is
+      reacting to a recorded event rather than to a flag. `go_dark()` is the
+      only counter and it costs exactly the thing it protects — dark, the
+      bridge is shut ("YOU CANNOT HIDE FROM IT AND USE IT") and reach falls to
+      4. *Still open:* nothing yet *consumes* `wetwire_traced` — no spawner
+      sends anybody to the fix, and no faction logic decides to revoke. The
+      state and its consequences exist; the antagonist reading them does not.
+- [x] ~~**AT1.8** Its radiation is what melts you at 8g and 9g — the thing
+      connecting you is killing you~~ Charged in the same call that grants the
+      plane, so it cannot be forgotten. `bridge()` at plane 8 or above pays
+      `RADIATION_DOSE_PER_SECOND` into `anatomy_state.dose["head"]` — **the
+      existing melting ledger**, not a new one: B3's `AnatomyComponent`
+      already burns `dose` against zone health and every organ in that zone,
+      and the only organ in `head` is `brain`. So the connection literally
+      eats the organ the index lives in, and it keeps eating after you come
+      down, which is what made writing it as dose rather than flat damage the
+      right call. 9g melts faster than 8g for the same seconds (2.4/s against
+      0.9/s, asserted), 7D and below cost nothing at all (asserted — the
+      melting starts at 8g exactly), and each dose is recorded as
+      `wetwire_radiation` rather than as a wound, because it is weather, not
+      an attack. Ties AO1.3 to AT: the towers melt you and the tower in your
+      head is one of them. *Still open:* no readout tells the player the
+      number before they cross, and there is no treatment for a dosed head.
 
 ## AU — The materia
 
