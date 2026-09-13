@@ -37,16 +37,6 @@ func condition_fraction() -> float:
 func is_wrecked() -> bool:
 	return integrity <= 0
 
-## V1.2. Damage is physical and visible (the crushed shell, the shed panels)
-## and it changes how the car drives. A beaten chassis does not corner, brake
-## or put power down as well as a fresh one - not zero, since a car parked at
-## zero integrity is already ending the round rather than still being driven,
-## but enough that a fight you are losing gets visibly harder to drive out of.
-const MIN_HANDLING_AT_ZERO_INTEGRITY := 0.5
-
-func handling_fraction() -> float:
-	return lerpf(MIN_HANDLING_AT_ZERO_INTEGRITY, 1.0, condition_fraction())
-
 const DRIVE_SPEED := 24.0
 const REVERSE_SPEED := 10.0
 const IMPACT_SPEED := 4.0
@@ -249,10 +239,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		# --- tire ---------------------------------------------------------
 		# Grip is a friction limit against this wheel's own load, which is what
 		# makes weight transfer matter rather than just look like it does.
-		# V1.2: the same limit clamps cornering, braking and drive force below,
-		# so scaling it by condition is what makes a battered car worse at all
-		# three at once, rather than needing three separate degradation terms.
-		var limit := load * TIRE_GRIP * handling_fraction()
+		var limit := load * TIRE_GRIP
 		var steered := forward if not FRONT_WHEELS.has(index) else forward.rotated(up, steer).normalized()
 		var lateral_axis := steered.cross(up).normalized()
 		var lateral_speed := point_velocity.dot(lateral_axis)
