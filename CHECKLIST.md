@@ -4091,8 +4091,27 @@ is a better tutorial for what a substance does than any readout of it.
       where you learn what a thing does, so it has to be repeatable
 - [ ] **AU3.4** Taking something here drives `psychedelic_rig.gd` through the
       same dials the game uses, never a separate demo path
-- [ ] **AU3.5** It doubles as the weapons range (AF) — same room, same bodies
-- [ ] **AU3.6** Reachable in the real world, not only from a dev menu
+- [x] **AU3.5** It doubles as the weapons range (AF) — same room, same bodies.
+      The gore sandbox drops a `SubstanceStation`, so the room that already has
+      seven bodies and an instant reset now also has every substance and every
+      smokeable in it
+- [x] **AU3.6** Reachable in the real world, not only from a dev menu — the Hunt
+      Grounds drop the same station under the wrecks, and lifting something off
+      it files through the identical `WorldHistory` inventory path a loot cache
+      already uses
+- [x] **AU3.7** Three places, one object — `systems/substance_station.gd`. The
+      shed, the sandbox and the Hunt Grounds do not lay their own tables out;
+      each drops the same node, so **if a substance is reachable in the sandbox
+      it is reachable in the Hunt Grounds, because it is the same object.**
+      There is no sandbox-only path to keep in step. `manifest_ids()` is the
+      single answer to "what is available", and a test asserts two independently
+      built stations expose an identical set, and that the shed's bench matches
+      (`tests/substance_station_test.gd`, 20 checks)
+- [ ] **AU3.8** The station has no collision — the table, the bong and the kit
+      are meshes with no bodies, so you walk through all of it. Cheap to add and
+      deliberately not guessed at here: this project's collision layers are a
+      convention I should be told rather than infer, and a body on the wrong
+      layer stops bullets or confuses `ashbloom_pathfinder.gd`
 
 ### AU4 — What a state actually looks like
 The rig can reach eleven named states and nothing in the game names them.

@@ -53,6 +53,7 @@ const BASELINE := preload("res://systems/baseline_human.gd")
 const BALLISTICS := preload("res://systems/ballistics.gd")
 const IMPACT_FEEL := preload("res://systems/impact_feel.gd")
 const CellOutzType := preload("res://systems/celloutz_type.gd")
+const SUBSTANCE_STATION := preload("res://systems/substance_station.gd")
 
 const BODY_COUNT := 7
 const ARENA := 26.0
@@ -107,6 +108,9 @@ var last_note := ""
 var note_life := 0.0
 
 
+var station: Node3D
+
+
 func _ready() -> void:
 	_build_room()
 	_build_camera()
@@ -114,6 +118,14 @@ func _ready() -> void:
 	add_child(impact_feel)
 	ballistics = BALLISTICS.new()
 	add_child(ballistics)
+	# AU3.5. The same station the shed and the Hunt Grounds drop - the sandbox
+	# does not get its own layout, because a sandbox-only list is a list that
+	# falls behind the game within a week.
+	station = SUBSTANCE_STATION.new()
+	station.name = "SubstanceStation"
+	station.position = Vector3(0.0, 0.0, 4.2)
+	add_child(station)
+	station.build()
 	for index in BODY_COUNT:
 		_spawn_body(index)
 	_build_hud()

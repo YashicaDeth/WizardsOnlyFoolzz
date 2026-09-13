@@ -80,6 +80,7 @@ const IMPACT_FEEL := preload("res://systems/impact_feel.gd")
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 const CARRION_SCAVENGER := preload("res://systems/carrion_scavenger.gd")
 const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
+const SUBSTANCE_STATION := preload("res://systems/substance_station.gd")
 
 var player := Vector3(0, 1.5, 19)
 var yaw := PI
@@ -240,6 +241,10 @@ var generated_world: Node3D
 var misfire_director: Node3D
 var encounter_actors: Array[Dictionary] = []
 var loose_loot: Array[Node3D] = []
+## AU3.5/AU3.6. The same station the shed and the sandbox drop. Nothing
+## here lays substances out on its own, so the Hunt Grounds cannot fall
+## behind what the sandbox offers - it is the same object in all three.
+var substance_station: Node3D
 var mara_encounter_number := 1
 var player_body: CharacterBody3D
 var player_rig: BaselineHuman
@@ -2002,6 +2007,20 @@ func _interact() -> void:
 		if not carried.is_empty():
 			prompt.text = "%s SECURED // [4] WIELD // CARRY %0.1f KG" % [str(carried.label), handheld.carry.total_mass()]
 			return
+	# AU3.2. The station decides what is in reach; this decides what taking it
+	# means here, which is the same inventory path a loot cache already uses.
+	if substance_station != null and is_instance_valid(substance_station):
+		var lifted: Dictionary = substance_station.take_nearest(player)
+		if not lifted.is_empty():
+			var carried_items: Array = WorldHistory.subject("inventory").get("items", []).duplicate()
+			carried_items.append(str(lifted["label"]))
+			WorldHistory.update_subject("inventory", {"items": carried_items}, "substance_lifted")
+			WorldHistory.record_event("substance_lifted", {
+				"kind": str(lifted["kind"]), "id": str(lifted["id"]), "location": HUNT_LOCATION,
+			})
+			prompt.text = "%s // TAKEN" % str(lifted["label"])
+			return
+
 	for marker in social_markers.duplicate():
 		if is_instance_valid(marker) and player.distance_to(marker.global_position) < 4.0:
 			var kind := str(marker.get_meta("kind"))
@@ -3780,6 +3799,15 @@ func _build_world() -> void:
 	# to the same sky material and driven by the same clock as everything else
 	# in A. `camera` is an `@onready`, which resolves before `_ready()` calls
 	# this, so it is safe to hand over here.
+	# AU3.6. Reachable in the real world rather than from a dev menu: a working
+	# table under the wrecks, where a hunt already brings you.
+	substance_station = SUBSTANCE_STATION.new()
+	substance_station.name = "SubstanceStation"
+	substance_station.position = Vector3(-6.4, 0.0, 9.2)
+	substance_station.rotation = Vector3(0, deg_to_rad(-24.0), 0)
+	add_child(substance_station)
+	substance_station.build()
+
 	gods = Gods.new()
 	gods.name = "Gods"
 	add_child(gods)

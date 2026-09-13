@@ -34,6 +34,7 @@ extends Node3D
 
 const SubstanceObjects := preload("res://systems/substance_objects.gd")
 const Smokeables := preload("res://systems/smokeables.gd")
+const SubstanceStation := preload("res://systems/substance_station.gd")
 
 const WIDTH := 3.2
 const DEPTH := 2.4
@@ -54,6 +55,7 @@ const BULB := Color("ffd39a")
 
 var bench: Node3D
 var door: Node3D
+var station: Node3D
 var floor_centre := Vector3.ZERO
 
 var _rng := RandomNumberGenerator.new()
@@ -328,44 +330,15 @@ func _build_bulb() -> void:
 	add_child(light)
 
 
-## AU3.2: set out in the room, not chosen from a list.
+## AU3.2. The bench is dressed by the same `SubstanceStation` the sandbox and
+## the Hunt Grounds drop, with its own table suppressed because the shed already
+## has one. This used to lay the objects out itself, which meant the shed and
+## every other place that wanted them were three lists that had to be kept in
+## agreement by hand - the exact shape of the E2 problem.
 func _dress_bench() -> void:
-	var top_y := 0.879
-	var laid := [
-		{"form": "baggie", "substance": "marrow_dust", "x": -0.86, "z": 0.10},
-		{"form": "weight", "substance": "choir_bloom", "x": -0.58, "z": 0.06},
-		{"form": "tab", "substance": "static_hymn", "x": -0.33, "z": 0.12},
-		{"form": "blister", "substance": "marrow_dust", "x": -0.12, "z": 0.09},
-	]
-	for entry: Dictionary in laid:
-		var node: Node3D = SubstanceObjects.build(str(entry["form"]), str(entry["substance"]))
-		node.position = Vector3(float(entry["x"]), top_y, float(entry["z"]))
-		node.rotation = Vector3(0, _rng.randf_range(-0.5, 0.5), 0)
-		add_child_to(bench, node)
-
-	var props := [
-		{"prop": "tray", "x": 0.20, "z": 0.02},
-		{"prop": "grinder", "x": 0.52, "z": 0.10},
-		{"prop": "scales", "x": 0.78, "z": -0.04},
-		{"prop": "ashtray", "x": 1.04, "z": 0.08},
-		{"prop": "lighter", "x": 0.36, "z": 0.18},
-	]
-	for entry: Dictionary in props:
-		var node: Node3D = SubstanceObjects.build_prop(str(entry["prop"]))
-		node.position = Vector3(float(entry["x"]), top_y, float(entry["z"]))
-		node.rotation = Vector3(0, _rng.randf_range(-0.35, 0.35), 0)
-		add_child_to(bench, node)
-
-	# The bong lives on the floor next to the bench, because it does not fit
-	# anywhere else and it is the one that takes both hands.
-	var bong: Node3D = Smokeables.build("bong")
-	bong.position = Vector3(-1.22, 0.0, 0.34)
-	add_child(bong)
-
-	var joint: Node3D = Smokeables.build("joint")
-	joint.rotation = Vector3(0, deg_to_rad(74.0), 0)
-	joint.position = Vector3(0.20, top_y + 0.009, 0.02)
-	add_child_to(bench, joint)
+	station = SubstanceStation.new()
+	bench.add_child(station)
+	station.build(false)
 
 
 ## --- primitives ----------------------------------------------------------
