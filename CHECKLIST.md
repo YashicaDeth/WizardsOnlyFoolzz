@@ -1662,20 +1662,63 @@ and start being an object — and leaving your body should cost something.
       normalises correctly), captured in `game/captures/m1_6_field_hud_vitals.png`.
 
 ### M2 — In the car
-**Deferred this session.** There is currently no first/third-person split in
-`rift_derby.gd` at all — one fixed chase camera — so this is a feature build
-(seated view, a visible WASD hand, a held gun, a real glass object that cracks)
-rather than a tune, in a file Agent B owns for visuals and is actively
-changing. Starting it without coordinating risked either a merge collision or
-landing something half-verified. Flagging it here rather than doing it
-silently, per this session's brief.
-- [ ] **M2.1** First-person driving is the default
-- [ ] **M2.2** One hand on the wheel; that hand *is* WASD and it is visible
-- [ ] **M2.3** The other hand holds a gun, and you shoot out of your own car
-- [ ] **M2.4** You shoot through your own windscreen, and the glass is really there
-- [ ] **M2.5** The glass degrades as the car takes hits — the view gets worse as you do
-- [ ] **M2.6** Third-person driving unlocks through derby progress, separately from M1
-- [ ] **M2.7** No hard cut between the two views (Rule 3)
+**The note above this line was wrong by the time anyone read it again.** It
+said there was no first/third-person split in `rift_derby.gd` and deferred
+the whole section rather than risk a collision in a file Agent B owns.
+Since it was written, `vehicle_interior.gd`/`dash_cluster.gd` — both Lane
+1's own files, "driving from inside" — were built in full, and
+`rift_derby.gd` wires them in (`INTERIOR := preload(...)`, `in_cab`,
+`_fire_from_cab()`). Read and verified here, not built here, and
+`rift_derby.gd` itself was not touched.
+- [x] ~~**M2.1** First-person driving is the default~~ Cross-ticked against
+      `rift_derby.gd`'s own `var in_cab := true` — the cab is genuinely
+      where a heat starts, not a chase camera you can optionally step into
+- [x] ~~**M2.2** One hand on the wheel; that hand *is* WASD and it is
+      visible~~ `VehicleInterior.drive(steer, throttle)` turns the wheel
+      and the `left_arm` gripping it by the same `steer` value the chassis
+      itself steers on — not a synced animation, the same number. Verified
+      against `captures/m2_cabin_straight.png` and
+      `captures/m2_cabin_turning.png`: the arm visibly leans with the wheel
+- [x] ~~**M2.3** The other hand holds a gun, and you shoot out of your own
+      car~~ `gun_arm` is real geometry (a grip, a slide, a barrel), LMB
+      calls `_fire_from_cab()` in `rift_derby.gd`, and it is a real weapon —
+      a raycast, real ammo (`rounds_left`), a cooldown, and real damage to
+      whatever it hits (`_damage_target`), not a cosmetic muzzle flash.
+      **Not yet true**: this is a second, simpler firearm system
+      (raycast + flat damage) rather than the one AF1/AF1.1 built —
+      `Ballistics`' real projectile and `BaselineHuman.hit_at`'s zone
+      resolution never enter it. That gap is AF1.8's own, named for exactly
+      this reason, and stays open
+- [x] ~~**M2.4** You shoot through your own windscreen, and the glass is
+      really there~~ `_windscreen()` is a real `BoxMesh` plane in front of
+      the camera, lit by the world, and `punch_through()` marks it exactly
+      where you aimed rather than a flat screen-space decal. Verified
+      against `captures/m2_cabin_straight.png`: buildings beyond the glass
+      are genuinely seen through real geometry, not composited
+- [x] ~~**M2.5** The glass degrades as the car takes hits — the view gets
+      worse as you do~~ `take_hit(severity, at_x)` raises `glass_damage`,
+      and `_apply_glass()` turns that into real milky scatter and roughness
+      on the same material rather than a health bar somewhere else on
+      screen. Verified against `captures/m2_cabin_wrecked.png`: at 5
+      recorded hits the windscreen has gone from the clear view in
+      `m2_cabin_straight.png` to a frosted wall — the buildings beyond are
+      gone, not merely dimmed
+- [~] **M2.6** Third-person driving unlocks through derby progress,
+      separately from M1 — `_third_person_earned()` in `rift_derby.gd` is
+      its own function, read fresh off `WorldHistory` rather than a stored
+      flag `bone_yard_hunt.gd` could leak into, which is "separately from
+      M1" in the sense that matters for a duplicated-flag bug. What it is
+      not separate from is the *condition*: its own comment says so
+      outright — "the same condition the Hunt Grounds uses" — a killed
+      rival or grudge ≥ 40, not a derby-specific measure like rounds won or
+      laps survived. Whether "derby progress" was meant to name a different
+      number is Greg's call, not assumed here
+- [ ] **M2.7** No hard cut between the two views (Rule 3) — checked, and it
+      is one: `_toggle_derby_view()` flips `in_cab` and `_apply_view_masks()`
+      swaps `camera.cull_mask` between the cab and bodywork layers on the
+      same frame, with no fade, no camera travel, nothing eased. Rule 3
+      ("every hard cut is a bug") names exactly this. Left open rather than
+      touched — `rift_derby.gd` is Lane 2's file
 
 ### M2b — Cars are the horses of this world
 Greg: *"in the car we need to be able to fully exit it like e exit the door type
