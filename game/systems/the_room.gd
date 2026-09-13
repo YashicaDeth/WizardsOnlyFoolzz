@@ -165,7 +165,19 @@ func hang_mirror(world: World3D) -> SubViewport:
 	# reflection camera renders the back of that wall and the mirror is black.
 	mirror.camera.cull_mask = 0xFFFFF & ~LAYER_MIRROR_WALL
 
-	var surface := _panel(Vector3(2.02, 1.92, 0.01), at + Vector3(0, 0, -0.035), Color.WHITE, 0.05)
+	# A quad, not a box. The glass was a BoxMesh, which puts the reflection on
+	# all six faces with the same UVs and leaves which one the viewer is
+	# actually reading up to the geometry — the reflection rendered correctly
+	# the whole time and the surface showing it did not. A quad has one face
+	# and a normal, so there is nothing to get wrong.
+	var glass := QuadMesh.new()
+	glass.size = Vector2(2.02, 1.92)
+	var surface := MeshInstance3D.new()
+	surface.mesh = glass
+	surface.position = at + Vector3(0, 0, -0.035)
+	# QuadMesh faces +Z; the room is on -Z of the glass, so it is turned round.
+	surface.rotation.y = PI
+	add_child(surface)
 	surface.layers = LAYER_MIRROR_WALL
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = mirror.get_texture()
