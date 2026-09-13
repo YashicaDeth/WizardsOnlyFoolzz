@@ -3662,7 +3662,19 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
 - [x] **AN1.6** Fatigue comes off stamina directly — a full player reads 0.00 and an empty one 1.00, so the guard degrades continuously rather than switching off at a threshold
 - [x] **AN1.7** Firearms run through the same object — the barrel swivels toward where you look and carries past it — like AF1.7, this was already wired rather than unbuilt, and unverified through an equipped weapon rather than untested: `ARM_WEIGHTS` has carried a shotgun and sidearm alongside the sword since AN1.5, and `_carry_current_weapon()`/`_pose_weapon()` read `arsenal.current_id` generically, never branching on melee versus firearm. Every existing momentum test drove `LimbMomentum` in isolation with hand-picked numbers; none of them equipped an actual gun. `tests/firearm_momentum_test.gd` does: equips each of the three weapons in turn through `_equip_weapon`, confirms the arm is re-carried with that weapon's own authored mass and reach, and confirms each weapon's own viewmodel (not just the sword's) visibly displaces off its authored rest pose under an identical turn — with the heavier shotgun lagging further off-anchor than the lighter sidearm, which is the whole point of AN1.5's per-weapon mass and could not happen if the pose write were melee-only. 7 checks.
 - [x] **AN1.8** The old swing stays authoritative, side by side — `momentum_damage` is false, so `commitment()` is computed and recorded on every blow but does not reach the damage number. Both systems see the same swings, which is what makes them comparable
-- [ ] **AN1.9** A grapple, a shove and a bare hand are the same object with a different mass
+- [x] **AN1.9** A grapple, a shove and a bare hand are the same object with a
+      different mass — `_carry_current_weapon()` now checks `grapple_target`
+      ahead of the weapon and the bare-hand state, since holding somebody
+      takes both hands regardless of what is holstered. Two new
+      `ARM_WEIGHTS` entries carry it: `grapple` while just holding on,
+      `shove` — heavier again, past even the severed limb — while
+      `grapple_pushing_now` says the player is forcing their weight into the
+      hold rather than maintaining it. Bare hands were already the same
+      object (`bare`, N/AN1's own baseline); this closes the other two.
+      Verified: `tests/grapple_mass_test.gd` — the arm's real mass changes
+      the instant a hold starts, changes again while pushing for advantage,
+      and returns to whatever was actually equipped the instant the hold
+      breaks.
 
 ### AN2 — What it costs to swing
 - [x] **AN2.1** A committed blow leaves you open in a way a flick does not

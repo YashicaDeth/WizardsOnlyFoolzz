@@ -431,6 +431,10 @@ var grapple_pressure_clock := 0.0
 ## action and there is no display server to raise a real one against in a
 ## headless run. Leave null for real input to decide it, as normal play does.
 var grapple_pushing_override: Variant = null
+## AN1.9. Mirrors `_update_grapple()`'s own local `pushing` each frame, since
+## `_carry_current_weapon()` needs to read it from outside that function to
+## pick "grapple" or the heavier "shove" mass.
+var grapple_pushing_now := false
 var friend_rig: BaselineHuman
 var lock_target := ""
 var lock_screen := Vector2(-1, -1)
@@ -1311,6 +1315,13 @@ const ARM_WEIGHTS := {
 	"sidearm": {"mass": 0.95, "reach": 0.22},
 	"severed_limb": {"mass": 2.6, "reach": 0.58},
 	"bare": {"mass": 0.4, "reach": 0.28},
+	# AN1.9. A held body is not a free hand — both arms are committed to it,
+	# heavier than anything carried one-handed. Pushing for advantage
+	# (`grapple_pushing_now`) commits the whole body's weight into the hold
+	# rather than just maintaining it, which is why it outweighs even the
+	# severed limb.
+	"grapple": {"mass": 1.8, "reach": 0.5},
+	"shove": {"mass": 2.4, "reach": 0.55},
 }
 
 
@@ -1323,7 +1334,12 @@ func _carry_current_weapon() -> void:
 	if arm == null:
 		return
 	var id := "bare"
-	if bare_handed:
+	# AN1.9. Holding somebody takes both hands regardless of what is
+	# holstered, so this is checked ahead of the weapon and the bare-hand
+	# state rather than beside them.
+	if not grapple_target.is_empty():
+		id = "shove" if grapple_pushing_now else "grapple"
+	elif bare_handed:
 		id = "bare"
 	elif carried_limb_index >= 0:
 		id = "severed_limb"
@@ -3487,6 +3503,7 @@ func grapple_shield(damage: float, from: Vector3) -> Dictionary:
 func _break_grapple(message := "") -> void:
 	grapple_target = ""
 	grapple_advantage = 0.0
+	grapple_pushing_now = false
 	if not message.is_empty():
 		prompt.text = message
 
@@ -3537,6 +3554,7 @@ func _update_grapple(delta: float) -> void:
 	# input read as a raw button rather than an action, so tests need a way in
 	# that does not depend on a display server existing.
 	var pushing: bool = grapple_pushing_override if grapple_pushing_override != null else (Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_key_pressed(KEY_C))
+	grapple_pushing_now = pushing
 	var player_force: float = player_rig.anatomy.combat_ratio() * (1.35 if pushing else 0.3)
 	# O3.3. combat_ratio() already softens their resistance for arm damage in
 	# general; this softens it further, specifically, for the one limb you
