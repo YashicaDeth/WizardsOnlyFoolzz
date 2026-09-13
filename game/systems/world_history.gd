@@ -242,6 +242,11 @@ const KARMA := {
 	# because it is deliberately rare — gated on the entity's attention, which is
 	# itself earned from a run of the acts above rather than bought.
 	"sin_washed": 0.12,
+	# N5.5. CellOutz's axis position is "Ownership" — defying a lock they put on
+	# your own body is the Ascent act of refusing to be owned, not a neutral
+	# inventory move. Only a *locked* pull counts: robbed or grown hardware
+	# (N5.8) was never CellOutz's claim to begin with.
+	"pull_locked_implant": 0.07,
 }
 
 
@@ -261,6 +266,8 @@ func event_karma(event: Dictionary) -> float:
 			return float(KARMA.silence_witness)
 		"limb_severed_in_combat":
 			return float(KARMA.maim)
+		"implant_pulled":
+			return float(KARMA.pull_locked_implant) if bool(details.get("was_locked", false)) else 0.0
 		"misfire_bond", "bond_strengthened", "npc_spared":
 			return float(KARMA.kindness)
 		"sin_washed":

@@ -1840,10 +1840,14 @@ player, and it should be possible from hour one and quietly discouraged.
       actually pulls it.
 - [x] **N5.4** The warning is in CellOutz's voice, not the game's — "you don't
       want to go rogue yet, do you" — `AnatomyComponent.LOCKED_WARNING`.
-- [ ] **N5.5** Pulling one is recorded, and CellOutz standing reads it (E,
-      `faction_price_factor`) — the pull is recorded (`implant_pulled`
-      events), but nothing yet moves it against `tree_alignment()`/CellOutz
-      standing specifically.
+- [x] **N5.5** Pulling one is recorded, and CellOutz standing reads it (E,
+      `faction_price_factor`) — `event_karma()` now prices `implant_pulled`
+      when `was_locked` is true: CellOutz's own axis is Ownership, so defying
+      their lock is a real Ascent act, not a neutral inventory move.
+      Unlocked hardware (robbed or grown, N5.8) does not touch it, since it
+      was never their claim. Verified: `tests/implant_lock_test.gd` — CellOutz's
+      `faction_price_factor` measurably worsens after a confirmed locked pull
+      and does not move again for an unlocked one.
 - [x] **N5.6** An empty slot is a real condition — the body works worse without
       what was in it — genuinely mechanical: `apply_hit()` already scales
       incoming damage by `installed_parts[zone].armor * implant_condition()`,

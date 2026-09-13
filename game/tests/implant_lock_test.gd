@@ -1,9 +1,11 @@
 extends Node
 
-## N5.2/N5.3/N5.4/N5.6/N5.7. Factory hardware fills real slots and is
+## N5.2/N5.3/N5.4/N5.5/N5.6/N5.7. Factory hardware fills real slots and is
 ## locked — locked has to mean discouraged, never disabled, and what comes
 ## out has to be a real carried object with a lien on it, not a number that
-## just vanishes.
+## just vanishes. N5.5: pulling a locked part is recorded and CellOutz's own
+## standing toward you actually moves, since the axis they sit on is
+## "Ownership" and defying their lock is the Ascent act of refusing it.
 
 const ANATOMY := preload("res://systems/anatomy_component.gd")
 const CARRY := preload("res://systems/carry.gd")
@@ -23,10 +25,13 @@ func _ready() -> void:
 		return
 
 	WorldHistory.clear_history()
+	WorldHistory.register_subject("player", {"faction_id": ""})
 	var body: Node = ANATOMY.new()
 	add_child(body)
 	body.configure("implant_test")
 	body.install_factory_loadout()
+
+	var standing_before := WorldHistory.faction_price_factor("celloutz", WorldHistory.subject("player"))
 
 	check(body.installed_parts.has("head") and body.installed_parts.has("torso") and body.installed_parts.has("left_arm"), "the factory loadout actually fills its three real zones")
 	check(not body.installed_parts.has("right_arm"), "and leaves the zones it does not touch genuinely empty")
@@ -44,6 +49,11 @@ func _ready() -> void:
 	check(bool(pulled.get("ok", false)), "confirmed, the same call that was refused now succeeds")
 	check(not body.installed_parts.has("head"), "and the slot is genuinely empty now")
 	check(absf(body.implant_condition("head")) < 0.001, "which reads as a real zero, not a hidden fallback (N5.6)")
+
+	# N5.5: defying a locked slot is CellOutz's axis being defied specifically,
+	# so their own price toward you actually moves, not karma in the abstract.
+	var standing_after := WorldHistory.faction_price_factor("celloutz", WorldHistory.subject("player"))
+	check(standing_after < standing_before, "pulling CellOutz's own lock makes CellOutz price you worse (%.3f -> %.3f)" % [standing_before, standing_after])
 
 	# N5.7: it comes out shaped for Carry.take_chunk(), lien attached, not a
 	# number that dissolves.
@@ -66,6 +76,11 @@ func _ready() -> void:
 	check(bool(unlocked.get("ok", false)), "a part that was never locked comes out on the first ask")
 
 	check(WorldHistory.event_count("implant_pulled") == 2, "every real pull is actually recorded (%d)" % WorldHistory.event_count("implant_pulled"))
+
+	# N5.5's gate: hardware that was never CellOutz's lock to begin with is not
+	# an act of defiance against them, so it does not touch their standing.
+	var standing_final := WorldHistory.faction_price_factor("celloutz", WorldHistory.subject("player"))
+	check(is_equal_approx(standing_final, standing_after), "pulling a part that was never locked does not move CellOutz's price again (%.3f -> %.3f)" % [standing_after, standing_final])
 
 	if failures.is_empty():
 		print("implant lock: discouraged, never disabled, and never free")
