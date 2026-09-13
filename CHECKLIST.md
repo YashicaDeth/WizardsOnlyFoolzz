@@ -2532,7 +2532,31 @@ being vehicles rather than set pieces.
       side-impact should list and pull, not just grip less all over) — that
       finer-grained model belongs with the panel/wheel-loss work in V10.2/V10.6
       rather than this first pass.
-- [ ] **V1.3** Fuel, or a reason a car is not infinite
+- [x] **V1.3** ~~Fuel, or a reason a car is not infinite~~
+      No car anywhere in the project burned anything — a derby heat, or in
+      principle a whole session, could be driven flat out forever. `fuel`
+      lives on `ArcadeVehicle` (V1.1's pattern: a real field on the chassis,
+      not a scene-local number), burns at `FUEL_BURN_PER_SECOND` only while
+      the throttle is actually held — idling and coasting are free, since the
+      tank is a cost of aggression rather than of existing — and a dry tank
+      cuts the rear-wheel drive branch in `_integrate_forces` outright, so an
+      empty car does not accelerate, it coasts down on rolling drag like any
+      unpowered thing does. `refuel()` tops it back up for whatever hands out
+      fuel later (V1.4's repair, a pit stop, a scavenged jerry can).
+      Verified: `tests/vehicle_fuel_test.gd` — idling burns nothing, holding
+      the throttle burns a measurable amount without emptying a full tank in
+      two seconds, a near-empty tank actually reaches zero rather than only
+      asymptoting toward it, `refuel()` restores it, and a car at zero fuel
+      measurably fails to move under full throttle. `tests/derby_exit_test.gd`
+      still runs a full ~35s heat clean — well inside a fresh tank's burn
+      budget, so this does not strand the existing heat-length tests.
+      Still open: nothing reads the number back except the test — there is no
+      HUD dial for it. `dash_cluster.gd`'s two-dial layout (hull, pace) is
+      deliberately, carefully positioned, and bolting on a third gauge without
+      the same care would read as an afterthought rather than an instrument;
+      that belongs with the cluster's own next real pass, not this one. There
+      is also no way to refill a tank in play yet — `refuel()` exists and is
+      tested, but nothing calls it.
 - [ ] **V1.4** Cars can be repaired, badly
 - [ ] **V1.5** Somebody else is driving one too, outside the derby
 

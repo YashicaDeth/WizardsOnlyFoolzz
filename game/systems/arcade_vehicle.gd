@@ -47,6 +47,12 @@ const MIN_HANDLING_AT_ZERO_INTEGRITY := 0.5
 func handling_fraction() -> float:
 	return lerpf(MIN_HANDLING_AT_ZERO_INTEGRITY, 1.0, condition_fraction())
 
+func has_fuel() -> bool:
+	return fuel > 0.0
+
+func refuel(amount: float = 1.0) -> void:
+	fuel = clampf(fuel + amount, 0.0, 1.0)
+
 const DRIVE_SPEED := 24.0
 const REVERSE_SPEED := 10.0
 const IMPACT_SPEED := 4.0
@@ -148,9 +154,17 @@ const SHOVE_STUN := 0.35
 const STUCK_SPEED := 1.2
 const STUCK_SECONDS := 2.0
 const UNSTICK_IMPULSE := 4.5
+## V1.3. Fuel, or a reason a car is not infinite. Idling or coasting burns
+## nothing — the tank is a cost of aggression, not of existing — so this is
+## per second *of throttle held*, not per second of the clock. At full send
+## that empties a full tank in a bit under a minute and a half, long enough
+## that a single derby heat is not a fuel-management exercise but a sustained
+## chase across several heats now genuinely runs a car dry.
+const FUEL_BURN_PER_SECOND := 0.012
 
 var throttle := 0.0
 var steering := 0.0
+var fuel := 1.0
 ## Highest normal closing speed seen at a real body contact. Kept as telemetry
 ## so balance tests can distinguish "never touched" from "threshold too high".
 var max_contact_closing := 0.0
@@ -205,6 +219,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	var up := transform.basis.y
 	signed_speed = state.linear_velocity.dot(forward)
 	stun = maxf(0.0, stun - state.step)
+	if enabled and absf(throttle) > 0.05:
+		fuel = maxf(0.0, fuel - FUEL_BURN_PER_SECOND * absf(throttle) * state.step)
 
 	var space := get_world_3d().direct_space_state
 	var grounded := 0
@@ -263,7 +279,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 
 		var rolling := point_velocity.dot(steered)
 		var longitudinal := 0.0
-		if enabled and stun <= 0.0 and REAR_WHEELS.has(index):
+		if enabled and stun <= 0.0 and fuel > 0.0 and REAR_WHEELS.has(index):
 			var target := throttle * (DRIVE_SPEED if throttle >= 0.0 else REVERSE_SPEED)
 			if absf(throttle) > 0.05:
 				longitudinal = signf(target - rolling) * DRIVE_FORCE * mass * 0.25 * absf(throttle)
