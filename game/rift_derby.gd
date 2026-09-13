@@ -793,9 +793,21 @@ func _update_cab_camera(_delta: float) -> void:
 ## AG3.4. A round leaves the gun, goes through your own windscreen, and lands on
 ## something. The glass keeps the hole for the rest of the heat.
 func _fire_from_cab() -> void:
-	if fire_cooldown > 0.0 or round_state != "active":
+	if fire_cooldown > 0.0:
+		return
+	# Greg: *"you still cant shoot"*. Half of that was the camera being outside
+	# the car (b5afadb) and half was this: before the flag dropped, the trigger
+	# did nothing at all and said nothing about it, which from the seat is
+	# exactly what a broken key looks like. The sight answers now.
+	if round_state != "active":
+		if reticle != null and is_instance_valid(reticle):
+			reticle.call("refuse")
+		if derby_audio != null:
+			derby_audio.play_impact(0.04, boat.global_position, "light")
 		return
 	if rounds_left <= 0:
+		if reticle != null and is_instance_valid(reticle):
+			reticle.call("refuse")
 		if derby_audio != null:
 			derby_audio.play_impact(0.05, boat.global_position, "light")
 		return
@@ -902,8 +914,12 @@ func _update_hud() -> void:
 	# live, nothing else on screen. Anywhere else it would be a promise the game
 	# does not keep, which is the complaint it exists to fix.
 	if reticle != null and is_instance_valid(reticle):
+		var cab_clear := in_cab and not index_open and not leaving_on_foot
 		reticle.call("report",
-			in_cab and round_state == "active" and not index_open and not leaving_on_foot,
+			cab_clear and round_state == "active",
+			# Caged rather than gone during the countdown: a sight that vanishes
+			# teaches there is no gun, which is the thing it exists to unteach.
+			cab_clear and round_state == "countdown",
 			rounds_left <= 0,
 			clampf(fire_cooldown / 0.16, 0.0, 1.0))
 	status.text = "BONE YARD DERBY  //  %s\nWASD DRIVE  ·  I WORLD INDEX  ·  E LEAVE VEHICLE" % round_state.to_upper()
