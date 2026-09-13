@@ -181,6 +181,16 @@ var lean_override: Variant = null
 const LEAN_KEY := KEY_L
 const LEAN_SCALE := 1.32
 
+## C9.1 `v9`. The rear is not another page. Holding O turns the same object
+## through its edge; releasing it returns to the mirror. `turn_override` is the
+## test seam used by the other held gestures in this file, not a second control
+## path. Keeping the state here also means hosted panels, glass damage and the
+## hand all agree about which face is actually toward the player.
+var turn := 0.0
+var turn_override: Variant = null
+const TURN_KEY := KEY_O
+var _turned_rect := Rect2()
+
 ## C1.7 `v2`. Deliberately letting go, as its own key rather than folded onto
 ## G (which raises and lowers) or Escape (which just closes the panel without
 ## losing the device) — `open_device()`'s own `possessed` check is what makes
@@ -546,6 +556,8 @@ func _process(delta: float) -> void:
 	# so a fault does not restart its cycle every time the device comes up.
 	panel_clock += delta
 	_drive_backlight(delta)
+	var turn_key_held: bool = turn_override if turn_override != null else Input.is_key_pressed(TURN_KEY)
+	turn = Motion.blend(turn, delta, Motion.PANEL, is_open and turn_key_held)
 	# AS1.2/AS1.3. The cost of holding it up to see: the torch and the screen
 	# both burn charge while actually raised, not while pocketed, and it
 	# recharges — slower — while left alone. See `_drive_battery()`.
@@ -588,18 +600,28 @@ func _process(delta: float) -> void:
 	# rect explicitly rather than through the node's transform.
 	var lifted := Vector2((size.x - device_size.x) * 0.5 + size.x * HELD_OFFSET_X, (size.y - device_size.y) * 0.5)
 	_device_rect = Rect2(resting.lerp(lifted, Motion.ease_out(raised)), device_size)
-	_screen_rect = Rect2(_device_rect.position + Vector2(26, 62), _device_rect.size - Vector2(52, 104))
+	# A horizontal turn preserves the object's centre while its visible width
+	# collapses to an edge and opens on the other face. The tiny floor avoids a
+	# zero-area draw at the exact halfway frame without pretending it vanished.
+	var turned_width := _device_rect.size.x * maxf(0.035, absf(cos(turn * PI)))
+	_turned_rect = Rect2(
+		Vector2(_device_rect.get_center().x - turned_width * 0.5, _device_rect.position.y),
+		Vector2(turned_width, _device_rect.size.y)
+	)
+	_screen_rect = Rect2(_turned_rect.position + Vector2(26, 62), _turned_rect.size - Vector2(52, 104))
 	_clip.position = _screen_rect.position
-	_clip.size = _screen_rect.size
-	_clip.visible = true
+	_clip.size = Vector2(maxf(_screen_rect.size.x, 1.0), maxf(_screen_rect.size.y, 1.0))
+	var front_visible := not showing_back() and _screen_rect.size.x > 2.0
+	_clip.visible = front_visible
 	_overlay.position = Vector2.ZERO
 	_overlay.size = size
+	_overlay.visible = front_visible
 
 	var mode := current_mode()
 	var showing_index := mode == "INDEX" or mode == "WIRE"
-	_index.visible = showing_index
-	_map.visible = mode == "MAP"
-	if showing_index:
+	_index.visible = showing_index and front_visible
+	_map.visible = mode == "MAP" and front_visible
+	if showing_index and front_visible:
 		_fit_into_aperture(_index)
 		# The index normally owns the screen and draws its own cursor; inside the
 		# device the chassis is the frame, so it is told not to chase the mouse.
@@ -638,7 +660,10 @@ func _draw() -> void:
 	# weight, and shaded from `screen_luminance()` so a dead or pocketed screen
 	# cannot leave a mysteriously lit hand behind.
 	_draw_holding_hand(_device_rect, alpha)
-	_draw_chassis(_device_rect, alpha)
+	if showing_back():
+		_draw_back(_turned_rect, alpha)
+		return
+	_draw_chassis(_turned_rect, alpha)
 	# I0.5. The screen is glass, not a lit panel. Painting SCREEN_BG opaque put
 	# a green surface over the mirror and left the black showing only in the
 	# bezel, which is a case with a screen in it — the thing this is not. The
@@ -662,7 +687,21 @@ func _draw() -> void:
 ## sag, while the distant beam is a world-space approximation owned by its
 ## host scene.
 func screen_luminance() -> float:
-	return clampf(raised * battery * backlight, 0.0, 1.0)
+	# The glass stops lighting the palm as it rotates away. This is deliberately
+	# a face angle, not a binary back/front switch, so the light leaves with the
+	# physical movement instead of popping off at the halfway frame.
+	var front_exposure := maxf(cos(turn * PI), 0.0)
+	return clampf(raised * battery * backlight * front_exposure, 0.0, 1.0)
+
+
+## Public, read-only answers for hosts/tests. Neither exposes a second state:
+## `turn` remains the one physical transition underneath both.
+func showing_back() -> bool:
+	return turn >= 0.5
+
+
+func shell_wear() -> float:
+	return 1.0 - clampf(condition, 0.0, 1.0)
 
 
 func _draw_holding_hand(rect: Rect2, alpha: float) -> void:
@@ -746,6 +785,7 @@ func _draw_chassis(rect: Rect2, alpha: float) -> void:
 		draw_line(Vector2(rect.position.x + rect.size.x - 30, y), Vector2(pack.end.x + 3, y), Color("100c0a") * Color(1, 1, 1, alpha), 3)
 	CellOutzType.draw_stamped(self, rect.position + Vector2(26, 20), "CELLOUTZ", 19.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.3 * alpha), 1.6)
 	CellOutzType.draw_condensed(self, rect.position + Vector2(190, 26), "FIELD WIRE MK-II // SALVAGED // NOT SERVICEABLE", 9.0, CASE_EDGE * Color(1, 1, 1, 0.8 * alpha), 0.8)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(26, 46), "HOLD O: TURN OVER", 8.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.7)
 	# The jester, pressed small into the bezel. It is on the back of the case;
 	# this is the edge of it showing round the side.
 	BlackMirror.draw_jester(self, Vector2(rect.end.x - 40, rect.position.y + 34), 26.0, 0.5 * alpha, elapsed)
@@ -757,6 +797,93 @@ func _draw_chassis(rect: Rect2, alpha: float) -> void:
 	# `_draw_damage()` now, scoped to `_screen_rect` alone and on `_overlay`
 	# (the topmost layer, over hosted panels and all), so wear is legible only
 	# on the glass you are actually reading through — never on the case itself.
+
+
+## C9.1/C9.2 `v9`. The physical reverse of the mirror. This is intentionally
+## not a UI page: no hosted Control, no glass, no status strip. What can be read
+## here is stamped, wired or damaged into the casing itself.
+func _draw_back(rect: Rect2, alpha: float) -> void:
+	if rect.size.x < 90.0:
+		# At the midpoint of the turn the device is its edge: ridges, battery lip,
+		# and nothing readable. This keeps the transition physical at its thinnest.
+		draw_rect(rect, Color("100c09") * Color(1, 1, 1, alpha))
+		draw_line(Vector2(rect.position.x + rect.size.x * 0.25, rect.position.y + 18), Vector2(rect.position.x + rect.size.x * 0.25, rect.end.y - 18), CASE_EDGE * Color(1, 1, 1, alpha), 2.0)
+		draw_line(Vector2(rect.end.x - rect.size.x * 0.22, rect.position.y + 70), Vector2(rect.end.x - rect.size.x * 0.22, rect.end.y - 70), Color("271d15") * Color(1, 1, 1, alpha), 5.0)
+		return
+
+	var wear := shell_wear()
+	var corner_bite := 12.0 + 24.0 * smoothstep(0.48, 0.9, wear)
+	var shell := PackedVector2Array([
+		rect.position + Vector2(13, 0),
+		rect.position + Vector2(rect.size.x - corner_bite, 0),
+		rect.position + Vector2(rect.size.x, corner_bite),
+		rect.end - Vector2(0, 16),
+		rect.end - Vector2(16, 0),
+		rect.position + Vector2(14, rect.size.y),
+		rect.position + Vector2(0, rect.size.y - 14),
+		rect.position + Vector2(0, 13),
+	])
+	draw_colored_polygon(shell, CASE * Color(1, 1, 1, alpha))
+	var outline := shell.duplicate()
+	outline.append(shell[0])
+	draw_polyline(outline, CASE_EDGE * Color(1, 1, 1, (0.78 - wear * 0.22) * alpha), 2.5)
+
+	# A recessed service plate and the seam around it make the rear a made thing,
+	# not a second black rectangle. Gaps spread along that seam as condition falls.
+	var plate := rect.grow(-22.0)
+	draw_rect(plate, Color("15110e") * Color(1, 1, 1, alpha))
+	draw_rect(plate, CASE_EDGE * Color(1, 1, 1, 0.48 * alpha), false, 2.0)
+	for gap in int(1.0 + wear * 7.0):
+		var t := fposmod(float(serial % 97) * 0.013 + float(gap) * 0.173, 1.0)
+		var gap_x := lerpf(plate.position.x + 16.0, plate.end.x - 52.0, t)
+		draw_line(Vector2(gap_x, plate.position.y), Vector2(gap_x + 30.0 + wear * 22.0, plate.position.y), Color("050403") * Color(1, 1, 1, wear * alpha), 4.0)
+
+	# The replacement cell protrudes from the back under three actual lashings.
+	var pack := Rect2(rect.position + Vector2(rect.size.x * 0.73, 72), Vector2(rect.size.x * 0.18, rect.size.y - 144))
+	draw_rect(pack.grow(5), Color("090706") * Color(1, 1, 1, 0.8 * alpha))
+	draw_rect(pack, Color("2a2118") * Color(1, 1, 1, alpha))
+	draw_rect(pack, CASE_EDGE * Color(1, 1, 1, 0.7 * alpha), false, 2.0)
+	for tie in 3:
+		var tie_y := pack.position.y + pack.size.y * (0.22 + float(tie) * 0.29)
+		var failed := wear > 0.42 + float(tie) * 0.19
+		if failed:
+			draw_line(Vector2(pack.position.x - 18, tie_y), Vector2(pack.get_center().x - 8, tie_y + 9), Color("0b0806") * Color(1, 1, 1, alpha), 5.0)
+			draw_line(Vector2(pack.get_center().x + 12, tie_y - 8), Vector2(pack.end.x + 14, tie_y), Color("0b0806") * Color(1, 1, 1, alpha), 5.0)
+		else:
+			draw_line(Vector2(pack.position.x - 18, tie_y), Vector2(pack.end.x + 14, tie_y), Color("0b0806") * Color(1, 1, 1, alpha), 5.0)
+
+	# The mark Greg specified, large enough to own the rear. It is printed into
+	# the shell, so unlike the reflection it does not sway when the device moves.
+	var jester_at := Vector2(rect.position.x + rect.size.x * 0.39, rect.get_center().y - 16.0)
+	BlackMirror.draw_jester(self, jester_at, minf(rect.size.x, rect.size.y) * 0.48, alpha, 0.0)
+	CellOutzType.draw_stamped(self, Vector2(rect.position.x + 42, rect.end.y - 76), "WIZARDS ONLY FOOLZ", 17.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.28 * alpha), 1.3)
+	CellOutzType.draw_condensed(self, Vector2(rect.position.x + 44, rect.end.y - 43), "UNIT %06d // RELEASE O: MIRROR" % serial, 9.0, CASE_EDGE * Color(1, 1, 1, 0.82 * alpha), 0.8)
+
+	# Condition is material here: abrasions take finish off, impact dents crease
+	# the plate, the upper corner delaminates, and cable ties fail in thresholds.
+	# No percentage is printed — the shell itself is the gauge.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = serial * 31 + 9001
+	for scratch in int(round(wear * 34.0)):
+		var from := Vector2(rng.randf_range(plate.position.x, plate.end.x), rng.randf_range(plate.position.y, plate.end.y))
+		var length := rng.randf_range(12.0, 54.0) * (0.55 + wear)
+		var heading := rng.randf_range(-0.35, 0.35)
+		draw_line(from, from + Vector2.from_angle(heading) * length, Color("a58b68") * Color(1, 1, 1, (0.12 + wear * 0.38) * alpha), rng.randf_range(0.7, 1.8))
+	var dents := mini(impacts.size(), 4)
+	if dents == 0:
+		dents = int(floor(wear * 4.0))
+	for dent in dents:
+		var hit := Vector2(rng.randf_range(0.14, 0.66), rng.randf_range(0.16, 0.78))
+		if dent < impacts.size():
+			var recorded: Vector2 = impacts[dent].get("at", hit)
+			hit = Vector2(1.0 - recorded.x, recorded.y)
+		var at := rect.position + rect.size * hit
+		var radius := 8.0 + wear * 18.0 + float(dent) * 2.0
+		draw_arc(at, radius, 0.18, PI * 1.72, 18, Color("070504") * Color(1, 1, 1, (0.35 + wear * 0.4) * alpha), 3.0)
+		draw_arc(at + Vector2(-2, -2), radius * 0.72, 0.35, PI * 1.45, 14, CASE_EDGE * Color(1, 1, 1, 0.3 * wear * alpha), 1.0)
+	if wear > 0.55:
+		var split := rect.position + Vector2(rect.size.x - corner_bite, 1)
+		draw_polyline(PackedVector2Array([split, split + Vector2(-18, 19), split + Vector2(-7, 43), split + Vector2(-26, 61)]), Color("080504") * Color(1, 1, 1, alpha), 4.0)
 
 
 func _draw_tabs(rect: Rect2, alpha: float) -> void:

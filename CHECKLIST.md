@@ -561,8 +561,8 @@ v7 made carrying it tactical and putting it away instant. Rule 3: every hard cut
 
 ### C v9 — the ninth pass
 Eight passes on the front of an object nobody has ever turned over. The jester is on the back and has never been seen.
-- [ ] **C9.1** `v9` The back of the device, and the jester on it
-- [ ] **C9.2** `v9` Its condition shows on the shell, not only on the screen
+- [x] ~~**C9.1** `v9` The back of the device, and the jester on it~~ Hold `O` while the handheld is raised and the same held object compresses through its physical edge before opening onto a purpose-built rear surface; releasing turns it back to the mirror. The aperture, hosted page and glass-damage overlay stay on the hidden front rather than becoming a seventh UI page, while the front-facing screen light fades continuously with the turn angle. The rear is a recessed service shell with a large static hollow-faced jester, protruding replacement battery under three lashings, stamped `WIZARDS ONLY FOOLZ` mark and the device's persistent serial. `tests/handheld_back_test.gd`, 10 C9.1 checks; `captures/c9_1_v9_jester_back.png` visually inspected at 1280x720
+- [x] ~~**C9.2** `v9` Its condition shows on the shell, not only on the screen~~ The rear reads the same persisted `condition` and remembered `impacts` as the glass: declining condition removes finish, opens the plate seam, delaminates the upper corner and breaks battery ties at fixed thresholds; up to four dent rings are placed from the impacts the device actually remembers (mirrored onto the reverse), rather than from a second cosmetic-damage state. No percentage is printed on the rear — the material is the gauge. `tests/handheld_back_test.gd`, 5 C9.2 checks including save/reload; `captures/c9_2_v9_battered_shell.png` inspected against the nearly sound rear
 
 ### C v10 — the tenth pass
 Greg, plainly: *"the entire blackmirror gui needs work"*. Nine passes on what the device *is* and none on how it reads.
