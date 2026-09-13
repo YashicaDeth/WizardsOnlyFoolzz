@@ -456,6 +456,50 @@ func clear_history() -> void:
 	_save_history()
 
 
+## A complete, portable copy of the world state. Quantum save slots use this
+## instead of trying to infer a run from a handful of flags: the events, bodies,
+## clock and the run's visual seed must all travel together.
+func snapshot() -> Dictionary:
+	return {
+		"next_sequence": next_sequence,
+		"events": events.duplicate(true),
+		"subjects": subjects.duplicate(true),
+		"run_salt": run_salt,
+		"world_minute": world_minute,
+		"flags": flags.duplicate(true),
+		"chaos_magick_level": chaos_magick_level,
+		"chaos_magick_at_minute": chaos_magick_at_minute,
+	}
+
+
+## Exchange the current universe for a previously captured one. This performs
+## the same schema repair as loading the ordinary save and emits subject changes
+## so open body, device and map views do not keep drawing bodies from the branch
+## the player just left.
+func restore_snapshot(saved: Dictionary) -> bool:
+	if not saved.get("events", null) is Array or not saved.get("subjects", null) is Dictionary:
+		return false
+	events.clear()
+	for stored_event in saved.events:
+		if stored_event is Dictionary:
+			events.append((stored_event as Dictionary).duplicate(true))
+	subjects.clear()
+	for subject_id in saved.subjects:
+		if saved.subjects[subject_id] is Dictionary:
+			subjects[str(subject_id)] = _normalise_body_records((saved.subjects[subject_id] as Dictionary).duplicate(true))
+	next_sequence = maxi(1, int(saved.get("next_sequence", events.size() + 1)))
+	run_salt = int(saved.get("run_salt", 0))
+	world_minute = float(saved.get("world_minute", 16.5 * 60.0))
+	flags = (saved.get("flags", {}) as Dictionary).duplicate(true) if saved.get("flags", {}) is Dictionary else {}
+	chaos_magick_level = float(saved.get("chaos_magick_level", 0.0))
+	chaos_magick_at_minute = float(saved.get("chaos_magick_at_minute", world_minute))
+	_save_history()
+	CellOutzGrunge.remember_run(run_salt)
+	for subject_id in subjects:
+		subject_changed.emit(subject_id, (subjects[subject_id] as Dictionary).duplicate(true))
+	return true
+
+
 func _load_history() -> void:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return
