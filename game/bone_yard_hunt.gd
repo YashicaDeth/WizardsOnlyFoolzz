@@ -4425,16 +4425,18 @@ func _update_body_record(delta: float) -> void:
 	WorldHistory.amend_subject("player", {"anatomy_state": player_rig.snapshot()})
 
 
-## A9.1 / A9.2. The volume follows the player in steps, and its severity is read
-## from the number AS4.2 says the storm will read — so when that segment builds
-## the storm, the air is already answering the same source rather than needing a
-## second one. `chaos_magick()` sits near zero on a quiet run and climbs with
-## rituals and with the gods A7 put in the sky.
+## A9.1 / A9.2 / W1.2. The volume follows the player in steps, and its severity
+## is `WorldWeather.contamination()` — an ambient floor that rises with elapsed
+## days, worse at night than by day, with whatever storm AS4.2 eventually
+## builds (currently `chaos_magick()`, sitting near zero on a quiet run and
+## climbing with rituals and the gods A7 put in the sky) folded in on top. A
+## clear, ritual-free night now reads as something rather than nothing, which
+## is the whole point of W1.2: contamination was a static paint job until now.
 func _update_air() -> void:
 	if air == null or not is_instance_valid(air):
 		return
 	air.follow(player)
-	air.set_severity(clampf(WorldHistory.chaos_magick(), 0.0, 1.0))
+	air.set_severity(WorldWeather.contamination())
 	# B7.1. Standing in it costs something. The air doses whatever it is
 	# touching, and what the player is wearing decides how much of it gets
 	# through — which is what makes a filter mask a decision rather than a

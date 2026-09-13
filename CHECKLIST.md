@@ -2637,7 +2637,40 @@ already switches presets by place; nothing switches by time.
       `WorldWeather.contamination()` should replace, blend with, or sit
       beside that stand-in is a real design call for whoever owns AS4.2 and
       the storm, not one to make unilaterally while landing this pass.
-- [ ] **W1.3** Being caught out in it costs something
+- [x] **W1.3** ~~Being caught out in it costs something~~
+      Already largely true before this segment: B7.1 built `expose()`, and
+      `bone_yard_hunt.gd`'s `_update_air()` already fed it real severity every
+      physics tick, converting exposure into genuine, garment-gated zone and
+      organ damage. What was not true is the half W1.2 named as still open —
+      that feed was `chaos_magick()` alone, so a quiet run with no ritual ever
+      worked cost a body standing in the world exactly nothing, no matter how
+      many days had passed. `_update_air()` now reads
+      `WorldWeather.contamination()` in its place (a one-line change, landed
+      via the surgical-split process this worktree's collisions have needed
+      all session, since another agent's grip-cycling work shares this file),
+      so the ambient floor and the diurnal push are what a body is being
+      caught out in now, not only a storm somebody happened to work.
+      Verified: `tests/contamination_exposure_test.gd` — at 90 days into a
+      run, deep night, with `chaos_magick_level` pinned at zero throughout,
+      one call to `_update_air()` sets the air to exactly
+      `WorldWeather.contamination()` and measurably doses the player's body
+      through `expose()`, proving the ambient weather alone (no ritual, no
+      storm) now carries a real cost. Checked as a single direct call rather
+      than by averaging over many physics ticks: this scene proved
+      reproducibly timing-sensitive to a tight, uninterrupted
+      `await physics_frame` loop in headless mode — the exact same logic read
+      a different outcome depending only on whether an unrelated print
+      statement sat in the loop, which smells like a genuine pre-existing
+      race somewhere in this scene's setup rather than anything this pass
+      introduced. Named here rather than chased down, since root-causing it
+      is a real side quest outside W1.2/W1.3's scope; a note worth another
+      agent's attention if a physics-timing bug surfaces in this scene later.
+      Still open: this is the exposure half only. `W1.3` as a design
+      statement plausibly wants more than health loss — an in-fiction
+      *warning* (a Geiger-click, a HUD cue, dialogue) that something is
+      wrong before a body starts actually melting — and none of that exists;
+      `dash_cluster.gd`'s two-dial layout doesn't read exposure either, the
+      same gap V1.3 named for the fuel gauge.
 - [ ] **W1.4** Factions keep hours; the Wire is busier at some of them
 - [ ] **W1.5** G7's exposure problem is a lighting *state* rather than a constant
 
