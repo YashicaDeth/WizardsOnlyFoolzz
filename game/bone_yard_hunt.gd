@@ -413,6 +413,11 @@ var kill_cam: Control
 var voice_channel: Node
 var arsenal: Node
 var pending_attack: Dictionary = {}
+## AN2.3. Set by `_attack_nearest_encounter_actor()` right before it returns
+## true, read once by `_resolve_strike()` immediately after — a throat and a
+## skull do not stop a blade the same amount, and `arm.strike()` was never
+## told which one it had just hit.
+var _last_melee_resistance := 0.65
 var carried_limb_index := -1
 var carried_limb_model: MeshInstance3D
 var asset_network := ASSET_NETWORK.new()
@@ -1392,7 +1397,9 @@ func _resolve_strike() -> void:
 	pending_attack = {}
 	if _attack_nearest_encounter_actor(report):
 		if arm != null:
-			arm.strike(0.65, Vector3(sin(yaw), 0.0, cos(yaw)))
+			# AN2.3. Set by the call above, from what that specific blow actually
+			# hit — armour and bone answer through the arm differently now.
+			arm.strike(_last_melee_resistance, Vector3(sin(yaw), 0.0, cos(yaw)))
 		connected = true
 		return
 	if enemy == null or not enemy.visible or enemy_retreating:
@@ -1499,6 +1506,7 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		zone = str(result.get("zone", "torso"))
 	else:
 		result = anatomy.call("apply_hit", zone, float(attack.damage), float(attack.impulse), str(attack.damage_type))
+	_last_melee_resistance = _melee_resistance(zone, result)
 	var organ_hit := str((result.get("organ", {}) as Dictionary).get("zone", ""))
 	if not organ_hit.is_empty() and bool((result.get("organ", {}) as Dictionary).get("ruptured", false)):
 		prompt.text = "%s IS OPENED UP" % str(actor.display_name).to_upper()
@@ -1516,6 +1524,23 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	if anatomy.dead:
 		_kill_encounter_actor(nearest_index, "combat_trauma")
 	return true
+
+
+## AN2.3. What the arm actually feels through the weapon, from what it hit
+## rather than a constant every blow shared. `BASE` is bone density, not
+## damage — the head stops a blade harder than a limb does whether or not
+## either is armoured, which is what makes an armoured hit *and* a skull hit
+## both read as more resistant than an unarmoured torso without conflating
+## the two causes into one number.
+const MELEE_RESISTANCE_BASE := {
+	"head": 0.72, "torso": 0.55,
+	"left_arm": 0.48, "right_arm": 0.48, "left_leg": 0.5, "right_leg": 0.5,
+}
+
+func _melee_resistance(zone: String, result: Dictionary) -> float:
+	var base: float = MELEE_RESISTANCE_BASE.get(zone, 0.55)
+	var absorbed := float(result.get("absorbed", 0.0))
+	return clampf(base + absorbed * 0.35, 0.0, 0.95)
 
 
 ## AF1.2. Where a round that missed everybody ended up. The world keeps the

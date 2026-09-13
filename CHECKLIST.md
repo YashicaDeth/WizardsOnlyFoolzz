@@ -3582,7 +3582,20 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
 ### AN2 — What it costs to swing
 - [ ] **AN2.1** A committed blow leaves you open in a way a flick does not (pairs with O5 footing)
 - [ ] **AN2.2** You can be disarmed, because a weapon you are barely holding is a weapon somebody can take
-- [ ] **AN2.3** Hitting armour, bone or a wall answers differently through `strike()`
+- [~] **AN2.3** Hitting armour, bone or a wall answers differently through
+      `strike()` — armour and bone, not the wall yet. `apply_hit()` now
+      reports `absorbed`, the real fraction of a blow armour and garments
+      just stopped; `_melee_resistance(zone, result)` turns that plus a
+      per-zone bone-density base (head firmer than a limb, armour raises
+      either) into what `arm.strike()` actually feels, replacing a flat
+      `0.65` on every connecting blow. A wall is still not a thing a swing
+      can hit at all — `_resolve_strike()` only ever recognises "connected
+      with an actor" or "hit nothing," so that half stays open rather than
+      being declared done. Verified: `tests/melee_resistance_test.gd` (new)
+      — a skull answers harder than a ribcage, which answers harder than a
+      limb, armour raises whichever zone it sits on further, and a real
+      swing through an armoured NPC measurably answers harder than the same
+      swing through an unarmoured one.
 - [ ] **AN2.4** The weapon's own condition rides on the same object — a bent blade swings wrong
 - [ ] **AN2.5** Two-handing changes the numbers, not just the pose
 

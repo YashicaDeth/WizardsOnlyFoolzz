@@ -151,6 +151,10 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 		"bleed_rate": snappedf(wound_bleed, 0.01),
 		"disabled": float(zone.health) <= 0.0,
 		"time_msec": Time.get_ticks_msec(),
+		# AN2.3. How much of the raw blow this zone actually stopped, from armour
+		# plate and shielding alone — the caller's own read of what the weapon
+		# hit, not a duplicate of the armour math above.
+		"absorbed": clampf(1.0 - applied / maxf(damage, 0.01), 0.0, 0.95),
 	}
 	# B6.7v2. A closed break and a compound break are not the same injury. The
 	# former is a disabled structure under intact skin; only a penetrating blow
