@@ -48,6 +48,14 @@ const GODS := {
 
 const FREED := "SOUL FREED"
 const ENSLAVED := "CYCLICIST ENSLAVEMENT AGAIN"
+## AJ5.6. "Freeing souls and enslaving them both have consequences, and they
+## are different ones." Each god's own `relations` (seeded empty in
+## `seed_gods()`, real per-subject data, not a value invented alongside it)
+## moves toward the killer on a FREED verdict and away from them on an
+## ENSLAVED one — the two outcomes are mechanically opposite, not just two
+## different strings of flavour text. Per god, per verdict, never summed
+## across the four the way AJ5.5 already forbids for the verdict itself.
+const FAVOR_STEP := 0.15
 
 
 static func seed_gods() -> void:
@@ -114,6 +122,36 @@ static func verdict(god_id: String, victim_id: String, details: Dictionary = {})
 	}
 
 
+## AJ5.6. A god's real standing toward one killer, read off the exact
+## `relations` table `_apply_consequence()` writes — never negative-forever
+## or positive-forever, since it is clamped the same way every time it moves.
+static func standing_with(god_id: String, subject_id: String) -> float:
+	var relations: Dictionary = WorldHistory.subject(god_id).get("relations", {})
+	return float(relations.get(subject_id, 0.0))
+
+
+## AJ5.6. The mechanical half of a verdict, kept apart from `verdict()`
+## itself so a caller that only wants the opinion (the Board, a dossier read)
+## never accidentally moves anything by asking for one. Writes to the god's
+## own `relations`, real per-subject data `seed_gods()` already seeds empty,
+## not a second table this file would have to keep synchronised with it.
+static func _apply_consequence(god_id: String, killer_id: String, label: String) -> void:
+	if killer_id.is_empty():
+		return
+	if label != FREED and label != ENSLAVED:
+		# An UNDECIDED verdict is a real god with genuinely no opinion — it
+		# would be dishonest to move a relationship on the strength of one.
+		return
+	var god := WorldHistory.subject(god_id)
+	if str(god.get("kind", "")) != "god":
+		return
+	var relations: Dictionary = god.get("relations", {}).duplicate(true)
+	var current := float(relations.get(killer_id, 0.0))
+	var delta := FAVOR_STEP if label == FREED else -FAVOR_STEP
+	relations[killer_id] = clampf(current + delta, -1.0, 1.0)
+	WorldHistory.amend_subject(god_id, {"relations": relations})
+
+
 ## AJ5.4/AJ5.7. Two verdicts on one death is the normal outcome, never summed
 ## into a score — each is recorded as its own opinion, attributed to its own
 ## god, so the Board (L) can pin them as the disagreement they are rather
@@ -132,4 +170,5 @@ static func record_death_verdicts(victim_id: String, killer_id: String, details:
 			"victim_id": victim_id, "killer_id": killer_id, "god_id": str(god_id),
 			"label": result.label, "lean": result.lean,
 		})
+		_apply_consequence(str(god_id), killer_id, str(result.label))
 	return results
