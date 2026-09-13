@@ -2767,13 +2767,26 @@ travels, hits something and leaves a mark on it.
 - [ ] **AF1.1** A round is a thing that travels, not a raycast resolved on the frame it is fired — half done. `ballistics.gd` gives the round a mass, a muzzle velocity, drop, drag and a trace between where it was and where it is so it cannot tunnel; a rifle drops 1.7cm over forty metres and a shotgun pattern opens to 3.8m. **Damage to a body still resolves on the frame the trigger goes down.** Moving that onto the projectile means deferring every anatomy hit by a few frames, which is a change worth making deliberately rather than folded into this one
 - [x] **AF1.2** It hits the world and leaves damage there (pairs with AB2) — a hole where it arrived, lifted off the surface so it does not fight the wall it is drawn on, sized by the round's energy, and recorded to WorldHistory for AB2 to read
 - [x] **AF1.3** Casings eject, bounce, land and stay — out of the port sideways and back, tumbling, two bounces that lose most of their energy, and then lying on their side rather than standing on end, which is the single most obvious tell that nobody simulated them. One case per trigger pull, so a shotgun leaves one for nine pellets
-- [ ] **AF1.4** Reloading is physical: the magazine leaves the weapon and a new
-      one arrives — true underneath now: `hunter_arsenal.gd`'s `reload()` does
-      a real full swap (whatever was chambered leaves, the fullest spare
-      arrives), not a top-up. What is not built is the part this wording
-      actually names: nothing shows the magazine leaving on screen —
-      `HeldGear` owns that geometry and this pass deliberately did not reach
-      into it.
+- [x] **AF1.4** Reloading is physical: the magazine leaves the weapon and a new
+      one arrives — the mechanical half was already true; this closes the
+      part the wording actually names, the part nothing showed. Both firearms
+      now carry a real node named `magazine` (`held_gear.gd`): a box mag proud
+      of the sidearm's grip heel, a quick-load cassette ahead of the shotgun's
+      trigger guard (built box-fed rather than tube-fed, since the mechanical
+      model already treats its reserve as discrete magazines exactly like the
+      sidearm's). `hunter_arsenal.gd` finds that node once at build time,
+      reads its authored rest position rather than a hardcoded one, and rides
+      it through the same `reload_remaining` timer that already drives
+      `state().reload_ratio`: the old magazine drops clear in the first third,
+      the well sits visibly empty through the middle third, a fresh one rises
+      back into place in the last third. Nothing can drift out of sync with
+      the real reload because both read the one timer. `tests/reload_visual_test.gd`
+      (9 checks: the sword's magazine-less case is a no-op rather than an
+      error, the sidearm's node resolves, rest/mid-swap/finished positions and
+      visibility all verified) plus a re-run of `magazine_test.gd` and
+      `arsenal_test.gd` clean. `tests/held_gear_capture.gd` re-captured for
+      both firearms — the new geometry sits where authored, no stray or
+      degenerate shapes.
 - [x] **AF1.5** A magazine dropped half-full is half-full when you pick it up —
       `_finish_reload()` ejects whatever is still loaded as its own discrete
       spare rather than merging it into one reserve number; `tests/magazine_test.gd`

@@ -44,6 +44,16 @@ var ammo := {
 var models: Dictionary = {}
 var hand: Node3D
 
+## AF1.4. The magazine node inside each built model, found by name once at
+## build time, plus the local position it sits at when nothing is happening —
+## read off the node rather than hardcoded, so retuning the mesh in
+## `held_gear.gd` cannot quietly desync the rest pose the reload animates back
+## to. A weapon with no such child (the sword) is simply absent from both and
+## `_update_reload_visual` skips it.
+var _magazine_nodes: Dictionary = {}
+var _magazine_rest: Dictionary = {}
+const MAGAZINE_DROP := Vector3(0, -0.145, 0.012)
+
 
 func configure(rig: BaselineHuman) -> void:
 	hand = rig.parts.get("right_arm") as Node3D
@@ -53,16 +63,52 @@ func configure(rig: BaselineHuman) -> void:
 		var model := _build_weapon_model(weapon_id)
 		hand.add_child(model)
 		models[weapon_id] = model
+		var magazine := model.find_child("magazine", true, false) as Node3D
+		if magazine != null:
+			_magazine_nodes[weapon_id] = magazine
+			_magazine_rest[weapon_id] = magazine.position
 	_update_models()
 
 
 func tick(delta: float) -> void:
 	cooldown = maxf(0.0, cooldown - delta)
 	if reload_remaining <= 0.0:
+		_update_reload_visual()
 		return
 	reload_remaining = maxf(0.0, reload_remaining - delta)
 	if reload_remaining <= 0.0:
 		_finish_reload()
+	_update_reload_visual()
+
+
+## AF1.4. Three phases inside the one reload timer already driving `state()`'s
+## `reload_ratio`, so nothing here can drift out of sync with how long a
+## reload actually takes: the old magazine drops clear of the well (first
+## third), the well sits visibly empty (middle third — the part the wording
+## actually names, and the part that never showed before this), and the
+## fresh magazine rises back into place (final third). Outside a reload the
+## magazine simply sits at rest, which is also where a freshly-equipped
+## weapon's model starts.
+func _update_reload_visual() -> void:
+	var magazine := _magazine_nodes.get(current_id) as Node3D
+	if magazine == null:
+		return
+	var rest: Vector3 = _magazine_rest.get(current_id, magazine.position)
+	var definition: Dictionary = current()
+	var duration := float(definition.get("reload", 0.0))
+	if reload_remaining <= 0.0 or duration <= 0.0:
+		magazine.visible = true
+		magazine.position = rest
+		return
+	var progress := 1.0 - (reload_remaining / duration)
+	if progress < 0.34:
+		magazine.visible = true
+		magazine.position = rest.lerp(rest + MAGAZINE_DROP, progress / 0.34)
+	elif progress < 0.66:
+		magazine.visible = false
+	else:
+		magazine.visible = true
+		magazine.position = (rest + MAGAZINE_DROP).lerp(rest, (progress - 0.66) / 0.34)
 
 
 func select_slot(slot: int) -> bool:

@@ -453,6 +453,22 @@ static func _build_shotgun(root: Node3D) -> void:
 	guard.material_override = _metal(gunmetal, 0.34, 37)
 	root.add_child(guard)
 
+	# AF1.4. The BONE YARD 12G is built box-fed rather than tube-fed — a
+	# quick-load cassette ahead of the guard, not the fixed `tube` above, which
+	# is why it is the only part of this weapon named "magazine": that is the
+	# name `HunterArsenal` looks for to ride the reload timer.
+	var cassette := MeshInstance3D.new()
+	cassette.name = "magazine"
+	cassette.mesh = _sweep([
+		{"at": 0.0, "width": 0.034, "depth": 0.020},
+		{"at": 0.070, "width": 0.034, "depth": 0.020},
+		{"at": 0.080, "width": 0.026, "depth": 0.016},
+	], 0.25)
+	cassette.rotation = Vector3(PI * 0.5 + 0.10, 0, 0)
+	cassette.position = Vector3(0, -0.058, 0.028)
+	cassette.material_override = _metal(gunmetal.darkened(0.1), 0.32, 61)
+	root.add_child(cassette)
+
 	_anchor(root, "grip", Vector3(0, -0.070, -0.044), Vector3(0.42, 0, 0))
 	_anchor(root, "forend", Vector3(0, -0.020, 0.300), Vector3(0.10, 0, 0))
 	_anchor(root, "muzzle", Vector3(0, 0.016, 0.745), Vector3.ZERO)
@@ -514,6 +530,22 @@ static func _build_sidearm(root: Node3D) -> void:
 	guard.position = Vector3(0, -0.030, -0.004)
 	guard.material_override = _metal(gunmetal, 0.32, 53)
 	root.add_child(guard)
+
+	# AF1.4. Named "magazine" on purpose — `HunterArsenal` finds this node by
+	# that name and rides it through the reload timer, dropping it clear of the
+	# well and bringing a fresh one back up. It sits proud of the butt's heel
+	# so the well it leaves actually reads as empty mid-swap, not just shorter.
+	var magazine := MeshInstance3D.new()
+	magazine.name = "magazine"
+	magazine.mesh = _sweep([
+		{"at": 0.0, "width": 0.024, "depth": 0.014},
+		{"at": 0.062, "width": 0.024, "depth": 0.014},
+		{"at": 0.070, "width": 0.019, "depth": 0.011},
+	], 0.25)
+	magazine.rotation = Vector3(PI * 0.5 + 0.38, 0, 0)
+	magazine.position = Vector3(0, -0.096, -0.050)
+	magazine.material_override = _metal(gunmetal.darkened(0.15), 0.30, 59)
+	root.add_child(magazine)
 
 	_anchor(root, "grip", Vector3(0, -0.062, -0.048), Vector3(0.38, 0, 0))
 	_anchor(root, "grip_support", Vector3(0.030, -0.058, -0.030), Vector3(0.38, 0, -0.5))
