@@ -3131,7 +3131,10 @@ func _update_grapple(delta: float) -> void:
 	var drag_speed := lerpf(0.9, 2.4, clampf(grapple_advantage * 0.5 + 0.5, 0.0, 1.0))
 	if drag.length() > 0.05 and stamina > 0.0:
 		var flat_forward := Vector3(sin(yaw), 0, cos(yaw))
-		var flat_right := Vector3(flat_forward.z, 0, -flat_forward.x)
+		# Same inversion as `HunterMotor.wish_direction` had, and the same fix:
+		# dragging somebody with A and D went the wrong way for the same reason
+		# walking with them did.
+		var flat_right := Vector3(-flat_forward.z, 0, flat_forward.x)
 		var shove := (flat_right * drag.x + flat_forward * -drag.y).normalized() * drag_speed
 		player_body.velocity = shove
 		# They are dragged in front of you rather than pulled through you: the

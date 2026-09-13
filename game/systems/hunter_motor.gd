@@ -28,9 +28,22 @@ static func camera_forward(yaw: float) -> Vector3:
 	return Vector3(sin(yaw), 0.0, cos(yaw)).normalized()
 
 
+## The right vector was `Vector3(forward.z, 0.0, -forward.x)`, which is the
+## correct formula for a frame whose forward is Godot's own `Vector3.FORWARD`
+## (0, 0, -1). This game's forward is the opposite: `camera_forward(0)` is
+## (0, 0, 1), which is `Vector3.BACK`. In that frame the same expression yields
+## the vector pointing at the player's LEFT, so A and D were swapped.
+##
+## The check that settles it without arguing about handedness: mouse-right
+## decreases yaw (`bone_yard_hunt.gd`, `yaw -= turn.x`), so turning right takes
+## the player from facing +Z toward facing -X. Whatever direction turning right
+## walks you into is, by definition, the direction strafing right should walk
+## you into - and `strafing right == turning 90 degrees right and walking
+## forward` is the invariant `movement_lab.gd` now pins, at four yaws, because
+## it holds in any frame and cannot be satisfied by an inverted one.
 static func wish_direction(input_vector: Vector2, yaw: float) -> Vector3:
 	var forward := camera_forward(yaw)
-	var right := Vector3(forward.z, 0.0, -forward.x)
+	var right := Vector3(-forward.z, 0.0, forward.x)
 	# W is input_vector.y == -1. Negating it makes W follow the camera.
 	var wish := right * input_vector.x - forward * input_vector.y
 	return wish.normalized() if wish.length_squared() > 0.0001 else Vector3.ZERO

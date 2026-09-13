@@ -131,8 +131,25 @@ func check(condition: bool, label: String) -> void:
 func _run_checks() -> void:
 	check(MOTOR.wish_direction(Vector2(0, -1), 0).dot(Vector3.BACK) > 0.99, "W follows camera forward")
 	check(MOTOR.wish_direction(Vector2(0, 1), 0).dot(Vector3.FORWARD) > 0.99, "S moves behind camera")
-	check(MOTOR.wish_direction(Vector2(-1, 0), 0).dot(Vector3.LEFT) > 0.99, "A strafes left")
-	check(MOTOR.wish_direction(Vector2(1, 0), 0).dot(Vector3.RIGHT) > 0.99, "D strafes right")
+	# These two used to read `.dot(Vector3.LEFT)` and `.dot(Vector3.RIGHT)`, and
+	# that is how an inverted strafe survived: the line above establishes that
+	# the player faces `Vector3.BACK` at yaw 0, so pinning A and D against the
+	# world's LEFT and RIGHT treated the player as facing the other way for two
+	# of the four keys. A test written in world axes cannot catch a frame error,
+	# because it is making the same assumption the code is.
+	#
+	# Strafing right is turning ninety degrees right and walking forward. That
+	# is what the input means, it holds at any yaw, and an inverted right vector
+	# cannot satisfy it. Mouse-right decreases yaw, so right is `yaw - PI/2`.
+	for at_yaw: float in [0.0, PI * 0.5, PI, -PI * 0.75]:
+		var strafe_right := MOTOR.wish_direction(Vector2(1, 0), at_yaw)
+		var strafe_left := MOTOR.wish_direction(Vector2(-1, 0), at_yaw)
+		check(strafe_right.dot(MOTOR.camera_forward(at_yaw - PI * 0.5)) > 0.99,
+			"D at yaw %.2f goes where turning right would take you" % at_yaw)
+		check(strafe_left.dot(MOTOR.camera_forward(at_yaw + PI * 0.5)) > 0.99,
+			"A at yaw %.2f goes where turning left would take you" % at_yaw)
+		check(strafe_right.dot(MOTOR.camera_forward(at_yaw)) < 0.01,
+			"and strafing at yaw %.2f is square to the way you are facing" % at_yaw)
 	check(is_equal_approx(MOTOR.wish_direction(Vector2(1, -1), 0).length(), 1.0), "diagonal input has no speed boost")
 	check(MOTOR.wish_direction(Vector2(0, -1), PI * 0.5).dot(Vector3.RIGHT) > 0.99, "movement rotates with camera yaw")
 	check(is_equal_approx(body.floor_snap_length, 0.42), "floor snap crosses curbs and descending ramps")
