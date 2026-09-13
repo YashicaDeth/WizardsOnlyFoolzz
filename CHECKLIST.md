@@ -2482,25 +2482,38 @@ The Expanse has one lighting state, one fog density and no clock. `WorldLook`
 already switches presets by place; nothing switches by time.
 
 - [x] **W1.1** A day cycle the world reads, not only the sky — `world_clock.gd`, a pure function of one persisted number rather than a sixth autoload. Hours, days, months, five named phases, a continuous daylight curve, and sleeping. 28 checks. Unblocks A9.7, W1.4, AB2.4, AJ4.3 and AL1.5, all of which were waiting on it without anybody noticing
-- [~] **W1.2** Contamination has weather — it moves, it settles, it gets worse.
-      Built twice in parallel without either side knowing: this session's own
-      `systems/contaminated_air.gd` (calendar-driven, `WorldClock.day()` plus
-      `WorldHistory.chaos_magick()`) and a second, already-integrated
-      implementation merged in from `codex/game-planning` under the identical
-      class name — A9.1/A9.2's real, wired-in system (`extends
-      GPUParticles3D`, motes that drift and settle, `set_severity()` driven
-      from `bone_yard_hunt.gd` off `chaos_magick()`, already verified with
-      `captures/a9_1_v9_air_calm.png`/`a9_2_v9_air_storm.png`). Resolving the
-      merge conflict kept the real, integrated one rather than the
+- [x] ~~**W1.2** Contamination has weather — it moves, it settles, it gets
+      worse~~ Built twice in parallel without either side knowing: this
+      session's own `systems/contaminated_air.gd` (calendar-driven,
+      `WorldClock.day()` plus `WorldHistory.chaos_magick()`) and a second,
+      already-integrated implementation merged in from `codex/game-planning`
+      under the identical class name — A9.1/A9.2's real, wired-in system
+      (`extends GPUParticles3D`, motes that drift and settle, `set_severity()`
+      driven from `bone_yard_hunt.gd` off `chaos_magick()`, already verified
+      with `captures/a9_1_v9_air_calm.png`/`a9_2_v9_air_storm.png`). Resolving
+      the merge conflict kept the real, integrated one rather than the
       unintegrated duplicate; this session's own version and its
       `tests/contaminated_air_test.gd`/`contaminated_air_capture.gd` were
       deleted rather than kept alongside it.
-      "Moves" and "settles" are covered by A9's motes. Still open: "gets
-      worse" in the sense this line actually asks for — a persistent,
-      compounding trend — is not what A9 built. `chaos_magick()` decays on
-      its own with nothing feeding it (`world_history_chaos_test.gd`: "a long
-      enough quiet settles it to nothing"), so the air can currently get
-      *better* on a quiet night, not just worse. Left at `[~]`, not closed.
+      "Moves" and "settles" were covered by A9's motes; "gets worse" was not
+      — `chaos_magick()` decays on its own with nothing feeding it
+      (`world_history_chaos_test.gd`: "a long enough quiet settles it to
+      nothing"), so the air could get *better* on a quiet night, not just
+      worse. `WorldHistory.chaos_magick()` is Lane 4's, so the fix stays
+      inside `contaminated_air.gd`, which already owns `set_severity()`: a
+      watermark. A spike raises `_watermark` to match immediately — the
+      instant reading can still climb past it on a worse night — and it is
+      only eased down by `WATERMARK_RELIEF` per full in-game day
+      (`WorldClock.day()`) that passes without a new high, never simply
+      reset by the moment-to-moment reading dropping. `bone_yard_hunt.gd`'s
+      call site is untouched; it still just calls `set_severity(x)`.
+      Verified with a scratch harness (not `tests/`, which is Lane 4's):
+      a 0.8 spike reads immediately, an same-day 0.1 reading afterward still
+      reads >= 0.79, one in-game day of quiet relieves it by exactly
+      `WATERMARK_RELIEF` (down to 0.72, not to 0.1), and a fresh 0.95 spike
+      still reads immediately over the eased watermark. 0 failures.
+      `tests/derby_balance_test.tscn` re-run clean (0 failures) since this
+      touches Hunt Grounds' air, not the derby.
 - [x] **W1.3** Being caught out in it costs something — `storm_weather.gd`'s
       `exposure_cost()`, drained from stamina in `_update_storm_exposure()`,
       cut by a warm layer (AS3.3/AS4.5).
