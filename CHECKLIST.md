@@ -2904,7 +2904,51 @@ question is not "how do we build that" but "what does this game actually need
 from it" — and the answer is probably narrower and more achievable: things break
 where they are hit, and what comes off them stays.
 
-- [ ] **AB1.1** Decide the scope honestly before building anything — full voxel destruction is not a feature, it is a second project
+- [x] **AB1.1** ~~Decide the scope honestly before building anything — full voxel destruction is not a feature, it is a second project~~
+      No voxels, no real-time fracture simulation, no arbitrary structural
+      collapse. That much was already decided by this section's own opening
+      line; what was missing was the second half — not what destruction
+      isn't, but what it actually *is* here, grounded in what this project has
+      already built rather than a wishlist.
+      The answer already exists, once: `systems/gore_chunks.gd`. A hit reaches
+      a `Layer`, throws pieces that are **identified objects** (`layer`,
+      `zone`, `subject_id`, `organ_id`/`implant` where relevant) rather than
+      decoration, capped at `MAX_CHUNKS` with LRU recycling, tracked in a
+      single `static var live` registry so `identify()`, `take()` and
+      `from_subject()` can all ask about any piece on the floor, and left to
+      rot and grow flies on a real clock rather than despawning on a timer.
+      That is "things break where they are hit, and what comes off them
+      stays," already shipped, for exactly one kind of destroyed thing.
+      The scope decision AB1.1 actually needed to make: **vehicle destruction
+      already exists too, built a second time, independently, narrower.**
+      `rift_derby.gd`'s `_add_vehicle_damage_parts()`/`_detach_vehicle_part()`
+      break a car where it is hit and throw a real physical piece — the same
+      instinct, arrived at separately — but the piece is unidentified (a bare
+      node name, no `GoreChunks`-style metadata contract), uncapped rather
+      than pool-managed, and explicitly **not persistent**: the very thing
+      AB1.3 asks for is where this implementation currently disagrees with
+      itself — `get_tree().create_timer(14.0).timeout.connect(loose.queue_free)`
+      deletes every detached panel fourteen seconds after it comes off,
+      unlike a gore chunk, which survives, rots, and can be picked up. It
+      also stores its own damage bookkeeping as loose `set_meta` on the node
+      — the exact pattern V1.1 already found and fixed for hull integrity on
+      this same file, still present here for panel loss specifically.
+      So: **AB1.2 through AB1.6 are not new systems.** They are
+      `GoreChunks`'s existing contract (identified, physical, capped,
+      persistent, rot-tracked) generalised past bodies, with the vehicle
+      damage-parts system as the concrete first migration target rather than
+      a hypothetical one — which is also exactly what AB1.4 already named
+      ("It reads through the gore system that already exists") before AB1.1
+      had said so out loud. AB1.5 ("a vehicle deforms rather than losing hit
+      points") is that migration plus V1.1/V1.2's `ArcadeVehicle.integrity`/
+      `condition_fraction()`, which already exist and already drive handling
+      — deformation should read off the same one number a car's own driving
+      already answers to, not a third, separately-tracked figure.
+      No code changed for this entry on purpose: this is the decision AB1.1
+      asked for, not an implementation of AB1.2+. Structures (AB1.2) have no
+      existing system to compare against yet — walls and windows have never
+      been struck-and-broken anywhere in the project — which is real,
+      separate work the migration above does not shortcut.
 - [ ] **AB1.2** Structures break where they are struck rather than swapping to a damaged model
 - [ ] **AB1.3** Debris is real, persists, and can be stood on or thrown
 - [ ] **AB1.4** It reads through the gore system that already exists — `gore_chunks.gd` already breaks bodies into identified pieces
