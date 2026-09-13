@@ -65,6 +65,9 @@ const INK := Color("e6d4ac")
 const AMBER := Color("b0552a")
 const MOSS := Color("8a9a4a")
 const ALERT := Color("a8281a")
+const HAND_SHADOW := Color("160d0a")
+const HAND_SKIN := Color("4a271d")
+const SCREEN_SPILL := Color("9bd4b0")
 
 var mode_index := 0
 ## Which thing in the bag is under the hand. The CARRY page had no selection at
@@ -630,6 +633,11 @@ func _draw() -> void:
 	if raised <= 0.001:
 		return
 	var alpha := clampf(raised, 0.0, 1.0)
+	# C4.2 `v4`. The hand belongs to the held object, not to a camera lamp in
+	# the world scene. Drawn behind the chassis so it grips something with
+	# weight, and shaded from `screen_luminance()` so a dead or pocketed screen
+	# cannot leave a mysteriously lit hand behind.
+	_draw_holding_hand(_device_rect, alpha)
 	_draw_chassis(_device_rect, alpha)
 	# I0.5. The screen is glass, not a lit panel. Painting SCREEN_BG opaque put
 	# a green surface over the mirror and left the black showing only in the
@@ -646,6 +654,75 @@ func _draw() -> void:
 		_draw_carry(_screen_rect, alpha)
 	elif mode == "RITUAL":
 		_draw_ritual(_screen_rect, alpha)
+
+
+## C4.2 `v4`. One answer for how much light the glass itself is giving off.
+## This is intentionally distinct from the world beam's energy: the hand is
+## inches from the screen and reads its backlight directly, including panel
+## sag, while the distant beam is a world-space approximation owned by its
+## host scene.
+func screen_luminance() -> float:
+	return clampf(raised * battery * backlight, 0.0, 1.0)
+
+
+func _draw_holding_hand(rect: Rect2, alpha: float) -> void:
+	var scale := clampf(rect.size.x / 1128.0, 0.72, 1.36)
+	var grip := Vector2(rect.position.x + 24.0 * scale, rect.end.y - 2.0 * scale)
+	var light := screen_luminance()
+	var skin := HAND_SKIN.lerp(SCREEN_SPILL, 0.16 * light)
+
+	# A soft spill below the lower-left corner. It begins at the screen edge,
+	# widens over the knuckles and dies before the wrist; layered translucent
+	# shapes read as emitted light without turning the hand into a flat tint.
+	for layer in range(4, 0, -1):
+		var spread := float(layer) * 14.0 * scale
+		var spill := PackedVector2Array([
+			Vector2(_screen_rect.position.x + 7.0 * scale, _screen_rect.end.y - 18.0 * scale),
+			Vector2(_screen_rect.position.x + 72.0 * scale, _screen_rect.end.y - 4.0 * scale),
+			grip + Vector2(70.0 * scale + spread, 38.0 * scale + spread * 0.25),
+			grip + Vector2(-52.0 * scale - spread, 28.0 * scale + spread * 0.35),
+		])
+		draw_colored_polygon(spill, SCREEN_SPILL * Color(1, 1, 1, light * alpha * (0.012 + 0.009 * float(5 - layer))))
+
+	# Wrist and palm enter from below rather than materialising at the bezel.
+	draw_colored_polygon(PackedVector2Array([
+		grip + Vector2(-35, 8) * scale,
+		grip + Vector2(59, 3) * scale,
+		grip + Vector2(73, 82) * scale,
+		grip + Vector2(-48, 82) * scale,
+	]), HAND_SHADOW.lerp(skin, 0.62) * Color(1, 1, 1, alpha))
+	draw_colored_polygon(_ellipse_points(grip, 67.0 * scale, 47.0 * scale, 20), skin * Color(1, 1, 1, alpha))
+	draw_arc(grip + Vector2(-4, 4) * scale, 31.0 * scale, 0.1, 2.0, 12, HAND_SHADOW * Color(1, 1, 1, 0.5 * alpha), maxf(1.0, 1.5 * scale))
+	draw_arc(grip + Vector2(-3, 0) * scale, 34.0 * scale, 0.1, 1.2, 10, SCREEN_SPILL * Color(1, 1, 1, light * 0.34 * alpha), maxf(1.0, 1.2 * scale))
+
+	# Four curled fingertips just outside the chassis edge. Their screen-facing
+	# rims carry more green than the palm, which locates the source at the glass
+	# above them rather than at an invisible lamp in front of the player.
+	for finger in 4:
+		var centre := Vector2(rect.position.x - (25.0 + float(finger % 2) * 3.0) * scale, rect.end.y - (43.0 + float(finger) * 29.0) * scale)
+		var radius := (13.5 - float(finger) * 0.65) * scale
+		var root_x := rect.position.x + (18.0 - float(finger) * 2.0) * scale
+		var finger_shape := PackedVector2Array([
+			centre + Vector2(0, -radius), Vector2(root_x, centre.y - radius * 0.72),
+			Vector2(root_x, centre.y + radius * 0.68), centre + Vector2(0, radius),
+		])
+		draw_colored_polygon(finger_shape, skin.darkened(0.08) * Color(1, 1, 1, alpha))
+		draw_circle(centre, radius, HAND_SHADOW * Color(1, 1, 1, alpha))
+		draw_circle(centre + Vector2(2.5, -1.0) * scale, radius * 0.79, skin * Color(1, 1, 1, alpha))
+		draw_line(centre + Vector2(5.0, -radius * 0.48) * scale, Vector2(rect.position.x + 7.0 * scale, centre.y - radius * 0.3), SCREEN_SPILL * Color(1, 1, 1, light * 0.55 * alpha), maxf(1.0, 1.3 * scale))
+		draw_line(centre + Vector2(-4.0, radius * 0.2) * scale, centre + Vector2(6.0, radius * 0.27) * scale, HAND_SHADOW * Color(1, 1, 1, 0.7 * alpha), maxf(1.0, scale))
+
+	# Thumb laid across the lower corner, still behind the case; only the part
+	# beyond the silhouette remains visible, which makes the overlap do the
+	# holding instead of drawing an outline around it.
+	var thumb := PackedVector2Array([
+		grip + Vector2(-31, -30) * scale,
+		grip + Vector2(72, -9) * scale,
+		grip + Vector2(77, 9) * scale,
+		grip + Vector2(-41, 0) * scale,
+	])
+	draw_colored_polygon(thumb, skin.lightened(0.04) * Color(1, 1, 1, alpha))
+	draw_line(grip + Vector2(-18, -22) * scale, grip + Vector2(51, -8) * scale, SCREEN_SPILL * Color(1, 1, 1, light * 0.58 * alpha), maxf(1.0, 1.4 * scale))
 
 
 func _draw_chassis(rect: Rect2, alpha: float) -> void:
