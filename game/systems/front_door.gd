@@ -92,6 +92,14 @@ func _ready() -> void:
 func _build_living_ashbloom() -> void:
 	_add_set_piece(BoxMesh.new(), Vector3(0, -1.2, -5.2), Vector3(15.0, 0.22, 13.0), Color("0e0d16"), "rust", 0)
 	_add_set_piece(BoxMesh.new(), Vector3(0, -1.06, -5.2), Vector3(3.1, 0.025, 12.0), Color("211722"), "rust", 2)
+	var street_body := StaticBody3D.new()
+	street_body.position = Vector3(0, -1.2, -5.2)
+	var street_collision := CollisionShape3D.new()
+	var street_shape := BoxShape3D.new()
+	street_shape.size = Vector3(15.0, 0.22, 13.0)
+	street_collision.shape = street_shape
+	street_body.add_child(street_collision)
+	add_child(street_body)
 	# Broken side buildings frame the street without covering its actors.
 	_add_set_piece(BoxMesh.new(), Vector3(-5.8, 0.2, -6.4), Vector3(2.2, 2.6, 4.4), Color("20121d"), "rust", 5)
 	_add_set_piece(BoxMesh.new(), Vector3(5.7, 0.05, -7.3), Vector3(2.5, 2.3, 3.5), Color("171521"), "rust", 7)

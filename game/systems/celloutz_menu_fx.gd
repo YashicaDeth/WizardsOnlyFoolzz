@@ -49,14 +49,14 @@ func _draw_blood_sigil() -> void:
 		if index % 2 == 0:
 			draw_line(points[index] + Vector2(0, 5), points[index] + Vector2(2, drip), blood * Color(1, 1, 1, 0.72), 2.0)
 			draw_circle(points[index] + Vector2(2, drip + 3), 2.2, blood)
-	# Scar-like crosshairs give the sigil a surgical, inspected quality.
-	draw_line(center + Vector2(-radius * 0.28, 0), center + Vector2(radius * 0.28, 0), blood, 1.0)
-	draw_line(center + Vector2(0, -radius * 0.28), center + Vector2(0, radius * 0.28), blood, 1.0)
+	# The centre is a fixed ritual cross, not a cursor-shaped decoration.
+	draw_line(center + Vector2(-radius * 0.29, 0), center + Vector2(radius * 0.29, 0), blood, 2.5)
+	draw_line(center + Vector2(0, -radius * 0.29), center + Vector2(0, radius * 0.29), blood, 2.5)
+	draw_circle(center, 4.5, Color("270507") * Color(1, 1, 1, 0.85))
 
 
 func _draw_hud_frame() -> void:
 	var edge := Color("c8502a") * Color(1, 1, 1, 0.48)
-	var dim := Color("e8b477") * Color(1, 1, 1, 0.22)
 	var margin := 18.0
 	var corner := 54.0
 	# Broken corners keep the overlay from becoming a generic rectangle.
@@ -65,8 +65,6 @@ func _draw_hud_frame() -> void:
 			var pivot := Vector2(margin if flip_x < 0.0 else size.x - margin, margin if flip_y < 0.0 else size.y - margin)
 			draw_line(pivot, pivot + Vector2(corner * flip_x, 0), edge, 1.5)
 			draw_line(pivot, pivot + Vector2(0, corner * flip_y), edge, 1.5)
-	draw_string(ThemeDB.fallback_font, Vector2(size.x - 220, 45), "MERCY COUNTY // LIVE FEED", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, dim)
-	draw_string(ThemeDB.fallback_font, Vector2(size.x - 220, 62), "BIOHAZARD: UNRESOLVED", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, edge)
 
 
 func _draw_tree() -> void:
@@ -111,7 +109,7 @@ func _draw_archive_nodes() -> void:
 func _draw_footer() -> void:
 	var font := ThemeDB.fallback_font
 	var y := size.y - 32.0
-	draw_string(font, Vector2(48, y), "WORLD BUILD 0001 // EVERY ACTION LEAVES A WITNESS", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, CREAM * Color(1, 1, 1, 0.56))
+	draw_string(font, Vector2(48, y), "WORLD BUILD // EVERY ACTION LEAVES A WITNESS // EVEN SPIRITS SEEK REDEMPTION", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, CREAM * Color(1, 1, 1, 0.62))
 	for index in 9:
 		var x := size.x - 210 + index * 18
 		var height := 4.0 + sin(elapsed * 2.5 + index * 0.7) * 3.0

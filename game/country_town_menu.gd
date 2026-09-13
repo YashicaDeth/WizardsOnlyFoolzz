@@ -248,55 +248,12 @@ func _open_celloutz() -> void:
 
 
 func _build_country_town() -> void:
-	# Was a hand-rolled Environment: a near-black background with a flat 0.5
-	# colour ambient and one spotlight, which rendered the whole town as an
-	# invisible dark mass. WorldLook is the shared look system the derby already
-	# uses, and it carries a real sky to light against.
-	menu_environment = WorldLook.environment("bone_yard")
+	# The front door owns its own composed street and camera.  This node still
+	# owns the settings Environment, but it must not build its old blockout under
+	# that camera: those legacy boxes were the floating orange geometry in the
+	# title shot.
+	menu_environment = WorldLook.environment("ossuary")
 	$WorldEnvironment.environment = menu_environment
-	_add_mesh(BoxMesh.new(), Vector3(0, -0.5, 0), Vector3(70, 0.7, 70), Color("25170e"), 0.0)
-	_add_mesh(BoxMesh.new(), Vector3(4, -0.1, 5), Vector3(11, 0.15, 62), Color("241f1a"), 0.0)
-	for index in 13:
-		_add_mesh(BoxMesh.new(), Vector3(4, 0.02, -25 + index * 5), Vector3(0.35, 0.03, 2.5), Color("ae8149"), 0.0)
-	_build_building(Vector3(-14, 2.4, -6), Vector3(10, 4.8, 7), Color("4b2818"), "MERCY SERVO")
-	_build_building(Vector3(16, 1.8, -14), Vector3(8, 3.6, 6), Color("332016"), "BONE YARD")
-	for index in 11:
-		var angle := TAU * float(index) / 11.0
-		var tree := CylinderMesh.new()
-		tree.top_radius = 0.25
-		tree.bottom_radius = 0.42
-		tree.height = 7.0 + float(index % 3)
-		_add_mesh(tree, Vector3(cos(angle) * 29.0, 3.2, sin(angle) * 29.0), Vector3.ONE, Color("26180f"), 0.0)
-	var tank := CylinderMesh.new()
-	tank.top_radius = 2.0
-	tank.bottom_radius = 2.0
-	tank.height = 5.0
-	_add_mesh(tank, Vector3(24, 6.0, 9), Vector3.ONE, Color("5d4532"), 0.0)
-	for offset in [-1.2, 1.2]:
-		_add_mesh(CylinderMesh.new(), Vector3(24 + offset, 2.2, 9), Vector3(0.25, 1.0, 0.25), Color("3b2920"), 0.0)
-	wreck = Node3D.new()
-	wreck.position = Vector3(1.5, 4.4, -3)
-	add_child(wreck)
-	var wreck_mesh := BoxMesh.new()
-	wreck_mesh.size = Vector3(3.4, 1.25, 5.2)
-	_add_mesh_to(wreck, wreck_mesh, Vector3.ZERO, Color("742018"), 0.0)
-	_add_mesh_to(wreck, SphereMesh.new(), Vector3(0, 0.7, -0.5), Color("301f17"), 0.0)
-	var floodlight := SpotLight3D.new()
-	floodlight.position = Vector3(-7, 10, 8)
-	floodlight.rotation_degrees = Vector3(-52, -25, 0)
-	floodlight.light_color = Color("ff8a3c")
-	floodlight.light_energy = 7.0
-	floodlight.spot_range = 35.0
-	add_child(floodlight)
-	# One spotlight cannot light a town. The key light is what makes the
-	# buildings, road and wreck read as forms rather than silhouettes.
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-34, -38, 0)
-	sun.light_color = Color("ffcf9e")
-	sun.light_energy = 1.5
-	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 90.0
-	add_child(sun)
 
 
 func _build_building(position_value: Vector3, size_value: Vector3, color: Color, sign_text: String) -> void:
