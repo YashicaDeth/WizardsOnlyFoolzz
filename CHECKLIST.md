@@ -2500,6 +2500,45 @@ options a person would actually reach for and no way in that is not "start".
 - [ ] **Y1.4** Colour is not the only carrier of meaning anywhere
 - [ ] **Y1.5** Somebody can put it down and come back a week later
 
+Greg, 2026-09-13, which is most of a section on its own:
+
+> *"fixing up the main menu screen guis and making save files multiples and they
+> are little chambers that change throughout game progression but they are what
+> you start in the pods with a fetus somewhat cell in there with a plug in there
+> mouth and then you go into it and get it out after the initial first part which
+> also needs work so it should just say start game also lowkey a multiplayer and
+> online option should be there but not be selectable and have a message saying
+> soon 'if you have ideas email me in settings'."*
+
+### Y2 — The way in
+- [ ] **Y2.1** One door, and it says **START GAME**. Not PLAY and DEMO, not a verb nobody uses out loud
+- [ ] **Y2.2** **MULTIPLAYER** and **ONLINE** are on the menu, visible, and not selectable — a greyed line that says SOON is a promise; a missing line is nothing at all
+- [ ] **Y2.3** And the SOON card says where to send the idea, which is the only reason to show a door you cannot open yet
+- [ ] **Y2.4** The part before you are out of the pod is authored rather than skipped past — it is the first thing anybody plays and it is currently the roughest thing in the build
+
+### Y3 — Saves are chambers
+A save slot is a row in a list in almost every game, and I0 says no screen is a
+list of text in a box. This is the segment where that rule reaches the save menu:
+**a save is a chamber you can look into**, and what is in it is the body that
+save has grown.
+
+- [ ] **Y3.1** More than one save, and choosing one is walking a row of chambers rather than reading their filenames
+- [ ] **Y3.2** A chamber changes with the run inside it — a save forty hours deep does not look like one an hour old, and nothing about that is a progress bar
+- [ ] **Y3.3** A new save is an occupied pod: a body at fetus stage, a cell, a plug in its mouth. You are looking at what you are about to be
+- [ ] **Y3.4** Starting is **going into the chamber and taking it out**, not a fade from a button
+- [ ] **Y3.5** An empty slot is an empty chamber — drained, lit, waiting — and not a blank row with NEW GAME on it
+- [ ] **Y3.6** The machinery is already there: `AG5.11` built real multi-slot saving with a manifest per slot. This is what it looks like, not what it does
+
+### Y4 — Support, from inside the game
+- [x] **Y4.1** Settings can send mail to **wizardsonlyfoolzthegame@gmail.com** — support, bug reports, and the ideas line Y2.3 points at. `support_mail.gd`: three subjects so mail lands sorted, one mechanism. No network, no dependency, no key — it hands a `mailto:` to the machine's own client
+- [x] **Y4.2** A bug report carries the build, the seed and the run with it, because a player should not have to write down what the game already knows — build, engine, platform and timestamp gathered automatically, anything else the caller attaches, and **nothing that nobody asked for**: `context()` is separate from `compose()` so the settings page can show the player exactly what is about to go out under their name
+- [x] **Y4.3** It never silently fails: if there is no mail client it says so and gives the address to copy — `send()` returns `sent` and a `reason`, and the address either way. 23 assertions in `tests/support_mail_test.gd`, including that an ampersand in the note is encoded rather than ending the query string early, and that line breaks are CRLF so the body is not one long line
+
+**Open, and blocking a rename:** Greg does not like **"Bone Yard"**. No
+replacement given. It is the main scene (`bone_yard_hunt.gd`/`.tscn`), a district
+in `living_map.gd`'s `DISTRICTS`, and appears across `CHECKLIST.md` — so this is
+a name to decide once and change everywhere in one commit, not to drift into.
+
 
 ### Y v10 — the final pass
 The last rung. Fifteen statements that are true of getting in when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
