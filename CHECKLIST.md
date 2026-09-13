@@ -2173,12 +2173,32 @@ v5 made a blow worth what you put in and a weapon you barely hold is still welde
       solid stance survives a hit that would disarm a barely-standing one; a
       real WorldHistory event is recorded; disarmed hits measurably softer
       and faster; footing recovering past the line hands the grip back.
-- [ ] **O6.2** `v6` Mass and reach become the whole balance conversation
+- [x] ~~**O6.2** `v6` Mass and reach become the whole balance conversation~~
+      Cross-ticked against AN1.5, built under that number rather than this
+      one: `ARM_WEIGHTS` is, in its own comment's words, "the entire
+      firearms-and-melee balance conversation, expressed as two numbers
+      rather than as a table of constants" — a bare hand at 0.4kg, a
+      cleaver at 1.45, a shotgun at 3.2, and every one of them the same
+      `LimbMomentum` object rather than a second system per weapon class.
+      `limb_momentum_test.gd` and `firearm_momentum_test.gd` already verify
+      it across melee and firearms both
 
 ### O v7 — the seventh pass
 v6 finished the human fight. Greg: *"overhauling halfsword combat"* — and the grapple, the shove and the bare hand are still separate systems.
-- [ ] **O7.1** `v7` Grapple, shove and bare hands are the same object with a different mass
-- [ ] **O7.2** `v7` Two-handing changes the numbers rather than the pose
+- [x] ~~**O7.1** `v7` Grapple, shove and bare hands are the same object with
+      a different mass~~ Cross-ticked against AN1.9, built under that
+      number: `grapple` (1.8kg) and `shove` (2.4kg) are `ARM_WEIGHTS`
+      entries exactly like `bare` (0.4kg), `sword` or any firearm — the
+      same arm the weapon hangs off, re-carried through the identical
+      `_carry_current_weapon()` path, not a parallel grapple-specific
+      system. Verified by `tests/grapple_mass_test.gd`
+- [x] ~~**O7.2** `v7` Two-handing changes the numbers rather than the
+      pose~~ The same claim as AN2.5, word for word — built there, ticked
+      here against it rather than duplicated. `held_gear.gd`'s `GRIPS`
+      table's `reach`, `damage_type` and the new `control` field now reach
+      `arm.reach`, `LimbMomentum`'s stiffness and the swing's own
+      `damage_type` through `_carry_current_weapon()`/`_attack()`, cycled
+      live with `B`. Verified by `tests/two_handing_test.gd` (11/11)
 
 ### O v8 — the eighth pass
 Seven passes against people. AO4 fills this world with things that are not people.
