@@ -197,6 +197,15 @@ const FOOTING_SHOVED := 0.34
 ## pays for both, which is the whole point: a flick has nothing to lose twice.
 const FOOTING_COMMITTED_SWING := 0.32
 
+## AN2.2. `arm.fatigue` (AN1.6, straight off stamina) is already "how loosely
+## you are holding it" as a real number. Deterministic rather than a coin
+## flip on top of it — the same hit, the same fatigue, the same outcome every
+## time — because this project's other thresholds (severing, footing) all
+## work the same way and a random disarm would be the one hit in the game a
+## player could never learn to read.
+const DISARM_FATIGUE_THRESHOLD := 0.75
+const DISARM_DAMAGE_THRESHOLD := 14.0
+
 var swing_side := 1
 var last_swing_at := 0.0
 const SWING_CHAIN_WINDOW := 0.9
@@ -722,6 +731,25 @@ func _wound_player(from: Vector3, damage: float, damage_type := "cut") -> void:
 	})
 	if bool(result.get("severed", false)):
 		_player_lost_limb(str(result.get("zone", "")))
+	elif _should_disarm(damage):
+		_disarm_player()
+
+
+## AN2.2. A weapon you are barely holding is a weapon somebody can take. Both
+## halves have to be real: a fresh grip does not give this up to a light
+## tap, and a hard blow does not shake loose a weapon held with everything
+## the arm has left.
+func _should_disarm(damage: float) -> bool:
+	if bare_handed or carried_limb_index >= 0 or arm == null:
+		return false
+	return arm.fatigue >= DISARM_FATIGUE_THRESHOLD and damage >= DISARM_DAMAGE_THRESHOLD
+
+
+func _disarm_player() -> void:
+	var lost := str(arsenal.current_id) if arsenal != null else ""
+	_put_the_weapons_down()
+	prompt.text = "DISARMED // [1-3] TO DRAW AGAIN"
+	WorldHistory.record_event("player_disarmed", {"weapon": lost, "fatigue": snappedf(arm.fatigue, 0.01), "location": HUNT_LOCATION})
 
 
 ## How much of a healthy swing and a healthy run the player has left. Both read

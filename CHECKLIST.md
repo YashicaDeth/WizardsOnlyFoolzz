@@ -3676,7 +3676,20 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
       `tests/footing_test.gd` — a forced full-commitment swing measurably
       costs footing, a zero-commitment one does not, and firing a gun with
       the same forced commitment costs none at all.
-- [ ] **AN2.2** You can be disarmed, because a weapon you are barely holding is a weapon somebody can take
+- [x] **AN2.2** You can be disarmed, because a weapon you are barely holding
+      is a weapon somebody can take — `arm.fatigue` (AN1.6, straight off
+      stamina) is already a real "how loosely" number; a hit at or above
+      `DISARM_DAMAGE_THRESHOLD` while fatigue is at or above
+      `DISARM_FATIGUE_THRESHOLD` calls `_put_the_weapons_down()` for real,
+      not a stat penalty. Deterministic on purpose, the same way severing and
+      footing already are, rather than a coin flip nobody could learn to
+      read. Recoverable mid-fight by drawing again (1-3), which is the
+      correct shape until dropped weapons are real world objects (blocked on
+      the same gap C1.7 named for the handheld). Excluded: a carried severed
+      limb, which already has its own condition/break mechanic. Verified:
+      `tests/disarm_test.gd` — a fresh grip survives a hard hit, an exhausted
+      one gives the weapon up to a hard hit but not a light one, drawing
+      again re-arms, and a carried limb is not double-counted.
 - [~] **AN2.3** Hitting armour, bone or a wall answers differently through
       `strike()` — armour and bone, not the wall yet. `apply_hit()` now
       reports `absorbed`, the real fraction of a blow armour and garments
