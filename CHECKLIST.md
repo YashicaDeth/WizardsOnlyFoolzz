@@ -2423,7 +2423,19 @@ The last rung. Fifteen statements that are true of your own faction when this ga
 M2b covers cars as this world's horses. This is everything else about them
 being vehicles rather than set pieces.
 
-- [ ] **V1.1** A car is a thing with a condition, not a state you are in
+- [ ] **V1.1** A car is a thing with a condition, not a state you are in —
+      checked against `DESIGN/DESTRUCTION.md`'s AB1.5 note, which defers
+      exactly this to Lane 2 on the condition that it reuses `world_damage.gd`
+      rather than inventing a third store. Not started this pass, deliberately:
+      `rift_derby.gd`'s `integrity` (a plain scene-local int, reset to 100
+      every heat) is a real second implementation of the same primitive, but
+      migrating it to a persistent, `WorldHistory`-backed condition is only
+      honest once V1.4 (repair) or AB2.4/2.5 (repair via a holding's owner,
+      which needs AA — not built) exists to bring it back up. Doing the
+      migration first would make a wrecked derby car stay wrecked forever
+      with no path back, which is not a technical detail, it is a dead end a
+      player would actually hit. Sequencing this after repair rather than
+      before it.
 - [ ] **V1.2** Damage is physical and visible, and it changes how it drives
 - [ ] **V1.3** Fuel, or a reason a car is not infinite
 - [ ] **V1.4** Cars can be repaired, badly
