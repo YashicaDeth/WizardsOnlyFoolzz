@@ -556,7 +556,7 @@ v6 made the lamp cost you something; it costs nobody else anything. AS1.5: its l
 
 ### C v8 — the eighth pass
 v7 made carrying it tactical and putting it away instant. Rule 3: every hard cut is a bug.
-- [ ] **C8.1** `v8` Pocketing it is a movement and the light leaves with it
+- [x] ~~**C8.1** `v8` Pocketing it is a movement and the light leaves with it~~ Already implemented under AS1.4 but left open here: `close_device()` changes intent, while `Motion.blend()` lowers `raised` over subsequent frames rather than hiding the object; the world lamp reads that same held threshold every frame, remains during the first part of the lowering action, then leaves once the screen crosses out of the hand. `tests/handheld_pocket_light_test.gd`, 5 checks in the running Hunt scene, including the intermediate moving/lit state and the final pocketed/dark state
 - [ ] **C8.2** `v8` Pockets are real, and what is in them is in them (AS3.2)
 
 ### C v9 — the ninth pass
