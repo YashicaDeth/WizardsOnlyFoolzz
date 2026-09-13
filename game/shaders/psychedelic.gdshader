@@ -98,7 +98,19 @@ void fragment() {
 		mat2 rot = mat2(vec2(cos(spin), sin(spin)), vec2(-sin(spin), cos(spin)));
 		vec2 feedback_uv = (rot * centered) / max(feedback_zoom, 0.001) * 0.5 + 0.5;
 		vec3 trailed = texture(feedback_texture, feedback_uv).rgb;
-		color = mix(color, trailed, feedback_strength);
+		// AU4.4. This was `mix(color, trailed, feedback_strength)`, which is a
+		// low-pass filter with no energy going in: each frame is 72% of the
+		// last one at 0.72, so after a second of held feedback every pixel has
+		// converged on the average of the frame and the screen is flat grey.
+		// That is what killed the first capture sheet's "everything" shot.
+		//
+		// A trail is an afterimage, not a crossfade. `max` can only ever
+		// brighten, so the current frame's contrast survives intact and the
+		// previous frame shows through exactly where the new one is darker -
+		// which is what a phosphor actually does. Multiplying the trail by
+		// `feedback_strength` is what makes it decay instead of ratcheting to
+		// white: at 0.72 an afterimage is down to 4% after ten frames.
+		color = max(color, trailed * feedback_strength);
 	}
 
 	// 6. Beat-locked cuts: about half of each beat holds on a flat hashed
