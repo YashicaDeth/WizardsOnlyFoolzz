@@ -43,6 +43,30 @@ const PRESETS := {
 		"fog": "5e466a", "fog_density": 0.02, "volumetric": 0.022,
 		"ambient": 0.72, "saturation": 0.78, "contrast": 1.1, "exposure": 1.2,
 	},
+	# The front door, and only the front door. Greg, on the title shot: *"i dont
+	# like the blueish backround and how low poly everything is"*. It was running
+	# `ossuary`, which is mauve from zenith to ground and carries the densest fog
+	# of any preset here — 0.02, nearly twice `ashbloom`'s. Both halves of the
+	# complaint come out of that one entry: the purple is the blue he means, and
+	# the fog is why the street reads as untextured blocks. `ashbloom`'s own note
+	# above already says it — dense fog "hid every surface the material system
+	# produces and is a large part of why the Ashbloom read as a grey-box
+	# prototype" — and the title screen was still carrying twice that density.
+	#
+	# Red and black, because that is what the mark, the sigil and the key light
+	# already are; a mauve screen behind a blood-red wordmark is two games. Fog
+	# down to a third so the geometry has surfaces again, saturation up because
+	# the red is supposed to be the thing you notice.
+	# Near-black carrying red, not red. The first cut of this went to a flat
+	# arterial field and the wordmark — which is itself red — vanished into it;
+	# trading a mauve screen for a monochrome one is not a fix. The mark reads on
+	# black, which is what its own PNG is drawn against, so the door is black
+	# with the red held in the horizon and the volumetrics and the lights.
+	"front_door": {
+		"zenith": "0a0406", "horizon": "3a0d0a", "ground": "120607",
+		"fog": "1e0908", "fog_density": 0.0060, "volumetric": 0.009,
+		"ambient": 0.40, "saturation": 0.92, "contrast": 1.28, "exposure": 1.0,
+	},
 }
 
 static var _noise_cache: Dictionary = {}

@@ -369,7 +369,10 @@ func _toggle_vsync() -> void:
 func _cycle_color_grade() -> void:
 	color_index = (color_index + 1) % color_modes.size()
 	var mode: String = color_modes[color_index]
-	var preset := "bone_yard"
+	# "CELLOUTZ COPPER" is the default the door opens on, so it has to be the
+	# door's own preset rather than `bone_yard` — otherwise touching the colour
+	# setting once threw away the look the title screen was built around.
+	var preset := "front_door"
 	if mode == "SALVAGE TEAL":
 		preset = "ashbloom"
 	elif mode == "NIGHT BLOOD":
@@ -389,7 +392,7 @@ func _build_country_town() -> void:
 	# owns the settings Environment, but it must not build its old blockout under
 	# that camera: those legacy boxes were the floating orange geometry in the
 	# title shot.
-	menu_environment = WorldLook.environment("ossuary")
+	menu_environment = WorldLook.environment("front_door")
 	$WorldEnvironment.environment = menu_environment
 
 

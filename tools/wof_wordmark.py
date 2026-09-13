@@ -4,7 +4,7 @@ Greg's two existing marks set the brief. The CellOutz logo is a death-metal
 wordmark: chiselled gothic letters fused into one mass, thorns sweeping off
 every terminal and interlocking between letters, the whole thing pulled into a
 lens-shaped envelope with a heraldic device dropped through the middle. The
-Illusions Too Grandeur mark is the same language set on two lines.
+Allusions Too Grandeur mark is the same language set on two lines.
 
 WIZARDSONLYFOOLS is sixteen letters. At CellOutz's density that is a smear on
 one line, so the default lockup stacks it the way Illusions does.
@@ -219,7 +219,7 @@ _glyph("Y", 1.10, [
     _stroke(0.54 - STEM * NIB, 1.00 - STEM * 0.16, 0.54 + STEM * NIB, 1.00 + STEM * 0.46, STEM * 0.60),
 ], [(0.04, 0.04, -106, 0.60, 0.30, 0.17), (1.06, 0.04, -74, 0.60, -0.30, 0.17)])
 
-# Added for "ALLUSIONS TO GRANDEUR" — the original twelve only covered
+# Added for "ALLUSIONS TOO GRANDEUR" — the original twelve only covered
 # WIZARDSONLYFOOLS. Same primitive, same unit system, same rule: a thorn root
 # only where a stroke actually ends in open air.
 
@@ -635,6 +635,18 @@ def render(layers, bounds, width_px=2200, seed=1312, pad=0.12, blood=True):
     out.paste(art.convert("RGBA"), (0, 0), mask)
 
     if blood:
+        # Room under the mark for the blood to actually run into. Greg: the mark
+        # "needs more blood that drips into the backround and melts" — nothing
+        # can melt into anything while the canvas stops where the letters do,
+        # which is why the old drips all ended in a bead a few pixels short of
+        # the edge. The mask is extended with it so `_bleed` still finds the
+        # same lowest-lit row per column.
+        room = int(width_px * 0.17)
+        tall = Image.new("RGBA", (size[0], size[1] + room), (0, 0, 0, 0))
+        tall.paste(out, (0, 0))
+        tall_mask = Image.new("L", (size[0], size[1] + room), 0)
+        tall_mask.paste(mask, (0, 0))
+        out, mask, size = tall, tall_mask, tall.size
         _bleed(out, mask, rng, width_px)
 
     grain = Image.new("L", size)
@@ -646,41 +658,91 @@ def render(layers, bounds, width_px=2200, seed=1312, pad=0.12, blood=True):
 
 
 def _bleed(canvas, mask, rng, width_px):
-    """Drips off the lowest edge of the mark, where the reference has them.
+    """Blood off the lowest edge of the mark.
 
-    Drawn as a stack of shrinking dots rather than a line and a ball: a drip
-    is widest where it tears off the metal and necks down as it falls, and a
-    uniform stroke with a circle on the end reads as a thermometer.
+    Greg: the mark *"needs more blood that drips into the backround and melts"*.
+    The first pass gave it six stubby runs that each ended on a hard bead a few
+    pixels below the letters, which reads as six thermometers rather than as
+    something bleeding.
+
+    So: sixteen runs instead of six, lengths spread from a bead to a long
+    runner, and every run losing both weight *and* opacity as it falls, so the
+    tail goes into the page instead of stopping on an edge. A few beads let go
+    and fall on their own under the longest runs. The part that actually reads
+    as melting is the blurred wash underneath them.
+
+    Drawn on two transparent layers and alpha-composited, because PIL's draw
+    *replaces* pixels rather than blending them — drawing a half-alpha drip
+    straight onto the canvas punches a hole through the letter behind it.
     """
-    from PIL import ImageDraw
-    pen = ImageDraw.Draw(canvas)
+    from PIL import Image, ImageDraw, ImageFilter
     columns = mask.size[0]
     floor = mask.load()
 
     picks = []
-    for _ in range(26):
-        x = rng.randrange(int(columns * 0.20), int(columns * 0.84))
-        if any(abs(x - taken) < width_px * 0.045 for taken, _ in picks):
+    for _ in range(220):
+        x = rng.randrange(int(columns * 0.14), int(columns * 0.88))
+        if any(abs(x - taken) < width_px * 0.019 for taken, _ in picks):
             continue
         lowest = None
         for y in range(mask.size[1] - 1, 0, -1):
             if floor[x, y] > 140:
                 lowest = y
                 break
-        if lowest is not None and lowest < mask.size[1] - width_px * 0.02:
+        if lowest is not None:
             picks.append((x, lowest))
+    picks = picks[:16]
 
-    for (x, top) in picks[:6]:
-        length = rng.uniform(0.018, 0.062) * width_px
-        head = rng.uniform(0.0030, 0.0052) * width_px
-        steps = max(6, int(length / 2))
+    # Geometry first, so the wash can be laid down under the drips that cast it
+    # without drawing either of them twice.
+    runs = []
+    for index, (x, top) in enumerate(picks):
+        runner = index % 3 == 0
+        length = (rng.uniform(0.11, 0.27) if runner else rng.uniform(0.015, 0.075)) * width_px
+        runs.append({
+            "x": x, "top": top, "length": length, "runner": runner,
+            "head": rng.uniform(0.0030, 0.0058) * width_px,
+            "drift": rng.uniform(-0.5, 0.5),
+            "bead": rng.random() < 0.8,
+            "bead_at": rng.uniform(1.08, 1.45),
+            "bead_size": rng.uniform(0.45, 0.8),
+            "bead_alpha": rng.randrange(70, 150),
+        })
+
+    wash = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    wash_pen = ImageDraw.Draw(wash)
+    drips = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    pen = ImageDraw.Draw(drips)
+
+    for run in runs:
+        steps = max(8, int(run["length"] / 1.6))
         for step in range(steps + 1):
             t = step / steps
-            y = top + length * t
-            # Heavy at the tear, necked in the middle, swollen at the bead.
-            radius = head * (1.0 - 0.72 * t) + head * 1.15 * (t ** 6)
-            pen.ellipse([x - radius, y - radius, x + radius, y + radius],
-                        fill=(146, 12, 9, 255))
+            y = run["top"] + run["length"] * t
+            # Heavy where it tears off the metal, necked as it falls, swollen
+            # again at the bead.
+            radius = run["head"] * (1.0 - 0.78 * t) + run["head"] * 1.05 * (t ** 6)
+            # The melt. Opacity falls away with the run, so a long runner is
+            # solid where it leaves the letter and gone by the time it lands.
+            alpha = int(255 * max(0.0, 1.0 - t ** 1.35))
+            if alpha <= 2:
+                continue
+            cx = run["x"] + run["drift"] * run["length"] * (t ** 2)
+            pen.ellipse([cx - radius, y - radius, cx + radius, y + radius],
+                        fill=(146, 12, 9, alpha))
+            if run["runner"]:
+                halo = radius * 3.4
+                wash_pen.ellipse([cx - halo, y - halo, cx + halo, y + halo],
+                                 fill=(96, 8, 6, int(alpha * 0.20)))
+        if run["runner"] and run["bead"]:
+            fall = run["top"] + run["length"] * run["bead_at"]
+            size = run["head"] * run["bead_size"]
+            cx = run["x"] + run["drift"] * run["length"]
+            pen.ellipse([cx - size, fall - size, cx + size, fall + size],
+                        fill=(146, 12, 9, run["bead_alpha"]))
+
+    canvas.alpha_composite(wash.filter(ImageFilter.GaussianBlur(width_px * 0.011)))
+    canvas.alpha_composite(drips)
 
 
 # ------------------------------------------------------------------ export --
@@ -698,7 +760,7 @@ VARIANTS = {
     # The algiz rune is Wizards Only Foolz's own device — Allusions to
     # Grandeur is the game itself, not that faction, so this carries no
     # device at all: letters, thorns and blood only.
-    "grandeur": dict(lines=["ALLUSIONS", "TO GRANDEUR"], line_gap=0.30, device=False),
+    "grandeur": dict(lines=["ALLUSIONS", "TOO GRANDEUR"], line_gap=0.30, device=False),
 }
 
 
