@@ -2095,13 +2095,13 @@ v4 made the weapon physical and damage still reads a constant off it.
 
 ### O v6 — the sixth pass
 v5 made a blow worth what you put in and a weapon you barely hold is still welded to your hand.
-- [ ] **O6.1** `v6` You can be disarmed, and so can they
-- [ ] **O6.2** `v6` Mass and reach become the whole balance conversation
+- [x] **O6.1** `v6` You can be disarmed, and so can they — and it asks the question this project already answered. "How well are you holding it" is `Clinch.grip_capacity()`, built for B6.2 to decide whether you can hold a *person*. A hand is a hand, so a player with one arm ruined loses their sword for the same reason and by the same number as they lose their grip on somebody. One exception, and it is a design line rather than a special case: `attached` things cannot be taken off you. A severed arm you picked up can be knocked loose; your own fist cannot, which is why unarmed is a floor and not a weakness
+- [x] **O6.2** `v6` Mass and reach become the whole balance conversation — `trade()` returns it as numbers: reach decides who touches first, mass decides what it is worth when it lands, and a longer lighter thing wins the opening and loses the exchange. There is no damage stat anywhere in it
 
 ### O v7 — the seventh pass
 v6 finished the human fight. Greg: *"overhauling halfsword combat"* — and the grapple, the shove and the bare hand are still separate systems.
-- [ ] **O7.1** `v7` Grapple, shove and bare hands are the same object with a different mass
-- [ ] **O7.2** `v7` Two-handing changes the numbers rather than the pose
+- [x] **O7.1** `v7` Grapple, shove and bare hands are the same object with a different mass — one table, `WeaponBody.THINGS`, and the honest reading of this is stronger than it sounds: **a person you are holding is a weapon you are holding.** Same spring, same overshoot, same commitment curve, eighty kilos instead of one and a half. `fit()` swaps the arm between a sword and a person without a second system existing
+- [x] **O7.2** `v7` Two-handing changes the numbers rather than the pose — `held_gear.gd` already had a `two_hand` grip and it was a hand position. Now it is a different weapon at the same weight: stiffer, steadier, nearly twice as hard to take off you, and **slower to whip around**, which is the cost. A fully committed two-handed blow is worth less than a one-handed one at the same commitment, and that is the trade rather than an upgrade
 
 ### O v8 — the eighth pass
 Seven passes against people. AO4 fills this world with things that are not people.
