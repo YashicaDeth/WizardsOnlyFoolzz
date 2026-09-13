@@ -678,6 +678,11 @@ func _draw() -> void:
 	BlackMirror.draw_glass(self, _screen_rect, alpha, elapsed)
 	draw_rect(_screen_rect, SCREEN_BG * Color(1, 1, 1, 0.55 * alpha))
 	BlackMirror.draw_reflection(self, _screen_rect, alpha, elapsed, 0.42)
+	# C10.2. One night-reading surface for every app. It is deliberately scoped
+	# to the shared aperture rather than the whole mirror: the black side
+	# gutters keep reflecting the holder while information rises out of its own
+	# dim phosphor bed. Hosted and device-native pages both land above this.
+	BlackMirror.draw_reading_bed(self, _page_rect, alpha, screen_luminance())
 	# The modes with no hosted panel draw straight onto the screen.
 	var mode := current_mode()
 	if mode == "RADIO":

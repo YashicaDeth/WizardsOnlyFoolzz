@@ -28,6 +28,13 @@ const CRACK := Color("8f9cab")
 const REFLECT := Color("1a2029")
 const JESTER := Color("7d2230")
 const BELL := Color("c9a23a")
+## C10.2. The mirror remains black around the working aperture, but the area
+## being read has its own phosphor bed. This is shared glass behaviour rather
+## than six page backgrounds, so changing apps cannot change whether the
+## device is usable after dark.
+const READING_EDGE := Color("07100e")
+const READING_CENTRE := Color("0c1b17")
+const READING_LIP := Color("6f9478")
 
 
 ## The dark ground the whole device sits on. Drawn first; everything else is
@@ -74,6 +81,43 @@ static func draw_reflection(canvas: CanvasItem, rect: Rect2, alpha: float, clock
 	if blink > -0.72:
 		for side in [-1.0, 1.0]:
 			canvas.draw_circle(centre + Vector2(side * scale * 0.075, -scale * 0.14), maxf(1.0, scale * 0.012), CRACK * Color(1, 1, 1, 0.5 * presence * alpha))
+
+
+## The readable part of the black mirror. Drawn after the broad reflection and
+## before page content: the reader still exists in the surrounding glass, but
+## never sits at equal weight behind type, chart marks or instrument needles.
+## Layered insets make emitted light belong to the glass instead of looking
+## like a flat UI rectangle.
+static func draw_reading_bed(canvas: CanvasItem, rect: Rect2, alpha: float, light_level: float) -> void:
+	if rect.size.x <= 2.0 or rect.size.y <= 2.0:
+		return
+	var energy := clampf(light_level, 0.0, 1.0)
+	canvas.draw_rect(rect, READING_EDGE * Color(1, 1, 1, 0.94 * alpha))
+	for layer in 6:
+		var through := float(layer + 1) / 6.0
+		var inset := minf(rect.size.x, rect.size.y) * through * 0.055
+		var tone := READING_EDGE.lerp(READING_CENTRE, through)
+		canvas.draw_rect(rect.grow(-inset), tone * Color(1, 1, 1, (0.24 + energy * 0.10) * alpha))
+	var lip := READING_LIP * Color(1, 1, 1, (0.18 + energy * 0.16) * alpha)
+	canvas.draw_rect(rect.grow(-1.0), lip, false, 1.0)
+
+
+## Testable colour contract for the shared reading surface. Kept here beside
+## the renderer so a later palette pass cannot quietly make the night aperture
+## brighter than its smallest labels.
+static func reading_contrast(foreground: Color, opacity := 1.0, centre := READING_CENTRE) -> float:
+	var composited := centre.lerp(foreground, clampf(opacity * foreground.a, 0.0, 1.0))
+	var bright := _relative_luminance(composited)
+	var dark := _relative_luminance(centre)
+	return (maxf(bright, dark) + 0.05) / (minf(bright, dark) + 0.05)
+
+
+static func _relative_luminance(colour: Color) -> float:
+	return 0.2126 * _linear_channel(colour.r) + 0.7152 * _linear_channel(colour.g) + 0.0722 * _linear_channel(colour.b)
+
+
+static func _linear_channel(channel: float) -> float:
+	return channel / 12.92 if channel <= 0.04045 else pow((channel + 0.055) / 1.055, 2.4)
 
 
 ## Damage to a mirror: long forks from an impact point, not a grid of dead
