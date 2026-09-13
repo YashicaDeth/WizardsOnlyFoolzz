@@ -316,7 +316,11 @@ static func _build_sword(root: Node3D) -> void:
 		Vector3(0.110, 0.0170, 0.0130),
 		Vector3(0.170, 0.0150, 0.0118),
 	], 10)
-	handle.rotation.y = PI * 0.5
+	# M4.4. Same fix as the shotgun barrel: `revolve()` extends along local Y,
+	# so only a rotation on X actually lays it down the blade's own axis.
+	# Negative here because the grip runs *back* from the guard (towards -Z)
+	# rather than forward like a barrel does.
+	handle.rotation.x = -PI * 0.5
 	handle.position = Vector3(0, 0, -0.10)
 	handle.material_override = _leather(Color("35261e"), 5)
 	root.add_child(handle)
@@ -329,7 +333,7 @@ static func _build_sword(root: Node3D) -> void:
 			Vector3(-0.005, 0.0195, 0.0150),
 			Vector3(0.005, 0.0195, 0.0150),
 		], 10)
-		cord.rotation.y = PI * 0.5
+		cord.rotation.x = -PI * 0.5
 		cord.position = Vector3(0, 0, -0.122 - float(index) * 0.0205)
 		cord.material_override = _leather(Color("241a14"), index)
 		root.add_child(cord)
@@ -345,7 +349,7 @@ static func _build_sword(root: Node3D) -> void:
 		Vector3(0.048, 0.022, 0.020),
 		Vector3(0.056, 0.010, 0.010),
 	], 10)
-	pommel.rotation.y = PI * 0.5
+	pommel.rotation.x = -PI * 0.5
 	pommel.position = Vector3(0, 0, -0.272)
 	pommel.material_override = _metal(Color("8b6040"), 0.30, 33)
 	root.add_child(pommel)
@@ -380,7 +384,13 @@ static func _build_shotgun(root: Node3D) -> void:
 		Vector3(0.40, 0.0112, 0.0112),
 		Vector3(0.52, 0.0118, 0.0118),
 	], 12)
-	barrel.rotation.y = -PI * 0.5
+	# M4.4. `BodyMesh.revolve()` extends along its own local Y, not Z like
+	# `_sweep()` — a rotation around Y cannot retarget a shape that is already
+	# aligned with Y, which is why this read as a barrel pointed at the sky
+	# rather than downrange. Tipping it over on X is what actually lays a
+	# Y-extending tube along +Z, matching every `_sweep()` part's own
+	# muzzle-forward convention.
+	barrel.rotation.x = PI * 0.5
 	barrel.position = Vector3(0, 0.016, 0.225)
 	barrel.material_override = _metal(gunmetal.darkened(0.2), 0.24, 17)
 	root.add_child(barrel)
@@ -391,7 +401,7 @@ static func _build_shotgun(root: Node3D) -> void:
 		Vector3(0.0, 0.0115, 0.0115),
 		Vector3(0.40, 0.0115, 0.0115),
 	], 10)
-	magazine.rotation.y = -PI * 0.5
+	magazine.rotation.x = PI * 0.5
 	magazine.position = Vector3(0, -0.014, 0.225)
 	magazine.material_override = _metal(gunmetal.darkened(0.3), 0.30, 19)
 	root.add_child(magazine)
@@ -417,7 +427,7 @@ static func _build_shotgun(root: Node3D) -> void:
 			Vector3(-0.004, 0.0235, 0.0255),
 			Vector3(0.004, 0.0235, 0.0255),
 		], 10)
-		rib.rotation.y = PI * 0.5
+		rib.rotation.x = PI * 0.5
 		rib.position = Vector3(0, -0.006, 0.272 + float(index) * 0.0225)
 		rib.material_override = _wood(Color("35241a"), index + 40)
 		root.add_child(rib)

@@ -1731,6 +1731,34 @@ image.
       is proportions and silhouette work (a longer, thinner barrel; a stock
       angled off the receiver) rather than another transform bug, so it is
       left here rather than force-finished. Recaptured in `game/captures/`.
+
+      Follow-up 2: the fix above targeted `hunter_arsenal.gd`'s own
+      box-primitive weapon models and was correct for what it touched — but
+      that whole system was superseded by `held_gear.gd`'s sculpted meshes at
+      "0006 touchdesigner" (`5630b82`), which never inherited it and
+      reintroduced the same *class* of bug independently, in the code that is
+      actually live today: `BodyMesh.revolve()` extends along its own local
+      Y, not Z like `_sweep()` does, and the shotgun's barrel/magazine used a
+      Y-axis rotation trying to point them forward — which cannot retarget a
+      shape already aligned with Y. The barrel read as a pole pointed at the
+      sky, not a stacked blob; the two prior writeups were looking at a
+      screen this dark by coincidence, not because the fix above had failed.
+      Fixed by rotating on X instead (`barrel.rotation.x = PI * 0.5`, sign
+      chosen so `+at` still means "toward the muzzle"), and the same
+      correction applied everywhere else `revolve()` carried the identical
+      wrong-axis rotation: the shotgun's ribs, and the sword's own
+      handle/pommel/wrap — dormant there too, just small enough parts that a
+      "reads clean" verdict never caught it. The sidearm has no `revolve()`
+      parts at all and was never touched by this specific bug; its
+      stacked-block read is the proportions/silhouette problem Follow-up
+      already named and it remains open. `tests/viewmodel_capture.gd` now
+      forces `WorldClock.set_hour(13.0)` before capturing — the night rework
+      landed after this segment was first opened and the world now defaults
+      dark enough to make a framing check unreadable by accident. Verified:
+      `viewmodel_frame_test.gd`, `magazine_test.gd`, `arsenal_test.gd`,
+      `firearm_momentum_test.gd` and `reload_visual_test.gd` all re-run
+      clean; all three `game/captures/m4_4_viewmodel_*.png` recaptured at the
+      forced hour.
 - [x] ~~**M4.5** The rules are the game's own and applied everywhere, not photographic realism~~ (the resolution/interrogation camera had its own bare `72.0` FOV with no relationship to the 78/63 pair M4.3 established; it now takes `THIRD_PERSON_FOV` since it is already the "look at the body from outside" register)
 
 ### M3 — The seam
