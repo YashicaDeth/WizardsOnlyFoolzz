@@ -2,12 +2,15 @@ extends Node3D
 
 const Quantum := preload("res://systems/quantum_saves.gd")
 
+const MENU_PLATE := preload("res://systems/menu_plate.gd")
+
 var wreck: Node3D
 var front_door: Node3D
 var warning_card: Control
 var menu_environment: Environment
 var ui_time := 0.0
 var menu_buttons: Array[Button] = []
+var menu_plate: Control
 var graphics_presets := ["ULTRA", "HIGH", "PERFORMANCE"]
 var graphics_index := 0
 var render_scales := [1.0, 1.25, 1.5, 0.8]
@@ -129,6 +132,13 @@ func _build_run_doors() -> void:
 	sandbox.mouse_entered.connect(_focus_button.bind(sandbox))
 	sandbox.mouse_exited.connect(_unfocus_button.bind(sandbox))
 	menu_buttons.append(sandbox)
+	# The column is set in the house type from here on. The buttons keep hit
+	# testing, focus, the tween and every signal; they just stop drawing their
+	# own text in the engine's fallback UI font.
+	menu_plate = MENU_PLATE.new()
+	menu_plate.name = "MenuPlate"
+	$HUD.add_child(menu_plate)
+	menu_plate.adopt(menu_buttons)
 	_build_branch_panel()
 
 
