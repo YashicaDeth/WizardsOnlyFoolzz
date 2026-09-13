@@ -2604,7 +2604,39 @@ The Expanse has one lighting state, one fog density and no clock. `WorldLook`
 already switches presets by place; nothing switches by time.
 
 - [x] **W1.1** A day cycle the world reads, not only the sky — `world_clock.gd`, a pure function of one persisted number rather than a sixth autoload. Hours, days, months, five named phases, a continuous daylight curve, and sleeping. 28 checks. Unblocks A9.7, W1.4, AB2.4, AJ4.3 and AL1.5, all of which were waiting on it without anybody noticing
-- [ ] **W1.2** Contamination has weather — it moves, it settles, it gets worse
+- [x] **W1.2** ~~Contamination has weather — it moves, it settles, it gets worse~~
+      A5 made contamination a property of every surface, painted in once at
+      authoring time — real, but static, and nothing asked whether the air
+      over the Bone Yard reads worse today than it did a week ago, because
+      nothing tracked an answer. `world_weather.gd` (`WorldWeather`,
+      `class_name`, `RefCounted`) does, in the same idiom W1.1 set for
+      `world_clock.gd`: a pure function of state that already exists and
+      already persists, so there is nothing new to save and nothing that can
+      drift out of sync with its sources. `contamination()` sums three real
+      terms — an `AMBIENT_PER_DAY` floor that only ever rises with
+      `WorldClock.day()` ("it gets worse"), a night/day push off
+      `WorldClock.daylight()` that recedes through the day and returns after
+      dark ("it moves" / "it settles"), and `WorldHistory.chaos_magick()`
+      (AS4.2) folded in at a weight, because a storm already loose in the air
+      is contamination too, not a separate fact politely declining to overlap.
+      Verified: `tests/world_weather_test.gd`, 11 checks — the floor rises by
+      exactly its authored per-day rate and stops at its ceiling however many
+      days pass; the same day reads worse at night than at noon while the
+      floor itself stays hour-blind; a bumped storm reads as worse
+      contamination and genuinely settles back toward (never below) that
+      day's floor once it decays; and the worst case (ancient save, deep
+      night, a live storm) still clamps to 1.0.
+      Still open, named honestly: "moves" here is temporal, not spatial —
+      the reading changes continuously on its own, but there is still no
+      per-place value anywhere in the project, so a live map of contamination
+      fronts crossing the region is real future work, not this pass. Nothing
+      reads `contamination()` yet either: `bone_yard_hunt.gd` currently feeds
+      `ContaminatedAir.set_severity()` from `chaos_magick()` directly as an
+      explicit stand-in for AS4.2's not-yet-built storm, and that file has
+      another agent's uncommitted work in it right now — deciding whether
+      `WorldWeather.contamination()` should replace, blend with, or sit
+      beside that stand-in is a real design call for whoever owns AS4.2 and
+      the storm, not one to make unilaterally while landing this pass.
 - [ ] **W1.3** Being caught out in it costs something
 - [ ] **W1.4** Factions keep hours; the Wire is busier at some of them
 - [ ] **W1.5** G7's exposure problem is a lighting *state* rather than a constant
