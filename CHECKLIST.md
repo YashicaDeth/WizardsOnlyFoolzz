@@ -546,7 +546,7 @@ v4 made it a lamp, and a lamp that never runs out is a torch, not a resource. *"
 
 ### C v6 — the sixth pass
 v5 gave the light a cost in charge and none in attention. Raising it should occupy you.
-- [ ] **C6.1** `v6` Holding it up is an action, and that hand is not available
+- [x] ~~**C6.1** `v6` Holding it up is an action, and that hand is not available~~ Already implemented under AS1.2 but left open here: `_attack()` refuses before it asks the arsenal for an action once `handheld.raised > 0.5`, the same physical threshold that makes the screen light live. It therefore spends no ammo, windup or cooldown while that hand is occupied, rather than cancelling a strike after its cost. `tests/handheld_busy_hand_test.gd`, 5 checks in the running Hunt scene: the pocketed control begins a real melee windup, while the identical attempt with the device raised leaves the action, windup and cooldown untouched
 - [ ] **C6.2** `v6` Waving it to see around a corner is a real thing you do
 
 ### C v7 — the seventh pass
