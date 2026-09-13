@@ -410,8 +410,8 @@ v8 of A gave the player a flame; B has never rendered the player as anything oth
 
 ### B v9 — the ninth pass
 v8 made the player's body exceptional and they can still never look at it. AH1.5: the mirror in the room shows your body, current.
-- [ ] **B9.1** `v9` The mirror renders this rig live, with everything done to it
-- [ ] **B9.2** `v9` Including the things you cannot see on yourself in first person
+- [x] **B9.1** `v9` The mirror renders this rig live, with everything done to it — `body_mirror.gd`, which is A10's technique pointed sideways instead of down. A reflection camera in the player's **own world**, never a copy of the rig, and that single decision is what makes "everything done to it" true for nothing: a severed arm is missing in the glass because it is missing on the body, an implant shows because it is installed, a garment shows because it is worn. There is no second body to update and so none to forget. Proved rather than asserted in `tests/body_mirror_capture.gd`: the arm comes off the rig and nothing about the mirror is touched between frames
+- [x] **B9.2** `v9` Including the things you cannot see on yourself in first person — in first person the head is behind the camera and the back is behind the body, so the anatomy carries damage nobody can look at. The mirror is the only surface in the game where the player's own face is visible to the player, which is why this is a segment and not a footnote to B9.1. The capture shows head damage read off the glass
 
 ### B v10 — the tenth pass
 Nine passes on one body, and T1.1 now says the universe restarts and you do not.
@@ -425,7 +425,7 @@ Nine passes on one body, and T1.1 now says the universe restarts and you do not.
 - [ ] **B10.7** `v10` What is installed in a limb is visible in that limb
 - [ ] **B10.8** `v10` Radiation, fire, bullets and blades all resolve through the same anatomy
 - [ ] **B10.9** `v10` A body reacts to the hour, the weather and what it is wearing
-- [ ] **B10.10** `v10` The mirror in the room renders this rig live
+- [x] **B10.10** `v10` The mirror in the room renders this rig live — the same `BodyMirror`. It sleeps when nobody is in the room (`UPDATE_DISABLED` until asked, the rule A10.8 set for the satellite), runs live while they are, and `distance_from()` is how the room decides. **AH1.5 stays open**: the class exists and is tested, the room it hangs in does not
 - [ ] **B10.11** `v10` Gore persists, rots on a real clock, and is eaten by things that eat
 - [ ] **B10.12** `v10` Nothing about a body is described in text that could be shown on the body
 - [ ] **B10.13** `v10` A corpse is a place other systems can read from days later
