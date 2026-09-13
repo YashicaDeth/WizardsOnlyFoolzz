@@ -218,7 +218,10 @@ func _spawn_body(index: int) -> void:
 	rig.build("demo_body_%d" % index, {
 		"flesh": Color("70201c") if index % 2 == 0 else Color("586c3a"),
 		"variation": index * 13 + 5,
-		"gore": true,
+		# Same world setting and same BaselineHuman implementation as the Hunt
+		# and derby. The sandbox used to force gore on, making it look like a
+		# separate, older system whenever the main-game setting was reduced.
+		"gore": BaselineHuman.apply_gore_setting(),
 		"blood": 4300.0,
 		"cybernetics": {"torso": {"name": "ceramic sternum", "armor": 0.18}},
 	})
@@ -597,6 +600,16 @@ func _paint_hud() -> void:
 	var rust := Color("b0552a")
 	var size := hud.size
 
+	# A damaged field instrument, not a clean debug overlay. The corners and
+	# centre sigil use the same copper/blood language as the front door and the
+	# handheld so this room reads as part of the game before anything is shot.
+	var frame := Color("862016")
+	hud.draw_line(Vector2(18, 18), Vector2(250, 18), frame * Color(1, 1, 1, 0.82), 2.0)
+	hud.draw_line(Vector2(18, 18), Vector2(18, 104), frame * Color(1, 1, 1, 0.82), 2.0)
+	hud.draw_line(Vector2(size.x - 18, 18), Vector2(size.x - 250, 18), frame * Color(1, 1, 1, 0.82), 2.0)
+	hud.draw_line(Vector2(size.x - 18, 18), Vector2(size.x - 18, 104), frame * Color(1, 1, 1, 0.82), 2.0)
+	hud.draw_line(Vector2(18, size.y - 18), Vector2(250, size.y - 18), frame * Color(1, 1, 1, 0.55), 2.0)
+	hud.draw_line(Vector2(size.x - 18, size.y - 18), Vector2(size.x - 250, size.y - 18), frame * Color(1, 1, 1, 0.55), 2.0)
 	CellOutzType.draw_text(hud, Vector2(26, 34), "GORE SANDBOX", 20.0, bone * Color(1, 1, 1, 0.85), 2.0)
 	CellOutzType.draw_condensed(hud, Vector2(26, 54), "WIZARDS ONLY FOOLS  //  NOTHING HERE IS A MOCK-UP", 9.0, bone * Color(1, 1, 1, 0.4), 2.2)
 
@@ -653,8 +666,12 @@ func _paint_hud() -> void:
 		CellOutzType.draw_text(hud, Vector2(size.x * 0.5 - note_width * 0.5, size.y - 84.0),
 			last_note, 17.0, rust * Color(1, 1, 1, clampf(note_life, 0.0, 1.0)), 3.0)
 
-	# A reticle, because you are aiming.
+	# An Algiz-like sight: a cross at the centre rather than an OS pointer,
+	# with branches that pulse during slow time. It stays precise enough to aim.
 	var centre := size * 0.5
-	hud.draw_arc(centre, 7.0, 0.0, TAU, 18, bone * Color(1, 1, 1, 0.4), 1.2)
-	hud.draw_line(centre - Vector2(13, 0), centre - Vector2(5, 0), bone * Color(1, 1, 1, 0.5), 1.2)
-	hud.draw_line(centre + Vector2(5, 0), centre + Vector2(13, 0), bone * Color(1, 1, 1, 0.5), 1.2)
+	var sight := rust.lerp(acid, slowed * 0.55) * Color(1, 1, 1, 0.88)
+	hud.draw_circle(centre, 2.0, sight)
+	hud.draw_line(centre + Vector2(0, 15), centre + Vector2(0, -15), sight, 1.5)
+	hud.draw_line(centre + Vector2(0, -9), centre + Vector2(-8, -1), sight, 1.5)
+	hud.draw_line(centre + Vector2(0, -9), centre + Vector2(8, -1), sight, 1.5)
+	hud.draw_arc(centre, 17.0, 0.22, PI - 0.22, 16, sight * Color(1, 1, 1, 0.55), 1.0)
