@@ -12,6 +12,7 @@ var ui_time := 0.0
 var menu_buttons: Array[Button] = []
 var menu_plate: Control
 var settings_plate: Control
+var branch_plate: Control
 var graphics_presets := ["ULTRA", "HIGH", "PERFORMANCE"]
 var graphics_index := 0
 var render_scales := [1.0, 1.25, 1.5, 0.8]
@@ -213,6 +214,20 @@ func _open_branch_picker(creating: bool) -> void:
 	cancel.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cancel.pressed.connect(func() -> void: branch_panel.hide())
 	branch_list.add_child(cancel)
+	# Greg named this screen alongside settings. Same treatment, but rebuilt
+	# every time the picker opens rather than dressed once, because this list is
+	# torn down and regenerated on each open — a plate adopted once would be
+	# speaking for freed nodes the second time through.
+	if branch_plate != null and is_instance_valid(branch_plate):
+		branch_plate.queue_free()
+	branch_plate = MENU_PLATE.new()
+	branch_plate.name = "BranchPlate"
+	branch_plate.compact = true
+	branch_panel.add_child(branch_plate)
+	var branch_rows: Array = []
+	for child in branch_list.get_children():
+		branch_rows.append(child)
+	branch_plate.adopt(branch_rows)
 	branch_panel.show()
 
 

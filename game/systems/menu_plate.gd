@@ -88,9 +88,28 @@ func _draw() -> void:
 		# column out on the right of the screen next to the sigil.
 		var rect := Rect2(control.global_position - global_position, control.size)
 		var focused := lit.r > 0.9 and lit.g < 0.6
+		# A row you cannot press is a heading. Taking the distinction off the
+		# node's own type keeps the hierarchy the engine labels used to carry —
+		# the branch picker's title was 16pt and centred over 16pt rows, and
+		# setting everything at one size flattened it into a list.
+		var heading := not (control is Button)
 		var cap := (11.0 if focused else 10.0) if compact else (17.0 if focused else 15.0)
+		var room := rect.size.x - (28.0 if compact else 0.0)
+		if heading:
+			cap += 1.5
+		# Set to the measure. A heading one and a half caps larger than its rows
+		# is wider than the panel holding it, and ran out over the border —
+		# `CellOutzType` has no wrapping and a Control will not clip it.
+		var natural := CellOutzType.width(label, cap, 2.2)
+		if natural > room and natural > 0.0 and room > 0.0:
+			cap *= room / natural
 		var tone := (HOT if focused else INK * Color(1, 1, 1, 0.72)) * Color(1, 1, 1, lit.a)
-		var baseline := rect.position + Vector2(14.0 if compact else 0.0, (rect.size.y - cap) * 0.5)
+		if heading:
+			tone = Color("e3a070") * Color(1, 1, 1, lit.a * 0.92)
+		var inset := 14.0 if compact else 0.0
+		if heading:
+			inset = maxf(inset, (rect.size.x - CellOutzType.width(label, cap, 2.2)) * 0.5)
+		var baseline := rect.position + Vector2(inset, (rect.size.y - cap) * 0.5)
 
 		if focused:
 			# A struck bar behind the live row, so selection is a thing on the
