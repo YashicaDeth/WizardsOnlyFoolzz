@@ -51,6 +51,51 @@ const FORGET_HOURS := 6.0
 ## so it can be found, stood next to, defaced or stolen later (AJ2.4) the
 ## same way any other physical thing in this world already can be.
 const MEDIA := ["scratched", "burned", "carried", "worn"]
+## AJ2.4. Only a portable medium can actually be stolen — a sigil scratched
+## into a door or burned into a wall does not move because someone wants it
+## to. `worn`/`carried` are the two `MEDIA` that go with a person.
+const PORTABLE_MEDIA := ["carried", "worn"]
+## AJ2.4. Grudge raised on whoever made a sigil that gets defaced or stolen
+## — the same real field the Hunt System's own propagation already reads
+## (F2), on the same escalating scale `wire_net.gd`'s channel-contest
+## retaliation already uses: a theft is remembered harder than a defacement.
+const DEFACE_GRUDGE := 6.0
+const STEAL_GRUDGE := 12.0
+
+## AJ2.5. How many charged-but-unfired sigils a subject can actually carry
+## before the next one comes out corrupted (`chaos_pending` tracks the real
+## count on their own record, advanced in `charge()`/`fire()`, never re-derived
+## by counting anything at read time).
+const CARRY_CAPACITY := 3
+const OVERCHARGE_CORRUPTION := 2.0
+## AJ2.2. What a genuine misfire costs — smaller than overcharging, because
+## a sigil that simply did not parse into anything is an honest miss, not a
+## body pushed past what it can hold.
+const MISFIRE_CORRUPTION := 1.0
+
+## AJ2.1. "Effects come from the intent, parsed, not from a spell list." Five
+## broad semantic families matched against real words in the stated intent,
+## never fifty exact authored phrases — a chaos-magick sigil worked because
+## of what the caster actually meant, not because they typed a password from
+## a list. An intent that matches none of them is a real, honest miss (AJ2.2),
+## not a fallback family invented so nothing ever fails.
+const INTENT_FAMILIES := {
+	"violence": {"words": ["kill", "hurt", "burn", "break", "hunt", "war", "wound", "destroy"], "stat": "combat_power"},
+	"protection": {"words": ["protect", "shield", "guard", "safe", "ward", "armour", "armor"], "stat": "pain_resist"},
+	"concealment": {"words": ["hide", "unseen", "quiet", "silent", "vanish", "shadow"], "stat": "stealth"},
+	"fortune": {"words": ["luck", "win", "money", "wealth", "gain", "debt"], "stat": "fortune"},
+	"sight": {"words": ["see", "know", "reveal", "truth", "find", "remember"], "stat": "perception"},
+}
+## AJ2.1/AJ2.3. The base swing of a resolved sigil before AJ2.3's own working
+## multiplies it, and how long that working actually lasts. Reuses `Boons`
+## for the grant itself — an effect from working chaos magick is exactly the
+## kind of temporary, body-adjacent boost `boons.gd` already exists for, not
+## a second effects system built beside it.
+const BASE_MAGNITUDE := 0.15
+const POTENCY_STEP := 0.1
+const EFFECT_DURATION := 180.0
+const EFFECT_COST_KIND := "standing"
+const EFFECT_COST := 4.0
 
 
 static func condense(intent: String) -> String:
@@ -113,6 +158,14 @@ static func draw(canvas: CanvasItem, center: Vector2, radius: float, intent: Str
 ## from — refused outright, the same as a boon would be, if the body does
 ## not have it to give. A charged sigil is a real, timestamped fact about
 ## the subject who made it, not a flag on an object nobody else can read.
+##
+## AJ2.5. "Corruption is what happens when you charge more than you can
+## carry." `chaos_pending` on the subject's own record counts real charged
+## sigils not yet fired — the ones actually being carried, in the sense the
+## checklist means it. Charging past `CARRY_CAPACITY` still succeeds (the
+## body still pays; refusing outright would just make overcharging
+## impossible rather than costly) but the new sigil comes out corrupted, and
+## `resolve()` reads that flag, not a value invented separately from it.
 static func charge(intent: String, subject_id: String = "player") -> Dictionary:
 	var sigil := seal_for(intent)
 	if sigil.is_empty():
@@ -130,7 +183,16 @@ static func charge(intent: String, subject_id: String = "player") -> Dictionary:
 	# and fired in the same breath.
 	sigil["last_attended"] = WorldClock.minutes()
 	sigil["fired"] = false
-	WorldHistory.record_event("sigil_charged", {"subject_id": subject_id, "intent": sigil.intent, "seed": sigil.seed, "cost_kind": "blood", "cost_paid": cost})
+	var maker := WorldHistory.subject(subject_id)
+	var pending := int(maker.get("chaos_pending", 0))
+	var overcharged := pending >= CARRY_CAPACITY
+	sigil["corrupted"] = overcharged
+	WorldHistory.amend_subject(subject_id, {"chaos_pending": pending + 1})
+	WorldHistory.record_event("sigil_charged", {"subject_id": subject_id, "intent": sigil.intent, "seed": sigil.seed, "cost_kind": "blood", "cost_paid": cost, "corrupted": overcharged})
+	if overcharged:
+		var corruption := float(maker.get("chaos_corruption", 0.0)) + OVERCHARGE_CORRUPTION
+		WorldHistory.amend_subject(subject_id, {"chaos_corruption": corruption})
+		WorldHistory.record_event("sigil_overcharged", {"subject_id": subject_id, "seed": sigil.seed, "pending": pending + 1, "chaos_corruption": corruption})
 	return {"ok": true, "sigil": sigil}
 
 
@@ -169,8 +231,85 @@ static func fire(sigil: Dictionary) -> Dictionary:
 		return {"ok": false, "reason": "STILL BEING HELD IN MIND"}
 	var fired := sigil.duplicate(true)
 	fired["fired"] = true
-	WorldHistory.record_event("sigil_fired", {"subject_id": str(sigil.get("subject_id", "")), "intent": str(sigil.get("intent", "")), "seed": int(sigil.get("seed", 0))})
+	var subject_id := str(sigil.get("subject_id", ""))
+	# AJ2.5. Fired is no longer carried — whatever `charge()` added to
+	# `chaos_pending`, this is the one place it comes back off.
+	var maker := WorldHistory.subject(subject_id)
+	if not maker.is_empty():
+		WorldHistory.amend_subject(subject_id, {"chaos_pending": maxi(0, int(maker.get("chaos_pending", 0)) - 1)})
+	WorldHistory.record_event("sigil_fired", {"subject_id": subject_id, "intent": str(sigil.get("intent", "")), "seed": int(sigil.get("seed", 0))})
 	return {"ok": true, "sigil": fired}
+
+
+## AJ2.1/AJ2.2/AJ2.3/AJ2.5. What a fired sigil actually does — the second
+## half of `fire()`'s own docstring. A corrupted sigil (AJ2.5) always
+## misfires regardless of what it asked for, on the theory that a working
+## charged past what the caster could carry does not do what they wanted,
+## it does what the overcharge made of it. Otherwise the stated intent is
+## matched against `INTENT_FAMILIES`; no match is a real, honest miss
+## (AJ2.2) rather than a family invented so resolution never fails, and
+## either way something is left behind — `chaos_corruption` rises on a
+## miss, the exact ledger AJ2.5's own overcharge already writes into, so a
+## caster who keeps missing accumulates the same real cost as one who keeps
+## overcharging.
+static func resolve(sigil: Dictionary, subject_id: String = "player") -> Dictionary:
+	if not bool(sigil.get("fired", false)):
+		return {"ok": false, "reason": "NOT FIRED YET"}
+	if bool(sigil.get("resolved", false)):
+		return {"ok": false, "reason": "ALREADY RESOLVED"}
+	var seed := int(sigil.get("seed", 0))
+	var resolved := sigil.duplicate(true)
+	resolved["resolved"] = true
+	var corrupted := bool(sigil.get("corrupted", false))
+	var family := "" if corrupted else _match_family(str(sigil.get("intent", "")))
+	if family.is_empty():
+		var maker := WorldHistory.subject(subject_id)
+		var corruption := float(maker.get("chaos_corruption", 0.0)) + (OVERCHARGE_CORRUPTION if corrupted else MISFIRE_CORRUPTION)
+		WorldHistory.amend_subject(subject_id, {"chaos_corruption": corruption})
+		WorldHistory.record_event("sigil_misfired", {"subject_id": subject_id, "intent": str(sigil.get("intent", "")), "seed": seed, "corrupted": corrupted, "chaos_corruption": corruption})
+		resolved["result"] = "misfired"
+		return {"ok": true, "sigil": resolved, "result": "misfired", "family": ""}
+	var potency := _potency(subject_id, seed)
+	var stat := str(INTENT_FAMILIES[family].stat)
+	var magnitude := BASE_MAGNITUDE * (1.0 + float(potency) * POTENCY_STEP)
+	var granted := Boons.grant(subject_id, "sigil:%s" % family, stat, magnitude, EFFECT_DURATION, EFFECT_COST_KIND, EFFECT_COST)
+	if not bool(granted.get("ok", false)):
+		# AJ2.2. Even a real, matched intent can still fail if the caster has
+		# nothing left to pay the effect with — a failure of the body, not of
+		# the parsing, but a sigil that does not fire is still a miss.
+		WorldHistory.record_event("sigil_misfired", {"subject_id": subject_id, "intent": str(sigil.get("intent", "")), "seed": seed, "reason": str(granted.get("reason", ""))})
+		resolved["result"] = "misfired"
+		return {"ok": true, "sigil": resolved, "result": "misfired", "family": family}
+	_bump_potency(subject_id, seed)
+	WorldHistory.record_event("sigil_resolved", {"subject_id": subject_id, "seed": seed, "family": family, "stat": stat, "magnitude": magnitude, "potency": potency + 1})
+	resolved["result"] = "resolved"
+	resolved["family"] = family
+	return {"ok": true, "sigil": resolved, "result": "resolved", "family": family, "magnitude": magnitude}
+
+
+static func _match_family(intent: String) -> String:
+	var lower := intent.to_lower()
+	for family in INTENT_FAMILIES:
+		for word in (INTENT_FAMILIES[family] as Dictionary).words:
+			if lower.contains(str(word)):
+				return str(family)
+	return ""
+
+
+## AJ2.3. "The same glyph gets stronger the more it has worked." Keyed by
+## seed, not by subject alone — two different intents charged by the same
+## caster stay at their own separate strength, because it is the glyph that
+## is said to gain power from working, not the caster's magic in general.
+static func _potency(subject_id: String, seed: int) -> int:
+	var table: Dictionary = WorldHistory.subject(subject_id).get("sigil_potency", {})
+	return int(table.get(str(seed), 0))
+
+
+static func _bump_potency(subject_id: String, seed: int) -> void:
+	var subject := WorldHistory.subject(subject_id)
+	var table: Dictionary = subject.get("sigil_potency", {}).duplicate(true)
+	table[str(seed)] = int(table.get(str(seed), 0)) + 1
+	WorldHistory.amend_subject(subject_id, {"sigil_potency": table})
 
 
 ## AJ1.6. Puts a charged sigil into the world as a real, findable object —
@@ -204,3 +343,58 @@ static func inscribe(sigil: Dictionary, subject_id: String, medium: String, loca
 	WorldHistory.amend_subject(subject_id, {"sigil_objects_made": made + 1})
 	WorldHistory.record_event("sigil_inscribed", {"subject_id": subject_id, "object_id": object_id, "medium": medium, "seed": int(sigil.get("seed", 0))})
 	return {"ok": true, "object_id": object_id}
+
+
+## AJ2.4. "Other people's sigils exist in the world and can be read." A
+## `sigil_object` (AJ1.6) is already a plain `WorldHistory` subject — this is
+## just the honest door into it, refusing anything that is not actually one,
+## rather than every caller reaching into `WorldHistory.subject()` directly
+## and having to know the `kind` check itself.
+static func read_object(object_id: String) -> Dictionary:
+	var object := WorldHistory.subject(object_id)
+	if object.is_empty() or str(object.get("kind", "")) != "sigil_object":
+		return {"ok": false, "reason": "NO SUCH SIGIL OBJECT"}
+	return {"ok": true, "object": object}
+
+
+## AJ2.4. "Defaced." A real, permanent mark on the object's own record — not
+## removed, because a defaced sigil having been made is still true — and the
+## maker actually feels it: their own `grudge` rises the same real field F2's
+## propagation already reads, so an act against a sigil is an act against
+## whoever made it, not a private edit to an inventory entry.
+static func deface(object_id: String, actor_id: String) -> Dictionary:
+	var found := read_object(object_id)
+	if not bool(found.get("ok", false)):
+		return found
+	var object: Dictionary = found.object
+	if bool(object.get("defaced", false)):
+		return {"ok": false, "reason": "ALREADY DEFACED"}
+	WorldHistory.amend_subject(object_id, {"defaced": true, "defaced_by": actor_id})
+	var maker_id := str(object.get("maker", ""))
+	var maker := WorldHistory.subject(maker_id)
+	if not maker.is_empty():
+		WorldHistory.amend_subject(maker_id, {"grudge": float(maker.get("grudge", 0.0)) + DEFACE_GRUDGE})
+	WorldHistory.record_event("sigil_defaced", {"object_id": object_id, "actor_id": actor_id, "maker": maker_id})
+	return {"ok": true}
+
+
+## AJ2.4. "Stolen." Only a portable object can actually change hands —
+## `held_by` is the object's own real current holder, distinct from `maker`
+## (who made it stays true forever; who holds it now is what theft changes).
+static func steal(object_id: String, actor_id: String) -> Dictionary:
+	var found := read_object(object_id)
+	if not bool(found.get("ok", false)):
+		return found
+	var object: Dictionary = found.object
+	if not PORTABLE_MEDIA.has(str(object.get("medium", ""))):
+		return {"ok": false, "reason": "FIXED IN PLACE"}
+	var current_holder := str(object.get("held_by", object.get("maker", "")))
+	if current_holder == actor_id:
+		return {"ok": false, "reason": "ALREADY IN THEIR OWN HANDS"}
+	WorldHistory.amend_subject(object_id, {"held_by": actor_id})
+	var maker_id := str(object.get("maker", ""))
+	var maker := WorldHistory.subject(maker_id)
+	if not maker.is_empty():
+		WorldHistory.amend_subject(maker_id, {"grudge": float(maker.get("grudge", 0.0)) + STEAL_GRUDGE})
+	WorldHistory.record_event("sigil_stolen", {"object_id": object_id, "actor_id": actor_id, "maker": maker_id, "from": current_holder})
+	return {"ok": true}
