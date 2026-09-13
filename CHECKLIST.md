@@ -541,8 +541,8 @@ v3 made the handheld a rich object that emits no light at all. Greg: *"having li
 
 ### C v5 — the fifth pass
 v4 made it a lamp, and a lamp that never runs out is a torch, not a resource. *"phone has a % possibly"*.
-- [ ] **C5.1** `v5` A battery percentage that runs down and can reach nothing
-- [ ] **C5.2** `v5` What it costs to keep the screen up is visible on the battery
+- [x] ~~**C5.1** `v5` A battery percentage that runs down and can reach nothing~~ Already built, left unticked: `battery` drains only while actually raised (`BATTERY_DRAIN_PER_SECOND`), recharges roughly four times slower while pocketed, and floors at exactly 0.0 rather than going negative — at which point `is_lit()` genuinely refuses (no light with nothing left to give it). `tests/handheld_battery_test.gd`, 14 checks, re-run clean: drains while raised, recharges only while pocketed and slower than it drains, floors at zero, an empty battery is not lit even raised, and it survives a reload with whatever charge was actually left
+- [x] ~~**C5.2** `v5` What it costs to keep the screen up is visible on the battery~~ Already built, left unticked: `_draw_status()` draws a real "CELL XX%" readout plus an eight-segment gauge, both read straight off `battery`, tinted amber-to-red under 35%. Verified against `handheld_index.png`/`handheld_radial.png` (this session's own C1.6 captures) — both show "CELL 99%"/"CELL 100%" and the segmented gauge in the bottom-right corner
 
 ### C v6 — the sixth pass
 v5 gave the light a cost in charge and none in attention. Raising it should occupy you.
