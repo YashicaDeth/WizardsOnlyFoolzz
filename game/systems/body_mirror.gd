@@ -101,6 +101,12 @@ func reflect(viewer: Transform3D) -> void:
 	if absf(gaze.normalized().dot(up.normalized())) > 0.999:
 		return
 	camera.look_at(eye + gaze, up)
+	# Clip at the glass. The reflection camera stands behind the mirror, so
+	# everything between it and the plane is the wall the mirror is set into —
+	# and rendering the back of that wall is a black mirror. Culling the wall
+	# instead works, and then the camera sees the void where the wall was; a
+	# near plane at the glass removes it without removing the room.
+	camera.near = maxf(0.05, distance_from(viewer.origin))
 
 
 ## How far the viewer is from the glass, which is what a room uses to decide

@@ -3144,11 +3144,11 @@ you recover it, fragment by fragment, out of a thing that used to know
 everything and has been decaying since before you arrived.
 
 ### AH1 — The room
-- [ ] **AH1.1** Opening the Board puts you in a room rather than on a screen
-- [ ] **AH1.2** A bed, a mirror the size of the wall, and the light of one window
+- [x] **AH1.1** Opening the Board puts you in a room rather than on a screen — `the_room.gd`, four walls the player stands inside, built the way everything else here is: procedural geometry from primitives, nothing imported. `facing()` turns to a wall by name so a caller asks for the Board rather than computing an angle and hoping
+- [x] **AH1.2** A bed, a mirror the size of the wall, and the light of one window — one window, low and off to the side, because a room lit evenly is a menu background and a room lit from a single opening is a place. First aim put the spot into the wall it is set in, which lit nothing and made the mirror black as well: a reflection of an unlit room is an unlit reflection
 - [ ] **AH1.3** Turn to the wall and the Board is there - the corkboard already built (L)
 - [ ] **AH1.4** Turn right and the cloud terminal is there
-- [ ] **AH1.5** The mirror shows your body, current, with everything done to it (pairs with N)
+- [ ] **AH1.5** The mirror shows your body, current, with everything done to it (pairs with N) — **half done, and the half that is missing is named rather than glossed.** `BodyMirror` is built, tested (17 assertions) and proven against a real rig in `tests/body_mirror_capture.gd`, where the arm comes off and the glass shows it. Hung in `the_room.gd` it reflects the room correctly — the poster wall behind the viewer, the window — but the player's own rig does not appear in it, and I did not isolate why: the 56 rig pieces are on the body layer, the reflection camera's cull mask includes that layer, and the near plane at the glass does not reach the body. Do not tick this until somebody has looked at the glass and seen themselves in it
 - [ ] **AH1.6** The room is yours and it accumulates - what you leave in it stays
 - [ ] **AH1.7** Leaving is a movement, not a menu close
 
