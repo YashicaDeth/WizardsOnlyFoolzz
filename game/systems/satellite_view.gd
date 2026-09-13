@@ -123,6 +123,13 @@ func observe(at: Vector3, look: float, zoom: float, delta: float, span := Vector
 		_clear_the_air()
 		_air_settled = world_3d != null and world_3d.environment != null
 
+	# A10.3. The tilt is the transition. Straight down until the camera is low
+	# enough for a roof to have a side, then it rolls forward to the horizon —
+	# which is what makes "somewhat 3D" arrive on its own rather than being a
+	# separate view the player has to ask for.
+	var tilt := 0.0
+	if descent > TILT_BEGINS:
+		tilt = inverse_lerp(TILT_BEGINS, 1.0, descent)
 	var height := lerpf(TOP_HEIGHT, STREET_HEIGHT, ease(descent, 2.2))
 	# A map is only a map if the photograph is at the chart's scale. When the
 	# chart says how much ground it is claiming, the camera frames exactly that
@@ -132,20 +139,20 @@ func observe(at: Vector3, look: float, zoom: float, delta: float, span := Vector
 	if span.x > 1.0 and span.y > 1.0:
 		_frame_chart(span)
 		var fitted := (span.y * 0.5) / tan(deg_to_rad(camera.fov) * 0.5)
-		if descent <= TILT_BEGINS:
-			height = fitted
-		else:
-			# Past the tilt this stops being a chart and becomes a place, so the
-			# descent to eye height takes back over from the fit.
-			height = lerpf(fitted, STREET_HEIGHT, ease(inverse_lerp(TILT_BEGINS, 1.0, descent), 2.2))
-	# A10.3. The tilt is the transition. Straight down until the camera is low
-	# enough for a roof to have a side, then it rolls forward to the horizon —
-	# which is what makes "somewhat 3D" arrive on its own rather than being a
-	# separate view the player has to ask for.
-	var tilt := 0.0
-	if descent > TILT_BEGINS:
-		tilt = inverse_lerp(TILT_BEGINS, 1.0, descent)
-	var pitch := lerpf(-90.0, -4.0, ease(tilt, 1.6))
+		# Fitted the whole way. Dropping to eye height past the tilt was the other
+		# half of the smear: the camera ended up standing in the street while the
+		# chart above it still claimed a few hundred metres of ground. It leans
+		# in as it tilts — enough that the oblique reads as leaning over a table
+		# — and never leaves the altitude the chart is drawn at.
+		height = fitted * lerpf(1.0, 0.72, ease(tilt, 1.4))
+	# Greg: the map at high zoom "reads as a smear". It did, and the reason is
+	# that this ran to -4 degrees — a horizon view — while `living_map.gd` goes
+	# on drawing its roads, districts and contacts in top-down coordinates. A
+	# street-level photograph under a plan view is not a tilted map, it is two
+	# pictures of different things. Held at an oblique instead: the roofs get
+	# sides, the ground plane still reads as ground, and the chart's marks still
+	# land roughly where the photograph puts the thing they name.
+	var pitch := lerpf(-90.0, -52.0, ease(tilt, 1.6))
 
 	# Backed off along the facing as it tilts, so the player's own position stays
 	# in frame rather than sliding under the camera.

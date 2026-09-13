@@ -361,7 +361,12 @@ func _draw() -> void:
 	var tilt := clampf((zoom - 1.6) / 1.4, 0.0, 1.0)
 	if tilt > 0.0:
 		var horizon := _chart.position.y + _chart.size.y * 0.62
-		var squash := lerpf(1.0, 0.60, tilt)
+		# Matched to the camera rather than picked. `satellite_view.gd` now holds
+		# the oblique at 52 degrees of pitch, so the ground is foreshortened by
+		# cos(38) = 0.79. Squashing the marks harder than that made the chart and
+		# the photograph disagree about the same ground, on top of each other,
+		# which is the other half of what "reads as a smear" was describing.
+		var squash := lerpf(1.0, 0.79, tilt)
 		draw_set_transform_matrix(Transform2D(Vector2(1.0, 0.0), Vector2(0.0, squash), Vector2(0.0, horizon * (1.0 - squash))))
 
 	# A10.4. Over a live image the grid is a reference overlay and belongs at
@@ -383,7 +388,9 @@ func _draw() -> void:
 		# The far edge falls away into haze, which an affine squash cannot do on
 		# its own and which is most of what makes a tilt legible.
 		var haze := _chart.size.y * 0.22 * tilt
-		var steps := 14
+		# 14 bands over a 0.22-height falloff banded visibly. Enough of them that
+		# the far edge reads as haze rather than as a stack of rectangles.
+		var steps := 38
 		for band in steps:
 			var travel := float(band) / float(steps)
 			draw_rect(Rect2(_chart.position + Vector2(0, haze * travel), Vector2(_chart.size.x, haze / float(steps) + 1.0)), VOID * Color(1, 1, 1, (1.0 - travel) * 0.72 * tilt))
