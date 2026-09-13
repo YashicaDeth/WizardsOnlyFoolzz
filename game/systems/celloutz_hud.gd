@@ -96,6 +96,18 @@ func _draw() -> void:
 	if viewport.x < 400 or viewport.y < 300:
 		return
 	_draw_glass(viewport)
+	# The derby is too fast to ask the player to infer a wrecked hull from a
+	# windscreen crack.  These instruments stay quiet and physical, but they
+	# remain on screen so the fight has readable stakes.
+	_draw_edge_frame(viewport)
+	_draw_bust_frame(viewport)
+	_draw_integrity(viewport)
+	_draw_speed(viewport)
+	_draw_radar(viewport)
+	_draw_keys(viewport)
+	_draw_event_feed(viewport)
+	if impact_flash > 0.0:
+		_draw_impact(viewport)
 
 
 ## Regression hook: the derby scene may keep this windscreen node, but it must
