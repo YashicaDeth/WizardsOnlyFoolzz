@@ -39,6 +39,21 @@ func _ready() -> void:
 	for _settle in settle_frames:
 		await tree.process_frame
 
+	# Greg named the settings and continue screens directly, and both are panels
+	# over this menu rather than scenes of their own, so they cannot be shot by
+	# loading something.
+	var panel := ""
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--panel="):
+			panel = argument.trim_prefix("--panel=")
+	if panel == "settings":
+		menu.call("_open_settings")
+	elif panel == "continue":
+		menu.call("_open_continue_runs")
+	if not panel.is_empty():
+		for _settle in 60:
+			await tree.process_frame
+
 	await RenderingServer.frame_post_draw
 	if get_viewport().get_texture().get_image().save_png(out_path) != OK:
 		print("CAPTURE_FAILED ", out_path)

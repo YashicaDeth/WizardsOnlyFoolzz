@@ -4,27 +4,31 @@ extends Control
 ## Greg: *"make the settings and contuine have design and ui instead of looking
 ## so lack luster"*.
 ##
-## The front door's rows were Godot `Button`s carrying their own text, which
-## means the engine's fallback UI font — the one thing this project has a
-## standing rule against, and the exact "tutorial look" Greg keeps pointing at.
-## Every other screen sets its type with `CellOutzType`, which is procedural
-## stroke glyphs drawn onto a canvas rather than a font resource, so a `Button`
-## cannot be told to use it and there is no .ttf anywhere in the project to fall
-## back on instead.
+## The front door's rows and the settings panel were Godot `Button`s carrying
+## their own text, which means the engine's fallback UI font — the one face this
+## project has a standing rule against, and exactly the "tutorial look" Greg
+## keeps naming. Every other screen sets type with `CellOutzType`.
 ##
-## So the buttons keep their job and lose their looks: they still own hit
-## testing, focus, the signal wiring and the slide tween, and their own `text` is
-## blanked. This draws over them in the house type, reading each row's label and
-## live rect off the button it belongs to, so nothing about navigating the menu
-## changes and all of it is set in the right face.
+## It cannot be themed away. `CellOutzType` is procedural stroke glyphs drawn
+## onto a CanvasItem, not a font resource, and there is no .ttf, .otf or .fnt
+## anywhere in the project to point a theme at instead.
+##
+## So the controls keep the job and lose the looks: they still own hit testing,
+## focus, the tweens and every signal, and this draws over them in the house
+## type, reading each row's label and live rect off the control it belongs to.
+## Nothing about operating either screen changes.
 
 const INK := Color("dce6ba")
 const HOT := Color("ff7138")
 const ARTERIAL := Color("c81f16")
 
-## Rows, as {button, label}. The label is lifted off the button at adopt time so
-## the button can be blanked without losing what it said.
-var rows: Array = []
+## The rows this plate speaks for. `Control` rather than `Button` because the
+## settings panel's heading is a `Label`, and every property needed here —
+## `text`, `size`, `global_position`, `modulate`, `visible` — both already have.
+var rows: Array[Control] = []
+
+## Compact rows for a panel rather than the front door's column.
+var compact := false
 
 
 func _ready() -> void:
@@ -32,49 +36,65 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
-## Takes the column over. Called once, after the buttons exist.
-func adopt(buttons: Array) -> void:
+## Takes a column over. The controls keep their own `text`, so anything that
+## rewrites it at runtime — "BLOOM: ON" flipping to "BLOOM: OFF" — still works
+## and this picks the new value up on the next frame. What they lose is the
+## ability to *draw* it: the engine font is made transparent rather than the
+## string being taken off them, which a snapshot would have gone stale against.
+func adopt(controls: Array) -> void:
 	rows.clear()
-	for button in buttons:
-		if button == null or not is_instance_valid(button):
+	var clear := Color(0, 0, 0, 0)
+	for control in controls:
+		if control == null or not is_instance_valid(control) or not (control is Control):
 			continue
-		rows.append({"button": button, "label": String(button.text)})
-		# Blanked, not hidden: a hidden Button stops taking the mouse, and the
-		# whole point is that it keeps doing that.
-		button.text = ""
+		rows.append(control as Control)
+		for slot in ["font_color", "font_hover_color", "font_pressed_color",
+				"font_focus_color", "font_hover_pressed_color", "font_disabled_color"]:
+			(control as Control).add_theme_color_override(slot, clear)
+		# And the default grey plate behind them, which is the other half of why
+		# the settings panel read as an engine dialog rather than as part of the
+		# game. A fresh StyleBoxEmpty per slot: one shared instance assigned to
+		# five slots on a dozen buttons is one resource every one of them then
+		# holds a reference to.
+		if control is Button:
+			for slot in ["normal", "hover", "pressed", "focus", "disabled"]:
+				(control as Button).add_theme_stylebox_override(slot, StyleBoxEmpty.new())
 	queue_redraw()
 
 
 func _process(_delta: float) -> void:
-	# The rows slide on focus, so the type has to follow them every frame rather
-	# than being placed once.
+	# The rows slide on focus and their text changes under them, so the type has
+	# to follow every frame rather than being placed once.
 	queue_redraw()
 
 
 func _draw() -> void:
-	for row in rows:
-		var button: Button = row["button"]
-		if button == null or not is_instance_valid(button) or not button.visible:
+	for control in rows:
+		if control == null or not is_instance_valid(control) or not control.is_visible_in_tree():
 			continue
-		var label := str(row["label"])
+		var label := String(control.get("text"))
 		if label.is_empty():
 			continue
-		var rect := Rect2(button.global_position, button.size)
-		# The button's own modulate carries both the focus tween and the cold
+		# The control's own modulate carries both the focus tween and the cold
 		# open's fade-in, so reading it here keeps one source of truth for what
-		# is selected and means the type arrives with the row rather than
+		# is selected, and means the type arrives with its row rather than
 		# sitting at full strength over a menu that has not appeared yet.
-		var lit := button.modulate
+		var lit := control.modulate
 		if lit.a <= 0.01:
 			continue
+		# Into this plate's own space. `draw_*` is local, and the settings plate
+		# is a child of the panel it speaks for rather than of the HUD root, so
+		# taking global positions straight to the pen put the whole settings
+		# column out on the right of the screen next to the sigil.
+		var rect := Rect2(control.global_position - global_position, control.size)
 		var focused := lit.r > 0.9 and lit.g < 0.6
-		var cap := 17.0 if focused else 15.0
+		var cap := (11.0 if focused else 10.0) if compact else (17.0 if focused else 15.0)
 		var tone := (HOT if focused else INK * Color(1, 1, 1, 0.72)) * Color(1, 1, 1, lit.a)
-		var baseline := rect.position + Vector2(0.0, (rect.size.y - cap) * 0.5)
+		var baseline := rect.position + Vector2(14.0 if compact else 0.0, (rect.size.y - cap) * 0.5)
 
 		if focused:
 			# A struck bar behind the live row, so selection is a thing on the
-			# plate rather than a colour change you have to notice.
+			# plate rather than a colour change you have to catch.
 			var width := CellOutzType.width(label, cap, 2.2) + 26.0
 			draw_rect(Rect2(baseline - Vector2(14.0, 7.0), Vector2(width, cap + 14.0)),
 				ARTERIAL * Color(1, 1, 1, 0.13 * lit.a))

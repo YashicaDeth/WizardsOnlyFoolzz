@@ -11,6 +11,7 @@ var menu_environment: Environment
 var ui_time := 0.0
 var menu_buttons: Array[Button] = []
 var menu_plate: Control
+var settings_plate: Control
 var graphics_presets := ["ULTRA", "HIGH", "PERFORMANCE"]
 var graphics_index := 0
 var render_scales := [1.0, 1.25, 1.5, 0.8]
@@ -311,7 +312,51 @@ func _start_game() -> void:
 		Interstitial.travel("res://vat_chamber.tscn", "the growing floor // decanting")
 
 
+## Greg: the settings screen looked "so lack luster". It was a default
+## `PanelContainer` of grey engine buttons sitting at x=50 — directly on top of
+## the menu column it was opened from — running off the bottom edge of a 720
+## window, with BACK half out of frame. Dressed once, on the way in.
+func _dress_settings_panel() -> void:
+	if settings_plate != null:
+		return
+	# Off the column and inside the frame. Anchored to the centre so it holds
+	# together at any window size instead of being pinned to a corner it was
+	# measured against once.
+	settings_panel.set_anchors_preset(Control.PRESET_CENTER)
+	settings_panel.offset_left = -196.0
+	settings_panel.offset_top = -150.0
+	settings_panel.offset_right = 196.0
+	settings_panel.offset_bottom = 150.0
+	settings_panel.z_index = 25
+	# The same skin the quantum branch picker already uses, so the two panels on
+	# this screen are recognisably the same object.
+	var skin := StyleBoxFlat.new()
+	skin.bg_color = Color("160706f2")
+	skin.border_color = Color("9e2817")
+	skin.set_border_width_all(2)
+	skin.corner_radius_top_left = 8
+	skin.corner_radius_top_right = 8
+	skin.corner_radius_bottom_left = 8
+	skin.corner_radius_bottom_right = 8
+	skin.shadow_color = Color("000000cc")
+	skin.shadow_size = 18
+	skin.content_margin_left = 16.0
+	skin.content_margin_right = 16.0
+	skin.content_margin_top = 14.0
+	skin.content_margin_bottom = 14.0
+	settings_panel.add_theme_stylebox_override("panel", skin)
+	var rows: Array = []
+	for child in $HUD/SettingsPanel/VBox.get_children():
+		rows.append(child)
+	settings_plate = MENU_PLATE.new()
+	settings_plate.name = "SettingsPlate"
+	settings_plate.compact = true
+	settings_panel.add_child(settings_plate)
+	settings_plate.adopt(rows)
+
+
 func _open_settings() -> void:
+	_dress_settings_panel()
 	settings_panel.visible = true
 
 
