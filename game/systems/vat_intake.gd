@@ -200,7 +200,7 @@ func _rows() -> int:
 		2:
 			return CharacterSheet.TRAITS.size()
 		3:
-			return 4
+			return 7
 		_:
 			return CharacterSheet.MODIFIERS.size()
 
@@ -225,7 +225,9 @@ func _commit() -> void:
 				transcript = "WROTE: NO BUDGET"
 				transcript_life = 2.4
 		3:
-			# D7. Under the skin, because the kill cam will show it later.
+			# D7. Under the skin, because the kill cam will show it later. The
+			# last three entries make the human/evolved line a choice that grows
+			# onto the same player body rather than a lore label.
 			match row:
 				0:
 					sheet.under_skin["blood"] = _cycle(["O-RUST", "A-ASH", "B-9", "AB-", "SAP", "NULL"], str(sheet.under_skin.get("blood", "O-RUST")))
@@ -233,8 +235,16 @@ func _commit() -> void:
 					sheet.under_skin["skeleton"] = _cycle(["standard", "dense", "hollow", "plated"], str(sheet.under_skin.get("skeleton", "standard")))
 				2:
 					sheet.under_skin["organs"] = _cycle(["standard", "doubled", "salvaged", "communion"], str(sheet.under_skin.get("organs", "standard")))
-				_:
+				3:
 					sheet.appearance["face"] = fmod(float(sheet.appearance.get("face", 0.5)) + 0.17, 1.0)
+				4:
+					sheet.appearance["wear"] = fmod(float(sheet.appearance.get("wear", 0.4)) + 0.2, 1.01)
+				5:
+					sheet.appearance["mutation"] = fmod(float(sheet.appearance.get("mutation", 0.0)) + 0.2, 1.01)
+				6:
+					sheet.appearance["ink"] = fmod(float(sheet.appearance.get("ink", 0.0)) + 0.25, 1.01)
+				_:
+					sheet.appearance["piercings"] = fmod(float(sheet.appearance.get("piercings", 0.0)) + 0.25, 1.01)
 			_transcribe("BODY")
 		_:
 			var key := str(CharacterSheet.MODIFIERS.keys()[row])
@@ -394,6 +404,10 @@ func _draw_body(_rect: Rect2, ink: Color, y: float) -> void:
 		["SKELETON", str(sheet.under_skin.get("skeleton", "standard")).to_upper()],
 		["ORGAN SET", str(sheet.under_skin.get("organs", "standard")).to_upper()],
 		["FACE", "SETTING %02d" % int(float(sheet.appearance.get("face", 0.5)) * 99.0)],
+		["WEAR", "%.0f%%" % (float(sheet.appearance.get("wear", 0.4)) * 100.0)],
+		["EVOLUTION", "%.0f%% // GROWTH / EYE / HORN" % (float(sheet.appearance.get("mutation", 0.0)) * 100.0)],
+		["INK", "%.0f%%" % (float(sheet.appearance.get("ink", 0.0)) * 100.0)],
+		["METAL", "%.0f%%" % (float(sheet.appearance.get("piercings", 0.0)) * 100.0)],
 	]
 	for index in rows.size():
 		_row_mark(ink, Vector2(30, y - 9), index == row, false)

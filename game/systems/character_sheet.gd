@@ -158,7 +158,9 @@ var traits: Array = []
 var modifiers: Array = []
 var birth := {"year": 2007, "month": 1, "day": 11, "hour": 2, "minute": 30}
 var instrument: Dictionary = {}
-var appearance: Dictionary = {"face": 0.5, "build": 0.5, "wear": 0.4}
+## These choices are physical: the hunt rig reads them when it grows the body,
+## so a marked, altered player is not a menu portrait that disappears on load.
+var appearance: Dictionary = {"face": 0.5, "build": 0.5, "wear": 0.4, "mutation": 0.0, "ink": 0.0, "piercings": 0.0}
 var under_skin: Dictionary = {"skeleton": "standard", "organs": "standard", "blood": "O-RUST", "grown_with": []}
 var display_name := "THE HUNTER"
 
