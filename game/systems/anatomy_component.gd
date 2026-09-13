@@ -286,8 +286,25 @@ const FACTORY_LOADOUT := {
 ## limb with nothing installed is a real, mechanically lesser condition
 ## (N5.6) already, through `implant_condition()` simply having nothing to
 ## report — no separate penalty needed for a gap already visible as one.
-func install_factory_loadout() -> void:
+##
+## N5.8. A zone the character sheet already grew something into (D4's
+## `_grown_cybernetics()`) is skipped rather than overwritten — CellOutz backs
+## the slots you walked out of the vat with nothing in, not the ones you
+## already had a body's worth of history in.
+##
+## `exclude` exists for one real reason today rather than as general API:
+## `baseline_human.gd`'s severance stress only ever accumulates on a limb zone
+## with nothing in `installed_parts` (B6.5/B6.6 — a limb already carrying any
+## hardware is read as an existing replacement, not organic tissue). The
+## catalog does not yet distinguish a wrist-mounted dose counter from a full
+## prosthetic arm, so filling `left_arm` here would quietly make the
+## player's own arm un-severable forever. The real caller excludes it until
+## that distinction exists; this method's own test still exercises all three
+## zones, since it never touches severance.
+func install_factory_loadout(exclude: Array[String] = []) -> void:
 	for zone_id in FACTORY_LOADOUT:
+		if zone_id in exclude or installed_parts.has(zone_id):
+			continue
 		install_part(zone_id, {"id": str(FACTORY_LOADOUT[zone_id]), "locked": true})
 
 

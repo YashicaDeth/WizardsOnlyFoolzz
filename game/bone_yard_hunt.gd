@@ -601,6 +601,14 @@ func _build_player_rig() -> void:
 		config["restore"] = saved.anatomy_state
 	player_rig.gore = viscera_fx
 	player_rig.build("player", config)
+	if not config.has("restore"):
+		# N5.2/N5.8. Only on a genuine first decanting — a restored body already
+		# carries whatever CellOutz's hardware became (still locked, or pulled
+		# and gone), and re-running this would silently re-lock a slot the
+		# player already went rogue on. left_arm excluded: see
+		# `install_factory_loadout()`'s own comment — B6.5/B6.6 needs that zone
+		# free of any installed part or the player's arm can never be severed.
+		player_rig.anatomy.install_factory_loadout(["left_arm"])
 	hunter_appearance = HUNTER_APPEARANCE.new()
 	hunter_appearance.name = "HunterAppearance"
 	player_rig.add_child(hunter_appearance)

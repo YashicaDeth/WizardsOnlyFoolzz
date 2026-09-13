@@ -1856,8 +1856,29 @@ player, and it should be possible from hour one and quietly discouraged.
       was never yours (B5.4) — `pull_part()`'s successful result is shaped for
       `Carry.take_chunk()` directly, `lien: "celloutz"` attached, verified
       accepted by a real `Carry` instance.
-- [ ] **N5.8** Robbed and grown hardware fit the same slots — one vocabulary,
-      per B2.1 — not touched this pass.
+- [x] **N5.8** Robbed and grown hardware fit the same slots — one vocabulary,
+      per B2.1 — this was already true in code (`Carry.install_into()` and D4's
+      `_grown_cybernetics()` both resolve through the same `ImplantCatalog`
+      into the same `installed_parts` dict N5.2 uses) but untested as a real
+      spawn path, because **`install_factory_loadout()` — all of N5.2-N5.7 —
+      was never actually called outside its own test.** The real player,
+      built in `bone_yard_hunt.gd`'s `_build_player_rig()`, walked out of the
+      vat with none of CellOutz's hardware and could never see the "you don't
+      want to go rogue yet" warning at all. Now wired: a genuine first
+      decanting installs the factory loadout, skipping any zone the sheet
+      already grew something into, and a restored body is left alone so a
+      slot already pulled stays pulled. `left_arm` stays out of it —
+      `_accumulate_sever_stress()` treats any installed part on a limb as an
+      existing replacement, so filling it would make the arm permanently
+      un-severable and regress B6.5/B6.6; a real fix needs the catalog to
+      distinguish a full prosthetic from a minor implant, which is N5.1's
+      same one-slot-per-zone limitation showing up on limbs instead of the
+      torso. Verified: `tests/factory_loadout_wired_test.gd` (new,
+      instantiates the real hunt scene three times) — a fresh decant carries
+      locked head/torso hardware and a still-severable left arm, a sheet-grown
+      part wins its zone over the factory one, and a previously pulled slot
+      survives a reload unlocked. `implant_lock_test.gd` and
+      `combat_integration_test.gd` re-verified clean.
 
 
 ### N v10 — the final pass
