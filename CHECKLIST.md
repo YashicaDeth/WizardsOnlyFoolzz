@@ -2138,8 +2138,24 @@ Three passes tuned a swing the player does not perform. AN: LMB plays an animati
 
 ### O v5 — the fifth pass
 v4 made the weapon physical and damage still reads a constant off it.
-- [ ] **O5.1** `v5` Damage asks `commitment()` — the weapon sets the ceiling, you earn it
-- [ ] **O5.2** `v5` A flick and a committed sweep are different blows from the same button
+- [ ] **O5.1** `v5` Damage asks `commitment()` — the weapon sets the ceiling,
+      you earn it — everything this needs is already built and calibrated
+      (AN1.4-AN1.9): `momentum_damage` is the one flag standing between the
+      formula and the damage number, and it is deliberately left off by its
+      own comment — *"the old swing stays authoritative until the new one is
+      demonstrably better, which is a judgement to make with a controller in
+      hand rather than in a commit."* `arm_wired_test.gd` asserts it is false
+      "by design", so flipping it is a real, load-bearing design decision,
+      not a bug fix, and not this agent's to make unwitnessed. What is
+      fixed: the formula would have applied unconditionally to firearms too
+      the moment the flag flipped — `commitment()`'s reference was
+      calibrated against melee gestures, and a gun's low, steady aim would
+      have read as permanently low commitment, quietly multiplying every
+      shot's damage by as little as 0.35 the instant somebody tried the
+      flip. Gated to melee now so that whenever this does flip — after
+      someone has actually felt it — it does not also silently break guns.
+- [ ] **O5.2** `v5` A flick and a committed sweep are different blows from the
+      same button — same block, same flag, same open question.
 
 ### O v6 — the sixth pass
 v5 made a blow worth what you put in and a weapon you barely hold is still welded to your hand.

@@ -1463,10 +1463,14 @@ func _attack(heavy := false) -> void:
 	# drift for AN1.7, and that is not the same thing as being off balance.
 	if str(report.get("kind", "")) != "firearm" and last_commitment > 0.0:
 		lose_footing(last_commitment * FOOTING_COMMITTED_SWING, "")
-	if momentum_damage and arm != null:
-		# The weapon sets the ceiling and the player earns how much of it they
-		# get. Floored well above zero: a game where a mistimed swing does
-		# nothing at all is a game that feels broken rather than demanding.
+	# O5.1/O5.2 v5. The weapon sets the ceiling and the player earns how much
+	# of it they get. Floored well above zero: a game where a mistimed swing
+	# does nothing at all is a game that feels broken rather than demanding.
+	# Melee only — `commitment()`'s reference was calibrated against melee
+	# gestures (AN1.4's own table), and a firearm's low, steady aim would read
+	# as low commitment too, quietly halving gun damage on every shot that
+	# wasn't thrown around like a swing.
+	if momentum_damage and arm != null and str(report.get("kind", "")) != "firearm":
 		report["damage"] = float(report.get("damage", 0.0)) * lerpf(0.35, 1.35, last_commitment)
 	report["damage"] = float(report.get("damage", 0.0)) * swing * float(momentum["power"])
 	report["impulse"] = float(report.get("impulse", 0.0)) * float(momentum["power"])
