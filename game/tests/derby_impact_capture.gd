@@ -16,13 +16,13 @@ func _ready() -> void:
 	derby.round_state = "active"
 	for _frame in 1800:
 		await get_tree().physics_frame
-		if derby.integrity < 100:
+		if derby.boat.integrity < 100:
 			for _hold in 12:
 				await get_tree().process_frame
 			await RenderingServer.frame_post_draw
 			var image := get_viewport().get_texture().get_image()
 			var error := image.save_png(out_path)
-			print("CAPTURED: " if error == OK else "CAPTURE_FAILED: ", out_path, " hull=", derby.integrity)
+			print("CAPTURED: " if error == OK else "CAPTURE_FAILED: ", out_path, " hull=", derby.boat.integrity)
 			get_tree().quit(0 if error == OK else 1)
 			return
 	print("CAPTURE_FAILED: no player damage inside thirty seconds")

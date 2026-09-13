@@ -82,10 +82,10 @@ func _ready() -> void:
 			var nearest_ai = nearest_car.get_node_or_null("AIDriver") if nearest_car != null else null
 			var charge := float(nearest_ai.final_approach_timer) if nearest_ai != null else 0.0
 			var nearest_speed: float = float(nearest_car.linear_velocity.length()) if nearest_car != null else 0.0
-			samples.append("%.0fs hull%d near%.1fm/%.1fms charge%.1f crowd%d hunt%d moving%d/%d" % [seconds, derby.integrity, nearest, nearest_speed, charge, crowding, hunters, moving, derby.targets.size()])
+			samples.append("%.0fs hull%d near%.1fm/%.1fms charge%.1f crowd%d hunt%d moving%d/%d" % [seconds, derby.boat.integrity, nearest, nearest_speed, charge, crowding, hunters, moving, derby.targets.size()])
 			next_sample += 4.0
 	print("  hull over time -> ", " ".join(samples))
-	print("  survived %.1fs, ended hull %d, wreckers disabled %d, peak crowding %d" % [seconds, derby.integrity, derby.disabled_count, peak_crowding])
+	print("  survived %.1fs, ended hull %d, wreckers disabled %d, peak crowding %d" % [seconds, derby.boat.integrity, derby.disabled_count, peak_crowding])
 	# Crowding is now a bound in both directions. Too many cars on the player at
 	# once is the complaint; zero is a pit with no teeth.
 	check(peak_crowding <= 4, "the pit never piles more than four cars on the player (peak %d)" % peak_crowding)
@@ -102,6 +102,6 @@ func _ready() -> void:
 	check(strongest_impact >= 3.0, "a hunter reaches the rebuilt chassis impact threshold (%.1f m/s)" % strongest_impact)
 	# The other side of the bound: if nothing can hurt a parked car, the pit has
 	# no teeth and the damage attribution has regressed the other way.
-	check(derby.integrity < 100, "a parked car still takes punishment (hull %d)" % derby.integrity)
+	check(derby.boat.integrity < 100, "a parked car still takes punishment (hull %d)" % derby.boat.integrity)
 	print("DERBY_BALANCE_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
