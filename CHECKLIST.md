@@ -3167,11 +3167,51 @@ are in it.
       suites re-verified clean.
 
 ### AD2 — The first-person HUD
-- [ ] **AD2.1** Diegetic: the hands, the weapon, the handheld, the windscreen (pairs with M1.6)
-- [ ] **AD2.2** Nothing floating in a corner that could be on an object instead
-- [ ] **AD2.3** Affordances along the bottom that say what you can do right now
-- [ ] **AD2.4** It survives the transition to third person without dissolving (M3.3)
-- [ ] **AD2.5** Readable while moving, which is when it is actually needed
+- [ ] **AD2.1** Diegetic: the hands, the weapon, the handheld, the windscreen
+      (pairs with M1.6) — three of four, not four. The hands and weapon are
+      a real held viewmodel (M4), and the handheld is a real device raised
+      into a real hand (`handheld_device.gd`, all of Section C). The
+      windscreen names M2, which does not exist yet — there is no in-car
+      first-person to be diegetic about until that lands
+- [x] ~~**AD2.2** Nothing floating in a corner that could be on an object
+      instead~~ Not built here — cross-ticked against what M1.6 and AG4.5
+      already did in `gothic_field_hud.gd`, unrelated to this pass and
+      never checked off. The old health readout was, in its own comment's
+      words, "a second instrument with no relationship to anything else on
+      screen, the exact 'floating in the corner' the design rule names";
+      it now hangs off a strap running into the weapon well, and stamina is
+      read off the screen's own breathing rather than a bar at all. Nothing
+      in the current build sits in a bare corner with no relationship to
+      anything else. Verified against `captures/m1_6_field_hud_vitals.png`
+      and this pass's own `captures/ad2_4_field_hud_first_person.png`: the
+      vitals gauge and the weapon well are one instrument, joined by a
+      visible cable, not two floating widgets
+- [~] **AD2.3** Affordances along the bottom that say what you can do right
+      now — real and already tagged `AD2.3` in `gothic_field_hud.gd`'s own
+      `_draw_controls()`, not built in this pass. **Not fully true yet**:
+      AG2.4 already recorded the actual gap and it still stands — the strip
+      shows the current verbs but does not announce a *new* one the moment
+      it becomes available, only the weapon's own. `gothic_field_hud.gd` is
+      Lane 5's file; noted rather than reached into
+- [x] ~~**AD2.4** It survives the transition to third person without
+      dissolving (M3.3)~~ True by construction rather than by a fix: nothing
+      in `_update_hud()` gates `field_interface.set_state()` or its
+      visibility on `third_person`, so there was nothing that could
+      dissolve on the switch. Verified rather than assumed —
+      `tests/field_hud_third_person_capture.gd` (new) drives the same
+      third-person camera path `_update_camera()` uses for a resolution
+      shot and captures both: `captures/ad2_4_field_hud_first_person.png`
+      and `captures/ad2_4_field_hud_third_person.png` show the identical
+      location crest, hunt thread, vitals-and-weapon gauge and bottom strip
+      over a camera that has genuinely moved to the third-person position
+- [x] ~~**AD2.5** Readable while moving, which is when it is actually
+      needed~~ `$HUD` is a `CanvasLayer` (`FieldInterface` lives at
+      `$HUD/FieldInterface`) — a 2D layer with no relationship to the 3D
+      camera's own transform, so nothing that shakes, kicks or turns the
+      camera (`impact_feel`, a dodge, a hard turn) ever touches the HUD's
+      own position or legibility; it is exactly as readable mid-fight as it
+      is standing still. Confirmed against both captures above: identical
+      text, identical position, camera in two different places
 
 ### AD3 — Builds that break the rules
 Greg: *"not to copy HAVKER-MAN X, but with the cybernetics and limb enhancements
