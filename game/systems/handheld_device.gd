@@ -46,6 +46,12 @@ const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 signal pin_requested(ref: String, kind: String, title: String)
 signal mode_changed(mode: String)
 signal lead_found(station: String)
+## C1.7 `v2`. `drop()` itself only closes the device and flips `possessed` —
+## this file owns no 3D space to put a dropped unit into (`bone_yard_hunt.gd`
+## does). Whoever hosts this device connects to `dropped` and is hand the
+## same identity payload `drop()`/`confiscate()` already return, to actually
+## spawn something pickable and, later, call `repossess()` on it.
+signal dropped(payload: Dictionary)
 
 ## TREE and ALLUSIONS are not gone, they are *inside* INDEX — the Tree axis is
 ## drawn on every dossier and the archive is a page rather than a mode. Listing
@@ -85,6 +91,11 @@ const HELD_OFFSET_X := 0.045
 const DEVICE_ID := "handheld"
 var serial := 0
 var condition := 0.78
+## C1.7 `v2`. "It can be dropped, and it can be taken off you." Reloaded on
+## every `open_device()` the same as `condition`/`battery` already are, so a
+## device lost in one scene stays lost the next time this one loads — there
+## is no second flag anywhere else that could disagree with this one.
+var possessed := true
 
 ## AS1.3. A real resource, not a torch that never runs out. Full charge is
 ## about eight real minutes of continuously holding it up — long enough that
@@ -166,6 +177,19 @@ var lean := 0.0
 var lean_override: Variant = null
 const LEAN_KEY := KEY_L
 const LEAN_SCALE := 1.32
+
+## C1.7 `v2`. Deliberately letting go, as its own key rather than folded onto
+## G (which raises and lowers) or Escape (which just closes the panel without
+## losing the device) — `open_device()`'s own `possessed` check is what makes
+## either of those genuinely different verbs, so a drop needs a press of its
+## own that survives the device already being closed. Edge-detected against
+## `_drop_key_was_down` because `drop()` is a single event, not a state a held
+## key should be free to fire every frame. `drop_key_override` follows
+## `lean_override`'s own reason: a headless test cannot rely on
+## `Input.is_key_pressed`.
+const DROP_KEY := KEY_K
+var drop_key_override: Variant = null
+var _drop_key_was_down := false
 
 
 func _ready() -> void:
@@ -283,6 +307,9 @@ func load_device() -> void:
 	wear_log = (record.get("wear_log", []) as Array).duplicate()
 	impacts = (record.get("impacts", []) as Array).duplicate(true)
 	battery = clampf(float(record.get("battery", 1.0)), 0.0, 1.0)
+	# C1.7 `v2`. A save from before this existed opens possessed — the honest
+	# read of "nobody has ever lost this yet".
+	possessed = bool(record.get("possessed", true))
 
 
 func save_device() -> void:
@@ -293,8 +320,53 @@ func save_device() -> void:
 		"battery": snappedf(battery, 0.001),
 		"wear_log": wear_log.duplicate(),
 		"impacts": impacts.duplicate(true),
+		"possessed": possessed,
 		"kind": "object",
 	}, "device_changed")
+
+
+## C1.7 `v2`. Losing the device is one real transition, not two — voluntarily
+## setting it down and having it taken both end in the identical state
+## (unraisable, closed, `possessed` false), so `drop()` and `confiscate()`
+## are two names for whoever is calling this, not two mechanisms. Splitting
+## the event type rather than the effect: the world should be able to tell a
+## deliberate drop from a robbery apart later even though the player cannot
+## use the device either way in the meantime. Returns the device's own
+## identity (serial, condition, wear) — what a caller elsewhere (the world
+## scene owns 3D space, not this file) needs to actually place a dropped
+## unit in the world rather than just deleting the player's access to it.
+func _lose_possession(event_type: String, details: Dictionary) -> Dictionary:
+	if not possessed:
+		return {"ok": false, "reason": "ALREADY NOT IN HAND"}
+	close_device()
+	possessed = false
+	save_device()
+	var payload := details.duplicate(true)
+	payload["serial"] = serial
+	WorldHistory.record_event(event_type, payload)
+	return {"ok": true, "serial": serial, "condition": condition, "wear_log": wear_log.duplicate(), "impacts": impacts.duplicate(true)}
+
+
+func drop() -> Dictionary:
+	var result := _lose_possession("device_dropped", {})
+	if bool(result.get("ok", false)):
+		dropped.emit(result)
+	return result
+
+
+func confiscate(reason := "") -> Dictionary:
+	return _lose_possession("device_taken", {"reason": reason})
+
+
+## The other half — found again, bought back, or handed back by whoever took
+## it. Wear travels with it either way: this is the same physical object
+## coming back, not a fresh one replacing it.
+func repossess() -> void:
+	if possessed:
+		return
+	possessed = true
+	save_device()
+	WorldHistory.record_event("device_repossessed", {"serial": serial})
 
 
 ## Something happened to it. Wear only ever goes one way — a cracked screen does
@@ -333,6 +405,11 @@ func take_wear(amount: float, cause := "", impact_at := Vector2(-1, -1)) -> void
 
 func open_device() -> void:
 	load_device()
+	# C1.7 `v2`. A device that has been dropped or taken cannot be raised —
+	# `load_device()` runs first specifically so this reads the real, current
+	# answer rather than a stale one from before whatever took it happened.
+	if not possessed:
+		return
 	is_open = true
 	visible = true
 	set_mode(current_mode())
@@ -455,6 +532,13 @@ func stand_at(world_position: Vector2) -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	# C1.7 `v2`. Checked against `possessed` rather than `is_open` — a device
+	# in your pocket is still yours to drop, the same as one in your hand.
+	# Edge-detected so holding the key down cannot fire `drop()` every frame.
+	var drop_key_down: bool = drop_key_override if drop_key_override != null else Input.is_key_pressed(DROP_KEY)
+	if drop_key_down and not _drop_key_was_down and possessed:
+		drop()
+	_drop_key_was_down = drop_key_down
 	# A6.6 v2. The panel keeps failing whether or not you are looking at it,
 	# so a fault does not restart its cycle every time the device comes up.
 	panel_clock += delta
