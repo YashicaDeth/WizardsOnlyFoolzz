@@ -2069,7 +2069,7 @@ Covered by `tests/chaos_sigil_resolve_test.gd` (19 checks) and `tests/chaos_sigi
 - [x] **AJ3.1** The gods of this world are what is actually worshipped: markets, metrics, engagement, brands — `systems/modern_gods.gd`: The Engagement, The Market, The Quota, The Brand
 - [x] **AJ3.2** A god is a real entity in WorldHistory with attention, not a flavour label — `kind: "god"`, real `attention` field, same shape `ascent_entities.gd` already proved
 - [~] **AJ3.3** Worship is measurable (`attention` accumulates on every verdict asked) — feeding the upper cone (AI1.4) is a UI/pyramid concern, not attempted here
-- [~] **AJ3.4** Naming a god in an intent gets their attention, which is not always wanted — `get_attention()` exists and accumulates, but AJ1 (intents/sigils) doesn't exist yet to call it; same relationship `ritual_app.gd` has to seals it doesn't draw
+- [x] **AJ3.4** Naming a god in an intent gets their attention, which is not always wanted — `ChaosSigil.resolve()` now checks the stated intent for each god's own name word (`GOD_NAME_WORDS`) and calls `ModernGods.get_attention()` for every one named, whether the sigil goes on to resolve, misfire or come out corrupted (naming is what costs the attention, not success). Covered by `tests/chaos_sigil_god_attention_test.gd` (11 checks)
 - [x] **AJ3.5** The target is always the institution, never the congregation — satisfied by construction: all four gods are markets/metrics/labor/image, never a person or a people
 
 ### AJ4 — Magic as progression

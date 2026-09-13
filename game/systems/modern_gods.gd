@@ -23,9 +23,10 @@ extends RefCounted
 ##
 ## AJ3.2: each god is a real WorldHistory subject with `attention`, on the
 ## same shape `ascent_entities.gd` already proved — not a flavour label.
-## AJ1 (sigils naming a god to get their attention) is not built here; this
-## is what it would eventually call into, same relationship ritual_app.gd
-## has to the seals it doesn't draw.
+## AJ3.4: `chaos_sigil.gd`'s `resolve()` now actually calls `get_attention()`
+## when a stated intent names one of these gods by name, whether or not the
+## sigil goes on to resolve, misfire or come out corrupted — attention is
+## what naming something costs, not a reward for a working that succeeded.
 
 const GODS := {
 	"the_engagement": {

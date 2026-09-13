@@ -24,6 +24,7 @@ extends RefCounted
 ## when consonants survive to replace them — the glyph is never empty.
 const CellOutzType := preload("res://systems/celloutz_type.gd")
 const Boons := preload("res://systems/boons.gd")
+const ModernGods := preload("res://systems/modern_gods.gd")
 
 const VOWELS := ["A", "E", "I", "O", "U"]
 ## AJ1.4. "Charging costs something real." Blood is the oldest cost in the
@@ -86,6 +87,19 @@ const INTENT_FAMILIES := {
 	"fortune": {"words": ["luck", "win", "money", "wealth", "gain", "debt"], "stat": "fortune"},
 	"sight": {"words": ["see", "know", "reveal", "truth", "find", "remember"], "stat": "perception"},
 }
+## AJ3.4. "Naming a god in an intent gets their attention, which is not always
+## wanted." Matched against the one word of each god's own name that could not
+## also be a stray English word doing something else (`engagement`/`market`/
+## `quota`/`brand`) - the same contains-based reading `_match_family` already
+## uses for `INTENT_FAMILIES`, on `modern_gods.gd`'s own real roster rather
+## than a second list this file would have to keep in sync with it.
+const GOD_NAME_WORDS := {
+	"the_engagement": "engagement",
+	"the_market": "market",
+	"the_quota": "quota",
+	"the_brand": "brand",
+}
+
 ## AJ2.1/AJ2.3. The base swing of a resolved sigil before AJ2.3's own working
 ## multiplies it, and how long that working actually lasts. Reuses `Boons`
 ## for the grant itself — an effect from working chaos magick is exactly the
@@ -272,6 +286,16 @@ static func resolve(sigil: Dictionary, subject_id: String = "player") -> Diction
 	var seed := int(sigil.get("seed", 0))
 	var resolved := sigil.duplicate(true)
 	resolved["resolved"] = true
+	# AJ3.4. Naming a god happens at the level of what was actually said, not
+	# what the working comes to - a misfired or corrupted sigil still said the
+	# name out loud. Every named god gets real, permanent attention regardless
+	# of whether the sigil resolves, misfires or comes out corrupted.
+	var named_gods := _named_gods(str(sigil.get("intent", "")))
+	for god_id in named_gods:
+		ModernGods.get_attention(str(god_id), 1)
+	if not named_gods.is_empty():
+		resolved["named_gods"] = named_gods
+		WorldHistory.record_event("sigil_named_god", {"subject_id": subject_id, "seed": seed, "gods": named_gods})
 	var corrupted := bool(sigil.get("corrupted", false))
 	var family := "" if corrupted else _match_family(str(sigil.get("intent", "")))
 	if family.is_empty():
@@ -280,7 +304,7 @@ static func resolve(sigil: Dictionary, subject_id: String = "player") -> Diction
 		WorldHistory.amend_subject(subject_id, {"chaos_corruption": corruption})
 		WorldHistory.record_event("sigil_misfired", {"subject_id": subject_id, "intent": str(sigil.get("intent", "")), "seed": seed, "corrupted": corrupted, "chaos_corruption": corruption})
 		resolved["result"] = "misfired"
-		return {"ok": true, "sigil": resolved, "result": "misfired", "family": ""}
+		return {"ok": true, "sigil": resolved, "result": "misfired", "family": "", "named_gods": named_gods}
 	var potency := _potency(subject_id, seed)
 	var stat := str(INTENT_FAMILIES[family].stat)
 	var magnitude := BASE_MAGNITUDE * (1.0 + float(potency) * POTENCY_STEP)
@@ -291,12 +315,12 @@ static func resolve(sigil: Dictionary, subject_id: String = "player") -> Diction
 		# the parsing, but a sigil that does not fire is still a miss.
 		WorldHistory.record_event("sigil_misfired", {"subject_id": subject_id, "intent": str(sigil.get("intent", "")), "seed": seed, "reason": str(granted.get("reason", ""))})
 		resolved["result"] = "misfired"
-		return {"ok": true, "sigil": resolved, "result": "misfired", "family": family}
+		return {"ok": true, "sigil": resolved, "result": "misfired", "family": family, "named_gods": named_gods}
 	_bump_potency(subject_id, seed)
 	WorldHistory.record_event("sigil_resolved", {"subject_id": subject_id, "seed": seed, "family": family, "stat": stat, "magnitude": magnitude, "potency": potency + 1, "world_minute": WorldClock.minutes()})
 	resolved["result"] = "resolved"
 	resolved["family"] = family
-	return {"ok": true, "sigil": resolved, "result": "resolved", "family": family, "magnitude": magnitude}
+	return {"ok": true, "sigil": resolved, "result": "resolved", "family": family, "magnitude": magnitude, "named_gods": named_gods}
 
 
 static func _match_family(intent: String) -> String:
@@ -306,6 +330,18 @@ static func _match_family(intent: String) -> String:
 			if lower.contains(str(word)):
 				return str(family)
 	return ""
+
+
+## AJ3.4. Every god actually named in the stated intent, not just the first
+## one - an intent can genuinely call on more than one institution at once,
+## and each one that got named gets its own real attention for it.
+static func _named_gods(intent: String) -> Array:
+	var lower := intent.to_lower()
+	var named: Array = []
+	for god_id in GOD_NAME_WORDS:
+		if lower.contains(str(GOD_NAME_WORDS[god_id])):
+			named.append(str(god_id))
+	return named
 
 
 ## AJ2.3. "The same glyph gets stronger the more it has worked." Keyed by
