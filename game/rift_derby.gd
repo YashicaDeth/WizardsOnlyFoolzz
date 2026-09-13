@@ -534,13 +534,13 @@ func _damage_target(target: ArcadeVehicle, collision_speed: float = 0.0, self_sh
 	boat.apply_damage(clampi(roundi(energy * 0.22 * (0.35 + 0.65 * (1.0 - self_share))), 1, 34))
 	var impact_direction := (target.global_position - boat.global_position).normalized()
 	_update_player_damage_visual(-impact_direction)
-	_update_wrecker_damage_visual(target, impact_direction)
-	_update_detachable_parts(target, impact_direction)
+	_update_wrecker_damage_visual(target, target_integrity, impact_direction)
+	_update_detachable_parts(target, target_integrity, impact_direction)
 	if damage >= 28:
 		_spawn_impact_debris(target.global_position, impact_direction, mini(10, damage / 8))
 	# Once the bumper and hood are gone there is nothing between the player's
 	# front end and the cab, so a fast hit there reaches the driver directly.
-	var detached: Array = target.detached_parts
+	var detached: Array = target.get_meta("detached_parts", [])
 	var front_stripped: bool = detached.has("BumperFront") and detached.has("Hood")
 	var ram_crush: bool = front_stripped and collision_speed > 13.0
 	_injure_driver(target, damage, impact_direction, ram_crush)
@@ -600,14 +600,11 @@ func _wreck_target(target: Node3D, impact_energy: int) -> void:
 		_finish_round("won")
 
 
-func _update_wrecker_damage_visual(target: ArcadeVehicle, impact_direction := Vector3.ZERO) -> void:
+func _update_wrecker_damage_visual(target: Node3D, target_integrity: int, impact_direction := Vector3.ZERO) -> void:
 	var shell := target.get_node_or_null("ScrapVehicleShell") as Node3D
 	if shell == null:
 		return
-	# AB1.5. Read against this chassis's own ceiling, not a flat 100 — the
-	# rival's authored 160 max used to read as pristine until it had lost more
-	# than the average wrecker's entire hull.
-	var crush := clampf(1.0 - target.condition_fraction(), 0.0, 0.72)
+	var crush := clampf(float(100 - target_integrity) / 100.0, 0.0, 0.72)
 	shell.scale = Vector3(1.05 + crush * 0.1, 1.05 - crush * 0.2, 1.05 - crush * 0.08)
 	# Fold the shell away from the side the hit came from. Uniform scaling reads
 	# as a car shrinking; an asymmetric fold reads as a car taking a beating.
@@ -618,7 +615,7 @@ func _update_wrecker_damage_visual(target: ArcadeVehicle, impact_direction := Ve
 
 
 func _update_player_damage_visual(impact_direction: Vector3) -> void:
-	_update_detachable_parts(boat, impact_direction)
+	_update_detachable_parts(boat, boat.integrity, impact_direction)
 	var shell := boat.get_node_or_null("AuthoredScrapSkiff") as Node3D
 	if shell == null:
 		return
@@ -905,7 +902,7 @@ func _suppress_props(root: Node) -> void:
 ## The player's shed panels are tracked on the chassis the same way the AI cars
 ## track theirs, so the dash schematic reads from real state.
 func _player_parts_lost() -> Array:
-	return boat.detached_parts
+	return boat.get_meta("detached_parts", [])
 
 
 ## The index reads `WorldHistory` directly now. This used to assemble a list of
@@ -993,6 +990,7 @@ func _add_vehicle_damage_parts(target: RigidBody3D, index: int) -> void:
 		var x := -1.42 if wheel_index % 2 == 0 else 1.42
 		var z := -1.55 if wheel_index < 2 else 1.55
 		_add_damage_part(damage_root, "Wheel%d" % wheel_index, Vector3(x, -0.42, z), Vector3(0.42, 0.78, 0.78), Color("181515"))
+	target.set_meta("detached_parts", [])
 
 
 func _add_damage_part(parent: Node3D, part_name: String, at: Vector3, dimensions: Vector3, color: Color) -> void:
@@ -1006,34 +1004,22 @@ func _add_damage_part(parent: Node3D, part_name: String, at: Vector3, dimensions
 	parent.add_child(part)
 
 
-## AB1.5. Fractions of this chassis's own ceiling, not absolute points out of
-## a flat 100 — the rival's authored 160 max used to shed its first panel at
-## under half its own health rather than at three-quarters of it, same as the
-## crush visual above disagreed with itself.
-const DETACHABLE_PART_THRESHOLDS := {0.75: "BumperFront", 0.62: "DoorLeft", 0.49: "Hood", 0.36: "DoorRight", 0.24: "Wheel0", 0.12: "BumperRear"}
-
-func _update_detachable_parts(target: ArcadeVehicle, impact_direction: Vector3) -> void:
-	var fraction := target.condition_fraction()
-	for threshold in DETACHABLE_PART_THRESHOLDS:
-		if fraction <= float(threshold):
-			_detach_vehicle_part(target, str(DETACHABLE_PART_THRESHOLDS[threshold]), impact_direction)
+func _update_detachable_parts(target: Node3D, target_integrity: int, impact_direction: Vector3) -> void:
+	var thresholds := {75: "BumperFront", 62: "DoorLeft", 49: "Hood", 36: "DoorRight", 24: "Wheel0", 12: "BumperRear"}
+	for threshold in thresholds:
+		if target_integrity <= int(threshold):
+			_detach_vehicle_part(target, str(thresholds[threshold]), impact_direction)
 
 
-## AB1.1/AB1.3. A shed panel used to hang its own fourteen-second timer to make
-## itself disappear — a private cleanup schedule nothing else in the game
-## answers to, and one `derby_exit_test.gd` already had to work around rather
-## than trust, since a scene swap could free the node the timer was still
-## holding a bare reference to. It registers with `GoreChunks` instead: the
-## same pool cap, rot clock, and pickup contract every gore chunk already has,
-## and a registry already built to tolerate exactly the "the scene that made
-## me is gone" case a fixed timer was working around badly.
-func _detach_vehicle_part(target: ArcadeVehicle, part_name: String, impact_direction: Vector3) -> void:
-	if target.detached_parts.has(part_name):
+func _detach_vehicle_part(target: Node3D, part_name: String, impact_direction: Vector3) -> void:
+	var detached: Array = target.get_meta("detached_parts", [])
+	if detached.has(part_name):
 		return
 	var part := target.get_node_or_null("DamageParts/%s" % part_name) as MeshInstance3D
 	if part == null:
 		return
-	target.detached_parts.append(part_name)
+	detached.append(part_name)
+	target.set_meta("detached_parts", detached)
 	var loose := RigidBody3D.new()
 	loose.name = "%s_Detached" % part_name
 	loose.mass = 16.0 if not part_name.begins_with("Wheel") else 28.0
@@ -1050,7 +1036,7 @@ func _detach_vehicle_part(target: ArcadeVehicle, part_name: String, impact_direc
 	loose.apply_central_impulse(impact_direction * 210.0 + Vector3.UP * 95.0)
 	loose.apply_torque_impulse(Vector3(35, 80, 24))
 	part.queue_free()
-	GoreChunks.register_debris(loose, part_name, "vehicle:%s" % target.name)
+	get_tree().create_timer(14.0).timeout.connect(loose.queue_free)
 	WorldHistory.record_event("vehicle_part_detached", {"vehicle": target.name, "part": part_name})
 
 

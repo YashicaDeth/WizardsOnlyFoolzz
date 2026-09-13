@@ -19,10 +19,6 @@ signal impact(other: Node, closing_speed: float, self_share: float)
 ## chassis and every wrecker's chassis carry it the same way.
 var max_integrity: int = 100
 var integrity: int = 100
-## AB1.1/AB1.5. Which panels have already come off, tracked on the chassis
-## itself rather than as loose `set_meta` — the exact pattern V1.1 already
-## fixed for hull integrity on this same file, still present here until now.
-var detached_parts: Array[String] = []
 
 func set_max_integrity(value: int) -> void:
 	max_integrity = maxi(1, value)

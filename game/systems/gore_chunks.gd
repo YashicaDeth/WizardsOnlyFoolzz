@@ -85,37 +85,6 @@ static func register_whole_limb(node: RigidBody3D, zone: String, subject_id: Str
 	return info
 
 
-## AB1.1/AB1.3. A piece off something that was never a body — a car door, a
-## shattered panel — but the same fact every gore chunk already has: it broke
-## where it was hit, and what came off stays. `label` and `source_id` are
-## honest about what this actually is (a door is not a limb) while giving it
-## the same registry, pool cap, rot clock and pickup contract every chunk
-## already gets for free, rather than the object inventing its own timer to
-## make debris disappear on a schedule nothing else in the game answers to.
-static func register_debris(node: RigidBody3D, label: String, source_id: String) -> Dictionary:
-	if node == null or not is_instance_valid(node):
-		return {}
-	if live.size() >= MAX_CHUNKS:
-		_recycle_oldest()
-	var info := {
-		"layer": -1,
-		"layer_name": "debris",
-		"whole_limb": false,
-		"zone": label,
-		"subject_id": source_id,
-		"organ_id": "",
-		"implant": "",
-		"condition": 1.0,
-		"taken": false,
-		"spawn_msec": Time.get_ticks_msec(),
-	}
-	node.set_meta("chunk", info)
-	live.append(node)
-	_watch_chunk(node)
-	_schedule_rot(node)
-	return info
-
-
 ## How deep a blow reached, as a `Layer`. The zone's current condition is part of
 ## the answer — the second cut into the same arm goes further than the first,
 ## which is the whole reason a fight escalates visually.

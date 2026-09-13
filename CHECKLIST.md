@@ -3013,52 +3013,9 @@ where they are hit, and what comes off them stays.
       been struck-and-broken anywhere in the project — which is real,
       separate work the migration above does not shortcut.
 - [ ] **AB1.2** Structures break where they are struck rather than swapping to a damaged model
-- [x] **AB1.3** ~~Debris is real, persists, and can be stood on or thrown~~
-      Already true for bodies before this segment — a gore chunk is a real
-      `RigidBody3D` with collision (stood on), and `bone_yard_hunt.gd`'s
-      `_nearest_takeable_chunk()` → `GoreChunks.take()` → `handheld.carry`
-      chain already lets a player pick one up (thrown, or at least carried,
-      via B5's economy). Vehicle debris did not share any of that: a shed
-      panel despawned outright after fourteen seconds on its own private
-      timer, registered nowhere, identified by nothing. `GoreChunks.register_debris()`
-      (new, alongside `register_whole_limb()`) puts a shed panel into the same
-      registry, so it now persists, is pool-capped and rot-tracked, and is
-      "stood on" the same real way a gore chunk already was.
-      Verified: `tests/vehicle_debris_test.gd` — a detached panel appears in
-      `GoreChunks.live`, `identify()` recognises it with an honest
-      `zone`/`subject_id` (a car door is not labelled a severed limb), and
-      `derby_exit_test.gd` still runs a full heat and scene swap clean
-      afterward, proving the registry survives the derby scene going away the
-      same way it already had to for gore (AG1.6).
-      Still open: "thrown" specifically is not wired up for vehicle debris —
-      `_nearest_takeable_chunk()`/`take()` are methods on `bone_yard_hunt.gd`
-      and only run in that scene; nothing offers the same pickup prompt while
-      still inside the derby, so a shed bumper is real and persistent but not
-      yet reachable by the player's hands in the scene it comes off in. That
-      is a derby-scene interaction gap, not a `GoreChunks` one.
-- [x] **AB1.4** ~~It reads through the gore system that already exists — `gore_chunks.gd` already breaks bodies into identified pieces~~
-      Named as the answer in AB1.1's scope decision and made real by AB1.3/
-      AB1.5: vehicle debris now registers through `GoreChunks.register_debris()`
-      rather than reinventing persistence, pooling and identity a second time.
-- [x] **AB1.5** ~~A vehicle deforms rather than losing hit points (pairs with V1.2)~~
-      Both halves of "deforms" read a flat 100 instead of this chassis's own
-      ceiling: `_update_wrecker_damage_visual`'s crush scale computed
-      `(100 - target_integrity) / 100`, so the rival's authored 160-integrity
-      chassis stayed visually pristine until it had lost more hull than an
-      ordinary wrecker's entire health bar; `_update_detachable_parts`'
-      thresholds compared the same way, so its first panel came off at under
-      half its own health rather than at three-quarters, same as every other
-      car. Both now read `ArcadeVehicle.condition_fraction()` (V1.1) instead
-      — one number, the same one that already drives V1.2's handling
-      degradation, rather than a third figure with its own private scale.
-      `detached_parts` also moved off loose `set_meta` onto a real field on
-      the chassis, the same fix V1.1 already made for hull integrity on this
-      file.
-      Verified: `tests/vehicle_debris_test.gd` — a 100-max car and the
-      160-max rival shed their first panel at the identical condition
-      *fraction* (74%) rather than the rival needing to fall much further in
-      absolute terms first, and the rival's crush visual is confirmed to
-      change well before its raw integrity is anywhere near zero.
+- [ ] **AB1.3** Debris is real, persists, and can be stood on or thrown
+- [ ] **AB1.4** It reads through the gore system that already exists — `gore_chunks.gd` already breaks bodies into identified pieces
+- [ ] **AB1.5** A vehicle deforms rather than losing hit points (pairs with V1.2)
 - [ ] **AB1.6** Measure the cost before committing; X exists because nothing here has been profiled
 
 ### AB2 — Damage the world keeps
