@@ -4047,31 +4047,36 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
       condition and stiffness, a connecting hit wears both down immediately,
       the same hit through real plate wears more than the same hit through
       nothing, and throwing a fist does not touch the sword sitting unused.
-- [ ] **AN2.5** Two-handing changes the numbers, not just the pose — not
-      built, diagnosed. `held_gear.gd`'s own `GRIPS` table already carries
-      `reach` and `damage_type` per grip, and its header comment names
-      exactly this claim: *"`reach` and `damage_type` are here rather than
-      on the weapon because they are properties of how it is being held.
-      Half-swording shortens your reach and turns a cut into a thrust, and
-      that is the whole reason anybody ever did it."* Nothing outside
-      `held_gear.gd` reads either field — confirmed by grep, not assumed.
-      `half_sword`'s own `reach` (0.62) already differs meaningfully from
-      `one_hand`/`two_hand` (both 1.0, not yet differentiated from each
-      other); `damage_type` shifts from `cut` to `puncture` on the same
-      switch. `hold(grip_name)` is real and callable — "the verb behind
-      half-swording: nothing is drawn or sheathed, the hands move" — but no
-      code path in the live game ever calls it: `hunter_arsenal.gd` only
-      calls `HeldGear.build_weapon()` once, as a model factory, and keeps
-      no persistent `HeldGear` instance whose `grip` a player action could
-      change. Wiring this for real needs three things, in order: (1) a
-      live `HeldGear` instance `_carry_current_weapon()` can hold onto
-      rather than a one-shot model, (2) an input that calls `hold()` on it
-      for weapons where a grip choice makes sense (the sword has three:
-      `one_hand`, `two_hand`, `half_sword`), and (3) `arm.reach` and the
-      swing's own `damage_type` reading the active grip's numbers instead
-      of the flat `ARM_WEIGHTS` entry. Left here rather than half-built
-      under time pressure with another agent already mid-edit in
-      `bone_yard_hunt.gd`
+- [x] ~~**AN2.5** Two-handing changes the numbers, not just the pose~~ Built
+      on the earlier diagnosis rather than around it: `held_gear.gd`'s
+      `GRIPS` table already carried `reach` and `damage_type` per grip, its
+      own header comment naming this exact claim, and nothing outside that
+      file ever read either. `hold(grip_name)` — "the verb behind
+      half-swording" — was real but never called from the live game, since
+      `hunter_arsenal.gd` only ever used `HeldGear.build_weapon()` as a
+      one-shot model factory with no persistent instance to change. Rather
+      than replace that carefully-tuned mounting code, the numbers are
+      wired independently of it: `B` cycles the sword through its three
+      real grips (`two_hand → one_hand → half_sword`, the only weapon
+      `GRIP_CYCLE` names, since a shotgun and a sidearm each have exactly
+      one grip already), and `_carry_current_weapon()` reads the active
+      grip's `reach` and a new `control` field — the number the file's own
+      comment asked for and nothing had — into `arm.reach` and
+      `LimbMomentum`'s stiffness. A swing's own `damage_type` follows the
+      same grip, so a half-sworded blow is a real `puncture` reaching
+      AN2.3's `strike()` rather than a `cut` that happens to be shorter.
+      Equipping a fresh weapon resets to `HeldGear`'s own default grip
+      rather than remembering the last stance — holstering is not choosing
+      a stance. Verified by `tests/two_handing_test.gd` (new, 11/11):
+      cycling moves through all three grips and wraps around; half-sword
+      measurably shortens reach (0.384 vs 0.620) and steadies the arm
+      (78.30 vs 66.70) against two-handed, itself steadier than one-handed
+      (47.56); a weapon with no `GRIP_CYCLE` entry ignores the key outright;
+      and a live `_attack()` reports `cut` two-handed and `puncture`
+      half-sworded from the identical weapon. Full regression suite
+      (vault, wall_run, jump, climb, momentum_carry, anatomy_traversal,
+      opening, combat_integration, zone_precision, ballistics,
+      firearm_momentum, deferred_damage) re-verified clean
 
 
 ### AN v10 — the final pass

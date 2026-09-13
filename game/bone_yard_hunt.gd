@@ -896,6 +896,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_3: _equip_weapon(2)
 			KEY_4: _equip_carried_limb()
 			KEY_5: _put_the_weapons_down()
+			KEY_B: _cycle_grip()
 			KEY_R:
 				if handheld.is_open:
 					_cycle_asset_task()
@@ -1339,8 +1340,39 @@ const ARM_WEIGHTS := {
 ## it — `LimbMomentum.carry()`'s own former default, named here because a
 ## worn weapon now needs a real number to be worn *from*.
 const WEAPON_BASE_STIFFNESS := 58.0
+## AN2.5. Which grips a weapon actually offers, in the order `B` cycles them.
+## Only the sword has a real choice to make — a shotgun and a sidearm each
+## have exactly one grip already (`HeldGear._default_grip`), so cycling them
+## would be a key that does nothing every time it is pressed.
+const GRIP_CYCLE := {
+	"sword": ["two_hand", "one_hand", "half_sword"],
+}
+## `HeldGear`'s own default for the sword — kept in sync by `_cycle_grip()`
+## rather than duplicated, since a fresh sword pull should start exactly
+## where `_default_grip()` already puts it.
+var current_grip := "two_hand"
 
-func _carry_current_weapon() -> void:
+## AN2.5. "Two-handing changes the numbers, not just the pose." `held_gear.gd`'s
+## `GRIPS` table already carried `reach`, `damage_type` and now `control` per
+## grip — its own header comment names the claim directly — and nothing ever
+## read them outside that file. This is the read: three real grips for the
+## one weapon that has a real choice between them, cycled rather than a
+## dedicated key each, because a fourth key for a weapon nobody has drawn yet
+## is exactly the kind of binding that never gets discovered.
+func _cycle_grip() -> void:
+	var id := str(arsenal.current_id) if arsenal != null else ""
+	var options: Array = GRIP_CYCLE.get(id, [])
+	if options.is_empty():
+		return
+	var index := options.find(current_grip)
+	current_grip = options[(index + 1) % options.size()] if index >= 0 else options[0]
+	var spec: Dictionary = HeldGear.GRIPS.get(current_grip, {})
+	prompt.text = "%s // %s GRIP" % [str(arsenal.current().label), current_grip.to_upper().replace("_", "-")]
+	WorldHistory.record_event("grip_changed", {"weapon": id, "grip": current_grip, "location": HUNT_LOCATION})
+	_carry_current_weapon(true)
+
+
+func _carry_current_weapon(force := false) -> void:
 	if arm == null:
 		return
 	var id := "bare"
@@ -1361,9 +1393,17 @@ func _carry_current_weapon() -> void:
 	# heard of, which is exactly "unworn" and asks for nothing special here.
 	var condition: float = arsenal.weapon_condition(id) if arsenal != null else 1.0
 	var target_stiffness := WEAPON_BASE_STIFFNESS * lerpf(0.45, 1.0, condition)
-	if is_equal_approx(arm.mass, float(spec["mass"])) and is_equal_approx(arm.stiffness, target_stiffness):
+	var reach: float = float(spec["reach"])
+	# AN2.5. Only the weapons `GRIP_CYCLE` actually offers a choice for read
+	# their own grip's numbers — everything else keeps exactly the reach and
+	# stiffness it always had, unaffected by a grip nothing lets it change.
+	if GRIP_CYCLE.has(id):
+		var grip_spec: Dictionary = HeldGear.GRIPS.get(current_grip, {})
+		reach *= float(grip_spec.get("reach", 1.0))
+		target_stiffness *= float(grip_spec.get("control", 1.0))
+	if not force and is_equal_approx(arm.mass, float(spec["mass"])) and is_equal_approx(arm.reach, reach) and is_equal_approx(arm.stiffness, target_stiffness):
 		return
-	arm.carry(float(spec["mass"]), float(spec["reach"]), target_stiffness)
+	arm.carry(float(spec["mass"]), reach, target_stiffness)
 
 
 ## AN1.2/AN1.6. One call a frame. The arm is given what the player did — how far
@@ -1459,6 +1499,15 @@ func _attack(heavy := false) -> void:
 				prompt.text = "NOTHING LEFT TO SWING"
 			return
 		report = fists
+	# AN2.5. The grip decides what kind of blow this actually is — a
+	# half-sworded thrust is not a cut that happens to be shorter, it is a
+	# different `damage_type` reaching `strike()`'s own AN2.3 answer for
+	# armour, bone and wall. Melee only, and only a weapon `GRIP_CYCLE` has
+	# a real choice for: bare hands and a carried limb have no grip to read.
+	if not bare_handed and carried_limb_index < 0 and str(report.get("kind", "")) != "firearm" and GRIP_CYCLE.has(str(arsenal.current_id)):
+		var grip_spec: Dictionary = HeldGear.GRIPS.get(current_grip, {})
+		if grip_spec.has("damage_type"):
+			report["damage_type"] = grip_spec["damage_type"]
 	var swing := _player_swing_scale()
 	# O5.1. The body's own motion is part of the blow.
 	var momentum := swing_momentum(player_body.velocity)
@@ -1976,6 +2025,12 @@ func _equip_weapon(slot: int) -> void:
 		# The ammo well and the model in the player's hand already show the new
 		# weapon. A persistent READY subtitle duplicated both of them.
 		prompt.text = ""
+		# AN2.5. A fresh draw starts from the grip `HeldGear` itself defaults
+		# to, not whatever the last sword pull happened to be left in —
+		# holstering is not the same act as choosing a stance.
+		var options: Array = GRIP_CYCLE.get(str(arsenal.current_id), [])
+		if not options.is_empty():
+			current_grip = options[0]
 
 
 func _reload_weapon() -> void:

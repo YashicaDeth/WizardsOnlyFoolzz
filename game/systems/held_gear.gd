@@ -45,24 +45,32 @@ extends Node3D
 ## `reach` and `damage_type` are here rather than on the weapon because they are
 ## properties of *how it is being held*. Half-swording shortens your reach and
 ## turns a cut into a thrust, and that is the whole reason anybody ever did it.
+## AN2.5. `control` is the number this comment already asked for and nothing
+## ever read: how steady the arm carrying this grip is, as a multiplier on
+## `LimbMomentum`'s own stiffness. Two hands brace each other, which is why a
+## longsword held in one is wilder than the same sword held in two; half-
+## swording is the most controlled grip in the table for the same reason a
+## thrust needs to be — it is how the technique finds a gap in plate at all.
+## Swinging by the blade is the opposite: an improvised hammer, held nowhere
+## it was meant to be held.
 const GRIPS := {
 	"fists": {
 		"right": {"anchor": "", "pose": "fist"},
 		"left": {"anchor": "", "pose": "fist"},
 		"rest": {"at": Vector3(0.030, -0.150, -0.300), "turn": Vector3(0.18, 0.0, 0.0)},
-		"reach": 0.55, "damage_type": "blunt",
+		"reach": 0.55, "damage_type": "blunt", "control": 1.0,
 	},
 	"one_hand": {
 		"right": {"anchor": "grip", "pose": "wrap"},
 		"left": {"anchor": "", "pose": "open"},
 		"rest": {"at": Vector3(0.205, -0.255, -0.225), "turn": Vector3(0.52, 0.34, 0.30)},
-		"reach": 1.0, "damage_type": "cut",
+		"reach": 1.0, "damage_type": "cut", "control": 0.82,
 	},
 	"two_hand": {
 		"right": {"anchor": "grip", "pose": "wrap"},
 		"left": {"anchor": "grip_low", "pose": "wrap"},
 		"rest": {"at": Vector3(0.135, -0.300, -0.245), "turn": Vector3(0.56, 0.20, 0.24)},
-		"reach": 1.0, "damage_type": "cut",
+		"reach": 1.0, "damage_type": "cut", "control": 1.15,
 	},
 	"half_sword": {
 		"right": {"anchor": "grip", "pose": "wrap"},
@@ -71,7 +79,7 @@ const GRIPS := {
 		# in period you would be wearing a glove to do it.
 		"left": {"anchor": "blade_grip", "pose": "pinch"},
 		"rest": {"at": Vector3(0.055, -0.215, -0.290), "turn": Vector3(0.16, 0.10, 0.08)},
-		"reach": 0.62, "damage_type": "puncture",
+		"reach": 0.62, "damage_type": "puncture", "control": 1.35,
 	},
 	"murder_stroke": {
 		# Held by the blade, swung as a hammer. The pommel is the head. It is
@@ -80,19 +88,19 @@ const GRIPS := {
 		"right": {"anchor": "blade_grip", "pose": "wrap"},
 		"left": {"anchor": "blade_high", "pose": "wrap"},
 		"rest": {"at": Vector3(0.150, -0.195, -0.250), "turn": Vector3(1.05, 0.26, 0.42)},
-		"reach": 0.72, "damage_type": "blunt",
+		"reach": 0.72, "damage_type": "blunt", "control": 0.75,
 	},
 	"pistol": {
 		"right": {"anchor": "grip", "pose": "trigger"},
 		"left": {"anchor": "grip_support", "pose": "cup"},
 		"rest": {"at": Vector3(0.090, -0.185, -0.245), "turn": Vector3(0.04, 0.20, 0.04)},
-		"reach": 1.0, "damage_type": "ballistic",
+		"reach": 1.0, "damage_type": "ballistic", "control": 1.0,
 	},
 	"long_gun": {
 		"right": {"anchor": "grip", "pose": "trigger"},
 		"left": {"anchor": "forend", "pose": "wrap"},
 		"rest": {"at": Vector3(0.105, -0.200, -0.215), "turn": Vector3(0.05, 0.26, 0.05)},
-		"reach": 1.0, "damage_type": "ballistic",
+		"reach": 1.0, "damage_type": "ballistic", "control": 1.0,
 	},
 }
 
