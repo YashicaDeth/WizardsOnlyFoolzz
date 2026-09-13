@@ -3552,21 +3552,21 @@ able to answer a rocket with a blade, and the game should let it.
 
 ### AD v10 — the final pass
 The last rung. Fifteen statements that are true of movement and first person when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
-- [ ] **AD10.1** `v10` Jumping is worth doing and the landing reads
-- [ ] **AD10.2** `v10` Waist-high things stop being walls
-- [ ] **AD10.3** `v10` Wall running is earned the way third person is
-- [ ] **AD10.4** `v10` Climbing a building is a route, not a cutscene
-- [ ] **AD10.5** `v10` Momentum carries between moves as one motion
-- [ ] **AD10.6** `v10` A broken leg cannot vault
-- [ ] **AD10.7** `v10` Crouching, sprinting and sliding are one continuous system
-- [ ] **AD10.8** `v10` The HUD is the hands, the weapon, the handheld and the glass
-- [ ] **AD10.9** `v10` Nothing floats in a corner that could sit on an object
-- [ ] **AD10.10** `v10` Affordances say what you can do right now
-- [ ] **AD10.11** `v10` It survives the change to third person without dissolving
-- [ ] **AD10.12** `v10` It is readable while moving, which is when it is needed
-- [ ] **AD10.13** `v10` Cybernetics change what movement is possible
-- [ ] **AD10.14** `v10` A projectile is a physical thing that can be met
-- [ ] **AD10.15** `v10` A melee build can close on a launcher and live
+- [x] **AD10.1** `v10` Jumping is worth doing and the landing reads — See AD1.1: a real upward impulse, `landing_time` firing for real, `jump_test.gd` (13/13). Re-verified clean this pass.
+- [x] **AD10.2** `v10` Waist-high things stop being walls — See AD1.2: `_vault_target()`'s real three-raycast read of actual collision geometry, `vault_test.gd` (13/13). Re-verified clean this pass.
+- [x] **AD10.3** `v10` Wall running is earned the way third person is — See AD1.3: `wall_run_unlocked()` mirrors `third_person_unlocked()`'s own shape, read live off `WorldHistory`, `wall_run_test.gd` (16/16). Re-verified clean this pass.
+- [x] **AD10.4** `v10` Climbing a building is a route, not a cutscene — See AD1.4: re-found every frame rather than scripted, hands off into a real mantle, `climb_test.gd` (13/13). Re-verified clean this pass.
+- [x] **AD10.5** `v10` Momentum carries between moves as one motion — See AD1.5: a vault captures and restores real horizontal velocity rather than zeroing it, `momentum_carry_test.gd` (9/9). Re-verified clean this pass.
+- [x] **AD10.6** `v10` A broken leg cannot vault — See AD1.6: `mobility_ratio()` below `PLAYER_INJURY_FLOOR` refuses vault and wall run outright, `anatomy_traversal_test.gd` (11/11). Re-verified clean this pass.
+- [ ] **AD10.7** `v10` Crouching, sprinting and sliding are one continuous system — Not built. No AD1 line ever covered crouching or sliding; sprinting exists (`B6.5`'s speed scale) but there is no crouch or slide verb to be continuous with it.
+- [ ] **AD10.8** `v10` The HUD is the hands, the weapon, the handheld and the glass — **Not fully true.** AD2.1 is three of four: the hands/weapon (M4) and the handheld (Section C) are real, but the windscreen names M2, which does not exist yet.
+- [x] **AD10.9** `v10` Nothing floats in a corner that could sit on an object — See AD2.2: the vitals gauge hangs off the weapon well by a visible cable rather than sitting alone; confirmed again by eye against `captures/ad2_4_field_hud_first_person.png` and `_third_person.png` while verifying AD10.11 below.
+- [ ] **AD10.10** `v10` Affordances say what you can do right now — **Not fully true**, per AD2.3's own note: the bottom strip shows current verbs but does not announce a *new* one the moment it becomes available. `gothic_field_hud.gd` is Lane 5's file.
+- [x] **AD10.11** `v10` It survives the change to third person without dissolving — See AD2.4. Opened and looked at both again rather than taking the old note on faith: `captures/ad2_4_field_hud_first_person.png` and `_third_person.png` show the identical location crest, hunt thread, vitals-and-weapon gauge and bottom strip over two genuinely different camera positions.
+- [x] **AD10.12** `v10` It is readable while moving, which is when it is needed — See AD2.5: `$HUD` is a `CanvasLayer` with no relationship to the 3D camera's transform, so nothing that shakes or turns the camera touches its position or legibility.
+- [ ] **AD10.13** `v10` Cybernetics change what movement is possible — Not built. See AD3.2, still open.
+- [ ] **AD10.14** `v10` A projectile is a physical thing that can be met — Not built. See AD3.3, still open; AF1.1's round travels but nothing lets a body meet or intercept one.
+- [ ] **AD10.15** `v10` A melee build can close on a launcher and live — Not built. See AD3.1, still open.
 
 ## AE — Sneaking, assassination and the law
 
