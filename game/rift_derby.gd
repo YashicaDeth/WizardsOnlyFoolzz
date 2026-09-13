@@ -39,6 +39,7 @@ const SILHOUETTE := preload("res://systems/silhouette.gd")
 const INTERIOR := preload("res://systems/vehicle_interior.gd")
 const KEYS_CARD := preload("res://systems/keys_card.gd")
 const DAMAGE_PORTRAIT := preload("res://systems/damage_portrait.gd")
+const CAB_RETICLE := preload("res://systems/cab_reticle.gd")
 
 ## The bezel `celloutz_hud.gd` draws for the driver, in its own coordinates, so
 ## the bust lands inside the frame instead of beside it. Kept next to the
@@ -107,6 +108,7 @@ var pit_radio: Control
 var world_index: Control
 @onready var dynamic_interface: Control = $HUD/DynamicInterface
 var driver_bust: SubViewportContainer
+var reticle: Control
 
 
 func _ready() -> void:
@@ -147,6 +149,11 @@ func _ready() -> void:
 	driver_bust.custom_minimum_size = Vector2.ZERO
 	driver_bust.position = DRIVER_BUST_FRAME.position
 	driver_bust.size = DRIVER_BUST_FRAME.size
+	# The gunsight. Added before the keys card so the card's own panel draws over
+	# it rather than under.
+	reticle = CAB_RETICLE.new()
+	reticle.name = "CabReticle"
+	$HUD.add_child(reticle)
 	# AG3.5. "Nothing in the derby says what any key does." The status line names
 	# three of them and the other six were folded into a sentence nobody reads
 	# while a wrecker is coming at them.
@@ -891,6 +898,14 @@ func _update_hud() -> void:
 	# rather than an ornament.
 	if driver_bust != null and is_instance_valid(driver_bust):
 		driver_bust.call("set_damage", clampf(1.0 - float(integrity) / 100.0, 0.0, 1.0))
+	# The sight is up only when the gun would actually answer: in the cab, round
+	# live, nothing else on screen. Anywhere else it would be a promise the game
+	# does not keep, which is the complaint it exists to fix.
+	if reticle != null and is_instance_valid(reticle):
+		reticle.call("report",
+			in_cab and round_state == "active" and not index_open and not leaving_on_foot,
+			rounds_left <= 0,
+			clampf(fire_cooldown / 0.16, 0.0, 1.0))
 	status.text = "BONE YARD DERBY  //  %s\nWASD DRIVE  ·  I WORLD INDEX  ·  E LEAVE VEHICLE" % round_state.to_upper()
 	score_label.text = "IMPACT SCORE  %05d\nHULL INTEGRITY  %03d%%\nACTIVE WRECKERS  %02d\nWORLD MEMORY  %03d" % [score, integrity, targets.size(), WorldHistory.event_count()]
 	# Only speaks when it has something to say. Left visible during play it sat
