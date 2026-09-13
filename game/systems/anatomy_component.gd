@@ -52,6 +52,27 @@ const DEFAULT_ZONES := {
 	"right_leg": {"health": 75.0, "bleed": 0.62, "critical": false},
 }
 
+## N5.1. A real slot per site rather than one slot per coarse damage zone.
+## `installed_parts` used to be keyed by these same six zones directly, so a
+## torso implant covered "torso" and nothing distinguished a spine cage from
+## a chest plate from an organ-bay graft — Greg's own list ("spine, skull,
+## chest, each arm, each leg, the organ bays") names four distinct sites
+## where the zone model only ever had "head" and "torso". Each site still
+## resolves to one of the six real damage zones below for armor/hit
+## purposes — the wound model itself is not what this changes, and every
+## existing caller that installs at a bare zone name ("head", "torso", a
+## limb) keeps working exactly as before, since a zone is also a valid site
+## of its own. What changes is that a caller can now also ask for "skull",
+## "spine", "chest" or "organ_bays" specifically, and have it tracked,
+## damaged and pulled as its own real slot rather than collapsing into
+## whichever single implant happened to occupy "torso".
+const INSTALL_SITES := {
+	"head": "head", "skull": "head",
+	"torso": "torso", "spine": "torso", "chest": "torso", "organ_bays": "torso",
+	"left_arm": "left_arm", "right_arm": "right_arm",
+	"left_leg": "left_leg", "right_leg": "right_leg",
+}
+
 ## B7.1. What this body has on. Names from `Garments.CATALOGUE`; an empty list
 ## is somebody standing in the Ashbloom in their skin, which the weather and the
 ## radiation path both treat exactly as badly as that sounds.
@@ -111,9 +132,14 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 		return {"accepted": false, "reason": "dead"}
 	var resolved_zone := zone_id if zones.has(zone_id) else "torso"
 	var zone: Dictionary = zones[resolved_zone]
-	var installed: Dictionary = installed_parts.get(resolved_zone, {})
-	var hardware_ratio := implant_condition(resolved_zone)
-	var armor := float(installed.get("armor", 0.0)) * hardware_ratio
+	# N5.1. A zone can now hold hardware at more than one site (a spine cage
+	# and a chest plate both answer to "torso"), so a hit's armor is the sum
+	# of every site installed there, each scaled by its own condition —
+	# never a single implant standing in for the whole zone.
+	var armor := 0.0
+	for site_id in _sites_for_zone(resolved_zone):
+		var part: Dictionary = installed_parts[site_id]
+		armor += float(part.get("armor", 0.0)) * implant_condition(site_id)
 	# B7.1 / B7.2. What is over this zone: what it is wearing, plus what it is
 	# behind. Melting damage is stopped by shielding and ordinary damage by
 	# plate, which is the difference between a lead wrap and a scrap plate and
@@ -169,8 +195,8 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 			zone["fracture"] = fracture
 			zones[resolved_zone] = zone
 		wound["fracture"] = fracture
-	if not installed.is_empty():
-		wound["implant_condition"] = damage_implant(resolved_zone, applied * (0.30 if penetrating else 0.16))
+	if not _sites_for_zone(resolved_zone).is_empty():
+		wound["implant_condition"] = damage_implants_at_zone(resolved_zone, applied * (0.30 if penetrating else 0.16))
 	wounds.append(wound)
 	if wounds.size() > 24:
 		wounds.pop_front()
@@ -312,10 +338,47 @@ func install_factory_loadout(exclude: Array[String] = []) -> void:
 		install_part(zone_id, {"id": str(FACTORY_LOADOUT[zone_id]), "locked": true})
 
 
-func install_part(zone_id: String, part_data: Dictionary) -> Dictionary:
+## N5.1. Keyed by the site the caller actually asked for, not by whichever
+## zone the catalog entry happens to carry — `ImplantCatalog`'s own entries
+## still decide the *damage zone* an implant answers to (through `resolve()`'s
+## `zone` field, read via `INSTALL_SITES` below), but "torso" and "spine" can
+## now both be occupied at once without one silently overwriting the other,
+## which was impossible while both collapsed onto the single key "torso".
+func install_part(site_id: String, part_data: Dictionary) -> Dictionary:
+	var zone_id := str(INSTALL_SITES.get(site_id, site_id))
 	var part := ImplantCatalog.resolve(part_data, zone_id)
-	installed_parts[str(part.zone)] = part
+	installed_parts[site_id] = part
 	return part.duplicate(true)
+
+
+## N5.1. Every occupied site that answers to a given damage zone — "torso"
+## alone once meant one implant; it can now mean a spine cage, a chest plate
+## and an organ-bay graft all at once, each tracked and damaged separately.
+func _sites_for_zone(zone_id: String) -> Array[String]:
+	var out: Array[String] = []
+	for site_id in installed_parts:
+		if str(INSTALL_SITES.get(site_id, site_id)) == zone_id:
+			out.append(site_id)
+	return out
+
+
+## The combined readout for a zone with more than one site occupied — the
+## average of what is actually installed there, rather than only ever seeing
+## whichever single implant used to own the whole zone.
+func implant_condition_at_zone(zone_id: String) -> float:
+	var sites := _sites_for_zone(zone_id)
+	if sites.is_empty():
+		return 0.0
+	var total := 0.0
+	for site_id in sites:
+		total += implant_condition(site_id)
+	return total / float(sites.size())
+
+
+func damage_implants_at_zone(zone_id: String, amount: float) -> float:
+	for site_id in _sites_for_zone(zone_id):
+		damage_implant(site_id, amount)
+	return implant_condition_at_zone(zone_id)
 
 
 ## N5.4. In CellOutz's own voice, not the game's — the warning belongs to the

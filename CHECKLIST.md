@@ -1897,11 +1897,38 @@ inventory, and the sheet you filled in D8 already calls each opt-in modifier "a
 handle on you". Pulling one is the first genuinely disloyal act available to a
 player, and it should be possible from hour one and quietly discouraged.
 
-- [ ] **N5.1** A real slot per site — spine, skull, chest, each arm, each leg, the
-      organ bays — `installed_parts` is still keyed by `BaselineHuman`'s six
-      anatomy zones, so torso covers spine, chest and the organ bays as one
-      slot rather than several. Splitting that out is a real data-model
-      change on its own, not attempted here.
+- [x] ~~**N5.1** A real slot per site — spine, skull, chest, each arm, each leg, the organ bays~~
+      `INSTALL_SITES` (`anatomy_component.gd`) maps eight real sites onto the
+      six damage zones a body already has — "torso" alone used to be the one
+      slot spine, chest and the organ bays all collapsed onto, so installing
+      a chest plate after a spine cage silently erased the spine cage.
+      `install_part()` now keys `installed_parts` by the site the caller
+      actually asked for rather than by whichever zone the catalog entry
+      happens to carry, so all three can be occupied at once, each pulled,
+      damaged and read independently. `apply_hit()` and the wound's own
+      implant-wear line now sum every site answering to the zone that was
+      actually hit, instead of reading a single implant standing in for the
+      whole zone. Every existing caller that installs at a bare zone name
+      ("head", "torso", a limb) is unaffected — a zone is also a valid site
+      of its own, which is also why `FACTORY_LOADOUT`'s three existing slots
+      were left exactly where they were rather than moved to the new names.
+      Verified: `tests/install_sites_test.gd` (11 checks, new) — a spine
+      cage, a chest plate and an organ-bay graft all installed at once
+      without erasing each other; a torso hit measurably absorbed more with
+      two sites armoured than with none; both sites independently wear from
+      that same hit; pulling one leaves the other untouched; "skull" and
+      plain "head" hold separate hardware. Thirteen existing tests
+      (`implant_lock_test`, `body_inspector_test`, `crystal_ball_test`,
+      `armor_resolution_test`, `melee_resistance_test`,
+      `weapon_condition_test`, `extraction_test`, `factory_loadout_wired_test`,
+      `baseline_human_test`, `combat_integration_test`, `pocket_search_test`,
+      `chunk_test`, `radiation_path_test`) re-verified clean against the
+      change.
+      Still open: `FACTORY_LOADOUT` itself still only fills three of the
+      eight real sites now available (skull/spine/chest/organ_bays plus
+      four limbs) — moving its three factory items to more specific sites,
+      or adding real content for the rest, is a fiction/content decision
+      this pass deliberately left alone rather than bundling in.
 - [x] **N5.2** Factory hardware fills them at decanting and is *locked*, not
       absent — `install_factory_loadout()`, three real zones (head, torso,
       left arm), each with a real reason CellOutz put it there.
