@@ -2551,8 +2551,27 @@ Nothing in this project has ever been profiled. It is a solo build with one
 region, so it has not needed to be — which is exactly when the debt is cheap to
 pay.
 
-- [ ] **X1.1** Profile it, and write down the real numbers
-- [ ] **X1.2** A frame budget, stated, that the region is held to
+- [x] ~~**X1.1** Profile it, and write down the real numbers~~ `Performance`
+      singleton, sampled over 180 frames at a settled idle in each scene, a
+      real windowed run (headless renders nothing, so draw calls/primitives
+      would read zero). Hunt Grounds spawn: 3395 draw calls, 405.8k
+      primitives, 5655 nodes, 249.8MB static / 327.8MB video memory. Derby
+      pit: 2983 draw calls, 532.0k primitives, 2802 nodes, 215.0MB static /
+      339.5MB video memory — fewer nodes than the Hunt Grounds region but
+      more primitives per car than a region full of low-poly buildings.
+      Flagging rather than trusting one number: both scenes also reported
+      `TIME_FPS` pinned at 60 alongside a `TIME_PROCESS` of 37-39ms, which is
+      internally inconsistent (37ms of process time cannot deliver 60 real
+      frames a second) — the run was an automated, unfocused window with
+      nothing driving input, and Godot's low-processor-usage-mode sleeping
+      between idle frames is the likely explanation, not a real 37ms
+      workload. The draw-call/primitive/memory numbers came from the
+      renderer's own counters and are trusted; the frame-timing pair is not,
+      and needs a focused, interactive re-run before anything is budgeted
+      against it — left for X1.2 rather than guessed at here.
+- [ ] **X1.2** A frame budget, stated, that the region is held to — blocked on
+      X1.1's frame-timing numbers actually being trustworthy; the draw call
+      and primitive counts alone are not enough to set a budget against.
 - [ ] **X1.3** The 238MB plugin referenced by no script (pairs with J1.3)
 - [ ] **X1.4** Bodies are the expensive thing — measure before optimising them
 - [ ] **X1.5** It has to hold up on a machine that is not Greg's
