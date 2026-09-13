@@ -536,7 +536,7 @@ work created or exposed, not a wish.
 
 ### C v4 — the fourth pass
 v3 made the handheld a rich object that emits no light at all. Greg: *"having light coming off the phone when you have it in your hand"*.
-- [ ] **C4.1** `v4` It throws real light into the world when it is in your hand
+- [x] ~~**C4.1** `v4` It throws real light into the world when it is in your hand~~ The implementation already existed under AS1.1 but this duplicate remained open: the Hunt Grounds mounts a real shadow-casting `SpotLight3D` off-centre on the camera, with its visible state and energy driven every frame by the handheld's raised state and battery. The device and world light share `LAMP_RANGE`, so its rendered reach and later visibility input cannot silently diverge. `tests/handheld_world_light_test.gd` verifies the complete seam in the running Hunt scene (8 checks), and paired 01:00 captures (`captures/c4_1_handheld_light_off.png` / `c4_1_handheld_light_on.png`) confirm the beam changes the surfaces ahead rather than merely brightening the 2D panel. C4.2 remains honestly open: there is no rendered first-person hand surface for the screen to illuminate, and the existing source is explicitly camera-mounted
 - [ ] **C4.2** `v4` Its own screen is what lights your hands, not a lamp bolted to it
 
 ### C v5 — the fifth pass
