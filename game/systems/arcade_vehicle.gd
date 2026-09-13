@@ -53,6 +53,18 @@ func has_fuel() -> bool:
 func refuel(amount: float = 1.0) -> void:
 	fuel = clampf(fuel + amount, 0.0, 1.0)
 
+## V1.4. Cars can be repaired, badly. A repair puts hull back on the gauge,
+## but a weld is not a replacement panel: the ceiling itself drops a little
+## every time, so a car patched back together three times reads as a worse
+## car than one that never needed it — even parked at a full-looking gauge —
+## rather than a repair being a way to launder damage away for free.
+const REPAIR_CEILING_LOSS := 0.05
+
+func repair(amount: int) -> int:
+	max_integrity = maxi(1, roundi(float(max_integrity) * (1.0 - REPAIR_CEILING_LOSS)))
+	integrity = clampi(integrity + maxi(0, amount), 0, max_integrity)
+	return integrity
+
 const DRIVE_SPEED := 24.0
 const REVERSE_SPEED := 10.0
 const IMPACT_SPEED := 4.0
