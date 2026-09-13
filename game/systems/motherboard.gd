@@ -36,6 +36,35 @@ const COPPER := Color("caa14a")
 ## difference matters here beyond accuracy, because the seal arrives in copper
 ## and leaves in gold, and that is how you read that it went *in*.
 const GOLD := Color("d9b43c")
+## E2.11 `v4`. The third state. Copper does not stay copper: it oxidises to a
+## brown scale first and a green patina after, and a board pulled out of the
+## Ashbloom has been doing that for years. Rust is not a colour swap here, it
+## is a dial, because the same board has to read as new on a bench and as
+## scrap in a pile.
+const RUST := Color("7a4326")
+const VERDIGRIS := Color("2f6a4f")
+## Silicon. Not black — a die is grey-violet and mirror-flat until the
+## metal layers catch the light.
+const DIE := Color("2b2733")
+
+## E2.12 `v4`. The dials TouchDesigner drives.
+##
+## FINAL_V §16 is unambiguous: TD cannot run inside a shipped game, so TD is
+## the lab and Godot is the engine. What makes a thing "TouchDesigner based"
+## in this project is therefore not that TD renders it — it is that every
+## number worth tuning is reachable from a slider while you watch. This is the
+## same `set_dial(name, value)` contract `psychedelic_rig.gd` exposes, which is
+## the contract `OSCBridge.drive()` calls, so `bridge.drive(board)` is the
+## whole of the wiring.
+const DIALS := {
+	"corrosion": 0.0,
+	"patina": 0.0,
+	"copper_gloss": 0.6,
+	"gold_gloss": 0.9,
+	"trace_glow": 0.0,
+	"die_glow": 0.35,
+	"chip_charge": -1.0,
+}
 const SOLDER_MASK := Color("0b3d24")
 const SILKSCREEN := Color("d8dcd4")
 const CHAR := Color("120e0c")
@@ -73,6 +102,12 @@ var _strokes: Array = []
 var _chip_at := Vector3.ZERO
 var _chip_pins: Array[MeshInstance3D] = []
 var _chip_body: MeshInstance3D = null
+
+## Kept by role so a dial can repaint them without rebuilding the board.
+var _copper_materials: Array[StandardMaterial3D] = []
+var _gold_materials: Array[StandardMaterial3D] = []
+var _die_materials: Array[StandardMaterial3D] = []
+var _dials: Dictionary = DIALS.duplicate()
 
 ## How many of the seventy-two are in the chip. Not a list: an infused seal
 ## leaves no scar on the board, which is the whole difference between
@@ -224,6 +259,10 @@ func _build_board() -> void:
 		cap.material_override = cap_material
 		_static.add_child(cap)
 
+	_build_cpu(Vector3(-BASE_SIZE.x * 0.23, 0.0, -BASE_SIZE.y * 0.26))
+	_collect_materials()
+	_apply_dials()
+
 
 # --- E2.4: the seal, burnt or bound onto this board ------------------------
 
@@ -269,6 +308,146 @@ func begin_burn(seed_value: int, complexity: int = 6, anim_duration: float = 2.4
 	_elapsed = 0.0
 	_strokes = CellOutzType.seal_strokes(seed_value, complexity)
 	set_process(true)
+
+
+# --- E2.11/E2.12: the CPU, and the dials TouchDesigner reaches ------------
+
+## The part the seals are going into, built at the scale the description asks
+## for. Delidded on purpose: an integrated heat spreader is a metal lid and
+## hides everything worth seeing, and "microscopic" was the whole note. So this
+## is substrate, die, bond wires and a land grid — the four things that are
+## actually in there, at the sizes they are actually at relative to each other.
+func _build_cpu(at: Vector3) -> void:
+	var substrate := Vector2(0.050, 0.050)
+	_box(_static, Vector3(substrate.x, 0.0025, substrate.y), at + Vector3(0, _top_y + 0.00125, 0), Color("1c4f37"), 0.0)
+
+	# The land grid underneath, which is what a modern socket actually touches.
+	var lands := 11
+	for row in lands:
+		for column in lands:
+			if (row + column) % 2 == 1:
+				continue
+			var lx := lerpf(-substrate.x * 0.42, substrate.x * 0.42, float(row) / float(lands - 1))
+			var lz := lerpf(-substrate.y * 0.42, substrate.y * 0.42, float(column) / float(lands - 1))
+			_box(_static, Vector3(0.0016, 0.0003, 0.0016), at + Vector3(lx, _top_y + 0.0026, lz), GOLD, 0.9)
+
+	# The die. Silicon, not black, and a good deal smaller than the package —
+	# which is the fact that makes a CPU look like a CPU.
+	var die := Vector2(0.021, 0.021)
+	var die_y := _top_y + 0.0034
+	_box(_static, Vector3(die.x, 0.0008, die.y), at + Vector3(0, die_y, 0), DIE, 0.25)
+
+	# Metal layers, as a dense orthogonal field. Real interconnect is Manhattan
+	# routing on a dozen stacked layers; two crossed sets at this scale reads as
+	# that from any angle a camera will ever see it from.
+	var lines := 19
+	for line in lines:
+		var along := lerpf(-die.x * 0.44, die.x * 0.44, float(line) / float(lines - 1))
+		var length := die.y * (0.55 + 0.35 * absf(sin(float(line) * 1.7)))
+		_box(_static, Vector3(0.00022, 0.0002, length), at + Vector3(along, die_y + 0.0005, 0), GOLD, 0.85)
+		var cross := die.x * (0.5 + 0.4 * absf(cos(float(line) * 2.3)))
+		_box(_static, Vector3(cross, 0.0002, 0.00022), at + Vector3(0, die_y + 0.0007, along), GOLD, 0.85)
+
+	# Four functional blocks, so the die is not a uniform mesh — a real one is
+	# obviously partitioned even in a photograph.
+	for block_x in [-1.0, 1.0]:
+		for block_z in [-1.0, 1.0]:
+			_box(_static, Vector3(die.x * 0.30, 0.0003, die.y * 0.30),
+				at + Vector3(block_x * die.x * 0.24, die_y + 0.0009, block_z * die.y * 0.24), DIE.lightened(0.12), 0.4)
+
+	# Bond wires: gold, arcing off the die edge to pads on the substrate. The
+	# only curves on the whole board, which is why they read.
+	var wires := ImmediateMesh.new()
+	var wire_material := StandardMaterial3D.new()
+	wire_material.albedo_color = GOLD
+	wire_material.metallic = 0.9
+	wire_material.roughness = 0.25
+	wire_material.emission_enabled = true
+	wire_material.emission = GOLD
+	wire_material.emission_energy_multiplier = 0.25
+	var per_side := 9
+	for side: float in [-1.0, 1.0]:
+		for wire in per_side:
+			var t := float(wire) / float(per_side - 1)
+			var z := lerpf(-die.y * 0.42, die.y * 0.42, t)
+			var from := at + Vector3(side * die.x * 0.5, die_y + 0.0009, z)
+			var to := at + Vector3(side * substrate.x * 0.42, _top_y + 0.0028, z * 1.35)
+			_box(_static, Vector3(0.0018, 0.0003, 0.0012), to, GOLD, 0.9)
+			wires.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, wire_material)
+			var steps := 7
+			for step in steps + 1:
+				var along := float(step) / float(steps)
+				var point := from.lerp(to, along)
+				point.y += sin(along * PI) * 0.0022
+				wires.surface_add_vertex(point)
+			wires.surface_end()
+	var wire_node := MeshInstance3D.new()
+	wire_node.mesh = wires
+	_static.add_child(wire_node)
+	_gold_materials.append(wire_material)
+
+
+## Roles are read back off the palette once the board is built rather than
+## threaded through every constructor. This board is made from a fixed set of
+## colours and here the colour *is* the role, so this is a lookup and not a
+## guess — and anything added later joins the right dial without anybody having
+## to remember to register it.
+func _collect_materials() -> void:
+	for child in _static.find_children("*", "MeshInstance3D", true, false):
+		var material := (child as MeshInstance3D).material_override as StandardMaterial3D
+		if material == null:
+			continue
+		if material.albedo_color.is_equal_approx(COPPER):
+			_copper_materials.append(material)
+		elif material.albedo_color.is_equal_approx(GOLD):
+			_gold_materials.append(material)
+		elif material.albedo_color.is_equal_approx(DIE):
+			_die_materials.append(material)
+
+
+## The `OSCBridge.drive()` contract, identical to `psychedelic_rig.gd`'s, so
+## `bridge.drive(board)` is the entire wiring and TouchDesigner moves a slider
+## while you watch the board change.
+func set_dial(dial_name: String, value: float) -> void:
+	if not _dials.has(dial_name):
+		return
+	_dials[dial_name] = value
+	_apply_dials()
+
+
+func dial(dial_name: String) -> float:
+	return float(_dials.get(dial_name, 0.0))
+
+
+func reset_dials() -> void:
+	_dials = DIALS.duplicate()
+	_apply_dials()
+
+
+func _apply_dials() -> void:
+	var corrosion := clampf(dial("corrosion"), 0.0, 1.0)
+	var patina := clampf(dial("patina"), 0.0, 1.0)
+	var aged := COPPER.lerp(RUST, corrosion).lerp(VERDIGRIS, patina)
+	for material in _copper_materials:
+		material.albedo_color = aged
+		# Oxide is not metal. Copper stops being shiny well before it stops being
+		# copper-coloured, so gloss has to fall faster than hue moves.
+		material.metallic = clampf(dial("copper_gloss") * (1.0 - corrosion * 0.85), 0.0, 1.0)
+		material.roughness = lerpf(0.35, 0.93, maxf(corrosion, patina))
+		material.emission_enabled = dial("trace_glow") > 0.0
+		material.emission = aged
+		material.emission_energy_multiplier = maxf(0.0, dial("trace_glow"))
+	for material in _gold_materials:
+		# Gold does not corrode. That is why it is on the contacts in the first
+		# place, and it is why a rusted board still has bright fingers.
+		material.metallic = clampf(dial("gold_gloss"), 0.0, 1.0)
+	for material in _die_materials:
+		material.emission_enabled = true
+		material.emission = GOLD
+		material.emission_energy_multiplier = maxf(0.0, dial("die_glow"))
+	var charge := dial("chip_charge")
+	if charge >= 0.0:
+		_light_pins(charge)
 
 
 # --- E2.5: the procession, and what "infused" means ------------------------
