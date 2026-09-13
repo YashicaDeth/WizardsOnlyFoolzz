@@ -2093,8 +2093,20 @@ Opened because O2.5 closed at v2. A fault the v2 work itself created.
 
 ### O v4 — the fourth pass
 Three passes tuned a swing the player does not perform. AN: LMB plays an animation and the player's whole contribution is the timing of one keypress.
-- [ ] **O4.1** `v4` `limb_momentum.gd` drives the weapon: it lags, overshoots and swings through
-- [ ] **O4.2** `v4` The weapon is drawn where the physics put it, not where an animation says
+- [x] ~~**O4.1** `v4` `limb_momentum.gd` drives the weapon: it lags, overshoots
+      and swings through~~ Built under AN1.1-AN1.3 rather than under this
+      number, and left unticked here — `_advance_arm()` runs the spring-damper
+      every frame, thrown by the same mouse delta the camera turns by plus the
+      player's own velocity, and it lags, overshoots and swings through
+      exactly as described. `limb_momentum_test.gd` (10 checks) and
+      `tests/firearm_momentum_test.gd` (AN1.7, 7 checks) verify it, the
+      second across all three weapons rather than only the sword.
+- [x] ~~**O4.2** `v4` The weapon is drawn where the physics put it, not where
+      an animation says~~ AN1.3: `_pose_weapon()` reads `arm.at - arm.anchor`
+      and offsets the model from its own authored rest pose every frame; the
+      hand still animates underneath, but the weapon itself hangs off the
+      physics, not the animation. `tests/firearm_momentum_test.gd` confirms
+      this reaches every weapon's own model, not just the sword's.
 
 ### O v5 — the fifth pass
 v4 made the weapon physical and damage still reads a constant off it.
