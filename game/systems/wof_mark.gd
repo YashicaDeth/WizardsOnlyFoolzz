@@ -63,41 +63,67 @@ static func _rough(canvas: CanvasItem, from: Vector2, to: Vector2, colour: Color
 
 
 ## One hand, as the rune it already is. `facing` is 1 for palm up (life) and -1
-## for the same hand inverted (death). Everything is measured off `reach`, so the
-## two halves are the one drawing twice rather than two drawings.
+## for the same hand inverted (death).
+##
+## Rebuilt, because the first version was not a hand. It drew two arms leaving a
+## stem at forty-five degrees with little split tips on the ends, which reads as
+## a tree — fingers do not splay like that and there was no palm at all. What the
+## photographs actually show is four fingers held close to vertical with a wide
+## gap opened between the middle and the ring, a thumb thrown well out to one
+## side, and the wrist running down out of frame.
+##
+## Drawn that way, nobody has to be told it is algiz. The two finger pairs *are*
+## the rune's arms and the wrist *is* its stem, and the glyph falls out of an
+## honest hand rather than being a rune with hand-shaped decoration on it.
 static func draw_hand_rune(canvas: CanvasItem, root: Vector2, reach: float, facing: float, colour: Color, width: float, rng: RandomNumberGenerator) -> void:
-	var wobble := reach * 0.018
+	var wobble := reach * 0.016
 	var up := Vector2(0, -1) * facing
 
-	# The stem: wrist and forearm. It runs the full half-height, because it is
-	# also the axis the other half is mirrored across.
-	var stem_end := root + up * reach
-	_rough(canvas, root, stem_end, colour, width, rng, wobble)
+	# The wrist, running back out of the glyph. This is the stem of the rune and
+	# it is drawn first so the palm overlaps it rather than butting onto it.
+	_rough(canvas, root, root - up * reach * 0.34, colour, width * 1.05, rng, wobble)
 
-	# The fork. Two arms leaving the stem low and opening to the gap the sign
-	# actually makes — index and middle as one, ring and little as the other.
-	var arm_root := root + up * (reach * ARM_ROOT)
-	for side: float in [-1.0, 1.0]:
-		var angle := (PI * 0.5 - FORK_GAP * 1.45) * side
-		# Rotate the arm off vertical by hand rather than by matrix: the sign is
-		# not symmetrical in the photographs and it should not be here either.
-		var direction := Vector2(sin(angle * 0.62), -cos(angle * 0.62) * facing).normalized()
-		var tip := arm_root + direction * (reach * 0.92)
-		_rough(canvas, arm_root, tip, colour, width, rng, wobble)
+	# The palm. Short, and the only part of a hand that is not a line — without
+	# it the fingers read as sticks radiating from a point.
+	var palm_top := root + up * (reach * 0.26)
+	_rough(canvas, root, palm_top, colour, width * 1.5, rng, wobble * 0.5)
 
-		# Each arm is two fingers, so it splits again at its end — small, but it
-		# is what stops the glyph reading as a plain rune with no hand in it.
-		var spread := reach * 0.17
-		var perpendicular := Vector2(-direction.y, direction.x)
-		for finger: float in [-1.0, 1.0]:
-			var end := tip + direction * spread * 0.55 + perpendicular * spread * finger * 0.5
-			_rough(canvas, tip, end, colour, width * 0.72, rng, wobble * 0.6)
+	# Four fingers in two pairs. The gap between the middle and the ring is the
+	# sign — it is what makes this hand *this* hand — so it is the widest angle
+	# in the drawing and everything else is closer to vertical than instinct
+	# suggests. Angles are radians off the palm; lengths are fractions of reach.
+	# Evenly spaced, these read as a bunch of sticks. The sign is not four
+	# fingers, it is *two pairs* — index and middle held together, ring and
+	# little held together, and a gap between them wider than either pair is
+	# internally. Tight pairs and a wide centre is the whole read.
+	var fingers := [
+		[-0.74, 0.86],
+		[-0.52, 1.00],
+		[0.52, 0.97],
+		[0.74, 0.82],
+	]
+	for finger: Array in fingers:
+		var lean := float(finger[0]) * facing
+		var length := float(finger[1]) * reach * 0.74
+		# Rotate `up` by the lean, so a finger leaves the palm rather than the
+		# origin and the whole hand turns together when `facing` flips.
+		var direction := Vector2(
+			up.x * cos(lean) - up.y * sin(lean),
+			up.x * sin(lean) + up.y * cos(lean)
+		)
+		var tip := palm_top + direction * length
+		_rough(canvas, palm_top, tip, colour, width, rng, wobble)
 
-	# The thumb. Short, low, on one side only — the asymmetry is what makes it a
-	# hand rather than a rune somebody drew symmetrically.
-	var thumb_root := root + up * (reach * 0.22)
-	var thumb := thumb_root + Vector2(-0.86, -0.42 * facing).normalized() * (reach * 0.40)
-	_rough(canvas, thumb_root, thumb, colour, width * 0.8, rng, wobble)
+	# The thumb. Thrown out and down, far wider than any finger, and on one side
+	# only — the asymmetry is what stops this reading as a symmetrical rune
+	# somebody drew with a ruler.
+	var thumb_root := root + up * (reach * 0.12)
+	var thumb_lean := -1.48 * facing
+	var thumb_direction := Vector2(
+		up.x * cos(thumb_lean) - up.y * sin(thumb_lean),
+		up.x * sin(thumb_lean) + up.y * cos(thumb_lean)
+	)
+	_rough(canvas, thumb_root, thumb_root + thumb_direction * reach * 0.38, colour, width * 0.92, rng, wobble)
 
 
 ## The ring. Cut in segments with gaps, so it is a struck circle rather than a
