@@ -27,7 +27,16 @@ func _ready() -> void:
 	await tree.process_frame
 
 	# The same key `warning_card.gd:112` writes when the player picks a level.
-	WorldHistory.update_subject("settings", {"gore": "FULL", "violence_acknowledged": "yes"}, "gore_setting_chosen")
+	# `--panel=warning` shoots the consent card itself, which means arriving
+	# without the acknowledgement a previous capture may have left on record.
+	var want_warning := false
+	for argument in OS.get_cmdline_user_args():
+		if argument == "--panel=warning":
+			want_warning = true
+	if want_warning:
+		WorldHistory.update_subject("settings", {"violence_acknowledged": ""}, "gore_setting_cleared")
+	else:
+		WorldHistory.update_subject("settings", {"gore": "FULL", "violence_acknowledged": "yes"}, "gore_setting_chosen")
 	await tree.process_frame
 
 	var menu: Node = load("res://country_town_menu.tscn").instantiate()

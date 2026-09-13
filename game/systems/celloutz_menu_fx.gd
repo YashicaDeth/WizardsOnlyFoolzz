@@ -205,9 +205,13 @@ func _draw_archive_nodes() -> void:
 
 
 func _draw_footer() -> void:
-	var font := ThemeDB.fallback_font
 	var y := size.y - 32.0
-	draw_string(font, Vector2(48, y), "WORLD BUILD // EVERY ACTION LEAVES A WITNESS // EVEN SPIRITS SEEK REDEMPTION", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, CREAM * Color(1, 1, 1, 0.62))
+	# House type. This line sits under a menu now entirely set in CellOutzType,
+	# so the engine fallback font was the one thing on the front door still
+	# speaking in somebody else's voice.
+	CellOutzType.draw_condensed(self, Vector2(48, y - 9.0),
+		"WORLD BUILD // EVERY ACTION LEAVES A WITNESS // EVEN SPIRITS SEEK REDEMPTION",
+		9.0, CREAM * Color(1, 1, 1, 0.62), 1.2)
 	for index in 9:
 		var x := size.x - 210 + index * 18
 		var height := 4.0 + sin(elapsed * 2.5 + index * 0.7) * 3.0

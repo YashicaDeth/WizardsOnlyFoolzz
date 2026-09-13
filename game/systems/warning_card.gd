@@ -147,7 +147,6 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	if not visible:
 		return
-	var font := ThemeDB.fallback_font
 	draw_rect(Rect2(Vector2.ZERO, size), VOID * Color(1, 1, 1, 0.93))
 	draw_set_transform(_origin, 0.0, Vector2(_factor, _factor))
 
@@ -163,13 +162,26 @@ func _draw() -> void:
 	CellOutzType.draw_text(self, Vector2(60, 96), "CELLOUTZ CORPORATION / LIABILITY NOTICE 11-B", 11.0, BILE, 1.4)
 	draw_line(Vector2(60, 118), Vector2(DESIGN.x - 60, 118), ARTERIAL * Color(1, 1, 1, 0.4), 1.0)
 
+	# This is the first prose anybody reads in the game, and it was set in the
+	# engine's fallback UI font — next to a stencilled WARNING, on a card that is
+	# otherwise entirely house type. `draw_string` takes a baseline and
+	# `CellOutzType` takes a top-left, so the y is lifted by the cap to land each
+	# line exactly where it already sat.
+	var body_cap := 11.0
 	var line_y := 152.0
 	for line in BODY.split("\n"):
-		draw_string(font, Vector2(60, line_y), line, HORIZONTAL_ALIGNMENT_LEFT, DESIGN.x - 120, 15, INK * Color(1, 1, 1, 0.82))
+		CellOutzType.draw_condensed(self, Vector2(60, line_y - body_cap), line, body_cap,
+			INK * Color(1, 1, 1, 0.82), 1.0)
 		line_y += 22.0
 
 	CellOutzType.draw_text(self, Vector2(60, 334), "CHOOSE WHAT YOU ARE WILLING TO SEE", 13.0, ACID, 2.2)
-	draw_string(font, Vector2(DESIGN.x - 60, 344), "1-3   ↑↓   ENTER", HORIZONTAL_ALIGNMENT_RIGHT, 0, 11, INK * Color(1, 1, 1, 0.4))
+	# Arrow glyphs are not in the stencil alphabet — `CellOutzType.draw_text`
+	# skips anything it has no glyph for, so the pair would have come out as two
+	# gaps. Named instead, which is also what the keys card does.
+	var keys_hint := "1-3   UP/DOWN   ENTER"
+	var keys_width := CellOutzType.width_condensed(keys_hint, 9.0, 1.2)
+	CellOutzType.draw_condensed(self, Vector2(DESIGN.x - 60 - keys_width, 335), keys_hint, 9.0,
+		INK * Color(1, 1, 1, 0.4), 1.2)
 
 	for index in buttons.size():
 		var row := buttons[index]
@@ -188,7 +200,9 @@ func _draw() -> void:
 	# The consequence line sits in one fixed place under the rows. Drawing it
 	# beneath the highlighted row put it through the row below and off the card
 	# entirely on the last tier.
-	draw_string(font, Vector2(60, DESIGN.y - 56), str(TIERS[highlighted].note), HORIZONTAL_ALIGNMENT_LEFT, DESIGN.x - 120, 14, INK * Color(1, 1, 1, 0.78))
+	CellOutzType.draw_condensed(self, Vector2(60, DESIGN.y - 66), str(TIERS[highlighted].note), 10.0,
+		INK * Color(1, 1, 1, 0.78), 1.0)
 
-	draw_string(font, Vector2(60, DESIGN.y - 28), "THIS CHOICE CAN BE CHANGED LATER. THE BODIES CANNOT.", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, BILE * Color(1, 1, 1, 0.65))
+	CellOutzType.draw_condensed(self, Vector2(60, DESIGN.y - 36), "THIS CHOICE CAN BE CHANGED LATER. THE BODIES CANNOT.", 9.0,
+		BILE * Color(1, 1, 1, 0.65), 1.2)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
