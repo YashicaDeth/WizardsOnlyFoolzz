@@ -40,6 +40,7 @@ var descent := 0.0
 var heading := 0.0
 var centre := Vector3.ZERO
 var _air_settled := false
+var _framed_aspect := 0.0
 
 
 ## 576 square rather than 768. The map draws it into a rectangle roughly a
@@ -108,7 +109,7 @@ func _clear_the_air() -> void:
 ## Called by the map each frame it is open. `at` is where the player is standing,
 ## `look` is the direction they are facing, and `zoom` is 0..1 from the map's own
 ## control — so the map keeps owning the input and this owns the geometry.
-func observe(at: Vector3, look: float, zoom: float, delta: float) -> void:
+func observe(at: Vector3, look: float, zoom: float, delta: float, span := Vector2.ZERO) -> void:
 	clock += delta
 	centre = at
 	heading = look
@@ -123,6 +124,20 @@ func observe(at: Vector3, look: float, zoom: float, delta: float) -> void:
 		_air_settled = world_3d != null and world_3d.environment != null
 
 	var height := lerpf(TOP_HEIGHT, STREET_HEIGHT, ease(descent, 2.2))
+	# A map is only a map if the photograph is at the chart's scale. When the
+	# chart says how much ground it is claiming, the camera frames exactly that
+	# instead of an unrelated 252m square: `fov` is the vertical angle under
+	# Godot's default KEEP_HEIGHT, so the vertical span fixes the height and the
+	# viewport's own aspect carries the horizontal.
+	if span.x > 1.0 and span.y > 1.0:
+		_frame_chart(span)
+		var fitted := (span.y * 0.5) / tan(deg_to_rad(camera.fov) * 0.5)
+		if descent <= TILT_BEGINS:
+			height = fitted
+		else:
+			# Past the tilt this stops being a chart and becomes a place, so the
+			# descent to eye height takes back over from the fit.
+			height = lerpf(fitted, STREET_HEIGHT, ease(inverse_lerp(TILT_BEGINS, 1.0, descent), 2.2))
 	# A10.3. The tilt is the transition. Straight down until the camera is low
 	# enough for a roof to have a side, then it rolls forward to the horizon —
 	# which is what makes "somewhat 3D" arrive on its own rather than being a
@@ -138,6 +153,23 @@ func observe(at: Vector3, look: float, zoom: float, delta: float) -> void:
 	var back := facing * lerpf(0.0, 6.0, tilt)
 	camera.global_position = Vector3(at.x, 0.0, at.z) - back + Vector3.UP * height
 	camera.rotation = Vector3(deg_to_rad(pitch), heading, 0.0)
+
+
+## The photograph is drawn into the chart's rectangle, so a square render was
+## being stretched to fit it and every distance in the picture came out wrong
+## along one axis. Matched to the chart's aspect instead, at about the pixel
+## count the square one cost, and only when the aspect has actually moved —
+## resizing a render target is not a per-frame thing to do.
+const RENDER_PIXELS := 576.0 * 576.0
+
+
+func _frame_chart(span: Vector2) -> void:
+	var aspect := clampf(span.x / span.y, 0.25, 4.0)
+	if absf(aspect - _framed_aspect) < 0.01:
+		return
+	_framed_aspect = aspect
+	var render_height := sqrt(RENDER_PIXELS / aspect)
+	size = Vector2i(int(roundf(render_height * aspect)), int(roundf(render_height)))
 
 
 ## A10.8. One frame, on request. The map calls this while it is open and stops

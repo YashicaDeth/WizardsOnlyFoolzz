@@ -217,9 +217,9 @@ func _gui_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
-			zoom = clampf(zoom * 1.14, 0.35, 5.0)
+			zoom = clampf(zoom * 1.14, _zoom_floor(), 5.0)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
-			zoom = clampf(zoom / 1.14, 0.35, 5.0)
+			zoom = clampf(zoom / 1.14, _zoom_floor(), 5.0)
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			dragging = event.pressed
 			last_pointer = event.position
@@ -276,11 +276,41 @@ func _to_screen(world: Vector2) -> Vector2:
 	return origin + (world - anchor) * zoom
 
 
+## The zoom that still holds the whole region, with a margin.
+##
+## Greg: *"the map in the maingame is completly broken"*. Part of why was this:
+## the wheel clamped to 0.35, and the Ashbloom is 470x370m. On a 1280 window a
+## chart 1228px wide at 0.35 claims to be showing three and a half kilometres of
+## a world that has four hundred metres in it, so the region sat as a small
+## island in the middle of an enormous blank floor and the default 1.25 was
+## already twice too wide. There is no view worth having that is wider than the
+## world, so the floor is derived from the chart and the region rather than
+## being a number somebody picked.
+func _zoom_floor() -> float:
+	if _chart.size.x <= 1.0 or _chart.size.y <= 1.0:
+		return 0.35
+	# 1.12 so the region has an edge rather than touching the frame.
+	var region := AshbloomWorldGenerator.REGION_SIZE * 1.12
+	return minf(_chart.size.x / region.x, _chart.size.y / region.y)
+
+
 func _draw() -> void:
 	if not visible:
 		return
 	var margin := 26.0
-	_chart = Rect2(margin, margin + 34.0, size.x - margin * 2.0, size.y - margin * 2.0 - 74.0)
+	# Controls can receive one draw during a resize with a zero-sized viewport.
+	# The former code made a negative chart in that frame, then fed it into every
+	# intersection test in the unexplored-ground pass — an error storm that made
+	# the map look broken and dragged the whole game down. A map with no surface
+	# simply waits one frame for its real dimensions.
+	var chart_size := Vector2(size.x - margin * 2.0, size.y - margin * 2.0 - 74.0)
+	if chart_size.x <= 1.0 or chart_size.y <= 1.0:
+		return
+	_chart = Rect2(Vector2(margin, margin + 34.0), chart_size)
+	# The floor depends on the chart, which depends on the window, so it is
+	# applied here rather than only where the wheel is read — a map opened on a
+	# smaller window would otherwise keep a zoom that window cannot justify.
+	zoom = clampf(zoom, _zoom_floor(), 5.0)
 
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.035, 0.026, 0.019, 0.94))
 	draw_rect(_chart, PLATE)
@@ -292,7 +322,17 @@ func _draw() -> void:
 		# Zoom already ran 0.6-3.0 for the chart; reuse it rather than inventing
 		# a second control the player has to learn.
 		descent = clampf(inverse_lerp(0.8, 2.8, zoom), 0.0, 1.0)
-		satellite.call("observe", Vector3(player_at.x, 0.0, player_at.y), player_yaw, descent, get_process_delta_time())
+		# The other half of "the map is broken". The chart's marks are drawn at
+		# `zoom` pixels per metre about the chart's own centre; the photograph
+		# under them was framed by a camera height that knew nothing about that,
+		# so at the default zoom the chart claimed 982m across while the camera
+		# photographed 252m and that square was then stretched into a wide
+		# rectangle. Roads, districts and contacts were sitting over a picture of
+		# somewhere else, at a different scale, squashed. The camera is told what
+		# ground the chart is claiming, and frames exactly that.
+		var span := _chart.size / maxf(zoom, 0.0001)
+		var chart_centre := _to_world(_chart.get_center())
+		satellite.call("observe", Vector3(chart_centre.x, 0.0, chart_centre.y), player_yaw, descent, get_process_delta_time(), span)
 		# A whole second render of the region, at 768 square, is not something to
 		# do sixty times a second for a picture nobody is animating. Asked for at
 		# about twenty, which is indistinguishable while panning and a third of
