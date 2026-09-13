@@ -1895,13 +1895,15 @@ enforcement type figures who punish you for bad local karmic events."*
 The karma axis and the witness ledger already exist. Nobody has ever come to
 arrest anybody.
 
-- [ ] **AE1.1** Unseen is a real state with real inputs — light, noise, cover, distance
-- [ ] **AE1.2** An unseen kill differs from a seen one, mechanically and in the record
-- [ ] **AE1.3** Assassination as a verb: reach somebody who does not know you are there
-- [ ] **AE1.4** Law figures respond to what was actually witnessed (`witness_ledger.gd`)
-- [ ] **AE1.5** Punishment is local: the holding remembers, and the holding sends them
-- [ ] **AE1.6** Karma is an axis, not a score — the law reads position, not "evil"
-- [ ] **AE1.7** Being hunted by the law is the Hunt System pointed back at you (F)
+- [x] **AE1.1** Unseen is a real state with real inputs — light, noise, cover, distance — `LocalLaw.unseen_state()`: combines real 0..1 light/noise/cover plus real distance against a real sight range (defaulting to `witness_ledger.gd`'s own `SIGHT_RANGE`, so being unseen and being unwitnessed never quietly disagree about how far is too far). Never a single invented "stealth" stat measured on its own authority
+- [x] **AE1.2** An unseen kill differs from a seen one, mechanically and in the record — `LocalLaw.assassinate()` routes every kill through `witness_ledger.gd`'s real `record()` (F1), carrying a real `unseen` flag; the mechanical difference is not a second flag anybody has to check, it is that a kill with no witnesses passed in has nothing in flight to ever report it, so it can never reach a faction's knowledge at all
+- [x] **AE1.3** Assassination as a verb: reach somebody who does not know you are there — `LocalLaw.assassinate()`, through the exact same `npc_resolution`/`execute` vocabulary every other execution already uses (`event_karma()`, `route_endings.gd`, `ascent_entities.gd`) so it moves karma and the Tree exactly as hard as any other kill; the only thing that changes is whether anybody was ever there to know
+- [x] **AE1.4** Law figures respond to what was actually witnessed (`witness_ledger.gd`) — `LocalLaw.witness_a_wrong()` refuses outright unless `ledger.faction_knows()` says the answering faction was actually told, real F1 delivery rather than a direct read of the event log every faction can already see
+- [x] **AE1.5** Punishment is local: the holding remembers, and the holding sends them — a real `place` subject (`held_by`, `unrest`) accumulates real offence magnitude per witnessed wrong on its own ground; once it remembers enough (`RESPONSE_THRESHOLD`) it spends that memory and raises the answering faction's own real `grudge` — the exact field `wire_net.gd`'s channel-contest retaliation (K4.6) and `the_four_horsemen.gd` (K2.5) already use for "the world acts on you", not a second consequence channel
+- [x] **AE1.6** Karma is an axis, not a score — the law reads position, not "evil" — `LocalLaw.offence_magnitude()`: a faction's own real `FACTION_TREE_AXIS` position decides whether an act was even a wrong to it, read against the same real `event_karma()` every act already carries. Verified both directions: the identical execution is no offence to a faction deep in Descent and a real one to a faction that climbed the other way, and the identical act of mercy inverts which faction is offended — nowhere is there a universal crime score either reads instead
+- [ ] **AE1.7** Being hunted by the law is the Hunt System pointed back at you (F) — needs `rival_registry.gd` (Lane 4's); `witness_a_wrong()`'s real `grudge` rise is already the field that system reads, so wiring it in is additive once asked for as an API, not attempted here
+
+Covered by `tests/local_law_test.gd` (23 checks). `tests/karma_test.gd`, `tests/witness_test.gd`, `tests/route_endings_test.gd`, `tests/ascent_entities_test.gd` and `tests/propagation_test.gd` re-run clean.
 
 
 ## AG — Playtest, 12 September 2026
