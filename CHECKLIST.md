@@ -970,6 +970,17 @@ Read-only; everything derived lands in `game/art/derived/` via `tools/art_pipeli
       cabin, panels) is only reachable by re-exporting from
       `art/scrap_skiff_v1/scrap_skiff.blend`.
 
+      **Scope widened by Greg, 2026-09-13:** *"this should not only just be for
+      the cars but for the whole hud and gui in the entire game."* The palette
+      is currently a remap applied at vehicle load. Making it the game's
+      palette means one source of colour that the HUD, the handheld pages, the
+      Board and the map all read from, rather than each surface carrying its
+      own constants — `living_map.gd` alone declares nine (`VOID`, `PLATE`,
+      `INK`, `ACID`, `SPORE`, `ARTERIAL`, `BILE`, `SCAN`, `BONE`), and
+      `black_mirror.gd` declares six more. That is a palette module plus a pass
+      over every drawing surface, and it is a bigger job than the re-export it
+      is written under. It should probably be its own segment.
+
 ### G0 — The wreckers cannot land a hit `OPEN BUG`
 Found 2026-09-12 by measurement, not yet fixed. A parked player finishes a
 thirty-second heat on **full hull** across seven consecutive runs. What the
