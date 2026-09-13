@@ -52,6 +52,20 @@ Two trees hold uncommitted work that is not yours to touch:
 - `atg-merge-check` — 3 uncommitted files. Lane 6 inherits this tree; commit or
   discard them deliberately, do not sweep them into the first commit.
 
+## One carve-out, learned the hard way
+
+`AGENT_SPLIT.md` gave **N5 — the cybernetic slots** to Agent A, and Lane 1's tree
+already has history there (`f19f107`, N5.5). Section N otherwise belongs to
+Lane 5. So:
+
+- **N5 is Lane 1's.** Factory hardware, locked slots, the loadout — it sits with
+  the arsenal and the body, not with the screens.
+- **N1-N4 and N6+ are Lane 5's.** The vat, extended.
+
+Lane 1 also holds commits in **AG** (`AG5.8`, `AG5.11`) made before this split
+existed. Those stay where they are; **AG is Lane 6's from here on.** Lane 6
+should read `d751808` and `2e0ebc5` before touching AG5.
+
 **Every tree shows ~120-143 dirty files that are pure `.import` churn** — Godot
 rewrites them on open. This is exactly why `git add -A` is banned here: a
 blanket add in any tree sweeps 140 regenerated files plus whatever another agent
