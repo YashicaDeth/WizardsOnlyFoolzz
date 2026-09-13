@@ -2640,7 +2640,22 @@ question is not "how do we build that" but "what does this game actually need
 from it" — and the answer is probably narrower and more achievable: things break
 where they are hit, and what comes off them stays.
 
-- [ ] **AB1.1** Decide the scope honestly before building anything — full voxel destruction is not a feature, it is a second project
+- [x] ~~**AB1.1** Decide the scope honestly before building anything — full
+      voxel destruction is not a feature, it is a second project~~
+      `DESIGN/DESTRUCTION.md`. No per-voxel or volumetric fracture — that is
+      a different visual register entirely from this game's authored
+      PS1/PS2 low-poly one, not a scaled-down version of it. The scope
+      instead: **condition, not fracture** — one number, 0..1, the same
+      shape `condition` already takes on the handheld and a weapon's wear;
+      a small, *authored* set of break states per object class (four is
+      enough to read as staged damage, twelve would only be more art, not
+      more damage); debris as real, identified, capped objects reusing
+      `gore_chunks.gd`'s already-proven pattern rather than VFX particles;
+      repair as one more thing a holding's owner does (AA), not a timer on
+      a flag. The doc maps every open AB item onto that reduced scope and
+      states plainly what is deferred and why — AB1.5 to Lane 2's own
+      vehicle work rather than a second implementation of the same
+      primitive, AB3/AB1.6 to once more than one real object exists.
 - [ ] **AB1.2** Structures break where they are struck rather than swapping to a damaged model
 - [ ] **AB1.3** Debris is real, persists, and can be stood on or thrown
 - [ ] **AB1.4** It reads through the gore system that already exists — `gore_chunks.gd` already breaks bodies into identified pieces
@@ -2656,9 +2671,34 @@ The tracking is the feature. A world where everything breaks and nothing is
 recorded resets the moment you look away, and this project already has the
 ledger to avoid that.
 
-- [ ] **AB2.1** Every breakable thing has a condition the world can read, not a destroyed flag
-- [ ] **AB2.2** Damage is recorded against the place, in WorldHistory, like everything else
-- [ ] **AB2.3** Cheap to ask "how wrecked is this street" without walking it
+- [x] ~~**AB2.1** Every breakable thing has a condition the world can read,
+      not a destroyed flag~~ New `systems/world_damage.gd`: the `Clothing`
+      pattern exactly — static functions over a `WorldHistory` subject, no
+      second store, no scene-local flag. `condition(subject_id)` never
+      invents damage that never happened; a subject nobody has hit reads as
+      intact, the same refusal `Clothing.worn()` already makes for a subject
+      nobody has dressed. `band()`/`DEFAULT_BANDS` give a generic answer
+      ("intact"/"damaged"/"wrecked"/"destroyed") for anything that has not
+      been handed its own authored ladder yet — the actual break-state
+      design `DESIGN/DESTRUCTION.md` scopes as the next step, not this one.
+- [x] ~~**AB2.2** Damage is recorded against the place, in WorldHistory, like
+      everything else~~ `world_damage.gd`'s `damage()`/`repair()` both
+      `record_event()` (`object_damaged`/`object_repaired`, with the subject,
+      the amount and a `cause`) on top of `amend_subject()`'s mutation —
+      refused outright for a subject the world does not know about, so a
+      typo'd id fails loudly rather than quietly creating a phantom object
+      with no owner and no history.
+- [x] ~~**AB2.3** Cheap to ask "how wrecked is this street" without walking
+      it~~ `condition()`/`band()` are a single `WorldHistory.subject()`
+      lookup each — no scene tree walk, no iterating every breakable object
+      in a region to answer one question about one of them.
+      Verified: `tests/world_damage_test.gd`, 17 checks — refuses an
+      unregistered subject, accumulates rather than overwrites across
+      repeated hits, floors at zero and ceilings at full, reports whether a
+      hit actually crossed a band rather than just landing within one, and
+      confirms a caller's own authored ladder (tested against a stand-in
+      vault door) decides its own band independently of the generic one
+      while both still read the identical underlying number.
 - [ ] **AB2.4** Repair happens over game time — a month, not a respawn
 - [ ] **AB2.5** Who repairs it is somebody: a holding nobody holds does not get fixed (pairs with AA)
 - [ ] **AB2.6** Dents, smashes and scoring are the common case; collapse is the rare one
