@@ -41,8 +41,13 @@ func _ready() -> void:
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.mouse_entered.connect(_focus_button.bind(button))
 		button.mouse_exited.connect(_unfocus_button.bind(button))
+	# Y2.1. One door, and it says what it does. "PLAY" is a verb nobody uses
+	# out loud about a game they are about to start.
+	$HUD/Play.text = "START GAME"
 	_build_gore_setting()
 	_build_sandbox_door()
+	_build_locked_doors()
+	_build_support_row()
 	_build_front_door()
 
 
@@ -78,6 +83,91 @@ func _build_sandbox_door() -> void:
 	sandbox.mouse_entered.connect(_focus_button.bind(sandbox))
 	sandbox.mouse_exited.connect(_unfocus_button.bind(sandbox))
 	menu_buttons.append(sandbox)
+
+
+## Y2.2/Y2.3. Two doors that are visible and do not open.
+##
+## Greg: *"a multiplayer and online option should be there but not be selectable
+## and have a message saying soon 'if you have ideas email me in settings'."*
+##
+## The instinct is to leave them out until they work. That is wrong for the same
+## reason a blank save slot is wrong: **a greyed line that says SOON is a
+## promise, and a missing line is nothing at all.** Somebody looking at this menu
+## deciding whether to care learns more from two doors marked shut than from a
+## menu that never mentions them.
+##
+## And a door you cannot open is only worth showing if it tells you where to
+## push instead, which is the whole reason Y4 exists.
+func _build_locked_doors() -> void:
+	var play: Button = $HUD/Play
+	var row: float = play.offset_bottom - play.offset_top + 8.0
+	var sandbox: Button = $HUD/Sandbox
+	for button: Button in [$HUD/Settings, $HUD/Quit, $HUD/CellOutzSite]:
+		button.offset_top += row * 2.0
+		button.offset_bottom += row * 2.0
+
+	var step := 1
+	for locked: String in ["MULTIPLAYER", "ONLINE"]:
+		var door := play.duplicate(0) as Button
+		door.name = locked.capitalize()
+		door.text = "%s   //   SOON" % locked
+		door.offset_top = sandbox.offset_top + row * float(step)
+		door.offset_bottom = sandbox.offset_bottom + row * float(step)
+		door.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		# Not selectable, and it looks it. `disabled` also takes it out of the
+		# focus order, so a controller cannot land on a dead row.
+		door.disabled = true
+		door.focus_mode = Control.FOCUS_NONE
+		door.modulate = Color(1, 1, 1, 0.42)
+		$HUD.add_child(door)
+		step += 1
+
+	# Where to push instead. One line, under both, rather than a tooltip nobody
+	# hovers on a row they cannot click.
+	var note := Label.new()
+	note.name = "SoonNote"
+	note.text = "not yet — if you have ideas, settings ▸ support"
+	note.modulate = Color(1, 1, 1, 0.34)
+	note.offset_left = play.offset_left + 4.0
+	note.offset_top = sandbox.offset_bottom + row * 2.0 - 6.0
+	note.offset_right = note.offset_left + 520.0
+	note.offset_bottom = note.offset_top + 24.0
+	$HUD.add_child(note)
+
+
+## Y4, at the point the player actually reaches it. `support_mail.gd` does the
+## work; this is the row in settings that calls it and the line that says what
+## happened, because Y4.3 is that it never silently fails.
+func _build_support_row() -> void:
+	var box: VBoxContainer = $HUD/SettingsPanel/VBox
+	var back: Button = $HUD/SettingsPanel/VBox/Back
+
+	var support := Button.new()
+	support.name = "Support"
+	support.text = "SUPPORT  /  REPORT A BUG"
+	box.add_child(support)
+	box.move_child(support, back.get_index())
+
+	var result := Label.new()
+	result.name = "SupportResult"
+	result.text = SupportMail.ADDRESS
+	result.modulate = Color(1, 1, 1, 0.45)
+	result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(result)
+	box.move_child(result, back.get_index())
+
+	support.pressed.connect(func() -> void:
+		# The seed goes with it, because Y4.2 is that the player should not have
+		# to write down what the game already knows.
+		var run: Dictionary = WorldHistory.subject("player")
+		var sent: Dictionary = SupportMail.send("support", "", {
+			"run_salt": str(run.get("run_salt", "")),
+			"violence": gore_modes[gore_index],
+		})
+		if bool(sent.get("sent", false)):
+			result.text = "opening your mail app — %s" % SupportMail.ADDRESS
+		else:
+			result.text = "no mail app answered. copy this: %s" % SupportMail.ADDRESS)
 
 ## The front end is a scene with junk falling through it, and the first thing
 ## the player is asked is what they are willing to look at. The violence tiers

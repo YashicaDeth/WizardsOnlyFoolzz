@@ -2511,9 +2511,9 @@ Greg, 2026-09-13, which is most of a section on its own:
 > soon 'if you have ideas email me in settings'."*
 
 ### Y2 — The way in
-- [ ] **Y2.1** One door, and it says **START GAME**. Not PLAY and DEMO, not a verb nobody uses out loud
-- [ ] **Y2.2** **MULTIPLAYER** and **ONLINE** are on the menu, visible, and not selectable — a greyed line that says SOON is a promise; a missing line is nothing at all
-- [ ] **Y2.3** And the SOON card says where to send the idea, which is the only reason to show a door you cannot open yet
+- [x] **Y2.1** One door, and it says **START GAME**. Not PLAY and DEMO, not a verb nobody uses out loud
+- [x] **Y2.2** **MULTIPLAYER** and **ONLINE** are on the menu, visible, and not selectable — a greyed line that says SOON is a promise; a missing line is nothing at all. `disabled` also takes them out of the focus order, so a controller cannot land on a dead row
+- [x] **Y2.3** And the SOON card says where to send the idea, which is the only reason to show a door you cannot open yet — one line under both doors rather than a tooltip nobody hovers on a row they cannot click
 - [ ] **Y2.4** The part before you are out of the pod is authored rather than skipped past — it is the first thing anybody plays and it is currently the roughest thing in the build
 
 ### Y3 — Saves are chambers
