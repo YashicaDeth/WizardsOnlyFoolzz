@@ -4118,8 +4118,8 @@ paperwork over things that used to be people.
 - [x] **AL1.2** The bank writes the liens the Choir already prices (CARRY, B) — the per-item `lien` field has existed since B5.4 but nothing ever wrote a real one into it; `Carry.borrow_against(amount, lender_faction, item_index)` reuses `borrow()`'s own real debt ledger and additionally stamps the exact carried item with who holds the lien and how much, found on the item itself rather than an abstract number nobody can point at
 - [x] **AL1.3** A debt is secured against something of yours, named, and they will take it — `Carry.seize_lien(lender_faction)` finds the item actually liened to that lender and removes it from CARRY for real, valued by the same `sale_value()` the Choir prices everything by (never a fiction number invented for this one verb), and shrinks the real debt by what the thing was actually worth. `tests/bank_lien_test.gd`, 14 checks; `money_test.gd` (R1.1/R1.4) re-verified clean against the same ledger. Honestly scoped: nothing yet triggers a seizure on its own (no interest clock, no collector visit) — this is the mechanism AL1.5/AL1.7 will call, not an automatic default
 - [ ] **AL1.4** Accounts, in a building, that you can walk into and rob
-- [ ] **AL1.5** Interest accrues in game time, and it does not stop while you are away
-- [ ] **AL1.6** They are an institution: the satire lands on the paperwork, not on debtors
+- [x] **AL1.5** Interest accrues in game time, and it does not stop while you are away — `Carry.accrue_interest()` settles the account from `WorldClock.minutes()`, not from a bank scene or a per-frame timer, so two full days catch up when a fresh Carry instance next reads the saved ledger. Three percent compounds per whole in-world day; unused hours remain on the account rather than being rounded into a charge or forgiven. Borrowing and repayment reset the lender's real clock anchor, every settlement writes a `bank_interest_accrued` receipt into WorldHistory, and old saves with debt but no timestamp begin honestly at first read instead of receiving invented retroactive charges. `tests/bank_lien_test.gd` expanded from 14 to 23 passing checks; `money_test.gd` and `world_clock_test.gd` remain green
+- [x] **AL1.6** They are an institution: the satire lands on the paperwork, not on debtors — `Carry.account_statement()` returns the real office, issuer, balance, rate and named collateral beside three clauses in the bank's own procedural voice. The account holder is never characterised or mocked; the office states, in writing, that it records ownership but provides no relief, recovers security without you present, and keeps its own errors payable until it chooses to correct them. The AL1.5 demo typesets the same returned clause rather than carrying separate joke copy, and `bank_lien_test.gd` proves the statement names the responsible office, the actual figures and the exact liver securing the loan
 - [ ] **AL1.7** Default has a collector, and the collector is a person with a body (F)
 
 ### AL2 — The network under it
@@ -4130,6 +4130,14 @@ paperwork over things that used to be people.
 - [ ] **AL2.5** It connects holdings that are not connected above ground (AA)
 - [ ] **AL2.6** Raiding a vault from underneath is the best version of AB3
 - [ ] **AL2.7** Sound behaves differently down there, and the game lets you hear that (G)
+
+
+### AL v2 — the second pass
+AL1.5 made interest persistent in game time. It exposed the distinction the
+later R10 wording makes explicit: closing the application currently stops the
+world clock, so "whether you play or not" is not true yet.
+- [ ] **AL1.5** `v2` Reconcile real elapsed time on load without letting a long absence create an absurd or overflowed debt
+- [ ] **AL1.6** `v2` Every lender currently prints the same boilerplate; its own doctrine should change the terms without making the borrower the joke
 
 
 ### AL v10 — the final pass

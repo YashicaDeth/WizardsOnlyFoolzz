@@ -169,6 +169,11 @@ func damage_item(index: int, amount: float) -> float:
 ## way to the coin, not just the body.
 const CURRENCY := "rust_scrip"
 const CURRENCY_ISSUER := "celloutz"
+## AL1.5. One in-world day is twenty-four real minutes at the current clock
+## rate. Three percent is deliberately legible after one day without making a
+## short walk across town cost more than the loan itself.
+const DEBT_INTEREST_RATE_PER_DAY := 0.03
+const DEBT_INTEREST_FACTOR_CEILING := 1000.0
 
 
 func currency_reason() -> String:
@@ -305,8 +310,85 @@ func sell(index: int, buyer_faction: String = "") -> Dictionary:
 ## rather than a second morality system — carrying a real, growing number
 ## rather than a flag.
 func debt_to(lender_faction: String) -> int:
+	accrue_interest(lender_faction)
 	var debts: Dictionary = WorldHistory.subject("inventory").get("player_debt", {})
 	return int(debts.get(lender_faction, 0))
+
+
+## AL1.5. Settle whole in-world days against the one persistent WorldClock.
+## Nothing ticks in a menu and no bank scene has to remain loaded: the next
+## read compares the saved minute with the world's current minute and catches
+## up every full day at once. Old saves have debt but no anchor; their first
+## read starts the clock now rather than inventing retroactive charges.
+func accrue_interest(lender_faction: String) -> Dictionary:
+	if lender_faction.is_empty():
+		return {"ok": false, "reason": "NO LENDER"}
+	var inventory := WorldHistory.subject("inventory")
+	var debts: Dictionary = (inventory.get("player_debt", {}) as Dictionary).duplicate(true)
+	var owed := int(debts.get(lender_faction, 0))
+	if owed <= 0:
+		return {"ok": true, "interest": 0, "owed": 0, "days": 0}
+	var anchors: Dictionary = (inventory.get("player_debt_at_minute", {}) as Dictionary).duplicate(true)
+	var now := WorldClock.minutes()
+	if not anchors.has(lender_faction):
+		anchors[lender_faction] = now
+		WorldHistory.amend_subject("inventory", {"player_debt_at_minute": anchors})
+		return {"ok": true, "interest": 0, "owed": owed, "days": 0, "migrated": true}
+	var anchor := float(anchors[lender_faction])
+	var whole_days := int(floor(maxf(now - anchor, 0.0) / WorldClock.MINUTES_PER_DAY))
+	if whole_days <= 0:
+		return {"ok": true, "interest": 0, "owed": owed, "days": 0}
+	var factor := minf(pow(1.0 + DEBT_INTEREST_RATE_PER_DAY, float(whole_days)), DEBT_INTEREST_FACTOR_CEILING)
+	var after := maxi(owed + 1, roundi(float(owed) * factor))
+	var interest := after - owed
+	debts[lender_faction] = after
+	# Carry the unused fraction forward. Settling after 25 hours charges one day
+	# and leaves the remaining hour on the account instead of forgiving it.
+	anchors[lender_faction] = anchor + float(whole_days) * WorldClock.MINUTES_PER_DAY
+	WorldHistory.amend_subject("inventory", {
+		"player_debt": debts,
+		"player_debt_at_minute": anchors,
+	})
+	WorldHistory.record_event("bank_interest_accrued", {
+		"lender_faction": lender_faction,
+		"days": whole_days,
+		"rate_per_day": DEBT_INTEREST_RATE_PER_DAY,
+		"interest": interest,
+		"owed_before": owed,
+		"owed_after": after,
+	})
+	return {"ok": true, "interest": interest, "owed": after, "days": whole_days}
+
+
+## AL1.6. The bank's voice is aimed upward, at the office that made ownership
+## ordinary paperwork. This is structured data so a future counter, receipt or
+## handheld page can typeset the same statement without each inventing its own
+## joke or turning the borrower into the target.
+func account_statement(lender_faction: String) -> Dictionary:
+	var lender := WorldHistory.subject(lender_faction)
+	if lender_faction.is_empty() or lender.is_empty():
+		return {"ok": false, "reason": "NO SUCH OFFICE"}
+	var owed := debt_to(lender_faction)
+	var security: Array[String] = []
+	for item_value in items:
+		var item: Dictionary = item_value
+		if str(item.get("lien_holder", "")) == lender_faction:
+			security.append(str(item.get("label", "UNNAMED PROPERTY")))
+	return {
+		"ok": true,
+		"office": "%s CREDIT OFFICE" % str(lender.get("name", lender_faction)).to_upper(),
+		"issuer": CURRENCY_ISSUER,
+		"account_holder": str(WorldHistory.subject("player").get("name", "THE HUNTER")),
+		"owed": owed,
+		"currency": CURRENCY,
+		"rate_per_day": DEBT_INTEREST_RATE_PER_DAY,
+		"security": security,
+		"clauses": [
+			"THE OFFICE RECORDS OWNERSHIP. IT DOES NOT PROVIDE RELIEF.",
+			"SECURITY MAY BE RECOVERED WITHOUT THE ACCOUNT HOLDER PRESENT.",
+			"ERRORS IN THIS RECORD REMAIN PAYABLE UNTIL THE OFFICE CORRECTS THEM.",
+		],
+	}
 
 
 ## Borrowing is real scrip added to the wallet now, in exchange for a real
@@ -317,11 +399,16 @@ func borrow(amount: int, lender_faction: String) -> Dictionary:
 		return {"ok": false, "reason": "NOTHING TO BORROW"}
 	if WorldHistory.subject(lender_faction).is_empty():
 		return {"ok": false, "reason": "NO SUCH LENDER"}
+	# Settle the old balance before new money joins it; a fresh loan is never
+	# charged for time that passed before it existed.
+	accrue_interest(lender_faction)
 	var inventory := WorldHistory.subject("inventory")
 	var debts: Dictionary = (inventory.get("player_debt", {}) as Dictionary).duplicate(true)
 	debts[lender_faction] = int(debts.get(lender_faction, 0)) + amount
+	var anchors: Dictionary = (inventory.get("player_debt_at_minute", {}) as Dictionary).duplicate(true)
+	anchors[lender_faction] = WorldClock.minutes()
 	var wallet := int(inventory.get("rust_scrip", 0)) + amount
-	WorldHistory.update_subject("inventory", {"rust_scrip": wallet, "player_debt": debts}, "player_borrowed")
+	WorldHistory.update_subject("inventory", {"rust_scrip": wallet, "player_debt": debts, "player_debt_at_minute": anchors}, "player_borrowed")
 	WorldHistory.record_event("player_borrowed", {"lender_faction": lender_faction, "amount": amount, "owed_after": debts[lender_faction]})
 	return {"ok": true, "wallet": wallet, "owed": int(debts[lender_faction])}
 
@@ -339,7 +426,9 @@ func repay(amount: int, lender_faction: String) -> Dictionary:
 		return {"ok": false, "reason": "NOTHING IN THE WALLET TO PAY IT WITH"}
 	var debts: Dictionary = (inventory.get("player_debt", {}) as Dictionary).duplicate(true)
 	debts[lender_faction] = owed - paid
-	WorldHistory.update_subject("inventory", {"rust_scrip": wallet - paid, "player_debt": debts}, "player_repaid")
+	var anchors: Dictionary = (inventory.get("player_debt_at_minute", {}) as Dictionary).duplicate(true)
+	anchors[lender_faction] = WorldClock.minutes()
+	WorldHistory.update_subject("inventory", {"rust_scrip": wallet - paid, "player_debt": debts, "player_debt_at_minute": anchors}, "player_repaid")
 	WorldHistory.record_event("player_repaid", {"lender_faction": lender_faction, "amount": paid, "owed_after": debts[lender_faction]})
 	return {"ok": true, "paid": paid, "owed": int(debts[lender_faction]), "wallet": wallet - paid}
 
