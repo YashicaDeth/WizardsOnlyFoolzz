@@ -70,9 +70,22 @@ static func _photo_matches(photo: Dictionary, requirement: Dictionary) -> bool:
 				var record: Dictionary = entry
 				if not bool(record.get("dead", false)):
 					continue
+				# `field_camera.gd` writes three separate lists into every
+				# photographed record - severed, destroyed and ruptured - and
+				# this only ever read two of them. A head blown apart lands in
+				# `destroyed`, not `severed`, so the most obviously gored head
+				# in the game did not count toward the Choir's own rite, while
+				# `ritual_ledger.gd` - which asks the camera the same question
+				# through `{"zone": "head", "state": "destroyed"}` - counted it.
+				# The two halves of E3/E4 disagreed about what gored means.
 				var severed: Array = record.get("severed", [])
 				var ruptured: Array = record.get("ruptured", [])
-				if severed.has("head") or ruptured.has("head") or severed.has("brain") or ruptured.has("brain"):
+				var destroyed: Array = record.get("destroyed", [])
+				var gored := false
+				for part in ["head", "brain"]:
+					if severed.has(part) or ruptured.has(part) or destroyed.has(part):
+						gored = true
+				if gored:
 					count += 1
 			return count >= required
 	return false
