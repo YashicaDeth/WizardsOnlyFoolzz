@@ -40,6 +40,7 @@ const INTERIOR := preload("res://systems/vehicle_interior.gd")
 const KEYS_CARD := preload("res://systems/keys_card.gd")
 const DAMAGE_PORTRAIT := preload("res://systems/damage_portrait.gd")
 const CAB_RETICLE := preload("res://systems/cab_reticle.gd")
+const BREAKABLE_PROP := preload("res://systems/breakable_prop.gd")
 
 ## The bezel `celloutz_hud.gd` draws for the driver, in its own coordinates, so
 ## the bust lands inside the frame instead of beside it. Kept next to the
@@ -79,6 +80,10 @@ var countdown := 3.0
 var result_countdown := 0.0
 var leaving := false
 var authored_collision_count := 0
+var breakable_props: Array[Node3D] = []
+## Explicit test-only opt-in. The crowding harness measures cars, not scenery;
+## a separate contract below exercises the real arena-breakable route.
+var include_breakables_in_test := false
 ## AG3.2. The cab. M2 built all of this and nothing ever instantiated it outside
 ## its own capture test, which is why the derby was still a chase camera looking
 ## at a box with wheels.
@@ -318,6 +323,7 @@ func _build_world() -> void:
 	floor_collision.position.y = -0.8
 	floor.add_child(floor_collision)
 	add_child(floor)
+	_spawn_breakable_props()
 	# Floodlights are pools of light in a dim pit, not a uniform wash. Two of the
 	# eight cast shadows: enough to anchor the wrecks without eight shadow maps.
 	# G3.3. These used to alternate orange and green per light, which painted
@@ -327,9 +333,10 @@ func _build_world() -> void:
 	# `regrime()` and `WorldLook.surface()` already carry the salvage-teal,
 	# rust and bloom colour on the materials themselves; a practical floodlight
 	# colour lets that stand instead of competing with it.
-	for index in 8:
+	var light_count := arena_light_budget()
+	for index in light_count:
 		var light := OmniLight3D.new()
-		var angle := TAU * index / 8.0
+		var angle := TAU * index / float(light_count)
 		light.position = Vector3(cos(angle) * 18.0 * ARENA_SCALE, 7.5 * ARENA_SCALE, sin(angle) * 18.0 * ARENA_SCALE)
 		light.light_color = Color("e8d3ab")
 		light.light_energy = 3.4
@@ -338,7 +345,7 @@ func _build_world() -> void:
 		# floodlights should not be reaching the inside of it.
 		light.light_cull_mask = 0xFFFFF & ~(1 << (INTERIOR.CAB_LAYER - 1))
 		light.omni_attenuation = 1.25
-		light.shadow_enabled = index % 4 == 0
+		light.shadow_enabled = index % 4 == 0 and WorldLook.quality != WorldLook.Quality.PERFORMANCE
 		add_child(light)
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-38, -34, 0)
@@ -347,6 +354,35 @@ func _build_world() -> void:
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 120.0
 	add_child(sun)
+
+
+## The fixed budget is visible in the game rather than hidden in a capture
+## script: performance mode halves active pit lights and keeps the rest of the
+## light from the sky and the few remaining floodlights.
+static func arena_light_budget() -> int:
+	return 4 if WorldLook.quality == WorldLook.Quality.PERFORMANCE else 8
+
+
+## Destroyable obstacles live toward the edge of the racing line. They are in
+## the playable pit but do not turn the first drive from the spawn into a wall.
+func _spawn_breakable_props() -> void:
+	if OS.get_environment("ATG_HUD_CAPTURE") == "1" and not include_breakables_in_test:
+		return
+	if OS.get_environment("ATG_TEST_MODE") == "1" and not include_breakables_in_test:
+		return
+	var locations := [
+		Vector3(-20.0, 0.0, -13.0), Vector3(20.0, 0.0, -13.0),
+		Vector3(-24.0, 0.0, 8.0), Vector3(24.0, 0.0, 8.0),
+		Vector3(-9.0, 0.0, -25.0), Vector3(9.0, 0.0, -25.0),
+	]
+	for index in locations.size():
+		var prop: BreakableProp = BREAKABLE_PROP.new()
+		prop.name = "BreakableBarricade_%02d" % index
+		prop.position = locations[index]
+		prop.rotation.y = PI * 0.5 if index < 4 else 0.0
+		prop.build("scrap_barricade" if index % 2 == 0 else "timber_barricade", Vector3(2.6, 1.3, 0.46), 24.0 + float(index % 3) * 4.0)
+		add_child(prop)
+		breakable_props.append(prop)
 
 
 func _build_boat() -> void:
@@ -527,6 +563,11 @@ func _on_vehicle_impact(other: Node, closing_speed: float, self_share: float) ->
 	if round_state != "active" or not is_instance_valid(other):
 		return
 	_shake_camera(closing_speed)
+	if other is BreakableProp:
+		var prop_result: Dictionary = (other as BreakableProp).impact(closing_speed, boat.global_position.direction_to(other.global_position), self_share)
+		if bool(prop_result.get("broken", false)):
+			WorldHistory.record_event("derby_prop_destroyed", {"prop": other.name, "speed": snappedf(closing_speed, 0.1)})
+		return
 	if targets.has(other):
 		_damage_target(other, closing_speed, self_share)
 	elif closing_speed > 7.0:
@@ -634,7 +675,7 @@ func _wreck_target(target: Node3D, impact_energy: int) -> void:
 		add_child(chunk)
 		chunk.global_position = target.global_position + Vector3(0, 0.8, 0)
 		var outward := (chunk.global_position - boat.global_position).normalized()
-		debris.append({"node": chunk, "velocity": outward * (5.0 + index % 5) + Vector3.UP * (3.0 + index % 4), "life": 2.6})
+		_track_debris(chunk, outward * (5.0 + index % 5) + Vector3.UP * (3.0 + index % 4), 2.6)
 	targets.erase(target)
 	disabled_count += 1
 	if disabled_count < 8:
@@ -679,9 +720,8 @@ func _update_player_damage_visual(impact_direction: Vector3) -> void:
 
 
 func _spawn_impact_debris(at: Vector3, direction: Vector3, count: int) -> void:
-	if debris.size() > 220:
-		return
-	for index in count:
+	var available := maxi(0, debris_budget() - debris.size())
+	for index in mini(count, available):
 		var shard := MeshInstance3D.new()
 		var mesh := BoxMesh.new()
 		mesh.size = Vector3(0.16 + randf() * 0.2, 0.05 + randf() * 0.09, 0.14 + randf() * 0.18)
@@ -690,7 +730,29 @@ func _spawn_impact_debris(at: Vector3, direction: Vector3, count: int) -> void:
 		add_child(shard)
 		shard.global_position = at + Vector3(randf_range(-0.6, 0.6), 0.7 + randf() * 0.6, randf_range(-0.6, 0.6))
 		var spray := (direction + Vector3(randf_range(-0.7, 0.7), randf_range(0.4, 1.1), randf_range(-0.7, 0.7))).normalized()
-		debris.append({"node": shard, "velocity": spray * (4.0 + randf() * 5.0), "life": 1.8})
+		_track_debris(shard, spray * (4.0 + randf() * 5.0), 1.8)
+
+
+## This is a cap on live objects, not an aesthetic quality label. The old
+## hard-coded 220 could be exceeded by several simultaneous hits and every
+## shard still ran an update every frame. At performance quality the pit has a
+## finite upper bound instead of an eventual frame-time cliff.
+static func debris_budget() -> int:
+	match WorldLook.quality:
+		WorldLook.Quality.ULTRA:
+			return 220
+		WorldLook.Quality.PERFORMANCE:
+			return 64
+		_:
+			return 128
+
+
+func _track_debris(node: Node3D, velocity: Vector3, lifetime: float) -> bool:
+	if debris.size() >= debris_budget():
+		node.queue_free()
+		return false
+	debris.append({"node": node, "velocity": velocity, "life": lifetime})
+	return true
 
 
 func _shake_camera(closing_speed: float) -> void:
@@ -1228,7 +1290,7 @@ func _crush_driver(target: Node3D, subject_id: String, impact_direction: Vector3
 			chunk.global_position = origin
 			add_child(chunk)
 			var spray := Vector3(randf_range(-1.0, 1.0), randf_range(0.25, 1.0), randf_range(-1.0, 1.0)).normalized()
-			debris.append({"node": chunk, "velocity": spray * (3.5 + randf() * 6.5) + impact_direction * 4.5, "life": 3.4})
+			_track_debris(chunk, spray * (3.5 + randf() * 6.5) + impact_direction * 4.5, 3.4)
 	score += 220 if ram_crush else 140
 	crowd_reaction = 2.0
 	if derby_audio != null:
