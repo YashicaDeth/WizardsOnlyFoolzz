@@ -15,6 +15,7 @@ const WOF_STACKED_PATH := "res://art/brand/wof_stacked.png"
 const GRANDEUR_PATH := "res://art/brand/grandeur_wordmark.png"
 const MENU_SCENE := "res://country_town_menu.tscn"
 const SPLASH_BACKDROP := preload("res://systems/splash_backdrop.gd")
+const REGAL_FRAME := preload("res://systems/regal_frame.gd")
 
 
 ## These must go through Godot's texture importer. `Image.load()` appeared to
@@ -45,6 +46,7 @@ var grandeur_rect: TextureRect
 var reveal_material: ShaderMaterial
 var grandeur_material: ShaderMaterial
 var backdrop: SplashBackdrop
+var frame: RegalFrame
 
 
 func _ready() -> void:
@@ -62,6 +64,17 @@ func _ready() -> void:
 	backdrop.attack = 0.18
 	add_child(backdrop)
 	move_child(backdrop, 0)
+	# A1.8. The photograph's own edge is a binary mask in
+	# `splash_attack.gdshader`, so without this it is a rectangle cut into
+	# black. The frame lies over that boundary rather than beside it — see
+	# `regal_frame.gd`. `reliquary` here because the publisher cards are small
+	# and central and the frame has nothing to lose an argument with.
+	frame = REGAL_FRAME.new()
+	frame.name = "ColdOpenFrame"
+	frame.reveal = 1.0
+	frame.fit_to_photo()
+	add_child(frame)
+	move_child(frame, 1)
 	_build_mark_layer()
 	set_process(true)
 	queue_redraw()

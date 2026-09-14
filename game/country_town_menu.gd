@@ -5,6 +5,7 @@ const Quantum := preload("res://systems/quantum_saves.gd")
 const MENU_PLATE := preload("res://systems/menu_plate.gd")
 const DECANTING_PROLOGUE := preload("res://systems/decanting_prologue.gd")
 const SPLASH_BACKDROP := preload("res://systems/splash_backdrop.gd")
+const REGAL_FRAME := preload("res://systems/regal_frame.gd")
 
 ## Well below anything else so the picture is unambiguously the backdrop and
 ## every other canvas in the scene still draws over the 3D as normal.
@@ -20,6 +21,7 @@ var menu_plate: Control
 var settings_plate: Control
 var prologue: Control
 var splash: ColorRect
+var splash_frame: RegalFrame
 var splash_layer: CanvasLayer
 var branch_plate: Control
 var graphics_presets := ["ULTRA", "HIGH", "PERFORMANCE"]
@@ -98,6 +100,17 @@ func _play_title_sequence() -> void:
 	splash = SPLASH_BACKDROP.new()
 	splash.name = "SplashBackdrop"
 	splash_layer.add_child(splash)
+	# A1.8. Same frame as the cold open, in the restrained cut. The menu has six
+	# lines of type sitting on this, and the frame has to lose that argument —
+	# `ossuary` keeps the ornament and drops the vessel gain and the gloss rather
+	# than running the band short, which is what leaks the photograph's hard edge
+	# back in. It arrives a beat behind the picture so it reads as the room being
+	# mounted rather than as one flat image fading up.
+	splash_frame = REGAL_FRAME.new()
+	splash_frame.name = "SplashFrame"
+	splash_frame.set_variant("ossuary")
+	splash_frame.fit_to_photo()
+	splash_layer.add_child(splash_frame)
 	_use_canvas_background()
 	$HUD/TitleLogo.modulate.a = 0.0
 	$HUD/Presents.modulate.a = 0.0
@@ -110,6 +123,8 @@ func _play_title_sequence() -> void:
 	# CellOutz/Algiz/Wizards lands and holds, then the authored cyan invert tears
 	# in from the left behind it rather than competing with the logo's entrance.
 	splash.play(self, 1.15)
+	# Behind the picture by the same beat the picture is behind the mark.
+	splash_frame.play(self, 1.50)
 	var tween := create_tween()
 	tween.tween_interval(0.22)
 	tween.tween_property(intro_veil, "color:a", 0.14, 0.55).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
