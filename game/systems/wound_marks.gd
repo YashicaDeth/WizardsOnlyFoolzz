@@ -84,43 +84,34 @@ static func record(existing: Array, wound: Dictionary) -> Array:
 	return existing
 
 
-## The mesh for one wound: a shallow disc, slightly domed, laid against the limb
-## surface. Not a decal projector — this game builds its own geometry everywhere
-## else and a projector would be one more renderer feature to explain, and would
-## not follow a limb that has been thrown across the room.
+## The mesh for one wound: a torn crater, generated per wound.
+##
+## The first version was a `CylinderMesh` — a clean disc — and rendering it made
+## the problem obvious immediately: nine identical circles down a torso read as
+## buttons sewn onto the skin, not as holes shot through it. Roundness was doing
+## the damage. A real opening is irregular at the rim, sunk in the middle, and
+## no two are the same shape.
+##
+## So the rim radius is jittered per vertex from the wound's own seed, the centre
+## is pushed *into* the limb, and the colour runs dark at the middle out to torn
+## tissue at the edge as vertex colour, which costs nothing and does the work an
+## extra texture would.
 static func build(wound: Dictionary, tint: Color) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
 	var radius: float = float(wound.get("radius", 0.04))
-	var disc := CylinderMesh.new()
-	disc.top_radius = radius
-	# Tapered, so the rim sits into the skin instead of standing on it as a
-	# cylinder with a visible side wall.
-	disc.bottom_radius = radius * 1.22
-	disc.height = radius * 0.36
-	disc.radial_segments = 8
-	disc.rings = 1
-	node.mesh = disc
+	node.mesh = _crater(radius, int(wound.get("seed", 0)), tint, str(wound.get("type", "ballistic")))
 
 	var material := StandardMaterial3D.new()
-	# The layer tint alone is wrong, and the first render proved it: `LAYER_TINTS`
-	# are the colours of *tissue in section*, which is what a chunk flying
-	# through the air should be, and on a body they came out as pale yellow and
-	# pink discs that read as buttons sewn to the skin. A wound is not the colour
-	# of what is under the skin — it is the colour of what is under the skin with
-	# blood in it and shadow around it. So the tint is pulled most of the way to
-	# blood and darkened hard.
-	material.albedo_color = tint.lerp(WOUND_BLOOD, 0.62).darkened(0.34)
+	# The shape carries the colour now, so the material just lets it through.
+	material.vertex_color_use_as_albedo = true
 	# Wet. Blood and opened tissue are the shiniest things on a body, and a matte
 	# wound reads as paint.
-	material.roughness = 0.26
+	material.roughness = 0.24
 	material.metallic = 0.0
-	# Pushed toward the viewer so it never z-fights with the limb it sits on,
-	# which at these thicknesses it otherwise always will.
+	# A hole has no back face worth culling to, and a torn rim is legible from
+	# behind when a limb turns.
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	material.render_priority = 1
-	# A hole should not catch a highlight the way a bead does, so the specular
-	# contribution is dialled down rather than switched off — wet tissue still
-	# has a sheen, it just is not chrome.
-	material.metallic_specular = 0.22
 	node.material_override = material
 
 	var at: Vector3 = wound.get("at", Vector3.ZERO)
@@ -128,13 +119,89 @@ static func build(wound: Dictionary, tint: Color) -> MeshInstance3D:
 	if normal.length_squared() < 0.0001:
 		normal = Vector3.UP
 	normal = normal.normalized()
-	# Sunk very slightly into the surface, so the disc reads as a hole in the
-	# limb rather than a coin stuck to it.
-	node.position = at - normal * radius * 0.18
+	# Sunk very slightly into the surface, so the rim sits in the skin rather
+	# than standing on it.
+	node.position = at - normal * radius * 0.10
 	node.basis = _basis_facing(normal)
-	# Rolled per wound, so a row of hits is not a row of identical stamps.
-	node.rotate_object_local(Vector3.UP, float(int(wound.get("seed", 0)) % 360) * 0.0174533)
 	return node
+
+
+## The crater itself. A fan from a sunk centre out to a ragged rim, plus a lip
+## ring outside it for the tissue pushed up around the hole.
+static func _crater(radius: float, seed_value: int, tint: Color, damage_type: String) -> ArrayMesh:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	# Tearing damage is more irregular than a punch, so it gets a rougher rim and
+	# fewer, longer tears rather than a uniformly wobbly circle.
+	var tearing := damage_type in TEARING
+	var segments := 11 if tearing else 14
+	var jitter := 0.42 if tearing else 0.22
+	var depth := radius * (0.75 if tearing else 0.95)
+
+	var vertices := PackedVector3Array()
+	var colors := PackedColorArray()
+	var indices := PackedInt32Array()
+
+	# Pull the layer tint toward blood before anything else derives from it.
+	# `GoreChunks.LAYER_TINTS` is the colour of tissue *in section* — right for a
+	# chunk in the air, and on a body the skin and fat tints are pale cream, so
+	# the craters came out as white blobs that read as growths rather than holes.
+	# This blend was in the disc version and was lost when the geometry was
+	# replaced; losing it undid the whole reason the discs had started to work.
+	# 0.88, not 0.66. The layer tints are *pale* — skin and fat are near-cream —
+	# so a two-thirds blend still lands on mid-brown, and mid-brown under a key
+	# light renders as tan, which is roughly the colour of the skin it is
+	# supposed to be a hole in. The tint is a hint about which layer was opened,
+	# not the colour of the wound; blood is the colour of the wound.
+	var wet: Color = tint.lerp(WOUND_BLOOD, 0.88).darkened(0.42)
+	# Middle of the hole: darkest, and below the surface.
+	var deep := wet.darkened(0.55)
+	var rim_colour := wet.lightened(0.08)
+	var lip_colour := wet.lerp(WOUND_BLOOD, 0.5).darkened(0.10)
+
+	vertices.append(Vector3(0.0, -depth, 0.0))
+	colors.append(deep)
+
+	var rim_start := vertices.size()
+	var lip_start := rim_start + segments
+	for index in segments:
+		var angle := TAU * float(index) / float(segments)
+		# Two octaves of wobble, so the outline is not a smooth ellipse.
+		var wobble := 1.0 + (rng.randf() - 0.5) * jitter + sin(angle * 3.0 + float(seed_value % 17)) * jitter * 0.35
+		var r := radius * clampf(wobble, 0.45, 1.6)
+		vertices.append(Vector3(cos(angle) * r, 0.0, sin(angle) * r))
+		colors.append(rim_colour)
+	for index in segments:
+		var angle := TAU * float(index) / float(segments)
+		var wobble := 1.0 + (rng.randf() - 0.5) * jitter * 1.4
+		var r := radius * 1.16 * clampf(wobble, 0.5, 1.7)
+		# The lip stands slightly proud — tissue pushed out of the way rather
+		# than a flat ring painted around the hole.
+		vertices.append(Vector3(cos(angle) * r, radius * 0.045, sin(angle) * r))
+		colors.append(lip_colour)
+
+	for index in segments:
+		var next := (index + 1) % segments
+		# Fan: centre to rim.
+		indices.append(0)
+		indices.append(rim_start + next)
+		indices.append(rim_start + index)
+		# Skirt: rim out to lip.
+		indices.append(rim_start + index)
+		indices.append(rim_start + next)
+		indices.append(lip_start + index)
+		indices.append(rim_start + next)
+		indices.append(lip_start + next)
+		indices.append(lip_start + index)
+
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
 
 
 ## A cylinder's length runs down its local Y, so the wound faces `normal` when
