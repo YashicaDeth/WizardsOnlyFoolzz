@@ -506,6 +506,37 @@ static func _build_sidearm(root: Node3D) -> void:
 	slide.material_override = _metal(gunmetal, 0.26, 41)
 	root.add_child(slide)
 
+	# The sidearm used to have the right mass but no landmarks: at first-person
+	# distance it read as a short metal rectangle.  These are the three details
+	# a player can identify without inspecting a high-poly asset — the open port,
+	# rear notch and front blade — all kept as real geometry so they catch the
+	# same world light as the rest of the held weapon.
+	var port := MeshInstance3D.new()
+	port.name = "ejection_port"
+	var port_mesh := BoxMesh.new()
+	port_mesh.size = Vector3(0.004, 0.016, 0.056)
+	port.mesh = port_mesh
+	port.position = Vector3(0.033, 0.019, 0.096)
+	port.material_override = _metal(Color("171a19"), 0.48, 45)
+	root.add_child(port)
+	for side in [-1.0, 1.0]:
+		var rear_sight := MeshInstance3D.new()
+		rear_sight.name = "rear_sight_l" if side < 0.0 else "rear_sight_r"
+		var rear_mesh := BoxMesh.new()
+		rear_mesh.size = Vector3(0.010, 0.020, 0.012)
+		rear_sight.mesh = rear_mesh
+		rear_sight.position = Vector3(side * 0.016, 0.048, 0.010)
+		rear_sight.material_override = _metal(gunmetal.darkened(0.34), 0.38, 46 + int(side))
+		root.add_child(rear_sight)
+	var front_sight := MeshInstance3D.new()
+	front_sight.name = "front_sight"
+	var front_mesh := BoxMesh.new()
+	front_mesh.size = Vector3(0.012, 0.021, 0.008)
+	front_sight.mesh = front_mesh
+	front_sight.position = Vector3(0, 0.048, 0.178)
+	front_sight.material_override = _metal(gunmetal.lightened(0.08), 0.32, 49)
+	root.add_child(front_sight)
+
 	# Serrations at the back of the slide, the detail that says "gun" faster
 	# than the silhouette does.
 	for index in 5:
