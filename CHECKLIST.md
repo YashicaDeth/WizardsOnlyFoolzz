@@ -478,19 +478,19 @@ Nine passes on one body, and T1.1 now says the universe restarts and you do not.
 - [ ] **B10.1** `v10` The body is recognisably itself across a quantum restart
 - [ ] **B10.2** `v10` What it carries over is scars, not statistics
 
-- [ ] **B10.3** `v10` Damage is always recorded against a zone, never against a hitbox
-- [ ] **B10.4** `v10` A body carries its whole history visibly and permanently
-- [ ] **B10.5** `v10` Blood, viscera and bone answer light as three different materials
+- [x] **B10.3** `v10` ~~Damage is always recorded against a zone, never against a hitbox~~ `zone_nearest()` resolves a world point to the limb it actually landed on, and `hit_at()` files every wound under a zone name — proven rather than asserted: `body_v10_audit` fires at the chest, head and left arm and checks each resolves to its own zone, then checks every key in `wound_marks` is a real member of `ZONES`. A hit that found a collider instead of a body part would fail that
+- [x] **B10.4** `v10` ~~A body carries its whole history visibly and permanently~~ Wounds are recorded at the real impact point in the limb's own local space and rendered there as torn craters, so four hits in four places leave four holes in four places — which is what `hit_at()` could never do while it was converting the impact point to a zone name and discarding it. Audited on both halves: four hits produce four marks *and* four meshes on the limb, and they are still there ninety frames later. Permanent, not a decal that ages out. Local space is why they ride the limb through animation and leave with it when it comes off
+- [x] **B10.5** `v10` ~~Blood, viscera and bone answer light as three different materials~~ Not three hex codes that happen to differ — three genuinely different responses, checked as such. Bone and viscera run different roughness through `WorldLook.surface` (0.68 against 0.39), and blood is a different *shading mode* entirely: unshaded, so it reads as a mark printed on the world rather than as a third wet object competing with the floor on the floor's terms. That was the change that made spatter start working
 - [ ] **B10.6** `v10` Any body can be opened up in the same detail as any other
-- [ ] **B10.7** `v10` What is installed in a limb is visible in that limb
-- [ ] **B10.8** `v10` Radiation, fire, bullets and blades all resolve through the same anatomy
+- [x] **B10.7** `v10` ~~What is installed in a limb is visible in that limb~~ Installing hardware at a site adds geometry to that limb's own node, so an arm with an industrial limb in it looks like an arm with something in it. Audited by counting the limb's children either side of an install rather than by trusting that the refresh path runs
+- [x] **B10.8** `v10` ~~Radiation, fire, bullets and blades all resolve through the same anatomy~~ All seven damage types — ballistic, cut, shear, blunt, puncture, radiation, caustic — go through one `apply_hit()`, and the audit proves it the only way that means anything: each one has to cost the zone health *and* come back carrying `blood_remaining` and `pain`, which are stamped on by `apply_hit` itself. A type that bypassed the anatomy could not produce them. This is what stops a new damage type quietly skipping organs, bleeding or severing
 - [ ] **B10.9** `v10` A body reacts to the hour, the weather and what it is wearing
 - [ ] **B10.10** `v10` The mirror in the room renders this rig live
 - [ ] **B10.11** `v10` Gore persists, rots on a real clock, and is eaten by things that eat
 - [ ] **B10.12** `v10` Nothing about a body is described in text that could be shown on the body
 - [ ] **B10.13** `v10` A corpse is a place other systems can read from days later
 - [ ] **B10.14** `v10` Bodies are cheap enough that a crowd is a crowd
-- [ ] **B10.15** `v10` The player's body is the same rig, made exceptional only by being undying
+- [x] **B10.15** `v10` ~~The player's body is the same rig, made exceptional only by being undying~~ Proven as an identity, not a claim: the audit checks the player's anatomy and rig are the *same script* as an ordinary body's, then kills both with the same call and checks one dies and the other fails instead. No second health pool, no damage multiplier, no separate player rig — one flag, and every wound goes through the same organs, the same bleed and the same severing. See B8.1 for the chokepoint that makes it safe
 
 ## C — The handheld, and killing the six-panel problem
 
@@ -3292,7 +3292,7 @@ The last rung. Fifteen statements that are true of guns when this game is finish
 - [ ] **AF10.4** `v10` Reloading is physical: the magazine leaves and another arrives
 - [ ] **AF10.5** `v10` A dropped half-full magazine is half-full when you pick it up
 - [ ] **AF10.6** `v10` Calibre decides what happens to a body and to a wall
-- [ ] **AF10.7** `v10` A round finds a zone, never a hitbox
+- [x] **AF10.7** `v10` ~~A round finds a zone, never a hitbox~~ Same proof as B10.3, from the gun's side: a round's impact point resolves through `zone_nearest()` to the limb it struck, and `Penetration` then measures that limb's real thickness at that height to decide how far in it got. A hitbox could not answer either question
 - [ ] **AF10.8** `v10` Firing from a car is the same system
 - [ ] **AF10.9** `v10` A gun is inspectable in full
 - [ ] **AF10.10** `v10` Weapon customisation lives on the weapon
