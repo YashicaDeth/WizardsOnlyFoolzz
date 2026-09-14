@@ -405,16 +405,22 @@ func flame_condition() -> float:
 
 
 
-## The armour over a zone, as one number, summed the same way `apply_hit()` sums
-## it. Public because `Penetration` needs the same figure to decide how much of
-## a round's budget is spent before it reaches flesh, and two loops computing the
-## same sum is one loop too many.
+## The armour over a zone, as one number, resolved the same way `apply_hit()`
+## resolves it. Public because `Penetration` needs the same figure to decide how
+## much of a round's budget is spent before it reaches flesh. A coat or plate
+## that softens the hit must also make the round spend some of itself before it
+## makes a wound; otherwise the two body reads would disagree about what was
+## actually being worn.
 func zone_armor(zone_id: String) -> float:
 	var armor := 0.0
 	for site_id: String in _sites_for_zone(zone_id):
 		var part: Dictionary = installed_parts.get(site_id, {})
 		armor += float(part.get("armor", 0.0)) * implant_condition(site_id)
-	return armor
+	var over := Garments.with_cover(
+		Garments.shielding(worn, zone_id),
+		float(cover.get(zone_id, 0.0)),
+	)
+	return armor + float(over.plate)
 
 func organ_ok(organ_id: String) -> bool:
 	return not bool((organs.get(organ_id, {}) as Dictionary).get("ruptured", false))

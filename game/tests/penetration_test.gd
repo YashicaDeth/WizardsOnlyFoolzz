@@ -67,6 +67,17 @@ func _ready() -> void:
 	add_child(rig)
 	rig.build("penetrated", {})
 	await get_tree().process_frame
+	# The same worn plate that reduces `apply_hit()` must reduce a round's
+	# remaining depth. This is deliberately a real rig read, not a second
+	# hand-maintained list of what clothes mean to ballistics.
+	var bare_torso_armour := rig.anatomy.zone_armor("torso")
+	rig.anatomy.worn = ["scrap plate"]
+	var worn_torso_armour := rig.anatomy.zone_armor("torso")
+	check(worn_torso_armour > bare_torso_armour, "worn scrap plate is included in the torso's penetration armour")
+	var bare_torso: Dictionary = PEN.resolve("torso", 0.3, false, pistol, bare_torso_armour, 0.66)
+	var worn_torso: Dictionary = PEN.resolve("torso", 0.3, false, pistol, worn_torso_armour, 0.66)
+	check(float(worn_torso["fraction"]) < float(bare_torso["fraction"]), "the same worn plate leaves the round less depth to make a wound")
+	rig.anatomy.worn = []
 	var arm := rig.parts.get("left_arm") as Node3D
 	# Low on the arm, where it is thin: expect an entry and an exit.
 	var low := arm.to_global(Vector3(0, -0.28, 0.06))
