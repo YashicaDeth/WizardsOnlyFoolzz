@@ -55,7 +55,28 @@ func _ready() -> void:
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--panel="):
 			panel = argument.trim_prefix("--panel=")
-	if panel == "settings":
+	if panel.begins_with("prologue"):
+		# Straight to the cutscene, then held on one card. `--panel=prologue2`
+		# shoots the third card, and so on — a fade cycle is CARD_FADE*2 +
+		# CARD_HOLD long and the prologue cannot be scrubbed any other way.
+		var want_card := 0
+		if panel.length() > 9:
+			want_card = int(panel.substr(9))
+		menu.call("_play_decanting_prologue")
+		var pro = menu.get("prologue")
+		# Read off the instance rather than the global class name: a freshly
+		# added `class_name` is not registered until the project is rescanned,
+		# and a test that cannot run until then is a test that silently fails.
+		for _settle in 8:
+			await tree.process_frame
+		pro.card = want_card
+		pro.clock = float(pro.get("CARD_FADE")) + float(pro.get("CARD_HOLD")) * 0.4
+		pro.set_process(false)
+		pro._card_alpha = 1.0
+		pro.queue_redraw()
+		for _settle in 4:
+			await tree.process_frame
+	elif panel == "settings":
 		menu.call("_open_settings")
 	elif panel == "continue":
 		menu.call("_open_continue_runs")

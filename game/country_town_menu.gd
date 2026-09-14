@@ -3,6 +3,7 @@ extends Node3D
 const Quantum := preload("res://systems/quantum_saves.gd")
 
 const MENU_PLATE := preload("res://systems/menu_plate.gd")
+const DECANTING_PROLOGUE := preload("res://systems/decanting_prologue.gd")
 
 var wreck: Node3D
 var front_door: Node3D
@@ -12,6 +13,7 @@ var ui_time := 0.0
 var menu_buttons: Array[Button] = []
 var menu_plate: Control
 var settings_plate: Control
+var prologue: Control
 var branch_plate: Control
 var graphics_presets := ["ULTRA", "HIGH", "PERFORMANCE"]
 var graphics_index := 0
@@ -323,8 +325,23 @@ func _start_game() -> void:
 	var opening := preload("res://systems/opening_director.gd")
 	if opening.reached("entered_pit"):
 		Interstitial.travel("res://rift_derby.tscn", "the bone yard // heat one")
-	else:
-		Interstitial.travel("res://vat_chamber.tscn", "the growing floor // decanting")
+		return
+	# Greg: *"the starting cutscne needs to be lore accurate then have the part
+	# where you can fully character customise"*. The second half was already
+	# here — the Growing Floor is the character creation. The prologue is the
+	# first half, and it only plays on the path that has never been walked, so a
+	# resumed run is not made to sit through it.
+	_play_decanting_prologue()
+
+
+func _play_decanting_prologue() -> void:
+	if prologue == null or not is_instance_valid(prologue):
+		prologue = DECANTING_PROLOGUE.new()
+		prologue.name = "DecantingPrologue"
+		$HUD.add_child(prologue)
+		prologue.finished.connect(func() -> void:
+			Interstitial.travel("res://vat_chamber.tscn", "the growing floor // decanting"))
+	prologue.play()
 
 
 ## Greg: the settings screen looked "so lack luster". It was a default
