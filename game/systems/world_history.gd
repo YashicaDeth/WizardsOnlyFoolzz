@@ -532,6 +532,23 @@ func is_demo() -> bool:
 	return run_mode == RUN_MODE_DEMO
 
 
+## P3.5. A demo ending is an event in the same ledger as every other ending,
+## not a UI flag. The guard makes the authored wall a demo route edge only and
+## makes repeated combat callbacks harmless.
+func complete_demo(ending: String, details: Dictionary = {}) -> bool:
+	if not is_demo() or ending.is_empty():
+		return false
+	var run := subject("demo_run")
+	if str(run.get("status", "")) == "ended":
+		return false
+	register_subject("demo_run", {"status": "active", "ending": ""})
+	amend_subject("demo_run", {"status": "ended", "ending": ending})
+	var record := details.duplicate(true)
+	record["ending"] = ending
+	record_event("demo_ending_reached", record)
+	return true
+
+
 func _reset_memory() -> void:
 	events.clear()
 	subjects.clear()
