@@ -130,6 +130,12 @@ var wheel_contacts := [false, false, false, false]
 var wheel_loads := [0.0, 0.0, 0.0, 0.0]
 var wheel_slip := 0.0
 var airborne := false
+## Physics normally guarantees finite transforms, but a high-speed compound
+## contact is precisely where that guarantee matters most.  Retaining the last
+## good body state gives a bad contact a safe recovery path instead of letting
+## NaN values poison every wheel ray and appear to hard-freeze the game.
+var _last_safe_transform := Transform3D.IDENTITY
+var _has_safe_transform := false
 
 func _ready() -> void:
 	mass = 1100.0
@@ -161,6 +167,11 @@ func _ready() -> void:
 
 func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	var transform := state.transform
+	if not _state_is_finite(transform, state.linear_velocity, state.angular_velocity):
+		_restore_safe_state(state)
+		return
+	_last_safe_transform = transform
+	_has_safe_transform = true
 	var forward := -transform.basis.z
 	var right := transform.basis.x
 	var up := transform.basis.y
@@ -257,6 +268,31 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		stuck_seconds = 0.0
 	_resolve_contacts(state)
 	previous_velocity = state.linear_velocity
+
+
+func _state_is_finite(transform: Transform3D, linear: Vector3, angular: Vector3) -> bool:
+	return _vector_is_finite(transform.origin) \
+		and _vector_is_finite(transform.basis.x) \
+		and _vector_is_finite(transform.basis.y) \
+		and _vector_is_finite(transform.basis.z) \
+		and _vector_is_finite(linear) \
+		and _vector_is_finite(angular)
+
+
+func _vector_is_finite(value: Vector3) -> bool:
+	return is_finite(value.x) and is_finite(value.y) and is_finite(value.z)
+
+
+func _restore_safe_state(state: PhysicsDirectBodyState3D) -> void:
+	state.transform = _last_safe_transform if _has_safe_transform else Transform3D.IDENTITY
+	state.linear_velocity = Vector3.ZERO
+	state.angular_velocity = Vector3.ZERO
+	previous_velocity = Vector3.ZERO
+	signed_speed = 0.0
+	wheel_slip = 0.0
+	stun = STUN_SECONDS
+	contact_seconds = 0.0
+	stuck_seconds = 0.0
 
 
 func _resolve_contacts(state: PhysicsDirectBodyState3D) -> void:

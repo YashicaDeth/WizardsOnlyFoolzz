@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource path="res://tests/derby_hold_drive_test.gd" type="Script" id="1"]
+
+[node name="DerbyHoldDriveTest" type="Node"]
+script = ExtResource("1")

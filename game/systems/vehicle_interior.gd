@@ -299,7 +299,6 @@ func _windscreen() -> void:
 	material.roughness = 0.05
 	# Off, or the glass darkens everything behind it into a windscreen-shaped
 	# shadow on the road.
-	material.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	glass.material_override = material
 	glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(glass)
