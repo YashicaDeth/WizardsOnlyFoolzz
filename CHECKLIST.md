@@ -3543,20 +3543,105 @@ same reset — a range that is a place rather than a menu of guns.
 
 ### AF v10 — the final pass
 The last rung. Fifteen statements that are true of guns when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
-- [ ] **AF10.1** `v10` A round travels, drops, slows and cannot tunnel
+- [x] **AF10.1** `v10` ~~A round travels, drops, slows and cannot tunnel~~
+      Travel, drop and slow were AF1.1/AF1.6, proven in `ballistics_test.gd`
+      (a rifle round drops 1.7cm over 40m, buckshot sheds speed faster than
+      a slug). Tunnelling was never actually forced: `_step_rounds()` traces
+      the whole segment a round crosses in a step (`was` to `at`), which
+      cannot miss geometry lying anywhere along the way regardless of how
+      far the step was, but nothing had made that step big enough to matter.
+      `tests/tunnel_test.gd` (new) calls `_step_rounds()` directly with one
+      full second of flight — on the order of 780m for a rifle round in a
+      single call — through a 2cm pane 5m out. A destination-only point
+      check would sail past it and see nothing; the round stops exactly at
+      the pane instead
 - [ ] **AF10.2** `v10` It leaves damage on whatever it reaches
-- [ ] **AF10.3** `v10` Casings eject, bounce, land and stay
-- [ ] **AF10.4** `v10` Reloading is physical: the magazine leaves and another arrives
-- [ ] **AF10.5** `v10` A dropped half-full magazine is half-full when you pick it up
+- [x] **AF10.3** `v10` ~~Casings eject, bounce, land and stay~~ AF1.3, already
+      proven in `ballistics_test.gd`: brass ejects sideways and back out of
+      the port, bounces twice losing most of its energy, settles lying on
+      its side rather than standing on end, and is still there a second
+      later because nothing sweeps it up on its own
+- [x] **AF10.4** `v10` ~~Reloading is physical: the magazine leaves and another arrives~~
+      AF1.4, already proven both mechanically (`tests/magazine_test.gd`) and
+      visually (`tests/reload_visual_test.gd`): a real node named `magazine`
+      on each firearm's model drops clear, the well sits visibly empty, and
+      a fresh one rises back into place, all driven off the one
+      `reload_remaining` timer that also gates the mechanical swap
+- [x] **AF10.5** `v10` ~~A dropped half-full magazine is half-full when you pick it up~~
+      AF1.5, already proven in `tests/magazine_test.gd`: `_finish_reload()`
+      ejects whatever is still loaded as its own discrete spare in
+      `spare_magazines` rather than merging it into one reserve number, and
+      a magazine that left with three rounds still has exactly three,
+      two reloads later. "Dropped" and "picked up" are the reserve bag, not a
+      physical object on the ground — the same reading AF1.5 already
+      established this codebase means by the sentence
 - [ ] **AF10.6** `v10` Calibre decides what happens to a body and to a wall
 - [x] **AF10.7** `v10` ~~A round finds a zone, never a hitbox~~ Same proof as B10.3, from the gun's side: a round's impact point resolves through `zone_nearest()` to the limb it struck, and `Penetration` then measures that limb's real thickness at that height to decide how far in it got. A hitbox could not answer either question
 - [ ] **AF10.8** `v10` Firing from a car is the same system
 - [ ] **AF10.9** `v10` A gun is inspectable in full
 - [ ] **AF10.10** `v10` Weapon customisation lives on the weapon
-- [ ] **AF10.11** `v10` A gun carries momentum and swivels toward where you look
-- [ ] **AF10.12** `v10` Jams, wear and condition are real
+- [x] **AF10.11** `v10` ~~A gun carries momentum and swivels toward where you look~~
+      AN1.7, already proven in `tests/firearm_momentum_test.gd`: `ARM_WEIGHTS`
+      carries each firearm's own authored mass and reach, `_carry_current_weapon()`/
+      `_pose_weapon()` read `arsenal.current_id` the same way for a gun as
+      for the sword, and a hard turn visibly displaces each weapon's own
+      model off its rest pose — the heavier shotgun lagging further than
+      the lighter sidearm under the identical turn, which could not happen
+      if the pose write were melee-only
+- [x] **AF10.12** `v10` ~~Jams, wear and condition are real~~ AN2.4 already gave a
+      *melee* weapon a real, one-way condition that dulls an edge; nothing
+      before this ever wore a firearm or let one fail to cycle, because
+      `wear_weapon()` was only ever called from the melee hit path. Now
+      `HunterArsenal.begin_attack()` wears the current firearm on every shot
+      the same way a connecting sword blow wears its edge — `wear_weapon`
+      does not care which one asked — and rolls a jam chance that is a pure
+      function of that same condition (`_jam_chance()`: zero at full
+      condition, rising to 35% as it runs out). A jam does not cost the shot
+      that caused it — the round has already left the barrel by the time the
+      action fails to cycle — it costs the next trigger pull, refused with
+      `{"accepted": false, "reason": "jammed"}` until cleared.
+      \
+      Clearing a jam is a real, timed action of its own (`JAM_CLEAR_TIME`),
+      not a reload dressed up as one: no magazine moves and no round is
+      lost. It rides the same input as a reload (`_reload_weapon()` in
+      `bone_yard_hunt.gd`) because both are "work the action" to a player,
+      and a jammed gun cannot usefully be reloaded until it is clear — the
+      same one input, a different real duration, the way `[R]` already meant
+      two different things for an empty gun and a full one.
+      \
+      `tests/weapon_jam_test.gd` (new, 23 checks): a fresh sidearm wears on
+      every shot and never jams, because the chance is exactly zero at
+      condition 1.0; run down to zero condition it reliably jams within a
+      magazine or two; a jammed gun refuses to fire again on its own but can
+      still be holstered and drawn again, still jammed; `reload()` clears it
+      on a real timer without touching the chambered round; and the arsenal
+      cannot be swapped mid-clear any more than it can mid-reload. Re-ran
+      `arsenal_test`, `magazine_test`, `weapon_condition_test`,
+      `reload_visual_test`, `wall_strike_test`, `combat_integration_test`
+      and `firearm_momentum_test` clean — nothing about the melee condition
+      path or the existing firearm tests changed, because every new branch
+      is gated behind `kind == "firearm"` or a jam-clear timer that starts
+      at zero.
+      \
+      This worktree's `.godot/global_script_class_cache.cfg` predated
+      `storm_weather.gd`/`clothing.gd` and made every test that loads
+      `bone_yard_hunt.tscn` fail to parse with unrelated "could not find
+      type" errors — not this change, but it hid a real type-inference bug
+      of this change's own underneath it (`arsenal.JAM_CLEAR_TIME` through a
+      loosely-typed reference cannot be inferred by `:=`, the same trap
+      `event.pressed` sets on a base `InputEvent`). One `--editor --quit`
+      pass rebuilt the cache; the fix is `var duration: float = ...` instead
+      of `:=`.
 - [ ] **AF10.13** `v10` The floor of a firefight can be read afterwards
-- [ ] **AF10.14** `v10` Nothing about firing is resolved on the frame the trigger went down
+- [x] **AF10.14** `v10` ~~Nothing about firing is resolved on the frame the
+      trigger went down~~ AF1.1, already proven in `tests/deferred_damage_test.gd`:
+      a shot at real distance wounds nobody and writes no `firearm_anatomy_hit`
+      the instant `_attack()` returns; `weapon_fired` itself is recorded
+      eagerly because the trigger going down is not an anatomy question,
+      but the wound and its event both wait for the round to actually cross
+      the distance and land on a real canonical zone; a shotgun blast
+      confirms more than one pellet lands as its own separate hit rather
+      than one pre-batched summary
 - [ ] **AF10.15** `v10` A gun can be taken from you
 
 ## AD — Movement, and being in first person
