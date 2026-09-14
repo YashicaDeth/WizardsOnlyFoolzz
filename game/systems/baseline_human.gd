@@ -1434,6 +1434,10 @@ static func clear_gore() -> void:
 ## jittered radii and a couple of thrown outliers, which is what a drop landing
 ## at speed actually leaves. Meshes are pooled by variation so a floor of four
 ## hundred marks costs a handful of resources, not four hundred.
+## Nine distinct splat shapes was enough when a splat was a blob; with
+## satellites each shape is much more recognisable, so a floor of nine repeats
+## visibly. Twelve, and they are built once and shared.
+const SPLAT_SHAPES := 12
 static var _splat_pool: Array[ArrayMesh] = []
 
 ## B4.6: a chunk from `GoreChunks` marks the ground the same way a blood drop
@@ -1512,21 +1516,37 @@ static func restore_blood(root: Node) -> int:
 
 
 static func _splat_mesh(radius: float) -> ArrayMesh:
-	if _splat_pool.size() >= 9:
+	if _splat_pool.size() >= SPLAT_SHAPES:
 		return _splat_pool[randi() % _splat_pool.size()]
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _splat_pool.size() * 7919 + 13
 	var points := PackedVector3Array()
 	var normals := PackedVector3Array()
-	var steps := 15
+	var colors := PackedColorArray()
+
+	# Greg: "make the blood realistic and fun but abstract arty".
+	#
+	# The arty half is a *decision about lighting*, not about shape. Blood shaded
+	# per-pixel like every other surface is a wet brown object lying on the
+	# ground, and no amount of silhouette work rescues it — it is competing with
+	# the floor on the floor's terms. Drawn flat, it stops being an object and
+	# becomes a mark: printed colour on the world, which is the same language the
+	# stencil typeface and the sigils already speak. Hence unshaded, with the
+	# tonal variation carried in vertex colour instead of in light.
+	#
+	# The realistic half is the satellites. A drop that lands does not make one
+	# blob — it throws a ring of smaller ones out along the direction it was
+	# travelling, and that scatter is the single most recognisable thing about
+	# real spatter. It is also, conveniently, the most graphic.
+	var steps := 17
 	var radii: Array[float] = []
 	var widest := 0.0
 	for step in steps:
-		var jitter := rng.randf_range(0.45, 1.0)
+		var jitter := rng.randf_range(0.40, 1.0)
 		# Every few points throw a long finger, so the outline has runs coming
 		# off it rather than being a fuzzy circle.
 		if step % 5 == 0:
-			jitter *= rng.randf_range(1.35, 2.1)
+			jitter *= rng.randf_range(1.4, 2.3)
 		widest = maxf(widest, jitter)
 		radii.append(jitter)
 	# Normalised so `radius` means what it says. It used to be accepted and
@@ -1534,6 +1554,16 @@ static func _splat_mesh(radius: float) -> ArrayMesh:
 	# — up to 2.1 units — which the caller then scaled up again.
 	for index in radii.size():
 		radii[index] = radii[index] / maxf(0.001, widest) * radius
+
+	# Pooled blood is darkest where it is deepest, which is the middle.
+	#
+	# Tuned for *unshaded*, which is a different job: with lighting off the
+	# vertex colour is the final pixel, so values picked to look right after a
+	# key light multiplies them come out washed. The first pass reused BLOOD and
+	# BLOOD_DARK straight and the floor went salmon pink. These are deliberately
+	# deeper and much more saturated than the lit palette — arterial, not meat.
+	var core := Color(0.135, 0.009, 0.011)
+	var edge := Color(0.355, 0.026, 0.024)
 	for step in steps:
 		var a := TAU * float(step) / float(steps)
 		var b := TAU * float(step + 1) / float(steps)
@@ -1542,33 +1572,57 @@ static func _splat_mesh(radius: float) -> ArrayMesh:
 		points.append(Vector3.ZERO)
 		points.append(Vector3(cos(a) * ra, sin(a) * ra, 0.0))
 		points.append(Vector3(cos(b) * rb, sin(b) * rb, 0.0))
+		colors.append(core)
+		colors.append(edge)
+		colors.append(edge)
 		# Without normals the surface has no defined lighting and renders black
 		# under the Ashbloom fog, which is how a floor of blood became invisible.
 		for _corner in 3:
 			normals.append(Vector3.BACK)
+
+	# Satellites: small discs flung off the main mass, thrown further where the
+	# main outline already has a finger, so the scatter reads as having come off
+	# *this* splat rather than being sprinkled around it.
+	for satellite in rng.randi_range(4, 9):
+		var finger := (satellite * 5) % steps
+		var angle := TAU * float(finger) / float(steps) + rng.randf_range(-0.35, 0.35)
+		var distance: float = radii[finger] * rng.randf_range(1.25, 2.4)
+		var centre := Vector3(cos(angle) * distance, sin(angle) * distance, 0.0)
+		var drop_radius: float = radius * rng.randf_range(0.055, 0.16)
+		var facets := 6
+		for facet in facets:
+			var fa := TAU * float(facet) / float(facets)
+			var fb := TAU * float(facet + 1) / float(facets)
+			points.append(centre)
+			points.append(centre + Vector3(cos(fa) * drop_radius, sin(fa) * drop_radius, 0.0))
+			points.append(centre + Vector3(cos(fb) * drop_radius, sin(fb) * drop_radius, 0.0))
+			colors.append(edge)
+			colors.append(core)
+			colors.append(core)
+			for _corner in 3:
+				normals.append(Vector3.BACK)
+
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = points
 	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_COLOR] = colors
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	var material := StandardMaterial3D.new()
-	material.albedo_color = (BLOOD_DARK if _splat_pool.size() % 2 == 0 else BLOOD) * Color(1, 1, 1, 1)
-	material.albedo_color.a = 0.9
+	material.vertex_color_use_as_albedo = true
+	# The colours above are written as sRGB the way every other colour in this
+	# project is, so say so rather than letting them be read as linear.
+	material.vertex_color_is_srgb = true
+	material.albedo_color = Color(1, 1, 1, 0.96)
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
-	# Wet, and just self-lit enough to survive the region's fog and low key
-	# light without reading as neon.
-	material.roughness = 0.16
-	material.metallic = 0.0
-	material.emission_enabled = true
-	material.emission = BLOOD * Color(1, 1, 1, 1)
-	material.emission_energy_multiplier = 0.22
+	# The whole point. See the note above: shaded, this is a brown object on the
+	# ground; unshaded, it is a mark on the world.
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mesh.surface_set_material(0, material)
 	_splat_pool.append(mesh)
 	return mesh
-
 
 ## B5.2. What is installed in a limb, visible in that limb.
 ##
