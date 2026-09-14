@@ -121,5 +121,59 @@ func _ready() -> void:
 	check(splat_mat != null, "sanity: blood resolves a material")
 	check(splat_mat.shading_mode != bone_mat.shading_mode, "and blood answers light differently again — it is shaded unshaded on purpose, so it reads as a mark rather than as a third wet object")
 
+
+	# --- B10.6: any body opens up in the same detail as any other ----------
+	# The claim is that there is no "detailed body" and "cheap body" — one rig,
+	# so an NPC nobody will ever inspect has the same organs as the one the
+	# player is about to dig through.
+	var a := _rig("body_a")
+	var b := _rig("body_b")
+	await get_tree().process_frame
+	check(a.anatomy.organs.keys().size() == b.anatomy.organs.keys().size(), "two different bodies carry the same organ count")
+	check(a.anatomy.zones.keys() == b.anatomy.zones.keys(), "and the same zones")
+	check(a.parts.keys() == b.parts.keys(), "and the same parts to open")
+	# Depth is a ratchet on any of them, not a property of special bodies.
+	b.call("mark_opened", "torso", GoreChunks.Layer.ORGAN)
+	check(b.exposed_layer("torso") >= GoreChunks.Layer.ORGAN, "any body can be opened to the organ layer, not just an authored one")
+	check(a.exposed_layer("torso") < GoreChunks.Layer.ORGAN, "and doing it to one does not do it to the other")
+
+	# --- B10.11: gore rots on a real clock, and is eaten ------------------
+	check(GoreChunks.ROT_SECONDS > 0.0, "gore has a real rot clock (%.0f s)" % GoreChunks.ROT_SECONDS)
+	# `has_method` cannot be called on a class name, only an instance, so the
+	# method list comes off the script resource — which also covers statics.
+	check(_declares("res://systems/gore_chunks.gd", "rot_ratio"), "and how rotten a piece is can be asked at any time")
+	check(ResourceLoader.exists("res://systems/carrion_scavenger.gd"), "and something exists that eats it")
+	check(_declares("res://systems/carrion_scavenger.gd", "can_eat"), "which decides for itself what counts as food")
+
+	# --- B10.13: a corpse is a place other systems can read from ----------
+	# Not "the mesh stays there" — that a *later* system, with no reference to
+	# the rig, can ask what happened to that body and get an answer.
+	var fallen := _rig("the_deceased")
+	await get_tree().process_frame
+	var chest2 := fallen.parts.get("torso") as Node3D
+	fallen.hit_at(chest2.global_position + Vector3(0, 0.08, 0.14), 30.0, 6.0, "ballistic", Vector3(0, 0, -1))
+	fallen.severed.append("left_arm")
+	WorldHistory.update_subject("the_deceased", {"anatomy_state": fallen.snapshot()}, "anatomy_changed")
+	# Everything about the rig is now gone, the way it would be a day later.
+	fallen.queue_free()
+	await get_tree().process_frame
+	var record: Dictionary = WorldHistory.subject("the_deceased")
+	var state: Dictionary = record.get("anatomy_state", {})
+	check(not state.is_empty(), "a body that is no longer in the scene still has a record")
+	check((state.get("severed", []) as Array).has("left_arm"), "the record remembers which limb came off")
+	check(state.has("zones") or state.has("organs"), "and the state of what is left, readable by anything — this is what makes a corpse a place rather than a prop")
+
 	print("BODY_V10_AUDIT_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+
+## Whether a script declares a method, static or otherwise. `has_method()` needs
+## an instance and these are static utility classes with no instances to make.
+func _declares(path: String, method_name: String) -> bool:
+	var script: Script = load(path)
+	if script == null:
+		return false
+	for entry: Dictionary in script.get_script_method_list():
+		if str(entry.get("name", "")) == method_name:
+			return true
+	return false
