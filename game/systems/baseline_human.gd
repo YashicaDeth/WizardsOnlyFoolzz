@@ -1657,6 +1657,22 @@ static func _splat_mesh(radius: float) -> ArrayMesh:
 			for _corner in 3:
 				normals.append(Vector3.BACK)
 
+	# The main blob was normalised above so `radius` meant what it says. The
+	# satellites are appended after that, at up to 2.4x a finger's length plus
+	# their own width, so the finished mark reached about 2.5x the radius it was
+	# handed and `radius` quietly stopped meaning anything -- which is how a
+	# landed drop ended up 1.46m across, a puddle you could lie in.
+	#
+	# Normalise once more, over everything, so the invariant holds for the mesh
+	# that is actually returned rather than for an intermediate state of it.
+	var extent := 0.0
+	for point in points:
+		extent = maxf(extent, Vector2(point.x, point.y).length())
+	if extent > radius and extent > 0.0001:
+		var shrink := radius / extent
+		for index in points.size():
+			points[index] = Vector3(points[index].x * shrink, points[index].y * shrink, points[index].z)
+
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = points
