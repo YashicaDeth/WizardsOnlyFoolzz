@@ -26,6 +26,17 @@ extends Node3D
 ## bounce, not a physics body per round.
 
 signal round_hit(hit: Dictionary)
+## AF1.1. The other half of a round having a real existence: something has to
+## know when one *stopped* existing without ever arriving anywhere — out of
+## range, or below the world — so a caller waiting to find out whether a shot
+## connected is not left waiting forever. `payload` is echoed back exactly as
+## given to `fire()`; empty for anything that did not ask to be told.
+signal round_expired(payload: Dictionary)
+## AD3.3. The third way a round's flight can end, distinct from the other
+## two: not arriving somewhere (`round_hit`) and not running out of world
+## (`round_expired`), but being reached into and taken out of the air before
+## either happens.
+signal round_intercepted(report: Dictionary)
 
 ## Calibres, and what each one is for. These are the whole balance conversation
 ## for firearms the same way mass and reach are for melee (AN1.5).
@@ -47,6 +58,17 @@ const CALIBRES := {
 	"slug": {
 		"label": "SLUG", "muzzle": 430.0, "grain": 0.028, "drag": 0.035,
 		"penetration": 0.55, "casing": Vector3(0.019, 0.070, 0.019),
+	},
+	# AD3.1. A rocket is the one round in this table you are meant to be able
+	# to answer. It leaves the tube at roughly a tenth of a pistol round's
+	# speed, which is what makes AD3.3's `intercept_near()` and your own feet
+	# real options against it rather than theoretical ones — you can see it
+	# coming. Heavy and low-drag so the slowness is mass rather than a round
+	# that stops in mid-air, and no casing, because a launcher does not throw
+	# brass.
+	"rocket": {
+		"label": "WARHEAD", "muzzle": 38.0, "grain": 0.900, "drag": 0.004,
+		"penetration": 0.85, "casing": Vector3.ZERO,
 	},
 }
 
@@ -90,7 +112,14 @@ func _ready() -> void:
 ## Fire. `from` and `along` are world space, `calibre` keys `CALIBRES`, `spread`
 ## is in radians and `count` is how many projectiles leave the barrel — which is
 ## the only difference between a pistol and a shotgun in this system.
-func fire(from: Vector3, along: Vector3, calibre := "pistol", spread := 0.0, count := 1, shooter := "") -> void:
+## AF1.1. `payload` is the round's own memory of what it was fired to do —
+## damage, impulse, damage type, whoever's trigger this was for — carried on
+## the round rather than resolved here, so whatever it eventually hits (or
+## fails to) is what decides when that damage actually happens, not the frame
+## the trigger went down. Ballistics does not know what a payload means and
+## never reads it; it only ever hands it back, on `round_hit` or
+## `round_expired`, to whoever is listening.
+func fire(from: Vector3, along: Vector3, calibre := "pistol", spread := 0.0, count := 1, shooter := "", payload := {}) -> void:
 	var spec: Dictionary = CALIBRES.get(calibre, CALIBRES["pistol"])
 	for index in count:
 		if rounds.size() >= MAX_ROUNDS:
@@ -118,6 +147,7 @@ func fire(from: Vector3, along: Vector3, calibre := "pistol", spread := 0.0, cou
 			"spec": spec,
 			"travelled": 0.0,
 			"shooter": shooter,
+			"payload": payload,
 		})
 	_eject(from, along, calibre)
 
@@ -127,6 +157,11 @@ func fire(from: Vector3, along: Vector3, calibre := "pistol", spread := 0.0, cou
 ## whoever was shooting rather than in front of them.
 func _eject(from: Vector3, along: Vector3, calibre: String) -> void:
 	var spec: Dictionary = CALIBRES.get(calibre, CALIBRES["pistol"])
+	# AD3.1. A launcher does not throw brass. Sized at zero in the table
+	# rather than special-cased by name here, so anything else that is fired
+	# without a case gets the same answer for free.
+	if (spec["casing"] as Vector3).is_zero_approx():
+		return
 	if casings.size() >= MAX_CASINGS:
 		_retire_casing(0)
 	var forward := along.normalized()
@@ -185,13 +220,26 @@ func _step_rounds(delta: float) -> void:
 		round_data["travelled"] = float(round_data["travelled"]) + (at - round_data["was"]).length()
 
 		var query := PhysicsRayQueryParameters3D.create(round_data["was"], at)
-		query.collide_with_areas = false
+		# AF1.1. A body's own zones are `Area3D` hitboxes (`baseline_human.gd`),
+		# not physics bodies — this traced only bodies before, which is exactly
+		# why nothing fired at a person could ever actually reach one through
+		# here. `_trace_actor()`'s own instant raycast has collided with areas
+		# from the start; this one has to now, or a round can travel forever
+		# and land on nobody.
+		query.collide_with_areas = true
+		query.collide_with_bodies = true
 		var hit := space.intersect_ray(query)
 		if not hit.is_empty():
 			_land(round_data, hit)
 			_retire_round(index)
 			continue
 		if float(round_data["travelled"]) > MAX_RANGE or at.y < -30.0:
+			# AF1.1. Ran out of world before it ran out of flight — still a real
+			# outcome for whoever fired it, and the only one of the three ways a
+			# round can stop existing that `_land()` never sees.
+			var expired_payload: Dictionary = round_data.get("payload", {})
+			if not expired_payload.is_empty():
+				round_expired.emit(expired_payload)
 			_retire_round(index)
 			continue
 		var node := round_data["node"] as Node3D
@@ -219,9 +267,71 @@ func _land(round_data: Dictionary, hit: Dictionary) -> void:
 		"energy": energy,
 		"penetration": float(spec["penetration"]),
 		"shooter": round_data["shooter"],
+		"payload": round_data.get("payload", {}),
 	}
 	_mark(at, normal, energy)
 	round_hit.emit(report)
+
+
+## AN2.3. The same scar a round leaves, for whatever else in this game hits a
+## wall hard enough to mark it — a melee swing meeting stone rather than an
+## actor, currently. Public because that caller is not a round in flight and
+## has no `_land()` of its own to route through.
+func mark_impact(at: Vector3, normal: Vector3, energy: float) -> void:
+	_mark(at, normal, energy)
+
+
+## AD3.3. "A projectile is a physical thing that can be met, not a damage
+## event." Everything above resolves a round *arriving*; this is the other
+## end of being met — something reaching into its flight path and taking it
+## out of the air before it gets anywhere.
+##
+## Position-and-radius rather than an index, because the caller that wants
+## this is a swing: it knows where and when it landed, not which of up to
+## `MAX_ROUNDS` entries that corresponds to. Returns how many it actually
+## took out, so a caller can tell the difference between cutting a round out
+## of the air and swinging at nothing — which is the whole feedback the move
+## needs to be worth making.
+##
+## Deliberately does not emit `round_hit` or `round_expired`: an intercepted
+## round never arrived anywhere and did not run out of world, and a caller
+## waiting on either of those to decide whether a shot connected would be
+## told the wrong thing by a third outcome dressed up as one of the first
+## two.
+func intercept_near(position: Vector3, radius: float, by: String = "") -> int:
+	if radius <= 0.0:
+		return 0
+	var destroyed := 0
+	for index in range(rounds.size() - 1, -1, -1):
+		var round_data: Dictionary = rounds[index]
+		var at: Vector3 = round_data["at"]
+		if position.distance_to(at) > radius:
+			continue
+		round_intercepted.emit({
+			"position": at,
+			"calibre": round_data["calibre"],
+			"shooter": round_data["shooter"],
+			"payload": round_data.get("payload", {}),
+			"by": by,
+			# What it still had left when it was taken out — a round cut down
+			# on the way out of the barrel was a different save from one met
+			# at the end of its travel, and only this knows the difference.
+			"energy": 0.5 * float((round_data["spec"] as Dictionary)["grain"]) * (round_data["velocity"] as Vector3).length_squared(),
+		})
+		_retire_round(index)
+		destroyed += 1
+	return destroyed
+
+
+## What is actually in the air right now, as positions. For anything that
+## needs to decide whether meeting a round is even available to it this
+## frame — an AI weighing a parry, a prompt telling the player a round is
+## coming — without reaching into `rounds` and depending on its shape.
+func rounds_in_flight() -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for round_data: Dictionary in rounds:
+		out.append(round_data["at"])
+	return out
 
 
 ## The hole. Small, dark, slightly irregular, and permanent for the scene —

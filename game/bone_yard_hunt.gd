@@ -20,6 +20,11 @@ const JUMP_IMPULSE := 6.6
 ## one's).
 const VAULT_MIN_TOP := 0.32
 const VAULT_MAX_TOP := 1.35
+## AD3.2. What a leg with drive hardware in it raises that ceiling to.
+## Chest height rather than head height on purpose: augmented legs make a
+## chest-high barrier passable, they do not make walls stop being walls,
+## which would take AD1.3's wall-running away from itself.
+const VAULT_MAX_TOP_AUGMENTED := 1.95
 const VAULT_REACH := 0.85
 const VAULT_FAR_SIDE := 0.55
 const VAULT_HEAD_CLEARANCE := 1.55
@@ -43,6 +48,20 @@ const WALL_RUN_DURATION := 1.1
 const WALL_RUN_GRAVITY_SCALE := 0.16
 const WALL_RUN_KICKOFF_UP := 5.2
 const WALL_RUN_KICKOFF_OUT := 5.0
+## AD1.4. A wall too tall for `_vault_target()`'s own high check, dead ahead
+## rather than to the side — the third rung of the same ladder vaulting and
+## wall-running already are. Gated on real kickoffs rather than a new
+## invented counter, since climbing is what wall-running was training for.
+## Duration is a real cap, not a promise of free climbing to any height —
+## the honest route up a tall building chains a climb into a mantle the
+## instant one comes within reach, same as `_wall_run_surface()`'s own wall
+## running into `_vault_target()` never needed a run system that could climb
+## forever either.
+const CLIMB_UNLOCK_KICKOFFS := 2
+const CLIMB_REACH := 0.85
+const CLIMB_SPEED := 5.4
+const CLIMB_MAX_DURATION := 2.6
+const CLIMB_STAMINA_DRAIN := 30.0
 ## Worst case a wrecked body can move or swing at, as a share of healthy. The
 ## soulslike register wants injury to hurt; it does not want a player who has
 ## lost a leg to be unable to disengage from the thing that took it.
@@ -178,6 +197,31 @@ const FOOTING_RECOVERY := 0.55
 const FOOTING_WHIFF := 0.14
 const FOOTING_BLOCKED := 0.2
 const FOOTING_SHOVED := 0.34
+## O6.1. "You can be disarmed, and so can they" — AN2.2 built the player's
+## own half off `arm.fatigue`; an encounter actor has no arm object, but it
+## already has the same shape of number in `footing` (O5.10 v2's own "same
+## meter, same constants, now on both bodies"). Barely standing (below the
+## line a stumble already uses) and hit hard enough to stagger is the NPC
+## reading of "barely held and hit hard"; footing recovering back past the
+## same line is them getting a grip on it again, the same way stamina
+## recovering lets the player draw a weapon back out.
+const NPC_UNARMED_DAMAGE_SCALE := 0.35
+const NPC_UNARMED_CYCLE_SCALE := 0.7
+## AN2.1. Scales `last_commitment` (0..1) into a footing cost paid the instant
+## a swing is thrown, hit or miss — a flick costs about what a whiff already
+## does; a hard committed sweep costs as much as being shoved. Whiffing still
+## adds its own `FOOTING_WHIFF` on top, so a committed swing that also misses
+## pays for both, which is the whole point: a flick has nothing to lose twice.
+const FOOTING_COMMITTED_SWING := 0.32
+
+## AN2.2. `arm.fatigue` (AN1.6, straight off stamina) is already "how loosely
+## you are holding it" as a real number. Deterministic rather than a coin
+## flip on top of it — the same hit, the same fatigue, the same outcome every
+## time — because this project's other thresholds (severing, footing) all
+## work the same way and a random disarm would be the one hit in the game a
+## player could never learn to read.
+const DISARM_FATIGUE_THRESHOLD := 0.75
+const DISARM_DAMAGE_THRESHOLD := 14.0
 
 var swing_side := 1
 var last_swing_at := 0.0
@@ -199,6 +243,14 @@ var guard_stamina_drain := 14.0
 var blood_veil: Control = null
 ## AF1. Rounds in flight, brass on the floor, holes in the walls.
 var ballistics: Node3D = null
+## AF1.1. One trigger pull's worth of rounds still in flight, keyed by an
+## id unique to that pull. A pellet lands on a body, lands on the world, or
+## runs out of range — `_settle_shot()` counts down `remaining` regardless
+## of which, and the miss/hit feedback (and the aggregate `weapon_fired`
+## record) fires once, when the last pellet's fate is actually known,
+## rather than on the frame the trigger went down.
+var _shot_counter := 0
+var _pending_shots: Dictionary = {}
 ## AN1.2. The arm the weapon hangs off. Fed the same mouse delta the camera
 ## turns by, so the weapon is thrown by you turning rather than by a curve.
 var arm: LimbMomentum = null
@@ -263,6 +315,10 @@ var dodge_remaining := 0.0
 ## that will actually carry the body off the ground; see that function's own
 ## comment for why a frame's delay either way stomps it back to the floor.
 var jump_queued := false
+## AD3.2. How many mid-air kick-offs have been spent since the last time the
+## body was on the ground. Reset by touching down, so the hardware grants one
+## extra departure rather than flight.
+var kick_off_spent := 0
 var dodge_direction := Vector3.ZERO
 ## AD1.2. How long is left of the current vault, counting down from
 ## `VAULT_DURATION`; the body is not under normal movement control for as
@@ -270,6 +326,15 @@ var dodge_direction := Vector3.ZERO
 var vaulting_time := 0.0
 var vault_from := Vector3.ZERO
 var vault_to := Vector3.ZERO
+## AD1.5. The horizontal speed the body was carrying the instant it left
+## the ground for this vault, handed straight back the moment the lerp
+## ends. A vault is a scripted position takeover, not a physics flight, so
+## `player_body.velocity` sits unread for its whole duration; without this,
+## it also sat unread at zero, and normal movement's own `move_toward`
+## acceleration had to rebuild a run from a dead stop on the far side of
+## every single obstacle — a stutter this segment's own wording names
+## directly ("run into vault... is one motion").
+var vault_entry_velocity := Vector3.ZERO
 ## AD1.6. The actual duration this specific vault was given, scaled by
 ## anatomy at the moment it started — `vaulting_time` counts down against
 ## this, never against the flat `VAULT_DURATION` constant, since a hobbled
@@ -282,6 +347,21 @@ var wall_running_time := 0.0
 var wall_run_normal := Vector3.ZERO
 var wall_run_kickoff_queued := false
 var wall_run_unlock_announced := false
+## AD1.4. Positive for as long as the wall is still there to climb;
+## re-checked every frame the same way `wall_running_time` is, and the
+## direction it started with is what both the re-check and the mid-climb
+## mantle attempt read, since the player is not steering sideways off a
+## climb the way they can steer along a wall run.
+var climbing_time := 0.0
+var climb_direction := Vector3.ZERO
+var climb_normal := Vector3.ZERO
+## AD1.5. The run speed the climb itself replaced — while climbing,
+## `player_body.velocity`'s horizontal part is only ever the small press
+## into the wall, not the sprint that got the player here, so a mantle
+## chained straight off it (see the `climbing_time` block) hands that back
+## to `_vault()` instead, the same way a running vault would.
+var climb_entry_speed := 0.0
+var climb_unlock_announced := false
 var handheld: Control
 ## FINAL_V.md §16. The one screen-space layer AS2's night warp, and later the
 ## drugs and shadow realms, all reach for instead of building their own effect.
@@ -313,6 +393,81 @@ const GATE_LIGHTS := [
 	{"at": Vector3(-31, 5, 18), "color": "d8552a", "energy": 2.6, "reach": 12.0},
 	{"at": Vector3(26, 5, -30), "color": "d8552a", "energy": 2.6, "reach": 12.0},
 ]
+
+## AE.1 - AE.4. The yard's own population.
+##
+## The Bone Yard has been a one-person world since it was built: the player, Nix
+## at the gate, and the captain. Every other body in the region either arrived
+## from a reality misfire or came to keep the captain's second body alive. Greg
+## asked for the world repopulated with killable characters, so this is a work
+## party already standing in the place the fight happens - the hunt is now a
+## hunt among people rather than a duel in an empty pit.
+##
+## AE.1. The slot prefix every one of these resolves through. Nothing in this
+## block is a person's name: `cast_names.gd` derives one from
+## `WorldHistory.run_salt` plus the slot, so a post is the same person inside a
+## save and somebody else entirely in the next one - the same rule the captain
+## has been on since v10.1.
+const POPULATION_SLOT_PREFIX := "boneyard_worker_"
+## AE.2. Where they stand: an offset from a lamp this scene already placed, so a
+## post is somewhere with a light and a route rather than a coordinate typed in
+## once and never revisited. `lamp` indexes `GATE_LIGHTS` above - the gate pair
+## the player walks in under, the mid-road pair further north, and one out on
+## the wreck line. Every post is more than `_update_encounter_actors()`'s own
+## 24 m engage radius from the player's spawn point, so the yard is populated
+## when you arrive rather than already on top of you.
+## `tint`, `variation` and `implant` go straight into the rig config
+## `baseline_human.gd` already reads, which is the only thing that makes two
+## bodies out of one model: different flesh, a different procedural head and
+## face, and a named piece of hardware on a named zone. A worker with a ceramic
+## sternum and a worker with a shoulder brace are not the same person with a
+## different label over them, and a hit that lands on an implant is recorded
+## against a real part rather than against "unknown hardware".
+const POPULATION_POSTS := [
+	{"lamp": 0, "offset": Vector2(-5.0, 4.5), "post": "gate west", "role": "Yard salvage hand",
+		"loot": ["gate scrip", "brass knuckle"], "tint": "6f5f4b", "variation": 3, "grudge": 0,
+		"implant": {"zone": "left_arm", "name": "loader brace", "armor": 0.14}},
+	{"lamp": 0, "offset": Vector2(4.5, -5.0), "post": "gate east", "role": "Wreck line cutter",
+		"loot": ["cutting torch", "soot rag"], "tint": "7a6350", "variation": 11, "grudge": 2,
+		"implant": {"zone": "torso", "name": "ceramic sternum", "armor": 0.12}},
+	{"lamp": 2, "offset": Vector2(-6.0, 2.0), "post": "mid road west", "role": "Haul foreman",
+		"loot": ["haul ledger", "spare chain"], "tint": "6b4f3a", "variation": 19, "grudge": 6,
+		"implant": {"zone": "head", "name": "quota ledger plate", "armor": 0.16}},
+	{"lamp": 2, "offset": Vector2(6.5, -3.0), "post": "mid road east", "role": "Signal keeper",
+		"loot": ["relay coil", "tinned meat"], "tint": "5f5a44", "variation": 27, "grudge": 0,
+		"implant": {"zone": "right_arm", "name": "relay spool", "armor": 0.1}},
+	{"lamp": 4, "offset": Vector2(4.0, -6.0), "post": "wreck line", "role": "Rig mechanic",
+		"loot": ["torque wrench", "battery cell"], "tint": "7c5744", "variation": 5, "grudge": 3,
+		"implant": {"zone": "left_leg", "name": "pile-driver shin", "armor": 0.18}},
+]
+## AE.2. The yard floor is y = 0 (`_build_world()` lays the ground slab at -0.6
+## with its top at 0), so a post takes its x/z from its lamp and its height from
+## the floor rather than from the lamp's own mounting height.
+const POPULATION_STAND_Y := 0.0
+## AE.5. Walk into the yard after dusk and these five would be five names in the
+## dark - the clock runs a game minute a second and dusk is a minute and a half
+## from the opening 16:30. Each of them carries a lantern instead: made through
+## `_place_night_light()` like every other light in the region, parented to the
+## body so it travels with whoever is holding it, and driven by
+## `_update_day_night()` off the same hour as the gate lamps. You find people
+## here because you can see them, not because you walked the grid blind.
+const POPULATION_LANTERN_ENERGY := 2.8
+const POPULATION_LANTERN_REACH := 12.0
+## Offset in the carrier's own frame: out to one side and at hand height, the
+## way a lantern is actually held rather than a lamp mounted on their spine.
+const POPULATION_LANTERN_AT := Vector3(0.42, 1.05, 0.0)
+## AE.4. The yard's people work for one of the four factions `cast_names.gd`
+## already hands out; this is the one that is theirs, registered as a
+## WorldHistory subject of kind "faction" the way every other faction in this
+## world is. It is not a parallel roster - a death in the yard then has a real
+## consequence through F3, where `wire_net.gd`'s `open_vacancy()` finds the post
+## the dead worker held and `promote_successor()` fills it from whoever of the
+## roster is still standing. The yard reorganises around its losses instead of
+## quietly forgetting them. The id and name are the ones already in
+## `CastNames.FACTIONS`, so a generated worker's faction and this subject can
+## never be two different things.
+const POPULATION_FACTION_ID := "bonewright_union"
+const POPULATION_FACTION_NAME := "Bonewright Union"
 
 ## A4.1. Every placed light, so `_update_day_night()` can put them out at dawn
 ## without holding a second list of where they are.
@@ -369,6 +524,10 @@ var grapple_clock := 0.0
 ## combat/mobility ratios already did, and costs that limb condition of its
 ## own while you press it.
 var grapple_zone := ""
+## B6.2. Which of the player's own limbs is holding. Severing it ends the
+## hold — the item's own claim, and the reason this is tracked at all rather
+## than a grapple being something the whole body does abstractly.
+var grapple_with := "right_arm"
 const GRAPPLE_PRESSURE_INTERVAL := 0.4
 var grapple_pressure_clock := 0.0
 ## Test hook: set true/false to force the press state `_update_grapple` reads,
@@ -376,6 +535,10 @@ var grapple_pressure_clock := 0.0
 ## action and there is no display server to raise a real one against in a
 ## headless run. Leave null for real input to decide it, as normal play does.
 var grapple_pushing_override: Variant = null
+## AN1.9. Mirrors `_update_grapple()`'s own local `pushing` each frame, since
+## `_carry_current_weapon()` needs to read it from outside that function to
+## pick "grapple" or the heavier "shove" mass.
+var grapple_pushing_now := false
 var friend_rig: BaselineHuman
 var lock_target := ""
 var lock_screen := Vector2(-1, -1)
@@ -396,6 +559,11 @@ var kill_cam: Control
 var voice_channel: Node
 var arsenal: Node
 var pending_attack: Dictionary = {}
+## AN2.3. Set by `_attack_nearest_encounter_actor()` right before it returns
+## true, read once by `_resolve_strike()` immediately after — a throat and a
+## skull do not stop a blade the same amount, and `arm.strike()` was never
+## told which one it had just hit.
+var _last_melee_resistance := 0.65
 var carried_limb_index := -1
 var carried_limb_model: MeshInstance3D
 var asset_network := ASSET_NETWORK.new()
@@ -416,6 +584,18 @@ var xray_active := false
 const XRAY_HOLD_TO_WHEEL := 0.35
 
 @onready var camera: Camera3D = $CameraRig/Camera3D
+## Agent 1 brief. "Do not solve darkness by merely increasing ambient
+## brightness. Night should remain dark. The Black Mirror camera should
+## become the meaningful navigation tool in extreme darkness." The real
+## world's own lighting (`sun`, `WorldEnvironment`, AS2's whole night curve)
+## is untouched either way — this swaps only the camera's own `environment`,
+## the same seam Godot already gives a lens for looking differently at an
+## unchanged world, to a steep brightness lift and a washed, near-monochrome
+## grade. Amplifying what little light is really there, not adding light
+## that was never there, is the actual difference between this and turning
+## the world's own lamps up.
+var black_mirror_active := false
+var _black_mirror_env: Environment
 @onready var title: Label = $HUD/Title
 @onready var status: Label = $HUD/Status
 @onready var vitals: Label = $HUD/VitalsPanel/Vitals
@@ -500,6 +680,7 @@ func _ready() -> void:
 	ballistics = BALLISTICS.new()
 	add_child(ballistics)
 	ballistics.round_hit.connect(_on_round_hit)
+	ballistics.round_expired.connect(_on_round_expired)
 	blood_veil = BLOOD_VEIL.new()
 	$HUD.add_child(blood_veil)
 	_pointer = Control.new()
@@ -556,7 +737,13 @@ func _ready() -> void:
 	body_motion.set_perspective(not third_person)
 	WorldHistory.register_subject("inventory", {"items": []})
 	_spawn_friend()
+	# AE.1. The captain is still spawned exactly as she always was, and this
+	# runs alongside her rather than instead of her or through her. The order
+	# matters: `_spawn_rival()` owns the Ashline captain and stays untouched,
+	# and the yard's own people are built after it, so if the population ever
+	# fails to build the canonical hunt is already standing.
 	_spawn_rival()
+	_spawn_yard_population()
 	_update_camera()
 	WorldHistory.record_event("player_entered_hunt_ground", {"location": HUNT_LOCATION, "hunt_id": CAST.id_for(CAPTAIN_SLOT)})
 
@@ -607,6 +794,14 @@ func _build_player_rig() -> void:
 		config["restore"] = saved.anatomy_state
 	player_rig.gore = viscera_fx
 	player_rig.build("player", config)
+	if not config.has("restore"):
+		# N5.2/N5.8. Only on a genuine first decanting — a restored body already
+		# carries whatever CellOutz's hardware became (still locked, or pulled
+		# and gone), and re-running this would silently re-lock a slot the
+		# player already went rogue on. left_arm excluded: see
+		# `install_factory_loadout()`'s own comment — B6.5/B6.6 needs that zone
+		# free of any installed part or the player's arm can never be severed.
+		player_rig.anatomy.install_factory_loadout(["left_arm"])
 	hunter_appearance = HUNTER_APPEARANCE.new()
 	hunter_appearance.name = "HunterAppearance"
 	player_rig.add_child(hunter_appearance)
@@ -662,6 +857,25 @@ func _wound_player(from: Vector3, damage: float, damage_type := "cut") -> void:
 	})
 	if bool(result.get("severed", false)):
 		_player_lost_limb(str(result.get("zone", "")))
+	elif _should_disarm(damage):
+		_disarm_player()
+
+
+## AN2.2. A weapon you are barely holding is a weapon somebody can take. Both
+## halves have to be real: a fresh grip does not give this up to a light
+## tap, and a hard blow does not shake loose a weapon held with everything
+## the arm has left.
+func _should_disarm(damage: float) -> bool:
+	if bare_handed or carried_limb_index >= 0 or arm == null:
+		return false
+	return arm.fatigue >= DISARM_FATIGUE_THRESHOLD and damage >= DISARM_DAMAGE_THRESHOLD
+
+
+func _disarm_player() -> void:
+	var lost := str(arsenal.current_id) if arsenal != null else ""
+	_put_the_weapons_down()
+	prompt.text = "DISARMED // [1-3] TO DRAW AGAIN"
+	WorldHistory.record_event("player_disarmed", {"weapon": lost, "fatigue": snappedf(arm.fatigue, 0.01), "location": HUNT_LOCATION})
 
 
 ## How much of a healthy swing and a healthy run the player has left. Both read
@@ -794,6 +1008,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_3: _equip_weapon(2)
 			KEY_4: _equip_carried_limb()
 			KEY_5: _put_the_weapons_down()
+			KEY_B: _cycle_grip()
 			KEY_R:
 				if handheld.is_open:
 					_cycle_asset_task()
@@ -838,8 +1053,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_M: _toggle_panel("map")
 			KEY_T: _toggle_panel("tree")
 			KEY_J: _toggle_artwork()
-			# L. The wall. It has existed since this morning and nothing opened it.
 			KEY_P: _toggle_panel("board")
+			# Agent 1 brief. The Black Mirror as a lens, not just a shutter — N
+			# still snaps a photo instantly, unchanged; L holds the view amplified
+			# so looking through it is a real choice you can hold rather than a
+			# single instant.
+			KEY_L: _toggle_black_mirror()
 			KEY_C: _start_grapple()
 			KEY_Z: _toggle_lock()
 			KEY_E: _interact()
@@ -1031,8 +1250,51 @@ func _update_player(delta: float) -> void:
 		player_body.position = vault_from.lerp(vault_to, eased)
 		if vaulting_time <= 0.0:
 			player_body.position = vault_to
+			# AD1.5. Handed back rather than left at the zero `_vault()`
+			# set it to — the run this vault interrupted keeps going on
+			# the far side instead of rebuilding from a standing start.
+			player_body.velocity = vault_entry_velocity
 		player = player_body.position + Vector3.UP * 0.6
 		return
+	# AD1.4. A scripted takeover the same way the vault above is — real
+	# gravity and floor-stick would fight straight vertical motion exactly
+	# as they would a lerp.
+	if climbing_time > 0.0:
+		# AD1.5. The climb does not stop to ask: `_vault_target()` is read
+		# from wherever the climb has actually got to, `false` waiving its
+		# own on-floor gate since a body mid-climb is airborne against a
+		# wall by definition. The instant a ledge is within reach it hands
+		# straight into the identical scripted mantle a running vault would
+		# use — one motion, not two verbs meeting at a seam.
+		var mantle := _vault_target(climb_direction, false)
+		if not mantle.is_empty():
+			climbing_time = 0.0
+			# AD1.5. `_vault()` is about to capture `player_body.velocity` as
+			# what the far side lands with; left alone that would be the
+			# climb loop's own small into-the-wall vector, not the run that
+			# led into the climb in the first place.
+			player_body.velocity = climb_direction * climb_entry_speed
+			_vault(mantle.landing)
+			return
+		var still_climbing := _climb_wall(climb_direction, false)
+		if still_climbing.is_empty() or stamina <= 0.0:
+			# The wall ran out, curved away, or the body is spent. Falling
+			# is the honest outcome — there is no ledge to catch and no
+			# cutscene papering over it.
+			climbing_time = 0.0
+		else:
+			climbing_time = maxf(0.0, climbing_time - delta)
+			climb_normal = still_climbing.normal
+			stamina = clampf(stamina - CLIMB_STAMINA_DRAIN * delta, 0, 100)
+			# AD1.6. Pressed lightly into the wall so the body reads as
+			# climbing it rather than floating in front of it, at a speed
+			# the same `mobility_ratio()` floor every other traversal verb
+			# already answers to scales down.
+			player_body.velocity = -climb_normal * 0.6
+			player_body.velocity.y = CLIMB_SPEED * lerpf(0.6, 1.0, player_rig.anatomy.mobility_ratio())
+			player_body.move_and_slide()
+			player = player_body.position + Vector3.UP * 0.6
+			return
 	# AD1.3. Also a scripted takeover rather than something layered on top of
 	# HUNTER_MOTOR.move_body() — re-finding the wall every frame (it can
 	# curve or run out mid-attempt) and redirecting velocity along it, with
@@ -1120,13 +1382,28 @@ func _update_player(delta: float) -> void:
 	# still-grounded body and gets overwritten straight back to -FLOOR_STICK.
 	# The jump and the slide that proves it happen in the same physics step.
 	var jumping := jump_queued and player_body.is_on_floor()
+	# AD3.2. A leg with drive hardware can kick off nothing. Binary, not a
+	# multiplier: a bare body simply cannot leave the ground a second time,
+	# and an augmented one can, once, until it touches down again. Gated on
+	# the same `capable_limbs()` route B6.1 established, so a severed leg
+	# takes the move with it (B6.2) without this line hearing about it.
+	var kicking_off := false
+	if jump_queued and not jumping and not player_body.is_on_floor():
+		if kick_off_spent <= 0 and player_rig != null and is_instance_valid(player_rig) and not player_rig.capable_limbs("kick_off").is_empty():
+			kicking_off = true
+			kick_off_spent += 1
+	if player_body.is_on_floor():
+		kick_off_spent = 0
 	jump_queued = false
 	# AD1.6. The same floor B6.5 already put under running speed and combat
 	# strength, not a new one invented for jumping — a hobbled body should
 	# leave the ground with a hobbled body's own jump, not a healthy one's.
-	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0, JUMP_IMPULSE * _player_speed_scale() if jumping else 0.0)
+	var leaving_ground := jumping or kicking_off
+	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0, JUMP_IMPULSE * _player_speed_scale() if leaving_ground else 0.0)
 	if jumping:
 		WorldHistory.record_event("player_jumped", {"location": HUNT_LOCATION})
+	if kicking_off:
+		WorldHistory.record_event("player_kicked_off", {"location": HUNT_LOCATION})
 	# AD1.3. Starting a run needs no key at all — the body grabs the wall
 	# the instant it is airborne, fast, and next to one, the same way real
 	# momentum would. Only leaving one on purpose (the kickoff, above) is a
@@ -1135,6 +1412,16 @@ func _update_player(delta: float) -> void:
 		var starting_surface := _wall_run_surface(direction if not direction.is_zero_approx() else HUNTER_MOTOR.wish_direction(Vector2(0, -1), yaw))
 		if not starting_surface.is_empty():
 			_begin_wall_run(starting_surface)
+	# AD1.4. Also needs no key — the Prototype reference is a body that runs
+	# at a building and keeps going up it, not one that stops to press
+	# something first. Unlike the wall run above, this fires from the
+	# ground too: the whole point is a sprint straight into a wall turning
+	# into a climb with no seam, not only a jump that happened to land
+	# against one.
+	if climbing_time <= 0.0 and wall_running_time <= 0.0 and vaulting_time <= 0.0 and sprinting and move.length() > 0.1:
+		var climb_start := _climb_wall(direction)
+		if not climb_start.is_empty():
+			_begin_climb(direction, climb_start.normal)
 	if player_body.position.y < -10.0:
 		player_body.position = Vector3(0, 1.0, 19)
 	player = player_body.position + Vector3.UP * 0.6
@@ -1171,23 +1458,84 @@ const ARM_WEIGHTS := {
 	"sidearm": {"mass": 0.95, "reach": 0.22},
 	"severed_limb": {"mass": 2.6, "reach": 0.58},
 	"bare": {"mass": 0.4, "reach": 0.28},
+	# AN1.9. A held body is not a free hand — both arms are committed to it,
+	# heavier than anything carried one-handed. Pushing for advantage
+	# (`grapple_pushing_now`) commits the whole body's weight into the hold
+	# rather than just maintaining it, which is why it outweighs even the
+	# severed limb.
+	"grapple": {"mass": 1.8, "reach": 0.5},
+	"shove": {"mass": 2.4, "reach": 0.55},
 }
 
 
-func _carry_current_weapon() -> void:
+## AN2.4. A weapon's own base stiffness before condition takes anything off
+## it — `LimbMomentum.carry()`'s own former default, named here because a
+## worn weapon now needs a real number to be worn *from*.
+const WEAPON_BASE_STIFFNESS := 58.0
+## AN2.5. Which grips a weapon actually offers, in the order `B` cycles them.
+## Only the sword has a real choice to make — a shotgun and a sidearm each
+## have exactly one grip already (`HeldGear._default_grip`), so cycling them
+## would be a key that does nothing every time it is pressed.
+const GRIP_CYCLE := {
+	"sword": ["two_hand", "one_hand", "half_sword"],
+}
+## `HeldGear`'s own default for the sword — kept in sync by `_cycle_grip()`
+## rather than duplicated, since a fresh sword pull should start exactly
+## where `_default_grip()` already puts it.
+var current_grip := "two_hand"
+
+## AN2.5. "Two-handing changes the numbers, not just the pose." `held_gear.gd`'s
+## `GRIPS` table already carried `reach`, `damage_type` and now `control` per
+## grip — its own header comment names the claim directly — and nothing ever
+## read them outside that file. This is the read: three real grips for the
+## one weapon that has a real choice between them, cycled rather than a
+## dedicated key each, because a fourth key for a weapon nobody has drawn yet
+## is exactly the kind of binding that never gets discovered.
+func _cycle_grip() -> void:
+	var id := str(arsenal.current_id) if arsenal != null else ""
+	var options: Array = GRIP_CYCLE.get(id, [])
+	if options.is_empty():
+		return
+	var index := options.find(current_grip)
+	current_grip = options[(index + 1) % options.size()] if index >= 0 else options[0]
+	var spec: Dictionary = HeldGear.GRIPS.get(current_grip, {})
+	prompt.text = "%s // %s GRIP" % [str(arsenal.current().label), current_grip.to_upper().replace("_", "-")]
+	WorldHistory.record_event("grip_changed", {"weapon": id, "grip": current_grip, "location": HUNT_LOCATION})
+	_carry_current_weapon(true)
+
+
+func _carry_current_weapon(force := false) -> void:
 	if arm == null:
 		return
 	var id := "bare"
-	if bare_handed:
+	# AN1.9. Holding somebody takes both hands regardless of what is
+	# holstered, so this is checked ahead of the weapon and the bare-hand
+	# state rather than beside them.
+	if not grapple_target.is_empty():
+		id = "shove" if grapple_pushing_now else "grapple"
+	elif bare_handed:
 		id = "bare"
 	elif carried_limb_index >= 0:
 		id = "severed_limb"
 	elif arsenal != null:
 		id = str(arsenal.current_id)
 	var spec: Dictionary = ARM_WEIGHTS.get(id, ARM_WEIGHTS["sword"])
-	if is_equal_approx(arm.mass, float(spec["mass"])):
+	# AN2.4. Bare hands and a carried limb are not entries in the arsenal's own
+	# condition table — `weapon_condition` reads 1.0 for anything it has never
+	# heard of, which is exactly "unworn" and asks for nothing special here.
+	var condition: float = arsenal.weapon_condition(id) if arsenal != null else 1.0
+	var target_stiffness := WEAPON_BASE_STIFFNESS * lerpf(0.45, 1.0, condition)
+	var reach: float = float(spec["reach"])
+	# AN2.5. Only the weapons `GRIP_CYCLE` actually offers a choice for read
+	# their own grip's numbers — everything else keeps exactly the reach and
+	# stiffness it always had, unaffected by a grip nothing lets it change.
+	if GRIP_CYCLE.has(id):
+		var grip_spec: Dictionary = HeldGear.GRIPS.get(current_grip, {})
+		reach *= float(grip_spec.get("reach", 1.0))
+		target_stiffness *= float(grip_spec.get("control", 1.0))
+	if not force and is_equal_approx(arm.mass, float(spec["mass"])) and is_equal_approx(arm.reach, reach) and is_equal_approx(arm.stiffness, target_stiffness):
 		return
-	arm.carry(float(spec["mass"]), float(spec["reach"]))
+	arm.carry(float(spec["mass"]), reach, target_stiffness)
 
 
 ## AN1.2/AN1.6. One call a frame. The arm is given what the player did — how far
@@ -1283,6 +1631,15 @@ func _attack(heavy := false) -> void:
 				prompt.text = "NOTHING LEFT TO SWING"
 			return
 		report = fists
+	# AN2.5. The grip decides what kind of blow this actually is — a
+	# half-sworded thrust is not a cut that happens to be shorter, it is a
+	# different `damage_type` reaching `strike()`'s own AN2.3 answer for
+	# armour, bone and wall. Melee only, and only a weapon `GRIP_CYCLE` has
+	# a real choice for: bare hands and a carried limb have no grip to read.
+	if not bare_handed and carried_limb_index < 0 and str(report.get("kind", "")) != "firearm" and GRIP_CYCLE.has(str(arsenal.current_id)):
+		var grip_spec: Dictionary = HeldGear.GRIPS.get(current_grip, {})
+		if grip_spec.has("damage_type"):
+			report["damage_type"] = grip_spec["damage_type"]
 	var swing := _player_swing_scale()
 	# O5.1. The body's own motion is part of the blow.
 	var momentum := swing_momentum(player_body.velocity)
@@ -1291,10 +1648,20 @@ func _attack(heavy := false) -> void:
 	# the damage number when `momentum_damage` says so (AN1.8).
 	last_commitment = arm.commitment() if arm != null else 0.0
 	report["commitment"] = last_commitment
-	if momentum_damage and arm != null:
-		# The weapon sets the ceiling and the player earns how much of it they
-		# get. Floored well above zero: a game where a mistimed swing does
-		# nothing at all is a game that feels broken rather than demanding.
+	# AN2.1. Committing to a heavy blow leaves you open whether or not it
+	# lands — the vulnerability is in throwing it, not in missing with it.
+	# Firearms carry no such wind-up; `arm.commitment()` still measures barrel
+	# drift for AN1.7, and that is not the same thing as being off balance.
+	if str(report.get("kind", "")) != "firearm" and last_commitment > 0.0:
+		lose_footing(last_commitment * FOOTING_COMMITTED_SWING, "")
+	# O5.1/O5.2 v5. The weapon sets the ceiling and the player earns how much
+	# of it they get. Floored well above zero: a game where a mistimed swing
+	# does nothing at all is a game that feels broken rather than demanding.
+	# Melee only — `commitment()`'s reference was calibrated against melee
+	# gestures (AN1.4's own table), and a firearm's low, steady aim would read
+	# as low commitment too, quietly halving gun damage on every shot that
+	# wasn't thrown around like a swing.
+	if momentum_damage and arm != null and str(report.get("kind", "")) != "firearm":
 		report["damage"] = float(report.get("damage", 0.0)) * lerpf(0.35, 1.35, last_commitment)
 	report["damage"] = float(report.get("damage", 0.0)) * swing * float(momentum["power"])
 	report["impulse"] = float(report.get("impulse", 0.0)) * float(momentum["power"])
@@ -1322,9 +1689,45 @@ func _resolve_strike() -> void:
 	if report.is_empty():
 		report = {"damage": 24.0, "impulse": 18.0, "damage_type": "cut", "range": 4.1, "weapon": "sword"}
 	pending_attack = {}
+	# AD3.3. A round crossing the arc is a physical thing that can be met.
+	# Checked before anything else the swing could reach, because a round in
+	# the path is the most immediate thing in it — and because a build that
+	# answers a shot with a blade has to be allowed to, or "the distance is
+	# the puzzle" (AD3.1) has no answer available to it at all.
+	if ballistics != null and is_instance_valid(ballistics):
+		var reach := float(report.get("range", 4.1))
+		var facing_now := Vector3(sin(yaw), 0.0, cos(yaw)).normalized()
+		var met: int = ballistics.intercept_near(player + facing_now * reach * 0.6, reach * 0.5, str(report.get("weapon", "")))
+		if met > 0:
+			if arm != null:
+				arm.strike(ROUND_MELEE_RESISTANCE, -facing_now)
+			# Less than the stone of a wall (AN2.4) and more than air: meeting
+			# an edge against something small and fast marks the edge.
+			_wear_current_weapon(str(report.get("weapon", "")), 0.6)
+			WorldHistory.record_event("melee_met_round", {
+				"weapon": str(report.get("weapon", "")), "rounds": met, "location": HUNT_LOCATION,
+			})
+			prompt.text = "CUT IT OUT OF THE AIR" if met == 1 else "CUT %d OF THEM OUT OF THE AIR" % met
+			return
 	if _attack_nearest_encounter_actor(report):
 		if arm != null:
-			arm.strike(0.65, Vector3(sin(yaw), 0.0, cos(yaw)))
+			# AN2.3. Set by the call above, from what that specific blow actually
+			# hit — armour and bone answer through the arm differently now.
+			arm.strike(_last_melee_resistance, Vector3(sin(yaw), 0.0, cos(yaw)))
+		connected = true
+		return
+	var wall_hit := _attack_wall(float(report.get("range", 4.1)))
+	if not wall_hit.is_empty():
+		# AN2.3. The half that stayed open: a wall answers too, harder than
+		# any body zone, and takes the same kind of edge off the weapon
+		# armour already does (AN2.4) — a blade stopped dead by stone should
+		# not come away in the same condition a clean miss leaves it in.
+		if arm != null:
+			arm.strike(WALL_MELEE_RESISTANCE, wall_hit.normal)
+		_wear_current_weapon(str(report.get("weapon", "")), 1.0)
+		ballistics.mark_impact(wall_hit.position, wall_hit.normal, float(report.get("damage", 24.0)) * 0.05)
+		WorldHistory.record_event("melee_struck_wall", {"weapon": str(report.get("weapon", "")), "location": HUNT_LOCATION})
+		prompt.text = "STEEL ON STONE"
 		connected = true
 		return
 	if enemy == null or not enemy.visible or enemy_retreating:
@@ -1464,6 +1867,8 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		zone = str(result.get("zone", "torso"))
 	else:
 		result = anatomy.call("apply_hit", zone, float(attack.damage), float(attack.impulse), str(attack.damage_type))
+	_last_melee_resistance = _melee_resistance(zone, result)
+	_wear_current_weapon(str(attack.get("weapon", "")), float(result.get("absorbed", 0.0)))
 	var organ_hit := str((result.get("organ", {}) as Dictionary).get("zone", ""))
 	if not organ_hit.is_empty() and bool((result.get("organ", {}) as Dictionary).get("ruptured", false)):
 		prompt.text = "%s IS OPENED UP" % str(actor.display_name).to_upper()
@@ -1483,12 +1888,63 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	return true
 
 
-## AF1.2. Where a round that missed everybody ended up. The world keeps the
-## hole (the projectile draws that itself) and the record keeps the fact,
-## which is what AB2 will read when destruction is tracked properly.
+## AN2.3. What the arm actually feels through the weapon, from what it hit
+## rather than a constant every blow shared. `BASE` is bone density, not
+## damage — the head stops a blade harder than a limb does whether or not
+## either is armoured, which is what makes an armoured hit *and* a skull hit
+## both read as more resistant than an unarmoured torso without conflating
+## the two causes into one number.
+const MELEE_RESISTANCE_BASE := {
+	"head": 0.72, "torso": 0.55,
+	"left_arm": 0.48, "right_arm": 0.48, "left_leg": 0.5, "right_leg": 0.5,
+}
+
+## AN2.3. The half the note above left open: a wall, unlike bone, does not
+## flex or bleed, so it sits above every zone `MELEE_RESISTANCE_BASE` names —
+## harder than even an armoured skull.
+const WALL_MELEE_RESISTANCE := 0.85
+## AD3.3. What meeting a round feels like through the arm. Below stone —
+## a bullet is small and gives — but well above air, because something that
+## fast stopping against an edge is a real jolt, not a whiff.
+const ROUND_MELEE_RESISTANCE := 0.55
+
+func _melee_resistance(zone: String, result: Dictionary) -> float:
+	var base: float = MELEE_RESISTANCE_BASE.get(zone, 0.55)
+	var absorbed := float(result.get("absorbed", 0.0))
+	return clampf(base + absorbed * 0.35, 0.0, 0.95)
+
+
+## AN2.4. Every connecting hit takes something off the edge; hitting whatever
+## the blow's own `absorbed` says was resistant (armour, bone) takes more —
+## a blade that keeps meeting plate dulls faster than one that keeps meeting
+## an unarmoured back. Bare hands and a carried limb are not in the arsenal's
+## own catalog, so this is a no-op for both; the limb already wears through
+## `_wear_carried_limb` instead. `_carry_current_weapon()` is called
+## immediately rather than left for next frame's `_advance_arm`, so the
+## degraded stiffness is real the instant the hit lands, not one frame late.
+const WEAPON_WEAR_BASE := 0.01
+const WEAPON_WEAR_ABSORBED := 0.05
+
+func _wear_current_weapon(weapon_id: String, absorbed: float) -> void:
+	if arsenal == null or not HunterArsenal.WEAPONS.has(weapon_id):
+		return
+	arsenal.wear_weapon(WEAPON_WEAR_BASE + absorbed * WEAPON_WEAR_ABSORBED, weapon_id)
+	_carry_current_weapon()
+
+
+## AF1.1/AF1.2. Where a round ended up. The world keeps the hole (the
+## projectile draws that itself) and the record keeps the fact — and, if the
+## round hit a body, this is now also the *only* place the shot that fired it
+## finds out. `_resolve_firearm()` no longer resolves anatomy damage itself;
+## it fires a round with its damage riding along as `payload` and waits.
 func _on_round_hit(hit: Dictionary) -> void:
 	var struck: Variant = hit.get("collider")
-	if struck != null and struck is Node and (struck as Node).is_in_group("actor_body"):
+	var payload: Dictionary = hit.get("payload", {})
+	# AF1.7's own lookup, not a group membership no code in this project ever
+	# assigns — a body's zones are `Area3D` hitboxes (`baseline_human.gd`),
+	# walked up to whichever encounter actor actually owns the one this round
+	# reached, exactly the way `_trace_actor()`'s instant raycast already did.
+	if struck != null and struck is Node and _resolve_body_hit(struck as Node, hit, payload):
 		return
 	WorldHistory.record_event("round_struck_world", {
 		"calibre": str(hit.get("calibre", "")),
@@ -1496,87 +1952,175 @@ func _on_round_hit(hit: Dictionary) -> void:
 		"shooter": str(hit.get("shooter", "")),
 		"location": HUNT_LOCATION,
 	})
+	if not payload.is_empty():
+		_settle_shot(int(payload.get("shot_id", 0)), false)
+
+
+## AF1.1. A round that ran out of range or fell out of the world without ever
+## arriving anywhere — still a real outcome, not a hit `Ballistics` swallowed.
+func _on_round_expired(payload: Dictionary) -> void:
+	if not payload.is_empty():
+		_settle_shot(int(payload.get("shot_id", 0)), false)
+
+
+## AF1.1. What used to happen inline in `_resolve_firearm()`, the instant the
+## trigger went down, now happens here — whenever `Ballistics` reports that
+## *this* round actually reached a body, however many frames after it was
+## fired that turns out to be. One round, one hit, one event: a shotgun's
+## pellets no longer land as a single pre-batched summary, because they no
+## longer arrive as one — each is its own real impact now, on its own frame.
+func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bool:
+	var shot_id := int(payload.get("shot_id", 0))
+	var actor := Dictionary()
+	for candidate in encounter_actors:
+		if not is_instance_valid(candidate.node) or candidate.anatomy.dead:
+			continue
+		var cursor: Node = struck
+		while cursor != null:
+			if cursor == candidate.node:
+				actor = candidate
+				break
+			cursor = cursor.get_parent()
+		if not actor.is_empty():
+			break
+	if actor.is_empty():
+		# Not an actor at all — the caller's own world-hit branch settles
+		# this pellet as a miss; settling it here too would count it twice.
+		return false
+	var direction: Vector3 = hit.get("direction", Vector3.FORWARD)
+	var rig := actor.rig as BaselineHuman
+	var damage := float(payload.get("damage", 0.0))
+	var impulse := float(payload.get("impulse", 0.0))
+	var damage_type := str(payload.get("damage_type", "ballistic"))
+	var weapon := str(payload.get("weapon", "firearm"))
+	var result := rig.hit_at(hit.get("position", actor.node.global_position), damage, impulse, damage_type, direction)
+	var zones: Array[String] = [str(result.get("zone", "torso"))]
+	var severed: Array[String] = []
+	var ruptures: Array[String] = []
+	var organ := result.get("organ", {}) as Dictionary
+	if bool(organ.get("ruptured", false)):
+		ruptures.append(str(organ.get("zone", "internal")))
+	if bool(result.get("severed", false)):
+		severed.append(str(result.get("zone", "limb")))
+	(actor.node as CharacterBody3D).velocity += direction * minf(6.0, impulse * 0.075)
+	# O2.2. Time, camera and sound on the same frame the round actually lands,
+	# same as a melee blow gets. Severity is measured against the zone's own
+	# health so a round through a head reads heavier than the same round
+	# through a thigh.
+	var zone_id := str(result.get("zone", "torso"))
+	var zone_max: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone_id, {}) as Dictionary).get("health", 100.0))
+	impact_feel.strike(
+		damage / maxf(zone_max, 1.0),
+		damage_type,
+		bool(result.get("severed", false)),
+		# O2.5 v2. Only the two of you are in this. Everyone else in the
+		# region keeps fighting at full speed.
+		["player", str(actor.subject_id)]
+	)
+	if actor.rig != null and is_instance_valid(actor.rig):
+		actor.rig.favour_injuries()
+	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": actor.rig.snapshot()}, "anatomy_changed")
+	WorldHistory.record_event("firearm_anatomy_hit", {
+		"subject_id": actor.subject_id, "weapon": weapon, "zones": zones,
+		"damage": snappedf(float(result.get("damage", 0.0)), 0.1), "ruptures": ruptures, "severed": severed,
+		"location": HUNT_LOCATION,
+	})
+	var fake_attack := {"damage": damage, "impulse": impulse, "damage_type": damage_type, "weapon": weapon, "heavy": bool(payload.get("heavy", false))}
+	if actor.anatomy.dead:
+		_kill_encounter_actor(encounter_actors.find(actor), weapon)
+	elif actor.anatomy.downed:
+		actor.state = "downed"
+	elif not severed.is_empty():
+		_apply_maiming_state(actor, severed, direction)
+	elif actor.anatomy.critical or actor.anatomy.pain >= 68.0:
+		actor.state = "fleeing"
+		actor.loot_at_risk = true
+	else:
+		_apply_combat_response(actor, fake_attack, {"pain": actor.anatomy.pain})
+	_settle_shot(shot_id, true, str(actor.subject_id))
+	return true
+
+
+## AF1.1. One trigger pull can fire several rounds (a shotgun's pellets),
+## each resolving on its own real frame as it lands, hits the world, or runs
+## out of range. The pull's own hit/miss feedback — the HUD line, and the
+## whiff and footing loss on a clean miss — decides itself the instant the
+## first pellet connects, or once every pellet has missed; `weapon_fired`
+## itself is not an anatomy question and is recorded eagerly, back in
+## `_resolve_firearm()`, the moment the trigger actually goes down.
+func _settle_shot(shot_id: int, hit_body: bool, subject_id := "") -> void:
+	if not _pending_shots.has(shot_id):
+		return
+	var shot: Dictionary = _pending_shots[shot_id]
+	shot.remaining = int(shot.remaining) - 1
+	if hit_body:
+		(shot.hit_ids as Array).append(subject_id)
+	_pending_shots[shot_id] = shot
+	# A clean miss has to wait for every pellet to actually miss before it is
+	# one — but a shotgun's spread means some pellets can sail on well past
+	# the ones that connected, into open air with no wall behind the target
+	# to end their flight quickly. A hit does not need to wait on them: the
+	# instant one pellet connects the shot already has an answer, and the
+	# stragglers still land their own real damage through `_resolve_body_hit`
+	# — they just no longer hold up the HUD line and the `weapon_fired`
+	# record waiting to hear from them.
+	if not hit_body and int(shot.remaining) > 0:
+		return
+	_pending_shots.erase(shot_id)
+	var hit_ids: Array = shot.hit_ids
+	if hit_ids.is_empty():
+		impact_feel.whiff()
+		# O2.3 / O5.7. A miss was already free of damage; it is no longer free of
+		# balance. Swinging at air is how you end up on your heels.
+		lose_footing(FOOTING_WHIFF, "SWUNG AT NOTHING")
+		prompt.text = "%s / MISS" % str(shot.label)
+	else:
+		prompt.text = "%s / %d BODY%s HIT" % [str(shot.label), hit_ids.size(), "IES" if hit_ids.size() != 1 else ""]
 
 
 func _resolve_firearm(attack: Dictionary) -> void:
 	var forward := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 	var origin := camera.global_position + forward * 0.48
-	var impacts: Dictionary = {}
 	var directions: Array[Vector3] = arsenal.shot_directions(forward, Vector3.UP)
-	# AF1. The visible round. Damage to a body still resolves below on the
-	# frame it is fired — moving that onto the projectile means deferring
-	# every anatomy hit by a few frames and is a change worth making on its
-	# own rather than folded into this one (AF1.1 stays open). What this
-	# buys now is everything the raycast could never do: a round you can
-	# see travel, a hole where it went wide, and brass on the floor.
-	if ballistics != null and is_instance_valid(ballistics):
-		var calibre := "buck" if directions.size() > 1 else "pistol"
-		for direction in directions:
-			ballistics.fire(origin, direction, calibre, 0.0, 1, "player")
+	# AF1.1. A round is a thing that travels, and now so is what it does: the
+	# damage payload rides on the round itself and is only ever spent when
+	# `_on_round_hit()`/`_on_round_expired()` reports that round's own real
+	# outcome, a few frames from now — never here, on the frame the trigger
+	# went down. `_resolve_body_hit()`, `_on_round_hit()`'s world branch and
+	# `_on_round_expired()` are the three ways a pellet's fate gets decided;
+	# `_settle_shot()` is where the pull as a whole finds out.
+	_shot_counter += 1
+	var shot_id := _shot_counter
+	_pending_shots[shot_id] = {
+		"weapon": str(attack.weapon),
+		"label": str(arsenal.current().label),
+		"remaining": directions.size(),
+		"hit_ids": [],
+	}
+	if ballistics == null or not is_instance_valid(ballistics):
+		# No projectile system to hand this to, and so no round that could
+		# ever report back and settle it — a shot that never happened rather
+		# than one stuck pending forever.
+		_pending_shots.erase(shot_id)
+		return
+	var calibre := "buck" if directions.size() > 1 else "pistol"
 	for direction in directions:
-		var hit := _trace_actor(origin, direction, float(attack.range))
-		if hit.is_empty():
-			continue
-		var actor: Dictionary = hit.actor
-		var rig := actor.rig as BaselineHuman
-		var result := rig.hit_at(hit.position, float(attack.damage), float(attack.impulse), str(attack.damage_type), direction)
-		var id := str(actor.subject_id)
-		if not impacts.has(id):
-			impacts[id] = {"actor": actor, "zones": [], "damage": 0.0, "ruptures": [], "severed": []}
-		var summary: Dictionary = impacts[id]
-		summary.zones.append(str(result.get("zone", "torso")))
-		summary.damage = float(summary.damage) + float(result.get("damage", 0.0))
-		var organ := result.get("organ", {}) as Dictionary
-		if bool(organ.get("ruptured", false)):
-			summary.ruptures.append(str(organ.get("zone", "internal")))
-		if bool(result.get("severed", false)):
-			summary.severed.append(str(result.get("zone", "limb")))
-		impacts[id] = summary
-		(actor.node as CharacterBody3D).velocity += direction * minf(6.0, float(attack.impulse) * 0.075)
-		# O2.2. Time, camera and sound on the same frame. Severity is measured
-		# against the zone's own health so a cleaver through a head reads
-		# heavier than the same cleaver through a thigh.
-		var zone_id := str(result.get("zone", "torso"))
-		var zone_max: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone_id, {}) as Dictionary).get("health", 100.0))
-		impact_feel.strike(
-			float(attack.get("damage", 0.0)) / maxf(zone_max, 1.0),
-			str(attack.get("damage_type", "cut")),
-			bool(result.get("severed", false)),
-			# O2.5 v2. Only the two of you are in this. Everyone else in the
-			# region keeps fighting at full speed.
-			["player", str(actor.subject_id)]
-		)
-		if actor.rig != null and is_instance_valid(actor.rig):
-			actor.rig.favour_injuries()
-	for id in impacts:
-		var summary: Dictionary = impacts[id]
-		var actor: Dictionary = summary.actor
-		WorldHistory.update_subject(id, {"anatomy_state": actor.rig.snapshot()}, "anatomy_changed")
-		WorldHistory.record_event("firearm_anatomy_hit", {
-			"subject_id": id, "weapon": attack.weapon, "zones": summary.zones,
-			"damage": snappedf(float(summary.damage), 0.1), "ruptures": summary.ruptures, "severed": summary.severed,
-			"location": HUNT_LOCATION,
-		})
-		if actor.anatomy.dead:
-			_kill_encounter_actor(encounter_actors.find(actor), str(attack.weapon))
-		elif actor.anatomy.downed:
-			actor.state = "downed"
-		elif not (summary.severed as Array).is_empty():
-			_apply_maiming_state(actor, summary.severed, forward)
-		elif actor.anatomy.critical or actor.anatomy.pain >= 68.0:
-			actor.state = "fleeing"
-			actor.loot_at_risk = true
-		else:
-			_apply_combat_response(actor, attack, {"pain": actor.anatomy.pain})
-	if impacts.is_empty():
-		impact_feel.whiff()
-		# O2.3 / O5.7. A miss was already free of damage; it is no longer free of
-		# balance. Swinging at air is how you end up on your heels.
-		lose_footing(FOOTING_WHIFF, "SWUNG AT NOTHING")
-		prompt.text = "%s / MISS" % str(arsenal.current().label)
-	else:
-		prompt.text = "%s / %d BODY%s HIT" % [str(arsenal.current().label), impacts.size(), "IES" if impacts.size() != 1 else ""]
-	WorldHistory.record_event("weapon_fired", {"weapon": attack.weapon, "hits": impacts.keys(), "location": HUNT_LOCATION})
+		var payload := {
+			"shot_id": shot_id,
+			"damage": float(attack.damage),
+			"impulse": float(attack.impulse),
+			"damage_type": str(attack.damage_type),
+			"weapon": str(attack.weapon),
+			"heavy": bool(attack.get("heavy", false)),
+		}
+		ballistics.fire(origin, direction, calibre, 0.0, 1, "player", payload)
+	# The trigger going down is not an anatomy question — it happens here,
+	# on this frame, same as it always did. What it hit is a separate record
+	# (`firearm_anatomy_hit`/`round_struck_world`, both per-pellet, both
+	# already deferred to when each round actually lands) rather than a
+	# "hits" list bolted onto this one, which would otherwise have to wait
+	# on whichever pellet takes longest to resolve.
+	WorldHistory.record_event("weapon_fired", {"weapon": attack.weapon, "location": HUNT_LOCATION})
 
 
 func _trace_actor(origin: Vector3, direction: Vector3, distance: float) -> Dictionary:
@@ -1597,6 +2141,24 @@ func _trace_actor(origin: Vector3, direction: Vector3, distance: float) -> Dicti
 				return {"actor": actor, "position": hit.position, "normal": hit.normal}
 			cursor = cursor.get_parent()
 	return {}
+
+
+## AN2.3. The half `_resolve_strike()` used to leave open: `_attack_nearest_encounter_actor()`
+## can only ever see an actor, so a swing that met a wall instead had nothing
+## to report and read back as a whiff. `collide_with_areas` stays false rather
+## than mirroring `_trace_actor()` — every zone hitbox in this game is an
+## `Area3D` (AF1.1's own finding), so leaving areas out of the query entirely
+## is what keeps a body from ever being mistaken for a wall here.
+func _attack_wall(reach: float) -> Dictionary:
+	var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+	var query := PhysicsRayQueryParameters3D.create(player, player + look * reach)
+	query.exclude = _player_collision_exclusions()
+	query.collide_with_areas = false
+	query.collide_with_bodies = true
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return {}
+	return {"position": hit.position, "normal": hit.normal}
 
 
 func _player_collision_exclusions() -> Array[RID]:
@@ -1652,6 +2214,12 @@ func _equip_weapon(slot: int) -> void:
 		# The ammo well and the model in the player's hand already show the new
 		# weapon. A persistent READY subtitle duplicated both of them.
 		prompt.text = ""
+		# AN2.5. A fresh draw starts from the grip `HeldGear` itself defaults
+		# to, not whatever the last sword pull happened to be left in —
+		# holstering is not the same act as choosing a stance.
+		var options: Array = GRIP_CYCLE.get(str(arsenal.current_id), [])
+		if not options.is_empty():
+			current_grip = options[0]
 
 
 func _reload_weapon() -> void:
@@ -1833,12 +2401,32 @@ func _update_handheld_lamp(_delta: float) -> void:
 ## AD1.2. Empty means "not vaultable", never a crash — every one of these
 ## rays is allowed to simply miss, because most things in front of the
 ## player most of the time are not a low wall.
-func _vault_target(direction: Vector3) -> Dictionary:
+## AD1.4. `require_floor` waives its own on-floor gate for exactly one
+## caller: the mid-climb mantle check in `_update_player()`, where the body
+## is airborne against a wall by definition and the ledge it is reaching
+## for is not on the ground either. Every other caller — the SPACE-pressed
+## vault a walking player takes over a crate — keeps the gate, unchanged.
+## AD3.2. How high a thing can be and still be vaultable *for this body*.
+## A bare one is capped at `VAULT_MAX_TOP` and everything above it is a wall
+## (AD1.2's own line). A leg carrying drive hardware raises the ceiling, so
+## obstacles in the band between the two are not "vaulted faster" — they are
+## vaultable at all, where for a bare body they were simply walls. That is
+## the item's own "not just the numbers": the same obstacle answers a
+## different question depending on what is in your leg.
+func _vault_ceiling() -> float:
+	if player_rig == null or not is_instance_valid(player_rig):
+		return VAULT_MAX_TOP
+	if player_rig.capable_limbs("vault_high").is_empty():
+		return VAULT_MAX_TOP
+	return VAULT_MAX_TOP_AUGMENTED
+
+
+func _vault_target(direction: Vector3, require_floor: bool = true) -> Dictionary:
 	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty():
 		return {}
 	if direction.is_zero_approx() or crouching or vaulting_time > 0.0:
 		return {}
-	if not player_body.is_on_floor():
+	if require_floor and not player_body.is_on_floor():
 		return {}
 	# AD1.6. "A broken leg cannot vault" — literally: `mobility_ratio()`
 	# reads 0.5 for one leg destroyed and the other untouched, so the same
@@ -1855,7 +2443,8 @@ func _vault_target(direction: Vector3) -> Dictionary:
 	var low_hit := space.intersect_ray(low_query)
 	if low_hit.is_empty():
 		return {}
-	var high_query := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * VAULT_MAX_TOP, feet + Vector3.UP * VAULT_MAX_TOP + direction * VAULT_REACH)
+	var ceiling := _vault_ceiling()
+	var high_query := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * ceiling, feet + Vector3.UP * ceiling + direction * VAULT_REACH)
 	high_query.exclude = exclusions
 	if not space.intersect_ray(high_query).is_empty():
 		# Something is still in the way above the vaultable band — a real
@@ -1868,7 +2457,7 @@ func _vault_target(direction: Vector3) -> Dictionary:
 	var probe_x: float = low_pos.x + direction.x * 0.1
 	var probe_z: float = low_pos.z + direction.z * 0.1
 	var top_query := PhysicsRayQueryParameters3D.create(
-		Vector3(probe_x, feet.y + VAULT_MAX_TOP + 0.2, probe_z),
+		Vector3(probe_x, feet.y + ceiling + 0.2, probe_z),
 		Vector3(probe_x, feet.y + VAULT_MIN_TOP - 0.1, probe_z))
 	top_query.exclude = exclusions
 	var top_hit := space.intersect_ray(top_query)
@@ -1876,7 +2465,7 @@ func _vault_target(direction: Vector3) -> Dictionary:
 		return {}
 	var top_pos: Vector3 = top_hit.position
 	var obstacle_height: float = top_pos.y - feet.y
-	if obstacle_height < VAULT_MIN_TOP or obstacle_height > VAULT_MAX_TOP:
+	if obstacle_height < VAULT_MIN_TOP or obstacle_height > ceiling:
 		return {}
 	# The far side has to have a floor of its own and room to stand once
 	# there — a vault is landing past the thing, not standing on top of it.
@@ -1908,6 +2497,9 @@ func _vault(landing: Vector3) -> void:
 	vaulting_time = vault_duration
 	vault_from = player_body.position
 	vault_to = landing
+	# AD1.5. Captured before the zero below erases it — whatever speed got
+	# the player to this obstacle is what they land with on the far side.
+	vault_entry_velocity = Vector3(player_body.velocity.x, 0.0, player_body.velocity.z)
 	player_body.velocity = Vector3.ZERO
 	WorldHistory.record_event("player_vaulted", {"location": HUNT_LOCATION})
 
@@ -1961,6 +2553,89 @@ func _wall_run_surface(direction: Vector3) -> Dictionary:
 	return {}
 
 
+## AD1.4. `_vault_target()`'s own low/high pair already says "a wall too
+## tall to vault" — this reuses exactly that shape rather than a second
+## obstacle scanner, casting straight ahead instead of `_wall_run_surface()`'s
+## sideways pair, since a climb is a wall the player is facing, not one
+## they are running alongside.
+## AD1.4/AD1.5. `require_tall` is the whole fix for a real race the mantle
+## chain exposed: the initial trigger and the per-frame "is the wall still
+## there" recheck used to share this one function outright, and both the
+## high check here and `_vault_target()`'s own top band key off the exact
+## same `VAULT_MAX_TOP` line relative to the player's current height. A
+## climb closing in on a ledge crosses that line once — the frame it does,
+## the high check here can go empty (correctly: there is no longer a wall
+## above the vault band) on the *same* frame `_vault_target()`'s own
+## discrete top-scan is a hair outside its band and also returns empty,
+## and the climb ended in a fall a tick before the mantle it was chaining
+## into would have fired. The per-frame recheck (`false`) only needs to
+## know a wall is still within reach at all; deciding "too tall to vault"
+## is a question this function only needs to answer once, at the start.
+func _climb_wall(direction: Vector3, require_tall: bool = true) -> Dictionary:
+	if not climb_unlocked():
+		return {}
+	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty():
+		return {}
+	if direction.is_zero_approx() or stamina <= 0.0:
+		return {}
+	# AD1.6. The same real floor every other traversal verb answers to — a
+	# leg wrecked past this point cannot hold weight against a wall any
+	# more than it can throw the body up and over one.
+	if player_rig.anatomy.mobility_ratio() < PLAYER_INJURY_FLOOR:
+		return {}
+	var horizontal := Vector3(direction.x, 0.0, direction.z)
+	if horizontal.is_zero_approx():
+		return {}
+	horizontal = horizontal.normalized()
+	var space := get_world_3d().direct_space_state
+	var exclusions := _player_collision_exclusions()
+	var feet: Vector3 = player_body.position + Vector3.UP * -0.9
+	var low_query := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * 0.4, feet + Vector3.UP * 0.4 + horizontal * CLIMB_REACH)
+	low_query.exclude = exclusions
+	var low_hit := space.intersect_ray(low_query)
+	if low_hit.is_empty():
+		return {}
+	if not require_tall:
+		return {"normal": low_hit.normal}
+	# Nothing above the vaultable band means this is `_vault_target()`'s
+	# obstacle, not this one's — a crate gets stepped over, not climbed.
+	var high_query := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * VAULT_MAX_TOP, feet + Vector3.UP * VAULT_MAX_TOP + horizontal * CLIMB_REACH)
+	high_query.exclude = exclusions
+	if space.intersect_ray(high_query).is_empty():
+		return {}
+	return {"normal": low_hit.normal}
+
+
+## AD1.4. `wall_run_unlocked()`'s own pattern one rung further up the same
+## ladder — climbing is what wall-running was training the body for, so it
+## is gated on a real kickoff rather than a fresh counter invented for it.
+func climb_unlocked() -> bool:
+	return WorldHistory.event_count("player_wall_run_kickoff") >= CLIMB_UNLOCK_KICKOFFS
+
+
+func _announce_climb_unlock() -> void:
+	prompt.text = "YOUR BODY CAN CLIMB NOW. RUN AT SOMETHING TALL."
+	if impact_feel != null:
+		impact_feel.kick += Vector2(0, -1.0) * 0.05
+		impact_feel.shake = maxf(impact_feel.shake, 0.5)
+	WorldHistory.record_event("climb_unlocked", {"location": HUNT_LOCATION})
+
+
+## AD1.4/AD1.6. Duration scaled the same way `_vault()`/`_begin_wall_run()`
+## already scale theirs — cleared the gate in `_climb_wall()`, so mobility
+## here is always somewhere a climb is still possible at all, just a
+## shorter or slower one the worse off the body is.
+func _begin_climb(direction: Vector3, normal: Vector3) -> void:
+	climbing_time = CLIMB_MAX_DURATION * lerpf(0.5, 1.0, player_rig.anatomy.mobility_ratio())
+	climb_direction = Vector3(direction.x, 0.0, direction.z).normalized()
+	climb_normal = normal
+	# AD1.5. Recorded before the climb loop overwrites velocity every frame
+	# with its own small into-the-wall vector.
+	climb_entry_speed = maxf(WALL_RUN_MIN_SPEED, Vector2(player_body.velocity.x, player_body.velocity.z).length())
+	player_body.velocity.y = maxf(player_body.velocity.y, 0.0)
+	WorldHistory.record_event("player_climb_started", {"location": HUNT_LOCATION})
+
+
 func _begin_wall_run(surface: Dictionary) -> void:
 	# AD1.6. Cleared the gate in `_wall_run_surface()` already, so this is
 	# always shortening a run rather than ever lengthening past the healthy
@@ -1997,8 +2672,15 @@ func _dodge() -> void:
 func _jump() -> void:
 	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty():
 		return
+	# AD3.2. Airborne is no longer an automatic refusal: a leg with drive
+	# hardware in it gets one kick off nothing, which `_update_player()`
+	# spends and the ground resets. A bare body is refused here exactly as
+	# it always was, so nothing about jumping changes without the hardware.
 	if not player_body.is_on_floor():
-		return
+		if kick_off_spent > 0 or player_rig == null or not is_instance_valid(player_rig):
+			return
+		if player_rig.capable_limbs("kick_off").is_empty():
+			return
 	jump_queued = true
 
 
@@ -2491,6 +3173,11 @@ func _update_encounter_actors(delta: float) -> void:
 		# standing in a stagger is still standing, and balance comes back on
 		# its own rather than only when the fight lets up.
 		actor["footing"] = clampf(_actor_footing(actor) + FOOTING_RECOVERY * actor_delta, 0.0, 1.0)
+		# O6.1. A grip regained rather than a weapon regained — the same
+		# threshold that took it decides when it comes back.
+		if bool(actor.get("disarmed", false)) and float(actor.footing) >= STUMBLE_AT:
+			actor["disarmed"] = false
+			prompt.text = "%s RECOVERS THEIR GRIP" % str(actor.display_name).to_upper()
 		if anatomy.downed:
 			(node as CharacterBody3D).velocity = Vector3.ZERO
 			actor.attack_time = 0.0
@@ -2526,6 +3213,18 @@ func _update_encounter_actors(delta: float) -> void:
 				RIVAL_REGISTRY.consider(str(actor.subject_id))
 				node.queue_free()
 				encounter_actors.remove_at(index)
+		elif LauncherActor.is_launcher(actor) and LauncherActor.in_envelope(distance):
+			# AD3.1. A launcher holds its ground and works the tube; all of the
+			# decision lives in `launcher_actor.gd` so this branch stays a hook
+			# rather than a second copy of the rule. Closing inside the arming
+			# ring drops it out of this branch entirely — which is the counterplay
+			# being the distance rather than a damage number.
+			var shot := LauncherActor.advance(actor, distance, actor_delta)
+			match str(shot.state):
+				"winding":
+					prompt.text = "%s SHOULDERS THE TUBE" % str(actor.display_name).to_upper()
+				"fire":
+					_fire_launcher(actor, node)
 		elif str(actor.get("disposition", "hostile")) == "hostile" and distance < 24.0 and distance > 3.0:
 			# O4.2. A naive approach put every hostile in single file toward the
 			# same 3 m ring, which reads as a queue rather than a fight. Whoever
@@ -2629,15 +3328,40 @@ func _rig_health_ratio(rig: BaselineHuman) -> float:
 	return clampf(current / maxf(1.0, ceiling), 0.0, 1.0)
 
 
+## AD3.1. Fires through the same `Ballistics` every other round in this game
+## leaves a barrel through, carrying the same payload shape `_on_round_hit()`
+## already resolves — so a warhead finds a zone through the anatomy (AF1.7)
+## and can be met in the air (AD3.3) without either of those knowing a
+## launcher exists.
+func _fire_launcher(actor: Dictionary, node: Node3D) -> void:
+	if ballistics == null or not is_instance_valid(ballistics):
+		return
+	var muzzle: Vector3 = node.global_position + Vector3.UP * 1.1
+	var toward := (player - muzzle)
+	if toward.length() < 0.01:
+		return
+	ballistics.fire(muzzle, toward.normalized(), LauncherActor.CALIBRE, 0.0, 1, str(actor.get("subject_id", "launcher")), LauncherActor.payload(actor))
+	WorldHistory.record_event("launcher_fired", {
+		"subject_id": str(actor.get("subject_id", "")), "location": HUNT_LOCATION,
+	})
+	prompt.text = "INCOMING"
+
+
 func _actor_attack_cycle(actor: Dictionary) -> float:
 	# O5.10 v2. Off-balance on top of whatever their arms already cost them —
 	# a fighter who is barely standing winds up slower than their combat_ratio
 	# alone would say, the same way a player who is stumbling swings softer.
-	return lerpf(2.4, 1.4, _actor_combat_ratio(actor)) * lerpf(1.6, 1.0, _actor_footing(actor))
+	# O6.1. A fist comes back faster than a weapon does — the same reason the
+	# player's own bare-hand attacks run at a shorter cooldown than a cleaver.
+	var unarmed := NPC_UNARMED_CYCLE_SCALE if bool(actor.get("disarmed", false)) else 1.0
+	return lerpf(2.4, 1.4, _actor_combat_ratio(actor)) * lerpf(1.6, 1.0, _actor_footing(actor)) * unarmed
 
 
 func _actor_attack_damage(actor: Dictionary) -> int:
-	return maxi(2, roundi(9.0 * _actor_combat_ratio(actor) * lerpf(0.55, 1.0, _actor_footing(actor))))
+	# O6.1. Low, but not a tickle — the same ratio bare hands hit for against
+	# the player's own cleaver (11 of 44 is a hair under a third).
+	var unarmed := NPC_UNARMED_DAMAGE_SCALE if bool(actor.get("disarmed", false)) else 1.0
+	return maxi(1, roundi(9.0 * unarmed * _actor_combat_ratio(actor) * lerpf(0.55, 1.0, _actor_footing(actor))))
 
 
 func _apply_combat_response(actor: Dictionary, attack: Dictionary, hit: Dictionary) -> void:
@@ -2647,6 +3371,13 @@ func _apply_combat_response(actor: Dictionary, attack: Dictionary, hit: Dictiona
 	# by three medium blows fought exactly as well as one who had taken none,
 	# right up until the fourth one crossed the line.
 	_actor_lose_footing(actor, clampf(float(response.severity) / COMBAT_RESPONSE.STAGGER_THRESHOLD * 0.3, 0.05, 0.5))
+	# O6.1. The other half of AN2.2: hit hard enough to stagger them while
+	# they are already barely standing, and the weapon goes the same way a
+	# barely-held one does in the player's own hand.
+	if not bool(actor.get("disarmed", false)) and bool(response.staggered) and _actor_footing(actor) < STUMBLE_AT:
+		actor["disarmed"] = true
+		WorldHistory.record_event("npc_disarmed", {"subject_id": actor.subject_id, "location": HUNT_LOCATION})
+		prompt.text = "%s'S GRIP GIVES OUT" % str(actor.display_name).to_upper()
 	if not bool(response.staggered):
 		return
 	actor.state = "staggered"
@@ -2713,7 +3444,14 @@ func _kill_encounter_actor(index: int, cause: String) -> void:
 	misfire_director.resolve(str(actor.get("encounter_id", "")), "defeated")
 	var node := actor.node as Node3D
 	var anatomy: Node = actor.anatomy as Node
-	WorldHistory.update_subject(str(actor.subject_id), {"status": "dead", "memory": "The Hunter caught them before escape.", "anatomy_state": anatomy.call("snapshot")}, "npc_killed")
+	# AE.1 / AE.4. Death, as the world's record rather than the scene's. The
+	# status string is read off `RivalRegistry.DEAD` rather than typed here, so
+	# the file that decides what "dead" means and the record that says somebody
+	# is dead can never drift into disagreeing - and the two fields beside it
+	# are what makes the death attributable later, since a status change on its
+	# own does not say who did it or where.
+	var dead_status := str(RivalRegistry.DEAD[0])
+	WorldHistory.update_subject(str(actor.subject_id), {"status": dead_status, "killed_by": "player", "killed_at": HUNT_LOCATION, "memory": "The Hunter caught them before escape.", "anatomy_state": anatomy.call("snapshot")}, "npc_killed")
 	var succession := WireNet.new(WireNet.SIGNAL_SURFACE)
 	var vacancy := succession.open_vacancy(str(actor.subject_id))
 	if not vacancy.is_empty():
@@ -3077,6 +3815,14 @@ func _start_grapple() -> void:
 	grapple_clock = 0.0
 	grapple_pressure_clock = 0.0
 	grapple_zone = _worst_limb(actor.anatomy as AnatomyComponent)
+	# B6.1/B6.2. Which of *your* arms is doing the holding. A limb with
+	# grappling hardware in it takes the hold if you have one — that is the
+	# hardware doing something rather than sitting in the limb being drawn —
+	# and otherwise it is the right arm, the same default the rest of this
+	# file assumes. Recorded because B6.2 needs to know which limb to miss
+	# when it comes off.
+	var capable: Array[String] = player_rig.capable_limbs("grapple")
+	grapple_with = capable[0] if not capable.is_empty() else "right_arm"
 	strike_windup = -1.0
 	WorldHistory.record_event("grapple_started", {"subject_id": grapple_target, "zone": grapple_zone, "location": HUNT_LOCATION})
 
@@ -3153,6 +3899,7 @@ func grapple_shield(damage: float, from: Vector3) -> Dictionary:
 func _break_grapple(message := "") -> void:
 	grapple_target = ""
 	grapple_advantage = 0.0
+	grapple_pushing_now = false
 	if not message.is_empty():
 		prompt.text = message
 
@@ -3163,6 +3910,13 @@ func _update_grapple(delta: float) -> void:
 	var actor := _actor_by_id(grapple_target)
 	if actor.is_empty() or bool(actor.get("dead", false)) or actor.anatomy.downed:
 		_break_grapple()
+		return
+	# B6.2. A grappling limb that is severed stops grappling. Checked here
+	# rather than only off `limb_severed` so it is true of the state itself —
+	# however the arm came off, and whoever took it, the hold is over on the
+	# next tick rather than only when a signal happened to be connected.
+	if player_rig != null and is_instance_valid(player_rig) and player_rig.severed.has(grapple_with):
+		_break_grapple("THE ARM HOLDING THEM IS GONE")
 		return
 	var node := actor.node as Node3D
 	var gap := player.distance_to(node.global_position)
@@ -3206,6 +3960,7 @@ func _update_grapple(delta: float) -> void:
 	# input read as a raw button rather than an action, so tests need a way in
 	# that does not depend on a display server existing.
 	var pushing: bool = grapple_pushing_override if grapple_pushing_override != null else (Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or Input.is_key_pressed(KEY_C))
+	grapple_pushing_now = pushing
 	var player_force: float = player_rig.anatomy.combat_ratio() * (1.35 if pushing else 0.3)
 	# O3.3. combat_ratio() already softens their resistance for arm damage in
 	# general; this softens it further, specifically, for the one limb you
@@ -3251,6 +4006,44 @@ func _update_grapple(delta: float) -> void:
 ## C3.1. Raise the camera and take the picture. What gets stored is not an
 ## image — it is what was actually in shot and what state those bodies were
 ## actually in, which is what makes it evidence a ritual can be held to.
+## Agent 1 brief. Builds the graded look once, off whatever the real
+## WorldEnvironment currently is, rather than a hardcoded resource that could
+## drift from `world_look.gd`'s own ashbloom preset or disagree with the hour
+## AS2 has already set. Cached rather than rebuilt every toggle — the
+## adjustment values are the point, not the sky/fog underneath them, which is
+## why this duplicates once and only ever edits its own copy from then on.
+func _black_mirror_environment() -> Environment:
+	if _black_mirror_env == null:
+		var base: Environment = $WorldEnvironment.environment
+		_black_mirror_env = base.duplicate() if base != null else Environment.new()
+		_black_mirror_env.adjustment_enabled = true
+		_black_mirror_env.adjustment_saturation = 0.15
+	return _black_mirror_env
+
+
+## Agent 1 brief. "The Black Mirror camera should become the meaningful
+## navigation tool in extreme darkness." A camera's own `environment`
+## overrides the scene's `WorldEnvironment` for exactly that camera, so this
+## touches nothing the naked eye sees — `sun`, ambient, fog and every other
+## real light in `_update_day_night()` are exactly as dark as AS2 already
+## made them, on and off. What changes is only the amplification applied to
+## whatever light already reached the lens: real night vision brightens what
+## little is there rather than adding light that was never there, and that
+## distinction is the whole point being asked for. Scaled by how dark it
+## actually is (`1.0 - daylight`) so the lens does something worth reaching
+## for at night and reads as barely more than a tint at noon, rather than one
+## fixed amplification regardless of the hour.
+func _toggle_black_mirror() -> void:
+	black_mirror_active = not black_mirror_active
+	if not black_mirror_active:
+		camera.environment = null
+		return
+	var graded := _black_mirror_environment()
+	var darkness := 1.0 - WorldClock.daylight()
+	graded.adjustment_brightness = lerpf(1.05, 3.4, darkness)
+	camera.environment = graded
+
+
 func _take_photograph() -> Dictionary:
 	if not panel_mode.is_empty() or resolution_ui.visible:
 		return {}
@@ -3398,12 +4191,18 @@ func _apply_clinch_result(actor: Dictionary, result: Dictionary, verb: String) -
 ## Winning drops them into the downed window rather than killing them. The
 ## takedown itself is blunt trauma to the head and torso, so the body carries a
 ## record of how it was beaten and the resolution form shows it.
+##
+## The guard is a body-state read rather than a call count: a body that is
+## already down or already dead must not be sent down a second time, because
+## that would overwrite the closed state the resolution form is showing with a
+## fresh one and lose what actually happened to them.
 func _finish_grapple(actor: Dictionary) -> void:
 	var rig := actor.rig as BaselineHuman
 	rig.hit("head", 26.0, 18.0, "blunt")
 	rig.hit("torso", 30.0, 20.0, "blunt")
-	if not actor.anatomy.downed and not actor.anatomy.dead:
-		actor.anatomy.go_down()
+	var body_state = actor["anatomy"]
+	if body_state != null and not bool(body_state.get("downed")) and not bool(body_state.get("dead")):
+		body_state.call("go_down")
 	WorldHistory.record_event("grapple_takedown", {"subject_id": str(actor.subject_id), "location": HUNT_LOCATION})
 	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": rig.snapshot()}, "anatomy_changed")
 	_break_grapple("%s IS ON THE GROUND — [E] DECIDE" % str(actor.display_name).to_upper())
@@ -3655,6 +4454,9 @@ func _update_hud() -> void:
 	if not wall_run_unlock_announced and wall_run_unlocked():
 		wall_run_unlock_announced = true
 		_announce_wall_run_unlock()
+	if not climb_unlock_announced and climb_unlocked():
+		climb_unlock_announced = true
+		_announce_climb_unlock()
 	title.text = "WIZARDS ONLY FOOLS // LIMBO: ASHBLOOM EXPANSE"
 	# I3. The second control strip is gone. `gothic_field_hud.gd` draws the one
 	# the player reads, in the game's own face, and it is contextual — this was
@@ -4014,16 +4816,18 @@ func _update_body_record(delta: float) -> void:
 	WorldHistory.amend_subject("player", {"anatomy_state": player_rig.snapshot()})
 
 
-## A9.1 / A9.2. The volume follows the player in steps, and its severity is read
-## from the number AS4.2 says the storm will read — so when that segment builds
-## the storm, the air is already answering the same source rather than needing a
-## second one. `chaos_magick()` sits near zero on a quiet run and climbs with
-## rituals and with the gods A7 put in the sky.
+## A9.1 / A9.2 / W1.2. The volume follows the player in steps, and its severity
+## is `WorldWeather.contamination()` — an ambient floor that rises with elapsed
+## days, worse at night than by day, with whatever storm AS4.2 eventually
+## builds (currently `chaos_magick()`, sitting near zero on a quiet run and
+## climbing with rituals and the gods A7 put in the sky) folded in on top. A
+## clear, ritual-free night now reads as something rather than nothing, which
+## is the whole point of W1.2: contamination was a static paint job until now.
 func _update_air() -> void:
 	if air == null or not is_instance_valid(air):
 		return
 	air.follow(player)
-	air.set_severity(clampf(WorldHistory.chaos_magick(), 0.0, 1.0))
+	air.set_severity(WorldWeather.contamination())
 	# B7.1. Standing in it costs something. The air doses whatever it is
 	# touching, and what the player is wearing decides how much of it gets
 	# through — which is what makes a filter mask a decision rather than a
@@ -4147,16 +4951,34 @@ func _on_reality_misfire(encounter: Dictionary, at: Vector3) -> void:
 		_spawn_misfire_marker(title_text, summary, at, kind, str(encounter.instance_id))
 
 
-func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> void:
+## Any actor the world puts in front of the player, built out of the same parts:
+## a body, a collision capsule, an identity label, and a `BaselineHuman` rig with
+## an anatomy component on it. Returns the actor dictionary it appended, or an
+## empty dictionary when the caller asked for somebody who is already dead or
+## already gone - `_spawn_ashline_reinforcements()` and the misfire director
+## ignore the return, the Bone Yard population uses it to finish dressing the
+## worker it just created.
+func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 	var subject_id := "%s_actor" % str(encounter.get("instance_id", "misfire"))
 	var saved_actor := WorldHistory.subject(subject_id)
 	if str(saved_actor.get("status", "")) in ["dead", "escaped"]:
-		return
-	# The encounter may name its own body. Misfires do not and keep the authored
-	# pair below; roamers do, because fourteen identical "Ashline Tollkeeper"s
-	# standing around a region is a spawn table with the seams showing.
-	var default_name := "Ashline Tollkeeper" if str(encounter.kind) == "hostile" else "Dead Weather Saint"
-	var display_name := str(encounter.get("display_name", default_name))
+		return {}
+	# AE.3. A caller that already knows who this is says so, and is believed.
+	# The population resolves its own people through `cast_names.gd` and passes
+	# the name in; everything that existed before this - reality misfires, the
+	# captain's reinforcements - passes nothing and keeps the two authored
+	# stand-ins it has always had. The saved record is read first, so a worker
+	# who was already in the yard when it was last written comes back as
+	# themselves rather than as a stranger standing in their post.
+	var display_name := str(saved_actor.get("name", ""))
+	if display_name.is_empty():
+		display_name = str(encounter.get("display_name", ""))
+	if display_name.is_empty():
+		display_name = "Ashline Tollkeeper" if str(encounter.kind) == "hostile" else "Dead Weather Saint"
+	# Standing travels with the name, for the same reason and read the same way
+	# round. A population whose every member's plate says ELO 1110 shows the
+	# spawn table's seams exactly the way one repeated name does. The authored
+	# pair stays the default, so a misfire is unchanged by this existing.
 	var elo := int(encounter.get("elo", 1110 if str(encounter.kind) == "hostile" else 1510))
 	var actor := CharacterBody3D.new()
 	actor.name = subject_id
@@ -4181,32 +5003,66 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> void:
 	rig.name = "Body"
 	actor.add_child(rig)
 	rig.position = Vector3(0, -0.9, 0)
+	# AE.3. Flesh colour, procedural variation, blood volume and named implants
+	# are the four things `baseline_human.gd`'s own `build()` reads to make two
+	# people out of one rig - and until now every spawn in this scene passed the
+	# same values for the first three, so the region's population was one body
+	# copied around with a different label over it. A caller may name them; the
+	# defaults are exactly what this function has always used, so the misfires
+	# and the captain's reinforcements are unchanged.
 	var rig_config := {
-		"flesh": Color("70201c") if str(encounter.kind) == "hostile" else Color("586c3a"),
-		"variation": subject_id.length(),
+		"flesh": Color(str(encounter.get("tint", "70201c"))) if str(encounter.kind) == "hostile" else Color("586c3a"),
+		"variation": int(encounter.get("variation", subject_id.length())),
 		"gore": viscera_fx,
-		"blood": 5200.0 if str(encounter.kind) == "boss" else 4300.0,
-		# Named, not just an armour number. Before B2 an implant *was* its armour
-		# value, so this passed an anonymous dictionary and every Ashline body
-		# ended up carrying a part the catalogue could only call "unknown
-		# hardware" — visible in the dossier and robbable as nothing in
-		# particular. The armour override keeps the encounter balance it was
-		# tuned with; the name gives it a zone, a condition and a real mesh.
-		"cybernetics": {"torso": {"name": "ceramic sternum", "armor": 0.18}},
+		"blood": float(encounter.get("blood", 5200.0 if str(encounter.kind) == "boss" else 4300.0)),
 	}
+	# Named, not just an armour number. Before B2 an implant *was* its armour
+	# value, so this passed an anonymous dictionary and every Ashline body
+	# ended up carrying a part the catalogue could only call "unknown
+	# hardware" — visible in the dossier and robbable as nothing in
+	# particular. The armour override keeps the encounter balance it was
+	# tuned with; the name gives it a zone, a condition and a real mesh.
+	#
+	# AE.3. Which hardware is now the caller's to say, because a yard full of
+	# people who all have the same sternum plate is a yard full of one person.
+	# A caller that names an implant gets it on the zone it names; every caller
+	# that predates this - misfires, the captain's reinforcements - gets the
+	# sternum this line has always built.
+	var implant: Variant = encounter.get("implant", null)
+	if implant is Dictionary:
+		rig_config["cybernetics"] = {
+			str(implant.get("zone", "torso")): {
+				"name": str(implant.get("name", "salvaged hardware")),
+				"armor": float(implant.get("armor", 0.12)),
+			},
+		}
+	else:
+		rig_config["cybernetics"] = {"torso": {"name": "ceramic sternum", "armor": 0.18}}
 	if saved_actor.get("anatomy_state") is Dictionary:
 		rig_config["restore"] = saved_actor.anatomy_state
 	rig.gore = viscera_fx
 	rig.build(subject_id, rig_config)
 	HUNTER_APPEARANCE.style_world_rig(rig, subject_id, str(encounter.kind) == "hostile")
 	var anatomy: Node = rig.anatomy
-	var loot := ["Ashline toll teeth", "rust scrip"] if str(encounter.kind) == "hostile" else ["weather-heart filament", "dead god relay"]
+	# AE.3. What is on the body when it goes down. A caller may say; everything
+	# else keeps the Ashline pockets this has always spawned with.
+	var loot: Array = []
+	var requested_loot: Variant = encounter.get("loot", null)
+	if requested_loot is Array:
+		loot.assign(requested_loot)
+	if loot.is_empty():
+		loot = ["Ashline toll teeth", "rust scrip"] if str(encounter.kind) == "hostile" else ["weather-heart filament", "dead god relay"]
 	encounter_actors.append({"subject_id": subject_id, "display_name": display_name, "node": actor, "rig": rig, "anatomy": anatomy, "state": "hunting", "disposition": "hostile", "speed": 3.7, "loot": loot, "loot_at_risk": false, "dead": false})
 	encounter_actors.back()["encounter_id"] = str(encounter.get("instance_id", ""))
 	if str(saved_actor.get("status", "")) in ["spared", "recruited"]:
 		encounter_actors.back().state = str(saved_actor.status)
 		encounter_actors.back().disposition = "ally" if str(saved_actor.status) == "recruited" else "neutral"
-	WorldHistory.register_subject(subject_id, {"name": display_name, "kind": "person", "role": str(encounter.kind), "elo": elo, "status": "encountered", "memory": summary_from(encounter), "wounds": [], "anatomy": anatomy.call("snapshot"), "relations": {"player": {"kind": "enemy", "strength": 35}}})
+	WorldHistory.register_subject(subject_id, {"name": display_name, "kind": "person", "role": str(encounter.get("role", encounter.kind)), "elo": elo, "status": "encountered", "memory": summary_from(encounter), "wounds": [], "anatomy": anatomy.call("snapshot"), "relations": {"player": {"kind": "enemy", "strength": 35}}})
+	# AE.3. Returned so the caller can finish dressing an actor it has a name
+	# and a body for - a lantern, a proper label, a faction on the record. The
+	# misfire director and `_spawn_ashline_reinforcements()` ignore this, as
+	# they always ignored the absence of it.
+	return encounter_actors.back()
 
 
 ## The Hunt Grounds had no standing population at all. Every hostile in the
@@ -4244,13 +5100,24 @@ var _roamer_serial := 0
 var _roamer_attempt := 0
 
 
-## How many living hostiles are actually still standing. Downed and dead bodies
-## stay in the world (they are lootable, robbable and part of the record) but
-## they are not opposition any more, so they do not hold a slot shut.
+## How many living ROAMERS are still standing. Downed and dead bodies stay in
+## the world (they are lootable, robbable and part of the record) but they are
+## not opposition any more, so they do not hold a slot shut.
+##
+## Counted by encounter id rather than by disposition, which matters more than
+## it looks: `_spawn_encounter_actor` hands every body it builds a default
+## disposition of "hostile", so the yard's own five workers (AE.1, standing at
+## their posts) and every misfire body read as hostile too. Counting those
+## against a roaming target of fourteen would have quietly capped the roaming
+## population at nine the moment the yard was manned — the region would have
+## looked busier and actually hunted you less. The target governs roamers, so
+## only roamers are counted toward it.
 func _living_hostiles() -> int:
 	var standing := 0
 	for actor in encounter_actors:
 		if bool(actor.get("dead", false)):
+			continue
+		if not str(actor.get("encounter_id", "")).begins_with("roamer_"):
 			continue
 		if str(actor.get("disposition", "hostile")) != "hostile":
 			continue
@@ -4446,6 +5313,171 @@ func _spawn_ashline_reinforcements() -> void:
 	for index in 2:
 		var encounter := {"instance_id": "mara_reinforcement_%d" % index, "kind": "hostile", "summary": "An Ashline knife came to keep Mara's second body alive."}
 		_spawn_encounter_actor(encounter, enemy.global_position + Vector3(-6.0 if index == 0 else 6.0, 0, 4.0 + index * 2.0))
+
+
+## AE.1 - AE.5. The yard's population. Five workers standing where they work,
+## each of whom is a person rather than a silhouette: a name generated per save,
+## a subject in `WorldHistory` with a faction, a role and a grudge, a real
+## `BaselineHuman` body with anatomy under it, a lantern so the dusk the clock
+## opens into does not swallow them, and a death that is a saved status change
+## rather than a node that stopped drawing.
+##
+## Everything here goes through the infrastructure that already exists. The body
+## is the same rig `_spawn_rival()` gives the captain and `_spawn_friend()`
+## gives Nix. The identity is `CastNames`, which is where the captain's name has
+## come from since v10.1. The state is `WorldHistory`, and a kill lands in
+## `encounter_actors` and reaches `_kill_encounter_actor()` by exactly the road
+## every misfire actor already takes - melee through
+## `_attack_nearest_encounter_actor()`, firearms through `_resolve_body_hit()`.
+## Nothing here is a second copy of any of that.
+func _spawn_yard_population() -> void:
+	_register_population_faction()
+	var spawned: Array[String] = []
+	for index in POPULATION_POSTS.size():
+		var subject_id := _spawn_yard_worker(index)
+		if not subject_id.is_empty():
+			spawned.append(subject_id)
+	WorldHistory.record_event("bone_yard_population_manned", {
+		"location": HUNT_LOCATION,
+		"faction_id": POPULATION_FACTION_ID,
+		"posts": spawned.size(),
+		"subjects": spawned.duplicate(),
+	})
+
+
+## AE.4. The yard is not staffed by nobody. Every worker generated below carries
+## this faction, so F3's succession has something real to work with when one of
+## them is killed: `wire_net.gd` looks up the dead worker's `faction_id`, opens a
+## vacancy on this subject and refills it from whoever else of the roster is
+## still alive. Registered with `register_subject()`, which fills in missing
+## authored fields without ever erasing a wound, grudge or vacant post an older
+## save has already earned.
+func _register_population_faction() -> void:
+	if not WorldHistory.subject(POPULATION_FACTION_ID).is_empty():
+		return
+	WorldHistory.register_subject(POPULATION_FACTION_ID, {
+		"name": POPULATION_FACTION_NAME, "kind": "faction", "role": "Yard labour union",
+		"threat": "LOW", "territory": "Bone Yard gate, mid road and wreck line",
+		"doctrine": "Somebody has to cut the wrecks. Those who do get first refusal on what comes out of them.",
+		"relations": {"player": {"kind": "known", "strength": 4}, CAST.id_for(CAPTAIN_SLOT): {"kind": "employer", "strength": 38}},
+	})
+
+
+## AE.1 / AE.2 / AE.3. One worker, posted at one offset from one of the region's
+## own lamps, built through `_spawn_encounter_actor()` rather than around it.
+##
+## The encounter dictionary is the same shape `_spawn_ashline_reinforcements()`
+## already passes - instance_id, kind, summary - which is the point of reusing
+## it: the worker is an encounter actor in every sense, so `_update_encounter_actors()`
+## moves them, they orbit and press openings, they can be disarmed, grappled,
+## downed, spared and recruited, the witness ledger counts them, the map shows
+## them, and the existing combat path wounds them without knowing anything new.
+## What the two extra keys do is identity, which `_spawn_encounter_actor()` has
+## no concept of and would otherwise invent a name for: `display_name` and
+## `role` come out of `CastNames` off this post's own slot.
+func _spawn_yard_worker(index: int) -> String:
+	var post: Dictionary = POPULATION_POSTS[index]
+	var slot := "%s%02d" % [POPULATION_SLOT_PREFIX, index]
+	var who: Dictionary = CAST.person(slot)
+	var role := str(post.get("role", who.get("role", "Yard hand")))
+	var request: Dictionary = {
+		"instance_id": slot,
+		"kind": "hostile",
+		"display_name": str(who["name"]),
+		"role": role,
+		"summary": "Works the Bone Yard %s. Carries a lantern, a quota and a grudge about both." % str(post.get("post", "floor")),
+		"faction": POPULATION_FACTION_NAME,
+		"faction_id": POPULATION_FACTION_ID,
+		"loot": post.get("loot", ["yard scrip"]),
+		"tint": str(post.get("tint", "6f5f4b")),
+		"variation": int(post.get("variation", index)),
+		"implant": post.get("implant", {}),
+	}
+	var spawned := _spawn_encounter_actor(request, _population_post_position(post))
+	if spawned.is_empty():
+		return ""
+	# The subject id comes back from the actor that was actually built, not from
+	# the name this asked for - `_spawn_encounter_actor()` derives its own id
+	# from the instance id, and a worker restored from a save has to be written
+	# back as the same person they were, wounds and all.
+	var subject_id := str(spawned.get("subject_id", who["id"]))
+	var body := spawned.get("node") as Node3D
+	_light_population_lantern(body)
+	_label_population_worker(body, str(spawned.get("display_name", who["name"])), role)
+	# AE.1 / AE.4. The identity is written here rather than left on whatever
+	# `_spawn_encounter_actor()` filled in, because this is the part that makes
+	# a worker a person in the world's record rather than a generic encounter:
+	# their post, their job, the union they work for, what the lantern means,
+	# and the name `cast_names.gd` generated for this save. A grudge is seeded
+	# rather than invented later, so the dossier has something to say about
+	# somebody the player has not touched yet. The faction `cast_names.gd`
+	# generated for them is kept alongside as `faction_origin`, since who they
+	# came from is theirs and who they work for is the yard's.
+	WorldHistory.update_subject(subject_id, {
+		"name": str(spawned.get("display_name", who["name"])),
+		"role": role,
+		"post": str(post.get("post", "")),
+		"faction": POPULATION_FACTION_NAME,
+		"faction_id": POPULATION_FACTION_ID,
+		"faction_origin": str(who["faction"]),
+		"grudge": int(post.get("grudge", 0)),
+		"lantern": true,
+		"memory": str(request["summary"]),
+	}, "bone_yard_post_manned")
+	return subject_id
+
+
+## AE.2. Where a post stands. Read off the lamp it belongs to so the population
+## follows the lights if those ever move, and snapped through the same
+## `pathfinder.safe_position()` every other spawn in this scene uses, so a worker
+## is never placed inside a wreck pile's own footprint.
+func _population_post_position(post: Dictionary) -> Vector3:
+	var lamp: Dictionary = GATE_LIGHTS[clampi(int(post.get("lamp", 0)), 0, GATE_LIGHTS.size() - 1)]
+	var lamp_at: Vector3 = lamp["at"]
+	var offset: Vector2 = post.get("offset", Vector2.ZERO)
+	return pathfinder.safe_position(Vector3(lamp_at.x + offset.x, POPULATION_STAND_Y, lamp_at.z + offset.y))
+
+
+## AE.5. The lantern. Built through `_place_night_light()` - the one place this
+## scene makes a light - then reparented onto the body that carries it, so it
+## travels with whoever is holding it instead of hanging over the spot they used
+## to stand on. `_update_day_night()` drives it off the same hour as the gate
+## lamps because it is in `night_lights` like every other one, and
+## `_place_night_light()` has already given it its warp shell and its bulb.
+func _light_population_lantern(body: Node3D) -> void:
+	if body == null or not is_instance_valid(body):
+		return
+	var lantern := _place_night_light(
+		body.global_position + POPULATION_LANTERN_AT,
+		Color("e8c46a"),
+		POPULATION_LANTERN_ENERGY,
+		POPULATION_LANTERN_REACH,
+		false,
+		0.22,
+	)
+	# Reparenting keeps nothing of the old global transform by default, so the
+	# lamp is placed at its offset in the body's own frame - which is what an
+	# offset from a hand means anyway.
+	remove_child(lantern)
+	body.add_child(lantern)
+	lantern.position = POPULATION_LANTERN_AT
+
+
+## AE.3. Who this is, over their head, in the same "<NAME> // <WHAT THEY ARE>"
+## register the captain's own label already uses.
+##
+## The whole generated name goes up rather than just the forename: five people
+## drawn from thirty-two forenames will collide often enough to matter, and two
+## of the yard's workers sharing a given name would undo the one thing this
+## population is for. `cast_names.gd` guarantees the full name is the stable,
+## save-specific one, so that is what is on the body.
+func _label_population_worker(body: Node3D, display_name: String, role: String) -> void:
+	if body == null or not is_instance_valid(body):
+		return
+	var label := body.get_node_or_null("Identity") as Label3D
+	if label == null:
+		return
+	label.text = "%s // %s" % [display_name.to_upper(), role.to_upper()]
 
 
 func _spawn_blood(at: Vector3, amount: int) -> void:

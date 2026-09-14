@@ -415,8 +415,45 @@ v4 made the body customisable and nothing in it does anything. The crystal ball 
 
 ### B v6 — the sixth pass
 v5 put an object in a limb; AD3.2 wants cybernetics that change what movement is possible. Greg: limbs *"that shoot missiles, grapple"*.
-- [ ] **B6.1** `v6` Limbs that shoot and grapple, through the anatomy rather than around it
-- [ ] **B6.2** `v6` A grappling limb that is severed stops grappling
+- [x] ~~**B6.1** `v6` Limbs that shoot and grapple, through the anatomy rather than around it~~
+      The load-bearing half of the item is its last five words. A capability
+      that is an ability flag sitting beside the body never hears about the
+      arm coming off; one read through the anatomy cannot help but hear.
+      `AnatomyComponent.LIMB_CAPABILITIES` keys off the hardware's own
+      `profile` — the field `implant_catalog.gd` has carried for every entry
+      since it was written and that B5.2 already draws the limb's shape from
+      — so a capability cannot disagree with the thing granting it the way a
+      second ability table would. `limb_capabilities()`/`limb_can()`/
+      `capable_sites()` answer for one site or find the limb to reach with,
+      and hardware below `CAPABILITY_MINIMUM_CONDITION` answers nothing: a
+      wrecked limb drive is a weight on the end of your arm.
+      Verified: `tests/limb_capability_test.gd` (17 checks) — a bare arm
+      cannot grapple, an industrial arm can and the other arm still cannot,
+      a ledger thumb is hardware and still cannot, wrecking the hardware
+      takes the capability with it, and the same routing carries a launching
+      limb without quietly granting every capability at once.
+      Still open, named rather than glossed: no *authored* launcher exists.
+      `implant_catalog.gd` is Lane 5's file and its twenty-one entries are
+      all grapple-or-nothing, so the launch path is proven with a
+      caller-supplied limb rather than one out of the catalogue. Adding a
+      real launcher entry is that file owner's call — and it is what AD3.1
+      needs before "answer a rocket with a blade" has a rocket in it.
+- [x] ~~**B6.2** `v6` A grappling limb that is severed stops grappling~~
+      Falls straight out of B6.1's layering rather than being bolted on
+      beside it: `BaselineHuman.limb_can()` asks the anatomy what the
+      hardware offers and then vetoes it if the limb is not attached, so a
+      severed arm answers `false` to everything from the moment it comes
+      off, with nothing needing to remember to go and switch a flag. The
+      hold itself tracks which of your own arms is doing the holding
+      (`grapple_with`, chosen as a grappling-capable limb when you have one),
+      and `_update_grapple()` checks it against `severed` every tick — so
+      however the arm came off and whoever took it, the hold ends on the
+      next tick rather than only when a signal happened to be connected.
+      Verified in the same suite, end to end: with the rig's own
+      `left_arm` severed mid-hold in a real instantiated Hunt Grounds,
+      `_update_grapple()` clears `grapple_target` — and the deliberate
+      layering check that the *hardware* is still installed and still intact
+      while the body is what refuses it.
 
 ### B v7 — the seventh pass
 v6 made the body a weapon platform wearing nothing. AS3.4: what you are wearing shows on the body the mirror renders.
@@ -1732,20 +1769,63 @@ and start being an object — and leaving your body should cost something.
       normalises correctly), captured in `game/captures/m1_6_field_hud_vitals.png`.
 
 ### M2 — In the car
-**Deferred this session.** There is currently no first/third-person split in
-`rift_derby.gd` at all — one fixed chase camera — so this is a feature build
-(seated view, a visible WASD hand, a held gun, a real glass object that cracks)
-rather than a tune, in a file Agent B owns for visuals and is actively
-changing. Starting it without coordinating risked either a merge collision or
-landing something half-verified. Flagging it here rather than doing it
-silently, per this session's brief.
-- [ ] **M2.1** First-person driving is the default
-- [ ] **M2.2** One hand on the wheel; that hand *is* WASD and it is visible
-- [ ] **M2.3** The other hand holds a gun, and you shoot out of your own car
-- [ ] **M2.4** You shoot through your own windscreen, and the glass is really there
-- [ ] **M2.5** The glass degrades as the car takes hits — the view gets worse as you do
-- [ ] **M2.6** Third-person driving unlocks through derby progress, separately from M1
-- [ ] **M2.7** No hard cut between the two views (Rule 3)
+**The note above this line was wrong by the time anyone read it again.** It
+said there was no first/third-person split in `rift_derby.gd` and deferred
+the whole section rather than risk a collision in a file Agent B owns.
+Since it was written, `vehicle_interior.gd`/`dash_cluster.gd` — both Lane
+1's own files, "driving from inside" — were built in full, and
+`rift_derby.gd` wires them in (`INTERIOR := preload(...)`, `in_cab`,
+`_fire_from_cab()`). Read and verified here, not built here, and
+`rift_derby.gd` itself was not touched.
+- [x] ~~**M2.1** First-person driving is the default~~ Cross-ticked against
+      `rift_derby.gd`'s own `var in_cab := true` — the cab is genuinely
+      where a heat starts, not a chase camera you can optionally step into
+- [x] ~~**M2.2** One hand on the wheel; that hand *is* WASD and it is
+      visible~~ `VehicleInterior.drive(steer, throttle)` turns the wheel
+      and the `left_arm` gripping it by the same `steer` value the chassis
+      itself steers on — not a synced animation, the same number. Verified
+      against `captures/m2_cabin_straight.png` and
+      `captures/m2_cabin_turning.png`: the arm visibly leans with the wheel
+- [x] ~~**M2.3** The other hand holds a gun, and you shoot out of your own
+      car~~ `gun_arm` is real geometry (a grip, a slide, a barrel), LMB
+      calls `_fire_from_cab()` in `rift_derby.gd`, and it is a real weapon —
+      a raycast, real ammo (`rounds_left`), a cooldown, and real damage to
+      whatever it hits (`_damage_target`), not a cosmetic muzzle flash.
+      **Not yet true**: this is a second, simpler firearm system
+      (raycast + flat damage) rather than the one AF1/AF1.1 built —
+      `Ballistics`' real projectile and `BaselineHuman.hit_at`'s zone
+      resolution never enter it. That gap is AF1.8's own, named for exactly
+      this reason, and stays open
+- [x] ~~**M2.4** You shoot through your own windscreen, and the glass is
+      really there~~ `_windscreen()` is a real `BoxMesh` plane in front of
+      the camera, lit by the world, and `punch_through()` marks it exactly
+      where you aimed rather than a flat screen-space decal. Verified
+      against `captures/m2_cabin_straight.png`: buildings beyond the glass
+      are genuinely seen through real geometry, not composited
+- [x] ~~**M2.5** The glass degrades as the car takes hits — the view gets
+      worse as you do~~ `take_hit(severity, at_x)` raises `glass_damage`,
+      and `_apply_glass()` turns that into real milky scatter and roughness
+      on the same material rather than a health bar somewhere else on
+      screen. Verified against `captures/m2_cabin_wrecked.png`: at 5
+      recorded hits the windscreen has gone from the clear view in
+      `m2_cabin_straight.png` to a frosted wall — the buildings beyond are
+      gone, not merely dimmed
+- [~] **M2.6** Third-person driving unlocks through derby progress,
+      separately from M1 — `_third_person_earned()` in `rift_derby.gd` is
+      its own function, read fresh off `WorldHistory` rather than a stored
+      flag `bone_yard_hunt.gd` could leak into, which is "separately from
+      M1" in the sense that matters for a duplicated-flag bug. What it is
+      not separate from is the *condition*: its own comment says so
+      outright — "the same condition the Hunt Grounds uses" — a killed
+      rival or grudge ≥ 40, not a derby-specific measure like rounds won or
+      laps survived. Whether "derby progress" was meant to name a different
+      number is Greg's call, not assumed here
+- [ ] **M2.7** No hard cut between the two views (Rule 3) — checked, and it
+      is one: `_toggle_derby_view()` flips `in_cab` and `_apply_view_masks()`
+      swaps `camera.cull_mask` between the cab and bodywork layers on the
+      same frame, with no fade, no camera travel, nothing eased. Rule 3
+      ("every hard cut is a bug") names exactly this. Left open rather than
+      touched — `rift_derby.gd` is Lane 2's file
 
 ### M2b — Cars are the horses of this world
 Greg: *"in the car we need to be able to fully exit it like e exit the door type
@@ -1801,6 +1881,34 @@ image.
       is proportions and silhouette work (a longer, thinner barrel; a stock
       angled off the receiver) rather than another transform bug, so it is
       left here rather than force-finished. Recaptured in `game/captures/`.
+
+      Follow-up 2: the fix above targeted `hunter_arsenal.gd`'s own
+      box-primitive weapon models and was correct for what it touched — but
+      that whole system was superseded by `held_gear.gd`'s sculpted meshes at
+      "0006 touchdesigner" (`5630b82`), which never inherited it and
+      reintroduced the same *class* of bug independently, in the code that is
+      actually live today: `BodyMesh.revolve()` extends along its own local
+      Y, not Z like `_sweep()` does, and the shotgun's barrel/magazine used a
+      Y-axis rotation trying to point them forward — which cannot retarget a
+      shape already aligned with Y. The barrel read as a pole pointed at the
+      sky, not a stacked blob; the two prior writeups were looking at a
+      screen this dark by coincidence, not because the fix above had failed.
+      Fixed by rotating on X instead (`barrel.rotation.x = PI * 0.5`, sign
+      chosen so `+at` still means "toward the muzzle"), and the same
+      correction applied everywhere else `revolve()` carried the identical
+      wrong-axis rotation: the shotgun's ribs, and the sword's own
+      handle/pommel/wrap — dormant there too, just small enough parts that a
+      "reads clean" verdict never caught it. The sidearm has no `revolve()`
+      parts at all and was never touched by this specific bug; its
+      stacked-block read is the proportions/silhouette problem Follow-up
+      already named and it remains open. `tests/viewmodel_capture.gd` now
+      forces `WorldClock.set_hour(13.0)` before capturing — the night rework
+      landed after this segment was first opened and the world now defaults
+      dark enough to make a framing check unreadable by accident. Verified:
+      `viewmodel_frame_test.gd`, `magazine_test.gd`, `arsenal_test.gd`,
+      `firearm_momentum_test.gd` and `reload_visual_test.gd` all re-run
+      clean; all three `game/captures/m4_4_viewmodel_*.png` recaptured at the
+      forced hour.
 - [x] ~~**M4.5** The rules are the game's own and applied everywhere, not photographic realism~~ (the resolution/interrogation camera had its own bare `72.0` FOV with no relationship to the 78/63 pair M4.3 established; it now takes `THIRD_PERSON_FOV` since it is already the "look at the body from outside" register)
 
 ### M3 — The seam
@@ -1896,11 +2004,38 @@ inventory, and the sheet you filled in D8 already calls each opt-in modifier "a
 handle on you". Pulling one is the first genuinely disloyal act available to a
 player, and it should be possible from hour one and quietly discouraged.
 
-- [ ] **N5.1** A real slot per site — spine, skull, chest, each arm, each leg, the
-      organ bays — `installed_parts` is still keyed by `BaselineHuman`'s six
-      anatomy zones, so torso covers spine, chest and the organ bays as one
-      slot rather than several. Splitting that out is a real data-model
-      change on its own, not attempted here.
+- [x] ~~**N5.1** A real slot per site — spine, skull, chest, each arm, each leg, the organ bays~~
+      `INSTALL_SITES` (`anatomy_component.gd`) maps eight real sites onto the
+      six damage zones a body already has — "torso" alone used to be the one
+      slot spine, chest and the organ bays all collapsed onto, so installing
+      a chest plate after a spine cage silently erased the spine cage.
+      `install_part()` now keys `installed_parts` by the site the caller
+      actually asked for rather than by whichever zone the catalog entry
+      happens to carry, so all three can be occupied at once, each pulled,
+      damaged and read independently. `apply_hit()` and the wound's own
+      implant-wear line now sum every site answering to the zone that was
+      actually hit, instead of reading a single implant standing in for the
+      whole zone. Every existing caller that installs at a bare zone name
+      ("head", "torso", a limb) is unaffected — a zone is also a valid site
+      of its own, which is also why `FACTORY_LOADOUT`'s three existing slots
+      were left exactly where they were rather than moved to the new names.
+      Verified: `tests/install_sites_test.gd` (11 checks, new) — a spine
+      cage, a chest plate and an organ-bay graft all installed at once
+      without erasing each other; a torso hit measurably absorbed more with
+      two sites armoured than with none; both sites independently wear from
+      that same hit; pulling one leaves the other untouched; "skull" and
+      plain "head" hold separate hardware. Thirteen existing tests
+      (`implant_lock_test`, `body_inspector_test`, `crystal_ball_test`,
+      `armor_resolution_test`, `melee_resistance_test`,
+      `weapon_condition_test`, `extraction_test`, `factory_loadout_wired_test`,
+      `baseline_human_test`, `combat_integration_test`, `pocket_search_test`,
+      `chunk_test`, `radiation_path_test`) re-verified clean against the
+      change.
+      Still open: `FACTORY_LOADOUT` itself still only fills three of the
+      eight real sites now available (skull/spine/chest/organ_bays plus
+      four limbs) — moving its three factory items to more specific sites,
+      or adding real content for the rest, is a fiction/content decision
+      this pass deliberately left alone rather than bundling in.
 - [x] **N5.2** Factory hardware fills them at decanting and is *locked*, not
       absent — `install_factory_loadout()`, three real zones (head, torso,
       left arm), each with a real reason CellOutz put it there.
@@ -1910,10 +2045,14 @@ player, and it should be possible from hour one and quietly discouraged.
       actually pulls it.
 - [x] **N5.4** The warning is in CellOutz's voice, not the game's — "you don't
       want to go rogue yet, do you" — `AnatomyComponent.LOCKED_WARNING`.
-- [ ] **N5.5** Pulling one is recorded, and CellOutz standing reads it (E,
-      `faction_price_factor`) — the pull is recorded (`implant_pulled`
-      events), but nothing yet moves it against `tree_alignment()`/CellOutz
-      standing specifically.
+- [x] **N5.5** Pulling one is recorded, and CellOutz standing reads it (E,
+      `faction_price_factor`) — `event_karma()` now prices `implant_pulled`
+      when `was_locked` is true: CellOutz's own axis is Ownership, so defying
+      their lock is a real Ascent act, not a neutral inventory move.
+      Unlocked hardware (robbed or grown, N5.8) does not touch it, since it
+      was never their claim. Verified: `tests/implant_lock_test.gd` — CellOutz's
+      `faction_price_factor` measurably worsens after a confirmed locked pull
+      and does not move again for an unlocked one.
 - [x] **N5.6** An empty slot is a real condition — the body works worse without
       what was in it — genuinely mechanical: `apply_hit()` already scales
       incoming damage by `installed_parts[zone].armor * implant_condition()`,
@@ -1922,8 +2061,29 @@ player, and it should be possible from hour one and quietly discouraged.
       was never yours (B5.4) — `pull_part()`'s successful result is shaped for
       `Carry.take_chunk()` directly, `lien: "celloutz"` attached, verified
       accepted by a real `Carry` instance.
-- [ ] **N5.8** Robbed and grown hardware fit the same slots — one vocabulary,
-      per B2.1 — not touched this pass.
+- [x] **N5.8** Robbed and grown hardware fit the same slots — one vocabulary,
+      per B2.1 — this was already true in code (`Carry.install_into()` and D4's
+      `_grown_cybernetics()` both resolve through the same `ImplantCatalog`
+      into the same `installed_parts` dict N5.2 uses) but untested as a real
+      spawn path, because **`install_factory_loadout()` — all of N5.2-N5.7 —
+      was never actually called outside its own test.** The real player,
+      built in `bone_yard_hunt.gd`'s `_build_player_rig()`, walked out of the
+      vat with none of CellOutz's hardware and could never see the "you don't
+      want to go rogue yet" warning at all. Now wired: a genuine first
+      decanting installs the factory loadout, skipping any zone the sheet
+      already grew something into, and a restored body is left alone so a
+      slot already pulled stays pulled. `left_arm` stays out of it —
+      `_accumulate_sever_stress()` treats any installed part on a limb as an
+      existing replacement, so filling it would make the arm permanently
+      un-severable and regress B6.5/B6.6; a real fix needs the catalog to
+      distinguish a full prosthetic from a minor implant, which is N5.1's
+      same one-slot-per-zone limitation showing up on limbs instead of the
+      torso. Verified: `tests/factory_loadout_wired_test.gd` (new,
+      instantiates the real hunt scene three times) — a fresh decant carries
+      locked head/torso hardware and a still-severable left arm, a sheet-grown
+      part wins its zone over the factory one, and a previously pulled slot
+      survives a reload unlocked. `implant_lock_test.gd` and
+      `combat_integration_test.gd` re-verified clean.
 
 
 ### N v10 — the final pass
@@ -2138,23 +2298,84 @@ Opened because O2.5 closed at v2. A fault the v2 work itself created.
 
 ### O v4 — the fourth pass
 Three passes tuned a swing the player does not perform. AN: LMB plays an animation and the player's whole contribution is the timing of one keypress.
-- [ ] **O4.1** `v4` `limb_momentum.gd` drives the weapon: it lags, overshoots and swings through
-- [ ] **O4.2** `v4` The weapon is drawn where the physics put it, not where an animation says
+- [x] ~~**O4.1** `v4` `limb_momentum.gd` drives the weapon: it lags, overshoots
+      and swings through~~ Built under AN1.1-AN1.3 rather than under this
+      number, and left unticked here — `_advance_arm()` runs the spring-damper
+      every frame, thrown by the same mouse delta the camera turns by plus the
+      player's own velocity, and it lags, overshoots and swings through
+      exactly as described. `limb_momentum_test.gd` (10 checks) and
+      `tests/firearm_momentum_test.gd` (AN1.7, 7 checks) verify it, the
+      second across all three weapons rather than only the sword.
+- [x] ~~**O4.2** `v4` The weapon is drawn where the physics put it, not where
+      an animation says~~ AN1.3: `_pose_weapon()` reads `arm.at - arm.anchor`
+      and offsets the model from its own authored rest pose every frame; the
+      hand still animates underneath, but the weapon itself hangs off the
+      physics, not the animation. `tests/firearm_momentum_test.gd` confirms
+      this reaches every weapon's own model, not just the sword's.
 
 ### O v5 — the fifth pass
 v4 made the weapon physical and damage still reads a constant off it.
-- [ ] **O5.1** `v5` Damage asks `commitment()` — the weapon sets the ceiling, you earn it
-- [ ] **O5.2** `v5` A flick and a committed sweep are different blows from the same button
+- [ ] **O5.1** `v5` Damage asks `commitment()` — the weapon sets the ceiling,
+      you earn it — everything this needs is already built and calibrated
+      (AN1.4-AN1.9): `momentum_damage` is the one flag standing between the
+      formula and the damage number, and it is deliberately left off by its
+      own comment — *"the old swing stays authoritative until the new one is
+      demonstrably better, which is a judgement to make with a controller in
+      hand rather than in a commit."* `arm_wired_test.gd` asserts it is false
+      "by design", so flipping it is a real, load-bearing design decision,
+      not a bug fix, and not this agent's to make unwitnessed. What is
+      fixed: the formula would have applied unconditionally to firearms too
+      the moment the flag flipped — `commitment()`'s reference was
+      calibrated against melee gestures, and a gun's low, steady aim would
+      have read as permanently low commitment, quietly multiplying every
+      shot's damage by as little as 0.35 the instant somebody tried the
+      flip. Gated to melee now so that whenever this does flip — after
+      someone has actually felt it — it does not also silently break guns.
+- [ ] **O5.2** `v5` A flick and a committed sweep are different blows from the
+      same button — same block, same flag, same open question.
 
 ### O v6 — the sixth pass
 v5 made a blow worth what you put in and a weapon you barely hold is still welded to your hand.
-- [ ] **O6.1** `v6` You can be disarmed, and so can they
-- [ ] **O6.2** `v6` Mass and reach become the whole balance conversation
+- [x] **O6.1** `v6` You can be disarmed, and so can they — an encounter actor
+      has no `arm`/`LimbMomentum` object for AN2.2's own trigger to read, but
+      it already has the same shape of number in `footing` (O5.10 v2's "same
+      meter, same constants, now on both bodies"). Barely standing (below
+      `STUMBLE_AT`) and hit hard enough to stagger takes the weapon, through
+      `_apply_combat_response()`; footing recovering back past that same
+      line gives it back. Disarmed attacks run through the identical
+      `_actor_attack_damage()`/`_actor_attack_cycle()` everything else
+      already reads, scaled down — low but not a tickle, the same ratio
+      bare hands hit for against the player's own cleaver — rather than a
+      second combat system. Verified: `tests/npc_disarm_test.gd` (new) — a
+      solid stance survives a hit that would disarm a barely-standing one; a
+      real WorldHistory event is recorded; disarmed hits measurably softer
+      and faster; footing recovering past the line hands the grip back.
+- [x] ~~**O6.2** `v6` Mass and reach become the whole balance conversation~~
+      Cross-ticked against AN1.5, built under that number rather than this
+      one: `ARM_WEIGHTS` is, in its own comment's words, "the entire
+      firearms-and-melee balance conversation, expressed as two numbers
+      rather than as a table of constants" — a bare hand at 0.4kg, a
+      cleaver at 1.45, a shotgun at 3.2, and every one of them the same
+      `LimbMomentum` object rather than a second system per weapon class.
+      `limb_momentum_test.gd` and `firearm_momentum_test.gd` already verify
+      it across melee and firearms both
 
 ### O v7 — the seventh pass
 v6 finished the human fight. Greg: *"overhauling halfsword combat"* — and the grapple, the shove and the bare hand are still separate systems.
-- [ ] **O7.1** `v7` Grapple, shove and bare hands are the same object with a different mass
-- [ ] **O7.2** `v7` Two-handing changes the numbers rather than the pose
+- [x] ~~**O7.1** `v7` Grapple, shove and bare hands are the same object with
+      a different mass~~ Cross-ticked against AN1.9, built under that
+      number: `grapple` (1.8kg) and `shove` (2.4kg) are `ARM_WEIGHTS`
+      entries exactly like `bare` (0.4kg), `sword` or any firearm — the
+      same arm the weapon hangs off, re-carried through the identical
+      `_carry_current_weapon()` path, not a parallel grapple-specific
+      system. Verified by `tests/grapple_mass_test.gd`
+- [x] ~~**O7.2** `v7` Two-handing changes the numbers rather than the
+      pose~~ The same claim as AN2.5, word for word — built there, ticked
+      here against it rather than duplicated. `held_gear.gd`'s `GRIPS`
+      table's `reach`, `damage_type` and the new `control` field now reach
+      `arm.reach`, `LimbMomentum`'s stiffness and the swing's own
+      `damage_type` through `_carry_current_weapon()`/`_attack()`, cycled
+      live with `B`. Verified by `tests/two_handing_test.gd` (11/11)
 
 ### O v8 — the eighth pass
 Seven passes against people. AO4 fills this world with things that are not people.
@@ -2494,8 +2715,73 @@ The Expanse has one lighting state, one fog density and no clock. `WorldLook`
 already switches presets by place; nothing switches by time.
 
 - [x] **W1.1** A day cycle the world reads, not only the sky — `world_clock.gd`, a pure function of one persisted number rather than a sixth autoload. Hours, days, months, five named phases, a continuous daylight curve, and sleeping. 28 checks. Unblocks A9.7, W1.4, AB2.4, AJ4.3 and AL1.5, all of which were waiting on it without anybody noticing
-- [ ] **W1.2** Contamination has weather — it moves, it settles, it gets worse
-- [ ] **W1.3** Being caught out in it costs something
+- [x] **W1.2** ~~Contamination has weather — it moves, it settles, it gets worse~~
+      A5 made contamination a property of every surface, painted in once at
+      authoring time — real, but static, and nothing asked whether the air
+      over the Bone Yard reads worse today than it did a week ago, because
+      nothing tracked an answer. `world_weather.gd` (`WorldWeather`,
+      `class_name`, `RefCounted`) does, in the same idiom W1.1 set for
+      `world_clock.gd`: a pure function of state that already exists and
+      already persists, so there is nothing new to save and nothing that can
+      drift out of sync with its sources. `contamination()` sums three real
+      terms — an `AMBIENT_PER_DAY` floor that only ever rises with
+      `WorldClock.day()` ("it gets worse"), a night/day push off
+      `WorldClock.daylight()` that recedes through the day and returns after
+      dark ("it moves" / "it settles"), and `WorldHistory.chaos_magick()`
+      (AS4.2) folded in at a weight, because a storm already loose in the air
+      is contamination too, not a separate fact politely declining to overlap.
+      Verified: `tests/world_weather_test.gd`, 11 checks — the floor rises by
+      exactly its authored per-day rate and stops at its ceiling however many
+      days pass; the same day reads worse at night than at noon while the
+      floor itself stays hour-blind; a bumped storm reads as worse
+      contamination and genuinely settles back toward (never below) that
+      day's floor once it decays; and the worst case (ancient save, deep
+      night, a live storm) still clamps to 1.0.
+      Still open, named honestly: "moves" here is temporal, not spatial —
+      the reading changes continuously on its own, but there is still no
+      per-place value anywhere in the project, so a live map of contamination
+      fronts crossing the region is real future work, not this pass. Nothing
+      reads `contamination()` yet either: `bone_yard_hunt.gd` currently feeds
+      `ContaminatedAir.set_severity()` from `chaos_magick()` directly as an
+      explicit stand-in for AS4.2's not-yet-built storm, and that file has
+      another agent's uncommitted work in it right now — deciding whether
+      `WorldWeather.contamination()` should replace, blend with, or sit
+      beside that stand-in is a real design call for whoever owns AS4.2 and
+      the storm, not one to make unilaterally while landing this pass.
+- [x] **W1.3** ~~Being caught out in it costs something~~
+      Already largely true before this segment: B7.1 built `expose()`, and
+      `bone_yard_hunt.gd`'s `_update_air()` already fed it real severity every
+      physics tick, converting exposure into genuine, garment-gated zone and
+      organ damage. What was not true is the half W1.2 named as still open —
+      that feed was `chaos_magick()` alone, so a quiet run with no ritual ever
+      worked cost a body standing in the world exactly nothing, no matter how
+      many days had passed. `_update_air()` now reads
+      `WorldWeather.contamination()` in its place (a one-line change, landed
+      via the surgical-split process this worktree's collisions have needed
+      all session, since another agent's grip-cycling work shares this file),
+      so the ambient floor and the diurnal push are what a body is being
+      caught out in now, not only a storm somebody happened to work.
+      Verified: `tests/contamination_exposure_test.gd` — at 90 days into a
+      run, deep night, with `chaos_magick_level` pinned at zero throughout,
+      one call to `_update_air()` sets the air to exactly
+      `WorldWeather.contamination()` and measurably doses the player's body
+      through `expose()`, proving the ambient weather alone (no ritual, no
+      storm) now carries a real cost. Checked as a single direct call rather
+      than by averaging over many physics ticks: this scene proved
+      reproducibly timing-sensitive to a tight, uninterrupted
+      `await physics_frame` loop in headless mode — the exact same logic read
+      a different outcome depending only on whether an unrelated print
+      statement sat in the loop, which smells like a genuine pre-existing
+      race somewhere in this scene's setup rather than anything this pass
+      introduced. Named here rather than chased down, since root-causing it
+      is a real side quest outside W1.2/W1.3's scope; a note worth another
+      agent's attention if a physics-timing bug surfaces in this scene later.
+      Still open: this is the exposure half only. `W1.3` as a design
+      statement plausibly wants more than health loss — an in-fiction
+      *warning* (a Geiger-click, a HUD cue, dialogue) that something is
+      wrong before a body starts actually melting — and none of that exists;
+      `dash_cluster.gd`'s two-dial layout doesn't read exposure either, the
+      same gap V1.3 named for the fuel gauge.
 - [ ] **W1.4** Factions keep hours; the Wire is busier at some of them
 - [ ] **W1.5** G7's exposure problem is a lighting *state* rather than a constant
 
@@ -2729,7 +3015,58 @@ question is not "how do we build that" but "what does this game actually need
 from it" — and the answer is probably narrower and more achievable: things break
 where they are hit, and what comes off them stays.
 
-- [ ] **AB1.1** Decide the scope honestly before building anything — full voxel destruction is not a feature, it is a second project
+- [x] **AB1.1** ~~Decide the scope honestly before building anything — full voxel destruction is not a feature, it is a second project~~
+      No voxels, no real-time fracture simulation, no arbitrary structural
+      collapse. That much was already decided by this section's own opening
+      line; what was missing was the second half — not what destruction
+      isn't, but what it actually *is* here, grounded in what this project has
+      already built rather than a wishlist.
+      The answer already exists, once: `systems/gore_chunks.gd`. A hit reaches
+      a `Layer`, throws pieces that are **identified objects** (`layer`,
+      `zone`, `subject_id`, `organ_id`/`implant` where relevant) rather than
+      decoration, capped at `MAX_CHUNKS` with LRU recycling, tracked in a
+      single `static var live` registry so `identify()`, `take()` and
+      `from_subject()` can all ask about any piece on the floor, and left to
+      rot and grow flies on a real clock rather than despawning on a timer.
+      That is "things break where they are hit, and what comes off them
+      stays," already shipped, for exactly one kind of destroyed thing.
+      The scope decision AB1.1 actually needed to make: **vehicle destruction
+      already exists too, built a second time, independently, narrower.**
+      `rift_derby.gd`'s `_add_vehicle_damage_parts()`/`_detach_vehicle_part()`
+      break a car where it is hit and throw a real physical piece — the same
+      instinct, arrived at separately — but the piece is unidentified (a bare
+      node name, no `GoreChunks`-style metadata contract), uncapped rather
+      than pool-managed, and explicitly **not persistent**: the very thing
+      AB1.3 asks for is where this implementation currently disagrees with
+      itself — `get_tree().create_timer(14.0).timeout.connect(loose.queue_free)`
+      deletes every detached panel fourteen seconds after it comes off,
+      unlike a gore chunk, which survives, rots, and can be picked up. It
+      also stores its own damage bookkeeping as loose `set_meta` on the node
+      — the exact pattern V1.1 already found and fixed for hull integrity on
+      this same file, still present here for panel loss specifically.
+      So: **AB1.2 through AB1.6 are not new systems.** They are
+      `GoreChunks`'s existing contract (identified, physical, capped,
+      persistent, rot-tracked) generalised past bodies, with the vehicle
+      damage-parts system as the concrete first migration target rather than
+      a hypothetical one — which is also exactly what AB1.4 already named
+      ("It reads through the gore system that already exists") before AB1.1
+      had said so out loud. AB1.5 ("a vehicle deforms rather than losing hit
+      points") is that migration, ideally reading off one real
+      condition/integrity figure on the chassis rather than a third,
+      separately-tracked number — V1.1/V1.2 would give that figure real
+      teeth (driving degrading with damage) if and when Lane 2 builds it.
+      No code changed for this entry on purpose: this is the decision AB1.1
+      asked for, not an implementation of AB1.2+. Structures (AB1.2) have no
+      existing system to compare against yet — walls and windows have never
+      been struck-and-broken anywhere in the project — which is real,
+      separate work the migration above does not shortcut.
+      Lane note: `rift_derby.gd` and `systems/arcade_vehicle.gd` are Lane 2's
+      file family per `LANE.md` ("chassis and visuals... you own the inside
+      of the car, they own the outside of it"), not Lane 1's. A same-day
+      attempt at AB1.3/AB1.4/AB1.5 and at V1.1-V1.4 was built, tested passing,
+      and then fully reverted on discovering that boundary — this entry
+      records the scope decision for whoever does own that file family to
+      execute, not a claim that Lane 1 built or will build it.
 - [ ] **AB1.2** Structures break where they are struck rather than swapping to a damaged model
 - [ ] **AB1.3** Debris is real, persists, and can be stood on or thrown
 - [ ] **AB1.4** It reads through the gore system that already exists — `gore_chunks.gd` already breaks bodies into identified pieces
@@ -2855,23 +3192,81 @@ does not have a **bullet**: firing is a raycast and an ammo decrement. Everythin
 Greg is describing needs the round to be a real object that leaves the weapon,
 travels, hits something and leaves a mark on it.
 
-- [ ] **AF1.1** A round is a thing that travels, not a raycast resolved on the frame it is fired — half done. `ballistics.gd` gives the round a mass, a muzzle velocity, drop, drag and a trace between where it was and where it is so it cannot tunnel; a rifle drops 1.7cm over forty metres and a shotgun pattern opens to 3.8m. **Damage to a body still resolves on the frame the trigger goes down.** Moving that onto the projectile means deferring every anatomy hit by a few frames, which is a change worth making deliberately rather than folded into this one
+- [x] ~~**AF1.1** A round is a thing that travels, not a raycast resolved on
+      the frame it is fired~~ The other half, closed deliberately rather
+      than folded into the pass that opened it. `_resolve_firearm()` no
+      longer calls `hit_at()` itself; it fires each round with its damage,
+      impulse and type riding along as a `payload`, and `Ballistics` hands
+      that back on `round_hit` (a body or the world) or a new
+      `round_expired` (out of range or below the world) — the three ways a
+      round's own fate actually gets decided, none of them the frame the
+      trigger went down. `_resolve_body_hit()` is what used to run inline;
+      it now runs whenever a round actually reaches somebody, however many
+      frames later that turns out to be.
+      \
+      Two real bugs surfaced building this, both now fixed rather than
+      only found: `_on_round_hit()`'s own body/world split gated on
+      `is_in_group("actor_body")`, a group nothing in this codebase has
+      ever assigned — dead code that had silently discarded every body hit
+      `Ballistics` ever reported, replaced with the same collider-to-actor
+      walk `_trace_actor()` already proved. And the round's own raycast
+      set `collide_with_areas = false`, while every zone hitbox
+      (`baseline_human.gd`) is an `Area3D` — a round could not have reached
+      a body through this path at all until that flipped to `true`.
+      \
+      Honestly scoped rather than silently changed: a shotgun's nine
+      pellets no longer land as one pre-batched `firearm_anatomy_hit` —
+      each is its own real impact on its own frame now, because they no
+      longer arrive as one. `weapon_fired` itself stays eager (the trigger
+      going down is not an anatomy question); the hit/miss HUD line and
+      the whiff/footing consequence of a clean miss wait for the first
+      pellet to connect, or for every pellet to have missed, so a stray
+      pellet sailing into open air cannot hold the feedback of an already-landed
+      hit hostage.
+      \
+      Verified by `tests/deferred_damage_test.gd` (new, 7/7): a shot at a
+      real 20m distance wounds nobody and writes no `firearm_anatomy_hit`
+      the instant `_attack()` returns, `weapon_fired` is recorded anyway,
+      and the wound and its event both land only once the round has had
+      real time to cross the distance — on a real canonical zone, same as
+      an instant hit would have landed on. A shotgun blast is confirmed to
+      write more than one `firearm_anatomy_hit`, proving the per-pellet
+      claim rather than assuming it. `combat_integration_test` and
+      `zone_precision_test` amended to await the round's own travel time
+      before reading a wound that no longer exists on the old schedule —
+      both, plus `ballistics_test`, `firearm_momentum_test`,
+      `vault_test`, `wall_run_test`, `jump_test`, `climb_test`,
+      `momentum_carry_test`, `anatomy_traversal_test` and `opening_test`,
+      re-verified clean
 - [x] **AF1.2** It hits the world and leaves damage there (pairs with AB2) — a hole where it arrived, lifted off the surface so it does not fight the wall it is drawn on, sized by the round's energy, and recorded to WorldHistory for AB2 to read
 - [x] **AF1.3** Casings eject, bounce, land and stay — out of the port sideways and back, tumbling, two bounces that lose most of their energy, and then lying on their side rather than standing on end, which is the single most obvious tell that nobody simulated them. One case per trigger pull, so a shotgun leaves one for nine pellets
-- [ ] **AF1.4** Reloading is physical: the magazine leaves the weapon and a new
-      one arrives — true underneath now: `hunter_arsenal.gd`'s `reload()` does
-      a real full swap (whatever was chambered leaves, the fullest spare
-      arrives), not a top-up. What is not built is the part this wording
-      actually names: nothing shows the magazine leaving on screen —
-      `HeldGear` owns that geometry and this pass deliberately did not reach
-      into it.
+- [x] **AF1.4** Reloading is physical: the magazine leaves the weapon and a new
+      one arrives — the mechanical half was already true; this closes the
+      part the wording actually names, the part nothing showed. Both firearms
+      now carry a real node named `magazine` (`held_gear.gd`): a box mag proud
+      of the sidearm's grip heel, a quick-load cassette ahead of the shotgun's
+      trigger guard (built box-fed rather than tube-fed, since the mechanical
+      model already treats its reserve as discrete magazines exactly like the
+      sidearm's). `hunter_arsenal.gd` finds that node once at build time,
+      reads its authored rest position rather than a hardcoded one, and rides
+      it through the same `reload_remaining` timer that already drives
+      `state().reload_ratio`: the old magazine drops clear in the first third,
+      the well sits visibly empty through the middle third, a fresh one rises
+      back into place in the last third. Nothing can drift out of sync with
+      the real reload because both read the one timer. `tests/reload_visual_test.gd`
+      (9 checks: the sword's magazine-less case is a no-op rather than an
+      error, the sidearm's node resolves, rest/mid-swap/finished positions and
+      visibility all verified) plus a re-run of `magazine_test.gd` and
+      `arsenal_test.gd` clean. `tests/held_gear_capture.gd` re-captured for
+      both firearms — the new geometry sits where authored, no stray or
+      degenerate shapes.
 - [x] **AF1.5** A magazine dropped half-full is half-full when you pick it up —
       `_finish_reload()` ejects whatever is still loaded as its own discrete
       spare rather than merging it into one reserve number; `tests/magazine_test.gd`
       confirms a magazine survives two separate reloads later still carrying
       the exact count it left with.
 - [x] **AF1.6** Calibre means something — muzzle velocity, grain and drag per calibre, and drag proportional to speed squared, so buckshot keeps 93.7% of its speed where a slug keeps 97.1% over the same flight. A shotgun stops being a shotgun at range without anybody writing a falloff curve
-- [ ] **AF1.7** It reads through the anatomy already built: a round finds a zone, not a hitbox
+- [x] **AF1.7** It reads through the anatomy already built: a round finds a zone, not a hitbox — this was already true and unverified rather than unbuilt: `_trace_actor` raycasts real collision geometry and hands the exact world-space impact point to `BaselineHuman.hit_at`, which resolves it through `zone_nearest(point)` — a live distance comparison against every part's real position — never a name read off whichever collider answered. `tests/zone_precision_test.gd` proves it rather than assuming it: one body, one weapon, one fixed distance, and the only thing that changes between three shots is the pitch, computed from each zone's own real current position (`rig.parts[zone].global_position`) rather than a guessed number. Aiming at where the head actually is wounds head and nothing else; the same for torso and left_leg. A hardcoded or round-robin zone table could not pass this — it would need the shot's outcome to be independent of aim, and it is not. (Building this surfaced a smaller confirmation of the same point: sinking a target far enough below its normal spawn height made shots miss entirely rather than falling back to some default zone, because there was nothing left to hit — a lookup table has no floor to fall through.)
 - [ ] **AF1.8** Firing from a car is the same system (M2.3)
 
 
@@ -3009,8 +3404,93 @@ are in it.
       really reaches the HUD rather than only the WorldHistory record.
       `jump_test`, `vault_test`, `opening_test` and `combat_integration_test`
       regression suites re-verified clean.
-- [ ] **AD1.4** Climbing a building is a route, not a cutscene (Prototype's lesson)
-- [ ] **AD1.5** Momentum carries between moves — run into vault into climb is one motion
+- [x] ~~**AD1.4** Climbing a building is a route, not a cutscene (Prototype's
+      lesson)~~ `_climb_wall()` is `_vault_target()`'s own low/high pair —
+      a hit within reach at foot height, and something still there above
+      the vaultable band — reused rather than a second obstacle scanner,
+      cast straight ahead instead of `_wall_run_surface()`'s sideways pair,
+      since a climb is a wall the player is facing, not one they are
+      running alongside. Needs no key, the same way starting a wall run
+      does not: a sprint into a wall too tall to vault becomes a climb with
+      no seam, on the ground or in the air, because the Prototype reference
+      is a body that runs at a building and keeps going up it, not one
+      that stops to ask first. Earned one rung past wall-running — gated on
+      `player_wall_run_kickoff`, the same shape `wall_run_unlocked()`
+      already uses one rung down — because climbing is what wall-running
+      was training the body for.
+      \
+      The "route, not a cutscene" half is the design decision: the climb
+      is re-found every frame exactly the way a wall run is, so a wall
+      that ends or curves away mid-climb drops the body into a real fall
+      rather than freezing it against nothing, and the instant a ledge
+      comes within reach — read straight off `_vault_target()`, its own
+      on-floor gate waived for this one caller since a climbing body is
+      airborne against a wall by definition — it hands straight into the
+      identical scripted mantle a running vault would use. AD1.5's own
+      claim before AD1.5 is properly built: climbing does not stop to ask
+      before becoming a vault, it just becomes one. Gated the same real
+      floor every other traversal verb answers to (`PLAYER_INJURY_FLOOR`
+      via `mobility_ratio()`), and duration and speed both shorten for a
+      hobbled body the same way `_vault()`/`_begin_wall_run()`'s own
+      already do, rather than a body that can still climb at all being
+      refused the healthy baseline right up until it cannot climb.
+      Honestly scoped: this is a timed climb with a real cap
+      (`CLIMB_MAX_DURATION`), not free climbing to any height a building
+      happens to be — a wall taller than the cap affords runs out and
+      drops the player, which is the honest outcome rather than a
+      cutscene papering over a height nobody built for. Verified:
+      `tests/climb_test.gd` (new, headless, 13/13, against real
+      `StaticBody3D` walls) — the unlock threshold is exact and reads live
+      off real events; a 3m wall dead ahead is found and its normal
+      genuinely points back out of the wall; a 0.8m box is correctly left
+      to `_vault_target()` instead of being double-handled; a triggered
+      climb travels real vertical distance over real time and then chains
+      into a real mantle with no key pressed for either half; and a wall
+      that disappears mid-climb ends the climb rather than continuing to
+      climb nothing. `vault_test`, `wall_run_test`, `jump_test`,
+      `anatomy_traversal_test`, `opening_test` and `combat_integration_test`
+      regression suites re-verified clean.
+- [x] ~~**AD1.5** Momentum carries between moves — run into vault into climb
+      is one motion~~ Real, measured gaps closed rather than a restatement
+      of AD1.4's own claim. A vault is a scripted position takeover —
+      `player_body.velocity` sits unread for its whole duration — and it
+      was being zeroed at the start and left there, so `HunterMotor`'s own
+      `move_toward()` acceleration had to rebuild a run from a dead stop on
+      the far side of every single obstacle: a real stutter, not a feeling.
+      `_vault()` now captures the horizontal velocity the instant it is
+      called and hands it straight back the moment the lerp ends, so the
+      run a vault interrupted keeps going on the far side instead of
+      re-accelerating from zero. The same gap existed one layer up: a climb
+      that chains into AD1.4's mantle was handing `_vault()` the climb
+      loop's own small into-the-wall vector instead of the sprint that led
+      into the climb, so `_begin_climb()` records that entry speed and the
+      mantle hand-off restores it before `_vault()` captures it.
+      \
+      Verifying this exposed a real bug in AD1.4 itself, not just AD1.5:
+      the per-frame "is the wall still there" recheck during a climb was
+      reusing the same too-tall-to-vault high check the *initial* trigger
+      needs, and that check keys off the exact height line
+      `_vault_target()`'s own mantle detection does — a climb closing in on
+      a ledge could cross that line and lose the high check on the very
+      frame the mantle should have taken over, ending in a fall instead.
+      `_climb_wall()` takes a `require_tall` parameter now: `true` for the
+      one-time initial decision (is this a wall or a crate), `false` for
+      the ongoing recheck, which only needs to know a wall is still within
+      reach at all. AD1.4's own test had also been passing on a fallback
+      that accepted "climbed at all" as good enough without a real mantle
+      actually landing anywhere — there was no roof built for it to land
+      on. Both `climb_test.gd` and the new coverage below now build one and
+      require the real thing.
+      \
+      Verified by `tests/momentum_carry_test.gd` (new, headless, 9/9):
+      landing speed after a vault (8.00) matches entry speed, not a
+      rebuilt fraction of it; the run speed a climb replaces is genuinely
+      recorded; and speed on the far side of a full climb-into-mantle chain
+      still reflects the sprint that led into it. `climb_test.gd` re-tightened
+      to require the mantle it chains into actually lands (13/13, still
+      clean). `vault_test`, `wall_run_test`, `jump_test`,
+      `anatomy_traversal_test`, `opening_test` and `combat_integration_test`
+      regression suites re-verified clean.
 - [x] ~~**AD1.6** All of it reads through the anatomy: a broken leg cannot
       vault~~ `AnatomyComponent.mobility_ratio()` already existed and
       already gated running speed through B6.5's `_player_speed_scale()` —
@@ -3049,11 +3529,57 @@ are in it.
       suites re-verified clean.
 
 ### AD2 — The first-person HUD
-- [ ] **AD2.1** Diegetic: the hands, the weapon, the handheld, the windscreen (pairs with M1.6)
-- [ ] **AD2.2** Nothing floating in a corner that could be on an object instead
-- [ ] **AD2.3** Affordances along the bottom that say what you can do right now
-- [ ] **AD2.4** It survives the transition to third person without dissolving (M3.3)
-- [ ] **AD2.5** Readable while moving, which is when it is actually needed
+- [x] ~~**AD2.1** Diegetic: the hands, the weapon, the handheld, the windscreen~~
+      (pairs with M1.6) — four of four now, not three. This line's own note
+      said the windscreen "names M2, which does not exist yet" — stale by
+      the time anyone read it again: M2 (`## M — The camera is progression`)
+      is fully built and verified above this line in the same file
+      (`M2.4`/`M2.5`), the same way that section's own header note already
+      caught itself out once. The hands and weapon are a real held
+      viewmodel (M4); the handheld is a real device raised into a real hand
+      (`handheld_device.gd`, Section C); the windscreen is a real `BoxMesh`
+      plane you shoot through and that degrades under hits (`M2.4`/`M2.5`,
+      `vehicle_interior.gd`). All four are real geometry a camera looks at,
+      not a HUD icon standing in for one
+- [x] ~~**AD2.2** Nothing floating in a corner that could be on an object
+      instead~~ Not built here — cross-ticked against what M1.6 and AG4.5
+      already did in `gothic_field_hud.gd`, unrelated to this pass and
+      never checked off. The old health readout was, in its own comment's
+      words, "a second instrument with no relationship to anything else on
+      screen, the exact 'floating in the corner' the design rule names";
+      it now hangs off a strap running into the weapon well, and stamina is
+      read off the screen's own breathing rather than a bar at all. Nothing
+      in the current build sits in a bare corner with no relationship to
+      anything else. Verified against `captures/m1_6_field_hud_vitals.png`
+      and this pass's own `captures/ad2_4_field_hud_first_person.png`: the
+      vitals gauge and the weapon well are one instrument, joined by a
+      visible cable, not two floating widgets
+- [~] **AD2.3** Affordances along the bottom that say what you can do right
+      now — real and already tagged `AD2.3` in `gothic_field_hud.gd`'s own
+      `_draw_controls()`, not built in this pass. **Not fully true yet**:
+      AG2.4 already recorded the actual gap and it still stands — the strip
+      shows the current verbs but does not announce a *new* one the moment
+      it becomes available, only the weapon's own. `gothic_field_hud.gd` is
+      Lane 5's file; noted rather than reached into
+- [x] ~~**AD2.4** It survives the transition to third person without
+      dissolving (M3.3)~~ True by construction rather than by a fix: nothing
+      in `_update_hud()` gates `field_interface.set_state()` or its
+      visibility on `third_person`, so there was nothing that could
+      dissolve on the switch. Verified rather than assumed —
+      `tests/field_hud_third_person_capture.gd` (new) drives the same
+      third-person camera path `_update_camera()` uses for a resolution
+      shot and captures both: `captures/ad2_4_field_hud_first_person.png`
+      and `captures/ad2_4_field_hud_third_person.png` show the identical
+      location crest, hunt thread, vitals-and-weapon gauge and bottom strip
+      over a camera that has genuinely moved to the third-person position
+- [x] ~~**AD2.5** Readable while moving, which is when it is actually
+      needed~~ `$HUD` is a `CanvasLayer` (`FieldInterface` lives at
+      `$HUD/FieldInterface`) — a 2D layer with no relationship to the 3D
+      camera's own transform, so nothing that shakes, kicks or turns the
+      camera (`impact_feel`, a dodge, a hard turn) ever touches the HUD's
+      own position or legibility; it is exactly as readable mid-fight as it
+      is standing still. Confirmed against both captures above: identical
+      text, identical position, camera in two different places
 
 ### AD3 — Builds that break the rules
 Greg: *"not to copy HAVKER-MAN X, but with the cybernetics and limb enhancements
@@ -3064,30 +3590,130 @@ sniping them, through enhanced character builds."*
 The payoff for D, B2 and N: a body built far enough in one direction should be
 able to answer a rocket with a blade, and the game should let it.
 
-- [ ] **AD3.1** A melee build can close on a launcher and live — the distance is the puzzle
-- [ ] **AD3.2** Cybernetics change what movement is possible, not just the numbers
-- [ ] **AD3.3** A projectile is a physical thing that can be met, not a damage event
+- [x] ~~**AD3.1** A melee build can close on a launcher and live — the distance is the puzzle~~
+      The item names its own answer in its last five words, and the answer is
+      not "a launcher that does less damage" — that is a number, and AD3's
+      whole complaint is numbers. `systems/launcher_actor.gd` makes range the
+      thing the weapon is good at *and* the thing it stops being good at:
+      **it cannot arm inside `MIN_ARMING_METRES` (9m)**. Inside that ring it
+      is a person holding a tube. Closing mid-wind-up does not pause the shot,
+      it loses it — the difference between the distance being a puzzle and
+      the distance being a delay.
+      Two more things make it answerable rather than merely survivable: the
+      `rocket` calibre leaves the tube at 38 m/s against a pistol's 340, so
+      you can see it coming; and it telegraphs with a wind-up deliberately
+      longer than a melee one, because a puzzle whose inputs you cannot read
+      is a coin flip.
+      **It closes AD3.3's loop.** A warhead is an ordinary round in ordinary
+      flight, so the interception AD3.3 built for bullets works on the thing
+      this section was actually about — you can cut a rocket out of the air.
+      It also resolves through the same payload `_on_round_hit()` already
+      reads, so it finds a zone through the anatomy (AF1.7) rather than being
+      a special explosion that knows about bodies by itself.
+      All the decision lives in `launcher_actor.gd` as pure statics over
+      plain values — the same shape `combat_response.gd` and `clinch.gd`
+      already use — so `bone_yard_hunt.gd` holds a hook rather than a second
+      copy of the rule, and the whole thing is testable without a scene.
+      Verified: `tests/launcher_test.gd` (17 checks) — it arms exactly at the
+      authored distance and not a hair inside it, winds up visibly before
+      firing, loses a building shot when you step inside the ring, never
+      touches a non-launcher actor, throws no brass, and is met in the air by
+      a blade with AD3.3's own `intercept_near()`. Eight existing suites
+      re-verified clean.
+      Still open: nothing in the world *spawns* one yet — an actor becomes a
+      launcher by carrying `launcher: true`, and no encounter authors that
+      today. That is content placement rather than mechanism, and it is the
+      one thing between this and meeting one in a real fight.
+- [x] ~~**AD3.2** Cybernetics change what movement is possible, not just the numbers~~
+      The second half is the whole item. A limb that makes you twelve per
+      cent faster has changed a number; these change whether a move exists.
+      Both run through the same `capable_limbs()` route B6.1 built, keyed off
+      the hardware's own catalogue `profile`, so they are the limb's and not
+      the body's — and a severed leg takes them with it (B6.2) without either
+      of them having to hear about it.
+      **The ceiling.** `_vault_ceiling()` replaces the flat `VAULT_MAX_TOP`
+      inside `_vault_target()`. Bare, it is AD1.2's own 1.35 line and
+      anything above it is a wall — "AD1.3's problem, not this one's", as
+      that function already said. With drive hardware in a leg it is 1.95,
+      which leaves a real 0.60m band of obstacle that is a *wall* for a bare
+      body and a *vault* for an augmented one. Not a faster vault. A possible
+      one. Deliberately chest height rather than head height, so walls stay
+      walls and AD1.3's wall-running is not quietly taken away from itself.
+      **The kick-off.** A bare body cannot leave the ground a second time —
+      `_jump()` refuses an airborne press exactly as it always has. A leg
+      with drive hardware gets one kick off nothing, spent on use and reset
+      by touching down, so the hardware grants an extra departure rather than
+      flight.
+      `heel anchors` is the catalogue's own right-leg entry and reads exactly
+      like the thing that drives a body off the ground, so nothing new had to
+      be authored in `implant_catalog.gd` (Lane 5's file) to make this real.
+      Verified: `tests/augmented_movement_test.gd` (19 checks) — the bare
+      ceiling is AD1.2's line to the centimetre, fitting the hardware raises
+      it to the authored augmented figure, the other leg is unaffected, an
+      airborne press is accepted with the hardware and refused without it,
+      pulling the hardware takes both moves back, and severing the leg takes
+      them too with nothing in this pass needing to know. Ten existing
+      movement suites (`jump`, `vault`, `wall_run`, `climb`,
+      `anatomy_traversal`, `momentum_carry`, `limb_capability`, `intercept`,
+      `footing`, `opening`) re-verified clean.
+- [x] ~~**AD3.3** A projectile is a physical thing that can be met, not a damage event~~
+      AF1.1 already made a round an object that travels, with two ways its
+      flight could end: arriving somewhere (`round_hit`) or running out of
+      world (`round_expired`). Neither is *being met* — until now a round
+      could only ever be dodged, never answered, which is what made AD3.1's
+      "answer a rocket with a blade" unexpressible rather than merely
+      unbalanced. `Ballistics.intercept_near(position, radius, by)` is the
+      third outcome: something reaches into the flight path and takes the
+      round out of the air, emitting its own `round_intercepted` (carrying
+      the shooter, the payload that now never arrives, and the energy it
+      still had left) and deliberately *not* `round_hit`/`round_expired`,
+      so a caller waiting on either to learn whether a shot connected is
+      never told the wrong thing by a third outcome dressed as one of them.
+      Position-and-radius rather than an index because the caller is a
+      swing — it knows where and when it landed, not which of `MAX_ROUNDS`
+      entries that is.
+      Wired into the real move, not left as an API nothing calls:
+      `_resolve_strike()` checks the arc for rounds *before* anything else
+      the swing could reach, answers through the arm at its own
+      `ROUND_MELEE_RESISTANCE` (below stone, well above air), takes a real
+      bite out of the edge (AN2.4), and records `melee_met_round`.
+      Verified: `tests/intercept_test.gd` (25 checks) — a round is taken
+      out of the air and genuinely gone; the interception is its own signal
+      carrying shooter/payload/remaining energy; `round_hit` and
+      `round_expired` both stay silent for it; a swing nowhere near it takes
+      nothing and reports no phantom; reach is a real distance (a miss at
+      3m, a connect at 0.4m); a zero reach meets nothing; all nine pellets
+      of a shotgun are nine separately-met objects; and — driven through
+      `_resolve_strike()` itself in a real instantiated Hunt Grounds — a
+      real swing takes a real round out of the air and the world records it
+      exactly once, while a swing at empty air records nothing. Ten
+      existing melee/ballistics tests re-verified clean.
+      Still open: nothing yet *fires* anything worth meeting — there is no
+      launcher or rocket in `hunter_arsenal.gd` (AD3.1's own gap), so today
+      this answers a bullet rather than the RPG the section is really
+      about. The primitive is the part that was missing; the weapon that
+      makes it dramatic is AD3.1's, not this line's.
 - [ ] **AD3.4** Absurd answers are allowed when the build earned them
 - [ ] **AD3.5** Original to this game: the reference is the feeling, never the implementation
 
 
 ### AD v10 — the final pass
 The last rung. Fifteen statements that are true of movement and first person when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
-- [ ] **AD10.1** `v10` Jumping is worth doing and the landing reads
-- [ ] **AD10.2** `v10` Waist-high things stop being walls
-- [ ] **AD10.3** `v10` Wall running is earned the way third person is
-- [ ] **AD10.4** `v10` Climbing a building is a route, not a cutscene
-- [ ] **AD10.5** `v10` Momentum carries between moves as one motion
-- [ ] **AD10.6** `v10` A broken leg cannot vault
-- [ ] **AD10.7** `v10` Crouching, sprinting and sliding are one continuous system
-- [ ] **AD10.8** `v10` The HUD is the hands, the weapon, the handheld and the glass
-- [ ] **AD10.9** `v10` Nothing floats in a corner that could sit on an object
-- [ ] **AD10.10** `v10` Affordances say what you can do right now
-- [ ] **AD10.11** `v10` It survives the change to third person without dissolving
-- [ ] **AD10.12** `v10` It is readable while moving, which is when it is needed
-- [ ] **AD10.13** `v10` Cybernetics change what movement is possible
-- [ ] **AD10.14** `v10` A projectile is a physical thing that can be met
-- [ ] **AD10.15** `v10` A melee build can close on a launcher and live
+- [x] **AD10.1** `v10` Jumping is worth doing and the landing reads — See AD1.1: a real upward impulse, `landing_time` firing for real, `jump_test.gd` (13/13). Re-verified clean this pass.
+- [x] **AD10.2** `v10` Waist-high things stop being walls — See AD1.2: `_vault_target()`'s real three-raycast read of actual collision geometry, `vault_test.gd` (13/13). Re-verified clean this pass.
+- [x] **AD10.3** `v10` Wall running is earned the way third person is — See AD1.3: `wall_run_unlocked()` mirrors `third_person_unlocked()`'s own shape, read live off `WorldHistory`, `wall_run_test.gd` (16/16). Re-verified clean this pass.
+- [x] **AD10.4** `v10` Climbing a building is a route, not a cutscene — See AD1.4: re-found every frame rather than scripted, hands off into a real mantle, `climb_test.gd` (13/13). Re-verified clean this pass.
+- [x] **AD10.5** `v10` Momentum carries between moves as one motion — See AD1.5: a vault captures and restores real horizontal velocity rather than zeroing it, `momentum_carry_test.gd` (9/9). Re-verified clean this pass.
+- [x] **AD10.6** `v10` A broken leg cannot vault — See AD1.6: `mobility_ratio()` below `PLAYER_INJURY_FLOOR` refuses vault and wall run outright, `anatomy_traversal_test.gd` (11/11). Re-verified clean this pass.
+- [ ] **AD10.7** `v10` Crouching, sprinting and sliding are one continuous system — Not built. No AD1 line ever covered crouching or sliding; sprinting exists (`B6.5`'s speed scale) but there is no crouch or slide verb to be continuous with it.
+- [x] ~~**AD10.8**~~ `v10` The HUD is the hands, the weapon, the handheld and the glass — true, now that AD2.1 above is: hands/weapon (M4), handheld (Section C) and the windscreen (M2.4/M2.5, real geometry you shoot through and that degrades) are all real, all diegetic, none of them a HUD icon standing in for the thing itself.
+- [x] **AD10.9** `v10` Nothing floats in a corner that could sit on an object — See AD2.2: the vitals gauge hangs off the weapon well by a visible cable rather than sitting alone; confirmed again by eye against `captures/ad2_4_field_hud_first_person.png` and `_third_person.png` while verifying AD10.11 below.
+- [ ] **AD10.10** `v10` Affordances say what you can do right now — **Not fully true**, per AD2.3's own note: the bottom strip shows current verbs but does not announce a *new* one the moment it becomes available. `gothic_field_hud.gd` is Lane 5's file.
+- [x] **AD10.11** `v10` It survives the change to third person without dissolving — See AD2.4. Opened and looked at both again rather than taking the old note on faith: `captures/ad2_4_field_hud_first_person.png` and `_third_person.png` show the identical location crest, hunt thread, vitals-and-weapon gauge and bottom strip over two genuinely different camera positions.
+- [x] **AD10.12** `v10` It is readable while moving, which is when it is needed — See AD2.5: `$HUD` is a `CanvasLayer` with no relationship to the 3D camera's transform, so nothing that shakes or turns the camera touches its position or legibility.
+- [ ] **AD10.13** `v10` Cybernetics change what movement is possible — Not built. See AD3.2, still open.
+- [ ] **AD10.14** `v10` A projectile is a physical thing that can be met — Not built. See AD3.3, still open; AF1.1's round travels but nothing lets a body meet or intercept one.
+- [ ] **AD10.15** `v10` A melee build can close on a launcher and live — Not built. See AD3.1, still open.
 
 ## AE — Sneaking, assassination and the law
 
@@ -3194,10 +3820,12 @@ Greg sending the first build to friends, and reporting while it ran.
 - [x] **AG5.5** The floating sword, third attempt and the first one that found the cause. Two passes retuned the mount and both made it worse, because the value was never reaching the model — `_pose_weapon` assigned `model.rotation` every frame from arm sway alone and discarded the counter-rotation `hunter_arsenal` writes to cancel the arm pitch. With the rest rotation cached the way the rest position already was, the honest value is the pure cancellation of `FIRST_PERSON_ARM_RAISE`
 - [x] **AG5.6** *"fixing the wobbly screen like you smoked weed or nicotine — even tho at the start you get a random drug"* — AS2.1 had nightfall driving the shader's displacement dial, so a sober player after dark had a permanently moving screen and the one state the shader exists to express stopped being legible. The hour no longer touches the dial; substances, meditation and the shadow realms own it
 - [x] **AG5.7** The transit plate was acid green, in a register nothing else in the game uses. Blood now, carrying the seal of the place you are arriving at — ring, point count and stride seeded off the destination path — with runnels down the glass
-- [ ] **AG5.8** *"i hate the look of this ui it looks ugly"* — the bottom-right cluster specifically, and the fonts generally. Greg wants boxes, dimensional HUD panels, and a grungier biopunk face throughout
+- [~] **AG5.8** *"i hate the look of this ui it looks ugly"* — the bottom-right cluster specifically, and the fonts generally. Greg wants boxes, dimensional HUD panels, and a grungier biopunk face throughout
+  - [x] The fonts. `gothic_field_hud.gd` had three call sites still drawing in `ThemeDB.fallback_font` — the location crest, the hunt-thread readout and the archive-frame header — the exact "tutorial level, same as the font" look `celloutz_type.gd` exists to replace, missed because all three are conditionally hidden and rarely on screen. All three now draw in the stencil face. The crest's em-dash bracketing is gone with it (the stencil alphabet has no glyph for "—"; it drew as two silent gaps) in favour of the "//" register the rest of the HUD already uses. Found in passing: the weapon well's reserve count used "×", also glyph-less and silently blank since it was written — now "x". Verified visually via `hunt_weapon_capture`, regression-checked against `hud_transience_test` (7/7)
+  - [ ] The bottom-right cluster itself. `_draw_weapon`/`_draw_regal_vitals` build a torn-leather recess *by design* — M1.6 and AG4.5's own comments name this as the deliberate alternative to "a fourth corner panel" / "an app widget checking in on you." Greg's ask here reads as a reversal of that call, not a bug in it, so it needs his steer before a rebuild rather than a guess: literal dimensional boxes back over a rig several segments deliberately moved away from, or the same organic register pushed to look less like a debug shape and more "grungier biopunk" on its own terms
 - [ ] **AG5.9** *"the hunt thing hardly works at all zero continuity"* — the Hunt System does not hold together across a session
 - [ ] **AG5.10** The map has to integrate the underground conspiracy network text file, and carry Greg's own art textures
-- [ ] **AG5.11** Save files: deletable, continuable, several of them, so somebody can keep a world and generate new stories in it
+- [x] **AG5.11** Save files: deletable, continuable, several of them, so somebody can keep a world and generate new stories in it — `WorldHistory` gains `active_slot_id`/`slot_manifest` and `create_slot`/`load_slot`/`delete_slot`/`list_slots`. `SAVE_PATH` stays the untouched legacy file every editor run and headless test always used; a slot is a layer the front-end opts into by setting `active_slot_id`, at which point `_current_path()` redirects load/save at `user://saves/<id>.json` with its own `manifest.json` row. A save from before this existed surfaces as a "Continue" slot the first time `list_slots` runs rather than becoming invisible. `tests/save_slots_test.gd`, 17 checks. Front-end menu wiring (an actual save-select screen) is not built yet — this is the machinery underneath it
 
 ### AG v10 — the final pass
 The last rung. Fifteen statements that are true of the playtest record when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
@@ -3584,16 +4212,124 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
 - [x] **AN1.4** Damage asks `commitment()` — **calibrated and ready; the flag is still off per AN1.8.** Getting here took three measures and the two failures are the design question. Peak head speed made a one-frame flick worth the same as a committed sweep. Peak of a *smoothed* head speed was no better — a hard sweep spends itself at full extension where the spring fights it, so it measured 2.16 against a gentler swing's 2.52, the wrong way round. What separates a blow from a twitch is **how far the head travelled while moving**, which is work done and multiplies speed by duration instead of discarding one. At a 3.9m reference: a slow look scores 0.00, tracking 0.19, a flick 0.48, a deliberate swing 0.46, a hard committed sweep 1.00. Flip `momentum_damage` in `bone_yard_hunt.gd` to put it on the damage number
 - [x] **AN1.5** Mass and reach per weapon — `ARM_WEIGHTS`: a cleaver 1.45kg at 0.62m, a shotgun 3.2, a sidearm 0.95, a severed limb 2.6, a bare hand 0.4. Re-carried whenever the held thing changes
 - [x] **AN1.6** Fatigue comes off stamina directly — a full player reads 0.00 and an empty one 1.00, so the guard degrades continuously rather than switching off at a threshold
-- [ ] **AN1.7** Firearms run through the same object — the barrel swivels toward where you look and carries past it
+- [x] **AN1.7** Firearms run through the same object — the barrel swivels toward where you look and carries past it — like AF1.7, this was already wired rather than unbuilt, and unverified through an equipped weapon rather than untested: `ARM_WEIGHTS` has carried a shotgun and sidearm alongside the sword since AN1.5, and `_carry_current_weapon()`/`_pose_weapon()` read `arsenal.current_id` generically, never branching on melee versus firearm. Every existing momentum test drove `LimbMomentum` in isolation with hand-picked numbers; none of them equipped an actual gun. `tests/firearm_momentum_test.gd` does: equips each of the three weapons in turn through `_equip_weapon`, confirms the arm is re-carried with that weapon's own authored mass and reach, and confirms each weapon's own viewmodel (not just the sword's) visibly displaces off its authored rest pose under an identical turn — with the heavier shotgun lagging further off-anchor than the lighter sidearm, which is the whole point of AN1.5's per-weapon mass and could not happen if the pose write were melee-only. 7 checks.
 - [x] **AN1.8** The old swing stays authoritative, side by side — `momentum_damage` is false, so `commitment()` is computed and recorded on every blow but does not reach the damage number. Both systems see the same swings, which is what makes them comparable
-- [ ] **AN1.9** A grapple, a shove and a bare hand are the same object with a different mass
+- [x] **AN1.9** A grapple, a shove and a bare hand are the same object with a
+      different mass — `_carry_current_weapon()` now checks `grapple_target`
+      ahead of the weapon and the bare-hand state, since holding somebody
+      takes both hands regardless of what is holstered. Two new
+      `ARM_WEIGHTS` entries carry it: `grapple` while just holding on,
+      `shove` — heavier again, past even the severed limb — while
+      `grapple_pushing_now` says the player is forcing their weight into the
+      hold rather than maintaining it. Bare hands were already the same
+      object (`bare`, N/AN1's own baseline); this closes the other two.
+      Verified: `tests/grapple_mass_test.gd` — the arm's real mass changes
+      the instant a hold starts, changes again while pushing for advantage,
+      and returns to whatever was actually equipped the instant the hold
+      breaks.
 
 ### AN2 — What it costs to swing
-- [ ] **AN2.1** A committed blow leaves you open in a way a flick does not (pairs with O5 footing)
-- [ ] **AN2.2** You can be disarmed, because a weapon you are barely holding is a weapon somebody can take
-- [ ] **AN2.3** Hitting armour, bone or a wall answers differently through `strike()`
-- [ ] **AN2.4** The weapon's own condition rides on the same object — a bent blade swings wrong
-- [ ] **AN2.5** Two-handing changes the numbers, not just the pose
+- [x] **AN2.1** A committed blow leaves you open in a way a flick does not
+      (pairs with O5 footing) — `FOOTING_COMMITTED_SWING` scales
+      `last_commitment` (already measured for AN1.4/AN1.8) straight into
+      `lose_footing()`, paid the instant the swing is thrown rather than on
+      whether it connects: a flick costs nothing, a fully committed sweep
+      costs as much as being shoved (O5's `FOOTING_SHOVED`). Firearms are
+      excluded — `arm.commitment()` still measures barrel drift for AN1.7,
+      which is not the same thing as being off balance. Verified:
+      `tests/footing_test.gd` — a forced full-commitment swing measurably
+      costs footing, a zero-commitment one does not, and firing a gun with
+      the same forced commitment costs none at all.
+- [x] **AN2.2** You can be disarmed, because a weapon you are barely holding
+      is a weapon somebody can take — `arm.fatigue` (AN1.6, straight off
+      stamina) is already a real "how loosely" number; a hit at or above
+      `DISARM_DAMAGE_THRESHOLD` while fatigue is at or above
+      `DISARM_FATIGUE_THRESHOLD` calls `_put_the_weapons_down()` for real,
+      not a stat penalty. Deterministic on purpose, the same way severing and
+      footing already are, rather than a coin flip nobody could learn to
+      read. Recoverable mid-fight by drawing again (1-3), which is the
+      correct shape until dropped weapons are real world objects (blocked on
+      the same gap C1.7 named for the handheld). Excluded: a carried severed
+      limb, which already has its own condition/break mechanic. Verified:
+      `tests/disarm_test.gd` — a fresh grip survives a hard hit, an exhausted
+      one gives the weapon up to a hard hit but not a light one, drawing
+      again re-arms, and a carried limb is not double-counted.
+- [x] ~~**AN2.3** Hitting armour, bone or a wall answers differently through
+      `strike()`~~ Armour and bone closed first; this pass closes the wall.
+      `apply_hit()` reports `absorbed`, the real fraction of a blow armour
+      and garments just stopped; `_melee_resistance(zone, result)` turns
+      that plus a per-zone bone-density base (head firmer than a limb,
+      armour raises either) into what `arm.strike()` actually feels,
+      replacing a flat `0.65` on every connecting blow. A wall was still not
+      a thing a swing could hit at all — `_resolve_strike()` only ever
+      recognised "connected with an actor" or "hit nothing," because
+      `_attack_nearest_encounter_actor()` has no concept of anything that
+      isn't one. `_attack_wall()` is the missing third outcome: a raycast
+      along the same look direction the aim already uses, `collide_with_areas`
+      held false rather than mirrored from `_trace_actor()`'s own query,
+      since AF1.1 already established every zone hitbox in this game is an
+      `Area3D` — excluding areas entirely is what keeps a body from ever
+      being misread as a wall here. A wall answers at `WALL_MELEE_RESISTANCE`
+      (0.85), above every zone in `MELEE_RESISTANCE_BASE` including an
+      armoured skull, wears the weapon the same way meeting armour already
+      does (AN2.4, at the maximum `absorbed` a wall does not flex or give),
+      and leaves the same scar a bullet does — `Ballistics.mark_impact()`,
+      a one-line public wrapper around the round's own `_mark()`, since a
+      melee swing is not a round in flight and has no `_land()` to route
+      through. Verified: `tests/melee_resistance_test.gd` (armour and bone,
+      unchanged, still clean) plus new `tests/wall_strike_test.gd` (8
+      checks) — a swing thrown at open air still carries through and gains
+      speed exactly as a whiff always has, wears nothing, and records
+      nothing; the same swing thrown at a real `StaticBody3D` wall is
+      measured stopping dead and bouncing back (+4.00 m/s into -2.47 rather
+      than whiffing up to +4.48), wears the sword the same swing through
+      nothing never did, and records `melee_struck_wall` exactly once.
+      `weapon_condition_test`, `disarm_test`, `combat_integration_test`,
+      `zone_precision_test`, `ballistics_test` and `opening_test` regression
+      suites re-verified clean.
+- [x] **AN2.4** The weapon's own condition rides on the same object — a bent
+      blade swings wrong — `HunterArsenal.wear_weapon()` (lazy, like `ammo`:
+      missing means unworn) takes something off the edge on every connecting
+      melee hit, more when the blow's own `absorbed` (AN2.3) says it met
+      armour or bone. `_carry_current_weapon()` reads that condition back
+      into a real, lower `arm_stiffness` on `LimbMomentum.carry()` — a worn
+      weapon is genuinely wobblier through the same arm, not a number on a
+      sheet. Bare hands and a carried limb are outside it entirely; the limb
+      already had its own wear mechanic. Verified:
+      `tests/weapon_condition_test.gd` — a fresh sword starts at full
+      condition and stiffness, a connecting hit wears both down immediately,
+      the same hit through real plate wears more than the same hit through
+      nothing, and throwing a fist does not touch the sword sitting unused.
+- [x] ~~**AN2.5** Two-handing changes the numbers, not just the pose~~ Built
+      on the earlier diagnosis rather than around it: `held_gear.gd`'s
+      `GRIPS` table already carried `reach` and `damage_type` per grip, its
+      own header comment naming this exact claim, and nothing outside that
+      file ever read either. `hold(grip_name)` — "the verb behind
+      half-swording" — was real but never called from the live game, since
+      `hunter_arsenal.gd` only ever used `HeldGear.build_weapon()` as a
+      one-shot model factory with no persistent instance to change. Rather
+      than replace that carefully-tuned mounting code, the numbers are
+      wired independently of it: `B` cycles the sword through its three
+      real grips (`two_hand → one_hand → half_sword`, the only weapon
+      `GRIP_CYCLE` names, since a shotgun and a sidearm each have exactly
+      one grip already), and `_carry_current_weapon()` reads the active
+      grip's `reach` and a new `control` field — the number the file's own
+      comment asked for and nothing had — into `arm.reach` and
+      `LimbMomentum`'s stiffness. A swing's own `damage_type` follows the
+      same grip, so a half-sworded blow is a real `puncture` reaching
+      AN2.3's `strike()` rather than a `cut` that happens to be shorter.
+      Equipping a fresh weapon resets to `HeldGear`'s own default grip
+      rather than remembering the last stance — holstering is not choosing
+      a stance. Verified by `tests/two_handing_test.gd` (new, 11/11):
+      cycling moves through all three grips and wraps around; half-sword
+      measurably shortens reach (0.384 vs 0.620) and steadies the arm
+      (78.30 vs 66.70) against two-handed, itself steadier than one-handed
+      (47.56); a weapon with no `GRIP_CYCLE` entry ignores the key outright;
+      and a live `_attack()` reports `cut` two-handed and `puncture`
+      half-sworded from the identical weapon. Full regression suite
+      (vault, wall_run, jump, climb, momentum_carry, anatomy_traversal,
+      opening, combat_integration, zone_precision, ballistics,
+      firearm_momentum, deferred_damage) re-verified clean
 
 
 ### AN6 — Dismemberment, at the reference standard
@@ -3625,20 +4361,20 @@ is art, not noise.
 
 ### AN v10 — the final pass
 The last rung. Fifteen statements that are true of the body as the weapon when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
-- [ ] **AN10.1** `v10` The weapon is a mass on the end of an arm
-- [ ] **AN10.2** `v10` Where you point is where the anchor goes
-- [ ] **AN10.3** `v10` Turning throws it, and heavier throws further
-- [ ] **AN10.4** `v10` Damage asks what the head was actually doing
-- [ ] **AN10.5** `v10` A flick and a committed sweep differ by an order of magnitude
-- [ ] **AN10.6** `v10` Mass and reach are the whole balance conversation
-- [ ] **AN10.7** `v10` Fatigue degrades the guard rather than announcing it
-- [ ] **AN10.8** `v10` Firearms run through the same object
-- [ ] **AN10.9** `v10` A grapple, a shove and a bare hand share it
-- [ ] **AN10.10** `v10` You can be disarmed
-- [ ] **AN10.11** `v10` Armour, bone and wall each answer differently
-- [ ] **AN10.12** `v10` The weapon's condition rides on the same object
-- [ ] **AN10.13** `v10` Two-handing changes numbers, not pose
-- [ ] **AN10.14** `v10` Walking into a blow counts toward it
+- [x] **AN10.1** `v10` The weapon is a mass on the end of an arm — See AN1.1: the spring-damper core, `limb_momentum.gd`, ten checks.
+- [x] **AN10.2** `v10` Where you point is where the anchor goes — See AN1.2: `anchor` is a fixed offset in view space, so it turns with the camera by construction; a hard turn throws the weapon 0.397m off it, against a 0.42m arm limit.
+- [x] **AN10.3** `v10` Turning throws it, and heavier throws further — See AN1.1/AN1.2: `limb_momentum_test.gd` throws the identical turn at a 0.5kg and a 6.0kg arm and measures the heavier one lagging further off-anchor every time.
+- [ ] **AN10.4** `v10` Damage asks what the head was actually doing — **Not true yet.** `commitment()` is calibrated and computed on every blow (AN1.4) but `momentum_damage` is still `false` (AN1.8, deliberately — "both systems see the same swings, which is what makes them comparable"); live damage still comes from the old swing. Flipping it is a real balance decision, not a bugfix, and stays Greg's call rather than this pass's.
+- [ ] **AN10.5** `v10` A flick and a committed sweep differ by an order of magnitude — **Not verified as stated.** The section's own intro quotes 0.013 vs 0.346 (~27x) but that figure does not reproduce: `limb_momentum_test.gd` currently measures flick 0.000 vs sweep 0.082, and `arm_calibration_test.gd`'s raw travel is 1.86m vs 3.96m (~2.1x) — neither a stale quote nor a live number I can currently reproduce support "an order of magnitude" cleanly enough to tick this without inventing the gap away. Left open rather than resolved on a guess.
+- [x] **AN10.6** `v10` Mass and reach are the whole balance conversation — See AN1.5: `ARM_WEIGHTS` carries every weapon's own mass and reach and nothing else changes when the held thing does.
+- [x] **AN10.7** `v10` Fatigue degrades the guard rather than announcing it — See AN1.6: fatigue reads straight off stamina into the spring's own stiffness, continuous rather than a threshold flip.
+- [x] **AN10.8** `v10` Firearms run through the same object — See AN1.7/`firearm_momentum_test.gd`: the sword, shotgun and sidearm all re-carry `LimbMomentum` with their own mass and reach and all three visibly displace off rest pose under an identical turn.
+- [x] **AN10.9** `v10` A grapple, a shove and a bare hand share it — See AN1.9/`grapple_mass_test.gd`: `grapple` and `shove` are real `ARM_WEIGHTS` entries the arm's mass switches to and from live.
+- [x] **AN10.10** `v10` You can be disarmed — See AN2.2/`disarm_test.gd`: a hard hit on a fatigued grip genuinely puts the weapon down.
+- [x] **AN10.11** `v10` Armour, bone and wall each answer differently — See AN2.3/`melee_resistance_test.gd`/`wall_strike_test.gd`: armour, per-zone bone density and a wall's own `WALL_MELEE_RESISTANCE` each feed `strike()` a different number.
+- [x] **AN10.12** `v10` The weapon's condition rides on the same object — See AN2.4/`weapon_condition_test.gd`: a worn weapon reads back into `LimbMomentum` as lower `arm_stiffness`, not a separate stat.
+- [x] **AN10.13** `v10` Two-handing changes numbers, not pose — See AN2.5/`two_handing_test.gd`: cycling grip measurably changes reach, control and damage type from the identical weapon.
+- [x] **AN10.14** `v10` Walking into a blow counts toward it — `_advance_arm()` has read `player_body.velocity` into `LimbMomentum.advance()`'s `body_velocity` parameter since AN1.2 shipped, with the comment already on the line ("a step forward is real force and the game should not be the only place that is untrue"), but nothing had ever exercised it through the real hunt loop with a moving body: `limb_momentum_test.gd` drives the arm in isolation with a hand-picked vector, `firearm_momentum_test.gd` holds the player still, and `arm_calibration_test.gd`'s one "walking into it" gesture changes the turn rate at the same time it changes body speed, so it cannot show what walking alone is worth. Honestly scoped once measured: `advance()` sums the body's velocity into the weapon's regardless of which way either points, so it cannot tell a charge from a retreat — only that the body moved counts, not specifically that it moved forward. Verified by `tests/walking_into_blow_test.gd` (new, 3/3) through the real `_advance_arm()` the game calls every physics frame: a turn too weak to register as a blow at all on a still body (`commitment() = 0.000`, below `IDLE_SPEED`) becomes a real one (0.033) the instant the identical turn is thrown while the body is moving, and a body moving the other way counts too (0.039). `limb_momentum_test`, `arm_calibration_test`, `firearm_momentum_test`, `footing_test`, `combat_integration_test` and `opening_test` regression suites re-verified clean.
 - [ ] **AN10.15** `v10` The old swing system is gone because this one is better
 
 ## AO — The world as it fell

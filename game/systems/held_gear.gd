@@ -45,24 +45,32 @@ extends Node3D
 ## `reach` and `damage_type` are here rather than on the weapon because they are
 ## properties of *how it is being held*. Half-swording shortens your reach and
 ## turns a cut into a thrust, and that is the whole reason anybody ever did it.
+## AN2.5. `control` is the number this comment already asked for and nothing
+## ever read: how steady the arm carrying this grip is, as a multiplier on
+## `LimbMomentum`'s own stiffness. Two hands brace each other, which is why a
+## longsword held in one is wilder than the same sword held in two; half-
+## swording is the most controlled grip in the table for the same reason a
+## thrust needs to be — it is how the technique finds a gap in plate at all.
+## Swinging by the blade is the opposite: an improvised hammer, held nowhere
+## it was meant to be held.
 const GRIPS := {
 	"fists": {
 		"right": {"anchor": "", "pose": "fist"},
 		"left": {"anchor": "", "pose": "fist"},
 		"rest": {"at": Vector3(0.030, -0.150, -0.300), "turn": Vector3(0.18, 0.0, 0.0)},
-		"reach": 0.55, "damage_type": "blunt",
+		"reach": 0.55, "damage_type": "blunt", "control": 1.0,
 	},
 	"one_hand": {
 		"right": {"anchor": "grip", "pose": "wrap"},
 		"left": {"anchor": "", "pose": "open"},
 		"rest": {"at": Vector3(0.205, -0.255, -0.225), "turn": Vector3(0.52, 0.34, 0.30)},
-		"reach": 1.0, "damage_type": "cut",
+		"reach": 1.0, "damage_type": "cut", "control": 0.82,
 	},
 	"two_hand": {
 		"right": {"anchor": "grip", "pose": "wrap"},
 		"left": {"anchor": "grip_low", "pose": "wrap"},
 		"rest": {"at": Vector3(0.135, -0.300, -0.245), "turn": Vector3(0.56, 0.20, 0.24)},
-		"reach": 1.0, "damage_type": "cut",
+		"reach": 1.0, "damage_type": "cut", "control": 1.15,
 	},
 	"half_sword": {
 		"right": {"anchor": "grip", "pose": "wrap"},
@@ -71,7 +79,7 @@ const GRIPS := {
 		# in period you would be wearing a glove to do it.
 		"left": {"anchor": "blade_grip", "pose": "pinch"},
 		"rest": {"at": Vector3(0.055, -0.215, -0.290), "turn": Vector3(0.16, 0.10, 0.08)},
-		"reach": 0.62, "damage_type": "puncture",
+		"reach": 0.62, "damage_type": "puncture", "control": 1.35,
 	},
 	"murder_stroke": {
 		# Held by the blade, swung as a hammer. The pommel is the head. It is
@@ -80,19 +88,19 @@ const GRIPS := {
 		"right": {"anchor": "blade_grip", "pose": "wrap"},
 		"left": {"anchor": "blade_high", "pose": "wrap"},
 		"rest": {"at": Vector3(0.150, -0.195, -0.250), "turn": Vector3(1.05, 0.26, 0.42)},
-		"reach": 0.72, "damage_type": "blunt",
+		"reach": 0.72, "damage_type": "blunt", "control": 0.75,
 	},
 	"pistol": {
 		"right": {"anchor": "grip", "pose": "trigger"},
 		"left": {"anchor": "grip_support", "pose": "cup"},
 		"rest": {"at": Vector3(0.090, -0.185, -0.245), "turn": Vector3(0.04, 0.20, 0.04)},
-		"reach": 1.0, "damage_type": "ballistic",
+		"reach": 1.0, "damage_type": "ballistic", "control": 1.0,
 	},
 	"long_gun": {
 		"right": {"anchor": "grip", "pose": "trigger"},
 		"left": {"anchor": "forend", "pose": "wrap"},
 		"rest": {"at": Vector3(0.105, -0.200, -0.215), "turn": Vector3(0.05, 0.26, 0.05)},
-		"reach": 1.0, "damage_type": "ballistic",
+		"reach": 1.0, "damage_type": "ballistic", "control": 1.0,
 	},
 }
 
@@ -316,7 +324,11 @@ static func _build_sword(root: Node3D) -> void:
 		Vector3(0.110, 0.0170, 0.0130),
 		Vector3(0.170, 0.0150, 0.0118),
 	], 10)
-	handle.rotation.y = PI * 0.5
+	# M4.4. Same fix as the shotgun barrel: `revolve()` extends along local Y,
+	# so only a rotation on X actually lays it down the blade's own axis.
+	# Negative here because the grip runs *back* from the guard (towards -Z)
+	# rather than forward like a barrel does.
+	handle.rotation.x = -PI * 0.5
 	handle.position = Vector3(0, 0, -0.10)
 	handle.material_override = _leather(Color("35261e"), 5)
 	root.add_child(handle)
@@ -329,7 +341,7 @@ static func _build_sword(root: Node3D) -> void:
 			Vector3(-0.005, 0.0195, 0.0150),
 			Vector3(0.005, 0.0195, 0.0150),
 		], 10)
-		cord.rotation.y = PI * 0.5
+		cord.rotation.x = -PI * 0.5
 		cord.position = Vector3(0, 0, -0.122 - float(index) * 0.0205)
 		cord.material_override = _leather(Color("241a14"), index)
 		root.add_child(cord)
@@ -345,7 +357,7 @@ static func _build_sword(root: Node3D) -> void:
 		Vector3(0.048, 0.022, 0.020),
 		Vector3(0.056, 0.010, 0.010),
 	], 10)
-	pommel.rotation.y = PI * 0.5
+	pommel.rotation.x = -PI * 0.5
 	pommel.position = Vector3(0, 0, -0.272)
 	pommel.material_override = _metal(Color("8b6040"), 0.30, 33)
 	root.add_child(pommel)
@@ -380,7 +392,13 @@ static func _build_shotgun(root: Node3D) -> void:
 		Vector3(0.40, 0.0112, 0.0112),
 		Vector3(0.52, 0.0118, 0.0118),
 	], 12)
-	barrel.rotation.y = -PI * 0.5
+	# M4.4. `BodyMesh.revolve()` extends along its own local Y, not Z like
+	# `_sweep()` — a rotation around Y cannot retarget a shape that is already
+	# aligned with Y, which is why this read as a barrel pointed at the sky
+	# rather than downrange. Tipping it over on X is what actually lays a
+	# Y-extending tube along +Z, matching every `_sweep()` part's own
+	# muzzle-forward convention.
+	barrel.rotation.x = PI * 0.5
 	barrel.position = Vector3(0, 0.016, 0.225)
 	barrel.material_override = _metal(gunmetal.darkened(0.2), 0.24, 17)
 	root.add_child(barrel)
@@ -391,7 +409,7 @@ static func _build_shotgun(root: Node3D) -> void:
 		Vector3(0.0, 0.0115, 0.0115),
 		Vector3(0.40, 0.0115, 0.0115),
 	], 10)
-	magazine.rotation.y = -PI * 0.5
+	magazine.rotation.x = PI * 0.5
 	magazine.position = Vector3(0, -0.014, 0.225)
 	magazine.material_override = _metal(gunmetal.darkened(0.3), 0.30, 19)
 	root.add_child(magazine)
@@ -417,7 +435,7 @@ static func _build_shotgun(root: Node3D) -> void:
 			Vector3(-0.004, 0.0235, 0.0255),
 			Vector3(0.004, 0.0235, 0.0255),
 		], 10)
-		rib.rotation.y = PI * 0.5
+		rib.rotation.x = PI * 0.5
 		rib.position = Vector3(0, -0.006, 0.272 + float(index) * 0.0225)
 		rib.material_override = _wood(Color("35241a"), index + 40)
 		root.add_child(rib)
@@ -452,6 +470,22 @@ static func _build_shotgun(root: Node3D) -> void:
 	guard.position = Vector3(0, -0.036, -0.012)
 	guard.material_override = _metal(gunmetal, 0.34, 37)
 	root.add_child(guard)
+
+	# AF1.4. The BONE YARD 12G is built box-fed rather than tube-fed — a
+	# quick-load cassette ahead of the guard, not the fixed `tube` above, which
+	# is why it is the only part of this weapon named "magazine": that is the
+	# name `HunterArsenal` looks for to ride the reload timer.
+	var cassette := MeshInstance3D.new()
+	cassette.name = "magazine"
+	cassette.mesh = _sweep([
+		{"at": 0.0, "width": 0.034, "depth": 0.020},
+		{"at": 0.070, "width": 0.034, "depth": 0.020},
+		{"at": 0.080, "width": 0.026, "depth": 0.016},
+	], 0.25)
+	cassette.rotation = Vector3(PI * 0.5 + 0.10, 0, 0)
+	cassette.position = Vector3(0, -0.058, 0.028)
+	cassette.material_override = _metal(gunmetal.darkened(0.1), 0.32, 61)
+	root.add_child(cassette)
 
 	_anchor(root, "grip", Vector3(0, -0.070, -0.044), Vector3(0.42, 0, 0))
 	_anchor(root, "forend", Vector3(0, -0.020, 0.300), Vector3(0.10, 0, 0))
@@ -514,6 +548,22 @@ static func _build_sidearm(root: Node3D) -> void:
 	guard.position = Vector3(0, -0.030, -0.004)
 	guard.material_override = _metal(gunmetal, 0.32, 53)
 	root.add_child(guard)
+
+	# AF1.4. Named "magazine" on purpose — `HunterArsenal` finds this node by
+	# that name and rides it through the reload timer, dropping it clear of the
+	# well and bringing a fresh one back up. It sits proud of the butt's heel
+	# so the well it leaves actually reads as empty mid-swap, not just shorter.
+	var magazine := MeshInstance3D.new()
+	magazine.name = "magazine"
+	magazine.mesh = _sweep([
+		{"at": 0.0, "width": 0.024, "depth": 0.014},
+		{"at": 0.062, "width": 0.024, "depth": 0.014},
+		{"at": 0.070, "width": 0.019, "depth": 0.011},
+	], 0.25)
+	magazine.rotation = Vector3(PI * 0.5 + 0.38, 0, 0)
+	magazine.position = Vector3(0, -0.096, -0.050)
+	magazine.material_override = _metal(gunmetal.darkened(0.15), 0.30, 59)
+	root.add_child(magazine)
 
 	_anchor(root, "grip", Vector3(0, -0.062, -0.048), Vector3(0.38, 0, 0))
 	_anchor(root, "grip_support", Vector3(0.030, -0.058, -0.030), Vector3(0.38, 0, -0.5))

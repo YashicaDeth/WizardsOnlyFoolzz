@@ -52,6 +52,27 @@ const DEFAULT_ZONES := {
 	"right_leg": {"health": 75.0, "bleed": 0.62, "critical": false},
 }
 
+## N5.1. A real slot per site rather than one slot per coarse damage zone.
+## `installed_parts` used to be keyed by these same six zones directly, so a
+## torso implant covered "torso" and nothing distinguished a spine cage from
+## a chest plate from an organ-bay graft — Greg's own list ("spine, skull,
+## chest, each arm, each leg, the organ bays") names four distinct sites
+## where the zone model only ever had "head" and "torso". Each site still
+## resolves to one of the six real damage zones below for armor/hit
+## purposes — the wound model itself is not what this changes, and every
+## existing caller that installs at a bare zone name ("head", "torso", a
+## limb) keeps working exactly as before, since a zone is also a valid site
+## of its own. What changes is that a caller can now also ask for "skull",
+## "spine", "chest" or "organ_bays" specifically, and have it tracked,
+## damaged and pulled as its own real slot rather than collapsing into
+## whichever single implant happened to occupy "torso".
+const INSTALL_SITES := {
+	"head": "head", "skull": "head",
+	"torso": "torso", "spine": "torso", "chest": "torso", "organ_bays": "torso",
+	"left_arm": "left_arm", "right_arm": "right_arm",
+	"left_leg": "left_leg", "right_leg": "right_leg",
+}
+
 ## B7.1. What this body has on. Names from `Garments.CATALOGUE`; an empty list
 ## is somebody standing in the Ashbloom in their skin, which the weather and the
 ## radiation path both treat exactly as badly as that sounds.
@@ -111,9 +132,14 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 		return {"accepted": false, "reason": "dead"}
 	var resolved_zone := zone_id if zones.has(zone_id) else "torso"
 	var zone: Dictionary = zones[resolved_zone]
-	var installed: Dictionary = installed_parts.get(resolved_zone, {})
-	var hardware_ratio := implant_condition(resolved_zone)
-	var armor := float(installed.get("armor", 0.0)) * hardware_ratio
+	# N5.1. A zone can now hold hardware at more than one site (a spine cage
+	# and a chest plate both answer to "torso"), so a hit's armor is the sum
+	# of every site installed there, each scaled by its own condition —
+	# never a single implant standing in for the whole zone.
+	var armor := 0.0
+	for site_id in _sites_for_zone(resolved_zone):
+		var part: Dictionary = installed_parts[site_id]
+		armor += float(part.get("armor", 0.0)) * implant_condition(site_id)
 	# B7.1 / B7.2. What is over this zone: what it is wearing, plus what it is
 	# behind. Melting damage is stopped by shielding and ordinary damage by
 	# plate, which is the difference between a lead wrap and a scrap plate and
@@ -151,6 +177,10 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 		"bleed_rate": snappedf(wound_bleed, 0.01),
 		"disabled": float(zone.health) <= 0.0,
 		"time_msec": Time.get_ticks_msec(),
+		# AN2.3. How much of the raw blow this zone actually stopped, from armour
+		# plate and shielding alone — the caller's own read of what the weapon
+		# hit, not a duplicate of the armour math above.
+		"absorbed": clampf(1.0 - applied / maxf(damage, 0.01), 0.0, 0.95),
 	}
 	# B6.7v2. A closed break and a compound break are not the same injury. The
 	# former is a disabled structure under intact skin; only a penetrating blow
@@ -165,8 +195,8 @@ func apply_hit(zone_id: String, damage: float, impulse: float, damage_type: Stri
 			zone["fracture"] = fracture
 			zones[resolved_zone] = zone
 		wound["fracture"] = fracture
-	if not installed.is_empty():
-		wound["implant_condition"] = damage_implant(resolved_zone, applied * (0.30 if penetrating else 0.16))
+	if not _sites_for_zone(resolved_zone).is_empty():
+		wound["implant_condition"] = damage_implants_at_zone(resolved_zone, applied * (0.30 if penetrating else 0.16))
 	wounds.append(wound)
 	if wounds.size() > 24:
 		wounds.pop_front()
@@ -286,15 +316,129 @@ const FACTORY_LOADOUT := {
 ## limb with nothing installed is a real, mechanically lesser condition
 ## (N5.6) already, through `implant_condition()` simply having nothing to
 ## report — no separate penalty needed for a gap already visible as one.
-func install_factory_loadout() -> void:
+##
+## N5.8. A zone the character sheet already grew something into (D4's
+## `_grown_cybernetics()`) is skipped rather than overwritten — CellOutz backs
+## the slots you walked out of the vat with nothing in, not the ones you
+## already had a body's worth of history in.
+##
+## `exclude` exists for one real reason today rather than as general API:
+## `baseline_human.gd`'s severance stress only ever accumulates on a limb zone
+## with nothing in `installed_parts` (B6.5/B6.6 — a limb already carrying any
+## hardware is read as an existing replacement, not organic tissue). The
+## catalog does not yet distinguish a wrist-mounted dose counter from a full
+## prosthetic arm, so filling `left_arm` here would quietly make the
+## player's own arm un-severable forever. The real caller excludes it until
+## that distinction exists; this method's own test still exercises all three
+## zones, since it never touches severance.
+func install_factory_loadout(exclude: Array[String] = []) -> void:
 	for zone_id in FACTORY_LOADOUT:
+		if zone_id in exclude or installed_parts.has(zone_id):
+			continue
 		install_part(zone_id, {"id": str(FACTORY_LOADOUT[zone_id]), "locked": true})
 
 
-func install_part(zone_id: String, part_data: Dictionary) -> Dictionary:
+## N5.1. Keyed by the site the caller actually asked for, not by whichever
+## zone the catalog entry happens to carry — `ImplantCatalog`'s own entries
+## still decide the *damage zone* an implant answers to (through `resolve()`'s
+## `zone` field, read via `INSTALL_SITES` below), but "torso" and "spine" can
+## now both be occupied at once without one silently overwriting the other,
+## which was impossible while both collapsed onto the single key "torso".
+func install_part(site_id: String, part_data: Dictionary) -> Dictionary:
+	var zone_id := str(INSTALL_SITES.get(site_id, site_id))
 	var part := ImplantCatalog.resolve(part_data, zone_id)
-	installed_parts[str(part.zone)] = part
+	installed_parts[site_id] = part
 	return part.duplicate(true)
+
+
+## B6.1. What a limb can *do* because of what is bolted into it — keyed off
+## the hardware's own `profile`, the field `implant_catalog.gd` has carried
+## for every entry since it was written and that B5.2 already draws the shape
+## from. Keyed that way on purpose: a capability read off the same field the
+## limb is drawn from cannot disagree with the thing granting it, the way a
+## second ability table sitting beside the body would.
+##
+## "Through the anatomy rather than around it" is the whole of the item. A
+## limb grapples because of what is installed in that limb, its condition is
+## the hardware's real condition, and when the limb stops being there it
+## stops being able to (B6.2) — none of which is true of an ability flag that
+## never hears about an arm coming off.
+const LIMB_CAPABILITIES := {
+	"industrial_limb": ["grapple"],
+	"scrap_limb": ["grapple"],
+	"limb_drive": ["grapple"],
+	"launcher_limb": ["launch"],
+	# AD3.2. "Cybernetics change what movement is possible, not just the
+	# numbers" — so these grant moves, never multipliers. `heel anchors` is
+	# the catalogue's own right-leg entry and reads exactly like the thing
+	# that would drive a body off the ground: with it a leg can kick off
+	# nothing mid-air, and clear obstacles a bare body reads as a wall.
+	"joint_anchor": ["kick_off", "vault_high"],
+}
+
+## Dead hardware does nothing. A limb drive at zero condition is a weight on
+## the end of your arm, not a grapple.
+const CAPABILITY_MINIMUM_CONDITION := 0.15
+
+
+## What the hardware at one site offers right now. Empty for an empty site,
+## for hardware with no capability profile, and for hardware too far gone to
+## answer — the last of which is why this reads condition rather than only
+## presence.
+func limb_capabilities(site_id: String) -> Array[String]:
+	var out: Array[String] = []
+	var part: Dictionary = installed_parts.get(site_id, {})
+	if part.is_empty():
+		return out
+	if implant_condition_ratio(part) < CAPABILITY_MINIMUM_CONDITION:
+		return out
+	for capability in LIMB_CAPABILITIES.get(str(part.get("profile", "")), []):
+		out.append(str(capability))
+	return out
+
+
+func limb_can(site_id: String, capability: String) -> bool:
+	return limb_capabilities(site_id).has(capability)
+
+
+## Every site that can do this right now. For a caller choosing which arm to
+## reach with rather than asking about one it already picked.
+func capable_sites(capability: String) -> Array[String]:
+	var out: Array[String] = []
+	for site_id in installed_parts:
+		if limb_can(str(site_id), capability):
+			out.append(str(site_id))
+	return out
+
+
+## N5.1. Every occupied site that answers to a given damage zone — "torso"
+## alone once meant one implant; it can now mean a spine cage, a chest plate
+## and an organ-bay graft all at once, each tracked and damaged separately.
+func _sites_for_zone(zone_id: String) -> Array[String]:
+	var out: Array[String] = []
+	for site_id in installed_parts:
+		if str(INSTALL_SITES.get(site_id, site_id)) == zone_id:
+			out.append(site_id)
+	return out
+
+
+## The combined readout for a zone with more than one site occupied — the
+## average of what is actually installed there, rather than only ever seeing
+## whichever single implant used to own the whole zone.
+func implant_condition_at_zone(zone_id: String) -> float:
+	var sites := _sites_for_zone(zone_id)
+	if sites.is_empty():
+		return 0.0
+	var total := 0.0
+	for site_id in sites:
+		total += implant_condition(site_id)
+	return total / float(sites.size())
+
+
+func damage_implants_at_zone(zone_id: String, amount: float) -> float:
+	for site_id in _sites_for_zone(zone_id):
+		damage_implant(site_id, amount)
+	return implant_condition_at_zone(zone_id)
 
 
 ## N5.4. In CellOutz's own voice, not the game's — the warning belongs to the

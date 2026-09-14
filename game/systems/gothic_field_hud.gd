@@ -179,9 +179,16 @@ func _draw_location_crest() -> void:
 	if location_announce <= 0.0:
 		return
 	var alpha := clampf(location_announce, 0.0, 1.0)
-	var font := ThemeDB.fallback_font
 	var center := Vector2(size.x * 0.5, 42)
-	draw_string(font, center + Vector2(-230, 0), "—  %s  —" % location, HORIZONTAL_ALIGNMENT_CENTER, 460, 16, BONE * Color(1, 1, 1, alpha))
+	# AG5.8. This was the engine's own font, `ThemeDB.fallback_font` — the
+	# exact "tutorial level" look `celloutz_type.gd` exists to replace, left
+	# behind here because the crest is announced rather than always on and so
+	# is rarely on screen to notice. The em-dash bracketing goes too: the
+	# stencil face has no glyph for it, so it drew as two silent gaps. "//"
+	# is what the rest of this file already brackets a header with.
+	var label := "// %s //" % location
+	var label_width := CellOutzType.width(label, 16.0, 2.0)
+	CellOutzType.draw_text(self, center + Vector2(-label_width * 0.5, -8.0), label, 16.0, BONE * Color(1, 1, 1, alpha), 2.0)
 	var pulse := 35 + sin(elapsed * 1.2) * 8
 	draw_line(center + Vector2(-pulse, 15), center + Vector2(pulse, 15), COPPER * Color(1, 1, 1, 0.5 * alpha), 1)
 
@@ -195,13 +202,14 @@ func _draw_location_crest() -> void:
 func _draw_hunt_thread() -> void:
 	if rival_status == "DORMANT" or rival_status.is_empty():
 		return
-	var font := ThemeDB.fallback_font
 	var anchor := Vector2(size.x - 260, 48)
 	var eye := anchor + Vector2(205, 12)
 	draw_arc(eye, 16, 0, TAU, 24, COPPER * Color(1, 1, 1, 0.45), 2)
 	draw_circle(eye, 4 + sin(elapsed * 3.1), BLOOD)
-	draw_string(font, anchor, "HUNT // %s" % rival_name.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COPPER)
-	draw_string(font, anchor + Vector2(0, 21), rival_status, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, BONE * Color(1, 1, 1, 0.65))
+	# AG5.8. `ThemeDB.fallback_font` again — the engine face standing in a
+	# panel that otherwise reads in CellOutz's own stencil cut.
+	CellOutzType.draw_text(self, anchor + Vector2(0, -13), "HUNT // %s" % rival_name.to_upper(), 13.0, COPPER)
+	CellOutzType.draw_text(self, anchor + Vector2(0, 8), rival_status, 11.0, BONE * Color(1, 1, 1, 0.65))
 
 
 func _draw_weapon() -> void:
@@ -250,7 +258,11 @@ func _draw_weapon() -> void:
 		var row := loose / 5
 		var loose_at := center + Vector2(-42 + (loose % 5) * 10, 34 - row * 7)
 		_draw_cartridge(loose_at, -0.18 + (loose % 3) * 0.12, BONE * Color(1, 1, 1, 0.58), true, weapon_id == "shotgun", 0.68)
-	var reserve_mark := "×%02d" % reserve
+	# AG5.8. "×" has no stroke path in the stencil alphabet (`GLYPHS.has`
+	# fails and `draw_text` silently skips it, advancing the cursor over
+	# nothing) — the reserve count has been drawing as a blank gap then two
+	# digits since this readout was written. "x" is a real glyph.
+	var reserve_mark := "x%02d" % reserve
 	CellOutzType.draw_condensed(self, center + Vector2(17, 29), reserve_mark, 9.0, BONE * Color(1, 1, 1, 0.46), 0.8)
 	if reloading:
 		var reload_ratio := clampf(float(weapon.get("reload_ratio", 0.0)), 0.0, 1.0)
@@ -356,8 +368,10 @@ func _draw_full_archive_frame() -> void:
 		draw_line(corner, corner + Vector2(0, sy * 72), COPPER, 3)
 		for knot in 3:
 			draw_circle(corner + Vector2(sx * (18 + knot * 16), sy * 8), 2, TEAL)
-	var font := ThemeDB.fallback_font
-	draw_string(font, center + Vector2(-220, -half.y + 35), "ARCHIVE // %s" % menu_mode, HORIZONTAL_ALIGNMENT_CENTER, 440, 18, BONE)
+	# AG5.8. The last `ThemeDB.fallback_font` holdout in this file.
+	var header := "ARCHIVE // %s" % menu_mode
+	var header_width := CellOutzType.width(header, 18.0, 2.0)
+	CellOutzType.draw_text(self, center + Vector2(-header_width * 0.5, -half.y + 27), header, 18.0, BONE, 2.0)
 	# Living Tree veins behind the data page.
 	var root := center + Vector2(0, half.y - 18)
 	for branch in 11:

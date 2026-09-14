@@ -9,6 +9,19 @@ signal subject_changed(subject_id: String, subject: Dictionary)
 const SAVE_PATH := "user://world_history.json"
 const MAX_EVENTS := 500
 
+## AG5.11. Several worlds, not one. `SAVE_PATH` above is the save this file has
+## always written — a scene opened directly in the editor, or any of this
+## project's ~90 headless tests, never touches a slot and keeps behaving
+## exactly as it did before this existed. Slots are a layer the front-end menu
+## opts into: once `active_slot_id` is set, `_current_path()` (what
+## `_load_history()`/`_save_history()` actually read and write) points at that
+## slot's own file instead.
+const SAVES_DIR := "user://saves"
+const TEST_SAVES_DIR := "user://test_saves"
+
+var active_slot_id := ""
+var slot_manifest: Array[Dictionary] = []
+
 var events: Array[Dictionary] = []
 var next_sequence := 1
 var subjects: Dictionary = {}
@@ -229,6 +242,11 @@ const KARMA := {
 	# because it is deliberately rare — gated on the entity's attention, which is
 	# itself earned from a run of the acts above rather than bought.
 	"sin_washed": 0.12,
+	# N5.5. CellOutz's axis position is "Ownership" — defying a lock they put on
+	# your own body is the Ascent act of refusing to be owned, not a neutral
+	# inventory move. Only a *locked* pull counts: robbed or grown hardware
+	# (N5.8) was never CellOutz's claim to begin with.
+	"pull_locked_implant": 0.07,
 }
 
 
@@ -248,6 +266,8 @@ func event_karma(event: Dictionary) -> float:
 			return float(KARMA.silence_witness)
 		"limb_severed_in_combat":
 			return float(KARMA.maim)
+		"implant_pulled":
+			return float(KARMA.pull_locked_implant) if bool(details.get("was_locked", false)) else 0.0
 		"misfire_bond", "bond_strengthened", "npc_spared":
 			return float(KARMA.kindness)
 		"sin_washed":
@@ -453,6 +473,14 @@ func clear_history() -> void:
 	events.clear()
 	subjects.clear()
 	next_sequence = 1
+	active_slot_id = ""
+	slot_manifest.clear()
+	if OS.get_environment("ATG_TEST_MODE") == "1":
+		# Every test in the project calls this first. Wiping the sandboxed test
+		# save directory here, rather than in a separate helper nobody would
+		# remember to call, is what keeps a slot test's own files from
+		# outliving the test that wrote them.
+		_wipe_test_saves()
 	_save_history()
 
 
@@ -500,10 +528,176 @@ func restore_snapshot(saved: Dictionary) -> bool:
 	return true
 
 
-func _load_history() -> void:
-	if not FileAccess.file_exists(SAVE_PATH):
+## AG5.11. The manifest lists what exists; the actual world lives at
+## `_current_path()`. Kept as two files rather than one so the front-end menu
+## can list slots (id/label/timestamps) without loading and parsing every
+## slot's full event log just to draw a row.
+func list_slots() -> Array[Dictionary]:
+	_load_manifest()
+	# Test mode never reads the real legacy save — a dev machine with an actual
+	# play session on it would otherwise leak that save into every test's
+	# supposedly empty, deterministic sandbox.
+	if slot_manifest.is_empty() and OS.get_environment("ATG_TEST_MODE") != "1" and FileAccess.file_exists(SAVE_PATH):
+		# A save from before AG5.11 existed is a real world somebody is
+		# playing. It becomes "Continue" rather than becoming invisible the
+		# moment they update.
+		_migrate_legacy_save()
+	var sorted := slot_manifest.duplicate(true)
+	sorted.sort_custom(func(a, b): return float(a.get("last_played_unix", 0.0)) > float(b.get("last_played_unix", 0.0)))
+	return sorted
+
+
+## Resets the in-memory world and gives it its own file and manifest row.
+## Nothing about an existing slot moves or is touched.
+func create_slot(label: String = "") -> String:
+	_load_manifest()
+	var id := "slot_%d" % Time.get_unix_time_from_system()
+	while _find_slot(id) != -1:
+		id = "slot_%d" % (Time.get_unix_time_from_system() + randi_range(1, 999))
+	events.clear()
+	subjects.clear()
+	next_sequence = 1
+	run_salt = randi() | 1
+	world_minute = 16.5 * 60.0
+	flags.clear()
+	chaos_magick_level = 0.0
+	chaos_magick_at_minute = 0.0
+	active_slot_id = id
+	var now := Time.get_unix_time_from_system()
+	slot_manifest.append({
+		"id": id,
+		"label": label if not label.is_empty() else "New World",
+		"created_unix": now,
+		"last_played_unix": now,
+	})
+	_save_manifest()
+	_save_history()
+	CellOutzGrunge.remember_run(run_salt)
+	return id
+
+
+## Continue. Replaces whatever is currently in memory with that slot's own
+## history — the point of a slot at all is that loading one never leaks into
+## another.
+func load_slot(id: String) -> bool:
+	_load_manifest()
+	var index := _find_slot(id)
+	if index == -1:
+		return false
+	active_slot_id = id
+	events.clear()
+	subjects.clear()
+	next_sequence = 1
+	flags.clear()
+	_load_history()
+	slot_manifest[index]["last_played_unix"] = Time.get_unix_time_from_system()
+	_save_manifest()
+	CellOutzGrunge.remember_run(run_salt)
+	return true
+
+
+## Deletable, per AG5.11's own wording. Removes the slot's file and its
+## manifest row; if it was the one loaded, `active_slot_id` clears rather than
+## silently continuing to point at a file that no longer exists.
+func delete_slot(id: String) -> bool:
+	_load_manifest()
+	var index := _find_slot(id)
+	if index == -1:
+		return false
+	var path := "%s/%s.json" % [_saves_dir(), id]
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	slot_manifest.remove_at(index)
+	_save_manifest()
+	if active_slot_id == id:
+		active_slot_id = ""
+	return true
+
+
+func _find_slot(id: String) -> int:
+	for index in slot_manifest.size():
+		if str(slot_manifest[index].get("id", "")) == id:
+			return index
+	return -1
+
+
+func _saves_dir() -> String:
+	return TEST_SAVES_DIR if OS.get_environment("ATG_TEST_MODE") == "1" else SAVES_DIR
+
+
+func _current_path() -> String:
+	if active_slot_id == "":
+		return SAVE_PATH
+	return "%s/%s.json" % [_saves_dir(), active_slot_id]
+
+
+func _migrate_legacy_save() -> void:
+	var id := "slot_legacy"
+	var legacy_file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if legacy_file == null:
 		return
-	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	var contents := legacy_file.get_as_text()
+	legacy_file.close()
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_saves_dir()))
+	var out := FileAccess.open("%s/%s.json" % [_saves_dir(), id], FileAccess.WRITE)
+	if out == null:
+		return
+	out.store_string(contents)
+	out.close()
+	var now := Time.get_unix_time_from_system()
+	slot_manifest.append({
+		"id": id,
+		"label": "Continue",
+		"created_unix": now,
+		"last_played_unix": now,
+	})
+	_save_manifest()
+
+
+func _load_manifest() -> void:
+	var path := "%s/manifest.json" % _saves_dir()
+	if not FileAccess.file_exists(path):
+		return
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	if parsed is Dictionary and parsed.get("slots", []) is Array:
+		slot_manifest = []
+		for entry in (parsed.get("slots", []) as Array):
+			if entry is Dictionary:
+				slot_manifest.append(entry as Dictionary)
+
+
+func _save_manifest() -> void:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_saves_dir()))
+	var file := FileAccess.open("%s/manifest.json" % _saves_dir(), FileAccess.WRITE)
+	if file == null:
+		return
+	file.store_string(JSON.stringify({"slots": slot_manifest}))
+
+
+## Test-only. Leaves the real `saves/` directory — and any player's real
+## slots in it — completely untouched; only the sandboxed mirror is wiped.
+func _wipe_test_saves() -> void:
+	var absolute := ProjectSettings.globalize_path(TEST_SAVES_DIR)
+	var dir := DirAccess.open(absolute)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var entry := dir.get_next()
+	while entry != "":
+		if not dir.current_is_dir():
+			dir.remove(entry)
+		entry = dir.get_next()
+	dir.list_dir_end()
+
+
+func _load_history() -> void:
+	var path := _current_path()
+	if not FileAccess.file_exists(path):
+		return
+	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return
 	var parsed: Variant = JSON.parse_string(file.get_as_text())
@@ -533,9 +727,13 @@ func _load_history() -> void:
 
 
 func _save_history() -> void:
-	if OS.get_environment("ATG_TEST_MODE") == "1":
+	# The legacy path is the real player's save; test mode never writes it.
+	# A slot path under test mode is `TEST_SAVES_DIR`, a sandbox `clear_history()`
+	# wipes on every test's own setup — writing there is exactly what lets
+	# `save_slots_test.gd` verify a slot round-trips for real.
+	if OS.get_environment("ATG_TEST_MODE") == "1" and active_slot_id == "":
 		return
-	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var file := FileAccess.open(_current_path(), FileAccess.WRITE)
 	if file == null:
 		return
 	file.store_string(JSON.stringify({

@@ -232,9 +232,9 @@ func _ready() -> void:
 	WorldClock.set_hour(1.0)
 	hunt._update_day_night()
 	# Raised through the world rather than by setting the dial: `_update_air()`
-	# reads `chaos_magick()` every physics frame, so anything written straight
-	# onto the node is gone by the next one — which is the system being right.
-	# Eight completed rituals is what a storm costs.
+	# reads `WorldWeather.contamination()` every physics frame, so anything
+	# written straight onto the node is gone by the next one — which is the
+	# system being right. Eight completed rituals is what a storm costs.
 	for shot: String in ["calm", "storm"]:
 		if shot == "storm":
 			for _ritual in 8:

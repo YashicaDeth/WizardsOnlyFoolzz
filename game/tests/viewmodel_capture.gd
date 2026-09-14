@@ -18,6 +18,10 @@ func _ready() -> void:
 	# — an overridden yaw of 0 turned out to face away from the sky entirely and
 	# read as a black frame that had nothing to do with the weapon model.
 	hunt.third_person = false
+	# A framing check needs to actually see the geometry. The night rework
+	# (A3-A10) landed after this capture was first authored and the world now
+	# defaults dark enough that the weapon was unreadable against it.
+	WorldClock.set_hour(13.0)
 	# Let the real idle pose settle: arm_raise only applies through
 	# hunter_body_motion.gd's normal update loop, so this runs the actual game
 	# for a second rather than posing the rig by hand.

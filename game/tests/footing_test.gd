@@ -55,6 +55,34 @@ func _ready() -> void:
 	hunt.call("lose_footing", hunt.get("FOOTING_WHIFF") if hunt.get("FOOTING_WHIFF") != null else 0.14, "SWUNG AT NOTHING")
 	_check(float(hunt.get("footing")) < before_whiff, "swinging at air puts you on your heels")
 
+	# AN2.1. Committing to a heavy blow costs footing whether or not it lands —
+	# the vulnerability is in throwing it. Forcing `arm._work` directly (as
+	# arm_calibration_test.gd already does) gives a deterministic commitment
+	# without driving forty frames of synthetic mouse input.
+	hunt.stamina = 100.0
+	hunt.set("footing", 1.0)
+	hunt.arsenal.cooldown = 0.0
+	hunt.arm._work = 10.0
+	hunt.call("_attack", false)
+	var footing_after_heavy: float = hunt.get("footing")
+	_check(footing_after_heavy < 0.8, "a fully committed swing costs real footing just for being thrown (%.2f)" % footing_after_heavy)
+
+	hunt.set("footing", 1.0)
+	hunt.arsenal.cooldown = 0.0
+	hunt.arm._work = 0.0
+	hunt.call("_attack", false)
+	var footing_after_flick: float = hunt.get("footing")
+	_check(footing_after_flick > footing_after_heavy, "an uncommitted flick costs far less footing than a committed sweep (%.2f vs %.2f)" % [footing_after_flick, footing_after_heavy])
+
+	# Firearms carry no wind-up in this sense — `arm.commitment()` still tracks
+	# barrel drift for AN1.7, and that is not the same thing as being off balance.
+	hunt.call("_equip_weapon", 1)
+	hunt.arsenal.cooldown = 0.0
+	hunt.set("footing", 1.0)
+	hunt.arm._work = 10.0
+	hunt.call("_attack", false)
+	_check(is_equal_approx(float(hunt.get("footing")), 1.0), "firing a gun costs no footing from commitment (%.2f)" % float(hunt.get("footing")))
+
 	# Bounded at both ends.
 	hunt.call("lose_footing", 99.0, "")
 	_check(float(hunt.get("footing")) >= 0.0, "footing cannot go below zero (%.2f)" % float(hunt.get("footing")))
