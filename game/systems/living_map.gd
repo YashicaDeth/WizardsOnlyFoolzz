@@ -818,7 +818,7 @@ func _draw_place_panel() -> void:
 	draw_rect(panel, ACID * Color(1, 1, 1, 0.45), false, 1.4)
 	CellOutzType.draw_stamped(self, panel.position + Vector2(14, 14), str(district.get("name", "UNNAMED")).to_upper(), 16.0, INK, ARTERIAL * Color(1, 1, 1, 0.3), 1.2)
 	var note_y := 54.0
-	for line: String in _wrap_condensed(str(district.get("note", "")).to_upper(), panel.size.x - 32.0, 9.0, 0.7):
+	for line: String in CellOutzType.wrap_condensed(str(district.get("note", "")).to_upper(), panel.size.x - 32.0, 9.0, 0.7):
 		CellOutzType.draw_condensed(self, panel.position + Vector2(16, note_y), line, 9.0, INK * Color(1, 1, 1, 0.7), 0.7)
 		note_y += 13.0
 	var charted := is_surveyed(district.get("at", Vector2.ZERO))
@@ -861,19 +861,3 @@ func _draw_legend() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-## Wraps to the stencil's own measure. The fallback font had to go from this
-## screen as well — Greg named it directly, and a survey sheet set in a system
-## UI font is the tutorial look he keeps pointing at.
-func _wrap_condensed(text: String, width: float, cap_height: float, tracking: float) -> Array:
-	var lines: Array = []
-	var line := ""
-	for word: String in text.split(" ", false):
-		var candidate: String = word if line.is_empty() else line + " " + word
-		if CellOutzType.width_condensed(candidate, cap_height, tracking) > width and not line.is_empty():
-			lines.append(line)
-			line = word
-		else:
-			line = candidate
-	if not line.is_empty():
-		lines.append(line)
-	return lines
