@@ -16,8 +16,10 @@
        exists; today it silently falls back to itself, which is correct
        behaviour for a link with nowhere real to go yet.
      - #discord-embed — needs a real Discord server ID (see comment there).
-     - #codex-embed — needs a real repo/board ID for the bug codex.
-   No accounts, payments or personal data are collected on this page. */
+     - The community codex uses the public GitHub Issues board for this
+       repository. Reading is anonymous; creating a thread uses GitHub's own
+       sign-in and form, so this page never handles a player's credentials.
+    No payments or personal data are collected on this page. */
 
 :root {
   --void:     #07080b;
@@ -336,6 +338,76 @@ body {
   word-break: break-word;
 }
 
+/* ---- community codex: a live, read-only relay from the real board ------- */
+
+.forum-status {
+  margin: 0 0 12px;
+  color: var(--pale-dim);
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.forum-list {
+  display: grid;
+  gap: 8px;
+}
+.forum-entry {
+  display: block;
+  border: 1px solid var(--rule);
+  background: rgba(7,8,11,.32);
+  color: var(--pale);
+  padding: 11px 12px;
+  text-decoration: none;
+  transition: border-color .12s linear, background .12s linear;
+}
+.forum-entry:hover, .forum-entry:focus-visible {
+  border-color: var(--frequency);
+  background: rgba(127,227,216,.07);
+}
+.forum-entry-title {
+  display: block;
+  color: var(--pale);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.forum-entry-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+  margin-top: 5px;
+  color: var(--pale-dim);
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.forum-label {
+  color: var(--frequency);
+}
+.forum-empty {
+  margin: 0;
+  color: var(--pale-dim);
+  font-size: 13px;
+}
+.forum-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.cta.secondary {
+  background: transparent;
+  border-color: var(--edge);
+  color: var(--pale);
+}
+.cta.secondary:hover, .cta.secondary:focus-visible {
+  background: var(--case-hi);
+  border-color: var(--frequency);
+  color: var(--frequency);
+}
+
 .cta {
   display: inline-block;
   font-family: "Courier Prime", "Courier New", monospace;
@@ -475,27 +547,24 @@ footer a { color: var(--frequency); }
 
     <div class="panel">
       <div class="panel-head">
-        <h4>The bug codex</h4>
+        <h4>The community codex</h4>
+        <span class="live-dot" aria-hidden="true"></span>
       </div>
       <div class="panel-body">
-        <p>A running record, not a comment section: what broke, what it
-          looked like, and whether it's fixed. Built for people finding this
-          from Instagram or a friend's screen recording, not just for other
-          developers.</p>
-        <!-- [SWAP] The lightest real option is GitHub Issues on a public
-             repo, embedded as a board. Two ways in, pick one:
-             1) Point straight at Issues: https://github.com/YOUR_ORG/YOUR_REPO/issues
-             2) Embed a live board with giscus (github.com/giscus/giscus) —
-                it turns this page's comments into repo Discussions, free,
-                no server to run. -->
-        <div class="embed-slot" id="codex-embed">
-          BUG BOARD NOT WIRED YET<br>
-          <code>needs: a public repo (or a form) to point this at</code>
+        <p>A shared board for what broke, what it looked like, and what the
+          game should become. The latest public threads appear below; opening
+          one takes you to its full discussion and its fix history.</p>
+        <div class="embed-slot" id="codex-embed" aria-live="polite" aria-busy="true">
+          <div style="width:min(100%, 520px)">
+            <p class="forum-status" id="forum-status">Tuning into the public board…</p>
+            <div class="forum-list" id="forum-list"></div>
+          </div>
         </div>
-        <p style="margin-top:12px">
-          <a class="cta ghost" href="#" id="codex-link">Post a bug or an idea</a>
-          <!-- [SWAP] href="#" → your issues board / feedback form -->
-        </p>
+        <div class="forum-actions">
+          <a class="cta ghost" href="https://github.com/YashicaDeth/WizardsOnlyFoolzz/issues/new?template=bug_report.yml" id="codex-link" target="_blank" rel="noreferrer">Report a bug</a>
+          <a class="cta secondary" href="https://github.com/YashicaDeth/WizardsOnlyFoolzz/issues/new?template=community_thread.yml" target="_blank" rel="noreferrer">Start a thread</a>
+          <a class="cta secondary" href="https://github.com/YashicaDeth/WizardsOnlyFoolzz/issues" target="_blank" rel="noreferrer">Open the whole board</a>
+        </div>
         <div class="tags">
           <span class="tag">Bug</span>
           <span class="tag">Feedback</span>
@@ -511,8 +580,8 @@ footer a { color: var(--frequency); }
     <div style="max-width:46ch">
       <b>WHO THIS IS FOR.</b> Playtesters, people who found a clip of the
       game somewhere, anyone who wants to build something on top of it.
-      Nobody needs an account to read; posting needs a Discord login, which
-      is the only account this page ever asks for.
+      Nobody needs an account to read; posting opens GitHub's own secure
+      issue form. This site never receives a player's login.
     </div>
     <div>
       WIZARDSONLYFOOLZ · <a href="wizardsonlyfoolz.html">wizardsonlyfoolz.net</a><br>
@@ -521,3 +590,88 @@ footer a { color: var(--frequency); }
     </div>
   </footer>
 </div>
+
+<script>
+/*
+  The public issue tracker is the community forum's source of truth.  This is
+  deliberately read-only in the page: submissions go through GitHub's forms,
+  where they are persistent, moderated, and usable by the people building the
+  game.  It also keeps this static site deployable without a hidden database.
+*/
+(() => {
+  const repository = "YashicaDeth/WizardsOnlyFoolzz";
+  const endpoint = `https://api.github.com/repos/${repository}/issues?state=open&sort=updated&direction=desc&per_page=8`;
+  const list = document.getElementById("forum-list");
+  const status = document.getElementById("forum-status");
+  const slot = document.getElementById("codex-embed");
+
+  const formatWhen = (isoDate) => {
+    const date = new Date(isoDate);
+    if (Number.isNaN(date.getTime())) return "updated recently";
+    return `updated ${new Intl.DateTimeFormat(undefined, {
+      month: "short", day: "numeric", year: "numeric"
+    }).format(date)}`;
+  };
+
+  const showMessage = (message) => {
+    list.replaceChildren();
+    const paragraph = document.createElement("p");
+    paragraph.className = "forum-empty";
+    paragraph.textContent = message;
+    list.append(paragraph);
+  };
+
+  const addThread = (issue) => {
+    const entry = document.createElement("a");
+    entry.className = "forum-entry";
+    entry.href = issue.html_url;
+    entry.target = "_blank";
+    entry.rel = "noreferrer";
+
+    const title = document.createElement("span");
+    title.className = "forum-entry-title";
+    title.textContent = issue.title || "Untitled signal";
+
+    const meta = document.createElement("span");
+    meta.className = "forum-entry-meta";
+    const number = document.createElement("span");
+    number.textContent = `thread #${issue.number}`;
+    const updated = document.createElement("span");
+    updated.textContent = formatWhen(issue.updated_at);
+    meta.append(number, updated);
+
+    (issue.labels || []).slice(0, 2).forEach((label) => {
+      const item = document.createElement("span");
+      item.className = "forum-label";
+      item.textContent = label.name;
+      meta.append(item);
+    });
+
+    entry.append(title, meta);
+    list.append(entry);
+  };
+
+  fetch(endpoint, { headers: { Accept: "application/vnd.github+json" } })
+    .then((response) => {
+      if (!response.ok) throw new Error(`Forum relay returned ${response.status}`);
+      return response.json();
+    })
+    .then((entries) => {
+      // The Issues API also returns pull requests. They are not community threads.
+      const threads = entries.filter((entry) => !entry.pull_request);
+      list.replaceChildren();
+      if (threads.length === 0) {
+        status.textContent = "Public board · no open threads yet";
+        showMessage("No active threads yet. Start the first signal — bug, idea, or playtest note.");
+      } else {
+        status.textContent = `Public board · ${threads.length} latest thread${threads.length === 1 ? "" : "s"}`;
+        threads.forEach(addThread);
+      }
+    })
+    .catch(() => {
+      status.textContent = "Public board temporarily unavailable";
+      showMessage("The live relay could not load. You can still open the board or start a thread directly.");
+    })
+    .finally(() => slot.setAttribute("aria-busy", "false"));
+})();
+</script>

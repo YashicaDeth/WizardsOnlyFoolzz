@@ -1,0 +1,51 @@
+name: Bug report
+description: Tell the build team what failed and how to reproduce it.
+title: "[BUG]: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Wizards Only Foolz. One clear report is more useful than ten guesses.
+  - type: input
+    id: build
+    attributes:
+      label: Build or version
+      description: Tell us what you played (for example, a build date or itch.io version).
+      placeholder: "e.g. Windows build, 2026-09-14"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you do?
+      description: List the shortest steps that make the problem happen.
+      placeholder: |
+        1. Start a new game
+        2. Drive while holding W
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened?
+      description: Screenshots or a short clip link are welcome, but never required.
+    validations:
+      required: true
+  - type: dropdown
+    id: repeatability
+    attributes:
+      label: Can you reproduce it?
+      options:
+        - Every time
+        - Sometimes
+        - Only happened once
+    validations:
+      required: true

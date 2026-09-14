@@ -1,0 +1,31 @@
+name: Community thread
+description: Share an idea, a playtest note, a clip, or a collaboration thought.
+title: "[THREAD]: "
+labels: []
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of thread is this?
+      options:
+        - Feedback
+        - Idea
+        - Playtest note
+        - Clip or artwork
+        - Collaboration
+        - Question
+    validations:
+      required: true
+  - type: textarea
+    id: message
+    attributes:
+      label: Send the signal
+      description: Say what you saw, what you felt, or what you would change.
+      placeholder: Write the thread you would want someone else to find.
+    validations:
+      required: true
+  - type: textarea
+    id: links
+    attributes:
+      label: Links or attachments (optional)
+      description: Add a clip, screenshot, or reference if it helps.
