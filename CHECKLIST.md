@@ -3580,7 +3580,14 @@ The last rung. Fifteen statements that are true of guns when this game is finish
 - [ ] **AF10.8** `v10` Firing from a car is the same system
 - [ ] **AF10.9** `v10` A gun is inspectable in full
 - [ ] **AF10.10** `v10` Weapon customisation lives on the weapon
-- [ ] **AF10.11** `v10` A gun carries momentum and swivels toward where you look
+- [x] **AF10.11** `v10` ~~A gun carries momentum and swivels toward where you look~~
+      AN1.7, already proven in `tests/firearm_momentum_test.gd`: `ARM_WEIGHTS`
+      carries each firearm's own authored mass and reach, `_carry_current_weapon()`/
+      `_pose_weapon()` read `arsenal.current_id` the same way for a gun as
+      for the sword, and a hard turn visibly displaces each weapon's own
+      model off its rest pose — the heavier shotgun lagging further than
+      the lighter sidearm under the identical turn, which could not happen
+      if the pose write were melee-only
 - [x] **AF10.12** `v10` ~~Jams, wear and condition are real~~ AN2.4 already gave a
       *melee* weapon a real, one-way condition that dulls an edge; nothing
       before this ever wore a firearm or let one fail to cycle, because
@@ -3626,7 +3633,15 @@ The last rung. Fifteen statements that are true of guns when this game is finish
       pass rebuilt the cache; the fix is `var duration: float = ...` instead
       of `:=`.
 - [ ] **AF10.13** `v10` The floor of a firefight can be read afterwards
-- [ ] **AF10.14** `v10` Nothing about firing is resolved on the frame the trigger went down
+- [x] **AF10.14** `v10` ~~Nothing about firing is resolved on the frame the
+      trigger went down~~ AF1.1, already proven in `tests/deferred_damage_test.gd`:
+      a shot at real distance wounds nobody and writes no `firearm_anatomy_hit`
+      the instant `_attack()` returns; `weapon_fired` itself is recorded
+      eagerly because the trigger going down is not an anatomy question,
+      but the wound and its event both wait for the round to actually cross
+      the distance and land on a real canonical zone; a shotgun blast
+      confirms more than one pellet lands as its own separate hit rather
+      than one pre-batched summary
 - [ ] **AF10.15** `v10` A gun can be taken from you
 
 ## AD — Movement, and being in first person
