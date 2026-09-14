@@ -12,7 +12,9 @@ extends Control
 
 const WOF_SEAL_PATH := "res://art/brand/wof_seal.png"
 const WOF_STACKED_PATH := "res://art/brand/wof_stacked.png"
-const GRANDEUR_PATH := "res://art/brand/grandeur_wordmark.png"
+## The original raster said "TO"; the screen title is intentionally
+## "ALLUSIONS TOO GRANDEUR" and uses the corrected marked wordmark.
+const GRANDEUR_PATH := "res://art/brand/grandeur_wordmark_too.png"
 const MENU_SCENE := "res://country_town_menu.tscn"
 const SPLASH_BACKDROP := preload("res://systems/splash_backdrop.gd")
 const REGAL_FRAME := preload("res://systems/regal_frame.gd")
