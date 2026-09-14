@@ -3554,7 +3554,50 @@ The last rung. Fifteen statements that are true of guns when this game is finish
 - [ ] **AF10.9** `v10` A gun is inspectable in full
 - [ ] **AF10.10** `v10` Weapon customisation lives on the weapon
 - [ ] **AF10.11** `v10` A gun carries momentum and swivels toward where you look
-- [ ] **AF10.12** `v10` Jams, wear and condition are real
+- [x] **AF10.12** `v10` ~~Jams, wear and condition are real~~ AN2.4 already gave a
+      *melee* weapon a real, one-way condition that dulls an edge; nothing
+      before this ever wore a firearm or let one fail to cycle, because
+      `wear_weapon()` was only ever called from the melee hit path. Now
+      `HunterArsenal.begin_attack()` wears the current firearm on every shot
+      the same way a connecting sword blow wears its edge — `wear_weapon`
+      does not care which one asked — and rolls a jam chance that is a pure
+      function of that same condition (`_jam_chance()`: zero at full
+      condition, rising to 35% as it runs out). A jam does not cost the shot
+      that caused it — the round has already left the barrel by the time the
+      action fails to cycle — it costs the next trigger pull, refused with
+      `{"accepted": false, "reason": "jammed"}` until cleared.
+      \
+      Clearing a jam is a real, timed action of its own (`JAM_CLEAR_TIME`),
+      not a reload dressed up as one: no magazine moves and no round is
+      lost. It rides the same input as a reload (`_reload_weapon()` in
+      `bone_yard_hunt.gd`) because both are "work the action" to a player,
+      and a jammed gun cannot usefully be reloaded until it is clear — the
+      same one input, a different real duration, the way `[R]` already meant
+      two different things for an empty gun and a full one.
+      \
+      `tests/weapon_jam_test.gd` (new, 23 checks): a fresh sidearm wears on
+      every shot and never jams, because the chance is exactly zero at
+      condition 1.0; run down to zero condition it reliably jams within a
+      magazine or two; a jammed gun refuses to fire again on its own but can
+      still be holstered and drawn again, still jammed; `reload()` clears it
+      on a real timer without touching the chambered round; and the arsenal
+      cannot be swapped mid-clear any more than it can mid-reload. Re-ran
+      `arsenal_test`, `magazine_test`, `weapon_condition_test`,
+      `reload_visual_test`, `wall_strike_test`, `combat_integration_test`
+      and `firearm_momentum_test` clean — nothing about the melee condition
+      path or the existing firearm tests changed, because every new branch
+      is gated behind `kind == "firearm"` or a jam-clear timer that starts
+      at zero.
+      \
+      This worktree's `.godot/global_script_class_cache.cfg` predated
+      `storm_weather.gd`/`clothing.gd` and made every test that loads
+      `bone_yard_hunt.tscn` fail to parse with unrelated "could not find
+      type" errors — not this change, but it hid a real type-inference bug
+      of this change's own underneath it (`arsenal.JAM_CLEAR_TIME` through a
+      loosely-typed reference cannot be inferred by `:=`, the same trap
+      `event.pressed` sets on a base `InputEvent`). One `--editor --quit`
+      pass rebuilt the cache; the fix is `var duration: float = ...` instead
+      of `:=`.
 - [ ] **AF10.13** `v10` The floor of a firefight can be read afterwards
 - [ ] **AF10.14** `v10` Nothing about firing is resolved on the frame the trigger went down
 - [ ] **AF10.15** `v10` A gun can be taken from you

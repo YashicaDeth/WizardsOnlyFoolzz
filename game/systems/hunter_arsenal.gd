@@ -48,6 +48,23 @@ var condition: Dictionary = {}
 var models: Dictionary = {}
 var hand: Node3D
 
+## AF10.12. A firearm that has fired enough rounds can fail to cycle cleanly —
+## missing means clean, the same lazy shape `condition` above uses. A jam
+## does not cost the shot that caused it (the round already left the barrel);
+## it costs the next trigger pull, until the action is cleared.
+var jammed: Dictionary = {}
+var jam_clear_remaining := 0.0
+const JAM_CLEAR_TIME := 1.4
+## Chance a shot fails to cycle, purely a function of how worn the weapon
+## already is: zero for a pristine weapon, rising as condition falls, so a
+## gun that has never been fired never jams and one run down to nothing jams
+## more often than it does not.
+const JAM_CHANCE_AT_ZERO := 0.35
+## Firing wears a weapon the same way a connecting melee hit does (AN2.4) —
+## `wear_weapon` does not care which one asked.
+const FIREARM_WEAR_PER_SHOT := 0.006
+var _rng := RandomNumberGenerator.new()
+
 ## AF1.4. The magazine node inside each built model, found by name once at
 ## build time, plus the local position it sits at when nothing is happening —
 ## read off the node rather than hardcoded, so retuning the mesh in
@@ -60,6 +77,7 @@ const MAGAZINE_DROP := Vector3(0, -0.145, 0.012)
 
 
 func configure(rig: BaselineHuman) -> void:
+	_rng.randomize()
 	hand = rig.parts.get("right_arm") as Node3D
 	if hand == null:
 		return
@@ -76,6 +94,11 @@ func configure(rig: BaselineHuman) -> void:
 
 func tick(delta: float) -> void:
 	cooldown = maxf(0.0, cooldown - delta)
+	if jam_clear_remaining > 0.0:
+		jam_clear_remaining = maxf(0.0, jam_clear_remaining - delta)
+		if jam_clear_remaining <= 0.0:
+			jammed[current_id] = false
+		return
 	if reload_remaining <= 0.0:
 		_update_reload_visual()
 		return
@@ -116,7 +139,7 @@ func _update_reload_visual() -> void:
 
 
 func select_slot(slot: int) -> bool:
-	if slot < 0 or slot >= SLOT_ORDER.size() or reload_remaining > 0.0:
+	if slot < 0 or slot >= SLOT_ORDER.size() or reload_remaining > 0.0 or jam_clear_remaining > 0.0:
 		return false
 	current_id = SLOT_ORDER[slot]
 	_update_models()
@@ -161,19 +184,33 @@ func state() -> Dictionary:
 		"spare_magazines": (rounds.get("spare_magazines", []) as Array).duplicate(),
 		"reloading": reload_remaining > 0.0,
 		"reload_ratio": reload_remaining / float(definition.get("reload", 1.0)) if reload_remaining > 0.0 else 0.0,
+		# AF10.12. Jammed is its own state, distinct from reloading: nothing
+		# about the magazine moves while an action is being cleared.
+		"jammed": bool(jammed.get(current_id, false)),
+		"clearing_jam": jam_clear_remaining > 0.0,
+		"jam_clear_ratio": jam_clear_remaining / JAM_CLEAR_TIME if jam_clear_remaining > 0.0 else 0.0,
 	}
 
 
 func begin_attack(heavy := false) -> Dictionary:
 	var definition: Dictionary = current()
-	if cooldown > 0.0 or reload_remaining > 0.0:
+	if cooldown > 0.0 or reload_remaining > 0.0 or jam_clear_remaining > 0.0:
 		return {"accepted": false, "reason": "busy"}
 	if definition.kind == "firearm":
+		if bool(jammed.get(current_id, false)):
+			return {"accepted": false, "reason": "jammed"}
 		var rounds: Dictionary = ammo[current_id]
 		if int(rounds.loaded) <= 0:
 			return {"accepted": false, "reason": "empty"}
 		rounds.loaded = int(rounds.loaded) - 1
 		ammo[current_id] = rounds
+		# AF10.12. The shot that causes the jam still fires — the round has
+		# already left the barrel by the time the action fails to cycle for
+		# the next one. Wear first, so the roll below reads the condition
+		# this very shot left the weapon in.
+		wear_weapon(FIREARM_WEAR_PER_SHOT, current_id)
+		if _rng.randf() < _jam_chance(current_id):
+			jammed[current_id] = true
 	cooldown = float(definition.cooldown) * (1.45 if heavy else 1.0)
 	shot_serial += 1
 	return {
@@ -189,6 +226,10 @@ func begin_attack(heavy := false) -> Dictionary:
 		"spread": float(definition.get("spread", 0.0)),
 		"range": float(definition.get("range", definition.get("reach", 3.0))),
 		"heavy": heavy,
+		# AF10.12. True only on the shot that just caused the jam — a caller
+		# wanting a distinct "that one jammed" cue reads it here rather than
+		# polling `state()` after the fact.
+		"caused_jam": bool(jammed.get(current_id, false)),
 	}
 
 
@@ -225,10 +266,25 @@ func _sync_reserve(weapon_id: String) -> void:
 	ammo[weapon_id] = rounds
 
 
+## AF10.12. How likely a shot is to jam the action, purely a function of how
+## worn the weapon already is: zero for anything at full condition, rising to
+## `JAM_CHANCE_AT_ZERO` as condition runs out.
+func _jam_chance(id: String) -> float:
+	return (1.0 - weapon_condition(id)) * JAM_CHANCE_AT_ZERO
+
+
+## AF10.12. Clearing a jam is a real action of its own, not a reload — no
+## magazine moves and nothing about ammunition changes, which is why this
+## does not go through `_finish_reload()`. Bound to the same input as a
+## reload (`_reload_weapon()`) because both are "work the action" to a
+## player, and a jammed gun cannot usefully be reloaded until it is clear.
 func reload() -> bool:
 	var definition: Dictionary = current()
-	if definition.kind != "firearm" or reload_remaining > 0.0 or cooldown > 0.0:
+	if definition.kind != "firearm" or reload_remaining > 0.0 or jam_clear_remaining > 0.0 or cooldown > 0.0:
 		return false
+	if bool(jammed.get(current_id, false)):
+		jam_clear_remaining = JAM_CLEAR_TIME
+		return true
 	_ensure_spare_magazines(current_id)
 	var rounds: Dictionary = ammo[current_id]
 	if int(rounds.loaded) >= int(definition.magazine) or (rounds.spare_magazines as Array).is_empty():

@@ -1703,6 +1703,8 @@ func _attack(heavy := false) -> void:
 	if not bool(report.get("accepted", false)):
 		if str(report.get("reason", "")) == "empty":
 			prompt.text = "DRY / [R] RELOAD"
+		elif str(report.get("reason", "")) == "jammed":
+			prompt.text = "JAMMED / [R] CLEAR"
 		return
 	var cost := float(report.get("stamina", 0.0))
 	if stamina < cost:
@@ -2319,8 +2321,12 @@ func _reload_weapon() -> void:
 	if carried_limb_index >= 0:
 		prompt.text = "THAT IS AN ARM, NOT A GUN"
 		return
+	# AF10.12. `reload()` clears a jam instead of swapping the magazine when
+	# the current weapon is jammed — same input, a different real duration.
+	var was_jammed := bool(arsenal.jammed.get(arsenal.current_id, false))
 	if arsenal.reload():
-		body_motion.trigger_reload(float(arsenal.current().reload))
+		var duration: float = arsenal.JAM_CLEAR_TIME if was_jammed else float(arsenal.current().reload)
+		body_motion.trigger_reload(duration)
 		# Reloading is visible as a cartridge travelling through the well.
 		prompt.text = ""
 
