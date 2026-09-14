@@ -12,6 +12,14 @@ signal organ_ruptured(organ_id: String, organ: Dictionary)
 ## system. It is symmetric: the player goes down the same way anyone else does.
 signal went_down()
 signal died(cause: Dictionary)
+## B8.2. The body ran out and the spirit did not go with it. Distinct from
+## `died` on purpose: anything listening for a death — the witness ledger, the
+## resolution window, the crowd — must not treat this as one, because nothing
+## about the world changes except that this body has stopped working.
+signal body_failed(report: Dictionary)
+## The way back up. Emitted by `rise()`, so the flame and the HUD can react to
+## the cost rather than being told to play an animation.
+signal spirit_rose(report: Dictionary)
 
 ## Organs sit inside zones. A zone tracks whether a limb still works; an organ
 ## decides how you die. The distinction matters because two torso hits of equal
@@ -122,6 +130,14 @@ var failures: Array[Dictionary] = []
 ## through more and the body mattering less — on the body, in the frame, rather
 ## than in a counter somewhere.
 var spirit_burden := 0.0
+## How much of the body each failure permanently gives up. Five failures reaches
+## the floor, which is a run, not a fight — the cost has to be felt across an
+## evening rather than inside one exchange.
+const BURDEN_PER_FAILURE := 0.2
+## Standing up returns blood only to the level it takes to be conscious. Not
+## full, never full.
+const RISE_BLOOD_FLOOR := 0.34
+const RISE_CONSCIOUSNESS := 26.0
 var critical := false
 var zones: Dictionary = {}
 var organs: Dictionary = {}
@@ -283,8 +299,7 @@ func damage_organ(organ_id: String, amount: float) -> Dictionary:
 		organ_ruptured.emit(organ_id, organ)
 		_enter_critical()
 		if bool(organ.get("fatal", false)):
-			dead = true
-			died.emit({"type": "organ_destroyed", "organ": organ_id, "subject_id": subject_id})
+			_die_or_fail({"type": "organ_destroyed", "organ": organ_id, "subject_id": subject_id})
 	organs[organ_id] = organ
 	return organ
 
@@ -312,9 +327,81 @@ func stabilise() -> void:
 func finish(cause: String) -> void:
 	if dead:
 		return
-	dead = true
+	_die_or_fail({"type": cause, "subject_id": subject_id, "wounds": wounds.duplicate(true)})
+
+
+## B8.1. The single door every death in this component goes through.
+##
+## There were three — a fatal organ, `finish()`, and bleeding out — and each set
+## `dead = true` itself. That is fine until one body is not allowed to die, at
+## which point three independent copies of "and now you are dead" is three
+## chances to miss one, and the one you miss is the one that kills the player
+## who cannot be killed. So they all call this, and the undying case is decided
+## in exactly one place.
+##
+## Returns true if the subject actually died.
+func _die_or_fail(report: Dictionary) -> bool:
+	if not undying:
+		dead = true
+		downed = false
+		died.emit(report)
+		return true
+	# AP2.1: "the spirit cannot be banished by violence." Note what is *not*
+	# here — no healing, no reset, no mercy on the wound. Everything that was
+	# done to this body is still done to it. It has simply stopped being able to
+	# carry on, and something is still holding it.
+	if failed:
+		return false
+	failed = true
+	downed = true
+	var record := report.duplicate(true)
+	record["failure_index"] = failures.size() + 1
+	failures.append(record)
+	# B8.1's "visibly". Each failure gives up more of the body permanently, and
+	# `UndyingFlame` reads condition — so the spirit shows through harder every
+	# time, on the body, in the frame. This is the whole readout; there is no
+	# counter anywhere.
+	spirit_burden = clampf(spirit_burden + BURDEN_PER_FAILURE, 0.0, 1.0)
+	body_failed.emit(record)
+	return false
+
+
+## B8.2. What is left, and what it costs to stand up in it.
+##
+## Deliberately not a revive. Blood comes back only to the floor it takes to be
+## conscious, pain is not touched, every wound and every severed limb stays, and
+## the burden that just went up never comes down. The body is worse than it was
+## and will be worse again next time — which is the only thing stopping "cannot
+## die" from meaning "nothing that happens matters".
+func rise() -> Dictionary:
+	if not failed:
+		return {"risen": false, "reason": "the body has not failed"}
+	failed = false
 	downed = false
-	died.emit({"type": cause, "subject_id": subject_id, "wounds": wounds.duplicate(true)})
+	blood_remaining = maxf(blood_remaining, blood_capacity * RISE_BLOOD_FLOOR)
+	consciousness = maxf(consciousness, RISE_CONSCIOUSNESS)
+	# Bleeding is slowed, not stopped. Standing up does not close anything.
+	bleed_rate *= 0.35
+	internal_bleed_rate *= 0.35
+	var report := {
+		"subject_id": subject_id,
+		"failures": failures.size(),
+		"spirit_burden": spirit_burden,
+		"condition": combat_ratio(),
+	}
+	spirit_rose.emit(report)
+	bleeding_changed.emit(bleed_rate, blood_remaining)
+	return report
+
+
+## What `UndyingFlame.set_condition()` should be handed for this body.
+##
+## The flame already burns harder as the anatomy worsens (A8). The burden folds
+## into the same number rather than adding a second effect beside it, so a body
+## that has run out three times reads as further gone than its current wounds
+## alone would say — which is exactly what it is.
+func flame_condition() -> float:
+	return clampf(combat_ratio() * (1.0 - spirit_burden), 0.0, 1.0)
 
 
 func organ_ok(organ_id: String) -> bool:
@@ -666,8 +753,7 @@ func _process(delta: float) -> void:
 		go_down()
 	# Running out of blood is the one thing nobody gets to decide about.
 	if blood_remaining <= 0.0:
-		dead = true
-		died.emit({"type": "bleed_out", "subject_id": subject_id, "wounds": wounds.duplicate(true)})
+		_die_or_fail({"type": "bleed_out", "subject_id": subject_id, "wounds": wounds.duplicate(true)})
 
 
 ## B3.2. Dose spends itself into the body it is sitting in. This is the half a

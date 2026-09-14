@@ -755,6 +755,22 @@ func _ready() -> void:
 ## and HUD are balanced around; the rig records *where* the damage is, renders it
 ## on the player's own limbs in first person, and persists it. Unifying the two
 ## numbers means rebalancing the whole hunt loop and is tracked in ROADMAP.md.
+
+## B8.2. The body ran out. Nothing here heals it and nothing here ends the run —
+## the spirit is still holding it, so what happens is that the player is on the
+## ground, wrecked, and gets up worse than they were.
+func _on_player_body_failed(report: Dictionary) -> void:
+	WorldHistory.record_event("body_failed", {
+		"subject_id": "player",
+		"cause": str(report.get("type", "unknown")),
+		"failure_index": int(report.get("failure_index", 1)),
+		"spirit_burden": player_rig.anatomy.spirit_burden,
+	})
+	# Straight to the flame rather than waiting for the next frame's poll, so the
+	# moment it happens is the moment it shows.
+	if flame != null:
+		flame.set_condition(player_rig.anatomy.flame_condition())
+
 func _build_player_rig() -> void:
 	player_rig = BaselineHuman.new()
 	player_rig.name = "HunterBody"
@@ -796,6 +812,18 @@ func _build_player_rig() -> void:
 		config["restore"] = saved.anatomy_state
 	player_rig.gore = viscera_fx
 	player_rig.build("player", config)
+	# B8.1. The one thing that makes this body different from the one lying in
+	# the road: it takes every wound through the same anatomy, and death does not
+	# take. AP2.1, "the spirit cannot be banished by violence."
+	#
+	# After `build()`, not before it. `build()` is what creates `anatomy`, and the
+	# first version of this sat up beside `flame.ignite()` twenty-seven lines
+	# earlier, touching a null and aborting the rest of the rig — which showed up
+	# as the player being unable to fire at all rather than as anything to do
+	# with dying. Set here rather than inside BaselineHuman because undying is a
+	# fact about this character in this scene, not a property of being a body.
+	player_rig.anatomy.undying = true
+	player_rig.anatomy.body_failed.connect(_on_player_body_failed)
 	if not config.has("restore"):
 		# N5.2/N5.8. Only on a genuine first decanting — a restored body already
 		# carries whatever CellOutz's hardware became (still locked, or pulled
@@ -4800,7 +4828,11 @@ func _update_flame() -> void:
 		return
 	if player_rig == null or not is_instance_valid(player_rig):
 		return
-	flame.set_condition(player_rig.anatomy.combat_ratio())
+	# B8.1's "visibly". `flame_condition()` folds the burden of every previous
+	# failure into the same number the flame already read, so a body that has run
+	# out three times burns harder than its current wounds alone would say —
+	# which is exactly what it is. No second effect, no counter.
+	flame.set_condition(player_rig.anatomy.flame_condition())
 
 
 ## B2.1. The rig, kept current while the player is looking at it.
