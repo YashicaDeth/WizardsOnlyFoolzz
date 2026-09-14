@@ -57,10 +57,41 @@ Merges what merges. Nothing else.
 - It never resolves a conflict and never should. Every conflict left in this
   repo is two agents having built one system in two places.
 
+
+## `rescue.sh` — every 2 hours
+
+Task `ATG-rescue`. Commits tracked work left sitting in worktrees nobody is
+watching, staged by explicit path.
+
+It exists because the cleanup pass on 15 September found three stale
+worktrees holding uncommitted source -- `wire_net.gd` +63, `black_mirror.gd`
++90, `gothic_field_hud.gd` +182 -- every one of them on a branch that was
+already fully merged, and therefore one `git worktree remove` from gone. One
+of those worktrees had 293 changed files by `git status` and four by `git
+diff`; the other 289 were line-ending noise. A tidy-up that trusted the first
+number would have deleted the work behind the second.
+
+It will not touch a worktree whose agent is live, will not touch trunk, and
+will not commit untracked files.
+
+## `report.sh` — every 30 minutes
+
+Task `ATG-report`. Writes `STATUS.md`: what landed, which lanes are running,
+which accounts are walled and until when, which branches still carry work and
+whether each merges clean, the current test signal, and the decisions still
+waiting on Greg. It is the one file to read after being away.
+
+## `sweep.sh` — on demand
+
+Runs all 252 assertion suites (the 72 `*_capture` scenes are screenshot
+scenes, not assertions) and classifies each as ok, FAILING, or **SILENT**.
+Silent is the one that matters: a suite printing no PASS, no FAIL and no
+error is not passing, it is a parse error somewhere in its dependency chain.
+Results land in `sweep.log`, and `report.sh` summarises them.
+
 ## Stopping it
 
-    powershell -Command "Unregister-ScheduledTask -TaskName ATG-lane-dispatch -Confirm:\$false"
-    powershell -Command "Unregister-ScheduledTask -TaskName ATG-integrate -Confirm:\$false"
+    powershell -Command "Get-ScheduledTask -TaskName 'ATG-*' | Unregister-ScheduledTask -Confirm:\$false"
 
 To park an account by hand, write a unix timestamp into
 `state/<account-id>.blocked`. To free one, delete that file.
