@@ -105,14 +105,20 @@ hazard.
 
 **Owns:** nothing. Writes no features.
 
-**Target:** 99 commits unmerged across 9 branches -> 0
+**Target:** 43 commits unmerged across 5 branches -> 0
 
-**Read this one twice before deciding it is a waste of an account.** There are
-**99** finished commits sitting on `agent-b` (26), `origin/agent-b` (20),
-`claude/b-ladder` (15), `codex/sol-agent-1` (12), `agent-c` (11) and four
-others — and that number went *up* by 23 over the course of one day's work. That work is already
-done and is invisible to everyone. Six more agents writing into that makes the
-number grow, not shrink — authoring has never been the bottleneck here.
+**Read this one twice before deciding it is a waste of an account.** The
+number was 99 on 14 September and it was wrong twice over. An overnight pass
+on 15 September took it to **43 across 5 branches** -- and of the original
+count, `origin/agent-b`'s 20 commits were an ancestor of `agent-b`'s 26 and
+were being counted twice. Check containment before quoting a figure:
+`git merge-base --is-ancestor origin/agent-b agent-b`.
+
+What is left is not a merging job. Every one of the five remaining branches is
+blocked on the same thing: two agents built one system in two places, under one
+class name, and git cannot choose between them. `MERGE_STATUS.md` states the
+five questions; each needs one line from Greg, and none of them should be
+answered by an agent picking a side.
 
 This lane merges one branch at a time, runs the test suites after each, and
 stops to ask when two branches disagree about a file rather than picking a side.
@@ -120,13 +126,26 @@ It is also the only lane that should ever resolve a conflict.
 
 ---
 
-## Two rules that override every target above
+## Three rules that override every target above
 
 1. **Never `git add -A`.** Roughly 140 `.import`/`.uid` files churn constantly,
    and two blanket adds in one day swept other agents' uncommitted work into
    unrelated commits. Stage by explicit path.
 
-2. **`substance_objects.gd` does not compile.** It makes unrelated test suites
-   print nothing, which reads exactly like a pass. A baseline measured without
-   swapping in the committed version of that one file is not a baseline. The
-   setup script warns about this on every new worktree.
+2. **`substance_objects.gd` compiled for the first time on 15 September**
+   (`4ec77a6`). Before that it had never parsed, and a GDScript file that fails
+   to parse makes *unrelated* test suites print nothing at all, which reads
+   exactly like a pass. Every baseline taken in this repo before that commit
+   was measured against silence.
+
+   The advice that used to be here -- restore the committed copy -- could never
+   have worked, because the committed copy was the broken one. If a suite
+   prints nothing, do not assume it passed: run `--check-only` over the scripts
+   it touches, and remember that `--check-only` does not register autoloads, so
+   "Identifier not found: WorldHistory" from it is an artifact and not a break.
+
+3. **A merge is not finished when git says it is finished.** `agent-b` merged
+   `silhouette.gd` with no conflict at all and the result did not compile: its
+   five-parameter `dress_vehicle` beat HEAD's six-parameter one, and the caller
+   passes six. Git cannot see a signature change. Build and run the suites
+   after every merge, before committing it.
