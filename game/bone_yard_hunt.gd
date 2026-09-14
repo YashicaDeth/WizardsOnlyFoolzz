@@ -20,6 +20,11 @@ const JUMP_IMPULSE := 6.6
 ## one's).
 const VAULT_MIN_TOP := 0.32
 const VAULT_MAX_TOP := 1.35
+## AD3.2. What a leg with drive hardware in it raises that ceiling to.
+## Chest height rather than head height on purpose: augmented legs make a
+## chest-high barrier passable, they do not make walls stop being walls,
+## which would take AD1.3's wall-running away from itself.
+const VAULT_MAX_TOP_AUGMENTED := 1.95
 const VAULT_REACH := 0.85
 const VAULT_FAR_SIDE := 0.55
 const VAULT_HEAD_CLEARANCE := 1.55
@@ -304,6 +309,10 @@ var dodge_remaining := 0.0
 ## that will actually carry the body off the ground; see that function's own
 ## comment for why a frame's delay either way stomps it back to the floor.
 var jump_queued := false
+## AD3.2. How many mid-air kick-offs have been spent since the last time the
+## body was on the ground. Reset by touching down, so the hardware grants one
+## extra departure rather than flight.
+var kick_off_spent := 0
 var dodge_direction := Vector3.ZERO
 ## AD1.2. How long is left of the current vault, counting down from
 ## `VAULT_DURATION`; the body is not under normal movement control for as
@@ -1269,13 +1278,28 @@ func _update_player(delta: float) -> void:
 	# still-grounded body and gets overwritten straight back to -FLOOR_STICK.
 	# The jump and the slide that proves it happen in the same physics step.
 	var jumping := jump_queued and player_body.is_on_floor()
+	# AD3.2. A leg with drive hardware can kick off nothing. Binary, not a
+	# multiplier: a bare body simply cannot leave the ground a second time,
+	# and an augmented one can, once, until it touches down again. Gated on
+	# the same `capable_limbs()` route B6.1 established, so a severed leg
+	# takes the move with it (B6.2) without this line hearing about it.
+	var kicking_off := false
+	if jump_queued and not jumping and not player_body.is_on_floor():
+		if kick_off_spent <= 0 and player_rig != null and is_instance_valid(player_rig) and not player_rig.capable_limbs("kick_off").is_empty():
+			kicking_off = true
+			kick_off_spent += 1
+	if player_body.is_on_floor():
+		kick_off_spent = 0
 	jump_queued = false
 	# AD1.6. The same floor B6.5 already put under running speed and combat
 	# strength, not a new one invented for jumping — a hobbled body should
 	# leave the ground with a hobbled body's own jump, not a healthy one's.
-	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0, JUMP_IMPULSE * _player_speed_scale() if jumping else 0.0)
+	var leaving_ground := jumping or kicking_off
+	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0, JUMP_IMPULSE * _player_speed_scale() if leaving_ground else 0.0)
 	if jumping:
 		WorldHistory.record_event("player_jumped", {"location": HUNT_LOCATION})
+	if kicking_off:
+		WorldHistory.record_event("player_kicked_off", {"location": HUNT_LOCATION})
 	# AD1.3. Starting a run needs no key at all — the body grabs the wall
 	# the instant it is airborne, fast, and next to one, the same way real
 	# momentum would. Only leaving one on purpose (the kickoff, above) is a
@@ -2245,6 +2269,21 @@ func _update_handheld_lamp(delta: float) -> void:
 ## is airborne against a wall by definition and the ledge it is reaching
 ## for is not on the ground either. Every other caller — the SPACE-pressed
 ## vault a walking player takes over a crate — keeps the gate, unchanged.
+## AD3.2. How high a thing can be and still be vaultable *for this body*.
+## A bare one is capped at `VAULT_MAX_TOP` and everything above it is a wall
+## (AD1.2's own line). A leg carrying drive hardware raises the ceiling, so
+## obstacles in the band between the two are not "vaulted faster" — they are
+## vaultable at all, where for a bare body they were simply walls. That is
+## the item's own "not just the numbers": the same obstacle answers a
+## different question depending on what is in your leg.
+func _vault_ceiling() -> float:
+	if player_rig == null or not is_instance_valid(player_rig):
+		return VAULT_MAX_TOP
+	if player_rig.capable_limbs("vault_high").is_empty():
+		return VAULT_MAX_TOP
+	return VAULT_MAX_TOP_AUGMENTED
+
+
 func _vault_target(direction: Vector3, require_floor: bool = true) -> Dictionary:
 	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty():
 		return {}
@@ -2267,7 +2306,8 @@ func _vault_target(direction: Vector3, require_floor: bool = true) -> Dictionary
 	var low_hit := space.intersect_ray(low_query)
 	if low_hit.is_empty():
 		return {}
-	var high_query := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * VAULT_MAX_TOP, feet + Vector3.UP * VAULT_MAX_TOP + direction * VAULT_REACH)
+	var ceiling := _vault_ceiling()
+	var high_query := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * ceiling, feet + Vector3.UP * ceiling + direction * VAULT_REACH)
 	high_query.exclude = exclusions
 	if not space.intersect_ray(high_query).is_empty():
 		# Something is still in the way above the vaultable band — a real
@@ -2280,7 +2320,7 @@ func _vault_target(direction: Vector3, require_floor: bool = true) -> Dictionary
 	var probe_x: float = low_pos.x + direction.x * 0.1
 	var probe_z: float = low_pos.z + direction.z * 0.1
 	var top_query := PhysicsRayQueryParameters3D.create(
-		Vector3(probe_x, feet.y + VAULT_MAX_TOP + 0.2, probe_z),
+		Vector3(probe_x, feet.y + ceiling + 0.2, probe_z),
 		Vector3(probe_x, feet.y + VAULT_MIN_TOP - 0.1, probe_z))
 	top_query.exclude = exclusions
 	var top_hit := space.intersect_ray(top_query)
@@ -2288,7 +2328,7 @@ func _vault_target(direction: Vector3, require_floor: bool = true) -> Dictionary
 		return {}
 	var top_pos: Vector3 = top_hit.position
 	var obstacle_height: float = top_pos.y - feet.y
-	if obstacle_height < VAULT_MIN_TOP or obstacle_height > VAULT_MAX_TOP:
+	if obstacle_height < VAULT_MIN_TOP or obstacle_height > ceiling:
 		return {}
 	# The far side has to have a floor of its own and room to stand once
 	# there — a vault is landing past the thing, not standing on top of it.
@@ -2495,8 +2535,15 @@ func _dodge() -> void:
 func _jump() -> void:
 	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty():
 		return
+	# AD3.2. Airborne is no longer an automatic refusal: a leg with drive
+	# hardware in it gets one kick off nothing, which `_update_player()`
+	# spends and the ground resets. A bare body is refused here exactly as
+	# it always was, so nothing about jumping changes without the hardware.
 	if not player_body.is_on_floor():
-		return
+		if kick_off_spent > 0 or player_rig == null or not is_instance_valid(player_rig):
+			return
+		if player_rig.capable_limbs("kick_off").is_empty():
+			return
 	jump_queued = true
 
 

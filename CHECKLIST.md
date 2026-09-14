@@ -3485,7 +3485,38 @@ The payoff for D, B2 and N: a body built far enough in one direction should be
 able to answer a rocket with a blade, and the game should let it.
 
 - [ ] **AD3.1** A melee build can close on a launcher and live — the distance is the puzzle
-- [ ] **AD3.2** Cybernetics change what movement is possible, not just the numbers
+- [x] ~~**AD3.2** Cybernetics change what movement is possible, not just the numbers~~
+      The second half is the whole item. A limb that makes you twelve per
+      cent faster has changed a number; these change whether a move exists.
+      Both run through the same `capable_limbs()` route B6.1 built, keyed off
+      the hardware's own catalogue `profile`, so they are the limb's and not
+      the body's — and a severed leg takes them with it (B6.2) without either
+      of them having to hear about it.
+      **The ceiling.** `_vault_ceiling()` replaces the flat `VAULT_MAX_TOP`
+      inside `_vault_target()`. Bare, it is AD1.2's own 1.35 line and
+      anything above it is a wall — "AD1.3's problem, not this one's", as
+      that function already said. With drive hardware in a leg it is 1.95,
+      which leaves a real 0.60m band of obstacle that is a *wall* for a bare
+      body and a *vault* for an augmented one. Not a faster vault. A possible
+      one. Deliberately chest height rather than head height, so walls stay
+      walls and AD1.3's wall-running is not quietly taken away from itself.
+      **The kick-off.** A bare body cannot leave the ground a second time —
+      `_jump()` refuses an airborne press exactly as it always has. A leg
+      with drive hardware gets one kick off nothing, spent on use and reset
+      by touching down, so the hardware grants an extra departure rather than
+      flight.
+      `heel anchors` is the catalogue's own right-leg entry and reads exactly
+      like the thing that drives a body off the ground, so nothing new had to
+      be authored in `implant_catalog.gd` (Lane 5's file) to make this real.
+      Verified: `tests/augmented_movement_test.gd` (19 checks) — the bare
+      ceiling is AD1.2's line to the centimetre, fitting the hardware raises
+      it to the authored augmented figure, the other leg is unaffected, an
+      airborne press is accepted with the hardware and refused without it,
+      pulling the hardware takes both moves back, and severing the leg takes
+      them too with nothing in this pass needing to know. Ten existing
+      movement suites (`jump`, `vault`, `wall_run`, `climb`,
+      `anatomy_traversal`, `momentum_carry`, `limb_capability`, `intercept`,
+      `footing`, `opening`) re-verified clean.
 - [x] ~~**AD3.3** A projectile is a physical thing that can be met, not a damage event~~
       AF1.1 already made a round an object that travels, with two ways its
       flight could end: arriving somewhere (`round_hit`) or running out of

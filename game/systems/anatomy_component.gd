@@ -368,6 +368,12 @@ const LIMB_CAPABILITIES := {
 	"scrap_limb": ["grapple"],
 	"limb_drive": ["grapple"],
 	"launcher_limb": ["launch"],
+	# AD3.2. "Cybernetics change what movement is possible, not just the
+	# numbers" — so these grant moves, never multipliers. `heel anchors` is
+	# the catalogue's own right-leg entry and reads exactly like the thing
+	# that would drive a body off the ground: with it a leg can kick off
+	# nothing mid-air, and clear obstacles a bare body reads as a wall.
+	"joint_anchor": ["kick_off", "vault_high"],
 }
 
 ## Dead hardware does nothing. A limb drive at zero condition is a weight on
