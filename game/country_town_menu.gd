@@ -7,6 +7,7 @@ const DECANTING_PROLOGUE := preload("res://systems/decanting_prologue.gd")
 const SPLASH_BACKDROP := preload("res://systems/splash_backdrop.gd")
 const REGAL_FRAME := preload("res://systems/regal_frame.gd")
 const CRT_GLASS := preload("res://systems/crt_glass.gd")
+const EYE_GLARE := preload("res://systems/eye_glare.gd")
 
 ## Well below anything else so the picture is unambiguously the backdrop and
 ## every other canvas in the scene still draws over the 3D as normal.
@@ -27,6 +28,7 @@ var prologue: Control
 var splash: ColorRect
 var splash_frame: RegalFrame
 var splash_glass: CrtGlass
+var splash_glare: EyeGlare
 var splash_glass_layer: CanvasLayer
 var splash_layer: CanvasLayer
 var branch_plate: Control
@@ -117,6 +119,11 @@ func _play_title_sequence() -> void:
 	splash_frame.set_variant("ossuary")
 	splash_frame.fit_to_photo()
 	splash_layer.add_child(splash_frame)
+	# The eye. On the backdrop canvas so the glass above picks it up and bends it
+	# with everything else, rather than sitting flat on top of a curved frame.
+	splash_glare = EYE_GLARE.new()
+	splash_glare.name = "SplashEyeGlare"
+	splash_layer.add_child(splash_glare)
 	# A1.9. Last of the three. The composition assembles — mark, picture, mount —
 	# and only then does it turn out you have been looking at a screen the whole
 	# time. Menu type is on $HUD, a different canvas entirely, so it never enters
@@ -145,7 +152,6 @@ func _play_title_sequence() -> void:
 	splash_glass_layer.add_child(splash_glass)
 	_use_canvas_background()
 	$HUD/TitleLogo.modulate.a = 0.0
-	$HUD/Presents.modulate.a = 0.0
 	$HUD/Algiz.modulate.a = 0.0
 	$HUD/TitleLogo.scale = Vector2(0.90, 0.90)
 	$HUD/TitleLogo.pivot_offset = $HUD/TitleLogo.size * 0.5
@@ -158,6 +164,7 @@ func _play_title_sequence() -> void:
 	# Behind the picture by the same beat the picture is behind the mark.
 	splash_frame.play(self, 1.50)
 	splash_glass.play(self, 1.90)
+	splash_glare.play(self, 2.20)
 	# The tube struggles as the authored invert tears across and recovers after
 	# it lands, which is what makes the distortion information rather than
 	# wallpaper. Timed to the backdrop's own attack rather than to a guess.
@@ -165,7 +172,6 @@ func _play_title_sequence() -> void:
 	var tween := create_tween()
 	tween.tween_interval(0.22)
 	tween.tween_property(intro_veil, "color:a", 0.14, 0.55).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
-	tween.parallel().tween_property($HUD/Presents, "modulate:a", 0.95, 0.32)
 	tween.tween_property($HUD/Algiz, "modulate:a", 1.0, 0.18)
 	tween.parallel().tween_property($HUD/TitleLogo, "modulate:a", 1.0, 0.36)
 	tween.parallel().tween_property($HUD/TitleLogo, "scale", Vector2.ONE, 0.52).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
