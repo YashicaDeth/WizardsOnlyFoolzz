@@ -2543,7 +2543,7 @@ supposed to feel like too much, and then end.
 - [ ] **P1.1** A curated route through the *real* game, not a separate map
 - [ ] **P1.2** The best features front-loaded: anatomy, gore, X-ray killcam, the derby, the Board
 - [ ] **P1.3** Generous rather than careful — it should feel like a full game while it lasts
-- [ ] **P1.4** No dependence on the cosmology being understood; the Horsemen stay off-screen
+- [x] **P1.4** No dependence on the cosmology being understood; the Horsemen stay off-screen — the whole demo-reachable route (`country_town_menu.gd`, `vat_chamber.gd`, `rift_derby.gd`, `bone_yard_hunt.gd`, `handheld_device.gd`, the opening/interstitial scripts) has zero references to the Horsemen, Thelema or the cosmology systems; the only hit is a design-rationale code comment in `vat_chamber.gd` that never reaches the player
 
 ### P2 — Two doors, one build
 - [x] **P2.1** PLAY and DEMO sit side by side on the main menu — the existing front door now names both routes directly; the branch picker remains behind PLAY and DEMO is its own immediate row in the same house-type plate
