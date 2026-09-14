@@ -5277,11 +5277,29 @@ func _spawn_loot_cache(at: Vector3, items: Array) -> void:
 	add_child(cache)
 	loose_loot.append(cache)
 	cache.set_meta("items", items.duplicate())
-	_add_mesh_to(cache, BoxMesh.new(), Vector3(0, 0.35, 0), Color("c08134"), 0.35)
+	# Was a default 1x1x1 BoxMesh tinted orange, floating at y 0.35 with nothing
+	# under it — a placeholder that shipped, standing exactly where the player is
+	# being rewarded. `LootCache` builds a dropped stash instead, and puts the
+	# actual items in silhouette on top of it, so a cache can be read at distance
+	# without reading the label.
+	LootCache.build(cache, items, hash(str(at.snapped(Vector3.ONE)) + str(items)))
 	var label := Label3D.new()
 	label.text = "LOOT // %s" % ", ".join(PackedStringArray(items))
-	label.position = Vector3(0, 1.4, 0)
+	# Sat at 1.4 over an object 0.35 tall — a metre of empty air between the
+	# words and the thing they were about. Down onto the stash, and dressed:
+	# bone on a dark outline in the region's own palette rather than white
+	# engine-default text, which is the same fallback-font problem the menu had.
+	label.position = Vector3(0, 0.62, 0)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.font_size = 28
+	label.pixel_size = 0.0028
+	label.modulate = Color("ead4ad")
+	label.outline_modulate = Color(0.04, 0.03, 0.03, 0.9)
+	label.outline_size = 10
+	# Readable through the wreck it was dropped behind, which is most of what a
+	# loot marker is for.
+	label.no_depth_test = true
+	label.render_priority = 2
 	cache.add_child(label)
 
 
