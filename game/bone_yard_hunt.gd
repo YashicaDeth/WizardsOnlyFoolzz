@@ -388,6 +388,81 @@ const GATE_LIGHTS := [
 	{"at": Vector3(26, 5, -30), "color": "d8552a", "energy": 2.6, "reach": 12.0},
 ]
 
+## AE.1 - AE.4. The yard's own population.
+##
+## The Bone Yard has been a one-person world since it was built: the player, Nix
+## at the gate, and the captain. Every other body in the region either arrived
+## from a reality misfire or came to keep the captain's second body alive. Greg
+## asked for the world repopulated with killable characters, so this is a work
+## party already standing in the place the fight happens - the hunt is now a
+## hunt among people rather than a duel in an empty pit.
+##
+## AE.1. The slot prefix every one of these resolves through. Nothing in this
+## block is a person's name: `cast_names.gd` derives one from
+## `WorldHistory.run_salt` plus the slot, so a post is the same person inside a
+## save and somebody else entirely in the next one - the same rule the captain
+## has been on since v10.1.
+const POPULATION_SLOT_PREFIX := "boneyard_worker_"
+## AE.2. Where they stand: an offset from a lamp this scene already placed, so a
+## post is somewhere with a light and a route rather than a coordinate typed in
+## once and never revisited. `lamp` indexes `GATE_LIGHTS` above - the gate pair
+## the player walks in under, the mid-road pair further north, and one out on
+## the wreck line. Every post is more than `_update_encounter_actors()`'s own
+## 24 m engage radius from the player's spawn point, so the yard is populated
+## when you arrive rather than already on top of you.
+## `tint`, `variation` and `implant` go straight into the rig config
+## `baseline_human.gd` already reads, which is the only thing that makes two
+## bodies out of one model: different flesh, a different procedural head and
+## face, and a named piece of hardware on a named zone. A worker with a ceramic
+## sternum and a worker with a shoulder brace are not the same person with a
+## different label over them, and a hit that lands on an implant is recorded
+## against a real part rather than against "unknown hardware".
+const POPULATION_POSTS := [
+	{"lamp": 0, "offset": Vector2(-5.0, 4.5), "post": "gate west", "role": "Yard salvage hand",
+		"loot": ["gate scrip", "brass knuckle"], "tint": "6f5f4b", "variation": 3, "grudge": 0,
+		"implant": {"zone": "left_arm", "name": "loader brace", "armor": 0.14}},
+	{"lamp": 0, "offset": Vector2(4.5, -5.0), "post": "gate east", "role": "Wreck line cutter",
+		"loot": ["cutting torch", "soot rag"], "tint": "7a6350", "variation": 11, "grudge": 2,
+		"implant": {"zone": "torso", "name": "ceramic sternum", "armor": 0.12}},
+	{"lamp": 2, "offset": Vector2(-6.0, 2.0), "post": "mid road west", "role": "Haul foreman",
+		"loot": ["haul ledger", "spare chain"], "tint": "6b4f3a", "variation": 19, "grudge": 6,
+		"implant": {"zone": "head", "name": "quota ledger plate", "armor": 0.16}},
+	{"lamp": 2, "offset": Vector2(6.5, -3.0), "post": "mid road east", "role": "Signal keeper",
+		"loot": ["relay coil", "tinned meat"], "tint": "5f5a44", "variation": 27, "grudge": 0,
+		"implant": {"zone": "right_arm", "name": "relay spool", "armor": 0.1}},
+	{"lamp": 4, "offset": Vector2(4.0, -6.0), "post": "wreck line", "role": "Rig mechanic",
+		"loot": ["torque wrench", "battery cell"], "tint": "7c5744", "variation": 5, "grudge": 3,
+		"implant": {"zone": "left_leg", "name": "pile-driver shin", "armor": 0.18}},
+]
+## AE.2. The yard floor is y = 0 (`_build_world()` lays the ground slab at -0.6
+## with its top at 0), so a post takes its x/z from its lamp and its height from
+## the floor rather than from the lamp's own mounting height.
+const POPULATION_STAND_Y := 0.0
+## AE.5. Walk into the yard after dusk and these five would be five names in the
+## dark - the clock runs a game minute a second and dusk is a minute and a half
+## from the opening 16:30. Each of them carries a lantern instead: made through
+## `_place_night_light()` like every other light in the region, parented to the
+## body so it travels with whoever is holding it, and driven by
+## `_update_day_night()` off the same hour as the gate lamps. You find people
+## here because you can see them, not because you walked the grid blind.
+const POPULATION_LANTERN_ENERGY := 2.8
+const POPULATION_LANTERN_REACH := 12.0
+## Offset in the carrier's own frame: out to one side and at hand height, the
+## way a lantern is actually held rather than a lamp mounted on their spine.
+const POPULATION_LANTERN_AT := Vector3(0.42, 1.05, 0.0)
+## AE.4. The yard's people work for one of the four factions `cast_names.gd`
+## already hands out; this is the one that is theirs, registered as a
+## WorldHistory subject of kind "faction" the way every other faction in this
+## world is. It is not a parallel roster - a death in the yard then has a real
+## consequence through F3, where `wire_net.gd`'s `open_vacancy()` finds the post
+## the dead worker held and `promote_successor()` fills it from whoever of the
+## roster is still standing. The yard reorganises around its losses instead of
+## quietly forgetting them. The id and name are the ones already in
+## `CastNames.FACTIONS`, so a generated worker's faction and this subject can
+## never be two different things.
+const POPULATION_FACTION_ID := "bonewright_union"
+const POPULATION_FACTION_NAME := "Bonewright Union"
+
 ## A4.1. Every placed light, so `_update_day_night()` can put them out at dawn
 ## without holding a second list of where they are.
 var night_lights: Array[OmniLight3D] = []
@@ -503,6 +578,18 @@ var xray_active := false
 const XRAY_HOLD_TO_WHEEL := 0.35
 
 @onready var camera: Camera3D = $CameraRig/Camera3D
+## Agent 1 brief. "Do not solve darkness by merely increasing ambient
+## brightness. Night should remain dark. The Black Mirror camera should
+## become the meaningful navigation tool in extreme darkness." The real
+## world's own lighting (`sun`, `WorldEnvironment`, AS2's whole night curve)
+## is untouched either way — this swaps only the camera's own `environment`,
+## the same seam Godot already gives a lens for looking differently at an
+## unchanged world, to a steep brightness lift and a washed, near-monochrome
+## grade. Amplifying what little light is really there, not adding light
+## that was never there, is the actual difference between this and turning
+## the world's own lamps up.
+var black_mirror_active := false
+var _black_mirror_env: Environment
 @onready var title: Label = $HUD/Title
 @onready var status: Label = $HUD/Status
 @onready var vitals: Label = $HUD/VitalsPanel/Vitals
@@ -644,7 +731,13 @@ func _ready() -> void:
 	body_motion.set_perspective(not third_person)
 	WorldHistory.register_subject("inventory", {"items": []})
 	_spawn_friend()
+	# AE.1. The captain is still spawned exactly as she always was, and this
+	# runs alongside her rather than instead of her or through her. The order
+	# matters: `_spawn_rival()` owns the Ashline captain and stays untouched,
+	# and the yard's own people are built after it, so if the population ever
+	# fails to build the canonical hunt is already standing.
 	_spawn_rival()
+	_spawn_yard_population()
 	_update_camera()
 	WorldHistory.record_event("player_entered_hunt_ground", {"location": HUNT_LOCATION, "hunt_id": CAST.id_for(CAPTAIN_SLOT)})
 
@@ -954,8 +1047,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_M: _toggle_panel("map")
 			KEY_T: _toggle_panel("tree")
 			KEY_J: _toggle_artwork()
-			# L. The wall. It has existed since this morning and nothing opened it.
 			KEY_P: _toggle_panel("board")
+			# Agent 1 brief. The Black Mirror as a lens, not just a shutter — N
+			# still snaps a photo instantly, unchanged; L holds the view amplified
+			# so looking through it is a real choice you can hold rather than a
+			# single instant.
+			KEY_L: _toggle_black_mirror()
 			KEY_C: _start_grapple()
 			KEY_Z: _toggle_lock()
 			KEY_E: _interact()
@@ -3262,7 +3359,14 @@ func _kill_encounter_actor(index: int, cause: String) -> void:
 	misfire_director.resolve(str(actor.get("encounter_id", "")), "defeated")
 	var node := actor.node as Node3D
 	var anatomy: Node = actor.anatomy as Node
-	WorldHistory.update_subject(str(actor.subject_id), {"status": "dead", "memory": "The Hunter caught them before escape.", "anatomy_state": anatomy.call("snapshot")}, "npc_killed")
+	# AE.1 / AE.4. Death, as the world's record rather than the scene's. The
+	# status string is read off `RivalRegistry.DEAD` rather than typed here, so
+	# the file that decides what "dead" means and the record that says somebody
+	# is dead can never drift into disagreeing - and the two fields beside it
+	# are what makes the death attributable later, since a status change on its
+	# own does not say who did it or where.
+	var dead_status := str(RivalRegistry.DEAD[0])
+	WorldHistory.update_subject(str(actor.subject_id), {"status": dead_status, "killed_by": "player", "killed_at": HUNT_LOCATION, "memory": "The Hunter caught them before escape.", "anatomy_state": anatomy.call("snapshot")}, "npc_killed")
 	var succession := WireNet.new(WireNet.SIGNAL_SURFACE)
 	var vacancy := succession.open_vacancy(str(actor.subject_id))
 	if not vacancy.is_empty():
@@ -3814,6 +3918,44 @@ func _update_grapple(delta: float) -> void:
 ## C3.1. Raise the camera and take the picture. What gets stored is not an
 ## image — it is what was actually in shot and what state those bodies were
 ## actually in, which is what makes it evidence a ritual can be held to.
+## Agent 1 brief. Builds the graded look once, off whatever the real
+## WorldEnvironment currently is, rather than a hardcoded resource that could
+## drift from `world_look.gd`'s own ashbloom preset or disagree with the hour
+## AS2 has already set. Cached rather than rebuilt every toggle — the
+## adjustment values are the point, not the sky/fog underneath them, which is
+## why this duplicates once and only ever edits its own copy from then on.
+func _black_mirror_environment() -> Environment:
+	if _black_mirror_env == null:
+		var base: Environment = $WorldEnvironment.environment
+		_black_mirror_env = base.duplicate() if base != null else Environment.new()
+		_black_mirror_env.adjustment_enabled = true
+		_black_mirror_env.adjustment_saturation = 0.15
+	return _black_mirror_env
+
+
+## Agent 1 brief. "The Black Mirror camera should become the meaningful
+## navigation tool in extreme darkness." A camera's own `environment`
+## overrides the scene's `WorldEnvironment` for exactly that camera, so this
+## touches nothing the naked eye sees — `sun`, ambient, fog and every other
+## real light in `_update_day_night()` are exactly as dark as AS2 already
+## made them, on and off. What changes is only the amplification applied to
+## whatever light already reached the lens: real night vision brightens what
+## little is there rather than adding light that was never there, and that
+## distinction is the whole point being asked for. Scaled by how dark it
+## actually is (`1.0 - daylight`) so the lens does something worth reaching
+## for at night and reads as barely more than a tint at noon, rather than one
+## fixed amplification regardless of the hour.
+func _toggle_black_mirror() -> void:
+	black_mirror_active = not black_mirror_active
+	if not black_mirror_active:
+		camera.environment = null
+		return
+	var graded := _black_mirror_environment()
+	var darkness := 1.0 - WorldClock.daylight()
+	graded.adjustment_brightness = lerpf(1.05, 3.4, darkness)
+	camera.environment = graded
+
+
 func _take_photograph() -> Dictionary:
 	if not panel_mode.is_empty() or resolution_ui.visible:
 		return {}
@@ -3961,12 +4103,18 @@ func _apply_clinch_result(actor: Dictionary, result: Dictionary, verb: String) -
 ## Winning drops them into the downed window rather than killing them. The
 ## takedown itself is blunt trauma to the head and torso, so the body carries a
 ## record of how it was beaten and the resolution form shows it.
+##
+## The guard is a body-state read rather than a call count: a body that is
+## already down or already dead must not be sent down a second time, because
+## that would overwrite the closed state the resolution form is showing with a
+## fresh one and lose what actually happened to them.
 func _finish_grapple(actor: Dictionary) -> void:
 	var rig := actor.rig as BaselineHuman
 	rig.hit("head", 26.0, 18.0, "blunt")
 	rig.hit("torso", 30.0, 20.0, "blunt")
-	if not actor.anatomy.downed and not actor.anatomy.dead:
-		actor.anatomy.go_down()
+	var body_state = actor["anatomy"]
+	if body_state != null and not bool(body_state.get("downed")) and not bool(body_state.get("dead")):
+		body_state.call("go_down")
 	WorldHistory.record_event("grapple_takedown", {"subject_id": str(actor.subject_id), "location": HUNT_LOCATION})
 	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": rig.snapshot()}, "anatomy_changed")
 	_break_grapple("%s IS ON THE GROUND — [E] DECIDE" % str(actor.display_name).to_upper())
@@ -4699,12 +4847,30 @@ func _on_reality_misfire(encounter: Dictionary, at: Vector3) -> void:
 		_spawn_misfire_marker(title_text, summary, at, kind, str(encounter.instance_id))
 
 
-func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> void:
+## Any actor the world puts in front of the player, built out of the same parts:
+## a body, a collision capsule, an identity label, and a `BaselineHuman` rig with
+## an anatomy component on it. Returns the actor dictionary it appended, or an
+## empty dictionary when the caller asked for somebody who is already dead or
+## already gone - `_spawn_ashline_reinforcements()` and the misfire director
+## ignore the return, the Bone Yard population uses it to finish dressing the
+## worker it just created.
+func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 	var subject_id := "%s_actor" % str(encounter.get("instance_id", "misfire"))
 	var saved_actor := WorldHistory.subject(subject_id)
 	if str(saved_actor.get("status", "")) in ["dead", "escaped"]:
-		return
-	var display_name := "Ashline Tollkeeper" if str(encounter.kind) == "hostile" else "Dead Weather Saint"
+		return {}
+	# AE.3. A caller that already knows who this is says so, and is believed.
+	# The population resolves its own people through `cast_names.gd` and passes
+	# the name in; everything that existed before this - reality misfires, the
+	# captain's reinforcements - passes nothing and keeps the two authored
+	# stand-ins it has always had. The saved record is read first, so a worker
+	# who was already in the yard when it was last written comes back as
+	# themselves rather than as a stranger standing in their post.
+	var display_name := str(saved_actor.get("name", ""))
+	if display_name.is_empty():
+		display_name = str(encounter.get("display_name", ""))
+	if display_name.is_empty():
+		display_name = "Ashline Tollkeeper" if str(encounter.kind) == "hostile" else "Dead Weather Saint"
 	var actor := CharacterBody3D.new()
 	actor.name = subject_id
 	actor.position = pathfinder.safe_position(at + Vector3.UP)
@@ -4728,31 +4894,65 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> void:
 	rig.name = "Body"
 	actor.add_child(rig)
 	rig.position = Vector3(0, -0.9, 0)
+	# AE.3. Flesh colour, procedural variation, blood volume and named implants
+	# are the four things `baseline_human.gd`'s own `build()` reads to make two
+	# people out of one rig - and until now every spawn in this scene passed the
+	# same values for the first three, so the region's population was one body
+	# copied around with a different label over it. A caller may name them; the
+	# defaults are exactly what this function has always used, so the misfires
+	# and the captain's reinforcements are unchanged.
 	var rig_config := {
-		"flesh": Color("70201c") if str(encounter.kind) == "hostile" else Color("586c3a"),
-		"variation": subject_id.length(),
+		"flesh": Color(str(encounter.get("tint", "70201c"))) if str(encounter.kind) == "hostile" else Color("586c3a"),
+		"variation": int(encounter.get("variation", subject_id.length())),
 		"gore": viscera_fx,
-		"blood": 5200.0 if str(encounter.kind) == "boss" else 4300.0,
-		# Named, not just an armour number. Before B2 an implant *was* its armour
-		# value, so this passed an anonymous dictionary and every Ashline body
-		# ended up carrying a part the catalogue could only call "unknown
-		# hardware" — visible in the dossier and robbable as nothing in
-		# particular. The armour override keeps the encounter balance it was
-		# tuned with; the name gives it a zone, a condition and a real mesh.
-		"cybernetics": {"torso": {"name": "ceramic sternum", "armor": 0.18}},
+		"blood": float(encounter.get("blood", 5200.0 if str(encounter.kind) == "boss" else 4300.0)),
 	}
+	# Named, not just an armour number. Before B2 an implant *was* its armour
+	# value, so this passed an anonymous dictionary and every Ashline body
+	# ended up carrying a part the catalogue could only call "unknown
+	# hardware" — visible in the dossier and robbable as nothing in
+	# particular. The armour override keeps the encounter balance it was
+	# tuned with; the name gives it a zone, a condition and a real mesh.
+	#
+	# AE.3. Which hardware is now the caller's to say, because a yard full of
+	# people who all have the same sternum plate is a yard full of one person.
+	# A caller that names an implant gets it on the zone it names; every caller
+	# that predates this - misfires, the captain's reinforcements - gets the
+	# sternum this line has always built.
+	var implant: Variant = encounter.get("implant", null)
+	if implant is Dictionary:
+		rig_config["cybernetics"] = {
+			str(implant.get("zone", "torso")): {
+				"name": str(implant.get("name", "salvaged hardware")),
+				"armor": float(implant.get("armor", 0.12)),
+			},
+		}
+	else:
+		rig_config["cybernetics"] = {"torso": {"name": "ceramic sternum", "armor": 0.18}}
 	if saved_actor.get("anatomy_state") is Dictionary:
 		rig_config["restore"] = saved_actor.anatomy_state
 	rig.gore = viscera_fx
 	rig.build(subject_id, rig_config)
 	var anatomy: Node = rig.anatomy
-	var loot := ["Ashline toll teeth", "rust scrip"] if str(encounter.kind) == "hostile" else ["weather-heart filament", "dead god relay"]
+	# AE.3. What is on the body when it goes down. A caller may say; everything
+	# else keeps the Ashline pockets this has always spawned with.
+	var loot: Array = []
+	var requested_loot: Variant = encounter.get("loot", null)
+	if requested_loot is Array:
+		loot.assign(requested_loot)
+	if loot.is_empty():
+		loot = ["Ashline toll teeth", "rust scrip"] if str(encounter.kind) == "hostile" else ["weather-heart filament", "dead god relay"]
 	encounter_actors.append({"subject_id": subject_id, "display_name": display_name, "node": actor, "rig": rig, "anatomy": anatomy, "state": "hunting", "disposition": "hostile", "speed": 3.7, "loot": loot, "loot_at_risk": false, "dead": false})
 	encounter_actors.back()["encounter_id"] = str(encounter.get("instance_id", ""))
 	if str(saved_actor.get("status", "")) in ["spared", "recruited"]:
 		encounter_actors.back().state = str(saved_actor.status)
 		encounter_actors.back().disposition = "ally" if str(saved_actor.status) == "recruited" else "neutral"
-	WorldHistory.register_subject(subject_id, {"name": display_name, "kind": "person", "role": str(encounter.kind), "elo": 1110 if str(encounter.kind) == "hostile" else 1510, "status": "encountered", "memory": summary_from(encounter), "wounds": [], "anatomy": anatomy.call("snapshot"), "relations": {"player": {"kind": "enemy", "strength": 35}}})
+	WorldHistory.register_subject(subject_id, {"name": display_name, "kind": "person", "role": str(encounter.get("role", encounter.kind)), "elo": 1110 if str(encounter.kind) == "hostile" else 1510, "status": "encountered", "memory": summary_from(encounter), "wounds": [], "anatomy": anatomy.call("snapshot"), "relations": {"player": {"kind": "enemy", "strength": 35}}})
+	# AE.3. Returned so the caller can finish dressing an actor it has a name
+	# and a body for - a lantern, a proper label, a faction on the record. The
+	# misfire director and `_spawn_ashline_reinforcements()` ignore this, as
+	# they always ignored the absence of it.
+	return encounter_actors.back()
 
 
 func summary_from(encounter: Dictionary) -> String:
@@ -4861,6 +5061,171 @@ func _spawn_ashline_reinforcements() -> void:
 	for index in 2:
 		var encounter := {"instance_id": "mara_reinforcement_%d" % index, "kind": "hostile", "summary": "An Ashline knife came to keep Mara's second body alive."}
 		_spawn_encounter_actor(encounter, enemy.global_position + Vector3(-6.0 if index == 0 else 6.0, 0, 4.0 + index * 2.0))
+
+
+## AE.1 - AE.5. The yard's population. Five workers standing where they work,
+## each of whom is a person rather than a silhouette: a name generated per save,
+## a subject in `WorldHistory` with a faction, a role and a grudge, a real
+## `BaselineHuman` body with anatomy under it, a lantern so the dusk the clock
+## opens into does not swallow them, and a death that is a saved status change
+## rather than a node that stopped drawing.
+##
+## Everything here goes through the infrastructure that already exists. The body
+## is the same rig `_spawn_rival()` gives the captain and `_spawn_friend()`
+## gives Nix. The identity is `CastNames`, which is where the captain's name has
+## come from since v10.1. The state is `WorldHistory`, and a kill lands in
+## `encounter_actors` and reaches `_kill_encounter_actor()` by exactly the road
+## every misfire actor already takes - melee through
+## `_attack_nearest_encounter_actor()`, firearms through `_resolve_body_hit()`.
+## Nothing here is a second copy of any of that.
+func _spawn_yard_population() -> void:
+	_register_population_faction()
+	var spawned: Array[String] = []
+	for index in POPULATION_POSTS.size():
+		var subject_id := _spawn_yard_worker(index)
+		if not subject_id.is_empty():
+			spawned.append(subject_id)
+	WorldHistory.record_event("bone_yard_population_manned", {
+		"location": HUNT_LOCATION,
+		"faction_id": POPULATION_FACTION_ID,
+		"posts": spawned.size(),
+		"subjects": spawned.duplicate(),
+	})
+
+
+## AE.4. The yard is not staffed by nobody. Every worker generated below carries
+## this faction, so F3's succession has something real to work with when one of
+## them is killed: `wire_net.gd` looks up the dead worker's `faction_id`, opens a
+## vacancy on this subject and refills it from whoever else of the roster is
+## still alive. Registered with `register_subject()`, which fills in missing
+## authored fields without ever erasing a wound, grudge or vacant post an older
+## save has already earned.
+func _register_population_faction() -> void:
+	if not WorldHistory.subject(POPULATION_FACTION_ID).is_empty():
+		return
+	WorldHistory.register_subject(POPULATION_FACTION_ID, {
+		"name": POPULATION_FACTION_NAME, "kind": "faction", "role": "Yard labour union",
+		"threat": "LOW", "territory": "Bone Yard gate, mid road and wreck line",
+		"doctrine": "Somebody has to cut the wrecks. Those who do get first refusal on what comes out of them.",
+		"relations": {"player": {"kind": "known", "strength": 4}, CAST.id_for(CAPTAIN_SLOT): {"kind": "employer", "strength": 38}},
+	})
+
+
+## AE.1 / AE.2 / AE.3. One worker, posted at one offset from one of the region's
+## own lamps, built through `_spawn_encounter_actor()` rather than around it.
+##
+## The encounter dictionary is the same shape `_spawn_ashline_reinforcements()`
+## already passes - instance_id, kind, summary - which is the point of reusing
+## it: the worker is an encounter actor in every sense, so `_update_encounter_actors()`
+## moves them, they orbit and press openings, they can be disarmed, grappled,
+## downed, spared and recruited, the witness ledger counts them, the map shows
+## them, and the existing combat path wounds them without knowing anything new.
+## What the two extra keys do is identity, which `_spawn_encounter_actor()` has
+## no concept of and would otherwise invent a name for: `display_name` and
+## `role` come out of `CastNames` off this post's own slot.
+func _spawn_yard_worker(index: int) -> String:
+	var post: Dictionary = POPULATION_POSTS[index]
+	var slot := "%s%02d" % [POPULATION_SLOT_PREFIX, index]
+	var who: Dictionary = CAST.person(slot)
+	var role := str(post.get("role", who.get("role", "Yard hand")))
+	var request: Dictionary = {
+		"instance_id": slot,
+		"kind": "hostile",
+		"display_name": str(who["name"]),
+		"role": role,
+		"summary": "Works the Bone Yard %s. Carries a lantern, a quota and a grudge about both." % str(post.get("post", "floor")),
+		"faction": POPULATION_FACTION_NAME,
+		"faction_id": POPULATION_FACTION_ID,
+		"loot": post.get("loot", ["yard scrip"]),
+		"tint": str(post.get("tint", "6f5f4b")),
+		"variation": int(post.get("variation", index)),
+		"implant": post.get("implant", {}),
+	}
+	var spawned := _spawn_encounter_actor(request, _population_post_position(post))
+	if spawned.is_empty():
+		return ""
+	# The subject id comes back from the actor that was actually built, not from
+	# the name this asked for - `_spawn_encounter_actor()` derives its own id
+	# from the instance id, and a worker restored from a save has to be written
+	# back as the same person they were, wounds and all.
+	var subject_id := str(spawned.get("subject_id", who["id"]))
+	var body := spawned.get("node") as Node3D
+	_light_population_lantern(body)
+	_label_population_worker(body, str(spawned.get("display_name", who["name"])), role)
+	# AE.1 / AE.4. The identity is written here rather than left on whatever
+	# `_spawn_encounter_actor()` filled in, because this is the part that makes
+	# a worker a person in the world's record rather than a generic encounter:
+	# their post, their job, the union they work for, what the lantern means,
+	# and the name `cast_names.gd` generated for this save. A grudge is seeded
+	# rather than invented later, so the dossier has something to say about
+	# somebody the player has not touched yet. The faction `cast_names.gd`
+	# generated for them is kept alongside as `faction_origin`, since who they
+	# came from is theirs and who they work for is the yard's.
+	WorldHistory.update_subject(subject_id, {
+		"name": str(spawned.get("display_name", who["name"])),
+		"role": role,
+		"post": str(post.get("post", "")),
+		"faction": POPULATION_FACTION_NAME,
+		"faction_id": POPULATION_FACTION_ID,
+		"faction_origin": str(who["faction"]),
+		"grudge": int(post.get("grudge", 0)),
+		"lantern": true,
+		"memory": str(request["summary"]),
+	}, "bone_yard_post_manned")
+	return subject_id
+
+
+## AE.2. Where a post stands. Read off the lamp it belongs to so the population
+## follows the lights if those ever move, and snapped through the same
+## `pathfinder.safe_position()` every other spawn in this scene uses, so a worker
+## is never placed inside a wreck pile's own footprint.
+func _population_post_position(post: Dictionary) -> Vector3:
+	var lamp: Dictionary = GATE_LIGHTS[clampi(int(post.get("lamp", 0)), 0, GATE_LIGHTS.size() - 1)]
+	var lamp_at: Vector3 = lamp["at"]
+	var offset: Vector2 = post.get("offset", Vector2.ZERO)
+	return pathfinder.safe_position(Vector3(lamp_at.x + offset.x, POPULATION_STAND_Y, lamp_at.z + offset.y))
+
+
+## AE.5. The lantern. Built through `_place_night_light()` - the one place this
+## scene makes a light - then reparented onto the body that carries it, so it
+## travels with whoever is holding it instead of hanging over the spot they used
+## to stand on. `_update_day_night()` drives it off the same hour as the gate
+## lamps because it is in `night_lights` like every other one, and
+## `_place_night_light()` has already given it its warp shell and its bulb.
+func _light_population_lantern(body: Node3D) -> void:
+	if body == null or not is_instance_valid(body):
+		return
+	var lantern := _place_night_light(
+		body.global_position + POPULATION_LANTERN_AT,
+		Color("e8c46a"),
+		POPULATION_LANTERN_ENERGY,
+		POPULATION_LANTERN_REACH,
+		false,
+		0.22,
+	)
+	# Reparenting keeps nothing of the old global transform by default, so the
+	# lamp is placed at its offset in the body's own frame - which is what an
+	# offset from a hand means anyway.
+	remove_child(lantern)
+	body.add_child(lantern)
+	lantern.position = POPULATION_LANTERN_AT
+
+
+## AE.3. Who this is, over their head, in the same "<NAME> // <WHAT THEY ARE>"
+## register the captain's own label already uses.
+##
+## The whole generated name goes up rather than just the forename: five people
+## drawn from thirty-two forenames will collide often enough to matter, and two
+## of the yard's workers sharing a given name would undo the one thing this
+## population is for. `cast_names.gd` guarantees the full name is the stable,
+## save-specific one, so that is what is on the body.
+func _label_population_worker(body: Node3D, display_name: String, role: String) -> void:
+	if body == null or not is_instance_valid(body):
+		return
+	var label := body.get_node_or_null("Identity") as Label3D
+	if label == null:
+		return
+	label.text = "%s // %s" % [display_name.to_upper(), role.to_upper()]
 
 
 func _spawn_blood(at: Vector3, amount: int) -> void:
