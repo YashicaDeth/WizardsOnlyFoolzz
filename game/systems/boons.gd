@@ -110,6 +110,8 @@ static func _default_anatomy_state() -> Dictionary:
 ## narrow public door so those systems cannot couple themselves to an underscore
 ## implementation detail.
 static func pay(subject_id: String, cost_kind: String, amount: float, cost_target: String = "") -> Dictionary:
+	if not COST_KINDS.has(cost_kind):
+		return {"ok": false, "reason": "UNKNOWN COST KIND"}
 	return _pay(subject_id, cost_kind, amount, cost_target)
 
 

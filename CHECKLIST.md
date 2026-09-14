@@ -4022,6 +4022,15 @@ arrest anybody.
 - [ ] **AE1.5** Punishment is local: the holding remembers, and the holding sends them
 - [ ] **AE1.6** Karma is an axis, not a score — the law reads position, not "evil"
 - [ ] **AE1.7** Being hunted by the law is the Hunt System pointed back at you (F)
+- [x] **AE1.1** Unseen is a real state with real inputs — light, noise, cover, distance — `LocalLaw.unseen_state()`: combines real 0..1 light/noise/cover plus real distance against a real sight range (defaulting to `witness_ledger.gd`'s own `SIGHT_RANGE`, so being unseen and being unwitnessed never quietly disagree about how far is too far). Never a single invented "stealth" stat measured on its own authority
+- [x] **AE1.2** An unseen kill differs from a seen one, mechanically and in the record — `LocalLaw.assassinate()` routes every kill through `witness_ledger.gd`'s real `record()` (F1), carrying a real `unseen` flag; the mechanical difference is not a second flag anybody has to check, it is that a kill with no witnesses passed in has nothing in flight to ever report it, so it can never reach a faction's knowledge at all
+- [x] **AE1.3** Assassination as a verb: reach somebody who does not know you are there — `LocalLaw.assassinate()`, through the exact same `npc_resolution`/`execute` vocabulary every other execution already uses (`event_karma()`, `route_endings.gd`, `ascent_entities.gd`) so it moves karma and the Tree exactly as hard as any other kill; the only thing that changes is whether anybody was ever there to know
+- [x] **AE1.4** Law figures respond to what was actually witnessed (`witness_ledger.gd`) — `LocalLaw.witness_a_wrong()` refuses outright unless `ledger.faction_knows()` says the answering faction was actually told, real F1 delivery rather than a direct read of the event log every faction can already see
+- [x] **AE1.5** Punishment is local: the holding remembers, and the holding sends them — a real `place` subject (`held_by`, `unrest`) accumulates real offence magnitude per witnessed wrong on its own ground; once it remembers enough (`RESPONSE_THRESHOLD`) it spends that memory and raises the answering faction's own real `grudge` — the exact field `wire_net.gd`'s channel-contest retaliation (K4.6) and `the_four_horsemen.gd` (K2.5) already use for "the world acts on you", not a second consequence channel
+- [x] **AE1.6** Karma is an axis, not a score — the law reads position, not "evil" — `LocalLaw.offence_magnitude()`: a faction's own real `FACTION_TREE_AXIS` position decides whether an act was even a wrong to it, read against the same real `event_karma()` every act already carries. Verified both directions: the identical execution is no offence to a faction deep in Descent and a real one to a faction that climbed the other way, and the identical act of mercy inverts which faction is offended — nowhere is there a universal crime score either reads instead
+- [ ] **AE1.7** Being hunted by the law is the Hunt System pointed back at you (F) — needs `rival_registry.gd` (Lane 4's); `witness_a_wrong()`'s real `grudge` rise is already the field that system reads, so wiring it in is additive once asked for as an API, not attempted here
+
+Covered by `tests/local_law_test.gd` (23 checks). `tests/karma_test.gd`, `tests/witness_test.gd`, `tests/route_endings_test.gd`, `tests/ascent_entities_test.gd` and `tests/propagation_test.gd` re-run clean.
 
 
 
@@ -4356,33 +4365,35 @@ letters, condense what is left into a glyph, charge it, forget it. Five real
 steps, which are five real game verbs, and not one of them had to be made up.
 
 ### AJ1 — Making a sigil
-- [ ] **AJ1.1** State an intent, in the player's own words
-- [ ] **AJ1.2** The letters are stripped and condensed on screen - you watch it become a glyph
-- [ ] **AJ1.3** The glyph is deterministic from the intent: the same words make the same sigil, always
-- [ ] **AJ1.4** Charging costs something real - blood, stamina, a drug, a death
-- [ ] **AJ1.5** Forgetting is mechanical: a charged sigil you keep looking at does not fire
-- [ ] **AJ1.6** It goes into the world as an object - scratched, burned, carried or worn
+- [~] **AJ1.1** State an intent, in the player's own words — `ChaosSigil.seal_for(intent)` accepts any free text and is the only door in; no screen asks for one yet (that entry point is Lane 5's — a text field on the handheld's RITUAL page, or wherever this gets hosted)
+- [~] **AJ1.2** The letters are stripped and condensed on screen - you watch it become a glyph — `ChaosSigil.condense()` is the real procedure (drop non-letters, keep only the first occurrence of each, drop vowels once consonants survive so a vowel-only intent never condenses to nothing) and `ChaosSigil.draw()` renders the result through `celloutz_type.gd`'s existing seal engine unmodified. The *watching it happen* half — an animated letters-collapsing-into-a-glyph transition — is not built; this produces the finished mark, not the transition into it
+- [x] **AJ1.3** The glyph is deterministic from the intent: the same words make the same sigil, always — seeded off the condensed letters rather than the raw text, so case and whitespace noise never change the mark. `tests/chaos_sigil_test.gd` (11 checks) and a windowed `chaos_sigil_capture` (three different intents, three genuinely different marks, `chaos_sigil_gallery.png`) verify both the seed math and the actual drawn output
+- [~] **AJ1.4** Charging costs something real - blood, stamina, a drug, a death — `ChaosSigil.charge()` spends real blood through the exact ledger `boons.gd` already pays E4 boosts from (`Boons.pay()`, newly exposed as a public wrapper rather than reaching into `_pay()`), scaled by how much the intent actually condensed to, refused outright the same way a boon would be if the body has nothing left to give. `tests/chaos_sigil_charge_test.gd` (9 checks): a real cost lands, a longer ask draws more, a blank intent charges nothing, an empty body refuses, and each successful charge is its own findable `sigil_charged` event. Honestly scoped to one of the four named costs: stamina lives only as a live, unpersisted value in `bone_yard_hunt.gd` (Lane 1's), a drug cost would spend from CARRY (contested with Lane 4's own AL work today), and "a death" is a real consequence system nothing here invents. Blood is the one already fully at home in this ledger
+- [x] **AJ1.5** Forgetting is mechanical: a charged sigil you keep looking at does not fire — `ChaosSigil.can_fire()`/`fire()`/`remember()` read a real clock against `WorldClock`'s own time (`FORGET_HOURS`, 6): charging is itself a moment of attention, so a freshly charged sigil cannot fire on the same breath, and `remember()` (looking at it again) resets the clock rather than letting the delay keep accumulating underneath the looking. Firing consumes it — a second `fire()` on the same sigil is refused as `ALREADY SPENT`, not a free second effect. Covered by `tests/chaos_sigil_forget_test.gd` (14 checks)
+- [x] **AJ1.6** It goes into the world as an object - scratched, burned, carried or worn — `ChaosSigil.inscribe()`: a charged sigil becomes its own real `WorldHistory` subject (`kind: "sigil_object"`), one of the four real media, findable and readable like anything else physical in this world (AJ2.4's future defacing/theft has something real to act on). Refuses an un-charged intent and a made-up medium alike. Deterministic per-maker object ids (`sigil_objects_made` counts up on the maker's own subject) so the same intent can genuinely go into the world twice over in different media without colliding. Covered by `tests/chaos_sigil_object_test.gd` (15 checks)
 
 ### AJ2 — What a sigil does
-- [ ] **AJ2.1** Effects come from the intent, parsed, not from a spell list
-- [ ] **AJ2.2** A sigil can fail, and a failed one leaves something behind
-- [ ] **AJ2.3** The same glyph gets stronger the more it has worked
-- [ ] **AJ2.4** Other people's sigils exist in the world and can be read, defaced or stolen
-- [ ] **AJ2.5** Corruption is what happens when you charge more than you can carry (AI1.5)
+- [x] **AJ2.1** Effects come from the intent, parsed, not from a spell list — `ChaosSigil.resolve()`: five broad semantic word families (`INTENT_FAMILIES` — violence, protection, concealment, fortune, sight), matched against real words in the stated intent, never fifty exact authored phrases. A match grants a real, temporary `Boons` effect on the family's own stat. Effects hang off `fire()`'s own forgetting gate (AJ1.5) rather than duplicating it
+- [x] **AJ2.2** A sigil can fail, and a failed one leaves something behind — an intent matching no family is a real, honest "misfired" outcome (not an error, not a silent no-op), and every miss raises `chaos_corruption` on the same real ledger AJ2.5's overcharging writes into. A matched intent can also misfire if the caster has nothing left to pay the granted effect with
+- [x] **AJ2.3** The same glyph gets stronger the more it has worked — `sigil_potency`, keyed by seed (not by subject alone, so two different intents from the same caster earn their strength separately), increments on every successful resolve and scales the next working's magnitude. Verified: the identical intent resolved twice hits harder the second time; a genuinely different intent does not inherit that earned strength
+- [x] **AJ2.4** Other people's sigils exist in the world and can be read, defaced or stolen — `read_object()`/`deface()`/`steal()` act on the exact same `sigil_object` subject AJ1.6's `inscribe()` already creates. Defacing and theft both raise the real maker's `grudge` (F2's own field), theft harder than defacing, so an act against a sigil is an act against whoever made it. Only `worn`/`carried` media can actually change hands — `scratched`/`burned` refuse outright as fixed in place
+- [x] **AJ2.5** Corruption is what happens when you charge more than you can carry (AI1.5) — `chaos_pending` tracks real charged-but-unfired sigils on the caster's own record (advanced in `charge()`, returned in `fire()`); past `CARRY_CAPACITY` (3) the next charge still succeeds but comes out corrupted, and a corrupted sigil always misfires on `resolve()` regardless of what it actually asked for. AI1.5's own UI reading of the resulting `chaos_corruption` number is not attempted here — only the real mechanical consequence is
+
+Covered by `tests/chaos_sigil_resolve_test.gd` (19 checks) and `tests/chaos_sigil_theft_test.gd` (16 checks). Full `chaos_sigil` suite (6 files, 84 checks) re-run clean.
 
 ### AJ3 — Modern gods
 - [x] **AJ3.1** The gods of this world are what is actually worshipped: markets, metrics, engagement, brands — `systems/modern_gods.gd`: The Engagement, The Market, The Quota, The Brand
 - [x] **AJ3.2** A god is a real entity in WorldHistory with attention, not a flavour label — `kind: "god"`, real `attention` field, same shape `ascent_entities.gd` already proved
 - [~] **AJ3.3** Worship is measurable (`attention` accumulates on every verdict asked) — feeding the upper cone (AI1.4) is a UI/pyramid concern, not attempted here
-- [~] **AJ3.4** Naming a god in an intent gets their attention, which is not always wanted — `get_attention()` exists and accumulates, but AJ1 (intents/sigils) doesn't exist yet to call it; same relationship `ritual_app.gd` has to seals it doesn't draw
+- [x] **AJ3.4** Naming a god in an intent gets their attention, which is not always wanted — `ChaosSigil.resolve()` now checks the stated intent for each god's own name word (`GOD_NAME_WORDS`) and calls `ModernGods.get_attention()` for every one named, whether the sigil goes on to resolve, misfire or come out corrupted (naming is what costs the attention, not success). Covered by `tests/chaos_sigil_god_attention_test.gd` (11 checks)
 - [x] **AJ3.5** The target is always the institution, never the congregation — satisfied by construction: all four gods are markets/metrics/labor/image, never a person or a people
 
 ### AJ4 — Magic as progression
-- [ ] **AJ4.1** Skill is what you have actually done, read off the record
-- [ ] **AJ4.2** No skill tree - the pyramid (AI) is the tree, and you climb it
-- [ ] **AJ4.3** A practice you stop practising decays
-- [ ] **AJ4.4** Every system in the game is reachable through a sigil, badly
-- [ ] **AJ4.5** The playground rule: the system should surprise its own author
+- [x] **AJ4.1** Skill is what you have actually done, read off the record — `ChaosSigil.skill_level(subject_id, family)` counts real `sigil_resolved` events for that family, the exact events `resolve()` already writes — no second stat invented anywhere that this file would have to keep in sync with the real one
+- [x] **AJ4.2** No skill tree - the pyramid (AI) is the tree, and you climb it — true by construction rather than a separate decision to enforce: `skill_level()` is a count over real history, not a node graph with its own state, so there is no second progression structure for AI's pyramid to compete with
+- [x] **AJ4.3** A practice you stop practising decays — `skill_level()` only counts within a trailing `SKILL_DECAY_HOURS` (168, a week of `world_clock.gd` time, W1.1). Nothing prunes old workings on a timer; they simply age out of the window on their own, which is what "stop practising and it decays" means read literally. Covered by `tests/chaos_sigil_skill_test.gd` (8 checks)
+- [ ] **AJ4.4** Every system in the game is reachable through a sigil, badly — out of scope this pass: genuinely reaching "every system" means integrating sigils into systems other lanes own, which is exactly what the six-lane split exists to prevent without an API request
+- [ ] **AJ4.5** The playground rule: the system should surprise its own author — a qualitative playtesting judgment, not a line a test can verify from inside the engine
 
 ### AJ5 — The verdict on a kill
 Greg: *"the killing and fighting the npc system should be made so that if you
@@ -4405,7 +4416,7 @@ as such, and a different god will read the same kill the other way.
 - [x] **AJ5.3** The verdict is computed from the kill: how, where, by whose hand, and what they were carrying — `details` (`witnessed`, `harvested`, `contracted`, `public`), each god reading a different one of them
 - [x] **AJ5.4** Gods disagree. Two verdicts on one death is a normal outcome — verified: the exact same death, asked of two gods, produces opposite labels
 - [x] **AJ5.5** It is an opinion, not a score - nothing in the game adds them up — each god's verdict is returned and recorded separately; nothing sums them
-- [ ] **AJ5.6** Freeing souls and enslaving them both have consequences, and they are different ones — not built: a verdict is currently read-only, with no differentiated mechanical effect on the world yet
+- [x] **AJ5.6** `v2` Freeing souls and enslaving them both have consequences, and they are different ones — `ModernGods._apply_consequence()` moves the ruling god's own real `relations` toward the killer on FREED and away from them on ENSLAVED (`standing_with()` reads it back), clamped, per-killer, per-god — a genuine `UNDECIDED` verdict moves nothing rather than being silently scored either way. Kept apart from `verdict()` itself so reading an opinion (the Board, a dossier) never moves anything by asking. Still one relationship number, not a differentiated *kind* of consequence per outcome (a real future step — e.g. an enslaved god actively working against you vs a freed one favouring you — is not attempted here). Covered by `tests/modern_gods_consequence_test.gd` (9 checks); `tests/modern_gods_test.gd` re-run clean
 - [x] **AJ5.7** It is recorded in WorldHistory, so the Board can pin it and the pyramid can read it — one `death_verdict` event per god's opinion. Covered by `tests/modern_gods_test.gd` (19 checks)
 
 
@@ -5875,6 +5886,176 @@ The last rung. Fifteen statements that are true of the bank and the tunnels when
 - [ ] **AL10.13** `v10` Sound behaves differently down there and you can hear it
 - [ ] **AL10.14** `v10` The military down there is eating itself on a clock
 - [ ] **AL10.15** `v10` What is down there is found, never briefed
+## AV — The planes
+
+Ten sephiroth plus the one that is not on the map, and four worlds as the
+registers each is seen in. Malkuth is 3D and the game is played there; the wizard
+eyes are 4D; the godhead is past Keter.
+
+**Da'ath is the good one** — real, unmapped, unreachable deliberately, and
+where the deliriants go.
+
+This section did not exist yet in this tree's own copy of the checklist —
+present in the fuller copy other lanes' trees carry, and in this lane's own
+stated work order (`LANE.md`: "AI, AU, AV, AQ"), but never copied into this
+file's body until now. Added faithfully from that fuller copy rather than
+reworded, so the item text below is Greg's own brief, not a paraphrase.
+
+### AV1 — The ladder
+- [x] **AV1.1** ~~Twelve planes, named from the tradition, each one a real place~~
+      Ten sephiroth, ordered low to high (`Sephiroth.PLANES`, `game/systems/sephiroth.gd`),
+      each with a real tradition name and a one-line Ashbloom-flavoured role —
+      Malkuth as "the only plane you did not have to leave your body to
+      reach," Keter as "the last real address before the godhead, which has
+      none." `order` (0..9) is also what AV2's floors scale against, so the
+      ladder and the altitude gate are one fact, not two tables that could
+      disagree. Verified: `tests/sephiroth_test.gd` — exactly ten, ordered,
+      each with a real name.
+- [x] **AV1.2** ~~Four worlds as registers rather than more planes~~
+      `Sephiroth.WORLDS` (Assiah/Yetzirah/Beriah/Atziluth) and `perceive(plane_id, world_id)`
+      — the same plane read through a world, not a second plane. Verified
+      alongside AV1.6 below, since they are the same mechanism.
+- [x] **AV1.3** ~~Da'ath is not on the map and cannot be aimed at~~
+      `Sephiroth.DAATH` is real data — `plane(DAATH)` returns a named row —
+      but it is never in `reachable_planes()`, `floor_requirement()` returns
+      `INF` for it, and `petition()` refuses it outright before anything is
+      spent. Verified: a specific assertion that it is absent from the
+      reachable list and that a petition aimed at it fails, not just that
+      nothing crashes.
+- [x] **AV1.4** ~~You petition a plane, you do not travel to it — a name, a seal, an offering, a licence to depart~~
+      `Sephiroth.petition()` — a real seal (refused if empty), a real
+      altitude precondition (refused if not yet high enough to be seen), and
+      a real offering paid through `Boons.pay()`, the one body/standing
+      ledger every other cost in this project already spends against.
+      `Sephiroth.depart()` is the other half — leaving costs something too,
+      so "a licence to depart" is a fact about the body rather than a phrase
+      folded silently into the entry price. Verified: refused on an empty
+      seal, refused on Da'ath, refused above your own altitude, and — once
+      genuinely earned — the offering is shown actually leaving the body on
+      both the way in and the way out.
+- [ ] **AV1.5** Each plane looks like itself, with more of Greg's art the higher it goes
+- [ ] **AV1.6** Hellscape and angelscape are one place in two registers, not two asset sets
+      Partially answered by `perceive()`'s `valence`-driven tone (the same
+      named plane reads as "debt, teeth, a bill coming due" through an
+      infernal world and "light with no source" through a celestial one) —
+      but that is a text register, not the actual art/shader AV1.6 is really
+      asking for. Left open rather than claimed.
+- [ ] **AV1.7** All of it runs on one shader with different dials (FINAL_V section 16)
+      Explicitly out of scope for this pass: the shader `FINAL_V.md` §16
+      names currently exists only as 21 uncommitted files in an unrelated
+      worktree (`atg-controls-ui`, branch `codex/controls-ui-repair`), which
+      `AGENT_SPLIT_6.md` itself flags as Lane 2 material that lane should
+      commit on its own branch first. Building against a shader with no
+      committed form anywhere would be building against nothing.
+
+### AV2 — Altitude is the gate
+Greg: *"the higher you have to be to talk or even fight, conjure, evoke etc"*.
+**This is the mechanic the rest hangs off.**
+- [x] **AV2.1** ~~Seeing a plane, talking on it, conjuring on it and fighting on it are four rising floors~~
+      `Sephiroth.FLOOR_ORDER` (see/talk/conjure/fight) and `floor_requirement()`,
+      scaling as a multiplier against the plane's own `order` — Malkuth's four
+      floors are all 0 ("the game is played there"), Keter's `fight` floor
+      clamps at the 0..100 ceiling. Verified: all four of Malkuth's floors
+      are exactly 0; Keter's floors exceed Yesod's; Keter's `fight` floor is
+      shown to actually clamp at the ceiling rather than merely being large.
+- [x] **AV2.2** ~~The substance decides which door opens, not a menu~~
+      `Sephiroth.altitude()` is a pure read of events `substances.gd` and
+      `meditation.gd` already record (`substance_taken`'s `consciousness_cost`,
+      `meditation_ended`/`meditation_interrupted`'s `held_seconds`), decayed
+      by real elapsed time since each one — the same half-life shape
+      `WorldHistory.chaos_magick()` already uses. There is no function
+      anywhere in `sephiroth.gd` that raises altitude directly; the only way
+      up is to actually take the substance or actually sit. Verified:
+      altitude is exactly 0 before anything is taken, rises after a real
+      `Substances.take()` call, and a full meditation hold reaches the same
+      floor a dose does — the parity the design brief itself calls for
+      between the fast, costly route and the slow, free one.
+- [x] **AV2.3** ~~Coming down mid-conversation is a real failure and the entity remembers it~~
+      `Sephiroth.sustain_or_fail()` — checked against live, decaying altitude
+      rather than a snapshot taken once at the start, so a hold that was
+      valid a minute ago can genuinely fail now. A failure records a real
+      `plane_altitude_failed` event naming the subject, the plane and which
+      floor gave out. Verified: a subject with nothing taken can still hold
+      a Malkuth-tier interaction (needs 0) but fails the same call one plane
+      up, and the failure leaves a real recorded event, not a silent `false`.
+- [x] **AV2.4** ~~You cannot fight the godhead sober, and that is not a difficulty setting~~
+      Structural rather than a rule someone could toggle: Keter's `fight`
+      floor is derived from its `order` the same formula every other floor
+      uses, and that derivation happens to clamp at the ceiling — there is no
+      branch anywhere that special-cases "sober" or reads a difficulty value.
+      The godhead fight itself (K v3-v10) is unbuilt elsewhere and this does
+      not attempt it; what this closes is that the altitude gate it will need
+      already exists and is already this strict at the top of the ladder.
+- [x] **AV2.5** ~~Sustaining altitude is its own problem, separate from reaching it~~
+      Altitude decays on its own half-life once nothing is feeding it —
+      reaching a floor and staying there are two different facts, verified
+      by backdating a real recorded event and showing the reading has
+      genuinely fallen rather than staying pinned at its high-water mark.
+
+### AV3 — They remember you
+- [x] **AV3.1** ~~Entities are subjects in WorldHistory like everybody else~~
+      `Sephiroth.register_planes()` — the same `WorldHistory.register_subject()`
+      shape `AscentEntities.seed_entities()` already uses for the order's
+      lower ranks, kept as its own table rather than merged into `ENTITIES`
+      since a plane is a place with a voice, not one of that order's
+      personified ranks. Da'ath is deliberately never registered, so nothing
+      can ask WorldHistory about a relationship with a place that is not on
+      the map. Verified: every reachable plane is a real subject with
+      `kind: "plane"`; Da'ath's subject lookup comes back empty.
+- [x] ~~**AV3.2** A relationship accumulates across trips~~
+      `systems/plane_voices.gd` (`PlaneVoices`). AV3.1 made every reachable
+      plane a real `WorldHistory` subject with an empty `relations` table;
+      this is what those subjects do with a memory. Standing accumulates out
+      of acts other systems already record — a completed petition, a paid
+      departure, a hold that fell through mid-sentence — the same discipline
+      `Sephiroth.altitude()` and `AscentEntities.regard()` both use. There is
+      no `set_standing()` anywhere in the file: the only way a plane thinks
+      better of you is to actually go there, actually pay, and actually not
+      come down mid-sentence. Verified: one clean trip is worth a measured
+      0.20, and AV2.3's own mid-conversation failure costs a plane's regard
+      *more* than a clean trip buys.
+- [x] ~~**AV3.3** Voice is distorted and clears with standing — the whole readout, no meter~~
+      Standing is never printed anywhere. It is expressed as how much of what
+      the plane actually said arrives intact: at a stranger's standing about a
+      seventh of a line survives, and it clears fully at five clean petitions'
+      worth. The transform is deterministic per (plane, subject, word), so the
+      same entity mangles the same word the same way every time — that
+      consistency is what makes the memory legible rather than noisy — and it
+      is monotone, so a word that survives at low clarity survives at every
+      higher clarity. The readout only ever *clears*; it never reshuffles into
+      a different sentence.
+- [x] ~~**AV3.4** Mysterious means withholding, never vague~~
+      `ask()` never returns mush. Either the plane genuinely does not know the
+      thing and says so plainly (`ok: false`), or it knows a specific, true,
+      derived-from-history answer and either hands it over or refuses it *by
+      name* — a refusal carries `known: true`, what kind of thing is being
+      kept, and the standing that would buy it. The withheld string exists in
+      full the whole time and comes back verbatim once standing clears, which
+      is exactly what makes it withholding rather than an empty branch
+      dressed up as mystery.
+- [x] ~~**AV3.5** They can be owed, and they collect (AR2.4)~~
+      `owe()`/`debt()`/`collect()`/`collect_due()` — a plane can be genuinely
+      owed, the debt is real state, and collection is a real act paid through
+      `Boons`' existing body/standing ledger rather than a second currency.
+- [x] ~~**AV3.6** They disagree with each other the way the gods do about a kill~~
+      `plane_verdict()`/`record_plane_verdicts()`/`disagreement()` — a plane
+      that approved of one of your kills thinks better of you for it and the
+      plane on the opposite pillar thinks worse, which is the whole point of
+      them disagreeing rather than all moving together.
+- [x] ~~**AV3.7** Demonic and jesterish is the register; the jester is already on the handheld~~
+      `handheld_readout()` puts the distorted voice through the device the
+      jester is already stamped on, so the register arrives in the place the
+      item names rather than as a separate presentation.
+
+      All six verified by `tests/plane_voices_test.gd` — **68 checks, 0
+      failures**, with `tests/sephiroth_test.gd` (AV1/AV2/AV3.1) re-verified
+      clean against the change.
+      Honest note on provenance: the agent that wrote this hit a session
+      limit after its tests went green but before it wrote these entries or
+      committed. The code and its 68 checks were re-run and verified
+      independently before this commit; these write-ups are reconstructed
+      from the implementation rather than authored by the agent that built
+      it. Nothing here is ticked on a claim that was not re-run.
 
 ## Open questions — only you can answer these
 
