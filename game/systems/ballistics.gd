@@ -334,33 +334,73 @@ func rounds_in_flight() -> Array[Vector3]:
 	return out
 
 
-## The hole. Small, dark, slightly irregular, and permanent for the scene —
+## The wound. Small, dark, slightly irregular, and permanent for the scene —
 ## which is the whole of "the bullet destroys the map" that can be afforded
-## before AB's destruction pass lands properly.
+## before AB's destruction pass lands properly.  This deliberately is not a
+## QuadMesh: a dark, untextured quad is a black square wherever a player shoots
+## the floor, which reads as a broken decal rather than a struck surface.
 func _mark(at: Vector3, normal: Vector3, energy: float) -> void:
 	if marks.size() >= MAX_CASINGS:
 		var oldest: Node3D = marks.pop_front()
 		if is_instance_valid(oldest):
 			oldest.queue_free()
-	var hole := MeshInstance3D.new()
-	var mesh := QuadMesh.new()
-	var scale := clampf(0.045 + energy * 0.02, 0.03, 0.22)
-	mesh.size = Vector2(scale, scale)
+	var surface_normal := normal.normalized()
+	if surface_normal.length_squared() < 0.001:
+		surface_normal = Vector3.UP
+	var radius := clampf(0.030 + energy * 0.012, 0.028, 0.135)
+
+	# A tiny two-layer cylinder scar gives the hit a real, circular outline at
+	# grazing angles: burnt displaced material around a recessed black centre.
+	# It is cheap enough to leave behind with the brass, but no longer exposes a
+	# full square when the camera looks down at the floor.
+	var wound := Node3D.new()
+	wound.name = "BulletWound"
+	add_child(wound)
+	# Global transforms only have a valid world after the wound joins this
+	# Ballistics node.  Setting them first silently collapsed every scar to the
+	# origin in a headless world and could make unrelated impacts stack together.
+	wound.global_position = at + surface_normal * 0.004
+	wound.global_basis = _surface_basis(surface_normal)
+
+	var rim := _wound_disc(radius, 0.006, Color("38140d"), "ImpactRim")
+	wound.add_child(rim)
+	var core := _wound_disc(radius * 0.61, 0.008, Color("080605"), "ImpactCore")
+	core.position.y = 0.003
+	wound.add_child(core)
+	marks.append(wound)
+
+
+## Builds a very shallow, many-sided disc.  The local Y axis is aligned to the
+## impact normal by `_surface_basis`, so one model reads correctly on a floor,
+## wall, ramp, or ceiling instead of needing a separate decal path for each.
+func _wound_disc(radius: float, depth: float, tint: Color, label: String) -> MeshInstance3D:
+	var disc := MeshInstance3D.new()
+	disc.name = label
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = radius
+	mesh.bottom_radius = radius * 0.88
+	mesh.height = depth
+	mesh.radial_segments = 12
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.04, 0.035, 0.03, 0.92)
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material.albedo_color = tint
+	material.metallic = 0.0
+	material.roughness = 0.96
 	mesh.material = material
-	hole.mesh = mesh
-	hole.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(hole)
-	# Lifted off the surface, or it fights the wall it is drawn on.
-	hole.global_position = at + normal * 0.006
-	if absf(normal.dot(Vector3.UP)) < 0.98:
-		hole.look_at(at + normal, Vector3.UP)
-	else:
-		hole.look_at(at + normal, Vector3.FORWARD)
-	marks.append(hole)
+	disc.mesh = mesh
+	disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return disc
+
+
+## Godot cylinder meshes point their local Y axis out of the surface.  `look_at`
+## would aim -Z instead, which is why the prior quad needed special cases and
+## still presented its square face incorrectly on the floor.
+func _surface_basis(surface_normal: Vector3) -> Basis:
+	var guide := Vector3.FORWARD
+	if absf(surface_normal.dot(guide)) > 0.94:
+		guide = Vector3.RIGHT
+	var right := guide.cross(surface_normal).normalized()
+	var forward := surface_normal.cross(right).normalized()
+	return Basis(right, surface_normal, forward)
 
 
 ## AF1.3. Brass on the floor. Stepped rather than given to the physics server,

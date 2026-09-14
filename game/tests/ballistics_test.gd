@@ -142,8 +142,22 @@ func _ready() -> void:
 		await tree.physics_frame
 	check(guns.casings.size() == count, "and it is still there a second later")
 
-	# ---- the wall keeps the holes.
+	# ---- the wall keeps surface-aligned circular wounds, not black square quads.
 	check(guns.marks.size() > 0, "the wall keeps its holes")
+	var wound := guns.marks.back() as Node3D
+	check(wound != null, "a hit leaves a bullet wound root")
+	var wound_discs := 0
+	if wound != null:
+		for child in wound.get_children():
+			var visual := child as MeshInstance3D
+			if visual != null and visual.mesh is CylinderMesh:
+				wound_discs += 1
+	check(wound_discs == 2, "each wound is a rim and recessed core, never a flat square quad")
+
+	# The same wound path must lie flat when the ground is what was struck.
+	guns.mark_impact(Vector3(1, 0, 1), Vector3.UP, 8.0)
+	var ground_wound := guns.marks.back() as Node3D
+	check(ground_wound != null and ground_wound.global_transform.basis.y.dot(Vector3.UP) > 0.99, "ground wounds align their round face to the floor")
 
 	# ---- and none of it grows without bound.
 	for _volley in 40:
