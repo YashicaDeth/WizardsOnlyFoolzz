@@ -490,8 +490,27 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 ---
 
 ### C v2 — the second pass
-- [ ] **C1.6** `v2` The device is raised at one angle in one hand, every time
-- [ ] **C1.7** `v2` It can be dropped, and it can be taken off you
+- [~] **C1.6** `v2` The device is raised at one angle in one hand, every time — the position half is real: `_device_rect` used to rise dead-centre and perfectly upright, which reads as a menu appearing rather than an object somebody is holding. It now rises to a fixed off-centre point (`HELD_OFFSET_X`), eased in with `raised` itself, deterministic — no per-raise randomness. The angle half was built and reverted: `radial` (the selection wheel, C2) is a child of this same `Control`, so rotating `self` dragged the wheel's own fixed screen-centre geometry along with the phone's tilt — visually confirmed broken in a capture before being pulled back out. A real tilt needs the chassis+screen moved into their own rotated sub-container first, with `radial` staying a sibling rather than a descendant of it — left as the named next step rather than guessed at further. Verified: `handheld_lean_test`/`handheld_impact_test`/`device_wear_test`/`handheld_battery_test` all re-run clean, and a fresh `handheld_capture` shows the offset device beside an unmoved, correctly screen-centred radial wheel
+- [~] **C1.7** `v2` It can be dropped, and it can be taken off you — `HandheldDevice.drop()`/`confiscate(reason)` are the same underlying transition (`possessed` false, forced closed, unraisable) reached through two callers and recorded as two distinct events, so the world can tell a deliberate drop from a robbery apart later even though the player cannot use the device either way meanwhile; `repossess()` is the way back, wear travelling with it since it is the same object, not a fresh one. Reloaded on every `open_device()` the same as condition/battery already are, so a device lost in one scene stays lost the next. `tests/device_possession_test.gd`, 18 checks; `handheld_lean_test`/`handheld_impact_test`/`device_wear_test`/`handheld_battery_test` re-verified clean.
+
+      The drop half is now reachable rather than only callable: `DROP_KEY`
+      (`K`), edge-detected the same way `lean_override` is test-overridable,
+      calls `drop()` and fires a new `dropped(payload)` signal carrying the
+      identity `drop()`/`confiscate()` already returned — checked against
+      `possessed` rather than `is_open`, since a pocketed device is still
+      yours to drop. This file still owns no 3D space (the docstring on
+      `_lose_possession` says so directly), so `dropped` is exactly as far as
+      this file can honestly go: it is the seam Lane 1 connects to spawn a
+      pickable object and eventually call `repossess()`, not a silent stub.
+      `tests/handheld_drop_test.gd`, 10 checks — the key firing exactly once
+      per press even held down, a dropped device refusing to reopen, and
+      `repossess()` making it droppable again with a second signal rather
+      than reusing the first.
+
+      Still open, and still not this file's to close: nothing calls
+      `confiscate()` from real gameplay — that caller is a robbery or defeat
+      event belonging to whichever lane owns that consequence, not something
+      `handheld_device.gd` can originate on its own.
 - [x] **C1.8** `v2` Wear accumulates in WorldHistory and only ever goes one way — a cracked screen does not heal
 - [x] **C2.6** `v2` F1-F5 reach a page directly; cycling is how you learn the device, not how you use one you know
 - [x] **C5.5** `v2` Cracks seeded from the device's own serial, at its real condition rather than a constant 0.85
@@ -500,7 +519,7 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 Opened because C1.8, C2.6 and C5.5 closed at v2. Each entry is a fault the v2
 work created or exposed, not a wish.
 
-- [ ] **C1.9** `v3` Wear is only visible on the screen you are reading; the device in your hand looks new from the outside
+- [x] ~~**C1.9** `v3` Wear is only visible on the screen you are reading; the device in your hand looks new from the outside~~ The real crack system (C5.5/C5.6 — seeded from the device's own `serial`, one fork cluster per recorded impact) drew across the *whole* `_device_rect` — chassis and bezel included — so a battered handheld never actually looked new from the outside; the case just wore along with the glass. Moved out of `_draw_chassis` (which no longer draws any cracks at all) into `_draw_damage()` on `_overlay`, rescoped to `_screen_rect` alone. Drawing on `_overlay` rather than `self` also fixes something C1.9 exposed in passing: `_overlay` is the topmost child, so cracks now genuinely sit over the hosted INDEX/MAP/WIRE panel too, not just over RADIO/CARRY/RITUAL's own directly-drawn content the way they effectively did before. Verified: `handheld_lean_test`/`handheld_impact_test`/`device_wear_test`/`handheld_battery_test`/`device_possession_test` all re-run clean, and a heavy-wear capture (two located impacts, condition down to 0.25) shows a spider-webbed screen behind an entirely undamaged logo, tabs, signal readout and battery gauge
 - [x] ~~**C2.7** `v3` Direct page access exists and nothing ever teaches it —
       a control nobody discovers is a control nobody has~~ `jump_to_mode()`
       has reached a page directly since C2.6 v2 and nothing on the device
@@ -537,17 +556,17 @@ work created or exposed, not a wish.
 
 ### C v4 — the fourth pass
 v3 made the handheld a rich object that emits no light at all. Greg: *"having light coming off the phone when you have it in your hand"*.
-- [ ] **C4.1** `v4` It throws real light into the world when it is in your hand
-- [ ] **C4.2** `v4` Its own screen is what lights your hands, not a lamp bolted to it
+- [x] ~~**C4.1** `v4` It throws real light into the world when it is in your hand~~ The implementation already existed under AS1.1 but this duplicate remained open: the Hunt Grounds mounts a real shadow-casting `SpotLight3D` off-centre on the camera, with its visible state and energy driven every frame by the handheld's raised state and battery. The device and world light share `LAMP_RANGE`, so its rendered reach and later visibility input cannot silently diverge. `tests/handheld_world_light_test.gd` verifies the complete seam in the running Hunt scene (8 checks), and paired 01:00 captures (`captures/c4_1_handheld_light_off.png` / `c4_1_handheld_light_on.png`) confirm the beam changes the surfaces ahead rather than merely brightening the 2D panel. C4.2 remains honestly open: there is no rendered first-person hand surface for the screen to illuminate, and the existing source is explicitly camera-mounted
+- [x] ~~**C4.2** `v4` Its own screen is what lights your hands, not a lamp bolted to it~~ The held hand is now part of the handheld object itself: a palm and wrist continue below the lower-left chassis while four curled fingers wrap its edge, keeping the screen an object somebody grips rather than a floating slab. Its skin and narrow green knuckle rims read one `screen_luminance()` value (`raised * battery * backlight`), entirely inside `handheld_device.gd`; lowering it, exhausting the cell or a sagging panel removes that spill without consulting the camera-mounted world beam. `tests/handheld_screen_light_test.gd`, 5 checks. Paired captures made without loading the Hunt scene (`captures/c4_2_screen_lit_hand.png` / `c4_2_screen_dead_hand.png`) show the lit and dead glass on the same grip; the centred radial remains a sibling and was visually rechecked over the new silhouette
 
 ### C v5 — the fifth pass
 v4 made it a lamp, and a lamp that never runs out is a torch, not a resource. *"phone has a % possibly"*.
-- [ ] **C5.1** `v5` A battery percentage that runs down and can reach nothing
-- [ ] **C5.2** `v5` What it costs to keep the screen up is visible on the battery
+- [x] ~~**C5.1** `v5` A battery percentage that runs down and can reach nothing~~ Already built, left unticked: `battery` drains only while actually raised (`BATTERY_DRAIN_PER_SECOND`), recharges roughly four times slower while pocketed, and floors at exactly 0.0 rather than going negative — at which point `is_lit()` genuinely refuses (no light with nothing left to give it). `tests/handheld_battery_test.gd`, 14 checks, re-run clean: drains while raised, recharges only while pocketed and slower than it drains, floors at zero, an empty battery is not lit even raised, and it survives a reload with whatever charge was actually left
+- [x] ~~**C5.2** `v5` What it costs to keep the screen up is visible on the battery~~ Already built, left unticked: `_draw_status()` draws a real "CELL XX%" readout plus an eight-segment gauge, both read straight off `battery`, tinted amber-to-red under 35%. Verified against `handheld_index.png`/`handheld_radial.png` (this session's own C1.6 captures) — both show "CELL 99%"/"CELL 100%" and the segmented gauge in the bottom-right corner
 
 ### C v6 — the sixth pass
 v5 gave the light a cost in charge and none in attention. Raising it should occupy you.
-- [ ] **C6.1** `v6` Holding it up is an action, and that hand is not available
+- [x] ~~**C6.1** `v6` Holding it up is an action, and that hand is not available~~ Already implemented under AS1.2 but left open here: `_attack()` refuses before it asks the arsenal for an action once `handheld.raised > 0.5`, the same physical threshold that makes the screen light live. It therefore spends no ammo, windup or cooldown while that hand is occupied, rather than cancelling a strike after its cost. `tests/handheld_busy_hand_test.gd`, 5 checks in the running Hunt scene: the pocketed control begins a real melee windup, while the identical attempt with the device raised leaves the action, windup and cooldown untouched
 - [ ] **C6.2** `v6` Waving it to see around a corner is a real thing you do
 
 ### C v7 — the seventh pass
@@ -557,18 +576,19 @@ v6 made the lamp cost you something; it costs nobody else anything. AS1.5: its l
 
 ### C v8 — the eighth pass
 v7 made carrying it tactical and putting it away instant. Rule 3: every hard cut is a bug.
-- [ ] **C8.1** `v8` Pocketing it is a movement and the light leaves with it
+- [x] ~~**C8.1** `v8` Pocketing it is a movement and the light leaves with it~~ Already implemented under AS1.4 but left open here: `close_device()` changes intent, while `Motion.blend()` lowers `raised` over subsequent frames rather than hiding the object; the world lamp reads that same held threshold every frame, remains during the first part of the lowering action, then leaves once the screen crosses out of the hand. `tests/handheld_pocket_light_test.gd`, 5 checks in the running Hunt scene, including the intermediate moving/lit state and the final pocketed/dark state
 - [ ] **C8.2** `v8` Pockets are real, and what is in them is in them (AS3.2)
 
 ### C v9 — the ninth pass
 Eight passes on the front of an object nobody has ever turned over. The jester is on the back and has never been seen.
-- [ ] **C9.1** `v9` The back of the device, and the jester on it
-- [ ] **C9.2** `v9` Its condition shows on the shell, not only on the screen
+- [x] ~~**C9.1** `v9` The back of the device, and the jester on it~~ Hold `O` while the handheld is raised and the same held object compresses through its physical edge before opening onto a purpose-built rear surface; releasing turns it back to the mirror. The aperture, hosted page and glass-damage overlay stay on the hidden front rather than becoming a seventh UI page, while the front-facing screen light fades continuously with the turn angle. The rear is a recessed service shell with a large static hollow-faced jester, protruding replacement battery under three lashings, stamped `WIZARDS ONLY FOOLZ` mark and the device's persistent serial. `tests/handheld_back_test.gd`, 10 C9.1 checks; `captures/c9_1_v9_jester_back.png` visually inspected at 1280x720
+- [x] ~~**C9.2** `v9` Its condition shows on the shell, not only on the screen~~ The rear reads the same persisted `condition` and remembered `impacts` as the glass: declining condition removes finish, opens the plate seam, delaminates the upper corner and breaks battery ties at fixed thresholds; up to four dent rings are placed from the impacts the device actually remembers (mirrored onto the reverse), rather than from a second cosmetic-damage state. No percentage is printed on the rear — the material is the gauge. `tests/handheld_back_test.gd`, 5 C9.2 checks including save/reload; `captures/c9_2_v9_battered_shell.png` inspected against the nearly sound rear
 
 ### C v10 — the tenth pass
 Greg, plainly: *"the entire blackmirror gui needs work"*. Nine passes on what the device *is* and none on how it reads.
 - [ ] **C10.1** `v10` The whole GUI re-authored as one thing rather than six pages
-- [ ] **C10.2** `v10` It is legible in the dark it now creates, which nothing before v4 had to be
+  - First narrow seam: Index/Wire and Map were 16:9 documents letterboxed inside the mirror, while Radio/Carry/Ritual used the full wide glass. All six now occupy one centred 16:9 working aperture with the same device-owned registration edge. This does not claim the line; their internal frames and interaction grammar still need unifying. `tests/handheld_aperture_test.gd`; six inspected captures at `captures/c10_1_aperture_{index,map,wire,radio,carry,ritual}.png`
+- [x] ~~**C10.2** `v10` It is legible in the dark it now creates, which nothing before v4 had to be~~ The six apps now rise through one device-owned phosphor reading bed in `black_mirror.gd`: an inset luminous surface suppresses the holder's reflection only beneath the working aperture while the side gutters remain black, reflective glass. Bone ink, moss instruments and copper registration have explicit contrast floors against that shared surface, rather than each page inventing a brighter box. `tests/handheld_dark_legibility_test.gd` checks the colour contract and all six modes' use of the same surface; `captures/c10_2_dark_{index,map,wire,radio,carry,ritual}.png` inspected at 1280x720.
 
 - [ ] **C10.3** `v10` Its battery is a real resource with a real floor
 - [ ] **C10.4** `v10` Raising it occupies a hand and the game never forgets that
@@ -3941,14 +3961,138 @@ Naming: **WETWIRE** is the system, **MATERIA** the index inside it — two
 institutions naming the same object differently, which is already this game's
 central rule.
 
+`systems/brain_index.gd` (`BrainIndex`) is the logic half of this section, held
+by `tests/brain_index_test.gd` at 72 checks. The render half — the organ, the
+curved CRT, the wet — is untouched and its three boxes stay open below, honestly.
+
 - [ ] **AT1.1** The brain is a real organ at full detail, not an icon
-- [ ] **AT1.2** A CRT bent into the cortex, curved, showing the inside from inside
-- [ ] **AT1.3** It is an index you open and most of what is in it is optional
+      — **not attempted.** `BaselineHuman` already has a `brain` organ in the
+      `head` zone with health, bleed and a `fatal` flag, and `brain_index.gd`
+      doses *that* organ rather than a new one, so the data this item needs is
+      in place and pointed at. But nothing models it at "full detail" and
+      nobody has looked at a brain in this build. Ticking it would be a claim
+      about a mesh that does not exist.
+- [x] ~~**AT1.2** A CRT bent into the cortex, curved, showing the inside from
+      inside~~ `PartViewer` now builds an eleven-segment convex phosphor mesh
+      between the brain hemispheres, with cortex continuing behind it and two
+      tissue lips overlapping its side rails; turning the existing live
+      specimen exposes the bend rather than rotating a flat UI card. Its
+      emissive texture is a nested viewport driven by `BrainIndex.listing()`,
+      `folder_counts()` and `reach()`, and the inspected 1280×720 capture
+      `captures/at1_2_curved_cortex_crt.png` visibly reads
+      `CORTEX:/TRAUMA`, `REACH 04D`, and two `[SEALED]` rows from inside the
+      organ. `brain_crt_test.gd` holds the geometry at 24 vertices, checks the
+      centre bows more than 0.01 units beyond its edges, proves the material is
+      fed by a live `ViewportTexture`, and proves the display leaves when the
+      specimen changes away from brain. This does **not** claim AT1.1's
+      full-detail organ or AT1.4's bloody implant; both remain open.
+- [x] ~~**AT1.3** It is an index you open and most of what is in it is
+      optional~~ The mind is a filesystem: `BrainIndex.FOLDERS` is fourteen
+      real regions (MEMORY, PASSWORDS, COMBAT, PEOPLE, PLACES, DREAMS,
+      MATERIA, ENTITIES, TRAUMA, SKILLS, RITUALS, LANGUAGES, ARCHIVED SELVES,
+      UNKNOWN) and `ENTRIES` twenty-two files inside them. "Most of it is
+      optional" is measured rather than asserted — `optional_ratio()` returns
+      0.86 and the test holds it above 0.8; exactly three entries are not
+      optional and they are the three the game cannot run without (who you
+      are, what is in your head, that you bleed).
+      **The part that makes it a mechanic rather than a skill tree:** an entry
+      is sealed behind a *keyword*, and `unlock()` refuses any keyword the
+      subject has no lived evidence for. Evidence is counted by reading
+      `WorldHistory.events` — the same "draw the conclusion from the log"
+      shape `ascent_entities.gd`'s `regard()` uses — so the fourteen keywords
+      are earned by things that already happen elsewhere in the game:
+      `player_captured` opens RESTRAINT, three `npc_resolution`/`spare` opens
+      MERCY, `substance_taken` on a given `substance_id` opens that drug's
+      entry, `ritual_completed` opens SEAL, `player_redecanted` opens
+      REDECANT. An NPC can say the word at you and it opens nothing: the
+      refusal reads "YOU KNOW THE WORD. YOU DO NOT KNOW WHAT IT MEANS YET."
+      That is remembering, not buying, stated as a refusal. Unlocking a
+      keyword opens *every* entry under it at once, because remembering is not
+      one file, it is the whole afternoon. Sealed entries are still **listed**
+      (as `[SEALED]`), which is the difference between an index and an
+      inventory. Two keywords — `DA'ATH` and `THE NINTH BODY` — have no rule
+      at all and can never be opened by any play; they are the UNKNOWN folder,
+      and the test asserts no amount of history produces evidence for them.
+      *Still open:* nothing draws this yet (AT1.2), the twenty-two entries are
+      a first pass rather than a full write, and nothing in the shipping game
+      calls `unlock()` from a real interaction yet.
 - [ ] **AT1.4** Visceral: it is wet, the chip is bolted into wet tissue, and looking at it is uncomfortable
-- [ ] **AT1.5** The tower in it — the bloody wired chip — is the bridge to the network above
+      — **not attempted, and deliberately not half-ticked.** The chip is now
+      genuinely *in tissue* rather than being a flag: `install_chip()` appends
+      a real `wetwire chip` implant (new `implant_catalog.gd` entry, `head`
+      zone, `armor: 0.0` because it protects nothing) to the same
+      `anatomy_state.cybernetics` list every other implant is on, so the body
+      panels find it and pulling it is the same operation as pulling anything
+      else. But "wet" and "uncomfortable to look at" are claims about a
+      render, and nobody has looked at it. Open.
+- [x] ~~**AT1.5** The tower in it — the bloody wired chip — is the bridge to
+      the network above~~ Stated as a number rather than a sentence.
+      `BrainIndex.PLANES` is the full ladder from `DESIGN/THE_BRAIN.md` §3
+      (Malkuth 3D through Keter 12D, Da'ath off the map), `FREE_PLANE = 4`,
+      and `bridge()` is the **only** door to a plane above it. Without the
+      chip, 5D and up refuse with "NOTHING IN YOUR HEAD TO REACH WITH"; 4D —
+      the wizard eyes — opens for anybody and records `via_chip: false`, which
+      is the design's "the only higher plane you see for free" made
+      mechanical. `reach()` returns 4 unwired and 12 wired, and entries
+      carry a `plane` floor, so the ENTITIES entry at Tiferet and the
+      LANGUAGES entry at Hod are unreadable without the bridge even after
+      their keyword has been remembered — the memory is yours, the altitude
+      is the chip's. *Still open:* the substances are not yet what raises you
+      to a plane (§5b's "altitude is the gate" — `bridge()` currently takes
+      the plane as a parameter and trusts its caller), and nothing above 8D
+      has content behind it.
 - [ ] **AT1.6** The Wire seen from 5D is what that network is
-- [ ] **AT1.7** It is hardware somebody else installed: revocable, traceable, and it can find you
-- [ ] **AT1.8** Its radiation is what melts you at 8g and 9g — the thing connecting you is killing you
+      — **half built, and half is not a tick.** `wire_from_above()` exists and
+      is tested: it gates on `bridge(5)`, then reaches for the *same*
+      `WireNet` accounts the ground-level Wire already has and re-ranks them
+      by `WorldHistory.tree_alignment()` instead of by reach. That is the
+      structurally correct reading of "the Wire seen from 5D *is* that
+      network" — no second dataset, the same people ordered by what they are
+      rather than by how loud they are — and with the chip revoked there is no
+      view from above at all. What is missing is the whole point of the item:
+      "the posts are being made by something else". That is writing and a
+      shader, and until the feed reads differently up there this is a re-sort,
+      not a plane. Left open.
+- [x] ~~**AT1.7** It is hardware somebody else installed: revocable,
+      traceable, and it can find you~~ All three, mechanically, in
+      `brain_index.gd`. **Somebody else's:** `install_chip()` takes an
+      `owner_faction` (default `celloutz`) and an installer, records
+      `wetwire_installed`, and refuses to install twice — AP1.3's "while you
+      were captured" has an owner attached to it now. **Revocable:**
+      `revoke(reason)` is the owner's call, drops `reach()` to 4, and shuts
+      every plane-gated entry with *their* reason quoted back at you
+      ("REVOKED: UNPAID SUBSCRIPTION") rather than a generic failure. The
+      distinction the test pins hardest: revocation does **not** touch
+      `wetwire_opened` — the memories are yours and the network is theirs, and
+      ground-level entries still read with the chip dead. **Traceable:**
+      `trace_level()` is not a counter on the subject, it is derived by
+      counting `wetwire_bridged` events with `via_chip: true` since the last
+      `wetwire_went_dark`, so the trail is read off the log like everything
+      else here and 4D leaves none. **It can find you:** at `TRACE_FIX = 5`
+      crossings `locate()` returns the real place of your last crossing with a
+      confidence and records `wetwire_traced`, so whoever the owner sends is
+      reacting to a recorded event rather than to a flag. `go_dark()` is the
+      only counter and it costs exactly the thing it protects — dark, the
+      bridge is shut ("YOU CANNOT HIDE FROM IT AND USE IT") and reach falls to
+      4. *Still open:* nothing yet *consumes* `wetwire_traced` — no spawner
+      sends anybody to the fix, and no faction logic decides to revoke. The
+      state and its consequences exist; the antagonist reading them does not.
+- [x] ~~**AT1.8** Its radiation is what melts you at 8g and 9g — the thing
+      connecting you is killing you~~ Charged in the same call that grants the
+      plane, so it cannot be forgotten. `bridge()` at plane 8 or above pays
+      `RADIATION_DOSE_PER_SECOND` into `anatomy_state.dose["head"]` — **the
+      existing melting ledger**, not a new one: B3's `AnatomyComponent`
+      already burns `dose` against zone health and every organ in that zone,
+      and the only organ in `head` is `brain`. So the connection literally
+      eats the organ the index lives in, and it keeps eating after you come
+      down, which is what made writing it as dose rather than flat damage the
+      right call. 9g melts faster than 8g for the same seconds (2.4/s against
+      0.9/s, asserted), 7D and below cost nothing at all (asserted — the
+      melting starts at 8g exactly), and each dose is recorded as
+      `wetwire_radiation` rather than as a wound, because it is weather, not
+      an attack. Ties AO1.3 to AT: the towers melt you and the tower in your
+      head is one of them. *Still open:* no readout tells the player the
+      number before they cross, and there is no treatment for a dosed head.
 
 ### AT2 — The brain is the file system
 Greg: *"the inventory system with the brain that's a file system of the entire

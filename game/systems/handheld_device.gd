@@ -46,6 +46,12 @@ const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 signal pin_requested(ref: String, kind: String, title: String)
 signal mode_changed(mode: String)
 signal lead_found(station: String)
+## C1.7 `v2`. `drop()` itself only closes the device and flips `possessed` —
+## this file owns no 3D space to put a dropped unit into (`bone_yard_hunt.gd`
+## does). Whoever hosts this device connects to `dropped` and is hand the
+## same identity payload `drop()`/`confiscate()` already return, to actually
+## spawn something pickable and, later, call `repossess()` on it.
+signal dropped(payload: Dictionary)
 
 ## TREE and ALLUSIONS are not gone, they are *inside* INDEX — the Tree axis is
 ## drawn on every dossier and the archive is a page rather than a mode. Listing
@@ -59,6 +65,14 @@ const INK := Color("e6d4ac")
 const AMBER := Color("b0552a")
 const MOSS := Color("8a9a4a")
 const ALERT := Color("a8281a")
+const HAND_SHADOW := Color("160d0a")
+const HAND_SKIN := Color("4a271d")
+const SCREEN_SPILL := Color("9bd4b0")
+## C10.1 first seam. The authored Index and Map are 16:9 documents. Radio,
+## Carry and Ritual used to draw across the mirror's wider physical glass,
+## making the content origin and usable height jump when the mode changed.
+## The glass stays wide; one centred working aperture now belongs to the device.
+const PAGE_ASPECT := 16.0 / 9.0
 
 var mode_index := 0
 ## Which thing in the bag is under the hand. The CARRY page had no selection at
@@ -67,6 +81,12 @@ var carry_index := 0
 var raised := 0.0
 var is_open := false
 var elapsed := 0.0
+## C1.6 `v2`. "Raised at one angle in one hand, every time." `_device_rect`
+## used to rise dead-centre — a menu appearing, not an object somebody is
+## holding. One fixed offset, eased in with `raised` itself rather than a
+## separate timer, so the same hand brings it up to the same place every
+## time: no per-raise randomness, no drift.
+const HELD_OFFSET_X := 0.045
 ## C1.8 / C5.5 `v2`. The device was a screen with a fixed condition and one
 ## hardcoded crack seed, so every handheld in the game cracked in exactly the
 ## same places and arrived at the same wear no matter what its owner had been
@@ -79,6 +99,11 @@ var elapsed := 0.0
 const DEVICE_ID := "handheld"
 var serial := 0
 var condition := 0.78
+## C1.7 `v2`. "It can be dropped, and it can be taken off you." Reloaded on
+## every `open_device()` the same as `condition`/`battery` already are, so a
+## device lost in one scene stays lost the next time this one loads — there
+## is no second flag anywhere else that could disagree with this one.
+var possessed := true
 
 ## AS1.3. A real resource, not a torch that never runs out. Full charge is
 ## about eight real minutes of continuously holding it up — long enough that
@@ -143,6 +168,7 @@ var _index: Control
 var _map: Control
 var _device_rect := Rect2()
 var _screen_rect := Rect2()
+var _page_rect := Rect2()
 
 ## I0.10 v2. "Panels are hosted at one fixed size inside the handheld; a map
 ## you cannot lean into is a picture of a map." `device_size` used to be a
@@ -160,6 +186,29 @@ var lean := 0.0
 var lean_override: Variant = null
 const LEAN_KEY := KEY_L
 const LEAN_SCALE := 1.32
+
+## C9.1 `v9`. The rear is not another page. Holding O turns the same object
+## through its edge; releasing it returns to the mirror. `turn_override` is the
+## test seam used by the other held gestures in this file, not a second control
+## path. Keeping the state here also means hosted panels, glass damage and the
+## hand all agree about which face is actually toward the player.
+var turn := 0.0
+var turn_override: Variant = null
+const TURN_KEY := KEY_O
+var _turned_rect := Rect2()
+
+## C1.7 `v2`. Deliberately letting go, as its own key rather than folded onto
+## G (which raises and lowers) or Escape (which just closes the panel without
+## losing the device) — `open_device()`'s own `possessed` check is what makes
+## either of those genuinely different verbs, so a drop needs a press of its
+## own that survives the device already being closed. Edge-detected against
+## `_drop_key_was_down` because `drop()` is a single event, not a state a held
+## key should be free to fire every frame. `drop_key_override` follows
+## `lean_override`'s own reason: a headless test cannot rely on
+## `Input.is_key_pressed`.
+const DROP_KEY := KEY_K
+var drop_key_override: Variant = null
+var _drop_key_was_down := false
 
 
 func _ready() -> void:
@@ -277,6 +326,9 @@ func load_device() -> void:
 	wear_log = (record.get("wear_log", []) as Array).duplicate()
 	impacts = (record.get("impacts", []) as Array).duplicate(true)
 	battery = clampf(float(record.get("battery", 1.0)), 0.0, 1.0)
+	# C1.7 `v2`. A save from before this existed opens possessed — the honest
+	# read of "nobody has ever lost this yet".
+	possessed = bool(record.get("possessed", true))
 
 
 func save_device() -> void:
@@ -287,8 +339,53 @@ func save_device() -> void:
 		"battery": snappedf(battery, 0.001),
 		"wear_log": wear_log.duplicate(),
 		"impacts": impacts.duplicate(true),
+		"possessed": possessed,
 		"kind": "object",
 	}, "device_changed")
+
+
+## C1.7 `v2`. Losing the device is one real transition, not two — voluntarily
+## setting it down and having it taken both end in the identical state
+## (unraisable, closed, `possessed` false), so `drop()` and `confiscate()`
+## are two names for whoever is calling this, not two mechanisms. Splitting
+## the event type rather than the effect: the world should be able to tell a
+## deliberate drop from a robbery apart later even though the player cannot
+## use the device either way in the meantime. Returns the device's own
+## identity (serial, condition, wear) — what a caller elsewhere (the world
+## scene owns 3D space, not this file) needs to actually place a dropped
+## unit in the world rather than just deleting the player's access to it.
+func _lose_possession(event_type: String, details: Dictionary) -> Dictionary:
+	if not possessed:
+		return {"ok": false, "reason": "ALREADY NOT IN HAND"}
+	close_device()
+	possessed = false
+	save_device()
+	var payload := details.duplicate(true)
+	payload["serial"] = serial
+	WorldHistory.record_event(event_type, payload)
+	return {"ok": true, "serial": serial, "condition": condition, "wear_log": wear_log.duplicate(), "impacts": impacts.duplicate(true)}
+
+
+func drop() -> Dictionary:
+	var result := _lose_possession("device_dropped", {})
+	if bool(result.get("ok", false)):
+		dropped.emit(result)
+	return result
+
+
+func confiscate(reason := "") -> Dictionary:
+	return _lose_possession("device_taken", {"reason": reason})
+
+
+## The other half — found again, bought back, or handed back by whoever took
+## it. Wear travels with it either way: this is the same physical object
+## coming back, not a fresh one replacing it.
+func repossess() -> void:
+	if possessed:
+		return
+	possessed = true
+	save_device()
+	WorldHistory.record_event("device_repossessed", {"serial": serial})
 
 
 ## Something happened to it. Wear only ever goes one way — a cracked screen does
@@ -327,6 +424,11 @@ func take_wear(amount: float, cause := "", impact_at := Vector2(-1, -1)) -> void
 
 func open_device() -> void:
 	load_device()
+	# C1.7 `v2`. A device that has been dropped or taken cannot be raised —
+	# `load_device()` runs first specifically so this reads the real, current
+	# answer rather than a stale one from before whatever took it happened.
+	if not possessed:
+		return
 	is_open = true
 	visible = true
 	set_mode(current_mode())
@@ -449,10 +551,19 @@ func stand_at(world_position: Vector2) -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	# C1.7 `v2`. Checked against `possessed` rather than `is_open` — a device
+	# in your pocket is still yours to drop, the same as one in your hand.
+	# Edge-detected so holding the key down cannot fire `drop()` every frame.
+	var drop_key_down: bool = drop_key_override if drop_key_override != null else Input.is_key_pressed(DROP_KEY)
+	if drop_key_down and not _drop_key_was_down and possessed:
+		drop()
+	_drop_key_was_down = drop_key_down
 	# A6.6 v2. The panel keeps failing whether or not you are looking at it,
 	# so a fault does not restart its cycle every time the device comes up.
 	panel_clock += delta
 	_drive_backlight(delta)
+	var turn_key_held: bool = turn_override if turn_override != null else Input.is_key_pressed(TURN_KEY)
+	turn = Motion.blend(turn, delta, Motion.PANEL, is_open and turn_key_held)
 	# AS1.2/AS1.3. The cost of holding it up to see: the torch and the screen
 	# both burn charge while actually raised, not while pocketed, and it
 	# recharges — slower — while left alone. See `_drive_battery()`.
@@ -484,20 +595,40 @@ func _process(delta: float) -> void:
 	var leaned_size := base_size * lerpf(1.0, LEAN_SCALE, lean)
 	var device_size := Vector2(minf(leaned_size.x, size.x * 0.98), minf(leaned_size.y, size.y * 0.98))
 	var resting := Vector2((size.x - device_size.x) * 0.5, size.y + 60.0)
-	var lifted := Vector2((size.x - device_size.x) * 0.5, (size.y - device_size.y) * 0.5)
+	# C1.6 `v2`. Off-centre rather than dead middle — held to one side, the way
+	# an arm actually brings a phone up in front of you rather than floating it
+	# on the camera's own axis. A visual tilt (`HANDHELD_TILT`, unused for now)
+	# was tried and reverted: `radial` — the selection wheel — is a child of
+	# this same Control, added before this rect existed, and rotating `self`
+	# would have dragged the wheel's own fixed screen-centre geometry along
+	# with the phone's tilt. The offset alone needs none of that, since every
+	# consumer (`_screen_rect`, `_clip`, `_overlay`) is positioned from this
+	# rect explicitly rather than through the node's transform.
+	var lifted := Vector2((size.x - device_size.x) * 0.5 + size.x * HELD_OFFSET_X, (size.y - device_size.y) * 0.5)
 	_device_rect = Rect2(resting.lerp(lifted, Motion.ease_out(raised)), device_size)
-	_screen_rect = Rect2(_device_rect.position + Vector2(26, 62), _device_rect.size - Vector2(52, 104))
-	_clip.position = _screen_rect.position
-	_clip.size = _screen_rect.size
-	_clip.visible = true
+	# A horizontal turn preserves the object's centre while its visible width
+	# collapses to an edge and opens on the other face. The tiny floor avoids a
+	# zero-area draw at the exact halfway frame without pretending it vanished.
+	var turned_width := _device_rect.size.x * maxf(0.035, absf(cos(turn * PI)))
+	_turned_rect = Rect2(
+		Vector2(_device_rect.get_center().x - turned_width * 0.5, _device_rect.position.y),
+		Vector2(turned_width, _device_rect.size.y)
+	)
+	_screen_rect = Rect2(_turned_rect.position + Vector2(26, 62), _turned_rect.size - Vector2(52, 104))
+	_page_rect = _aspect_fit(_screen_rect, PAGE_ASPECT)
+	_clip.position = _page_rect.position
+	_clip.size = Vector2(maxf(_page_rect.size.x, 1.0), maxf(_page_rect.size.y, 1.0))
+	var front_visible := not showing_back() and _screen_rect.size.x > 2.0
+	_clip.visible = front_visible
 	_overlay.position = Vector2.ZERO
 	_overlay.size = size
+	_overlay.visible = front_visible
 
 	var mode := current_mode()
 	var showing_index := mode == "INDEX" or mode == "WIRE"
-	_index.visible = showing_index
-	_map.visible = mode == "MAP"
-	if showing_index:
+	_index.visible = showing_index and front_visible
+	_map.visible = mode == "MAP" and front_visible
+	if showing_index and front_visible:
 		_fit_into_aperture(_index)
 		# The index normally owns the screen and draws its own cursor; inside the
 		# device the chassis is the frame, so it is told not to chase the mouse.
@@ -531,7 +662,15 @@ func _draw() -> void:
 	if raised <= 0.001:
 		return
 	var alpha := clampf(raised, 0.0, 1.0)
-	_draw_chassis(_device_rect, alpha)
+	# C4.2 `v4`. The hand belongs to the held object, not to a camera lamp in
+	# the world scene. Drawn behind the chassis so it grips something with
+	# weight, and shaded from `screen_luminance()` so a dead or pocketed screen
+	# cannot leave a mysteriously lit hand behind.
+	_draw_holding_hand(_device_rect, alpha)
+	if showing_back():
+		_draw_back(_turned_rect, alpha)
+		return
+	_draw_chassis(_turned_rect, alpha)
 	# I0.5. The screen is glass, not a lit panel. Painting SCREEN_BG opaque put
 	# a green surface over the mirror and left the black showing only in the
 	# bezel, which is a case with a screen in it — the thing this is not. The
@@ -539,14 +678,102 @@ func _draw() -> void:
 	BlackMirror.draw_glass(self, _screen_rect, alpha, elapsed)
 	draw_rect(_screen_rect, SCREEN_BG * Color(1, 1, 1, 0.55 * alpha))
 	BlackMirror.draw_reflection(self, _screen_rect, alpha, elapsed, 0.42)
+	# C10.2. One night-reading surface for every app. It is deliberately scoped
+	# to the shared aperture rather than the whole mirror: the black side
+	# gutters keep reflecting the holder while information rises out of its own
+	# dim phosphor bed. Hosted and device-native pages both land above this.
+	BlackMirror.draw_reading_bed(self, _page_rect, alpha, screen_luminance())
 	# The modes with no hosted panel draw straight onto the screen.
 	var mode := current_mode()
 	if mode == "RADIO":
-		_draw_radio(_screen_rect, alpha)
+		_draw_radio(_page_rect, alpha)
 	elif mode == "CARRY":
-		_draw_carry(_screen_rect, alpha)
+		_draw_carry(_page_rect, alpha)
 	elif mode == "RITUAL":
-		_draw_ritual(_screen_rect, alpha)
+		_draw_ritual(_page_rect, alpha)
+
+
+## C4.2 `v4`. One answer for how much light the glass itself is giving off.
+## This is intentionally distinct from the world beam's energy: the hand is
+## inches from the screen and reads its backlight directly, including panel
+## sag, while the distant beam is a world-space approximation owned by its
+## host scene.
+func screen_luminance() -> float:
+	# The glass stops lighting the palm as it rotates away. This is deliberately
+	# a face angle, not a binary back/front switch, so the light leaves with the
+	# physical movement instead of popping off at the halfway frame.
+	var front_exposure := maxf(cos(turn * PI), 0.0)
+	return clampf(raised * battery * backlight * front_exposure, 0.0, 1.0)
+
+
+## Public, read-only answers for hosts/tests. Neither exposes a second state:
+## `turn` remains the one physical transition underneath both.
+func showing_back() -> bool:
+	return turn >= 0.5
+
+
+func shell_wear() -> float:
+	return 1.0 - clampf(condition, 0.0, 1.0)
+
+
+func _draw_holding_hand(rect: Rect2, alpha: float) -> void:
+	var scale := clampf(rect.size.x / 1128.0, 0.72, 1.36)
+	var grip := Vector2(rect.position.x + 24.0 * scale, rect.end.y - 2.0 * scale)
+	var light := screen_luminance()
+	var skin := HAND_SKIN.lerp(SCREEN_SPILL, 0.16 * light)
+
+	# A soft spill below the lower-left corner. It begins at the screen edge,
+	# widens over the knuckles and dies before the wrist; layered translucent
+	# shapes read as emitted light without turning the hand into a flat tint.
+	for layer in range(4, 0, -1):
+		var spread := float(layer) * 14.0 * scale
+		var spill := PackedVector2Array([
+			Vector2(_screen_rect.position.x + 7.0 * scale, _screen_rect.end.y - 18.0 * scale),
+			Vector2(_screen_rect.position.x + 72.0 * scale, _screen_rect.end.y - 4.0 * scale),
+			grip + Vector2(70.0 * scale + spread, 38.0 * scale + spread * 0.25),
+			grip + Vector2(-52.0 * scale - spread, 28.0 * scale + spread * 0.35),
+		])
+		draw_colored_polygon(spill, SCREEN_SPILL * Color(1, 1, 1, light * alpha * (0.012 + 0.009 * float(5 - layer))))
+
+	# Wrist and palm enter from below rather than materialising at the bezel.
+	draw_colored_polygon(PackedVector2Array([
+		grip + Vector2(-35, 8) * scale,
+		grip + Vector2(59, 3) * scale,
+		grip + Vector2(73, 82) * scale,
+		grip + Vector2(-48, 82) * scale,
+	]), HAND_SHADOW.lerp(skin, 0.62) * Color(1, 1, 1, alpha))
+	draw_colored_polygon(_ellipse_points(grip, 67.0 * scale, 47.0 * scale, 20), skin * Color(1, 1, 1, alpha))
+	draw_arc(grip + Vector2(-4, 4) * scale, 31.0 * scale, 0.1, 2.0, 12, HAND_SHADOW * Color(1, 1, 1, 0.5 * alpha), maxf(1.0, 1.5 * scale))
+	draw_arc(grip + Vector2(-3, 0) * scale, 34.0 * scale, 0.1, 1.2, 10, SCREEN_SPILL * Color(1, 1, 1, light * 0.34 * alpha), maxf(1.0, 1.2 * scale))
+
+	# Four curled fingertips just outside the chassis edge. Their screen-facing
+	# rims carry more green than the palm, which locates the source at the glass
+	# above them rather than at an invisible lamp in front of the player.
+	for finger in 4:
+		var centre := Vector2(rect.position.x - (25.0 + float(finger % 2) * 3.0) * scale, rect.end.y - (43.0 + float(finger) * 29.0) * scale)
+		var radius := (13.5 - float(finger) * 0.65) * scale
+		var root_x := rect.position.x + (18.0 - float(finger) * 2.0) * scale
+		var finger_shape := PackedVector2Array([
+			centre + Vector2(0, -radius), Vector2(root_x, centre.y - radius * 0.72),
+			Vector2(root_x, centre.y + radius * 0.68), centre + Vector2(0, radius),
+		])
+		draw_colored_polygon(finger_shape, skin.darkened(0.08) * Color(1, 1, 1, alpha))
+		draw_circle(centre, radius, HAND_SHADOW * Color(1, 1, 1, alpha))
+		draw_circle(centre + Vector2(2.5, -1.0) * scale, radius * 0.79, skin * Color(1, 1, 1, alpha))
+		draw_line(centre + Vector2(5.0, -radius * 0.48) * scale, Vector2(rect.position.x + 7.0 * scale, centre.y - radius * 0.3), SCREEN_SPILL * Color(1, 1, 1, light * 0.55 * alpha), maxf(1.0, 1.3 * scale))
+		draw_line(centre + Vector2(-4.0, radius * 0.2) * scale, centre + Vector2(6.0, radius * 0.27) * scale, HAND_SHADOW * Color(1, 1, 1, 0.7 * alpha), maxf(1.0, scale))
+
+	# Thumb laid across the lower corner, still behind the case; only the part
+	# beyond the silhouette remains visible, which makes the overlap do the
+	# holding instead of drawing an outline around it.
+	var thumb := PackedVector2Array([
+		grip + Vector2(-31, -30) * scale,
+		grip + Vector2(72, -9) * scale,
+		grip + Vector2(77, 9) * scale,
+		grip + Vector2(-41, 0) * scale,
+	])
+	draw_colored_polygon(thumb, skin.lightened(0.04) * Color(1, 1, 1, alpha))
+	draw_line(grip + Vector2(-18, -22) * scale, grip + Vector2(51, -8) * scale, SCREEN_SPILL * Color(1, 1, 1, light * 0.58 * alpha), maxf(1.0, 1.4 * scale))
 
 
 func _draw_chassis(rect: Rect2, alpha: float) -> void:
@@ -570,31 +797,105 @@ func _draw_chassis(rect: Rect2, alpha: float) -> void:
 		draw_line(Vector2(rect.position.x + rect.size.x - 30, y), Vector2(pack.end.x + 3, y), Color("100c0a") * Color(1, 1, 1, alpha), 3)
 	CellOutzType.draw_stamped(self, rect.position + Vector2(26, 20), "CELLOUTZ", 19.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.3 * alpha), 1.6)
 	CellOutzType.draw_condensed(self, rect.position + Vector2(190, 26), "FIELD WIRE MK-II // SALVAGED // NOT SERVICEABLE", 9.0, CASE_EDGE * Color(1, 1, 1, 0.8 * alpha), 0.8)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(26, 46), "HOLD O: TURN OVER", 8.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.7)
 	# The jester, pressed small into the bezel. It is on the back of the case;
 	# this is the edge of it showing round the side.
 	BlackMirror.draw_jester(self, Vector2(rect.end.x - 40, rect.position.y + 34), 26.0, 0.5 * alpha, elapsed)
 	_draw_tabs(rect, alpha)
 	_draw_status(rect, alpha)
-	# Cracks last, over the content: the damage is in front of what you are
-	# reading, because it is damage to the surface you are reading through.
-	# C5.5 `v2`. Seeded from this device rather than from 90211, and the severity
-	# is how broken it actually is rather than a constant. A pristine handheld
-	# has almost no cracks; one that has been through a derby is a mess.
-	# C5.6 `v3`. One fork cluster per recorded impact, each radiating from
-	# where that particular hit actually landed rather than every crack in
-	# the game sharing one authored point. A device with no recorded impacts
-	# yet (an old save from before `impacts` existed, still carrying wear
-	# from the previous system) falls back to the one legacy cluster so it
-	# does not suddenly read as undamaged.
-	var overall := clampf(1.0 - condition, 0.0, 1.0)
-	if impacts.is_empty():
-		if overall > 0.0:
-			BlackMirror.draw_cracks(self, rect, alpha, serial, overall)
-	else:
-		for index in impacts.size():
-			var impact: Dictionary = impacts[index]
-			var severity := clampf(overall * (0.5 + float(impact.get("severity", 0.05)) * 4.0), 0.0, 1.0)
-			BlackMirror.draw_cracks(self, rect, alpha, serial + index * 101, severity, impact.get("at", Vector2(0.74, 0.22)))
+	# C1.9 `v3`. Cracks used to end here, drawn across the whole chassis rect —
+	# which meant the case and bezel wore too, and "the device in your hand
+	# looks new from the outside" was never true. They are drawn in
+	# `_draw_damage()` now, scoped to `_screen_rect` alone and on `_overlay`
+	# (the topmost layer, over hosted panels and all), so wear is legible only
+	# on the glass you are actually reading through — never on the case itself.
+
+
+## C9.1/C9.2 `v9`. The physical reverse of the mirror. This is intentionally
+## not a UI page: no hosted Control, no glass, no status strip. What can be read
+## here is stamped, wired or damaged into the casing itself.
+func _draw_back(rect: Rect2, alpha: float) -> void:
+	if rect.size.x < 90.0:
+		# At the midpoint of the turn the device is its edge: ridges, battery lip,
+		# and nothing readable. This keeps the transition physical at its thinnest.
+		draw_rect(rect, Color("100c09") * Color(1, 1, 1, alpha))
+		draw_line(Vector2(rect.position.x + rect.size.x * 0.25, rect.position.y + 18), Vector2(rect.position.x + rect.size.x * 0.25, rect.end.y - 18), CASE_EDGE * Color(1, 1, 1, alpha), 2.0)
+		draw_line(Vector2(rect.end.x - rect.size.x * 0.22, rect.position.y + 70), Vector2(rect.end.x - rect.size.x * 0.22, rect.end.y - 70), Color("271d15") * Color(1, 1, 1, alpha), 5.0)
+		return
+
+	var wear := shell_wear()
+	var corner_bite := 12.0 + 24.0 * smoothstep(0.48, 0.9, wear)
+	var shell := PackedVector2Array([
+		rect.position + Vector2(13, 0),
+		rect.position + Vector2(rect.size.x - corner_bite, 0),
+		rect.position + Vector2(rect.size.x, corner_bite),
+		rect.end - Vector2(0, 16),
+		rect.end - Vector2(16, 0),
+		rect.position + Vector2(14, rect.size.y),
+		rect.position + Vector2(0, rect.size.y - 14),
+		rect.position + Vector2(0, 13),
+	])
+	draw_colored_polygon(shell, CASE * Color(1, 1, 1, alpha))
+	var outline := shell.duplicate()
+	outline.append(shell[0])
+	draw_polyline(outline, CASE_EDGE * Color(1, 1, 1, (0.78 - wear * 0.22) * alpha), 2.5)
+
+	# A recessed service plate and the seam around it make the rear a made thing,
+	# not a second black rectangle. Gaps spread along that seam as condition falls.
+	var plate := rect.grow(-22.0)
+	draw_rect(plate, Color("15110e") * Color(1, 1, 1, alpha))
+	draw_rect(plate, CASE_EDGE * Color(1, 1, 1, 0.48 * alpha), false, 2.0)
+	for gap in int(1.0 + wear * 7.0):
+		var t := fposmod(float(serial % 97) * 0.013 + float(gap) * 0.173, 1.0)
+		var gap_x := lerpf(plate.position.x + 16.0, plate.end.x - 52.0, t)
+		draw_line(Vector2(gap_x, plate.position.y), Vector2(gap_x + 30.0 + wear * 22.0, plate.position.y), Color("050403") * Color(1, 1, 1, wear * alpha), 4.0)
+
+	# The replacement cell protrudes from the back under three actual lashings.
+	var pack := Rect2(rect.position + Vector2(rect.size.x * 0.73, 72), Vector2(rect.size.x * 0.18, rect.size.y - 144))
+	draw_rect(pack.grow(5), Color("090706") * Color(1, 1, 1, 0.8 * alpha))
+	draw_rect(pack, Color("2a2118") * Color(1, 1, 1, alpha))
+	draw_rect(pack, CASE_EDGE * Color(1, 1, 1, 0.7 * alpha), false, 2.0)
+	for tie in 3:
+		var tie_y := pack.position.y + pack.size.y * (0.22 + float(tie) * 0.29)
+		var failed := wear > 0.42 + float(tie) * 0.19
+		if failed:
+			draw_line(Vector2(pack.position.x - 18, tie_y), Vector2(pack.get_center().x - 8, tie_y + 9), Color("0b0806") * Color(1, 1, 1, alpha), 5.0)
+			draw_line(Vector2(pack.get_center().x + 12, tie_y - 8), Vector2(pack.end.x + 14, tie_y), Color("0b0806") * Color(1, 1, 1, alpha), 5.0)
+		else:
+			draw_line(Vector2(pack.position.x - 18, tie_y), Vector2(pack.end.x + 14, tie_y), Color("0b0806") * Color(1, 1, 1, alpha), 5.0)
+
+	# The mark Greg specified, large enough to own the rear. It is printed into
+	# the shell, so unlike the reflection it does not sway when the device moves.
+	var jester_at := Vector2(rect.position.x + rect.size.x * 0.39, rect.get_center().y - 16.0)
+	BlackMirror.draw_jester(self, jester_at, minf(rect.size.x, rect.size.y) * 0.48, alpha, 0.0)
+	CellOutzType.draw_stamped(self, Vector2(rect.position.x + 42, rect.end.y - 76), "WIZARDS ONLY FOOLZ", 17.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.28 * alpha), 1.3)
+	CellOutzType.draw_condensed(self, Vector2(rect.position.x + 44, rect.end.y - 43), "UNIT %06d // RELEASE O: MIRROR" % serial, 9.0, CASE_EDGE * Color(1, 1, 1, 0.82 * alpha), 0.8)
+
+	# Condition is material here: abrasions take finish off, impact dents crease
+	# the plate, the upper corner delaminates, and cable ties fail in thresholds.
+	# No percentage is printed — the shell itself is the gauge.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = serial * 31 + 9001
+	for scratch in int(round(wear * 34.0)):
+		var from := Vector2(rng.randf_range(plate.position.x, plate.end.x), rng.randf_range(plate.position.y, plate.end.y))
+		var length := rng.randf_range(12.0, 54.0) * (0.55 + wear)
+		var heading := rng.randf_range(-0.35, 0.35)
+		draw_line(from, from + Vector2.from_angle(heading) * length, Color("a58b68") * Color(1, 1, 1, (0.12 + wear * 0.38) * alpha), rng.randf_range(0.7, 1.8))
+	var dents := mini(impacts.size(), 4)
+	if dents == 0:
+		dents = int(floor(wear * 4.0))
+	for dent in dents:
+		var hit := Vector2(rng.randf_range(0.14, 0.66), rng.randf_range(0.16, 0.78))
+		if dent < impacts.size():
+			var recorded: Vector2 = impacts[dent].get("at", hit)
+			hit = Vector2(1.0 - recorded.x, recorded.y)
+		var at := rect.position + rect.size * hit
+		var radius := 8.0 + wear * 18.0 + float(dent) * 2.0
+		draw_arc(at, radius, 0.18, PI * 1.72, 18, Color("070504") * Color(1, 1, 1, (0.35 + wear * 0.4) * alpha), 3.0)
+		draw_arc(at + Vector2(-2, -2), radius * 0.72, 0.35, PI * 1.45, 14, CASE_EDGE * Color(1, 1, 1, 0.3 * wear * alpha), 1.0)
+	if wear > 0.55:
+		var split := rect.position + Vector2(rect.size.x - corner_bite, 1)
+		draw_polyline(PackedVector2Array([split, split + Vector2(-18, 19), split + Vector2(-7, 43), split + Vector2(-26, 61)]), Color("080504") * Color(1, 1, 1, alpha), 4.0)
 
 
 func _draw_tabs(rect: Rect2, alpha: float) -> void:
@@ -749,6 +1050,7 @@ func _draw_damage() -> void:
 	var alpha := clampf(raised, 0.0, 1.0)
 	var rect := _screen_rect
 	var wear := 1.0 - clampf(condition, 0.0, 1.0)
+	_draw_page_registration(alpha)
 	for scan in range(0, int(rect.size.y), 3):
 		_overlay.draw_line(Vector2(rect.position.x, rect.position.y + scan), Vector2(rect.end.x, rect.position.y + scan), Color(0, 0, 0, 0.12 * alpha), 1.0)
 
@@ -797,11 +1099,49 @@ func _draw_damage() -> void:
 			run.append(rect.position + Vector2(point.x * rect.size.x, point.y * rect.size.y))
 		_overlay.draw_polyline(run, Color(0, 0, 0, 0.66 * alpha), 2.4)
 		_overlay.draw_polyline(run, INK * Color(1, 1, 1, 0.10 * alpha), 1.0)
+	# C1.9 `v3`. The real crack system (C5.5/C5.6 — seeded from this device's
+	# own `serial`, one fork cluster per recorded impact rather than the fixed
+	# three lines above), moved here from `_draw_chassis` and rescoped to
+	# `rect` — `_screen_rect`, not the whole device — so a battered handheld
+	# still looks like an intact piece of hardware in your hand and only
+	# gives up the damage once you are actually reading its screen. Drawn on
+	# `_overlay`, the topmost layer, so it is genuinely over the hosted panel
+	# in INDEX/MAP/WIRE too, not just over RADIO/CARRY/RITUAL's own content.
+	var overall := clampf(1.0 - condition, 0.0, 1.0)
+	if impacts.is_empty():
+		if overall > 0.0:
+			BlackMirror.draw_cracks(_overlay, rect, alpha, serial, overall)
+	else:
+		for index in impacts.size():
+			var impact: Dictionary = impacts[index]
+			var severity := clampf(overall * (0.5 + float(impact.get("severity", 0.05)) * 4.0), 0.0, 1.0)
+			BlackMirror.draw_cracks(_overlay, rect, alpha, serial + index * 101, severity, impact.get("at", Vector2(0.74, 0.22)))
 	# The glass itself, over everything.
 	_overlay.draw_rect(rect, Color(0.55, 0.72, 0.62, 0.035 * alpha))
 
 
-# --- the two modes that have no hosted panel ------------------------------
+## The same calibration edge survives every app. It is deliberately lighter
+## than the internal frames authored by Index and Map: this marks the device's
+## aperture, while those marks still describe the document or chart inside it.
+func _draw_page_registration(alpha: float) -> void:
+	if _page_rect.size.x <= 2.0 or _page_rect.size.y <= 2.0:
+		return
+	var edge := CASE_EDGE * Color(1, 1, 1, 0.42 * alpha)
+	_overlay.draw_rect(_page_rect, edge, false, 1.0)
+	var corner := 13.0
+	for at in [
+		_page_rect.position,
+		Vector2(_page_rect.end.x, _page_rect.position.y),
+		_page_rect.end,
+		Vector2(_page_rect.position.x, _page_rect.end.y),
+	]:
+		var inward_x := 1.0 if at.x == _page_rect.position.x else -1.0
+		var inward_y := 1.0 if at.y == _page_rect.position.y else -1.0
+		_overlay.draw_line(at, at + Vector2(corner * inward_x, 0), AMBER * Color(1, 1, 1, 0.62 * alpha), 1.4)
+		_overlay.draw_line(at, at + Vector2(0, corner * inward_y), AMBER * Color(1, 1, 1, 0.62 * alpha), 1.4)
+
+
+# --- the three modes that have no hosted panel ----------------------------
 
 ## E3. The ritual page is a camera assignment, not a menu of powers. The five
 ## positions around the aperture are real distinct bodies the current best
@@ -1180,3 +1520,14 @@ func _fit_into_aperture(panel: Control) -> void:
 	var fit := minf(_clip.size.x / design.x, _clip.size.y / design.y)
 	panel.scale = Vector2(fit, fit)
 	panel.position = (_clip.size - design * fit) * 0.5
+
+
+static func _aspect_fit(outer: Rect2, aspect: float) -> Rect2:
+	if outer.size.x <= 0.0 or outer.size.y <= 0.0 or aspect <= 0.0:
+		return Rect2(outer.position, Vector2.ZERO)
+	var fitted := outer.size
+	if fitted.x / fitted.y > aspect:
+		fitted.x = fitted.y * aspect
+	else:
+		fitted.y = fitted.x / aspect
+	return Rect2(outer.position + (outer.size - fitted) * 0.5, fitted)

@@ -22,6 +22,7 @@ const ORGAN_SIZES := {
 	"liver": 0.070, "gut": 0.088, "spine": 0.042,
 }
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
+const BRAIN_CRT_DISPLAY := preload("res://systems/brain_crt_display.gd")
 const BONE := Color("cfc2a4")
 const FLESH := Color("9a6c5c")
 const STEEL := Color("7d8894")
@@ -37,6 +38,7 @@ var _spec := ""
 var _base_fit := 1.0
 var _ruptured := false
 var _compressed := false
+var _brain_display: SubViewport
 
 
 func _ready() -> void:
@@ -92,6 +94,9 @@ func show_part(part: Dictionary, state: float) -> void:
 	for child in _pivot.get_children():
 		_pivot.remove_child(child)
 		child.queue_free()
+	if _brain_display != null:
+		_brain_display.queue_free()
+		_brain_display = null
 	match str(part.get("kind", "")):
 		"organ":
 			_build_organ(str(part.id), _compressed)
@@ -188,10 +193,80 @@ func _build_organ(organ_id: String, compressed := false) -> void:
 			_ellipsoid("Hemisphere", Vector3(side * 0.038, 0.012, 0.0), Vector3(0.78, 0.92, 0.72), tint, Vector3(0, 0, side * 0.08))
 			for lobe_index in 3:
 				_ellipsoid("BrainLobe", Vector3(side * (0.034 + lobe_index * 0.008), 0.052 - lobe_index * 0.045, 0.045), Vector3(0.34, 0.30, 0.22), tint.lightened(0.05))
+		_build_brain_crt()
+		# Tissue rolls over both side rails. Depth, rather than a decal,
+		# makes the display read as displaced into cortex when the part turns.
+		for side in [-1.0, 1.0]:
+			_ellipsoid("CortexLip", Vector3(side * 0.061, 0.006, 0.083), Vector3(0.20, 0.66, 0.16), tint.lightened(0.025), Vector3(0, 0, side * 0.08))
 	else:
 		_ellipsoid("Organ", Vector3.ZERO, Vector3.ONE, tint)
 	if _ruptured:
 		_add_rupture(organ_id)
+
+
+## AT1.2. The display is geometry inside the specimen, not a flat UI pasted
+## over its viewport. Eleven strips bow toward the eye; the flesh hemispheres
+## continue behind and around it, so rotating the specimen exposes both the
+## curved glass profile and the cortex it has displaced.
+func _build_brain_crt() -> void:
+	_brain_display = BRAIN_CRT_DISPLAY.new()
+	_brain_display.name = "CortexIndex"
+	add_child(_brain_display)
+	_brain_display.configure("player", "trauma")
+
+	var screen := MeshInstance3D.new()
+	screen.name = "CurvedCrtGlass"
+	screen.mesh = _curved_screen_mesh(11, 0.052, 0.032, 0.012)
+	screen.position = Vector3(0, 0.006, 0.071)
+	var screen_material := ShaderMaterial.new()
+	var screen_shader := Shader.new()
+	screen_shader.code = "shader_type spatial; render_mode unshaded, cull_disabled; uniform sampler2D phosphor; void fragment(){ vec3 p=texture(phosphor,UV).rgb; float edge=1.0-smoothstep(0.78,1.0,length(UV*2.0-1.0)); p*=mix(0.42,1.0,edge); ALBEDO=p; EMISSION=p*(1.35+edge*0.35); }"
+	screen_material.shader = screen_shader
+	screen_material.set_shader_parameter("phosphor", _brain_display.get_texture())
+	screen.material_override = screen_material
+	_pivot.add_child(screen)
+
+	# Four separate rails leave cortex visible between hardware and glass. A
+	# solid box here read as a tablet balanced on an organ rather than bent into it.
+	_brain_crt_rail("CrtUpperRail", Vector3(0, 0.043, 0.073), Vector3(0.126, 0.012, 0.018))
+	_brain_crt_rail("CrtLowerRail", Vector3(0, -0.031, 0.073), Vector3(0.126, 0.012, 0.018))
+	_brain_crt_rail("CrtLeftRail", Vector3(-0.059, 0.006, 0.073), Vector3(0.012, 0.062, 0.018))
+	_brain_crt_rail("CrtRightRail", Vector3(0.059, 0.006, 0.073), Vector3(0.012, 0.062, 0.018))
+
+
+func _brain_crt_rail(piece_name: String, at: Vector3, rail_size: Vector3) -> void:
+	var mesh := BoxMesh.new()
+	mesh.size = rail_size
+	var rail := _piece(mesh, at, Color("29241f"), true)
+	rail.name = piece_name
+
+
+func _curved_screen_mesh(segments: int, half_width: float, half_height: float, bow: float) -> ArrayMesh:
+	var vertices := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	var indices := PackedInt32Array()
+	for column in segments + 1:
+		var u := float(column) / float(segments)
+		var x := lerpf(-half_width, half_width, u)
+		var normal_x := (2.0 * bow * x) / (half_width * half_width)
+		var z := bow * (1.0 - (x * x) / (half_width * half_width))
+		for row in 2:
+			vertices.append(Vector3(x, lerpf(half_height, -half_height, float(row)), z))
+			normals.append(Vector3(normal_x, 0, 1).normalized())
+			uvs.append(Vector2(u, float(row)))
+	for column in segments:
+		var top := column * 2
+		indices.append_array(PackedInt32Array([top, top + 2, top + 1, top + 2, top + 3, top + 1]))
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
 
 
 func _ellipsoid(piece_name: String, at: Vector3, shape: Vector3, tint: Color, rotation := Vector3.ZERO) -> MeshInstance3D:
