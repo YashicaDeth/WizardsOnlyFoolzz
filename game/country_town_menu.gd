@@ -46,6 +46,11 @@ var intro_veil: ColorRect
 var branch_panel: PanelContainer
 var branch_list: VBoxContainer
 var branch_creating := false
+## A menu can only leave once. Apart from preventing duplicate scene-load
+## requests, this makes the old scene inert during the interstitial: controls
+## such as Settings cannot continue receiving clicks after their panel has
+## disappeared from view.
+var menu_departing := false
 
 @onready var settings_panel: PanelContainer = $HUD/SettingsPanel
 @onready var effects_button: Button = $HUD/SettingsPanel/VBox/Effects
@@ -221,8 +226,7 @@ func _build_run_doors() -> void:
 	sandbox.offset_bottom = play.offset_bottom + row * 2.0
 	sandbox.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	$HUD.add_child(sandbox)
-	sandbox.pressed.connect(func() -> void:
-		Interstitial.travel("res://gore_demo.tscn", "the sandbox // seven of them"))
+	sandbox.pressed.connect(_open_gore_sandbox)
 	sandbox.mouse_entered.connect(_focus_button.bind(sandbox))
 	sandbox.mouse_exited.connect(_unfocus_button.bind(sandbox))
 	menu_buttons.append(sandbox)
@@ -272,6 +276,8 @@ func _open_new_game() -> void:
 
 
 func _open_branch_picker(creating: bool) -> void:
+	if menu_departing:
+		return
 	branch_creating = creating
 	for child in branch_list.get_children():
 		child.queue_free()
@@ -324,6 +330,8 @@ func _open_branch_picker(creating: bool) -> void:
 
 
 func _choose_branch(slot: int) -> void:
+	if menu_departing:
+		return
 	if branch_creating:
 		var created := Quantum.begin_new(slot, "WORLD %02d" % (slot + 1))
 		if created.is_empty():
@@ -410,11 +418,13 @@ func _unfocus_button(button: Button) -> void:
 
 
 func _start_game() -> void:
+	if not _prepare_menu_departure():
+		return
 	# A run that has not begun starts on the Growing Floor; one already under way
 	# resumes at the pit rather than replaying the decanting.
 	var opening := preload("res://systems/opening_director.gd")
 	if opening.reached("entered_pit"):
-		Interstitial.travel("res://rift_derby.tscn", "the bone yard // heat one")
+		_travel_from_menu("res://rift_derby.tscn", "the bone yard // heat one")
 		return
 	# Greg: *"the starting cutscne needs to be lore accurate then have the part
 	# where you can fully character customise"*. The second half was already
@@ -430,8 +440,53 @@ func _play_decanting_prologue() -> void:
 		prologue.name = "DecantingPrologue"
 		$HUD.add_child(prologue)
 		prologue.finished.connect(func() -> void:
-			Interstitial.travel("res://vat_chamber.tscn", "the growing floor // decanting"))
+			_travel_from_menu("res://vat_chamber.tscn", "the growing floor // decanting"))
 	prologue.play()
+
+
+## The Gore Sandbox uses the exact same exit route as a regular run. The old
+## direct `Interstitial.travel()` call let the Settings panel remain alive over
+## the fade, so another click could still arrive before the scene was swapped.
+func _open_gore_sandbox() -> void:
+	if not _prepare_menu_departure():
+		return
+	_travel_from_menu("res://gore_demo.tscn", "the sandbox // seven of them")
+
+
+## Close every transient menu surface before the loading plate appears and make
+## every old control inert. The source scene is about to be removed; it must not
+## be allowed to process a second button event while that happens.
+func _prepare_menu_departure() -> bool:
+	if menu_departing or Interstitial.travelling:
+		return false
+	menu_departing = true
+	settings_panel.hide()
+	settings_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if branch_panel != null and is_instance_valid(branch_panel):
+		branch_panel.hide()
+		branch_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if warning_card != null and is_instance_valid(warning_card):
+		warning_card.hide()
+		warning_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_set_menu_buttons_enabled(false)
+	return true
+
+
+func _set_menu_buttons_enabled(enabled: bool) -> void:
+	for button in menu_buttons:
+		if button != null and is_instance_valid(button):
+			button.disabled = not enabled
+	for child in $HUD/SettingsPanel/VBox.get_children():
+		if child is BaseButton:
+			(child as BaseButton).disabled = not enabled
+
+
+## Kept separate from the preparation above so the decanting prologue can play
+## after the UI has already become inert.
+func _travel_from_menu(scene_path: String, travel_caption: String) -> void:
+	if not menu_departing or Interstitial.travelling:
+		return
+	Interstitial.travel(scene_path, travel_caption)
 
 
 ## Greg: the settings screen looked "so lack luster". It was a default
@@ -478,6 +533,8 @@ func _dress_settings_panel() -> void:
 
 
 func _open_settings() -> void:
+	if menu_departing:
+		return
 	_dress_settings_panel()
 	settings_panel.visible = true
 
