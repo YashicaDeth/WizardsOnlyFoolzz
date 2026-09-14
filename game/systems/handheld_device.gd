@@ -40,6 +40,7 @@ const SIGNAL_FIELD := preload("res://systems/signal_field.gd")
 const RADIAL := preload("res://systems/radial_menu.gd")
 const RADIO_AUDIO := preload("res://systems/radio_audio.gd")
 const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
+const RESONANCE_READOUT := preload("res://systems/resonance_readout.gd")
 
 ## L2.1. A part in the bag is worth putting on the wall. The handheld does not
 ## know the board exists — it hands the reference up, the way the index does.
@@ -56,7 +57,7 @@ signal dropped(payload: Dictionary)
 ## TREE and ALLUSIONS are not gone, they are *inside* INDEX — the Tree axis is
 ## drawn on every dossier and the archive is a page rather than a mode. Listing
 ## them again here would recreate the six-panel problem inside the fix for it.
-const MODES := ["INDEX", "MAP", "WIRE", "RADIO", "CARRY", "RITUAL"]
+const MODES := ["INDEX", "MAP", "WIRE", "RADIO", "CARRY", "RITUAL", "FIELD"]
 
 const CASE := Color("1b1713")
 const CASE_EDGE := Color("6d5a44")
@@ -691,6 +692,8 @@ func _draw() -> void:
 		_draw_carry(_page_rect, alpha)
 	elif mode == "RITUAL":
 		_draw_ritual(_page_rect, alpha)
+	elif mode == "FIELD":
+		_draw_resonance(_page_rect, alpha)
 
 
 ## C4.2 `v4`. One answer for how much light the glass itself is giving off.
@@ -1208,6 +1211,52 @@ func _draw_ritual(rect: Rect2, alpha: float) -> void:
 	var proof_width := CellOutzType.width_condensed(proof_label, 10.0, 0.7)
 	CellOutzType.draw_condensed(self, centre + Vector2(-proof_width * 0.5, iris_radius + 84.0), proof_label, 10.0, INK * Color(1, 1, 1, 0.72 * alpha), 0.7)
 	CellOutzType.draw_condensed(self, Vector2(rect.position.x + 24, rect.end.y - 42), "N / RECORD EVIDENCE", 10.0, AMBER * Color(1, 1, 1, alpha), 0.8)
+
+
+## AT0. The field page does not claim revelation.  It draws the one state
+## payload that already joins practice, temporary access, provenance and harm,
+## so a player can see what the device knows without a new occult currency.
+func _draw_resonance(rect: Rect2, alpha: float) -> void:
+	var readout := RESONANCE_READOUT.snapshot("player", "yesod")
+	CellOutzType.draw_stamped(self, rect.position + Vector2(24, 22), "RESONANCE READOUT", 18.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.3 * alpha), 1.4)
+	if not bool(readout.get("ok", false)):
+		CellOutzType.draw_text(self, rect.get_center() + Vector2(-94, 4), "NO SIGNAL", 16.0, ALERT * Color(1, 1, 1, alpha), 1.0)
+		return
+
+	var centre := rect.position + Vector2(rect.size.x * 0.31, rect.size.y * 0.53)
+	var radius := minf(92.0, rect.size.y * 0.22)
+	# The wheel is a readout, not an objective compass: four nested arcs only
+	# light when the action is actually available at the current altitude.
+	for ring in 4:
+		var floor: Dictionary = (readout.get("floors", [])[ring] as Dictionary)
+		var lit := bool(floor.get("available", false))
+		var tint: Color = MOSS if lit else CASE_EDGE
+		var ring_radius := radius - float(ring) * 17.0
+		draw_arc(centre, ring_radius, -PI * 0.84, PI * 0.84, 36, tint * Color(1, 1, 1, (0.88 if lit else 0.36) * alpha), 2.4)
+		var label := str(floor.get("action", "")).to_upper()
+		CellOutzType.draw_condensed(self, centre + Vector2(-ring_radius - 28.0, -ring_radius * 0.55), label, 9.0, tint * Color(1, 1, 1, alpha), 0.7)
+	draw_circle(centre, 14.0, Color("020503") * Color(1, 1, 1, alpha))
+	draw_arc(centre, 14.0, 0.0, TAU, 20, AMBER * Color(1, 1, 1, alpha), 1.6)
+	CellOutzType.draw_condensed(self, centre + Vector2(-22, 4), str(readout.get("plane_name", "YESOD")).to_upper(), 8.0, INK * Color(1, 1, 1, alpha), 0.55)
+
+	var meditating := bool(readout.get("meditating", false))
+	var state_label := "SITTING / STABLE" if meditating else "NO PRACTICE ACTIVE"
+	CellOutzType.draw_text(self, rect.position + Vector2(rect.size.x * 0.56, 78), state_label, 13.0, (MOSS if meditating else CASE_EDGE) * Color(1, 1, 1, alpha), 1.0)
+	var provenance: Dictionary = readout.get("provenance", {})
+	var observed := int(provenance.get("OBSERVED", 0))
+	var attributed := int(provenance.get("ATTRIBUTED", 0))
+	CellOutzType.draw_condensed(self, rect.position + Vector2(rect.size.x * 0.56, 112), "OBSERVED  %02d" % observed, 11.0, MOSS * Color(1, 1, 1, alpha), 0.8)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(rect.size.x * 0.56, 134), "ATTRIBUTED %02d" % attributed, 11.0, AMBER * Color(1, 1, 1, alpha), 0.8)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(rect.size.x * 0.56, 156), "REPEATS ARE NOT PROOF", 9.0, CASE_EDGE * Color(1, 1, 1, alpha), 0.7)
+
+	var consequence: Dictionary = readout.get("consequence", {})
+	var posture := str(consequence.get("posture", "MIXED"))
+	var posture_tint: Color = ALERT if posture == "HARM OUTRUNS REPAIR" else (MOSS if posture == "REPAIR HAS A TRACE" else AMBER)
+	var box := Rect2(rect.position + Vector2(rect.size.x * 0.54, rect.size.y - 116), Vector2(rect.size.x * 0.40, 62))
+	draw_rect(box, Color(0, 0, 0, 0.30 * alpha))
+	draw_rect(box, posture_tint * Color(1, 1, 1, 0.7 * alpha), false, 1.2)
+	CellOutzType.draw_condensed(self, box.position + Vector2(12, 14), posture, 10.0, posture_tint * Color(1, 1, 1, alpha), 0.75)
+	CellOutzType.draw_condensed(self, box.position + Vector2(12, 36), str(consequence.get("question", "")), 8.0, INK * Color(1, 1, 1, alpha), 0.62)
 
 ## A9.1. The dial: a real sweep with the band drawn under it, stations as ticks
 ## whose height is how well they are actually coming in from where you stand.
