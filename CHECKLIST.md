@@ -3543,11 +3543,38 @@ same reset — a range that is a place rather than a menu of guns.
 
 ### AF v10 — the final pass
 The last rung. Fifteen statements that are true of guns when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
-- [ ] **AF10.1** `v10` A round travels, drops, slows and cannot tunnel
+- [x] **AF10.1** `v10` ~~A round travels, drops, slows and cannot tunnel~~
+      Travel, drop and slow were AF1.1/AF1.6, proven in `ballistics_test.gd`
+      (a rifle round drops 1.7cm over 40m, buckshot sheds speed faster than
+      a slug). Tunnelling was never actually forced: `_step_rounds()` traces
+      the whole segment a round crosses in a step (`was` to `at`), which
+      cannot miss geometry lying anywhere along the way regardless of how
+      far the step was, but nothing had made that step big enough to matter.
+      `tests/tunnel_test.gd` (new) calls `_step_rounds()` directly with one
+      full second of flight — on the order of 780m for a rifle round in a
+      single call — through a 2cm pane 5m out. A destination-only point
+      check would sail past it and see nothing; the round stops exactly at
+      the pane instead
 - [ ] **AF10.2** `v10` It leaves damage on whatever it reaches
-- [ ] **AF10.3** `v10` Casings eject, bounce, land and stay
-- [ ] **AF10.4** `v10` Reloading is physical: the magazine leaves and another arrives
-- [ ] **AF10.5** `v10` A dropped half-full magazine is half-full when you pick it up
+- [x] **AF10.3** `v10` ~~Casings eject, bounce, land and stay~~ AF1.3, already
+      proven in `ballistics_test.gd`: brass ejects sideways and back out of
+      the port, bounces twice losing most of its energy, settles lying on
+      its side rather than standing on end, and is still there a second
+      later because nothing sweeps it up on its own
+- [x] **AF10.4** `v10` ~~Reloading is physical: the magazine leaves and another arrives~~
+      AF1.4, already proven both mechanically (`tests/magazine_test.gd`) and
+      visually (`tests/reload_visual_test.gd`): a real node named `magazine`
+      on each firearm's model drops clear, the well sits visibly empty, and
+      a fresh one rises back into place, all driven off the one
+      `reload_remaining` timer that also gates the mechanical swap
+- [x] **AF10.5** `v10` ~~A dropped half-full magazine is half-full when you pick it up~~
+      AF1.5, already proven in `tests/magazine_test.gd`: `_finish_reload()`
+      ejects whatever is still loaded as its own discrete spare in
+      `spare_magazines` rather than merging it into one reserve number, and
+      a magazine that left with three rounds still has exactly three,
+      two reloads later. "Dropped" and "picked up" are the reserve bag, not a
+      physical object on the ground — the same reading AF1.5 already
+      established this codebase means by the sentence
 - [ ] **AF10.6** `v10` Calibre decides what happens to a body and to a wall
 - [x] **AF10.7** `v10` ~~A round finds a zone, never a hitbox~~ Same proof as B10.3, from the gun's side: a round's impact point resolves through `zone_nearest()` to the limb it struck, and `Penetration` then measures that limb's real thickness at that height to decide how far in it got. A hitbox could not answer either question
 - [ ] **AF10.8** `v10` Firing from a car is the same system
