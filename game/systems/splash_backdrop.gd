@@ -98,6 +98,7 @@ func _push() -> void:
 	_material.set_shader_parameter("attack", attack)
 	_material.set_shader_parameter("reveal", reveal)
 	_material.set_shader_parameter("face_blur", 0.72)
+	_material.set_shader_parameter("photo_inset", 0.94)
 
 
 ## The whole sequence, as one tween the caller can hang the rest of the cold

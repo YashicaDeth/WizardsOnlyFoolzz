@@ -29,7 +29,8 @@ enum Stage { CELLOUTZ, GRANDEUR, MARK, DONE }
 const STAGE_DURATION := {
 	Stage.CELLOUTZ: 2.4,
 	Stage.GRANDEUR: 2.4,
-	Stage.MARK: 4.2,
+	# The Algiz needs a held hero moment before the full mark arrives.
+	Stage.MARK: 6.2,
 }
 # Fraction of a stage spent fading in and fading out; the middle holds solid.
 const FADE_FRACTION := 0.30
@@ -176,7 +177,8 @@ func _update_mark_visibility() -> void:
 	# it once the seal itself has finished pouring in, so the icon is never
 	# fighting the full lockup for the same few seconds of attention.
 	var seal_reveal: float = clampf(stage_clock / maxf(fade, 0.01), 0.0, 1.0)
-	var mark_start := fade
+	# Seal first, held long enough to become an emblem rather than a transition.
+	var mark_start := duration * 0.54
 	var mark_reveal: float = clampf((stage_clock - mark_start) / maxf(fade, 0.01), 0.0, 1.0)
 	var hold_end := duration - fade
 	var out_alpha := 1.0
@@ -236,7 +238,6 @@ func _draw() -> void:
 			# than fighting it for the centre of the frame.
 			_draw_subtitle("PRESENTS", STAGE_DURATION[Stage.GRANDEUR], size.y * 0.5 + grandeur_rect.size.y * 0.5 + 26.0)
 	_draw_regal_frame()
-	_draw_celloutz_orbit()
 
 
 ## A physical-looking frame — copper registration, blood-red wet forms and
@@ -261,21 +262,6 @@ func _draw_regal_frame() -> void:
 			draw_circle(base + Vector2(side * index * 8.0, wobble - index * 3.0), 8.0 - index * 0.65, blood * Color(1, 1, 1, 0.50), true, -1.0, true)
 
 
-## CellOutz becomes an orbiting institutional mark around the game's seal at
-## the final title beat, rather than a subtitle that competes with the wordmark.
-func _draw_celloutz_orbit() -> void:
-	if stage != Stage.MARK:
-		return
-	var alpha := _card_alpha(STAGE_DURATION[Stage.MARK])
-	var centre := size * 0.5
-	var rx := size.x * 0.255
-	var ry := size.y * 0.19
-	for index in 6:
-		var angle := stage_clock * 0.52 + float(index) * TAU / 6.0
-		var at := centre + Vector2(cos(angle) * rx, sin(angle) * ry)
-		draw_set_transform(at, angle + PI * 0.5, Vector2.ONE)
-		CellOutzType.draw_condensed(self, Vector2(-31, 0), "CELLOUTZ", 9.0, Color("df9a72") * Color(1, 1, 1, alpha * 0.72), 0.85)
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_card(title: String, subtitle: String, duration: float) -> void:

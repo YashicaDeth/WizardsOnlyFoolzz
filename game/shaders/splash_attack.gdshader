@@ -30,13 +30,24 @@ uniform float tear : hint_range(0.0, 0.08) = 0.020;
 // The room image is personal source material. Keep the face unreadable while
 // preserving the hands, posters and authored rune as the actual scene.
 uniform float face_blur : hint_range(0.0, 1.0) = 0.72;
+// The source room is 4:3. Preserve its authored geometry within a small
+// in-screen frame instead of stretching a face and hands across a 16:9 build.
+uniform float photo_inset : hint_range(0.75, 1.0) = 0.94;
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(41.7, 289.1))) * 43758.5453);
 }
 
 void fragment() {
-	vec2 uv = UV;
+	float screen_aspect = SCREEN_PIXEL_SIZE.y / SCREEN_PIXEL_SIZE.x;
+	float photo_aspect = 1.25;
+	vec2 frame_size = vec2(photo_inset * photo_aspect / screen_aspect, photo_inset);
+	vec2 uv = (UV - vec2(0.5)) / frame_size + vec2(0.5);
+	float inside_frame = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
+	// Let the 3D world show in the side gutters; the photo is a deliberate
+	// framed surface, not a stretched wallpaper. Sampling outside the image is
+	// harmless because the final alpha below removes those gutter pixels.
+	uv = clamp(uv, vec2(0.0), vec2(1.0));
 
 // The edge. Off the LEFT at attack 0, past the right at 1, jittered per
 // horizontal band so the authored inverted half attacks left-to-right rather
@@ -91,5 +102,5 @@ float edge_x = mix(-0.06, 1.06, attack) + jitter;
 		col = mix(col, torn, 0.5);
 	}
 
-	COLOR = vec4(col * reveal, reveal);
+	COLOR = vec4(col * reveal, reveal * inside_frame);
 }
