@@ -90,6 +90,91 @@ const PATHS := [
 ## faction you commit to. Tiferet is also left out — a panel should read it
 ## off the same ascent/descent commitment the double pyramid already
 ## computes, not a faction lookup of its own.
+## AR / AQ. Greg: *"the evil qliphoth this is the flipped tree i meant"* and
+## *"tree of life and how the tree should look in game this should be the ui and
+## the qilplithoth should flip this"*.
+##
+## The Qliphoth are the tradition's own shadow of the tree above — the
+## *qelippot*, "shells" or "husks": what is left when a sephirah's light is
+## withdrawn and only the vessel remains. They are not a second invented tree.
+## Each one is the recognised counterpart of the sephirah at the same position,
+## so the flip is exactly that — a flip, node for node, on the layout already in
+## `POSITIONS`. Nothing here needs new geometry.
+##
+## Why the game wants them: the tree above is the ascent AR charts and AV gates.
+## The husks are the same ladder read downward, and they are where the low
+## register of this world actually lives — the CellOutz side, the things that
+## feed, the debt that is in the meat. A player descending is not off the tree.
+## They are on the other face of it.
+##
+## Da'ath is deliberately absent from the shells for the same reason it is
+## absent from `PATHS`: the abyss is the gap, and the gap does not invert.
+const QLIPHOTH := {
+	"keter": "THAUMIEL",
+	"chokmah": "CHAIGIDEL",
+	"binah": "SATHARIEL",
+	"chesed": "GAMCHICOTH",
+	"gevurah": "GOLACHAB",
+	"tiferet": "THAGIRION",
+	"netzach": "A'ARAB ZARAQ",
+	"hod": "SAMAEL",
+	"yesod": "GAMALIEL",
+	"malkuth": "NEHEMOTH",
+}
+
+## One line each, in this game's register rather than the tradition's — the
+## same job `MEANINGS` does for the tree above, so a flipped panel has real
+## glosses to draw instead of bare transliterations.
+const QLIPHOTH_MEANINGS := {
+	"keter": "The twins. Two contending godheads where there should be none.",
+	"chokmah": "Will that has been confused on purpose, and sold back to you.",
+	"binah": "The form withheld. Everything concealed behind a process.",
+	"chesed": "The devourers. Mercy that eats what it was extended to.",
+	"gevurah": "The burning bodies. Severity with nothing left to restrain it.",
+	"tiferet": "The disputers. Balance argued into permanent litigation.",
+	"netzach": "The raven of dispersion. A market that scatters what it prices.",
+	"hod": "The poison. Splendor as paperwork, and paperwork as venom.",
+	"yesod": "The obscene. A foundation that is only appetite.",
+	"malkuth": "The whisperers. The kingdom as it actually is at ground level.",
+}
+
+
+## The flipped tree, as a position lookup. Malkuth becomes the crown and Keter
+## the floor: descending the husks is climbing, from the husks' point of view,
+## which is the whole reason the CellOutz ladder is a ladder at all.
+static func qliphoth_position(sephirah_id: String) -> Vector2:
+	var above: Vector2 = POSITIONS.get(sephirah_id, Vector2(0.5, 0.5))
+	return Vector2(above.x, 1.0 - above.y)
+
+
+## Name and gloss for one husk. Returns empty strings for `daath`, which has no
+## shell on purpose — callers should treat that as "draw the abyss", not as an
+## error or a missing entry.
+static func qliphah(sephirah_id: String) -> Dictionary:
+	return {
+		"name": str(QLIPHOTH.get(sephirah_id, "")),
+		"meaning": str(QLIPHOTH_MEANINGS.get(sephirah_id, "")),
+		"position": qliphoth_position(sephirah_id),
+		"is_abyss": sephirah_id == "daath",
+	}
+
+
+## Everything a panel needs to draw either face of the tree from one call, so
+## the flip is a parameter rather than a second renderer that drifts out of
+## sync with this one.
+static func face(inverted: bool) -> Array[Dictionary]:
+	var nodes: Array[Dictionary] = []
+	for id: String in ORDER:
+		nodes.append({
+			"id": id,
+			"name": str(QLIPHOTH.get(id, "")) if inverted else str(NAMES.get(id, "")),
+			"meaning": str(QLIPHOTH_MEANINGS.get(id, "")) if inverted else str(MEANINGS.get(id, "")),
+			"position": qliphoth_position(id) if inverted else (POSITIONS.get(id, Vector2(0.5, 0.5)) as Vector2),
+			"faction": str(LEANING_FACTION.get(id, "")),
+		})
+	return nodes
+
+
 const LEANING_FACTION := {
 	"chesed": "black_mile",
 	"gevurah": "ashline_wreckers",

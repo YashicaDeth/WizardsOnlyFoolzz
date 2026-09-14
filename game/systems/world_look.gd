@@ -14,6 +14,83 @@ extends RefCounted
 
 const FIRMAMENT_SHADER := preload("res://shaders/firmament.gdshader")
 
+## Greg, playing the build: *"it's lagging a lot in the Gore Sandbox and we put
+## it on full screen ... the FPS is about thirteen"*, and separately *"the
+## settings look completely different when you enter Gore Sandbox or main
+## game"*. Those are one bug, not two.
+##
+## `country_town_menu._cycle_graphics()` only ever touched the **menu's own**
+## Environment, and only its `glow_enabled`. It never touched the two settings
+## that actually cost frames, and the moment you left the menu
+## `WorldLook.environment()` built a brand new Environment with everything
+## switched back on. So GRAPHICS: PERFORMANCE did nothing anywhere except the
+## title screen, and the sandbox always ran at maximum.
+##
+## The three effects below are all fill-rate bound — their cost scales with the
+## number of pixels, which is exactly why the build was playable in a window
+## and thirteen frames a second fullscreen:
+##
+##   - **Volumetric fog** ray-marches the view. It is the single most expensive
+##     thing in this Environment and the first to go.
+##   - **SSAO** samples depth per pixel at a 1.2m radius.
+##   - **Glow** blurs the frame through a mip chain.
+##
+## Quality lives here rather than in the menu because `environment()` is the one
+## place every scene passes through. Set it once and the Hunt, the derby, the
+## vat and the sandbox all honour it — which is also what makes the settings
+## stop disagreeing with each other between scenes.
+enum Quality { ULTRA, HIGH, PERFORMANCE }
+
+## Static so it survives a scene change. Scenes build their Environment fresh on
+## load, and an instance field would be rebuilt to the default every time.
+static var quality: Quality = Quality.HIGH
+
+
+## Named for the settings panel, which shows the word rather than the enum.
+static func quality_name() -> String:
+	match quality:
+		Quality.ULTRA: return "ULTRA"
+		Quality.HIGH: return "HIGH"
+		_: return "PERFORMANCE"
+
+
+static func set_quality_name(value: String) -> void:
+	match value.to_upper():
+		"ULTRA": quality = Quality.ULTRA
+		"PERFORMANCE": quality = Quality.PERFORMANCE
+		_: quality = Quality.HIGH
+
+
+## Applies the current quality to an Environment. Separated from `environment()`
+## so a live scene can be re-tuned the instant the player changes the setting,
+## without rebuilding the sky or losing the hour of day.
+static func apply_quality(env: Environment, preset: Dictionary) -> void:
+	if env == null:
+		return
+	# Distance fog stays on at every level: it is cheap, it is the art
+	# direction, and without it the far edge of every region pops.
+	env.fog_enabled = true
+	match quality:
+		Quality.ULTRA:
+			env.volumetric_fog_enabled = true
+			env.volumetric_fog_density = float(preset.get("volumetric", 0.01))
+			env.ssao_enabled = true
+			env.glow_enabled = true
+		Quality.HIGH:
+			# Volumetric fog at roughly half density still reads as depth and
+			# costs appreciably less than the full march.
+			env.volumetric_fog_enabled = true
+			env.volumetric_fog_density = float(preset.get("volumetric", 0.01)) * 0.55
+			env.ssao_enabled = true
+			env.glow_enabled = true
+		_:
+			env.volumetric_fog_enabled = false
+			env.ssao_enabled = false
+			env.glow_enabled = false
+
+
+
+
 ## Authored albedo in the Bone Yard kit runs from 0.025 (oil_asphalt, dead_forest)
 ## to about 0.3 (rusted_steel). Surfaces that dark need real light to read at all:
 ## too little and the pit goes black, too much and the palette cooks to pastel.
@@ -105,8 +182,6 @@ static func environment(preset_name: String = "bone_yard") -> Environment:
 	env.fog_density = float(preset.fog_density)
 	env.fog_aerial_perspective = 0.45
 	env.fog_sky_affect = 0.6
-	env.volumetric_fog_enabled = true
-	env.volumetric_fog_density = float(preset.volumetric)
 	env.volumetric_fog_albedo = Color(preset.fog)
 	env.volumetric_fog_emission = Color(preset.fog).darkened(0.7)
 
@@ -116,18 +191,20 @@ static func environment(preset_name: String = "bone_yard") -> Environment:
 	env.tonemap_exposure = float(preset.get("exposure", 1.25))
 	env.tonemap_white = 6.0
 
-	env.ssao_enabled = true
 	env.ssao_radius = 1.2
 	env.ssao_intensity = 1.8
 	env.ssao_power = 1.4
 
 	# Threshold keeps bloom on actual light sources instead of smearing every
 	# bright surface, which is what made the pastel pass read as plastic.
-	env.glow_enabled = true
 	env.glow_intensity = 0.55
 	env.glow_strength = 0.95
 	env.glow_bloom = 0.08
 	env.glow_hdr_threshold = 1.0
+
+	# The three fill-rate switches, set from the one global the settings panel
+	# drives, so every scene agrees and PERFORMANCE actually performs.
+	apply_quality(env, preset)
 
 	env.adjustment_enabled = true
 	env.adjustment_saturation = float(preset.saturation)
