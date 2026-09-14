@@ -14,6 +14,7 @@ const WOF_SEAL_PATH := "res://art/brand/wof_seal.png"
 const WOF_STACKED_PATH := "res://art/brand/wof_stacked.png"
 const GRANDEUR_PATH := "res://art/brand/grandeur_wordmark.png"
 const MENU_SCENE := "res://country_town_menu.tscn"
+const SPLASH_BACKDROP := preload("res://systems/splash_backdrop.gd")
 
 
 ## Loaded by reading the file directly rather than `preload()`/`load()` —
@@ -47,6 +48,7 @@ var seal_rect: TextureRect
 var grandeur_rect: TextureRect
 var reveal_material: ShaderMaterial
 var grandeur_material: ShaderMaterial
+var backdrop: SplashBackdrop
 
 
 func _ready() -> void:
@@ -55,6 +57,15 @@ func _ready() -> void:
 	# Godot resolves the window size a frame late from a cold boot; without
 	# this the very first _draw() lays text out against a 0x0 rect.
 	custom_minimum_size = get_viewport_rect().size
+	# The publisher cards belong to the same place as the front door, not to a
+	# separate black void.  Put the very same composed room / cyan-rip plate
+	# beneath them so the last beat cuts naturally into the live street tableau.
+	backdrop = SPLASH_BACKDROP.new()
+	backdrop.name = "ColdOpenRoom"
+	backdrop.reveal = 1.0
+	backdrop.attack = 0.18
+	add_child(backdrop)
+	move_child(backdrop, 0)
 	_build_mark_layer()
 	set_process(true)
 	queue_redraw()
@@ -207,7 +218,11 @@ func _card_alpha(duration: float) -> float:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.012, 0.01), true)
+	# Keep the first institution card legible, but never return to the old
+	# disconnected blank screen: the audience can already read the same world
+	# that becomes the live menu a moment later.
+	var veil_alpha := 0.72 if stage == Stage.CELLOUTZ else 0.30
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.012, 0.01, veil_alpha), true)
 	match stage:
 		Stage.CELLOUTZ:
 			_draw_card("CELLOUTZ INC.", "AN INSTITUTION, NOT A COMPANY", STAGE_DURATION[Stage.CELLOUTZ])
