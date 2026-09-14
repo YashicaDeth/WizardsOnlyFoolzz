@@ -77,6 +77,7 @@ const WORLD_GENERATOR := preload("res://systems/ashbloom_world_generator.gd")
 const MISFIRE_DIRECTOR := preload("res://systems/reality_misfire_director.gd")
 const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
+const LIVE_BODY_MIRROR := preload("res://systems/live_body_mirror.gd")
 const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
 const KEYS_CARD := preload("res://systems/keys_card.gd")
@@ -726,6 +727,7 @@ func _ready() -> void:
 	add_child(player_body)
 	player_body.position = player - Vector3.UP * 0.6
 	_build_player_rig()
+	_build_body_witness()
 	arsenal = HUNTER_ARSENAL.new()
 	arsenal.name = "HunterArsenal"
 	player_body.add_child(arsenal)
@@ -807,6 +809,18 @@ func _build_player_rig() -> void:
 	player_rig.add_child(hunter_appearance)
 	# B4.1. The sheet's marks travel with the appearance it already drives.
 	hunter_appearance.configure(player_rig, appearance)
+
+
+## B9.1/B9.2.  This is a physical fixture in the hunt, rather than a HUD
+## portrait.  The `LiveBodyMirror` shares this World3D and watches HunterBody,
+## letting the player inspect the rear of their real rig and its current damage.
+func _build_body_witness() -> void:
+	var mirror := LIVE_BODY_MIRROR.new()
+	mirror.name = "BodyWitnessMirror"
+	mirror.position = Vector3(2.3, 1.55, 15.8)
+	mirror.rotation.y = PI
+	add_child(mirror)
+	mirror.set_target(player_rig)
 
 
 ## Blood type is a choice on the intake sheet, so it has to mean something.
