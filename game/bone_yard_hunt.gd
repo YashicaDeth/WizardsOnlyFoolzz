@@ -3159,6 +3159,18 @@ func _update_encounter_actors(delta: float) -> void:
 				RIVAL_REGISTRY.consider(str(actor.subject_id))
 				node.queue_free()
 				encounter_actors.remove_at(index)
+		elif LauncherActor.is_launcher(actor) and LauncherActor.in_envelope(distance):
+			# AD3.1. A launcher holds its ground and works the tube; all of the
+			# decision lives in `launcher_actor.gd` so this branch stays a hook
+			# rather than a second copy of the rule. Closing inside the arming
+			# ring drops it out of this branch entirely — which is the counterplay
+			# being the distance rather than a damage number.
+			var shot := LauncherActor.advance(actor, distance, actor_delta)
+			match str(shot.state):
+				"winding":
+					prompt.text = "%s SHOULDERS THE TUBE" % str(actor.display_name).to_upper()
+				"fire":
+					_fire_launcher(actor, node)
 		elif str(actor.get("disposition", "hostile")) == "hostile" and distance < 24.0 and distance > 3.0:
 			# O4.2. A naive approach put every hostile in single file toward the
 			# same 3 m ring, which reads as a queue rather than a fight. Whoever
@@ -3260,6 +3272,25 @@ func _rig_health_ratio(rig: BaselineHuman) -> float:
 		ceiling += max_health
 		current += clampf(float((rig.anatomy.zones.get(zone_id, {}) as Dictionary).get("health", max_health)), 0.0, max_health)
 	return clampf(current / maxf(1.0, ceiling), 0.0, 1.0)
+
+
+## AD3.1. Fires through the same `Ballistics` every other round in this game
+## leaves a barrel through, carrying the same payload shape `_on_round_hit()`
+## already resolves — so a warhead finds a zone through the anatomy (AF1.7)
+## and can be met in the air (AD3.3) without either of those knowing a
+## launcher exists.
+func _fire_launcher(actor: Dictionary, node: Node3D) -> void:
+	if ballistics == null or not is_instance_valid(ballistics):
+		return
+	var muzzle: Vector3 = node.global_position + Vector3.UP * 1.1
+	var toward := (player - muzzle)
+	if toward.length() < 0.01:
+		return
+	ballistics.fire(muzzle, toward.normalized(), LauncherActor.CALIBRE, 0.0, 1, str(actor.get("subject_id", "launcher")), LauncherActor.payload(actor))
+	WorldHistory.record_event("launcher_fired", {
+		"subject_id": str(actor.get("subject_id", "")), "location": HUNT_LOCATION,
+	})
+	prompt.text = "INCOMING"
 
 
 func _actor_attack_cycle(actor: Dictionary) -> float:

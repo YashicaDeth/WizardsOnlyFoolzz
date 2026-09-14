@@ -59,6 +59,17 @@ const CALIBRES := {
 		"label": "SLUG", "muzzle": 430.0, "grain": 0.028, "drag": 0.035,
 		"penetration": 0.55, "casing": Vector3(0.019, 0.070, 0.019),
 	},
+	# AD3.1. A rocket is the one round in this table you are meant to be able
+	# to answer. It leaves the tube at roughly a tenth of a pistol round's
+	# speed, which is what makes AD3.3's `intercept_near()` and your own feet
+	# real options against it rather than theoretical ones — you can see it
+	# coming. Heavy and low-drag so the slowness is mass rather than a round
+	# that stops in mid-air, and no casing, because a launcher does not throw
+	# brass.
+	"rocket": {
+		"label": "WARHEAD", "muzzle": 38.0, "grain": 0.900, "drag": 0.004,
+		"penetration": 0.85, "casing": Vector3.ZERO,
+	},
 }
 
 ## Past this a round is somebody else's problem. Rounds are cheap but not free
@@ -146,6 +157,11 @@ func fire(from: Vector3, along: Vector3, calibre := "pistol", spread := 0.0, cou
 ## whoever was shooting rather than in front of them.
 func _eject(from: Vector3, along: Vector3, calibre: String) -> void:
 	var spec: Dictionary = CALIBRES.get(calibre, CALIBRES["pistol"])
+	# AD3.1. A launcher does not throw brass. Sized at zero in the table
+	# rather than special-cased by name here, so anything else that is fired
+	# without a case gets the same answer for free.
+	if (spec["casing"] as Vector3).is_zero_approx():
+		return
 	if casings.size() >= MAX_CASINGS:
 		_retire_casing(0)
 	var forward := along.normalized()

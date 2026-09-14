@@ -3484,7 +3484,40 @@ sniping them, through enhanced character builds."*
 The payoff for D, B2 and N: a body built far enough in one direction should be
 able to answer a rocket with a blade, and the game should let it.
 
-- [ ] **AD3.1** A melee build can close on a launcher and live — the distance is the puzzle
+- [x] ~~**AD3.1** A melee build can close on a launcher and live — the distance is the puzzle~~
+      The item names its own answer in its last five words, and the answer is
+      not "a launcher that does less damage" — that is a number, and AD3's
+      whole complaint is numbers. `systems/launcher_actor.gd` makes range the
+      thing the weapon is good at *and* the thing it stops being good at:
+      **it cannot arm inside `MIN_ARMING_METRES` (9m)**. Inside that ring it
+      is a person holding a tube. Closing mid-wind-up does not pause the shot,
+      it loses it — the difference between the distance being a puzzle and
+      the distance being a delay.
+      Two more things make it answerable rather than merely survivable: the
+      `rocket` calibre leaves the tube at 38 m/s against a pistol's 340, so
+      you can see it coming; and it telegraphs with a wind-up deliberately
+      longer than a melee one, because a puzzle whose inputs you cannot read
+      is a coin flip.
+      **It closes AD3.3's loop.** A warhead is an ordinary round in ordinary
+      flight, so the interception AD3.3 built for bullets works on the thing
+      this section was actually about — you can cut a rocket out of the air.
+      It also resolves through the same payload `_on_round_hit()` already
+      reads, so it finds a zone through the anatomy (AF1.7) rather than being
+      a special explosion that knows about bodies by itself.
+      All the decision lives in `launcher_actor.gd` as pure statics over
+      plain values — the same shape `combat_response.gd` and `clinch.gd`
+      already use — so `bone_yard_hunt.gd` holds a hook rather than a second
+      copy of the rule, and the whole thing is testable without a scene.
+      Verified: `tests/launcher_test.gd` (17 checks) — it arms exactly at the
+      authored distance and not a hair inside it, winds up visibly before
+      firing, loses a building shot when you step inside the ring, never
+      touches a non-launcher actor, throws no brass, and is met in the air by
+      a blade with AD3.3's own `intercept_near()`. Eight existing suites
+      re-verified clean.
+      Still open: nothing in the world *spawns* one yet — an actor becomes a
+      launcher by carrying `launcher: true`, and no encounter authors that
+      today. That is content placement rather than mechanism, and it is the
+      one thing between this and meeting one in a real fight.
 - [x] ~~**AD3.2** Cybernetics change what movement is possible, not just the numbers~~
       The second half is the whole item. A limb that makes you twelve per
       cent faster has changed a number; these change whether a move exists.
