@@ -24,10 +24,17 @@ extends Node3D
 ## is decided in `ritual_app.gd`, not here. This is only the instrument.
 
 const CellOutzType := preload("res://systems/celloutz_type.gd")
+const GoeticSeals := preload("res://systems/goetic_seals.gd")
 
 const BASE_SIZE := Vector2(0.22, 0.16)
 const BASE_THICKNESS := 0.006
 const COPPER := Color("caa14a")
+## Real boards plate contact points — pads and IC leads, exactly the places a
+## finger or a socket actually touches — in gold over the bare copper
+## underneath, because copper alone corrodes and a connection has to survive
+## being made and broken. Traces stay copper; only what is actually a contact
+## surface gets the second metal.
+const GOLD := Color("f0c85a")
 const SOLDER_MASK := Color("0b3d24")
 const SILKSCREEN := Color("d8dcd4")
 const CHAR := Color("120e0c")
@@ -51,6 +58,21 @@ var _baked: Node3D
 ## which from colour alone.
 var bound_seals: Array = []
 var burnt_seals: Array = []
+
+## E2.4 cutscene director. "Each and every" Goetia, Mathers' own listed
+## order, walked into this board one at a time — a director on top of
+## `begin_burn`/`begin_bind` rather than second drawing machinery: each entry
+## in the sequence is a real, individually-baked call, chained the instant
+## the one before it finishes. `sequence_seal_started` names which demon is
+## currently burning, for whatever HUD or subtitle wants to say so during the
+## cutscene; `sequence_finished` fires once, when the 72nd bake completes.
+signal sequence_seal_started(index: int, total: int, entry: Dictionary)
+signal sequence_finished()
+
+var _sequence: Array = []
+var _sequence_index := -1
+var _sequence_mode := "burn"
+var _sequence_seal_duration := 0.6
 
 var _mode := ""
 var _seed := 0
@@ -111,8 +133,10 @@ func _trace(parent: Node3D, points: PackedVector2Array, width: float, height: fl
 			continue
 		var angle := (b - a).angle()
 		_box(parent, Vector3(length + width, height, width), Vector3(mid.x, _top_y + height * 0.5, mid.y), COPPER, 0.6, -angle)
+	# Pads, gold over the copper trace they cap — the actual contact points,
+	# not the run of wire between them.
 	for point in points:
-		_box(parent, Vector3(width * 1.8, height, width * 1.8), Vector3(point.x, _top_y + height * 0.5, point.y), COPPER, 0.6)
+		_box(parent, Vector3(width * 1.8, height, width * 1.8), Vector3(point.x, _top_y + height * 0.5, point.y), GOLD, 0.75)
 
 
 ## Manhattan-routed, the way real copper is: seeded turns rather than a
@@ -157,11 +181,13 @@ func _build_board() -> void:
 	var chip_size := Vector2(0.045, 0.032)
 	_box(_static, Vector3(chip_size.x, 0.010, chip_size.y), chip_at + Vector3(0, _top_y + 0.005, 0), CHAR, 0.1)
 	_box(_static, Vector3(0.006, 0.011, 0.006), chip_at + Vector3(-chip_size.x * 0.5 + 0.006, _top_y + 0.005, -chip_size.y * 0.5 + 0.006), SILKSCREEN, 0.0)
+	# The legs, gold rather than copper — the one part of the whole board a
+	# socket actually grips, and real ones are plated for exactly that reason.
 	var pins := 6
 	for side in [-1.0, 1.0]:
 		for pin in pins:
 			var pin_y := lerpf(-chip_size.y * 0.4, chip_size.y * 0.4, float(pin) / float(pins - 1))
-			_box(_static, Vector3(0.010, 0.002, 0.003), chip_at + Vector3(side * (chip_size.x * 0.5 + 0.005), _top_y + 0.001, pin_y), COPPER, 0.6)
+			_box(_static, Vector3(0.010, 0.002, 0.003), chip_at + Vector3(side * (chip_size.x * 0.5 + 0.005), _top_y + 0.001, pin_y), GOLD, 0.8)
 
 	# Silkscreen outline around the chip footprint. Every real board has one.
 	var outline := chip_size + Vector2(0.006, 0.006)
@@ -230,6 +256,45 @@ func begin_burn(seed_value: int, complexity: int = 6, anim_duration: float = 2.4
 	_elapsed = 0.0
 	_strokes = CellOutzType.seal_strokes(seed_value, complexity)
 	set_process(true)
+
+
+## E2.4 cutscene director. Starts the whole roster burning (or binding) into
+## this one board, in order, unattended — call once and let `sequence_seal_started`/
+## `sequence_finished` drive whatever the cutscene wants to show on top.
+## Calling this while a sequence is already running restarts it from Bael
+## rather than layering two queues against each other.
+func begin_full_sequence(mode: String = "burn", per_seal_duration: float = 0.6) -> void:
+	_sequence = GoeticSeals.GOETIA.duplicate()
+	_sequence_index = -1
+	_sequence_mode = mode
+	_sequence_seal_duration = maxf(0.05, per_seal_duration)
+	_advance_sequence()
+
+
+func is_running_sequence() -> bool:
+	return _sequence_index >= 0 and _sequence_index < _sequence.size()
+
+
+## Named rather than numbered: `hash()` of the demon's own name, so the same
+## name always burns the same shape and nothing here has to invent or store a
+## second identifier for something `GoeticSeals.GOETIA` already names.
+func _advance_sequence() -> void:
+	_sequence_index += 1
+	if _sequence_index >= _sequence.size():
+		_sequence.clear()
+		_sequence_index = -1
+		sequence_finished.emit()
+		return
+	var entry: Dictionary = _sequence[_sequence_index]
+	var seed_value: int = hash(str(entry.get("name", "")))
+	# Each demon's front enters from a different point round the ring rather
+	# than every one of the 72 repeating the exact same burn from true north.
+	var front := TAU * (float(_sequence_index) / float(maxi(_sequence.size(), 1)))
+	sequence_seal_started.emit(_sequence_index, _sequence.size(), entry)
+	if _sequence_mode == "bind":
+		begin_bind(seed_value, 6, _sequence_seal_duration)
+	else:
+		begin_burn(seed_value, 6, _sequence_seal_duration, front)
 
 
 func _process(delta: float) -> void:
@@ -329,3 +394,8 @@ func _bake_current() -> void:
 	_live_mesh.mesh = null
 	_mode = ""
 	set_process(false)
+	# E2.4 cutscene director. The chain: this bake finishing is what starts
+	# the next demon burning, so "each and every" is 72 real, individually
+	# baked calls rather than one call asked to somehow mean all of them.
+	if is_running_sequence():
+		_advance_sequence()

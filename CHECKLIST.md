@@ -850,6 +850,35 @@ mass-produced by the million.
       char scar. Both bake onto the board and stay once the animation ends;
       a board accumulates every seal it has actually carried
       (`bound_seals`/`burnt_seals`).
+
+      Follow-up: "each and every" named a cutscene that did not exist —
+      `begin_burn`/`begin_bind` took one seed and ran one animation, and all
+      72 `GoeticSeals.GOETIA` entries existed only as data. `begin_full_sequence(mode,
+      per_seal_duration)` is a director on top of that, not new drawing
+      machinery: it walks the roster in Mathers' own listed order, seeding
+      each demon's shape off `hash()` of its own name, and the instant one
+      seal's own real bake completes it chains straight into the next —
+      `sequence_seal_started`/`sequence_finished` are the two signals a
+      cutscene or subtitle track hooks into. `tests/motherboard_sequence_test.gd`
+      (10 checks) drives it end to end: all 72 genuinely start and bake, in
+      the right order, with 72 distinct seeds, `sequence_finished` firing
+      exactly once, and a second call restarting cleanly from Bael rather
+      than layering two queues.
+
+      Captured both ways rather than assumed: burning's permanent mark is
+      deliberately minimal by E2.7's own rule ("burn 1.0 leaves nothing but
+      the memory of the ring"), and that is just as true stacked 72 deep as
+      it is for one — `e2_4_motherboard_sequence_burn_finished.png` reads as
+      barely more than a single burnt seal, which is honest rather than a
+      fault in the director. Binding does not share that limit: every
+      stroke of every one of the 72 stays as permanent lit copper, and
+      `e2_4_motherboard_sequence_bind_finished.png` is a dense, legible tangle
+      of 72 overlaid seals — the far stronger image if a cutscene wants "each
+      and every" to actually read as all of them. `e2_4_motherboard_sequence_live.png`
+      is one demon caught mid-burn, confirming the individual live animation
+      inside the sequence looks exactly like the single-seal version already
+      on file. Which mode the finished cutscene actually uses is a direction
+      call, not something decided here.
 - [x] ~~**E2.5** The board is a real board: traces, pads, silkscreen, a chip
       that reads as a chip~~ Procedural, the same way every other object in
       this game is built — no imported asset. Manhattan-routed copper traces
@@ -858,6 +887,22 @@ mass-produced by the million.
       down two sides and a pin-1 notch, a silkscreen outline around its
       footprint, and two capacitors, so the board reads as populated rather
       than a diagram with one component on it.
+
+      Follow-up: only had one metal. A real board plates its actual contact
+      points — pads and IC leads, wherever a socket or a finger actually
+      touches — in gold over the bare copper underneath, because copper
+      alone corrodes and a connection has to survive being made and broken.
+      `GOLD` (`#f0c85a`) now sits on the chip's twelve legs and every trace's
+      end pads; the traces themselves stay `COPPER`, since the run of wire
+      between contacts was never the part that needed the second metal.
+      `tests/motherboard_gold_test.gd` (4 checks) walks the built mesh tree
+      rather than reading the constants back at themselves — real gold-toned
+      instances present, real copper-toned instances still present alongside
+      them, and specifically more gold than just the chip's own twelve legs
+      accounts for. Captured in `game/captures/` (via `motherboard_capture.gd`,
+      re-run): pads read as a visibly brighter tone at each trace joint and
+      the chip's legs read gold against the black package, without the
+      board's overall read changing.
 - [x] ~~**E2.6** Burning is subtractive and binding is additive — one scars
       the copper, one completes a circuit~~ Built into `begin_bind()`/
       `begin_burn()` directly (see E2.4) — binding only ever adds strokes,
@@ -5517,13 +5562,13 @@ legitimate, and the conspiracy is the ordinary one - an institution doing
 paperwork over things that used to be people.
 
 ### AL1 — The bank
-- [ ] **AL1.1** Money exists as a real quantity with a real issuer
-- [ ] **AL1.2** The bank writes the liens the Choir already prices (CARRY, B)
-- [ ] **AL1.3** A debt is secured against something of yours, named, and they will take it
+- [x] **AL1.1** Money exists as a real quantity with a real issuer — already built, under R rather than AL: `Carry.CURRENCY` (`rust_scrip`) and `CURRENCY_ISSUER` (`celloutz`, a real registered faction subject with its own doctrine), the wallet living durably at `WorldHistory.subject("inventory").rust_scrip`. Verified by the pre-existing `money_test.gd` (R1.1), re-run clean rather than duplicated
+- [x] **AL1.2** The bank writes the liens the Choir already prices (CARRY, B) — the per-item `lien` field has existed since B5.4 but nothing ever wrote a real one into it; `Carry.borrow_against(amount, lender_faction, item_index)` reuses `borrow()`'s own real debt ledger and additionally stamps the exact carried item with who holds the lien and how much, found on the item itself rather than an abstract number nobody can point at
+- [x] **AL1.3** A debt is secured against something of yours, named, and they will take it — `Carry.seize_lien(lender_faction)` finds the item actually liened to that lender and removes it from CARRY for real, valued by the same `sale_value()` the Choir prices everything by (never a fiction number invented for this one verb), and shrinks the real debt by what the thing was actually worth. `tests/bank_lien_test.gd` covers the lien, seizure, and real balance; `money_test.gd` (R1.1/R1.4) remains on the same ledger. `Carry.send_collector()` now supplies the AL1.7 default visit seam.
 - [ ] **AL1.4** Accounts, in a building, that you can walk into and rob
-- [ ] **AL1.5** Interest accrues in game time, and it does not stop while you are away
-- [ ] **AL1.6** They are an institution: the satire lands on the paperwork, not on debtors
-- [ ] **AL1.7** Default has a collector, and the collector is a person with a body (F)
+- [x] **AL1.5** Interest accrues in game time, and it does not stop while you are away — `Carry.accrue_interest()` settles the account from `WorldClock.minutes()`, not from a bank scene or a per-frame timer, so two full days catch up when a fresh Carry instance next reads the saved ledger. Three percent compounds per whole in-world day; unused hours remain on the account rather than being rounded into a charge or forgiven. Borrowing and repayment reset the lender's real clock anchor, every settlement writes a `bank_interest_accrued` receipt into WorldHistory, and old saves with debt but no timestamp begin honestly at first read instead of receiving invented retroactive charges. `tests/bank_lien_test.gd` expanded from 14 to 23 passing checks; `money_test.gd` and `world_clock_test.gd` remain green
+- [x] **AL1.6** They are an institution: the satire lands on the paperwork, not on debtors — `Carry.account_statement()` returns the real office, issuer, balance, rate and named collateral beside three clauses in the bank's own procedural voice. The account holder is never characterised or mocked; the office states, in writing, that it records ownership but provides no relief, recovers security without you present, and keeps its own errors payable until it chooses to correct them. The AL1.5 demo typesets the same returned clause rather than carrying separate joke copy, and `bank_lien_test.gd` proves the statement names the responsible office, the actual figures and the exact liver securing the loan
+- [x] **AL1.7** Default has a collector, and the collector is a persisted person with a `BaselineHuman` body record and full anatomy snapshot; `Carry.send_collector()` creates one deterministic lender collector when needed, seizes the named lien, and records `debt_collector_visited`. `tests/bank_lien_test.gd` covers identity, body schema, anatomy, and history.
 
 ### AL2 — The network under it
 - [ ] **AL2.1** A sewer and tunnel layer under the region, connected and navigable
@@ -5533,6 +5578,14 @@ paperwork over things that used to be people.
 - [ ] **AL2.5** It connects holdings that are not connected above ground (AA)
 - [ ] **AL2.6** Raiding a vault from underneath is the best version of AB3
 - [ ] **AL2.7** Sound behaves differently down there, and the game lets you hear that (G)
+
+
+### AL v2 — the second pass
+AL1.5 made interest persistent in game time. It exposed the distinction the
+later R10 wording makes explicit: closing the application currently stops the
+world clock, so "whether you play or not" is not true yet.
+- [ ] **AL1.5** `v2` Reconcile real elapsed time on load without letting a long absence create an absurd or overflowed debt
+- [ ] **AL1.6** `v2` Every lender currently prints the same boilerplate; its own doctrine should change the terms without making the borrower the joke
 
 
 ### AL v10 — the final pass

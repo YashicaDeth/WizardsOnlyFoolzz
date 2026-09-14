@@ -22,6 +22,7 @@ extends RefCounted
 ##   is what stops the Choir's economy being a vending machine.
 
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
+const AnatomyComponent := preload("res://systems/anatomy_component.gd")
 
 const SPOIL_SECONDS := 420.0
 ## Kilograms a body will carry before it starts costing movement. Deliberately
@@ -169,6 +170,11 @@ func damage_item(index: int, amount: float) -> float:
 ## way to the coin, not just the body.
 const CURRENCY := "rust_scrip"
 const CURRENCY_ISSUER := "celloutz"
+## AL1.5. One in-world day is twenty-four real minutes at the current clock
+## rate. Three percent is deliberately legible after one day without making a
+## short walk across town cost more than the loan itself.
+const DEBT_INTEREST_RATE_PER_DAY := 0.03
+const DEBT_INTEREST_FACTOR_CEILING := 1000.0
 
 
 func currency_reason() -> String:
@@ -294,7 +300,14 @@ func sell(index: int, buyer_faction: String = "") -> Dictionary:
 	items.remove_at(index)
 	var inventory := WorldHistory.subject("inventory")
 	var wallet := int(inventory.get("rust_scrip", 0)) + price
-	WorldHistory.update_subject("inventory", {"items": items.duplicate(true), "rust_scrip": wallet}, "carried_part_sold")
+	# A discovered bug, not a design choice: `update_subject`'s own third
+	# argument already calls `record_event(event_type, ...)` once by itself
+	# (see its definition in `world_history.gd`) — passing "carried_part_sold"
+	# here as well as recording it explicitly below meant every sale wrote the
+	# event twice. `_market_glut()` counts occurrences of exactly this type
+	# within a window, so every real sale has been gluting the market at
+	# double the rate R1.5 actually intended since the day it was written.
+	WorldHistory.update_subject("inventory", {"items": items.duplicate(true), "rust_scrip": wallet}, "carry_changed")
 	WorldHistory.record_event("carried_part_sold", {"part": item.duplicate(true), "price": price, "currency": "rust_scrip", "buyer_faction": buyer_faction})
 	return {"item": item, "price": price, "wallet": wallet, "faction": buyer_faction, "disposition": WorldHistory.faction_disposition(buyer_faction, WorldHistory.subject("player")) if not buyer_faction.is_empty() else ""}
 
@@ -305,8 +318,85 @@ func sell(index: int, buyer_faction: String = "") -> Dictionary:
 ## rather than a second morality system — carrying a real, growing number
 ## rather than a flag.
 func debt_to(lender_faction: String) -> int:
+	accrue_interest(lender_faction)
 	var debts: Dictionary = WorldHistory.subject("inventory").get("player_debt", {})
 	return int(debts.get(lender_faction, 0))
+
+
+## AL1.5. Settle whole in-world days against the one persistent WorldClock.
+## Nothing ticks in a menu and no bank scene has to remain loaded: the next
+## read compares the saved minute with the world's current minute and catches
+## up every full day at once. Old saves have debt but no anchor; their first
+## read starts the clock now rather than inventing retroactive charges.
+func accrue_interest(lender_faction: String) -> Dictionary:
+	if lender_faction.is_empty():
+		return {"ok": false, "reason": "NO LENDER"}
+	var inventory := WorldHistory.subject("inventory")
+	var debts: Dictionary = (inventory.get("player_debt", {}) as Dictionary).duplicate(true)
+	var owed := int(debts.get(lender_faction, 0))
+	if owed <= 0:
+		return {"ok": true, "interest": 0, "owed": 0, "days": 0}
+	var anchors: Dictionary = (inventory.get("player_debt_at_minute", {}) as Dictionary).duplicate(true)
+	var now := WorldClock.minutes()
+	if not anchors.has(lender_faction):
+		anchors[lender_faction] = now
+		WorldHistory.amend_subject("inventory", {"player_debt_at_minute": anchors})
+		return {"ok": true, "interest": 0, "owed": owed, "days": 0, "migrated": true}
+	var anchor := float(anchors[lender_faction])
+	var whole_days := int(floor(maxf(now - anchor, 0.0) / WorldClock.MINUTES_PER_DAY))
+	if whole_days <= 0:
+		return {"ok": true, "interest": 0, "owed": owed, "days": 0}
+	var factor := minf(pow(1.0 + DEBT_INTEREST_RATE_PER_DAY, float(whole_days)), DEBT_INTEREST_FACTOR_CEILING)
+	var after := maxi(owed + 1, roundi(float(owed) * factor))
+	var interest := after - owed
+	debts[lender_faction] = after
+	# Carry the unused fraction forward. Settling after 25 hours charges one day
+	# and leaves the remaining hour on the account instead of forgiving it.
+	anchors[lender_faction] = anchor + float(whole_days) * WorldClock.MINUTES_PER_DAY
+	WorldHistory.amend_subject("inventory", {
+		"player_debt": debts,
+		"player_debt_at_minute": anchors,
+	})
+	WorldHistory.record_event("bank_interest_accrued", {
+		"lender_faction": lender_faction,
+		"days": whole_days,
+		"rate_per_day": DEBT_INTEREST_RATE_PER_DAY,
+		"interest": interest,
+		"owed_before": owed,
+		"owed_after": after,
+	})
+	return {"ok": true, "interest": interest, "owed": after, "days": whole_days}
+
+
+## AL1.6. The bank's voice is aimed upward, at the office that made ownership
+## ordinary paperwork. This is structured data so a future counter, receipt or
+## handheld page can typeset the same statement without each inventing its own
+## joke or turning the borrower into the target.
+func account_statement(lender_faction: String) -> Dictionary:
+	var lender := WorldHistory.subject(lender_faction)
+	if lender_faction.is_empty() or lender.is_empty():
+		return {"ok": false, "reason": "NO SUCH OFFICE"}
+	var owed := debt_to(lender_faction)
+	var security: Array[String] = []
+	for item_value in items:
+		var item: Dictionary = item_value
+		if str(item.get("lien_holder", "")) == lender_faction:
+			security.append(str(item.get("label", "UNNAMED PROPERTY")))
+	return {
+		"ok": true,
+		"office": "%s CREDIT OFFICE" % str(lender.get("name", lender_faction)).to_upper(),
+		"issuer": CURRENCY_ISSUER,
+		"account_holder": str(WorldHistory.subject("player").get("name", "THE HUNTER")),
+		"owed": owed,
+		"currency": CURRENCY,
+		"rate_per_day": DEBT_INTEREST_RATE_PER_DAY,
+		"security": security,
+		"clauses": [
+			"THE OFFICE RECORDS OWNERSHIP. IT DOES NOT PROVIDE RELIEF.",
+			"SECURITY MAY BE RECOVERED WITHOUT THE ACCOUNT HOLDER PRESENT.",
+			"ERRORS IN THIS RECORD REMAIN PAYABLE UNTIL THE OFFICE CORRECTS THEM.",
+		],
+	}
 
 
 ## Borrowing is real scrip added to the wallet now, in exchange for a real
@@ -317,11 +407,19 @@ func borrow(amount: int, lender_faction: String) -> Dictionary:
 		return {"ok": false, "reason": "NOTHING TO BORROW"}
 	if WorldHistory.subject(lender_faction).is_empty():
 		return {"ok": false, "reason": "NO SUCH LENDER"}
+	# Settle the old balance before new money joins it; a fresh loan is never
+	# charged for time that passed before it existed.
+	accrue_interest(lender_faction)
 	var inventory := WorldHistory.subject("inventory")
 	var debts: Dictionary = (inventory.get("player_debt", {}) as Dictionary).duplicate(true)
 	debts[lender_faction] = int(debts.get(lender_faction, 0)) + amount
+	var anchors: Dictionary = (inventory.get("player_debt_at_minute", {}) as Dictionary).duplicate(true)
+	anchors[lender_faction] = WorldClock.minutes()
 	var wallet := int(inventory.get("rust_scrip", 0)) + amount
-	WorldHistory.update_subject("inventory", {"rust_scrip": wallet, "player_debt": debts}, "player_borrowed")
+	# The same double-record `sell()` had: `update_subject`'s own third
+	# argument already writes one event by itself, so repeating the type in
+	# the explicit call below wrote every loan twice into WorldHistory.
+	WorldHistory.update_subject("inventory", {"rust_scrip": wallet, "player_debt": debts, "player_debt_at_minute": anchors}, "carry_changed")
 	WorldHistory.record_event("player_borrowed", {"lender_faction": lender_faction, "amount": amount, "owed_after": debts[lender_faction]})
 	return {"ok": true, "wallet": wallet, "owed": int(debts[lender_faction])}
 
@@ -339,9 +437,117 @@ func repay(amount: int, lender_faction: String) -> Dictionary:
 		return {"ok": false, "reason": "NOTHING IN THE WALLET TO PAY IT WITH"}
 	var debts: Dictionary = (inventory.get("player_debt", {}) as Dictionary).duplicate(true)
 	debts[lender_faction] = owed - paid
-	WorldHistory.update_subject("inventory", {"rust_scrip": wallet - paid, "player_debt": debts}, "player_repaid")
+	var anchors: Dictionary = (inventory.get("player_debt_at_minute", {}) as Dictionary).duplicate(true)
+	anchors[lender_faction] = WorldClock.minutes()
+	WorldHistory.update_subject("inventory", {"rust_scrip": wallet - paid, "player_debt": debts, "player_debt_at_minute": anchors}, "carry_changed")
 	WorldHistory.record_event("player_repaid", {"lender_faction": lender_faction, "amount": paid, "owed_after": debts[lender_faction]})
 	return {"ok": true, "paid": paid, "owed": int(debts[lender_faction]), "wallet": wallet - paid}
+
+
+## AL1.2. The bank does not lend against nothing. `borrow()` already writes a
+## real debt against a real lender; this is the other half — a real lien
+## written onto one exact carried item, named and found on inspection,
+## rather than an abstract number nobody can point at. Reuses `borrow()`'s
+## own ledger instead of a second one: the lien is which real item secures
+## a slice of the same real debt.
+func borrow_against(amount: int, lender_faction: String, item_index: int) -> Dictionary:
+	if item_index < 0 or item_index >= items.size():
+		return {"ok": false, "reason": "NOTHING TO SECURE IT AGAINST"}
+	var result := borrow(amount, lender_faction)
+	if not bool(result.get("ok", false)):
+		return result
+	var item: Dictionary = items[item_index]
+	item["lien"] = "%s // %d %s" % [str(WorldHistory.subject(lender_faction).get("name", lender_faction)).to_upper(), amount, CURRENCY]
+	item["lien_holder"] = lender_faction
+	items[item_index] = item
+	save_to_history()
+	WorldHistory.record_event("bank_lien_written", {"lender_faction": lender_faction, "amount": amount, "item": item.duplicate(true)})
+	result["item"] = item
+	return result
+
+
+## AL1.3. "A debt secured against something of yours, named, and they will
+## take it" — literally: default has no separate penalty invented for it,
+## the bank simply takes the exact thing the lien named. Valued at the same
+## `sale_value()` the Choir prices everything by, never a fiction number
+## invented for this one verb, so a good part clears more debt than a
+## battered one the same way selling it honestly would.
+func seize_lien(lender_faction: String) -> Dictionary:
+	for index in items.size():
+		var item: Dictionary = items[index]
+		if str(item.get("lien_holder", "")) != lender_faction:
+			continue
+		var value := sale_value(item, lender_faction)
+		items.remove_at(index)
+		var owed := debt_to(lender_faction)
+		var cleared := mini(value, owed)
+		var inventory := WorldHistory.subject("inventory")
+		var debts: Dictionary = (inventory.get("player_debt", {}) as Dictionary).duplicate(true)
+		debts[lender_faction] = owed - cleared
+		# Same bug as `sell()`/`borrow()`/`repay()` above, and this one is mine:
+		# `update_subject`'s own third argument already records one event by
+		# itself, so this wrote every seizure twice until AL1.7's own test
+		# caught it.
+		WorldHistory.update_subject("inventory", {"items": items.duplicate(true), "player_debt": debts}, "carry_changed")
+		WorldHistory.record_event("lien_seized", {"lender_faction": lender_faction, "item": item.duplicate(true), "value": value, "owed_after": debts[lender_faction]})
+		return {"ok": true, "item": item, "value": value, "owed": int(debts[lender_faction])}
+	return {"ok": false, "reason": "NOTHING LIENED TO THIS LENDER"}
+
+
+## AL1.7. "Default has a collector, and the collector is a person with a
+## body" — not the bank auto-deducting itself. Reuses `WorldHistory.
+## subjects_in_faction()` rather than a second membership index: whoever the
+## lender faction already has on record, alive, is who comes for it. A
+## faction with nobody on record yet collects through nobody named — honest
+## about the gap rather than fabricating a face this file would then have
+## to keep consistent forever.
+const DEAD_STATUSES := ["dead", "executed", "killed"]
+
+
+func collector_for(lender_faction: String) -> String:
+	for person in WorldHistory.subjects_in_faction(lender_faction):
+		if str(person.get("kind", "")) != "person":
+			continue
+		if str(person.get("status", "")).to_lower() in DEAD_STATUSES:
+			continue
+		return str(person.get("id", ""))
+	var lender := WorldHistory.subject(lender_faction)
+	if lender.is_empty():
+		return ""
+	var collector_id := "%s_collector" % lender_faction
+	WorldHistory.register_subject(collector_id, {
+		"name": "%s Collector" % str(lender.get("name", lender_faction)),
+		"kind": "person", "faction_id": lender_faction,
+		"role": "debt collector", "status": "active",
+		"body_kind": "BaselineHuman", "anatomy_state": _collector_anatomy_state(),
+	})
+	return collector_id
+
+
+static func _collector_anatomy_state() -> Dictionary:
+	var organs := {}
+	for organ_id in AnatomyComponent.ORGANS:
+		var organ: Dictionary = (AnatomyComponent.ORGANS[organ_id] as Dictionary).duplicate(true)
+		organ["ruptured"] = false
+		organs[organ_id] = organ
+	var zones := {}
+	for zone_id in AnatomyComponent.DEFAULT_ZONES:
+		zones[zone_id] = (AnatomyComponent.DEFAULT_ZONES[zone_id] as Dictionary).duplicate(true)
+	return {"blood": 5000.0, "blood_capacity": 5000.0, "organs": organs, "zones": zones}
+
+
+## The visit itself: the same seizure `seize_lien()` already performs, plus
+## who actually did it — named, findable in the world, inspectable in their
+## own dossier — so a defaulted debt reads as a person coming for a thing
+## rather than scrip vanishing from an account on its own.
+func send_collector(lender_faction: String) -> Dictionary:
+	var seized := seize_lien(lender_faction)
+	if not bool(seized.get("ok", false)):
+		return seized
+	var collector_id := collector_for(lender_faction)
+	seized["collector_id"] = collector_id
+	WorldHistory.record_event("debt_collector_visited", {"lender_faction": lender_faction, "collector_id": collector_id, "item": (seized.get("item", {}) as Dictionary).duplicate(true)})
+	return seized
 
 
 func drop(index: int) -> Dictionary:
