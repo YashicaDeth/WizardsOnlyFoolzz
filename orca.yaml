@@ -1,3 +1,0 @@
-scripts:
-  setup: |
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup\orca_worktree_setup.ps1
