@@ -49,6 +49,12 @@ func _test_rig_shape() -> void:
 		if hitbox == null or str(hitbox.get_meta("body_zone", "")) != zone_id:
 			missing.append("%s_hitbox" % zone_id)
 	check(missing.is_empty(), "every canonical zone has a mesh and a tagged hitbox (missing %s)" % str(missing))
+	# Shoulders are chest-owned bridges, not arm-owned spheres. That makes the
+	# silhouette read as one body and leaves a physical shoulder behind when an
+	# arm is severed instead of exposing a daylight seam at the torso.
+	check(body.shoulders.size() == 2 \
+		and body.shoulders.get("left_arm") != null \
+		and body.shoulders.get("right_arm") != null, "the torso carries both shoulder caps")
 	# Proximity voice needs one consistent place to speak from on any body.
 	check(body.head_anchor != null and body.head_anchor.position.y > 1.0, "rig exposes a head anchor for voice")
 	check((body.bones.torso as Node3D).get_child_count() >= BaselineHuman.SPINE_VERTEBRAE, "the torso rig carries all 33 vertebrae")
@@ -127,6 +133,8 @@ func _test_severing() -> void:
 	var second := body.hit("right_arm", 44.0, 28.0, "cut", "", Vector3.RIGHT)
 	check(bool(second.get("severed", false)) and body.severed.has("right_arm"), "the cross-cut crossing the limb threshold severs mid-fight")
 	check(not (body.get_node("right_arm") as MeshInstance3D).visible, "a severed limb stops rendering")
+	var right_shoulder := body.shoulders.get("right_arm") as MeshInstance3D
+	check(right_shoulder != null and right_shoulder.visible, "the chest keeps its shoulder after an arm is severed")
 	check(not body.anatomy.dead and not body.anatomy.downed, "losing an arm leaves the person alive and still in the fight")
 	check(body.anatomy.combat_ratio() < combat_before, "arm loss reduces combat ability (%.2f -> %.2f)" % [combat_before, body.anatomy.combat_ratio()])
 	check(body.zone_nearest(body.to_global(Vector3(0.34, 1.12, 0))) != "right_arm", "a severed limb cannot be hit again")
