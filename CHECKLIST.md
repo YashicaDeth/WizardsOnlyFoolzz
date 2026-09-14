@@ -2574,11 +2574,11 @@ diegetic.
 ### P3 — The wall
 The part that makes it a demo rather than a trial. It is a designed moment, in
 the game's own voice, not a fade to a store page.
-- [ ] **P3.1** The game stops at an authored point, deliberately and visibly
-- [ ] **P3.2** The stop is in the register — CellOutz would bill you for it
-- [ ] **P3.3** It arrives *after* a win, not in the middle of one
-- [ ] **P3.4** What the player loses by stopping is made concrete: the wall names what was next
-- [ ] **P3.5** The stop is written into WorldHistory like any other ending
+- [x] **P3.1** The game stops at an authored point, deliberately and visibly — the Hunt freezes under a full-frame `DemoWall` only after its first real story victory
+- [x] **P3.2** The stop is in the register — CellOutz closes the demonstration account with a final invoice and bills the balance as `THE REST OF THE GAME`
+- [x] **P3.3** It arrives *after* a win, not in the middle of one — the only hook is `_rival_retreats()`, after `hunt_arc_first_beat_complete` records that the Ashline captain was forced from the field
+- [x] **P3.4** What the player loses by stopping is made concrete: the invoice names the outer Ashbloom road, the captain's rebuilt second hunt, and Board/Wire contracts
+- [x] **P3.5** The stop is written into WorldHistory like any other ending — `complete_demo()` writes `demo_run.status = ended`, the ending id, and one idempotent `demo_ending_reached` event to the isolated demo ledger
 
 ### P4 — The half hour
 - [ ] **P4.1** Playable within sixty seconds of launching
@@ -2600,7 +2600,7 @@ The last rung. Fifteen statements that are true of the demo when this game is fi
 - [x] **P10.1** `v10` One build, two doors: PLAY and DEMO on the same menu — both are built into `country_town_menu.gd`, in the executable's existing main-menu scene
 - [ ] **P10.2** `v10` The demo is the real game with exploration locked off
 - [x] **P10.3** `v10` Nothing in it is a special build that can rot — DEMO changes a runtime route/save mode and invokes the same scene transition function as PLAY; no duplicate scene, project or export exists
-- [ ] **P10.4** `v10` It ends because the game stops, not because a timer did
+- [x] **P10.4** `v10` It ends because the game stops, not because a timer did — victory in the real Hunt is the hinge; no elapsed-time check exists
 - [ ] **P10.5** `v10` It shows the opening: captured, quiz, tortured, festival, derby, out
 - [ ] **P10.6** `v10` Combat, the handheld and the map are all fully present
 - [ ] **P10.7** `v10` It is playable without anybody explaining anything

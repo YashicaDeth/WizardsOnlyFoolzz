@@ -105,6 +105,7 @@ const HELD_GEAR := preload("res://systems/held_gear.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
 const PIN_BOARD := preload("res://systems/pin_board.gd")
+const DEMO_WALL := preload("res://systems/demo_wall.gd")
 const IMPACT_FEEL := preload("res://systems/impact_feel.gd")
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 const CARRION_SCAVENGER := preload("res://systems/carrion_scavenger.gd")
@@ -543,6 +544,7 @@ var world_index: Control
 ## tests — there has never been a key that opens it, which is why Greg could not
 ## remember how to reach it. There is one now.
 var pin_board: Control
+var demo_wall: Control
 ## The cursor the game draws for itself while the OS one is hidden.
 var _pointer: Control
 ## O2.2. The moment of contact. There was none — see impact_feel.gd.
@@ -700,6 +702,15 @@ func _ready() -> void:
 	pin_board = PIN_BOARD.new()
 	pin_board.name = "PinBoard"
 	$HUD.add_child(pin_board)
+	demo_wall = DEMO_WALL.new()
+	demo_wall.name = "DemoWall"
+	$HUD.add_child(demo_wall)
+	demo_wall.front_door_requested.connect(_leave_demo_wall)
+	# An ended demo remains ended when its dedicated save is resumed. The front
+	# door routes a won opening to this real scene, which immediately restores
+	# the wall instead of dropping the player back behind the authored stop.
+	if WorldHistory.is_demo() and str(WorldHistory.subject("demo_run").get("status", "")) == "ended":
+		demo_wall.call_deferred("open_wall")
 	# AG1.7, from the first playtest: "when I'm looking through the Tree section
 	# I can't see my mouse cursor." B3.5 hid the OS pointer so the game could own
 	# it, and then only the index ever drew a replacement — so every other panel
@@ -3748,6 +3759,16 @@ func _rival_retreats(message: String) -> void:
 	WorldHistory.record_event("hunt_arc_first_beat_complete", {"target": CAST.id_for(CAPTAIN_SLOT), "outcome": "escaped", "location": HUNT_LOCATION})
 	RIVAL_REGISTRY.consider(CAST.id_for(CAPTAIN_SLOT))
 	prompt.text = message
+	if WorldHistory.complete_demo("ashline_captain_repulsed", {
+		"after": "hunt_arc_first_beat_complete",
+		"location": HUNT_LOCATION,
+		"next": ["outer_ashbloom_road", "ashline_second_hunt", "board_contracts"],
+	}):
+		demo_wall.open_wall()
+
+
+func _leave_demo_wall() -> void:
+	get_tree().change_scene_to_file("res://country_town_menu.tscn")
 
 
 ## Live contacts for the map, expressed as plain data so the map never reaches
