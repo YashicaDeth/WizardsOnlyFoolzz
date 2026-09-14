@@ -54,11 +54,29 @@ const WHEEL_ANCHORS := [
 ## that is not a detail: it is why it can be kicked sideways.
 const FRONT_WHEELS := [0, 1]
 const REAR_WHEELS := [2, 3]
-const WHEEL_RADIUS := 0.30
+## Matched to `art/scrap_skiff.glb`, which is what the car actually looks like:
+## its wheel meshes are 0.70 units tall, so the radius is 0.35. This was 0.30,
+## measured against nothing, and the gap is why the visible wheels could never
+## sit on the surface the physics was standing on.
+const WHEEL_RADIUS := 0.35
 const SUSPENSION_REST := 0.35
 ## Expressed as multiples of mass so the ride height does not change if the
 ## chassis is ever made heavier or lighter.
-const SPRING_RATE := 26.0
+## Each wheel pushes back with `compression * SPRING_RATE * mass * 0.25`, so at
+## rest four wheels carry `SPRING_RATE * compression * mass`, and equilibrium is
+## `compression = gravity / SPRING_RATE`.
+##
+## At 26 that is 9.8 / 26 = 0.377 — **larger than SUSPENSION_REST**. The spring
+## could not hold the car up, compression clamped at 0.35 every frame, and the
+## derby has been driving around bottomed out on its bump stops since the
+## suspension model was written. The chassis half-height is 0.65 and the ground
+## sat at exactly -0.65 in body space, which is to say the hull was resting on
+## the floor: Greg's "dragging", measured.
+##
+## 82 puts equilibrium at 0.12, a little under a third of available travel,
+## which is where a road car sits and leaves real compression for a landing
+## instead of spending it all standing still.
+const SPRING_RATE := 82.0
 const SPRING_DAMP := 4.4
 ## Roughly 30 degrees of lock.
 const MAX_STEER := 0.52
@@ -125,6 +143,39 @@ var stun := 0.0
 var contact_seconds := 0.0
 var stuck_seconds := 0.0
 var grind_side := 1.0
+## Godot's own default, and the value the derby actually falls at. Named here
+## because the rest height below is solved against it rather than measured by
+## dropping a car and squinting.
+const GRAVITY := 9.8
+
+
+## How far the suspension is compressed when the car is simply standing still.
+##
+## Solved, not tuned: four wheels each returning `c * SPRING_RATE * mass * 0.25`
+## carry `c * SPRING_RATE * mass`, which balances `GRAVITY * mass` at
+## `c = GRAVITY / SPRING_RATE`. Clamped the same way the per-frame force is, so
+## if a future spring rate is ever too soft again this reports the bottomed-out
+## value rather than a number the car cannot actually reach.
+static func rest_compression() -> float:
+	return minf(GRAVITY / SPRING_RATE, SUSPENSION_REST)
+
+
+## True when the spring cannot hold the car up at all and it is riding on its
+## bump stops. Worth being able to ask, because the symptom — a car that drags,
+## bottoms on every bump and has no travel left to absorb a landing — reads as
+## ten different handling problems rather than as one wrong constant.
+static func bottomed_out() -> bool:
+	return GRAVITY / SPRING_RATE >= SUSPENSION_REST
+
+
+## Where the ground is, in the chassis's own space, with the car at rest. This
+## is the number anything hanging a wheel or a body shell off the chassis needs,
+## and the only correct source for it is the suspension model itself.
+static func rest_contact_y() -> float:
+	var anchor: Vector3 = WHEEL_ANCHORS[0]
+	return anchor.y - (SUSPENSION_REST + WHEEL_RADIUS - rest_compression())
+
+
 ## Per-wheel state, kept for the AI, the audio and the camera to read.
 var wheel_contacts := [false, false, false, false]
 var wheel_loads := [0.0, 0.0, 0.0, 0.0]

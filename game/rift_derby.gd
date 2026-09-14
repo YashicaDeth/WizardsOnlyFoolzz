@@ -49,6 +49,10 @@ const DRIVER_BUST_FRAME := Rect2(Vector2(22, 18), Vector2(150, 178))
 ## the chassis at spawn time because the collider is built in `_ready()` too,
 ## so the shape does not exist yet on the frame the car is instanced.
 const CHASSIS_DIMENSIONS := Vector3(2.65, 1.3, 4.8)
+## The lowest point of the wheel meshes in `scrap_skiff.glb`, in the model's own
+## units. Measured off the file rather than guessed (`tests/skiff_probe.gd`
+## prints it); the shell is seated by this so its tyres meet the ground.
+const SKIFF_WHEEL_BOTTOM := 0.030
 
 ## Authored props that fight the read at arena scale. Hidden rather than deleted
 ## from the kit, so a re-export can reinstate them deliberately.
@@ -355,6 +359,7 @@ func _build_boat() -> void:
 	authored_skiff.name = "AuthoredScrapSkiff"
 	authored_skiff.scale = Vector3(1.15, 1.15, 1.15)
 	boat.add_child(authored_skiff)
+	_seat_shell(authored_skiff)
 	WorldLook.regrime(authored_skiff, 3)
 	_dress_vehicle_biopunk(boat, 3)
 	_add_vehicle_damage_parts(boat as RigidBody3D, 12)
@@ -434,6 +439,9 @@ func _create_wrecker(index: int) -> void:
 		authored_skiff.rotation.y = PI
 	if index == 0:
 		authored_skiff.scale *= 1.12
+	# After the last scale change, never before it — the seat height depends on
+	# the scale, and index 0 has its own.
+	_seat_shell(authored_skiff)
 	WorldLook.regrime(authored_skiff, index + 5)
 	_dress_vehicle_biopunk(target, index + 5, false)
 	_add_vehicle_damage_parts(target, index)
@@ -1044,6 +1052,21 @@ func _add_authored_environment_collision(root_node: Node) -> void:
 ## one. Silhouette's vehicle kit hangs those on afterward, parented to the
 ## chassis body itself so the greebles sit in real chassis-local metres
 ## regardless of whatever scale the authored shell renders at.
+## The shell's own origin is its ground plane — `scrap_skiff.glb` has its wheel
+## meshes bottoming at y 0.030 — and it was being parented straight onto the
+## chassis, whose origin is its centre. So the whole visible car floated about
+## two thirds of a metre above the surface the raycasts were standing on: wheels
+## in the air, and with the spring bottomed out (see `arcade_vehicle.gd`) a hull
+## dragging through the floor underneath them. Greg saw both and described both.
+##
+## Sit it on the contact patch instead, and ask the suspension where that is
+## rather than hardcoding a number that goes stale the moment a spring rate or a
+## wheel radius changes.
+func _seat_shell(shell: Node3D) -> void:
+	var scale_y: float = shell.scale.y
+	shell.position.y = VEHICLE.rest_contact_y() - SKIFF_WHEEL_BOTTOM * scale_y
+
+
 func _dress_vehicle_biopunk(target: Node3D, seed_value: int, include_spatter: bool = true) -> void:
 	SILHOUETTE.dress_vehicle(target, CHASSIS_DIMENSIONS, VEHICLE.WHEEL_ANCHORS, seed_value, Callable(self, "_vehicle_surface"), include_spatter)
 
