@@ -104,6 +104,15 @@ static func _default_anatomy_state() -> Dictionary:
 	return {"blood": 5000.0, "blood_capacity": 5000.0, "organs": organs, "zones": zones}
 
 
+## A cost can stand on its own.  Petitions and creditors spend the same body /
+## standing ledger as a boon, but they must not invent a fake timed boost merely
+## to get access to it.  Keep the actual debit private below and expose this
+## narrow public door so those systems cannot couple themselves to an underscore
+## implementation detail.
+static func pay(subject_id: String, cost_kind: String, amount: float, cost_target: String = "") -> Dictionary:
+	return _pay(subject_id, cost_kind, amount, cost_target)
+
+
 static func _pay(subject_id: String, cost_kind: String, amount: float, cost_target: String) -> Dictionary:
 	var subject := WorldHistory.subject(subject_id)
 	var anatomy: Dictionary = subject.get("anatomy_state", {})
