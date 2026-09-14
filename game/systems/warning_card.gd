@@ -13,18 +13,25 @@ extends Control
 
 signal chosen(gore_mode: String)
 
+## This is a description of what the game already is at every tier — the
+## world's own aggression, its language, what it implies about sex and
+## drugs — not a promise that a lower tier launders any of it. Only the
+## gore axis is actually mechanically gated today
+## (`BaselineHuman.apply_gore_setting()`, splat detail and whether they
+## render at all); CLINICAL is the honest floor of what that one dial can
+## turn down, stated plainly rather than implied.
 const TIERS := [
 	{
 		"id": "OFF", "name": "CLINICAL",
-		"note": "No blood, no viscera. The record still says what happened to them.",
+		"note": "No blood, no viscera. The record still says what happened to them. Nothing else here is softened — the temper, the mouths, what people want stay exactly as they are.",
 	},
 	{
 		"id": "REDUCED", "name": "FIELD CONDITIONS",
-		"note": "What you would actually see, badly lit, mostly at speed.",
+		"note": "What you would actually see, badly lit, mostly at speed. Full aggression, full language, adult content and drug use throughout — this tier softens the wound, not the world.",
 	},
 	{
 		"id": "FULL", "name": "UNRESTRICTED",
-		"note": "Everything the body has, on the floor, for as long as you stand there.",
+		"note": "Everything the body has, on the floor, for as long as you stand there. No limits anywhere — violence, aggression, language, sex, drugs. This is the game as written.",
 	},
 ]
 
@@ -144,6 +151,58 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
+## The words say what each tier is; this is the same claim shown rather than
+## told. One small silhouette per row, unmarked at CLINICAL, opening up
+## further at each tier down to UNRESTRICTED's missing limb — procedural
+## rather than three authored images for the reason every mark in this
+## project is: nothing to keep in sync if a tier's own balance is retuned
+## later. Seeded per tier rather than per frame, so the preview holds still
+## instead of crawling every redraw.
+## Word-wraps at the stencil face's own measured width rather than a character
+## count, so a run of narrow letters and a run of wide ones both actually fit
+## the line they were measured against.
+func _wrap_condensed(text: String, cap: float, tracking: float, max_width: float) -> Array[String]:
+	var lines: Array[String] = []
+	var current := ""
+	for word in text.split(" "):
+		var candidate := word if current.is_empty() else "%s %s" % [current, word]
+		if CellOutzType.width_condensed(candidate, cap, tracking) > max_width and not current.is_empty():
+			lines.append(current)
+			current = word
+		else:
+			current = candidate
+	if not current.is_empty():
+		lines.append(current)
+	return lines
+
+
+func _draw_gore_preview(at: Vector2, tier_index: int) -> void:
+	var ghost := INK * Color(1, 1, 1, 0.45)
+	draw_line(at + Vector2(0, -20), at + Vector2(0, 14), ghost, 2.0)
+	draw_circle(at + Vector2(0, -27), 7.0, ghost)
+	draw_line(at + Vector2(0, -10), at + Vector2(-11, 3), ghost, 2.0)
+	draw_line(at + Vector2(0, -10), at + Vector2(11, 3), ghost, 2.0)
+	draw_line(at + Vector2(0, 14), at + Vector2(-9, 32), ghost, 2.0)
+	var right_leg_gone := tier_index == 2
+	if not right_leg_gone:
+		draw_line(at + Vector2(0, 14), at + Vector2(9, 32), ghost, 2.0)
+	if tier_index == 0:
+		return
+	# CLINICAL is the honest floor of the one dial this actually is — see the
+	# note on `TIERS` above.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 90210 + tier_index
+	var marks := 4 if tier_index == 1 else 14
+	for _mark in marks:
+		var offset := Vector2(rng.randf_range(-13.0, 13.0), rng.randf_range(-24.0, 30.0))
+		draw_circle(at + offset, rng.randf_range(1.1, 2.6), ARTERIAL * Color(1, 1, 1, 0.85))
+	if right_leg_gone:
+		# The stump, not the intact silhouette everything else on this card
+		# points at — the one row where the preview stops implying and shows.
+		draw_line(at + Vector2(0, 14), at + Vector2(3, 22), ARTERIAL, 3.0)
+		draw_circle(at + Vector2(3, 22), 2.6, ARTERIAL)
+
+
 func _draw() -> void:
 	if not visible:
 		return
@@ -188,6 +247,7 @@ func _draw() -> void:
 		var accent_row := ARTERIAL if index == 2 else (ACID if index == 1 else INK)
 		CellOutzType.draw_text(self, row.position + Vector2(20, 18), "%02d" % (index + 1), 15.0, INK * Color(1, 1, 1, 0.4), 1.6)
 		CellOutzType.draw_text(self, row.position + Vector2(62, 15), str(TIERS[index].name), 21.0, accent_row * Color(1, 1, 1, 1.0 if index == highlighted else 0.78), 3.0)
+		_draw_gore_preview(row.position + Vector2(725, 25), index)
 		if index == highlighted:
 			var accent := ARTERIAL if index == 2 else (ACID if index == 1 else INK)
 			var slide := 5.0 + sin(clock * 6.0) * 2.0
@@ -199,10 +259,16 @@ func _draw() -> void:
 
 	# The consequence line sits in one fixed place under the rows. Drawing it
 	# beneath the highlighted row put it through the row below and off the card
-	# entirely on the last tier.
-	CellOutzType.draw_condensed(self, Vector2(60, DESIGN.y - 66), str(TIERS[highlighted].note), 10.0,
-		INK * Color(1, 1, 1, 0.78), 1.0)
+	# entirely on the last tier. Wrapped rather than one line now that the note
+	# actually says what every tier covers, not only what it looks like — the
+	# unwrapped text ran clean off the right edge of the card, uncut, on the
+	# capture that first proved it.
+	var note_lines := _wrap_condensed(str(TIERS[highlighted].note), 10.0, 1.0, DESIGN.x - 120.0)
+	var note_y := DESIGN.y - 58.0 - float(note_lines.size() - 1) * 14.0
+	for line in note_lines:
+		CellOutzType.draw_condensed(self, Vector2(60, note_y), line, 10.0, INK * Color(1, 1, 1, 0.78), 1.0)
+		note_y += 14.0
 
-	CellOutzType.draw_condensed(self, Vector2(60, DESIGN.y - 36), "THIS CHOICE CAN BE CHANGED LATER. THE BODIES CANNOT.", 9.0,
+	CellOutzType.draw_condensed(self, Vector2(60, DESIGN.y - 28), "THIS CHOICE CAN BE CHANGED LATER. THE BODIES CANNOT.", 9.0,
 		BILE * Color(1, 1, 1, 0.65), 1.2)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
