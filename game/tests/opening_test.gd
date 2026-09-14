@@ -170,5 +170,6 @@ func _ready() -> void:
 	derby._finish_round("won")
 	derby._finish_round("lost")
 	check(derby.round_state == "won" and derby.mode_label.visible, "terminal derby result is stable and visible")
+	check(OpeningDirector.reached("won_derby"), "winning the real derby advances the opening route")
 	print("OPENING_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
