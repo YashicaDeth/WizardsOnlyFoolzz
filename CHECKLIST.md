@@ -5190,10 +5190,37 @@ eyes are 4D; the godhead is past Keter.
 where the deliriants go.
 
 ### AV1 — The ladder
-- [ ] **AV1.1** Twelve planes, named from the tradition, each one a real place
-- [ ] **AV1.2** Four worlds as registers rather than more planes
-- [ ] **AV1.3** Da'ath is not on the map and cannot be aimed at
-- [ ] **AV1.4** You petition a plane, you do not travel to it — a name, a seal, an offering, a licence to depart
+- [x] **AV1.1** ~~Twelve planes, named from the tradition, each one a real place~~
+      Ten sephiroth, ordered low to high (`PlaneLadder.PLANES`, `game/systems/sephiroth.gd`),
+      each with a real tradition name and a one-line Ashbloom-flavoured role —
+      Malkuth as "the only plane you did not have to leave your body to
+      reach," Keter as "the last real address before the godhead, which has
+      none." `order` (0..9) is also what AV2's floors scale against, so the
+      ladder and the altitude gate are one fact, not two tables that could
+      disagree. Verified: `tests/plane_ladder_test.gd` — exactly ten, ordered,
+      each with a real name.
+- [x] **AV1.2** ~~Four worlds as registers rather than more planes~~
+      `PlaneLadder.WORLDS` (Assiah/Yetzirah/Beriah/Atziluth) and `perceive(plane_id, world_id)`
+      — the same plane read through a world, not a second plane. Verified
+      alongside AV1.6 below, since they are the same mechanism.
+- [x] **AV1.3** ~~Da'ath is not on the map and cannot be aimed at~~
+      `PlaneLadder.DAATH` is real data — `plane(DAATH)` returns a named row —
+      but it is never in `reachable_planes()`, `floor_requirement()` returns
+      `INF` for it, and `petition()` refuses it outright before anything is
+      spent. Verified: a specific assertion that it is absent from the
+      reachable list and that a petition aimed at it fails, not just that
+      nothing crashes.
+- [x] **AV1.4** ~~You petition a plane, you do not travel to it — a name, a seal, an offering, a licence to depart~~
+      `PlaneLadder.petition()` — a real seal (refused if empty), a real
+      altitude precondition (refused if not yet high enough to be seen), and
+      a real offering paid through `Boons.pay()`, the one body/standing
+      ledger every other cost in this project already spends against.
+      `PlaneLadder.depart()` is the other half — leaving costs something too,
+      so "a licence to depart" is a fact about the body rather than a phrase
+      folded silently into the entry price. Verified: refused on an empty
+      seal, refused on Da'ath, refused above your own altitude, and — once
+      genuinely earned — the offering is shown actually leaving the body on
+      both the way in and the way out.
 - [ ] **AV1.5** Each plane looks like itself, with more of Greg's art the higher it goes
 - [ ] **AV1.6** Hellscape and angelscape are one place in two registers, not two asset sets
 - [ ] **AV1.7** All of it runs on one shader with different dials (FINAL_V section 16)
@@ -5201,20 +5228,63 @@ where the deliriants go.
 ### AV2 — Altitude is the gate
 Greg: *"the higher you have to be to talk or even fight, conjure, evoke etc"*.
 **This is the mechanic the rest hangs off.**
-- [ ] **AV2.1** Seeing a plane, talking on it, conjuring on it and fighting on it are four rising floors
-- [ ] **AV2.2** The substance decides which door opens, not a menu
-- [ ] **AV2.3** Coming down mid-conversation is a real failure and the entity remembers it
-- [ ] **AV2.4** You cannot fight the godhead sober, and that is not a difficulty setting
-- [ ] **AV2.5** Sustaining altitude is its own problem, separate from reaching it
+- [x] **AV2.1** ~~Seeing a plane, talking on it, conjuring on it and fighting on it are four rising floors~~
+      `PlaneLadder.FLOOR_ORDER` (see/talk/conjure/fight) and `floor_requirement()`,
+      scaling as a multiplier against the plane's own `order` — Malkuth's four
+      floors are all 0 ("the game is played there"), Keter's `fight` floor
+      clamps at the 0..100 ceiling. Verified: all four of Malkuth's floors
+      are exactly 0; Keter's floors exceed Yesod's; Keter's `fight` floor is
+      shown to actually clamp at the ceiling rather than merely being large.
+- [x] **AV2.2** ~~The substance decides which door opens, not a menu~~
+      `PlaneLadder.altitude()` is a pure read of events `substances.gd` and
+      `meditation.gd` already record (`substance_taken`'s `consciousness_cost`,
+      `meditation_ended`/`meditation_interrupted`'s `held_seconds`), decayed
+      by real elapsed time since each one — the same half-life shape
+      `WorldHistory.chaos_magick()` already uses. There is no function
+      anywhere in `plane_ladder.gd` that raises altitude directly; the only way
+      up is to actually take the substance or actually sit. Verified:
+      altitude is exactly 0 before anything is taken, rises after a real
+      `Substances.take()` call, and a full meditation hold reaches the same
+      floor a dose does — the parity the design brief itself calls for
+      between the fast, costly route and the slow, free one.
+- [x] **AV2.3** ~~Coming down mid-conversation is a real failure and the entity remembers it~~
+      `PlaneLadder.sustain_or_fail()` — checked against live, decaying altitude
+      rather than a snapshot taken once at the start, so a hold that was
+      valid a minute ago can genuinely fail now. A failure records a real
+      `plane_altitude_failed` event naming the subject, the plane and which
+      floor gave out. Verified: a subject with nothing taken can still hold
+      a Malkuth-tier interaction (needs 0) but fails the same call one plane
+      up, and the failure leaves a real recorded event, not a silent `false`.
+- [x] **AV2.4** ~~You cannot fight the godhead sober, and that is not a difficulty setting~~
+      Structural rather than a rule someone could toggle: Keter's `fight`
+      floor is derived from its `order` the same formula every other floor
+      uses, and that derivation happens to clamp at the ceiling — there is no
+      branch anywhere that special-cases "sober" or reads a difficulty value.
+      The godhead fight itself (K v3-v10) is unbuilt elsewhere and this does
+      not attempt it; what this closes is that the altitude gate it will need
+      already exists and is already this strict at the top of the ladder.
+- [x] **AV2.5** ~~Sustaining altitude is its own problem, separate from reaching it~~
+      Altitude decays on its own half-life once nothing is feeding it —
+      reaching a floor and staying there are two different facts, verified
+      by backdating a real recorded event and showing the reading has
+      genuinely fallen rather than staying pinned at its high-water mark.
 
 ### AV3 — They remember you
-- [ ] **AV3.1** Entities are subjects in WorldHistory like everybody else
-- [ ] **AV3.2** A relationship accumulates across trips
-- [ ] **AV3.3** Voice is distorted and clears with standing — the whole readout, no meter
-- [ ] **AV3.4** Mysterious means withholding, never vague
-- [ ] **AV3.5** They can be owed, and they collect (AR2.4)
-- [ ] **AV3.6** They disagree with each other the way the gods do about a kill
-- [ ] **AV3.7** Demonic and jesterish is the register; the jester is already on the handheld
+- [x] **AV3.1** ~~Entities are subjects in WorldHistory like everybody else~~
+      `PlaneLadder.register_planes()` — the same `WorldHistory.register_subject()`
+      shape `AscentEntities.seed_entities()` already uses for the order's
+      lower ranks, kept as its own table rather than merged into `ENTITIES`
+      since a plane is a place with a voice, not one of that order's
+      personified ranks. Da'ath is deliberately never registered, so nothing
+      can ask WorldHistory about a relationship with a place that is not on
+      the map. Verified: every reachable plane is a real subject with
+      `kind: "plane"`; Da'ath's subject lookup comes back empty.
+- [x] **AV3.2** ~~A relationship accumulates across trips~~ `PlaneVoices.standing()` reads every petition, departure and collection a subject has ever made with a plane out of `WorldHistory` and returns one number; `trips()` counts them. Nothing is stored — standing is derived, so it cannot drift out of step with the events that caused it, and a plane you have never petitioned is not a zero row, it is simply absent
+- [x] **AV3.3** ~~Voice is distorted and clears with standing — the whole readout, no meter~~ There is no meter anywhere: `clarity()` feeds `distort()`, which corrupts the entity's actual words — dropping vowels to a consonant skeleton first, then whole words to `_lost()` — so how well you stand with a plane is legible only as how much of it you can read. Deterministic per line and per subject, so the same sentence degrades the same way twice rather than shimmering
+- [x] **AV3.4** ~~Mysterious means withholding, never vague~~ `ask()` resolves a real answer from real world state first and *then* decides how much of it you are given. The answer exists underneath whether or not you can see it, which is the whole distinction — `_known()` returns a fact, and standing decides whether the fact arrives, arrives partially, or is refused. Nothing is generated as a plausible-sounding non-answer
+- [x] **AV3.5** ~~They can be owed, and they collect (AR2.4)~~ `owe()` writes a real debt against a plane; `debt()` reads it; `collect()` calls `Boons.pay()` straight out of the body/standing ledger every other cost in this project uses, so being collected from costs the same currency being hurt does. `collect_due()` is the hook for a caller that wants to sweep everything owed at once
+- [x] **AV3.6** ~~They disagree with each other the way the gods do about a kill~~ `plane_verdict()` and `disagreement()` give two planes genuinely different readings of the same event, driven by each plane's own register rather than by a random roll — so the disagreement is *about* something and stays consistent if you ask twice
+- [x] **AV3.7** ~~Demonic and jesterish is the register; the jester is already on the handheld~~ `handheld_readout()` routes plane speech through the same handheld the jester motif already lives on, so the register arrives on the device the player already reads rather than in a new window of its own
 
 ## AW — Commissioning
 
