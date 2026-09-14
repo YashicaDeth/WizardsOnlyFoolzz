@@ -61,7 +61,16 @@ func _ready() -> void:
 	var expiring := Boons.grant("player", "flash_courage", "aggression", 0.6, 0.05, "standing", 2.0)
 	check(bool(expiring.get("ok", false)), "a short boost is still granted")
 	check(Boons.active_boons("player").any(func(b): return str((b as Dictionary).get("id", "")) == "flash_courage"), "and is active immediately")
-	await get_tree().create_timer(0.2).timeout
+	# Backdate the stored grant instead of waiting on wall time. Headless runs
+	# may not advance their frame clock while booting project autoloads, and this
+	# test is about expiry/pruning, not the engine's timer implementation.
+	var subject := WorldHistory.subject("player")
+	var active: Array = (subject.get("active_boons", []) as Array).duplicate(true)
+	for raw in active:
+		var boon: Dictionary = raw
+		if str(boon.get("id", "")) == "flash_courage":
+			boon["granted_msec"] = int(boon.get("granted_msec", 0)) - int(boon.get("duration_msec", 0)) - 1
+	WorldHistory.amend_subject("player", {"active_boons": active})
 	check(not Boons.active_boons("player").any(func(b): return str((b as Dictionary).get("id", "")) == "flash_courage"), "and is gone once its duration has actually passed")
 
 	print("BOONS_TEST_RESULT failures=", failures.size())
