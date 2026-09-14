@@ -126,7 +126,7 @@ It is also the only lane that should ever resolve a conflict.
 
 ---
 
-## Three rules that override every target above
+## Four rules that override every target above
 
 1. **Never `git add -A`.** Roughly 140 `.import`/`.uid` files churn constantly,
    and two blanket adds in one day swept other agents' uncommitted work into
@@ -149,3 +149,11 @@ It is also the only lane that should ever resolve a conflict.
    five-parameter `dress_vehicle` beat HEAD's six-parameter one, and the caller
    passes six. Git cannot see a signature change. Build and run the suites
    after every merge, before committing it.
+
+4. **Never measure in the same breath as `--import`.** A suite run immediately
+   after the class cache is rebuilt reports failures that do not exist:
+   `weapon_jam_test` said 5 of 23 failed that way, then passed 23 of 23 seven
+   times in a row on the same tree. This is the same cold-cache trap as the
+   phantom "function not found", wearing the opposite face -- there it invents
+   missing functions, here it invents failing checks. Let the import finish,
+   then measure.
