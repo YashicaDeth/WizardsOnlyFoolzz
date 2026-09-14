@@ -482,7 +482,16 @@ func _draw_unwalked_veil() -> void:
 			# have properly walked clears fast — the satisfying part is the last bit
 			# coming off, the way wiping a window is.
 			var veil := pow(1.0 - clearness, 1.45)
-			draw_rect(patch, Color(0.46, 0.47, 0.44, veil * 0.88))
+			# On the satellite view this used to redraw each unseen cell as a
+			# fully square grey slab.  The world was correct underneath, but the
+			# exploration boundary read as a grid of apartment blocks.  A soft,
+			# overlapping survey bloom keeps the information while letting the
+			# actual terrain remain the dominant shape.
+			if _satellite_live():
+				var bloom_radius := minf(step * 0.73, minf(patch.size.x, patch.size.y) * 0.73)
+				draw_circle(patch.get_center(), bloom_radius, Color(0.46, 0.47, 0.44, veil * 0.48), true, -1.0, true)
+			else:
+				draw_rect(patch, Color(0.46, 0.47, 0.44, veil * 0.88))
 			# A breath of haze that lingers even on cleared ground, so the map never
 			# reads as a clean render of a place nobody has been to.
 			if clearness > 0.0 and clearness < 1.0:
@@ -505,8 +514,16 @@ func _draw_unsurveyed() -> void:
 			if not _chart.intersects(cell):
 				continue
 			var patch := cell.intersection(_chart)
-			draw_rect(patch, Color(0.03, 0.045, 0.038, 0.82))
-			draw_texture_rect(_hatch, patch, true, Color(0.35, 0.42, 0.28, 0.22))
+			if _satellite_live():
+				# Survey uncertainty is atmospheric over a live world image, not a
+				# square cover laid over it. Keep a faint ring/hatch for the map's
+				# printed language without turning buildings into blocky fog tiles.
+				var radius := minf(step * 0.48, minf(patch.size.x, patch.size.y) * 0.48)
+				draw_circle(patch.get_center(), radius, Color(0.025, 0.040, 0.033, 0.38), true, -1.0, true)
+				draw_arc(patch.get_center(), radius, 0.0, TAU, 18, Color(0.35, 0.42, 0.28, 0.22), 0.8, true)
+			else:
+				draw_rect(patch, Color(0.03, 0.045, 0.038, 0.82))
+				draw_texture_rect(_hatch, patch, true, Color(0.35, 0.42, 0.28, 0.22))
 
 
 func _draw_roads() -> void:
@@ -859,5 +876,4 @@ func _draw_legend() -> void:
 	draw_set_transform(Vector2(size.x - 152.0 - CellOutzType.width_condensed(scrawl, 8.0, 0.8), size.y - 26.0), -0.028, Vector2.ONE)
 	CellOutzType.draw_condensed(self, Vector2.ZERO, scrawl, 8.0, ACID * Color(1, 1, 1, 0.45), 0.8)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-
 
