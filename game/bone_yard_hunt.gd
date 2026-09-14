@@ -259,10 +259,10 @@ var arm: LimbMomentum = null
 ## per-event value: a 1000Hz mouse delivers several motion events per frame and
 ## handing the arm each one separately throws it several times as hard.
 var _look_delta := Vector2.ZERO
-## AN1.4/AN1.8. Whether `commitment()` reaches the damage number yet. The old
-## swing stays authoritative until the new one is demonstrably better, which is
-## a judgement to make with a controller in hand rather than in a commit.
-var momentum_damage := false
+## AN1.4/AN1.8. Commitment is live: mouse/arm motion and carried weapon weight
+## now change melee damage. Firearms remain deliberately excluded below, so a
+## steady aim does not get mistaken for a weak shot.
+var momentum_damage := true
 ## What the arm was worth at the moment of contact, kept so the HUD and the
 ## record can read the blow that actually happened rather than the intent.
 var last_commitment := 0.0

@@ -86,8 +86,8 @@ func _ready() -> void:
 		print("model moved %.4f m" % model.position.distance_to(before))
 		check(model.position.distance_to(before) > 0.02, "the weapon is drawn where the arm put it")
 
-	# ---- AN1.8: the old swing still owns damage until somebody says otherwise.
-	check(hunt.get("momentum_damage") == false, "commitment does not reach damage yet, by design")
+	# ---- AN1.8: committed arm motion now reaches melee damage by default.
+	check(hunt.get("momentum_damage") == true, "commitment reaches melee damage by default")
 
 	_report()
 
