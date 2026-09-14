@@ -68,6 +68,6 @@ func _draw() -> void:
 	draw_circle(center, 37.0 + sin(elapsed * 2.0) * 4.0, BLOOD * Color(1, 1, 1, 0.45))
 	draw_circle(center + (pointer - center).normalized() * 14.0, 9.0, BONE)
 	var font := ThemeDB.fallback_font
-	draw_string(font, Vector2(42, 48), "ALLUSIONS TO GRANDEUR // INTERACTIVE STUDY 001", HORIZONTAL_ALIGNMENT_LEFT, -1, 19, BONE)
+	draw_string(font, Vector2(42, 48), "ALLUSIONS TOO GRANDEUR // INTERACTIVE STUDY 001", HORIZONTAL_ALIGNMENT_LEFT, -1, 19, BONE)
 	draw_string(font, Vector2(42, 72), "AS ABOVE, SO BELOW — HISTORY %03d / MARA GRUDGE %03d" % [WorldHistory.event_count(), roundi(grudge * 100.0)], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COPPER)
 	draw_string(font, Vector2(42, size.y - 35), "MOVE: BEND THE IMAGE   CLICK: PEEL A LAYER   J: RETURN", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, BONE * Color(1, 1, 1, 0.64))

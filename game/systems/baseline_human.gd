@@ -123,6 +123,10 @@ var anatomy: AnatomyComponent
 var organ_parts: Dictionary = {}
 var bones: Dictionary = {}
 var head_anchor: Node3D
+## Shoulder caps live on the torso, not the arms. The arm can be cut away and
+## the shoulder still belongs to the chest — which avoids the detached-action-
+## figure silhouette while keeping severing mechanically honest.
+var shoulders: Dictionary = {}
 var _xray := false
 var subject_id := ""
 var parts: Dictionary = {}
@@ -212,6 +216,7 @@ func build(id: String, config: Dictionary = {}) -> void:
 		shape_node.shape = box
 		hitbox.add_child(shape_node)
 
+	_build_shoulders()
 	_build_organs()
 	_build_bones(layout)
 
@@ -246,6 +251,39 @@ func build(id: String, config: Dictionary = {}) -> void:
 		for organ_id in organ_parts:
 			if not anatomy.organ_ok(organ_id):
 				_hide_organ(str(organ_id))
+
+
+## The old torso ended at a vertical wall and the arm began as another separate
+## shape, leaving a visible daylight seam at both shoulders. Build a pair of
+## organic caps over that join, plus short clavicle bridges, from the torso so
+## all characters — player, NPC, seated driver — share one continuous body.
+func _build_shoulders() -> void:
+	var torso := parts.get("torso") as MeshInstance3D
+	if torso == null:
+		return
+	for side in [-1.0, 1.0]:
+		var joint := MeshInstance3D.new()
+		joint.name = "Shoulder_L" if side < 0.0 else "Shoulder_R"
+		var mesh := SphereMesh.new()
+		mesh.radius = 0.5
+		mesh.height = 1.0
+		mesh.radial_segments = 16
+		mesh.rings = 8
+		joint.mesh = mesh
+		joint.position = Vector3(side * 0.285, 0.255, 0.0)
+		joint.scale = Vector3(0.20, 0.17, 0.18) * build_factor
+		joint.material_override = _zone_material("torso", _flesh, "flesh")
+		torso.add_child(joint)
+		shoulders["left_arm" if side < 0.0 else "right_arm"] = joint
+		var clavicle := MeshInstance3D.new()
+		clavicle.name = "Clavicle_L" if side < 0.0 else "Clavicle_R"
+		var bridge := BoxMesh.new()
+		bridge.size = Vector3(0.23, 0.055, 0.09)
+		clavicle.mesh = bridge
+		clavicle.position = Vector3(side * 0.16, 0.20, -0.035)
+		clavicle.rotation.z = side * -0.10
+		clavicle.material_override = _zone_material("torso", _flesh.lightened(0.025), "flesh")
+		torso.add_child(clavicle)
 
 
 ## Where a blow actually landed, rather than a round-robin through the zone

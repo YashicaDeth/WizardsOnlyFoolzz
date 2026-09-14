@@ -27,7 +27,7 @@ Status: early concept, not a locked game bible. Compiled from Greg's shared conv
 - Followers, friends, captives/slaves and religious or faction devotees are possible fictional social roles. Scope and mechanics need design.
 - Base building, home decoration and relationships/story development inspired by the user's references. Survival-system depth is deliberately undecided.
 - An in-game internet connected with CellOutz and the user's artistic universe.
-- Allusions to Grandeur is an extremely detailed unlockable book of images and lore, potentially accessible from the menu. Changing images, metadata, characters in art, hints and hidden lore were discussed.
+- Allusions Too Grandeur is an extremely detailed unlockable book of images and lore, potentially accessible from the menu. Changing images, metadata, characters in art, hints and hidden lore were discussed.
 - A violent demolition-derby activity with original world, vehicle, targets and presentation; it may take broad genre-level inspiration from arcade demolition derbies, but must not copy a specific game's protected content. BeamNG-level damage remains a research ambition needing a separate feasibility prototype.
 - Persistent multiplayer/server ambitions were mentioned as a far-future possibility. Rust-like human proximity chat is a future multiplayer consideration, not part of the clarified current player model.
 
