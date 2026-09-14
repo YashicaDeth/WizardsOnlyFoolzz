@@ -48,8 +48,12 @@ const ZONE_ALIASES := {
 const STANDING := {
 	"head": {"at": Vector3(0, 1.62, 0), "size": Vector3(0.26, 0.28, 0.26)},
 	"torso": {"at": Vector3(0, 1.12, 0), "size": Vector3(0.48, 0.66, 0.28)},
-	"left_arm": {"at": Vector3(-0.235, 1.10, 0), "size": Vector3(0.17, 0.62, 0.19)},
-	"right_arm": {"at": Vector3(0.235, 1.10, 0), "size": Vector3(0.17, 0.62, 0.19)},
+	# Arms hang *from* the shoulder, so their top has to end below the torso's
+	# shoulder ring rather than level with it. At 1.10 the top of the arm sat at
+	# 1.41 — above the torso's widest ring at 1.351 — and stuck up beside the
+	# neck as a visibly separate object. Dropped, and tucked slightly inboard.
+	"left_arm": {"at": Vector3(-0.228, 1.055, 0), "size": Vector3(0.17, 0.62, 0.19)},
+	"right_arm": {"at": Vector3(0.228, 1.055, 0), "size": Vector3(0.17, 0.62, 0.19)},
 	"left_leg": {"at": Vector3(-0.14, 0.42, 0), "size": Vector3(0.21, 0.84, 0.23)},
 	"right_leg": {"at": Vector3(0.14, 0.42, 0), "size": Vector3(0.21, 0.84, 0.23)},
 }
@@ -288,18 +292,35 @@ func _build_shoulders() -> void:
 		mesh.radial_segments = 16
 		mesh.rings = 8
 		joint.mesh = mesh
-		joint.position = Vector3(side * 0.285, 0.255, 0.0)
-		joint.scale = Vector3(0.20, 0.17, 0.18) * build_factor
+		# Much smaller, and lower, than it was.
+		#
+		# It used to be 0.20 x 0.17 x 0.18 sitting at 0.255 — a ball the size of
+		# the head perched on each corner, because it was covering a real gap:
+		# the torso profile narrowed at the top and the arm tapered at the top,
+		# so there was daylight between them and something had to fill it.
+		# `BodyMesh.torso` now has a shoulder line as its widest ring and
+		# `BodyMesh.arm` has a deltoid as its thickest, so the two meet on their
+		# own. What is left here is a joint, not a patch.
+		joint.position = Vector3(side * 0.228, 0.196, 0.0)
+		joint.scale = Vector3(0.118, 0.108, 0.116) * build_factor
 		joint.material_override = _zone_material("torso", _flesh, "flesh")
 		torso.add_child(joint)
 		shoulders["left_arm" if side < 0.0 else "right_arm"] = joint
 		var clavicle := MeshInstance3D.new()
 		clavicle.name = "Clavicle_L" if side < 0.0 else "Clavicle_R"
+		# A collarbone under the skin, not a plate on top of it.
+		#
+		# At 0.23 x 0.055 x 0.09 sitting at 0.20 this was a rectangular slab
+		# standing proud of each shoulder — fine when the torso was narrow there
+		# and something had to bridge the gap, and a visible boxy flap now that
+		# the torso has a real shoulder line of its own. Narrowed, thinned,
+		# pulled inboard and forward so it reads as the ridge of a clavicle
+		# under the surface.
 		var bridge := BoxMesh.new()
-		bridge.size = Vector3(0.23, 0.055, 0.09)
+		bridge.size = Vector3(0.155, 0.030, 0.052)
 		clavicle.mesh = bridge
-		clavicle.position = Vector3(side * 0.16, 0.20, -0.035)
-		clavicle.rotation.z = side * -0.10
+		clavicle.position = Vector3(side * 0.105, 0.222, -0.062)
+		clavicle.rotation.z = side * -0.16
 		clavicle.material_override = _zone_material("torso", _flesh.lightened(0.025), "flesh")
 		torso.add_child(clavicle)
 
