@@ -28,6 +28,12 @@ Interstitial="*res://systems/interstitial.gd"
 PauseGate="*res://systems/pause_gate.gd"
 PerfProbe="*res://systems/perf_probe.gd"
 
+[debug]
+
+file_logging/enable_file_logging=true
+file_logging/log_path="user://logs/wizards.log"
+file_logging/max_log_files=8
+
 [display]
 
 window/size/viewport_width=1280

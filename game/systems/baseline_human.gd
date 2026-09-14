@@ -139,6 +139,11 @@ var sever_stress: Dictionary = {}
 ## Deepest `GoreChunks.Layer` any blow has reached, per zone. A body remembers
 ## how far it has been opened, not just how much health it has left.
 var zone_depth: Dictionary = {}
+## Where this body has actually been hit, per zone, in each limb's own local
+## space. `hit_at()` has always received the exact impact point and always threw
+## it away at the door; keeping it is the whole of B10.4's "a body carries its
+## whole history visibly". See `wound_marks.gd`.
+var wound_marks: Dictionary = {}
 var gore := true
 ## D4.2. How big this body is, from the race on the sheet. Every body in the
 ## world used to be exactly the same size whatever the sheet said, because the
@@ -580,6 +585,9 @@ func mark_opened(zone_id: String, layer: int) -> int:
 
 func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt", hit_direction := Vector3.ZERO) -> Dictionary:
 	var zone := zone_nearest(global_point)
+	# Kept before `hit()` resolves, because `hit()` may sever the limb and the
+	# point has to be recorded against the limb that was actually struck.
+	_record_wound(zone, global_point, hit_direction, damage, damage_type)
 	var organ_id := ""
 	if damage_type in ["cut", "puncture", "ballistic", "shear"]:
 		organ_id = organ_nearest(global_point)
@@ -1037,6 +1045,59 @@ func _add_fracture(zone_id: String) -> void:
 ## B4.5: the zone shows the deepest layer it has ever been cut to, on the body
 ## itself rather than only in the chunks it shed. Skin, fat, muscle in order -
 ## bone is handled separately above because a fracture already owns that read.
+## Keep where a round landed, and show it there.
+##
+## The single `LayerExposure` flap this replaces sat at a hardcoded local offset
+## and only ever showed the deepest layer a limb had been opened to, so six hits
+## in six places produced one mark in one place. A body that has been shot six
+## times should look like a body that has been shot six times.
+func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, damage: float, damage_type: String) -> void:
+	if damage < WoundMarks.MIN_DAMAGE:
+		return
+	var zone := canonical_zone(zone_id)
+	if severed.has(zone):
+		return
+	var part := parts.get(zone) as Node3D
+	if part == null or not is_instance_valid(part) or not part.is_inside_tree():
+		return
+	var surface: Dictionary = WoundMarks.surface_of(part, global_point, travel)
+	# The layer is read *after* the hit resolves everywhere else; here it is read
+	# before, so a fresh hole shows the depth the body was already opened to and
+	# deepens on the next frame's refresh rather than predicting itself.
+	var layer := int(zone_depth.get(zone, 0))
+	var wound: Dictionary = WoundMarks.make(surface["at"], surface["normal"], damage, damage_type, layer)
+	wound_marks[zone] = WoundMarks.record(wound_marks.get(zone, []) as Array, wound)
+	_refresh_wounds(zone)
+
+
+## Rebuild a zone's wound meshes. Cheap because a zone is capped at
+## `WoundMarks.MAX_PER_ZONE`, and rebuilding beats tracking which of fourteen
+## small nodes corresponds to which of fourteen dictionaries.
+func _refresh_wounds(zone_id: String) -> void:
+	var zone := canonical_zone(zone_id)
+	var part := parts.get(zone) as Node3D
+	if part == null or not is_instance_valid(part):
+		return
+	var holder := part.get_node_or_null("Wounds") as Node3D
+	if holder != null and is_instance_valid(holder):
+		part.remove_child(holder)
+		holder.queue_free()
+	var marks: Array = wound_marks.get(zone, [])
+	if marks.is_empty() or not gore:
+		return
+	holder = Node3D.new()
+	holder.name = "Wounds"
+	part.add_child(holder)
+	var depth := int(zone_depth.get(zone, 0))
+	for wound: Dictionary in marks:
+		# A wound never shows a layer deeper than the limb has actually been
+		# opened to, so a graze recorded before a blast does not retroactively
+		# claim to show bone.
+		var shown: int = mini(int(wound.get("layer", 0)), depth)
+		var tint := Color(str(GoreChunks.LAYER_TINTS[clampi(shown, 0, GoreChunks.LAYER_TINTS.size() - 1)]))
+		holder.add_child(WoundMarks.build(wound, tint))
+
+
 ## Reads `zone_depth`, the same ratchet `_shed_chunks` writes, so this survives
 ## healing and reattachment exactly the way the remembered depth does.
 func _update_layer_exposure(zone_id: String, prosthetic: bool) -> void:
