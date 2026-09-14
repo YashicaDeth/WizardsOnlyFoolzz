@@ -102,10 +102,16 @@ func _push() -> void:
 ## The whole sequence, as one tween the caller can hang the rest of the cold
 ## open off. Held deliberately slow: this is the first thing anybody sees and
 ## the picture is dense enough to be worth a beat before the type lands on it.
-func play(into: Node) -> Tween:
+func play(into: Node, title_hold := 0.0) -> Tween:
 	var tween := into.create_tween()
 	tween.tween_property(self, "reveal", 1.0, 1.1).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	# The invert comes across after the photograph has had a moment to read.
+	# Let the CellOutz/Wizards plate land before the image attacks it. The hold
+	# is supplied by the title sequence; scenes using the backdrop alone retain
+	# the old immediate behaviour.
+	if title_hold > 0.0:
+		tween.tween_interval(title_hold)
+	# The invert tears in from the LEFT after the photograph has had a moment to
+	# read, matching Greg's composed source rather than inventing a new direction.
 	tween.tween_property(self, "attack", 1.0, 1.5).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	# and then falls back, leaving the room as shot under the logo.
 	tween.tween_property(self, "attack", 0.18, 0.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)

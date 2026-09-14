@@ -35,11 +35,12 @@ float hash(vec2 p) {
 void fragment() {
 	vec2 uv = UV;
 
-	// The edge. Off the right at attack 0, past the left at 1, jittered per
-	// horizontal band so it reads as torn rather than ruled.
-	float band = floor(uv.y * 130.0);
-	float jitter = (hash(vec2(band, floor(clock * 9.0))) - 0.5) * 0.030 * attack;
-	float edge_x = mix(1.06, -0.06, attack) + jitter;
+// The edge. Off the LEFT at attack 0, past the right at 1, jittered per
+// horizontal band so the authored inverted half attacks left-to-right rather
+// than undoing itself from a direction Greg did not ask for.
+float band = floor(uv.y * 130.0);
+float jitter = (hash(vec2(band, floor(clock * 9.0))) - 0.5) * 0.030 * attack;
+float edge_x = mix(-0.06, 1.06, attack) + jitter;
 
 	float d = uv.x - edge_x;
 	float near = 1.0 - smoothstep(0.0, 0.10, abs(d));

@@ -106,9 +106,10 @@ func _play_title_sequence() -> void:
 	$HUD/TitleLogo.pivot_offset = $HUD/TitleLogo.size * 0.5
 	for button in menu_buttons:
 		button.modulate.a = 0.0
-	# The backdrop runs on its own tween so the picture can breathe under the
-	# type rather than being gated on each type beat landing.
-	splash.play(self)
+	# The backdrop runs on its own tween, but the mark gets a clear read first:
+	# CellOutz/Algiz/Wizards lands and holds, then the authored cyan invert tears
+	# in from the left behind it rather than competing with the logo's entrance.
+	splash.play(self, 1.15)
 	var tween := create_tween()
 	tween.tween_interval(0.22)
 	tween.tween_property(intro_veil, "color:a", 0.14, 0.55).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
