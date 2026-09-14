@@ -737,6 +737,34 @@ func zone_health(zone_id: String) -> float:
 	return float(zone.get("health", 0.0))
 
 
+## B6.1. What this limb can do, asked of the rig rather than of the anatomy
+## component alone — because the component knows what is installed and in
+## what condition, and only the rig knows whether the limb is still attached.
+## That split is the item's own "through the anatomy rather than around it":
+## a capability is the hardware's, but it is vetoed by the body.
+##
+## B6.2 falls straight out of it: a severed limb answers `false` to
+## everything from the moment it comes off, with nothing needing to remember
+## to go and switch a separate ability flag off.
+func limb_can(zone_id: String, capability: String) -> bool:
+	var zone := canonical_zone(zone_id)
+	if severed.has(zone):
+		return false
+	return anatomy.limb_can(zone, capability)
+
+
+## Every limb still attached to this body that can do the thing. Ordered
+## arms before legs and left before right, the same stable order `_worst_limb`
+## uses, so the same body reaches with the same arm twice rather than
+## flickering between two equally-capable ones.
+func capable_limbs(capability: String) -> Array[String]:
+	var out: Array[String] = []
+	for zone_id in ["left_arm", "right_arm", "left_leg", "right_leg"]:
+		if limb_can(zone_id, capability):
+			out.append(zone_id)
+	return out
+
+
 ## Proportioned geometry rather than primitives. A capsule cannot express the
 ## difference between a chest and a forearm, and that difference is most of what
 ## makes a body read as a body.

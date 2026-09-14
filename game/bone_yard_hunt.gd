@@ -434,6 +434,10 @@ var grapple_clock := 0.0
 ## combat/mobility ratios already did, and costs that limb condition of its
 ## own while you press it.
 var grapple_zone := ""
+## B6.2. Which of the player's own limbs is holding. Severing it ends the
+## hold — the item's own claim, and the reason this is tracked at all rather
+## than a grapple being something the whole body does abstractly.
+var grapple_with := "right_arm"
 const GRAPPLE_PRESSURE_INTERVAL := 0.4
 var grapple_pressure_clock := 0.0
 ## Test hook: set true/false to force the press state `_update_grapple` reads,
@@ -3575,6 +3579,14 @@ func _start_grapple() -> void:
 	grapple_clock = 0.0
 	grapple_pressure_clock = 0.0
 	grapple_zone = _worst_limb(actor.anatomy as AnatomyComponent)
+	# B6.1/B6.2. Which of *your* arms is doing the holding. A limb with
+	# grappling hardware in it takes the hold if you have one — that is the
+	# hardware doing something rather than sitting in the limb being drawn —
+	# and otherwise it is the right arm, the same default the rest of this
+	# file assumes. Recorded because B6.2 needs to know which limb to miss
+	# when it comes off.
+	var capable: Array[String] = player_rig.capable_limbs("grapple")
+	grapple_with = capable[0] if not capable.is_empty() else "right_arm"
 	strike_windup = -1.0
 	WorldHistory.record_event("grapple_started", {"subject_id": grapple_target, "zone": grapple_zone, "location": HUNT_LOCATION})
 
@@ -3662,6 +3674,13 @@ func _update_grapple(delta: float) -> void:
 	var actor := _actor_by_id(grapple_target)
 	if actor.is_empty() or bool(actor.get("dead", false)) or actor.anatomy.downed:
 		_break_grapple()
+		return
+	# B6.2. A grappling limb that is severed stops grappling. Checked here
+	# rather than only off `limb_severed` so it is true of the state itself —
+	# however the arm came off, and whoever took it, the hold is over on the
+	# next tick rather than only when a signal happened to be connected.
+	if player_rig != null and is_instance_valid(player_rig) and player_rig.severed.has(grapple_with):
+		_break_grapple("THE ARM HOLDING THEM IS GONE")
 		return
 	var node := actor.node as Node3D
 	var gap := player.distance_to(node.global_position)

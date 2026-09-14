@@ -351,6 +351,60 @@ func install_part(site_id: String, part_data: Dictionary) -> Dictionary:
 	return part.duplicate(true)
 
 
+## B6.1. What a limb can *do* because of what is bolted into it — keyed off
+## the hardware's own `profile`, the field `implant_catalog.gd` has carried
+## for every entry since it was written and that B5.2 already draws the shape
+## from. Keyed that way on purpose: a capability read off the same field the
+## limb is drawn from cannot disagree with the thing granting it, the way a
+## second ability table sitting beside the body would.
+##
+## "Through the anatomy rather than around it" is the whole of the item. A
+## limb grapples because of what is installed in that limb, its condition is
+## the hardware's real condition, and when the limb stops being there it
+## stops being able to (B6.2) — none of which is true of an ability flag that
+## never hears about an arm coming off.
+const LIMB_CAPABILITIES := {
+	"industrial_limb": ["grapple"],
+	"scrap_limb": ["grapple"],
+	"limb_drive": ["grapple"],
+	"launcher_limb": ["launch"],
+}
+
+## Dead hardware does nothing. A limb drive at zero condition is a weight on
+## the end of your arm, not a grapple.
+const CAPABILITY_MINIMUM_CONDITION := 0.15
+
+
+## What the hardware at one site offers right now. Empty for an empty site,
+## for hardware with no capability profile, and for hardware too far gone to
+## answer — the last of which is why this reads condition rather than only
+## presence.
+func limb_capabilities(site_id: String) -> Array[String]:
+	var out: Array[String] = []
+	var part: Dictionary = installed_parts.get(site_id, {})
+	if part.is_empty():
+		return out
+	if implant_condition_ratio(part) < CAPABILITY_MINIMUM_CONDITION:
+		return out
+	for capability in LIMB_CAPABILITIES.get(str(part.get("profile", "")), []):
+		out.append(str(capability))
+	return out
+
+
+func limb_can(site_id: String, capability: String) -> bool:
+	return limb_capabilities(site_id).has(capability)
+
+
+## Every site that can do this right now. For a caller choosing which arm to
+## reach with rather than asking about one it already picked.
+func capable_sites(capability: String) -> Array[String]:
+	var out: Array[String] = []
+	for site_id in installed_parts:
+		if limb_can(str(site_id), capability):
+			out.append(str(site_id))
+	return out
+
+
 ## N5.1. Every occupied site that answers to a given damage zone — "torso"
 ## alone once meant one implant; it can now mean a spine cage, a chest plate
 ## and an organ-bay graft all at once, each tracked and damaged separately.

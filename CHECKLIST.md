@@ -395,8 +395,45 @@ v4 made the body customisable and nothing in it does anything. The crystal ball 
 
 ### B v6 — the sixth pass
 v5 put an object in a limb; AD3.2 wants cybernetics that change what movement is possible. Greg: limbs *"that shoot missiles, grapple"*.
-- [ ] **B6.1** `v6` Limbs that shoot and grapple, through the anatomy rather than around it
-- [ ] **B6.2** `v6` A grappling limb that is severed stops grappling
+- [x] ~~**B6.1** `v6` Limbs that shoot and grapple, through the anatomy rather than around it~~
+      The load-bearing half of the item is its last five words. A capability
+      that is an ability flag sitting beside the body never hears about the
+      arm coming off; one read through the anatomy cannot help but hear.
+      `AnatomyComponent.LIMB_CAPABILITIES` keys off the hardware's own
+      `profile` — the field `implant_catalog.gd` has carried for every entry
+      since it was written and that B5.2 already draws the limb's shape from
+      — so a capability cannot disagree with the thing granting it the way a
+      second ability table would. `limb_capabilities()`/`limb_can()`/
+      `capable_sites()` answer for one site or find the limb to reach with,
+      and hardware below `CAPABILITY_MINIMUM_CONDITION` answers nothing: a
+      wrecked limb drive is a weight on the end of your arm.
+      Verified: `tests/limb_capability_test.gd` (17 checks) — a bare arm
+      cannot grapple, an industrial arm can and the other arm still cannot,
+      a ledger thumb is hardware and still cannot, wrecking the hardware
+      takes the capability with it, and the same routing carries a launching
+      limb without quietly granting every capability at once.
+      Still open, named rather than glossed: no *authored* launcher exists.
+      `implant_catalog.gd` is Lane 5's file and its twenty-one entries are
+      all grapple-or-nothing, so the launch path is proven with a
+      caller-supplied limb rather than one out of the catalogue. Adding a
+      real launcher entry is that file owner's call — and it is what AD3.1
+      needs before "answer a rocket with a blade" has a rocket in it.
+- [x] ~~**B6.2** `v6` A grappling limb that is severed stops grappling~~
+      Falls straight out of B6.1's layering rather than being bolted on
+      beside it: `BaselineHuman.limb_can()` asks the anatomy what the
+      hardware offers and then vetoes it if the limb is not attached, so a
+      severed arm answers `false` to everything from the moment it comes
+      off, with nothing needing to remember to go and switch a flag. The
+      hold itself tracks which of your own arms is doing the holding
+      (`grapple_with`, chosen as a grappling-capable limb when you have one),
+      and `_update_grapple()` checks it against `severed` every tick — so
+      however the arm came off and whoever took it, the hold ends on the
+      next tick rather than only when a signal happened to be connected.
+      Verified in the same suite, end to end: with the rig's own
+      `left_arm` severed mid-hold in a real instantiated Hunt Grounds,
+      `_update_grapple()` clears `grapple_target` — and the deliberate
+      layering check that the *hardware* is still installed and still intact
+      while the body is what refuses it.
 
 ### B v7 — the seventh pass
 v6 made the body a weapon platform wearing nothing. AS3.4: what you are wearing shows on the body the mirror renders.
