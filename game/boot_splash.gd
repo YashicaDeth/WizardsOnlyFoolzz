@@ -16,6 +16,7 @@ const GRANDEUR_PATH := "res://art/brand/grandeur_wordmark.png"
 const MENU_SCENE := "res://country_town_menu.tscn"
 const SPLASH_BACKDROP := preload("res://systems/splash_backdrop.gd")
 const REGAL_FRAME := preload("res://systems/regal_frame.gd")
+const CRT_GLASS := preload("res://systems/crt_glass.gd")
 
 
 ## These must go through Godot's texture importer. `Image.load()` appeared to
@@ -47,6 +48,7 @@ var reveal_material: ShaderMaterial
 var grandeur_material: ShaderMaterial
 var backdrop: SplashBackdrop
 var frame: RegalFrame
+var glass: CrtGlass
 
 
 func _ready() -> void:
@@ -75,6 +77,15 @@ func _ready() -> void:
 	frame.fit_to_photo()
 	add_child(frame)
 	move_child(frame, 1)
+	# A1.9. The glass the whole cold open is seen through. Above the picture and
+	# the frame, below the publisher cards — the marks stay crisp while the room
+	# behind them bows, which is the only way "curving on the screen" and "still
+	# playabile" are both true at once.
+	glass = CRT_GLASS.new()
+	glass.name = "ColdOpenGlass"
+	glass.reveal = 1.0
+	add_child(glass)
+	move_child(glass, 2)
 	_build_mark_layer()
 	set_process(true)
 	queue_redraw()
