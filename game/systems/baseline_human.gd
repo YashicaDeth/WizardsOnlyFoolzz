@@ -144,6 +144,13 @@ var zone_depth: Dictionary = {}
 ## it away at the door; keeping it is the whole of B10.4's "a body carries its
 ## whole history visibly". See `wound_marks.gd`.
 var wound_marks: Dictionary = {}
+## Fractional drops owed. Bleeding runs well under one drop per frame, so the
+## rate is accumulated and spent whole rather than rounded every frame — which
+## would round to zero forever or to one every frame, and neither is a rate.
+var _drip_owed := 0.0
+## How long this body has been bleeding, in seconds, which is what lengthens and
+## dries the streaks running down it.
+var _bleed_seconds := 0.0
 var gore := true
 ## D4.2. How big this body is, from the race on the sheet. Every body in the
 ## world used to be exactly the same size whatever the sheet said, because the
@@ -1045,6 +1052,102 @@ func _add_fracture(zone_id: String) -> void:
 ## B4.5: the zone shows the deepest layer it has ever been cut to, on the body
 ## itself rather than only in the chunks it shed. Skin, fat, muscle in order -
 ## bone is handled separately above because a fracture already owns that read.
+## Blood leaving the wounds it is actually coming out of.
+##
+## Driven by `anatomy.bleed_rate` — the same number that decides whether this
+## body bleeds to death — so what is on screen is the thing that is killing
+## them rather than an effect playing alongside it. See `blood_flow.gd` for why
+## this is drops and streaks rather than a fluid solve.
+func _bleed(delta: float) -> void:
+	if not gore or anatomy == null or anatomy.dead and _loose.is_empty() and _bleed_seconds > 12.0:
+		return
+	# Internal bleeding is blood going *into* the body, so only a fraction of it
+	# shows outside — but it is forty-seven points against an external one or
+	# two, so a ruptured organ still reads as a gusher rather than a graze.
+	var rate := anatomy.bleed_rate + anatomy.internal_bleed_rate * 0.12
+	if rate < BloodFlow.MIN_BLEED:
+		return
+	var sites := _bleeding_sites()
+	if sites.is_empty():
+		return
+	_bleed_seconds += delta
+	_drip_owed += BloodFlow.drops_for(rate, delta)
+	while _drip_owed >= 1.0:
+		_drip_owed -= 1.0
+		_drip_one(sites[randi() % sites.size()])
+	_refresh_streaks(sites)
+
+
+## Every wound currently open enough to run, as {part, at, normal}. A severed
+## limb is not in here — its stump bleeds, and the stump is its own zone.
+func _bleeding_sites() -> Array:
+	var sites: Array = []
+	for zone: String in wound_marks.keys():
+		if severed.has(zone):
+			continue
+		var part := parts.get(zone) as Node3D
+		if part == null or not is_instance_valid(part) or not part.is_inside_tree():
+			continue
+		var marks: Array = wound_marks[zone]
+		if marks.is_empty():
+			continue
+		# The worst wound on a limb is the one that runs. A body with fourteen
+		# grazes on one arm should not out-bleed one with a hole in it.
+		var worst: Dictionary = marks[0]
+		for wound: Dictionary in marks:
+			if float(wound.get("damage", 0.0)) > float(worst.get("damage", 0.0)):
+				worst = wound
+		sites.append({"zone": zone, "part": part, "wound": worst})
+	return sites
+
+
+func _drip_one(site: Dictionary) -> void:
+	if live_gore >= MAX_LIVE_GORE:
+		return
+	var part := site["part"] as Node3D
+	var wound: Dictionary = site["wound"]
+	var root := _gore_root()
+	if root == null or not is_inside_tree():
+		return
+	var drop := MeshInstance3D.new()
+	var blob := SphereMesh.new()
+	# Smaller than a spray drop. This is running out, not being thrown out.
+	blob.radius = 0.014 + randf() * 0.016
+	blob.height = blob.radius * 2.0
+	blob.material = WorldLook.surface(BLOOD if randf() > 0.5 else BLOOD_DARK, "flesh", _variation)
+	drop.mesh = blob
+	root.add_child(drop)
+	var normal: Vector3 = wound.get("normal", Vector3.UP)
+	drop.global_position = part.to_global(wound.get("at", Vector3.ZERO) as Vector3 + normal * 0.02)
+	var velocity: Vector3 = part.global_transform.basis * BloodFlow.drip_velocity(normal)
+	# Longer life than a spray drop, because it starts slow and has further to
+	# fall before it lands and marks.
+	_loose.append({"node": drop, "velocity": velocity, "life": 2.6 + randf() * 1.2, "splat": true, "size": blob.radius})
+	live_gore += 1
+
+
+## The wet runs down the skin. One per bleeding limb, lengthening with time and
+## drying as it goes, reusing the node rather than rebuilding it every frame.
+func _refresh_streaks(sites: Array) -> void:
+	var length := minf(BloodFlow.STREAK_GROWTH * _bleed_seconds, BloodFlow.STREAK_MAX)
+	if length < 0.02:
+		return
+	var age := clampf(_bleed_seconds / 45.0, 0.0, 1.0)
+	for site: Dictionary in sites:
+		var part := site["part"] as Node3D
+		var wound: Dictionary = site["wound"]
+		var streak := part.get_node_or_null("BloodStreak") as MeshInstance3D
+		if streak == null or not is_instance_valid(streak):
+			streak = BloodFlow.build_streak(BloodFlow.STREAK_WIDTH, length, age)
+			streak.name = "BloodStreak"
+			part.add_child(streak)
+		else:
+			streak.mesh = BloodFlow.streak_mesh(BloodFlow.STREAK_WIDTH, length)
+			streak.material_override = BloodFlow.streak_material(age)
+		streak.transform = BloodFlow.streak_transform(
+			part, wound.get("at", Vector3.ZERO) as Vector3, wound.get("normal", Vector3.UP) as Vector3, length)
+
+
 ## Keep where a round landed, and show it there.
 ##
 ## The single `LayerExposure` flap this replaces sat at a hardcoded local offset
@@ -1202,6 +1305,7 @@ func _process(delta: float) -> void:
 	# Everything this rig animates runs on the exchange's clock, not the world's.
 	var own_delta := delta * motion_scale
 	_apply_pain_posture(own_delta)
+	_bleed(own_delta)
 	if _loose.is_empty():
 		return
 	delta = own_delta
