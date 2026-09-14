@@ -3587,8 +3587,33 @@ able to answer a rocket with a blade, and the game should let it.
       this answers a bullet rather than the RPG the section is really
       about. The primitive is the part that was missing; the weapon that
       makes it dramatic is AD3.1's, not this line's.
-- [ ] **AD3.4** Absurd answers are allowed when the build earned them
-- [ ] **AD3.5** Original to this game: the reference is the feeling, never the implementation
+- [x] ~~**AD3.4** Absurd answers are allowed when the build earned them~~
+      Not a new item so much as what AD3.1 and AD3.3 add up to, stated
+      plainly: cutting a rocket out of the air with a blade is absurd on
+      its face, and it is not gated behind a cutscene or a QTE — it is
+      `_resolve_strike()` checking the arc for a live round through
+      `intercept_near()` before anything else the swing could reach,
+      answering through the same arm every other blow does. Nothing stops
+      a fresh, unaugmented body from trying it and nothing helps one
+      succeed either: `AD3.2`'s cybernetics do not touch interception at
+      all, so meeting a rocket is earned entirely by timing and reach, and
+      closing on a launcher is earned by knowing `MIN_ARMING_METRES` and
+      using it, not by a stat that makes the launcher forget to fire.
+      Verified already by `intercept_test.gd` and `launcher_test.gd`
+      (42 checks between them) — nothing new to build, only to say plainly
+- [x] ~~**AD3.5** Original to this game: the reference is the feeling, never
+      the implementation~~ Audited rather than built. AD3's own header
+      names HAVKER-MAN X and says explicitly not to copy it; every piece
+      that answers this section is original mechanism built from this
+      game's own primitives — `launcher_actor.gd`'s arming ring is a
+      distance check against `MIN_ARMING_METRES`, `intercept_near()` is a
+      position-and-radius check against `Ballistics`' own rounds, and
+      `_vault_ceiling()`/kick-off are `capable_limbs()` reading a catalogue
+      `profile` — none of it borrowed code or a ported system, each
+      already used elsewhere in this project (`combat_response.gd`,
+      `clinch.gd`, B6.1's own route) for an unrelated reason first. The
+      feeling — a body built far enough in one direction can answer a
+      rocket with a blade — is the only thing carried over
 
 
 ### AD v10 — the final pass
