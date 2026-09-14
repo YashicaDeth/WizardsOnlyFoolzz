@@ -97,6 +97,7 @@ func _push() -> void:
 	_material.set_shader_parameter("clock", clock)
 	_material.set_shader_parameter("attack", attack)
 	_material.set_shader_parameter("reveal", reveal)
+	_material.set_shader_parameter("face_blur", 0.72)
 
 
 ## The whole sequence, as one tween the caller can hang the rest of the cold

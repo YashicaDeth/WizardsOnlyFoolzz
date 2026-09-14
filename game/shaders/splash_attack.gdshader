@@ -27,6 +27,9 @@ uniform float reveal : hint_range(0.0, 1.0) = 1.0;
 uniform float clock = 0.0;
 // How hard the travelling edge tears, in UV at the edge itself.
 uniform float tear : hint_range(0.0, 0.08) = 0.020;
+// The room image is personal source material. Keep the face unreadable while
+// preserving the hands, posters and authored rune as the actual scene.
+uniform float face_blur : hint_range(0.0, 1.0) = 0.72;
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(41.7, 289.1))) * 43758.5453);
@@ -62,6 +65,20 @@ float edge_x = mix(-0.06, 1.06, attack) + jitter;
 	// Which of his two pictures this pixel is showing.
 	float side = smoothstep(-0.004, 0.004, -d);
 	vec3 col = mix(a, b, side);
+
+	// A contained, film-like blur over the central face plane instead of a
+	// censor box. It breathes softly into the surrounding room and leaves the
+	// title/background readable as a single composition.
+	vec2 face_center = vec2(0.50, 0.46);
+	float face_mask = (1.0 - smoothstep(0.095, 0.245, length(uv - face_center))) * face_blur;
+	vec2 blur_step = vec2(0.008, 0.006);
+	vec3 softened = col * 0.30;
+	softened += mix(texture(room, uv + vec2( blur_step.x, 0.0)).rgb, texture(invert, uv + vec2( blur_step.x, 0.0)).rgb, side) * 0.14;
+	softened += mix(texture(room, uv + vec2(-blur_step.x, 0.0)).rgb, texture(invert, uv + vec2(-blur_step.x, 0.0)).rgb, side) * 0.14;
+	softened += mix(texture(room, uv + vec2(0.0,  blur_step.y)).rgb, texture(invert, uv + vec2(0.0,  blur_step.y)).rgb, side) * 0.14;
+	softened += mix(texture(room, uv + vec2(0.0, -blur_step.y)).rgb, texture(invert, uv + vec2(0.0, -blur_step.y)).rgb, side) * 0.14;
+	softened += mix(texture(room, uv + vec2(blur_step.x * 0.7, blur_step.y * 0.7)).rgb, texture(invert, uv + vec2(blur_step.x * 0.7, blur_step.y * 0.7)).rgb, side) * 0.14;
+	col = mix(col, softened, face_mask);
 
 	// A hot line riding the edge — the leading front of the attack.
 	col += vec3(0.45, 0.95, 1.0) * near * near * 0.40 * attack;

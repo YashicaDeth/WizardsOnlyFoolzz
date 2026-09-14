@@ -17,17 +17,12 @@ const MENU_SCENE := "res://country_town_menu.tscn"
 const SPLASH_BACKDROP := preload("res://systems/splash_backdrop.gd")
 
 
-## Loaded by reading the file directly rather than `preload()`/`load()` —
-## both of those go through the resource importer, which needs a `.import`
-## sidecar the editor bakes the first time it scans a new asset. These PNGs
-## were dropped straight into `game/art/brand/` by a tool outside the editor,
-## so `Image.load()`'s raw decode is what actually works headless, on a
-## worktree that has never opened this project in the GUI.
-static func _load_png(path: String) -> ImageTexture:
-	var image := Image.new()
-	if image.load(path) != OK:
-		return null
-	return ImageTexture.create_from_image(image)
+## These must go through Godot's texture importer. `Image.load()` appeared to
+## work in the editor, but its raw PNG path is not guaranteed to be packed into
+## a released PCK — exactly the kind of export-only null texture that can crash
+## once the second title card asks for its dimensions.
+static func _load_texture(path: String) -> Texture2D:
+	return ResourceLoader.load(path) as Texture2D
 
 enum Stage { CELLOUTZ, GRANDEUR, MARK, DONE }
 
@@ -94,7 +89,7 @@ func _build_mark_layer() -> void:
 
 func _build_reveal_rect(path: String, material: ShaderMaterial) -> TextureRect:
 	var rect := TextureRect.new()
-	rect.texture = _load_png(path)
+	rect.texture = _load_texture(path)
 	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	rect.set_anchors_preset(Control.PRESET_CENTER)
 	rect.material = material
@@ -148,6 +143,10 @@ func _update_grandeur_visibility() -> void:
 	grandeur_rect.visible = stage == Stage.GRANDEUR
 	if stage != Stage.GRANDEUR:
 		return
+	if grandeur_rect.texture == null:
+		# Missing brand art is a degraded presentation, never a startup crash.
+		grandeur_rect.modulate.a = 0.0
+		return
 	var duration: float = STAGE_DURATION[Stage.GRANDEUR]
 	var fade := duration * FADE_FRACTION
 	var reveal: float = clampf(stage_clock / maxf(fade, 0.01), 0.0, 1.0)
@@ -184,17 +183,18 @@ func _update_mark_visibility() -> void:
 	if stage_clock > hold_end:
 		out_alpha = 1.0 - clampf((stage_clock - hold_end) / maxf(fade, 0.01), 0.0, 1.0)
 
-	seal_rect.modulate = Color(1, 1, 1, (1.0 - mark_reveal) * out_alpha)
-	seal_rect.material.set_shader_parameter("progress", seal_reveal)
-	seal_rect.size = seal_rect.texture.get_size() * lerpf(0.55, 0.85, seal_reveal)
-	seal_rect.position = size * 0.5 - seal_rect.size * 0.5
-
-	mark_rect.modulate = Color(1, 1, 1, mark_reveal * out_alpha)
-	mark_rect.material.set_shader_parameter("progress", mark_reveal)
-	var mark_size := size.x * 0.52
-	var aspect: float = mark_rect.texture.get_size().y / mark_rect.texture.get_size().x
-	mark_rect.size = Vector2(mark_size, mark_size * aspect)
-	mark_rect.position = size * 0.5 - mark_rect.size * 0.5
+	if seal_rect.texture != null:
+		seal_rect.modulate = Color(1, 1, 1, (1.0 - mark_reveal) * out_alpha)
+		seal_rect.material.set_shader_parameter("progress", seal_reveal)
+		seal_rect.size = seal_rect.texture.get_size() * lerpf(0.55, 0.85, seal_reveal)
+		seal_rect.position = size * 0.5 - seal_rect.size * 0.5
+	if mark_rect.texture != null:
+		mark_rect.modulate = Color(1, 1, 1, mark_reveal * out_alpha)
+		mark_rect.material.set_shader_parameter("progress", mark_reveal)
+		var mark_size := size.x * 0.52
+		var aspect: float = mark_rect.texture.get_size().y / mark_rect.texture.get_size().x
+		mark_rect.size = Vector2(mark_size, mark_size * aspect)
+		mark_rect.position = size * 0.5 - mark_rect.size * 0.5
 
 
 func _advance_stage() -> void:
@@ -235,6 +235,47 @@ func _draw() -> void:
 			# is still drawn in the plain stencil face, under the image rather
 			# than fighting it for the centre of the frame.
 			_draw_subtitle("PRESENTS", STAGE_DURATION[Stage.GRANDEUR], size.y * 0.5 + grandeur_rect.size.y * 0.5 + 26.0)
+	_draw_regal_frame()
+	_draw_celloutz_orbit()
+
+
+## A physical-looking frame — copper registration, blood-red wet forms and
+## bone-coloured organ beads — so the cold open belongs to the game rather than
+## looking like a plain video card laid on top of it.
+func _draw_regal_frame() -> void:
+	var inset := 18.0
+	var frame := Rect2(Vector2(inset, inset), size - Vector2(inset * 2.0, inset * 2.0))
+	var copper := Color("b64b25")
+	var blood := Color("67150f")
+	draw_rect(frame, copper * Color(1, 1, 1, 0.74), false, 1.5)
+	for corner in [frame.position, Vector2(frame.end.x, frame.position.y), frame.end, Vector2(frame.position.x, frame.end.y)]:
+		draw_circle(corner, 5.0, blood * Color(1, 1, 1, 0.85), true, -1.0, true)
+		for index in 4:
+			var at: Vector2 = corner.lerp(frame.get_center(), 0.026 + index * 0.016)
+			draw_circle(at, 2.0 + float(index) * 0.75, Color("d29f62") * Color(1, 1, 1, 0.42), true, -1.0, true)
+	# Two subdued organ clusters in the lower corners: material, not a box UI.
+	for side in [-1.0, 1.0]:
+		var base := Vector2(size.x * (0.12 if side < 0.0 else 0.88), size.y * 0.89)
+		for index in 5:
+			var wobble := sin(stage_clock * 1.7 + index * 2.1) * 2.0
+			draw_circle(base + Vector2(side * index * 8.0, wobble - index * 3.0), 8.0 - index * 0.65, blood * Color(1, 1, 1, 0.50), true, -1.0, true)
+
+
+## CellOutz becomes an orbiting institutional mark around the game's seal at
+## the final title beat, rather than a subtitle that competes with the wordmark.
+func _draw_celloutz_orbit() -> void:
+	if stage != Stage.MARK:
+		return
+	var alpha := _card_alpha(STAGE_DURATION[Stage.MARK])
+	var centre := size * 0.5
+	var rx := size.x * 0.255
+	var ry := size.y * 0.19
+	for index in 6:
+		var angle := stage_clock * 0.52 + float(index) * TAU / 6.0
+		var at := centre + Vector2(cos(angle) * rx, sin(angle) * ry)
+		draw_set_transform(at, angle + PI * 0.5, Vector2.ONE)
+		CellOutzType.draw_condensed(self, Vector2(-31, 0), "CELLOUTZ", 9.0, Color("df9a72") * Color(1, 1, 1, alpha * 0.72), 0.85)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_card(title: String, subtitle: String, duration: float) -> void:
