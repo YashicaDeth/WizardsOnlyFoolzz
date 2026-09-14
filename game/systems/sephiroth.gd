@@ -190,6 +190,12 @@ static func petition(subject_id: String, plane_id: String, seal: String, offerin
 		return {"ok": false, "reason": "A PETITION WITH NO SEAL IS NOISE"}
 	if not has_floor(subject_id, plane_id, "see"):
 		return {"ok": false, "reason": "NOT HIGH ENOUGH TO BE SEEN YET"}
+	# AV3.5. Every creditor collects the moment you set foot anywhere, before
+	# the offering for *this* plane is even weighed — so you cannot visit the
+	# plane you can afford while dodging the one you cannot. A default here
+	# does not block the petition; it just means you arrive owing more and
+	# audible to fewer of them (`PlaneVoices.clarity()`).
+	var collected := PlaneVoices.collect_due(subject_id)
 	var payment := Boons.pay(subject_id, offering_kind, offering_amount, offering_target)
 	if not bool(payment.get("ok", false)):
 		return payment
@@ -198,7 +204,10 @@ static func petition(subject_id: String, plane_id: String, seal: String, offerin
 		"offering_kind": offering_kind, "offering_amount": offering_amount,
 		"altitude_at_petition": altitude(subject_id),
 	})
-	return {"ok": true, "plane_id": plane_id}
+	# AV3.2. The trip is now on the record; fold it into what this plane
+	# remembers about the subject.
+	PlaneVoices.remember(plane_id, subject_id)
+	return {"ok": true, "plane_id": plane_id, "collected": collected}
 
 
 ## AV1.4's other half. A real cost to leave, same ledger, so "a licence to
@@ -210,6 +219,7 @@ static func depart(subject_id: String, plane_id: String, offering_kind: String, 
 	if not bool(payment.get("ok", false)):
 		return payment
 	WorldHistory.record_event("plane_departed", {"subject_id": subject_id, "plane_id": plane_id})
+	PlaneVoices.remember(plane_id, subject_id)
 	return {"ok": true}
 
 
@@ -225,6 +235,9 @@ static func sustain_or_fail(subject_id: String, plane_id: String, floor_name: St
 		"subject_id": subject_id, "plane_id": plane_id, "floor": floor_name,
 		"altitude_at_failure": altitude(subject_id),
 	})
+	# AV3.2/AV2.3. The entity remembers the fall, and it costs more standing
+	# than a clean trip ever earned.
+	PlaneVoices.remember(plane_id, subject_id)
 	return {"ok": false, "reason": "CAME DOWN MID-%s" % floor_name.to_upper()}
 
 

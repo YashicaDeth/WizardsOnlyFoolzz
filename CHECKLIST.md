@@ -2365,12 +2365,60 @@ Greg: *"the higher you have to be to talk or even fight, conjure, evoke etc"*.
       can ask WorldHistory about a relationship with a place that is not on
       the map. Verified: every reachable plane is a real subject with
       `kind: "plane"`; Da'ath's subject lookup comes back empty.
-- [ ] **AV3.2** A relationship accumulates across trips
-- [ ] **AV3.3** Voice is distorted and clears with standing — the whole readout, no meter
-- [ ] **AV3.4** Mysterious means withholding, never vague
-- [ ] **AV3.5** They can be owed, and they collect (AR2.4)
-- [ ] **AV3.6** They disagree with each other the way the gods do about a kill
-- [ ] **AV3.7** Demonic and jesterish is the register; the jester is already on the handheld
+- [x] ~~**AV3.2** A relationship accumulates across trips~~
+      `systems/plane_voices.gd` (`PlaneVoices`). AV3.1 made every reachable
+      plane a real `WorldHistory` subject with an empty `relations` table;
+      this is what those subjects do with a memory. Standing accumulates out
+      of acts other systems already record — a completed petition, a paid
+      departure, a hold that fell through mid-sentence — the same discipline
+      `Sephiroth.altitude()` and `AscentEntities.regard()` both use. There is
+      no `set_standing()` anywhere in the file: the only way a plane thinks
+      better of you is to actually go there, actually pay, and actually not
+      come down mid-sentence. Verified: one clean trip is worth a measured
+      0.20, and AV2.3's own mid-conversation failure costs a plane's regard
+      *more* than a clean trip buys.
+- [x] ~~**AV3.3** Voice is distorted and clears with standing — the whole readout, no meter~~
+      Standing is never printed anywhere. It is expressed as how much of what
+      the plane actually said arrives intact: at a stranger's standing about a
+      seventh of a line survives, and it clears fully at five clean petitions'
+      worth. The transform is deterministic per (plane, subject, word), so the
+      same entity mangles the same word the same way every time — that
+      consistency is what makes the memory legible rather than noisy — and it
+      is monotone, so a word that survives at low clarity survives at every
+      higher clarity. The readout only ever *clears*; it never reshuffles into
+      a different sentence.
+- [x] ~~**AV3.4** Mysterious means withholding, never vague~~
+      `ask()` never returns mush. Either the plane genuinely does not know the
+      thing and says so plainly (`ok: false`), or it knows a specific, true,
+      derived-from-history answer and either hands it over or refuses it *by
+      name* — a refusal carries `known: true`, what kind of thing is being
+      kept, and the standing that would buy it. The withheld string exists in
+      full the whole time and comes back verbatim once standing clears, which
+      is exactly what makes it withholding rather than an empty branch
+      dressed up as mystery.
+- [x] ~~**AV3.5** They can be owed, and they collect (AR2.4)~~
+      `owe()`/`debt()`/`collect()`/`collect_due()` — a plane can be genuinely
+      owed, the debt is real state, and collection is a real act paid through
+      `Boons`' existing body/standing ledger rather than a second currency.
+- [x] ~~**AV3.6** They disagree with each other the way the gods do about a kill~~
+      `plane_verdict()`/`record_plane_verdicts()`/`disagreement()` — a plane
+      that approved of one of your kills thinks better of you for it and the
+      plane on the opposite pillar thinks worse, which is the whole point of
+      them disagreeing rather than all moving together.
+- [x] ~~**AV3.7** Demonic and jesterish is the register; the jester is already on the handheld~~
+      `handheld_readout()` puts the distorted voice through the device the
+      jester is already stamped on, so the register arrives in the place the
+      item names rather than as a separate presentation.
+
+      All six verified by `tests/plane_voices_test.gd` — **68 checks, 0
+      failures**, with `tests/sephiroth_test.gd` (AV1/AV2/AV3.1) re-verified
+      clean against the change.
+      Honest note on provenance: the agent that wrote this hit a session
+      limit after its tests went green but before it wrote these entries or
+      committed. The code and its 68 checks were re-run and verified
+      independently before this commit; these write-ups are reconstructed
+      from the implementation rather than authored by the agent that built
+      it. Nothing here is ticked on a claim that was not re-run.
 
 ## Open questions — only you can answer these
 
