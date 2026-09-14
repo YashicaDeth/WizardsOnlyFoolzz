@@ -11,6 +11,9 @@ const CRT_GLASS := preload("res://systems/crt_glass.gd")
 ## Well below anything else so the picture is unambiguously the backdrop and
 ## every other canvas in the scene still draws over the 3D as normal.
 const SPLASH_CANVAS_LAYER := -100
+## Above the backdrop and the 3D world, below every readable canvas. See where
+## the glass is built for why it cannot live on the backdrop layer itself.
+const SPLASH_GLASS_CANVAS_LAYER := -50
 
 var wreck: Node3D
 var front_door: Node3D
@@ -24,6 +27,7 @@ var prologue: Control
 var splash: ColorRect
 var splash_frame: RegalFrame
 var splash_glass: CrtGlass
+var splash_glass_layer: CanvasLayer
 var splash_layer: CanvasLayer
 var branch_plate: Control
 var graphics_presets := ["ULTRA", "HIGH", "PERFORMANCE"]
@@ -117,9 +121,28 @@ func _play_title_sequence() -> void:
 	# and only then does it turn out you have been looking at a screen the whole
 	# time. Menu type is on $HUD, a different canvas entirely, so it never enters
 	# the warp and stays as readable as it was.
+	# Its own canvas, between the backdrop and the HUD, and the layer number is
+	# the whole point.
+	#
+	# Inside `splash_layer` the glass degraded the picture correctly — bloom,
+	# scanlines, aberration all landed — and its **geometry did nothing**: the
+	# photograph stayed a dead-straight rectangle while the standalone harness
+	# bowed the same shader hard enough to open black wedges in the corners.
+	# That canvas is the 3D background via `BG_CANVAS`, so a screen-texture read
+	# inside it sees its own canvas rather than the composited frame, and warping
+	# the sample of a thing that is about to be re-projected warps nothing.
+	#
+	# On a layer of its own above it, the glass samples what has actually been
+	# drawn — the room *and* the street and the bodies in front of it — so the
+	# whole tableau curves together instead of a flat picture behind curved
+	# nothing. Still below `$HUD` at 0, so the menu type never enters the warp.
+	splash_glass_layer = CanvasLayer.new()
+	splash_glass_layer.name = "SplashGlassLayer"
+	splash_glass_layer.layer = SPLASH_GLASS_CANVAS_LAYER
+	add_child(splash_glass_layer)
 	splash_glass = CRT_GLASS.new()
 	splash_glass.name = "SplashGlass"
-	splash_layer.add_child(splash_glass)
+	splash_glass_layer.add_child(splash_glass)
 	_use_canvas_background()
 	$HUD/TitleLogo.modulate.a = 0.0
 	$HUD/Presents.modulate.a = 0.0
