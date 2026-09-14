@@ -31,11 +31,21 @@ enum Stage { CELLOUTZ, GRANDEUR, MARK, DONE }
 const STAGE_DURATION := {
 	Stage.CELLOUTZ: 2.4,
 	Stage.GRANDEUR: 2.4,
-	# The Algiz needs a held hero moment before the full mark arrives.
-	Stage.MARK: 6.2,
+	# The circled Algiz needs a true hero moment before the full mark arrives.
+	# Keep this skippable, but do not treat the seal as a one-second transition.
+	Stage.MARK: 8.9,
 }
 # Fraction of a stage spent fading in and fading out; the middle holds solid.
 const FADE_FRACTION := 0.30
+
+# The final card has a deliberate independent rhythm: the Algiz arrives,
+# remains readable as the only image, then gives way to the lockup.  Do not
+# derive this from FADE_FRACTION: that made the emblem's full hold shrink every
+# time the final card duration was tuned.
+const SEAL_REVEAL_SECONDS := 1.20
+const SEAL_HERO_HOLD_SECONDS := 3.35
+const LOCKUP_CROSSFADE_SECONDS := 1.35
+const MARK_EXIT_FADE_SECONDS := 1.10
 
 var stage: Stage = Stage.CELLOUTZ
 var stage_clock := 0.0
@@ -180,7 +190,9 @@ func _update_grandeur_visibility() -> void:
 	if stage_clock > hold_end:
 		out_alpha = 1.0 - clampf((stage_clock - hold_end) / maxf(fade, 0.01), 0.0, 1.0)
 
-	grandeur_rect.modulate = Color(1, 1, 1, out_alpha)
+	# The torn reveal supplies the texture motion; the scalar alpha makes the
+	# title itself fade on instead of appearing at full brightness behind it.
+	grandeur_rect.modulate = Color(1, 1, 1, reveal * out_alpha)
 	grandeur_rect.material.set_shader_parameter("progress", reveal)
 	# The cold-open mark used to fill most of the frame, which made the image
 	# beneath it feel like a cropped wallpaper.  Leave a real perimeter so the
@@ -196,23 +208,24 @@ func _update_mark_visibility() -> void:
 	if stage != Stage.MARK:
 		return
 	var duration: float = STAGE_DURATION[Stage.MARK]
-	var fade := duration * FADE_FRACTION
-	# Seal first, revealing; the stacked wordmark crossfades over the top of
-	# it once the seal itself has finished pouring in, so the icon is never
-	# fighting the full lockup for the same few seconds of attention.
-	var seal_reveal: float = clampf(stage_clock / maxf(fade, 0.01), 0.0, 1.0)
-	# Seal first, held long enough to become an emblem rather than a transition.
-	var mark_start := duration * 0.54
-	var mark_reveal: float = clampf((stage_clock - mark_start) / maxf(fade, 0.01), 0.0, 1.0)
-	var hold_end := duration - fade
+	# Seal first, then let it sit alone for over three seconds before the lockup
+	# begins to enter.  The previous proportional timing gave the circle only
+	# about 1.5 seconds of full, isolated presence.
+	var seal_reveal: float = clampf(stage_clock / SEAL_REVEAL_SECONDS, 0.0, 1.0)
+	var mark_start := SEAL_REVEAL_SECONDS + SEAL_HERO_HOLD_SECONDS
+	var mark_reveal: float = clampf((stage_clock - mark_start) / LOCKUP_CROSSFADE_SECONDS, 0.0, 1.0)
+	var hold_end := duration - MARK_EXIT_FADE_SECONDS
 	var out_alpha := 1.0
 	if stage_clock > hold_end:
-		out_alpha = 1.0 - clampf((stage_clock - hold_end) / maxf(fade, 0.01), 0.0, 1.0)
+		out_alpha = 1.0 - clampf((stage_clock - hold_end) / MARK_EXIT_FADE_SECONDS, 0.0, 1.0)
 
 	if seal_rect.texture != null:
-		seal_rect.modulate = Color(1, 1, 1, (1.0 - mark_reveal) * out_alpha)
+		# Fade the image as well as tearing it on.  This is still a graphic mark,
+		# but it follows the same soft entrance/exit language as the text cards.
+		seal_rect.modulate = Color(1, 1, 1, seal_reveal * (1.0 - mark_reveal) * out_alpha)
 		seal_rect.material.set_shader_parameter("progress", seal_reveal)
-		seal_rect.size = seal_rect.texture.get_size() * lerpf(0.55, 0.85, seal_reveal)
+		var seal_scale := lerpf(0.56, 0.82, seal_reveal) * (1.0 + sin(stage_clock * 1.6) * 0.012)
+		seal_rect.size = seal_rect.texture.get_size() * seal_scale
 		seal_rect.position = size * 0.5 - seal_rect.size * 0.5
 	if mark_rect.texture != null:
 		mark_rect.modulate = Color(1, 1, 1, mark_reveal * out_alpha)
