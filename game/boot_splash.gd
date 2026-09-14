@@ -158,7 +158,11 @@ func _update_grandeur_visibility() -> void:
 
 	grandeur_rect.modulate = Color(1, 1, 1, out_alpha)
 	grandeur_rect.material.set_shader_parameter("progress", reveal)
-	var target_width := size.x * 0.58
+	# The cold-open mark used to fill most of the frame, which made the image
+	# beneath it feel like a cropped wallpaper.  Leave a real perimeter so the
+	# room, sigil and incoming 3D tableau can establish scale before the player
+	# reads the company/title card.
+	var target_width := size.x * 0.50
 	var aspect: float = grandeur_rect.texture.get_size().y / grandeur_rect.texture.get_size().x
 	grandeur_rect.size = Vector2(target_width, target_width * aspect)
 	grandeur_rect.position = size * 0.5 - grandeur_rect.size * 0.5
@@ -187,7 +191,7 @@ func _update_mark_visibility() -> void:
 
 	mark_rect.modulate = Color(1, 1, 1, mark_reveal * out_alpha)
 	mark_rect.material.set_shader_parameter("progress", mark_reveal)
-	var mark_size := size.x * 0.62
+	var mark_size := size.x * 0.52
 	var aspect: float = mark_rect.texture.get_size().y / mark_rect.texture.get_size().x
 	mark_rect.size = Vector2(mark_size, mark_size * aspect)
 	mark_rect.position = size * 0.5 - mark_rect.size * 0.5
