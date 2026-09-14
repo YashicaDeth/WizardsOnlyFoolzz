@@ -26,6 +26,9 @@ func _ready() -> void:
 	tree.root.add_child(menu)
 	tree.current_scene = menu
 	await tree.process_frame
+	var requests: Array[Dictionary] = []
+	menu.travel_request_override = func(scene_path: String, caption: String) -> void:
+		requests.append({"scene": scene_path, "caption": caption})
 
 	menu._open_settings()
 	check(menu.settings_panel.visible, "settings opens before departure")
@@ -42,9 +45,7 @@ func _ready() -> void:
 		if child is BaseButton:
 			check((child as BaseButton).disabled, "%s is disabled during departure" % child.name)
 
-	# The interstitial starts asynchronously, but the duplicate requests above
-	# must not queue a second trip before it gets its first process frame.
-	await tree.process_frame
-	check(Interstitial.travelling, "one sandbox transition is in flight")
+	check(requests.size() == 1, "three presses request exactly one sandbox transition")
+	check(str(requests[0].scene) == "res://gore_demo.tscn", "sandbox is the requested destination")
 	print("MENU_TRANSITION_TEST_RESULT failures=%d" % failures.size())
 	tree.quit(0 if failures.is_empty() else 1)

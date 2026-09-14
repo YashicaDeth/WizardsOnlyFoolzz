@@ -46,6 +46,9 @@ var intro_veil: ColorRect
 var branch_panel: PanelContainer
 var branch_list: VBoxContainer
 var branch_creating := false
+## Kept unset in the game. The regression scene supplies it so departure UI can
+## be tested without loading a whole destination world after the assertions.
+var travel_request_override: Callable
 ## A menu can only leave once. Apart from preventing duplicate scene-load
 ## requests, this makes the old scene inert during the interstitial: controls
 ## such as Settings cannot continue receiving clicks after their panel has
@@ -485,6 +488,9 @@ func _set_menu_buttons_enabled(enabled: bool) -> void:
 ## after the UI has already become inert.
 func _travel_from_menu(scene_path: String, travel_caption: String) -> void:
 	if not menu_departing or Interstitial.travelling:
+		return
+	if travel_request_override.is_valid():
+		travel_request_override.call(scene_path, travel_caption)
 		return
 	Interstitial.travel(scene_path, travel_caption)
 
