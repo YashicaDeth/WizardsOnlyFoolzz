@@ -150,6 +150,11 @@ var _flesh := Color("6b5842")
 var _seated := false
 var _variation := 0
 var _loose: Array[Dictionary] = []
+## Most owners keep their own root (vehicles, scripted actors).  The range can
+## opt into a short, floor-preserving travel on collapse so a defeated body
+## reads as landing in the arena instead of snapping through its own feet.
+var _knockdown_travel := 0.0
+var _knockdown_tween: Tween
 ## O2.7 v4. Greg: *"gore and chunk physics still run at full speed through a
 ## hit, so a limb can leave a body that has not moved yet"*. Exactly right, and
 ## it is the most visible hole left in the hitstop work — the whole effect is
@@ -183,6 +188,7 @@ func build(id: String, config: Dictionary = {}) -> void:
 	# clean body ended up standing in three metres of blood.
 	gore = bool(config.get("gore", apply_gore_setting()))
 	_seated = bool(config.get("seated", false))
+	_knockdown_travel = maxf(0.0, float(config.get("knockdown_travel", 0.0)))
 	_flesh = config.get("flesh", Color("6b5842")) as Color
 	_variation = int(config.get("variation", 0))
 	build_factor = clampf(float(config.get("build", 1.0)), 0.7, 1.4)
@@ -654,7 +660,28 @@ func is_downed() -> bool:
 ## where the body sits — inside a cab, on a controller — and fighting them for
 ## the position would put the body through the floor.
 func _on_went_down() -> void:
-	rotation.x = -PI * 0.46
+	if _knockdown_tween != null and _knockdown_tween.is_valid():
+		_knockdown_tween.kill()
+	# Preserve the established direct pose for every owner that did not opt into
+	# sandbox travel.  Vehicles and the anatomy regression suite deliberately
+	# inspect this state on the same frame the body goes down.
+	if _knockdown_travel <= 0.0:
+		rotation.x = -PI * 0.46
+		went_down.emit()
+		return
+	# Pivot at the feet and travel in the fall direction.  This keeps a rig at
+	# the y supplied by its owner (the floor is still y=0 in the sandbox) rather
+	# than adding a fake vertical offset that makes corpses hover or tunnel.
+	var forward := -global_transform.basis.z
+	forward.y = 0.0
+	if forward.length_squared() < 0.001:
+		forward = Vector3.FORWARD
+	forward = forward.normalized()
+	var landed := position + forward * _knockdown_travel
+	_knockdown_tween = create_tween().set_parallel(true)
+	_knockdown_tween.tween_property(self, "rotation:x", -PI * 0.46, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	if _knockdown_travel > 0.0:
+		_knockdown_tween.tween_property(self, "position", landed, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	went_down.emit()
 
 

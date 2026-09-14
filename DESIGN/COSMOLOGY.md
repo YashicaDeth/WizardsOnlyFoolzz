@@ -28,6 +28,53 @@ handheld is CellOutz hardware. The player has been carrying hell's branded
 merchandise since the first scene, and it reads as ordinary because a company
 is exactly what a modern hell would look like.
 
+## Dimensional ecology — a world state, not a level select
+
+The alternate dimensions are not separate maps with different sky colours.
+They are **readings of the same places** that become reachable as the player
+accumulates evidence, relationships, damage and attention. A street remains a
+street; its hidden social and spiritual infrastructure becomes visible, usable,
+or hostile.
+
+The visual language is the supplied torus-field reference: luminous nested
+fields, root/branch symmetry, magnetic arcs, and repeated forms at body, city
+and planetary scale. It is art direction, not a claim about real physics or
+religion. The game calls its upside-down descent structure the **Inverted
+Lattice**, an original fiction term rather than presenting a real tradition as
+literal cosmology.
+
+| Reading | What changes in play | How it reads |
+| --- | --- | --- |
+| Street / matter | Jobs, routines, fights, trade and witnesses are visible. | Rust, wet concrete, organs, signal hardware. |
+| Wire / relation | Kinship, faction obligation, conversations and grudges become traversable information. | Copper threads, name-chains, a pyramid that rearranges as alliances change. |
+| Field / soul | Consequences of a death, rite or promise appear without replacing the physical world. | A translucent torus around people/places, slow field lines and a small Samsara wheel. |
+| Inverted Lattice | A descent route where factions see the player through fear, debt and ownership. | Gravity-bent city fragments, crimson roots, mirrored geometry and CellOutz accounting marks. |
+
+### The rule for people
+
+Every named person needs a role, a place, a schedule, affiliations, known
+relations and a memory of witnessed conversations/actions. Neutral people are
+not enemies waiting to be triggered: aggression is an authored choice with
+faction, kinship and local consequences. Killing a neutral worker can create a
+grudge in their household, a price change at their employer, a hunt from their
+faction and a reputation shift with a race/community — but never a universal
+"evil score."
+
+The existing witness ledger remains the source of truth. The new work is to
+add conversation records, relationship edges and group-specific reputation to
+it, then make each layer read those records differently. A faction can fear
+the player while an individual inside it owes them; a rival community can
+respect a merciful choice even while their leadership wants revenge.
+
+### The soul response
+
+On a permanent death, a brief 3D **Samsara wheel** rises near the event and a
+small torus-field gauge occupies the left edge. The wheel reports competing
+opinions — for example *SOUL FREED* or *BOUND AGAIN* — from named in-world
+powers. It never declares objective cosmic fact. The torus gauge moves through
+the player’s current relationship to the two ladders, while the actual event,
+witnesses and faction reactions remain inspectable in the Wire.
+
 `wizardsonlyfoolz` was previously recorded only as a candidate working title
 (open question 5), and this document argued for keeping it as the name of the
 ascending collective rather than the game's title, to avoid the two colliding.

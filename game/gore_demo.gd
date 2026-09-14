@@ -57,6 +57,7 @@ const SUBSTANCE_STATION := preload("res://systems/substance_station.gd")
 const SUBSTANCES := preload("res://systems/substances.gd")
 const SUBSTANCE_EXPERIENCE := preload("res://systems/substance_experience.gd")
 const SMOKEABLES := preload("res://systems/smokeables.gd")
+const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
 
 const BODY_COUNT := 7
 const ARENA := 26.0
@@ -115,6 +116,12 @@ var note_life := 0.0
 var station: Node3D
 var carried_substances: Array[Dictionary] = []
 var handheld: HandheldDevice
+var psychedelic: PsychedelicRig
+## Smokeables are deliberately held rather than clicked.  The draw duration is
+## the input to their shared sweet-spot/harshness curve, so a bong can actually
+## be a long, high-risk pull instead of a renamed inventory button.
+var smoke_draw_slot := -1
+var smoke_draw_started := 0.0
 
 
 func _ready() -> void:
@@ -223,6 +230,10 @@ func _spawn_body(index: int) -> void:
 		# separate, older system whenever the main-game setting was reduced.
 		"gore": BaselineHuman.apply_gore_setting(),
 		"blood": 4300.0,
+		# The same body still owns its collapse, but the sandbox asks it to use a
+		# grounded fall pose.  A body cannot be allowed to tunnel beneath the
+		# range floor just because it has gone down.
+		"knockdown_travel": 0.42,
 		"cybernetics": {"torso": {"name": "ceramic sternum", "armor": 0.18}},
 	})
 	# Greg: *"the gore in the gore sandbox is not up to date with the gore in the
@@ -240,6 +251,7 @@ func _spawn_body(index: int) -> void:
 
 
 func _reset() -> void:
+	smoke_draw_slot = -1
 	for entry: Dictionary in bodies:
 		var holder := entry["holder"] as Node3D
 		if is_instance_valid(holder):
@@ -381,6 +393,28 @@ func _fire() -> void:
 	_note("%s OFF" % _spoken(zone) if off else "HIT // %s" % _spoken(zone))
 
 
+## A close cutting pass is not a cosmetic alternate-fire.  It enters the same
+## BaselineHuman anatomy path as melee in the Hunt: it opens layers, can rupture
+## an organ, can sever a limb, and sends those real chunks/blood into the room.
+func _cut() -> void:
+	var along := -camera.global_transform.basis.z
+	var found := _trace_body(camera.global_position + along * 0.45, along)
+	if found.is_empty():
+		_note("CUT // NO BODY")
+		return
+	var rig := found["rig"] as BaselineHuman
+	var zone := str(found["zone"])
+	var result := rig.hit(zone, 58.0, 72.0, "cut", "", along)
+	if not bool(result.get("accepted", true)):
+		_note("%s ALREADY GONE" % _spoken(zone))
+		return
+	var off := bool(result.get("severed", false))
+	if off:
+		severed_total += 1
+	_kick(0.58, "cut", off, HITSTOP_SHOT)
+	_note("CUT // %s%s" % [_spoken(zone), " OFF" if off else " OPEN"])
+
+
 ## Where the shot actually lands, on the zone that was actually aimed at.
 ##
 ## Iterated rather than a single ray because loose gore is a `RigidBody3D` on
@@ -464,20 +498,50 @@ func _unhandled_input(event: InputEvent) -> void:
 			var found := _trace_body(camera.global_position + along * 0.6, along)
 			var at: Vector3 = found.get("position", camera.global_position + along * 6.0)
 			_explode(at, 58.0)
-	if event is InputEventKey and event.pressed and not event.echo:
-		match event.keycode:
+	if event is InputEventKey and not event.echo:
+		var key := event as InputEventKey
+		var slot := _carry_slot_for_key(key.keycode)
+		if not key.pressed:
+			if slot == smoke_draw_slot:
+				var held := maxf(0.08, Time.get_ticks_msec() * 0.001 - smoke_draw_started)
+				smoke_draw_slot = -1
+				_use_carried(slot, held)
+			return
+		if slot >= 0:
+			_begin_or_use_carried(slot)
+			return
+		match key.keycode:
 			KEY_E: _take_station_item()
 			KEY_G:
 				if handheld != null:
 					handheld.toggle_device()
-			KEY_1: _use_carried(0)
-			KEY_2: _use_carried(1)
-			KEY_3: _use_carried(2)
-			KEY_4: _use_carried(3)
+			KEY_Q: _cut()
 			KEY_R: _reset()
 			KEY_X: _set_xray(not xray)
 			KEY_ESCAPE: _step_out()
 			KEY_F: _explode(camera.global_position + Vector3(0, 0.4, 0), 92.0)
+
+
+func _carry_slot_for_key(keycode: Key) -> int:
+	match keycode:
+		KEY_1: return 0
+		KEY_2: return 1
+		KEY_3: return 2
+		KEY_4: return 3
+	return -1
+
+
+func _begin_or_use_carried(index: int) -> void:
+	if index < 0 or index >= carried_substances.size():
+		_note("CARRY SLOT EMPTY")
+		return
+	var item := carried_substances[index]
+	if str(item.get("kind", "")) != "smokeable":
+		_use_carried(index)
+		return
+	smoke_draw_slot = index
+	smoke_draw_started = Time.get_ticks_msec() * 0.001
+	_note("DRAWING // %s" % str(item.get("label", "SMOKEABLE")))
 
 
 func _take_station_item() -> void:
@@ -495,7 +559,7 @@ func _on_station_taken(entry: Dictionary) -> void:
 	carried_substances.append(entry.duplicate(true))
 
 
-func _use_carried(index: int) -> void:
+func _use_carried(index: int, held := 1.0) -> void:
 	if index < 0 or index >= carried_substances.size():
 		_note("CARRY SLOT EMPTY")
 		return
@@ -506,10 +570,11 @@ func _use_carried(index: int) -> void:
 		if bool(result.get("ok", false)):
 			SUBSTANCE_EXPERIENCE.begin(SANDBOX_SUBJECT, str(item.get("id", "")), Time.get_ticks_msec() * 0.001, 1.0)
 	else:
-		result = SMOKEABLES.hit(SANDBOX_SUBJECT, str(item.get("id", "")), 0.55, Time.get_ticks_msec() * 0.001)
+		result = SMOKEABLES.hit(SANDBOX_SUBJECT, str(item.get("id", "")), held, Time.get_ticks_msec() * 0.001)
 	if bool(result.get("ok", false)):
 		carried_substances.remove_at(index)
-		_note("DOSE BEGUN // %s" % str(item.get("label", item.get("id", ""))))
+		var grade := str(result.get("grade", ""))
+		_note("DOSE %s // %s" % [grade.to_upper() if not grade.is_empty() else "BEGUN", str(item.get("label", item.get("id", "")))])
 	else:
 		_note("DOSE REFUSED // %s" % str(result.get("reason", "BODY LEDGER")))
 
@@ -578,6 +643,13 @@ func _physics_process(delta: float) -> void:
 	camera.global_transform.basis = Basis(Vector3.UP, yaw + shove.x) * Basis(Vector3.RIGHT, pitch + shove.y) * Basis(Vector3.FORWARD, impact_feel.roll)
 
 	note_life = maxf(0.0, note_life - real_delta)
+	# A dose is only a gameplay feature when the player can actually see its
+	# state.  This drives the same fullscreen rig and timed profile the Hunt
+	# uses; the sandbox does not invent a separate "drug screen" effect.
+	if psychedelic != null and is_instance_valid(psychedelic):
+		var now := Time.get_ticks_msec() * 0.001
+		SUBSTANCE_EXPERIENCE.drive(psychedelic, SANDBOX_SUBJECT, now)
+		SUBSTANCE_EXPERIENCE.settle(SANDBOX_SUBJECT, now)
 	if hud != null and is_instance_valid(hud):
 		hud.queue_redraw()
 
@@ -600,6 +672,9 @@ func _build_hud() -> void:
 	handheld = HandheldDevice.new()
 	handheld.name = "SandboxHandheld"
 	layer.add_child(handheld)
+	psychedelic = PSYCHEDELIC_RIG.new()
+	psychedelic.name = "SandboxPsychedelic"
+	layer.add_child(psychedelic)
 
 
 func _paint_hud() -> void:
@@ -627,7 +702,7 @@ func _paint_hud() -> void:
 
 	var keys := [
 		["LMB", "SHOOT"], ["RMB", "BLAST THERE"], ["F", "BLAST HERE"],
-		["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["E", "TAKE"], ["1-4", "USE"], ["G", "DEVICE"], ["R", "RESET"], ["WASD", "MOVE"],
+		["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"], ["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["WASD", "MOVE"],
 	]
 	var x := 26.0
 	for pair: Array in keys:
@@ -635,14 +710,27 @@ func _paint_hud() -> void:
 		x += CellOutzType.draw_condensed(hud, Vector2(x, size.y - 26.0), str(pair[1]), 10.0, bone * Color(1, 1, 1, 0.55), 1.6) + 22.0
 
 	# What is actually on the floor. The interesting number in a gore sandbox.
+	# Greg: *"CAN YOU FIX THE KNOCKDOWN ISSUE"*. This was it. The count tested
+	# `dead` and nothing else, so a body that had gone down - unconscious, tipped
+	# flat on its back by `BaselineHuman._on_went_down()`, lying in its own
+	# blood - still counted as STANDING. The knockdown machinery works and has
+	# the whole time; nothing in the sandbox ever said so, and a knockdown with
+	# no acknowledgement anywhere on screen is indistinguishable from one that
+	# did not happen.
 	var standing := 0
+	var downed := 0
 	for entry: Dictionary in bodies:
 		var rig := entry["rig"] as BaselineHuman
-		if rig != null and is_instance_valid(rig) and not rig.anatomy.dead:
+		if rig == null or not is_instance_valid(rig) or rig.anatomy.dead:
+			continue
+		if rig.anatomy.downed:
+			downed += 1
+		else:
 			standing += 1
 	var right_edge := size.x - 26.0
 	var lines := [
 		"STANDING  %d / %d" % [standing, BODY_COUNT],
+		"DOWNED	%03d" % downed,
 		"TAKEN OFF	%03d" % severed_total,
 		"ON THE FLOOR  %03d" % GoreChunks.live_count(),
 		"BRASS	%03d" % (ballistics.spent_brass() if ballistics != null else 0),

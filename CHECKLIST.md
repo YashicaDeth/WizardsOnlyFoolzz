@@ -4686,6 +4686,31 @@ The last rung. Fifteen statements that are true of the tree and the work when th
 
 ## AT — WETWIRE: the brain, the chip and the index
 
+### AT0 — dimensional ecology and witnessed consequence
+
+Design source: `DESIGN/COSMOLOGY.md` §"Dimensional ecology". The torus-field
+reference is a visual language for the game, not a factual claim about physics
+or a borrowed religious system.
+
+- [ ] **AT0.1** The same physical location can expose Street, Wire, Field and
+      Inverted Lattice readings without becoming four disconnected maps.
+- [ ] **AT0.2** Every ambient NPC has a role, home area/schedule, faction,
+      relationship edges and a witness memory before it can be used as combat
+      population.
+- [ ] **AT0.3** Conversation events are recorded against the participants and
+      can alter a relationship without changing global karma by themselves.
+- [ ] **AT0.4** Reputation is group-specific: faction, race/community and
+      household reactions can disagree about the same act.
+- [ ] **AT0.5** A neutral killing has a legible local consequence only when
+      somebody, some record, or some relationship can actually know about it.
+- [ ] **AT0.6** Permanent death raises a compact 3D Samsara wheel with named,
+      conflicting in-world verdicts; it never presents a cosmic opinion as fact.
+- [ ] **AT0.7** The left-field readout is a torus-field state indicator tied to
+      real tree alignment, witness evidence and faction response — not a second
+      morality meter.
+- [ ] **AT0.8** The Inverted Lattice is original game fiction with its own
+      language and rules, not an assertion about a living religious tradition.
+
 `DESIGN/THE_BRAIN.md` is the document. Greg's substance and dimension design
 arrived as four things that are **one system**: a brain you open, a chip somebody
 put in it, the materia, and the planes it reaches.
