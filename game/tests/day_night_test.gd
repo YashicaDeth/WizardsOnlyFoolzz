@@ -39,7 +39,18 @@ func _ready() -> void:
 	var night_energy: float = sun.light_energy
 	var night_warp: float = hunt.get("psychedelic").dial("displacement_strength")
 	check(night_energy < noon_energy * 0.15, "deep night is genuinely dim, not a re-tinted noon (%.2f)" % night_energy)
-	check(night_warp > 0.0, "and the light actually warps at night rather than only dimming")
+	# Was: "and the light actually warps at night rather than only dimming".
+	# That assertion outlived the design. `_update_day_night` deliberately
+	# stopped driving `displacement_strength` -- a sober player walking around
+	# after dark was getting a permanently moving screen, and the warp is what
+	# being on something is supposed to look like. Greg, twice, unprompted:
+	# "fixing the wobbly screen like you smoked weed or nicotine". The dial is
+	# left for substances.gd, meditation.gd and the shadow realms.
+	#
+	# So the contract is now the opposite one, and it is worth holding: night
+	# dims and must NOT warp, or the one state the shader exists to express
+	# stops being legible.
+	check(absf(night_warp) < 0.001, "and night dims without warping -- the warp belongs to substances, not to the hour")
 
 	# A dawn in between should sit between the two, since it reads off the
 	# same continuous daylight() curve rather than snapping between states.

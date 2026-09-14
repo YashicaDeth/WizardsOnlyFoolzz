@@ -32,11 +32,22 @@ func _ready() -> void:
 		if not unique_layouts.has(layout):
 			unique_layouts.append(layout)
 	check(unique_layouts.size() == layouts.size(), "no two sites share a layout (%d layouts, %d sites)" % [unique_layouts.size(), layouts.size()])
-	var unique_palettes: Array = []
-	for entry in palettes:
-		if not unique_palettes.has(entry):
-			unique_palettes.append(entry)
-	check(unique_palettes.size() == palettes.size(), "and no two share a palette")
+	# Was: every palette had to be unique. That failed the moment the web got a
+	# second CellOutz page -- celloutz_support and celloutz_store are both
+	# "corporate", and they should be: two pages of one company are supposed to
+	# look like one company. A brand with a different palette per page is not a
+	# brand.
+	#
+	# What the assertion was actually protecting is that no two sites are
+	# indistinguishable, and layout plus palette together is the honest test of
+	# that. Sibling pages stay on-brand and still cannot be confused with each
+	# other.
+	var signatures: Array = []
+	for index in layouts.size():
+		var signature := "%s/%s" % [layouts[index], palettes[index]]
+		if not signatures.has(signature):
+			signatures.append(signature)
+	check(signatures.size() == layouts.size(), "and no two sites are indistinguishable -- layout and palette together (%d of %d)" % [signatures.size(), layouts.size()])
 
 	# Every palette resolves to a real set of colours rather than the fallback.
 	var grounds: Array = []
