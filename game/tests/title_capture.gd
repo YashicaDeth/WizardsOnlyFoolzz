@@ -60,8 +60,10 @@ func _ready() -> void:
 		# shoots the third card, and so on — a fade cycle is CARD_FADE*2 +
 		# CARD_HOLD long and the prologue cannot be scrubbed any other way.
 		var want_card := 0
-		if panel.length() > 9:
-			want_card = int(panel.substr(9))
+		# "prologue" is 8 characters, so the digit sits at index 8. substr(9) on
+		# "prologue2" returns "" and every card request silently shot card 0.
+		if panel.length() > 8:
+			want_card = int(panel.substr(8))
 		menu.call("_play_decanting_prologue")
 		var pro = menu.get("prologue")
 		# Read off the instance rather than the global class name: a freshly

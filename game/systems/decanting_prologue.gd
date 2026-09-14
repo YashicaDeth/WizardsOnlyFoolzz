@@ -110,8 +110,10 @@ func play() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not running:
 		return
-	var pressed := event is InputEventKey and event.pressed and not event.is_echo()
-	var clicked := event is InputEventMouseButton and event.pressed
+	# Explicitly typed: `event.pressed` off a base `InputEvent` has no static
+	# type, so `:=` cannot infer one and the whole script fails to compile.
+	var pressed: bool = event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).is_echo()
+	var clicked: bool = event is InputEventMouseButton and (event as InputEventMouseButton).pressed
 	if pressed or clicked:
 		accept_event()
 		_end()
