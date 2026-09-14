@@ -419,8 +419,20 @@ static func surface(color: Color, kind: String = "paint", variation_seed: int = 
 		"dirt":
 			material.metallic = 0.0
 			material.roughness = 0.97
-			# Ash and spoil return almost nothing. Without this the ground carries a
-			# sheen under every lamp and reads as wet concrete.
+			# G7.2. Near-black albedo (oil_asphalt, dead_forest run 0.03-0.06) plus
+			# 0.97 roughness means flat ground has no grazing-angle response at
+			# all — it just goes solid black under anything but direct overhead
+			# light, which is most of what a first-person camera sees of the
+			# ground. The same rim trick "flesh" already uses picks up the sky's
+			# horizon glow at grazing angles instead, so the near field reads as
+			# a lit surface with an edge rather than a black hole — contrast from
+			# the existing light, not a global exposure or ambient raise.
+			material.rim_enabled = true
+			material.rim = 0.3
+			material.rim_tint = 0.75
+			# Ash and spoil return almost nothing at normal incidence, which the
+			# rim above does not touch — without this the ground carries a sheen
+			# under every lamp and reads as wet concrete even with the edge fixed.
 			material.metallic_specular = 0.08
 			_apply_grain(material, 0.22, 0.6, "dirt", variation_seed)
 		_:

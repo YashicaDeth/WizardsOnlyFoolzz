@@ -80,6 +80,14 @@ const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const LIVE_BODY_MIRROR := preload("res://systems/live_body_mirror.gd")
 const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
+const STORM_WEATHER := preload("res://systems/storm_weather.gd")
+const PERCEPTION := preload("res://systems/perception.gd")
+const GLITCH_SPIDER := preload("res://systems/glitch_spider.gd")
+## AE1.1. Beyond this, nobody hunting the player needs a light/noise/cover
+## verdict at all — the same reason `storm_weather.gd`'s exposure only
+## starts mattering past a real severity, not from the first drop of rain.
+const PERCEPTION_MAX_RANGE := 30.0
+const PSYCHEDELIC_OSC := preload("res://systems/psychedelic_osc.gd")
 const KEYS_CARD := preload("res://systems/keys_card.gd")
 ## AS1.1. Bright enough to actually read as a light source against
 ## `world_look.gd`'s low-ambient presets rather than a glow nobody would notice.
@@ -484,6 +492,16 @@ const BODY_RECORD_INTERVAL := 0.5
 ## `_update_day_night()` writes the same value off the hour and the two would
 ## otherwise fight frame by frame.
 const AIR_FOG_BLEND := 0.08
+## W1.2. "Contamination has weather — it moves, it settles, it gets worse."
+## Days (of the 30-day month `WorldClock`/AB2.4/W10.11 already treat as the
+## game's one calendar unit) for the calendar term alone to reach its worst.
+## Shorter than the month itself so a lived-in save reads as measurably
+## worse before the month turns over and repairs land.
+const AIR_WORSENING_DAYS := 18.0
+## However bad the calendar term gets on its own, loose chaos-magick can push
+## the rest of the way — the ecology and the occult are named as the same rot
+## in this world ("runaway fungal ecology, decayed cybernetics").
+const AIR_CHAOS_CONTRIBUTION := 0.35
 ## A7.1. Who is up, and the hour that decides it.
 var gods: Gods
 ## A8.1. The spirit on the body, and the frame melting around it.
@@ -498,6 +516,21 @@ var body_record_timer := 0.0
 ## angle and brightness no matter the hour, which is why W1.1 existing made no
 ## visible difference until this read off it.
 var sun: DirectionalLight3D
+## AS4. Storms that answer the occult — severity is a read of
+## `WorldHistory.chaos_magick()`, never authored here.
+var storm_weather: StormWeather
+## PiFrac-DEV Studio's "Glitch Spider particle system" reference. The one
+## burst `_on_reality_misfire()` fires — see `glitch_spider.gd`.
+var glitch_spider: Node3D
+## AE1.1. How loud the player is being right now, 0..1 — one of
+## `perception.gd`'s four real inputs. No noise system existed anywhere in
+## the project before this; sprinting is the one real, if simple, source of
+## it for a first pass.
+var player_noise := 0.0
+## AE1.1. The worst-case (most exposed) verdict against any live hostile
+## this frame, and the boolean AS1.5/AU1.10's AE1.4 were both waiting on.
+var player_visibility := 0.0
+var player_unseen := true
 var pathfinder = preload("res://systems/ashbloom_pathfinder.gd").new()
 var social_markers: Array[Node3D] = []
 var resolution_ui: Control
@@ -684,6 +717,12 @@ func _ready() -> void:
 	add_child(ballistics)
 	ballistics.round_hit.connect(_on_round_hit)
 	ballistics.round_expired.connect(_on_round_expired)
+	storm_weather = STORM_WEATHER.new()
+	storm_weather.name = "StormWeather"
+	add_child(storm_weather)
+	glitch_spider = GLITCH_SPIDER.new()
+	glitch_spider.name = "GlitchSpider"
+	add_child(glitch_spider)
 	blood_veil = BLOOD_VEIL.new()
 	$HUD.add_child(blood_veil)
 	_pointer = Control.new()
@@ -705,6 +744,13 @@ func _ready() -> void:
 	psychedelic = PSYCHEDELIC_RIG.new()
 	psychedelic.name = "Psychedelic"
 	$HUD.add_child(psychedelic)
+	# DESIGN/FINAL_V.md §16, Path C. Frees itself immediately unless dev tools
+	# are on and `--osc` was actually asked for, so this costs nothing in a
+	# normal run — see `psychedelic_osc.gd`.
+	var osc := PSYCHEDELIC_OSC.new()
+	osc.name = "PsychedelicOSC"
+	add_child(osc)
+	osc.attach(psychedelic)
 	keys_card = KEYS_CARD.new()
 	keys_card.name = "KeysCard"
 	$HUD.add_child(keys_card)
@@ -1180,6 +1226,9 @@ func _physics_process(delta: float) -> void:
 	# builds a third.
 	WorldClock.advance(delta)
 	_update_day_night()
+	_update_storm_exposure(delta)
+	_update_altered_perception()
+	_update_perception(delta)
 	dodge_remaining = maxf(0.0, dodge_remaining - delta)
 	# O2.7 v3. scale_for() only ever reached the encounter loop's actor_delta —
 	# the player is the other half of every exchange they are in and kept
@@ -4960,6 +5009,93 @@ func _update_day_night() -> void:
 				glass.albedo_color = light.light_color * (1.0 - daylight)
 
 
+## AS4.5/AS3.3. Being caught out in a real storm costs something — stamina
+## here, rather than a new damage type, so this stays a real cost without
+## reaching into the anatomy/wound systems a weather pass has no business
+## touching. AS3.3: what you are wearing is strategy, so a real layer's
+## warmth cuts a real storm's cost — applied here, not inside
+## storm_weather.gd itself, since the weather does not know or care who is
+## standing in it, only the one getting rained on does. Split out from
+## `_physics_process` (the same reason `_update_day_night` and
+## `_update_altered_perception` already are) so a test can call it directly
+## without first satisfying every earlier gate in that function.
+func _update_storm_exposure(delta: float) -> void:
+	if storm_weather == null or not is_instance_valid(storm_weather):
+		return
+	storm_weather.follow(player)
+	var warmth := float(Clothing.stats("player").get("warmth", 0.0))
+	stamina = clampf(stamina - storm_weather.exposure_cost(delta) * (1.0 - warmth), 0.0, 100.0)
+
+
+## AE1.1. "Unseen is a real state with real inputs — light, noise, cover,
+## distance." `perception.gd`'s `visibility()` is a pure function of those
+## four; this is what actually supplies them from the live world, against
+## every hostile still hunting, and keeps the worst (most exposed) verdict —
+## the one a hostile closest to noticing you would actually see.
+##
+## Noise is the one input with no existing system behind it anywhere in the
+## project: sprinting is a real, if simple, first source, decaying rather
+## than switching instantly so a sprint's noise does not vanish the exact
+## frame you stop. Light reads `WorldClock.daylight()` and the handheld's
+## own `is_lit()` — AS1.5's light_radius() hook finally has a caller. Cover
+## is one raycast per live hostile, the same exclude-both-ends convention
+## `_update_camera()`'s own obstruction check already uses: nothing in the
+## way reads as a clear sightline, anything else in the way reads as full
+## cover.
+func _update_perception(delta: float) -> void:
+	var sprinting_now := Input.is_action_pressed("sprint") and player_body.velocity.length() > 0.5
+	player_noise = move_toward(player_noise, 1.0 if sprinting_now else 0.0, delta * 2.0)
+
+	var light := clampf(maxf(WorldClock.daylight(), 0.9 if handheld.is_lit() else 0.0), 0.0, 1.0)
+	var target := player + Vector3.UP * 0.2
+
+	var worst := 0.0
+	for actor: Dictionary in encounter_actors:
+		if bool(actor.get("dead", false)):
+			continue
+		var hostile: Node3D = actor.get("node")
+		if hostile == null or not is_instance_valid(hostile):
+			continue
+		var eye := hostile.global_position + Vector3.UP * 1.5
+		var distance := eye.distance_to(target)
+		var excluded: Array[RID] = [player_body.get_rid()]
+		if hostile is CollisionObject3D:
+			excluded.append((hostile as CollisionObject3D).get_rid())
+		var query := PhysicsRayQueryParameters3D.create(eye, target)
+		query.exclude = excluded
+		var cover := 0.0 if get_world_3d().direct_space_state.intersect_ray(query).is_empty() else 1.0
+		worst = maxf(worst, PERCEPTION.visibility(light, player_noise, cover, distance, PERCEPTION_MAX_RANGE))
+	player_visibility = worst
+	player_unseen = worst < PERCEPTION.UNSEEN_THRESHOLD
+
+
+## E6/E8. `substances.gd` and `meditation.gd` have both paid into
+## `anatomy_state.consciousness` since before either system existed, and
+## neither one has ever had anything on screen to show for it — the entire
+## cost was invisible. Perception distorting as consciousness fades is the
+## same shader at a different dial (FINAL_V.md §16's own argument), not a
+## fourth system: whatever actually caused the drop, a substance, a
+## meditation session, blood loss, the fiction does not care which, only the
+## player's own state does.
+##
+## Always sets every dial it owns, even back to zero, rather than only ever
+## pushing them up — `storm_weather.gd`'s lightning flash already taught this
+## build what happens to a value nothing ever resets: it freezes wherever it
+## last was instead of actually relaxing when the state that raised it passes.
+## `displacement_strength` is added to whatever `_update_day_night` just set
+## rather than overwriting it, since night and altered consciousness are two
+## real causes of the same dial and neither should erase the other.
+func _update_altered_perception() -> void:
+	if player_rig == null or not is_instance_valid(player_rig):
+		return
+	if psychedelic == null or not is_instance_valid(psychedelic):
+		return
+	var altered := 1.0 - clampf(player_rig.anatomy.consciousness / 100.0, 0.0, 1.0)
+	psychedelic.set_dial("displacement_strength", psychedelic.dial("displacement_strength") + altered * 0.05)
+	psychedelic.set_dial("chromatic_offset", altered * 0.012)
+	psychedelic.set_dial("kaleidoscope_segments", lerpf(0.0, 5.0, clampf(inverse_lerp(0.5, 1.0, altered), 0.0, 1.0)))
+
+
 func _build_expanse_systems() -> void:
 	generated_world = WORLD_GENERATOR.new()
 	generated_world.name = "ProceduralAshbloomDistricts"
@@ -4992,6 +5128,11 @@ func _on_reality_misfire(encounter: Dictionary, at: Vector3) -> void:
 	var title_text := str(encounter.get("title", "REALITY MISFIRE"))
 	var summary := str(encounter.get("summary", "Something impossible notices you."))
 	prompt.text = "REALITY MISFIRE // %s\n%s" % [title_text, summary]
+	# A system named "Reality Misfire" had never once made reality visibly
+	# misfire — a text prompt was the whole event. One burst, world-space and
+	# on the screen at once, rather than a fabricated new meaning for the name.
+	if glitch_spider != null and is_instance_valid(glitch_spider):
+		glitch_spider.trigger(at + Vector3.UP, player, psychedelic)
 	var kind := str(encounter.get("kind", "mystery"))
 	if kind in ["hostile", "boss"]:
 		_spawn_encounter_actor(encounter, at)

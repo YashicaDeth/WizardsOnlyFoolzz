@@ -33,9 +33,20 @@ const STORM_MOTES := 1500
 ## the air ends up moving with the player instead of past them.
 const RECENTRE_STEP := 6.0
 
+## W1.2. `chaos_magick()` decays on its own with nothing feeding it, so read
+## on its own the air got *better* on every quiet night — the opposite of
+## what "contamination has weather" asked for. A watermark fixes that without
+## touching `WorldHistory`: a spike raises what "normal" reads as immediately,
+## and only a full quiet day earns back a small piece of that ceiling. The
+## instant `chaos_magick()` term can still spike air above the watermark on a
+## bad night; it just cannot silently erase yesterday's on a calm one.
+const WATERMARK_RELIEF := 0.08
+
 var _process_material: ParticleProcessMaterial
 var _mesh_material: StandardMaterial3D
 var _severity := 0.0
+var _watermark := 0.0
+var _watermark_day := -1
 var _centre := Vector3.ZERO
 
 
@@ -94,8 +105,18 @@ func _init() -> void:
 ## A9.2. `severity` is 0 to 1. Everything it touches is something you can see
 ## before anything makes a sound: how much is up, how fast it is going, how hard
 ## it is being pushed around, and how dirty it looks doing it.
-func set_severity(level: float) -> void:
-	_severity = clampf(level, 0.0, 1.0)
+func set_severity(severity: float) -> void:
+	severity = clampf(severity, 0.0, 1.0)
+	var day := WorldClock.day()
+	if severity > _watermark:
+		# It just got worse. That is the new floor until a quiet day earns
+		# relief against it — not a number this frame's reading can undo.
+		_watermark = severity
+		_watermark_day = day
+	elif _watermark_day >= 0 and day > _watermark_day:
+		_watermark = maxf(severity, _watermark - WATERMARK_RELIEF * float(day - _watermark_day))
+		_watermark_day = day
+	_severity = maxf(severity, _watermark)
 	amount_ratio = lerpf(float(CALM_MOTES) / float(STORM_MOTES), 1.0, _severity)
 	speed_scale = lerpf(1.0, 2.6, _severity)
 	if _process_material != null:

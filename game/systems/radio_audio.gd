@@ -57,6 +57,12 @@ var _band: AudioEffectBandPassFilter
 var _drive: AudioEffectDistortion
 var _room: AudioEffectReverb
 var _beds: Dictionary = {}
+## Audio-reactive visuals for whatever draws the receiver's screen (pwnisher's
+## technique this was pointed at: a real spectrum reading driving a visual
+## parameter, not a fake pulse keyed to `strength` alone — a station cutting
+## in and out mid-word should visibly flicker with it).
+var _spectrum: AudioEffectSpectrumAnalyzerInstance
+var _bus_index := -1
 
 
 func _ready() -> void:
@@ -75,17 +81,23 @@ func _ensure_bus() -> void:
 	AudioBus.ensure()
 	var existed := AudioServer.get_bus_index(BUS) != -1
 	var index := AudioBus.chain(BUS)
+	_bus_index = index
 	if not existed:
 		# Order matters: shape the band first, then drive what is left, then put
 		# it in a room. Driving before filtering makes mush rather than a radio.
 		AudioServer.add_bus_effect(index, AudioEffectBandPassFilter.new())
 		AudioServer.add_bus_effect(index, AudioEffectDistortion.new())
 		AudioServer.add_bus_effect(index, AudioEffectReverb.new())
+		# Read-only tap, after the other three have already shaped the signal —
+		# a visual driven by this hears the set the same way the player does,
+		# static and all, rather than reading the clean source underneath it.
+		AudioServer.add_bus_effect(index, AudioEffectSpectrumAnalyzer.new())
 	_band = AudioServer.get_bus_effect(index, 0) as AudioEffectBandPassFilter
 	_drive = AudioServer.get_bus_effect(index, 1) as AudioEffectDistortion
 	_room = AudioServer.get_bus_effect(index, 2) as AudioEffectReverb
 	if _drive:
 		_drive.mode = AudioEffectDistortion.MODE_LOFI
+	_spectrum = AudioServer.get_bus_effect_instance(index, 3) as AudioEffectSpectrumAnalyzerInstance
 
 
 func _player(node_name: String, stream: AudioStream) -> AudioStreamPlayer:
@@ -116,6 +128,31 @@ func tune_to(station_kind: String, signal_strength: float) -> void:
 ## and by anything that leaves a set behind, like getting out of the car.
 func silence() -> void:
 	listening = false
+
+
+## A real 0..1 reading of what is actually coming out of the set right now,
+## for anything that wants to draw a visual off it — the receiver's own
+## screen, or another effect entirely. Three bands rather than one number
+## across the whole spectrum, so a low, throat-heavy bed and a thin, high
+## one do not average into the same flat reading.
+func spectrum_bands() -> Vector3:
+	if _spectrum == null or _gain <= 0.001:
+		return Vector3.ZERO
+	var low := _spectrum.get_magnitude_for_frequency_range(20.0, 250.0).length()
+	var mid := _spectrum.get_magnitude_for_frequency_range(250.0, 2000.0).length()
+	var high := _spectrum.get_magnitude_for_frequency_range(2000.0, 8000.0).length()
+	# Magnitudes are linear amplitude, not 0..1 to begin with — a bare sine at
+	# full volume reads well under 1.0, so this is scaled to something a
+	# visual can actually use rather than one that never leaves the bottom
+	# tenth of its own range.
+	return Vector3(clampf(low * 6.0, 0.0, 1.0), clampf(mid * 6.0, 0.0, 1.0), clampf(high * 6.0, 0.0, 1.0))
+
+
+## The single-number version, for a caller that just wants "how loud right
+## now" rather than the three bands `spectrum_bands()` gives.
+func audio_energy() -> float:
+	var bands := spectrum_bands()
+	return clampf((bands.x + bands.y + bands.z) / 3.0, 0.0, 1.0)
 
 
 func _process(delta: float) -> void:

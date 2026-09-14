@@ -183,12 +183,91 @@ func _ready() -> void:
 			device.set_mode("WIRE")
 			for _hold in 60:
 				await get_tree().process_frame
+	elif trigger == "radio":
+		var device: Node = scene.get_node_or_null("HUD/Handheld")
+		if device != null:
+			device.open_device()
+			device.set_mode("RADIO")
+			# Held long enough for a real audio device to actually mix and
+			# for the spectrum analyzer to have real samples to report on —
+			# a dummy/headless driver never processes DSP at all, which is
+			# exactly why this needed a real capture rather than a number
+			# printed from a headless run.
+			for _hold in 90:
+				await get_tree().process_frame
+	elif trigger == "altered":
+		# E6/E8. Forced directly rather than routed through a real substance
+		# or meditation session, which need input this harness does not drive.
+		scene.player_rig.anatomy.consciousness = 30.0
+		scene._update_altered_perception()
+		for _hold in 6:
+			await get_tree().process_frame
+	elif trigger == "portrait_art":
+		var portrait: GPUParticles3D = preload("res://systems/particle_portrait.gd").new()
+		add_child(portrait)
+		portrait.position = Vector3(0, 1.6, -2.5)
+		portrait.set_source_from_art("body", 22, 56, 56)
+		portrait.set_dial("spread", 1.6)
+		portrait.set_dial("depth_scale", 0.4)
+		var cam := Camera3D.new()
+		add_child(cam)
+		cam.position = Vector3(0, 1.6, 0)
+		cam.look_at(portrait.position, Vector3.UP)
+		cam.current = true
+		for _hold in 20:
+			await get_tree().process_frame
+	elif trigger == "portrait_spirit":
+		# Third person and held: a first-person camera sits essentially
+		# inside the cloud's own origin (it is centred on the player's own
+		# body) and _update_camera() resets any manual override every
+		# physics frame regardless, the same lesson AS3.4's capture needed.
+		var target: Node3D = scene.player_rig
+		scene.third_person = true
+		var portrait: GPUParticles3D = preload("res://systems/particle_portrait.gd").new()
+		scene.add_child(portrait)
+		portrait.global_position = target.global_position
+		portrait.set_dial("spread", 1.8)
+		portrait.set_dial("depth_scale", 0.5)
+		portrait.set_dial("glitch", 0.05)
+		portrait.follow_node(target, 64, 64, Vector2i(256, 256))
+		for _hold in 60:
+			scene._update_camera()
+			await get_tree().process_frame
+	elif trigger == "glitch_spider":
+		scene.glitch_spider.trigger(scene.player + Vector3(0, 0.3, -3), scene.player, scene.psychedelic)
+		for _hold in 6:
+			await get_tree().process_frame
+	elif trigger == "storm":
+		# AS4. Force the chaos-magick level up directly rather than waiting on
+		# a ritual, then force a strike so the shot lands mid-crawl instead of
+		# on whatever random tick the storm's own clock would have picked.
+		WorldHistory.chaos_magick_level = 0.95
+		WorldHistory.chaos_magick_at_minute = WorldClock.minutes()
+		WorldClock.set_hour(1.0)
+		scene._update_day_night()
+		var storm: Node3D = scene.storm_weather
+		storm._process(0.1)
+		storm._strike(storm.severity())
+		if "--red" in OS.get_cmdline_user_args():
+			storm._crawler_material.set_shader_parameter("red", true)
+		for _hold in 6:
+			storm._process(0.05)
+			await get_tree().process_frame
 	elif trigger == "night":
 		# AS2. Forced rather than waited for — a real night is 24 real minutes
 		# away at the default clock rate, per world_clock.gd.
 		WorldClock.set_hour(2.0)
 		scene._update_day_night()
 		for _hold in 4:
+			await get_tree().process_frame
+	elif trigger == "clothing":
+		# AS3.4. Third-person so the coat itself is actually in frame — first
+		# person never sees the torso at all.
+		scene.third_person = true
+		Clothing.wear("player", "lead_vest")
+		scene.hunter_appearance.sync_from_clothing()
+		for _hold in 60:
+			scene._update_camera()
 			await get_tree().process_frame
 	elif trigger == "lamp":
 		# AS1.1. Raised by hand rather than by key so the shot is deterministic:

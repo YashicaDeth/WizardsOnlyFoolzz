@@ -479,7 +479,7 @@ func _create_wrecker(index: int) -> void:
 	# the scale, and index 0 has its own.
 	_seat_shell(authored_skiff)
 	WorldLook.regrime(authored_skiff, index + 5)
-	_dress_vehicle_biopunk(target, index + 5, false)
+	_dress_vehicle_biopunk(target, index + 5)
 	_add_vehicle_damage_parts(target, index)
 	_add_driver_rig(target, index)
 	targets.append(target)

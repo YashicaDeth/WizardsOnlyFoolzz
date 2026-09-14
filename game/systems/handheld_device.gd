@@ -1295,6 +1295,7 @@ func _draw_radio(rect: Rect2, alpha: float) -> void:
 	# about 166px and the name was starting at 150.
 	var dial_width := CellOutzType.width("%06.2f" % radio.khz, 26.0, 1.4)
 	CellOutzType.draw_condensed(self, rect.position + Vector2(24 + dial_width + 22, 178), str(signal_state.get("name", "CARRIER")), 11.0, MOSS * Color(1, 1, 1, alpha), 0.9)
+	_draw_radio_spectrum(rect, alpha)
 
 	# What is coming out of it. Worn type, scaled by how badly it is coming in -
 	# a weak signal is heard *wrongly*, not quietly.
@@ -1314,6 +1315,25 @@ func _draw_radio(rect: Rect2, alpha: float) -> void:
 		draw_rect(bar, INK * Color(1, 1, 1, 0.10 * alpha))
 		draw_rect(Rect2(bar.position, Vector2(bar.size.x * progress, bar.size.y)), MOSS * Color(1, 1, 1, alpha))
 		CellOutzType.draw_condensed(self, Vector2(rect.position.x + 24, rect.end.y - 62), "HOLDING A LOCK", 9.0, MOSS * Color(1, 1, 1, alpha), 0.8)
+
+
+## Greg's own reference for this: pwnisher's "audio-reactive art" technique —
+## a real spectrum reading driving a visual, not a fake pulse keyed to
+## `strength` alone. Three bars, not one: a low, throat-heavy bed and a thin,
+## noisy static reach this at completely different bands, and averaging them
+## into a single number would read as the same flat pulse regardless of what
+## is actually coming out of the set.
+func _draw_radio_spectrum(rect: Rect2, alpha: float) -> void:
+	var bands: Vector3 = radio_audio.spectrum_bands() if radio_audio != null and radio_audio.has_method("spectrum_bands") else Vector3.ZERO
+	var origin := rect.position + Vector2(rect.size.x - 90, 26)
+	var labels := ["LO", "MID", "HI"]
+	var values := [bands.x, bands.y, bands.z]
+	for index in 3:
+		var x := origin.x + float(index) * 16.0
+		var height := 26.0 * float(values[index])
+		draw_rect(Rect2(Vector2(x, origin.y + 26.0 - height), Vector2(10, height)), MOSS * Color(1, 1, 1, (0.4 + 0.6 * float(values[index])) * alpha))
+		draw_rect(Rect2(Vector2(x, origin.y), Vector2(10, 26.0)), CASE_EDGE * Color(1, 1, 1, 0.25 * alpha), false, 1.0)
+		CellOutzType.draw_condensed(self, Vector2(x - 1, origin.y + 36.0), str(labels[index]), 7.0, INK * Color(1, 1, 1, 0.4 * alpha), 0.6)
 
 
 ## C4. The inventory that has existed in `WorldHistory` since the Hunt Grounds

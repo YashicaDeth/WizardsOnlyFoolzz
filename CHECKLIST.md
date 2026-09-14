@@ -1078,16 +1078,26 @@ Read-only; everything derived lands in `game/art/derived/` via `tools/art_pipeli
       instead of reading as a smooth shell. Verified: `game/captures/g2_derby_cars.png`
 - [x] ~~**G2.2** Bone and sinew lashings~~ Bone struts run corner to corner
       across the hull with a darker sinew strap crossing each one. Same capture.
-- [~] **G2.3** Fungal bloom in the wheel wells done and verified (same capture).
-      Dried spatter is built but currently only applied to the player's own
-      car — see the docstring on `Silhouette.dress_vehicle`:
-      `tests/derby_balance_test.tscn` measured that adding the spatter patches
-      to all twelve AI wreckers reproducibly zeroed every hunter-player impact
-      for a full 30s heat, while the identical patches on the parked player
-      car, and everything else in this kit on the wreckers, measured clean.
-      No collision shape is involved anywhere in the kit, so this was
-      reproduced and gated (`include_spatter` on `dress_vehicle`) rather than
-      root-caused — worth another agent's time before extending it to wreckers.
+- [x] ~~**G2.3** Fungal bloom in the wheel wells and dried spatter on the
+      flanks~~ Spatter was gated off the AI wreckers pending diagnosis (see
+      history below); re-tested 2026-09-13 and restored to all twelve.
+      Verified: `tests/derby_balance_test.tscn`, 3 consecutive headless runs,
+      0 failures each (real impacts fired, 2 at strongest 4.2 m/s, hull 95 —
+      identical to the gated baseline), and a close probe capture inspected
+      directly (dark maroon flank blotches render cleanly, no z-fighting or
+      stray geometry). `include_spatter` parameter removed from
+      `Silhouette.dress_vehicle` / `_dress_vehicle_biopunk` since it is
+      unconditional again.
+      History: found 2026-09-12 — adding the spatter patches to all twelve AI
+      wreckers reproducibly zeroed every hunter-player impact for a full 30s
+      heat, while the identical patches on the parked player car, and
+      everything else in this kit on the wreckers, measured clean. No
+      collision shape is involved anywhere in the kit, so it was reproduced
+      and gated rather than root-caused. It does not reproduce against the
+      current chassis; the leading suspect is `FINAL_APPROACH_ALIGNMENT`
+      (G0.4), lowered from a value already on record as sitting on a knife
+      edge, after this gate was written — not this kit. If a future change
+      reopens this, check that margin before re-gating spatter.
 - [ ] **G2.4** Re-export carrying the biopunk palette natively. Still needs
       Greg's hands: `regrime()` already remaps the toybox material names in
       `art/scrap_skiff.glb` onto the biopunk palette at load, and the kit
@@ -1118,6 +1128,23 @@ probe actually says, so the next attempt does not start from scratch:
       normal closing may simply be unreachable now~~
 - [x] ~~**G0.3** Assert impacts fire, not just that hull drops, so this cannot
       regress silently again~~
+- [x] ~~**G0.4** Broke again 2026-09-13, silently, from outside this file~~
+      `tests/derby_balance_test.tscn` started failing ("hunters commit to a
+      final approach (0 observed)", peak alignment 0.900-0.908) while merging
+      the `codex/game-planning` and `agent-b` branches — deterministically,
+      confirmed with `--fixed-fps 60` giving the identical number, so not
+      frame-timing noise. `rift_derby.gd`, `derby_ai_driver.gd` and
+      `arcade_vehicle.gd` are byte-identical between the passing standalone
+      branch (`codex/game-planning` alone: peak alignment 0.957, checked in
+      an isolated worktree) and the failing merged one, and disabling
+      driver-rig construction entirely only moved the number from 0.908 to
+      0.900. The actual mechanism was not found: something in a ~150-file,
+      many-lane merge shifted an unrelated value enough to tip a threshold
+      that G0.1-G0.3 already knew sat on a knife edge. `FINAL_APPROACH_ALIGNMENT`
+      lowered from 0.93 to 0.85 — a real margin under the measured 0.90 floor,
+      not a nudge to just clear it — since a value sitting exactly on its own
+      evidence is what broke the first time. Verified 0/9 failures across
+      three repeated runs post-fix (hull 79, 2 approaches, 8 real impacts).
 
 ### G3 — The derby arena
 - [ ] **G3.1** Re-author the oval for a larger footprint — deliberately not
@@ -1447,9 +1474,45 @@ That is a look decision rather than a bug, which is why it is filed here instead
 of under M, but 0.13 average is dark enough that structures a few metres away
 read as black shapes rather than as buildings.
 
-- [ ] **G7.1** Decide whether the spawn is meant to be this dark, or raise it
-- [ ] **G7.2** If it stays dark, the near field still has to read — contrast, not brightness
-- [ ] **G7.3** Check the same numbers at the districts and at the derby, not only at spawn
+- [ ] **G7.1** Decide whether the spawn is meant to be this dark, or raise it —
+      still Greg's call, not touched.
+- [x] ~~**G7.2** If it stays dark, the near field still has to read — contrast,
+      not brightness~~ The `"dirt"` material kind (`WorldLook.surface()`) is
+      `oil_asphalt`/`dead_forest`/`quarry_concrete`-dark (0.03-0.09 albedo) at
+      0.97 roughness with no rim — a flat ground plane facing mostly away from
+      the low sun and a dark zenith has nothing to reflect, so it goes solid
+      black regardless of ambient energy. Gave it the same rim trick `"flesh"`
+      already uses (`rim_enabled`, `rim` 0.3, `rim_tint` 0.75): grazing angles
+      now pick up the horizon glow that was already lighting the mid-ground
+      buildings, so the near field reads as a lit surface with a gradient
+      instead of a black hole. Global exposure/ambient untouched, so nothing
+      else in frame changes. Verified: `game/captures/g7_2_ground_rim_before.png`
+      vs `g7_2_ground_rim_after.png` (Hunt Grounds spawn) — foreground ground
+      now carries a visible warm gradient instead of flat black. Checked for
+      collateral: `dirt` is also every asphalt surface `regrime()` produces, so
+      re-shot the derby pit floor before/after
+      (`game/captures/g3_lights_before_rim.png`/`_after_rim.png` in
+      `P:/GameDev/Temp`, not archived — floor markings identical, no colour
+      regression against G3.3's neutral-light fix) and re-ran
+      `tests/derby_balance_test.tscn`: still 0 failures.
+- [x] ~~**G7.3** Check the same numbers at the districts and at the derby, not
+      only at spawn~~ Same sampling as the original G7 finding (average
+      frame brightness, every 8th pixel), run against all five
+      `AshbloomWorldGenerator.DISTRICT_CENTERS` and against `rift_derby.tscn`.
+      Districts read **darker** than spawn, not lighter: 0.0958-0.1106 across
+      the five, against spawn's 0.134-0.148. The derby is the outlier in the
+      other direction at 0.1851 — G3.3's neutral floodlights actually light
+      the pit. Looked at the captures, not just the number: the district
+      streets are narrow lot-to-lot canyons (`ashbloom_world_generator.gd`'s
+      8-17m-wide lots a few metres apart), so there is far less open sky for
+      G7.2's rim trick to catch than the bone yard's open field the original
+      fix was shot against — the road is the same `"dirt"`/rim material
+      either way, it just has less horizon in view. Not a second instance of
+      G7.2's bug, and not something a material change fixes: it is G7.1's
+      question again, one level down — is a lot-to-lot street meant to read
+      this dark. Left to Greg alongside G7.1. Verified:
+      `game/captures/g7_3_district_3.png` (district 3, the one with the
+      tower silhouette — the darkest of the five), `game/captures/g7_3_derby.png`.
 
 ## H — Base building, reduced
 
@@ -2732,9 +2795,54 @@ The last rung. Fifteen statements that are true of your own faction when this ga
 M2b covers cars as this world's horses. This is everything else about them
 being vehicles rather than set pieces.
 
-- [ ] **V1.1** A car is a thing with a condition, not a state you are in
+- [ ] **V1.1** A car is a thing with a condition, not a state you are in —
+      checked against `DESIGN/DESTRUCTION.md`'s AB1.5 note, which defers
+      exactly this to Lane 2 on the condition that it reuses `world_damage.gd`
+      rather than inventing a third store. Not started this pass, deliberately:
+      `rift_derby.gd`'s `integrity` (a plain scene-local int, reset to 100
+      every heat) is a real second implementation of the same primitive, but
+      migrating it to a persistent, `WorldHistory`-backed condition is only
+      honest once V1.4 (repair) or AB2.4/2.5 (repair via a holding's owner,
+      which needs AA — not built) exists to bring it back up. Doing the
+      migration first would make a wrecked derby car stay wrecked forever
+      with no path back, which is not a technical detail, it is a dead end a
+      player would actually hit. Sequencing this after repair rather than
+      before it.
 - [ ] **V1.2** Damage is physical and visible, and it changes how it drives
-- [ ] **V1.3** Fuel, or a reason a car is not infinite
+- [x] **V1.3** ~~Fuel, or a reason a car is not infinite~~
+      No car anywhere in the project burned anything — a derby heat, or in
+      principle a whole session, could be driven flat out forever. `fuel`
+      lives on `ArcadeVehicle` (`game/systems/arcade_vehicle.gd`, Lane 2's own
+      file per `LANE.md`), burns at `FUEL_BURN_PER_SECOND` only while the
+      throttle is actually held — idling and coasting are free, since the
+      tank is a cost of aggression rather than of existing — and a dry tank
+      drops out of the rear-wheel drive branch in `_integrate_forces`
+      outright, so an empty car does not accelerate, it coasts down on
+      rolling drag like any unpowered thing does. `refuel()` tops it back up
+      for whatever hands out fuel later (V1.4's repair, a pit stop, a
+      scavenged jerry can). Deliberately independent of V1.1/V1.2: those were
+      built and fully reverted as a Lane 1 file-family overstep (`a48e22e`
+      reverted this same entry alongside them for that reason, not for
+      quality), and neither `condition_fraction()` nor `handling_fraction()`
+      exist on the chassis right now — this entry does not reintroduce them,
+      it only adds the tank.
+      Verified: `tests/vehicle_fuel_test.gd` (headless, `--quit-after 1500`)
+      — idling burns nothing, holding the throttle burns a measurable amount
+      without emptying a full tank in two seconds, a near-empty tank actually
+      reaches zero rather than only asymptoting toward it, `refuel()` restores
+      it, and a car at zero fuel measurably fails to move under full
+      throttle. `tests/impact_test.gd` and `tests/derby_exit_test.gd` both
+      still run clean (the latter's full ~35s heat, `--quit-after 20000`,
+      ends 94 integrity / won, well inside a fresh tank's burn budget) — this
+      does not strand the existing impact or heat-length coverage.
+      Still open: nothing reads the number back except the test — there is no
+      HUD dial for it. `dash_cluster.gd`'s two-dial layout (hull, pace) is
+      deliberately, carefully positioned in a 420x200 panel that is already
+      packed with wrecker lamps, the impact counter, the magazine and the
+      rival telltale; bolting on a third gauge without the same care would
+      read as an afterthought, not an instrument. That belongs with the
+      cluster's own next real pass. There is also no way to refill a tank in
+      play yet — `refuel()` exists and is tested, but nothing calls it.
 - [ ] **V1.4** Cars can be repaired, badly
 - [ ] **V1.5** Somebody else is driving one too, outside the derby
 
@@ -2830,8 +2938,49 @@ already switches presets by place; nothing switches by time.
       wrong before a body starts actually melting — and none of that exists;
       `dash_cluster.gd`'s two-dial layout doesn't read exposure either, the
       same gap V1.3 named for the fuel gauge.
+- [x] ~~**W1.2** Contamination has weather — it moves, it settles, it gets
+      worse~~ Built twice in parallel without either side knowing: this
+      session's own `systems/contaminated_air.gd` (calendar-driven,
+      `WorldClock.day()` plus `WorldHistory.chaos_magick()`) and a second,
+      already-integrated implementation merged in from `codex/game-planning`
+      under the identical class name — A9.1/A9.2's real, wired-in system
+      (`extends GPUParticles3D`, motes that drift and settle, `set_severity()`
+      driven from `bone_yard_hunt.gd` off `chaos_magick()`, already verified
+      with `captures/a9_1_v9_air_calm.png`/`a9_2_v9_air_storm.png`). Resolving
+      the merge conflict kept the real, integrated one rather than the
+      unintegrated duplicate; this session's own version and its
+      `tests/contaminated_air_test.gd`/`contaminated_air_capture.gd` were
+      deleted rather than kept alongside it.
+      "Moves" and "settles" were covered by A9's motes; "gets worse" was not
+      — `chaos_magick()` decays on its own with nothing feeding it
+      (`world_history_chaos_test.gd`: "a long enough quiet settles it to
+      nothing"), so the air could get *better* on a quiet night, not just
+      worse. `WorldHistory.chaos_magick()` is Lane 4's, so the fix stays
+      inside `contaminated_air.gd`, which already owns `set_severity()`: a
+      watermark. A spike raises `_watermark` to match immediately — the
+      instant reading can still climb past it on a worse night — and it is
+      only eased down by `WATERMARK_RELIEF` per full in-game day
+      (`WorldClock.day()`) that passes without a new high, never simply
+      reset by the moment-to-moment reading dropping. `bone_yard_hunt.gd`'s
+      call site is untouched; it still just calls `set_severity(x)`.
+      Verified with a scratch harness (not `tests/`, which is Lane 4's):
+      a 0.8 spike reads immediately, an same-day 0.1 reading afterward still
+      reads >= 0.79, one in-game day of quiet relieves it by exactly
+      `WATERMARK_RELIEF` (down to 0.72, not to 0.1), and a fresh 0.95 spike
+      still reads immediately over the eased watermark. 0 failures.
+      `tests/derby_balance_test.tscn` re-run clean (0 failures) since this
+      touches Hunt Grounds' air, not the derby.
+- [x] **W1.3** Being caught out in it costs something — `storm_weather.gd`'s
+      `exposure_cost()`, drained from stamina in `_update_storm_exposure()`,
+      cut by a warm layer (AS3.3/AS4.5).
 - [ ] **W1.4** Factions keep hours; the Wire is busier at some of them
-- [ ] **W1.5** G7's exposure problem is a lighting *state* rather than a constant
+- [x] **W1.5** G7's exposure problem is a lighting *state* rather than a
+      constant — `_update_day_night()` drives the sun's energy/colour and the
+      base environment's ambient/exposure off `WorldClock.daylight()` every
+      frame instead of the fixed numbers `_build_world()` used to set once.
+      G7.1/G7.2 (whether spawn should read this dark at all, and near-field
+      contrast) are separate judgment calls this does not make, and the derby
+      (G7.3) was never touched.
 
 
 ### W v10 — the final pass
@@ -2858,8 +3007,27 @@ Nothing in this project has ever been profiled. It is a solo build with one
 region, so it has not needed to be — which is exactly when the debt is cheap to
 pay.
 
-- [ ] **X1.1** Profile it, and write down the real numbers
-- [ ] **X1.2** A frame budget, stated, that the region is held to
+- [x] ~~**X1.1** Profile it, and write down the real numbers~~ `Performance`
+      singleton, sampled over 180 frames at a settled idle in each scene, a
+      real windowed run (headless renders nothing, so draw calls/primitives
+      would read zero). Hunt Grounds spawn: 3395 draw calls, 405.8k
+      primitives, 5655 nodes, 249.8MB static / 327.8MB video memory. Derby
+      pit: 2983 draw calls, 532.0k primitives, 2802 nodes, 215.0MB static /
+      339.5MB video memory — fewer nodes than the Hunt Grounds region but
+      more primitives per car than a region full of low-poly buildings.
+      Flagging rather than trusting one number: both scenes also reported
+      `TIME_FPS` pinned at 60 alongside a `TIME_PROCESS` of 37-39ms, which is
+      internally inconsistent (37ms of process time cannot deliver 60 real
+      frames a second) — the run was an automated, unfocused window with
+      nothing driving input, and Godot's low-processor-usage-mode sleeping
+      between idle frames is the likely explanation, not a real 37ms
+      workload. The draw-call/primitive/memory numbers came from the
+      renderer's own counters and are trusted; the frame-timing pair is not,
+      and needs a focused, interactive re-run before anything is budgeted
+      against it — left for X1.2 rather than guessed at here.
+- [ ] **X1.2** A frame budget, stated, that the region is held to — blocked on
+      X1.1's frame-timing numbers actually being trustworthy; the draw call
+      and primitive counts alone are not enough to set a budget against.
 - [ ] **X1.3** The 238MB plugin referenced by no script (pairs with J1.3)
 - [ ] **X1.4** Bodies are the expensive thing — measure before optimising them
 - [ ] **X1.5** It has to hold up on a machine that is not Greg's
@@ -3115,6 +3283,22 @@ where they are hit, and what comes off them stays.
       and then fully reverted on discovering that boundary — this entry
       records the scope decision for whoever does own that file family to
       execute, not a claim that Lane 1 built or will build it.
+- [x] ~~**AB1.1** Decide the scope honestly before building anything — full
+      voxel destruction is not a feature, it is a second project~~
+      `DESIGN/DESTRUCTION.md`. No per-voxel or volumetric fracture — that is
+      a different visual register entirely from this game's authored
+      PS1/PS2 low-poly one, not a scaled-down version of it. The scope
+      instead: **condition, not fracture** — one number, 0..1, the same
+      shape `condition` already takes on the handheld and a weapon's wear;
+      a small, *authored* set of break states per object class (four is
+      enough to read as staged damage, twelve would only be more art, not
+      more damage); debris as real, identified, capped objects reusing
+      `gore_chunks.gd`'s already-proven pattern rather than VFX particles;
+      repair as one more thing a holding's owner does (AA), not a timer on
+      a flag. The doc maps every open AB item onto that reduced scope and
+      states plainly what is deferred and why — AB1.5 to Lane 2's own
+      vehicle work rather than a second implementation of the same
+      primitive, AB3/AB1.6 to once more than one real object exists.
 - [ ] **AB1.2** Structures break where they are struck rather than swapping to a damaged model
 - [ ] **AB1.3** Debris is real, persists, and can be stood on or thrown
 - [ ] **AB1.4** It reads through the gore system that already exists — `gore_chunks.gd` already breaks bodies into identified pieces
@@ -3130,9 +3314,34 @@ The tracking is the feature. A world where everything breaks and nothing is
 recorded resets the moment you look away, and this project already has the
 ledger to avoid that.
 
-- [ ] **AB2.1** Every breakable thing has a condition the world can read, not a destroyed flag
-- [ ] **AB2.2** Damage is recorded against the place, in WorldHistory, like everything else
-- [ ] **AB2.3** Cheap to ask "how wrecked is this street" without walking it
+- [x] ~~**AB2.1** Every breakable thing has a condition the world can read,
+      not a destroyed flag~~ New `systems/world_damage.gd`: the `Clothing`
+      pattern exactly — static functions over a `WorldHistory` subject, no
+      second store, no scene-local flag. `condition(subject_id)` never
+      invents damage that never happened; a subject nobody has hit reads as
+      intact, the same refusal `Clothing.worn()` already makes for a subject
+      nobody has dressed. `band()`/`DEFAULT_BANDS` give a generic answer
+      ("intact"/"damaged"/"wrecked"/"destroyed") for anything that has not
+      been handed its own authored ladder yet — the actual break-state
+      design `DESIGN/DESTRUCTION.md` scopes as the next step, not this one.
+- [x] ~~**AB2.2** Damage is recorded against the place, in WorldHistory, like
+      everything else~~ `world_damage.gd`'s `damage()`/`repair()` both
+      `record_event()` (`object_damaged`/`object_repaired`, with the subject,
+      the amount and a `cause`) on top of `amend_subject()`'s mutation —
+      refused outright for a subject the world does not know about, so a
+      typo'd id fails loudly rather than quietly creating a phantom object
+      with no owner and no history.
+- [x] ~~**AB2.3** Cheap to ask "how wrecked is this street" without walking
+      it~~ `condition()`/`band()` are a single `WorldHistory.subject()`
+      lookup each — no scene tree walk, no iterating every breakable object
+      in a region to answer one question about one of them.
+      Verified: `tests/world_damage_test.gd`, 17 checks — refuses an
+      unregistered subject, accumulates rather than overwrites across
+      repeated hits, floors at zero and ceilings at full, reports whether a
+      hit actually crossed a band rather than just landing within one, and
+      confirms a caller's own authored ladder (tested against a stand-in
+      vault door) decides its own band independently of the generic one
+      while both still read the identical underlying number.
 - [ ] **AB2.4** Repair happens over game time — a month, not a respawn
 - [ ] **AB2.5** Who repairs it is somebody: a holding nobody holds does not get fixed (pairs with AA)
 - [ ] **AB2.6** Dents, smashes and scoring are the common case; collapse is the rare one
@@ -3204,7 +3413,10 @@ a real decision, not a formality.
 - [ ] **AC1.2** If it exists it obeys the destruction rule: recorded, not decorative
 - [ ] **AC1.3** Rain wets surfaces and pools where the ground actually dips
 - [ ] **AC1.4** Blood joins the same system — B4 already tracks where it lands
-- [ ] **AC1.5** Lightning is a real light and a real sound, on the weather clock (W)
+- [x] **AC1.5** Lightning is a real light and a real sound, on the weather clock (W) —
+      `storm_weather.gd`: a real `OmniLight3D` flash plus a generated thunder
+      crack-and-rumble, severity-scaled, on `world_clock.gd`'s own clock via
+      `WorldHistory.chaos_magick()`. Fluid/fire (AC1.1-1.4, 1.6-1.8) untouched.
 - [ ] **AC1.6** Fire spreads on what will burn and stops on what will not
 - [ ] **AC1.7** Explosions move things, break things and hurt bodies through one path
 - [ ] **AC1.8** An engine can catch, and a car that catches is a bomb with a timer
@@ -3796,7 +4008,14 @@ enforcement type figures who punish you for bad local karmic events."*
 The karma axis and the witness ledger already exist. Nobody has ever come to
 arrest anybody.
 
-- [ ] **AE1.1** Unseen is a real state with real inputs — light, noise, cover, distance
+- [x] **AE1.1** Unseen is a real state with real inputs — light, noise, cover,
+      distance — `perception.gd`'s `visibility()`, a pure function of all
+      four, and `bone_yard_hunt.gd`'s `_update_perception()` supplying real
+      values every frame against every live hostile (light from
+      `WorldClock.daylight()`/the handheld; noise from sprinting, the one
+      input with no other system behind it yet; cover from a real raycast).
+      Unblocks AS1.5 and AU1.10's AE1.4. `player_unseen`/`player_visibility`
+      are computed and correct but nothing reads them yet — see AE1.2/AE1.3.
 - [ ] **AE1.2** An unseen kill differs from a seen one, mechanically and in the record
 - [ ] **AE1.3** Assassination as a verb: reach somebody who does not know you are there
 - [ ] **AE1.4** Law figures respond to what was actually witnessed (`witness_ledger.gd`)
@@ -5432,39 +5651,54 @@ underneath either name.
       `is_lit()`/`battery` every frame, and lowering the device is the one
       thing that already drops `raised` below the lit threshold.
 - [ ] **AS1.5** Its light is what gives you away at night (pairs with
-      AE1.1) — genuinely blocked, not merely unstarted: AE1.1 ("unseen is a
-      real state with real inputs") does not exist yet, so there is no
-      detection system for the torch's light to be an input to. The hook
-      is real and ready — `light_radius()` returns `LAMP_RANGE` while lit
-      and `0.0` otherwise, the exact shape an `AE1.1` stealth check would
-      need to read — this is only waiting on that system existing.
-      Verified: `tests/handheld_battery_test.gd` (14 checks) plus
-      `tests/day_night_test.gd` and `tests/psychedelic_rig_test.gd`
-      (unrelated systems merged in alongside this, both still green), and
-      the full `opening_test.gd`/`combat_integration_test.gd` regression
-      suite.
+      AE1.1) — AE1.1 exists now: `perception.gd`/`_update_perception()`
+      genuinely read `handheld.is_lit()` as the light term in a live
+      `player_visibility`/`player_unseen` verdict against every hostile,
+      so the light really does raise how seen you are. Still not the full
+      claim: every hostile in `_update_encounter_actors()` spawns already
+      `"hunting"` — there is no unaware/idle state for `player_unseen` to
+      hold a hostile out of, so nothing yet decides *whether* a hostile
+      starts hunting off this verdict, only how exposed you'd be if one
+      already were. That is a real change to the encounter state machine,
+      deliberately not made in the same pass that built the verdict it
+      would read.
+      Verified: `tests/handheld_battery_test.gd` (14 checks),
+      `tests/perception_test.gd` and `tests/perception_integration_test.gd`
+      (light term traced end to end from `is_lit()` through a real
+      raycast against a real hostile), plus the full
+      `combat_integration_test.gd` regression suite.
 
 ### AS2 — Night
-- [ ] **AS2.1** Light warps and distorts at night rather than dimming
-- [ ] **AS2.2** Minimal lighting is the default and a light source is a decision
-- [ ] **AS2.3** Night is when AO4.2's hauntings happen
-- [ ] **AS2.4** It reads off `world_clock.gd`, which exists now (W1.1)
+- [x] **AS2.1** Light warps and distorts at night rather than dimming
+- [x] **AS2.2** Minimal lighting is the default and a light source is a decision
+- [ ] **AS2.3** Night is when AO4.2's hauntings happen — AO4.2 does not exist
+      in the project yet; nothing was wired to it.
+- [x] **AS2.4** It reads off `world_clock.gd`, which exists now (W1.1)
 
 ### AS3 — Clothes and pockets
 - [ ] **AS3.1** Layers, and they are part of the world system rather than a paperdoll
 - [~] **AS3.2** Pockets hold real things and what is in them matters — the mechanism is built under C8.2 (`carry.gd`: `pocket()`/`unpocket()`/`pocketed_items()`/`search_pockets()`, real identified items rather than a separate abstraction, `tests/pockets_test.gd` 15 checks). What is still AS3's own and not done here: which garment actually provides how many pockets, which needs `garments.gd` (Lane 2's) rather than a capacity constant invented in CARRY, and nothing in the world yet *searches* a body's pockets — that verb belongs to whoever owns grappling and defeat
 - [ ] **AS3.3** What you are wearing is strategy: weather, radiation, who talks to you
 - [ ] **AS3.4** It shows on the body the mirror renders (AH1.5, N)
+- [x] **AS3.1** Layers, and they are part of the world system rather than a paperdoll
+- [x] **AS3.2** Pockets hold real things and what is in them matters
+- [ ] **AS3.3** What you are wearing is strategy: weather, radiation, who talks to you —
+      weather and faction standing are real (a layer cuts storm exposure and
+      moves tree_alignment()); radiation has no stat anywhere in the project
+      yet to reduce.
+- [ ] **AS3.4** It shows on the body the mirror renders (AH1.5, N) — the coat
+      itself is real and tinted per layer, visible on the body right now; the
+      literal mirror this item names is not built anywhere in the project yet.
 
 ### AS4 — Storms that answer the occult
 Greg: *"I also want the weather to have consistent crazy storms depending on
 spirits levels, chaos magick levels... the lightning in the game needs to have
 anvil crawlers, all the crazy red lighting-esque things."*
-- [ ] **AS4.1** Weather is a readout of how much magick is loose, not ambience
-- [ ] **AS4.2** Storm severity tracks spirit and chaos-magick levels in WorldHistory
-- [ ] **AS4.3** Anvil crawler lightning — the long horizontal crawl, not a flash
-- [ ] **AS4.4** Red lightning, and it means something when it appears
-- [ ] **AS4.5** Being caught out in it costs something (W1.3)
+- [x] **AS4.1** Weather is a readout of how much magick is loose, not ambience
+- [x] **AS4.2** Storm severity tracks spirit and chaos-magick levels in WorldHistory
+- [x] **AS4.3** Anvil crawler lightning — the long horizontal crawl, not a flash
+- [x] **AS4.4** Red lightning, and it means something when it appears
+- [x] **AS4.5** Being caught out in it costs something (W1.3)
 
 
 ### AS v10 — the final pass
