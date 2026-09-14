@@ -55,7 +55,21 @@ func _ready() -> void:
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--panel="):
 			panel = argument.trim_prefix("--panel=")
-	if panel.begins_with("prologue"):
+	if panel.begins_with("splash"):
+		# Hold the attack mid-sweep, where the seam is actually on screen, and
+		# optionally pick a variant: --panel=splash:arterial
+		var sp = menu.get("splash")
+		var want := panel.substr(6).lstrip(":")
+		if sp != null and not want.is_empty():
+			sp.call("set_variant", want)
+		if sp != null:
+			for _settle in 6:
+				await tree.process_frame
+			sp.set("reveal", 1.0)
+			sp.set("attack", 0.62)
+			for _settle in 4:
+				await tree.process_frame
+	elif panel.begins_with("prologue"):
 		# Straight to the cutscene, then held on one card. `--panel=prologue2`
 		# shoots the third card, and so on — a fade cycle is CARD_FADE*2 +
 		# CARD_HOLD long and the prologue cannot be scrubbed any other way.

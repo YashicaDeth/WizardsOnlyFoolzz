@@ -4,6 +4,7 @@ const Quantum := preload("res://systems/quantum_saves.gd")
 
 const MENU_PLATE := preload("res://systems/menu_plate.gd")
 const DECANTING_PROLOGUE := preload("res://systems/decanting_prologue.gd")
+const SPLASH_BACKDROP := preload("res://systems/splash_backdrop.gd")
 
 var wreck: Node3D
 var front_door: Node3D
@@ -14,6 +15,7 @@ var menu_buttons: Array[Button] = []
 var menu_plate: Control
 var settings_plate: Control
 var prologue: Control
+var splash: ColorRect
 var branch_plate: Control
 var graphics_presets := ["ULTRA", "HIGH", "PERFORMANCE"]
 var graphics_index := 0
@@ -71,6 +73,14 @@ func _play_title_sequence() -> void:
 	intro_veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	intro_veil.z_index = 20
 	$HUD.add_child(intro_veil)
+	# Greg's own room, under the cold open. The inverted cyan half sweeps across
+	# it live (see `splash_backdrop.gd`) rather than being a baked seam, so the
+	# thing he called "the blue invertred side attacking the screen" actually
+	# attacks instead of sitting still.
+	splash = SPLASH_BACKDROP.new()
+	splash.name = "SplashBackdrop"
+	$HUD.add_child(splash)
+	$HUD.move_child(splash, 0)
 	$HUD/TitleLogo.modulate.a = 0.0
 	$HUD/Presents.modulate.a = 0.0
 	$HUD/Algiz.modulate.a = 0.0
@@ -78,6 +88,9 @@ func _play_title_sequence() -> void:
 	$HUD/TitleLogo.pivot_offset = $HUD/TitleLogo.size * 0.5
 	for button in menu_buttons:
 		button.modulate.a = 0.0
+	# The backdrop runs on its own tween so the picture can breathe under the
+	# type rather than being gated on each type beat landing.
+	splash.play(self)
 	var tween := create_tween()
 	tween.tween_interval(0.22)
 	tween.tween_property(intro_veil, "color:a", 0.14, 0.55).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)

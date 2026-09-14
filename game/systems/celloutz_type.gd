@@ -78,6 +78,43 @@ const GLYPHS := {
 	"]": [[[1.8, 0], [4, 0], [4, 10], [1.8, 10]]],
 	"%": [[[0, 10], [6, 0]], [[0.4, 0.4], [2, 0.4], [2, 2], [0.4, 2], [0.4, 0.4]], [[4, 8], [5.6, 8], [5.6, 9.6], [4, 9.6], [4, 8]]],
 	"*": [[[3, 1.4], [3, 8.6]], [[0.4, 2.8], [5.6, 7.2]], [[5.6, 2.8], [0.4, 7.2]]],
+	# The ten characters the screens actually use that the plate did not have.
+	#
+	# An unset glyph is not a missing-character box in this face - `draw_text`
+	# skips it and still advances the cursor, so it comes out as a hole of exactly
+	# one letter's width. That is why converting a screen off the fallback font
+	# has been a quiet layout hazard rather than an obvious one, and it is the
+	# reason these were counted off the real `draw_string` call sites rather than
+	# guessed at: interpunct 12 uses, em dash 7, underscore 7, then the arrows.
+	"·": [[[2.4, 4.45], [3.6, 4.45], [3.6, 5.55], [2.4, 5.55], [2.4, 4.45]]],
+	# Eleventh, and not from the count: `gothic_field_hud.gd`'s weapon well had
+	# been drawing its reserve count through a multiplication sign since it was
+	# written, silently blank the whole time, and the fix at the time was to
+	# change the copy to "x". The copy stays as it is — it ships and it is
+	# verified — but the glyph exists now, so the next plate that reaches for it
+	# gets a multiplication sign instead of a hole.
+	"×": [[[1.2, 3.2], [4.8, 6.8]], [[4.8, 3.2], [1.2, 6.8]]],
+	"—": [[[0, 5], [6, 5]]],
+	"_": [[[0, 10.4], [6, 10.4]]],
+	"\\": [[[0, 0], [6, 10]]],
+	# Shaft plus an open chevron, not a filled head: a solid triangle at 10px cap
+	# turns into a blob, and the rest of the face is cut lines.
+	#
+	# The two horizontal arrows carry a head wider and shallower than the two
+	# vertical ones, which is not a symmetry mistake. `CONDENSED` squeezes x to
+	# 0.68 and leaves y alone, so a head 2.2 units wide and 4.8 tall — the
+	# obvious mirror of the vertical pair — comes out 1.5 wide and 4.8 tall in
+	# the condensed cut and reads as a plus sign. 3.0 by 3.6 survives the
+	# squeeze. Caught by rendering the specimen sheet, not by reading the data.
+	"↑": [[[3, 10], [3, 0.6]], [[0.9, 3.1], [3, 0.6], [5.1, 3.1]]],
+	"↓": [[[3, 0], [3, 9.4]], [[0.9, 6.9], [3, 9.4], [5.1, 6.9]]],
+	"←": [[[6, 5], [0.4, 5]], [[3.4, 3.2], [0.4, 5], [3.4, 6.8]]],
+	"→": [[[0, 5], [5.6, 5]], [[2.6, 3.2], [5.6, 5], [2.6, 6.8]]],
+	# Directional quotes as slanted pairs of the apostrophe stroke. The lean is
+	# the only thing distinguishing open from closed at this weight, so they lean
+	# opposite ways rather than both sitting vertical.
+	"“": [[[2.2, 0], [1.6, 2.6]], [[4.4, 0], [3.8, 2.6]]],
+	"”": [[[1.6, 0], [2.2, 2.6]], [[3.8, 0], [4.4, 2.6]]],
 }
 
 
@@ -235,6 +272,88 @@ static func draw_condensed(canvas: CanvasItem, at: Vector2, text: String, cap_he
 
 static func width_condensed(text: String, cap_height: float, tracking := 0.0) -> float:
 	return width(text, cap_height, tracking, CONDENSED)
+
+
+## Wrapping and alignment, which this face has never had and which is the only
+## reason thirteen screens are still set in the engine's fallback font.
+##
+## `draw_string` gives you `HORIZONTAL_ALIGNMENT_RIGHT`, a wrap width and clipping
+## for free. `CellOutzType` gives you none of those: it is procedural stroke
+## glyphs drawn one at a time from a top-left. So every conversion away from the
+## fallback font has had to hand-roll a wrapper, or has quietly overflowed its
+## panel — `living_map.gd` grew a private `_wrap_condensed` and everything else
+## went without. Promoted here so a conversion is mechanical rather than an
+## invitation to break a layout.
+##
+## Caps only: the stencil has no lower case, and mixed case reads as missing
+## glyphs rather than as sentence case. Callers should upper-case their copy.
+static func wrap_condensed(text: String, width: float, cap_height: float, tracking := 0.0) -> Array:
+	var lines: Array = []
+	if width <= 0.0:
+		return [text]
+	var line := ""
+	for word: String in text.split(" ", false):
+		var candidate: String = word if line.is_empty() else line + " " + word
+		if width_condensed(candidate, cap_height, tracking) > width and not line.is_empty():
+			lines.append(line)
+			line = word
+		else:
+			line = candidate
+	if not line.is_empty():
+		lines.append(line)
+	return lines
+
+
+## One line, placed inside `room` by alignment. 0 = left, 1 = centre, 2 = right,
+## matching `HORIZONTAL_ALIGNMENT_*` so a converted call keeps its old argument.
+static func draw_condensed_aligned(canvas: CanvasItem, at: Vector2, room: float, text: String,
+		cap_height: float, color: Color, align := 0, tracking := 0.0) -> float:
+	var measure := width_condensed(text, cap_height, tracking)
+	var x := at.x
+	if align == 1:
+		x = at.x + maxf(0.0, (room - measure) * 0.5)
+	elif align == 2:
+		x = at.x + maxf(0.0, room - measure)
+	return draw_condensed(canvas, Vector2(x, at.y), text, cap_height, color, tracking)
+
+
+## A wrapped block. Returns the y the caller should continue from, so stacked
+## paragraphs do not each have to re-measure what the one above them consumed.
+static func draw_block(canvas: CanvasItem, at: Vector2, room: float, text: String,
+		cap_height: float, color: Color, tracking := 0.0, leading := 0.0, align := 0,
+		max_lines := 0) -> float:
+	var step := leading if leading > 0.0 else cap_height * 1.55
+	var lines := wrap_condensed(text, room, cap_height, tracking)
+	if max_lines > 0 and lines.size() > max_lines:
+		lines = lines.slice(0, max_lines)
+	var y := at.y
+	for line: String in lines:
+		draw_condensed_aligned(canvas, Vector2(at.x, y), room, line, cap_height, color, align, tracking)
+		y += step
+	return y
+
+
+## The third thing `draw_string` gives away free and this face does not: clipping.
+##
+## A stroke face cannot be clipped by a rect the way a font atlas can without
+## also clipping whatever is drawn behind it, so a name too long for its column
+## has to be *shortened*, not masked. Returns `text` trimmed until it fits inside
+## `room` with an ellipsis, or unchanged if it already fits.
+##
+## Three full stops rather than U+2026: the ellipsis is one glyph the plate does
+## not have, and this is the function whose entire job is not overflowing.
+static func fit_condensed(text: String, room: float, cap_height: float, tracking := 0.0) -> String:
+	if room <= 0.0 or width_condensed(text, cap_height, tracking) <= room:
+		return text
+	var cut := text.length()
+	while cut > 0:
+		cut -= 1
+		var candidate := text.substr(0, cut).strip_edges() + "..."
+		if width_condensed(candidate, cap_height, tracking) <= room:
+			return candidate
+	# Not even "..." fits. Better a clipped mark than a line running out of its
+	# panel and over whatever is beside it.
+	return ""
 
 
 ## A1.5. The worn cut: the same letterforms printed by something that is failing.
