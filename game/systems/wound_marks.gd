@@ -48,6 +48,11 @@ const WOUND_BLOOD := Color(0.28, 0.032, 0.028)
 ## Damage types that tear rather than punch, and so leave a wider, more ragged
 ## opening at the same damage.
 const TEARING := ["shear", "cut", "blunt"]
+## How much wider an exit is than its entry. A round that has crossed a body is
+## tumbling and carrying tissue with it, which is why an exit is the wound people
+## recognise — and why making it the same hole on the other side would be the one
+## detail that gives the whole system away.
+const EXIT_SPREAD := 1.85
 
 
 ## One wound, as data. `at` and `normal` are in the limb's own local space, so

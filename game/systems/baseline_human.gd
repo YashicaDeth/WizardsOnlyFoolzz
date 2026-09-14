@@ -611,11 +611,16 @@ func mark_opened(zone_id: String, layer: int) -> int:
 	return int(zone_depth[zone])
 
 
-func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt", hit_direction := Vector3.ZERO) -> Dictionary:
+## `penetration` is the round's own figure from `Ballistics.CALIBRES` — the one
+## that has been carried in every round's payload since ballistics was written
+## and never read by anything. Left at -1 it is derived from the damage type, so
+## every existing caller keeps working and a caller that knows what it fired
+## gets a wound that reflects it.
+func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt", hit_direction := Vector3.ZERO, penetration := -1.0) -> Dictionary:
 	var zone := zone_nearest(global_point)
 	# Kept before `hit()` resolves, because `hit()` may sever the limb and the
 	# point has to be recorded against the limb that was actually struck.
-	_record_wound(zone, global_point, hit_direction, damage, damage_type)
+	_record_wound(zone, global_point, hit_direction, damage, damage_type, penetration)
 	var organ_id := ""
 	if damage_type in ["cut", "puncture", "ballistic", "shear"]:
 		organ_id = organ_nearest(global_point)
@@ -1175,7 +1180,21 @@ func _refresh_streaks(sites: Array) -> void:
 ## and only ever showed the deepest layer a limb had been opened to, so six hits
 ## in six places produced one mark in one place. A body that has been shot six
 ## times should look like a body that has been shot six times.
-func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, damage: float, damage_type: String) -> void:
+## Rough penetration for a hit whose caller did not say what it fired. These are
+## the same order as `Ballistics.CALIBRES`: a blade barely crosses tissue, a
+## rifle round crosses a body.
+const TYPE_PENETRATION := {
+	"ballistic": 0.35,
+	"shear": 0.50,
+	"puncture": 0.30,
+	"cut": 0.18,
+	"blunt": 0.05,
+	"radiation": 0.0,
+	"caustic": 0.0,
+}
+
+
+func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, damage: float, damage_type: String, penetration := -1.0) -> void:
 	if damage < WoundMarks.MIN_DAMAGE:
 		return
 	var zone := canonical_zone(zone_id)
@@ -1185,12 +1204,48 @@ func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, dama
 	if part == null or not is_instance_valid(part) or not part.is_inside_tree():
 		return
 	var surface: Dictionary = WoundMarks.surface_of(part, global_point, travel)
+
+	# --- how far in did it get -------------------------------------------
+	# Greg's whole ask, in one call: a hand is thin so a round goes through it,
+	# an upper arm is not so the same round stops inside. Nothing here knows
+	# what a hand is — it asks how much body is at that height and spends the
+	# round's budget against it.
+	var points: float = penetration if penetration >= 0.0 else float(TYPE_PENETRATION.get(damage_type, 0.2))
+	var spec: Dictionary = _layout.get(zone, {})
+	var limb_length: float = float((spec.get("size", Vector3(0.2, 0.6, 0.2)) as Vector3).y)
+	var local_point: Vector3 = surface["at"]
+	var local_travel: Vector3 = (part.global_transform.basis.inverse() * travel) if travel.length_squared() > 0.0001 else Vector3(0, 0, -1)
+	var shot: Dictionary = Penetration.resolve(
+		zone,
+		Penetration.height_fraction(local_point, limb_length),
+		Penetration.across_wide_axis(local_travel),
+		points,
+		anatomy.zone_armor(zone),
+		limb_length)
+	if int(shot["result"]) == Penetration.Result.STOPPED_BY_ARMOUR:
+		# What you are wearing stopped it. No hole in you.
+		return
 	# The layer is read *after* the hit resolves everywhere else; here it is read
 	# before, so a fresh hole shows the depth the body was already opened to and
 	# deepens on the next frame's refresh rather than predicting itself.
 	var layer := int(zone_depth.get(zone, 0))
 	var wound: Dictionary = WoundMarks.make(surface["at"], surface["normal"], damage, damage_type, layer)
+	wound["depth"] = shot["fraction"]
+	wound["through"] = shot["through"]
+	# A hole that nearly went through looks nearly like one that did.
+	wound["radius"] = float(wound["radius"]) * lerpf(0.62, 1.0, float(shot["fraction"]))
 	wound_marks[zone] = WoundMarks.record(wound_marks.get(zone, []) as Array, wound)
+
+	# --- and out the other side ------------------------------------------
+	if bool(shot["through"]):
+		var exit_at: Vector3 = local_point - (surface["normal"] as Vector3) * float(shot["thickness"])
+		var exit_wound: Dictionary = WoundMarks.make(exit_at, -(surface["normal"] as Vector3), damage, damage_type, layer)
+		exit_wound["radius"] = float(exit_wound["radius"]) * WoundMarks.EXIT_SPREAD
+		exit_wound["depth"] = 1.0
+		exit_wound["through"] = true
+		exit_wound["exit"] = true
+		wound_marks[zone] = WoundMarks.record(wound_marks.get(zone, []) as Array, exit_wound)
+
 	_refresh_wounds(zone)
 
 

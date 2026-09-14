@@ -67,6 +67,128 @@ static func arc_tube(width: float, depth: float, thickness: float, from_angle: f
 	return surface.commit()
 
 
+## The profiles, as data.
+##
+## Something other than the mesh builder needs to know how thick a body is at a
+## given height: `Penetration` decides whether a round goes through a hand and
+## only part-way into an upper arm, and the only honest source for "how much
+## body is there" is the same numbers the body is built from. A separate table
+## of thicknesses would be a second description of the same shape, wrong the
+## first time anybody edits one and not the other.
+##
+## Entries are Vector3(height_fraction, radius_x, radius_z), where the fraction
+## runs -1 at the bottom of the limb to +1 at the top. `scaled()` turns those
+## into real heights for a given length.
+
+const TORSO_PROFILE := [
+		Vector3(-1.00, 0.152, 0.098),
+		# Waist, genuinely narrower than the hips and the ribs either side of it.
+		Vector3(-0.55, 0.134, 0.088),
+		Vector3(-0.10, 0.160, 0.104),
+		Vector3(0.34, 0.206, 0.118),
+		# The shoulder line. Widest ring in the body, and flatter front-to-back
+		# than the chest below it, because shoulders are a bar rather than a ball.
+		Vector3(0.70, 0.232, 0.113),
+		# Trapezius: a slope up off the shoulder, not a step.
+		Vector3(0.88, 0.158, 0.099),
+		Vector3(0.99, 0.082, 0.076),
+		# Neck, running up past the collar and finishing inside the skull.
+		Vector3(1.10, 0.064, 0.062),
+		Vector3(1.28, 0.061, 0.059),
+]
+
+const HEAD_PROFILE := [
+		# Under the jaw, narrow, so the neck disappears into it.
+		Vector3(-1.15, 0.044, 0.050),
+		# Chin and jawline: the widest part of the lower head is behind the chin,
+		# so x stays modest while z runs long.
+		Vector3(-0.72, 0.072, 0.090),
+		Vector3(-0.32, 0.094, 0.108),
+		# Cheekbones.
+		Vector3(0.02, 0.104, 0.114),
+		Vector3(0.44, 0.100, 0.108),
+		Vector3(0.78, 0.080, 0.086),
+		Vector3(1.00, 0.040, 0.044),
+]
+
+const ARM_PROFILE := [
+		Vector3(-1.00, 0.034, 0.032),
+		# Wrist in, forearm out — the taper that says which end is which.
+		Vector3(-0.78, 0.032, 0.031),
+		Vector3(-0.52, 0.047, 0.045),
+		Vector3(-0.06, 0.050, 0.048),
+		Vector3(0.06, 0.056, 0.054),
+		Vector3(0.46, 0.078, 0.074),
+		# Deltoid: the widest ring in the arm. Carried lower than the very top,
+		# because the top has to be a dome rather than a rim.
+		Vector3(0.72, 0.092, 0.086),
+		Vector3(0.90, 0.068, 0.064),
+		# Closed over, not cut off. The previous profile ended on a full-width
+		# ring, which `revolve` caps flat — so every arm finished in an open
+		# circular lid standing above the shoulder line, clearly detached, right
+		# beside the neck. A dome tucks under the torso's shoulder instead.
+		Vector3(1.00, 0.026, 0.024),
+]
+
+const LEG_PROFILE := [
+		Vector3(-1.00, 0.046, 0.050),
+		Vector3(-0.80, 0.039, 0.043),
+		# Calf, carried higher and further back than the old profile had it.
+		Vector3(-0.34, 0.072, 0.076),
+		Vector3(-0.04, 0.057, 0.059),
+		Vector3(0.06, 0.071, 0.073),
+		Vector3(0.52, 0.094, 0.094),
+		Vector3(0.84, 0.104, 0.102),
+		Vector3(1.00, 0.098, 0.096),
+]
+
+
+## A profile in real units, for a limb of half-height `h`.
+static func scaled(profile: Array, h: float) -> Array:
+	var rings: Array = []
+	for ring: Vector3 in profile:
+		rings.append(Vector3(ring.x * h, ring.y, ring.z))
+	return rings
+
+
+## Half-width of a limb at a height, interpolated between the two rings either
+## side of it. `at` is the same -1..1 fraction the profiles use.
+##
+## Returns Vector2(radius_x, radius_z) — a chest is wide and shallow and a
+## forearm is round, and a round crossing one front-to-back is crossing a very
+## different amount of body than one crossing it side-to-side.
+static func half_width_at(profile: Array, at: float) -> Vector2:
+	var t := clampf(at, -1.0, 1.0)
+	if profile.is_empty():
+		return Vector2(0.05, 0.05)
+	var first: Vector3 = profile[0]
+	if t <= first.x:
+		return Vector2(first.y, first.z)
+	for index in profile.size() - 1:
+		var lower: Vector3 = profile[index]
+		var upper: Vector3 = profile[index + 1]
+		if t <= upper.x:
+			var span: float = maxf(upper.x - lower.x, 0.0001)
+			var blend: float = (t - lower.x) / span
+			return Vector2(lerpf(lower.y, upper.y, blend), lerpf(lower.z, upper.z, blend))
+	var last: Vector3 = profile[profile.size() - 1]
+	return Vector2(last.y, last.z)
+
+
+## Which profile a zone is built from, so a caller with a zone name can measure
+## it without knowing which builder made it.
+static func profile_for(zone_id: String) -> Array:
+	match zone_id:
+		"head":
+			return HEAD_PROFILE
+		"torso":
+			return TORSO_PROFILE
+		"left_arm", "right_arm":
+			return ARM_PROFILE
+		_:
+			return LEG_PROFILE
+
+
 ## Flesh. Proportions are the point: shoulders wider than the waist, a calf that
 ## swells and tapers to an ankle, a forearm narrower than a bicep.
 ## The torso, with shoulders and a neck on it.
@@ -86,43 +208,14 @@ static func arc_tube(width: float, depth: float, thickness: float, from_angle: f
 ## shared ring still show a seam when either one moves, and one that runs past
 ## the join never can.
 static func torso(height: float) -> ArrayMesh:
-	var h := height * 0.5
-	return revolve([
-		Vector3(-h, 0.152, 0.098),
-		# Waist, genuinely narrower than the hips and the ribs either side of it.
-		Vector3(-h * 0.55, 0.134, 0.088),
-		Vector3(-h * 0.10, 0.160, 0.104),
-		Vector3(h * 0.34, 0.206, 0.118),
-		# The shoulder line. Widest ring in the body, and flatter front-to-back
-		# than the chest below it, because shoulders are a bar rather than a ball.
-		Vector3(h * 0.70, 0.232, 0.113),
-		# Trapezius: a slope up off the shoulder, not a step.
-		Vector3(h * 0.88, 0.158, 0.099),
-		Vector3(h * 0.99, 0.082, 0.076),
-		# Neck, running up past the collar and finishing inside the skull.
-		Vector3(h * 1.10, 0.064, 0.062),
-		Vector3(h * 1.28, 0.061, 0.059),
-	])
+	return revolve(scaled(TORSO_PROFILE, height * 0.5))
 
 
 ## The head. Deeper than it is wide, with a jaw that comes to a chin rather than
 ## a sphere that tapers evenly — the even taper is most of why the old head read
 ## as a blob with a face painted on it.
 static func head(size: float) -> ArrayMesh:
-	var r := size * 0.5
-	return revolve([
-		# Under the jaw, narrow, so the neck disappears into it.
-		Vector3(-r * 1.15, 0.044, 0.050),
-		# Chin and jawline: the widest part of the lower head is behind the chin,
-		# so x stays modest while z runs long.
-		Vector3(-r * 0.72, 0.072, 0.090),
-		Vector3(-r * 0.32, 0.094, 0.108),
-		# Cheekbones.
-		Vector3(r * 0.02, 0.104, 0.114),
-		Vector3(r * 0.44, 0.100, 0.108),
-		Vector3(r * 0.78, 0.080, 0.086),
-		Vector3(r * 1.00, 0.040, 0.044),
-	])
+	return revolve(scaled(HEAD_PROFILE, size * 0.5))
 
 
 ## The arm, with a deltoid on top of it.
@@ -132,42 +225,13 @@ static func head(size: float) -> ArrayMesh:
 ## shoulder is the thickest part of the arm, and once it is, it meets the torso's
 ## widened shoulder ring on its own and the sphere is not doing any work.
 static func arm(length: float) -> ArrayMesh:
-	var h := length * 0.5
-	return revolve([
-		Vector3(-h, 0.034, 0.032),
-		# Wrist in, forearm out — the taper that says which end is which.
-		Vector3(-h * 0.78, 0.032, 0.031),
-		Vector3(-h * 0.52, 0.047, 0.045),
-		Vector3(-h * 0.06, 0.050, 0.048),
-		Vector3(h * 0.06, 0.056, 0.054),
-		Vector3(h * 0.46, 0.078, 0.074),
-		# Deltoid: the widest ring in the arm. Carried lower than the very top,
-		# because the top has to be a dome rather than a rim.
-		Vector3(h * 0.72, 0.092, 0.086),
-		Vector3(h * 0.90, 0.068, 0.064),
-		# Closed over, not cut off. The previous profile ended on a full-width
-		# ring, which `revolve` caps flat — so every arm finished in an open
-		# circular lid standing above the shoulder line, clearly detached, right
-		# beside the neck. A dome tucks under the torso's shoulder instead.
-		Vector3(h, 0.026, 0.024),
-	])
+	return revolve(scaled(ARM_PROFILE, length * 0.5))
 
 
 ## The leg. Ankle, calf, knee, thigh, hip — the knee pinch between calf and
 ## thigh is what stops it reading as a cone.
 static func leg(length: float) -> ArrayMesh:
-	var h := length * 0.5
-	return revolve([
-		Vector3(-h, 0.046, 0.050),
-		Vector3(-h * 0.80, 0.039, 0.043),
-		# Calf, carried higher and further back than the old profile had it.
-		Vector3(-h * 0.34, 0.072, 0.076),
-		Vector3(-h * 0.04, 0.057, 0.059),
-		Vector3(h * 0.06, 0.071, 0.073),
-		Vector3(h * 0.52, 0.094, 0.094),
-		Vector3(h * 0.84, 0.104, 0.102),
-		Vector3(h, 0.098, 0.096),
-	])
+	return revolve(scaled(LEG_PROFILE, length * 0.5))
 
 
 ## Bone. Sits inside the flesh, shows through the X-ray, and is what is left
