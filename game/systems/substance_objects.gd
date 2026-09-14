@@ -28,9 +28,7 @@ const STEEL := Color("8f959a")
 const RESIN := Color("4a3a1c")
 const GLASS := Color("cfe0dd")
 
-## Which shape each catalogued form gets. The substance decides the colour of
-## what is inside it; the form decides everything else, which is why two
-## substances in baggies still read as two different baggies.
+## Which shape each catalogued form gets.
 const FORMS := ["baggie", "weight", "tab", "blister"]
 
 ## The contents colour per substance, so a bag of ground bone and a bag of
@@ -41,73 +39,186 @@ const FILL := {
 	"static_hymn": Color("3d4348"),
 }
 
+## What the substance physically *is*, at the scale you can see it. `coarse` is
+## the size of one grain: Marrow Dust is cut bone and therefore chips and
+## splinters rather than flour, which is the difference between a bag that reads
+## as ground bone and a bag that reads as sugar.
+const GRAIN := {
+	"marrow_dust": {"chip": Color("ece5d2"), "dark": Color("978a71"), "coarse": 0.0042},
+	"choir_bloom": {"chip": Color("87954f"), "dark": Color("39431f"), "coarse": 0.0048},
+	"static_hymn": {"chip": Color("656d75"), "dark": Color("23272b"), "coarse": 0.0030},
+}
 
+
+## Greg, on this whole game: *"everything looks like boxes"*. That was literally
+## true here — a pressed weight of Choir Bloom, a fungal graft the Choir grows on
+## purpose, was a green box with a lighter green box on top of it, and the only
+## thing separating it from a bag of ground bone was the hex code.
+##
+## The rule that replaces "form decides the shape, substance decides the colour":
+## **where the substance IS the object, the substance decides the silhouette.** A
+## cultivated graft is not a brick; a dose somebody scrapes off a blown speaker
+## is not a square of card. Only where the container genuinely is the object — a
+## press-seal bag, a foil blister — does the form still lead, and even then what
+## is inside it is built as matter with grain and lumps rather than as a slab in
+## a tint.
+##
+## Silhouette is the test, because silhouette is what survives distance: each of
+## these has to be nameable from across the shed with the colour taken away.
 static func build(form: String, substance_id := "") -> Node3D:
 	var root := Node3D.new()
 	root.name = form
 	var fill: Color = FILL.get(substance_id, POWDER_BONE)
 	match form:
-		"baggie": _build_baggie(root, fill)
-		"weight": _build_weight(root, fill)
-		"tab": _build_tab(root, fill)
-		"blister": _build_blister(root, fill)
-		_: _build_baggie(root, fill)
+		"baggie":
+			_build_baggie(root, fill, substance_id)
+		"weight":
+			if substance_id == "choir_bloom":
+				_build_graft(root, fill)
+			else:
+				_build_weight(root, fill, substance_id)
+		"tab":
+			if substance_id == "static_hymn":
+				_build_cone(root, fill)
+			else:
+				_build_tab(root, fill)
+		"blister":
+			_build_blister(root, fill, substance_id)
+		_:
+			_build_baggie(root, fill, substance_id)
 	return root
 
 
-## A press-seal bag, 50×50mm, sat slumped rather than flat — the contents pool
-## in the bottom third and the empty top folds over, which is the whole reason
-## a bag reads as a bag and not as a card.
-static func _build_baggie(root: Node3D, fill: Color) -> void:
-	var slump := _box(Vector3(0.050, 0.016, 0.022), fill.lightened(0.10), 0.94)
-	slump.position = Vector3(0, 0.008, 0)
-	root.add_child(slump)
+## A press-seal bag, 55mm, sat slumped. Every part of this is a curve: the
+## contents pool into a sagging pillow, the bag skin follows it, the empty top
+## gathers into a twist. The old version was three boxes and a flap and it
+## photographed as a white rectangle at any distance over half a metre —
+## a bag has *no* straight edges, which is precisely how you know it is soft.
+##
+## What is in it is built as grain, not as a fill colour: Marrow Dust is cut
+## cortical bone, so the bag holds chips and splinters of visibly different
+## sizes and the smallest of them have spilled onto the table.
+static func _build_baggie(root: Node3D, fill: Color, substance_id := "") -> void:
+	var grain: Dictionary = GRAIN.get(substance_id, GRAIN["marrow_dust"])
+	var chip: Color = grain["chip"]
+	var dark: Color = grain["dark"]
+	var coarse: float = grain["coarse"]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("baggie" + substance_id)
 
-	# The bag around it, slightly larger and clear.
-	var bag := _box(Vector3(0.052, 0.019, 0.025), PLASTIC_CLEAR, 0.38)
-	_clarify(bag, 0.20)
-	(bag.material_override as StandardMaterial3D).cull_mode = BaseMaterial3D.CULL_BACK
-	bag.position = Vector3(0, 0.0095, 0)
-	root.add_child(bag)
+	# The pool of contents. Sunk below the table plane so the bottom of the
+	# ellipsoid is cut off and it reads as slumped under its own weight rather
+	# than as an egg balanced on a bench.
+	var pool := _blob(Vector3(0.050, 0.026, 0.032), fill.darkened(0.05), 0.96)
+	pool.position = Vector3(0, 0.0085, 0)
+	root.add_child(pool)
+	# A second, smaller heap offset to one side, because contents settle
+	# unevenly and one lump is a shape while two lumps are a substance.
+	var heap := _blob(Vector3(0.028, 0.020, 0.022), fill, 0.96)
+	heap.position = Vector3(-0.011, 0.0105, 0.002)
+	root.add_child(heap)
 
-	# The empty top, creased over. Half the height it was: at 30mm it stood up
-	# off a 50mm bag like a sail and became the whole silhouette, which left the
-	# thing the bag is *for* reading as nothing.
-	var flap := _box(Vector3(0.050, 0.015, 0.0022), PLASTIC_CLEAR, 0.42)
-	_clarify(flap, 0.16)
-	flap.rotation = Vector3(deg_to_rad(-74.0), 0, 0)
-	flap.position = Vector3(0, 0.0235, 0.006)
-	root.add_child(flap)
+	# The grain itself, breaking the surface of the pool.
+	for _piece in 14:
+		var angle := rng.randf_range(0.0, TAU)
+		var reach := rng.randf_range(0.0, 0.020)
+		var size := coarse * rng.randf_range(0.55, 1.5)
+		var shard := _box(
+			Vector3(size, size * rng.randf_range(0.3, 0.7), size * rng.randf_range(0.5, 1.3)),
+			chip.lerp(dark, rng.randf_range(0.0, 0.55)), 0.97,
+		)
+		shard.rotation = Vector3(rng.randf_range(-0.6, 0.6), angle, rng.randf_range(-0.6, 0.6))
+		shard.position = Vector3(
+			sin(angle) * reach, 0.0155 - reach * 0.22, cos(angle) * reach * 0.62,
+		)
+		root.add_child(shard)
+
+	# The bag skin: the same slumped shape one millimetre proud of the contents,
+	# clear, and closed so its own back faces cannot sort over what it contains.
+	var skin := _blob(Vector3(0.055, 0.030, 0.036), PLASTIC_CLEAR, 0.34, 14)
+	_clarify(skin, 0.22)
+	(skin.material_override as StandardMaterial3D).cull_mode = BaseMaterial3D.CULL_BACK
+	skin.position = Vector3(0, 0.0085, 0)
+	root.add_child(skin)
+
+	# The empty top gathered into a twist — a taper, not a flap. This is the
+	# silhouette detail: a pinched crown over a soft body says "bag" from a
+	# distance where nothing else on the object is resolvable.
+	var neck := _taper(0.0035, 0.014, 0.014, PLASTIC_CLEAR, 0.36)
+	_clarify(neck, 0.26)
+	neck.rotation = Vector3(0, 0, deg_to_rad(13.0))
+	neck.position = Vector3(0.002, 0.0245, 0.001)
+	root.add_child(neck)
+	var twist := _taper(0.0022, 0.0042, 0.009, PLASTIC_CLEAR, 0.36)
+	_clarify(twist, 0.32)
+	twist.rotation = Vector3(deg_to_rad(18.0), 0, deg_to_rad(34.0))
+	twist.position = Vector3(0.006, 0.0335, 0.001)
+	root.add_child(twist)
 
 	# The zip: two ribs, which is the detail that makes it a press-seal and not
 	# a sandwich bag.
-	for side in [-0.0016, 0.0016]:
-		var rib := _box(Vector3(0.050, 0.0018, 0.0016), PLASTIC_CLEAR.darkened(0.12), 0.3)
-		_clarify(rib, 0.65)
-		rib.position = Vector3(0, 0.0195, side)
+	for side in [-0.0018, 0.0018]:
+		var rib := _box(Vector3(0.042, 0.0016, 0.0014), PLASTIC_CLEAR.darkened(0.16), 0.3)
+		_clarify(rib, 0.7)
+		rib.position = Vector3(0, 0.0225, side)
 		root.add_child(rib)
+
+	# What got spilled getting it open. A bag nobody has opened is stock; a bag
+	# with dust beside it is somebody's.
+	for spill in 3:
+		var dust := _blob(
+			Vector3(0.016 - float(spill) * 0.004, 0.0012, 0.012 - float(spill) * 0.003),
+			chip.darkened(0.12), 0.99, 8,
+		)
+		dust.position = Vector3(0.034 + float(spill) * 0.012, 0.0004, 0.010 - float(spill) * 0.007)
+		root.add_child(dust)
 
 
 ## 28g, pressed and wrapped. Cling wrap is a second skin one millimetre off the
 ## brick with a different roughness — a single shiny box reads as a bar of soap.
-static func _build_weight(root: Node3D, fill: Color) -> void:
-	var brick := _box(Vector3(0.062, 0.026, 0.042), fill, 0.92)
-	brick.position = Vector3(0, 0.013, 0)
+## The corner is torn open and the press is crumbling out of it, so even the one
+## form that genuinely is a rectangle is not a *clean* rectangle.
+static func _build_weight(root: Node3D, fill: Color, substance_id := "") -> void:
+	var grain: Dictionary = GRAIN.get(substance_id, GRAIN["marrow_dust"])
+	var chip: Color = grain["chip"]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("weight" + substance_id)
+
+	var brick := _box(Vector3(0.062, 0.024, 0.042), fill, 0.92)
+	brick.position = Vector3(0, 0.012, 0)
 	root.add_child(brick)
+	# The press is domed, not flat — a mould never fills square at the top.
+	var dome := _blob(Vector3(0.058, 0.012, 0.038), fill.lightened(0.05), 0.93)
+	dome.position = Vector3(0, 0.0235, 0)
+	root.add_child(dome)
 
 	# Cling is scuffed, not polished, and it is a closed box - leaving it
 	# double-sided let its own back faces sort over the brick.
-	var wrap := _box(Vector3(0.064, 0.028, 0.044), PLASTIC_CLEAR, 0.44)
+	var wrap := _box(Vector3(0.064, 0.027, 0.044), PLASTIC_CLEAR, 0.44)
 	_clarify(wrap, 0.13)
 	(wrap.material_override as StandardMaterial3D).cull_mode = BaseMaterial3D.CULL_BACK
-	wrap.position = Vector3(0, 0.014, 0)
+	wrap.position = Vector3(0, 0.0135, 0)
 	root.add_child(wrap)
 
 	# Tape across the seam, because nobody wraps one of these neatly.
 	var tape := _box(Vector3(0.068, 0.0022, 0.016), Color("6d6553"), 0.86)
 	tape.rotation = Vector3(0, deg_to_rad(6.0), 0)
-	tape.position = Vector3(0, 0.0282, 0.004)
+	tape.position = Vector3(0, 0.0272, 0.004)
 	root.add_child(tape)
+
+	# The opened corner and what came out of it.
+	var torn := _box(Vector3(0.014, 0.010, 0.013), fill.darkened(0.10), 0.95)
+	torn.rotation = Vector3(deg_to_rad(16.0), deg_to_rad(-22.0), deg_to_rad(9.0))
+	torn.position = Vector3(0.030, 0.020, 0.019)
+	root.add_child(torn)
+	for _crumb in 5:
+		var size := rng.randf_range(0.0022, 0.0050)
+		var crumb := _box(Vector3(size, size * 0.6, size * 0.8), chip, 0.97)
+		crumb.rotation = Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0), 0)
+		crumb.position = Vector3(
+			rng.randf_range(0.036, 0.058), size * 0.3, rng.randf_range(0.012, 0.030),
+		)
+		root.add_child(crumb)
 
 
 ## Blotter: a 12mm square of card with the perforation grid still on it and a
@@ -133,10 +244,92 @@ static func _build_tab(root: Node3D, fill: Color) -> void:
 		root.add_child(nick)
 
 
+## `choir_bloom` in the `weight` form. The Choir grows this on purpose, so a
+## 28g "weight" of it is a graft lifted off the substrate, not a pressed brick:
+## a fused cluster of caps over a short mycelial foot, with the cut face still
+## showing where it came away. Silhouette test — lumps over a stalk is nameable
+## across the shed with the colour taken away; a rectangle is not.
+static func _build_graft(root: Node3D, fill: Color) -> void:
+	var grain: Dictionary = GRAIN["choir_bloom"]
+	var chip: Color = grain["chip"]
+	var dark: Color = grain["dark"]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("graft" + "choir_bloom")
+
+	# The foot: what it was cut off at. Wider at the base, and the cut face is
+	# paler than the growth because it is the inside of the thing.
+	var foot := _taper(0.020, 0.030, 0.014, fill.lightened(0.18), 0.97)
+	foot.position = Vector3(0, 0.007, 0)
+	root.add_child(foot)
+
+	# The cluster. Five caps of different sizes leaning off one another - one
+	# dome is a mushroom, several fused at different angles is a graft.
+	for cap in 5:
+		var spread := float(cap) / 4.0
+		var angle := rng.randf_range(0.0, TAU)
+		var size := 0.030 - spread * 0.011
+		var lump := _blob(
+			Vector3(size, size * rng.randf_range(0.52, 0.74), size * rng.randf_range(0.82, 1.0)),
+			fill.lerp(dark, spread * 0.45), 0.95,
+		)
+		lump.rotation = Vector3(rng.randf_range(-0.34, 0.34), angle, rng.randf_range(-0.34, 0.34))
+		lump.position = Vector3(
+			sin(angle) * spread * 0.016, 0.019 + spread * 0.007, cos(angle) * spread * 0.013,
+		)
+		root.add_child(lump)
+
+	# Spores on the caps, which is the detail that says grown rather than made.
+	for _fleck in 10:
+		var angle := rng.randf_range(0.0, TAU)
+		var reach := rng.randf_range(0.004, 0.020)
+		var fleck := _blob(Vector3(0.0022, 0.0012, 0.0022), chip, 0.99, 6)
+		fleck.position = Vector3(sin(angle) * reach, 0.030 + rng.randf_range(-0.004, 0.004), cos(angle) * reach * 0.8)
+		root.add_child(fleck)
+
+
+## `static_hymn` in the `tab` form. Greg's rule at the top of this file: a dose
+## somebody scrapes off a blown speaker is not a square of card. So it is the
+## cone itself - a torn wedge of speaker paper with the dose still coned up on
+## it where it was scraped into a pile, and the dust ring it left behind.
+static func _build_cone(root: Node3D, fill: Color) -> void:
+	var grain: Dictionary = GRAIN["static_hymn"]
+	var chip: Color = grain["chip"]
+	var dark: Color = grain["dark"]
+	var coarse: float = grain["coarse"]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("cone" + "static_hymn")
+
+	# The paper: a shallow dish, because a speaker cone is a cone even when it
+	# is a fragment. Cut off below the table plane so it sits as a sliver.
+	var paper := _blob(Vector3(0.026, 0.009, 0.026), CARD.darkened(0.42), 0.98, 18)
+	paper.position = Vector3(0, 0.0004, 0)
+	root.add_child(paper)
+
+	# The dose, scraped into a cone. 12mm across the base, which is a dose and
+	# not a serving.
+	var heap := _taper(0.0006, 0.0060, 0.0085, fill, 0.98)
+	heap.position = Vector3(0, 0.0043, 0)
+	root.add_child(heap)
+
+	# What the card edge pushed aside on the way in.
+	for _fleck in 9:
+		var angle := rng.randf_range(0.0, TAU)
+		var reach := rng.randf_range(0.008, 0.019)
+		var size := coarse * rng.randf_range(0.6, 1.4)
+		var fleck := _box(
+			Vector3(size, size * 0.45, size * rng.randf_range(0.6, 1.2)),
+			chip.lerp(dark, rng.randf_range(0.0, 0.6)), 0.99,
+		)
+		fleck.rotation = Vector3(0, angle, 0)
+		fleck.position = Vector3(sin(angle) * reach, 0.0006, cos(angle) * reach)
+		root.add_child(fleck)
+
 ## Foil-backed card. Named in AU1.2 and used by nothing in the catalogue yet —
 ## built anyway, because the moment a pharmaceutical enters AU it needs to
 ## already look like one rather than like a baggie with a different label.
-static func _build_blister(root: Node3D, fill: Color) -> void:
+static func _build_blister(root: Node3D, fill: Color, substance_id := "") -> void:
+	var grain: Dictionary = GRAIN.get(substance_id, GRAIN["marrow_dust"])
+	var chip: Color = grain["chip"]
 	var card := _box(Vector3(0.034, 0.0006, 0.052), FOIL, 0.42)
 	card.position = Vector3(0, 0.0003, 0)
 	root.add_child(card)
@@ -155,7 +348,7 @@ static func _build_blister(root: Node3D, fill: Color) -> void:
 			bubble.position = Vector3(-0.0075 + float(column) * 0.015, 0.0028, -0.018 + float(row) * 0.012)
 			root.add_child(bubble)
 
-			var pill := _box(Vector3(0.0062, 0.0026, 0.0062), fill.lightened(0.28), 0.9)
+			var pill := _box(Vector3(0.0062, 0.0026, 0.0062), fill.lightened(0.28).lerp(chip, 0.4), 0.9)
 			pill.position = Vector3(-0.0075 + float(column) * 0.015, 0.0019, -0.018 + float(row) * 0.012)
 			root.add_child(pill)
 
@@ -285,6 +478,31 @@ static func _build_scales(root: Node3D) -> void:
 
 
 ## --- primitives ----------------------------------------------------------
+
+static func _blob(size: Vector3, tint: Color, roughness: float, segments := 20) -> MeshInstance3D:
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.5
+	mesh.height = 1.0
+	mesh.radial_segments = segments
+	mesh.rings = maxi(4, segments / 2)
+	var node := MeshInstance3D.new()
+	node.mesh = mesh
+	node.scale = size
+	node.material_override = _material(tint, roughness)
+	return node
+
+
+static func _taper(top_radius: float, bottom_radius: float, height: float, tint: Color, roughness: float) -> MeshInstance3D:
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = top_radius
+	mesh.bottom_radius = bottom_radius
+	mesh.height = height
+	mesh.radial_segments = 16
+	var node := MeshInstance3D.new()
+	node.mesh = mesh
+	node.material_override = _material(tint, roughness)
+	return node
+
 
 static func _box(size: Vector3, tint: Color, roughness: float) -> MeshInstance3D:
 	var mesh := BoxMesh.new()
