@@ -36,7 +36,15 @@ func _ready() -> void:
 	motion.set_perspective(true)
 	motion.update(0.1, Vector3(0, 0, 7), true, false, false, false)
 	check(motion.state == "walk", "real velocity selects walk locomotion")
-	check(rig.parts.right_arm.rotation.x > 0.7 and rig.parts.left_arm.rotation.x > 0.7, "first person raises both real arms into view")
+	# AG5.5 retuned FIRST_PERSON_ARM_RAISE (now 0.62) to the exact value that
+	# cancels hunter_arsenal.gd's own arm-pitch counter-rotation - the fix for
+	# the floating-sword bug. This hardcoded ">0.7" predates that and started
+	# failing the instant the honest, calibrated value replaced whatever
+	# placeholder was here before. Checked against the real constant, with a
+	# tolerance below it for the walk cycle's own +/-0.34 swing, rather than a
+	# number that goes stale the next time this constant is legitimately retuned.
+	var raised_floor: float = MOTION.FIRST_PERSON_ARM_RAISE - 0.4
+	check(rig.parts.right_arm.rotation.x > raised_floor and rig.parts.left_arm.rotation.x > raised_floor, "first person raises both real arms into view")
 	check(rig.get_node("right_arm_hitbox").position.is_equal_approx(rig.parts.right_arm.position), "animated anatomy hitbox follows visible arm")
 	motion.update(0.1, Vector3(0, 0, 3), true, false, true, false)
 	check(motion.state == "crouch", "crouch has its own full-body state")
