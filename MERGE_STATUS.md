@@ -6,7 +6,9 @@ the rest can.
 
 ## Where the number went
 
-**77 unmerged commits across 10 branches -> 43 across 5.**
+**77 unmerged commits across 10 branches -> 43 across 5.** Plus one
+branch that did not exist when this started: `lane-4-demo`, merged at
+`9c26be4`.
 
 The 77 was also inflated: `origin/agent-b`'s 20 commits are an ancestor of
 `agent-b`'s 26, so they were being counted twice. Check containment before
@@ -84,16 +86,19 @@ the AG5.11 slot manifest with quantum snapshots on the other. Both real, both
 wired.
 **Question: which one owns where a save file lives?**
 
-### 4. `integration-check-agent-a` — 4 commits left — what does PLAY do?
-This is P-section work, the demo, the lane sitting at 0 of 45 — so it matters
-more than its size suggests. HEAD wires PLAY to a continue-runs screen;
-the branch wires PLAY and DEMO as two doors into the same scene (P2/P2.2).
-Its `.tscn` would also revert the title from "FOOLZ" to "FOOLS", which a
-later commit changed deliberately.
-Its independent commits were already taken (`65708e2`, `225c848`). The
-remaining ones need this answered. `P2.3` also touches decision 3.
-**Question: does PLAY open the run list, or go straight in next to a DEMO
-button?**
+### 4. `integration-check-agent-a` — 4 commits left — ANSWERED, mostly
+**Resolved in practice by `9c26be4`.** The lane-4 agent's scheduled 03:45 run
+refused the premise: instead of rewiring PLAY into two doors, it added DEMO as
+its own door beside it, so the continue-runs screen survives and the demo
+still gets in. PLAY // SURVIVING WORLDS, DEMO // THE BEST HALF HOUR, NEW GAME,
+GORE SANDBOX. Merged clean, `demo_mode_test` 9/9 on the save isolation in both
+directions.
+
+**P is no longer 0 of 45. It is 7 of 45.**
+
+What is left on the branch is `P2.3`, which touches `world_history.gd` and so
+folds into decision 3. Its `.tscn` still wants "FOOLS" over "FOOLZ" and should
+not get it.
 
 ### 5. `codex/controls-ui-repair` — 4 commits — a WIP tip
 32 conflict hunks across 13 files for four commits, because the branch is from
