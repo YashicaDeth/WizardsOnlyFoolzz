@@ -155,6 +155,68 @@ func first_index(kind: String) -> int:
 	return -1
 
 
+## C8.2 / AS3.2. "Pockets are real, and what is in them is in them." Not a
+## second inventory — the same real `items` this file has always carried,
+## with `pocketed` marking which ones are on the body rather than in the bag
+## CAPACITY already budgets against (this file's own comment already named
+## the difference: "a person with pockets, not a rucksack simulator"). Small
+## and few on purpose: a pocket holds what a hand can find without looking,
+## not the whole kit.
+const POCKET_CAPACITY := 3
+const POCKET_MASS_LIMIT := 0.6
+
+
+func pocketed_items() -> Array:
+	var found: Array = []
+	for item in items:
+		if bool((item as Dictionary).get("pocketed", false)):
+			found.append(item)
+	return found
+
+
+## Moves a carried item into a pocket. Refused, not silently truncated, when
+## there is genuinely nowhere left or the thing does not fit a pocket at
+## all — a severed limb does not go in a pocket regardless of how few are
+## already full.
+func pocket(index: int) -> Dictionary:
+	if index < 0 or index >= items.size():
+		return {"ok": false, "reason": "NOTHING THERE"}
+	var item: Dictionary = items[index]
+	if bool(item.get("pocketed", false)):
+		return {"ok": false, "reason": "ALREADY POCKETED"}
+	if float(item.get("mass", 0.5)) > POCKET_MASS_LIMIT:
+		return {"ok": false, "reason": "TOO BIG FOR A POCKET"}
+	if pocketed_items().size() >= POCKET_CAPACITY:
+		return {"ok": false, "reason": "POCKETS ARE FULL"}
+	item["pocketed"] = true
+	items[index] = item
+	save_to_history()
+	return {"ok": true, "item": item}
+
+
+## The other direction — into the bag, off the body. Nothing here refuses a
+## bag that is already over `CAPACITY`; `burden()` already answers for that
+## the same way it does for everything else carried.
+func unpocket(index: int) -> Dictionary:
+	if index < 0 or index >= items.size():
+		return {"ok": false, "reason": "NOTHING THERE"}
+	var item: Dictionary = items[index]
+	if not bool(item.get("pocketed", false)):
+		return {"ok": false, "reason": "NOT POCKETED"}
+	item["pocketed"] = false
+	items[index] = item
+	save_to_history()
+	return {"ok": true, "item": item}
+
+
+## What a search actually finds. A frisk or a robbery that only pats down
+## pockets should never turn up the severed limb wrapped in the bag on your
+## back — this is the honest, narrower half of `items`, real objects same as
+## the rest, not a second, separately-tracked fiction of "small stuff".
+func search_pockets() -> Array:
+	return pocketed_items()
+
+
 func damage_item(index: int, amount: float) -> float:
 	if index < 0 or index >= items.size():
 		return 0.0

@@ -617,7 +617,7 @@ v6 made the lamp cost you something; it costs nobody else anything. AS1.5: its l
 ### C v8 — the eighth pass
 v7 made carrying it tactical and putting it away instant. Rule 3: every hard cut is a bug.
 - [x] ~~**C8.1** `v8` Pocketing it is a movement and the light leaves with it~~ Already implemented under AS1.4 but left open here: `close_device()` changes intent, while `Motion.blend()` lowers `raised` over subsequent frames rather than hiding the object; the world lamp reads that same held threshold every frame, remains during the first part of the lowering action, then leaves once the screen crosses out of the hand. `tests/handheld_pocket_light_test.gd`, 5 checks in the running Hunt scene, including the intermediate moving/lit state and the final pocketed/dark state
-- [ ] **C8.2** `v8` Pockets are real, and what is in them is in them (AS3.2)
+- [x] ~~**C8.2** `v8` Pockets are real, and what is in them is in them (AS3.2)~~ Not a second inventory: `carry.gd` marks which of the real items it already carries are `pocketed`, so a pocket holds the same identified object the bag does rather than a parallel fiction of "small stuff". `POCKET_CAPACITY` 3 and `POCKET_MASS_LIMIT` 0.6kg — a severed limb is refused outright with a reason rather than silently truncated, and a fourth small thing is refused rather than the set growing quietly. `search_pockets()` is the narrower honest half for a frisk or a robbery that pats down a body without going through the bag on its back. `tests/pockets_test.gd`, 15 checks; `substances_test`/`money_test`/`chunk_test` re-verified clean. Honestly scoped: nothing yet *calls* `search_pockets()` — a frisk is somebody else's verb (Lane 1's grapple/clinch, Lane 4's defeat routing) — and which garment provides how many pockets is AS3's own, needing `garments.gd` (Lane 2) rather than reached into from here
 
 ### C v9 — the ninth pass
 Eight passes on the front of an object nobody has ever turned over. The jester is on the back and has never been seen.
@@ -5416,7 +5416,7 @@ underneath either name.
 
 ### AS3 — Clothes and pockets
 - [ ] **AS3.1** Layers, and they are part of the world system rather than a paperdoll
-- [ ] **AS3.2** Pockets hold real things and what is in them matters
+- [~] **AS3.2** Pockets hold real things and what is in them matters — the mechanism is built under C8.2 (`carry.gd`: `pocket()`/`unpocket()`/`pocketed_items()`/`search_pockets()`, real identified items rather than a separate abstraction, `tests/pockets_test.gd` 15 checks). What is still AS3's own and not done here: which garment actually provides how many pockets, which needs `garments.gd` (Lane 2's) rather than a capacity constant invented in CARRY, and nothing in the world yet *searches* a body's pockets — that verb belongs to whoever owns grappling and defeat
 - [ ] **AS3.3** What you are wearing is strategy: weather, radiation, who talks to you
 - [ ] **AS3.4** It shows on the body the mirror renders (AH1.5, N)
 
