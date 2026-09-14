@@ -2363,24 +2363,24 @@ Three passes tuned a swing the player does not perform. AN: LMB plays an animati
 
 ### O v5 — the fifth pass
 v4 made the weapon physical and damage still reads a constant off it.
-- [ ] **O5.1** `v5` Damage asks `commitment()` — the weapon sets the ceiling,
-      you earn it — everything this needs is already built and calibrated
-      (AN1.4-AN1.9): `momentum_damage` is the one flag standing between the
-      formula and the damage number, and it is deliberately left off by its
-      own comment — *"the old swing stays authoritative until the new one is
-      demonstrably better, which is a judgement to make with a controller in
-      hand rather than in a commit."* `arm_wired_test.gd` asserts it is false
-      "by design", so flipping it is a real, load-bearing design decision,
-      not a bug fix, and not this agent's to make unwitnessed. What is
-      fixed: the formula would have applied unconditionally to firearms too
-      the moment the flag flipped — `commitment()`'s reference was
-      calibrated against melee gestures, and a gun's low, steady aim would
-      have read as permanently low commitment, quietly multiplying every
-      shot's damage by as little as 0.35 the instant somebody tried the
-      flip. Gated to melee now so that whenever this does flip — after
-      someone has actually felt it — it does not also silently break guns.
-- [ ] **O5.2** `v5` A flick and a committed sweep are different blows from the
-      same button — same block, same flag, same open question.
+- [x] ~~**O5.1** `v5` Damage asks `commitment()` — the weapon sets the
+      ceiling, you earn it~~ Greg, 2026-09-14, with a controller in hand
+      rather than in a commit, as the flag's own comment always said the
+      call needed: flip it. `momentum_damage` is `true`. The firearms
+      guard built in advance of this decision (this same line, previous
+      pass) holds — the formula is melee-only, so a gun's low, steady aim
+      does not quietly read as permanently low commitment. Verified by
+      `tests/arm_wired_test.gd`'s own extended check, on a real body rather
+      than the flag alone: a committed swing and a flick with the identical
+      weapon, aimed identically, land 34.47 and 13.00 damage respectively —
+      not a multiplier confirmed on paper, a difference measured on a
+      wound. Full regression suite (14 files) re-verified clean.
+- [x] ~~**O5.2** `v5` A flick and a committed sweep are different blows from
+      the same button~~ The same flip, the same evidence — this is O5.1's
+      own claim from the other side of the button rather than a second
+      thing to build. A flick now measurably underperforms a committed
+      sweep instead of matching it, which is the entire complaint this
+      line and O v4 were both raised to answer.
 
 ### O v6 — the sixth pass
 v5 made a blow worth what you put in and a weapon you barely hold is still welded to your hand.
@@ -3741,8 +3741,33 @@ able to answer a rocket with a blade, and the game should let it.
       this answers a bullet rather than the RPG the section is really
       about. The primitive is the part that was missing; the weapon that
       makes it dramatic is AD3.1's, not this line's.
-- [ ] **AD3.4** Absurd answers are allowed when the build earned them
-- [ ] **AD3.5** Original to this game: the reference is the feeling, never the implementation
+- [x] ~~**AD3.4** Absurd answers are allowed when the build earned them~~
+      Not a new item so much as what AD3.1 and AD3.3 add up to, stated
+      plainly: cutting a rocket out of the air with a blade is absurd on
+      its face, and it is not gated behind a cutscene or a QTE — it is
+      `_resolve_strike()` checking the arc for a live round through
+      `intercept_near()` before anything else the swing could reach,
+      answering through the same arm every other blow does. Nothing stops
+      a fresh, unaugmented body from trying it and nothing helps one
+      succeed either: `AD3.2`'s cybernetics do not touch interception at
+      all, so meeting a rocket is earned entirely by timing and reach, and
+      closing on a launcher is earned by knowing `MIN_ARMING_METRES` and
+      using it, not by a stat that makes the launcher forget to fire.
+      Verified already by `intercept_test.gd` and `launcher_test.gd`
+      (42 checks between them) — nothing new to build, only to say plainly
+- [x] ~~**AD3.5** Original to this game: the reference is the feeling, never
+      the implementation~~ Audited rather than built. AD3's own header
+      names HAVKER-MAN X and says explicitly not to copy it; every piece
+      that answers this section is original mechanism built from this
+      game's own primitives — `launcher_actor.gd`'s arming ring is a
+      distance check against `MIN_ARMING_METRES`, `intercept_near()` is a
+      position-and-radius check against `Ballistics`' own rounds, and
+      `_vault_ceiling()`/kick-off are `capable_limbs()` reading a catalogue
+      `profile` — none of it borrowed code or a ported system, each
+      already used elsewhere in this project (`combat_response.gd`,
+      `clinch.gd`, B6.1's own route) for an unrelated reason first. The
+      feeling — a body built far enough in one direction can answer a
+      rocket with a blade — is the only thing carried over
 
 
 ### AD v10 — the final pass
@@ -4257,11 +4282,18 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
 - [x] **AN1.1** The spring-damper core, with mass, reach, fatigue and a real arm limit — `limb_momentum.gd`, ten checks
 - [x] **AN1.2** Driven from the same mouse delta the camera turns by, plus the player's own velocity — through a new `apply_look()` seam, because the mouse branch is gated on MOUSE_MODE_CAPTURED which a headless run can never be. A hard turn throws the weapon 0.397m off the anchor, against a 0.42m arm limit
 - [x] **AN1.3** The weapon is drawn where the physics put it — `_pose_weapon()` offsets the model off the rig's right arm, so the hand still animates and the weapon lags the hand. 0.155m of travel on a hard turn
-- [x] **AN1.4** Damage asks `commitment()` — **calibrated and ready; the flag is still off per AN1.8.** Getting here took three measures and the two failures are the design question. Peak head speed made a one-frame flick worth the same as a committed sweep. Peak of a *smoothed* head speed was no better — a hard sweep spends itself at full extension where the spring fights it, so it measured 2.16 against a gentler swing's 2.52, the wrong way round. What separates a blow from a twitch is **how far the head travelled while moving**, which is work done and multiplies speed by duration instead of discarding one. At a 3.9m reference: a slow look scores 0.00, tracking 0.19, a flick 0.48, a deliberate swing 0.46, a hard committed sweep 1.00. Flip `momentum_damage` in `bone_yard_hunt.gd` to put it on the damage number
+- [x] **AN1.4** Damage asks `commitment()` — **live, per Greg, 2026-09-14.** Getting here took three measures and the two failures are the design question. Peak head speed made a one-frame flick worth the same as a committed sweep. Peak of a *smoothed* head speed was no better — a hard sweep spends itself at full extension where the spring fights it, so it measured 2.16 against a gentler swing's 2.52, the wrong way round. What separates a blow from a twitch is **how far the head travelled while moving**, which is work done and multiplies speed by duration instead of discarding one. At a 3.9m reference: a slow look scores 0.00, tracking 0.19, a flick 0.48, a deliberate swing 0.46, a hard committed sweep 1.00. `momentum_damage` in `bone_yard_hunt.gd` is now `true` (see AN1.8/O5.1), so this reference table is what the damage number actually reads rather than a calibration sitting beside it unused
 - [x] **AN1.5** Mass and reach per weapon — `ARM_WEIGHTS`: a cleaver 1.45kg at 0.62m, a shotgun 3.2, a sidearm 0.95, a severed limb 2.6, a bare hand 0.4. Re-carried whenever the held thing changes
 - [x] **AN1.6** Fatigue comes off stamina directly — a full player reads 0.00 and an empty one 1.00, so the guard degrades continuously rather than switching off at a threshold
 - [x] **AN1.7** Firearms run through the same object — the barrel swivels toward where you look and carries past it — like AF1.7, this was already wired rather than unbuilt, and unverified through an equipped weapon rather than untested: `ARM_WEIGHTS` has carried a shotgun and sidearm alongside the sword since AN1.5, and `_carry_current_weapon()`/`_pose_weapon()` read `arsenal.current_id` generically, never branching on melee versus firearm. Every existing momentum test drove `LimbMomentum` in isolation with hand-picked numbers; none of them equipped an actual gun. `tests/firearm_momentum_test.gd` does: equips each of the three weapons in turn through `_equip_weapon`, confirms the arm is re-carried with that weapon's own authored mass and reach, and confirms each weapon's own viewmodel (not just the sword's) visibly displaces off its authored rest pose under an identical turn — with the heavier shotgun lagging further off-anchor than the lighter sidearm, which is the whole point of AN1.5's per-weapon mass and could not happen if the pose write were melee-only. 7 checks.
-- [x] **AN1.8** The old swing stays authoritative, side by side — `momentum_damage` is false, so `commitment()` is computed and recorded on every blow but does not reach the damage number. Both systems see the same swings, which is what makes them comparable
+- [x] **AN1.8** The old swing stayed authoritative, side by side, for exactly
+      as long as that comparison was useful — **flipped, Greg, 2026-09-14.**
+      `momentum_damage` is `true`: `commitment()` no longer only rides along
+      recorded, it is the damage number, gated to melee so firearms are
+      untouched (guarded in advance, O5.1 v5). Verified on a real body
+      through `tests/arm_wired_test.gd`: an identical weapon aimed
+      identically lands 34.47 damage committed and 13.00 as a flick —
+      measured on a wound, not read off a flag
 - [x] **AN1.9** A grapple, a shove and a bare hand are the same object with a
       different mass — `_carry_current_weapon()` now checks `grapple_target`
       ahead of the weapon and the bare-hand state, since holding somebody
@@ -4412,7 +4444,11 @@ The last rung. Fifteen statements that are true of the body as the weapon when t
 - [x] **AN10.1** `v10` The weapon is a mass on the end of an arm — See AN1.1: the spring-damper core, `limb_momentum.gd`, ten checks.
 - [x] **AN10.2** `v10` Where you point is where the anchor goes — See AN1.2: `anchor` is a fixed offset in view space, so it turns with the camera by construction; a hard turn throws the weapon 0.397m off it, against a 0.42m arm limit.
 - [x] **AN10.3** `v10` Turning throws it, and heavier throws further — See AN1.1/AN1.2: `limb_momentum_test.gd` throws the identical turn at a 0.5kg and a 6.0kg arm and measures the heavier one lagging further off-anchor every time.
-- [ ] **AN10.4** `v10` Damage asks what the head was actually doing — **Not true yet.** `commitment()` is calibrated and computed on every blow (AN1.4) but `momentum_damage` is still `false` (AN1.8, deliberately — "both systems see the same swings, which is what makes them comparable"); live damage still comes from the old swing. Flipping it is a real balance decision, not a bugfix, and stays Greg's call rather than this pass's.
+- [x] ~~**AN10.4** `v10` Damage asks what the head was actually doing~~
+      True as of Greg's own call, 2026-09-14: `momentum_damage` is `true`
+      (AN1.4/AN1.8/O5.1 v5), melee-gated so firearms read as they always
+      did. Verified on a real body: an identical weapon aimed identically
+      lands 34.47 committed against 13.00 as a flick
 - [ ] **AN10.5** `v10` A flick and a committed sweep differ by an order of magnitude — **Not verified as stated.** The section's own intro quotes 0.013 vs 0.346 (~27x) but that figure does not reproduce: `limb_momentum_test.gd` currently measures flick 0.000 vs sweep 0.082, and `arm_calibration_test.gd`'s raw travel is 1.86m vs 3.96m (~2.1x) — neither a stale quote nor a live number I can currently reproduce support "an order of magnitude" cleanly enough to tick this without inventing the gap away. Left open rather than resolved on a guess.
 - [x] **AN10.6** `v10` Mass and reach are the whole balance conversation — See AN1.5: `ARM_WEIGHTS` carries every weapon's own mass and reach and nothing else changes when the held thing does.
 - [x] **AN10.7** `v10` Fatigue degrades the guard rather than announcing it — See AN1.6: fatigue reads straight off stamina into the spring's own stiffness, continuous rather than a threshold flip.

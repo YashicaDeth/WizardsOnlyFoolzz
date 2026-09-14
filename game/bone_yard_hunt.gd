@@ -260,9 +260,11 @@ var arm: LimbMomentum = null
 ## per-event value: a 1000Hz mouse delivers several motion events per frame and
 ## handing the arm each one separately throws it several times as hard.
 var _look_delta := Vector2.ZERO
-## AN1.4/AN1.8. Commitment is live: mouse/arm motion and carried weapon weight
-## now change melee damage. Firearms remain deliberately excluded below, so a
-## steady aim does not get mistaken for a weak shot.
+## AN1.4/AN1.8/O5.1 v5. Whether `commitment()` reaches the damage number.
+## Judged with a controller in hand rather than in a commit, per Greg,
+## 2026-09-14: flipped on. The old flat click-to-swing number is no longer
+## authoritative — a flick now measurably underperforms a committed sweep
+## instead of matching it, which is the entire point O v5 was raised for.
 var momentum_damage := true
 ## What the arm was worth at the moment of contact, kept so the HUD and the
 ## record can read the blow that actually happened rather than the intent.
