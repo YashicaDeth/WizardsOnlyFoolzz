@@ -6,6 +6,10 @@ const MENU_PLATE := preload("res://systems/menu_plate.gd")
 const DECANTING_PROLOGUE := preload("res://systems/decanting_prologue.gd")
 const SPLASH_BACKDROP := preload("res://systems/splash_backdrop.gd")
 
+## Well below anything else so the picture is unambiguously the backdrop and
+## every other canvas in the scene still draws over the 3D as normal.
+const SPLASH_CANVAS_LAYER := -100
+
 var wreck: Node3D
 var front_door: Node3D
 var warning_card: Control
@@ -16,6 +20,7 @@ var menu_plate: Control
 var settings_plate: Control
 var prologue: Control
 var splash: ColorRect
+var splash_layer: CanvasLayer
 var branch_plate: Control
 var graphics_presets := ["ULTRA", "HIGH", "PERFORMANCE"]
 var graphics_index := 0
@@ -77,10 +82,23 @@ func _play_title_sequence() -> void:
 	# it live (see `splash_backdrop.gd`) rather than being a baked seam, so the
 	# thing he called "the blue invertred side attacking the screen" actually
 	# attacks instead of sitting still.
+	# Greg: the backdrop should have "all the 3d fighting landscapes and other
+	# stuff there too". As a HUD child it could not — a CanvasLayer always draws
+	# over the 3D viewport, so his room hid the street, the falling debris and
+	# the bodies completely.
+	#
+	# So the picture stops being an overlay and becomes the 3D *background*.
+	# `Environment.BG_CANVAS` lets a canvas layer be what the 3D world is drawn
+	# against, so the street and everything fighting in it now render on top of
+	# the room instead of being erased by it.
+	splash_layer = CanvasLayer.new()
+	splash_layer.name = "SplashLayer"
+	splash_layer.layer = SPLASH_CANVAS_LAYER
+	add_child(splash_layer)
 	splash = SPLASH_BACKDROP.new()
 	splash.name = "SplashBackdrop"
-	$HUD.add_child(splash)
-	$HUD.move_child(splash, 0)
+	splash_layer.add_child(splash)
+	_use_canvas_background()
 	$HUD/TitleLogo.modulate.a = 0.0
 	$HUD/Presents.modulate.a = 0.0
 	$HUD/Algiz.modulate.a = 0.0
@@ -479,7 +497,19 @@ func _cycle_color_grade() -> void:
 		preset = "ossuary"
 	menu_environment = WorldLook.environment(preset)
 	$WorldEnvironment.environment = menu_environment
+	_use_canvas_background()
 	$HUD/SettingsPanel/VBox/ColorGrade.text = "COLOR: %s" % mode
+
+
+## Points the menu environment at the splash canvas. Called after the backdrop
+## exists and again whenever the environment is swapped, because
+## `WorldLook.environment()` hands back a fresh Environment each time and a new
+## one does not remember that it was supposed to be showing a photograph.
+func _use_canvas_background() -> void:
+	if menu_environment == null:
+		return
+	menu_environment.background_mode = Environment.BG_CANVAS
+	menu_environment.background_canvas_max_layer = SPLASH_CANVAS_LAYER
 
 
 func _open_celloutz() -> void:
@@ -494,6 +524,7 @@ func _build_country_town() -> void:
 	# title shot.
 	menu_environment = WorldLook.environment("front_door")
 	$WorldEnvironment.environment = menu_environment
+	_use_canvas_background()
 
 
 func _build_building(position_value: Vector3, size_value: Vector3, color: Color, sign_text: String) -> void:
