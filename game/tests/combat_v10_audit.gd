@@ -36,8 +36,10 @@ func _ready() -> void:
 
 	# --- O5.1 / O5.2: the weapon sets the ceiling, the player earns it -----
 	# `commitment()` is what combat asks instead of a constant on the weapon.
+	# LimbMomentum is a RefCounted, not a Node -- it is driven directly by
+	# _gesture() below and never belongs in the tree. add_child() on it here
+	# was a parse error, which made this entire audit print nothing at all.
 	var arm: LimbMomentum = MOMENTUM.new()
-	add_child(arm)
 	# A flick: a short, fast gesture. A committed sweep: sustained work.
 	arm.call("reset") if arm.has_method("reset") else null
 	var flick := _gesture(arm, 0.06, 12)
@@ -86,10 +88,14 @@ func _ready() -> void:
 
 
 ## Accumulate work into a limb the way a gesture does, then read what it earned.
+## Drives the arm the way the hunt drives it: `advance()` with an accumulated
+## look delta, exactly as `bone_yard_hunt.gd:1660` does. The previous version
+## called `arm.follow()`, which does not exist on LimbMomentum -- so every
+## gesture measured an arm that had never moved, and the three commitment
+## claims below failed against 0.00 while the same behaviour passes on a real
+## body in arm_wired_test. A test that drives a fake API is not an audit.
 func _gesture(arm: LimbMomentum, reach: float, frames: int) -> float:
 	arm.set("_work", 0.0)
-	var at := Vector3.ZERO
-	for step in frames:
-		at += Vector3(reach, 0.0, 0.0)
-		arm.follow(at, 1.0 / 60.0)
+	for _step in frames:
+		arm.advance(1.0 / 60.0, Vector2(reach, 0.0))
 	return arm.commitment()
