@@ -155,16 +155,45 @@ func _draw() -> void:
 	var entry: Dictionary = CARDS[card]
 	var fade := _card_alpha
 	var left := size.x * 0.18
-	var y := size.y * 0.36
 
+	# Every other surface in this game carries the grain — the HUD, the plates,
+	# the index, the device. These cards were a flat fill, which made the cold
+	# open the one clean screen in a game whose entire look is authored decay:
+	# it read as a different product's title sequence bolted to the front.
+	# Seeded off the card so each is dirty in its own way rather than four
+	# identical frames, and kept under the fade so it arrives with the card.
+	# Scratches only, and deliberately not grain. Grain was tried at 0.05 and
+	# again at 0.16 with more than double the density; both were checked in a
+	# real capture and neither was perceptible against this card's own 050203
+	# ground — the PNG grew by two kilobytes, so the marks were genuinely being
+	# drawn, they simply had no black left to clear. Five hundred draw calls a
+	# frame for something nobody can see is the trade X exists to refuse, so
+	# the grain is not here. The scratches are, because those do read.
+	CellOutzGrunge.scratches(self, Rect2(Vector2.ZERO, size), 4400 + card, 4)
+
+	# The block was anchored at 0.36 of the height and grew downward, so every
+	# card left the bottom two fifths of the frame as dead black and the text
+	# sat neither centred nor cornered — floating high with nothing under it.
+	# Measured and centred on its own height instead, at 0.46 rather than a
+	# true half because a title card centred optically sits slightly high. A
+	# one-line card and a four-line card are now both composed, where before
+	# only the tallest one looked deliberate.
 	var head := str(entry["head"])
+	var sub_text := str(entry["sub"])
+	var block := 0.0
+	if not head.is_empty():
+		block += 44.0
+	if not sub_text.is_empty():
+		block += 44.0
+	block += float((entry["lines"] as Array).size()) * 26.0
+	var y := maxf(0.0, (size.y - block) * 0.46)
+
 	if not head.is_empty():
 		CellOutzType.draw_stamped(self, Vector2(left, y), head, 30.0,
 			ARTERIAL * Color(1, 1, 1, fade), ARTERIAL * Color(1, 1, 1, 0.22 * fade), 3.0)
 		y += 44.0
-	var sub := str(entry["sub"])
-	if not sub.is_empty():
-		CellOutzType.draw_condensed(self, Vector2(left, y), sub, 10.0, BILE * Color(1, 1, 1, 0.8 * fade), 1.6)
+	if not sub_text.is_empty():
+		CellOutzType.draw_condensed(self, Vector2(left, y), sub_text, 10.0, BILE * Color(1, 1, 1, 0.8 * fade), 1.6)
 		y += 20.0
 		draw_line(Vector2(left, y), Vector2(size.x - left, y), ARTERIAL * Color(1, 1, 1, 0.35 * fade), 1.0)
 		y += 24.0
