@@ -26,6 +26,7 @@ WorldHistory="*res://systems/world_history.gd"
 CosmologyFactions="*res://systems/cosmology_factions.gd"
 Interstitial="*res://systems/interstitial.gd"
 PauseGate="*res://systems/pause_gate.gd"
+PerfProbe="*res://systems/perf_probe.gd"
 
 [display]
 
