@@ -41,6 +41,7 @@ const KEYS_CARD := preload("res://systems/keys_card.gd")
 const DAMAGE_PORTRAIT := preload("res://systems/damage_portrait.gd")
 const CAB_RETICLE := preload("res://systems/cab_reticle.gd")
 const BREAKABLE_PROP := preload("res://systems/breakable_prop.gd")
+const OPENING := preload("res://systems/opening_director.gd")
 
 ## The bezel `celloutz_hud.gd` draws for the driver, in its own coordinates, so
 ## the bust lands inside the frame instead of beside it. Kept next to the
@@ -1086,6 +1087,12 @@ func _finish_round(result: String) -> void:
 	result_countdown = 5.0
 	respawn_queue.clear()
 	WorldHistory.record_event("derby_round_%s" % result, {"venue": "rift_derby_quarry", "score": score, "disabled": disabled_count, "integrity": integrity})
+	# The opening ledger used to stop at `entered_pit` even after the player won
+	# the pit. This is the authored hinge the demo route reads: only a real win
+	# advances it, while a wreck still leads to the existing dragged-out failure
+	# state instead of pretending the player earned the road.
+	if result == "won":
+		OPENING.advance("won_derby")
 
 
 func _add_authored_environment_collision(root_node: Node) -> void:

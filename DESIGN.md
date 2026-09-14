@@ -1,5 +1,7 @@
 # Living design notes
 
+15 September implementation note: the requested demo is now a runtime route in the same build, entered from a dedicated DEMO door beside PLAY. It uses the production opening scenes and an isolated demo history file; this is implementation of the explicit direction already recorded in section P, not a new creative-direction decision. The curated route and authored ending remain in progress.
+
 11 September implementation note: user requests a redo of the production opening prompt. Prior feature lists are prototype descriptions, not proof of production completion. The player-controlled first/third-person camera choice supersedes the older forced-camera text below. Current artwork key is J; A remains movement. Detailed organs, authored rigs, navigation, production assets and completed encounter branches remain pending.
 
 Status: early concept, not a locked game bible. Compiled from Greg's shared conversation and this task. Do not silently promote an assistant's suggestions into requirements.

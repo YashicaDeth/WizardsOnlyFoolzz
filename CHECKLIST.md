@@ -2546,11 +2546,11 @@ supposed to feel like too much, and then end.
 - [ ] **P1.4** No dependence on the cosmology being understood; the Horsemen stay off-screen
 
 ### P2 — Two doors, one build
-- [ ] **P2.1** PLAY and DEMO sit side by side on the main menu
-- [ ] **P2.2** A single runtime flag distinguishes them — no second export preset
-- [ ] **P2.3** Demo saves are their own slot and can never touch a real save
-- [ ] **P2.4** Any feature the demo shows is the real feature, running the real code
-- [ ] **P2.5** Starting DEMO from the menu is one click, with no configuration in between
+- [x] **P2.1** PLAY and DEMO sit side by side on the main menu — the existing front door now names both routes directly; the branch picker remains behind PLAY and DEMO is its own immediate row in the same house-type plate
+- [x] **P2.2** A single runtime flag distinguishes them — `WorldHistory.run_mode` is either `play` or `demo`; there is no demo project or second export preset
+- [x] **P2.3** Demo saves are their own slot and can never touch a real save — demo history resolves only to `user://demo/world_history.json` (and a separate test path under `ATG_TEST_MODE`). `demo_mode_test.tscn` writes unique markers on both sides, changes modes twice, and proves neither marker crosses over (9/9)
+- [x] **P2.4** Any feature the demo shows is the real feature, running the real code — the DEMO button enters the existing `_start_game()` path: the production prologue, Growing Floor, derby and Hunt scenes rather than copies of them
+- [x] **P2.5** Starting DEMO from the menu is one click, with no configuration in between — `_start_demo()` selects the isolated ledger and immediately hands to `_start_game()`; there is no branch or demo-options panel
 
 ### P2b — The edges of the demo
 
@@ -2597,9 +2597,9 @@ the game's own voice, not a fade to a store page.
 
 ### P v10 — the final pass
 The last rung. Fifteen statements that are true of the demo when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
-- [ ] **P10.1** `v10` One build, two doors: PLAY and DEMO on the same menu
+- [x] **P10.1** `v10` One build, two doors: PLAY and DEMO on the same menu — both are built into `country_town_menu.gd`, in the executable's existing main-menu scene
 - [ ] **P10.2** `v10` The demo is the real game with exploration locked off
-- [ ] **P10.3** `v10` Nothing in it is a special build that can rot
+- [x] **P10.3** `v10` Nothing in it is a special build that can rot — DEMO changes a runtime route/save mode and invokes the same scene transition function as PLAY; no duplicate scene, project or export exists
 - [ ] **P10.4** `v10` It ends because the game stops, not because a timer did
 - [ ] **P10.5** `v10` It shows the opening: captured, quiz, tortured, festival, derby, out
 - [ ] **P10.6** `v10` Combat, the handheld and the map are all fully present

@@ -50,5 +50,10 @@ func _ready() -> void:
 			celloutz_index = index
 	check(celloutz_index == debt_index + 1, "the reframe lands as the very next beat after the debt line, not buried elsewhere")
 
+	OpeningDirector.advance("entered_pit")
+	check(str(OpeningDirector.resume_destination().scene) == "res://rift_derby.tscn", "an unfinished heat resumes at the real derby")
+	OpeningDirector.advance("won_derby")
+	check(str(OpeningDirector.resume_destination().scene) == "res://bone_yard_hunt.tscn", "a won heat resumes beyond the derby instead of replaying it")
+
 	print("OPENING_DIRECTION_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

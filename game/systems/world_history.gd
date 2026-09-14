@@ -7,7 +7,12 @@ signal event_recorded(event: Dictionary)
 signal subject_changed(subject_id: String, subject: Dictionary)
 
 const SAVE_PATH := "user://world_history.json"
+const DEMO_SAVE_PATH := "user://demo/world_history.json"
+const TEST_DEMO_SAVE_PATH := "user://test_demo/world_history.json"
 const MAX_EVENTS := 500
+
+const RUN_MODE_PLAY := "play"
+const RUN_MODE_DEMO := "demo"
 
 ## AG5.11. Several worlds, not one. `SAVE_PATH` above is the save this file has
 ## always written — a scene opened directly in the editor, or any of this
@@ -21,6 +26,10 @@ const TEST_SAVES_DIR := "user://test_saves"
 
 var active_slot_id := ""
 var slot_manifest: Array[Dictionary] = []
+## P2.2. One runtime distinction, kept out of the saved world itself. The demo
+## runs every real system and scene; this flag only chooses its route edges and
+## the file those systems write to.
+var run_mode := RUN_MODE_PLAY
 
 var events: Array[Dictionary] = []
 var next_sequence := 1
@@ -479,6 +488,7 @@ func clear_history() -> void:
 	subjects.clear()
 	next_sequence = 1
 	active_slot_id = ""
+	run_mode = RUN_MODE_PLAY
 	slot_manifest.clear()
 	if OS.get_environment("ATG_TEST_MODE") == "1":
 		# Every test in the project calls this first. Wiping the sandboxed test
@@ -487,6 +497,50 @@ func clear_history() -> void:
 		# outliving the test that wrote them.
 		_wipe_test_saves()
 	_save_history()
+
+
+## P2.2/P2.3. Enter the demo's one dedicated world without touching the legacy
+## save, a named play slot, or the quantum-branch files. Returning to DEMO
+## resumes this file; its route is curated, but its state is ordinary
+## WorldHistory state produced by the ordinary game scenes.
+func begin_demo() -> void:
+	_reset_memory()
+	run_mode = RUN_MODE_DEMO
+	active_slot_id = ""
+	_load_history()
+	if run_salt == 0:
+		run_salt = randi() | 1
+		world_minute = 16.5 * 60.0
+		chaos_magick_at_minute = world_minute
+	CellOutzGrunge.remember_run(run_salt)
+	record_event("demo_session_started", {"stage": str(subject("opening_run").get("stage", "none"))})
+
+
+## Put the ledger back on the full-game side before a PLAY branch is selected.
+## `load_legacy` is false when another save mechanism is about to restore a
+## complete snapshot over this memory.
+func enter_play_mode(load_legacy: bool = true) -> void:
+	_reset_memory()
+	run_mode = RUN_MODE_PLAY
+	active_slot_id = ""
+	if load_legacy:
+		_load_history()
+	CellOutzGrunge.remember_run(run_salt)
+
+
+func is_demo() -> bool:
+	return run_mode == RUN_MODE_DEMO
+
+
+func _reset_memory() -> void:
+	events.clear()
+	subjects.clear()
+	next_sequence = 1
+	run_salt = 0
+	world_minute = 16.5 * 60.0
+	flags.clear()
+	chaos_magick_level = 0.0
+	chaos_magick_at_minute = world_minute
 
 
 ## A complete, portable copy of the world state. Quantum save slots use this
@@ -555,6 +609,7 @@ func list_slots() -> Array[Dictionary]:
 ## Resets the in-memory world and gives it its own file and manifest row.
 ## Nothing about an existing slot moves or is touched.
 func create_slot(label: String = "") -> String:
+	run_mode = RUN_MODE_PLAY
 	_load_manifest()
 	var id := "slot_%d" % Time.get_unix_time_from_system()
 	while _find_slot(id) != -1:
@@ -585,6 +640,7 @@ func create_slot(label: String = "") -> String:
 ## history — the point of a slot at all is that loading one never leaks into
 ## another.
 func load_slot(id: String) -> bool:
+	run_mode = RUN_MODE_PLAY
 	_load_manifest()
 	var index := _find_slot(id)
 	if index == -1:
@@ -631,6 +687,8 @@ func _saves_dir() -> String:
 
 
 func _current_path() -> String:
+	if run_mode == RUN_MODE_DEMO:
+		return TEST_DEMO_SAVE_PATH if OS.get_environment("ATG_TEST_MODE") == "1" else DEMO_SAVE_PATH
 	if active_slot_id == "":
 		return SAVE_PATH
 	return "%s/%s.json" % [_saves_dir(), active_slot_id]
@@ -687,15 +745,17 @@ func _save_manifest() -> void:
 func _wipe_test_saves() -> void:
 	var absolute := ProjectSettings.globalize_path(TEST_SAVES_DIR)
 	var dir := DirAccess.open(absolute)
-	if dir == null:
-		return
-	dir.list_dir_begin()
-	var entry := dir.get_next()
-	while entry != "":
-		if not dir.current_is_dir():
-			dir.remove(entry)
-		entry = dir.get_next()
-	dir.list_dir_end()
+	if dir != null:
+		dir.list_dir_begin()
+		var entry := dir.get_next()
+		while entry != "":
+			if not dir.current_is_dir():
+				dir.remove(entry)
+			entry = dir.get_next()
+		dir.list_dir_end()
+	var demo_path := ProjectSettings.globalize_path(TEST_DEMO_SAVE_PATH)
+	if FileAccess.file_exists(TEST_DEMO_SAVE_PATH):
+		DirAccess.remove_absolute(demo_path)
 
 
 func _load_history() -> void:
@@ -736,9 +796,11 @@ func _save_history() -> void:
 	# A slot path under test mode is `TEST_SAVES_DIR`, a sandbox `clear_history()`
 	# wipes on every test's own setup — writing there is exactly what lets
 	# `save_slots_test.gd` verify a slot round-trips for real.
-	if OS.get_environment("ATG_TEST_MODE") == "1" and active_slot_id == "":
+	if OS.get_environment("ATG_TEST_MODE") == "1" and active_slot_id == "" and run_mode == RUN_MODE_PLAY:
 		return
-	var file := FileAccess.open(_current_path(), FileAccess.WRITE)
+	var path := _current_path()
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path).get_base_dir())
+	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		return
 	file.store_string(JSON.stringify({

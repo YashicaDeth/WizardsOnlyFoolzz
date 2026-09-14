@@ -204,15 +204,27 @@ func _play_title_sequence() -> void:
 ## everything below it moves down by exactly one row height.
 func _build_run_doors() -> void:
 	var play: Button = $HUD/Play
+	play.text = "PLAY // SURVIVING WORLDS"
 	var row: float = play.offset_bottom - play.offset_top + 8.0
 	for button: Button in [$HUD/Settings, $HUD/Quit, $HUD/CellOutzSite]:
-		button.offset_top += row * 2.0
-		button.offset_bottom += row * 2.0
+		button.offset_top += row * 3.0
+		button.offset_bottom += row * 3.0
+	var demo := play.duplicate(0) as Button
+	demo.name = "Demo"
+	demo.text = "DEMO // THE BEST HALF HOUR"
+	demo.offset_top = play.offset_top + row
+	demo.offset_bottom = play.offset_bottom + row
+	demo.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	$HUD.add_child(demo)
+	demo.pressed.connect(_start_demo)
+	demo.mouse_entered.connect(_focus_button.bind(demo))
+	demo.mouse_exited.connect(_unfocus_button.bind(demo))
+	menu_buttons.append(demo)
 	var new_game := play.duplicate(0) as Button
 	new_game.name = "NewGame"
 	new_game.text = "NEW GAME  //  SPLIT THE WORLD"
-	new_game.offset_top = play.offset_top + row
-	new_game.offset_bottom = play.offset_bottom + row
+	new_game.offset_top = play.offset_top + row * 2.0
+	new_game.offset_bottom = play.offset_bottom + row * 2.0
 	new_game.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	$HUD.add_child(new_game)
 	new_game.pressed.connect(_open_new_game)
@@ -225,8 +237,8 @@ func _build_run_doors() -> void:
 	var sandbox := play.duplicate(0) as Button
 	sandbox.name = "Sandbox"
 	sandbox.text = "GORE SANDBOX"
-	sandbox.offset_top = play.offset_top + row * 2.0
-	sandbox.offset_bottom = play.offset_bottom + row * 2.0
+	sandbox.offset_top = play.offset_top + row * 3.0
+	sandbox.offset_bottom = play.offset_bottom + row * 3.0
 	sandbox.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	$HUD.add_child(sandbox)
 	sandbox.pressed.connect(_open_gore_sandbox)
@@ -271,11 +283,22 @@ func _build_branch_panel() -> void:
 
 
 func _open_continue_runs() -> void:
+	WorldHistory.enter_play_mode()
 	_open_branch_picker(false)
 
 
 func _open_new_game() -> void:
+	WorldHistory.enter_play_mode()
 	_open_branch_picker(true)
+
+
+## P2.5. No slot picker and no configuration fork: DEMO selects its isolated
+## ledger and enters the same `_start_game()` used by PLAY.
+func _start_demo() -> void:
+	if menu_departing:
+		return
+	WorldHistory.begin_demo()
+	_start_game()
 
 
 func _open_branch_picker(creating: bool) -> void:
@@ -424,10 +447,15 @@ func _start_game() -> void:
 	if not _prepare_menu_departure():
 		return
 	# A run that has not begun starts on the Growing Floor; one already under way
-	# resumes at the pit rather than replaying the decanting.
+	# resumes at the stage it actually earned rather than replaying decanting or
+	# being sent back into a derby it has already won.
 	var opening := preload("res://systems/opening_director.gd")
+	var destination: Dictionary = opening.resume_destination()
+	if opening.reached("won_derby"):
+		_travel_from_menu(str(destination.scene), str(destination.caption))
+		return
 	if opening.reached("entered_pit"):
-		_travel_from_menu("res://rift_derby.tscn", "the bone yard // heat one")
+		_travel_from_menu(str(destination.scene), str(destination.caption))
 		return
 	# Greg: *"the starting cutscne needs to be lore accurate then have the part
 	# where you can fully character customise"*. The second half was already

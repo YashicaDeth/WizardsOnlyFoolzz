@@ -29,6 +29,16 @@ static func reached(target: String) -> bool:
 	return target_index >= 0 and stage_index() >= target_index
 
 
+## The front door asks the route where this world resumes. Keeping the stage
+## mapping here prevents PLAY and DEMO from growing separate scene ladders.
+static func resume_destination() -> Dictionary:
+	if reached("won_derby"):
+		return {"scene": "res://bone_yard_hunt.tscn", "caption": "walking out into the ashbloom expanse"}
+	if reached("entered_pit"):
+		return {"scene": "res://rift_derby.tscn", "caption": "the bone yard // heat one"}
+	return {"scene": "res://vat_chamber.tscn", "caption": "the growing floor // decanting"}
+
+
 static func advance(target: String) -> void:
 	var target_index := STAGES.find(target)
 	if target_index < 0 or target_index <= stage_index():
