@@ -55,6 +55,14 @@ const MAX_CHUNKS := 90
 ## corner of the world is meant to read as a body forgetting nobody found it.
 const ROT_SECONDS := 240.0
 
+## O2.9. How the layer voices of a single burst sit against each other. Each
+## step shallower than the deepest layer reached is this much quieter, and each
+## layer starts this much later than the one above it. The stagger is the half
+## of it that matters: five transients on one frame is a wall, and the same five
+## spread over ~50ms is a shot passing through a body.
+const STACK_FALLOFF := 0.62
+const STACK_STAGGER := 0.012
+
 static var live: Array[Node3D] = []
 
 
@@ -139,9 +147,26 @@ static func burst(host: Node3D, origin: Vector3, heading: Vector3, info: Diction
 			layer_produced += 1
 		# One impact voice per layer actually reached, not per piece - a burst
 		# through three layers sounds like three distinct events, not a hail.
+		#
+		# O2.9. That comment described an intention the code did not implement.
+		# Every layer voice started on the *same frame* at the *same position*,
+		# so a rifle round reaching the organ layer fired five generator voices
+		# at once whose gains summed to 3.05 linear - about +10dB over a single
+		# hit, straight into the Gore bus with no limiter on it. That, and not
+		# the camera, is what "loud" was. They are staggered and weighted now so
+		# the burst actually is a sequence: quiet entry ticks building to the
+		# deepest layer, which is the one worth hearing.
 		if layer_produced > 0:
-			play_impact(host, origin, layer)
+			play_impact(host, origin, layer, stack_level(layer, depth), float(layer) * STACK_STAGGER)
 	return produced
+
+
+## How loud a layer's voice is within a single burst. The deepest layer reached
+## is the event - a bone cracking or an organ going - and everything shallower
+## is the bullet on its way there, so loudness *rises* with depth rather than
+## falling off in spawn order.
+static func stack_level(layer: int, depth: int) -> float:
+	return pow(STACK_FALLOFF, float(maxi(depth - layer, 0)))
 
 
 static func _make_chunk(layer: int, zone: String, subject_id: String, info: Dictionary, rng: RandomNumberGenerator) -> RigidBody3D:
@@ -418,13 +443,27 @@ static func impact_sample(profile: Dictionary, t: float, noise: float) -> float:
 ## A short procedural burst rather than a sample library - nothing shipped yet
 ## has recorded audio, and a synthesised voice per layer is honest about that
 ## rather than silent. G5 replaces this with authored, positional audio later.
-static func play_impact(host: Node3D, at: Vector3, layer: int) -> void:
+##
+## `level` scales the voice against the rest of its burst and `delay` holds it
+## back so a penetrating hit arrives as a sequence rather than a wall — see
+## `stack_level()`. Both default to the single-voice case, so a caller that just
+## wants one impact sound is unchanged.
+static func play_impact(host: Node3D, at: Vector3, layer: int, level := 1.0, delay := 0.0) -> void:
 	if host == null or not is_instance_valid(host) or not host.is_inside_tree():
+		return
+	if delay > 0.0:
+		# Deliberately a time-scaled timer: under the sandbox's held slow motion
+		# the layers should spread out with everything else. It is only ever a
+		# few tens of milliseconds of real time either way.
+		host.get_tree().create_timer(delay).timeout.connect(
+			func() -> void: play_impact(host, at, layer, level, 0.0)
+		)
 		return
 	var scene := host.get_tree().current_scene
 	if scene == null:
 		return
 	var profile := impact_profile(layer)
+	profile["gain"] = float(profile.get("gain", 0.5)) * maxf(level, 0.0)
 	var player := AudioStreamPlayer3D.new()
 	var generator := AudioStreamGenerator.new()
 	generator.mix_rate = 22050.0

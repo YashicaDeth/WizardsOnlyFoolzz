@@ -70,6 +70,136 @@ func _ready() -> void:
 	while feel.holding():
 		await get_tree().process_frame
 
+	# ------------------------------------------------------------------ O2.9
+	# "Loud aggressive screen shake without feeling satisfying." Each of these
+	# asserts one of the four things that made it read as noise.
+
+	print("")
+	print("O2.9 - punch instead of noise")
+
+	# 1. Random roll on every contact was the single most disorienting channel.
+	# An ordinary hit must now leave the horizon alone entirely.
+	feel.roll = 0.0
+	feel.kick = Vector2.ZERO
+	feel.strike(0.5, "ballistic", false)
+	_check(is_equal_approx(feel.roll, 0.0), "a routine shot does not roll the horizon at all (%.5f)" % feel.roll)
+	while feel.holding():
+		await get_tree().process_frame
+	feel.roll = 0.0
+	feel.strike(1.0, "cut", true)
+	_check(absf(feel.roll) > 0.0, "but a severing blow still wrenches the view (%.5f)" % feel.roll)
+	while feel.holding():
+		await get_tree().process_frame
+
+	# 2. Directionality beats randomness: a caller that says where the hit came
+	# from gets a camera pushed away from it, and the sign is not a coin flip.
+	feel.kick = Vector2.ZERO
+	feel.strike(0.8, "cut", false, [], Vector2.RIGHT)
+	var pushed_left: float = feel.kick.x
+	while feel.holding():
+		await get_tree().process_frame
+	feel.kick = Vector2.ZERO
+	feel.strike(0.8, "cut", false, [], Vector2.LEFT)
+	var pushed_right: float = feel.kick.x
+	_check(pushed_left < 0.0 and pushed_right > 0.0, "the camera is thrown away from what was hit (%.4f vs %.4f)" % [pushed_left, pushed_right])
+	while feel.holding():
+		await get_tree().process_frame
+
+	# 3. Headroom. The sandbox passes the same mid severity on every rifle shot;
+	# if that already sits near the ceiling a sever has nowhere left to go.
+	feel.kick = Vector2.ZERO
+	feel.strike(0.7, "ballistic", false)
+	var routine_kick: float = feel.kick.length()
+	var routine_shake: float = feel.shake
+	while feel.holding():
+		await get_tree().process_frame
+	feel.kick = Vector2.ZERO
+	feel.shake = 0.0
+	feel.strike(1.0, "cut", true)
+	var sever_kick: float = feel.kick.length()
+	var sever_shake: float = feel.shake
+	_check(sever_kick > routine_kick * 1.8, "a sever kicks far past a routine shot (%.4f vs %.4f)" % [sever_kick, routine_kick])
+	_check(sever_shake > routine_shake * 2.0, "and shakes far past it too (%.3f vs %.3f)" % [sever_shake, routine_shake])
+	_check(routine_kick < ImpactFeel.KICK_CEILING * 0.5, "while the routine shot leaves half the range unspent (%.4f)" % routine_kick)
+	while feel.holding():
+		await get_tree().process_frame
+
+	# 4. The kick is a spring, not a slide. v3's comment claimed it settled past
+	# centre and its `lerp` mathematically could not. Punch is the counter-swing.
+	feel.kick = Vector2.ZERO
+	feel.shake = 0.0
+	feel.strike(0.9, "cut", false)
+	_check(feel.kick.y < 0.0, "the blow throws the view up first")
+	var crossed := false
+	var spring_waited := 0.0
+	while spring_waited < 0.6:
+		await get_tree().process_frame
+		spring_waited += get_process_delta_time()
+		if feel.kick.y > 0.0:
+			crossed = true
+			break
+	_check(crossed, "and the camera snaps back through centre rather than sliding home (%.3fs)" % spring_waited)
+	_check(spring_waited < 0.3, "within a snap, not a wallow (%.3fs)" % spring_waited)
+
+	# 5. The shake is a trace, not static. Two reads of the same state used to
+	# differ because `camera_offset()` called `randf` twice per frame, which is
+	# a signal fault to look at, not a camera being hit.
+	feel.kick = Vector2.ZERO
+	feel.shake = 0.0
+	feel.strike(1.0, "blunt", false)
+	var first_read: Vector2 = feel.camera_offset()
+	var second_read: Vector2 = feel.camera_offset()
+	_check(first_read.is_equal_approx(second_read), "the shake is a continuous trace, not per-frame noise")
+	_check(not first_read.is_equal_approx(feel.kick), "and it is genuinely moving the camera")
+
+	# 6. And it is a transient. A routine shot's shake used to outlast its kick.
+	feel.shake = 0.0
+	feel.kick = Vector2.ZERO
+	feel.strike(0.7, "ballistic", false)
+	var shot_ring := 0.0
+	while feel.shake > 0.0 and shot_ring < 1.0:
+		await get_tree().process_frame
+		shot_ring += get_process_delta_time()
+	feel.strike(1.0, "cut", true)
+	var sever_ring := 0.0
+	while feel.shake > 0.0 and sever_ring < 1.0:
+		await get_tree().process_frame
+		sever_ring += get_process_delta_time()
+	_check(shot_ring < 0.12, "a shot's shake is a flick, not a hum (%.3fs)" % shot_ring)
+	_check(sever_ring > shot_ring * 1.5, "and a sever rings for meaningfully longer (%.3fs)" % sever_ring)
+	while feel.holding():
+		await get_tree().process_frame
+
+	# 7. Sustained fire must not walk the view into the sky. v3's `kick +=` had
+	# no ceiling at all.
+	feel.kick = Vector2.ZERO
+	for _shot in 40:
+		feel.strike(0.8, "ballistic", false)
+	_check(feel.kick.length() <= ImpactFeel.KICK_CEILING + 0.0001, "forty rounds cannot stack the camera past its ceiling (%.4f)" % feel.kick.length())
+	while feel.holding():
+		await get_tree().process_frame
+
+	# 8. The ballistic stop cut is for routine hits. A limb leaving the body is
+	# the heaviest thing the game does whatever took it off.
+	feel.strike(1.0, "ballistic", true)
+	var ballistic_sever_hold := 0.0
+	while feel.holding() and ballistic_sever_hold < 1.0:
+		await get_tree().process_frame
+		ballistic_sever_hold += get_process_delta_time()
+	_check(ballistic_sever_hold > 0.1, "a limb shot off still earns the full stop (%.3fs)" % ballistic_sever_hold)
+
+	# 9. The other half of "loud": five gore voices on one frame at one point.
+	var deepest: float = GoreChunks.stack_level(GoreChunks.Layer.ORGAN, GoreChunks.Layer.ORGAN)
+	var entry: float = GoreChunks.stack_level(GoreChunks.Layer.SKIN, GoreChunks.Layer.ORGAN)
+	_check(is_equal_approx(deepest, 1.0), "the deepest layer a hit reached is the voice that plays at full")
+	_check(entry < deepest * 0.25, "and the layers it passed through on the way are only ticks (%.3f)" % entry)
+	var stacked := 0.0
+	for layer in range(0, GoreChunks.Layer.ORGAN + 1):
+		stacked += float(GoreChunks.impact_profile(layer)["gain"]) * GoreChunks.stack_level(layer, GoreChunks.Layer.ORGAN)
+	_check(stacked < 1.6, "a rifle round through to the organ layer no longer sums past clipping (%.2f linear)" % stacked)
+	var single: float = float(GoreChunks.impact_profile(GoreChunks.Layer.ORGAN)["gain"])
+	_check(stacked > single, "without flattening it into a single sound either")
+
 	# O2.3. A miss moves the camera but never stops time — the absence is the
 	# feedback.
 	feel.kick = Vector2.ZERO

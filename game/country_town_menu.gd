@@ -555,24 +555,36 @@ func _toggle_effects() -> void:
 
 
 func _cycle_graphics() -> void:
+	# Greg: "the FPS is about thirteen" fullscreen in the sandbox, and "the
+	# settings look completely different when you enter Gore Sandbox or main
+	# game". Both came from here. This only ever set `menu_environment.glow`,
+	# so PERFORMANCE changed nothing that costs frames and changed nothing at
+	# all outside this one screen — every other scene rebuilt its Environment
+	# from scratch with volumetric fog and SSAO back on.
+	#
+	# Quality is now a single global on `WorldLook`, which every scene passes
+	# through, so the setting reaches the Hunt, the derby, the vat and the
+	# sandbox alike and the three of them stop disagreeing.
 	graphics_index = (graphics_index + 1) % graphics_presets.size()
 	var preset: String = graphics_presets[graphics_index]
+	WorldLook.set_quality_name(preset)
 	match preset:
 		"ULTRA":
 			get_viewport().scaling_3d_scale = 1.0
 			get_viewport().msaa_3d = Viewport.MSAA_4X
 			get_viewport().use_taa = true
-			menu_environment.glow_enabled = true
 		"HIGH":
 			get_viewport().scaling_3d_scale = 0.9
 			get_viewport().msaa_3d = Viewport.MSAA_2X
 			get_viewport().use_taa = true
-			menu_environment.glow_enabled = true
 		_:
 			get_viewport().scaling_3d_scale = 0.75
 			get_viewport().msaa_3d = Viewport.MSAA_DISABLED
 			get_viewport().use_taa = false
-			menu_environment.glow_enabled = false
+	# Re-tune the live Environment too, so the change is visible on this screen
+	# immediately rather than only after the next scene load.
+	if menu_environment != null:
+		WorldLook.apply_quality(menu_environment, WorldLook.PRESETS.get("front_door", {}))
 	$HUD/SettingsPanel/VBox/Graphics.text = "GRAPHICS: %s" % preset
 
 

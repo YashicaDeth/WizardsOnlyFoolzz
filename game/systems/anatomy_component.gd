@@ -97,6 +97,31 @@ var pain := 0.0
 var consciousness := 100.0
 var dead := false
 var downed := false
+## B8.1. The only thing that makes the player's body exceptional (B10.15).
+##
+## Not a second health pool, not a damage multiplier, not a separate player
+## rig — this body takes every wound through exactly the same anatomy as the
+## one lying in the road, and gets the same organs ruptured and the same limbs
+## taken off. What is different is one thing: death does not take. AP2.1, "the
+## spirit cannot be banished by violence."
+var undying := false
+## B8.2. What is left when a body fails but its spirit does not.
+##
+## `dead` is the end of a subject. `failed` is a body that has run out — every
+## reason it should be `dead` has happened — attached to a spirit that will not
+## go with it. Nothing recovers from this on its own; `rise()` is the only way
+## out, and it costs.
+var failed := false
+## Every time this body has run out, and what did it. The record is the point:
+## an undying body that forgets is a checkpoint, and one that remembers is a
+## character (B10.2 — what carries over is scars, not statistics).
+var failures: Array[Dictionary] = []
+## B8.1's "visibly". How much of the body has been given up to keep standing,
+## 0..1. Rises with every failure and never falls. Drives `UndyingFlame`, so
+## surviving what would kill anybody else is legible as the spirit showing
+## through more and the body mattering less — on the body, in the frame, rather
+## than in a counter somewhere.
+var spirit_burden := 0.0
 var critical := false
 var zones: Dictionary = {}
 var organs: Dictionary = {}

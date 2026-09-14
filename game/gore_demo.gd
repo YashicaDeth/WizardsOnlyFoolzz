@@ -21,14 +21,21 @@ extends Node3D
 ## Five things had to be true before any of that was playable, and none of them
 ## were. Each one failed silently, which is why the scene looked finished:
 ##
-## 1. **Bullets went through everybody.** `Ballistics` traces its rounds with
+## 1. **Bullets went through everybody.** `Ballistics` traced its rounds with
 ##	  `collide_with_areas = false`, and every hitbox on a `BaselineHuman` is an
-##	  `Area3D`. Rounds passed through a body and stopped on the wall behind it,
-##	  and the old code then went looking for somebody within 1.4m of that wall.
-##	  Damage is resolved by its own trace on the frame the trigger goes down now
-##	  — which is exactly what the Hunt does (`_trace_actor` in
-##	  `bone_yard_hunt.gd`) and for the same reason — while the visible round
-##	  still flies for the tracer, the hole and the brass.
+##	  `Area3D`, so a round passed through a body and stopped on the wall behind
+##	  it. The workaround was an instant hitscan resolved on the frame the trigger
+##	  went down, with the visible round fired alongside it and explicitly marked
+##	  cosmetic. Greg, on that: *"the guns dont have bullets that come out hit the
+##	  models and destroy there bodys bullet by bullet"* — which is exactly right,
+##	  because the thing you could see was not the thing that did the damage.
+##
+##	  AF1.1 fixed the trace (`_step_rounds` asks for areas now), so the
+##	  workaround has no reason to exist. One round leaves the barrel, travels,
+##	  and the anatomy is opened in `_on_round_hit()` at the moment that round
+##	  actually arrives — the same contract `bone_yard_hunt.gd` runs on. Nothing
+##	  here resolves damage at the trigger; the trigger only spends a round,
+##	  throws the brass and kicks the gun.
 ## 2. **The X-ray was a call to nothing.** It asked the rig for `set_xray()`,
 ##	  which does not exist, behind a `has_method` guard that swallowed it. It is
 ##	  `reveal_organs()` for the organs and bones, and `see_through()` so they
@@ -58,6 +65,7 @@ const SUBSTANCES := preload("res://systems/substances.gd")
 const SUBSTANCE_EXPERIENCE := preload("res://systems/substance_experience.gd")
 const SMOKEABLES := preload("res://systems/smokeables.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
+const HELD_GEAR := preload("res://systems/held_gear.gd")
 
 const BODY_COUNT := 7
 const ARENA := 26.0
@@ -87,6 +95,43 @@ const SLOW_SCALE := 0.14
 const TRACE_RANGE := 90.0
 const SANDBOX_SUBJECT := "sandbox_player"
 
+## What the sandbox is holding, named once. `HeldGear` builds the model and the
+## grip, `Ballistics` fires the round: the model and the calibre come from the
+## same three lines so the thing in your hands cannot drift away from the thing
+## that leaves it. The pairing is the Hunt's own (`sidearm` / `pistol`), not a
+## sandbox-only weapon that would then be the only one nobody balances.
+const SHOT_WEAPON := "sidearm"
+const SHOT_GRIP := "pistol"
+const SHOT_CALIBRE := "pistol"
+## What a round of `SHOT_CALIBRE` does when it arrives carrying everything it
+## left with. Scaled by what it has actually still got — see `_on_round_hit()` —
+## so a round that has spent itself crossing the room lands lighter, which is
+## the whole reason the energy is carried on the round at all.
+const SHOT_DAMAGE := 46.0
+const SHOT_IMPULSE := 30.0
+## Rounds are only this scene's to resolve if they say so. `Ballistics` is a
+## shared system and the Hunt fires through one too; a handler that resolved
+## anything arriving anywhere would eventually resolve somebody else's shot.
+const SHOT_SOURCE := "gore_demo"
+
+## The streak. A 9mm crosses this room in about a frame and a half, and the
+## mesh `Ballistics` gives each round is a 16cm box — correct, and never
+## rendered anywhere a player is looking, which reads as "no bullet came out".
+## This draws the ground the round actually covered between one physics frame
+## and the next, so what you see is the round's real path rather than a
+## decoration fired alongside it. Short-lived on purpose: past about a fifth of
+## a second a tracer stops reading as speed and starts reading as a laser.
+const TRACER_LIFE := 0.16
+const TRACER_WIDTH := 0.028
+const MAX_TRACERS := 48
+## How long the flash at the barrel lasts, in real seconds. A muzzle flash is
+## one or two frames of light; anything longer is a torch.
+const FLASH_LIFE := 0.045
+## How far the gun is driven back into the frame by its own recoil, and how
+## fast it comes back.
+const GEAR_RECOIL := 0.055
+const GEAR_RETURN := 9.0
+
 var camera: Camera3D
 var bodies: Array = []
 var ballistics: Node3D
@@ -113,6 +158,27 @@ var last_note := ""
 var note_life := 0.0
 
 
+## The gun you are actually holding. `HeldGear` is the project's weapon
+## presentation — swept geometry, real hands, a grip table — and it is a plain
+## `Node3D` that poses itself, so the sandbox mounts one on the camera rather
+## than growing a second viewmodel system of its own. What it cannot borrow from
+## the Hunt is `hunter_arsenal._build_weapon_model()`, which exists to cancel the
+## first-person *arm* pose; there is no player rig in this room to cancel.
+var view_gear: HeldGear
+var muzzle_point: Node3D
+var _flash_light: OmniLight3D
+var _flash_cone: MeshInstance3D
+var _flash_life := 0.0
+var _gear_rest := Vector3.ZERO
+var _gear_recoil := 0.0
+## One serial per trigger pull, so a round can be recognised as this scene's own
+## when it eventually arrives, and so the streak drawn for it knows which round
+## it belongs to.
+var _shot_serial := 0
+## Where each of this scene's rounds in flight was last seen, by serial.
+var _seen: Dictionary = {}
+var _tracers: Array = []
+
 var station: Node3D
 var carried_substances: Array[Dictionary] = []
 var handheld: HandheldDevice
@@ -134,6 +200,10 @@ func _ready() -> void:
 	add_child(impact_feel)
 	ballistics = BALLISTICS.new()
 	add_child(ballistics)
+	# The whole of the fix. A round decides what it did when it gets there.
+	ballistics.round_hit.connect(_on_round_hit)
+	ballistics.round_expired.connect(_on_round_expired)
+	_build_view_gear()
 	# AU3.5. The same station the shed and the Hunt Grounds drop - the sandbox
 	# does not get its own layout, because a sandbox-only list is a list that
 	# falls behind the game within a week.
@@ -258,6 +328,9 @@ func _reset() -> void:
 			holder.queue_free()
 	bodies.clear()
 	GoreChunks.clear()
+	for index in range(_tracers.size() - 1, -1, -1):
+		_retire_tracer(index)
+	_seen.clear()
 	if ballistics != null:
 		ballistics.clear()
 	BaselineHuman.clear_gore()
@@ -367,30 +440,333 @@ func _blast_light(at: Vector3, force: float) -> void:
 		(chunk as RigidBody3D).apply_central_impulse(lift * (1.0 - distance / reach) * force * 0.16)
 
 
+## The trigger, and nothing but the trigger. One real round leaves the barrel
+## carrying the mark that says whose it is; the brass comes off it; the gun goes
+## back into the frame and the sight climbs. No anatomy is touched here, because
+## the round has not arrived anywhere yet — that is the entire point.
 func _fire() -> void:
 	var along := -camera.global_transform.basis.z
-	var muzzle := camera.global_position + along * 0.6
-	# The round you can see, and the brass on the floor afterwards. Cosmetic
-	# only: it is traced with `collide_with_areas = false` and will pass
-	# straight through the body this shot is about to resolve against.
-	ballistics.fire(muzzle, along, "rifle", 0.0, 1, "demo")
+	var start := camera.global_position + along * 0.6
 	spent += 1
+	_shot_serial += 1
+	ballistics.fire(start, along, SHOT_CALIBRE, 0.0, 1, "demo", {
+		"source": SHOT_SOURCE,
+		"shot": _shot_serial,
+	})
+	# The streak is drawn from where the gun actually is, not from the round's
+	# own start point 0.6m off the lens — the round is aimed down the camera
+	# axis so the crosshair stays honest, and the first segment of its trail is
+	# what makes it read as having come out of the barrel.
+	_seen[_shot_serial] = _muzzle_world(start)
+	_muzzle_flash()
+	_gear_recoil = 1.0
+	# Muzzle side only: climb and a little roll, which is the gun moving, not a
+	# hit landing. `_kick()` is contact and does not belong on a trigger pull.
+	impact_feel.kick += Vector2(randf_range(-0.3, 0.3), 1.0) * IMPACT_FEEL.KICK_GRAZE * 2.0
+	impact_feel.roll += randf_range(-1.0, 1.0) * 0.004
 
-	var found := _trace_body(muzzle, along)
-	if found.is_empty():
-		_note("MISS")
+
+## Where a round of this scene's ended up, on the frame it actually got there.
+##
+## Everything `_fire()` used to do the instant the trigger went down happens
+## here instead, however many frames later that turns out to be — and once per
+## round, which is what makes emptying a magazine into one body take it apart in
+## stages rather than in one lump.
+func _on_round_hit(hit: Dictionary) -> void:
+	var payload: Dictionary = hit.get("payload", {})
+	if str(payload.get("source", "")) != SHOT_SOURCE:
 		return
-	var rig := found["rig"] as BaselineHuman
-	var zone := str(found["zone"])
-	var result: Dictionary = rig.hit(zone, 46.0, 30.0, "ballistic", "", along)
+	var serial := int(payload.get("shot", 0))
+	var at: Vector3 = hit.get("position", Vector3.ZERO)
+	var normal: Vector3 = hit.get("normal", Vector3.UP)
+	var direction: Vector3 = hit.get("direction", Vector3.FORWARD)
+	# The last stretch of the flight, from wherever it was last seen to where it
+	# stopped. Without this a round that crossed the room inside one physics
+	# frame would leave no trail at all.
+	if _seen.has(serial):
+		_streak(_seen[serial], at)
+		_seen.erase(serial)
+
+	var struck := hit.get("collider") as Node
+	var rig: BaselineHuman = null
+	if struck != null and is_instance_valid(struck):
+		rig = _rig_above(struck)
+	if rig == null:
+		# Loose gore is a `RigidBody3D` on the same layer as the walls, so a
+		# round can genuinely stop in what is already on the floor. It arrived;
+		# it just did not arrive at anybody.
+		if struck != null and is_instance_valid(struck) and not GoreChunks.identify(struck).is_empty():
+			_impact_burst(at, normal, Color("6b2a26"))
+			_note("INTO THE MESS")
+			return
+		_impact_burst(at, normal, Color("9c8f78"))
+		_note("INTO THE FLOOR" if normal.dot(Vector3.UP) > 0.6 else "INTO THE WALL")
+		return
+
+	# A round meeting a person opens them; it does not scar them. `Ballistics`
+	# stamps its generic wall-hole from inside `_land()` before this handler is
+	# ever called and has no idea what it landed on, which is where the flat
+	# black rectangles across a shot-up body were coming from. Taking the last
+	# mark back off is the only thing this scene can do about that without
+	# reaching into `ballistics.gd`, which another lane owns — the real fix
+	# belongs in `_land()`.
+	_unmark_last()
+
+	var zone := str(struck.get_meta("body_zone")) if struck.has_meta("body_zone") else rig.zone_nearest(at)
+	# What it still had when it got here, against what it had leaving the
+	# barrel. Near one at this range; well under one for anything that has had
+	# to cross the room, which is the difference a travelling round buys.
+	var muzzle_energy := _muzzle_energy(str(hit.get("calibre", SHOT_CALIBRE)))
+	var carried := clampf(float(hit.get("energy", 0.0)) / maxf(muzzle_energy, 0.001), 0.12, 1.4)
+	var result: Dictionary = rig.hit(zone, SHOT_DAMAGE * carried, SHOT_IMPULSE * carried, "ballistic", "", direction)
 	if not bool(result.get("accepted", true)):
 		_note("%s ALREADY GONE" % _spoken(zone))
 		return
 	var off := bool(result.get("severed", false))
 	if off:
 		severed_total += 1
-	_kick(0.7, "ballistic", off, HITSTOP_SHOT)
+	_kick(0.7 * carried, "ballistic", off, HITSTOP_SHOT)
 	_note("%s OFF" % _spoken(zone) if off else "HIT // %s" % _spoken(zone))
+
+
+## A round that ran out of world without arriving anywhere. Still an outcome,
+## and the only one `_on_round_hit()` never sees.
+func _on_round_expired(payload: Dictionary) -> void:
+	if str(payload.get("source", "")) != SHOT_SOURCE:
+		return
+	_seen.erase(int(payload.get("shot", 0)))
+	_note("MISS")
+
+
+## What a round of this calibre carries as it leaves the barrel, read out of the
+## calibre table rather than written down a second time — `Ballistics._land()`
+## reports `0.5 * grain * v²`, so this is the same number at t=0.
+func _muzzle_energy(calibre: String) -> float:
+	var spec: Dictionary = BALLISTICS.CALIBRES.get(calibre, {})
+	if spec.is_empty():
+		return 1.0
+	var muzzle := float(spec["muzzle"])
+	return 0.5 * float(spec["grain"]) * muzzle * muzzle
+
+
+## The hole `Ballistics` punched from inside `_land()` on the frame it landed.
+## `marks` is appended to immediately before `round_hit` is emitted, so the last
+## entry is unambiguously this round's.
+func _unmark_last() -> void:
+	if ballistics == null or not is_instance_valid(ballistics) or ballistics.marks.is_empty():
+		return
+	var hole: Node3D = ballistics.marks.pop_back()
+	if hole != null and is_instance_valid(hole):
+		hole.queue_free()
+
+
+# ------------------------------------------------------- what you can see of it
+## Greg, playing it: *"the bullets on the floor are good but the fact that when
+## you shoot into the ground there no animations or whatever no gun model or
+## anything goin on / and no bullet shot only bullet casings"*. The round was
+## real before this and the brass was real before this; everything else about a
+## shot was invisible. Three things had to arrive: something in your hands,
+## something leaving it, and something happening where it lands.
+func _build_view_gear() -> void:
+	view_gear = HELD_GEAR.new()
+	view_gear.name = "ViewGear"
+	# On the camera, because in this room the camera *is* the player — there is
+	# no body and so no arm pose for the weapon to be hung off and cancelled
+	# against, which is the only part of the Hunt's viewmodel path that cannot
+	# come across. `HeldGear` poses itself off `GRIPS[...].rest`, in view space.
+	camera.add_child(view_gear)
+	view_gear.take(SHOT_WEAPON, SHOT_GRIP)
+	_gear_rest = view_gear.position
+
+	muzzle_point = Node3D.new()
+	muzzle_point.name = "Muzzle"
+	camera.add_child(muzzle_point)
+	# The weapon's own muzzle anchor, expressed in the camera's space, so the
+	# flash sits on the end of the barrel that is actually modelled rather than
+	# at a number somebody guessed.
+	muzzle_point.position = Vector3(0.09, -0.17, -0.44)
+	if view_gear.weapon != null and is_instance_valid(view_gear.weapon):
+		var anchor := view_gear.weapon.get_node_or_null("anchor_muzzle") as Node3D
+		if anchor != null:
+			muzzle_point.position = view_gear.transform * (view_gear.weapon.transform * anchor.position)
+
+	_flash_light = OmniLight3D.new()
+	_flash_light.light_color = Color("ffcf8a")
+	_flash_light.light_energy = 0.0
+	_flash_light.omni_range = 5.5
+	muzzle_point.add_child(_flash_light)
+
+	_flash_cone = MeshInstance3D.new()
+	var cone := SphereMesh.new()
+	cone.radius = 0.055
+	cone.height = 0.11
+	cone.radial_segments = 8
+	cone.rings = 4
+	_flash_cone.mesh = cone
+	_flash_cone.scale = Vector3(1.0, 1.0, 2.6)
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glow.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	glow.cull_mode = BaseMaterial3D.CULL_DISABLED
+	glow.albedo_color = Color(1.0, 0.82, 0.42, 0.9)
+	_flash_cone.material_override = glow
+	_flash_cone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_flash_cone.visible = false
+	muzzle_point.add_child(_flash_cone)
+
+
+func _muzzle_world(fallback: Vector3) -> Vector3:
+	if muzzle_point != null and is_instance_valid(muzzle_point):
+		return muzzle_point.global_position
+	return fallback
+
+
+func _muzzle_flash() -> void:
+	_flash_life = FLASH_LIFE
+	if _flash_cone != null and is_instance_valid(_flash_cone):
+		_flash_cone.visible = true
+		_flash_cone.rotation.z = randf() * TAU
+
+
+## One segment of a round's real path, for the eye. Built from where the round
+## was to where it now is, which is why it stretches with speed: the faster the
+## round, the longer the streak, and a pistol round covers about five metres
+## between physics frames. Hold SHIFT and the same round crawls — the streak
+## shortens, the bullet separates from its own trail, and the thing this sandbox
+## exists to show is a bullet you can watch cross a room.
+func _streak(from: Vector3, to: Vector3) -> void:
+	var length := from.distance_to(to)
+	if length < 0.03:
+		return
+	while _tracers.size() >= MAX_TRACERS:
+		_retire_tracer(0)
+	var node := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(TRACER_WIDTH, TRACER_WIDTH, length)
+	node.mesh = mesh
+	var skin := StandardMaterial3D.new()
+	skin.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	skin.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	skin.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	skin.cull_mode = BaseMaterial3D.CULL_DISABLED
+	skin.albedo_color = Color(1.0, 0.84, 0.44, 0.95)
+	node.material_override = skin
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(node)
+	node.global_position = (from + to) * 0.5
+	var along := (to - from).normalized()
+	# `look_at` cannot use UP as its up vector when that is where it is pointing,
+	# and a shot straight up or straight down is exactly what a sandbox gets.
+	node.look_at(to, Vector3.FORWARD if absf(along.dot(Vector3.UP)) > 0.98 else Vector3.UP)
+	_tracers.append({"node": node, "skin": skin, "life": TRACER_LIFE})
+
+
+func _retire_tracer(index: int) -> void:
+	if index < 0 or index >= _tracers.size():
+		return
+	var node := (_tracers[index] as Dictionary)["node"] as Node3D
+	if node != null and is_instance_valid(node):
+		node.queue_free()
+	_tracers.remove_at(index)
+
+
+## Something happens where it lands. Not a decal — `Ballistics` already owns the
+## hole — but the moment of arrival: a spark off the surface and a puff of
+## whatever the surface is made of, thrown back along the normal.
+func _impact_burst(at: Vector3, normal: Vector3, dust: Color) -> void:
+	var out := normal.normalized() if normal.length_squared() > 0.001 else Vector3.UP
+	var spark := OmniLight3D.new()
+	spark.position = at + out * 0.05
+	spark.light_color = Color("ffd08a")
+	spark.light_energy = 2.6
+	spark.omni_range = 1.6
+	add_child(spark)
+
+	var puff := MeshInstance3D.new()
+	var ball := SphereMesh.new()
+	ball.radius = 0.5
+	ball.height = 1.0
+	ball.radial_segments = 10
+	ball.rings = 5
+	puff.mesh = ball
+	puff.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var smoke := StandardMaterial3D.new()
+	smoke.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	smoke.cull_mode = BaseMaterial3D.CULL_DISABLED
+	smoke.albedo_color = Color(dust.r, dust.g, dust.b, 0.5)
+	puff.material_override = smoke
+	add_child(puff)
+	puff.global_position = at + out * 0.06
+	puff.scale = Vector3.ONE * 0.06
+
+	# Grit thrown back out of the surface, as short streaks in a cone around the
+	# normal — the same primitive as a tracer, because that is what a spall is.
+	for _piece in 5:
+		var scatter := (out + Vector3(randf_range(-0.8, 0.8), randf_range(-0.8, 0.8), randf_range(-0.8, 0.8))).normalized()
+		_streak(at + out * 0.02, at + scatter * randf_range(0.14, 0.42))
+
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(spark, "light_energy", 0.0, 0.09)
+	tween.tween_property(puff, "scale", Vector3.ONE * randf_range(0.30, 0.46), 0.28).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	tween.tween_property(smoke, "albedo_color", Color(dust.r, dust.g, dust.b, 0.0), 0.30)
+	tween.chain().tween_callback(func() -> void:
+		if is_instance_valid(spark):
+			spark.queue_free()
+		if is_instance_valid(puff):
+			puff.queue_free())
+
+
+## Every frame of presentation a shot owes: the streaks fading, the flash going
+## out, the gun coming back down out of its own recoil, and the trail of any
+## round still in the air.
+func _advance_shot_feel(real_delta: float) -> void:
+	for index in range(_tracers.size() - 1, -1, -1):
+		var streak: Dictionary = _tracers[index]
+		streak["life"] = float(streak["life"]) - real_delta
+		var node := streak["node"] as Node3D
+		if float(streak["life"]) <= 0.0 or node == null or not is_instance_valid(node):
+			_retire_tracer(index)
+			continue
+		var fade := clampf(float(streak["life"]) / TRACER_LIFE, 0.0, 1.0)
+		var skin := streak["skin"] as StandardMaterial3D
+		if skin != null:
+			skin.albedo_color.a = fade * 0.95
+		node.scale = Vector3(fade, fade, 1.0)
+
+	if _flash_life > 0.0:
+		_flash_life = maxf(0.0, _flash_life - real_delta)
+		var strength := clampf(_flash_life / FLASH_LIFE, 0.0, 1.0)
+		if _flash_light != null and is_instance_valid(_flash_light):
+			_flash_light.light_energy = strength * 5.5
+		if _flash_cone != null and is_instance_valid(_flash_cone):
+			_flash_cone.visible = _flash_life > 0.0
+			(_flash_cone.material_override as StandardMaterial3D).albedo_color.a = strength * 0.9
+
+	if view_gear != null and is_instance_valid(view_gear):
+		_gear_recoil = maxf(0.0, _gear_recoil - real_delta * GEAR_RETURN)
+		view_gear.position = _gear_rest + Vector3(0.0, 0.006, GEAR_RECOIL) * _gear_recoil
+
+	if ballistics == null or not is_instance_valid(ballistics):
+		return
+	# The trail of everything still in the air, one segment per frame per round.
+	var live: Dictionary = {}
+	for round_data: Dictionary in ballistics.rounds:
+		var payload: Dictionary = round_data.get("payload", {})
+		if str(payload.get("source", "")) != SHOT_SOURCE:
+			continue
+		var serial := int(payload.get("shot", 0))
+		var at: Vector3 = round_data["at"]
+		var was: Vector3 = _seen.get(serial, round_data["was"])
+		_streak(was, at)
+		live[serial] = at
+	# A round fired this frame has not been stepped yet and so is not in
+	# `rounds`; its muzzle position has to survive to be the start of its first
+	# segment. Everything else that has gone has genuinely gone.
+	if _seen.has(_shot_serial) and not live.has(_shot_serial):
+		live[_shot_serial] = _seen[_shot_serial]
+	_seen = live
 
 
 ## A close cutting pass is not a cosmetic alternate-fire.  It enters the same
@@ -415,7 +791,9 @@ func _cut() -> void:
 	_note("CUT // %s%s" % [_spoken(zone), " OFF" if off else " OPEN"])
 
 
-## Where the shot actually lands, on the zone that was actually aimed at.
+## What the crosshair is on, right now. Firing no longer goes through here —
+## a round finds its own body by arriving at it — but the cut and the blast are
+## both instant by nature and still need to know what is in front of you.
 ##
 ## Iterated rather than a single ray because loose gore is a `RigidBody3D` on
 ## the same layer as the walls: a floor covered in what you have already done
@@ -464,6 +842,18 @@ func _kick(severity: float, kind: String, severed: bool, freeze: float) -> void:
 	# a hitstop underneath it would only read as a hitch.
 	if slowed < 0.05:
 		hitstop = maxf(hitstop, freeze * (1.6 if severed else 1.0))
+
+
+## How many of this scene's own rounds are in the air right now.
+func _rounds_in_flight() -> int:
+	if ballistics == null or not is_instance_valid(ballistics):
+		return 0
+	var count := 0
+	for round_data: Dictionary in ballistics.rounds:
+		var payload: Dictionary = round_data.get("payload", {})
+		if str(payload.get("source", "")) == SHOT_SOURCE:
+			count += 1
+	return count
 
 
 func _spoken(zone: String) -> String:
@@ -642,6 +1032,11 @@ func _physics_process(delta: float) -> void:
 	camera.global_position = eye
 	camera.global_transform.basis = Basis(Vector3.UP, yaw + shove.x) * Basis(Vector3.RIGHT, pitch + shove.y) * Basis(Vector3.FORWARD, impact_feel.roll)
 
+	# Everything a shot owes the eye, timed in real seconds like the hitstop is:
+	# a tracer measured on the bent clock would hang in the air for a second and
+	# a half the moment slow motion is held, which is a laser, not a bullet.
+	_advance_shot_feel(real_delta)
+
 	note_life = maxf(0.0, note_life - real_delta)
 	# A dose is only a gameplay feature when the player can actually see its
 	# state.  This drives the same fullscreen rig and timed profile the Hunt
@@ -735,6 +1130,10 @@ func _paint_hud() -> void:
 		"ON THE FLOOR  %03d" % GoreChunks.live_count(),
 		"BRASS	%03d" % (ballistics.spent_brass() if ballistics != null else 0),
 		"SPENT	%03d" % spent,
+		# The number that says a round is a thing and not an event. It is 1 for
+		# the frame or two a pistol round needs to cross this room, and it sits
+		# there for seconds on end while slow motion is held.
+		"IN FLIGHT  %03d" % _rounds_in_flight(),
 	]
 	var y := 40.0
 	for line: String in lines:

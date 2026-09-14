@@ -208,6 +208,19 @@ func _build_chamber() -> void:
 	_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(-7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
 	_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
 	_slab(Vector3(16.0, 4.4, 0.5), Vector3(0, 2.2, 3.6), "rust", Color("19140f"))
+	# Greg, playing the build: "you walk to the end of this room and then
+	# there's just a skybox... I just fell out of the skybox."
+	#
+	# He was right and the geometry says why. The floor runs to z = -34.6 and
+	# the side walls run its full length, but the far end was capped only by
+	# the door slab on line ~255 — which is 3.4 units wide in a 16-unit
+	# corridor. Anywhere outside x +/-1.7 there was simply nothing there, so
+	# walking past the door on either side took you off the edge of the world.
+	# The near end had had a wall this whole time; the far end never did.
+	#
+	# The door is opened by proximity in `_interact()`, not by walking through
+	# it, so capping the end solid costs nothing and the exit still works.
+	_slab(Vector3(16.0, 4.4, 0.5), Vector3(0, 2.2, -AISLE_LENGTH - 0.4), "rust", Color("19140f"))
 
 	# Vertebral arches down the aisle. Repetition is the whole effect.
 	for bay in 11:
