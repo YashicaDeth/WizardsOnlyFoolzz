@@ -27,7 +27,12 @@ extends ColorRect
 ## collection on the Desktop into `game/art/derived/`, so the repository never
 ## carries a binary that cannot be rebuilt.
 
-const BACKDROP_PATH := "res://art/derived/splash_backdrop.png"
+## Both of Greg's images. `room` is his image 2; `invert` is his image 1, which
+## he had already cut and inverted himself — the shader wipes between them
+## rather than generating the invert, because generating it replaced his
+## artwork with an approximation of it.
+const ROOM_PATH := "res://art/derived/splash_room.png"
+const INVERT_PATH := "res://art/derived/splash_invert.png"
 const SPLASH_SHADER := preload("res://shaders/splash_attack.gdshader")
 
 var clock := 0.0
@@ -40,20 +45,17 @@ var reveal := 0.0
 ## different cut — each is a tint for the inverted half plus how hard the seam
 ## tears. They are named rather than numbered because the difference is a look,
 ## not a level.
+## The variants used to be tints for a generated invert. There is no generated
+## invert any more — the colour is Greg's, in his own file — so what is left to
+## vary is the one thing the shader legitimately owns: how violently the edge
+## between his two pictures tears as it crosses.
 const VARIANTS := {
-	# His own inverted cut: cyan, hard seam.
-	"cyan": {"tint": Vector3(0.35, 0.95, 1.0), "tear": 0.022},
-	# The CellOutz register — the invert goes arterial instead of cold, which
-	# reads as the brand eating the picture rather than a signal fault.
-	"arterial": {"tint": Vector3(1.0, 0.28, 0.24), "tear": 0.030},
-	# wizardsonlyfoolz, the other ladder: acid green, and barely torn, because
-	# what is above is supposed to arrive cleanly.
-	"spore": {"tint": Vector3(0.62, 1.0, 0.30), "tear": 0.010},
-	# Full corruption. Violent tearing, near-white invert: the frame losing.
-	"bleach": {"tint": Vector3(0.92, 0.92, 1.0), "tear": 0.062},
+	"clean": {"tear": 0.006},
+	"torn": {"tear": 0.020},
+	"shredded": {"tear": 0.050},
 }
 
-var variant := "cyan"
+var variant := "torn"
 var _material: ShaderMaterial
 
 
@@ -66,10 +68,11 @@ func _ready() -> void:
 	_material.shader = SPLASH_SHADER
 	# Missing art is not a crash. If the derived backdrop has not been built the
 	# plate simply stays black and the cold open runs exactly as it did before.
-	if ResourceLoader.exists(BACKDROP_PATH):
-		_material.set_shader_parameter("backdrop", load(BACKDROP_PATH))
+	if ResourceLoader.exists(ROOM_PATH) and ResourceLoader.exists(INVERT_PATH):
+		_material.set_shader_parameter("room", load(ROOM_PATH))
+		_material.set_shader_parameter("invert", load(INVERT_PATH))
 	else:
-		push_warning("splash backdrop missing — run tools/splash_backdrop.py")
+		push_warning("splash backdrops missing — run tools/splash_backdrop.py")
 	material = _material
 	set_variant(variant)
 	_push()
@@ -77,10 +80,9 @@ func _ready() -> void:
 
 ## Swap the cut. Safe to call at any time; unknown names fall back to his own.
 func set_variant(name: String) -> void:
-	variant = name if VARIANTS.has(name) else "cyan"
+	variant = name if VARIANTS.has(name) else "torn"
 	var v: Dictionary = VARIANTS[variant]
 	if _material != null:
-		_material.set_shader_parameter("invert_tint", v["tint"])
 		_material.set_shader_parameter("tear", v["tear"])
 
 

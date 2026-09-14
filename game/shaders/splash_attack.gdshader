@@ -1,30 +1,33 @@
 shader_type canvas_item;
 
-// The title backdrop, and the thing Greg described as "the blue invertred side
-// attacking the screen".
+// The title backdrop. Greg's two images, and the wipe between them.
 //
-// His reference image is one photograph with a vertical seam down the middle:
-// the left half as shot, the right half inverted into cyan. Baking that would
-// give a fixed seam. Done here instead, so the seam can *move* — it sweeps in
-// from the right, tears chromatically as it travels, and the inverted half
-// eats the frame rather than sitting in it.
+// The first version of this shader *generated* the inverted half — split the
+// screen, flip the colours, tint them cyan. That was wrong, and worth naming:
+// Greg had already made the inverted image. Re-deriving it in a shader replaces
+// his artwork with an approximation of his artwork, and the approximation is
+// never going to be the thing he drew.
 //
-// Everything is driven from `attack` (0 = untouched photograph, 1 = the invert
-// has taken the whole screen) so the menu can drive it from a tween and the
-// same shader covers the fade-in, the hold and the retreat.
+// So this samples two textures and does almost nothing to them. `room` is his
+// image 2 — the room, the hands, the rune. `invert` is his image 1, the same
+// shot with the right half already inverted into cyan by him. The attack is the
+// edge between them travelling across the screen.
+//
+// The only invention left is the *edge*: it tears per scanline and drags the
+// colour channels apart where it passes, because a hard vertical line sweeping
+// across would read as a PowerPoint wipe. Everything either side of that edge
+// is his picture, untouched.
 
-uniform sampler2D backdrop : source_color, filter_linear_mipmap;
-// 0..1. How far the inverted side has come across.
+uniform sampler2D room : source_color, filter_linear_mipmap;
+uniform sampler2D invert : source_color, filter_linear_mipmap;
+// 0 = his image 2 alone. 1 = his image 1 has taken the whole screen.
 uniform float attack : hint_range(0.0, 1.0) = 0.0;
-// 0..1. Master fade, so the whole plate can come up out of black.
+// Master fade, so the plate comes up out of black.
 uniform float reveal : hint_range(0.0, 1.0) = 1.0;
 uniform float clock = 0.0;
-// How hard the seam tears. In pixels of UV at the seam itself.
-uniform float tear : hint_range(0.0, 0.08) = 0.022;
-uniform vec3 invert_tint = vec3(0.35, 0.95, 1.0);
+// How hard the travelling edge tears, in UV at the edge itself.
+uniform float tear : hint_range(0.0, 0.08) = 0.020;
 
-// Cheap value noise. The seam needs to jitter per-scanline rather than be a
-// ruler-straight edge, which is what separates a glitch from a wipe.
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(41.7, 289.1))) * 43758.5453);
 }
@@ -32,47 +35,43 @@ float hash(vec2 p) {
 void fragment() {
 	vec2 uv = UV;
 
-	// The seam. At attack 0 it sits just off the right edge; at 1 it has passed
-	// the left one. Jittered per horizontal band so it reads as torn.
-	float band = floor(uv.y * 120.0);
-	float jitter = (hash(vec2(band, floor(clock * 9.0))) - 0.5) * 0.035 * attack;
-	float seam = mix(1.08, -0.08, attack) + jitter;
+	// The edge. Off the right at attack 0, past the left at 1, jittered per
+	// horizontal band so it reads as torn rather than ruled.
+	float band = floor(uv.y * 130.0);
+	float jitter = (hash(vec2(band, floor(clock * 9.0))) - 0.5) * 0.030 * attack;
+	float edge_x = mix(1.06, -0.06, attack) + jitter;
 
-	// Distance from the seam decides both the tearing and which side we are on.
-	float d = uv.x - seam;
-	float edge = 1.0 - smoothstep(0.0, 0.14, abs(d));
+	float d = uv.x - edge_x;
+	float near = 1.0 - smoothstep(0.0, 0.10, abs(d));
 
-	// Chromatic displacement, strongest at the seam. The three channels are
-	// sampled at different offsets, which is the whole look of his composite.
-	float push = tear * edge * (0.6 + 0.4 * sin(clock * 3.1 + uv.y * 22.0));
+	// Chromatic drag, only near the edge. Away from it both pictures are sampled
+	// straight, which is the point.
+	float push = tear * near * (0.6 + 0.4 * sin(clock * 3.1 + uv.y * 22.0));
 	vec2 skew = vec2(push, 0.0);
-	float r = texture(backdrop, uv + skew).r;
-	float g = texture(backdrop, uv).g;
-	float b = texture(backdrop, uv - skew).b;
-	vec3 shot = vec3(r, g, b);
 
-	// The inverted half. Not a plain 1-x: his is inverted *and* pushed to cyan,
-	// so the invert is tinted rather than neutral.
-	vec3 flipped = (vec3(1.0) - shot) * invert_tint;
+	vec3 a = vec3(
+		texture(room, uv + skew).r,
+		texture(room, uv).g,
+		texture(room, uv - skew).b);
+	vec3 b = vec3(
+		texture(invert, uv + skew).r,
+		texture(invert, uv).g,
+		texture(invert, uv - skew).b);
 
-	// Which side of the seam this pixel is on. Softened slightly so the join is
-	// a torn edge rather than an aliased line.
+	// Which of his two pictures this pixel is showing.
 	float side = smoothstep(-0.004, 0.004, -d);
-	vec3 col = mix(shot, flipped, side);
+	vec3 col = mix(a, b, side);
 
-	// A hot line riding the seam itself — the leading edge of the attack.
-	col += vec3(0.45, 0.95, 1.0) * edge * edge * 0.55 * attack;
+	// A hot line riding the edge — the leading front of the attack.
+	col += vec3(0.45, 0.95, 1.0) * near * near * 0.40 * attack;
 
-	// Scanline tearing just behind the front: whole bands slip sideways.
-	float slip = step(0.82, hash(vec2(band, floor(clock * 14.0)))) * attack;
-	if (slip > 0.0 && abs(d) < 0.25) {
-		vec2 slipped = uv + vec2((hash(vec2(band, 7.0)) - 0.5) * 0.06, 0.0);
-		col = mix(col, texture(backdrop, slipped).rgb, 0.55);
+	// Whole bands slipping sideways just behind the front.
+	float slip = step(0.86, hash(vec2(band, floor(clock * 14.0)))) * attack;
+	if (slip > 0.0 && abs(d) < 0.22) {
+		vec2 slipped = uv + vec2((hash(vec2(band, 7.0)) - 0.5) * 0.05, 0.0);
+		vec3 torn = mix(texture(room, slipped).rgb, texture(invert, slipped).rgb, side);
+		col = mix(col, torn, 0.5);
 	}
-
-	// Vignette, so the plate sits under type rather than competing with it.
-	float vig = 1.0 - 0.55 * length((uv - 0.5) * vec2(1.15, 1.0));
-	col *= vig;
 
 	COLOR = vec4(col * reveal, reveal);
 }
