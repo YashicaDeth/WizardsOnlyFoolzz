@@ -5336,6 +5336,10 @@ The last rung. Fifteen statements that are true of night, the lamp and what you 
 
 ## AK — The agency that owns the sky
 
+Reference intake for the field/geometry/satellite/doomscrolling direction:
+`DESIGN/REFERENCE_INTAKE_2026-09-14.md`.  Its provenance rule governs every
+future briefing, feed and occult visual in this section.
+
 Greg: *"maps like this and insane esoteric knowledge would be really cool, again
 linking back to the satellite and map part, but i wanted to add a satanic or
 evil version of NASA that owns your phone's satellite app and you have to do
