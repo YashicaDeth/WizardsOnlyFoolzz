@@ -110,9 +110,11 @@ var include_breakables_in_test := false
 ## its own capture test, which is why the derby was still a chase camera looking
 ## at a box with wheels.
 var interior: Node3D = null
-## Where you are sitting. Third person is the unlocked view, not the default —
-## M1 already made that the rule on foot and the derby never followed it.
-var in_cab := true
+## Where you are sitting. Third person is the unlocked view on foot (M1's
+## rule) — the derby is a deliberate exception, per Greg: driving starts in
+## chase view, freely toggled with the cab at any time, not gated behind
+## earning it.
+var in_cab := false
 ## Where the driver is looking, relative to the car. You steer with the car and
 ## aim independently of it, which is the whole point of having a gun in the
 ## other hand.
@@ -446,6 +448,14 @@ const COLOSSEUM_TUNNEL_COUNT := 3
 const COLOSSEUM_TUNNEL_WIDTH := 9.0
 const COLOSSEUM_TUNNEL_HEIGHT := 6.5
 const COLOSSEUM_TUNNEL_LENGTH := 32.0
+## Where each tunnel's dead-end chamber actually sits — matches
+## `_build_colosseum_tunnel()`'s own `chamber_center` distance exactly, so the
+## ring corridor's gaps land precisely on the chambers rather than near them.
+const COLOSSEUM_CHAMBER_RADIUS := (COLOSSEUM_RADIUS - 1.0) + COLOSSEUM_TUNNEL_LENGTH + 8.0
+const COLOSSEUM_RING_WIDTH := 8.0
+## The floor has to reach past the ring corridor, not stop at the bowl's own
+## wall — the ring is real ground the car drives on, not a prop out past it.
+const COLOSSEUM_OUTER_RADIUS := COLOSSEUM_CHAMBER_RADIUS + 14.0
 
 func _build_colosseum_world() -> void:
 	$WorldEnvironment.environment = WorldLook.environment("bone_yard")
@@ -454,15 +464,17 @@ func _build_colosseum_world() -> void:
 	var floor_body := StaticBody3D.new()
 	var floor_collision := CollisionShape3D.new()
 	var floor_shape := CylinderShape3D.new()
-	floor_shape.radius = COLOSSEUM_RADIUS
+	# Reaches past the ring corridor now, not just the bowl — the ring is
+	# real ground a car drives on, not scenery sitting outside the floor.
+	floor_shape.radius = COLOSSEUM_OUTER_RADIUS
 	floor_shape.height = 1.0
 	floor_collision.shape = floor_shape
 	floor_collision.position.y = -0.8
 	floor_body.add_child(floor_collision)
 	add_child(floor_body)
 	var floor_mesh := CylinderMesh.new()
-	floor_mesh.top_radius = COLOSSEUM_RADIUS
-	floor_mesh.bottom_radius = COLOSSEUM_RADIUS
+	floor_mesh.top_radius = COLOSSEUM_OUTER_RADIUS
+	floor_mesh.bottom_radius = COLOSSEUM_OUTER_RADIUS
 	floor_mesh.height = 1.0
 	_add_mesh(floor_mesh, Vector3(0, -0.8, 0), Vector3.ONE, Color("2a2620"), 0.0)
 	# The ring wall, in segments — a colosseum bowl, not a box arena. Gaps are
@@ -484,6 +496,19 @@ func _build_colosseum_world() -> void:
 		var segment_width := (TAU * COLOSSEUM_RADIUS / float(SEGMENTS)) * 1.06
 		var at := Vector3(cos(angle) * COLOSSEUM_RADIUS, COLOSSEUM_WALL_HEIGHT * 0.5, sin(angle) * COLOSSEUM_RADIUS)
 		_build_wall_segment(at, Vector3(segment_width, COLOSSEUM_WALL_HEIGHT, 1.6), Vector3(0, -angle, 0), Color("221d18"))
+		# AP1.5. Identity, not just a wall — a banner every fourth segment,
+		# hung from the top rather than painted on, so the bowl reads as a
+		# venue somebody built rather than a box somebody forgot to texture.
+		if index % 4 == 0:
+			var banner := MeshInstance3D.new()
+			var banner_mesh := BoxMesh.new()
+			banner_mesh.size = Vector3(segment_width * 0.55, COLOSSEUM_WALL_HEIGHT * 0.5, 0.12)
+			banner.mesh = banner_mesh
+			banner_mesh.material = WorldLook.emissive(Color("8a1a12") if index % 8 == 0 else Color("b0552a"), 0.6)
+			banner.position = at + Vector3(0, COLOSSEUM_WALL_HEIGHT * 0.18, 0)
+			banner.rotation = Vector3(0, -angle, 0)
+			banner.position -= Vector3(cos(angle), 0, sin(angle)) * 0.9
+			add_child(banner)
 	# The stands — a stepped bank behind the wall, same crowd this venue
 	# already knows how to seat (`_spawn_crowd()`, branched on `is_colosseum`).
 	for step in 3:
@@ -494,9 +519,12 @@ func _build_colosseum_world() -> void:
 		step_mesh.height = 1.2
 		_add_mesh(step_mesh, Vector3(0, COLOSSEUM_WALL_HEIGHT * 0.2 + float(step) * 2.4, 0), Vector3.ONE, Color("241f19"), 0.0)
 	# Tunnels — straight corridors punched through the gaps above, each
-	# ending in a small dead-end chamber: a real side route, not a prop.
+	# opening into a wider chamber. The chambers used to dead-end; they now
+	# connect to each other through a back corridor (below), so a tunnel is
+	# a real route between two points on the bowl, not just an escape.
 	for tunnel_angle in tunnel_angles:
 		_build_colosseum_tunnel(tunnel_angle)
+	_build_colosseum_ring_corridor(tunnel_angles)
 	var light_count := arena_light_budget()
 	for index in light_count:
 		var light := OmniLight3D.new()
@@ -511,9 +539,11 @@ func _build_colosseum_world() -> void:
 		add_child(light)
 
 
-## One straight corridor: two side walls, a ceiling, and a wider dead-end
-## chamber at the far end. Floor is the same arena floor extended under it —
-## a tunnel is a roof and two walls laid over open ground, not a separate box.
+## One straight corridor: two side walls, a ceiling, and a wider chamber at
+## the far end that opens into the ring corridor (`_build_colosseum_ring_corridor()`)
+## rather than dead-ending — a real route between two points on the bowl, not
+## just an escape. Floor is the same arena floor extended under it — a
+## tunnel is a roof and two walls laid over open ground, not a separate box.
 func _build_colosseum_tunnel(angle: float) -> void:
 	var direction := Vector3(cos(angle), 0, sin(angle))
 	var start := direction * (COLOSSEUM_RADIUS - 1.0)
@@ -525,14 +555,14 @@ func _build_colosseum_tunnel(angle: float) -> void:
 		var lateral: Vector3 = Vector3(-direction.z, 0, direction.x) * (half_width + 0.4) * side
 		_build_wall_segment(mid + lateral, Vector3(1.0, COLOSSEUM_TUNNEL_HEIGHT, COLOSSEUM_TUNNEL_LENGTH), basis_rotation, Color("1c1815"))
 	_build_wall_segment(mid + Vector3(0, COLOSSEUM_TUNNEL_HEIGHT, 0), Vector3(COLOSSEUM_TUNNEL_WIDTH + 1.0, 1.0, COLOSSEUM_TUNNEL_LENGTH), basis_rotation, Color("19140f"))
-	# The dead-end chamber: wider than the corridor, so it reads as a pocket
-	# worth ducking into rather than just a corridor that stops.
+	# The chamber: wider than the corridor, so it reads as a real room rather
+	# than just a corridor that stops. Its far side is open — no cap wall
+	# here — because it connects straight into the ring corridor.
 	var chamber_center := start + direction * (COLOSSEUM_TUNNEL_LENGTH + 8.0)
 	var chamber_size := Vector3(COLOSSEUM_TUNNEL_WIDTH * 2.2, COLOSSEUM_TUNNEL_HEIGHT, 16.0)
 	for side in sides:
 		var lateral: Vector3 = Vector3(-direction.z, 0, direction.x) * (chamber_size.x * 0.5 + 0.4) * side
 		_build_wall_segment(chamber_center + lateral, Vector3(1.0, COLOSSEUM_TUNNEL_HEIGHT, chamber_size.z), basis_rotation, Color("1c1815"))
-	_build_wall_segment(chamber_center + direction * (chamber_size.z * 0.5), Vector3(chamber_size.x, COLOSSEUM_TUNNEL_HEIGHT, 1.0), basis_rotation, Color("1c1815"))
 	_build_wall_segment(chamber_center + Vector3(0, COLOSSEUM_TUNNEL_HEIGHT, 0), Vector3(chamber_size.x, 1.0, chamber_size.z), basis_rotation, Color("19140f"))
 	var lamp := OmniLight3D.new()
 	lamp.position = chamber_center + Vector3(0, COLOSSEUM_TUNNEL_HEIGHT * 0.6, 0)
@@ -541,6 +571,78 @@ func _build_colosseum_tunnel(angle: float) -> void:
 	lamp.omni_range = 14.0
 	lamp.light_cull_mask = 0xFFFFF & ~(1 << (INTERIOR.CAB_LAYER - 1))
 	add_child(lamp)
+	_build_colosseum_fuel_pickup(chamber_center)
+
+
+## A real reason to duck into a tunnel besides escaping a pile-on — reuses
+## `ArcadeVehicle.refuel()` (V1.3), not a second fuel system invented for
+## this one room. Consumed on pickup; does nothing while the tank is already
+## full rather than vanishing for no reason the player could see.
+func _build_colosseum_fuel_pickup(at: Vector3) -> void:
+	var pickup := Area3D.new()
+	pickup.name = "ColosseumFuelPickup"
+	pickup.position = at + Vector3(0, 0.7, 0)
+	pickup.collision_layer = 0
+	pickup.collision_mask = 0xFFFFF
+	var pickup_shape := CollisionShape3D.new()
+	var pickup_sphere := SphereShape3D.new()
+	pickup_sphere.radius = 2.4
+	pickup_shape.shape = pickup_sphere
+	pickup.add_child(pickup_shape)
+	add_child(pickup)
+	var canister := MeshInstance3D.new()
+	var canister_mesh := CylinderMesh.new()
+	canister_mesh.top_radius = 0.5
+	canister_mesh.bottom_radius = 0.62
+	canister_mesh.height = 1.3
+	canister.mesh = canister_mesh
+	canister_mesh.material = WorldLook.emissive(Color("6fae9e"), 1.4)
+	pickup.add_child(canister)
+	pickup.body_entered.connect(_on_colosseum_fuel_pickup.bind(pickup))
+
+
+func _on_colosseum_fuel_pickup(body: Node, pickup: Area3D) -> void:
+	if body != boat or not is_instance_valid(pickup) or float(boat.get("fuel")) >= 0.98:
+		return
+	boat.call("refuel", 0.5)
+	if derby_audio != null:
+		derby_audio.play_impact(0.1, pickup.global_position, "light")
+	pickup.queue_free()
+
+
+## The back corridor. Straight tunnels used to each end in their own sealed
+## room; this connects all three chambers into one loop, the same segmented-
+## ring technique the outer wall already uses, so a tunnel is a real route
+## between two points on the bowl rather than a pocket with one door.
+func _build_colosseum_ring_corridor(tunnel_angles: Array[float]) -> void:
+	const RING_SEGMENTS := 36
+	var half_width := COLOSSEUM_RING_WIDTH * 0.5
+	var gap_half_width := (COLOSSEUM_TUNNEL_WIDTH * 2.2 * 0.5 + 1.0) / COLOSSEUM_CHAMBER_RADIUS
+	for index in RING_SEGMENTS:
+		var angle := TAU * float(index) / float(RING_SEGMENTS)
+		var in_gap := false
+		for tunnel_angle in tunnel_angles:
+			if absf(wrapf(angle - tunnel_angle, -PI, PI)) < gap_half_width:
+				in_gap = true
+				break
+		if in_gap:
+			continue
+		var segment_length := (TAU * COLOSSEUM_CHAMBER_RADIUS / float(RING_SEGMENTS)) * 1.06
+		var basis_rotation := Vector3(0, -angle, 0)
+		var inner_at := Vector3(cos(angle), 0, sin(angle)) * (COLOSSEUM_CHAMBER_RADIUS - half_width)
+		var outer_at := Vector3(cos(angle), 0, sin(angle)) * (COLOSSEUM_CHAMBER_RADIUS + half_width)
+		_build_wall_segment(inner_at + Vector3(0, COLOSSEUM_TUNNEL_HEIGHT * 0.5, 0), Vector3(1.0, COLOSSEUM_TUNNEL_HEIGHT, segment_length), basis_rotation, Color("1c1815"))
+		_build_wall_segment(outer_at + Vector3(0, COLOSSEUM_TUNNEL_HEIGHT * 0.5, 0), Vector3(1.0, COLOSSEUM_TUNNEL_HEIGHT, segment_length), basis_rotation, Color("1c1815"))
+		var mid_at := Vector3(cos(angle), 0, sin(angle)) * COLOSSEUM_CHAMBER_RADIUS
+		_build_wall_segment(mid_at + Vector3(0, COLOSSEUM_TUNNEL_HEIGHT, 0), Vector3(COLOSSEUM_RING_WIDTH + 1.0, 1.0, segment_length), basis_rotation, Color("19140f"))
+		if index % 5 == 0:
+			var lamp := OmniLight3D.new()
+			lamp.position = mid_at + Vector3(0, COLOSSEUM_TUNNEL_HEIGHT * 0.6, 0)
+			lamp.light_color = Color("a8845a")
+			lamp.light_energy = 2.0
+			lamp.omni_range = 12.0
+			lamp.light_cull_mask = 0xFFFFF & ~(1 << (INTERIOR.CAB_LAYER - 1))
+			add_child(lamp)
 
 
 ## A wall/ceiling piece that is both physically real (the car cannot drive
@@ -796,7 +898,9 @@ func _on_vehicle_impact(other: Node, closing_speed: float, self_share: float) ->
 	if targets.has(other):
 		_damage_target(other, closing_speed, self_share)
 	elif closing_speed > 7.0:
-		integrity = maxi(0, integrity - roundi(closing_speed * 0.4))
+		# First-pass softening, same user feedback as `_on_wrecker_impact()`:
+		# was `closing_speed * 0.4`. Not a definitive rebalance.
+		integrity = maxi(0, integrity - roundi(closing_speed * 0.3))
 		# V1.1/V1.2. `integrity` stays the tuned, authoritative number — this
 		# only mirrors it into the chassis's own generic `condition` field so
 		# handling degradation and the engine's damage rattle read the same
@@ -819,7 +923,10 @@ func _on_wrecker_impact(other: Node, closing_speed: float, self_share: float, wr
 		return
 	wrecker.set_meta("player_hit_ready_msec", now + 520)
 	var attacker_share := clampf(self_share, 0.0, 1.0)
-	var damage := clampi(roundi(closing_speed * 0.55 * (0.4 + attacker_share * 0.6)), 1, 18)
+	# First-pass softening, direct user feedback ("you get wrecked way too
+	# quickly"): was `0.55 * ... , 1, 18`. Not a definitive rebalance — just
+	# less punishing per hit until it's played more.
+	var damage := clampi(roundi(closing_speed * 0.4 * (0.4 + attacker_share * 0.6)), 1, 14)
 	integrity = maxi(0, integrity - damage)
 	# V1.1/V1.2. See the mirror note in `_on_vehicle_impact()`.
 	boat.condition = clampf(float(integrity) / 100.0, 0.0, 1.0)
@@ -839,13 +946,20 @@ func _on_wrecker_impact(other: Node, closing_speed: float, self_share: float, wr
 		_finish_round("lost")
 
 
-func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: float = 1.0) -> void:
+func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: float = 1.0, gate_key: String = "hit_ready_msec") -> void:
 	if round_state != "active":
 		return
 	var now: int = Time.get_ticks_msec()
-	if now < int(target.get_meta("hit_ready_msec", 0)):
+	# The ram cooldown and the gun cooldown are gated separately (`gate_key`).
+	# They used to share one `hit_ready_msec`, which meant a target still
+	# inside its 520ms ram-cooldown silently ate a gun shot too — in a
+	# crowded derby a target is rammed by *something* almost constantly, so
+	# the cab gun would visibly fire and connect (`round_hit` firing) while
+	# doing nothing, which from the seat looks exactly like "the gun doesn't
+	# shoot bullets."
+	if now < int(target.get_meta(gate_key, 0)):
 		return
-	target.set_meta("hit_ready_msec", now + 520)
+	target.set_meta(gate_key, now + 520)
 	var impact_energy: int = roundi(collision_speed * 10.0)
 	# Damage rises with the square of closing speed so a committed ram strips
 	# panels on the first contact instead of the fifth, and the share of the
@@ -1194,7 +1308,17 @@ func _fire_from_cab() -> void:
 	var from := camera.global_position
 	var along := -camera.global_transform.basis.z
 	_cab_shot_serial += 1
-	var muzzle := from + along * 1.4
+	# `ballistics.gd` has no shooter-exclusion of its own — see the long note
+	# above `_cab_seen`/`CAB_SHOT_SOURCE`: it just raycasts muzzle-to-muzzle
+	# every physics step, with no exclude list. The old instant raycast this
+	# replaced explicitly excluded `boat.get_rid()`; this doesn't have that
+	# option, so the spawn point has to clear the car's own hull instead.
+	# `VEHICLE_INTERIOR.EYE` sits close to chassis centre and the chassis is
+	# 4.8m long (`CHASSIS_DIMENSIONS`) — the windscreen is ~2.2m ahead of the
+	# eye, so the old 1.4m offset landed the round inside the player's own
+	# hood. Every round was hitting the car that fired it, silently, which is
+	# exactly what "the gun doesn't damage anything" looks like from outside.
+	var muzzle := from + along * 3.2
 	ballistics.fire(muzzle, along, "pistol", 0.0, 1, "derby_player", {
 		"source": CAB_SHOT_SOURCE,
 		"shot": _cab_shot_serial,
@@ -1226,7 +1350,7 @@ func _on_cab_round_hit(hit: Dictionary) -> void:
 		# through it: the two are different units, and this number was
 		# already tuned against real play, not invented alongside the rest
 		# of this rewrite.
-		_damage_target(struck as Node3D, 9.0, 1.0)
+		_damage_target(struck as Node3D, 9.0, 1.0, "gun_hit_ready_msec")
 		WorldHistory.record_event("derby_shot_landed", {"venue": "rift_derby_quarry", "target": struck.name})
 
 
@@ -1829,7 +1953,25 @@ func _spawn_crowd() -> void:
 		spectator.set_meta("rest_y", spectator.position.y)
 		spectator.set_meta("phase", float(index) * 0.71)
 		add_child(spectator)
-		_add_mesh_to(spectator, CapsuleMesh.new(), Vector3.ZERO, Color("150d0d") if index % 3 else Color("263a34"), 0.0, Vector3(0.42, 0.8, 0.42), "Body", "dirt", index + 1)
+		if is_colosseum:
+			# AP1.5. "Different races, robots, elites, reptilians, aliens" —
+			# `PLAYTEST_2026-09-14_LIVE.md`'s own description of the stands.
+			# Real variety, not one silhouette repeated 64 times: a seeded
+			# RNG per spectator picks a build and a palette entry, same
+			# deterministic-per-seat approach `WorldLook.surface()`'s own
+			# `variation_seed` argument already uses everywhere else.
+			var rng := RandomNumberGenerator.new()
+			rng.seed = index * 7919 + 41
+			const CROWD_PALETTE := [
+				Color("150d0d"), Color("263a34"), Color("3a2e1a"),
+				Color("1a3020"), Color("2e1a30"), Color("4a3a1a"),
+			]
+			var palette_color: Color = CROWD_PALETTE[rng.randi() % CROWD_PALETTE.size()]
+			var build_height := rng.randf_range(0.55, 1.15)
+			var build_width := rng.randf_range(0.32, 0.58)
+			_add_mesh_to(spectator, CapsuleMesh.new(), Vector3.ZERO, palette_color, 0.0, Vector3(build_width, build_height, build_width), "Body", "dirt", index + 1)
+		else:
+			_add_mesh_to(spectator, CapsuleMesh.new(), Vector3.ZERO, Color("150d0d") if index % 3 else Color("263a34"), 0.0, Vector3(0.42, 0.8, 0.42), "Body", "dirt", index + 1)
 		crowd_members.append(spectator)
 
 
