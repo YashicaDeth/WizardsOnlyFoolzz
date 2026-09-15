@@ -2540,8 +2540,8 @@ purpose**. A demo that feels thin is a demo that cut things. This one is
 supposed to feel like too much, and then end.
 
 ### P1 — What the demo route is
-- [ ] **P1.1** A curated route through the *real* game, not a separate map
-- [ ] **P1.2** The best features front-loaded: anatomy, gore, X-ray killcam, the derby, the Board
+- [x] **P1.1** A curated route through the *real* game, not a separate map — `resume_destination()` chains the actual scenes (`vat_chamber.tscn` -> `rift_derby.tscn` -> `bone_yard_hunt.tscn`); it did so only in name, since `OpeningDirector.advance()` was called by tests and never by real gameplay, so a resumed run always reopened the Growing Floor regardless of progress. Wired at the one chokepoint every real transition already shares (`Interstitial.travel()`), verified in `opening_stage_wiring_test.gd` by driving the three production transitions with no test-only shortcut (6/6)
+- [x] **P1.2** The best features front-loaded: anatomy, gore, X-ray killcam, the derby, the Board — all reachable inside the curated route itself: `vat_chamber.gd` is the anatomy/character creation, `rift_derby.tscn` is the derby, and `bone_yard_hunt.gd` instantiates `GoreChunks`, `WorldXray`, `KillCam` and `PinBoard` (the Board) directly (`bone_yard_hunt.gd:702-754,4211`)
 - [ ] **P1.3** Generous rather than careful — it should feel like a full game while it lasts
 - [x] **P1.4** No dependence on the cosmology being understood; the Horsemen stay off-screen — the whole demo-reachable route (`country_town_menu.gd`, `vat_chamber.gd`, `rift_derby.gd`, `bone_yard_hunt.gd`, `handheld_device.gd`, the opening/interstitial scripts) has zero references to the Horsemen, Thelema or the cosmology systems; the only hit is a design-rationale code comment in `vat_chamber.gd` that never reaches the player
 
@@ -2581,8 +2581,8 @@ the game's own voice, not a fade to a store page.
 - [x] **P3.5** The stop is written into WorldHistory like any other ending — `complete_demo()` writes `demo_run.status = ended`, the ending id, and one idempotent `demo_ending_reached` event to the isolated demo ledger
 
 ### P4 — The half hour
-- [ ] **P4.1** Playable within sixty seconds of launching
-- [ ] **P4.2** Measured, not estimated — a real run timed end to end
+- [x] **P4.1** Playable within sixty seconds of launching — `demo_launch_timing_test.gd` skips the boot slate and the decanting prologue the instant each allows it (the same click an eager player makes) and lands control in the Growing Floor at 5.4s
+- [x] **P4.2** Measured, not estimated — a real run timed end to end — `Time.get_ticks_msec()` around the actual scene chain (`boot_splash.tscn` -> `country_town_menu.gd::_start_demo()` -> `decanting_prologue.gd` -> `Interstitial.travel()` -> `vat_chamber.tscn`), never a frame count; prints `DEMO_LAUNCH_ELAPSED_MS`. Scope stated in the file: headless, one machine, floor only — it is not P5.1's "a machine that is not Greg's"
 - [ ] **P4.3** Nothing in it outstays its welcome: the second derby lap, the long walk, the third menu
 - [ ] **P4.4** One moment engineered to be the thing a player describes to somebody else
 - [ ] **P4.5** A failure state that is interesting rather than a reload
