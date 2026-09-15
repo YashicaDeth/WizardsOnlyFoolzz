@@ -20,6 +20,7 @@ const MAX_SPEED := 24.0
 ## the captain is stable inside a save and different in the next.
 const CAPTAIN_SLOT := "derby_captain"
 const CAST := preload("res://systems/cast_names.gd")
+const DEFEAT_ROUTER := preload("res://systems/defeat_router.gd")
 const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const BONE_YARD_ENVIRONMENT := preload("res://art/bone_yard_environment.glb")
 const DERBY_AUDIO := preload("res://systems/procedural_derby_audio.gd")
@@ -1093,6 +1094,13 @@ func _finish_round(result: String) -> void:
 	# state instead of pretending the player earned the road.
 	if result == "won":
 		OPENING.advance("won_derby")
+	else:
+		# A wreck used to just relabel the same "hauled to the Bone Yard" exit a
+		# win takes, so losing cost nothing but five seconds of countdown text.
+		# `DefeatRouter` already turns a Bone Yard defeat into real ownership and
+		# a forfeitable body (F5); routing the wreck through it too means the
+		# Captain is the one who has you when the scene changes, not the count.
+		DEFEAT_ROUTER.route(CAST.id_for(CAPTAIN_SLOT), "rift_derby_quarry")
 
 
 func _add_authored_environment_collision(root_node: Node) -> void:

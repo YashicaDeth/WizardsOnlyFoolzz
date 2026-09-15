@@ -46,6 +46,15 @@ func check(condition: bool, label: String) -> void:
 ## Both ways out of a scene: the interstitial, and the raw change that
 ## `gore_demo.gd` still uses as a fallback. Grepping for only the first would
 ## miss a real edge, which is the kind of gap that makes a green test worthless.
+##
+## A third form: `country_town_menu.gd` wraps the literal call in
+## `_travel_from_menu()` so the Settings panel can go inert before the fade
+## starts, which means the literal string never sits next to
+## `Interstitial.travel` in that file at all. That silently zeroed the menu's
+## outbound edges and made the front door look like a dead end to this test,
+## which then failed the very reachability checks it exists to run — a false
+## alarm on the loop, not a broken one. Any function with "travel" in its name
+## is trusted to be a wrapper around the same chokepoint.
 func _edges_from(script_path: String) -> Array[String]:
 	var out: Array[String] = []
 	var file := FileAccess.open(script_path, FileAccess.READ)
@@ -53,7 +62,7 @@ func _edges_from(script_path: String) -> Array[String]:
 		return out
 	var source := file.get_as_text()
 	var finder := RegEx.new()
-	finder.compile('(?:Interstitial\\.travel|change_scene_to_file)\\(\\s*"(res://[^"]+\\.tscn)"')
+	finder.compile('(?:Interstitial\\.travel|change_scene_to_file|\\w*travel\\w*)\\(\\s*"(res://[^"]+\\.tscn)"')
 	for found in finder.search_all(source):
 		var target := found.get_string(1)
 		if not out.has(target):

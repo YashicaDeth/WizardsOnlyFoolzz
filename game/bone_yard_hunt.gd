@@ -807,6 +807,18 @@ func _ready() -> void:
 	_spawn_yard_population()
 	_update_camera()
 	WorldHistory.record_event("player_entered_hunt_ground", {"location": HUNT_LOCATION, "hunt_id": CAST.id_for(CAPTAIN_SLOT)})
+	# A wreck in the derby already routed the player through `DefeatRouter`
+	# before this scene loaded (`rift_derby.gd::_finish_round`), so a lost heat
+	# and a lost fight land in the same captivity rather than one of them being
+	# a same-shape scene change with a different label. Excludes "redecanted":
+	# once the player has paid that exit, walking back into this scene later is
+	# a fresh arrival, not a second capture of the one that already ended.
+	var arriving_player := WorldHistory.subject("player")
+	if str(arriving_player.get("status", "")) in ["shackled", "stamped", "conscripted"]:
+		_enter_captivity({
+			"outcome": arriving_player.get("status", ""),
+			"destination": arriving_player.get("held_at", HUNT_LOCATION),
+		})
 
 
 ## The player had no body at all — only a `health` integer, the same defect the
@@ -3214,6 +3226,13 @@ func _update_rival(delta: float) -> void:
 
 func _route_player_defeat(captor_id: String) -> void:
 	var result := DEFEAT_ROUTER.route(captor_id, HUNT_LOCATION)
+	_enter_captivity(result)
+
+
+## Shared by a defeat that happens in this scene and one the player already
+## carried in from a lost derby heat (see `_ready()`) — the captivity state
+## is the same either way, so it has one place to be set rather than two.
+func _enter_captivity(result: Dictionary) -> void:
 	health = 1
 	stamina = 0.0
 	enemy_retreating = true
