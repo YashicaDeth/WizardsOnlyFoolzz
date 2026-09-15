@@ -4110,9 +4110,9 @@ The last rung. Fifteen statements that are true of movement and first person whe
 - [ ] **AD10.10** `v10` Affordances say what you can do right now — **Not fully true**, per AD2.3's own note: the bottom strip shows current verbs but does not announce a *new* one the moment it becomes available. `gothic_field_hud.gd` is Lane 5's file.
 - [x] **AD10.11** `v10` It survives the change to third person without dissolving — See AD2.4. Opened and looked at both again rather than taking the old note on faith: `captures/ad2_4_field_hud_first_person.png` and `_third_person.png` show the identical location crest, hunt thread, vitals-and-weapon gauge and bottom strip over two genuinely different camera positions.
 - [x] **AD10.12** `v10` It is readable while moving, which is when it is needed — See AD2.5: `$HUD` is a `CanvasLayer` with no relationship to the 3D camera's transform, so nothing that shakes or turns the camera touches its position or legibility.
-- [ ] **AD10.13** `v10` Cybernetics change what movement is possible — Not built. See AD3.2, still open.
-- [ ] **AD10.14** `v10` A projectile is a physical thing that can be met — Not built. See AD3.3, still open; AF1.1's round travels but nothing lets a body meet or intercept one.
-- [ ] **AD10.15** `v10` A melee build can close on a launcher and live — Not built. See AD3.1, still open.
+- [ ] **AD10.13** `v10` Cybernetics change what movement is possible — Note corrected 2026-09-15: AD3.2 is now `[x]` closed, not open as this line previously claimed. Not yet re-verified whether it lands as a true v10 statement — needs a real check against AD3.2's implementation, not another status flip.
+- [ ] **AD10.14** `v10` A projectile is a physical thing that can be met — Note corrected 2026-09-15: AD3.3 is now `[x]` closed, not open as this line previously claimed. AF1.1's round-travels-but-nothing-intercepts-it gap was the separate, substantive claim here and has not been re-checked — don't assume it's resolved just because AD3.3 closed.
+- [ ] **AD10.15** `v10` A melee build can close on a launcher and live — Note corrected 2026-09-15: AD3.1 is now `[x]` closed, not open as this line previously claimed. Not yet re-verified whether it lands as a true v10 statement — needs a real check against AD3.1's implementation, not another status flip.
 
 ## AE — Sneaking, assassination and the law
 

@@ -15,6 +15,15 @@ const WOF_STACKED_PATH := "res://art/brand/wof_stacked.png"
 ## The original raster said "TO"; the screen title is intentionally
 ## "ALLUSIONS TOO GRANDEUR" and uses the corrected marked wordmark.
 const GRANDEUR_PATH := "res://art/brand/grandeur_wordmark_too.png"
+## The wordmark used to sit on flat black. These are the same poster-collage
+## source images the Wire handheld draws from (`art/derived/wire/`) — reused
+## here rather than duplicated, so the title card and the Wire read as the
+## same paper rather than two unrelated props.
+const WIRE_COLLAGE_PATHS := [
+	"res://art/derived/wire/collage_00.png",
+	"res://art/derived/wire/collage_01.png",
+	"res://art/derived/wire/collage_02.png",
+]
 const MENU_SCENE := "res://country_town_menu.tscn"
 const SPLASH_BACKDROP := preload("res://systems/splash_backdrop.gd")
 const REGAL_FRAME := preload("res://systems/regal_frame.gd")
@@ -56,6 +65,7 @@ var finishing := false
 var mark_rect: TextureRect
 var seal_rect: TextureRect
 var grandeur_rect: TextureRect
+var collage_rects: Array[TextureRect] = []
 var reveal_material: ShaderMaterial
 var grandeur_material: ShaderMaterial
 var backdrop: SplashBackdrop
@@ -98,9 +108,26 @@ func _ready() -> void:
 	glass.reveal = 1.0
 	add_child(glass)
 	move_child(glass, 2)
+	_build_collage_backdrop()
 	_build_mark_layer()
 	set_process(true)
 	queue_redraw()
+
+
+## Behind the wordmark, not competing with it: three overlapping fragments
+## rather than one flat poster, tinted toward the same copper/blood palette
+## as the frame and glass so it reads as one card instead of a wordmark
+## pasted over borrowed art.
+func _build_collage_backdrop() -> void:
+	for path in WIRE_COLLAGE_PATHS:
+		var rect := TextureRect.new()
+		rect.texture = _load_texture(path)
+		rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rect.modulate = Color(0.95, 0.55, 0.42, 0.0)
+		add_child(rect)
+		collage_rects.append(rect)
 
 
 func _build_mark_layer() -> void:
@@ -178,6 +205,8 @@ func _process(delta: float) -> void:
 ## because it never had a separate icon to hand off from.
 func _update_grandeur_visibility() -> void:
 	grandeur_rect.visible = stage == Stage.GRANDEUR
+	for rect in collage_rects:
+		rect.visible = stage == Stage.GRANDEUR
 	if stage != Stage.GRANDEUR:
 		return
 	if grandeur_rect.texture == null:
@@ -196,6 +225,10 @@ func _update_grandeur_visibility() -> void:
 	# title itself fade on instead of appearing at full brightness behind it.
 	grandeur_rect.modulate = Color(1, 1, 1, reveal * out_alpha)
 	grandeur_rect.material.set_shader_parameter("progress", reveal)
+	# Capped well under full opacity — this is paper behind the wordmark, not
+	# a second thing fighting it for the eye.
+	for rect in collage_rects:
+		rect.modulate.a = reveal * out_alpha * 0.5
 	# The cold-open mark used to fill most of the frame, which made the image
 	# beneath it feel like a cropped wallpaper.  Leave a real perimeter so the
 	# room, sigil and incoming 3D tableau can establish scale before the player
@@ -266,7 +299,10 @@ func _draw() -> void:
 	# Keep the first institution card legible, but never return to the old
 	# disconnected blank screen: the audience can already read the same world
 	# that becomes the live menu a moment later.
-	var veil_alpha := 0.72 if stage == Stage.CELLOUTZ else 0.30
+	# GRANDEUR gets a much thinner veil than the other two cards: the whole
+	# point of the collage backdrop is that it shows, not that it sits under
+	# the same near-opaque wash CELLOUTZ and MARK use for legibility.
+	var veil_alpha := 0.72 if stage == Stage.CELLOUTZ else (0.16 if stage == Stage.GRANDEUR else 0.30)
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.012, 0.01, veil_alpha), true)
 	match stage:
 		Stage.CELLOUTZ:
