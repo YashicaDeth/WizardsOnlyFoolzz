@@ -2585,7 +2585,7 @@ the game's own voice, not a fade to a store page.
 - [x] **P4.2** Measured, not estimated — a real run timed end to end — `Time.get_ticks_msec()` around the actual scene chain (`boot_splash.tscn` -> `country_town_menu.gd::_start_demo()` -> `decanting_prologue.gd` -> `Interstitial.travel()` -> `vat_chamber.tscn`), never a frame count; prints `DEMO_LAUNCH_ELAPSED_MS`. Scope stated in the file: headless, one machine, floor only — it is not P5.1's "a machine that is not Greg's"
 - [ ] **P4.3** Nothing in it outstays its welcome: the second derby lap, the long walk, the third menu
 - [ ] **P4.4** One moment engineered to be the thing a player describes to somebody else
-- [ ] **P4.5** A failure state that is interesting rather than a reload
+- [x] **P4.5** A failure state that is interesting rather than a reload — a lost derby heat used to leave through the exact same door a win does, relabelled `WRECKED`, with no captor and no consequence. `_finish_round("lost")` now calls `DEFEAT_ROUTER.route()`, the same F5 mechanism the Bone Yard already uses, before the scene hands off; `bone_yard_hunt.gd::_ready()` reads the resulting captivity status back off `WorldHistory` and starts the player held rather than walked in fresh. `derby_loss_capture_test.gd` drives a real loss into a real hunt-scene arrival (7/7)
 
 ### P5 — Shipping it
 - [ ] **P5.1** Runs on a machine that is not Greg's, from a clean folder
