@@ -46,7 +46,8 @@ Settled by `9c26be4`. The lane-4 agent refused the premise: instead of rewiring
 PLAY into two doors it added DEMO as its own door beside it, so the continue-runs
 screen survives and the demo still gets in. PLAY // SURVIVING WORLDS, DEMO // THE
 BEST HALF HOUR, NEW GAME, GORE SANDBOX. `demo_mode_test` 9/9 on save isolation
-in both directions. **P stopped being 0 of 45 and became 7 of 45.**
+in both directions. **P stopped being 0 of 45.** It was 7 of 45 when that
+landed; it measured **23 of 45** on 16 September.
 
 Its `.tscn` still wants "FOOLS" over "FOOLZ" and should not get it.
 

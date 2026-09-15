@@ -47,7 +47,9 @@ was no marker to resolve. Git reported success. The build was broken.
 Every other section is a system. P is the only one that *is the game* — what a
 player does in the first ten minutes and why they keep going. In Greg's own
 words: *"there needs to be a point of the game because right now it just seems
-really sandboxy."* P was 0 of 45 on 14 September and is 7 of 45 now.
+really sandboxy."* P was 0 of 45 on 14 September and measured **23 of 45** on
+16 September — the "7 of 45" that `MERGE_STATUS.md` and the first draft of this
+folder both quoted was stale on arrival.
 
 ## If you need to cross a boundary
 

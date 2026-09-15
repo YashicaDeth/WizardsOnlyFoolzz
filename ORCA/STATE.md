@@ -81,11 +81,52 @@ implementation already shipped and is committed — `arcade_vehicle.gd` has
 `condition`, `_condition_scale()` at `:207` and impact-driven degradation at
 `:432` — but its test never made it into git. See `QUEUE.md`.
 
-## Progress
+## Progress — measured 16 September
 
-`CHECKLIST.md`: **762 closed, 1022 open** (42.7%).
+`CHECKLIST.md`: **762 closed of 1784 — 42.7%.** The per-section table below
+accounts for all 1784 items exactly; nothing is unclassified.
 
-    grep -c '^- \[x\]' CHECKLIST.md ; grep -c '^- \[ \]' CHECKLIST.md
+Regenerate it with:
+
+    sed -n 's/^- \[\([x ]\)\] *~*\*\*\([A-Z][A-Z]*\)[0-9].*/\2 \1/p' CHECKLIST.md \
+      | awk '{if($2=="x")c[$1]++; else o[$1]++; s[$1]=1} END{for(k in s){t=c[k]+o[k]; printf "%-3s %4d %4d %5.1f%%\n", k, c[k], t, (c[k]*100.0/t)}}' \
+      | sort -k4 -rn
+
+| Section | Done | Total | % | | Section | Done | Total | % |
+|---|---|---|---|---|---|---|---|---|
+| A | 95 | 98 | 96.9% | | K | 18 | 48 | 37.5% |
+| B | 78 | 83 | 94.0% | | J | 11 | 30 | 36.7% |
+| AV | 32 | 38 | 84.2% | | N | 13 | 41 | 31.7% |
+| AD | 25 | 30 | 83.3% | | AU | 16 | 53 | 30.2% |
+| AN | 27 | 37 | 73.0% | | Q | 6 | 21 | 28.6% |
+| E | 39 | 55 | 70.9% | | W | 6 | 22 | 27.3% |
+| D | 33 | 48 | 68.8% | | R | 5 | 20 | 25.0% |
+| C | 37 | 54 | 68.5% | | AE | 7 | 29 | 24.1% |
+| O | 37 | 57 | 64.9% | | U | 4 | 20 | 20.0% |
+| AF | 16 | 27 | 59.3% | | AL | 6 | 31 | 19.4% |
+| F | 21 | 36 | 58.3% | | Y | 6 | 33 | 18.2% |
+| G | 25 | 44 | 56.8% | | AB | 7 | 39 | 17.9% |
+| AJ | 22 | 39 | 56.4% | | AT | 5 | 29 | 17.2% |
+| AG | 25 | 47 | 53.2% | | AQ | 3 | 23 | 13.0% |
+| **P** | **23** | **45** | **51.1%** | | T | 2 | 20 | 10.0% |
+| I | 32 | 63 | 50.8% | | AH | 3 | 41 | 7.3% |
+| AS | 18 | 36 | 50.0% | | Z, X, V | 1 | 20 ea | 5.0% |
+| L | 27 | 56 | 48.2% | | AC | 1 | 23 | 4.3% |
+| AI | 12 | 28 | 42.9% | | AR | 1 | 27 | 3.7% |
+| M | 15 | 39 | 38.5% | | S, H, AW, AP, AO, AM, AK, AA | **0** | 234 total | **0.0%** |
+
+### What the table says that the briefs do not
+
+- **P is 51.1%, not 15%.** Every doc in this repo quoted "7 of 45" — that was
+  stale before it was written down. P1.1, P1.4, P3, P4.3, P4.5, P5.2, P5.3 and
+  P5.4 had all landed. The demo lane is mid-pack, not nearly-empty.
+- **Eight sections are at literal zero** — S, H, AW, AP, AO, AM, AK, AA, and
+  together they are **234 items**, 23% of everything still open. No lane in
+  `OWNERSHIP.md` owns any of them. That is the real gap in the lane structure:
+  not that lanes collide, but that a quarter of the remaining work has no lane
+  at all.
+- The body (`B` 94%, `A` 96.9%, `AD` 83.3%, `AN` 73%) is close to finished. The
+  world and the frame budget (`X` 5%, `V` 5%, `AB` 17.9%) are barely started.
 
 ## Operational gotchas
 

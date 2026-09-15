@@ -49,8 +49,16 @@ Scope is exactly three things:
 
 ## 3. The P section — lane 4 (`lane-4-demo`)
 
-The highest-value lane in the project. P is **7 of 45**. Build on the DEMO door
-that `9c26be4` already added; do not re-litigate the menu shape.
+P is **23 of 45 (51.1%)**, measured 16 September. `MERGE_STATUS.md`'s "7 of 45"
+was already stale when written into it — P1.1, P1.4, P3, P4.3, P4.5, P5.2, P5.3
+and P5.4 had all landed. **This changes the lane's priority**: P is no longer
+the near-empty section the briefs describe, it is middle of the pack and ahead
+of `I`. Re-measure before treating it as the top of the queue:
+
+    grep -cE '^- \[x\] *~*\*\*P[0-9]' CHECKLIST.md
+
+Build on the DEMO door that `9c26be4` already added; do not re-litigate the
+menu shape.
 
 Pick the next two or three open `P` items that give the first ten minutes a
 point, rather than items that add more systems. Re-verify `demo_mode_test`
