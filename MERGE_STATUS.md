@@ -59,7 +59,29 @@ to fix it by restoring the committed copy. The committed copy was the broken
 one, so that advice could never have worked. Fixed in `4ec77a6`; both
 documents corrected.
 
-## The five decisions. Nothing else merges until these are answered.
+## ANSWERED by Greg, 16 September 2026
+
+Asked directly and answered in one pass. These are settled — an agent that
+reopens one is wasting a session. Recorded here rather than in any agent's
+private notes so the next session reads the call, not the argument.
+
+| # | Question | Greg's call |
+|---|---|---|
+| 1 | Which `BodyMirror` is the mirror? | **HEAD's `Node3D`.** The "do not build a second body" one. `claude/b-ladder`'s `SubViewport` version does not land; its other 14 commits still can, keeping HEAD's `body_mirror.gd`. |
+| 2 | Are the two `Sephiroth` classes one system or two? | Moot — `agent-c` is already merged (0 unmerged as of 16 Sep). |
+| 3 | Which system owns where a save file lives? | **HEAD's** `active_save_path()` / `save_path_for_slot()` / `_active_save_slot`. `codex/sol-agent-1`'s `_current_path()` / `active_slot_id` / AG5.11 slot manifest does not win the path logic; its other commits can land on top of HEAD's shape. This also unblocks `integration-check-agent-a`'s `P2.3`. |
+| 4 | `integration-check-agent-a` | Already resolved in practice by `9c26be4`. |
+| 5 | Is `codex/controls-ui-repair` still wanted? | **Redo it fresh on trunk.** The branch is dead as a merge source — 4 commits, a `WIP:` tip, 32 conflict hunks across 13 files, one of them a merge commit. The *work* is still wanted: re-do the controls-UI repair as a new task against current HEAD. Do not attempt to merge or cherry-pick the branch. |
+
+### Still open — do NOT act on this one
+
+`J1.3`/`X1.3`, deleting `game/addons/fmod/` (239MB, untracked, referenced by
+zero real game script): **asked and deliberately deferred.** Greg was not sure
+what the directory was and did not want game content deleted on a guess. It is
+audio middleware, not authored content, but the call is his and he has not made
+it. Leave the directory alone until he says otherwise.
+
+## The five decisions, as originally posed
 
 Each is the same failure: **two agents built one system in two places.** Git
 cannot choose, and neither should an agent. One line from you unblocks each.
