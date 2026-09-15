@@ -83,6 +83,23 @@ var _runnels: Array = []
 var _specimen: XraySpecimen = null
 var _rain: Array = []
 
+## P1.1/P2.4. `OpeningDirector.advance()` had no caller anywhere in real
+## gameplay — only in tests — so `stage()` never left "none" and
+## `resume_destination()` always sent a resumed run back to the Growing
+## Floor, however far it had actually gotten. Every forward step of the
+## opening (`vat_chamber` -> `rift_derby` -> `bone_yard_hunt`) already
+## travels through this one chokepoint, so the stage is recorded on arrival
+## here rather than reaching into three other lanes' scenes to call it from
+## each of them. `bone_yard_hunt.tscn` is the arrival for a lost heat as well
+## as a won one (`rift_derby.gd::_leave_derby` sends both there — O10.12,
+## losing is not dying) — `won_derby` marks "the pit is behind you", which is
+## what `resume_destination()` actually needs, not literal victory.
+const STAGE_ON_ARRIVAL := {
+	"res://vat_chamber.tscn": "woke",
+	"res://rift_derby.tscn": "entered_pit",
+	"res://bone_yard_hunt.tscn": "won_derby",
+}
+
 
 func _ready() -> void:
 	layer = 128
@@ -144,8 +161,10 @@ func travel(scene_path: String, travel_caption: String = "") -> void:
 			await tree.process_frame
 			held += tree.root.get_process_delta_time()
 	progress = 1.0
+	var reached := false
 	if packed != null:
 		tree.change_scene_to_packed(packed)
+		reached = true
 	else:
 		# Threaded loading is the fast path, not the only one: a failure here
 		# must still put the player in the scene rather than stranding them on
@@ -153,6 +172,10 @@ func travel(scene_path: String, travel_caption: String = "") -> void:
 		var error := tree.change_scene_to_file(scene_path)
 		if error != OK:
 			push_error("Interstitial could not reach %s (%d)" % [scene_path, error])
+		else:
+			reached = true
+	if reached and STAGE_ON_ARRIVAL.has(scene_path):
+		OpeningDirector.advance(str(STAGE_ON_ARRIVAL[scene_path]))
 	await tree.process_frame
 	BaselineHuman.restore_blood(tree.current_scene)
 	# The floor exists so a cached scene does not flash the plate for two frames.
