@@ -16,6 +16,16 @@ const IMPACT_SPEED := 4.0
 ## clean AI run, while barrier hits still reach well above four. Cars therefore
 ## use the lower measured threshold; scenery keeps the old one.
 const VEHICLE_IMPACT_SPEED := 3.0
+## V1.1. How much condition a hard impact actually costs, scaled by how far
+## past the impact threshold the closing speed was and by this car's own
+## `self_share` of it (`_resolve_contacts` already computes both for the
+## `impact` signal) — a graze right at the threshold costs almost nothing and
+## a hard, square hit costs real integrity, the same distinction
+## `_kick_apart`'s own stun scaling already draws.
+const CONDITION_DAMAGE_PER_SPEED := 0.016
+## Below this, grip and steering authority (V1.2) stop degrading further — a
+## wrecked car should read as crippled, not as a brick nobody can move.
+const MIN_CONDITION_SCALE := 0.5
 ## Ramming reads as discrete blows rather than one long scrape: a pair that has
 ## just traded a hit cannot score again until this elapses.
 const CONTACT_LOCKOUT_MSEC := 520
@@ -138,6 +148,14 @@ const FUEL_BURN_PER_SECOND := 0.012
 var throttle := 0.0
 var steering := 0.0
 var fuel := 1.0
+## V1.1. Hull integrity — the same shape `condition` already takes on the
+## handheld (`handheld_device.gd`, C1.8) and a weapon's own wear
+## (`hunter_arsenal.gd`, AN2.4): one 0..1 number, "condition, not fracture"
+## per `DESIGN/DESTRUCTION.md` rather than a second, continuously-deforming
+## representation of the mesh. 1.0 is pristine. Never healed here, the same
+## one-way rule those two already run on — repair (V1.4) does not exist yet,
+## so there is deliberately no verb anywhere that raises this back up.
+var condition := 1.0
 ## Highest normal closing speed seen at a real body contact. Kept as telemetry
 ## so balance tests can distinguish "never touched" from "threshold too high".
 var max_contact_closing := 0.0
@@ -182,6 +200,12 @@ static func bottomed_out() -> bool:
 static func rest_contact_y() -> float:
 	var anchor: Vector3 = WHEEL_ANCHORS[0]
 	return anchor.y - (SUSPENSION_REST + WHEEL_RADIUS - rest_compression())
+
+
+## V1.2. 1.0 pristine, floored at `MIN_CONDITION_SCALE` rather than 0 — a
+## wrecked car is crippled, not undrivable.
+func _condition_scale() -> float:
+	return lerpf(MIN_CONDITION_SCALE, 1.0, condition)
 
 
 ## Per-wheel state, kept for the AI, the audio and the camera to read.
@@ -248,6 +272,10 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	# reduce *authority* at low speed the way the old servo did - at a standstill
 	# the wheels still point, they simply have nothing to push against yet.
 	steer *= lerpf(1.0, 0.45, clampf(absf(signed_speed) / DRIVE_SPEED, 0.0, 1.0))
+	# V1.2. Damage read back into handling — a beaten-up rack turns less, not
+	# just looks worse. Same floor `limit` below uses, so a wrecked car goes
+	# soft rather than inert.
+	steer *= _condition_scale()
 
 	for index in WHEEL_ANCHORS.size():
 		var anchor: Vector3 = WHEEL_ANCHORS[index]
@@ -282,7 +310,11 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		# --- tire ---------------------------------------------------------
 		# Grip is a friction limit against this wheel's own load, which is what
 		# makes weight transfer matter rather than just look like it does.
-		var limit := load * TIRE_GRIP
+		# V1.2. Also the one constraint drive force, braking and lateral
+		# correction all clamp against below, so scaling it by condition is
+		# enough to make a hard-hit car both grippier-feeling and weaker to
+		# accelerate at once, rather than tuning each force separately.
+		var limit := load * TIRE_GRIP * _condition_scale()
 		var steered := forward if not FRONT_WHEELS.has(index) else forward.rotated(up, steer).normalized()
 		var lateral_axis := steered.cross(up).normalized()
 		var lateral_speed := point_velocity.dot(lateral_axis)
@@ -386,6 +418,10 @@ func _resolve_contacts(state: PhysicsDirectBodyState3D) -> void:
 		# How much of the closing speed this body brought decides which car wears
 		# the damage, so parking in the pit is not a way to farm wrecks.
 		var self_share := clampf(maxf(0.0, -previous_velocity.dot(normal)) / maxf(closing, 0.01), 0.0, 1.0)
+		# V1.1. The same closing speed and share that already decide the
+		# `impact` signal's payload also decide condition — one real number
+		# instead of a second damage model computed separately downstream.
+		condition = clampf(condition - maxf(0.0, closing - impact_threshold) * CONDITION_DAMAGE_PER_SPEED * self_share, 0.0, 1.0)
 		impact.emit.call_deferred(other, closing, self_share)
 	if pressed.length_squared() > 0.0:
 		contact_seconds += state.step

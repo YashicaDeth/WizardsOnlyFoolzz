@@ -95,20 +95,12 @@ const SLOW_SCALE := 0.14
 const TRACE_RANGE := 90.0
 const SANDBOX_SUBJECT := "sandbox_player"
 
-## What the sandbox is holding, named once. `HeldGear` builds the model and the
-## grip, `Ballistics` fires the round: the model and the calibre come from the
-## same three lines so the thing in your hands cannot drift away from the thing
-## that leaves it. The pairing is the Hunt's own (`sidearm` / `pistol`), not a
-## sandbox-only weapon that would then be the only one nobody balances.
-const SHOT_WEAPON := "sidearm"
-const SHOT_GRIP := "pistol"
-const SHOT_CALIBRE := "pistol"
-## What a round of `SHOT_CALIBRE` does when it arrives carrying everything it
-## left with. Scaled by what it has actually still got — see `_on_round_hit()` —
-## so a round that has spent itself crossing the room lands lighter, which is
-## the whole reason the energy is carried on the round at all.
-const SHOT_DAMAGE := 46.0
-const SHOT_IMPULSE := 30.0
+## AF6. What the sandbox is holding is `HunterArsenal`'s own real state now —
+## the same `WEAPONS` table and ammo/reload/jam machinery the Hunt runs on —
+## not one fixed pairing hand-picked for the sandbox. `configure()` is never
+## called: that method exists to hang weapon models off a body rig's arm for
+## third-person, and this room has no rig, only a camera (see `view_gear`
+## below), so `HunterArsenal` is used here purely for its weapon logic.
 ## Rounds are only this scene's to resolve if they say so. `Ballistics` is a
 ## shared system and the Hunt fires through one too; a handler that resolved
 ## anything arriving anywhere would eventually resolve somebody else's shot.
@@ -158,6 +150,10 @@ var last_note := ""
 var note_life := 0.0
 
 
+## AF6. Real weapon state — current weapon, ammo, reload, jam — shared with
+## the Hunt rather than reinvented for the range. `configure()` is skipped
+## (see the comment above `SHOT_SOURCE`); only the logic is borrowed.
+var arsenal: HunterArsenal
 ## The gun you are actually holding. `HeldGear` is the project's weapon
 ## presentation — swept geometry, real hands, a grip table — and it is a plain
 ## `Node3D` that poses itself, so the sandbox mounts one on the camera rather
@@ -203,6 +199,12 @@ func _ready() -> void:
 	# The whole of the fix. A round decides what it did when it gets there.
 	ballistics.round_hit.connect(_on_round_hit)
 	ballistics.round_expired.connect(_on_round_expired)
+	arsenal = HunterArsenal.new()
+	add_child(arsenal)
+	# Starts on the sidearm — the same weapon the range always opened on before
+	# AF6, so nobody's muscle memory for "LMB shoots a pistol" breaks. Switching
+	# away from it is the new part, not the default.
+	arsenal.select_slot(HunterArsenal.SLOT_ORDER.find("sidearm"))
 	_build_view_gear()
 	# AU3.5. The same station the shed and the Hunt Grounds drop - the sandbox
 	# does not get its own layout, because a sandbox-only list is a list that
@@ -440,30 +442,90 @@ func _blast_light(at: Vector3, force: float) -> void:
 		(chunk as RigidBody3D).apply_central_impulse(lift * (1.0 - distance / reach) * force * 0.16)
 
 
-## The trigger, and nothing but the trigger. One real round leaves the barrel
-## carrying the mark that says whose it is; the brass comes off it; the gun goes
-## back into the frame and the sight climbs. No anatomy is touched here, because
-## the round has not arrived anywhere yet — that is the entire point.
+## The trigger, and nothing but the trigger for a firearm — one real round
+## leaves the barrel carrying the mark that says whose it is and what it will
+## do when it lands (AF6.1: the current `HunterArsenal` weapon's own real
+## damage/impulse/type, not one number fixed for the whole room); the brass
+## comes off it; the gun goes back into the frame and the sight climbs. No
+## anatomy is touched here, because the round has not arrived anywhere yet —
+## that is the entire point. The sword has no round to fire, so it swings
+## through `_melee_swing()` instead.
 func _fire() -> void:
+	if str(arsenal.current().get("kind", "")) == "melee":
+		_melee_swing()
+		return
+	var attack: Dictionary = arsenal.begin_attack()
+	if not bool(attack.get("accepted", false)):
+		match str(attack.get("reason", "")):
+			"empty": _note("DRY // [T] RELOAD")
+			"jammed": _note("JAMMED // [T] CLEAR")
+			_: _note("BUSY")
+		return
 	var along := -camera.global_transform.basis.z
 	var start := camera.global_position + along * 0.6
+	# `shot_directions()` returns one direction for a single-pellet weapon and
+	# several for a shotgun — mirrors `bone_yard_hunt.gd`'s own
+	# `_resolve_firearm()` exactly, calibre included, so the range and the Hunt
+	# can never quietly disagree about what "buck" means.
+	var directions: Array[Vector3] = arsenal.shot_directions(along, Vector3.UP)
+	var calibre := "buck" if directions.size() > 1 else "pistol"
 	spent += 1
-	_shot_serial += 1
-	ballistics.fire(start, along, SHOT_CALIBRE, 0.0, 1, "demo", {
-		"source": SHOT_SOURCE,
-		"shot": _shot_serial,
-	})
-	# The streak is drawn from where the gun actually is, not from the round's
-	# own start point 0.6m off the lens — the round is aimed down the camera
-	# axis so the crosshair stays honest, and the first segment of its trail is
-	# what makes it read as having come out of the barrel.
-	_seen[_shot_serial] = _muzzle_world(start)
+	for direction in directions:
+		_shot_serial += 1
+		ballistics.fire(start, direction, calibre, 0.0, 1, "demo", {
+			"source": SHOT_SOURCE,
+			"shot": _shot_serial,
+			"weapon": str(attack.get("weapon", arsenal.current_id)),
+			"damage": float(attack.get("damage", 0.0)),
+			"impulse": float(attack.get("impulse", 0.0)),
+			"damage_type": str(attack.get("damage_type", "ballistic")),
+		})
+		# The streak is drawn from where the gun actually is, not from the
+		# round's own start point 0.6m off the lens — the round is aimed down
+		# the camera axis so the crosshair stays honest, and the first segment
+		# of its trail is what makes it read as having come out of the barrel.
+		_seen[_shot_serial] = _muzzle_world(start)
 	_muzzle_flash()
 	_gear_recoil = 1.0
 	# Muzzle side only: climb and a little roll, which is the gun moving, not a
 	# hit landing. `_kick()` is contact and does not belong on a trigger pull.
 	impact_feel.kick += Vector2(randf_range(-0.3, 0.3), 1.0) * IMPACT_FEEL.KICK_GRAZE * 2.0
 	impact_feel.roll += randf_range(-1.0, 1.0) * 0.004
+	if bool(attack.get("caused_jam", false)):
+		_note("JAMMED")
+
+
+## AF6.1. A sword has no round to travel and no barrel to leave from, so a
+## swing resolves on the frame it lands rather than deferred like a firearm's
+## round — the same instant-vs-travelling split `AN2.5`'s grip already draws
+## between a cut and a shot. Reuses `_trace_body()` (already built for the
+## blast's own crosshair targeting) rather than growing a second raycast path,
+## the only new part is holding the hit to the weapon's own `reach` instead of
+## the blast's much longer `TRACE_RANGE`.
+func _melee_swing() -> void:
+	var attack: Dictionary = arsenal.begin_attack()
+	if not bool(attack.get("accepted", false)):
+		return
+	_gear_recoil = 1.0
+	var along := -camera.global_transform.basis.z
+	var start := camera.global_position + along * 0.6
+	var reach := float(attack.get("range", 3.0))
+	var found := _trace_body(start, along)
+	if found.is_empty() or camera.global_position.distance_to(found.get("position", start)) > reach:
+		_note("MISS")
+		return
+	var rig: BaselineHuman = found["rig"]
+	var zone: String = found["zone"]
+	var damage_type := str(attack.get("damage_type", "cut"))
+	var result: Dictionary = rig.hit(zone, float(attack.get("damage", 0.0)), float(attack.get("impulse", 0.0)), damage_type, "", along)
+	if not bool(result.get("accepted", true)):
+		_note("%s ALREADY GONE" % _spoken(zone))
+		return
+	var off := bool(result.get("severed", false))
+	if off:
+		severed_total += 1
+	_kick(0.9, damage_type, off, HITSTOP_SHOT)
+	_note("%s OFF" % _spoken(zone) if off else "HIT // %s" % _spoken(zone))
 
 
 ## Where a round of this scene's ended up, on the frame it actually got there.
@@ -516,16 +578,22 @@ func _on_round_hit(hit: Dictionary) -> void:
 	# What it still had when it got here, against what it had leaving the
 	# barrel. Near one at this range; well under one for anything that has had
 	# to cross the room, which is the difference a travelling round buys.
-	var muzzle_energy := _muzzle_energy(str(hit.get("calibre", SHOT_CALIBRE)))
+	var muzzle_energy := _muzzle_energy(str(hit.get("calibre", "pistol")))
 	var carried := clampf(float(hit.get("energy", 0.0)) / maxf(muzzle_energy, 0.001), 0.12, 1.4)
-	var result: Dictionary = rig.hit(zone, SHOT_DAMAGE * carried, SHOT_IMPULSE * carried, "ballistic", "", direction)
+	# AF6.1. Read off the round's own payload rather than one fixed number —
+	# `_fire()` carries the weapon that actually fired it, so a shotgun pellet
+	# and a pistol round no longer do identical damage.
+	var damage := float(payload.get("damage", 46.0))
+	var impulse := float(payload.get("impulse", 30.0))
+	var damage_type := str(payload.get("damage_type", "ballistic"))
+	var result: Dictionary = rig.hit(zone, damage * carried, impulse * carried, damage_type, "", direction)
 	if not bool(result.get("accepted", true)):
 		_note("%s ALREADY GONE" % _spoken(zone))
 		return
 	var off := bool(result.get("severed", false))
 	if off:
 		severed_total += 1
-	_kick(0.7 * carried, "ballistic", off, HITSTOP_SHOT)
+	_kick(0.7 * carried, damage_type, off, HITSTOP_SHOT)
 	_note("%s OFF" % _spoken(zone) if off else "HIT // %s" % _spoken(zone))
 
 
@@ -575,20 +643,13 @@ func _build_view_gear() -> void:
 	# against, which is the only part of the Hunt's viewmodel path that cannot
 	# come across. `HeldGear` poses itself off `GRIPS[...].rest`, in view space.
 	camera.add_child(view_gear)
-	view_gear.take(SHOT_WEAPON, SHOT_GRIP)
+	view_gear.take(arsenal.current_id)
 	_gear_rest = view_gear.position
 
 	muzzle_point = Node3D.new()
 	muzzle_point.name = "Muzzle"
 	camera.add_child(muzzle_point)
-	# The weapon's own muzzle anchor, expressed in the camera's space, so the
-	# flash sits on the end of the barrel that is actually modelled rather than
-	# at a number somebody guessed.
-	muzzle_point.position = Vector3(0.09, -0.17, -0.44)
-	if view_gear.weapon != null and is_instance_valid(view_gear.weapon):
-		var anchor := view_gear.weapon.get_node_or_null("anchor_muzzle") as Node3D
-		if anchor != null:
-			muzzle_point.position = view_gear.transform * (view_gear.weapon.transform * anchor.position)
+	_refresh_muzzle_anchor()
 
 	_flash_light = OmniLight3D.new()
 	_flash_light.light_color = Color("ffcf8a")
@@ -614,6 +675,37 @@ func _build_view_gear() -> void:
 	_flash_cone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_flash_cone.visible = false
 	muzzle_point.add_child(_flash_cone)
+
+
+## The weapon's own muzzle anchor, expressed in the camera's space, so the
+## flash sits on the end of the barrel that is actually modelled rather than
+## at a number somebody guessed. Factored out of `_build_view_gear()` so
+## switching weapons (AF6.1) can re-anchor to the new model's barrel — a sword
+## has no `anchor_muzzle` at all, so the guessed fallback position is what a
+## melee swing's flash/kick effects sit at instead.
+func _refresh_muzzle_anchor() -> void:
+	muzzle_point.position = Vector3(0.09, -0.17, -0.44)
+	if view_gear.weapon != null and is_instance_valid(view_gear.weapon):
+		var anchor := view_gear.weapon.get_node_or_null("anchor_muzzle") as Node3D
+		if anchor != null:
+			muzzle_point.position = view_gear.transform * (view_gear.weapon.transform * anchor.position)
+
+
+## AF6.1. Every `HunterArsenal` weapon reachable in the sandbox, not just the
+## one it opened on. Declined while mid-reload/jam-clear — `select_slot()`
+## itself already refuses then — so a weapon swap can never strand a reload.
+func _switch_weapon(slot: int) -> void:
+	if slot < 0 or slot >= HunterArsenal.SLOT_ORDER.size():
+		return
+	if HunterArsenal.SLOT_ORDER[slot] == arsenal.current_id:
+		return
+	if not arsenal.select_slot(slot):
+		_note("CAN'T SWITCH // BUSY")
+		return
+	view_gear.take(arsenal.current_id)
+	_gear_rest = view_gear.position
+	_refresh_muzzle_anchor()
+	_note("EQUIPPED // %s" % str(arsenal.current().label))
 
 
 func _muzzle_world(fallback: Vector3) -> Vector3:
@@ -888,6 +980,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			var found := _trace_body(camera.global_position + along * 0.6, along)
 			var at: Vector3 = found.get("position", camera.global_position + along * 6.0)
 			_explode(at, 58.0)
+		elif click.button_index == MOUSE_BUTTON_WHEEL_UP or click.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			# AF6.1. Cycling rather than reserving three more number keys, since
+			# 1-4 already belong to the carry/substance slots and doubling a key
+			# up between two different systems is exactly the kind of thing that
+			# reads as a bug the first time somebody reaches for a smoke mid-fight.
+			var current_slot := HunterArsenal.SLOT_ORDER.find(arsenal.current_id)
+			var step := 1 if click.button_index == MOUSE_BUTTON_WHEEL_UP else -1
+			var total := HunterArsenal.SLOT_ORDER.size()
+			_switch_weapon(posmod(current_slot + step, total))
 	if event is InputEventKey and not event.echo:
 		var key := event as InputEventKey
 		var slot := _carry_slot_for_key(key.keycode)
@@ -910,6 +1011,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_X: _set_xray(not xray)
 			KEY_ESCAPE: _step_out()
 			KEY_F: _explode(camera.global_position + Vector3(0, 0.4, 0), 92.0)
+			KEY_6: _switch_weapon(HunterArsenal.SLOT_ORDER.find("sword"))
+			KEY_7: _switch_weapon(HunterArsenal.SLOT_ORDER.find("shotgun"))
+			KEY_8: _switch_weapon(HunterArsenal.SLOT_ORDER.find("sidearm"))
+			KEY_T:
+				if not arsenal.reload():
+					_note("CAN'T RELOAD")
 
 
 func _carry_slot_for_key(keycode: Key) -> int:
@@ -1036,6 +1143,10 @@ func _physics_process(delta: float) -> void:
 	# a tracer measured on the bent clock would hang in the air for a second and
 	# a half the moment slow motion is held, which is a laser, not a bullet.
 	_advance_shot_feel(real_delta)
+	# Real seconds, same as the hitstop and the tracers above — reload and jam
+	# recovery are muscle-memory timing a player is meant to be testing here,
+	# not something holding slow motion should let them cheat.
+	arsenal.tick(real_delta)
 
 	note_life = maxf(0.0, note_life - real_delta)
 	# A dose is only a gameplay feature when the player can actually see its
@@ -1096,7 +1207,8 @@ func _paint_hud() -> void:
 	CellOutzType.draw_condensed(hud, Vector2(26, 62), "WIZARDS ONLY FOOLS  //  NOTHING HERE IS A MOCK-UP", 9.0, bone * Color(1, 1, 1, 0.4), 2.2)
 
 	var keys := [
-		["LMB", "SHOOT"], ["RMB", "BLAST THERE"], ["F", "BLAST HERE"],
+		["LMB", "FIRE/SWING"], ["RMB", "BLAST THERE"], ["F", "BLAST HERE"],
+		["6-8", "WEAPON"], ["WHEEL", "CYCLE"], ["T", "RELOAD"],
 		["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"], ["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["WASD", "MOVE"],
 	]
 	var x := 26.0
@@ -1123,7 +1235,20 @@ func _paint_hud() -> void:
 		else:
 			standing += 1
 	var right_edge := size.x - 26.0
+	# AF6.1. The weapon actually equipped, read live off `arsenal` rather than
+	# a fixed label — a jam or an empty magazine is exactly the kind of thing
+	# a range needs to say out loud rather than leave the player to guess at.
+	var arsenal_state: Dictionary = arsenal.state()
+	var weapon_line := "WEAPON  %s" % str(arsenal.current().get("label", "?"))
+	if str(arsenal_state.get("kind", "")) == "firearm":
+		if bool(arsenal_state.get("jammed", false)):
+			weapon_line += "  //  JAMMED"
+		elif bool(arsenal_state.get("reloading", false)):
+			weapon_line += "  //  RELOADING"
+		else:
+			weapon_line += "  //  %d / %d" % [int(arsenal_state.get("loaded", 0)), int(arsenal_state.get("reserve", 0))]
 	var lines := [
+		weapon_line,
 		"STANDING  %d / %d" % [standing, BODY_COUNT],
 		"DOWNED	%03d" % downed,
 		"TAKEN OFF	%03d" % severed_total,
