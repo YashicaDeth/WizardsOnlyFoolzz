@@ -109,9 +109,9 @@ flat = true
 [node name="SettingsPanel" type="PanelContainer" parent="HUD"]
 visible = false
 offset_left = 50.0
-offset_top = 392.0
-offset_right = 420.0
-offset_bottom = 674.0
+offset_top = 250.0
+offset_right = 470.0
+offset_bottom = 690.0
 theme_override_styles/panel = SubResource("panel")
 
 [node name="VBox" type="VBoxContainer" parent="HUD/SettingsPanel"]

@@ -186,7 +186,7 @@ The technique already exists in this project — `xray_specimen.gd` renders a li
 - [x] **A10.5** Unwalked ground is grey and fogged, thinning at the edges of where you have been; walking brings the colour in
 - [x] **A10.9** The reveal is a gradient — clearness is read from the whole 3x3 neighbourhood, eased so the last of it comes off last
 - [x] **A10.6** The chart marks, districts, contacts and title block all still read over the image
-- [ ] **A10.7** It lives in the handheld's MAP page, so it is the black mirror looking down
+- [x] **A10.7** It lives in the handheld's MAP page, so it is the black mirror looking down — the satellite was built and worked anywhere a scene called `LivingMap.attach_world` itself. The device never did: `HandheldDevice.bind` passed the generator to the map's own `bind` and stopped, so reaching the map through the thing you actually hold left `satellite` null, `_satellite_ready()` false, and the mirror drawing the A6 chart on a dark plate while the satellite worked fine everywhere else. One call, and nothing said so. `_attach_map_world()` now hands the world down at `bind` and retries on every page open, because a device built before its region has no world to take yet. Leaving MAP also calls `close_map()` — A10.8 was true of the map and not of the device, which only ever set `visible`, so the camera kept rendering behind the WIRE page. Nine assertions in `tests/handheld_satellite_test.gd`
 - [x] **A10.8** UPDATE_DISABLED while the map is shut; one frame per open frame otherwise
 
 ### A6 — Living Map as an object `BUILT`
@@ -908,6 +908,12 @@ mass-produced by the million.
       `begin_burn()` directly (see E2.4) — binding only ever adds strokes,
       burning only ever removes them, and the two are visually distinct
       (lit copper vs. dark char) rather than the same mark tinted two colours.
+- [x] **E2.8** `v3` The board has two metals — copper is the etched trace, gold is plating, and plating goes exactly where something has to make contact: the edge connector's fourteen fingers and the chip's legs. Greg asked for *"copper and gold wiring"* and the board had only copper, which also meant a seal arriving somewhere new had no way to say so in the material
+- [x] **E2.9** `v3` Each and every one of the seventy-two is infused into the chip, not left on the board — `begin_procession()` walks the Ars Goetia in traditional order, seeding each seal off its own number times 7919 so Bael and Agares are not neighbours and the same demon is the same glyph every run. A seal burns in as before, then the same geometry collapses into the chip, copper going in and gold arriving. Seventy-two burns would have been seventy-two overlapping scars on one patch; seventy-two infusions leave a chip whose legs sit brighter the more it holds. Rendered in `tests/infusion_capture.gd`
+- [x] **E2.10** `v3` The seal's reserved patch is reserved from everything, not only from routing — two capacitors sat inside `SEAL_RADIUS` and every seal ever drawn went straight through them
+- [x] **E2.11** `v4` Copper, gold **and rust** — the third state. Copper oxidises to brown scale and then to green patina, and a board out of the Ashbloom has been doing that for years, so it is a dial rather than a colour: the same board reads as new on a bench and as scrap in a pile. Gold does not corrode, which is why it is on the contacts, and why a rusted board still has bright fingers
+- [x] **E2.12** `v4` The board is TouchDesigner-driven in the sense FINAL_V §16 actually permits — TD cannot run in a shipped game, so being "TD based" means every number worth tuning is reachable from a slider while you watch. `Motherboard.set_dial()` is the same contract `psychedelic_rig.gd` exposes and `OSCBridge.drive()` calls, so `bridge.drive(board)` is the whole wiring. Seven dials: `corrosion`, `patina`, `copper_gloss`, `gold_gloss`, `trace_glow`, `die_glow`, `chip_charge`
+- [x] **E2.13** `v4` The CPU at die scale, delidded on purpose — a heat spreader is a metal lid and hides everything worth seeing. Substrate, land grid, silicon die well under package size (the fact that makes a CPU look like a CPU), Manhattan-routed metal layers in two crossed sets, four functional blocks so the die is not a uniform mesh, and gold bond wires arcing off the die edge to substrate pads: the only curves on the whole board, which is why they read. `tests/cpu_capture.gd`
 - [x] ~~**E2.7** A bound seal keeps working while the board keeps power, and
       a burnt one is gone for the run~~ Decided in `ritual_app.gd`, not the
       board — `attempt()` reads the exact repeat count `Boons.grant()`
@@ -1104,6 +1110,17 @@ Read-only; everything derived lands in `game/art/derived/` via `tools/art_pipeli
       above adds procedural detail on top, but the base mesh itself (bonnet,
       cabin, panels) is only reachable by re-exporting from
       `art/scrap_skiff_v1/scrap_skiff.blend`.
+
+      **Scope widened by Greg, 2026-09-13:** *"this should not only just be for
+      the cars but for the whole hud and gui in the entire game."* The palette
+      is currently a remap applied at vehicle load. Making it the game's
+      palette means one source of colour that the HUD, the handheld pages, the
+      Board and the map all read from, rather than each surface carrying its
+      own constants — `living_map.gd` alone declares nine (`VOID`, `PLATE`,
+      `INK`, `ACID`, `SPORE`, `ARTERIAL`, `BILE`, `SCAN`, `BONE`), and
+      `black_mirror.gd` declares six more. That is a palette module plus a pass
+      over every drawing surface, and it is a bigger job than the re-export it
+      is written under. It should probably be its own segment.
 
 ### G0 — The wreckers cannot land a hit `OPEN BUG`
 Found 2026-09-12 by measurement, not yet fixed. A parked player finishes a
@@ -3082,6 +3099,45 @@ options a person would actually reach for and no way in that is not "start".
 - [ ] **Y1.4** Colour is not the only carrier of meaning anywhere
 - [ ] **Y1.5** Somebody can put it down and come back a week later
 
+Greg, 2026-09-13, which is most of a section on its own:
+
+> *"fixing up the main menu screen guis and making save files multiples and they
+> are little chambers that change throughout game progression but they are what
+> you start in the pods with a fetus somewhat cell in there with a plug in there
+> mouth and then you go into it and get it out after the initial first part which
+> also needs work so it should just say start game also lowkey a multiplayer and
+> online option should be there but not be selectable and have a message saying
+> soon 'if you have ideas email me in settings'."*
+
+### Y2 — The way in
+- [x] **Y2.1** One door, and it says **START GAME**. Not PLAY and DEMO, not a verb nobody uses out loud
+- [x] **Y2.2** **MULTIPLAYER** and **ONLINE** are on the menu, visible, and not selectable — a greyed line that says SOON is a promise; a missing line is nothing at all. `disabled` also takes them out of the focus order, so a controller cannot land on a dead row
+- [x] **Y2.3** And the SOON card says where to send the idea, which is the only reason to show a door you cannot open yet — one line under both doors rather than a tooltip nobody hovers on a row they cannot click
+- [ ] **Y2.4** The part before you are out of the pod is authored rather than skipped past — it is the first thing anybody plays and it is currently the roughest thing in the build
+
+### Y3 — Saves are chambers
+A save slot is a row in a list in almost every game, and I0 says no screen is a
+list of text in a box. This is the segment where that rule reaches the save menu:
+**a save is a chamber you can look into**, and what is in it is the body that
+save has grown.
+
+- [ ] **Y3.1** More than one save, and choosing one is walking a row of chambers rather than reading their filenames
+- [ ] **Y3.2** A chamber changes with the run inside it — a save forty hours deep does not look like one an hour old, and nothing about that is a progress bar
+- [ ] **Y3.3** A new save is an occupied pod: a body at fetus stage, a cell, a plug in its mouth. You are looking at what you are about to be
+- [ ] **Y3.4** Starting is **going into the chamber and taking it out**, not a fade from a button
+- [ ] **Y3.5** An empty slot is an empty chamber — drained, lit, waiting — and not a blank row with NEW GAME on it
+- [ ] **Y3.6** The machinery is already there: `AG5.11` built real multi-slot saving with a manifest per slot. This is what it looks like, not what it does
+
+### Y4 — Support, from inside the game
+- [x] **Y4.1** Settings can send mail to **wizardsonlyfoolzthegame@gmail.com** — support, bug reports, and the ideas line Y2.3 points at. `support_mail.gd`: three subjects so mail lands sorted, one mechanism. No network, no dependency, no key — it hands a `mailto:` to the machine's own client
+- [x] **Y4.2** A bug report carries the build, the seed and the run with it, because a player should not have to write down what the game already knows — build, engine, platform and timestamp gathered automatically, anything else the caller attaches, and **nothing that nobody asked for**: `context()` is separate from `compose()` so the settings page can show the player exactly what is about to go out under their name
+- [x] **Y4.3** It never silently fails: if there is no mail client it says so and gives the address to copy — `send()` returns `sent` and a `reason`, and the address either way. 23 assertions in `tests/support_mail_test.gd`, including that an ampersand in the note is encoded rather than ending the query string early, and that line breaks are CRLF so the body is not one long line
+
+**Open, and blocking a rename:** Greg does not like **"Bone Yard"**. No
+replacement given. It is the main scene (`bone_yard_hunt.gd`/`.tscn`), a district
+in `living_map.gd`'s `DISTRICTS`, and appears across `CHECKLIST.md` — so this is
+a name to decide once and change everywhere in one commit, not to drift into.
+
 
 ### Y v10 — the final pass
 The last rung. Fifteen statements that are true of getting in when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
@@ -4309,13 +4365,38 @@ you recover it, fragment by fragment, out of a thing that used to know
 everything and has been decaying since before you arrived.
 
 ### AH1 — The room
-- [ ] **AH1.1** Opening the Board puts you in a room rather than on a screen
-- [ ] **AH1.2** A bed, a mirror the size of the wall, and the light of one window
+- [x] **AH1.1** Opening the Board puts you in a room rather than on a screen — `the_room.gd`, four walls the player stands inside, built the way everything else here is: procedural geometry from primitives, nothing imported. `facing()` turns to a wall by name so a caller asks for the Board rather than computing an angle and hoping
+- [x] **AH1.2** A bed, a mirror the size of the wall, and the light of one window — one window, low and off to the side, because a room lit evenly is a menu background and a room lit from a single opening is a place. First aim put the spot into the wall it is set in, which lit nothing and made the mirror black as well: a reflection of an unlit room is an unlit reflection
 - [ ] **AH1.3** Turn to the wall and the Board is there - the corkboard already built (L)
 - [ ] **AH1.4** Turn right and the cloud terminal is there
-- [ ] **AH1.5** The mirror shows your body, current, with everything done to it (pairs with N)
+- [x] **AH1.5** The mirror shows your body, current, with everything done to it (pairs with N) — done, and the bug is worth keeping because it cost an hour of looking at the wrong thing. The reflection was correct the entire time. `tests/room_mirror_diagnostic.gd` asked the camera directly rather than squinting at renders — position, gaze, near plane, cull mask, frustum tests on head, chest and feet, and a count of pieces passing the mask — and every one of them came back right. Dumping the viewport's own texture full frame showed the body standing in the room, perfectly rendered. **The fault was the surface displaying it.** The glass was a `BoxMesh`, which puts the reflection on all six faces with the same UVs and leaves which one the viewer reads up to the geometry. A `QuadMesh` has one face and a normal, so there is nothing to get wrong. Lesson for the next one of these: when a render looks wrong, separate *what is being drawn* from *what is drawing it* before touching either
 - [ ] **AH1.6** The room is yours and it accumulates - what you leave in it stays
 - [ ] **AH1.7** Leaving is a movement, not a menu close
+
+Greg, 2026-09-13, which changes what the room *is* rather than adding to it:
+*"menus or idk index inside the phone maybe like a trapped menu inside the phone
+of a 3d modelled version of my room or using photos."*
+
+Two things follow, and the second is the bigger one. **It is a specific room**,
+not a bedroom — the poster wall is the reference photograph in
+`Art Collections`: Taxi Driver, End of Evangelion, Nausicaä, Mononoke, Silent
+Hill 2, Apocalypse Now, Dark Souls, Postal 2, Vault-Tec, the GTA map, two
+SHADOW WIZARDS sheets and the money-gang print above them, visionary panels
+filling the corner, and a persian rug across the ceiling. That wall is where
+this game's references actually come from, so putting it behind the glass is
+the game admitting what it is made of. And **the index lives there too** — not
+just the tutorial. This is house rule I0 taken to its end: no screen is a list
+of text in a box, and the last screens that still are lists stop being screens
+at all.
+
+"Trapped" is the word worth keeping. You are holding a phone, and inside the
+phone is the room you are sitting in, holding the phone.
+
+- [ ] **AH1.8** The room is a real one — the poster wall, not a generic bedroom
+- [ ] **AH1.9** Every page of the handheld is somewhere in the room; the INDEX is a place you turn to, not a list
+- [ ] **AH1.10** Built from photographs rather than modelled where that reads better — projected planes and depth from the corner, not a scanned mesh
+- [ ] **AH1.11** You are in the room, holding the phone, which contains the room. The recursion is on purpose and is visible in the mirror
+- [ ] **AH1.12** The wall accumulates: what the run does to you gets pinned up there, so the reference wall becomes a record (pairs with AH1.6)
 
 ### AH2 — REMEMBER THE CLOUD
 - [ ] **AH2.1** The cloud is an archive of everything the world used to know, in fragments

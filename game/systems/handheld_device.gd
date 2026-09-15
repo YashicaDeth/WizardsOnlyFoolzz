@@ -167,6 +167,10 @@ var _clip: Control
 var _overlay: Control
 var _index: Control
 var _map: Control
+## A10.7. Kept so the world can be handed over later than `bind`. A generator
+## that is not in the tree yet has no `World3D` to give, and the device is
+## built before the region in at least one scene.
+var _world_source: Node = null
 var _device_rect := Rect2()
 var _screen_rect := Rect2()
 var _page_rect := Rect2()
@@ -294,10 +298,31 @@ func _ready() -> void:
 	set_process(true)
 
 
+## A10.7. The world the map looks down on, taken from whatever owns the region.
+## Guarded rather than assumed: a generator that is not a `Node3D`, or not yet
+## in the tree, simply does not produce one and the map stays a chart until it
+## does.
+func _attach_map_world() -> void:
+	if _map == null or not _map.has_method("attach_world"):
+		return
+	var source := _world_source if _world_source != null else get_parent()
+	if source is Node3D and source.is_inside_tree():
+		_map.call("attach_world", (source as Node3D).get_world_3d())
+
+
 ## Handed the live world so the hosted panels and the radio read real state.
 func bind(generator: Node, director: Node, contacts: Callable) -> void:
+	_world_source = generator
 	if _map.has_method("bind"):
 		_map.bind(generator, director, contacts)
+	# A10.7. The MAP page is the satellite, not a second drawing of the same
+	# region. `LivingMap.attach_world` is what builds the downward camera, and
+	# it is deliberately never called by the map itself — "the map never goes
+	# looking for one". Nothing called it on this path, so reaching the map
+	# through the device left `satellite` null, `_satellite_ready()` false, and
+	# the black mirror showing the drawn chart on a dark plate while the
+	# satellite worked perfectly well anywhere a scene wired it directly.
+	_attach_map_world()
 	# A9.2. The town's footprints already exist on the generator; the radio
 	# borrows them rather than keeping a second copy that can drift.
 	if generator != null and "lots" in generator:
@@ -526,7 +551,16 @@ func set_mode(mode: String) -> void:
 	# Both hosted panels gate their own drawing on an open flag, so entering a
 	# mode has to open the panel as well as show it.
 	if current_mode() == "MAP" and _map.has_method("open_map"):
+		# Cheap and idempotent: `attach_world` returns immediately once the
+		# camera exists, so this is the retry for a device built before the
+		# region it looks down on.
+		_attach_map_world()
 		_map.open_map()
+	elif _map.has_method("close_map"):
+		# A10.8. Nothing renders while the map is shut — which was true of the
+		# map and not of the device, because leaving the page only ever set
+		# `visible`. The satellite kept rendering behind the WIRE page.
+		_map.close_map()
 	if current_mode() in ["INDEX", "WIRE"] and _index.has_method("open"):
 		_index.open()
 	if current_mode() == "RITUAL":
