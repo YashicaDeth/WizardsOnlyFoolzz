@@ -8,6 +8,11 @@ extends Node
 
 var scene: Node
 var out_dir := "P:/GameDev/Temp"
+## Optional `--size=WxH`. Left unset the capture keeps the window it was given,
+## so existing runs are unchanged; 1080x1920 shoots the same real beats at the
+## portrait crop a phone actually wants. `--resolution` does not do this in
+## Godot 4 - it is ignored, and every shot comes out 1280x720 anyway.
+var shot_size := Vector2i.ZERO
 
 
 func _shot(name: String) -> void:
@@ -39,7 +44,13 @@ func _ready() -> void:
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--out="):
 			out_dir = argument.trim_prefix("--out=")
-	get_window().size = Vector2i(1280, 720)
+		if argument.begins_with("--size="):
+			var parts := argument.trim_prefix("--size=").split("x")
+			if parts.size() == 2:
+				shot_size = Vector2i(int(parts[0]), int(parts[1]))
+	# The default stays 1280x720 so existing runs are unchanged; --size wins
+	# when it is given, rather than being set and then immediately overwritten.
+	get_window().size = shot_size if shot_size.x > 0 and shot_size.y > 0 else Vector2i(1280, 720)
 	await get_tree().process_frame
 
 	scene = load("res://bone_yard_hunt.tscn").instantiate()
