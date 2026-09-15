@@ -42,6 +42,8 @@ const KEYS_CARD := preload("res://systems/keys_card.gd")
 const DAMAGE_PORTRAIT := preload("res://systems/damage_portrait.gd")
 const CAB_RETICLE := preload("res://systems/cab_reticle.gd")
 const BREAKABLE_PROP := preload("res://systems/breakable_prop.gd")
+const WORLD_DEBRIS := preload("res://systems/world_debris.gd")
+const VEHICLE_PART_POOL := "vehicle_part"
 const OPENING := preload("res://systems/opening_director.gd")
 
 ## The bezel `celloutz_hud.gd` draws for the driver, in its own coordinates, so
@@ -363,6 +365,22 @@ func _build_world() -> void:
 ## light from the sky and the few remaining floodlights.
 static func arena_light_budget() -> int:
 	return 4 if WorldLook.quality == WorldLook.Quality.PERFORMANCE else 8
+
+
+## AB1.3/AB1.6. Detached panels used to have no shared budget at all — only a
+## per-vehicle guard against detaching the same named part twice. Twelve
+## wreckers each shedding six real `RigidBody3D` parts is up to 72 uncapped
+## physics bodies with nothing measuring the cost. They are heavier than a
+## barricade fragment, so the budget is tighter for the same reason a whole
+## wrecked car costs more frame than a splinter of one.
+static func vehicle_part_budget() -> int:
+	match WorldLook.quality:
+		WorldLook.Quality.ULTRA:
+			return 24
+		WorldLook.Quality.PERFORMANCE:
+			return 8
+		_:
+			return 16
 
 
 ## Destroyable obstacles live toward the edge of the racing line. They are in
@@ -1212,7 +1230,11 @@ func _detach_vehicle_part(target: Node3D, part_name: String, impact_direction: V
 	loose.apply_central_impulse(impact_direction * 210.0 + Vector3.UP * 95.0)
 	loose.apply_torque_impulse(Vector3(35, 80, 24))
 	part.queue_free()
-	get_tree().create_timer(14.0).timeout.connect(loose.queue_free)
+	# AB1.3. This used to be freed on a flat 14-second timer no matter how far
+	# under budget the pit was — a car door that comes off is meant to be a
+	# real thing on the ground, not a VFX particle with a lifespan. It now
+	# persists until the shared pool actually needs the room.
+	WORLD_DEBRIS.register(loose, {"kind": "vehicle_part", "part": part_name, "vehicle": target.name}, VEHICLE_PART_POOL, vehicle_part_budget())
 	WorldHistory.record_event("vehicle_part_detached", {"vehicle": target.name, "part": part_name})
 
 
