@@ -305,6 +305,10 @@ func _ready() -> void:
 		WorldHistory.record_event("npc_resolution", {"subject_id": "capture_boss", "outcome": "execute", "actor": "player"})
 		for _hold in 90:
 			await get_tree().physics_frame
+	elif trigger == "keys":
+		scene.keys_card.toggle()
+		for _hold in 6:
+			await get_tree().process_frame
 	elif trigger == "arsenal":
 		scene.third_person = true
 		scene._equip_weapon(1)

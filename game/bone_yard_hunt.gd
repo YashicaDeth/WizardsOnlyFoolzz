@@ -4461,7 +4461,9 @@ func _build_keys_card() -> void:
 			["1 2 3", "SWORD / SHOTGUN / PISTOL"],
 			["4", "CARRIED LIMB"],
 			["5", "PUT THEM DOWN"],
+			["B", "CYCLE GRIP"],
 			["R", "RELOAD"],
+			["Q", "PROSTHETIC SURGE // COSTS STAMINA"],
 			["HOLD Q", "X-RAY, THEN THE WHEEL"],
 		]},
 		{"group": "HANDS ON", "rows": [
@@ -4480,6 +4482,7 @@ func _build_keys_card() -> void:
 			["P", "THE BOARD"],
 			["J", "ALLUSIONS / SIGIL"],
 			["HOLD L", "LEAN INTO THE SCREEN"],
+			["K", "RE-DECANT // A RESET THAT COSTS YOU"],
 			["ESC", "CLOSE"],
 		]},
 	])
