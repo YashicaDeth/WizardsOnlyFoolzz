@@ -173,6 +173,16 @@ var _gear_recoil := 0.0
 var _shot_serial := 0
 ## Where each of this scene's rounds in flight was last seen, by serial.
 var _seen: Dictionary = {}
+## AF6.2. When each of this scene's rounds actually left the barrel, by
+## serial — the other half of a real travel-time readout, since `_on_round_hit()`
+## only ever learns when a round arrived.
+var _fire_time: Dictionary = {}
+## AF6.2. What the range is supposed to teach: not a number invented for the
+## HUD, but exactly the numbers `_on_round_hit()` already computes to resolve
+## the hit itself — real distance, real travel time, and the real fraction of
+## muzzle energy a round still had carrying it (drag/drop's actual effect,
+## not a separate cosmetic stat standing in for it).
+var last_shot_readout: Dictionary = {}
 var _tracers: Array = []
 
 var station: Node3D
@@ -485,6 +495,7 @@ func _fire() -> void:
 		# the camera axis so the crosshair stays honest, and the first segment
 		# of its trail is what makes it read as having come out of the barrel.
 		_seen[_shot_serial] = _muzzle_world(start)
+		_fire_time[_shot_serial] = Time.get_ticks_msec()
 	_muzzle_flash()
 	_gear_recoil = 1.0
 	# Muzzle side only: climb and a little roll, which is the gun moving, not a
@@ -545,9 +556,18 @@ func _on_round_hit(hit: Dictionary) -> void:
 	# The last stretch of the flight, from wherever it was last seen to where it
 	# stopped. Without this a round that crossed the room inside one physics
 	# frame would leave no trail at all.
+	var muzzle_position := at
 	if _seen.has(serial):
+		muzzle_position = _seen[serial]
 		_streak(_seen[serial], at)
 		_seen.erase(serial)
+	# AF6.2. The other half of the streak above: not where it travelled, but
+	# how long it took — real muzzle-to-target time, not a number the HUD
+	# invents. `_fire_time` has no entry once a round has already resolved,
+	# so a stale serial (should not happen; kept as a safety default) reads
+	# as zero travel rather than a huge, meaningless duration.
+	var fired_at_msec: int = int(_fire_time.get(serial, Time.get_ticks_msec()))
+	_fire_time.erase(serial)
 
 	var struck := hit.get("collider") as Node
 	var rig: BaselineHuman = null
@@ -580,6 +600,18 @@ func _on_round_hit(hit: Dictionary) -> void:
 	# to cross the room, which is the difference a travelling round buys.
 	var muzzle_energy := _muzzle_energy(str(hit.get("calibre", "pistol")))
 	var carried := clampf(float(hit.get("energy", 0.0)) / maxf(muzzle_energy, 0.001), 0.12, 1.4)
+	# AF6.2. "Bullets are readable here" — not a stat invented for the HUD,
+	# the exact real distance/travel-time/energy numbers this function just
+	# used to resolve the hit itself, shown rather than only acted on. What
+	# a round dragged off between the barrel and the body is `1.0 - carried`;
+	# real drag against a real distance is why it is not 1.0 every time.
+	last_shot_readout = {
+		"calibre": str(hit.get("calibre", "pistol")),
+		"distance": muzzle_position.distance_to(at),
+		"travel_ms": Time.get_ticks_msec() - fired_at_msec,
+		"energy_pct": carried,
+		"zone": zone,
+	}
 	# AF6.1. Read off the round's own payload rather than one fixed number —
 	# `_fire()` carries the weapon that actually fired it, so a shotgun pellet
 	# and a pistol round no longer do identical damage.
@@ -1260,6 +1292,19 @@ func _paint_hud() -> void:
 		# there for seconds on end while slow motion is held.
 		"IN FLIGHT  %03d" % _rounds_in_flight(),
 	]
+	# AF6.2. The last shot, read back rather than only felt: real distance,
+	# real travel time, and how much muzzle energy actually survived the
+	# trip — drag's real effect against a real number, not a cosmetic stat.
+	if not last_shot_readout.is_empty():
+		lines.append("LAST SHOT  %s @ %.1fm" % [
+			str(last_shot_readout.get("calibre", "?")).to_upper(),
+			float(last_shot_readout.get("distance", 0.0)),
+		])
+		lines.append("  %dms TRAVEL // %d%% ENERGY // %s" % [
+			int(last_shot_readout.get("travel_ms", 0)),
+			roundi(float(last_shot_readout.get("energy_pct", 1.0)) * 100.0),
+			_spoken(str(last_shot_readout.get("zone", ""))),
+		])
 	var y := 40.0
 	for line: String in lines:
 		var width := CellOutzType.width_condensed(line, 11.0, 2.0)

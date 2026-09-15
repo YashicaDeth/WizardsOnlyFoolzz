@@ -25,6 +25,7 @@ const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
 const BONE_YARD_ENVIRONMENT := preload("res://art/bone_yard_environment.glb")
 const DERBY_AUDIO := preload("res://systems/procedural_derby_audio.gd")
 const VEHICLE := preload("res://systems/arcade_vehicle.gd")
+const BALLISTICS := preload("res://systems/ballistics.gd")
 const AI_DRIVER := preload("res://systems/derby_ai_driver.gd")
 ## At most this many wreckers may hunt the player at once, and not from the
 ## opening horn: the cap ramps in over ENGAGE_RAMP seconds. Every car targeting
@@ -45,6 +46,23 @@ const BREAKABLE_PROP := preload("res://systems/breakable_prop.gd")
 const WORLD_DEBRIS := preload("res://systems/world_debris.gd")
 const VEHICLE_PART_POOL := "vehicle_part"
 const OPENING := preload("res://systems/opening_director.gd")
+const RINGMASTER_CARD := preload("res://systems/ringmaster_card.gd")
+
+## AP1.5/AP1.6. Set true only by `underground_colosseum.tscn` — every other
+## behaviour in this file is unchanged for the existing `rift_derby.tscn`
+## when this stays false, on purpose: this script is heavily tested and
+## tuned, and the colosseum is a new venue built on top of it, not a
+## replacement for it. Where the two diverge (`_build_world()`, the win
+## sequence) is marked with this flag rather than forked into a second file.
+@export var is_colosseum := false
+const RINGMASTER_SLOT := "ringmaster"
+var ringmaster_rig: BaselineHuman
+var ringmaster_card: Control
+var _ringmaster_walk_clock := 0.0
+var _ringmaster_walking := false
+var ringmaster_active := false
+var _ringmaster_start := Vector3.ZERO
+var _ringmaster_mark := Vector3.ZERO
 
 ## The bezel `celloutz_hud.gd` draws for the driver, in its own coordinates, so
 ## the bust lands inside the frame instead of beside it. Kept next to the
@@ -109,6 +127,33 @@ var keys_card: Control
 var _cab_seat := Vector3.ZERO
 var fire_cooldown := 0.0
 var rounds_left := 12
+## AF1.8/AF10.8. The cab gun's real ammo/reload/jam state — the Hunt's own
+## `HunterArsenal`, fixed to the sidearm, rather than the plain `rounds_left`
+## int this file tracked on its own before. `rounds_left`/`fire_cooldown`
+## stay as the HUD-facing mirrors everything downstream already reads; only
+## where they come from changes.
+var cab_arsenal: HunterArsenal
+## AF1.8/AF10.8. A real, shared `Ballistics` instance so the cab gun fires an
+## actual travelling round — the same system the Hunt and the gore sandbox
+## fire through — instead of an instant invisible raycast with nothing
+## visible ever leaving the barrel.
+var ballistics: Node3D
+var _cab_shot_serial := 0
+## Rounds are only this scene's to resolve if they say so, same rule
+## `gore_demo.gd`'s `SHOT_SOURCE` already follows: `Ballistics` is shared,
+## and a handler that resolved anything arriving anywhere would eventually
+## resolve somebody else's shot.
+const CAB_SHOT_SOURCE := "derby_cab"
+## AF1.8/AF10.8. A pistol round covers tens of metres between one physics
+## frame and the next — the base round mesh alone reads as nothing coming
+## out of the barrel at all, the exact complaint `gore_demo.gd`'s own
+## `_streak()` already exists to answer. Same fix, ported rather than
+## reinvented: where each round was seen leaving the barrel, so the segment
+## it actually crossed can be drawn once it lands.
+var _cab_seen: Dictionary = {}
+var _cab_tracers: Array = []
+const CAB_TRACER_LIFE := 0.16
+const CAB_TRACER_WIDTH := 0.03
 var derby_audio: Node
 var kill_cam: Control
 var pit_radio: Control
@@ -128,6 +173,16 @@ func _ready() -> void:
 	_apply_gore_setting()
 	_build_world()
 	_build_boat()
+	# AF1.8/AF10.8. Fixed to the sidearm — a mounted cab gun, not a full
+	# loadout switch while driving, which nobody asked for and which would
+	# need its own key that is not free in this scene.
+	cab_arsenal = HunterArsenal.new()
+	add_child(cab_arsenal)
+	cab_arsenal.select_slot(HunterArsenal.SLOT_ORDER.find("sidearm"))
+	ballistics = BALLISTICS.new()
+	ballistics.name = "CabBallistics"
+	add_child(ballistics)
+	ballistics.round_hit.connect(_on_cab_round_hit)
 	if OS.get_environment("ATG_HUD_CAPTURE") != "1":
 		_spawn_targets()
 	if OS.get_environment("ATG_HUD_CAPTURE") != "1":
@@ -256,7 +311,14 @@ func _physics_process(delta: float) -> void:
 	fire_cooldown = maxf(0.0, fire_cooldown - delta)
 	if leaving_on_foot:
 		# AG3.3. Nothing else runs while the body is getting out. The heat is
-		# over for you the moment you open the door.
+		# over for you the moment you open the door. AP1.6: once the ringmaster
+		# encounter takes over, its own camera/beat runs instead — the climb
+		# animation is already finished and re-running it would fight the
+		# encounter for the camera every frame.
+		if ringmaster_active:
+			_update_ringmaster_encounter(delta)
+			_update_hud()
+			return
 		_update_climb_out(delta)
 		_update_hud()
 		return
@@ -292,6 +354,7 @@ func _physics_process(delta: float) -> void:
 	_update_crowd(delta)
 	_update_camera(delta)
 	_update_respawns(delta)
+	_update_cab_tracers(delta)
 	_update_hud()
 
 
@@ -303,6 +366,9 @@ func _apply_gore_setting() -> void:
 
 
 func _build_world() -> void:
+	if is_colosseum:
+		_build_colosseum_world()
+		return
 	$WorldEnvironment.environment = WorldLook.environment("bone_yard")
 	if OS.get_environment("ATG_HUD_CAPTURE") != "1":
 		var authored_environment := BONE_YARD_ENVIRONMENT.instantiate()
@@ -358,6 +424,144 @@ func _build_world() -> void:
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 120.0
 	add_child(sun)
+
+
+## AP1.5. The colosseum. Confirmed by research before building: the authored
+## `bone_yard_environment.glb` cannot simply be rescaled bigger — that was
+## already tried (`ARENA_SCALE` at 2.15/2.45) and documented as broken, since
+## the kit was modelled for a fixed 29m bowl. This is procedural box geometry
+## instead, following the same pattern `ashbloom_world_generator.gd` already
+## proves at large scale (reused as-is by the Hunt Grounds arena) — a
+## placeholder register the project already accepts (`vat_chamber.gd`:
+## "art-directed now, authored later"), not the authored bowl's polish.
+##
+## Tunnels are player-navigable side corridors only — `ashbloom_pathfinder.gd`
+## has no enclosed-corridor/multi-level support, so AI wreckers stay in the
+## main bowl on their existing direct-approach driving rather than being
+## asked to navigate a network nothing in this project can path them through
+## yet. A real scope cut, not a silent one.
+const COLOSSEUM_RADIUS := 95.0
+const COLOSSEUM_WALL_HEIGHT := 14.0
+const COLOSSEUM_TUNNEL_COUNT := 3
+const COLOSSEUM_TUNNEL_WIDTH := 9.0
+const COLOSSEUM_TUNNEL_HEIGHT := 6.5
+const COLOSSEUM_TUNNEL_LENGTH := 32.0
+
+func _build_colosseum_world() -> void:
+	$WorldEnvironment.environment = WorldLook.environment("bone_yard")
+	# Underground: no sun. Floodlights and the tunnel lights are the only
+	# light this room has, which is also the honest read of "a facility."
+	var floor_body := StaticBody3D.new()
+	var floor_collision := CollisionShape3D.new()
+	var floor_shape := CylinderShape3D.new()
+	floor_shape.radius = COLOSSEUM_RADIUS
+	floor_shape.height = 1.0
+	floor_collision.shape = floor_shape
+	floor_collision.position.y = -0.8
+	floor_body.add_child(floor_collision)
+	add_child(floor_body)
+	var floor_mesh := CylinderMesh.new()
+	floor_mesh.top_radius = COLOSSEUM_RADIUS
+	floor_mesh.bottom_radius = COLOSSEUM_RADIUS
+	floor_mesh.height = 1.0
+	_add_mesh(floor_mesh, Vector3(0, -0.8, 0), Vector3.ONE, Color("2a2620"), 0.0)
+	# The ring wall, in segments — a colosseum bowl, not a box arena. Gaps are
+	# left open wherever a tunnel mouth needs to punch through.
+	var tunnel_angles: Array[float] = []
+	for index in COLOSSEUM_TUNNEL_COUNT:
+		tunnel_angles.append(TAU * float(index) / float(COLOSSEUM_TUNNEL_COUNT))
+	const SEGMENTS := 28
+	var gap_half_width := (COLOSSEUM_TUNNEL_WIDTH * 0.5 + 2.0) / COLOSSEUM_RADIUS
+	for index in SEGMENTS:
+		var angle := TAU * float(index) / float(SEGMENTS)
+		var in_gap := false
+		for tunnel_angle in tunnel_angles:
+			if absf(wrapf(angle - tunnel_angle, -PI, PI)) < gap_half_width:
+				in_gap = true
+				break
+		if in_gap:
+			continue
+		var segment_width := (TAU * COLOSSEUM_RADIUS / float(SEGMENTS)) * 1.06
+		var at := Vector3(cos(angle) * COLOSSEUM_RADIUS, COLOSSEUM_WALL_HEIGHT * 0.5, sin(angle) * COLOSSEUM_RADIUS)
+		_build_wall_segment(at, Vector3(segment_width, COLOSSEUM_WALL_HEIGHT, 1.6), Vector3(0, -angle, 0), Color("221d18"))
+	# The stands — a stepped bank behind the wall, same crowd this venue
+	# already knows how to seat (`_spawn_crowd()`, branched on `is_colosseum`).
+	for step in 3:
+		var step_radius := COLOSSEUM_RADIUS + 3.0 + float(step) * 4.0
+		var step_mesh := CylinderMesh.new()
+		step_mesh.top_radius = step_radius
+		step_mesh.bottom_radius = step_radius + 4.0
+		step_mesh.height = 1.2
+		_add_mesh(step_mesh, Vector3(0, COLOSSEUM_WALL_HEIGHT * 0.2 + float(step) * 2.4, 0), Vector3.ONE, Color("241f19"), 0.0)
+	# Tunnels — straight corridors punched through the gaps above, each
+	# ending in a small dead-end chamber: a real side route, not a prop.
+	for tunnel_angle in tunnel_angles:
+		_build_colosseum_tunnel(tunnel_angle)
+	var light_count := arena_light_budget()
+	for index in light_count:
+		var light := OmniLight3D.new()
+		var angle := TAU * index / float(light_count)
+		light.position = Vector3(cos(angle) * COLOSSEUM_RADIUS * 0.72, COLOSSEUM_WALL_HEIGHT * 0.75, sin(angle) * COLOSSEUM_RADIUS * 0.72)
+		light.light_color = Color("e8d3ab")
+		light.light_energy = 4.2
+		light.omni_range = COLOSSEUM_RADIUS * 0.5
+		light.light_cull_mask = 0xFFFFF & ~(1 << (INTERIOR.CAB_LAYER - 1))
+		light.omni_attenuation = 1.15
+		light.shadow_enabled = index % 4 == 0 and WorldLook.quality != WorldLook.Quality.PERFORMANCE
+		add_child(light)
+
+
+## One straight corridor: two side walls, a ceiling, and a wider dead-end
+## chamber at the far end. Floor is the same arena floor extended under it —
+## a tunnel is a roof and two walls laid over open ground, not a separate box.
+func _build_colosseum_tunnel(angle: float) -> void:
+	var direction := Vector3(cos(angle), 0, sin(angle))
+	var start := direction * (COLOSSEUM_RADIUS - 1.0)
+	var mid := start + direction * (COLOSSEUM_TUNNEL_LENGTH * 0.5)
+	var basis_rotation := Vector3(0, -angle, 0)
+	var half_width := COLOSSEUM_TUNNEL_WIDTH * 0.5
+	var sides: Array[float] = [-1.0, 1.0]
+	for side in sides:
+		var lateral: Vector3 = Vector3(-direction.z, 0, direction.x) * (half_width + 0.4) * side
+		_build_wall_segment(mid + lateral, Vector3(1.0, COLOSSEUM_TUNNEL_HEIGHT, COLOSSEUM_TUNNEL_LENGTH), basis_rotation, Color("1c1815"))
+	_build_wall_segment(mid + Vector3(0, COLOSSEUM_TUNNEL_HEIGHT, 0), Vector3(COLOSSEUM_TUNNEL_WIDTH + 1.0, 1.0, COLOSSEUM_TUNNEL_LENGTH), basis_rotation, Color("19140f"))
+	# The dead-end chamber: wider than the corridor, so it reads as a pocket
+	# worth ducking into rather than just a corridor that stops.
+	var chamber_center := start + direction * (COLOSSEUM_TUNNEL_LENGTH + 8.0)
+	var chamber_size := Vector3(COLOSSEUM_TUNNEL_WIDTH * 2.2, COLOSSEUM_TUNNEL_HEIGHT, 16.0)
+	for side in sides:
+		var lateral: Vector3 = Vector3(-direction.z, 0, direction.x) * (chamber_size.x * 0.5 + 0.4) * side
+		_build_wall_segment(chamber_center + lateral, Vector3(1.0, COLOSSEUM_TUNNEL_HEIGHT, chamber_size.z), basis_rotation, Color("1c1815"))
+	_build_wall_segment(chamber_center + direction * (chamber_size.z * 0.5), Vector3(chamber_size.x, COLOSSEUM_TUNNEL_HEIGHT, 1.0), basis_rotation, Color("1c1815"))
+	_build_wall_segment(chamber_center + Vector3(0, COLOSSEUM_TUNNEL_HEIGHT, 0), Vector3(chamber_size.x, 1.0, chamber_size.z), basis_rotation, Color("19140f"))
+	var lamp := OmniLight3D.new()
+	lamp.position = chamber_center + Vector3(0, COLOSSEUM_TUNNEL_HEIGHT * 0.6, 0)
+	lamp.light_color = Color("6fae9e")
+	lamp.light_energy = 2.4
+	lamp.omni_range = 14.0
+	lamp.light_cull_mask = 0xFFFFF & ~(1 << (INTERIOR.CAB_LAYER - 1))
+	add_child(lamp)
+
+
+## A wall/ceiling piece that is both physically real (the car cannot drive
+## through it) and visible — the two are built together so nothing in the
+## colosseum is a collision box with no mesh or a mesh with no collision.
+func _build_wall_segment(at: Vector3, size: Vector3, rotation_value: Vector3, color: Color) -> void:
+	var body := StaticBody3D.new()
+	body.position = at
+	body.rotation = rotation_value
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	collision.shape = shape
+	body.add_child(collision)
+	add_child(body)
+	var mesh := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = size
+	mesh.mesh = box
+	box.material = WorldLook.surface(color, "rust", int(at.length()))
+	body.add_child(mesh)
 
 
 ## The fixed budget is visible in the game rather than hidden in a capture
@@ -505,7 +709,7 @@ func _create_wrecker(index: int) -> void:
 	targets.append(target)
 
 
-func _update_boat(_delta: float) -> void:
+func _update_boat(delta: float) -> void:
 	var throttle := Input.get_axis("move_back", "move_forward")
 	var steering := Input.get_axis("move_left", "move_right")
 	boat.throttle = throttle
@@ -515,7 +719,8 @@ func _update_boat(_delta: float) -> void:
 	if boat.position.y < -10.0:
 		boat.recover(Vector3(0, 1.2, 12.0 * SPAWN_SCALE))
 	if derby_audio != null:
-		derby_audio.call("update_engine", speed, throttle)
+		derby_audio.call("update_engine", speed, throttle, boat.condition)
+	cab_arsenal.tick(delta)
 
 
 func _update_wreckers(delta: float) -> void:
@@ -592,6 +797,12 @@ func _on_vehicle_impact(other: Node, closing_speed: float, self_share: float) ->
 		_damage_target(other, closing_speed, self_share)
 	elif closing_speed > 7.0:
 		integrity = maxi(0, integrity - roundi(closing_speed * 0.4))
+		# V1.1/V1.2. `integrity` stays the tuned, authoritative number — this
+		# only mirrors it into the chassis's own generic `condition` field so
+		# handling degradation and the engine's damage rattle read the same
+		# real number the dash gauge shows, instead of a second, disagreeing
+		# one computed separately in `arcade_vehicle.gd`.
+		boat.condition = clampf(float(integrity) / 100.0, 0.0, 1.0)
 		_update_player_damage_visual(Vector3.ZERO)
 		if pit_radio != null and closing_speed > 11.0:
 			pit_radio.transmit("hit_player")
@@ -610,6 +821,8 @@ func _on_wrecker_impact(other: Node, closing_speed: float, self_share: float, wr
 	var attacker_share := clampf(self_share, 0.0, 1.0)
 	var damage := clampi(roundi(closing_speed * 0.55 * (0.4 + attacker_share * 0.6)), 1, 18)
 	integrity = maxi(0, integrity - damage)
+	# V1.1/V1.2. See the mirror note in `_on_vehicle_impact()`.
+	boat.condition = clampf(float(integrity) / 100.0, 0.0, 1.0)
 	_update_player_damage_visual((boat.global_position - wrecker.global_position).normalized())
 	_shake_camera(closing_speed)
 	if pit_radio != null and closing_speed > 11.0:
@@ -642,8 +855,22 @@ func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: fl
 	var damage: int = clampi(roundi(energy * (0.35 + 0.65 * self_share)), 6, 95)
 	var target_integrity: int = maxi(0, int(target.get_meta("integrity", 100)) - damage)
 	target.set_meta("integrity", target_integrity)
+	# V1.2. A wrecker is an `ArcadeVehicle` too, but nothing ever set its own
+	# real `condition` — only the player's did, so a wrecker's handling never
+	# degraded no matter how beaten up it looked. `set()` rather than a cast:
+	# `arcade_vehicle.gd` has no `class_name`, so `target`'s static type stays
+	# `Node3D` and this is the same dynamic-property idiom `set_meta` already
+	# uses one line up, just for a real script property instead of metadata.
+	# Safe now that `arcade_vehicle.gd` no longer scales lateral grip by
+	# condition — see the `grip_limit`/`drive_limit` note there. An earlier
+	# version scaled lateral grip too and let several damaged wreckers
+	# compound into a 200+ m/s pile-up in a crowded pit; that version is
+	# reverted, this one only costs a wrecker its acceleration and braking.
+	target.set("condition", clampf(float(target_integrity) / 100.0, 0.0, 1.0))
 	score += damage * 5
 	integrity = maxi(0, integrity - clampi(roundi(energy * 0.22 * (0.35 + 0.65 * (1.0 - self_share))), 1, 34))
+	# V1.1/V1.2. See the mirror note in `_on_vehicle_impact()`.
+	boat.condition = clampf(float(integrity) / 100.0, 0.0, 1.0)
 	var impact_direction := (target.global_position - boat.global_position).normalized()
 	_update_player_damage_visual(-impact_direction)
 	_update_wrecker_damage_visual(target, target_integrity, impact_direction)
@@ -713,11 +940,30 @@ func _wreck_target(target: Node3D, impact_energy: int) -> void:
 		_finish_round("won")
 
 
+## AB1.1/V1.2. "Condition, not fracture" (`DESIGN/DESTRUCTION.md`): what the
+## player sees change is meant to be a small, authored set of stages, not
+## geometry continuously interpolating with a number. The fold/scale
+## transform below is unchanged — no shell here is built to survive real
+## deformation — but it now snaps between four stages instead of sliding
+## smoothly across the whole 0..100 range, the same discrete-band shape the
+## streetlight's own intact/flickering/sparking/hanging states take.
+const DAMAGE_STAGE_THRESHOLDS := [75, 50, 25]
+const DAMAGE_STAGE_FRACTIONS := [0.0, 0.34, 0.64, 1.0]
+
+func _crush_for_stage(current_integrity: int, max_crush: float) -> float:
+	var stage := DAMAGE_STAGE_THRESHOLDS.size()
+	for index in DAMAGE_STAGE_THRESHOLDS.size():
+		if current_integrity > DAMAGE_STAGE_THRESHOLDS[index]:
+			stage = index
+			break
+	return max_crush * DAMAGE_STAGE_FRACTIONS[stage]
+
+
 func _update_wrecker_damage_visual(target: Node3D, target_integrity: int, impact_direction := Vector3.ZERO) -> void:
 	var shell := target.get_node_or_null("ScrapVehicleShell") as Node3D
 	if shell == null:
 		return
-	var crush := clampf(float(100 - target_integrity) / 100.0, 0.0, 0.72)
+	var crush := _crush_for_stage(target_integrity, 0.72)
 	shell.scale = Vector3(1.05 + crush * 0.1, 1.05 - crush * 0.2, 1.05 - crush * 0.08)
 	# Fold the shell away from the side the hit came from. Uniform scaling reads
 	# as a car shrinking; an asymmetric fold reads as a car taking a beating.
@@ -732,7 +978,7 @@ func _update_player_damage_visual(impact_direction: Vector3) -> void:
 	var shell := boat.get_node_or_null("AuthoredScrapSkiff") as Node3D
 	if shell == null:
 		return
-	var crush := clampf(float(100 - integrity) / 100.0, 0.0, 0.55)
+	var crush := _crush_for_stage(integrity, 0.55)
 	var local := boat.global_transform.basis.inverse() * impact_direction
 	shell.scale = Vector3(1.15 + crush * 0.05, 1.15 - crush * 0.16, 1.15 - crush * 0.05)
 	shell.rotation.z = clampf(-local.x, -1.0, 1.0) * crush * 0.16
@@ -859,16 +1105,46 @@ func _update_camera(delta: float) -> void:
 	camera.look_at(boat.global_position + forward * 8.0 + Vector3.UP * 1.2)
 
 
+## AF1.8/AF10.8. Sitting still and aimed carefully is the one case this
+## should not touch at all — the wobble scales with how hard the wheel is
+## actually being worked (throttle plus steering, not just speed, since a
+## car held on the brake at a dead stop takes no hand off the gun either),
+## not with time or with anything the player cannot see coming from their
+## own input. First pass at 0.024 rad / effort up to 1.6 read as the aim
+## itself being broken rather than as a one-handed cost, stacked on top of
+## the pre-existing look-vs-steer split this scene already had — cut by
+## more than half and capped lower so it is felt, not fought.
+const CAB_AIM_WOBBLE := 0.009
+
+func _cab_aim_wobble() -> Vector2:
+	var effort := clampf(absf(float(boat.get("throttle"))) + absf(float(boat.get("steering"))) * 0.7, 0.0, 1.0)
+	if effort <= 0.01:
+		return Vector2.ZERO
+	var beat := float(Time.get_ticks_msec()) * 0.001
+	# Two frequencies per axis rather than one clean sine, so it reads as an
+	# arm fighting the wheel rather than as a metronome.
+	return Vector2(
+		sin(beat * 12.7) + sin(beat * 7.1) * 0.55,
+		cos(beat * 10.3) + sin(beat * 5.9) * 0.5,
+	) * effort * CAB_AIM_WOBBLE
+
+
 ## The view from the seat. The camera is not following the car — it *is* in the
 ## car, so every jolt the suspension takes arrives without being smoothed, which
 ## is most of why a chase camera never feels like driving.
 func _update_cab_camera(_delta: float) -> void:
 	var seat := boat.global_transform * _cab_seat
 	camera.global_position = seat
+	# AF1.8/AF10.8. One hand on the wheel: the same "a worse grip changes the
+	# numbers, not just the pose" rule `AN2.5`'s half-sword draws for a sword
+	# held one-handed applies here without a grip system to hang it on — the
+	# wobble below is that cost, paid in real time instead of a fixed accuracy
+	# penalty, so the driving itself is what visibly unsteadies the sight.
+	var wobble := _cab_aim_wobble()
 	# Look where the car looks, plus where the driver is looking. Multiplying in
 	# this order keeps the aim in car space, so a slide moves your aim with the
 	# car instead of leaving it pointing at the horizon.
-	var basis := boat.global_transform.basis * Basis(Vector3.UP, aim_yaw) * Basis(Vector3.RIGHT, aim_pitch)
+	var basis := boat.global_transform.basis * Basis(Vector3.UP, aim_yaw + wobble.x) * Basis(Vector3.RIGHT, aim_pitch + wobble.y)
 	camera.global_transform = Transform3D(basis.orthonormalized(), seat)
 	# M4.3. The first-person value, not the chase pair. Godot's fov is vertical,
 	# so 78 here is roughly 110 across at 16:9.
@@ -880,8 +1156,12 @@ func _update_cab_camera(_delta: float) -> void:
 		interior.drive(float(boat.get("steering")), float(boat.get("throttle")))
 
 
-## AG3.4. A round leaves the gun, goes through your own windscreen, and lands on
-## something. The glass keeps the hole for the rest of the heat.
+## AG3.4/AF1.8/AF10.8. A round leaves the gun, goes through your own
+## windscreen, and lands on something. The glass keeps the hole for the rest
+## of the heat. The gun itself is the Hunt's real `HunterArsenal` now — real
+## ammo, real reload, real jams — not a `rounds_left` int this file made up
+## and reset by hand. What still lives here is only the trade the cab gun
+## offers over a ram: less damage, from further away, through glass.
 func _fire_from_cab() -> void:
 	if fire_cooldown > 0.0:
 		return
@@ -895,41 +1175,118 @@ func _fire_from_cab() -> void:
 		if derby_audio != null:
 			derby_audio.play_impact(0.04, boat.global_position, "light")
 		return
-	if rounds_left <= 0:
+	var attack: Dictionary = cab_arsenal.begin_attack()
+	if not bool(attack.get("accepted", false)):
 		if reticle != null and is_instance_valid(reticle):
 			reticle.call("refuse")
 		if derby_audio != null:
 			derby_audio.play_impact(0.05, boat.global_position, "light")
 		return
-	rounds_left -= 1
-	fire_cooldown = 0.16
+	rounds_left = int(cab_arsenal.state().get("loaded", 0))
+	fire_cooldown = float(cab_arsenal.current().get("cooldown", 0.28))
 	# The hole goes where you were aiming, in glass-local terms.
 	if interior != null and is_instance_valid(interior):
 		interior.punch_through(Vector2(-aim_yaw / 1.15, aim_pitch / 0.5))
+	# AF1.8/AF10.8. A real round now — the same travelling, physical thing
+	# `ballistics.gd` gives the Hunt and the gore sandbox, not an instant,
+	# invisible raycast. Nothing lands here; `_on_cab_round_hit()` resolves
+	# whatever this round actually reaches, whenever it gets there.
 	var from := camera.global_position
 	var along := -camera.global_transform.basis.z
-	var space := get_world_3d().direct_space_state
-	var query := PhysicsRayQueryParameters3D.create(from + along * 1.4, from + along * 140.0)
-	query.exclude = [boat.get_rid()]
-	var hit := space.intersect_ray(query)
+	_cab_shot_serial += 1
+	var muzzle := from + along * 1.4
+	ballistics.fire(muzzle, along, "pistol", 0.0, 1, "derby_player", {
+		"source": CAB_SHOT_SOURCE,
+		"shot": _cab_shot_serial,
+	})
+	_cab_seen[_cab_shot_serial] = muzzle
 	if derby_audio != null:
 		derby_audio.play_impact(0.55, boat.global_position, "light")
 	camera_shake = maxf(camera_shake, 0.16)
-	if hit.is_empty():
+
+
+## AF1.8/AF10.8. Where a cab round actually ended up, on the frame it got
+## there — mirrors `gore_demo.gd`'s own `_on_round_hit()` contract exactly,
+## since both fire through the one shared `Ballistics` system.
+func _on_cab_round_hit(hit: Dictionary) -> void:
+	var payload: Dictionary = hit.get("payload", {})
+	if str(payload.get("source", "")) != CAB_SHOT_SOURCE:
 		return
+	var serial := int(payload.get("shot", 0))
+	var at: Vector3 = hit.get("position", Vector3.ZERO)
+	if _cab_seen.has(serial):
+		_cab_streak(_cab_seen[serial], at)
+		_cab_seen.erase(serial)
 	var struck: Node = hit.get("collider")
 	if struck != null and targets.has(struck):
 		# A bullet is not a ram. It does less, and it does it from further away,
-		# which is the trade the gun exists to offer.
+		# which is the trade the gun exists to offer — kept as this scene's
+		# own tuned pseudo-speed input to `_damage_target()`'s ram-damage
+		# formula rather than feeding the sidearm's real body-damage number
+		# through it: the two are different units, and this number was
+		# already tuned against real play, not invented alongside the rest
+		# of this rewrite.
 		_damage_target(struck as Node3D, 9.0, 1.0)
 		WorldHistory.record_event("derby_shot_landed", {"venue": "rift_derby_quarry", "target": struck.name})
 
 
-func _reload_cab_gun() -> void:
-	if rounds_left >= 12 or round_state != "active":
+## AF1.8/AF10.8. One segment of a round's real path, for the eye — ported
+## from `gore_demo.gd`'s own `_streak()` rather than reinvented.
+func _cab_streak(from: Vector3, to: Vector3) -> void:
+	var length := from.distance_to(to)
+	if length < 0.03:
 		return
-	rounds_left = 12
-	fire_cooldown = 0.9
+	while _cab_tracers.size() >= 24:
+		_retire_cab_tracer(0)
+	var node := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(CAB_TRACER_WIDTH, CAB_TRACER_WIDTH, length)
+	node.mesh = mesh
+	var skin := StandardMaterial3D.new()
+	skin.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	skin.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	skin.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	skin.cull_mode = BaseMaterial3D.CULL_DISABLED
+	skin.albedo_color = Color(1.0, 0.84, 0.44, 0.95)
+	node.material_override = skin
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(node)
+	node.global_position = (from + to) * 0.5
+	var along := (to - from).normalized()
+	node.look_at(to, Vector3.FORWARD if absf(along.dot(Vector3.UP)) > 0.98 else Vector3.UP)
+	_cab_tracers.append({"node": node, "skin": skin, "life": CAB_TRACER_LIFE})
+
+
+func _retire_cab_tracer(index: int) -> void:
+	if index < 0 or index >= _cab_tracers.size():
+		return
+	var node := (_cab_tracers[index] as Dictionary)["node"] as Node3D
+	if node != null and is_instance_valid(node):
+		node.queue_free()
+	_cab_tracers.remove_at(index)
+
+
+func _update_cab_tracers(delta: float) -> void:
+	for index in range(_cab_tracers.size() - 1, -1, -1):
+		var streak: Dictionary = _cab_tracers[index]
+		streak["life"] = float(streak["life"]) - delta
+		var node := streak["node"] as Node3D
+		if float(streak["life"]) <= 0.0 or node == null or not is_instance_valid(node):
+			_retire_cab_tracer(index)
+			continue
+		var fade := clampf(float(streak["life"]) / CAB_TRACER_LIFE, 0.0, 1.0)
+		var skin := streak["skin"] as StandardMaterial3D
+		if skin != null:
+			skin.albedo_color.a = fade * 0.95
+		node.scale = Vector3(fade, fade, 1.0)
+
+
+func _reload_cab_gun() -> void:
+	if round_state != "active":
+		return
+	if not cab_arsenal.reload():
+		return
+	fire_cooldown = float(cab_arsenal.current().get("reload", 0.9))
 	if derby_audio != null:
 		derby_audio.play_impact(0.12, boat.global_position, "light")
 
@@ -946,6 +1303,86 @@ func _begin_climbing_out() -> void:
 		index_open = false
 		world_index.close()
 	WorldHistory.record_event("player_left_derby_vehicle", {"venue": "rift_derby_quarry", "destination": "bone_yard_outskirts"})
+
+
+## AP1.6. Out of the car and the pit is clear — the ringmaster comes out to
+## greet you. Spawned through `CastNames`, exactly the way the derby captain
+## already is (`CAPTAIN_SLOT` above) — a generated name and record, not a
+## second hardcoded one.
+func _begin_ringmaster_encounter() -> void:
+	ringmaster_active = true
+	_ringmaster_walk_clock = 0.0
+	_ringmaster_walking = true
+	CAST.ensure(RINGMASTER_SLOT, {
+		"elo": 1600, "status": "active", "memory": "Runs the colosseum floor.",
+	})
+	ringmaster_rig = BaselineHuman.new()
+	ringmaster_rig.name = "Ringmaster"
+	add_child(ringmaster_rig)
+	_ringmaster_mark = boat.global_position + boat.global_transform.basis.z * -5.0 + boat.global_transform.basis.x * 4.0
+	_ringmaster_start = _ringmaster_mark + boat.global_transform.basis.x * 14.0
+	ringmaster_rig.global_position = _ringmaster_start
+	ringmaster_rig.build(RINGMASTER_SLOT, {
+		"flesh": Color("6a5240"), "variation": 41, "gore": false, "blood": 4300.0,
+	})
+	HunterAppearance.style_world_rig(ringmaster_rig, RINGMASTER_SLOT, true)
+	WorldHistory.record_event("ringmaster_encountered", {"venue": "underground_colosseum"})
+
+
+## The walk-in, then the camera holds on him once he arrives. No free
+## player movement here — Phase B scoped this as an arrival beat, not a new
+## on-foot controller; `_open_ringmaster_dialogue()` takes over once he's in.
+func _update_ringmaster_encounter(delta: float) -> void:
+	if ringmaster_rig == null or not is_instance_valid(ringmaster_rig):
+		return
+	if _ringmaster_walking:
+		_ringmaster_walk_clock = minf(1.0, _ringmaster_walk_clock + delta / 3.0)
+		var eased := ease(_ringmaster_walk_clock, 0.6)
+		ringmaster_rig.global_position = _ringmaster_start.lerp(_ringmaster_mark, eased)
+		ringmaster_rig.look_at(camera.global_position, Vector3.UP)
+		if _ringmaster_walk_clock >= 1.0:
+			_ringmaster_walking = false
+			_open_ringmaster_dialogue()
+	camera.look_at(ringmaster_rig.global_position + Vector3.UP * 1.4, Vector3.UP)
+
+
+## The exchange. Same house register `warning_card.gd` already established
+## (bone/copper/blood, `CellOutzType`, real `Button` hit targets under drawn
+## labels) rather than the untested `dialogue_manager` addon — confirmed with
+## Greg before building: nothing in this project has ever driven a real
+## conversation through that addon yet, and this is not the pass to be first.
+func _open_ringmaster_dialogue() -> void:
+	if ringmaster_card != null and is_instance_valid(ringmaster_card):
+		return
+	ringmaster_card = RINGMASTER_CARD.new()
+	ringmaster_card.name = "RingmasterCard"
+	$HUD.add_child(ringmaster_card)
+	var rival := WorldHistory.subject(CAST.id_for(RINGMASTER_SLOT))
+	ringmaster_card.call("open_card", str(rival.get("name", "THE RINGMASTER")))
+	ringmaster_card.chosen.connect(_on_ringmaster_choice)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+## AP1.6. "From there its up to you." Three real, distinct, recorded outcomes
+## — the first branching ending this project has beyond the derby's own
+## binary won/lost (`route_endings.gd`'s own note: multi-outcome branching
+## "deliberately not attempted" elsewhere). "Work for him" and "escape" are
+## flags for downstream content to react to later, not built out here; "kill
+## him" hands off to the Hunt's real combat rather than fighting him in a
+## scene with no player body at all — see `bone_yard_hunt.gd`'s
+## `challenge_pending` check.
+func _on_ringmaster_choice(choice: String) -> void:
+	var ringmaster_id := CAST.id_for(RINGMASTER_SLOT)
+	match choice:
+		"join":
+			WorldHistory.update_subject(ringmaster_id, {"status": "employer"}, "ringmaster_joined")
+			WorldHistory.record_event("ringmaster_joined", {"venue": "underground_colosseum"})
+		"escape":
+			WorldHistory.record_event("ringmaster_escaped", {"venue": "underground_colosseum"})
+		"fight":
+			WorldHistory.update_subject(ringmaster_id, {"challenge_pending": true}, "ringmaster_challenged")
+			WorldHistory.record_event("ringmaster_challenged", {"venue": "underground_colosseum"})
+	Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
 
 
 func _update_climb_out(delta: float) -> void:
@@ -972,10 +1409,21 @@ func _update_climb_out(delta: float) -> void:
 		camera.cull_mask = 0xFFFFF & ~(1 << (INTERIOR.CAB_LAYER - 1))
 	if climbing_out >= 1.0 and not leaving:
 		leaving = true
-		Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
+		if is_colosseum:
+			_begin_ringmaster_encounter()
+		else:
+			Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
 
 
 func _update_hud() -> void:
+	# AF1.8/AF10.8. Live off `cab_arsenal`'s own real state every frame, not
+	# only at the moment a trigger or reload key was pressed — a reload in
+	# progress moves the magazine back up over real time (`HunterArsenal.tick()`),
+	# and a HUD reading a value only updated at fire time would sit stale
+	# through the whole reload instead of showing it happen.
+	var cab_state: Dictionary = cab_arsenal.state()
+	rounds_left = int(cab_state.get("loaded", 0))
+	var magazine_full := int(HunterArsenal.WEAPONS.get(cab_arsenal.current_id, {}).get("magazine", 12))
 	# AG3.1. The instruments. These are the readouts `_ready` used to switch off
 	# outright; they live on the dashboard now, where you can look at them.
 	if interior != null and is_instance_valid(interior):
@@ -994,7 +1442,7 @@ func _update_hud() -> void:
 			"rival_grudge": int(rival_subject.get("grudge", 0)),
 			"rival_here": rival_running,
 			"rounds": rounds_left,
-			"rounds_full": 12,
+			"rounds_full": magazine_full,
 		})
 	# The bust takes the damage the car takes, which is what makes it a readout
 	# rather than an ornament.
@@ -1011,7 +1459,7 @@ func _update_hud() -> void:
 			# teaches there is no gun, which is the thing it exists to unteach.
 			cab_clear and round_state == "countdown",
 			rounds_left <= 0,
-			clampf(fire_cooldown / 0.16, 0.0, 1.0))
+			clampf(fire_cooldown / float(cab_arsenal.current().get("cooldown", 0.28)), 0.0, 1.0))
 	status.text = "BONE YARD DERBY  //  %s\nWASD DRIVE  ·  I WORLD INDEX  ·  E LEAVE VEHICLE" % round_state.to_upper()
 	score_label.text = "IMPACT SCORE  %05d\nHULL INTEGRITY  %03d%%\nACTIVE WRECKERS  %02d\nWORLD MEMORY  %03d" % [score, integrity, targets.size(), WorldHistory.event_count()]
 	# Only speaks when it has something to say. Left visible during play it sat
@@ -1112,6 +1560,13 @@ func _finish_round(result: String) -> void:
 	# state instead of pretending the player earned the road.
 	if result == "won":
 		OPENING.advance("won_derby")
+		# AP1.6. "You get out of the car properly." The colosseum's win does
+		# not wait for E — the existing 5-second victory countdown still
+		# plays out under the climb, same as it always did, it just does not
+		# also auto-travel afterward (`_update_result()`'s own auto-leave
+		# never runs once `leaving_on_foot` is true, so nothing races this).
+		if is_colosseum:
+			_begin_climbing_out()
 	else:
 		# A wreck used to just relabel the same "hauled to the Bone Yard" exit a
 		# win takes, so losing cost nothing but five seconds of countdown text.
@@ -1355,13 +1810,22 @@ func _crush_driver(target: Node3D, subject_id: String, impact_direction: Vector3
 
 
 func _spawn_crowd() -> void:
+	# AP1.5. The colosseum's stands sit far past where the bone yard's own
+	# `ARENA_SCALE`-relative placement would land — that constant describes
+	# the authored glb's own footprint, not this venue's, so the colosseum
+	# places its crowd around its own real radius instead.
+	var ring_radius := COLOSSEUM_RADIUS + 6.0 if is_colosseum else 0.0
 	for index in 64:
 		var spectator := Node3D.new()
 		spectator.name = "CrowdSilhouette_%02d" % index
 		var side := -1.0 if index % 2 == 0 else 1.0
 		@warning_ignore("integer_division")
 		var row := float((index / 2) % 4)
-		spectator.position = Vector3((-30.0 + float(index % 32) * 1.95) * ARENA_SCALE, (2.0 + row * 0.85) * ARENA_SCALE, side * (30.0 + row * 1.2) * ARENA_SCALE)
+		if is_colosseum:
+			var angle := TAU * float(index) / 64.0
+			spectator.position = Vector3(cos(angle) * (ring_radius + row * 1.6), 2.0 + row * 0.85, sin(angle) * (ring_radius + row * 1.6))
+		else:
+			spectator.position = Vector3((-30.0 + float(index % 32) * 1.95) * ARENA_SCALE, (2.0 + row * 0.85) * ARENA_SCALE, side * (30.0 + row * 1.2) * ARENA_SCALE)
 		spectator.set_meta("rest_y", spectator.position.y)
 		spectator.set_meta("phase", float(index) * 0.71)
 		add_child(spectator)

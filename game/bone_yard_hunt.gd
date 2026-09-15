@@ -68,6 +68,10 @@ const CLIMB_STAMINA_DRAIN := 30.0
 const PLAYER_INJURY_FLOOR := 0.55
 ## The person the hunt is about. Generated per save — see `cast_names.gd`.
 const CAPTAIN_SLOT := "derby_captain"
+## AP1.6. Matches `rift_derby.gd`'s own `RINGMASTER_SLOT` — the same
+## `CastNames` slot string, so `CAST.id_for()` resolves to the same generated
+## person on both sides of the scene change.
+const RINGMASTER_SLOT := "ringmaster"
 const CAST := preload("res://systems/cast_names.gd")
 const FRIEND_ID := "nix_arden"
 const HUNT_LOCATION := "ashbloom_bone_yard"
@@ -75,7 +79,18 @@ const HANDHELD := preload("res://systems/handheld_device.gd")
 const ANATOMY_COMPONENT := preload("res://systems/anatomy_component.gd")
 const WORLD_GENERATOR := preload("res://systems/ashbloom_world_generator.gd")
 const MISFIRE_DIRECTOR := preload("res://systems/reality_misfire_director.gd")
-const SCRAP_SKIFF := preload("res://art/scrap_skiff.glb")
+## AP1.6. Was `preload()` — evaluated at script compile time, which meant
+## every load of `bone_yard_hunt.gd` (this script is often compiled on a
+## background thread as part of `Interstitial.travel()`'s threaded scene
+## load) raced `rift_derby.gd`'s own independent `preload()` of the exact
+## same resource in the scene being left. Confirmed as the cause of a real,
+## pre-existing bug: derby -> Hunt transitions failed to load at all
+## ("Could not preload resource file res://art/scrap_skiff.glb"), reproduced
+## on the original, unmodified derby's own win path, unrelated to anything
+## the colosseum added. `load()` at the one real call site below happens at
+## runtime, long after both scripts have finished compiling, which removes
+## the race entirely rather than only hiding it.
+const SCRAP_SKIFF_PATH := "res://art/scrap_skiff.glb"
 const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const LIVE_BODY_MIRROR := preload("res://systems/live_body_mirror.gd")
 const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
@@ -805,6 +820,24 @@ func _ready() -> void:
 	# fails to build the canonical hunt is already standing.
 	_spawn_rival()
 	_spawn_yard_population()
+	# AP1.6. "Attempt to kill him" hands off here rather than fighting the
+	# ringmaster inside `rift_derby.gd`, which has no player body or combat
+	# system at all — this is a forced encounter through the same real actor
+	# `_spawn_encounter_actor()` already builds for every other named
+	# hostile, not a random misfire roll and not a new fight system.
+	var ringmaster_id := CAST.id_for(RINGMASTER_SLOT)
+	var ringmaster_subject := WorldHistory.subject(ringmaster_id)
+	if bool(ringmaster_subject.get("challenge_pending", false)):
+		WorldHistory.update_subject(ringmaster_id, {"challenge_pending": false}, "ringmaster_challenge_spawned")
+		_spawn_encounter_actor({
+			"instance_id": "ringmaster_boss",
+			"kind": "boss",
+			"elo": 1800,
+			"display_name": str(ringmaster_subject.get("name", "The Ringmaster")),
+			"tint": "3a1414",
+			"variation": 41,
+			"blood": 5800.0,
+		}, player + Vector3(4.0, 0, -6.0))
 	_update_camera()
 	WorldHistory.record_event("player_entered_hunt_ground", {"location": HUNT_LOCATION, "hunt_id": CAST.id_for(CAPTAIN_SLOT)})
 	# A wreck in the derby already routed the player through `DefeatRouter`
@@ -5552,7 +5585,7 @@ func _spawn_rival() -> void:
 		# rather than being a cylinder parented next to her.
 		if str(adaptation.get("kind", "")) == "prosthetic":
 			enemy_rig.install_prosthetic(str(adaptation.get("zone", "left_arm")), {"name": str(adaptation.get("item", "Ashline industrial limb")), "armor": 0.34, "restores": 0.82, "tint": Color("c15d2d")})
-		var altered_vehicle := SCRAP_SKIFF.instantiate()
+		var altered_vehicle := (load(SCRAP_SKIFF_PATH) as PackedScene).instantiate()
 		altered_vehicle.name = "MarasRebuiltWrecker"
 		altered_vehicle.position = Vector3(4.0, -0.45, 1.8)
 		altered_vehicle.rotation.y = -0.7

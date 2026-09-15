@@ -2796,19 +2796,39 @@ M2b covers cars as this world's horses. This is everything else about them
 being vehicles rather than set pieces.
 
 - [ ] **V1.1** A car is a thing with a condition, not a state you are in —
-      checked against `DESIGN/DESTRUCTION.md`'s AB1.5 note, which defers
-      exactly this to Lane 2 on the condition that it reuses `world_damage.gd`
-      rather than inventing a third store. Not started this pass, deliberately:
-      `rift_derby.gd`'s `integrity` (a plain scene-local int, reset to 100
-      every heat) is a real second implementation of the same primitive, but
-      migrating it to a persistent, `WorldHistory`-backed condition is only
-      honest once V1.4 (repair) or AB2.4/2.5 (repair via a holding's owner,
-      which needs AA — not built) exists to bring it back up. Doing the
-      migration first would make a wrecked derby car stay wrecked forever
-      with no path back, which is not a technical detail, it is a dead end a
-      player would actually hit. Sequencing this after repair rather than
-      before it.
-- [ ] **V1.2** Damage is physical and visible, and it changes how it drives
+      Updated 2026-09-15: a real, live `condition: float` (0..1) now exists
+      on `ArcadeVehicle` itself (`game/systems/arcade_vehicle.gd`), degraded
+      by real impact closing speed the same way `fuel` (V1.3) already burns
+      off real throttle-held time — `vehicle_condition_test.gd` covers it
+      directly (hard impact drops it measurably, a soft contact doesn't,
+      clamps at 0..1). This is still not the `world_damage.gd`-backed,
+      persistent store this item actually asks for, and the reasoning below
+      for deferring that still holds — a persisted condition with no repair
+      verb is a dead end a player would actually hit, so persistence stays
+      sequenced after V1.4. `rift_derby.gd`'s own `integrity` stays the
+      tuned, authoritative number for the derby (untouched formula, no
+      balance risk) and is mirrored into `condition` after every hit, so the
+      two no longer silently disagree the way this note used to warn about —
+      but `condition` itself still does not survive a scene reload and is
+      not yet the primitive V1.1 is really asking for. Original note, still
+      true: checked against `DESIGN/DESTRUCTION.md`'s AB1.5, which defers
+      the persistent version to Lane 2 on the condition that it reuses
+      `world_damage.gd` rather than inventing a third store — migrating
+      `integrity` itself there is only honest once V1.4 or AB2.4/2.5 (needs
+      AA, not built) exists to bring a wrecked car back up.
+- [ ] **V1.2** Damage is physical and visible, and it changes how it drives —
+      Updated 2026-09-15: it does now, for the player. `_condition_scale()`
+      in `arcade_vehicle.gd` scales tire grip and steering authority by the
+      same `condition` field above (floored at `MIN_CONDITION_SCALE` rather
+      than going inert), and `rift_derby.gd`'s existing crush-visual and
+      detachable-part system already reads the number `condition` is now
+      mirrored from, so damage was already visible and is now also felt.
+      Not yet true universally: nothing sets `condition` on an AI wrecker —
+      they still run on `set_meta("integrity", ...)` alone — so a wrecker's
+      own handling never degrades, only the player's does. No dedicated test
+      asserts the handling numbers themselves; `vehicle_condition_test.gd`
+      only covers the field's own value, not what reading it does to grip or
+      steer.
 - [x] **V1.3** ~~Fuel, or a reason a car is not infinite~~
       No car anywhere in the project burned anything — a derby heat, or in
       principle a whole session, could be driven flat out forever. `fuel`
@@ -3563,12 +3583,25 @@ travels, hits something and leaves a mark on it.
 The gore sandbox is where a weapon is learned (AU3.5). Same room, same bodies,
 same reset — a range that is a place rather than a menu of guns.
 - [ ] **AF6.1** Every weapon in `hunter_arsenal.gd` is physically present and
-      pick-up-able in the shed
+      pick-up-able in the shed — Updated 2026-09-15: every weapon is reachable
+      now (AF6.4 below), by wheel/hotkey through a real `HunterArsenal`
+      instance in `gore_demo.gd` — but there is still no shed, no rack, no
+      physical pickup interaction. Switchable is not the same claim as
+      pick-up-able; this item is about the latter and stays open.
 - [ ] **AF6.2** Bullets are readable here: drop, drag, travel time, penetration
       shown against real bodies at real distances (AF2)
 - [ ] **AF6.3** The reset restores the bodies without restarting the scene
-- [ ] **AF6.4** What you learn transfers — the range uses the live ballistics
-      and the live arsenal, never a demo copy of either
+- [x] **AF6.4** What you learn transfers — the range uses the live ballistics
+      and the live arsenal, never a demo copy of either —
+      `gore_demo.gd` used to hardcode its own `SHOT_WEAPON`/`SHOT_GRIP`/
+      `SHOT_CALIBRE`/`SHOT_DAMAGE`/`SHOT_IMPULSE` constants: one weapon's
+      numbers copied in, not a reference to them. It now instantiates a real
+      `HunterArsenal` and fires through `arsenal.begin_attack()`/
+      `shot_directions()`/`current()` directly — the same calls
+      `bone_yard_hunt.gd`'s own `_resolve_firearm()` makes — so a weapon's
+      damage, ammo, jam and reload behaviour in the range is the Hunt's own,
+      not a second copy of it. `ballistics.gd` was already shared. Verified:
+      `gore_demo_test.tscn` and `gore_parity_test.tscn` both clean.
 
 ### AF v10 — the final pass
 The last rung. Fifteen statements that are true of guns when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.

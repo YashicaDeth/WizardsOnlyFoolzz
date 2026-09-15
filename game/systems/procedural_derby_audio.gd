@@ -101,21 +101,32 @@ func _process(delta: float) -> void:
 	_apply_engine_volume()
 
 
-func update_engine(speed: float, throttle: float) -> void:
+## V1.2. A damaged engine does not wait for the driver to ask more of it — it
+## already sounds hurt. `condition` is the same 0..1 field the chassis itself
+## already reads for handling (`arcade_vehicle.gd`'s `_condition_scale()`);
+## this is the audio side of the same number rather than a second damage
+## input invented here.
+func update_engine(speed: float, throttle: float, condition := 1.0) -> void:
 	if engine_low == null:
 		return
+	var damage := 1.0 - clampf(condition, 0.0, 1.0)
 	var load_ratio := clampf(absf(speed) / 24.0, 0.0, 1.0)
 	var effort := clampf(load_ratio + absf(throttle) * 0.25, 0.0, 1.0)
-	engine_low.pitch_scale = clampf(0.7 + load_ratio * 0.55, 0.6, 1.4)
-	engine_high.pitch_scale = clampf(0.85 + load_ratio * 0.95, 0.8, 1.95)
-	engine_strain.pitch_scale = clampf(1.05 + load_ratio * 0.5, 1.0, 1.6)
+	# A rough, uneven idle rather than a clean pitch shift — the engine
+	# audibly missing a beat rather than just running quieter.
+	var rattle := sin(Time.get_ticks_msec() * 0.001 * (23.0 + damage * 19.0)) * damage * 0.05
+	engine_low.pitch_scale = clampf(0.7 + load_ratio * 0.55 + rattle, 0.55, 1.4)
+	engine_high.pitch_scale = clampf(0.85 + load_ratio * 0.95 + rattle * 0.6, 0.8, 1.95)
+	engine_strain.pitch_scale = clampf(1.05 + load_ratio * 0.5 + rattle, 1.0, 1.6)
 	target_low = lerpf(ENGINE_IDLE_LOW, -9.0, effort)
 	# The whine only arrives under real load, so cruising and flooring it differ.
 	target_high = lerpf(ENGINE_IDLE_HIGH, -13.0, pow(effort, 1.6))
 	# G5.2. Its own band: silent below STRAIN_THRESHOLD, then rises fast, so it
 	# reads as the engine being asked for more than it wants to give rather
-	# than a third tone blended in across the whole range.
-	var strain := clampf((effort - STRAIN_THRESHOLD) / (1.0 - STRAIN_THRESHOLD), 0.0, 1.0)
+	# than a third tone blended in across the whole range. A wrecked engine
+	# earns that band at a fraction of the effort a pristine one needs to.
+	var strain_threshold := lerpf(STRAIN_THRESHOLD, STRAIN_THRESHOLD * 0.3, damage)
+	var strain := clampf((effort - strain_threshold) / maxf(1.0 - strain_threshold, 0.01), 0.0, 1.0)
 	target_strain = lerpf(ENGINE_SILENT, -7.0, strain * strain)
 	_apply_engine_volume()
 

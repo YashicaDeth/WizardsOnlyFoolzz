@@ -310,16 +310,24 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		# --- tire ---------------------------------------------------------
 		# Grip is a friction limit against this wheel's own load, which is what
 		# makes weight transfer matter rather than just look like it does.
-		# V1.2. Also the one constraint drive force, braking and lateral
-		# correction all clamp against below, so scaling it by condition is
-		# enough to make a hard-hit car both grippier-feeling and weaker to
-		# accelerate at once, rather than tuning each force separately.
-		var limit := load * TIRE_GRIP * _condition_scale()
+		# V1.2. Two separate limits rather than one shared by everything: a
+		# crowded pile-on relies on full lateral grip every frame to catch a
+		# car after `_kick_apart()`/`_shove_off()`'s impulses (those are
+		# computed from `mass` and `closing` alone, with no idea how much
+		# grip is left to arrest them with) — scaling lateral grip down by
+		# condition let several damaged wreckers compound into a 200+ m/s
+		# pile-up in a crowded pit (`derby_balance_test.gd` caught it).
+		# Longitudinal drive/brake authority carries no such recovery-safety
+		# dependency, so that is where damage still visibly costs a car
+		# something: a beaten-up wrecker accelerates and brakes worse without
+		# losing its ability to catch a slide.
+		var grip_limit := load * TIRE_GRIP
+		var drive_limit := grip_limit * _condition_scale()
 		var steered := forward if not FRONT_WHEELS.has(index) else forward.rotated(up, steer).normalized()
 		var lateral_axis := steered.cross(up).normalized()
 		var lateral_speed := point_velocity.dot(lateral_axis)
-		var lateral_force := clampf(-lateral_speed * LATERAL_STIFFNESS * mass * 0.25, -limit, limit)
-		if absf(lateral_speed) * LATERAL_STIFFNESS * mass * 0.25 > limit:
+		var lateral_force := clampf(-lateral_speed * LATERAL_STIFFNESS * mass * 0.25, -grip_limit, grip_limit)
+		if absf(lateral_speed) * LATERAL_STIFFNESS * mass * 0.25 > grip_limit:
 			wheel_slip = maxf(wheel_slip, clampf(absf(lateral_speed) / 8.0, 0.0, 1.0))
 		state.apply_force(lateral_axis * lateral_force, offset)
 
@@ -336,7 +344,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		elif not enabled:
 			longitudinal = -rolling * BRAKE_FORCE * mass * 0.25
 		longitudinal -= rolling * ROLLING_DRAG * mass * 0.25 * 0.1
-		longitudinal = clampf(longitudinal, -limit, limit)
+		longitudinal = clampf(longitudinal, -drive_limit, drive_limit)
 		state.apply_force(steered * longitudinal, offset)
 
 	airborne = grounded == 0
