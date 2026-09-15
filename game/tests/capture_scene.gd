@@ -170,6 +170,20 @@ func _ready() -> void:
 			await get_tree().physics_frame
 		for _hold in 10:
 			await get_tree().process_frame
+	elif trigger == "vat_aisle":
+		# P4.3. Skips straight past the locked submerged/voiding/floor beats
+		# into the walkable aisle itself, standing near the door end, so a
+		# change to AISLE_LENGTH or the bay dressing can be looked at without
+		# waiting out ~13s of cutscene per capture.
+		scene.phase = "aisle"
+		scene.can_move = true
+		scene._on_intake_filed({})
+		var aisle_len: float = scene.get("AISLE_LENGTH")
+		scene.player.position = Vector3(0.0, 1.62, -aisle_len + 4.0)
+		scene.yaw = PI
+		scene.player.rotation.y = scene.yaw
+		for _hold in 10:
+			await get_tree().process_frame
 	elif trigger == "killcam":
 		var cam: Node = scene.get_node_or_null("HUD/KillCam")
 		if cam != null:
