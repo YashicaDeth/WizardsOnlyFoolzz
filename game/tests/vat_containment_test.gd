@@ -36,7 +36,7 @@ func _ready() -> void:
 	for _settle in 60:
 		await tree.process_frame
 
-	var aisle: float = scene.get("AISLE_LENGTH") if scene.get("AISLE_LENGTH") != null else 34.0
+	var aisle: float = scene.get("AISLE_LENGTH") if scene.get("AISLE_LENGTH") != null else 22.0
 	var escaped := 0
 	for x: float in SAMPLES:
 		var probe := CharacterBody3D.new()

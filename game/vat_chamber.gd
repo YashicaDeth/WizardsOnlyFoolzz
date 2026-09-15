@@ -18,7 +18,11 @@ const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 
 const EYE_HEIGHT := 1.62
 const VAT_POSITION := Vector3(0, 0, 0)
-const AISLE_LENGTH := 34.0
+## P4.3: was 34.0 — a fresh body limps this at mobility_ratio speed (2.7 u/s),
+## so the aisle alone cost ~10.6s of forced, agency-free walking after the
+## ~19s of locked beats already ahead of it. Cut to the shortest length that
+## still reads as a receding row of tanks (see the bay-count derivation below).
+const AISLE_LENGTH := 22.0
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -223,7 +227,11 @@ func _build_chamber() -> void:
 	_slab(Vector3(16.0, 4.4, 0.5), Vector3(0, 2.2, -AISLE_LENGTH - 0.4), "rust", Color("19140f"))
 
 	# Vertebral arches down the aisle. Repetition is the whole effect.
-	for bay in 11:
+	# Bay count derived from AISLE_LENGTH (spacing 3.1, same 3.0-unit clearance
+	# before the door as the original 11-bay/34.0 layout) so shortening the
+	# aisle cannot leave dressing poking past the end wall or the door.
+	var bay_count := roundi((AISLE_LENGTH - 3.0) / 3.1) + 1
+	for bay in bay_count:
 		var z := 2.0 - float(bay) * 3.1
 		for side in [-1.0, 1.0]:
 			for vertebra in 5:
