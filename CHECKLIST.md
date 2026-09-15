@@ -3300,8 +3300,37 @@ where they are hit, and what comes off them stays.
       vehicle work rather than a second implementation of the same
       primitive, AB3/AB1.6 to once more than one real object exists.
 - [ ] **AB1.2** Structures break where they are struck rather than swapping to a damaged model
-- [ ] **AB1.3** Debris is real, persists, and can be stood on or thrown
-- [ ] **AB1.4** It reads through the gore system that already exists — `gore_chunks.gd` already breaks bodies into identified pieces
+- [x] ~~**AB1.3** Debris is real, persists, and can be stood on or thrown~~
+      New `systems/world_debris.gd`: both places destruction actually throws a
+      real `RigidBody3D` — `breakable_prop.gd`'s barricade fragments and
+      `rift_derby.gd`'s detached vehicle panels — used to force-despawn on a
+      flat timer (3.4s, 14.0s) no matter how far under budget the pool was.
+      That was the exact "not persistent" gap AB1.1 named for the vehicle
+      panels specifically. Both now register through a shared, named-pool
+      registry instead: identified via metadata, capped by recycling the
+      oldest piece in that named pool, no fixed-lifetime despawn. A piece
+      that fits inside its budget now sits on the ground until something
+      actually needs the room — it can be stood on today (both already carry
+      a real collider); `take()` exists for pickup-and-throw but nothing
+      calls it yet, the same unconsumed seam `gore_chunks.gd` already has for
+      B5. Vehicle panels also went from **no shared cap at all** (only a
+      per-vehicle guard against detaching the same part twice — up to 72
+      uncapped bodies across a full pit of wreckers) to a real quality-scaled
+      budget (`vehicle_part_budget()`), which is also a genuine AB1.6/X find:
+      that path had never been measured. `breakable_prop_test.gd`,
+      `derby_breakables_test.gd` and `derby_budget_test.gd` all still pass
+      unchanged; `derby_exit_test.gd` confirms leaving the derby with panels
+      shed does not crash.
+- [x] ~~**AB1.4** It reads through the gore system that already exists —
+      `gore_chunks.gd` already breaks bodies into identified pieces~~
+      `world_debris.gd` generalises `gore_chunks.gd`'s proven contract
+      (identified via metadata, capped by recycling the oldest, no timer
+      despawn) rather than literally calling into it — a scrap barricade and
+      a car door have no layer, organ or subject to reuse, only the pattern.
+      `DESIGN/DESTRUCTION.md` scoped exactly this: debris "reusing
+      `gore_chunks.gd`'s already-proven pattern rather than VFX particles."
+      Named pools (`barricade_fragment`, `vehicle_part`) keep the two kinds
+      of debris from evicting each other just because they now share a file.
 - [ ] **AB1.5** A vehicle deforms rather than losing hit points (pairs with V1.2)
 - [ ] **AB1.6** Measure the cost before committing; X exists because nothing here has been profiled
 

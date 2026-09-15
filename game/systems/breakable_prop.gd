@@ -3,20 +3,25 @@ extends StaticBody3D
 
 ## A piece of the world that can take a hit without turning every wall into a
 ## permanent physics simulation. It owns one solid collider while intact, then
-## a deliberately small number of short-lived rigid fragments after it breaks.
-## The fragment ceiling is global because ten individual props each promising
+## a deliberately small number of rigid fragments after it breaks — real,
+## identified debris (`world_debris.gd`) that persists rather than despawning
+## on a clock, capped globally because ten individual props each promising
 ## "only six" is still sixty active bodies during a derby.
 
 const WORLD_LOOK := preload("res://systems/world_look.gd")
+const WORLD_DEBRIS := preload("res://systems/world_debris.gd")
+
+## AB1.3. Fragments used to force-despawn on this timer regardless of how far
+## under budget the pool was — the exact "not persistent" gap AB1.1 named.
+## `WORLD_DEBRIS` now owns that call: a fragment stays until the pool it is
+## in actually needs the room.
+const FRAGMENT_POOL := "barricade_fragment"
 
 const MIN_DAMAGE_SPEED := 4.0
 const DAMAGE_PER_METRE := 2.8
-const FRAGMENT_LIFETIME := 3.4
 const MAX_FRAGMENTS_ULTRA := 48
 const MAX_FRAGMENTS_HIGH := 28
 const MAX_FRAGMENTS_PERFORMANCE := 14
-
-static var active_fragments := 0
 
 var kind := "scrap_barricade"
 var dimensions := Vector3(2.4, 1.35, 0.42)
@@ -108,7 +113,7 @@ func _fracture(direction: Vector3, speed: float) -> void:
 		_collision.set_deferred("disabled", true)
 	collision_layer = 0
 	collision_mask = 0
-	var available := maxi(0, fragment_budget() - active_fragments)
+	var available := maxi(0, fragment_budget() - WORLD_DEBRIS.pool_count(FRAGMENT_POOL))
 	var wanted := mini(6, available)
 	for index in wanted:
 		_spawn_fragment(index, direction, speed)
@@ -139,9 +144,7 @@ func _spawn_fragment(index: int, direction: Vector3, speed: float) -> void:
 	fragment.apply_central_impulse(spray * (2.4 + speed * 0.28))
 	fragment.apply_torque_impulse(Vector3(randf_range(-1.6, 1.6), randf_range(-1.6, 1.6), randf_range(-1.6, 1.6)))
 	_fragments.append(fragment)
-	active_fragments += 1
-	fragment.tree_exited.connect(func(): active_fragments = maxi(0, active_fragments - 1))
-	get_tree().create_timer(FRAGMENT_LIFETIME).timeout.connect(fragment.queue_free)
+	WORLD_DEBRIS.register(fragment, {"kind": kind, "part": "fragment"}, FRAGMENT_POOL, fragment_budget())
 
 
 func _add_box(parent: Node3D, at: Vector3, size: Vector3, colour: Color) -> void:
