@@ -162,7 +162,27 @@ func _ready() -> void:
 		"holding for the ideal is exactly heat 1.0, so the gauge and the grade agree")
 	check(SMOKEABLES.draw_heat("bong", 1.6) < 1.0, "and the bong wants longer before it reads full")
 
-	for node in [fresh, stub, tank_full, tank_dry, bowl_packed, bowl_ashed, built_at_rest, released]:
+	var bong_parts: Dictionary = bowl_packed.get_meta("parts")
+	var bong_chamber: MeshInstance3D = bong_parts["chamber_smoke"]
+	var bong_bubbles: Array = bong_parts["bubbles"]
+	SMOKEABLES.set_draw(bowl_packed, 0.0)
+	check(not bong_chamber.visible and (bong_bubbles as Array).all(func(bubble): return not (bubble as MeshInstance3D).visible),
+		"a resting bong has clear water and a clear chamber")
+	SMOKEABLES.set_draw(bowl_packed, 0.8)
+	check(bong_chamber.visible, "drawing continuously fills the bong chamber")
+	check((bong_bubbles as Array).all(func(bubble): return (bubble as MeshInstance3D).visible),
+		"and pulls visible bubbles through the water")
+	check((bong_parts["light"] as OmniLight3D).light_energy > 0.0,
+		"and lights the bowl during the same held draw")
+
+	var live_spliff := SMOKEABLES.build("spliff", 0.0)
+	var spliff_ash: MeshInstance3D = (live_spliff.get_meta("parts") as Dictionary)["ash"]
+	SMOKEABLES.set_draw(live_spliff, 0.55)
+	check(absf(spliff_ash.rotation.z) > 0.01, "a spliff visibly rolls as it is drawn")
+	SMOKEABLES.set_draw(live_spliff, 0.0)
+	check(is_zero_approx(spliff_ash.rotation.z), "and settles back into its authored rest")
+
+	for node in [fresh, stub, tank_full, tank_dry, bowl_packed, bowl_ashed, built_at_rest, released, live_spliff]:
 		(node as Node3D).free()
 
 	print("SMOKEABLES_TEST_RESULT failures=", failures.size())
