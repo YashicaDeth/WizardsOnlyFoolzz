@@ -89,6 +89,96 @@ static func record(existing: Array, wound: Dictionary) -> Array:
 	return existing
 
 
+## --- scars a save file can hold ------------------------------------------
+##
+## B10.2 wants the body to carry its scars across a restart, and a restart goes
+## out through a JSON file. JSON has no Vector3. `JSON.stringify` does not fail
+## on one, which is the trap — it writes the *string* `"(0.1, 0.2, 0.3)"`, and
+## parsing hands that string straight back. A wound whose `at` is a string is
+## not a place on a limb any more: `to_local` arithmetic on it is meaningless
+## and `WoundMarks.build` would put every crater at the origin.
+##
+## So positions leave as three plain numbers and come back as a position.
+## `from_record` also accepts a Vector3 unchanged, because the same pair is used
+## for the in-memory hand-off where nothing has been through a file.
+static func to_record(wound: Dictionary) -> Dictionary:
+	var out := wound.duplicate(true)
+	out["at"] = _triple(wound.get("at", Vector3.ZERO))
+	out["normal"] = _triple(wound.get("normal", Vector3.UP))
+	return out
+
+
+static func from_record(record_data: Dictionary) -> Dictionary:
+	var out := record_data.duplicate(true)
+	out["at"] = _vector(record_data.get("at", Vector3.ZERO), Vector3.ZERO)
+	out["normal"] = _vector(record_data.get("normal", Vector3.UP), Vector3.UP)
+	# JSON has no integers either — every number comes back a float, and `seed`
+	# is fed to `RandomNumberGenerator.seed` and `layer` indexes a tint table.
+	# A crater generated from a float seed is a differently-shaped crater, which
+	# would mean a scar that changes shape every time it is saved.
+	out["seed"] = int(record_data.get("seed", 0))
+	out["layer"] = int(record_data.get("layer", 0))
+	out["radius"] = float(record_data.get("radius", 0.04))
+	out["damage"] = float(record_data.get("damage", 0.0))
+	return out
+
+
+## The whole per-zone table, in and out. Zones are filtered on the way back in
+## rather than trusted: a save is a file on someone's disk, and a key that is
+## not a limb would put wounds on a body part that does not exist.
+static func to_records(marks: Dictionary) -> Dictionary:
+	var out := {}
+	for zone: String in marks.keys():
+		var list: Array = []
+		for wound in marks[zone]:
+			if wound is Dictionary:
+				list.append(to_record(wound as Dictionary))
+		if not list.is_empty():
+			out[zone] = list
+	return out
+
+
+static func from_records(saved: Variant, allowed: Array = []) -> Dictionary:
+	var out := {}
+	if not saved is Dictionary:
+		return out
+	for zone_key in (saved as Dictionary):
+		var zone := str(zone_key)
+		if not allowed.is_empty() and not allowed.has(zone):
+			continue
+		var stored: Variant = (saved as Dictionary)[zone_key]
+		if not stored is Array:
+			continue
+		var list: Array = []
+		for wound in (stored as Array):
+			if wound is Dictionary:
+				list.append(from_record(wound as Dictionary))
+			if list.size() >= MAX_PER_ZONE:
+				break
+		if not list.is_empty():
+			out[zone] = list
+	return out
+
+
+static func _triple(value: Variant) -> Array:
+	if value is Vector3:
+		var vector: Vector3 = value
+		return [vector.x, vector.y, vector.z]
+	if value is Array and (value as Array).size() >= 3:
+		var stored: Array = value
+		return [float(stored[0]), float(stored[1]), float(stored[2])]
+	return [0.0, 0.0, 0.0]
+
+
+static func _vector(value: Variant, fallback: Vector3) -> Vector3:
+	if value is Vector3:
+		return value
+	if value is Array and (value as Array).size() >= 3:
+		var stored: Array = value
+		return Vector3(float(stored[0]), float(stored[1]), float(stored[2]))
+	return fallback
+
+
 ## The mesh for one wound: a torn crater, generated per wound.
 ##
 ## The first version was a `CylinderMesh` — a clean disc — and rendering it made

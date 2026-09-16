@@ -17,6 +17,8 @@ extends Node3D
 ## characters only. `head_anchor` exists so proximity voice has one consistent
 ## place to speak from.
 
+const ImplantCatalog := preload("res://systems/implant_catalog.gd")
+
 signal zone_disabled(zone_id: String)
 signal limb_severed(zone_id: String, report: Dictionary)
 signal went_down()
@@ -266,10 +268,26 @@ func build(id: String, config: Dictionary = {}) -> void:
 				severed.append(canonical)
 		sever_stress = (restored.get("sever_stress", {}) as Dictionary).duplicate(true)
 		zone_depth = (restored.get("zone_depth", {}) as Dictionary).duplicate(true)
+		# After `zone_depth`, never before it: `_refresh_wounds` shows a wound
+		# at the shallower of its own layer and the depth the limb was actually
+		# opened to, so restoring the marks first would draw every old graze
+		# claiming to show bone.
+		wound_marks = WoundMarks.from_records(restored.get("wound_marks", {}), ZONES)
+		# A limb that is not there has no health to have. Ordinary saves already
+		# wrote zero here because `_sever_zone` zeroes it, but a body restored
+		# from scars alone has no saved zone numbers at all — and a missing arm
+		# reporting full health would have `combat_ratio()` counting it toward a
+		# swing it cannot throw.
+		for zone_id in severed:
+			var stump: Dictionary = anatomy.zones.get(zone_id, {})
+			if not stump.is_empty():
+				stump["health"] = 0.0
+				anatomy.zones[zone_id] = stump
 		if anatomy.downed:
 			rotation.x = -PI * 0.46
 		for zone_id in ZONES:
 			_refresh_zone(zone_id)
+			_refresh_wounds(zone_id)
 		for organ_id in organ_parts:
 			if not anatomy.organ_ok(organ_id):
 				_hide_organ(str(organ_id))
@@ -835,7 +853,113 @@ func snapshot() -> Dictionary:
 	state["severed"] = severed.duplicate()
 	state["sever_stress"] = sever_stress.duplicate(true)
 	state["zone_depth"] = zone_depth.duplicate(true)
+	# B10.2. Until this line a body's snapshot was eighteen keys of statistics
+	# and not one mark: it saved the health the arm had left and lost the hole
+	# in the arm. Everything B10.4 built — the real impact point, kept in the
+	# limb's own space, drawn where it landed — existed only for as long as the
+	# rig did, so every load rebuilt an unmarked body carrying a damage number.
+	state["wound_marks"] = WoundMarks.to_records(wound_marks)
 	return state
+
+
+## Everything in a `snapshot()` that is a mark rather than a measurement. A
+## whitelist rather than a list of things to strip, so a new statistic added to
+## `AnatomyComponent.snapshot()` does not silently start surviving restarts
+## because nobody remembered to add it to a denylist.
+const SCAR_KEYS := ["wound_marks", "zone_depth", "severed", "cybernetics"]
+
+
+## What a body carries across a quantum restart, as opposed to across a load.
+##
+## B10.2, both halves load-bearing. A scar is *located, visible and permanent*:
+## the hole, where it is, how deep the limb was opened to, the arm that is not
+## there any more, the hardware bolted into what is left. A statistic is a
+## number describing the condition the body is in right now — health, blood,
+## pain, consciousness, dose, whether it was on the floor, how close a limb was
+## to coming off — and none of those are a mark on anything.
+##
+## Carrying the statistics is the easy accident, because they are most of what
+## `snapshot()` is made of. It produces exactly the wrong body: one that arrives
+## in a new universe still bleeding out from a wound that is not in this world,
+## and with no hole where that wound was.
+##
+## A load is the other operation and is deliberately untouched by this: picking
+## a save back up has to return the body exactly as it was put down, statistics
+## included, or every slot in the game quietly heals whoever is in it.
+static func scars_of(state: Dictionary) -> Dictionary:
+	var scars := {}
+	for key: String in SCAR_KEYS:
+		if state.has(key):
+			var value: Variant = state[key]
+			scars[key] = value.duplicate(true) if value is Dictionary or value is Array else value
+	return scars
+
+
+## The rig this person's papers describe.
+##
+## B10.1: "the body is recognisably itself across a quantum restart". What makes
+## a body recognisable is not its health — it is the authored shape. The race's
+## build is a silhouette, the face seeds the generated head, the wear darkens
+## the skin, the blood type is how much of it there is, and the hardware is what
+## was grown around. All of that already lived on the subject record; the
+## derivation from record to rig lived inside the hunt scene, so nothing else in
+## the game could build the same body from the same papers, and no test could
+## ask whether two bodies built either side of a restart were the same one.
+##
+## D, whose work this is, is the reason there is anything here to carry: the
+## intake collected a face, a wear level, a blood type and whatever you were
+## grown with, and the body read none of it — every player walked out of the vat
+## the same colour, the same blood, and wearing a hardcoded torque arm whatever
+## the sheet said. Greg's report was "nothing with the character creation
+## modelling gets made". A body that is the same as every other body cannot be
+## recognisably itself across anything.
+static func config_from_subject(record: Dictionary) -> Dictionary:
+	var race: Dictionary = CharacterSheet.RACES.get(str(record.get("race", "decanted")), {})
+	var appearance: Dictionary = record.get("appearance", {}) if record.get("appearance") is Dictionary else {}
+	var sheet_anatomy: Dictionary = record.get("anatomy", {}) if record.get("anatomy") is Dictionary else {}
+	var wear := clampf(float(appearance.get("wear", 0.4)), 0.0, 1.0)
+	var config := {
+		# Face drives the rig's procedural variation, so two players with
+		# different faces are not the same generated head.
+		"variation": 1 + int(clampf(float(appearance.get("face", 0.5)), 0.0, 1.0) * 24.0),
+		"flesh": Color("7a6350").darkened(wear * 0.35),
+		"blood": blood_volume(str(sheet_anatomy.get("blood_type", "O-RUST"))),
+		"build": float(race.get("build", 1.0)),
+		"cybernetics": grown_cybernetics(sheet_anatomy),
+	}
+	if record.get("anatomy_state") is Dictionary:
+		config["restore"] = record.anatomy_state
+	return config
+
+
+## Blood type is a choice on the intake sheet, so it has to mean something.
+## Volumes are small differences rather than build-defining ones: a NULL carrier
+## bleeds out faster than an O-RUST and that is the whole of it.
+static func blood_volume(blood_type: String) -> float:
+	match blood_type:
+		"NULL": return 4200.0
+		"SAP": return 5800.0
+		"AB-": return 4900.0
+		"B-9": return 5100.0
+		"A-ASH": return 5000.0
+		_: return 5200.0
+
+
+## What you were grown with, rather than a hardcoded arm. An empty sheet still
+## gets the salvaged torque arm, because the opening hands you one either way
+## and a body with no history at all is not this game.
+static func grown_cybernetics(sheet_anatomy: Dictionary) -> Dictionary:
+	var grown: Dictionary = {}
+	var listed: Variant = sheet_anatomy.get("cybernetics", [])
+	for entry in ImplantCatalog.list(listed):
+		grown[str(entry.zone)] = {
+			"name": str(entry.name),
+			"armor": float(entry.get("armor", 0.1)),
+			"restores": 0.7,
+		}
+	if grown.is_empty():
+		grown["right_arm"] = {"name": "salvaged torque arm", "armor": 0.22, "restores": 0.72}
+	return grown
 
 
 func zone_health(zone_id: String) -> float:

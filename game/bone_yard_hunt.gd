@@ -122,7 +122,6 @@ const WORLD_INDEX := preload("res://systems/world_index.gd")
 const PIN_BOARD := preload("res://systems/pin_board.gd")
 const DEMO_WALL := preload("res://systems/demo_wall.gd")
 const IMPACT_FEEL := preload("res://systems/impact_feel.gd")
-const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 const CARRION_SCAVENGER := preload("res://systems/carrion_scavenger.gd")
 const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 const SUBSTANCE_STATION := preload("res://systems/substance_station.gd")
@@ -893,27 +892,15 @@ func _build_player_rig() -> void:
 	# D4.2. The race you were decanted as is a silhouette, not just a stat block.
 	# A Marrow-Cut stands bigger than an Unreset, and until now every body in the
 	# world was the same size whatever the sheet said.
-	var race: Dictionary = CharacterSheet.RACES.get(str(saved.get("race", "decanted")), {})
-	# The intake collected a face, a wear level, a blood type and whatever you
-	# were grown with, and the body read none of it — every player walked out of
-	# the vat the same colour, the same blood, and wearing a hardcoded torque arm
-	# regardless of what the sheet said. Greg's report: "nothing with the
-	# character creation modelling gets made".
+	#
+	# B10.1. The derivation from papers to body used to live here, in the hunt,
+	# which meant the hunt was the only thing in the game that could build this
+	# person. "Recognisably itself across a restart" is a claim about two bodies
+	# built from one record at two different times, and it cannot even be stated
+	# while only one scene knows how to read the record. It moved to the rig.
 	var appearance: Dictionary = saved.get("appearance", {})
-	var sheet_anatomy: Dictionary = saved.get("anatomy", {})
-	var wear := clampf(float(appearance.get("wear", 0.4)), 0.0, 1.0)
-	var config := {
-		# Face drives the rig's procedural variation, so two players with
-		# different faces are not the same generated head.
-		"variation": 1 + int(clampf(float(appearance.get("face", 0.5)), 0.0, 1.0) * 24.0),
-		"flesh": Color("7a6350").darkened(wear * 0.35),
-		"blood": _blood_volume(str(sheet_anatomy.get("blood_type", "O-RUST"))),
-		"gore": viscera_fx,
-		"build": float(race.get("build", 1.0)),
-		"cybernetics": _grown_cybernetics(sheet_anatomy),
-	}
-	if saved.get("anatomy_state") is Dictionary:
-		config["restore"] = saved.anatomy_state
+	var config := BaselineHuman.config_from_subject(saved)
+	config["gore"] = viscera_fx
 	player_rig.gore = viscera_fx
 	player_rig.build("player", config)
 	# B8.1. The one thing that makes this body different from the one lying in
@@ -955,34 +942,16 @@ func _build_body_witness() -> void:
 	mirror.set_target(player_rig)
 
 
-## Blood type is a choice on the intake sheet, so it has to mean something.
-## Volumes are small differences rather than build-defining ones: a NULL carrier
-## bleeds out faster than an O-RUST and that is the whole of it.
+## Both of these are the rig's now — see `BaselineHuman.config_from_subject`.
+## Kept as delegates rather than deleted because blood volume and what you were
+## grown with are two of the things D's audit asks this scene directly, and a
+## body-level fact should not stop being askable of the scene that decants one.
 func _blood_volume(blood_type: String) -> float:
-	match blood_type:
-		"NULL": return 4200.0
-		"SAP": return 5800.0
-		"AB-": return 4900.0
-		"B-9": return 5100.0
-		"A-ASH": return 5000.0
-		_: return 5200.0
+	return BaselineHuman.blood_volume(blood_type)
 
 
-## What you were grown with, rather than a hardcoded arm. An empty sheet still
-## gets the salvaged torque arm, because the opening hands you one either way
-## and a body with no history at all is not this game.
 func _grown_cybernetics(sheet_anatomy: Dictionary) -> Dictionary:
-	var grown: Dictionary = {}
-	var listed: Variant = sheet_anatomy.get("cybernetics", [])
-	for entry in ImplantCatalog.list(listed):
-		grown[str(entry.zone)] = {
-			"name": str(entry.name),
-			"armor": float(entry.get("armor", 0.1)),
-			"restores": 0.7,
-		}
-	if grown.is_empty():
-		grown["right_arm"] = {"name": "salvaged torque arm", "armor": 0.22, "restores": 0.72}
-	return grown
+	return BaselineHuman.grown_cybernetics(sheet_anatomy)
 
 
 ## Damage to the player, routed through the body so it lands on a real zone,
