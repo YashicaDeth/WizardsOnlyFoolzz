@@ -58,6 +58,26 @@ signal dropped(payload: Dictionary)
 ## drawn on every dossier and the archive is a page rather than a mode. Listing
 ## them again here would recreate the six-panel problem inside the fix for it.
 const MODES := ["INDEX", "MAP", "WIRE", "RADIO", "CARRY", "RITUAL", "FIELD"]
+## I3.1 v3. Apps can keep their own information architecture, but the device
+## owns how every one identifies itself and how the hand operates it.
+const PAGE_ROLES := {
+	"INDEX": "RECORD / DOSSIER",
+	"MAP": "SATELLITE / GROUND",
+	"WIRE": "NETWORK / SITES",
+	"RADIO": "RECEIVER / BAND",
+	"CARRY": "CUSTODY / OBJECTS",
+	"RITUAL": "EVIDENCE / RITE",
+	"FIELD": "RESONANCE / PRACTICE",
+}
+const PAGE_ACTIONS := {
+	"INDEX": "POINT / OPEN RECORD",
+	"MAP": "LEAN / SURVEY",
+	"WIRE": "POINT / FOLLOW LINK",
+	"RADIO": "TUNE / HOLD",
+	"CARRY": "STEP / PIN OBJECT",
+	"RITUAL": "N / RECORD EVIDENCE",
+	"FIELD": "READ / PRACTISE",
+}
 
 const CASE := Color("1b1713")
 const CASE_EDGE := Color("6d5a44")
@@ -76,6 +96,14 @@ const SCREEN_SPILL := Color("9bd4b0")
 const PAGE_ASPECT := 16.0 / 9.0
 
 var mode_index := 0
+## I3.2 v3. `mode_index` is where the hand asked to go; this is the page still
+## visible behind the sliding shutter. They become equal only under full cover.
+var displayed_mode_index := 0
+var pending_mode_index := -1
+var page_transition := 1.0
+var page_transition_direction := 1.0
+var page_transition_from := "INDEX"
+const PAGE_TRANSITION_SECONDS := 0.52
 ## Which thing in the bag is under the hand. The CARRY page had no selection at
 ## all, which was fine when it was a table and is not now that it is objects.
 var carry_index := 0
@@ -179,6 +207,7 @@ var _world_source: Node = null
 var _device_rect := Rect2()
 var _screen_rect := Rect2()
 var _page_rect := Rect2()
+var _content_rect := Rect2()
 
 ## I0.10 v2. "Panels are hosted at one fixed size inside the handheld; a map
 ## you cannot lean into is a picture of a map." `device_size` used to be a
@@ -519,6 +548,10 @@ func current_mode() -> String:
 	return MODES[mode_index]
 
 
+func displayed_mode() -> String:
+	return MODES[displayed_mode_index]
+
+
 func cycle_mode(step: int) -> void:
 	if not is_open:
 		return
@@ -562,15 +595,35 @@ func set_mode(mode: String) -> void:
 	if found < 0:
 		return
 	mode_index = found
+	# Opening the page already physically present is reconciliation, not a page
+	# change. This keeps loading and repossession immediate while every actual
+	# app change travels through the shutter below.
+	if found == displayed_mode_index and pending_mode_index < 0:
+		_activate_mode(found)
+		return
+	page_transition_from = displayed_mode()
+	pending_mode_index = found
+	page_transition = 0.0
+	var forward := posmod(found - displayed_mode_index, MODES.size())
+	var backward := posmod(displayed_mode_index - found, MODES.size())
+	page_transition_direction = 1.0 if forward <= backward else -1.0
+	queue_redraw()
+	if _overlay != null:
+		_overlay.queue_redraw()
+
+
+func _activate_mode(index: int) -> void:
+	displayed_mode_index = clampi(index, 0, MODES.size() - 1)
+	var mode := displayed_mode()
 	# WIRE is not a separate surface — it is the index already open on its own
 	# page. Duplicating it would be the six-panel problem again in miniature.
-	if current_mode() == "WIRE" and "page" in _index:
+	if mode == "WIRE" and "page" in _index:
 		_index.set("page", 2)
-	elif current_mode() == "INDEX" and "page" in _index and int(_index.get("page")) == 2:
+	elif mode == "INDEX" and "page" in _index and int(_index.get("page")) == 2:
 		_index.set("page", 0)
 	# Both hosted panels gate their own drawing on an open flag, so entering a
 	# mode has to open the panel as well as show it.
-	if current_mode() == "MAP" and _map.has_method("open_map"):
+	if mode == "MAP" and _map.has_method("open_map"):
 		# Cheap and idempotent: `attach_world` returns immediately once the
 		# camera exists, so this is the retry for a device built before the
 		# region it looks down on.
@@ -581,14 +634,45 @@ func set_mode(mode: String) -> void:
 		# map and not of the device, because leaving the page only ever set
 		# `visible`. The satellite kept rendering behind the WIRE page.
 		_map.close_map()
-	if current_mode() in ["INDEX", "WIRE"] and _index.has_method("open"):
+	if mode in ["INDEX", "WIRE"] and _index.has_method("open"):
 		_index.open()
-	if current_mode() == "RITUAL":
+	if mode == "RITUAL":
 		# A camera frame can outlive the version that first asked for it. Reconcile
 		# here rather than in `_draw`, so opening a page cannot award evidence more
 		# than once merely because it redraws at sixty frames per second.
 		RITUAL_LEDGER.reconcile_album()
-	mode_changed.emit(current_mode())
+	mode_changed.emit(mode)
+
+
+func _advance_page_transition(delta: float) -> void:
+	if pending_mode_index < 0:
+		page_transition = 1.0
+		return
+	var before := page_transition
+	page_transition = minf(1.0, page_transition + maxf(delta, 0.0) / PAGE_TRANSITION_SECONDS)
+	if before < 0.5 and page_transition >= 0.5:
+		_activate_mode(pending_mode_index)
+	if page_transition >= 1.0:
+		pending_mode_index = -1
+
+
+func page_transition_coverage() -> float:
+	if pending_mode_index < 0:
+		return 0.0
+	if page_transition <= 0.5:
+		return Motion.ease_out(page_transition * 2.0)
+	return 1.0 - Motion.ease_out((page_transition - 0.5) * 2.0)
+
+
+func page_contract(mode: String) -> Dictionary:
+	var id := mode.to_upper()
+	return {
+		"mode": id,
+		"role": str(PAGE_ROLES.get(id, "UNREGISTERED PAGE")),
+		"action": str(PAGE_ACTIONS.get(id, "OPERATE")),
+		"index": MODES.find(id) + 1,
+		"count": MODES.size(),
+	}
 
 
 ## Where the character is standing. Reception, coverage and which parts of the
@@ -606,6 +690,7 @@ func stand_at(world_position: Vector2) -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	_advance_page_transition(delta)
 	# C1.7 `v2`. Checked against `possessed` rather than `is_open` — a device
 	# in your pocket is still yours to drop, the same as one in your hand.
 	# Edge-detected so holding the key down cannot fire `drop()` every frame.
@@ -644,7 +729,7 @@ func _process(delta: float) -> void:
 	# I0.10 v2. Only worth doing while there is something to lean into — the
 	# radio and CARRY have no hosted panel to gain detail from, and leaning
 	# in on a fixed readout would just be a camera trick.
-	var leanable := is_open and current_mode() in ["INDEX", "MAP", "WIRE"]
+	var leanable := is_open and displayed_mode() in ["INDEX", "MAP", "WIRE"]
 	var lean_key_held: bool = lean_override if lean_override != null else Input.is_key_pressed(LEAN_KEY)
 	lean = Motion.blend(lean, delta, Motion.PANEL, leanable and lean_key_held)
 	var wave_input := Vector2.ZERO
@@ -677,6 +762,13 @@ func _process(delta: float) -> void:
 	)
 	_screen_rect = Rect2(_turned_rect.position + Vector2(26, 62), _turned_rect.size - Vector2(52, 104))
 	_page_rect = _aspect_fit(_screen_rect, PAGE_ASPECT)
+	var chrome_top := clampf(_page_rect.size.y * 0.055, 24.0, 34.0)
+	var chrome_bottom := clampf(_page_rect.size.y * 0.043, 20.0, 29.0)
+	var chrome_side := clampf(_page_rect.size.x * 0.011, 8.0, 13.0)
+	_content_rect = Rect2(
+		_page_rect.position + Vector2(chrome_side, chrome_top),
+		_page_rect.size - Vector2(chrome_side * 2.0, chrome_top + chrome_bottom)
+	)
 	_clip.position = _page_rect.position
 	_clip.size = Vector2(maxf(_page_rect.size.x, 1.0), maxf(_page_rect.size.y, 1.0))
 	var front_visible := not showing_back() and _screen_rect.size.x > 2.0
@@ -685,7 +777,7 @@ func _process(delta: float) -> void:
 	_overlay.size = size
 	_overlay.visible = front_visible
 
-	var mode := current_mode()
+	var mode := displayed_mode()
 	var showing_index := mode == "INDEX" or mode == "WIRE"
 	_index.visible = showing_index and front_visible
 	_map.visible = mode == "MAP" and front_visible
@@ -745,15 +837,15 @@ func _draw() -> void:
 	# dim phosphor bed. Hosted and device-native pages both land above this.
 	BlackMirror.draw_reading_bed(self, _page_rect, alpha, screen_luminance())
 	# The modes with no hosted panel draw straight onto the screen.
-	var mode := current_mode()
+	var mode := displayed_mode()
 	if mode == "RADIO":
-		_draw_radio(_page_rect, alpha)
+		_draw_radio(_content_rect, alpha)
 	elif mode == "CARRY":
-		_draw_carry(_page_rect, alpha)
+		_draw_carry(_content_rect, alpha)
 	elif mode == "RITUAL":
-		_draw_ritual(_page_rect, alpha)
+		_draw_ritual(_content_rect, alpha)
 	elif mode == "FIELD":
-		_draw_resonance(_page_rect, alpha)
+		_draw_resonance(_content_rect, alpha)
 
 
 ## C4.2 `v4`. One answer for how much light the glass itself is giving off.
@@ -967,7 +1059,7 @@ func _draw_tabs(rect: Rect2, alpha: float) -> void:
 	for index in MODES.size():
 		var label: String = MODES[index]
 		var width := CellOutzType.width(label, 11.0, 1.0) + 26.0
-		var active := index == mode_index
+		var active := index == displayed_mode_index
 		var tint: Color = AMBER if active else CASE_EDGE
 		var shape := PackedVector2Array([
 			Vector2(x, y), Vector2(x + width, y),
@@ -1027,7 +1119,7 @@ func _draw_status(rect: Rect2, alpha: float) -> void:
 	var cell_label := "CELL %02d%%" % roundi(charge * 100.0)
 	var cell_width := CellOutzType.width_condensed(cell_label, 10.0, 0.9)
 	CellOutzType.draw_condensed(self, Vector2(rect.position.x + rect.size.x - 30 - cell_width, rect.position.y + rect.size.y - 30), cell_label, 10.0, tint * Color(1, 1, 1, alpha), 0.9)
-	if current_mode() == "MAP":
+	if displayed_mode() == "MAP":
 		CellOutzType.draw_condensed(self, Vector2(rect.position.x + rect.size.x - 250, rect.position.y + rect.size.y - 30), "SAT DRAW x%.1f" % MAP_BATTERY_MULTIPLIER, 8.0, AMBER * Color(1, 1, 1, 0.9 * alpha), 0.72)
 	for cell in 8:
 		var lit := float(cell) / 8.0 < charge
@@ -1079,11 +1171,11 @@ func _drive_battery(delta: float) -> void:
 
 
 func battery_draw_multiplier() -> float:
-	return MAP_BATTERY_MULTIPLIER if current_mode() == "MAP" else 1.0
+	return MAP_BATTERY_MULTIPLIER if displayed_mode() == "MAP" else 1.0
 
 
 func emitted_light_multiplier() -> float:
-	return MAP_LIGHT_MULTIPLIER if current_mode() == "MAP" else 1.0
+	return MAP_LIGHT_MULTIPLIER if displayed_mode() == "MAP" else 1.0
 
 
 func wave_vector() -> Vector2:
@@ -1137,6 +1229,8 @@ func _draw_damage() -> void:
 	var rect := _screen_rect
 	var wear := 1.0 - clampf(condition, 0.0, 1.0)
 	_draw_page_registration(alpha)
+	_draw_page_chrome(alpha)
+	_draw_page_shutter(alpha)
 	for scan in range(0, int(rect.size.y), 3):
 		_overlay.draw_line(Vector2(rect.position.x, rect.position.y + scan), Vector2(rect.end.x, rect.position.y + scan), Color(0, 0, 0, 0.12 * alpha), 1.0)
 
@@ -1225,6 +1319,57 @@ func _draw_page_registration(alpha: float) -> void:
 		var inward_y := 1.0 if at.y == _page_rect.position.y else -1.0
 		_overlay.draw_line(at, at + Vector2(corner * inward_x, 0), AMBER * Color(1, 1, 1, 0.62 * alpha), 1.4)
 		_overlay.draw_line(at, at + Vector2(0, corner * inward_y), AMBER * Color(1, 1, 1, 0.62 * alpha), 1.4)
+
+
+## I3.1 v3. One registration language around all seven apps. The content can
+## remain a dossier, a satellite picture or an instrument; identity, position,
+## navigation and the primary verb never move or change type treatment.
+func _draw_page_chrome(alpha: float) -> void:
+	if _page_rect.size.x <= 2.0 or _content_rect.size.x <= 2.0:
+		return
+	var contract := page_contract(displayed_mode())
+	var top := Rect2(_page_rect.position, Vector2(_page_rect.size.x, _content_rect.position.y - _page_rect.position.y))
+	var bottom := Rect2(Vector2(_page_rect.position.x, _content_rect.end.y), Vector2(_page_rect.size.x, _page_rect.end.y - _content_rect.end.y))
+	_overlay.draw_rect(top, Color(0.012, 0.020, 0.017, 0.91 * alpha))
+	_overlay.draw_rect(bottom, Color(0.010, 0.016, 0.014, 0.92 * alpha))
+	_overlay.draw_line(Vector2(_page_rect.position.x, top.end.y), Vector2(_page_rect.end.x, top.end.y), MOSS * Color(1, 1, 1, 0.42 * alpha), 1.0)
+	_overlay.draw_line(Vector2(_page_rect.position.x, bottom.position.y), Vector2(_page_rect.end.x, bottom.position.y), CASE_EDGE * Color(1, 1, 1, 0.52 * alpha), 1.0)
+	var page_code := "%02d/%02d" % [int(contract.index), int(contract.count)]
+	CellOutzType.draw_text(_overlay, top.position + Vector2(12, 7), str(contract.mode), 12.0, INK * Color(1, 1, 1, alpha), 1.0)
+	CellOutzType.draw_condensed(_overlay, top.position + Vector2(118, 9), str(contract.role), 9.0, MOSS * Color(1, 1, 1, 0.82 * alpha), 0.72)
+	var code_width := CellOutzType.width_condensed(page_code, 9.0, 0.72)
+	CellOutzType.draw_condensed(_overlay, Vector2(top.end.x - code_width - 12, top.position.y + 9), page_code, 9.0, AMBER * Color(1, 1, 1, alpha), 0.72)
+	CellOutzType.draw_condensed(_overlay, bottom.position + Vector2(12, 6), "TAB / NEXT PAGE", 8.0, CASE_EDGE * Color(1, 1, 1, 0.86 * alpha), 0.66)
+	var action := str(contract.action)
+	var action_width := CellOutzType.width_condensed(action, 8.0, 0.66)
+	CellOutzType.draw_condensed(_overlay, Vector2(bottom.end.x - action_width - 12, bottom.position.y + 6), action, 8.0, AMBER * Color(1, 1, 1, 0.88 * alpha), 0.66)
+
+
+## I3.2 v3. The old page changes only while the work surface is physically
+## occluded. The shutter crosses in the direction of travel, closes fully,
+## swaps the page behind itself, then leaves by the opposite edge.
+func _draw_page_shutter(alpha: float) -> void:
+	var coverage := page_transition_coverage()
+	if coverage <= 0.001 or _content_rect.size.x <= 2.0:
+		return
+	var width := _content_rect.size.x * coverage
+	var entering := page_transition <= 0.5
+	var from_right := page_transition_direction > 0.0
+	var x := _content_rect.position.x
+	if entering == from_right:
+		x = _content_rect.end.x - width
+	var shutter := Rect2(Vector2(x, _content_rect.position.y), Vector2(width, _content_rect.size.y))
+	_overlay.draw_rect(shutter, Color(0.012, 0.009, 0.011, 0.985 * alpha))
+	for rib in 7:
+		var rib_x := shutter.position.x + shutter.size.x * float(rib + 1) / 8.0
+		_overlay.draw_line(Vector2(rib_x, shutter.position.y), Vector2(rib_x, shutter.end.y), CASE_EDGE * Color(1, 1, 1, 0.18 * alpha), 1.0)
+	var leading_x := shutter.position.x if entering == from_right else shutter.end.x
+	_overlay.draw_line(Vector2(leading_x, shutter.position.y), Vector2(leading_x, shutter.end.y), AMBER * Color(1, 1, 1, 0.85 * alpha), 2.0)
+	if coverage > 0.46:
+		var destination: String = MODES[pending_mode_index] if pending_mode_index >= 0 else displayed_mode()
+		var transit := "%s  >  %s" % [page_transition_from, destination]
+		var transit_width := CellOutzType.width_condensed(transit, 10.0, 0.8)
+		CellOutzType.draw_condensed(_overlay, shutter.get_center() + Vector2(-transit_width * 0.5, -4), transit, 10.0, AMBER * Color(1, 1, 1, coverage * alpha), 0.8)
 
 
 # --- the three modes that have no hosted panel ----------------------------
@@ -1669,9 +1814,14 @@ func _fit_into_aperture(panel: Control) -> void:
 	if design.x <= 1.0 or design.y <= 1.0:
 		design = Vector2(1280, 720)
 	panel.size = design
-	var fit := minf(_clip.size.x / design.x, _clip.size.y / design.y)
+	# I3.1 v3. The header/footer are device-owned. Hosted pages receive the same
+	# remaining work surface as native ones instead of painting underneath the
+	# common registration and becoming seven subtly different layouts again.
+	var available := _content_rect.size
+	var local_origin := _content_rect.position - _page_rect.position
+	var fit := minf(available.x / design.x, available.y / design.y)
 	panel.scale = Vector2(fit, fit)
-	panel.position = (_clip.size - design * fit) * 0.5
+	panel.position = local_origin + (available - design * fit) * 0.5
 
 
 static func _aspect_fit(outer: Rect2, aspect: float) -> Rect2:

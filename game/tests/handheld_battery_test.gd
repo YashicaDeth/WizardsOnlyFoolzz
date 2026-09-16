@@ -16,6 +16,10 @@ func check(condition: bool, label: String) -> void:
 		failures.append(label)
 
 
+func finish_page_movement(device: Control) -> void:
+	device._advance_page_transition(device.PAGE_TRANSITION_SECONDS)
+
+
 func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		get_tree().quit(2)
@@ -43,11 +47,13 @@ func _ready() -> void:
 	# C7.2. The satellite page is deliberately expensive: brighter and wider,
 	# while the ordinary Index remains the baseline.
 	device.set_mode("INDEX")
+	finish_page_movement(device)
 	device.battery = 1.0
 	device._drive_battery(60.0)
 	var index_cost: float = 1.0 - device.battery
 	var index_radius: float = device.light_radius()
 	device.set_mode("MAP")
+	finish_page_movement(device)
 	device.battery = 1.0
 	device._drive_battery(60.0)
 	var map_cost: float = 1.0 - device.battery
@@ -55,6 +61,7 @@ func _ready() -> void:
 	check(device.light_radius() > index_radius, "the map's brighter panel broadcasts its source farther")
 	check(is_equal_approx(device.battery_draw_multiplier(), HANDHELD.MAP_BATTERY_MULTIPLIER), "the map exposes its real draw multiplier for its status readout")
 	device.set_mode("INDEX")
+	finish_page_movement(device)
 
 	# Drain it out entirely.
 	device._drive_battery(4000.0)

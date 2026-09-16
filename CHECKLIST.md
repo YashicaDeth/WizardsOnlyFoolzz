@@ -1743,8 +1743,23 @@ finished. Applies to everything below and to A5, A6, C1.
 
 ### I v3 — the third pass
 v2 made the screens their own medium and the medium is still six separate designs. Greg: *"the entire blackmirror gui needs work"*.
-- [ ] **I3.1** `v3` One GUI with one grammar, not a set of well-drawn pages
-- [ ] **I3.2** `v3` Moving between pages is movement, not a cut
+- [x] **I3.1** `v3` One GUI with one grammar, not a set of well-drawn pages —
+      all seven Black Mirror apps now live inside one chassis-owned page
+      contract: fixed 16:9 glass, inset work surface, persistent header/footer
+      rails, mode/role registration, page number, navigation hint and one
+      page-specific primary verb. Hosted INDEX/MAP/WIRE panels and native
+      RADIO/CARRY/RITUAL/FIELD instruments receive the same content aperture
+      instead of each deciding its own edges. `handheld_page_grammar_test.gd`
+      verifies the shared bounds and complete seven-page contracts; visual
+      evidence: `captures/i3_1_shared_page_grammar.png`.
+- [x] **I3.2** `v3` Moving between pages is movement, not a cut — every direct
+      jump and cyclic page change now drives a 0.52-second ribbed shutter in
+      the shortest travel direction. The old live page remains present while
+      it enters; the destination activates and emits `mode_changed` only at
+      full occlusion; the new live page is revealed as it exits. The
+      deterministic midpoint contract and reversed travel are proven by
+      `handheld_page_grammar_test.gd`; visual evidence:
+      `captures/i3_2_page_shutter.png` and `i3_2_page_arrival.png`.
 
 ### I v4 — the fourth pass
 v3 unified the pages and the weapon is still configured in a list. Greg: *"the slide pops out into a menu if you press shift and lock it, expanding into the weapon customisation, maybe the circle in the middle and 4 boxes around it"*.
@@ -1782,7 +1797,9 @@ Nine passes designed in a lit room. C v4 made the device the main light source i
 - [ ] **I10.2** `v10` What the screen throws onto your hands is part of the design
 
 - [ ] **I10.3** `v10` Every screen is a physical object with a surface and a condition
-- [ ] **I10.4** `v10` Moving between pages is movement, never a cut
+- [x] **I10.4** `v10` Moving between pages is movement, never a cut — fulfilled
+      by the same Black Mirror shutter and hidden-midpoint page swap proven
+      under I3.2; the physical casing and glass remain continuous throughout.
 - [ ] **I10.5** `v10` Everything in the world can be inspected with the same verbs
 - [ ] **I10.6** `v10` A screen is legible while you are being attacked
 - [ ] **I10.7** `v10` Screens are readable in the dark and lit by their own emission

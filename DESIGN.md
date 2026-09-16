@@ -1,5 +1,16 @@
 # Living design notes
 
+17 September Black Mirror note: its seven apps are different instruments inside
+one object, not seven unrelated UI compositions. The casing now owns a fixed
+page grammar — header and footer rails, app identity and role, stable page
+number, navigation hint, primary physical verb and a common inset work surface.
+INDEX, MAP and WIRE keep their authored hosted content while RADIO, CARRY,
+RITUAL and FIELD retain their native instruments inside those same bounds.
+Moving between them is physical movement: a ribbed shutter travels across the
+glass in the shortest direction, the old live page remains until full cover,
+and only then does the next page activate beneath it and get revealed. No app
+change may expose a hard visibility cut.
+
 17 September implementation note: changing view in the derby is physical camera travel through the car, not a teleport followed by a visibility swap. A heat begins in its cab; once chase view has been earned, the eye eases between the live seat and chase targets over 0.68 seconds while both interior and exterior shells remain present. Only arrival changes the view mask, preventing either half of the vehicle from vanishing around the moving camera. Sleep is likewise an action on a world object rather than a menu command: the Hunt's reachable bedroll advances the persistent clock to 07:00 and records the hours actually passed, while nearby living hostiles make rest impossible. Interface failure is anatomically local rather than a uniform hurt filter: head wounds disturb the portrait, torso wounds the anatomy/X-ray, arm wounds the held-object reliquary and leg wounds the navigation aperture, all derived from the live zone health so treatment repairs the same instrument. Project-owned editor diagnostics now have a zero-warning/error budget enforced by a repeatable headless-editor check; addon and engine-shutdown noise remain outside that ownership boundary.
 
 16 September implementation note: the Black Mirror's world light and the body carrying it are separate stealth observations. At night a hunter can follow the bright source before resolving its holder; cover, an empty battery, or physically pocketing the device removes that trail. Hostile pursuit reads this verdict directly, rather than leaving `player_unseen` as presentation-only state. The satellite map is deliberately the loudest page: twice the baseline battery draw and 1.3 times the emitted-light output, shown on the chassis as `SAT DRAW x2.0`, so opening it at night trades a wider readable pool for a longer detection signature. While a hosted page is braced with `L`, WASD carries the held object and its real beam around the same screen edge; this is a physical wrist/lighting action that recentres on release, not a free camera peek. The device's saved condition now answers live handling: incoming blows only damage it while raised, locate their cracks from the attacker's screen direction, and a deliberate drop adds its own lower-edge impact before the same serial leaves possession. A dropped device becomes a colliding world object carrying that serial, charge and wear; its world position survives reload and proximity interaction repossesses the same object.
