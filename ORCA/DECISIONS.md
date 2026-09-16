@@ -63,9 +63,65 @@ against current HEAD. See `QUEUE.md`.
 
 ---
 
+## Answered, second round — 16 September, afternoon
+
+### The three that change how everything is scheduled
+
+**1. The eight zero sections get lanes.** S, H, AW, AP, AO, AM, AK, AA — 234
+items, 23% of all open work, and no lane owned any of them. Greg: *"they 100%
+matter to me."* They are not deprioritised, they were simply never assigned.
+Every one gets a real owner in `OWNERSHIP.md`.
+
+**2. Destructible surfaces WILL be built** — `A10.11` and everything downstream
+of it. Greg: *"build it once its possible and you have made all the synergising
+building blocks."* So this is approved but **sequenced**: build its prerequisites
+first, then it. It is not a free-standing task and must not be started as one.
+
+**3. THE DESCENT IS NO LONGER ALPHABETICAL.** This supersedes the earlier
+A -> B -> C -> D instruction. Greg, verbatim:
+
+> *"screw the alphabetical, do it most efficiently most logical, work on
+> everything in order of it working in conjunction with every other feature
+> instead of binding you to work on mechanics that need 10 other edits on things
+> down the line"*
+
+Work is ordered by DEPENDENCY, not by letter. Free wins first (items whose
+blocker now exists), then foundations ranked by how much each unblocks, then
+leaf clusters grouped by file family. Alphabetical order is arbitrary and forces
+work on mechanics that need ten other things first.
+
+### The small ones
+
+| # | Question | Greg's call |
+|---|---|---|
+| `J1.3`/`X1.3` | Delete `game/addons/fmod/`? | **Deleted.** 239MB reclaimed, 16 Sep. It was untracked, gitignored, and referenced by exactly one line — `game/tests/plugin_probe.gd:9`, a `ClassDB.class_exists()` probe that only *reports* whether it is installed. Greg's reasoning: it is middleware you would reinstall fresh, not resurrect from a stale copy. |
+| `const GOLD` | Trunk's `f0c85a` or b-ladder's `d9b43c`? | **b-ladder's `d9b43c`**, the deeper tone. Its rationale stands: the seal arrives in copper and leaves in gold, and that is how you read that it went *in*. |
+| menu doors | Wire `_build_locked_doors()`/`_build_support_row()` in, or delete? | **Wire them in** to the new door shape. Greg wants the feature; they are not dead weight. |
+| motherboard | Unify `begin_full_sequence()` and `begin_procession()`? | **Unify them.** Two parallel ideas under different names. |
+| rescued files | Are `night_vision.gd` and `black_mirror_camera.gd` + the HUD settings suite wanted? | **Wanted.** Land them on trunk rather than leaving them on their rescue branches. |
+
 ## Open — waiting on Greg. Do not act.
 
-### Deleting `game/addons/fmod/` (`J1.3` / `X1.3`)
+### `G7.1` — is the spawn meant to be this dark?
+
+Greg has said he does not understand this one yet, so it stays open until he
+does. It is **purely an art call and nothing is broken**, which is the part that
+was never made clear to him:
+
+`G7.2` already fixed the *readability* half and is closed. The ground was going
+solid black — `"dirt"` is a 0.03-0.09 albedo material at 0.97 roughness, and a
+flat plane facing away from a low sun with a dark zenith has nothing to reflect.
+It got the same rim trick `"flesh"` already uses, so grazing angles now pick up
+the horizon glow and the near field reads as a lit surface with a gradient
+instead of a hole. **Global exposure and ambient were deliberately left
+untouched, so nothing else in frame changed.**
+
+So the only question left is taste: **is spawning into near-darkness the
+intended mood, or should the whole scene be brighter?** Nothing is blocked
+either way. Raising exposure would change every other thing in frame, which is
+why it was not done on an agent's initiative.
+
+### Superseded — kept for the record
 
 239MB on disk, already `.gitignore`d and untracked, referenced by **zero real
 game script** — the grep hits on "fmod" in `bone_yard_hunt.gd` and friends are
