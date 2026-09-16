@@ -22,11 +22,11 @@ extends RefCounted
 ## already the thing this project treats as the record of what is true. Adding a
 ## sixth autoload to hold a float would be a worse answer.
 
-## How much game time passes per real second. At 60, one real minute is one game
-## hour and a day takes twenty-four real minutes, which is roughly where
-## survival games land and is short enough that a player sees a night in a
-## session without a day feeling like a stopwatch.
-const MINUTES_PER_SECOND := 1.0
+## How much game time passes per real second. At 0.4, one complete day takes
+## sixty real minutes. The former 1.0 rate made a day only twenty-four minutes
+## long and the light visibly ran away while a player was reading or fighting.
+## Sleeping and authored time skips still pass world-hours directly.
+const MINUTES_PER_SECOND := 0.4
 
 const MINUTES_PER_HOUR := 60.0
 const HOURS_PER_DAY := 24.0
@@ -34,6 +34,17 @@ const MINUTES_PER_DAY := MINUTES_PER_HOUR * HOURS_PER_DAY
 ## Thirty days. Long enough that AB2.4's "repairs after a month" is a real wait
 ## and short enough that a player who keeps a save will see one turn over.
 const DAYS_PER_MONTH := 30.0
+const MONTHS_PER_YEAR := 12
+const REGULAR_DAYS_PER_YEAR := 360
+const DAYS_PER_YEAR := 365
+const MONTHS_PER_SEASON := 4
+const SEASON_NAMES := ["ASHFALL", "EMERGENCE", "REAPING"]
+const MONTH_NAMES := [
+	"ASHWAKE", "RUST RAIN", "CINDER FLOOD", "BLACK BLOOM",
+	"SPOREWAKE", "BONE RISE", "MARROWTIDE", "LONG STATIC",
+	"RED HARVEST", "HOLLOW SUN", "LAST ROT", "QUIET PYRE",
+]
+const UNCOUNTED_DAYS := ["THE FOOL", "THE WOUND", "THE MIRROR", "THE WIRE", "THE FLAME"]
 
 ## Where the day starts. Not midnight: a run opens in the late afternoon, so the
 ## first thing a new player meets is the light going, which is the register this
@@ -73,6 +84,60 @@ static func month_progress() -> float:
 ## How many months have turned over. AB2's repair pass reads this.
 static func month() -> int:
 	return int(float(day() - 1) / DAYS_PER_MONTH) + 1
+
+
+## The civil calendar of the Ashbloom Expanse. It deliberately uses twelve
+## thirty-day months arranged as three seasons, then five dangerous days that
+## belong to no month. Those five are not a thirteenth month: institutions can
+## date them, but cannot pretend they are ordinary working days.
+static func calendar_date() -> Dictionary:
+	var absolute_day := day() - 1
+	var year_index := absolute_day / DAYS_PER_YEAR
+	var day_of_year := absolute_day % DAYS_PER_YEAR
+	if day_of_year >= REGULAR_DAYS_PER_YEAR:
+		var outside_index := day_of_year - REGULAR_DAYS_PER_YEAR
+		return {
+			"year": year_index + 1,
+			"day_of_year": day_of_year + 1,
+			"uncounted": true,
+			"uncounted_day": outside_index + 1,
+			"name": UNCOUNTED_DAYS[outside_index],
+			"season": "OUTSIDE THE YEAR",
+			"month": 0,
+			"month_name": "",
+			"day": 0,
+			"decan": 0,
+			"day_in_decan": 0,
+		}
+	var month_index := day_of_year / int(DAYS_PER_MONTH)
+	var day_in_month := day_of_year % int(DAYS_PER_MONTH)
+	return {
+		"year": year_index + 1,
+		"day_of_year": day_of_year + 1,
+		"uncounted": false,
+		"uncounted_day": 0,
+		"name": MONTH_NAMES[month_index],
+		"season": SEASON_NAMES[month_index / MONTHS_PER_SEASON],
+		"month": month_index + 1,
+		"month_name": MONTH_NAMES[month_index],
+		"day": day_in_month + 1,
+		"decan": day_in_month / 10 + 1,
+		"day_in_decan": day_in_month % 10 + 1,
+	}
+
+
+## Compact enough for the shared header of the handheld, and strange enough
+## that the player immediately knows this is not the Roman calendar in costume.
+static func calendar_stamp() -> String:
+	var date := calendar_date()
+	if bool(date["uncounted"]):
+		return "%s // YEAR %d" % [date["name"], date["year"]]
+	return "%s %02d // DECAN %s // YEAR %d" % [
+		date["month_name"], date["day"], _roman_decan(int(date["decan"])), date["year"]]
+
+
+static func _roman_decan(value: int) -> String:
+	return ["I", "II", "III"][clampi(value - 1, 0, 2)]
 
 
 ## What the hour is called. Five names rather than four: the hour before dawn is
@@ -121,9 +186,9 @@ static func stamp() -> String:
 	return "%02d:%02d" % [int(at), int(fmod(at * MINUTES_PER_HOUR, MINUTES_PER_HOUR))]
 
 
-## The full line, for anything that prints one. "DAY 3 // 03:42 // DEEP NIGHT".
+## The full line, for anything that prints one: date, clock face and light phase.
 static func long_stamp() -> String:
-	return "DAY %d  //  %s  //  %s" % [day(), stamp(), phase().to_upper()]
+	return "%s  //  %s  //  %s" % [calendar_stamp(), stamp(), phase().to_upper()]
 
 
 ## Set the hour directly. For harnesses that need a specific time, and for

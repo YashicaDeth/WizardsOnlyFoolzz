@@ -963,6 +963,11 @@ func _draw_tabs(rect: Rect2, alpha: float) -> void:
 
 
 func _draw_status(rect: Rect2, alpha: float) -> void:
+	# The date is device-owned registration, not content authored seven times.
+	# It therefore remains in exactly the same place while every app changes
+	# beneath it — the second narrow seam toward C10.1's one coherent GUI.
+	CellOutzType.draw_condensed(self, rect.position + Vector2(190, 47), _calendar_header_text(), 8.0,
+		MOSS * Color(1, 1, 1, 0.82 * alpha), 0.72)
 	# C5. Signal first, because it is the thing that decides whether half the
 	# device works, and "no signal" is useless without saying what would fix it.
 	var reading: Dictionary = signal_field.reading()
@@ -1000,6 +1005,10 @@ func _draw_status(rect: Rect2, alpha: float) -> void:
 		var lit := float(cell) / 8.0 < charge
 		var bar := Rect2(Vector2(rect.position.x + rect.size.x - 150 + cell * 9.0, rect.position.y + rect.size.y - 30), Vector2(6, 11))
 		draw_rect(bar, (tint if lit else CASE_EDGE * Color(1, 1, 1, 0.3)) * Color(1, 1, 1, alpha))
+
+
+func _calendar_header_text() -> String:
+	return "%s // %s" % [WorldClock.calendar_stamp(), WorldClock.stamp()]
 
 
 ## C1.5. Drawn by the overlay child so it lands on top of whatever panel is

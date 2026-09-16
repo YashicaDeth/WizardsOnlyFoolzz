@@ -1,9 +1,9 @@
 extends Node
 
-## A short deterministic gameplay take: inspect and raise a cigarette, draw to
-## its clean window, release into the automatic exhale, shape the fresh breath,
-## sink a bong cone, then inspect a weapon. This drives the same Hunt methods as
-## live input; it is not a separate animation demo.
+## A deterministic full smoking showcase. It drives the same Hunt methods as
+## live input; it is not a separate animation demo. Every held device appears,
+## all three smoke tricks cycle in their normal order, and the take ends on the
+## universal weapon inspection pose.
 
 var hunt: Node
 var frame := 0
@@ -31,42 +31,66 @@ func _process(_delta: float) -> void:
 	if frame <= 0 or hunt == null:
 		return
 	frame += 1
-	# Cigarette: the fingers and remaining paper are readable before the compact
-	# clean pull, continuous paper burn and neutral breath.
+	# Cigarette: inspect, Zippo, continuous burn, automatic breath and an O.
 	if frame == 12:
 		hunt.set("inspect_held", true)
-	if frame == 38:
+	if frame == 42:
 		hunt.set("inspect_held", false)
-	if frame == 54:
+	if frame == 55:
 		hunt.call("_begin_smoking_draw")
-	if frame == 102:
+	if frame == 110:
 		hunt.call("_finish_smoking_draw")
-	if frame == 124:
+	if frame == 128:
 		hunt.call("_shape_smoke_trick")
-	# Spliff: relaxed roll into the mouth and the first green-grey breath.
-	if frame == 168:
+	# Vape: distinct hand rhythm, no lighter, then DOUBLE O.
+	if frame == 170:
+		hunt.call("_equip_smokeable", "vape")
+	if frame == 185:
+		hunt.call("_begin_smoking_draw")
+	if frame == 235:
+		hunt.call("_finish_smoking_draw")
+	if frame == 253:
+		hunt.call("_shape_smoke_trick")
+	# Joint: herb tint and the GHOST inhale.
+	if frame == 295:
+		hunt.call("_equip_smokeable", "joint")
+	if frame == 310:
+		hunt.call("_begin_smoking_draw")
+	if frame == 365:
+		hunt.call("_finish_smoking_draw")
+	if frame == 383:
+		hunt.call("_shape_smoke_trick")
+	# Spliff: inspect the rolled object, then its slower mouth gesture.
+	if frame == 425:
 		hunt.call("_equip_smokeable", "spliff")
-	if frame == 184:
+	if frame == 438:
+		hunt.set("inspect_held", true)
+	if frame == 468:
+		hunt.set("inspect_held", false)
+	if frame == 480:
 		hunt.call("_begin_smoking_draw")
-	if frame == 244:
+	if frame == 540:
 		hunt.call("_finish_smoking_draw")
-	if frame == 266:
-		hunt.call("_shape_smoke_trick")
-	# Bong: weighted two-hand lift, live bowl, water bubbles and chamber fill.
-	if frame == 308:
+	# Bong: inspect, weighted two-hand lift, Zippo, live bowl, water bubbles,
+	# chamber fill and a long cone sink while the camera looks down it.
+	if frame == 590:
 		hunt.call("_equip_smokeable", "bong")
-	if frame == 326:
+	if frame == 605:
+		hunt.set("inspect_held", true)
+	if frame == 640:
+		hunt.set("inspect_held", false)
+	if frame == 650:
 		hunt.call("_begin_smoking_draw")
-	if frame == 428:
+	if frame == 770:
 		hunt.call("_finish_smoking_draw")
-	if frame == 450:
+	if frame == 788:
 		hunt.call("_shape_smoke_trick")
 	# End on a real two-hand weapon inspection to show the verb is universal.
-	if frame == 478:
+	if frame == 830:
 		hunt.call("_equip_weapon", 1)
-	if frame == 492:
+	if frame == 850:
 		hunt.set("inspect_held", true)
-	if frame == 550:
+	if frame == 920:
 		hunt.set("inspect_held", false)
-	if frame >= 574:
+	if frame >= 950:
 		get_tree().quit()

@@ -1361,6 +1361,7 @@ func _physics_process(delta: float) -> void:
 	var player_delta: float = delta * impact_feel.scale_for("player")
 	_advance_arm(player_delta)
 	_update_held_inspection(delta)
+	_update_first_person_forearms()
 	# O2.7 v4. And the gore. Greg: *"gore and chunk physics still run at full
 	# speed through a hit, so a limb can leave a body that has not moved
 	# yet"*. The rig's own spray and organs take the exchange's clock;
@@ -2439,8 +2440,16 @@ func _equip_smokeable(device_id: String) -> void:
 	if grip != null:
 		smoke_grip_hand = HELD_GEAR.build_humiliation_hand(1)
 		smoke_grip_hand.name = "SmokingGripHand"
-		HELD_GEAR.set_pose(smoke_grip_hand, "pinch" if device_id in ["cigarette", "joint", "spliff"] else "wrap")
-		smoke_grip_hand.position = grip.position + Vector3(0.018, -0.012, 0.0)
+		var rolled := device_id in ["cigarette", "joint", "spliff"]
+		HELD_GEAR.set_pose(smoke_grip_hand, "smoke" if rolled else "wrap")
+		# Rolled objects sit above the palm between two fingers. Viewmodel hands
+		# need to be slightly smaller than weapon hands at this camera distance or
+		# an anatomically correct 84mm cigarette disappears behind the glove.
+		if rolled:
+			smoke_grip_hand.scale *= 0.80
+			smoke_grip_hand.position = grip.position + Vector3(0.006, -0.050, 0.010)
+		else:
+			smoke_grip_hand.position = grip.position + Vector3(0.018, -0.012, 0.0)
 		smoke_grip_hand.rotation = grip.rotation + Vector3(-PI * 0.5, 0.0, PI * 0.5)
 		smoke_model.add_child(smoke_grip_hand)
 	# A bong's second hand is not a text claim: a real hand closes at its
@@ -2682,12 +2691,13 @@ func _begin_smoke_ignition(device_id: String) -> void:
 	(player_rig.parts.left_arm as Node3D).add_child(smoke_lighter)
 	smoke_lighter_hand = HELD_GEAR.build_humiliation_hand(-1)
 	smoke_lighter_hand.name = "LighterHand"
-	HELD_GEAR.set_pose(smoke_lighter_hand, "wrap")
+	HELD_GEAR.set_pose(smoke_lighter_hand, "lighter")
+	smoke_lighter_hand.scale *= 0.80
 	# The thumb rides by the flint wheel; the other fingers close around the
 	# case. Because it is a child of the Zippo it follows the whole flip and
 	# bowl-lighting arc without ever lagging behind the prop.
-	smoke_lighter_hand.position = Vector3(-0.018, 0.010, 0.004)
-	smoke_lighter_hand.rotation = Vector3(-PI * 0.5, 0.10, -PI * 0.5)
+	smoke_lighter_hand.position = Vector3(-0.010, -0.006, 0.012)
+	smoke_lighter_hand.rotation = Vector3(-PI * 0.5, -0.08, -PI * 0.42)
 	smoke_lighter.add_child(smoke_lighter_hand)
 	smoke_lighter_lid = smoke_lighter.get_node("LidPivot") as Node3D
 	smoke_lighter_flame = smoke_lighter.get_node("Flame") as MeshInstance3D
@@ -2827,6 +2837,57 @@ func _update_held_inspection(delta: float) -> void:
 		inspect_blend * (0.10 + sin(inspect_time * 1.6) * 0.06),
 		inspect_blend * (0.62 + turn * 0.30),
 		inspect_blend * sin(inspect_time * 1.3) * 0.12)
+
+
+## The actual body's arms own the third-person silhouette. In first person the
+## props are camera-composed, so their costume sleeves need the same honest
+## seam: each begins outside a lower corner and ends exactly at its own wrist.
+## This is recomputed after weapon lag, smoking lift and inspection have all
+## moved the hands, which prevents the arm from arriving one frame late.
+func _update_first_person_forearms() -> void:
+	if body_motion == null:
+		return
+	var hands: Array = []
+	if smoke_model != null and is_instance_valid(smoke_model):
+		if smoke_grip_hand != null:
+			hands.append(smoke_grip_hand)
+		if smoke_support_hand != null and smoke_support_hand.visible:
+			hands.append(smoke_support_hand)
+		if smoke_lighter_hand != null and smoke_lighter_hand.visible:
+			hands.append(smoke_lighter_hand)
+	elif arsenal != null:
+		var model := arsenal.models.get(str(arsenal.current_id)) as Node3D
+		if model != null and model.visible:
+			for hand_name in ["RightGripHand", "LeftGripHand"]:
+				var weapon_hand := model.get_node_or_null(hand_name) as Node3D
+				if weapon_hand != null:
+					hands.append(weapon_hand)
+	for hand in hands:
+		_pose_first_person_forearm(hand as Node3D)
+
+
+func _pose_first_person_forearm(hand: Node3D) -> void:
+	if hand == null or not is_instance_valid(hand):
+		return
+	var forearm := hand.get_node_or_null("FirstPersonForearm") as Node3D
+	if forearm == null:
+		return
+	if not body_motion.first_person:
+		forearm.visible = false
+		return
+	forearm.visible = true
+	forearm.top_level = true
+	var side := int(hand.get_meta("screen_entry_side", 1))
+	var start := camera.to_global(Vector3(0.43 * float(side), -0.49, -0.30))
+	var end := hand.to_global(Vector3(0.0, 0.0, -0.035))
+	var along := end - start
+	var length := maxf(along.length(), 0.08)
+	var basis := Basis(Quaternion(Vector3.UP, along.normalized()))
+	forearm.global_transform = Transform3D(basis, start)
+	var sleeve := forearm.get_node_or_null("TaperedSleeve") as MeshInstance3D
+	if sleeve != null:
+		(sleeve.mesh as CylinderMesh).height = length
+		sleeve.position.y = length * 0.5
 
 
 func _smoke_prop_material(tint: Color, roughness: float, metallic: bool) -> StandardMaterial3D:

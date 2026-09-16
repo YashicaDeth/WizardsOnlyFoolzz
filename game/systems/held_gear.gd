@@ -113,6 +113,16 @@ const POSES := {
 	"wrap": {"fingers": [1.18, 1.34, 0.92], "thumb": [0.62, 0.70], "spread": 0.25},
 	# Flatter, and the fingers stay straighter: a blade is a plate, not a rod.
 	"pinch": {"fingers": [0.92, 1.48, 0.55], "thumb": [0.95, 0.35], "spread": 0.35},
+	# A cigarette sits between the index and middle fingers. The old generic
+	# pinch closed every finger into a near-fist, hiding the whole rolled object
+	# behind the palm. These two stay long and visibly parted while the ring and
+	# little fingers rest against the palm beneath them.
+	"smoke": {"fingers": [1.12, 1.36, 0.78], "thumb": [0.58, 0.34], "spread": 0.48,
+		"index": [0.52, 0.88, 0.48], "middle": [0.62, 0.96, 0.54]},
+	# The Zippo needs a thumb at the wheel and an index curled around its far
+	# shoulder, not the same four-finger cylinder grip used on a sword handle.
+	"lighter": {"fingers": [1.06, 1.30, 0.82], "thumb": [0.28, 0.18], "spread": 0.32,
+		"index": [0.66, 0.82, 0.42]},
 	# Index out, everything else closed. The one pose a player will notice is
 	# wrong, because it is the finger that does the thing.
 	"trigger": {"fingers": [1.30, 1.46, 1.20], "thumb": [0.70, 0.55], "spread": 0.20,
@@ -199,6 +209,7 @@ static func build_hand(side: int, flesh := Color("8a6a55")) -> Node3D:
 static func build_humiliation_hand(side: int) -> Node3D:
 	var hand := build_hand(side, Color("3b2029"))
 	hand.scale = Vector3.ONE * 1.16
+	hand.set_meta("screen_entry_side", side)
 	for child in hand.find_children("*", "MeshInstance3D", true, false):
 		(child as MeshInstance3D).material_override = _leather(Color("28151e"), 70 + side)
 
@@ -247,6 +258,42 @@ static func build_humiliation_hand(side: int) -> Node3D:
 		bell.position = Vector3(side_step * 0.035, -0.030, -0.018)
 		bell.material_override = _metal(Color("a7772d"), 0.24, 121 + int(side_step))
 		cuff.add_child(bell)
+
+	# The hand is never a floating viewmodel. A tapered costumed forearm carries
+	# it back out through the bottom-left or bottom-right of the frame. Keeping it
+	# under the hand means every smoking, lighter, weapon and inspection pose
+	# inherits one continuous limb without each prop inventing an arm.
+	var forearm := Node3D.new()
+	forearm.name = "FirstPersonForearm"
+	hand.add_child(forearm)
+	var sleeve := MeshInstance3D.new()
+	sleeve.name = "TaperedSleeve"
+	var sleeve_mesh := CylinderMesh.new()
+	sleeve_mesh.top_radius = 0.052
+	sleeve_mesh.bottom_radius = 0.078
+	sleeve_mesh.height = 0.36
+	sleeve_mesh.radial_segments = 12
+	sleeve.mesh = sleeve_mesh
+	# Authored along +Y so the live view can stretch it exactly from a lower
+	# screen edge to the wrist without guessing through the prop's rotations.
+	sleeve.position = Vector3(0.0, 0.18, 0.0)
+	sleeve.material_override = _leather(Color("40121e"), 140 + side)
+	forearm.add_child(sleeve)
+	# A broad entry puff hides the far cap at the screen edge and makes the arm
+	# widen toward the unseen elbow instead of ending as a cut-off tube.
+	for index in 4:
+		var angle := TAU * float(index) / 4.0
+		var entry_puff := MeshInstance3D.new()
+		entry_puff.name = "EntryPuff%d" % index
+		var entry_mesh := SphereMesh.new()
+		entry_mesh.radius = 0.052
+		entry_mesh.height = 0.086
+		entry_mesh.radial_segments = 10
+		entry_mesh.rings = 6
+		entry_puff.mesh = entry_mesh
+		entry_puff.position = Vector3(cos(angle) * 0.040, 0.018, sin(angle) * 0.040)
+		entry_puff.material_override = _leather(Color("651d2a") if index % 2 == 0 else Color("c6ae7a"), 150 + index)
+		forearm.add_child(entry_puff)
 	return hand
 
 

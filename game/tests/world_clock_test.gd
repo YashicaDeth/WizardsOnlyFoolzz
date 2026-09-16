@@ -23,14 +23,37 @@ func _ready() -> void:
 	check(WorldClock.day() == 1, "on day one")
 	check(WorldClock.phase() == "day", "which is still day")
 
-	# It advances, and it advances at the rate it says it does.
-	WorldClock.advance(60.0)
-	check(absf(WorldClock.hour() - 17.5) < 0.01, "a real minute is a game hour")
+	# It advances, and it advances at the slower rate it says it does.
+	WorldClock.advance(150.0)
+	check(absf(WorldClock.hour() - 17.5) < 0.01, "two and a half real minutes is a game hour")
 
 	# A full day turns over.
 	WorldHistory.world_minute = 0.0
-	WorldClock.advance(60.0 * 24.0)
-	check(WorldClock.day() == 2, "twenty-four game hours is a new day")
+	WorldClock.advance(60.0 * 60.0)
+	check(WorldClock.day() == 2, "one real hour is one complete world day")
+
+	# The Expanse keeps three four-month seasons, three decans per month,
+	# and five named days that no institution can hide inside an ordinary month.
+	WorldHistory.world_minute = 0.0
+	var opening_date := WorldClock.calendar_date()
+	check(opening_date.month_name == "ASHWAKE" and opening_date.day == 1 and opening_date.season == "ASHFALL",
+		"the calendar opens on Ashwake 1 in Ashfall")
+	WorldHistory.world_minute = 19.0 * WorldClock.MINUTES_PER_DAY
+	var second_decan := WorldClock.calendar_date()
+	check(second_decan.decan == 2 and second_decan.day_in_decan == 10,
+		"thirty-day months are divided into three ten-day decans")
+	WorldHistory.world_minute = 359.0 * WorldClock.MINUTES_PER_DAY
+	check(WorldClock.calendar_date().month_name == "QUIET PYRE" and WorldClock.calendar_date().day == 30,
+		"the twelfth month closes the regular year")
+	WorldHistory.world_minute = 360.0 * WorldClock.MINUTES_PER_DAY
+	check(WorldClock.calendar_date().uncounted and WorldClock.calendar_date().name == "THE FOOL",
+		"the first uncounted day belongs to no month")
+	WorldHistory.world_minute = 364.0 * WorldClock.MINUTES_PER_DAY
+	check(WorldClock.calendar_stamp() == "THE FLAME // YEAR 1",
+		"all five days outside the year carry their own names")
+	WorldHistory.world_minute = 365.0 * WorldClock.MINUTES_PER_DAY
+	check(WorldClock.calendar_date().year == 2 and WorldClock.calendar_date().month_name == "ASHWAKE",
+		"Ashwake returns when the next year begins")
 
 	# The phases land where they are named.
 	for sample in [[2.0, "deep night"], [5.5, "before dawn"], [7.5, "dawn"], [13.0, "day"], [19.0, "dusk"], [22.0, "night"]]:
