@@ -581,10 +581,9 @@ work created or exposed, not a wish.
       impact from its own point rather than one shared authored origin. An
       impact with a genuinely unknown location (an accumulated tick rather
       than a single blow) still lands on a varied point instead of the one
-      shared spot. `take_wear()` itself is not yet called from anywhere in
-      the game — that wiring is a separate, larger gap this does not close —
-      so this is the mechanism working correctly, verified directly rather
-      than through real gameplay impacts. Verified:
+      shared spot. This pass originally had no live `take_wear()` caller;
+      that larger wiring gap has since closed under C10.8, while the mechanism
+      here remains independently verified. Verified:
       `tests/handheld_impact_test.gd` (new, 7/7 — a given location is used
       exactly, two unlocated impacts land on different points and neither is
       the old authored one, the impact list is capped, and it survives a
@@ -636,7 +635,7 @@ Greg, plainly: *"the entire blackmirror gui needs work"*. Nine passes on what th
 - [ ] **C10.5** `v10` Its glow is what anything hunting you sees first
 - [ ] **C10.6** `v10` It has a back, a jester on it, and a condition that shows on the shell
 - [ ] **C10.7** `v10` Every page reads correctly in the dark it creates
-- [ ] **C10.8** `v10` The device wears from what you have actually done to it
+- [x] ~~**C10.8** `v10` The device wears from what you have actually done to it~~ Two real player actions now reach the existing persistent wear mechanism. A wound taken while the Black Mirror is physically raised reduces its condition in proportion to the incoming damage and projects the attacker's world position onto the glass, so the new crack begins on the side the blow arrived from; the identical wound while it is pocketed cannot touch it. Deliberately dropping the device applies a smaller lower-edge impact before possession leaves, and the dropped payload therefore belongs to the same newly damaged serial rather than a replacement. Both causes enter `wear_log`, persist, and continue to drive the front cracks and rear shell degradation already built. `tests/handheld_live_wear_test.gd` (9 checks), `handheld_drop_test.gd`, `device_possession_test.gd`, and `handheld_impact_test.gd` pass headless; `captures/c10_8_live_device_wear.png` was produced through `_wound_player()` in the real Hunt scene and visually inspected at 1280x720
 - [ ] **C10.9** `v10` Nothing on it is a list of text in a box
 - [ ] **C10.10** `v10` It is the Wire, the map, the carry and the radio without four designs
 - [ ] **C10.11** `v10` Apps on it are playable and some of them are load-bearing

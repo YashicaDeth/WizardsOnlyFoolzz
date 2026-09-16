@@ -1084,6 +1084,12 @@ func _grown_cybernetics(sheet_anatomy: Dictionary) -> Dictionary:
 func _wound_player(from: Vector3, damage: float, damage_type := "cut") -> void:
 	if player_rig == null:
 		return
+	# C10.8. The raised Black Mirror is physically in the exchange. A blow only
+	# marks it while it is actually exposed in the hand, and its crack starts on
+	# the side of the glass the attacker occupied on screen rather than at a
+	# cosmetic random point.
+	if handheld != null and is_instance_valid(handheld) and handheld.possessed and handheld.raised > 0.5:
+		handheld.take_wear(clampf(damage / 400.0, 0.008, 0.08), "%s impact while raised" % damage_type, _handheld_impact_point(from))
 	var toward := (from - player)
 	toward.y = 0.0
 	var aim := player_rig.global_position + Vector3(0, 1.1, 0) + toward.normalized() * 0.3
@@ -1099,6 +1105,16 @@ func _wound_player(from: Vector3, damage: float, damage_type := "cut") -> void:
 		_player_lost_limb(str(result.get("zone", "")))
 	elif _should_disarm(damage):
 		_disarm_player()
+
+
+func _handheld_impact_point(from: Vector3) -> Vector2:
+	if camera == null or not is_instance_valid(camera):
+		return Vector2(0.5, 0.5)
+	var viewport_size := Vector2(get_viewport().get_visible_rect().size)
+	if viewport_size.x <= 0.0 or viewport_size.y <= 0.0 or camera.is_position_behind(from):
+		return Vector2(0.5, 0.5)
+	var projected := camera.unproject_position(from) / viewport_size
+	return Vector2(clampf(projected.x, 0.1, 0.9), clampf(projected.y, 0.1, 0.9))
 
 
 ## AN2.2. A weapon you are barely holding is a weapon somebody can take. Both

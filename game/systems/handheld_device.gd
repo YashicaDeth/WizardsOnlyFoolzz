@@ -407,6 +407,11 @@ func _lose_possession(event_type: String, details: Dictionary) -> Dictionary:
 
 
 func drop() -> Dictionary:
+	# C10.8. A deliberate drop is not a free inventory toggle. The lower glass
+	# takes the small, repeatable impact before possession leaves, so the exact
+	# same persisted object is the one that lands damaged in the world.
+	if possessed:
+		take_wear(0.025, "deliberate drop", Vector2(0.52, 0.88))
 	var result := _lose_possession("device_dropped", {})
 	if bool(result.get("ok", false)):
 		dropped.emit(result)
