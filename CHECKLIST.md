@@ -1955,12 +1955,18 @@ Since it was written, `vehicle_interior.gd`/`dash_cluster.gd` — both Lane
       rival or grudge ≥ 40, not a derby-specific measure like rounds won or
       laps survived. Whether "derby progress" was meant to name a different
       number is Greg's call, not assumed here
-- [ ] **M2.7** No hard cut between the two views (Rule 3) — checked, and it
-      is one: `_toggle_derby_view()` flips `in_cab` and `_apply_view_masks()`
-      swaps `camera.cull_mask` between the cab and bodywork layers on the
-      same frame, with no fade, no camera travel, nothing eased. Rule 3
-      ("every hard cut is a bug") names exactly this. Left open rather than
-      touched — `rift_derby.gd` is Lane 2's file
+- [x] **M2.7** No hard cut between the two views (Rule 3) — the toggle now
+      captures the live camera pose and travels for 0.68 seconds through a
+      smoothstep interpolation to the moving cab/chase target, including its
+      FOV. Both the bodywork and cab shell stay rendered while the eye crosses
+      the car; the destination cull mask is applied only on arrival, so neither
+      side disappears around the player mid-move. The heat now also begins in
+      the cab as M2.6 specifies, rather than exposing its still-locked chase
+      view by default. `tests/derby_view_transition_test.gd` proves both
+      journeys and both arrival masks (9 checks); `derby_cab_test` and
+      `derby_balance_test` remain green. The actual cab, halfway-through-car
+      and chase frames were opened and compared at
+      `captures/m2_7_view_{cab,midway,chase}.png`.
 
 ### M2b — Cars are the horses of this world
 Greg: *"in the car we need to be able to fully exit it like e exit the door type

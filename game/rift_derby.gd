@@ -111,10 +111,16 @@ var include_breakables_in_test := false
 ## at a box with wheels.
 var interior: Node3D = null
 ## Where you are sitting. Third person is the unlocked view on foot (M1's
-## rule) — the derby is a deliberate exception, per Greg: driving starts in
-## chase view, freely toggled with the cab at any time, not gated behind
-## earning it.
-var in_cab := false
+## rule), and M2.6 applies that same rule here: a heat begins in the physical
+## cab; the chase view becomes available once it has been earned.
+var in_cab := true
+## M2.7. A view change is camera travel, not a cull-mask cut. `in_cab` is the
+## destination while this 0..1 clock carries the existing camera transform to
+## the live target pose; both shells remain rendered until the move arrives.
+const VIEW_TRANSITION_SECONDS := 0.68
+var view_transition := 1.0
+var view_transition_from := Transform3D.IDENTITY
+var view_transition_fov := 70.0
 ## Where the driver is looking, relative to the car. You steer with the car and
 ## aim independently of it, which is the whole point of having a gun in the
 ## other hand.
@@ -1179,8 +1185,13 @@ func _toggle_derby_view() -> void:
 			pit_radio.transmit("hit_player")
 		WorldHistory.record_event("derby_third_person_refused", {"venue": "rift_derby_quarry"})
 		return
+	view_transition_from = camera.global_transform
+	view_transition_fov = camera.fov
+	view_transition = 0.0
 	in_cab = not in_cab
-	_apply_view_masks()
+	# During travel both pieces of the car exist in frame. The destination mask
+	# is applied only once the eye actually reaches its new side of the shell.
+	camera.cull_mask = 0xFFFFF
 	WorldHistory.record_event("derby_view_changed", {"view": "cab" if in_cab else "chase"})
 
 
@@ -1198,6 +1209,17 @@ func _third_person_earned() -> bool:
 
 func _update_camera(delta: float) -> void:
 	camera_shake = maxf(0.0, camera_shake - delta * 2.4)
+	if view_transition < 1.0:
+		view_transition = minf(1.0, view_transition + delta / VIEW_TRANSITION_SECONDS)
+		var target: Dictionary = _cab_camera_target() if in_cab else _chase_camera_target()
+		var through := smoothstep(0.0, 1.0, view_transition)
+		camera.global_transform = view_transition_from.interpolate_with(target.transform, through)
+		camera.fov = lerpf(view_transition_fov, float(target.fov), through)
+		if interior != null and is_instance_valid(interior):
+			interior.drive(float(boat.get("steering")), float(boat.get("throttle")))
+		if view_transition >= 1.0:
+			_apply_view_masks()
+		return
 	if in_cab:
 		_update_cab_camera(delta)
 		return
@@ -1217,6 +1239,17 @@ func _update_camera(delta: float) -> void:
 		# Applied after the follow lerp; smoothing a jolt at 4.5/s erases it.
 		camera.global_position += Vector3(sin(beat * 47.0), cos(beat * 61.0), sin(beat * 39.0)) * camera_shake * 0.7
 	camera.look_at(boat.global_position + forward * 8.0 + Vector3.UP * 1.2)
+
+
+func _chase_camera_target() -> Dictionary:
+	var forward := -boat.global_transform.basis.z
+	var pace := clampf(absf(float(boat.get("signed_speed"))) / 24.0, 0.0, 1.0)
+	var position := boat.global_position - forward * lerpf(13.0, 17.0, pace) + Vector3.UP * lerpf(6.8, 8.0, pace)
+	var focus := boat.global_position + forward * 8.0 + Vector3.UP * 1.2
+	return {
+		"transform": Transform3D(Basis.IDENTITY, position).looking_at(focus, Vector3.UP),
+		"fov": lerpf(CAMERA_FOV_REST, CAMERA_FOV_FLAT, pace * pace),
+	}
 
 
 ## AF1.8/AF10.8. Sitting still and aimed carefully is the one case this
@@ -1247,27 +1280,31 @@ func _cab_aim_wobble() -> Vector2:
 ## car, so every jolt the suspension takes arrives without being smoothed, which
 ## is most of why a chase camera never feels like driving.
 func _update_cab_camera(_delta: float) -> void:
-	var seat := boat.global_transform * _cab_seat
-	camera.global_position = seat
+	var target := _cab_camera_target()
+	camera.global_transform = target.transform
 	# AF1.8/AF10.8. One hand on the wheel: the same "a worse grip changes the
 	# numbers, not just the pose" rule `AN2.5`'s half-sword draws for a sword
 	# held one-handed applies here without a grip system to hang it on — the
 	# wobble below is that cost, paid in real time instead of a fixed accuracy
 	# penalty, so the driving itself is what visibly unsteadies the sight.
-	var wobble := _cab_aim_wobble()
-	# Look where the car looks, plus where the driver is looking. Multiplying in
-	# this order keeps the aim in car space, so a slide moves your aim with the
-	# car instead of leaving it pointing at the horizon.
-	var basis := boat.global_transform.basis * Basis(Vector3.UP, aim_yaw + wobble.x) * Basis(Vector3.RIGHT, aim_pitch + wobble.y)
-	camera.global_transform = Transform3D(basis.orthonormalized(), seat)
 	# M4.3. The first-person value, not the chase pair. Godot's fov is vertical,
 	# so 78 here is roughly 110 across at 16:9.
-	camera.fov = lerpf(camera.fov, 78.0, minf(_delta * 4.0, 1.0))
+	camera.fov = lerpf(camera.fov, float(target.fov), minf(_delta * 4.0, 1.0))
 	if camera_shake > 0.0:
 		var beat := float(Time.get_ticks_msec()) * 0.001
 		camera.global_position += Vector3(sin(beat * 47.0), cos(beat * 61.0), sin(beat * 39.0)) * camera_shake * 0.10
 	if interior != null and is_instance_valid(interior):
 		interior.drive(float(boat.get("steering")), float(boat.get("throttle")))
+
+
+func _cab_camera_target() -> Dictionary:
+	var seat := boat.global_transform * _cab_seat
+	var wobble := _cab_aim_wobble()
+	# Look where the car looks, plus where the driver is looking. Multiplying in
+	# this order keeps the aim in car space, so a slide moves your aim with the
+	# car instead of leaving it pointing at the horizon.
+	var basis := boat.global_transform.basis * Basis(Vector3.UP, aim_yaw + wobble.x) * Basis(Vector3.RIGHT, aim_pitch + wobble.y)
+	return {"transform": Transform3D(basis.orthonormalized(), seat), "fov": 78.0}
 
 
 ## AG3.4/AF1.8/AF10.8. A round leaves the gun, goes through your own
