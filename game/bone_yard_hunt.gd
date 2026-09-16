@@ -617,13 +617,25 @@ const SMOKEABLE_ORDER := ["cigarette", "vape", "joint", "spliff", "bong"]
 const SMOKE_REST := Vector3(0.02, -0.19, -0.18)
 const SMOKE_AT_MOUTH := Vector3(-0.03, 0.13, -0.04)
 const SMOKE_FP_REST := Vector3(0.10, -0.23, -0.66)
-const SMOKE_FP_AT_MOUTH := Vector3(-0.10, 0.04, -0.38)
+## The first-person mouth sits just above the low diegetic reticle. Keeping the
+## lit end here lets the cherry itself become the last centimetre of the aim
+## picture instead of hiding below the HUD.
+const SMOKE_FP_AT_MOUTH := Vector3(-0.26, -0.015, -0.31)
 var smoke_index := -1
 var smoke_model: Node3D
+var smoke_grip_hand: Node3D
 var smoke_support_hand: Node3D
+var smoke_lighter: Node3D
+var smoke_lighter_hand: Node3D
+var smoke_lighter_lid: Node3D
+var smoke_lighter_flame: MeshInstance3D
+var smoke_ignition := 0.0
+var smoke_bong_audio: AudioStreamPlayer
+var smoke_lighter_audio: AudioStreamPlayer
 var smoke_held := 0.0
 var smoke_drawing := false
 var smoke_spent: Dictionary = {}
+var smoke_draw_start_spent := 0.0
 var smoke_pose := 0.0
 var smoke_exhale_delay := 0.0
 var smoke_pending_exhale: Dictionary = {}
@@ -632,6 +644,12 @@ const SMOKE_TRICKS := ["O", "DOUBLE O", "GHOST"]
 var smoke_trick_index := 0
 var smoke_trick_window := 0.0
 var smoke_last_exhale: Dictionary = {}
+## Hold I to turn whichever object is actually in the player's hands through a
+## slow, close reading. This is a pose rather than a separate inventory screen:
+## the object, its wear and the hands holding it remain in the live world.
+var inspect_held := false
+var inspect_blend := 0.0
+var inspect_time := 0.0
 var pending_attack: Dictionary = {}
 ## AN2.3. Set by `_attack_nearest_encounter_actor()` right before it returns
 ## true, read once by `_resolve_strike()` immediately after — a throat and a
@@ -950,6 +968,50 @@ func _build_player_rig() -> void:
 	player_rig.add_child(hunter_appearance)
 	# B4.1. The sheet's marks travel with the appearance it already drives.
 	hunter_appearance.configure(player_rig, appearance)
+	_dress_player_humiliation_outfit()
+
+
+## The elites did not decant the hunter naked; they issued a joke of a uniform.
+## Shoulder puffs and a locked ruff make the humiliation readable on the body
+## witness and in third person, while the matching glove cuffs carry that story
+## all the way into the first-person smoking and weapon animations.
+func _dress_player_humiliation_outfit() -> void:
+	var wine := _smoke_prop_material(Color("541825"), 0.78, false)
+	var bone_cloth := _smoke_prop_material(Color("bda877"), 0.82, false)
+	for zone_id in ["left_arm", "right_arm"]:
+		var arm_part := player_rig.parts.get(zone_id) as Node3D
+		if arm_part == null:
+			continue
+		var sleeve := Node3D.new()
+		sleeve.name = "ForcedJesterSleeve"
+		sleeve.position.y = 0.225
+		arm_part.add_child(sleeve)
+		for index in 5:
+			var angle := TAU * float(index) / 5.0
+			var puff := MeshInstance3D.new()
+			var mesh := SphereMesh.new()
+			mesh.radius = 0.075
+			mesh.height = 0.115
+			mesh.radial_segments = 12
+			mesh.rings = 7
+			puff.mesh = mesh
+			puff.position = Vector3(cos(angle) * 0.070, 0.0, sin(angle) * 0.062)
+			puff.material_override = wine if index % 2 == 0 else bone_cloth
+			sleeve.add_child(puff)
+	var torso := player_rig.parts.get("torso") as Node3D
+	if torso != null:
+		var ruff := MeshInstance3D.new()
+		ruff.name = "ForcedJesterRuff"
+		var ruff_mesh := TorusMesh.new()
+		ruff_mesh.inner_radius = 0.125
+		ruff_mesh.outer_radius = 0.205
+		ruff_mesh.rings = 18
+		ruff_mesh.ring_segments = 12
+		ruff.mesh = ruff_mesh
+		ruff.rotation.x = PI * 0.5
+		ruff.position = Vector3(0.0, 0.285, 0.0)
+		ruff.material_override = bone_cloth
+		torso.add_child(ruff)
 
 
 ## B9.1/B9.2.  This is a physical fixture in the hunt, rather than a HUD
@@ -1147,6 +1209,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_finish_smoking_draw()
 		elif event.pressed:
 			_attack(true)
+	if event is InputEventKey and event.keycode == KEY_I and not event.echo:
+		inspect_held = event.pressed
+		if inspect_held and panel_mode.is_empty():
+			prompt.text = "INSPECT // RELEASE I TO LOWER"
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_1: _equip_weapon(0)
@@ -1294,6 +1360,7 @@ func _physics_process(delta: float) -> void:
 	# whole point of a local freeze is that both bodies in contact feel it.
 	var player_delta: float = delta * impact_feel.scale_for("player")
 	_advance_arm(player_delta)
+	_update_held_inspection(delta)
 	# O2.7 v4. And the gore. Greg: *"gore and chunk physics still run at full
 	# speed through a hit, so a limb can leave a body that has not moved
 	# yet"*. The rig's own spray and organs take the exchange's clock;
@@ -2367,12 +2434,21 @@ func _equip_smokeable(device_id: String) -> void:
 	smoke_model.set_meta("rest_position", anchored_rest)
 	smoke_model.set_meta("grip_correction", smoke_model.transform.basis * grip.position if grip != null else Vector3.ZERO)
 	(player_rig.parts.right_arm as Node3D).add_child(smoke_model)
+	# The prop no longer floats at the end of an implied arm. Cigarettes and
+	# hand-rolls sit in a relaxed pinch; the vape and bong get a full wrap.
+	if grip != null:
+		smoke_grip_hand = HELD_GEAR.build_humiliation_hand(1)
+		smoke_grip_hand.name = "SmokingGripHand"
+		HELD_GEAR.set_pose(smoke_grip_hand, "pinch" if device_id in ["cigarette", "joint", "spliff"] else "wrap")
+		smoke_grip_hand.position = grip.position + Vector3(0.018, -0.012, 0.0)
+		smoke_grip_hand.rotation = grip.rotation + Vector3(-PI * 0.5, 0.0, PI * 0.5)
+		smoke_model.add_child(smoke_grip_hand)
 	# A bong's second hand is not a text claim: a real hand closes at its
 	# support anchor. One-hand objects have no support hand at all.
 	if bool(smoke_model.get_meta("two_handed", false)):
 		var support := smoke_model.get_node_or_null("anchor_grip_support") as Node3D
 		if support != null:
-			smoke_support_hand = HELD_GEAR.build_hand(-1)
+			smoke_support_hand = HELD_GEAR.build_humiliation_hand(-1)
 			smoke_support_hand.name = "BongSupportHand"
 			smoke_support_hand.position = support.position + Vector3(-0.026, 0.0, 0.0)
 			smoke_support_hand.rotation = Vector3(0.0, 0.0, -PI * 0.5)
@@ -2386,9 +2462,20 @@ func _put_smokeable_away(show_arsenal := true) -> void:
 		SMOKEABLES.set_draw(smoke_model, 0.0)
 		smoke_model.queue_free()
 	smoke_model = null
+	smoke_grip_hand = null
 	smoke_support_hand = null
+	if smoke_lighter != null and is_instance_valid(smoke_lighter):
+		smoke_lighter.queue_free()
+	smoke_lighter = null
+	smoke_lighter_hand = null
+	smoke_lighter_lid = null
+	smoke_lighter_flame = null
+	smoke_ignition = 0.0
+	if smoke_bong_audio != null:
+		smoke_bong_audio.stop()
 	smoke_drawing = false
 	smoke_held = 0.0
+	smoke_draw_start_spent = 0.0
 	smoke_pose = 0.0
 	smoke_exhale_delay = 0.0
 	smoke_pending_exhale = {}
@@ -2409,7 +2496,9 @@ func _begin_smoking_draw() -> void:
 		prompt.text = "SPENT // PRESS 6 FOR ANOTHER OBJECT"
 		return
 	smoke_held = 0.0
+	smoke_draw_start_spent = float(smoke_spent.get(device_id, 0.0))
 	smoke_drawing = true
+	_begin_smoke_ignition(device_id)
 
 
 func _update_smoking(delta: float) -> void:
@@ -2420,8 +2509,14 @@ func _update_smoking(delta: float) -> void:
 		smoke_held += delta
 		SMOKEABLES.set_draw(smoke_model, SMOKEABLES.draw_heat(device_id, smoke_held))
 		var live_ideal := float((SMOKEABLES.CATALOG.get(device_id, {}) as Dictionary).get("draw_ideal", 1.0))
+		# The coal advances while air is actually moving through it. The stored
+		# charge is committed on release, but the geometry previews that same
+		# amount continuously so a cigarette never waits for a one-frame event to
+		# become shorter.
+		var live_burn := SMOKEABLES.spend_per_hit(device_id) * clampf(smoke_held / maxf(live_ideal, 0.01), 0.0, 1.0)
+		SMOKEABLES.set_spent(smoke_model, clampf(smoke_draw_start_spent + live_burn, 0.0, 1.0))
 		var draw_percent := roundi(clampf(smoke_held / maxf(live_ideal, 0.01), 0.0, 1.35) * 100.0)
-		prompt.text = "INHALE // %d%% // RELEASE ON THE SWEET SPOT" % draw_percent
+		prompt.text = ("SINK THE CONE // %d%% // RELEASE AS IT CLEARS" if device_id == "bong" else "INHALE // %d%% // RELEASE ON THE SWEET SPOT") % draw_percent
 	if smoke_exhale_delay > 0.0:
 		smoke_exhale_delay = maxf(0.0, smoke_exhale_delay - delta)
 		if smoke_exhale_delay <= 0.0:
@@ -2432,7 +2527,8 @@ func _update_smoking(delta: float) -> void:
 	# A cigarette comes up quickly but settles into the last centimetre. The
 	# slower descent after release is the breath beat; it never snaps between
 	# hand and face just because a button changed state.
-	smoke_pose = move_toward(smoke_pose, 1.0 if at_mouth else 0.0, delta * (5.8 if at_mouth else 2.7))
+	var raise_speed := 2.45 if device_id == "bong" else (3.7 if device_id == "spliff" else 5.8)
+	smoke_pose = move_toward(smoke_pose, 1.0 if at_mouth else 0.0, delta * (raise_speed if at_mouth else 2.7))
 	var lift := smoothstep(0.0, 1.0, smoke_pose)
 	var rest: Vector3 = smoke_model.get_meta("rest_position", SMOKE_REST)
 	var mouth_target := SMOKE_AT_MOUTH
@@ -2440,17 +2536,65 @@ func _update_smoking(delta: float) -> void:
 		var grip_correction: Vector3 = smoke_model.get_meta("grip_correction", Vector3.ZERO)
 		rest = SMOKE_FP_REST - grip_correction
 		mouth_target = SMOKE_FP_AT_MOUTH - grip_correction
+		if device_id == "bong":
+			rest = Vector3(0.18, -0.40, -0.78) - grip_correction
+			mouth_target = Vector3(-0.02, -0.20, -0.55) - grip_correction
+		elif device_id == "spliff":
+			mouth_target += Vector3(0.015, -0.012, -0.035)
 	var draw_ratio := clampf(smoke_held / maxf(ideal, 0.01), 0.0, 1.4) if smoke_drawing else 0.0
+	_update_smoke_ignition(delta, device_id, draw_ratio, lift)
 	# Tiny pull-back and tremor at the lips: enough movement for the inhale to
 	# read without turning a cigarette into a lever waving across the screen.
 	var breath_pull := Vector3(0.0, 0.004 * draw_ratio, 0.012 * draw_ratio)
 	var ember_tremor := Vector3(sin(smoke_held * 10.0) * 0.0018, cos(smoke_held * 7.0) * 0.0012, 0.0) if smoke_drawing else Vector3.ZERO
 	var cough_kick := Vector3(0.0, -sin(smoke_cough * 24.0) * smoke_cough * 0.035, smoke_cough * 0.04)
+	var device_gesture := Vector3.ZERO
+	if device_id == "spliff":
+		# A loose, slow arc and a small roll between the fingers. It should not
+		# share the machine-straight cigarette lift.
+		device_gesture = Vector3(sin(lift * PI) * 0.032, sin(lift * PI) * 0.018, 0.0)
+	elif device_id == "bong":
+		# Weight first, mouthpiece second: the base dips as both hands take it,
+		# then steadies during the pull with a tiny water-driven tremor.
+		device_gesture = Vector3(0.0, -sin(lift * PI) * 0.045, sin(smoke_held * 7.0) * draw_ratio * 0.003)
 	smoke_cough = maxf(0.0, smoke_cough - delta * 2.4)
-	smoke_model.position = rest.lerp(mouth_target, lift) + breath_pull + ember_tremor + cough_kick
-	smoke_model.rotation.z = (-0.42 if device_id != "bong" else -0.18) + lift * 0.18 + sin(smoke_held * 6.0) * 0.008
+	if body_motion != null and body_motion.first_person:
+		# A first-person held object belongs to the camera composition while its
+		# node still belongs to the real arm. This keeps the cigarette at the
+		# mouth/reticle and lets the player look down the bong instead of seeing
+		# its tube inherit a sideways whole-arm rotation.
+		smoke_model.top_level = true
+		var view_rest := Vector3(0.20, -0.30, -0.58)
+		var view_mouth := Vector3(-0.035, -0.095, -0.265)
+		var view_rotation := Vector3(0.18, -0.98, -0.18)
+		if device_id == "spliff":
+			view_mouth = Vector3(-0.045, -0.10, -0.29)
+			view_rotation = Vector3(0.12, -0.90, -0.30 + sin(smoke_held * 3.2) * 0.06)
+		elif device_id == "bong":
+			view_rest = Vector3(0.22, -0.48, -0.72)
+			view_mouth = Vector3(0.04, -0.34, -0.56)
+			view_rotation = Vector3(0.34, 0.0, -0.06)
+		var view_position := view_rest.lerp(view_mouth, lift) + Vector3(0.0, 0.0, ember_tremor.x * 0.35)
+		if inspect_blend > 0.0 and not smoke_drawing:
+			# Bring the whole hand-and-object assembly into clean light and turn it
+			# slowly enough to read the paper seam, ember, bowl and remaining burn.
+			view_position = view_position.lerp(Vector3(0.0, -0.08, -0.38), inspect_blend)
+			view_rotation += Vector3(
+				sin(inspect_time * 1.4) * 0.18,
+				inspect_blend * (0.48 + sin(inspect_time * 0.9) * 0.34),
+				inspect_blend * sin(inspect_time * 1.1) * 0.16)
+		smoke_model.global_transform = camera.global_transform * Transform3D(Basis.from_euler(view_rotation), view_position)
+	else:
+		smoke_model.top_level = false
+		smoke_model.position = rest.lerp(mouth_target, lift) + breath_pull + ember_tremor + cough_kick + device_gesture
+		if device_id == "bong":
+			smoke_model.rotation = Vector3(-0.15 + lift * 0.16, 0.20 - lift * 0.08, -0.18 + lift * 0.12)
+		elif device_id == "spliff":
+			smoke_model.rotation = Vector3(1.02 + lift * 0.12, -0.34, -0.52 + lift * 0.20 + sin(smoke_held * 3.2) * 0.035)
+		else:
+			smoke_model.rotation.z = -0.42 + lift * 0.18 + sin(smoke_held * 6.0) * 0.008
 	if body_motion != null:
-		body_motion.set_smoking_pose(lift, bool(smoke_model.get_meta("two_handed", false)))
+		body_motion.set_smoking_pose(lift, bool(smoke_model.get_meta("two_handed", false)), device_id)
 
 
 func _finish_smoking_draw() -> Dictionary:
@@ -2458,12 +2602,15 @@ func _finish_smoking_draw() -> Dictionary:
 		return {}
 	smoke_drawing = false
 	var device_id := str(smoke_model.get_meta("device_id", ""))
+	if smoke_bong_audio != null:
+		smoke_bong_audio.stop()
 	SMOKEABLES.set_draw(smoke_model, 0.0)
 	if smoke_held < 0.05:
+		SMOKEABLES.set_spent(smoke_model, smoke_draw_start_spent)
 		smoke_held = 0.0
 		return {}
 	var result: Dictionary = SMOKEABLES.hit("player", device_id, smoke_held, Time.get_ticks_msec() / 1000.0)
-	var spent := clampf(float(smoke_spent.get(device_id, 0.0)) + SMOKEABLES.spend_per_hit(device_id), 0.0, 1.0)
+	var spent := clampf(smoke_draw_start_spent + SMOKEABLES.spend_per_hit(device_id), 0.0, 1.0)
 	smoke_spent[device_id] = spent
 	SMOKEABLES.set_spent(smoke_model, spent)
 	if bool(result.get("ok", false)):
@@ -2485,7 +2632,8 @@ func _exhale_smoke() -> void:
 	var emission := _smoke_emission_pose()
 	var forward: Vector3 = emission.forward
 	var mouth: Vector3 = emission.mouth
-	air.emit_exhale(mouth, forward, float(smoke_pending_exhale.get("exhale", 1.0)))
+	var device_id := str(smoke_pending_exhale.get("device", ""))
+	air.emit_exhale(mouth, forward, float(smoke_pending_exhale.get("exhale", 1.0)), _smoke_tint(device_id))
 	smoke_last_exhale = smoke_pending_exhale.duplicate(true)
 	smoke_trick_window = 1.15
 	prompt.text = "%s // CLICK TO SHAPE THE SMOKE" % str(smoke_pending_exhale.get("grade", "")).to_upper()
@@ -2506,7 +2654,8 @@ func _shape_smoke_trick() -> void:
 	var emission := _smoke_emission_pose(0.06)
 	var forward: Vector3 = emission.forward
 	var mouth: Vector3 = emission.mouth
-	air.emit_smoke_trick(mouth, forward, trick, float(smoke_last_exhale.get("exhale", 1.0)))
+	var device_id := str(smoke_last_exhale.get("device", ""))
+	air.emit_smoke_trick(mouth, forward, trick, float(smoke_last_exhale.get("exhale", 1.0)), _smoke_tint(device_id))
 	WorldHistory.record_event("smoke_trick", {
 		"subject_id": "player", "trick": trick,
 		"device": str(smoke_last_exhale.get("device", "")), "location": HUNT_LOCATION,
@@ -2515,12 +2664,238 @@ func _shape_smoke_trick() -> void:
 	smoke_trick_window = 0.0
 
 
+## Herb smoke is only green enough to distinguish beside tobacco smoke. It is
+## still grey air under the region's light, never a neon gameplay marker.
+func _smoke_tint(device_id: String) -> Color:
+	match device_id:
+		"joint", "spliff": return Color(0.68, 0.75, 0.65)
+		"bong": return Color(0.66, 0.75, 0.63)
+		_: return Color(0.72, 0.74, 0.69)
+
+
+func _begin_smoke_ignition(device_id: String) -> void:
+	if device_id == "vape":
+		return
+	if smoke_lighter != null and is_instance_valid(smoke_lighter):
+		smoke_lighter.queue_free()
+	smoke_lighter = _build_zippo()
+	(player_rig.parts.left_arm as Node3D).add_child(smoke_lighter)
+	smoke_lighter_hand = HELD_GEAR.build_humiliation_hand(-1)
+	smoke_lighter_hand.name = "LighterHand"
+	HELD_GEAR.set_pose(smoke_lighter_hand, "wrap")
+	# The thumb rides by the flint wheel; the other fingers close around the
+	# case. Because it is a child of the Zippo it follows the whole flip and
+	# bowl-lighting arc without ever lagging behind the prop.
+	smoke_lighter_hand.position = Vector3(-0.018, 0.010, 0.004)
+	smoke_lighter_hand.rotation = Vector3(-PI * 0.5, 0.10, -PI * 0.5)
+	smoke_lighter.add_child(smoke_lighter_hand)
+	smoke_lighter_lid = smoke_lighter.get_node("LidPivot") as Node3D
+	smoke_lighter_flame = smoke_lighter.get_node("Flame") as MeshInstance3D
+	smoke_ignition = 0.0
+	if smoke_support_hand != null:
+		smoke_support_hand.visible = device_id != "bong"
+	if smoke_lighter_audio == null:
+		smoke_lighter_audio = AudioStreamPlayer.new()
+		smoke_lighter_audio.name = "ZippoFlip"
+		if AudioServer.get_bus_index("Bodies") >= 0:
+			smoke_lighter_audio.bus = "Bodies"
+		add_child(smoke_lighter_audio)
+	smoke_lighter_audio.stream = _lighter_click_stream()
+	smoke_lighter_audio.play()
+	if device_id == "bong":
+		if smoke_bong_audio == null:
+			smoke_bong_audio = AudioStreamPlayer.new()
+			smoke_bong_audio.name = "BongRip"
+			if AudioServer.get_bus_index("Bodies") >= 0:
+				smoke_bong_audio.bus = "Bodies"
+			add_child(smoke_bong_audio)
+		smoke_bong_audio.stream = _bong_rip_stream()
+		smoke_bong_audio.volume_db = -7.0
+		smoke_bong_audio.play()
+
+
+func _update_smoke_ignition(delta: float, device_id: String, draw_ratio: float, lift: float) -> void:
+	if smoke_lighter == null or not is_instance_valid(smoke_lighter):
+		return
+	smoke_ignition += delta
+	var flip := smoothstep(0.0, 1.0, clampf(smoke_ignition / 0.24, 0.0, 1.0))
+	smoke_lighter_lid.rotation.z = -flip * 2.18
+	var stays_lit := smoke_drawing and (device_id == "bong" or smoke_ignition < 0.95)
+	smoke_lighter_flame.visible = stays_lit and smoke_ignition > 0.12
+	if smoke_lighter_flame.visible:
+		var flutter := 0.88 + sin(smoke_held * 31.0) * 0.12
+		smoke_lighter_flame.scale = Vector3(0.82, flutter, 0.82)
+	if smoke_support_hand != null:
+		smoke_support_hand.visible = not (device_id == "bong" and smoke_drawing)
+	if body_motion != null and body_motion.first_person:
+		smoke_lighter.top_level = true
+		var lighter_position := Vector3(-0.12, -0.16, -0.34)
+		var lighter_rotation := Vector3(0.08, -0.12, 0.10)
+		if device_id == "bong":
+			# Follow the bowl as the bong reaches the mouth; the flame is the
+			# moving half of the cone-sink timing game.
+			lighter_position = Vector3(0.005, -0.255, -0.49).lerp(Vector3(-0.015, -0.205, -0.47), lift)
+			lighter_rotation = Vector3(-0.42, 0.10, 0.34)
+		smoke_lighter.global_transform = camera.global_transform * Transform3D(Basis.from_euler(lighter_rotation), lighter_position)
+	else:
+		smoke_lighter.top_level = false
+		smoke_lighter.position = Vector3(-0.035, -0.24, -0.46)
+		smoke_lighter.rotation = Vector3(0.25, 0.1, 0.4)
+
+
+func _build_zippo() -> Node3D:
+	var root := Node3D.new()
+	root.name = "HeldZippo"
+	var body := MeshInstance3D.new()
+	var body_mesh := BoxMesh.new()
+	body_mesh.size = Vector3(0.034, 0.052, 0.012)
+	body.mesh = body_mesh
+	body.material_override = _smoke_prop_material(Color("6d777b"), 0.24, true)
+	body.position.y = 0.026
+	root.add_child(body)
+	var hinge := Node3D.new()
+	hinge.name = "LidPivot"
+	hinge.position = Vector3(-0.017, 0.052, 0.0)
+	root.add_child(hinge)
+	var lid := MeshInstance3D.new()
+	var lid_mesh := BoxMesh.new()
+	lid_mesh.size = Vector3(0.034, 0.018, 0.012)
+	lid.mesh = lid_mesh
+	lid.material_override = _smoke_prop_material(Color("788287"), 0.20, true)
+	lid.position = Vector3(0.017, 0.009, 0.0)
+	hinge.add_child(lid)
+	var chimney := MeshInstance3D.new()
+	var chimney_mesh := CylinderMesh.new()
+	chimney_mesh.top_radius = 0.006
+	chimney_mesh.bottom_radius = 0.006
+	chimney_mesh.height = 0.013
+	chimney_mesh.radial_segments = 10
+	chimney.mesh = chimney_mesh
+	chimney.material_override = _smoke_prop_material(Color("34393b"), 0.35, true)
+	chimney.position.y = 0.058
+	root.add_child(chimney)
+	var flame_mesh := SphereMesh.new()
+	flame_mesh.radius = 0.007
+	flame_mesh.height = 0.026
+	flame_mesh.radial_segments = 10
+	flame_mesh.rings = 6
+	var flame_node := MeshInstance3D.new()
+	flame_node.name = "Flame"
+	flame_node.mesh = flame_mesh
+	var flame_material := _smoke_prop_material(Color("ffc25e"), 0.18, false)
+	flame_material.emission_enabled = true
+	flame_material.emission = Color("ff7a2c")
+	flame_material.emission_energy_multiplier = 4.2
+	flame_node.material_override = flame_material
+	flame_node.position.y = 0.078
+	flame_node.visible = false
+	root.add_child(flame_node)
+	return root
+
+
+## One inspection verb for every object the hands can currently own. Weapon
+## mounts are reset by `_pose_weapon()` immediately before this runs, while the
+## carried limb has an authored rest cached on equip, so the animation never
+## accumulates drift no matter how long I is held.
+func _update_held_inspection(delta: float) -> void:
+	var allowed := panel_mode.is_empty() and not smoke_drawing and grapple_target.is_empty()
+	inspect_blend = move_toward(inspect_blend, 1.0 if inspect_held and allowed else 0.0, delta * 5.2)
+	if inspect_blend <= 0.001:
+		return
+	inspect_time += delta
+	var turn := sin(inspect_time * 1.15)
+	if smoke_model != null and is_instance_valid(smoke_model):
+		# First-person smokeables are composed inside `_update_smoking`; third
+		# person still gets a readable turn here.
+		if body_motion == null or not body_motion.first_person:
+			smoke_model.rotation.y += inspect_blend * (0.55 + turn * 0.22)
+			smoke_model.rotation.x += inspect_blend * 0.16
+		return
+	if carried_limb_model != null and is_instance_valid(carried_limb_model):
+		var limb_rest_position: Vector3 = carried_limb_model.get_meta("inspect_rest_position", carried_limb_model.position)
+		var limb_rest_rotation: Vector3 = carried_limb_model.get_meta("inspect_rest_rotation", carried_limb_model.rotation)
+		carried_limb_model.position = limb_rest_position + Vector3(0.0, 0.13, -0.10) * inspect_blend
+		carried_limb_model.rotation = limb_rest_rotation + Vector3(0.12, inspect_blend * (0.75 + turn * 0.30), 0.10)
+		return
+	if arsenal == null:
+		return
+	var model := arsenal.models.get(str(arsenal.current_id)) as Node3D
+	if model == null or not is_instance_valid(model) or not model.visible:
+		return
+	model.position += Vector3(-0.055, 0.105, -0.095) * inspect_blend
+	model.rotation += Vector3(
+		inspect_blend * (0.10 + sin(inspect_time * 1.6) * 0.06),
+		inspect_blend * (0.62 + turn * 0.30),
+		inspect_blend * sin(inspect_time * 1.3) * 0.12)
+
+
+func _smoke_prop_material(tint: Color, roughness: float, metallic: bool) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = tint
+	material.roughness = roughness
+	material.metallic = 0.85 if metallic else 0.0
+	return material
+
+
+func _lighter_click_stream() -> AudioStreamWAV:
+	var rate := 22050
+	var sample_count := int(rate * 0.24)
+	var bytes := PackedByteArray()
+	bytes.resize(sample_count * 2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 62017
+	for index in sample_count:
+		var t := float(index) / rate
+		var click_one := exp(-absf(t - 0.025) * 180.0)
+		var click_two := exp(-absf(t - 0.135) * 150.0)
+		var ring := sin(TAU * 2350.0 * t) * click_one + sin(TAU * 1280.0 * t) * click_two * 0.72
+		var grit := rng.randf_range(-1.0, 1.0) * (click_one + click_two) * 0.20
+		var sample := clampi(roundi((ring * 0.42 + grit) * 32767.0), -32768, 32767)
+		bytes[index * 2] = sample & 0xff
+		bytes[index * 2 + 1] = (sample >> 8) & 0xff
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = rate
+	stream.stereo = false
+	stream.data = bytes
+	return stream
+
+
+func _bong_rip_stream() -> AudioStreamWAV:
+	var rate := 22050
+	var sample_count := int(rate * 1.2)
+	var bytes := PackedByteArray()
+	bytes.resize(sample_count * 2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 420710
+	var smoothed_noise := 0.0
+	for index in sample_count:
+		var t := float(index) / rate
+		smoothed_noise = lerpf(smoothed_noise, rng.randf_range(-1.0, 1.0), 0.055)
+		var bubble_phase := fmod(t * 7.3, 1.0)
+		var bubble_env := exp(-bubble_phase * 8.5)
+		var bubble := sin(TAU * (82.0 + bubble_phase * 210.0) * t) * bubble_env
+		var water := sin(TAU * 46.0 * t) * 0.16 + smoothed_noise * 0.74
+		var sample := clampi(roundi((water + bubble * 0.34) * 0.48 * 32767.0), -32768, 32767)
+		bytes[index * 2] = sample & 0xff
+		bytes[index * 2 + 1] = (sample >> 8) & 0xff
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = rate
+	stream.stereo = false
+	stream.data = bytes
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end = sample_count
+	return stream
+
+
 ## First person breath begins just beyond the lens; third person breath begins
 ## on the body's actual face. Emitting from the camera in an exterior view was
 ## the reason the first gameplay take filled the screen with smoke while the
 ## character stood several metres behind it.
 func _smoke_emission_pose(extra_forward := 0.0) -> Dictionary:
-	var forward := -camera.global_transform.basis.z.normalized()
+	var forward := (-camera.global_transform.basis.z + Vector3.UP * 0.04).normalized()
 	if perspective_blend > 0.5:
 		var head := player_rig.parts.get("head") as Node3D
 		if head != null and is_instance_valid(head):
@@ -2529,7 +2904,7 @@ func _smoke_emission_pose(extra_forward := 0.0) -> Dictionary:
 				"forward": forward,
 			}
 	return {
-		"mouth": camera.global_position + forward * (0.42 + extra_forward) + Vector3.DOWN * 0.06,
+		"mouth": camera.global_position + forward * (0.48 + extra_forward) + Vector3.DOWN * 0.06,
 		"forward": forward,
 	}
 
@@ -3364,6 +3739,8 @@ func _equip_carried_limb() -> void:
 	carried_limb_model.material_override = WorldLook.surface(Color("6b3d34"), "flesh", 44)
 	carried_limb_model.position = Vector3(0.0, -0.48, 0.18)
 	carried_limb_model.rotation = Vector3(PI * 0.5, 0.0, -0.18)
+	carried_limb_model.set_meta("inspect_rest_position", carried_limb_model.position)
+	carried_limb_model.set_meta("inspect_rest_rotation", carried_limb_model.rotation)
 	(player_rig.parts.right_arm as Node3D).add_child(carried_limb_model)
 	prompt.text = "%s // IMPROVISED WEAPON // %d%%" % [str(item.label), roundi(float(item.condition) * 100.0)]
 
@@ -4707,6 +5084,7 @@ func _build_keys_card() -> void:
 		]},
 		{"group": "HANDS ON", "rows": [
 			["E", "INTERACT"],
+			["HOLD I", "INSPECT HELD OBJECT"],
 			["C", "GRAPPLE"],
 			["V", "PERSUADE"],
 			["X", "THREATEN"],
@@ -4970,6 +5348,7 @@ func _update_camera() -> void:
 	camera.global_position = fp_position.lerp(tp_position, perspective_blend)
 	camera.look_at(fp_target.lerp(tp_target, perspective_blend), Vector3.UP)
 	if body_motion != null:
+		camera.rotation.x -= body_motion.smoking_look_down * (1.0 - perspective_blend)
 		camera.rotation.z += body_motion.camera_roll * lerpf(1.0, 0.45, perspective_blend)
 		# O2.2. The kick from whatever you just hit, applied here so the derby
 		# and the hunt can each carry it in their own rig's terms.

@@ -383,4 +383,22 @@ func _build_weapon_model(weapon_id: String) -> Node3D:
 	if grip != null:
 		gear.position = -(gear.transform.basis * grip.position)
 	root.add_child(gear)
+	# Visible fingers are part of the weapon presentation, not an optional body
+	# overlay. The grip anchors already author exactly where those fingers close.
+	var right := HeldGear.build_humiliation_hand(1)
+	right.name = "RightGripHand"
+	HeldGear.set_pose(right, "trigger" if weapon_id in ["shotgun", "sidearm"] else "wrap")
+	right.position = Vector3(0.019, -0.013, 0.0)
+	right.rotation = Vector3(-PI * 0.5, 0.0, PI * 0.5)
+	root.add_child(right)
+	var off_anchor_name := "forend" if weapon_id == "shotgun" else ("grip_support" if weapon_id == "sidearm" else "grip_low")
+	var off_anchor := gear.get_node_or_null("anchor_%s" % off_anchor_name) as Node3D
+	if off_anchor != null:
+		var left := HeldGear.build_humiliation_hand(-1)
+		left.name = "LeftGripHand"
+		HeldGear.set_pose(left, "cup" if weapon_id == "sidearm" else "wrap")
+		var placed := gear.transform * off_anchor.transform
+		left.position = placed.origin + Vector3(-0.019, -0.013, 0.0)
+		left.rotation = placed.basis.get_euler() + Vector3(-PI * 0.5, 0.0, -PI * 0.5)
+		root.add_child(left)
 	return root

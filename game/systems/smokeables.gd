@@ -189,6 +189,10 @@ static func build(device_id: String, spent := 0.0) -> Node3D:
 		"vape": _build_vape(root)
 		"bong": _build_bong(root)
 		_: return root
+	if root.has_meta("parts"):
+		var authored_parts: Dictionary = root.get_meta("parts")
+		authored_parts["device"] = device_id
+		root.set_meta("parts", authored_parts)
 	_add_hold_anchors(root, device_id)
 	root.set_meta("two_handed", bool((CATALOG.get(device_id, {}) as Dictionary).get("two_handed", false)))
 	set_spent(root, spent)
@@ -305,7 +309,26 @@ static func set_draw(node: Node3D, heat: float) -> void:
 			var led: MeshInstance3D = parts["led"]
 			var glow: StandardMaterial3D = led.material_override
 			glow.emission_energy_multiplier = lerpf(0.4, 5.0, clampf(heat, 0.0, 1.0))
-		return
+			return
+		if str(parts.get("kind", "")) == "bong":
+			var pull := clampf(heat, 0.0, 1.4)
+			var pack: MeshInstance3D = parts["pack"]
+			var bowl_coal: StandardMaterial3D = pack.material_override
+			bowl_coal.emission_energy_multiplier = lerpf(0.0, 4.8, clampf(pull, 0.0, 1.0))
+			var bowl_light: OmniLight3D = parts["light"]
+			bowl_light.light_energy = lerpf(0.0, 0.72, clampf(pull, 0.0, 1.0))
+			var chamber: MeshInstance3D = parts["chamber_smoke"]
+			chamber.visible = pull > 0.025
+			var chamber_material: StandardMaterial3D = chamber.material_override
+			chamber_material.albedo_color.a = lerpf(0.0, 0.22, clampf(pull, 0.0, 1.0))
+			var water: MeshInstance3D = parts["water"]
+			water.scale.y = 1.0 + sin(clampf(pull, 0.0, 1.0) * PI) * 0.08
+			var bubbles: Array = parts["bubbles"]
+			for index in bubbles.size():
+				var bubble := bubbles[index] as MeshInstance3D
+				bubble.visible = pull > 0.04
+				bubble.position.y = 0.010 + fmod(pull * (0.019 + index * 0.004) + index * 0.009, 0.045)
+			return
 	var climb := clampf(heat, 0.0, 1.6)
 	var coal: MeshInstance3D = parts["coal"]
 	var ember: StandardMaterial3D = coal.material_override
@@ -320,6 +343,12 @@ static func set_draw(node: Node3D, heat: float) -> void:
 	var ash: MeshInstance3D = parts["ash"]
 	var ash_mesh: CylinderMesh = ash.mesh
 	ash_mesh.height = lerpf(0.006, 0.016, clampf(climb, 0.0, 1.0))
+	if str(parts.get("device", "")) == "spliff":
+		ash.rotation.z = sin(clampf(climb, 0.0, 1.0) * PI) * 0.18
+		coal.scale = Vector3.ONE * lerpf(1.0, 1.18, clampf(climb, 0.0, 1.0))
+	else:
+		ash.rotation.z = 0.0
+		coal.scale = Vector3.ONE
 
 
 ## What `set_draw` should be fed, given how long the button has been down. Split
@@ -491,6 +520,33 @@ static func _build_bong(root: Node3D) -> void:
 	wet.albedo_color = Color(0.16, 0.23, 0.20, 0.72)
 	root.add_child(water)
 
+	# The held pull fills the chamber and draws bubbles through the water every
+	# frame. These are object state, not an effect fired after the hit.
+	var chamber_smoke := _cylinder(0.042, 0.082, Color("b7c1ad"), 0.9)
+	chamber_smoke.position = Vector3(0, 0.071, 0)
+	var chamber_material: StandardMaterial3D = chamber_smoke.material_override
+	chamber_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	chamber_material.albedo_color = Color(0.72, 0.78, 0.68, 0.0)
+	chamber_material.disable_receive_shadows = true
+	chamber_smoke.visible = false
+	root.add_child(chamber_smoke)
+	var bubbles: Array[MeshInstance3D] = []
+	for index in 5:
+		var bubble := MeshInstance3D.new()
+		var bubble_mesh := SphereMesh.new()
+		bubble_mesh.radius = 0.0035 + index * 0.00035
+		bubble_mesh.height = bubble_mesh.radius * 2.0
+		bubble_mesh.radial_segments = 8
+		bubble_mesh.rings = 4
+		bubble.mesh = bubble_mesh
+		bubble.material_override = _plastic(Color(0.68, 0.82, 0.75, 0.48), 0.15)
+		var bubble_material: StandardMaterial3D = bubble.material_override
+		bubble_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		bubble.position = Vector3(-0.022 + index * 0.011, 0.010 + index * 0.007, sin(float(index) * 2.1) * 0.016)
+		bubble.visible = false
+		root.add_child(bubble)
+		bubbles.append(bubble)
+
 	var downstem := _cylinder(0.0085, 0.085, GLASS, 0.06)
 	downstem.rotation = Vector3(deg_to_rad(-45.0), 0, 0)
 	downstem.position = Vector3(0, 0.052, -0.030)
@@ -507,14 +563,28 @@ static func _build_bong(root: Node3D) -> void:
 	packed.rotation = Vector3(deg_to_rad(-45.0), 0, 0)
 	packed.position = Vector3(0, 0.090, -0.068)
 	packed.name = "bowl_pack"
+	var packed_material: StandardMaterial3D = packed.material_override
+	packed_material.emission_enabled = true
+	packed_material.emission = COAL
+	packed_material.emission_energy_multiplier = 0.0
 	root.add_child(packed)
+	var bowl_light := OmniLight3D.new()
+	bowl_light.light_color = COAL
+	bowl_light.light_energy = 0.0
+	bowl_light.omni_range = 0.32
+	bowl_light.position = packed.position
+	root.add_child(bowl_light)
 
 	# Resin, because a clean one belongs to nobody.
 	var ring := _cylinder(0.0505, 0.004, RESIN, 0.9)
 	ring.position = Vector3(0, 0.033, 0)
 	root.add_child(ring)
 
-	root.set_meta("parts", {"kind": "bong", "pack": packed, "pack_height": 0.008})
+	root.set_meta("parts", {
+		"kind": "bong", "pack": packed, "pack_height": 0.008,
+		"light": bowl_light, "water": water, "chamber_smoke": chamber_smoke,
+		"bubbles": bubbles,
+	})
 	root.set_meta("spent", 0.0)
 
 

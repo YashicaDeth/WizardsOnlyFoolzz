@@ -145,9 +145,10 @@ func follow(at: Vector3) -> void:
 ## short-lived local plume, not a second weather layer: the same lit billboard,
 ## turbulence and settling logic, emitted once from the player's mouth and then
 ## left to drift through whatever light is really there.
-func emit_exhale(at: Vector3, direction: Vector3, density := 1.0) -> GPUParticles3D:
+func emit_exhale(at: Vector3, direction: Vector3, density := 1.0, tint := Color(0.72, 0.74, 0.69)) -> GPUParticles3D:
 	var plume := GPUParticles3D.new()
 	plume.name = "SmokeExhale"
+	plume.set_meta("smoke_tint", tint)
 	plume.one_shot = true
 	plume.amount = roundi(lerpf(24.0, 52.0, clampf(density / 2.4, 0.0, 1.0)))
 	plume.lifetime = lerpf(2.2, 3.8, clampf(density / 2.4, 0.0, 1.0))
@@ -183,9 +184,9 @@ func emit_exhale(at: Vector3, direction: Vector3, density := 1.0) -> GPUParticle
 	smoke.billboard_keep_scale = true
 	smoke.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	smoke.albedo_texture = _soft_smoke_texture()
-	smoke.albedo_color = Color(0.72, 0.74, 0.69, 0.34)
+	smoke.albedo_color = Color(tint.r, tint.g, tint.b, 0.34)
 	smoke.emission_enabled = true
-	smoke.emission = Color(0.18, 0.20, 0.16)
+	smoke.emission = tint.darkened(0.73)
 	smoke.emission_energy_multiplier = 0.18
 	smoke.disable_receive_shadows = true
 	quad.material = smoke
@@ -208,9 +209,10 @@ func emit_exhale(at: Vector3, direction: Vector3, density := 1.0) -> GPUParticle
 ## particle geometry — the puffs begin around a hollow circle and inherit the
 ## player's look direction — so an O expands and frays instead of being a flat
 ## sprite pasted over the camera.
-func emit_smoke_trick(at: Vector3, direction: Vector3, trick: String, density := 1.0) -> Node3D:
+func emit_smoke_trick(at: Vector3, direction: Vector3, trick: String, density := 1.0, tint := Color(0.72, 0.74, 0.69)) -> Node3D:
 	var rig := Node3D.new()
 	rig.name = "SmokeTrick_%s" % trick.replace(" ", "_")
+	rig.set_meta("smoke_tint", tint)
 	get_parent().add_child(rig)
 	rig.global_position = at
 	var forward := direction.normalized()
@@ -233,9 +235,9 @@ func emit_smoke_trick(at: Vector3, direction: Vector3, trick: String, density :=
 			var core_smoke := StandardMaterial3D.new()
 			core_smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 			core_smoke.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
-			core_smoke.albedo_color = Color(0.77, 0.79, 0.73, 0.30)
+			core_smoke.albedo_color = Color(tint.r, tint.g, tint.b, 0.30)
 			core_smoke.emission_enabled = true
-			core_smoke.emission = Color(0.17, 0.19, 0.16)
+			core_smoke.emission = tint.darkened(0.75)
 			core_smoke.emission_energy_multiplier = 0.26
 			core_smoke.disable_receive_shadows = true
 			torus.material = core_smoke
@@ -246,7 +248,7 @@ func emit_smoke_trick(at: Vector3, direction: Vector3, trick: String, density :=
 			var core_tween := core.create_tween().set_parallel(true)
 			core_tween.tween_property(core, "position:z", -1.25, 2.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 			core_tween.tween_property(core, "scale", Vector3.ONE * 1.85, 2.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-			core_tween.tween_property(core_smoke, "albedo_color", Color(0.72, 0.75, 0.69, 0.0), 2.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			core_tween.tween_property(core_smoke, "albedo_color", Color(tint.r, tint.g, tint.b, 0.0), 2.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		var ring := GPUParticles3D.new()
 		ring.name = "Ring%d" % index
 		ring.one_shot = true
@@ -283,9 +285,9 @@ func emit_smoke_trick(at: Vector3, direction: Vector3, trick: String, density :=
 		smoke.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 		smoke.billboard_keep_scale = true
 		smoke.albedo_texture = _soft_smoke_texture()
-		smoke.albedo_color = Color(0.78, 0.79, 0.74, 0.52)
+		smoke.albedo_color = Color(tint.r, tint.g, tint.b, 0.52)
 		smoke.emission_enabled = true
-		smoke.emission = Color(0.19, 0.21, 0.18)
+		smoke.emission = tint.darkened(0.73)
 		smoke.emission_energy_multiplier = 0.34
 		smoke.disable_receive_shadows = true
 		quad.material = smoke

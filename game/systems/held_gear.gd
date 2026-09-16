@@ -192,6 +192,64 @@ static func build_hand(side: int, flesh := Color("8a6a55")) -> Node3D:
 	return root
 
 
+## The hunter's hands are issued costume, not bare skin. The ruling elite's
+## joke is a black-wine glove forced through an oversized fool's cuff: readable
+## in first person, humiliating in third, and large enough that the articulated
+## fingers stop looking like detached doll hands beside a full-size weapon.
+static func build_humiliation_hand(side: int) -> Node3D:
+	var hand := build_hand(side, Color("3b2029"))
+	hand.scale = Vector3.ONE * 1.16
+	for child in hand.find_children("*", "MeshInstance3D", true, false):
+		(child as MeshInstance3D).material_override = _leather(Color("28151e"), 70 + side)
+
+	var cuff := Node3D.new()
+	cuff.name = "HumiliationCuff"
+	cuff.position.z = -0.030
+	hand.add_child(cuff)
+	# Six stuffed lobes make the silhouette deliberately theatrical instead of
+	# reading as a tiny naked wrist. Bone and dried-blood alternate like a rank
+	# the wearer never chose.
+	for index in 6:
+		var angle := TAU * float(index) / 6.0
+		var puff := MeshInstance3D.new()
+		puff.name = "CuffPuff%d" % index
+		var puff_mesh := SphereMesh.new()
+		puff_mesh.radius = 0.024
+		puff_mesh.height = 0.040
+		puff_mesh.radial_segments = 10
+		puff_mesh.rings = 6
+		puff.mesh = puff_mesh
+		puff.position = Vector3(cos(angle) * 0.037, sin(angle) * 0.037, 0.0)
+		puff.scale = Vector3(1.0, 1.0, 0.82)
+		puff.material_override = _leather(Color("651d2a") if index % 2 == 0 else Color("c6ae7a"), 90 + index)
+		cuff.add_child(puff)
+
+	var shackle := MeshInstance3D.new()
+	shackle.name = "CuffShackle"
+	var shackle_mesh := TorusMesh.new()
+	shackle_mesh.inner_radius = 0.031
+	shackle_mesh.outer_radius = 0.044
+	shackle_mesh.rings = 12
+	shackle_mesh.ring_segments = 8
+	shackle.mesh = shackle_mesh
+	shackle.rotation.x = PI * 0.5
+	shackle.position.z = -0.015
+	shackle.material_override = _metal(Color("655d55"), 0.32, 113 + side)
+	cuff.add_child(shackle)
+
+	for side_step in [-1.0, 1.0]:
+		var bell := MeshInstance3D.new()
+		bell.name = "CuffBell"
+		var bell_mesh := SphereMesh.new()
+		bell_mesh.radius = 0.008
+		bell_mesh.height = 0.014
+		bell.mesh = bell_mesh
+		bell.position = Vector3(side_step * 0.035, -0.030, -0.018)
+		bell.material_override = _metal(Color("a7772d"), 0.24, 121 + int(side_step))
+		cuff.add_child(bell)
+	return hand
+
+
 static func _build_finger(parent: Node3D, length: float, girth: float, flesh: Color, seed_value: int, bones := 3) -> void:
 	# Each bone hangs off the end of the one before it, so curling a knuckle
 	# carries everything past it round with the joint — which is what a finger

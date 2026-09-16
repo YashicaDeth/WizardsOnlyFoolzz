@@ -41,6 +41,8 @@ var step_voice: AudioStreamPlayer3D
 ## needs the second hand.
 var smoking_blend := 0.0
 var smoking_two_handed := false
+var smoking_device := ""
+var smoking_look_down := 0.0
 
 
 func configure(body_rig: BaselineHuman) -> void:
@@ -80,9 +82,11 @@ func trigger_interaction() -> void:
 	state = "interact"
 
 
-func set_smoking_pose(amount: float, two_handed: bool) -> void:
+func set_smoking_pose(amount: float, two_handed: bool, device_id := "") -> void:
 	smoking_blend = clampf(amount, 0.0, 1.0)
 	smoking_two_handed = two_handed
+	smoking_device = device_id
+	smoking_look_down = smoking_blend * 0.18 if device_id == "bong" and first_person else 0.0
 
 
 func update(delta: float, velocity: Vector3, grounded: bool, sprinting: bool, crouching: bool, dodging: bool) -> void:
@@ -156,15 +160,26 @@ func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: 
 	if smoking_blend > 0.0:
 		var right := rig.parts.get("right_arm") as Node3D
 		if right != null:
-			right.rotation.x += smoking_blend * (0.74 if first_person else 1.16)
-			right.rotation.y += smoking_blend * -0.18
-			right.rotation.z += smoking_blend * -0.58
+			var right_raise := 0.74 if first_person else 1.16
+			var right_cant := -0.58
+			if smoking_device == "spliff":
+				right_raise *= 0.90
+				right_cant = -0.70
+			elif smoking_device == "bong":
+				right_raise *= 0.72
+				right_cant = -0.40
+			right.rotation.x += smoking_blend * right_raise
+			right.rotation.y += smoking_blend * (-0.26 if smoking_device == "spliff" else -0.18)
+			right.rotation.z += smoking_blend * right_cant
 		if smoking_two_handed:
 			var left := rig.parts.get("left_arm") as Node3D
 			if left != null:
-				left.rotation.x += smoking_blend * (0.48 if first_person else 0.82)
-				left.rotation.y += smoking_blend * 0.12
-				left.rotation.z += smoking_blend * 0.46
+				# The bong is cradled from underneath rather than mirrored like a
+				# two-handed gun. Both forearms rise at different heights so its
+				# weight reads before the mouthpiece arrives.
+				left.rotation.x += smoking_blend * (0.38 if first_person else 0.66)
+				left.rotation.y += smoking_blend * 0.22
+				left.rotation.z += smoking_blend * 0.58
 	var torso := rig.parts.get("torso") as Node3D
 	if torso != null:
 		var rest: Vector3 = torso.get_meta("rest_position", torso.position)

@@ -17,6 +17,7 @@ Status: early concept, not a locked game bible. Compiled from Greg's shared conv
 - One realm forces first-person play; its working metaphor is hell. Another forces third-person play; its working metaphor is heaven or a corrupted counterpart. Exact cosmology and names remain open.
 - Hubs, main-world roaming, transitions and eventual overlap between perspectives are desired. How these work remains open.
 - A dense, surprising, psychedelic, uncanny, occult and sometimes funny world. The experience should not feel crushing.
+- The player is forced by the elites to wear a humiliating jester/gimp outfit. Its first implemented read is oversized black-wine gloves, poofy bone-and-blood cuffs, restraint hardware, bells, shoulder puffs and a locked ruff; the costume must remain visible in first-person hand interactions as well as on the body.
 - High-quality code and deliberate art direction; generative imagery is not the foundation. Greg's own artwork should be central.
 - Soulslike combat and bosses, with eventual power, aggressive mobility and physical brutality. The player should not remain weak forever.
 - Highly physical, exaggerated fictional violence with meaningful hitting and body systems. Different bosses may have different anatomy and rules.
