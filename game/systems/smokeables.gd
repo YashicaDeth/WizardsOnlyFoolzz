@@ -189,12 +189,32 @@ static func build(device_id: String, spent := 0.0) -> Node3D:
 		"vape": _build_vape(root)
 		"bong": _build_bong(root)
 		_: return root
+	_add_hold_anchors(root, device_id)
+	root.set_meta("two_handed", bool((CATALOG.get(device_id, {}) as Dictionary).get("two_handed", false)))
 	set_spent(root, spent)
 	# Rest is whatever `set_draw` says rest is. The builder used to carry its own
 	# coal brightness as well, which meant a cigarette straight off the table and
 	# one somebody had just stopped drawing on were visibly different objects.
 	set_draw(root, 0.0)
 	return root
+
+
+## AU7.9. The objects speak HeldGear's anchor language rather than asking the
+## Hunt scene to guess their centres. Rolled objects and the vape are pinched
+## close to the mouthpiece; the bong has a second real support point on its
+## base, which is what makes it a two-hand object rather than a boolean alone.
+static func _add_hold_anchors(root: Node3D, device_id: String) -> void:
+	match device_id:
+		"cigarette", "joint", "spliff":
+			HeldGearRef.add_anchor(root, "grip", Vector3(0.0, 0.0, -0.018))
+			HeldGearRef.add_anchor(root, "mouth", Vector3.ZERO)
+		"vape":
+			HeldGearRef.add_anchor(root, "grip", Vector3(0.0, 0.0, 0.015))
+			HeldGearRef.add_anchor(root, "mouth", Vector3(0.0, 0.0, -0.057))
+		"bong":
+			HeldGearRef.add_anchor(root, "grip", Vector3(0.0, 0.13, 0.0))
+			HeldGearRef.add_anchor(root, "grip_support", Vector3(0.0, 0.035, 0.0))
+			HeldGearRef.add_anchor(root, "mouth", Vector3(0.0, 0.30, 0.0))
 
 
 ## What one clean draw consumes. Falls straight out of the charge count the

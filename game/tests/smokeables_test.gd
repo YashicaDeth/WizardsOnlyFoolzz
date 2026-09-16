@@ -27,8 +27,14 @@ func _ready() -> void:
 	for device_id: String in SMOKEABLES.CATALOG:
 		var node: Node3D = SMOKEABLES.build(device_id)
 		check(node != null and node.get_child_count() > 0, "%s is built from primitives, not nothing" % device_id)
+		check(node.get_node_or_null("anchor_grip") != null, "%s names where HeldGear closes the hand" % device_id)
 		check(SX.PROFILES.has(str((SMOKEABLES.CATALOG[device_id] as Dictionary)["substance"])),
 			"%s burns something with an authored curve" % device_id)
+		if device_id == "bong":
+			check(node.get_node_or_null("anchor_grip_support") != null, "the bong has a second physical handhold")
+			check(bool(node.get_meta("two_handed", false)), "and names itself as a two-hand object")
+		else:
+			check(node.get_node_or_null("anchor_grip_support") == null, "%s does not invent a second hand" % device_id)
 		node.free()
 
 	# --- the curve: a snatch is thin, the sweet spot is best, greed bites ----

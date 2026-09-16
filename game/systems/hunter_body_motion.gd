@@ -36,6 +36,11 @@ var camera_roll := 0.0
 var view_motion := 1.0
 var fov_add := 0.0
 var step_voice: AudioStreamPlayer3D
+## Smoking is a full-body pose, not a prop teleport. The Hunt owns the timed
+## draw; this animator only receives the eased amount and whether the object
+## needs the second hand.
+var smoking_blend := 0.0
+var smoking_two_handed := false
 
 
 func configure(body_rig: BaselineHuman) -> void:
@@ -73,6 +78,11 @@ func trigger_reload(duration: float) -> void:
 func trigger_interaction() -> void:
 	interaction_time = 0.38
 	state = "interact"
+
+
+func set_smoking_pose(amount: float, two_handed: bool) -> void:
+	smoking_blend = clampf(amount, 0.0, 1.0)
+	smoking_two_handed = two_handed
 
 
 func update(delta: float, velocity: Vector3, grounded: bool, sprinting: bool, crouching: bool, dodging: bool) -> void:
@@ -140,6 +150,21 @@ func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: 
 	var fp_spread := 0.045 if first_person else 0.0
 	_set_zone_pose("left_arm", Vector3(-fp_spread, -0.05 * crouch_blend, 0), Vector3(arm_swing + arm_raise, 0, 0.08))
 	_set_zone_pose("right_arm", Vector3(fp_spread, -0.05 * crouch_blend, 0), Vector3(-arm_swing + arm_raise, 0, -0.08))
+	# Bring the actual arm across the chest and up to the face. Previously only
+	# the tiny cigarette moved, leaving the hand hanging at the hip in third
+	# person. A bong recruits the left arm into a lower supporting cradle.
+	if smoking_blend > 0.0:
+		var right := rig.parts.get("right_arm") as Node3D
+		if right != null:
+			right.rotation.x += smoking_blend * (0.74 if first_person else 1.16)
+			right.rotation.y += smoking_blend * -0.18
+			right.rotation.z += smoking_blend * -0.58
+		if smoking_two_handed:
+			var left := rig.parts.get("left_arm") as Node3D
+			if left != null:
+				left.rotation.x += smoking_blend * (0.48 if first_person else 0.82)
+				left.rotation.y += smoking_blend * 0.12
+				left.rotation.z += smoking_blend * 0.46
 	var torso := rig.parts.get("torso") as Node3D
 	if torso != null:
 		var rest: Vector3 = torso.get_meta("rest_position", torso.position)

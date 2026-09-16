@@ -5626,7 +5626,7 @@ to get right.
       curve, so smoked and swallowed cannot drift into two systems
 - [x] **AU7.5** Lit ends are real `OmniLight3D`s, so a cigarette in the dark is
       a light source and gives you away (pairs with AS)
-- [~] **AU7.6** The bind: press-and-hold, with the hold readable **while** it
+- [x] **AU7.6** The bind: press-and-hold, with the hold readable **while** it
       happens. I0 settled where: *no screen is a list of text in a box*, and the
       derby's lesson was that the arena is the interface — so the gauge is the
       object. `set_draw(node, heat)` runs the cherry up the paper: the coal
@@ -5635,10 +5635,15 @@ to get right.
       is a different signal rather than more of the same one, and it is what
       warns you before the cough does. Nothing is drawn on screen, so it reads
       the same in first person, over a shoulder, and in somebody else's hands
-      across the room. Remaining: an actual input action bound to it — the
-      curve, the state and the readout exist and nothing presses the button yet
-- [ ] **AU7.7** Exhale: smoke that leaves you and drifts, on `contaminated_air`'s
-      particle work rather than a second system (Lane 2 owns it - ask)
+      across the room. `bone_yard_hunt.gd` now binds the real held act to RMB:
+      the live HUD counts the pull toward its authored sweet spot, release lands
+      the weak / clean / harsh result, and weapon input cannot fire through it
+      (`tests/smoking_act_test.gd`)
+- [x] **AU7.7** Release automatically exhales from the player's actual mouth
+      into `contaminated_air.gd`: soft lit particles rise, tumble, spread and
+      fade in the world. The fresh breath stays playable for a short window;
+      LMB cycles an expanding O, double O and ghost whose particle edges fray
+      as they travel (`tests/smoking_act_test.gd`, `smoking_gameplay_capture`)
 - [x] **AU7.8** Charges burn down visibly — a cigarette gets shorter, a bong
       bowl goes to ash and sinks, a vape's tank window drops. `spend_per_hit()`
       is derived from the charge count the catalogue already carries rather than
@@ -5647,8 +5652,11 @@ to get right.
       stops the coal reaching the filter and the geometry inverting. Tested
       monotonic across nine steps, because a thing that got *longer* partway
       through is a bug nobody would think to look for
-- [ ] **AU7.9** Held in the hand through `held_gear.gd`'s anchors, and the bong
-      takes both hands, so smoking one costs you your weapon
+- [x] **AU7.9** Every smokeable is held through `held_gear.gd`'s public anchor
+      convention on the body's real right arm. The draw raises that arm to the
+      mouth; the bong has a second physical grip and support hand, recruits the
+      left-arm pose, and hides the whole weapon set while held
+      (`tests/smokeables_test.gd`, `tests/smoking_act_test.gd`)
 - [ ] **AU7.10** Passing one to somebody is a real act with a real meaning (S)
 
 ### AU5 — The effect taxonomy

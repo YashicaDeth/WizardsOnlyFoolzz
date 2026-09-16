@@ -609,6 +609,14 @@ static func _anchor(root: Node3D, anchor_name: String, at: Vector3, turn: Vector
 	root.add_child(node)
 
 
+## The anchor convention belongs to held gear, not only to weapons. Small
+## carried objects use this public seam so hands, smokeables and anything added
+## later agree that `anchor_grip` is the place a palm closes around the object.
+static func add_anchor(root: Node3D, anchor_name: String, at: Vector3, turn := Vector3.ZERO) -> Node3D:
+	_anchor(root, anchor_name, at, turn)
+	return root.get_node("anchor_%s" % anchor_name) as Node3D
+
+
 # ----------------------------------------------------------------- the assembly
 func _init() -> void:
 	name = "HeldGear"

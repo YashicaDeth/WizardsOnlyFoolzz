@@ -117,6 +117,7 @@ const ASSET_NETWORK := preload("res://systems/asset_network.gd")
 const COMBAT_RESPONSE := preload("res://systems/combat_response.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const HELD_GEAR := preload("res://systems/held_gear.gd")
+const SMOKEABLES := preload("res://systems/smokeables.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
 const PIN_BOARD := preload("res://systems/pin_board.gd")
@@ -610,6 +611,27 @@ var _unlock_feel_timer := 0.0
 var kill_cam: Control
 var voice_channel: Node
 var arsenal: Node
+## AU7.6/AU7.9. Six cycles through the five smokeables. RMB then belongs to a
+## real held draw until it is released; selecting a weapon puts the object away.
+const SMOKEABLE_ORDER := ["cigarette", "vape", "joint", "spliff", "bong"]
+const SMOKE_REST := Vector3(0.02, -0.19, -0.18)
+const SMOKE_AT_MOUTH := Vector3(-0.03, 0.13, -0.04)
+const SMOKE_FP_REST := Vector3(0.10, -0.23, -0.66)
+const SMOKE_FP_AT_MOUTH := Vector3(-0.10, 0.04, -0.38)
+var smoke_index := -1
+var smoke_model: Node3D
+var smoke_support_hand: Node3D
+var smoke_held := 0.0
+var smoke_drawing := false
+var smoke_spent: Dictionary = {}
+var smoke_pose := 0.0
+var smoke_exhale_delay := 0.0
+var smoke_pending_exhale: Dictionary = {}
+var smoke_cough := 0.0
+const SMOKE_TRICKS := ["O", "DOUBLE O", "GHOST"]
+var smoke_trick_index := 0
+var smoke_trick_window := 0.0
+var smoke_last_exhale: Dictionary = {}
 var pending_attack: Dictionary = {}
 ## AN2.3. Set by `_attack_nearest_encounter_actor()` right before it returns
 ## true, read once by `_resolve_strike()` immediately after — a throat and a
@@ -1106,7 +1128,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		if event.pressed:
-			_attack()
+			if smoke_trick_window > 0.0:
+				_shape_smoke_trick()
+			else:
+				_attack()
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_MIDDLE:
 		_toggle_lock()
 	if event is InputEventMouseButton and event.pressed and not lock_target.is_empty():
@@ -1114,8 +1139,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			_cycle_lock(1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			_cycle_lock(-1)
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-		_attack(true)
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
+		if smoke_model != null and is_instance_valid(smoke_model):
+			if event.pressed:
+				_begin_smoking_draw()
+			else:
+				_finish_smoking_draw()
+		elif event.pressed:
+			_attack(true)
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_1: _equip_weapon(0)
@@ -1123,6 +1154,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_3: _equip_weapon(2)
 			KEY_4: _equip_carried_limb()
 			KEY_5: _put_the_weapons_down()
+			KEY_6: _cycle_smokeable()
 			KEY_B: _cycle_grip()
 			KEY_R:
 				if handheld.is_open:
@@ -1242,6 +1274,7 @@ func _physics_process(delta: float) -> void:
 		_update_hud()
 		return
 	pulse += delta
+	_update_smoking(delta)
 	_update_handheld_lamp(delta)
 	_update_flame()
 	_update_air()
@@ -1713,6 +1746,8 @@ func _pose_weapon() -> void:
 
 func _attack(heavy := false) -> void:
 	if resolution_ui.visible or kill_cam.active or player_rig.is_downed() or player_rig.anatomy.dead:
+		return
+	if smoke_model != null and is_instance_valid(smoke_model):
 		return
 	# In a clinch the strike button is the press, not a swing.
 	if not grapple_target.is_empty():
@@ -2292,11 +2327,211 @@ func _player_collision_exclusions() -> Array[RID]:
 
 ## O5.8. Put everything down. Not a weapon slot — the absence of one.
 func _put_the_weapons_down() -> void:
+	_put_smokeable_away(false)
 	_clear_carried_limb_model()
 	bare_handed = true
 	pending_attack = {}
 	strike_windup = -1.0
 	prompt.text = "HANDS"
+
+
+## AU7.6/AU7.9. Six is a held-object slot rather than five separate hidden
+## binds. Repeated presses walk the five authored objects; RMB belongs to the
+## selected object until a weapon key takes the hand back.
+func _cycle_smokeable() -> void:
+	if smoke_drawing:
+		_finish_smoking_draw()
+	smoke_index = (smoke_index + 1) % SMOKEABLE_ORDER.size()
+	_equip_smokeable(str(SMOKEABLE_ORDER[smoke_index]))
+
+
+func _equip_smokeable(device_id: String) -> void:
+	if not SMOKEABLES.CATALOG.has(device_id):
+		return
+	_put_smokeable_away(false)
+	_clear_carried_limb_model(false)
+	bare_handed = false
+	for model in arsenal.models.values():
+		(model as Node3D).visible = false
+	smoke_model = SMOKEABLES.build(device_id, float(smoke_spent.get(device_id, 0.0)))
+	smoke_model.name = "HeldSmokeable"
+	smoke_model.set_meta("device_id", device_id)
+	# The rig's real arm owns it. Its own HeldGear anchor, rather than the
+	# object's origin, lands at the authored rest point in the palm.
+	var grip := smoke_model.get_node_or_null("anchor_grip") as Node3D
+	smoke_model.rotation = Vector3(1.05, -0.28, -0.42) if device_id != "bong" else Vector3(-0.15, 0.2, -0.18)
+	var anchored_rest := SMOKE_REST
+	if grip != null:
+		anchored_rest -= smoke_model.transform.basis * grip.position
+	smoke_model.position = anchored_rest
+	smoke_model.set_meta("rest_position", anchored_rest)
+	smoke_model.set_meta("grip_correction", smoke_model.transform.basis * grip.position if grip != null else Vector3.ZERO)
+	(player_rig.parts.right_arm as Node3D).add_child(smoke_model)
+	# A bong's second hand is not a text claim: a real hand closes at its
+	# support anchor. One-hand objects have no support hand at all.
+	if bool(smoke_model.get_meta("two_handed", false)):
+		var support := smoke_model.get_node_or_null("anchor_grip_support") as Node3D
+		if support != null:
+			smoke_support_hand = HELD_GEAR.build_hand(-1)
+			smoke_support_hand.name = "BongSupportHand"
+			smoke_support_hand.position = support.position + Vector3(-0.026, 0.0, 0.0)
+			smoke_support_hand.rotation = Vector3(0.0, 0.0, -PI * 0.5)
+			smoke_model.add_child(smoke_support_hand)
+	var label := str((SMOKEABLES.CATALOG[device_id] as Dictionary).get("label", device_id)).to_upper()
+	prompt.text = "%s // HOLD RMB TO DRAW" % label
+
+
+func _put_smokeable_away(show_arsenal := true) -> void:
+	if smoke_model != null and is_instance_valid(smoke_model):
+		SMOKEABLES.set_draw(smoke_model, 0.0)
+		smoke_model.queue_free()
+	smoke_model = null
+	smoke_support_hand = null
+	smoke_drawing = false
+	smoke_held = 0.0
+	smoke_pose = 0.0
+	smoke_exhale_delay = 0.0
+	smoke_pending_exhale = {}
+	smoke_cough = 0.0
+	smoke_trick_window = 0.0
+	smoke_last_exhale = {}
+	if body_motion != null:
+		body_motion.set_smoking_pose(0.0, false)
+	if show_arsenal and arsenal != null and carried_limb_index < 0 and not bare_handed:
+		arsenal._update_models()
+
+
+func _begin_smoking_draw() -> void:
+	if smoke_model == null or not is_instance_valid(smoke_model) or not panel_mode.is_empty():
+		return
+	var device_id := str(smoke_model.get_meta("device_id", ""))
+	if float(smoke_spent.get(device_id, 0.0)) >= 0.999:
+		prompt.text = "SPENT // PRESS 6 FOR ANOTHER OBJECT"
+		return
+	smoke_held = 0.0
+	smoke_drawing = true
+
+
+func _update_smoking(delta: float) -> void:
+	if smoke_model == null or not is_instance_valid(smoke_model):
+		return
+	var device_id := str(smoke_model.get_meta("device_id", ""))
+	if smoke_drawing:
+		smoke_held += delta
+		SMOKEABLES.set_draw(smoke_model, SMOKEABLES.draw_heat(device_id, smoke_held))
+		var live_ideal := float((SMOKEABLES.CATALOG.get(device_id, {}) as Dictionary).get("draw_ideal", 1.0))
+		var draw_percent := roundi(clampf(smoke_held / maxf(live_ideal, 0.01), 0.0, 1.35) * 100.0)
+		prompt.text = "INHALE // %d%% // RELEASE ON THE SWEET SPOT" % draw_percent
+	if smoke_exhale_delay > 0.0:
+		smoke_exhale_delay = maxf(0.0, smoke_exhale_delay - delta)
+		if smoke_exhale_delay <= 0.0:
+			_exhale_smoke()
+	smoke_trick_window = maxf(0.0, smoke_trick_window - delta)
+	var ideal := float((SMOKEABLES.CATALOG.get(device_id, {}) as Dictionary).get("draw_ideal", 1.0))
+	var at_mouth := smoke_drawing or smoke_exhale_delay > 0.0
+	# A cigarette comes up quickly but settles into the last centimetre. The
+	# slower descent after release is the breath beat; it never snaps between
+	# hand and face just because a button changed state.
+	smoke_pose = move_toward(smoke_pose, 1.0 if at_mouth else 0.0, delta * (5.8 if at_mouth else 2.7))
+	var lift := smoothstep(0.0, 1.0, smoke_pose)
+	var rest: Vector3 = smoke_model.get_meta("rest_position", SMOKE_REST)
+	var mouth_target := SMOKE_AT_MOUTH
+	if body_motion != null and body_motion.first_person:
+		var grip_correction: Vector3 = smoke_model.get_meta("grip_correction", Vector3.ZERO)
+		rest = SMOKE_FP_REST - grip_correction
+		mouth_target = SMOKE_FP_AT_MOUTH - grip_correction
+	var draw_ratio := clampf(smoke_held / maxf(ideal, 0.01), 0.0, 1.4) if smoke_drawing else 0.0
+	# Tiny pull-back and tremor at the lips: enough movement for the inhale to
+	# read without turning a cigarette into a lever waving across the screen.
+	var breath_pull := Vector3(0.0, 0.004 * draw_ratio, 0.012 * draw_ratio)
+	var ember_tremor := Vector3(sin(smoke_held * 10.0) * 0.0018, cos(smoke_held * 7.0) * 0.0012, 0.0) if smoke_drawing else Vector3.ZERO
+	var cough_kick := Vector3(0.0, -sin(smoke_cough * 24.0) * smoke_cough * 0.035, smoke_cough * 0.04)
+	smoke_cough = maxf(0.0, smoke_cough - delta * 2.4)
+	smoke_model.position = rest.lerp(mouth_target, lift) + breath_pull + ember_tremor + cough_kick
+	smoke_model.rotation.z = (-0.42 if device_id != "bong" else -0.18) + lift * 0.18 + sin(smoke_held * 6.0) * 0.008
+	if body_motion != null:
+		body_motion.set_smoking_pose(lift, bool(smoke_model.get_meta("two_handed", false)))
+
+
+func _finish_smoking_draw() -> Dictionary:
+	if not smoke_drawing or smoke_model == null or not is_instance_valid(smoke_model):
+		return {}
+	smoke_drawing = false
+	var device_id := str(smoke_model.get_meta("device_id", ""))
+	SMOKEABLES.set_draw(smoke_model, 0.0)
+	if smoke_held < 0.05:
+		smoke_held = 0.0
+		return {}
+	var result: Dictionary = SMOKEABLES.hit("player", device_id, smoke_held, Time.get_ticks_msec() / 1000.0)
+	var spent := clampf(float(smoke_spent.get(device_id, 0.0)) + SMOKEABLES.spend_per_hit(device_id), 0.0, 1.0)
+	smoke_spent[device_id] = spent
+	SMOKEABLES.set_spent(smoke_model, spent)
+	if bool(result.get("ok", false)):
+		prompt.text = "%s DRAW // %s" % [str(result.get("grade", "")).to_upper(), "SPENT" if spent >= 0.999 else "%d%% LEFT" % roundi((1.0 - spent) * 100.0)]
+		smoke_pending_exhale = result.duplicate(true)
+		smoke_exhale_delay = 0.26
+		if str(result.get("grade", "")) == SMOKEABLES.HARSH:
+			smoke_cough = clampf(float(result.get("harsh", 0.0)), 0.25, 1.0)
+	smoke_held = 0.0
+	return result
+
+
+## Release is the end of the draw, not another input prompt. The breath leaves
+## automatically after one short hold at the mouth and becomes part of the same
+## contaminated air already moving through the region.
+func _exhale_smoke() -> void:
+	if smoke_pending_exhale.is_empty():
+		return
+	var emission := _smoke_emission_pose()
+	var forward: Vector3 = emission.forward
+	var mouth: Vector3 = emission.mouth
+	air.emit_exhale(mouth, forward, float(smoke_pending_exhale.get("exhale", 1.0)))
+	smoke_last_exhale = smoke_pending_exhale.duplicate(true)
+	smoke_trick_window = 1.15
+	prompt.text = "%s // CLICK TO SHAPE THE SMOKE" % str(smoke_pending_exhale.get("grade", "")).to_upper()
+	WorldHistory.record_event("smoke_exhaled", {
+		"subject_id": "player",
+		"device": str(smoke_pending_exhale.get("device", "")),
+		"density": float(smoke_pending_exhale.get("exhale", 1.0)),
+		"location": HUNT_LOCATION,
+	})
+	smoke_pending_exhale = {}
+
+
+func _shape_smoke_trick() -> void:
+	if smoke_trick_window <= 0.0 or smoke_last_exhale.is_empty():
+		return
+	var trick := str(SMOKE_TRICKS[smoke_trick_index % SMOKE_TRICKS.size()])
+	smoke_trick_index = (smoke_trick_index + 1) % SMOKE_TRICKS.size()
+	var emission := _smoke_emission_pose(0.06)
+	var forward: Vector3 = emission.forward
+	var mouth: Vector3 = emission.mouth
+	air.emit_smoke_trick(mouth, forward, trick, float(smoke_last_exhale.get("exhale", 1.0)))
+	WorldHistory.record_event("smoke_trick", {
+		"subject_id": "player", "trick": trick,
+		"device": str(smoke_last_exhale.get("device", "")), "location": HUNT_LOCATION,
+	})
+	prompt.text = "%s // SMOKE TRICK" % trick
+	smoke_trick_window = 0.0
+
+
+## First person breath begins just beyond the lens; third person breath begins
+## on the body's actual face. Emitting from the camera in an exterior view was
+## the reason the first gameplay take filled the screen with smoke while the
+## character stood several metres behind it.
+func _smoke_emission_pose(extra_forward := 0.0) -> Dictionary:
+	var forward := -camera.global_transform.basis.z.normalized()
+	if perspective_blend > 0.5:
+		var head := player_rig.parts.get("head") as Node3D
+		if head != null and is_instance_valid(head):
+			return {
+				"mouth": head.global_position + forward * (0.16 + extra_forward) + Vector3.DOWN * 0.035,
+				"forward": forward,
+			}
+	return {
+		"mouth": camera.global_position + forward * (0.42 + extra_forward) + Vector3.DOWN * 0.06,
+		"forward": forward,
+	}
 
 
 ## What a punch is worth. Kept beside the arsenal's own table rather than inside
@@ -2326,6 +2561,7 @@ func bare_hand_attack(heavy := false) -> Dictionary:
 
 
 func _equip_weapon(slot: int) -> void:
+	_put_smokeable_away(false)
 	bare_handed = false
 	_clear_carried_limb_model()
 	if arsenal.select_slot(slot):
@@ -3116,6 +3352,7 @@ func _equip_carried_limb() -> void:
 	if index < 0:
 		prompt.text = "CARRY HAS NO WHOLE LIMB"
 		return
+	_put_smokeable_away(false)
 	_clear_carried_limb_model(false)
 	carried_limb_index = index
 	for model in arsenal.models.values():
@@ -4475,6 +4712,9 @@ func _build_keys_card() -> void:
 			["X", "THREATEN"],
 			["H", "EXTRACTION"],
 			["N", "PHOTOGRAPH"],
+			["6", "CYCLE SMOKEABLE"],
+			["HOLD RMB", "DRAW / RELEASE TO EXHALE"],
+			["LMB EXHALE", "O / DOUBLE O / GHOST"],
 		]},
 		{"group": "WHAT YOU CARRY", "rows": [
 			["G", "THE DEVICE"],
