@@ -5113,6 +5113,19 @@ instead.
 - [ ] **AP1.6** Out, and choosing what happens to the lands (hands over to AA)
 - [ ] **AP1.7** Digestible segment to segment, and a playground if you want it
 
+### AP4 — Starting-facility territory slice
+
+- [x] **AP4.1** The production opening enters the authored underground colosseum, not the old surface quarry — both the Growing Floor door and `OpeningDirector.resume_destination()` now resolve to `underground_colosseum.tscn`; `opening_stage_wiring_test.gd` drives the real transitions (6/6).
+- [x] **AP4.2** One persistent authority owns the facility holdings — `facility_territory.gd` stores the Growing Floor, Underground Colosseum, Service Ring and Surface Gate under one WorldHistory subject rather than distributing ownership flags across UI and scenes.
+- [x] **AP4.3** Exploration changes only what was actually reached — waking reveals the Growing Floor, entering the pit surveys it, and the three existing colosseum tunnels reveal the Service Ring without falsely liberating either.
+- [x] **AP4.4** A real achievement liberates one holding — only `derby_round_won` in the underground venue changes the Colosseum from surveyed to liberated; entry and loss cannot award it.
+- [x] **AP4.5** MAP exposes ownership, surveillance, objectives and routes — the Black Mirror's facility sheet draws the four bounded holdings, existing scene adjacency, live owner/state, the next authored objective and approximate CellOutz surveillance from the authority record.
+- [x] **AP4.6** The territory sheet is operable with pointer and keyboard — pointing selects a holding, arrow keys move through revealed holdings, and `L` switches between facility holdings and the Ashbloom satellite; verified by `facility_device_integration_test.gd` (7/7 total integration checks).
+- [x] **AP4.7** Liberation unlocks trustworthy INDEX knowledge — the Underground Colosseum becomes a selectable recovered FILE record with its live ownership and a floor-plan stamp; place records never fabricate human portraits.
+- [x] **AP4.8** CellOutz reacts as the openly evil corporate platform requested — one persistent `REPOSSESSION ORDER 0C-7` circulates against the player as company inventory, appears on the MAP, and cannot duplicate when the win callback repeats.
+- [x] **AP4.9** The loop survives persistence and respects quantum restart — `facility_territory_test.gd` proves normal WorldHistory state, a fresh universe returning the pit to corporate control, and quantum branch restore returning liberation, INDEX file and bounty together (15/15).
+- [x] **AP4.10** The whole state change is captured, not inferred — `captures/facility_territory_loop.mp4` is a verified 1280×720 30 FPS H.264/AAC reel showing progressive reveal, liberation, INDEX unlock, corporate response, reset and reload; three accepted PNG evidence frames accompany it. Full contract and honest scope: `DESIGN/FACILITY_TERRITORY_SLICE.md`.
+
 ### AP2 — Undying
 - [ ] **AP2.1** The spirit cannot be banished by violence, and the game proves this to you early
 - [ ] **AP2.2** Bright vibrant flame that melts the screen itself — a real shader, not an overlay
