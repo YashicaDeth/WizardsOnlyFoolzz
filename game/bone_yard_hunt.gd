@@ -96,6 +96,7 @@ const LIVE_BODY_MIRROR := preload("res://systems/live_body_mirror.gd")
 const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
 const FIELD_LENS := preload("res://systems/field_lens.gd")
+const HELD_ITEM_RELIQUARY := preload("res://systems/held_item_reliquary.gd")
 const STORM_WEATHER := preload("res://systems/storm_weather.gd")
 const PERCEPTION := preload("res://systems/perception.gd")
 const GLITCH_SPIDER := preload("res://systems/glitch_spider.gd")
@@ -395,6 +396,7 @@ var handheld: Control
 ## drugs and shadow realms, all reach for instead of building their own effect.
 var psychedelic: Control
 var field_lens: Control
+var held_reliquary: Control
 ## AG2. What can be pressed, when somebody asks.
 var keys_card: Control
 ## AS1.1. The one real light the handheld throws into the world. Lives on the
@@ -816,6 +818,9 @@ func _ready() -> void:
 	field_lens = FIELD_LENS.new()
 	field_lens.name = "FieldLens"
 	$HUD.add_child(field_lens)
+	held_reliquary = HELD_ITEM_RELIQUARY.new()
+	held_reliquary.name = "HeldItemReliquary"
+	$HUD.add_child(held_reliquary)
 	psychedelic = PSYCHEDELIC_RIG.new()
 	psychedelic.name = "Psychedelic"
 	$HUD.add_child(psychedelic)
@@ -850,7 +855,9 @@ func _ready() -> void:
 	add_child(player_body)
 	player_body.position = player - Vector3.UP * 0.6
 	_build_player_rig()
-	_build_body_witness()
+	# The old red witness mirror was a body-inspection prototype left standing
+	# directly in the opening sightline. The real room mirror remains tested and
+	# reusable, but the Hunt no longer begins beside an unexplained red rectangle.
 	arsenal = HUNTER_ARSENAL.new()
 	arsenal.name = "HunterArsenal"
 	player_body.add_child(arsenal)
@@ -5333,6 +5340,7 @@ func _update_hud() -> void:
 		vitals_panel.visible = false
 	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("status", "dormant")).to_upper()]
 	prompt.visible = not resolution_ui.visible and not living_map.visible and not world_index.visible
+	_update_held_reliquary()
 	if field_interface.has_method("set_state"):
 		var blood_ratio := 1.0
 		var lung_state := {"health": 1.0, "stain": 0.0}
@@ -5343,6 +5351,7 @@ func _update_hud() -> void:
 			lung_state = player_rig.anatomy.lung_state()
 			pain = player_rig.anatomy.pain
 			consciousness = player_rig.anatomy.consciousness
+		var local_map: Texture2D = living_map.update_minimap(get_process_delta_time()) if living_map != null else null
 		field_interface.set_state({
 			"health": health,
 			"blood": blood_ratio,
@@ -5359,6 +5368,8 @@ func _update_hud() -> void:
 			"magick": WorldHistory.chaos_magick(),
 			"world_stamp": "%s // %s" % [WorldClock.calendar_stamp(), WorldClock.stamp()],
 			"air": air.severity() if air != null and is_instance_valid(air) else 0.0,
+			"minimap_texture": local_map,
+			"minimap_heading": yaw,
 			"rival_status": WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("status", "dormant"),
 			"rival_name": _captain_name(),
 			"menu_open": world_index.visible or character_archive.visible or allusions_artwork.visible or living_map.visible,
@@ -5366,6 +5377,32 @@ func _update_hud() -> void:
 			"weapon": arsenal.state() if arsenal != null else {},
 			"lock_screen": lock_screen,
 		})
+
+
+func _update_held_reliquary() -> void:
+	if held_reliquary == null or not is_instance_valid(held_reliquary):
+		return
+	var covered := world_index.visible or character_archive.visible or allusions_artwork.visible or living_map.visible or pin_board.visible
+	if covered:
+		held_reliquary.clear_item()
+		return
+	if smoke_model != null and is_instance_valid(smoke_model):
+		var smoke_label := str((SMOKEABLES.CATALOG.get(str(smoke_model.get_meta("device_id", "")), {}) as Dictionary).get("label", "smokeable"))
+		var smoke_left := roundi((1.0 - SMOKEABLES.spent_of(smoke_model)) * 100.0)
+		held_reliquary.show_item(smoke_model, smoke_label, "%d%%" % smoke_left)
+		return
+	if carried_limb_model != null and is_instance_valid(carried_limb_model) and carried_limb_index >= 0 and carried_limb_index < handheld.carry.items.size():
+		var limb: Dictionary = handheld.carry.items[carried_limb_index]
+		held_reliquary.show_item(carried_limb_model, str(limb.get("label", "severed limb")), "%d%%" % roundi(float(limb.get("condition", 1.0)) * 100.0))
+		return
+	if arsenal != null and arsenal.models.has(arsenal.current_id):
+		var held_weapon := arsenal.models[arsenal.current_id] as Node3D
+		if held_weapon != null and held_weapon.visible:
+			var state: Dictionary = arsenal.state()
+			var detail := "EDGE" if int(state.get("loaded", -1)) < 0 else "%02d // %02d" % [int(state.get("loaded", 0)), int(state.get("reserve", 0))]
+			held_reliquary.show_item(held_weapon, str(state.get("label", arsenal.current_id)), detail)
+			return
+	held_reliquary.clear_item()
 
 
 func _update_camera() -> void:
@@ -5911,6 +5948,9 @@ func _build_expanse_systems() -> void:
 	misfire_director.call("generate", 774013, Vector2(470, 370), 18)
 	if living_map != null:
 		living_map.bind(generated_world, misfire_director, _map_contacts)
+		# The field radar and the opened map share this one sleeping satellite.
+		# It renders only on their explicit request, never twice in parallel.
+		living_map.attach_world(get_world_3d())
 	# The region is inhabited on arrival rather than filling in over the first
 	# two minutes. Half the target standing at the start, the rest arriving on
 	# the ordinary interval, so walking out of the gate finds a populated world

@@ -112,6 +112,10 @@ func _ready() -> void:
 	check(hunt.handheld.carry.items.size() == carry_before + 1 and str(hunt.handheld.carry.items.back().kind) == "limb", "E picks the physical limb up into the real CARRY inventory")
 	hunt._equip_carried_limb()
 	check(hunt.carried_limb_index >= 0 and hunt.carried_limb_model != null, "slot 4 visibly equips the carried limb")
+	hunt._update_hud()
+	var limb_reliquary: Control = hunt.held_reliquary as Control
+	check(limb_reliquary != null and int(limb_reliquary.displayed_source_id) == hunt.carried_limb_model.get_instance_id() and int(limb_reliquary.mesh_count) > 0,
+		"the same carried limb appears as real rotating geometry in the universal held-item reliquary")
 	hunt.lock_target = str(locked_actor.subject_id)
 	hunt.attack_cooldown = 0.0
 	var target_wounds: int = locked_actor.anatomy.wounds.size()

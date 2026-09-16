@@ -62,6 +62,7 @@ var satellite: SubViewport = null
 var descent := 0.0
 ## Counts down to the next satellite render. See `_draw`.
 var _satellite_due := 0.0
+var _minimap_due := 0.0
 var pan := Vector2.ZERO
 var follow := true
 var dragging := false
@@ -166,6 +167,20 @@ func _sleep_satellite() -> void:
 func close_map() -> void:
 	_sleep_satellite()
 	visible = false
+
+
+## The pocket feed reuses the exact satellite camera the full map owns. It is
+## deliberately slow (eight frames a second) and close around the player: a
+## navigational instrument, not a second always-on render of the whole region.
+func update_minimap(delta: float) -> Texture2D:
+	if visible or satellite == null or not is_instance_valid(satellite):
+		return null
+	satellite.call("observe", Vector3(player_at.x, 0.0, player_at.y), player_yaw, 0.0, delta, Vector2(120, 120))
+	_minimap_due -= delta
+	if _minimap_due <= 0.0:
+		_minimap_due = 1.0 / 8.0
+		satellite.call("request_frame")
+	return satellite.get_texture()
 
 
 func _handle_travel(delta: float) -> void:
@@ -876,4 +891,3 @@ func _draw_legend() -> void:
 	draw_set_transform(Vector2(size.x - 152.0 - CellOutzType.width_condensed(scrawl, 8.0, 0.8), size.y - 26.0), -0.028, Vector2.ONE)
 	CellOutzType.draw_condensed(self, Vector2.ZERO, scrawl, 8.0, ACID * Color(1, 1, 1, 0.45), 0.8)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-

@@ -98,11 +98,19 @@ func _clear_the_air() -> void:
 		air.ambient_light_color = Color("6d6a58")
 		air.ambient_light_energy = 1.0
 	else:
-		# Lift the ambient a little. Overhead light on a region built to be lit
-		# from the side leaves the roofs correct and the streets between them
-		# unreadably dark, and a satellite picture whose streets are black is
-		# not a map.
-		air.ambient_light_energy = maxf(air.ambient_light_energy, 0.9)
+		# The surveillance camera supplies its own false-colour ambient response.
+		# Reusing the night sky as its ambient source left streets almost black at
+		# minimap scale even after brightness grading.
+		air.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+		air.ambient_light_color = Color("9aa080")
+		air.ambient_light_energy = 1.65
+	# This is surveillance hardware, not a second human eye. At night the raw
+	# world render is nearly black at minimap scale, so the agency feed applies a
+	# restrained low-light lift and partial desaturation of its own.
+	air.adjustment_enabled = true
+	air.adjustment_brightness = 1.48
+	air.adjustment_contrast = 1.08
+	air.adjustment_saturation = 0.62
 	camera.environment = air
 
 

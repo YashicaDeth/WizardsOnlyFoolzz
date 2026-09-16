@@ -39,6 +39,13 @@ func _ready() -> void:
 	var field_lens: Control = hunt.get("field_lens") as Control
 	check(field_lens != null and float(field_lens.treatment().curvature) > 0.0,
 		"ordinary first-person play passes through a slight permanent curved lens")
+	hunt.call("_update_hud")
+	var reliquary: Control = hunt.get("held_reliquary") as Control
+	check(reliquary != null and int(reliquary.displayed_source_id) == held.get_instance_id() and int(reliquary.mesh_count) > 0,
+		"the bottom-right reliquary presents the real held cigarette as rotating 3D geometry")
+	var field_map: Control = hunt.get("living_map") as Control
+	check(field_map != null and field_map.get("satellite") != null,
+		"the lower-left field radar shares the real satellite camera with the opened map")
 	check(held.get_parent() == rig.parts.right_arm, "the object belongs to the body's real right arm")
 	check(held.get_node_or_null("anchor_grip") != null, "and it arrived through HeldGear's grip anchor")
 	check(held.get_node_or_null("SmokingGripHand") != null,
