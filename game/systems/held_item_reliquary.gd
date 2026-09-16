@@ -22,6 +22,7 @@ var _bounds := AABB()
 var _has_bounds := false
 var _clock := 0.0
 var _fit_scale := 1.0
+var arm_damage := 0.0
 
 const PHI := 1.61803398875
 const GOLDEN_ANGLE := TAU / (PHI * PHI)
@@ -105,6 +106,11 @@ func clear_item() -> void:
 	_clear_stage()
 
 
+func set_arm_damage(value: float) -> void:
+	arm_damage = clampf(value, 0.0, 1.0)
+	queue_redraw()
+
+
 func _rebuild(source: Node3D) -> void:
 	_clear_stage()
 	_bounds = AABB()
@@ -170,6 +176,10 @@ func _process(delta: float) -> void:
 	_stage.rotation.y = phase + sin(phase * 2.0 + GOLDEN_ANGLE) * 0.72
 	_stage.rotation.x = sin(phase * 3.0) * 0.14 + sin(phase * 5.0 + GOLDEN_ANGLE) * 0.045
 	_stage.rotation.z = sin(phase * 8.0 + GOLDEN_ANGLE * 2.0) * 0.035
+	# I4.3v2/I10.9. Arm damage destabilises the object the arms are presenting,
+	# not the map or portrait elsewhere on screen.
+	_stage.rotation.z += sin(_clock * 11.0) * arm_damage * 0.045
+	_stage.position.x = sin(_clock * 8.3) * arm_damage * 0.045
 	var breathe := 1.0 + sin(phase * 5.0 + GOLDEN_ANGLE) * 0.018
 	_stage.scale = Vector3.ONE * _fit_scale * breathe
 	queue_redraw()
@@ -195,3 +205,9 @@ func _draw() -> void:
 	if not detail.is_empty():
 		var width := CellOutzType.width_condensed(detail, 8.0, 0.62)
 		CellOutzType.draw_condensed(self, Vector2(220 - width, 175), detail, 8.0, COPPER, 0.62)
+	if arm_damage > 0.08:
+		var break_at := Vector2(228, 44)
+		var elbow := break_at + Vector2(-22, 23)
+		var end := elbow + Vector2(-38, 17) * arm_damage
+		draw_polyline(PackedVector2Array([break_at, elbow, end]), BLOOD * Color(1, 1, 1, 0.30 + arm_damage * 0.55), 1.2 + arm_damage)
+		draw_rect(Rect2(8, 104 + sin(_clock * 6.0) * 4.0, 220 * arm_damage, 3 + arm_damage * 4), Color(0.01, 0.003, 0.006, 0.82))

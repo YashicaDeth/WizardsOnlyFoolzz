@@ -1738,7 +1738,7 @@ finished. Applies to everything below and to A5, A6, C1.
       Verified: `tests/index_wire_glow_test.gd` (3/3) plus
       `captures/i1_5_v2_index_file_no_rain.png` /
       `i1_5_v2_index_wire_has_rain.png`.
-- [ ] **I4.3** `v2` Vitality degrades the panels uniformly; a specific wound should damage a specific part of what you are reading
+- [x] **I4.3** `v2` Vitality degrades the panels uniformly; a specific wound should damage a specific part of what you are reading — the live six-zone anatomy now collapses into four explicit instrument feeds without introducing another health model: head damage slips/cracks only the top-right portrait, torso damage tears and summons the contextual anatomy/X-ray, either arm shakes and breaks registration only in the held-object reliquary, and either leg disrupts only the lower-left satellite/dead-reckoning aperture. Healing the real zone repairs its instrument because the ratios are derived afresh from `AnatomyComponent.zones` every HUD update. `tests/interface_wound_damage_test.gd` proves clean state, all four mappings, exact ratio transfer, contextual torso display and arm/reliquary delivery (8 checks); `smoking_lung_ui_test` and `hud_transience_test` remain green. The four simultaneous local failures were inspected in the live Hunt at `captures/i4_3_region_wound_ui.png`.
 
 
 ### I v3 — the third pass
@@ -1787,7 +1787,7 @@ Nine passes designed in a lit room. C v4 made the device the main light source i
 - [ ] **I10.6** `v10` A screen is legible while you are being attacked
 - [ ] **I10.7** `v10` Screens are readable in the dark and lit by their own emission
 - [ ] **I10.8** `v10` The weapon customisation lives on the weapon
-- [ ] **I10.9** `v10` Damage to you damages the specific part of what you are reading
+- [x] **I10.9** `v10` Damage to you damages the specific part of what you are reading — implemented with I4.3 v2: head/portrait, torso/anatomy, arms/held object and legs/navigation each fail locally from their corresponding live anatomy zone; there is no whole-screen injury filter and no parallel cosmetic damage value.
 - [ ] **I10.10** `v10` Nothing is clickable that does not look clickable
 - [ ] **I10.11** `v10` Every panel works on keyboard and on the pointer equally
 - [ ] **I10.12** `v10` The cursor exists on every screen that hides the OS one

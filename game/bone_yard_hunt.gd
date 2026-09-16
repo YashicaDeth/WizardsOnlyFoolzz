@@ -5848,13 +5848,34 @@ func _update_hud() -> void:
 			"menu_open": world_index.visible or character_archive.visible or allusions_artwork.visible or living_map.visible,
 			"menu_mode": panel_mode,
 			"weapon": arsenal.state() if arsenal != null else {},
+			"wound_regions": _interface_wound_regions(),
 			"lock_screen": lock_screen,
 		})
+
+
+## I4.3v2/I10.9. Collapse the anatomy's six physical zones into the four
+## instruments they can disrupt. This is derived every frame from the body;
+## there is no interface-only damage state to drift away from a healed limb.
+func _interface_wound_regions() -> Dictionary:
+	var result := {"head": 0.0, "torso": 0.0, "arms": 0.0, "legs": 0.0}
+	if player_rig == null or not is_instance_valid(player_rig):
+		return result
+	var zones: Dictionary = player_rig.anatomy.zones
+	var loss := func(zone_id: String) -> float:
+		var baseline: Dictionary = ANATOMY_COMPONENT.DEFAULT_ZONES.get(zone_id, {"health": 1.0})
+		var current: Dictionary = zones.get(zone_id, baseline)
+		return 1.0 - clampf(float(current.get("health", 0.0)) / maxf(float(baseline.get("health", 1.0)), 1.0), 0.0, 1.0)
+	result.head = loss.call("head")
+	result.torso = loss.call("torso")
+	result.arms = maxf(loss.call("left_arm"), loss.call("right_arm"))
+	result.legs = maxf(loss.call("left_leg"), loss.call("right_leg"))
+	return result
 
 
 func _update_held_reliquary() -> void:
 	if held_reliquary == null or not is_instance_valid(held_reliquary):
 		return
+	held_reliquary.set_arm_damage(float(_interface_wound_regions().arms))
 	var covered := world_index.visible or character_archive.visible or allusions_artwork.visible or living_map.visible or pin_board.visible
 	if covered:
 		held_reliquary.clear_item()
