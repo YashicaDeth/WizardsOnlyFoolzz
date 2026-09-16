@@ -45,10 +45,15 @@ func _ready() -> void:
 	# Hold rather than tap: the visible heat and the delivered grade are driven
 	# by the same accumulated duration.
 	hunt.call("_begin_smoking_draw")
+	var length_before_draw := Smokeables.spent_of(held)
 	for _frame in 96:
 		hunt.call("_update_smoking", 1.0 / 60.0)
 	var held_seconds := float(hunt.get("smoke_held"))
 	check(held_seconds > 1.5, "holding RMB accumulates a real draw duration")
+	check(Smokeables.spent_of(held) > length_before_draw,
+		"the cigarette burns shorter continuously while the button is held")
+	check(held.position.x < -0.15,
+		"the lit cigarette rises beside the first-person reticle at the mouth")
 	var result: Dictionary = hunt.call("_finish_smoking_draw")
 	check(bool(result.get("ok", false)), "releasing RMB lands the draw")
 	check(str(result.get("device", "")) == "cigarette", "the hit comes from the object actually held")

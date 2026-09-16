@@ -617,13 +617,17 @@ const SMOKEABLE_ORDER := ["cigarette", "vape", "joint", "spliff", "bong"]
 const SMOKE_REST := Vector3(0.02, -0.19, -0.18)
 const SMOKE_AT_MOUTH := Vector3(-0.03, 0.13, -0.04)
 const SMOKE_FP_REST := Vector3(0.10, -0.23, -0.66)
-const SMOKE_FP_AT_MOUTH := Vector3(-0.10, 0.04, -0.38)
+## The first-person mouth sits just above the low diegetic reticle. Keeping the
+## lit end here lets the cherry itself become the last centimetre of the aim
+## picture instead of hiding below the HUD.
+const SMOKE_FP_AT_MOUTH := Vector3(-0.26, -0.015, -0.31)
 var smoke_index := -1
 var smoke_model: Node3D
 var smoke_support_hand: Node3D
 var smoke_held := 0.0
 var smoke_drawing := false
 var smoke_spent: Dictionary = {}
+var smoke_draw_start_spent := 0.0
 var smoke_pose := 0.0
 var smoke_exhale_delay := 0.0
 var smoke_pending_exhale: Dictionary = {}
@@ -2389,6 +2393,7 @@ func _put_smokeable_away(show_arsenal := true) -> void:
 	smoke_support_hand = null
 	smoke_drawing = false
 	smoke_held = 0.0
+	smoke_draw_start_spent = 0.0
 	smoke_pose = 0.0
 	smoke_exhale_delay = 0.0
 	smoke_pending_exhale = {}
@@ -2409,6 +2414,7 @@ func _begin_smoking_draw() -> void:
 		prompt.text = "SPENT // PRESS 6 FOR ANOTHER OBJECT"
 		return
 	smoke_held = 0.0
+	smoke_draw_start_spent = float(smoke_spent.get(device_id, 0.0))
 	smoke_drawing = true
 
 
@@ -2420,6 +2426,12 @@ func _update_smoking(delta: float) -> void:
 		smoke_held += delta
 		SMOKEABLES.set_draw(smoke_model, SMOKEABLES.draw_heat(device_id, smoke_held))
 		var live_ideal := float((SMOKEABLES.CATALOG.get(device_id, {}) as Dictionary).get("draw_ideal", 1.0))
+		# The coal advances while air is actually moving through it. The stored
+		# charge is committed on release, but the geometry previews that same
+		# amount continuously so a cigarette never waits for a one-frame event to
+		# become shorter.
+		var live_burn := SMOKEABLES.spend_per_hit(device_id) * clampf(smoke_held / maxf(live_ideal, 0.01), 0.0, 1.0)
+		SMOKEABLES.set_spent(smoke_model, clampf(smoke_draw_start_spent + live_burn, 0.0, 1.0))
 		var draw_percent := roundi(clampf(smoke_held / maxf(live_ideal, 0.01), 0.0, 1.35) * 100.0)
 		prompt.text = "INHALE // %d%% // RELEASE ON THE SWEET SPOT" % draw_percent
 	if smoke_exhale_delay > 0.0:
@@ -2432,7 +2444,8 @@ func _update_smoking(delta: float) -> void:
 	# A cigarette comes up quickly but settles into the last centimetre. The
 	# slower descent after release is the breath beat; it never snaps between
 	# hand and face just because a button changed state.
-	smoke_pose = move_toward(smoke_pose, 1.0 if at_mouth else 0.0, delta * (5.8 if at_mouth else 2.7))
+	var raise_speed := 2.45 if device_id == "bong" else (3.7 if device_id == "spliff" else 5.8)
+	smoke_pose = move_toward(smoke_pose, 1.0 if at_mouth else 0.0, delta * (raise_speed if at_mouth else 2.7))
 	var lift := smoothstep(0.0, 1.0, smoke_pose)
 	var rest: Vector3 = smoke_model.get_meta("rest_position", SMOKE_REST)
 	var mouth_target := SMOKE_AT_MOUTH
@@ -2440,15 +2453,34 @@ func _update_smoking(delta: float) -> void:
 		var grip_correction: Vector3 = smoke_model.get_meta("grip_correction", Vector3.ZERO)
 		rest = SMOKE_FP_REST - grip_correction
 		mouth_target = SMOKE_FP_AT_MOUTH - grip_correction
+		if device_id == "bong":
+			rest = Vector3(0.18, -0.40, -0.78) - grip_correction
+			mouth_target = Vector3(-0.02, -0.20, -0.55) - grip_correction
+		elif device_id == "spliff":
+			mouth_target += Vector3(0.015, -0.012, -0.035)
 	var draw_ratio := clampf(smoke_held / maxf(ideal, 0.01), 0.0, 1.4) if smoke_drawing else 0.0
 	# Tiny pull-back and tremor at the lips: enough movement for the inhale to
 	# read without turning a cigarette into a lever waving across the screen.
 	var breath_pull := Vector3(0.0, 0.004 * draw_ratio, 0.012 * draw_ratio)
 	var ember_tremor := Vector3(sin(smoke_held * 10.0) * 0.0018, cos(smoke_held * 7.0) * 0.0012, 0.0) if smoke_drawing else Vector3.ZERO
 	var cough_kick := Vector3(0.0, -sin(smoke_cough * 24.0) * smoke_cough * 0.035, smoke_cough * 0.04)
+	var device_gesture := Vector3.ZERO
+	if device_id == "spliff":
+		# A loose, slow arc and a small roll between the fingers. It should not
+		# share the machine-straight cigarette lift.
+		device_gesture = Vector3(sin(lift * PI) * 0.032, sin(lift * PI) * 0.018, 0.0)
+	elif device_id == "bong":
+		# Weight first, mouthpiece second: the base dips as both hands take it,
+		# then steadies during the pull with a tiny water-driven tremor.
+		device_gesture = Vector3(0.0, -sin(lift * PI) * 0.045, sin(smoke_held * 7.0) * draw_ratio * 0.003)
 	smoke_cough = maxf(0.0, smoke_cough - delta * 2.4)
-	smoke_model.position = rest.lerp(mouth_target, lift) + breath_pull + ember_tremor + cough_kick
-	smoke_model.rotation.z = (-0.42 if device_id != "bong" else -0.18) + lift * 0.18 + sin(smoke_held * 6.0) * 0.008
+	smoke_model.position = rest.lerp(mouth_target, lift) + breath_pull + ember_tremor + cough_kick + device_gesture
+	if device_id == "bong":
+		smoke_model.rotation = Vector3(-0.15 + lift * 0.16, 0.20 - lift * 0.08, -0.18 + lift * 0.12)
+	elif device_id == "spliff":
+		smoke_model.rotation = Vector3(1.02 + lift * 0.12, -0.34, -0.52 + lift * 0.20 + sin(smoke_held * 3.2) * 0.035)
+	else:
+		smoke_model.rotation.z = -0.42 + lift * 0.18 + sin(smoke_held * 6.0) * 0.008
 	if body_motion != null:
 		body_motion.set_smoking_pose(lift, bool(smoke_model.get_meta("two_handed", false)))
 
@@ -2460,10 +2492,11 @@ func _finish_smoking_draw() -> Dictionary:
 	var device_id := str(smoke_model.get_meta("device_id", ""))
 	SMOKEABLES.set_draw(smoke_model, 0.0)
 	if smoke_held < 0.05:
+		SMOKEABLES.set_spent(smoke_model, smoke_draw_start_spent)
 		smoke_held = 0.0
 		return {}
 	var result: Dictionary = SMOKEABLES.hit("player", device_id, smoke_held, Time.get_ticks_msec() / 1000.0)
-	var spent := clampf(float(smoke_spent.get(device_id, 0.0)) + SMOKEABLES.spend_per_hit(device_id), 0.0, 1.0)
+	var spent := clampf(smoke_draw_start_spent + SMOKEABLES.spend_per_hit(device_id), 0.0, 1.0)
 	smoke_spent[device_id] = spent
 	SMOKEABLES.set_spent(smoke_model, spent)
 	if bool(result.get("ok", false)):
