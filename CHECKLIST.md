@@ -611,7 +611,7 @@ v5 gave the light a cost in charge and none in attention. Raising it should occu
 
 ### C v7 — the seventh pass
 v6 made the lamp cost you something; it costs nobody else anything. AS1.5: its light is what gives you away at night.
-- [ ] **C7.1** `v7` Anything hunting you can see the light before it sees you
+- [x] ~~**C7.1** `v7` Anything hunting you can see the light before it sees you~~ The live perception pass now resolves two different sightings for every hostile: the player's body and the handheld's emitted source. At night a clear raised Black Mirror is traceable at 20 m while its holder remains below the unseen threshold; pocketing it removes that trail, a wall blocks it, and an exhausted cell emits nothing. The encounter state machine now reads those verdicts before pursuing or shouldering a launcher, so `player_unseen` is no longer an unused diagnostic and the light can actually draw a hunter before the body is resolved. A first sighting records one `hunter_noticed_handheld_light` history event rather than writing every frame. `tests/perception_test.gd` (15 checks), `tests/perception_integration_test.gd` (11 checks), and `tests/combat_integration_test.gd` (46 checks) pass headless
 - [ ] **C7.2** `v7` Using the map at night is a decision with a price
 
 ### C v8 — the eighth pass
@@ -5949,22 +5949,14 @@ underneath either name.
       Falls out of AS1.1's own wiring: the light's energy is read fresh off
       `is_lit()`/`battery` every frame, and lowering the device is the one
       thing that already drops `raised` below the lit threshold.
-- [ ] **AS1.5** Its light is what gives you away at night (pairs with
-      AE1.1) — AE1.1 exists now: `perception.gd`/`_update_perception()`
-      genuinely read `handheld.is_lit()` as the light term in a live
-      `player_visibility`/`player_unseen` verdict against every hostile,
-      so the light really does raise how seen you are. Still not the full
-      claim: every hostile in `_update_encounter_actors()` spawns already
-      `"hunting"` — there is no unaware/idle state for `player_unseen` to
-      hold a hostile out of, so nothing yet decides *whether* a hostile
-      starts hunting off this verdict, only how exposed you'd be if one
-      already were. That is a real change to the encounter state machine,
-      deliberately not made in the same pass that built the verdict it
-      would read.
-      Verified: `tests/handheld_battery_test.gd` (14 checks),
-      `tests/perception_test.gd` and `tests/perception_integration_test.gd`
-      (light term traced end to end from `is_lit()` through a real
-      raycast against a real hostile), plus the full
+- [x] ~~**AS1.5** Its light is what gives you away at night (pairs with
+      AE1.1)~~ Closed with C7.1: the emitted source has its own range-and-cover
+      verdict, hostile pursuit and launcher readiness read it, and the
+      player's body remains a separate sighting. That separation creates a
+      real night interval in which a hunter follows the visible Black Mirror
+      while its holder is still `player_unseen`; cover, charge and pocketing
+      all close the trail. Verified by `tests/perception_test.gd`,
+      `tests/perception_integration_test.gd`, and the full
       `combat_integration_test.gd` regression suite.
 
 ### AS2 — Night

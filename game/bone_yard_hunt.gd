@@ -104,6 +104,10 @@ const GLITCH_SPIDER := preload("res://systems/glitch_spider.gd")
 ## verdict at all — the same reason `storm_weather.gd`'s exposure only
 ## starts mattering past a real severity, not from the first drop of rain.
 const PERCEPTION_MAX_RANGE := 30.0
+## The screen spills some light back onto its holder, but much less than the
+## beam broadcasts its own source. That gap is C7.1's warning interval: a
+## hunter can notice the light before resolving the body behind it.
+const HANDHELD_BODY_LIGHT := 0.25
 const PSYCHEDELIC_OSC := preload("res://systems/psychedelic_osc.gd")
 const KEYS_CARD := preload("res://systems/keys_card.gd")
 ## AS1.1. Bright enough to actually read as a light source against
@@ -4359,7 +4363,7 @@ func _update_encounter_actors(delta: float) -> void:
 				RIVAL_REGISTRY.consider(str(actor.subject_id))
 				node.queue_free()
 				encounter_actors.remove_at(index)
-		elif LauncherActor.is_launcher(actor) and LauncherActor.in_envelope(distance):
+		elif LauncherActor.is_launcher(actor) and LauncherActor.in_envelope(distance) and (bool(actor.get("tracking_player", false)) or bool(actor.get("tracking_light", false))):
 			# AD3.1. A launcher holds its ground and works the tube; all of the
 			# decision lives in `launcher_actor.gd` so this branch stays a hook
 			# rather than a second copy of the rule. Closing inside the arming
@@ -4371,7 +4375,7 @@ func _update_encounter_actors(delta: float) -> void:
 					prompt.text = "%s SHOULDERS THE TUBE" % str(actor.display_name).to_upper()
 				"fire":
 					_fire_launcher(actor, node)
-		elif str(actor.get("disposition", "hostile")) == "hostile" and distance < 24.0 and distance > 3.0:
+		elif str(actor.get("disposition", "hostile")) == "hostile" and distance < 24.0 and distance > 3.0 and (bool(actor.get("tracking_player", false)) or bool(actor.get("tracking_light", false))):
 			# O4.2. A naive approach put every hostile in single file toward the
 			# same 3 m ring, which reads as a queue rather than a fight. Whoever
 			# does not already hold the melee opening orbits at a stand-off
@@ -6177,7 +6181,7 @@ func _update_perception(delta: float) -> void:
 	var sprinting_now := Input.is_action_pressed("sprint") and player_body.velocity.length() > 0.5
 	player_noise = move_toward(player_noise, 1.0 if sprinting_now else 0.0, delta * 2.0)
 
-	var light := clampf(maxf(WorldClock.daylight(), 0.9 if handheld.is_lit() else 0.0), 0.0, 1.0)
+	var light := clampf(maxf(WorldClock.daylight(), HANDHELD_BODY_LIGHT if handheld.is_lit() else 0.0), 0.0, 1.0)
 	var target := player + Vector3.UP * 0.2
 
 	var worst := 0.0
@@ -6195,7 +6199,19 @@ func _update_perception(delta: float) -> void:
 		var query := PhysicsRayQueryParameters3D.create(eye, target)
 		query.exclude = excluded
 		var cover := 0.0 if get_world_3d().direct_space_state.intersect_ray(query).is_empty() else 1.0
-		worst = maxf(worst, PERCEPTION.visibility(light, player_noise, cover, distance, PERCEPTION_MAX_RANGE))
+		var body_visibility := PERCEPTION.visibility(light, player_noise, cover, distance, PERCEPTION_MAX_RANGE)
+		var saw_body: bool = body_visibility >= PERCEPTION.UNSEEN_THRESHOLD
+		var saw_light: bool = handheld.is_lit() and PERCEPTION.sees_emitted_light(distance, handheld.light_radius(), cover) and not saw_body
+		var was_tracking_light := bool(actor.get("tracking_light", false))
+		actor["tracking_player"] = saw_body
+		actor["tracking_light"] = saw_light
+		if saw_light and not was_tracking_light:
+			WorldHistory.record_event("hunter_noticed_handheld_light", {
+				"hunter": str(actor.get("subject_id", "unknown")),
+				"distance": snappedf(distance, 0.1),
+				"location": HUNT_LOCATION,
+			})
+		worst = maxf(worst, body_visibility)
 	player_visibility = worst
 	player_unseen = worst < PERCEPTION.UNSEEN_THRESHOLD
 

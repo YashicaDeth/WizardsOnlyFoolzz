@@ -52,6 +52,14 @@ func _ready() -> void:
 	var extreme := PERCEPTION.visibility(50.0, -30.0, 12.0, -900.0, 40.0)
 	check(extreme >= 0.0 and extreme <= 1.0, "out-of-range inputs still land inside 0..1 (%.3f)" % extreme)
 
+	# C7.1. A lamp's source remains readable beyond the distance where its
+	# useful pool ends, but a wall or dead lamp removes that signal.
+	var lamp_signal := PERCEPTION.emitted_light_signal(20.0, 14.0, 0.0)
+	check(lamp_signal >= PERCEPTION.EMITTED_LIGHT_THRESHOLD, "a clear handheld light is visible beyond its useful lighting radius (%.3f)" % lamp_signal)
+	check(PERCEPTION.sees_emitted_light(20.0, 14.0, 0.0), "a hunter can notice the emitted light at that distance")
+	check(not PERCEPTION.sees_emitted_light(20.0, 14.0, 1.0), "solid cover hides the emitted source")
+	check(not PERCEPTION.sees_emitted_light(2.0, 0.0, 0.0), "an exhausted light emits no detectable signal")
+
 	if failures.is_empty():
 		print("perception: unseen is a real, continuous state")
 		get_tree().quit(0)

@@ -1,5 +1,7 @@
 # Living design notes
 
+16 September implementation note: the Black Mirror's world light and the body carrying it are separate stealth observations. At night a hunter can follow the bright source before resolving its holder; cover, an empty battery, or physically pocketing the device removes that trail. Hostile pursuit reads this verdict directly, rather than leaving `player_unseen` as presentation-only state.
+
 15 September implementation note: the requested demo is now a runtime route in the same build, entered from a dedicated DEMO door beside PLAY. It uses the production opening scenes and an isolated demo history file. Its first authored ending is the CellOutz final invoice shown only after the real Hunt's first win; it records the ending and names the real-game roads withheld beyond it. This implements the explicit direction already recorded in section P, not a new creative-direction decision. Full route curation remains in progress.
 
 11 September implementation note: user requests a redo of the production opening prompt. Prior feature lists are prototype descriptions, not proof of production completion. The player-controlled first/third-person camera choice supersedes the older forced-camera text below. Current artwork key is J; A remains movement. Detailed organs, authored rigs, navigation, production assets and completed encounter branches remain pending.

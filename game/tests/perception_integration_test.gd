@@ -50,6 +50,24 @@ func _ready() -> void:
 	var far_visibility: float = hunt.get("player_visibility")
 	check(far_visibility < close_visibility, "moved far away, the same hostile sees you less (%.3f vs %.3f)" % [far_visibility, close_visibility])
 
+	# C7.1. At night and twenty metres out the holder is still unresolved, but
+	# the charged raised screen is a distinct source the hostile can follow.
+	WorldClock.set_hour(1.0)
+	actor.node.global_position = Vector3(20, 0.9, 0)
+	hunt.handheld.battery = 1.0
+	hunt.handheld.raised = 1.0
+	hunt.handheld.is_open = true
+	hunt.call("_update_perception", 0.1)
+	check(bool(actor.get("tracking_light", false)), "at night a hunter notices the raised handheld at twenty metres")
+	check(not bool(actor.get("tracking_player", true)), "the same hunter has not yet resolved the person behind the light")
+	check(bool(hunt.get("player_unseen")), "the player remains unseen during the emitted-light warning interval")
+	hunt.call("_update_encounter_actors", 0.1)
+	check((actor.node as CharacterBody3D).velocity.length() > 0.0, "the emitted-light verdict enters the real pursuit state machine")
+
+	hunt.handheld.raised = 0.0
+	hunt.call("_update_perception", 0.1)
+	check(not bool(actor.get("tracking_light", true)), "pocketing the screen removes the trail a hunter was following")
+
 	# A real wall between a close hostile and the player: real cover.
 	actor.node.global_position = Vector3(3, 0.9, 0)
 	var wall := StaticBody3D.new()
