@@ -39,6 +39,7 @@ const CARRY := preload("res://systems/carry.gd")
 const SIGNAL_FIELD := preload("res://systems/signal_field.gd")
 const RADIAL := preload("res://systems/radial_menu.gd")
 const RADIO_AUDIO := preload("res://systems/radio_audio.gd")
+const PAGE_AUDIO := preload("res://systems/black_mirror_transition_audio.gd")
 const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 const RESONANCE_READOUT := preload("res://systems/resonance_readout.gd")
 
@@ -104,6 +105,10 @@ var page_transition := 1.0
 var page_transition_direction := 1.0
 var page_transition_from := "INDEX"
 const PAGE_TRANSITION_SECONDS := 0.52
+const PAGE_TRANSITION_STYLES := ["shutter", "corruption", "carousel"]
+## The comparison is deliberately non-binding. Production continues to use the
+## tested shutter until Greg chooses after seeing all three at equal timing.
+var page_transition_style := "shutter"
 ## Which thing in the bag is under the hand. The CARRY page had no selection at
 ## all, which was fine when it was a table and is not now that it is objects.
 var carry_index := 0
@@ -168,6 +173,7 @@ var carry: Carry
 var signal_field: SignalField
 var radial: Control
 var radio_audio: Node
+var page_audio: Node
 
 ## A6.6 v2. The faults, with their character.
 ##
@@ -339,6 +345,9 @@ func _ready() -> void:
 	radio_audio = RADIO_AUDIO.new()
 	radio_audio.name = "RadioAudio"
 	add_child(radio_audio)
+	page_audio = PAGE_AUDIO.new()
+	page_audio.name = "PageTransitionAudio"
+	add_child(page_audio)
 	set_process(true)
 
 
@@ -552,6 +561,24 @@ func displayed_mode() -> String:
 	return MODES[displayed_mode_index]
 
 
+func set_page_transition_style(style: String) -> bool:
+	var candidate := style.to_lower()
+	if not PAGE_TRANSITION_STYLES.has(candidate):
+		return false
+	page_transition_style = candidate
+	return true
+
+
+func page_transition_contract() -> Dictionary:
+	return {
+		"style": page_transition_style,
+		"duration": PAGE_TRANSITION_SECONDS,
+		"swap_at": 0.5,
+		"keeps_fallback": page_transition_style == "shutter",
+		"fully_occludes": true,
+	}
+
+
 func cycle_mode(step: int) -> void:
 	if not is_open:
 		return
@@ -607,6 +634,8 @@ func set_mode(mode: String) -> void:
 	var forward := posmod(found - displayed_mode_index, MODES.size())
 	var backward := posmod(displayed_mode_index - found, MODES.size())
 	page_transition_direction = 1.0 if forward <= backward else -1.0
+	if page_audio != null and page_audio.has_method("play_transition"):
+		page_audio.call("play_transition", page_transition_style)
 	queue_redraw()
 	if _overlay != null:
 		_overlay.queue_redraw()
@@ -1230,7 +1259,7 @@ func _draw_damage() -> void:
 	var wear := 1.0 - clampf(condition, 0.0, 1.0)
 	_draw_page_registration(alpha)
 	_draw_page_chrome(alpha)
-	_draw_page_shutter(alpha)
+	_draw_page_transition(alpha)
 	for scan in range(0, int(rect.size.y), 3):
 		_overlay.draw_line(Vector2(rect.position.x, rect.position.y + scan), Vector2(rect.end.x, rect.position.y + scan), Color(0, 0, 0, 0.12 * alpha), 1.0)
 
@@ -1348,6 +1377,16 @@ func _draw_page_chrome(alpha: float) -> void:
 ## I3.2 v3. The old page changes only while the work surface is physically
 ## occluded. The shutter crosses in the direction of travel, closes fully,
 ## swaps the page behind itself, then leaves by the opposite edge.
+func _draw_page_transition(alpha: float) -> void:
+	match page_transition_style:
+		"corruption":
+			_draw_page_corruption(alpha)
+		"carousel":
+			_draw_page_carousel(alpha)
+		_:
+			_draw_page_shutter(alpha)
+
+
 func _draw_page_shutter(alpha: float) -> void:
 	var coverage := page_transition_coverage()
 	if coverage <= 0.001 or _content_rect.size.x <= 2.0:
@@ -1370,6 +1409,83 @@ func _draw_page_shutter(alpha: float) -> void:
 		var transit := "%s  >  %s" % [page_transition_from, destination]
 		var transit_width := CellOutzType.width_condensed(transit, 10.0, 0.8)
 		CellOutzType.draw_condensed(_overlay, shutter.get_center() + Vector2(-transit_width * 0.5, -4), transit, 10.0, AMBER * Color(1, 1, 1, coverage * alpha), 0.8)
+
+
+## Comparison candidate 2. The page is lost in a bad decode that travels along
+## the existing glass fractures. Rectangular packets are deliberately opaque at
+## the midpoint: this remains physical concealment, not a cross-fade in costume.
+func _draw_page_corruption(alpha: float) -> void:
+	var coverage := page_transition_coverage()
+	if coverage <= 0.001 or _content_rect.size.x <= 2.0:
+		return
+	var bands := 14
+	for band in bands:
+		var band_height := _content_rect.size.y / float(bands)
+		var stagger := fmod(float((band * 7) % bands) / float(bands) * 0.19, 0.19)
+		var local_coverage := clampf((coverage - stagger) / 0.81, 0.0, 1.0)
+		var width := _content_rect.size.x * local_coverage
+		var from_right := (band % 2 == 0) == (page_transition_direction > 0.0)
+		var x := _content_rect.end.x - width if from_right else _content_rect.position.x
+		var packet := Rect2(Vector2(x, _content_rect.position.y + band_height * band), Vector2(width, band_height + 1.0))
+		_overlay.draw_rect(packet, Color(0.008, 0.014, 0.012, 0.99 * alpha))
+		if width > 8.0:
+			var tear_x := packet.position.x if from_right else packet.end.x
+			_overlay.draw_line(Vector2(tear_x, packet.position.y), Vector2(tear_x, packet.end.y), (MOSS if band % 3 else ALERT) * Color(1, 1, 1, 0.75 * alpha), 1.0)
+	# Fractures do the indexing; their intersections carry brief corrupt packets.
+	for index in 7:
+		var seed := float(index + 1)
+		var origin := _content_rect.position + Vector2(_content_rect.size.x * fmod(seed * 0.173, 0.94), _content_rect.size.y * fmod(seed * 0.311, 0.92))
+		var reach := _content_rect.size.x * coverage * (0.06 + fmod(seed * 0.07, 0.08))
+		_overlay.draw_line(origin - Vector2(reach, reach * 0.22), origin + Vector2(reach, -reach * 0.31), INK * Color(1, 1, 1, 0.30 * coverage * alpha), 1.0)
+	if coverage > 0.54:
+		_draw_transition_label("DECODE FAILURE", coverage, alpha)
+
+
+## Comparison candidate 3. A wheel of dark leaves rotates through the mirror.
+## It is an occult mechanism rather than a menu flourish: indexed teeth, a
+## centre bearing and a full physical cover before the page underneath changes.
+func _draw_page_carousel(alpha: float) -> void:
+	var coverage := page_transition_coverage()
+	if coverage <= 0.001 or _content_rect.size.x <= 2.0:
+		return
+	var centre := _content_rect.get_center()
+	var rotation := page_transition_direction * page_transition * TAU * 0.32
+	# Eight leaves terminate on the aperture perimeter. At coverage 1 their fan
+	# tiles the rectangle exactly, so the mechanism never spills over the glass
+	# and never leaves a corner exposing the page during its midpoint swap.
+	var rim := PackedVector2Array([
+		_content_rect.position,
+		Vector2(centre.x, _content_rect.position.y),
+		Vector2(_content_rect.end.x, _content_rect.position.y),
+		Vector2(_content_rect.end.x, centre.y),
+		_content_rect.end,
+		Vector2(centre.x, _content_rect.end.y),
+		Vector2(_content_rect.position.x, _content_rect.end.y),
+		Vector2(_content_rect.position.x, centre.y),
+		_content_rect.position,
+	])
+	for leaf in 8:
+		var outer_a := centre.lerp(rim[leaf], coverage)
+		var outer_b := centre.lerp(rim[leaf + 1], coverage)
+		_overlay.draw_colored_polygon(PackedVector2Array([centre, outer_a, outer_b]), Color(0.012, 0.009, 0.012, 0.99 * alpha))
+		_overlay.draw_line(centre, outer_a, CASE_EDGE * Color(1, 1, 1, 0.40 * alpha), 1.4)
+	for tooth in 12:
+		var angle := -rotation + TAU * float(tooth) / 12.0
+		var ellipse := Vector2(cos(angle) * _content_rect.size.x * 0.30, sin(angle) * _content_rect.size.y * 0.30) * coverage
+		var at := centre + ellipse
+		_overlay.draw_circle(at, maxf(1.0, _content_rect.size.y * coverage * 0.007), AMBER * Color(1, 1, 1, 0.68 * alpha))
+	var hub_radius := maxf(3.0, _content_rect.size.y * coverage * 0.09)
+	_overlay.draw_circle(centre, hub_radius, CASE * Color(1, 1, 1, alpha))
+	_overlay.draw_arc(centre, maxf(4.0, hub_radius * 1.35), 0.0, TAU, 32, MOSS * Color(1, 1, 1, 0.72 * alpha), 1.4)
+	if coverage > 0.54:
+		_draw_transition_label("INDEXING MIRROR", coverage, alpha)
+
+
+func _draw_transition_label(label: String, coverage: float, alpha: float) -> void:
+	var destination: String = MODES[pending_mode_index] if pending_mode_index >= 0 else displayed_mode()
+	var transit := "%s  //  %s  //  %s" % [page_transition_from, label, destination]
+	var width := CellOutzType.width_condensed(transit, 10.0, 0.8)
+	CellOutzType.draw_condensed(_overlay, _content_rect.get_center() + Vector2(-width * 0.5, -4), transit, 10.0, AMBER * Color(1, 1, 1, coverage * alpha), 0.8)
 
 
 # --- the three modes that have no hosted panel ----------------------------

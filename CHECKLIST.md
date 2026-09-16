@@ -1760,6 +1760,11 @@ v2 made the screens their own medium and the medium is still six separate design
       deterministic midpoint contract and reversed travel are proven by
       `handheld_page_grammar_test.gd`; visual evidence:
       `captures/i3_2_page_shutter.png` and `i3_2_page_arrival.png`.
+      A non-binding decision reel now compares that fallback against equally
+      timed cracked-glass corruption and occult-carousel candidates, each with
+      digital-tear and glass-resonance sound sketches. No candidate silently
+      replaced production: `DESIGN/BLACK_MIRROR_TRANSITION_COMPARISON.md`,
+      `captures/black_mirror_transition_comparison.mp4`.
 
 ### I v4 — the fourth pass
 v3 unified the pages and the weapon is still configured in a list. Greg: *"the slide pops out into a menu if you press shift and lock it, expanding into the weapon customisation, maybe the circle in the middle and 4 boxes around it"*.

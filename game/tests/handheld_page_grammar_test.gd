@@ -42,10 +42,22 @@ func _ready() -> void:
 		_check(str(contract.role) != "" and str(contract.action) != "", "%s declares its role and primary physical verb" % mode)
 		_check(int(contract.index) == device.MODES.find(mode) + 1 and int(contract.count) == device.MODES.size(), "%s occupies one stable numbered place in the seven-page object" % mode)
 
+	for style in device.PAGE_TRANSITION_STYLES:
+		_check(device.set_page_transition_style(style), "%s is an isolated selectable comparison candidate" % style)
+		var movement: Dictionary = device.page_transition_contract()
+		_check(is_equal_approx(float(movement.duration), device.PAGE_TRANSITION_SECONDS) and is_equal_approx(float(movement.swap_at), 0.5), "%s uses the common movement timing and hidden midpoint" % style)
+		_check(bool(movement.fully_occludes), "%s promises full physical occlusion rather than a cross-fade" % style)
+		var sound: Dictionary = device.page_audio.profile(style)
+		_check(bool(sound.digital_tear) and bool(sound.glass_resonance), "%s shares the corruption and cracked-glass sound grammar" % style)
+	_check(not device.set_page_transition_style("unapproved"), "an unknown movement cannot silently become production presentation")
+	device.set_page_transition_style("shutter")
+	_check(bool(device.page_transition_contract().keeps_fallback), "the tested mechanical shutter remains the production fallback")
+
 	device.mode_changed.connect(func(mode: String) -> void: emitted_modes.append(mode))
 	device.set_mode("MAP")
 	_check(device.current_mode() == "MAP" and device.displayed_mode() == "INDEX", "requesting MAP changes the destination but leaves INDEX physically visible")
 	_check(emitted_modes.is_empty(), "requesting a page does not emit a visible page change before movement")
+	_check(device.page_audio.last_style == "shutter", "the fallback movement plays its matching material sound")
 
 	device._advance_page_transition(device.PAGE_TRANSITION_SECONDS * 0.25)
 	_check(device.displayed_mode() == "INDEX", "the old page remains visible while the shutter enters")
@@ -66,4 +78,5 @@ func _ready() -> void:
 	_check(device.displayed_mode() == "INDEX", "a reverse transition also changes pages only through the physical mechanism")
 
 	print("HANDHELD_PAGE_GRAMMAR_RESULT failures=", failures.size())
+	device.free()
 	get_tree().quit(0 if failures.is_empty() else 1)
