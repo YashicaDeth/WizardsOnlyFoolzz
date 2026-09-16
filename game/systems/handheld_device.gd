@@ -196,6 +196,15 @@ var lean := 0.0
 var lean_override: Variant = null
 const LEAN_KEY := KEY_L
 const LEAN_SCALE := 1.32
+## C6.2. Leaning into a hosted page also braces the device for a deliberate
+## wave. WASD still moves the body; its direction now carries through the
+## wrist and beam as well, which lets the player put the light around an edge
+## before their camera follows. A vector override keeps the physical gesture
+## testable without synthesising keyboard state.
+var wave := Vector2.ZERO
+var wave_input_override: Variant = null
+const WAVE_SCREEN_FRACTION := Vector2(0.055, 0.035)
+const WAVE_RESPONSE := 5.0
 
 ## C9.1 `v9`. The rear is not another page. Holding O turns the same object
 ## through its edge; releasing it returns to the mirror. `turn_override` is the
@@ -632,6 +641,11 @@ func _process(delta: float) -> void:
 	var leanable := is_open and current_mode() in ["INDEX", "MAP", "WIRE"]
 	var lean_key_held: bool = lean_override if lean_override != null else Input.is_key_pressed(LEAN_KEY)
 	lean = Motion.blend(lean, delta, Motion.PANEL, leanable and lean_key_held)
+	var wave_input := Vector2.ZERO
+	if leanable and lean_key_held:
+		wave_input = wave_input_override if wave_input_override != null else Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+		wave_input = wave_input.limit_length(1.0)
+	wave = wave.move_toward(wave_input, delta * WAVE_RESPONSE)
 	var leaned_size := base_size * lerpf(1.0, LEAN_SCALE, lean)
 	var device_size := Vector2(minf(leaned_size.x, size.x * 0.98), minf(leaned_size.y, size.y * 0.98))
 	var resting := Vector2((size.x - device_size.x) * 0.5, size.y + 60.0)
@@ -645,6 +659,7 @@ func _process(delta: float) -> void:
 	# consumer (`_screen_rect`, `_clip`, `_overlay`) is positioned from this
 	# rect explicitly rather than through the node's transform.
 	var lifted := Vector2((size.x - device_size.x) * 0.5 + size.x * HELD_OFFSET_X, (size.y - device_size.y) * 0.5)
+	lifted += Vector2(wave.x * size.x * WAVE_SCREEN_FRACTION.x, wave.y * size.y * WAVE_SCREEN_FRACTION.y)
 	_device_rect = Rect2(resting.lerp(lifted, Motion.ease_out(raised)), device_size)
 	# A horizontal turn preserves the object's centre while its visible width
 	# collapses to an edge and opens on the other face. The tiny floor avoids a
@@ -1063,6 +1078,10 @@ func battery_draw_multiplier() -> float:
 
 func emitted_light_multiplier() -> float:
 	return MAP_LIGHT_MULTIPLIER if current_mode() == "MAP" else 1.0
+
+
+func wave_vector() -> Vector2:
+	return wave
 
 
 ## AS1.1. Whether the lamp is actually throwing light right now — raised

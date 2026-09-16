@@ -113,6 +113,10 @@ const KEYS_CARD := preload("res://systems/keys_card.gd")
 ## AS1.1. Bright enough to actually read as a light source against
 ## `world_look.gd`'s low-ambient presets rather than a glow nobody would notice.
 const HANDHELD_LAMP_ENERGY := 6.0
+const HANDHELD_LAMP_BASE_POSITION := Vector3(0.16, -0.14, -0.15)
+const HANDHELD_LAMP_BASE_ROTATION := Vector3(-6.0, 4.0, 0.0)
+const HANDHELD_WAVE_POSITION := Vector2(0.28, 0.16)
+const HANDHELD_WAVE_ANGLE := Vector2(18.0, 10.0)
 const BALLISTICS := preload("res://systems/ballistics.gd")
 const LIMB_MOMENTUM := preload("res://systems/limb_momentum.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
@@ -742,8 +746,8 @@ func _ready() -> void:
 	# Kept from the other implementation of this: off-centre and slightly
 	# rotated, because a phone in a raised hand does not sit dead centre
 	# like a headlamp, and it casts shadows so the light has edges.
-	handheld_lamp.position = Vector3(0.16, -0.14, -0.15)
-	handheld_lamp.rotation_degrees = Vector3(-6, 4, 0)
+	handheld_lamp.position = HANDHELD_LAMP_BASE_POSITION
+	handheld_lamp.rotation_degrees = HANDHELD_LAMP_BASE_ROTATION
 	handheld_lamp.shadow_enabled = true
 	camera.add_child(handheld_lamp)
 	# A4.2. The handheld is a light like any other, so it warps the air like any
@@ -3513,6 +3517,7 @@ func _update_handheld_lamp(_delta: float) -> void:
 		return
 	var charge: float = handheld.battery_percent() if handheld.has_method("battery_percent") else 1.0
 	var output: float = handheld.emitted_light_multiplier() if handheld.has_method("emitted_light_multiplier") else 1.0
+	var wave: Vector2 = handheld.wave_vector() if handheld.has_method("wave_vector") else Vector2.ZERO
 	var waver := 1.0 + sin(pulse * 11.0) * 0.03 * (1.0 + (1.0 - charge) * 2.5)
 	# Below a fifth of a charge it starts guttering rather than merely dimming.
 	if charge < 0.2:
@@ -3520,6 +3525,8 @@ func _update_handheld_lamp(_delta: float) -> void:
 		waver *= 0.7 + 0.3 * gutter
 	handheld_lamp.spot_range = handheld.light_radius()
 	handheld_lamp.light_energy = 9.0 * charge * output * waver
+	handheld_lamp.position = HANDHELD_LAMP_BASE_POSITION + Vector3(wave.x * HANDHELD_WAVE_POSITION.x, -wave.y * HANDHELD_WAVE_POSITION.y, 0.0)
+	handheld_lamp.rotation_degrees = HANDHELD_LAMP_BASE_ROTATION + Vector3(-wave.y * HANDHELD_WAVE_ANGLE.y, -wave.x * HANDHELD_WAVE_ANGLE.x, 0.0)
 	# A4.2. The air the beam bends answers the same battery the beam does, so a
 	# guttering torch bends it in the same stutter rather than holding a steady
 	# shimmer over a dying light.
@@ -5509,7 +5516,7 @@ func _build_keys_card() -> void:
 			["T", "CHARACTER TREE"],
 			["P", "THE BOARD"],
 			["J", "ALLUSIONS / SIGIL"],
-			["HOLD L", "LEAN INTO THE SCREEN"],
+			["HOLD L + WASD", "LEAN / WAVE DEVICE LIGHT"],
 			["K", "RE-DECANT // A RESET THAT COSTS YOU"],
 			["ESC", "CLOSE"],
 		]},

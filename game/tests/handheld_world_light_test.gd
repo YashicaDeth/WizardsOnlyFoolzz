@@ -43,6 +43,17 @@ func _ready() -> void:
 	check(lamp.spot_range > hunt.handheld.LAMP_RANGE, "the satellite map's greater exposure expands the real rendered beam")
 	check(lamp.light_energy > index_energy, "and its extra battery draw appears as more world light rather than an invisible tax")
 
+	# C6.2. The same gesture moving the drawn phone steers the real 3D source.
+	var base_position: Vector3 = lamp.position
+	var base_rotation: Vector3 = lamp.rotation_degrees
+	hunt.handheld.lean_override = true
+	hunt.handheld.wave_input_override = Vector2(1.0, -1.0).normalized()
+	for _frame in 20:
+		hunt.handheld._process(0.05)
+	hunt._update_handheld_lamp(0.016)
+	check(lamp.position.x > base_position.x and lamp.position.y > base_position.y, "waving up-right physically carries the world light up-right")
+	check(lamp.rotation_degrees.y < base_rotation.y and lamp.rotation_degrees.x > base_rotation.x, "the beam yaws and pitches around the corner with the wrist")
+
 	hunt.handheld.close_device()
 	hunt.handheld.raised = 0.0
 	hunt._update_handheld_lamp(0.016)
