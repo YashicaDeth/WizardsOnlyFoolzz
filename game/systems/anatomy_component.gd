@@ -51,12 +51,6 @@ const DOSE_DECAY_PER_SECOND := 0.035
 ## something, and staying out in it is not.
 const EXPOSURE_DOSE_PER_SECOND := 0.42
 
-## B10.9. How fast the cold gets into a body, and how fast it leaves once the
-## sun is up or a coat is on. Asymmetric on purpose: a night takes a while to
-## get through you, and stepping inside is felt almost at once.
-const CHILL_PER_SECOND := 0.22
-const CHILL_RECOVERY_PER_SECOND := 0.4
-
 const DEFAULT_ZONES := {
 	"head": {"health": 45.0, "bleed": 0.75, "critical": true},
 	"torso": {"health": 120.0, "bleed": 0.42, "critical": true},
@@ -99,14 +93,6 @@ var cover: Dictionary = {}
 ## B3.1. What each zone is still carrying, in dose points. Not a status flag: it
 ## is spent down by `_process()` and it does damage the whole time it is there.
 var dose: Dictionary = {}
-
-## B10.9. How cold this body is, 0 to 1. Deliberately its own number and
-## deliberately *not* folded into `pain`: pain never comes down on its own here —
-## only `treat_wound()` and `stabilise()`/`rise()` ever lower it — so a chill
-## poured into pain would be permanent no matter how long the sun had been up,
-## and it would put the weather into the wound record, which is a lie about what
-## happened to this body. This one eases both ways. See `chill()`.
-var chilled := 0.0
 
 var subject_id := ""
 var blood_capacity := 5000.0
@@ -687,11 +673,7 @@ func posture() -> Dictionary:
 	var right_ratio := float(right_leg.health) / float(DEFAULT_ZONES.right_leg.health)
 	return {
 		"state": "upright" if visual_pain < 0.12 else ("guarded" if visual_pain < 0.72 else "faltering"),
-		# B10.9. A cold body draws itself in. Added to the same hunch pain already
-		# drives — `baseline_human.gd`'s `_apply_pain_posture()` reads this every
-		# frame — so the hour and the weather show up on the rig without a second
-		# piece of rendering deciding what cold looks like.
-		"hunch": -visual_pain * 0.085 - clampf(chilled, 0.0, 1.0) * 0.05,
+		"hunch": -visual_pain * 0.085,
 		"lean": clampf((right_ratio - left_ratio) * 0.16, -0.16, 0.16),
 	}
 
@@ -708,12 +690,7 @@ func mobility_ratio() -> float:
 	var damaged_count := (spine.get("vertebrae_damaged", []) as Array).size()
 	var spine_ratio := 1.0 - float(damaged_count) / float(SPINE_VERTEBRAE)
 	var functional_pain := maxf(0.0, pain - FUNCTIONAL_PAIN)
-	# B10.9. Cold stiffens a body. A small multiplier rather than a gate — a bad
-	# night slows you down, it does not refuse the vault a broken leg refuses —
-	# and it comes back the moment the body warms up, which is what separates it
-	# from the injury terms above.
-	var stiffness := 1.0 - clampf(chilled, 0.0, 1.0) * 0.18
-	return clampf(limb_ratio * lerpf(0.38, 1.0, spine_ratio) * (1.0 - functional_pain * 0.008) * stiffness, 0.18, 1.0)
+	return clampf(limb_ratio * lerpf(0.38, 1.0, spine_ratio) * (1.0 - functional_pain * 0.008), 0.18, 1.0)
 
 
 func combat_ratio() -> float:
@@ -729,9 +706,6 @@ func snapshot() -> Dictionary:
 		# whole point of it being a path through the anatomy rather than an
 		# effect attached to a place.
 		"dose": dose.duplicate(true),
-		# B10.9. Travels with the body the way dose does. A body carried out of a
-		# night into the next scene is still the body that was out in it.
-		"chilled": snappedf(chilled, 0.001),
 		"worn": worn.duplicate(),
 		"blood": roundi(blood_remaining),
 		"blood_capacity": roundi(blood_capacity),
@@ -751,7 +725,6 @@ func snapshot() -> Dictionary:
 
 func restore(state: Dictionary) -> void:
 	dose = (state.get("dose", {}) as Dictionary).duplicate(true)
-	chilled = clampf(float(state.get("chilled", 0.0)), 0.0, 1.0)
 	worn = (state.get("worn", []) as Array).duplicate()
 	blood_capacity = maxf(100.0, float(state.get("blood_capacity", blood_capacity)))
 	blood_remaining = clampf(float(state.get("blood", blood_capacity)), 0.0, blood_capacity)
@@ -842,35 +815,6 @@ func expose(severity: float, delta: float) -> void:
 		if taken <= 0.0:
 			continue
 		dose[zone_id] = float(dose.get(zone_id, 0.0)) + taken
-
-
-## B10.9. The hour and the weather, on a body that is wearing something.
-##
-## `cold` arrives as an argument for exactly the reason `expose()` takes a
-## severity: the anatomy stays a thing you can test without a world around it,
-## and the caller — the scene, which is the only thing that knows what hour it
-## is and what the air is doing — decides. `_update_air()` passes the two apart
-## rather than pre-multiplied into one "badness", so the night and the storm stay
-## separable and a test can move one and hold the other.
-##
-## What the body has on is read here, off the same `Garments.shielding()` figure
-## that `apply_hit()` and `expose()` already resolve — `warmth` has been computed
-## and clamped for every worn set since B7.1 and had nothing reading it. Taking a
-## coat off takes its warmth off with it, because there is no second number.
-##
-## No dead zone, unlike `expose()`: an early return at low severity would strand
-## a body at whatever chill it was carrying when the storm let up, and the whole
-## claim is that this eases back down when the sun rises or a coat goes on.
-func chill(cold: float, delta: float) -> void:
-	if dead or delta <= 0.0 or zones.is_empty():
-		return
-	var bite := clampf(cold, 0.0, 1.0)
-	var uncovered := 0.0
-	for zone_id in zones:
-		uncovered += 1.0 - float(Garments.shielding(worn, str(zone_id)).warmth)
-	var target := clampf(bite * (uncovered / float(zones.size())), 0.0, 1.0)
-	var rate := CHILL_PER_SECOND if target > chilled else CHILL_RECOVERY_PER_SECOND
-	chilled = clampf(move_toward(chilled, target, rate * delta), 0.0, 1.0)
 
 
 ## B3.2. How melted a zone reads, 0 to 1, for anything that draws it.

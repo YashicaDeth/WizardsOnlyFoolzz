@@ -44,10 +44,34 @@ ancestor of `agent-b`'s 26 and were double-counted for a whole day:
 
     git merge-base --is-ancestor origin/agent-b agent-b
 
-## Worktrees — 19 of them
+## Worktrees — 11, down from 19
 
-**This is sprawl and it is worth a cleanup pass.** Nine `P:/GameDev/atg-*`
-worktrees are left over from older agent rounds and no current lane uses them.
+**Cleaned up 16 September.** The nine `P:/GameDev/atg-*` leftovers from older
+agent rounds were removed with `git worktree remove --force`. Every branch and
+every commit survives — a worktree is a checkout, not the history. Recreate one
+with `git worktree add <path> <branch>` if you need to work on it again.
+
+They were also cluttering the Godot Project Manager, which is where the sprawl
+actually hurt: thirteen entries all named "Wizards Only Fools", only one of them
+the real build. Godot holds that list in memory and rewrites `projects.cfg` on
+exit, so editing that file while the editor is open achieves nothing — use the
+Project Manager's own **Remove** button, which drops the entry without touching
+any files.
+
+Two pieces of genuinely stranded work were rescued onto their own branches
+first, because deleting the folders would have lost them for good:
+- `game/systems/night_vision.gd` -> `85d180a` on `agent-a-help`
+- `game/systems/black_mirror_camera.gd` + the HUD settings suite -> `253be51`
+  on `codex/hud-release-20260914`. That branch's PREVIOUS commit was itself
+  named "Rescue: the black mirror and the pause gate, uncommitted in a stale
+  worktree" — these three files survived that sweep and were still untracked.
+
+**Do not trust a dirty-file count on a worktree here.** `atg-hud-release`
+reported 641 dirty files and `atg-sol-agent-1` reported four modified gun
+scripts; staging them produced *nothing*. It was CRLF/LF line-ending churn and
+regenerated `.import` files, not work. Before concluding a worktree holds
+something, check whether the changes survive `git add` — and filter `.import`
+and `.uid` out of any count you quote.
 
 The ones that matter:
 
