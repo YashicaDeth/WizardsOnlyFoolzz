@@ -163,6 +163,92 @@ func _ready() -> void:
 	check((state.get("severed", []) as Array).has("left_arm"), "the record remembers which limb came off")
 	check(state.has("zones") or state.has("organs"), "and the state of what is left, readable by anything — this is what makes a corpse a place rather than a prop")
 
+	# --- B10.9: a body reacts to the hour, the weather and what it is wearing --
+	# Three inputs, moved one at a time with the other two nailed down, because
+	# "reacts to all three" is only worth anything if each one can be shown to
+	# move the body on its own. `chill()` takes the cold as an argument the way
+	# `expose()` takes a severity, so the hour and the weather are combined here
+	# exactly the way `_update_air()` combines them — and the wiring check at the
+	# end is what proves that is still the expression the live scene uses.
+	var storm := 0.6
+	var step := 0.5
+	var ticks := 8
+
+	# (a) THE HOUR. Same weather, same bare body, three different hours. This was
+	# the missing input: neither `anatomy_component.gd` nor `baseline_human.gd`
+	# contained the string "WorldClock" at all before this item.
+	var at_night := _rig("out_at_night")
+	var at_noon := _rig("out_at_noon")
+	var at_dusk := _rig("out_at_dusk")
+	await get_tree().process_frame
+	WorldClock.set_hour(2.0)
+	for _t in ticks:
+		at_night.anatomy.chill((1.0 - WorldClock.daylight()) * storm, step)
+	WorldClock.set_hour(13.0)
+	for _t in ticks:
+		at_noon.anatomy.chill((1.0 - WorldClock.daylight()) * storm, step)
+	WorldClock.set_hour(19.5)
+	for _t in ticks:
+		at_dusk.anatomy.chill((1.0 - WorldClock.daylight()) * storm, step)
+	check(at_night.anatomy.chilled > at_noon.anatomy.chilled, "the hour reaches the body: the same weather at 02:00 chills it more than at 13:00 (%.3f vs %.3f)" % [at_night.anatomy.chilled, at_noon.anatomy.chilled])
+	check(at_dusk.anatomy.chilled > at_noon.anatomy.chilled and at_dusk.anatomy.chilled < at_night.anatomy.chilled, "and the light going is a curve rather than a night/day switch — dusk lands between the two (%.3f)" % at_dusk.anatomy.chilled)
+
+	# (b) WHAT IT IS WEARING. Same hour, same weather, one body in a coat. The
+	# `warmth` figure `Garments.shielding()` has clamped for every worn set since
+	# B7.1 had nothing reading it until now; this is the wardrobe and the body
+	# being one object rather than two, the way `plate` and `seal` already are.
+	WorldClock.set_hour(2.0)
+	var night_cold := (1.0 - WorldClock.daylight()) * storm
+	var bare := _rig("bare_at_night")
+	var coated := _rig("coated_at_night")
+	await get_tree().process_frame
+	coated.anatomy.worn = ["ash coat", "pit leathers"]
+	for _t in ticks:
+		bare.anatomy.chill(night_cold, step)
+		coated.anatomy.chill(night_cold, step)
+	check(coated.anatomy.chilled < bare.anatomy.chilled, "what a body has on reaches it too: at the same hour in the same weather, a coat and leathers cost less than skin (%.3f vs %.3f)" % [coated.anatomy.chilled, bare.anatomy.chilled])
+
+	# (c) THE WEATHER. One rig, one hour, only the air moved.
+	var standing := _rig("standing_out")
+	await get_tree().process_frame
+	for _t in ticks:
+		standing.anatomy.chill((1.0 - WorldClock.daylight()) * 0.0, step)
+	var calm_air := standing.anatomy.chilled
+	for _t in ticks:
+		standing.anatomy.chill((1.0 - WorldClock.daylight()) * storm, step)
+	check(is_zero_approx(calm_air) and standing.anatomy.chilled > 0.0, "and the weather reaches it: the same body at the same hour takes nothing from still air (%.3f) and something from a storm (%.3f)" % [calm_air, standing.anatomy.chilled])
+	# The reason this is its own number and not poured into `pain`: pain never
+	# comes down on its own here, so a chill kept there would be permanent.
+	var worst := standing.anatomy.chilled
+	for _t in ticks * 2:
+		standing.anatomy.chill(0.0, step)
+	check(standing.anatomy.chilled < worst, "and it eases back off when the storm passes (%.3f -> %.3f) — which is why it is not folded into pain, which never lowers itself" % [worst, standing.anatomy.chilled])
+
+	# It shows on the body through the answers the rig already reads every frame,
+	# rather than through a second piece of rendering deciding what cold looks like.
+	var shivering := _rig("shivering")
+	await get_tree().process_frame
+	var warm_hunch := float(shivering.anatomy.posture().hunch)
+	var warm_mobility: float = shivering.anatomy.mobility_ratio()
+	for _t in 20:
+		shivering.anatomy.chill(1.0, step)
+	check(float(shivering.anatomy.posture().hunch) < warm_hunch, "a cold body draws itself in, through the same posture() hunch pain already drives (%.4f -> %.4f)" % [warm_hunch, float(shivering.anatomy.posture().hunch)])
+	check(shivering.anatomy.mobility_ratio() < warm_mobility, "and stiffens, through the same mobility_ratio() every traversal verb already gates on (%.3f -> %.3f)" % [warm_mobility, shivering.anatomy.mobility_ratio()])
+	# And it travels with the body the way dose does.
+	var carried: Dictionary = shivering.anatomy.snapshot()
+	var arrived := _rig("arrived_cold")
+	await get_tree().process_frame
+	arrived.anatomy.restore(carried)
+	check(arrived.anatomy.chilled > 0.0, "and the cold survives snapshot/restore like dose does — a body carried out of a night is still the body that was out in it (%.3f)" % arrived.anatomy.chilled)
+
+	# The wiring, read off the live scene's own source: the hour and the air go in
+	# as two separate factors, so neither can hide inside one pre-mixed number.
+	var wired := false
+	for line in FileAccess.get_file_as_string("res://bone_yard_hunt.gd").split("\n"):
+		if line.contains("anatomy.chill(") and line.contains("WorldClock.daylight()") and line.contains("air.severity()"):
+			wired = true
+	check(wired, "and _update_air() really does feed the body the hour and the weather as two separate factors")
+
 	print("BODY_V10_AUDIT_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
 
