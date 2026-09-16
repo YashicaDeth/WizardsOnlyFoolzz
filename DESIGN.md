@@ -43,6 +43,10 @@ Status: early concept, not a locked game bible. Compiled from Greg's shared conv
 - World time should breathe rather than race: the implemented day/night cycle is one full in-world day per real hour, with deliberate sleep and travel still able to pass time directly.
 - The Ashbloom Expanse does not use the modern Roman calendar. Its civil calendar has three seasons (Ashfall, Emergence and Reaping), twelve original thirty-day months divided into ten-day decans, then five ominous Uncounted Days outside every month: the Fool, Wound, Mirror, Wire and Flame. This is an original setting system structurally informed by ancient Egyptian civil timekeeping, not a direct import of its religious names.
 - High-quality code and deliberate art direction; generative imagery is not the foundation. Greg's own artwork should be central.
+- Greg's own artwork is the visual foundation, not a decorative layer added
+  after systems are complete. `ART-DIRECTION-MINDMAP.md` owns the intake and
+  replacement map and distinguishes verified Greg sources, provisional work,
+  references and open decisions.
 - Soulslike combat and bosses, with eventual power, aggressive mobility and physical brutality. The player should not remain weak forever.
 - Highly physical, exaggerated fictional violence with meaningful hitting and body systems. Different bosses may have different anatomy and rules.
 - Persistent rivalries, bounties, ranks/hidden Elo-like ratings, distinct loot pools and an optional boss ladder.
@@ -55,7 +59,23 @@ Status: early concept, not a locked game bible. Compiled from Greg's shared conv
 - Base building, home decoration and relationships/story development inspired by the user's references. Survival-system depth is deliberately undecided.
 - An in-game internet connected with CellOutz and the user's artistic universe.
 - The Black Mirror's satellite map is an exceptionally invasive security system owned by a fictional corrupt space/surveillance agency. It can publish a target's approximate area, attach bounties and jobs to places, and let contractors work for or against that institution; looking through the map also means the institution can look back.
+- The Black Mirror should initially favour MAP because the captured player
+  begins inside surveilled territory. Freeing a place gradually exposes the
+  reliable INDEX knowledge attached to it; MAP is therefore the pressure and
+  INDEX is earned understanding, not two unrelated apps.
+- The surveillance institution is an openly occult, satirically evil corporate
+  bounty platform. Its exact name, seal and liturgy remain open, but its malice
+  is not hidden behind a neutral public-service presentation.
 - The world map is divided into named, visibly bounded holdings. Exploration reveals them and later play can reclaim/liberate them by dismantling fictional bandit camps, trafficker and organ-market networks, cartels, alien installations and other local power structures. Cleared holdings visibly improve and produce new consequences, work and faction reactions rather than becoming a one-time checklist icon.
+- The first territorial art and implementation focus is the underground
+  facility where the player is held, the route used to escape it, and the derby
+  that follows. Do not design the whole overworld before this connected opening
+  territory reads coherently.
+- First-person combat begins heavy, physical, challenging and brawl-like,
+  including deliberate firearm aiming. Earned third-person combat becomes more
+  expressive and combo-oriented with readable movement between threats. Exact
+  unlock conditions, combo vocabulary and the point where switching becomes
+  available remain design work rather than settled lore.
 - Allusions Too Grandeur is an extremely detailed unlockable book of images and lore, potentially accessible from the menu. Changing images, metadata, characters in art, hints and hidden lore were discussed.
 - A violent demolition-derby activity with original world, vehicle, targets and presentation; it may take broad genre-level inspiration from arcade demolition derbies, but must not copy a specific game's protected content. BeamNG-level damage remains a research ambition needing a separate feasibility prototype.
 - Persistent multiplayer/server ambitions were mentioned as a far-future possibility. Rust-like human proximity chat is a future multiplayer consideration, not part of the clarified current player model.
