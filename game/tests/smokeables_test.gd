@@ -103,8 +103,11 @@ func _ready() -> void:
 	var stub: Node3D = SMOKEABLES.build("cigarette", 1.0)
 	var fresh_length: float = ((fresh.get_meta("parts") as Dictionary)["body"] as MeshInstance3D).mesh.height
 	var stub_length: float = ((stub.get_meta("parts") as Dictionary)["body"] as MeshInstance3D).mesh.height
+	var fresh_ash: float = (((fresh.get_meta("parts") as Dictionary)["ash"] as MeshInstance3D).mesh as CylinderMesh).height
+	var stub_ash: float = (((stub.get_meta("parts") as Dictionary)["ash"] as MeshInstance3D).mesh as CylinderMesh).height
 	check(stub_length < fresh_length * 0.4, "a spent cigarette is visibly shorter than a fresh one")
 	check(stub_length > 0.0, "and never burns away to nothing - you stub it out")
+	check(stub_ash > fresh_ash, "ash accumulates on the resting object instead of existing only during RMB")
 
 	# Monotonic, because a thing that got longer partway through would be a bug
 	# nobody would think to look for.

@@ -19,6 +19,16 @@ var lung_cough := 0.0
 var lung_health := 1.0
 var lung_stain := 0.0
 var lung_linger := 0.0
+var lung_recovery_flash := 0.0
+var _lung_state_initialised := false
+var _lung_fill_target := 0.0
+var _lung_cough_target := 0.0
+var _lung_health_target := 1.0
+var _lung_stain_target := 0.0
+var _lung_fill_visual := 0.0
+var _lung_cough_visual := 0.0
+var _lung_health_visual := 1.0
+var _lung_stain_visual := 0.0
 var magick_unlocked := false
 var magick := 0.0
 var world_stamp := ""
@@ -80,10 +90,27 @@ func set_state(values: Dictionary) -> void:
 	consciousness = clampf(float(values.get("consciousness", consciousness)), 0.0, 100.0)
 	smoking = bool(values.get("smoking", smoking))
 	lung_inhaling = bool(values.get("lung_inhaling", lung_inhaling))
-	lung_fill = clampf(float(values.get("lung_fill", lung_fill)), 0.0, 1.0)
-	lung_cough = clampf(float(values.get("lung_cough", lung_cough)), 0.0, 1.0)
-	lung_health = clampf(float(values.get("lung_health", lung_health)), 0.0, 1.0)
-	lung_stain = clampf(float(values.get("lung_stain", lung_stain)), 0.0, 1.0)
+	_lung_fill_target = clampf(float(values.get("lung_fill", _lung_fill_target)), 0.0, 1.0)
+	_lung_cough_target = clampf(float(values.get("lung_cough", _lung_cough_target)), 0.0, 1.0)
+	_lung_health_target = clampf(float(values.get("lung_health", _lung_health_target)), 0.0, 1.0)
+	var next_stain := clampf(float(values.get("lung_stain", _lung_stain_target)), 0.0, 1.0)
+	if _lung_state_initialised and next_stain < _lung_stain_target - 0.002:
+		# A replacement/cleaning event reads as fresh tissue arriving, rather than
+		# the silhouette silently changing colour between frames.
+		lung_recovery_flash = 1.0
+	_lung_stain_target = next_stain
+	# Public state remains the body's exact current reading. Only the drawn organ
+	# lags behind; gameplay, mood and tests must never wait on presentation.
+	lung_fill = _lung_fill_target
+	lung_cough = _lung_cough_target
+	lung_health = _lung_health_target
+	lung_stain = _lung_stain_target
+	if not _lung_state_initialised:
+		_lung_fill_visual = lung_fill
+		_lung_cough_visual = lung_cough
+		_lung_health_visual = lung_health
+		_lung_stain_visual = lung_stain
+		_lung_state_initialised = true
 	magick_unlocked = bool(values.get("magick_unlocked", magick_unlocked))
 	magick = clampf(float(values.get("magick", magick)), 0.0, 1.0)
 	world_stamp = str(values.get("world_stamp", world_stamp))
@@ -111,6 +138,14 @@ func set_state(values: Dictionary) -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	# The organ view has inertia of its own: inhalation fills quickly, exhalation
+	# clears slowly, a cough snaps on and decays, and saved tissue state changes
+	# without one-frame colour pops.
+	_lung_fill_visual = move_toward(_lung_fill_visual, _lung_fill_target, delta * (2.8 if _lung_fill_target > _lung_fill_visual else 0.92))
+	_lung_cough_visual = move_toward(_lung_cough_visual, _lung_cough_target, delta * (5.5 if _lung_cough_target > _lung_cough_visual else 2.2))
+	_lung_health_visual = move_toward(_lung_health_visual, _lung_health_target, delta * 0.65)
+	_lung_stain_visual = move_toward(_lung_stain_visual, _lung_stain_target, delta * 0.38)
+	lung_recovery_flash = maxf(0.0, lung_recovery_flash - delta * 0.7)
 	# Familiarity is earned by playing, not by waiting: it only climbs while the
 	# player is actually doing the things the strip is describing.
 	if not menu_open:
@@ -368,31 +403,52 @@ func _draw_lung_xray() -> void:
 	if lung_linger <= 0.0:
 		return
 	var alpha := minf(1.0, lung_linger * 1.4)
+	var visual_fill := _lung_fill_visual
+	var visual_cough := _lung_cough_visual
+	var visual_health := _lung_health_visual
+	var visual_stain := _lung_stain_visual
 	var centre := Vector2(126, 224)
-	var cough_jolt := sin(elapsed * 35.0) * lung_cough * 5.0
-	centre.x += cough_jolt
+	var cough_jolt := Vector2(sin(elapsed * 35.0), cos(elapsed * 27.0) * 0.45) * visual_cough * 5.0
+	centre += cough_jolt
+	var breath_scale := 1.0 + sin(elapsed * (2.4 if lung_inhaling else 1.15)) * (0.018 + visual_fill * 0.018)
+	breath_scale -= visual_cough * (0.045 + absf(sin(elapsed * 22.0)) * 0.035)
 	# Broken X-ray aperture and a few ribs establish this as a body view without
 	# putting it in another literal box.
 	for rib in 5:
 		var rib_y := centre.y - 50 + rib * 23.0
 		draw_arc(Vector2(centre.x - 4, rib_y), 72.0 - rib * 4.0, PI * 0.10, PI * 0.90, 18, BONE * Color(1, 1, 1, 0.10 * alpha), 1.2)
-	var tissue := Color("a35b58").lerp(Color("171313"), lung_stain)
+	var tissue := Color("a35b58").lerp(Color("171313"), visual_stain)
 	for side in [-1.0, 1.0]:
 		var lung_center := centre + Vector2(side * 32.0, 2.0)
 		var lung := PackedVector2Array([
-			lung_center + Vector2(-side * 3, -52), lung_center + Vector2(side * 23, -40),
-			lung_center + Vector2(side * 31, -8), lung_center + Vector2(side * 25, 39),
-			lung_center + Vector2(side * 7, 53), lung_center + Vector2(-side * 9, 28),
-			lung_center + Vector2(-side * 12, -18), lung_center + Vector2(-side * 3, -52),
+			lung_center + Vector2(-side * 3, -52) * breath_scale, lung_center + Vector2(side * 23, -40) * breath_scale,
+			lung_center + Vector2(side * 31, -8) * breath_scale, lung_center + Vector2(side * 25, 39) * breath_scale,
+			lung_center + Vector2(side * 7, 53) * breath_scale, lung_center + Vector2(-side * 9, 28) * breath_scale,
+			lung_center + Vector2(-side * 12, -18) * breath_scale, lung_center + Vector2(-side * 3, -52) * breath_scale,
 		])
-		draw_colored_polygon(lung, tissue * Color(1, 1, 1, (0.34 + lung_fill * 0.22) * alpha))
-		draw_polyline(lung, (TEAL if lung_health > 0.45 else BLOOD) * Color(1, 1, 1, 0.72 * alpha), 1.5)
+		# Four translucent depth shells and an offset hilum give the quick X-ray a
+		# volumetric read without inventing a second organ model or viewport.
+		for depth in range(4, 0, -1):
+			var shell := PackedVector2Array()
+			var shell_scale := 1.0 - float(depth) * 0.035
+			for point in lung:
+				shell.append(lung_center + (point - lung_center) * shell_scale + Vector2(-side * depth * 1.2, depth * 1.5))
+			draw_colored_polygon(shell, tissue.darkened(float(depth) * 0.06) * Color(1, 1, 1, 0.055 * alpha))
+		draw_colored_polygon(lung, tissue * Color(1, 1, 1, (0.34 + visual_fill * 0.22) * alpha))
+		draw_polyline(lung, (TEAL if visual_health > 0.45 else BLOOD) * Color(1, 1, 1, 0.72 * alpha), 1.5)
+		var hilum := lung_center + Vector2(-side * 7, -7)
+		draw_circle(hilum, 9.0, Color(0.10, 0.22, 0.20, 0.20 * alpha))
+		for branch in 3:
+			var branch_end := lung_center + Vector2(side * (12 + branch * 5), -20 + branch * 19) * breath_scale
+			draw_line(hilum, branch_end, BONE * Color(1, 1, 1, 0.18 * alpha), 1.2)
 		# Smoke curls remain inside the approximate lobe rather than becoming a
 		# generic particle cloud behind it.
-		for wisp in int(round(lung_fill * 7.0)):
+		for wisp in int(round(visual_fill * 7.0)):
 			var phase: float = elapsed * (0.8 + float(wisp) * 0.07) + float(wisp) * 1.7 + side
 			var at := lung_center + Vector2(side * (5 + sin(phase) * 13), 34 - fposmod(phase * 18.0, 70.0))
-			draw_circle(at, 3.0 + float(wisp % 3), Color(0.70, 0.74, 0.68, 0.10 * alpha))
+			draw_arc(at, 4.0 + float(wisp % 3), phase, phase + PI * 1.35, 8, Color(0.70, 0.74, 0.68, 0.14 * alpha), 1.4)
+		if lung_recovery_flash > 0.0:
+			draw_arc(lung_center, 47.0 * breath_scale, -PI * 0.78, PI * 0.78, 24, TEAL * Color(1, 1, 1, lung_recovery_flash * 0.38 * alpha), 2.0)
 	draw_line(centre + Vector2(0, -72), centre + Vector2(0, 20), BONE * Color(1, 1, 1, 0.40 * alpha), 4.0)
 	CellOutzType.draw_condensed(self, centre + Vector2(-78, 67), "PULMONARY X-RAY // %s" % ("COUGH" if lung_cough > 0.1 else "DRAW" if lung_inhaling else "CLEARING"), 9.0, (BLOOD if lung_cough > 0.1 else TEAL) * Color(1, 1, 1, alpha), 0.75)
 

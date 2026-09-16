@@ -644,6 +644,8 @@ var smoke_draw_start_spent := 0.0
 var smoke_pose := 0.0
 var smoke_mouth_held := false
 var smoke_mouth_blend := 0.0
+var smoke_breath_phase := 0.0
+var smoke_ash_flick := 0.0
 var smoke_exhale_delay := 0.0
 var smoke_pending_exhale: Dictionary = {}
 var smoke_cough := 0.0
@@ -1244,6 +1246,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		inspect_held = event.pressed
 		if inspect_held and panel_mode.is_empty():
 			prompt.text = "INSPECT // RELEASE I TO LOWER"
+			var inspected_id := ""
+			if smoke_model != null and is_instance_valid(smoke_model):
+				inspected_id = str(smoke_model.get_meta("device_id", ""))
+			elif carried_limb_model != null and is_instance_valid(carried_limb_model):
+				inspected_id = "carried_limb"
+			elif arsenal != null:
+				inspected_id = str(arsenal.current_id)
+			if not inspected_id.is_empty():
+				WorldHistory.record_event("held_item_inspected", {
+					"subject_id": "player", "item": inspected_id, "location": HUNT_LOCATION,
+				})
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_1: _equip_weapon(0)
@@ -2555,6 +2568,8 @@ func _put_smokeable_away(show_arsenal := true) -> void:
 	smoke_pose = 0.0
 	smoke_mouth_held = false
 	smoke_mouth_blend = 0.0
+	smoke_breath_phase = 0.0
+	smoke_ash_flick = 0.0
 	smoke_exhale_delay = 0.0
 	smoke_pending_exhale = {}
 	smoke_cough = 0.0
@@ -2585,11 +2600,14 @@ func _update_smoking(delta: float) -> void:
 		return
 	var device_id := str(smoke_model.get_meta("device_id", ""))
 	var rolled := device_id in ["cigarette", "joint", "spliff"]
-	smoke_mouth_blend = move_toward(smoke_mouth_blend, 1.0 if smoke_mouth_held else 0.0, delta * 3.6)
+	smoke_breath_phase += delta
+	# Deliberately slower than the draw lift: placing something between the lips
+	# is a handoff with a small settling beat, not a slot toggle.
+	smoke_mouth_blend = move_toward(smoke_mouth_blend, 1.0 if smoke_mouth_held else 0.0, delta * 3.0)
 	_restore_grip_hand(smoke_grip_hand, "smoke" if rolled else "wrap")
 	_restore_grip_hand(smoke_support_hand, "wrap")
 	if smoke_grip_hand != null:
-		smoke_grip_hand.visible = smoke_mouth_blend < 0.88
+		smoke_grip_hand.visible = smoke_mouth_blend < 0.96
 	if smoke_drawing:
 		smoke_held += delta
 		var live_ideal := float((SMOKEABLES.CATALOG.get(device_id, {}) as Dictionary).get("draw_ideal", 1.0))
@@ -2605,7 +2623,8 @@ func _update_smoking(delta: float) -> void:
 	elif smoke_exhale_delay <= 0.0:
 		smoke_lung_fill = move_toward(smoke_lung_fill, 0.0, delta * 1.35)
 	var live_heat := SMOKEABLES.draw_heat(device_id, smoke_held) if smoke_drawing else 0.0
-	SMOKEABLES.set_draw(smoke_model, live_heat, _close_prop_light_scale())
+	var breath_pulse := (sin(smoke_breath_phase * 2.1) + 1.0) * 0.5
+	SMOKEABLES.set_draw(smoke_model, live_heat, _close_prop_light_scale(), breath_pulse)
 	if smoke_exhale_delay > 0.0:
 		smoke_exhale_delay = maxf(0.0, smoke_exhale_delay - delta)
 		if smoke_exhale_delay <= 0.0:
@@ -2637,6 +2656,14 @@ func _update_smoking(delta: float) -> void:
 	var breath_pull := Vector3(0.0, 0.004 * draw_ratio, 0.012 * draw_ratio)
 	var ember_tremor := Vector3(sin(smoke_held * 10.0) * 0.0018, cos(smoke_held * 7.0) * 0.0012, 0.0) if smoke_drawing else Vector3.ZERO
 	var cough_kick := Vector3(0.0, -sin(smoke_cough * 24.0) * smoke_cough * 0.035, smoke_cough * 0.04)
+	var ash_flick_kick := Vector3.ZERO
+	var ash_flick_roll := 0.0
+	if smoke_ash_flick > 0.0:
+		var flick_progress := 1.0 - clampf(smoke_ash_flick / 0.58, 0.0, 1.0)
+		var flick_arc := sin(flick_progress * PI)
+		ash_flick_kick = Vector3(-0.030 * flick_arc, 0.018 * flick_arc, 0.008 * flick_arc)
+		ash_flick_roll = -0.24 * flick_arc + sin(flick_progress * PI * 2.0) * 0.055
+		smoke_ash_flick = maxf(0.0, smoke_ash_flick - delta)
 	var device_gesture := Vector3.ZERO
 	if device_id == "spliff":
 		# A loose, slow arc and a small roll between the fingers. It should not
@@ -2663,14 +2690,23 @@ func _update_smoking(delta: float) -> void:
 			view_rest = Vector3(0.22, -0.48, -0.72)
 			view_mouth = Vector3(0.04, -0.34, -0.56)
 			view_rotation = Vector3(0.34, 0.0, -0.06)
-		var view_position := view_rest.lerp(view_mouth, lift) + Vector3(0.0, 0.0, ember_tremor.x * 0.35)
+		var held_breath := Vector3(sin(smoke_breath_phase * 1.25) * 0.0015, cos(smoke_breath_phase * 1.25) * 0.0028, 0.0)
+		var view_position := view_rest.lerp(view_mouth, lift) + Vector3(0.0, 0.0, ember_tremor.x * 0.35) + held_breath + ash_flick_kick
+		view_rotation += Vector3(cos(smoke_breath_phase * 1.25) * 0.007, sin(smoke_breath_phase * 0.72) * 0.006, ash_flick_roll)
 		if smoke_mouth_blend > 0.0 and device_id != "bong":
 			# Transfer the live object from the finger cradle to an implied lip point
 			# just beneath the reticle. The hand travels with it, releases, and leaves
 			# the frame; taking it back plays the same movement in reverse.
-			var lip_position := Vector3(-0.012, -0.072, -0.245) if rolled else Vector3(0.018, -0.092, -0.275)
+			var lip_position := Vector3(-0.008, -0.032, -0.220) if rolled else Vector3(0.010, -0.052, -0.240)
 			var lip_rotation := Vector3(0.04, -1.10, -0.08) if rolled else Vector3(0.10, -0.94, -0.03)
 			var transfer := smoothstep(0.0, 1.0, smoke_mouth_blend)
+			var mouth_anchor := smoke_model.get_node_or_null("anchor_mouth") as Node3D
+			if mouth_anchor != null:
+				lip_position -= Basis.from_euler(lip_rotation) * mouth_anchor.position
+			# The fingers carry it on a shallow arc, then the last few millimetres
+			# settle with the player's breath once the hand has released.
+			lip_position += Vector3(0.0, -sin(transfer * PI) * 0.012, 0.0)
+			lip_position += held_breath * smoothstep(0.72, 1.0, transfer)
 			view_position = view_position.lerp(lip_position, transfer)
 			view_rotation = view_rotation.lerp(lip_rotation, transfer)
 		if inspect_blend > 0.0 and not smoke_drawing:
@@ -2682,13 +2718,13 @@ func _update_smoking(delta: float) -> void:
 		smoke_model.global_transform = camera.global_transform * Transform3D(Basis.from_euler(view_rotation), view_position)
 	else:
 		smoke_model.top_level = false
-		smoke_model.position = rest.lerp(mouth_target, lift) + breath_pull + ember_tremor + cough_kick + device_gesture
+		smoke_model.position = rest.lerp(mouth_target, lift) + breath_pull + ember_tremor + cough_kick + device_gesture + ash_flick_kick
 		if device_id == "bong":
 			smoke_model.rotation = Vector3(-0.15 + lift * 0.16, 0.20 - lift * 0.08, -0.18 + lift * 0.12)
 		elif device_id == "spliff":
 			smoke_model.rotation = Vector3(1.02 + lift * 0.12, -0.34, -0.52 + lift * 0.20 + sin(smoke_held * 3.2) * 0.035)
 		else:
-			smoke_model.rotation.z = -0.42 + lift * 0.18 + sin(smoke_held * 6.0) * 0.008
+			smoke_model.rotation.z = -0.42 + lift * 0.18 + sin(smoke_held * 6.0) * 0.008 + ash_flick_roll
 	if body_motion != null:
 		body_motion.set_smoking_pose(lift, bool(smoke_model.get_meta("two_handed", false)), device_id)
 
@@ -2705,6 +2741,9 @@ func _finish_smoking_draw() -> Dictionary:
 		SMOKEABLES.set_spent(smoke_model, smoke_draw_start_spent)
 		smoke_held = 0.0
 		return {}
+	# One physical draw mutates dose, tolerance, anatomy, consumed prop and event
+	# history. Keep every normal signal/event, but persist that cluster once.
+	WorldHistory.begin_ledger_batch()
 	var result: Dictionary = SMOKEABLES.hit("player", device_id, smoke_held, Time.get_ticks_msec() / 1000.0)
 	var spent := clampf(smoke_draw_start_spent + SMOKEABLES.spend_per_hit(device_id), 0.0, 1.0)
 	smoke_spent[device_id] = spent
@@ -2723,8 +2762,67 @@ func _finish_smoking_draw() -> Dictionary:
 		smoke_exhale_delay = 0.26
 		if str(result.get("grade", "")) == SMOKEABLES.HARSH:
 			smoke_cough = clampf(float(result.get("harsh", 0.0)), 0.25, 1.0)
+			WorldHistory.record_event("smoke_coughed", {
+				"subject_id": "player", "device": device_id,
+				"intensity": smoke_cough, "location": HUNT_LOCATION,
+			})
+		WorldHistory.record_event("smoke_draw_resolved", {
+			"subject_id": "player", "device": device_id,
+			"grade": str(result.get("grade", "")),
+			"consumed": SMOKEABLES.spend_per_hit(device_id), "spent": spent,
+			"lungs": result.get("lungs", {}), "location": HUNT_LOCATION,
+		})
+		# Every third completed rolled draw ends with a small wrist snap and real
+		# falling ash. It is deterministic per object, never a random interruption.
+		if device_id in ["cigarette", "joint", "spliff"]:
+			var completed_draws := roundi(spent / maxf(SMOKEABLES.spend_per_hit(device_id), 0.001))
+			if completed_draws > 0 and completed_draws % 3 == 0:
+				smoke_ash_flick = 0.58
+				_emit_smoke_ash()
+	WorldHistory.commit_ledger_batch()
 	smoke_held = 0.0
 	return result
+
+
+func _emit_smoke_ash() -> void:
+	if smoke_model == null or not is_instance_valid(smoke_model) or not smoke_model.has_meta("parts"):
+		return
+	var parts: Dictionary = smoke_model.get_meta("parts")
+	var coal := parts.get("coal") as Node3D
+	if coal == null:
+		return
+	var fall := GPUParticles3D.new()
+	fall.name = "AshFlick"
+	fall.one_shot = true
+	fall.amount = 9
+	fall.lifetime = 1.25
+	fall.explosiveness = 0.96
+	fall.visibility_aabb = AABB(Vector3(-0.35, -0.8, -0.35), Vector3(0.7, 1.0, 0.7))
+	var motion := ParticleProcessMaterial.new()
+	motion.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	motion.emission_sphere_radius = 0.006
+	motion.direction = Vector3(-0.35, 0.45, 0.15)
+	motion.spread = 38.0
+	motion.initial_velocity_min = 0.10
+	motion.initial_velocity_max = 0.28
+	motion.gravity = Vector3(0.0, -0.72, 0.0)
+	motion.scale_min = 0.45
+	motion.scale_max = 1.15
+	fall.process_material = motion
+	var fleck := SphereMesh.new()
+	fleck.radius = 0.0018
+	fleck.height = 0.0036
+	fleck.radial_segments = 5
+	fleck.rings = 3
+	var ash_material := StandardMaterial3D.new()
+	ash_material.albedo_color = Color("8b8174")
+	ash_material.roughness = 1.0
+	fleck.material = ash_material
+	fall.draw_pass_1 = fleck
+	add_child(fall)
+	fall.global_position = coal.global_position
+	fall.emitting = true
+	get_tree().create_timer(fall.lifetime + 0.25).timeout.connect(fall.queue_free)
 
 
 ## Release is the end of the draw, not another input prompt. The breath leaves

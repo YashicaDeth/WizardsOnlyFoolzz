@@ -265,6 +265,13 @@ static func _spend_rolled(parts: Dictionary, burn: float) -> void:
 		var part: Node3D = parts[key]
 		var offset := float(parts["%s_offset" % key])
 		part.position = Vector3(0, 0, -live + offset)
+	# Ash belongs to the consumed object, not only to the frame RMB is down.
+	# It slowly collars the live end between flicks and remains visible at rest.
+	var ash: MeshInstance3D = parts["ash"]
+	var ash_mesh := ash.mesh as CylinderMesh
+	var rest_ash := lerpf(0.0045, 0.013, burn)
+	ash_mesh.height = rest_ash
+	parts["ash_rest_height"] = rest_ash
 
 
 static func _spend_vape(parts: Dictionary, burn: float) -> void:
@@ -300,7 +307,7 @@ static func _spend_bong(parts: Dictionary, burn: float) -> void:
 ## `heat` is 0 at rest and 1 at the sweet spot; it keeps climbing past 1 into
 ## the harsh band, and that overshoot is what the object shows you before the
 ## cough tells you.
-static func set_draw(node: Node3D, heat: float, light_scale := 1.0) -> void:
+static func set_draw(node: Node3D, heat: float, light_scale := 1.0, pulse := 0.0) -> void:
 	if node == null or not node.has_meta("parts"):
 		return
 	var parts: Dictionary = node.get_meta("parts")
@@ -339,7 +346,8 @@ static func set_draw(node: Node3D, heat: float, light_scale := 1.0) -> void:
 	# which is what an over-pulled cherry actually does and is a different
 	# signal rather than more of the same one.
 	ember.emission = COAL.lerp(Color("ffd9a0"), clampf(climb - 1.0, 0.0, 1.0))
-	ember.emission_energy_multiplier = lerpf(1.4, 7.5, clampf(climb, 0.0, 1.0))
+	var ember_pulse := 1.0 + maxf(0.0, pulse) * lerpf(0.045, 0.11, clampf(climb, 0.0, 1.0))
+	ember.emission_energy_multiplier = lerpf(1.4, 7.5, clampf(climb, 0.0, 1.0)) * ember_pulse
 	var light: OmniLight3D = parts["light"]
 	# At rest it makes a close amber pool; drawing turns it into a brief usable
 	# torch. The warm omnidirectional spill keeps it distinct from a flashlight.
@@ -347,13 +355,14 @@ static func set_draw(node: Node3D, heat: float, light_scale := 1.0) -> void:
 	light.omni_range = lerpf(1.8, 6.4, clampf(climb, 0.0, 1.0)) * lerpf(0.72, 1.0, light_scale)
 	var ash: MeshInstance3D = parts["ash"]
 	var ash_mesh: CylinderMesh = ash.mesh
-	ash_mesh.height = lerpf(0.006, 0.016, clampf(climb, 0.0, 1.0))
+	var ash_rest := float(parts.get("ash_rest_height", 0.006))
+	ash_mesh.height = lerpf(ash_rest, maxf(0.016, ash_rest + 0.004), clampf(climb, 0.0, 1.0))
 	if str(parts.get("device", "")) == "spliff":
 		ash.rotation.z = sin(clampf(climb, 0.0, 1.0) * PI) * 0.18
-		coal.scale = Vector3.ONE * lerpf(1.0, 1.18, clampf(climb, 0.0, 1.0))
+		coal.scale = Vector3.ONE * lerpf(1.0, 1.18, clampf(climb, 0.0, 1.0)) * ember_pulse
 	else:
 		ash.rotation.z = 0.0
-		coal.scale = Vector3.ONE
+		coal.scale = Vector3.ONE * ember_pulse
 
 
 ## What `set_draw` should be fed, given how long the button has been down. Split

@@ -24,6 +24,14 @@ func _ready() -> void:
 	hunt.set("perspective_blend", 0.0)
 	hunt.get("body_motion").set_perspective(true)
 	hunt.call("_equip_smokeable", "cigarette")
+	# Begin two draws into the same cigarette so the first demonstrated release
+	# is its deterministic ash-flick beat rather than hiding that polish outside
+	# the reel. This is still the live object and the live draw path.
+	var primed_spent := Smokeables.spend_per_hit("cigarette") * 2.0
+	var stored_spent: Dictionary = hunt.get("smoke_spent")
+	stored_spent["cigarette"] = primed_spent
+	hunt.set("smoke_spent", stored_spent)
+	Smokeables.set_spent(hunt.get("smoke_model") as Node3D, primed_spent)
 	frame = 1
 
 

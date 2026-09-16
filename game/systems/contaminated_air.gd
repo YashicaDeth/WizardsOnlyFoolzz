@@ -150,7 +150,7 @@ func emit_exhale(at: Vector3, direction: Vector3, density := 1.0, tint := Color(
 	plume.name = "SmokeExhale"
 	plume.set_meta("smoke_tint", tint)
 	plume.one_shot = true
-	plume.amount = roundi(lerpf(24.0, 52.0, clampf(density / 2.4, 0.0, 1.0)))
+	plume.amount = roundi(lerpf(12.0, 26.0, clampf(density / 2.4, 0.0, 1.0)))
 	plume.lifetime = lerpf(2.2, 3.8, clampf(density / 2.4, 0.0, 1.0))
 	plume.explosiveness = 0.86
 	plume.fixed_fps = 30
@@ -172,26 +172,36 @@ func emit_exhale(at: Vector3, direction: Vector3, density := 1.0, tint := Color(
 	motion.turbulence_noise_scale = 2.1
 	motion.turbulence_influence_min = 0.25
 	motion.turbulence_influence_max = 0.72
-	motion.scale_min = 0.48
-	motion.scale_max = 1.18
+	# Long narrow cards overlap into threads. Square cards, even with a radial
+	# texture, resolve as a stream of bright beads in front of the face.
+	motion.scale_min = 0.34
+	motion.scale_max = 0.88
 	plume.process_material = motion
 
 	var quad := QuadMesh.new()
-	quad.size = Vector2(0.105, 0.105)
+	quad.size = Vector2(0.030, 0.078)
 	var smoke := StandardMaterial3D.new()
 	smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	smoke.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	smoke.billboard_keep_scale = true
-	smoke.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	# Keep a stable grey under the close Zippo instead of accepting its tiny
+	# point light as a miniature sun. Low alpha makes this smoke, not neon.
+	smoke.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	smoke.albedo_texture = _soft_smoke_texture()
-	smoke.albedo_color = Color(tint.r, tint.g, tint.b, 0.34)
-	smoke.emission_enabled = true
-	smoke.emission = tint.darkened(0.73)
-	smoke.emission_energy_multiplier = 0.18
+	smoke.albedo_color = Color(tint.r, tint.g, tint.b, 0.065)
 	smoke.disable_receive_shadows = true
 	quad.material = smoke
 	motion.color_ramp = _smoke_lifetime_ramp()
 	plume.draw_pass_1 = quad
+	# A softer crossing layer stops the thin pass reading as hair. Both passes
+	# share the same particles, so this does not double the simulation cost.
+	plume.draw_passes = 2
+	var haze_quad := QuadMesh.new()
+	haze_quad.size = Vector2(0.058, 0.052)
+	var haze := smoke.duplicate() as StandardMaterial3D
+	haze.albedo_color = Color(tint.r, tint.g, tint.b, 0.028)
+	haze_quad.material = haze
+	plume.draw_pass_2 = haze_quad
 	plume.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	plume.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
 
@@ -234,11 +244,8 @@ func emit_smoke_trick(at: Vector3, direction: Vector3, trick: String, density :=
 			torus.ring_segments = 10
 			var core_smoke := StandardMaterial3D.new()
 			core_smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			core_smoke.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
-			core_smoke.albedo_color = Color(tint.r, tint.g, tint.b, 0.30)
-			core_smoke.emission_enabled = true
-			core_smoke.emission = tint.darkened(0.75)
-			core_smoke.emission_energy_multiplier = 0.26
+			core_smoke.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			core_smoke.albedo_color = Color(tint.r, tint.g, tint.b, 0.09)
 			core_smoke.disable_receive_shadows = true
 			torus.material = core_smoke
 			core.mesh = torus
@@ -252,7 +259,7 @@ func emit_smoke_trick(at: Vector3, direction: Vector3, trick: String, density :=
 		var ring := GPUParticles3D.new()
 		ring.name = "Ring%d" % index
 		ring.one_shot = true
-		ring.amount = roundi(lerpf(64.0, 92.0, clampf(density / 2.4, 0.0, 1.0)))
+		ring.amount = roundi(lerpf(34.0, 56.0, clampf(density / 2.4, 0.0, 1.0)))
 		ring.lifetime = 3.2
 		ring.explosiveness = 0.94
 		ring.fixed_fps = 30
@@ -279,16 +286,14 @@ func emit_smoke_trick(at: Vector3, direction: Vector3, trick: String, density :=
 		motion.scale_max = 1.0
 		ring.process_material = motion
 		var quad := QuadMesh.new()
-		quad.size = Vector2(0.064, 0.064)
+		quad.size = Vector2(0.020, 0.046)
 		var smoke := StandardMaterial3D.new()
 		smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		smoke.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 		smoke.billboard_keep_scale = true
+		smoke.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		smoke.albedo_texture = _soft_smoke_texture()
-		smoke.albedo_color = Color(tint.r, tint.g, tint.b, 0.52)
-		smoke.emission_enabled = true
-		smoke.emission = tint.darkened(0.73)
-		smoke.emission_energy_multiplier = 0.34
+		smoke.albedo_color = Color(tint.r, tint.g, tint.b, 0.11)
 		smoke.disable_receive_shadows = true
 		quad.material = smoke
 		motion.color_ramp = _smoke_lifetime_ramp()

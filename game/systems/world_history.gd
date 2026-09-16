@@ -71,6 +71,13 @@ var flags: Dictionary = {}
 var chaos_magick_level := 0.0
 var chaos_magick_at_minute := 0.0
 
+## A physical act can touch several ledgers at once: dose, anatomy, consumed
+## object and the event itself. Those mutations still emit normally as they
+## happen, but a short batch coalesces their disk persistence into one write.
+## Nested callers are safe; only the outermost commit flushes.
+var _ledger_batch_depth := 0
+var _ledger_batch_dirty := false
+
 ## What bumps it, and by how much. Ritual work is the only source at the
 ## moment this was written — the honest answer for a system this new is that
 ## the table grows as other occult acts get recorded, not that one was
@@ -120,6 +127,19 @@ func flag(key: String, fallback: Variant = null) -> Variant:
 func set_flag(key: String, value: Variant) -> void:
 	flags[key] = value
 	_save_history()
+
+
+func begin_ledger_batch() -> void:
+	_ledger_batch_depth += 1
+
+
+func commit_ledger_batch() -> void:
+	if _ledger_batch_depth <= 0:
+		return
+	_ledger_batch_depth -= 1
+	if _ledger_batch_depth == 0 and _ledger_batch_dirty:
+		_ledger_batch_dirty = false
+		_save_history()
 
 
 func record_event(event_type: String, details: Dictionary = {}) -> Dictionary:
@@ -809,6 +829,9 @@ func _load_history() -> void:
 
 
 func _save_history() -> void:
+	if _ledger_batch_depth > 0:
+		_ledger_batch_dirty = true
+		return
 	# The legacy path is the real player's save; test mode never writes it.
 	# A slot path under test mode is `TEST_SAVES_DIR`, a sandbox `clear_history()`
 	# wipes on every test's own setup — writing there is exactly what lets

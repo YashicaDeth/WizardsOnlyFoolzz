@@ -5632,7 +5632,11 @@ to get right.
       A draw raises a contextual top-left lung X-ray; smoke visibly fills and
       clears, harsh draws cough, and repeated use leaves a dark `smoke_stain`
       that survives save/restore until replacement lungs clear it
-      (`tests/smoking_lung_ui_test.tscn`, `tests/smoking_act_test.tscn`)
+      (`tests/smoking_lung_ui_test.tscn`, `tests/smoking_act_test.tscn`). The
+      quick diagnostic now eases its fill, clearing, cough compression, tissue
+      darkness and replacement flash across layered depth shells and a visible
+      bronchial tree; its public values remain the exact anatomy reading rather
+      than presentation-delayed gameplay state
 - [x] **AU7.4** The buzz is a real short dose on `substance_experience.gd`'s own
       curve, so smoked and swallowed cannot drift into two systems
 - [x] **AU7.5** Lit ends are real `OmniLight3D`s, so a cigarette in the dark is
@@ -5660,8 +5664,10 @@ to get right.
       the weak / clean / harsh result, and weapon input cannot fire through it
       (`tests/smoking_act_test.gd`)
 - [x] **AU7.7** Release automatically exhales from the player's actual mouth
-      into `contaminated_air.gd`: soft lit particles rise, tumble, spread and
-      fade in the world. The fresh breath stays playable for a short window;
+      into `contaminated_air.gd`: two crossed, low-alpha layers make long wisps
+      rise, tumble, spread and fade without resolving as bright circular beads
+      or accepting the close Zippo as a daylight floodlight. The fresh breath
+      stays playable for a short window;
       LMB cycles an expanding O, double O and ghost whose particle edges fray
       as they travel (`tests/smoking_act_test.gd`, `smoking_gameplay_capture`)
 - [x] **AU7.8** Charges burn down visibly — a cigarette gets shorter, a bong
@@ -5671,7 +5677,9 @@ to get right.
       nothing: you stub it out with a finger of paper left, which is also what
       stops the coal reaching the filter and the geometry inverting. Tested
       monotonic across nine steps, because a thing that got *longer* partway
-      through is a bug nobody would think to look for
+      through is a bug nobody would think to look for. Rolled ash now grows on
+      the resting consumed object, the ember pulses subtly with breathing, and
+      each third draw produces a deterministic wrist flick with falling ash
 - [x] **AU7.9** Every smokeable is held through `held_gear.gd`'s public anchor
       convention on the body's real right arm. The draw raises that arm to the
       mouth; the bong has a second physical grip and support hand, recruits the
@@ -5693,9 +5701,14 @@ to get right.
       becoming a navigational flashlight (`tests/smoking_act_test.gd`,
       `tests/combat_integration_test.gd`, `tests/smoking_gameplay_capture.gd`).
       Y also transfers any one-hand smokeable from fingers to a persistent lip
-      point beneath the reticle: the hand carries it there, releases and leaves
-      the frame; RMB still draws hands-free, and Y reverses the transfer. The
-      bong explicitly refuses because its weight and cone-sink require both hands
+      point beneath the reticle through the object's real mouth anchor: the hand
+      carries it on a shallow arc, the item settles with the player's breathing,
+      releases and leaves the frame; RMB still draws hands-free, and Y reverses
+      the transfer. The bong explicitly refuses because its weight and cone-sink
+      require both hands. A draw's dose, tolerance, anatomy, consumed charge and
+      history still emit their normal events/signals, but `WorldHistory` batches
+      their persistence into one disk flush; resolved draw/cough, exhale, trick,
+      mouth hold and inspection all remain explicit ledger events
 - [ ] **AU7.10** Passing one to somebody is a real act with a real meaning (S)
 
 ### AU5 — The effect taxonomy

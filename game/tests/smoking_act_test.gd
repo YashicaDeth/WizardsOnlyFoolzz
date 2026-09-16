@@ -122,6 +122,8 @@ func _ready() -> void:
 	var result: Dictionary = hunt.call("_finish_smoking_draw")
 	check(bool(result.get("ok", false)), "releasing RMB lands the draw")
 	check(str(result.get("device", "")) == "cigarette", "the hit comes from the object actually held")
+	check(WorldHistory.event_count("smoke_draw_resolved") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"dose, lungs, consumption and history leave one committed draw ledger batch")
 	check(bool(hunt.get("smoke_mouth_held")), "the same RMB draw works while the cigarette remains in the mouth")
 	check(float((hunt.get("smoke_spent") as Dictionary).get("cigarette", 0.0)) > 0.0,
 		"and the same act burns down that object")
@@ -142,6 +144,12 @@ func _ready() -> void:
 	if cigarette_plume != null:
 		var tobacco_tint: Color = cigarette_plume.get_meta("smoke_tint", Color.BLACK)
 		check(tobacco_tint.g - tobacco_tint.r < 0.04, "cigarette smoke stays neutral grey")
+		var wisp_quad := cigarette_plume.draw_pass_1 as QuadMesh
+		var wisp_material := wisp_quad.material as StandardMaterial3D
+		check(cigarette_plume.draw_passes == 2 and wisp_quad.size.y > wisp_quad.size.x * 2.0,
+			"the exhale layers long wisps instead of bright round beads")
+		check(wisp_material.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED,
+			"the close lighter cannot bleach the smoke plume in daylight")
 	var herb_tint: Color = hunt.call("_smoke_tint", "joint")
 	check(herb_tint.g > herb_tint.r + 0.04 and herb_tint.g > herb_tint.b,
 		"joint, spliff and bong smoke receive only a subtle green bias")
@@ -154,6 +162,18 @@ func _ready() -> void:
 		hunt.call("_update_smoking", 1.0 / 60.0)
 	check(not bool(hunt.get("smoke_mouth_held")) and smoking_hand.visible,
 		"toggling again returns the cigarette to the waiting hand")
+	# Prime the same object for its deterministic third-draw maintenance beat.
+	var primed_spent := Smokeables.spend_per_hit("cigarette") * 2.0
+	var stored_spent: Dictionary = hunt.get("smoke_spent")
+	stored_spent["cigarette"] = primed_spent
+	hunt.set("smoke_spent", stored_spent)
+	Smokeables.set_spent(held, primed_spent)
+	hunt.call("_begin_smoking_draw")
+	for _third_draw in 96:
+		hunt.call("_update_smoking", 1.0 / 60.0)
+	hunt.call("_finish_smoking_draw")
+	check(float(hunt.get("smoke_ash_flick")) > 0.0 and hunt.get_node_or_null("AshFlick") != null,
+		"each third rolled draw snaps the wrist and sheds physical ash")
 
 	# Cycle to the fifth object. Its second hand and weapon cost must be visible,
 	# not merely catalog metadata.
