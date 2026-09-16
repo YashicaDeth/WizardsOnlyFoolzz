@@ -18,6 +18,8 @@ Status: early concept, not a locked game bible. Compiled from Greg's shared conv
 - Hubs, main-world roaming, transitions and eventual overlap between perspectives are desired. How these work remains open.
 - A dense, surprising, psychedelic, uncanny, occult and sometimes funny world. The experience should not feel crushing.
 - The player is forced by the elites to wear a humiliating jester/gimp outfit. Its first implemented read is oversized black-wine gloves, poofy bone-and-blood cuffs, restraint hardware, bells, shoulder puffs and a locked ruff; the costume must remain visible in first-person hand interactions as well as on the body.
+- World time should breathe rather than race: the implemented day/night cycle is one full in-world day per real hour, with deliberate sleep and travel still able to pass time directly.
+- The Ashbloom Expanse does not use the modern Roman calendar. Its civil calendar has three seasons (Ashfall, Emergence and Reaping), twelve original thirty-day months divided into ten-day decans, then five ominous Uncounted Days outside every month: the Fool, Wound, Mirror, Wire and Flame. This is an original setting system structurally informed by ancient Egyptian civil timekeeping, not a direct import of its religious names.
 - High-quality code and deliberate art direction; generative imagery is not the foundation. Greg's own artwork should be central.
 - Soulslike combat and bosses, with eventual power, aggressive mobility and physical brutality. The player should not remain weak forever.
 - Highly physical, exaggerated fictional violence with meaningful hitting and body systems. Different bosses may have different anatomy and rules.

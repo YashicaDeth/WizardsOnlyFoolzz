@@ -628,6 +628,7 @@ Eight passes on the front of an object nobody has ever turned over. The jester i
 Greg, plainly: *"the entire blackmirror gui needs work"*. Nine passes on what the device *is* and none on how it reads.
 - [ ] **C10.1** `v10` The whole GUI re-authored as one thing rather than six pages
   - First narrow seam: Index/Wire and Map were 16:9 documents letterboxed inside the mirror, while Radio/Carry/Ritual used the full wide glass. All six now occupy one centred 16:9 working aperture with the same device-owned registration edge. This does not claim the line; their internal frames and interaction grammar still need unifying. `tests/handheld_aperture_test.gd`; six inspected captures at `captures/c10_1_aperture_{index,map,wire,radio,carry,ritual}.png`
+  - Second narrow seam: the Ashbloom calendar and live hour are chassis registration rather than app content, so every mode carries the same date in the same place. `handheld_aperture_test.gd` proves all seven modes preserve it; internal interaction grammar remains open.
 - [x] ~~**C10.2** `v10` It is legible in the dark it now creates, which nothing before v4 had to be~~ The six apps now rise through one device-owned phosphor reading bed in `black_mirror.gd`: an inset luminous surface suppresses the holder's reflection only beneath the working aperture while the side gutters remain black, reflective glass. Bone ink, moss instruments and copper registration have explicit contrast floors against that shared surface, rather than each page inventing a brighter box. `tests/handheld_dark_legibility_test.gd` checks the colour contract and all six modes' use of the same surface; `captures/c10_2_dark_{index,map,wire,radio,carry,ritual}.png` inspected at 1280x720.
 
 - [ ] **C10.3** `v10` Its battery is a real resource with a real floor
@@ -2907,7 +2908,7 @@ The last rung. Fifteen statements that are true of the road when this game is fi
 The Expanse has one lighting state, one fog density and no clock. `WorldLook`
 already switches presets by place; nothing switches by time.
 
-- [x] **W1.1** A day cycle the world reads, not only the sky — `world_clock.gd`, a pure function of one persisted number rather than a sixth autoload. Hours, days, months, five named phases, a continuous daylight curve, and sleeping. 28 checks. Unblocks A9.7, W1.4, AB2.4, AJ4.3 and AL1.5, all of which were waiting on it without anybody noticing
+- [x] **W1.1** A day cycle the world reads, not only the sky — `world_clock.gd`, a pure function of one persisted number rather than a sixth autoload. Hours, days, months, five named phases, a continuous daylight curve, and sleeping. The cycle now lasts one real hour instead of 24 minutes, and the same ledger resolves an original 365-day Ashbloom calendar: three seasons, twelve 30-day months in ten-day decans, and five named Uncounted Days outside every month. 33 checks. Unblocks A9.7, W1.4, AB2.4, AJ4.3 and AL1.5, all of which were waiting on it without anybody noticing
 - [x] **W1.2** ~~Contamination has weather — it moves, it settles, it gets worse~~
       A5 made contamination a property of every surface, painted in once at
       authoring time — real, but static, and nothing asked whether the air
