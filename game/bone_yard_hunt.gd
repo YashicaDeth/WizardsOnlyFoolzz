@@ -3795,7 +3795,7 @@ func _rival_retreats(message: String) -> void:
 
 
 func _leave_demo_wall() -> void:
-	get_tree().change_scene_to_file("res://country_town_menu.tscn")
+	Interstitial.travel("res://country_town_menu.tscn", "leaving this universe on the board")
 
 
 ## Live contacts for the map, expressed as plain data so the map never reaches

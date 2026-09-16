@@ -94,22 +94,16 @@ func _ready() -> void:
 	print("  graph: %d edges across %d scripts" % [total_edges, ROOTS.size()])
 	check(total_edges > 0, "reading the source produced a graph, so nothing below passes vacuously")
 
-	# --- what the graph says about the hunt ---------------------------------
-	# Reported rather than asserted. `bone_yard_hunt.gd` has no transition out
-	# of it in any form: you enter the Bone Yard and the only exit is the pause
-	# gate, which is abandoning the run rather than finishing it. That is a real
-	# gap and it is a *known* one - all of T is blocked on "what persists
-	# between runs", and an ending is downstream of that answer.
-	#
-	# It is not a `check()` because a check for "the hunt cannot end" turns red
-	# the day somebody fixes it, and a test that is expected to fail is a test
-	# nobody reads - which is the whole lesson of J5.
+	# --- the hunt has an authored ending -------------------------------------
+	# The demo wall is the first real end of a run. It must leave through the
+	# same visible seam as every other production transition rather than making
+	# the last action of the run a raw scene cut. Keep both claims executable:
+	# there is a way out, and that way goes through the interstitial.
 	var hunt_exits := _edges_from("res://bone_yard_hunt.gd")
-	if hunt_exits.is_empty():
-		print("  NOTE: bone_yard_hunt has no exit transition. The run cannot end, ")
-		print("        only be abandoned through the pause gate. See T, blocked.")
-	else:
-		print("  the hunt now ends somewhere: %s" % ", ".join(PackedStringArray(hunt_exits)))
+	check(hunt_exits.has(ENTRY), "the hunt has an authored ending back at the front door")
+	var hunt_source := FileAccess.get_file_as_string("res://bone_yard_hunt.gd")
+	check(hunt_source.contains('Interstitial.travel("res://country_town_menu.tscn"'),
+		"the hunt ending uses the interstitial rather than a hard scene cut")
 
 	# --- and every one of them actually loads -------------------------------
 	var scenes: Array[String] = [ENTRY]
