@@ -37,6 +37,11 @@ func _ready() -> void:
 	hunt._update_handheld_lamp(0.016)
 	check(hunt.handheld.is_lit(), "a charged raised screen reports itself lit")
 	check(lamp.visible and lamp.light_energy > 0.0, "raising it puts real light into the running world")
+	var index_energy: float = lamp.light_energy
+	hunt.handheld.set_mode("MAP")
+	hunt._update_handheld_lamp(0.016)
+	check(lamp.spot_range > hunt.handheld.LAMP_RANGE, "the satellite map's greater exposure expands the real rendered beam")
+	check(lamp.light_energy > index_energy, "and its extra battery draw appears as more world light rather than an invisible tax")
 
 	hunt.handheld.close_device()
 	hunt.handheld.raised = 0.0

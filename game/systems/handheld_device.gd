@@ -115,6 +115,11 @@ var possessed := true
 var battery := 1.0
 const BATTERY_DRAIN_PER_SECOND := 1.0 / 480.0
 const BATTERY_RECHARGE_PER_SECOND := 1.0 / 1800.0
+## C7.2. The satellite page drives the panel and world-facing emitter harder
+## than the quiet document pages. It buys a wider readable pool at the cost of
+## charge and a source that can be picked out from farther away.
+const MAP_BATTERY_MULTIPLIER := 2.0
+const MAP_LIGHT_MULTIPLIER := 1.3
 ## AS1.1/AS1.5. How far the lamp throws light when it is lit. One constant
 ## shared by the light `bone_yard_hunt.gd` actually places in the world and by
 ## `light_radius()` below, so the two can never quietly disagree.
@@ -1001,6 +1006,8 @@ func _draw_status(rect: Rect2, alpha: float) -> void:
 	var cell_label := "CELL %02d%%" % roundi(charge * 100.0)
 	var cell_width := CellOutzType.width_condensed(cell_label, 10.0, 0.9)
 	CellOutzType.draw_condensed(self, Vector2(rect.position.x + rect.size.x - 30 - cell_width, rect.position.y + rect.size.y - 30), cell_label, 10.0, tint * Color(1, 1, 1, alpha), 0.9)
+	if current_mode() == "MAP":
+		CellOutzType.draw_condensed(self, Vector2(rect.position.x + rect.size.x - 250, rect.position.y + rect.size.y - 30), "SAT DRAW x%.1f" % MAP_BATTERY_MULTIPLIER, 8.0, AMBER * Color(1, 1, 1, 0.9 * alpha), 0.72)
 	for cell in 8:
 		var lit := float(cell) / 8.0 < charge
 		var bar := Rect2(Vector2(rect.position.x + rect.size.x - 150 + cell * 9.0, rect.position.y + rect.size.y - 30), Vector2(6, 11))
@@ -1045,9 +1052,17 @@ func _drive_backlight(delta: float) -> void:
 ## the light should not snap on at full draw the instant the key is pressed.
 func _drive_battery(delta: float) -> void:
 	if raised > 0.5:
-		battery = clampf(battery - BATTERY_DRAIN_PER_SECOND * delta, 0.0, 1.0)
+		battery = clampf(battery - BATTERY_DRAIN_PER_SECOND * battery_draw_multiplier() * delta, 0.0, 1.0)
 	else:
 		battery = clampf(battery + BATTERY_RECHARGE_PER_SECOND * delta, 0.0, 1.0)
+
+
+func battery_draw_multiplier() -> float:
+	return MAP_BATTERY_MULTIPLIER if current_mode() == "MAP" else 1.0
+
+
+func emitted_light_multiplier() -> float:
+	return MAP_LIGHT_MULTIPLIER if current_mode() == "MAP" else 1.0
 
 
 ## AS1.1. Whether the lamp is actually throwing light right now — raised
@@ -1075,7 +1090,7 @@ func battery_percent() -> float:
 ## the day it does, rather than that system inventing its own answer to
 ## "is the player lit right now".
 func light_radius() -> float:
-	return LAMP_RANGE if is_lit() else 0.0
+	return LAMP_RANGE * emitted_light_multiplier() if is_lit() else 0.0
 
 
 ## A6.6 v2. Whether a fault is currently expressing itself. A fault with no

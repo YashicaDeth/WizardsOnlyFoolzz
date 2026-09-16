@@ -3512,12 +3512,14 @@ func _update_handheld_lamp(_delta: float) -> void:
 			handheld_warp.set_amount(0.0)
 		return
 	var charge: float = handheld.battery_percent() if handheld.has_method("battery_percent") else 1.0
+	var output: float = handheld.emitted_light_multiplier() if handheld.has_method("emitted_light_multiplier") else 1.0
 	var waver := 1.0 + sin(pulse * 11.0) * 0.03 * (1.0 + (1.0 - charge) * 2.5)
 	# Below a fifth of a charge it starts guttering rather than merely dimming.
 	if charge < 0.2:
 		var gutter := 1.0 if fmod(pulse * (5.0 + (0.2 - charge) * 40.0), 1.0) > 0.5 else 0.0
 		waver *= 0.7 + 0.3 * gutter
-	handheld_lamp.light_energy = 9.0 * charge * waver
+	handheld_lamp.spot_range = handheld.light_radius()
+	handheld_lamp.light_energy = 9.0 * charge * output * waver
 	# A4.2. The air the beam bends answers the same battery the beam does, so a
 	# guttering torch bends it in the same stutter rather than holding a steady
 	# shimmer over a dying light.

@@ -68,6 +68,17 @@ func _ready() -> void:
 	hunt.call("_update_perception", 0.1)
 	check(not bool(actor.get("tracking_light", true)), "pocketing the screen removes the trail a hunter was following")
 
+	# C7.2. At the edge of the warning interval the quiet Index is safe while
+	# the satellite page's harder-driven panel crosses the same sight threshold.
+	actor.node.global_position = Vector3(24, 0.9, 0)
+	hunt.handheld.raised = 1.0
+	hunt.handheld.set_mode("INDEX")
+	hunt.call("_update_perception", 0.1)
+	check(not bool(actor.get("tracking_light", true)), "the quiet Index does not broadcast at twenty-four metres")
+	hunt.handheld.set_mode("MAP")
+	hunt.call("_update_perception", 0.1)
+	check(bool(actor.get("tracking_light", false)), "opening the satellite map at the same place gives the hunter a trail")
+
 	# A real wall between a close hostile and the player: real cover.
 	actor.node.global_position = Vector3(3, 0.9, 0)
 	var wall := StaticBody3D.new()

@@ -40,6 +40,22 @@ func _ready() -> void:
 	check(device.is_lit(), "and while raised with charge, it is lit")
 	check(absf(device.light_radius() - HANDHELD.LAMP_RANGE) < 0.001, "reaching its full range")
 
+	# C7.2. The satellite page is deliberately expensive: brighter and wider,
+	# while the ordinary Index remains the baseline.
+	device.set_mode("INDEX")
+	device.battery = 1.0
+	device._drive_battery(60.0)
+	var index_cost: float = 1.0 - device.battery
+	var index_radius: float = device.light_radius()
+	device.set_mode("MAP")
+	device.battery = 1.0
+	device._drive_battery(60.0)
+	var map_cost: float = 1.0 - device.battery
+	check(map_cost > index_cost * 1.9, "the live satellite page drains at twice the quiet Index rate")
+	check(device.light_radius() > index_radius, "the map's brighter panel broadcasts its source farther")
+	check(is_equal_approx(device.battery_draw_multiplier(), HANDHELD.MAP_BATTERY_MULTIPLIER), "the map exposes its real draw multiplier for its status readout")
+	device.set_mode("INDEX")
+
 	# Drain it out entirely.
 	device._drive_battery(4000.0)
 	check(absf(device.battery) < 0.001, "enough continuous use runs it out")
