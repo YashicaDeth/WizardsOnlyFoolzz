@@ -403,7 +403,7 @@ func _lose_possession(event_type: String, details: Dictionary) -> Dictionary:
 	var payload := details.duplicate(true)
 	payload["serial"] = serial
 	WorldHistory.record_event(event_type, payload)
-	return {"ok": true, "serial": serial, "condition": condition, "wear_log": wear_log.duplicate(), "impacts": impacts.duplicate(true)}
+	return {"ok": true, "serial": serial, "condition": condition, "battery": battery, "wear_log": wear_log.duplicate(), "impacts": impacts.duplicate(true)}
 
 
 func drop() -> Dictionary:

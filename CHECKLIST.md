@@ -533,19 +533,19 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 - [~] **C1.6** `v2` The device is raised at one angle in one hand, every time — the position half is real: `_device_rect` used to rise dead-centre and perfectly upright, which reads as a menu appearing rather than an object somebody is holding. It now rises to a fixed off-centre point (`HELD_OFFSET_X`), eased in with `raised` itself, deterministic — no per-raise randomness. The angle half was built and reverted: `radial` (the selection wheel, C2) is a child of this same `Control`, so rotating `self` dragged the wheel's own fixed screen-centre geometry along with the phone's tilt — visually confirmed broken in a capture before being pulled back out. A real tilt needs the chassis+screen moved into their own rotated sub-container first, with `radial` staying a sibling rather than a descendant of it — left as the named next step rather than guessed at further. Verified: `handheld_lean_test`/`handheld_impact_test`/`device_wear_test`/`handheld_battery_test` all re-run clean, and a fresh `handheld_capture` shows the offset device beside an unmoved, correctly screen-centred radial wheel
 - [~] **C1.7** `v2` It can be dropped, and it can be taken off you — `HandheldDevice.drop()`/`confiscate(reason)` are the same underlying transition (`possessed` false, forced closed, unraisable) reached through two callers and recorded as two distinct events, so the world can tell a deliberate drop from a robbery apart later even though the player cannot use the device either way meanwhile; `repossess()` is the way back, wear travelling with it since it is the same object, not a fresh one. Reloaded on every `open_device()` the same as condition/battery already are, so a device lost in one scene stays lost the next. `tests/device_possession_test.gd`, 18 checks; `handheld_lean_test`/`handheld_impact_test`/`device_wear_test`/`handheld_battery_test` re-verified clean.
 
-      The drop half is now reachable rather than only callable: `DROP_KEY`
-      (`K`), edge-detected the same way `lean_override` is test-overridable,
-      calls `drop()` and fires a new `dropped(payload)` signal carrying the
-      identity `drop()`/`confiscate()` already returned — checked against
-      `possessed` rather than `is_open`, since a pocketed device is still
-      yours to drop. This file still owns no 3D space (the docstring on
-      `_lose_possession` says so directly), so `dropped` is exactly as far as
-      this file can honestly go: it is the seam Lane 1 connects to spawn a
-      pickable object and eventually call `repossess()`, not a silent stub.
-      `tests/handheld_drop_test.gd`, 10 checks — the key firing exactly once
-      per press even held down, a dropped device refusing to reopen, and
-      `repossess()` making it droppable again with a second signal rather
-      than reusing the first.
+      The drop half is now complete in the live Hunt rather than stopping at
+      the signal: `DROP_KEY` (`K`) calls `drop()`, and the scene turns that
+      exact payload into a colliding `DroppedHandheld` with rendered case,
+      emissive mirror, lashed rear cell, serial, condition and remaining
+      charge. It tumbles from the real camera, advertises `[E] RECOVER BLACK
+      MIRROR // serial` only in reach, and E calls `repossess()` before the
+      world body leaves. Its settled position is amended into WorldHistory;
+      reloading while it is still lost reconstructs the same pickable serial
+      there instead of trapping the save in `possessed = false`. Verified by
+      `tests/handheld_world_drop_test.gd` (15 checks), plus the existing
+      `handheld_drop_test.gd` and `device_possession_test.gd`; windowed evidence
+      at `captures/c1_7_dropped_black_mirror.png` shows the real world object,
+      its serial and the recovery prompt in the production HUD.
 
       Still open, and still not this file's to close: nothing calls
       `confiscate()` from real gameplay — that caller is a robbery or defeat

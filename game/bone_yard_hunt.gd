@@ -97,6 +97,7 @@ const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
 const FIELD_LENS := preload("res://systems/field_lens.gd")
 const HELD_ITEM_RELIQUARY := preload("res://systems/held_item_reliquary.gd")
+const DROPPED_HANDHELD := preload("res://systems/dropped_handheld.gd")
 const STORM_WEATHER := preload("res://systems/storm_weather.gd")
 const PERCEPTION := preload("res://systems/perception.gd")
 const GLITCH_SPIDER := preload("res://systems/glitch_spider.gd")
@@ -400,6 +401,8 @@ var climb_normal := Vector3.ZERO
 var climb_entry_speed := 0.0
 var climb_unlock_announced := false
 var handheld: Control
+var dropped_handheld: RigidBody3D
+var dropped_handheld_save_timer := 0.0
 ## FINAL_V.md §16. The one screen-space layer AS2's night warp, and later the
 ## drugs and shadow realms, all reach for instead of building their own effect.
 var psychedelic: Control
@@ -731,6 +734,8 @@ func _ready() -> void:
 	handheld = HANDHELD.new()
 	handheld.name = "Handheld"
 	$HUD.add_child(handheld)
+	handheld.load_device()
+	handheld.dropped.connect(_on_handheld_dropped)
 	# AS1.1. Parented to the camera so it always points where the player is
 	# looking, the way a phone held up in front of you actually would. Range is
 	# `HandheldDevice.LAMP_RANGE` — the one constant AS1.5's `light_radius()`
@@ -878,6 +883,7 @@ func _ready() -> void:
 	HUNTER_MOTOR.configure(player_body)
 	add_child(player_body)
 	player_body.position = player - Vector3.UP * 0.6
+	_restore_dropped_handheld()
 	_build_player_rig()
 	# The old red witness mirror was a body-inspection prototype left standing
 	# directly in the opening sightline. The real room mirror remains tested and
@@ -1411,6 +1417,7 @@ func _physics_process(delta: float) -> void:
 	pulse += delta
 	_update_smoking(delta)
 	_update_handheld_lamp(delta)
+	_update_dropped_handheld_persistence(delta)
 	_update_flame()
 	_update_air()
 	_update_body_record(delta)
@@ -1492,6 +1499,7 @@ func _physics_process(delta: float) -> void:
 		_check_third_person_unlock_feel()
 	_update_camera()
 	_update_hud()
+	_update_dropped_handheld_prompt()
 
 
 ## B4.10v2. The world notices unattended flesh. This is deliberately part of
@@ -3861,6 +3869,9 @@ func _interact() -> void:
 	if not panel_mode.is_empty():
 		return
 	body_motion.trigger_interaction()
+	if dropped_handheld != null and is_instance_valid(dropped_handheld) and player.distance_to(dropped_handheld.global_position) <= 3.2:
+		_pick_up_handheld()
+		return
 	var downed := _nearest_downed()
 	if not downed.is_empty():
 		# F6.1. Raising the handheld changes E from an offer into an overwrite.
@@ -3937,6 +3948,83 @@ func _interact() -> void:
 		_begin_canonical_encounter()
 		return
 	prompt.text = "Nothing answers. Find Nix or follow the floodlights to the tunnel."
+
+
+## C1.7. The device owns identity and possession; this scene owns 3D space.
+## The signal is the seam between them, producing one physical, colliding body
+## whose payload is the exact serial/condition/charge that just left the HUD.
+func _on_handheld_dropped(payload: Dictionary) -> void:
+	if dropped_handheld != null and is_instance_valid(dropped_handheld):
+		return
+	var forward := -camera.global_transform.basis.z.normalized()
+	_spawn_dropped_handheld(payload, camera.global_position + forward * 0.85 + Vector3.DOWN * 0.32, true)
+	_persist_dropped_handheld()
+	prompt.text = "BLACK MIRROR DROPPED // [E] TO RECOVER"
+
+
+func _spawn_dropped_handheld(payload: Dictionary, at: Vector3, tossed: bool) -> void:
+	dropped_handheld = DROPPED_HANDHELD.new()
+	dropped_handheld.name = "DroppedBlackMirror"
+	dropped_handheld.configure(payload)
+	add_child(dropped_handheld)
+	dropped_handheld.global_position = at
+	dropped_handheld.rotation_degrees = Vector3(18.0, 12.0, -9.0)
+	if tossed:
+		var forward := -camera.global_transform.basis.z.normalized()
+		dropped_handheld.linear_velocity = forward * 2.1 + Vector3.UP * 1.0
+		dropped_handheld.angular_velocity = Vector3(2.4, -1.3, 3.1)
+
+
+func _restore_dropped_handheld() -> void:
+	if handheld.possessed:
+		return
+	var record := WorldHistory.subject("handheld")
+	if str(record.get("dropped_scene", "")) != HUNT_LOCATION:
+		return
+	var saved_position: Array = record.get("dropped_position", [])
+	if saved_position.size() != 3:
+		return
+	var payload := {
+		"serial": handheld.serial, "condition": handheld.condition,
+		"battery": handheld.battery, "wear_log": handheld.wear_log.duplicate(),
+		"impacts": handheld.impacts.duplicate(true),
+	}
+	_spawn_dropped_handheld(payload, Vector3(float(saved_position[0]), float(saved_position[1]), float(saved_position[2])), false)
+
+
+func _persist_dropped_handheld() -> void:
+	if dropped_handheld == null or not is_instance_valid(dropped_handheld):
+		return
+	var at := dropped_handheld.global_position
+	WorldHistory.amend_subject("handheld", {
+		"dropped_scene": HUNT_LOCATION,
+		"dropped_position": [snappedf(at.x, 0.01), snappedf(at.y, 0.01), snappedf(at.z, 0.01)],
+	})
+
+
+func _update_dropped_handheld_persistence(delta: float) -> void:
+	if dropped_handheld == null or not is_instance_valid(dropped_handheld):
+		return
+	dropped_handheld_save_timer -= delta
+	if dropped_handheld_save_timer <= 0.0:
+		dropped_handheld_save_timer = 0.75
+		_persist_dropped_handheld()
+
+
+func _update_dropped_handheld_prompt() -> void:
+	if dropped_handheld != null and is_instance_valid(dropped_handheld) and panel_mode.is_empty() and player.distance_to(dropped_handheld.global_position) <= 3.2:
+		prompt.text = "[E] RECOVER BLACK MIRROR // %06d" % handheld.serial
+
+
+func _pick_up_handheld() -> void:
+	if dropped_handheld == null or not is_instance_valid(dropped_handheld):
+		return
+	var serial: int = handheld.serial
+	handheld.repossess()
+	WorldHistory.amend_subject("handheld", {"dropped_scene": "", "dropped_position": []})
+	dropped_handheld.queue_free()
+	dropped_handheld = null
+	prompt.text = "BLACK MIRROR %06d RECOVERED // CONDITION %d%%" % [serial, roundi(handheld.condition * 100.0)]
 
 
 func _mind_stamp(actor: Dictionary) -> void:
