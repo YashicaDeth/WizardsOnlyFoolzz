@@ -1564,7 +1564,17 @@ The last rung. Fifteen statements that are true of somewhere of your own when th
 - [ ] **H10.5** `v10` The room with the bed and the mirror is the first one
 - [ ] **H10.6** `v10` The Board is on its wall
 - [ ] **H10.7** `v10` The cloud terminal is to the right of it
-- [ ] **H10.8** `v10` You can sleep, and sleeping moves the clock
+- [x] **H10.8** `v10` You can sleep, and sleeping moves the clock — a physical
+      bedroll now sits within reach of the Hunt's opening route and owns a
+      contextual `[E] REST ... WAKE AT 07:00` interaction. Rest advances the
+      one persisted `WorldClock` forward to the next dawn, immediately updates
+      the world's light, and records the exact elapsed hours, waking stamp and
+      calendar date as `player_slept`; it does not run a second timer or silently
+      edit the sky. A living hostile within 18 metres refuses the action without
+      moving time. `tests/sleep_site_test.gd` proves the physical site, reach,
+      forward clock movement, ledger receipt, distance gate and danger refusal
+      (7 checks); `world_clock_test` remains green. The live dusk encounter and
+      its prompt were opened at `captures/h10_8_sleep_site.png`.
 - [ ] **H10.9** `v10` What is stored there is really stored, not a menu
 - [ ] **H10.10** `v10` Somebody can be waiting in it when you come back
 - [ ] **H10.11** `v10` Holding it costs something ongoing

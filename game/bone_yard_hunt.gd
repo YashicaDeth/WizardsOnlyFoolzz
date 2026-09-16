@@ -75,6 +75,11 @@ const RINGMASTER_SLOT := "ringmaster"
 const CAST := preload("res://systems/cast_names.gd")
 const FRIEND_ID := "nix_arden"
 const HUNT_LOCATION := "ashbloom_bone_yard"
+## H10.8. Rest is attached to one reachable thing in the world, not a menu
+## button that can advance the ledger from anywhere.
+const SLEEP_SITE_POSITION := Vector3(2.6, 0.05, 18.0)
+const SLEEP_REACH := 3.4
+const SLEEP_WAKE_HOUR := 7.0
 const HANDHELD := preload("res://systems/handheld_device.gd")
 const ANATOMY_COMPONENT := preload("res://systems/anatomy_component.gd")
 const WORLD_GENERATOR := preload("res://systems/ashbloom_world_generator.gd")
@@ -139,6 +144,8 @@ const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 const SUBSTANCE_STATION := preload("res://systems/substance_station.gd")
 
 var player := Vector3(0, 1.5, 19)
+var sleep_site: Node3D
+var sleep_prompt_hold := 0.0
 var yaw := PI
 var pitch := -0.12
 ## Greg, 2026-09-12: *"the game should start probably in first person with the
@@ -1499,6 +1506,7 @@ func _physics_process(delta: float) -> void:
 		_check_third_person_unlock_feel()
 	_update_camera()
 	_update_hud()
+	_update_sleep_prompt(delta)
 	_update_dropped_handheld_prompt()
 
 
@@ -3872,6 +3880,8 @@ func _interact() -> void:
 	if dropped_handheld != null and is_instance_valid(dropped_handheld) and player.distance_to(dropped_handheld.global_position) <= 3.2:
 		_pick_up_handheld()
 		return
+	if _try_sleep_at_site():
+		return
 	var downed := _nearest_downed()
 	if not downed.is_empty():
 		# F6.1. Raising the handheld changes E from an offer into an overwrite.
@@ -3948,6 +3958,53 @@ func _interact() -> void:
 		_begin_canonical_encounter()
 		return
 	prompt.text = "Nothing answers. Find Nix or follow the floodlights to the tunnel."
+
+
+## H10.8. Returns true whenever the bedroll owned the interaction, including a
+## refused rest, so the same press cannot also resolve a body or conversation.
+func _try_sleep_at_site() -> bool:
+	if sleep_site == null or not is_instance_valid(sleep_site):
+		return false
+	if player.distance_to(sleep_site.global_position) > SLEEP_REACH:
+		return false
+	var danger := _sleep_danger()
+	if not danger.is_empty():
+		prompt.text = "TOO CLOSE TO SLEEP // %s" % danger
+		sleep_prompt_hold = 2.5
+		return true
+	var before := WorldClock.minutes()
+	WorldClock.set_hour(SLEEP_WAKE_HOUR)
+	var passed := (WorldClock.minutes() - before) / WorldClock.MINUTES_PER_HOUR
+	WorldHistory.record_event("player_slept", {
+		"location": HUNT_LOCATION,
+		"hours": passed,
+		"woke_at": WorldClock.stamp(),
+		"calendar": WorldClock.calendar_stamp(),
+	})
+	prompt.text = "SLEPT %.1f HOURS // %s // %s" % [passed, WorldClock.stamp(), WorldClock.calendar_stamp()]
+	sleep_prompt_hold = 3.0
+	_update_day_night()
+	return true
+
+
+func _sleep_danger() -> String:
+	if enemy != null and is_instance_valid(enemy) and enemy.visible and not enemy_retreating and player.distance_to(enemy.global_position) < 18.0:
+		return "%s IS HUNTING NEARBY" % _captain_name()
+	for actor: Dictionary in encounter_actors:
+		if str(actor.get("disposition", "hostile")) != "hostile" or bool(actor.get("dead", false)):
+			continue
+		var body: Node3D = actor.get("node")
+		if body != null and is_instance_valid(body) and player.distance_to(body.global_position) < 18.0:
+			return "%s IS WITHIN EARSHOT" % str(actor.get("display_name", "SOMETHING")).to_upper()
+	return ""
+
+
+func _update_sleep_prompt(delta: float) -> void:
+	sleep_prompt_hold = maxf(0.0, sleep_prompt_hold - delta)
+	if sleep_prompt_hold > 0.0 or sleep_site == null or not is_instance_valid(sleep_site):
+		return
+	if panel_mode.is_empty() and player.distance_to(sleep_site.global_position) <= SLEEP_REACH:
+		prompt.text = "[E] REST AT THE BEDROLL // WAKE AT 07:00"
 
 
 ## C1.7. The device owns identity and possession; this scene owns 3D space.
@@ -5999,6 +6056,7 @@ func _build_world() -> void:
 	floor_body.position.y = -0.6
 	floor_body.add_child(floor_collider)
 	add_child(floor_body)
+	_build_sleep_site()
 	_add_mesh(BoxMesh.new(), Vector3(0, 0, -24), Vector3(13, 5, 1.5), Color("2b2119"), 0.0)
 	# G4. This was twenty-six identical bare cubes on a regular nine-column grid,
 	# standing exactly where the player spawns — which is the real answer to
@@ -6068,6 +6126,40 @@ func _build_world() -> void:
 	sun.light_energy = 1.4
 	sun.shadow_enabled = true
 	add_child(sun)
+
+
+## H10.8. A low, battered sleeping place close to the opening route. Its long
+## silhouette, rolled foot blanket and pillow read as somewhere a body lies;
+## the bone placard carries the interaction without turning it into HUD décor.
+func _build_sleep_site() -> void:
+	sleep_site = Node3D.new()
+	sleep_site.name = "AshbloomBedroll"
+	sleep_site.position = SLEEP_SITE_POSITION
+	add_child(sleep_site)
+	_add_mesh_to(sleep_site, BoxMesh.new(), Vector3(0, 0.04, 0), Color("291612"), 0.0, Vector3(2.4, 0.10, 1.15))
+	_add_mesh_to(sleep_site, BoxMesh.new(), Vector3(-0.08, 0.10, 0), Color("54251f"), 0.0, Vector3(2.0, 0.08, 0.92))
+	_add_mesh_to(sleep_site, BoxMesh.new(), Vector3(-0.82, 0.19, 0), Color("a69a76"), 0.0, Vector3(0.42, 0.16, 0.72))
+	var roll := MeshInstance3D.new()
+	var roll_mesh := CylinderMesh.new()
+	roll_mesh.top_radius = 0.23
+	roll_mesh.bottom_radius = 0.23
+	roll_mesh.height = 1.0
+	roll_mesh.radial_segments = 10
+	roll_mesh.material = _material(Color("301d18"), 0.0)
+	roll.mesh = roll_mesh
+	roll.position = Vector3(0.94, 0.24, 0)
+	roll.rotation_degrees.z = 90.0
+	sleep_site.add_child(roll)
+	for side in [-1.0, 1.0]:
+		_add_mesh_to(sleep_site, CylinderMesh.new(), Vector3(0, 0.08, side * 0.72), Color("7b6750"), 0.0, Vector3(0.07, 0.16, 0.07))
+	var marker := Label3D.new()
+	marker.text = "BEDROLL  //  REST TO DAWN"
+	marker.font_size = 28
+	marker.modulate = Color("c7b77b")
+	marker.outline_modulate = Color("170b09")
+	marker.outline_size = 8
+	marker.position = Vector3(0, 0.78, -0.72)
+	sleep_site.add_child(marker)
 
 
 ## A4.1. One place a light is made, so every light in the region is in the same
