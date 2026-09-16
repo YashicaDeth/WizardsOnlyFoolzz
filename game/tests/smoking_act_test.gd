@@ -42,6 +42,13 @@ func _ready() -> void:
 		"an articulated pinching hand visibly holds the cigarette")
 	check(held.get_node_or_null("SmokingGripHand/HumiliationCuff") != null,
 		"the hand wears the elites' oversized jester restraint cuff")
+	var smoking_hand := held.get_node("SmokingGripHand") as Node3D
+	check(smoking_hand.scale.x < 1.0 and smoking_hand.position.y < -0.04,
+		"the cigarette sits above a compact palm instead of being buried inside it")
+	var smoking_index := smoking_hand.get_node("index/bone0") as Node3D
+	var smoking_ring := smoking_hand.get_node("ring/bone0") as Node3D
+	check(absf(smoking_index.rotation.x) < absf(smoking_ring.rotation.x) * 0.5,
+		"index and middle stay extended while the lower fingers rest against the palm")
 	var camera := hunt.get("camera") as Camera3D
 	var smoking_forearm := held.get_node_or_null("SmokingGripHand/FirstPersonForearm") as Node3D
 	check(smoking_forearm != null and smoking_forearm.get_node_or_null("TaperedSleeve") != null,
@@ -111,6 +118,8 @@ func _ready() -> void:
 		"the Zippo is itself held by an articulated lighter hand")
 	check(lighter.get_node_or_null("LighterHand/HumiliationCuff") != null,
 		"the lighter hand carries the same forced costume")
+	check((lighter.get_node("LighterHand") as Node3D).scale.x < 1.0,
+		"the Zippo hand is compact enough for the lighter and flame to remain readable")
 	check(lighter.get_node_or_null("LighterHand/FirstPersonForearm") != null,
 		"the lighter hand enters on its own continuous opposite forearm")
 	check((hunt.get("smoke_lighter_lid") as Node3D).rotation.z < -1.5,

@@ -2440,8 +2440,16 @@ func _equip_smokeable(device_id: String) -> void:
 	if grip != null:
 		smoke_grip_hand = HELD_GEAR.build_humiliation_hand(1)
 		smoke_grip_hand.name = "SmokingGripHand"
-		HELD_GEAR.set_pose(smoke_grip_hand, "pinch" if device_id in ["cigarette", "joint", "spliff"] else "wrap")
-		smoke_grip_hand.position = grip.position + Vector3(0.018, -0.012, 0.0)
+		var rolled := device_id in ["cigarette", "joint", "spliff"]
+		HELD_GEAR.set_pose(smoke_grip_hand, "smoke" if rolled else "wrap")
+		# Rolled objects sit above the palm between two fingers. Viewmodel hands
+		# need to be slightly smaller than weapon hands at this camera distance or
+		# an anatomically correct 84mm cigarette disappears behind the glove.
+		if rolled:
+			smoke_grip_hand.scale *= 0.80
+			smoke_grip_hand.position = grip.position + Vector3(0.006, -0.050, 0.010)
+		else:
+			smoke_grip_hand.position = grip.position + Vector3(0.018, -0.012, 0.0)
 		smoke_grip_hand.rotation = grip.rotation + Vector3(-PI * 0.5, 0.0, PI * 0.5)
 		smoke_model.add_child(smoke_grip_hand)
 	# A bong's second hand is not a text claim: a real hand closes at its
@@ -2683,12 +2691,13 @@ func _begin_smoke_ignition(device_id: String) -> void:
 	(player_rig.parts.left_arm as Node3D).add_child(smoke_lighter)
 	smoke_lighter_hand = HELD_GEAR.build_humiliation_hand(-1)
 	smoke_lighter_hand.name = "LighterHand"
-	HELD_GEAR.set_pose(smoke_lighter_hand, "wrap")
+	HELD_GEAR.set_pose(smoke_lighter_hand, "lighter")
+	smoke_lighter_hand.scale *= 0.80
 	# The thumb rides by the flint wheel; the other fingers close around the
 	# case. Because it is a child of the Zippo it follows the whole flip and
 	# bowl-lighting arc without ever lagging behind the prop.
-	smoke_lighter_hand.position = Vector3(-0.018, 0.010, 0.004)
-	smoke_lighter_hand.rotation = Vector3(-PI * 0.5, 0.10, -PI * 0.5)
+	smoke_lighter_hand.position = Vector3(-0.010, -0.006, 0.012)
+	smoke_lighter_hand.rotation = Vector3(-PI * 0.5, -0.08, -PI * 0.42)
 	smoke_lighter.add_child(smoke_lighter_hand)
 	smoke_lighter_lid = smoke_lighter.get_node("LidPivot") as Node3D
 	smoke_lighter_flame = smoke_lighter.get_node("Flame") as MeshInstance3D

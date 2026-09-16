@@ -113,6 +113,16 @@ const POSES := {
 	"wrap": {"fingers": [1.18, 1.34, 0.92], "thumb": [0.62, 0.70], "spread": 0.25},
 	# Flatter, and the fingers stay straighter: a blade is a plate, not a rod.
 	"pinch": {"fingers": [0.92, 1.48, 0.55], "thumb": [0.95, 0.35], "spread": 0.35},
+	# A cigarette sits between the index and middle fingers. The old generic
+	# pinch closed every finger into a near-fist, hiding the whole rolled object
+	# behind the palm. These two stay long and visibly parted while the ring and
+	# little fingers rest against the palm beneath them.
+	"smoke": {"fingers": [1.12, 1.36, 0.78], "thumb": [0.58, 0.34], "spread": 0.48,
+		"index": [0.52, 0.88, 0.48], "middle": [0.62, 0.96, 0.54]},
+	# The Zippo needs a thumb at the wheel and an index curled around its far
+	# shoulder, not the same four-finger cylinder grip used on a sword handle.
+	"lighter": {"fingers": [1.06, 1.30, 0.82], "thumb": [0.28, 0.18], "spread": 0.32,
+		"index": [0.66, 0.82, 0.42]},
 	# Index out, everything else closed. The one pose a player will notice is
 	# wrong, because it is the finger that does the thing.
 	"trigger": {"fingers": [1.30, 1.46, 1.20], "thumb": [0.70, 0.55], "spread": 0.20,
