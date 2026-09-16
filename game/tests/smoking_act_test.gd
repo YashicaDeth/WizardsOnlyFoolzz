@@ -90,7 +90,7 @@ func _ready() -> void:
 	hunt.call("_update_hud")
 	var field_hud: Control = hunt.get("field_interface") as Control
 	check(float(field_hud.lung_stain) > lung_stain_before and field_hud.lung_linger > 0.0,
-		"the lower-left X-ray reads the same live lung state after the draw")
+		"the contextual X-ray reads the same live lung state after the draw")
 	for _breath in 20:
 		hunt.call("_update_smoking", 1.0 / 60.0)
 	var air = hunt.get("air")

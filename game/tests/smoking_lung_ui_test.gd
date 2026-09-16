@@ -47,7 +47,7 @@ func _ready() -> void:
 		"lung_health": float(harsh.health), "lung_stain": float(harsh.stain),
 		"magick_unlocked": false, "magick": 0.9,
 	})
-	check(hud.lung_linger > 0.0 and hud.lung_fill > 0.7, "using the lungs opens a contextual lower-left X-ray")
+	check(hud.lung_linger > 0.0 and hud.lung_fill > 0.7, "using the lungs opens a contextual organ X-ray")
 	check(hud.mood_name() == "CHOKING", "the top-right face reports the body's acute emotion")
 	check(not hud.magick_unlocked, "magick has no empty locked bar before it exists")
 	hud.set_state({"lung_cough": 0.0, "smoking": false, "stamina": 12.0, "magick_unlocked": true, "magick": 0.45})

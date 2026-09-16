@@ -218,15 +218,18 @@ func _draw_player_state() -> void:
 	CellOutzType.draw_condensed(self, portrait + Vector2(-mood_width - 55, -13), mood, 10.0, mood_tint, 0.9)
 	CellOutzType.draw_condensed(self, portrait + Vector2(-mood_width - 55, 4), "THE HUNTER", 8.0, BONE * Color(1, 1, 1, 0.52), 0.7)
 
-	var vessel_x := size.x - 292.0
-	_draw_fluid_vessel(Rect2(vessel_x, 122, 226, 16), blood, Color("7f080b"), "BLOOD")
+	# The reservoirs hang from the portrait like medical ampoules. Their vertical
+	# orientation keeps every player-state read in one narrow silhouette and
+	# makes loss literal: the fluid level falls away from the face above it.
+	var vessel_y := 119.0
+	_draw_vertical_fluid_vessel(Rect2(portrait.x - 36.0, vessel_y, 20, 112), blood, Color("7f080b"), "BLD")
 	# Low stamina is not clean empty glass: sediment takes over as the water is
 	# worked, so the remaining fluid looks increasingly brown and foul.
 	var stamina_ratio := clampf(stamina / 100.0, 0.0, 1.0)
 	var foul_water := Color("70572b").lerp(Color("a58a45"), stamina_ratio)
-	_draw_fluid_vessel(Rect2(vessel_x, 148, 226, 16), stamina_ratio, foul_water, "STAMINA")
+	_draw_vertical_fluid_vessel(Rect2(portrait.x - 8.0, vessel_y, 20, 112), stamina_ratio, foul_water, "STA")
 	if magick_unlocked:
-		_draw_fluid_vessel(Rect2(vessel_x, 174, 226, 16), magick, Color("593f87"), "MAGICK")
+		_draw_vertical_fluid_vessel(Rect2(portrait.x + 20.0, vessel_y, 20, 112), magick, Color("593f87"), "MAG")
 
 
 func mood_name() -> String:
@@ -245,34 +248,42 @@ func mood_name() -> String:
 	return "STEADY"
 
 
-func _draw_fluid_vessel(rect: Rect2, ratio: float, fluid: Color, label: String) -> void:
+func _draw_vertical_fluid_vessel(rect: Rect2, ratio: float, fluid: Color, label: String) -> void:
 	var amount := clampf(ratio, 0.0, 1.0)
+	# Neck and suspension wire make this an object hanging from the portrait,
+	# not a progress bar turned ninety degrees.
+	var neck_x := rect.position.x + rect.size.x * 0.5
+	draw_line(Vector2(neck_x, rect.position.y - 8), Vector2(neck_x, rect.position.y), BONE * Color(1, 1, 1, 0.28), 1.2)
 	draw_rect(rect, Color(0.01, 0.008, 0.008, 0.76))
 	var inner := rect.grow(-2.0)
 	if amount > 0.001:
-		var filled_width := inner.size.x * amount
-		var wave := sin(elapsed * 2.2 + rect.position.y * 0.03) * 1.2
+		var filled_height := inner.size.y * amount
+		var surface_y := inner.end.y - filled_height
+		var wave := sin(elapsed * 2.2 + rect.position.x * 0.05) * 1.1
 		var fluid_shape := PackedVector2Array([
-			inner.position + Vector2(0, wave),
-			inner.position + Vector2(filled_width, -wave),
-			Vector2(inner.position.x + filled_width, inner.end.y), inner.end * Vector2(0, 1) + Vector2(inner.position.x, 0),
+			Vector2(inner.position.x, surface_y + wave),
+			Vector2(inner.end.x, surface_y - wave), inner.end,
+			Vector2(inner.position.x, inner.end.y),
 		])
 		draw_colored_polygon(fluid_shape, fluid * Color(1, 1, 1, 0.82))
-		for sediment in 5:
-			var px := inner.position.x + fposmod(float(sediment * 41) + elapsed * (3.0 + sediment), maxf(filled_width, 1.0))
-			draw_circle(Vector2(px, inner.end.y - 2.0 - float(sediment % 2) * 2.0), 1.2, Color(0.08, 0.04, 0.01, 0.42))
-	draw_rect(rect, BONE * Color(1, 1, 1, 0.30), false, 1.2)
-	CellOutzType.draw_condensed(self, rect.position + Vector2(5, 3), label, 8.0, BONE * Color(1, 1, 1, 0.72), 0.65)
+		for sediment in 3:
+			var px := inner.position.x + 3.0 + fposmod(float(sediment * 7) + elapsed * (1.0 + sediment), maxf(inner.size.x - 6.0, 1.0))
+			draw_circle(Vector2(px, inner.end.y - 3.0 - float(sediment % 2) * 3.0), 1.2, Color(0.08, 0.04, 0.01, 0.46))
+	draw_rect(rect, BONE * Color(1, 1, 1, 0.34), false, 1.2)
+	draw_line(rect.position + Vector2(4, 7), rect.position + Vector2(4, rect.size.y - 7), Color(1, 1, 1, 0.08), 1.0)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(1, rect.size.y + 6), label, 7.0, BONE * Color(1, 1, 1, 0.66), 0.48)
 
 
-## Bottom-left is whichever organ is currently doing something. For smoking,
-## the rib window fills while inhaling, empties on exhale and retains the stain
-## accumulated on the real AnatomyComponent lungs after the animation is gone.
+## The upper-left diagnostic answers the world/threat instrument above it while
+## leaving the lower-left satellite/radar position stable. A future held
+## inspection expands this quick silhouette into the actual 3D organ model.
+## For smoking, the rib window fills while inhaling, empties on exhale and
+## retains the stain stored on the real AnatomyComponent lungs.
 func _draw_lung_xray() -> void:
 	if lung_linger <= 0.0:
 		return
 	var alpha := minf(1.0, lung_linger * 1.4)
-	var centre := Vector2(126, size.y - 128)
+	var centre := Vector2(126, 224)
 	var cough_jolt := sin(elapsed * 35.0) * lung_cough * 5.0
 	centre.x += cough_jolt
 	# Broken X-ray aperture and a few ribs establish this as a body view without
