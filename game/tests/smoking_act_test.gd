@@ -42,6 +42,17 @@ func _ready() -> void:
 		"an articulated pinching hand visibly holds the cigarette")
 	check(held.get_node_or_null("SmokingGripHand/HumiliationCuff") != null,
 		"the hand wears the elites' oversized jester restraint cuff")
+	var camera := hunt.get("camera") as Camera3D
+	var smoking_forearm := held.get_node_or_null("SmokingGripHand/FirstPersonForearm") as Node3D
+	check(smoking_forearm != null and smoking_forearm.get_node_or_null("TaperedSleeve") != null,
+		"a costumed forearm continues from the smoking hand toward the screen edge")
+	hunt.call("_update_first_person_forearms")
+	var smoking_sleeve := smoking_forearm.get_node_or_null("TaperedSleeve") as MeshInstance3D
+	var arm_entry := camera.to_local(smoking_forearm.global_position)
+	check(smoking_forearm.top_level and smoking_forearm.visible and smoking_sleeve != null and (smoking_sleeve.mesh as CylinderMesh).height > 0.08,
+		"the first-person forearm is stretched from the frame to the live wrist")
+	check(arm_entry.x > 0.30 and arm_entry.y < -0.35,
+		"the smoking arm enters from below the right edge rather than floating at the hand")
 	var arsenal = hunt.get("arsenal")
 	check((arsenal.models.values() as Array).all(func(model): return not (model as Node3D).visible),
 		"holding it puts the weapon away")
@@ -56,7 +67,6 @@ func _ready() -> void:
 	check(held_seconds > 1.5, "holding RMB accumulates a real draw duration")
 	check(Smokeables.spent_of(held) > length_before_draw,
 		"the cigarette burns shorter continuously while the button is held")
-	var camera := hunt.get("camera") as Camera3D
 	var cigarette_in_view := camera.to_local(held.global_position)
 	check(absf(cigarette_in_view.x) < 0.10 and cigarette_in_view.y < 0.0,
 		"the lit cigarette rises beside the first-person reticle at the mouth")
@@ -101,6 +111,8 @@ func _ready() -> void:
 		"the Zippo is itself held by an articulated lighter hand")
 	check(lighter.get_node_or_null("LighterHand/HumiliationCuff") != null,
 		"the lighter hand carries the same forced costume")
+	check(lighter.get_node_or_null("LighterHand/FirstPersonForearm") != null,
+		"the lighter hand enters on its own continuous opposite forearm")
 	check((hunt.get("smoke_lighter_lid") as Node3D).rotation.z < -1.5,
 		"the Zippo lid visibly completes its flip")
 	check((hunt.get("smoke_bong_audio") as AudioStreamPlayer).playing,
@@ -128,6 +140,8 @@ func _ready() -> void:
 	var shotgun := arsenal.models.get("shotgun") as Node3D
 	check(shotgun.get_node_or_null("RightGripHand") != null and shotgun.get_node_or_null("LeftGripHand") != null,
 		"weapons render both hands on their authored grip anchors")
+	check(shotgun.get_node_or_null("RightGripHand/FirstPersonForearm") != null and shotgun.get_node_or_null("LeftGripHand/FirstPersonForearm") != null,
+		"both weapon hands remain connected to lower-left and lower-right arms")
 	hunt.call("_unhandled_input", inspect_press)
 	var weapon_before := shotgun.rotation
 	for _weapon_inspect in 12:

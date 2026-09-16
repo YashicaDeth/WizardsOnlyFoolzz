@@ -199,6 +199,7 @@ static func build_hand(side: int, flesh := Color("8a6a55")) -> Node3D:
 static func build_humiliation_hand(side: int) -> Node3D:
 	var hand := build_hand(side, Color("3b2029"))
 	hand.scale = Vector3.ONE * 1.16
+	hand.set_meta("screen_entry_side", side)
 	for child in hand.find_children("*", "MeshInstance3D", true, false):
 		(child as MeshInstance3D).material_override = _leather(Color("28151e"), 70 + side)
 
@@ -247,6 +248,42 @@ static func build_humiliation_hand(side: int) -> Node3D:
 		bell.position = Vector3(side_step * 0.035, -0.030, -0.018)
 		bell.material_override = _metal(Color("a7772d"), 0.24, 121 + int(side_step))
 		cuff.add_child(bell)
+
+	# The hand is never a floating viewmodel. A tapered costumed forearm carries
+	# it back out through the bottom-left or bottom-right of the frame. Keeping it
+	# under the hand means every smoking, lighter, weapon and inspection pose
+	# inherits one continuous limb without each prop inventing an arm.
+	var forearm := Node3D.new()
+	forearm.name = "FirstPersonForearm"
+	hand.add_child(forearm)
+	var sleeve := MeshInstance3D.new()
+	sleeve.name = "TaperedSleeve"
+	var sleeve_mesh := CylinderMesh.new()
+	sleeve_mesh.top_radius = 0.052
+	sleeve_mesh.bottom_radius = 0.078
+	sleeve_mesh.height = 0.36
+	sleeve_mesh.radial_segments = 12
+	sleeve.mesh = sleeve_mesh
+	# Authored along +Y so the live view can stretch it exactly from a lower
+	# screen edge to the wrist without guessing through the prop's rotations.
+	sleeve.position = Vector3(0.0, 0.18, 0.0)
+	sleeve.material_override = _leather(Color("40121e"), 140 + side)
+	forearm.add_child(sleeve)
+	# A broad entry puff hides the far cap at the screen edge and makes the arm
+	# widen toward the unseen elbow instead of ending as a cut-off tube.
+	for index in 4:
+		var angle := TAU * float(index) / 4.0
+		var entry_puff := MeshInstance3D.new()
+		entry_puff.name = "EntryPuff%d" % index
+		var entry_mesh := SphereMesh.new()
+		entry_mesh.radius = 0.052
+		entry_mesh.height = 0.086
+		entry_mesh.radial_segments = 10
+		entry_mesh.rings = 6
+		entry_puff.mesh = entry_mesh
+		entry_puff.position = Vector3(cos(angle) * 0.040, 0.018, sin(angle) * 0.040)
+		entry_puff.material_override = _leather(Color("651d2a") if index % 2 == 0 else Color("c6ae7a"), 150 + index)
+		forearm.add_child(entry_puff)
 	return hand
 
 
