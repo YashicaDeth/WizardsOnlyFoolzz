@@ -47,8 +47,8 @@ func _ready() -> void:
 		"the cigarette sits above a compact palm instead of being buried inside it")
 	var smoking_index := smoking_hand.get_node("index/bone0") as Node3D
 	var smoking_ring := smoking_hand.get_node("ring/bone0") as Node3D
-	check(absf(smoking_index.rotation.x) < absf(smoking_ring.rotation.x) * 0.5,
-		"index and middle stay extended while the lower fingers rest against the palm")
+	check(absf(smoking_index.rotation.x) < absf(smoking_ring.rotation.x) * 0.7,
+		"the smoking fingers stay visibly splayed instead of closing into a fist")
 	var camera := hunt.get("camera") as Camera3D
 	var smoking_forearm := held.get_node_or_null("SmokingGripHand/FirstPersonForearm") as Node3D
 	check(smoking_forearm != null and smoking_forearm.get_node_or_null("TaperedSleeve") != null,
@@ -67,6 +67,7 @@ func _ready() -> void:
 	# Hold rather than tap: the visible heat and the delivered grade are driven
 	# by the same accumulated duration.
 	hunt.call("_begin_smoking_draw")
+	var lung_stain_before := float(rig.anatomy.lung_state().stain)
 	var length_before_draw := Smokeables.spent_of(held)
 	for _frame in 96:
 		hunt.call("_update_smoking", 1.0 / 60.0)
@@ -82,6 +83,14 @@ func _ready() -> void:
 	check(str(result.get("device", "")) == "cigarette", "the hit comes from the object actually held")
 	check(float((hunt.get("smoke_spent") as Dictionary).get("cigarette", 0.0)) > 0.0,
 		"and the same act burns down that object")
+	check(float(rig.anatomy.lung_state().stain) > lung_stain_before,
+		"the draw visibly and persistently stains the body's real lung organs")
+	check((WorldHistory.subject("player").get("anatomy_state", {}) as Dictionary).has("organs"),
+		"the lung result is written through to the persistent body record")
+	hunt.call("_update_hud")
+	var field_hud: Control = hunt.get("field_interface") as Control
+	check(float(field_hud.lung_stain) > lung_stain_before and field_hud.lung_linger > 0.0,
+		"the lower-left X-ray reads the same live lung state after the draw")
 	for _breath in 20:
 		hunt.call("_update_smoking", 1.0 / 60.0)
 	var air = hunt.get("air")

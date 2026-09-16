@@ -3263,6 +3263,7 @@ in; nothing has ever asked the player to *use* them on a map.
 - [ ] **AA2.3** Giving it is an act with a cost, not a menu choice
 - [ ] **AA2.4** A holding remembers who took it and when (WorldHistory, like everything else)
 - [ ] **AA2.5** Neither side is the good one; the karma axis already refuses that framing
+- [ ] **AA2.6** A holding can be reclaimed through connected local work — dismantling fictional bandit camps, trafficker/organ-market networks, cartels, alien installations and other controlling structures — rather than by touching one map icon
 
 ### AA3 — What the land becomes
 - [ ] **AA3.1** Ascended ground: colour, light, weather clearing, things growing back
@@ -4327,7 +4328,8 @@ Greg sending the first build to friends, and reporting while it ran.
 - [x] **AG5.7** The transit plate was acid green, in a register nothing else in the game uses. Blood now, carrying the seal of the place you are arriving at — ring, point count and stride seeded off the destination path — with runnels down the glass
 - [~] **AG5.8** *"i hate the look of this ui it looks ugly"* — the bottom-right cluster specifically, and the fonts generally. Greg wants boxes, dimensional HUD panels, and a grungier biopunk face throughout
   - [x] The fonts. `gothic_field_hud.gd` had three call sites still drawing in `ThemeDB.fallback_font` — the location crest, the hunt-thread readout and the archive-frame header — the exact "tutorial level, same as the font" look `celloutz_type.gd` exists to replace, missed because all three are conditionally hidden and rarely on screen. All three now draw in the stencil face. The crest's em-dash bracketing is gone with it (the stencil alphabet has no glyph for "—"; it drew as two silent gaps) in favour of the "//" register the rest of the HUD already uses. Found in passing: the weapon well's reserve count used "×", also glyph-less and silently blank since it was written — now "x". Verified visually via `hunt_weapon_capture`, regression-checked against `hud_transience_test` (7/7)
-  - [ ] The bottom-right cluster itself. `_draw_weapon`/`_draw_regal_vitals` build a torn-leather recess *by design* — M1.6 and AG4.5's own comments name this as the deliberate alternative to "a fourth corner panel" / "an app widget checking in on you." Greg's ask here reads as a reversal of that call, not a bug in it, so it needs his steer before a rebuild rather than a guess: literal dimensional boxes back over a rig several segments deliberately moved away from, or the same organic register pushed to look less like a debug shape and more "grungier biopunk" on its own terms
+  - [x] Greg supplied the missing steer: corners have separate responsibilities rather than four matching boxes. Top-right is an original cracked mood reliquary with fluid blood and dirty-water stamina reservoirs; its magick vessel does not exist before unlock. Bottom-left is contextual anatomy, first implemented as a live lung X-ray. Top-left holds the Ashbloom date/hour, contaminated air and hunt threat. Bottom-right remains held weapon and ammunition. `_draw_regal_vitals` is retired from the live draw path rather than restyled into another generic status block (`tests/smoking_lung_ui_test.tscn`, `tests/hud_transience_test.tscn`)
+  - [ ] Greg's next refinement supersedes the temporary lower-corner ownership above: the scuffed Black Mirror should physically poke from a pocket at lower-right, while its satellite/radar feed owns lower-left. Contextual anatomy does not disappear; it hijacks that feed during use or injury and yields it back afterward. Rework these together with the map rather than drawing a decorative radar disconnected from A10's real satellite camera
 - [ ] **AG5.9** *"the hunt thing hardly works at all zero continuity"* — the Hunt System does not hold together across a session
 - [ ] **AG5.10** The map has to integrate the underground conspiracy network text file, and carry Greg's own art textures
 - [x] **AG5.11** Save files: deletable, continuable, several of them, so somebody can keep a world and generate new stories in it — `WorldHistory` gains `active_slot_id`/`slot_manifest` and `create_slot`/`load_slot`/`delete_slot`/`list_slots`. `SAVE_PATH` stays the untouched legacy file every editor run and headless test always used; a slot is a layer the front-end opts into by setting `active_slot_id`, at which point `_current_path()` redirects load/save at `user://saves/<id>.json` with its own `manifest.json` row. A save from before this existed surfaces as a "Continue" slot the first time `list_slots` runs rather than becoming invisible. `tests/save_slots_test.gd`, 17 checks. Front-end menu wiring (an actual save-select screen) is not built yet — this is the machinery underneath it
@@ -5621,8 +5623,12 @@ to get right.
 - [x] **AU7.2** A draw is press-and-hold with a weak / clean / harsh grade, and
       the punishment is reserved for greed - a short draw is thin, never
       punished (`tests/smokeables_test.gd`, 47 checks)
-- [x] **AU7.3** Harshness is paid into `anatomy_state` where every other body
-      cost is paid, never into a private cough counter
+- [x] **AU7.3** Harshness is paid into the live lung organs in `anatomy_state`
+      where every other body cost is paid, never into a private cough counter.
+      A draw raises a contextual lower-left lung X-ray; smoke visibly fills and
+      clears, harsh draws cough, and repeated use leaves a dark `smoke_stain`
+      that survives save/restore until replacement lungs clear it
+      (`tests/smoking_lung_ui_test.tscn`, `tests/smoking_act_test.tscn`)
 - [x] **AU7.4** The buzz is a real short dose on `substance_experience.gd`'s own
       curve, so smoked and swallowed cannot drift into two systems
 - [x] **AU7.5** Lit ends are real `OmniLight3D`s, so a cigarette in the dark is
@@ -5657,7 +5663,10 @@ to get right.
       convention on the body's real right arm. The draw raises that arm to the
       mouth; the bong has a second physical grip and support hand, recruits the
       left-arm pose, and hides the whole weapon set while held
-      (`tests/smokeables_test.gd`, `tests/smoking_act_test.gd`)
+      (`tests/smokeables_test.gd`, `tests/smoking_act_test.gd`). Cigarettes,
+      joints and spliffs use a distinct open-palm, long splayed-finger grip so
+      the item stays visible between the fingers instead of being swallowed by
+      a fist; the jester sleeves and arms still enter from the lower frame.
 - [ ] **AU7.10** Passing one to somebody is a real act with a real meaning (S)
 
 ### AU5 — The effect taxonomy
@@ -6032,6 +6041,7 @@ AK1.1 and AK2.1 the same object.
 - [ ] **AK1.5** You can work against them, and the sky gets worse for you when you do
 - [ ] **AK1.6** Losing them costs the satellite: back to a paper chart (A10 degrades, it does not vanish)
 - [ ] **AK1.7** They are an institution and the satire stays pointed at institutions
+- [ ] **AK1.8** Their target pings publish an approximate area rather than omniscient coordinates; bounties and jobs draw hunters into that area and make the phone's convenience a direct threat to whoever carries it
 
 ### AK2 — The esoteric chart register
 - [ ] **AK2.1** Their briefings read like the charts: dense, hand-lettered, confident, unsourced

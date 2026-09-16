@@ -176,6 +176,10 @@ func configure(id: String, capacity: float = 5000.0, cybernetics: Variant = {}) 
 	for organ_id in ORGANS:
 		var organ: Dictionary = (ORGANS[organ_id] as Dictionary).duplicate(true)
 		organ["ruptured"] = false
+		if organ_id in ["left_lung", "right_lung"]:
+			# Persisted on the organ itself. It is not a cosmetic counter beside
+			# the body: the X-ray reads this field and a replacement clears it.
+			organ["smoke_stain"] = 0.0
 		if organ_id == "spine":
 			organ["vertebrae_damaged"] = []
 		organs[organ_id] = organ
@@ -316,6 +320,58 @@ func damage_organ(organ_id: String, amount: float) -> Dictionary:
 			_die_or_fail({"type": "organ_destroyed", "organ": organ_id, "subject_id": subject_id})
 	organs[organ_id] = organ
 	return organ
+
+
+## Smoke enters the same two lungs a bullet or a blade can reach. `density`
+## controls how much arrives; `harshness` controls the acute tissue cost and
+## cough. The stain is deliberately slow, cumulative and saved inside each
+## organ so replacing a lung can genuinely replace the history written on it.
+func inhale_smoke(density: float, harshness: float, device_id := "cigarette") -> Dictionary:
+	var delivered := clampf(density, 0.0, 3.0)
+	var harsh := clampf(harshness, 0.0, 1.0)
+	var stain_rate := 0.003 if device_id == "vape" else (0.005 if device_id in ["joint", "spliff", "bong"] else 0.007)
+	for organ_id in ["left_lung", "right_lung"]:
+		if not organs.has(organ_id):
+			continue
+		var organ: Dictionary = organs[organ_id]
+		organ["smoke_stain"] = clampf(float(organ.get("smoke_stain", 0.0)) + delivered * stain_rate * (1.0 + harsh * 1.6), 0.0, 1.0)
+		organs[organ_id] = organ
+		# Clean use still leaves a trace; a greedy pull does most of the damage.
+		damage_organ(organ_id, delivered * (0.012 + harsh * 0.10))
+	# Acute harshness belongs to this live body too. Smokeables records the dose
+	# and history; this component owns what the coughing body pays right now.
+	pain = clampf(pain + harsh * 6.0, 0.0, 100.0)
+	consciousness = clampf(consciousness - harsh * 9.0, 0.0, 100.0)
+	return lung_state()
+
+
+func lung_state() -> Dictionary:
+	var left: Dictionary = organs.get("left_lung", {})
+	var right: Dictionary = organs.get("right_lung", {})
+	var left_max := float((ORGANS["left_lung"] as Dictionary).health)
+	var right_max := float((ORGANS["right_lung"] as Dictionary).health)
+	return {
+		"left_health": clampf(float(left.get("health", 0.0)) / left_max, 0.0, 1.0),
+		"right_health": clampf(float(right.get("health", 0.0)) / right_max, 0.0, 1.0),
+		"health": clampf((float(left.get("health", 0.0)) / left_max + float(right.get("health", 0.0)) / right_max) * 0.5, 0.0, 1.0),
+		"stain": clampf((float(left.get("smoke_stain", 0.0)) + float(right.get("smoke_stain", 0.0))) * 0.5, 0.0, 1.0),
+	}
+
+
+## A future surgeon/shop calls this exact seam. Resetting only the display
+## would leave a black lung underneath a clean icon; replacing the real organ
+## makes health and accumulated smoke history agree again.
+func replace_organ(organ_id: String, replacement: Dictionary = {}) -> Dictionary:
+	if not ORGANS.has(organ_id):
+		return {}
+	var fresh: Dictionary = (ORGANS[organ_id] as Dictionary).duplicate(true)
+	fresh["ruptured"] = false
+	if organ_id in ["left_lung", "right_lung"]:
+		fresh["smoke_stain"] = 0.0
+	if not replacement.is_empty():
+		fresh["replacement"] = replacement.duplicate(true)
+	organs[organ_id] = fresh
+	return fresh.duplicate(true)
 
 
 func go_down() -> void:

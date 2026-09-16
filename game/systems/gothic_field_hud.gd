@@ -8,7 +8,21 @@ const COPPER := Color("dc5827")
 const TEAL := Color("278f87")
 const VOID := Color(0.018, 0.008, 0.012, 0.88)
 var health := 100.0
+var blood := 1.0
 var stamina := 100.0
+var pain := 0.0
+var consciousness := 100.0
+var smoking := false
+var lung_inhaling := false
+var lung_fill := 0.0
+var lung_cough := 0.0
+var lung_health := 1.0
+var lung_stain := 0.0
+var lung_linger := 0.0
+var magick_unlocked := false
+var magick := 0.0
+var world_stamp := ""
+var air := 0.0
 var rival_status := "DORMANT"
 ## Whoever the captain is this save. Set from the record by whoever drives
 ## this panel — the name is generated per save now (`cast_names.gd`), so a
@@ -55,7 +69,22 @@ var familiar := 0.0
 
 func set_state(values: Dictionary) -> void:
 	health = float(values.get("health", health))
+	blood = clampf(float(values.get("blood", blood)), 0.0, 1.0)
 	stamina = float(values.get("stamina", stamina))
+	pain = clampf(float(values.get("pain", pain)), 0.0, 100.0)
+	consciousness = clampf(float(values.get("consciousness", consciousness)), 0.0, 100.0)
+	smoking = bool(values.get("smoking", smoking))
+	lung_inhaling = bool(values.get("lung_inhaling", lung_inhaling))
+	lung_fill = clampf(float(values.get("lung_fill", lung_fill)), 0.0, 1.0)
+	lung_cough = clampf(float(values.get("lung_cough", lung_cough)), 0.0, 1.0)
+	lung_health = clampf(float(values.get("lung_health", lung_health)), 0.0, 1.0)
+	lung_stain = clampf(float(values.get("lung_stain", lung_stain)), 0.0, 1.0)
+	magick_unlocked = bool(values.get("magick_unlocked", magick_unlocked))
+	magick = clampf(float(values.get("magick", magick)), 0.0, 1.0)
+	world_stamp = str(values.get("world_stamp", world_stamp))
+	air = clampf(float(values.get("air", air)), 0.0, 1.0)
+	if smoking or lung_fill > 0.01 or lung_cough > 0.01:
+		lung_linger = 3.2
 	rival_status = str(values.get("rival_status", rival_status)).to_upper()
 	rival_name = str(values.get("rival_name", rival_name))
 	location = str(values.get("location", location))
@@ -80,6 +109,7 @@ func _process(delta: float) -> void:
 	if not menu_open:
 		familiar = minf(1.0, familiar + delta * 0.0055)
 	location_announce = maxf(0.0, location_announce - delta)
+	lung_linger = maxf(0.0, lung_linger - delta)
 	queue_redraw()
 
 
@@ -92,9 +122,11 @@ func _draw() -> void:
 			_draw_full_archive_frame()
 		return
 	_draw_location_crest()
+	_draw_world_condition()
 	_draw_hunt_thread()
+	_draw_player_state()
 	_draw_weapon()
-	_draw_regal_vitals()
+	_draw_lung_xray()
 	_draw_breath()
 	_draw_lock_reticle()
 	_draw_controls()
@@ -147,6 +179,134 @@ func _draw_regal_vitals() -> void:
 	draw_circle(heart, 7.0 + beat * (1.0 + (1.0 - health_ratio) * 2.4), BLOOD)
 	if health_ratio < 0.25:
 		draw_circle(heart, 13.0 + beat * 4.0, BLOOD * Color(1, 1, 1, 0.14))
+
+
+## The player owns the top-right corner. A small expressive mask reports the
+## body state without importing somebody else's portrait-widget design, and
+## the reservoirs underneath are fluids rather than rectangular progress bars:
+## blood, filthy stamina water, and magick only after a ritual has made it real.
+func _draw_player_state() -> void:
+	var portrait := Vector2(size.x - 74.0, 68.0)
+	var mood := mood_name()
+	var mood_tint := TEAL
+	if mood in ["HURTING", "AGONY", "CHOKING"]:
+		mood_tint = BLOOD
+	elif mood in ["WINDED", "FADING"]:
+		mood_tint = COPPER
+	# An asymmetrical cracked reliquary, not a clean app card.
+	var frame := PackedVector2Array([
+		portrait + Vector2(-43, -37), portrait + Vector2(31, -42),
+		portrait + Vector2(44, -18), portrait + Vector2(39, 34),
+		portrait + Vector2(10, 45), portrait + Vector2(-39, 31),
+		portrait + Vector2(-47, -7), portrait + Vector2(-43, -37),
+	])
+	draw_colored_polygon(frame, VOID)
+	draw_polyline(frame, mood_tint * Color(1, 1, 1, 0.72), 2.0)
+	# The issued jester hood frames an actual changing face.
+	draw_circle(portrait, 25.0, Color("26131d"))
+	draw_circle(portrait + Vector2(-18, -23), 12.0, Color("651d2a"))
+	draw_circle(portrait + Vector2(18, -23), 12.0, Color("c6ae7a"))
+	var droop := 5.0 if mood in ["HURTING", "AGONY", "FADING"] else (-2.0 if mood == "ALTERED" else 1.0)
+	var eye_open := 2.0 if consciousness > 35.0 else 0.5
+	for side in [-1.0, 1.0]:
+		var eye := portrait + Vector2(side * 9.0, -4.0 + droop * 0.25)
+		draw_line(eye + Vector2(-5, -eye_open), eye + Vector2(5, eye_open), BONE, 1.6)
+		draw_circle(eye + Vector2(side * 1.5, 0), 1.8, mood_tint)
+	var mouth_curve := -5.0 if mood == "STEADY" else (8.0 if mood in ["HURTING", "AGONY", "CHOKING"] else 2.0)
+	draw_arc(portrait + Vector2(0, 11 - mouth_curve * 0.25), 9.0, 0.25 if mouth_curve > 0 else PI + 0.25, PI - 0.25 if mouth_curve > 0 else TAU - 0.25, 12, BONE, 1.5)
+	var mood_width := CellOutzType.width_condensed(mood, 10.0, 0.9)
+	CellOutzType.draw_condensed(self, portrait + Vector2(-mood_width - 55, -13), mood, 10.0, mood_tint, 0.9)
+	CellOutzType.draw_condensed(self, portrait + Vector2(-mood_width - 55, 4), "THE HUNTER", 8.0, BONE * Color(1, 1, 1, 0.52), 0.7)
+
+	var vessel_x := size.x - 292.0
+	_draw_fluid_vessel(Rect2(vessel_x, 122, 226, 16), blood, Color("7f080b"), "BLOOD")
+	# Low stamina is not clean empty glass: sediment takes over as the water is
+	# worked, so the remaining fluid looks increasingly brown and foul.
+	var stamina_ratio := clampf(stamina / 100.0, 0.0, 1.0)
+	var foul_water := Color("70572b").lerp(Color("a58a45"), stamina_ratio)
+	_draw_fluid_vessel(Rect2(vessel_x, 148, 226, 16), stamina_ratio, foul_water, "STAMINA")
+	if magick_unlocked:
+		_draw_fluid_vessel(Rect2(vessel_x, 174, 226, 16), magick, Color("593f87"), "MAGICK")
+
+
+func mood_name() -> String:
+	if lung_cough > 0.12:
+		return "CHOKING"
+	if consciousness < 28.0:
+		return "FADING"
+	if pain >= 72.0:
+		return "AGONY"
+	if pain >= 38.0 or health < 55.0:
+		return "HURTING"
+	if stamina < 22.0:
+		return "WINDED"
+	if magick_unlocked and magick > 0.52:
+		return "ALTERED"
+	return "STEADY"
+
+
+func _draw_fluid_vessel(rect: Rect2, ratio: float, fluid: Color, label: String) -> void:
+	var amount := clampf(ratio, 0.0, 1.0)
+	draw_rect(rect, Color(0.01, 0.008, 0.008, 0.76))
+	var inner := rect.grow(-2.0)
+	if amount > 0.001:
+		var filled_width := inner.size.x * amount
+		var wave := sin(elapsed * 2.2 + rect.position.y * 0.03) * 1.2
+		var fluid_shape := PackedVector2Array([
+			inner.position + Vector2(0, wave),
+			inner.position + Vector2(filled_width, -wave),
+			Vector2(inner.position.x + filled_width, inner.end.y), inner.end * Vector2(0, 1) + Vector2(inner.position.x, 0),
+		])
+		draw_colored_polygon(fluid_shape, fluid * Color(1, 1, 1, 0.82))
+		for sediment in 5:
+			var px := inner.position.x + fposmod(float(sediment * 41) + elapsed * (3.0 + sediment), maxf(filled_width, 1.0))
+			draw_circle(Vector2(px, inner.end.y - 2.0 - float(sediment % 2) * 2.0), 1.2, Color(0.08, 0.04, 0.01, 0.42))
+	draw_rect(rect, BONE * Color(1, 1, 1, 0.30), false, 1.2)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(5, 3), label, 8.0, BONE * Color(1, 1, 1, 0.72), 0.65)
+
+
+## Bottom-left is whichever organ is currently doing something. For smoking,
+## the rib window fills while inhaling, empties on exhale and retains the stain
+## accumulated on the real AnatomyComponent lungs after the animation is gone.
+func _draw_lung_xray() -> void:
+	if lung_linger <= 0.0:
+		return
+	var alpha := minf(1.0, lung_linger * 1.4)
+	var centre := Vector2(126, size.y - 128)
+	var cough_jolt := sin(elapsed * 35.0) * lung_cough * 5.0
+	centre.x += cough_jolt
+	# Broken X-ray aperture and a few ribs establish this as a body view without
+	# putting it in another literal box.
+	for rib in 5:
+		var rib_y := centre.y - 50 + rib * 23.0
+		draw_arc(Vector2(centre.x - 4, rib_y), 72.0 - rib * 4.0, PI * 0.10, PI * 0.90, 18, BONE * Color(1, 1, 1, 0.10 * alpha), 1.2)
+	var tissue := Color("a35b58").lerp(Color("171313"), lung_stain)
+	for side in [-1.0, 1.0]:
+		var lung_center := centre + Vector2(side * 32.0, 2.0)
+		var lung := PackedVector2Array([
+			lung_center + Vector2(-side * 3, -52), lung_center + Vector2(side * 23, -40),
+			lung_center + Vector2(side * 31, -8), lung_center + Vector2(side * 25, 39),
+			lung_center + Vector2(side * 7, 53), lung_center + Vector2(-side * 9, 28),
+			lung_center + Vector2(-side * 12, -18), lung_center + Vector2(-side * 3, -52),
+		])
+		draw_colored_polygon(lung, tissue * Color(1, 1, 1, (0.34 + lung_fill * 0.22) * alpha))
+		draw_polyline(lung, (TEAL if lung_health > 0.45 else BLOOD) * Color(1, 1, 1, 0.72 * alpha), 1.5)
+		# Smoke curls remain inside the approximate lobe rather than becoming a
+		# generic particle cloud behind it.
+		for wisp in int(round(lung_fill * 7.0)):
+			var phase: float = elapsed * (0.8 + float(wisp) * 0.07) + float(wisp) * 1.7 + side
+			var at := lung_center + Vector2(side * (5 + sin(phase) * 13), 34 - fposmod(phase * 18.0, 70.0))
+			draw_circle(at, 3.0 + float(wisp % 3), Color(0.70, 0.74, 0.68, 0.10 * alpha))
+	draw_line(centre + Vector2(0, -72), centre + Vector2(0, 20), BONE * Color(1, 1, 1, 0.40 * alpha), 4.0)
+	CellOutzType.draw_condensed(self, centre + Vector2(-78, 67), "PULMONARY X-RAY // %s" % ("COUGH" if lung_cough > 0.1 else "DRAW" if lung_inhaling else "CLEARING"), 9.0, (BLOOD if lung_cough > 0.1 else TEAL) * Color(1, 1, 1, alpha), 0.75)
+
+
+func _draw_world_condition() -> void:
+	if world_stamp.is_empty():
+		return
+	CellOutzType.draw_condensed(self, Vector2(30, 30), world_stamp, 9.0, BONE * Color(1, 1, 1, 0.55), 0.75)
+	var air_label := "AIR // %s" % ("FOUL" if air > 0.66 else "TAINTED" if air > 0.25 else "THIN")
+	CellOutzType.draw_condensed(self, Vector2(30, 48), air_label, 8.0, (BLOOD if air > 0.66 else COPPER) * Color(1, 1, 1, 0.64), 0.7)
 
 
 ## AG4.5. Breathing, rather than a meter of breath.
@@ -202,7 +362,9 @@ func _draw_location_crest() -> void:
 func _draw_hunt_thread() -> void:
 	if rival_status == "DORMANT" or rival_status.is_empty():
 		return
-	var anchor := Vector2(size.x - 260, 48)
+	# Top-right belongs to the player's face and fluids now. A hunt is external
+	# world pressure, so it hangs under the top-left date/air instrument instead.
+	var anchor := Vector2(30, 82)
 	var eye := anchor + Vector2(205, 12)
 	draw_arc(eye, 16, 0, TAU, 24, COPPER * Color(1, 1, 1, 0.45), 2)
 	draw_circle(eye, 4 + sin(elapsed * 3.1), BLOOD)

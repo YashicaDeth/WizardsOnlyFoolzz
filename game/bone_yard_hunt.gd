@@ -640,6 +640,10 @@ var smoke_pose := 0.0
 var smoke_exhale_delay := 0.0
 var smoke_pending_exhale: Dictionary = {}
 var smoke_cough := 0.0
+## What the contextual X-ray is showing inside the actual lungs. It fills with
+## the held draw and drains through the automatic exhale; permanent darkness
+## is stored by AnatomyComponent on the organs themselves.
+var smoke_lung_fill := 0.0
 const SMOKE_TRICKS := ["O", "DOUBLE O", "GHOST"]
 var smoke_trick_index := 0
 var smoke_trick_window := 0.0
@@ -2489,6 +2493,7 @@ func _put_smokeable_away(show_arsenal := true) -> void:
 	smoke_exhale_delay = 0.0
 	smoke_pending_exhale = {}
 	smoke_cough = 0.0
+	smoke_lung_fill = 0.0
 	smoke_trick_window = 0.0
 	smoke_last_exhale = {}
 	if body_motion != null:
@@ -2526,6 +2531,9 @@ func _update_smoking(delta: float) -> void:
 		SMOKEABLES.set_spent(smoke_model, clampf(smoke_draw_start_spent + live_burn, 0.0, 1.0))
 		var draw_percent := roundi(clampf(smoke_held / maxf(live_ideal, 0.01), 0.0, 1.35) * 100.0)
 		prompt.text = ("SINK THE CONE // %d%% // RELEASE AS IT CLEARS" if device_id == "bong" else "INHALE // %d%% // RELEASE ON THE SWEET SPOT") % draw_percent
+		smoke_lung_fill = move_toward(smoke_lung_fill, clampf(float(draw_percent) / 100.0, 0.0, 1.0), delta * 1.8)
+	elif smoke_exhale_delay <= 0.0:
+		smoke_lung_fill = move_toward(smoke_lung_fill, 0.0, delta * 1.35)
 	if smoke_exhale_delay > 0.0:
 		smoke_exhale_delay = maxf(0.0, smoke_exhale_delay - delta)
 		if smoke_exhale_delay <= 0.0:
@@ -2623,6 +2631,14 @@ func _finish_smoking_draw() -> Dictionary:
 	smoke_spent[device_id] = spent
 	SMOKEABLES.set_spent(smoke_model, spent)
 	if bool(result.get("ok", false)):
+		# The dose/history lives in Smokeables; the tissue cost belongs to the
+		# live anatomy in this scene. Persist its snapshot immediately so the
+		# dossier, save and contextual X-ray all read the same two lungs.
+		if player_rig != null and is_instance_valid(player_rig):
+			var lung_report: Dictionary = player_rig.anatomy.inhale_smoke(
+				float(result.get("exhale", 1.0)), float(result.get("harsh", 0.0)), device_id)
+			result["lungs"] = lung_report
+			WorldHistory.amend_subject("player", {"anatomy_state": player_rig.snapshot()})
 		prompt.text = "%s DRAW // %s" % [str(result.get("grade", "")).to_upper(), "SPENT" if spent >= 0.999 else "%d%% LEFT" % roundi((1.0 - spent) * 100.0)]
 		smoke_pending_exhale = result.duplicate(true)
 		smoke_exhale_delay = 0.26
@@ -5298,9 +5314,31 @@ func _update_hud() -> void:
 	vitals.text = "BODY  %03d%%\nSTAMINA  %03d%%\nPROSTHETIC  TORQUE ARM\nHUNT  %s" % [health, roundi(stamina), str(WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("status", "dormant")).to_upper()]
 	prompt.visible = not resolution_ui.visible and not living_map.visible and not world_index.visible
 	if field_interface.has_method("set_state"):
+		var blood_ratio := 1.0
+		var lung_state := {"health": 1.0, "stain": 0.0}
+		var pain := 0.0
+		var consciousness := 100.0
+		if player_rig != null and is_instance_valid(player_rig):
+			blood_ratio = clampf(player_rig.anatomy.blood_remaining / maxf(player_rig.anatomy.blood_capacity, 1.0), 0.0, 1.0)
+			lung_state = player_rig.anatomy.lung_state()
+			pain = player_rig.anatomy.pain
+			consciousness = player_rig.anatomy.consciousness
 		field_interface.set_state({
 			"health": health,
+			"blood": blood_ratio,
 			"stamina": stamina,
+			"pain": pain,
+			"consciousness": consciousness,
+			"smoking": smoke_drawing or smoke_exhale_delay > 0.0 or smoke_lung_fill > 0.01,
+			"lung_inhaling": smoke_drawing,
+			"lung_fill": smoke_lung_fill,
+			"lung_cough": smoke_cough,
+			"lung_health": float(lung_state.get("health", 1.0)),
+			"lung_stain": float(lung_state.get("stain", 0.0)),
+			"magick_unlocked": WorldHistory.event_count("ritual_completed") > 0,
+			"magick": WorldHistory.chaos_magick(),
+			"world_stamp": "%s // %s" % [WorldClock.calendar_stamp(), WorldClock.stamp()],
+			"air": air.severity() if air != null and is_instance_valid(air) else 0.0,
 			"rival_status": WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("status", "dormant"),
 			"rival_name": _captain_name(),
 			"menu_open": world_index.visible or character_archive.visible or allusions_artwork.visible or living_map.visible,
