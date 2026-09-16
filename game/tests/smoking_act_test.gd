@@ -36,6 +36,9 @@ func _ready() -> void:
 		_report()
 		return
 	var rig = hunt.get("player_rig")
+	var field_lens: Control = hunt.get("field_lens") as Control
+	check(field_lens != null and float(field_lens.treatment().curvature) > 0.0,
+		"ordinary first-person play passes through a slight permanent curved lens")
 	check(held.get_parent() == rig.parts.right_arm, "the object belongs to the body's real right arm")
 	check(held.get_node_or_null("anchor_grip") != null, "and it arrived through HeldGear's grip anchor")
 	check(held.get_node_or_null("SmokingGripHand") != null,
@@ -123,6 +126,9 @@ func _ready() -> void:
 	var lighter := hunt.get("smoke_lighter") as Node3D
 	check(lighter != null and lighter.get_node_or_null("Flame") != null,
 		"the other hand flips a physical Zippo onto the bong bowl")
+	var lighter_light := lighter.get_node_or_null("FlameLight") as OmniLight3D
+	check(lighter_light != null and lighter_light.visible and lighter_light.omni_range >= 7.0,
+		"the open Zippo casts a warm navigable pool through the dark")
 	check(lighter.get_node_or_null("LighterHand") != null,
 		"the Zippo is itself held by an articulated lighter hand")
 	check(lighter.get_node_or_null("LighterHand/HumiliationCuff") != null,

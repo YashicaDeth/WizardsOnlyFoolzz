@@ -141,6 +141,8 @@ func _ready() -> void:
 	SMOKEABLES.set_draw(fresh, 1.0)
 	check(coal_material.emission_energy_multiplier > rest_energy, "drawing brightens the coal")
 	check(held_light.light_energy > rest_throw, "and it throws more light while you do it")
+	check(held_light.omni_range >= 6.0 and held_light.light_energy >= 4.0,
+		"a live draw casts a usable warm pool into the night")
 	var sweet_hue := coal_material.emission
 	SMOKEABLES.set_draw(fresh, 1.6)
 	check(coal_material.emission != sweet_hue,
@@ -174,6 +176,8 @@ func _ready() -> void:
 		"and pulls visible bubbles through the water")
 	check((bong_parts["light"] as OmniLight3D).light_energy > 0.0,
 		"and lights the bowl during the same held draw")
+	check((bong_parts["light"] as OmniLight3D).omni_range >= 4.5,
+		"the burning bowl reaches beyond the prop into the nearby room")
 
 	var live_spliff := SMOKEABLES.build("spliff", 0.0)
 	var spliff_ash: MeshInstance3D = (live_spliff.get_meta("parts") as Dictionary)["ash"]

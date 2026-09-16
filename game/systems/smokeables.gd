@@ -316,7 +316,10 @@ static func set_draw(node: Node3D, heat: float) -> void:
 			var bowl_coal: StandardMaterial3D = pack.material_override
 			bowl_coal.emission_energy_multiplier = lerpf(0.0, 4.8, clampf(pull, 0.0, 1.0))
 			var bowl_light: OmniLight3D = parts["light"]
-			bowl_light.light_energy = lerpf(0.0, 0.72, clampf(pull, 0.0, 1.0))
+			# The burning bowl is the player's smallest emergency night light:
+			# warm and local, but strong enough to reveal the hands and nearby floor.
+			bowl_light.light_energy = lerpf(0.0, 4.2, clampf(pull, 0.0, 1.0))
+			bowl_light.omni_range = lerpf(1.4, 6.0, clampf(pull, 0.0, 1.0))
 			var chamber: MeshInstance3D = parts["chamber_smoke"]
 			chamber.visible = pull > 0.025
 			var chamber_material: StandardMaterial3D = chamber.material_override
@@ -338,8 +341,10 @@ static func set_draw(node: Node3D, heat: float) -> void:
 	ember.emission = COAL.lerp(Color("ffd9a0"), clampf(climb - 1.0, 0.0, 1.0))
 	ember.emission_energy_multiplier = lerpf(1.4, 7.5, clampf(climb, 0.0, 1.0))
 	var light: OmniLight3D = parts["light"]
-	light.light_energy = lerpf(0.22, 1.5, clampf(climb, 0.0, 1.0))
-	light.omni_range = lerpf(0.28, 0.62, clampf(climb, 0.0, 1.0))
+	# At rest it makes a close amber pool; drawing turns it into a brief usable
+	# torch. The warm omnidirectional spill keeps it distinct from a flashlight.
+	light.light_energy = lerpf(0.85, 4.4, clampf(climb, 0.0, 1.0))
+	light.omni_range = lerpf(1.8, 6.4, clampf(climb, 0.0, 1.0))
 	var ash: MeshInstance3D = parts["ash"]
 	var ash_mesh: CylinderMesh = ash.mesh
 	ash_mesh.height = lerpf(0.006, 0.016, clampf(climb, 0.0, 1.0))
@@ -416,11 +421,10 @@ static func _build_rolled(root: Node3D, length: float, mouth_radius: float, burn
 	var light := OmniLight3D.new()
 	light.name = "ember_light"
 	light.light_color = COAL
-	# A coal lights its own hand and the thing it is resting on, not the room.
-	# At 0.9m every lit end on the bench was throwing onto every other object,
-	# so a filter tip half a metre away photographed as if it were glowing.
-	light.light_energy = 0.5
-	light.omni_range = 0.34
+	# In the field this coal is also the smallest torch the player owns. The
+	# draw curve raises it further; at rest it only makes a local amber pool.
+	light.light_energy = 0.85
+	light.omni_range = 1.8
 	light.position = Vector3(0, 0, -length)
 	root.add_child(light)
 

@@ -95,6 +95,7 @@ const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
 const LIVE_BODY_MIRROR := preload("res://systems/live_body_mirror.gd")
 const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
+const FIELD_LENS := preload("res://systems/field_lens.gd")
 const STORM_WEATHER := preload("res://systems/storm_weather.gd")
 const PERCEPTION := preload("res://systems/perception.gd")
 const GLITCH_SPIDER := preload("res://systems/glitch_spider.gd")
@@ -393,6 +394,7 @@ var handheld: Control
 ## FINAL_V.md §16. The one screen-space layer AS2's night warp, and later the
 ## drugs and shadow realms, all reach for instead of building their own effect.
 var psychedelic: Control
+var field_lens: Control
 ## AG2. What can be pressed, when somebody asks.
 var keys_card: Control
 ## AS1.1. The one real light the handheld throws into the world. Lives on the
@@ -629,6 +631,7 @@ var smoke_lighter: Node3D
 var smoke_lighter_hand: Node3D
 var smoke_lighter_lid: Node3D
 var smoke_lighter_flame: MeshInstance3D
+var smoke_lighter_light: OmniLight3D
 var smoke_ignition := 0.0
 var smoke_bong_audio: AudioStreamPlayer
 var smoke_lighter_audio: AudioStreamPlayer
@@ -810,6 +813,9 @@ func _ready() -> void:
 	kill_cam = preload("res://systems/kill_cam.gd").new()
 	kill_cam.name = "KillCam"
 	$HUD.add_child(kill_cam)
+	field_lens = FIELD_LENS.new()
+	field_lens.name = "FieldLens"
+	$HUD.add_child(field_lens)
 	psychedelic = PSYCHEDELIC_RIG.new()
 	psychedelic.name = "Psychedelic"
 	$HUD.add_child(psychedelic)
@@ -2483,6 +2489,7 @@ func _put_smokeable_away(show_arsenal := true) -> void:
 	smoke_lighter_hand = null
 	smoke_lighter_lid = null
 	smoke_lighter_flame = null
+	smoke_lighter_light = null
 	smoke_ignition = 0.0
 	if smoke_bong_audio != null:
 		smoke_bong_audio.stop()
@@ -2717,6 +2724,7 @@ func _begin_smoke_ignition(device_id: String) -> void:
 	smoke_lighter.add_child(smoke_lighter_hand)
 	smoke_lighter_lid = smoke_lighter.get_node("LidPivot") as Node3D
 	smoke_lighter_flame = smoke_lighter.get_node("Flame") as MeshInstance3D
+	smoke_lighter_light = smoke_lighter.get_node("FlameLight") as OmniLight3D
 	smoke_ignition = 0.0
 	if smoke_support_hand != null:
 		smoke_support_hand.visible = device_id != "bong"
@@ -2748,9 +2756,13 @@ func _update_smoke_ignition(delta: float, device_id: String, draw_ratio: float, 
 	smoke_lighter_lid.rotation.z = -flip * 2.18
 	var stays_lit := smoke_drawing and (device_id == "bong" or smoke_ignition < 0.95)
 	smoke_lighter_flame.visible = stays_lit and smoke_ignition > 0.12
+	smoke_lighter_light.visible = smoke_lighter_flame.visible
 	if smoke_lighter_flame.visible:
 		var flutter := 0.88 + sin(smoke_held * 31.0) * 0.12
 		smoke_lighter_flame.scale = Vector3(0.82, flutter, 0.82)
+		# A Zippo is the stronger improvised light. The flicker moves warmth over
+		# nearby surfaces without pulsing the exposure of the entire scene.
+		smoke_lighter_light.light_energy = 5.2 + sin(smoke_held * 47.0) * 0.45
 	if smoke_support_hand != null:
 		smoke_support_hand.visible = not (device_id == "bong" and smoke_drawing)
 	if body_motion != null and body_motion.first_person:
@@ -2816,6 +2828,14 @@ func _build_zippo() -> Node3D:
 	flame_node.position.y = 0.078
 	flame_node.visible = false
 	root.add_child(flame_node)
+	var flame_light := OmniLight3D.new()
+	flame_light.name = "FlameLight"
+	flame_light.light_color = Color("ffad58")
+	flame_light.light_energy = 5.2
+	flame_light.omni_range = 7.2
+	flame_light.position.y = 0.078
+	flame_light.visible = false
+	root.add_child(flame_light)
 	return root
 
 
@@ -5206,7 +5226,7 @@ func _build_keys_card() -> void:
 ## ends up in front of what.
 func _order_hud_layers() -> void:
 	# Everything above the world and below the interface, in this order.
-	var lens: Array = [blood_veil, psychedelic]
+	var lens: Array = [field_lens, blood_veil, psychedelic]
 	# `ScreenTreatment` is authored as the first child and is world-level too,
 	# so the lens stacks directly on top of it rather than at index 0.
 	var treatment := $HUD.get_node_or_null("ScreenTreatment")

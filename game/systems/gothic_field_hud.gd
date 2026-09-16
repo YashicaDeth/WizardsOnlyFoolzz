@@ -42,6 +42,9 @@ var elapsed := 0.0
 const LOCATION_ANNOUNCE_TIME := 4.0
 var _location_seen := ""
 var location_announce := 0.0
+## Dormant rather than deleted: a future authored transition can deliberately
+## call the arrival crest back, but ordinary field play leaves the top clear.
+var location_crest_enabled := false
 
 
 func _ready() -> void:
@@ -121,7 +124,8 @@ func _draw() -> void:
 		if menu_mode not in ["MAP", "TREE", "ARTWORK"]:
 			_draw_full_archive_frame()
 		return
-	_draw_location_crest()
+	if location_crest_enabled:
+		_draw_location_crest()
 	_draw_world_condition()
 	_draw_hunt_thread()
 	_draw_player_state()
@@ -130,6 +134,53 @@ func _draw() -> void:
 	_draw_breath()
 	_draw_lock_reticle()
 	_draw_controls()
+	_draw_screen_frame()
+
+
+## A screen-edge object, not four rectangular panels. Dark organic cartouches
+## take the corners while the bone/copper rules remain thin enough that the
+## world still reaches the edge. The separate FieldLens bows the world beneath;
+## this frame stays sharp with the rest of the usable interface.
+func _draw_screen_frame() -> void:
+	var pulse := 1.0 + sin(elapsed * 0.8) * 0.04
+	# A quiet smoked-glass lip. The corners carry the visual weight.
+	draw_rect(Rect2(0, 0, size.x, 11), Color(0.025, 0.008, 0.012, 0.68))
+	draw_rect(Rect2(0, size.y - 11, size.x, 11), Color(0.025, 0.008, 0.012, 0.72))
+	draw_rect(Rect2(0, 0, 10, size.y), Color(0.025, 0.008, 0.012, 0.70))
+	draw_rect(Rect2(size.x - 10, 0, 10, size.y), Color(0.025, 0.008, 0.012, 0.70))
+	for sx in [-1.0, 1.0]:
+		for sy in [-1.0, 1.0]:
+			var corner := Vector2(0.0 if sx > 0.0 else size.x, 0.0 if sy > 0.0 else size.y)
+			var mass := PackedVector2Array([
+				corner,
+				corner + Vector2(108 * sx, 0),
+				corner + Vector2(78 * sx, 12 * sy),
+				corner + Vector2(45 * sx, 19 * sy),
+				corner + Vector2(19 * sx, 45 * sy),
+				corner + Vector2(12 * sx, 78 * sy),
+				corner + Vector2(0, 108 * sy),
+			])
+			draw_colored_polygon(mass, Color(0.055, 0.008, 0.016, 0.86))
+			draw_polyline(mass, COPPER * Color(1, 1, 1, 0.48), 1.4)
+			var carving := PackedVector2Array([
+				corner + Vector2(16 * sx, 83 * sy),
+				corner + Vector2(23 * sx, 52 * sy),
+				corner + Vector2(39 * sx, 34 * sy),
+				corner + Vector2(59 * sx, 23 * sy),
+				corner + Vector2(86 * sx, 16 * sy),
+			])
+			draw_polyline(carving, BONE * Color(1, 1, 1, 0.38), 1.5)
+			# Mirrored lobe and thorn: viscera made exact enough to read as regalia.
+			var jewel := corner + Vector2(31 * sx, 31 * sy)
+			draw_circle(jewel, 7.0 * pulse, BLOOD * Color(1, 1, 1, 0.62))
+			draw_arc(jewel, 13.0 * pulse, 0.0, TAU, 20, BONE * Color(1, 1, 1, 0.22), 1.0)
+			draw_line(corner + Vector2(49 * sx, 18 * sy), corner + Vector2(65 * sx, 36 * sy), COPPER * Color(1, 1, 1, 0.36), 1.2)
+	# Rails stop before the cartouches and bow inward by a few pixels, echoing
+	# the fisheye without bending any text.
+	var top_rail := PackedVector2Array([Vector2(106, 12), Vector2(size.x * 0.5, 17), Vector2(size.x - 106, 12)])
+	var bottom_rail := PackedVector2Array([Vector2(106, size.y - 12), Vector2(size.x * 0.5, size.y - 17), Vector2(size.x - 106, size.y - 12)])
+	draw_polyline(top_rail, BONE * Color(1, 1, 1, 0.24), 1.2)
+	draw_polyline(bottom_rail, BONE * Color(1, 1, 1, 0.24), 1.2)
 
 
 ## M1.6. This used to be its own plate in the top-left corner — a second
