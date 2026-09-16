@@ -534,7 +534,7 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 - [~] **C1.7** `v2` It can be dropped, and it can be taken off you — `HandheldDevice.drop()`/`confiscate(reason)` are the same underlying transition (`possessed` false, forced closed, unraisable) reached through two callers and recorded as two distinct events, so the world can tell a deliberate drop from a robbery apart later even though the player cannot use the device either way meanwhile; `repossess()` is the way back, wear travelling with it since it is the same object, not a fresh one. Reloaded on every `open_device()` the same as condition/battery already are, so a device lost in one scene stays lost the next. `tests/device_possession_test.gd`, 18 checks; `handheld_lean_test`/`handheld_impact_test`/`device_wear_test`/`handheld_battery_test` re-verified clean.
 
       The drop half is now complete in the live Hunt rather than stopping at
-      the signal: `DROP_KEY` (`K`) calls `drop()`, and the scene turns that
+      the signal: `DROP_KEY` (`Delete`) calls `drop()`, and the scene turns that
       exact payload into a colliding `DroppedHandheld` with rendered case,
       emissive mirror, lashed rear cell, serial, condition and remaining
       charge. It tumbles from the real camera, advertises `[E] RECOVER BLACK
@@ -546,6 +546,13 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
       `handheld_drop_test.gd` and `device_possession_test.gd`; windowed evidence
       at `captures/c1_7_dropped_black_mirror.png` shows the real world object,
       its serial and the recovery prompt in the production HUD.
+
+      Control repair (17 September): the first live version accidentally put
+      drop on `K`, which the Hunt already reserves for deliberate re-decanting;
+      a captured player could therefore lose the phone and reset their body on
+      one press. Drop now owns `Delete`, the keys card teaches both actions as
+      separate rows, and `tests/handheld_control_binding_test.gd` (5 checks)
+      prevents the irreversible bindings from collapsing together again.
 
       Still open, and still not this file's to close: nothing calls
       `confiscate()` from real gameplay — that caller is a robbery or defeat

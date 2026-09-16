@@ -5621,6 +5621,7 @@ func _build_keys_card() -> void:
 			["P", "THE BOARD"],
 			["J", "ALLUSIONS / SIGIL"],
 			["HOLD L + WASD", "LEAN / WAVE DEVICE LIGHT"],
+			[HANDHELD.DROP_KEY_LABEL, "DROP DEVICE"],
 			["K", "RE-DECANT // A RESET THAT COSTS YOU"],
 			["ESC", "CLOSE"],
 		]},

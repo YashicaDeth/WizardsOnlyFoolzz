@@ -225,7 +225,8 @@ var _turned_rect := Rect2()
 ## key should be free to fire every frame. `drop_key_override` follows
 ## `lean_override`'s own reason: a headless test cannot rely on
 ## `Input.is_key_pressed`.
-const DROP_KEY := KEY_K
+const DROP_KEY := KEY_DELETE
+const DROP_KEY_LABEL := "DELETE"
 var drop_key_override: Variant = null
 var _drop_key_was_down := false
 
