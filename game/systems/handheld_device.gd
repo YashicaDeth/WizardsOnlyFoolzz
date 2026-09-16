@@ -40,6 +40,7 @@ const SIGNAL_FIELD := preload("res://systems/signal_field.gd")
 const RADIAL := preload("res://systems/radial_menu.gd")
 const RADIO_AUDIO := preload("res://systems/radio_audio.gd")
 const PAGE_AUDIO := preload("res://systems/black_mirror_transition_audio.gd")
+const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 const RESONANCE_READOUT := preload("res://systems/resonance_readout.gd")
 
@@ -395,6 +396,12 @@ func load_device() -> void:
 		battery = 1.0
 		wear_log = []
 		battery = 1.0
+		# The first useful fact this device knows is where its owner just escaped
+		# from. Start on MAP only for that real opening route; isolated UI tests
+		# and old worlds with no facility record retain the historic INDEX start.
+		if not WorldHistory.subject(FACILITY_TERRITORY.SUBJECT).is_empty():
+			mode_index = MODES.find("MAP")
+			displayed_mode_index = mode_index
 		save_device()
 		return
 	serial = int(record.get("serial", 90211))
@@ -408,6 +415,10 @@ func load_device() -> void:
 	# C1.7 `v2`. A save from before this existed opens possessed — the honest
 	# read of "nobody has ever lost this yet".
 	possessed = bool(record.get("possessed", true))
+	var remembered_mode := MODES.find(str(record.get("preferred_mode", current_mode())).to_upper())
+	if remembered_mode >= 0:
+		mode_index = remembered_mode
+		displayed_mode_index = remembered_mode
 
 
 func save_device() -> void:
@@ -419,6 +430,7 @@ func save_device() -> void:
 		"wear_log": wear_log.duplicate(),
 		"impacts": impacts.duplicate(true),
 		"possessed": possessed,
+		"preferred_mode": current_mode(),
 		"kind": "object",
 	}, "device_changed")
 

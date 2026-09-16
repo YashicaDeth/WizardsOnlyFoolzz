@@ -38,6 +38,7 @@ const BrokenWeb := preload("res://systems/broken_web.gd")
 const BlackMirror := preload("res://systems/black_mirror.gd")
 const Sephiroth := preload("res://systems/sephiroth.gd")
 const PinBoardScript := preload("res://systems/pin_board.gd")
+const FacilityTerritory := preload("res://systems/facility_territory.gd")
 
 ## Six live 3D heads is cheap; sixty would not be, and each icon owns a World3D.
 ## So they are a pool the pages draw into by slot rather than one per row.
@@ -215,7 +216,10 @@ func refresh() -> void:
 ## So neither trusting the default nor requiring the field works: a subject is a
 ## person if somebody gave it a name.
 func _is_person(subject: Dictionary) -> bool:
-	if str(subject.get("kind", "")) == "faction":
+	var kind := str(subject.get("kind", ""))
+	if kind == "facility_sector":
+		return true
+	if kind in ["faction", "job", "object", "territory", "run"]:
 		return false
 	return str(subject.get("name", "")) != ""
 
@@ -472,6 +476,11 @@ func _draw_icon(slot: int, subject_id: String, rect: Rect2) -> bool:
 	var icon: SubViewport = _icons[slot]
 	var subject: Dictionary = WorldHistory.subject(subject_id)
 	if subject.is_empty():
+		return false
+	# A recovered place file belongs in the same FILE register as a person, but
+	# it must never be rendered as an invented human head just because the icon
+	# pool knows how to build one from sparse subject data.
+	if str(subject.get("kind", "")) == "facility_sector":
 		return false
 	icon.set_subject(subject, _subject_tone(subject))
 	icon.set_xray(xray)
@@ -1036,6 +1045,9 @@ func _draw_file(rect: Rect2) -> void:
 		draw_string(font, rect.position + Vector2(0, 20), "NO SUBJECT ON FILE.", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, INK * Color(1, 1, 1, 0.5))
 		return
 	var subject: Dictionary = WorldHistory.subject(str(entry.id))
+	if str(subject.get("kind", "")) == "facility_sector":
+		_draw_facility_file(rect, str(entry.id), subject)
+		return
 	CellOutzType.draw_stamped(self, rect.position, str(subject.get("name", entry.id)).to_upper(), 21.0, INK, COPPER * Color(1, 1, 1, 0.3), 1.4)
 	draw_string(font, rect.position + Vector2(2, 44), "%s   ·   %s" % [str(subject.get("role", "unindexed")).to_upper(), str(subject.get("faction", "Unbound")).to_upper()], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COPPER)
 
@@ -1193,6 +1205,61 @@ func _draw_file(rect: Rect2) -> void:
 		shown += 1
 	if shown == 0:
 		draw_string(font, Vector2(rect.position.x, base_y), "NOTHING ABOUT THEM HAS BEEN WRITTEN DOWN YET.", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, INK * Color(1, 1, 1, 0.4))
+
+
+func _draw_facility_file(rect: Rect2, subject_id: String, subject: Dictionary) -> void:
+	var font := ThemeDB.fallback_font
+	CellOutzType.draw_stamped(self, rect.position, str(subject.get("name", subject_id)).to_upper(), 21.0, INK, COPPER * Color(1, 1, 1, 0.3), 1.4)
+	draw_string(font, rect.position + Vector2(2, 44), "%s   ·   %s" % [str(subject.get("role", "TERRITORY FILE")).to_upper(), str(subject.get("faction", "UNKNOWN")).to_upper()], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COPPER)
+	var territory_id := str(subject.get("territory_id", ""))
+	var definition := FacilityTerritory.sector_def(territory_id)
+	var live := FacilityTerritory.sector(territory_id)
+	var state := str(live.get("state", subject.get("status", "controlled"))).to_upper()
+	var state_tone := SPORE if state == "LIBERATED" else (MOSS if state == "SURVEYED" else HOT)
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 78), "CURRENT STATE", 10.0, INK * Color(1, 1, 1, 0.48), 1.0)
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 105), state, 25.0, state_tone, 1.4)
+	CellOutzType.draw_text(self, rect.position + Vector2(250, 78), "REGISTERED OWNER", 10.0, INK * Color(1, 1, 1, 0.48), 1.0)
+	CellOutzType.draw_text(self, rect.position + Vector2(250, 105), "UNBOUND" if state == "LIBERATED" else str(live.get("owner", "celloutz")).to_upper(), 20.0, state_tone, 1.2)
+	draw_line(rect.position + Vector2(0, 126), rect.position + Vector2(rect.size.x, 126), INK * Color(1, 1, 1, 0.16), 1.0)
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 155), "RECOVERED DIRECTIVE", 11.0, MOSS, 1.2)
+	var y := rect.position.y + 182.0
+	for line: String in _wrap(str(definition.get("objective", subject.get("objective", ""))), 64):
+		draw_string(font, Vector2(rect.position.x, y), line, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.76, 14, INK * Color(1, 1, 1, 0.86))
+		y += 19.0
+
+	# A stripped floor-plan stamp links this recovered file back to the MAP
+	# without copying the whole map application into the dossier.
+	var stamp := Rect2(Vector2(rect.end.x - 176, rect.position.y + 146), Vector2(160, 126))
+	draw_rect(stamp, GROUND)
+	draw_rect(stamp, state_tone * Color(1, 1, 1, 0.55), false, 1.4)
+	for route: Array in FacilityTerritory.ROUTES:
+		var a := FacilityTerritory.sector_def(str(route[0]))
+		var b := FacilityTerritory.sector_def(str(route[1]))
+		if a.is_empty() or b.is_empty():
+			continue
+		var pa: Vector2 = stamp.position + stamp.size * (a.at as Vector2)
+		var pb: Vector2 = stamp.position + stamp.size * (b.at as Vector2)
+		draw_line(pa, pb, INK * Color(1, 1, 1, 0.22), 1.0)
+	for row: Dictionary in FacilityTerritory.SECTORS:
+		var point: Vector2 = stamp.position + stamp.size * (row.at as Vector2)
+		var selected := str(row.id) == territory_id
+		var marker := Rect2(point - Vector2(5, 4), Vector2(10, 8))
+		if selected:
+			draw_rect(marker, state_tone)
+		else:
+			draw_rect(marker, INK * Color(1, 1, 1, 0.24), false, 1.2)
+
+	CellOutzType.draw_text(self, Vector2(rect.position.x, rect.end.y - 64), "WHAT THE WORLD RECORDED", 11.0, MOSS, 1.2)
+	draw_line(Vector2(rect.position.x, rect.end.y - 47), Vector2(rect.end.x, rect.end.y - 47), MOSS * Color(1, 1, 1, 0.3), 1.0)
+	var shown := 0
+	for event in WorldHistory.recent_events(40):
+		var details: Dictionary = event.get("details", {})
+		if str(details.get("territory", "")) != FacilityTerritory.SUBJECT and str(details.get("subject_id", "")) != subject_id:
+			continue
+		draw_string(font, Vector2(rect.position.x + shown * 220.0, rect.end.y - 20), str(event.type).replace("_", " ").to_upper(), HORIZONTAL_ALIGNMENT_LEFT, 210, 11, COPPER)
+		shown += 1
+		if shown >= 3:
+			break
 
 
 ## Naive word wrap. The memory line is the only free prose on the panel and it

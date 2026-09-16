@@ -16,25 +16,25 @@ const LIBERATED := "liberated"
 const SECTORS := [
 	{
 		"id": "growing_floor", "name": "THE GROWING FLOOR",
-		"at": Vector2(0.18, 0.22), "owner": "celloutz",
+		"at": Vector2(0.18, 0.34), "owner": "celloutz",
 		"objective": "GET OUT OF THE VAT AISLE",
 		"record": "facility:growing_floor",
 	},
 	{
 		"id": "pit", "name": "THE UNDERGROUND COLOSSEUM",
-		"at": Vector2(0.48, 0.48), "owner": "celloutz",
+		"at": Vector2(0.48, 0.52), "owner": "celloutz",
 		"objective": "SINK THE HEAT AND LEAVE THE CAR",
 		"record": "facility:underground_colosseum",
 	},
 	{
 		"id": "service_ring", "name": "THE SERVICE RING",
-		"at": Vector2(0.76, 0.48), "owner": "celloutz",
+		"at": Vector2(0.76, 0.52), "owner": "celloutz",
 		"objective": "FIND A ROUTE THROUGH THE THREE TUNNELS",
 		"record": "facility:service_ring",
 	},
 	{
 		"id": "surface_gate", "name": "THE SURFACE GATE",
-		"at": Vector2(0.76, 0.78), "owner": "celloutz",
+		"at": Vector2(0.76, 0.80), "owner": "celloutz",
 		"objective": "CHOOSE HOW YOU LEAVE",
 		"record": "facility:surface_gate",
 	},

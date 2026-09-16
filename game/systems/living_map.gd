@@ -15,6 +15,7 @@ extends Control
 const Grunge := preload("res://systems/celloutz_grunge.gd")
 const Motion := preload("res://systems/celloutz_motion.gd")
 const SATELLITE := preload("res://systems/satellite_view.gd")
+const FACILITY := preload("res://systems/facility_territory.gd")
 
 const SURVEY_ID := "ashbloom_survey"
 const CELL := 22.0
@@ -77,6 +78,13 @@ var _chart := Rect2()
 var _place_rects: Array = []
 var hovered_place := -1
 var selected_place := -1
+## The Black Mirror opens on the facility sheet while that route has ever been
+## seen. L flips between it and the Ashbloom satellite: one MAP application,
+## two physical survey sheets, rather than a second territory menu.
+var facility_sheet := false
+var facility_hover := -1
+var facility_selected := -1
+var _facility_rects: Array = []
 var travel_hold := 0.0
 signal travel_requested(place: Dictionary)
 
@@ -155,6 +163,10 @@ func open_map() -> void:
 	visible = true
 	follow = true
 	pan = Vector2.ZERO
+	var territory := WorldHistory.subject(FACILITY.SUBJECT)
+	facility_sheet = not territory.is_empty()
+	if facility_sheet and facility_selected < 0:
+		facility_selected = _first_revealed_facility_sector()
 	queue_redraw()
 
 
@@ -219,6 +231,9 @@ func _place_under(point: Vector2) -> int:
 
 
 func _gui_input(event: InputEvent) -> void:
+	if facility_sheet:
+		_handle_facility_input(event)
+		return
 	if event is InputEventMouseMotion:
 		hovered_place = _place_under(event.position)
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -246,6 +261,58 @@ func _gui_input(event: InputEvent) -> void:
 	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F:
 		follow = true
 		pan = Vector2.ZERO
+	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_L:
+		facility_sheet = true
+		facility_selected = _first_revealed_facility_sector()
+		queue_redraw()
+
+
+func _handle_facility_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		facility_hover = _facility_under((event as InputEventMouseMotion).position)
+		queue_redraw()
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		var found := _facility_under((event as InputEventMouseButton).position)
+		if found >= 0:
+			facility_selected = found
+			queue_redraw()
+	elif event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_L:
+				facility_sheet = false
+			KEY_LEFT, KEY_UP:
+				_select_facility(-1)
+			KEY_RIGHT, KEY_DOWN:
+				_select_facility(1)
+		queue_redraw()
+
+
+func _facility_under(point: Vector2) -> int:
+	for entry: Dictionary in _facility_rects:
+		if (entry.rect as Rect2).has_point(point):
+			return int(entry.index)
+	return -1
+
+
+func _first_revealed_facility_sector() -> int:
+	var rows: Array = FACILITY.overview().sectors
+	for index in rows.size():
+		if bool(rows[index].revealed):
+			return index
+	return -1
+
+
+func _select_facility(step: int) -> void:
+	var rows: Array = FACILITY.overview().sectors
+	if rows.is_empty():
+		facility_selected = -1
+		return
+	var start := facility_selected if facility_selected >= 0 else 0
+	for offset in range(1, rows.size() + 1):
+		var candidate := wrapi(start + step * offset, 0, rows.size())
+		if bool(rows[candidate].revealed):
+			facility_selected = candidate
+			return
 
 
 ## Greg, on the second playtest: *"the map is incredibly laggy right now"*.
@@ -322,6 +389,9 @@ func _draw() -> void:
 	if chart_size.x <= 1.0 or chart_size.y <= 1.0:
 		return
 	_chart = Rect2(Vector2(margin, margin + 34.0), chart_size)
+	if facility_sheet:
+		_draw_facility_sheet()
+		return
 	# The floor depends on the chart, which depends on the window, so it is
 	# applied here rather than only where the wheel is read — a map opened on a
 	# smaller window would otherwise keep a zoom that window cannot justify.
@@ -891,3 +961,108 @@ func _draw_legend() -> void:
 	draw_set_transform(Vector2(size.x - 152.0 - CellOutzType.width_condensed(scrawl, 8.0, 0.8), size.y - 26.0), -0.028, Vector2.ONE)
 	CellOutzType.draw_condensed(self, Vector2.ZERO, scrawl, 8.0, ACID * Color(1, 1, 1, 0.45), 0.8)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _draw_facility_sheet() -> void:
+	var overview := FACILITY.overview()
+	var rows: Array = overview.sectors
+	_facility_rects.clear()
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.035, 0.026, 0.019, 0.96))
+	draw_rect(_chart, PLATE)
+	Grunge.stain(self, _chart.position + _chart.size * Vector2(0.24, 0.70), 180.0, 991, Grunge.RUST, 0.06)
+	Grunge.stain(self, _chart.position + _chart.size * Vector2(0.76, 0.26), 150.0, 997, Grunge.BILE, 0.05)
+
+	# The routes are real scene adjacency, shown before the rooms so every line
+	# terminates underneath its destination rather than through its label.
+	for route: Array in overview.routes:
+		var a := _facility_row(rows, str(route[0]))
+		var b := _facility_row(rows, str(route[1]))
+		if a.is_empty() or b.is_empty():
+			continue
+		var from := _facility_at(a)
+		var to := _facility_at(b)
+		var known := bool(a.revealed) and bool(b.revealed)
+		draw_dashed_line(from, to, SPORE * Color(1, 1, 1, 0.72) if known else INK * Color(1, 1, 1, 0.13), 2.0, 8.0)
+
+	for index in rows.size():
+		var row: Dictionary = rows[index]
+		var at := _facility_at(row)
+		var revealed := bool(row.revealed)
+		var state := str(row.state)
+		var room := Rect2(at - Vector2(72, 38), Vector2(144, 76))
+		_facility_rects.append({"index": index, "rect": room.grow(8.0)})
+		var tone := ARTERIAL
+		if state == FACILITY.LIBERATED:
+			tone = SPORE
+		elif state == FACILITY.SURVEYED:
+			tone = BILE
+		var hot := index == facility_hover or index == facility_selected
+		draw_rect(room, tone * Color(1, 1, 1, 0.13 if revealed else 0.035))
+		draw_rect(room, tone * Color(1, 1, 1, 0.92 if hot else (0.48 if revealed else 0.14)), false, 2.2 if hot else 1.2)
+		# Corporate surveillance is a cone, not a generic eye icon: its footprint
+		# is an intentionally imprecise area the player can reason about.
+		if revealed and state != FACILITY.LIBERATED:
+			var sweep := 0.22 + 0.06 * sin(clock * 1.7 + float(index))
+			draw_arc(at, 51.0, -PI * sweep, PI * sweep, 18, ARTERIAL * Color(1, 1, 1, 0.34), 1.2)
+		var name := str(row.name).to_upper() if revealed else "REDACTED HOLDING"
+		var lines := CellOutzType.wrap_condensed(name, room.size.x - 12.0, 7.5, 0.66)
+		var name_y := -12.0 if lines.size() > 1 else -5.0
+		for line: String in lines:
+			var width := CellOutzType.width_condensed(line, 7.5, 0.66)
+			CellOutzType.draw_condensed(self, at + Vector2(-width * 0.5, name_y), line, 7.5, tone * Color(1, 1, 1, 0.95 if revealed else 0.25), 0.66)
+			name_y += 10.0
+		if revealed:
+			var state_label := state.to_upper()
+			var sw := CellOutzType.width_condensed(state_label, 7.0, 0.65)
+			CellOutzType.draw_condensed(self, at + Vector2(-sw * 0.5, 20), state_label, 7.0, tone, 0.65)
+
+	_draw_facility_header(overview)
+	if facility_selected >= 0 and facility_selected < rows.size():
+		_draw_facility_panel(rows[facility_selected])
+	_draw_frame()
+	_draw_bezel()
+	_draw_cracks()
+	var hint := "POINTER / ARROWS SELECT HOLDING   L ASHBLOOM SATELLITE"
+	CellOutzType.draw_condensed(self, Vector2(28, size.y - 27), hint, 8.0, INK * Color(1, 1, 1, 0.5), 0.7)
+
+
+func _facility_row(rows: Array, id: String) -> Dictionary:
+	for row: Dictionary in rows:
+		if str(row.id) == id:
+			return row
+	return {}
+
+
+func _facility_at(row: Dictionary) -> Vector2:
+	var normal: Vector2 = row.get("at", Vector2.ZERO)
+	return _chart.position + Vector2(_chart.size.x * normal.x, _chart.size.y * normal.y)
+
+
+func _draw_facility_header(overview: Dictionary) -> void:
+	CellOutzType.draw_stamped(self, Vector2(26, 10), "LIVING MAP / HOLDINGS", 20.0, ACID, ARTERIAL * Color(1, 1, 1, 0.25), 3.4)
+	var box := Rect2(_chart.position + Vector2(16, 16), Vector2(258, 79))
+	draw_rect(box, VOID * Color(1, 1, 1, 0.9))
+	draw_rect(box, ACID * Color(1, 1, 1, 0.38), false, 1.0)
+	CellOutzType.draw_condensed(self, box.position + Vector2(11, 10), str(overview.name), 11.0, INK, 0.9)
+	CellOutzType.draw_condensed(self, box.position + Vector2(11, 30), "REGISTERED OWNER / CELLOUTZ", 8.0, ARTERIAL, 0.7)
+	CellOutzType.draw_condensed(self, box.position + Vector2(11, 46), "LIBERATED %d / %d" % [int(overview.liberated_count), (overview.sectors as Array).size()], 8.0, SPORE, 0.7)
+	CellOutzType.draw_condensed(self, box.position + Vector2(11, 61), "SURVEILLANCE %03d%%" % roundi(float(overview.surveillance) * 100.0), 8.0, BILE, 0.7)
+	var reaction := WorldHistory.subject(FACILITY.REACTION_SUBJECT)
+	if not reaction.is_empty():
+		var order := Rect2(Vector2(_chart.position.x + 16, _chart.end.y - 43), Vector2(420, 27))
+		draw_rect(order, ARTERIAL * Color(1, 1, 1, 0.13))
+		draw_rect(order, ARTERIAL * Color(1, 1, 1, 0.66), false, 1.2)
+		CellOutzType.draw_condensed(self, order.position + Vector2(10, 7), "%s // %s" % [str(reaction.get("name", "REPOSSESSION ORDER")), str(reaction.get("status", "circulating")).to_upper()], 9.0, ARTERIAL, 0.8)
+
+
+func _draw_facility_panel(row: Dictionary) -> void:
+	var panel := Rect2(Vector2(_chart.end.x - 350, _chart.position.y + 16), Vector2(330, 144))
+	draw_rect(panel, VOID * Color(1, 1, 1, 0.94))
+	draw_rect(panel, ACID * Color(1, 1, 1, 0.42), false, 1.2)
+	CellOutzType.draw_stamped(self, panel.position + Vector2(14, 14), str(row.name), 15.0, INK, ARTERIAL * Color(1, 1, 1, 0.25), 1.0)
+	CellOutzType.draw_condensed(self, panel.position + Vector2(14, 48), "STATE / %s" % str(row.state).to_upper(), 9.0, SPORE if str(row.state) == FACILITY.LIBERATED else BILE, 0.8)
+	CellOutzType.draw_condensed(self, panel.position + Vector2(14, 66), "OWNER / %s" % ("UNBOUND" if str(row.state) == FACILITY.LIBERATED else str(row.owner).to_upper()), 9.0, ARTERIAL, 0.8)
+	var y := 91.0
+	for line: String in CellOutzType.wrap_condensed(str(row.objective), panel.size.x - 28.0, 9.0, 0.75):
+		CellOutzType.draw_condensed(self, panel.position + Vector2(14, y), line, 9.0, INK * Color(1, 1, 1, 0.72), 0.75)
+		y += 14.0
