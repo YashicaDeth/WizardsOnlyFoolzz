@@ -300,7 +300,7 @@ static func _spend_bong(parts: Dictionary, burn: float) -> void:
 ## `heat` is 0 at rest and 1 at the sweet spot; it keeps climbing past 1 into
 ## the harsh band, and that overshoot is what the object shows you before the
 ## cough tells you.
-static func set_draw(node: Node3D, heat: float) -> void:
+static func set_draw(node: Node3D, heat: float, light_scale := 1.0) -> void:
 	if node == null or not node.has_meta("parts"):
 		return
 	var parts: Dictionary = node.get_meta("parts")
@@ -318,8 +318,8 @@ static func set_draw(node: Node3D, heat: float) -> void:
 			var bowl_light: OmniLight3D = parts["light"]
 			# The burning bowl is the player's smallest emergency night light:
 			# warm and local, but strong enough to reveal the hands and nearby floor.
-			bowl_light.light_energy = lerpf(0.0, 4.2, clampf(pull, 0.0, 1.0))
-			bowl_light.omni_range = lerpf(1.4, 6.0, clampf(pull, 0.0, 1.0))
+			bowl_light.light_energy = lerpf(0.0, 4.2, clampf(pull, 0.0, 1.0)) * light_scale
+			bowl_light.omni_range = lerpf(1.4, 6.0, clampf(pull, 0.0, 1.0)) * lerpf(0.72, 1.0, light_scale)
 			var chamber: MeshInstance3D = parts["chamber_smoke"]
 			chamber.visible = pull > 0.025
 			var chamber_material: StandardMaterial3D = chamber.material_override
@@ -343,8 +343,8 @@ static func set_draw(node: Node3D, heat: float) -> void:
 	var light: OmniLight3D = parts["light"]
 	# At rest it makes a close amber pool; drawing turns it into a brief usable
 	# torch. The warm omnidirectional spill keeps it distinct from a flashlight.
-	light.light_energy = lerpf(0.85, 4.4, clampf(climb, 0.0, 1.0))
-	light.omni_range = lerpf(1.8, 6.4, clampf(climb, 0.0, 1.0))
+	light.light_energy = lerpf(0.85, 4.4, clampf(climb, 0.0, 1.0)) * light_scale
+	light.omni_range = lerpf(1.8, 6.4, clampf(climb, 0.0, 1.0)) * lerpf(0.72, 1.0, light_scale)
 	var ash: MeshInstance3D = parts["ash"]
 	var ash_mesh: CylinderMesh = ash.mesh
 	ash_mesh.height = lerpf(0.006, 0.016, clampf(climb, 0.0, 1.0))

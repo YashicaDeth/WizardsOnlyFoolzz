@@ -388,8 +388,17 @@ func _build_weapon_model(weapon_id: String) -> Node3D:
 	var right := HeldGear.build_humiliation_hand(1)
 	right.name = "RightGripHand"
 	HeldGear.set_pose(right, "trigger" if weapon_id in ["shotgun", "sidearm"] else "wrap")
-	right.position = Vector3(0.019, -0.013, 0.0)
+	# Each class seats the palm around a slightly different section. The old one
+	# offset made the trigger hand acceptable on the sword, but buried the pistol
+	# tang in the palm and left the shotgun wrist hovering below its stock.
+	right.position = {
+		"shotgun": Vector3(0.016, -0.010, 0.006),
+		"sidearm": Vector3(0.014, -0.016, 0.008),
+	}.get(weapon_id, Vector3(0.019, -0.013, 0.0))
 	right.rotation = Vector3(-PI * 0.5, 0.0, PI * 0.5)
+	right.set_meta("grip_rest_position", right.position)
+	right.set_meta("grip_rest_rotation", right.rotation)
+	right.set_meta("forearm_entry", Vector3(0.47, -0.53, -0.30))
 	root.add_child(right)
 	var off_anchor_name := "forend" if weapon_id == "shotgun" else ("grip_support" if weapon_id == "sidearm" else "grip_low")
 	var off_anchor := gear.get_node_or_null("anchor_%s" % off_anchor_name) as Node3D
@@ -398,7 +407,11 @@ func _build_weapon_model(weapon_id: String) -> Node3D:
 		left.name = "LeftGripHand"
 		HeldGear.set_pose(left, "cup" if weapon_id == "sidearm" else "wrap")
 		var placed := gear.transform * off_anchor.transform
-		left.position = placed.origin + Vector3(-0.019, -0.013, 0.0)
+		var palm_clearance := Vector3(-0.017, -0.010, 0.005) if weapon_id == "shotgun" else Vector3(-0.016, -0.014, 0.006)
+		left.position = placed.origin + palm_clearance
 		left.rotation = placed.basis.get_euler() + Vector3(-PI * 0.5, 0.0, -PI * 0.5)
+		left.set_meta("grip_rest_position", left.position)
+		left.set_meta("grip_rest_rotation", left.rotation)
+		left.set_meta("forearm_entry", Vector3(-0.47, -0.53, -0.31))
 		root.add_child(left)
 	return root

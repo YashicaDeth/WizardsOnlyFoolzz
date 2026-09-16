@@ -59,6 +59,12 @@ func _ready() -> void:
 	var smoking_ring := smoking_hand.get_node("ring/bone0") as Node3D
 	check(absf(smoking_index.rotation.x) < absf(smoking_ring.rotation.x) * 0.7,
 		"the smoking fingers stay visibly splayed instead of closing into a fist")
+	var cigarette_inspect: Dictionary = hunt.call("_smoke_inspection_pose", "cigarette", 1.0)
+	var vape_inspect: Dictionary = hunt.call("_smoke_inspection_pose", "vape", 1.0)
+	var bong_inspect: Dictionary = hunt.call("_smoke_inspection_pose", "bong", 1.0)
+	check((cigarette_inspect.rotation as Vector3).distance_to(vape_inspect.rotation as Vector3) > 0.25 and
+		(cigarette_inspect.position as Vector3).distance_to(bong_inspect.position as Vector3) > 0.15,
+		"rolled paper, vape and bong have distinct inspection compositions")
 	var camera := hunt.get("camera") as Camera3D
 	var smoking_forearm := held.get_node_or_null("SmokingGripHand/FirstPersonForearm") as Node3D
 	check(smoking_forearm != null and smoking_forearm.get_node_or_null("TaperedSleeve") != null,
@@ -73,6 +79,31 @@ func _ready() -> void:
 	var arsenal = hunt.get("arsenal")
 	check((arsenal.models.values() as Array).all(func(model): return not (model as Node3D).visible),
 		"holding it puts the weapon away")
+
+	# Y transfers a one-hand smokeable to an implied lip point. The hand carries
+	# it there before leaving the frame; the same RMB draw then works hands-free.
+	var lip_toggle := InputEventKey.new()
+	lip_toggle.keycode = KEY_Y
+	lip_toggle.pressed = true
+	hunt.call("_unhandled_input", lip_toggle)
+	for _transfer in 20:
+		hunt.call("_update_smoking", 1.0 / 60.0)
+	var lip_position := camera.to_local(held.global_position)
+	check(bool(hunt.get("smoke_mouth_held")) and float(hunt.get("smoke_mouth_blend")) > 0.95,
+		"Y transfers the cigarette into a persistent lip-hold state")
+	check(not smoking_hand.visible and absf(lip_position.x) < 0.08 and lip_position.y < 0.0,
+		"the cigarette stays beneath the reticle while the released hand leaves the frame")
+
+	# Close prop lights follow the world's exposure rather than throwing the same
+	# hard pool and shadows at noon that they do in darkness.
+	var saved_minute := WorldHistory.world_minute
+	WorldHistory.world_minute = 2.0 * 60.0
+	var night_prop_light: float = hunt.call("_close_prop_light_scale")
+	WorldHistory.world_minute = 12.0 * 60.0
+	var day_prop_light: float = hunt.call("_close_prop_light_scale")
+	WorldHistory.world_minute = saved_minute
+	check(day_prop_light < night_prop_light * 0.5,
+		"embers, Zippo and inspection glint cast substantially less light in daylight")
 
 	# Hold rather than tap: the visible heat and the delivered grade are driven
 	# by the same accumulated duration.
@@ -91,6 +122,7 @@ func _ready() -> void:
 	var result: Dictionary = hunt.call("_finish_smoking_draw")
 	check(bool(result.get("ok", false)), "releasing RMB lands the draw")
 	check(str(result.get("device", "")) == "cigarette", "the hit comes from the object actually held")
+	check(bool(hunt.get("smoke_mouth_held")), "the same RMB draw works while the cigarette remains in the mouth")
 	check(float((hunt.get("smoke_spent") as Dictionary).get("cigarette", 0.0)) > 0.0,
 		"and the same act burns down that object")
 	check(float(rig.anatomy.lung_state().stain) > lung_stain_before,
@@ -117,6 +149,11 @@ func _ready() -> void:
 	hunt.call("_shape_smoke_trick")
 	check(air.get_parent().get_node_or_null("SmokeTrick_O") != null, "clicking shapes the breath into a physical smoke O")
 	check(WorldHistory.event_count("smoke_trick") == 1, "and the world records the trick as an act")
+	hunt.call("_toggle_mouth_hold")
+	for _take_back in 20:
+		hunt.call("_update_smoking", 1.0 / 60.0)
+	check(not bool(hunt.get("smoke_mouth_held")) and smoking_hand.visible,
+		"toggling again returns the cigarette to the waiting hand")
 
 	# Cycle to the fifth object. Its second hand and weapon cost must be visible,
 	# not merely catalog metadata.
@@ -127,6 +164,8 @@ func _ready() -> void:
 	check(bong.get_node_or_null("BongSupportHand") != null, "the bong physically takes the second hand")
 	check((arsenal.models.values() as Array).all(func(model): return not (model as Node3D).visible),
 		"and no weapon remains in either hand")
+	var before_night_bong: float = WorldHistory.world_minute
+	WorldHistory.world_minute = 22.0 * 60.0
 	hunt.call("_begin_smoking_draw")
 	for _bong_frame in 30:
 		hunt.call("_update_smoking", 1.0 / 60.0)
@@ -151,6 +190,7 @@ func _ready() -> void:
 	check(float(hunt.get("body_motion").smoking_look_down) > 0.0,
 		"the first-person body looks down the chamber while sinking the cone")
 	hunt.call("_finish_smoking_draw")
+	WorldHistory.world_minute = before_night_bong
 
 	# Inspection is the same live hand-and-object assembly, not a separate icon.
 	var inspect_press := InputEventKey.new()
@@ -175,18 +215,46 @@ func _ready() -> void:
 		"both weapon hands remain connected to lower-left and lower-right arms")
 	hunt.call("_unhandled_input", inspect_press)
 	var weapon_before := shotgun.rotation
+	var shotgun_left := shotgun.get_node("LeftGripHand") as Node3D
+	var shotgun_left_rest: Vector3 = shotgun_left.position
 	for _weapon_inspect in 12:
 		hunt.call("_advance_arm", 1.0 / 60.0)
 		hunt.call("_update_held_inspection", 1.0 / 60.0)
 	check(shotgun.rotation.distance_to(weapon_before) > 0.15,
 		"holding I turns the equipped weapon through a readable inspection pose")
+	check(shotgun_left.position.z > shotgun_left_rest.z + 0.035,
+		"the shotgun support hand slides over the forend for a receiver check")
 	hunt.call("_unhandled_input", inspect_release)
+
+	# A sidearm is press-checked rather than copied from the long-gun turn.
+	hunt.call("_equip_weapon", 2)
+	hunt.set("inspect_blend", 1.0)
+	hunt.set("inspect_held", true)
+	hunt.call("_advance_arm", 1.0 / 60.0)
+	var sidearm := arsenal.models.get("sidearm") as Node3D
+	var pistol_left := sidearm.get_node("LeftGripHand") as Node3D
+	var pistol_left_rest: Vector3 = pistol_left.position
+	hunt.call("_update_held_inspection", 0.0)
+	check(pistol_left.position.y > pistol_left_rest.y + 0.05,
+		"the pistol support hand leaves its cup and pinches the slide for a press-check")
+
+	# The sword presents its edge and opens the off hand toward the forte.
+	hunt.call("_equip_weapon", 0)
+	hunt.call("_advance_arm", 1.0 / 60.0)
+	var sword := arsenal.models.get("sword") as Node3D
+	var sword_left := sword.get_node("LeftGripHand") as Node3D
+	var sword_left_rest: Vector3 = sword_left.position
+	hunt.call("_update_held_inspection", 0.0)
+	check(sword_left.position.z < sword_left_rest.z - 0.05,
+		"the sword inspection releases the off hand to read the edge instead of mimicking a firearm")
+	hunt.set("inspect_held", false)
 
 	# The help card must teach every bind this added.
 	var rows: Array = []
 	for group: Dictionary in hunt.get("keys_card").groups:
 		rows.append_array(group.get("rows", []) as Array)
 	check(rows.any(func(row): return row[0] == "6"), "the keys card teaches the smokeable slot")
+	check(rows.any(func(row): return row[0] == "Y"), "and teaches the reversible hand-to-mouth transfer")
 	check(rows.any(func(row): return row[0] == "HOLD RMB"), "and teaches that drawing is a hold")
 	check(rows.any(func(row): return row[0] == "LMB EXHALE"), "and teaches the optional smoke control")
 	check(rows.any(func(row): return row[0] == "HOLD I"), "and teaches the universal held-object inspection")

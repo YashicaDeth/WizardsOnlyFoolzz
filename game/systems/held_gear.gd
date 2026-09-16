@@ -348,6 +348,40 @@ static func set_pose(hand: Node3D, pose_name: String, blend := 1.0) -> void:
 		_curl(thumb, pose.get("thumb", [0.4, 0.4]), blend, 0.0)
 
 
+## Interpolate between two authored grips rather than fading a target grip from
+## a mathematically straight hand. Inspection uses this when a support hand
+## leaves its firing contact to pinch a slide, feel a receiver or trace an edge.
+static func blend_pose(hand: Node3D, from_name: String, to_name: String, weight: float) -> void:
+	if hand == null or not is_instance_valid(hand):
+		return
+	var from_pose: Dictionary = POSES.get(from_name, POSES["open"])
+	var to_pose: Dictionary = POSES.get(to_name, POSES["open"])
+	var amount := clampf(weight, 0.0, 1.0)
+	var from_default: Array = from_pose["fingers"]
+	var to_default: Array = to_pose["fingers"]
+	var spread := lerpf(float(from_pose.get("spread", 0.5)), float(to_pose.get("spread", 0.5)), amount)
+	for index in FINGERS.size():
+		var finger_name: String = FINGERS[index]
+		var knuckle := hand.get_node_or_null(NodePath(finger_name)) as Node3D
+		if knuckle == null:
+			continue
+		var from_curl: Array = from_pose.get(finger_name, from_default)
+		var to_curl: Array = to_pose.get(finger_name, to_default)
+		var curls: Array = []
+		for joint in mini(from_curl.size(), to_curl.size()):
+			curls.append(lerpf(float(from_curl[joint]), float(to_curl[joint]), amount))
+		var fan := (float(index) - 1.5) * 0.09 * spread
+		_curl(knuckle, curls, 1.0, fan)
+	var thumb := hand.get_node_or_null("thumb") as Node3D
+	if thumb != null:
+		var from_thumb: Array = from_pose.get("thumb", [0.4, 0.4])
+		var to_thumb: Array = to_pose.get("thumb", [0.4, 0.4])
+		var thumb_curls: Array = []
+		for joint in mini(from_thumb.size(), to_thumb.size()):
+			thumb_curls.append(lerpf(float(from_thumb[joint]), float(to_thumb[joint]), amount))
+		_curl(thumb, thumb_curls, 1.0, 0.0)
+
+
 static func _curl(joint: Node3D, angles: Array, blend: float, fan: float) -> void:
 	var cursor := joint
 	for index in angles.size():

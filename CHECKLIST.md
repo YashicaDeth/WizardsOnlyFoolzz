@@ -5640,7 +5640,11 @@ to get right.
       prop light made night captures unreadable; a resting coal now casts a
       close amber pool, a held draw reaches roughly six metres, and the Zippo
       reaches farther while its lid is open. These remain warm omni lights,
-      never white flashlight beams (`tests/smokeables_test.gd`,
+      never white flashlight beams. Ember, bong bowl, Zippo and close inspection
+      light are exposure-aware: their cast energy and reach recede sharply in
+      clear daylight, return through dusk/night, and regain some usefulness
+      beneath a severe magick storm rather than bleaching daytime hands or
+      throwing hard noon shadows (`tests/smokeables_test.gd`,
       `tests/smoking_act_test.gd`)
 - [x] **AU7.6** The bind: press-and-hold, with the hold readable **while** it
       happens. I0 settled where: *no screen is a list of text in a box*, and the
@@ -5675,7 +5679,23 @@ to get right.
       (`tests/smokeables_test.gd`, `tests/smoking_act_test.gd`). Cigarettes,
       joints and spliffs use a distinct open-palm, long splayed-finger grip so
       the item stays visible between the fingers instead of being swallowed by
-      a fist; the jester sleeves and arms still enter from the lower frame.
+      a fist; the jester sleeves and arms still enter from authored lower-frame
+      points appropriate to the object instead of every wrist growing from one
+      generic corner. The same anatomy pass now reaches firearms and carried
+      limbs: weapon palms are seated per grip, and an improvised severed limb is
+      visibly clenched by a costumed articulated hand with a continuous arm.
+      Holding I is one verb with class-specific physical readings rather than a
+      copied turntable motion: rolled paper exposes seam/ember, a vape presents
+      its cell face, a bong tips bowl/chamber, a sword presents its edge, the
+      shotgun support hand checks the forend/receiver, a pistol support hand
+      pinches the slide, and a severed limb is hefted under dead weight. A short
+      warm inspection glint makes those contacts legible at night without
+      becoming a navigational flashlight (`tests/smoking_act_test.gd`,
+      `tests/combat_integration_test.gd`, `tests/smoking_gameplay_capture.gd`).
+      Y also transfers any one-hand smokeable from fingers to a persistent lip
+      point beneath the reticle: the hand carries it there, releases and leaves
+      the frame; RMB still draws hands-free, and Y reverses the transfer. The
+      bong explicitly refuses because its weight and cone-sink require both hands
 - [ ] **AU7.10** Passing one to somebody is a real act with a real meaning (S)
 
 ### AU5 — The effect taxonomy

@@ -112,10 +112,22 @@ func _ready() -> void:
 	check(hunt.handheld.carry.items.size() == carry_before + 1 and str(hunt.handheld.carry.items.back().kind) == "limb", "E picks the physical limb up into the real CARRY inventory")
 	hunt._equip_carried_limb()
 	check(hunt.carried_limb_index >= 0 and hunt.carried_limb_model != null, "slot 4 visibly equips the carried limb")
+	var carried_hand := hunt.carried_limb_model.get_node_or_null("CarriedLimbGripHand") as Node3D
+	check(carried_hand != null and carried_hand.get_node_or_null("HumiliationCuff") != null,
+		"the improvised limb is visibly held by the same costumed articulated hand")
+	check(carried_hand != null and carried_hand.get_node_or_null("FirstPersonForearm") != null,
+		"the limb grip continues into an authored lower-right arm")
 	hunt._update_hud()
 	var limb_reliquary: Control = hunt.held_reliquary as Control
 	check(limb_reliquary != null and int(limb_reliquary.displayed_source_id) == hunt.carried_limb_model.get_instance_id() and int(limb_reliquary.mesh_count) > 0,
 		"the same carried limb appears as real rotating geometry in the universal held-item reliquary")
+	var limb_rest_rotation: Vector3 = hunt.carried_limb_model.rotation
+	hunt.inspect_held = true
+	for _inspect_limb in 18:
+		hunt._update_held_inspection(1.0 / 60.0)
+	check(hunt.carried_limb_model.rotation.distance_to(limb_rest_rotation) > 0.25,
+		"inspection hefts the dead weight and turns its cut end toward the player")
+	hunt.inspect_held = false
 	hunt.lock_target = str(locked_actor.subject_id)
 	hunt.attack_cooldown = 0.0
 	var target_wounds: int = locked_actor.anatomy.wounds.size()
