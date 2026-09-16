@@ -46,6 +46,7 @@ const BREAKABLE_PROP := preload("res://systems/breakable_prop.gd")
 const WORLD_DEBRIS := preload("res://systems/world_debris.gd")
 const VEHICLE_PART_POOL := "vehicle_part"
 const OPENING := preload("res://systems/opening_director.gd")
+const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const RINGMASTER_CARD := preload("res://systems/ringmaster_card.gd")
 
 ## AP1.5/AP1.6. Set true only by `underground_colosseum.tscn` — every other
@@ -272,7 +273,7 @@ func _ready() -> void:
 		"elo": 1180, "grudge": 0, "injury": "none", "status": "active", "memory": "Watching the derby",
 	})
 	WorldHistory.record_event("derby_session_started", {
-		"venue": "rift_derby_quarry",
+		"venue": "underground_colosseum" if is_colosseum else "rift_derby_quarry",
 		"vehicle": "rift_skiff",
 		"target_count": targets.size(),
 	})
@@ -1463,7 +1464,7 @@ func _begin_climbing_out() -> void:
 	if index_open:
 		index_open = false
 		world_index.close()
-	WorldHistory.record_event("player_left_derby_vehicle", {"venue": "rift_derby_quarry", "destination": "bone_yard_outskirts"})
+	WorldHistory.record_event("player_left_derby_vehicle", {"venue": "underground_colosseum" if is_colosseum else "rift_derby_quarry", "destination": "bone_yard_outskirts"})
 
 
 ## AP1.6. Out of the car and the pit is clear — the ringmaster comes out to
@@ -1543,6 +1544,8 @@ func _on_ringmaster_choice(choice: String) -> void:
 		"fight":
 			WorldHistory.update_subject(ringmaster_id, {"challenge_pending": true}, "ringmaster_challenged")
 			WorldHistory.record_event("ringmaster_challenged", {"venue": "underground_colosseum"})
+	FACILITY_TERRITORY.apply_event("ringmaster_%s" % choice if choice != "fight" else "ringmaster_challenged")
+	OPENING.advance("left_facility")
 	Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
 
 
@@ -1714,13 +1717,16 @@ func _finish_round(result: String) -> void:
 	speed = 0.0
 	result_countdown = 5.0
 	respawn_queue.clear()
-	WorldHistory.record_event("derby_round_%s" % result, {"venue": "rift_derby_quarry", "score": score, "disabled": disabled_count, "integrity": integrity})
+	var venue := "underground_colosseum" if is_colosseum else "rift_derby_quarry"
+	WorldHistory.record_event("derby_round_%s" % result, {"venue": venue, "score": score, "disabled": disabled_count, "integrity": integrity})
 	# The opening ledger used to stop at `entered_pit` even after the player won
 	# the pit. This is the authored hinge the demo route reads: only a real win
 	# advances it, while a wreck still leads to the existing dragged-out failure
 	# state instead of pretending the player earned the road.
 	if result == "won":
 		OPENING.advance("won_derby")
+		if is_colosseum:
+			FACILITY_TERRITORY.apply_event("derby_round_won")
 		# AP1.6. "You get out of the car properly." The colosseum's win does
 		# not wait for E — the existing 5-second victory countdown still
 		# plays out under the climb, same as it always did, it just does not

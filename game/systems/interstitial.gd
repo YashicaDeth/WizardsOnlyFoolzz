@@ -97,6 +97,7 @@ var _rain: Array = []
 const STAGE_ON_ARRIVAL := {
 	"res://vat_chamber.tscn": "woke",
 	"res://rift_derby.tscn": "entered_pit",
+	"res://underground_colosseum.tscn": "entered_pit",
 	"res://bone_yard_hunt.tscn": "won_derby",
 }
 

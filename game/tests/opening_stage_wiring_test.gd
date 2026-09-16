@@ -37,11 +37,11 @@ func _ready() -> void:
 	await Interstitial.travel("res://vat_chamber.tscn", "the growing floor // decanting")
 	check(OpeningDirector.reached("woke"), "arriving at the Growing Floor records woke")
 
-	await Interstitial.travel("res://rift_derby.tscn", "the bone yard // heat one")
+	await Interstitial.travel("res://underground_colosseum.tscn", "the underground colosseum // heat one")
 	check(OpeningDirector.reached("entered_pit"), "arriving at the derby records entered_pit")
 	check(not OpeningDirector.reached("won_derby"), "the heat is not won just by entering it")
-	check(str(OpeningDirector.resume_destination().scene) == "res://rift_derby.tscn",
-		"an unfinished heat still resumes at the real derby, wired from actual play")
+	check(str(OpeningDirector.resume_destination().scene) == "res://underground_colosseum.tscn",
+		"an unfinished heat resumes in the real underground colosseum")
 
 	await Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
 	check(OpeningDirector.reached("won_derby"), "arriving at the Hunt Grounds records won_derby")

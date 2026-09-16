@@ -12,6 +12,7 @@ extends Node3D
 ## primitives on the biopunk palette — art-directed now, authored later.
 
 const OPENING := preload("res://systems/opening_director.gd")
+const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const ANATOMY := preload("res://systems/anatomy_component.gd")
 const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
@@ -92,6 +93,7 @@ func _on_intake_filed(_state: Dictionary) -> void:
 	line_index = -1
 	phase = "submerged"
 	OPENING.advance("woke")
+	FACILITY_TERRITORY.apply_event("opening_woke")
 	WorldHistory.record_event("opening_woke", {"location": "growing_floor"})
 
 
@@ -484,10 +486,11 @@ func _interact() -> void:
 		return
 	opening_audio.cue("door")
 	OPENING.advance("entered_pit")
+	FACILITY_TERRITORY.apply_event("opening_entered_pit")
 	WorldHistory.update_subject("player", {"status": "racked for a heat"}, "opening_entered_pit")
 	WorldHistory.record_event("opening_entered_pit", {"location": "growing_floor"})
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	Interstitial.travel("res://rift_derby.tscn", "racked for the heat // debt is in the meat")
+	Interstitial.travel("res://underground_colosseum.tscn", "racked for the tunnel heat // debt is in the meat")
 
 
 func _update_hud() -> void:

@@ -35,7 +35,7 @@ static func resume_destination() -> Dictionary:
 	if reached("won_derby"):
 		return {"scene": "res://bone_yard_hunt.tscn", "caption": "walking out into the ashbloom expanse"}
 	if reached("entered_pit"):
-		return {"scene": "res://rift_derby.tscn", "caption": "the bone yard // heat one"}
+		return {"scene": "res://underground_colosseum.tscn", "caption": "the underground colosseum // heat one"}
 	return {"scene": "res://vat_chamber.tscn", "caption": "the growing floor // decanting"}
 
 
