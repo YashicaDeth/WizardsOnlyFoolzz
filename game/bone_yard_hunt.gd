@@ -4982,6 +4982,13 @@ func _update_air() -> void:
 	# cosmetic.
 	if player_rig != null and is_instance_valid(player_rig):
 		player_rig.anatomy.expose(air.severity(), get_physics_process_delta_time())
+		# B10.9. The same body, answering the hour as well as the air. The two
+		# arrive as separate factors on purpose — the dark is what makes it cold
+		# and the storm is what gives it teeth — so neither can hide inside a
+		# single pre-mixed "badness" and a test can move one while holding the
+		# other. What the player has on decides how much of it lands, inside
+		# `chill()`, off the same `Garments` figure that stops a bullet.
+		player_rig.anatomy.chill((1.0 - WorldClock.daylight()) * air.severity(), get_physics_process_delta_time())
 	var env: Environment = $WorldEnvironment.environment
 	if env != null:
 		# The haze thickens with it. Motes say there is something in the air;
