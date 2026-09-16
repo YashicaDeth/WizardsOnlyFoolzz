@@ -57,6 +57,12 @@ Rebuild the class cache after adding a new `class_name` (or Godot will not see i
 TEMP=P:/GameDev/Temp TMP=P:/GameDev/Temp "P:/GameDev/Tools/Godot-4.7.2/Godot_v4.7.2-stable_win64.exe" --headless --path game --import
 ```
 
+Fail the build if editor parsing introduces a project-owned script warning or error (addon and engine-shutdown noise is excluded):
+
+```powershell
+./tools/verify-godot-diagnostics.ps1 -Godot P:/GameDev/Tools/Godot-4.7.2/Godot_v4.7.2-stable_win64_console.exe
+```
+
 ---
 
 # 3. The documents

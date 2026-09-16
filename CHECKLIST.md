@@ -1843,9 +1843,18 @@ nobody reads, and a real error has nowhere to appear.
       Every one was checked and every one was deliberate — grid rows, id digits,
       halving a point budget. The annotation says so at the site, which leaves the
       warning live for the next one that is not.
-- [ ] **J5.5** A test that fails when the count goes back up — the warnings are
-      editor-only diagnostics and appear in no headless run, so nothing currently
-      stops them accumulating again
+- [x] **J5.5** A test that fails when the count goes back up —
+      `tools/verify-godot-diagnostics.ps1` boots the actual editor headlessly,
+      groups `SCRIPT WARNING`/`SCRIPT ERROR` blocks by their `res://` source,
+      excludes addon-owned and engine-shutdown noise, and fails above the fixed
+      project budget of zero. Its self-test proves shutdown leak noise stays out
+      while a synthetic project warning makes the count rise to one; the real
+      editor scan passes at 0. The first run immediately earned the gate: it
+      caught `the_room.gd` calling the obsolete `BodyMirror.make()` API left by
+      a merge. The wall-reflection camera now has its own `RoomMirrorView`
+      contract while the freestanding body-following `BodyMirror` remains
+      intact. `body_mirror_test` passes 13 checks and the live room diagnostic
+      again places all sampled body points inside the wall mirror frustum.
 
 ---
 

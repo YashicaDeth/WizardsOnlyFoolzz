@@ -18,7 +18,7 @@ extends Node3D
 ## photographs projected onto the poster wall; the wall is laid out here so that
 ## is a texture swap rather than a rebuild.
 
-const BODY_MIRROR := preload("res://systems/body_mirror.gd")
+const ROOM_MIRROR_VIEW := preload("res://systems/room_mirror_view.gd")
 
 ## A real bedroom, in metres. Small on purpose: the reference photograph is a
 ## corner room with a bed against one wall and posters over every surface, and
@@ -158,7 +158,7 @@ func hang_mirror(world: World3D) -> SubViewport:
 	_panel(Vector3(2.22, 2.12, 0.02), at + Vector3(0, 0, -0.015), FRAME).layers = LAYER_MIRROR_WALL
 	_mirror_plane_origin = at + Vector3(0, 0, -0.03)
 	_mirror_normal = Vector3(0, 0, -1)
-	mirror = BODY_MIRROR.make(world, Vector2i(768, 720))
+	mirror = ROOM_MIRROR_VIEW.make(world, Vector2i(768, 720))
 	add_child(mirror)
 	mirror.call("place", _mirror_plane_origin, _mirror_normal)
 	# Everything except the wall the glass is set into. Without this the
