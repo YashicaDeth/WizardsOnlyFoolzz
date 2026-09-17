@@ -45,8 +45,12 @@ static func grant(subject_id: String, boon_id: String, stat: String, magnitude: 
 	var history: Dictionary = subject.get("boon_history", {})
 	var taken := int(history.get(boon_id, 0))
 	var scaled_cost := base_cost * pow(REPEAT_MULTIPLIER, float(taken))
+	# Body payment, boon refresh and the public grant fact are one grant. This
+	# remains nested-safe when a ritual owns the surrounding player action.
+	WorldHistory.begin_ledger_batch()
 	var payment := _pay(subject_id, cost_kind, scaled_cost, cost_target)
 	if not bool(payment.get("ok", false)):
+		WorldHistory.commit_ledger_batch()
 		return payment
 	history[boon_id] = taken + 1
 	var active := active_boons(subject_id)
@@ -60,6 +64,7 @@ static func grant(subject_id: String, boon_id: String, stat: String, magnitude: 
 		"subject_id": subject_id, "boon_id": boon_id, "stat": stat, "magnitude": magnitude,
 		"cost_kind": cost_kind, "cost_paid": scaled_cost, "times_taken": taken + 1,
 	})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "cost_paid": scaled_cost, "duration_msec": int(duration_seconds * 1000.0)}
 
 
