@@ -5126,6 +5126,15 @@ instead.
 - [x] **AP4.9** The loop survives persistence and respects quantum restart — `facility_territory_test.gd` proves normal WorldHistory state, a fresh universe returning the pit to corporate control, and quantum branch restore returning liberation, INDEX file and bounty together (15/15).
 - [x] **AP4.10** The whole state change is captured, not inferred — `captures/facility_territory_loop.mp4` is a verified 1280×720 30 FPS H.264/AAC reel showing progressive reveal, liberation, INDEX unlock, corporate response, reset and reload; three accepted PNG evidence frames accompany it. Full contract and honest scope: `DESIGN/FACILITY_TERRITORY_SLICE.md`.
 
+### AP5 — Service Ring liberation
+
+- [x] **AP5.1** The Service Ring exists in the playable world — each of the underground colosseum's three authored tunnel chambers contains one physical CellOutz relay, not a MAP-only objective marker.
+- [x] **AP5.2** The relays use verbs the derby already teaches — three travelling cab rounds or three qualifying vehicle impacts disable one; a dead relay stops scanning and cannot award duplicate progress.
+- [x] **AP5.3** The escape is a compound objective — eight wreckers clear the bowl but leave the heat active until all three relays are dark, so winning combat alone no longer counterfeits territorial liberation.
+- [x] **AP5.4** Surveillance is readable from the cab — each live head sweeps a real acquisition cone, and the existing physical instrument cluster carries three relay lamps plus the current scan level instead of adding another permanent corner panel.
+- [x] **AP5.5** The world answers the act once — each disabled index persists in `facility_territory`; the third liberates the Service Ring, unlocks its recovered INDEX file and escalates CellOutz's existing order to priority exactly once. `service_ring_relay_test` (7/7) and `service_ring_objective_test` (13/13) cover the target and integrated objective.
+- [x] **AP5.6** The physical loop is recorded, not inferred — `captures/service_ring_liberation.mp4` is a visually inspected 1280×720, 30 FPS, 14.23-second H.264 reel of the real cab firing nine travelling rounds, all three live relay signatures extinguishing, the cab counter advancing and the final liberation state landing.
+
 ### AP2 — Undying
 - [ ] **AP2.1** The spirit cannot be banished by violence, and the game proves this to you early
 - [ ] **AP2.2** Bright vibrant flame that melts the screen itself — a real shader, not an overlay

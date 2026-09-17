@@ -49,6 +49,26 @@ same record back.
 - Choosing how to leave reveals the Surface Gate and the remaining recovered
   facility records.
 
+## The Service Ring is played, not awarded
+
+The Underground Colosseum's three existing tunnel chambers each contain one
+CellOutz surveillance relay. A live head sweeps a red acquisition cone while
+its local light makes the machine readable against the dark masonry. Relays
+take three physical contacts and accept both of the derby's existing verbs:
+travelling cab rounds and vehicle impacts. Going dark removes the scan and its
+light rather than only incrementing a hidden objective counter.
+
+The heat is now compound: eight wreckers clear the bowl, but the player keeps
+control until all three relays are disabled. The physical cab cluster carries
+three relay lamps and the live acquisition level; after the last wrecker the
+only extra screen-space line is the temporary cleanup direction. The final
+relay liberates the Service Ring, unlocks its INDEX record and escalates the
+already circulating CellOutz order to priority. It does not create a second
+unrelated quest or bounty.
+
+Disabled relay indices live in the territory authority and restore with it, so
+re-entering cannot resurrect hardware or duplicate the escalation event.
+
 The reaction is idempotent: replaying the callback cannot farm duplicate
 bounties or events.
 
@@ -85,6 +105,10 @@ rules, while the facility begins controlled again.
   opening scene transitions.
 - Relevant regressions: `map_perf_test`, `index_link_rebuild_test`,
   `handheld_satellite_test`, and `handheld_page_grammar_test` pass.
+- `game/tests/service_ring_relay_test.tscn`: 7/7 physical target and scan
+  checks. `game/tests/service_ring_objective_test.tscn`: 13/13 integration
+  checks across real chamber placement, vehicle impact, compound completion,
+  INDEX unlock and one-shot CellOutz escalation.
 - Stills:
   `game/captures/phase3_facility_liberated.png`,
   `game/captures/phase3_facility_index.png`, and
@@ -94,6 +118,11 @@ rules, while the facility begins controlled again.
   seconds, H.264/AAC. It shows progressive reveal, liberation, INDEX unlock,
   corporate reaction, a fresh branch resetting ownership, and restoration of
   the saved branch.
+- Physical gameplay evidence:
+  `game/captures/service_ring_liberation.mp4` — 1280×720, 30 FPS, 14.23
+  seconds, H.264. The real cab fires nine travelling rounds into all three
+  chamber relays; their live signatures go dark, the cab counter advances and
+  the last relay completes liberation.
 
 ## Honest boundary
 

@@ -18,7 +18,9 @@ var clock := 0.0
 var head: Node3D
 var lens: MeshInstance3D
 var lamp: SpotLight3D
+var status_glow: OmniLight3D
 var _lens_material: StandardMaterial3D
+var _status_materials: Array[StandardMaterial3D] = []
 
 
 func build(index: int) -> void:
@@ -53,7 +55,9 @@ func build(index: int) -> void:
 		collar_mesh.outer_radius = 1.08
 		collar_mesh.rings = 12
 		collar_mesh.ring_segments = 8
-		collar_mesh.material = WorldLook.surface(Color("523126"), "metal", 6250 + index * 5 + collar_index)
+		var collar_material := WorldLook.emissive(Color("8f1f18") if collar_index == 1 else Color("5b211c"), 1.35 if collar_index == 1 else 0.45)
+		collar_mesh.material = collar_material
+		_status_materials.append(collar_material)
 		collar.mesh = collar_mesh
 		collar.position.y = 0.75 + float(collar_index) * 1.25
 		add_child(collar)
@@ -81,6 +85,19 @@ func build(index: int) -> void:
 	lens.rotation_degrees.x = 90.0
 	lens.position.z = -0.88
 	head.add_child(lens)
+	var aperture := MeshInstance3D.new()
+	var aperture_mesh := TorusMesh.new()
+	aperture_mesh.inner_radius = 0.58
+	aperture_mesh.outer_radius = 0.78
+	aperture_mesh.rings = 16
+	aperture_mesh.ring_segments = 8
+	var aperture_material := WorldLook.emissive(Color("ad271e"), 1.6)
+	aperture_mesh.material = aperture_material
+	_status_materials.append(aperture_material)
+	aperture.mesh = aperture_mesh
+	aperture.rotation_degrees.x = 90.0
+	aperture.position.z = -0.93
+	head.add_child(aperture)
 
 	lamp = SpotLight3D.new()
 	lamp.name = "SurveillanceCone"
@@ -93,6 +110,17 @@ func build(index: int) -> void:
 	lamp.shadow_enabled = false
 	head.add_child(lamp)
 
+	# Enough local spill to reveal the machine's silhouette against the dark
+	# masonry. The long cone remains the threat; this short glow only makes its
+	# source readable from the cab and dies with the hardware.
+	status_glow = OmniLight3D.new()
+	status_glow.position.y = 4.1
+	status_glow.light_color = Color("c93928")
+	status_glow.light_energy = 1.7
+	status_glow.omni_range = 7.0
+	status_glow.shadow_enabled = false
+	add_child(status_glow)
+
 
 func take_hit(cause: String = "shot", force: float = 1.0) -> Dictionary:
 	if disabled or force <= 0.0:
@@ -101,8 +129,13 @@ func take_hit(cause: String = "shot", force: float = 1.0) -> Dictionary:
 	if hits >= MAX_HITS:
 		disabled = true
 		lamp.visible = false
+		status_glow.visible = false
 		_lens_material.emission = Color("263116")
 		_lens_material.albedo_color = Color("18200e")
+		for material in _status_materials:
+			material.emission = Color("18200e")
+			material.albedo_color = Color("11150c")
+			material.emission_energy_multiplier = 0.2
 		head.rotation_degrees.z = 13.0 if relay_index % 2 == 0 else -11.0
 		collision_layer = 1
 		relay_disabled.emit(relay_index, cause)
@@ -119,8 +152,13 @@ func restore_disabled() -> void:
 	hits = MAX_HITS
 	disabled = true
 	lamp.visible = false
+	status_glow.visible = false
 	_lens_material.emission = Color("263116")
 	_lens_material.albedo_color = Color("18200e")
+	for material in _status_materials:
+		material.emission = Color("18200e")
+		material.albedo_color = Color("11150c")
+		material.emission_energy_multiplier = 0.2
 	head.rotation_degrees.z = 13.0 if relay_index % 2 == 0 else -11.0
 
 

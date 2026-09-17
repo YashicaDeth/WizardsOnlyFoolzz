@@ -27,8 +27,11 @@ func _ready() -> void:
 	check(not derby._try_finish_colosseum_objective(), "eight wreckers alone no longer skips the Service Ring")
 	check(derby.round_state == "active", "the emptied bowl remains driveable while the ring is live")
 
-	for index in 2:
-		derby.service_relays[index].take_hit("test", 3.0)
+	for _hit in 3:
+		derby.service_relays[0].set_meta("ram_ready_msec", 0)
+		derby._on_vehicle_impact(derby.service_relays[0], 9.0, 0.5)
+	check(derby.service_relays[0].disabled, "the existing vehicle-impact seam can physically ram a relay dark")
+	derby.service_relays[1].take_hit("test", 3.0)
 	check(derby.round_state == "active", "two disabled relays do not counterfeit liberation")
 	check(str(FACILITY.sector("service_ring").state) != FACILITY.LIBERATED, "territory still reports the Service Ring as occupied")
 	derby.service_relays[2].take_hit("test", 3.0)
