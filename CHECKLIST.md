@@ -984,7 +984,7 @@ mass-produced by the million.
 - [x] **E5.3** The long route: climbing lets the game continue — `route_endings.gd` (E7.2) is that hand-off, now built: reaching it is named `ascended_continue`, not a terminal state, and nothing in `RouteEndings` ends the game either way
 
 ### E6 — Drugs
-- [x] **E6.1** Substances with real body cost through the anatomy component — `systems/substances.gd`: Marrow Dust, Choir Bloom and Static Hymn, each an Ashbloom-native thing (ground bone, a fungal graft, dead-mast feedback — non-negotiable 1, nothing renamed off a real drug), paying into the same `anatomy_state` ledger `boons.gd` already pays into
+- [x] **E6.1** Substances with real body cost through the anatomy component — `systems/substances.gd`: Marrow Dust, Choir Bloom and Static Hymn, each an Ashbloom-native thing (ground bone, a fungal graft, dead-mast feedback — non-negotiable 1, nothing renamed off a real drug), paying into the same `anatomy_state` ledger `boons.gd` already pays into. A player dose now routes payment, anatomy mutation, its public event and any door glimpse through one nested-safe ledger batch and one compact `PlayerActionLedger` receipt; `tests/substances_test.gd` covers the closed transaction and stable action identity (19 checks)
 - [ ] **E6.2** Preparation and consumption minigames (UI; not attempted here)
 
 ### E8 — Sitting still
