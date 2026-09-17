@@ -3084,7 +3084,18 @@ already switches presets by place; nothing switches by time.
 - [x] **W1.3** Being caught out in it costs something — `storm_weather.gd`'s
       `exposure_cost()`, drained from stamina in `_update_storm_exposure()`,
       cut by a warm layer (AS3.3/AS4.5).
-- [ ] **W1.4** Factions keep hours; the Wire is busier at some of them
+- [x] **W1.4** Factions keep hours; the Wire is busier at some of them — every
+      known faction now has one communications window on the shared
+      `WorldClock` (with subject-level override support rather than another
+      timer). Cross-midnight shifts remain continuous, CellOutz automation
+      never closes, off-shift accounts name when their channel returns, and
+      the Wire's visible traffic register, active voices, reply volume and
+      proportion of live world reports all rise and fall with the aggregate
+      of factions actually represented on the reachable network.
+      `wire_hours_test` proves distinct day/night shifts, quiet accounts,
+      24-hour automation and denser live reporting at the real aggregate peak;
+      `captures/wire_faction_hours.png` verifies the quiet-hours register and
+      account return time on the live Wire composition.
 - [x] **W1.5** G7's exposure problem is a lighting *state* rather than a
       constant — `_update_day_night()` drives the sun's energy/colour and the
       base environment's ambient/exposure off `WorldClock.daylight()` every

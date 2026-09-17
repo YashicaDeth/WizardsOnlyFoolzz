@@ -64,6 +64,26 @@ var traced_by := ""
 var _accounts: Dictionary = {}
 var _coverage: Dictionary = {}
 
+## W1.4. Factions share the one WorldClock, but they do not share a shift.
+## These are communications windows, not a second simulation clock: patrols,
+## shops and bodies may still exist outside them. A faction subject may provide
+## `wire_hours: [start, end]`; this table is the stable baseline for the cast
+## already in the world. Equal endpoints mean an institutional 24-hour channel.
+const FACTION_WIRE_HOURS := {
+	"celloutz": [0.0, 0.0],
+	"ashline_wreckers": [18.0, 6.0],
+	"gate_lanterns": [5.0, 18.0],
+	"black_mile": [20.0, 8.0],
+	"soft_rot": [4.0, 16.0],
+	"choir_of_marrow": [22.0, 5.0],
+	"vanity_row": [12.0, 2.0],
+	"honeyvein": [7.0, 21.0],
+	"long_static": [0.0, 10.0],
+	"wizardsonlyfoolz": [19.0, 4.0],
+}
+
+const QUIET_ACTIVITY := 0.12
+
 
 func _init(grade: int = SIGNAL_SURFACE) -> void:
 	signal_grade = grade
@@ -136,12 +156,14 @@ func _build_account(subject_id: String, subject: Dictionary) -> Dictionary:
 	var reach := 40 + influence * 46 + coverage * 120 + skill_reach + manufactured
 	reach = int(float(reach) * _ladder_split_penalty(relations))
 	var tier := _tier_for(reach)
+	var faction_id := str(subject.get("faction_id", ""))
+	var activity := faction_activity(faction_id)
 	return {
 		"id": subject_id,
 		"name": str(subject.get("name", subject_id)),
 		"handle": _handle(str(subject.get("name", subject_id))),
 		"faction": str(subject.get("faction", "Unbound")),
-		"faction_id": str(subject.get("faction_id", "")),
+		"faction_id": faction_id,
 		"role": str(subject.get("role", "unindexed")),
 		"reach": reach,
 		"influence": influence,
@@ -154,7 +176,8 @@ func _build_account(subject_id: String, subject: Dictionary) -> Dictionary:
 		"verified": bool(tier.verified),
 		"answers": float(tier.answers),
 		"band": _band_for(subject),
-		"last_seen": _last_seen(subject_id, subject),
+		"activity": activity,
+		"last_seen": _last_seen(subject_id, subject, activity),
 	}
 
 
@@ -191,8 +214,12 @@ func _band_for(subject: Dictionary) -> int:
 
 ## A dormant profile reading "last online two minutes ago" should be unsettling,
 ## so the number is real: it comes from the subject's status, not from decoration.
-func _last_seen(subject_id: String, subject: Dictionary) -> String:
+func _last_seen(subject_id: String, subject: Dictionary, activity := 1.0) -> String:
 	var status := str(subject.get("status", "")).to_lower()
+	var faction_id := str(subject.get("faction_id", ""))
+	if not faction_id.is_empty() and activity <= QUIET_ACTIVITY + 0.001 and status not in ["dead", "downed", "executed"]:
+		var schedule := faction_schedule(faction_id)
+		return "QUIET UNTIL %02d:00" % int(schedule.get("start", 0.0))
 	if status in ["active", "following", "hunting", "awake"]:
 		return "ONLINE NOW"
 	if status in ["roaming", "cultivating", "waiting"]:
@@ -202,6 +229,58 @@ func _last_seen(subject_id: String, subject: Dictionary) -> String:
 	if status in ["dead", "downed", "executed"]:
 		return "LAST POST STANDS"
 	return "%d DAYS AGO" % ((hash(subject_id) & 0x7f) % 900 + 4)
+
+
+## A continuous activity value rather than an online/offline switch. Inside a
+## shift it rises toward the middle and falls toward handover; outside it keeps
+## a small automated residue. Windows crossing midnight use the same math.
+func faction_schedule(faction_id: String) -> Dictionary:
+	var faction := WorldHistory.subject(faction_id)
+	var authored: Array = faction.get("wire_hours", [])
+	var hours: Array = authored if authored.size() >= 2 else FACTION_WIRE_HOURS.get(faction_id, [8.0, 20.0])
+	return {"start": float(hours[0]), "end": float(hours[1])}
+
+
+func faction_activity(faction_id: String, at := -1.0) -> float:
+	if faction_id.is_empty():
+		return 0.45
+	var schedule := faction_schedule(faction_id)
+	var start := fposmod(float(schedule.start), WorldClock.HOURS_PER_DAY)
+	var finish := fposmod(float(schedule.end), WorldClock.HOURS_PER_DAY)
+	if is_equal_approx(start, finish):
+		return 1.0
+	var hour_at: float = WorldClock.hour() if float(at) < 0.0 else fposmod(float(at), WorldClock.HOURS_PER_DAY)
+	var duration := fposmod(finish - start, WorldClock.HOURS_PER_DAY)
+	var elapsed := fposmod(hour_at - start, WorldClock.HOURS_PER_DAY)
+	if elapsed > duration:
+		return QUIET_ACTIVITY
+	var through := clampf(elapsed / duration, 0.0, 1.0)
+	return lerpf(0.62, 1.0, sin(through * PI))
+
+
+## Mean traffic across factions that actually have people on this reachable
+## Wire. No new population is invented just to make the gauge move.
+func network_activity() -> float:
+	var seen: Dictionary = {}
+	for account_data: Dictionary in _accounts.values():
+		var faction_id := str(account_data.get("faction_id", ""))
+		if not faction_id.is_empty():
+			seen[faction_id] = faction_activity(faction_id)
+	if seen.is_empty():
+		return 0.0
+	var total := 0.0
+	for value in seen.values():
+		total += float(value)
+	return clampf(total / float(seen.size()), 0.0, 1.0)
+
+
+func activity_band() -> String:
+	var activity := network_activity()
+	if activity >= 0.72:
+		return "CROWDED"
+	if activity >= 0.38:
+		return "RESTLESS"
+	return "QUIET"
 
 
 func accounts_by_reach() -> Array:
@@ -960,10 +1039,16 @@ func feed(count: int = 14, seed_offset: int = 0) -> Array:
 	if signal_grade >= SIGNAL_UNDERBELLY:
 		kinds.append("underbelly")
 	var voices := accounts_by_reach()
+	var active_voices: Array = voices.filter(func(voice: Dictionary): return float(voice.get("activity", 0.0)) > QUIET_ACTIVITY + 0.01)
+	if not active_voices.is_empty():
+		voices = active_voices
+	var traffic := network_activity()
+	var report_stride := 2 if traffic >= 0.72 else (3 if traffic >= 0.38 else 4)
 	for index in count:
-		# Roughly one post in three is the world actually reporting on itself.
-		# The rest is what the platform would rather you read.
-		if index % 3 == 1 and not reports.is_empty():
+		# The proportion of live world reports now follows who is awake. Filler
+		# never disappears—the platform is still farming attention during quiet
+		# hours—but a crowded Wire carries events sooner and more often.
+		if index % report_stride == 1 and not reports.is_empty():
 			var event: Dictionary = reports[index % reports.size()]
 			posts.append(_report_post(event, rng, voices))
 			continue
@@ -978,7 +1063,7 @@ func feed(count: int = 14, seed_offset: int = 0) -> Array:
 			"reach": int(voice.get("reach", 0)),
 			"verified": bool(voice.get("verified", false)) and kind != "bot",
 			"band": SIGNAL_UNDERBELLY if kind == "underbelly" else SIGNAL_SURFACE,
-			"replies": rng.randi_range(0, 340),
+			"replies": roundi(float(rng.randi_range(0, 340)) * lerpf(0.45, 1.55, traffic)),
 		})
 	return posts
 
