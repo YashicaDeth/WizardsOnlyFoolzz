@@ -1312,22 +1312,28 @@ func _unhandled_input(event: InputEvent) -> void:
 		inspect_held = event.pressed
 		if inspect_held and panel_mode.is_empty():
 			prompt.text = "INSPECT // RELEASE I TO LOWER"
-			inspected_world_item = _nearest_world_item_for_inspection()
-			var inspected_id := str(inspected_world_item.get("item_id", ""))
+			# The receipt must name what the animation is actually raising. A
+			# proximity-first lookup let a bedroll or passer-by steal the event
+			# while the player's hands visibly turned their bong or gun. Held
+			# things own I; slot 5 puts the hands down and exposes world inspection.
+			inspected_world_item.clear()
+			var inspected_id := ""
 			var inspected_event := "held_item_inspected"
+			if smoke_model != null and is_instance_valid(smoke_model):
+				inspected_id = str(smoke_model.get_meta("device_id", ""))
+			elif carried_limb_model != null and is_instance_valid(carried_limb_model):
+				inspected_id = "carried_limb"
+			elif arsenal != null and not bare_handed:
+				inspected_id = str(arsenal.current_id)
+			if inspected_id.is_empty():
+				inspected_world_item = _nearest_world_item_for_inspection()
+				inspected_id = str(inspected_world_item.get("item_id", ""))
 			if not inspected_world_item.is_empty():
 				match str(inspected_world_item.get("kind", "")):
 					"person": inspected_event = "world_subject_inspected"
 					"fixture": inspected_event = "world_fixture_inspected"
 					_: inspected_event = "world_item_inspected"
-			if not inspected_world_item.is_empty():
 				prompt.text = "%s // INSPECT // RELEASE I TO LOWER" % str(inspected_world_item.get("label", "OBJECT"))
-			elif smoke_model != null and is_instance_valid(smoke_model):
-				inspected_id = str(smoke_model.get_meta("device_id", ""))
-			elif carried_limb_model != null and is_instance_valid(carried_limb_model):
-				inspected_id = "carried_limb"
-			elif arsenal != null:
-				inspected_id = str(arsenal.current_id)
 			if not inspected_id.is_empty():
 				PLAYER_ACTION_LEDGER.record(inspected_event, {
 					"subject_id": "player", "item": inspected_id, "location": HUNT_LOCATION,
@@ -1343,7 +1349,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_5: _put_the_weapons_down()
 			KEY_6: _cycle_smokeable()
 			KEY_Y: _toggle_mouth_hold()
-			KEY_B: _cycle_grip()
+			KEY_B:
+				if not grapple_target.is_empty():
+					_buy_witness_report()
+				else:
+					_cycle_grip()
 			KEY_R:
 				if handheld.is_open:
 					_cycle_asset_task()
@@ -5624,8 +5634,9 @@ func _update_grapple(delta: float) -> void:
 	# currently worth rather than only how hard you are squeezing.
 	var offer := _clinch_options(actor)
 	var grip_note := " BY THE %s" % grapple_zone.replace("_", " ").to_upper() if grip_zone_ratio < 0.6 else ""
-	prompt.text = "CLINCH / %s%s   %+d   [LMB] PRESS  [WASD] WALK THEM  [V] TALK  [X] LEAN  [H] TAKE  [SPACE] BREAK" % [
-		str(actor.display_name).to_upper(), grip_note, roundi(grapple_advantage * 100.0),
+	var buy_report := "  [B] BUY REPORT" if witness_ledger.reports_carried_by(str(actor.subject_id)) > 0 else ""
+	prompt.text = "CLINCH / %s%s   %+d   [LMB] PRESS  [WASD] WALK THEM  [V] TALK  [X] LEAN%s  [H] TAKE  [SPACE] BREAK" % [
+		str(actor.display_name).to_upper(), grip_note, roundi(grapple_advantage * 100.0), buy_report,
 	]
 	if bool(offer.surrender):
 		prompt.text = "%s IS GIVING UP — [V] TAKE THE SURRENDER" % str(actor.display_name).to_upper()
@@ -5785,6 +5796,23 @@ func _clinch_threaten() -> void:
 	var subject := WorldHistory.subject(str(actor.subject_id))
 	var result := Clinch.threaten(subject, grapple_advantage, actor.anatomy.call("snapshot"), float(WorldHistory.subject("player").get("karma", 0.0)))
 	_apply_clinch_result(actor, result, "threatened")
+
+
+## AE10.10. Buying a witness is a physical exchange with the exact person
+## carrying the report, not a police-menu option. B is otherwise the smoking
+## grip key; the clinch owns it while a body is actually in your hands.
+func _buy_witness_report() -> void:
+	var actor := _actor_by_id(grapple_target)
+	if actor.is_empty():
+		return
+	var result := witness_ledger.buy(str(actor.subject_id), "player")
+	if not bool(result.get("ok", false)):
+		prompt.text = str(result.get("reason", "THEY WILL NOT TAKE IT"))
+		return
+	prompt.text = "%s TAKES %d RUST SCRIP // %d REPORT%s BURIED" % [
+		str(actor.display_name).to_upper(), int(result.price), int(result.reports),
+		"" if int(result.reports) == 1 else "S",
+	]
 
 
 ## One place where a clinch outcome is written into the record, so persuading

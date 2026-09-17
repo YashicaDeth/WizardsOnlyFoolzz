@@ -23,6 +23,22 @@ func _ready() -> void:
 	var station_pickups: Array = hunt.substance_station.pickups()
 	var ground_pickup: Dictionary = station_pickups[0]
 	hunt.player = (ground_pickup["node"] as Node3D).global_position
+	var inspect_press := InputEventKey.new()
+	inspect_press.keycode = KEY_I
+	inspect_press.pressed = true
+	var inspect_release := InputEventKey.new()
+	inspect_release.keycode = KEY_I
+	inspect_release.pressed = false
+	hunt._equip_weapon(1)
+	hunt._unhandled_input(inspect_press)
+	check(str((WorldHistory.recent_events(1)[0] as Dictionary).get("type", "")) == "held_item_inspected" and hunt.inspected_world_item.is_empty(),
+		"a held weapon owns I even while a world pickup is within inspection range")
+	hunt._unhandled_input(inspect_release)
+	hunt._put_the_weapons_down()
+	hunt._unhandled_input(inspect_press)
+	check(str((WorldHistory.recent_events(1)[0] as Dictionary).get("type", "")) == "world_item_inspected" and not hunt.inspected_world_item.is_empty(),
+		"slot 5 frees the same I verb to inspect the nearby world object")
+	hunt._unhandled_input(inspect_release)
 	var world_preview: Dictionary = hunt._nearest_world_item_for_inspection()
 	hunt.inspected_world_item = world_preview
 	hunt.inspect_held = true

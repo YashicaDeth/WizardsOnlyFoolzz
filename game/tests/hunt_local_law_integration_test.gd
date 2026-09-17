@@ -97,6 +97,40 @@ func _ready() -> void:
 		return str(event.get("type", "")) == "report_cut" and str((event.get("details", {}) as Dictionary).get("subject", "")) == str(cut_witness.subject_id)),
 		"the silencing is attributable in history rather than silently deleting testimony")
 
+	# The other physical way to stop an account: buy it from the exact body
+	# carrying it while they are held in a clinch. Drive the real contextual B
+	# binding so smoking's ordinary grip-cycle use of B cannot mask a dead route.
+	hunt._spawn_encounter_actor({
+		"instance_id": "paid_witness", "kind": "hostile", "display_name": "Pell Writ",
+		"role": "GATE LANTERN RUNNER", "summary": "Knows what an account costs.",
+	}, at + Vector3(6, 0, 0))
+	var paid_witness: Dictionary = hunt.encounter_actors.back()
+	WorldHistory.amend_subject(str(paid_witness.subject_id), {"faction_id": "gate_lanterns", "faction": "Gate Lanterns"})
+	var paid_event: Dictionary = hunt.witness_ledger.record("npc_resolution", {
+		"subject_id": "paid_report_target", "actor": "player", "outcome": "execute",
+		"place_id": "ashbloom:tunnel_mouth", "held_by": "gate_lanterns",
+	}, [str(paid_witness.subject_id)])
+	WorldHistory.amend_subject("inventory", {"rust_scrip": WitnessLedger.REPORT_PRICE * 2})
+	hunt.kill_cam.cancel()
+	hunt.grapple_target = str(paid_witness.subject_id)
+	var buy_key := InputEventKey.new()
+	buy_key.keycode = KEY_B
+	buy_key.pressed = true
+	hunt._unhandled_input(buy_key)
+	hunt.grapple_target = ""
+	check(hunt.witness_ledger.reports_carried_by(str(paid_witness.subject_id)) == 0,
+		"the contextual B binding buys the report from the physically held witness")
+	check(int(WorldHistory.subject("inventory").get("rust_scrip", -1)) == WitnessLedger.REPORT_PRICE,
+		"the production exchange spends the real persistent rust-scrip wallet")
+	var bought_events := WorldHistory.events.filter(func(event: Dictionary):
+		return str(event.get("type", "")) == "report_bought" and int(paid_event.sequence) in ((event.get("details", {}) as Dictionary).get("source_sequences", []) as Array))
+	check(bought_events.size() == 1 and str((bought_events[0].get("details", {}) as Dictionary).get("action_id", "")) != "",
+		"buying testimony produces one attributable player-action receipt")
+	hunt.witness_ledger.tick(WitnessLedger.REPORT_DELAY * 2.0)
+	check(not hunt.witness_ledger.faction_knows("gate_lanterns", int(paid_event.sequence)),
+		"the bought physical account never becomes faction knowledge")
+	(paid_witness.node as Node3D).position = Vector3(-220, 1, -170)
+
 	# One incident is memory, not an enemy printer. Repeated distinct witnessed
 	# acts cross the real threshold and should finally put the holder's own people
 	# onto the road through the ordinary encounter pipeline.

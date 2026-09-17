@@ -1,6 +1,8 @@
 class_name WitnessLedger
 extends RefCounted
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 ## Who saw it, whether they lived to say so, and what the world ended up
 ## believing as a result.
 ##
@@ -41,12 +43,17 @@ const WIRE_FORCE := 0.45
 ## How far a witness can be and still see it. Generous, because the failure mode
 ## that matters is a killing nobody reports, not one somebody implausibly saw.
 const SIGHT_RANGE := 34.0
+## AE10.10. Buying testimony uses the one currency the world already has. The
+## price is per account, not per witness, so somebody carrying three separate
+## wrongs is materially harder to buy than somebody carrying one.
+const REPORT_PRICE := 12
 
 ## Pending reports in flight. Runtime only: a report that has not landed is not
 ## knowledge, so persisting it would be persisting the wrong thing.
 var pending: Array = []
 var delivered := 0
 var cut := 0
+var bought := 0
 
 
 ## Who was close enough to see it. `candidates` is [{id, at, alive}] so the
@@ -149,6 +156,50 @@ func silence(subject_id: String) -> int:
 	if lost > 0:
 		WorldHistory.record_event("report_cut", {"subject": subject_id, "reports": lost})
 	return lost
+
+
+func reports_carried_by(subject_id: String) -> int:
+	return pending.filter(func(report: Dictionary): return str(report.get("witness", "")) == subject_id).size()
+
+
+## AE10.10. Pay the person who is physically carrying the account before it
+## lands. This is neither murder nor retroactive deletion from faction
+## knowledge: only pending reports can be bought. Inventory, witness memory,
+## removed testimony and the action receipt settle in one nested ledger batch.
+func buy(subject_id: String, buyer_id: String = "player") -> Dictionary:
+	var carried: Array = pending.filter(func(report: Dictionary): return str(report.get("witness", "")) == subject_id)
+	if carried.is_empty():
+		return {"ok": false, "reason": "THEY ARE CARRYING NO REPORT"}
+	var inventory := WorldHistory.subject("inventory")
+	var price := carried.size() * REPORT_PRICE
+	var wallet := int(inventory.get("rust_scrip", 0))
+	if wallet < price:
+		return {"ok": false, "reason": "NEED %d RUST SCRIP" % price, "price": price, "wallet": wallet}
+	var sequences: Array = carried.map(func(report: Dictionary): return int(report.get("sequence", -1)))
+	WorldHistory.begin_ledger_batch()
+	pending = pending.filter(func(report: Dictionary): return str(report.get("witness", "")) != subject_id)
+	bought += carried.size()
+	WorldHistory.amend_subject("inventory", {"rust_scrip": wallet - price})
+	var witness := WorldHistory.subject(subject_id)
+	WorldHistory.amend_subject(subject_id, {
+		"bribes_taken": int(witness.get("bribes_taken", 0)) + price,
+		"memory": "Took rust scrip to bury %d pending account%s." % [carried.size(), "" if carried.size() == 1 else "s"],
+	})
+	var details := {
+		"actor": buyer_id, "subject_id": subject_id, "reports": carried.size(),
+		"source_sequences": sequences, "price": price, "currency": "rust_scrip",
+	}
+	var event: Dictionary
+	if buyer_id == "player":
+		event = PLAYER_ACTION_LEDGER.record("report_bought", details)
+	else:
+		event = WorldHistory.record_event("report_bought", details)
+	WorldHistory.commit_ledger_batch()
+	return {
+		"ok": true, "reports": carried.size(), "price": price,
+		"wallet": wallet - price, "source_sequences": sequences,
+		"action_id": str((event.get("details", {}) as Dictionary).get("action_id", "")),
+	}
 
 
 # --- F2: grudges travel real edges -----------------------------------------

@@ -4421,9 +4421,16 @@ The last rung. Fifteen statements that are true of sneaking and the law when thi
       the report delay can deliver it. The true event remains in world history
       and an attributable `report_cut` is added; the holder never learns the
       carried account. `hunt_local_law_integration_test.gd` proves this through
-      a live anatomical witness and physical death. Retelling distortion is the
-      safe foundation for “wrong”; a costed, playable way to buy testimony is
-      still missing, so this broader item remains honestly open.
+      a live anatomical witness and physical death. The bought third is now a
+      contextual physical exchange too: grapple the exact witness while their
+      account is still pending and `[B] BUY REPORT` spends twelve real rust
+      scrip per account, buries only what that body carries and writes one
+      `report_bought` action receipt. Insufficient funds or already-delivered
+      knowledge cannot be bribed away (`witness_test.gd`). Retelling distortion
+      is the safe foundation for “wrong”, but law still reconstructs the true
+      event details underneath that account, so this broader item remains open
+      until wrong testimony can produce a wrong consequence rather than merely
+      wrong prose.
 - [x] **AE10.11** `v10` The tunnels are where the satellite cannot see you —
       `SignalField.DEAD_ZONES` now closes the complete observation loop: MAP
       keeps only remembered chart ink, sleeps the orbital camera, hides the
