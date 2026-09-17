@@ -2794,7 +2794,7 @@ the game's own voice, not a fade to a store page.
 - [x] **P3.2** The stop is in the register — CellOutz closes the demonstration account with a final invoice and bills the balance as `THE REST OF THE GAME`
 - [x] **P3.3** It arrives *after* a win, not in the middle of one — the only hook is `_rival_retreats()`, after `hunt_arc_first_beat_complete` records that the Ashline captain was forced from the field
 - [x] **P3.4** What the player loses by stopping is made concrete: the invoice names the outer Ashbloom road, the captain's rebuilt second hunt, and Board/Wire contracts
-- [x] **P3.5** The stop is written into WorldHistory like any other ending — `complete_demo()` writes `demo_run.status = ended`, the ending id, and one idempotent `demo_ending_reached` event to the isolated demo ledger
+- [x] **P3.5** The stop is written into WorldHistory like any other ending — `complete_demo()` writes `demo_run.status = ended`, the ending id, and one idempotent `demo_ending_reached` event to the isolated demo ledger; the ended state and canonical event persist in one transaction without an intermediate active record
 
 ### P4 — The half hour
 - [x] **P4.1** Playable within sixty seconds of launching — `demo_launch_timing_test.gd` skips the boot slate and the decanting prologue the instant each allows it (the same click an eager player makes) and lands control in the Growing Floor at 5.4s

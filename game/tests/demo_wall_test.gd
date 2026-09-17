@@ -26,6 +26,7 @@ func _ready() -> void:
 	check(str(WorldHistory.subject("demo_run").status) == "ended", "the demo run is permanently ended")
 	check(str(WorldHistory.subject("demo_run").ending) == "ashline_captain_repulsed", "the authored ending id is retained")
 	check(WorldHistory.event_count("demo_ending_reached") == 1, "the ending is written once into WorldHistory")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "ended state and the canonical ending event close one transaction")
 	check(not WorldHistory.complete_demo("ashline_captain_repulsed"), "the ending is idempotent")
 	check(WorldHistory.event_count("demo_ending_reached") == 1, "repeated callbacks cannot duplicate the ending")
 

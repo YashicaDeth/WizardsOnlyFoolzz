@@ -570,11 +570,12 @@ func complete_demo(ending: String, details: Dictionary = {}) -> bool:
 	var run := subject("demo_run")
 	if str(run.get("status", "")) == "ended":
 		return false
-	register_subject("demo_run", {"status": "active", "ending": ""})
+	begin_ledger_batch()
 	amend_subject("demo_run", {"status": "ended", "ending": ending})
 	var record := details.duplicate(true)
 	record["ending"] = ending
 	record_event("demo_ending_reached", record)
+	commit_ledger_batch()
 	return true
 
 
