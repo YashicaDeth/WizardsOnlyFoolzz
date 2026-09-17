@@ -65,7 +65,7 @@ var _ringmaster_walking := false
 var ringmaster_active := false
 var _ringmaster_start := Vector3.ZERO
 var _ringmaster_mark := Vector3.ZERO
-## The three tunnel chambers are the Service Ring's playable objective. The
+## The three tunnel chambers are the Lockdown Grid's playable objective. The
 ## heat only ends when both the eight wreckers and these three physical
 ## surveillance relays are down; the final wreck leaves the tunnels quiet
 ## enough to finish the job instead of teleporting the player away.

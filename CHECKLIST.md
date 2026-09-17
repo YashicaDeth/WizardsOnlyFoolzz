@@ -3311,7 +3311,7 @@ in; nothing has ever asked the player to *use* them on a map.
 - [x] **AA1.4** Reveal is per holding, not per metre, so it arrives in satisfying pieces — `ashbloom_holdings.gd` resolves the nearest authored settlement and reveals that entire persistent polygon exactly once. Fine cell survey remains underneath for streets/buildings, but it no longer controls whether the land itself has a name
 
 ### AA2 — The split
-- [x] **AA2.1** The region divides into named holdings with their own edges — the five settlements the world generator already builds now share one definition table with MAP and produce five deterministic convex Voronoi cells clipped to the real 470-by-370-metre region. `ashbloom_holdings_test` proves all five bounded polygons, settlement containment, whole-piece/idempotent reveal, holder/timestamp persistence and the live map seam (16 checks)
+- [x] **AA2.1** The region divides into named holdings with their own edges — the five settlements the world generator already builds now share one definition table with MAP and produce five deterministic convex Voronoi cells clipped to the real 470-by-370-metre region. Every polygon also owns one canonical `kind: place` WorldHistory record, revealed through the same exploration act and consumed unchanged by MAP, INDEX and Board. `ashbloom_holdings_test` proves all five bounded polygons, settlement containment, whole-piece/idempotent reveal, holder/timestamp persistence, save-safe migration, live map seam and cross-instrument record identity (25 checks)
 - [ ] **AA2.2** A holding can be given to the ascent or given to corruption
 - [ ] **AA2.3** Giving it is an act with a cost, not a menu choice
 - [ ] **AA2.4** A holding remembers who took it and when (WorldHistory, like everything else)
@@ -3329,7 +3329,7 @@ in; nothing has ever asked the player to *use* them on a map.
 ### AA4 — Consequence
 - [ ] **AA4.1** Who lives there reacts — a corrupted holding loses its people
 - [ ] **AA4.2** Factions care: taking ground moves standing on both ladders
-- [ ] **AA4.3** The Board can pin a holding, so a theory can be about land
+- [x] **AA4.3** The Board can pin a holding, so a theory can be about land — a revealed place appears in INDEX without a fabricated portrait, pins as a filed survey record carrying its live holder and field note, and accepts ordinary red string to `THE SIGNAL IS THE PRAYER`. Verified through the production INDEX/Board paths by `ashbloom_holdings_test` and visually at `captures/ashbloom_holding_index.png` / `captures/ashbloom_holding_board.png`
 - [ ] **AA4.4** An ending can be reached through the map rather than through a person
 
 

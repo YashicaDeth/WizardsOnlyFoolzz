@@ -26,7 +26,7 @@ func _ready() -> void:
 	check(derby._service_relays_disabled() == 0, "all three begin as live surveillance")
 	derby.round_state = "active"
 	derby.disabled_count = 8
-	check(not derby._try_finish_colosseum_objective(), "eight wreckers alone no longer skips the Service Ring")
+	check(not derby._try_finish_colosseum_objective(), "eight wreckers alone no longer skips the Lockdown Grid")
 	check(derby.round_state == "active", "the emptied bowl remains driveable while the ring is live")
 
 	for _hit in 3:
@@ -35,10 +35,10 @@ func _ready() -> void:
 	check(derby.service_relays[0].disabled, "the existing vehicle-impact seam can physically ram a relay dark")
 	derby.service_relays[1].take_hit("test", 3.0)
 	check(derby.round_state == "active", "two disabled relays do not counterfeit liberation")
-	check(str(FACILITY.sector("service_ring").state) != FACILITY.LIBERATED, "territory still reports the Service Ring as occupied")
+	check(str(FACILITY.sector("service_ring").state) != FACILITY.LIBERATED, "territory still reports the Lockdown Grid as occupied")
 	derby.service_relays[2].take_hit("test", 3.0)
 	check(derby.round_state == "won", "the final relay completes the compound derby objective")
-	check(str(FACILITY.sector("service_ring").state) == FACILITY.LIBERATED, "the playable act liberates the Service Ring")
+	check(str(FACILITY.sector("service_ring").state) == FACILITY.LIBERATED, "the playable act liberates the Lockdown Grid")
 	check(not WorldHistory.subject("facility:service_ring").is_empty(), "liberation unlocks its INDEX record")
 	check(str(WorldHistory.subject(FACILITY.REACTION_SUBJECT).status) == "priority", "CellOutz escalates its response when the ring goes dark")
 	check(WorldHistory.event_count("celloutz_service_ring_retaliation") == 1, "the escalation is written exactly once")

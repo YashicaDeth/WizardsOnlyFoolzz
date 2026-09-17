@@ -223,7 +223,11 @@ signal theory_retracted(theory_id: String, result: Dictionary)
 
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	# A CanvasLayer is not a Control parent, so stretch anchors have no rect to
+	# resolve against. Keep zero anchors and own the viewport-sized rect below;
+	# combining FULL_RECT anchors with a manual size emitted a layout warning on
+	# every Board open even though the final pixels happened to look correct.
+	set_anchors_preset(Control.PRESET_TOP_LEFT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
 	set_process(true)
@@ -950,12 +954,22 @@ func _card_for(ref: String, kind: String, seed_value: int) -> Card:
 	if state.is_empty():
 		return null
 	var subject_kind := str(state.get("kind", "person"))
-	card.kind = "record" if subject_kind == "faction" else "photo"
+	# Places come off the INDEX as filed survey records, never fabricated human
+	# photographs. The same distinction already applies to faction dossiers.
+	card.kind = "record" if subject_kind in ["faction", "place", "facility_sector"] else "photo"
 	card.title = str(state.get("name", ref)).to_upper()
 	card.body = str(state.get("role", state.get("doctrine", ""))).to_upper()
+	if subject_kind == "place":
+		var holder_id := str(state.get("held_by", "unbound"))
+		var holder := WorldHistory.subject(holder_id)
+		var holder_name := str(holder.get("name", holder_id)).replace("_", " ").to_upper()
+		var field_note := str(state.get("note", "")).to_upper()
+		card.body = "HELD: %s" % holder_name
+		if field_note != "":
+			card.body += "  //  " + field_note
 	card.struck = str(state.get("status", "")) in ["dead", "executed"]
-	card.size = Vector2(164, 92) if subject_kind == "faction" else Vector2(132, 148)
-	card.tint = PAPER_COOL if subject_kind == "faction" else PAPER
+	card.size = Vector2(164, 92) if card.kind == "record" else Vector2(132, 148)
+	card.tint = PAPER_COOL if card.kind == "record" else PAPER
 	if ref == "player":
 		card.body = "ME"
 		card.size = Vector2(140, 158)

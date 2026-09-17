@@ -26,6 +26,15 @@ settlement over 1.4 seconds, gaining its holder colour and name as one weighted
 event. This establishes land, ownership and discovery; it deliberately does
 not decide how the eventual act of giving land upward or downward works.
 
+18 September implementation note: a revealed surface holding is now one
+first-class place everywhere, not a polygon trapped inside MAP. Its canonical
+WorldHistory record carries the same holder, reveal time, field note and world
+position into INDEX, where land receives a live polygon survey instead of a
+fabricated human portrait. The same record can be pinned as a filed card on the
+Board and strung into an existing theory; its card retains the current holder
+and field evidence. This is the shared seam future local law, jobs and ownership
+changes must use rather than creating parallel map-pin or quest-place state.
+
 17 September Black Mirror note: its seven apps are different instruments inside
 one object, not seven unrelated UI compositions. The casing now owns a fixed
 page grammar — header and footer rails, app identity and role, stable page
@@ -46,7 +55,7 @@ a scanning CellOutz relay that can be shot with the cab's travelling rounds or
 rammed with the vehicle. Eight wreckers no longer counterfeit territorial
 liberation: the empty bowl remains driveable until all three relays are dark.
 The cab's own instrument cluster shows relay state and acquisition pressure;
-the final relay persists, unlocks the Service Ring's recovered INDEX file and
+the final relay persists, unlocks the Lockdown Grid's recovered INDEX file and
 escalates the existing repossession order rather than inventing a parallel
 mission.
 

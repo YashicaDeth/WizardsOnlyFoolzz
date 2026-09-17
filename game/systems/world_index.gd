@@ -39,6 +39,7 @@ const BlackMirror := preload("res://systems/black_mirror.gd")
 const Sephiroth := preload("res://systems/sephiroth.gd")
 const PinBoardScript := preload("res://systems/pin_board.gd")
 const FacilityTerritory := preload("res://systems/facility_territory.gd")
+const AshbloomHoldings := preload("res://systems/ashbloom_holdings.gd")
 
 ## Six live 3D heads is cheap; sixty would not be, and each icon owns a World3D.
 ## So they are a pool the pages draw into by slot rather than one per row.
@@ -219,6 +220,8 @@ func _is_person(subject: Dictionary) -> bool:
 	var kind := str(subject.get("kind", ""))
 	if kind == "facility_sector":
 		return true
+	if kind == "place":
+		return bool(subject.get("revealed", false))
 	if kind in ["faction", "job", "object", "territory", "run"]:
 		return false
 	return str(subject.get("name", "")) != ""
@@ -480,7 +483,7 @@ func _draw_icon(slot: int, subject_id: String, rect: Rect2) -> bool:
 	# A recovered place file belongs in the same FILE register as a person, but
 	# it must never be rendered as an invented human head just because the icon
 	# pool knows how to build one from sparse subject data.
-	if str(subject.get("kind", "")) == "facility_sector":
+	if str(subject.get("kind", "")) in ["facility_sector", "place"]:
 		return false
 	icon.set_subject(subject, _subject_tone(subject))
 	icon.set_xray(xray)
@@ -1048,6 +1051,9 @@ func _draw_file(rect: Rect2) -> void:
 	if str(subject.get("kind", "")) == "facility_sector":
 		_draw_facility_file(rect, str(entry.id), subject)
 		return
+	if str(subject.get("kind", "")) == "place":
+		_draw_holding_file(rect, str(entry.id), subject)
+		return
 	CellOutzType.draw_stamped(self, rect.position, str(subject.get("name", entry.id)).to_upper(), 21.0, INK, COPPER * Color(1, 1, 1, 0.3), 1.4)
 	draw_string(font, rect.position + Vector2(2, 44), "%s   ·   %s" % [str(subject.get("role", "unindexed")).to_upper(), str(subject.get("faction", "Unbound")).to_upper()], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COPPER)
 
@@ -1260,6 +1266,59 @@ func _draw_facility_file(rect: Rect2, subject_id: String, subject: Dictionary) -
 		shown += 1
 		if shown >= 3:
 			break
+
+
+## A place file uses the same live polygon MAP does. It does not borrow the
+## human dossier's head, wounds, blood or ELO just because FILE can draw those.
+func _draw_holding_file(rect: Rect2, subject_id: String, subject: Dictionary) -> void:
+	var font := ThemeDB.fallback_font
+	var holding_id := str(subject.get("holding_id", ""))
+	var definition := AshbloomHoldings.definition_for(holding_id)
+	var live := AshbloomHoldings.holding(holding_id)
+	var holder := str(live.get("held_by", subject.get("held_by", "unbound")))
+	var holder_record := WorldHistory.subject(holder)
+	var holder_name := str(holder_record.get("name", holder)).replace("_", " ").to_upper()
+	var tone := _subject_tone({"faction_id": holder})
+	CellOutzType.draw_stamped(self, rect.position, str(subject.get("name", subject_id)).to_upper(), 21.0, INK, COPPER * Color(1, 1, 1, 0.3), 1.4)
+	draw_string(font, rect.position + Vector2(2, 44), "ASHBLOOM HOLDING   //   FIELD-SURVEYED PLACE", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COPPER)
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 78), "CURRENT HOLDER", 10.0, INK * Color(1, 1, 1, 0.48), 1.0)
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 105), holder_name, 21.0, tone, 1.2)
+	CellOutzType.draw_text(self, rect.position + Vector2(330, 78), "REVEALED", 10.0, INK * Color(1, 1, 1, 0.48), 1.0)
+	CellOutzType.draw_text(self, rect.position + Vector2(330, 105), str(live.get("revealed_at", subject.get("revealed_at", "UNKNOWN"))).to_upper(), 11.0, MOSS, 0.9)
+	draw_line(rect.position + Vector2(0, 130), rect.position + Vector2(rect.size.x, 130), INK * Color(1, 1, 1, 0.16), 1.0)
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 160), "FIELD NOTE", 11.0, MOSS, 1.2)
+	var y := rect.position.y + 188.0
+	for line: String in _wrap(str(subject.get("note", definition.get("note", ""))).to_upper(), 46):
+		draw_string(font, Vector2(rect.position.x, y), line, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.48, 14, INK * Color(1, 1, 1, 0.82))
+		y += 19.0
+
+	var stamp := Rect2(Vector2(rect.end.x - 315, rect.position.y + 150), Vector2(295, 228))
+	draw_rect(stamp, GROUND)
+	draw_rect(stamp, tone * Color(1, 1, 1, 0.42), false, 1.2)
+	var polygons := AshbloomHoldings.polygons()
+	var half := AshbloomHoldings.REGION_SIZE * 0.5
+	for id in polygons:
+		var world_polygon: PackedVector2Array = polygons[id]
+		var plan := PackedVector2Array()
+		for point: Vector2 in world_polygon:
+			plan.append(stamp.position + Vector2(
+				(point.x + half.x) / AshbloomHoldings.REGION_SIZE.x * stamp.size.x,
+				(point.y + half.y) / AshbloomHoldings.REGION_SIZE.y * stamp.size.y))
+		if plan.size() < 3:
+			continue
+		var closed := plan.duplicate()
+		closed.append(plan[0])
+		var selected := str(id) == holding_id
+		if selected:
+			draw_colored_polygon(plan, tone * Color(1, 1, 1, 0.16))
+		draw_polyline(closed, tone * Color(1, 1, 1, 0.86 if selected else 0.16), 2.0 if selected else 0.8)
+	if not definition.is_empty():
+		var centre_world: Vector2 = definition.at
+		var centre := stamp.position + Vector2(
+			(centre_world.x + half.x) / AshbloomHoldings.REGION_SIZE.x * stamp.size.x,
+			(centre_world.y + half.y) / AshbloomHoldings.REGION_SIZE.y * stamp.size.y)
+		draw_circle(centre, 4.0, tone)
+	CellOutzType.draw_condensed(self, stamp.position + Vector2(8, stamp.size.y - 16), "MAP / LIVE HOLDING RECORD", 8.0, tone, 0.7)
 
 
 ## Naive word wrap. The memory line is the only free prose on the panel and it

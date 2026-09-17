@@ -10,11 +10,11 @@ const SUBJECT := "ashbloom_holdings"
 const REGION_SIZE := Vector2(470, 370)
 
 const DEFINITIONS := [
-	{"id": "black_mile_yards", "at": Vector2(-150, -122), "name": "BLACK MILE YARDS", "note": "raider highway, tolls", "held_by": "black_mile"},
-	{"id": "soft_rot_communion", "at": Vector2(130, -122), "name": "SOFT ROT COMMUNION", "note": "fungal forest, shifting", "held_by": "soft_rot"},
-	{"id": "bone_yard", "at": Vector2(-155, 0), "name": "THE BONE YARD", "note": "quarry, Ashline ground", "held_by": "ashline_wreckers"},
-	{"id": "ossuary_works", "at": Vector2(135, 0), "name": "OSSUARY WORKS", "note": "sealed anatomy industry", "held_by": "choir_of_marrow"},
-	{"id": "tunnel_mouth", "at": Vector2(65, 115), "name": "TUNNEL MOUTH", "note": "floodlit trade route", "held_by": "gate_lanterns"},
+	{"id": "black_mile_yards", "record": "ashbloom:black_mile_yards", "at": Vector2(-150, -122), "name": "BLACK MILE YARDS", "note": "raider highway, tolls", "held_by": "black_mile"},
+	{"id": "soft_rot_communion", "record": "ashbloom:soft_rot_communion", "at": Vector2(130, -122), "name": "SOFT ROT COMMUNION", "note": "fungal forest, shifting", "held_by": "soft_rot"},
+	{"id": "bone_yard", "record": "ashbloom:bone_yard", "at": Vector2(-155, 0), "name": "THE BONE YARD", "note": "quarry, Ashline ground", "held_by": "ashline_wreckers"},
+	{"id": "ossuary_works", "record": "ashbloom:ossuary_works", "at": Vector2(135, 0), "name": "OSSUARY WORKS", "note": "sealed anatomy industry", "held_by": "choir_of_marrow"},
+	{"id": "tunnel_mouth", "record": "ashbloom:tunnel_mouth", "at": Vector2(65, 115), "name": "TUNNEL MOUTH", "note": "floodlit trade route", "held_by": "gate_lanterns"},
 ]
 
 
@@ -31,6 +31,26 @@ static func ensure() -> Dictionary:
 				"revealed_at": "",
 			}
 			changed = true
+		var holding_entry: Dictionary = holdings[id]
+		var current_holder := str(holding_entry.get("held_by", definition.held_by))
+		# One place subject is the referent shared by INDEX, the Board, local law
+		# and later jobs. The nested territory row is the compact map overview;
+		# this registration migrates existing saves from that authoritative row,
+		# while all later mutations must update both through this class.
+		WorldHistory.register_subject(str(definition.record), {
+			"kind": "place",
+			"name": str(definition.name),
+			"role": "ASHBLOOM HOLDING",
+			"territory": SUBJECT,
+			"holding_id": id,
+			"held_by": current_holder,
+			"faction_id": current_holder,
+			"revealed": bool(holding_entry.get("revealed", false)),
+			"revealed_at": str(holding_entry.get("revealed_at", "")),
+			"note": str(definition.note),
+			"at": {"x": (definition.at as Vector2).x, "z": (definition.at as Vector2).y},
+			"relations": {current_holder: {"kind": "held_by", "strength": 100}},
+		})
 	if record.is_empty():
 		return WorldHistory.register_subject(SUBJECT, {
 			"kind": "territory",
@@ -101,13 +121,29 @@ static func observe(at: Vector2) -> Dictionary:
 		"active_holding": id,
 		"revealed_count": count,
 	})
+	var definition := definition_for(id)
+	if not definition.is_empty():
+		WorldHistory.amend_subject(str(definition.record), {
+			"revealed": true,
+			"revealed_at": str(entry.revealed_at),
+			"held_by": str(entry.get("held_by", definition.held_by)),
+			"faction_id": str(entry.get("held_by", definition.held_by)),
+		})
 	WorldHistory.record_event("holding_revealed", {
 		"territory": SUBJECT,
 		"holding_id": id,
+		"subject_id": str(definition.get("record", "")),
 		"at": {"x": at.x, "z": at.y},
 		"held_by": str(entry.get("held_by", "")),
 	})
 	return entry
+
+
+static func definition_for(id: String) -> Dictionary:
+	for definition: Dictionary in DEFINITIONS:
+		if str(definition.id) == id:
+			return definition.duplicate(true)
+	return {}
 
 
 ## Convex Voronoi cells for every authored centre. The output uses world X/Z
