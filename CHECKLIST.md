@@ -1464,18 +1464,18 @@ holds what the *player* thinks — which is allowed to be wrong.
 - [x] **L1.4** Legible from across the room as a shape, up close as cards
 
 ### L2 — Pinning
-- [x] **L2.1** The player pins what they choose, from the index, the camera and CARRY
+- [x] **L2.1** The player pins what they choose, from the index, the camera and CARRY; pin, unpin and release-after-moving each close as one player-action receipt with the saved board state
 - [x] **L2.2** Photographs from `field_camera.gd` pin with their verifiable contents
 - [x] **L2.3** Nothing auto-pins except the first card
 
 ### L3 — Strings are claims
-- [x] **L3.1** Draw a connection between two pinned things
+- [x] **L3.1** Draw a connection between two pinned things; drawing and cutting persist the wall and their player-action receipt atomically
 - [x] **L3.2** A string the world supports becomes a lead and opens work
 - [x] **L3.3** A false string looks exactly as convincing as a true one
 - [x] **L3.4** The board never marks it — what a lead *leads to* lands with L5
 
 ### L4 — Publishing a theory
-- [x] **L4.1** A theory goes to the Wire through `expose` / `fabricate`
+- [x] **L4.1** A theory goes to the Wire through `expose` / `fabricate`; its Wire receipt, board mutation and single public outcome share one transaction (the former duplicate `theory_published` pair is gone)
 - [x] **L4.2** True published = discrediting; false published = fabrication, and it costs
 - [x] **L4.3** Being wrong has a price — the first screen where it does
 

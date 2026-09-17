@@ -53,6 +53,8 @@ func _ready() -> void:
 	# L2.1. The player puts it up themselves.
 	_check(board.pin("mara_voss", "photo"), "a subject can be pinned")
 	_check(board.is_pinned("mara_voss"), "and it stays pinned")
+	var pin_event: Dictionary = WorldHistory.events[-1]
+	_check(str(pin_event.get("type", "")) == "board_pinned" and str((pin_event.get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_"), "pinning closes with one player-action receipt")
 	_check(not board.pin("mara_voss", "photo"), "the same thing cannot be pinned twice")
 	_check(board.pin("ashline_wreckers", "record"), "a faction can be pinned")
 	_check(board.pin("event:0", "cutting"), "an event can be pinned as a cutting")
@@ -78,6 +80,8 @@ func _ready() -> void:
 	var before: Vector2 = board.pinned[1]["at"]
 	board.move_card("mara_voss", Vector2(40, -25))
 	_check((board.pinned[1]["at"] as Vector2).is_equal_approx(before + Vector2(40, -25)), "a card can be moved by hand")
+	board._commit_move("mara_voss")
+	_check(str((WorldHistory.events[-1] as Dictionary).get("type", "")) == "board_card_moved", "releasing a moved card records one gesture rather than every mouse motion")
 
 	# Taking something down.
 	_check(board.unpin("event:0"), "a pinned card can be taken down")
@@ -139,6 +143,7 @@ func _ready() -> void:
 	var leads_after: int = board.leads().size()
 	board.lay_string("ashline_wreckers", "theory_frequency")
 	_check(board.leads().size() == leads_after, "an unsupported string opens nothing")
+	_check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "board gestures close their shared ledger transaction")
 
 	# L3.3. The one that matters: the board must not give it away.
 	board.rebuild()
@@ -185,6 +190,7 @@ func _ready() -> void:
 	board.pin("mara_voss", "photo")
 	board.lay_string("part:HEART@mara_voss", "theory_ownership")
 	_check(board.strung_to("theory_ownership").size() > 0, "the theory knows what is holding it up")
+	var publications_before := WorldHistory.events.filter(func(event): return str((event as Dictionary).get("type", "")) == "theory_published").size()
 	var sound: Dictionary = board.publish("theory_ownership")
 	_check(bool(sound.get("ok", false)), "a theory can be published")
 	_check(bool(sound.get("sound", false)), "one built only on supported strings is sound")
@@ -192,6 +198,9 @@ func _ready() -> void:
 	_check(int(sound.get("exposure", 0)) > 0, "publishing costs exposure")
 	_check(int(sound.get("reach", 0)) < 0, "and takes reach off the target")
 	_check(board.is_published("theory_ownership"), "the wall remembers it went out")
+	var publications_after := WorldHistory.events.filter(func(event): return str((event as Dictionary).get("type", "")) == "theory_published").size()
+	_check(publications_after == publications_before + 1, "one publication produces one public outcome, not a duplicate pair")
+	_check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "the Wire receipt and board publication close as one transaction")
 	_check(not bool(board.publish("theory_ownership").get("ok", true)), "and it cannot go out twice")
 
 	# L4.2 / L4.3. One bad string makes the whole thing a fabrication, and the

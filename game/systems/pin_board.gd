@@ -27,6 +27,7 @@ extends Control
 const Grunge := preload("res://systems/celloutz_grunge.gd")
 
 const FieldCamera := preload("res://systems/field_camera.gd")
+const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
 const WireNetScript := preload("res://systems/wire_net.gd")
 
 const BOARD_ID := "pin_board"
@@ -333,10 +334,12 @@ func pin(ref: String, kind := "photo", at := Vector2.INF) -> bool:
 		"angle": rng.randf_range(-0.11, 0.11),
 		"seed": rng.randi(),
 	})
+	WorldHistory.begin_ledger_batch()
 	save_board()
+	PlayerActionLedger.record("board_pinned", {"subject": ref, "kind": kind})
+	WorldHistory.commit_ledger_batch()
 	rebuild()
 	pinned_changed.emit()
-	WorldHistory.record_event("board_pinned", {"subject": ref, "kind": kind})
 	return true
 
 
@@ -345,11 +348,16 @@ func unpin(ref: String) -> bool:
 	for index in pinned.size():
 		if str((pinned[index] as Dictionary)["ref"]) == ref:
 			pinned.remove_at(index)
+			var strings_cut := 0
 			for thread in range(strings.size() - 1, -1, -1):
 				var row: Dictionary = strings[thread]
 				if str(row["from"]) == ref or str(row["to"]) == ref:
 					strings.remove_at(thread)
+					strings_cut += 1
+			WorldHistory.begin_ledger_batch()
 			save_board()
+			PlayerActionLedger.record("board_unpinned", {"subject": ref, "strings_cut": strings_cut})
+			WorldHistory.commit_ledger_batch()
 			rebuild()
 			pinned_changed.emit()
 			return true
@@ -370,14 +378,16 @@ func lay_string(from: String, to: String) -> bool:
 		if (a == from and b == to) or (a == to and b == from):
 			return false
 	strings.append({"from": from, "to": to, "seed": hash(from + to)})
+	var supported := supports(from, to)
+	WorldHistory.begin_ledger_batch()
 	save_board()
 	# L3.2. A string the world supports opens work. One that it does not is
 	# recorded exactly the same way, because the ledger holds what the player
 	# did, not whether they were right.
-	var supported := supports(from, to)
-	WorldHistory.record_event("board_string_drawn", {"subject": from, "target": to, "supported": supported})
+	PlayerActionLedger.record("board_string_drawn", {"subject": from, "target": to, "supported": supported})
 	if supported:
 		_open_lead(from, to)
+	WorldHistory.commit_ledger_batch()
 	rebuild()
 	strings_changed.emit()
 	return true
@@ -390,7 +400,10 @@ func cut_string(from: String, to: String) -> bool:
 		var b := str(row["to"])
 		if (a == from and b == to) or (a == to and b == from):
 			strings.remove_at(index)
+			WorldHistory.begin_ledger_batch()
 			save_board()
+			PlayerActionLedger.record("board_string_cut", {"subject": from, "target": to})
+			WorldHistory.commit_ledger_batch()
 			rebuild()
 			strings_changed.emit()
 			return true
@@ -510,6 +523,8 @@ func publish(theory_id: String, wire: Object = null) -> Dictionary:
 	if target == "":
 		return {"ok": false, "headline": "NOBODY TO PUBLISH AGAINST", "detail": "A THEORY NEEDS SOMEONE IN IT."}
 	var net: Object = wire if wire != null else WireNetScript.new(WireNetScript.SIGNAL_UNDERBELLY)
+	# The Wire receipt and the board's public outcome are one publish attempt.
+	WorldHistory.begin_ledger_batch()
 	var result: Dictionary = net.act(target, "expose" if sound else "fabricate")
 	# Being right is not the same as being able to prove it. A sound theory
 	# about somebody you hold nothing on does not go out, and the game should
@@ -524,10 +539,11 @@ func publish(theory_id: String, wire: Object = null) -> Dictionary:
 		var record: Dictionary = WorldHistory.subject(BOARD_ID)
 		var out: Array = (record.get("published", []) as Array).duplicate()
 		out.append({"theory": theory_id, "sound": sound, "target": target})
-		WorldHistory.update_subject(BOARD_ID, {"published": out}, "theory_published")
+		WorldHistory.amend_subject(BOARD_ID, {"published": out})
 		WorldHistory.record_event("theory_published", {"subject": target, "theory": theory_id, "sound": sound})
 		theory_published.emit(theory_id, result)
 		rebuild()
+	WorldHistory.commit_ledger_batch()
 	return result
 
 
@@ -554,15 +570,17 @@ func retract(theory_id: String, wire: Object = null) -> Dictionary:
 		return {"ok": false, "headline": "NOTHING TO RETRACT", "detail": "YOU NEVER PUBLISHED THAT."}
 	var target := str((out[index] as Dictionary).get("target", ""))
 	var net: Object = wire if wire != null else WireNetScript.new(WireNetScript.SIGNAL_UNDERBELLY)
+	WorldHistory.begin_ledger_batch()
 	var result: Dictionary = net.act(target, "retract")
 	result["theory"] = theory_id
 	result["target"] = target
 	if bool(result.get("ok", false)):
 		out.remove_at(index)
-		WorldHistory.update_subject(BOARD_ID, {"published": out}, "theory_retracted")
+		WorldHistory.amend_subject(BOARD_ID, {"published": out})
 		WorldHistory.record_event("theory_retracted", {"subject": target, "theory": theory_id})
 		theory_retracted.emit(theory_id, result)
 		rebuild()
+	WorldHistory.commit_ledger_batch()
 	return result
 
 
@@ -1019,7 +1037,7 @@ func _gui_input(event: InputEvent) -> void:
 					_dragging = _moving == ""
 				else:
 					if _moving != "":
-						save_board()
+						_commit_move(_moving)
 					_moving = ""
 					_dragging = false
 			MOUSE_BUTTON_MIDDLE:
@@ -1066,6 +1084,19 @@ func move_card(ref: String, by: Vector2) -> void:
 			return
 
 
+## Mouse motion is deliberately kept out of persistence; releasing the card is
+## the single authored act, regardless of how many motion events got it there.
+func _commit_move(ref: String) -> void:
+	for entry: Dictionary in pinned:
+		if str(entry["ref"]) == ref:
+			var at: Vector2 = entry["at"]
+			WorldHistory.begin_ledger_batch()
+			save_board()
+			PlayerActionLedger.record("board_card_moved", {"subject": ref, "at": [at.x, at.y]})
+			WorldHistory.commit_ledger_batch()
+			return
+
+
 ## Cuts every string running into a card. Used by the right button, so taking
 ## a card down never leaves threads hanging off nothing.
 func _cut_any(ref: String) -> bool:
@@ -1076,7 +1107,10 @@ func _cut_any(ref: String) -> bool:
 			strings.remove_at(index)
 			cut = true
 	if cut:
+		WorldHistory.begin_ledger_batch()
 		save_board()
+		PlayerActionLedger.record("board_strings_cut", {"subject": ref})
+		WorldHistory.commit_ledger_batch()
 		rebuild()
 		strings_changed.emit()
 	return cut
