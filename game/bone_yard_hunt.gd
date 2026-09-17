@@ -136,6 +136,7 @@ const HELD_GEAR := preload("res://systems/held_gear.gd")
 const SMOKEABLES := preload("res://systems/smokeables.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
+const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
 const PIN_BOARD := preload("res://systems/pin_board.gd")
 const DEMO_WALL := preload("res://systems/demo_wall.gd")
@@ -6730,6 +6731,7 @@ func _living_hostiles() -> int:
 func _maintain_roamers(delta: float) -> void:
 	if pathfinder == null or generated_world == null or not is_instance_valid(generated_world):
 		return
+	_maintain_celloutz_contractors()
 	_cull_distant_roamers()
 	_roamer_clock += delta
 	if _roamer_clock < ROAMER_SPAWN_INTERVAL:
@@ -6738,6 +6740,88 @@ func _maintain_roamers(delta: float) -> void:
 	if _living_hostiles() >= ROAMER_TARGET:
 		return
 	_spawn_roamer()
+
+
+## AK1.8. A published area is work somebody can take. The responders are built
+## through the ordinary encounter actor path, so they have the same anatomy,
+## wounds, loot, perception and persistence as every other hunter. One live
+## team owns the contract at a time; moving between ping cells cannot become an
+## infinite enemy printer. A later ping can commission a replacement only once
+## both members of the previous contract are dead or escaped.
+func _maintain_celloutz_contractors() -> void:
+	var reaction := WorldHistory.subject(FACILITY_TERRITORY.REACTION_SUBJECT)
+	var area: Dictionary = reaction.get("target_area", {})
+	if area.is_empty():
+		return
+	var ping_sequence := int(area.get("sequence", 0))
+	var response_sequence := int(reaction.get("response_sequence", 0))
+	if response_sequence > 0 and _celloutz_team_unresolved(response_sequence):
+		_restore_celloutz_team(response_sequence, reaction.get("response_area", area))
+		return
+	if ping_sequence <= response_sequence:
+		return
+	WorldHistory.amend_subject(FACILITY_TERRITORY.REACTION_SUBJECT, {
+		"response_sequence": ping_sequence,
+		"response_area": area.duplicate(true),
+	})
+	WorldHistory.record_event("celloutz_repossession_team_dispatched", {
+		"subject_id": FACILITY_TERRITORY.REACTION_SUBJECT,
+		"target_id": "player",
+		"sequence": ping_sequence,
+		"area": area.duplicate(true),
+	})
+	_restore_celloutz_team(ping_sequence, area)
+
+
+func _celloutz_team_unresolved(sequence: int) -> bool:
+	for slot in 2:
+		var id := "celloutz_contract_%d_%d_actor" % [sequence, slot]
+		var status := str(WorldHistory.subject(id).get("status", ""))
+		if status not in ["dead", "escaped", "spared", "recruited"]:
+			return true
+	return false
+
+
+func _restore_celloutz_team(sequence: int, area_variant: Variant) -> void:
+	var area: Dictionary = area_variant if area_variant is Dictionary else {}
+	if area.is_empty():
+		return
+	var centre := Vector3(float(area.get("x", 0.0)), 0.0, float(area.get("z", 0.0)))
+	var radius := float(area.get("radius", FACILITY_TERRITORY.TARGET_PING_RADIUS))
+	var away := centre - player
+	away.y = 0.0
+	if away.length_squared() < 0.01:
+		away = Vector3(1, 0, 0)
+	away = away.normalized()
+	var across := Vector3(-away.z, 0, away.x)
+	for slot in 2:
+		var instance_id := "celloutz_contract_%d_%d" % [sequence, slot]
+		if encounter_actors.any(func(actor: Dictionary): return str(actor.get("encounter_id", "")) == instance_id):
+			continue
+		var subject_id := "%s_actor" % instance_id
+		if str(WorldHistory.subject(subject_id).get("status", "")) in ["dead", "escaped", "spared", "recruited"]:
+			continue
+		var at := centre + away * radius * 0.88 + across * (-13.0 if slot == 0 else 13.0)
+		var spawned := _spawn_encounter_actor({
+			"instance_id": instance_id,
+			"kind": "hostile",
+			"display_name": "Ledger Bailiff %s" % ("A" if slot == 0 else "B"),
+			"role": "CELLOUTZ REPOSSESSION CONTRACTOR",
+			"elo": 1160 + slot * 45,
+			"tint": "4f1718",
+			"variation": 440 + sequence * 7 + slot,
+			"implant": {"zone": "torso", "name": "pulse cage", "armor": 0.16},
+			"loot": ["repossession writ", "sealed rust scrip"],
+			"summary": "Contracted through the Black Mirror's published target area.",
+		}, at)
+		if spawned.is_empty():
+			continue
+		spawned["contract_sequence"] = sequence
+		WorldHistory.amend_subject(str(spawned.subject_id), {
+			"faction": "CellOutz",
+			"faction_id": "celloutz",
+			"contract": FACILITY_TERRITORY.REACTION_SUBJECT,
+		})
 
 
 ## Only roamers are recycled. A misfire's own body is part of an encounter the

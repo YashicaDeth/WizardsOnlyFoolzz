@@ -13,6 +13,13 @@ const CONTROLLED := "controlled"
 const SURVEYED := "surveyed"
 const LIBERATED := "liberated"
 
+## CellOutz sells a search area, not omniscience. Snapping to this grid keeps
+## the target somewhere inside the published radius even at a cell corner and
+## means carrying the Black Mirror across a meaningful distance is what emits
+## a new ping—not standing still with the page open.
+const TARGET_PING_CELL := 96.0
+const TARGET_PING_RADIUS := 72.0
+
 const SECTORS := [
 	{
 		"id": "growing_floor", "name": "THE GROWING FLOOR",
@@ -135,6 +142,40 @@ static func apply_event(event_type: String, details: Dictionary = {}) -> Diction
 			_set_sector("surface_gate", SURVEYED, true)
 			_unlock_record("surface_gate")
 	return overview()
+
+
+## The Black Mirror is the agency's instrument as much as the player's. Once a
+## repossession order exists, consulting it publishes the carrier's coarse area
+## to that same order. The result is JSON-safe persistent data for MAP, jobs and
+## later hunter routing to share.
+static func publish_target_ping(world_position: Vector2, source := "black_mirror") -> Dictionary:
+	var reaction := WorldHistory.subject(REACTION_SUBJECT)
+	if reaction.is_empty():
+		return {}
+	var centre := Vector2(
+		roundf(world_position.x / TARGET_PING_CELL) * TARGET_PING_CELL,
+		roundf(world_position.y / TARGET_PING_CELL) * TARGET_PING_CELL)
+	var previous: Dictionary = reaction.get("target_area", {})
+	if is_equal_approx(float(previous.get("x", INF)), centre.x) and is_equal_approx(float(previous.get("z", INF)), centre.y):
+		return previous.duplicate(true)
+	var area := {
+		"x": centre.x,
+		"z": centre.y,
+		"radius": TARGET_PING_RADIUS,
+		"source": source,
+		"sequence": int(previous.get("sequence", 0)) + 1,
+	}
+	WorldHistory.amend_subject(REACTION_SUBJECT, {"target_area": area})
+	WorldHistory.record_event("celloutz_target_area_published", {
+		"subject_id": REACTION_SUBJECT,
+		"target_id": "player",
+		"area": area.duplicate(true),
+	})
+	return area
+
+
+static func target_area() -> Dictionary:
+	return (WorldHistory.subject(REACTION_SUBJECT).get("target_area", {}) as Dictionary).duplicate(true)
 
 
 static func _set_sector(id: String, state: String, revealed: bool) -> void:

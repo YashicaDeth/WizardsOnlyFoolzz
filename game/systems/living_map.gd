@@ -163,6 +163,7 @@ func open_map() -> void:
 	visible = true
 	follow = true
 	pan = Vector2.ZERO
+	FACILITY.publish_target_ping(player_at)
 	var territory := WorldHistory.subject(FACILITY.SUBJECT)
 	facility_sheet = not territory.is_empty()
 	if facility_sheet and facility_selected < 0:
@@ -217,6 +218,10 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	clock += delta
+	# Looking through the corporate lens lets it look back. The authority
+	# de-duplicates within its coarse cell, so this is cheap and only writes when
+	# the carried device has crossed into a genuinely new search area.
+	FACILITY.publish_target_ping(player_at)
 	_handle_travel(delta)
 	queue_redraw()
 
@@ -466,6 +471,7 @@ func _draw() -> void:
 	_draw_districts()
 	_draw_misfires()
 	_draw_contacts()
+	_draw_celloutz_target_area()
 	_draw_player()
 	_draw_places()
 	if tilt > 0.0:
@@ -485,6 +491,31 @@ func _draw() -> void:
 	if selected_place >= 0:
 		_draw_place_panel()
 	_draw_cracks()
+
+
+func _draw_celloutz_target_area() -> void:
+	var area := FACILITY.target_area()
+	if area.is_empty():
+		return
+	var centre_world := Vector2(float(area.get("x", 0.0)), float(area.get("z", 0.0)))
+	var centre := _to_screen(centre_world)
+	var radius := float(area.get("radius", FACILITY.TARGET_PING_RADIUS)) * zoom
+	if not _chart.grow(radius).has_point(centre):
+		return
+	# Broken arcs communicate an estimated search area. A solid circle would
+	# falsely promise that CellOutz knows the player's boundary exactly.
+	var turn := clock * 0.23
+	for segment in 10:
+		var start := turn + TAU * float(segment) / 10.0
+		draw_arc(centre, radius, start, start + TAU * 0.058, 8, ARTERIAL * Color(1, 1, 1, 0.82), 2.0, true)
+	var sweep := Vector2(cos(clock * 0.7), sin(clock * 0.7))
+	draw_line(centre - sweep * radius * 0.72, centre + sweep * radius * 0.72, ARTERIAL * Color(1, 1, 1, 0.18), 1.0)
+	draw_circle(centre, 4.0 + sin(clock * 2.2) * 1.2, ARTERIAL * Color(1, 1, 1, 0.82))
+	var label := "CELLOUTZ TARGET AREA // +/- %d M" % roundi(float(area.get("radius", 0.0)))
+	var label_at := centre + Vector2(-radius, -radius - 17.0)
+	label_at.x = clampf(label_at.x, _chart.position.x + 8.0, _chart.end.x - CellOutzType.width_condensed(label, 8.0, 0.7) - 8.0)
+	label_at.y = clampf(label_at.y, _chart.position.y + 8.0, _chart.end.y - 18.0)
+	CellOutzType.draw_condensed(self, label_at, label, 8.0, ARTERIAL, 0.7)
 
 
 func _draw_grid() -> void:

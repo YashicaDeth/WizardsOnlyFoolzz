@@ -91,6 +91,15 @@ selectable recovered file in the existing INDEX FILE register. Place records
 use a territory dossier and small floor-plan stamp rather than inventing a
 human portrait from sparse data.
 
+The repossession order now acquires the escaped body through the same device.
+Opening MAP publishes a coarse 96-metre cell with a 72-metre uncertainty
+radius; the true position is somewhere inside the broken red target ring, not
+at its centre. A new ledger event is written only after crossing into another
+cell. The first area dispatches two persistent CellOutz Ledger Bailiffs at the
+edge of that approximate zone through the existing encounter/anatomy pipeline.
+A live team prevents duplicate dispatches, while a later area may commission a
+replacement only after the prior contract has genuinely resolved.
+
 ## Persistence contract
 
 Territory, unlocked files and the CellOutz order are ordinary WorldHistory
@@ -101,9 +110,9 @@ rules, while the facility begins controlled again.
 
 ## Evidence
 
-- `game/tests/facility_territory_test.tscn`: 15/15 checks, including
+- `game/tests/facility_territory_test.tscn`: 21/21 checks, including
   idempotence, quantum reset and branch restore.
-- `game/tests/facility_device_integration_test.tscn`: 7/7 checks, including
+- `game/tests/facility_device_integration_test.tscn`: 8/8 checks, including
   pointer/keyboard-facing selection contract, INDEX unlock and device page
   memory.
 - `game/tests/opening_stage_wiring_test.tscn`: 6/6 checks against the real
@@ -114,6 +123,11 @@ rules, while the facility begins controlled again.
   checks. `game/tests/service_ring_objective_test.tscn`: 13/13 integration
   checks across real chamber placement, vehicle impact, compound completion,
   INDEX unlock and one-shot CellOutz escalation.
+- `game/tests/celloutz_bounty_response_test.tscn`: 7/7 checks covering coarse
+  arrival, named persistent responders, one live-team cap and resolved-team
+  replacement. `facility_territory_test` covers cell idempotence and quantum
+  restore; `facility_device_integration_test` covers the MAP publication seam.
+- Target-area still: `game/captures/celloutz_target_area.png`.
 - Stills:
   `game/captures/phase3_facility_liberated.png`,
   `game/captures/phase3_facility_index.png`, and

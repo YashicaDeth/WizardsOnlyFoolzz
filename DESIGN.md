@@ -1,5 +1,18 @@
 # Living design notes
 
+18 September implementation note: the Black Mirror's convenience now has the
+corporate threat promised by the map direction. Once CellOutz has issued its
+repossession order, opening MAP publishes a persisted 96-metre acquisition
+cell with a 72-metre uncertainty radius rather than the player's exact
+coordinate. The Ashbloom sheet renders that as a broken red search ring with
+the real player offset somewhere inside it. Remaining inside the same cell
+cannot spam the ledger; crossing a cell boundary updates the bounty. The first
+published area commissions two named CellOutz bailiffs through the ordinary
+encounter-body pipeline, so they have anatomy, loot, perception and persistent
+outcomes rather than existing as map icons. A living contract blocks duplicate
+spawns; a later ping can commission replacements only after the previous team
+is dead, escaped, spared or recruited.
+
 17 September Black Mirror note: its seven apps are different instruments inside
 one object, not seven unrelated UI compositions. The casing now owns a fixed
 page grammar — header and footer rails, app identity and role, stable page

@@ -5120,10 +5120,10 @@ instead.
 - [x] **AP4.3** Exploration changes only what was actually reached — waking reveals the Growing Floor, entering the pit surveys it, and the three existing colosseum tunnels reveal the Service Ring without falsely liberating either.
 - [x] **AP4.4** A real achievement liberates one holding — only `derby_round_won` in the underground venue changes the Colosseum from surveyed to liberated; entry and loss cannot award it.
 - [x] **AP4.5** MAP exposes ownership, surveillance, objectives and routes — the Black Mirror's facility sheet draws the four bounded holdings, existing scene adjacency, live owner/state, the next authored objective and approximate CellOutz surveillance from the authority record.
-- [x] **AP4.6** The territory sheet is operable with pointer and keyboard — pointing selects a holding, arrow keys move through revealed holdings, and `L` switches between facility holdings and the Ashbloom satellite; verified by `facility_device_integration_test.gd` (7/7 total integration checks).
+- [x] **AP4.6** The territory sheet is operable with pointer and keyboard — pointing selects a holding, arrow keys move through revealed holdings, and `L` switches between facility holdings and the Ashbloom satellite; verified by `facility_device_integration_test.gd` (8/8 total integration checks, including the corporate acquisition seam).
 - [x] **AP4.7** Liberation unlocks trustworthy INDEX knowledge — the Underground Colosseum becomes a selectable recovered FILE record with its live ownership and a floor-plan stamp; place records never fabricate human portraits.
 - [x] **AP4.8** CellOutz reacts as the openly evil corporate platform requested — one persistent `REPOSSESSION ORDER 0C-7` circulates against the player as company inventory, appears on the MAP, and cannot duplicate when the win callback repeats.
-- [x] **AP4.9** The loop survives persistence and respects quantum restart — `facility_territory_test.gd` proves normal WorldHistory state, a fresh universe returning the pit to corporate control, and quantum branch restore returning liberation, INDEX file and bounty together (15/15).
+- [x] **AP4.9** The loop survives persistence and respects quantum restart — `facility_territory_test.gd` proves normal WorldHistory state, a fresh universe returning the pit to corporate control, and quantum branch restore returning liberation, INDEX file, bounty and last approximate target area together (21/21).
 - [x] **AP4.10** The whole state change is captured, not inferred — `captures/facility_territory_loop.mp4` is a verified 1280×720 30 FPS H.264/AAC reel showing progressive reveal, liberation, INDEX unlock, corporate response, reset and reload; three accepted PNG evidence frames accompany it. Full contract and honest scope: `DESIGN/FACILITY_TERRITORY_SLICE.md`.
 
 ### AP5 — Lockdown Grid liberation
@@ -6155,13 +6155,13 @@ AK1.1 and AK2.1 the same object.
 
 ### AK1 — Whose satellite it is
 - [ ] **AK1.1** The satellite app has an owner, named, with a logo and a licence agreement
-- [ ] **AK1.2** They see what you see - using the map is being seen using the map
+- [x] **AK1.2** They see what you see — after the repossession order exists, opening MAP calls the territory authority with the carrier's live position. The device publishes a coarse acquisition area into the same persistent bounty, so using its satellite view is itself the thing that lets CellOutz reacquire you; staying in one cell cannot spam a cosmetic event
 - [ ] **AK1.3** Standing with them is a real quantity and it moves
 - [ ] **AK1.4** They give you work, on the map, and the work changes the map
 - [ ] **AK1.5** You can work against them, and the sky gets worse for you when you do
 - [ ] **AK1.6** Losing them costs the satellite: back to a paper chart (A10 degrades, it does not vanish)
 - [ ] **AK1.7** They are an institution and the satire stays pointed at institutions
-- [ ] **AK1.8** Their target pings publish an approximate area rather than omniscient coordinates; bounties and jobs draw hunters into that area and make the phone's convenience a direct threat to whoever carries it
+- [x] **AK1.8** Their target pings publish an approximate area rather than omniscient coordinates; bounties and jobs draw hunters into that area and make the phone's convenience a direct threat to whoever carries it — CellOutz snaps the true position to a 96-metre acquisition grid and publishes a persisted 72-metre uncertainty radius, rendered on the Ashbloom sheet as a broken red ring with the green player offset somewhere inside it (`captures/celloutz_target_area.png`). Crossing a cell boundary updates the order; standing inside one cannot duplicate it. The first area commissions two named Ledger Bailiffs through `_spawn_encounter_actor`, giving the contractors ordinary anatomy, AI, loot and persistent outcomes rather than icon-only existence. A living pair caps the response; only a later ping after both are dead, escaped, spared or recruited can commission replacements. `facility_territory_test` proves coarse/idempotent/restored pings, `facility_device_integration_test` proves using MAP publishes one, and `celloutz_bounty_response_test` proves the physical response and spawn cap
 
 ### AK2 — The esoteric chart register
 - [ ] **AK2.1** Their briefings read like the charts: dense, hand-lettered, confident, unsourced

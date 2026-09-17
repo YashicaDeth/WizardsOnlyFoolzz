@@ -26,6 +26,7 @@ func _ready() -> void:
 	var map := MAP.new()
 	map.size = Vector2(960, 540)
 	add_child(map)
+	map.observe(Vector3(31, 0, -77), 0.0)
 	map.open_map()
 	await get_tree().process_frame
 	check(map.facility_sheet, "MAP defaults to the facility sheet after the opening route exists")
@@ -41,6 +42,9 @@ func _ready() -> void:
 	layer.pressed = true
 	map._gui_input(layer)
 	check(not map.facility_sheet, "L returns to the Ashbloom satellite sheet")
+	var target_area := FACILITY.target_area()
+	check(not target_area.is_empty() and Vector2(float(target_area.x), float(target_area.z)) != map.player_at,
+		"opening the corporate MAP publishes only the carrier's approximate area")
 
 	var index := INDEX.new()
 	index.size = Vector2(960, 540)
