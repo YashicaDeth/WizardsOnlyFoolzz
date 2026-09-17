@@ -1114,6 +1114,9 @@ func _grown_cybernetics(sheet_anatomy: Dictionary) -> Dictionary:
 func _wound_player(from: Vector3, damage: float, damage_type := "cut") -> void:
 	if player_rig == null:
 		return
+	# One incoming blow may crack the held mirror, change anatomy, sever a limb
+	# and force a drop. Those are consequences of one physical impact.
+	WorldHistory.begin_ledger_batch()
 	# C10.8. The raised Black Mirror is physically in the exchange. A blow only
 	# marks it while it is actually exposed in the hand, and its crack starts on
 	# the side of the glass the attacker occupied on screen rather than at a
@@ -1135,6 +1138,7 @@ func _wound_player(from: Vector3, damage: float, damage_type := "cut") -> void:
 		_player_lost_limb(str(result.get("zone", "")))
 	elif _should_disarm(damage):
 		_disarm_player()
+	WorldHistory.commit_ledger_batch()
 
 
 func _handheld_impact_point(from: Vector3) -> Vector2:
@@ -1184,6 +1188,7 @@ func _player_speed_scale() -> float:
 func _player_lost_limb(zone: String) -> void:
 	if zone == "":
 		return
+	WorldHistory.begin_ledger_batch()
 	if zone.ends_with("_arm"):
 		# The hand that was carrying it is on the floor.
 		if carried_limb_index >= 0:
@@ -1202,6 +1207,7 @@ func _player_lost_limb(zone: String) -> void:
 		"mobility_ratio": snappedf(player_rig.anatomy.mobility_ratio(), 0.01),
 		"alive": not player_rig.anatomy.dead,
 	})
+	WorldHistory.commit_ledger_batch()
 	prompt.text = "YOUR %s IS GONE — BLEEDING HARD, STILL STANDING" % zone.replace("_", " ").to_upper()
 
 

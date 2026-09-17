@@ -385,7 +385,7 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B6.2** Sever from a directional blow crossing a limb threshold *mid-fight*~~
 - [x] ~~**B6.3** The fight continues with them still in it, fighting worse~~
 - [x] ~~**B6.4** The severed limb is a chunk: pick it up, carry it, sell it, hit someone with it~~ — selling now batches inventory removal, wallet payment and the market-readable `carried_part_sold` fact behind one identified player-action receipt; `chunk_test.gd` verifies the transaction closes
-- [x] ~~**B6.5** `v2` Reciprocity — the player is dismembered and keeps playing~~
+- [x] ~~**B6.5** `v2` Reciprocity — the player is dismembered and keeps playing~~ — each incoming blow now persists its raised-device wear, anatomy change, wound fact, possible severing/forced drop and disarm as one nested-safe injury transaction
   - v1 — losing a limb ends the fight
   - v2 — the fight continues in both directions, and the stump bleeds on everyone's clock
 - [x] ~~**B6.6** Stump behaviour: bleed rate, one-armed movement and attacks~~

@@ -311,6 +311,7 @@ func _ready() -> void:
 	hunt._player_lost_limb("left_arm")
 	check(hunt._player_swing_scale() < healthy_swing, "a one-armed player hits softer")
 	check(WorldHistory.recent_events(10).any(func(event): return str(event.get("type", "")) == "player_limb_severed"), "the player's maiming enters world history like anyone else's")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "maiming state, forced drop and severing fact close one injury transaction")
 	if held_before >= 0:
 		check(hunt.carried_limb_index == -1, "the arm that was holding something drops it")
 	hunt.player_rig.hit("left_leg", 90.0, 30.0, "cut", "", Vector3.LEFT)
