@@ -7,6 +7,7 @@ extends Node
 
 const LocalLaw := preload("res://systems/local_law.gd")
 const Holdings := preload("res://systems/ashbloom_holdings.gd")
+const Quantum := preload("res://systems/quantum_saves.gd")
 
 var failures: Array[String] = []
 
@@ -110,6 +111,22 @@ func _ready() -> void:
 		"a witnessed wrong by kin is remembered locally rather than forgiven or immediately escalated")
 	check(bool(refused_response.get("dispatched", false)),
 		"the identical witnessed wrong sends law immediately when the faction already refuses the actor")
+
+	print("AE10.15 - the reason for a warrant remains on the player across a quantum restart")
+	var wanted_before: Dictionary = WorldHistory.subject("player").get("wanted_for", {})
+	check(str(wanted_before.get("event_type", "")) == "npc_resolution" and str(wanted_before.get("outcome", "")) == "execute",
+		"dispatch records the actual act and outcome rather than a generic wanted flag")
+	check(str(wanted_before.get("subject_id", "")) == "refused_victim" and str(wanted_before.get("faction_id", "")) == "wizardsonlyfoolz" and str(wanted_before.get("place_id", "")) == "refused_place",
+		"the warrant memory names its victim, issuing faction and jurisdiction")
+	var origin_salt := int(wanted_before.get("origin_run_salt", 0))
+	var new_branch := Quantum.begin_new(2, "LAW RESTART PROBE")
+	var wanted_after: Dictionary = WorldHistory.subject("player").get("wanted_for", {})
+	check(not new_branch.is_empty() and int(WorldHistory.run_salt) != origin_salt,
+		"begin_new creates a genuinely different universe for the law-memory proof")
+	check(wanted_after == wanted_before and (WorldHistory.subject("refused_place").is_empty()),
+		"what the player was wanted for crosses intact while the old jurisdiction itself does not")
+	check((WorldHistory.subject("player").get("wanted_history", []) as Array).size() >= 1,
+		"the continuing player retains an inspectable warrant history rather than only the latest label")
 
 	print("AE1.4/AE1.5 production seam - a landed report answers through the real surface holding")
 	WorldHistory.clear_history()

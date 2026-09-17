@@ -4449,7 +4449,16 @@ The last rung. Fifteen statements that are true of sneaking and the law when thi
       The faction's axis still decides whether the act was an offence at all.
       `local_law_test.gd` proves both dispositions, thresholds, retained memory
       and divergent dispatch outcomes from otherwise identical executions.
-- [ ] **AE10.15** `v10` What you were wanted for carries into the next universe
+- [x] **AE10.15** `v10` What you were wanted for carries into the next universe —
+      when local unrest genuinely commissions law, the continuing player's
+      record receives an attributable warrant memory: originating universe,
+      source event, act/outcome, victim, issuing faction, jurisdiction and
+      magnitude. `QuantumSaves.begin_new()` carries that bounded history with
+      the player while correctly erasing the old place, unrest and active team;
+      this preserves what happened to the spirit without smuggling the previous
+      world across with it. `local_law_test.gd` proves the live dispatch reason,
+      a genuinely new run salt, exact memory equality after restart, and absence
+      of the abandoned jurisdiction in the new world.
 
 ### AG4 — The third playtest, and what Greg is sick of
 - [x] **AG4.1** *"when running and the stamina bar depletes, the screen becomes super jittery"* — TaKeS was right and so was his guess at the cause. Two thresholds now, not one

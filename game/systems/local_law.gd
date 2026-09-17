@@ -59,6 +59,7 @@ const KIN_RESPONSE_SCALE := 1.55
 ## System already reads, scaled up from the small 0..1 offence magnitudes here
 ## into that field's own working range.
 const GRUDGE_SCALE := 10.0
+const WANTED_HISTORY_LIMIT := 12
 
 
 ## AE1.1. "Unseen is a real state with real inputs — light, noise, cover,
@@ -122,6 +123,41 @@ static func response_threshold(faction_id: String, actor_id: String) -> float:
 	return RESPONSE_THRESHOLD * lerpf(HOSTILE_RESPONSE_SCALE, KIN_RESPONSE_SCALE, closeness)
 
 
+## AE10.15. The warrant belongs to the world that issued it; the fact that the
+## continuing spirit was wanted for something belongs to the player. Keep a
+## compact reason on that player record only when law actually dispatches. The
+## record contains attribution, not the old world's active team or unrest, so a
+## quantum restart can differ without pretending the abandoned jurisdiction
+## crossed over wholesale.
+static func _remember_wanted_for(actor_id: String, place_id: String, faction_id: String, event: Dictionary, magnitude: float) -> Dictionary:
+	var actor := WorldHistory.subject(actor_id)
+	if actor.is_empty():
+		return {}
+	var details: Dictionary = event.get("details", {}) if event.get("details", {}) is Dictionary else {}
+	var reason := {
+		"origin_run_salt": WorldHistory.run_salt,
+		"source_sequence": int(event.get("sequence", -1)),
+		"event_type": str(event.get("type", "")),
+		"outcome": str(details.get("outcome", "")),
+		"subject_id": str(details.get("subject_id", "")),
+		"place_id": place_id,
+		"faction_id": faction_id,
+		"magnitude": magnitude,
+	}
+	var history: Array = (actor.get("wanted_history", []) as Array).duplicate(true)
+	var duplicate := history.any(func(entry: Variant):
+		return entry is Dictionary \
+			and int((entry as Dictionary).get("origin_run_salt", 0)) == int(reason.origin_run_salt) \
+			and int((entry as Dictionary).get("source_sequence", -2)) == int(reason.source_sequence) \
+			and str((entry as Dictionary).get("faction_id", "")) == faction_id)
+	if not duplicate:
+		history.append(reason.duplicate(true))
+		while history.size() > WANTED_HISTORY_LIMIT:
+			history.pop_front()
+	WorldHistory.amend_subject(actor_id, {"wanted_for": reason, "wanted_history": history})
+	return reason
+
+
 ## AE1.4/AE1.5. "Law figures respond to what was actually witnessed...
 ## Punishment is local: the holding remembers, and the holding sends them."
 ## Refuses outright unless the faction that holds this ground has actually
@@ -166,10 +202,12 @@ static func witness_a_wrong(place_id: String, faction_id: String, ledger: Witnes
 		var faction := WorldHistory.subject(faction_id)
 		if not faction.is_empty():
 			WorldHistory.amend_subject(faction_id, {"grudge": float(faction.get("grudge", 0.0)) + unrest * GRUDGE_SCALE})
+		var wanted_for := _remember_wanted_for(actor_id, place_id, faction_id, event, magnitude)
 		WorldHistory.record_event("law_dispatched", {
 			"place_id": place_id, "faction_id": faction_id, "actor_id": actor_id,
 			"source_sequence": sequence, "unrest_spent": unrest,
 			"response_threshold": threshold, "disposition": disposition,
+			"wanted_for": wanted_for,
 		})
 		unrest = 0.0
 		dispatched = true
