@@ -31,6 +31,7 @@ extends RefCounted
 ## this index lives in is the organ the connection eats first.
 
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 ## The chip as a real piece of hardware in the head, not a boolean. Registered
 ## into `anatomy_state.cybernetics` through the same catalogue every other
@@ -256,10 +257,12 @@ static func install_chip(subject_id: String = "player", owner_faction: String = 
 	var installed: Array = anatomy.get("cybernetics", [])
 	installed.append(ImplantCatalog.resolve({"id": CHIP_IMPLANT_ID, "name": CHIP_IMPLANT_ID}))
 	anatomy["cybernetics"] = installed
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(subject_id, {"wetwire_chip": record, "anatomy_state": anatomy})
 	WorldHistory.record_event("wetwire_installed", {
 		"subject_id": subject_id, "serial": serial, "owner_faction": owner_faction, "installed_by": installer_id,
 	})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "serial": serial, "owner_faction": owner_faction}
 
 
@@ -275,11 +278,13 @@ static func revoke(subject_id: String = "player", reason: String = "TERMS OF SER
 		return {"ok": false, "reason": "ALREADY REVOKED"}
 	record["revoked"] = true
 	record["revoked_reason"] = reason
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(subject_id, {"wetwire_chip": record})
 	WorldHistory.record_event("wetwire_revoked", {
 		"subject_id": subject_id, "serial": str(record.get("serial", "")),
 		"owner_faction": str(record.get("owner_faction", "")), "reason": reason,
 	})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "reason": reason}
 
 
@@ -291,8 +296,10 @@ static func reinstate(subject_id: String = "player") -> Dictionary:
 		return {"ok": false, "reason": "NOT REVOKED"}
 	record["revoked"] = false
 	record["revoked_reason"] = ""
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(subject_id, {"wetwire_chip": record})
 	WorldHistory.record_event("wetwire_reinstated", {"subject_id": subject_id, "serial": str(record.get("serial", ""))})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true}
 
 
@@ -307,8 +314,10 @@ static func go_dark(subject_id: String = "player") -> Dictionary:
 		return {"ok": false, "reason": "ALREADY DARK"}
 	record["dark"] = true
 	record["dark_since_sequence"] = WorldHistory.next_sequence
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(subject_id, {"wetwire_chip": record})
-	WorldHistory.record_event("wetwire_went_dark", {"subject_id": subject_id, "serial": str(record.get("serial", ""))})
+	_record_subject_action("wetwire_went_dark", subject_id, {"subject_id": subject_id, "serial": str(record.get("serial", ""))})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true}
 
 
@@ -319,8 +328,10 @@ static func surface(subject_id: String = "player") -> Dictionary:
 	if not bool(record.get("dark", false)):
 		return {"ok": false, "reason": "NOT DARK"}
 	record["dark"] = false
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(subject_id, {"wetwire_chip": record})
-	WorldHistory.record_event("wetwire_surfaced", {"subject_id": subject_id, "serial": str(record.get("serial", ""))})
+	_record_subject_action("wetwire_surfaced", subject_id, {"subject_id": subject_id, "serial": str(record.get("serial", ""))})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true}
 
 
@@ -425,7 +436,8 @@ static func bridge(subject_id: String, plane: int, seconds: float = 1.0, place: 
 		if bool(record.get("dark", false)):
 			return {"ok": false, "reason": "DARK — YOU CANNOT HIDE FROM IT AND USE IT"}
 	var plane_data: Dictionary = PLANES[plane]
-	WorldHistory.record_event("wetwire_bridged", {
+	WorldHistory.begin_ledger_batch()
+	_record_subject_action("wetwire_bridged", subject_id, {
 		"subject_id": subject_id, "plane": plane, "sephirah": str(plane_data.sephirah),
 		"via_chip": via_chip, "place": place, "seconds": seconds,
 	})
@@ -437,6 +449,7 @@ static func bridge(subject_id: String, plane: int, seconds: float = 1.0, place: 
 		result["dose"] = _radiate(subject_id, plane, seconds)
 	if via_chip:
 		result["trace"] = trace_level(subject_id)
+	WorldHistory.commit_ledger_batch()
 	return result
 
 
@@ -590,11 +603,23 @@ static func unlock(keyword: String, subject_id: String = "player") -> Dictionary
 		newly.append(entry_id)
 	if newly.is_empty():
 		return {"ok": false, "reason": "ALREADY REMEMBERED", "opened": []}
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(subject_id, {"wetwire_opened": already})
-	WorldHistory.record_event("memory_recovered", {
+	_record_subject_action("memory_recovered", subject_id, {
 		"subject_id": subject_id, "keyword": word, "entries": newly.duplicate(),
 	})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "keyword": word, "opened": newly}
+
+
+## Crossing, hiding, surfacing and remembering are the subject's acts. The
+## corporate installation/revocation calls above deliberately do not pass
+## through here: those are things done *to* the player, not by them.
+static func _record_subject_action(event_type: String, subject_id: String, details: Dictionary) -> void:
+	if subject_id == "player":
+		PLAYER_ACTION_LEDGER.record(event_type, details)
+	else:
+		WorldHistory.record_event(event_type, details)
 
 
 ## Reading one. Three separate refusals, and they say different things because

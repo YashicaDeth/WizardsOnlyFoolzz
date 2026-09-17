@@ -57,6 +57,7 @@ func _ready() -> void:
 	check((remembered.get("opened", []) as Array).size() == 2, "opening the whole afternoon, not one file (%d entries)" % (remembered.get("opened", []) as Array).size())
 	check(BrainIndex.is_open("the_table") and BrainIndex.is_open("who_held_you"), "both sealed entries under that word are open")
 	check(WorldHistory.event_count("memory_recovered") == 1, "a recovery is a recorded event like anything else")
+	check(PlayerActionLedger.count("memory_recovered") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "remembering is one identified action and closes its ledger transaction")
 	check(not bool(BrainIndex.unlock("RESTRAINT").get("ok", false)), "and it cannot be remembered twice")
 
 	# A threshold keyword is not satisfied by one instance of its evidence.
@@ -132,6 +133,7 @@ func _ready() -> void:
 	check(bool(fix.get("found", false)), "five is")
 	check(str(fix.get("place", "")) == "black_mile", "and the fix is the real place of the last crossing")
 	check(WorldHistory.event_count("wetwire_traced") == 1, "being found is a recorded event the world can react to")
+	check(PlayerActionLedger.count("wetwire_bridged") == 6 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "each accepted crossing is one action even when radiation mutates the brain in the same transaction")
 
 	# Going dark is a real reset and a real cost, not a cosmetic flag.
 	check(bool(BrainIndex.go_dark().get("ok", false)), "you can go dark")
@@ -144,6 +146,7 @@ func _ready() -> void:
 	BrainIndex.surface()
 	check(BrainIndex.reach() == 12, "surfacing restores it")
 	check(BrainIndex.trace_level() == 0, "and the old trail stays cut")
+	check(PlayerActionLedger.count("wetwire_went_dark") == 1 and PlayerActionLedger.count("wetwire_surfaced") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "dark and surface are one closed player action each")
 
 	# Revocation. Theirs to take; your memories are not theirs to take.
 	var opened_before := BrainIndex.opened().size()

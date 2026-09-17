@@ -5731,7 +5731,10 @@ curved CRT, the wet — is untouched and its three boxes stay open below, honest
       reacting to a recorded event rather than to a flag. `go_dark()` is the
       only counter and it costs exactly the thing it protects — dark, the
       bridge is shut ("YOU CANNOT HIDE FROM IT AND USE IT") and reach falls to
-      4. *Still open:* nothing yet *consumes* `wetwire_traced` — no spawner
+      4. Chip install/revoke/reinstate now batch their state with their public
+      fact; player go-dark/surface and crossings additionally receive one
+      compact action identity without misattributing corporate acts to the
+      player. *Still open:* nothing yet *consumes* `wetwire_traced` — no spawner
       sends anybody to the fix, and no faction logic decides to revoke. The
       state and its consequences exist; the antagonist reading them does not.
 - [x] ~~**AT1.8** Its radiation is what melts you at 8g and 9g — the thing
@@ -5743,7 +5746,9 @@ curved CRT, the wet — is untouched and its three boxes stay open below, honest
       and the only organ in `head` is `brain`. So the connection literally
       eats the organ the index lives in, and it keeps eating after you come
       down, which is what made writing it as dose rather than flat damage the
-      right call. 9g melts faster than 8g for the same seconds (2.4/s against
+      right call. A crossing, its trace fact, and any head-dose/radiation fact
+      now persist in one nested-safe transaction. 9g melts faster than 8g for
+      the same seconds (2.4/s against
       0.9/s, asserted), 7D and below cost nothing at all (asserted — the
       melting starts at 8g exactly), and each dose is recorded as
       `wetwire_radiation` rather than as a wound, because it is weather, not
