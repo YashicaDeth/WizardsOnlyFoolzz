@@ -1064,8 +1064,8 @@ mechanisms and almost none are built.
 - [x] ~~**F5.3** Deliberate death: forfeit loot, re-decant out of the tar~~ — capture state and its two world facts persist atomically; deliberate death batches the inventory forfeit, player-body replacement and both public facts behind one `PlayerActionLedger` identity without pretending the resulting re-decant is a second action
 
 ### F6 — Mind-stamp and the asset list
-- [x] ~~**F6.1** Non-consensual recruitment through the handheld~~
-- [x] ~~**F6.2** Assets listed, taskable, remotely executable~~
+- [x] ~~**F6.1** Non-consensual recruitment through the handheld~~ — the bodily rewrite and public recruitment fact now persist as one identified `PlayerActionLedger` transaction
+- [x] ~~**F6.2** Assets listed, taskable, remotely executable~~ — issuing and executing remote orders each use one ledger receipt; subject state and established world events commit together, with the asset test covering closed nested transactions
 
 ### F7 — The clinch as a social verb
 **Highest value per line of code in the whole list** — four systems that already

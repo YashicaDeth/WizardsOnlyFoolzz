@@ -4,6 +4,8 @@ extends RefCounted
 ## F6. The handheld's coercive personnel channel. An asset is an existing
 ## person in WorldHistory, never a generated unit or an inventory token.
 
+const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
+
 const TASKS := ["observe", "retrieve", "sabotage", "report"]
 
 
@@ -26,11 +28,15 @@ func mind_stamp(subject_id: String, anatomy_state: Dictionary = {}) -> Dictionar
 	}
 	if not anatomy_state.is_empty():
 		changes["anatomy_state"] = anatomy_state.duplicate(true)
+	# The bodily rewrite and the public recruitment fact are one player act.
+	# Keep the existing event vocabulary while avoiding two separate saves.
+	WorldHistory.begin_ledger_batch()
 	var stamped := WorldHistory.update_subject(subject_id, changes, "asset_mind_stamped")
-	WorldHistory.record_event("nonconsensual_recruitment", {
+	PlayerActionLedger.record("nonconsensual_recruitment", {
 		"actor": "player", "subject_id": subject_id, "method": "handheld_mind_stamp",
 		"consensual": false,
 	})
+	WorldHistory.commit_ledger_batch()
 	return stamped
 
 
@@ -52,7 +58,15 @@ func task(subject_id: String, command: String, target: String = "") -> Dictionar
 	if not _is_controlled(subject) or command not in TASKS:
 		return {}
 	var order := {"command": command, "target": target, "state": "queued"}
-	WorldHistory.update_subject(subject_id, {"remote_task": order}, "asset_tasked")
+	WorldHistory.begin_ledger_batch()
+	WorldHistory.amend_subject(subject_id, {"remote_task": order})
+	PlayerActionLedger.record("asset_tasked", {
+		"actor": "player", "subject_id": subject_id,
+		"command": command, "target": target,
+		# Preserve the old update-event shape for any history consumer.
+		"changes": {"remote_task": order.duplicate(true)},
+	})
+	WorldHistory.commit_ledger_batch()
 	return order
 
 
@@ -66,11 +80,13 @@ func execute_task(subject_id: String) -> Dictionary:
 	order = order.duplicate(true)
 	order["state"] = "executing"
 	order["started_at"] = WorldHistory.event_count() + 1
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.update_subject(subject_id, {"remote_task": order, "status": "deployed"}, "asset_task_executed")
-	WorldHistory.record_event("remote_asset_command", {
+	PlayerActionLedger.record("remote_asset_command", {
 		"actor": "player", "subject_id": subject_id,
 		"command": order.command, "target": order.target,
 	})
+	WorldHistory.commit_ledger_batch()
 	return order
 
 
