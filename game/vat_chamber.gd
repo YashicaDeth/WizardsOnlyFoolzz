@@ -16,6 +16,7 @@ const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const ANATOMY := preload("res://systems/anatomy_component.gd")
 const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 const EYE_HEIGHT := 1.62
 const VAT_POSITION := Vector3(0, 0, 0)
@@ -92,9 +93,11 @@ func _on_intake_filed(_state: Dictionary) -> void:
 	clock = 0.0
 	line_index = -1
 	phase = "submerged"
+	WorldHistory.begin_ledger_batch()
 	OPENING.advance("woke")
 	FACILITY_TERRITORY.apply_event("opening_woke")
 	WorldHistory.record_event("opening_woke", {"location": "growing_floor"})
+	WorldHistory.commit_ledger_batch()
 
 
 func _build_player() -> void:
@@ -484,13 +487,26 @@ func _interact() -> void:
 	to_door.y = 0.0
 	if to_door.length() > 3.4:
 		return
+	if not _record_pit_entry():
+		return
 	opening_audio.cue("door")
-	OPENING.advance("entered_pit")
-	FACILITY_TERRITORY.apply_event("opening_entered_pit")
-	WorldHistory.update_subject("player", {"status": "racked for a heat"}, "opening_entered_pit")
-	WorldHistory.record_event("opening_entered_pit", {"location": "growing_floor"})
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Interstitial.travel("res://underground_colosseum.tscn", "racked for the tunnel heat // debt is in the meat")
+
+
+## The door press changes the player's status, the opening route and two
+## territory sectors. It is still one authored act and must not be filed again
+## while the asynchronous scene handoff is in flight.
+func _record_pit_entry() -> bool:
+	if OPENING.reached("entered_pit"):
+		return false
+	WorldHistory.begin_ledger_batch()
+	OPENING.advance("entered_pit")
+	FACILITY_TERRITORY.apply_event("opening_entered_pit")
+	WorldHistory.amend_subject("player", {"status": "racked for a heat"})
+	PLAYER_ACTION_LEDGER.record("opening_entered_pit", {"location": "growing_floor", "destination": "underground_colosseum"})
+	WorldHistory.commit_ledger_batch()
+	return true
 
 
 func _update_hud() -> void:
