@@ -30,5 +30,8 @@ func _ready() -> void:
 	check(int(WorldHistory.get("_ledger_batch_depth")) == 1, "the action route nests inside a larger physical transaction")
 	WorldHistory.commit_ledger_batch()
 	check(int(WorldHistory.get("_ledger_batch_depth")) == 0 and LEDGER.count("smoke_exhaled") == 1, "the outer transaction performs the final commit")
+	WorldHistory.amend_subject("atomic_new_subject", {"value": 1})
+	WorldHistory.update_subject("atomic_new_event_subject", {"value": 2}, "atomic_subject_updated")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")) and WorldHistory.event_count("atomic_subject_updated") == 1, "core subject primitives close first registration and mutation as one nested-safe write")
 	print("PLAYER_ACTION_LEDGER_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

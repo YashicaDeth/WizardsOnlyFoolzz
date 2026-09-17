@@ -446,11 +446,16 @@ func tree_axis_label(value: float) -> String:
 
 func update_subject(subject_id: String, changes: Dictionary, event_type: String = "subject_updated") -> Dictionary:
 	changes = _normalise_body_records(changes)
+	# A first update may also have to register the subject. Keep that schema
+	# creation, the actual mutation and its public event under one flush even
+	# when the caller did not need a wider action transaction.
+	begin_ledger_batch()
 	var updated := register_subject(subject_id, {})
 	for key in changes:
 		updated[key] = changes[key]
 	subjects[subject_id] = updated
 	record_event(event_type, {"subject_id": subject_id, "changes": changes.duplicate(true)})
+	commit_ledger_batch()
 	subject_changed.emit(subject_id, updated.duplicate(true))
 	return updated.duplicate(true)
 
@@ -461,11 +466,15 @@ func update_subject(subject_id: String, changes: Dictionary, event_type: String 
 ## rumour is actually about. Used by F2's propagation.
 func amend_subject(subject_id: String, changes: Dictionary) -> Dictionary:
 	changes = _normalise_body_records(changes)
+	# Registration plus a silent amendment is likewise one mutation. This is
+	# nested-safe beneath every explicit gameplay ledger batch.
+	begin_ledger_batch()
 	var updated := register_subject(subject_id, {})
 	for key in changes:
 		updated[key] = changes[key]
 	subjects[subject_id] = updated
 	_save_history()
+	commit_ledger_batch()
 	subject_changed.emit(subject_id, updated.duplicate(true))
 	return updated.duplicate(true)
 

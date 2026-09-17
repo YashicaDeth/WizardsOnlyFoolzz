@@ -6075,7 +6075,10 @@ to get right.
       every existing event name for current consumers, adds one monotonic action
       id, maintains cheap per-kind counts and coalesces its summary plus event
       into one save. Nested draw transactions still flush only at their outer
-      commit (`player_action_ledger_test`, 8/8; `smoking_act_test` exercises all
+      commit. The core `amend_subject()`/`update_subject()` primitives now also
+      batch first-time registration with the mutation/event, removing the
+      redundant first write for every system without changing public facts
+      (`player_action_ledger_test`, 9/9; `smoking_act_test` exercises all
       eight live routes). The promised complete use-and-inspect reel is now
       rendered at `captures/full_use_inspection_demo.mp4`: 1280×720, 30 FPS,
       59.15 seconds, H.264/AAC with live game audio. Its nine labelled chapters
