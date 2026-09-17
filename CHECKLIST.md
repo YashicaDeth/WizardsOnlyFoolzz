@@ -4415,7 +4415,13 @@ The last rung. Fifteen statements that are true of sneaking and the law when thi
       `local_law_test.gd` (26 checks) and `hunt_local_law_integration_test.gd`
       (13 production-scene checks).
 - [ ] **AE10.10** `v10` Witnesses can be wrong, bought or silenced
-- [ ] **AE10.11** `v10` The tunnels are where the satellite cannot see you
+- [x] **AE10.11** `v10` The tunnels are where the satellite cannot see you —
+      `SignalField.DEAD_ZONES` now closes the complete observation loop: MAP
+      keeps only remembered chart ink, sleeps the orbital camera, hides the
+      live player fix, returns no pocket minimap and suppresses CellOutz target
+      pings until surface carrier coverage returns. `handheld_satellite_test.gd`
+      proves the direct map and real Black Mirror seams; visual evidence:
+      `captures/underground_satellite_occluded.png`.
 - [ ] **AE10.12** `v10` A crime has a jurisdiction and jurisdictions end
 - [ ] **AE10.13** `v10` You can be arrested rather than killed
 - [ ] **AE10.14** `v10` Standing with a faction changes what the law does
@@ -6303,7 +6309,9 @@ The last rung. Fifteen statements that are true of the agency that owns the sky 
 - [ ] **AK10.9** `v10` Their claims pin onto the Board
 - [ ] **AK10.10** `v10` Their version of the world sits near the top of the pyramid
 - [ ] **AK10.11** `v10` Two records: what the satellite saw and what they published
-- [ ] **AK10.12** `v10` The tunnels are where they cannot see you
+- [x] **AK10.12** `v10` The tunnels are where they cannot see you — same proven
+      observation boundary as AE10.11: a dead-zone MAP consultation cannot
+      publish the corporate acquisition area that surface MAP use does.
 - [ ] **AK10.13** `v10` They are an institution and the satire stays there
 - [ ] **AK10.14** `v10` The subject is occult, never the real-world conspiracy canon
 - [ ] **AK10.15** `v10` They know you across the restart
@@ -6341,6 +6349,12 @@ paperwork over things that used to be people.
 - [ ] **AL2.2** It is how the collateral moves - the organ trade has a route
 - [ ] **AL2.3** Entrances are found, not marked: a grate you noticed is a route you own
 - [ ] **AL2.4** Down there the satellite cannot see you (AK1.2), which is the point
+      The observation rule is now real without falsely claiming the underground
+      network around it exists: authored dead zones remove live imagery,
+      minimap, player fix and corporate target ping while preserving the paper
+      chart (`handheld_satellite_test.gd`,
+      `captures/underground_satellite_occluded.png`). AL2.4 remains open until
+      AL2.1 supplies a connected navigable layer for “down there” to mean.
 - [ ] **AL2.5** It connects holdings that are not connected above ground (AA)
 - [ ] **AL2.6** Raiding a vault from underneath is the best version of AB3
 - [ ] **AL2.7** Sound behaves differently down there, and the game lets you hear that (G)

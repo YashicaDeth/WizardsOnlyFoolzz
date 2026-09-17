@@ -53,6 +53,10 @@ var zoom := 1.25
 ## without it and simply draws its chart on a dark plate, which is what every
 ## test and every scene with no 3D world gets.
 var satellite: SubViewport = null
+## Underground dead zones keep the remembered chart but deny every live orbital
+## affordance: image, minimap, player fix and corporate acquisition ping.
+var satellite_available := true
+var satellite_block_reason := ""
 ## 0 = high above, looking down. 1 = standing in the street. Driven by the same
 ## zoom the chart already had, so there is one control rather than two.
 var descent := 0.0
@@ -164,11 +168,20 @@ func attach_world(world: World3D) -> void:
 	add_child(satellite)
 
 
+func set_satellite_available(available: bool, reason := "") -> void:
+	satellite_available = available
+	satellite_block_reason = reason if not available else ""
+	if not available:
+		_sleep_satellite()
+	queue_redraw()
+
+
 func open_map() -> void:
 	visible = true
 	follow = true
 	pan = Vector2.ZERO
-	FACILITY.publish_target_ping(player_at)
+	if satellite_available:
+		FACILITY.publish_target_ping(player_at)
 	var territory := WorldHistory.subject(FACILITY.SUBJECT)
 	facility_sheet = not territory.is_empty()
 	if facility_sheet and facility_selected < 0:
@@ -191,7 +204,7 @@ func close_map() -> void:
 ## deliberately slow (eight frames a second) and close around the player: a
 ## navigational instrument, not a second always-on render of the whole region.
 func update_minimap(delta: float) -> Texture2D:
-	if visible or satellite == null or not is_instance_valid(satellite):
+	if not satellite_available or visible or satellite == null or not is_instance_valid(satellite):
 		return null
 	satellite.call("observe", Vector3(player_at.x, 0.0, player_at.y), player_yaw, 0.0, delta, Vector2(120, 120))
 	_minimap_due -= delta
@@ -231,7 +244,8 @@ func _process(delta: float) -> void:
 	# Looking through the corporate lens lets it look back. The authority
 	# de-duplicates within its coarse cell, so this is cheap and only writes when
 	# the carried device has crossed into a genuinely new search area.
-	FACILITY.publish_target_ping(player_at)
+	if satellite_available:
+		FACILITY.publish_target_ping(player_at)
 	_handle_travel(delta)
 	queue_redraw()
 
@@ -406,6 +420,8 @@ func _draw() -> void:
 	_chart = Rect2(Vector2(margin, margin + 34.0), chart_size)
 	if facility_sheet:
 		_draw_facility_sheet()
+		if not satellite_available:
+			_draw_satellite_block()
 		return
 	# The floor depends on the chart, which depends on the window, so it is
 	# applied here rather than only where the wheel is read — a map opened on a
@@ -418,7 +434,7 @@ func _draw() -> void:
 	# A10.1/A10.2. The region itself, under everything else. The chart's marks,
 	# roads and contacts still draw on top — what changes is what they draw on
 	# top *of*: the world in its own materials rather than a dark plate.
-	if satellite != null and is_instance_valid(satellite):
+	if satellite_available and satellite != null and is_instance_valid(satellite):
 		# Zoom already ran 0.6-3.0 for the chart; reuse it rather than inventing
 		# a second control the player has to learn.
 		descent = clampf(inverse_lerp(0.8, 2.8, zoom), 0.0, 1.0)
@@ -484,7 +500,8 @@ func _draw() -> void:
 	_draw_misfires()
 	_draw_contacts()
 	_draw_celloutz_target_area()
-	_draw_player()
+	if satellite_available:
+		_draw_player()
 	_draw_places()
 	if tilt > 0.0:
 		draw_set_transform_matrix(Transform2D.IDENTITY)
@@ -503,6 +520,20 @@ func _draw() -> void:
 	if selected_place >= 0:
 		_draw_place_panel()
 	_draw_cracks()
+	if not satellite_available:
+		_draw_satellite_block()
+
+
+func _draw_satellite_block() -> void:
+	var reason := satellite_block_reason.to_upper()
+	var title := "SATELLITE OCCLUDED // LOCAL MEMORY ONLY"
+	var width := CellOutzType.width_condensed(title, 11.0, 0.82)
+	var at := Vector2(_chart.get_center().x - width * 0.5, _chart.position.y + 22.0)
+	draw_rect(Rect2(at - Vector2(10, 15), Vector2(width + 20, 25)), VOID * Color(1, 1, 1, 0.88))
+	CellOutzType.draw_condensed(self, at, title, 11.0, ARTERIAL, 0.82)
+	if not reason.is_empty():
+		var reason_width := CellOutzType.width_condensed(reason, 8.0, 0.68)
+		CellOutzType.draw_condensed(self, Vector2(_chart.get_center().x - reason_width * 0.5, at.y + 17.0), reason, 8.0, INK * Color(1, 1, 1, 0.7), 0.68)
 
 
 func _draw_celloutz_target_area() -> void:
@@ -676,7 +707,7 @@ func _draw_roads() -> void:
 ## when no scene has handed the map a world, and it has to stay legible on its
 ## own.
 func _satellite_live() -> bool:
-	return satellite != null and is_instance_valid(satellite) and satellite.get_texture() != null
+	return satellite_available and satellite != null and is_instance_valid(satellite) and satellite.get_texture() != null
 
 
 func _draw_lots() -> void:

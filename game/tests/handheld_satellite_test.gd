@@ -15,6 +15,7 @@ extends Node3D
 ## of the device.
 
 const LIVING_MAP := preload("res://systems/living_map.gd")
+const HANDHELD := preload("res://systems/handheld_device.gd")
 
 var failures: Array[String] = []
 
@@ -62,6 +63,25 @@ func _ready() -> void:
 	if source is Node3D and source.is_inside_tree():
 		hosted.call("attach_world", (source as Node3D).get_world_3d())
 	_check(hosted.get("satellite") != null, "so the MAP page ends up looking down, reached through the device")
+	hosted.call("set_satellite_available", false, "THE OSSUARY, BELOW")
+	_check(not bool(hosted.get("satellite_available")), "an underground dead zone explicitly occludes the orbital feed")
+	_check(hosted.call("update_minimap", 0.2) == null, "and cannot leak a live pocket minimap")
+	hosted.call("set_satellite_available", true)
+	_check(bool(hosted.get("satellite_available")), "leaving the dead zone restores the live feed")
+
+	var layer := CanvasLayer.new()
+	add_child(layer)
+	var device: Control = HANDHELD.new()
+	device.size = Vector2(1280, 720)
+	layer.add_child(device)
+	await get_tree().process_frame
+	device.bind(generator, null, Callable())
+	device.stand_at(Vector2(135.0, 40.0))
+	var device_map: Control = device.get("_map") as Control
+	_check(device_map != null and not bool(device_map.get("satellite_available")),
+		"the real Black Mirror passes its underground dead-zone verdict into MAP")
+	device.stand_at(Vector2(-155.0, 0.0))
+	_check(bool(device_map.get("satellite_available")), "surface carrier coverage restores MAP through the same seam")
 
 	# A generator that is not in the tree yet must not crash the device; it just
 	# leaves the map as a chart until the retry on page open finds one.
