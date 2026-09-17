@@ -50,6 +50,9 @@ var rival_grudge := 0
 var rival_here := false
 var rounds := 12
 var rounds_full := 12
+var service_left := 0
+var service_total := 0
+var surveillance := 0.0
 ## Rises when something hits the car, so the needle kicks rather than sliding.
 var jolt := 0.0
 ## Filth on the instrument glass. Climbs with damage taken.
@@ -101,6 +104,9 @@ func report(values: Dictionary) -> void:
 	rival_here = bool(values.get("rival_here", rival_here))
 	rounds = int(values.get("rounds", rounds))
 	rounds_full = maxi(1, int(values.get("rounds_full", rounds_full)))
+	service_left = maxi(0, int(values.get("service_left", service_left)))
+	service_total = maxi(0, int(values.get("service_total", service_total)))
+	surveillance = clampf(float(values.get("surveillance", surveillance)), 0.0, 1.0)
 
 
 func _process(delta: float) -> void:
@@ -125,7 +131,10 @@ func _paint() -> void:
 	_hull_dial(Vector2(128, 96), 78.0)
 	_pace_dial(Vector2(300, 66), 46.0)
 	_wrecker_lamps(Vector2(232, 132))
-	_impact_counter(Vector2(232, 160))
+	if service_total > 0:
+		_service_lamps(Vector2(232, 160))
+	else:
+		_impact_counter(Vector2(232, 160))
 	_magazine(Vector2(356, 96))
 	_rival_telltale(Vector2(388, 154))
 	if placard > 0.01:
@@ -236,6 +245,29 @@ func _magazine(at: Vector2) -> void:
 			face.draw_rect(Rect2(cell.position, Vector2(6, 3)), Color(NEEDLE, 0.8))
 		else:
 			face.draw_rect(cell, Color(ETCH, 0.22), false, 1.0)
+
+
+## The underground cab was already a physical instrument panel, so the new
+## territorial objective belongs here rather than as another screen-space HUD.
+## Three lamps are the three real tunnel chambers; the red strip is how much of
+## the current scan the relays have on the vehicle.
+func _service_lamps(at: Vector2) -> void:
+	CellOutzType.draw_condensed(face, at - Vector2(0, 11), "SERVICE RING", 9.0, Color(ETCH, 0.8), 2.0)
+	var disabled := maxi(0, service_total - service_left)
+	for index in service_total:
+		var lamp_at := at + Vector2(12.0 + float(index) * 22.0, 3.0)
+		face.draw_circle(lamp_at, 7.0, LAMP_OUT)
+		if index < disabled:
+			face.draw_circle(lamp_at, 5.0, LAMP_DEAD)
+			face.draw_line(lamp_at + Vector2(-5, -5), lamp_at + Vector2(5, 5), Color(ETCH, 0.7), 1.4)
+		else:
+			var pulse := 0.76 + sin(_clock * 3.1 + float(index)) * 0.24
+			face.draw_circle(lamp_at, 5.0, Color(RIVAL_LAMP, pulse))
+	var scan_bar := Rect2(at + Vector2(0, 16), Vector2(82, 5))
+	face.draw_rect(scan_bar, Color(ETCH, 0.18))
+	face.draw_rect(Rect2(scan_bar.position, Vector2(scan_bar.size.x * surveillance, scan_bar.size.y)), Color(RIVAL_LAMP, 0.9))
+	if surveillance > 0.7:
+		CellOutzType.draw_condensed(face, at + Vector2(88, 20), "ACQUIRED", 8.0, RIVAL_LAMP, 1.4)
 
 
 ## A mechanical counter, digits on drums, so the number reads as a thing the car

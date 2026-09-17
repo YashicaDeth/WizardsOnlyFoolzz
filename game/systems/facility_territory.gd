@@ -68,6 +68,7 @@ static func ensure() -> Dictionary:
 			"active_sector": "growing_floor",
 			"liberated_count": 0,
 			"surveillance": 1.0,
+			"relay_disabled": [],
 		})
 	var sectors: Dictionary = (current.get("sectors", {}) as Dictionary).duplicate(true)
 	var changed := false
@@ -78,6 +79,8 @@ static func ensure() -> Dictionary:
 			changed = true
 	if changed:
 		current = WorldHistory.amend_subject(SUBJECT, {"sectors": sectors})
+	if not current.has("relay_disabled"):
+		current = WorldHistory.amend_subject(SUBJECT, {"relay_disabled": []})
 	return current
 
 
@@ -110,7 +113,7 @@ static func overview() -> Dictionary:
 	}
 
 
-static func apply_event(event_type: String) -> Dictionary:
+static func apply_event(event_type: String, details: Dictionary = {}) -> Dictionary:
 	ensure()
 	match event_type:
 		"opening_woke":
@@ -124,9 +127,10 @@ static func apply_event(event_type: String) -> Dictionary:
 			_set_sector("service_ring", SURVEYED, true)
 			_unlock_record("pit")
 			_raise_reaction()
+		"service_ring_relay_disabled":
+			_record_relay(clampi(int(details.get("index", -1)), -1, 2))
 		"ringmaster_joined", "ringmaster_escaped", "ringmaster_challenged":
 			_set_sector("surface_gate", SURVEYED, true)
-			_unlock_record("service_ring")
 			_unlock_record("surface_gate")
 	return overview()
 
@@ -168,6 +172,46 @@ static func _unlock_record(id: String) -> void:
 		"status": str(territory.get("state", CONTROLLED)),
 		"objective": str(definition.objective),
 		"memory": "Recovered from the Black Mirror after the pit changed hands.",
+	})
+
+
+static func _record_relay(index: int) -> void:
+	if index < 0:
+		return
+	var record := ensure()
+	var disabled: Array = (record.get("relay_disabled", []) as Array).duplicate()
+	if disabled.has(index):
+		return
+	disabled.append(index)
+	disabled.sort()
+	WorldHistory.amend_subject(SUBJECT, {"relay_disabled": disabled})
+	WorldHistory.record_event("service_ring_relay_disabled", {
+		"territory": SUBJECT,
+		"sector": "service_ring",
+		"relay": index,
+		"remaining": 3 - disabled.size(),
+	})
+	if disabled.size() < 3:
+		return
+	_set_sector("service_ring", LIBERATED, true)
+	_unlock_record("service_ring")
+	_escalate_reaction()
+
+
+static func _escalate_reaction() -> void:
+	_raise_reaction()
+	var reaction := WorldHistory.subject(REACTION_SUBJECT)
+	if bool(reaction.get("service_ring_escalated", false)):
+		return
+	WorldHistory.update_subject(REACTION_SUBJECT, {
+		"status": "priority",
+		"service_ring_escalated": true,
+		"threat": "SERVICE RING LOST; RECOVER ASSET INTACT ENOUGH TO INTERROGATE",
+	}, "celloutz_repossession_escalated")
+	WorldHistory.record_event("celloutz_service_ring_retaliation", {
+		"subject_id": REACTION_SUBJECT,
+		"target_id": "player",
+		"territory": SUBJECT,
 	})
 
 

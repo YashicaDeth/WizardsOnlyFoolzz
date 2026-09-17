@@ -47,6 +47,7 @@ const WORLD_DEBRIS := preload("res://systems/world_debris.gd")
 const VEHICLE_PART_POOL := "vehicle_part"
 const OPENING := preload("res://systems/opening_director.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
+const SERVICE_RING_RELAY := preload("res://systems/service_ring_relay.gd")
 const RINGMASTER_CARD := preload("res://systems/ringmaster_card.gd")
 
 ## AP1.5/AP1.6. Set true only by `underground_colosseum.tscn` — every other
@@ -64,6 +65,13 @@ var _ringmaster_walking := false
 var ringmaster_active := false
 var _ringmaster_start := Vector3.ZERO
 var _ringmaster_mark := Vector3.ZERO
+## The three tunnel chambers are the Service Ring's playable objective. The
+## heat only ends when both the eight wreckers and these three physical
+## surveillance relays are down; the final wreck leaves the tunnels quiet
+## enough to finish the job instead of teleporting the player away.
+var service_relays: Array[Node3D] = []
+var service_exposure := 0.0
+var service_scan_announced := false
 
 ## The bezel `celloutz_hud.gd` draws for the driver, in its own coordinates, so
 ## the bust lands inside the frame instead of beside it. Kept next to the
@@ -318,6 +326,8 @@ func _physics_process(delta: float) -> void:
 	WorldClock.advance(delta)
 	boat.enabled = round_state == "active" and not index_open and not leaving_on_foot
 	fire_cooldown = maxf(0.0, fire_cooldown - delta)
+	if is_colosseum:
+		_update_service_ring(delta)
 	if leaving_on_foot:
 		# AG3.3. Nothing else runs while the body is getting out. The heat is
 		# over for you the moment you open the door. AP1.6: once the ringmaster
@@ -529,8 +539,8 @@ func _build_colosseum_world() -> void:
 	# opening into a wider chamber. The chambers used to dead-end; they now
 	# connect to each other through a back corridor (below), so a tunnel is
 	# a real route between two points on the bowl, not just an escape.
-	for tunnel_angle in tunnel_angles:
-		_build_colosseum_tunnel(tunnel_angle)
+	for tunnel_index in tunnel_angles.size():
+		_build_colosseum_tunnel(tunnel_angles[tunnel_index], tunnel_index)
 	_build_colosseum_ring_corridor(tunnel_angles)
 	var light_count := arena_light_budget()
 	for index in light_count:
@@ -551,7 +561,7 @@ func _build_colosseum_world() -> void:
 ## rather than dead-ending — a real route between two points on the bowl, not
 ## just an escape. Floor is the same arena floor extended under it — a
 ## tunnel is a roof and two walls laid over open ground, not a separate box.
-func _build_colosseum_tunnel(angle: float) -> void:
+func _build_colosseum_tunnel(angle: float, tunnel_index: int) -> void:
 	var direction := Vector3(cos(angle), 0, sin(angle))
 	var start := direction * (COLOSSEUM_RADIUS - 1.0)
 	var mid := start + direction * (COLOSSEUM_TUNNEL_LENGTH * 0.5)
@@ -579,6 +589,22 @@ func _build_colosseum_tunnel(angle: float) -> void:
 	lamp.light_cull_mask = 0xFFFFF & ~(1 << (INTERIOR.CAB_LAYER - 1))
 	add_child(lamp)
 	_build_colosseum_fuel_pickup(chamber_center)
+	_build_service_ring_relay(chamber_center, direction, tunnel_index)
+
+
+func _build_service_ring_relay(chamber_center: Vector3, direction: Vector3, tunnel_index: int) -> void:
+	var relay: Node3D = SERVICE_RING_RELAY.new()
+	relay.build(tunnel_index)
+	# Off the driving line but inside the real chamber: the canister remains in
+	# the centre and the relay can be rammed or shot without blocking the route.
+	var tangent := Vector3(-direction.z, 0.0, direction.x)
+	relay.position = chamber_center + tangent * (5.2 if tunnel_index % 2 == 0 else -5.2)
+	add_child(relay)
+	var persisted: Array = FACILITY_TERRITORY.ensure().get("relay_disabled", [])
+	if persisted.has(tunnel_index):
+		relay.restore_disabled()
+	relay.relay_disabled.connect(_on_service_relay_disabled)
+	service_relays.append(relay)
 
 
 ## A real reason to duck into a tunnel besides escaping a pile-on — reuses
@@ -615,6 +641,53 @@ func _on_colosseum_fuel_pickup(body: Node, pickup: Area3D) -> void:
 	if derby_audio != null:
 		derby_audio.play_impact(0.1, pickup.global_position, "light")
 	pickup.queue_free()
+
+
+func _update_service_ring(delta: float) -> void:
+	if boat == null or not is_instance_valid(boat):
+		return
+	var scanned := 0.0
+	for relay: Node3D in service_relays:
+		if relay != null and is_instance_valid(relay):
+			scanned = maxf(scanned, relay.advance_scan(delta, boat.global_position))
+	service_exposure = move_toward(service_exposure, scanned, delta * (1.8 if scanned > service_exposure else 0.65))
+	if service_exposure >= 0.72 and not service_scan_announced:
+		service_scan_announced = true
+		WorldHistory.record_event("service_ring_vehicle_acquired", {
+			"venue": "underground_colosseum",
+			"exposure": snappedf(service_exposure, 0.01),
+		})
+	elif service_exposure < 0.18:
+		service_scan_announced = false
+
+
+func _service_relays_disabled() -> int:
+	var count := 0
+	for relay: Node3D in service_relays:
+		if relay != null and is_instance_valid(relay) and relay.disabled:
+			count += 1
+	return count
+
+
+func _on_service_relay_disabled(index: int, cause: String) -> void:
+	FACILITY_TERRITORY.apply_event("service_ring_relay_disabled", {"index": index})
+	WorldHistory.record_event("derby_service_relay_destroyed", {
+		"venue": "underground_colosseum",
+		"relay": index,
+		"cause": cause,
+		"disabled": _service_relays_disabled(),
+	})
+	if derby_audio != null:
+		derby_audio.play_impact(0.8, service_relays[index].global_position, "heavy")
+	crowd_reaction = 1.0
+	_try_finish_colosseum_objective()
+
+
+func _try_finish_colosseum_objective() -> bool:
+	if not is_colosseum or disabled_count < 8 or _service_relays_disabled() < COLOSSEUM_TUNNEL_COUNT:
+		return false
+	_finish_round("won")
+	return true
 
 
 ## The back corridor. Straight tunnels used to each end in their own sealed
@@ -897,6 +970,14 @@ func _on_vehicle_impact(other: Node, closing_speed: float, self_share: float) ->
 	if round_state != "active" or not is_instance_valid(other):
 		return
 	_shake_camera(closing_speed)
+	if other != null and other.get_script() == SERVICE_RING_RELAY:
+		var relay := other
+		var now := Time.get_ticks_msec()
+		if closing_speed >= 6.5 and now >= int(relay.get_meta("ram_ready_msec", 0)):
+			relay.set_meta("ram_ready_msec", now + 420)
+			relay.take_hit("ram", 1.0)
+			derby_audio.play_impact(clampf(closing_speed / 20.0, 0.25, 1.0), relay.global_position, "heavy")
+		return
 	if other is BreakableProp:
 		var prop_result: Dictionary = (other as BreakableProp).impact(closing_speed, boat.global_position.direction_to(other.global_position), self_share)
 		if bool(prop_result.get("broken", false)):
@@ -1058,7 +1139,10 @@ func _wreck_target(target: Node3D, impact_energy: int) -> void:
 		"score_after_impact": score,
 	})
 	if disabled_count >= 8:
-		_finish_round("won")
+		if not is_colosseum:
+			_finish_round("won")
+		else:
+			_try_finish_colosseum_objective()
 
 
 ## AB1.1/V1.2. "Condition, not fracture" (`DESIGN/DESTRUCTION.md`): what the
@@ -1380,7 +1464,10 @@ func _on_cab_round_hit(hit: Dictionary) -> void:
 		_cab_streak(_cab_seen[serial], at)
 		_cab_seen.erase(serial)
 	var struck: Node = hit.get("collider")
-	if struck != null and targets.has(struck):
+	if struck != null and struck.get_script() == SERVICE_RING_RELAY:
+		struck.call("take_hit", "cab_round", 1.0)
+		WorldHistory.record_event("derby_shot_landed", {"venue": "underground_colosseum", "target": struck.name})
+	elif struck != null and targets.has(struck):
 		# A bullet is not a ram. It does less, and it does it from further away,
 		# which is the trade the gun exists to offer — kept as this scene's
 		# own tuned pseudo-speed input to `_damage_target()`'s ram-damage
@@ -1389,7 +1476,7 @@ func _on_cab_round_hit(hit: Dictionary) -> void:
 		# already tuned against real play, not invented alongside the rest
 		# of this rewrite.
 		_damage_target(struck as Node3D, 9.0, 1.0, "gun_hit_ready_msec")
-		WorldHistory.record_event("derby_shot_landed", {"venue": "rift_derby_quarry", "target": struck.name})
+		WorldHistory.record_event("derby_shot_landed", {"venue": "underground_colosseum" if is_colosseum else "rift_derby_quarry", "target": struck.name})
 
 
 ## AF1.8/AF10.8. One segment of a round's real path, for the eye — ported
@@ -1607,6 +1694,9 @@ func _update_hud() -> void:
 			"rival_here": rival_running,
 			"rounds": rounds_left,
 			"rounds_full": magazine_full,
+			"service_left": maxi(0, COLOSSEUM_TUNNEL_COUNT - _service_relays_disabled()) if is_colosseum else 0,
+			"service_total": COLOSSEUM_TUNNEL_COUNT if is_colosseum else 0,
+			"surveillance": service_exposure if is_colosseum else 0.0,
 		})
 	# The bust takes the damage the car takes, which is what makes it a readout
 	# rather than an ornament.
@@ -1624,16 +1714,17 @@ func _update_hud() -> void:
 			cab_clear and round_state == "countdown",
 			rounds_left <= 0,
 			clampf(fire_cooldown / float(cab_arsenal.current().get("cooldown", 0.28)), 0.0, 1.0))
-	status.text = "BONE YARD DERBY  //  %s\nWASD DRIVE  ·  I WORLD INDEX  ·  E LEAVE VEHICLE" % round_state.to_upper()
+	status.text = "%s  //  %s\nWASD DRIVE  ·  I WORLD INDEX  ·  E LEAVE VEHICLE" % ["UNDERGROUND TUNNEL DERBY" if is_colosseum else "BONE YARD DERBY", round_state.to_upper()]
 	score_label.text = "IMPACT SCORE  %05d\nHULL INTEGRITY  %03d%%\nACTIVE WRECKERS  %02d\nWORLD MEMORY  %03d" % [score, integrity, targets.size(), WorldHistory.event_count()]
 	# Only speaks when it has something to say. Left visible during play it sat
 	# on top of the control ribbon repeating what the ribbon already showed.
-	mode_label.visible = round_state != "active"
+	var service_cleanup := is_colosseum and round_state == "active" and disabled_count >= 8 and _service_relays_disabled() < COLOSSEUM_TUNNEL_COUNT
+	mode_label.visible = round_state != "active" or service_cleanup
 	# The countdown case is here rather than only in `_physics_process`: now that
 	# the countdown runs the HUD (so the player can see the cab they are sitting
 	# in), this line runs during it too and used to blank the objective straight
 	# back out on the same frame it was set.
-	mode_label.text = ("VICTORY  //  HAULED OUT TO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "won" else "WRECKED  //  DRAGGED INTO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "lost" else "DISABLE EIGHT WRECKERS  //  %d" % maxi(1, ceili(countdown)) if round_state == "countdown" else "")
+	mode_label.text = ("VICTORY  //  SERVICE RING CUT LOOSE" if round_state == "won" and is_colosseum else "VICTORY  //  HAULED OUT TO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "won" else "WRECKED  //  DRAGGED INTO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "lost" else "DISABLE EIGHT WRECKERS  //  %d" % maxi(1, ceili(countdown)) if round_state == "countdown" else "WRECKERS DOWN  //  BREACH SERVICE RING  %d/%d" % [_service_relays_disabled(), COLOSSEUM_TUNNEL_COUNT] if service_cleanup else "")
 	var rival := WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT))
 	rival_label.text = "HUNT ARC  //  %s\n%s  ·  GRUDGE %03d  ·  ELO %04d\n[I] WORLD INDEX" % [str(rival.get("name", "THE CAPTAIN")).to_upper(), str(rival.get("status", "active")).to_upper(), int(rival.get("grudge", 0)), int(rival.get("elo", 1180))]
 	# Computed once for both readouts. It used to live inside the cab-screen

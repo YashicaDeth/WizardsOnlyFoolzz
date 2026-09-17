@@ -51,7 +51,7 @@ func _ready() -> void:
 	check(celloutz_index == debt_index + 1, "the reframe lands as the very next beat after the debt line, not buried elsewhere")
 
 	OpeningDirector.advance("entered_pit")
-	check(str(OpeningDirector.resume_destination().scene) == "res://rift_derby.tscn", "an unfinished heat resumes at the real derby")
+	check(str(OpeningDirector.resume_destination().scene) == "res://underground_colosseum.tscn", "an unfinished heat resumes in the real underground colosseum")
 	OpeningDirector.advance("won_derby")
 	check(str(OpeningDirector.resume_destination().scene) == "res://bone_yard_hunt.tscn", "a won heat resumes beyond the derby instead of replaying it")
 
