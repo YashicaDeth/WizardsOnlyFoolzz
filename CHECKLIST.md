@@ -2981,11 +2981,11 @@ Greg: *"how you can persuade them to join your ranks your own faction that you
 start through progressing and exploring around the map"*. E is the two ladders
 that already exist. This is the third one, which is yours.
 
-- [x] **U1.1** Found something — a name, a mark, a first member — `systems/player_faction.gd`'s `found()`: the player becomes a real `WorldHistory` faction's founder, holding CROWN on the exact same rank machinery every other faction uses, with a real recorded `mark` rather than just a name. Refused if one already exists — there is only one
-- [x] **U1.2** Recruits from the clinch and the downed window belong to it — `recruit()`, an API offered for whoever wires the actual clinch/downed resolution (Codex's F5/F6 territory) to call, same relationship this file has to combat as `ritual_app.gd` has to the camera it doesn't hold
+- [x] **U1.1** Found something — a name, a mark, a first member — `systems/player_faction.gd`'s `found()`: the player becomes a real `WorldHistory` faction's founder, holding CROWN on the exact same rank machinery every other faction uses, with a real recorded `mark` rather than just a name. Refused if one already exists — there is only one. Faction creation, founder membership and the founding fact now share one identified player-action transaction
+- [x] **U1.2** Recruits from the clinch and the downed window belong to it — `recruit()`, an API offered for whoever wires the actual clinch/downed resolution (Codex's F5/F6 territory) to call, same relationship this file has to combat as `ritual_app.gd` has to the camera it doesn't hold. Every accepted recruit receives one action receipt; refusals receive none
 - [x] **U1.3** It has standing on the same axis every other faction does — deliberately *not* a `FACTION_TREE_AXIS` entry (that table is authored, for the seven Sins and the two poles); `standing()` computes the real average `tree_alignment()` of whoever has actually joined, so recruiting someone who was climbing genuinely pulls the faction's own standing up
-- [x] **U1.4** It can be attacked, and it can lose people — `lose_member()` records the real reason (killed, walked away, whatever it was) rather than a silent disappearance, and actually drops them from the roster. The "attacked" half is combat wiring, not attempted here
-- [ ] **U1.5** Rank inside it is somebody else's problem too — they have opinions (needs members with individual reactions to rank changes — not attempted here). Covered in `tests/player_faction_test.gd` (19 checks)
+- [x] **U1.4** It can be attacked, and it can lose people — `lose_member()` records the real reason (killed, walked away, whatever it was) rather than a silent disappearance, and actually drops them from the roster in the same world transaction. The "attacked" half is combat wiring, not attempted here
+- [ ] **U1.5** Rank inside it is somebody else's problem too — they have opinions (needs members with individual reactions to rank changes — not attempted here). Covered in `tests/player_faction_test.gd` (23 checks)
 
 
 ### U v10 — the final pass
