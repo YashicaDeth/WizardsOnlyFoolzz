@@ -1,6 +1,8 @@
 class_name QuantumSaves
 extends RefCounted
 
+const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
+
 ## Three named worlds the player can preserve and return to. They are copies,
 ## not checkpoints that overwrite each other: choosing another slot restores
 ## its own history, bodies, time, flags and visual seed.
@@ -55,10 +57,14 @@ static func enter(slot: int) -> bool:
 	var payload := _read_slot(slot)
 	if payload.is_empty() or not payload.get("world", null) is Dictionary:
 		return false
+	# Restored universe, selected slot and the act of crossing are one boundary.
+	WorldHistory.begin_ledger_batch()
 	if not WorldHistory.restore_snapshot(payload.world as Dictionary):
+		WorldHistory.commit_ledger_batch()
 		return false
 	WorldHistory.set_flag("quantum_active_slot", slot)
-	WorldHistory.record_event("quantum_branch_entered", {"slot": slot, "label": str(payload.get("label", ""))})
+	PlayerActionLedger.record("quantum_branch_entered", {"slot": slot, "label": str(payload.get("label", ""))})
+	WorldHistory.commit_ledger_batch()
 	return true
 
 
@@ -79,6 +85,9 @@ static func begin_new(slot: int, label: String = "") -> Dictionary:
 	if slot < 0 or slot >= SLOT_COUNT:
 		return {}
 	var carried := _carry_across()
+	# Do not persist the empty instant between erasing the old universe and
+	# carrying the surviving body into the new one.
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.clear_history()
 	WorldHistory.run_salt = randi() | 1
 	WorldHistory.world_minute = 16.5 * 60.0
@@ -87,7 +96,8 @@ static func begin_new(slot: int, label: String = "") -> Dictionary:
 	WorldHistory.chaos_magick_at_minute = WorldHistory.world_minute
 	for subject_id: String in carried:
 		WorldHistory.register_subject(subject_id, carried[subject_id] as Dictionary)
-	WorldHistory.record_event("quantum_branch_born", {"slot": slot, "carried": carried.keys()})
+	PlayerActionLedger.record("quantum_branch_born", {"slot": slot, "carried": carried.keys()})
+	WorldHistory.commit_ledger_batch()
 	CellOutzGrunge.remember_run(WorldHistory.run_salt)
 	return save_current(slot, label)
 

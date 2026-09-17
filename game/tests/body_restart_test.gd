@@ -135,6 +135,9 @@ func _ready() -> void:
 	# --- cross the restart --------------------------------------------------
 	var born := Quantum.begin_new(1, "SECOND WORLD")
 	check(not born.is_empty(), "sanity: the restart births a new world")
+	var born_event: Dictionary = WorldHistory.events[-1]
+	check(str(born_event.get("type", "")) == "quantum_branch_born" and str((born_event.get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_") and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"the blank world, carried body and branch-birth receipt persist as one crossing")
 	# Round-trip it through the file the branch was written to, rather than
 	# reading the live dictionary the restart left behind. JSON has no Vector3:
 	# a scar written straight out comes back as the *string* "(0.1, 0.2, 0.3)",
