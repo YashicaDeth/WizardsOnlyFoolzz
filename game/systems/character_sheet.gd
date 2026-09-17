@@ -480,7 +480,6 @@ func apply_to_world() -> Dictionary:
 	# Filing is one intake decision even when it also creates the subject,
 	# records declined modifications and opens a broken achievement run.
 	WorldHistory.begin_ledger_batch()
-	WorldHistory.register_subject("player", state)
 	WorldHistory.amend_subject("player", state)
 	PlayerActionLedger.record("sheet_filed", {
 		"actor": "player", "subject_id": "player", "changes": state.duplicate(true),

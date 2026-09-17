@@ -160,8 +160,11 @@ func _deliver(report: Dictionary) -> void:
 		"account": wire.distort("%s, as told by the one who walked back" % account_subject, 1),
 		"testimony": testimony,
 	})
-	WorldHistory.register_subject(record_id, {"kind": "knowledge", "faction": faction, "entries": []})
-	WorldHistory.update_subject(record_id, {"entries": entries}, "faction_learned")
+	WorldHistory.update_subject(record_id, {
+		"kind": "knowledge",
+		"faction": faction,
+		"entries": entries,
+	}, "faction_learned")
 	delivered += 1
 	# F2. Getting home is not the end of it. The witness tells the people they
 	# actually know, and it travels from there until nobody repeats it.

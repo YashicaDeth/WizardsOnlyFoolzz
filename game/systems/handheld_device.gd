@@ -428,7 +428,6 @@ func load_device() -> void:
 
 
 func save_device() -> void:
-	WorldHistory.register_subject(DEVICE_ID, {})
 	WorldHistory.update_subject(DEVICE_ID, {
 		"serial": serial,
 		"condition": snappedf(condition, 0.001),
