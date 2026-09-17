@@ -178,12 +178,14 @@ static func witness_a_wrong(place_id: String, faction_id: String, ledger: Witnes
 	var magnitude := offence_magnitude(faction_id, event)
 	if is_zero_approx(magnitude):
 		return {"ok": false, "reason": "NOT AN OFFENCE TO WHOEVER HOLDS THIS GROUND"}
+	WorldHistory.begin_ledger_batch()
 	if place.is_empty():
 		WorldHistory.register_subject(place_id, {"kind": "place", "held_by": faction_id, "unrest": 0.0})
 		place = WorldHistory.subject(place_id)
 	var sequence := int(event.get("sequence", -1))
 	var answered: Array = (place.get("law_seen_sequences", []) as Array).duplicate()
 	if sequence >= 0 and answered.has(sequence):
+		WorldHistory.commit_ledger_batch()
 		return {"ok": false, "reason": "THIS WRONG WAS ALREADY ANSWERED HERE"}
 	if sequence >= 0:
 		answered.append(sequence)
@@ -212,6 +214,7 @@ static func witness_a_wrong(place_id: String, faction_id: String, ledger: Witnes
 		unrest = 0.0
 		dispatched = true
 	WorldHistory.amend_subject(place_id, {"unrest": unrest, "law_seen_sequences": answered})
+	WorldHistory.commit_ledger_batch()
 	return {
 		"ok": true, "magnitude": magnitude, "unrest": unrest,
 		"dispatched": dispatched, "response_threshold": threshold,

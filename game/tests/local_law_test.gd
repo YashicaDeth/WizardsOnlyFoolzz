@@ -173,6 +173,7 @@ func _ready() -> void:
 	var unrest_events := WorldHistory.events.filter(func(event: Dictionary):
 		return str(event.get("type", "")) == "local_unrest" and int((event.get("details", {}) as Dictionary).get("source_sequence", -1)) == int(field_event.sequence))
 	check(unrest_events.size() == 1, "the local consequence cites the exact witnessed resolution that caused it")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "unrest, warrant memory, dispatch and the holding's spent balance always close one transaction")
 
 	print("LOCAL_LAW_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
