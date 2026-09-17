@@ -28,6 +28,7 @@ static func publish(patron_id: String, target_id: String, block_kind: String, ob
 	if not Boons.COST_KINDS.has(cost_kind) or cost_amount <= 0.0:
 		return {"ok": false, "reason": "CONTRACT HAS NO REAL COST"}
 	var contract_id := "hunt_contract:%s:%s:%06d" % [patron_id, target_id, WorldHistory.next_sequence]
+	WorldHistory.begin_ledger_batch()
 	var contract := WorldHistory.register_subject(contract_id, {
 		"name": "%s // %s" % [str(patron.get("name", patron_id)), str(target.get("name", target_id))],
 		"kind": "job", "job_class": "frequency_bounty", "status": "offered",
@@ -41,6 +42,7 @@ static func publish(patron_id: String, target_id: String, block_kind: String, ob
 		"subject_id": contract_id, "patron_id": patron_id, "target_id": target_id,
 		"patron_side": str(contract.patron_side), "block_kind": block_kind,
 	})
+	WorldHistory.commit_ledger_batch()
 	contract["id"] = contract_id
 	contract["ok"] = true
 	return contract

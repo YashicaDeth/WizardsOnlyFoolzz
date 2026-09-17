@@ -60,6 +60,7 @@ func _ready() -> void:
 	check(carry.items.size() == before_count - 1, "and it is genuinely gone from CARRY, not just marked")
 	check(int(seized.get("value", -1)) > 0, "valued at something real, the same pricing the Choir sells by")
 	check(carry.debt_to("choir_of_marrow") < 40, "and the debt actually shrinks by what the thing was worth")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "inventory, reduced debt and seizure event close one transaction")
 
 	var second_seize := carry.seize_lien("choir_of_marrow")
 	check(not bool(second_seize.get("ok", false)), "seizing again with nothing left liened is refused, not a phantom repeat")
@@ -77,6 +78,7 @@ func _ready() -> void:
 	WorldClock.pass_time(1.0)
 	check(first_account.debt_to("choir_of_marrow") == 103, "one whole in-world day accrues the stated three percent (100 -> 103)")
 	check(WorldHistory.event_count("bank_interest_accrued") == 1, "the charge is written once into world history")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "the new balance, clock anchor and interest event close one settlement")
 	WorldClock.pass_time(48.0)
 	var reopened_account := Carry.new()
 	check(reopened_account.debt_to("choir_of_marrow") == 109, "two unattended days catch up on a fresh Carry instance (103 -> 109)")

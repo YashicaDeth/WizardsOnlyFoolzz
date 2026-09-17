@@ -418,6 +418,7 @@ func accrue_interest(lender_faction: String) -> Dictionary:
 	# Carry the unused fraction forward. Settling after 25 hours charges one day
 	# and leaves the remaining hour on the account instead of forgiving it.
 	anchors[lender_faction] = anchor + float(whole_days) * WorldClock.MINUTES_PER_DAY
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject("inventory", {
 		"player_debt": debts,
 		"player_debt_at_minute": anchors,
@@ -430,6 +431,7 @@ func accrue_interest(lender_faction: String) -> Dictionary:
 		"owed_before": owed,
 		"owed_after": after,
 	})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "interest": interest, "owed": after, "days": whole_days}
 
 
@@ -552,6 +554,7 @@ func seize_lien(lender_faction: String) -> Dictionary:
 		var item: Dictionary = items[index]
 		if str(item.get("lien_holder", "")) != lender_faction:
 			continue
+		WorldHistory.begin_ledger_batch()
 		var value := sale_value(item, lender_faction)
 		items.remove_at(index)
 		var owed := debt_to(lender_faction)
@@ -565,6 +568,7 @@ func seize_lien(lender_faction: String) -> Dictionary:
 		# caught it.
 		WorldHistory.update_subject("inventory", {"items": items.duplicate(true), "player_debt": debts}, "carry_changed")
 		WorldHistory.record_event("lien_seized", {"lender_faction": lender_faction, "item": item.duplicate(true), "value": value, "owed_after": debts[lender_faction]})
+		WorldHistory.commit_ledger_batch()
 		return {"ok": true, "item": item, "value": value, "owed": int(debts[lender_faction])}
 	return {"ok": false, "reason": "NOTHING LIENED TO THIS LENDER"}
 

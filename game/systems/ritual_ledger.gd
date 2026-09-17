@@ -111,6 +111,9 @@ static func submit_photo(photo: Dictionary) -> Dictionary:
 		}
 		accepted.append(ritual)
 	if not accepted.is_empty():
+		# One photograph can satisfy more than one authored rite; its evidence
+		# snapshot and every resulting completion are one derived settlement.
+		WorldHistory.begin_ledger_batch()
 		WorldHistory.amend_subject(LEDGER_ID, {"version": 1, "rituals": entries})
 		for ritual in accepted:
 			WorldHistory.record_event("ritual_completed", {
@@ -120,6 +123,7 @@ static func submit_photo(photo: Dictionary) -> Dictionary:
 				"photo_id": str(photo.get("id", "")),
 				"location": str(photo.get("location", "")),
 			})
+		WorldHistory.commit_ledger_batch()
 	return {"completed": accepted, "reports": reports}
 
 

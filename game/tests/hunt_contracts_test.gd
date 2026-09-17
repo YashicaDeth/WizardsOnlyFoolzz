@@ -33,6 +33,7 @@ func _ready() -> void:
 	var contract_id := str(offered.get("id", ""))
 	check(bool(offered.get("ok", false)) and not contract_id.is_empty(), "a noticed ascent patron publishes one exact-target job")
 	check(str(offered.get("target_id", "")) == "signal_broker" and str(offered.get("patron_side", "")) == "ascent", "the offer keeps its real patron, side, target and obstruction")
+	check(WorldHistory.event_count("hunt_contract_published") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "the offered job and its publication close one world transaction")
 	check(CONTRACTS.offers().size() == 1, "the unconsumed offer appears in the live job market")
 
 	var blood_before := float(WorldHistory.subject("player").get("anatomy_state", {}).get("blood", 5000.0))
