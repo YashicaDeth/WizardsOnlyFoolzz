@@ -1079,13 +1079,37 @@ exist start talking to each other.
 
 ### F v10 — the final pass
 The last rung. Fifteen statements that are true of the hunt when this game is finished, each one an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
-- [ ] **F10.1** `v10` A rival is made by what happened, never spawned as a rival
-- [ ] **F10.2** `v10` Their body remembers the specific damage you did
+- [x] **F10.1** `v10` A rival is made by what happened, never spawned as a rival —
+      `RivalRegistry.consider()` requires both attributed harm and survival on
+      an existing person; a boss label without lived history and an untouched
+      escape both fail. `rival_registry_test.gd` proves emergence preserves
+      population size and cites the exact originating event.
+- [x] **F10.2** `v10` Their body remembers the specific damage you did — the
+      adaptation is derived from the same persisted anatomy snapshot that
+      movement, combat and INDEX read: severed zone, ruptured organ, or the
+      worst damaged live zone. The registry test takes the left arm and proves
+      both the prosthetic response and written memory name that arm.
 - [ ] **F10.3** `v10` Their tactics come from the record, read fresh, never cached
 - [ ] **F10.4** `v10` A rival who fled comes back changed in a way you can see
-- [ ] **F10.5** `v10` Death opens a real succession and somebody takes the place
-- [ ] **F10.6** `v10` Being hunted is the same system pointed at you
-- [ ] **F10.7** `v10` The law is a hunter with a jurisdiction
+- [x] **F10.5** `v10` Death opens a real succession and somebody takes the place —
+      every production encounter death calls `WireNet.open_vacancy()` and
+      defers `promote_successor()` to the next idle turn. The saved post is
+      filled by an existing faction person using influence, loyalty, debt and
+      wealth rather than ELO. `wire_test.gd` proves the ranking rule;
+      `hunt_succession_integration_test.gd` proves the real anatomical Hunt
+      death opens and fills that post exactly once without generating anybody.
+- [x] **F10.6** `v10` Being hunted is the same system pointed at you — local law
+      commissions named people through `_spawn_encounter_actor()`, so its
+      hunters use ordinary anatomy, perception, pathfinding, wounds, loot,
+      resolution and persistence. Their finishing blow now routes the player
+      into the same defeat/captivity system used by the canonical rival.
+- [x] **F10.7** `v10` The law is a hunter with a jurisdiction — a delayed witness
+      report resolves to the bounded canonical holding that MAP, INDEX and the
+      Board share; that holder sends its own two-person team to the recorded
+      scene rather than the player's live coordinate. Outside the 470×370-metre
+      Ashbloom boundary there is no local jurisdiction. Covered by
+      `local_law_test.gd`, `ashbloom_holdings_test.gd` and the production
+      `hunt_local_law_integration_test.gd`.
 - [ ] **F10.8** `v10` Bounty work for the top angels or the top demons is the job market
 - [ ] **F10.9** `v10` A contract is consumable and costs something to take
 - [ ] **F10.10** `v10` Elites cannot really die, which is why hunting them is work not war
