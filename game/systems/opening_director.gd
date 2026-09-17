@@ -43,8 +43,9 @@ static func advance(target: String) -> void:
 	var target_index := STAGES.find(target)
 	if target_index < 0 or target_index <= stage_index():
 		return
-	WorldHistory.register_subject(SUBJECT, {"kind": "run", "stage": "none", "debt": 1})
-	WorldHistory.update_subject(SUBJECT, {"stage": target}, "opening_stage_%s" % target)
+	# update_subject owns first registration and its event atomically; include
+	# the opening schema in that first mutation instead of saving it beforehand.
+	WorldHistory.update_subject(SUBJECT, {"kind": "run", "debt": 1, "stage": target}, "opening_stage_%s" % target)
 
 
 ## The player owns the handheld only after physically picking it up.

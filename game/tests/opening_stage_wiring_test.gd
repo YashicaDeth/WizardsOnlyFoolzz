@@ -36,6 +36,8 @@ func _ready() -> void:
 
 	await Interstitial.travel("res://vat_chamber.tscn", "the growing floor // decanting")
 	check(OpeningDirector.reached("woke"), "arriving at the Growing Floor records woke")
+	var opening_record := WorldHistory.subject(OpeningDirector.SUBJECT)
+	check(str(opening_record.get("kind", "")) == "run" and int(opening_record.get("debt", 0)) == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "first stage registration, schema and event close as one opening transition")
 
 	await Interstitial.travel("res://underground_colosseum.tscn", "the underground colosseum // heat one")
 	check(OpeningDirector.reached("entered_pit"), "arriving at the derby records entered_pit")

@@ -181,6 +181,8 @@ func _watch(present: Array, delta: float) -> void:
 	var key := "god_seen_%s_day_%d" % [nearest, WorldClock.day()]
 	if bool(WorldHistory.flag(key, false)):
 		return
+	# The once-per-day guard and the sighting it guards are one omen.
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.set_flag(key, true)
 	WorldHistory.record_event("god_seen", {
 		"god": nearest,
@@ -190,4 +192,5 @@ func _watch(present: Array, delta: float) -> void:
 		"hour": WorldClock.hour(),
 		"stamp": WorldClock.long_stamp(),
 	})
+	WorldHistory.commit_ledger_batch()
 	god_seen.emit(nearest_body)
