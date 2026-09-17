@@ -752,14 +752,36 @@ func _draw_holdings() -> void:
 		if blend <= 0.001:
 			continue
 		var centre := _to_screen(row.at)
-		var eased := 1.0 - pow(1.0 - blend, 3.0)
+		var reveal := holding_reveal_profile(blend)
+		var eased := float(reveal.coverage)
 		var arriving := PackedVector2Array()
 		for point: Vector2 in full:
 			arriving.append(centre.lerp(point, eased))
 		draw_colored_polygon(arriving, tone * Color(1, 1, 1, 0.035 + blend * 0.055))
 		var arriving_closed := arriving.duplicate()
 		arriving_closed.append(arriving[0])
-		draw_polyline(arriving_closed, tone * Color(1, 1, 1, 0.35 + blend * 0.40), 1.6)
+		# The moving edge is the cleaning action: pale and thick at mid-travel,
+		# relaxing into the holder-coloured border once the glass is clear.
+		var wipe_tone := BONE.lerp(tone, blend)
+		draw_polyline(arriving_closed, wipe_tone * Color(1, 1, 1, float(reveal.edge_alpha)), float(reveal.edge_width))
+		if float(reveal.streak_alpha) > 0.01:
+			for vertex in range(0, full.size(), 2):
+				var streak_end: Vector2 = arriving[vertex]
+				var streak_start := centre.lerp(full[vertex], maxf(0.0, eased - 0.10))
+				draw_line(streak_start, streak_end, BONE * Color(1, 1, 1, float(reveal.streak_alpha)), 1.0)
+
+
+## Testable timing contract for the holding reveal. Coverage only advances;
+## the bright cleaning lip peaks halfway and is gone once the new border rests.
+static func holding_reveal_profile(blend: float) -> Dictionary:
+	var clamped := clampf(blend, 0.0, 1.0)
+	var front := sin(clamped * PI)
+	return {
+		"coverage": 1.0 - pow(1.0 - clamped, 3.0),
+		"edge_alpha": 0.35 + clamped * 0.40 + front * 0.38,
+		"edge_width": 1.6 + front * 2.6,
+		"streak_alpha": front * 0.32,
+	}
 
 
 func _holding_tone(holder: String) -> Color:
