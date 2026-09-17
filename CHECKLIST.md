@@ -1817,6 +1817,17 @@ v8 made the device dangerous and most objects in the world still cannot be looke
 - [ ] **I9.1** `v9` Anything in the world can be inspected properly, guns included
 - [ ] **I9.2** `v9` Inspection is the same grammar everywhere rather than per-object
 
+      The safe first world-side slice is now live without over-claiming either
+      universal statement: every takeable substance and smokeable on the shared
+      station can be held under `I` without being picked up. Its actual live
+      mesh enters the same 3D reliquary, prompt grammar and action-ledger route
+      already used by held guns, smokeables and severed limbs; releasing `I`
+      restores the held object and leaves the inspected pickup on the table.
+      `substance_station_test.gd` proves identity, reach and non-consumption;
+      `combat_integration_test.gd` proves the real Hunt/reliquary seam. Visual
+      evidence: `captures/world_item_inspection.png`. Bodies, fixtures and the
+      wider prop population still need adapters before I9.1/I9.2 may be ticked.
+
 ### I v10 — the tenth pass
 Nine passes designed in a lit room. C v4 made the device the main light source in the world.
 - [ ] **I10.1** `v10` Every screen re-judged as the only light in a dark place
@@ -3803,7 +3814,14 @@ The last rung. Fifteen statements that are true of guns when this game is finish
 - [ ] **AF10.6** `v10` Calibre decides what happens to a body and to a wall
 - [x] **AF10.7** `v10` ~~A round finds a zone, never a hitbox~~ Same proof as B10.3, from the gun's side: a round's impact point resolves through `zone_nearest()` to the limb it struck, and `Penetration` then measures that limb's real thickness at that height to decide how far in it got. A hitbox could not answer either question
 - [ ] **AF10.8** `v10` Firing from a car is the same system
-- [ ] **AF10.9** `v10` A gun is inspectable in full
+- [x] **AF10.9** `v10` A gun is inspectable in full — the Hunt's complete firearm
+      set (shotgun and sidearm) uses the same held `I` verb and live model as
+      combat, but each has physical choreography rather than a canned spin: the
+      shotgun rolls its receiver into view and works the forend while the
+      sidearm cants its ejection port and performs a restrained press-check.
+      Both remain visible in the universal 3D reliquary with their live
+      ammunition state. `combat_integration_test.gd` protects the common seam;
+      `captures/full_use_inspection_demo.mp4` is the gameplay proof.
 - [ ] **AF10.10** `v10` Weapon customisation lives on the weapon
 - [x] **AF10.11** `v10` ~~A gun carries momentum and swivels toward where you look~~
       AN1.7, already proven in `tests/firearm_momentum_test.gd`: `ARM_WEIGHTS`

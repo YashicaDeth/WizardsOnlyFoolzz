@@ -140,6 +140,22 @@ func nearest(from: Vector3, reach := REACH) -> Dictionary:
 	return best
 
 
+## I9. Looking at a thing must present the same object the player can take.
+## Return its live node and authored identity so the common 3D reliquary can
+## copy the geometry already sitting in the world instead of inventing an icon.
+func inspection_nearest(from: Vector3, reach := REACH) -> Dictionary:
+	var entry := nearest(from, reach)
+	if entry.is_empty():
+		return {}
+	return {
+		"source": entry["node"],
+		"item_id": str(entry["id"]),
+		"kind": str(entry["kind"]),
+		"label": str(entry["label"]),
+		"detail": str(entry.get("form", "ground")),
+	}
+
+
 ## Take the nearest thing. Returns {} when nothing is in reach, so a caller can
 ## fall through to whatever else its interact key does rather than swallowing
 ## the press.

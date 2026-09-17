@@ -683,6 +683,9 @@ var smoke_last_exhale: Dictionary = {}
 ## slow, close reading. This is a pose rather than a separate inventory screen:
 ## the object, its wear and the hands holding it remain in the live world.
 var inspect_held := false
+## A ground object enters the same inspection grammar while I is held. This
+## keeps the live source rather than manufacturing a UI-only representation.
+var inspected_world_item: Dictionary = {}
 ## Hold V outside a grapple to pull the same live lungs shown by the contextual
 ## X-ray into a rotatable 3D field specimen. V remains persuade inside clinches.
 var pulmonary_held := false
@@ -1308,17 +1311,23 @@ func _unhandled_input(event: InputEvent) -> void:
 		inspect_held = event.pressed
 		if inspect_held and panel_mode.is_empty():
 			prompt.text = "INSPECT // RELEASE I TO LOWER"
-			var inspected_id := ""
-			if smoke_model != null and is_instance_valid(smoke_model):
+			inspected_world_item = _nearest_world_item_for_inspection()
+			var inspected_id := str(inspected_world_item.get("item_id", ""))
+			var inspected_event := "world_item_inspected" if not inspected_world_item.is_empty() else "held_item_inspected"
+			if not inspected_world_item.is_empty():
+				prompt.text = "%s // INSPECT // RELEASE I TO LOWER" % str(inspected_world_item.get("label", "OBJECT"))
+			elif smoke_model != null and is_instance_valid(smoke_model):
 				inspected_id = str(smoke_model.get_meta("device_id", ""))
 			elif carried_limb_model != null and is_instance_valid(carried_limb_model):
 				inspected_id = "carried_limb"
 			elif arsenal != null:
 				inspected_id = str(arsenal.current_id)
 			if not inspected_id.is_empty():
-				PLAYER_ACTION_LEDGER.record("held_item_inspected", {
+				PLAYER_ACTION_LEDGER.record(inspected_event, {
 					"subject_id": "player", "item": inspected_id, "location": HUNT_LOCATION,
 				})
+		else:
+			inspected_world_item.clear()
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_1: _equip_weapon(0)
@@ -6094,6 +6103,15 @@ func _interface_wound_regions() -> Dictionary:
 	return result
 
 
+## I9. The first world-object family enters through the exact same I verb and
+## reliquary as held gear. Selection remains a world-space reach test owned by
+## the station; this scene only decides whether held or nearby geometry wins.
+func _nearest_world_item_for_inspection() -> Dictionary:
+	if substance_station == null or not is_instance_valid(substance_station):
+		return {}
+	return substance_station.inspection_nearest(player)
+
+
 func _update_held_reliquary() -> void:
 	if held_reliquary == null or not is_instance_valid(held_reliquary):
 		return
@@ -6102,6 +6120,12 @@ func _update_held_reliquary() -> void:
 	if covered:
 		held_reliquary.clear_item()
 		return
+	if inspect_held and not inspected_world_item.is_empty():
+		var world_source: Node3D = inspected_world_item.get("source") as Node3D
+		if world_source != null and is_instance_valid(world_source):
+			held_reliquary.show_item(world_source, str(inspected_world_item.get("label", "object")), str(inspected_world_item.get("detail", "ground")))
+			return
+		inspected_world_item.clear()
 	if smoke_model != null and is_instance_valid(smoke_model):
 		var smoke_label := str((SMOKEABLES.CATALOG.get(str(smoke_model.get_meta("device_id", "")), {}) as Dictionary).get("label", "smokeable"))
 		var smoke_left := roundi((1.0 - SMOKEABLES.spent_of(smoke_model)) * 100.0)

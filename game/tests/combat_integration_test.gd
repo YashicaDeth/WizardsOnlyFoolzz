@@ -17,6 +17,22 @@ func _ready() -> void:
 	add_child(hunt)
 	hunt.set_physics_process(false)
 	await get_tree().physics_frame
+	# I9. The world-side half of universal inspection: the pickup remains on its
+	# table while the same reliquary that presents held weapons presents its live
+	# geometry. This is checked before relocating to the isolated combat range.
+	var station_pickups: Array = hunt.substance_station.pickups()
+	var ground_pickup: Dictionary = station_pickups[0]
+	hunt.player = (ground_pickup["node"] as Node3D).global_position
+	var world_preview: Dictionary = hunt._nearest_world_item_for_inspection()
+	hunt.inspected_world_item = world_preview
+	hunt.inspect_held = true
+	hunt._update_held_reliquary()
+	check(not world_preview.is_empty() and hunt.held_reliquary.displayed_source_id == (ground_pickup["node"] as Node3D).get_instance_id(),
+		"I presents a nearby world pickup through the universal 3D reliquary")
+	check((hunt.substance_station.pickups() as Array).size() == station_pickups.size(),
+		"world inspection leaves the real pickup on its table")
+	hunt.inspect_held = false
+	hunt.inspected_world_item.clear()
 	hunt.player_body.position = Vector3(175, 0.9, 125)
 	hunt.player = hunt.player_body.position + Vector3.UP * 0.6
 	hunt.yaw = 0.0
