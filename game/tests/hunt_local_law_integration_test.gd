@@ -165,6 +165,8 @@ func _ready() -> void:
 		"the player remembers both exact officers as hunters rather than a generic wanted level")
 	check(str((WorldHistory.subject("ashbloom:tunnel_mouth").get("active_law_dispatch", {}) as Dictionary).get("status", "")) == "active",
 		"the active warrant persists on the holding instead of depending on the rolling event log")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")),
+		"the physical team, its exact hunters, the contract and dispatch fact close together")
 	var distance_before := (enforcers[0].node as Node3D).global_position.distance_to(at) if not enforcers.is_empty() else 0.0
 	for _step in 3:
 		hunt._update_encounter_actors(0.5)
@@ -220,6 +222,8 @@ func _ready() -> void:
 		"the finishing blow writes one capture and one attributable local-law arrest")
 	check(str((WorldHistory.subject("ashbloom:tunnel_mouth").get("active_law_dispatch", {}) as Dictionary).get("status", "")) == "arrested",
 		"the warrant settles when its physical team takes the player into custody")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")),
+		"custody, the settled warrant and attributable arrest close as one outcome")
 	if not arrestor.is_empty():
 		hunt._update_encounter_actors(10.0)
 	check(WorldHistory.event_count("player_captured") == 1 and WorldHistory.event_count("local_law_arrested_player") == 1,

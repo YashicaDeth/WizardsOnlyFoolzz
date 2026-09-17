@@ -4422,6 +4422,7 @@ func _dispatch_local_law_team(response: Dictionary) -> void:
 	if WorldHistory.events.any(func(event: Dictionary):
 		return str(event.get("type", "")) == "local_law_team_dispatched" and int((event.get("details", {}) as Dictionary).get("source_sequence", -2)) == sequence):
 		return
+	WorldHistory.begin_ledger_batch()
 	var at_data: Dictionary = response.get("at", {}) if response.get("at", {}) is Dictionary else {}
 	var target := Vector3(float(at_data.get("x", player.x)), 0.0, float(at_data.get("z", player.z)))
 	var subjects := _restore_local_law_team(sequence, place_id, faction_id, target)
@@ -4434,6 +4435,7 @@ func _dispatch_local_law_team(response: Dictionary) -> void:
 		"source_sequence": sequence, "place_id": place_id, "faction_id": faction_id,
 		"target": {"x": target.x, "z": target.z}, "subjects": subjects,
 	})
+	WorldHistory.commit_ledger_batch()
 
 
 func _restore_local_law_teams() -> void:
@@ -4928,6 +4930,7 @@ func _complete_local_law_arrest(actor: Dictionary) -> void:
 	var captor := WorldHistory.subject(captor_id)
 	var place_id := str(captor.get("contract_place", ""))
 	var sequence := int(actor.get("law_dispatch_sequence", -1))
+	WorldHistory.begin_ledger_batch()
 	_route_player_defeat(captor_id)
 	if not place_id.is_empty():
 		var place := WorldHistory.subject(place_id)
@@ -4940,6 +4943,7 @@ func _complete_local_law_arrest(actor: Dictionary) -> void:
 		"actor": captor_id, "subject_id": "player", "place_id": place_id,
 		"faction_id": str(captor.get("faction_id", "")), "source_sequence": sequence,
 	})
+	WorldHistory.commit_ledger_batch()
 
 
 func _actor_combat_ratio(actor: Dictionary) -> float:
