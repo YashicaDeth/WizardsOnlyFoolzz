@@ -13,6 +13,19 @@ outcomes rather than existing as map icons. A living contract blocks duplicate
 spawns; a later ping can commission replacements only after the previous team
 is dead, escaped, spared or recruited.
 
+18 September implementation note: the surface territory now has a factual
+first layer without pre-empting the player's later ascent/corruption decision.
+The five settlements already generated in the Ashbloom each own one named,
+persistent holding. Their borders are a Voronoi partition of the actual
+settlement centres clipped to the actual 470-by-370-metre region, so the map
+cannot invent a province whose town stands outside it. Exploration reveals a
+whole holding once, records its existing holder and world timestamp, and then
+continues fine street survey inside it. On MAP, unknown holdings retain faint
+complete silhouettes while a newly known holding develops outward from its
+settlement over 1.4 seconds, gaining its holder colour and name as one weighted
+event. This establishes land, ownership and discovery; it deliberately does
+not decide how the eventual act of giving land upward or downward works.
+
 17 September Black Mirror note: its seven apps are different instruments inside
 one object, not seven unrelated UI compositions. The casing now owns a fixed
 page grammar — header and footer rails, app identity and role, stable page

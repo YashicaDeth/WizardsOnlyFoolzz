@@ -29,11 +29,21 @@ func _ready() -> void:
 	for _settle in 5:
 		await get_tree().process_frame
 	await RenderingServer.frame_post_draw
-	var shot := get_viewport().get_texture().get_image()
-	var path := "%s/celloutz_target_area.png" % out_dir
-	if shot.save_png(path) != OK:
-		print("CAPTURE_FAILED ", path)
+	var arriving := get_viewport().get_texture().get_image()
+	var arriving_path := "%s/ashbloom_holding_reveal.png" % out_dir
+	if arriving.save_png(arriving_path) != OK:
+		print("CAPTURE_FAILED ", arriving_path)
 		get_tree().quit(1)
 		return
-	print("CAPTURED: ", path)
+	print("CAPTURED: ", arriving_path)
+	for _settle in 100:
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var settled := get_viewport().get_texture().get_image()
+	var settled_path := "%s/celloutz_target_area.png" % out_dir
+	if settled.save_png(settled_path) != OK:
+		print("CAPTURE_FAILED ", settled_path)
+		get_tree().quit(1)
+		return
+	print("CAPTURED: ", settled_path)
 	get_tree().quit()

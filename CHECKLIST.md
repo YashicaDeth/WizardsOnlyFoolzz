@@ -3306,12 +3306,12 @@ in; nothing has ever asked the player to *use* them on a map.
 
 ### AA1 — Cleaning the window
 - [ ] **AA1.1** Revealing ground is the satisfying part, not the admin — it should feel like wiping glass
-- [ ] **AA1.2** Colour arrives with weight: a revealed holding is a small event, not a tick
-- [ ] **AA1.3** What is still grey pulls at you — the unrevealed shape is legible enough to want
-- [ ] **AA1.4** Reveal is per holding, not per metre, so it arrives in satisfying pieces
+- [x] **AA1.2** Colour arrives with weight: a revealed holding is a small event, not a tick — entering a holding writes one `holding_revealed` event, and MAP develops the claimed polygon outward from its real settlement over 1.4 seconds rather than flipping one label. The early and settled states are visually recorded at `captures/ashbloom_holding_reveal.png` and `captures/celloutz_target_area.png`
+- [x] **AA1.3** What is still grey pulls at you — the unrevealed shape is legible enough to want — every unknown holding keeps its complete faint border and an `UNSURVEYED SECTOR` centre mark while withholding its name and holder; the map shows the shape of missing knowledge rather than blanking it
+- [x] **AA1.4** Reveal is per holding, not per metre, so it arrives in satisfying pieces — `ashbloom_holdings.gd` resolves the nearest authored settlement and reveals that entire persistent polygon exactly once. Fine cell survey remains underneath for streets/buildings, but it no longer controls whether the land itself has a name
 
 ### AA2 — The split
-- [ ] **AA2.1** The region divides into named holdings with their own edges
+- [x] **AA2.1** The region divides into named holdings with their own edges — the five settlements the world generator already builds now share one definition table with MAP and produce five deterministic convex Voronoi cells clipped to the real 470-by-370-metre region. `ashbloom_holdings_test` proves all five bounded polygons, settlement containment, whole-piece/idempotent reveal, holder/timestamp persistence and the live map seam (16 checks)
 - [ ] **AA2.2** A holding can be given to the ascent or given to corruption
 - [ ] **AA2.3** Giving it is an act with a cost, not a menu choice
 - [ ] **AA2.4** A holding remembers who took it and when (WorldHistory, like everything else)
@@ -3335,7 +3335,7 @@ in; nothing has ever asked the player to *use* them on a map.
 
 ### AA v10 — the final pass
 The last rung. Fifteen statements that are true of the land taking a side when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
-- [ ] **AA10.1** `v10` Every holding belongs to somebody and the map shows it
+- [x] **AA10.1** `v10` Every holding belongs to somebody and the map shows it — all five surface place records begin with the faction already established by their authored district, and a revealed polygon prints `HELD / <faction>` in that holder's Tree-axis colour. This records the current world without deciding the still-open player act in AA2.2/AA2.3
 - [ ] **AA10.2** `v10` Giving one to the ascent or to corruption is a real, costly act
 - [ ] **AA10.3** `v10` The colour of the region changes with who holds it
 - [ ] **AA10.4** `v10` Weather quality degrades where corruption holds
@@ -3343,7 +3343,7 @@ The last rung. Fifteen statements that are true of the land taking a side when t
 - [ ] **AA10.6** `v10` A holding remembers who gave it away
 - [ ] **AA10.7** `v10` Holdings can be taken back and it is harder the second time
 - [ ] **AA10.8** `v10` Nobody holding a place means nobody repairs it
-- [ ] **AA10.9** `v10` Exploration is what reveals a holding's real state
+- [x] **AA10.9** `v10` Exploration is what reveals a holding's real state — `LivingMap.observe()` hands the player's real X/Z position to the territory authority on the same path that surveys streets; opening a menu or pointing at a polygon cannot reveal it
 - [ ] **AA10.10** `v10` The satellite sees it and the agency has opinions
 - [ ] **AA10.11** `v10` Factions move on the pyramid as holdings change hands
 - [ ] **AA10.12** `v10` The Board can pin a holding to a faction to a person

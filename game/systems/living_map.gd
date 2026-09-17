@@ -16,6 +16,7 @@ const Grunge := preload("res://systems/celloutz_grunge.gd")
 const Motion := preload("res://systems/celloutz_motion.gd")
 const SATELLITE := preload("res://systems/satellite_view.gd")
 const FACILITY := preload("res://systems/facility_territory.gd")
+const HOLDINGS := preload("res://systems/ashbloom_holdings.gd")
 
 const SURVEY_ID := "ashbloom_survey"
 const CELL := 22.0
@@ -31,13 +32,7 @@ const BILE := Color("9a8c3f")
 const SCAN := Color("8a9a4a")
 const BONE := Color("ead4ad")
 
-const DISTRICTS := [
-	{"at": Vector2(-150, -122), "name": "BLACK MILE YARDS", "note": "raider highway, tolls"},
-	{"at": Vector2(130, -122), "name": "SOFT ROT COMMUNION", "note": "fungal forest, shifting"},
-	{"at": Vector2(-155, 0), "name": "THE BONE YARD", "note": "quarry, Ashline ground"},
-	{"at": Vector2(135, 0), "name": "OSSUARY WORKS", "note": "sealed anatomy industry"},
-	{"at": Vector2(65, 115), "name": "TUNNEL MOUTH", "note": "floodlit trade route"},
-]
+const DISTRICTS := HOLDINGS.DEFINITIONS
 ## The three road slabs `ashbloom_world_generator.gd` lays down, in plan view.
 const ROADS := [
 	Rect2(-9, -185, 18, 370),
@@ -85,6 +80,10 @@ var facility_sheet := false
 var facility_hover := -1
 var facility_selected := -1
 var _facility_rects: Array = []
+## Local arrival animation only. Persistent truth lives in AshbloomHoldings;
+## this is how strongly that truth has physically developed on this sheet.
+var _holding_reveal: Dictionary = {}
+var _holding_polygons: Dictionary = {}
 var travel_hold := 0.0
 signal travel_requested(place: Dictionary)
 
@@ -94,6 +93,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	_hatch = _build_hatch()
+	_holding_polygons = HOLDINGS.polygons()
 	visible = false
 	set_process(true)
 	_load_survey()
@@ -129,6 +129,7 @@ func _load_survey() -> void:
 func observe(world_position: Vector3, yaw: float) -> void:
 	player_at = Vector2(world_position.x, world_position.z)
 	player_yaw = yaw
+	HOLDINGS.observe(player_at)
 	var base := Vector2i(roundi(player_at.x / CELL), roundi(player_at.y / CELL))
 	var added := false
 	for dx in range(-SURVEY_RADIUS, SURVEY_RADIUS + 1):
@@ -218,6 +219,11 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	clock += delta
+	for row: Dictionary in HOLDINGS.overview().holdings:
+		var id := str(row.id)
+		var current := float(_holding_reveal.get(id, 0.0))
+		var target := 1.0 if bool(row.revealed) else 0.0
+		_holding_reveal[id] = move_toward(current, target, delta * 0.72)
 	# Looking through the corporate lens lets it look back. The authority
 	# de-duplicates within its coarse cell, so this is cheap and only writes when
 	# the carried device has crossed into a genuinely new search area.
@@ -468,6 +474,7 @@ func _draw() -> void:
 	# Over the plan, not under it: unwalked ground is supposed to withhold what
 	# is standing on it, which it cannot do from underneath.
 	_draw_unsurveyed()
+	_draw_holdings()
 	_draw_districts()
 	_draw_misfires()
 	_draw_contacts()
@@ -695,23 +702,63 @@ func _draw_districts() -> void:
 	for district in DISTRICTS:
 		var at: Vector2 = district.at
 		var screen := _to_screen(at)
-		var charted := is_surveyed(at)
-		var radius := 58.0 * zoom
-		var tint := SPORE if charted else INK
-		draw_arc(screen, radius, 0.0, TAU, 40, tint * Color(1, 1, 1, 0.2 if charted else 0.08), 1.0)
+		var state := HOLDINGS.holding(str(district.id))
+		var charted := bool(state.get("revealed", false))
+		var tint := _holding_tone(str(state.get("held_by", district.held_by))) if charted else INK
 		if not _chart.has_point(screen):
-			continue
-		if not charted and not _chart.has_point(screen):
 			continue
 		var label := str(district.name) if charted else "UNSURVEYED SECTOR"
 		# Held inside the sheet. A name that escapes the chart prints over the
 		# title and reads as a caption on the device instead of a place.
-		var name_at := screen + Vector2(-radius * 0.5, -radius - 18.0)
+		var name_at := screen + Vector2(-CellOutzType.width_condensed(label.to_upper(), 11.0, 1.0) * 0.5, -29.0)
 		name_at.y = maxf(name_at.y, _chart.position.y + 8.0)
 		name_at.x = clampf(name_at.x, _chart.position.x + 8.0, _chart.end.x - CellOutzType.width_condensed(label.to_upper(), 11.0, 1.0) - 8.0)
 		CellOutzType.draw_condensed(self, name_at, label.to_upper(), 11.0, tint * Color(1, 1, 1, 0.9 if charted else 0.3), 1.0)
 		if charted:
-			CellOutzType.draw_condensed(self, name_at + Vector2(0, 14.0), str(district.note).to_upper(), 7.0, INK * Color(1, 1, 1, 0.4), 0.7)
+			var holder := str(state.get("held_by", district.held_by)).replace("_", " ").to_upper()
+			CellOutzType.draw_condensed(self, name_at + Vector2(0, 14.0), "HELD / %s" % holder, 7.0, tint * Color(1, 1, 1, 0.55), 0.7)
+
+
+func _draw_holdings() -> void:
+	for row: Dictionary in HOLDINGS.overview().holdings:
+		var id := str(row.id)
+		var world_polygon: PackedVector2Array = _holding_polygons.get(id, PackedVector2Array())
+		if world_polygon.size() < 3:
+			continue
+		var full := PackedVector2Array()
+		for point: Vector2 in world_polygon:
+			full.append(_to_screen(point))
+		var revealed := bool(row.revealed)
+		var tone := _holding_tone(str(row.held_by)) if revealed else INK
+		var blend := float(_holding_reveal.get(id, 0.0)) if revealed else 0.0
+		# Unknown land keeps a complete faint silhouette: enough shape to pull at
+		# the player. Known land develops outward from its settlement like an old
+		# instant photograph, making the reveal one event rather than many pixels.
+		var closed := full.duplicate()
+		closed.append(full[0])
+		draw_polyline(closed, tone * Color(1, 1, 1, 0.16 if not revealed else 0.24), 1.0)
+		if blend <= 0.001:
+			continue
+		var centre := _to_screen(row.at)
+		var eased := 1.0 - pow(1.0 - blend, 3.0)
+		var arriving := PackedVector2Array()
+		for point: Vector2 in full:
+			arriving.append(centre.lerp(point, eased))
+		draw_colored_polygon(arriving, tone * Color(1, 1, 1, 0.035 + blend * 0.055))
+		var arriving_closed := arriving.duplicate()
+		arriving_closed.append(arriving[0])
+		draw_polyline(arriving_closed, tone * Color(1, 1, 1, 0.35 + blend * 0.40), 1.6)
+
+
+func _holding_tone(holder: String) -> Color:
+	var axis := 0.0
+	if WorldHistory.FACTION_TREE_AXIS.has(holder):
+		axis = float((WorldHistory.FACTION_TREE_AXIS[holder] as Dictionary).get("axis", 0.0))
+	if axis < -0.2:
+		return ARTERIAL
+	if axis > 0.2:
+		return SPORE
+	return BILE
 
 
 func _draw_misfires() -> void:
@@ -923,7 +970,7 @@ func _draw_places() -> void:
 		var screen := _to_screen(world_at)
 		if not _chart.has_point(screen):
 			continue
-		var charted := is_surveyed(world_at)
+		var charted := bool(HOLDINGS.holding(str(district.id)).get("revealed", false))
 		var box := Rect2(screen - Vector2(9, 9), Vector2(18, 18))
 		_place_rects.append({"index": index, "rect": box, "at": world_at})
 		var tint: Color = SPORE if charted else INK * Color(1, 1, 1, 0.3)
@@ -954,10 +1001,12 @@ func _draw_place_panel() -> void:
 	for line: String in CellOutzType.wrap_condensed(str(district.get("note", "")).to_upper(), panel.size.x - 32.0, 9.0, 0.7):
 		CellOutzType.draw_condensed(self, panel.position + Vector2(16, note_y), line, 9.0, INK * Color(1, 1, 1, 0.7), 0.7)
 		note_y += 13.0
-	var charted := is_surveyed(district.get("at", Vector2.ZERO))
-	var status := "SURVEYED" if charted else "UNWALKED \u2014 NO ROUTE"
-	CellOutzType.draw_text(self, panel.position + Vector2(14, 82), status, 10.0, SPORE if charted else ARTERIAL, 1.0)
-	if charted:
+	var holding_state := HOLDINGS.holding(str(district.id))
+	var charted := bool(holding_state.get("revealed", false))
+	var route_ready := is_surveyed(district.get("at", Vector2.ZERO))
+	var status := ("HELD / %s" % str(holding_state.get("held_by", district.held_by)).replace("_", " ").to_upper()) if charted else "UNWALKED // NO ROUTE"
+	CellOutzType.draw_text(self, panel.position + Vector2(14, 82), status, 10.0, _holding_tone(str(holding_state.get("held_by", ""))) if charted else ARTERIAL, 1.0)
+	if route_ready:
 		var bar := Rect2(panel.position + Vector2(14, 106), Vector2(panel.size.x - 28, 14))
 		draw_rect(bar, INK * Color(1, 1, 1, 0.10))
 		draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(travel_hold, 0.0, 1.0), bar.size.y)), ACID)
