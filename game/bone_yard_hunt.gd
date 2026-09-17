@@ -130,6 +130,7 @@ const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 const RIVAL_REGISTRY := preload("res://systems/rival_registry.gd")
 const RIVAL_TACTICS := preload("res://systems/rival_tactics.gd")
 const HUNT_MEMORY := preload("res://systems/hunt_memory.gd")
+const OFFSCREEN_HUNTS := preload("res://systems/offscreen_hunts.gd")
 const DEFEAT_ROUTER := preload("res://systems/defeat_router.gd")
 const ASSET_NETWORK := preload("res://systems/asset_network.gd")
 const COMBAT_RESPONSE := preload("res://systems/combat_response.gd")
@@ -4599,7 +4600,7 @@ func _begin_canonical_encounter() -> void:
 	enemy_health_max = 150 if mara_encounter_number == 2 else 100
 	enemy_health = enemy_health_max
 	WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"status": "hunting", "encounter_number": mara_encounter_number, "memory": "Mara returned rebuilt to settle the Bone Yard debt." if mara_encounter_number == 2 else "Mara came to settle the Bone Yard debt."}, "hunt_arc_started")
-	var offscreen_hunt := OffscreenHunts.start(CAST.id_for(CAPTAIN_SLOT), "player", HUNT_LOCATION)
+	var offscreen_hunt := OFFSCREEN_HUNTS.start(CAST.id_for(CAPTAIN_SLOT), "player", HUNT_LOCATION)
 	WorldHistory.record_event("canonical_hunt_encounter_started", {"hunter": "player", "target": CAST.id_for(CAPTAIN_SLOT), "location": HUNT_LOCATION, "encounter_number": mara_encounter_number})
 	HUNT_MEMORY.remember(CAST.id_for(CAPTAIN_SLOT), "canonical_rival")
 	if mara_encounter_number == 2:

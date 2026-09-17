@@ -324,11 +324,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	# W1.1. A heat takes time out of the day like anything else does.
-	WorldClock.advance(delta)
-	# F10.11. The quarry/colosseum owns the clock while this scene is loaded,
-	# but a named hunter left behind in Ashbloom still works in world time.
-	OFFSCREEN_HUNTS.advance("underground_colosseum" if is_colosseum else "rift_derby_quarry")
+	_advance_world_time(delta)
 	boat.enabled = round_state == "active" and not index_open and not leaving_on_foot
 	fire_cooldown = maxf(0.0, fire_cooldown - delta)
 	if is_colosseum:
@@ -382,6 +378,16 @@ func _physics_process(delta: float) -> void:
 	_update_respawns(delta)
 	_update_cab_tracers(delta)
 	_update_hud()
+
+
+## Kept separate from vehicle simulation so the cross-scene ledger route can
+## be verified without constructing a car, camera and twelve AI drivers.
+func _advance_world_time(delta: float) -> void:
+	# W1.1. A heat takes time out of the day like anything else does.
+	WorldClock.advance(delta)
+	# F10.11. The quarry/colosseum owns the clock while this scene is loaded,
+	# but a named hunter left behind in Ashbloom still works in world time.
+	OFFSCREEN_HUNTS.advance("underground_colosseum" if is_colosseum else "rift_derby_quarry")
 
 
 ## Gore is a settings choice now, not a hotkey over the pit. Read once at scene

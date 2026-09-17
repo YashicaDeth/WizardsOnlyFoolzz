@@ -1150,7 +1150,16 @@ The last rung. Fifteen statements that are true of the hunt when this game is fi
       `hunt_contracts_test.gd` proves the debit, refusal, one-use transition
       and nonlethal exact-target resolution in 15 checks.
 - [ ] **F10.10** `v10` Elites cannot really die, which is why hunting them is work not war
-- [ ] **F10.11** `v10` Hunts run while you are elsewhere
+- [x] **F10.11** `v10` Hunts run while you are elsewhere — the canonical
+      captain registers an exact hunter/target/place clock anchor when the
+      hunt begins. `OffscreenHunts` settles one persistent turn per fifteen
+      world-minutes spent in another scene, moving the same hunt through
+      searching, closing and waiting without keeping its scene loaded. Long
+      absences catch up arithmetically in one event, time spent face-to-face
+      cannot be miscounted later, and a resolved hunter stops. The quarry and
+      Underground Colosseum production clock call the route directly; returning
+      to the Hunt reports how many turns the captain kept working. Proven in
+      `offscreen_hunts_test.gd` (10 checks, including the production derby seam).
 - [ ] **F10.12** `v10` A hunt can be inherited by somebody who never met you
 - [ ] **F10.13** `v10` Nothing in a hunt is scripted to find you
 - [ ] **F10.14** `v10` The godhead is the last hunter and it does not need to look for you
