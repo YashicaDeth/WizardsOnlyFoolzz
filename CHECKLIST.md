@@ -5782,8 +5782,14 @@ to get right.
       the transfer. The bong explicitly refuses because its weight and cone-sink
       require both hands. A draw's dose, tolerance, anatomy, consumed charge and
       history still emit their normal events/signals, but `WorldHistory` batches
-      their persistence into one disk flush; resolved draw/cough, exhale, trick,
-      mouth hold and inspection all remain explicit ledger events
+      their persistence into one disk flush. `player_action_ledger.gd` is now
+      the single receipt route for hit, resolved draw, cough, exhale, trick,
+      mouth transfer, completed consumption and held-item inspection: it keeps
+      every existing event name for current consumers, adds one monotonic action
+      id, maintains cheap per-kind counts and coalesces its summary plus event
+      into one save. Nested draw transactions still flush only at their outer
+      commit (`player_action_ledger_test`, 8/8; `smoking_act_test` exercises all
+      eight live routes)
 - [ ] **AU7.10** Passing one to somebody is a real act with a real meaning (S)
 
 ### AU5 — The effect taxonomy

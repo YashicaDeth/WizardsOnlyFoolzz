@@ -1,5 +1,7 @@
 extends Node
 
+const ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 ## AU7.6/AU7.9. The object suite already proves the curve. This proves the
 ## Hunt actually gives a player the object, drives that curve from a held bind,
 ## and takes the weapon away when the two-hand object is raised.
@@ -157,11 +159,16 @@ func _ready() -> void:
 	hunt.call("_shape_smoke_trick")
 	check(air.get_parent().get_node_or_null("SmokeTrick_O") != null, "clicking shapes the breath into a physical smoke O")
 	check(WorldHistory.event_count("smoke_trick") == 1, "and the world records the trick as an act")
+	check(ACTION_LEDGER.count("smoked") == 1 and ACTION_LEDGER.count("smoke_draw_resolved") == 1 and
+		ACTION_LEDGER.count("smoke_exhaled") == 1 and ACTION_LEDGER.count("smoke_trick") == 1,
+		"draw, dose, automatic exhale and optional trick share one action-ledger route")
 	hunt.call("_toggle_mouth_hold")
 	for _take_back in 20:
 		hunt.call("_update_smoking", 1.0 / 60.0)
 	check(not bool(hunt.get("smoke_mouth_held")) and smoking_hand.visible,
 		"toggling again returns the cigarette to the waiting hand")
+	check(ACTION_LEDGER.count("smokeable_mouth_hold") == 2,
+		"placing the cigarette at the lips and taking it back are routed acts")
 	# Prime the same object for its deterministic third-draw maintenance beat.
 	var primed_spent := Smokeables.spend_per_hit("cigarette") * 2.0
 	var stored_spent: Dictionary = hunt.get("smoke_spent")
@@ -174,6 +181,18 @@ func _ready() -> void:
 	hunt.call("_finish_smoking_draw")
 	check(float(hunt.get("smoke_ash_flick")) > 0.0 and hunt.get_node_or_null("AshFlick") != null,
 		"each third rolled draw snaps the wrist and sheds physical ash")
+
+	# The last draw is a distinct ledger act only when this exact object crosses
+	# from usable to spent; revisiting an already spent prop cannot duplicate it.
+	var almost_spent := 1.0 - Smokeables.spend_per_hit("cigarette")
+	stored_spent["cigarette"] = almost_spent
+	hunt.set("smoke_spent", stored_spent)
+	Smokeables.set_spent(held, almost_spent)
+	hunt.call("_begin_smoking_draw")
+	hunt.set("smoke_held", 1.6)
+	hunt.call("_finish_smoking_draw")
+	check(ACTION_LEDGER.count("smokeable_consumed") == 1 and WorldHistory.event_count("smokeable_consumed") == 1,
+		"finishing the physical cigarette records one routed consumption receipt")
 
 	# Cycle to the fifth object. Its second hand and weapon cost must be visible,
 	# not merely catalog metadata.
@@ -210,6 +229,11 @@ func _ready() -> void:
 	check(float(hunt.get("body_motion").smoking_look_down) > 0.0,
 		"the first-person body looks down the chamber while sinking the cone")
 	hunt.call("_finish_smoking_draw")
+	hunt.call("_begin_smoking_draw")
+	hunt.set("smoke_held", 6.0)
+	hunt.call("_finish_smoking_draw")
+	check(ACTION_LEDGER.count("smoke_coughed") == 1 and WorldHistory.event_count("smoke_coughed") == 1,
+		"an over-pulled bong routes the real cough through the same action ledger")
 	WorldHistory.world_minute = before_night_bong
 
 	# Inspection is the same live hand-and-object assembly, not a separate icon.
@@ -245,6 +269,8 @@ func _ready() -> void:
 	check(shotgun_left.position.z > shotgun_left_rest.z + 0.035,
 		"the shotgun support hand slides over the forend for a receiver check")
 	hunt.call("_unhandled_input", inspect_release)
+	check(ACTION_LEDGER.count("held_item_inspected") >= 2,
+		"smokeable and weapon inspections use the same action-ledger route")
 
 	# A sidearm is press-checked rather than copied from the long-gun turn.
 	hunt.call("_equip_weapon", 2)

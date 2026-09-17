@@ -1,6 +1,8 @@
 class_name Smokeables
 extends RefCounted
 
+const ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 ## AU1.8. "Smoking is a real act: cigarettes, vapes, joints, spliffs, blunts,
 ## bongs, alien devices."
 ##
@@ -153,7 +155,7 @@ static func hit(subject_id: String, device_id: String, held: float, now: float) 
 		anatomy["pain"] = clampf(float(anatomy.get("pain", 0.0)) + float(quality["harsh"]) * 6.0, 0.0, 100.0)
 		WorldHistory.amend_subject(subject_id, {"anatomy_state": anatomy})
 
-	WorldHistory.record_event("smoked", {
+	ACTION_LEDGER.record("smoked", {
 		"subject_id": subject_id, "device": device_id,
 		"grade": str(quality["grade"]), "held": held,
 		"strength": float(quality["strength"]), "harsh": float(quality["harsh"]),

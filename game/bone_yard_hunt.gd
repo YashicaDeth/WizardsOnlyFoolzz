@@ -134,6 +134,7 @@ const COMBAT_RESPONSE := preload("res://systems/combat_response.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const HELD_GEAR := preload("res://systems/held_gear.gd")
 const SMOKEABLES := preload("res://systems/smokeables.gd")
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
 const PIN_BOARD := preload("res://systems/pin_board.gd")
@@ -1291,7 +1292,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif arsenal != null:
 				inspected_id = str(arsenal.current_id)
 			if not inspected_id.is_empty():
-				WorldHistory.record_event("held_item_inspected", {
+				PLAYER_ACTION_LEDGER.record("held_item_inspected", {
 					"subject_id": "player", "item": inspected_id, "location": HUNT_LOCATION,
 				})
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -2515,7 +2516,7 @@ func _toggle_mouth_hold() -> void:
 	inspect_held = false
 	var label := str((SMOKEABLES.CATALOG.get(device_id, {}) as Dictionary).get("label", device_id)).to_upper()
 	prompt.text = "%s // %s" % [label, "HELD AT THE LIPS // Y TO TAKE IT" if smoke_mouth_held else "BACK IN HAND // Y TO LIP-HOLD"]
-	WorldHistory.record_event("smokeable_mouth_hold", {
+	PLAYER_ACTION_LEDGER.record("smokeable_mouth_hold", {
 		"subject_id": "player", "device": device_id, "held": smoke_mouth_held,
 		"location": HUNT_LOCATION,
 	})
@@ -2802,16 +2803,20 @@ func _finish_smoking_draw() -> Dictionary:
 		smoke_exhale_delay = 0.26
 		if str(result.get("grade", "")) == SMOKEABLES.HARSH:
 			smoke_cough = clampf(float(result.get("harsh", 0.0)), 0.25, 1.0)
-			WorldHistory.record_event("smoke_coughed", {
+			PLAYER_ACTION_LEDGER.record("smoke_coughed", {
 				"subject_id": "player", "device": device_id,
 				"intensity": smoke_cough, "location": HUNT_LOCATION,
 			})
-		WorldHistory.record_event("smoke_draw_resolved", {
+		PLAYER_ACTION_LEDGER.record("smoke_draw_resolved", {
 			"subject_id": "player", "device": device_id,
 			"grade": str(result.get("grade", "")),
 			"consumed": SMOKEABLES.spend_per_hit(device_id), "spent": spent,
 			"lungs": result.get("lungs", {}), "location": HUNT_LOCATION,
 		})
+		if smoke_draw_start_spent < 0.999 and spent >= 0.999:
+			PLAYER_ACTION_LEDGER.record("smokeable_consumed", {
+				"subject_id": "player", "device": device_id, "location": HUNT_LOCATION,
+			})
 		# Every third completed rolled draw ends with a small wrist snap and real
 		# falling ash. It is deterministic per object, never a random interruption.
 		if device_id in ["cigarette", "joint", "spliff"]:
@@ -2879,7 +2884,7 @@ func _exhale_smoke() -> void:
 	smoke_last_exhale = smoke_pending_exhale.duplicate(true)
 	smoke_trick_window = 1.15
 	prompt.text = "%s // CLICK TO SHAPE THE SMOKE" % str(smoke_pending_exhale.get("grade", "")).to_upper()
-	WorldHistory.record_event("smoke_exhaled", {
+	PLAYER_ACTION_LEDGER.record("smoke_exhaled", {
 		"subject_id": "player",
 		"device": str(smoke_pending_exhale.get("device", "")),
 		"density": float(smoke_pending_exhale.get("exhale", 1.0)),
@@ -2898,7 +2903,7 @@ func _shape_smoke_trick() -> void:
 	var mouth: Vector3 = emission.mouth
 	var device_id := str(smoke_last_exhale.get("device", ""))
 	air.emit_smoke_trick(mouth, forward, trick, float(smoke_last_exhale.get("exhale", 1.0)), _smoke_tint(device_id))
-	WorldHistory.record_event("smoke_trick", {
+	PLAYER_ACTION_LEDGER.record("smoke_trick", {
 		"subject_id": "player", "trick": trick,
 		"device": str(smoke_last_exhale.get("device", "")), "location": HUNT_LOCATION,
 	})
