@@ -1129,7 +1129,14 @@ The last rung. Fifteen statements that are true of the hunt when this game is fi
       `local_law_test.gd`, `ashbloom_holdings_test.gd` and the production
       `hunt_local_law_integration_test.gd`.
 - [ ] **F10.8** `v10` Bounty work for the top angels or the top demons is the job market
-- [ ] **F10.9** `v10` A contract is consumable and costs something to take
+- [x] **F10.9** `v10` A contract is consumable and costs something to take —
+      `HuntContracts` stores each offer as a one-use WorldHistory job. Taking
+      it first pays through `Boons.pay`, so blood, an organ, a limb or standing
+      really changes; only a successful debit consumes the offer, and retrying
+      an active contract cannot charge twice. The acceptance has one compact
+      `PlayerActionLedger` receipt and remains exact about patron and target.
+      `hunt_contracts_test.gd` proves the debit, refusal, one-use transition
+      and nonlethal exact-target resolution in 15 checks.
 - [ ] **F10.10** `v10` Elites cannot really die, which is why hunting them is work not war
 - [ ] **F10.11** `v10` Hunts run while you are elsewhere
 - [ ] **F10.12** `v10` A hunt can be inherited by somebody who never met you
@@ -5505,8 +5512,13 @@ is where power is, the tree is which way you went.** Two charts, one document.
 ### AR2 — Jobs and contracts
 - [ ] **AR2.1** A real economy with jobs, because the elites cannot die and war is pointless
 - [ ] **AR2.2** Bounty work for the top angels or the top demons
-- [ ] **AR2.3** Targets are whoever is blocking a frequency or an aura — not "bad guys"
-- [ ] **AR2.4** Contracts are consumable and cost something, Chainsaw Man style
+- [x] **AR2.3** Targets are whoever is blocking a frequency or an aura — not
+      "bad guys" — a publisher must name `frequency` or `aura`, an exact
+      existing subject and a non-empty obstruction. `HuntContracts` has no
+      morality field or wanted-level shortcut, and its test explicitly refuses
+      `crime` as a substitute classification.
+- [x] **AR2.4** Contracts are consumable and cost something, Chainsaw Man
+      style — the same one-use body/standing debit proven at F10.9.
 - [ ] **AR2.5** Consumable progress against bosses and big figures
 - [ ] **AR2.6** Work for the bank (AL1) and work for the agency (AK1) are the same market
 
@@ -5522,8 +5534,12 @@ The last rung. Fifteen statements that are true of the tree and the work when th
 - [ ] **AR10.7** `v10` Paths open at chapters, never at levels
 - [ ] **AR10.8** `v10` The economy has jobs because the elites cannot die
 - [ ] **AR10.9** `v10` Bounty work for the top angels or the top demons
-- [ ] **AR10.10** `v10` Targets are whoever blocks a frequency or an aura
-- [ ] **AR10.11** `v10` Contracts are consumable and cost something
+- [x] **AR10.10** `v10` Targets are whoever blocks a frequency or an aura —
+      enforced at contract publication, not left to authored quest wording;
+      see AR2.3 and `hunt_contracts_test.gd`.
+- [x] **AR10.11** `v10` Contracts are consumable and cost something — one
+      successful acceptance spends the existing body/standing ledger, removes
+      the offer and writes one action receipt; see F10.9.
 - [ ] **AR10.12** `v10` Consumable progress against bosses and big figures
 - [ ] **AR10.13** `v10` Bank work and agency work are one market
 - [ ] **AR10.14** `v10` The tree and the pyramid are one document
