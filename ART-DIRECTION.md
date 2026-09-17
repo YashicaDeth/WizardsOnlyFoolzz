@@ -1,5 +1,9 @@
 # CellOutz visual direction
 
+Decision routing now lives in `ART-DIRECTION-MINDMAP.md`: it separates locked
+direction, safe working areas and choices that must return to Greg. This file
+remains the detailed material and interface brief.
+
 **Superseded 2026-09-11.** The original brief called for "a battered toybox version of a roadside combat game" in sun-bleached copper and teal salvage paint. The Bone Yard kit and the scrap skiff were authored to that spec, which is exactly why they read as toys. The direction below replaces it. Existing assets are now provisional and scheduled for regrime.
 
 ## Biopunk apocalyptic

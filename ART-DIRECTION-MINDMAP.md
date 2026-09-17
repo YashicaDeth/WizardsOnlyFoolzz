@@ -441,6 +441,11 @@ like?” and can be answered one at a time.
 7. Which sounds can Greg record or perform personally—voice, breath, handling,
    impacts, room tone, radio fragments—so the sound layer has the same authorial
    ownership as the image layer?
+8. When connected local work makes a holding `ready_for_decision`, what is the
+   visible difference between liberation, bargaining, inheritance, ascent and
+   corruption? The live MAP/INDEX/Board route deliberately preserves the old
+   holder at that threshold, so no provisional colour or victory flourish may
+   choose the recipient or imply a good/evil axis before Greg chooses the act.
 
 Until these are answered, the project should continue improving systems,
 replacement seams, staging, readability, and verified physical behavior rather

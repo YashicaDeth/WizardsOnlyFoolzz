@@ -1,5 +1,10 @@
 # Living design notes
 
+Art-direction decisions are indexed in `ART-DIRECTION-MINDMAP.md`. It is the
+boundary between confirmed visual rules, safe implementation work and choices
+that still require Greg; the detailed material brief remains
+`ART-DIRECTION.md`.
+
 18 September implementation note: the Black Mirror's convenience now has the
 corporate threat promised by the map direction. Once CellOutz has issued its
 repossession order, opening MAP publishes a persisted 96-metre acquisition
