@@ -911,6 +911,7 @@ func _ready() -> void:
 	arsenal.name = "HunterArsenal"
 	player_body.add_child(arsenal)
 	arsenal.configure(player_rig)
+	arsenal.reload_finished.connect(_on_weapon_reload_finished)
 	body_motion = HUNTER_BODY_MOTION.new()
 	body_motion.name = "HunterBodyMotion"
 	player_body.add_child(body_motion)
@@ -3444,6 +3445,18 @@ func _reload_weapon() -> void:
 		body_motion.trigger_reload(duration)
 		# Reloading is visible as a cartridge travelling through the well.
 		prompt.text = ""
+
+
+## AF1.4. Record the completed physical swap, not the key press that requested
+## it. Full magazines, empty reserves and interrupted requests create no act.
+func _on_weapon_reload_finished(weapon_id: String) -> void:
+	var state: Dictionary = arsenal.state()
+	PLAYER_ACTION_LEDGER.record("weapon_reloaded", {
+		"weapon": weapon_id,
+		"loaded": int(state.get("loaded", 0)),
+		"reserve": int(state.get("reserve", 0)),
+		"location": HUNT_LOCATION,
+	})
 
 
 ## O5.7. Something took your balance. Shoves, blocked blows and your own

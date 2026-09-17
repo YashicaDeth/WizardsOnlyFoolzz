@@ -3757,7 +3757,10 @@ travels, hits something and leaves a mark on it.
       visibility all verified) plus a re-run of `magazine_test.gd` and
       `arsenal_test.gd` clean. `tests/held_gear_capture.gd` re-captured for
       both firearms — the new geometry sits where authored, no stray or
-      degenerate shapes.
+      degenerate shapes. Completion now emits one `weapon_reloaded` action
+      receipt carrying the post-swap loaded/reserve counts; refused requests
+      emit nothing because pressing R is not the act. The real Hunt signal seam
+      is protected by `combat_integration_test.gd`.
 - [x] **AF1.5** A magazine dropped half-full is half-full when you pick it up —
       `_finish_reload()` ejects whatever is still loaded as its own discrete
       spare rather than merging it into one reserve number; `tests/magazine_test.gd`

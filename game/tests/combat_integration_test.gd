@@ -103,6 +103,15 @@ func _ready() -> void:
 	var fired_events: Array = WorldHistory.events.filter(func(event: Dictionary): return str(event.get("type", "")) == "weapon_fired")
 	check(not fired_events.is_empty() and not str(((fired_events.back() as Dictionary).get("details", {}) as Dictionary).get("action_id", "")).is_empty(),
 		"the established weapon event carries the trigger pull's stable action id")
+	var reload_receipts_before := PlayerActionLedger.count("weapon_reloaded")
+	hunt.arsenal.cooldown = 0.0
+	hunt._reload_weapon()
+	hunt.arsenal.tick(float(hunt.arsenal.current().reload) + 0.01)
+	check(PlayerActionLedger.count("weapon_reloaded") == reload_receipts_before + 1,
+		"a completed physical reload receives one durable action receipt")
+	var reload_event: Dictionary = WorldHistory.events.filter(func(event: Dictionary): return str(event.get("type", "")) == "weapon_reloaded").back()
+	check(int((reload_event.get("details", {}) as Dictionary).get("loaded", 0)) == int(hunt.arsenal.current().magazine),
+		"the reload receipt records the ammunition state after the magazine arrives")
 
 	# Lock-on: the verb that makes third-person combat aimable at all.
 	hunt.third_person = true
