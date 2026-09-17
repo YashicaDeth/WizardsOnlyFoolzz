@@ -190,10 +190,12 @@ static func record(subject_id: String, entity_id: String, substance_id: String) 
 			already = true
 	if not already:
 		met.append({"id": entity_id, "plane": str(entry.get("plane", "")), "first_through": substance_id})
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(subject_id, {"contacts": met})
 	WorldHistory.record_event("contact_made", {
 		"subject_id": subject_id, "entity_id": entity_id,
 		"substance_id": substance_id, "plane": str(entry.get("plane", "")),
 		"first_time": not already,
 	})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "entity": entry, "first_time": not already}

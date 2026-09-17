@@ -71,6 +71,7 @@ func _ready() -> void:
 	check((WorldHistory.subject("player").get("contacts", []) as Array).size() == 1, "and it is only in the list once")
 	var events := WorldHistory.events.filter(func(e): return str(e.get("type", "")) == "contact_made")
 	check(events.size() == 2, "both meetings are real recorded events even so")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "contact memory and each meeting fact close one derived transaction")
 
 	# --- no entity hands out objectives -------------------------------------
 	for entry in CONTACTS.all():

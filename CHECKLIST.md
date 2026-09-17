@@ -6133,7 +6133,9 @@ is the one that proves it — the Carrier Choir has not noticed you and never
 will, which is what makes autonomy and attention two different things.
 - [x] **AU6.1** A catalogue that survives being drawn — five entities, every
       one with a concrete form, an action, a regard, and what it leaves behind
-      (`systems/contact_entities.gd`, `tests/contact_entities_test.gd`, 40 checks)
+      Contact memory and its public meeting fact persist atomically without
+      falsely adding another player action to the dose that caused it
+      (`systems/contact_entities.gd`, `tests/contact_entities_test.gd`, 80 checks)
 - [x] **AU6.2** Contact is earned, never bought: a weak dose reaches nobody, and
       tolerance closes the door the way it flattens the curve (AU4.5)
 - [x] **AU6.3** Deterministic per subject, substance and dose count, so a save
