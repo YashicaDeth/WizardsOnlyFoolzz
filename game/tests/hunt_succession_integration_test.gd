@@ -59,6 +59,10 @@ func _ready() -> void:
 		"role": "Crown of the Test Claim",
 	})
 	var faction_people_before := faction_people("succession_probe_faction")
+	WorldHistory.amend_subject(str(holder.subject_id), {"status": "hunting"})
+	OffscreenHunts.start(str(holder.subject_id), "player", "ashbloom_bone_yard")
+	WorldClock.pass_time(0.5)
+	OffscreenHunts.advance("rift_derby_quarry")
 	holder.rig.execute()
 	hunt._kill_encounter_actor(hunt.encounter_actors.find(holder), "succession_probe")
 	check(str(WorldHistory.subject(str(holder.subject_id)).get("status", "")) == "dead",
@@ -76,6 +80,14 @@ func _ready() -> void:
 		"succession creates no replacement template or extra faction person")
 	check(WorldHistory.event_count("faction_post_filled") == 1 and (WorldHistory.subject("succession_probe_faction").get("vacant_posts", []) as Array).is_empty(),
 		"promotion closes the persisted vacancy exactly once")
+	check(str(heir.get("status", "")) == "hunting" and str(heir.get("hunt_target", "")) == "player" and str(heir.get("hunt_inherited_from", "")) == str(holder.subject_id),
+		"the promoted person inherits the fallen holder's exact unfinished hunt")
+	check(bool(heir.get("hunt_inherited_without_contact", false)) and not (heir.get("relations", {}) as Dictionary).has("player"),
+		"inheritance needs no prior meeting or relationship with the target")
+	check(int(heir.get("hunt_offscreen_turns", 0)) == 2 and str(WorldHistory.subject(str(holder.subject_id)).get("hunt_inherited_by", "")) == "succession_heir",
+		"the same offscreen search state transfers instead of restarting a new hunt")
+	check(WorldHistory.event_count("hunt_inherited") == 1 and (WorldHistory.subject("player").get("hunted_by", []) as Array).any(func(entry: Dictionary): return str(entry.get("hunter_id", "")) == "succession_heir" and str(entry.get("reason", "")) == "inherited_hunt"),
+		"the stranger's inherited hunt is attributable and enters the player's exact hunter memory")
 
 	print("HUNT_SUCCESSION_INTEGRATION_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

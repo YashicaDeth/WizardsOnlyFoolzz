@@ -5103,7 +5103,7 @@ func _kill_encounter_actor(index: int, cause: String) -> void:
 	if not vacancy.is_empty():
 		# The vacancy is written first and remains a separate historical fact;
 		# succession resolves on the following idle turn from the existing roster.
-		call_deferred("_fill_faction_vacancy", str(WorldHistory.subject(str(actor.subject_id)).get("faction_id", "")), str(vacancy.rank))
+		call_deferred("_fill_faction_vacancy", str(WorldHistory.subject(str(actor.subject_id)).get("faction_id", "")), str(vacancy.rank), str(actor.subject_id))
 	WorldHistory.record_event("loot_dropped", {"subject_id": actor.subject_id, "items": actor.loot, "cause": cause})
 	_spawn_loot_cache(node.global_position, actor.loot)
 	var label := node.get_node_or_null("Identity") as Label3D
@@ -5116,11 +5116,17 @@ func _kill_encounter_actor(index: int, cause: String) -> void:
 	encounter_actors.remove_at(index)
 
 
-func _fill_faction_vacancy(faction_id: String, rank: String) -> void:
+func _fill_faction_vacancy(faction_id: String, rank: String, fallen_id: String = "") -> void:
 	if faction_id.is_empty():
 		return
 	var succession := WireNet.new(WireNet.SIGNAL_SURFACE)
-	succession.promote_successor(faction_id, rank)
+	var promoted := succession.promote_successor(faction_id, rank)
+	if promoted.is_empty() or fallen_id.is_empty():
+		return
+	var successor_id := str(promoted.get("id", ""))
+	var inherited := OFFSCREEN_HUNTS.inherit(fallen_id, successor_id)
+	if bool(inherited.get("ok", false)):
+		HUNT_MEMORY.remember(successor_id, "inherited_hunt", fallen_id)
 
 func _actor_by_id(id: String) -> Dictionary:
 	for actor in encounter_actors:

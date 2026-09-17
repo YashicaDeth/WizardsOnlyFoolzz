@@ -81,9 +81,57 @@ static func advance(current_location: String) -> Array[Dictionary]:
 	return settled
 
 
+## F10.12. Succession can carry an unfinished hunt as well as an office. The
+## successor inherits the exact target, place and accumulated search state;
+## no prior relation or encounter is required. Whether they had ever met is
+## recorded, so an inherited stranger remains distinguishable from a rival who
+## earned the hunt personally.
+static func inherit(fallen_id: String, successor_id: String) -> Dictionary:
+	var fallen := WorldHistory.subject(fallen_id)
+	var successor := WorldHistory.subject(successor_id)
+	var target_id := str(fallen.get("hunt_target", ""))
+	var hunt_location := str(fallen.get("hunt_location", ""))
+	if fallen.is_empty() or successor.is_empty() or target_id.is_empty() or hunt_location.is_empty():
+		return {"ok": false, "reason": "NO UNFINISHED HUNT TO INHERIT"}
+	if str(successor.get("kind", "")) != "person" or LIVE_HUNT_STATUSES.has(str(successor.get("status", ""))):
+		return {"ok": false, "reason": "SUCCESSOR CANNOT INHERIT"}
+	var met_before := _has_met(successor_id, target_id)
+	var updated := WorldHistory.update_subject(successor_id, {
+		"status": "hunting", "hunt_target": target_id,
+		"hunt_location": hunt_location,
+		"hunt_started_minute": WorldClock.minutes(),
+		"hunt_last_minute": WorldClock.minutes(),
+		"hunt_offscreen_turns": int(fallen.get("hunt_offscreen_turns", 0)),
+		"hunt_phase": str(fallen.get("hunt_phase", "present")),
+		"hunt_inherited_from": fallen_id,
+		"hunt_inherited_without_contact": not met_before,
+	}, "hunt_inherited")
+	WorldHistory.amend_subject(fallen_id, {"hunt_inherited_by": successor_id})
+	updated["ok"] = true
+	return updated
+
+
 static func _phase(turns: int) -> String:
 	if turns >= 6:
 		return "waiting"
 	if turns >= 3:
 		return "closing"
 	return "searching"
+
+
+static func _has_met(subject_id: String, target_id: String) -> bool:
+	var relations: Dictionary = WorldHistory.subject(subject_id).get("relations", {})
+	if relations.has(target_id):
+		return true
+	for event in WorldHistory.events:
+		var details: Dictionary = event.get("details", {}) as Dictionary
+		var names_subject := false
+		var names_target := false
+		for key in details:
+			if str(details[key]) == subject_id:
+				names_subject = true
+			if str(details[key]) == target_id:
+				names_target = true
+		if names_subject and names_target:
+			return true
+	return false

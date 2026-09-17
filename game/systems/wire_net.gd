@@ -447,7 +447,12 @@ func promote_successor(faction_id: String, rank: String = "") -> Dictionary:
 		"debt_leverage": successor.debt_leverage, "wealth": successor.wealth,
 	})
 	rebuild()
-	return WorldHistory.subject(subject_id)
+	var promoted := WorldHistory.subject(subject_id)
+	# The caller already receives the promoted subject; include its stable id so
+	# consequences of succession (an inherited hunt, debt, command) can attach
+	# to the real person without re-deriving who won the post from rank labels.
+	promoted["id"] = subject_id
+	return promoted
 
 
 func _best_successor(faction_id: String, excluded_id: String) -> Dictionary:

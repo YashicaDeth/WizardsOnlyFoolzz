@@ -1160,7 +1160,15 @@ The last rung. Fifteen statements that are true of the hunt when this game is fi
       Underground Colosseum production clock call the route directly; returning
       to the Hunt reports how many turns the captain kept working. Proven in
       `offscreen_hunts_test.gd` (10 checks, including the production derby seam).
-- [ ] **F10.12** `v10` A hunt can be inherited by somebody who never met you
+- [x] **F10.12** `v10` A hunt can be inherited by somebody who never met you —
+      a hunter's ordinary anatomical death opens the existing faction vacancy;
+      once `WireNet` promotes its real socially strongest successor,
+      `OffscreenHunts.inherit()` transfers the exact target, place, phase and
+      elapsed search turns. Prior contact is neither invented nor required:
+      the inherited record explicitly says whether they had met, and the new
+      stranger enters the player's exact `hunted_by` memory. The production
+      succession test proves this full chain through a dead live actor and an
+      heir with no player relation or shared event (10/10 checks).
 - [ ] **F10.13** `v10` Nothing in a hunt is scripted to find you
 - [ ] **F10.14** `v10` The godhead is the last hunter and it does not need to look for you
 - [x] **F10.15** `v10` Who hunted you is the thing the next universe knows —
