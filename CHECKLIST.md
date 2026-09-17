@@ -1083,7 +1083,8 @@ The last rung. Fifteen statements that are true of the hunt when this game is fi
       `RivalRegistry.consider()` requires both attributed harm and survival on
       an existing person; a boss label without lived history and an untouched
       escape both fail. `rival_registry_test.gd` proves emergence preserves
-      population size and cites the exact originating event.
+      population size, cites the exact originating event, and commits the
+      rival mutation with its one-time emergence fact as one transaction.
 - [x] **F10.2** `v10` Their body remembers the specific damage you did — the
       adaptation is derived from the same persisted anatomy snapshot that
       movement, combat and INDEX read: severed zone, ruptured organ, or the

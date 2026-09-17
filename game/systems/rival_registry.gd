@@ -32,6 +32,9 @@ static func consider(subject_id: String) -> Dictionary:
 	var latest: Dictionary = harm[harm.size() - 1]
 	var adaptation := adaptation_from_anatomy(subject)
 	var already := bool(subject.get("is_rival", false))
+	# The conclusion and its first public fact are indivisible. Reconsidering an
+	# existing rival still uses the same safe mutation path without a new fact.
+	WorldHistory.begin_ledger_batch()
 	var updated := WorldHistory.amend_subject(subject_id, {
 		"is_rival": true,
 		"rival_origin": str(origin.get("id", "")),
@@ -43,6 +46,7 @@ static func consider(subject_id: String) -> Dictionary:
 	})
 	if not already:
 		WorldHistory.record_event("rival_emerged", {"subject_id": subject_id, "origin_event": updated.rival_origin, "origin_type": updated.rival_origin_type, "adaptation": adaptation.duplicate(true)})
+	WorldHistory.commit_ledger_batch()
 	return updated
 
 

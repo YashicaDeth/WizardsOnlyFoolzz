@@ -27,6 +27,7 @@ func _ready() -> void:
 	check(WorldHistory.event_count("rival_emerged") == 1, "emergence is a fact in world history")
 	RivalRegistry.consider("road_knife")
 	check(WorldHistory.event_count("rival_emerged") == 1, "reconsidering an existing rival does not invent a second origin")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "rival state and its one-time emergence fact close one world transaction")
 	WorldHistory.register_subject("untouched", {"name": "Untouched", "kind": "person", "status": "escaped"})
 	check(RivalRegistry.consider("untouched").is_empty(), "escape alone does not author a rival")
 	check(RivalRegistry.consider("written_boss").is_empty(), "an authored label without lived history is not enough")
