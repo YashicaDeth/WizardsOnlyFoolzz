@@ -45,11 +45,28 @@ func _ready() -> void:
 		"blood": 0.62, "stamina": 18.0, "pain": 12.0, "consciousness": 90.0,
 		"smoking": true, "lung_fill": 0.72, "lung_cough": 0.8,
 		"lung_health": float(harsh.health), "lung_stain": float(harsh.stain),
-		"magick_unlocked": false, "magick": 0.9,
+		"magick_unlocked": false, "magick": 0.9, "pulmonary_expanded": true,
 	})
 	check(hud.lung_linger > 0.0 and hud.lung_fill > 0.7, "using the lungs opens a contextual organ X-ray")
 	check(hud.mood_name() == "CHOKING", "the top-right face reports the body's acute emotion")
 	check(not hud.magick_unlocked, "magick has no empty locked bar before it exists")
+	var diagnostic: Dictionary = hud.pulmonary_state()
+	var viewer_state: Dictionary = diagnostic.get("viewer", {})
+	check(bool(diagnostic.get("expanded", false)), "holding the diagnostic input expands the live pulmonary reliquary")
+	check(bool(viewer_state.get("pulmonary", false)) and int(viewer_state.get("pieces", 0)) > 8,
+		"the expansion contains the authored paired 3D lungs rather than a flat duplicate")
+	check(is_equal_approx(float(diagnostic.get("health", 0.0)), float(harsh.health))
+		and is_equal_approx(float(diagnostic.get("stain", 0.0)), float(harsh.stain))
+		and is_equal_approx(float(diagnostic.get("fill", 0.0)), 0.72),
+		"the 3D specimen reports the exact live anatomy and inhaled smoke values")
+	var rotation_before: Vector2 = viewer_state.get("rotation", Vector2.ZERO)
+	hud.rotate_pulmonary(Vector2(24, -11))
+	hud.zoom_pulmonary(1.12)
+	var manipulated: Dictionary = (hud.pulmonary_state().get("viewer", {}) as Dictionary)
+	var rotation_after: Vector2 = manipulated.get("rotation", Vector2.ZERO)
+	check(rotation_after != rotation_before
+		and float(manipulated.get("zoom", 1.0)) > 1.0,
+		"mouse movement rotates and the wheel zooms the held specimen")
 	hud.set_state({"lung_cough": 0.0, "smoking": false, "stamina": 12.0, "magick_unlocked": true, "magick": 0.45})
 	check(hud.mood_name() == "WINDED", "the portrait changes with the next strongest live body state")
 	check(hud.magick_unlocked and is_equal_approx(hud.magick, 0.45), "working a ritual reveals the magick fluid reservoir")

@@ -304,6 +304,17 @@ func _ready() -> void:
 	check(rows.any(func(row): return row[0] == "HOLD RMB"), "and teaches that drawing is a hold")
 	check(rows.any(func(row): return row[0] == "LMB EXHALE"), "and teaches the optional smoke control")
 	check(rows.any(func(row): return row[0] == "HOLD I"), "and teaches the universal held-object inspection")
+	check(rows.any(func(row): return row[0] == "HOLD V"), "and teaches the held 3D lung diagnostic")
+	var pulmonary_press := InputEventKey.new()
+	pulmonary_press.keycode = KEY_V
+	pulmonary_press.pressed = true
+	hunt.call("_unhandled_input", pulmonary_press)
+	check(bool(hunt.get("pulmonary_held")), "holding V outside a grapple raises the pulmonary reliquary")
+	var pulmonary_release := InputEventKey.new()
+	pulmonary_release.keycode = KEY_V
+	pulmonary_release.pressed = false
+	hunt.call("_unhandled_input", pulmonary_release)
+	check(not bool(hunt.get("pulmonary_held")), "releasing V lowers it without leaving a modal screen")
 
 	_report()
 

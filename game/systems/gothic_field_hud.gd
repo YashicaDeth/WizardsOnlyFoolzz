@@ -1,6 +1,7 @@
 extends Control
 
 const CellOutzType := preload("res://systems/celloutz_type.gd")
+const PULMONARY_DIAGNOSTIC := preload("res://systems/pulmonary_diagnostic.gd")
 
 const BONE := Color("ead4ad")
 const BLOOD := Color("a81716")
@@ -61,10 +62,14 @@ var location_announce := 0.0
 ## Dormant rather than deleted: a future authored transition can deliberately
 ## call the arrival crest back, but ordinary field play leaves the top clear.
 var location_crest_enabled := false
+var pulmonary_diagnostic: Control
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pulmonary_diagnostic = PULMONARY_DIAGNOSTIC.new()
+	pulmonary_diagnostic.name = "PulmonaryDiagnostic"
+	add_child(pulmonary_diagnostic)
 
 
 ## The space between a key and the verb it performs. `draw_condensed` returns
@@ -145,6 +150,22 @@ func set_state(values: Dictionary) -> void:
 	near_something = bool(values.get("near_something", near_something))
 	interact_verb = str(values.get("interact_verb", interact_verb))
 	lock_screen = values.get("lock_screen", lock_screen)
+	if pulmonary_diagnostic != null:
+		pulmonary_diagnostic.set_state(values)
+
+
+func rotate_pulmonary(relative: Vector2) -> void:
+	if pulmonary_diagnostic != null:
+		pulmonary_diagnostic.rotate_by(relative)
+
+
+func zoom_pulmonary(factor: float) -> void:
+	if pulmonary_diagnostic != null:
+		pulmonary_diagnostic.zoom_by(factor)
+
+
+func pulmonary_state() -> Dictionary:
+	return pulmonary_diagnostic.diagnostic_state() if pulmonary_diagnostic != null else {}
 
 
 func _process(delta: float) -> void:

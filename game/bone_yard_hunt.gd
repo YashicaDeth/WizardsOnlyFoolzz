@@ -680,6 +680,9 @@ var smoke_last_exhale: Dictionary = {}
 ## slow, close reading. This is a pose rather than a separate inventory screen:
 ## the object, its wear and the hands holding it remain in the live world.
 var inspect_held := false
+## Hold V outside a grapple to pull the same live lungs shown by the contextual
+## X-ray into a rotatable 3D field specimen. V remains persuade inside clinches.
+var pulmonary_held := false
 var inspect_blend := 0.0
 var inspect_time := 0.0
 var inspection_light: OmniLight3D
@@ -1258,6 +1261,21 @@ func _register_people() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if resolution_ui.visible or kill_cam.active:
 		return
+	if event is InputEventKey and event.keycode == KEY_V and not event.echo:
+		if event.pressed and grapple_target.is_empty() and panel_mode.is_empty():
+			pulmonary_held = true
+			prompt.text = "PULMONARY RELIQUARY // MOVE MOUSE / WHEEL // RELEASE V"
+		elif not event.pressed:
+			pulmonary_held = false
+	if _pulmonary_diagnostic_active() and event is InputEventMouseButton:
+		if event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			field_interface.zoom_pulmonary(1.12)
+			return
+		if event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			field_interface.zoom_pulmonary(0.89)
+			return
+		if event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+			return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		if event.pressed:
@@ -1399,7 +1417,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_Q: _use_prosthetic_surge()
 			KEY_K: _deliberate_redecant()
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		apply_look(Vector2(event.relative.x * 0.0026, event.relative.y * 0.0024))
+		if _pulmonary_diagnostic_active():
+			field_interface.rotate_pulmonary(event.relative)
+		else:
+			apply_look(Vector2(event.relative.x * 0.0026, event.relative.y * 0.0024))
+
+
+func _pulmonary_diagnostic_active() -> bool:
+	return pulmonary_held and grapple_target.is_empty() and panel_mode.is_empty() and not resolution_ui.visible
 
 
 ## The captain's name, upper case, read off the record rather than written
@@ -5666,7 +5691,7 @@ func _build_keys_card() -> void:
 			["E", "INTERACT"],
 			["HOLD I", "INSPECT HELD OBJECT"],
 			["C", "GRAPPLE"],
-			["V", "PERSUADE"],
+			["HOLD V", "LUNG RELIQUARY / CLINCH: PERSUADE"],
 			["X", "THREATEN"],
 			["H", "EXTRACTION"],
 			["N", "PHOTOGRAPH"],
@@ -5842,6 +5867,7 @@ func _update_hud() -> void:
 			"lung_cough": smoke_cough,
 			"lung_health": float(lung_state.get("health", 1.0)),
 			"lung_stain": float(lung_state.get("stain", 0.0)),
+			"pulmonary_expanded": _pulmonary_diagnostic_active(),
 			"magick_unlocked": WorldHistory.event_count("ritual_completed") > 0,
 			"magick": WorldHistory.chaos_magick(),
 			"world_stamp": "%s // %s" % [WorldClock.calendar_stamp(), WorldClock.stamp()],
