@@ -27,6 +27,8 @@ extends RefCounted
 ## already tied to a real faction — never a rite invented with no seal
 ## standing behind it.
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 const RITUALS := {
 	"rite_of_bael": {
 		"seal": "Bael", "label": "The First Rite",
@@ -126,14 +128,21 @@ static func attempt(ritual_id: String, photo: Dictionary, subject_id: String = "
 		return {"ok": false, "reason": "THE PHOTOGRAPH DOES NOT SHOW WHAT THE RITE ASKS FOR"}
 	var taken := int((subject.get("boon_history", {}) as Dictionary).get(ritual_id, 0))
 	var outcome := _decide_outcome(ritual_id, subject_id, taken)
+	WorldHistory.begin_ledger_batch()
 	var granted := Boons.grant(
 		subject_id, ritual_id, str(rite.stat), float(rite.magnitude), float(rite.duration),
 		str(rite.cost_kind), float(rite.cost_amount), str(rite.get("cost_target", "")),
 	)
 	if not bool(granted.get("ok", false)):
+		WorldHistory.commit_ledger_batch()
 		return granted
-	WorldHistory.record_event("ritual_completed", {"subject_id": subject_id, "ritual_id": ritual_id, "seal": str(rite.seal), "outcome": outcome})
+	var details := {"subject_id": subject_id, "ritual_id": ritual_id, "seal": str(rite.seal), "outcome": outcome}
+	if subject_id == "player":
+		PLAYER_ACTION_LEDGER.record("ritual_completed", details)
+	else:
+		WorldHistory.record_event("ritual_completed", details)
 	if outcome == "burn":
 		burnt.append(ritual_id)
 		WorldHistory.update_subject(subject_id, {"burnt_rituals": burnt}, "seal_burnt")
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "ritual_id": ritual_id, "seal": str(rite.seal), "cost_paid": granted.cost_paid, "outcome": outcome}

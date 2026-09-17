@@ -40,6 +40,7 @@ func _ready() -> void:
 
 	var events := WorldHistory.events.filter(func(e): return str(e.get("type", "")) == "ritual_completed")
 	check(not events.is_empty(), "a completed rite is a real recorded event")
+	check(PlayerActionLedger.count("ritual_completed") == 1 and str((events[0].get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_") and int(WorldHistory.get("_ledger_batch_depth")) == 0, "body cost, boon and completion share one closed player-action transaction")
 
 	# --- gored_heads specifically requires a head/brain hit on a dead subject
 	var wrong_zone := {"contents": [

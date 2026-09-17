@@ -51,9 +51,12 @@ func _ready() -> void:
 	var entry: Dictionary = (ledger.get("rituals", {}) as Dictionary).get("five_gored_heads", {}) as Dictionary
 	check(str(entry.get("photo_id", "")) == "proof_crowns" and entry.has("photo"), "the completed record keeps the evidence even if the album rolls over")
 	check(WorldHistory.event_count("ritual_completed") == 1, "completion is one recorded world event")
+	var cast := RITUAL_LEDGER.cast("five_gored_heads")
+	check(bool(cast.get("ok", false)) and int(cast.get("cast", 0)) == 1, "filed evidence reaches the real body-paid casting route")
+	check(PlayerActionLedger.count("ritual_completed") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "the cast count, boon and body payment close as one identified transaction")
 
 	RITUAL_LEDGER.submit_photo(proof)
-	check(WorldHistory.event_count("ritual_completed") == 1, "resubmitting proof cannot complete the same rite twice")
+	check(WorldHistory.event_count("ritual_completed") == 2, "resubmitting proof cannot add another evidence-completion event")
 
 	# A frame held before rituals are checked still counts when the ledger is
 	# reconciled from the persistent camera album.
