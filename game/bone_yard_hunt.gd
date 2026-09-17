@@ -4018,7 +4018,7 @@ func _try_sleep_at_site() -> bool:
 	var before := WorldClock.minutes()
 	WorldClock.set_hour(SLEEP_WAKE_HOUR)
 	var passed := (WorldClock.minutes() - before) / WorldClock.MINUTES_PER_HOUR
-	WorldHistory.record_event("player_slept", {
+	PLAYER_ACTION_LEDGER.record("player_slept", {
 		"location": HUNT_LOCATION,
 		"hours": passed,
 		"woke_at": WorldClock.stamp(),

@@ -1590,10 +1590,11 @@ The last rung. Fifteen statements that are true of somewhere of your own when th
       one persisted `WorldClock` forward to the next dawn, immediately updates
       the world's light, and records the exact elapsed hours, waking stamp and
       calendar date as `player_slept`; it does not run a second timer or silently
-      edit the sky. A living hostile within 18 metres refuses the action without
-      moving time. `tests/sleep_site_test.gd` proves the physical site, reach,
-      forward clock movement, ledger receipt, distance gate and danger refusal
-      (7 checks); `world_clock_test` remains green. The live dusk encounter and
+      edit the sky. The completed rest now receives one durable action-ledger
+      receipt; a living hostile within 18 metres refuses the action without
+      moving time or counterfeiting another receipt. `tests/sleep_site_test.gd`
+      proves the physical site, reach, forward clock movement, ledger receipt,
+      distance gate and danger refusal (9 checks); `world_clock_test` remains green. The live dusk encounter and
       its prompt were opened at `captures/h10_8_sleep_site.png`.
 - [ ] **H10.9** `v10` What is stored there is really stored, not a menu
 - [ ] **H10.10** `v10` Somebody can be waiting in it when you come back
@@ -3108,17 +3109,36 @@ already switches presets by place; nothing switches by time.
 ### W v10 — the final pass
 The last rung. Fifteen statements that are true of weather and the hour when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
 - [ ] **W10.1** `v10` One clock, wound in one place, read by everything
-- [ ] **W10.2** `v10` Light warps at night rather than dimming
-- [ ] **W10.3** `v10` Storm severity is a readout of how much magick is loose
-- [ ] **W10.4** `v10` Anvil crawlers, and red lightning that means something
-- [ ] **W10.5** `v10` Contamination has weather that moves and settles
-- [ ] **W10.6** `v10` Being caught out in it costs something
-- [ ] **W10.7** `v10` Factions keep hours and the Wire is busier at some
-- [ ] **W10.8** `v10` Stations keep schedules
+- [x] **W10.2** `v10` Light warps at night rather than dimming — A3.2's real
+      per-light warp shells answer the shared daylight curve; the handheld's
+      carried spot uses the same system through its own cone measure.
+- [x] **W10.3** `v10` Storm severity is a readout of how much magick is loose —
+      `StormWeather.severity()` is a pure read of decaying
+      `WorldHistory.chaos_magick()` and drives rain, strikes and exposure.
+- [x] **W10.4** `v10` Anvil crawlers, and red lightning that means something —
+      the horizon crawler, real flash light and thunder are one strike; red is
+      possible only above 0.7 severity and becomes less rare toward the maximum.
+- [x] **W10.5** `v10` Contamination has weather that moves and settles — W1.2's
+      motes, fog and slow watermark relief are the live implementation.
+- [x] **W10.6** `v10` Being caught out in it costs something — W1.3/B7.1 dose
+      the real body through garment protection, while severe magick weather
+      also drains stamina through the same storm severity.
+- [x] **W10.7** `v10` Factions keep hours and the Wire is busier at some — W1.4
+      now drives account presence, active voices, reply volume, live-report
+      density and the visible traffic register from faction windows on the one
+      WorldClock (`wire_hours_test`, 10 checks).
+- [x] **W10.8** `v10` Stations keep schedules — A9.7 and `world_clock_test`
+      prove always-on numbers, the daytime pit channel and the 03:00 preacher
+      against the same hour used by the sky and factions.
 - [ ] **W10.9** `v10` Hauntings happen at night and are not permanent
-- [ ] **W10.10** `v10` The gods are visible at their hours
+- [x] **W10.10** `v10` The gods are visible at their hours — A7.1 places all
+      nine bodies on authored windows read directly from `WorldClock.hour()`;
+      the same body's once-per-day sighting enters history under A7.2.
 - [ ] **W10.11** `v10` A month passes and things repair
-- [ ] **W10.12** `v10` Sleeping moves the clock and something can wake you
+- [x] **W10.12** `v10` Sleeping moves the clock and something can wake you —
+      H10.8's physical bedroll advances to 07:00 through WorldClock, while a
+      living hostile inside 18 metres refuses it without time or receipt moving
+      (`sleep_site_test`, 9 checks).
 - [ ] **W10.13** `v10` Weather is audible before it is visible
 - [ ] **W10.14** `v10` Nothing in the game keeps a second clock
 - [ ] **W10.15** `v10` The hour is legible without a clock on screen

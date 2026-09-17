@@ -1,5 +1,7 @@
 extends Node
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 ## H10.8. Sleeping is a reachable Hunt action, advances the one persistent
 ## clock to dawn, records the elapsed time, and refuses nearby danger.
 
@@ -36,6 +38,8 @@ func _ready() -> void:
 	check(absf(WorldClock.hour() - hunt.SLEEP_WAKE_HOUR) < 0.01 and WorldClock.minutes() > before, "sleep advances forward to 07:00")
 	var event := WorldHistory.recent_events(1)[0]
 	check(str(event.get("type", "")) == "player_slept" and float((event.details as Dictionary).get("hours", 0.0)) > 0.0, "the sleep and its real elapsed hours enter world history")
+	check(str((event.details as Dictionary).get("action_id", "")).begins_with("action_") and PLAYER_ACTION_LEDGER.count("player_slept") == 1,
+		"the complete rest receives one durable player-action receipt")
 
 	hunt.player = hunt.sleep_site.global_position + Vector3(10, 0, 0)
 	check(not hunt._try_sleep_at_site(), "the bedroll cannot be used at a distance")
@@ -45,6 +49,7 @@ func _ready() -> void:
 	hunt.enemy.global_position = hunt.player + Vector3(2, 0, 0)
 	before = WorldClock.minutes()
 	check(hunt._try_sleep_at_site() and is_equal_approx(WorldClock.minutes(), before), "a nearby hunter refuses sleep without moving the clock")
+	check(PLAYER_ACTION_LEDGER.count("player_slept") == 1, "refused rest cannot counterfeit another sleep receipt")
 
 	print("SLEEP_SITE_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
