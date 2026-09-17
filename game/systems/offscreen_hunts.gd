@@ -96,6 +96,7 @@ static func inherit(fallen_id: String, successor_id: String) -> Dictionary:
 	if str(successor.get("kind", "")) != "person" or LIVE_HUNT_STATUSES.has(str(successor.get("status", ""))):
 		return {"ok": false, "reason": "SUCCESSOR CANNOT INHERIT"}
 	var met_before := _has_met(successor_id, target_id)
+	WorldHistory.begin_ledger_batch()
 	var updated := WorldHistory.update_subject(successor_id, {
 		"status": "hunting", "hunt_target": target_id,
 		"hunt_location": hunt_location,
@@ -107,6 +108,7 @@ static func inherit(fallen_id: String, successor_id: String) -> Dictionary:
 		"hunt_inherited_without_contact": not met_before,
 	}, "hunt_inherited")
 	WorldHistory.amend_subject(fallen_id, {"hunt_inherited_by": successor_id})
+	WorldHistory.commit_ledger_batch()
 	updated["ok"] = true
 	return updated
 

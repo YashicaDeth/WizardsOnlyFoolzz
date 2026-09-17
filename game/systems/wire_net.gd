@@ -410,8 +410,10 @@ func open_vacancy(subject_id: String) -> Dictionary:
 			return existing
 	var vacancy := {"rank": rank, "former": subject_id, "opened_sequence": WorldHistory.next_sequence}
 	vacancies.append(vacancy)
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(faction_id, {"vacant_posts": vacancies})
 	WorldHistory.record_event("faction_post_vacated", {"faction_id": faction_id, "rank": rank, "former": subject_id})
+	WorldHistory.commit_ledger_batch()
 	return vacancy
 
 
@@ -434,6 +436,7 @@ func promote_successor(faction_id: String, rank: String = "") -> Dictionary:
 		return {}
 	var subject_id := str(successor.id)
 	var subject := WorldHistory.subject(subject_id)
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.update_subject(subject_id, {
 		"faction_rank": str(vacancy.rank),
 		"previous_role": str(subject.get("role", "unindexed")),
@@ -447,6 +450,7 @@ func promote_successor(faction_id: String, rank: String = "") -> Dictionary:
 		"debt_leverage": successor.debt_leverage, "wealth": successor.wealth,
 	})
 	rebuild()
+	WorldHistory.commit_ledger_batch()
 	var promoted := WorldHistory.subject(subject_id)
 	# The caller already receives the promoted subject; include its stable id so
 	# consequences of succession (an inherited hunt, debt, command) can attach

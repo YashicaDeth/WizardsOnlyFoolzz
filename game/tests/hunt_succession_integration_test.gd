@@ -88,6 +88,8 @@ func _ready() -> void:
 		"the same offscreen search state transfers instead of restarting a new hunt")
 	check(WorldHistory.event_count("hunt_inherited") == 1 and (WorldHistory.subject("player").get("hunted_by", []) as Array).any(func(entry: Dictionary): return str(entry.get("hunter_id", "")) == "succession_heir" and str(entry.get("reason", "")) == "inherited_hunt"),
 		"the stranger's inherited hunt is attributable and enters the player's exact hunter memory")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"promotion, hunt transfer and player memory close as one deferred succession transaction")
 
 	print("HUNT_SUCCESSION_INTEGRATION_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

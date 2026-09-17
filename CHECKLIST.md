@@ -1116,6 +1116,9 @@ The last rung. Fifteen statements that are true of the hunt when this game is fi
       wealth rather than ELO. `wire_test.gd` proves the ranking rule;
       `hunt_succession_integration_test.gd` proves the real anatomical Hunt
       death opens and fills that post exactly once without generating anybody.
+      Vacancy and promotion are nested-safe on their own; the production idle
+      turn commits promotion, exact hunt transfer and retained player memory as
+      one succession transaction (11 integration checks).
 - [x] **F10.6** `v10` Being hunted is the same system pointed at you — local law
       commissions named people through `_spawn_encounter_actor()`, so its
       hunters use ordinary anatomy, perception, pathfinding, wounds, loot,

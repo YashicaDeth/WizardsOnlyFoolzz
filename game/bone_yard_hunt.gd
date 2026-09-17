@@ -5120,13 +5120,18 @@ func _fill_faction_vacancy(faction_id: String, rank: String, fallen_id: String =
 	if faction_id.is_empty():
 		return
 	var succession := WireNet.new(WireNet.SIGNAL_SURFACE)
+	# Promotion, exact hunt transfer and the player's retained hunter memory are
+	# one deferred world turn. The subsystem batches remain nested beneath it.
+	WorldHistory.begin_ledger_batch()
 	var promoted := succession.promote_successor(faction_id, rank)
 	if promoted.is_empty() or fallen_id.is_empty():
+		WorldHistory.commit_ledger_batch()
 		return
 	var successor_id := str(promoted.get("id", ""))
 	var inherited := OFFSCREEN_HUNTS.inherit(fallen_id, successor_id)
 	if bool(inherited.get("ok", false)):
 		HUNT_MEMORY.remember(successor_id, "inherited_hunt", fallen_id)
+	WorldHistory.commit_ledger_batch()
 
 func _actor_by_id(id: String) -> Dictionary:
 	for actor in encounter_actors:
