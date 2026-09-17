@@ -76,7 +76,11 @@ its local claim `disrupted`; both make it `ready_for_decision` and write that
 threshold once. INDEX, MAP and the place's pinned Board card expose the same
 state. Crucially, this does not change `held_by`: clearing two objectives earns
 the later land act, but cannot silently choose ascent, corruption or a
-recipient for the player.
+recipient for the player. Accepting and resolving that local work now travels
+through the same compact player-action ledger as smoking, coughing and held-item
+inspection. Existing territory event names remain available to current readers,
+while one action id and one outer persistence transaction bind the job mutation,
+the receipt and the resulting place-state change together.
 District, objective and moving-contact labels now negotiate one shared set of
 chart-space registers as they draw. They try positions around their actual mark,
 fall back to the least-overlapping position when the area is genuinely dense,

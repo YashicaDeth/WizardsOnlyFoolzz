@@ -8,6 +8,7 @@ extends RefCounted
 
 const SUBJECT := "ashbloom_holdings"
 const REGION_SIZE := Vector2(470, 370)
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 const DEFINITIONS := [
 	{"id": "black_mile_yards", "record": "ashbloom:black_mile_yards", "at": Vector2(-150, -122), "name": "BLACK MILE YARDS", "note": "raider highway, tolls", "held_by": "black_mile"},
@@ -210,13 +211,17 @@ static func accept_work(job_id: String) -> Dictionary:
 	if str(job.get("status", "")) != "offered":
 		return job
 	var accepted_at := WorldClock.long_stamp()
+	# One player decision touches the contract, history and compact receipt.
+	# Keep every existing event name, but flush the complete act once.
+	WorldHistory.begin_ledger_batch()
 	job = WorldHistory.update_subject(job_id, {
 		"status": "active", "accepted_at": accepted_at,
 	}, "holding_work_accepted")
-	WorldHistory.record_event("holding_work_started", {
+	PLAYER_ACTION_LEDGER.record("holding_work_started", {
 		"subject_id": job_id, "place_id": str(job.get("place_id", "")),
 		"holding_id": str(job.get("holding_id", "")), "work_type": str(job.get("work_type", "")),
 	})
+	WorldHistory.commit_ledger_batch()
 	return job
 
 
@@ -225,15 +230,19 @@ static func complete_work(job_id: String, evidence: Dictionary = {}) -> Dictiona
 	if str(job.get("status", "")) != "active":
 		return job
 	var completed_at := WorldClock.long_stamp()
+	# Completion may also update the place and open its land decision. All of
+	# those facts belong to this one physical resolution and persist together.
+	WorldHistory.begin_ledger_batch()
 	job = WorldHistory.update_subject(job_id, {
 		"status": "completed", "progress": int(job.get("required", 1)),
 		"completed_at": completed_at, "evidence": evidence.duplicate(true),
 	}, "holding_work_completed")
-	WorldHistory.record_event("holding_work_resolved", {
+	PLAYER_ACTION_LEDGER.record("holding_work_resolved", {
 		"subject_id": job_id, "place_id": str(job.get("place_id", "")),
 		"holding_id": str(job.get("holding_id", "")), "work_type": str(job.get("work_type", "")),
 	})
 	_refresh_local_work(str(job.get("place_id", "")))
+	WorldHistory.commit_ledger_batch()
 	return job
 
 

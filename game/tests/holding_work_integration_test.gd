@@ -2,6 +2,7 @@ extends Node
 
 const HOLDINGS := preload("res://systems/ashbloom_holdings.gd")
 const INDEX := preload("res://systems/world_index.gd")
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 var failures: Array[String] = []
 
@@ -53,6 +54,11 @@ func _ready() -> void:
 		"taking dossier work creates one saved active contract rather than a map toggle")
 	index._follow_link(raid_link)
 	check(WorldHistory.event_count("holding_work_started") == 1, "an accepted order cannot be consumed or duplicated twice")
+	var start_events := WorldHistory.recent_events(8).filter(func(event: Dictionary): return str(event.get("type", "")) == "holding_work_started")
+	check(start_events.size() == 1 and str((start_events[0] as Dictionary).get("details", {}).get("action_id", "")).begins_with("action_"),
+		"acceptance receives one durable player-action receipt")
+	check(PLAYER_ACTION_LEDGER.count("holding_work_started") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"acceptance leaves one summarized act and closes its persistence batch")
 
 	var hunt = load("res://bone_yard_hunt.tscn").instantiate()
 	add_child(hunt)
@@ -102,6 +108,11 @@ func _ready() -> void:
 		hunt._interact()
 	check(str(WorldHistory.subject(collection_id).get("status", "")) == "completed" and WorldHistory.event_count("holding_work_resolved") == 2,
 		"physically collecting the cache completes the recovery through the ordinary loot interaction")
+	var resolution_events := WorldHistory.recent_events(24).filter(func(event: Dictionary): return str(event.get("type", "")) == "holding_work_resolved")
+	check(resolution_events.size() == 2 and resolution_events.all(func(event: Dictionary): return str(event.get("details", {}).get("action_id", "")).begins_with("action_")),
+		"both physical resolutions travel through the same durable action route")
+	check(PLAYER_ACTION_LEDGER.count("holding_work_resolved") == 2 and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"resolved work is summarized without leaving a nested batch open")
 	check(int(WorldHistory.subject(str(bone.record)).get("local_work_completed", 0)) == 2 and str(WorldHistory.subject(str(bone.record)).get("local_work_state", "")) == "ready_for_decision" and WorldHistory.event_count("holding_claim_disrupted") == 1,
 		"both connected jobs open one persistent land decision without choosing its recipient")
 	hunt.pin_board.pin(str(bone.record), "record")
