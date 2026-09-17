@@ -37,6 +37,7 @@ extends RefCounted
 ## in here to let creditors collect, and nothing here calls back.
 
 const Ledger := preload("res://systems/boons.gd")
+const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
 
 # --- AV3.2. What a trip is worth ---------------------------------------------
 ## A relationship accumulates out of acts already recorded by other systems —
@@ -478,12 +479,19 @@ static func owe(plane_id: String, subject_id: String, kind: String, amount: floa
 		"for_what": for_what, "incurred_sequence": WorldHistory.next_sequence,
 	}
 	relations[subject_id] = edge
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(plane_id, {"relations": relations})
-	WorldHistory.record_event("plane_debt_incurred", {
+	var details := {
+		"actor": subject_id,
 		"plane_id": plane_id, "subject_id": subject_id, "amount": amount,
 		"kind": kind, "for_what": for_what,
-	})
+	}
+	if subject_id == "player":
+		PlayerActionLedger.record("plane_debt_incurred", details)
+	else:
+		WorldHistory.record_event("plane_debt_incurred", details)
 	remember(plane_id, subject_id)
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "owed": carried + amount}
 
 
@@ -501,6 +509,7 @@ static func collect(plane_id: String, subject_id: String) -> Dictionary:
 		return {"ok": true, "collected": 0.0}
 	var amount := float(owing.get("amount", 0.0))
 	var kind := str(owing.get("kind", ""))
+	WorldHistory.begin_ledger_batch()
 	var payment := Ledger.pay(subject_id, kind, amount, str(owing.get("target", "")))
 	if bool(payment.get("ok", false)):
 		_write_debt(plane_id, subject_id, {})
@@ -508,6 +517,7 @@ static func collect(plane_id: String, subject_id: String) -> Dictionary:
 			"plane_id": plane_id, "subject_id": subject_id, "amount": amount, "kind": kind,
 		})
 		remember(plane_id, subject_id)
+		WorldHistory.commit_ledger_batch()
 		return {"ok": true, "collected": amount, "kind": kind}
 	var grown := amount * DEFAULT_INTEREST
 	var next: Dictionary = owing.duplicate(true)
@@ -518,6 +528,7 @@ static func collect(plane_id: String, subject_id: String) -> Dictionary:
 		"kind": kind, "now_owed": grown, "reason": str(payment.get("reason", "")),
 	})
 	remember(plane_id, subject_id)
+	WorldHistory.commit_ledger_batch()
 	return {"ok": false, "reason": str(payment.get("reason", "")), "now_owed": grown, "defaulted": true}
 
 
@@ -527,6 +538,7 @@ static func collect(plane_id: String, subject_id: String) -> Dictionary:
 ## dodging the one you cannot.
 static func collect_due(subject_id: String) -> Array:
 	var results: Array = []
+	WorldHistory.begin_ledger_batch()
 	for plane_id in WorldHistory.all_subjects():
 		var id := str(plane_id)
 		if str(WorldHistory.subject(id).get("kind", "")) != "plane":
@@ -536,6 +548,7 @@ static func collect_due(subject_id: String) -> Array:
 		var result := collect(id, subject_id)
 		result["plane_id"] = id
 		results.append(result)
+	WorldHistory.commit_ledger_batch()
 	return results
 
 
@@ -605,6 +618,7 @@ static func record_plane_verdicts(victim_id: String, killer_id: String, details:
 	if asked.is_empty():
 		asked = PILLAR.keys()
 	var results: Array = []
+	WorldHistory.begin_ledger_batch()
 	for plane_id in asked:
 		var id := str(plane_id)
 		var result := plane_verdict(id, victim_id, details)
@@ -616,6 +630,7 @@ static func record_plane_verdicts(victim_id: String, killer_id: String, details:
 			"label": str(result.label), "lean": float(result.lean),
 		})
 		remember(id, killer_id)
+	WorldHistory.commit_ledger_batch()
 	return results
 
 

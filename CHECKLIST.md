@@ -6267,8 +6267,8 @@ Greg: *"the higher you have to be to talk or even fight, conjure, evoke etc"*.
 - [x] **AV3.2** ~~A relationship accumulates across trips~~ `PlaneVoices.standing()` reads every petition, departure and collection a subject has ever made with a plane out of `WorldHistory` and returns one number; `trips()` counts them. Nothing is stored — standing is derived, so it cannot drift out of step with the events that caused it, and a plane you have never petitioned is not a zero row, it is simply absent
 - [x] **AV3.3** ~~Voice is distorted and clears with standing — the whole readout, no meter~~ There is no meter anywhere: `clarity()` feeds `distort()`, which corrupts the entity's actual words — dropping vowels to a consonant skeleton first, then whole words to `_lost()` — so how well you stand with a plane is legible only as how much of it you can read. Deterministic per line and per subject, so the same sentence degrades the same way twice rather than shimmering
 - [x] **AV3.4** ~~Mysterious means withholding, never vague~~ `ask()` resolves a real answer from real world state first and *then* decides how much of it you are given. The answer exists underneath whether or not you can see it, which is the whole distinction — `_known()` returns a fact, and standing decides whether the fact arrives, arrives partially, or is refused. Nothing is generated as a plausible-sounding non-answer
-- [x] **AV3.5** ~~They can be owed, and they collect (AR2.4)~~ `owe()` writes a real debt against a plane; `debt()` reads it; `collect()` calls `Boons.pay()` straight out of the body/standing ledger every other cost in this project uses, so being collected from costs the same currency being hurt does. `collect_due()` is the hook for a caller that wants to sweep everything owed at once
-- [x] **AV3.6** ~~They disagree with each other the way the gods do about a kill~~ `plane_verdict()` and `disagreement()` give two planes genuinely different readings of the same event, driven by each plane's own register rather than by a random roll — so the disagreement is *about* something and stays consistent if you ask twice
+- [x] **AV3.5** ~~They can be owed, and they collect (AR2.4)~~ `owe()` writes a real debt against a plane; `debt()` reads it; `collect()` calls `Boons.pay()` straight out of the body/standing ledger every other cost in this project uses, so being collected from costs the same currency being hurt does. `collect_due()` is the hook for a caller that wants to sweep everything owed at once. Player debt acceptance receives one receipt; each collection/default and a whole creditor sweep persist atomically
+- [x] **AV3.6** ~~They disagree with each other the way the gods do about a kill~~ `plane_verdict()` and `disagreement()` give two planes genuinely different readings of the same event, driven by each plane's own register rather than by a random roll — so the disagreement is *about* something and stays consistent if you ask twice. All separate plane verdicts and remembered relationships persist as one response to one death
 - [x] **AV3.7** ~~Demonic and jesterish is the register; the jester is already on the handheld~~ `handheld_readout()` routes plane speech through the same handheld the jester motif already lives on, so the register arrives on the device the player already reads rather than in a new window of its own
 
 ## AW — Commissioning
@@ -6721,7 +6721,7 @@ Greg: *"the higher you have to be to talk or even fight, conjure, evoke etc"*.
       jester is already stamped on, so the register arrives in the place the
       item names rather than as a separate presentation.
 
-      All six verified by `tests/plane_voices_test.gd` — **68 checks, 0
+      All six verified by `tests/plane_voices_test.gd` — **71 checks, 0
       failures**, with `tests/sephiroth_test.gd` (AV1/AV2/AV3.1) re-verified
       clean against the change.
       Honest note on provenance: the agent that wrote this hit a session
