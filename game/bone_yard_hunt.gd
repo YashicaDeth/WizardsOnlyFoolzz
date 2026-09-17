@@ -1212,6 +1212,8 @@ func _player_lost_limb(zone: String) -> void:
 
 
 func _register_people() -> void:
+	# Authored cast schema is one scene bootstrap, not ten independent acts.
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.register_subject("player", {
 		"name": "THE HUNTER", "kind": "person", "role": "Unindexed survivor", "faction": "Unbound",
 		"elo": 1000, "grudge": 0, "status": "awake", "memory": "The derby door opened into Limbo.",
@@ -1275,6 +1277,7 @@ func _register_people() -> void:
 		"anatomy": {"blood_type": "NULL", "cybernetics": ["six-finger surgical crown", "blackbox liver", "remote pulse cage"]},
 		"relations": {"choir_of_marrow": {"kind": "command", "strength": 83}, "" + CAST.id_for(CAPTAIN_SLOT) + "": {"kind": "known", "strength": 26}},
 	})
+	WorldHistory.commit_ledger_batch()
 
 
 func _unhandled_input(event: InputEvent) -> void:

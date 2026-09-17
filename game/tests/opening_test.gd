@@ -39,6 +39,7 @@ func _ready() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	check(hunt.player_body is CharacterBody3D, "hunter uses collision body")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "the Hunt's authored cast seeds in one closed bootstrap batch")
 	var building: Node3D = hunt.generated_world.generated_buildings[0]
 	var floor_shape: BoxShape3D = building.get_child(5).get_child(0).shape
 	var depth := floor_shape.size.z
