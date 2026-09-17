@@ -1061,7 +1061,7 @@ mechanisms and almost none are built.
 ### F5 — Player defeat routed to shackled
 - [x] ~~**F5.1** Losing is not a reload~~
 - [x] ~~**F5.2** Shackled, conscripted or stamped by whoever won~~
-- [x] ~~**F5.3** Deliberate death: forfeit loot, re-decant out of the tar~~
+- [x] ~~**F5.3** Deliberate death: forfeit loot, re-decant out of the tar~~ — capture state and its two world facts persist atomically; deliberate death batches the inventory forfeit, player-body replacement and both public facts behind one `PlayerActionLedger` identity without pretending the resulting re-decant is a second action
 
 ### F6 — Mind-stamp and the asset list
 - [x] ~~**F6.1** Non-consensual recruitment through the handheld~~
