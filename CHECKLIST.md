@@ -5988,7 +5988,7 @@ to get right.
       84mm, vape, spliff 98mm, joint, bong 300mm (`systems/smokeables.gd`)
 - [x] **AU7.2** A draw is press-and-hold with a weak / clean / harsh grade, and
       the punishment is reserved for greed - a short draw is thin, never
-      punished (`tests/smokeables_test.gd`, 47 checks)
+      punished (`tests/smokeables_test.gd`, 106 checks)
 - [x] **AU7.3** Harshness is paid into the live lung organs in `anatomy_state`
       where every other body cost is paid, never into a private cough counter.
       A draw raises a contextual top-left lung X-ray; smoke visibly fills and
@@ -6000,7 +6000,10 @@ to get right.
       bronchial tree; its public values remain the exact anatomy reading rather
       than presentation-delayed gameplay state
 - [x] **AU7.4** The buzz is a real short dose on `substance_experience.gd`'s own
-      curve, so smoked and swallowed cannot drift into two systems
+      curve, so smoked and swallowed cannot drift into two systems. Experience
+      history/tolerance and its public fact persist together; `Smokeables.hit()`
+      wraps that nested transaction with harsh anatomy and the single smoking
+      receipt, even outside the Hunt scene's wider draw batch
 - [x] **AU7.5** Lit ends are real `OmniLight3D`s, so a cigarette in the dark is
       a light source and gives you away (pairs with AS). The original sub-metre
       prop light made night captures unreadable; a resting coal now casts a

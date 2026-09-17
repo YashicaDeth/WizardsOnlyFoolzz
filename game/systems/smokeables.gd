@@ -143,6 +143,9 @@ static func hit(subject_id: String, device_id: String, held: float, now: float) 
 	if subject.is_empty():
 		return {"ok": false, "reason": "NO SUCH SUBJECT"}
 
+	# Experience/tolerance, harsh anatomy and the one smoking receipt are one
+	# hit even when this API is used outside the Hunt scene's wider draw batch.
+	WorldHistory.begin_ledger_batch()
 	var substance_id := str(quality["substance"])
 	var potency := clampf(float(quality["strength"]), 0.05, 2.0)
 	var began := SubstanceExperience.begin(subject_id, substance_id, now, potency)
@@ -160,6 +163,7 @@ static func hit(subject_id: String, device_id: String, held: float, now: float) 
 		"grade": str(quality["grade"]), "held": held,
 		"strength": float(quality["strength"]), "harsh": float(quality["harsh"]),
 	})
+	WorldHistory.commit_ledger_batch()
 	quality["dose"] = began.get("dose", {})
 	return quality
 

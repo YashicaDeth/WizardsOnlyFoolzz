@@ -89,6 +89,7 @@ func _ready() -> void:
 	check(not smoked.is_empty(), "smoking is a recorded event like anything else you do")
 	check(str((smoked[0].get("details", {}) as Dictionary).get("grade", "")) == SMOKEABLES.HARSH,
 		"and the record says which kind of draw it was")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "dose, tolerance, harsh body cost and smoking receipt close one hit transaction")
 
 	# --- tolerance reaches through the device --------------------------------
 	check(SX.tolerance("player", "choir_bloom") == 1, "a smoked dose counts toward tolerance like any other")
