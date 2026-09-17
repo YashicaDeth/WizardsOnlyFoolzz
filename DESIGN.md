@@ -76,6 +76,12 @@ chart-space registers as they draw. They try positions around their actual mark,
 fall back to the least-overlapping position when the area is genuinely dense,
 and stay inside the physical bezel. This changes presentation only: contacts
 retain their true coordinates and the satellite image remains the authority.
+The whole-holding reveal is the pleasurable exploration payoff rather than an
+administrative unlock. Its polygon develops outward from the settlement under
+a pale cleaning lip that is strongest halfway across the glass, with short
+streaks travelling behind the front and disappearing completely when the live
+holder-coloured border settles. The movement is monotonic and does not wait for
+the player to open a menu.
 
 18 September implementation note: territory evidence now reaches the physical
 Board through the actual input route. `P` on a revealed place in full-size
