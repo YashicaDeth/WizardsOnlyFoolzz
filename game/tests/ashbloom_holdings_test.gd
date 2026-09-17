@@ -1,5 +1,7 @@
 extends Node
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 const HOLDINGS := preload("res://systems/ashbloom_holdings.gd")
 const MAP := preload("res://systems/living_map.gd")
 const INDEX := preload("res://systems/world_index.gd")
@@ -51,11 +53,17 @@ func _ready() -> void:
 	var first_record := str(first.record)
 	check(bool(WorldHistory.subject(first_record).get("revealed", false)), "the same reveal opens the canonical place record for INDEX, Board and local law")
 	check(WorldHistory.event_count("holding_revealed") == 1, "the reveal arrives as one persistent event")
+	var reveal_events := WorldHistory.recent_events(8).filter(func(event: Dictionary): return str(event.get("type", "")) == "holding_revealed")
+	check(reveal_events.size() == 1 and str((reveal_events[0] as Dictionary).get("details", {}).get("action_id", "")).begins_with("action_"),
+		"the border crossing receives one durable action receipt")
 	HOLDINGS.observe(first.at + Vector2(2, 2))
-	check(WorldHistory.event_count("holding_revealed") == 1, "walking another metre inside it cannot fragment that event")
+	check(WorldHistory.event_count("holding_revealed") == 1 and PLAYER_ACTION_LEDGER.count("holding_revealed") == 1,
+		"walking another metre inside it fragments neither the event nor its action receipt")
 	HOLDINGS.observe((HOLDINGS.DEFINITIONS[1] as Dictionary).at)
 	check(int(HOLDINGS.overview().revealed_count) == 2 and WorldHistory.event_count("holding_revealed") == 2,
 		"crossing a real border reveals the next holding as a second whole piece")
+	check(PLAYER_ACTION_LEDGER.count("holding_revealed") == 2 and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"each new holding is one summarized act and the outer discovery batch closes")
 
 	var map := MAP.new()
 	map.size = Vector2(960, 540)

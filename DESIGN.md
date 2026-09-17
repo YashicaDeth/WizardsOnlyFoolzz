@@ -32,7 +32,11 @@ continues fine street survey inside it. On MAP, unknown holdings retain faint
 complete silhouettes while a newly known holding develops outward from its
 settlement over 1.4 seconds, gaining its holder colour and name as one weighted
 event. This establishes land, ownership and discovery; it deliberately does
-not decide how the eventual act of giving land upward or downward works.
+not decide how the eventual act of giving land upward or downward works. The
+first border crossing carries the territory row, canonical place, published
+local work and reveal event through one player-action receipt and one outer
+persistence transaction; observation inside already known land remains a read,
+not another save.
 
 18 September implementation note: a revealed surface holding is now one
 first-class place everywhere, not a polygon trapped inside MAP. Its canonical

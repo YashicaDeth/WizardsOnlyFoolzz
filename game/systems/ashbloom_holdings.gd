@@ -162,6 +162,9 @@ static func observe(at: Vector2) -> Dictionary:
 	for holding_id in holdings:
 		if bool((holdings[holding_id] as Dictionary).get("revealed", false)):
 			count += 1
+	# One border crossing opens the territory row, the canonical place and its
+	# local work. Keep that whole discovery under one receipt and disk flush.
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(SUBJECT, {
 		"holdings": holdings,
 		"active_holding": id,
@@ -176,13 +179,14 @@ static func observe(at: Vector2) -> Dictionary:
 			"faction_id": str(entry.get("held_by", definition.held_by)),
 		})
 		_ensure_work(id)
-	WorldHistory.record_event("holding_revealed", {
+	PLAYER_ACTION_LEDGER.record("holding_revealed", {
 		"territory": SUBJECT,
 		"holding_id": id,
 		"subject_id": str(definition.get("record", "")),
 		"at": {"x": at.x, "z": at.y},
 		"held_by": str(entry.get("held_by", "")),
 	})
+	WorldHistory.commit_ledger_batch()
 	return entry
 
 
