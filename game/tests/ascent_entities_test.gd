@@ -24,6 +24,7 @@ func _ready() -> void:
 	WorldHistory.clear_history()
 	WorldHistory.register_subject("player", {"name": "THE HUNTER", "kind": "person"})
 	AscentEntities.seed_entities()
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "both ascent entities seed in one closed schema transaction")
 
 	var seeded := WorldHistory.subject("clear_frequency")
 	check(str(seeded.get("kind", "")) == "entity", "The Clear Frequency is registered as an entity")

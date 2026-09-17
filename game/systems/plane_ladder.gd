@@ -285,9 +285,11 @@ static func sustain_or_fail(subject_id: String, plane_id: String, floor_name: St
 ## be able to ask WorldHistory about a relationship with a place that is not
 ## on the map.
 static func register_planes() -> void:
+	WorldHistory.begin_ledger_batch()
 	for plane_id in reachable_planes():
 		var data: Dictionary = PLANES[plane_id]
 		WorldHistory.register_subject(plane_id, {
 			"name": str(data.name), "kind": "plane", "role": str(data.role),
 			"order": int(data.order), "relations": {},
 		})
+	WorldHistory.commit_ledger_batch()

@@ -42,6 +42,7 @@ const ENTITIES := {
 
 
 static func seed_entities() -> void:
+	WorldHistory.begin_ledger_batch()
 	for entity_id in ENTITIES:
 		var data: Dictionary = ENTITIES[entity_id]
 		WorldHistory.register_subject(entity_id, {
@@ -51,6 +52,7 @@ static func seed_entities() -> void:
 			"has_noticed": false, "washed_at_sequence": -1, "wash_count": 0,
 			"relations": {},
 		})
+	WorldHistory.commit_ledger_batch()
 
 
 ## Draws the same conclusion `RivalRegistry.consider()` draws on the other

@@ -19,6 +19,7 @@ func _ready() -> void:
 		return
 	WorldHistory.clear_history()
 	ModernGods.seed_gods()
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "all modern gods seed in one closed schema transaction")
 
 	for god_id in ModernGods.GODS:
 		var subject := WorldHistory.subject(god_id)

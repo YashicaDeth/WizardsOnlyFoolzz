@@ -60,6 +60,7 @@ const FAVOR_STEP := 0.15
 
 
 static func seed_gods() -> void:
+	WorldHistory.begin_ledger_batch()
 	for god_id in GODS:
 		var data: Dictionary = GODS[god_id]
 		WorldHistory.register_subject(god_id, {
@@ -67,6 +68,7 @@ static func seed_gods() -> void:
 			"threat": "NONE", "status": "watching", "memory": str(data.memory),
 			"attention": 0, "relations": {},
 		})
+	WorldHistory.commit_ledger_batch()
 
 
 ## AJ3.4. Attention is not spent the way AscentEntities' notice is (there is
