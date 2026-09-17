@@ -1,5 +1,7 @@
 extends Node
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 const FACILITY := preload("res://systems/facility_territory.gd")
 
 var failures: Array[String] = []
@@ -19,6 +21,11 @@ func _ready() -> void:
 	FACILITY.apply_event("opening_entered_pit")
 	FACILITY.apply_event("derby_round_won")
 	var first_area := FACILITY.publish_target_ping(Vector2(90, 3))
+	var first_ping_events := WorldHistory.recent_events(8).filter(func(event: Dictionary): return str(event.get("type", "")) == "celloutz_target_area_published")
+	check(first_ping_events.size() == 1 and str((first_ping_events[0] as Dictionary).get("details", {}).get("action_id", "")).begins_with("action_"),
+		"the first corporate acquisition area receives one durable player-action receipt")
+	check(PLAYER_ACTION_LEDGER.count("celloutz_target_area_published") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"the bounty mutation and its publication close as one persisted action")
 
 	var hunt = load("res://bone_yard_hunt.tscn").instantiate()
 	add_child(hunt)
@@ -41,6 +48,9 @@ func _ready() -> void:
 		return str(actor.get("encounter_id", "")).begins_with("celloutz_contract_1_")).size() == 2,
 		"ticking the response cannot duplicate a living team")
 	FACILITY.publish_target_ping(Vector2(-150, 3))
+	FACILITY.publish_target_ping(Vector2(-151, 4))
+	check(PLAYER_ACTION_LEDGER.count("celloutz_target_area_published") == 2,
+		"crossing a cell adds one receipt while consulting MAP again inside it adds none")
 	hunt._maintain_celloutz_contractors()
 	check(WorldHistory.event_count("celloutz_repossession_team_dispatched") == 1,
 		"crossing another ping cell reroutes the live contract instead of printing enemies")

@@ -1,6 +1,8 @@
 class_name FacilityTerritory
 extends RefCounted
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 ## One persistent account of the opening facility.  Scenes report authored
 ## milestones here; the MAP, INDEX and CellOutz reaction all read the same
 ## record back.  No UI owns liberation state and no second quest ledger has to
@@ -165,12 +167,17 @@ static func publish_target_ping(world_position: Vector2, source := "black_mirror
 		"source": source,
 		"sequence": int(previous.get("sequence", 0)) + 1,
 	}
+	# Opening the corporate satellite is one player act even though it mutates
+	# the bounty and publishes a history event. Route both through one receipt
+	# and one persistence transaction; an unchanged cell returns above for free.
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(REACTION_SUBJECT, {"target_area": area})
-	WorldHistory.record_event("celloutz_target_area_published", {
+	PLAYER_ACTION_LEDGER.record("celloutz_target_area_published", {
 		"subject_id": REACTION_SUBJECT,
 		"target_id": "player",
 		"area": area.duplicate(true),
 	})
+	WorldHistory.commit_ledger_batch()
 	return area
 
 

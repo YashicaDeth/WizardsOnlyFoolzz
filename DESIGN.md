@@ -11,7 +11,10 @@ repossession order, opening MAP publishes a persisted 96-metre acquisition
 cell with a 72-metre uncertainty radius rather than the player's exact
 coordinate. The Ashbloom sheet renders that as a broken red search ring with
 the real player offset somewhere inside it. Remaining inside the same cell
-cannot spam the ledger; crossing a cell boundary updates the bounty. The first
+cannot spam the ledger; crossing a cell boundary updates the bounty. That
+boundary crossing now uses the same compact player-action receipt route as
+smoking, inspection and local territory work, coalescing the bounty mutation
+and publication into one persistence transaction. The first
 published area commissions two named CellOutz bailiffs through the ordinary
 encounter-body pipeline, so they have anatomy, loot, perception and persistent
 outcomes rather than existing as map icons. A living contract blocks duplicate

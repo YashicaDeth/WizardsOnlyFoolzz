@@ -6183,7 +6183,7 @@ AK1.1 and AK2.1 the same object.
 
 ### AK1 — Whose satellite it is
 - [ ] **AK1.1** The satellite app has an owner, named, with a logo and a licence agreement
-- [x] **AK1.2** They see what you see — after the repossession order exists, opening MAP calls the territory authority with the carrier's live position. The device publishes a coarse acquisition area into the same persistent bounty, so using its satellite view is itself the thing that lets CellOutz reacquire you; staying in one cell cannot spam a cosmetic event
+- [x] **AK1.2** They see what you see — after the repossession order exists, opening MAP calls the territory authority with the carrier's live position. The device publishes a coarse acquisition area into the same persistent bounty, so using its satellite view is itself the thing that lets CellOutz reacquire you; staying in one cell cannot spam a cosmetic event. A newly crossed cell now enters the compact player-action ledger with one durable receipt while the bounty mutation and publication persist in one outer transaction; reopening MAP inside that cell creates neither another event nor another receipt (`celloutz_bounty_response_test`, 10 checks)
 - [ ] **AK1.3** Standing with them is a real quantity and it moves
 - [ ] **AK1.4** They give you work, on the map, and the work changes the map
 - [ ] **AK1.5** You can work against them, and the sky gets worse for you when you do
