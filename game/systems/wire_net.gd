@@ -902,13 +902,15 @@ func act(subject_id: String, action: String) -> Dictionary:
 			result.ok = false
 			result.headline = "UNKNOWN ACTION"
 	if result.ok:
+		WorldHistory.begin_ledger_batch()
 		exposure += int(result.exposure)
 		if int(result.grudge) != 0:
 			var subject: Dictionary = WorldHistory.subject(subject_id)
 			WorldHistory.update_subject(subject_id, {"grudge": int(subject.get("grudge", 0)) + int(result.grudge)}, "wire_action")
-		WorldHistory.record_event("wire_%s" % action, {"subject": subject_id, "exposure": exposure})
+		PlayerActionLedger.record("wire_%s" % action, {"actor": "player", "subject": subject_id, "exposure": exposure})
 		_accounts[subject_id]["grudge"] = int(_accounts[subject_id]["grudge"]) + int(result.grudge)
 		_accounts[subject_id]["reach"] = maxi(40, int(_accounts[subject_id]["reach"]) + int(result.reach))
+		WorldHistory.commit_ledger_batch()
 	return result
 
 
@@ -948,7 +950,10 @@ func publish_photograph(photo: Dictionary) -> Dictionary:
 		"grudge": 8 + carnage * 4,
 	}
 	strain += 0.6 + float(carnage) * 0.2
-	WorldHistory.record_event("photograph_published", {
+	# Publishing and every depicted person's durable reaction are one act.
+	WorldHistory.begin_ledger_batch()
+	PlayerActionLedger.record("photograph_published", {
+		"actor": "player",
 		"photo": str(photo.get("id", "")),
 		"subjects": named,
 		"carnage": carnage,
@@ -964,6 +969,7 @@ func publish_photograph(photo: Dictionary) -> Dictionary:
 			"grudge": mini(100, int(subject.get("grudge", 0)) + int(result.grudge)),
 			"memory": "There is a picture of me like that, and everyone has seen it.",
 		})
+	WorldHistory.commit_ledger_batch()
 	return result
 
 

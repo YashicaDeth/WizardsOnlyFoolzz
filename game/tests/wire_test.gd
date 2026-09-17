@@ -1,5 +1,7 @@
 extends Node
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 ## The Wire's claims are all comparative — reach is not skill, Crowns do not
 ## answer, being hated is access, hostile actions cost — so the checks are
 ## bounded from both sides. A pass here means the *ordering* holds, not merely
@@ -177,6 +179,9 @@ func _ready() -> void:
 
 	var fabricate := clean.act("iris_coil", "fabricate")
 	check(bool(fabricate.ok) and str(fabricate.detail) != "", "fabrication always resolves one way or the other")
+	var action_events := WorldHistory.events.filter(func(event: Dictionary) -> bool: return str(event.get("type", "")) in ["wire_expose", "wire_swarm", "wire_fabricate"])
+	check(action_events.size() == 3 and action_events.all(func(event: Dictionary) -> bool: return str((event.get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_")), "every landed Wire verb has one durable player-action identity")
+	check(PLAYER_ACTION_LEDGER.count("wire_expose") == 1 and PLAYER_ACTION_LEDGER.count("wire_swarm") == 1 and PLAYER_ACTION_LEDGER.count("wire_fabricate") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "Wire actions summarize once and close their target mutation transaction")
 
 	# --- the feed -------------------------------------------------------------
 	var posts := clean.feed(18)

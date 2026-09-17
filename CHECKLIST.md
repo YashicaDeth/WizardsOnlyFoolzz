@@ -514,7 +514,7 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 - [x] ~~**C3.1** Raise a camera, frame the world, take a photograph~~
 - [x] ~~**C3.2** Photographs are objects with contents that can be inspected~~
 - [x] ~~**C3.3** Verify what is in frame against real anatomy state (required by E3)~~
-- [x] ~~**C3.4** Photographs post to the Wire~~
+- [x] ~~**C3.4** Photographs post to the Wire~~ — publication now carries one player-action receipt, and its public fact plus every depicted subject's grudge/memory persist in one transaction
 
 ### C4 — CARRY `BUILT`
 - [x] ~~**C4.1** Surface the inventory subject that already exists~~

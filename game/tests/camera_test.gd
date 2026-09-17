@@ -1,5 +1,7 @@
 extends Node
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 ## C3. A photograph is not a screenshot. It is a record of what was in shot and
 ## what state those bodies were really in, taken off the same rig the fight
 ## happened to — which is the only version E3 can hold a ritual to, because a
@@ -89,7 +91,9 @@ func _ready() -> void:
 	check(bool(posted.ok) and int(posted.reach) > 0, "a real photograph travels")
 	check(int(posted.exposure) > 0, "and it is evidence you were close enough to take it")
 	check(int(WorldHistory.subject("in_shot").get("grudge", 0)) > grudge_before, "whoever is in it has a new reason to know your name")
-	check(WorldHistory.recent_events(6).any(func(event): return str(event.get("type", "")) == "photograph_published"), "and publishing it is itself a recorded act")
+	var published_events := WorldHistory.events.filter(func(event: Dictionary) -> bool: return str(event.get("type", "")) == "photograph_published")
+	check(published_events.size() == 1 and PLAYER_ACTION_LEDGER.count("photograph_published") == 1 and str((published_events[0].get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_"), "and publishing it is one identified recorded act")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "the publication and every depicted subject reaction close one transaction")
 
 	print("CAMERA_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
