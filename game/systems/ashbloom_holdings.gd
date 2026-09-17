@@ -17,6 +17,24 @@ const DEFINITIONS := [
 	{"id": "tunnel_mouth", "record": "ashbloom:tunnel_mouth", "at": Vector2(65, 115), "name": "TUNNEL MOUTH", "note": "floodlit trade route", "held_by": "gate_lanterns"},
 ]
 
+## Work belongs to the place that caused it. Every revealed holding publishes
+## the same two legible verbs while the names, issuer and coordinates come from
+## that holding's canonical record: a physical crew to dislodge and a physical
+## cache to recover. These are deliberately modest local orders, not the later
+## moral choice about who receives the land.
+const WORK_TEMPLATES := [
+	{
+		"suffix": "claim_crew", "type": "raid", "required": 2,
+		"offset": Vector2(18, 14), "label": "DISLODGE THE CLAIM CREW",
+		"brief": "A two-person crew is enforcing an unrecorded claim on this ground.",
+	},
+	{
+		"suffix": "field_recovery", "type": "collection", "required": 1,
+		"offset": Vector2(-16, 10), "label": "RECOVER THE FIELD CACHE",
+		"brief": "A sealed local evidence cache remains somewhere inside the holding.",
+	},
+]
+
 
 static func ensure() -> Dictionary:
 	var record := WorldHistory.subject(SUBJECT)
@@ -51,6 +69,8 @@ static func ensure() -> Dictionary:
 			"at": {"x": (definition.at as Vector2).x, "z": (definition.at as Vector2).y},
 			"relations": {current_holder: {"kind": "held_by", "strength": 100}},
 		})
+		if bool(holding_entry.get("revealed", false)):
+			_ensure_work(id)
 	if record.is_empty():
 		return WorldHistory.register_subject(SUBJECT, {
 			"kind": "territory",
@@ -147,6 +167,7 @@ static func observe(at: Vector2) -> Dictionary:
 			"held_by": str(entry.get("held_by", definition.held_by)),
 			"faction_id": str(entry.get("held_by", definition.held_by)),
 		})
+		_ensure_work(id)
 	WorldHistory.record_event("holding_revealed", {
 		"territory": SUBJECT,
 		"holding_id": id,
@@ -155,6 +176,103 @@ static func observe(at: Vector2) -> Dictionary:
 		"held_by": str(entry.get("held_by", "")),
 	})
 	return entry
+
+
+## The stable jobs attached to one place. Calling this for unknown ground does
+## not leak it into INDEX: work is published only after the place was revealed.
+static func work_orders(id: String) -> Array[Dictionary]:
+	ensure()
+	var place := WorldHistory.subject(str(definition_for(id).get("record", "")))
+	if not bool(place.get("revealed", false)):
+		return []
+	_ensure_work(id)
+	var rows: Array[Dictionary] = []
+	for job_id in place.get("work_orders", []):
+		var job := WorldHistory.subject(str(job_id))
+		if not job.is_empty():
+			var row := job.duplicate(true)
+			row["id"] = str(job_id)
+			rows.append(row)
+	return rows
+
+
+static func accept_work(job_id: String) -> Dictionary:
+	var job := WorldHistory.subject(job_id)
+	if str(job.get("kind", "")) != "job" or str(job.get("job_class", "")) != "holding_work":
+		return {}
+	if str(job.get("status", "")) != "offered":
+		return job
+	var accepted_at := WorldClock.long_stamp()
+	job = WorldHistory.update_subject(job_id, {
+		"status": "active", "accepted_at": accepted_at,
+	}, "holding_work_accepted")
+	WorldHistory.record_event("holding_work_started", {
+		"subject_id": job_id, "place_id": str(job.get("place_id", "")),
+		"holding_id": str(job.get("holding_id", "")), "work_type": str(job.get("work_type", "")),
+	})
+	return job
+
+
+static func complete_work(job_id: String, evidence: Dictionary = {}) -> Dictionary:
+	var job := WorldHistory.subject(job_id)
+	if str(job.get("status", "")) != "active":
+		return job
+	var completed_at := WorldClock.long_stamp()
+	job = WorldHistory.update_subject(job_id, {
+		"status": "completed", "progress": int(job.get("required", 1)),
+		"completed_at": completed_at, "evidence": evidence.duplicate(true),
+	}, "holding_work_completed")
+	WorldHistory.record_event("holding_work_resolved", {
+		"subject_id": job_id, "place_id": str(job.get("place_id", "")),
+		"holding_id": str(job.get("holding_id", "")), "work_type": str(job.get("work_type", "")),
+	})
+	return job
+
+
+static func active_work() -> Array[Dictionary]:
+	var active: Array[Dictionary] = []
+	for subject_id in WorldHistory.all_subjects():
+		var subject := WorldHistory.subject(str(subject_id))
+		if str(subject.get("job_class", "")) != "holding_work" or str(subject.get("status", "")) != "active":
+			continue
+		var row := subject.duplicate(true)
+		row["id"] = str(subject_id)
+		active.append(row)
+	return active
+
+
+static func _ensure_work(id: String) -> void:
+	var definition := definition_for(id)
+	if definition.is_empty():
+		return
+	var place_id := str(definition.record)
+	var place := WorldHistory.subject(place_id)
+	if not bool(place.get("revealed", false)):
+		return
+	var job_ids: Array[String] = []
+	for template: Dictionary in WORK_TEMPLATES:
+		var job_id := "holding_job:%s:%s" % [id, str(template.suffix)]
+		job_ids.append(job_id)
+		var target: Vector2 = (definition.at as Vector2) + (template.offset as Vector2)
+		WorldHistory.register_subject(job_id, {
+			"kind": "job", "job_class": "holding_work",
+			"name": "%s // %s" % [str(definition.name), str(template.label)],
+			"role": "LOCAL %s ORDER" % str(template.type).to_upper(),
+			"status": "offered", "work_type": str(template.type),
+			"holding_id": id, "place_id": place_id,
+			"issued_by": str(place.get("held_by", definition.held_by)),
+			"brief": str(template.brief), "required": int(template.required), "progress": 0,
+			"target": {"x": target.x, "z": target.y}, "target_subjects": [],
+		})
+	var first_publication := not bool(place.get("work_published", false))
+	# INDEX asks for these rows while drawing. Do not turn a read into a save on
+	# every frame: migrate the place once, then leave the persisted row alone.
+	if first_publication or place.get("work_orders", []) != job_ids:
+		WorldHistory.amend_subject(place_id, {"work_orders": job_ids, "work_published": true})
+	if first_publication:
+		WorldHistory.record_event("holding_work_published", {
+			"subject_id": place_id, "holding_id": id, "job_ids": job_ids.duplicate(),
+		})
 
 
 static func definition_for(id: String) -> Dictionary:

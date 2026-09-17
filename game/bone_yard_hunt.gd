@@ -3980,6 +3980,11 @@ func _interact() -> void:
 			var items: Array = WorldHistory.subject("inventory").get("items", []).duplicate()
 			items.append_array(cache.get_meta("items", []))
 			WorldHistory.update_subject("inventory", {"items": items}, "loot_collected")
+			var work_job_id := str(cache.get_meta("holding_work_job", ""))
+			if not work_job_id.is_empty():
+				ASHBLOOM_HOLDINGS.complete_work(work_job_id, {
+					"method": "cache_collected", "items": cache.get_meta("items", []).duplicate(),
+				})
 			loose_loot.erase(cache)
 			cache.queue_free()
 			prompt.text = "SALVAGE SECURED // %d ITEMS" % items.size()
@@ -6890,6 +6895,7 @@ func _living_hostiles() -> int:
 func _maintain_roamers(delta: float) -> void:
 	if pathfinder == null or generated_world == null or not is_instance_valid(generated_world):
 		return
+	_maintain_holding_work()
 	_maintain_celloutz_contractors()
 	_cull_distant_roamers()
 	_roamer_clock += delta
@@ -6899,6 +6905,70 @@ func _maintain_roamers(delta: float) -> void:
 	if _living_hostiles() >= ROAMER_TARGET:
 		return
 	_spawn_roamer()
+
+
+## AA10.13. Accepted work leaves the dossier and enters the same physical world
+## as every other encounter. Raid targets are ordinary persistent people;
+## recovery targets are ordinary loot caches. Rebuilding the Hunt restores an
+## unresolved objective from the job record instead of silently completing it.
+func _maintain_holding_work() -> void:
+	for job: Dictionary in ASHBLOOM_HOLDINGS.active_work():
+		var job_id := str(job.id)
+		var target_data: Dictionary = job.get("target", {}) if job.get("target", {}) is Dictionary else {}
+		var target := Vector3(float(target_data.get("x", 0.0)), 0.0, float(target_data.get("z", 0.0)))
+		match str(job.get("work_type", "")):
+			"raid":
+				_maintain_holding_raid(job_id, job, target)
+			"collection":
+				_maintain_holding_collection(job_id, job, target)
+
+
+func _maintain_holding_raid(job_id: String, job: Dictionary, target: Vector3) -> void:
+	var required := maxi(1, int(job.get("required", 2)))
+	var subject_ids: Array = job.get("target_subjects", []).duplicate()
+	if subject_ids.is_empty():
+		for slot in required:
+			subject_ids.append("holding_work_%s_%d_actor" % [str(job.get("holding_id", "unknown")), slot])
+		WorldHistory.amend_subject(job_id, {"target_subjects": subject_ids.duplicate()})
+	var resolved := 0
+	for slot in required:
+		var subject_id := str(subject_ids[slot])
+		var status := str(WorldHistory.subject(subject_id).get("status", ""))
+		if status in ["dead", "escaped", "spared", "recruited"]:
+			resolved += 1
+			continue
+		var instance_id := subject_id.trim_suffix("_actor")
+		if encounter_actors.any(func(actor: Dictionary): return str(actor.get("encounter_id", "")) == instance_id):
+			continue
+		var who := CAST.person(instance_id)
+		var spawned := _spawn_encounter_actor({
+			"instance_id": instance_id, "kind": "hostile", "display_name": str(who.name),
+			"role": "UNRECORDED CLAIM CREW", "elo": 1050 + slot * 55,
+			"variation": 610 + abs(hash(job_id)) % 200 + slot,
+			"tint": "70513b", "loot": ["false claim writ", "holding survey stake"],
+			"summary": "Named by a local holding's accepted raid order.",
+		}, target + Vector3(-4.0 if slot == 0 else 4.0, 0.0, float(slot) * 2.0))
+		if spawned.is_empty():
+			continue
+		spawned["holding_work_job"] = job_id
+		WorldHistory.amend_subject(str(spawned.subject_id), {
+			"holding_work_job": job_id, "contract_place": str(job.get("place_id", "")),
+		})
+	if int(job.get("progress", 0)) != resolved:
+		WorldHistory.amend_subject(job_id, {"progress": resolved})
+	if resolved >= required:
+		ASHBLOOM_HOLDINGS.complete_work(job_id, {
+			"method": "claim_crew_resolved", "subjects": subject_ids.duplicate(),
+		})
+
+
+func _maintain_holding_collection(job_id: String, job: Dictionary, target: Vector3) -> void:
+	if loose_loot.any(func(cache: Node3D):
+		return is_instance_valid(cache) and str(cache.get_meta("holding_work_job", "")) == job_id):
+		return
+	var item := "%s field cache" % str(job.get("holding_id", "local")).replace("_", " ")
+	var cache := _spawn_loot_cache(target, [item])
+	cache.set_meta("holding_work_job", job_id)
 
 
 ## AK1.8. A published area is work somebody can take. The responders are built
@@ -7067,7 +7137,7 @@ func _spawn_misfire_marker(title_text: String, summary: String, at: Vector3, kin
 	marker.add_child(label)
 
 
-func _spawn_loot_cache(at: Vector3, items: Array) -> void:
+func _spawn_loot_cache(at: Vector3, items: Array) -> Node3D:
 	var cache := Node3D.new()
 	cache.position = at
 	add_child(cache)
@@ -7097,6 +7167,7 @@ func _spawn_loot_cache(at: Vector3, items: Array) -> void:
 	label.no_depth_test = true
 	label.render_priority = 2
 	cache.add_child(label)
+	return cache
 
 
 func _spawn_friend() -> void:

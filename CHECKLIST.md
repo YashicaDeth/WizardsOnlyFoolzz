@@ -3347,7 +3347,7 @@ The last rung. Fifteen statements that are true of the land taking a side when t
 - [ ] **AA10.10** `v10` The satellite sees it and the agency has opinions
 - [ ] **AA10.11** `v10` Factions move on the pyramid as holdings change hands
 - [ ] **AA10.12** `v10` The Board can pin a holding to a faction to a person
-- [ ] **AA10.13** `v10` A holding generates work: jobs, raids, collections
+- [x] **AA10.13** `v10` A holding generates work: jobs, raids, collections — revealing a surface holding now publishes two stable `kind: job` records on that canonical place: a two-person claim-crew raid and a field-cache recovery. Both are pointable actions in the holding's INDEX dossier rather than automatic quest spam. Acceptance persists one active contract; the Hunt restores raid members through its ordinary anatomical encounter pipeline or restores one identified loot cache at the recorded local coordinate. Raid progress comes only from resolving those exact people, collection progress only from physically taking that cache, and rebuilding the scene restores unresolved work rather than completing or duplicating it. `holding_work_integration_test` proves the full dossier → world → resolution route in 13 production checks; the refreshed `captures/ashbloom_holding_index.png` shows both offers on the live place file
 - [ ] **AA10.14** `v10` Every land decision is visible from a distance
 - [ ] **AA10.15** `v10` The distribution of holdings is what the next universe inherits
 

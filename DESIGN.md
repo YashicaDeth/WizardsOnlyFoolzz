@@ -47,10 +47,22 @@ One incident can be remembered only once per holding, even if two witnesses
 report it. The resulting unrest lives on the same place record MAP, INDEX and
 the Board already share. When that memory crosses its threshold, the holder
 sends two generated, persistent people through the Hunt's ordinary encounter
-pipeline. They have full anatomy, loot and resolution choices and walk a real
+ pipeline. They have full anatomy, loot and resolution choices and walk a real
 route to the recorded scene of the acts—not to the player's magically current
 coordinate. An unresolved team restores from WorldHistory when the scene is
 rebuilt.
+
+18 September implementation note: revealed surface holdings now generate
+local work without becoming quest icons. Each canonical place publishes one
+claim-crew raid and one field-cache recovery as persistent job subjects in its
+INDEX dossier; unknown land publishes nothing. The player explicitly takes an
+order from that file. An accepted raid restores two stable named bodies through
+the ordinary Hunt/anatomy/resolution path, while an accepted recovery restores
+one identified loot cache at its saved coordinate. Only resolving those exact
+people or physically collecting that cache advances the contract, and an
+unfinished order survives rebuilding the scene. This establishes a factual
+place → work → world → ledger route while leaving the later decision about who
+receives reclaimed land deliberately open.
 
 17 September Black Mirror note: its seven apps are different instruments inside
 one object, not seven unrelated UI compositions. The casing now owns a fixed

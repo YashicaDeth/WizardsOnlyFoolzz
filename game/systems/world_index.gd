@@ -600,6 +600,12 @@ func _follow_link(link: Dictionary) -> void:
 			# treats as a link rather than a modal.
 			var id := str(link.get("id", ""))
 			viewing_site = "" if viewing_site == id else id
+		"holding_job":
+			var work := AshbloomHoldings.accept_work(str(link.get("id", "")))
+			if not work.is_empty():
+				last_action = "WORK ACCEPTED // %s" % str(work.get("name", "LOCAL ORDER"))
+				action_life = 2.4
+				_rebuild_links()
 
 
 ## Wounds are recorded as prose, not as a zone id, so the link reads the zone
@@ -664,6 +670,17 @@ func _panel_rect() -> Rect2:
 func _file_link_rows(rect: Rect2, subject: Dictionary) -> Array:
 	if rect.size == Vector2.ZERO or subject.is_empty():
 		return []
+	if str(subject.get("kind", "")) == "place":
+		var holding_rows: Array = []
+		var holding_y := rect.position.y + 278.0
+		for job: Dictionary in AshbloomHoldings.work_orders(str(subject.get("holding_id", ""))):
+			if str(job.get("status", "")) == "offered":
+				holding_rows.append({
+					"kind": "holding_job", "id": str(job.id),
+					"rect": Rect2(rect.position.x - 4, holding_y - 15, rect.size.x * 0.53, 24),
+				})
+			holding_y += 30.0
+		return holding_rows
 	var right_x := rect.position.x + rect.size.x * 0.60
 	var right_width := rect.size.x * 0.40
 	var rows: Array = []
@@ -1291,6 +1308,16 @@ func _draw_holding_file(rect: Rect2, subject_id: String, subject: Dictionary) ->
 	for line: String in _wrap(str(subject.get("note", definition.get("note", ""))).to_upper(), 46):
 		draw_string(font, Vector2(rect.position.x, y), line, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.48, 14, INK * Color(1, 1, 1, 0.82))
 		y += 19.0
+
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 252), "LOCAL WORK", 11.0, MOSS, 1.2)
+	var work_y := rect.position.y + 283.0
+	for job: Dictionary in AshbloomHoldings.work_orders(holding_id):
+		var status := str(job.get("status", "offered"))
+		var work_tone := MOSS if status == "completed" else (COPPER if status == "active" else INK)
+		var verb := "TAKE" if status == "offered" else status.to_upper()
+		CellOutzType.draw_condensed(self, Vector2(rect.position.x, work_y), "[%s] %s" % [verb, str(job.get("role", "LOCAL ORDER"))], 9.0, work_tone, 0.76)
+		CellOutzType.draw_condensed(self, Vector2(rect.position.x, work_y + 13), "%d/%d  %s" % [int(job.get("progress", 0)), int(job.get("required", 1)), str(job.get("brief", ""))], 8.0, INK * Color(1, 1, 1, 0.62), 0.62)
+		work_y += 30.0
 
 	var stamp := Rect2(Vector2(rect.end.x - 315, rect.position.y + 150), Vector2(295, 228))
 	draw_rect(stamp, GROUND)
