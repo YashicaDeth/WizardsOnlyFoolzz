@@ -378,7 +378,7 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B5.3** The tool matters: bare hands, blade, or something surgical~~
 - [x] ~~**B5.4** Extracted part enters CARRY with its condition and its lien~~
 - [x] ~~**B5.5** Install a robbed part into yourself~~
-- [x] ~~**B5.6** Someone notices — the Choir price it, the owner remembers~~
+- [x] ~~**B5.6** Someone notices — the Choir price it, the owner remembers~~ — the true extraction fact now carries one player-action receipt whether or not anyone sees it; witness testimony and a living owner's grudge/memory settle in the same transaction
 
 ### B6 — Dismemberment as a combat verb
 - [x] ~~**B6.1** Severing exists on the rig with thrown limbs, stumps and exposed bone, driven by the strike direction~~

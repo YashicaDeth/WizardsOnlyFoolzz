@@ -80,10 +80,12 @@ static func witnesses_of(at: Vector3, candidates: Array, exclude: String = "") -
 
 ## F1.1. Records the act, and separately puts a report in flight for each
 ## witness. The event is true the moment it happens; the knowledge is not.
-func record(event_type: String, details: Dictionary, witness_ids: Array) -> Dictionary:
+func record(event_type: String, details: Dictionary, witness_ids: Array, as_player_action: bool = false) -> Dictionary:
 	var full := details.duplicate()
 	full["witnesses"] = witness_ids.duplicate()
-	var event := WorldHistory.record_event(event_type, full)
+	# Most callers describe world acts. A caller that owns an explicit player
+	# verb may opt into the shared receipt route without rebuilding testimony.
+	var event := PLAYER_ACTION_LEDGER.record(event_type, full) if as_player_action else WorldHistory.record_event(event_type, full)
 	for witness_id in witness_ids:
 		var subject: Dictionary = WorldHistory.subject(str(witness_id))
 		var faction := str(subject.get("faction_id", ""))

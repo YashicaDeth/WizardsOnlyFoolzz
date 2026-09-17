@@ -4,6 +4,8 @@ extends Node
 ## depth you have to get through, a tool that decides what survives the trip,
 ## a part that remembers whose it was, and somebody who saw you do it.
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 var failures: Array[String] = []
 
 
@@ -112,6 +114,9 @@ func _ready() -> void:
 	check(ledger.in_flight().size() == 1, "and an account of it is walking home")
 	var unseen := Extraction.notice(WitnessLedger.new(), rough, Vector3.ZERO, [], false, "ashbloom_bone_yard")
 	check((unseen.witnesses as Array).is_empty() and not bool(unseen.stolen), "a dead owner and an empty field means nobody ever knows")
+	var extraction_events := WorldHistory.events.filter(func(event: Dictionary) -> bool: return str(event.get("type", "")) == "part_extracted")
+	check(extraction_events.size() == 2 and PLAYER_ACTION_LEDGER.count("part_extracted") == 2 and extraction_events.all(func(event: Dictionary) -> bool: return str((event.get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_")), "seen and unseen extractions remain true world facts with one player receipt each")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "extraction, testimony and the living owner's memory close one transaction")
 
 	var hot := carry.take_chunk(rough.merged({"stolen": true}, true))
 	var cold_goods := carry.take_chunk(rough)
