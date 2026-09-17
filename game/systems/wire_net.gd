@@ -2,6 +2,7 @@ class_name WireNet
 extends RefCounted
 
 const WoundCatalog := preload("res://systems/wound_catalog.gd")
+const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
 
 ## The surviving internet, as a simulation rather than a screen.
 ##
@@ -600,9 +601,18 @@ func contest_channel(faction_id: String, action: String, subject_id: String = "p
 			control = 0.0
 			result.headline = "MAST CUT"
 			result.detail = "COVERAGE IS GONE FOR EVERYONE HERE, INCLUDING YOU."
+	# Control, the public act and every resulting grudge are one consequence
+	# chain. Player contests get a receipt; autonomous actors remain ordinary
+	# world events rather than being falsely charged to the player.
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(faction_id, {"signal_control": control})
-	WorldHistory.record_event("channel_contested", {"faction_id": faction_id, "action": action, "subject_id": subject_id, "control_after": control})
+	var details := {"faction_id": faction_id, "action": action, "subject_id": subject_id, "control_after": control}
+	if subject_id == "player":
+		PlayerActionLedger.record("channel_contested", details)
+	else:
+		WorldHistory.record_event("channel_contested", details)
 	_retaliate(faction_id, action, subject_id)
+	WorldHistory.commit_ledger_batch()
 	result["control_after"] = control
 	return result
 

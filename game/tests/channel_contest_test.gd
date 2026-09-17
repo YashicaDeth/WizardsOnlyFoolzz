@@ -3,6 +3,8 @@ extends Node
 ## K4.4. A Sin holds signal, not a keep — each of the five routes must be a
 ## real requirement against real state, not a cost paid to a menu.
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 var failures: Array[String] = []
 
 
@@ -94,6 +96,14 @@ func _ready() -> void:
 	var refused := wire.contest_channel("vanity_row", "hijack", "player", false)
 	check(not bool(refused.get("ok", false)), "a refused contest attempt")
 	check(int(WorldHistory.subject("cass_lumen").get("grudge", 0)) == grudge_after_cut, "does not also raise grudge — only a contest that actually landed is remembered")
+
+	var player_contests := WorldHistory.events.filter(func(e: Dictionary) -> bool:
+		return str(e.get("type", "")) == "channel_contested" and str((e.get("details", {}) as Dictionary).get("subject_id", "")) == "player")
+	check(player_contests.size() == PLAYER_ACTION_LEDGER.count("channel_contested") and player_contests.all(func(e: Dictionary) -> bool: return str((e.get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_")), "every landed player contest has exactly one durable action receipt")
+	var receipts_before_npc := PLAYER_ACTION_LEDGER.count("channel_contested")
+	var npc_contest := wire.contest_channel("vanity_row", "flood", "cass_lumen")
+	check(bool(npc_contest.get("ok", false)) and PLAYER_ACTION_LEDGER.count("channel_contested") == receipts_before_npc, "a non-player channel move remains a world event rather than a counterfeit player action")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "signal control, public fact and retaliation grudges close one nested transaction")
 
 	print("CHANNEL_CONTEST_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
