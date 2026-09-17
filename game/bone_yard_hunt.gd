@@ -1314,7 +1314,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			prompt.text = "INSPECT // RELEASE I TO LOWER"
 			inspected_world_item = _nearest_world_item_for_inspection()
 			var inspected_id := str(inspected_world_item.get("item_id", ""))
-			var inspected_event := "world_item_inspected" if not inspected_world_item.is_empty() else "held_item_inspected"
+			var inspected_event := "held_item_inspected"
+			if not inspected_world_item.is_empty():
+				inspected_event = "world_subject_inspected" if str(inspected_world_item.get("kind", "")) == "person" else "world_item_inspected"
 			if not inspected_world_item.is_empty():
 				prompt.text = "%s // INSPECT // RELEASE I TO LOWER" % str(inspected_world_item.get("label", "OBJECT"))
 			elif smoke_model != null and is_instance_valid(smoke_model):
@@ -6184,6 +6186,36 @@ func _nearest_world_item_for_inspection() -> Dictionary:
 				"source": cache, "item_id": "salvage_cache:%d" % cache.get_instance_id(),
 				"kind": "cache", "label": "SALVAGE CACHE",
 				"detail": "%d ITEMS" % items.size(),
+			}
+	for actor: Dictionary in encounter_actors:
+		var subject_node: Node3D = actor.get("node") as Node3D
+		if subject_node == null or not is_instance_valid(subject_node):
+			continue
+		var subject_distance := player.distance_to(subject_node.global_position)
+		if subject_distance <= 3.2 and subject_distance < best_distance:
+			var subject_id := str(actor.get("subject_id", actor.get("instance_id", "unknown")))
+			var condition := "DEAD" if bool(actor.get("dead", false)) else str(actor.get("state", "STANDING")).to_upper()
+			best_distance = subject_distance
+			best = {
+				"source": subject_node, "item_id": subject_id,
+				"kind": "person", "label": str(actor.get("display_name", subject_id)),
+				"detail": condition,
+			}
+	if friend != null and is_instance_valid(friend):
+		var friend_distance := player.distance_to(friend.global_position)
+		if friend_distance <= 3.2 and friend_distance < best_distance:
+			best_distance = friend_distance
+			best = {
+				"source": friend, "item_id": FRIEND_ID, "kind": "person",
+				"label": str(WorldHistory.subject(FRIEND_ID).get("name", "NIX")),
+				"detail": str(WorldHistory.subject(FRIEND_ID).get("status", "ALLY")),
+			}
+	if enemy != null and is_instance_valid(enemy) and enemy.visible:
+		var rival_distance := player.distance_to(enemy.global_position)
+		if rival_distance <= 3.2 and rival_distance < best_distance:
+			best = {
+				"source": enemy, "item_id": CAST.id_for(CAPTAIN_SLOT), "kind": "person",
+				"label": _captain_name(), "detail": "RETREATING" if enemy_retreating else "HOSTILE",
 			}
 	return best
 

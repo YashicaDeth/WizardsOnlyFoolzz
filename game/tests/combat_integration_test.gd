@@ -70,6 +70,22 @@ func _ready() -> void:
 	hunt.pitch = 0.0
 	hunt.third_person = false
 	hunt._update_camera()
+	var inspection_subject: Dictionary = hunt._spawn_encounter_actor({
+		"instance_id": "inspection_subject", "kind": "friendly", "display_name": "MERCY BELL",
+	}, hunt.player + Vector3(0, -0.5, 1.2))
+	inspection_subject.node.position = hunt.player + Vector3(0, -0.5, 1.2)
+	var subject_preview: Dictionary = hunt._nearest_world_item_for_inspection()
+	hunt.inspected_world_item = subject_preview
+	hunt.inspect_held = true
+	hunt._update_held_reliquary()
+	check(str(subject_preview.get("kind", "")) == "person" and subject_preview.get("source") == inspection_subject.node,
+		"a nearby living person enters the same world inspection grammar")
+	check(int(hunt.held_reliquary.mesh_count) > 0 and hunt.held_reliquary.displayed_source_id == inspection_subject.node.get_instance_id(),
+		"person inspection presents that subject's live body geometry")
+	hunt.inspect_held = false
+	hunt.inspected_world_item.clear()
+	hunt.encounter_actors.erase(inspection_subject)
+	inspection_subject.node.queue_free()
 	hunt._spawn_encounter_actor({"instance_id": "armed_target", "kind": "hostile", "summary": "ballistic target"}, hunt.player + Vector3(0, 0, 6))
 	var actor: Dictionary = hunt.encounter_actors.back()
 	actor.node.position = hunt.player + Vector3(0, -0.5, 6)

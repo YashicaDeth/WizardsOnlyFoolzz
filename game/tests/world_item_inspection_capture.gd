@@ -44,4 +44,27 @@ func _ready() -> void:
 	await RenderingServer.frame_post_draw
 	var result := get_viewport().get_texture().get_image().save_png(out_path)
 	print("WORLD_ITEM_INSPECTION_CAPTURE_RESULT path=", out_path, " result=", result)
-	get_tree().quit(0 if result == OK else 1)
+
+	# The second frame proves people use the same live-geometry grammar without
+	# being mislabeled as items in the action ledger.
+	var inspected_person: Dictionary = hunt._spawn_encounter_actor({
+		"instance_id": "inspection_capture_subject", "kind": "friendly",
+		"display_name": "MERCY BELL", "role": "ASHLINE WITNESS",
+	}, hunt.player + Vector3(0.0, -0.5, -1.35))
+	inspected_person.node.position = hunt.player + Vector3(0.0, -0.5, -1.35)
+	hunt.inspected_world_item = {
+		"source": inspected_person.node,
+		"item_id": str(inspected_person.subject_id),
+		"kind": "person",
+		"label": str(inspected_person.display_name),
+		"detail": "STANDING",
+	}
+	hunt.prompt.text = "%s // INSPECT // RELEASE I TO LOWER" % str(inspected_person.display_name)
+	for _settle in 30:
+		hunt._update_held_reliquary()
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var subject_path := out_path.get_base_dir().path_join("world_subject_inspection.png")
+	var subject_result := get_viewport().get_texture().get_image().save_png(subject_path)
+	print("WORLD_SUBJECT_INSPECTION_CAPTURE_RESULT path=", subject_path, " result=", subject_result)
+	get_tree().quit(0 if result == OK and subject_result == OK else 1)

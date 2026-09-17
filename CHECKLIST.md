@@ -1830,10 +1830,14 @@ v8 made the device dangerous and most objects in the world still cannot be looke
       guns, smokeables and severed limbs; releasing `I` restores the held object
       and leaves the inspected pickup in the world. `substance_station_test.gd`
       proves identity, reach and non-consumption; `combat_integration_test.gd`
-      proves all four real Hunt adapters and the reliquary seam. Visual evidence:
-      `captures/world_item_inspection.png`. Living bodies, fixed fixtures and
-      the wider scenery population still need adapters before I9.1/I9.2 may be
-      ticked.
+      proves all four real Hunt adapters and the reliquary seam. Nearby living,
+      downed and dead encounter subjects now enter that same live-geometry
+      grammar with their identity and current state, but file a distinct
+      `world_subject_inspected` receipt rather than being mislabeled as items;
+      their deeper organs and history remain on the Black Mirror dossier.
+      Visual evidence: `captures/world_item_inspection.png` and
+      `captures/world_subject_inspection.png`. Fixed fixtures and the wider
+      scenery population still need adapters before I9.1/I9.2 may be ticked.
 
 ### I v10 — the tenth pass
 Nine passes designed in a lit room. C v4 made the device the main light source in the world.
