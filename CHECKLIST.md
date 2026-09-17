@@ -681,7 +681,7 @@ Greg, plainly: *"the entire blackmirror gui needs work"*. Nine passes on what th
 under-directed opening.
 
 ### D1 — The sheet `BUILT`
-- [x] ~~**D1.1** A real player subject built from data, not a hardcoded dict~~
+- [x] ~~**D1.1** A real player subject built from data, not a hardcoded dict~~ — filing the subject, declined modifiers and any broken-run fact now persists as one identified player action
 - [x] ~~**D1.2** Everything below writes into it~~
 - [x] ~~**D1.3** Save and load it~~
 

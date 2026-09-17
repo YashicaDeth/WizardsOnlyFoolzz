@@ -1,6 +1,8 @@
 class_name CharacterSheet
 extends RefCounted
 
+const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
+
 ## Who you are, as data rather than as a hardcoded dictionary.
 ##
 ## D1. `bone_yard_hunt.gd` registers the player with literal values — elo 1000,
@@ -475,8 +477,14 @@ func apply_to_world() -> Dictionary:
 		if not modifiers.has(str(key)):
 			declined.append(str(key))
 	state["declined_modifiers"] = declined
+	# Filing is one intake decision even when it also creates the subject,
+	# records declined modifications and opens a broken achievement run.
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.register_subject("player", state)
-	WorldHistory.update_subject("player", state, "sheet_filed")
+	WorldHistory.amend_subject("player", state)
+	PlayerActionLedger.record("sheet_filed", {
+		"actor": "player", "subject_id": "player", "changes": state.duplicate(true),
+	})
 	if not declined.is_empty():
 		WorldHistory.record_event("modifiers_declined", {"subject": "player", "declined": declined})
 	# N2.2. Achievement-run register, not an error dialog: the event names
@@ -484,6 +492,7 @@ func apply_to_world() -> Dictionary:
 	# record the world keeps.
 	if bool(state.get("broken_run", false)):
 		WorldHistory.record_event("achievement_run_started", {"overspent_by": int(state.get("overspent_by", 0))})
+	WorldHistory.commit_ledger_batch()
 	return state
 
 
