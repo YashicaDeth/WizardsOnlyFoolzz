@@ -66,6 +66,11 @@ coordinate, while the actual crew remain ordinary moving contacts; resolving
 the order removes its objective without erasing the people or history. This
 establishes a factual place → work → world → map → ledger route while leaving
 the later decision about who receives reclaimed land deliberately open.
+The canonical place also counts the connected outcomes: one completion makes
+its local claim `disrupted`; both make it `ready_for_decision` and write that
+threshold once. INDEX and MAP expose the same state. Crucially, this does not
+change `held_by`: clearing two objectives earns the later land act, but cannot
+silently choose ascent, corruption or a recipient for the player.
 
 18 September implementation note: territory evidence now reaches the physical
 Board through the actual input route. `P` on a revealed place in full-size

@@ -717,6 +717,11 @@ func _draw_districts() -> void:
 		if charted:
 			var holder := str(state.get("held_by", district.held_by)).replace("_", " ").to_upper()
 			CellOutzType.draw_condensed(self, name_at + Vector2(0, 14.0), "HELD / %s" % holder, 7.0, tint * Color(1, 1, 1, 0.55), 0.7)
+			var required := int(state.get("local_work_required", 0))
+			if required > 0:
+				var work_state := str(state.get("local_work_state", "held"))
+				var work_label := "DECISION OPEN" if work_state == "ready_for_decision" else "LOCAL CLAIM %d/%d" % [int(state.get("local_work_completed", 0)), required]
+				CellOutzType.draw_condensed(self, name_at + Vector2(0, 25.0), work_label, 7.0, SPORE if work_state == "ready_for_decision" else tint * Color(1, 1, 1, 0.66), 0.7)
 
 
 func _draw_holdings() -> void:

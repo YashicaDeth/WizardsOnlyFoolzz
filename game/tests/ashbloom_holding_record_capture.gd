@@ -43,6 +43,13 @@ func _ready() -> void:
 	for _settle in 30:
 		await get_tree().process_frame
 	await _capture("%s/ashbloom_holding_index.png" % out_dir)
+	for job_id in ["holding_job:bone_yard:claim_crew", "holding_job:bone_yard:field_recovery"]:
+		HOLDINGS.accept_work(job_id)
+		HOLDINGS.complete_work(job_id, {"method": "visual_proof"})
+	index.queue_redraw()
+	for _settle in 12:
+		await get_tree().process_frame
+	await _capture("%s/holding_decision_open_index.png" % out_dir)
 
 	index.queue_free()
 	await get_tree().process_frame

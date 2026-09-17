@@ -83,6 +83,8 @@ func _ready() -> void:
 	hunt._maintain_holding_work()
 	check(str(WorldHistory.subject(raid_id).get("status", "")) == "completed" and int(WorldHistory.subject(raid_id).get("progress", 0)) == 2,
 		"resolving both physical targets completes and timestamps the same raid record")
+	check(int(WorldHistory.subject(str(bone.record)).get("local_work_completed", 0)) == 1 and str(WorldHistory.subject(str(bone.record)).get("local_work_state", "")) == "disrupted",
+		"one resolved order weakens the place's claim but cannot counterfeit reclamation")
 	check(not hunt._map_contacts().any(func(contact: Dictionary): return str(contact.get("job_id", "")) == raid_id),
 		"completed raid work leaves MAP while its resolved people remain ordinary world records")
 
@@ -100,6 +102,8 @@ func _ready() -> void:
 		hunt._interact()
 	check(str(WorldHistory.subject(collection_id).get("status", "")) == "completed" and WorldHistory.event_count("holding_work_resolved") == 2,
 		"physically collecting the cache completes the recovery through the ordinary loot interaction")
+	check(int(WorldHistory.subject(str(bone.record)).get("local_work_completed", 0)) == 2 and str(WorldHistory.subject(str(bone.record)).get("local_work_state", "")) == "ready_for_decision" and WorldHistory.event_count("holding_claim_disrupted") == 1,
+		"both connected jobs open one persistent land decision without choosing its recipient")
 
 	print("HOLDING_WORK_INTEGRATION_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

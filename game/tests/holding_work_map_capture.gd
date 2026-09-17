@@ -43,4 +43,17 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 	print("CAPTURED: ", path)
+	for job_id in ["holding_job:bone_yard:claim_crew", "holding_job:bone_yard:field_recovery"]:
+		HOLDINGS.complete_work(job_id, {"method": "visual_proof"})
+	map.queue_redraw()
+	for _settle in 18:
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var resolved_path := "%s/holding_decision_open_map.png" % out_dir
+	error = get_viewport().get_texture().get_image().save_png(resolved_path)
+	if error != OK:
+		push_error("CAPTURE_FAILED %s (%s)" % [resolved_path, error_string(error)])
+		get_tree().quit(1)
+		return
+	print("CAPTURED: ", resolved_path)
 	get_tree().quit()

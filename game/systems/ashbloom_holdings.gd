@@ -101,7 +101,14 @@ static func overview() -> Dictionary:
 
 
 static func holding(id: String) -> Dictionary:
-	return ((ensure().get("holdings", {}) as Dictionary).get(id, {}) as Dictionary).duplicate(true)
+	var live := ((ensure().get("holdings", {}) as Dictionary).get(id, {}) as Dictionary).duplicate(true)
+	var definition := definition_for(id)
+	if not definition.is_empty():
+		var place := WorldHistory.subject(str(definition.record))
+		for key in ["local_work_completed", "local_work_required", "local_work_state"]:
+			if place.has(key):
+				live[key] = place[key]
+	return live
 
 
 static func nearest_id(at: Vector2) -> String:
@@ -226,6 +233,7 @@ static func complete_work(job_id: String, evidence: Dictionary = {}) -> Dictiona
 		"subject_id": job_id, "place_id": str(job.get("place_id", "")),
 		"holding_id": str(job.get("holding_id", "")), "work_type": str(job.get("work_type", "")),
 	})
+	_refresh_local_work(str(job.get("place_id", "")))
 	return job
 
 
@@ -272,6 +280,40 @@ static func _ensure_work(id: String) -> void:
 	if first_publication:
 		WorldHistory.record_event("holding_work_published", {
 			"subject_id": place_id, "holding_id": id, "job_ids": job_ids.duplicate(),
+		})
+	_refresh_local_work(place_id)
+
+
+## Connected work weakens one local claim without deciding who inherits it.
+## The later ascent/corruption act reads `ready_for_decision`; it must still
+## charge its own cost and write the actual ownership change.
+static func _refresh_local_work(place_id: String) -> void:
+	if place_id.is_empty():
+		return
+	var place := WorldHistory.subject(place_id)
+	var orders: Array = place.get("work_orders", [])
+	if orders.is_empty():
+		return
+	var completed := 0
+	for job_id in orders:
+		if str(WorldHistory.subject(str(job_id)).get("status", "")) == "completed":
+			completed += 1
+	var state := "held"
+	if completed >= orders.size():
+		state = "ready_for_decision"
+	elif completed > 0:
+		state = "disrupted"
+	var previous := str(place.get("local_work_state", ""))
+	var changes := {
+		"local_work_completed": completed, "local_work_required": orders.size(),
+		"local_work_state": state,
+	}
+	if int(place.get("local_work_completed", -1)) != completed or int(place.get("local_work_required", -1)) != orders.size() or previous != state:
+		WorldHistory.amend_subject(place_id, changes)
+	if state == "ready_for_decision" and previous != state:
+		WorldHistory.record_event("holding_claim_disrupted", {
+			"subject_id": place_id, "holding_id": str(place.get("holding_id", "")),
+			"completed_jobs": orders.duplicate(),
 		})
 
 

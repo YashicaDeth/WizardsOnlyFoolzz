@@ -1309,8 +1309,13 @@ func _draw_holding_file(rect: Rect2, subject_id: String, subject: Dictionary) ->
 		draw_string(font, Vector2(rect.position.x, y), line, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.48, 14, INK * Color(1, 1, 1, 0.82))
 		y += 19.0
 
-	CellOutzType.draw_text(self, rect.position + Vector2(0, 252), "LOCAL WORK", 11.0, MOSS, 1.2)
-	var work_y := rect.position.y + 283.0
+	var local_done := int(live.get("local_work_completed", 0))
+	var local_required := int(live.get("local_work_required", 0))
+	var local_state := str(live.get("local_work_state", "held"))
+	var pressure := "CLAIM DISRUPTED // DECISION OPEN" if local_state == "ready_for_decision" else "CLAIM PRESSURE %d/%d" % [local_done, local_required]
+	CellOutzType.draw_condensed(self, rect.position + Vector2(0, 234), pressure, 9.0, SPORE if local_state == "ready_for_decision" else COPPER, 0.76)
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 266), "LOCAL WORK", 11.0, MOSS, 1.2)
+	var work_y := rect.position.y + 297.0
 	for job: Dictionary in AshbloomHoldings.work_orders(holding_id):
 		var status := str(job.get("status", "offered"))
 		var work_tone := MOSS if status == "completed" else (COPPER if status == "active" else INK)
