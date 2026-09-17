@@ -848,6 +848,16 @@ func install_prosthetic(zone_id: String, part_data: Dictionary) -> void:
 	_refresh_zone(zone)
 
 
+## Mount visible hardware without claiming it replaces a missing limb. Rival
+## adaptations use this for an impact cage over a remembered wound or support
+## around a ruptured organ; `install_prosthetic()` remains the stronger operation
+## that restores function and removes a zone from the severed set.
+func install_hardware(zone_id: String, part_data: Dictionary) -> void:
+	var zone := canonical_zone(zone_id)
+	anatomy.install_part(zone, part_data)
+	_refresh_zone(zone)
+
+
 func snapshot() -> Dictionary:
 	var state := anatomy.snapshot()
 	state["severed"] = severed.duplicate()

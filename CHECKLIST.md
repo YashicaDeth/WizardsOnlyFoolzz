@@ -1098,7 +1098,17 @@ The last rung. Fifteen statements that are true of the hunt when this game is fi
       severing reverses their very next decision into a stand-off;
       `rival_tactics_test.gd` still covers every derivation and distance rule,
       while `enemy_ai_test.gd` proves ordinary crowd spacing is unchanged.
-- [ ] **F10.4** `v10` A rival who fled comes back changed in a way you can see
+- [x] **F10.4** `v10` A rival who fled comes back changed in a way you can see —
+      the roaming-population maintenance now spends its next open slot on an
+      escaped earned rival before generating another stranger. The shared
+      encounter builder permits that explicit return, keeps the exact subject,
+      restores their saved wounds and mounts the registry's prosthetic, organ
+      support or impact cage through `BaselineHuman` so both anatomy and mesh
+      own it. The return changes status durably, records one attributable fact
+      and cannot duplicate a person already present. Proven by
+      `hunt_rival_return_integration_test.gd` (10 checks); the real live body,
+      replacement arm and field HUD were rendered and visually inspected in
+      `captures/hunt_rival_return.png`.
 - [x] **F10.5** `v10` Death opens a real succession and somebody takes the place —
       every production encounter death calls `WireNet.open_vacancy()` and
       defers `promote_successor()` to the next idle turn. The saved post is

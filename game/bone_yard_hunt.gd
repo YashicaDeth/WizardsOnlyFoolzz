@@ -7009,7 +7009,8 @@ func _on_reality_misfire(encounter: Dictionary, at: Vector3) -> void:
 func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 	var subject_id := "%s_actor" % str(encounter.get("instance_id", "misfire"))
 	var saved_actor := WorldHistory.subject(subject_id)
-	if str(saved_actor.get("status", "")) in ["dead", "escaped"]:
+	var returning_rival := bool(encounter.get("returning_rival", false)) and bool(saved_actor.get("is_rival", false)) and str(saved_actor.get("status", "")) == "escaped"
+	if str(saved_actor.get("status", "")) == "dead" or (str(saved_actor.get("status", "")) == "escaped" and not returning_rival):
 		return {}
 	# AE.3. A caller that already knows who this is says so, and is believed.
 	# The population resolves its own people through `cast_names.gd` and passes
@@ -7091,6 +7092,9 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 	rig.gore = viscera_fx
 	rig.build(subject_id, rig_config)
 	HUNTER_APPEARANCE.style_world_rig(rig, subject_id, str(encounter.kind) == "hostile")
+	var rival_changed := _fit_rival_adaptation(rig, saved_actor)
+	if rival_changed:
+		identity.text = "%s // RETURNED RIVAL" % display_name.to_upper()
 	var anatomy: Node = rig.anatomy
 	# AE.3. What is on the body when it goes down. A caller may say; everything
 	# else keeps the Ashline pockets this has always spawned with.
@@ -7102,15 +7106,60 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 		loot = ["Ashline toll teeth", "rust scrip"] if str(encounter.kind) == "hostile" else ["weather-heart filament", "dead god relay"]
 	encounter_actors.append({"subject_id": subject_id, "display_name": display_name, "node": actor, "rig": rig, "anatomy": anatomy, "state": "hunting", "disposition": "hostile", "speed": 3.7, "loot": loot, "loot_at_risk": false, "dead": false})
 	encounter_actors.back()["encounter_id"] = str(encounter.get("instance_id", ""))
+	if returning_rival:
+		encounter_actors.back()["returning_rival"] = true
 	if str(saved_actor.get("status", "")) in ["spared", "recruited"]:
 		encounter_actors.back().state = str(saved_actor.status)
 		encounter_actors.back().disposition = "ally" if str(saved_actor.status) == "recruited" else "neutral"
 	WorldHistory.register_subject(subject_id, {"name": display_name, "kind": "person", "role": str(encounter.get("role", encounter.kind)), "elo": elo, "status": "encountered", "memory": summary_from(encounter), "wounds": [], "anatomy": anatomy.call("snapshot"), "relations": {"player": {"kind": "enemy", "strength": 35}}})
+	if returning_rival:
+		var return_count := int(saved_actor.get("rival_returns", 0)) + 1
+		WorldHistory.amend_subject(subject_id, {
+			"status": "hunting", "rival_returns": return_count,
+			"anatomy_state": rig.snapshot(),
+		})
+		WorldHistory.record_event("rival_returned_to_hunt", {
+			"subject_id": subject_id, "return_count": return_count,
+			"adaptation": (saved_actor.get("rival_adaptation", {}) as Dictionary).duplicate(true),
+			"location": HUNT_LOCATION,
+		})
 	# AE.3. Returned so the caller can finish dressing an actor it has a name
 	# and a body for - a lantern, a proper label, a faction on the record. The
 	# misfire director and `_spawn_ashline_reinforcements()` ignore this, as
 	# they always ignored the absence of it.
 	return encounter_actors.back()
+
+
+## F10.4. Put the answer RivalRegistry derived onto the body that returns. The
+## saved anatomy already restores scars and missing tissue; this adds the thing
+## the rival did about it. All hardware goes through BaselineHuman, so anatomy,
+## combat capability, INDEX and visible mesh read one installation.
+func _fit_rival_adaptation(rig: BaselineHuman, subject: Dictionary) -> bool:
+	if not bool(subject.get("is_rival", false)):
+		return false
+	var adaptation: Dictionary = subject.get("rival_adaptation", {})
+	if adaptation.is_empty():
+		return false
+	var zone := str(adaptation.get("zone", "torso"))
+	var item := str(adaptation.get("item", "remembered impact cage"))
+	match str(adaptation.get("kind", "scar")):
+		"prosthetic":
+			rig.install_prosthetic(zone, {
+				"name": item, "armor": 0.34, "restores": 0.82,
+				"tint": "c15d2d",
+			})
+		"organ_support":
+			rig.install_hardware(zone, {
+				"name": item, "armor": 0.27, "tint": "8e6a54",
+			})
+		"armour":
+			rig.install_hardware(zone, {
+				"name": item, "armor": 0.22, "tint": "6c6258",
+			})
+		# A scar is already part of the restored body's wound geometry. Returning
+		# true still marks the identity as changed rather than pretending no
+		# adaptation exists because it did not require new hardware.
+	return true
 
 
 ## The Hunt Grounds had no standing population at all. Every hostile in the
@@ -7188,7 +7237,57 @@ func _maintain_roamers(delta: float) -> void:
 	_roamer_clock = 0.0
 	if _living_hostiles() >= ROAMER_TARGET:
 		return
+	# A person the player made into a rival gets the open population slot before
+	# another anonymous road body. This is the missing production bridge between
+	# RivalRegistry's conclusion and a body actually coming back into play.
+	if _spawn_returning_rival():
+		return
 	_spawn_roamer()
+
+
+func _spawn_returning_rival() -> bool:
+	var candidate_ids: Array[String] = []
+	for subject_id: String in WorldHistory.all_subjects():
+		var subject := WorldHistory.subject(subject_id)
+		if subject_id == CAST.id_for(CAPTAIN_SLOT) or not subject_id.ends_with("_actor"):
+			continue
+		if str(subject.get("kind", "")) != "person" or str(subject.get("status", "")) != "escaped" or not bool(subject.get("is_rival", false)):
+			continue
+		if encounter_actors.any(func(actor: Dictionary): return str(actor.get("subject_id", "")) == subject_id):
+			continue
+		candidate_ids.append(subject_id)
+	if candidate_ids.is_empty():
+		return false
+	candidate_ids.sort()
+	var subject_id := candidate_ids[0]
+	var subject := WorldHistory.subject(subject_id)
+	var instance_id := subject_id.trim_suffix("_actor")
+	var spawned := _spawn_encounter_actor({
+		"instance_id": instance_id, "kind": "hostile", "returning_rival": true,
+		"display_name": str(subject.get("name", "Returned Rival")),
+		"role": str(subject.get("role", "RIVAL")), "elo": int(subject.get("elo", 1110)),
+		"variation": abs(hash(subject_id)),
+		"summary": "The same person returned with the last encounter still on their body.",
+	}, _rival_return_position(subject_id))
+	return not spawned.is_empty()
+
+
+func _rival_return_position(subject_id: String) -> Vector3:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("rival_return:%s:%d" % [subject_id, int(WorldHistory.subject(subject_id).get("rival_returns", 0))])
+	var centres: Array = WORLD_GENERATOR.DISTRICT_CENTERS
+	for attempt in centres.size():
+		var centre: Vector3 = centres[(abs(hash(subject_id)) + attempt) % centres.size()]
+		var angle := rng.randf() * TAU
+		var candidate := centre + Vector3(cos(angle), 0, sin(angle)) * rng.randf_range(10.0, 34.0)
+		var reach := player.distance_to(candidate)
+		if reach >= ROAMER_MIN_SPAWN_RANGE and reach <= ROAMER_MAX_SPAWN_RANGE:
+			return pathfinder.safe_position(candidate + Vector3.UP)
+	# The deterministic district pass can fail while the player stands at the
+	# edge of the generated region. The fallback is still outside view and still
+	# projected through the shared pathfinder rather than dropped through terrain.
+	var fallback_angle := rng.randf() * TAU
+	return pathfinder.safe_position(player + Vector3(cos(fallback_angle), 0, sin(fallback_angle)) * ROAMER_MIN_SPAWN_RANGE + Vector3.UP)
 
 
 ## AA10.13. Accepted work leaves the dossier and enters the same physical world
@@ -7509,8 +7608,7 @@ func _spawn_rival() -> void:
 		# The industrial arm is now an actual prosthetic in the anatomy record,
 		# so it restores function, changes her combat ratio and shows on the rig
 		# rather than being a cylinder parented next to her.
-		if str(adaptation.get("kind", "")) == "prosthetic":
-			enemy_rig.install_prosthetic(str(adaptation.get("zone", "left_arm")), {"name": str(adaptation.get("item", "Ashline industrial limb")), "armor": 0.34, "restores": 0.82, "tint": Color("c15d2d")})
+		_fit_rival_adaptation(enemy_rig, mara)
 		var altered_vehicle := (load(SCRAP_SKIFF_PATH) as PackedScene).instantiate()
 		altered_vehicle.name = "MarasRebuiltWrecker"
 		altered_vehicle.position = Vector3(4.0, -0.45, 1.8)
