@@ -56,6 +56,17 @@ func _ready() -> void:
 	gate._cycle_gore()
 	check(str(WorldHistory.subject("settings").get("gore", "")) != before, "violence cycles from the pause menu too")
 
+	# Restoring saved window state is application, not another player choice.
+	var fullscreen: bool = bool(gate._fullscreen())
+	WorldHistory.amend_subject("settings", {"fullscreen": fullscreen})
+	var screen_events := WorldHistory.event_count("screen_setting_changed")
+	gate._restore_screen()
+	check(WorldHistory.event_count("screen_setting_changed") == screen_events,
+		"restoring saved fullscreen state does not fabricate a player setting event")
+	gate._set_fullscreen(fullscreen)
+	check(WorldHistory.event_count("screen_setting_changed") == screen_events + 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"an explicit fullscreen choice still persists once and closes its transaction")
+
 	# Rows are the menu; settings has to be reachable from root.
 	gate.page = "root"
 	gate._build_rows()

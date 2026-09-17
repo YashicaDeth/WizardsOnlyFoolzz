@@ -115,7 +115,6 @@ func _highlight(index: int) -> void:
 
 func _choose(index: int) -> void:
 	var mode := str(TIERS[index].id)
-	WorldHistory.register_subject("settings", {"gore": mode})
 	WorldHistory.update_subject("settings", {"gore": mode}, "gore_setting_chosen")
 	BaselineHuman.apply_gore_setting()
 	hide()

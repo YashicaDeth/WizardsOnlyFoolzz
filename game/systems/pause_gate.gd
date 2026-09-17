@@ -95,7 +95,6 @@ func _apply_mix() -> void:
 
 
 func _set_volume(bus_name: String, level: float) -> void:
-	WorldHistory.register_subject(SETTINGS_ID, {})
 	WorldHistory.update_subject(SETTINGS_ID, {"volume_%s" % bus_name.to_lower(): clampf(level, 0.0, 1.0)}, "audio_setting_changed")
 	_apply_mix()
 
@@ -107,7 +106,6 @@ func _gore_mode() -> String:
 func _cycle_gore() -> void:
 	const ORDER := ["FULL", "REDUCED", "OFF"]
 	var next: String = ORDER[(maxi(0, ORDER.find(_gore_mode())) + 1) % ORDER.size()]
-	WorldHistory.register_subject(SETTINGS_ID, {})
 	WorldHistory.update_subject(SETTINGS_ID, {"gore": next}, "gore_setting_chosen")
 	BaselineHuman.apply_gore_setting()
 
@@ -120,10 +118,13 @@ func _fullscreen() -> bool:
 	return DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]
 
 
-func _set_fullscreen(on: bool) -> void:
-	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_WINDOWED)
-	WorldHistory.register_subject(SETTINGS_ID, {})
-	WorldHistory.update_subject(SETTINGS_ID, {"fullscreen": on}, "screen_setting_changed")
+func _set_fullscreen(on: bool, persist := true) -> void:
+	# Headless verification has no window to resize; the preference still needs
+	# to be testable and persist without asking the dummy display server to wait.
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_WINDOWED)
+	if persist:
+		WorldHistory.update_subject(SETTINGS_ID, {"fullscreen": on}, "screen_setting_changed")
 
 
 ## Applied once at startup, because a setting that is saved and never reapplied
@@ -132,7 +133,8 @@ func _restore_screen() -> void:
 	var stored: Dictionary = WorldHistory.subject(SETTINGS_ID)
 	if not stored.has("fullscreen"):
 		return
-	_set_fullscreen(bool(stored["fullscreen"]))
+	# Applying a preference is not the player changing it again.
+	_set_fullscreen(bool(stored["fullscreen"]), false)
 
 
 ## Rows are rebuilt each frame the plate is open, because their labels carry
