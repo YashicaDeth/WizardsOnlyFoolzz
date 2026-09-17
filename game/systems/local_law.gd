@@ -140,7 +140,7 @@ static func witness_a_wrong(place_id: String, faction_id: String, ledger: Witnes
 		var faction := WorldHistory.subject(faction_id)
 		if not faction.is_empty():
 			WorldHistory.amend_subject(faction_id, {"grudge": float(faction.get("grudge", 0.0)) + unrest * GRUDGE_SCALE})
-		WorldHistory.record_event("law_dispatched", {"place_id": place_id, "faction_id": faction_id, "actor_id": actor_id, "unrest_spent": unrest})
+		WorldHistory.record_event("law_dispatched", {"place_id": place_id, "faction_id": faction_id, "actor_id": actor_id, "source_sequence": sequence, "unrest_spent": unrest})
 		unrest = 0.0
 		dispatched = true
 	WorldHistory.amend_subject(place_id, {"unrest": unrest, "law_seen_sequences": answered})
@@ -167,4 +167,6 @@ static func answer_report(ledger: WitnessLedger, report: Dictionary) -> Dictiona
 	var result := witness_a_wrong(place_id, holder_id, ledger, event, str(details.get("actor", details.get("actor_id", "player"))))
 	result["place_id"] = place_id
 	result["faction_id"] = holder_id
+	result["source_sequence"] = int(report.get("sequence", -1))
+	result["at"] = details.get("at", {})
 	return result

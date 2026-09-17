@@ -45,7 +45,12 @@ can answer it. The faction judges the act from its existing Tree position, so
 Ashline ground may punish mercy while Gate Lantern ground punishes execution.
 One incident can be remembered only once per holding, even if two witnesses
 report it. The resulting unrest lives on the same place record MAP, INDEX and
-the Board already share.
+the Board already share. When that memory crosses its threshold, the holder
+sends two generated, persistent people through the Hunt's ordinary encounter
+pipeline. They have full anatomy, loot and resolution choices and walk a real
+route to the recorded scene of the acts—not to the player's magically current
+coordinate. An unresolved team restores from WorldHistory when the scene is
+rebuilt.
 
 17 September Black Mirror note: its seven apps are different instruments inside
 one object, not seven unrelated UI compositions. The casing now owns a fixed

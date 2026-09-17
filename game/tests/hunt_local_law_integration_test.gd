@@ -73,5 +73,51 @@ func _ready() -> void:
 		return str(event.get("type", "")) == "local_unrest" and str((event.get("details", {}) as Dictionary).get("place_id", "")) == "ashbloom:tunnel_mouth"),
 		"the resulting unrest is attributable to the same holding in world history")
 
+	# One incident is memory, not an enemy printer. Repeated distinct witnessed
+	# acts cross the real threshold and should finally put the holder's own people
+	# onto the road through the ordinary encounter pipeline.
+	hunt.kill_cam.cancel()
+	for repeat in 3:
+		var instance_id := "law_target_repeat_%d" % repeat
+		hunt._spawn_encounter_actor({
+			"instance_id": instance_id, "kind": "hostile", "display_name": "Repeat Debtor %d" % repeat,
+			"role": "GATE LANTERN DEBTOR", "summary": "Another witnessed decision on Lantern ground.",
+		}, at)
+		var repeated: Dictionary = hunt.encounter_actors.back()
+		repeated.node.position = at
+		WorldHistory.amend_subject(str(repeated.subject_id), {"faction_id": "gate_lanterns", "faction": "Gate Lanterns"})
+		repeated.anatomy.go_down()
+		hunt.resolution_target = str(repeated.subject_id)
+		hunt._resolve_downed("execute")
+		var next_reports: Array = hunt.witness_ledger.tick(WitnessLedger.REPORT_DELAY * 2.0)
+		hunt._answer_local_reports(next_reports)
+		hunt.kill_cam.cancel()
+	check(WorldHistory.event_count("law_dispatched") == 1 and WorldHistory.event_count("local_law_team_dispatched") == 1,
+		"distinct local wrongs cross the threshold once and commission one physical team")
+	var enforcers: Array = hunt.encounter_actors.filter(func(actor: Dictionary):
+		return str(actor.get("encounter_id", "")).begins_with("local_law_"))
+	check(enforcers.size() == 2, "the holder sends a two-person team into the live encounter world")
+	check(enforcers.all(func(actor: Dictionary):
+		return str(WorldHistory.subject(str(actor.subject_id)).get("faction_id", "")) == "gate_lanterns" and actor.rig is BaselineHuman),
+		"both enforcers are persistent Gate Lantern people with full anatomy, not law markers")
+	check(str((WorldHistory.subject("ashbloom:tunnel_mouth").get("active_law_dispatch", {}) as Dictionary).get("status", "")) == "active",
+		"the active warrant persists on the holding instead of depending on the rolling event log")
+	var distance_before := (enforcers[0].node as Node3D).global_position.distance_to(at) if not enforcers.is_empty() else 0.0
+	for _step in 3:
+		hunt._update_encounter_actors(0.5)
+	var distance_after := (enforcers[0].node as Node3D).global_position.distance_to(at) if not enforcers.is_empty() else 0.0
+	check(distance_after < distance_before, "the dispatched team physically follows a route to the recorded scene instead of knowing the player's new position")
+	for index in range(hunt.encounter_actors.size() - 1, -1, -1):
+		var candidate: Dictionary = hunt.encounter_actors[index]
+		if not str(candidate.get("encounter_id", "")).begins_with("local_law_"):
+			continue
+		(candidate.node as Node3D).queue_free()
+		hunt.encounter_actors.remove_at(index)
+	await get_tree().process_frame
+	hunt._restore_local_law_teams()
+	var restored: Array = hunt.encounter_actors.filter(func(actor: Dictionary):
+		return str(actor.get("encounter_id", "")).begins_with("local_law_"))
+	check(restored.size() == 2, "an unresolved physical law team restores from world history after the scene is rebuilt")
+
 	print("HUNT_LOCAL_LAW_INTEGRATION_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

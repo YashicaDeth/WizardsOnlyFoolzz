@@ -4272,23 +4272,19 @@ arrest anybody.
       values every frame against every live hostile (light from
       `WorldClock.daylight()`/the handheld; noise from sprinting, the one
       input with no other system behind it yet; cover from a real raycast).
-      Unblocks AS1.5 and AU1.10's AE1.4. `player_unseen`/`player_visibility`
-      are computed and correct but nothing reads them yet — see AE1.2/AE1.3.
-- [ ] **AE1.2** An unseen kill differs from a seen one, mechanically and in the record
-- [ ] **AE1.3** Assassination as a verb: reach somebody who does not know you are there
-- [ ] **AE1.4** Law figures respond to what was actually witnessed (`witness_ledger.gd`)
-- [ ] **AE1.5** Punishment is local: the holding remembers, and the holding sends them
-- [ ] **AE1.6** Karma is an axis, not a score — the law reads position, not "evil"
-- [ ] **AE1.7** Being hunted by the law is the Hunt System pointed back at you (F)
-- [x] **AE1.1** Unseen is a real state with real inputs — light, noise, cover, distance — `LocalLaw.unseen_state()`: combines real 0..1 light/noise/cover plus real distance against a real sight range (defaulting to `witness_ledger.gd`'s own `SIGHT_RANGE`, so being unseen and being unwitnessed never quietly disagree about how far is too far). Never a single invented "stealth" stat measured on its own authority
+      `LocalLaw.unseen_state()` uses the same four inputs and defaults to
+      `WitnessLedger.SIGHT_RANGE`, so being unseen and being unwitnessed never
+      quietly disagree about how far is too far. `player_unseen` and
+      `player_visibility` remain diagnostic summaries; each actor's live
+      `tracking_player` / `tracking_light` verdict is what pursuit actually reads.
 - [x] **AE1.2** An unseen kill differs from a seen one, mechanically and in the record — `LocalLaw.assassinate()` routes every kill through `witness_ledger.gd`'s real `record()` (F1), carrying a real `unseen` flag; the mechanical difference is not a second flag anybody has to check, it is that a kill with no witnesses passed in has nothing in flight to ever report it, so it can never reach a faction's knowledge at all
 - [x] **AE1.3** Assassination as a verb: reach somebody who does not know you are there — `LocalLaw.assassinate()`, through the exact same `npc_resolution`/`execute` vocabulary every other execution already uses (`event_karma()`, `route_endings.gd`, `ascent_entities.gd`) so it moves karma and the Tree exactly as hard as any other kill; the only thing that changes is whether anybody was ever there to know
 - [x] **AE1.4** Law figures respond to what was actually witnessed (`witness_ledger.gd`) — production Hunt resolutions now record through the live ledger with nearby living witnesses instead of writing around it. `LocalLaw.answer_report()` accepts only a report that completed the real F1 delay and reached the faction holding the scene; the global event log cannot dispatch law by itself. Two witnesses cannot charge one source sequence twice. `hunt_local_law_integration_test` drives a real execute resolution in the production Hunt and proves all seven stages from scene position to delayed faction knowledge
 - [x] **AE1.5** Punishment is local: the holding remembers, and the holding sends them — `AshbloomHoldings.jurisdiction_at()` resolves the act's real X/Z to the same canonical `place` subject MAP, INDEX and Board use without revealing unsurveyed land. That subject (`held_by`, `unrest`, source sequences) accumulates real offence magnitude per witnessed wrong on its own ground; once it remembers enough (`RESPONSE_THRESHOLD`) it spends that memory and raises the answering faction's own real `grudge` — the exact field `wire_net.gd`'s channel-contest retaliation (K4.6) and `the_four_horsemen.gd` (K2.5) already use for "the world acts on you", not a second consequence channel. Covered by `local_law_test` plus the production-scene integration above
 - [x] **AE1.6** Karma is an axis, not a score — the law reads position, not "evil" — `LocalLaw.offence_magnitude()`: a faction's own real `FACTION_TREE_AXIS` position decides whether an act was even a wrong to it, read against the same real `event_karma()` every act already carries. Verified both directions: the identical execution is no offence to a faction deep in Descent and a real one to a faction that climbed the other way, and the identical act of mercy inverts which faction is offended — nowhere is there a universal crime score either reads instead
-- [ ] **AE1.7** Being hunted by the law is the Hunt System pointed back at you (F) — needs `rival_registry.gd` (Lane 4's); `witness_a_wrong()`'s real `grudge` rise is already the field that system reads, so wiring it in is additive once asked for as an API, not attempted here
+- [x] **AE1.7** Being hunted by the law is the Hunt System pointed back at you (F) — crossing a holding's real unrest threshold commissions exactly one two-person team from the faction that holds it. Stable generated names become persistent WorldHistory people and enter `_spawn_encounter_actor()`, so they inherit the Hunt's full anatomy, AI, wounds, loot, defeat/resolution and save status rather than existing as police icons. Their warrant carries the recorded scene coordinate and they physically path there; it never tracks the player's current coordinate for free. The active contract persists on the holding itself rather than depending on the rolling event window, so an unresolved team restores when the Hunt scene is rebuilt even after old events age out. `hunt_local_law_integration_test` proves the complete route in 13 production-scene checks
 
-Covered by `tests/local_law_test.gd` (23 checks). `tests/karma_test.gd`, `tests/witness_test.gd`, `tests/route_endings_test.gd`, `tests/ascent_entities_test.gd` and `tests/propagation_test.gd` re-run clean.
+Covered by `tests/local_law_test.gd` (26 checks) and `tests/hunt_local_law_integration_test.gd` (13 checks). `tests/karma_test.gd`, `tests/witness_test.gd`, `tests/route_endings_test.gd`, `tests/ascent_entities_test.gd`, `tests/resolution_test.gd` and `tests/propagation_test.gd` re-run clean.
 
 
 

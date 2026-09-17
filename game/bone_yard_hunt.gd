@@ -920,6 +920,7 @@ func _ready() -> void:
 	# fails to build the canonical hunt is already standing.
 	_spawn_rival()
 	_spawn_yard_population()
+	_restore_local_law_teams()
 	# AP1.6. "Attempt to kill him" hands off here rather than fighting the
 	# ringmaster inside `rift_derby.gd`, which has no player body or combat
 	# system at all — this is a forced encounter through the same real actor
@@ -4314,6 +4315,113 @@ func _answer_local_reports(reports: Array) -> void:
 		if bool(response.get("dispatched", false)):
 			var place := WorldHistory.subject(str(response.get("place_id", "")))
 			prompt.text = "%s HAS REMEMBERED ENOUGH // ITS HOLDER IS MOVING" % str(place.get("name", "THIS GROUND")).to_upper()
+			_dispatch_local_law_team(response)
+
+
+## AE1.7. A threshold crossing is not just a grudge number. Two generated,
+## persistent people from the faction that actually holds the ground enter the
+## ordinary encounter pipeline: same anatomy, AI, wounds, loot and resolution
+## choices as everybody else. They are sent to the recorded scene, not given
+## omniscient access to the player's current position.
+func _dispatch_local_law_team(response: Dictionary) -> void:
+	var sequence := int(response.get("source_sequence", -1))
+	var place_id := str(response.get("place_id", ""))
+	var faction_id := str(response.get("faction_id", ""))
+	if sequence < 0 or place_id == "" or faction_id == "":
+		return
+	if WorldHistory.events.any(func(event: Dictionary):
+		return str(event.get("type", "")) == "local_law_team_dispatched" and int((event.get("details", {}) as Dictionary).get("source_sequence", -2)) == sequence):
+		return
+	var at_data: Dictionary = response.get("at", {}) if response.get("at", {}) is Dictionary else {}
+	var target := Vector3(float(at_data.get("x", player.x)), 0.0, float(at_data.get("z", player.z)))
+	var subjects := _restore_local_law_team(sequence, place_id, faction_id, target)
+	var contract := {
+		"status": "active", "source_sequence": sequence, "faction_id": faction_id,
+		"target": {"x": target.x, "z": target.z}, "subjects": subjects,
+	}
+	WorldHistory.amend_subject(place_id, {"active_law_dispatch": contract})
+	WorldHistory.record_event("local_law_team_dispatched", {
+		"source_sequence": sequence, "place_id": place_id, "faction_id": faction_id,
+		"target": {"x": target.x, "z": target.z}, "subjects": subjects,
+	})
+
+
+func _restore_local_law_teams() -> void:
+	# Events are a rolling historical window; the active contract belongs on
+	# the place and therefore survives after its dispatch event ages out.
+	ASHBLOOM_HOLDINGS.ensure()
+	for definition: Dictionary in ASHBLOOM_HOLDINGS.DEFINITIONS:
+		var place_id := str(definition.record)
+		var contract: Dictionary = WorldHistory.subject(place_id).get("active_law_dispatch", {})
+		if str(contract.get("status", "")) != "active":
+			continue
+		var sequence := int(contract.get("source_sequence", -1))
+		if sequence < 0:
+			continue
+		if not _local_law_team_unresolved(sequence):
+			contract["status"] = "resolved"
+			WorldHistory.amend_subject(place_id, {"active_law_dispatch": contract})
+			continue
+		var target_data: Dictionary = contract.get("target", {})
+		_restore_local_law_team(sequence, place_id, str(contract.get("faction_id", "")), Vector3(float(target_data.get("x", 0.0)), 0.0, float(target_data.get("z", 0.0))))
+
+
+func _local_law_team_unresolved(sequence: int) -> bool:
+	var found := false
+	for slot in 2:
+		var subject_id := "local_law_%d_%d_actor" % [sequence, slot]
+		var record := WorldHistory.subject(subject_id)
+		if record.is_empty():
+			return true
+		found = true
+		if str(record.get("status", "")) not in ["dead", "escaped", "spared", "recruited"]:
+			return true
+	return not found
+
+
+func _restore_local_law_team(sequence: int, place_id: String, faction_id: String, target: Vector3) -> Array[String]:
+	var subjects: Array[String] = []
+	if place_id == "" or faction_id == "":
+		return subjects
+	var place := WorldHistory.subject(place_id)
+	var place_at: Dictionary = place.get("at", {})
+	var centre := Vector3(float(place_at.get("x", target.x)), 0.0, float(place_at.get("z", target.z)))
+	var faction := WorldHistory.subject(faction_id)
+	var faction_name := str(faction.get("name", faction_id)).replace("_", " ")
+	var toward := target - centre
+	toward.y = 0.0
+	if toward.length_squared() < 0.01:
+		toward = Vector3(1, 0, 0)
+	toward = toward.normalized()
+	var across := Vector3(-toward.z, 0, toward.x)
+	for slot in 2:
+		var instance_id := "local_law_%d_%d" % [sequence, slot]
+		var subject_id := "%s_actor" % instance_id
+		if str(WorldHistory.subject(subject_id).get("status", "")) in ["dead", "escaped", "spared", "recruited"]:
+			continue
+		if encounter_actors.any(func(actor: Dictionary): return str(actor.get("encounter_id", "")) == instance_id):
+			subjects.append(subject_id)
+			continue
+		var who := CAST.person(instance_id)
+		var spawn_at := centre - toward * 18.0 + across * (-5.0 if slot == 0 else 5.0)
+		var spawned := _spawn_encounter_actor({
+			"instance_id": instance_id, "kind": "hostile", "display_name": str(who.name),
+			"role": "%s CLAIM ENFORCER" % faction_name.to_upper(),
+			"elo": 1080 + slot * 45, "variation": 520 + sequence * 3 + slot,
+			"tint": "664238", "loot": ["local claim writ", "field restraint"],
+			"summary": "Sent by %s to answer a witnessed wrong on %s." % [faction_name, str(place.get("name", place_id))],
+		}, spawn_at)
+		if spawned.is_empty():
+			continue
+		spawned["law_target"] = target
+		spawned["law_dispatch_sequence"] = sequence
+		spawned["law_arrived"] = false
+		WorldHistory.amend_subject(str(spawned.subject_id), {
+			"faction": faction_name, "faction_id": faction_id, "law_dispatch": sequence,
+			"contract_place": place_id, "memory": "Sent to answer a witnessed wrong on %s." % str(place.get("name", place_id)),
+		})
+		subjects.append(str(spawned.subject_id))
+	return subjects
 
 
 func _nearest_takeable_chunk(radius: float) -> Node3D:
@@ -4578,6 +4686,20 @@ func _update_encounter_actors(delta: float) -> void:
 				RIVAL_REGISTRY.consider(str(actor.subject_id))
 				node.queue_free()
 				encounter_actors.remove_at(index)
+		elif actor.get("law_target") is Vector3 and not bool(actor.get("law_arrived", false)):
+			# A dispatched team knows the scene it was sent to, not where the
+			# player moved afterward. Walk the real route there; normal perception
+			# takes over only after arrival.
+			var law_target: Vector3 = actor.law_target
+			if node.global_position.distance_to(law_target) > 2.5:
+				_move_actor_on_route(actor, law_target, actor_delta)
+			else:
+				actor["law_arrived"] = true
+				WorldHistory.amend_subject(str(actor.subject_id), {"status": "searching_dispatched_scene"})
+				WorldHistory.record_event("local_law_enforcer_arrived", {
+					"subject_id": str(actor.subject_id), "source_sequence": int(actor.get("law_dispatch_sequence", -1)),
+					"at": {"x": law_target.x, "z": law_target.z},
+				})
 		elif LauncherActor.is_launcher(actor) and LauncherActor.in_envelope(distance) and (bool(actor.get("tracking_player", false)) or bool(actor.get("tracking_light", false))):
 			# AD3.1. A launcher holds its ground and works the tube; all of the
 			# decision lives in `launcher_actor.gd` so this branch stays a hook
@@ -4968,6 +5090,7 @@ func _resolve_downed(outcome: String) -> void:
 		"holding_id": str(jurisdiction.get("holding_id", "")),
 		"place_id": str(jurisdiction.get("place_id", "")),
 		"held_by": str(jurisdiction.get("held_by", "")),
+		"at": {"x": act_at.x, "z": act_at.z},
 	}
 	if outcome == "execute":
 		var finish := _execution_target(actor)
