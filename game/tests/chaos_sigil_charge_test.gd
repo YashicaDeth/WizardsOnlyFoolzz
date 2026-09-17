@@ -51,6 +51,7 @@ func _ready() -> void:
 	for event in WorldHistory.events:
 		events.append(str(event.get("type", "")))
 	check(events.count("sigil_charged") == 3, "one event per successful charge above, none for the refused ones (%d)" % events.count("sigil_charged"))
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "body payment, pending count and every charge fact close one transaction")
 
 	print("CHAOS_SIGIL_CHARGE_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

@@ -82,6 +82,7 @@ func _ready() -> void:
 	var overcharge_result := ChaosSigil.resolve(overcharged_fired, "carrier")
 	check(str(overcharge_result.get("result", "")) == "misfired", "a corrupted sigil always misfires, even naming a real family")
 	check(str(overcharge_result.get("family", "z")) == "", "a corrupted sigil's own words never get to matter")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "successful and misfired resolutions both close their nested effect transaction")
 
 	print("CHAOS_SIGIL_RESOLVE_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
