@@ -543,7 +543,11 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
       reloading while it is still lost reconstructs the same pickable serial
       there instead of trapping the save in `possessed = false`. Verified by
       `tests/handheld_world_drop_test.gd` (15 checks), plus the existing
-      `handheld_drop_test.gd` and `device_possession_test.gd`; windowed evidence
+      `handheld_drop_test.gd` and `device_possession_test.gd`; deliberate drop
+      and recovery now route condition/possession persistence and their durable
+      action receipts through one transaction apiece, while confiscation
+      remains a distinct world event with no counterfeit player receipt
+      (`device_possession_test.gd`, 22 checks). Windowed evidence
       at `captures/c1_7_dropped_black_mirror.png` shows the real world object,
       its serial and the recovery prompt in the production HUD.
 

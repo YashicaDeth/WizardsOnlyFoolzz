@@ -4145,7 +4145,7 @@ func _pick_up_handheld() -> void:
 	if dropped_handheld == null or not is_instance_valid(dropped_handheld):
 		return
 	var serial: int = handheld.serial
-	handheld.repossess()
+	handheld.repossess({"location": HUNT_LOCATION})
 	WorldHistory.amend_subject("handheld", {"dropped_scene": "", "dropped_position": []})
 	dropped_handheld.queue_free()
 	dropped_handheld = null

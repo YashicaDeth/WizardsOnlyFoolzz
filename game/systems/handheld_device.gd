@@ -43,6 +43,7 @@ const PAGE_AUDIO := preload("res://systems/black_mirror_transition_audio.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 const RESONANCE_READOUT := preload("res://systems/resonance_readout.gd")
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 ## L2.1. A part in the bag is worth putting on the wall. The handheld does not
 ## know the board exists — it hands the reference up, the way the index does.
@@ -450,7 +451,7 @@ func save_device() -> void:
 ## identity (serial, condition, wear) — what a caller elsewhere (the world
 ## scene owns 3D space, not this file) needs to actually place a dropped
 ## unit in the world rather than just deleting the player's access to it.
-func _lose_possession(event_type: String, details: Dictionary) -> Dictionary:
+func _lose_possession(event_type: String, details: Dictionary, player_act := false) -> Dictionary:
 	if not possessed:
 		return {"ok": false, "reason": "ALREADY NOT IN HAND"}
 	close_device()
@@ -458,7 +459,10 @@ func _lose_possession(event_type: String, details: Dictionary) -> Dictionary:
 	save_device()
 	var payload := details.duplicate(true)
 	payload["serial"] = serial
-	WorldHistory.record_event(event_type, payload)
+	if player_act:
+		PLAYER_ACTION_LEDGER.record(event_type, payload)
+	else:
+		WorldHistory.record_event(event_type, payload)
 	return {"ok": true, "serial": serial, "condition": condition, "battery": battery, "wear_log": wear_log.duplicate(), "impacts": impacts.duplicate(true)}
 
 
@@ -466,9 +470,14 @@ func drop() -> Dictionary:
 	# C10.8. A deliberate drop is not a free inventory toggle. The lower glass
 	# takes the small, repeatable impact before possession leaves, so the exact
 	# same persisted object is the one that lands damaged in the world.
-	if possessed:
-		take_wear(0.025, "deliberate drop", Vector2(0.52, 0.88))
-	var result := _lose_possession("device_dropped", {})
+	if not possessed:
+		return {"ok": false, "reason": "ALREADY NOT IN HAND"}
+	# Wear, possession, device persistence and the one player receipt are one
+	# deliberate gesture even though condition and ownership both change.
+	WorldHistory.begin_ledger_batch()
+	take_wear(0.025, "deliberate drop", Vector2(0.52, 0.88))
+	var result := _lose_possession("device_dropped", {}, true)
+	WorldHistory.commit_ledger_batch()
 	if bool(result.get("ok", false)):
 		dropped.emit(result)
 	return result
@@ -481,12 +490,16 @@ func confiscate(reason := "") -> Dictionary:
 ## The other half — found again, bought back, or handed back by whoever took
 ## it. Wear travels with it either way: this is the same physical object
 ## coming back, not a fresh one replacing it.
-func repossess() -> void:
+func repossess(details: Dictionary = {}) -> void:
 	if possessed:
 		return
+	WorldHistory.begin_ledger_batch()
 	possessed = true
 	save_device()
-	WorldHistory.record_event("device_repossessed", {"serial": serial})
+	var payload := details.duplicate(true)
+	payload["serial"] = serial
+	PLAYER_ACTION_LEDGER.record("device_repossessed", payload)
+	WorldHistory.commit_ledger_batch()
 
 
 ## Something happened to it. Wear only ever goes one way — a cracked screen does
