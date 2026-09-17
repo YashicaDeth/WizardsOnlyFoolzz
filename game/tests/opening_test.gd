@@ -153,9 +153,11 @@ func _ready() -> void:
 	var rig = wrecker.get_node_or_null("DriverRig")
 	check(rig is BaselineHuman, "derby drivers use the shared baseline rig")
 	var driver_subject := str(wrecker.get_meta("driver_subject", ""))
-	derby._injure_driver(wrecker, 60, Vector3(0, 0, 1), false)
+	derby._damage_target(wrecker, 18.0, 1.0, "ledger_probe_ready_msec")
 	var state: Dictionary = WorldHistory.subject(driver_subject).get("anatomy_state", {})
 	check(state.has("zones"), "a derby injury is recorded on the driver's subject")
+	check(WorldHistory.event_count("derby_driver_injured") == 1 and WorldHistory.event_count("derby_vehicle_hit") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")),
+		"one collision closes its driver, vehicle and persistent consequences together")
 	var hurt: Array[String] = []
 	for zone_id in state.get("zones", {}):
 		if float(state.zones[zone_id].health) < float(AnatomyComponent.DEFAULT_ZONES[zone_id].health):

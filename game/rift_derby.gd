@@ -47,6 +47,7 @@ const WORLD_DEBRIS := preload("res://systems/world_debris.gd")
 const VEHICLE_PART_POOL := "vehicle_part"
 const OPENING := preload("res://systems/opening_director.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const OFFSCREEN_HUNTS := preload("res://systems/offscreen_hunts.gd")
 const SERVICE_RING_RELAY := preload("res://systems/service_ring_relay.gd")
 const RINGMASTER_CARD := preload("res://systems/ringmaster_card.gd")
@@ -1098,6 +1099,9 @@ func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: fl
 	var detached: Array = target.get_meta("detached_parts", [])
 	var front_stripped: bool = detached.has("BumperFront") and detached.has("Hood")
 	var ram_crush: bool = front_stripped and collision_speed > 13.0
+	# Driver anatomy, vehicle impact, rival memory and a possible cab death all
+	# come from this one collision.
+	WorldHistory.begin_ledger_batch()
 	_injure_driver(target, damage, impact_direction, ram_crush)
 	crowd_reaction = clampf(crowd_reaction + damage / 22.0, 0.0, 2.0)
 	if derby_audio != null:
@@ -1123,6 +1127,7 @@ func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: fl
 		_wreck_target(target, impact_energy)
 	if integrity <= 0:
 		_finish_round("lost")
+	WorldHistory.commit_ledger_batch()
 
 
 func _wreck_target(target: Node3D, impact_energy: int) -> void:
@@ -1634,19 +1639,31 @@ func _open_ringmaster_dialogue() -> void:
 ## scene with no player body at all — see `bone_yard_hunt.gd`'s
 ## `challenge_pending` check.
 func _on_ringmaster_choice(choice: String) -> void:
+	if not _record_ringmaster_choice(choice):
+		return
+	Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
+
+
+## Separated from scene travel so the choice's durable boundary is directly
+## verifiable without loading a second gameplay scene underneath the test.
+func _record_ringmaster_choice(choice: String) -> bool:
+	if choice not in ["join", "escape", "fight"]:
+		return false
 	var ringmaster_id := CAST.id_for(RINGMASTER_SLOT)
+	var event_type := "ringmaster_%s" % ("challenged" if choice == "fight" else ("joined" if choice == "join" else "escaped"))
+	WorldHistory.begin_ledger_batch()
 	match choice:
 		"join":
-			WorldHistory.update_subject(ringmaster_id, {"status": "employer"}, "ringmaster_joined")
-			WorldHistory.record_event("ringmaster_joined", {"venue": "underground_colosseum"})
+			WorldHistory.amend_subject(ringmaster_id, {"status": "employer"})
 		"escape":
-			WorldHistory.record_event("ringmaster_escaped", {"venue": "underground_colosseum"})
+			pass
 		"fight":
-			WorldHistory.update_subject(ringmaster_id, {"challenge_pending": true}, "ringmaster_challenged")
-			WorldHistory.record_event("ringmaster_challenged", {"venue": "underground_colosseum"})
-	FACILITY_TERRITORY.apply_event("ringmaster_%s" % choice if choice != "fight" else "ringmaster_challenged")
+			WorldHistory.amend_subject(ringmaster_id, {"challenge_pending": true})
+	PLAYER_ACTION_LEDGER.record(event_type, {"venue": "underground_colosseum", "subject_id": ringmaster_id})
+	FACILITY_TERRITORY.apply_event(event_type)
 	OPENING.advance("left_facility")
-	Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
+	WorldHistory.commit_ledger_batch()
+	return true
 
 
 func _update_climb_out(delta: float) -> void:
