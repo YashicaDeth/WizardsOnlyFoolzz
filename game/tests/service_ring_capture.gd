@@ -1,6 +1,6 @@
 extends Node
 
-## Visual proof for the Service Ring slice. This does not stage a decorative
+## Visual proof for the Lockdown Grid slice. This does not stage a decorative
 ## relay gallery: it loads the real underground derby, sits in its real cab,
 ## fires the real travelling rounds and fails the capture if those rounds do
 ## not disable the three real chamber relays.

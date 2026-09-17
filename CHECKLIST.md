@@ -5113,8 +5113,8 @@ instead.
 ### AP4 — Starting-facility territory slice
 
 - [x] **AP4.1** The production opening enters the authored underground colosseum, not the old surface quarry — both the Growing Floor door and `OpeningDirector.resume_destination()` now resolve to `underground_colosseum.tscn`; `opening_stage_wiring_test.gd` drives the real transitions (6/6).
-- [x] **AP4.2** One persistent authority owns the facility holdings — `facility_territory.gd` stores the Growing Floor, Underground Colosseum, Service Ring and Surface Gate under one WorldHistory subject rather than distributing ownership flags across UI and scenes.
-- [x] **AP4.3** Exploration changes only what was actually reached — waking reveals the Growing Floor, entering the pit surveys it, and the three existing colosseum tunnels reveal the Service Ring without falsely liberating either.
+- [x] **AP4.2** One persistent authority owns the facility holdings — `facility_territory.gd` stores the Growing Floor, Underground Colosseum, Lockdown Grid and Surface Gate under one WorldHistory subject rather than distributing ownership flags across UI and scenes.
+- [x] **AP4.3** Exploration changes only what was actually reached — waking reveals the Growing Floor, entering the pit surveys it, and the three existing colosseum tunnels reveal the Lockdown Grid without falsely liberating either.
 - [x] **AP4.4** A real achievement liberates one holding — only `derby_round_won` in the underground venue changes the Colosseum from surveyed to liberated; entry and loss cannot award it.
 - [x] **AP4.5** MAP exposes ownership, surveillance, objectives and routes — the Black Mirror's facility sheet draws the four bounded holdings, existing scene adjacency, live owner/state, the next authored objective and approximate CellOutz surveillance from the authority record.
 - [x] **AP4.6** The territory sheet is operable with pointer and keyboard — pointing selects a holding, arrow keys move through revealed holdings, and `L` switches between facility holdings and the Ashbloom satellite; verified by `facility_device_integration_test.gd` (8/8 total integration checks, including the corporate acquisition seam).
