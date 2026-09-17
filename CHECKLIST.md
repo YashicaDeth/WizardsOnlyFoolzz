@@ -1072,7 +1072,7 @@ mechanisms and almost none are built.
 exist start talking to each other.
 - [x] ~~**F7.1** Hold-and-negotiate state out of the existing clinch~~
 - [x] ~~**F7.2** Rob, abuse or persuade from inside the hold~~
-- [x] ~~**F7.3** Feeds the downed-window resolution and recruitment~~
+- [x] ~~**F7.3** Feeds the downed-window resolution and recruitment~~ — taking hold, a completed takedown, persuasion and threats now use the common player-action route. Each social result silently amends memory, debt, consent, body and surrender state behind one established public event instead of `update_subject()` and `record_event()` filing the same clinch twice. A sent proximity-voice contact follows the same rule: one receipt, no raw audio, and one silent listener memory. `grapple_test.gd` and `resolution_test.gd` cover the receipts, closed transactions and absence of duplicate surrender/voice-memory events.
 
 ---
 

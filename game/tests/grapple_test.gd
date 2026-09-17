@@ -22,6 +22,10 @@ func _ready() -> void:
 	hunt.set_physics_process(false)
 	await get_tree().physics_frame
 
+	# Conduct the fixture away from the production bedroll. Interaction gives a
+	# nearby world object priority over a downed body by design.
+	hunt.player_body.position = Vector3(40, 0.9, 40)
+	hunt.player = hunt.player_body.position + Vector3.UP * 0.6
 	hunt.yaw = 0.0
 	var at: Vector3 = hunt.player + Vector3(0, 0, 1.6)
 	hunt._spawn_encounter_actor({"instance_id": "clinch", "kind": "hostile"}, at)
@@ -36,8 +40,10 @@ func _ready() -> void:
 
 	actor.node.position = at
 	hunt.stamina = 100.0
+	var grapple_receipts_before := PlayerActionLedger.count("grapple_started")
 	hunt._start_grapple()
-	check(hunt.grapple_target == str(actor.subject_id), "the clinch takes hold at contact range")
+	check(hunt.grapple_target == str(actor.subject_id) and PlayerActionLedger.count("grapple_started") == grapple_receipts_before + 1, "the clinch takes hold at contact range as one identified act")
+	var takedowns_before := PlayerActionLedger.count("grapple_takedown")
 
 	# Without pressing, the contest does not simply resolve itself.
 	var opening: float = hunt.grapple_advantage
@@ -56,10 +62,13 @@ func _ready() -> void:
 	check(actor.anatomy.downed and not actor.anatomy.dead, "winning a clinch downs them alive")
 	check(actor.rig.zone_health("torso") < AnatomyComponent.DEFAULT_ZONES.torso.health, "the takedown is recorded on the body")
 	check(hunt.grapple_target.is_empty(), "the clinch releases once it resolves")
-	check(WorldHistory.recent_events(20).any(func(e): return str(e.get("type", "")) == "grapple_takedown"), "the takedown enters world history")
+	var takedown_events := WorldHistory.events.filter(func(event: Dictionary) -> bool: return str(event.get("type", "")) == "grapple_takedown")
+	check(PlayerActionLedger.count("grapple_takedown") == takedowns_before + 1 and str(((takedown_events.back() as Dictionary).get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_"), "the takedown enters world history once as the resolved player act")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "the takedown and body snapshot close together")
 
 	# And the downed body is now decidable, which is the whole point.
-	hunt.player = (actor.node as Node3D).global_position - Vector3(0, 0, 1.2)
+	hunt.player_body.global_position = (actor.node as Node3D).global_position - Vector3(0, 0, 1.2)
+	hunt.player = hunt.player_body.global_position
 	hunt._interact()
 	check(hunt.resolution_ui.visible, "a grappled body opens the resolution window")
 	hunt.resolution_ui.cancel_menu()
@@ -101,12 +110,16 @@ func _ready() -> void:
 	hunt.grapple_advantage = 0.9
 	var offer: Dictionary = hunt._clinch_options(mark)
 	check(float(offer.persuasion) > float(offer.coercion), "standing makes talking the better verb here")
+	var persuaded_before := PlayerActionLedger.count("clinch_persuaded")
+	var surrender_events_before := WorldHistory.event_count("clinch_surrender")
 	hunt._clinch_persuade()
 	var persuaded := WorldHistory.subject(mark_id)
 	check(float(persuaded.get("debt_to_player", 0.0)) > 0.0, "talking them down leaves them owing you")
 	check(hunt._accepts_recruitment(persuaded), "and that debt is what makes recruitment possible in the downed window")
 	check(hunt.grapple_target.is_empty(), "a surrender ends the hold")
 	check(mark.anatomy.downed and not mark.anatomy.dead, "they go down awake, having decided, rather than knocked out")
+	check(PlayerActionLedger.count("clinch_persuaded") == persuaded_before + 1 and WorldHistory.event_count("clinch_surrender") == surrender_events_before,
+		"persuasion and its surrender state share one public action instead of duplicate events")
 
 	# Leaning on someone instead buys it with a grudge.
 	var fourth: Vector3 = hunt.player + Vector3(1.1, 0, 0.6)
@@ -121,9 +134,11 @@ func _ready() -> void:
 	hunt.grapple_target = leaned_id
 	hunt.grapple_advantage = 0.9
 	var grudge_before := int(WorldHistory.subject(leaned_id).get("grudge", 0))
+	var threatened_before := PlayerActionLedger.count("clinch_threatened")
 	hunt._clinch_threaten()
 	check(int(WorldHistory.subject(leaned_id).get("grudge", 0)) > grudge_before, "leaning on them is remembered as a grudge")
-	check(WorldHistory.recent_events(6).any(func(event): return str(event.get("type", "")) == "clinch_threatened"), "and the act enters the record with whoever saw it")
+	var threat_events := WorldHistory.events.filter(func(event: Dictionary) -> bool: return str(event.get("type", "")) == "clinch_threatened")
+	check(PlayerActionLedger.count("clinch_threatened") == threatened_before + 1 and str(((threat_events.back() as Dictionary).get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_"), "and the act enters the record once with whoever saw it")
 
 	print("GRAPPLE_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

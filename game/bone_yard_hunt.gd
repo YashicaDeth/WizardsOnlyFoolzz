@@ -5344,8 +5344,10 @@ func _voice_captured(subject_id: String, result: Dictionary) -> void:
 	var reply := "You have my attention. Make the offer." if _accepts_recruitment(subject) else "I heard you. It changes nothing yet."
 	if int(subject.get("grudge", 0)) >= 40:
 		reply = "I know your voice. I still hate you."
-	WorldHistory.record_event("proximity_voice_addressed", {"speaker": "player", "listener": subject_id, "duration": result.duration, "location": HUNT_LOCATION, "raw_audio_saved": false})
-	WorldHistory.update_subject(subject_id, {"last_voice_contact": WorldHistory.event_count(), "memory": "The Hunter spoke to me while I was downed."}, "voice_contact_remembered")
+	WorldHistory.begin_ledger_batch()
+	var contact := PLAYER_ACTION_LEDGER.record("proximity_voice_addressed", {"speaker": "player", "listener": subject_id, "duration": result.duration, "location": HUNT_LOCATION, "raw_audio_saved": false})
+	WorldHistory.amend_subject(subject_id, {"last_voice_contact": int(contact.get("sequence", WorldHistory.event_count())), "memory": "The Hunter spoke to me while I was downed."})
+	WorldHistory.commit_ledger_batch()
 	voice_channel.play_positional_acknowledgement(actor.rig.head_anchor)
 	resolution_ui.set_voice_state("VOICE RECEIVED / POSITIONAL REPLY", float(result.peak), reply)
 
@@ -5562,7 +5564,7 @@ func _start_grapple() -> void:
 	var capable: Array[String] = player_rig.capable_limbs("grapple")
 	grapple_with = capable[0] if not capable.is_empty() else "right_arm"
 	strike_windup = -1.0
-	WorldHistory.record_event("grapple_started", {"subject_id": grapple_target, "zone": grapple_zone, "location": HUNT_LOCATION})
+	PLAYER_ACTION_LEDGER.record("grapple_started", {"subject_id": grapple_target, "zone": grapple_zone, "location": HUNT_LOCATION})
 
 
 ## O3.3. Whichever limb is worst off right now, out of the four you could
@@ -5923,9 +5925,10 @@ func _apply_clinch_result(actor: Dictionary, result: Dictionary, verb: String) -
 		changes["recruitment_consent"] = true
 	if bool(result.get("accepted", false)):
 		changes["memory"] = "The Hunter had hold of me and %s me into it." % verb
+	WorldHistory.begin_ledger_batch()
 	if not changes.is_empty():
-		WorldHistory.update_subject(id, changes, "clinch_%s" % verb)
-	WorldHistory.record_event("clinch_%s" % verb, {
+		WorldHistory.amend_subject(id, changes)
+	PLAYER_ACTION_LEDGER.record("clinch_%s" % verb, {
 		"subject_id": id,
 		"accepted": bool(result.get("accepted", false)),
 		"advantage": snappedf(grapple_advantage, 0.01),
@@ -5939,8 +5942,9 @@ func _apply_clinch_result(actor: Dictionary, result: Dictionary, verb: String) -
 	if bool(result.get("accepted", false)) and (bool(result.get("consent", false)) or bool(result.get("yields", false))):
 		if not actor.anatomy.downed and not actor.anatomy.dead:
 			actor.anatomy.go_down()
-		WorldHistory.update_subject(id, {"status": "surrendered", "anatomy_state": actor.rig.snapshot()}, "clinch_surrender")
+		WorldHistory.amend_subject(id, {"status": "surrendered", "anatomy_state": actor.rig.snapshot()})
 		_break_grapple("%s GIVES UP — [E] DECIDE" % str(actor.display_name).to_upper())
+	WorldHistory.commit_ledger_batch()
 
 
 ## Winning drops them into the downed window rather than killing them. The
@@ -5952,14 +5956,16 @@ func _apply_clinch_result(actor: Dictionary, result: Dictionary, verb: String) -
 ## that would overwrite the closed state the resolution form is showing with a
 ## fresh one and lose what actually happened to them.
 func _finish_grapple(actor: Dictionary) -> void:
+	WorldHistory.begin_ledger_batch()
 	var rig := actor.rig as BaselineHuman
 	rig.hit("head", 26.0, 18.0, "blunt")
 	rig.hit("torso", 30.0, 20.0, "blunt")
 	var body_state = actor["anatomy"]
 	if body_state != null and not bool(body_state.get("downed")) and not bool(body_state.get("dead")):
 		body_state.call("go_down")
-	WorldHistory.record_event("grapple_takedown", {"subject_id": str(actor.subject_id), "location": HUNT_LOCATION})
-	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": rig.snapshot()}, "anatomy_changed")
+	PLAYER_ACTION_LEDGER.record("grapple_takedown", {"subject_id": str(actor.subject_id), "location": HUNT_LOCATION})
+	WorldHistory.amend_subject(str(actor.subject_id), {"anatomy_state": rig.snapshot()})
+	WorldHistory.commit_ledger_batch()
 	_break_grapple("%s IS ON THE GROUND — [E] DECIDE" % str(actor.display_name).to_upper())
 	attack_cooldown = 0.5
 
