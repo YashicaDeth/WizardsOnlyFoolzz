@@ -2364,6 +2364,10 @@ what that is rather than fixing another symptom.
       schema, so `.duplicate()` carried the stricter type over and
       `wounds.has()`/`.append()` on a plain string were throwing silently in
       the console rather than failing loud enough to notice without a test.
+      A connecting player melee swing now routes its existing
+      `npc_anatomy_hit`/`melee_body_hit` event through the same compact action
+      ledger; wall strikes and rounds cut out of the air use that grammar too.
+      Anatomy and gore events remain consequences rather than extra receipts.
 - [x] **O3.2** A damaged limb changes what that person can do, and now shows it — arms hang, legs trail, the body leans off the bad side
 - [x] ~~**O3.3** Grappling connects to it — hold, force, rob, recruit~~ Rob and
       recruit already did (F7.2 lets you rob somebody you are holding; F7's
@@ -3727,7 +3731,11 @@ travels, hits something and leaves a mark on it.
       both, plus `ballistics_test`, `firearm_momentum_test`,
       `vault_test`, `wall_run_test`, `jump_test`, `climb_test`,
       `momentum_carry_test`, `anatomy_traversal_test` and `opening_test`,
-      re-verified clean
+      re-verified clean. The intentional boundary is now just as explicit in
+      the compact ledger: one trigger pull produces one `weapon_fired` receipt
+      with a stable action id, while its later per-pellet anatomy/world impacts
+      remain consequences rather than nine counterfeit player actions
+      (`combat_integration_test.gd`).
 - [x] **AF1.2** It hits the world and leaves damage there (pairs with AB2) — a hole where it arrived, lifted off the surface so it does not fight the wall it is drawn on, sized by the round's energy, and recorded to WorldHistory for AB2 to read
 - [x] **AF1.3** Casings eject, bounce, land and stay — out of the port sideways and back, tumbling, two bounces that lose most of their energy, and then lying on their side rather than standing on end, which is the single most obvious tell that nobody simulated them. One case per trigger pull, so a shotgun leaves one for nine pellets
 - [x] **AF1.4** Reloading is physical: the magazine leaves the weapon and a new

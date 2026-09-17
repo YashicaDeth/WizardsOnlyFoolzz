@@ -2061,7 +2061,7 @@ func _resolve_strike() -> void:
 			# Less than the stone of a wall (AN2.4) and more than air: meeting
 			# an edge against something small and fast marks the edge.
 			_wear_current_weapon(str(report.get("weapon", "")), 0.6)
-			WorldHistory.record_event("melee_met_round", {
+			PLAYER_ACTION_LEDGER.record("melee_met_round", {
 				"weapon": str(report.get("weapon", "")), "rounds": met, "location": HUNT_LOCATION,
 			})
 			prompt.text = "CUT IT OUT OF THE AIR" if met == 1 else "CUT %d OF THEM OUT OF THE AIR" % met
@@ -2083,7 +2083,7 @@ func _resolve_strike() -> void:
 			arm.strike(WALL_MELEE_RESISTANCE, wall_hit.normal)
 		_wear_current_weapon(str(report.get("weapon", "")), 1.0)
 		ballistics.mark_impact(wall_hit.position, wall_hit.normal, float(report.get("damage", 24.0)) * 0.05)
-		WorldHistory.record_event("melee_struck_wall", {"weapon": str(report.get("weapon", "")), "location": HUNT_LOCATION})
+		PLAYER_ACTION_LEDGER.record("melee_struck_wall", {"weapon": str(report.get("weapon", "")), "location": HUNT_LOCATION})
 		prompt.text = "STEEL ON STONE"
 		connected = true
 		return
@@ -2121,7 +2121,7 @@ func _resolve_strike() -> void:
 	else:
 		enemy_health = maxi(0, enemy_health - damage)
 	_spawn_blood(enemy.global_position + Vector3(0, 1.2, 0), damage)
-	WorldHistory.record_event("melee_body_hit", {"target": CAST.id_for(CAPTAIN_SLOT), "body_zone": body_zone, "damage": damage, "location": HUNT_LOCATION})
+	PLAYER_ACTION_LEDGER.record("melee_body_hit", {"target": CAST.id_for(CAPTAIN_SLOT), "body_zone": body_zone, "damage": damage, "location": HUNT_LOCATION})
 	# Untyped rebuild rather than .duplicate(): the stored array can already be
 	# a TypedArray[Dictionary] by the time some other subject touched "wounds"
 	# first, and .duplicate() carries that runtime type over — has()/append()
@@ -2231,7 +2231,9 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		prompt.text = "%s IS OPENED UP" % str(actor.display_name).to_upper()
 	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": anatomy.call("snapshot")}, "anatomy_changed")
 	_spawn_blood(target.global_position + Vector3(0, 1.1, 0), roundi(float(attack.damage)))
-	WorldHistory.record_event("npc_anatomy_hit", {"subject_id": actor.subject_id, "weapon": attack.weapon, "zone": zone, "result": result, "location": HUNT_LOCATION})
+	# One committed swing can open one body. Route that intentional boundary;
+	# anatomy_changed and any gore remain consequences, not extra player acts.
+	PLAYER_ACTION_LEDGER.record("npc_anatomy_hit", {"subject_id": actor.subject_id, "weapon": attack.weapon, "zone": zone, "result": result, "location": HUNT_LOCATION})
 	if bool(result.get("severed", false)) and not anatomy.dead and not anatomy.downed:
 		_apply_maiming_state(actor, [zone], result.get("sever_direction", Vector3.ZERO))
 	elif anatomy.critical or anatomy.pain >= 68.0:
@@ -2477,7 +2479,9 @@ func _resolve_firearm(attack: Dictionary) -> void:
 	# already deferred to when each round actually lands) rather than a
 	# "hits" list bolted onto this one, which would otherwise have to wait
 	# on whichever pellet takes longest to resolve.
-	WorldHistory.record_event("weapon_fired", {"weapon": attack.weapon, "location": HUNT_LOCATION})
+	# One receipt per trigger pull, never one per pellet or wound. The deferred
+	# firearm_anatomy_hit records remain consequences of this eager action.
+	PLAYER_ACTION_LEDGER.record("weapon_fired", {"weapon": attack.weapon, "location": HUNT_LOCATION})
 
 
 func _trace_actor(origin: Vector3, direction: Vector3, distance: float) -> Dictionary:
@@ -3911,7 +3915,7 @@ func _use_prosthetic_surge() -> void:
 			var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 			var wound := enemy_rig.hit_at(enemy.global_position + Vector3.UP * 1.0, 30.0, 34.0, "blunt", look)
 			WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
-			WorldHistory.record_event("melee_body_hit", {"target": CAST.id_for(CAPTAIN_SLOT), "body_zone": str(wound.get("zone", "torso")), "damage": 30, "location": HUNT_LOCATION})
+			PLAYER_ACTION_LEDGER.record("melee_body_hit", {"target": CAST.id_for(CAPTAIN_SLOT), "body_zone": str(wound.get("zone", "torso")), "damage": 30, "location": HUNT_LOCATION})
 			enemy_health = roundi(float(enemy_health_max) * _rig_health_ratio(enemy_rig))
 		else:
 			enemy_health = maxi(0, enemy_health - 30)

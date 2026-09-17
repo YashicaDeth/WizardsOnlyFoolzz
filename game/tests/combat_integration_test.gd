@@ -76,8 +76,11 @@ func _ready() -> void:
 	await get_tree().physics_frame
 	hunt._equip_weapon(1)
 	var shell_before := int(hunt.arsenal.ammo.shotgun.loaded)
+	var trigger_receipts_before := PlayerActionLedger.count("weapon_fired")
 	hunt._attack()
 	check(int(hunt.arsenal.ammo.shotgun.loaded) == shell_before - 1, "live Hunt input fires a chambered shotgun shell")
+	check(PlayerActionLedger.count("weapon_fired") == trigger_receipts_before + 1,
+		"one trigger pull receives one player-action receipt rather than one per pellet")
 	# AF1.1. Damage now resolves when the round actually lands, not on the
 	# frame the trigger went down — `hunt.set_physics_process(false)` above
 	# only stops `hunt`'s own callback; `ballistics`, a real child node with
@@ -97,6 +100,9 @@ func _ready() -> void:
 	# this pull records is easily buried in that pellet-level detail within
 	# a 12-event window; widened rather than special-cased around it.
 	check(WorldHistory.recent_events(24).any(func(event): return str(event.get("type", "")) == "weapon_fired"), "weapon discharge enters world history")
+	var fired_events: Array = WorldHistory.events.filter(func(event: Dictionary): return str(event.get("type", "")) == "weapon_fired")
+	check(not fired_events.is_empty() and not str(((fired_events.back() as Dictionary).get("details", {}) as Dictionary).get("action_id", "")).is_empty(),
+		"the established weapon event carries the trigger pull's stable action id")
 
 	# Lock-on: the verb that makes third-person combat aimable at all.
 	hunt.third_person = true
@@ -182,9 +188,12 @@ func _ready() -> void:
 	hunt.attack_cooldown = 0.0
 	var target_wounds: int = locked_actor.anatomy.wounds.size()
 	var limb_condition: float = float(hunt.handheld.carry.items[hunt.carried_limb_index].condition)
+	var melee_receipts_before := PlayerActionLedger.count("npc_anatomy_hit")
 	hunt._attack()
 	hunt._resolve_strike()
 	check(locked_actor.anatomy.wounds.size() > target_wounds, "the severed limb hits an NPC through the normal melee resolver")
+	check(PlayerActionLedger.count("npc_anatomy_hit") == melee_receipts_before + 1,
+		"one connecting melee swing receives one action receipt")
 	check(float(hunt.handheld.carry.items[hunt.carried_limb_index].condition) < limb_condition, "the improvised limb loses condition when swung")
 	var sale: Dictionary = hunt._sell_first_carried_part()
 	check(int(sale.get("price", 0)) > 0 and hunt.carried_limb_index == -1, "a broker can buy the same carried limb and unequip it cleanly")
