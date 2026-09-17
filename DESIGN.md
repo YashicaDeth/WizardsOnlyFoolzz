@@ -71,6 +71,11 @@ its local claim `disrupted`; both make it `ready_for_decision` and write that
 threshold once. INDEX and MAP expose the same state. Crucially, this does not
 change `held_by`: clearing two objectives earns the later land act, but cannot
 silently choose ascent, corruption or a recipient for the player.
+District, objective and moving-contact labels now negotiate one shared set of
+chart-space registers as they draw. They try positions around their actual mark,
+fall back to the least-overlapping position when the area is genuinely dense,
+and stay inside the physical bezel. This changes presentation only: contacts
+retain their true coordinates and the satellite image remains the authority.
 
 18 September implementation note: territory evidence now reaches the physical
 Board through the actual input route. `P` on a revealed place in full-size

@@ -71,6 +71,10 @@ var _chart := Rect2()
 ## A6.2/A6.3. Discovered places, the one under the cursor, and where travel is
 ## being committed to.
 var _place_rects: Array = []
+## Reserved in chart coordinates during one draw pass so district, objective
+## and moving-contact labels negotiate the same scarce ink instead of printing
+## through one another.
+var _map_label_rects: Array[Rect2] = []
 var hovered_place := -1
 var selected_place := -1
 ## The Black Mirror opens on the facility sheet while that route has ever been
@@ -475,6 +479,7 @@ func _draw() -> void:
 	# is standing on it, which it cannot do from underneath.
 	_draw_unsurveyed()
 	_draw_holdings()
+	_map_label_rects.clear()
 	_draw_districts()
 	_draw_misfires()
 	_draw_contacts()
@@ -710,9 +715,11 @@ func _draw_districts() -> void:
 		var label := str(district.name) if charted else "UNSURVEYED SECTOR"
 		# Held inside the sheet. A name that escapes the chart prints over the
 		# title and reads as a caption on the device instead of a place.
-		var name_at := screen + Vector2(-CellOutzType.width_condensed(label.to_upper(), 11.0, 1.0) * 0.5, -29.0)
-		name_at.y = maxf(name_at.y, _chart.position.y + 8.0)
-		name_at.x = clampf(name_at.x, _chart.position.x + 8.0, _chart.end.x - CellOutzType.width_condensed(label.to_upper(), 11.0, 1.0) - 8.0)
+		var label_width := CellOutzType.width_condensed(label.to_upper(), 11.0, 1.0)
+		var name_at := _reserve_map_label(screen, Vector2(label_width, 36.0), [
+			Vector2(-label_width * 0.5, -29.0), Vector2(10.0, -29.0),
+			Vector2(-label_width - 10.0, -29.0), Vector2(-label_width * 0.5, 12.0),
+		])
 		CellOutzType.draw_condensed(self, name_at, label.to_upper(), 11.0, tint * Color(1, 1, 1, 0.9 if charted else 0.3), 1.0)
 		if charted:
 			var holder := str(state.get("held_by", district.held_by)).replace("_", " ").to_upper()
@@ -835,15 +842,11 @@ func _draw_contacts() -> void:
 					screen + Vector2(-7, 0), screen + Vector2(0, -7),
 				]), tint, 1.6)
 				draw_line(screen - Vector2(3, 0), screen + Vector2(3, 0), tint, 1.2)
-				var raid_label := str(contact.get("name", "LOCAL RAID"))
-				CellOutzType.draw_condensed(self, screen + Vector2(11, -16), raid_label.to_upper(), 8.0, tint, 0.72)
 			"work_collection":
 				# A bracketed cache, kept distinct from the plain filled square
 				# used for incidental loot.
 				draw_rect(Rect2(screen - Vector2(6, 6), Vector2(12, 12)), tint, false, 1.6)
 				draw_circle(screen, 2.0, tint)
-				var collection_label := str(contact.get("name", "LOCAL RECOVERY"))
-				CellOutzType.draw_condensed(self, screen + Vector2(11, 17), collection_label.to_upper(), 8.0, tint, 0.72)
 			"hostile":
 				# Point down: a thing coming at you.
 				draw_colored_polygon(PackedVector2Array([
@@ -861,9 +864,43 @@ func _draw_contacts() -> void:
 				# Open: neither yours nor after you yet.
 				draw_arc(screen, 4.6, 0.0, TAU, 14, tint, 1.4)
 		draw_arc(screen, 9.0 + beat * 4.0, 0.0, TAU, 14, tint * Color(1, 1, 1, 0.4 - beat * 0.2), 1.0)
-		var label := "" if state in ["work_raid", "work_collection"] else str(contact.get("name", ""))
+		var label := str(contact.get("name", ""))
 		if not label.is_empty():
-			CellOutzType.draw_condensed(self, screen + Vector2(10, -10), label.to_upper(), 8.0, tint * Color(1, 1, 1, 0.9), 0.7)
+			var width := CellOutzType.width_condensed(label.to_upper(), 8.0, 0.7)
+			var label_at := _reserve_map_label(screen, Vector2(width, 13.0), [
+				Vector2(10, -16), Vector2(10, 9), Vector2(-width - 10, -16),
+				Vector2(-width - 10, 9), Vector2(10, -34), Vector2(-width * 0.5, 18),
+			])
+			CellOutzType.draw_condensed(self, label_at, label.to_upper(), 8.0, tint * Color(1, 1, 1, 0.9), 0.7)
+
+
+## Chooses the first clear authored register, then the least-overlapping one if
+## the chart is genuinely dense. Clamped to the chart so avoiding one label can
+## never push another through the bezel.
+func _reserve_map_label(anchor: Vector2, label_size: Vector2, offsets: Array) -> Vector2:
+	var best := anchor
+	var best_rect := Rect2(anchor, label_size)
+	var best_overlap := INF
+	for offset_variant in offsets:
+		var offset: Vector2 = offset_variant
+		var candidate := anchor + offset
+		candidate.x = clampf(candidate.x, _chart.position.x + 7.0, _chart.end.x - label_size.x - 7.0)
+		candidate.y = clampf(candidate.y, _chart.position.y + 7.0, _chart.end.y - label_size.y - 7.0)
+		var rect := Rect2(candidate - Vector2(2, 2), label_size + Vector2(4, 4))
+		var overlap := 0.0
+		for occupied: Rect2 in _map_label_rects:
+			var intersection := rect.intersection(occupied)
+			if intersection.has_area():
+				overlap += intersection.get_area()
+		if is_zero_approx(overlap):
+			_map_label_rects.append(rect)
+			return candidate
+		if overlap < best_overlap:
+			best_overlap = overlap
+			best = candidate
+			best_rect = rect
+	_map_label_rects.append(best_rect)
+	return best
 
 
 func _draw_player() -> void:
