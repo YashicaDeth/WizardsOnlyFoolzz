@@ -68,9 +68,10 @@ establishes a factual place → work → world → map → ledger route while le
 the later decision about who receives reclaimed land deliberately open.
 The canonical place also counts the connected outcomes: one completion makes
 its local claim `disrupted`; both make it `ready_for_decision` and write that
-threshold once. INDEX and MAP expose the same state. Crucially, this does not
-change `held_by`: clearing two objectives earns the later land act, but cannot
-silently choose ascent, corruption or a recipient for the player.
+threshold once. INDEX, MAP and the place's pinned Board card expose the same
+state. Crucially, this does not change `held_by`: clearing two objectives earns
+the later land act, but cannot silently choose ascent, corruption or a
+recipient for the player.
 District, objective and moving-contact labels now negotiate one shared set of
 chart-space registers as they draw. They try positions around their actual mark,
 fall back to the least-overlapping position when the area is genuinely dense,

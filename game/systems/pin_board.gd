@@ -967,8 +967,15 @@ func _card_for(ref: String, kind: String, seed_value: int) -> Card:
 		card.body = "HELD: %s" % holder_name
 		if field_note != "":
 			card.body += "  //  " + field_note
+		var work_state := str(state.get("local_work_state", ""))
+		var work_done := int(state.get("local_work_completed", 0))
+		var work_required := int(state.get("local_work_required", 0))
+		if work_state == "ready_for_decision":
+			card.body += "\nCLAIM DISRUPTED // DECISION OPEN"
+		elif work_required > 0:
+			card.body += "\nLOCAL WORK %d/%d" % [work_done, work_required]
 	card.struck = str(state.get("status", "")) in ["dead", "executed"]
-	card.size = Vector2(164, 92) if card.kind == "record" else Vector2(132, 148)
+	card.size = Vector2(180, 108) if subject_kind == "place" else (Vector2(164, 92) if card.kind == "record" else Vector2(132, 148))
 	card.tint = PAPER_COOL if card.kind == "record" else PAPER
 	if ref == "player":
 		card.body = "ME"

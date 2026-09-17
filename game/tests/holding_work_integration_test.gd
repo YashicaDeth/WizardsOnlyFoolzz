@@ -104,6 +104,10 @@ func _ready() -> void:
 		"physically collecting the cache completes the recovery through the ordinary loot interaction")
 	check(int(WorldHistory.subject(str(bone.record)).get("local_work_completed", 0)) == 2 and str(WorldHistory.subject(str(bone.record)).get("local_work_state", "")) == "ready_for_decision" and WorldHistory.event_count("holding_claim_disrupted") == 1,
 		"both connected jobs open one persistent land decision without choosing its recipient")
+	hunt.pin_board.pin(str(bone.record), "record")
+	var decision_cards: Array = hunt.pin_board.cards.filter(func(card): return card.id == str(bone.record))
+	check(decision_cards.size() == 1 and decision_cards[0].body.contains("CLAIM DISRUPTED") and decision_cards[0].body.contains("DECISION OPEN"),
+		"the same completed place state reaches its pinned Board card without a parallel flag")
 
 	print("HOLDING_WORK_INTEGRATION_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
