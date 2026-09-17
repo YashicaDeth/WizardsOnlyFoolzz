@@ -4815,8 +4815,41 @@ func _update_encounter_actors(delta: float) -> void:
 						# ever read — so a parry cost the enemy nothing beyond
 						# the damage it already blocked. Real footing loss now.
 						_actor_lose_footing(actor, 0.45, "%s LOSES THEIR FOOTING // PRESS THE OPENING" % str(actor.display_name).to_upper())
-					health = maxi(1, health - roundi(float(guarded.get("damage", incoming))))
+					var health_after := health - roundi(float(guarded.get("damage", incoming)))
 					_wound_player(node.global_position, maxf(5.0, 15.0 * _actor_combat_ratio(actor)), "cut")
+					# AE10.13. Ordinary hostiles keep the old one-health floor: the
+					# undying player is not silently killed by a roaming damage tick.
+					# A physical law team is different. Its finishing blow performs the
+					# arrest it was commissioned for through the existing persistent
+					# defeat route, with this exact officer and issuing jurisdiction.
+					if health_after <= 0 and actor.has("law_dispatch_sequence"):
+						_complete_local_law_arrest(actor)
+						return
+					health = maxi(1, health_after)
+
+
+func _complete_local_law_arrest(actor: Dictionary) -> void:
+	var player_record := WorldHistory.subject("player")
+	if str(player_record.get("status", "")) in ["shackled", "stamped", "conscripted"]:
+		return
+	var captor_id := str(actor.get("subject_id", ""))
+	if captor_id.is_empty():
+		return
+	var captor := WorldHistory.subject(captor_id)
+	var place_id := str(captor.get("contract_place", ""))
+	var sequence := int(actor.get("law_dispatch_sequence", -1))
+	_route_player_defeat(captor_id)
+	if not place_id.is_empty():
+		var place := WorldHistory.subject(place_id)
+		var contract: Dictionary = (place.get("active_law_dispatch", {}) as Dictionary).duplicate(true)
+		if int(contract.get("source_sequence", -2)) == sequence:
+			contract["status"] = "arrested"
+			contract["arrested_by"] = captor_id
+			WorldHistory.amend_subject(place_id, {"active_law_dispatch": contract})
+	WorldHistory.record_event("local_law_arrested_player", {
+		"actor": captor_id, "subject_id": "player", "place_id": place_id,
+		"faction_id": str(captor.get("faction_id", "")), "source_sequence": sequence,
+	})
 
 
 func _actor_combat_ratio(actor: Dictionary) -> float:

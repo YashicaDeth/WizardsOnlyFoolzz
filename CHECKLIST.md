@@ -4428,7 +4428,17 @@ The last rung. Fifteen statements that are true of sneaking and the law when thi
       470×370-metre Ashbloom boundary. An act beyond that edge returns no local
       holder instead of being silently assigned to whichever settlement is
       nearest (`ashbloom_holdings_test.gd`, 31 checks; local-law suites green).
-- [ ] **AE10.13** `v10` You can be arrested rather than killed
+- [x] **AE10.13** `v10` You can be arrested rather than killed — a finishing
+      blow from a commissioned local-law enforcer is the one ordinary encounter
+      hit allowed to cross the old one-health floor. It routes the undying
+      player through the existing persistent defeat/captivity system, records
+      the exact officer and faction, holds them at the canonical jurisdiction
+      that issued the warrant, and settles that warrant instead of re-arresting
+      on later AI ticks. Other roaming enemies retain the one-health floor, so
+      this is an arrest power belonging to law rather than generic enemy death.
+      `hunt_local_law_integration_test.gd` drives the real dispatched team from
+      witnessed offence through pursuit to a physical finishing blow and proves
+      custody, attribution, jurisdiction, warrant settlement and idempotence.
 - [ ] **AE10.14** `v10` Standing with a faction changes what the law does
 - [ ] **AE10.15** `v10` What you were wanted for carries into the next universe
 

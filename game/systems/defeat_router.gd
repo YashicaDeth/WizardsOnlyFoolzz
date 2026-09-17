@@ -14,7 +14,13 @@ static func route(captor_id: String, location: String) -> Dictionary:
 	var captor := WorldHistory.subject(captor_id)
 	var faction_id := str(captor.get("faction_id", ""))
 	var outcome := str(OUTCOMES.get(faction_id, "shackled"))
-	var destination := _destination(faction_id, location)
+	# A commissioned local-law actor already carries the canonical holding that
+	# issued their warrant. Unknown factions used to fall back to the scene id,
+	# so a Gate Lantern arrest claimed the player was "held at bone_yard" and
+	# forgot which jurisdiction had actually taken them. Named faction prisons
+	# still win; the issuing holding is the honest fallback for local custody.
+	var local_custody := str(captor.get("contract_place", ""))
+	var destination := _destination(faction_id, local_custody if not local_custody.is_empty() else location)
 	var player := WorldHistory.subject("player")
 	var defeats := int(player.get("defeats", 0)) + 1
 	var state := {

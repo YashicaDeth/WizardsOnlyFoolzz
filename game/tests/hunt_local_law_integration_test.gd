@@ -119,5 +119,48 @@ func _ready() -> void:
 		return str(actor.get("encounter_id", "")).begins_with("local_law_"))
 	check(restored.size() == 2, "an unresolved physical law team restores from world history after the scene is rebuilt")
 
+	# AE10.13. The team was previously incapable of completing its own job:
+	# every ordinary actor attack hard-clamped the player to one health. Put one
+	# restored officer in a real melee opening and prove the finishing blow uses
+	# the same persistent capture route as the authored rival, rather than death,
+	# reload, or a decorative arrest prompt.
+	for candidate: Dictionary in hunt.encounter_actors:
+		(candidate.node as Node3D).position = Vector3(-220, 1, -170)
+	(witness.node as Node3D).position = hunt.player + Vector3(0, -0.5, 1.5)
+	witness["attack_time"] = hunt._actor_attack_cycle(witness) + 0.1
+	hunt.health = 1
+	hunt.dodge_remaining = 0.0
+	hunt.guarding = false
+	hunt._update_encounter_actors(0.05)
+	check(hunt.health == 1 and WorldHistory.event_count("player_captured") == 0,
+		"an ordinary hostile still cannot counterfeit a law arrest or kill the undying player")
+	for candidate: Dictionary in hunt.encounter_actors:
+		(candidate.node as Node3D).position = Vector3(-220, 1, -170)
+	var arrestor: Dictionary = restored[0] if not restored.is_empty() else {}
+	if not arrestor.is_empty():
+		(arrestor.node as Node3D).position = hunt.player + Vector3(0, -0.5, 1.5)
+		arrestor["law_arrived"] = true
+		arrestor["tracking_player"] = true
+		arrestor["attack_time"] = hunt._actor_attack_cycle(arrestor) + 0.1
+		hunt.health = 1
+		hunt.dodge_remaining = 0.0
+		hunt.guarding = false
+		hunt._update_encounter_actors(0.05)
+	var arrested_player := WorldHistory.subject("player")
+	check(str(arrested_player.get("status", "")) == "shackled",
+		"a law enforcer's finishing blow arrests the undying player instead of killing them")
+	check(str(arrested_player.get("captor_id", "")) == str(arrestor.get("subject_id", "")),
+		"custody names the exact physical officer who landed the finishing blow")
+	check(str(arrested_player.get("held_at", "")) == "ashbloom:tunnel_mouth",
+		"local arrest holds the player in the jurisdiction that issued the warrant")
+	check(WorldHistory.event_count("player_captured") == 1 and WorldHistory.event_count("local_law_arrested_player") == 1,
+		"the finishing blow writes one capture and one attributable local-law arrest")
+	check(str((WorldHistory.subject("ashbloom:tunnel_mouth").get("active_law_dispatch", {}) as Dictionary).get("status", "")) == "arrested",
+		"the warrant settles when its physical team takes the player into custody")
+	if not arrestor.is_empty():
+		hunt._update_encounter_actors(10.0)
+	check(WorldHistory.event_count("player_captured") == 1 and WorldHistory.event_count("local_law_arrested_player") == 1,
+		"custody is idempotent rather than arresting the same player every AI tick")
+
 	print("HUNT_LOCAL_LAW_INTEGRATION_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
