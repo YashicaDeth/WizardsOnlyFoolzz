@@ -5778,16 +5778,15 @@ func _take_photograph() -> Dictionary:
 	if not panel_mode.is_empty() or resolution_ui.visible:
 		return {}
 	var photo := FieldCamera.capture(camera, _all_rigs(), HUNT_LOCATION)
-	FieldCamera.store(photo)
-	WorldHistory.record_event("photograph_taken", {
-		"photo": str(photo.id),
-		"in_frame": (photo.contents as Array).size(),
-		"location": HUNT_LOCATION,
-	})
+	# One shutter press may also satisfy a ritual. Album storage, the identified
+	# player act and that consequence must survive together or not at all.
+	WorldHistory.begin_ledger_batch()
+	FieldCamera.store(photo, true)
 	# E3.3. A rite is satisfied by doing the thing and recording it. The photo is
 	# submitted as it is taken; there is no separate acceptance screen or button
 	# that could make the evidence into a menu chore.
 	var ritual_result := RITUAL_LEDGER.submit_photo(photo)
+	WorldHistory.commit_ledger_batch()
 	var completed: Array = ritual_result.get("completed", []) as Array
 	var count: int = (photo.contents as Array).size()
 	if not completed.is_empty():

@@ -77,8 +77,13 @@ func _ready() -> void:
 	check(not FieldCamera.verify(photo, {"subject": "somebody_else", "zone": "right_arm", "state": "severed"}).ok, "and evidence about the wrong person does not count")
 
 	# --- the album persists --------------------------------------------------
-	FieldCamera.store(photo)
+	FieldCamera.store(photo, true)
 	check(FieldCamera.album().size() > 0, "photographs are kept, so one taken before a ritual existed still counts")
+	check(str(WorldHistory.subject("photographs").get("kind", "")) == "album" and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"the first frame and album schema persist in one closed mutation")
+	var taken_events := WorldHistory.events.filter(func(event: Dictionary) -> bool: return str(event.get("type", "")) == "photograph_taken")
+	check(taken_events.size() == 1 and PLAYER_ACTION_LEDGER.count("photograph_taken") == 1 and str((taken_events[0].get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_"),
+		"storing a shutter press produces one identified photograph action")
 
 	# --- C3.4: posting it -----------------------------------------------------
 	var wire := WireNet.new(WireNet.SIGNAL_SURFACE)

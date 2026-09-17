@@ -14,6 +14,7 @@ extends Control
 
 const Grunge := preload("res://systems/celloutz_grunge.gd")
 const Motion := preload("res://systems/celloutz_motion.gd")
+const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
 const SATELLITE := preload("res://systems/satellite_view.gd")
 const FACILITY := preload("res://systems/facility_territory.gd")
 const HOLDINGS := preload("res://systems/ashbloom_holdings.gd")
@@ -225,11 +226,21 @@ func _handle_travel(delta: float) -> void:
 	if Input.is_key_pressed(KEY_T):
 		travel_hold = minf(1.0, travel_hold + delta * 0.85)
 		if travel_hold >= 1.0:
-			travel_requested.emit(district)
-			WorldHistory.record_event("map_travel", {"subject": "player", "place": str(district.get("name", ""))})
+			_commit_travel(district)
 			travel_hold = 0.0
 	else:
 		travel_hold = maxf(0.0, travel_hold - delta * 2.2)
+
+
+## Holding T resolves once, here. The signal may start a scene transition, but
+## the choice that requested it already has a durable identity in the ledger.
+func _commit_travel(district: Dictionary) -> void:
+	travel_requested.emit(district)
+	PlayerActionLedger.record("map_travel", {
+		"subject": "player",
+		"place": str(district.get("name", "")),
+		"place_id": str(district.get("id", district.get("record", ""))),
+	})
 
 
 func _process(delta: float) -> void:

@@ -194,7 +194,7 @@ The technique already exists in this project — `xray_specimen.gd` renders a li
   - v1 — a hand-rolled Environment per scene
   - v2 — one WorldLook preset system every scene goes through
 - [x] ~~**A6.2** Named discovered places with a description panel~~
-- [x] ~~**A6.3** Location-based travel~~
+- [x] ~~**A6.3** Location-based travel~~ — committing the held destination now emits one travel request and one identified `map_travel` player receipt
 - [x] ~~**A6.4** Cracked-screen occlusion over unsurveyed ground~~
 - [x] ~~**A6.5** 2D-to-tilted-3D zoom~~
 
@@ -511,8 +511,8 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 - [x] ~~**C2.5** Custom cursor art~~
 
 ### C3 — Camera mode `BUILT`
-- [x] ~~**C3.1** Raise a camera, frame the world, take a photograph~~
-- [x] ~~**C3.2** Photographs are objects with contents that can be inspected~~
+- [x] ~~**C3.1** Raise a camera, frame the world, take a photograph~~ — one shutter press batches its album frame, identified `photograph_taken` receipt and any ritual consequence
+- [x] ~~**C3.2** Photographs are objects with contents that can be inspected~~ — first storage creates the album schema and its first frame in one mutation rather than flushing an empty album first
 - [x] ~~**C3.3** Verify what is in frame against real anatomy state (required by E3)~~
 - [x] ~~**C3.4** Photographs post to the Wire~~ — publication now carries one player-action receipt, and its public fact plus every depicted subject's grudge/memory persist in one transaction
 

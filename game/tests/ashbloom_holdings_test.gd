@@ -73,6 +73,15 @@ func _ready() -> void:
 	map.observe(Vector3(first.at.x, 0, first.at.y), 0.0)
 	check(bool(HOLDINGS.holding(str(first.id)).revealed), "the live map's ordinary observation path drives the same territory authority")
 	check(MAP.DISTRICTS.size() == HOLDINGS.DEFINITIONS.size(), "map labels and generated holding authority share one definition table")
+	var travel_signals := [0]
+	map.travel_requested.connect(func(_place: Dictionary): travel_signals[0] += 1)
+	var travel_before := PLAYER_ACTION_LEDGER.count("map_travel")
+	map._commit_travel(first)
+	var travel_event: Dictionary = WorldHistory.events[-1]
+	check(int(travel_signals[0]) == 1 and PLAYER_ACTION_LEDGER.count("map_travel") == travel_before + 1,
+		"committing a surveyed destination emits one request and one summarized player act")
+	check(str(travel_event.get("type", "")) == "map_travel" and str((travel_event.get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_") and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"map travel carries an action identity and closes its ledger transaction")
 
 	var index := INDEX.new()
 	index.size = Vector2(960, 540)
