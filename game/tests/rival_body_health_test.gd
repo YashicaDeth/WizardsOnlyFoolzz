@@ -37,6 +37,7 @@ func _ready() -> void:
 	var expected: int = roundi(float(hunt.enemy_health_max) * hunt._rig_health_ratio(hunt.enemy_rig))
 	check(hunt.enemy_health == expected, "enemy_health after a real hit matches her actual body ratio (%d vs %d)" % [hunt.enemy_health, expected])
 	check(hunt.enemy_rig.anatomy.wounds.size() > 0, "the hit left a real wound on her rig, not just a number change")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")), "the rival wound, memory and landed swing close as one outcome")
 
 	# --- the prosthetic surge now wounds her too, instead of a silent -30 --
 	var wounds_before: int = hunt.enemy_rig.anatomy.wounds.size()

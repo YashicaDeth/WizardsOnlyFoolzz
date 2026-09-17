@@ -2469,7 +2469,12 @@ what that is rather than fixing another symptom.
       A connecting player melee swing now routes its existing
       `npc_anatomy_hit`/`melee_body_hit` event through the same compact action
       ledger; wall strikes and rounds cut out of the air use that grammar too.
-      Anatomy and gore events remain consequences rather than extra receipts.
+      Anatomy and gore events remain consequences rather than extra receipts. The
+      complete landed outcome now shares that boundary too: anatomy snapshot,
+      combat response, maiming, death/loot and Mara's possible retreat commit in
+      one nested-safe batch for either a named-rival swing or a roaming body.
+      `rival_body_health_test.gd` and `combat_integration_test.gd` assert the
+      transactions close after real hits.
 - [x] **O3.2** A damaged limb changes what that person can do, and now shows it — arms hang, legs trail, the body leans off the bad side
 - [x] ~~**O3.3** Grappling connects to it — hold, force, rob, recruit~~ Rob and
       recruit already did (F7.2 lets you rob somebody you are holding; F7's
@@ -3836,8 +3841,10 @@ travels, hits something and leaves a mark on it.
       re-verified clean. The intentional boundary is now just as explicit in
       the compact ledger: one trigger pull produces one `weapon_fired` receipt
       with a stable action id, while its later per-pellet anatomy/world impacts
-      remain consequences rather than nine counterfeit player actions
-      (`combat_integration_test.gd`).
+      remain consequences rather than nine counterfeit player actions. Each
+      pellet's later anatomy, response, possible death and loot now commits as
+      one impact-frame transaction of its own (`deferred_damage_test.gd`,
+      `combat_integration_test.gd`).
 - [x] **AF1.2** It hits the world and leaves damage there (pairs with AB2) — a hole where it arrived, lifted off the surface so it does not fight the wall it is drawn on, sized by the round's energy, and recorded to WorldHistory for AB2 to read
 - [x] **AF1.3** Casings eject, bounce, land and stay — out of the port sideways and back, tumbling, two bounces that lose most of their energy, and then lying on their side rather than standing on end, which is the single most obvious tell that nobody simulated them. One case per trigger pull, so a shotgun leaves one for nine pellets
 - [x] **AF1.4** Reloading is physical: the magazine leaves the weapon and a new

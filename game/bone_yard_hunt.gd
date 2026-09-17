@@ -2128,6 +2128,9 @@ func _resolve_strike() -> void:
 	if facing < 0.18:
 		return
 	var damage := 22 if story_step > 0 else 15
+	# Anatomy, the landed-action receipt, rival memory and a possible retreat
+	# are all consequences of this one completed swing.
+	WorldHistory.begin_ledger_batch()
 	# Mara's wounds used to be picked from her remaining health — "left arm"
 	# below 55, "leg" below 28 — so where the player aimed never mattered and
 	# nothing landed on her body. She has a rig now, so the blow resolves
@@ -2163,6 +2166,7 @@ func _resolve_strike() -> void:
 	WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"injury": wound, "wounds": wounds, "grudge": mini(100, int(WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT)).get("grudge", 0)) + 14), "status": "fighting"}, "rival_injured")
 	if enemy_health <= 0:
 		_rival_retreats("You left Mara alive. She will return altered.")
+	WorldHistory.commit_ledger_batch()
 
 
 func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
@@ -2232,6 +2236,7 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	var rig := actor.get("rig") as BaselineHuman
 	var zone := "torso"
 	var result: Dictionary = {}
+	WorldHistory.begin_ledger_batch()
 	if rig != null and is_instance_valid(rig):
 		# Where you are looking decides what you open. The zone used to come from
 		# (event_count + index) % 6 — a round-robin, so aiming at a head and
@@ -2272,6 +2277,7 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		_apply_combat_response(actor, attack, result)
 	if anatomy.dead:
 		_kill_encounter_actor(nearest_index, "combat_trauma")
+	WorldHistory.commit_ledger_batch()
 	return true
 
 
@@ -2380,6 +2386,9 @@ func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bo
 	var impulse := float(payload.get("impulse", 0.0))
 	var damage_type := str(payload.get("damage_type", "ballistic"))
 	var weapon := str(payload.get("weapon", "firearm"))
+	# A delayed round is resolved on its impact frame, but its anatomy, response,
+	# death and loot still form one physical outcome on that frame.
+	WorldHistory.begin_ledger_batch()
 	var result := rig.hit_at(hit.get("position", actor.node.global_position), damage, impulse, damage_type, direction)
 	var zones: Array[String] = [str(result.get("zone", "torso"))]
 	var severed: Array[String] = []
@@ -2425,6 +2434,7 @@ func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bo
 	else:
 		_apply_combat_response(actor, fake_attack, {"pain": actor.anatomy.pain})
 	_settle_shot(shot_id, true, str(actor.subject_id))
+	WorldHistory.commit_ledger_batch()
 	return true
 
 

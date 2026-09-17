@@ -120,6 +120,8 @@ func _ready() -> void:
 	for _tick in 10:
 		await get_tree().physics_frame
 	check(actor.anatomy.wounds.size() > 0, "live pellets resolve against the NPC BaselineHuman")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")),
+		"every delayed pellet closes its anatomy and response transaction on impact")
 	var wounded_zones: Array[String] = []
 	for wound in actor.anatomy.wounds:
 		var zone := str(wound.get("zone", ""))
@@ -170,6 +172,7 @@ func _ready() -> void:
 	hunt._attack_nearest_encounter_actor({"damage": 20.0, "impulse": 10.0, "damage_type": "cut", "range": 9.0, "weapon": "cleaver"})
 	check(decoy.anatomy.wounds.size() == decoy_wounds, "a nearer body does not steal a locked strike")
 	check(locked_actor.anatomy.wounds.size() > locked_wounds, "the locked target takes the strike")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")), "the landed swing closes anatomy, response and its receipt together")
 	hunt._toggle_lock()
 	check(hunt.lock_target.is_empty(), "lock releases")
 

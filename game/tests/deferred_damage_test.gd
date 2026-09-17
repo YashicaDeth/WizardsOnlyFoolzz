@@ -63,6 +63,7 @@ func _ready() -> void:
 	check(landed, "the wound exists once the round has had real time to cross a real distance")
 	check(actor.anatomy.wounds.all(func(w): return BaselineHuman.ZONES.has(str(w.get("zone", "")))), "and it landed on a real canonical zone, same as an instant hit would have")
 	check(WorldHistory.recent_events(4).any(func(e): return str(e.get("type", "")) == "firearm_anatomy_hit"), "the deferred hit is what actually wrote firearm_anatomy_hit, not the frame it was fired on")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")), "the impact's anatomy, response and world facts close on that arrival frame")
 
 	print("AF1.1 - a shotgun's own pellets land as real, separate hits rather than one pre-batched summary")
 	# The first shot's own attack_cooldown is a real cooldown and not this
