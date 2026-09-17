@@ -47,6 +47,9 @@ static func advance(current_location: String) -> Array[Dictionary]:
 	if now - _last_scan_minute < SCAN_MINUTES:
 		return settled
 	_last_scan_minute = now
+	# One clock settlement may advance several hunters. Their state and bounded
+	# public events are one world turn, so coalesce the scan into one flush.
+	WorldHistory.begin_ledger_batch()
 	for hunter_id in WorldHistory.all_subjects():
 		var hunter := WorldHistory.subject(str(hunter_id))
 		if str(hunter.get("kind", "")) != "person" or str(hunter.get("status", "")) not in LIVE_HUNT_STATUSES:
@@ -78,6 +81,7 @@ static func advance(current_location: String) -> Array[Dictionary]:
 			"turns": turns, "total_turns": total, "phase": phase,
 		})
 		settled.append(event)
+	WorldHistory.commit_ledger_batch()
 	return settled
 
 

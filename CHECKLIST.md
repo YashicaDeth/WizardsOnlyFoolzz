@@ -1162,7 +1162,7 @@ The last rung. Fifteen statements that are true of the hunt when this game is fi
       cannot be miscounted later, and a resolved hunter stops. The quarry and
       Underground Colosseum production clock call the route directly; returning
       to the Hunt reports how many turns the captain kept working. Proven in
-      `offscreen_hunts_test.gd` (10 checks, including the production derby seam).
+      `offscreen_hunts_test.gd` (12 checks, including multi-hunt atomic settlement and the production derby seam).
 - [x] **F10.12** `v10` A hunt can be inherited by somebody who never met you —
       a hunter's ordinary anatomical death opens the existing faction vacancy;
       once `WireNet` promotes its real socially strongest successor,
