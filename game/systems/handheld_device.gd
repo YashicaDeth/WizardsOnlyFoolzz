@@ -454,6 +454,9 @@ func save_device() -> void:
 func _lose_possession(event_type: String, details: Dictionary, player_act := false) -> Dictionary:
 	if not possessed:
 		return {"ok": false, "reason": "ALREADY NOT IN HAND"}
+	# `drop()` already owns a wider wear transaction; confiscation enters here
+	# directly. A nested batch makes both paths atomic without duplicating them.
+	WorldHistory.begin_ledger_batch()
 	close_device()
 	possessed = false
 	save_device()
@@ -463,6 +466,7 @@ func _lose_possession(event_type: String, details: Dictionary, player_act := fal
 		PLAYER_ACTION_LEDGER.record(event_type, payload)
 	else:
 		WorldHistory.record_event(event_type, payload)
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "serial": serial, "condition": condition, "battery": battery, "wear_log": wear_log.duplicate(), "impacts": impacts.duplicate(true)}
 
 

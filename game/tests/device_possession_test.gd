@@ -84,6 +84,7 @@ func _ready() -> void:
 	_check(ACTION_LEDGER.count("device_taken") == 0, "confiscation is not falsely credited as the player's act")
 	var drop_event: Dictionary = WorldHistory.events.filter(func(event: Dictionary): return str(event.get("type", "")) == "device_dropped")[0]
 	_check(not str((drop_event.get("details", {}) as Dictionary).get("action_id", "")).is_empty(), "the established drop event carries its stable action id")
+	_check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "drop, confiscation and recovery all close their nested device transactions")
 
 	print("")
 	if failures.is_empty():
