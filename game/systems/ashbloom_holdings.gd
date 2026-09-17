@@ -8,6 +8,7 @@ extends RefCounted
 
 const SUBJECT := "ashbloom_holdings"
 const REGION_SIZE := Vector2(470, 370)
+const REGION_BOUNDS := Rect2(-REGION_SIZE * 0.5, REGION_SIZE)
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 const DEFINITIONS := [
@@ -128,6 +129,11 @@ static func nearest_id(at: Vector2) -> String:
 ## owns discovery through `observe()`. The law can know whose ground it is even
 ## while the player has not surveyed the border yet.
 static func jurisdiction_at(at: Vector2) -> Dictionary:
+	# A nearest-centre Voronoi answer is infinite unless it is clipped. The map
+	# polygons stop at the authored region edge; law must stop at that same edge
+	# rather than assigning an act in another world to the closest Ashbloom town.
+	if not REGION_BOUNDS.has_point(at):
+		return {}
 	var id := nearest_id(at)
 	var definition := definition_for(id)
 	if definition.is_empty():

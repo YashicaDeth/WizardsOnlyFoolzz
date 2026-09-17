@@ -28,6 +28,8 @@ func _ready() -> void:
 	check(str(fresh_jurisdiction.place_id) == "ashbloom:bone_yard" and str(fresh_jurisdiction.held_by) == "ashline_wreckers",
 		"a world position resolves to the same canonical place and holder local law will use")
 	check(int(HOLDINGS.overview().revealed_count) == 0, "jurisdiction lookup does not reveal unsurveyed land to the player")
+	check(HOLDINGS.jurisdiction_at(Vector2(HOLDINGS.REGION_SIZE.x, 0.0)).is_empty(),
+		"Ashbloom jurisdiction ends at the same authored region edge as its map polygons")
 	check(HOLDINGS.DEFINITIONS.all(func(definition: Dictionary):
 		return str(WorldHistory.subject(str(definition.record)).get("kind", "")) == "place"),
 		"every map polygon has one first-class WorldHistory place record")

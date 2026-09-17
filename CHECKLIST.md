@@ -3393,7 +3393,7 @@ in; nothing has ever asked the player to *use* them on a map.
 - [x] **AA1.4** Reveal is per holding, not per metre, so it arrives in satisfying pieces — `ashbloom_holdings.gd` resolves the nearest authored settlement and reveals that entire persistent polygon exactly once. Fine cell survey remains underneath for streets/buildings, but it no longer controls whether the land itself has a name
 
 ### AA2 — The split
-- [x] **AA2.1** The region divides into named holdings with their own edges — the five settlements the world generator already builds now share one definition table with MAP and produce five deterministic convex Voronoi cells clipped to the real 470-by-370-metre region. Every polygon also owns one canonical `kind: place` WorldHistory record, revealed through the same exploration act and consumed unchanged by MAP, INDEX, Board and local jurisdiction. `ashbloom_holdings_test` proves all five bounded polygons, settlement containment, whole-piece/idempotent reveal and receipt routing, holder/timestamp persistence, save-safe migration, non-revealing jurisdiction lookup, live map seam and cross-instrument record identity (30 checks)
+- [x] **AA2.1** The region divides into named holdings with their own edges — the five settlements the world generator already builds now share one definition table with MAP and produce five deterministic convex Voronoi cells clipped to the real 470-by-370-metre region. Every polygon also owns one canonical `kind: place` WorldHistory record, revealed through the same exploration act and consumed unchanged by MAP, INDEX, Board and local jurisdiction. `ashbloom_holdings_test` proves all five bounded polygons, settlement containment, whole-piece/idempotent reveal and receipt routing, holder/timestamp persistence, save-safe migration, non-revealing bounded jurisdiction lookup, live map seam and cross-instrument record identity (31 checks)
 - [ ] **AA2.2** A holding can be given to the ascent or given to corruption
 - [ ] **AA2.3** Giving it is an act with a cost, not a menu choice
 - [ ] **AA2.4** A holding remembers who took it and when (WorldHistory, like everything else)
@@ -4422,7 +4422,12 @@ The last rung. Fifteen statements that are true of sneaking and the law when thi
       pings until surface carrier coverage returns. `handheld_satellite_test.gd`
       proves the direct map and real Black Mirror seams; visual evidence:
       `captures/underground_satellite_occluded.png`.
-- [ ] **AE10.12** `v10` A crime has a jurisdiction and jurisdictions end
+- [x] **AE10.12** `v10` A crime has a jurisdiction and jurisdictions end —
+      witnessed acts resolve to the same canonical holding MAP/INDEX/Board use,
+      but `jurisdiction_at()` now clips the Voronoi authority to the authored
+      470×370-metre Ashbloom boundary. An act beyond that edge returns no local
+      holder instead of being silently assigned to whichever settlement is
+      nearest (`ashbloom_holdings_test.gd`, 31 checks; local-law suites green).
 - [ ] **AE10.13** `v10` You can be arrested rather than killed
 - [ ] **AE10.14** `v10` Standing with a faction changes what the law does
 - [ ] **AE10.15** `v10` What you were wanted for carries into the next universe
