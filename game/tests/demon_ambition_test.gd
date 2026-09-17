@@ -62,6 +62,7 @@ func _ready() -> void:
 		"relations": {"player": {"kind": "grudge", "strength": 3}},
 	})
 	check(str(DemonAmbition.ambition("mild_grudge_demon").get("kind", "")) == "seek_patronage", "a grudge too small to matter yet does not override seeking patronage")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "autonomous patronage state and its public fact close one world transaction")
 
 	print("DEMON_AMBITION_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

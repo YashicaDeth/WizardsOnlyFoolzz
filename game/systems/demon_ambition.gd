@@ -76,9 +76,11 @@ static func pursue(subject_id: String) -> Dictionary:
 			var faction := WorldHistory.subject(faction_id)
 			if faction.is_empty():
 				return {"ok": false, "reason": "NO FACTION WILL HAVE THEM YET"}
+			WorldHistory.begin_ledger_batch()
 			WorldHistory.update_subject(subject_id, {
 				"faction_id": faction_id, "faction": str(faction.get("name", faction_id)),
 			}, "demon_sought_patronage")
 			WorldHistory.record_event("demon_joined_faction", {"subject_id": subject_id, "faction_id": faction_id})
+			WorldHistory.commit_ledger_batch()
 			return {"ok": true, "kind": "seek_patronage", "faction_id": faction_id}
 	return {"ok": false, "reason": "UNKNOWN AMBITION"}
