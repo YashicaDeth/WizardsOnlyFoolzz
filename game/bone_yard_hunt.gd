@@ -3951,10 +3951,16 @@ func _interact() -> void:
 		if not lifted.is_empty():
 			var carried_items: Array = WorldHistory.subject("inventory").get("items", []).duplicate()
 			carried_items.append(str(lifted["label"]))
-			WorldHistory.update_subject("inventory", {"items": carried_items}, "substance_lifted")
-			WorldHistory.record_event("substance_lifted", {
-				"kind": str(lifted["kind"]), "id": str(lifted["id"]), "location": HUNT_LOCATION,
+			# One lift used to emit `substance_lifted` twice (once from the
+			# inventory update and once explicitly) and persist each write. Keep
+			# the established event name, but make the inventory mutation and its
+			# compact receipt one atomic player act.
+			WorldHistory.begin_ledger_batch()
+			WorldHistory.amend_subject("inventory", {"items": carried_items})
+			PLAYER_ACTION_LEDGER.record("substance_lifted", {
+				"kind": str(lifted["kind"]), "item": str(lifted["id"]), "location": HUNT_LOCATION,
 			})
+			WorldHistory.commit_ledger_batch()
 			prompt.text = "%s // TAKEN" % str(lifted["label"])
 			return
 

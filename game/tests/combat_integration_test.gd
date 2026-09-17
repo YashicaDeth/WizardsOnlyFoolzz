@@ -31,6 +31,18 @@ func _ready() -> void:
 		"I presents a nearby world pickup through the universal 3D reliquary")
 	check((hunt.substance_station.pickups() as Array).size() == station_pickups.size(),
 		"world inspection leaves the real pickup on its table")
+	var lifted_events_before := WorldHistory.event_count("substance_lifted")
+	var lifted_receipts_before := PlayerActionLedger.count("substance_lifted")
+	hunt._interact()
+	check((hunt.substance_station.pickups() as Array).size() == station_pickups.size() - 1,
+		"E still takes the inspected world pickup through its established interaction")
+	check(WorldHistory.event_count("substance_lifted") == lifted_events_before + 1,
+		"one physical lift emits one substance event rather than the former duplicate pair")
+	check(PlayerActionLedger.count("substance_lifted") == lifted_receipts_before + 1,
+		"the lift receives one durable action-ledger receipt")
+	var lifted_event: Dictionary = WorldHistory.recent_events(1)[0]
+	check(not str((lifted_event.get("details", {}) as Dictionary).get("action_id", "")).is_empty(),
+		"the established substance event carries its stable action id")
 	hunt.inspect_held = false
 	hunt.inspected_world_item.clear()
 	hunt.player_body.position = Vector3(175, 0.9, 125)

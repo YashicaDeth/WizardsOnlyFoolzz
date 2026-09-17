@@ -5723,7 +5723,11 @@ is a better tutorial for what a substance does than any readout of it.
 - [x] **AU3.6** Reachable in the real world, not only from a dev menu — the Hunt
       Grounds drop the same station under the wrecks, and lifting something off
       it files through the identical `WorldHistory` inventory path a loot cache
-      already uses
+      already uses. That lift is now one ledger-routed act: the inventory
+      mutation and the established `substance_lifted` event persist in one
+      transaction, the event carries a stable action id, and the former second
+      duplicate `substance_lifted` event is gone. `combat_integration_test.gd`
+      proves one press removes one live pickup, adds one event and one receipt.
 - [x] **AU3.7** Three places, one object — `systems/substance_station.gd`. The
       shed, the sandbox and the Hunt Grounds do not lay their own tables out;
       each drops the same node, so **if a substance is reachable in the sandbox
