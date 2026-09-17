@@ -39,6 +39,7 @@ const WORK_TEMPLATES := [
 
 
 static func ensure() -> Dictionary:
+	WorldHistory.begin_ledger_batch()
 	var record := WorldHistory.subject(SUBJECT)
 	var holdings: Dictionary = (record.get("holdings", {}) as Dictionary).duplicate(true)
 	var changed := record.is_empty()
@@ -73,17 +74,19 @@ static func ensure() -> Dictionary:
 		})
 		if bool(holding_entry.get("revealed", false)):
 			_ensure_work(id)
+	var result := record
 	if record.is_empty():
-		return WorldHistory.register_subject(SUBJECT, {
+		result = WorldHistory.register_subject(SUBJECT, {
 			"kind": "territory",
 			"name": "THE ASHBLOOM EXPANSE",
 			"holdings": holdings,
 			"active_holding": "",
 			"revealed_count": 0,
 		})
-	if changed:
-		return WorldHistory.amend_subject(SUBJECT, {"holdings": holdings})
-	return record
+	elif changed:
+		result = WorldHistory.amend_subject(SUBJECT, {"holdings": holdings})
+	WorldHistory.commit_ledger_batch()
+	return result
 
 
 static func overview() -> Dictionary:

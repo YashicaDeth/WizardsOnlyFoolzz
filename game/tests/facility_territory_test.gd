@@ -33,6 +33,7 @@ func _ready() -> void:
 	check(not WorldHistory.subject("facility:underground_colosseum").is_empty(), "liberation unlocks the colosseum INDEX record")
 	check(str(WorldHistory.subject(FACILITY.REACTION_SUBJECT).status) == "circulating", "CellOutz posts a persistent repossession order")
 	check(WorldHistory.event_count("celloutz_repossession_order_posted") == 1, "the corporate reaction is idempotent")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "pit liberation, Index record and repossession order close one facility transition")
 	var true_position := Vector2(31, -77)
 	var ping := FACILITY.publish_target_ping(true_position)
 	var ping_centre := Vector2(float(ping.x), float(ping.z))

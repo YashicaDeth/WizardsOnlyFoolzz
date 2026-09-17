@@ -23,6 +23,7 @@ func _ready() -> void:
 	WorldHistory.clear_history()
 	var fresh := HOLDINGS.overview()
 	check((fresh.holdings as Array).size() == 5, "the surface authority owns the five settlements the world generator actually builds")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "territory and its five canonical place records seed as one closed batch")
 	check(int(fresh.revealed_count) == 0, "a new Ashbloom does not begin with its holdings revealed")
 	var fresh_jurisdiction := HOLDINGS.jurisdiction_at((HOLDINGS.DEFINITIONS[2] as Dictionary).at)
 	check(str(fresh_jurisdiction.place_id) == "ashbloom:bone_yard" and str(fresh_jurisdiction.held_by) == "ashline_wreckers",

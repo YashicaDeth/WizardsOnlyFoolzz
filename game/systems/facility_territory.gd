@@ -70,9 +70,10 @@ static func _blank_sectors() -> Dictionary:
 
 
 static func ensure() -> Dictionary:
+	WorldHistory.begin_ledger_batch()
 	var current := WorldHistory.subject(SUBJECT)
 	if current.is_empty():
-		return WorldHistory.register_subject(SUBJECT, {
+		current = WorldHistory.register_subject(SUBJECT, {
 			"kind": "territory",
 			"name": "CELLOUTZ SUBLEVEL 0C",
 			"sectors": _blank_sectors(),
@@ -92,6 +93,7 @@ static func ensure() -> Dictionary:
 		current = WorldHistory.amend_subject(SUBJECT, {"sectors": sectors})
 	if not current.has("relay_disabled"):
 		current = WorldHistory.amend_subject(SUBJECT, {"relay_disabled": []})
+	WorldHistory.commit_ledger_batch()
 	return current
 
 
@@ -125,6 +127,9 @@ static func overview() -> Dictionary:
 
 
 static func apply_event(event_type: String, details: Dictionary = {}) -> Dictionary:
+	# One canonical route event may change several sector, Index and retaliation
+	# records. Persist the consequence as one boundary.
+	WorldHistory.begin_ledger_batch()
 	ensure()
 	match event_type:
 		"opening_woke":
@@ -143,7 +148,9 @@ static func apply_event(event_type: String, details: Dictionary = {}) -> Diction
 		"ringmaster_joined", "ringmaster_escaped", "ringmaster_challenged":
 			_set_sector("surface_gate", SURVEYED, true)
 			_unlock_record("surface_gate")
-	return overview()
+	var result := overview()
+	WorldHistory.commit_ledger_batch()
+	return result
 
 
 ## The Black Mirror is the agency's instrument as much as the player's. Once a
