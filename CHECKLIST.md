@@ -1836,8 +1836,13 @@ v8 made the device dangerous and most objects in the world still cannot be looke
       `world_subject_inspected` receipt rather than being mislabeled as items;
       their deeper organs and history remain on the Black Mirror dossier.
       Visual evidence: `captures/world_item_inspection.png` and
-      `captures/world_subject_inspection.png`. Fixed fixtures and the wider
-      scenery population still need adapters before I9.1/I9.2 may be ticked.
+      `captures/world_subject_inspection.png`. Authored working fixtures now
+      begin the same contract: the station's tray, grinder, scales, ashtray and
+      lighter plus the Hunt bedroll expose live geometry and stable fixture
+      identities without becoming takeable, filing `world_fixture_inspected`
+      rather than item receipts (`substance_station_test.gd`,
+      `sleep_site_test.gd`). Broad architecture and incidental scenery still
+      need adapters before I9.1/I9.2 may be ticked.
 
 ### I v10 — the tenth pass
 Nine passes designed in a lit room. C v4 made the device the main light source in the world.
@@ -5728,7 +5733,10 @@ is a better tutorial for what a substance does than any readout of it.
       which is the failure that line was written against. The contents colour
       comes from the substance and everything else comes from the form, so two
       substances in baggies still read as two different baggies
-      (`tests/substance_objects_capture.tscn`, three sheets looked at)
+      (`tests/substance_objects_capture.tscn`, three sheets looked at). The
+      fixed kit now also enters the universal `I` inspection grammar using its
+      actual live mesh, while deliberately remaining absent from the takeable
+      manifest (`substance_station_test.gd`).
 - [ ] **AU3.2** Every substance in AU is physically set out in the room and
       takeable, not chosen from a list
 - [ ] **AU3.3** The bodies stay killable and the reset stays instant — this is

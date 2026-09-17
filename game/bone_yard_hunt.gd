@@ -1316,7 +1316,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			var inspected_id := str(inspected_world_item.get("item_id", ""))
 			var inspected_event := "held_item_inspected"
 			if not inspected_world_item.is_empty():
-				inspected_event = "world_subject_inspected" if str(inspected_world_item.get("kind", "")) == "person" else "world_item_inspected"
+				match str(inspected_world_item.get("kind", "")):
+					"person": inspected_event = "world_subject_inspected"
+					"fixture": inspected_event = "world_fixture_inspected"
+					_: inspected_event = "world_item_inspected"
 			if not inspected_world_item.is_empty():
 				prompt.text = "%s // INSPECT // RELEASE I TO LOWER" % str(inspected_world_item.get("label", "OBJECT"))
 			elif smoke_model != null and is_instance_valid(smoke_model):
@@ -6216,6 +6219,13 @@ func _nearest_world_item_for_inspection() -> Dictionary:
 			best = {
 				"source": enemy, "item_id": CAST.id_for(CAPTAIN_SLOT), "kind": "person",
 				"label": _captain_name(), "detail": "RETREATING" if enemy_retreating else "HOSTILE",
+			}
+	if sleep_site != null and is_instance_valid(sleep_site):
+		var bedroll_distance := player.distance_to(sleep_site.global_position)
+		if bedroll_distance <= SLEEP_REACH and bedroll_distance < best_distance:
+			best = {
+				"source": sleep_site, "item_id": "hunt_bedroll", "kind": "fixture",
+				"label": "BEDROLL", "detail": "REST SITE",
 			}
 	return best
 

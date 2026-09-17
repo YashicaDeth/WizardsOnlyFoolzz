@@ -65,6 +65,7 @@ signal taken(entry: Dictionary)
 ## Live pickups, in manifest order. An entry that has been taken is dropped from
 ## here, so `pickups()` is always what is actually still on the table.
 var _live: Array[Dictionary] = []
+var _fixtures: Array[Dictionary] = []
 var _rng := RandomNumberGenerator.new()
 
 
@@ -81,6 +82,13 @@ func build(with_table := true, seed_value := 4093) -> void:
 		node.position = Vector3(float(fixture["x"]), TOP_Y, float(fixture["z"]))
 		node.rotation = Vector3(0, _rng.randf_range(-0.35, 0.35), 0)
 		add_child(node)
+		_fixtures.append({
+			"source": node,
+			"item_id": "station_fixture:%s" % str(fixture["prop"]),
+			"kind": "fixture",
+			"label": str(fixture["prop"]).replace("_", " ").to_upper(),
+			"detail": "WORKING SURFACE",
+		})
 	for raw in MANIFEST:
 		var entry: Dictionary = (raw as Dictionary).duplicate()
 		var node := _build_one(entry)
@@ -145,15 +153,27 @@ func nearest(from: Vector3, reach := REACH) -> Dictionary:
 ## copy the geometry already sitting in the world instead of inventing an icon.
 func inspection_nearest(from: Vector3, reach := REACH) -> Dictionary:
 	var entry := nearest(from, reach)
-	if entry.is_empty():
-		return {}
-	return {
-		"source": entry["node"],
-		"item_id": str(entry["id"]),
-		"kind": str(entry["kind"]),
-		"label": str(entry["label"]),
-		"detail": str(entry.get("form", "ground")),
-	}
+	var result := {}
+	var best_distance := reach
+	if not entry.is_empty():
+		var pickup_source := entry["node"] as Node3D
+		best_distance = from.distance_to(pickup_source.global_position)
+		result = {
+			"source": pickup_source,
+			"item_id": str(entry["id"]),
+			"kind": str(entry["kind"]),
+			"label": str(entry["label"]),
+			"detail": str(entry.get("form", "ground")),
+		}
+	for fixture: Dictionary in _fixtures:
+		var fixture_source := fixture.get("source") as Node3D
+		if fixture_source == null or not is_instance_valid(fixture_source):
+			continue
+		var distance := from.distance_to(fixture_source.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			result = fixture.duplicate()
+	return result
 
 
 ## Take the nearest thing. Returns {} when nothing is in reach, so a caller can

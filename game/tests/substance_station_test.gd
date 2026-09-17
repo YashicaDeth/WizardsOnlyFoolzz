@@ -71,6 +71,9 @@ func _ready() -> void:
 	var far: Dictionary = a.nearest(at + Vector3(0, 0, 40.0))
 	check(far.is_empty(), "and standing in the next county does not")
 	check(a.inspection_nearest(at + Vector3(0, 0, 40.0)).is_empty(), "nor can a distant object be inspected through the world")
+	var fixture_probe: Dictionary = a.inspection_nearest((a as Node3D).to_global(Vector3(1.04, STATION.TOP_Y, 0.08)), 0.08)
+	check(str(fixture_probe.get("kind", "")) == "fixture" and str(fixture_probe.get("label", "")) == "ASHTRAY",
+		"fixed working objects enter the same inspection contract without becoming takeable")
 
 	var before: int = (a.pickups() as Array).size()
 	var lifted: Dictionary = a.take_nearest(at)

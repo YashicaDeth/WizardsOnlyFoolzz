@@ -33,6 +33,9 @@ func _ready() -> void:
 	hunt.enemy_retreating = true
 	for actor: Dictionary in hunt.encounter_actors:
 		actor.disposition = "neutral"
+	var bedroll_preview: Dictionary = hunt._nearest_world_item_for_inspection()
+	check(str(bedroll_preview.get("kind", "")) == "fixture" and bedroll_preview.get("source") == hunt.sleep_site,
+		"the physical bedroll enters the same world-fixture inspection grammar")
 	var before := WorldClock.minutes()
 	check(hunt._try_sleep_at_site(), "interacting in reach is owned by the bedroll")
 	check(absf(WorldClock.hour() - hunt.SLEEP_WAKE_HOUR) < 0.01 and WorldClock.minutes() > before, "sleep advances forward to 07:00")
