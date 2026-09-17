@@ -27,9 +27,11 @@ const SECTORS := [
 		"record": "facility:underground_colosseum",
 	},
 	{
-		"id": "service_ring", "name": "THE SERVICE RING",
+		# Stable id kept for save compatibility; the player-facing name says what
+		# the machinery does instead of asking them to understand floor-plan lore.
+		"id": "service_ring", "name": "THE LOCKDOWN GRID",
 		"at": Vector2(0.76, 0.52), "owner": "celloutz",
-		"objective": "FIND A ROUTE THROUGH THE THREE TUNNELS",
+		"objective": "DESTROY THREE RED RELAYS TO UNSEAL THE EXIT",
 		"record": "facility:service_ring",
 	},
 	{
@@ -206,7 +208,7 @@ static func _escalate_reaction() -> void:
 	WorldHistory.update_subject(REACTION_SUBJECT, {
 		"status": "priority",
 		"service_ring_escalated": true,
-		"threat": "SERVICE RING LOST; RECOVER ASSET INTACT ENOUGH TO INTERROGATE",
+		"threat": "LOCKDOWN GRID LOST; RECOVER ASSET INTACT ENOUGH TO INTERROGATE",
 	}, "celloutz_repossession_escalated")
 	WorldHistory.record_event("celloutz_service_ring_retaliation", {
 		"subject_id": REACTION_SUBJECT,

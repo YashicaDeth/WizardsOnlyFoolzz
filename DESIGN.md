@@ -13,8 +13,9 @@ change may expose a hard visibility cut.
 
 17 September implementation note: the opening now uses the authored underground colosseum rather than accidentally entering and resuming in the surface quarry. Its first territorial loop is live: four persistent facility holdings progress from controlled to surveyed to liberated through real opening/derby milestones; winning the underground heat liberates the Colosseum, unlocks its recovered INDEX file and causes CellOutz to circulate one persistent repossession order. The Black Mirror defaults to the facility MAP after this route exists, supports pointer and arrow selection plus `L` to the Ashbloom satellite, and restores the entire territory/file/bounty state through a quantum branch while a genuinely new world returns the facility to corporate control. Full contract and evidence are in `DESIGN/FACILITY_TERRITORY_SLICE.md`.
 
-17 September implementation note: the Service Ring is now the physical second
-half of that underground heat. Each of the three existing tunnel chambers owns
+17 September implementation note: the Lockdown Grid is now the physical second
+half of that underground heat. (“Service Ring” remains only as its stable save
+id.) Each of the three existing tunnel chambers owns
 a scanning CellOutz relay that can be shot with the cab's travelling rounds or
 rammed with the vehicle. Eight wreckers no longer counterfeit territorial
 liberation: the empty bowl remains driveable until all three relays are dark.

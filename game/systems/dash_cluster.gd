@@ -252,7 +252,7 @@ func _magazine(at: Vector2) -> void:
 ## Three lamps are the three real tunnel chambers; the red strip is how much of
 ## the current scan the relays have on the vehicle.
 func _service_lamps(at: Vector2) -> void:
-	CellOutzType.draw_condensed(face, at - Vector2(0, 11), "SERVICE RING", 9.0, Color(ETCH, 0.8), 2.0)
+	CellOutzType.draw_condensed(face, at - Vector2(0, 11), "LOCKDOWN", 9.0, Color(ETCH, 0.8), 2.0)
 	var disabled := maxi(0, service_total - service_left)
 	for index in service_total:
 		var lamp_at := at + Vector2(12.0 + float(index) * 22.0, 3.0)

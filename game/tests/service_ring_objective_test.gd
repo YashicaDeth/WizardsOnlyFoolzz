@@ -17,6 +17,8 @@ func _ready() -> void:
 		return
 	WorldHistory.clear_history()
 	FACILITY.apply_event("opening_entered_pit")
+	check(str(FACILITY.SECTORS[2].name) == "THE LOCKDOWN GRID", "the player-facing name explains function instead of floor-plan lore")
+	check(str(FACILITY.SECTORS[2].objective).contains("UNSEAL THE EXIT"), "the MAP explains why the three relays matter")
 	var derby: Node = load("res://underground_colosseum.tscn").instantiate()
 	add_child(derby)
 	await get_tree().process_frame

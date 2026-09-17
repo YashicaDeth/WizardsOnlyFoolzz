@@ -27,8 +27,8 @@ four authored holdings in `WorldHistory.subject("facility_territory")`:
 
 1. the Growing Floor;
 2. the Underground Colosseum;
-3. the Service Ring, made from the colosseum's existing three tunnels and ring
-   corridor;
+3. the Lockdown Grid, made from the colosseum's existing three tunnels and ring
+   corridor (its stable save id remains `service_ring`);
 4. the Surface Gate, where the existing ringmaster choice hands the opening to
    the Ashbloom.
 
@@ -39,7 +39,7 @@ same record back.
 ## Earned change
 
 - Waking reveals the Growing Floor.
-- Entering the pit surveys the colosseum and reveals the Service Ring as
+- Entering the pit surveys the colosseum and reveals the Lockdown Grid as
   controlled ground.
 - Winning the underground derby liberates the colosseum holding. Merely
   entering it or losing does not.
@@ -49,7 +49,12 @@ same record back.
 - Choosing how to leave reveals the Surface Gate and the remaining recovered
   facility records.
 
-## The Service Ring is played, not awarded
+## The Lockdown Grid is played, not awarded
+
+The former engineering label “Service Ring” described the outer tunnel layout
+but did not tell a player what to do or why. The player-facing name is now
+**Lockdown Grid**: its three relays keep the surface exit sealed. The internal
+`service_ring` identifiers remain unchanged for save compatibility.
 
 The Underground Colosseum's three existing tunnel chambers each contain one
 CellOutz surveillance relay. A live head sweeps a red acquisition cone while
@@ -62,7 +67,7 @@ The heat is now compound: eight wreckers clear the bowl, but the player keeps
 control until all three relays are disabled. The physical cab cluster carries
 three relay lamps and the live acquisition level; after the last wrecker the
 only extra screen-space line is the temporary cleanup direction. The final
-relay liberates the Service Ring, unlocks its INDEX record and escalates the
+relay liberates the Lockdown Grid, unseals the exit, unlocks its INDEX record and escalates the
 already circulating CellOutz order to priority. It does not create a second
 unrelated quest or bounty.
 

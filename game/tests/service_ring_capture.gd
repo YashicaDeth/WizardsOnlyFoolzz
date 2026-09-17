@@ -80,7 +80,7 @@ func _ready() -> void:
 	caption.add_theme_constant_override("shadow_offset_y", 2)
 	layer.add_child(caption)
 
-	_caption("EIGHT WRECKERS DOWN  //  THE SERVICE RING IS STILL WATCHING")
+	_caption("EIGHT WRECKERS DOWN  //  THE EXIT REMAINS SEALED")
 	_park_on(derby.service_relays[0])
 	await _frames(FPS * 2)
 
@@ -93,10 +93,10 @@ func _ready() -> void:
 			push_error("CAPTURE_FAILED relay %d survived three real rounds" % index)
 			get_tree().quit(1)
 			return
-		_caption("RELAY %02d DARK  //  SERVICE RING %d/3" % [index + 1, index + 1])
+		_caption("RELAY %02d DARK  //  LOCKDOWN GRID %d/3" % [index + 1, index + 1])
 		await _frames(FPS)
 
-	_caption("SERVICE RING CUT LOOSE  //  CELLOUTZ RESPONSE ESCALATED")
+	_caption("LOCKDOWN GRID DEAD  //  SURFACE EXIT UNSEALED")
 	await _frames(FPS * 2)
 	var liberated := str(FACILITY.sector("service_ring").state) == FACILITY.LIBERATED
 	print("SERVICE_RING_CAPTURE_RESULT liberated=", liberated, " rounds=", WorldHistory.event_count("derby_shot_landed"))

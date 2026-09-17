@@ -72,6 +72,7 @@ var _ringmaster_mark := Vector3.ZERO
 var service_relays: Array[Node3D] = []
 var service_exposure := 0.0
 var service_scan_announced := false
+var lockdown_briefing := 7.0
 
 ## The bezel `celloutz_hud.gd` draws for the driver, in its own coordinates, so
 ## the bust lands inside the frame instead of beside it. Kept next to the
@@ -368,6 +369,8 @@ func _physics_process(delta: float) -> void:
 		_update_hud()
 		return
 	_update_boat(delta)
+	if is_colosseum:
+		lockdown_briefing = maxf(0.0, lockdown_briefing - delta)
 	_update_debris(delta)
 	_update_wreckers(delta)
 	_update_crowd(delta)
@@ -1719,12 +1722,13 @@ func _update_hud() -> void:
 	# Only speaks when it has something to say. Left visible during play it sat
 	# on top of the control ribbon repeating what the ribbon already showed.
 	var service_cleanup := is_colosseum and round_state == "active" and disabled_count >= 8 and _service_relays_disabled() < COLOSSEUM_TUNNEL_COUNT
-	mode_label.visible = round_state != "active" or service_cleanup
+	var lockdown_intro := is_colosseum and round_state == "active" and lockdown_briefing > 0.0
+	mode_label.visible = round_state != "active" or service_cleanup or lockdown_intro
 	# The countdown case is here rather than only in `_physics_process`: now that
 	# the countdown runs the HUD (so the player can see the cab they are sitting
 	# in), this line runs during it too and used to blank the objective straight
 	# back out on the same frame it was set.
-	mode_label.text = ("VICTORY  //  SERVICE RING CUT LOOSE" if round_state == "won" and is_colosseum else "VICTORY  //  HAULED OUT TO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "won" else "WRECKED  //  DRAGGED INTO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "lost" else "DISABLE EIGHT WRECKERS  //  %d" % maxi(1, ceili(countdown)) if round_state == "countdown" else "WRECKERS DOWN  //  BREACH SERVICE RING  %d/%d" % [_service_relays_disabled(), COLOSSEUM_TUNNEL_COUNT] if service_cleanup else "")
+	mode_label.text = ("VICTORY  //  LOCKDOWN GRID DEAD  //  SURFACE EXIT UNSEALED" if round_state == "won" and is_colosseum else "VICTORY  //  HAULED OUT TO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "won" else "WRECKED  //  DRAGGED INTO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "lost" else "DISABLE EIGHT WRECKERS  //  %d" % maxi(1, ceili(countdown)) if round_state == "countdown" else "EXIT STILL SEALED  //  DESTROY 3 RED LOCKDOWN RELAYS  //  %d/3" % _service_relays_disabled() if service_cleanup else "ESCAPE CONTRACT  //  WRECK 8 CARS + DESTROY 3 RED RELAYS" if lockdown_intro else "")
 	var rival := WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT))
 	rival_label.text = "HUNT ARC  //  %s\n%s  ·  GRUDGE %03d  ·  ELO %04d\n[I] WORLD INDEX" % [str(rival.get("name", "THE CAPTAIN")).to_upper(), str(rival.get("status", "active")).to_upper(), int(rival.get("grudge", 0)), int(rival.get("elo", 1180))]
 	# Computed once for both readouts. It used to live inside the cab-screen
