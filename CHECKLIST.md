@@ -1818,15 +1818,18 @@ v8 made the device dangerous and most objects in the world still cannot be looke
 - [ ] **I9.2** `v9` Inspection is the same grammar everywhere rather than per-object
 
       The safe first world-side slice is now live without over-claiming either
-      universal statement: every takeable substance and smokeable on the shared
-      station can be held under `I` without being picked up. Its actual live
-      mesh enters the same 3D reliquary, prompt grammar and action-ledger route
-      already used by held guns, smokeables and severed limbs; releasing `I`
-      restores the held object and leaves the inspected pickup on the table.
-      `substance_station_test.gd` proves identity, reach and non-consumption;
-      `combat_integration_test.gd` proves the real Hunt/reliquary seam. Visual
-      evidence: `captures/world_item_inspection.png`. Bodies, fixtures and the
-      wider prop population still need adapters before I9.1/I9.2 may be ticked.
+      universal statement: every presently takeable object in the Hunt — each
+      substance and smokeable on the shared station, the dropped Black Mirror,
+      salvage caches and identified gore/whole limbs — can be held under `I`
+      without being picked up. Its actual live mesh enters the same 3D
+      reliquary, prompt grammar and action-ledger route already used by held
+      guns, smokeables and severed limbs; releasing `I` restores the held object
+      and leaves the inspected pickup in the world. `substance_station_test.gd`
+      proves identity, reach and non-consumption; `combat_integration_test.gd`
+      proves all four real Hunt adapters and the reliquary seam. Visual evidence:
+      `captures/world_item_inspection.png`. Living bodies, fixed fixtures and
+      the wider scenery population still need adapters before I9.1/I9.2 may be
+      ticked.
 
 ### I v10 — the tenth pass
 Nine passes designed in a lit room. C v4 made the device the main light source in the world.

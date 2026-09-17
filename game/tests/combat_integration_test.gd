@@ -35,6 +35,19 @@ func _ready() -> void:
 	hunt.inspected_world_item.clear()
 	hunt.player_body.position = Vector3(175, 0.9, 125)
 	hunt.player = hunt.player_body.position + Vector3.UP * 0.6
+	# The remaining takeable families use the same adapter, not bespoke panels.
+	hunt._spawn_dropped_handheld({"serial": 73421, "condition": 0.72, "battery": 0.4}, hunt.player, false)
+	var device_preview: Dictionary = hunt._nearest_world_item_for_inspection()
+	check(str(device_preview.get("item_id", "")) == "black_mirror" and device_preview.get("source") == hunt.dropped_handheld,
+		"the dropped Black Mirror enters the same world inspection grammar")
+	hunt.dropped_handheld.queue_free()
+	hunt.dropped_handheld = null
+	var cache: Node3D = hunt._spawn_loot_cache(hunt.player, ["rust scrip", "field dressing"])
+	var cache_preview: Dictionary = hunt._nearest_world_item_for_inspection()
+	check(str(cache_preview.get("kind", "")) == "cache" and str(cache_preview.get("detail", "")) == "2 ITEMS",
+		"a salvage cache enters the same grammar with its live contents summarized")
+	hunt.loose_loot.erase(cache)
+	cache.queue_free()
 	hunt.yaw = 0.0
 	hunt.pitch = 0.0
 	hunt.third_person = false
@@ -123,6 +136,9 @@ func _ready() -> void:
 	hunt.add_child(loose_limb)
 	loose_limb.global_position = hunt.player
 	GoreChunks.register_whole_limb(loose_limb, "left_arm", "carry_victim")
+	var body_part_preview: Dictionary = hunt._nearest_world_item_for_inspection()
+	check(str(body_part_preview.get("kind", "")) == "body_part" and body_part_preview.get("source") == loose_limb,
+		"a takeable body part enters the same world inspection grammar")
 	var carry_before: int = hunt.handheld.carry.items.size()
 	hunt._interact()
 	check(hunt.handheld.carry.items.size() == carry_before + 1 and str(hunt.handheld.carry.items.back().kind) == "limb", "E picks the physical limb up into the real CARRY inventory")

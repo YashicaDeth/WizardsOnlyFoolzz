@@ -6103,13 +6103,56 @@ func _interface_wound_regions() -> Dictionary:
 	return result
 
 
-## I9. The first world-object family enters through the exact same I verb and
-## reliquary as held gear. Selection remains a world-space reach test owned by
-## the station; this scene only decides whether held or nearby geometry wins.
+## I9. Every presently takeable object in the Hunt enters through the exact
+## same I verb and reliquary as held gear. Each owning system still supplies
+## identity; this scene only chooses the nearest reachable live object.
 func _nearest_world_item_for_inspection() -> Dictionary:
-	if substance_station == null or not is_instance_valid(substance_station):
-		return {}
-	return substance_station.inspection_nearest(player)
+	var best: Dictionary = {}
+	var best_distance := INF
+	if substance_station != null and is_instance_valid(substance_station):
+		var station_item: Dictionary = substance_station.inspection_nearest(player)
+		var station_source: Node3D = station_item.get("source") as Node3D
+		if station_source != null and is_instance_valid(station_source):
+			best = station_item
+			best_distance = player.distance_to(station_source.global_position)
+	if dropped_handheld != null and is_instance_valid(dropped_handheld):
+		var device_distance := player.distance_to(dropped_handheld.global_position)
+		if device_distance <= 3.2 and device_distance < best_distance:
+			best_distance = device_distance
+			best = {
+				"source": dropped_handheld, "item_id": "black_mirror",
+				"kind": "device", "label": "BLACK MIRROR",
+				"detail": "%06d // %d%%" % [handheld.serial, roundi(handheld.condition * 100.0)],
+			}
+	var chunk := _nearest_takeable_chunk(3.2)
+	if chunk != null:
+		var chunk_distance := player.distance_to(chunk.global_position)
+		if chunk_distance < best_distance:
+			var info: Dictionary = GoreChunks.identify(chunk)
+			var identity := str(info.get("implant", ""))
+			if identity.is_empty():
+				identity = str(info.get("organ_id", ""))
+			if identity.is_empty():
+				identity = "%s %s" % [str(info.get("zone", "body")), str(info.get("layer_name", "piece"))]
+			best_distance = chunk_distance
+			best = {
+				"source": chunk, "item_id": "chunk:%s:%s" % [str(info.get("subject_id", "unknown")), identity],
+				"kind": "body_part", "label": identity.replace("_", " ").to_upper(),
+				"detail": str(info.get("subject_id", "unclaimed")),
+			}
+	for cache in loose_loot:
+		if cache == null or not is_instance_valid(cache):
+			continue
+		var cache_distance := player.distance_to(cache.global_position)
+		if cache_distance <= 3.5 and cache_distance < best_distance:
+			var items: Array = cache.get_meta("items", [])
+			best_distance = cache_distance
+			best = {
+				"source": cache, "item_id": "salvage_cache:%d" % cache.get_instance_id(),
+				"kind": "cache", "label": "SALVAGE CACHE",
+				"detail": "%d ITEMS" % items.size(),
+			}
+	return best
 
 
 func _update_held_reliquary() -> void:
