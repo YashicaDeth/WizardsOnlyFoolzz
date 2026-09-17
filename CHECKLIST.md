@@ -6343,7 +6343,7 @@ underneath either name.
 - [~] **AS3.2** Pockets hold real things and what is in them matters — the mechanism is built under C8.2 (`carry.gd`: `pocket()`/`unpocket()`/`pocketed_items()`/`search_pockets()`, real identified items rather than a separate abstraction, `tests/pockets_test.gd` 15 checks). What is still AS3's own and not done here: which garment actually provides how many pockets, which needs `garments.gd` (Lane 2's) rather than a capacity constant invented in CARRY, and nothing in the world yet *searches* a body's pockets — that verb belongs to whoever owns grappling and defeat
 - [ ] **AS3.3** What you are wearing is strategy: weather, radiation, who talks to you
 - [ ] **AS3.4** It shows on the body the mirror renders (AH1.5, N)
-- [x] **AS3.1** Layers, and they are part of the world system rather than a paperdoll
+- [x] **AS3.1** Layers, and they are part of the world system rather than a paperdoll — player wear batches the real layer/bias mutation with one identified action; dressing another subject preserves the same `layer_worn` world fact without falsely attributing it to the player
 - [x] **AS3.2** Pockets hold real things and what is in them matters
 - [ ] **AS3.3** What you are wearing is strategy: weather, radiation, who talks to you —
       weather and faction standing are real (a layer cuts storm exposure and

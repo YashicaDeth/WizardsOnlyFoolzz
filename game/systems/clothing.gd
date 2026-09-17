@@ -57,6 +57,7 @@ const CATALOG := {
 ## AS3.2. Three, not a number tuned for balance — enough to matter what you
 ## chose to keep close, not enough that a pocket is just a second bag.
 const POCKET_CAPACITY := 3
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 
 ## Never invents "bare" as a stored fact — a subject nobody has dressed yet
@@ -81,8 +82,14 @@ static func wear(subject_id: String, item_id: String) -> Dictionary:
 	if WorldHistory.subject(subject_id).is_empty():
 		return {"ok": false, "reason": "NO SUCH SUBJECT"}
 	var bias := float(CATALOG[item_id].get("faction_bias", 0.0))
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(subject_id, {"worn_layer": item_id, "clothing_bias": bias})
-	WorldHistory.record_event("layer_worn", {"subject_id": subject_id, "item_id": item_id})
+	var details := {"subject_id": subject_id, "item_id": item_id}
+	if subject_id == "player":
+		PLAYER_ACTION_LEDGER.record("layer_worn", details)
+	else:
+		WorldHistory.record_event("layer_worn", details)
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true}
 
 
