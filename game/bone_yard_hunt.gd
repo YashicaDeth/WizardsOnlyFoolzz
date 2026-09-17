@@ -4599,6 +4599,7 @@ func _begin_canonical_encounter() -> void:
 	enemy_health_max = 150 if mara_encounter_number == 2 else 100
 	enemy_health = enemy_health_max
 	WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"status": "hunting", "encounter_number": mara_encounter_number, "memory": "Mara returned rebuilt to settle the Bone Yard debt." if mara_encounter_number == 2 else "Mara came to settle the Bone Yard debt."}, "hunt_arc_started")
+	var offscreen_hunt := OffscreenHunts.start(CAST.id_for(CAPTAIN_SLOT), "player", HUNT_LOCATION)
 	WorldHistory.record_event("canonical_hunt_encounter_started", {"hunter": "player", "target": CAST.id_for(CAPTAIN_SLOT), "location": HUNT_LOCATION, "encounter_number": mara_encounter_number})
 	HUNT_MEMORY.remember(CAST.id_for(CAPTAIN_SLOT), "canonical_rival")
 	if mara_encounter_number == 2:
@@ -4606,6 +4607,8 @@ func _begin_canonical_encounter() -> void:
 		prompt.text = "SECOND HUNT // %s: INDUSTRIAL ARM, REBUILT WRECKER, TWO ASHLINE KNIVES." % _captain_name()
 	else:
 		prompt.text = "HUNT ARC: %s has found you. Do not kill the story; make them remember." % _captain_name()
+	if int(offscreen_hunt.get("hunt_offscreen_turns", 0)) > 0:
+		prompt.text += "\nKEPT HUNTING WHILE YOU WERE GONE // %s // %d TURNS" % [str(offscreen_hunt.get("hunt_phase", "searching")).to_upper(), int(offscreen_hunt.hunt_offscreen_turns)]
 
 
 func _update_rival(delta: float) -> void:

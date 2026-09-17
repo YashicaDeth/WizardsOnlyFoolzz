@@ -47,6 +47,7 @@ const WORLD_DEBRIS := preload("res://systems/world_debris.gd")
 const VEHICLE_PART_POOL := "vehicle_part"
 const OPENING := preload("res://systems/opening_director.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
+const OFFSCREEN_HUNTS := preload("res://systems/offscreen_hunts.gd")
 const SERVICE_RING_RELAY := preload("res://systems/service_ring_relay.gd")
 const RINGMASTER_CARD := preload("res://systems/ringmaster_card.gd")
 
@@ -325,6 +326,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	# W1.1. A heat takes time out of the day like anything else does.
 	WorldClock.advance(delta)
+	# F10.11. The quarry/colosseum owns the clock while this scene is loaded,
+	# but a named hunter left behind in Ashbloom still works in world time.
+	OFFSCREEN_HUNTS.advance("underground_colosseum" if is_colosseum else "rift_derby_quarry")
 	boat.enabled = round_state == "active" and not index_open and not leaving_on_foot
 	fire_cooldown = maxf(0.0, fire_cooldown - delta)
 	if is_colosseum:
