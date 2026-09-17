@@ -4414,7 +4414,7 @@ The last rung. Fifteen statements that are true of sneaking and the law when thi
       anatomy, AI, wounds, loot and resolution. Re-verified with
       `local_law_test.gd` (26 checks) and `hunt_local_law_integration_test.gd`
       (13 production-scene checks).
-- [ ] **AE10.10** `v10` Witnesses can be wrong, bought or silenced — the
+- [x] **AE10.10** `v10` Witnesses can be wrong, bought or silenced — the
       silenced third now works in production rather than only in
       `witness_test.gd`: every real Hunt death converges on
       `_kill_encounter_actor()`, which cuts that body's pending testimony before
@@ -4426,11 +4426,15 @@ The last rung. Fifteen statements that are true of sneaking and the law when thi
       account is still pending and `[B] BUY REPORT` spends twelve real rust
       scrip per account, buries only what that body carries and writes one
       `report_bought` action receipt. Insufficient funds or already-delivered
-      knowledge cannot be bribed away (`witness_test.gd`). Retelling distortion
-      is the safe foundation for “wrong”, but law still reconstructs the true
-      event details underneath that account, so this broader item remains open
-      until wrong testimony can produce a wrong consequence rather than merely
-      wrong prose.
+      knowledge cannot be bribed away (`witness_test.gd`). “Wrong” is now a
+      consequence rather than prose: testimony reads the witness body's real
+      consciousness at the act, and below the same visible impairment threshold
+      used by altered perception can confuse an execution with mercy or mercy
+      with execution. WorldHistory retains the true act; faction knowledge gets
+      only the mistaken account and local law judges that account. The game
+      stores no corrective label. `local_law_test.gd` proves CellOutz punishes
+      reported mercy produced by an impaired witness even though the true
+      execution was not an offence to it.
 - [x] **AE10.11** `v10` The tunnels are where the satellite cannot see you —
       `SignalField.DEAD_ZONES` now closes the complete observation loop: MAP
       keeps only remembered chart ink, sleeps the orbital camera, hides the

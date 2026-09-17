@@ -65,6 +65,30 @@ func _ready() -> void:
 	check(is_zero_approx(LocalLaw.offence_magnitude("wizardsonlyfoolz", mercy_event)), "the same mercy is no offence at all to the faction it already agrees with")
 	check(is_zero_approx(LocalLaw.offence_magnitude("no_such_faction", seen_event)), "an unlisted faction has no axis to read anything against")
 
+	print("AE10.10 - an impaired body's wrong account causes a wrong legal consequence")
+	WorldHistory.register_subject("impaired_witness", {
+		"name": "Impaired Witness", "kind": "person", "faction_id": "celloutz",
+		"anatomy_state": {"consciousness": 20.0},
+	})
+	WorldHistory.register_subject("wrong_place", {"kind": "place", "held_by": "celloutz", "unrest": 0.0})
+	var wrong_ledger := WitnessLedger.new()
+	var true_execution := wrong_ledger.record("npc_resolution", {
+		"subject_id": "wrongly_seen_victim", "actor": "player", "outcome": "execute",
+		"place_id": "wrong_place", "held_by": "celloutz",
+	}, ["impaired_witness"])
+	var wrong_reports := wrong_ledger.tick(WitnessLedger.REPORT_DELAY * 2.0)
+	var wrong_report: Dictionary = wrong_reports[0]
+	check(str((true_execution.get("details", {}) as Dictionary).get("outcome", "")) == "execute",
+		"the world's true event remains an execution")
+	check(str((wrong_report.get("details", {}) as Dictionary).get("outcome", "")) == "spare",
+		"the badly impaired witness carries the opposite resolution home")
+	var wrong_response := LocalLaw.answer_report(wrong_ledger, wrong_report)
+	check(is_zero_approx(LocalLaw.offence_magnitude("celloutz", true_execution)) and bool(wrong_response.get("ok", false)) and float(wrong_response.get("magnitude", 0.0)) > 0.0,
+		"CellOutz acts on the reported mercy it condemns, not the true execution it would accept")
+	var wrong_knowledge: Array = wrong_ledger.knowledge("celloutz")
+	check(str((((wrong_knowledge[0] as Dictionary).get("testimony", {}) as Dictionary).get("outcome", ""))) == "spare" and not ((wrong_knowledge[0] as Dictionary).get("testimony", {}) as Dictionary).has("true_outcome"),
+		"faction knowledge stores only the account and never labels or reveals the correction")
+
 	print("AE1.4/AE1.5 - law only responds to what a faction was actually told, and a place remembers locally")
 	var untold := LocalLaw.witness_a_wrong("holding_alpha", "wizardsonlyfoolz", loud_ledger, unseen_event, "player")
 	check(not bool(untold.get("ok", false)) and str(untold.get("reason", "")) == "THE HOLDER WAS NEVER TOLD", "an act nobody ever reported to this faction is refused outright, even a real execution")

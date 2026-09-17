@@ -47,6 +47,11 @@ const SIGHT_RANGE := 34.0
 ## price is per account, not per witness, so somebody carrying three separate
 ## wrongs is materially harder to buy than somebody carrying one.
 const REPORT_PRICE := 12
+## Below this the body's own perception is already visibly breaking down (the
+## Hunt drives its full-screen altered-perception treatment from the same
+## consciousness value). Testimony can invert the one binary resolution this
+## witness actually had to distinguish; there is no hidden random falsehood.
+const CLEAR_TESTIMONY_AT := 45.0
 
 ## Pending reports in flight. Runtime only: a report that has not landed is not
 ## knowledge, so persisting it would be persisting the wrong thing.
@@ -92,9 +97,28 @@ func record(event_type: String, details: Dictionary, witness_ids: Array) -> Dict
 			"witness": str(witness_id),
 			"faction": faction,
 			"remaining": REPORT_DELAY,
-			"details": details.duplicate(),
+			"details": _testimony_details(event_type, details, subject),
 		})
 	return event
+
+
+## What the body can honestly carry home. WorldHistory keeps `details`
+## unchanged above; only this witness's account is affected. Restrict the
+## mistake to the authored opposite outcomes instead of mutating arbitrary
+## fields or inventing a random suspect the witness never saw.
+static func _testimony_details(event_type: String, details: Dictionary, witness: Dictionary) -> Dictionary:
+	var testimony := details.duplicate(true)
+	if event_type != "npc_resolution":
+		return testimony
+	var anatomy: Dictionary = witness.get("anatomy_state", {}) if witness.get("anatomy_state", {}) is Dictionary else {}
+	if anatomy.is_empty() and witness.get("anatomy", {}) is Dictionary:
+		anatomy = witness.get("anatomy", {}) as Dictionary
+	if float(anatomy.get("consciousness", 100.0)) >= CLEAR_TESTIMONY_AT:
+		return testimony
+	match str(testimony.get("outcome", "")):
+		"execute": testimony["outcome"] = "spare"
+		"spare": testimony["outcome"] = "execute"
+	return testimony
 
 
 ## F1.2. Time passes and reports land. Returns the reports that arrived this
@@ -123,11 +147,16 @@ func _deliver(report: Dictionary) -> void:
 	# distortion at the point of report; `DESIGN/HUNT_SYSTEM.md` adds more per
 	# hop when F2 propagates it onward from here.
 	var wire := WireNet.new(WireNet.SIGNAL_SURFACE)
+	var testimony: Dictionary = (report.get("details", {}) as Dictionary).duplicate(true)
+	var account_subject := str(report["type"]).replace("_", " ")
+	if not str(testimony.get("outcome", "")).is_empty():
+		account_subject += ": %s" % str(testimony.outcome)
 	entries.append({
 		"sequence": int(report["sequence"]),
 		"type": str(report["type"]),
 		"told_by": str(report["witness"]),
-		"account": wire.distort("%s, as told by the one who walked back" % str(report["type"]).replace("_", " "), 1),
+		"account": wire.distort("%s, as told by the one who walked back" % account_subject, 1),
+		"testimony": testimony,
 	})
 	WorldHistory.register_subject(record_id, {"kind": "knowledge", "faction": faction, "entries": []})
 	WorldHistory.update_subject(record_id, {"entries": entries}, "faction_learned")
