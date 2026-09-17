@@ -40,6 +40,7 @@ const Sephiroth := preload("res://systems/sephiroth.gd")
 const PinBoardScript := preload("res://systems/pin_board.gd")
 const FacilityTerritory := preload("res://systems/facility_territory.gd")
 const AshbloomHoldings := preload("res://systems/ashbloom_holdings.gd")
+const HuntContracts := preload("res://systems/hunt_contracts.gd")
 
 ## Six live 3D heads is cheap; sixty would not be, and each icon owns a World3D.
 ## So they are a pool the pages draw into by slot rather than one per row.
@@ -57,7 +58,7 @@ const GROUND := Color(0.035, 0.026, 0.019, 0.90)
 ## AR1.1. Appended rather than inserted — WIRE and BODY's hardcoded page
 ## indices (2 and 3) are referenced elsewhere in this file by number, and a
 ## new page ahead of them would silently retarget those jumps.
-const PAGES := ["FILE", "PYRAMID", "WIRE", "BODY", "TREE"]
+const PAGES := ["FILE", "PYRAMID", "WIRE", "BODY", "TREE", "WORK"]
 
 var page := 0
 var rail_index := 0
@@ -260,6 +261,15 @@ func _rebuild_rail() -> void:
 					note += "  \u00b7  YOU"
 				if _matches(str(account.name), note):
 					_rail_cache.append({"id": str(account.id), "label": str(account.name), "note": note})
+		5:
+			for subject_id in WorldHistory.all_subjects():
+				var contract := WorldHistory.subject(str(subject_id))
+				if str(contract.get("job_class", "")) != "frequency_bounty":
+					continue
+				var label := str(contract.get("name", subject_id))
+				var note := "%s  ·  %s" % [str(contract.get("status", "offered")).to_upper(), str(contract.get("block_kind", "signal")).to_upper()]
+				if _matches(label, note + " " + str(contract.get("obstruction", ""))):
+					_rail_cache.append({"id": str(subject_id), "label": label, "note": note})
 
 
 func _process(delta: float) -> void:
@@ -382,6 +392,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				if page != 3 or not _inspector.handle_key(KEY_TAB):
 					return
 			KEY_ENTER, KEY_KP_ENTER:
+				if page == 5:
+					_accept_selected_contract()
+					get_viewport().set_input_as_handled()
+					queue_redraw()
+					return
 				# A4.5. Sending is an act, so it re-rolls deliberately rather
 				# than the panel re-rolling it behind your back every frame.
 				if page != 2 or _contact_for == "":
@@ -606,6 +621,10 @@ func _follow_link(link: Dictionary) -> void:
 				last_action = "WORK ACCEPTED // %s" % str(work.get("name", "LOCAL ORDER"))
 				action_life = 2.4
 				_rebuild_links()
+		"hunt_contract":
+			_accept_contract(str(link.get("id", "")))
+		"contract_subject":
+			_jump_to_subject(str(link.get("id", "")))
 
 
 ## Wounds are recorded as prose, not as a zone id, so the link reads the zone
@@ -648,6 +667,44 @@ func _rebuild_links() -> void:
 		2:
 			_link_rects.append_array(_wire_link_rows(_panel_rect()))
 			_link_rects.append_array(_site_link_rows(_panel_rect()))
+		5:
+			_link_rects.append_array(_contract_link_rows(_panel_rect()))
+
+
+func _contract_link_rows(rect: Rect2) -> Array:
+	var entry := _selected()
+	if rect.size == Vector2.ZERO or entry.is_empty():
+		return []
+	var contract := WorldHistory.subject(str(entry.id))
+	if str(contract.get("job_class", "")) != "frequency_bounty":
+		return []
+	var rows: Array = [
+		{"kind": "contract_subject", "id": str(contract.get("patron_id", "")), "rect": Rect2(rect.position + Vector2(0, 72), Vector2(rect.size.x * 0.46, 54))},
+		{"kind": "contract_subject", "id": str(contract.get("target_id", "")), "rect": Rect2(rect.position + Vector2(rect.size.x * 0.52, 72), Vector2(rect.size.x * 0.48, 54))},
+	]
+	if str(contract.get("status", "")) == "offered":
+		rows.append({
+			"kind": "hunt_contract", "id": str(entry.id),
+			"rect": Rect2(rect.position + Vector2(0, rect.size.y - 82), Vector2(rect.size.x, 48)),
+		})
+	return rows
+
+
+func _accept_selected_contract() -> void:
+	var entry := _selected()
+	if not entry.is_empty():
+		_accept_contract(str(entry.id))
+
+
+func _accept_contract(contract_id: String) -> void:
+	var result := HuntContracts.accept(contract_id)
+	if bool(result.get("ok", false)):
+		last_action = "CONTRACT CONSUMED // %s PAID" % str(result.get("cost_kind", "COST")).to_upper()
+	else:
+		last_action = "REFUSED // %s" % str(result.get("reason", "CONTRACT UNAVAILABLE"))
+	action_life = 3.2
+	_rebuild_rail()
+	_rebuild_links()
 
 
 ## The FILE/PYRAMID/WIRE/BODY content rect, exactly as `_draw()` derives it
@@ -833,6 +890,8 @@ func _draw() -> void:
 			_draw_body(panel)
 		4:
 			_draw_tree(panel)
+		5:
+			_draw_contract(panel)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if page_blend < 1.0:
 		_draw_page_wipe(panel, eased)
@@ -970,7 +1029,7 @@ func _draw_rail(rect: Rect2) -> void:
 	# not a set of rows to page through — so the rail stays present (the
 	# frame reads as one made object, not four with a fifth bolted on) but
 	# empty, same as any other page would with nothing matching a search.
-	var heading: String = ["SUBJECTS", "FACTIONS", "ACCOUNTS", "BODIES", "PATHS"][page]
+	var heading: String = ["SUBJECTS", "FACTIONS", "ACCOUNTS", "BODIES", "PATHS", "CONTRACTS"][page]
 	CellOutzType.draw_text(self, rect.position, heading, 12.0, MOSS, 1.4)
 	var total := "%02d" % _rail_cache.size()
 	var total_width := CellOutzType.width(total, 10.0, 0.8)
@@ -1948,6 +2007,77 @@ func _draw_post(feed: Rect2, post: Dictionary, y: float) -> void:
 	draw_line(Vector2(feed.position.x + 12, y + 60), Vector2(feed.position.x + feed.size.x - 8, y + 60), INK * Color(1, 1, 1, 0.08), 1.0)
 
 
+# --- page six: one-use hunt work -------------------------------------------
+
+func _draw_contract(rect: Rect2) -> void:
+	var font := ThemeDB.fallback_font
+	var entry := _selected()
+	if entry.is_empty():
+		CellOutzType.draw_stamped(self, rect.position, "NO CONTRACTS CIRCULATING", 20.0, INK * Color(1, 1, 1, 0.5), COPPER * Color(1, 1, 1, 0.2), 1.3)
+		draw_string(font, rect.position + Vector2(2, 48), "TOP-TIER WORK APPEARS ONLY AFTER A REAL PATRON POSTS AN EXACT OBSTRUCTION.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 12, INK * Color(1, 1, 1, 0.48))
+		return
+	var contract := WorldHistory.subject(str(entry.id))
+	var status := str(contract.get("status", "offered")).to_upper()
+	var tone: Color = COPPER if status == "OFFERED" else (SPORE if status == "COMPLETED" else HOT)
+	CellOutzType.draw_stamped(self, rect.position, str(contract.get("block_kind", "signal")).to_upper() + " OBSTRUCTION", 21.0, INK, tone * Color(1, 1, 1, 0.34), 1.4)
+	var status_width := CellOutzType.width(status, 13.0, 1.0)
+	CellOutzType.draw_text(self, Vector2(rect.end.x - status_width, rect.position.y + 5), status, 13.0, tone, 1.0)
+	draw_string(font, rect.position + Vector2(2, 44), str(contract.get("obstruction", "UNSPECIFIED INTERFERENCE")), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 4, 13, INK * Color(1, 1, 1, 0.82))
+	draw_line(rect.position + Vector2(0, 58), rect.position + Vector2(rect.size.x, 58), INK * Color(1, 1, 1, 0.15), 1.0)
+
+	var patron_id := str(contract.get("patron_id", ""))
+	var target_id := str(contract.get("target_id", ""))
+	var patron := WorldHistory.subject(patron_id)
+	var target := WorldHistory.subject(target_id)
+	var split := rect.size.x * 0.48
+	var patron_rect := Rect2(rect.position + Vector2(0, 72), Vector2(split, 54))
+	var target_rect := Rect2(rect.position + Vector2(rect.size.x * 0.52, 72), Vector2(rect.size.x * 0.48, 54))
+	for card in [
+		{"rect": patron_rect, "label": "PATRON // %s" % str(contract.get("patron_side", "unknown")).to_upper(), "name": str(patron.get("name", patron_id)), "tone": SPORE if str(contract.get("patron_side", "")) == "ascent" else HOT},
+		{"rect": target_rect, "label": "EXACT TARGET", "name": str(target.get("name", target_id)), "tone": COPPER},
+	]:
+		var card_rect: Rect2 = card.rect
+		var hovered := card_rect.has_point(cursor_at)
+		draw_rect(card_rect, (card.tone as Color) * Color(1, 1, 1, 0.10 if hovered else 0.045))
+		draw_line(card_rect.position, card_rect.position + Vector2(card_rect.size.x, 0), (card.tone as Color) * Color(1, 1, 1, 0.55), 1.4)
+		CellOutzType.draw_text(self, card_rect.position + Vector2(8, 9), str(card.label), 9.0, (card.tone as Color) * Color(1, 1, 1, 0.85), 0.9)
+		draw_string(font, card_rect.position + Vector2(8, 39), str(card.name).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, card_rect.size.x - 16, 13, INK)
+
+	var cy := rect.position.y + 154.0
+	CellOutzType.draw_text(self, Vector2(rect.position.x, cy), "PRICE OF TAKING IT", 11.0, MOSS, 1.2)
+	draw_line(Vector2(rect.position.x, cy + 18), Vector2(rect.end.x, cy + 18), MOSS * Color(1, 1, 1, 0.32), 1.0)
+	var cost_kind := str(contract.get("cost_kind", "unknown")).to_upper()
+	var cost_amount := float(contract.get("cost_amount", 0.0))
+	var cost_target := str(contract.get("cost_target", "")).replace("_", " ").to_upper()
+	var cost_text := "%.0f %s" % [cost_amount, cost_kind]
+	if not cost_target.is_empty():
+		cost_text += " // " + cost_target
+	CellOutzType.draw_stamped(self, Vector2(rect.position.x, cy + 34), cost_text, 24.0, HOT, INK * Color(1, 1, 1, 0.18), 1.4)
+	draw_string(font, Vector2(rect.position.x + 2, cy + 72), "NO CURRENCY. THE CONTRACT ENTERS THROUGH THE BODY OR THE STANDING LEDGER.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 11, INK * Color(1, 1, 1, 0.48))
+
+	var target_status := str(target.get("status", "UNKNOWN")).to_upper()
+	var sy := cy + 112.0
+	CellOutzType.draw_text(self, Vector2(rect.position.x, sy), "TARGET NOW", 10.0, MOSS, 1.1)
+	CellOutzType.draw_text(self, Vector2(rect.position.x + 132, sy - 2), target_status, 14.0, HOT if target_status == "ACTIVE" else INK, 0.9)
+	if not str(contract.get("target_outcome", "")).is_empty():
+		draw_string(font, Vector2(rect.position.x + 2, sy + 32), "RECORDED OUTCOME // %s" % str(contract.target_outcome).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 12, SPORE)
+
+	var action_rect := Rect2(rect.position + Vector2(0, rect.size.y - 82), Vector2(rect.size.x, 48))
+	if status == "OFFERED":
+		var hot := action_rect.has_point(cursor_at)
+		draw_colored_polygon(PackedVector2Array([
+			action_rect.position + Vector2(8, 0), action_rect.position + Vector2(action_rect.size.x, 0),
+			action_rect.end - Vector2(8, 0), action_rect.position + Vector2(0, action_rect.size.y),
+		]), HOT * Color(1, 1, 1, 0.22 if hot else 0.13))
+		draw_polyline(PackedVector2Array([action_rect.position + Vector2(8, 0), action_rect.position + Vector2(action_rect.size.x, 0), action_rect.end - Vector2(8, 0), action_rect.position + Vector2(0, action_rect.size.y), action_rect.position + Vector2(8, 0)]), HOT * Color(1, 1, 1, 0.72), 1.5)
+		CellOutzType.draw_stamped(self, action_rect.position + Vector2(18, 13), "[ENTER / CLICK] CONSUME CONTRACT", 15.0, INK, HOT * Color(1, 1, 1, 0.34), 1.1)
+	else:
+		var notice := "CONTRACT ACTIVE // OFFER TOKEN SPENT" if status == "ACTIVE" else "CONTRACT CLOSED // %s" % str(contract.get("target_outcome", "RESOLVED")).to_upper()
+		CellOutzType.draw_stamped(self, action_rect.position + Vector2(8, 13), notice, 14.0, tone, INK * Color(1, 1, 1, 0.18), 1.0)
+	if action_life > 0.0 and not last_action.is_empty():
+		draw_string(font, action_rect.position + Vector2(4, -12), last_action, HORIZONTAL_ALIGNMENT_LEFT, action_rect.size.x, 11, SPORE if last_action.begins_with("CONTRACT") else HOT)
+
+
 # --- page four: the body ---------------------------------------------------
 
 ## B1 and B2. The inspector owns its own state and its own 3D viewport and draws
@@ -2007,8 +2137,8 @@ func _draw_gore(plate: Rect2) -> void:
 ## The stamp a clerk hit the page with, per page, because this is a processed
 ## document in a system that does not care about the person it describes.
 func _draw_stamp(plate: Rect2) -> void:
-	var text: String = ["NO FIXED ABODE", "NO REFUNDS", "UNVERIFIED", "SPECIMEN", "UNCHARTED"][page]
-	var tint: Color = [Grunge.DRIED, Grunge.RUST, Grunge.BILE, Grunge.DRIED, Grunge.BILE][page]
+	var text: String = ["NO FIXED ABODE", "NO REFUNDS", "UNVERIFIED", "SPECIMEN", "UNCHARTED", "ONE USE ONLY"][page]
+	var tint: Color = [Grunge.DRIED, Grunge.RUST, Grunge.BILE, Grunge.DRIED, Grunge.BILE, Grunge.RUST][page]
 	Grunge.stamp(self, plate.position + Vector2(plate.size.x - 258, 92), text, 15.0, -0.16, tint, 300 + page)
 
 
