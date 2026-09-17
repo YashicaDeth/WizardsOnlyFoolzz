@@ -111,7 +111,6 @@ func _ready() -> void:
 
 	# And it reaches the trade, rather than being a spare function.
 	var carry = preload("res://systems/carry.gd").new()
-	add_child(carry)
 	var organ := {"kind": "organ", "label": "liver", "condition": 1.0}
 	var anonymous := carry.sale_value(organ)
 	var kin_price := carry.sale_value(organ, "soft_rot")

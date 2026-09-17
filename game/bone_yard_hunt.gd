@@ -136,6 +136,8 @@ const HELD_GEAR := preload("res://systems/held_gear.gd")
 const SMOKEABLES := preload("res://systems/smokeables.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
+const ASHBLOOM_HOLDINGS := preload("res://systems/ashbloom_holdings.gd")
+const LOCAL_LAW := preload("res://systems/local_law.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
 const PIN_BOARD := preload("res://systems/pin_board.gd")
@@ -1521,7 +1523,9 @@ func _physics_process(delta: float) -> void:
 	# Q is the one of the three that is actually free.
 	_update_xray(delta, Input.is_key_pressed(KEY_Q))
 	# Reports walk home in real time; F1.3's window only exists if it ticks.
-	witness_ledger.tick(delta)
+	# A report that reaches the faction holding the ground is also the only door
+	# into local unrest — the global event log never dispatches law by itself.
+	_answer_local_reports(witness_ledger.tick(delta))
 	if misfire_director != null:
 		misfire_director.call("update_player_position", player)
 	if not grapple_target.is_empty():
@@ -4302,6 +4306,16 @@ func _witness_candidates() -> Array:
 	return out
 
 
+func _answer_local_reports(reports: Array) -> void:
+	for report: Dictionary in reports:
+		var response := LOCAL_LAW.answer_report(witness_ledger, report)
+		if not bool(response.get("ok", false)):
+			continue
+		if bool(response.get("dispatched", false)):
+			var place := WorldHistory.subject(str(response.get("place_id", "")))
+			prompt.text = "%s HAS REMEMBERED ENOUGH // ITS HOLDER IS MOVING" % str(place.get("name", "THIS GROUND")).to_upper()
+
+
 func _nearest_takeable_chunk(radius: float) -> Node3D:
 	var nearest: Node3D
 	var nearest_distance := radius
@@ -4943,12 +4957,29 @@ func _resolve_downed(outcome: String) -> void:
 		return
 	if outcome not in ["execute", "spare", "recruit"]:
 		return
+	var act_at: Vector3 = actor.node.global_position
+	var jurisdiction := ASHBLOOM_HOLDINGS.jurisdiction_at(Vector2(act_at.x, act_at.z))
+	var witnesses := WitnessLedger.witnesses_of(act_at, _witness_candidates(), id)
+	var resolution_details := {
+		"subject_id": id,
+		"outcome": outcome,
+		"actor": "player",
+		"location": HUNT_LOCATION,
+		"holding_id": str(jurisdiction.get("holding_id", "")),
+		"place_id": str(jurisdiction.get("place_id", "")),
+		"held_by": str(jurisdiction.get("held_by", "")),
+	}
 	if outcome == "execute":
 		var finish := _execution_target(actor)
 		actor.rig.hit(str(finish[0]), 100.0, 30.0, "puncture", str(finish[1]))
 		actor.rig.execute()
 		var snapshot: Dictionary = actor.rig.snapshot()
-		WorldHistory.record_event("npc_resolution", {"subject_id": id, "outcome": outcome, "actor": "player", "zone": finish[0], "organ": finish[1], "anatomy_state": snapshot})
+		resolution_details["zone"] = finish[0]
+		resolution_details["organ"] = finish[1]
+		resolution_details["anatomy_state"] = snapshot
+		# Preserve the original chronology: the decision is the fact; death,
+		# vacancy and dropped loot are its consequences.
+		witness_ledger.record("npc_resolution", resolution_details, witnesses)
 		kill_cam.trigger(str(actor.display_name), str(finish[0]), actor.node.global_position - player, "EXECUTION / %s" % str(finish[1]).to_upper().replace("_", " "), snapshot)
 		_kill_encounter_actor(encounter_actors.find(actor), "execution")
 	else:
@@ -4960,13 +4991,18 @@ func _resolve_downed(outcome: String) -> void:
 		if outcome == "recruit":
 			relations["player"] = {"kind": "bond", "strength": maxi(20, int(subject.get("bond", 0))), "consensual": true}
 		WorldHistory.update_subject(id, {"status": actor.state, "disposition": actor.disposition, "relations": relations, "grudge": int(subject.get("grudge", 0)) + (5 if outcome == "spare" else 0), "memory": "The Hunter offered shelter; I agreed to join." if outcome == "recruit" else "The Hunter spared me. I remember the wounds.", "anatomy_state": actor.rig.snapshot()}, "npc_recruited" if outcome == "recruit" else "npc_spared")
-		WorldHistory.record_event("npc_resolution", {"subject_id": id, "outcome": outcome, "actor": "player", "witnesses": [id]})
+		# Somebody left alive carries their own outcome even when everybody else
+		# looked away. Executed subjects cannot report themselves.
+		if not witnesses.has(id):
+			witnesses.append(id)
+		resolution_details["anatomy_state"] = actor.rig.snapshot()
 		if outcome == "spare":
 			RIVAL_REGISTRY.consider(id)
 		misfire_director.resolve(str(actor.get("encounter_id", "")), actor.state)
 		var label := actor.node.get_node_or_null("Identity") as Label3D
 		if label != null:
 			label.text = "%s / %s" % [str(actor.display_name).to_upper(), str(actor.state).to_upper()]
+		witness_ledger.record("npc_resolution", resolution_details, witnesses)
 	prompt.text = "DISPOSITION RECORDED / " + outcome.to_upper()
 	attack_cooldown = 0.72
 

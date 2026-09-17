@@ -6,6 +6,7 @@ extends Node
 ## offence to where it already stands on the Tree, not a universal crime score.
 
 const LocalLaw := preload("res://systems/local_law.gd")
+const Holdings := preload("res://systems/ashbloom_holdings.gd")
 
 var failures: Array[String] = []
 
@@ -73,13 +74,43 @@ func _ready() -> void:
 	var grudge_before := float(WorldHistory.subject("wizardsonlyfoolz").get("grudge", 0.0))
 	var first_response := LocalLaw.witness_a_wrong("holding_alpha", "wizardsonlyfoolz", loud_ledger, seen_event, "player")
 	check(bool(first_response.get("ok", false)) and not bool(first_response.get("dispatched", true)), "one witnessed execution alone is remembered but not yet enough to send anyone")
-	var second_response := LocalLaw.witness_a_wrong("holding_alpha", "wizardsonlyfoolz", loud_ledger, seen_event, "player")
+	var duplicate_response := LocalLaw.witness_a_wrong("holding_alpha", "wizardsonlyfoolz", loud_ledger, seen_event, "player")
+	check(not bool(duplicate_response.get("ok", false)) and str(duplicate_response.get("reason", "")).contains("ALREADY"), "two witnesses cannot make one wrong count twice at the same place")
+	WorldHistory.register_subject("victim_four", {"name": "Victim Four", "kind": "person"})
+	var second_event := LocalLaw.assassinate(loud_ledger, "player", "victim_four", false, ["witness_one"])
+	loud_ledger.tick(WitnessLedger.REPORT_DELAY * 2.0)
+	var second_response := LocalLaw.witness_a_wrong("holding_alpha", "wizardsonlyfoolz", loud_ledger, second_event, "player")
 	check(not bool(second_response.get("dispatched", true)), "still not enough on its own (%.3f unrest)" % float(second_response.get("unrest", 0.0)))
-	var third_response := LocalLaw.witness_a_wrong("holding_alpha", "wizardsonlyfoolz", loud_ledger, seen_event, "player")
-	check(bool(third_response.get("dispatched", false)), "a place that keeps remembering the same wrong eventually sends its own people")
+	WorldHistory.register_subject("victim_five", {"name": "Victim Five", "kind": "person"})
+	var third_event := LocalLaw.assassinate(loud_ledger, "player", "victim_five", false, ["witness_one"])
+	loud_ledger.tick(WitnessLedger.REPORT_DELAY * 2.0)
+	var third_response := LocalLaw.witness_a_wrong("holding_alpha", "wizardsonlyfoolz", loud_ledger, third_event, "player")
+	check(bool(third_response.get("dispatched", false)), "a place that remembers wrong after wrong eventually sends its own people")
 	var grudge_after := float(WorldHistory.subject("wizardsonlyfoolz").get("grudge", 0.0))
 	check(grudge_after > grudge_before, "and sending them is a real rise in the faction's own grudge (%.2f -> %.2f)" % [grudge_before, grudge_after])
 	check(float(WorldHistory.subject("holding_alpha").get("unrest", -1.0)) == 0.0, "the place's own remembered unrest is spent once it actually acts")
+
+	print("AE1.4/AE1.5 production seam - a landed report answers through the real surface holding")
+	WorldHistory.clear_history()
+	WorldHistory.register_subject("player", {"name": "THE HUNTER", "kind": "person"})
+	WorldHistory.register_subject("ashline_wreckers", {"name": "Ashline Wreckers", "kind": "faction", "grudge": 0.0})
+	WorldHistory.register_subject("ashline_witness", {"name": "Ashline Witness", "kind": "person", "faction_id": "ashline_wreckers"})
+	WorldHistory.register_subject("mercy_target", {"name": "Mercy Target", "kind": "person", "faction_id": "ashline_wreckers"})
+	var jurisdiction := Holdings.jurisdiction_at((Holdings.DEFINITIONS[2] as Dictionary).at)
+	var field_ledger := WitnessLedger.new()
+	var field_event := field_ledger.record("npc_resolution", {
+		"subject_id": "mercy_target", "actor": "player", "outcome": "spare",
+		"holding_id": jurisdiction.holding_id, "place_id": jurisdiction.place_id, "held_by": jurisdiction.held_by,
+	}, ["ashline_witness"])
+	var landed := field_ledger.tick(WitnessLedger.REPORT_DELAY * 2.0)
+	var field_response := LocalLaw.answer_report(field_ledger, landed[0])
+	check(bool(field_response.get("ok", false)) and str(field_response.get("place_id", "")) == "ashbloom:bone_yard",
+		"the production report seam resolves into the Bone Yard's canonical place record")
+	check(float(WorldHistory.subject("ashbloom:bone_yard").get("unrest", 0.0)) > 0.0,
+		"the same place shown by MAP, INDEX and Board now carries its own local unrest")
+	var unrest_events := WorldHistory.events.filter(func(event: Dictionary):
+		return str(event.get("type", "")) == "local_unrest" and int((event.get("details", {}) as Dictionary).get("source_sequence", -1)) == int(field_event.sequence))
+	check(unrest_events.size() == 1, "the local consequence cites the exact witnessed resolution that caused it")
 
 	print("LOCAL_LAW_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

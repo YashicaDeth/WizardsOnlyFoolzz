@@ -116,15 +116,25 @@ static func offence_magnitude(faction_id: String, event: Dictionary) -> float:
 static func witness_a_wrong(place_id: String, faction_id: String, ledger: WitnessLedger, event: Dictionary, actor_id: String) -> Dictionary:
 	if not ledger.faction_knows(faction_id, int(event.get("sequence", -1))):
 		return {"ok": false, "reason": "THE HOLDER WAS NEVER TOLD"}
+	var place := WorldHistory.subject(place_id)
+	if not place.is_empty() and str(place.get("held_by", faction_id)) != faction_id:
+		return {"ok": false, "reason": "THAT FACTION DOES NOT HOLD THIS GROUND"}
 	var magnitude := offence_magnitude(faction_id, event)
 	if is_zero_approx(magnitude):
 		return {"ok": false, "reason": "NOT AN OFFENCE TO WHOEVER HOLDS THIS GROUND"}
-	var place := WorldHistory.subject(place_id)
 	if place.is_empty():
 		WorldHistory.register_subject(place_id, {"kind": "place", "held_by": faction_id, "unrest": 0.0})
 		place = WorldHistory.subject(place_id)
+	var sequence := int(event.get("sequence", -1))
+	var answered: Array = (place.get("law_seen_sequences", []) as Array).duplicate()
+	if sequence >= 0 and answered.has(sequence):
+		return {"ok": false, "reason": "THIS WRONG WAS ALREADY ANSWERED HERE"}
+	if sequence >= 0:
+		answered.append(sequence)
+		if answered.size() > 64:
+			answered.pop_front()
 	var unrest := float(place.get("unrest", 0.0)) + magnitude
-	WorldHistory.record_event("local_unrest", {"place_id": place_id, "faction_id": faction_id, "actor_id": actor_id, "magnitude": magnitude, "unrest": unrest})
+	WorldHistory.record_event("local_unrest", {"place_id": place_id, "faction_id": faction_id, "actor_id": actor_id, "source_sequence": sequence, "magnitude": magnitude, "unrest": unrest})
 	var dispatched := false
 	if unrest >= RESPONSE_THRESHOLD:
 		var faction := WorldHistory.subject(faction_id)
@@ -133,5 +143,28 @@ static func witness_a_wrong(place_id: String, faction_id: String, ledger: Witnes
 		WorldHistory.record_event("law_dispatched", {"place_id": place_id, "faction_id": faction_id, "actor_id": actor_id, "unrest_spent": unrest})
 		unrest = 0.0
 		dispatched = true
-	WorldHistory.amend_subject(place_id, {"unrest": unrest})
+	WorldHistory.amend_subject(place_id, {"unrest": unrest, "law_seen_sequences": answered})
 	return {"ok": true, "magnitude": magnitude, "unrest": unrest, "dispatched": dispatched}
+
+
+## One report that actually completed WitnessLedger's walk home. Resolution
+## writers attach the jurisdiction that existed at the scene; this accepts the
+## report only when it reached that holder, reconstructs the original event
+## shape used by `event_karma()`, and lets the canonical place remember it.
+static func answer_report(ledger: WitnessLedger, report: Dictionary) -> Dictionary:
+	var details: Dictionary = (report.get("details", {}) as Dictionary).duplicate(true)
+	var place_id := str(details.get("place_id", ""))
+	var holder_id := str(details.get("held_by", ""))
+	if place_id == "" or holder_id == "":
+		return {"ok": false, "reason": "NO LOCAL JURISDICTION ON THE REPORT"}
+	if str(report.get("faction", "")) != holder_id:
+		return {"ok": false, "reason": "THE REPORT WENT SOMEWHERE ELSE"}
+	var event := {
+		"sequence": int(report.get("sequence", -1)),
+		"type": str(report.get("type", "")),
+		"details": details,
+	}
+	var result := witness_a_wrong(place_id, holder_id, ledger, event, str(details.get("actor", details.get("actor_id", "player"))))
+	result["place_id"] = place_id
+	result["faction_id"] = holder_id
+	return result

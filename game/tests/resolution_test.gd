@@ -22,10 +22,19 @@ func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		get_tree().quit(2)
 		return
+	# This suite resolves the same stable actor ids on every run. Without a
+	# fresh ledger, last run's spared/recruited/dead state is restored before
+	# the first interaction and a rerun fails before testing the UI at all.
+	WorldHistory.clear_history()
 	hunt = load("res://bone_yard_hunt.tscn").instantiate()
 	add_child(hunt)
 	hunt.set_physics_process(false)
 	await get_tree().physics_frame
+	# The production start is now beside the reachable bedroll. E correctly
+	# prioritises that world object, so conduct this encounter away from it or
+	# the test measures sleeping instead of the downed-person interaction.
+	hunt.player_body.position = Vector3(40, 0.9, 40)
+	hunt.player = hunt.player_body.position + Vector3.UP * 0.6
 	var actor := downed("mercy")
 	var before: int = hunt.health
 	var position: Vector3 = actor.node.position
@@ -50,7 +59,12 @@ func _ready() -> void:
 	check(actor.rig.head_anchor.get_node_or_null("VoiceReply") is AudioStreamPlayer3D, "reply sound originates at the subject's head")
 	hunt._spawn_encounter_actor({"instance_id": "world_keeps_moving", "kind": "hostile"}, hunt.player + Vector3(0, 0, 10))
 	var moving: Dictionary = hunt.encounter_actors.back()
+	# Perception normally sets this in the Hunt's frame loop. This test drives
+	# the actor update directly, so provide the same live verdict explicitly.
+	moving["tracking_player"] = true
 	var moving_before: Vector3 = moving.node.position
+	# First update acquires a route; the following update advances along it.
+	hunt._update_encounter_actors(0.5)
 	hunt._update_encounter_actors(0.5)
 	check(moving.node.position != moving_before, "other enemies keep moving while the decision is open")
 	moving.node.queue_free()

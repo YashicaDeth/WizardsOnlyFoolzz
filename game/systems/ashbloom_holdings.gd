@@ -95,6 +95,24 @@ static func nearest_id(at: Vector2) -> String:
 	return nearest
 
 
+## The one jurisdiction answer shared by combat, local law and later jobs.
+## Looking up where an act happened does not reveal it to the player; MAP still
+## owns discovery through `observe()`. The law can know whose ground it is even
+## while the player has not surveyed the border yet.
+static func jurisdiction_at(at: Vector2) -> Dictionary:
+	var id := nearest_id(at)
+	var definition := definition_for(id)
+	if definition.is_empty():
+		return {}
+	var live := holding(id)
+	return {
+		"holding_id": id,
+		"place_id": str(definition.record),
+		"held_by": str(live.get("held_by", definition.held_by)),
+		"name": str(definition.name),
+	}
+
+
 ## Crossing into a holding reveals that whole named piece once. Fine-grained
 ## survey still records streets and structures; this is the land identity that
 ## arrives with weight rather than one more metre of fog.

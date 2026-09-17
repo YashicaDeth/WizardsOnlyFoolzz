@@ -35,6 +35,18 @@ Board and strung into an existing theory; its card retains the current holder
 and field evidence. This is the shared seam future local law, jobs and ownership
 changes must use rather than creating parallel map-pin or quest-place state.
 
+18 September implementation note: downed-person decisions in the Hunt now
+enter the existing witness pipeline with the exact surface jurisdiction where
+they occurred. Execute, spare and recruit no longer write around local law.
+The world position resolves to one canonical holding and its current holder;
+only a living nearby witness can carry the account, the account still takes
+WitnessLedger's real delay to arrive, and only the ground-holder's own faction
+can answer it. The faction judges the act from its existing Tree position, so
+Ashline ground may punish mercy while Gate Lantern ground punishes execution.
+One incident can be remembered only once per holding, even if two witnesses
+report it. The resulting unrest lives on the same place record MAP, INDEX and
+the Board already share.
+
 17 September Black Mirror note: its seven apps are different instruments inside
 one object, not seven unrelated UI compositions. The casing now owns a fixed
 page grammar — header and footer rails, app identity and role, stable page

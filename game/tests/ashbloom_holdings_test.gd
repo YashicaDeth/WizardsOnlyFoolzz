@@ -22,6 +22,10 @@ func _ready() -> void:
 	var fresh := HOLDINGS.overview()
 	check((fresh.holdings as Array).size() == 5, "the surface authority owns the five settlements the world generator actually builds")
 	check(int(fresh.revealed_count) == 0, "a new Ashbloom does not begin with its holdings revealed")
+	var fresh_jurisdiction := HOLDINGS.jurisdiction_at((HOLDINGS.DEFINITIONS[2] as Dictionary).at)
+	check(str(fresh_jurisdiction.place_id) == "ashbloom:bone_yard" and str(fresh_jurisdiction.held_by) == "ashline_wreckers",
+		"a world position resolves to the same canonical place and holder local law will use")
+	check(int(HOLDINGS.overview().revealed_count) == 0, "jurisdiction lookup does not reveal unsurveyed land to the player")
 	check(HOLDINGS.DEFINITIONS.all(func(definition: Dictionary):
 		return str(WorldHistory.subject(str(definition.record)).get("kind", "")) == "place"),
 		"every map polygon has one first-class WorldHistory place record")
