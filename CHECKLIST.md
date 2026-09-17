@@ -1089,7 +1089,15 @@ The last rung. Fifteen statements that are true of the hunt when this game is fi
       movement, combat and INDEX read: severed zone, ruptured organ, or the
       worst damaged live zone. The registry test takes the left arm and proves
       both the prosthetic response and written memory name that arm.
-- [ ] **F10.3** `v10` Their tactics come from the record, read fresh, never cached
+- [x] **F10.3** `v10` Their tactics come from the record, read fresh, never cached —
+      both the authored captain and every ordinary encounter actor now ask
+      `RivalTactics.tactic_for()` only at the live movement decision, after
+      `RivalRegistry` confirms the person actually became a rival. No tactic is
+      stored on the scene or actor. The production integration test proves the
+      same person closes under a front-hit record, then a newly recorded limb
+      severing reverses their very next decision into a stand-off;
+      `rival_tactics_test.gd` still covers every derivation and distance rule,
+      while `enemy_ai_test.gd` proves ordinary crowd spacing is unchanged.
 - [ ] **F10.4** `v10` A rival who fled comes back changed in a way you can see
 - [x] **F10.5** `v10` Death opens a real succession and somebody takes the place —
       every production encounter death calls `WireNet.open_vacancy()` and

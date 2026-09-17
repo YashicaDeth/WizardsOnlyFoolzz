@@ -128,6 +128,7 @@ const LIMB_MOMENTUM := preload("res://systems/limb_momentum.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 const RIVAL_REGISTRY := preload("res://systems/rival_registry.gd")
+const RIVAL_TACTICS := preload("res://systems/rival_tactics.gd")
 const DEFEAT_ROUTER := preload("res://systems/defeat_router.gd")
 const ASSET_NETWORK := preload("res://systems/asset_network.gd")
 const COMBAT_RESPONSE := preload("res://systems/combat_response.gd")
@@ -4610,7 +4611,21 @@ func _update_rival(delta: float) -> void:
 	var to_player := player - enemy.global_position
 	to_player.y = 0
 	var distance := to_player.length()
-	if distance > 3.2:
+	# F10.3. This is deliberately a local value, asked for at the decision and
+	# discarded. The next frame reads WorldHistory again, so a wound that lands
+	# during the fight can change the captain's spacing without a cached tactic
+	# on this scene or on her body.
+	var tactic := _fresh_rival_tactic(CAST.id_for(CAPTAIN_SLOT))
+	var approach := RIVAL_TACTICS.approach(tactic, distance) if not tactic.is_empty() else "close"
+	if approach == "withdraw":
+		var away := -to_player.normalized() if distance > 0.1 else Vector3.FORWARD
+		enemy.global_position += away * delta * 4.3
+		enemy.look_at(player, Vector3.UP)
+	elif approach == "hold" and distance > 3.2:
+		# Holding is active: keep the player in front rather than freezing in the
+		# last travel pose. The player can close the distance and force the melee.
+		enemy.look_at(player, Vector3.UP)
+	elif distance > 3.2:
 		enemy.global_position += to_player.normalized() * delta * 4.3
 		enemy.look_at(player, Vector3.UP)
 	else:
@@ -4684,6 +4699,18 @@ func _melee_slot_taken() -> bool:
 	return false
 
 
+## F10.3. The only production door into rival tactics. RivalRegistry decides
+## whether a real person earned the role; RivalTactics derives the answer from
+## the event record right now. Nothing returned here is written onto `actor`,
+## which keeps a long-lived encounter dictionary from becoming a stale second
+## source of truth.
+func _fresh_rival_tactic(subject_id: String) -> Dictionary:
+	var subject := WorldHistory.subject(subject_id)
+	if not bool(subject.get("is_rival", false)):
+		return {}
+	return RIVAL_TACTICS.tactic_for(subject_id)
+
+
 func _update_encounter_actors(delta: float) -> void:
 	var melee_slot_taken := _melee_slot_taken()
 	for index in range(encounter_actors.size() - 1, -1, -1):
@@ -4737,6 +4764,8 @@ func _update_encounter_actors(delta: float) -> void:
 		var offset := player - node.global_position
 		offset.y = 0
 		var distance := offset.length()
+		var rival_tactic := _fresh_rival_tactic(str(actor.get("subject_id", "")))
+		var rival_approach := RIVAL_TACTICS.approach(rival_tactic, distance) if not rival_tactic.is_empty() else ""
 		if str(actor.get("state", "idle")) == "maimed":
 			actor["maimed_remaining"] = maxf(0.0, float(actor.get("maimed_remaining", 0.0)) - actor_delta)
 			if float(actor.maimed_remaining) <= 0.0:
@@ -4776,6 +4805,25 @@ func _update_encounter_actors(delta: float) -> void:
 					prompt.text = "%s SHOULDERS THE TUBE" % str(actor.display_name).to_upper()
 				"fire":
 					_fire_launcher(actor, node)
+		elif not rival_tactic.is_empty() and distance < 24.0 and (bool(actor.get("tracking_player", false)) or bool(actor.get("tracking_light", false))) and rival_approach == "withdraw":
+			# A remembered close-range wound has an immediate physical answer: get
+			# outside the remembered distance instead of walking into the shared
+			# three-metre melee ring like an ordinary hostile.
+			var away := -offset.normalized() if distance > 0.1 else Vector3.FORWARD
+			_move_actor_on_route(actor, node.global_position + away * 10.0, actor_delta)
+		elif not rival_tactic.is_empty() and distance > 3.0 and distance < 24.0 and (bool(actor.get("tracking_player", false)) or bool(actor.get("tracking_light", false))) and rival_approach == "hold":
+			# Circling and stand-off memories use their own recorded distance. A
+			# stable per-person phase prevents multiple rivals sharing one point;
+			# the tactic itself is still read fresh above and never stored.
+			var start_angle := fposmod(float(hash(str(actor.get("subject_id", index)))), TAU)
+			actor["orbit_angle"] = fposmod(float(actor.get("orbit_angle", start_angle)) + actor_delta * 0.15, TAU)
+			var radius := float(rival_tactic.get("keep_distance", 4.0))
+			var orbit_point := player + Vector3(cos(actor.orbit_angle), 0, sin(actor.orbit_angle)) * radius
+			_move_actor_on_route(actor, orbit_point, actor_delta)
+		elif not rival_tactic.is_empty() and distance > 3.0 and distance < 24.0 and (bool(actor.get("tracking_player", false)) or bool(actor.get("tracking_light", false))) and rival_approach == "close":
+			# A rival whose record says press does not inherit the ordinary crowd's
+			# melee queue. Their remembered tactic wins this one decision.
+			_move_actor_on_route(actor, player, actor_delta)
 		elif str(actor.get("disposition", "hostile")) == "hostile" and distance < 24.0 and distance > 3.0 and (bool(actor.get("tracking_player", false)) or bool(actor.get("tracking_light", false))):
 			# O4.2. A naive approach put every hostile in single file toward the
 			# same 3 m ring, which reads as a queue rather than a fight. Whoever
