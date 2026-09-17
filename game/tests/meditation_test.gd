@@ -70,6 +70,8 @@ func _ready() -> void:
 	check(bool(ended.get("ok", false)), "a clean end succeeds")
 	var pain_after_clean_end := float(WorldHistory.subject("player").get("anatomy_state", {}).get("pain", 0.0))
 	check(is_equal_approx(pain_before_clean_end, pain_after_clean_end), "and costs nothing — only interruption does")
+	var interrupted_events := WorldHistory.events.filter(func(event: Dictionary): return str(event.get("type", "")) == "meditation_interrupted")
+	check(PlayerActionLedger.count("meditation_began") == 3 and PlayerActionLedger.count("meditation_ended") == 2 and PlayerActionLedger.count("meditation_interrupted") == 1 and interrupted_events.size() == 1 and str((interrupted_events[0].get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_") and int(WorldHistory.get("_ledger_batch_depth")) == 0, "session boundaries are compact identified acts and every nested transaction closes")
 
 	print("MEDITATION_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

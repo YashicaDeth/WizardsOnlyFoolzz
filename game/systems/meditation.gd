@@ -41,6 +41,7 @@ extends RefCounted
 const PAIN_RATE := 2.0
 const STAMINA_MULTIPLIER := 2.5
 const ENTITY_THRESHOLD_SECONDS := 60.0
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 
 static func is_meditating(subject_id: String) -> bool:
@@ -59,10 +60,12 @@ static func begin(subject_id: String, context: Dictionary = {}) -> Dictionary:
 		return {"ok": false, "reason": "NO SUCH SUBJECT"}
 	if is_meditating(subject_id):
 		return {"ok": false, "reason": "ALREADY SITTING"}
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(subject_id, {
 		"meditating": true, "meditation_progress_seconds": 0.0, "meditation_context": context.duplicate(true),
 	})
-	WorldHistory.record_event("meditation_began", {"subject_id": subject_id, "context": context.duplicate(true)})
+	_record_boundary("meditation_began", subject_id, {"subject_id": subject_id, "context": context.duplicate(true)})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true}
 
 
@@ -102,8 +105,10 @@ static func end(subject_id: String) -> Dictionary:
 	if not is_meditating(subject_id):
 		return {"ok": false, "reason": "NOT SITTING"}
 	var held := progress_seconds(subject_id)
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(subject_id, {"meditating": false, "meditation_progress_seconds": 0.0, "meditation_context": {}})
-	WorldHistory.record_event("meditation_ended", {"subject_id": subject_id, "held_seconds": held})
+	_record_boundary("meditation_ended", subject_id, {"subject_id": subject_id, "held_seconds": held})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "held_seconds": held}
 
 
@@ -119,8 +124,20 @@ static func interrupt(subject_id: String, reason: String) -> Dictionary:
 	var anatomy: Dictionary = subject.get("anatomy_state", {})
 	var shock := clampf(held * 0.5, 0.0, 40.0)
 	anatomy["pain"] = clampf(float(anatomy.get("pain", 0.0)) + shock, 0.0, 100.0)
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(subject_id, {
 		"anatomy_state": anatomy, "meditating": false, "meditation_progress_seconds": 0.0, "meditation_context": {},
 	})
-	WorldHistory.record_event("meditation_interrupted", {"subject_id": subject_id, "held_seconds": held, "reason": reason, "shock_pain": shock})
+	_record_boundary("meditation_interrupted", subject_id, {"subject_id": subject_id, "held_seconds": held, "reason": reason, "shock_pain": shock})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "held_seconds": held, "shock_pain": shock}
+
+
+## Player sessions join the one compact action index used by smoking, drugs,
+## holdings and the carried-goods economy. NPC sessions keep the same public
+## facts without falsely attributing their acts to the player.
+static func _record_boundary(event_type: String, subject_id: String, details: Dictionary) -> void:
+	if subject_id == "player":
+		PLAYER_ACTION_LEDGER.record(event_type, details)
+	else:
+		WorldHistory.record_event(event_type, details)
