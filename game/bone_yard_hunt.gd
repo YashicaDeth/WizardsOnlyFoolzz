@@ -6461,16 +6461,18 @@ func _update_perception(delta: float) -> void:
 ## pushing them up — `storm_weather.gd`'s lightning flash already taught this
 ## build what happens to a value nothing ever resets: it freezes wherever it
 ## last was instead of actually relaxing when the state that raised it passes.
-## `displacement_strength` is added to whatever `_update_day_night` just set
-## rather than overwriting it, since night and altered consciousness are two
-## real causes of the same dial and neither should erase the other.
+## This must assign from current anatomy, not add to the previous frame. The
+## old `dial() + altered * 0.05` compounded sixty times a second: one mildly
+## harsh draw became a fully liquefied screen before an inspection finished.
+## Night deliberately owns no fullscreen displacement (A3.2 uses local light
+## shells), so consciousness is the complete live source for this dial here.
 func _update_altered_perception() -> void:
 	if player_rig == null or not is_instance_valid(player_rig):
 		return
 	if psychedelic == null or not is_instance_valid(psychedelic):
 		return
 	var altered := 1.0 - clampf(player_rig.anatomy.consciousness / 100.0, 0.0, 1.0)
-	psychedelic.set_dial("displacement_strength", psychedelic.dial("displacement_strength") + altered * 0.05)
+	psychedelic.set_dial("displacement_strength", altered * 0.05)
 	psychedelic.set_dial("chromatic_offset", altered * 0.012)
 	psychedelic.set_dial("kaleidoscope_segments", lerpf(0.0, 5.0, clampf(inverse_lerp(0.5, 1.0, altered), 0.0, 1.0)))
 

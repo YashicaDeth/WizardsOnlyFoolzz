@@ -7,6 +7,11 @@ extends Node
 
 var hunt: Node
 var frame := 0
+var caption: Label
+
+
+func _say(text: String) -> void:
+	caption.text = text
 
 
 func _ready() -> void:
@@ -23,7 +28,21 @@ func _ready() -> void:
 	hunt.set("third_person", false)
 	hunt.set("perspective_blend", 0.0)
 	hunt.get("body_motion").set_perspective(true)
+	var captions := CanvasLayer.new()
+	captions.layer = 90
+	hunt.add_child(captions)
+	caption = Label.new()
+	caption.position = Vector2(28, 18)
+	caption.size = Vector2(1224, 54)
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	caption.add_theme_font_size_override("font_size", 18)
+	caption.add_theme_color_override("font_color", Color("f0d5a8"))
+	caption.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.95))
+	caption.add_theme_constant_override("shadow_offset_x", 2)
+	caption.add_theme_constant_override("shadow_offset_y", 2)
+	captions.add_child(caption)
 	hunt.call("_equip_smokeable", "cigarette")
+	_say("CIGARETTE // ASH FLICK · LIP HOLD · HANDS-FREE DRAW · PAPER INSPECTION")
 	# Begin two draws into the same cigarette so the first demonstrated release
 	# is its deterministic ash-flick beat rather than hiding that polish outside
 	# the reel. This is still the live object and the live draw path.
@@ -63,6 +82,7 @@ func _process(_delta: float) -> void:
 	# Vape: use, DOUBLE O, then show its cell/window face.
 	if frame == 210:
 		hunt.call("_equip_smokeable", "vape")
+		_say("VAPE // TIMED DRAW · DOUBLE O · CELL AND WINDOW INSPECTION")
 	if frame == 225:
 		hunt.call("_begin_smoking_draw")
 	if frame == 282:
@@ -76,6 +96,7 @@ func _process(_delta: float) -> void:
 	# Joint: use, GHOST, then inspect its thicker roll and green-biased ember.
 	if frame == 410:
 		hunt.call("_equip_smokeable", "joint")
+		_say("JOINT // GREEN-BIASED WISPS · GHOST · THICK ROLL INSPECTION")
 	if frame == 425:
 		hunt.call("_begin_smoking_draw")
 	if frame == 485:
@@ -89,6 +110,7 @@ func _process(_delta: float) -> void:
 	# Spliff: slower mouth gesture, use, then seam inspection.
 	if frame == 614:
 		hunt.call("_equip_smokeable", "spliff")
+		_say("SPLIFF // SLOW MOUTH GESTURE · DRAW · PAPER SEAM INSPECTION")
 	if frame == 630:
 		hunt.call("_begin_smoking_draw")
 	if frame == 696:
@@ -101,6 +123,7 @@ func _process(_delta: float) -> void:
 	# chamber fill and a long cone sink; inspect bowl and chamber after the rip.
 	if frame == 826:
 		hunt.call("_equip_smokeable", "bong")
+		_say("BONG // TWO HANDS · ZIPPO · WATER RIP · CONE SINK · CHAMBER INSPECTION")
 	if frame == 842:
 		hunt.call("_begin_smoking_draw")
 	if frame == 962:
@@ -114,6 +137,7 @@ func _process(_delta: float) -> void:
 	# Use and inspect every weapon class: edge read, receiver check, press-check.
 	if frame == 1105:
 		hunt.call("_equip_weapon", 0)
+		_say("SWORD // LIVE ATTACK · OPEN-HAND EDGE INSPECTION")
 	if frame == 1118:
 		hunt.call("_attack")
 	if frame == 1140:
@@ -122,6 +146,7 @@ func _process(_delta: float) -> void:
 		hunt.set("inspect_held", false)
 	if frame == 1245:
 		hunt.call("_equip_weapon", 1)
+		_say("SHOTGUN // LIVE FIRE · FOREND AND RECEIVER CHECK")
 	if frame == 1258:
 		hunt.call("_attack")
 	if frame == 1280:
@@ -130,6 +155,7 @@ func _process(_delta: float) -> void:
 		hunt.set("inspect_held", false)
 	if frame == 1390:
 		hunt.call("_equip_weapon", 2)
+		_say("SIDEARM // LIVE FIRE · TWO-HAND SLIDE PRESS-CHECK")
 	if frame == 1403:
 		hunt.call("_attack")
 	if frame == 1425:
@@ -139,6 +165,7 @@ func _process(_delta: float) -> void:
 	# Finally use and inspect the gruesome improvised class that used to float
 	# without any hand at all.
 	if frame == 1535:
+		_say("CARRIED LIMB // IMPROVISED SWING · WEIGHTED TWO-HAND INSPECTION")
 		hunt.get("handheld").carry.take_chunk({
 			"layer_name": "limb", "whole_limb": true, "zone": "left_arm",
 			"subject_id": "inspection_reel", "condition": 1.0,
