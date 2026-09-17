@@ -90,6 +90,27 @@ func _ready() -> void:
 	check(grudge_after > grudge_before, "and sending them is a real rise in the faction's own grudge (%.2f -> %.2f)" % [grudge_before, grudge_after])
 	check(float(WorldHistory.subject("holding_alpha").get("unrest", -1.0)) == 0.0, "the place's own remembered unrest is spent once it actually acts")
 
+	print("AE10.14 - standing changes enforcement tolerance without erasing the witnessed wrong")
+	WorldHistory.register_subject("standing_witness", {"name": "Standing Witness", "kind": "person", "faction_id": "wizardsonlyfoolz"})
+	WorldHistory.register_subject("kin_place", {"kind": "place", "held_by": "wizardsonlyfoolz", "unrest": 0.0})
+	WorldHistory.register_subject("refused_place", {"kind": "place", "held_by": "wizardsonlyfoolz", "unrest": 0.0})
+	var standing_ledger := WitnessLedger.new()
+	var kin_event := standing_ledger.record("npc_resolution", {"subject_id": "kin_victim", "outcome": "execute", "actor": "player"}, ["standing_witness"])
+	var refused_event := standing_ledger.record("npc_resolution", {"subject_id": "refused_victim", "outcome": "execute", "actor": "player"}, ["standing_witness"])
+	standing_ledger.tick(WitnessLedger.REPORT_DELAY * 2.0)
+	WorldHistory.amend_subject("player", {"karma": 1.0})
+	var kin_response := LocalLaw.witness_a_wrong("kin_place", "wizardsonlyfoolz", standing_ledger, kin_event, "player")
+	WorldHistory.amend_subject("player", {"karma": -1.0})
+	var refused_response := LocalLaw.witness_a_wrong("refused_place", "wizardsonlyfoolz", standing_ledger, refused_event, "player")
+	check(str(kin_response.get("disposition", "")) == "kin" and str(refused_response.get("disposition", "")) == "refuses",
+		"law reads the same live faction disposition as trade rather than a second reputation score")
+	check(float(kin_response.get("response_threshold", 0.0)) > float(refused_response.get("response_threshold", 0.0)),
+		"kin receive a longer leash than somebody the same faction already refuses")
+	check(bool(kin_response.get("ok", false)) and not bool(kin_response.get("dispatched", true)) and float(kin_response.get("unrest", 0.0)) > 0.0,
+		"a witnessed wrong by kin is remembered locally rather than forgiven or immediately escalated")
+	check(bool(refused_response.get("dispatched", false)),
+		"the identical witnessed wrong sends law immediately when the faction already refuses the actor")
+
 	print("AE1.4/AE1.5 production seam - a landed report answers through the real surface holding")
 	WorldHistory.clear_history()
 	WorldHistory.register_subject("player", {"name": "THE HUNTER", "kind": "person"})

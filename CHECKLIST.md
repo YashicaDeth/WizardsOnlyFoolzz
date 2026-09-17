@@ -4439,7 +4439,16 @@ The last rung. Fifteen statements that are true of sneaking and the law when thi
       `hunt_local_law_integration_test.gd` drives the real dispatched team from
       witnessed offence through pursuit to a physical finishing blow and proves
       custody, attribution, jurisdiction, warrant settlement and idempotence.
-- [ ] **AE10.14** `v10` Standing with a faction changes what the law does
+- [x] **AE10.14** `v10` Standing with a faction changes what the law does —
+      enforcement reads `WorldHistory.faction_price_factor()`, the existing
+      relative Tree position shared with trade, rather than adding a police
+      reputation bar. A witnessed wrong by somebody the holder reads as kin is
+      still written into that place's unrest but receives a longer leash;
+      committing the identical offence while the faction refuses you crosses a
+      much lower response threshold and can commission its team immediately.
+      The faction's axis still decides whether the act was an offence at all.
+      `local_law_test.gd` proves both dispositions, thresholds, retained memory
+      and divergent dispatch outcomes from otherwise identical executions.
 - [ ] **AE10.15** `v10` What you were wanted for carries into the next universe
 
 ### AG4 — The third playtest, and what Greg is sick of

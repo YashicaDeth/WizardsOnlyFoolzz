@@ -44,6 +44,15 @@ const UNSEEN_EXPOSURE_THRESHOLD := 0.35
 ## problem answers it within a handful of witnessed acts, not a career's worth.
 const RESPONSE_THRESHOLD := 0.18
 
+## AE10.14. Existing faction standing changes how much remembered unrest a
+## holder tolerates before it sends bodies. This is intentionally a multiplier
+## on the local threshold, not a second reputation score and not forgiveness:
+## the witnessed wrong still enters the place record either way. `0.4` makes a
+## faction that already refuses the actor answer one serious wrong; `1.55`
+## gives somebody it reads as kin a meaningfully longer leash without immunity.
+const HOSTILE_RESPONSE_SCALE := 0.4
+const KIN_RESPONSE_SCALE := 1.55
+
 ## AE1.5. What being sent actually is: the exact `grudge` scalar `wire_net.gd`'s
 ## own channel-contest retaliation (K4.6) and `the_four_horsemen.gd` (K2.5)
 ## already raise on a faction's own record — the same real field the Hunt
@@ -102,6 +111,17 @@ static func offence_magnitude(faction_id: String, event: Dictionary) -> float:
 	return maxf(0.0, faction_axis * pull)
 
 
+## The same derived relationship already used by trade, read as enforcement
+## tolerance. `faction_price_factor()` compares the actor's live Tree position
+## (including what their body has visibly become) with the faction's; no local-
+## law-only affinity is stored or displayed.
+static func response_threshold(faction_id: String, actor_id: String) -> float:
+	var actor := WorldHistory.subject(actor_id)
+	var standing := WorldHistory.faction_price_factor(faction_id, actor)
+	var closeness := clampf(standing / 1.2, 0.0, 1.0)
+	return RESPONSE_THRESHOLD * lerpf(HOSTILE_RESPONSE_SCALE, KIN_RESPONSE_SCALE, closeness)
+
+
 ## AE1.4/AE1.5. "Law figures respond to what was actually witnessed...
 ## Punishment is local: the holding remembers, and the holding sends them."
 ## Refuses outright unless the faction that holds this ground has actually
@@ -134,17 +154,31 @@ static func witness_a_wrong(place_id: String, faction_id: String, ledger: Witnes
 		if answered.size() > 64:
 			answered.pop_front()
 	var unrest := float(place.get("unrest", 0.0)) + magnitude
-	WorldHistory.record_event("local_unrest", {"place_id": place_id, "faction_id": faction_id, "actor_id": actor_id, "source_sequence": sequence, "magnitude": magnitude, "unrest": unrest})
+	var threshold := response_threshold(faction_id, actor_id)
+	var disposition := WorldHistory.faction_disposition(faction_id, WorldHistory.subject(actor_id))
+	WorldHistory.record_event("local_unrest", {
+		"place_id": place_id, "faction_id": faction_id, "actor_id": actor_id,
+		"source_sequence": sequence, "magnitude": magnitude, "unrest": unrest,
+		"response_threshold": threshold, "disposition": disposition,
+	})
 	var dispatched := false
-	if unrest >= RESPONSE_THRESHOLD:
+	if unrest >= threshold:
 		var faction := WorldHistory.subject(faction_id)
 		if not faction.is_empty():
 			WorldHistory.amend_subject(faction_id, {"grudge": float(faction.get("grudge", 0.0)) + unrest * GRUDGE_SCALE})
-		WorldHistory.record_event("law_dispatched", {"place_id": place_id, "faction_id": faction_id, "actor_id": actor_id, "source_sequence": sequence, "unrest_spent": unrest})
+		WorldHistory.record_event("law_dispatched", {
+			"place_id": place_id, "faction_id": faction_id, "actor_id": actor_id,
+			"source_sequence": sequence, "unrest_spent": unrest,
+			"response_threshold": threshold, "disposition": disposition,
+		})
 		unrest = 0.0
 		dispatched = true
 	WorldHistory.amend_subject(place_id, {"unrest": unrest, "law_seen_sequences": answered})
-	return {"ok": true, "magnitude": magnitude, "unrest": unrest, "dispatched": dispatched}
+	return {
+		"ok": true, "magnitude": magnitude, "unrest": unrest,
+		"dispatched": dispatched, "response_threshold": threshold,
+		"disposition": disposition,
+	}
 
 
 ## One report that actually completed WitnessLedger's walk home. Resolution
