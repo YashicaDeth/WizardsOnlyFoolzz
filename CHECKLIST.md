@@ -6202,7 +6202,9 @@ where the deliriants go.
       folded silently into the entry price. Verified: refused on an empty
       seal, refused on Da'ath, refused above your own altitude, and — once
       genuinely earned — the offering is shown actually leaving the body on
-      both the way in and the way out.
+      both the way in and the way out. Accepted player petitions and
+      departures receive one receipt each; debt collection, offering,
+      crossing fact and remembered standing persist in one transaction.
 - [ ] **AV1.5** Each plane looks like itself, with more of Greg's art the higher it goes
 - [ ] **AV1.6** Hellscape and angelscape are one place in two registers, not two asset sets
 - [ ] **AV1.7** All of it runs on one shader with different dials (FINAL_V section 16)
@@ -6237,6 +6239,7 @@ Greg: *"the higher you have to be to talk or even fight, conjure, evoke etc"*.
       floor gave out. Verified: a subject with nothing taken can still hold
       a Malkuth-tier interaction (needs 0) but fails the same call one plane
       up, and the failure leaves a real recorded event, not a silent `false`.
+      That event and the plane's changed memory share one world transaction.
 - [x] **AV2.4** ~~You cannot fight the godhead sober, and that is not a difficulty setting~~
       Structural rather than a rule someone could toggle: Keter's `fight`
       floor is derived from its `order` the same formula every other floor
