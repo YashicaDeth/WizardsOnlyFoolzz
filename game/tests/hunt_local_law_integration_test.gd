@@ -73,6 +73,30 @@ func _ready() -> void:
 		return str(event.get("type", "")) == "local_unrest" and str((event.get("details", {}) as Dictionary).get("place_id", "")) == "ashbloom:tunnel_mouth"),
 		"the resulting unrest is attributable to the same holding in world history")
 
+	# F1.3 / AE10.10. Exercise the production death seam, not the ledger helper
+	# in isolation: a physical witness carrying a fresh account dies in the Hunt
+	# before the delay, and that exact account must never become faction knowledge.
+	hunt._spawn_encounter_actor({
+		"instance_id": "cut_witness", "kind": "hostile", "display_name": "Sable Rook",
+		"role": "GATE LANTERN COURIER", "summary": "Carrying a report home.",
+	}, at + Vector3(5, 0, 0))
+	var cut_witness: Dictionary = hunt.encounter_actors.back()
+	WorldHistory.amend_subject(str(cut_witness.subject_id), {"faction_id": "gate_lanterns", "faction": "Gate Lanterns"})
+	var cut_event: Dictionary = hunt.witness_ledger.record("npc_resolution", {
+		"subject_id": "cut_report_target", "actor": "player", "outcome": "execute",
+		"place_id": "ashbloom:tunnel_mouth", "held_by": "gate_lanterns",
+	}, [str(cut_witness.subject_id)])
+	check(hunt.witness_ledger.in_flight().any(func(report: Dictionary): return int(report.sequence) == int(cut_event.sequence)),
+		"the physical witness is carrying a distinct report before they die")
+	cut_witness.rig.execute()
+	hunt._kill_encounter_actor(hunt.encounter_actors.find(cut_witness), "witness_silenced")
+	hunt.witness_ledger.tick(WitnessLedger.REPORT_DELAY * 2.0)
+	check(not hunt.witness_ledger.faction_knows("gate_lanterns", int(cut_event.sequence)),
+		"killing the physical witness cuts their report before the faction can learn it")
+	check(WorldHistory.events.any(func(event: Dictionary):
+		return str(event.get("type", "")) == "report_cut" and str((event.get("details", {}) as Dictionary).get("subject", "")) == str(cut_witness.subject_id)),
+		"the silencing is attributable in history rather than silently deleting testimony")
+
 	# One incident is memory, not an enemy printer. Repeated distinct witnessed
 	# acts cross the real threshold and should finally put the holder's own people
 	# onto the road through the ordinary encounter pipeline.

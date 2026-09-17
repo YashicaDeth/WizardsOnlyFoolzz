@@ -4414,7 +4414,16 @@ The last rung. Fifteen statements that are true of sneaking and the law when thi
       anatomy, AI, wounds, loot and resolution. Re-verified with
       `local_law_test.gd` (26 checks) and `hunt_local_law_integration_test.gd`
       (13 production-scene checks).
-- [ ] **AE10.10** `v10` Witnesses can be wrong, bought or silenced
+- [ ] **AE10.10** `v10` Witnesses can be wrong, bought or silenced — the
+      silenced third now works in production rather than only in
+      `witness_test.gd`: every real Hunt death converges on
+      `_kill_encounter_actor()`, which cuts that body's pending testimony before
+      the report delay can deliver it. The true event remains in world history
+      and an attributable `report_cut` is added; the holder never learns the
+      carried account. `hunt_local_law_integration_test.gd` proves this through
+      a live anatomical witness and physical death. Retelling distortion is the
+      safe foundation for “wrong”; a costed, playable way to buy testimony is
+      still missing, so this broader item remains honestly open.
 - [x] **AE10.11** `v10` The tunnels are where the satellite cannot see you —
       `SignalField.DEAD_ZONES` now closes the complete observation loop: MAP
       keeps only remembered chart ink, sleeps the orbital camera, hides the

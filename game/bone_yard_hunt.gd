@@ -5018,6 +5018,13 @@ func _kill_encounter_actor(index: int, cause: String) -> void:
 	misfire_director.resolve(str(actor.get("encounter_id", "")), "defeated")
 	var node := actor.node as Node3D
 	var anatomy: Node = actor.anatomy as Node
+	# F1.3 / AE10.10. A report in this live scene belongs to the body carrying
+	# it. The ledger has always known how to cut that report, but production
+	# deaths never told it a witness had died, so their testimony arrived after
+	# their corpse hit the floor. Any real death route converges here: execution,
+	# bleed-out or ordinary combat all silence exactly this subject before law can
+	# tick the report home.
+	witness_ledger.silence(str(actor.subject_id))
 	# AE.1 / AE.4. Death, as the world's record rather than the scene's. The
 	# status string is read off `RivalRegistry.DEAD` rather than typed here, so
 	# the file that decides what "dead" means and the record that says somebody
