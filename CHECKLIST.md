@@ -384,7 +384,7 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B6.1** Severing exists on the rig with thrown limbs, stumps and exposed bone, driven by the strike direction~~
 - [x] ~~**B6.2** Sever from a directional blow crossing a limb threshold *mid-fight*~~
 - [x] ~~**B6.3** The fight continues with them still in it, fighting worse~~
-- [x] ~~**B6.4** The severed limb is a chunk: pick it up, carry it, sell it, hit someone with it~~
+- [x] ~~**B6.4** The severed limb is a chunk: pick it up, carry it, sell it, hit someone with it~~ — selling now batches inventory removal, wallet payment and the market-readable `carried_part_sold` fact behind one identified player-action receipt; `chunk_test.gd` verifies the transaction closes
 - [x] ~~**B6.5** `v2` Reciprocity — the player is dismembered and keeps playing~~
   - v1 — losing a limb ends the fight
   - v2 — the fight continues in both directions, and the stump bleeds on everyone's clock
@@ -2870,8 +2870,8 @@ ties it together into a reason to get up in the morning.
 - [x] **R1.1** One currency with a name and a reason — rust scrip, and who issues it — `carry.gd`'s `currency_reason()` reads CellOutz's own real doctrine ("ownership, downward") as the reason, rather than an invented lore line
 - [x] **R1.2** What a body is worth, by part, condition and whose it was — audited: `sale_value()` already priced all three (base by kind, `condition`/`freshness`, and `stolen` heat); simply never credited here
 - [x] **R1.3** Buyers with their own appetites, so a market is a set of people and not a price — `FACTION_APPETITES`: the Choir pays more for an organ, Vanity Row pays more for a cybernetic, drawn from what each faction already is rather than an invented preference table
-- [x] **R1.4** Debt you can be in, since `debt_to_player` already runs the other way — `borrow()`/`repay()`/`debt_to()`: real scrip added to the wallet against a real, named debt to a real faction; repaying is capped at what is actually owed and what is actually in the wallet
-- [x] **R1.5** Prices move with what the world has been through — `_market_glut()` reads real recent `carried_part_sold` history: the more of a kind that has actually sold, the less the next one is worth, specific to that kind rather than a global crash. Covered by `tests/money_test.gd` (16 checks)
+- [x] **R1.4** Debt you can be in, since `debt_to_player` already runs the other way — `borrow()`/`repay()`/`debt_to()`: real scrip added to the wallet against a real, named debt to a real faction; repaying is capped at what is actually owed and what is actually in the wallet. Borrowing and repayment now batch their wallet/debt mutation with one compact, identified `PlayerActionLedger` receipt
+- [x] **R1.5** Prices move with what the world has been through — `_market_glut()` reads real recent `carried_part_sold` history: the more of a kind that has actually sold, the less the next one is worth, specific to that kind rather than a global crash. Sales preserve that public event while routing the mutation and receipt through one ledger transaction. Covered by `tests/money_test.gd` (19 checks)
 
 
 ### R v10 — the final pass

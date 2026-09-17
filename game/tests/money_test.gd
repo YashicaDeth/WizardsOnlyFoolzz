@@ -62,10 +62,14 @@ func _ready() -> void:
 	check(bool(borrowed.get("ok", false)), "borrowing succeeds")
 	check(int(WorldHistory.subject("inventory").get("rust_scrip", 0)) == wallet_before + 50, "and the wallet actually grows by the real amount")
 	check(carry.debt_to("choir_of_marrow") == 50, "and the debt is real and owed to the actual lender")
+	check(PlayerActionLedger.count("player_borrowed") == 1, "the loan is summarized as one durable player act")
 
 	var over_repay := carry.repay(1000, "choir_of_marrow")
 	check(bool(over_repay.get("ok", false)) and int(over_repay.get("paid", -1)) == 50, "repaying more than owed only pays what is actually owed")
 	check(carry.debt_to("choir_of_marrow") == 0, "and the debt actually clears")
+	var repayment_events := WorldHistory.events.filter(func(event: Dictionary): return str(event.get("type", "")) == "player_repaid")
+	check(repayment_events.size() == 1 and str((repayment_events[0].get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_"), "wallet, debt and repayment share one identified action receipt")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "economy actions leave no open ledger transaction")
 	var nothing_owed := carry.repay(10, "choir_of_marrow")
 	check(not bool(nothing_owed.get("ok", false)), "repaying a cleared debt is refused, not a silent no-op")
 

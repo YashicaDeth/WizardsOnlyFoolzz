@@ -100,6 +100,8 @@ func _ready() -> void:
 	var sold := carry.sell(0)
 	check(quoted > 0 and int(sold.get("price", 0)) == quoted, "a whole limb receives a real condition-and-freshness sale price")
 	check(int(WorldHistory.subject("inventory").get("rust_scrip", 0)) == quoted, "selling the limb pays into the persistent rust-scrip wallet")
+	var sale_events := WorldHistory.events.filter(func(event: Dictionary): return str(event.get("type", "")) == "carried_part_sold")
+	check(sale_events.size() == 1 and str((sale_events[0].get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_") and int(WorldHistory.get("_ledger_batch_depth")) == 0, "the sale mutation and public market fact share one closed player-action receipt")
 
 	# --- the body remembers how far it was opened ----------------------------
 	check(rig.exposed_layer("torso") >= GoreChunks.Layer.MUSCLE, "the zone records its deepest breach (%d)" % rig.exposed_layer("torso"))

@@ -23,6 +23,7 @@ extends RefCounted
 
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 const AnatomyComponent := preload("res://systems/anatomy_component.gd")
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 const SPOIL_SECONDS := 420.0
 ## Kilograms a body will carry before it starts costing movement. Deliberately
@@ -362,6 +363,7 @@ func sell(index: int, buyer_faction: String = "") -> Dictionary:
 	items.remove_at(index)
 	var inventory := WorldHistory.subject("inventory")
 	var wallet := int(inventory.get("rust_scrip", 0)) + price
+	WorldHistory.begin_ledger_batch()
 	# A discovered bug, not a design choice: `update_subject`'s own third
 	# argument already calls `record_event(event_type, ...)` once by itself
 	# (see its definition in `world_history.gd`) — passing "carried_part_sold"
@@ -370,7 +372,8 @@ func sell(index: int, buyer_faction: String = "") -> Dictionary:
 	# within a window, so every real sale has been gluting the market at
 	# double the rate R1.5 actually intended since the day it was written.
 	WorldHistory.update_subject("inventory", {"items": items.duplicate(true), "rust_scrip": wallet}, "carry_changed")
-	WorldHistory.record_event("carried_part_sold", {"part": item.duplicate(true), "price": price, "currency": "rust_scrip", "buyer_faction": buyer_faction})
+	PLAYER_ACTION_LEDGER.record("carried_part_sold", {"part": item.duplicate(true), "price": price, "currency": "rust_scrip", "buyer_faction": buyer_faction})
+	WorldHistory.commit_ledger_batch()
 	return {"item": item, "price": price, "wallet": wallet, "faction": buyer_faction, "disposition": WorldHistory.faction_disposition(buyer_faction, WorldHistory.subject("player")) if not buyer_faction.is_empty() else ""}
 
 
@@ -478,11 +481,13 @@ func borrow(amount: int, lender_faction: String) -> Dictionary:
 	var anchors: Dictionary = (inventory.get("player_debt_at_minute", {}) as Dictionary).duplicate(true)
 	anchors[lender_faction] = WorldClock.minutes()
 	var wallet := int(inventory.get("rust_scrip", 0)) + amount
+	WorldHistory.begin_ledger_batch()
 	# The same double-record `sell()` had: `update_subject`'s own third
 	# argument already writes one event by itself, so repeating the type in
 	# the explicit call below wrote every loan twice into WorldHistory.
 	WorldHistory.update_subject("inventory", {"rust_scrip": wallet, "player_debt": debts, "player_debt_at_minute": anchors}, "carry_changed")
-	WorldHistory.record_event("player_borrowed", {"lender_faction": lender_faction, "amount": amount, "owed_after": debts[lender_faction]})
+	PLAYER_ACTION_LEDGER.record("player_borrowed", {"lender_faction": lender_faction, "amount": amount, "owed_after": debts[lender_faction]})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "wallet": wallet, "owed": int(debts[lender_faction])}
 
 
@@ -501,8 +506,10 @@ func repay(amount: int, lender_faction: String) -> Dictionary:
 	debts[lender_faction] = owed - paid
 	var anchors: Dictionary = (inventory.get("player_debt_at_minute", {}) as Dictionary).duplicate(true)
 	anchors[lender_faction] = WorldClock.minutes()
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.update_subject("inventory", {"rust_scrip": wallet - paid, "player_debt": debts, "player_debt_at_minute": anchors}, "carry_changed")
-	WorldHistory.record_event("player_repaid", {"lender_faction": lender_faction, "amount": paid, "owed_after": debts[lender_faction]})
+	PLAYER_ACTION_LEDGER.record("player_repaid", {"lender_faction": lender_faction, "amount": paid, "owed_after": debts[lender_faction]})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "paid": paid, "owed": int(debts[lender_faction]), "wallet": wallet - paid}
 
 
@@ -515,8 +522,13 @@ func repay(amount: int, lender_faction: String) -> Dictionary:
 func borrow_against(amount: int, lender_faction: String, item_index: int) -> Dictionary:
 	if item_index < 0 or item_index >= items.size():
 		return {"ok": false, "reason": "NOTHING TO SECURE IT AGAINST"}
+	# The loan and the lien are one agreement. `borrow()` owns the ordinary
+	# loan receipt; this outer transaction keeps its nested batch open until
+	# the exact collateral has been persisted and named as well.
+	WorldHistory.begin_ledger_batch()
 	var result := borrow(amount, lender_faction)
 	if not bool(result.get("ok", false)):
+		WorldHistory.commit_ledger_batch()
 		return result
 	var item: Dictionary = items[item_index]
 	item["lien"] = "%s // %d %s" % [str(WorldHistory.subject(lender_faction).get("name", lender_faction)).to_upper(), amount, CURRENCY]
@@ -524,6 +536,7 @@ func borrow_against(amount: int, lender_faction: String, item_index: int) -> Dic
 	items[item_index] = item
 	save_to_history()
 	WorldHistory.record_event("bank_lien_written", {"lender_faction": lender_faction, "amount": amount, "item": item.duplicate(true)})
+	WorldHistory.commit_ledger_batch()
 	result["item"] = item
 	return result
 
