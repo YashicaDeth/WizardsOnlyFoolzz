@@ -64,15 +64,25 @@ static func regard(entity_id: String, subject_id: String = "player") -> Dictiona
 		return entity
 	var since := int(entity.get("washed_at_sequence", -1))
 	var count := 0
+	var counted_acts: Dictionary = {}
 	for event in WorldHistory.events:
 		if int(event.get("sequence", 0)) <= since:
 			continue
 		if WorldHistory.event_actor(event) != subject_id:
 			continue
 		var event_type := str(event.get("type", ""))
-		var outcome := str((event.get("details", {}) as Dictionary).get("outcome", ""))
+		var details: Dictionary = event.get("details", {}) as Dictionary
+		var outcome := str(details.get("outcome", ""))
 		if MERCY_EVENTS.has(event_type) or (event_type == "npc_resolution" and MERCY_OUTCOMES.has(outcome)):
-			count += 1
+			# Production sparing writes a subject state change (`npc_spared`) and
+			# its canonical witnessed act (`npc_resolution`). Those are two rows
+			# describing one person spared, not two mercies. Prefer the exact
+			# subject as the act key; events without one remain distinct acts.
+			var mercy_subject_id := str(details.get("subject_id", ""))
+			var act_key := "subject:%s" % mercy_subject_id if not mercy_subject_id.is_empty() else "event:%d" % int(event.get("sequence", 0))
+			if not counted_acts.has(act_key):
+				counted_acts[act_key] = true
+				count += 1
 	var threshold := int((ENTITIES.get(entity_id, {}) as Dictionary).get("threshold", 4))
 	if count < threshold:
 		return entity

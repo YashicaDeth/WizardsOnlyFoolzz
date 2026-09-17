@@ -43,6 +43,15 @@ func _ready() -> void:
 	AscentEntities.regard("clear_frequency")
 	check(bool(WorldHistory.subject("clear_frequency").get("has_noticed", false)), "the third act of mercy earns its attention")
 
+	# The live Hunt writes one state-change event and one canonical resolution
+	# for the same spared person. Attention counts the person once, not both rows.
+	WorldHistory.amend_subject("clear_frequency", {"has_noticed": false, "washed_at_sequence": WorldHistory.next_sequence - 1})
+	WorldHistory.record_event("npc_spared", {"subject_id": "same_person", "actor": "player"})
+	WorldHistory.record_event("npc_resolution", {"subject_id": "same_person", "outcome": "spare", "actor": "player"})
+	AscentEntities.regard("clear_frequency")
+	check(not bool(WorldHistory.subject("clear_frequency").get("has_noticed", false)), "duplicate ledger rows for one spared person count as one mercy, not two")
+	WorldHistory.amend_subject("clear_frequency", {"has_noticed": true, "washed_at_sequence": -1})
+
 	# --- washing is refused before notice, real once granted ----------------
 	var refused := AscentEntities.wash("still_ledger")
 	check(not bool(refused.get("ok", false)), "The Still Ledger refuses — it has not noticed you")

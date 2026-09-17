@@ -109,6 +109,35 @@ static func active() -> Array[Dictionary]:
 	return _contracts_with_status("active")
 
 
+## The first organic market edge. Once an ascent entity has really noticed the
+## player, it and the current CROWN holder see one another as reciprocal signal
+## obstructions. The names and office are read fresh from the world; succession
+## changes who posts and who is targeted without a second authored quest. One
+## open pair per relationship keeps repeated mercy checks from printing offers.
+static func publish_opposition(ascent_id: String) -> Array[Dictionary]:
+	var ascent := WorldHistory.subject(ascent_id)
+	if str(ascent.get("kind", "")) != "entity" or not bool(ascent.get("has_noticed", false)):
+		return []
+	var crown_id := TheFourHorsemen.current_reign()
+	var crown := WorldHistory.subject(crown_id)
+	if crown_id.is_empty() or crown.is_empty():
+		return []
+	var published: Array[Dictionary] = []
+	if not _has_open_contract(ascent_id, crown_id, "frequency"):
+		published.append(publish(
+			ascent_id, crown_id, "frequency",
+			"%s holds CellOutz's descending carrier across %s's frequency." % [str(crown.get("name", crown_id)), str(ascent.get("name", ascent_id))],
+			"blood", 250.0,
+		))
+	if not _has_open_contract(crown_id, ascent_id, "aura"):
+		published.append(publish(
+			crown_id, ascent_id, "aura",
+			"%s's noticed aura lifts subjects beyond %s's signal control." % [str(ascent.get("name", ascent_id)), str(crown.get("name", crown_id))],
+			"standing", 5.0,
+		))
+	return published.filter(func(row: Dictionary): return bool(row.get("ok", false)))
+
+
 static func _contracts_with_status(status: String) -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
 	for subject_id in WorldHistory.all_subjects():
@@ -118,6 +147,18 @@ static func _contracts_with_status(status: String) -> Array[Dictionary]:
 		subject["id"] = str(subject_id)
 		rows.append(subject)
 	return rows
+
+
+static func _has_open_contract(patron_id: String, target_id: String, block_kind: String) -> bool:
+	for subject_id in WorldHistory.all_subjects():
+		var subject := WorldHistory.subject(str(subject_id))
+		if str(subject.get("job_class", "")) != "frequency_bounty":
+			continue
+		if str(subject.get("status", "")) not in ["offered", "active"]:
+			continue
+		if str(subject.get("patron_id", "")) == patron_id and str(subject.get("target_id", "")) == target_id and str(subject.get("block_kind", "")) == block_kind:
+			return true
+	return false
 
 
 static func _patron_side(patron_id: String, patron: Dictionary) -> String:

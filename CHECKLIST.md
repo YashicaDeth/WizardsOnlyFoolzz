@@ -1128,15 +1128,19 @@ The last rung. Fifteen statements that are true of the hunt when this game is fi
       Ashbloom boundary there is no local jurisdiction. Covered by
       `local_law_test.gd`, `ashbloom_holdings_test.gd` and the production
       `hunt_local_law_integration_test.gd`.
-- [ ] **F10.8** `v10` Bounty work for the top angels or the top demons is the job market
-      — foundation landed 2026-09-18: `HuntContracts` admits only a noticed
+- [x] **F10.8** `v10` Bounty work for the top angels or the top demons is the job market
+      — `HuntContracts` admits only a noticed
       ascent entity or the current living CellOutz CROWN holder as patron, and
       the physical INDEX now has a WORK leaf listing every persisted offer,
       active contract and completed contract. The page makes patron, exact
       target, obstruction and body/standing price pointable before acceptance
       (`captures/hunt_contract_work.png`; 8/8 INDEX integration checks). This
-      remains open until a production world event organically publishes the
-      first offer rather than a caller or capture fixture doing so.
+      is now organic in the production Hunt: the third distinct spared or
+      recruited body makes the Clear Frequency notice the player, then that
+      entity and the current CROWN holder publish reciprocal work against one
+      another's frequency/aura through the same market. The production test
+      drives three real anatomy bodies through `_resolve_downed()` and proves
+      timing, exact dynamic patrons/targets and non-duplication in 7 checks.
 - [x] **F10.9** `v10` A contract is consumable and costs something to take —
       `HuntContracts` stores each offer as a one-use WorldHistory job. Taking
       it first pays through `Boons.pay`, so blood, an organ, a limb or standing
@@ -5519,9 +5523,9 @@ is where power is, the tree is which way you went.** Two charts, one document.
 
 ### AR2 — Jobs and contracts
 - [ ] **AR2.1** A real economy with jobs, because the elites cannot die and war is pointless
-- [ ] **AR2.2** Bounty work for the top angels or the top demons — the shared
-      persisted market, top-patron gates and operable WORK page exist; see
-      F10.8. Still open pending organic production publication.
+- [x] **AR2.2** Bounty work for the top angels or the top demons — the shared
+      persisted market, top-patron gates and operable WORK page are fed by
+      earned production notice; see F10.8.
 - [x] **AR2.3** Targets are whoever is blocking a frequency or an aura — not
       "bad guys" — a publisher must name `frequency` or `aura`, an exact
       existing subject and a non-empty obstruction. `HuntContracts` has no
@@ -5543,9 +5547,9 @@ The last rung. Fifteen statements that are true of the tree and the work when th
 - [ ] **AR10.6** `v10` A path taken shows on the tree
 - [ ] **AR10.7** `v10` Paths open at chapters, never at levels
 - [ ] **AR10.8** `v10` The economy has jobs because the elites cannot die
-- [ ] **AR10.9** `v10` Bounty work for the top angels or the top demons — the
-      operable INDEX market exists and both patron sides pass the system tests;
-      production publication is the remaining seam (F10.8).
+- [x] **AR10.9** `v10` Bounty work for the top angels or the top demons — the
+      operable INDEX market and both patron sides are reached from three real
+      Hunt mercy resolutions rather than a fixture; see F10.8.
 - [x] **AR10.10** `v10` Targets are whoever blocks a frequency or an aura —
       enforced at contract publication, not left to authored quest wording;
       see AR2.3 and `hunt_contracts_test.gd`.

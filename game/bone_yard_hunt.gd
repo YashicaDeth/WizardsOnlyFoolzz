@@ -5281,8 +5281,23 @@ func _resolve_downed(outcome: String) -> void:
 		if label != null:
 			label.text = "%s / %s" % [str(actor.display_name).to_upper(), str(actor.state).to_upper()]
 		witness_ledger.record("npc_resolution", resolution_details, witnesses)
+	if outcome in ["spare", "recruit"]:
+		_refresh_ascent_job_market()
 	prompt.text = "DISPOSITION RECORDED / " + outcome.to_upper()
 	attack_cooldown = 0.72
+
+
+## Mercy already has one canonical production fact above: npc_resolution. Ask
+## each existing ascent entity to read that same ledger, then open the
+## reciprocal top-tier market only on the transition from unnoticed to noticed.
+## Nothing is awarded per button press and repeated checks cannot duplicate an
+## offer; HuntContracts reads the current CROWN holder fresh after succession.
+func _refresh_ascent_job_market() -> void:
+	for entity_id in AscentEntities.ENTITIES:
+		var before := bool(WorldHistory.subject(str(entity_id)).get("has_noticed", false))
+		var entity := AscentEntities.regard(str(entity_id), "player")
+		if not before and bool(entity.get("has_noticed", false)):
+			HuntContracts.publish_opposition(str(entity_id))
 
 
 func _voice_capture(holding: bool) -> void:
