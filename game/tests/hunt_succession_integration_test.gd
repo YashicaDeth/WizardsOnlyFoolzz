@@ -69,6 +69,8 @@ func _ready() -> void:
 		"the production anatomical actor dies through the ordinary Hunt route")
 	check(WorldHistory.event_count("faction_post_vacated") == 1,
 		"that physical death opens the holder's actual saved post")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")),
+		"death, loot and the opened post close as one physical outcome")
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var heir := WorldHistory.subject("succession_heir")

@@ -3957,7 +3957,8 @@ func _use_prosthetic_surge() -> void:
 	if stamina < 35.0:
 		return
 	stamina -= 35.0
-	WorldHistory.record_event("prosthetic_surge_used", {"implant": "salvaged torque arm", "location": HUNT_LOCATION})
+	WorldHistory.begin_ledger_batch()
+	PLAYER_ACTION_LEDGER.record("prosthetic_surge_used", {"implant": "salvaged torque arm", "location": HUNT_LOCATION})
 	if enemy != null and not enemy_retreating and player.distance_to(enemy.global_position) < 7.0:
 		# O3.1. Used to subtract a flat 30 with no wound at all — the one
 		# attack in the fight that hit nothing you could ever see on her body.
@@ -3965,13 +3966,16 @@ func _use_prosthetic_surge() -> void:
 			var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 			var wound := enemy_rig.hit_at(enemy.global_position + Vector3.UP * 1.0, 30.0, 34.0, "blunt", look)
 			WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
-			PLAYER_ACTION_LEDGER.record("melee_body_hit", {"target": CAST.id_for(CAPTAIN_SLOT), "body_zone": str(wound.get("zone", "torso")), "damage": 30, "location": HUNT_LOCATION})
+			# The surge is the act; this impact remains a physical consequence,
+			# just as a firearm impact does not counterfeit another trigger pull.
+			WorldHistory.record_event("melee_body_hit", {"target": CAST.id_for(CAPTAIN_SLOT), "body_zone": str(wound.get("zone", "torso")), "damage": 30, "location": HUNT_LOCATION})
 			enemy_health = roundi(float(enemy_health_max) * _rig_health_ratio(enemy_rig))
 		else:
 			enemy_health = maxi(0, enemy_health - 30)
 		_spawn_blood(enemy.global_position + Vector3(0, 1.0, 0), 30)
 		if enemy_health <= 0:
 			_rival_retreats("Mara's arm breaks. Her crew drag her into the tunnel.")
+	WorldHistory.commit_ledger_batch()
 
 
 func _interact() -> void:
@@ -4618,10 +4622,12 @@ func _begin_canonical_encounter() -> void:
 	mara_encounter_number = 2 if bool(mara.get("is_rival", false)) and not (mara.get("rival_adaptation", {}) as Dictionary).is_empty() else 1
 	enemy_health_max = 150 if mara_encounter_number == 2 else 100
 	enemy_health = enemy_health_max
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"status": "hunting", "encounter_number": mara_encounter_number, "memory": "Mara returned rebuilt to settle the Bone Yard debt." if mara_encounter_number == 2 else "Mara came to settle the Bone Yard debt."}, "hunt_arc_started")
 	var offscreen_hunt := OFFSCREEN_HUNTS.start(CAST.id_for(CAPTAIN_SLOT), "player", HUNT_LOCATION)
 	WorldHistory.record_event("canonical_hunt_encounter_started", {"hunter": "player", "target": CAST.id_for(CAPTAIN_SLOT), "location": HUNT_LOCATION, "encounter_number": mara_encounter_number})
 	HUNT_MEMORY.remember(CAST.id_for(CAPTAIN_SLOT), "canonical_rival")
+	WorldHistory.commit_ledger_batch()
 	if mara_encounter_number == 2:
 		_spawn_ashline_reinforcements()
 		prompt.text = "SECOND HUNT // %s: INDUSTRIAL ARM, REBUILT WRECKER, TWO ASHLINE KNIVES." % _captain_name()
@@ -5097,6 +5103,7 @@ func _move_actor_on_route(actor: Dictionary, destination: Vector3, delta: float)
 func _kill_encounter_actor(index: int, cause: String) -> void:
 	if index < 0 or index >= encounter_actors.size():
 		return
+	WorldHistory.begin_ledger_batch()
 	var actor: Dictionary = encounter_actors[index]
 	actor.dead = true
 	misfire_director.resolve(str(actor.get("encounter_id", "")), "defeated")
@@ -5133,6 +5140,7 @@ func _kill_encounter_actor(index: int, cause: String) -> void:
 		"node": node, "rig": actor.get("rig"),
 	})
 	encounter_actors.remove_at(index)
+	WorldHistory.commit_ledger_batch()
 
 
 func _fill_faction_vacancy(faction_id: String, rank: String, fallen_id: String = "") -> void:
@@ -5367,6 +5375,7 @@ func _rival_retreats(message: String) -> void:
 		return
 	enemy_retreating = true
 	enemy.visible = false
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"status": "escaped"}, "rival_survived_hunt")
 	WorldHistory.record_event("hunt_arc_first_beat_complete", {"target": CAST.id_for(CAPTAIN_SLOT), "outcome": "escaped", "location": HUNT_LOCATION})
 	RIVAL_REGISTRY.consider(CAST.id_for(CAPTAIN_SLOT))
@@ -5377,6 +5386,7 @@ func _rival_retreats(message: String) -> void:
 		"next": ["outer_ashbloom_road", "ashline_second_hunt", "board_contracts"],
 	}):
 		demo_wall.open_wall()
+	WorldHistory.commit_ledger_batch()
 
 
 func _leave_demo_wall() -> void:

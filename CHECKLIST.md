@@ -2474,7 +2474,9 @@ what that is rather than fixing another symptom.
       combat response, maiming, death/loot and Mara's possible retreat commit in
       one nested-safe batch for either a named-rival swing or a roaming body.
       `rival_body_health_test.gd` and `combat_integration_test.gd` assert the
-      transactions close after real hits.
+      transactions close after real hits. The prosthetic surge is likewise one
+      `prosthetic_surge_used` action; its `melee_body_hit` remains a world
+      consequence rather than counterfeiting a second player input.
 - [x] **O3.2** A damaged limb changes what that person can do, and now shows it — arms hang, legs trail, the body leans off the bad side
 - [x] ~~**O3.3** Grappling connects to it — hold, force, rob, recruit~~ Rob and
       recruit already did (F7.2 lets you rob somebody you are holding; F7's
@@ -2797,7 +2799,7 @@ The part that makes it a demo rather than a trial. It is a designed moment, in
 the game's own voice, not a fade to a store page.
 - [x] **P3.1** The game stops at an authored point, deliberately and visibly — the Hunt freezes under a full-frame `DemoWall` only after its first real story victory
 - [x] **P3.2** The stop is in the register — CellOutz closes the demonstration account with a final invoice and bills the balance as `THE REST OF THE GAME`
-- [x] **P3.3** It arrives *after* a win, not in the middle of one — the only hook is `_rival_retreats()`, after `hunt_arc_first_beat_complete` records that the Ashline captain was forced from the field
+- [x] **P3.3** It arrives *after* a win, not in the middle of one — the only hook is `_rival_retreats()`, after `hunt_arc_first_beat_complete` records that the Ashline captain was forced from the field. Captain status, completed hunt beat, emergent rivalry and the demo ending now close as one nested-safe retreat outcome (`demo_route_test.gd`).
 - [x] **P3.4** What the player loses by stopping is made concrete: the invoice names the outer Ashbloom road, the captain's rebuilt second hunt, and Board/Wire contracts
 - [x] **P3.5** The stop is written into WorldHistory like any other ending — `complete_demo()` writes `demo_run.status = ended`, the ending id, and one idempotent `demo_ending_reached` event to the isolated demo ledger; the ended state and canonical event persist in one transaction without an intermediate active record
 

@@ -41,11 +41,17 @@ func _ready() -> void:
 
 	# --- the prosthetic surge now wounds her too, instead of a silent -30 --
 	var wounds_before: int = hunt.enemy_rig.anatomy.wounds.size()
+	var surge_receipts_before := PlayerActionLedger.count("prosthetic_surge_used")
+	var melee_receipts_before := PlayerActionLedger.count("melee_body_hit")
+	var melee_events_before := WorldHistory.event_count("melee_body_hit")
 	hunt.stamina = 100.0
 	hunt._use_prosthetic_surge()
 	check(hunt.enemy_rig.anatomy.wounds.size() > wounds_before, "the prosthetic surge leaves a wound on her body now")
 	var expected_after_surge: int = roundi(float(hunt.enemy_health_max) * hunt._rig_health_ratio(hunt.enemy_rig))
 	check(hunt.enemy_health == expected_after_surge, "and enemy_health still reads off the real ratio afterward")
+	check(PlayerActionLedger.count("prosthetic_surge_used") == surge_receipts_before + 1 and PlayerActionLedger.count("melee_body_hit") == melee_receipts_before and WorldHistory.event_count("melee_body_hit") == melee_events_before + 1,
+		"the surge is one player action and its landed wound is one consequence, not a second act")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")), "surge, anatomy and any rival outcome close together")
 
 	# --- diminishing returns on a zone that is already gone ----------------
 	hunt.enemy_rig.anatomy.zones["left_arm"]["health"] = 0.0
