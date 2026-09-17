@@ -76,6 +76,10 @@ func _ready() -> void:
 	hunt.call("_update_perception", 0.1)
 	check(not bool(actor.get("tracking_light", true)), "the quiet Index does not broadcast at twenty-four metres")
 	hunt.handheld.set_mode("MAP")
+	# I3.2 keeps the old physical page live until the shutter reaches full
+	# occlusion.  The emitted-light contract follows what the glass is actually
+	# displaying, not the requested destination one frame early.
+	hunt.handheld._advance_page_transition(hunt.handheld.PAGE_TRANSITION_SECONDS)
 	hunt.call("_update_perception", 0.1)
 	check(bool(actor.get("tracking_light", false)), "opening the satellite map at the same place gives the hunter a trail")
 

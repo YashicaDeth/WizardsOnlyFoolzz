@@ -637,11 +637,31 @@ Greg, plainly: *"the entire blackmirror gui needs work"*. Nine passes on what th
   - Second narrow seam: the Ashbloom calendar and live hour are chassis registration rather than app content, so every mode carries the same date in the same place. `handheld_aperture_test.gd` proves all seven modes preserve it; internal interaction grammar remains open.
 - [x] ~~**C10.2** `v10` It is legible in the dark it now creates, which nothing before v4 had to be~~ The six apps now rise through one device-owned phosphor reading bed in `black_mirror.gd`: an inset luminous surface suppresses the holder's reflection only beneath the working aperture while the side gutters remain black, reflective glass. Bone ink, moss instruments and copper registration have explicit contrast floors against that shared surface, rather than each page inventing a brighter box. `tests/handheld_dark_legibility_test.gd` checks the colour contract and all six modes' use of the same surface; `captures/c10_2_dark_{index,map,wire,radio,carry,ritual}.png` inspected at 1280x720.
 
-- [ ] **C10.3** `v10` Its battery is a real resource with a real floor
-- [ ] **C10.4** `v10` Raising it occupies a hand and the game never forgets that
-- [ ] **C10.5** `v10` Its glow is what anything hunting you sees first
-- [ ] **C10.6** `v10` It has a back, a jester on it, and a condition that shows on the shell
-- [ ] **C10.7** `v10` Every page reads correctly in the dark it creates
+- [x] **C10.3** `v10` Its battery is a real resource with a real floor — C5.1/C5.2
+      are the finished mechanism rather than a prototype: charge drains only
+      while the physical device is raised, the satellite page costs twice the
+      INDEX draw, zero charge extinguishes the screen and world light, and the
+      exact remainder survives reload (`handheld_battery_test`, 17 checks).
+- [x] **C10.4** `v10` Raising it occupies a hand and the game never forgets that —
+      the same `raised` value that moves and lights the object rejects attacks
+      before ammo, windup or cooldown are spent; lowering it restores the hand
+      only when the movement actually clears the threshold
+      (`handheld_busy_hand_test`, `handheld_pocket_light_test`).
+- [x] **C10.5** `v10` Its glow is what anything hunting you sees first — the live
+      perception pass resolves the emitted source separately from the body, so
+      a clear raised screen at night draws pursuit at ranges where its holder
+      remains unseen; walls, an empty cell and pocketing it all break that trace
+      (`perception_integration_test`, 13 checks).
+- [x] **C10.6** `v10` It has a back, a jester on it, and a condition that shows on
+      the shell — holding O turns the one continuous object through its edge to
+      the recessed rear, where finish loss, plate separation, broken battery
+      ties and impact-position dent rings read the persisted device state
+      (`handheld_back_test`, 15 checks; C9.1/C9.2).
+- [x] **C10.7** `v10` Every page reads correctly in the dark it creates — all
+      seven apps inherit the same glass aperture, phosphor reading bed and
+      device-owned ink contrast floors instead of page-local bright boxes;
+      hosted and native modes are covered together by
+      `handheld_dark_legibility_test` and the six inspected C10.2 captures.
 - [x] ~~**C10.8** `v10` The device wears from what you have actually done to it~~ Two real player actions now reach the existing persistent wear mechanism. A wound taken while the Black Mirror is physically raised reduces its condition in proportion to the incoming damage and projects the attacker's world position onto the glass, so the new crack begins on the side the blow arrived from; the identical wound while it is pocketed cannot touch it. Deliberately dropping the device applies a smaller lower-edge impact before possession leaves, and the dropped payload therefore belongs to the same newly damaged serial rather than a replacement. Both causes enter `wear_log`, persist, and continue to drive the front cracks and rear shell degradation already built. `tests/handheld_live_wear_test.gd` (9 checks), `handheld_drop_test.gd`, `device_possession_test.gd`, and `handheld_impact_test.gd` pass headless; `captures/c10_8_live_device_wear.png` was produced through `_wound_player()` in the real Hunt scene and visually inspected at 1280x720
 - [ ] **C10.9** `v10` Nothing on it is a list of text in a box
 - [ ] **C10.10** `v10` It is the Wire, the map, the carry and the radio without four designs
