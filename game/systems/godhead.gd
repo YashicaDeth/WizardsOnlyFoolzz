@@ -1,6 +1,8 @@
 class_name Godhead
 extends RefCounted
 
+const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
+
 ## AQ. The one true godhead.
 ##
 ## Greg: *"the one true godhead, being commenting and enslaving us all in its own
@@ -236,12 +238,15 @@ static func heed(lesson_id: String) -> bool:
 		return false
 	var taken: Array = _heeded().duplicate()
 	taken.append({"id": lesson_id, "costs": float(lesson["costs"])})
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.set_flag(HEEDED_KEY, taken)
-	WorldHistory.record_event("godhead_lesson_heeded", {
+	PlayerActionLedger.record("godhead_lesson_heeded", {
+		"actor": "player",
 		"lesson": lesson_id,
 		"teaches": str(lesson["teaches"]),
 		"attention_after": attention(),
 	})
+	WorldHistory.commit_ledger_batch()
 	return true
 
 
@@ -249,7 +254,7 @@ static func heed(lesson_id: String) -> bool:
 ## of who said it is its own kind of cost, and the game should let the player
 ## make that trade knowingly rather than pretending refusal is clean.
 static func refuse(lesson_id: String) -> void:
-	WorldHistory.record_event("godhead_lesson_refused", {"lesson": lesson_id})
+	PlayerActionLedger.record("godhead_lesson_refused", {"actor": "player", "lesson": lesson_id})
 
 
 static func _heeded() -> Array:
