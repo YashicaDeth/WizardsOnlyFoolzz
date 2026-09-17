@@ -66,6 +66,10 @@ func _ready() -> void:
 		"the return is durable state on that exact person")
 	check(WorldHistory.event_count("rival_returned_to_hunt") == 1,
 		"the visible return is one attributable historical fact")
+	var remembered: Array = (WorldHistory.subject("player").get("hunted_by", []) as Array)
+	check(remembered.any(func(entry: Dictionary):
+		return str(entry.get("hunter_id", "")) == subject_id and str(entry.get("reason", "")) == "returning_rival"),
+		"the player remembers the exact returning person as a hunter")
 	check(not hunt._spawn_returning_rival(),
 		"a rival already present cannot be duplicated by the maintenance loop")
 

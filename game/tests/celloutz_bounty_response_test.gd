@@ -42,6 +42,11 @@ func _ready() -> void:
 	check(first_team.all(func(actor: Dictionary):
 		return str(WorldHistory.subject(str(actor.subject_id)).get("faction_id", "")) == "celloutz"),
 		"the responders are named persistent CellOutz people, not anonymous map markers")
+	var remembered_contractors: Array = (WorldHistory.subject("player").get("hunted_by", []) as Array).filter(func(entry: Dictionary):
+		return str(entry.get("reason", "")) == "repossession_contract")
+	check(remembered_contractors.size() == 2 and first_team.all(func(actor: Dictionary):
+		return remembered_contractors.any(func(entry: Dictionary): return str(entry.get("hunter_id", "")) == str(actor.subject_id))),
+		"the player carries both exact corporate hunters, not just the bounty that sent them")
 
 	hunt._maintain_celloutz_contractors()
 	check(hunt.encounter_actors.filter(func(actor: Dictionary):

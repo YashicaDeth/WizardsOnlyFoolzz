@@ -158,6 +158,11 @@ func _ready() -> void:
 	check(enforcers.all(func(actor: Dictionary):
 		return str(WorldHistory.subject(str(actor.subject_id)).get("faction_id", "")) == "gate_lanterns" and actor.rig is BaselineHuman),
 		"both enforcers are persistent Gate Lantern people with full anatomy, not law markers")
+	var remembered_law: Array = (WorldHistory.subject("player").get("hunted_by", []) as Array).filter(func(entry: Dictionary):
+		return str(entry.get("reason", "")) == "local_law")
+	check(remembered_law.size() == 2 and enforcers.all(func(actor: Dictionary):
+		return remembered_law.any(func(entry: Dictionary): return str(entry.get("hunter_id", "")) == str(actor.subject_id))),
+		"the player remembers both exact officers as hunters rather than a generic wanted level")
 	check(str((WorldHistory.subject("ashbloom:tunnel_mouth").get("active_law_dispatch", {}) as Dictionary).get("status", "")) == "active",
 		"the active warrant persists on the holding instead of depending on the rolling event log")
 	var distance_before := (enforcers[0].node as Node3D).global_position.distance_to(at) if not enforcers.is_empty() else 0.0

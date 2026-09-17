@@ -129,6 +129,7 @@ const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 const RIVAL_REGISTRY := preload("res://systems/rival_registry.gd")
 const RIVAL_TACTICS := preload("res://systems/rival_tactics.gd")
+const HUNT_MEMORY := preload("res://systems/hunt_memory.gd")
 const DEFEAT_ROUTER := preload("res://systems/defeat_router.gd")
 const ASSET_NETWORK := preload("res://systems/asset_network.gd")
 const COMBAT_RESPONSE := preload("res://systems/combat_response.gd")
@@ -4485,6 +4486,7 @@ func _restore_local_law_team(sequence: int, place_id: String, faction_id: String
 			"faction": faction_name, "faction_id": faction_id, "law_dispatch": sequence,
 			"contract_place": place_id, "memory": "Sent to answer a witnessed wrong on %s." % str(place.get("name", place_id)),
 		})
+		HUNT_MEMORY.remember(str(spawned.subject_id), "local_law", "%s:%d" % [place_id, sequence])
 		subjects.append(str(spawned.subject_id))
 	return subjects
 
@@ -4598,6 +4600,7 @@ func _begin_canonical_encounter() -> void:
 	enemy_health = enemy_health_max
 	WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"status": "hunting", "encounter_number": mara_encounter_number, "memory": "Mara returned rebuilt to settle the Bone Yard debt." if mara_encounter_number == 2 else "Mara came to settle the Bone Yard debt."}, "hunt_arc_started")
 	WorldHistory.record_event("canonical_hunt_encounter_started", {"hunter": "player", "target": CAST.id_for(CAPTAIN_SLOT), "location": HUNT_LOCATION, "encounter_number": mara_encounter_number})
+	HUNT_MEMORY.remember(CAST.id_for(CAPTAIN_SLOT), "canonical_rival")
 	if mara_encounter_number == 2:
 		_spawn_ashline_reinforcements()
 		prompt.text = "SECOND HUNT // %s: INDUSTRIAL ARM, REBUILT WRECKER, TWO ASHLINE KNIVES." % _captain_name()
@@ -7269,6 +7272,8 @@ func _spawn_returning_rival() -> bool:
 		"variation": abs(hash(subject_id)),
 		"summary": "The same person returned with the last encounter still on their body.",
 	}, _rival_return_position(subject_id))
+	if not spawned.is_empty():
+		HUNT_MEMORY.remember(subject_id, "returning_rival")
 	return not spawned.is_empty()
 
 
@@ -7434,6 +7439,7 @@ func _restore_celloutz_team(sequence: int, area_variant: Variant) -> void:
 			"faction_id": "celloutz",
 			"contract": FACILITY_TERRITORY.REACTION_SUBJECT,
 		})
+		HUNT_MEMORY.remember(str(spawned.subject_id), "repossession_contract", "%s:%d" % [FACILITY_TERRITORY.REACTION_SUBJECT, sequence])
 
 
 ## Only roamers are recycled. A misfire's own body is part of an encounter the

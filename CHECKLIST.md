@@ -1135,7 +1135,18 @@ The last rung. Fifteen statements that are true of the hunt when this game is fi
 - [ ] **F10.12** `v10` A hunt can be inherited by somebody who never met you
 - [ ] **F10.13** `v10` Nothing in a hunt is scripted to find you
 - [ ] **F10.14** `v10` The godhead is the last hunter and it does not need to look for you
-- [ ] **F10.15** `v10` Who hunted you is the thing the next universe knows
+- [x] **F10.15** `v10` Who hunted you is the thing the next universe knows —
+      every explicit production hunt now writes the exact person, name,
+      faction, reason, contract and originating run onto the player's bounded
+      `hunted_by` memory: the canonical captain, each local-law officer, each
+      CellOutz repossession contractor and any earned rival who returns. The
+      write is deduplicated per real contract, while different people remain
+      different memories. `QuantumSaves` carries the player rather than the old
+      world, so a fresh universe retains those names even though the hunter
+      subjects themselves are gone. `hunt_memory_test.gd` proves the full
+      production-captain → restart route in 10 checks; the local-law, corporate
+      bounty and rival-return integration suites each prove their exact actors
+      enter the same memory.
 
 ## G — The look
 
