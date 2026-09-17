@@ -58,8 +58,14 @@ func _ready() -> void:
 	var cache_preview: Dictionary = hunt._nearest_world_item_for_inspection()
 	check(str(cache_preview.get("kind", "")) == "cache" and str(cache_preview.get("detail", "")) == "2 ITEMS",
 		"a salvage cache enters the same grammar with its live contents summarized")
-	hunt.loose_loot.erase(cache)
-	cache.queue_free()
+	var cache_items_before: int = (WorldHistory.subject("inventory").get("items", []) as Array).size()
+	var cache_events_before := WorldHistory.event_count("loot_collected")
+	var cache_receipts_before := PlayerActionLedger.count("loot_collected")
+	hunt._interact()
+	check(not hunt.loose_loot.has(cache) and (WorldHistory.subject("inventory").get("items", []) as Array).size() == cache_items_before + 2,
+		"E takes the inspected cache and moves its exact contents into inventory")
+	check(WorldHistory.event_count("loot_collected") == cache_events_before + 1 and PlayerActionLedger.count("loot_collected") == cache_receipts_before + 1,
+		"one cache pickup emits one event and one durable action receipt")
 	hunt.yaw = 0.0
 	hunt.pitch = 0.0
 	hunt.third_person = false

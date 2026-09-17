@@ -3994,14 +3994,24 @@ func _interact() -> void:
 			return
 	for cache in loose_loot.duplicate():
 		if is_instance_valid(cache) and player.distance_to(cache.global_position) < 3.5:
+			var cache_items: Array = cache.get_meta("items", []).duplicate()
 			var items: Array = WorldHistory.subject("inventory").get("items", []).duplicate()
-			items.append_array(cache.get_meta("items", []))
-			WorldHistory.update_subject("inventory", {"items": items}, "loot_collected")
+			items.append_array(cache_items)
+			# Inventory, receipt and any holding-work resolution belong to one
+			# physical pickup. `complete_work` safely nests its own ledger batch,
+			# leaving this outer commit as the only persistence boundary.
+			WorldHistory.begin_ledger_batch()
+			WorldHistory.amend_subject("inventory", {"items": items})
+			PLAYER_ACTION_LEDGER.record("loot_collected", {
+				"location": HUNT_LOCATION, "items": cache_items,
+				"cache_id": cache.get_instance_id(),
+			})
 			var work_job_id := str(cache.get_meta("holding_work_job", ""))
 			if not work_job_id.is_empty():
 				ASHBLOOM_HOLDINGS.complete_work(work_job_id, {
-					"method": "cache_collected", "items": cache.get_meta("items", []).duplicate(),
+					"method": "cache_collected", "items": cache_items,
 				})
+			WorldHistory.commit_ledger_batch()
 			loose_loot.erase(cache)
 			cache.queue_free()
 			prompt.text = "SALVAGE SECURED // %d ITEMS" % items.size()
