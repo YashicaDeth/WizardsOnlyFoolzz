@@ -24,6 +24,7 @@ extends RefCounted
 
 const MERCY_EVENTS := ["misfire_bond", "bond_strengthened", "npc_spared"]
 const MERCY_OUTCOMES := ["spare", "recruit"]
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 ## The lower ranks, per COSMOLOGY.md — not gods, the rank below them. Each
 ## entity's `faction_id` is `wizardsonlyfoolz` so pricing and the Tree axis
@@ -86,8 +87,10 @@ static func regard(entity_id: String, subject_id: String = "player") -> Dictiona
 	var threshold := int((ENTITIES.get(entity_id, {}) as Dictionary).get("threshold", 4))
 	if count < threshold:
 		return entity
+	WorldHistory.begin_ledger_batch()
 	var updated := WorldHistory.amend_subject(entity_id, {"has_noticed": true})
 	WorldHistory.record_event("entity_took_notice", {"entity_id": entity_id, "subject_id": subject_id, "mercy_count": count})
+	WorldHistory.commit_ledger_batch()
 	return updated
 
 
@@ -101,12 +104,18 @@ static func wash(entity_id: String, subject_id: String = "player") -> Dictionary
 		return {"ok": false, "reason": "NO SUCH ENTITY"}
 	if not bool(entity.get("has_noticed", false)):
 		return {"ok": false, "reason": "IT HAS NOT NOTICED YOU YET"}
-	WorldHistory.record_event("sin_washed", {"entity_id": entity_id, "subject_id": subject_id, "actor": subject_id})
+	WorldHistory.begin_ledger_batch()
+	var details := {"entity_id": entity_id, "subject_id": subject_id, "actor": subject_id}
+	if subject_id == "player":
+		PLAYER_ACTION_LEDGER.record("sin_washed", details)
+	else:
+		WorldHistory.record_event("sin_washed", details)
 	WorldHistory.amend_subject(entity_id, {
 		"has_noticed": false,
 		"washed_at_sequence": WorldHistory.next_sequence - 1,
 		"wash_count": int(entity.get("wash_count", 0)) + 1,
 	})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "karma_after": float(WorldHistory.subject(subject_id).get("karma", 0.0))}
 
 

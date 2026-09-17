@@ -61,6 +61,7 @@ func _ready() -> void:
 	check(bool(granted.get("ok", false)), "The Clear Frequency, having noticed you, will wash")
 	var after_karma := float(WorldHistory.subject("player").get("karma", 0.0))
 	check(after_karma > before_karma, "and it actually moves you up the axis (%.3f -> %.3f)" % [before_karma, after_karma])
+	check(PlayerActionLedger.count("sin_washed") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "the karma event and spent attention close as one identified player act")
 
 	# --- the notice is spent, not free to use twice --------------------------
 	check(not bool(WorldHistory.subject("clear_frequency").get("has_noticed", false)), "attention is spent on use")
