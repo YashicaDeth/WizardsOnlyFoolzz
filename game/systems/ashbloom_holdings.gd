@@ -25,12 +25,12 @@ const DEFINITIONS := [
 const WORK_TEMPLATES := [
 	{
 		"suffix": "claim_crew", "type": "raid", "required": 2,
-		"offset": Vector2(18, 14), "label": "DISLODGE THE CLAIM CREW",
+		"offset": Vector2(30, 28), "label": "DISLODGE THE CLAIM CREW",
 		"brief": "A two-person crew is enforcing an unrecorded claim on this ground.",
 	},
 	{
 		"suffix": "field_recovery", "type": "collection", "required": 1,
-		"offset": Vector2(-16, 10), "label": "RECOVER THE FIELD CACHE",
+		"offset": Vector2(-30, -24), "label": "RECOVER THE FIELD CACHE",
 		"brief": "A sealed local evidence cache remains somewhere inside the holding.",
 	},
 ]

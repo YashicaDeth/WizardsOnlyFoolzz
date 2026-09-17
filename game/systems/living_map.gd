@@ -806,6 +806,8 @@ func _draw_contacts() -> void:
 			"neutral", "spared": tint = BILE
 			"downed": tint = BILE
 			"loot": tint = BONE
+			"work_raid": tint = ACID
+			"work_collection": tint = SCAN
 		if state == "loot":
 			draw_rect(Rect2(screen - Vector2(3, 3), Vector2(6, 6)), tint * Color(1, 1, 1, 0.8))
 			continue
@@ -816,6 +818,27 @@ func _draw_contacts() -> void:
 		# mark that has not been drawn. These are told apart by shape, so the
 		# key could be deleted rather than restyled.
 		match state:
+			"work_raid":
+				# Four blades around an empty centre: a place to break open, not
+				# another person pretending to be a quest marker.
+				draw_colored_polygon(PackedVector2Array([
+					screen + Vector2(0, -7), screen + Vector2(7, 0),
+					screen + Vector2(0, 7), screen + Vector2(-7, 0),
+				]), tint * Color(1, 1, 1, 0.28))
+				draw_polyline(PackedVector2Array([
+					screen + Vector2(0, -7), screen + Vector2(7, 0), screen + Vector2(0, 7),
+					screen + Vector2(-7, 0), screen + Vector2(0, -7),
+				]), tint, 1.6)
+				draw_line(screen - Vector2(3, 0), screen + Vector2(3, 0), tint, 1.2)
+				var raid_label := str(contact.get("name", "LOCAL RAID"))
+				CellOutzType.draw_condensed(self, screen + Vector2(11, -16), raid_label.to_upper(), 8.0, tint, 0.72)
+			"work_collection":
+				# A bracketed cache, kept distinct from the plain filled square
+				# used for incidental loot.
+				draw_rect(Rect2(screen - Vector2(6, 6), Vector2(12, 12)), tint, false, 1.6)
+				draw_circle(screen, 2.0, tint)
+				var collection_label := str(contact.get("name", "LOCAL RECOVERY"))
+				CellOutzType.draw_condensed(self, screen + Vector2(11, 17), collection_label.to_upper(), 8.0, tint, 0.72)
 			"hostile":
 				# Point down: a thing coming at you.
 				draw_colored_polygon(PackedVector2Array([
@@ -833,7 +856,7 @@ func _draw_contacts() -> void:
 				# Open: neither yours nor after you yet.
 				draw_arc(screen, 4.6, 0.0, TAU, 14, tint, 1.4)
 		draw_arc(screen, 9.0 + beat * 4.0, 0.0, TAU, 14, tint * Color(1, 1, 1, 0.4 - beat * 0.2), 1.0)
-		var label := str(contact.get("name", ""))
+		var label := "" if state in ["work_raid", "work_collection"] else str(contact.get("name", ""))
 		if not label.is_empty():
 			CellOutzType.draw_condensed(self, screen + Vector2(10, -10), label.to_upper(), 8.0, tint * Color(1, 1, 1, 0.9), 0.7)
 

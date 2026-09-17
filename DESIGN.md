@@ -60,9 +60,12 @@ order from that file. An accepted raid restores two stable named bodies through
 the ordinary Hunt/anatomy/resolution path, while an accepted recovery restores
 one identified loot cache at its saved coordinate. Only resolving those exact
 people or physically collecting that cache advances the contract, and an
-unfinished order survives rebuilding the scene. This establishes a factual
-place → work → world → ledger route while leaving the later decision about who
-receives reclaimed land deliberately open.
+unfinished order survives rebuilding the scene. MAP reads those same active
+records as a hollow raid diamond or bracketed recovery cache at the saved
+coordinate, while the actual crew remain ordinary moving contacts; resolving
+the order removes its objective without erasing the people or history. This
+establishes a factual place → work → world → map → ledger route while leaving
+the later decision about who receives reclaimed land deliberately open.
 
 17 September Black Mirror note: its seven apps are different instruments inside
 one object, not seven unrelated UI compositions. The casing now owns a fixed

@@ -62,6 +62,9 @@ func _ready() -> void:
 	var raid_targets: Array = hunt.encounter_actors.filter(func(actor: Dictionary): return str(actor.get("holding_work_job", "")) == raid_id)
 	check(raid_targets.size() == 2 and raid_targets.all(func(actor: Dictionary): return actor.rig is BaselineHuman),
 		"accepted raid work enters the production encounter world as two full anatomy bodies")
+	var raid_contacts: Array = hunt._map_contacts().filter(func(contact: Dictionary): return str(contact.get("job_id", "")) == raid_id)
+	check(raid_contacts.size() == 1 and str(raid_contacts[0].state) == "work_raid",
+		"MAP receives one raid objective at the contract coordinate instead of duplicating its two people")
 	var target_ids: Array = WorldHistory.subject(raid_id).get("target_subjects", [])
 	check(target_ids.size() == 2, "the contract persists the exact two people who own its progress")
 
@@ -80,12 +83,17 @@ func _ready() -> void:
 	hunt._maintain_holding_work()
 	check(str(WorldHistory.subject(raid_id).get("status", "")) == "completed" and int(WorldHistory.subject(raid_id).get("progress", 0)) == 2,
 		"resolving both physical targets completes and timestamps the same raid record")
+	check(not hunt._map_contacts().any(func(contact: Dictionary): return str(contact.get("job_id", "")) == raid_id),
+		"completed raid work leaves MAP while its resolved people remain ordinary world records")
 
 	var collection_id := "holding_job:bone_yard:field_recovery"
 	HOLDINGS.accept_work(collection_id)
 	hunt._maintain_holding_work()
 	var work_caches: Array = hunt.loose_loot.filter(func(cache: Node3D): return str(cache.get_meta("holding_work_job", "")) == collection_id)
 	check(work_caches.size() == 1, "accepted collection work places one identified cache at its saved world coordinate")
+	var collection_contacts: Array = hunt._map_contacts().filter(func(contact: Dictionary): return str(contact.get("job_id", "")) == collection_id)
+	check(collection_contacts.size() == 1 and str(collection_contacts[0].state) == "work_collection",
+		"MAP marks the active recovery once rather than stacking a generic loot square beneath it")
 	if not work_caches.is_empty():
 		hunt.player = (work_caches[0] as Node3D).global_position
 		hunt.player_body.position = hunt.player - Vector3.UP * 0.6

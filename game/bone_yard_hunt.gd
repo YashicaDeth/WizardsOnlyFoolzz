@@ -5186,6 +5186,17 @@ func _leave_demo_wall() -> void:
 ## into the hunt loop for them.
 func _map_contacts() -> Array:
 	var contacts: Array = []
+	# Accepted work is a place-bound objective first and a set of spawned nodes
+	# second. One contract marker sits at its saved coordinate, while the people
+	# involved remain ordinary moving contacts around it.
+	for job: Dictionary in ASHBLOOM_HOLDINGS.active_work():
+		var target: Dictionary = job.get("target", {}) if job.get("target", {}) is Dictionary else {}
+		contacts.append({
+			"at": Vector2(float(target.get("x", 0.0)), float(target.get("z", 0.0))),
+			"state": "work_%s" % str(job.get("work_type", "job")),
+			"name": "RAID ORDER" if str(job.get("work_type", "")) == "raid" else "RECOVERY ORDER",
+			"job_id": str(job.id),
+		})
 	for actor in encounter_actors:
 		var node := actor.get("node") as Node3D
 		if node == null or not is_instance_valid(node) or bool(actor.get("dead", false)):
@@ -5196,6 +5207,8 @@ func _map_contacts() -> Array:
 		contacts.append({"at": Vector2(node.global_position.x, node.global_position.z), "state": state, "name": str(actor.get("display_name", ""))})
 	for cache in loose_loot:
 		if is_instance_valid(cache):
+			if not str(cache.get_meta("holding_work_job", "")).is_empty():
+				continue
 			contacts.append({"at": Vector2(cache.global_position.x, cache.global_position.z), "state": "loot", "name": ""})
 	if enemy != null and is_instance_valid(enemy) and enemy.visible and not enemy_retreating:
 		contacts.append({"at": Vector2(enemy.global_position.x, enemy.global_position.z), "state": "hostile", "name": _captain_name()})
