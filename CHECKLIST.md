@@ -3659,7 +3659,7 @@ ledger to avoid that.
 - [x] ~~**AB2.2** Damage is recorded against the place, in WorldHistory, like
       everything else~~ `world_damage.gd`'s `damage()`/`repair()` both
       `record_event()` (`object_damaged`/`object_repaired`, with the subject,
-      the amount and a `cause`) on top of `amend_subject()`'s mutation —
+      the amount and a `cause`) in the same ledger batch as `amend_subject()`'s mutation —
       refused outright for a subject the world does not know about, so a
       typo'd id fails loudly rather than quietly creating a phantom object
       with no owner and no history.
