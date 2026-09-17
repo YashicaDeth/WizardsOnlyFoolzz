@@ -325,6 +325,11 @@ func _ready() -> void:
 	_index = WORLD_INDEX.new()
 	_index.name = "IndexPanel"
 	_clip.add_child(_index)
+	# The hosted INDEX is still the same instrument. Bubble its physical pin
+	# action through the device so the scene's one Board owns the resulting card
+	# whether INDEX was opened full-size or through the Black Mirror aperture.
+	_index.pin_requested.connect(func(ref: String, kind: String, title: String):
+		pin_requested.emit(ref, kind, title))
 	_map = LIVING_MAP.new()
 	_map.name = "MapPanel"
 	_clip.add_child(_map)
@@ -1941,6 +1946,10 @@ func _fit_into_aperture(panel: Control) -> void:
 	var design := get_viewport_rect().size
 	if design.x <= 1.0 or design.y <= 1.0:
 		design = Vector2(1280, 720)
+	# Hosted pages are explicitly sized and scaled below. Their own fullscreen
+	# ready paths leave stretch anchors behind, which made every assignment emit
+	# a layout warning even though the final pixels happened to fit.
+	panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	panel.size = design
 	# I3.1 v3. The header/footer are device-owned. Hosted pages receive the same
 	# remaining work surface as native ones instead of painting underneath the

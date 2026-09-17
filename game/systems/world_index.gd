@@ -376,7 +376,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				if rail_index >= 0 and rail_index < _rail_cache.size():
 					var row: Dictionary = _rail_cache[rail_index]
 					var subject: Dictionary = WorldHistory.subject(str(row["id"]))
-					var row_kind := "record" if str(subject.get("kind", "")) == "faction" else "photo"
+					var row_kind := "record" if str(subject.get("kind", "")) in ["faction", "place", "facility_sector"] else "photo"
 					pin_requested.emit(str(row["id"]), row_kind, str(row["label"]))
 			KEY_TAB:
 				if page != 3 or not _inspector.handle_key(KEY_TAB):

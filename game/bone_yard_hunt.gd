@@ -797,6 +797,8 @@ func _ready() -> void:
 	pin_board = PIN_BOARD.new()
 	pin_board.name = "PinBoard"
 	$HUD.add_child(pin_board)
+	world_index.pin_requested.connect(_pin_index_record)
+	handheld.pin_requested.connect(_pin_index_record)
 	demo_wall = DEMO_WALL.new()
 	demo_wall.name = "DemoWall"
 	$HUD.add_child(demo_wall)
@@ -5180,6 +5182,17 @@ func _rival_retreats(message: String) -> void:
 
 func _leave_demo_wall() -> void:
 	Interstitial.travel("res://country_town_menu.tscn", "leaving this universe on the board")
+
+
+## INDEX offers a record; the room's one physical Board decides whether there
+## is space for it. The handheld and full-size reader both arrive here through
+## the same signal, preventing two invisible collections of pinned evidence.
+func _pin_index_record(ref: String, kind: String, title: String) -> void:
+	if pin_board.pin(ref, kind):
+		prompt.text = "%s // FILED ON THE BOARD" % title.to_upper()
+		return
+	var refusal := str(pin_board.get("last_refusal"))
+	prompt.text = refusal if not refusal.is_empty() else "%s // ALREADY ON THE BOARD" % title.to_upper()
 
 
 ## Live contacts for the map, expressed as plain data so the map never reaches

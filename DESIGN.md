@@ -67,6 +67,15 @@ the order removes its objective without erasing the people or history. This
 establishes a factual place → work → world → map → ledger route while leaving
 the later decision about who receives reclaimed land deliberately open.
 
+18 September implementation note: territory evidence now reaches the physical
+Board through the actual input route. `P` on a revealed place in full-size
+INDEX files it as land rather than a human photograph; `P` on PYRAMID can file
+its holder faction; and the same action inside the Black Mirror's hosted INDEX
+bubbles outward to the room's one Board instead of vanishing inside the device.
+The player can string place → holder → person, with support read from the
+place's `held_by` relation and the faction's existing person edge. No automatic
+theory is authored and no string is drawn for the player.
+
 17 September Black Mirror note: its seven apps are different instruments inside
 one object, not seven unrelated UI compositions. The casing now owns a fixed
 page grammar — header and footer rails, app identity and role, stable page

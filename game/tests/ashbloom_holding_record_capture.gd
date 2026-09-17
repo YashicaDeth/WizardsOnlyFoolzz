@@ -7,6 +7,7 @@ extends Node
 const HOLDINGS := preload("res://systems/ashbloom_holdings.gd")
 const INDEX := preload("res://systems/world_index.gd")
 const BOARD := preload("res://systems/pin_board.gd")
+const CAST := preload("res://systems/cast_names.gd")
 
 
 func _ready() -> void:
@@ -25,6 +26,11 @@ func _ready() -> void:
 	var definition: Dictionary = HOLDINGS.DEFINITIONS[2]
 	var record_id := str(definition.record)
 	HOLDINGS.observe(definition.at)
+	var captain := CAST.ensure("derby_captain", {"faction_id": "ashline_wreckers", "faction": "Ashline Wreckers"})
+	WorldHistory.register_subject("ashline_wreckers", {
+		"name": "Ashline Wreckers", "kind": "faction", "role": "Road murder syndicate",
+		"relations": {str(captain.id): {"kind": "command", "strength": 72}},
+	})
 
 	var layer := CanvasLayer.new()
 	add_child(layer)
@@ -47,6 +53,10 @@ func _ready() -> void:
 	# ordinary red string can treat land as evidence without inventing a map-pin
 	# subsystem beside the Board.
 	board.pin(record_id, "record", Vector2(330, -210))
+	board.pin("ashline_wreckers", "record", Vector2(80, -115))
+	board.pin(str(captain.id), "photo", Vector2(-150, -150))
+	board.lay_string(record_id, "ashline_wreckers")
+	board.lay_string("ashline_wreckers", str(captain.id))
 	board.lay_string(record_id, "theory_frequency")
 	board.pan = Vector2(-100, 250)
 	board.zoom = 1.0

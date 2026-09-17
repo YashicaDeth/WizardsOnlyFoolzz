@@ -28,6 +28,7 @@ func _ready() -> void:
 	var device: Control = HANDHELD.new()
 	add_child(device)
 	device.set_process(false)
+	device.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	device.size = Vector2(1280, 720)
 	device.open_device()
 	for _frame in 20:
