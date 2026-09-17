@@ -4387,15 +4387,33 @@ Covered by `tests/local_law_test.gd` (26 checks) and `tests/hunt_local_law_integ
 
 ### AE v10 — the final pass
 The last rung. Fifteen statements that are true of sneaking and the law when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
-- [ ] **AE10.1** `v10` Unseen is a real state with real inputs
-- [ ] **AE10.2** `v10` Light, noise, cover and distance all feed it
-- [ ] **AE10.3** `v10` The handheld's glow is the commonest thing that gives you away
-- [ ] **AE10.4** `v10` An unseen kill differs mechanically and in the record
-- [ ] **AE10.5** `v10` Assassination is reaching somebody who does not know you are there
-- [ ] **AE10.6** `v10` Law figures respond to what was actually witnessed
-- [ ] **AE10.7** `v10` Punishment is local and the holding sends them
-- [ ] **AE10.8** `v10` Karma is an axis, not a score
-- [ ] **AE10.9** `v10` Being hunted by the law is the Hunt System pointed at you
+- [x] **AE10.1** `v10` Unseen is a real state with real inputs — AE1.1's live
+      per-hostile `tracking_player` verdict, not a stealth toggle.
+- [x] **AE10.2** `v10` Light, noise, cover and distance all feed it — AE1.1's
+      pure `Perception.visibility()` contract plus production raycast, noise
+      and daylight inputs; `perception_integration_test.gd` proves the live seam.
+- [x] **AE10.3** `v10` The handheld's glow is the commonest thing that gives you away —
+      AS1.5's emitted-source verdict enters real pursuit while the holder is
+      still unseen; pocketing, cover and exhausted charge close the trail, and
+      the harder-driven MAP page broadcasts farther than INDEX.
+- [x] **AE10.4** `v10` An unseen kill differs mechanically and in the record —
+      AE1.2: the canonical execute carries `unseen`, and no witness means no
+      report can ever reach law.
+- [x] **AE10.5** `v10` Assassination is reaching somebody who does not know you are there —
+      AE1.3's ordinary execution/karma route is distinguished by the real
+      perception and witness state rather than bonus damage.
+- [x] **AE10.6** `v10` Law figures respond to what was actually witnessed —
+      AE1.4's delayed `WitnessLedger` report is required; global history alone
+      cannot dispatch law.
+- [x] **AE10.7** `v10` Punishment is local and the holding sends them — AE1.5:
+      the canonical place accumulates and spends its own unrest.
+- [x] **AE10.8** `v10` Karma is an axis, not a score — AE1.6 proves opposite
+      factions judge the identical execution or mercy in opposite directions.
+- [x] **AE10.9** `v10` Being hunted by the law is the Hunt System pointed at you —
+      AE1.7's persistent two-person warrant team uses ordinary named actors,
+      anatomy, AI, wounds, loot and resolution. Re-verified with
+      `local_law_test.gd` (26 checks) and `hunt_local_law_integration_test.gd`
+      (13 production-scene checks).
 - [ ] **AE10.10** `v10` Witnesses can be wrong, bought or silenced
 - [ ] **AE10.11** `v10` The tunnels are where the satellite cannot see you
 - [ ] **AE10.12** `v10` A crime has a jurisdiction and jurisdictions end
