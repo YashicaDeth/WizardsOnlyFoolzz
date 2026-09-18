@@ -13,6 +13,8 @@ const DISTRICT_CENTERS := [Vector3(-150, 0, -122), Vector3(130, 0, -122), Vector
 
 var generated_buildings: Array[Node3D] = []
 var lots: Array[Rect2] = []
+var _holding_state_root: Node3D
+var _holding_state_signature := ""
 
 
 func generate(seed_value: int = 774013) -> void:
@@ -22,6 +24,8 @@ func generate(seed_value: int = 774013) -> void:
 		child.queue_free()
 	generated_buildings.clear()
 	lots.clear()
+	_holding_state_root = null
+	_holding_state_signature = ""
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	_build_road(Vector3(0, -0.32, 0), Vector3(18, 0.24, REGION_SIZE.y))
@@ -38,6 +42,78 @@ func generate(seed_value: int = 774013) -> void:
 			var lot_center := Vector2(district_center.x + offset.x, district_center.z + offset.z)
 			lots.append(Rect2(lot_center - Vector2(width, depth) * 0.5, Vector2(width, depth)))
 			_build_enterable_shell(district_center + offset, Vector3(width, height, depth), WALLS[rng.randi_range(0, WALLS.size() - 1)], SIGNS[rng.randi_range(0, SIGNS.size() - 1)])
+
+
+## Local work has to change the walked place, not merely its dossier. These
+## deliberately modest field marks show that the old claim is failing without
+## pretending the player has already made the later ascent/corruption choice.
+## Rebuilding is signature-gated because Hunt asks every frame while contracts
+## are live; a state transition should change geometry once, not churn nodes.
+func apply_holding_work_states(rows: Array) -> void:
+	var signature_parts: Array[String] = []
+	for row: Dictionary in rows:
+		if not bool(row.get("revealed", false)):
+			continue
+		var state := str(row.get("local_work_state", "held"))
+		if state in ["disrupted", "ready_for_decision"]:
+			signature_parts.append("%s:%s" % [str(row.get("id", "")), state])
+	signature_parts.sort()
+	var signature := "|".join(signature_parts)
+	if signature == _holding_state_signature:
+		return
+	_holding_state_signature = signature
+	if _holding_state_root != null and is_instance_valid(_holding_state_root):
+		remove_child(_holding_state_root)
+		_holding_state_root.queue_free()
+	_holding_state_root = Node3D.new()
+	_holding_state_root.name = "HoldingWorkState"
+	add_child(_holding_state_root)
+	for row: Dictionary in rows:
+		var state := str(row.get("local_work_state", "held"))
+		if not bool(row.get("revealed", false)) or state not in ["disrupted", "ready_for_decision"]:
+			continue
+		_build_holding_state_mark(row, state)
+
+
+func _build_holding_state_mark(row: Dictionary, state: String) -> void:
+	var centre2: Vector2 = row.get("at", Vector2.ZERO)
+	var centre := Vector3(centre2.x, 0.0, centre2.y)
+	var cluster := Node3D.new()
+	cluster.name = "Claim_%s" % str(row.get("id", "unknown"))
+	cluster.set_meta("holding_id", str(row.get("id", "")))
+	cluster.set_meta("work_state", state)
+	cluster.position = centre
+	_holding_state_root.add_child(cluster)
+	var open := state == "ready_for_decision"
+	var tint := Color("a5c774") if open else Color("c76b49")
+	for index in 6:
+		var angle := TAU * float(index) / 6.0
+		var stake := MeshInstance3D.new()
+		stake.name = "BrokenClaimStake_%d" % index
+		var box := BoxMesh.new()
+		box.size = Vector3(0.13, 2.5, 0.13)
+		box.material = _material(tint.darkened(0.35), 0.0, "rust")
+		stake.mesh = box
+		stake.position = Vector3(cos(angle) * 9.0, 1.05, sin(angle) * 9.0)
+		stake.rotation = Vector3(sin(angle) * 0.42, -angle, cos(angle) * 0.42)
+		cluster.add_child(stake)
+	var beacon := OmniLight3D.new()
+	beacon.name = "ClaimStateBeacon"
+	beacon.position = Vector3(0, 2.2, 0)
+	beacon.light_color = tint
+	beacon.light_energy = 1.35 if open else 0.55
+	beacon.omni_range = 11.0 if open else 6.0
+	beacon.shadow_enabled = false
+	cluster.add_child(beacon)
+	var label := Label3D.new()
+	label.name = "ClaimStateLabel"
+	label.position = Vector3(0, 2.75, 0)
+	label.text = "DECISION OPEN" if open else "LOCAL CLAIM DISRUPTED"
+	label.font_size = 30
+	label.modulate = tint
+	label.outline_size = 7
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	cluster.add_child(label)
 
 
 func _build_road(at: Vector3, dimensions: Vector3) -> void:

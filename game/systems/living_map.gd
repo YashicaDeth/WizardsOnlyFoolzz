@@ -785,6 +785,7 @@ func _draw_holdings() -> void:
 		var revealed := bool(row.revealed)
 		var tone := _holding_tone(str(row.held_by)) if revealed else INK
 		var blend := float(_holding_reveal.get(id, 0.0)) if revealed else 0.0
+		var work_state := str(row.get("local_work_state", "held"))
 		# Unknown land keeps a complete faint silhouette: enough shape to pull at
 		# the player. Known land develops outward from its settlement like an old
 		# instant photograph, making the reveal one event rather than many pixels.
@@ -806,6 +807,18 @@ func _draw_holdings() -> void:
 		# relaxing into the holder-coloured border once the glass is clear.
 		var wipe_tone := BONE.lerp(tone, blend)
 		draw_polyline(arriving_closed, wipe_tone * Color(1, 1, 1, float(reveal.edge_alpha)), float(reveal.edge_width))
+		var work_profile := holding_work_profile(work_state, Time.get_ticks_msec() / 1000.0)
+		if bool(work_profile.visible):
+			# A broken claim fractures inward from every border vertex. It reads
+			# over satellite terrain at any zoom and leaves the holder colour in
+			# place until the player performs the separate land decision.
+			for vertex in full.size():
+				var edge: Vector2 = full[vertex]
+				var next: Vector2 = full[(vertex + 1) % full.size()]
+				var bite := edge.lerp(next, 0.22)
+				draw_line(edge, centre.lerp(bite, 0.28), ARTERIAL * Color(1, 1, 1, float(work_profile.crack_alpha)), float(work_profile.crack_width))
+			if bool(work_profile.decision_open):
+				draw_polyline(arriving_closed, SPORE * Color(1, 1, 1, float(work_profile.pulse_alpha)), 2.4)
 		if float(reveal.streak_alpha) > 0.01:
 			for vertex in range(0, full.size(), 2):
 				var streak_end: Vector2 = arriving[vertex]
@@ -823,6 +836,22 @@ static func holding_reveal_profile(blend: float) -> Dictionary:
 		"edge_alpha": 0.35 + clamped * 0.40 + front * 0.38,
 		"edge_width": 1.6 + front * 2.6,
 		"streak_alpha": front * 0.32,
+	}
+
+
+## The map treatment is data-testable independently of a framebuffer. A single
+## completed job scars the old claim; the full connected set adds a slow living
+## border, announcing an available decision without assigning the land.
+static func holding_work_profile(state: String, elapsed: float) -> Dictionary:
+	if state not in ["disrupted", "ready_for_decision"]:
+		return {"visible": false, "decision_open": false, "crack_alpha": 0.0, "crack_width": 0.0, "pulse_alpha": 0.0}
+	var open := state == "ready_for_decision"
+	return {
+		"visible": true,
+		"decision_open": open,
+		"crack_alpha": 0.52 if open else 0.34,
+		"crack_width": 1.6 if open else 1.15,
+		"pulse_alpha": (0.42 + sin(elapsed * 1.7) * 0.14) if open else 0.0,
 	}
 
 

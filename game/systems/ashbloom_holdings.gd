@@ -96,6 +96,14 @@ static func overview() -> Dictionary:
 	for definition: Dictionary in DEFINITIONS:
 		var row := definition.duplicate(true)
 		row.merge((holdings.get(str(definition.id), {}) as Dictionary), true)
+		# Work progress belongs to the canonical place record, while borders and
+		# reveal state belong to the territory row. An overview is the seam used
+		# by MAP and the walked-world dressing, so it must expose both halves of
+		# that one holding rather than making callers rediscover the join.
+		var place := WorldHistory.subject(str(definition.record))
+		for key in ["local_work_completed", "local_work_required", "local_work_state"]:
+			if place.has(key):
+				row[key] = place[key]
 		rows.append(row)
 	return {
 		"name": str(record.get("name", "THE ASHBLOOM EXPANSE")),

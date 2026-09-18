@@ -91,6 +91,14 @@ func _ready() -> void:
 		"resolving both physical targets completes the same raid record in one closed maintenance transaction")
 	check(int(WorldHistory.subject(str(bone.record)).get("local_work_completed", 0)) == 1 and str(WorldHistory.subject(str(bone.record)).get("local_work_state", "")) == "disrupted",
 		"one resolved order weakens the place's claim but cannot counterfeit reclamation")
+	hunt._maintain_holding_work()
+	var state_root: Node = hunt.generated_world.get_node_or_null("HoldingWorkState")
+	var state_mark: Node = state_root.get_node_or_null("Claim_bone_yard") if state_root != null else null
+	check(state_mark != null and str(state_mark.get_meta("work_state", "")) == "disrupted",
+		"disrupted work appears as a physical broken claim in the walked district")
+	var disrupted_profile: Dictionary = hunt.living_map.holding_work_profile("disrupted", 0.0)
+	check(bool(disrupted_profile.visible) and not bool(disrupted_profile.decision_open) and float(disrupted_profile.crack_alpha) > 0.0,
+		"MAP fractures a disrupted holding without falsely opening the land decision")
 	check(not hunt._map_contacts().any(func(contact: Dictionary): return str(contact.get("job_id", "")) == raid_id),
 		"completed raid work leaves MAP while its resolved people remain ordinary world records")
 
@@ -115,6 +123,12 @@ func _ready() -> void:
 		"resolved work is summarized without leaving a nested batch open")
 	check(int(WorldHistory.subject(str(bone.record)).get("local_work_completed", 0)) == 2 and str(WorldHistory.subject(str(bone.record)).get("local_work_state", "")) == "ready_for_decision" and WorldHistory.event_count("holding_claim_disrupted") == 1,
 		"both connected jobs open one persistent land decision without choosing its recipient")
+	hunt._maintain_holding_work()
+	state_root = hunt.generated_world.get_node_or_null("HoldingWorkState")
+	state_mark = state_root.get_node_or_null("Claim_bone_yard") if state_root != null else null
+	var open_profile: Dictionary = hunt.living_map.holding_work_profile("ready_for_decision", 1.0)
+	check(state_mark != null and str(state_mark.get_meta("work_state", "")) == "ready_for_decision" and bool(open_profile.decision_open) and float(open_profile.pulse_alpha) > 0.0,
+		"the walked district and MAP both escalate when its connected land decision opens")
 	hunt.pin_board.pin(str(bone.record), "record")
 	var decision_cards: Array = hunt.pin_board.cards.filter(func(card): return card.id == str(bone.record))
 	check(decision_cards.size() == 1 and decision_cards[0].body.contains("CLAIM DISRUPTED") and decision_cards[0].body.contains("DECISION OPEN"),

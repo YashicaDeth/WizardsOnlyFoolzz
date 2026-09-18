@@ -7088,6 +7088,7 @@ func _build_expanse_systems() -> void:
 	generated_world.name = "ProceduralAshbloomDistricts"
 	add_child(generated_world)
 	generated_world.call("generate", 774013)
+	generated_world.call("apply_holding_work_states", ASHBLOOM_HOLDINGS.overview().holdings)
 	# A4.1. One light per settlement, read from the generator's own centres so a
 	# district that moves takes its light with it rather than leaving a lamp over
 	# empty ground. Wide and low: this is the glow you steer by from two hundred
@@ -7439,6 +7440,8 @@ func _maintain_holding_work() -> void:
 				_maintain_holding_raid(job_id, job, target)
 			"collection":
 				_maintain_holding_collection(job_id, job, target)
+	if generated_world != null and is_instance_valid(generated_world):
+		generated_world.call("apply_holding_work_states", ASHBLOOM_HOLDINGS.overview().holdings)
 
 
 func _maintain_holding_raid(job_id: String, job: Dictionary, target: Vector3) -> void:
