@@ -1617,7 +1617,7 @@ func _physics_process(delta: float) -> void:
 	# X leans on somebody while a clinch is up, so the guard only claims the key
 	# when there is nobody in your hands. A control that does two things at once
 	# is worse than a control that does nothing.
-	var wants_guard := Input.is_key_pressed(KEY_X) and panel_mode.is_empty() and not resolution_ui.visible and grapple_target.is_empty()
+	var wants_guard := Input.is_key_pressed(KEY_X) and panel_mode.is_empty() and not resolution_ui.visible and grapple_target.is_empty() and dodge_remaining <= 0.0
 	if wants_guard and guard_strength() > 0.0 and stamina > 1.0 and not stumbling():
 		if not guarding:
 			guard_raised = 0.0
@@ -4079,14 +4079,45 @@ func _begin_wall_run(surface: Dictionary) -> void:
 
 
 func _dodge() -> void:
-	if not panel_mode.is_empty() or dodge_cooldown > 0.0 or stamina < 25.0:
+	# A dodge is a committed grounded combat action. Previously it could begin
+	# in mid-air, through a grapple, or halfway through a melee wind-up. That
+	# made the nominally deliberate combat loop cancel itself whenever SPACE
+	# was pressed and let several incompatible poses own the body at once.
+	if not panel_mode.is_empty() or resolution_ui.visible or not grapple_target.is_empty() or kill_cam.active:
+		return
+	if dodge_cooldown > 0.0 or dodge_remaining > 0.0 or stamina < 25.0 or not player_body.is_on_floor():
+		return
+	if strike_windup >= 0.0 or not pending_attack.is_empty():
+		prompt.text = "COMMITTED TO THE SWING"
 		return
 	dodge_cooldown = 0.75
 	stamina -= 25.0
 	var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-	dodge_direction = HUNTER_MOTOR.dodge_direction(move, yaw)
+	dodge_direction = _combat_dodge_direction(move)
 	dodge_remaining = 0.28
+	# Evasion owns the body for its short window. Do not drag a shouldered gun
+	# or raised guard through it and then snap those poses off a frame later.
+	firearm_aiming = false
+	guarding = false
 	PLAYER_ACTION_LEDGER.record("player_dodged", {"location": HUNT_LOCATION})
+
+
+## Camera-relative in free movement; target-relative while locked. The latter
+## matters on the first frame after lock acquisition, before `_steer_lock()`
+## has had time to turn the camera: left/right already circle the opponent and
+## an empty input already retreats from them instead of following stale yaw.
+func _combat_dodge_direction(move: Vector2) -> Vector3:
+	var target := _lock_node()
+	if target == null:
+		return HUNTER_MOTOR.dodge_direction(move, yaw)
+	var toward: Vector3 = target.global_position - player
+	toward.y = 0.0
+	if toward.length_squared() <= 0.0001:
+		return HUNTER_MOTOR.dodge_direction(move, yaw)
+	var forward := toward.normalized()
+	var right := Vector3(-forward.z, 0.0, forward.x)
+	var wish := right * move.x - forward * move.y
+	return wish.normalized() if wish.length_squared() > 0.0001 else -forward
 
 
 ## AD1.1. Free rather than costing stamina like a dodge does — jumping is

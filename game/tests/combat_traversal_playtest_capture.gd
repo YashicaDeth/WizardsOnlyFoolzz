@@ -63,6 +63,20 @@ func _ready() -> void:
 		await get_tree().process_frame
 	await _shot("combat_playtest_third_person_lock")
 
+	# A locked lateral dodge uses the opponent as its frame even before the
+	# camera finishes steering. Hold the authored evasion silhouette at its
+	# readable midpoint for the visual evidence sheet.
+	hunt.dodge_direction = hunt._combat_dodge_direction(Vector2.RIGHT)
+	hunt.dodge_remaining = 0.14
+	for _frame in 18:
+		hunt.body_motion.update(1.0 / 60.0, hunt.dodge_direction * 16.0, true, false, false, true)
+		hunt._steer_lock(1.0 / 60.0)
+		hunt._update_camera()
+		hunt._update_hud()
+		await get_tree().process_frame
+	await _shot("combat_playtest_locked_dodge")
+	hunt.dodge_remaining = 0.0
+
 	# The narrated playtest found that RMB simply fired another shot and there
 	# was no firearm aim at all. Capture the production held stance and narrowed
 	# lens in first person before returning to the melee grip sheet below.
