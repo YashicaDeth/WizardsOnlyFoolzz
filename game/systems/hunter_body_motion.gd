@@ -50,6 +50,11 @@ var smoking_blend := 0.0
 var smoking_two_handed := false
 var smoking_device := ""
 var smoking_look_down := 0.0
+## A clinch owns the upper-body silhouette while locomotion continues beneath
+## it. Holder and captive use different poses so this reads as one person
+## controlling another, not two mirrored mannequins touching forearms.
+var grapple_blend := 0.0
+var grapple_holder := false
 
 
 func configure(body_rig: BaselineHuman) -> void:
@@ -100,6 +105,11 @@ func set_smoking_pose(amount: float, two_handed: bool, device_id := "") -> void:
 	smoking_two_handed = two_handed
 	smoking_device = device_id
 	smoking_look_down = smoking_blend * 0.18 if device_id == "bong" and first_person else 0.0
+
+
+func set_grapple_pose(amount: float, is_holder: bool) -> void:
+	grapple_blend = clampf(amount, 0.0, 1.0)
+	grapple_holder = is_holder
 
 
 func update(delta: float, velocity: Vector3, grounded: bool, sprinting: bool, crouching: bool, dodging: bool) -> void:
@@ -223,6 +233,35 @@ func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: 
 				left.rotation.x += smoking_blend * (0.38 if first_person else 0.66)
 				left.rotation.y += smoking_blend * 0.22
 				left.rotation.z += smoking_blend * 0.58
+	# The articulated full-arm hold is an exterior silhouette. Applying it to
+	# the first-person body swung the placeholder upper arms through the camera
+	# as two screen-sized black slabs; first person keeps its authored low
+	# presence while the captive still visibly struggles in this same pose.
+	if grapple_blend > 0.0 and (not grapple_holder or not first_person):
+		var grapple_left := rig.parts.get("left_arm") as Node3D
+		var grapple_right := rig.parts.get("right_arm") as Node3D
+		if grapple_holder:
+			# One hand controls the near shoulder while the other braces across the
+			# chest. Unequal arms make the hold readable from behind the player.
+			if grapple_right != null:
+				grapple_right.rotation.x = lerpf(grapple_right.rotation.x, 1.18, grapple_blend)
+				grapple_right.rotation.y = lerpf(grapple_right.rotation.y, -0.24, grapple_blend)
+				grapple_right.rotation.z = lerpf(grapple_right.rotation.z, -0.72, grapple_blend)
+			if grapple_left != null:
+				grapple_left.rotation.x = lerpf(grapple_left.rotation.x, 0.88, grapple_blend)
+				grapple_left.rotation.y = lerpf(grapple_left.rotation.y, 0.18, grapple_blend)
+				grapple_left.rotation.z = lerpf(grapple_left.rotation.z, 0.48, grapple_blend)
+		else:
+			# The captive's elbows are displaced and defensive rather than raised
+			# into the same offensive pose as the holder.
+			if grapple_right != null:
+				grapple_right.rotation.x = lerpf(grapple_right.rotation.x, 0.54, grapple_blend)
+				grapple_right.rotation.y = lerpf(grapple_right.rotation.y, 0.32, grapple_blend)
+				grapple_right.rotation.z = lerpf(grapple_right.rotation.z, -1.02, grapple_blend)
+			if grapple_left != null:
+				grapple_left.rotation.x = lerpf(grapple_left.rotation.x, 0.38, grapple_blend)
+				grapple_left.rotation.y = lerpf(grapple_left.rotation.y, -0.28, grapple_blend)
+				grapple_left.rotation.z = lerpf(grapple_left.rotation.z, 0.96, grapple_blend)
 	var torso := rig.parts.get("torso") as Node3D
 	if torso != null:
 		var rest: Vector3 = torso.get_meta("rest_position", torso.position)

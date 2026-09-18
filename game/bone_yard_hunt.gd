@@ -600,6 +600,11 @@ var impact_feel: Node
 var viscera_fx := true
 var enemy_rig: BaselineHuman
 var grapple_target := ""
+## The exact physics body currently owned by the clinch. Keeping the reference
+## lets release always remove the reciprocal collision exceptions, even when
+## the encounter dictionary has already been removed by death or cleanup.
+var grapple_body: CharacterBody3D = null
+var grapple_motion: HunterBodyMotion = null
 var grapple_advantage := 0.0
 var grapple_clock := 0.0
 ## O3.3. Which limb the hold actually has. Set once, at the moment you take
@@ -4907,6 +4912,13 @@ func _update_encounter_actors(delta: float) -> void:
 		if node == null or not is_instance_valid(node) or anatomy == null:
 			encounter_actors.remove_at(index)
 			continue
+		# A held body has one owner: `_update_grapple()`. Do this before ordinary
+		# animation as well as before AI, otherwise the captive consumes its old
+		# velocity here and visibly poses one frame behind the physical constraint.
+		if str(actor.get("subject_id", "")) == grapple_target:
+			(node as CharacterBody3D).velocity = Vector3.ZERO
+			actor.attack_time = 0.0
+			continue
 		# Enemies used to have the same articulated body as the player but no
 		# animator driving it. Their CharacterBody crossed the ground while every
 		# limb stayed in its bind pose—the conspicuous skating seen in the sandbox
@@ -4933,10 +4945,6 @@ func _update_encounter_actors(delta: float) -> void:
 		# the ordinary hunter AI move or wind up the held actor first made the
 		# same body pursue, attack and get dragged in one tick—the visible jitter
 		# and random breakaways reported in playtesting.
-		if str(actor.get("subject_id", "")) == grapple_target:
-			(node as CharacterBody3D).velocity = Vector3.ZERO
-			actor.attack_time = 0.0
-			continue
 		# O5.10 v2. Recovers regardless of state, same as the player's own —
 		# standing in a stagger is still standing, and balance comes back on
 		# its own rather than only when the fight lets up.
@@ -5661,6 +5669,19 @@ func _lock_node() -> Node3D:
 	return null
 
 
+func _camera_combat_focus() -> Node3D:
+	# A clinch is already a two-body combat focus and has priority over an old
+	# lock. This is kept as a pure selector so camera behaviour is directly
+	# testable even when a headless fixture has a wall behind its shoulder.
+	if not grapple_target.is_empty():
+		var grapple_actor := _actor_by_id(grapple_target)
+		if not grapple_actor.is_empty():
+			var grapple_node := grapple_actor.get("node") as Node3D
+			if grapple_node != null and is_instance_valid(grapple_node):
+				return grapple_node
+	return _lock_node()
+
+
 func _lock_candidates() -> Array:
 	var found: Array = []
 	for actor in encounter_actors:
@@ -5787,6 +5808,13 @@ func _start_grapple() -> void:
 		prompt.text = "NOTHING IN REACH TO GRAB"
 		return
 	grapple_target = str(actor.subject_id)
+	grapple_body = actor.node as CharacterBody3D
+	grapple_motion = actor.get("motion") as HunterBodyMotion
+	if grapple_body != null and is_instance_valid(grapple_body):
+		# The constraint, not capsule-on-capsule collision response, owns the
+		# distance between these bodies until release. World collision remains.
+		player_body.add_collision_exception_with(grapple_body)
+		grapple_body.add_collision_exception_with(player_body)
 	grapple_advantage = 0.0
 	grapple_clock = 0.0
 	grapple_pressure_clock = 0.0
@@ -5873,7 +5901,17 @@ func grapple_shield(damage: float, from: Vector3) -> Dictionary:
 
 
 func _break_grapple(message := "") -> void:
+	if grapple_body != null and is_instance_valid(grapple_body):
+		player_body.remove_collision_exception_with(grapple_body)
+		grapple_body.remove_collision_exception_with(player_body)
+		grapple_body.velocity = Vector3.ZERO
+	if body_motion != null:
+		body_motion.set_grapple_pose(0.0, true)
+	if grapple_motion != null and is_instance_valid(grapple_motion):
+		grapple_motion.set_grapple_pose(0.0, false)
 	grapple_target = ""
+	grapple_body = null
+	grapple_motion = null
 	grapple_advantage = 0.0
 	grapple_pushing_now = false
 	if not message.is_empty():
@@ -5895,7 +5933,9 @@ func _update_grapple(delta: float) -> void:
 		_break_grapple("THE ARM HOLDING THEM IS GONE")
 		return
 	var node := actor.node as Node3D
-	var gap := player.distance_to(node.global_position)
+	var flat_gap := node.global_position - player_body.global_position
+	flat_gap.y = 0.0
+	var gap := flat_gap.length()
 	if gap > GRAPPLE_RANGE + 1.2:
 		_break_grapple("THEY TORE FREE")
 		return
@@ -5907,6 +5947,11 @@ func _update_grapple(delta: float) -> void:
 	toward.y = 0.0
 	if toward.length() > 0.01:
 		yaw = atan2(toward.x, toward.z)
+	# First person should meet the captive's upper body, not stare through their
+	# belt line. It remains an eased nudge (and only while linked), so taking a
+	# hold does not hard-cut or permanently steal the player's look direction.
+	if not third_person:
+		pitch = lerpf(pitch, 0.10, clampf(delta * 6.0, 0.0, 1.0))
 	# O5.4. You can walk while holding somebody, and they come with you. Slowly,
 	# and more slowly the worse you are winning — dragging a person who is still
 	# fighting you is most of the work. This is what turns the clinch from a
@@ -5932,18 +5977,33 @@ func _update_grapple(delta: float) -> void:
 	# nothing and the next frame zeroed the unused velocity. The clinch owns its
 	# two bodies here and advances both in the same frame.
 	var held_body := node as CharacterBody3D
-	# Move the person in front first. Advancing the player into an unmoved
-	# capsule made forward input collide and stop while sideways input happened
-	# to work—the exact kind of arbitrary response that made the clinch feel
-	# broken. Preserve the current spacing until it settles into the hold band.
-	var hold_spacing := clampf(toward.length(), 1.15, 1.65)
-	var predicted_player := player + shove * delta
-	var desired_hold := predicted_player + hold_direction * hold_spacing
-	held_body.velocity = shove + (desired_hold - node.global_position) * 4.0
-	held_body.move_and_slide()
+	# Reciprocal exceptions mean the pair can advance in the intuitive order:
+	# move the controlled player first, then constrain the captive to the
+	# player's *physical capsule height*. The old code aimed at `player`, which
+	# is 0.6 m above the capsule and slowly hoisted the captive off the floor.
+	# Close enough for the procedural forearms to visibly bridge the bodies,
+	# but still outside the combined capsule radii (whose collision response is
+	# intentionally suspended for this pair while the constraint owns them).
+	var hold_spacing := clampf(toward.length(), 0.86, 1.05)
 	player_body.move_and_slide()
 	player = player_body.position + Vector3.UP * 0.6
+	var desired_hold := player_body.global_position + hold_direction * hold_spacing
+	desired_hold.y = held_body.global_position.y
+	held_body.velocity = shove + (desired_hold - held_body.global_position) * 7.0
+	held_body.move_and_slide()
+	var face_player := player_body.global_position - held_body.global_position
+	face_player.y = 0.0
+	if face_player.length_squared() > 0.001:
+		held_body.rotation.y = atan2(face_player.x, face_player.z) + PI
 	actor.attack_time = 0.0
+	if body_motion != null:
+		body_motion.set_grapple_pose(1.0, true)
+		body_motion.update(delta, player_body.velocity, player_body.is_on_floor(), false, crouching, false)
+	var held_motion := actor.get("motion") as HunterBodyMotion
+	if held_motion != null and is_instance_valid(held_motion):
+		held_motion.set_combat_pose(0.0, "")
+		held_motion.set_grapple_pose(1.0, false)
+		held_motion.update(delta, held_body.velocity, held_body.is_on_floor(), false, false, false)
 
 	# A real Input press cannot be raised headless, and this is the one clinch
 	# input read as a raw button rather than an action, so tests need a way in
@@ -6798,11 +6858,16 @@ func _update_camera() -> void:
 	# sits off-centre over one shoulder and low in frame, the rig is close
 	# enough to read a swing on, and the whole thing is spring-damped so it
 	# trails the player instead of snapping to a computed point each frame.
-	var locked := _lock_node()
+	var locked := _camera_combat_focus()
 	var focus := player + Vector3.UP * 0.95
 	var shoulder := Vector3(cos(yaw), 0, -sin(yaw)) * 0.62
 	var distance := 4.4 if locked != null else 3.8
-	if locked != null:
+	if not grapple_target.is_empty() and locked != null:
+		# This is a connected-body action, not a distant lock-on. Keep both
+		# silhouettes large enough to read the arms and their shared footing.
+		distance = 3.05
+		focus = focus.lerp(locked.global_position + Vector3.UP * 0.9, 0.44)
+	elif locked != null:
 		# Framing holds the pair, so backing off a locked target widens the
 		# shot instead of losing them behind the player's own shoulder.
 		var gap: float = player.distance_to(locked.global_position)
@@ -6812,7 +6877,7 @@ func _update_camera() -> void:
 	if not camera_ready:
 		camera_position = desired
 		camera_ready = true
-	var responsiveness := 15.0 if locked != null else 11.0
+	var responsiveness := 18.0 if not grapple_target.is_empty() else (15.0 if locked != null else 11.0)
 	camera_position = camera_position.lerp(desired, clampf(get_physics_process_delta_time() * responsiveness, 0.0, 1.0))
 	# The wall test is the last thing that happens, on the position actually
 	# used. Testing the *target* and then smoothing toward it let the camera
@@ -6851,7 +6916,7 @@ func _update_camera() -> void:
 			camera.rotation.z += impact_feel.roll
 	if player_rig != null and is_instance_valid(player_rig):
 		var facing := yaw + PI
-		var locked_body := _lock_node()
+		var locked_body := locked
 		if locked_body != null and third_person:
 			var toward := locked_body.global_position - player
 			facing = atan2(toward.x, toward.z) + PI

@@ -52,8 +52,11 @@ func _ready() -> void:
 	hunt.third_person = false
 	hunt.perspective_blend = 0.0
 	hunt.body_motion.set_perspective(true)
-	hunt.player = Vector3(0, 1.5, 19)
-	hunt.player_body.position = Vector3(0, 0.9, 19)
+	# Open ground leaves enough room behind the shoulder for the third-person
+	# half of the same capture; the Hunt spawn has a wall directly behind it and
+	# correctly collapses the collision-safe camera back into the eye.
+	hunt.player = Vector3(175, 1.5, 125)
+	hunt.player_body.position = Vector3(175, 0.9, 125)
 	hunt.yaw = PI
 	var actor: Dictionary = hunt._spawn_encounter_actor({
 		"instance_id": "grapple_capture", "kind": "hostile",
@@ -63,7 +66,11 @@ func _ready() -> void:
 	hunt.grapple_advantage = 0.28
 	hunt.grapple_pushing_override = false
 	hunt.grapple_drag_override = Vector2.ZERO
-	hunt._update_grapple(0.01)
+	# Settle the real constraint and camera composition instead of photographing
+	# the first frame before either has had time to reach its authored pose.
+	for _clinch_frame in 18:
+		hunt.grapple_advantage = 0.28
+		hunt._update_grapple(1.0 / 60.0)
 	hunt.grapple_drag_override = null
 	hunt.set_physics_process(false)
 	hunt._update_camera()
@@ -71,6 +78,17 @@ func _ready() -> void:
 	for _settle in 6:
 		await get_tree().process_frame
 	await _capture("grapple_clinch_controls.png")
+	# The same uninterrupted hold after F: proof that the camera frames the pair
+	# and the exterior body silhouettes take over without releasing the target.
+	hunt.third_person = true
+	hunt.body_motion.set_perspective(false)
+	hunt.perspective_blend = 1.0
+	hunt.camera_ready = false
+	hunt._update_grapple(1.0 / 60.0)
+	for _camera_frame in 24:
+		hunt._update_camera()
+		await get_tree().process_frame
+	await _capture("grapple_clinch_third_person.png")
 	actor.node.queue_free()
 	get_tree().quit()
 
