@@ -2913,12 +2913,8 @@ func _update_smoking(delta: float) -> void:
 			# Transfer the live object from the finger cradle to an implied lip point
 			# just beneath the reticle. The hand travels with it, releases, and leaves
 			# the frame; taking it back plays the same movement in reverse.
-			# Rolled smokeables sit out of the aiming lane, almost horizontal in
-			# screen space and below the reticle. The old near-centre pose read as
-			# a vertical pointer attached to the crosshair rather than something
-			# hanging naturally from the side of the mouth.
-			var lip_position := Vector3(-0.055, -0.105, -0.265) if rolled else Vector3(0.010, -0.052, -0.240)
-			var lip_rotation := Vector3(0.03, -1.48, -0.05) if rolled else Vector3(0.10, -0.94, -0.03)
+			var lip_position := Vector3(-0.008, -0.032, -0.220) if rolled else Vector3(0.010, -0.052, -0.240)
+			var lip_rotation := Vector3(0.04, -1.10, -0.08) if rolled else Vector3(0.10, -0.94, -0.03)
 			var transfer := smoothstep(0.0, 1.0, smoke_mouth_blend)
 			var mouth_anchor := smoke_model.get_node_or_null("anchor_mouth") as Node3D
 			if mouth_anchor != null:
