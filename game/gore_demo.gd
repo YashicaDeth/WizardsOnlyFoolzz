@@ -167,6 +167,11 @@ var dodge_direction := Vector3.ZERO
 var stamina := 100.0
 var firearm_aiming := false
 var firearm_aim_blend := 0.0
+## C now rehearses the Hunt's contact-range clinch. The selected range body is
+## still its real anatomy rig; holding it does not spawn a proxy or freeze the
+## rest of the drill around it.
+var grapple_index := -1
+var grapple_distance := 1.15
 
 
 ## AF6. Real weapon state — current weapon, ammo, reload, jam — shared with
@@ -1034,7 +1039,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 				Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 				return
-			_fire()
+			if grapple_index >= 0:
+				_grapple_pressure()
+			else:
+				_fire()
 		elif click.button_index == MOUSE_BUTTON_RIGHT:
 			if str(arsenal.current().get("kind", "")) == "firearm":
 				firearm_aiming = click.pressed
@@ -1062,7 +1070,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_begin_or_use_carried(slot)
 			return
 		match key.keycode:
-			KEY_C: _set_enemies_enabled(not enemies_enabled)
+			KEY_C: _toggle_grapple()
+			KEY_H: _set_enemies_enabled(not enemies_enabled)
 			KEY_SPACE:
 				var move := _sandbox_move_input()
 				if move.length_squared() > 0.01:
@@ -1098,7 +1107,7 @@ func _sandbox_move_input() -> Vector3:
 
 
 func _begin_dodge(requested_direction := Vector3.ZERO) -> bool:
-	if dodge_remaining > 0.0 or dodge_cooldown > 0.0 or stamina < 25.0 or vertical_velocity != 0.0:
+	if grapple_index >= 0 or dodge_remaining > 0.0 or dodge_cooldown > 0.0 or stamina < 25.0 or vertical_velocity != 0.0:
 		return false
 	var requested: Vector3 = requested_direction
 	requested.y = 0.0
@@ -1111,6 +1120,68 @@ func _begin_dodge(requested_direction := Vector3.ZERO) -> bool:
 	firearm_aiming = false
 	_note("DODGE // COMMIT, RECOVER, MOVE AGAIN")
 	return true
+
+
+func _toggle_grapple() -> bool:
+	if grapple_index >= 0:
+		_release_grapple("YOU LET GO")
+		return false
+	var along := -camera.global_transform.basis.z
+	var found := _trace_body(camera.global_position, along)
+	if found.is_empty() or camera.global_position.distance_to(found.get("position", camera.global_position)) > 2.65:
+		_note("NO BODY IN GRAPPLING REACH")
+		return false
+	var target_rig := found.get("rig") as BaselineHuman
+	for index in bodies.size():
+		if (bodies[index] as Dictionary).get("rig") == target_rig:
+			return _begin_grapple(index)
+	return false
+
+
+func _begin_grapple(index: int) -> bool:
+	if index < 0 or index >= bodies.size() or grapple_index >= 0:
+		return false
+	var entry: Dictionary = bodies[index]
+	var rig := entry.get("rig") as BaselineHuman
+	var holder := entry.get("holder") as Node3D
+	if rig == null or holder == null or not is_instance_valid(rig) or not is_instance_valid(holder) or rig.anatomy.dead or rig.anatomy.downed:
+		return false
+	if camera.global_position.distance_to(holder.global_position + Vector3.UP * 0.7) > 2.9:
+		return false
+	grapple_index = index
+	grapple_distance = clampf(camera.global_position.distance_to(holder.global_position), 0.95, 1.45)
+	firearm_aiming = false
+	var motion := entry.get("motion") as HunterBodyMotion
+	if motion != null:
+		motion.set_grapple_pose(1.0, false)
+	_note("CLINCH // WASD DRAGS, LMB PRESSES, C RELEASES")
+	return true
+
+
+func _release_grapple(message := "") -> void:
+	if grapple_index >= 0 and grapple_index < bodies.size():
+		var motion := (bodies[grapple_index] as Dictionary).get("motion") as HunterBodyMotion
+		if motion != null and is_instance_valid(motion):
+			motion.set_grapple_pose(0.0, false)
+	grapple_index = -1
+	if not message.is_empty():
+		_note(message)
+
+
+func _grapple_pressure() -> bool:
+	if grapple_index < 0 or grapple_index >= bodies.size():
+		return false
+	var entry: Dictionary = bodies[grapple_index]
+	var rig := entry.get("rig") as BaselineHuman
+	if rig == null or not is_instance_valid(rig) or rig.anatomy.dead:
+		_release_grapple()
+		return false
+	var result: Dictionary = rig.hit("torso", 3.0, 2.0, "blunt")
+	_kick(0.18, "blunt", false, HITSTOP_SHOT)
+	_note("CLINCH PRESSURE // C RELEASES")
+	if rig.anatomy.dead or rig.anatomy.downed:
+		_release_grapple("THE BODY DROPS OUT OF YOUR HOLD")
+	return bool(result.get("accepted", true))
 
 
 func _carry_slot_for_key(keycode: Key) -> int:
@@ -1329,7 +1400,7 @@ func _set_enemies_enabled(enabled: bool) -> void:
 func _update_mode_button() -> void:
 	if mode_button == null or not is_instance_valid(mode_button):
 		return
-	mode_button.text = "[C] TRAINING MODE  //  %s" % ("ENEMIES" if enemies_enabled else "DUMMIES")
+	mode_button.text = "[H] TRAINING MODE  //  %s" % ("ENEMIES" if enemies_enabled else "DUMMIES")
 	mode_button.add_theme_color_override("font_color", Color("e05032") if enemies_enabled else Color("d7c69e"))
 
 
@@ -1338,13 +1409,32 @@ func _update_mode_button() -> void:
 ## advance, face the camera and land timed training strikes; downed, dead or
 ## dismembered bodies stop. DUMMY mode halts this entire path immediately.
 func _update_training_bodies(real_delta: float) -> void:
-	for entry: Dictionary in bodies:
+	if grapple_index >= bodies.size():
+		_release_grapple()
+	for index in bodies.size():
+		var entry: Dictionary = bodies[index]
 		var holder := entry.get("holder") as Node3D
 		var rig := entry.get("rig") as BaselineHuman
 		var motion := entry.get("motion") as HunterBodyMotion
 		if holder == null or rig == null or not is_instance_valid(holder) or not is_instance_valid(rig):
 			continue
 		if rig.anatomy.dead or rig.anatomy.downed:
+			if index == grapple_index:
+				_release_grapple("THE BODY DROPS OUT OF YOUR HOLD")
+			continue
+		if index == grapple_index:
+			var forward := -camera.global_transform.basis.z
+			forward.y = 0.0
+			if forward.length_squared() <= 0.001:
+				forward = Vector3.FORWARD
+			var anchor := eye + forward.normalized() * grapple_distance
+			anchor.y = 0.9
+			holder.global_position = holder.global_position.lerp(anchor, clampf(real_delta * 22.0, 0.0, 1.0))
+			holder.rotation.y = yaw
+			if motion != null:
+				motion.set_combat_pose(0.0, "")
+				motion.set_grapple_pose(1.0, false)
+				motion.update(real_delta, walk, true, walk.length() > 3.0, false, false)
 			continue
 		if not enemies_enabled:
 			if motion != null:
@@ -1406,7 +1496,7 @@ func _paint_hud() -> void:
 	var keys := [
 		["LMB", "FIRE/SWING"], ["RMB", "AIM/HEAVY"], ["F", "BLAST HERE"],
 		["6-8", "WEAPON"], ["WHEEL", "CYCLE"], ["T", "RELOAD"],
-		["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"], ["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["C", "DUMMY/ENEMY"], ["SPACE", "JUMP/MOVE+DODGE"], ["CTRL", "CROUCH"], ["WASD", "MOVE"],
+		["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"], ["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["H", "DUMMY/ENEMY"], ["C", "GRAPPLE/LET GO"], ["SPACE", "JUMP/MOVE+DODGE"], ["CTRL", "CROUCH"], ["WASD", "MOVE/DRAG"],
 	]
 	var row_size := 6
 	for index in keys.size():

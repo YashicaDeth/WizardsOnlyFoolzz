@@ -38,6 +38,16 @@ func _ready() -> void:
 	await _settle(tree, 6)
 	await _shoot(tree, out_dir + "/gore_demo_room.png")
 
+	# Put one of the actual anatomy bodies inside reach and take it into the
+	# shared captive pose. This proves C is teaching a physical clinch now, not
+	# toggling an unrelated menu state.
+	var grapple_holder := (demo.bodies[0] as Dictionary).get("holder") as Node3D
+	grapple_holder.global_position = Vector3(demo.eye.x, 0.9, demo.eye.z - 1.5)
+	demo._begin_grapple(0)
+	await _settle(tree, 5)
+	await _shoot(tree, out_dir + "/gore_sandbox_grapple.png")
+	demo._release_grapple()
+
 	# The training room now speaks the same firearm language as the Hunt. Hold
 	# aim long enough for the lens and viewmodel to settle, then photograph the
 	# live stance readout rather than relying on a unit assertion alone.
