@@ -12,7 +12,7 @@ extends CanvasLayer
 ## the person with the problem do the measuring, and he is playing, not
 ## profiling. This makes the build answer for itself.
 ##
-## F3 toggles it. F4 writes a dump next to the executable that can be sent back
+## F10 toggles it. F11 writes a dump next to the executable that can be sent back
 ## as a file rather than retyped.
 ##
 ## Deliberately cheap: the numbers come from `RenderingServer.get_rendering_info`
@@ -59,10 +59,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
 	match (event as InputEventKey).keycode:
-		KEY_F3:
+		KEY_F10:
 			showing = not showing
 			visible = showing
-		KEY_F4:
+		KEY_F11:
 			_dump()
 
 
@@ -135,11 +135,11 @@ func _report(rich: bool) -> String:
 	]
 	var body := "\n".join(lines)
 	if rich:
-		return "[font_size=13][color=#cfe3a8]%s[/color]\n[color=#7d8a6a]F3 hide   F4 write a dump to send[/color][/font_size]" % body
+		return "[font_size=13][color=#cfe3a8]%s[/color]\n[color=#7d8a6a]F10 hide   F11 write a dump to send[/color][/font_size]" % body
 	return body
 
 
-## F4. Writes beside the executable rather than into `user://`, because the point
+## F11. Writes beside the executable rather than into `user://`, because the point
 ## is that Greg can find the file and send it without being told where Godot
 ## hides its application data on Windows.
 func _dump() -> void:

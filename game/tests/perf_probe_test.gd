@@ -17,6 +17,18 @@ func _ready() -> void:
 	check(PerfProbe != null, "the probe is an autoload and exists in every scene")
 	check(not PerfProbe.visible, "it is off until asked for — a HUD nobody opted into is a HUD in every screenshot")
 	check(PerfProbe.process_mode == Node.PROCESS_MODE_ALWAYS, "it keeps measuring while the game is paused, which is when people open it")
+	var old_phone_key := InputEventKey.new()
+	old_phone_key.keycode = KEY_F3
+	old_phone_key.pressed = true
+	PerfProbe._unhandled_input(old_phone_key)
+	check(not PerfProbe.showing, "phone function keys no longer also toggle diagnostics")
+	var probe_key := InputEventKey.new()
+	probe_key.keycode = KEY_F10
+	probe_key.pressed = true
+	PerfProbe._unhandled_input(probe_key)
+	check(PerfProbe.showing and PerfProbe.visible, "F10 opens the isolated performance overlay")
+	PerfProbe._unhandled_input(probe_key)
+	check(not PerfProbe.showing and not PerfProbe.visible, "F10 closes the overlay cleanly")
 
 	for _f in 12:
 		await get_tree().process_frame
