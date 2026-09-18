@@ -150,6 +150,7 @@ const IMPACT_FEEL := preload("res://systems/impact_feel.gd")
 const CARRION_SCAVENGER := preload("res://systems/carrion_scavenger.gd")
 const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 const SUBSTANCE_STATION := preload("res://systems/substance_station.gd")
+const FIELD_INVENTORY := preload("res://systems/field_inventory.gd")
 
 var player := Vector3(0, 1.5, 19)
 var sleep_site: Node3D
@@ -593,6 +594,10 @@ var resolution_target := ""
 var living_map: Control
 ## I0.1. The real index. Hunt Grounds was drawing its own text list instead.
 var world_index: Control
+## O opens the body's actual carried-object model directly. The Black Mirror's
+## CARRY app remains a second physical view of this same data, not the only
+## route into inventory during ordinary play.
+var field_inventory: FieldInventory
 ## L. The Board was built across twenty-odd segments and instantiated only in
 ## tests — there has never been a key that opens it, which is why Greg could not
 ## remember how to reach it. There is one now.
@@ -945,6 +950,11 @@ func _ready() -> void:
 	body_motion.configure(player_rig)
 	body_motion.set_perspective(not third_person)
 	WorldHistory.register_subject("inventory", {"items": []})
+	field_inventory = FIELD_INVENTORY.new()
+	field_inventory.name = "FieldInventory"
+	$HUD.add_child(field_inventory)
+	field_inventory.close_requested.connect(_toggle_inventory)
+	field_inventory.activate_requested.connect(_activate_inventory_item)
 	_spawn_friend()
 	# AE.1. The captain is still spawned exactly as she always was, and this
 	# runs alongside her rather than instead of her or through her. The order
@@ -1307,6 +1317,9 @@ func _register_people() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if resolution_ui.visible or kill_cam.active:
 		return
+	if panel_mode == "inventory" and field_inventory != null and field_inventory.handle_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	# Full-size readers own their navigation keys. LivingMap is a Control, but it
 	# does not take keyboard focus merely by becoming visible; without this route
 	# L fell through to the field's Black Mirror lens and appeared to turn the
@@ -1488,6 +1501,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_T: _toggle_panel("tree")
 			KEY_J: _toggle_artwork()
 			KEY_P: _toggle_panel("board")
+			KEY_O: _toggle_inventory()
 			# Agent 1 brief. The Black Mirror as a lens, not just a shutter — N
 			# still snaps a photo instantly, unchanged; L holds the view amplified
 			# so looking through it is a real choice you can hold rather than a
@@ -4752,11 +4766,18 @@ func _nearest_takeable_chunk(radius: float) -> Node3D:
 
 
 func _equip_carried_limb() -> void:
-	firearm_aiming = false
 	var index: int = handheld.carry.first_index("limb")
 	if index < 0:
 		prompt.text = "CARRY HAS NO WHOLE LIMB"
 		return
+	_equip_carried_limb_index(index)
+
+
+func _equip_carried_limb_index(index: int) -> void:
+	if index < 0 or index >= handheld.carry.items.size() or str((handheld.carry.items[index] as Dictionary).get("kind", "")) != "limb":
+		prompt.text = "THAT CANNOT BE WIELDED"
+		return
+	firearm_aiming = false
 	_put_smokeable_away(false)
 	_clear_carried_limb_model(false)
 	carried_limb_index = index
@@ -6472,6 +6493,7 @@ func _build_keys_card() -> void:
 			["LMB EXHALE", "O / DOUBLE O / GHOST"],
 		]},
 		{"group": "WHAT YOU CARRY", "rows": [
+			["O", "FIELD INVENTORY / BODY / LOOT"],
 			["G", "RAISE / LOWER BLACK MIRROR"],
 			["TAB", "INDEX / NEXT DEVICE APP"],
 			["CLICK / F1-F7", "SELECT DEVICE APP"],
@@ -6561,6 +6583,7 @@ func _toggle_panel(mode: String) -> void:
 	# of the run. That is the interface "breaking once you get out of the car":
 	# nothing breaks on arrival, it breaks the first time you open a panel.
 	var covering: bool = living_map.visible or world_index.visible or pin_board.visible
+	covering = covering or (field_inventory != null and field_inventory.visible)
 	prompt.visible = not covering
 	# The old ArchivePanel is dead. It was a Label in a box and it is exactly
 	# what "no more of this tutorial look" was about.
@@ -6581,12 +6604,48 @@ func _close_panel_views() -> void:
 	allusions_artwork.close_artwork()
 	character_archive.close_archive()
 	living_map.close_map()
+	if field_inventory != null:
+		field_inventory.close_inventory()
 	if world_index.visible:
 		world_index.close()
 		world_index.visible = false
 	if pin_board.visible:
 		pin_board.close()
 	panel.visible = false
+
+
+func _toggle_inventory() -> void:
+	var opening := panel_mode != "inventory"
+	if opening:
+		firearm_aiming = false
+		if handheld.is_open:
+			handheld.close_device()
+		keys_card.close()
+		_close_panel_views()
+		panel_mode = "inventory"
+		field_inventory.open_inventory(handheld.carry, player_rig, arsenal)
+		prompt.visible = false
+		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
+		if _pointer != null and is_instance_valid(_pointer):
+			_pointer.visible = true
+	else:
+		field_inventory.close_inventory()
+		panel_mode = ""
+		prompt.visible = true
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if _pointer != null and is_instance_valid(_pointer):
+			_pointer.visible = false
+
+
+func _activate_inventory_item(index: int) -> void:
+	if index < 0 or index >= handheld.carry.items.size():
+		return
+	var item: Dictionary = handheld.carry.items[index]
+	if str(item.get("kind", "")) != "limb":
+		prompt.text = "%s // CARRIED, NOT WIELDABLE" % str(item.get("label", "OBJECT"))
+		return
+	_toggle_inventory()
+	_equip_carried_limb_index(index)
 
 
 ## Return true only when this scene actually consumed an interface close.
