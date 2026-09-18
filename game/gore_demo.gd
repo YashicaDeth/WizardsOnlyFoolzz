@@ -567,6 +567,7 @@ func _melee_swing() -> void:
 	if not bool(result.get("accepted", true)):
 		_note("%s ALREADY GONE" % _spoken(zone))
 		return
+	_trigger_body_hit_reaction(rig, along, zone, float(result.get("damage", attack.get("damage", 0.0))))
 	var off := bool(result.get("severed", false))
 	if off:
 		severed_total += 1
@@ -657,11 +658,32 @@ func _on_round_hit(hit: Dictionary) -> void:
 	if not bool(result.get("accepted", true)):
 		_note("%s ALREADY GONE" % _spoken(zone))
 		return
+	_trigger_body_hit_reaction(rig, direction, zone, float(result.get("damage", damage * carried)))
 	var off := bool(result.get("severed", false))
 	if off:
 		severed_total += 1
 	_kick(0.7 * carried, damage_type, off, HITSTOP_SHOT)
 	_note("%s OFF" % _spoken(zone) if off else "HIT // %s" % _spoken(zone))
+
+
+## Range bodies already share anatomy with the Hunt; they now share the hit
+## animation handoff too. Direction remains world-space until BodyMotion turns
+## it into the victim's local lean, so a left hit and right hit cannot collapse
+## into the same generic flinch.
+func _trigger_body_hit_reaction(rig: BaselineHuman, direction: Vector3, zone: String, damage: float) -> bool:
+	if rig == null or not is_instance_valid(rig):
+		return false
+	for entry: Dictionary in bodies:
+		if entry.get("rig") != rig:
+			continue
+		var motion := entry.get("motion") as HunterBodyMotion
+		if motion == null or not is_instance_valid(motion):
+			return false
+		var zone_max: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone, {}) as Dictionary).get("health", 100.0))
+		motion.trigger_hit(direction, damage / maxf(zone_max, 1.0))
+		rig.favour_injuries()
+		return true
+	return false
 
 
 ## A round that ran out of world without arriving anywhere. Still an outcome,

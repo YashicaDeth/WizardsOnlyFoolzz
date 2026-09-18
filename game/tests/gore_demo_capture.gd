@@ -79,8 +79,23 @@ func _ready() -> void:
 	demo.pitch = -0.02
 	await _settle(tree, 4)
 	demo._fire()
-	await _settle(tree, 10)
+	# Three frames preserves the victim's directional recoil; ten frames let the
+	# short hit animation finish before the evidence was photographed.
+	await _settle(tree, 3)
 	await _shoot(tree, out_dir + "/gore_demo_shot.png")
+
+	# A deterministic close target makes the directional lean legible even when
+	# the preceding spread shot happened to miss its distant intended body.
+	var reaction_entry: Dictionary = demo.bodies[1]
+	var reaction_holder := reaction_entry.get("holder") as Node3D
+	var reaction_rig := reaction_entry.get("rig") as BaselineHuman
+	var view_forward: Vector3 = -demo.camera.global_transform.basis.z
+	view_forward.y = 0.0
+	reaction_holder.global_position = demo.eye + view_forward.normalized() * 2.8
+	reaction_holder.global_position.y = 0.9
+	demo._trigger_body_hit_reaction(reaction_rig, Vector3.RIGHT, "torso", 90.0)
+	await _settle(tree, 1)
+	await _shoot(tree, out_dir + "/gore_sandbox_hit_reaction.png")
 
 	# Then the thing it is named after.
 	var centre: Vector3 = (demo.bodies[0] as Dictionary)["rig"].global_position
