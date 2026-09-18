@@ -122,7 +122,7 @@ text = "BLOOM: ON"
 [node name="Graphics" type="Button" parent="HUD/SettingsPanel/VBox"]
 text = "GRAPHICS: PERFORMANCE"
 [node name="Resolution" type="Button" parent="HUD/SettingsPanel/VBox"]
-text = "RENDER SCALE: 100%"
+text = "RENDER SCALE: 75%"
 [node name="AntiAliasing" type="Button" parent="HUD/SettingsPanel/VBox"]
 text = "ANTI-ALIASING: TAA + MSAA 4X"
 [node name="VSync" type="Button" parent="HUD/SettingsPanel/VBox"]

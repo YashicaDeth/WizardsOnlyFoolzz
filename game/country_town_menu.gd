@@ -34,8 +34,11 @@ var splash_layer: CanvasLayer
 var branch_plate: Control
 var graphics_presets := ["ULTRA", "HIGH", "PERFORMANCE"]
 var graphics_index := 2
-var render_scales := [1.0, 1.25, 1.5, 0.8]
-var render_scale_index := 0
+# Resolution is a recovery lever, not a hidden supersampling benchmark. The old
+# 125/150% choices rendered up to 2.25x the window pixels and could combine with
+# 4x MSAA; one accidental click was enough to recreate the reported 13 FPS.
+var render_scales := [0.67, 0.75, 0.9, 1.0]
+var render_scale_index := 1
 var color_modes := ["CELLOUTZ COPPER", "SALVAGE TEAL", "NIGHT BLOOD"]
 var color_index := 0
 var gore_modes := ["FULL", "REDUCED", "OFF"]
@@ -693,14 +696,17 @@ func _apply_graphics_preset(preset: String) -> void:
 	WorldLook.set_quality_name(preset)
 	match preset:
 		"ULTRA":
+			render_scale_index = 3
 			get_viewport().scaling_3d_scale = 1.0
 			get_viewport().msaa_3d = Viewport.MSAA_4X
 			get_viewport().use_taa = true
 		"HIGH":
+			render_scale_index = 2
 			get_viewport().scaling_3d_scale = 0.9
 			get_viewport().msaa_3d = Viewport.MSAA_2X
 			get_viewport().use_taa = true
 		_:
+			render_scale_index = 1
 			get_viewport().scaling_3d_scale = 0.75
 			get_viewport().msaa_3d = Viewport.MSAA_DISABLED
 			get_viewport().use_taa = false
@@ -711,6 +717,9 @@ func _apply_graphics_preset(preset: String) -> void:
 	var button := get_node_or_null("HUD/SettingsPanel/VBox/Graphics") as Button
 	if button != null:
 		button.text = "GRAPHICS: %s" % preset
+	var resolution_button := get_node_or_null("HUD/SettingsPanel/VBox/Resolution") as Button
+	if resolution_button != null:
+		resolution_button.text = "RENDER SCALE: %d%%" % roundi(get_viewport().scaling_3d_scale * 100.0)
 
 
 func _cycle_resolution() -> void:
