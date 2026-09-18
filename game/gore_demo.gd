@@ -148,6 +148,15 @@ var spent := 0
 var severed_total := 0
 var last_note := ""
 var note_life := 0.0
+## A range needs both non-retaliating anatomy targets and something that proves
+## the same body remains readable while it closes distance. This is an explicit
+## player-owned switch, not an invisible sandbox argument.
+var enemies_enabled := false
+var simulation_health := 100
+var mode_button: Button
+var jump_queued := false
+var vertical_velocity := 0.0
+var stance_height := 1.68
 
 
 ## AF6. Real weapon state — current weapon, ammo, reload, jam — shared with
@@ -329,7 +338,13 @@ func _spawn_body(index: int) -> void:
 	if xray:
 		rig.reveal_organs(true)
 		rig.see_through(true)
-	bodies.append({"holder": holder, "rig": rig, "id": "demo_body_%d" % index})
+	bodies.append({
+		"holder": holder,
+		"rig": rig,
+		"id": "demo_body_%d" % index,
+		"attack_ready": 0.35 + float(index) * 0.12,
+		"stride_phase": float(index) * 0.9,
+	})
 
 
 func _reset() -> void:
@@ -1034,6 +1049,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_begin_or_use_carried(slot)
 			return
 		match key.keycode:
+			KEY_C: _set_enemies_enabled(not enemies_enabled)
+			KEY_SPACE: jump_queued = true
 			KEY_E: _take_station_item()
 			KEY_G:
 				if handheld != null:
@@ -1162,7 +1179,21 @@ func _physics_process(delta: float) -> void:
 	eye += walk * real_delta
 	eye.x = clampf(eye.x, -ARENA + 2.0, ARENA - 2.0)
 	eye.z = clampf(eye.z, -ARENA + 2.0, ARENA - 2.0)
-	eye.y = 1.68
+	var crouching := Input.is_key_pressed(KEY_CTRL)
+	var target_stance := 1.08 if crouching else 1.68
+	stance_height = move_toward(stance_height, target_stance, real_delta * 3.8)
+	if jump_queued and vertical_velocity == 0.0 and not crouching:
+		vertical_velocity = 5.8
+	jump_queued = false
+	if vertical_velocity != 0.0:
+		vertical_velocity -= 16.0 * real_delta
+		eye.y += vertical_velocity * real_delta
+		if eye.y <= stance_height:
+			eye.y = stance_height
+			vertical_velocity = 0.0
+	else:
+		eye.y = stance_height
+	_update_training_bodies(real_delta)
 
 	# The third of the three things that are supposed to arrive together on
 	# contact. The feeler has been carrying this the whole time and nothing in
@@ -1213,6 +1244,76 @@ func _build_hud() -> void:
 	psychedelic = PSYCHEDELIC_RIG.new()
 	psychedelic.name = "SandboxPsychedelic"
 	layer.add_child(psychedelic)
+	mode_button = Button.new()
+	mode_button.name = "TrainingMode"
+	mode_button.position = Vector2(476, 24)
+	mode_button.size = Vector2(328, 38)
+	mode_button.focus_mode = Control.FOCUS_NONE
+	mode_button.add_theme_font_size_override("font_size", 14)
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color(0.035, 0.02, 0.016, 0.9)
+	normal.border_color = Color("862016")
+	normal.set_border_width_all(2)
+	normal.set_corner_radius_all(4)
+	mode_button.add_theme_stylebox_override("normal", normal)
+	var hover := normal.duplicate()
+	hover.bg_color = Color(0.12, 0.035, 0.02, 0.96)
+	mode_button.add_theme_stylebox_override("hover", hover)
+	mode_button.pressed.connect(func() -> void: _set_enemies_enabled(not enemies_enabled))
+	layer.add_child(mode_button)
+	_update_mode_button()
+
+
+func _set_enemies_enabled(enabled: bool) -> void:
+	enemies_enabled = enabled
+	if enabled:
+		simulation_health = 100
+		_note("ENEMY DRILL // BODIES WILL CLOSE AND STRIKE")
+	else:
+		_note("DUMMY DRILL // BODIES HOLD POSITION")
+	_update_mode_button()
+
+
+func _update_mode_button() -> void:
+	if mode_button == null or not is_instance_valid(mode_button):
+		return
+	mode_button.text = "[C] TRAINING MODE  //  %s" % ("ENEMIES" if enemies_enabled else "DUMMIES")
+	mode_button.add_theme_color_override("font_color", Color("e05032") if enemies_enabled else Color("d7c69e"))
+
+
+## The enemy drill deliberately stays inside the sandbox's existing anatomy
+## bodies: no duplicate health rig and no decorative AI proxy. Standing bodies
+## advance, face the camera and land timed training strikes; downed, dead or
+## dismembered bodies stop. DUMMY mode halts this entire path immediately.
+func _update_training_bodies(real_delta: float) -> void:
+	if not enemies_enabled:
+		return
+	for entry: Dictionary in bodies:
+		var holder := entry.get("holder") as Node3D
+		var rig := entry.get("rig") as BaselineHuman
+		if holder == null or rig == null or not is_instance_valid(holder) or not is_instance_valid(rig):
+			continue
+		if rig.anatomy.dead or rig.anatomy.downed:
+			continue
+		var toward := eye - holder.global_position
+		toward.y = 0.0
+		var distance := toward.length()
+		if distance > 1.45:
+			var step := toward.normalized() * minf(distance - 1.35, real_delta * 2.15)
+			holder.global_position += step
+			holder.look_at(Vector3(eye.x, holder.global_position.y, eye.z), Vector3.UP)
+			entry["stride_phase"] = float(entry.get("stride_phase", 0.0)) + real_delta * 8.0
+			rig.position.y = -0.9 + absf(sin(float(entry["stride_phase"]))) * 0.035
+		entry["attack_ready"] = float(entry.get("attack_ready", 0.0)) - real_delta
+		if distance <= 1.65 and float(entry["attack_ready"]) <= 0.0:
+			entry["attack_ready"] = 1.05
+			simulation_health = maxi(0, simulation_health - 8)
+			_kick(0.24, "blunt", false, HITSTOP_SHOT)
+			_note("TRAINING HIT // SIM HEALTH %03d" % simulation_health)
+			if simulation_health <= 0:
+				simulation_health = 100
+				eye = Vector3(0.0, stance_height, 9.0)
+				_note("SIMULATION BODY RESET // TARGETS RETAIN DAMAGE")
 
 
 func _paint_hud() -> void:
@@ -1241,12 +1342,18 @@ func _paint_hud() -> void:
 	var keys := [
 		["LMB", "FIRE/SWING"], ["RMB", "BLAST THERE"], ["F", "BLAST HERE"],
 		["6-8", "WEAPON"], ["WHEEL", "CYCLE"], ["T", "RELOAD"],
-		["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"], ["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["WASD", "MOVE"],
+		["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"], ["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["C", "DUMMY/ENEMY"], ["SPACE", "JUMP"], ["CTRL", "CROUCH"], ["WASD", "MOVE"],
 	]
-	var x := 26.0
-	for pair: Array in keys:
-		x += CellOutzType.draw_condensed(hud, Vector2(x, size.y - 26.0), str(pair[0]), 11.0, rust, 2.0) + 13.0
-		x += CellOutzType.draw_condensed(hud, Vector2(x, size.y - 26.0), str(pair[1]), 10.0, bone * Color(1, 1, 1, 0.55), 1.6) + 22.0
+	var row_size := 6
+	for index in keys.size():
+		var pair: Array = keys[index]
+		var row := index / row_size
+		var in_row := index % row_size
+		var column_width := (size.x - 52.0) / float(row_size)
+		var x := 26.0 + float(in_row) * column_width
+		var y_keys := size.y - 66.0 + float(row) * 21.0
+		var used := CellOutzType.draw_condensed(hud, Vector2(x, y_keys), str(pair[0]), 10.0, rust, 1.8)
+		CellOutzType.draw_condensed(hud, Vector2(x + used + 7.0, y_keys), str(pair[1]), 8.5, bone * Color(1, 1, 1, 0.55), 1.4)
 
 	# What is actually on the floor. The interesting number in a gore sandbox.
 	# Greg: *"CAN YOU FIX THE KNOCKDOWN ISSUE"*. This was it. The count tested
@@ -1281,6 +1388,7 @@ func _paint_hud() -> void:
 			weapon_line += "  //  %d / %d" % [int(arsenal_state.get("loaded", 0)), int(arsenal_state.get("reserve", 0))]
 	var lines := [
 		weapon_line,
+		"TRAINING  %s // SIM HEALTH %03d" % ["ENEMIES" if enemies_enabled else "DUMMIES", simulation_health],
 		"STANDING  %d / %d" % [standing, BODY_COUNT],
 		"DOWNED	%03d" % downed,
 		"TAKEN OFF	%03d" % severed_total,
@@ -1332,7 +1440,7 @@ func _paint_hud() -> void:
 
 	if note_life > 0.0 and last_note != "":
 		var note_width := CellOutzType.width(last_note, 17.0, 3.0)
-		CellOutzType.draw_text(hud, Vector2(size.x * 0.5 - note_width * 0.5, size.y - 84.0),
+		CellOutzType.draw_text(hud, Vector2(size.x * 0.5 - note_width * 0.5, size.y - 112.0),
 			last_note, 17.0, rust * Color(1, 1, 1, clampf(note_life, 0.0, 1.0)), 3.0)
 
 	# An Algiz-like sight: a cross at the centre rather than an OS pointer,

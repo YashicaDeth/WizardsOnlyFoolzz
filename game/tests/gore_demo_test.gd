@@ -112,6 +112,10 @@ func _ready() -> void:
 	var spent_before: int = demo.spent
 	demo._fire()
 	check(demo.spent == spent_before + 1, "pulling the trigger spends a round")
+	var flight_frames := 0
+	while total_health(rig) >= health_before and flight_frames < 24:
+		await tree.physics_frame
+		flight_frames += 1
 	check(total_health(rig) < health_before, "and the round lands on the body, not the wall")
 
 	# ---- the X-ray is two calls, and neither of them is `set_xray`.
@@ -145,7 +149,7 @@ func _ready() -> void:
 
 	# ---- and leaving does not take the slow motion out of the room with you.
 	demo.slowed = 1.0
-	await tree.physics_frame
+	demo._physics_process(1.0 / 60.0)
 	check(Engine.time_scale < 0.5, "held slow motion slows the world")
 	tree.current_scene = null
 	demo.free()

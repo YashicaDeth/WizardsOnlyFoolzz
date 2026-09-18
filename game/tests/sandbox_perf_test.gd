@@ -25,6 +25,12 @@ func _ready() -> void:
 		return
 	var tree := get_tree()
 	get_window().size = Vector2i(1920, 1080)
+	# Measuring three quality levels behind a 60 Hz present cap only measures
+	# the monitor: all three report ~16.6ms and tiny scheduling noise can make
+	# PERFORMANCE look slower than ULTRA. The sandbox complaint was frame cost,
+	# so remove presentation throttling for this benchmark.
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	Engine.max_fps = 0
 	await tree.process_frame
 
 	var demo: Node = load("res://gore_demo.tscn").instantiate()

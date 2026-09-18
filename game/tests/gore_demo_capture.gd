@@ -38,6 +38,14 @@ func _ready() -> void:
 	await _settle(tree, 6)
 	await _shoot(tree, out_dir + "/gore_demo_room.png")
 
+	# The same range bodies, switched live from passive anatomy targets into a
+	# closing combat drill. Capture the production control and the advancing
+	# bodies together so the mode is not verified by label alone.
+	demo._set_enemies_enabled(true)
+	await _settle(tree, 22)
+	await _shoot(tree, out_dir + "/gore_sandbox_enemy_mode.png")
+	demo._set_enemies_enabled(false)
+
 	# One shot, aimed at the nearest body, so there is a wound before there is
 	# a crater.
 	demo.yaw = 0.55
