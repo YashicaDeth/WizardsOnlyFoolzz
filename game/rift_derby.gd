@@ -1482,6 +1482,7 @@ func _on_cab_round_hit(hit: Dictionary) -> void:
 		_cab_streak(_cab_seen[serial], at)
 		_cab_seen.erase(serial)
 	var struck: Node = hit.get("collider")
+	WorldHistory.begin_ledger_batch()
 	if struck != null and struck.get_script() == SERVICE_RING_RELAY:
 		struck.call("take_hit", "cab_round", 1.0)
 		WorldHistory.record_event("derby_shot_landed", {"venue": "underground_colosseum", "target": struck.name})
@@ -1495,6 +1496,7 @@ func _on_cab_round_hit(hit: Dictionary) -> void:
 		# of this rewrite.
 		_damage_target(struck as Node3D, 9.0, 1.0, "gun_hit_ready_msec")
 		WorldHistory.record_event("derby_shot_landed", {"venue": "underground_colosseum" if is_colosseum else "rift_derby_quarry", "target": struck.name})
+	WorldHistory.commit_ledger_batch()
 
 
 ## AF1.8/AF10.8. One segment of a round's real path, for the eye — ported

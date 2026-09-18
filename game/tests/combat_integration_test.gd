@@ -181,6 +181,7 @@ func _ready() -> void:
 	# to slow and weaken subsequent attacks.
 	var full_cycle: float = hunt._actor_attack_cycle(locked_actor)
 	var full_damage: int = hunt._actor_attack_damage(locked_actor)
+	var severing_events_before := WorldHistory.event_count("limb_severed_in_combat")
 	locked_actor.rig.hit("right_arm", 44.0, 28.0, "cut", "", Vector3.RIGHT)
 	var sever: Dictionary = locked_actor.rig.hit("right_arm", 44.0, 28.0, "cut", "", Vector3.RIGHT)
 	check(bool(sever.get("severed", false)), "a directional blow severs a live encounter actor mid-fight")
@@ -188,7 +189,8 @@ func _ready() -> void:
 	check(locked_actor.state == "maimed" and not locked_actor.anatomy.dead and not locked_actor.anatomy.downed, "the maimed actor remains alive, standing and hostile")
 	check(hunt._actor_attack_cycle(locked_actor) > full_cycle, "the one-armed fighter attacks more slowly")
 	check(hunt._actor_attack_damage(locked_actor) < full_damage, "the one-armed fighter hits less hard")
-	check(WorldHistory.recent_events(20).any(func(event): return str(event.get("type", "")) == "limb_severed_in_combat"), "mid-fight limb loss enters persistent world history")
+	check(WorldHistory.event_count("limb_severed_in_combat") == severing_events_before + 1, "mid-fight limb loss enters persistent world history exactly once")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")), "maimed body state and its one public severing fact close together")
 	for candidate in hunt.encounter_actors:
 		candidate.disposition = "friendly"
 	locked_actor.disposition = "hostile"

@@ -5062,15 +5062,16 @@ func _apply_combat_response(actor: Dictionary, attack: Dictionary, hit: Dictiona
 func _apply_maiming_state(actor: Dictionary, zones: Array, direction: Vector3) -> void:
 	if zones.is_empty() or actor.anatomy.dead or actor.anatomy.downed:
 		return
+	WorldHistory.begin_ledger_batch()
 	actor.state = "maimed"
 	actor["maimed_remaining"] = 2.4
 	actor["loot_at_risk"] = false
 	var ratio := _actor_combat_ratio(actor)
-	WorldHistory.update_subject(str(actor.subject_id), {
+	WorldHistory.amend_subject(str(actor.subject_id), {
 		"status": "maimed_fighting",
 		"anatomy_state": actor.rig.snapshot(),
 		"memory": "Lost %s and kept fighting." % ", ".join(PackedStringArray(zones)),
-	}, "limb_severed_in_combat")
+	})
 	WorldHistory.record_event("limb_severed_in_combat", {
 		"subject_id": actor.subject_id,
 		"zones": zones.duplicate(),
@@ -5079,6 +5080,7 @@ func _apply_maiming_state(actor: Dictionary, zones: Array, direction: Vector3) -
 		"alive": true,
 		"location": HUNT_LOCATION,
 	})
+	WorldHistory.commit_ledger_batch()
 	prompt.text = "%s LOSES %s — STILL FIGHTING AT %d%%" % [str(actor.display_name).to_upper(), str(zones[0]).replace("_", " ").to_upper(), roundi(ratio * 100.0)]
 
 func _move_actor_on_route(actor: Dictionary, destination: Vector3, delta: float) -> void:

@@ -2477,7 +2477,7 @@ what that is rather than fixing another symptom.
       transactions close after real hits. The prosthetic surge is likewise one
       `prosthetic_surge_used` action; its `melee_body_hit` remains a world
       consequence rather than counterfeiting a second player input.
-- [x] **O3.2** A damaged limb changes what that person can do, and now shows it — arms hang, legs trail, the body leans off the bad side
+- [x] **O3.2** A damaged limb changes what that person can do, and now shows it — arms hang, legs trail, the body leans off the bad side. A live severing now amends that body silently and publishes exactly one detailed `limb_severed_in_combat` fact inside the landed-hit transaction; the former `update_subject()` event plus explicit event pair was double-counting the same lost limb for rival tactics and occult attention. `combat_integration_test.gd` fixes the one-event and closed-batch contract.
 - [x] ~~**O3.3** Grappling connects to it — hold, force, rob, recruit~~ Rob and
       recruit already did (F7.2 lets you rob somebody you are holding; F7's
       persuade/threaten already read pain and fading consciousness). Hold and
@@ -5409,7 +5409,7 @@ instead.
 ### AP5 — Lockdown Grid liberation
 
 - [x] **AP5.1** The Lockdown Grid exists in the playable world — each of the underground colosseum's three authored tunnel chambers contains one physical CellOutz relay, not a MAP-only objective marker. The old “Service Ring” engineering label survives only in stable save/code identifiers; MAP names the function and says the relays seal the exit.
-- [x] **AP5.2** The relays use verbs the derby already teaches — three travelling cab rounds or three qualifying vehicle impacts disable one; a dead relay stops scanning and cannot award duplicate progress.
+- [x] **AP5.2** The relays use verbs the derby already teaches — three travelling cab rounds or three qualifying vehicle impacts disable one; a dead relay stops scanning and cannot award duplicate progress. A cab round's relay/vehicle consequence and its `derby_shot_landed` fact now close as one impact transaction on the frame the shared Ballistics system reports contact.
 - [x] **AP5.3** The escape is a compound objective — eight wreckers clear the bowl but leave the heat active until all three relays are dark, so winning combat alone no longer counterfeits territorial liberation.
 - [x] **AP5.4** Surveillance is readable from the cab — each live head sweeps a real acquisition cone, and the existing physical instrument cluster carries three relay lamps plus the current scan level instead of adding another permanent corner panel.
 - [x] **AP5.5** The world answers the act once — each disabled index persists in `facility_territory`; the third liberates the Lockdown Grid, unseals the surface exit, unlocks its recovered INDEX file and escalates CellOutz's existing order to priority exactly once. `service_ring_relay_test` (7/7) and `service_ring_objective_test` (15/15) cover the target, explanation and integrated objective.
