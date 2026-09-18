@@ -2297,7 +2297,8 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		var node := candidate.get("node") as Node3D
 		if node == null or not is_instance_valid(node) or bool(candidate.get("dead", false)):
 			continue
-		if candidate.anatomy.downed or str(candidate.get("disposition", "hostile")) != "hostile":
+		var disposition := str(candidate.get("disposition", "hostile"))
+		if candidate.anatomy.downed or disposition in ["friendly", "ally", "asset"]:
 			continue
 		var distance := player.distance_to(node.global_position)
 		if distance > reach:
@@ -7484,6 +7485,13 @@ func _update_perception(delta: float) -> void:
 	for actor: Dictionary in encounter_actors:
 		if bool(actor.get("dead", false)):
 			continue
+		# Neutral workers are inhabitants, not extra sensors for the hostile
+		# network. They become combatants only through `_provoke_actor()` after a
+		# deliberate hit, at which point this same loop begins reading them.
+		if str(actor.get("disposition", "hostile")) != "hostile":
+			actor["tracking_player"] = false
+			actor["tracking_light"] = false
+			continue
 		var hostile: Node3D = actor.get("node")
 		if hostile == null or not is_instance_valid(hostile):
 			continue
@@ -7530,6 +7538,14 @@ func _update_perception(delta: float) -> void:
 ## melee and delayed ballistic impacts come through here, so neither can leave
 ## a target politely waiting after the player has already opened them up.
 func _provoke_actor(actor: Dictionary) -> void:
+	var prior := str(actor.get("disposition", "hostile"))
+	if prior == "neutral":
+		actor["disposition"] = "hostile"
+		actor["state"] = "hunting"
+		WorldHistory.update_subject(str(actor.get("subject_id", "")), {
+			"status": "provoked", "disposition": "hostile",
+			"memory": "The Hunter struck first in the Bone Yard.",
+		}, "npc_provoked")
 	actor["notice_remaining"] = 0.0
 	actor["tracking_player"] = true
 	actor["tracking_light"] = false
@@ -7740,7 +7756,9 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 		loot.assign(requested_loot)
 	if loot.is_empty():
 		loot = ["Ashline toll teeth", "rust scrip"] if str(encounter.kind) == "hostile" else ["weather-heart filament", "dead god relay"]
-	encounter_actors.append({"subject_id": subject_id, "display_name": display_name, "node": actor, "rig": rig, "motion": actor_motion, "anatomy": anatomy, "state": "hunting", "disposition": "hostile", "speed": 3.7, "loot": loot, "loot_at_risk": false, "dead": false})
+	var initial_disposition := str(encounter.get("disposition", "hostile"))
+	var initial_state := "hunting" if initial_disposition == "hostile" else "idle"
+	encounter_actors.append({"subject_id": subject_id, "display_name": display_name, "node": actor, "rig": rig, "motion": actor_motion, "anatomy": anatomy, "state": initial_state, "disposition": initial_disposition, "speed": 3.7, "loot": loot, "loot_at_risk": false, "dead": false})
 	encounter_actors.back()["encounter_id"] = str(encounter.get("instance_id", ""))
 	if returning_rival:
 		encounter_actors.back()["returning_rival"] = true
@@ -7748,7 +7766,7 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 		encounter_actors.back().state = str(saved_actor.status)
 		encounter_actors.back().disposition = "ally" if str(saved_actor.status) == "recruited" else "neutral"
 	WorldHistory.begin_ledger_batch()
-	WorldHistory.register_subject(subject_id, {"name": display_name, "kind": "person", "role": str(encounter.get("role", encounter.kind)), "elo": elo, "status": "encountered", "memory": summary_from(encounter), "wounds": [], "anatomy": anatomy.call("snapshot"), "relations": {"player": {"kind": "enemy", "strength": 35}}})
+	WorldHistory.register_subject(subject_id, {"name": display_name, "kind": "person", "role": str(encounter.get("role", encounter.kind)), "elo": elo, "status": "encountered", "disposition": initial_disposition, "memory": summary_from(encounter), "wounds": [], "anatomy": anatomy.call("snapshot"), "relations": {"player": {"kind": "enemy" if initial_disposition == "hostile" else "known", "strength": 35 if initial_disposition == "hostile" else 4}}})
 	if returning_rival:
 		var return_count := int(saved_actor.get("rival_returns", 0)) + 1
 		WorldHistory.amend_subject(subject_id, {
@@ -8343,6 +8361,7 @@ func _spawn_yard_worker(index: int) -> String:
 	var request: Dictionary = {
 		"instance_id": slot,
 		"kind": "hostile",
+		"disposition": "neutral",
 		"display_name": str(who["name"]),
 		"role": role,
 		"summary": "Works the Bone Yard %s. Carries a lantern, a quota and a grudge about both." % str(post.get("post", "floor")),
