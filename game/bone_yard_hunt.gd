@@ -581,7 +581,6 @@ var social_markers: Array[Node3D] = []
 var resolution_ui: Control
 var resolution_target := ""
 var living_map: Control
-var natal_sigil: Control
 ## I0.1. The real index. Hunt Grounds was drawing its own text list instead.
 var world_index: Control
 ## L. The Board was built across twenty-odd segments and instantiated only in
@@ -791,9 +790,6 @@ func _ready() -> void:
 	living_map = LIVING_MAP.new()
 	living_map.name = "LivingMap"
 	$HUD.add_child(living_map)
-	natal_sigil = preload("res://systems/natal_sigil.gd").new()
-	natal_sigil.name = "NatalSigil"
-	$HUD.add_child(natal_sigil)
 	# I0.1. Every rework of the index went into `world_index.gd`, and this scene
 	# never used it: TAB opened a Label full of "- weapon fired" instead. That is
 	# why the tutorial look kept coming back no matter how many times the index
@@ -6183,7 +6179,7 @@ func _build_keys_card() -> void:
 			["M", "LIVING MAP"],
 			["T", "CHARACTER TREE"],
 			["P", "THE BOARD"],
-			["J", "ALLUSIONS / SIGIL"],
+			["J", "ALLUSIONS ARTWORK"],
 			["HOLD L + WASD", "LEAN / WAVE DEVICE LIGHT"],
 			[HANDHELD.DROP_KEY_LABEL, "DROP DEVICE"],
 			["K", "RE-DECANT // A RESET THAT COSTS YOU"],
@@ -6269,18 +6265,13 @@ func _toggle_panel(mode: String) -> void:
 		_pointer.visible = not panel_mode.is_empty()
 
 
-## `J` cycles the Allusions archive: the artwork study, then the natal sigil,
-## then closed. The sigil is the chaos-magick half of the same archive — the
-## Tree axis the dossier already reads on, drawn as a bound mark.
+## J remains a temporary two-state route to the actual interactive artwork.
+## The old third state exposed Greg's placeholder birth chart before the player
+## had created a character. NatalSigil and CharacterSheet remain intact for the
+## future vat route, but ordinary exploration never constructs or opens them.
 func _toggle_artwork() -> void:
 	if allusions_artwork.visible:
 		allusions_artwork.close_artwork()
-		natal_sigil.open_chart()
-		panel_mode = "artwork"
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-		return
-	if natal_sigil.visible:
-		natal_sigil.close_chart()
 		panel_mode = ""
 	else:
 		panel.visible = false

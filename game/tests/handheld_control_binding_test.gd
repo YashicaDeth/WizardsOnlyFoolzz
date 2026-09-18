@@ -64,12 +64,23 @@ func _ready() -> void:
 	var pointer_returned := DisplayServer.get_name() == "headless" or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	check(not hunt.handheld.is_open and pointer_returned,
 		"Escape lowers the raised Black Mirror and returns control to play")
+	var j_key := InputEventKey.new()
+	j_key.keycode = KEY_J
+	j_key.pressed = true
+	hunt._unhandled_input(j_key)
+	check(hunt.allusions_artwork.visible and hunt.panel_mode == "artwork" and hunt.get_node_or_null("HUD/NatalSigil") == null,
+		"J opens the interactive artwork without constructing placeholder birth data")
+	hunt._unhandled_input(j_key)
+	check(not hunt.allusions_artwork.visible and hunt.panel_mode.is_empty(),
+		"a second J press returns directly to play rather than cycling into a natal chart")
 	var rows: Array = []
 	for group: Dictionary in hunt.keys_card.groups:
 		rows.append_array(group.get("rows", []))
 	check(rows.any(func(row: Array): return row[0] == HANDHELD.DROP_KEY_LABEL and row[1] == "DROP DEVICE"), "the in-world keys card teaches the new drop binding")
 	check(rows.any(func(row: Array): return row[0] == "CLICK / F1-F7" and row[1] == "SELECT DEVICE APP"), "the keys card teaches pointer and direct app selection")
 	check(rows.any(func(row: Array): return row[0] == "TAB" and "NEXT DEVICE APP" in row[1]), "the keys card explains Tab's raised-device meaning")
+	check(rows.any(func(row: Array): return row[0] == "J" and row[1] == "ALLUSIONS ARTWORK"),
+		"the keys card names J's surviving artwork action without promising a sigil")
 	check(rows.any(func(row: Array): return row[0] == "K" and "RE-DECANT" in row[1]), "K remains honestly labelled for its one surviving action")
 	check(rows.filter(func(row: Array): return row[0] == "K").size() == 1, "the card contains no second hidden K action")
 

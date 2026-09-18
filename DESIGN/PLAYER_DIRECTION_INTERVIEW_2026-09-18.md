@@ -4,6 +4,14 @@ This document preserves Greg's answers to the player-experience interview. It
 is authoritative for the direction below. It does not turn unanswered prompts
 or implementation suggestions into lore.
 
+Provenance is explicit where it matters:
+
+- **Confirmed** — Greg stated the direction directly or approved it in the goal.
+- **Working recommendation** — a practical layout or interpretation proposed in
+  response; useful for implementation, but still open to visual feedback.
+- **Open** — deliberately unresolved and not authority to invent an answer.
+- **Implementation note** — what the current build does, not a design mandate.
+
 ## Vocabulary
 
 `holding` is an internal territory/save identifier, not the preferred word in
@@ -151,8 +159,9 @@ object class. The world continues moving. Visual condition, function, ownership,
 anatomy and hidden knowledge should be composed around the object instead of
 appearing as generic coloured text at the bottom of the screen.
 
-The cigarette is the first gold-standard smoking interaction; the bong is the
-second. The cigarette needs convincing hand-to-mouth and lip placement,
+The cigarette is the first gold-standard smoking interaction. The bong remains
+another candidate benchmark rather than a confirmed second-place ordering. The
+cigarette needs convincing hand-to-mouth and lip placement,
 persistent length/ember/ash, repeated puffs, a mouth-held state compatible with
 weapons, and a chance to be disturbed or knocked loose by impacts and movement.
 Cigarettes are primarily atmospheric. Joints, spliffs and bongs may create a
@@ -161,9 +170,11 @@ addiction and long-term balance remain open.
 
 ## Interface and the Black Mirror
 
-The interface should be structurally clean enough to receive Greg's own art,
+**Confirmed:** the interface should be structurally clean enough to receive Greg's own art,
 textures and collage work. It should be relatively quiet in ordinary play and
 become oppressive contextually rather than covering every corner permanently.
+
+**Working recommendation for the next structural pass:**
 
 - Top right: emotion/state portrait with narrow vertical body-resource columns.
 - Top left: contextual anatomy and implant diagnostics.
@@ -177,11 +188,18 @@ chained to the same device that enables surveillance and control. Phones are
 common, but advanced AI/LLM neural integration is not universal, and the
 player's device can be valuable to other people.
 
-The current G/phone interaction, unexplained J birthday/resonance flow and
-incomplete pointer/keyboard navigation were specifically rejected. Birthday,
-role and related resonance choices belong in proper character creation rather
-than an unexplained ordinary-play panel. Useful underlying resonance systems
-may remain dormant until that route exists.
+At interview time, the G/phone interaction, unexplained J birthday/resonance
+flow and incomplete pointer/keyboard navigation were specifically rejected.
+Birthday, role and related resonance choices belong in proper character
+creation rather than an unexplained ordinary-play panel. Useful underlying
+resonance systems may remain dormant until that route exists. The present
+Ritual and Wire presentation is also unapproved rework material even where its
+underlying systems remain useful.
+
+**Implementation note:** commits `b9af4ef` and the subsequent J access repair
+made all seven phone tabs clickable/directly reachable and removed the natal
+chart from ordinary Hunt play. Broader phone, Ritual and Wire presentation
+remain open to the narrated playtest.
 
 ## Reference field
 
@@ -207,3 +225,19 @@ mind-map pass remains required.
 These questions should be recorded when encountered. They do not block work on
 controls, current combat readability, animation anatomy, inspection grammar or
 the factual territory states that precede the transfer decision.
+
+## Evidence still requested
+
+The next narrated playtest should gather observations rather than reopen the
+abstract interview:
+
+1. Press G and say what was expected.
+2. Navigate every Black Mirror page.
+3. Press J and identify any remaining comprehension break.
+4. Shoot several enemy types and call out trivial or spongey wounds.
+5. Fight the same encounter in first and third person.
+6. Grapple and compare intended movement with the result.
+7. Mouth-hold a cigarette and attempt to use a weapon.
+8. Inspect several distinct item classes.
+9. Open MAP and explain what each visible mark appears to mean.
+10. Name interface elements that are instinctively ignored.

@@ -564,6 +564,16 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
       `handheld_device.gd` can originate on its own.
 - [x] **C1.8** `v2` Wear accumulates in WorldHistory and only ever goes one way — a cracked screen does not heal
 - [x] **C2.6** `v2` Every drawn app tab is now an actual control: click it or use F1-F7 to reach its page directly; Tab and the mouse wheel cycle while the Black Mirror is raised. G releases the captured pointer, Escape lowers the hardware and returns the pointer to play, and the keys card states this context change instead of mislabelling Tab as only WORLD INDEX. `handheld_control_binding_test.gd` covers all seven clickable regions, exact selection, G/F7/Escape and pointer release in 13 checks
+
+      Direction correction, 18 September: ordinary Hunt play no longer binds
+      `J` from the Allusions study into Greg's placeholder natal chart. J now
+      opens and closes the actual interactive artwork directly; ordinary Hunt
+      play no longer constructs the natal control at all. NatalSigil and the
+      chart math remain intact for the future vat/character-creation route,
+      where the player can actually supply or choose the data. The live keys
+      card names only the surviving artwork action, and
+      `handheld_control_binding_test.gd` proves both J states and the absence of
+      placeholder birth data alongside the repaired phone controls (16 checks).
 - [x] **C5.5** `v2` Cracks seeded from the device's own serial, at its real condition rather than a constant 0.85
 
 ### C v3 — the third pass
