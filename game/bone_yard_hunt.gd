@@ -2366,6 +2366,10 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		prompt.text = "%s IS OPENED UP" % str(actor.display_name).to_upper()
 	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": anatomy.call("snapshot")}, "anatomy_changed")
 	_spawn_blood(target.global_position + Vector3(0, 1.1, 0), roundi(float(attack.damage)))
+	var hit_motion := actor.get("motion") as HunterBodyMotion
+	if hit_motion != null and is_instance_valid(hit_motion):
+		var zone_max: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone, {}) as Dictionary).get("health", 100.0))
+		hit_motion.trigger_hit(view, float(result.get("damage", attack.damage)) / maxf(zone_max, 1.0))
 	# One committed swing can open one body. Route that intentional boundary;
 	# anatomy_changed and any gore remain consequences, not extra player acts.
 	PLAYER_ACTION_LEDGER.record("npc_anatomy_hit", {"subject_id": actor.subject_id, "weapon": attack.weapon, "zone": zone, "result": result, "location": HUNT_LOCATION})
@@ -2516,6 +2520,9 @@ func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bo
 		# region keeps fighting at full speed.
 		["player", str(actor.subject_id)]
 	)
+	var hit_motion := actor.get("motion") as HunterBodyMotion
+	if hit_motion != null and is_instance_valid(hit_motion):
+		hit_motion.trigger_hit(direction, damage / maxf(zone_max, 1.0))
 	if actor.rig != null and is_instance_valid(actor.rig):
 		actor.rig.favour_injuries()
 	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": actor.rig.snapshot()}, "anatomy_changed")

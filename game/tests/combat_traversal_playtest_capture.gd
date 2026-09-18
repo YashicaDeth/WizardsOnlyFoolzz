@@ -77,6 +77,21 @@ func _ready() -> void:
 	await _shot("combat_playtest_locked_dodge")
 	hunt.dodge_remaining = 0.0
 
+	# Hold a nonlethal side impact at the peak of the shared hit-reaction
+	# envelope. This is the feedback ordinary wounds used to lack entirely.
+	(target.node as Node3D).position = hunt.player + Vector3(0, -0.5, -2.7)
+	for _frame in 12:
+		hunt._steer_lock(1.0 / 60.0)
+		hunt._update_camera()
+		await get_tree().process_frame
+	var target_motion := target.motion as HunterBodyMotion
+	target_motion.trigger_hit(Vector3.RIGHT, 1.0)
+	target_motion.update(target_motion.hit_react_duration * 0.5, Vector3.ZERO, true, false, false, false)
+	hunt.body_motion.update(1.0 / 60.0, Vector3.ZERO, true, false, false, false)
+	hunt._update_camera()
+	hunt._update_hud()
+	await _shot("combat_playtest_enemy_hit_reaction")
+
 	# The narrated playtest found that RMB simply fired another shot and there
 	# was no firearm aim at all. Capture the production held stance and narrowed
 	# lens in first person before returning to the melee grip sheet below.

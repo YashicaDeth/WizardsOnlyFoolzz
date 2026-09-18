@@ -28,6 +28,14 @@ var attack_kind := ""
 var combat_pose := 0.0
 var combat_kind := ""
 var recoil_time := 0.0
+## A landed hit should move the body even when it did not cross the gameplay
+## stagger threshold. This is presentation only: AI state and interruption
+## remain owned by combat_response, while this short directional recoil makes
+## an ordinary wound visible instead of reading like damage to a spreadsheet.
+var hit_react_time := 0.0
+var hit_react_duration := 0.0
+var hit_react_strength := 0.0
+var hit_react_direction := Vector3.ZERO
 var reload_time := 0.0
 var interaction_time := 0.0
 var landing_time := 0.0
@@ -90,6 +98,18 @@ func trigger_recoil(strength: float) -> void:
 	recoil_time = maxf(recoil_time, 0.10 + clampf(strength / 60.0, 0.0, 0.16))
 
 
+func trigger_hit(world_direction: Vector3, severity: float) -> void:
+	hit_react_strength = clampf(severity, 0.12, 1.0)
+	hit_react_duration = lerpf(0.14, 0.30, hit_react_strength)
+	hit_react_time = hit_react_duration
+	var local_direction := world_direction
+	if rig != null and is_instance_valid(rig):
+		local_direction = rig.global_transform.basis.inverse() * world_direction
+	local_direction.y = clampf(local_direction.y, -0.65, 0.65)
+	hit_react_direction = local_direction.normalized() if local_direction.length_squared() > 0.0001 else Vector3.BACK
+	state = "hit"
+
+
 func trigger_reload(duration: float) -> void:
 	reload_time = maxf(0.1, duration)
 	state = "reload"
@@ -127,6 +147,7 @@ func update(delta: float, velocity: Vector3, grounded: bool, sprinting: bool, cr
 	grounded_last = grounded
 	attack_time = maxf(0.0, attack_time - delta)
 	recoil_time = maxf(0.0, recoil_time - delta)
+	hit_react_time = maxf(0.0, hit_react_time - delta)
 	reload_time = maxf(0.0, reload_time - delta)
 	interaction_time = maxf(0.0, interaction_time - delta)
 	landing_time = maxf(0.0, landing_time - delta)
@@ -137,7 +158,7 @@ func update(delta: float, velocity: Vector3, grounded: bool, sprinting: bool, cr
 
 
 func _choose_state(horizontal_speed: float, grounded: bool, sprinting: bool, crouching: bool, dodging: bool) -> void:
-	if attack_time > 0.0 or recoil_time > 0.0 or reload_time > 0.0 or interaction_time > 0.0:
+	if attack_time > 0.0 or recoil_time > 0.0 or hit_react_time > 0.0 or reload_time > 0.0 or interaction_time > 0.0:
 		return
 	if dodging:
 		state = "dodge"
@@ -286,6 +307,22 @@ func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: 
 		if head_hitbox != null:
 			head_hitbox.position = head.position
 			head_hitbox.rotation = head.rotation
+	# Directional, brief and additive: a shoulder hit turns the torso away, a
+	# frontal hit folds it back, and the head follows by a smaller amount. The
+	# sine envelope guarantees the body returns to its ordinary locomotion pose
+	# rather than preserving an accumulated lean.
+	if hit_react_time > 0.0 and hit_react_duration > 0.0:
+		var progress := 1.0 - hit_react_time / hit_react_duration
+		var envelope := sin(progress * PI) * hit_react_strength
+		if torso != null:
+			torso.rotation.x += -hit_react_direction.z * 0.26 * envelope
+			torso.rotation.z += -hit_react_direction.x * 0.34 * envelope
+		if head != null:
+			head.rotation.x += -hit_react_direction.z * 0.12 * envelope
+			head.rotation.z += -hit_react_direction.x * 0.18 * envelope
+			var reacted_head_hitbox := rig.get_node_or_null("head_hitbox") as Node3D
+			if reacted_head_hitbox != null:
+				reacted_head_hitbox.rotation = head.rotation
 	# Weapon actions layer over locomotion instead of replacing the body.
 	if attack_time > 0.0 and attack_duration > 0.0:
 		var progress := 1.0 - attack_time / attack_duration
