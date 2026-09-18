@@ -5,6 +5,13 @@ boundary between confirmed visual rules, safe implementation work and choices
 that still require Greg; the detailed material brief remains
 `ART-DIRECTION.md`.
 
+Player-experience decisions from the 18 September interview are preserved in
+`DESIGN/PLAYER_DIRECTION_INTERVIEW_2026-09-18.md`. It supersedes older prose
+where that prose treats a map area as merely a “holding,” assumes land can only
+be given to ascent or corruption, makes the derby mandatory, or presents the
+J birthday/resonance screen as an established ordinary-play action. Stable
+internal and save identifiers are not renamed by that vocabulary correction.
+
 18 September implementation note: connected local territory work now has one
 visible consequence before the still-unresolved political or supernatural land
 decision. Resolving one order fractures the affected polygon on MAP; resolving
@@ -35,23 +42,23 @@ spawns; a later ping can commission replacements only after the previous team
 is dead, escaped, spared or recruited.
 
 18 September implementation note: the surface territory now has a factual
-first layer without pre-empting the player's later ascent/corruption decision.
-The five settlements already generated in the Ashbloom each own one named,
-persistent holding. Their borders are a Voronoi partition of the actual
+first layer without pre-empting the player's later control/transfer decision.
+The five settlements already generated in the Ashbloom each belong to one named,
+persistent territory. Their borders are a Voronoi partition of the actual
 settlement centres clipped to the actual 470-by-370-metre region, so the map
 cannot invent a province whose town stands outside it. Exploration reveals a
-whole holding once, records its existing holder and world timestamp, and then
-continues fine street survey inside it. On MAP, unknown holdings retain faint
-complete silhouettes while a newly known holding develops outward from its
+whole territory once, records its existing holder and world timestamp, and then
+continues fine street survey inside it. On MAP, unknown territories retain faint
+complete silhouettes while a newly known territory develops outward from its
 settlement over 1.4 seconds, gaining its holder colour and name as one weighted
 event. This establishes land, ownership and discovery; it deliberately does
-not decide how the eventual act of giving land upward or downward works. The
+not decide whether local people, the player, a faction or nobody inherits it. The
 first border crossing carries the territory row, canonical place, published
 local work and reveal event through one player-action receipt and one outer
 persistence transaction; observation inside already known land remains a read,
 not another save.
 
-18 September implementation note: a revealed surface holding is now one
+18 September implementation note: a revealed surface territory is now one
 first-class place everywhere, not a polygon trapped inside MAP. Its canonical
 WorldHistory record carries the same holder, reveal time, field note and world
 position into INDEX, where land receives a live polygon survey instead of a
@@ -63,12 +70,12 @@ changes must use rather than creating parallel map-pin or quest-place state.
 18 September implementation note: downed-person decisions in the Hunt now
 enter the existing witness pipeline with the exact surface jurisdiction where
 they occurred. Execute, spare and recruit no longer write around local law.
-The world position resolves to one canonical holding and its current holder;
+The world position resolves to one canonical territory and its current holder;
 only a living nearby witness can carry the account, the account still takes
 WitnessLedger's real delay to arrive, and only the ground-holder's own faction
 can answer it. The faction judges the act from its existing Tree position, so
 Ashline ground may punish mercy while Gate Lantern ground punishes execution.
-One incident can be remembered only once per holding, even if two witnesses
+One incident can be remembered only once per territory, even if two witnesses
 report it. The resulting unrest lives on the same place record MAP, INDEX and
 the Board already share. When that memory crosses its threshold, the holder
 sends two generated, persistent people through the Hunt's ordinary encounter
@@ -77,7 +84,7 @@ route to the recorded scene of the acts—not to the player's magically current
 coordinate. An unresolved team restores from WorldHistory when the scene is
 rebuilt.
 
-18 September implementation note: revealed surface holdings now generate
+18 September implementation note: revealed surface territories now generate
 local work without becoming quest icons. Each canonical place publishes one
 claim-crew raid and one field-cache recovery as persistent job subjects in its
 INDEX dossier; unknown land publishes nothing. The player explicitly takes an
@@ -95,7 +102,7 @@ The canonical place also counts the connected outcomes: one completion makes
 its local claim `disrupted`; both make it `ready_for_decision` and write that
 threshold once. INDEX, MAP and the place's pinned Board card expose the same
 state. Crucially, this does not change `held_by`: clearing two objectives earns
-the later land act, but cannot silently choose ascent, corruption or a
+the later land act, but cannot silently choose a faction, local government or a
 recipient for the player. Accepting and resolving that local work now travels
 through the same compact player-action ledger as smoking, coughing and held-item
 inspection. Existing territory event names remain available to current readers,
@@ -106,7 +113,7 @@ chart-space registers as they draw. They try positions around their actual mark,
 fall back to the least-overlapping position when the area is genuinely dense,
 and stay inside the physical bezel. This changes presentation only: contacts
 retain their true coordinates and the satellite image remains the authority.
-The whole-holding reveal is the pleasurable exploration payoff rather than an
+The whole-territory reveal is the pleasurable exploration payoff rather than an
 administrative unlock. Its polygon develops outward from the settlement under
 a pale cleaning lip that is strongest halfway across the glass, with short
 streaks travelling behind the front and disappearing completely when the live
@@ -226,15 +233,15 @@ Status: early concept, not a locked game bible. Compiled from Greg's shared conv
 - Followers, friends, captives/slaves and religious or faction devotees are possible fictional social roles. Scope and mechanics need design.
 - Base building, home decoration and relationships/story development inspired by the user's references. Survival-system depth is deliberately undecided.
 - An in-game internet connected with CellOutz and the user's artistic universe.
-- The Black Mirror's satellite map is an exceptionally invasive security system owned by a fictional corrupt space/surveillance agency. It can publish a target's approximate area, attach bounties and jobs to places, and let contractors work for or against that institution; looking through the map also means the institution can look back.
+- The Black Mirror's satellite map is an exceptionally invasive CellOutz security system. It can publish a target's approximate area, attach bounties and jobs to places, and let contractors work for or against the many issuers using that platform; looking through the map also means CellOutz can look back.
 - The Black Mirror should initially favour MAP because the captured player
   begins inside surveilled territory. Freeing a place gradually exposes the
   reliable INDEX knowledge attached to it; MAP is therefore the pressure and
   INDEX is earned understanding, not two unrelated apps.
-- The surveillance institution is an openly occult, satirically evil corporate
-  bounty platform. Its exact name, seal and liturgy remain open, but its malice
-  is not hidden behind a neutral public-service presentation.
-- The world map is divided into named, visibly bounded holdings. Exploration reveals them and later play can reclaim/liberate them by dismantling fictional bandit camps, trafficker and organ-market networks, cartels, alien installations and other local power structures. Cleared holdings visibly improve and produce new consequences, work and faction reactions rather than becoming a one-time checklist icon.
+- CellOutz operates an openly occult, satirically evil corporate bounty
+  platform. Its seal and liturgy remain open, but its malice is not hidden
+  behind a neutral public-service presentation.
+- The world map is divided into named, visibly bounded territories containing settlements, districts, outposts, camps and facilities. Exploration reveals them and later play can disrupt, recover, secure, reoccupy or desolate them by confronting fictional bandit camps, trafficker and organ-market networks, cartels, alien installations and other local power structures. Changed territories visibly evolve and produce new consequences, work and faction reactions rather than becoming one-time checklist icons.
 - The first territorial art and implementation focus is the underground
   facility where the player is held, the route used to escape it, and the derby
   that follows. Do not design the whole overworld before this connected opening
