@@ -28,7 +28,10 @@ func _ready() -> void:
 	hunt._spawn_encounter_actor({"instance_id": "presser", "kind": "hostile"}, hunt.player + Vector3(0, -0.5, 2.0))
 	var presser: Dictionary = hunt.encounter_actors.back()
 	presser.node.position = hunt.player + Vector3(0, -0.5, 2.0)
+	presser["tracking_player"] = true
+	presser["notice_remaining"] = 0.0
 	await get_tree().physics_frame
+	check(presser.motion is HunterBodyMotion, "a Hunt enemy owns the same articulated motion controller as the player")
 
 	hunt.strike_windup = -1.0
 	presser.attack_time = 0.0
@@ -41,6 +44,9 @@ func _ready() -> void:
 	hunt._update_encounter_actors(0.2)
 	var pressed: float = float(presser.attack_time)
 	check(pressed > baseline * 1.5, "the player committing to a swing makes the same hostile press harder (%.2f vs %.2f)" % [pressed, baseline])
+	hunt._update_encounter_actors(0.2)
+	check(float(presser.motion.combat_pose) > 0.0 and absf(presser.rig.parts.right_arm.rotation.z) > 0.1,
+		"the enemy's melee clock is visible as a weapon-arm wind-up")
 	presser.attack_time = 0.0
 	hunt.strike_windup = -1.0
 
@@ -50,6 +56,8 @@ func _ready() -> void:
 	hunt._spawn_encounter_actor({"instance_id": "outer", "kind": "hostile"}, hunt.player + Vector3(6, -0.5, 6))
 	var outer: Dictionary = hunt.encounter_actors.back()
 	outer.node.position = hunt.player + Vector3(6, -0.5, 6)
+	outer["tracking_player"] = true
+	outer["notice_remaining"] = 0.0
 	check(hunt._melee_slot_taken(), "the first hostile already holding melee range is read as the taken slot")
 
 	for _tick in 240:
@@ -57,6 +65,7 @@ func _ready() -> void:
 	var final_gap: float = hunt.player.distance_to(outer.node.global_position)
 	check(final_gap > 4.2, "the second hostile settles at a stand-off distance rather than stacking on the first (%.2fm)" % final_gap)
 	check(hunt.player.distance_to(presser.node.global_position) <= 3.0, "the actor already holding the opening is undisturbed by the second one orbiting")
+	check(float(outer.motion.gait_phase) > 0.5, "route movement advances a full-body gait instead of translating a rigid enemy")
 
 	print("ENEMY_AI_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

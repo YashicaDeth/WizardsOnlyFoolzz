@@ -66,6 +66,7 @@ const SUBSTANCE_EXPERIENCE := preload("res://systems/substance_experience.gd")
 const SMOKEABLES := preload("res://systems/smokeables.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
 const HELD_GEAR := preload("res://systems/held_gear.gd")
+const BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
 
 const BODY_COUNT := 7
 const ARENA := 26.0
@@ -335,15 +336,20 @@ func _spawn_body(index: int) -> void:
 	# makes, so the two cannot drift apart again. Odd bodies come armed, which is
 	# also what makes the range a place a fight could start rather than a rack.
 	HunterAppearance.style_world_rig(rig, "demo_body_%d" % index, index % 2 == 1)
+	var motion: HunterBodyMotion = BODY_MOTION.new()
+	motion.name = "BodyMotion"
+	holder.add_child(motion)
+	motion.configure(rig)
+	motion.set_perspective(false)
 	if xray:
 		rig.reveal_organs(true)
 		rig.see_through(true)
 	bodies.append({
 		"holder": holder,
 		"rig": rig,
+		"motion": motion,
 		"id": "demo_body_%d" % index,
 		"attack_ready": 0.35 + float(index) * 0.12,
-		"stride_phase": float(index) * 0.9,
 	})
 
 
@@ -1286,27 +1292,39 @@ func _update_mode_button() -> void:
 ## advance, face the camera and land timed training strikes; downed, dead or
 ## dismembered bodies stop. DUMMY mode halts this entire path immediately.
 func _update_training_bodies(real_delta: float) -> void:
-	if not enemies_enabled:
-		return
 	for entry: Dictionary in bodies:
 		var holder := entry.get("holder") as Node3D
 		var rig := entry.get("rig") as BaselineHuman
+		var motion := entry.get("motion") as HunterBodyMotion
 		if holder == null or rig == null or not is_instance_valid(holder) or not is_instance_valid(rig):
 			continue
 		if rig.anatomy.dead or rig.anatomy.downed:
 			continue
+		if not enemies_enabled:
+			if motion != null:
+				motion.set_combat_pose(0.0, "")
+				motion.update(real_delta, Vector3.ZERO, true, false, false, false)
+			continue
 		var toward := eye - holder.global_position
 		toward.y = 0.0
 		var distance := toward.length()
+		var visual_velocity := Vector3.ZERO
 		if distance > 1.45:
-			var step := toward.normalized() * minf(distance - 1.35, real_delta * 2.15)
+			var travel_speed := 3.8 if distance > 4.5 else 2.15
+			var step := toward.normalized() * minf(distance - 1.35, real_delta * travel_speed)
 			holder.global_position += step
 			holder.look_at(Vector3(eye.x, holder.global_position.y, eye.z), Vector3.UP)
-			entry["stride_phase"] = float(entry.get("stride_phase", 0.0)) + real_delta * 8.0
-			rig.position.y = -0.9 + absf(sin(float(entry["stride_phase"]))) * 0.035
+			visual_velocity = step / maxf(real_delta, 0.0001)
 		entry["attack_ready"] = float(entry.get("attack_ready", 0.0)) - real_delta
+		var windup := clampf(1.0 - float(entry["attack_ready"]) / 1.05, 0.0, 1.0) if distance <= 1.65 else 0.0
+		if motion != null:
+			motion.set_combat_pose(windup, "melee")
+			motion.update(real_delta, visual_velocity, true, visual_velocity.length() > 3.0, false, false)
 		if distance <= 1.65 and float(entry["attack_ready"]) <= 0.0:
 			entry["attack_ready"] = 1.05
+			if motion != null:
+				motion.set_combat_pose(0.0, "")
+				motion.trigger_attack(0.62, "melee")
 			simulation_health = maxi(0, simulation_health - 8)
 			_kick(0.24, "blunt", false, HITSTOP_SHOT)
 			_note("TRAINING HIT // SIM HEALTH %03d" % simulation_health)

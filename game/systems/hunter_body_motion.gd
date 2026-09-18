@@ -20,6 +20,13 @@ var speed_blend := 0.0
 var crouch_blend := 0.0
 var attack_time := 0.0
 var attack_duration := 0.0
+var attack_kind := ""
+## Continuous action preparation supplied by AI or a future authored
+## controller. This is deliberately separate from `attack_time`: aiming or
+## telegraphing can hold a readable pose without repeatedly restarting an
+## attack animation.
+var combat_pose := 0.0
+var combat_kind := ""
 var recoil_time := 0.0
 var reload_time := 0.0
 var interaction_time := 0.0
@@ -65,7 +72,13 @@ func set_perspective(is_first_person: bool) -> void:
 func trigger_attack(duration: float, weapon_kind: String) -> void:
 	attack_duration = maxf(0.12, duration)
 	attack_time = attack_duration
+	attack_kind = weapon_kind
 	state = "shoot" if weapon_kind == "firearm" else "attack"
+
+
+func set_combat_pose(amount: float, weapon_kind: String) -> void:
+	combat_pose = clampf(amount, 0.0, 1.0)
+	combat_kind = weapon_kind if combat_pose > 0.0 else ""
 
 
 func trigger_recoil(strength: float) -> void:
@@ -136,11 +149,18 @@ func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: 
 	var gait := sin(gait_phase)
 	var opposite := sin(gait_phase + PI)
 	var locomotion := clampf(horizontal_speed / 7.0, 0.0, 1.0)
-	var leg_swing := gait * 0.52 * locomotion * (1.32 if sprinting else 1.0)
-	var arm_swing := opposite * 0.34 * locomotion
+	# The old values moved the feet a little while the root translated at full
+	# speed, which is exactly the familiar procedural-enemy "ice skating" look.
+	# Sprinting now opens the stride, drives the opposite shoulder and lifts the
+	# planted leg just enough to read from combat distance.
+	var run_blend := 1.0 if sprinting else clampf((horizontal_speed - 4.0) / 3.0, 0.0, 1.0)
+	var leg_swing := gait * lerpf(0.58, 0.88, run_blend) * locomotion
+	var arm_swing := opposite * lerpf(0.38, 0.58, run_blend) * locomotion
+	var step_lift := maxf(0.0, gait) * 0.055 * locomotion * lerpf(1.0, 1.5, run_blend)
+	var opposite_lift := maxf(0.0, opposite) * 0.055 * locomotion * lerpf(1.0, 1.5, run_blend)
 	var injury := 1.0 - rig.anatomy.mobility_ratio()
-	_set_zone_pose("left_leg", Vector3(0, -0.24 * crouch_blend, 0), Vector3(leg_swing + crouch_blend * 0.45, 0, injury * -0.12))
-	_set_zone_pose("right_leg", Vector3(0, -0.24 * crouch_blend, 0), Vector3(-leg_swing + crouch_blend * 0.45, 0, injury * 0.12))
+	_set_zone_pose("left_leg", Vector3(0, step_lift - 0.24 * crouch_blend, 0), Vector3(leg_swing + crouch_blend * 0.45, 0, injury * -0.12))
+	_set_zone_pose("right_leg", Vector3(0, opposite_lift - 0.24 * crouch_blend, 0), Vector3(-leg_swing + crouch_blend * 0.45, 0, injury * 0.12))
 	# M4.4. Was 1.14 rad (65 degrees) — enough to swing the whole forearm box up
 	# past the lens at FOV 78, where it read as a screen-filling black slab
 	# rather than a held weapon. A shallower raise keeps the arm in the lower
@@ -154,6 +174,29 @@ func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: 
 	var fp_spread := 0.045 if first_person else 0.0
 	_set_zone_pose("left_arm", Vector3(-fp_spread, -0.05 * crouch_blend, 0), Vector3(arm_swing + arm_raise, 0, 0.08))
 	_set_zone_pose("right_arm", Vector3(fp_spread, -0.05 * crouch_blend, 0), Vector3(-arm_swing + arm_raise, 0, -0.08))
+	# Preparation is visible before damage happens. Melee draws the weapon arm
+	# behind the shoulder; firearms settle both hands into a shouldered line.
+	# Locomotion still runs underneath, so an enemy can aim while advancing
+	# without its lower half freezing.
+	if combat_pose > 0.0:
+		var left_combat := rig.parts.get("left_arm") as Node3D
+		var right_combat := rig.parts.get("right_arm") as Node3D
+		if combat_kind == "firearm":
+			if right_combat != null:
+				right_combat.rotation.x = lerpf(right_combat.rotation.x, 1.12, combat_pose)
+				right_combat.rotation.z = lerpf(right_combat.rotation.z, -0.18, combat_pose)
+			if left_combat != null:
+				left_combat.rotation.x = lerpf(left_combat.rotation.x, 1.02, combat_pose)
+				left_combat.rotation.y = lerpf(left_combat.rotation.y, -0.18, combat_pose)
+				left_combat.rotation.z = lerpf(left_combat.rotation.z, 0.30, combat_pose)
+		else:
+			if right_combat != null:
+				right_combat.rotation.x += combat_pose * 0.48
+				right_combat.rotation.y -= combat_pose * 0.18
+				right_combat.rotation.z -= combat_pose * 0.82
+			if left_combat != null:
+				left_combat.rotation.x += combat_pose * 0.18
+				left_combat.rotation.z += combat_pose * 0.22
 	# Bring the actual arm across the chest and up to the face. Previously only
 	# the tiny cigarette moved, leaving the hand hanging at the hip in third
 	# person. A bong recruits the left arm into a lower supporting cradle.
@@ -191,27 +234,62 @@ func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: 
 		# outside, so third person and any future onlooker keep the real
 		# proportions) gives the eye the same clearance a real neck would.
 		var fp_recede := Vector3(0, -0.16, 0.28) if first_person else Vector3.ZERO
-		torso.position = rest + fp_recede + Vector3(0, sin(elapsed * 1.7) * 0.008 - crouch_blend * 0.22, 0)
-		torso.rotation = Vector3(crouch_blend * 0.18 + (0.30 if dodging else 0.0), 0, -gait * 0.025 * locomotion)
+		var footfall := absf(sin(gait_phase)) * lerpf(0.018, 0.042, run_blend) * locomotion
+		torso.position = rest + fp_recede + Vector3(gait * 0.012 * locomotion, sin(elapsed * 1.7) * 0.008 + footfall - crouch_blend * 0.22, 0)
+		torso.rotation = Vector3(crouch_blend * 0.18 + (0.30 if dodging else 0.0), opposite * 0.035 * locomotion, -gait * lerpf(0.035, 0.07, run_blend) * locomotion)
+	var head := rig.parts.get("head") as Node3D
+	if head != null:
+		var head_rest_position: Vector3 = head.get_meta("rest_position", head.position)
+		var head_rest_rotation: Vector3 = head.get_meta("rest_rotation", Vector3.ZERO)
+		head.position = head_rest_position + Vector3(0, absf(sin(gait_phase)) * 0.014 * locomotion, 0)
+		head.rotation = head_rest_rotation + Vector3(0, gait * 0.025 * locomotion, opposite * 0.018 * locomotion)
+		var head_hitbox := rig.get_node_or_null("head_hitbox") as Node3D
+		if head_hitbox != null:
+			head_hitbox.position = head.position
+			head_hitbox.rotation = head.rotation
 	# Weapon actions layer over locomotion instead of replacing the body.
 	if attack_time > 0.0 and attack_duration > 0.0:
 		var progress := 1.0 - attack_time / attack_duration
-		var swing := sin(progress * PI)
-		var right := rig.parts.get("right_arm") as Node3D
-		if right != null:
-			right.rotation.x += swing * 0.55
-			right.rotation.z -= swing * 1.05
+		var right_action := rig.parts.get("right_arm") as Node3D
+		var left_action := rig.parts.get("left_arm") as Node3D
+		if attack_kind == "firearm":
+			var shoulder := sin(clampf(progress * 1.8, 0.0, 1.0) * PI * 0.5)
+			if right_action != null:
+				right_action.rotation.x = lerpf(right_action.rotation.x, 1.10, shoulder)
+				right_action.rotation.z = lerpf(right_action.rotation.z, -0.18, shoulder)
+			if left_action != null:
+				left_action.rotation.x = lerpf(left_action.rotation.x, 0.98, shoulder)
+				left_action.rotation.z = lerpf(left_action.rotation.z, 0.28, shoulder)
+		else:
+			# Anticipation -> cut -> follow-through, rather than one symmetric
+			# sine that looked like the arm simply raised and lowered.
+			var anticipation := smoothstep(0.0, 0.28, progress) * (1.0 - smoothstep(0.28, 0.48, progress))
+			var cut := smoothstep(0.30, 0.58, progress)
+			var recover := smoothstep(0.72, 1.0, progress)
+			if right_action != null:
+				right_action.rotation.x += anticipation * 0.62 - cut * 0.38 + recover * 0.20
+				right_action.rotation.z += anticipation * -0.92 + cut * 1.42 - recover * 0.50
 	if recoil_time > 0.0:
 		var kick := recoil_time * 2.8
 		for zone_id in ["left_arm", "right_arm"]:
 			var arm := rig.parts.get(zone_id) as Node3D
 			if arm != null:
 				arm.rotation.x -= kick
+		if torso != null:
+			torso.rotation.x -= kick * 0.14
 	if reload_time > 0.0:
 		var left := rig.parts.get("left_arm") as Node3D
 		if left != null:
 			left.rotation.x = 0.9 + sin(reload_time * 8.0) * 0.12
 			left.rotation.z = -0.72
+	# Arm actions are layered after their locomotion pose, so copy the finished
+	# transforms—not the pre-action transforms—onto the anatomy areas. An enemy
+	# cannot visibly shoulder a weapon while leaving an invisible bind-pose arm
+	# behind for bullets and melee traces to hit.
+	_sync_zone_hitbox("left_arm")
+	_sync_zone_hitbox("right_arm")
+	if not first_person:
+		_sync_zone_hitbox("torso")
 
 
 func _set_zone_pose(zone_id: String, offset: Vector3, angles: Vector3) -> void:
@@ -226,6 +304,15 @@ func _set_zone_pose(zone_id: String, offset: Vector3, angles: Vector3) -> void:
 	if hitbox != null:
 		hitbox.position = part.position
 		hitbox.rotation = part.rotation
+
+
+func _sync_zone_hitbox(zone_id: String) -> void:
+	var part := rig.parts.get(zone_id) as Node3D
+	var hitbox := rig.get_node_or_null("%s_hitbox" % zone_id) as Node3D
+	if part == null or hitbox == null:
+		return
+	hitbox.position = part.position
+	hitbox.rotation = part.rotation
 
 
 func _update_camera_motion(horizontal_speed: float, sprinting: bool, grounded: bool) -> void:

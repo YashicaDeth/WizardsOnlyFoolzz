@@ -299,6 +299,10 @@ mindmap
 
 ## 4. Existing asset audit
 
+Production requests and collaborator assignments now live in
+`ART-ASSET-LEDGER.md`. This section remains the factual audit of what is already
+present; it should not become a second, conflicting request list.
+
 The audit was performed against the repository, the checked-in manifest, asset
 consumer paths, and reproducible conversion scripts. “Verified Greg source” is
 used only where a manifest or source script explicitly establishes it.

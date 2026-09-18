@@ -21,18 +21,24 @@ func _ready() -> void:
 
 	var subject: Dictionary = demo.bodies[0]
 	var holder := subject.holder as Node3D
+	var motion := subject.motion as HunterBodyMotion
+	check(motion != null, "every sandbox body owns the shared gameplay animator")
 	holder.global_position = Vector3(demo.eye.x + 5.0, 0.9, demo.eye.z)
 	var before := holder.global_position
 	demo._set_enemies_enabled(true)
 	demo._update_training_bodies(0.5)
 	check(demo.mode_button.text.contains("ENEMIES"), "the same physical control visibly switches to ENEMIES")
 	check(holder.global_position.distance_to(demo.eye) < before.distance_to(demo.eye), "a live enemy body physically closes on the player")
+	check(motion.gait_phase > 0.0 and absf(subject.rig.parts.left_leg.rotation.x) > 0.05,
+		"closing distance drives a visible running stride through the real limbs")
 
 	holder.global_position = Vector3(demo.eye.x + 1.0, 0.9, demo.eye.z)
 	subject["attack_ready"] = 0.0
 	var health_before: int = demo.simulation_health
 	demo._update_training_bodies(0.05)
 	check(demo.simulation_health < health_before, "a close enemy lands a timed simulation hit")
+	check(motion.attack_time > 0.0 and motion.attack_kind == "melee",
+		"the simulation hit has a committed anticipation and follow-through animation")
 	demo._set_enemies_enabled(false)
 	var held := holder.global_position
 	demo._update_training_bodies(1.0)

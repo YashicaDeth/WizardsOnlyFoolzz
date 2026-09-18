@@ -2913,8 +2913,12 @@ func _update_smoking(delta: float) -> void:
 			# Transfer the live object from the finger cradle to an implied lip point
 			# just beneath the reticle. The hand travels with it, releases, and leaves
 			# the frame; taking it back plays the same movement in reverse.
-			var lip_position := Vector3(-0.008, -0.032, -0.220) if rolled else Vector3(0.010, -0.052, -0.240)
-			var lip_rotation := Vector3(0.04, -1.10, -0.08) if rolled else Vector3(0.10, -0.94, -0.03)
+			# Rolled smokeables sit out of the aiming lane, almost horizontal in
+			# screen space and below the reticle. The old near-centre pose read as
+			# a vertical pointer attached to the crosshair rather than something
+			# hanging naturally from the side of the mouth.
+			var lip_position := Vector3(-0.055, -0.105, -0.265) if rolled else Vector3(0.010, -0.052, -0.240)
+			var lip_rotation := Vector3(0.03, -1.48, -0.05) if rolled else Vector3(0.10, -0.94, -0.03)
 			var transfer := smoothstep(0.0, 1.0, smoke_mouth_blend)
 			var mouth_anchor := smoke_model.get_node_or_null("anchor_mouth") as Node3D
 			if mouth_anchor != null:
@@ -4907,6 +4911,25 @@ func _update_encounter_actors(delta: float) -> void:
 		if node == null or not is_instance_valid(node) or anatomy == null:
 			encounter_actors.remove_at(index)
 			continue
+		# Enemies used to have the same articulated body as the player but no
+		# animator driving it. Their CharacterBody crossed the ground while every
+		# limb stayed in its bind pose—the conspicuous skating seen in the sandbox
+		# and Hunt. Run the shared body motion from the body's real velocity, and
+		# preserve any melee wind-up from the previous frame as a readable pose.
+		var actor_motion := actor.get("motion") as HunterBodyMotion
+		if actor_motion != null and is_instance_valid(actor_motion):
+			var prior_windup := 0.0
+			var prior_kind := "melee"
+			if LauncherActor.is_launcher(actor):
+				prior_kind = "firearm"
+				var launcher_clock := float(actor.get("launcher_clock", 0.0))
+				prior_windup = clampf((launcher_clock - (LauncherActor.CYCLE_SECONDS - LauncherActor.WINDUP_SECONDS)) / LauncherActor.WINDUP_SECONDS, 0.0, 1.0)
+			else:
+				prior_windup = clampf(float(actor.get("attack_time", 0.0)) / maxf(_actor_attack_cycle(actor) * 0.57, 0.01), 0.0, 1.0)
+			actor_motion.set_combat_pose(prior_windup, prior_kind)
+			var actor_velocity := (node as CharacterBody3D).velocity
+			var actor_horizontal_speed := Vector2(actor_velocity.x, actor_velocity.z).length()
+			actor_motion.update(actor_delta, actor_velocity, true, actor_horizontal_speed > 3.2, false, false)
 		if anatomy.dead and not bool(actor.get("dead", false)):
 			_kill_encounter_actor(index, "bleed_out")
 			continue
@@ -5001,10 +5024,15 @@ func _update_encounter_actors(delta: float) -> void:
 			# ring drops it out of this branch entirely — which is the counterplay
 			# being the distance rather than a damage number.
 			var shot := LauncherActor.advance(actor, distance, actor_delta)
+			if actor_motion != null:
+				actor_motion.set_combat_pose(float(shot.windup), "firearm")
 			match str(shot.state):
 				"winding":
 					prompt.text = "%s SHOULDERS THE TUBE" % str(actor.display_name).to_upper()
 				"fire":
+					if actor_motion != null:
+						actor_motion.trigger_attack(0.34, "firearm")
+						actor_motion.trigger_recoil(LauncherActor.IMPULSE)
 					_fire_launcher(actor, node)
 		elif not rival_tactic.is_empty() and distance < 24.0 and (bool(actor.get("tracking_player", false)) or bool(actor.get("tracking_light", false))) and rival_approach == "withdraw":
 			# A remembered close-range wound has an immediate physical answer: get
@@ -5058,10 +5086,15 @@ func _update_encounter_actors(delta: float) -> void:
 			var pressing := 2.2 if strike_windup >= 0.0 else 1.0
 			actor["attack_time"] = float(actor.get("attack_time", 0.0)) + actor_delta * pressing
 			var attack_cycle := _actor_attack_cycle(actor)
+			if actor_motion != null:
+				actor_motion.set_combat_pose(clampf(float(actor.attack_time) / maxf(attack_cycle * 0.57, 0.01), 0.0, 1.0), "melee")
 			if float(actor.attack_time) > attack_cycle * 0.57:
 				prompt.text = "%s RAISES THEIR WEAPON" % str(actor.display_name).to_upper()
 			if float(actor.attack_time) >= attack_cycle:
 				actor.attack_time = 0.0
+				if actor_motion != null:
+					actor_motion.set_combat_pose(0.0, "")
+					actor_motion.trigger_attack(0.62, "melee")
 				if dodge_remaining <= 0.0:
 					# O2.4. Through the guard first. A parry takes none of it and
 					# hands the initiative back; a block takes the edge off and
@@ -7479,6 +7512,11 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 	rig.gore = viscera_fx
 	rig.build(subject_id, rig_config)
 	HUNTER_APPEARANCE.style_world_rig(rig, subject_id, str(encounter.kind) == "hostile")
+	var actor_motion: HunterBodyMotion = HUNTER_BODY_MOTION.new()
+	actor_motion.name = "BodyMotion"
+	actor.add_child(actor_motion)
+	actor_motion.configure(rig)
+	actor_motion.set_perspective(false)
 	var rival_changed := _fit_rival_adaptation(rig, saved_actor)
 	if rival_changed:
 		identity.text = "%s // RETURNED RIVAL" % display_name.to_upper()
@@ -7491,7 +7529,7 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 		loot.assign(requested_loot)
 	if loot.is_empty():
 		loot = ["Ashline toll teeth", "rust scrip"] if str(encounter.kind) == "hostile" else ["weather-heart filament", "dead god relay"]
-	encounter_actors.append({"subject_id": subject_id, "display_name": display_name, "node": actor, "rig": rig, "anatomy": anatomy, "state": "hunting", "disposition": "hostile", "speed": 3.7, "loot": loot, "loot_at_risk": false, "dead": false})
+	encounter_actors.append({"subject_id": subject_id, "display_name": display_name, "node": actor, "rig": rig, "motion": actor_motion, "anatomy": anatomy, "state": "hunting", "disposition": "hostile", "speed": 3.7, "loot": loot, "loot_at_risk": false, "dead": false})
 	encounter_actors.back()["encounter_id"] = str(encounter.get("instance_id", ""))
 	if returning_rival:
 		encounter_actors.back()["returning_rival"] = true

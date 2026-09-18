@@ -93,8 +93,11 @@ func _ready() -> void:
 	var lip_position := camera.to_local(held.global_position)
 	check(bool(hunt.get("smoke_mouth_held")) and float(hunt.get("smoke_mouth_blend")) > 0.95,
 		"Y transfers the cigarette into a persistent lip-hold state")
-	check(not smoking_hand.visible and absf(lip_position.x) < 0.08 and lip_position.y < 0.0,
-		"the cigarette stays beneath the reticle while the released hand leaves the frame")
+	var lip_axis := camera.global_basis.inverse() * held.global_basis.z
+	check(not smoking_hand.visible and lip_position.x < -0.03 and lip_position.y < -0.08,
+		"the cigarette parks low and to the side while the released hand leaves the aiming lane")
+	check(absf(lip_axis.x) > absf(lip_axis.z) * 3.0,
+		"the mouth-held cigarette lies horizontally across the view instead of pointing at the reticle")
 
 	# Drawing a weapon must not delete or replace the live object at the lips.
 	# While armed, the mouse remains the weapon and Alt becomes the breath bind.
@@ -169,8 +172,8 @@ func _ready() -> void:
 	check(Smokeables.spent_of(held) > length_before_draw,
 		"the cigarette burns shorter continuously while the button is held")
 	var cigarette_in_view := camera.to_local(held.global_position)
-	check(absf(cigarette_in_view.x) < 0.10 and cigarette_in_view.y < 0.0,
-		"the lit cigarette rises beside the first-person reticle at the mouth")
+	check(cigarette_in_view.x < -0.03 and cigarette_in_view.y < -0.08,
+		"the lit cigarette remains below and beside the first-person reticle at the mouth")
 	var result: Dictionary = hunt.call("_finish_smoking_draw")
 	check(bool(result.get("ok", false)), "releasing RMB lands the draw")
 	check(str(result.get("device", "")) == "cigarette", "the hit comes from the object actually held")
