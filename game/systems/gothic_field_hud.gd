@@ -203,6 +203,7 @@ func _draw() -> void:
 	_draw_minimap()
 	_draw_lung_xray()
 	_draw_breath()
+	_draw_critical_condition()
 	_draw_lock_reticle()
 	_draw_controls()
 	_draw_screen_frame()
@@ -555,6 +556,30 @@ func _draw_breath() -> void:
 	# And a catch at the top of each breath, so it reads as effort.
 	if spent > 0.7 and cycle > 0.94:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.04, 0.0, 0.0, (spent - 0.7) * 0.12))
+
+
+## The playtest mistook blood-loss collapse for getting progressively higher.
+## At the point a fullscreen effect changes play, the body must name the cause
+## in the otherwise unused space between the two lower instruments.
+func _draw_critical_condition() -> void:
+	if pulmonary_diagnostic != null and pulmonary_diagnostic.expanded:
+		return
+	if blood >= 0.55 and consciousness >= 55.0:
+		return
+	# Above the contextual E prompt and control strip, between the stable lower
+	# corner instruments. The first capture caught the earlier position printing
+	# directly through a bedroll prompt—the exact overlap this pass is removing.
+	var centre := Vector2(size.x * 0.5, size.y - 110.0)
+	var blood_percent := roundi(blood * 100.0)
+	var consciousness_percent := roundi(consciousness)
+	var label := "BLOOD LOSS // %02d%%" % blood_percent if blood < 0.55 else "CONSCIOUSNESS // %02d%%" % consciousness_percent
+	var detail := "FADING // HOLD V: SELF CONDITION" if consciousness < 35.0 else "WOUNDED // HOLD V: SELF CONDITION"
+	var width := maxf(CellOutzType.width(label, 13.0, 1.3), CellOutzType.width_condensed(detail, 8.0, 0.7))
+	draw_line(centre + Vector2(-width * 0.5 - 22, -5), centre + Vector2(-width * 0.5 - 5, -5), BLOOD, 2.0)
+	draw_line(centre + Vector2(width * 0.5 + 5, -5), centre + Vector2(width * 0.5 + 22, -5), BLOOD, 2.0)
+	CellOutzType.draw_text(self, centre + Vector2(-width * 0.5, -17), label, 13.0, BLOOD, 1.3)
+	var detail_width := CellOutzType.width_condensed(detail, 8.0, 0.7)
+	CellOutzType.draw_condensed(self, centre + Vector2(-detail_width * 0.5, 7), detail, 8.0, BONE * Color(1, 1, 1, 0.72), 0.7)
 func _draw_location_crest() -> void:
 	if location_announce <= 0.0:
 		return

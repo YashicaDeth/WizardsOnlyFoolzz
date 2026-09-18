@@ -36,7 +36,7 @@ func _ready() -> void:
 	check(absf(psychedelic.dial("kaleidoscope_segments")) < 0.001, "and no kaleidoscope fold")
 
 	# A substance or a deep meditation session actually shows.
-	player_rig.anatomy.consciousness = 40.0
+	player_rig.anatomy.consciousness = 20.0
 	hunt.call("_update_altered_perception")
 	var altered_chromatic: float = psychedelic.dial("chromatic_offset")
 	var altered_kaleidoscope: float = psychedelic.dial("kaleidoscope_segments")
@@ -48,8 +48,22 @@ func _ready() -> void:
 	check(is_equal_approx(psychedelic.dial("displacement_strength"), altered_displacement),
 		"a held altered state stays bounded instead of recompounding every frame")
 
+	# Blood-loss collapse must remain playable and must not look like a drug.
+	player_rig.anatomy.blood_remaining = player_rig.anatomy.blood_capacity * 0.30
+	player_rig.anatomy.consciousness = 8.0
+	hunt.call("_update_altered_perception")
+	check(psychedelic.dial("displacement_strength") <= 0.0061,
+		"blood-loss displacement is capped below the intentional trip (%.4f)" % psychedelic.dial("displacement_strength"))
+	check(psychedelic.dial("chromatic_offset") <= 0.0016,
+		"blood-loss chromatic separation remains readable (%.4f)" % psychedelic.dial("chromatic_offset"))
+	check(psychedelic.dial("kaleidoscope_segments") < 2.0,
+		"bleeding out never folds the playfield into a psychedelic kaleidoscope")
+
 	# And it relaxes back down rather than freezing at the worst it reached —
 	# the exact failure storm_weather.gd's own flash light had.
+	player_rig.anatomy.blood_remaining = player_rig.anatomy.blood_capacity
+	player_rig.anatomy.critical = false
+	player_rig.anatomy.pain = 0.0
 	player_rig.anatomy.consciousness = 100.0
 	hunt.call("_update_altered_perception")
 	check(absf(psychedelic.dial("chromatic_offset")) < 0.001, "coming back round actually clears the distortion")

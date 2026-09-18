@@ -7141,10 +7141,26 @@ func _update_altered_perception() -> void:
 		return
 	if psychedelic == null or not is_instance_valid(psychedelic):
 		return
-	var altered := 1.0 - clampf(player_rig.anatomy.consciousness / 100.0, 0.0, 1.0)
-	psychedelic.set_dial("displacement_strength", altered * 0.05)
-	psychedelic.set_dial("chromatic_offset", altered * 0.012)
-	psychedelic.set_dial("kaleidoscope_segments", lerpf(0.0, 5.0, clampf(inverse_lerp(0.5, 1.0, altered), 0.0, 1.0)))
+	var anatomy: AnatomyComponent = player_rig.anatomy
+	var altered: float = 1.0 - clampf(anatomy.consciousness / 100.0, 0.0, 1.0)
+	var blood_ratio: float = clampf(anatomy.blood_remaining / maxf(anatomy.blood_capacity, 1.0), 0.0, 1.0)
+	var physiological_collapse: bool = blood_ratio < 0.55 or bool(anatomy.critical) or anatomy.pain >= 68.0
+	if physiological_collapse:
+		# Bleeding out is not a psychedelic trip. Preserve a slight loss of
+		# registration so failing consciousness is felt, but never fold the
+		# whole playfield into an unusable kaleidoscope. The explicit body
+		# diagnostic and FADING readout now carry the information instead.
+		var collapse := smoothstep(0.22, 0.92, altered)
+		psychedelic.set_dial("displacement_strength", collapse * 0.006)
+		psychedelic.set_dial("chromatic_offset", collapse * 0.0015)
+		psychedelic.set_dial("kaleidoscope_segments", 0.0)
+	else:
+		# Healthy-blood altered consciousness remains a perceptual state, but
+		# eases in below 70% instead of tinting every ordinary moment.
+		var trip := smoothstep(0.28, 0.92, altered)
+		psychedelic.set_dial("displacement_strength", trip * 0.032)
+		psychedelic.set_dial("chromatic_offset", trip * 0.008)
+		psychedelic.set_dial("kaleidoscope_segments", lerpf(0.0, 5.0, smoothstep(0.62, 0.98, altered)))
 
 
 func _build_expanse_systems() -> void:
@@ -8035,8 +8051,10 @@ func _wear_it(at: Vector3, amount: int) -> void:
 	if distance > 4.0:
 		return
 	var closeness := clampf(1.0 - (distance - 0.8) / 3.2, 0.0, 1.0)
-	var weight := clampf(float(amount) / 34.0, 0.15, 1.0)
-	var force := closeness * closeness * weight
+	var weight := clampf(float(amount) / 55.0, 0.10, 0.75)
+	# Blood on the lens punctuates a close hit; it cannot be the dominant state
+	# of an entire encounter. World blood and stains retain the rest of the act.
+	var force := closeness * closeness * weight * 0.55
 	if force <= 0.02:
 		return
 	var from := Vector2.ZERO
