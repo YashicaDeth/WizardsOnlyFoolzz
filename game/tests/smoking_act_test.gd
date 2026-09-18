@@ -109,6 +109,20 @@ func _ready() -> void:
 		"the weapon draw preserves the same burning cigarette object at the lips")
 	check(sidearm_with_smoke.visible and not smoking_hand.visible,
 		"the armed posture restores the weapon and its hands without duplicating the smoking hand")
+	var armed_inspect := InputEventKey.new()
+	armed_inspect.keycode = KEY_I
+	armed_inspect.pressed = true
+	hunt.call("_unhandled_input", armed_inspect)
+	for _armed_inspect_frame in 14:
+		hunt.call("_advance_arm", 1.0 / 60.0)
+		hunt.call("_update_held_inspection", 1.0 / 60.0)
+		hunt.call("_update_held_reliquary")
+	check(float(hunt.get("inspect_blend")) > 0.9 and int(reliquary.displayed_source_id) == sidearm_with_smoke.get_instance_id(),
+		"I inspects the armed weapon and reliquary while the cigarette stays at the lips")
+	armed_inspect.pressed = false
+	hunt.call("_unhandled_input", armed_inspect)
+	for _armed_lower in 14:
+		hunt.call("_update_held_inspection", 1.0 / 60.0)
 	var alt_draw := InputEventKey.new()
 	alt_draw.keycode = KEY_ALT
 	alt_draw.pressed = true

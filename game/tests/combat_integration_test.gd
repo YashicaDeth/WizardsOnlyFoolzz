@@ -35,6 +35,8 @@ func _ready() -> void:
 		"a held weapon owns I even while a world pickup is within inspection range")
 	hunt._unhandled_input(inspect_release)
 	hunt._put_the_weapons_down()
+	check((hunt.arsenal.models.values() as Array).all(func(model): return not (model as Node3D).visible),
+		"slot 5 physically clears every weapon model before world inspection")
 	hunt._unhandled_input(inspect_press)
 	check(str((WorldHistory.recent_events(1)[0] as Dictionary).get("type", "")) == "world_item_inspected" and not hunt.inspected_world_item.is_empty(),
 		"slot 5 frees the same I verb to inspect the nearby world object")

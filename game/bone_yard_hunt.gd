@@ -1368,7 +1368,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			inspected_world_item.clear()
 			var inspected_id := ""
 			var inspected_event := "held_item_inspected"
-			if smoke_model != null and is_instance_valid(smoke_model):
+			if smoke_model != null and is_instance_valid(smoke_model) and not smoke_weapon_drawn:
 				inspected_id = str(smoke_model.get_meta("device_id", ""))
 			elif carried_limb_model != null and is_instance_valid(carried_limb_model):
 				inspected_id = "carried_limb"
@@ -1380,6 +1380,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if not inspected_world_item.is_empty():
 				match str(inspected_world_item.get("kind", "")):
 					"person": inspected_event = "world_subject_inspected"
+					"corpse": inspected_event = "world_body_inspected"
 					"fixture": inspected_event = "world_fixture_inspected"
 					_: inspected_event = "world_item_inspected"
 				prompt.text = "%s // INSPECT // RELEASE I TO LOWER" % str(inspected_world_item.get("label", "OBJECT"))
@@ -2638,6 +2639,9 @@ func _put_the_weapons_down() -> void:
 	_put_smokeable_away(false)
 	_clear_carried_limb_model()
 	bare_handed = true
+	if arsenal != null:
+		for model in arsenal.models.values():
+			(model as Node3D).visible = false
 	pending_attack = {}
 	strike_windup = -1.0
 	prompt.text = "HANDS"
@@ -3303,7 +3307,7 @@ func _smoke_inspection_pose(device_id: String, time: float) -> Dictionary:
 ## `_pose_weapon()` immediately before this runs; hands then perform the action
 ## appropriate to the object: edge reading, receiver check or press-check.
 func _update_held_inspection(delta: float) -> void:
-	var allowed := panel_mode.is_empty() and not smoke_drawing and not smoke_mouth_held and grapple_target.is_empty()
+	var allowed := panel_mode.is_empty() and not smoke_drawing and (not smoke_mouth_held or smoke_weapon_drawn) and grapple_target.is_empty()
 	inspect_blend = move_toward(inspect_blend, 1.0 if inspect_held and allowed else 0.0, delta * 5.2)
 	if inspection_light != null:
 		inspection_light.visible = inspect_blend > 0.01
@@ -3311,7 +3315,7 @@ func _update_held_inspection(delta: float) -> void:
 	if inspect_blend > 0.001:
 		inspect_time += delta
 	var turn := sin(inspect_time * 1.15)
-	if smoke_model != null and is_instance_valid(smoke_model):
+	if smoke_model != null and is_instance_valid(smoke_model) and not smoke_weapon_drawn:
 		# First-person smokeables are composed inside `_update_smoking`; third
 		# person still receives the same class-specific intention without drift.
 		if body_motion == null or not body_motion.first_person:
@@ -3392,7 +3396,7 @@ func _update_first_person_forearms() -> void:
 	if body_motion == null:
 		return
 	var hands: Array = []
-	if smoke_model != null and is_instance_valid(smoke_model):
+	if smoke_model != null and is_instance_valid(smoke_model) and not smoke_weapon_drawn:
 		if smoke_grip_hand != null and smoke_grip_hand.visible:
 			hands.append(smoke_grip_hand)
 		if smoke_support_hand != null and smoke_support_hand.visible:
@@ -4081,6 +4085,50 @@ func _use_prosthetic_surge() -> void:
 	WorldHistory.commit_ledger_batch()
 
 
+## A dead body's tied stash is one search result even when loose gore occupies
+## the same spot. This returns only caches with an owning corpse; incidental
+## salvage keeps the ordinary proximity rule below.
+func _nearest_corpse_loot_cache(reach: float) -> Node3D:
+	var nearest: Node3D
+	var nearest_distance := reach
+	for cache in loose_loot:
+		if cache == null or not is_instance_valid(cache) or str(cache.get_meta("dropped_by", "")).is_empty():
+			continue
+		var distance := player.distance_to(cache.global_position)
+		if distance <= nearest_distance:
+			nearest_distance = distance
+			nearest = cache
+	return nearest
+
+
+func _collect_loot_cache(cache: Node3D) -> bool:
+	if cache == null or not is_instance_valid(cache) or not loose_loot.has(cache):
+		return false
+	var cache_items: Array = cache.get_meta("items", []).duplicate()
+	var dropped_by := str(cache.get_meta("dropped_by", ""))
+	var items: Array = WorldHistory.subject("inventory").get("items", []).duplicate()
+	items.append_array(cache_items)
+	# Inventory, receipt and any holding-work resolution belong to one physical
+	# pickup. `complete_work` safely nests beneath the single persistence edge.
+	WorldHistory.begin_ledger_batch()
+	WorldHistory.amend_subject("inventory", {"items": items})
+	PLAYER_ACTION_LEDGER.record("loot_collected", {
+		"location": HUNT_LOCATION, "items": cache_items,
+		"cache_id": cache.get_instance_id(), "subject_id": dropped_by,
+	})
+	var work_job_id := str(cache.get_meta("holding_work_job", ""))
+	if not work_job_id.is_empty():
+		ASHBLOOM_HOLDINGS.complete_work(work_job_id, {"method": "cache_collected", "items": cache_items})
+	WorldHistory.commit_ledger_batch()
+	loose_loot.erase(cache)
+	cache.queue_free()
+	prompt.text = (
+		"BODY SEARCHED // %s" % ", ".join(PackedStringArray(cache_items)).to_upper()
+		if not dropped_by.is_empty() else "SALVAGE SECURED // %d ITEMS" % items.size()
+	)
+	return true
+
+
 func _interact() -> void:
 	if not panel_mode.is_empty():
 		return
@@ -4098,6 +4146,9 @@ func _interact() -> void:
 			_mind_stamp(downed)
 			return
 		_open_resolution(downed)
+		return
+	var corpse_cache := _nearest_corpse_loot_cache(3.2)
+	if corpse_cache != null and _collect_loot_cache(corpse_cache):
 		return
 	var chunk := _nearest_takeable_chunk(3.2)
 	if chunk != null:
@@ -4155,27 +4206,7 @@ func _interact() -> void:
 			return
 	for cache in loose_loot.duplicate():
 		if is_instance_valid(cache) and player.distance_to(cache.global_position) < 3.5:
-			var cache_items: Array = cache.get_meta("items", []).duplicate()
-			var items: Array = WorldHistory.subject("inventory").get("items", []).duplicate()
-			items.append_array(cache_items)
-			# Inventory, receipt and any holding-work resolution belong to one
-			# physical pickup. `complete_work` safely nests its own ledger batch,
-			# leaving this outer commit as the only persistence boundary.
-			WorldHistory.begin_ledger_batch()
-			WorldHistory.amend_subject("inventory", {"items": items})
-			PLAYER_ACTION_LEDGER.record("loot_collected", {
-				"location": HUNT_LOCATION, "items": cache_items,
-				"cache_id": cache.get_instance_id(),
-			})
-			var work_job_id := str(cache.get_meta("holding_work_job", ""))
-			if not work_job_id.is_empty():
-				ASHBLOOM_HOLDINGS.complete_work(work_job_id, {
-					"method": "cache_collected", "items": cache_items,
-				})
-			WorldHistory.commit_ledger_batch()
-			loose_loot.erase(cache)
-			cache.queue_free()
-			prompt.text = "SALVAGE SECURED // %d ITEMS" % items.size()
+			_collect_loot_cache(cache)
 			return
 	if friend != null and player.distance_to(friend.global_position) < 4.0:
 		var bond := int(WorldHistory.subject(FRIEND_ID).get("bond", 12)) + 10
@@ -5267,13 +5298,14 @@ func _kill_encounter_actor(index: int, cause: String) -> void:
 		# succession resolves on the following idle turn from the existing roster.
 		call_deferred("_fill_faction_vacancy", str(WorldHistory.subject(str(actor.subject_id)).get("faction_id", "")), str(vacancy.rank), str(actor.subject_id))
 	WorldHistory.record_event("loot_dropped", {"subject_id": actor.subject_id, "items": actor.loot, "cause": cause})
-	_spawn_loot_cache(node.global_position, actor.loot)
+	var dropped_cache := _spawn_loot_cache(node.global_position, actor.loot)
+	dropped_cache.set_meta("dropped_by", str(actor.subject_id))
 	var label := node.get_node_or_null("Identity") as Label3D
 	if label != null:
 		label.text = "%s // DEAD\nLOOT DROPPED" % str(actor.display_name).to_upper()
 	dead_bodies.append({
 		"subject_id": str(actor.subject_id), "display_name": str(actor.display_name),
-		"node": node, "rig": actor.get("rig"),
+		"node": node, "rig": actor.get("rig"), "loot": actor.loot.duplicate(),
 	})
 	encounter_actors.remove_at(index)
 	WorldHistory.commit_ledger_batch()
@@ -6565,6 +6597,23 @@ func _nearest_world_item_for_inspection() -> Dictionary:
 				"kind": "body_part", "label": identity.replace("_", " ").to_upper(),
 				"detail": str(info.get("subject_id", "unclaimed")),
 			}
+	# Dead actors leave the AI list, but they remain the most important object at
+	# their own position. Read the whole body before the stash or loose pieces it
+	# dropped, including the exact pocket manifest E will collect in one action.
+	for body: Dictionary in dead_bodies:
+		var body_source := body.get("node") as Node3D
+		if body_source == null or not is_instance_valid(body_source):
+			continue
+		var body_distance := player.distance_to(body_source.global_position)
+		if body_distance <= 3.2 and body_distance <= best_distance:
+			var body_loot: Array = body.get("loot", [])
+			var manifest := ", ".join(PackedStringArray(body_loot)).to_upper()
+			best_distance = body_distance
+			best = {
+				"source": body_source, "item_id": str(body.get("subject_id", "unknown")),
+				"kind": "corpse", "label": str(body.get("display_name", "BODY")).to_upper(),
+				"detail": "DEAD // %s" % (manifest if not manifest.is_empty() else "NOTHING LOOSE"),
+			}
 	for cache in loose_loot:
 		if cache == null or not is_instance_valid(cache):
 			continue
@@ -6631,7 +6680,7 @@ func _update_held_reliquary() -> void:
 			held_reliquary.show_item(world_source, str(inspected_world_item.get("label", "object")), str(inspected_world_item.get("detail", "ground")))
 			return
 		inspected_world_item.clear()
-	if smoke_model != null and is_instance_valid(smoke_model):
+	if smoke_model != null and is_instance_valid(smoke_model) and not smoke_weapon_drawn:
 		var smoke_label := str((SMOKEABLES.CATALOG.get(str(smoke_model.get_meta("device_id", "")), {}) as Dictionary).get("label", "smokeable"))
 		var smoke_left := roundi((1.0 - SMOKEABLES.spent_of(smoke_model)) * 100.0)
 		held_reliquary.show_item(smoke_model, smoke_label, "%d%%" % smoke_left)
@@ -6640,7 +6689,7 @@ func _update_held_reliquary() -> void:
 		var limb: Dictionary = handheld.carry.items[carried_limb_index]
 		held_reliquary.show_item(carried_limb_model, str(limb.get("label", "severed limb")), "%d%%" % roundi(float(limb.get("condition", 1.0)) * 100.0))
 		return
-	if arsenal != null and arsenal.models.has(arsenal.current_id):
+	if arsenal != null and not bare_handed and arsenal.models.has(arsenal.current_id):
 		var held_weapon := arsenal.models[arsenal.current_id] as Node3D
 		if held_weapon != null and held_weapon.visible:
 			var state: Dictionary = arsenal.state()
