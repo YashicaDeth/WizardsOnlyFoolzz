@@ -23,13 +23,53 @@ func _ready() -> void:
 	check(HANDHELD.DROP_KEY == KEY_DELETE, "dropping the device uses the dedicated Delete key")
 	check(HANDHELD.DROP_KEY != KEY_K, "drop no longer shares the irreversible re-decant binding")
 
+	var device := HANDHELD.new()
+	add_child(device)
+	device.load_device()
+	device.open_device()
+	device._tab_rects = device.tab_layout(Rect2(Vector2(80, 40), Vector2(1128, 640)))
+	check(device.mouse_filter == Control.MOUSE_FILTER_STOP and device._tab_rects.size() == device.MODES.size(),
+		"raising the device exposes one clickable region for every drawn app tab")
+	var ritual_tab: Rect2 = device._tab_rects[5]
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = ritual_tab.get_center()
+	device._gui_input(click)
+	check(device.current_mode() == "RITUAL", "clicking a drawn tab selects that exact device app")
+	device.close_device()
+	check(device.mouse_filter == Control.MOUSE_FILTER_IGNORE, "lowered hardware releases the pointer back to the game")
+	device.queue_free()
+
 	var hunt = HUNT.instantiate()
 	add_child(hunt)
 	await get_tree().process_frame
+	var g_key := InputEventKey.new()
+	g_key.keycode = KEY_G
+	g_key.pressed = true
+	hunt._unhandled_input(g_key)
+	check(hunt.handheld.is_open and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE,
+		"G raises the Black Mirror and releases the pointer for its controls")
+	var f7_key := InputEventKey.new()
+	f7_key.keycode = KEY_F7
+	f7_key.pressed = true
+	hunt._unhandled_input(f7_key)
+	check(hunt.handheld.current_mode() == "FIELD", "F7 reaches the seventh advertised app directly")
+	var escape_key := InputEventKey.new()
+	escape_key.keycode = KEY_ESCAPE
+	escape_key.pressed = true
+	hunt._unhandled_input(escape_key)
+	# The headless display refuses MOUSE_MODE_CAPTURED and reports VISIBLE even
+	# after the production assignment; the close itself is still testable here.
+	var pointer_returned := DisplayServer.get_name() == "headless" or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+	check(not hunt.handheld.is_open and pointer_returned,
+		"Escape lowers the raised Black Mirror and returns control to play")
 	var rows: Array = []
 	for group: Dictionary in hunt.keys_card.groups:
 		rows.append_array(group.get("rows", []))
 	check(rows.any(func(row: Array): return row[0] == HANDHELD.DROP_KEY_LABEL and row[1] == "DROP DEVICE"), "the in-world keys card teaches the new drop binding")
+	check(rows.any(func(row: Array): return row[0] == "CLICK / F1-F7" and row[1] == "SELECT DEVICE APP"), "the keys card teaches pointer and direct app selection")
+	check(rows.any(func(row: Array): return row[0] == "TAB" and "NEXT DEVICE APP" in row[1]), "the keys card explains Tab's raised-device meaning")
 	check(rows.any(func(row: Array): return row[0] == "K" and "RE-DECANT" in row[1]), "K remains honestly labelled for its one surviving action")
 	check(rows.filter(func(row: Array): return row[0] == "K").size() == 1, "the card contains no second hidden K action")
 

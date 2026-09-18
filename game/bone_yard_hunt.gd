@@ -1373,9 +1373,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				else:
 					_reload_weapon()
 			KEY_ESCAPE:
-				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-				if not panel_mode.is_empty():
+				if handheld.is_open:
+					handheld.close_device()
+					Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+				elif not panel_mode.is_empty():
 					_toggle_panel(panel_mode)
+				else:
+					Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 			KEY_F:
 				if not third_person and not third_person_unlocked():
 					prompt.text = third_person_refusal()
@@ -1398,10 +1402,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F3: handheld.jump_to_mode(2)
 			KEY_F4: handheld.jump_to_mode(3)
 			KEY_F5: handheld.jump_to_mode(4)
+			KEY_F6: handheld.jump_to_mode(5)
+			KEY_F7: handheld.jump_to_mode(6)
 			KEY_G:
 				handheld.toggle_device()
+				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if handheld.is_open else Input.MOUSE_MODE_CAPTURED
 				if handheld.is_open:
-					prompt.text = asset_network.roster_line() + " // [R] ISSUE NEXT ORDER"
+					prompt.text = asset_network.roster_line() + " // CLICK APP / TAB NEXT / ESC LOWER"
 			KEY_TAB:
 				# The handheld owns Tab while raised: one object, modes on it.
 				if handheld.is_open:
@@ -6170,8 +6177,9 @@ func _build_keys_card() -> void:
 			["LMB EXHALE", "O / DOUBLE O / GHOST"],
 		]},
 		{"group": "WHAT YOU CARRY", "rows": [
-			["G", "THE DEVICE"],
-			["TAB", "WORLD INDEX"],
+			["G", "RAISE / LOWER BLACK MIRROR"],
+			["TAB", "INDEX / NEXT DEVICE APP"],
+			["CLICK / F1-F7", "SELECT DEVICE APP"],
 			["M", "LIVING MAP"],
 			["T", "CHARACTER TREE"],
 			["P", "THE BOARD"],

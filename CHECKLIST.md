@@ -555,7 +555,7 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
       drop on `K`, which the Hunt already reserves for deliberate re-decanting;
       a captured player could therefore lose the phone and reset their body on
       one press. Drop now owns `Delete`, the keys card teaches both actions as
-      separate rows, and `tests/handheld_control_binding_test.gd` (5 checks)
+      separate rows, and `tests/handheld_control_binding_test.gd` (13 checks)
       prevents the irreversible bindings from collapsing together again.
 
       Still open, and still not this file's to close: nothing calls
@@ -563,7 +563,7 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
       event belonging to whichever lane owns that consequence, not something
       `handheld_device.gd` can originate on its own.
 - [x] **C1.8** `v2` Wear accumulates in WorldHistory and only ever goes one way — a cracked screen does not heal
-- [x] **C2.6** `v2` F1-F5 reach a page directly; cycling is how you learn the device, not how you use one you know
+- [x] **C2.6** `v2` Every drawn app tab is now an actual control: click it or use F1-F7 to reach its page directly; Tab and the mouse wheel cycle while the Black Mirror is raised. G releases the captured pointer, Escape lowers the hardware and returns the pointer to play, and the keys card states this context change instead of mislabelling Tab as only WORLD INDEX. `handheld_control_binding_test.gd` covers all seven clickable regions, exact selection, G/F7/Escape and pointer release in 13 checks
 - [x] **C5.5** `v2` Cracks seeded from the device's own serial, at its real condition rather than a constant 0.85
 
 ### C v3 — the third pass
@@ -575,12 +575,14 @@ work created or exposed, not a wish.
       a control nobody discovers is a control nobody has~~ `jump_to_mode()`
       has reached a page directly since C2.6 v2 and nothing on the device
       itself ever said so. Each tab in `_draw_tabs()` now prints the F-key
-      that jumps straight to it — "F1" over INDEX through "F5" over CARRY —
+      that jumps straight to it — "F1" over INDEX through "F7" over FIELD —
       the same register a real handheld prints a function-key legend in,
       rather than a control the player can only ever stumble onto by cycling
-      through with Tab. Verified: a windowed capture
+      through with Tab. The painted rail and its pointer hitboxes now come from
+      one shared layout, so all seven labels are clickable rather than decorative.
+      Verified by `handheld_control_binding_test.gd` and a windowed capture
       (`captures/c2_7_v3_tab_key_hints.png`) showing the legend printed and
-      matching `bone_yard_hunt.gd`'s actual `KEY_F1`.."KEY_F5" bindings.
+      matching `bone_yard_hunt.gd`'s actual `KEY_F1`.."KEY_F7" bindings.
 - [x] ~~**C5.6** `v3` Cracks are per-device but still radiate from one
       authored origin; an impact should crack the glass where it landed~~
       `BlackMirror.draw_cracks()` always forked from the exact same point

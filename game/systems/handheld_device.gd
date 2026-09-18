@@ -252,6 +252,7 @@ var turn := 0.0
 var turn_override: Variant = null
 const TURN_KEY := KEY_O
 var _turned_rect := Rect2()
+var _tab_rects: Array[Rect2] = []
 
 ## C1.7 `v2`. Deliberately letting go, as its own key rather than folded onto
 ## G (which raises and lowers) or Escape (which just closes the panel without
@@ -548,15 +549,41 @@ func open_device() -> void:
 		return
 	is_open = true
 	visible = true
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	set_mode(current_mode())
 
 
 func close_device() -> void:
 	is_open = false
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# AS1.3. The natural checkpoint for a number that otherwise only changes a
 	# little every frame — saving on every tick it drains would mean writing
 	# the whole history file to disk sixty times a second for nothing.
 	save_device()
+
+
+## The labels painted along the phone's bottom edge are controls, not a legend.
+## Hosted pages keep their own pointer handling inside the aperture; this only
+## owns the physical tab rail around them.
+func _gui_input(event: InputEvent) -> void:
+	if not is_open or not (event is InputEventMouseButton):
+		return
+	var button := event as InputEventMouseButton
+	if button.pressed and button.button_index == MOUSE_BUTTON_LEFT:
+		var tab := tab_index_at(button.position)
+		if tab >= 0:
+			jump_to_mode(tab)
+			accept_event()
+	elif button.pressed and button.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		cycle_mode(-1 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 1)
+		accept_event()
+
+
+func tab_index_at(local_position: Vector2) -> int:
+	for index in _tab_rects.size():
+		if _tab_rects[index].has_point(local_position):
+			return index
+	return -1
 
 
 func toggle_device() -> void:
@@ -1119,11 +1146,13 @@ func _draw_back(rect: Rect2, alpha: float) -> void:
 
 
 func _draw_tabs(rect: Rect2, alpha: float) -> void:
-	var x := rect.position.x + 26.0
-	var y := rect.position.y + rect.size.y - 34.0
+	_tab_rects = tab_layout(rect)
 	for index in MODES.size():
 		var label: String = MODES[index]
-		var width := CellOutzType.width(label, 11.0, 1.0) + 26.0
+		var tab_rect := _tab_rects[index]
+		var x := tab_rect.position.x
+		var y := tab_rect.position.y
+		var width := tab_rect.size.x
 		var active := index == displayed_mode_index
 		var tint: Color = AMBER if active else CASE_EDGE
 		var shape := PackedVector2Array([
@@ -1142,7 +1171,20 @@ func _draw_tabs(rect: Rect2, alpha: float) -> void:
 		# jumps to, the same register a real handheld prints a function key
 		# legend in.
 		CellOutzType.draw_condensed(self, Vector2(x + 6, y - 10), "F%d" % (index + 1), 8.0, tint * Color(1, 1, 1, 0.7 * alpha), 0.6)
+
+
+## Pure geometry companion to `_draw_tabs`, shared with hit-testing and tests.
+## Keeping the painted rail and clickable rail derived from one calculation
+## prevents the interaction from drifting away when a label changes width.
+func tab_layout(rect: Rect2) -> Array[Rect2]:
+	var result: Array[Rect2] = []
+	var x := rect.position.x + 26.0
+	var y := rect.position.y + rect.size.y - 34.0
+	for label: String in MODES:
+		var width := CellOutzType.width(label, 11.0, 1.0) + 26.0
+		result.append(Rect2(Vector2(x, y), Vector2(width, 22.0)))
 		x += width + 8.0
+	return result
 
 
 func _draw_status(rect: Rect2, alpha: float) -> void:
