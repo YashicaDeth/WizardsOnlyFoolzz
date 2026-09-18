@@ -6093,6 +6093,15 @@ to get right.
       stays playable for a short window;
       LMB cycles an expanding O, double O and ghost whose particle edges fray
       as they travel (`tests/smoking_act_test.gd`, `smoking_gameplay_capture`)
+
+      The final daylight play-read caught the implementation still technically
+      satisfying “long” while visually resolving as spaced bright droplets.
+      Exhale cards are now more than eight times as long as wide, individually
+      canted, overlapped more densely and given less than half the former
+      lifetime opacity; the crossed haze is broader and quieter. The result is
+      a continuous layered breath in
+      `P:/GameDev/Temp/smoking_feel_cigarette_exhale.png`, not a dotted particle
+      path. The stronger aspect/opacity contract is now asserted directly.
 - [x] **AU7.8** Charges burn down visibly — a cigarette gets shorter, a bong
       bowl goes to ash and sinks, a vape's tank window drops. `spend_per_hit()`
       is derived from the charge count the catalogue already carries rather than
@@ -6146,6 +6155,16 @@ to get right.
       drive the production Hunt through cigarette, vape, joint, spliff, bong,
       sword, shotgun, sidearm and carried-limb use followed by each distinct
       inspection; a 6-second contact sheet was visually checked across the reel
+
+      18 September hand-occlusion correction: rolled objects rest closer and
+      higher in the lower third, the cigarette receives the smallest of the
+      still-costumed grip hands plus extra finger clearance, and the Zippo hand
+      now withdraws off the opposite lower edge once ignition has caught (or
+      once a bong pull ends) instead of haunting the entire draw, exhale and lip
+      hold. The production rest, draw, exhale, lip-hold and inspection frames
+      are captured under `P:/GameDev/Temp/smoking_feel_cigarette_*.png`;
+      `smoking_act_test.gd` pins the lighter withdrawal and the stricter wisp
+      silhouette alongside the existing anatomy, burn and ledger checks.
 - [ ] **AU7.10** Passing one to somebody is a real act with a real meaning (S)
 
 ### AU5 — The effect taxonomy

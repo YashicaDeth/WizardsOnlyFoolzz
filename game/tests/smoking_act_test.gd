@@ -116,6 +116,8 @@ func _ready() -> void:
 		hunt.call("_update_smoking", 1.0 / 60.0)
 	var held_seconds := float(hunt.get("smoke_held"))
 	check(held_seconds > 1.5, "holding RMB accumulates a real draw duration")
+	check(hunt.get("smoke_lighter") == null,
+		"the Zippo hand withdraws after ignition instead of crowding the whole draw and exhale")
 	check(Smokeables.spent_of(held) > length_before_draw,
 		"the cigarette burns shorter continuously while the button is held")
 	var cigarette_in_view := camera.to_local(held.global_position)
@@ -148,7 +150,7 @@ func _ready() -> void:
 		check(tobacco_tint.g - tobacco_tint.r < 0.04, "cigarette smoke stays neutral grey")
 		var wisp_quad := cigarette_plume.draw_pass_1 as QuadMesh
 		var wisp_material := wisp_quad.material as StandardMaterial3D
-		check(cigarette_plume.draw_passes == 2 and wisp_quad.size.y > wisp_quad.size.x * 2.0,
+		check(cigarette_plume.draw_passes == 2 and wisp_quad.size.y > wisp_quad.size.x * 6.0 and wisp_material.albedo_color.a < 0.04,
 			"the exhale layers long wisps instead of bright round beads")
 		check(wisp_material.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED,
 			"the close lighter cannot bleach the smoke plume in daylight")

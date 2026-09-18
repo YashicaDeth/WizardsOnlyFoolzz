@@ -150,7 +150,7 @@ func emit_exhale(at: Vector3, direction: Vector3, density := 1.0, tint := Color(
 	plume.name = "SmokeExhale"
 	plume.set_meta("smoke_tint", tint)
 	plume.one_shot = true
-	plume.amount = roundi(lerpf(12.0, 26.0, clampf(density / 2.4, 0.0, 1.0)))
+	plume.amount = roundi(lerpf(15.0, 30.0, clampf(density / 2.4, 0.0, 1.0)))
 	plume.lifetime = lerpf(2.2, 3.8, clampf(density / 2.4, 0.0, 1.0))
 	plume.explosiveness = 0.86
 	plume.fixed_fps = 30
@@ -172,14 +172,16 @@ func emit_exhale(at: Vector3, direction: Vector3, density := 1.0, tint := Color(
 	motion.turbulence_noise_scale = 2.1
 	motion.turbulence_influence_min = 0.25
 	motion.turbulence_influence_max = 0.72
+	motion.angle_min = -32.0
+	motion.angle_max = 32.0
 	# Long narrow cards overlap into threads. Square cards, even with a radial
 	# texture, resolve as a stream of bright beads in front of the face.
-	motion.scale_min = 0.34
-	motion.scale_max = 0.88
+	motion.scale_min = 0.48
+	motion.scale_max = 1.0
 	plume.process_material = motion
 
 	var quad := QuadMesh.new()
-	quad.size = Vector2(0.030, 0.078)
+	quad.size = Vector2(0.020, 0.180)
 	var smoke := StandardMaterial3D.new()
 	smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	smoke.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
@@ -188,18 +190,18 @@ func emit_exhale(at: Vector3, direction: Vector3, density := 1.0, tint := Color(
 	# point light as a miniature sun. Low alpha makes this smoke, not neon.
 	smoke.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	smoke.albedo_texture = _soft_smoke_texture()
-	smoke.albedo_color = Color(tint.r, tint.g, tint.b, 0.065)
+	smoke.albedo_color = Color(tint.r, tint.g, tint.b, 0.032)
 	smoke.disable_receive_shadows = true
 	quad.material = smoke
-	motion.color_ramp = _smoke_lifetime_ramp()
+	motion.color_ramp = _smoke_lifetime_ramp(0.46)
 	plume.draw_pass_1 = quad
 	# A softer crossing layer stops the thin pass reading as hair. Both passes
 	# share the same particles, so this does not double the simulation cost.
 	plume.draw_passes = 2
 	var haze_quad := QuadMesh.new()
-	haze_quad.size = Vector2(0.058, 0.052)
+	haze_quad.size = Vector2(0.095, 0.066)
 	var haze := smoke.duplicate() as StandardMaterial3D
-	haze.albedo_color = Color(tint.r, tint.g, tint.b, 0.028)
+	haze.albedo_color = Color(tint.r, tint.g, tint.b, 0.014)
 	haze_quad.material = haze
 	plume.draw_pass_2 = haze_quad
 	plume.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -328,13 +330,13 @@ func _soft_smoke_texture() -> GradientTexture2D:
 	return texture
 
 
-func _smoke_lifetime_ramp() -> GradientTexture1D:
+func _smoke_lifetime_ramp(peak := 1.0) -> GradientTexture1D:
 	var gradient := Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0, 0.035, 0.62, 1.0])
 	gradient.colors = PackedColorArray([
 		Color(1.0, 1.0, 1.0, 0.0),
-		Color(1.0, 1.0, 1.0, 1.0),
-		Color(0.92, 0.94, 0.88, 0.58),
+		Color(1.0, 1.0, 1.0, peak),
+		Color(0.92, 0.94, 0.88, peak * 0.58),
 		Color(0.86, 0.89, 0.82, 0.0),
 	])
 	var texture := GradientTexture1D.new()

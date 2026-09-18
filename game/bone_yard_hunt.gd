@@ -660,6 +660,7 @@ var smoke_lighter_lid: Node3D
 var smoke_lighter_flame: MeshInstance3D
 var smoke_lighter_light: OmniLight3D
 var smoke_ignition := 0.0
+var smoke_lighter_retreat := 0.0
 var smoke_bong_audio: AudioStreamPlayer
 var smoke_lighter_audio: AudioStreamPlayer
 var smoke_held := 0.0
@@ -2656,11 +2657,11 @@ func _equip_smokeable(device_id: String) -> void:
 		# need to be slightly smaller than weapon hands at this camera distance or
 		# an anatomically correct 84mm cigarette disappears behind the glove.
 		if rolled:
-			smoke_grip_hand.scale *= 0.80
+			smoke_grip_hand.scale *= 0.74 if device_id == "cigarette" else 0.80
 			# The paper passes through the index/middle cradle, above the palm. A
 			# slightly larger clearance for the fat hand-rolls keeps their ember and
 			# paper visible instead of letting the glove swallow half the model.
-			var roll_clearance := 0.016 if device_id in ["joint", "spliff"] else 0.012
+			var roll_clearance := 0.026 if device_id in ["joint", "spliff"] else 0.022
 			smoke_grip_hand.position = grip.position + Vector3(0.006, -0.054, roll_clearance)
 		else:
 			smoke_grip_hand.position = grip.position + Vector3(0.018, -0.012, 0.0)
@@ -2701,6 +2702,7 @@ func _put_smokeable_away(show_arsenal := true) -> void:
 	smoke_lighter_flame = null
 	smoke_lighter_light = null
 	smoke_ignition = 0.0
+	smoke_lighter_retreat = 0.0
 	if smoke_bong_audio != null:
 		smoke_bong_audio.stop()
 	smoke_drawing = false
@@ -2821,7 +2823,11 @@ func _update_smoking(delta: float) -> void:
 		# mouth/reticle and lets the player look down the bong instead of seeing
 		# its tube inherit a sideways whole-arm rotation.
 		smoke_model.top_level = true
-		var view_rest := Vector3(0.20, -0.30, -0.58)
+		# Rolled objects are physically small. Their former rest sat so deep and
+		# low that only the ember occasionally broke the bottom edge of the frame;
+		# bring the real hand/object assembly into the readable lower third without
+		# scaling the cigarette into a cigar.
+		var view_rest := Vector3(0.16, -0.245, -0.50) if rolled else Vector3(0.20, -0.30, -0.58)
 		var view_mouth := Vector3(-0.035, -0.095, -0.265)
 		var view_rotation := Vector3(0.18, -0.98, -0.18)
 		if device_id == "spliff":
@@ -3059,6 +3065,7 @@ func _begin_smoke_ignition(device_id: String) -> void:
 	smoke_lighter_flame = smoke_lighter.get_node("Flame") as MeshInstance3D
 	smoke_lighter_light = smoke_lighter.get_node("FlameLight") as OmniLight3D
 	smoke_ignition = 0.0
+	smoke_lighter_retreat = 0.0
 	if smoke_support_hand != null:
 		smoke_support_hand.visible = device_id != "bong"
 	if smoke_lighter_audio == null:
@@ -3105,6 +3112,8 @@ func _update_smoke_ignition(delta: float, device_id: String, draw_ratio: float, 
 		smoke_lighter_light.omni_range = 7.2 * lerpf(0.45, 1.0, light_scale)
 	if smoke_support_hand != null:
 		smoke_support_hand.visible = not (device_id == "bong" and smoke_drawing)
+	var should_retreat := (device_id != "bong" and smoke_ignition > 0.82) or (device_id == "bong" and not smoke_drawing)
+	smoke_lighter_retreat = minf(1.0, smoke_lighter_retreat + delta / 0.42) if should_retreat else 0.0
 	if body_motion != null and body_motion.first_person:
 		smoke_lighter.top_level = true
 		var lighter_position := Vector3(-0.12, -0.16, -0.34)
@@ -3114,11 +3123,22 @@ func _update_smoke_ignition(delta: float, device_id: String, draw_ratio: float, 
 			# moving half of the cone-sink timing game.
 			lighter_position = Vector3(0.005, -0.255, -0.49).lerp(Vector3(-0.015, -0.205, -0.47), lift)
 			lighter_rotation = Vector3(-0.42, 0.10, 0.34)
+		if smoke_lighter_retreat > 0.0:
+			var retreat := smoothstep(0.0, 1.0, smoke_lighter_retreat)
+			lighter_position = lighter_position.lerp(Vector3(-0.58, -0.52, -0.30), retreat)
+			lighter_rotation = lighter_rotation.lerp(Vector3(0.18, -0.55, -0.48), retreat)
 		smoke_lighter.global_transform = camera.global_transform * Transform3D(Basis.from_euler(lighter_rotation), lighter_position)
 	else:
 		smoke_lighter.top_level = false
 		smoke_lighter.position = Vector3(-0.035, -0.24, -0.46)
 		smoke_lighter.rotation = Vector3(0.25, 0.1, 0.4)
+	if smoke_lighter_retreat >= 1.0:
+		smoke_lighter.queue_free()
+		smoke_lighter = null
+		smoke_lighter_hand = null
+		smoke_lighter_lid = null
+		smoke_lighter_flame = null
+		smoke_lighter_light = null
 
 
 func _build_zippo() -> Node3D:
