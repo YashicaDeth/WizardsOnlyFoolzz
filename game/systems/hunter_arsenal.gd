@@ -299,10 +299,10 @@ func reload() -> bool:
 	return true
 
 
-func shot_directions(forward: Vector3, up: Vector3) -> Array[Vector3]:
+func shot_directions(forward: Vector3, up: Vector3, spread_scale := 1.0) -> Array[Vector3]:
 	var definition: Dictionary = current()
 	var count := int(definition.get("pellets", 1))
-	var spread := float(definition.get("spread", 0.0))
+	var spread := float(definition.get("spread", 0.0)) * clampf(spread_scale, 0.0, 1.0)
 	var result: Array[Vector3] = []
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("%s:%d" % [current_id, shot_serial])

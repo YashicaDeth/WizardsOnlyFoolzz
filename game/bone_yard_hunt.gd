@@ -170,6 +170,11 @@ var pitch := -0.12
 ## The condition is read out of `WorldHistory`, never stored — the same rule the
 ## Board runs on, so there is nothing to get out of sync.
 var third_person := false
+## RMB is a held firearm stance. It used to fire a slower duplicate shot on
+## press because the melee "heavy" route owned RMB for every weapon kind,
+## leaving the game with no actual aiming control at all.
+var firearm_aiming := false
+var firearm_aim_blend := 0.0
 ## M1.5. `third_person_unlocked()` is a pure read of history, so it can flip
 ## from false to true on any frame — the instant the first body hit lands —
 ## with nobody pressing anything. Left alone that is a permission
@@ -1359,6 +1364,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_begin_smoking_draw()
 			else:
 				_finish_smoking_draw()
+		elif arsenal != null and not bare_handed and carried_limb_index < 0 and str(arsenal.current().get("kind", "")) == "firearm":
+			firearm_aiming = event.pressed
+			if event.pressed:
+				prompt.text = "%s // AIMING" % str(arsenal.current().get("label", "FIREARM"))
 		elif event.pressed:
 			_attack(true)
 	# Once a cigarette or hand-roll is parked at the lips, the mouse belongs to
@@ -1801,6 +1810,10 @@ func _update_player(delta: float) -> void:
 	# rather than scaled straight off `mobility_ratio`, because a game you cannot
 	# retreat from is a game that is over.
 	speed *= _player_speed_scale()
+	# A shouldered gun keeps footwork, but not full sprint-speed strafing. This
+	# is continuous with the held stance rather than an arbitrary movement lock.
+	if firearm_aiming:
+		speed *= 0.68
 	# A melee press is one committed swing, not an automatic attack repeated by
 	# holding the mouse. You can still steer it, but not sprint through its tell.
 	speed *= COMBAT_RESPONSE.movement_scale(pending_attack, strike_windup)
@@ -1861,6 +1874,11 @@ func _update_player(delta: float) -> void:
 	# swing pose, the raised arm, the walk cycle) is the visible half of "the
 	# blow met resistance" and was still posing at full speed through it.
 	var animation_delta: float = delta * impact_feel.scale_for("player")
+	# Exterior arms shoulder the weapon. The first-person model already owns its
+	# authored camera-space mount; applying the exterior shoulder rotation there
+	# swings the whole receiver across the lens.
+	var exterior_aim_pose: bool = firearm_aiming and not body_motion.first_person
+	body_motion.set_combat_pose(1.0 if exterior_aim_pose else 0.0, "firearm" if exterior_aim_pose else "")
 	body_motion.update(animation_delta, player_body.velocity, player_body.is_on_floor(), sprinting, crouching, dodge_remaining > 0.0)
 	hunter_appearance.set_mouth(player_rig.anatomy.pain / 180.0, sin(pulse * 0.7) * player_rig.anatomy.pain / 100.0)
 
@@ -2551,7 +2569,7 @@ func _settle_shot(shot_id: int, hit_body: bool, subject_id := "") -> void:
 func _resolve_firearm(attack: Dictionary) -> void:
 	var forward := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
 	var origin := camera.global_position + forward * 0.48
-	var directions: Array[Vector3] = arsenal.shot_directions(forward, Vector3.UP)
+	var directions: Array[Vector3] = arsenal.shot_directions(forward, Vector3.UP, 0.38 if firearm_aiming else 1.0)
 	# AF1.1. A round is a thing that travels, and now so is what it does: the
 	# damage payload rides on the round itself and is only ever spent when
 	# `_on_round_hit()`/`_on_round_expired()` reports that round's own real
@@ -2566,6 +2584,7 @@ func _resolve_firearm(attack: Dictionary) -> void:
 		"label": str(arsenal.current().label),
 		"remaining": directions.size(),
 		"hit_ids": [],
+		"aimed": firearm_aiming,
 	}
 	if ballistics == null or not is_instance_valid(ballistics):
 		# No projectile system to hand this to, and so no round that could
@@ -2592,7 +2611,7 @@ func _resolve_firearm(attack: Dictionary) -> void:
 	# on whichever pellet takes longest to resolve.
 	# One receipt per trigger pull, never one per pellet or wound. The deferred
 	# firearm_anatomy_hit records remain consequences of this eager action.
-	PLAYER_ACTION_LEDGER.record("weapon_fired", {"weapon": attack.weapon, "location": HUNT_LOCATION})
+	PLAYER_ACTION_LEDGER.record("weapon_fired", {"weapon": attack.weapon, "aimed": firearm_aiming, "location": HUNT_LOCATION})
 
 
 func _trace_actor(origin: Vector3, direction: Vector3, distance: float) -> Dictionary:
@@ -2644,6 +2663,7 @@ func _player_collision_exclusions() -> Array[RID]:
 
 ## O5.8. Put everything down. Not a weapon slot — the absence of one.
 func _put_the_weapons_down() -> void:
+	firearm_aiming = false
 	if smoke_weapon_drawn and smoke_model != null and is_instance_valid(smoke_model):
 		smoke_weapon_drawn = false
 		for model in arsenal.models.values():
@@ -2665,6 +2685,7 @@ func _put_the_weapons_down() -> void:
 ## binds. Repeated presses walk the five authored objects; RMB belongs to the
 ## selected object until a weapon key takes the hand back.
 func _cycle_smokeable() -> void:
+	firearm_aiming = false
 	if smoke_drawing:
 		_finish_smoking_draw()
 	smoke_index = (smoke_index + 1) % SMOKEABLE_ORDER.size()
@@ -3576,6 +3597,7 @@ func _equip_weapon(slot: int) -> void:
 	bare_handed = false
 	_clear_carried_limb_model()
 	if arsenal.select_slot(slot):
+		firearm_aiming = false
 		smoke_weapon_drawn = preserve_mouth_smoke
 		pending_attack = {}
 		strike_windup = -1.0
@@ -3592,6 +3614,7 @@ func _equip_weapon(slot: int) -> void:
 
 
 func _reload_weapon() -> void:
+	firearm_aiming = false
 	if carried_limb_index >= 0:
 		prompt.text = "THAT IS AN ARM, NOT A GUN"
 		return
@@ -4679,6 +4702,7 @@ func _nearest_takeable_chunk(radius: float) -> Node3D:
 
 
 func _equip_carried_limb() -> void:
+	firearm_aiming = false
 	var index: int = handheld.carry.first_index("limb")
 	if index < 0:
 		prompt.text = "CARRY HAS NO WHOLE LIMB"
@@ -6367,7 +6391,7 @@ func _build_keys_card() -> void:
 		]},
 		{"group": "FIGHTING", "rows": [
 			["LMB", "ATTACK"],
-			["RMB", "HEAVY"],
+			["RMB", "AIM FIREARMS / HEAVY MELEE"],
 			["HOLD X", "GUARD"],
 			["Z", "LOCK ON"],
 			["WHEEL", "CYCLE TARGET"],
@@ -6447,6 +6471,8 @@ func _order_hud_layers() -> void:
 
 func _toggle_panel(mode: String) -> void:
 	var opening := panel_mode != mode
+	if opening:
+		firearm_aiming = false
 	# Major interfaces are mutually exclusive. The phone is a physical object
 	# in the hand and these are full-size reading surfaces; drawing both at once
 	# caused two cursor owners, two sets of shortcuts and battery drain behind a
@@ -6538,6 +6564,7 @@ func _toggle_handheld_surface() -> void:
 		handheld.close_device()
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		return
+	firearm_aiming = false
 	# Pocket every other reader before raising the physical device. This also
 	# sleeps the satellite viewport instead of leaving it rendering behind G.
 	_close_panel_views()
@@ -6558,6 +6585,8 @@ func _toggle_handheld_surface() -> void:
 ## future vat route, but ordinary exploration never constructs or opens them.
 func _toggle_artwork() -> void:
 	var opening := not allusions_artwork.visible
+	if opening:
+		firearm_aiming = false
 	if handheld.is_open:
 		handheld.close_device()
 	keys_card.close()
@@ -6830,6 +6859,12 @@ func _update_camera() -> void:
 				player_head.visible = false
 			return
 	var look := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+	# The sight comes to the eye rather than the world snapping into a zoom.
+	# Releasing RMB reverses the same blend, and non-firearms cannot strand it.
+	var aiming_now := firearm_aiming and arsenal != null and not bare_handed and carried_limb_index < 0 and str(arsenal.current().get("kind", "")) == "firearm"
+	if not aiming_now:
+		firearm_aiming = false
+	firearm_aim_blend = move_toward(firearm_aim_blend, 1.0 if aiming_now else 0.0, get_physics_process_delta_time() * 7.0)
 	var physical_offset := Vector3.ZERO
 	var fov_add := 0.0
 	if body_motion != null:
@@ -6873,6 +6908,9 @@ func _update_camera() -> void:
 		var gap: float = player.distance_to(locked.global_position)
 		distance = clampf(3.6 + gap * 0.22, 3.6, 6.2)
 		focus = focus.lerp(locked.global_position + Vector3.UP * 0.9, 0.32)
+	if firearm_aim_blend > 0.0:
+		distance *= lerpf(1.0, 0.76, firearm_aim_blend)
+		shoulder *= lerpf(1.0, 0.72, firearm_aim_blend)
 	var desired := player - look * distance + Vector3.UP * 0.85 + shoulder + physical_offset * 0.35
 	if not camera_ready:
 		camera_position = desired
@@ -6894,7 +6932,9 @@ func _update_camera() -> void:
 	# nominal third-person blend here made the player's torso fill the complete
 	# frame at the Hunt spawn even though collision avoidance itself was working.
 	var camera_blend := perspective_blend * HUNTER_MOTOR.third_person_clearance_blend(fp_position, tp_position)
-	camera.fov = lerpf(FIRST_PERSON_FOV, THIRD_PERSON_FOV, camera_blend) + fov_add
+	var base_fov := lerpf(FIRST_PERSON_FOV, THIRD_PERSON_FOV, camera_blend) + fov_add
+	var aimed_fov := lerpf(56.0, 50.0, camera_blend)
+	camera.fov = lerpf(base_fov, aimed_fov, firearm_aim_blend)
 	# Locked, the shot is about the pair, so aim between them. Unlocked, aim
 	# parallel to the look heading rather than at the player — aiming *at*
 	# the player cancels the shoulder offset and re-centres the body, which

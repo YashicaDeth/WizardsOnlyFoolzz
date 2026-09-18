@@ -63,8 +63,26 @@ func _ready() -> void:
 		await get_tree().process_frame
 	await _shot("combat_playtest_third_person_lock")
 
+	# The narrated playtest found that RMB simply fired another shot and there
+	# was no firearm aim at all. Capture the production held stance and narrowed
+	# lens in first person before returning to the melee grip sheet below.
+	hunt.third_person = false
+	hunt.body_motion.set_perspective(true)
+	hunt.perspective_blend = 0.0
+	hunt.lock_target = ""
+	hunt._equip_weapon(2)
+	hunt.firearm_aiming = true
+	for _frame in 24:
+		hunt._update_player(1.0 / 60.0)
+		hunt._update_camera()
+		hunt._update_hud()
+		await get_tree().process_frame
+	await _shot("combat_playtest_firearm_aim")
+	hunt.firearm_aiming = false
+
 	# The same production viewmodel in all three sword stances. These frames
 	# catch the exact failure where half-sword numbers changed while its hand did not.
+	hunt._equip_weapon(0)
 	hunt.third_person = false
 	hunt.body_motion.set_perspective(true)
 	hunt.perspective_blend = 0.0
