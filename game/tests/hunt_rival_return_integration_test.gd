@@ -64,8 +64,8 @@ func _ready() -> void:
 	var saved := WorldHistory.subject(subject_id)
 	check(str(saved.get("status", "")) == "hunting" and int(saved.get("rival_returns", 0)) == 1,
 		"the return is durable state on that exact person")
-	check(WorldHistory.event_count("rival_returned_to_hunt") == 1,
-		"the visible return is one attributable historical fact")
+	check(WorldHistory.event_count("rival_returned_to_hunt") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"the restored body, rival state and visible return close as one world transaction")
 	var remembered: Array = (WorldHistory.subject("player").get("hunted_by", []) as Array)
 	check(remembered.any(func(entry: Dictionary):
 		return str(entry.get("hunter_id", "")) == subject_id and str(entry.get("reason", "")) == "returning_rival"),

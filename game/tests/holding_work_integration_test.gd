@@ -66,8 +66,8 @@ func _ready() -> void:
 	await get_tree().physics_frame
 	hunt._maintain_holding_work()
 	var raid_targets: Array = hunt.encounter_actors.filter(func(actor: Dictionary): return str(actor.get("holding_work_job", "")) == raid_id)
-	check(raid_targets.size() == 2 and raid_targets.all(func(actor: Dictionary): return actor.rig is BaselineHuman),
-		"accepted raid work enters the production encounter world as two full anatomy bodies")
+	check(raid_targets.size() == 2 and raid_targets.all(func(actor: Dictionary): return actor.rig is BaselineHuman) and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"accepted raid work enters as two full anatomy bodies in one closed maintenance transaction")
 	var raid_contacts: Array = hunt._map_contacts().filter(func(contact: Dictionary): return str(contact.get("job_id", "")) == raid_id)
 	check(raid_contacts.size() == 1 and str(raid_contacts[0].state) == "work_raid",
 		"MAP receives one raid objective at the contract coordinate instead of duplicating its two people")
@@ -87,8 +87,8 @@ func _ready() -> void:
 		if actor_index >= 0:
 			hunt._kill_encounter_actor(actor_index, "holding_work_test")
 	hunt._maintain_holding_work()
-	check(str(WorldHistory.subject(raid_id).get("status", "")) == "completed" and int(WorldHistory.subject(raid_id).get("progress", 0)) == 2,
-		"resolving both physical targets completes and timestamps the same raid record")
+	check(str(WorldHistory.subject(raid_id).get("status", "")) == "completed" and int(WorldHistory.subject(raid_id).get("progress", 0)) == 2 and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"resolving both physical targets completes the same raid record in one closed maintenance transaction")
 	check(int(WorldHistory.subject(str(bone.record)).get("local_work_completed", 0)) == 1 and str(WorldHistory.subject(str(bone.record)).get("local_work_state", "")) == "disrupted",
 		"one resolved order weakens the place's claim but cannot counterfeit reclamation")
 	check(not hunt._map_contacts().any(func(contact: Dictionary): return str(contact.get("job_id", "")) == raid_id),

@@ -172,6 +172,12 @@ func _ready() -> void:
 		hunt._update_encounter_actors(0.5)
 	var distance_after := (enforcers[0].node as Node3D).global_position.distance_to(at) if not enforcers.is_empty() else 0.0
 	check(distance_after < distance_before, "the dispatched team physically follows a route to the recorded scene instead of knowing the player's new position")
+	if not enforcers.is_empty():
+		var arrival_target: Vector3 = enforcers[0].law_target
+		(enforcers[0].node as Node3D).global_position = arrival_target
+		hunt._update_encounter_actors(0.01)
+	check(WorldHistory.event_count("local_law_enforcer_arrived") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"an officer's arrived state and attributable arrival fact close as one world transaction")
 	for index in range(hunt.encounter_actors.size() - 1, -1, -1):
 		var candidate: Dictionary = hunt.encounter_actors[index]
 		if not str(candidate.get("encounter_id", "")).begins_with("local_law_"):

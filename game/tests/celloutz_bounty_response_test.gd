@@ -34,7 +34,8 @@ func _ready() -> void:
 	var first_team: Array = hunt.encounter_actors.filter(func(actor: Dictionary):
 		return str(actor.get("encounter_id", "")).begins_with("celloutz_contract_1_"))
 	check(first_team.size() == 2, "the first published target area dispatches one two-person recovery contract")
-	check(WorldHistory.event_count("celloutz_repossession_team_dispatched") == 1, "dispatch is one persisted world event")
+	check(WorldHistory.event_count("celloutz_repossession_team_dispatched") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"dispatch, response state and both persistent contractors close as one world transaction")
 	var centre := Vector3(float(first_area.x), 0.0, float(first_area.z))
 	check(first_team.all(func(actor: Dictionary):
 		return (actor.node as Node3D).global_position.distance_to(centre) <= float(first_area.radius) * 1.15),
@@ -66,8 +67,8 @@ func _ready() -> void:
 	hunt._maintain_celloutz_contractors()
 	var replacement: Array = hunt.encounter_actors.filter(func(actor: Dictionary):
 		return str(actor.get("encounter_id", "")).begins_with("celloutz_contract_2_"))
-	check(replacement.size() == 2 and WorldHistory.event_count("celloutz_repossession_team_dispatched") == 2,
-		"a later area can commission a replacement only after the prior contract is resolved")
+	check(replacement.size() == 2 and WorldHistory.event_count("celloutz_repossession_team_dispatched") == 2 and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"a later area commissions one replacement transaction only after the prior contract is resolved")
 
 	print("CELLOUTZ_BOUNTY_RESPONSE_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

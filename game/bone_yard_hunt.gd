@@ -4822,11 +4822,13 @@ func _update_encounter_actors(delta: float) -> void:
 				_move_actor_on_route(actor, law_target, actor_delta)
 			else:
 				actor["law_arrived"] = true
+				WorldHistory.begin_ledger_batch()
 				WorldHistory.amend_subject(str(actor.subject_id), {"status": "searching_dispatched_scene"})
 				WorldHistory.record_event("local_law_enforcer_arrived", {
 					"subject_id": str(actor.subject_id), "source_sequence": int(actor.get("law_dispatch_sequence", -1)),
 					"at": {"x": law_target.x, "z": law_target.z},
 				})
+				WorldHistory.commit_ledger_batch()
 		elif LauncherActor.is_launcher(actor) and LauncherActor.in_envelope(distance) and (bool(actor.get("tracking_player", false)) or bool(actor.get("tracking_light", false))):
 			# AD3.1. A launcher holds its ground and works the tube; all of the
 			# decision lives in `launcher_actor.gd` so this branch stays a hook
@@ -5034,6 +5036,7 @@ func _actor_attack_damage(actor: Dictionary) -> int:
 
 func _apply_combat_response(actor: Dictionary, attack: Dictionary, hit: Dictionary) -> void:
 	var response := COMBAT_RESPONSE.from_hit(attack, actor.anatomy, hit)
+	WorldHistory.begin_ledger_batch()
 	# O5.10 v2. Every landed hit costs footing on its own scale — this used to
 	# leave no mark at all below the stagger threshold, so a fighter chipped
 	# by three medium blows fought exactly as well as one who had taken none,
@@ -5047,6 +5050,7 @@ func _apply_combat_response(actor: Dictionary, attack: Dictionary, hit: Dictiona
 		WorldHistory.record_event("npc_disarmed", {"subject_id": actor.subject_id, "location": HUNT_LOCATION})
 		prompt.text = "%s'S GRIP GIVES OUT" % str(actor.display_name).to_upper()
 	if not bool(response.staggered):
+		WorldHistory.commit_ledger_batch()
 		return
 	actor.state = "staggered"
 	actor["stagger_remaining"] = float(response.duration)
@@ -5057,6 +5061,7 @@ func _apply_combat_response(actor: Dictionary, attack: Dictionary, hit: Dictiona
 		"location": HUNT_LOCATION,
 	})
 	prompt.text = "%s LOSES THEIR FOOTING // PRESS THE OPENING" % str(actor.display_name).to_upper()
+	WorldHistory.commit_ledger_batch()
 
 
 func _apply_maiming_state(actor: Dictionary, zones: Array, direction: Vector3) -> void:
@@ -7184,6 +7189,7 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 	if str(saved_actor.get("status", "")) in ["spared", "recruited"]:
 		encounter_actors.back().state = str(saved_actor.status)
 		encounter_actors.back().disposition = "ally" if str(saved_actor.status) == "recruited" else "neutral"
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.register_subject(subject_id, {"name": display_name, "kind": "person", "role": str(encounter.get("role", encounter.kind)), "elo": elo, "status": "encountered", "memory": summary_from(encounter), "wounds": [], "anatomy": anatomy.call("snapshot"), "relations": {"player": {"kind": "enemy", "strength": 35}}})
 	if returning_rival:
 		var return_count := int(saved_actor.get("rival_returns", 0)) + 1
@@ -7196,6 +7202,7 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 			"adaptation": (saved_actor.get("rival_adaptation", {}) as Dictionary).duplicate(true),
 			"location": HUNT_LOCATION,
 		})
+	WorldHistory.commit_ledger_batch()
 	# AE.3. Returned so the caller can finish dressing an actor it has a name
 	# and a body for - a lantern, a proper label, a faction on the record. The
 	# misfire director and `_spawn_ashline_reinforcements()` ignore this, as
@@ -7382,6 +7389,7 @@ func _maintain_holding_work() -> void:
 
 
 func _maintain_holding_raid(job_id: String, job: Dictionary, target: Vector3) -> void:
+	WorldHistory.begin_ledger_batch()
 	var required := maxi(1, int(job.get("required", 2)))
 	var subject_ids: Array = job.get("target_subjects", []).duplicate()
 	if subject_ids.is_empty():
@@ -7418,6 +7426,7 @@ func _maintain_holding_raid(job_id: String, job: Dictionary, target: Vector3) ->
 		ASHBLOOM_HOLDINGS.complete_work(job_id, {
 			"method": "claim_crew_resolved", "subjects": subject_ids.duplicate(),
 		})
+	WorldHistory.commit_ledger_batch()
 
 
 func _maintain_holding_collection(job_id: String, job: Dictionary, target: Vector3) -> void:
@@ -7447,6 +7456,7 @@ func _maintain_celloutz_contractors() -> void:
 		return
 	if ping_sequence <= response_sequence:
 		return
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(FACILITY_TERRITORY.REACTION_SUBJECT, {
 		"response_sequence": ping_sequence,
 		"response_area": area.duplicate(true),
@@ -7458,6 +7468,7 @@ func _maintain_celloutz_contractors() -> void:
 		"area": area.duplicate(true),
 	})
 	_restore_celloutz_team(ping_sequence, area)
+	WorldHistory.commit_ledger_batch()
 
 
 func _celloutz_team_unresolved(sequence: int) -> bool:

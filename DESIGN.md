@@ -142,6 +142,17 @@ cheap per-kind counts, and batches its compact summary with the event into one
 persistence flush. A complete draw remains one nested outer transaction across
 dose, lungs, consumed geometry and all receipts.
 
+18 September implementation note: that route now covers the remaining
+deliberate movement and handling verbs too. A jump is receipted only when the
+body actually leaves the floor; a dodge, wall-run kickoff and supported grip
+change receive one receipt each; refused inputs receive none. The corresponding
+autonomous consequences remain world events rather than counterfeit player
+actions. A production-wide multi-write audit also closed the derived outcome
+boundaries around landed combat response, law-team arrival, returning rivals,
+holding-raid maintenance and CellOutz contractor dispatch. Subject mutation,
+public fact and any spawned persistent people now commit together without
+changing the established event vocabulary.
+
 17 September verification note: the complete use-and-inspect reel exposed a
 production perception defect rather than a capture-only problem. Reduced
 consciousness added displacement onto the previous frame every update, turning
