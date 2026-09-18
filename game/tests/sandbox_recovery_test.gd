@@ -24,6 +24,7 @@ func _ready() -> void:
 	WorldLook.set_quality_name("PERFORMANCE")
 	check(WorldLook.quality_name() == "PERFORMANCE", "a fresh safe-quality route disables the costly fullscreen tier")
 	check(GoreChunks.chunk_budget() == 36, "performance quality caps persistent rigid gore at 36")
+	check(GoreChunks.impact_voice_budget() == 8, "performance quality prevents impact sounds from becoming an unbounded wall")
 	check(BaselineHuman.live_gore_budget() == 52, "performance quality caps transient body effects at 52")
 	check(BaselineHuman.splat_budget() == 96, "performance quality prevents hundreds of permanent blood draw objects")
 

@@ -71,6 +71,14 @@ const STACK_FALLOFF := 0.62
 const STACK_STAGGER := 0.012
 
 static var live: Array[Node3D] = []
+static var impact_voices: Array[AudioStreamPlayer3D] = []
+
+
+static func impact_voice_budget() -> int:
+	match WorldLook.quality:
+		WorldLook.Quality.ULTRA: return 24
+		WorldLook.Quality.HIGH: return 14
+		_: return 8
 
 
 ## A severed limb is a chunk too, but it is an entire body zone rather than one
@@ -469,6 +477,14 @@ static func play_impact(host: Node3D, at: Vector3, layer: int, level := 1.0, del
 	var scene := host.get_tree().current_scene
 	if scene == null:
 		return
+	for index in range(impact_voices.size() - 1, -1, -1):
+		if not is_instance_valid(impact_voices[index]):
+			impact_voices.remove_at(index)
+	while impact_voices.size() >= impact_voice_budget():
+		var oldest: AudioStreamPlayer3D = impact_voices.pop_front()
+		if is_instance_valid(oldest):
+			oldest.stop()
+			oldest.queue_free()
 	var profile := impact_profile(layer)
 	profile["gain"] = float(profile.get("gain", 0.5)) * maxf(level, 0.0)
 	var player := AudioStreamPlayer3D.new()
@@ -482,14 +498,23 @@ static func play_impact(host: Node3D, at: Vector3, layer: int, level := 1.0, del
 	# the SFX slider could not touch it.
 	AudioBus.route(player, "Gore")
 	scene.add_child(player)
+	impact_voices.append(player)
 	player.global_position = at
 	player.play()
 	var playback := player.get_stream_playback() as AudioStreamGeneratorPlayback
 	if playback != null:
 		_fill_impact_buffer(playback, profile)
+	# Capture the integer id, not the Node. The voice limiter may retire this
+	# player before its own timer; a lambda retaining a freed Object emits an
+	# engine error precisely during dense combat—the audio bug we are avoiding.
+	var player_id := player.get_instance_id()
 	player.get_tree().create_timer(0.25).timeout.connect(func():
-		if is_instance_valid(player):
-			player.queue_free())
+		var finished := instance_from_id(player_id) as AudioStreamPlayer3D
+		if finished != null and is_instance_valid(finished):
+			finished.queue_free()
+		for voice_index in range(impact_voices.size() - 1, -1, -1):
+			if not is_instance_valid(impact_voices[voice_index]) or impact_voices[voice_index].get_instance_id() == player_id:
+				impact_voices.remove_at(voice_index))
 
 
 static func _fill_impact_buffer(playback: AudioStreamGeneratorPlayback, profile: Dictionary) -> void:
