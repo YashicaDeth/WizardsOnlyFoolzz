@@ -27,7 +27,7 @@ func _ready() -> void:
 	check(opening.intake == null and opening.phase == "submerged", "filing the sheet begins decanting")
 	check(OpeningDirector.reached("woke"), "the run begins only after the sheet is filed")
 
-	opening.clock = 5.25
+	opening.clock = 3.25
 	opening._update_sequence(0.05)
 	check(opening.phase == "voiding", "the directed camera reaches the voiding beat")
 	check(opening.opening_audio.played_cues.has("drain"), "voiding has its own sound event")
@@ -40,15 +40,12 @@ func _ready() -> void:
 	var celloutz_line := beat_texts.filter(func(text): return text.contains("CellOutz"))
 	check(not celloutz_line.is_empty(), "the handler's own dialogue names CellOutz as the one who grew you")
 	check(celloutz_line[0].contains("owns what it grew"), "and ties that directly to ownership of the debt")
-	var debt_index := -1
-	var celloutz_index := -1
-	for index in opening.BEATS.size():
-		var text := str(opening.BEATS[index].text)
-		if text.contains("Debt's in the meat"):
-			debt_index = index
-		if text.contains("CellOutz"):
-			celloutz_index = index
-	check(celloutz_index == debt_index + 1, "the reframe lands as the very next beat after the debt line, not buried elsewhere")
+	check(celloutz_line[0].contains("Debt's in the meat"), "debt and ownership land as one comprehensible attributed beat")
+	check(beat_texts.back() == "OBJECTIVE  //  ESCAPE THE FACILITY", "the last opening beat states the first objective plainly")
+	opening.clock = 8.81
+	opening.phase = "floor"
+	opening._update_sequence(0.05)
+	check(opening.can_move, "normal control arrives in under nine seconds after filing")
 
 	OpeningDirector.advance("entered_pit")
 	check(str(OpeningDirector.resume_destination().scene) == "res://underground_colosseum.tscn", "an unfinished heat resumes in the real underground colosseum")

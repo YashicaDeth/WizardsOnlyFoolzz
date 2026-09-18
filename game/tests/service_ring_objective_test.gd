@@ -22,6 +22,9 @@ func _ready() -> void:
 	var derby: Node = load("res://underground_colosseum.tscn").instantiate()
 	add_child(derby)
 	await get_tree().process_frame
+	var roof := derby.get_node_or_null("ColosseumRoof")
+	check(roof != null, "the underground colosseum has a real enclosing roof")
+	check(roof != null and roof.get_node_or_null("CollisionShape3D") != null, "the roof is physical architecture, not a backdrop")
 	check(derby.service_relays.size() == 3, "the three real tunnel chambers each contain one relay")
 	check(derby._service_relays_disabled() == 0, "all three begin as live surveillance")
 	derby.round_state = "active"

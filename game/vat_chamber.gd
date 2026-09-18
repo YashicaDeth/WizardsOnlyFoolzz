@@ -45,15 +45,14 @@ var line_index := -1
 
 # 0 submerged, 1 voiding, 2 breach, 3 floor, 4 aisle
 const BEATS := [
-	{"at": 1.4, "text": "Something is in your throat. It is not yours."},
-	{"at": 5.2, "text": "TANK 0C-7 // CYCLE ABORTED — VOIDING"},
-	{"at": 9.6, "text": "HANDLER: \"That one's finished growing. Rack it for the heat.\""},
-	{"at": 14.5, "text": "HANDLER: \"Debt's in the meat, friend. Win a round and it's yours to keep.\""},
+	{"at": 0.8, "text": "AIRWAY OBSTRUCTED  //  FOREIGN TUBE"},
+	{"at": 3.2, "text": "TANK 0C-7  //  CYCLE ABORTED  //  VOIDING"},
+	{"at": 5.8, "text": "HANDLER: \"Decant is stable. Rack them for the heat.\""},
+	{"at": 7.4, "text": "HANDLER: \"Debt's in the meat. CellOutz owns what it grew.\""},
 	# K3.2. "The opening reframed: CellOutz grew you, which is why the debt is
-	# in the meat" — DESIGN/COSMOLOGY.md. The line above already said the debt
-	# was in the meat; nothing before this said whose meat it started as.
-	{"at": 16.5, "text": "HANDLER: \"CellOutz grew you. CellOutz owns what it grew. Read your own contract sometime.\""},
-	{"at": 19.0, "text": "Walk the aisle. The car is at the end of it."},
+	# in the meat" — DESIGN/COSMOLOGY.md. It is one attributed sentence now,
+	# rather than two lore lines racing each other while the player is helpless.
+	{"at": 9.0, "text": "OBJECTIVE  //  ESCAPE THE FACILITY"},
 ]
 
 @onready var subtitle: Label = $HUD/Subtitle
@@ -378,19 +377,19 @@ func _update_sequence(_delta: float) -> void:
 	match phase:
 		"submerged":
 			# Suspended, drifting, breathing something thicker than air.
-			var t := clampf(clock / 5.2, 0.0, 1.0)
+			var t := clampf(clock / 3.2, 0.0, 1.0)
 			fade.color.a = clampf(1.0 - clock / 2.2, 0.0, 1.0)
 			submerge_tint.color.a = 0.42
 			camera.rotation = Vector3(sin(clock * 0.7) * 0.09 - 0.1, sin(clock * 0.4) * 0.16, cos(clock * 0.55) * 0.07)
 			camera.fov = 92.0 + sin(clock * 1.6) * 3.5
 			player.position.y = 1.35 + sin(clock * 0.8) * 0.06
 			opening_audio.set_phase("submerged", t)
-			if clock >= 5.2:
+			if clock >= 3.2:
 				phase = "voiding"
 				opening_audio.cue("drain")
 		"voiding":
 			# The column drops. You come down with it.
-			var t := clampf((clock - 5.2) / 3.4, 0.0, 1.0)
+			var t := clampf((clock - 3.2) / 2.4, 0.0, 1.0)
 			var height := lerpf(2.9, 0.25, ease(t, 0.7))
 			fluid.mesh.height = height
 			fluid.position.y = height * 0.5
@@ -403,13 +402,14 @@ func _update_sequence(_delta: float) -> void:
 				_breach()
 		"floor":
 			# On hands and knees on the grating.
-			var t := clampf((clock - 8.6) / 4.2, 0.0, 1.0)
+			var t := clampf((clock - 5.6) / 3.2, 0.0, 1.0)
 			player.position.y = lerpf(0.62, EYE_HEIGHT, ease(t, 0.45))
 			camera.rotation = Vector3(lerpf(-0.95, 0.0, ease(t, 0.5)), 0, lerpf(0.22, 0.0, ease(t, 0.5)))
 			camera.fov = lerpf(78.0, 74.0, t) + sin(clock * 2.4) * (1.0 - t) * 4.0
 			if t >= 1.0:
 				phase = "aisle"
 				can_move = true
+				subtitle.text = ""
 				yaw = 0.0
 				pitch = 0.0
 
@@ -521,4 +521,4 @@ func _update_hud() -> void:
 		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0
-	prompt.text = "[E] INTO THE PIT" if to_door.length() <= 3.4 else "WASD MOVE   MOUSE LOOK   WALK THE AISLE"
+	prompt.text = "[E] ENTER THE UNDERGROUND HEAT" if to_door.length() <= 3.4 else "OBJECTIVE: ESCAPE THE FACILITY   //   WASD MOVE   MOUSE LOOK"

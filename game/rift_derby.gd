@@ -514,6 +514,7 @@ func _build_colosseum_world() -> void:
 	floor_mesh.bottom_radius = COLOSSEUM_OUTER_RADIUS
 	floor_mesh.height = 1.0
 	_add_mesh(floor_mesh, Vector3(0, -0.8, 0), Vector3.ONE, Color("2a2620"), 0.0)
+	_build_colosseum_roof()
 	# The ring wall, in segments — a colosseum bowl, not a box arena. Gaps are
 	# left open wherever a tunnel mouth needs to punch through.
 	var tunnel_angles: Array[float] = []
@@ -574,6 +575,45 @@ func _build_colosseum_world() -> void:
 		light.omni_attenuation = 1.15
 		light.shadow_enabled = index % 4 == 0 and WorldLook.quality != WorldLook.Quality.PERFORMANCE
 		add_child(light)
+
+
+## The arena used to have a tall ring wall but no lid, so the environment sky
+## was visible above the stands and the supposed underground prison read as an
+## outdoor demo bowl. This is real collidable architecture spanning the bowl,
+## tunnels and service ring. Its underside is deliberately plain and dark: the
+## floodlights, not a sky, describe the room.
+func _build_colosseum_roof() -> void:
+	var roof := StaticBody3D.new()
+	roof.name = "ColosseumRoof"
+	var collision := CollisionShape3D.new()
+	collision.name = "CollisionShape3D"
+	var shape := CylinderShape3D.new()
+	shape.radius = COLOSSEUM_OUTER_RADIUS
+	shape.height = 1.2
+	collision.shape = shape
+	collision.position.y = COLOSSEUM_WALL_HEIGHT + 1.6
+	roof.add_child(collision)
+	var mesh_instance := MeshInstance3D.new()
+	mesh_instance.name = "RoofMesh"
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = COLOSSEUM_OUTER_RADIUS
+	mesh.bottom_radius = COLOSSEUM_OUTER_RADIUS
+	mesh.height = 1.2
+	mesh.material = WorldLook.surface(Color("110e0c"), "rust", 404)
+	mesh_instance.mesh = mesh
+	mesh_instance.position = collision.position
+	roof.add_child(mesh_instance)
+	add_child(roof)
+	# Six shallow structural ribs keep the enormous lid from reading as a single
+	# untextured plane when headlights or impact flashes rake across it.
+	for index in 6:
+		var angle := TAU * float(index) / 6.0
+		_build_wall_segment(
+			Vector3(0, COLOSSEUM_WALL_HEIGHT + 0.75, 0),
+			Vector3(COLOSSEUM_OUTER_RADIUS * 2.0, 0.45, 0.7),
+			Vector3(0, angle, 0),
+			Color("211914")
+		)
 
 
 ## One straight corridor: two side walls, a ceiling, and a wider chamber at
