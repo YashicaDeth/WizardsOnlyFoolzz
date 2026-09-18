@@ -27,6 +27,9 @@ var arm_damage := 0.0
 const PHI := 1.61803398875
 const GOLDEN_ANGLE := TAU / (PHI * PHI)
 const LOOP_SECONDS := 22.0
+const FIT_WIDTH := 2.18
+const FIT_HEIGHT := 1.62
+const ORBIT_VERTICAL_ALLOWANCE := 0.22
 
 
 func _ready() -> void:
@@ -89,6 +92,10 @@ func show_item(source: Node3D, item_label: String, item_detail := "") -> void:
 	var source_id := source.get_instance_id()
 	if source_id != displayed_source_id:
 		displayed_source_id = source_id
+		# Every newly presented object begins at the same readable three-quarter
+		# register. Carrying the previous object's arbitrary orbit phase across a
+		# switch could introduce a pistol or cigarette edge-on.
+		_clock = 0.0
 		_rebuild(source)
 	visible = mesh_count > 0
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if visible else SubViewport.UPDATE_DISABLED
@@ -120,10 +127,14 @@ func _rebuild(source: Node3D) -> void:
 	_copy_geometry(source, inverse)
 	if not _has_bounds:
 		return
-	# Fit the whole bounding sphere, not only the longest axis seen at rest. A
-	# sword or limb can therefore turn broadside without clipping the aperture.
-	var diameter := _bounds.size.length()
-	_fit_scale = 1.62 / maxf(diameter, 0.01)
+	# Yaw spends most of the loop turning X/Z into one another, while pitch is
+	# deliberately shallow. A full bounding sphere treated a metre-long sword as
+	# though it might stand vertically and made every long, thin object needlessly
+	# tiny. Fit the actual orbit envelope: radial length against the wide aperture,
+	# height plus the maximum authored pitch contribution against its height.
+	var radial := Vector2(_bounds.size.x, _bounds.size.z).length()
+	var orbit_height := _bounds.size.y + radial * ORBIT_VERTICAL_ALLOWANCE
+	_fit_scale = minf(FIT_WIDTH / maxf(radial, 0.01), FIT_HEIGHT / maxf(orbit_height, 0.01))
 	_stage.scale = Vector3.ONE * _fit_scale
 	_stage.position = Vector3.ZERO
 	_content.position = -_bounds.get_center()
@@ -135,10 +146,14 @@ func _copy_geometry(node: Node, inverse: Transform3D) -> void:
 		return
 	if node is MeshInstance3D:
 		var source_mesh := node as MeshInstance3D
-		if source_mesh.mesh != null:
+		if source_mesh.mesh != null and source_mesh.visible:
 			var clone := MeshInstance3D.new()
 			clone.mesh = source_mesh.mesh
 			clone.material_override = source_mesh.material_override
+			for surface in source_mesh.get_surface_override_material_count():
+				var override := source_mesh.get_surface_override_material(surface)
+				if override != null:
+					clone.set_surface_override_material(surface, override)
 			clone.transform = inverse * source_mesh.global_transform
 			_content.add_child(clone)
 			var transformed: AABB = clone.transform * clone.mesh.get_aabb()
@@ -156,6 +171,7 @@ func _clear_stage() -> void:
 	if _content == null:
 		return
 	for child in _content.get_children():
+		_content.remove_child(child)
 		child.queue_free()
 	_stage.position = Vector3.ZERO
 	_stage.scale = Vector3.ONE
@@ -201,10 +217,13 @@ func _draw() -> void:
 		var x := 15.0 if side == 0.0 else 225.0
 		draw_circle(Vector2(x, 26), 4.0 + sin(_clock * 1.2 + side * PI) * 0.5, BLOOD)
 		draw_line(Vector2(x, 34), Vector2(x + (8 if side == 0.0 else -8), 55), BONE * Color(1, 1, 1, 0.28), 1.0)
-	CellOutzType.draw_condensed(self, Vector2(20, 174), label, 9.0, BONE, 0.72)
-	if not detail.is_empty():
-		var width := CellOutzType.width_condensed(detail, 8.0, 0.62)
-		CellOutzType.draw_condensed(self, Vector2(220 - width, 175), detail, 8.0, COPPER, 0.62)
+	var shown_detail := CellOutzType.fit_condensed(detail, 68.0, 8.0, 0.62) if not detail.is_empty() else ""
+	var detail_width := CellOutzType.width_condensed(shown_detail, 8.0, 0.62) if not shown_detail.is_empty() else 0.0
+	var label_room := 192.0 - detail_width - (9.0 if detail_width > 0.0 else 0.0)
+	var shown_label := CellOutzType.fit_condensed(label, label_room, 9.0, 0.72)
+	CellOutzType.draw_condensed(self, Vector2(20, 174), shown_label, 9.0, BONE, 0.72)
+	if not shown_detail.is_empty():
+		CellOutzType.draw_condensed(self, Vector2(220 - detail_width, 175), shown_detail, 8.0, COPPER, 0.62)
 	if arm_damage > 0.08:
 		var break_at := Vector2(228, 44)
 		var elbow := break_at + Vector2(-22, 23)

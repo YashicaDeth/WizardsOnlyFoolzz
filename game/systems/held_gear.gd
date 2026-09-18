@@ -804,6 +804,28 @@ func _default_grip(weapon_id: String) -> String:
 	return "one_hand"
 
 
+## Re-pose the hands on a production weapon mount without rebuilding it. The
+## Hunt uses lightweight weapon nodes rather than a full HeldGear instance, but
+## the anchors and grip table are the same authored grammar. Keeping this here
+## prevents half-swording from changing only combat numbers while the visible
+## off hand remains wrapped around the pommel.
+static func pose_mounted_hand(hand: Node3D, weapon: Node3D, hand_spec: Dictionary, side: int) -> void:
+	if hand == null or weapon == null or not is_instance_valid(hand) or not is_instance_valid(weapon):
+		return
+	set_pose(hand, str(hand_spec.get("pose", "open")))
+	var anchor_name := str(hand_spec.get("anchor", ""))
+	var anchor := weapon.get_node_or_null("anchor_%s" % anchor_name) as Node3D
+	if anchor == null:
+		hand.position = Vector3(0.085 * float(side), -0.075, -0.02)
+		hand.rotation = Vector3(-0.30, 0.20 * float(side), 0.18 * float(side))
+	else:
+		var placed := weapon.transform * anchor.transform
+		hand.position = placed.origin + Vector3(0.019 * float(side), -0.013, 0.0)
+		hand.rotation = placed.basis.get_euler() + Vector3(-PI * 0.5, 0.0, (PI * 0.5) * float(side))
+	hand.set_meta("grip_rest_position", hand.position)
+	hand.set_meta("grip_rest_rotation", hand.rotation)
+
+
 ## Change how the same thing is held. This is the verb behind half-swording:
 ## nothing is drawn or sheathed, the hands move.
 func hold(grip_name: String) -> bool:

@@ -1937,6 +1937,19 @@ v8 made the device dangerous and most objects in the world still cannot be looke
       `sleep_site_test.gd`). Broad architecture and incidental scenery still
       need adapters before I9.1/I9.2 may be ticked.
 
+      The shared reliquary itself has now been play-read rather than merely
+      fed more classes: it ignores hidden live submeshes (so an ejected or
+      deliberately hidden magazine cannot reappear in the display), copies
+      surface overrides, clears an old specimen synchronously on a rapid
+      class switch, and fits against the orbit's horizontal and vertical
+      envelope instead of shrinking long thin objects by their diagonal.
+      Each new source begins from the same legible three-quarter phase, while
+      long labels and state marks condense independently instead of colliding.
+      `held_item_reliquary_test.gd` pins all five behaviours; the live Marrow
+      Dust render at `P:/GameDev/Temp/reliquary_world.png` verifies the larger,
+      centred result. This improves the common grammar without pretending
+      incidental architecture already has the missing world adapters.
+
 ### I v10 — the tenth pass
 Nine passes designed in a lit room. C v4 made the device the main light source in the world.
 - [ ] **I10.1** `v10` Every screen re-judged as the only light in a dark place
@@ -5206,6 +5219,16 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
       (vault, wall_run, jump, climb, momentum_carry, anatomy_traversal,
       opening, combat_integration, zone_precision, ballistics,
       firearm_momentum, deferred_damage) re-verified clean
+
+      18 September playtest correction: those values previously changed while
+      the production model's hands stayed in their original two-hand pose.
+      `HunterArsenal.apply_grip()` now reapplies `HeldGear.GRIPS` to the live
+      mounted model on cycle/equip, and inspection restores the active grip
+      rather than snapping the support hand back. `two_handing_test.gd` now
+      proves the half-sword hand physically reaches its blade anchor; the
+      production frames `P:/GameDev/Temp/combat_playtest_two_hand.png`,
+      `combat_playtest_one_hand.png` and `combat_playtest_half_sword.png` make
+      the difference visible.
 
 
 ### AN6 — Dismemberment, at the reference standard

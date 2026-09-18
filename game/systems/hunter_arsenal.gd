@@ -346,6 +346,23 @@ func _update_models() -> void:
 		(models[weapon_id] as Node3D).visible = weapon_id == current_id
 
 
+## Apply one of HeldGear's authored grips to the already-mounted production
+## model. Changing grip moves hands on the same object and never replaces it.
+func apply_grip(grip_name: String) -> bool:
+	if not HeldGear.GRIPS.has(grip_name):
+		return false
+	var mount := models.get(current_id) as Node3D
+	if mount == null or not is_instance_valid(mount):
+		return false
+	var weapon := mount.get_node_or_null("%s_model" % current_id) as Node3D
+	if weapon == null:
+		return false
+	var spec: Dictionary = HeldGear.GRIPS[grip_name]
+	HeldGear.pose_mounted_hand(mount.get_node_or_null("RightGripHand") as Node3D, weapon, spec.right, 1)
+	HeldGear.pose_mounted_hand(mount.get_node_or_null("LeftGripHand") as Node3D, weapon, spec.left, -1)
+	return true
+
+
 ## M4.4 / the first-person pass. This used to build each weapon out of three
 ## `BoxMesh` primitives with hand-tuned counter-rotations cancelling the arm
 ## pose, and every comment in it was about fighting that inheritance rather than

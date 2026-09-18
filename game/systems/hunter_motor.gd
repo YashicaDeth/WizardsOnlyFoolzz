@@ -67,6 +67,14 @@ static func collision_safe_camera(space: PhysicsDirectSpaceState3D, focus: Vecto
 	return obstruction.position + toward_focus * 0.24
 
 
+## A chase camera that has been forced onto the player's shoulders is no
+## longer a useful third-person camera: the body fills the lens and hides the
+## fight. Blend it into the eye as clearance disappears, then restore the
+## authored shoulder shot once there is room again.
+static func third_person_clearance_blend(first_person: Vector3, third_person: Vector3) -> float:
+	return smoothstep(0.55, 1.65, first_person.distance_to(third_person))
+
+
 ## `jump_impulse` must be applied here, inside the same move_and_slide() this
 ## call makes, not by the caller afterward: is_on_floor() only turns false
 ## once a slide has actually carried the body off the ground, so a caller

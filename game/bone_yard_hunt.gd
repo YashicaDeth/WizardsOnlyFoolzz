@@ -1800,7 +1800,7 @@ func _update_player(delta: float) -> void:
 	if player_body.position.y < -10.0:
 		player_body.position = Vector3(0, 1.0, 19)
 	player = player_body.position + Vector3.UP * 0.6
-	stamina = clampf(stamina + (-26.0 if sprinting else 18.0) * delta, 0, 100)
+	stamina = clampf(stamina + _movement_stamina_rate(sprinting) * delta, 0, 100)
 	# O2.7 v3. Movement itself stays on the real clock — hitstop is not meant
 	# to take your feet out from under you — but the rig's own animation (the
 	# swing pose, the raised arm, the walk cycle) is the visible half of "the
@@ -1808,6 +1808,17 @@ func _update_player(delta: float) -> void:
 	var animation_delta: float = delta * impact_feel.scale_for("player")
 	body_motion.update(animation_delta, player_body.velocity, player_body.is_on_floor(), sprinting, crouching, dodge_remaining > 0.0)
 	hunter_appearance.set_mouth(player_rig.anatomy.pain / 180.0, sin(pulse * 0.7) * player_rig.anatomy.pain / 100.0)
+
+
+## Passive recovery is rest, not a background subsidy for every other action.
+## Previously +18/s ran while guarding and grappling, almost erasing those
+## systems' authored drains; a held clinch could actually restore stamina.
+func _movement_stamina_rate(sprinting: bool) -> float:
+	if sprinting:
+		return -26.0
+	if guarding or not grapple_target.is_empty() or strike_windup >= 0.0 or dodge_remaining > 0.0:
+		return 0.0
+	return 18.0
 
 
 ## AN1.2. Where the camera turns, in radians, and the one seam the arm is
@@ -1875,6 +1886,7 @@ func _cycle_grip() -> void:
 	current_grip = options[(index + 1) % options.size()] if index >= 0 else options[0]
 	var spec: Dictionary = HeldGear.GRIPS.get(current_grip, {})
 	prompt.text = "%s // %s GRIP" % [str(arsenal.current().label), current_grip.to_upper().replace("_", "-")]
+	arsenal.apply_grip(current_grip)
 	PLAYER_ACTION_LEDGER.record("grip_changed", {"weapon": id, "grip": current_grip, "location": HUNT_LOCATION})
 	_carry_current_weapon(true)
 
@@ -1970,8 +1982,11 @@ func _pose_weapon() -> void:
 	# not a shotgun receiver check). Restore authored contact before the current
 	# frame's inspection choreography is layered on, so release cannot leave a
 	# hand stranded away from its grip.
-	_restore_grip_hand(model.get_node_or_null("RightGripHand") as Node3D, "trigger" if str(arsenal.current_id) in ["shotgun", "sidearm"] else "wrap")
-	_restore_grip_hand(model.get_node_or_null("LeftGripHand") as Node3D, "cup" if str(arsenal.current_id) == "sidearm" else "wrap")
+	var active_grip: Dictionary = HeldGear.GRIPS.get(current_grip, {}) if str(arsenal.current_id) == "sword" else {}
+	var right_pose := str((active_grip.get("right", {}) as Dictionary).get("pose", "trigger" if str(arsenal.current_id) in ["shotgun", "sidearm"] else "wrap"))
+	var left_pose := str((active_grip.get("left", {}) as Dictionary).get("pose", "cup" if str(arsenal.current_id) == "sidearm" else "wrap"))
+	_restore_grip_hand(model.get_node_or_null("RightGripHand") as Node3D, right_pose)
+	_restore_grip_hand(model.get_node_or_null("LeftGripHand") as Node3D, left_pose)
 
 
 func _attack(heavy := false) -> void:
@@ -2003,6 +2018,7 @@ func _attack(heavy := false) -> void:
 			var rounds: Dictionary = arsenal.ammo[arsenal.current_id]
 			rounds.loaded = int(rounds.loaded) + 1
 			arsenal.ammo[arsenal.current_id] = rounds
+		prompt.text = "TOO WINDED TO COMMIT TO THE BLOW"
 		return
 	stamina -= cost
 	# B6.5/B6.6. The same `combat_ratio` that already slows a one-armed NPC now
@@ -3468,6 +3484,7 @@ func _equip_weapon(slot: int) -> void:
 		var options: Array = GRIP_CYCLE.get(str(arsenal.current_id), [])
 		if not options.is_empty():
 			current_grip = options[0]
+			arsenal.apply_grip(current_grip)
 
 
 func _reload_weapon() -> void:
@@ -6508,8 +6525,6 @@ func _update_camera() -> void:
 	# and a reward you can watch happen reads better than one you only notice
 	# has already happened.
 	perspective_blend = move_toward(perspective_blend, 1.0 if third_person else 0.0, PERSPECTIVE_BLEND_RATE * get_physics_process_delta_time())
-	camera.fov = lerpf(FIRST_PERSON_FOV, THIRD_PERSON_FOV, perspective_blend) + fov_add
-
 	# M4.2. The eye, not the chest. Crouching lowers it by exactly as much as
 	# the body actually shortens, so the view and the collider agree.
 	var crouch_drop: float = (STANDING_HEIGHT - player_capsule.height) * 0.5
@@ -6546,6 +6561,12 @@ func _update_camera() -> void:
 		camera_position,
 		[player_body.get_rid()]
 	)
+	# If a wreck or wall collapses the shoulder camera onto the hunter's back,
+	# continue the same authored perspective transition into the eye. Keeping a
+	# nominal third-person blend here made the player's torso fill the complete
+	# frame at the Hunt spawn even though collision avoidance itself was working.
+	var camera_blend := perspective_blend * HUNTER_MOTOR.third_person_clearance_blend(fp_position, tp_position)
+	camera.fov = lerpf(FIRST_PERSON_FOV, THIRD_PERSON_FOV, camera_blend) + fov_add
 	# Locked, the shot is about the pair, so aim between them. Unlocked, aim
 	# parallel to the look heading rather than at the player — aiming *at*
 	# the player cancels the shoulder offset and re-centres the body, which
@@ -6553,11 +6574,11 @@ func _update_camera() -> void:
 	# of an over-the-shoulder shot.
 	var tp_target := focus if locked != null else tp_position + look * 12.0
 
-	camera.global_position = fp_position.lerp(tp_position, perspective_blend)
-	camera.look_at(fp_target.lerp(tp_target, perspective_blend), Vector3.UP)
+	camera.global_position = fp_position.lerp(tp_position, camera_blend)
+	camera.look_at(fp_target.lerp(tp_target, camera_blend), Vector3.UP)
 	if body_motion != null:
-		camera.rotation.x -= body_motion.smoking_look_down * (1.0 - perspective_blend)
-		camera.rotation.z += body_motion.camera_roll * lerpf(1.0, 0.45, perspective_blend)
+		camera.rotation.x -= body_motion.smoking_look_down * (1.0 - camera_blend)
+		camera.rotation.z += body_motion.camera_roll * lerpf(1.0, 0.45, camera_blend)
 		# O2.2. The kick from whatever you just hit, applied here so the derby
 		# and the hunt can each carry it in their own rig's terms.
 		if impact_feel != null:
@@ -6579,7 +6600,7 @@ func _update_camera() -> void:
 		# to have a reason to.
 		var head := player_rig.parts.get("head") as Node3D
 		if head != null and is_instance_valid(head):
-			head.visible = perspective_blend > 0.5
+			head.visible = camera_blend > 0.5
 
 
 ## The pointer, in the project's own hand rather than the operating system's. A
@@ -6663,6 +6684,18 @@ func _build_world() -> void:
 		core_mesh.material = WorldLook.surface(Color("3d291d"), "rust", index + 7)
 		core.mesh = core_mesh
 		pile.add_child(core)
+		# These cores used to be scenery only. In third person the camera could
+		# therefore pass straight through one and render a full frame of rust,
+		# while the player could walk through the same apparent obstacle. Keep the
+		# irregular silhouette visual-only, but give each pile's readable mass one
+		# simple box so traversal and camera avoidance agree with what is drawn.
+		var wreck_body := StaticBody3D.new()
+		var wreck_collider := CollisionShape3D.new()
+		var wreck_shape := BoxShape3D.new()
+		wreck_shape.size = bulk
+		wreck_collider.shape = wreck_shape
+		wreck_body.add_child(wreck_collider)
+		pile.add_child(wreck_body)
 		Silhouette.dress(pile, bulk, index + 31, Callable(WorldLook, "surface"))
 		Silhouette.settle(pile, index + 31)
 	# Vast readable landmarks: original fungal towers, shattered pylons and
