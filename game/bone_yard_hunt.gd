@@ -1280,6 +1280,12 @@ func _register_people() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if resolution_ui.visible or kill_cam.active:
 		return
+	# Native Black Mirror pages own their controls before the field can read the
+	# same key as a weapon, dodge or standalone panel shortcut. Hosted INDEX/MAP
+	# pages still receive their own unhandled events normally.
+	if handheld != null and handheld.is_open and handheld.handle_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.keycode == KEY_V and not event.echo:
 		if event.pressed and grapple_target.is_empty() and panel_mode.is_empty():
 			pulmonary_held = true

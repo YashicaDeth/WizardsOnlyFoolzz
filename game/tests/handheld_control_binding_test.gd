@@ -37,6 +37,37 @@ func _ready() -> void:
 	click.position = ritual_tab.get_center()
 	device._gui_input(click)
 	check(device.current_mode() == "RITUAL", "clicking a drawn tab selects that exact device app")
+	device.jump_to_mode(3)
+	device._advance_page_transition(1.0)
+	var tune_before: float = device.radio.khz
+	var tune_right := InputEventKey.new()
+	tune_right.keycode = KEY_RIGHT
+	tune_right.pressed = true
+	check(device.handle_input(tune_right) and device.radio.khz > tune_before,
+		"RADIO owns an advertised tuning key and visibly moves its real dial")
+	device.radio.lock_seconds = 1.0
+	device.radio_lock_held = false
+	device._process(0.1)
+	check(is_zero_approx(device.radio.lock_progress()),
+		"merely viewing RADIO cannot finish a lead lock without a deliberate hold")
+	var lock_key := InputEventKey.new()
+	lock_key.keycode = KEY_SPACE
+	lock_key.pressed = true
+	check(device.handle_input(lock_key) and device.radio_lock_held,
+		"holding Space begins the receiver's deliberate lock control")
+	lock_key.pressed = false
+	check(device.handle_input(lock_key) and not device.radio_lock_held,
+		"releasing Space releases the radio lock instead of continuing invisibly")
+	device.carry.items = [{"label": "TEST HEART", "kind": "organ", "mass": 0.9, "from": "ash_rafter"}]
+	device.jump_to_mode(4)
+	device._advance_page_transition(1.0)
+	var pinned: Array[String] = []
+	device.pin_requested.connect(func(ref: String, _kind: String, _title: String): pinned.append(ref))
+	var pin_key := InputEventKey.new()
+	pin_key.keycode = KEY_P
+	pin_key.pressed = true
+	check(device.handle_input(pin_key) and pinned.size() == 1 and "TEST HEART" in pinned[0],
+		"CARRY owns P and sends the selected physical object to the Board")
 	device.close_device()
 	check(device.mouse_filter == Control.MOUSE_FILTER_IGNORE, "lowered hardware releases the pointer back to the game")
 	device.queue_free()

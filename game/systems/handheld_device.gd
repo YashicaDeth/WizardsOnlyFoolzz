@@ -114,6 +114,9 @@ var page_transition_style := "shutter"
 ## Which thing in the bag is under the hand. The CARRY page had no selection at
 ## all, which was fine when it was a table and is not now that it is objects.
 var carry_index := 0
+## A radio lead requires a deliberate continuous hold. Page visibility is not
+## input: merely looking at RADIO must never finish a lock by itself.
+var radio_lock_held := false
 var raised := 0.0
 var is_open := false
 var elapsed := 0.0
@@ -555,6 +558,8 @@ func open_device() -> void:
 
 func close_device() -> void:
 	is_open = false
+	radio_lock_held = false
+	radio.release_lock()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# AS1.3. The natural checkpoint for a number that otherwise only changes a
 	# little every frame — saving on every tick it drains would mean writing
@@ -569,14 +574,54 @@ func _gui_input(event: InputEvent) -> void:
 	if not is_open or not (event is InputEventMouseButton):
 		return
 	var button := event as InputEventMouseButton
-	if button.pressed and button.button_index == MOUSE_BUTTON_LEFT:
+	if button.button_index == MOUSE_BUTTON_LEFT:
 		var tab := tab_index_at(button.position)
-		if tab >= 0:
+		if button.pressed and tab >= 0:
 			jump_to_mode(tab)
 			accept_event()
+		elif _content_rect.has_point(button.position) and displayed_mode() == "RADIO":
+			radio_lock_held = button.pressed
+			if not radio_lock_held:
+				radio.release_lock()
+			accept_event()
+		elif button.pressed and _content_rect.has_point(button.position) and displayed_mode() == "CARRY":
+			pin_selected_part()
+			accept_event()
 	elif button.pressed and button.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-		cycle_mode(-1 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 1)
+		var direction := -1 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 1
+		match displayed_mode():
+			"RADIO": radio.tune(float(direction) * 0.2)
+			"CARRY": step_carry(direction)
+			_: cycle_mode(direction)
 		accept_event()
+
+
+## Native phone pages own their own keys before the Hunt can interpret the
+## same P as BOARD or the same Space as DODGE. Hosted pages keep handling their
+## own events; this route exists only for controls drawn directly by this node.
+func handle_input(event: InputEvent) -> bool:
+	if not is_open or not (event is InputEventKey) or event.echo:
+		return false
+	var key := event as InputEventKey
+	match displayed_mode():
+		"RADIO":
+			if key.keycode in [KEY_LEFT, KEY_RIGHT] and key.pressed:
+				radio.tune(-0.2 if key.keycode == KEY_LEFT else 0.2)
+				queue_redraw()
+				return true
+			if key.keycode in [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]:
+				radio_lock_held = key.pressed
+				if not radio_lock_held:
+					radio.release_lock()
+				return true
+		"CARRY":
+			if key.pressed and key.keycode in [KEY_LEFT, KEY_UP, KEY_RIGHT, KEY_DOWN]:
+				step_carry(-1 if key.keycode in [KEY_LEFT, KEY_UP] else 1)
+				return true
+			if key.pressed and key.keycode in [KEY_P, KEY_ENTER, KEY_KP_ENTER]:
+				pin_selected_part()
+				return true
+	return false
 
 
 func tab_index_at(local_position: Vector2) -> int:
@@ -702,6 +747,9 @@ func set_mode(mode: String) -> void:
 
 
 func _activate_mode(index: int) -> void:
+	if displayed_mode() == "RADIO" and MODES[clampi(index, 0, MODES.size() - 1)] != "RADIO":
+		radio_lock_held = false
+		radio.release_lock()
 	displayed_mode_index = clampi(index, 0, MODES.size() - 1)
 	var mode := displayed_mode()
 	# WIRE is not a separate surface — it is the index already open on its own
@@ -895,10 +943,12 @@ func _process(delta: float) -> void:
 		radio_audio.tune_to(str(heard.get("kind", "static")), float(heard.get("strength", 0.0)))
 	else:
 		radio_audio.silence()
-	if mode == "RADIO":
+	if mode == "RADIO" and radio_lock_held:
 		var found := radio.hold(delta)
 		if found != "":
 			lead_found.emit(found)
+	elif mode == "RADIO":
+		radio.release_lock()
 	_overlay.queue_redraw()
 	queue_redraw()
 
@@ -1718,6 +1768,7 @@ func _draw_radio(rect: Rect2, alpha: float) -> void:
 	var dial_width := CellOutzType.width("%06.2f" % radio.khz, 26.0, 1.4)
 	CellOutzType.draw_condensed(self, rect.position + Vector2(24 + dial_width + 22, 178), str(signal_state.get("name", "CARRIER")), 11.0, MOSS * Color(1, 1, 1, alpha), 0.9)
 	_draw_radio_spectrum(rect, alpha)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(24, 202), "WHEEL / LEFT RIGHT: TUNE    HOLD CLICK / SPACE: LOCK", 8.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.62)
 
 	# What is coming out of it. Worn type, scaled by how badly it is coming in -
 	# a weak signal is heard *wrongly*, not quietly.
@@ -1775,6 +1826,7 @@ func _draw_carry(rect: Rect2, alpha: float) -> void:
 	draw_rect(Rect2(track.position, Vector2(track.size.x * minf(burden, 1.0), track.size.y)), tone * Color(1, 1, 1, alpha))
 	if burden > 1.0:
 		draw_rect(Rect2(track.position + Vector2(0, -3), Vector2(track.size.x * clampf(burden - 1.0, 0.0, 1.0), 3)), ALERT * Color(1, 1, 1, alpha))
+	CellOutzType.draw_condensed(self, rect.position + Vector2(24, 70), "WHEEL / ARROWS: SELECT    CLICK / P: PIN TO BOARD", 8.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.62)
 
 	if carry.items.is_empty():
 		CellOutzType.draw_condensed(self, rect.position + Vector2(24, 88), "NOTHING ON YOU WORTH LISTING.", 12.0, INK * Color(1, 1, 1, 0.4 * alpha), 0.9)
