@@ -89,6 +89,13 @@ const MELTED_SKIN := Color("6e7a3c")
 ## Loose gore is capped across every body at once. Twelve drivers shedding
 ## unbounded blood in a pileup is a frame-rate bug, not atmosphere.
 const MAX_LIVE_GORE := 140
+
+
+static func live_gore_budget() -> int:
+	match WorldLook.quality:
+		WorldLook.Quality.ULTRA: return MAX_LIVE_GORE
+		WorldLook.Quality.HIGH: return 92
+		_: return 52
 ## Airborne blood is capped because twelve drivers shedding unbounded physics
 ## blobs in a pileup is a frame-rate bug. Blood that has *landed* is a flat
 ## splat with no simulation attached, so it can be far more numerous — and it
@@ -96,6 +103,13 @@ const MAX_LIVE_GORE := 140
 ## body means nothing ever accumulates and the fight leaves no trace. "Heaps of
 ## gore" is a property of the floor, not of the air.
 const MAX_SPLATS := 420
+
+
+static func splat_budget() -> int:
+	match WorldLook.quality:
+		WorldLook.Quality.ULTRA: return MAX_SPLATS
+		WorldLook.Quality.HIGH: return 220
+		_: return 96
 ## How far a landed drop spreads, as a multiple of the drop's own radius. A
 ## drop of blood makes a mark a few times its own size, not a puddle you could
 ## lie down in: at the old multiplier (6–12.5x, against a mesh already about
@@ -817,7 +831,7 @@ func _on_organ_ruptured(organ_id: String, _organ: Dictionary) -> void:
 	var origin := organ.global_position if organ != null and is_instance_valid(organ) and organ.is_inside_tree() else _zone_origin("torso")
 	_hide_organ(organ_id)
 	_spray(origin, Vector3.UP, 12)
-	if spec.is_empty() or live_gore >= MAX_LIVE_GORE:
+	if spec.is_empty() or live_gore >= live_gore_budget():
 		return
 	var root := _gore_root()
 	var loose_organ := MeshInstance3D.new()
@@ -1153,7 +1167,7 @@ func _gore_root() -> Node:
 func _spray(origin: Vector3, bias: Vector3, count: int) -> void:
 	var root := _gore_root()
 	for index in maxi(1, roundi(count * detail)):
-		if live_gore >= MAX_LIVE_GORE:
+		if live_gore >= live_gore_budget():
 			return
 		var drop := MeshInstance3D.new()
 		var blob := SphereMesh.new()
@@ -1177,7 +1191,7 @@ func _spill_guts() -> void:
 	var root := _gore_root()
 	var origin := _zone_origin("torso")
 	for index in maxi(2, roundi(8 * detail)):
-		if live_gore >= MAX_LIVE_GORE:
+		if live_gore >= live_gore_budget():
 			return
 		var organ := MeshInstance3D.new()
 		var blob := SphereMesh.new()
@@ -1262,7 +1276,7 @@ func _bleeding_sites() -> Array:
 
 
 func _drip_one(site: Dictionary) -> void:
-	if live_gore >= MAX_LIVE_GORE:
+	if live_gore >= live_gore_budget():
 		return
 	var part := site["part"] as Node3D
 	var wound: Dictionary = site["wound"]
@@ -1446,7 +1460,7 @@ func _throw_limb(zone_id: String, hit_direction := Vector3.ZERO) -> void:
 	var part := parts.get(zone_id) as MeshInstance3D
 	if part == null or not is_instance_valid(part) or not part.is_inside_tree():
 		return
-	if live_gore >= MAX_LIVE_GORE:
+	if live_gore >= live_gore_budget():
 		return
 	var limb := RigidBody3D.new()
 	limb.name = "%s_severed" % zone_id
@@ -1593,7 +1607,7 @@ func _land_splat(at: Vector3, size: float, velocity := Vector3.DOWN) -> void:
 	)
 	splats.append(splat)
 	_remember_blood(root, splat)
-	while splats.size() > MAX_SPLATS:
+	while splats.size() > splat_budget():
 		var oldest: Node3D = splats.pop_front()
 		if is_instance_valid(oldest):
 			oldest.queue_free()
@@ -1634,7 +1648,7 @@ static var _splat_pool: Array[ArrayMesh] = []
 ## function rather than a method so `GoreChunks`, which is not a body, can call
 ## it without needing an instance.
 static func mark_ground_for_chunk(world: World3D, root: Node, at: Vector3, velocity: Vector3, size: float) -> void:
-	if root == null or not root.is_inside_tree() or world == null or splats.size() > MAX_SPLATS * 2:
+	if root == null or not root.is_inside_tree() or world == null or splats.size() > splat_budget() * 2:
 		return
 	var space := world.direct_space_state
 	var heading := velocity.normalized() if velocity.length_squared() > 0.01 else Vector3.DOWN
@@ -1666,7 +1680,7 @@ static func mark_ground_for_chunk(world: World3D, root: Node, at: Vector3, veloc
 	root.add_child(splat)
 	splats.append(splat)
 	_remember_blood(root, splat)
-	while splats.size() > MAX_SPLATS:
+	while splats.size() > splat_budget():
 		var oldest: Node3D = splats.pop_front()
 		if is_instance_valid(oldest):
 			oldest.queue_free()
@@ -1681,7 +1695,7 @@ static func _remember_blood(root: Node, splat: MeshInstance3D) -> void:
 	var key := _blood_scene_key(root)
 	var records: Array = blood_records.get(key, [])
 	records.append({"transform": splat.global_transform})
-	while records.size() > MAX_SPLATS:
+	while records.size() > splat_budget():
 		records.pop_front()
 	blood_records[key] = records
 

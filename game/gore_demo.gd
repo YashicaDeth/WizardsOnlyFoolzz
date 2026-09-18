@@ -167,6 +167,10 @@ var dodge_direction := Vector3.ZERO
 var stamina := 100.0
 var firearm_aiming := false
 var firearm_aim_blend := 0.0
+var launcher_equipped := false
+var launcher_rounds := 4
+var launcher_cooldown := 0.0
+var controls_expanded := false
 ## C now rehearses the Hunt's contact-range clinch. The selected range body is
 ## still its real anatomy rig; holding it does not spawn a proxy or freeze the
 ## rest of the drill around it.
@@ -265,7 +269,11 @@ func _build_room() -> void:
 	var key := DirectionalLight3D.new()
 	key.rotation_degrees = Vector3(-52, 34, 0)
 	key.light_energy = 0.85
-	key.shadow_enabled = true
+	# Seven articulated anatomy rigs already account for roughly a thousand
+	# visible mesh surfaces. Re-rendering all of them into the sandbox shadow map
+	# is the dominant baseline cost, so the safe preset keeps the authored key
+	# light and drops only its duplicate shadow pass.
+	key.shadow_enabled = WorldLook.quality != WorldLook.Quality.PERFORMANCE
 	add_child(key)
 
 	var floor_body := StaticBody3D.new()
@@ -496,6 +504,9 @@ func _blast_light(at: Vector3, force: float) -> void:
 ## that is the entire point. The sword has no round to fire, so it swings
 ## through `_melee_swing()` instead.
 func _fire() -> void:
+	if launcher_equipped:
+		_fire_launcher()
+		return
 	if str(arsenal.current().get("kind", "")) == "melee":
 		_melee_swing()
 		return
@@ -539,6 +550,34 @@ func _fire() -> void:
 	impact_feel.roll += randf_range(-1.0, 1.0) * 0.004
 	if bool(attack.get("caused_jam", false)):
 		_note("JAMMED")
+
+
+func _fire_launcher() -> void:
+	if launcher_cooldown > 0.0:
+		_note("LAUNCHER CYCLING")
+		return
+	if launcher_rounds <= 0:
+		_note("LAUNCHER EMPTY // SELECT ANOTHER WEAPON")
+		return
+	launcher_rounds -= 1
+	launcher_cooldown = 1.15
+	var along := -camera.global_transform.basis.z
+	var start := _muzzle_world(camera.global_position + along * 0.7)
+	_shot_serial += 1
+	ballistics.fire(start, along, "rocket", 0.0, 1, "demo", {
+		"source": SHOT_SOURCE,
+		"shot": _shot_serial,
+		"weapon": "breach_launcher",
+		"damage": 0.0,
+		"impulse": 0.0,
+		"damage_type": "blast",
+		"explosive": true,
+	})
+	_seen[_shot_serial] = start
+	_fire_time[_shot_serial] = Time.get_ticks_msec()
+	_muzzle_flash()
+	_gear_recoil = 1.0
+	_note("WARHEAD AWAY // %d REMAIN" % launcher_rounds)
 
 
 ## AF6.1. A sword has no round to travel and no barrel to leave from, so a
@@ -604,6 +643,12 @@ func _on_round_hit(hit: Dictionary) -> void:
 	# as zero travel rather than a huge, meaningless duration.
 	var fired_at_msec: int = int(_fire_time.get(serial, Time.get_ticks_msec()))
 	_fire_time.erase(serial)
+	if bool(payload.get("explosive", false)):
+		_unmark_last()
+		_impact_burst(at, normal, Color("9c6230"))
+		_explode(at, 72.0)
+		_note("BREACH WARHEAD // IMPACT")
+		return
 
 	var struck := hit.get("collider") as Node
 	var rig: BaselineHuman = null
@@ -786,16 +831,29 @@ func _refresh_muzzle_anchor() -> void:
 func _switch_weapon(slot: int) -> void:
 	if slot < 0 or slot >= HunterArsenal.SLOT_ORDER.size():
 		return
-	if HunterArsenal.SLOT_ORDER[slot] == arsenal.current_id:
+	if not launcher_equipped and HunterArsenal.SLOT_ORDER[slot] == arsenal.current_id:
 		return
 	if not arsenal.select_slot(slot):
 		_note("CAN'T SWITCH // BUSY")
 		return
+	launcher_equipped = false
 	firearm_aiming = false
 	view_gear.take(arsenal.current_id)
 	_gear_rest = view_gear.position
 	_refresh_muzzle_anchor()
 	_note("EQUIPPED // %s" % str(arsenal.current().label))
+
+
+func _equip_launcher() -> void:
+	if grapple_index >= 0:
+		_note("LET GO BEFORE CHANGING WEAPONS")
+		return
+	launcher_equipped = true
+	firearm_aiming = false
+	view_gear.take("launcher")
+	_gear_rest = view_gear.position
+	_refresh_muzzle_anchor()
+	_note("BREACH LAUNCHER // LMB FIRES A VISIBLE WARHEAD")
 
 
 func _muzzle_world(fallback: Vector3) -> Vector3:
@@ -1066,7 +1124,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				_fire()
 		elif click.button_index == MOUSE_BUTTON_RIGHT:
-			if str(arsenal.current().get("kind", "")) == "firearm":
+			if launcher_equipped or str(arsenal.current().get("kind", "")) == "firearm":
 				firearm_aiming = click.pressed
 			elif click.pressed:
 				_melee_swing()
@@ -1092,6 +1150,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_begin_or_use_carried(slot)
 			return
 		match key.keycode:
+			KEY_F1:
+				controls_expanded = not controls_expanded
+				_note("FULL CONTROL REFERENCE" if controls_expanded else "ESSENTIAL CONTROLS ONLY")
 			KEY_C: _toggle_grapple()
 			KEY_H: _set_enemies_enabled(not enemies_enabled)
 			KEY_SPACE:
@@ -1108,12 +1169,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_R: _reset()
 			KEY_X: _set_xray(not xray)
 			KEY_ESCAPE: _step_out()
-			KEY_F: _explode(camera.global_position + Vector3(0, 0.4, 0), 92.0)
 			KEY_6: _switch_weapon(HunterArsenal.SLOT_ORDER.find("sword"))
 			KEY_7: _switch_weapon(HunterArsenal.SLOT_ORDER.find("shotgun"))
 			KEY_8: _switch_weapon(HunterArsenal.SLOT_ORDER.find("sidearm"))
+			KEY_9: _equip_launcher()
 			KEY_T:
-				if not arsenal.reload():
+				if launcher_equipped:
+					_note("LAUNCHER AUTO-CYCLES // %d WARHEADS REMAIN" % launcher_rounds)
+				elif not arsenal.reload():
 					_note("CAN'T RELOAD")
 
 
@@ -1342,6 +1405,8 @@ func _physics_process(delta: float) -> void:
 	camera.global_position = eye
 	camera.global_transform.basis = Basis(Vector3.UP, yaw + shove.x) * Basis(Vector3.RIGHT, pitch + shove.y) * Basis(Vector3.FORWARD, impact_feel.roll)
 	var aiming_now := firearm_aiming and str(arsenal.current().get("kind", "")) == "firearm"
+	if launcher_equipped:
+		aiming_now = firearm_aiming
 	if not aiming_now:
 		firearm_aiming = false
 	firearm_aim_blend = move_toward(firearm_aim_blend, 1.0 if aiming_now else 0.0, real_delta * 7.0)
@@ -1355,6 +1420,7 @@ func _physics_process(delta: float) -> void:
 	# recovery are muscle-memory timing a player is meant to be testing here,
 	# not something holding slow motion should let them cheat.
 	arsenal.tick(real_delta)
+	launcher_cooldown = maxf(0.0, launcher_cooldown - real_delta)
 
 	note_life = maxf(0.0, note_life - real_delta)
 	# A dose is only a gameplay feature when the player can actually see its
@@ -1516,18 +1582,27 @@ func _paint_hud() -> void:
 	CellOutzType.draw_condensed(hud, Vector2(26, 62), "WIZARDS ONLY FOOLS  //  NOTHING HERE IS A MOCK-UP", 9.0, bone * Color(1, 1, 1, 0.4), 2.2)
 
 	var keys := [
-		["LMB", "FIRE/SWING"], ["RMB", "AIM/HEAVY"], ["F", "BLAST HERE"],
-		["6-8", "WEAPON"], ["WHEEL", "CYCLE"], ["T", "RELOAD"],
-		["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"], ["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["H", "DUMMY/ENEMY"], ["C", "GRAPPLE/LET GO"], ["SPACE", "JUMP/MOVE+DODGE"], ["CTRL", "CROUCH"], ["WASD", "MOVE/DRAG"],
+		["WASD", "MOVE/DRAG"], ["LMB", "FIRE/PRESS"], ["RMB", "AIM/HEAVY"],
+		["SPACE", "JUMP/MOVE+DODGE"], ["C", "GRAPPLE/LET GO"], ["H", "DUMMY/ENEMY"],
+		["6-9", "WEAPONS"], ["F1", "MORE CONTROLS"],
 	]
-	var row_size := 6
+	if controls_expanded:
+		keys = [
+			["WASD", "MOVE/DRAG"], ["LMB", "FIRE/PRESS"], ["RMB", "AIM/HEAVY"],
+			["SPACE", "JUMP/MOVE+DODGE"], ["C", "GRAPPLE/LET GO"], ["H", "DUMMY/ENEMY"],
+			["6-8", "MELEE/FIREARMS"], ["9", "BREACH LAUNCHER"], ["WHEEL", "CYCLE"], ["T", "RELOAD"],
+			["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"],
+			["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["CTRL", "CROUCH"], ["F1", "LESS CONTROLS"],
+		]
+	var row_size := 7 if controls_expanded else 4
+	var row_count := ceili(float(keys.size()) / float(row_size))
 	for index in keys.size():
 		var pair: Array = keys[index]
 		var row := index / row_size
 		var in_row := index % row_size
 		var column_width := (size.x - 52.0) / float(row_size)
 		var x := 26.0 + float(in_row) * column_width
-		var y_keys := size.y - 66.0 + float(row) * 21.0
+		var y_keys := size.y - 20.0 - float(row_count - row) * 21.0
 		var used := CellOutzType.draw_condensed(hud, Vector2(x, y_keys), str(pair[0]), 10.0, rust, 1.8)
 		CellOutzType.draw_condensed(hud, Vector2(x + used + 7.0, y_keys), str(pair[1]), 8.5, bone * Color(1, 1, 1, 0.55), 1.4)
 
@@ -1554,8 +1629,8 @@ func _paint_hud() -> void:
 	# a fixed label — a jam or an empty magazine is exactly the kind of thing
 	# a range needs to say out loud rather than leave the player to guess at.
 	var arsenal_state: Dictionary = arsenal.state()
-	var weapon_line := "WEAPON  %s" % str(arsenal.current().get("label", "?"))
-	if str(arsenal_state.get("kind", "")) == "firearm":
+	var weapon_line := "WEAPON  BREACH LAUNCHER // %d WARHEADS" % launcher_rounds if launcher_equipped else "WEAPON  %s" % str(arsenal.current().get("label", "?"))
+	if not launcher_equipped and str(arsenal_state.get("kind", "")) == "firearm":
 		if bool(arsenal_state.get("jammed", false)):
 			weapon_line += "  //  JAMMED"
 		elif bool(arsenal_state.get("reloading", false)):

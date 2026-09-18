@@ -49,6 +49,13 @@ const ORGAN_TINTS := {
 ## drivers shedding unbounded physics bodies in a pileup is a bug, not atmosphere.
 const MAX_CHUNKS := 90
 
+
+static func chunk_budget() -> int:
+	match WorldLook.quality:
+		WorldLook.Quality.ULTRA: return MAX_CHUNKS
+		WorldLook.Quality.HIGH: return 60
+		_: return 36
+
 ## A chunk that survives this long has fully rotted: discoloured, and a scent
 ## source other systems can query. Most chunks never see it - the cap and the
 ## whole-limb cleanup timer recycle them first - but one left undisturbed in a
@@ -72,7 +79,7 @@ static var live: Array[Node3D] = []
 static func register_whole_limb(node: RigidBody3D, zone: String, subject_id: String) -> Dictionary:
 	if node == null or not is_instance_valid(node):
 		return {}
-	if live.size() >= MAX_CHUNKS:
+	if live.size() >= chunk_budget():
 		_recycle_oldest()
 	var info := {
 		"layer": -1,
@@ -130,7 +137,7 @@ static func burst(host: Node3D, origin: Vector3, heading: Vector3, info: Diction
 			count = 1
 		var layer_produced := 0
 		for index in count:
-			if live.size() >= MAX_CHUNKS:
+			if live.size() >= chunk_budget():
 				_recycle_oldest()
 			var chunk := _make_chunk(layer, zone, subject_id, info, rng)
 			if chunk == null:
@@ -156,7 +163,7 @@ static func burst(host: Node3D, origin: Vector3, heading: Vector3, info: Diction
 		# the camera, is what "loud" was. They are staggered and weighted now so
 		# the burst actually is a sequence: quiet entry ticks building to the
 		# deepest layer, which is the one worth hearing.
-		if layer_produced > 0:
+		if layer_produced > 0 and (WorldLook.quality != WorldLook.Quality.PERFORMANCE or layer == depth):
 			play_impact(host, origin, layer, stack_level(layer, depth), float(layer) * STACK_STAGGER)
 	return produced
 

@@ -405,6 +405,7 @@ static func build_weapon(weapon_id: String) -> Node3D:
 		"sword": _build_sword(root)
 		"shotgun": _build_shotgun(root)
 		"sidearm": _build_sidearm(root)
+		"launcher": _build_launcher(root)
 		_: _build_sword(root)
 	# Every part above is authored muzzle-forward along +Z because that is the
 	# readable way to write a sweep, and a Godot node's forward is -Z. Turning
@@ -413,6 +414,47 @@ static func build_weapon(weapon_id: String) -> Node3D:
 	# anchors round with it so a grip cannot disagree with the shape.
 	root.rotation.y = PI
 	return root
+
+
+## Sandbox breach launcher: a visibly different, heavy single tube rather than
+## an invisible key that detonates the crosshair. It deliberately stays a
+## range-only tool until explosive weapons belong in the production loadout.
+static func _build_launcher(root: Node3D) -> void:
+	var tube := MeshInstance3D.new()
+	tube.name = "launch_tube"
+	tube.mesh = BodyMesh.revolve([
+		Vector3(0.0, 0.052, 0.052),
+		Vector3(0.08, 0.060, 0.060),
+		Vector3(0.62, 0.060, 0.060),
+		Vector3(0.70, 0.068, 0.068),
+	], 14)
+	tube.rotation.x = PI * 0.5
+	tube.position = Vector3(0, 0.015, 0.15)
+	tube.material_override = _metal(Color("3f5145"), 0.42, 109)
+	root.add_child(tube)
+
+	var sight := MeshInstance3D.new()
+	sight.name = "launcher_sight"
+	var sight_mesh := BoxMesh.new()
+	sight_mesh.size = Vector3(0.018, 0.055, 0.11)
+	sight.mesh = sight_mesh
+	sight.position = Vector3(0, 0.083, 0.33)
+	sight.material_override = _metal(Color("a06b31"), 0.35, 111)
+	root.add_child(sight)
+
+	var grip := MeshInstance3D.new()
+	grip.name = "launcher_grip"
+	var grip_mesh := BoxMesh.new()
+	grip_mesh.size = Vector3(0.065, 0.15, 0.075)
+	grip.mesh = grip_mesh
+	grip.position = Vector3(0, -0.075, -0.02)
+	grip.rotation.x = 0.22
+	grip.material_override = _wood(Color("392a20"), 113)
+	root.add_child(grip)
+
+	_anchor(root, "grip", Vector3(0, -0.075, -0.035), Vector3(0.22, 0, 0))
+	_anchor(root, "forend", Vector3(0, -0.035, 0.34), Vector3.ZERO)
+	_anchor(root, "muzzle", Vector3(0, 0.015, 0.85), Vector3.ZERO)
 
 
 ## The Ashline Cleaver. Single-edged, heavy at the front, a blade that is a
@@ -801,6 +843,7 @@ func _default_grip(weapon_id: String) -> String:
 		"sword": return "two_hand"
 		"shotgun": return "long_gun"
 		"sidearm": return "pistol"
+		"launcher": return "long_gun"
 	return "one_hand"
 
 

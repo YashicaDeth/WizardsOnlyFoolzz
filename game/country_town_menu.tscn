@@ -120,7 +120,7 @@ text = "DISPLAY // SIGNAL CALIBRATION"
 [node name="Effects" type="Button" parent="HUD/SettingsPanel/VBox"]
 text = "BLOOM: ON"
 [node name="Graphics" type="Button" parent="HUD/SettingsPanel/VBox"]
-text = "GRAPHICS: ULTRA"
+text = "GRAPHICS: PERFORMANCE"
 [node name="Resolution" type="Button" parent="HUD/SettingsPanel/VBox"]
 text = "RENDER SCALE: 100%"
 [node name="AntiAliasing" type="Button" parent="HUD/SettingsPanel/VBox"]

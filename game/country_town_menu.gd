@@ -33,7 +33,7 @@ var splash_glass_layer: CanvasLayer
 var splash_layer: CanvasLayer
 var branch_plate: Control
 var graphics_presets := ["ULTRA", "HIGH", "PERFORMANCE"]
-var graphics_index := 0
+var graphics_index := 2
 var render_scales := [1.0, 1.25, 1.5, 0.8]
 var render_scale_index := 0
 var color_modes := ["CELLOUTZ COPPER", "SALVAGE TEAL", "NIGHT BLOOD"]
@@ -60,6 +60,9 @@ var menu_departing := false
 
 
 func _ready() -> void:
+	# Start on the safe measured preset. This also makes the button truthful:
+	# previously it said ULTRA while WorldLook silently began on HIGH.
+	_apply_graphics_preset(graphics_presets[graphics_index])
 	_build_country_town()
 	$HUD/Play.pressed.connect(_open_continue_runs)
 	$HUD/Settings.pressed.connect(_open_settings)
@@ -683,6 +686,10 @@ func _cycle_graphics() -> void:
 	# sandbox alike and the three of them stop disagreeing.
 	graphics_index = (graphics_index + 1) % graphics_presets.size()
 	var preset: String = graphics_presets[graphics_index]
+	_apply_graphics_preset(preset)
+
+
+func _apply_graphics_preset(preset: String) -> void:
 	WorldLook.set_quality_name(preset)
 	match preset:
 		"ULTRA":
@@ -701,7 +708,9 @@ func _cycle_graphics() -> void:
 	# immediately rather than only after the next scene load.
 	if menu_environment != null:
 		WorldLook.apply_quality(menu_environment, WorldLook.PRESETS.get("front_door", {}))
-	$HUD/SettingsPanel/VBox/Graphics.text = "GRAPHICS: %s" % preset
+	var button := get_node_or_null("HUD/SettingsPanel/VBox/Graphics") as Button
+	if button != null:
+		button.text = "GRAPHICS: %s" % preset
 
 
 func _cycle_resolution() -> void:

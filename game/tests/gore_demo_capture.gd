@@ -56,6 +56,14 @@ func _ready() -> void:
 	await _shoot(tree, out_dir + "/gore_sandbox_aim.png")
 	demo.firearm_aiming = false
 
+	# The old F-key blast had no weapon, ammunition or travel. The replacement
+	# is visible in the same real hands and the reduced essential-controls strip
+	# names where it lives without restoring the former wall of bindings.
+	demo._equip_launcher()
+	await _settle(tree, 4)
+	await _shoot(tree, out_dir + "/gore_sandbox_breach_launcher.png")
+	demo._switch_weapon(HunterArsenal.SLOT_ORDER.find("sidearm"))
+
 	# Capture the middle of an actual paid sidestep. The displaced viewpoint and
 	# DODGE stance are the visual evidence that this is movement, not a label.
 	demo.stamina = 100.0

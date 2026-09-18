@@ -43,7 +43,11 @@ enum Quality { ULTRA, HIGH, PERFORMANCE }
 
 ## Static so it survives a scene change. Scenes build their Environment fresh on
 ## load, and an instance field would be rebuilt to the default every time.
-static var quality: Quality = Quality.HIGH
+# Performance is the safe first-launch contract. The measured sandbox still
+# preserves the authored distance fog and colour work at this level, while
+# avoiding three fullscreen effects before the player has chosen to pay for
+# them. HIGH and ULTRA remain one click away in Settings.
+static var quality: Quality = Quality.PERFORMANCE
 
 
 ## Named for the settings panel, which shows the word rather than the enum.
