@@ -5414,6 +5414,23 @@ instead.
 - [ ] **AP1.6** Out, and choosing what happens to the lands (hands over to AA)
 - [ ] **AP1.7** Digestible segment to segment, and a playground if you want it
 
+      18 September continuity pass: the first rendered colosseum frame is now
+      already seated at the live cab transform instead of flashing once from
+      the arena origin. Cab/chase remains the physical 0.68-second crossing
+      proven by `derby_view_transition_test.gd`. The facility cab can no
+      longer bypass the opening: `E` during countdown or an active escape
+      contract is refused visibly and records no departure; a real win releases
+      the same climb-out. During that exit the eye stays inside the cull-safe
+      interior until it clears the body shell, while the driver portrait,
+      instruments, reticle and keys hint fade with distance from the seat
+      instead of remaining as a car HUD on foot. Production captures:
+      `P:/GameDev/Temp/opening_vehicle_arrival_cab.png`,
+      `opening_vehicle_exit_refused.png`, `opening_vehicle_exit_midway.png`
+      and `opening_vehicle_exit_standing.png`. `opening_test`, route wiring,
+      service-ring objective and the complete played-heat derby-to-Hunt exit
+      all remain green. AP1.7 stays open for holistic player pacing rather than
+      being claimed from this repaired seam alone.
+
 ### AP4 — Starting-facility territory slice
 
 - [x] **AP4.1** The production opening enters the authored underground colosseum, not the old surface quarry — both the Growing Floor door and `OpeningDirector.resume_destination()` now resolve to `underground_colosseum.tscn`; `opening_stage_wiring_test.gd` drives the real transitions (6/6).

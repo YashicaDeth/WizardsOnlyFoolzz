@@ -142,6 +142,7 @@ var aim_pitch := 0.0
 ## 1 as the body leaves the car.
 var climbing_out := 0.0
 var leaving_on_foot := false
+var exit_refusal := 0.0
 ## AG3.5. What can be pressed, when somebody asks.
 var keys_card: Control
 var _cab_seat := Vector3.ZERO
@@ -259,7 +260,7 @@ func _ready() -> void:
 			["R", "RELOAD"],
 		]},
 		{"group": "GETTING OUT", "rows": [
-			["E", "CLIMB OUT OF THE CAR"],
+			["E", "CLIMB OUT AFTER THE HEAT"],
 			["ENTER", "ACCEPT THE RESULT"],
 			["I", "WORLD INDEX"],
 			["ESC", "RELEASE THE MOUSE"],
@@ -288,6 +289,10 @@ func _ready() -> void:
 		"vehicle": "rift_skiff",
 		"target_count": targets.size(),
 	})
+	# Seat the eye before the first rendered frame. Waiting for the countdown's
+	# first physics tick left one arena-origin frame between the interstitial and
+	# the cab, which made entering the vehicle read as a scene cut and correction.
+	_update_camera(1.0)
 	_update_hud()
 
 
@@ -326,6 +331,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
 	_advance_world_time(delta)
+	exit_refusal = maxf(0.0, exit_refusal - delta)
 	boat.enabled = round_state == "active" and not index_open and not leaving_on_foot
 	fire_cooldown = maxf(0.0, fire_cooldown - delta)
 	if is_colosseum:
@@ -1563,15 +1569,27 @@ func _reload_cab_gun() -> void:
 ## AG3.3. You climb out. Greg: *"not progressing out of the car animation"* —
 ## pressing E used to swap the scene on the same frame, which reads as the game
 ## closing rather than as you leaving.
-func _begin_climbing_out() -> void:
+func _begin_climbing_out() -> bool:
 	if leaving_on_foot or leaving:
-		return
+		return false
+	# The starting facility's cab is the player's way through the pit, not a
+	# skippable room. Before the compound objective is won its door is locked by
+	# the same CellOutz authority sealing the surface exit. The old unconditional
+	# E path let a player leave during the countdown and meet the Ringmaster
+	# without surviving a single second of the derby.
+	if is_colosseum and round_state != "won":
+		exit_refusal = 1.8
+		if reticle != null and is_instance_valid(reticle):
+			reticle.call("refuse")
+		return false
+	exit_refusal = 0.0
 	leaving_on_foot = true
 	climbing_out = 0.0
 	if index_open:
 		index_open = false
 		world_index.close()
 	WorldHistory.record_event("player_left_derby_vehicle", {"venue": "underground_colosseum" if is_colosseum else "rift_derby_quarry", "destination": "bone_yard_outskirts"})
+	return true
 
 
 ## AP1.6. Out of the car and the pit is clear — the ringmaster comes out to
@@ -1686,9 +1704,17 @@ func _update_climb_out(delta: float) -> void:
 	var look := boat.global_position + boat.global_transform.basis.z * lerpf(-6.0, 3.0, eased) + Vector3.UP * 1.1
 	camera.look_at(look, Vector3.UP)
 	camera.fov = lerpf(camera.fov, 70.0, minf(delta * 3.0, 1.0))
-	if climbing_out >= 0.3:
-		# Once you are out of the seat you are looking at your own car again, so
-		# the bodywork comes back and the cab goes away.
+	# The windscreen instruments belong to the seat. Let them fall away over the
+	# same middle third in which the eye clears the sill instead of surviving as
+	# an inexplicable driving HUD once the player is standing outside.
+	var vehicle_hud_alpha := 1.0 - smoothstep(0.22, 0.72, eased)
+	for cab_ui: CanvasItem in [dynamic_interface, driver_bust, reticle, keys_card, $HUD/ScreenTreatment]:
+		if cab_ui != null and is_instance_valid(cab_ui):
+			cab_ui.modulate.a = vehicle_hud_alpha
+	if climbing_out >= 0.72:
+		# Do not reveal the exterior shell while the eye is still physically
+		# passing through its left flank. At the old 0.3 threshold the entire
+		# midpoint frame was a door-coloured rectangle.
 		camera.cull_mask = 0xFFFFF & ~(1 << (INTERIOR.CAB_LAYER - 1))
 	if climbing_out >= 1.0 and not leaving:
 		leaving = true
@@ -1746,18 +1772,19 @@ func _update_hud() -> void:
 			cab_clear and round_state == "countdown",
 			rounds_left <= 0,
 			clampf(fire_cooldown / float(cab_arsenal.current().get("cooldown", 0.28)), 0.0, 1.0))
-	status.text = "%s  //  %s\nWASD DRIVE  ·  I WORLD INDEX  ·  E LEAVE VEHICLE" % ["UNDERGROUND TUNNEL DERBY" if is_colosseum else "BONE YARD DERBY", round_state.to_upper()]
+	var exit_instruction := "E CLIMB OUT" if not is_colosseum or round_state == "won" else "E DOOR LOCKED UNTIL ESCAPE CONTRACT CLEARS"
+	status.text = "%s  //  %s\nWASD DRIVE  ·  I WORLD INDEX  ·  %s" % ["UNDERGROUND TUNNEL DERBY" if is_colosseum else "BONE YARD DERBY", round_state.to_upper(), exit_instruction]
 	score_label.text = "IMPACT SCORE  %05d\nHULL INTEGRITY  %03d%%\nACTIVE WRECKERS  %02d\nWORLD MEMORY  %03d" % [score, integrity, targets.size(), WorldHistory.event_count()]
 	# Only speaks when it has something to say. Left visible during play it sat
 	# on top of the control ribbon repeating what the ribbon already showed.
 	var service_cleanup := is_colosseum and round_state == "active" and disabled_count >= 8 and _service_relays_disabled() < COLOSSEUM_TUNNEL_COUNT
 	var lockdown_intro := is_colosseum and round_state == "active" and lockdown_briefing > 0.0
-	mode_label.visible = round_state != "active" or service_cleanup or lockdown_intro
+	mode_label.visible = round_state != "active" or service_cleanup or lockdown_intro or exit_refusal > 0.0
 	# The countdown case is here rather than only in `_physics_process`: now that
 	# the countdown runs the HUD (so the player can see the cab they are sitting
 	# in), this line runs during it too and used to blank the objective straight
 	# back out on the same frame it was set.
-	mode_label.text = ("VICTORY  //  LOCKDOWN GRID DEAD  //  SURFACE EXIT UNSEALED" if round_state == "won" and is_colosseum else "VICTORY  //  HAULED OUT TO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "won" else "WRECKED  //  DRAGGED INTO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "lost" else "DISABLE EIGHT WRECKERS  //  %d" % maxi(1, ceili(countdown)) if round_state == "countdown" else "EXIT STILL SEALED  //  DESTROY 3 RED LOCKDOWN RELAYS  //  %d/3" % _service_relays_disabled() if service_cleanup else "ESCAPE CONTRACT  //  WRECK 8 CARS + DESTROY 3 RED RELAYS" if lockdown_intro else "")
+	mode_label.text = ("CAB DOOR HELD BY CELLOUTZ  //  CLEAR THE ESCAPE CONTRACT" if exit_refusal > 0.0 else "VICTORY  //  LOCKDOWN GRID DEAD  //  SURFACE EXIT UNSEALED" if round_state == "won" and is_colosseum else "VICTORY  //  HAULED OUT TO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "won" else "WRECKED  //  DRAGGED INTO ASHBLOOM IN %d" % maxi(1, ceili(result_countdown)) if round_state == "lost" else "DISABLE EIGHT WRECKERS  //  %d" % maxi(1, ceili(countdown)) if round_state == "countdown" else "EXIT STILL SEALED  //  DESTROY 3 RED LOCKDOWN RELAYS  //  %d/3" % _service_relays_disabled() if service_cleanup else "ESCAPE CONTRACT  //  WRECK 8 CARS + DESTROY 3 RED RELAYS" if lockdown_intro else "")
 	var rival := WorldHistory.subject(CAST.id_for(CAPTAIN_SLOT))
 	rival_label.text = "HUNT ARC  //  %s\n%s  ·  GRUDGE %03d  ·  ELO %04d\n[I] WORLD INDEX" % [str(rival.get("name", "THE CAPTAIN")).to_upper(), str(rival.get("status", "active")).to_upper(), int(rival.get("grudge", 0)), int(rival.get("elo", 1180))]
 	# Computed once for both readouts. It used to live inside the cab-screen

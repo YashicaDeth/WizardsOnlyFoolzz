@@ -25,8 +25,9 @@ func _ready() -> void:
 	await get_tree().process_frame
 	derby.set_physics_process(false)
 
-	derby._update_camera(1.0)
 	var cab_at: Vector3 = derby.camera.global_position
+	var authored_cab_at: Vector3 = (derby._cab_camera_target().transform as Transform3D).origin
+	check(cab_at.distance_to(authored_cab_at) < 0.05, "the first rendered frame is already seated in the physical cab")
 	WorldHistory.update_subject(derby.CAST.id_for(derby.CAPTAIN_SLOT), {"grudge": 40}, "test_unlock")
 	derby._toggle_derby_view()
 	check(not derby.in_cab and is_zero_approx(derby.view_transition), "toggle sets a chase destination without teleporting there")
@@ -50,6 +51,15 @@ func _ready() -> void:
 	derby._update_camera(derby.VIEW_TRANSITION_SECONDS)
 	check(derby.camera.global_position.distance_to(cab_at) < 0.05, "the return finishes at the physical cab seat")
 	check((derby.camera.cull_mask & bodywork_bit) == 0 and (derby.camera.cull_mask & cab_bit) != 0, "the cab mask changes only after the return arrives")
+
+	derby.is_colosseum = true
+	derby.round_state = "active"
+	check(not derby._begin_climbing_out() and not derby.leaving_on_foot,
+		"the facility cab cannot skip an active escape contract")
+	check(derby.exit_refusal > 0.0, "the locked door gives immediate visible refusal")
+	derby.round_state = "won"
+	check(derby._begin_climbing_out() and derby.leaving_on_foot,
+		"a cleared facility heat releases the same physical climb-out")
 
 	print("DERBY_VIEW_TRANSITION_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
