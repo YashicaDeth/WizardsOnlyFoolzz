@@ -737,6 +737,10 @@ var witness_ledger := WitnessLedger.new()
 ## B3.3/B3.6. Hold G and you are looking through people; keep holding and the
 ## ring the X-ray has always been one seat of opens into the full wheel.
 var xray_held := 0.0
+## Q has two contextual outcomes. The press begins a possible scan; only a
+## release before the hold threshold spends the prosthetic surge. Previously
+## the press spent 35 stamina immediately and then also opened the scanner.
+var q_tap_pending := false
 ## One wheel per hold. Set when a wheel opens, cleared when the key comes up.
 var wheel_spent := false
 var xray_active := false
@@ -1343,6 +1347,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
 			return
+	if event is InputEventKey and event.keycode == KEY_Q and not event.echo:
+		if event.pressed:
+			q_tap_pending = panel_mode.is_empty() and not resolution_ui.visible
+		else:
+			# A short press resolves as the implant act. Once the scanner has
+			# crossed its hold threshold, release only lowers that scanner.
+			if q_tap_pending and xray_held < XRAY_HOLD_TO_WHEEL and panel_mode.is_empty() and not resolution_ui.visible:
+				_use_prosthetic_surge()
+			q_tap_pending = false
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if panel_mode.is_empty():
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -1521,7 +1534,6 @@ func _unhandled_input(event: InputEvent) -> void:
 						_dodge()
 					else:
 						_jump()
-			KEY_Q: _use_prosthetic_surge()
 			KEY_K: _deliberate_redecant()
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if _pulmonary_diagnostic_active():
@@ -6173,6 +6185,7 @@ func _update_xray(delta: float, holding: bool) -> void:
 		# and slowed again in a loop. One wheel per hold — the key has to come
 		# up before another one opens.
 		if xray_held >= XRAY_HOLD_TO_WHEEL and not handheld.radial.is_open and not wheel_spent:
+			q_tap_pending = false
 			wheel_spent = true
 			# B3.6. This is where B3 becomes C2 — the empty seats on the cursor
 			# ring were always the rest of this wheel.
@@ -6400,8 +6413,8 @@ func _build_keys_card() -> void:
 			["5", "PUT THEM DOWN"],
 			["B", "CYCLE GRIP"],
 			["R", "RELOAD"],
-			["Q", "PROSTHETIC SURGE // COSTS STAMINA"],
-			["HOLD Q", "X-RAY, THEN THE WHEEL"],
+			["TAP Q", "PROSTHETIC SURGE // COSTS STAMINA"],
+			["HOLD Q", "FREE X-RAY / KEEP HOLDING FOR WHEEL"],
 		]},
 		{"group": "HANDS ON", "rows": [
 			["E", "INTERACT"],
