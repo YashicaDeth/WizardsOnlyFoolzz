@@ -13,6 +13,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 
 	WorldHistory.clear_history()
+	WorldClock.set_hour(13.0)
 	var hunt = load("res://bone_yard_hunt.tscn").instantiate()
 	add_child(hunt)
 	for _settle in 50:
@@ -45,6 +46,7 @@ func _ready() -> void:
 	print("CAPTURED: ", path)
 	for job_id in ["holding_job:bone_yard:claim_crew", "holding_job:bone_yard:field_recovery"]:
 		HOLDINGS.complete_work(job_id, {"method": "visual_proof"})
+	hunt._maintain_holding_work()
 	map.queue_redraw()
 	for _settle in 18:
 		await get_tree().process_frame
@@ -56,4 +58,26 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 	print("CAPTURED: ", resolved_path)
+
+	# The same state must exist under the player's boots, not only as a MAP
+	# treatment. Close the sheet and frame the live broken-stake cluster at the
+	# Bone Yard centre from an ordinary first-person approach.
+	map.close_map()
+	hunt.player_body.position = Vector3(float(bone.at.x), 0.9, float(bone.at.y) + 18.0)
+	hunt.player = hunt.player_body.position + Vector3.UP * 0.6
+	hunt.yaw = PI
+	hunt.pitch = -0.08
+	hunt.camera_ready = false
+	for _settle in 24:
+		hunt._update_camera()
+		hunt._update_hud()
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var world_path := "%s/holding_decision_open_world.png" % out_dir
+	error = get_viewport().get_texture().get_image().save_png(world_path)
+	if error != OK:
+		push_error("CAPTURE_FAILED %s (%s)" % [world_path, error_string(error)])
+		get_tree().quit(1)
+		return
+	print("CAPTURED: ", world_path)
 	get_tree().quit()

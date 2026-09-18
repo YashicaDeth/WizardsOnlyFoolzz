@@ -91,15 +91,17 @@ func _build_holding_state_mark(row: Dictionary, state: String) -> void:
 		var stake := MeshInstance3D.new()
 		stake.name = "BrokenClaimStake_%d" % index
 		var box := BoxMesh.new()
-		box.size = Vector3(0.13, 2.5, 0.13)
-		box.material = _material(tint.darkened(0.35), 0.0, "rust")
+		box.size = Vector3(0.22, 3.4, 0.22)
+		box.material = _material(tint.darkened(0.18), 0.22 if open else 0.08, "rust")
 		stake.mesh = box
-		stake.position = Vector3(cos(angle) * 9.0, 1.05, sin(angle) * 9.0)
+		stake.position = Vector3(cos(angle) * 9.0, 1.45, sin(angle) * 9.0)
 		stake.rotation = Vector3(sin(angle) * 0.42, -angle, cos(angle) * 0.42)
 		cluster.add_child(stake)
 	var beacon := OmniLight3D.new()
 	beacon.name = "ClaimStateBeacon"
-	beacon.position = Vector3(0, 2.2, 0)
+	# Offset toward the district approach instead of burying the read inside the
+	# settlement's existing centre structure.
+	beacon.position = Vector3(0, 2.8, 7.0)
 	beacon.light_color = tint
 	beacon.light_energy = 1.35 if open else 0.55
 	beacon.omni_range = 11.0 if open else 6.0
@@ -107,7 +109,7 @@ func _build_holding_state_mark(row: Dictionary, state: String) -> void:
 	cluster.add_child(beacon)
 	var label := Label3D.new()
 	label.name = "ClaimStateLabel"
-	label.position = Vector3(0, 2.75, 0)
+	label.position = Vector3(0, 3.65, 7.0)
 	label.text = "DECISION OPEN" if open else "LOCAL CLAIM DISRUPTED"
 	label.font_size = 30
 	label.modulate = tint

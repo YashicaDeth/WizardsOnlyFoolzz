@@ -5,6 +5,19 @@ boundary between confirmed visual rules, safe implementation work and choices
 that still require Greg; the detailed material brief remains
 `ART-DIRECTION.md`.
 
+18 September implementation note: connected local territory work now has one
+visible consequence before the still-unresolved political or supernatural land
+decision. Resolving one order fractures the affected polygon on MAP; resolving
+the complete local set adds a living decision-open border. The same canonical
+place state raises broken claim stakes and a restrained field beacon in the
+walked settlement. None of these marks changes the recorded owner. They expose
+the power vacuum the player earned without silently choosing who inherits it.
+MAP and the physical district both consume `local_work_state` from the same
+place record, and `holding_work_integration_test` covers the complete transition.
+Player-facing language should call these bounded world areas territories; the
+older `holding` name remains only where changing stable code/save identifiers
+would create migration risk.
+
 18 September implementation note: the Black Mirror's convenience now has the
 corporate threat promised by the map direction. Once CellOutz has issued its
 repossession order, opening MAP publishes a persisted 96-metre acquisition
