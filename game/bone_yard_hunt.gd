@@ -1369,13 +1369,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				else:
 					_reload_weapon()
 			KEY_ESCAPE:
-				if handheld.is_open:
-					handheld.close_device()
-					Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-				elif not panel_mode.is_empty():
-					_toggle_panel(panel_mode)
-				else:
-					Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+				# This scene owns Escape only while one of its interfaces is up.
+				# Consuming that close is essential: without it the same physical
+				# press continued into PauseGate and immediately opened the pause
+				# menu behind the phone or chart that had just been lowered.
+				if _close_active_interface():
+					get_viewport().set_input_as_handled()
+				return
 			KEY_F:
 				if not third_person and not third_person_unlocked():
 					prompt.text = third_person_refusal()
@@ -1400,11 +1400,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F5: handheld.jump_to_mode(4)
 			KEY_F6: handheld.jump_to_mode(5)
 			KEY_F7: handheld.jump_to_mode(6)
-			KEY_G:
-				handheld.toggle_device()
-				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if handheld.is_open else Input.MOUSE_MODE_CAPTURED
-				if handheld.is_open:
-					prompt.text = asset_network.roster_line() + " // CLICK APP / TAB NEXT / ESC LOWER"
+			KEY_G: _toggle_handheld_surface()
 			KEY_TAB:
 				# The handheld owns Tab while raised: one object, modes on it.
 				if handheld.is_open:
@@ -6222,8 +6218,16 @@ func _order_hud_layers() -> void:
 
 
 func _toggle_panel(mode: String) -> void:
-	allusions_artwork.close_artwork()
-	panel_mode = "" if panel_mode == mode else mode
+	var opening := panel_mode != mode
+	# Major interfaces are mutually exclusive. The phone is a physical object
+	# in the hand and these are full-size reading surfaces; drawing both at once
+	# caused two cursor owners, two sets of shortcuts and battery drain behind a
+	# panel the player could not see through.
+	if handheld.is_open:
+		handheld.close_device()
+	keys_card.close()
+	_close_panel_views()
+	panel_mode = mode if opening else ""
 	character_archive.visible = panel_mode == "tree"
 	# The map is a chart now, not a paragraph, so it owns its own surface.
 	living_map.visible = panel_mode == "map"
@@ -6265,20 +6269,75 @@ func _toggle_panel(mode: String) -> void:
 		_pointer.visible = not panel_mode.is_empty()
 
 
+## Shut every full-size reader without changing which one the caller intends
+## to open next. WorldIndex normally animates its close; surface handoff needs
+## it gone immediately so it cannot remain clickable underneath the successor.
+func _close_panel_views() -> void:
+	allusions_artwork.close_artwork()
+	character_archive.close_archive()
+	living_map.close_map()
+	if world_index.visible:
+		world_index.close()
+		world_index.visible = false
+	if pin_board.visible:
+		pin_board.close()
+	panel.visible = false
+
+
+## Return true only when this scene actually consumed an interface close.
+## A bare Escape is deliberately left for PauseGate.
+func _close_active_interface() -> bool:
+	if handheld.is_open:
+		handheld.close_device()
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		return true
+	if not panel_mode.is_empty():
+		_close_panel_views()
+		panel_mode = ""
+		prompt.visible = true
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if _pointer != null and is_instance_valid(_pointer):
+			_pointer.visible = false
+		return true
+	if keys_card.is_open:
+		keys_card.close()
+		return true
+	return false
+
+
+func _toggle_handheld_surface() -> void:
+	if handheld.is_open:
+		handheld.close_device()
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		return
+	# Pocket every other reader before raising the physical device. This also
+	# sleeps the satellite viewport instead of leaving it rendering behind G.
+	_close_panel_views()
+	panel_mode = ""
+	keys_card.close()
+	if _pointer != null and is_instance_valid(_pointer):
+		_pointer.visible = false
+	handheld.open_device()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if handheld.is_open else Input.MOUSE_MODE_CAPTURED
+	if handheld.is_open:
+		prompt.visible = true
+		prompt.text = asset_network.roster_line() + " // CLICK APP / TAB NEXT / ESC LOWER"
+
+
 ## J remains a temporary two-state route to the actual interactive artwork.
 ## The old third state exposed Greg's placeholder birth chart before the player
 ## had created a character. NatalSigil and CharacterSheet remain intact for the
 ## future vat route, but ordinary exploration never constructs or opens them.
 func _toggle_artwork() -> void:
-	if allusions_artwork.visible:
-		allusions_artwork.close_artwork()
-		panel_mode = ""
-	else:
-		panel.visible = false
-		character_archive.close_archive()
-		living_map.close_map()
-		panel_mode = "artwork"
+	var opening := not allusions_artwork.visible
+	if handheld.is_open:
+		handheld.close_device()
+	keys_card.close()
+	_close_panel_views()
+	panel_mode = "artwork" if opening else ""
+	if opening:
 		allusions_artwork.open_artwork()
+	prompt.visible = not opening
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if panel_mode.is_empty() else Input.MOUSE_MODE_HIDDEN
 	if _pointer != null and is_instance_valid(_pointer):
 		_pointer.visible = not panel_mode.is_empty()

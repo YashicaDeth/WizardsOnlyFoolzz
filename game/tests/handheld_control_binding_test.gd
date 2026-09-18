@@ -64,6 +64,21 @@ func _ready() -> void:
 	var pointer_returned := DisplayServer.get_name() == "headless" or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	check(not hunt.handheld.is_open and pointer_returned,
 		"Escape lowers the raised Black Mirror and returns control to play")
+	var map_key := InputEventKey.new()
+	map_key.keycode = KEY_M
+	map_key.pressed = true
+	hunt._unhandled_input(map_key)
+	check(hunt.panel_mode == "map" and hunt.living_map.visible and not hunt.handheld.is_open,
+		"M opens the full map as the one active major interface")
+	hunt._unhandled_input(g_key)
+	check(hunt.handheld.is_open and hunt.panel_mode.is_empty() and not hunt.living_map.visible,
+		"G pockets the full map before raising the Black Mirror")
+	hunt._unhandled_input(map_key)
+	check(not hunt.handheld.is_open and hunt.panel_mode == "map" and hunt.living_map.visible,
+		"opening a full panel lowers the Black Mirror instead of drawing underneath it")
+	hunt._unhandled_input(escape_key)
+	check(hunt.panel_mode.is_empty() and not hunt.living_map.visible,
+		"Escape closes the active full-size interface in one step")
 	var j_key := InputEventKey.new()
 	j_key.keycode = KEY_J
 	j_key.pressed = true
@@ -73,6 +88,26 @@ func _ready() -> void:
 	hunt._unhandled_input(j_key)
 	check(not hunt.allusions_artwork.visible and hunt.panel_mode.is_empty(),
 		"a second J press returns directly to play rather than cycling into a natal chart")
+	hunt._unhandled_input(g_key)
+	hunt._unhandled_input(j_key)
+	check(not hunt.handheld.is_open and hunt.allusions_artwork.visible and hunt.panel_mode == "artwork",
+		"J lowers the Black Mirror before opening the artwork")
+	hunt._unhandled_input(g_key)
+	check(hunt.handheld.is_open and not hunt.allusions_artwork.visible and hunt.panel_mode.is_empty(),
+		"G closes the artwork before raising the Black Mirror")
+	hunt._unhandled_input(escape_key)
+	var pause_gate := get_node_or_null("/root/PauseGate")
+	if pause_gate != null:
+		pause_gate.close()
+		hunt._toggle_handheld_surface()
+		Input.parse_input_event(escape_key)
+		await get_tree().process_frame
+		check(not hunt.handheld.is_open and not pause_gate.open,
+			"a dispatched Escape lowers the phone without also opening PauseGate")
+		Input.parse_input_event(escape_key)
+		await get_tree().process_frame
+		check(pause_gate.open, "a bare dispatched Escape still opens PauseGate")
+		pause_gate.close()
 	var rows: Array = []
 	for group: Dictionary in hunt.keys_card.groups:
 		rows.append_array(group.get("rows", []))
