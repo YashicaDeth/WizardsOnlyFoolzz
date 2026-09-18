@@ -30,7 +30,8 @@ const VAULT_FAR_SIDE := 0.55
 const VAULT_HEAD_CLEARANCE := 1.55
 const VAULT_DURATION := 0.34
 ## AD1.3. "Earned the way third person is earned rather than given" —
-## `third_person_unlocked()` gates on real boss kills; this gates on real
+## `third_person_unlocked()` gates on the player's first real combat contact;
+## this gates on real
 ## traversal, tied to the mechanic it is a step up from rather than to
 ## combat, since wall-running is a movement skill and vaulting is the
 ## movement skill just before it. Counted straight off `player_vaulted`
@@ -161,7 +162,8 @@ var pitch := -0.12
 ##
 ## So the camera is progression rather than a preference. You begin locked
 ## inside your own head at a field of view wide enough to be uncomfortable, and
-## the game only lets you step outside yourself once you have earned it. That is
+## the game lets you step outside yourself as soon as you have physically
+## entered the first fight. That is
 ## the right way round for this project: third person is the abstract view, the
 ## one where you look at yourself as an object, and it should cost something.
 ##
@@ -169,8 +171,8 @@ var pitch := -0.12
 ## Board runs on, so there is nothing to get out of sync.
 var third_person := false
 ## M1.5. `third_person_unlocked()` is a pure read of history, so it can flip
-## from false to true on any frame — usually the instant a boss-tier kill
-## resolves — with nobody pressing anything. Left alone that is a permission
+## from false to true on any frame — the instant the first body hit lands —
+## with nobody pressing anything. Left alone that is a permission
 ## quietly granted in the background: you would only ever find out by trying
 ## the key. This edge-triggers once, off that same read, so the moment itself
 ## gets a beat instead of waiting to be discovered.
@@ -195,8 +197,6 @@ const THIRD_PERSON_FOV := 63.0
 ## makes, and at a wide FOV it reads as the world being slightly too big.
 const EYE_ABOVE_CENTRE := 0.78
 const STANDING_HEIGHT := 1.8
-## The two things that unlock it.
-const UNLOCK_BOSSES := 1
 var stamina := 100.0
 var health := 100
 var attack_cooldown := 0.0
@@ -621,6 +621,9 @@ var grapple_pressure_clock := 0.0
 ## action and there is no display server to raise a real one against in a
 ## headless run. Leave null for real input to decide it, as normal play does.
 var grapple_pushing_override: Variant = null
+## Same headless seam for WASD. Production always leaves this null; focused
+## tests can drive the physical two-body move without a display server.
+var grapple_drag_override: Variant = null
 ## AN1.9. Mirrors `_update_grapple()`'s own local `pushing` each frame, since
 ## `_carry_current_weapon()` needs to read it from outside that function to
 ## pick "grapple" or the heavier "shove" mass.
@@ -1285,6 +1288,17 @@ func _register_people() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if resolution_ui.visible or kill_cam.active:
 		return
+	# The help card is two readable leaves rather than four crushed columns.
+	# While it is up, page keys belong to it before TAB can open the INDEX.
+	if keys_card != null and keys_card.is_open and event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode in [KEY_RIGHT, KEY_TAB]:
+			keys_card.change_page(1)
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_LEFT:
+			keys_card.change_page(-1)
+			get_viewport().set_input_as_handled()
+			return
 	# Native Black Mirror pages own their controls before the field can read the
 	# same key as a weapon, dodge or standalone panel shortcut. Hosted INDEX/MAP
 	# pages still receive their own unhandled events normally.
@@ -4816,6 +4830,14 @@ func _update_encounter_actors(delta: float) -> void:
 		if anatomy.dead and not bool(actor.get("dead", false)):
 			_kill_encounter_actor(index, "bleed_out")
 			continue
+		# The clinch owns both CharacterBodies at the end of this frame. Letting
+		# the ordinary hunter AI move or wind up the held actor first made the
+		# same body pursue, attack and get dragged in one tick—the visible jitter
+		# and random breakaways reported in playtesting.
+		if str(actor.get("subject_id", "")) == grapple_target:
+			(node as CharacterBody3D).velocity = Vector3.ZERO
+			actor.attack_time = 0.0
+			continue
 		# O5.10 v2. Recovers regardless of state, same as the player's own —
 		# standing in a stagger is still standing, and balance comes back on
 		# its own rather than only when the fight lets up.
@@ -5618,6 +5640,8 @@ const GRAPPLE_DRAIN := 22.0
 
 func _grapple_candidate() -> Dictionary:
 	var forward := Vector3(sin(yaw), 0, cos(yaw)).normalized()
+	var best: Dictionary = {}
+	var best_score := INF
 	for actor in encounter_actors:
 		var node := actor.get("node") as Node3D
 		if node == null or not is_instance_valid(node) or bool(actor.get("dead", false)):
@@ -5626,12 +5650,20 @@ func _grapple_candidate() -> Dictionary:
 			continue
 		var toward := node.global_position - player
 		toward.y = 0.0
-		if toward.length() > GRAPPLE_RANGE:
+		var distance := toward.length()
+		if distance > GRAPPLE_RANGE or distance < 0.01:
 			continue
-		if forward.dot(toward.normalized()) < 0.25:
+		var aim := forward.dot(toward.normalized())
+		if aim < 0.25:
 			continue
-		return actor
-	return {}
+		# Contact range can contain several bodies. Array order is spawn order,
+		# not intent; favour the body nearest the centre of the player's view and
+		# use distance only as the tie-breaker.
+		var score := (1.0 - aim) * GRAPPLE_RANGE * 2.5 + distance
+		if score < best_score:
+			best_score = score
+			best = actor
+	return best
 
 
 func _start_grapple() -> void:
@@ -5769,25 +5801,38 @@ func _update_grapple(delta: float) -> void:
 	# and more slowly the worse you are winning — dragging a person who is still
 	# fighting you is most of the work. This is what turns the clinch from a
 	# conversation into a position you can move.
-	var drag := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	var drag: Vector2 = grapple_drag_override if grapple_drag_override != null else Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var drag_speed := lerpf(0.9, 2.4, clampf(grapple_advantage * 0.5 + 0.5, 0.0, 1.0))
+	var hold_direction := toward.normalized() if toward.length() > 0.01 else Vector3(sin(yaw), 0, cos(yaw))
+	var shove := Vector3.ZERO
 	if drag.length() > 0.05 and stamina > 0.0:
 		var flat_forward := Vector3(sin(yaw), 0, cos(yaw))
 		# Same inversion as `HunterMotor.wish_direction` had, and the same fix:
 		# dragging somebody with A and D went the wrong way for the same reason
 		# walking with them did.
 		var flat_right := Vector3(-flat_forward.z, 0, flat_forward.x)
-		var shove := (flat_right * drag.x + flat_forward * -drag.y).normalized() * drag_speed
+		shove = (flat_right * drag.x + flat_forward * -drag.y).normalized() * drag_speed
 		player_body.velocity = shove
-		# They are dragged in front of you rather than pulled through you: the
-		# hold keeps its own spacing, which is what stops the two bodies from
-		# occupying the same metre.
-		var offset := (node.global_position - player).normalized() * 1.15
-		(node as CharacterBody3D).velocity = shove + (player + offset - node.global_position) * 4.0
 		stamina = maxf(0.0, stamina - GRAPPLE_DRAIN * 0.25 * delta)
 	else:
 		player_body.velocity = Vector3.ZERO
-		(node as CharacterBody3D).velocity = Vector3.ZERO
+	# `_update_player()` deliberately yields ordinary locomotion while a hold is
+	# active. Previously this code only assigned velocities after that return and
+	# never moved either CharacterBody, so WASD in a grapple did literally
+	# nothing and the next frame zeroed the unused velocity. The clinch owns its
+	# two bodies here and advances both in the same frame.
+	var held_body := node as CharacterBody3D
+	# Move the person in front first. Advancing the player into an unmoved
+	# capsule made forward input collide and stop while sideways input happened
+	# to work—the exact kind of arbitrary response that made the clinch feel
+	# broken. Preserve the current spacing until it settles into the hold band.
+	var hold_spacing := clampf(toward.length(), 1.15, 1.65)
+	var predicted_player := player + shove * delta
+	var desired_hold := predicted_player + hold_direction * hold_spacing
+	held_body.velocity = shove + (desired_hold - node.global_position) * 4.0
+	held_body.move_and_slide()
+	player_body.move_and_slide()
+	player = player_body.position + Vector3.UP * 0.6
 	actor.attack_time = 0.0
 
 	# A real Input press cannot be raised headless, and this is the one clinch
@@ -6064,30 +6109,14 @@ func _finish_grapple(actor: Dictionary) -> void:
 	attack_cooldown = 0.5
 
 
-## Whether the player has earned the outside view. Two conditions, both of them
-## things they did rather than flags somebody set: a melee weapon in hand, and a
-## named rival put down. The Hunt System supplies the second — a boss here means
-## somebody the world had already decided was dangerous.
+## Whether the player has earned the outside view. The old condition required a
+## melee hit *and* a rated rival resolution, which meant a player could finish
+## the opening, shoot through several encounters and still reasonably conclude
+## third person did not exist. The first real located body hit is the tutorial:
+## once combat has physically happened, F is available. This remains a read of
+## history rather than a save flag and works for either melee or firearms.
 func third_person_unlocked() -> bool:
-	if WorldHistory.event_count("melee_body_hit") <= 0:
-		return false
-	# A boss is a rival the world already knew by name when you put them down.
-	# Was reading a `"subject"` key. Every `npc_resolution` this file records
-	# (the only two writers, both in `_resolve_downed`) writes `"subject_id"`,
-	# so this loop always found an empty string and never counted a single
-	# kill — third person could not unlock no matter what you did, and M1.2
-	# was checked off on the strength of the refusal message, not the unlock.
-	var bosses := 0
-	for event: Dictionary in WorldHistory.events:
-		if str(event.get("type", "")) not in ["npc_resolution", "execution"]:
-			continue
-		var subject := str((event.get("details", {}) as Dictionary).get("subject_id", ""))
-		if subject == "":
-			continue
-		var record: Dictionary = WorldHistory.subject(subject)
-		if int(record.get("elo", 0)) >= 1100 or int(record.get("grudge", 0)) >= 30 or bool(record.get("rival", false)):
-			bosses += 1
-	return bosses >= UNLOCK_BOSSES
+	return WorldHistory.event_count("melee_body_hit") > 0 or WorldHistory.event_count("firearm_anatomy_hit") > 0
 
 
 ## AD1.3. "Earned the way third person is earned rather than given" — the
@@ -6132,9 +6161,7 @@ func _check_third_person_unlock_feel() -> void:
 ## What the player is told when they press the key too early. Never a silent
 ## refusal: a control that does nothing reads as a bug, and this one is content.
 func third_person_refusal() -> String:
-	if WorldHistory.event_count("melee_body_hit") <= 0:
-		return "YOU HAVE NOT PUT ANYTHING IN REACH YET. SWING AT SOMEBODY FIRST."
-	return "NOTHING HAS LOOKED BACK AT YOU YET. PUT DOWN SOMEONE WHO MATTERS."
+	return "FIRST CONTACT UNLOCKS THE OUTSIDE VIEW // LAND ONE HIT, THEN [F]"
 
 
 ## M1.5. Called the one frame the unlock condition first reads true. The prompt
@@ -6166,7 +6193,7 @@ func _build_keys_card() -> void:
 			["SHIFT", "SPRINT"],
 			["CTRL", "CROUCH"],
 			["SPACE", "JUMP / VAULT / DODGE"],
-			["F", "FIRST / THIRD PERSON"],
+			["F", "FIRST / THIRD (AFTER HIT)"],
 		]},
 		{"group": "FIGHTING", "rows": [
 			["LMB", "ATTACK"],
@@ -6185,8 +6212,11 @@ func _build_keys_card() -> void:
 		{"group": "HANDS ON", "rows": [
 			["E", "INTERACT"],
 			["HOLD I", "INSPECT HELD OBJECT"],
-			["C", "GRAPPLE"],
-			["HOLD V", "LUNG RELIQUARY / CLINCH: PERSUADE"],
+			["C", "GRAPPLE AIMED BODY"],
+			["CLINCH LMB", "PRESS THE HOLD"],
+			["CLINCH WASD", "WALK THEM WITH YOU"],
+			["CLINCH SPACE", "LET GO"],
+			["HOLD V", "LUNGS / CLINCH: PERSUADE"],
 			["X", "THREATEN"],
 			["H", "EXTRACTION"],
 			["N", "PHOTOGRAPH"],

@@ -33,6 +33,10 @@ const VOID := Color(0.02, 0.01, 0.012, 0.93)
 ## How fast the card comes up and goes away. Fast enough not to be a wait,
 ## slow enough that it reads as something being held up rather than a popup.
 const FADE_PER_SECOND := 6.5
+## Four dense columns made the help card technically complete and practically
+## unreadable at the playtest window size. Two focused groups per leaf keep the
+## type large enough to scan while the arrows make the second leaf explicit.
+const GROUPS_PER_PAGE := 2
 
 ## Groups of rows: `{"group": "MOVING", "rows": [["WASD", "MOVE"], ...]}`.
 var groups: Array = []
@@ -47,6 +51,7 @@ var shown := 0.0
 ## permanent prompt for a help screen is the tutorial look arriving by the back
 ## door. Counted rather than timed: somebody who never opens it keeps being told.
 var opened_count := 0
+var page := 0
 
 
 func _ready() -> void:
@@ -59,6 +64,7 @@ func _ready() -> void:
 func configure(key_label: String, card_groups: Array) -> void:
 	open_key = key_label
 	groups = card_groups
+	page = 0
 	queue_redraw()
 
 
@@ -66,11 +72,29 @@ func toggle() -> void:
 	is_open = not is_open
 	if is_open:
 		opened_count += 1
+		page = 0
 	queue_redraw()
 
 
 func close() -> void:
 	is_open = false
+
+
+func page_count() -> int:
+	return maxi(1, ceili(float(groups.size()) / float(GROUPS_PER_PAGE)))
+
+
+func change_page(direction: int) -> void:
+	if not is_open or groups.is_empty():
+		return
+	page = posmod(page + direction, page_count())
+	queue_redraw()
+
+
+func page_groups() -> Array:
+	var first := page * GROUPS_PER_PAGE
+	var last := mini(groups.size(), first + GROUPS_PER_PAGE)
+	return groups.slice(first, last)
 
 
 func _process(delta: float) -> void:
@@ -100,19 +124,20 @@ func _draw_hint() -> void:
 
 func _draw_card() -> void:
 	var alpha := shown
+	var visible_groups := page_groups()
 	# Sized from the content rather than fixed, so a scene with fewer bindings
 	# gets a smaller card instead of a mostly empty one.
 	var rows_in_longest := 0
-	for group: Dictionary in groups:
+	for group: Dictionary in visible_groups:
 		rows_in_longest = maxi(rows_in_longest, (group.get("rows", []) as Array).size())
-	var columns := groups.size()
+	var columns := visible_groups.size()
 	if columns <= 0:
 		return
-	var column_width := 232.0
-	var row_height := 21.0
+	var column_width := 330.0
+	var row_height := 23.0
 	var plate := Vector2(
 		column_width * float(columns) + 56.0,
-		rows_in_longest * row_height + 122.0)
+		rows_in_longest * row_height + 165.0)
 	var origin := (size - plate) * 0.5
 
 	# The plate. Dimmed world behind it rather than a hard cut, because the card
@@ -131,13 +156,13 @@ func _draw_card() -> void:
 	CellOutzType.draw_stamped(self, origin + Vector2(28.0, 34.0), "KEYS", 22.0,
 		Color(COPPER, alpha), Color(BLOOD, 0.35 * alpha), 3.2)
 	CellOutzType.draw_condensed(self, origin + Vector2(28.0, 60.0),
-		"CELLOUTZ FIELD ISSUE / WHAT THIS BODY CAN BE MADE TO DO", 9.0,
+		"CELLOUTZ FIELD ISSUE / WHAT THIS BODY CAN BE MADE TO DO / %d OF %d" % [page + 1, page_count()], 9.0,
 		Color(BONE, 0.45 * alpha), 0.9)
 	draw_line(origin + Vector2(28.0, 74.0), origin + Vector2(plate.x - 28.0, 74.0),
 		Color(COPPER, 0.3 * alpha), 1.0)
 
-	for index: int in groups.size():
-		var group: Dictionary = groups[index]
+	for index: int in visible_groups.size():
+		var group: Dictionary = visible_groups[index]
 		var column := origin + Vector2(28.0 + column_width * float(index), 98.0)
 		CellOutzType.draw_condensed(self, column, str(group.get("group", "")), 10.0,
 			Color(BLOOD, 0.95 * alpha), 2.2)
@@ -148,9 +173,9 @@ func _draw_card() -> void:
 			# hierarchy rather than each inventing one.
 			CellOutzType.draw_condensed(self, column + Vector2(0.0, y), str(row[0]), 10.5,
 				Color(COPPER, 0.92 * alpha), 1.8)
-			CellOutzType.draw_condensed(self, column + Vector2(84.0, y), str(row[1]), 9.5,
+			CellOutzType.draw_condensed(self, column + Vector2(104.0, y), str(row[1]), 10.0,
 				Color(BONE, 0.62 * alpha), 1.2)
 			y += row_height
 
 	CellOutzType.draw_condensed(self, origin + Vector2(28.0, plate.y - 22.0),
-		"%s  CLOSE" % open_key, 9.5, Color(BONE, 0.42 * alpha), 1.6)
+		"LEFT / RIGHT  TURN LEAF     %s / ESC  CLOSE" % open_key, 9.5, Color(BONE, 0.42 * alpha), 1.6)
