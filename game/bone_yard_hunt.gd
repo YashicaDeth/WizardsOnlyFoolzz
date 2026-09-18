@@ -1701,7 +1701,7 @@ func _update_player(delta: float) -> void:
 			wall_run_kickoff_queued = false
 			player_body.velocity += wall_run_normal * WALL_RUN_KICKOFF_OUT
 			player_body.velocity.y = WALL_RUN_KICKOFF_UP
-			WorldHistory.record_event("player_wall_run_kickoff", {"location": HUNT_LOCATION})
+			PLAYER_ACTION_LEDGER.record("player_wall_run_kickoff", {"location": HUNT_LOCATION})
 			player_body.move_and_slide()
 			player = player_body.position + Vector3.UP * 0.6
 			return
@@ -1776,9 +1776,9 @@ func _update_player(delta: float) -> void:
 	var leaving_ground := jumping or kicking_off
 	HUNTER_MOTOR.move_body(player_body, direction, speed, delta, dodge_direction if dodge_remaining > 0.0 else Vector3.ZERO, 16.0, JUMP_IMPULSE * _player_speed_scale() if leaving_ground else 0.0)
 	if jumping:
-		WorldHistory.record_event("player_jumped", {"location": HUNT_LOCATION})
+		PLAYER_ACTION_LEDGER.record("player_jumped", {"location": HUNT_LOCATION})
 	if kicking_off:
-		WorldHistory.record_event("player_kicked_off", {"location": HUNT_LOCATION})
+		PLAYER_ACTION_LEDGER.record("player_kicked_off", {"location": HUNT_LOCATION})
 	# AD1.3. Starting a run needs no key at all — the body grabs the wall
 	# the instant it is airborne, fast, and next to one, the same way real
 	# momentum would. Only leaving one on purpose (the kickoff, above) is a
@@ -1875,7 +1875,7 @@ func _cycle_grip() -> void:
 	current_grip = options[(index + 1) % options.size()] if index >= 0 else options[0]
 	var spec: Dictionary = HeldGear.GRIPS.get(current_grip, {})
 	prompt.text = "%s // %s GRIP" % [str(arsenal.current().label), current_grip.to_upper().replace("_", "-")]
-	WorldHistory.record_event("grip_changed", {"weapon": id, "grip": current_grip, "location": HUNT_LOCATION})
+	PLAYER_ACTION_LEDGER.record("grip_changed", {"weapon": id, "grip": current_grip, "location": HUNT_LOCATION})
 	_carry_current_weapon(true)
 
 
@@ -3930,7 +3930,7 @@ func _dodge() -> void:
 	var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	dodge_direction = HUNTER_MOTOR.dodge_direction(move, yaw)
 	dodge_remaining = 0.28
-	WorldHistory.record_event("player_dodged", {"location": HUNT_LOCATION})
+	PLAYER_ACTION_LEDGER.record("player_dodged", {"location": HUNT_LOCATION})
 
 
 ## AD1.1. Free rather than costing stamina like a dodge does — jumping is

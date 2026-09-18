@@ -33,12 +33,14 @@ func _ready() -> void:
 	print("AN2.5 - the sword actually has a real choice to cycle through")
 	hunt._equip_weapon(0) # sword
 	check(hunt.current_grip == "two_hand", "a fresh draw starts at HeldGear's own default (two_hand)")
+	var grip_receipts_before := PlayerActionLedger.count("grip_changed")
 	hunt._cycle_grip()
 	check(hunt.current_grip == "one_hand", "cycling once moves to one_hand")
 	hunt._cycle_grip()
 	check(hunt.current_grip == "half_sword", "cycling again reaches half_sword")
 	hunt._cycle_grip()
 	check(hunt.current_grip == "two_hand", "and wraps back around")
+	check(PlayerActionLedger.count("grip_changed") == grip_receipts_before + 3, "each accepted grip change receives exactly one action receipt")
 
 	print("AN2.5 - the reach and the stiffness actually differ, not just the label")
 	hunt.current_grip = "two_hand"

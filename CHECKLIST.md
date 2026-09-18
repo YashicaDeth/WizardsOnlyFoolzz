@@ -4026,7 +4026,7 @@ M covers which camera you are in and why. AD is what the body can do while you
 are in it.
 
 ### AD1 — The body moves
-- [x] **AD1.1** Jumping worth doing — height, arc and a landing that reads. `HunterMotor.move_body()` already ran real gravity, air acceleration and floor-stick every physics frame and `hunter_body_motion.gd` already had a dormant `landing_time` camera-dip/FOV-kick — nothing had ever given the player an upward velocity to actually reach them with. SPACE now jumps when there is no directional input held (a "dodge in place" makes no sense; `_dodge()` still owns SPACE-with-direction exactly as before), queued through `jump_queued` and consumed in `_update_player()`. Building it surfaced a real one-frame-late bug: the first version applied the impulse *after* `HUNTER_MOTOR.move_body()` returned, which is a whole physics step too late — `move_body()`'s own floor-stick branch reads `is_on_floor()` from the *previous* slide, so next frame it saw the body still (stale-)grounded and stomped the impulse straight back to `-FLOOR_STICK` before `move_and_slide()` ever got to use it. Fixed by giving `move_body()` an optional `jump_impulse` parameter so the impulse rides the same `move_and_slide()` call that has to prove it, not the next one. `game/tests/jump_test.gd` (13 checks) covers: queued-not-immediate, consumed-and-applied-in-the-same-slide, refused while airborne, refused while paneled/grappling, the arc actually leaving and returning to the floor on its own, `landing_time` firing for real, and SPACE-with-direction still dodging without also queuing a jump. `opening_test` and `combat_integration_test` re-verified clean against the `HunterMotor.move_body()` signature change (the one call site).
+- [x] **AD1.1** Jumping worth doing — height, arc and a landing that reads. `HunterMotor.move_body()` already ran real gravity, air acceleration and floor-stick every physics frame and `hunter_body_motion.gd` already had a dormant `landing_time` camera-dip/FOV-kick — nothing had ever given the player an upward velocity to actually reach them with. SPACE now jumps when there is no directional input held (a "dodge in place" makes no sense; `_dodge()` still owns SPACE-with-direction exactly as before), queued through `jump_queued` and consumed in `_update_player()`. Building it surfaced a real one-frame-late bug: the first version applied the impulse *after* `HUNTER_MOTOR.move_body()` returned, which is a whole physics step too late — `move_body()`'s own floor-stick branch reads `is_on_floor()` from the *previous* slide, so next frame it saw the body still (stale-)grounded and stomped the impulse straight back to `-FLOOR_STICK` before `move_and_slide()` ever got to use it. Fixed by giving `move_body()` an optional `jump_impulse` parameter so the impulse rides the same `move_and_slide()` call that has to prove it, not the next one. `game/tests/jump_test.gd` covers: queued-not-immediate, consumed-and-applied-in-the-same-slide, refused while airborne, refused while paneled/grappling, the arc actually leaving and returning to the floor on its own, `landing_time` firing for real, and SPACE-with-direction still dodging without also queuing a jump. A jump is receipted only once it genuinely leaves the floor; an accepted directional dodge gets its own stable receipt, while refused inputs write nothing. `opening_test` and `combat_integration_test` re-verified clean against the `HunterMotor.move_body()` signature change (the one call site).
 - [x] ~~**AD1.2** Vaulting and mantling: waist-high things stop being
       walls~~ Three real raycasts against actual collision geometry decide
       it (`_vault_target()` in `bone_yard_hunt.gd`), not a fixed "step
@@ -4077,7 +4077,9 @@ are in it.
       person's is (`_announce_wall_run_unlock()`, checked in `_update_hud()`
       the frame the count first crosses, an `impact_feel` kick, a
       `wall_run_unlocked` WorldHistory event, a prompt line), not a silent
-      permission flip.
+      permission flip. The automatically detected start remains a derived
+      movement fact; the player's deliberate kickoff now receives exactly one
+      action receipt when its physical impulse is actually consumed.
       \
       The run itself needs no key to start: `_wall_run_surface()` looks to
       both sides of the player whenever they are airborne and moving fast
@@ -4360,7 +4362,9 @@ able to answer a rocket with a blade, and the game should let it.
       `_jump()` refuses an airborne press exactly as it always has. A leg
       with drive hardware gets one kick off nothing, spent on use and reset
       by touching down, so the hardware grants an extra departure rather than
-      flight.
+      flight. That successful airborne press is recorded once as
+      `player_kicked_off`; merely requesting an impossible second departure is
+      not an action receipt.
       `heel anchors` is the catalogue's own right-leg entry and reads exactly
       like the thing that drives a body off the ground, so nothing new had to
       be authored in `implant_catalog.gd` (Lane 5's file) to make this real.
@@ -5196,7 +5200,9 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
       (78.30 vs 66.70) against two-handed, itself steadier than one-handed
       (47.56); a weapon with no `GRIP_CYCLE` entry ignores the key outright;
       and a live `_attack()` reports `cut` two-handed and `puncture`
-      half-sworded from the identical weapon. Full regression suite
+      half-sworded from the identical weapon. Each accepted grip cycle now
+      uses the compact player-action route as well; unsupported weapons still
+      do nothing and therefore record nothing. Full regression suite
       (vault, wall_run, jump, climb, momentum_carry, anatomy_traversal,
       opening, combat_integration, zone_precision, ballistics,
       firearm_momentum, deferred_damage) re-verified clean

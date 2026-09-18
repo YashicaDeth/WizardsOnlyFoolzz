@@ -36,12 +36,14 @@ func _ready() -> void:
 
 	print("AD1.1 - a jump is a real upward impulse, not a flag")
 	check(hunt.player_body.is_on_floor(), "the player starts grounded")
+	var jumps_before := PlayerActionLedger.count("player_jumped")
 	hunt._jump()
 	check(hunt.jump_queued, "the request is queued rather than applied immediately")
 	hunt._update_player(1.0 / 60.0)
 	check(not hunt.jump_queued, "and consumed on the very next physics step")
 	check(hunt.player_body.velocity.y > 0.0, "leaving the player with real upward velocity (%.2f)" % hunt.player_body.velocity.y)
 	check(not hunt.player_body.is_on_floor(), "and the same move_and_slide() that carried the impulse already left the ground - no one-frame lag")
+	check(PlayerActionLedger.count("player_jumped") == jumps_before + 1, "the completed jump receives one action receipt only after leaving the floor")
 
 	print("AD1.1 - you cannot jump again mid-air")
 	hunt._jump()
@@ -73,10 +75,12 @@ func _ready() -> void:
 	var event := InputEventKey.new()
 	event.keycode = KEY_SPACE
 	event.pressed = true
+	var dodges_before := PlayerActionLedger.count("player_dodged")
 	Input.action_press("move_forward")
 	hunt._unhandled_input(event)
 	check(hunt.dodge_remaining > 0.0, "held direction + space dodges, not jumps")
 	check(not hunt.jump_queued, "and does not also queue a jump")
+	check(PlayerActionLedger.count("player_dodged") == dodges_before + 1, "the accepted dodge receives one action receipt")
 	Input.action_release("move_forward")
 
 	print("JUMP_RESULT failures=", failures.size())
