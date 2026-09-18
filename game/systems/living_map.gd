@@ -504,7 +504,11 @@ func _draw() -> void:
 	_draw_lots()
 	# Over the plan, not under it: unwalked ground is supposed to withhold what
 	# is standing on it, which it cannot do from underneath.
-	_draw_unsurveyed()
+	# The live satellite already received `_draw_unwalked_veil`; adding the
+	# printed-sheet hatch as circles per cell turned it into a giant polka-dot
+	# grid and hid the terrain the layer exists to show.
+	if not _satellite_live():
+		_draw_unsurveyed()
 	_draw_holdings()
 	_map_label_rects.clear()
 	_draw_districts()
@@ -652,14 +656,11 @@ func _draw_unwalked_veil() -> void:
 			# have properly walked clears fast — the satisfying part is the last bit
 			# coming off, the way wiping a window is.
 			var veil := pow(1.0 - clearness, 1.45)
-			# On the satellite view this used to redraw each unseen cell as a
-			# fully square grey slab.  The world was correct underneath, but the
-			# exploration boundary read as a grid of apartment blocks.  A soft,
-			# overlapping survey bloom keeps the information while letting the
-			# actual terrain remain the dominant shape.
+			# Adjacent cells share exactly the same edge, producing one continuous
+			# grey survey veil. The former circle per cell made the satellite a
+			# polka-dot pattern and obscured the geography it was meant to reveal.
 			if _satellite_live():
-				var bloom_radius := minf(step * 0.73, minf(patch.size.x, patch.size.y) * 0.73)
-				draw_circle(patch.get_center(), bloom_radius, Color(0.46, 0.47, 0.44, veil * 0.48), true, -1.0, true)
+				draw_rect(patch, Color(0.46, 0.47, 0.44, veil * 0.36))
 			else:
 				draw_rect(patch, Color(0.46, 0.47, 0.44, veil * 0.88))
 			# A breath of haze that lingers even on cleared ground, so the map never
@@ -765,7 +766,7 @@ func _draw_districts() -> void:
 		CellOutzType.draw_condensed(self, name_at, label.to_upper(), 11.0, tint * Color(1, 1, 1, 0.9 if charted else 0.3), 1.0)
 		if charted:
 			var holder := str(state.get("held_by", district.held_by)).replace("_", " ").to_upper()
-			CellOutzType.draw_condensed(self, name_at + Vector2(0, 14.0), "HELD / %s" % holder, 7.0, tint * Color(1, 1, 1, 0.55), 0.7)
+			CellOutzType.draw_condensed(self, name_at + Vector2(0, 14.0), "CONTROL / %s" % holder, 7.0, tint * Color(1, 1, 1, 0.55), 0.7)
 			var required := int(state.get("local_work_required", 0))
 			if required > 0:
 				var work_state := str(state.get("local_work_state", "held"))
@@ -1036,7 +1037,8 @@ func _draw_frame() -> void:
 		var dy := -14.0 if corner.y > 0.5 else 14.0
 		draw_line(at, at + Vector2(dx, 0), ACID, 2.0)
 		draw_line(at, at + Vector2(0, dy), ACID, 2.0)
-	CellOutzType.draw_stamped(self, Vector2(26, 10), "LIVING MAP", 20.0, ACID, ARTERIAL * Color(1, 1, 1, 0.25), 3.4)
+	var layer_title := "LIVING MAP / UNDERGROUND FACILITY" if facility_sheet else "LIVING MAP / SURFACE SATELLITE"
+	CellOutzType.draw_stamped(self, Vector2(26, 10), layer_title, 20.0, ACID, ARTERIAL * Color(1, 1, 1, 0.25), 3.4)
 	_draw_title_block()
 
 
@@ -1162,7 +1164,7 @@ func _draw_place_panel() -> void:
 	var holding_state := HOLDINGS.holding(str(district.id))
 	var charted := bool(holding_state.get("revealed", false))
 	var route_ready := is_surveyed(district.get("at", Vector2.ZERO))
-	var status := ("HELD / %s" % str(holding_state.get("held_by", district.held_by)).replace("_", " ").to_upper()) if charted else "UNWALKED // NO ROUTE"
+	var status := ("CONTROL / %s" % str(holding_state.get("held_by", district.held_by)).replace("_", " ").to_upper()) if charted else "UNWALKED // NO ROUTE"
 	CellOutzType.draw_text(self, panel.position + Vector2(14, 82), status, 10.0, _holding_tone(str(holding_state.get("held_by", ""))) if charted else ARTERIAL, 1.0)
 	if route_ready:
 		var bar := Rect2(panel.position + Vector2(14, 106), Vector2(panel.size.x - 28, 14))
@@ -1191,7 +1193,7 @@ func _draw_legend() -> void:
 	# Marginalia. Scrawled along the bottom edge at a slight angle, low enough
 	# in contrast to ignore once it is known, which is what a control hint is
 	# for. It is no longer a row of labels in a strip.
-	var scrawl := "DRAG TO PAN / WHEEL ZOOMS / F RECENTRES / M PUTS IT AWAY"
+	var scrawl := "DRAG TO PAN / WHEEL ZOOMS / F RECENTRES / L CHANGES LAYER / M PUTS IT AWAY"
 	# Ends clear of the keys card, which draws its own closed-state hint at
 	# `size.x - 128` on this exact same baseline (`keys_card.gd:96`). Ending at
 	# `size.x - 40` put this straight through it, so the one corner of the screen
@@ -1242,7 +1244,7 @@ func _draw_facility_sheet() -> void:
 		if revealed and state != FACILITY.LIBERATED:
 			var sweep := 0.22 + 0.06 * sin(clock * 1.7 + float(index))
 			draw_arc(at, 51.0, -PI * sweep, PI * sweep, 18, ARTERIAL * Color(1, 1, 1, 0.34), 1.2)
-		var name := str(row.name).to_upper() if revealed else "REDACTED HOLDING"
+		var name := str(row.name).to_upper() if revealed else "REDACTED SECTOR"
 		var lines := CellOutzType.wrap_condensed(name, room.size.x - 12.0, 7.5, 0.66)
 		var name_y := -12.0 if lines.size() > 1 else -5.0
 		for line: String in lines:
@@ -1260,7 +1262,7 @@ func _draw_facility_sheet() -> void:
 	_draw_frame()
 	_draw_bezel()
 	_draw_cracks()
-	var hint := "POINTER / ARROWS SELECT HOLDING   L ASHBLOOM SATELLITE"
+	var hint := "POINTER / ARROWS SELECT SECTOR   L SURFACE SATELLITE"
 	CellOutzType.draw_condensed(self, Vector2(28, size.y - 27), hint, 8.0, INK * Color(1, 1, 1, 0.5), 0.7)
 
 
@@ -1277,7 +1279,6 @@ func _facility_at(row: Dictionary) -> Vector2:
 
 
 func _draw_facility_header(overview: Dictionary) -> void:
-	CellOutzType.draw_stamped(self, Vector2(26, 10), "LIVING MAP / HOLDINGS", 20.0, ACID, ARTERIAL * Color(1, 1, 1, 0.25), 3.4)
 	var box := Rect2(_chart.position + Vector2(16, 16), Vector2(258, 79))
 	draw_rect(box, VOID * Color(1, 1, 1, 0.9))
 	draw_rect(box, ACID * Color(1, 1, 1, 0.38), false, 1.0)

@@ -1293,6 +1293,14 @@ func _register_people() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if resolution_ui.visible or kill_cam.active:
 		return
+	# Full-size readers own their navigation keys. LivingMap is a Control, but it
+	# does not take keyboard focus merely by becoming visible; without this route
+	# L fell through to the field's Black Mirror lens and appeared to turn the
+	# map randomly black-and-white instead of changing map layers.
+	if panel_mode == "map" and event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_L, KEY_F, KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN]:
+		living_map._gui_input(event)
+		get_viewport().set_input_as_handled()
+		return
 	# The help card is two readable leaves rather than four crushed columns.
 	# While it is up, page keys belong to it before TAB can open the INDEX.
 	if keys_card != null and keys_card.is_open and event is InputEventKey and event.pressed and not event.echo:
@@ -1326,12 +1334,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
 			return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-		if event.pressed:
-			if smoke_trick_window > 0.0:
-				_shape_smoke_trick()
-			else:
-				_attack()
+		if panel_mode.is_empty():
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+			if event.pressed:
+				if smoke_trick_window > 0.0:
+					_shape_smoke_trick()
+				else:
+					_attack()
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_MIDDLE:
 		_toggle_lock()
 	if event is InputEventMouseButton and event.pressed and not lock_target.is_empty():
