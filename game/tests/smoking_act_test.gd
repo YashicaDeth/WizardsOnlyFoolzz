@@ -96,6 +96,40 @@ func _ready() -> void:
 	check(not smoking_hand.visible and absf(lip_position.x) < 0.08 and lip_position.y < 0.0,
 		"the cigarette stays beneath the reticle while the released hand leaves the frame")
 
+	# Drawing a weapon must not delete or replace the live object at the lips.
+	# While armed, the mouse remains the weapon and Alt becomes the breath bind.
+	var cigarette_instance := held.get_instance_id()
+	hunt.call("_equip_weapon", 2)
+	for _armed_settle in 4:
+		hunt.call("_update_smoking", 1.0 / 60.0)
+	var sidearm_with_smoke := arsenal.models.get("sidearm") as Node3D
+	check(bool(hunt.get("smoke_weapon_drawn")) and bool(hunt.get("smoke_mouth_held")),
+		"drawing a weapon preserves the mouth-held smoking state")
+	check(is_instance_valid(held) and held.get_instance_id() == cigarette_instance and held.visible,
+		"the weapon draw preserves the same burning cigarette object at the lips")
+	check(sidearm_with_smoke.visible and not smoking_hand.visible,
+		"the armed posture restores the weapon and its hands without duplicating the smoking hand")
+	var alt_draw := InputEventKey.new()
+	alt_draw.keycode = KEY_ALT
+	alt_draw.pressed = true
+	hunt.call("_unhandled_input", alt_draw)
+	check(bool(hunt.get("smoke_drawing")), "holding Alt inhales from a lip-held cigarette while armed")
+	alt_draw.pressed = false
+	hunt.call("_unhandled_input", alt_draw)
+	check(not bool(hunt.get("smoke_drawing")), "releasing Alt resolves the armed inhale without stealing RMB")
+	var left_attack := InputEventMouseButton.new()
+	left_attack.button_index = MOUSE_BUTTON_LEFT
+	left_attack.pressed = true
+	var rounds_before_armed_shot := int((arsenal.state() as Dictionary).get("loaded", -1))
+	hunt.call("_unhandled_input", left_attack)
+	check(int((arsenal.state() as Dictionary).get("loaded", -1)) == rounds_before_armed_shot - 1,
+		"the firearm trigger remains usable with the cigarette at the lips")
+	hunt.set("pending_attack", {})
+	hunt.set("strike_windup", -1.0)
+	hunt.call("_put_the_weapons_down")
+	check(is_instance_valid(held) and bool(hunt.get("smoke_mouth_held")) and not bool(hunt.get("smoke_weapon_drawn")),
+		"holstering the weapon leaves the same cigarette parked at the lips")
+
 	# Close prop lights follow the world's exposure rather than throwing the same
 	# hard pool and shadows at noon that they do in darkness.
 	var saved_minute := WorldHistory.world_minute
@@ -304,6 +338,7 @@ func _ready() -> void:
 	check(rows.any(func(row): return row[0] == "6"), "the keys card teaches the smokeable slot")
 	check(rows.any(func(row): return row[0] == "Y"), "and teaches the reversible hand-to-mouth transfer")
 	check(rows.any(func(row): return row[0] == "HOLD RMB"), "and teaches that drawing is a hold")
+	check(rows.any(func(row): return row[0] == "HOLD ALT"), "and teaches the armed mouth-puff control")
 	check(rows.any(func(row): return row[0] == "LMB EXHALE"), "and teaches the optional smoke control")
 	check(rows.any(func(row): return row[0] == "HOLD I"), "and teaches the universal held-object inspection")
 	check(rows.any(func(row): return row[0] == "HOLD V"), "and teaches the held 3D lung diagnostic")

@@ -676,6 +676,11 @@ var smoke_spent: Dictionary = {}
 var smoke_draw_start_spent := 0.0
 var smoke_pose := 0.0
 var smoke_mouth_held := false
+## A rolled smokeable can remain in the mouth while the arsenal owns both
+## hands. This is deliberately separate from `bare_handed`: selecting the
+## smokeable slot already clears that flag, so it cannot tell us whether a
+## weapon was subsequently drawn without destroying the live cigarette.
+var smoke_weapon_drawn := false
 var smoke_mouth_blend := 0.0
 var smoke_breath_phase := 0.0
 var smoke_ash_flick := 0.0
@@ -1335,13 +1340,23 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			_cycle_lock(-1)
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
-		if smoke_model != null and is_instance_valid(smoke_model):
+		if smoke_model != null and is_instance_valid(smoke_model) and not smoke_weapon_drawn:
 			if event.pressed:
 				_begin_smoking_draw()
 			else:
 				_finish_smoking_draw()
 		elif event.pressed:
 			_attack(true)
+	# Once a cigarette or hand-roll is parked at the lips, the mouse belongs to
+	# the weapon again. Holding Alt is the small, deliberate breathing control:
+	# it draws on the same live object, then release resolves the same exhale.
+	if event is InputEventKey and event.keycode == KEY_ALT and not event.echo and smoke_weapon_drawn:
+		if event.pressed:
+			_begin_smoking_draw()
+		else:
+			_finish_smoking_draw()
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.keycode == KEY_I and not event.echo:
 		inspect_held = event.pressed
 		if inspect_held and panel_mode.is_empty():
@@ -2017,7 +2032,7 @@ func _pose_weapon() -> void:
 func _attack(heavy := false) -> void:
 	if resolution_ui.visible or kill_cam.active or player_rig.is_downed() or player_rig.anatomy.dead:
 		return
-	if smoke_model != null and is_instance_valid(smoke_model):
+	if smoke_model != null and is_instance_valid(smoke_model) and not smoke_weapon_drawn:
 		return
 	# In a clinch the strike button is the press, not a swing.
 	if not grapple_target.is_empty():
@@ -2614,6 +2629,12 @@ func _player_collision_exclusions() -> Array[RID]:
 
 ## O5.8. Put everything down. Not a weapon slot — the absence of one.
 func _put_the_weapons_down() -> void:
+	if smoke_weapon_drawn and smoke_model != null and is_instance_valid(smoke_model):
+		smoke_weapon_drawn = false
+		for model in arsenal.models.values():
+			(model as Node3D).visible = false
+		prompt.text = "WEAPON HOLSTERED // SMOKEABLE REMAINS AT THE LIPS"
+		return
 	_put_smokeable_away(false)
 	_clear_carried_limb_model()
 	bare_handed = true
@@ -2639,6 +2660,13 @@ func _toggle_mouth_hold() -> void:
 	if device_id == "bong":
 		prompt.text = "THE BONG NEEDS BOTH HANDS"
 		return
+	# Taking it back requires the hand that currently owns the weapon. Holster
+	# first, then let the existing transfer animation bring the same object back
+	# to its articulated smoking grip.
+	if smoke_mouth_held and smoke_weapon_drawn:
+		smoke_weapon_drawn = false
+		for model in arsenal.models.values():
+			(model as Node3D).visible = false
 	smoke_mouth_held = not smoke_mouth_held
 	inspect_held = false
 	var label := str((SMOKEABLES.CATALOG.get(device_id, {}) as Dictionary).get("label", device_id)).to_upper()
@@ -2655,6 +2683,7 @@ func _equip_smokeable(device_id: String) -> void:
 	_put_smokeable_away(false)
 	_clear_carried_limb_model(false)
 	bare_handed = false
+	smoke_weapon_drawn = false
 	for model in arsenal.models.values():
 		(model as Node3D).visible = false
 	smoke_model = SMOKEABLES.build(device_id, float(smoke_spent.get(device_id, 0.0)))
@@ -2736,6 +2765,7 @@ func _put_smokeable_away(show_arsenal := true) -> void:
 	smoke_draw_start_spent = 0.0
 	smoke_pose = 0.0
 	smoke_mouth_held = false
+	smoke_weapon_drawn = false
 	smoke_mouth_blend = 0.0
 	smoke_breath_phase = 0.0
 	smoke_ash_flick = 0.0
@@ -2899,7 +2929,11 @@ func _update_smoking(delta: float) -> void:
 		else:
 			smoke_model.rotation.z = -0.42 + lift * 0.18 + sin(smoke_held * 6.0) * 0.008 + ash_flick_roll
 	if body_motion != null:
-		body_motion.set_smoking_pose(lift, bool(smoke_model.get_meta("two_handed", false)), device_id)
+		# At the lips the prop is independent of the arms. Once a weapon has been
+		# drawn, do not layer the old smoking-hand shoulder pose over its authored
+		# two-hand grip.
+		var hand_pose := lift * (1.0 - smoke_mouth_blend) if smoke_weapon_drawn else lift
+		body_motion.set_smoking_pose(hand_pose, bool(smoke_model.get_meta("two_handed", false)), device_id)
 
 
 func _finish_smoking_draw() -> Dictionary:
@@ -3515,10 +3549,16 @@ func bare_hand_attack(heavy := false) -> Dictionary:
 
 
 func _equip_weapon(slot: int) -> void:
-	_put_smokeable_away(false)
+	var preserve_mouth_smoke := false
+	if smoke_model != null and is_instance_valid(smoke_model) and smoke_mouth_held:
+		var smoke_id := str(smoke_model.get_meta("device_id", ""))
+		preserve_mouth_smoke = smoke_id in ["cigarette", "joint", "spliff"]
+	if not preserve_mouth_smoke:
+		_put_smokeable_away(false)
 	bare_handed = false
 	_clear_carried_limb_model()
 	if arsenal.select_slot(slot):
+		smoke_weapon_drawn = preserve_mouth_smoke
 		pending_attack = {}
 		strike_windup = -1.0
 		# The ammo well and the model in the player's hand already show the new
@@ -6223,6 +6263,7 @@ func _build_keys_card() -> void:
 			["6", "CYCLE SMOKEABLE"],
 			["Y", "HAND / LIP-HOLD SMOKEABLE"],
 			["HOLD RMB", "DRAW / RELEASE TO EXHALE"],
+			["HOLD ALT", "PUFF LIP-HELD SMOKE WHILE ARMED"],
 			["LMB EXHALE", "O / DOUBLE O / GHOST"],
 		]},
 		{"group": "WHAT YOU CARRY", "rows": [

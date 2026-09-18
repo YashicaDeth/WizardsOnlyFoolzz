@@ -48,6 +48,11 @@ func _ready() -> void:
 	hunt._toggle_mouth_hold()
 	await _wait_frames(32)
 	await _shot("smoking_feel_cigarette_lip_hold")
+	hunt._equip_weapon(2)
+	await _wait_frames(18)
+	await _shot("smoking_feel_cigarette_armed")
+	hunt._put_the_weapons_down()
+	await _wait_frames(8)
 	hunt._toggle_mouth_hold()
 	await _wait_frames(28)
 	hunt.inspect_held = true
