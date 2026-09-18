@@ -25,7 +25,12 @@ const WEAPONS := {
 		"reload": 2.15, "damage_type": "ballistic",
 	},
 	"sidearm": {
-		"label": "MERCY NINE", "kind": "firearm", "damage": 38.0,
+		# A first accurate hit should open a fight, not silently finish it. At
+		# 38 damage this round also delivered 26.6 damage to the nearest organ:
+		# enough to rupture the 18-point brain on contact. Twenty-four leaves it
+		# barely intact, so the first shot makes a severe, readable wound and a
+		# deliberate follow-up finishes the same target through the same anatomy.
+		"label": "MERCY NINE", "kind": "firearm", "damage": 24.0,
 		"impulse": 18.0, "range": 76.0, "cooldown": 0.28,
 		"pellets": 1, "spread": 0.008, "magazine": 10, "reserve": 50,
 		"reload": 1.3, "damage_type": "ballistic",

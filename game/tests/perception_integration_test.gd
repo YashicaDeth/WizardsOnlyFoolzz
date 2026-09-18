@@ -53,7 +53,9 @@ func _ready() -> void:
 	# C7.1. At night and twenty metres out the holder is still unresolved, but
 	# the charged raised screen is a distinct source the hostile can follow.
 	WorldClock.set_hour(1.0)
-	actor.node.global_position = Vector3(20, 0.9, 0)
+	hunt.set("player", Vector3(150, 1.5, 150))
+	hunt.player_body.position = Vector3(150, 0.9, 150)
+	actor.node.global_position = Vector3(150, 0.9, 170)
 	hunt.handheld.battery = 1.0
 	hunt.handheld.raised = 1.0
 	hunt.handheld.is_open = true
@@ -62,7 +64,11 @@ func _ready() -> void:
 	check(not bool(actor.get("tracking_player", true)), "the same hunter has not yet resolved the person behind the light")
 	check(bool(hunt.get("player_unseen")), "the player remains unseen during the emitted-light warning interval")
 	hunt.call("_update_encounter_actors", 0.1)
-	check((actor.node as CharacterBody3D).velocity.length() > 0.0, "the emitted-light verdict enters the real pursuit state machine")
+	check((actor.node as CharacterBody3D).velocity.length() == 0.0 and float(actor.get("notice_remaining", 0.0)) > 0.0,
+		"the emitted-light verdict gives a readable reaction before pursuit")
+	hunt.call("_update_encounter_actors", hunt.ENCOUNTER_NOTICE_SECONDS)
+	hunt.call("_update_encounter_actors", 0.1)
+	check((actor.node as CharacterBody3D).velocity.length() > 0.0, "the same verdict enters the real pursuit state machine after the tell")
 
 	hunt.handheld.raised = 0.0
 	hunt.call("_update_perception", 0.1)
@@ -70,7 +76,7 @@ func _ready() -> void:
 
 	# C7.2. At the edge of the warning interval the quiet Index is safe while
 	# the satellite page's harder-driven panel crosses the same sight threshold.
-	actor.node.global_position = Vector3(24, 0.9, 0)
+	actor.node.global_position = Vector3(150, 0.9, 174)
 	hunt.handheld.raised = 1.0
 	hunt.handheld.set_mode("INDEX")
 	hunt.call("_update_perception", 0.1)
@@ -84,6 +90,8 @@ func _ready() -> void:
 	check(bool(actor.get("tracking_light", false)), "opening the satellite map at the same place gives the hunter a trail")
 
 	# A real wall between a close hostile and the player: real cover.
+	hunt.set("player", Vector3(0, 1.5, 0))
+	hunt.player_body.position = Vector3(0, 0.9, 0)
 	actor.node.global_position = Vector3(3, 0.9, 0)
 	var wall := StaticBody3D.new()
 	var shape := CollisionShape3D.new()

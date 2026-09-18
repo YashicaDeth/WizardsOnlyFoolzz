@@ -576,6 +576,11 @@ var player_noise := 0.0
 ## this frame, and the boolean AS1.5/AU1.10's AE1.4 were both waiting on.
 var player_visibility := 0.0
 var player_unseen := true
+## AG5.15. Detection is not the same instant as a committed attack. This is
+## long enough to see who noticed you, orient, draw or leave, but short enough
+## that stepping into a lit hostile post still becomes a fight. A player who
+## attacks first clears the hesitation immediately in `_provoke_actor()`.
+const ENCOUNTER_NOTICE_SECONDS := 2.4
 var pathfinder = preload("res://systems/ashbloom_pathfinder.gd").new()
 var social_markers: Array[Node3D] = []
 var resolution_ui: Control
@@ -2250,6 +2255,7 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	if nearest_index < 0 or nearest_distance > reach:
 		return false
 	var actor: Dictionary = encounter_actors[nearest_index]
+	_provoke_actor(actor)
 	var target: Node3D = actor.node as Node3D
 	var facing := Vector3(sin(yaw), 0, cos(yaw)).normalized().dot((target.global_position - player).normalized())
 	if facing < 0.12:
@@ -2402,6 +2408,7 @@ func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bo
 		# Not an actor at all — the caller's own world-hit branch settles
 		# this pellet as a miss; settling it here too would count it twice.
 		return false
+	_provoke_actor(actor)
 	var direction: Vector3 = hit.get("direction", Vector3.FORWARD)
 	var rig := actor.rig as BaselineHuman
 	var damage := float(payload.get("damage", 0.0))
@@ -4840,6 +4847,20 @@ func _update_encounter_actors(delta: float) -> void:
 		var offset := player - node.global_position
 		offset.y = 0
 		var distance := offset.length()
+		var tracking := bool(actor.get("tracking_player", false)) or bool(actor.get("tracking_light", false))
+		# AG5.15. Seeing somebody starts a readable reaction, not a teleport into
+		# their attack cycle. The body stays in the world and keeps bleeding, but
+		# it cannot pursue or wind up until this one brief tell has completed.
+		var notice_remaining := float(actor.get("notice_remaining", 0.0))
+		if tracking and notice_remaining > 0.0:
+			actor["notice_remaining"] = maxf(0.0, notice_remaining - actor_delta)
+			(node as CharacterBody3D).velocity = Vector3.ZERO
+			actor.attack_time = 0.0
+			actor.state = "noticing"
+			prompt.text = "%s SPOTS YOU // MOVE, DRAW, OR BREAK SIGHT" % str(actor.display_name).to_upper()
+			if float(actor.notice_remaining) <= 0.0:
+				actor.state = "hunting"
+			continue
 		var rival_tactic := _fresh_rival_tactic(str(actor.get("subject_id", "")))
 		var rival_approach := RIVAL_TACTICS.approach(rival_tactic, distance) if not rival_tactic.is_empty() else ""
 		if str(actor.get("state", "idle")) == "maimed":
@@ -4925,7 +4946,7 @@ func _update_encounter_actors(delta: float) -> void:
 				_move_actor_on_route(actor, orbit_point, actor_delta)
 			else:
 				_move_actor_on_route(actor, player, actor_delta)
-		elif distance <= 3.0 and not _actor_stumbling(actor):
+		elif tracking and distance <= 3.0 and not _actor_stumbling(actor):
 			# O4.1. A player mid-swing cannot cancel or guard, so an enemy who
 			# is actually watching presses that opening instead of ticking down
 			# on its own clock regardless of what you just committed to.
@@ -7096,17 +7117,31 @@ func _update_perception(delta: float) -> void:
 		var eye := hostile.global_position + Vector3.UP * 1.5
 		var distance := eye.distance_to(target)
 		var excluded: Array[RID] = [player_body.get_rid()]
+		# The ray starts at one anatomical rig and ends inside another. Excluding
+		# only the two CharacterBody roots left every Area3D zone in both rigs as
+		# fake "cover", so a hunter looking straight at a raised screen read their
+		# own chest hitbox as a wall. Real walls remain in the query; body zones at
+		# either endpoint do not.
+		for player_collider_node in player_body.find_children("*", "CollisionObject3D", true, false):
+			excluded.append((player_collider_node as CollisionObject3D).get_rid())
 		if hostile is CollisionObject3D:
 			excluded.append((hostile as CollisionObject3D).get_rid())
+		for hostile_collider_node in hostile.find_children("*", "CollisionObject3D", true, false):
+			excluded.append((hostile_collider_node as CollisionObject3D).get_rid())
 		var query := PhysicsRayQueryParameters3D.create(eye, target)
 		query.exclude = excluded
-		var cover := 0.0 if get_world_3d().direct_space_state.intersect_ray(query).is_empty() else 1.0
+		var obstruction := get_world_3d().direct_space_state.intersect_ray(query)
+		var cover := 0.0 if obstruction.is_empty() else 1.0
 		var body_visibility := PERCEPTION.visibility(light, player_noise, cover, distance, PERCEPTION_MAX_RANGE)
 		var saw_body: bool = body_visibility >= PERCEPTION.UNSEEN_THRESHOLD
 		var saw_light: bool = handheld.is_lit() and PERCEPTION.sees_emitted_light(distance, handheld.light_radius(), cover) and not saw_body
+		var was_tracking_player := bool(actor.get("tracking_player", false))
 		var was_tracking_light := bool(actor.get("tracking_light", false))
 		actor["tracking_player"] = saw_body
 		actor["tracking_light"] = saw_light
+		if (saw_body and not was_tracking_player) or (saw_light and not was_tracking_light):
+			actor["notice_remaining"] = ENCOUNTER_NOTICE_SECONDS
+			actor["state"] = "noticing"
 		if saw_light and not was_tracking_light:
 			WorldHistory.record_event("hunter_noticed_handheld_light", {
 				"hunter": str(actor.get("subject_id", "unknown")),
@@ -7116,6 +7151,17 @@ func _update_perception(delta: float) -> void:
 		worst = maxf(worst, body_visibility)
 	player_visibility = worst
 	player_unseen = worst < PERCEPTION.UNSEEN_THRESHOLD
+
+
+## A deliberate hit answers the question the notice window was asking. Both
+## melee and delayed ballistic impacts come through here, so neither can leave
+## a target politely waiting after the player has already opened them up.
+func _provoke_actor(actor: Dictionary) -> void:
+	actor["notice_remaining"] = 0.0
+	actor["tracking_player"] = true
+	actor["tracking_light"] = false
+	if str(actor.get("state", "")) == "noticing":
+		actor["state"] = "hunting"
 
 
 ## E6/E8. `substances.gd` and `meditation.gd` have both paid into
