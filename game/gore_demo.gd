@@ -158,6 +158,15 @@ var mode_button: Button
 var jump_queued := false
 var vertical_velocity := 0.0
 var stance_height := 1.68
+## The range shares the Hunt's basic combat footwork instead of teaching a
+## different control language: directional Space evades, still Space jumps,
+## and a shouldered firearm narrows the same real projectile cone.
+var dodge_remaining := 0.0
+var dodge_cooldown := 0.0
+var dodge_direction := Vector3.ZERO
+var stamina := 100.0
+var firearm_aiming := false
+var firearm_aim_blend := 0.0
 
 
 ## AF6. Real weapon state — current weapon, ammo, reload, jam — shared with
@@ -498,7 +507,7 @@ func _fire() -> void:
 	# several for a shotgun — mirrors `bone_yard_hunt.gd`'s own
 	# `_resolve_firearm()` exactly, calibre included, so the range and the Hunt
 	# can never quietly disagree about what "buck" means.
-	var directions: Array[Vector3] = arsenal.shot_directions(along, Vector3.UP)
+	var directions: Array[Vector3] = arsenal.shot_directions(along, Vector3.UP, 0.38 if firearm_aiming else 1.0)
 	var calibre := "buck" if directions.size() > 1 else "pistol"
 	spent += 1
 	for direction in directions:
@@ -755,6 +764,7 @@ func _switch_weapon(slot: int) -> void:
 	if not arsenal.select_slot(slot):
 		_note("CAN'T SWITCH // BUSY")
 		return
+	firearm_aiming = false
 	view_gear.take(arsenal.current_id)
 	_gear_rest = view_gear.position
 	_refresh_muzzle_anchor()
@@ -1016,9 +1026,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		var motion := event as InputEventMouseMotion
 		yaw -= motion.relative.x * 0.0026
 		pitch = clampf(pitch - motion.relative.y * 0.0024, -1.2, 0.9)
-	if event is InputEventMouseButton and event.pressed:
+	if event is InputEventMouseButton:
 		var click := event as InputEventMouseButton
-		if click.button_index == MOUSE_BUTTON_LEFT:
+		if click.button_index == MOUSE_BUTTON_LEFT and click.pressed:
 			# Clicking back into a released mouse should not also fire a round
 			# into whatever happened to be under the cursor.
 			if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
@@ -1026,14 +1036,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 			_fire()
 		elif click.button_index == MOUSE_BUTTON_RIGHT:
-			# A blast where you are looking, not where you are standing — and
-			# put against whatever the crosshair is actually on, so it goes off
-			# at the body rather than in the air somewhere near it.
-			var along := -camera.global_transform.basis.z
-			var found := _trace_body(camera.global_position + along * 0.6, along)
-			var at: Vector3 = found.get("position", camera.global_position + along * 6.0)
-			_explode(at, 58.0)
-		elif click.button_index == MOUSE_BUTTON_WHEEL_UP or click.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			if str(arsenal.current().get("kind", "")) == "firearm":
+				firearm_aiming = click.pressed
+			elif click.pressed:
+				_melee_swing()
+		elif click.pressed and (click.button_index == MOUSE_BUTTON_WHEEL_UP or click.button_index == MOUSE_BUTTON_WHEEL_DOWN):
 			# AF6.1. Cycling rather than reserving three more number keys, since
 			# 1-4 already belong to the carry/substance slots and doubling a key
 			# up between two different systems is exactly the kind of thing that
@@ -1056,7 +1063,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		match key.keycode:
 			KEY_C: _set_enemies_enabled(not enemies_enabled)
-			KEY_SPACE: jump_queued = true
+			KEY_SPACE:
+				var move := _sandbox_move_input()
+				if move.length_squared() > 0.01:
+					_begin_dodge(move)
+				else:
+					jump_queued = true
 			KEY_E: _take_station_item()
 			KEY_G:
 				if handheld != null:
@@ -1072,6 +1084,33 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_T:
 				if not arsenal.reload():
 					_note("CAN'T RELOAD")
+
+
+func _sandbox_move_input() -> Vector3:
+	var forward := Vector3(sin(yaw), 0, cos(yaw))
+	var right := Vector3(forward.z, 0, -forward.x)
+	var move := Vector3.ZERO
+	if Input.is_key_pressed(KEY_W): move -= forward
+	if Input.is_key_pressed(KEY_S): move += forward
+	if Input.is_key_pressed(KEY_A): move -= right
+	if Input.is_key_pressed(KEY_D): move += right
+	return move.normalized()
+
+
+func _begin_dodge(requested_direction := Vector3.ZERO) -> bool:
+	if dodge_remaining > 0.0 or dodge_cooldown > 0.0 or stamina < 25.0 or vertical_velocity != 0.0:
+		return false
+	var requested: Vector3 = requested_direction
+	requested.y = 0.0
+	if requested.length_squared() <= 0.01:
+		return false
+	dodge_direction = requested.normalized()
+	dodge_remaining = 0.28
+	dodge_cooldown = 0.75
+	stamina -= 25.0
+	firearm_aiming = false
+	_note("DODGE // COMMIT, RECOVER, MOVE AGAIN")
+	return true
 
 
 func _carry_slot_for_key(keycode: Key) -> int:
@@ -1174,15 +1213,17 @@ func _physics_process(delta: float) -> void:
 	hitstop = maxf(0.0, hitstop - real_delta)
 	Engine.time_scale = lerpf(1.0, SLOW_SCALE, slowed) * (HITSTOP_SCALE if hitstop > 0.0 else 1.0)
 
-	var forward := Vector3(sin(yaw), 0, cos(yaw))
-	var right := Vector3(forward.z, 0, -forward.x)
-	var move := Vector3.ZERO
-	if Input.is_key_pressed(KEY_W): move -= forward
-	if Input.is_key_pressed(KEY_S): move += forward
-	if Input.is_key_pressed(KEY_A): move -= right
-	if Input.is_key_pressed(KEY_D): move += right
-	walk = walk.lerp(move.normalized() * 7.0, clampf(real_delta * 14.0, 0.0, 1.0))
-	eye += walk * real_delta
+	var move := _sandbox_move_input()
+	var move_speed := 7.0 * (0.68 if firearm_aiming else 1.0)
+	walk = walk.lerp(move * move_speed, clampf(real_delta * 14.0, 0.0, 1.0))
+	if dodge_remaining > 0.0:
+		eye += dodge_direction * 16.0 * real_delta
+	else:
+		eye += walk * real_delta
+	dodge_remaining = maxf(0.0, dodge_remaining - real_delta)
+	dodge_cooldown = maxf(0.0, dodge_cooldown - real_delta)
+	if dodge_remaining <= 0.0:
+		stamina = minf(100.0, stamina + 18.0 * real_delta)
 	eye.x = clampf(eye.x, -ARENA + 2.0, ARENA - 2.0)
 	eye.z = clampf(eye.z, -ARENA + 2.0, ARENA - 2.0)
 	var crouching := Input.is_key_pressed(KEY_CTRL)
@@ -1207,6 +1248,11 @@ func _physics_process(delta: float) -> void:
 	var shove: Vector2 = impact_feel.camera_offset()
 	camera.global_position = eye
 	camera.global_transform.basis = Basis(Vector3.UP, yaw + shove.x) * Basis(Vector3.RIGHT, pitch + shove.y) * Basis(Vector3.FORWARD, impact_feel.roll)
+	var aiming_now := firearm_aiming and str(arsenal.current().get("kind", "")) == "firearm"
+	if not aiming_now:
+		firearm_aiming = false
+	firearm_aim_blend = move_toward(firearm_aim_blend, 1.0 if aiming_now else 0.0, real_delta * 7.0)
+	camera.fov = lerpf(78.0, 56.0, firearm_aim_blend)
 
 	# Everything a shot owes the eye, timed in real seconds like the hitstop is:
 	# a tracer measured on the bent clock would hang in the air for a second and
@@ -1358,9 +1404,9 @@ func _paint_hud() -> void:
 	CellOutzType.draw_condensed(hud, Vector2(26, 62), "WIZARDS ONLY FOOLS  //  NOTHING HERE IS A MOCK-UP", 9.0, bone * Color(1, 1, 1, 0.4), 2.2)
 
 	var keys := [
-		["LMB", "FIRE/SWING"], ["RMB", "BLAST THERE"], ["F", "BLAST HERE"],
+		["LMB", "FIRE/SWING"], ["RMB", "AIM/HEAVY"], ["F", "BLAST HERE"],
 		["6-8", "WEAPON"], ["WHEEL", "CYCLE"], ["T", "RELOAD"],
-		["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"], ["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["C", "DUMMY/ENEMY"], ["SPACE", "JUMP"], ["CTRL", "CROUCH"], ["WASD", "MOVE"],
+		["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"], ["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["C", "DUMMY/ENEMY"], ["SPACE", "JUMP/MOVE+DODGE"], ["CTRL", "CROUCH"], ["WASD", "MOVE"],
 	]
 	var row_size := 6
 	for index in keys.size():
@@ -1406,6 +1452,7 @@ func _paint_hud() -> void:
 			weapon_line += "  //  %d / %d" % [int(arsenal_state.get("loaded", 0)), int(arsenal_state.get("reserve", 0))]
 	var lines := [
 		weapon_line,
+		"STANCE  %s // STAMINA %03d" % ["AIM" if firearm_aiming else ("DODGE" if dodge_remaining > 0.0 else "READY"), roundi(stamina)],
 		"TRAINING  %s // SIM HEALTH %03d" % ["ENEMIES" if enemies_enabled else "DUMMIES", simulation_health],
 		"STANDING  %d / %d" % [standing, BODY_COUNT],
 		"DOWNED	%03d" % downed,

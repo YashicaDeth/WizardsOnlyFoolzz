@@ -38,6 +38,23 @@ func _ready() -> void:
 	await _settle(tree, 6)
 	await _shoot(tree, out_dir + "/gore_demo_room.png")
 
+	# The training room now speaks the same firearm language as the Hunt. Hold
+	# aim long enough for the lens and viewmodel to settle, then photograph the
+	# live stance readout rather than relying on a unit assertion alone.
+	demo.firearm_aiming = true
+	await _settle(tree, 12)
+	await _shoot(tree, out_dir + "/gore_sandbox_aim.png")
+	demo.firearm_aiming = false
+
+	# Capture the middle of an actual paid sidestep. The displaced viewpoint and
+	# DODGE stance are the visual evidence that this is movement, not a label.
+	demo.stamina = 100.0
+	demo.dodge_cooldown = 0.0
+	demo.vertical_velocity = 0.0
+	demo._begin_dodge(Vector3.RIGHT)
+	await _settle(tree, 3)
+	await _shoot(tree, out_dir + "/gore_sandbox_dodge.png")
+
 	# The same range bodies, switched live from passive anatomy targets into a
 	# closing combat drill. Capture the production control and the advancing
 	# bodies together so the mode is not verified by label alone.
