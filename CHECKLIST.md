@@ -3323,9 +3323,29 @@ pay.
       renderer's own counters and are trusted; the frame-timing pair is not,
       and needs a focused, interactive re-run before anything is budgeted
       against it — left for X1.2 rather than guessed at here.
-- [ ] **X1.2** A frame budget, stated, that the region is held to — blocked on
-      X1.1's frame-timing numbers actually being trustworthy; the draw call
-      and primitive counts alone are not enough to set a budget against.
+- [x] ~~**X1.2** A frame budget, stated, that the region is held to~~ —
+      `WorldLook.FRAME_BUDGET_MS` states the PERFORMANCE contract as 16.67 ms
+      / 60 FPS. The rendered benchmark now measures the complete player-facing
+      tier (post effects, render scale, MSAA and TAA), rotates tier order over
+      three passes so shader warm-up and thermal drift cannot masquerade as a
+      quality win, and reports median plus p95 rather than one order-sensitive
+      mean. On Greg's RTX 2060 SUPER at 1920x1080, the final rendered run gave
+      PERFORMANCE median 4.55 ms / p95 11.52 ms and ULTRA median 5.25 ms;
+      PERFORMANCE held the budget with 12.12 ms of median headroom. A resumed
+      confirmation gave 4.69 ms / p95 10.98 ms and ULTRA 5.88 ms. An honest
+      detached run against unchanged commit `5113e93`, using only the same
+      disposable measurement instrumentation, gave PERFORMANCE 5.03 ms / p95
+      12.51 ms and ULTRA 5.14 ms. Those comparisons prove the new harness is
+      measuring the existing build consistently within ordinary run variance;
+      they do not prove a runtime optimization. The independent sandbox
+      benchmark also enforces the same ceiling. `perf_probe_test.gd` carries
+      the fast contract assertions, while `frame_cost_test.gd` is the rendered
+      hardware gate. This closes a real measurement-fidelity bug: the old
+      benchmark changed only the Environment, omitted the render-scale/AA half
+      of the preset, sampled each tier once in a fixed order, and could report
+      PERFORMANCE slower than ULTRA on the same machine. X1.5 remains open:
+      this is a budget held on Greg's machine, not evidence about lower-spec
+      hardware.
 - [ ] **X1.3** The 238MB plugin referenced by no script (pairs with J1.3)
 - [ ] **X1.4** Bodies are the expensive thing — measure before optimising them
 - [ ] **X1.5** It has to hold up on a machine that is not Greg's
