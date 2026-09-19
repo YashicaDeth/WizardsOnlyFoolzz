@@ -57,7 +57,7 @@ static func _prune_transient_smoke() -> void:
 static func _reserve_transient_smoke() -> void:
 	_prune_transient_smoke()
 	while _transient_smoke.size() >= transient_smoke_budget():
-		var oldest := _transient_smoke.pop_front()
+		var oldest: Node3D = _transient_smoke.pop_front()
 		if is_instance_valid(oldest):
 			oldest.queue_free()
 
