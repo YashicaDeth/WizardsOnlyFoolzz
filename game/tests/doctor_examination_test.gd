@@ -63,5 +63,21 @@ func _ready() -> void:
 
 	check(DoctorExamination.CONSENT_NOTICE.contains("CONSENT NOT REQUIRED"), "the recording notice says consent was not required")
 
+	# AX2.6. Killing him has to stay killed.
+	WorldHistory.clear_history()
+	check(not DoctorExamination.was_killed(), "he starts the run alive")
+	check(not bool(DoctorExamination.reconstruct().ok), "a man who was never killed cannot be reconstructed")
+	var kill := DoctorExamination.record_kill("blade")
+	check(bool(kill.killed), "an apparent kill is recorded as a real one")
+	check(str(kill.killed_by) == "player", "and the player gets the credit")
+	check(DoctorExamination.was_killed(), "the world agrees he is dead")
+	var back := DoctorExamination.reconstruct()
+	check(bool(back.ok), "medical reconstruction can bring him back")
+	check(bool(back.killed), "and it does NOT undo the kill - the victory stays true")
+	check(DoctorExamination.was_killed(), "the world still agrees the player killed him")
+	check(bool(back.remembers), "he remembers it")
+	check(str(back.scar).contains("throat"), "and he carries the scar the method left (%s)" % back.scar)
+	check(not bool(DoctorExamination.reconstruct().ok), "he does not come back twice")
+
 	print("failures: %d" % failures.size())
 	get_tree().quit(1 if failures.size() > 0 else 0)

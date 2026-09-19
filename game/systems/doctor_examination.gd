@@ -119,3 +119,67 @@ static func verdict(sheet) -> Array:
 			"hold": 3.4,
 		})
 	return beats
+
+
+## AX2.6. If an exceptionally skilled player reaches him and kills him, that
+## has to stay killed.
+##
+## The direction doc is unusually firm here: "An apparent doctor kill remains a
+## real victory; later medical reconstruction can return him later with his
+## memory and scars intact. The victory remains true and begins a personal
+## rivalry; resurrection is not a cutscene retcon."
+##
+## So reconstruction is not undo. The record of the kill survives it, the scars
+## are derived from how it was done, and he remembers. What the player took
+## from him is permanent; what comes back is a man with a grudge and a repaired
+## body, not a reset.
+const FATE_SUBJECT := "the_visiting_doctor"
+
+## What a method leaves on a man who is put back together afterwards.
+const SCARS := {
+	"blunt": "jaw rebuilt; the left side of his face does not move with the right",
+	"ballistic": "entry and exit through the chest, both closed badly on purpose",
+	"blade": "throat, reopened and stitched by somebody competent and unkind",
+	"burn": "grafted from shoulder to ear; the graft did not take his colour",
+	"fall": "spine pinned; he stands straighter than he used to and it costs him",
+}
+const DEFAULT_SCAR := "repaired without a note on the file, which is its own answer"
+
+
+## Records a kill as having happened. Nothing here is provisional -- there is
+## no "apparent" flag, because the doc says the victory is true.
+static func record_kill(method: String, killed_by: String = "player") -> Dictionary:
+	var record := {
+		"killed": true,
+		"killed_by": killed_by,
+		"method": method,
+		"scar": str(SCARS.get(method, DEFAULT_SCAR)),
+		"reconstructed": false,
+		"remembers": true,
+	}
+	WorldHistory.register_subject(FATE_SUBJECT, record)
+	return record
+
+
+## Brings him back, and cannot erase anything. `killed` stays true forever:
+## reconstruction adds to the record, it never rewrites it. If this function
+## ever clears that flag, an arbitrary cutscene has taken a win off the player,
+## which is the exact thing the doc forbids.
+static func reconstruct() -> Dictionary:
+	var record: Dictionary = WorldHistory.subject(FATE_SUBJECT)
+	if record.is_empty() or not bool(record.get("killed", false)):
+		return {"ok": false, "reason": "HE WAS NEVER KILLED"}
+	if bool(record.get("reconstructed", false)):
+		return {"ok": false, "reason": "ALREADY BACK"}
+	var returned := record.duplicate(true)
+	returned["reconstructed"] = true
+	returned["killed"] = true
+	returned["remembers"] = true
+	returned["rivalry"] = true
+	WorldHistory.update_subject(FATE_SUBJECT, returned, "doctor_reconstructed")
+	return {"ok": true, "scar": str(returned.get("scar", "")), "remembers": true, "killed": true}
+
+
+## Whether the player has ever killed him, which stays true after he is back.
+static func was_killed() -> bool:
+	return bool(WorldHistory.subject(FATE_SUBJECT).get("killed", false))
