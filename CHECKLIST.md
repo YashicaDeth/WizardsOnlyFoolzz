@@ -6948,7 +6948,20 @@ not make AX a second owner of anatomy, inventory, combat or the Black Mirror.
 ### AX5 — The slice proves the wider game
 - [ ] **AX5.1** First- and third-person combat share anatomy, wound depth, ballistics and consequences throughout the facility
 - [ ] **AX5.2** The implanted external camera is introduced as technology, with cramped-space, darkness, injury and interference failure cases
-- [ ] **AX5.3** Nearby population stays inside the 5–20 fully simulated budget; distant people keep identity while expensive detail reduces smoothly
+- [ ] **AX5.3** Nearby population stays inside the 5–20 fully simulated budget; distant people keep identity while expensive detail reduces smoothly.
+      **Measured, not yet true.** `tests/population_budget_test` seeds the
+      Bone Yard Hunt's roaming population through its own `_spawn_roamer()`
+      and settles at **14 living hostiles**, inside the 5-20 budget, with 22
+      `BaselineHuman` rigs total in the scene once the yard's standing workers
+      are counted. Toggling every rig's ticking in place found **no frame
+      cost this harness can separate from noise** at that population (control
+      7.36/7.63 ms vs silent 6.85 ms, inside a 0.75 ms floor) — the budget
+      half is cheap enough to not be the bottleneck. The distant half is not
+      built: `_cull_distant_roamers()` (`bone_yard_hunt.gd`) is a single hard
+      cutoff at 230m, full simulation on one side and gone on the other —
+      no reduced tick rate, no impostor, nothing that keeps identity while
+      shedding detail. Nothing in `game/systems` implements a cheaper distant
+      tier for people. That is the real gap, not a number to chase.
 - [ ] **AX5.4** The complete route holds the 60 FPS contract under its authored combat and aftermath load
 - [ ] **AX5.5** One recorded playthrough demonstrates creation, breakout, equipment, biometric choice, combat, Black Mirror theft, at least two routes and surface handoff
 - [ ] **AX5.6** Only after those sockets are proven does AW emit the friend-facing opening asset/model/texture/audio commission list
