@@ -89,6 +89,13 @@ var interact_verb := "act"
 ## plainly stopped needing it — the same rule the derby's dashboard placard
 ## uses — rather than after a timer somebody chose.
 var familiar := 0.0
+## A newly available verb gets one short readout. This is deliberately derived
+## from the same offers as the lower strip: it teaches a change in the live
+## state without adding another permanent objective panel.
+var affordance_notice := ""
+var affordance_notice_time := 0.0
+var _affordances_seen := false
+var _affordance_signature := ""
 
 
 func set_state(values: Dictionary) -> void:
@@ -150,6 +157,7 @@ func set_state(values: Dictionary) -> void:
 	near_something = bool(values.get("near_something", near_something))
 	interact_verb = str(values.get("interact_verb", interact_verb))
 	lock_screen = values.get("lock_screen", lock_screen)
+	_refresh_affordance_notice()
 	if pulmonary_diagnostic != null:
 		pulmonary_diagnostic.set_state(values)
 
@@ -184,6 +192,7 @@ func _process(delta: float) -> void:
 		familiar = minf(1.0, familiar + delta * 0.0055)
 	location_announce = maxf(0.0, location_announce - delta)
 	lung_linger = maxf(0.0, lung_linger - delta)
+	affordance_notice_time = maxf(0.0, affordance_notice_time - delta)
 	queue_redraw()
 
 
@@ -204,6 +213,7 @@ func _draw() -> void:
 	_draw_lung_xray()
 	_draw_breath()
 	_draw_critical_condition()
+	_draw_affordance_notice()
 	_draw_lock_reticle()
 	_draw_controls()
 	_draw_screen_frame()
@@ -732,6 +742,27 @@ func _draw_weapon_silhouette(at: Vector2, weapon_id: String) -> void:
 func _draw_controls() -> void:
 	if familiar >= 0.999:
 		return
+	var offers := _current_offers()
+	if offers.is_empty():
+		return
+
+	# Laid out from the middle, so the strip grows symmetrically rather than
+	# sliding sideways every time an affordance appears or goes.
+	var gap := 26.0
+	var total := 0.0
+	for offer: Array in offers:
+		total += CellOutzType.width_condensed(str(offer[0]), 11.0, 2.0) + KEY_GAP
+		total += CellOutzType.width_condensed(str(offer[1]), 10.0, 1.6) + gap
+	var cursor := size.x * 0.5 - total * 0.5
+	var fade := 1.0 - familiar
+	for offer: Array in offers:
+		var key := str(offer[0])
+		var verb := str(offer[1])
+		cursor += CellOutzType.draw_condensed(self, Vector2(cursor, size.y - 26.0), key, 11.0, Color(COPPER, 0.92 * fade), 2.0) + KEY_GAP
+		cursor += CellOutzType.draw_condensed(self, Vector2(cursor, size.y - 26.0), verb, 10.0, Color(BONE, 0.55 * fade), 1.6) + gap
+
+
+func _current_offers() -> Array:
 	var offers: Array = []
 	var held := str((weapon as Dictionary).get("label", ""))
 	if bare:
@@ -750,21 +781,40 @@ func _draw_controls() -> void:
 	if near_something:
 		offers.append(["E", str(interact_verb).to_upper()])
 	offers.append(["G", "DEVICE"])
+	return offers
 
-	# Laid out from the middle, so the strip grows symmetrically rather than
-	# sliding sideways every time an affordance appears or goes.
-	var gap := 26.0
-	var total := 0.0
+
+func _refresh_affordance_notice() -> void:
+	var offers := _current_offers()
+	var signature_parts := PackedStringArray()
 	for offer: Array in offers:
-		total += CellOutzType.width_condensed(str(offer[0]), 11.0, 2.0) + KEY_GAP
-		total += CellOutzType.width_condensed(str(offer[1]), 10.0, 1.6) + gap
-	var cursor := size.x * 0.5 - total * 0.5
-	var fade := 1.0 - familiar
+		signature_parts.append("%s:%s" % [offer[0], offer[1]])
+	var next_signature := ";".join(signature_parts)
+	if not _affordances_seen:
+		_affordance_signature = next_signature
+		_affordances_seen = true
+		return
+	if next_signature == _affordance_signature:
+		return
+	var previous := _affordance_signature.split(";", false)
+	var additions: Array[String] = []
 	for offer: Array in offers:
-		var key := str(offer[0])
-		var verb := str(offer[1])
-		cursor += CellOutzType.draw_condensed(self, Vector2(cursor, size.y - 26.0), key, 11.0, Color(COPPER, 0.92 * fade), 2.0) + KEY_GAP
-		cursor += CellOutzType.draw_condensed(self, Vector2(cursor, size.y - 26.0), verb, 10.0, Color(BONE, 0.55 * fade), 1.6) + gap
+		var token := "%s:%s" % [offer[0], offer[1]]
+		if token not in previous:
+			additions.append("%s %s" % [offer[0], offer[1]])
+	_affordance_signature = next_signature
+	if not additions.is_empty():
+		affordance_notice = "AVAILABLE // " + "  /  ".join(additions)
+		affordance_notice_time = 2.4
+
+
+func _draw_affordance_notice() -> void:
+	if affordance_notice_time <= 0.0 or affordance_notice.is_empty():
+		return
+	var alpha := clampf(minf(1.0, affordance_notice_time * 2.0), 0.0, 1.0)
+	var width := CellOutzType.width_condensed(affordance_notice, 9.0, 1.2)
+	var at := Vector2(maxf(24.0, size.x * 0.5 - width * 0.5), 168.0)
+	CellOutzType.draw_condensed(self, at, affordance_notice, 9.0, BONE * Color(1, 1, 1, alpha * 0.78), 1.2)
 
 
 func _draw_full_archive_frame() -> void:
