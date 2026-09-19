@@ -204,6 +204,7 @@ func _ready() -> void:
 	ballistics.name = "CabBallistics"
 	add_child(ballistics)
 	ballistics.round_hit.connect(_on_cab_round_hit)
+	ballistics.round_expired.connect(_on_cab_round_expired)
 	if OS.get_environment("ATG_HUD_CAPTURE") != "1":
 		_spawn_targets()
 	if OS.get_environment("ATG_HUD_CAPTURE") != "1":
@@ -1543,6 +1544,17 @@ func _on_cab_round_hit(hit: Dictionary) -> void:
 		_damage_target(struck as Node3D, 9.0, 1.0, "gun_hit_ready_msec")
 		WorldHistory.record_event("derby_shot_landed", {"venue": "underground_colosseum" if is_colosseum else "rift_derby_quarry", "target": struck.name})
 	WorldHistory.commit_ledger_batch()
+
+
+## AF1.8/AF10.8. The port from `gore_demo.gd` took `_on_round_hit()` but
+## dropped its other half: a cab round that runs out of range or falls below
+## the world never reaches `_on_cab_round_hit()`, so without this its muzzle
+## position in `_cab_seen` would sit there for the rest of the heat — the
+## exact leak `gore_demo.gd`'s own `_on_round_expired()` exists to close.
+func _on_cab_round_expired(payload: Dictionary) -> void:
+	if str(payload.get("source", "")) != CAB_SHOT_SOURCE:
+		return
+	_cab_seen.erase(int(payload.get("shot", 0)))
 
 
 ## AF1.8/AF10.8. One segment of a round's real path, for the eye — ported

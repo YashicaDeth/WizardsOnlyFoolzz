@@ -2134,13 +2134,11 @@ Since it was written, `vehicle_interior.gd`/`dash_cluster.gd` — both Lane
 - [x] ~~**M2.3** The other hand holds a gun, and you shoot out of your own
       car~~ `gun_arm` is real geometry (a grip, a slide, a barrel), LMB
       calls `_fire_from_cab()` in `rift_derby.gd`, and it is a real weapon —
-      a raycast, real ammo (`rounds_left`), a cooldown, and real damage to
-      whatever it hits (`_damage_target`), not a cosmetic muzzle flash.
-      **Not yet true**: this is a second, simpler firearm system
-      (raycast + flat damage) rather than the one AF1/AF1.1 built —
-      `Ballistics`' real projectile and `BaselineHuman.hit_at`'s zone
-      resolution never enter it. That gap is AF1.8's own, named for exactly
-      this reason, and stays open
+      real ammo, reload and jams through the Hunt's own `HunterArsenal`
+      (`cab_arsenal`), and a real travelling round through the Hunt's own
+      `Ballistics` (`ballistics.fire()`), not a cosmetic muzzle flash or an
+      instant raycast. Closed by AF1.8/AF10.8 — see there for what was
+      actually verified and the two bugs that verification found
 - [x] ~~**M2.4** You shoot through your own windscreen, and the glass is
       really there~~ `_windscreen()` is a real `BoxMesh` plane in front of
       the camera, lit by the world, and `punch_through()` marks it exactly
@@ -3952,7 +3950,31 @@ travels, hits something and leaves a mark on it.
       the exact count it left with.
 - [x] **AF1.6** Calibre means something — muzzle velocity, grain and drag per calibre, and drag proportional to speed squared, so buckshot keeps 93.7% of its speed where a slug keeps 97.1% over the same flight. A shotgun stops being a shotgun at range without anybody writing a falloff curve
 - [x] **AF1.7** It reads through the anatomy already built: a round finds a zone, not a hitbox — this was already true and unverified rather than unbuilt: `_trace_actor` raycasts real collision geometry and hands the exact world-space impact point to `BaselineHuman.hit_at`, which resolves it through `zone_nearest(point)` — a live distance comparison against every part's real position — never a name read off whichever collider answered. `tests/zone_precision_test.gd` proves it rather than assuming it: one body, one weapon, one fixed distance, and the only thing that changes between three shots is the pitch, computed from each zone's own real current position (`rig.parts[zone].global_position`) rather than a guessed number. Aiming at where the head actually is wounds head and nothing else; the same for torso and left_leg. A hardcoded or round-robin zone table could not pass this — it would need the shot's outcome to be independent of aim, and it is not. (Building this surfaced a smaller confirmation of the same point: sinking a target far enough below its normal spawn height made shots miss entirely rather than falling back to some default zone, because there was nothing left to hit — a lookup table has no floor to fall through.)
-- [ ] **AF1.8** Firing from a car is the same system (M2.3)
+- [x] **AF1.8** Firing from a car is the same system (M2.3) — the wiring was
+      already in `rift_derby.gd`'s `_fire_from_cab()`/`_on_cab_round_hit()`,
+      landed by an unreviewed, unrun rescue commit (`57f9242`) and never
+      actually exercised. `tests/derby_cab_fire_test.gd` (new) is the first
+      thing to run it: a cab round exists in `Ballistics.rounds` the physics
+      frame after firing rather than resolving instantly, later reaches a
+      frozen wrecker placed directly ahead of the muzzle and reduces its real
+      `integrity` meta, and that landing is what raises the score — the same
+      `_damage_target()` consequence chain a ram already used. Also caught
+      and fixed two real bugs the "unrun" label meant nobody had found yet:
+      `_fire_from_cab()` connected `Ballistics.round_hit` but never
+      `round_expired`, so a cab shot that missed everything leaked its
+      muzzle entry in `_cab_seen` for the rest of the heat — the exact leak
+      `gore_demo.gd`'s own `_on_round_expired()` exists to close, now given
+      the same handler here. And `ballistics.gd`'s own `_step_rounds()`
+      called `look_at(at + velocity, Vector3.UP)` unconditionally, which
+      warns every physics step for any round travelling exactly vertical
+      (velocity colinear with the up vector) — the test's own expiry check
+      fires one straight up to prove the miss path, and hit exactly this;
+      fixed with the same guard `_surface_basis()` already uses for a
+      colinear surface normal. `ballistics_test`, `arsenal_test`,
+      `magazine_test`, `weapon_jam_test`, `deferred_damage_test`,
+      `combat_integration_test`, `derby_exit_test`, `tunnel_test`,
+      `zone_precision_test`, `firearm_momentum_test`, `reload_visual_test`,
+      `gore_demo_test`, `gore_parity_test` and `derby_cab_test` re-run clean.
 
 
 ### AF6 — The range
@@ -4015,7 +4037,11 @@ The last rung. Fifteen statements that are true of guns when this game is finish
       established this codebase means by the sentence
 - [ ] **AF10.6** `v10` Calibre decides what happens to a body and to a wall
 - [x] **AF10.7** `v10` ~~A round finds a zone, never a hitbox~~ Same proof as B10.3, from the gun's side: a round's impact point resolves through `zone_nearest()` to the limb it struck, and `Penetration` then measures that limb's real thickness at that height to decide how far in it got. A hitbox could not answer either question
-- [ ] **AF10.8** `v10` Firing from a car is the same system
+- [x] **AF10.8** `v10` ~~Firing from a car is the same system~~ Same closure
+      as AF1.8, verified rather than assumed: `tests/derby_cab_fire_test.gd`
+      proves the cab gun fires a real `Ballistics` round that travels,
+      lands on a wrecker and raises the score, not the instant raycast this
+      item used to describe
 - [x] **AF10.9** `v10` A gun is inspectable in full — the Hunt's complete firearm
       set (shotgun and sidearm) uses the same held `I` verb and live model as
       combat, but each has physical choreography rather than a canned spin: the

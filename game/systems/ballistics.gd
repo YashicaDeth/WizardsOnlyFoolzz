@@ -246,7 +246,14 @@ func _step_rounds(delta: float) -> void:
 		if node != null and is_instance_valid(node):
 			node.global_position = at
 			if velocity.length() > 0.1:
-				node.look_at(at + velocity, Vector3.UP)
+				# A round fired straight up (or down) has `velocity` colinear
+				# with `Vector3.UP` — the same case `_surface_basis()` already
+				# guards below, just met here instead of a surface normal.
+				# Unguarded, `look_at()` warns every physics step for the rest
+				# of that round's flight instead of just picking a roll.
+				var direction := velocity.normalized()
+				var up := Vector3.FORWARD if absf(direction.dot(Vector3.UP)) > 0.98 else Vector3.UP
+				node.look_at(at + velocity, up)
 
 
 ## AF1.2. It arrives, and the thing it arrived at is different for it.
