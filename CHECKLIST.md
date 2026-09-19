@@ -689,7 +689,15 @@ Greg, plainly: *"the entire blackmirror gui needs work"*. Nine passes on what th
       and as lost on the next launch as it was on this one.
       `tests/handheld_impact_test.gd`'s save/load round trip and
       `tests/device_possession_test.gd`, re-run clean.
-- [ ] **C10.15** `v10` Somebody could pick it up and know whose it was
+- [x] ~~**C10.15** `v10` Somebody could pick it up and know whose it was~~
+      `owner_name` is stamped once when a device is first created (from the
+      current player subject, falling back to `carry.gd`'s "THE HUNTER" if
+      there is none) and never rewritten by `drop()`, `confiscate()` or
+      `repossess()` — the case reads "PROPERTY OF" whoever it was made for,
+      not whoever is holding it. Round-trips through `save_device()`/
+      `load_device()`, and a pre-C10.15 save with no `owner_name` field reads
+      the same honest fallback instead of crashing or coming back blank.
+      `tests/handheld_owner_test.gd`, 6/6, new.
 
 ## D — Character creation in the vat
 
