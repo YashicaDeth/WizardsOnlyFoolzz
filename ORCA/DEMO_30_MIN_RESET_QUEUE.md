@@ -6,8 +6,10 @@ Prepared 19 September 2026 for Orca run `run_6da4e5a9677d`.
 
 Orca reported four Codex weekly resets tonight: **10:22 PM, 10:31 PM,
 10:41 PM, and 10:47 PM** Hobart time. These are the four implementation seats.
-One Claude account is already available and owns the read-only cross-lane audit,
-then the final integration/review pass after the four Codex commits arrive.
+Two Claude accounts are available for the strike. Claude A owns the read-only
+cross-lane design/integration audit. Claude B owns the executable playtest route,
+capture plan, and feedback-gate audit. After the four Codex commits arrive, the
+two reports govern the final integration/review pass.
 Dispatch the four implementation lanes after 10:47 PM so all accounts are
 eligible. The integration gate starts only when the four implementation tasks
 and Claude audit are complete.
@@ -16,8 +18,8 @@ The implementation lanes are deliberately independent. Dispatch each to a clean
 worktree from the same base commit. Do not let workers share a worktree. The
 Orca coordinator owns dispatch, concise progress updates, user feedback gates,
 usage conservation, terminal cleanup, and routing corrections. The integration
-gate remains blocked until all four implementation lanes and Claude's audit have
-reported accepted results.
+gate remains blocked until all four implementation lanes and both Claude audits
+have reported accepted results.
 
 Authoritative context, in order:
 
