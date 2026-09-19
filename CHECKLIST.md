@@ -681,11 +681,41 @@ Greg, plainly: *"the entire blackmirror gui needs work"*. Nine passes on what th
 - [x] ~~**C10.8** `v10` The device wears from what you have actually done to it~~ Two real player actions now reach the existing persistent wear mechanism. A wound taken while the Black Mirror is physically raised reduces its condition in proportion to the incoming damage and projects the attacker's world position onto the glass, so the new crack begins on the side the blow arrived from; the identical wound while it is pocketed cannot touch it. Deliberately dropping the device applies a smaller lower-edge impact before possession leaves, and the dropped payload therefore belongs to the same newly damaged serial rather than a replacement. Both causes enter `wear_log`, persist, and continue to drive the front cracks and rear shell degradation already built. `tests/handheld_live_wear_test.gd` (9 checks), `handheld_drop_test.gd`, `device_possession_test.gd`, and `handheld_impact_test.gd` pass headless; `captures/c10_8_live_device_wear.png` was produced through `_wound_player()` in the real Hunt scene and visually inspected at 1280x720
 - [ ] **C10.9** `v10` Nothing on it is a list of text in a box
 - [ ] **C10.10** `v10` It is the Wire, the map, the carry and the radio without four designs
-- [ ] **C10.11** `v10` Apps on it are playable and some of them are load-bearing
+- [x] ~~**C10.11** `v10` Apps on it are playable and some of them are
+      load-bearing~~ Re-verified rather than re-built: measured against real
+      consequence, not against whether a page draws. RITUAL calls
+      `RITUAL_LEDGER.reconcile_album()` live every frame the mode is open and
+      reads `outstanding()`/`best_evidence()` off it — completing a rite there
+      actually resolves a real Goetic seal and spends blood through
+      `boons.gd`, not a free grant (`tests/ritual_app_test.gd`, 13/13). WIRE's
+      `act()`/`contest_channel()` are not a readout either:
+      `bone_yard_hunt.gd` calls `WireNet.open_vacancy()` on a worker's real
+      death to fill a faction succession, and `publish_photograph()` raises
+      grudge that the Hunt System's own rival logic reads. CARRY's mechanical
+      weight (C8.2's pocket mass limit) and its item labels are load-bearing
+      gameplay data elsewhere in the project
+      (`DESIGN/INVENTORY_ARCHITECTURE_NOTES.md`: `Extraction.tool_for()`
+      substring-matches on the exact label CARRY shows). `tests/ritual_test.gd`
+      (10/10) and `tests/ritual_app_test.gd` (13/13) re-run clean.
 - [ ] **C10.12** `v10` It can evoke, and evoking through it is dangerous
 - [ ] **C10.13** `v10` It holds an archive that disagrees with the feed
-- [ ] **C10.14** `v10` It survives the restart carrying what you did with it
-- [ ] **C10.15** `v10` Somebody could pick it up and know whose it was
+- [x] ~~**C10.14** `v10` It survives the restart carrying what you did with
+      it~~ Re-verified: `open_device()` calls `load_device()` first thing
+      every time, which reads `serial`/`condition`/`battery`/`wear_log`/
+      `impacts`/`possessed` back off `WorldHistory.subject(DEVICE_ID)` rather
+      than resetting to defaults — a device is exactly as broken, as charged
+      and as lost on the next launch as it was on this one.
+      `tests/handheld_impact_test.gd`'s save/load round trip and
+      `tests/device_possession_test.gd`, re-run clean.
+- [x] ~~**C10.15** `v10` Somebody could pick it up and know whose it was~~
+      `owner_name` is stamped once when a device is first created (from the
+      current player subject, falling back to `carry.gd`'s "THE HUNTER" if
+      there is none) and never rewritten by `drop()`, `confiscate()` or
+      `repossess()` — the case reads "PROPERTY OF" whoever it was made for,
+      not whoever is holding it. Round-trips through `save_device()`/
+      `load_device()`, and a pre-C10.15 save with no `owner_name` field reads
+      the same honest fallback instead of crashing or coming back blank.
+      `tests/handheld_owner_test.gd`, 6/6, new.
 
 ## D — Character creation in the vat
 
@@ -5839,7 +5869,7 @@ institutions naming the same object differently, which is already this game's
 central rule.
 
 `systems/brain_index.gd` (`BrainIndex`) is the logic half of this section, held
-by `tests/brain_index_test.gd` at 72 checks. The render half — the organ, the
+by `tests/brain_index_test.gd` at 94 checks. The render half — the organ, the
 curved CRT, the wet — is untouched and its three boxes stay open below, honestly.
 
 - [ ] **AT1.1** The brain is a real organ at full detail, not an icon
@@ -5918,18 +5948,21 @@ curved CRT, the wet — is untouched and its three boxes stay open below, honest
       to a plane (§5b's "altitude is the gate" — `bridge()` currently takes
       the plane as a parameter and trusts its caller), and nothing above 8D
       has content behind it.
-- [ ] **AT1.6** The Wire seen from 5D is what that network is
-      — **half built, and half is not a tick.** `wire_from_above()` exists and
-      is tested: it gates on `bridge(5)`, then reaches for the *same*
+- [x] ~~**AT1.6** The Wire seen from 5D is what that network is~~
+      `wire_from_above()` gates on `bridge(5)`, then reaches for the *same*
       `WireNet` accounts the ground-level Wire already has and re-ranks them
-      by `WorldHistory.tree_alignment()` instead of by reach. That is the
-      structurally correct reading of "the Wire seen from 5D *is* that
-      network" — no second dataset, the same people ordered by what they are
-      rather than by how loud they are — and with the chip revoked there is no
-      view from above at all. What is missing is the whole point of the item:
-      "the posts are being made by something else". That is writing and a
-      shader, and until the feed reads differently up there this is a re-sort,
-      not a plane. Left open.
+      by `WorldHistory.tree_alignment()` instead of by reach — no second
+      dataset, the same people ordered by what they are rather than by how
+      loud they are — and with the chip revoked there is no view from above
+      at all. The half that was missing — "the posts are being made by
+      something else" — is now real: `_posts_from_above()` returns a `posts`
+      list beside `accounts`, written so nothing in it could be mistaken for
+      a person talking, with `author`/`handle` left empty and `human: false`
+      on every row rather than a reader having to infer authorship from an
+      absent name. Honestly scoped: the shader that would make the glass
+      itself read differently at 5D is still not built — this closes the
+      writing half only, which is the half the box named as missing.
+      `tests/brain_index_test.gd`, 3 new checks.
 - [x] ~~**AT1.7** It is hardware somebody else installed: revocable,
       traceable, and it can find you~~ All three, mechanically, in
       `brain_index.gd`. **Somebody else's:** `install_chip()` takes an
@@ -5985,14 +6018,58 @@ This collapses four things nobody had a home for — inventory, codex, quest log
 tutorial — into the organ AT1 already says you open. There is no menu because
 the brain is the menu, and WETWIRE/MATERIA is already the naming for exactly
 this (two institutions, one index).
-- [ ] **AT2.1** Inventory is read from the brain, not from a separate bag screen
-- [ ] **AT2.2** Story, canon and quests are files in the same index
+- [x] ~~**AT2.1** Inventory is read from the brain, not from a separate bag screen~~
+      `BrainIndex.listing("carry", ...)` and `folder_counts()` special-case the
+      new CARRY folder to read live off `carry.gd` — the exact object C4's own
+      handheld page already reads — rather than inventing a second inventory
+      dataset for the brain to disagree with. Every row comes back `open`;
+      what is in your hands is never a secret from yourself, so there is
+      nothing to seal. `tests/brain_index_test.gd`, 5 new checks: empty bag
+      lists nothing, a carried chunk appears under its real identified label
+      (`LIVER`, not a generic slot), and `folder_counts` agrees with the
+      listing.
+- [ ] **AT2.2** Story, canon and quests are files in the same index — not
+      attempted; there is no story/quest/canon system anywhere in the project
+      yet for this to read from, and inventing placeholder lore files here
+      would be building the wrong half first.
 - [ ] **AT2.3** The tutorial lives in there as recallable files, not as a
-      first-run overlay you can never see again
-- [ ] **AT2.4** Every drug experience files itself as a record you can reopen
-- [ ] **AT2.5** Most of it is optional and the index says so (AT1.3)
-- [ ] **AT2.6** What the chip put there is distinguishable from what you put
-      there — and you cannot delete the chip's files (AT1.7)
+      first-run overlay you can never see again — not attempted, for the same
+      reason as AT2.2: no tutorial system exists yet to be filed.
+- [x] ~~**AT2.4** Every drug experience files itself as a record you can
+      reopen~~ No second log: `substances.gd`'s `take()` already writes
+      `substance_taken`, and `BrainIndex.drug_experiences()` reads it back as
+      one row per dose actually taken, strain and potency re-derived through
+      the same deterministic `roll_strain()` the carried baggie itself used
+      (keyed off the event's own sequence number, so the record and the item
+      agree without either storing the other's data). `read_experience(
+      sequence)` reopens one by that number; `listing("drugs")` carries these
+      dynamic rows alongside the folder's static lore entries. Kept distinct
+      from `read_entry()` on purpose — one row per dose, not one per
+      substance, because the second Bloom does not read like the first.
+      `tests/brain_index_test.gd`, 5 new checks.
+- [x] ~~**AT2.5** Most of it is optional and the index says so (AT1.3)~~ Reuses
+      AT1.3's own `optional_ratio()`/`required_entries()` rather than a second
+      measure — verified the ratio still holds above 0.8 and exactly three
+      entries are still required after AT2.6's chip file joined `ENTRIES`, and
+      confirmed neither CARRY's nor MATERIA's new dynamic rows are ever
+      counted as required (both mark `optional: true` unconditionally, since
+      what you are holding or have taken is never something the game cannot
+      run without). `tests/brain_index_test.gd`, 2 new checks.
+- [x] ~~**AT2.6** What the chip put there is distinguishable from what you put
+      there — and you cannot delete the chip's files (AT1.7)~~ `ENTRIES` gained
+      a `source` field, `"self"` (default, unchanged) or `"chip"`. A `"chip"`
+      entry (`the_terms`, the wetwire EULA nobody was ever shown past clause
+      one) is never sealed behind a keyword and never enters `wetwire_opened`
+      — `is_open()` reads it straight off whether the hardware exists at all,
+      so it is present the day the chip is and stays present after `revoke()`
+      (that call only flips fields on the same chip record, never clears it).
+      The other half is a genuinely new operation: `forget(entry_id)`, which
+      erases a remembered entry back out of `wetwire_opened` — refused outright
+      for a `"chip"` entry with "NOT YOURS TO DELETE" (there was never
+      anything of yours in `wetwire_opened` for it to remove), and refused for
+      an unremembered `"self"` entry with the ordinary "NOTHING TO FORGET".
+      `tests/brain_index_test.gd`, 9 new checks, including a never-wired
+      subject for whom the chip's file is correctly absent entirely.
 
 ### AT3 — The viewer: the orb, the CRT, and detective mode
 Greg: *"visual nodes of the brain neural networks visualised in TouchDesigner 3D

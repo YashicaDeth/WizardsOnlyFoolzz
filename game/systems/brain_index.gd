@@ -32,6 +32,13 @@ extends RefCounted
 
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+## AT2. "The inventory system with the brain that's a file system of the
+## entire game's info index... with drug experiences and other stuff." Both
+## preloads below back a *listing*, never a second copy of the data: CARRY
+## already owns what you are holding and `substances.gd` already owns what a
+## dose costs, so this file reads them back rather than tracking either again.
+const CarryModel := preload("res://systems/carry.gd")
+const Substances := preload("res://systems/substances.gd")
 
 ## The chip as a real piece of hardware in the head, not a boolean. Registered
 ## into `anatomy_state.cybernetics` through the same catalogue every other
@@ -52,6 +59,10 @@ const FOLDERS := {
 	"combat": {"label": "COMBAT", "note": "What the body learned being hurt"},
 	"people": {"label": "PEOPLE", "note": "Who you are carrying"},
 	"places": {"label": "PLACES", "note": "Ground you have stood on"},
+	# AT2.1. Not a second CARRY page — `listing()`/`folder_counts()` special-case
+	# this one folder to read live off the same `carry.gd` object C4's own page
+	# already reads, so the bag and the index cannot disagree.
+	"carry": {"label": "CARRY", "note": "What your hands are holding, filed here instead of a second screen"},
 	"dreams": {"label": "DREAMS", "note": "Unattributed. Filed anyway"},
 	"drugs": {"label": "MATERIA", "note": "The cabinet. What it cost"},
 	"entities": {"label": "ENTITIES", "note": "Things that have noticed you"},
@@ -105,6 +116,14 @@ const KEYWORDS := {
 ## `optional_ratio()` measures it. Three entries are not optional and they are
 ## the three the game genuinely cannot run without you having — who you are,
 ## what is in your head, and that you bleed.
+##
+## AT2.6, "what the chip put there is distinguishable from what you put
+## there." `source` defaults to `"self"` — a memory, opened by living the
+## keyword's evidence, same as always. `"chip"` marks the other kind: a file
+## that arrived the day the hardware did rather than one you remembered.
+## `is_open()` reads the two sources completely differently (installed vs.
+## unlocked) and `forget()` refuses a `"chip"` entry outright — it is theirs to
+## have put there, not yours to take back out.
 const ENTRIES := {
 	"self_name": {
 		"folder": "memory", "title": "WHO YOU ARE", "optional": false, "keyword": "", "plane": 0,
@@ -193,6 +212,11 @@ const ENTRIES := {
 	"the_ninth": {
 		"folder": "unknown", "title": "[UNINDEXED REGION]", "optional": true, "keyword": "THE NINTH BODY", "plane": 0,
 		"body": "Filed under a body number you have not reached.",
+	},
+	"the_terms": {
+		"folder": "passwords", "title": "WHAT YOU AGREED TO (YOU DID NOT)", "optional": true, "keyword": "", "plane": 0,
+		"source": "chip",
+		"body": "Standard CellOutz wetwire terms, installed the same day as the hardware. Revocation for non-payment is clause four. Nobody has ever shown you clauses one through three.",
 	},
 }
 
@@ -569,6 +593,14 @@ static func is_open(entry_id: String, subject_id: String = "player") -> bool:
 	var entry: Dictionary = ENTRIES.get(entry_id, {})
 	if entry.is_empty():
 		return false
+	# AT2.6. A chip file is never sealed behind a keyword and never remembered
+	# into `wetwire_opened` — it is simply present once the hardware is,
+	# whether or not the subject would ever have gone looking for it. `chip()`
+	# stays populated after `revoke()` (that call only flips fields on the same
+	# record), so a revoked chip's own paperwork does not vanish with it —
+	# consistent with "you cannot delete the chip's files" below in `forget()`.
+	if str(entry.get("source", "self")) == "chip":
+		return not chip(subject_id).is_empty()
 	if str(entry.get("keyword", "")) == "":
 		return true
 	return opened(subject_id).has(entry_id)
@@ -622,6 +654,27 @@ static func _record_subject_action(event_type: String, subject_id: String, detai
 		WorldHistory.record_event(event_type, details)
 
 
+## AT2.6, the other half of the distinction `is_open()` draws: a memory can be
+## let go of, its own file. A `"chip"` entry refuses outright, permanently and
+## for the one reason that matters — it was never yours to begin with, so
+## there is nothing here for you to hand back. A `"self"` entry that was never
+## opened refuses too, but for the ordinary reason: there is nothing there yet
+## to forget.
+static func forget(entry_id: String, subject_id: String = "player") -> Dictionary:
+	var entry: Dictionary = ENTRIES.get(entry_id, {})
+	if entry.is_empty():
+		return {"ok": false, "reason": "NO SUCH ENTRY"}
+	if str(entry.get("source", "self")) == "chip":
+		return {"ok": false, "reason": "NOT YOURS TO DELETE"}
+	var already := opened(subject_id)
+	if not already.has(entry_id):
+		return {"ok": false, "reason": "NOTHING TO FORGET"}
+	already.erase(entry_id)
+	WorldHistory.amend_subject(subject_id, {"wetwire_opened": already})
+	WorldHistory.record_event("memory_forgotten", {"subject_id": subject_id, "entry_id": entry_id})
+	return {"ok": true, "entry_id": entry_id}
+
+
 ## Reading one. Three separate refusals, and they say different things because
 ## they *are* different things: sealed is "you have not remembered this",
 ## revoked is "somebody took the floor you were standing on", and too-low is
@@ -648,13 +701,22 @@ static func read_entry(entry_id: String, subject_id: String = "player") -> Dicti
 	return {
 		"ok": true, "id": entry_id, "title": str(entry.title), "folder": str(entry.folder),
 		"body": str(entry.body), "optional": bool(entry.optional), "plane": required,
+		"source": str(entry.get("source", "self")),
 	}
 
 
 ## What the index draws. Sealed entries are **listed and not readable** — you
 ## can see the shape of what you have not remembered, which is the difference
 ## between an index and an inventory.
+##
+## AT2.1/AT2.4. Two folders draw from somewhere other than `ENTRIES`: CARRY is
+## entirely live (`carry_listing()` — there is no static entry to list at
+## all), and MATERIA's static lore rows are followed by one real row per dose
+## actually taken (`drug_experiences()`). Neither is a second dataset; both
+## read the same objects their own systems already keep.
 static func listing(folder_id: String, subject_id: String = "player") -> Array:
+	if folder_id == "carry":
+		return carry_listing(subject_id)
 	var rows: Array = []
 	for entry_id in ENTRIES:
 		var entry: Dictionary = ENTRIES[entry_id]
@@ -669,23 +731,107 @@ static func listing(folder_id: String, subject_id: String = "player") -> Array:
 			"open": open_now,
 			"plane": required,
 			"reachable": required <= reach(subject_id),
+			"source": str(entry.get("source", "self")),
 		})
+	if folder_id == "drugs":
+		rows.append_array(drug_experiences(subject_id))
 	return rows
 
 
 static func folder_counts(subject_id: String = "player") -> Dictionary:
 	var counts := {}
 	for folder_id in FOLDERS:
-		var total := 0
+		var rows := listing(folder_id, subject_id)
 		var open_count := 0
-		for entry_id in ENTRIES:
-			if str((ENTRIES[entry_id] as Dictionary).get("folder", "")) != folder_id:
-				continue
-			total += 1
-			if is_open(entry_id, subject_id):
+		for row in rows:
+			if bool((row as Dictionary).get("open", false)):
 				open_count += 1
-		counts[folder_id] = {"total": total, "open": open_count}
+		counts[folder_id] = {"total": rows.size(), "open": open_count}
 	return counts
+
+
+## AT2.1. Reads the exact object C4's own CARRY page already reads
+## (`carry.gd`), so the brain and the bag can never disagree about what you
+## are holding. There is nothing to seal here — what is in your hands is
+## never a secret from yourself — so every row comes back open.
+static func carry_listing(subject_id: String = "player") -> Array:
+	var carry := CarryModel.new()
+	var rows: Array = []
+	for index in carry.items.size():
+		var item: Dictionary = carry.items[index]
+		rows.append({
+			"id": "carry_%d" % index,
+			"index": index,
+			"title": str(item.get("label", "UNNAMED")),
+			"kind": str(item.get("kind", "goods")),
+			"mass": float(item.get("mass", 0.5)),
+			"condition": float(item.get("condition", 1.0)),
+			"pocketed": bool(item.get("pocketed", false)),
+			"optional": true,
+			"open": true,
+			"plane": 0,
+			"reachable": true,
+			"source": "self",
+		})
+	return rows
+
+
+## AT2.4. Every dose already writes `substance_taken` (`substances.gd`); this
+## reads that log back as a reopenable record instead of a drug experience
+## needing to be saved into a second place to be reopenable at all. Strain and
+## potency are re-derived through the same deterministic `roll_strain()` the
+## carried baggie itself was rolled with, keyed off the event's own sequence
+## number, so the record and the item agree without either storing the
+## other's data.
+static func drug_experiences(subject_id: String = "player") -> Array:
+	var rows: Array = []
+	for event in WorldHistory.events:
+		if str(event.get("type", "")) != "substance_taken":
+			continue
+		var details: Dictionary = event.get("details", {})
+		if str(details.get("subject_id", "")) != subject_id:
+			continue
+		var sequence := int(event.get("sequence", 0))
+		var substance_id := str(details.get("substance_id", ""))
+		var data: Dictionary = Substances.CATALOG.get(substance_id, {})
+		var strain := Substances.roll_strain(substance_id, sequence)
+		rows.append({
+			"id": "experience_%d" % sequence,
+			"sequence": sequence,
+			"title": "%s — %s" % [str(data.get("label", substance_id)).to_upper(), str(strain.strain)],
+			"substance_id": substance_id,
+			"optional": true,
+			"open": true,
+			"plane": 0,
+			"reachable": true,
+			"source": "self",
+		})
+	return rows
+
+
+## The reopened record itself, kept separate from `read_entry()` because these
+## are not files in `ENTRIES` — there is one per dose actually taken, not one
+## per substance, and the second Bloom does not read the same as the first.
+static func read_experience(sequence: int, subject_id: String = "player") -> Dictionary:
+	for event in WorldHistory.events:
+		if int(event.get("sequence", -1)) != sequence:
+			continue
+		if str(event.get("type", "")) != "substance_taken":
+			return {"ok": false, "reason": "NOT A DRUG EXPERIENCE"}
+		var details: Dictionary = event.get("details", {})
+		if str(details.get("subject_id", "")) != subject_id:
+			return {"ok": false, "reason": "NOT YOURS"}
+		var substance_id := str(details.get("substance_id", ""))
+		var data: Dictionary = Substances.CATALOG.get(substance_id, {})
+		var strain := Substances.roll_strain(substance_id, sequence)
+		return {
+			"ok": true, "sequence": sequence, "substance_id": substance_id,
+			"title": "%s — %s" % [str(data.get("label", substance_id)).to_upper(), str(strain.strain)],
+			"role": str(data.get("role", "")), "potency": float(strain.potency),
+			"cost_kind": str(details.get("cost_kind", "")),
+			"cost_amount": float(details.get("cost_amount", 0.0)),
+		}
+	return {"ok": false, "reason": "NO SUCH RECORD"}
 
 
 ## AT1.3, measured rather than asserted. "Most of what is in it is optional"
@@ -710,15 +856,19 @@ static func required_entries() -> Array:
 
 # -- the Wire from above ------------------------------------------------------
 
-## AT1.6, the half of it that is data. "The Wire seen from 5D is what that
-## network is" — so this deliberately builds **no second dataset**: it reaches
+## AT1.6. "The Wire seen from 5D is what that network is" — so this
+## deliberately builds **no second dataset** for the accounts half: it reaches
 ## for the same `WireNet` accounts the ground-level Wire already has and
 ## re-ranks them by Tree alignment instead of reach. The same people, ordered
 ## by what they are rather than by how loud they are, which is the only
-## difference Hod actually makes.
+## difference Hod makes to who they are.
 ##
-## Its box stays open: the *content* half of AT1.6 — "the posts are being made
-## by something else" — is writing and a shader, neither of which is here.
+## The other half of the design's own line — "the posts are being made by
+## something else" — is `_posts_from_above()`: real content, attributed to
+## nobody, sitting in the same `posts` list beside the accounts. What still
+## does not exist is the shader that would make the glass itself read
+## differently up here; that is a render concern and stays open honestly
+## rather than being claimed by writing alone.
 static func wire_from_above(subject_id: String = "player") -> Dictionary:
 	var gate := bridge(subject_id, 5, 0.0)
 	if not bool(gate.get("ok", false)):
@@ -737,4 +887,36 @@ static func wire_from_above(subject_id: String = "player") -> Dictionary:
 			"alignment": WorldHistory.tree_alignment(WorldHistory.subject(account_id)),
 		})
 	rows.sort_custom(func(a, b): return float(a.alignment) > float(b.alignment))
-	return {"ok": true, "plane": 5, "sephirah": "Hod", "accounts": rows}
+	return {"ok": true, "plane": 5, "sephirah": "Hod", "accounts": rows, "posts": _posts_from_above(subject_id)}
+
+
+## AT1.6, the content half. Not a second `FILLER` table in the ground-level
+## voice (that would just be more filler) — these lines are written so that
+## nothing in them could be mistaken for a person talking.
+const TRANSMISSIONS := [
+	"THE COUNT ON THIS PAGE WAS NEVER PEOPLE.",
+	"YOUR OWN HANDLE POSTED HERE WHILE YOU WERE OFFLINE. YOU WERE OFFLINE.",
+	"THERE IS A TIER ABOVE CROWN. IT DOES NOT SCROLL AND IT DOES NOT ANSWER.",
+	"EVERY ACCOUNT ON THIS FEED RESOLVES TO THE SAME PLACE FROM HERE.",
+	"THIS IS NOT ENGAGEMENT. THIS IS BEING COUNTED.",
+	"THE REPLIES BELOW THIS POST PREDATE IT.",
+	"NOBODY WROTE THIS. SOMETHING NOTICED THE SHAPE OF WHAT YOU WOULD READ NEXT.",
+]
+
+
+## Deterministic per read, the same seeding shape `feed()` already uses, so a
+## capture of this page is reproducible rather than a fresh roll every call.
+## `human` is the field a panel checks — `false` on every row here — rather
+## than a reader having to infer authorship from an absent name, the way a
+## genuinely unattributed human post (`"UNATTRIBUTED"` in `feed()`) would be.
+static func _posts_from_above(subject_id: String) -> Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = (hash(subject_id) + WorldHistory.next_sequence * 977) & 0x7fffffff
+	var pool := TRANSMISSIONS.duplicate()
+	var picked: Array = []
+	var count := mini(4, pool.size())
+	for i in count:
+		var index := rng.randi_range(0, pool.size() - 1)
+		picked.append({"body": str(pool[index]), "author": "", "handle": "", "human": false})
+		pool.remove_at(index)
+	return picked

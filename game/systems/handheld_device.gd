@@ -137,6 +137,13 @@ const HELD_OFFSET_X := 0.045
 ## it now comes back from `WorldHistory` rather than starting at 0.78 forever.
 const DEVICE_ID := "handheld"
 var serial := 0
+## C10.15. Stamped once, from whoever's device this was when it first existed,
+## and never rewritten afterward — the same reason `serial` never regenerates.
+## `drop()`/`confiscate()`/`repossess()` all leave it untouched, so a device
+## that changed hands still says who it was made for rather than who is
+## currently holding it. Defaults to `carry.gd`'s own "THE HUNTER" fallback so
+## the two files never disagree about what an unnamed player is called.
+var owner_name := ""
 var condition := 0.78
 ## C1.7 `v2`. "It can be dropped, and it can be taken off you." Reloaded on
 ## every `open_device()` the same as `condition`/`battery` already are, so a
@@ -402,6 +409,9 @@ func load_device() -> void:
 		# A new device is nearly intact and gets its own identity. Not random per
 		# session: written down, so it is this device from now on.
 		serial = randi() % 900000 + 100000
+		# C10.15. Stamped from whoever the player is right now, once, the same
+		# moment the serial itself is fixed for good.
+		owner_name = str(WorldHistory.subject("player").get("name", "THE HUNTER"))
 		condition = 0.94
 		battery = 1.0
 		wear_log = []
@@ -415,6 +425,7 @@ func load_device() -> void:
 		save_device()
 		return
 	serial = int(record.get("serial", 90211))
+	owner_name = str(record.get("owner_name", "THE HUNTER"))
 	condition = clampf(float(record.get("condition", 0.78)), 0.0, 1.0)
 	# AS1.3. A save from before the battery existed opens full rather than
 	# empty — the honest read of "nobody has ever drained this yet".
@@ -434,6 +445,7 @@ func load_device() -> void:
 func save_device() -> void:
 	WorldHistory.update_subject(DEVICE_ID, {
 		"serial": serial,
+		"owner_name": owner_name,
 		"condition": snappedf(condition, 0.001),
 		"battery": snappedf(battery, 0.001),
 		"wear_log": wear_log.duplicate(),
@@ -1165,6 +1177,11 @@ func _draw_back(rect: Rect2, alpha: float) -> void:
 	# the shell, so unlike the reflection it does not sway when the device moves.
 	var jester_at := Vector2(rect.position.x + rect.size.x * 0.39, rect.get_center().y - 16.0)
 	BlackMirror.draw_jester(self, jester_at, minf(rect.size.x, rect.size.y) * 0.48, alpha, 0.0)
+	# C10.15. Whoever picks this up reads whose it was off the case itself —
+	# stamped once with `owner_name` (see its own doc comment) and never the
+	# current holder, so a dropped or confiscated unit still names the person
+	# it was made for.
+	CellOutzType.draw_condensed(self, Vector2(rect.position.x + 44, rect.end.y - 92), "PROPERTY OF %s" % owner_name.to_upper(), 9.0, CASE_EDGE * Color(1, 1, 1, 0.82 * alpha), 0.8)
 	CellOutzType.draw_stamped(self, Vector2(rect.position.x + 42, rect.end.y - 76), "WIZARDS ONLY FOOLZ", 17.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.28 * alpha), 1.3)
 	CellOutzType.draw_condensed(self, Vector2(rect.position.x + 44, rect.end.y - 43), "UNIT %06d // RELEASE O: MIRROR" % serial, 9.0, CASE_EDGE * Color(1, 1, 1, 0.82 * alpha), 0.8)
 
