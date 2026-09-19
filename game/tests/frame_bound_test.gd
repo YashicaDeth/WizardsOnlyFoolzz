@@ -63,6 +63,7 @@ func _ready() -> void:
 	var width := 1280
 	var height := 720
 	var soak := false
+	var breakdown := false
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--scene="):
 			scene_path = argument.trim_prefix("--scene=")
@@ -72,6 +73,8 @@ func _ready() -> void:
 			height = int(argument.trim_prefix("--height="))
 		elif argument == "--soak":
 			soak = true
+		elif argument == "--breakdown":
+			breakdown = true
 	get_window().size = Vector2i(width, height)
 	await tree.process_frame
 
@@ -89,6 +92,11 @@ func _ready() -> void:
 
 	if soak:
 		await _soak(tree, scene)
+		print("FRAME_BOUND_RESULT done")
+		tree.quit(0)
+		return
+	if breakdown:
+		await _breakdown(tree, scene)
 		print("FRAME_BOUND_RESULT done")
 		tree.quit(0)
 		return
@@ -302,6 +310,61 @@ func _soak(tree: SceneTree, scene: Node) -> void:
 	print("SOAK_DRIFT %+.2f ms from first sample to last" % (await _sample(tree) - first))
 
 
+## Fast follow-up once the scale/rate sweep has identified a simulation-bound
+## frame.  The broad sweep answers *which subsystem*; this mode answers which
+## owner inside that subsystem deserves the next inspection without paying for
+## the scale sweep again.
+func _breakdown(tree: SceneTree, scene: Node) -> void:
+	print("physics owner breakdown — each owner is toggled in place")
+
+	var hunt_before := await _settle_and_sample(tree)
+	scene.set_physics_process(false)
+	var hunt_quiet := await _settle_and_sample(tree)
+	scene.set_physics_process(true)
+	var hunt_after := await _settle_and_sample(tree)
+	print("")
+	print("Hunt root physics tick")
+	_verdict("Hunt root tick", hunt_before, hunt_after, hunt_quiet)
+
+	var rigs := _rigs(scene)
+	if not rigs.is_empty():
+		var rigs_before := await _settle_and_sample(tree)
+		_set_ticking(rigs, false)
+		var rigs_quiet := await _settle_and_sample(tree)
+		_set_ticking(rigs, true)
+		var rigs_after := await _settle_and_sample(tree)
+		print("")
+		print("rig-owned callbacks — %d rigs" % rigs.size())
+		_verdict("rig callbacks", rigs_before, rigs_after, rigs_quiet)
+
+	var world_bodies := _world_static_bodies(scene)
+	if not world_bodies.is_empty():
+		var saved_layers: Array[int] = []
+		for body in world_bodies:
+			saved_layers.append(body.collision_layer)
+		var world_before := await _settle_and_sample(tree)
+		_set_collision_layers(world_bodies, 0)
+		var world_quiet := await _settle_and_sample(tree)
+		_restore_collision_layers(world_bodies, saved_layers)
+		var world_after := await _settle_and_sample(tree)
+		print("")
+		print("generated world collision — %d static bodies" % world_bodies.size())
+		_verdict("generated collision", world_before, world_after, world_quiet)
+
+	var ballistics := scene.get_node_or_null("Ballistics")
+	if ballistics != null:
+		var shots_before := await _settle_and_sample(tree)
+		ballistics.set_physics_process(false)
+		var shots_quiet := await _settle_and_sample(tree)
+		ballistics.set_physics_process(true)
+		var shots_after := await _settle_and_sample(tree)
+		print("")
+		print("Ballistics physics tick")
+		_verdict("Ballistics tick", shots_before, shots_after, shots_quiet)
+
+	_census(scene)
+
+
 ## Report one toggled experiment against its own noise.
 ##
 ## The scene does not produce the same number twice: samples of an unchanged
@@ -381,6 +444,30 @@ func _set_monitoring(areas: Array[Area3D], value: bool) -> void:
 	for area in areas:
 		if is_instance_valid(area):
 			area.monitoring = value
+
+
+func _world_static_bodies(root: Node) -> Array[StaticBody3D]:
+	var found: Array[StaticBody3D] = []
+	var stack: Array[Node] = [root]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		for child in node.get_children():
+			stack.append(child)
+		if node is StaticBody3D and _blame(node) == "ashbloom_world_generator.gd":
+			found.append(node as StaticBody3D)
+	return found
+
+
+func _set_collision_layers(bodies: Array[StaticBody3D], layer: int) -> void:
+	for body in bodies:
+		if is_instance_valid(body):
+			body.collision_layer = layer
+
+
+func _restore_collision_layers(bodies: Array[StaticBody3D], layers: Array[int]) -> void:
+	for index in mini(bodies.size(), layers.size()):
+		if is_instance_valid(bodies[index]):
+			bodies[index].collision_layer = layers[index]
 
 
 func _settle_and_sample(tree: SceneTree) -> float:

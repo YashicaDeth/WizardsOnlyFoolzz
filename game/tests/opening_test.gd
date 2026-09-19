@@ -41,8 +41,12 @@ func _ready() -> void:
 	check(hunt.player_body is CharacterBody3D, "hunter uses collision body")
 	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "the Hunt's authored cast seeds in one closed bootstrap batch")
 	var building: Node3D = hunt.generated_world.generated_buildings[0]
-	var floor_shape: BoxShape3D = building.get_child(5).get_child(0).shape
-	var depth := floor_shape.size.z
+	var dimensions: Vector3 = building.get_meta("dimensions", Vector3.ZERO)
+	var depth := dimensions.z
+	check(depth > 0.0, "generated building exposes its authored dimensions without depending on child order")
+	var shared_collision := building.get_node_or_null("Collision") as StaticBody3D
+	check(shared_collision != null and shared_collision.get_child_count() >= 7,
+		"one building shares one physics body across its detailed wall shapes")
 	hunt.player_body.position = building.position + Vector3(0, 0.92, depth * 0.5 + 2)
 	await get_tree().physics_frame
 	check(not hunt.player_body.test_move(hunt.player_body.global_transform, Vector3(0, 0, -3)), "doorway admits hunter")

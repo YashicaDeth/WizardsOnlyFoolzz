@@ -429,7 +429,12 @@ func _draw_vertical_fluid_vessel(rect: Rect2, ratio: float, fluid: Color, label:
 	if amount > 0.001:
 		var filled_height := inner.size.y * amount
 		var surface_y := inner.end.y - filled_height
-		var wave := sin(elapsed * 2.2 + rect.position.x * 0.05) * 1.1
+		# Near empty, the old fixed-height wave could put one surface corner
+		# below the vessel floor. That turns this otherwise simple quad inside
+		# out and makes CanvasItem reject it every frame. Let the ripple grow
+		# with the available fluid depth so a drained ampoule remains valid.
+		var wave_limit := maxf(0.0, minf(1.1, filled_height * 0.45))
+		var wave := sin(elapsed * 2.2 + rect.position.x * 0.05) * wave_limit
 		var fluid_shape := PackedVector2Array([
 			Vector2(inner.position.x, surface_y + wave),
 			Vector2(inner.end.x, surface_y - wave), inner.end,

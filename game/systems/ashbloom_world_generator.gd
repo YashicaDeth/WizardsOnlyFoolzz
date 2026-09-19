@@ -146,8 +146,17 @@ func _build_enterable_shell(at: Vector3, dimensions: Vector3, color: Color, sign
 	var building := Node3D.new()
 	building.name = "Enterable_%03d" % generated_buildings.size()
 	building.position = at
+	building.set_meta("dimensions", dimensions)
 	add_child(building)
 	generated_buildings.append(building)
+	# One immovable building is one physics body. The old layout created a
+	# separate StaticBody3D for every wall, floor, roof and decorative storey
+	# band: 654 server bodies for sixty shells. Collision detail still lives in
+	# the same individual BoxShape3Ds, but they now share the transform and
+	# lifetime of the building they belong to.
+	var collision_body := StaticBody3D.new()
+	collision_body.name = "Collision"
+	building.add_child(collision_body)
 	var wall_thickness := 0.45
 	var half_x := dimensions.x * 0.5
 	var half_z := dimensions.z * 0.5
@@ -196,20 +205,26 @@ func _build_enterable_shell(at: Vector3, dimensions: Vector3, color: Color, sign
 
 
 func _add_wall(parent: Node3D, at: Vector3, dimensions: Vector3, color: Color) -> void:
-	var body := StaticBody3D.new()
-	body.position = at
-	parent.add_child(body)
+	var body := parent.get_node_or_null("Collision") as StaticBody3D
+	if body == null:
+		# Defensive fallback for small harnesses that call this helper directly
+		# instead of constructing a complete enterable shell.
+		body = StaticBody3D.new()
+		body.name = "Collision"
+		parent.add_child(body)
 	var collision := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
 	shape.size = dimensions
 	collision.shape = shape
+	collision.position = at
 	body.add_child(collision)
 	var mesh_instance := MeshInstance3D.new()
 	var box := BoxMesh.new()
 	box.size = dimensions
 	box.material = _material(color, 0.0)
 	mesh_instance.mesh = box
-	body.add_child(mesh_instance)
+	mesh_instance.position = at
+	parent.add_child(mesh_instance)
 
 
 ## The whole region was built with its own flat material function and never
