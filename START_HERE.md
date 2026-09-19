@@ -1,26 +1,22 @@
-# START HERE — Lane 7
+# START HERE — Lane 1
 
-This worktree is lane 7. Read this file, then begin.
-Your branch is `lane-7-merge`. Stay inside the file family below.
+This worktree is lane 1. Read this file, then begin.
+Your branch is `lane-1-body`. Stay inside the file family below.
 
 ---
 
-## Lane 7 — Merging
+## Lane 1 — The body and what happens to it
 
-**Owns:** nothing. Writes no features.
+**Owns:** `baseline_human.gd`, `anatomy_component.gd`, `wound_marks.gd`,
+`blood_flow.gd`, `penetration.gd`, `body_mesh.gd`, `gore_chunks.gd`,
+`body_mirror.gd`, `carrion_scavenger.gd`, `bone_yard_hunt.gd`, `gore_demo.gd`
 
-**Target:** 99 commits unmerged across 9 branches -> 0
+**Target:** B 94% -> 100%, AN 70.3% -> 90%, O 61.4% -> 80%
 
-**Read this one twice before deciding it is a waste of an account.** There are
-**99** finished commits sitting on `agent-b` (26), `origin/agent-b` (20),
-`claude/b-ladder` (15), `codex/sol-agent-1` (12), `agent-c` (11) and four
-others — and that number went *up* by 23 over the course of one day's work. That work is already
-done and is invisible to everyone. Six more agents writing into that makes the
-number grow, not shrink — authoring has never been the bottleneck here.
-
-This lane merges one branch at a time, runs the test suites after each, and
-stops to ask when two branches disagree about a file rather than picking a side.
-It is also the only lane that should ever resolve a conflict.
+Five items left in B and four of them are blocked on the quantum restart, which
+does not exist anywhere in the codebase — do not build it to close them. AN's
+`AN6.x` (a wound as an opening with depth you can see into, organs falling out
+through it) is the real work and it builds directly on `penetration.gd`.
 
 ---
 
