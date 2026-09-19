@@ -1,5 +1,10 @@
 # Four agents, one game — the split
 
+> **Superseded for allocation by `AGENT_SPLIT_6.md`.** This four-seat split was
+> written for a different set of agents. Its *rules* still govern — own a
+> worktree, never `git add -A`, one owner per file family, never claim an
+> unseen visual result — but do not take a lane from this file.
+
 Written 2026-09-12. Greg is running three Claude accounts plus Codex. This is
 how the remaining work divides so that four agents can grind in parallel without
 fighting over the same files.

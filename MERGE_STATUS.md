@@ -1,5 +1,10 @@
 # Merge status — 15 September 2026, overnight
 
+> **Stale. Do not quote its numbers.** Its "P is 7 of 45" was already wrong
+> when it was written — P measured 23 of 45 on 16 September. For live branch
+> and merge state read `ORCA/STATE.md`, or just measure it:
+> `git rev-list --count codex/game-planning..<branch>`.
+
 Integration pass run while nobody was awake. This file is the handover: what
 landed, what did not, and the five questions that have to be answered before
 the rest can.

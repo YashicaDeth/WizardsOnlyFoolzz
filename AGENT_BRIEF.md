@@ -1,5 +1,9 @@
 # Agent brief — Wizards Only Fools
 
+> **Superseded by `AGENT_BRIEF_CURRENT.md`.** Kept only because several files
+> still link here. Read the current brief instead; anything here that
+> contradicts it is out of date.
+
 Paste this whole file to any coding agent starting work on this project. It is
 written to be handed over cold and assumes no prior conversation.
 
