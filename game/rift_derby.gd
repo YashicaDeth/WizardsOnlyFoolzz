@@ -75,6 +75,20 @@ var service_relays: Array[Node3D] = []
 var service_exposure := 0.0
 var service_scan_announced := false
 var lockdown_briefing := 7.0
+## AP1.4/P10.5. The institution calls the pre-heat execution a festival. It is
+## not a title card: the player sits in the real cab while a press turns the
+## previous entrant into the numbered meat loaded beside the track. The three
+## seconds before the horn withhold vehicle control, so the beat costs no
+## playable time and ends before the heat begins.
+var gore_festival: Node3D
+var festival_victim: Node3D
+var festival_slabs: Node3D
+var festival_left_press: Node3D
+var festival_right_press: Node3D
+var festival_clock := 0.0
+var festival_impact_played := false
+var festival_completed := false
+const GORE_FESTIVAL_SECONDS := 4.4
 
 ## The bezel `celloutz_hud.gd` draws for the driver, in its own coordinates, so
 ## the bust lands inside the frame instead of beside it. Kept next to the
@@ -193,6 +207,8 @@ var reticle: Control
 func _ready() -> void:
 	_apply_gore_setting()
 	_build_world()
+	if is_colosseum:
+		countdown = 5.0
 	_build_boat()
 	# AF1.8/AF10.8. Fixed to the sidearm — a mounted cab gun, not a full
 	# loadout switch while driving, which nobody asked for and which would
@@ -353,8 +369,12 @@ func _physics_process(delta: float) -> void:
 		return
 	if round_state == "countdown":
 		countdown -= delta
+		_update_gore_festival(delta)
 		mode_label.visible = true
-		mode_label.text = "DISABLE EIGHT WRECKERS // %d" % maxi(1, ceili(countdown))
+		if is_colosseum and not festival_completed:
+			mode_label.text = "GORE FESTIVAL // LOT 0C-7 // PRESSING"
+		else:
+			mode_label.text = "DISABLE EIGHT WRECKERS // %d" % maxi(1, ceili(countdown))
 		if countdown <= 0.0:
 			round_state = "active"
 		# Greg: *"the cars in the derby ... you still cant shoot ... there no car
@@ -563,6 +583,7 @@ func _build_colosseum_world() -> void:
 	for tunnel_index in tunnel_angles.size():
 		_build_colosseum_tunnel(tunnel_angles[tunnel_index], tunnel_index)
 	_build_colosseum_ring_corridor(tunnel_angles)
+	_build_gore_festival()
 	var light_count := arena_light_budget()
 	for index in light_count:
 		var light := OmniLight3D.new()
@@ -575,6 +596,146 @@ func _build_colosseum_world() -> void:
 		light.omni_attenuation = 1.15
 		light.shadow_enabled = index % 4 == 0 and WorldLook.quality != WorldLook.Quality.PERFORMANCE
 		add_child(light)
+
+
+## The spectacle is framed straight through the player's windscreen at the
+## centre of the underground bowl. All pieces are deliberately simple authored
+## primitives: a readable body, two industrial jaws and the result. It is one
+## transformation the player watches, not decorative gore scattered around a
+## room and called a festival.
+func _build_gore_festival() -> void:
+	gore_festival = Node3D.new()
+	gore_festival.name = "GoreFestivalPress"
+	# The player's cab begins at z=22 looking toward -z. This is close enough to
+	# read as a ceremony performed at the windscreen; the entire assembly lifts
+	# into the roof before the horn, so it never becomes a driving obstacle.
+	gore_festival.position = Vector3(0.0, 0.0, 10.0)
+	add_child(gore_festival)
+
+	var gantry := BoxMesh.new()
+	gantry.size = Vector3(13.0, 0.55, 1.0)
+	_add_mesh_to(gore_festival, gantry, Vector3(0.0, 8.0, 0.0), Color("302820"), 0.0, Vector3.ZERO, "Gantry")
+	for side in [-1.0, 1.0]:
+		var upright := BoxMesh.new()
+		upright.size = Vector3(0.7, 8.0, 0.9)
+		_add_mesh_to(gore_festival, upright, Vector3(6.0 * side, 4.0, 0.0), Color("211b17"), 0.0)
+
+	festival_left_press = Node3D.new()
+	festival_left_press.name = "LeftPressJaw"
+	gore_festival.add_child(festival_left_press)
+	var left_jaw := BoxMesh.new()
+	left_jaw.size = Vector3(2.4, 5.2, 1.5)
+	_add_mesh_to(festival_left_press, left_jaw, Vector3.ZERO, Color("6b3028"), 0.28, Vector3.ZERO, "Jaw", "rust", 704)
+	festival_right_press = Node3D.new()
+	festival_right_press.name = "RightPressJaw"
+	gore_festival.add_child(festival_right_press)
+	var right_jaw := BoxMesh.new()
+	right_jaw.size = Vector3(2.4, 5.2, 1.5)
+	_add_mesh_to(festival_right_press, right_jaw, Vector3.ZERO, Color("6b3028"), 0.28, Vector3.ZERO, "Jaw", "rust", 705)
+
+	festival_victim = Node3D.new()
+	festival_victim.name = "FestivalVictim"
+	gore_festival.add_child(festival_victim)
+	_build_pressed_victim(festival_victim)
+
+	festival_slabs = Node3D.new()
+	festival_slabs.name = "PressedMeatSlabs"
+	festival_slabs.visible = false
+	gore_festival.add_child(festival_slabs)
+	for index in 3:
+		var slab_y := float(index) * 0.84
+		var slab := BoxMesh.new()
+		slab.size = Vector3(1.55, 0.78, 1.0)
+		_add_mesh_to(
+			festival_slabs, slab, Vector3(0.0, slab_y, 0.0),
+			Color("8b211b") if viscera_fx else Color("5a3e36"), 0.32,
+			Vector3(0.0, 0.0, (-0.025 + float(index) * 0.025)),
+			"LOT_0C7_%02d" % (index + 1), "flesh", 710 + index
+		)
+		# It must read as compressed anatomy rather than three generic red boxes:
+		# pale bone is caught in each face and two dark press straps still bind it.
+		var bone := CylinderMesh.new()
+		bone.top_radius = 0.07
+		bone.bottom_radius = 0.09
+		bone.height = 0.72
+		_add_mesh_to(festival_slabs, bone, Vector3(-0.18 + float(index) * 0.16, slab_y, 0.54), Color("d4c6a4"), 0.18, Vector3(0.0, 0.0, PI * 0.5), "Bone_%02d" % index, "bone", 720 + index)
+		for band_side in [-1.0, 1.0]:
+			var band := BoxMesh.new()
+			band.size = Vector3(1.66, 0.07, 1.08)
+			_add_mesh_to(festival_slabs, band, Vector3(0.0, slab_y + 0.21 * band_side, 0.0), Color("241b18"), 0.0, Vector3.ZERO, "PressBand")
+	var tray := BoxMesh.new()
+	tray.size = Vector3(4.8, 0.35, 2.0)
+	_add_mesh_to(gore_festival, tray, Vector3(0.0, 0.35, 0.0), Color("312721"), 0.0, Vector3.ZERO, "CollectionTray")
+	var work_light := OmniLight3D.new()
+	work_light.name = "PressWorkLight"
+	work_light.position = Vector3(0.0, 6.6, 2.2)
+	work_light.light_color = Color("ef9b72")
+	work_light.light_energy = 5.0
+	work_light.omni_range = 11.0
+	work_light.shadow_enabled = WorldLook.quality != WorldLook.Quality.PERFORMANCE
+	gore_festival.add_child(work_light)
+	_set_gore_festival_pose(0.0)
+
+
+func _build_pressed_victim(parent: Node3D) -> void:
+	var flesh := Color("8c3a2d") if viscera_fx else Color("66514a")
+	var torso := CapsuleMesh.new()
+	torso.radius = 0.58
+	torso.height = 2.2
+	_add_mesh_to(parent, torso, Vector3(0.0, 4.2, 0.0), flesh, 0.38, Vector3.ZERO, "Torso", "flesh", 701)
+	var head := SphereMesh.new()
+	head.radius = 0.48
+	head.height = 0.96
+	_add_mesh_to(parent, head, Vector3(0.0, 5.75, 0.0), flesh.darkened(0.08), 0.38, Vector3.ZERO, "Head", "flesh", 702)
+	for side in [-1.0, 1.0]:
+		var arm := CapsuleMesh.new()
+		arm.radius = 0.18
+		arm.height = 1.9
+		_add_mesh_to(parent, arm, Vector3(0.8 * side, 4.15, 0.0), flesh.darkened(0.05), 0.38, Vector3(0.0, 0.0, 0.18 * side), "Arm")
+		var leg := CapsuleMesh.new()
+		leg.radius = 0.23
+		leg.height = 2.25
+		_add_mesh_to(parent, leg, Vector3(0.3 * side, 2.15, 0.0), flesh.darkened(0.12), 0.38, Vector3.ZERO, "Leg")
+
+
+func _update_gore_festival(delta: float) -> void:
+	if not is_colosseum or gore_festival == null or festival_completed:
+		return
+	festival_clock = minf(5.0, festival_clock + delta)
+	_set_gore_festival_pose(festival_clock)
+	if festival_clock >= 2.25 and not festival_impact_played:
+		festival_impact_played = true
+		if derby_audio != null:
+			derby_audio.play_impact(1.0, gore_festival.global_position + Vector3.UP * 3.5, "meat")
+		crowd_reaction = 1.0
+	if festival_clock >= GORE_FESTIVAL_SECONDS:
+		festival_completed = true
+		if WorldHistory.event_count("gore_festival_witnessed") == 0:
+			WorldHistory.record_event("gore_festival_witnessed", {
+				"venue": "underground_colosseum",
+				"lot": "0C-7",
+				"slabs": 3,
+			})
+
+
+func _set_gore_festival_pose(at: float) -> void:
+	if gore_festival == null:
+		return
+	var closing := smoothstep(0.0, 1.0, clampf((at - 0.9) / 1.35, 0.0, 1.0))
+	var opening := smoothstep(0.0, 1.0, clampf((at - 2.55) / 0.85, 0.0, 1.0))
+	var jaw_gap := lerpf(4.1, 0.75, closing)
+	jaw_gap = lerpf(jaw_gap, 4.1, opening)
+	festival_left_press.position = Vector3(-jaw_gap, 4.0, 0.0)
+	festival_right_press.position = Vector3(jaw_gap, 4.0, 0.0)
+	var pressed := clampf((at - 0.9) / 1.35, 0.0, 1.0)
+	festival_victim.scale = Vector3(lerpf(1.4, 0.25, pressed), lerpf(1.1, 0.72, pressed), 1.15)
+	festival_victim.visible = at < 2.25
+	festival_slabs.visible = at >= 2.25
+	if festival_slabs.visible:
+		var drop := smoothstep(0.0, 1.0, clampf((at - 2.25) / 0.75, 0.0, 1.0))
+		festival_slabs.position = Vector3(0.0, lerpf(4.2, 0.7, drop), 0.0)
+	var retract := smoothstep(0.0, 1.0, clampf((at - 3.4) / 1.0, 0.0, 1.0))
+	gore_festival.position = Vector3(0.0, lerpf(0.0, 9.0, retract), 10.0)
 
 
 ## The arena used to have a tall ring wall but no lid, so the environment sky
