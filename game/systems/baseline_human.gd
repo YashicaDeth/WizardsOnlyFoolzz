@@ -829,22 +829,61 @@ func _on_organ_ruptured(organ_id: String, _organ: Dictionary) -> void:
 	var spec: Dictionary = ORGAN_LAYOUT.get(organ_id, {})
 	var organ := organ_parts.get(organ_id) as Node3D
 	var origin := organ.global_position if organ != null and is_instance_valid(organ) and organ.is_inside_tree() else _zone_origin("torso")
-	_hide_organ(organ_id)
 	_spray(origin, Vector3.UP, 12)
-	if spec.is_empty() or live_gore >= live_gore_budget():
+	if spec.is_empty():
+		_hide_organ(organ_id)
 		return
-	var root := _gore_root()
-	var loose_organ := MeshInstance3D.new()
-	var mesh := SphereMesh.new()
-	mesh.radius = float(spec.size) * 1.05
-	mesh.height = mesh.radius * 2.2
-	mesh.material = WorldLook.surface(Color(str(spec.tint)), "flesh", _variation + 21)
-	loose_organ.mesh = mesh
-	root.add_child(loose_organ)
-	loose_organ.global_position = origin
+	_spill_organ(organ_id)
+
+
+## AN6.2. A ruptured organ leaves the body as itself — the exact mesh the X-ray
+## already shows, handed to a real `RigidBody3D` — rather than a cosmetic blob
+## on a hand-integrated trajectory nothing else in the project could find. The
+## same move `_throw_limb()` already makes for a severed limb: duplicate the
+## geometry, wrap it in a physics body, register it with `GoreChunks` so it
+## rots and sheds like everything else that comes off a body, and — AN6.3 —
+## can eventually be picked up the same way a severed limb already can.
+func _spill_organ(organ_id: String) -> void:
+	var organ := organ_parts.get(organ_id) as MeshInstance3D
+	if organ == null or not is_instance_valid(organ) or not organ.is_inside_tree():
+		return
+	if live_gore >= live_gore_budget():
+		return
+	var body := RigidBody3D.new()
+	body.name = "organ_%s_loose" % organ_id
+	body.mass = 0.3
+	body.continuous_cd = true
+	_gore_root().add_child(body)
+	body.global_transform = organ.global_transform
+	organ.visible = false
+
+	var visual := MeshInstance3D.new()
+	# Organs carry their colour on the mesh resource itself (`_build_organs()`
+	# sets `mesh.material`, not `material_override`), so a duplicate rather
+	# than a shared reference — `see_through()` still walks `organ_parts` and
+	# mutates that material's depth test on the hidden original whenever the
+	# X-ray is toggled, and a shared mesh would carry that flicker onto the
+	# piece now lying across the room.
+	visual.mesh = organ.mesh.duplicate(true)
+	body.add_child(visual)
+
+	var shape_node := CollisionShape3D.new()
+	var shape := SphereShape3D.new()
+	shape.radius = maxf(0.03, (organ.mesh as SphereMesh).radius)
+	shape_node.shape = shape
+	body.add_child(shape_node)
+
+	var zone_id := str((ORGAN_LAYOUT.get(organ_id, {}) as Dictionary).get("zone", "torso"))
+	GoreChunks.register_organ(body, organ_id, zone_id, anatomy.subject_id)
 	var spill := Vector3(randf_range(-1.0, 1.0), randf_range(0.2, 0.8), randf_range(-1.0, 1.0)).normalized()
-	_loose.append({"node": loose_organ, "velocity": spill * (2.2 + randf() * 2.4), "life": 9.0})
+	body.apply_central_impulse(spill * (1.8 + randf() * 2.0) * body.mass)
+	body.apply_torque_impulse(Vector3(randf_range(-3.0, 3.0), randf_range(-3.0, 3.0), randf_range(-3.0, 3.0)))
 	live_gore += 1
+	get_tree().create_timer(90.0).timeout.connect(func():
+		live_gore = maxi(0, live_gore - 1)
+		GoreChunks.live.erase(body)
+		if is_instance_valid(body):
+			body.queue_free())
 
 
 func install_prosthetic(zone_id: String, part_data: Dictionary) -> void:
@@ -1377,7 +1416,7 @@ func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, dama
 	# before, so a fresh hole shows the depth the body was already opened to and
 	# deepens on the next frame's refresh rather than predicting itself.
 	var layer := int(zone_depth.get(zone, 0))
-	var wound: Dictionary = WoundMarks.make(surface["at"], surface["normal"], damage, damage_type, layer)
+	var wound: Dictionary = WoundMarks.make(surface["at"], surface["normal"], damage, damage_type, layer, local_travel)
 	wound["depth"] = shot["fraction"]
 	wound["through"] = shot["through"]
 	# A hole that nearly went through looks nearly like one that did.
@@ -1387,7 +1426,7 @@ func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, dama
 	# --- and out the other side ------------------------------------------
 	if bool(shot["through"]):
 		var exit_at: Vector3 = local_point - (surface["normal"] as Vector3) * float(shot["thickness"])
-		var exit_wound: Dictionary = WoundMarks.make(exit_at, -(surface["normal"] as Vector3), damage, damage_type, layer)
+		var exit_wound: Dictionary = WoundMarks.make(exit_at, -(surface["normal"] as Vector3), damage, damage_type, layer, local_travel)
 		exit_wound["radius"] = float(exit_wound["radius"]) * WoundMarks.EXIT_SPREAD
 		exit_wound["depth"] = 1.0
 		exit_wound["through"] = true

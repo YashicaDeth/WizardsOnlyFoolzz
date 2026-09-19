@@ -73,6 +73,25 @@ func _ready() -> void:
 	var organ: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "ballistic", 4)
 	check(float(organ["radius"]) > float(skin["radius"]), "a wound into the organ layer reads bigger than one that only broke skin")
 
+	# --- AN6.5: weapon and angle author the silhouette -----------------------
+	var straight_round: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "ballistic", 0, Vector3.DOWN)
+	var grazing_round: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "ballistic", 0, Vector3(1.0, -0.12, 0.0))
+	var straight_cut: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "cut", 0, Vector3.DOWN)
+	check(float(straight_cut["aspect"]) > float(straight_round["aspect"]), "a blade authors a longer opening than a round at the same damage and angle")
+	check(float(grazing_round["aspect"]) > float(straight_round["aspect"]), "a grazing round stretches along its real path instead of stamping the perpendicular entry")
+	var along_x: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "ballistic", 0, Vector3(1.0, -0.12, 0.0))
+	var along_z: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "ballistic", 0, Vector3(0.0, -0.12, 1.0))
+	check(absf(float(along_x["shape_rotation"]) - float(along_z["shape_rotation"])) > 1.0, "the long axis follows the strike tangent rather than a fixed body axis")
+	var slash_node := MARKS.build(straight_cut, Color.WHITE)
+	var round_node := MARKS.build(straight_round, Color.WHITE)
+	var slash_bounds: Vector3 = slash_node.mesh.get_aabb().size
+	var round_bounds: Vector3 = round_node.mesh.get_aabb().size
+	check(slash_bounds.x / maxf(slash_bounds.z, 0.0001) > round_bounds.x / maxf(round_bounds.z, 0.0001), "the authored blade profile reaches the actual crater geometry")
+	slash_node.free()
+	round_node.free()
+	var restored_shape: Dictionary = MARKS.from_record(MARKS.to_record(grazing_round))
+	check(is_equal_approx(float(restored_shape["aspect"]), float(grazing_round["aspect"])) and is_equal_approx(float(restored_shape["shape_rotation"]), float(grazing_round["shape_rotation"])), "the authored silhouette survives the same save record as the wound")
+
 	# --- AN6.1: an opening with depth, not a decal --------------------------
 	# The crater's own sink has to answer to how far the round actually got,
 	# not just sit at a fixed multiple of the rim's radius — otherwise a graze

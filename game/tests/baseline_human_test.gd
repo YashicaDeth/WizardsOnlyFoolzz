@@ -256,10 +256,22 @@ func _test_organs() -> void:
 	var gut_bleed: float = gutted.anatomy.bleed_rate
 	gutted.queue_free()
 
+	# Random organ selection in earlier hits (`_test_gore()`'s unaimed torso
+	# shears among others) can already have thrown a "heart" chunk into the
+	# registry by chance — clear it so the check below is unambiguously this
+	# rupture's own chunk rather than a coincidence from a prior test. The
+	# earlier gore tests also leave `live_gore` sitting at its own cap, which
+	# gates a whole-organ spill exactly the way it already gates a thrown limb.
+	GoreChunks.clear()
+	BaselineHuman.live_gore = 0
 	var shot := _rig()
 	shot.hit("torso", 90.0, 20.0, "cut", "heart")
 	check(shot.anatomy.internal_bleed_rate > gutted.anatomy.internal_bleed_rate, "a heart shot bleeds harder inside than a gut wound (%.1f vs %.1f)" % [shot.anatomy.internal_bleed_rate, gutted.anatomy.internal_bleed_rate])
 	check(not shot.organ_parts["heart"].visible, "a ruptured organ leaves the body")
+	# AN6.2: it leaves as a real physics body registered with GoreChunks, not a
+	# hand-integrated blob nothing else in the project could find or pick up.
+	var heart_chunks := GoreChunks.live.filter(func(piece): return is_instance_valid(piece) and str(GoreChunks.identify(piece).get("organ_id", "")) == "heart" and bool(GoreChunks.identify(piece).get("whole_organ", false)))
+	check(heart_chunks.size() == 1 and heart_chunks[0] is RigidBody3D, "the ruptured heart falls out as a real physics body (%d found)" % heart_chunks.size())
 	shot.queue_free()
 
 	var executed := _rig()
