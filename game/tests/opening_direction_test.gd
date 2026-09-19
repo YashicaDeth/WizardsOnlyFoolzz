@@ -33,6 +33,11 @@ func _ready() -> void:
 	check(opening.opening_audio.played_cues.has("drain"), "voiding has its own sound event")
 	opening._breach()
 	check(opening.opening_audio.played_cues.has("glass"), "the breach has its own sound event")
+	check(opening.breakout_complete and opening.first_acquisition_complete, "the soul/implant breakout completes instead of stalling in the vat")
+	check(OpeningDirector.reached("broke_free"), "breakout is persisted as an opening stage")
+	var carried: Array = WorldHistory.subject("inventory").get("items", [])
+	check(carried.any(func(item): return str((item as Dictionary).get("label", "")).contains("MEDICAL RESTRAINT")), "the first physical acquisition uses the shared inventory")
+	check(str(WorldHistory.subject("player").get("status", "")) == "broke free", "the player's body and history record the breakout")
 
 	# K3.2. The opening reframed: CellOutz grew you, which is why the debt is
 	# in the meat. Checked as real scene content, not just prose in a design doc.
@@ -46,6 +51,8 @@ func _ready() -> void:
 	opening.phase = "floor"
 	opening._update_sequence(0.05)
 	check(opening.can_move, "normal control arrives in under nine seconds after filing")
+	opening._update_hud()
+	check(opening.get_node("HUD/Objective").text.contains("ESCAPE THE FACILITY"), "the escape objective remains legible when control arrives")
 
 	OpeningDirector.advance("entered_pit")
 	check(str(OpeningDirector.resume_destination().scene) == "res://underground_colosseum.tscn", "an unfinished heat resumes in the real underground colosseum")
