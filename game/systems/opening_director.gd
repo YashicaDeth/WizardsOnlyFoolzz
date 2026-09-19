@@ -12,7 +12,7 @@ extends RefCounted
 ##   left_facility -> out into the Ashbloom Expanse
 
 const SUBJECT := "opening_run"
-const STAGES := ["none", "woke", "entered_pit", "won_derby", "took_wire", "left_facility"]
+const STAGES := ["none", "woke", "broke_free", "entered_pit", "won_derby", "took_wire", "left_facility"]
 
 
 static func stage() -> String:
