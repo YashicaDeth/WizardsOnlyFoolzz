@@ -739,6 +739,20 @@ var dead_bodies: Array[Dictionary] = []
 var carrion_scavengers: Array[Node3D] = []
 var extraction_session: Dictionary = {}
 var witness_ledger := WitnessLedger.new()
+## P2b. Which holding the player's own ground belongs to. Learned the first
+## time `_enforce_demo_territory()` runs in a demo rather than assumed to be
+## "bone_yard" by name — the Voronoi border in `ashbloom_holdings.gd` decides
+## that from real coordinates, and the Hunt's own spawn point is not
+## guaranteed to fall inside the cell that shares its name.
+var _demo_home_holding := ""
+## The last position confirmed inside that holding, so a refusal puts the
+## player back on their own ground rather than teleporting them to the
+## scene's original spawn or leaving them pressed against the line.
+var _demo_last_home_position := player
+## Which neighbouring holding the player was most recently turned back from,
+## so the line is written once per approach — to the prompt and to history —
+## rather than once per physics frame spent leaning on the border.
+var _demo_border_named_holding := ""
 ## B3.3/B3.6. Hold G and you are looking through people; keep holding and the
 ## ring the X-ray has always been one seat of opens into the full wheel.
 var xray_held := 0.0
@@ -1642,6 +1656,7 @@ func _physics_process(delta: float) -> void:
 		guarding = false
 		guard_raised = 0.0
 	_update_player(delta)
+	_enforce_demo_territory()
 	_update_rival(delta)
 	_update_encounter_actors(delta)
 	_maintain_roamers(delta)
@@ -1907,6 +1922,41 @@ func _update_player(delta: float) -> void:
 	body_motion.set_combat_pose(1.0 if exterior_aim_pose else 0.0, "firearm" if exterior_aim_pose else "")
 	body_motion.update(animation_delta, player_body.velocity, player_body.is_on_floor(), sprinting, crouching, dodge_remaining > 0.0)
 	hunter_appearance.set_mouth(player_rig.anatomy.pain / 180.0, sin(pulse * 0.7) * player_rig.anatomy.pain / 100.0)
+
+
+## P2b. Locked regions are refused by the world, never by a disabled control.
+## This reuses the exact jurisdiction lookup combat and local law already read
+## off real coordinates (`ASHBLOOM_HOLDINGS.jurisdiction_at`) — no separate
+## demo geometry, no second implementation of the border. Mainline calls this
+## every frame too; `WorldHistory.is_demo()` is the only thing that makes it
+## act, so nothing here can lock the full game by mistake.
+func _enforce_demo_territory() -> void:
+	if not WorldHistory.is_demo():
+		return
+	var jurisdiction := ASHBLOOM_HOLDINGS.jurisdiction_at(Vector2(player.x, player.z))
+	var holding_id := str(jurisdiction.get("holding_id", ""))
+	if _demo_home_holding.is_empty():
+		_demo_home_holding = holding_id
+	if holding_id.is_empty() or holding_id == _demo_home_holding:
+		_demo_last_home_position = player
+		_demo_border_named_holding = ""
+		return
+	player = _demo_last_home_position
+	player_body.position = player - Vector3.UP * 0.6
+	player_body.velocity = Vector3.ZERO
+	if holding_id == _demo_border_named_holding:
+		return
+	_demo_border_named_holding = holding_id
+	var definition := ASHBLOOM_HOLDINGS.definition_for(holding_id)
+	var held_by := str(jurisdiction.get("held_by", "")).replace("_", " ").to_upper()
+	var note := str(definition.get("note", "")).to_upper()
+	# P2b.3. Names what is on the other side rather than refusing silently.
+	prompt.text = "%s — %s // %s HOLDS THIS GROUND. NO DEMO CONTRACT REACHES IT." % [
+		str(jurisdiction.get("name", "")), note, held_by,
+	]
+	WorldHistory.record_event("demo_border_refused", {
+		"location": HUNT_LOCATION, "holding_id": holding_id, "held_by": str(jurisdiction.get("held_by", "")),
+	})
 
 
 ## Passive recovery is rest, not a background subsidy for every other action.
