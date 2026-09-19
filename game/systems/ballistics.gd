@@ -155,12 +155,15 @@ func fire(from: Vector3, along: Vector3, calibre := "pistol", spread := 0.0, cou
 		tracer.global_position = from
 		rounds.append({
 			"node": tracer,
+			"origin": from,
 			"at": from,
 			"was": from,
+			"initial_direction": direction,
 			"velocity": direction * float(spec["muzzle"]),
 			"calibre": calibre,
 			"spec": spec,
 			"travelled": 0.0,
+			"flight_time": 0.0,
 			"shooter": shooter,
 			"payload": payload,
 		})
@@ -233,6 +236,7 @@ func _step_rounds(delta: float) -> void:
 		round_data["velocity"] = velocity
 		round_data["at"] = at
 		round_data["travelled"] = float(round_data["travelled"]) + (at - round_data["was"]).length()
+		round_data["flight_time"] = float(round_data.get("flight_time", 0.0)) + delta
 
 		var query := PhysicsRayQueryParameters3D.create(round_data["was"], at)
 		# AF1.1. A body's own zones are `Area3D` hitboxes (`baseline_human.gd`),
@@ -245,7 +249,7 @@ func _step_rounds(delta: float) -> void:
 		query.collide_with_bodies = true
 		var hit := space.intersect_ray(query)
 		if not hit.is_empty():
-			_land(round_data, hit)
+			_land(round_data, hit, delta)
 			_retire_round(index)
 			continue
 		if float(round_data["travelled"]) > MAX_RANGE or at.y < -30.0:
@@ -261,15 +265,36 @@ func _step_rounds(delta: float) -> void:
 		if node != null and is_instance_valid(node):
 			node.global_position = at
 			if velocity.length() > 0.1:
-				node.look_at(at + velocity, Vector3.UP)
+				# A round fired straight up (or down) has `velocity` colinear
+				# with `Vector3.UP` — the same case `_surface_basis()` already
+				# guards below, just met here instead of a surface normal.
+				# Unguarded, `look_at()` warns every physics step for the rest
+				# of that round's flight instead of just picking a roll.
+				var direction := velocity.normalized()
+				var up := Vector3.FORWARD if absf(direction.dot(Vector3.UP)) > 0.98 else Vector3.UP
+				node.look_at(at + velocity, up)
 
 
 ## AF1.2. It arrives, and the thing it arrived at is different for it.
-func _land(round_data: Dictionary, hit: Dictionary) -> void:
+func _land(round_data: Dictionary, hit: Dictionary, step_delta: float) -> void:
 	var spec: Dictionary = round_data["spec"]
 	var at: Vector3 = hit.get("position", round_data["at"])
 	var normal: Vector3 = hit.get("normal", Vector3.UP)
 	var velocity: Vector3 = round_data["velocity"]
+	var origin: Vector3 = round_data.get("origin", round_data["was"])
+	var initial_direction: Vector3 = round_data.get("initial_direction", velocity.normalized())
+	# The integrator advances to the end of a frame before tracing that whole
+	# segment. A collision may be near its start, so trim both distance and time
+	# to the actual intercept instead of reporting the unused tail of the step.
+	var stepped: float = (round_data["at"] as Vector3).distance_to(round_data["was"])
+	var reached: float = at.distance_to(round_data["was"])
+	var step_fraction := clampf(reached / maxf(stepped, 0.0001), 0.0, 1.0)
+	var travelled_to_hit := float(round_data.get("travelled", 0.0)) - stepped + reached
+	var flight_to_hit := float(round_data.get("flight_time", 0.0)) - step_delta + step_delta * step_fraction
+	# Distance below the ray that left the muzzle. This is the drop a sight has
+	# to compensate for, rather than simply the world's Y coordinate changing.
+	var ray_distance := maxf(0.0, (at - origin).dot(initial_direction))
+	var expected_on_ray := origin + initial_direction * ray_distance
 	# Energy, not speed: the number that decides what this does to whatever it
 	# just met. Half m v squared, in whatever units this world runs on.
 	var energy := 0.5 * float(spec["grain"]) * velocity.length_squared()
@@ -280,6 +305,10 @@ func _land(round_data: Dictionary, hit: Dictionary) -> void:
 		"direction": velocity.normalized(),
 		"calibre": round_data["calibre"],
 		"energy": energy,
+		"travelled": maxf(0.0, travelled_to_hit),
+		"flight_time": maxf(0.0, flight_to_hit),
+		"drop": maxf(0.0, expected_on_ray.y - at.y),
+		"speed": velocity.length(),
 		"penetration": float(spec["penetration"]),
 		"shooter": round_data["shooter"],
 		"payload": round_data.get("payload", {}),

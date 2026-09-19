@@ -2164,13 +2164,11 @@ Since it was written, `vehicle_interior.gd`/`dash_cluster.gd` — both Lane
 - [x] ~~**M2.3** The other hand holds a gun, and you shoot out of your own
       car~~ `gun_arm` is real geometry (a grip, a slide, a barrel), LMB
       calls `_fire_from_cab()` in `rift_derby.gd`, and it is a real weapon —
-      a raycast, real ammo (`rounds_left`), a cooldown, and real damage to
-      whatever it hits (`_damage_target`), not a cosmetic muzzle flash.
-      **Not yet true**: this is a second, simpler firearm system
-      (raycast + flat damage) rather than the one AF1/AF1.1 built —
-      `Ballistics`' real projectile and `BaselineHuman.hit_at`'s zone
-      resolution never enter it. That gap is AF1.8's own, named for exactly
-      this reason, and stays open
+      real ammo, reload and jams through the Hunt's own `HunterArsenal`
+      (`cab_arsenal`), and a real travelling round through the Hunt's own
+      `Ballistics` (`ballistics.fire()`), not a cosmetic muzzle flash or an
+      instant raycast. Closed by AF1.8/AF10.8 — see there for what was
+      actually verified and the two bugs that verification found
 - [x] ~~**M2.4** You shoot through your own windscreen, and the glass is
       really there~~ `_windscreen()` is a real `BoxMesh` plane in front of
       the camera, lit by the world, and `punch_through()` marks it exactly
@@ -4031,21 +4029,80 @@ travels, hits something and leaves a mark on it.
       the exact count it left with.
 - [x] **AF1.6** Calibre means something — muzzle velocity, grain and drag per calibre, and drag proportional to speed squared, so buckshot keeps 93.7% of its speed where a slug keeps 97.1% over the same flight. A shotgun stops being a shotgun at range without anybody writing a falloff curve
 - [x] **AF1.7** It reads through the anatomy already built: a round finds a zone, not a hitbox — this was already true and unverified rather than unbuilt: `_trace_actor` raycasts real collision geometry and hands the exact world-space impact point to `BaselineHuman.hit_at`, which resolves it through `zone_nearest(point)` — a live distance comparison against every part's real position — never a name read off whichever collider answered. `tests/zone_precision_test.gd` proves it rather than assuming it: one body, one weapon, one fixed distance, and the only thing that changes between three shots is the pitch, computed from each zone's own real current position (`rig.parts[zone].global_position`) rather than a guessed number. Aiming at where the head actually is wounds head and nothing else; the same for torso and left_leg. A hardcoded or round-robin zone table could not pass this — it would need the shot's outcome to be independent of aim, and it is not. (Building this surfaced a smaller confirmation of the same point: sinking a target far enough below its normal spawn height made shots miss entirely rather than falling back to some default zone, because there was nothing left to hit — a lookup table has no floor to fall through.)
-- [ ] **AF1.8** Firing from a car is the same system (M2.3)
+- [x] **AF1.8** Firing from a car is the same system (M2.3) — the wiring was
+      already in `rift_derby.gd`'s `_fire_from_cab()`/`_on_cab_round_hit()`,
+      landed by an unreviewed, unrun rescue commit (`57f9242`) and never
+      actually exercised. `tests/derby_cab_fire_test.gd` (new) is the first
+      thing to run it: a cab round exists in `Ballistics.rounds` the physics
+      frame after firing rather than resolving instantly, later reaches a
+      frozen wrecker placed directly ahead of the muzzle and reduces its real
+      `integrity` meta, and that landing is what raises the score — the same
+      `_damage_target()` consequence chain a ram already used. Also caught
+      and fixed two real bugs the "unrun" label meant nobody had found yet:
+      `_fire_from_cab()` connected `Ballistics.round_hit` but never
+      `round_expired`, so a cab shot that missed everything leaked its
+      muzzle entry in `_cab_seen` for the rest of the heat — the exact leak
+      `gore_demo.gd`'s own `_on_round_expired()` exists to close, now given
+      the same handler here. And `ballistics.gd`'s own `_step_rounds()`
+      called `look_at(at + velocity, Vector3.UP)` unconditionally, which
+      warns every physics step for any round travelling exactly vertical
+      (velocity colinear with the up vector) — the test's own expiry check
+      fires one straight up to prove the miss path, and hit exactly this;
+      fixed with the same guard `_surface_basis()` already uses for a
+      colinear surface normal. `ballistics_test`, `arsenal_test`,
+      `magazine_test`, `weapon_jam_test`, `deferred_damage_test`,
+      `combat_integration_test`, `derby_exit_test`, `tunnel_test`,
+      `zone_precision_test`, `firearm_momentum_test`, `reload_visual_test`,
+      `gore_demo_test`, `gore_parity_test` and `derby_cab_test` re-run clean.
 
 
 ### AF6 — The range
 The gore sandbox is where a weapon is learned (AU3.5). Same room, same bodies,
 same reset — a range that is a place rather than a menu of guns.
-- [ ] **AF6.1** Every weapon in `hunter_arsenal.gd` is physically present and
-      pick-up-able in the shed — Updated 2026-09-15: every weapon is reachable
-      now (AF6.4 below), by wheel/hotkey through a real `HunterArsenal`
-      instance in `gore_demo.gd` — but there is still no shed, no rack, no
-      physical pickup interaction. Switchable is not the same claim as
-      pick-up-able; this item is about the latter and stays open.
-- [ ] **AF6.2** Bullets are readable here: drop, drag, travel time, penetration
-      shown against real bodies at real distances (AF2)
-- [ ] **AF6.3** The reset restores the bodies without restarting the scene
+- [x] **AF6.1** Every weapon in `hunter_arsenal.gd` is physically present and
+      pick-up-able in the shed — the Gore Sandbox now builds one lit, open
+      weapon shed carrying the sword, shotgun and sidearm as the exact authored
+      `HeldGear.build_weapon()` models used in the player's hands, not display
+      substitutes. They present their real profiles on the rack. Walking within
+      reach and pressing the room's existing `E` take verb equips that same
+      weapon through the live `HunterArsenal`, removes its physical model from
+      the rack and returns it when the drill resets; reaching from across the
+      room or changing weapons during reload/jam recovery is refused. Wheel and
+      hotkeys remain quick practice access, but they are no longer the only way
+      weapons exist in the room. `tests/gore_weapon_rack_test.gd` verifies the
+      complete shared weapon set, authored anchors, distance gate, rack-to-hand
+      transition and reset (15 checks); range, parity, training, arsenal and
+      reload suites remain green. Rendered and inspected at
+      `P:/GameDev/Temp/lane-8-guns-af6-1/gore_sandbox_weapon_rack.png`.
+- [x] **AF6.2** Bullets are readable here: drop, drag, travel time and
+      penetration are shown from the live round against the live body, not
+      copied into range-only numbers. `Ballistics` now carries its origin,
+      initial ray, accumulated distance and simulated flight time to impact;
+      the landing report trims the unused tail of the final physics step, so
+      its metres and milliseconds stop where the collider actually was rather
+      than at the frame's projected endpoint. Drop is measured below the
+      original muzzle ray and retained energy is the same drag-reduced energy
+      the range uses for damage. The sandbox now passes the round's real
+      calibre penetration and exact impact point through `BaselineHuman.hit_at`
+      instead of discarding both in `hit(zone)`, then reads the resulting wound
+      as armour-stopped, lodged by depth, or through. The field instrument
+      presents all five facts beside the body that produced them.
+      `gore_range_ballistics_test.gd` fires one real pistol round down a
+      measured 16-metre lane into a production `BaselineHuman` and verifies
+      travel, drop, drag and the backed wound; `ballistics_test.gd` protects
+      the landing report itself. Rendered and inspected at
+      `P:/GameDev/Temp/lane-8-guns-af6-2/gore_sandbox_ballistics_readout.png`:
+      the target remains visible and the readout resolves `14.2m`, `42ms`,
+      `1.2cm DROP` and `ARMOUR STOP`; inspection also caught energy rounding
+      hiding drag, so retained energy now keeps one decimal place.
+- [x] **AF6.3** The reset restores the bodies without restarting the scene —
+      the implementation was already present and is now protected through its
+      public `R` input rather than rewritten. `gore_range_reset_test.gd`
+      damages a production body's torso, dirties the drill counters and presses
+      `R` through Godot's input queue. The range keeps the same instance, retires
+      all seven old rigs, builds seven new `BaselineHuman` targets with full
+      health in every canonical zone and clears the drill counters. A cosmetic
+      heal, stale array entry or scene reload cannot pass those checks.
 - [x] **AF6.4** What you learn transfers — the range uses the live ballistics
       and the live arsenal, never a demo copy of either —
       `gore_demo.gd` used to hardcode its own `SHOT_WEAPON`/`SHOT_GRIP`/
@@ -4094,7 +4151,11 @@ The last rung. Fifteen statements that are true of guns when this game is finish
       established this codebase means by the sentence
 - [ ] **AF10.6** `v10` Calibre decides what happens to a body and to a wall
 - [x] **AF10.7** `v10` ~~A round finds a zone, never a hitbox~~ Same proof as B10.3, from the gun's side: a round's impact point resolves through `zone_nearest()` to the limb it struck, and `Penetration` then measures that limb's real thickness at that height to decide how far in it got. A hitbox could not answer either question
-- [ ] **AF10.8** `v10` Firing from a car is the same system
+- [x] **AF10.8** `v10` ~~Firing from a car is the same system~~ Same closure
+      as AF1.8, verified rather than assumed: `tests/derby_cab_fire_test.gd`
+      proves the cab gun fires a real `Ballistics` round that travels,
+      lands on a wrecker and raises the score, not the instant raycast this
+      item used to describe
 - [x] **AF10.9** `v10` A gun is inspectable in full — the Hunt's complete firearm
       set (shotgun and sidearm) uses the same held `I` verb and live model as
       combat, but each has physical choreography rather than a canned spin: the
@@ -4103,7 +4164,28 @@ The last rung. Fifteen statements that are true of guns when this game is finish
       Both remain visible in the universal 3D reliquary with their live
       ammunition state. `combat_integration_test.gd` protects the common seam;
       `captures/full_use_inspection_demo.mp4` is the gameplay proof.
-- [ ] **AF10.10** `v10` Weapon customisation lives on the weapon
+- [x] **AF10.10** `v10` ~~Weapon customisation lives on the weapon~~
+      `HunterArsenal.customization` is keyed by weapon and physical slot, in
+      the same instance-owned shape as condition and ammunition rather than a
+      perk on the player, range or vehicle. `install_customization()` accepts
+      only attachment points authored for that firearm, keeps the fitted
+      part's identity/provenance, discards unknown holder bonuses and clamps
+      the small shared modifier vocabulary at the ownership boundary.
+      `weapon_definition()` composes those parts over the authored weapon, so
+      every existing consumer of `current()`, `begin_attack()` and
+      `shot_directions()` — the Hunt, Gore Sandbox and derby cab — reads the
+      same fitted damage, impulse, range, spread, cooldown and reload values.
+      The current state and physical weapon mount expose that same complete
+      attachment record for inventory UI and later authored geometry without
+      teaching the holder what an optic is. Holstering preserves it; another
+      weapon or another arsenal does not inherit it; removing a part returns
+      that same record and restores the base numbers. Verified by the new
+      `tests/weapon_customization_test.gd` (16 checks), plus `arsenal_test`,
+      `magazine_test`, `weapon_jam_test`, `firearm_aim_test`,
+      `firearm_momentum_test`, `reload_visual_test`, `ballistics_test`,
+      `deferred_damage_test`, `combat_integration_test`, `gore_demo_test`,
+      `gore_parity_test`, `derby_cab_fire_test` and `derby_cab_test`, all with
+      real output after restoring this worktree's required gitignored addons
 - [x] **AF10.11** `v10` ~~A gun carries momentum and swivels toward where you look~~
       AN1.7, already proven in `tests/firearm_momentum_test.gd`: `ARM_WEIGHTS`
       carries each firearm's own authored mass and reach, `_carry_current_weapon()`/
