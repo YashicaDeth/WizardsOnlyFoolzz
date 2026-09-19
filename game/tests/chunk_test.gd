@@ -103,6 +103,24 @@ func _ready() -> void:
 	var sale_events := WorldHistory.events.filter(func(event: Dictionary): return str(event.get("type", "")) == "carried_part_sold")
 	check(sale_events.size() == 1 and str((sale_events[0].get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_") and int(WorldHistory.get("_ledger_batch_depth")) == 0, "the sale mutation and public market fact share one closed player-action receipt")
 
+	# --- AN6.2/AN6.3: a ruptured organ is a whole physics body, identified the
+	# same way a severed limb is, and CARRY already knows what to do with it ---
+	# The blood spray from every hit above this point shares this same budget
+	# (`_throw_limb()` is gated by it too), and PERFORMANCE quality's default
+	# cap of 52 is well under what this file has already spent — reset it so
+	# the rupture below is not silently swallowed by unrelated cosmetic spray.
+	BaselineHuman.live_gore = 0
+	rig.hit("torso", 90.0, 20.0, "cut", "liver")
+	await get_tree().physics_frame
+	var whole_organ: Node3D
+	for piece in GoreChunks.from_subject("chunk_probe"):
+		if bool(GoreChunks.identify(piece).get("whole_organ", false)) and str(GoreChunks.identify(piece).get("organ_id", "")) == "liver":
+			whole_organ = piece
+			break
+	check(whole_organ != null and whole_organ is RigidBody3D, "a ruptured organ falls out as a real physics body, not a gib or a scripted trajectory")
+	var carried_organ := carry.take_chunk(GoreChunks.take(whole_organ))
+	check(str(carried_organ.get("kind", "")) == "organ" and str(carried_organ.get("organ_id", "")) == "liver", "the whole organ enters CARRY the same way a whole limb does")
+
 	# --- the body remembers how far it was opened ----------------------------
 	check(rig.exposed_layer("torso") >= GoreChunks.Layer.MUSCLE, "the zone records its deepest breach (%d)" % rig.exposed_layer("torso"))
 	var before_depth: int = rig.exposed_layer("torso")

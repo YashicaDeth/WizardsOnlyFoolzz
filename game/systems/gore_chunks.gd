@@ -108,6 +108,39 @@ static func register_whole_limb(node: RigidBody3D, zone: String, subject_id: Str
 	return info
 
 
+## AN6.2. The organ itself leaving the body, not a gib of it — `burst()`'s own
+## `Layer.ORGAN` pieces are debris torn loose *around* the cavity a blow just
+## opened, keyed to whatever organ that blow was nearest and thrown whether or
+## not the organ actually failed. This is the organ, whole, registered the
+## moment its own health reaches zero, so it exists exactly once per organ per
+## body rather than once per hit that happened to reach it. Same identity
+## contract as `register_whole_limb()` — real `RigidBody3D`, real rot, and
+## `whole_organ` reads the same way `whole_limb` does, which is what lets
+## `carry.gd` pick it up (AN6.3) rather than a piece nothing downstream can find.
+static func register_organ(node: RigidBody3D, organ_id: String, zone: String, subject_id: String) -> Dictionary:
+	if node == null or not is_instance_valid(node):
+		return {}
+	if live.size() >= chunk_budget():
+		_recycle_oldest()
+	var info := {
+		"layer": Layer.ORGAN,
+		"layer_name": "organ",
+		"whole_organ": true,
+		"zone": zone,
+		"subject_id": subject_id,
+		"organ_id": organ_id,
+		"implant": "",
+		"condition": 1.0,
+		"taken": false,
+		"spawn_msec": Time.get_ticks_msec(),
+	}
+	node.set_meta("chunk", info)
+	live.append(node)
+	_watch_chunk(node)
+	_schedule_rot(node)
+	return info
+
+
 ## How deep a blow reached, as a `Layer`. The zone's current condition is part of
 ## the answer — the second cut into the same arm goes further than the first,
 ## which is the whole reason a fight escalates visually.
