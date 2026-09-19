@@ -95,6 +95,10 @@ const HITSTOP_BLAST := 0.13
 const SLOW_SCALE := 0.14
 const TRACE_RANGE := 90.0
 const SANDBOX_SUBJECT := "sandbox_player"
+## AF6.1. A weapon is learned from a thing in the room, not only from a number
+## key. This is deliberately the same short reach as the substance station:
+## taking something means walking up to it, not selecting a distant display.
+const WEAPON_PICKUP_REACH := 2.2
 
 ## AF6. What the sandbox is holding is `HunterArsenal`'s own real state now —
 ## the same `WEAPONS` table and ammo/reload/jam machinery the Hunt runs on —
@@ -201,10 +205,6 @@ var _gear_recoil := 0.0
 var _shot_serial := 0
 ## Where each of this scene's rounds in flight was last seen, by serial.
 var _seen: Dictionary = {}
-## AF6.2. When each of this scene's rounds actually left the barrel, by
-## serial — the other half of a real travel-time readout, since `_on_round_hit()`
-## only ever learns when a round arrived.
-var _fire_time: Dictionary = {}
 ## AF6.2. What the range is supposed to teach: not a number invented for the
 ## HUD, but exactly the numbers `_on_round_hit()` already computes to resolve
 ## the hit itself — real distance, real travel time, and the real fraction of
@@ -215,6 +215,10 @@ var _tracers: Array = []
 
 var station: Node3D
 var carried_substances: Array[Dictionary] = []
+## The range's physical arsenal. Each entry owns the production weapon model
+## standing on the rack and whether that exact object is still there to take.
+var weapon_rack: Node3D
+var weapon_pickups: Array[Dictionary] = []
 var handheld: HandheldDevice
 var psychedelic: PsychedelicRig
 ## Smokeables are deliberately held rather than clicked.  The draw duration is
@@ -244,6 +248,7 @@ func _ready() -> void:
 	# away from it is the new part, not the default.
 	arsenal.select_slot(HunterArsenal.SLOT_ORDER.find("sidearm"))
 	_build_view_gear()
+	_build_weapon_rack()
 	# AU3.5. The same station the shed and the Hunt Grounds drop - the sandbox
 	# does not get its own layout, because a sandbox-only list is a list that
 	# falls behind the game within a week.
@@ -321,6 +326,61 @@ func _build_camera() -> void:
 	camera.global_position = eye
 
 
+## AF6.1. The shed rack is part of the range, not a weapon menu given a mesh.
+## It uses `HeldGear.build_weapon()` so the object on the wall and the object
+## that enters the player's hands cannot drift into two different silhouettes.
+func _build_weapon_rack() -> void:
+	weapon_rack = Node3D.new()
+	weapon_rack.name = "WeaponShed"
+	weapon_rack.position = Vector3(-4.6, 0.0, 7.2)
+	add_child(weapon_rack)
+
+	# A shallow roof and battered backing make this read as a range shed from
+	# across the room. The open front keeps every weapon visible and reachable.
+	_rack_box("Backing", Vector3(0.0, 1.25, -0.10), Vector3(3.4, 2.5, 0.16), Color("3b3025"))
+	_rack_box("Roof", Vector3(0.0, 2.55, 0.12), Vector3(3.8, 0.16, 1.05), Color("493a2b"))
+	_rack_box("LeftPost", Vector3(-1.72, 1.25, 0.08), Vector3(0.16, 2.5, 0.42), Color("57412c"))
+	_rack_box("RightPost", Vector3(1.72, 1.25, 0.08), Vector3(0.16, 2.5, 0.42), Color("57412c"))
+	_rack_box("Rail", Vector3(0.0, 1.02, 0.04), Vector3(3.25, 0.10, 0.20), Color("766044"))
+	var lamp := OmniLight3D.new()
+	lamp.name = "RackLamp"
+	lamp.position = Vector3(0.0, 2.28, 0.92)
+	lamp.light_color = Color("e8ad68")
+	lamp.light_energy = 2.2
+	lamp.omni_range = 4.2
+	lamp.shadow_enabled = false
+	weapon_rack.add_child(lamp)
+
+	weapon_pickups.clear()
+	var placements := {
+		# Authored muzzle-forward along Z; quarter-turning the mounts shows the
+		# actual profiles instead of pointing three foreshortened barrels at the eye.
+		"sword": {"at": Vector3(-0.42, 1.75, 0.12), "turn": Vector3(0.0, PI * 0.5, -0.04)},
+		"shotgun": {"at": Vector3(-0.42, 0.86, 0.12), "turn": Vector3(0.0, PI * 0.5, 0.03)},
+		"sidearm": {"at": Vector3(1.12, 1.34, 0.12), "turn": Vector3(0.0, PI * 0.5, 0.0)},
+	}
+	for weapon_id: String in HunterArsenal.SLOT_ORDER:
+		var placement: Dictionary = placements.get(weapon_id, {})
+		var model := HELD_GEAR.build_weapon(weapon_id)
+		model.name = "%s_pickup" % weapon_id
+		model.position = placement.get("at", Vector3.ZERO)
+		model.rotation = placement.get("turn", Vector3.ZERO)
+		model.scale = Vector3.ONE * 1.2
+		weapon_rack.add_child(model)
+		weapon_pickups.append({"weapon": weapon_id, "model": model, "available": true})
+
+
+func _rack_box(label: String, at: Vector3, dimensions: Vector3, tint: Color) -> void:
+	var piece := MeshInstance3D.new()
+	piece.name = label
+	var mesh := BoxMesh.new()
+	mesh.size = dimensions
+	mesh.material = WorldLook.surface(tint, "wood", label.hash())
+	piece.mesh = mesh
+	piece.position = at
+	weapon_rack.add_child(piece)
+
+
 # ---------------------------------------------------------------- the bodies
 func _spawn_body(index: int) -> void:
 	var angle := TAU * float(index) / float(BODY_COUNT)
@@ -388,6 +448,7 @@ func _reset() -> void:
 	_seen.clear()
 	if ballistics != null:
 		ballistics.clear()
+	_restore_weapon_rack()
 	BaselineHuman.clear_gore()
 	await get_tree().process_frame
 	for index in BODY_COUNT:
@@ -541,7 +602,6 @@ func _fire() -> void:
 		# the camera axis so the crosshair stays honest, and the first segment
 		# of its trail is what makes it read as having come out of the barrel.
 		_seen[_shot_serial] = _muzzle_world(start)
-		_fire_time[_shot_serial] = Time.get_ticks_msec()
 	_muzzle_flash()
 	_gear_recoil = 1.0
 	# Muzzle side only: climb and a little roll, which is the gun moving, not a
@@ -574,7 +634,6 @@ func _fire_launcher() -> void:
 		"explosive": true,
 	})
 	_seen[_shot_serial] = start
-	_fire_time[_shot_serial] = Time.get_ticks_msec()
 	_muzzle_flash()
 	_gear_recoil = 1.0
 	_note("WARHEAD AWAY // %d REMAIN" % launcher_rounds)
@@ -636,13 +695,9 @@ func _on_round_hit(hit: Dictionary) -> void:
 		muzzle_position = _seen[serial]
 		_streak(_seen[serial], at)
 		_seen.erase(serial)
-	# AF6.2. The other half of the streak above: not where it travelled, but
-	# how long it took — real muzzle-to-target time, not a number the HUD
-	# invents. `_fire_time` has no entry once a round has already resolved,
-	# so a stale serial (should not happen; kept as a safety default) reads
-	# as zero travel rather than a huge, meaningless duration.
-	var fired_at_msec: int = int(_fire_time.get(serial, Time.get_ticks_msec()))
-	_fire_time.erase(serial)
+	# Flight time and drop arrive on the round's own report below. They are
+	# simulated ballistic facts, so slow motion and headless tests cannot turn
+	# them into different answers by changing how fast the host clock advances.
 	if bool(payload.get("explosive", false)):
 		_unmark_last()
 		_impact_burst(at, normal, Color("9c6230"))
@@ -688,8 +743,9 @@ func _on_round_hit(hit: Dictionary) -> void:
 	# real drag against a real distance is why it is not 1.0 every time.
 	last_shot_readout = {
 		"calibre": str(hit.get("calibre", "pistol")),
-		"distance": muzzle_position.distance_to(at),
-		"travel_ms": Time.get_ticks_msec() - fired_at_msec,
+		"distance": float(hit.get("travelled", muzzle_position.distance_to(at))),
+		"travel_ms": roundi(float(hit.get("flight_time", 0.0)) * 1000.0),
+		"drop_cm": float(hit.get("drop", 0.0)) * 100.0,
 		"energy_pct": carried,
 		"zone": zone,
 	}
@@ -699,7 +755,22 @@ func _on_round_hit(hit: Dictionary) -> void:
 	var damage := float(payload.get("damage", 46.0))
 	var impulse := float(payload.get("impulse", 30.0))
 	var damage_type := str(payload.get("damage_type", "ballistic"))
-	var result: Dictionary = rig.hit(zone, damage * carried, impulse * carried, damage_type, "", direction)
+	# Keep the exact impact point and the calibre's penetration budget. Calling
+	# `hit(zone)` here used to throw both away, so the range could never teach
+	# whether this live round lodged or opened an exit wound.
+	var result: Dictionary = rig.hit_at(
+		at, damage * carried, impulse * carried, damage_type, direction,
+		float(hit.get("penetration", -1.0)))
+	var penetration_report: Dictionary = result.get("penetration", {})
+	match int(penetration_report.get("result", Penetration.Result.GRAZE)):
+		Penetration.Result.STOPPED_BY_ARMOUR:
+			last_shot_readout["penetration"] = "ARMOUR STOP"
+		Penetration.Result.THROUGH:
+			last_shot_readout["penetration"] = "THROUGH"
+		Penetration.Result.BLIND:
+			last_shot_readout["penetration"] = "LODGED %d%%" % roundi(float(penetration_report.get("fraction", 0.0)) * 100.0)
+		_:
+			last_shot_readout["penetration"] = "GRAZE"
 	if not bool(result.get("accepted", true)):
 		_note("%s ALREADY GONE" % _spoken(zone))
 		return
@@ -1292,6 +1363,8 @@ func _begin_or_use_carried(index: int) -> void:
 
 
 func _take_station_item() -> void:
+	if _take_nearest_weapon():
+		return
 	if station == null:
 		return
 	var taken: Dictionary = station.take_nearest(eye)
@@ -1300,6 +1373,53 @@ func _take_station_item() -> void:
 		return
 	# The signal appends the actual data; this only narrates the physical action.
 	_note("TAKEN // %s" % str(taken.get("label", "UNMARKED")))
+
+
+## AF6.1. E takes the nearest authored gun or blade only when the player has
+## physically walked into reach. The rack model disappears in the same action
+## that equips the live arsenal entry, so this cannot read as a display prop
+## beside a hotkey swap.
+func _take_nearest_weapon() -> bool:
+	var nearest: Dictionary = {}
+	var nearest_distance := WEAPON_PICKUP_REACH
+	for pickup: Dictionary in weapon_pickups:
+		if not bool(pickup.get("available", false)):
+			continue
+		var model := pickup.get("model") as Node3D
+		if model == null or not is_instance_valid(model):
+			continue
+		var distance := eye.distance_to(model.global_position)
+		if distance <= nearest_distance:
+			nearest = pickup
+			nearest_distance = distance
+	if nearest.is_empty():
+		return false
+	var weapon_id := str(nearest.get("weapon", ""))
+	var slot := HunterArsenal.SLOT_ORDER.find(weapon_id)
+	if slot < 0:
+		return false
+	# Use the same refusal the hotkeys use: a half-finished reload or jam clear
+	# cannot strand its timer merely because the replacement came off a wall.
+	if weapon_id != arsenal.current_id and not arsenal.select_slot(slot):
+		_note("CAN'T TAKE // HANDS BUSY")
+		return true
+	launcher_equipped = false
+	firearm_aiming = false
+	view_gear.take(weapon_id)
+	_gear_rest = view_gear.position
+	_refresh_muzzle_anchor()
+	nearest["available"] = false
+	(nearest.get("model") as Node3D).visible = false
+	_note("TAKEN FROM RACK // %s" % str(arsenal.current().get("label", weapon_id)).to_upper())
+	return true
+
+
+func _restore_weapon_rack() -> void:
+	for pickup: Dictionary in weapon_pickups:
+		pickup["available"] = true
+		var model := pickup.get("model") as Node3D
+		if model != null and is_instance_valid(model):
+			model.visible = true
 
 
 func _on_station_taken(entry: Dictionary) -> void:
@@ -1660,10 +1780,14 @@ func _paint_hud() -> void:
 			str(last_shot_readout.get("calibre", "?")).to_upper(),
 			float(last_shot_readout.get("distance", 0.0)),
 		])
-		lines.append("  %dms TRAVEL // %d%% ENERGY // %s" % [
+		lines.append("  %dms TRAVEL // %.1f%% ENERGY // %s" % [
 			int(last_shot_readout.get("travel_ms", 0)),
-			roundi(float(last_shot_readout.get("energy_pct", 1.0)) * 100.0),
+			float(last_shot_readout.get("energy_pct", 1.0)) * 100.0,
 			_spoken(str(last_shot_readout.get("zone", ""))),
+		])
+		lines.append("  %.1fcm DROP // %s" % [
+			float(last_shot_readout.get("drop_cm", 0.0)),
+			str(last_shot_readout.get("penetration", "NO BODY READ")),
 		])
 	var y := 40.0
 	for line: String in lines:
@@ -1674,7 +1798,7 @@ func _paint_hud() -> void:
 	for index in carried_substances.size():
 		carry_line += "%d:%s  " % [index + 1, str((carried_substances[index] as Dictionary).get("id", "?")).to_upper()]
 	if carried_substances.is_empty():
-		carry_line += "EMPTY // [E] AT THE STATION"
+		carry_line += "EMPTY // [E] AT STATION OR WEAPON RACK"
 	var carry_width := CellOutzType.width_condensed(carry_line, 10.0, 1.8)
 	CellOutzType.draw_condensed(hud, Vector2(right_edge - carry_width, y + 10.0), carry_line, 10.0, bone * Color(1, 1, 1, 0.62), 1.8)
 

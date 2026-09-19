@@ -671,7 +671,7 @@ func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type :=
 	var zone := zone_nearest(global_point)
 	# Kept before `hit()` resolves, because `hit()` may sever the limb and the
 	# point has to be recorded against the limb that was actually struck.
-	_record_wound(zone, global_point, hit_direction, damage, damage_type, penetration)
+	var penetration_report := _record_wound(zone, global_point, hit_direction, damage, damage_type, penetration)
 	var organ_id := ""
 	if damage_type in ["cut", "puncture", "ballistic", "shear"]:
 		organ_id = organ_nearest(global_point)
@@ -679,7 +679,15 @@ func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type :=
 		# surface, so keep the two answers consistent with each other.
 		if not organ_id.is_empty() and str((ORGAN_LAYOUT[organ_id] as Dictionary).zone) != zone:
 			organ_id = _organ_in_zone(zone)
-	return hit(zone, damage, impulse, damage_type, organ_id, hit_direction, _joint_alignment_at(zone, global_point))
+	# Both halves of this line landed at once and they want the same call.
+	# AN6.4 needs the joint alignment passed in; AF6.2 needs the result kept
+	# so a range or a HUD is told stopped/grazed/lodged/through instead of
+	# inferring it from the size of a capped wound-mark array. Neither is
+	# optional and neither conflicts with the other.
+	var result := hit(zone, damage, impulse, damage_type, organ_id, hit_direction, _joint_alignment_at(zone, global_point))
+	if not penetration_report.is_empty():
+		result["penetration"] = penetration_report
+	return result
 
 
 ## AN6.4. How close a strike landed to a real joint on this limb, as a
@@ -1427,15 +1435,15 @@ const TYPE_PENETRATION := {
 }
 
 
-func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, damage: float, damage_type: String, penetration := -1.0) -> void:
+func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, damage: float, damage_type: String, penetration := -1.0) -> Dictionary:
 	if damage < WoundMarks.MIN_DAMAGE:
-		return
+		return {}
 	var zone := canonical_zone(zone_id)
 	if severed.has(zone):
-		return
+		return {}
 	var part := parts.get(zone) as Node3D
 	if part == null or not is_instance_valid(part) or not part.is_inside_tree():
-		return
+		return {}
 	var surface: Dictionary = WoundMarks.surface_of(part, global_point, travel)
 
 	# --- how far in did it get -------------------------------------------
@@ -1457,7 +1465,7 @@ func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, dama
 		limb_length)
 	if int(shot["result"]) == Penetration.Result.STOPPED_BY_ARMOUR:
 		# What you are wearing stopped it. No hole in you.
-		return
+		return shot
 	# The layer is read *after* the hit resolves everywhere else; here it is read
 	# before, so a fresh hole shows the depth the body was already opened to and
 	# deepens on the next frame's refresh rather than predicting itself.
@@ -1486,6 +1494,7 @@ func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, dama
 		wound_marks[zone] = WoundMarks.record(wound_marks.get(zone, []) as Array, exit_wound)
 
 	_refresh_wounds(zone)
+	return shot
 
 
 ## Rebuild a zone's wound meshes. Cheap because a zone is capped at
