@@ -3323,9 +3323,26 @@ pay.
       renderer's own counters and are trusted; the frame-timing pair is not,
       and needs a focused, interactive re-run before anything is budgeted
       against it — left for X1.2 rather than guessed at here.
-- [ ] **X1.2** A frame budget, stated, that the region is held to — blocked on
-      X1.1's frame-timing numbers actually being trustworthy; the draw call
-      and primitive counts alone are not enough to set a budget against.
+- [ ] **X1.2** A frame budget, stated, that the region is held to —
+      **unblocked, not yet done.** X1.1's frame timing is now trustworthy:
+      `tests/frame_bound_test` (`3e6a620`) stops reading the engine's
+      monitors, which disagree with the wall clock by more than the frame
+      is long, and instead changes one thing at a time with a stopwatch
+      either side, vsync off, on the Hunt. Measured across five runs at
+      1280x720 on a 2060 Super: **34-37 ms a frame, 27-29 fps.** That is
+      the honest number and it is a bad one.
+      What it is bound by is settled too. A quarter of the pixels moves the
+      frame by 0-1% and sometimes the wrong way, so **render scale is not a
+      lever here** — worth knowing before another pass is spent on it. A
+      sixth of the physics tick rate makes the frame 47-70% shorter, every
+      run, and silencing the rigs' own processing accounts for 2-9 ms of
+      that. `--soak` rules out accumulation: over five idle minutes nodes
+      plateau at 9275, collision pairs at 520, population at 20, orphans at
+      zero.
+      What remains is the budget itself, and it needs Greg: **what frame
+      rate is this game held to, and on what machine?** 60 on the 2060
+      Super is a different project from 30 on something older, and the
+      number decides how much of the physics tick has to be given back.
 - [ ] **X1.3** The 238MB plugin referenced by no script (pairs with J1.3)
 - [ ] **X1.4** Bodies are the expensive thing — measure before optimising them
 - [ ] **X1.5** It has to hold up on a machine that is not Greg's
