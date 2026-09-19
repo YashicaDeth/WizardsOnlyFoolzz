@@ -54,12 +54,32 @@ const TEARING := ["shear", "cut", "blunt"]
 ## detail that gives the whole system away.
 const EXIT_SPREAD := 1.85
 
+## AN6.5. Authored silhouettes by the thing that made the opening. These are
+## aspect ratios rather than replacement meshes: the wound still keeps its
+## exact impact point, depth, layer and deterministic torn rim, while a blade
+## leaves a slash and a round leaves a compact entry. Impact angle adds to this
+## profile below instead of selecting a second canned wound.
+const TYPE_ASPECT := {
+	"ballistic": 1.0,
+	"puncture": 1.18,
+	"cut": 2.35,
+	"shear": 1.75,
+	"blunt": 1.25,
+}
+const GRAZE_STRETCH := {
+	"ballistic": 0.85,
+	"puncture": 1.05,
+	"cut": 1.25,
+	"shear": 1.10,
+	"blunt": 0.45,
+}
+
 
 ## One wound, as data. `at` and `normal` are in the limb's own local space, so
 ## the mark rides the limb through every animation and leaves with it when it
 ## comes off — which is the whole reason to store it there rather than in world
 ## space and chase it every frame.
-static func make(at: Vector3, normal: Vector3, damage: float, damage_type: String, layer: int) -> Dictionary:
+static func make(at: Vector3, normal: Vector3, damage: float, damage_type: String, layer: int, travel: Vector3 = Vector3.ZERO) -> Dictionary:
 	var spread: float = float(LAYER_SPREAD.get(layer, 0.04))
 	# Bigger hits open bigger holes, but sub-linearly: a 90-damage slug does not
 	# leave a hole three times the width of a 30-damage one, it leaves a deeper
@@ -67,6 +87,7 @@ static func make(at: Vector3, normal: Vector3, damage: float, damage_type: Strin
 	var scale := clampf(sqrt(damage / 40.0), 0.45, 2.1)
 	if damage_type in TEARING:
 		scale *= 1.35
+	var shape := _impact_shape(normal, travel, damage_type)
 	return {
 		"at": at,
 		"normal": normal,
@@ -74,6 +95,8 @@ static func make(at: Vector3, normal: Vector3, damage: float, damage_type: Strin
 		"layer": layer,
 		"damage": damage,
 		"type": damage_type,
+		"aspect": shape.aspect,
+		"shape_rotation": shape.rotation,
 		# Overwritten by `_record_wound` with `Penetration`'s own fraction once a
 		# round has actually crossed tissue. Left at 1.0 here so a caller with no
 		# penetration model (a punch, a claw) still gets the old full-depth crater
@@ -125,6 +148,9 @@ static func from_record(record_data: Dictionary) -> Dictionary:
 	out["layer"] = int(record_data.get("layer", 0))
 	out["radius"] = float(record_data.get("radius", 0.04))
 	out["damage"] = float(record_data.get("damage", 0.0))
+	out["depth"] = float(record_data.get("depth", 1.0))
+	out["aspect"] = maxf(1.0, float(record_data.get("aspect", 1.0)))
+	out["shape_rotation"] = float(record_data.get("shape_rotation", 0.0))
 	return out
 
 
@@ -200,7 +226,8 @@ static func build(wound: Dictionary, tint: Color) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
 	var radius: float = float(wound.get("radius", 0.04))
 	var depth_fraction: float = clampf(float(wound.get("depth", 1.0)), 0.0, 1.0)
-	node.mesh = _crater(radius, int(wound.get("seed", 0)), tint, str(wound.get("type", "ballistic")), depth_fraction)
+	var aspect: float = maxf(1.0, float(wound.get("aspect", 1.0)))
+	node.mesh = _crater(radius, int(wound.get("seed", 0)), tint, str(wound.get("type", "ballistic")), depth_fraction, aspect)
 
 	var material := StandardMaterial3D.new()
 	# The shape carries the colour now, so the material just lets it through.
@@ -223,7 +250,7 @@ static func build(wound: Dictionary, tint: Color) -> MeshInstance3D:
 	# Sunk very slightly into the surface, so the rim sits in the skin rather
 	# than standing on it.
 	node.position = at - normal * radius * 0.10
-	node.basis = _basis_facing(normal)
+	node.basis = _basis_facing(normal) * Basis(Vector3.UP, float(wound.get("shape_rotation", 0.0)))
 	return node
 
 
@@ -237,7 +264,7 @@ static func build(wound: Dictionary, tint: Color) -> MeshInstance3D:
 ## crater's sink was a constant multiple of its radius, so a graze that barely
 ## broke the skin and a round that blew through the far side read as the same
 ## hole with a different rim width — a wider decal, not a deeper one.
-static func _crater(radius: float, seed_value: int, tint: Color, damage_type: String, depth_fraction: float = 1.0) -> ArrayMesh:
+static func _crater(radius: float, seed_value: int, tint: Color, damage_type: String, depth_fraction: float = 1.0, aspect: float = 1.0) -> ArrayMesh:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	# Tearing damage is more irregular than a punch, so it gets a rougher rim and
@@ -277,12 +304,16 @@ static func _crater(radius: float, seed_value: int, tint: Color, damage_type: St
 
 	var rim_start := vertices.size()
 	var lip_start := rim_start + segments
+	# Preserve roughly the same opening area while changing its silhouette. A
+	# slash should not gain damage merely because its authored profile is long.
+	var long_axis := sqrt(maxf(1.0, aspect))
+	var short_axis := 1.0 / long_axis
 	for index in segments:
 		var angle := TAU * float(index) / float(segments)
 		# Two octaves of wobble, so the outline is not a smooth ellipse.
 		var wobble := 1.0 + (rng.randf() - 0.5) * jitter + sin(angle * 3.0 + float(seed_value % 17)) * jitter * 0.35
 		var r := radius * clampf(wobble, 0.45, 1.6)
-		vertices.append(Vector3(cos(angle) * r, 0.0, sin(angle) * r))
+		vertices.append(Vector3(cos(angle) * r * long_axis, 0.0, sin(angle) * r * short_axis))
 		colors.append(rim_colour)
 	for index in segments:
 		var angle := TAU * float(index) / float(segments)
@@ -290,7 +321,7 @@ static func _crater(radius: float, seed_value: int, tint: Color, damage_type: St
 		var r := radius * 1.16 * clampf(wobble, 0.5, 1.7)
 		# The lip stands slightly proud — tissue pushed out of the way rather
 		# than a flat ring painted around the hole.
-		vertices.append(Vector3(cos(angle) * r, radius * 0.045, sin(angle) * r))
+		vertices.append(Vector3(cos(angle) * r * long_axis, radius * 0.045, sin(angle) * r * short_axis))
 		colors.append(lip_colour)
 
 	for index in segments:
@@ -315,6 +346,30 @@ static func _crater(radius: float, seed_value: int, tint: Color, damage_type: St
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
+
+
+## The strike's tangent is stored as one rotation around the surface normal, so
+## the authored ellipse follows the blade/round rather than a global axis. A
+## perpendicular hit has no tangent and therefore keeps the weapon profile's
+## deterministic default orientation; a grazing hit stretches progressively.
+static func _impact_shape(normal: Vector3, travel: Vector3, damage_type: String) -> Dictionary:
+	var safe_normal := normal.normalized() if normal.length_squared() > 0.0001 else Vector3.UP
+	var base_aspect := float(TYPE_ASPECT.get(damage_type, 1.0))
+	if travel.length_squared() <= 0.0001:
+		return {"aspect": base_aspect, "rotation": 0.0}
+	var direction := travel.normalized()
+	var alignment := clampf(absf(direction.dot(safe_normal)), 0.0, 1.0)
+	var grazing := 1.0 - alignment
+	var tangent := direction - safe_normal * direction.dot(safe_normal)
+	var rotation := 0.0
+	if tangent.length_squared() > 0.0001:
+		tangent = tangent.normalized()
+		var facing := _basis_facing(safe_normal)
+		rotation = atan2(tangent.dot(facing.z), tangent.dot(facing.x))
+	return {
+		"aspect": base_aspect + grazing * float(GRAZE_STRETCH.get(damage_type, 0.65)),
+		"rotation": rotation,
+	}
 
 
 ## A cylinder's length runs down its local Y, so the wound faces `normal` when

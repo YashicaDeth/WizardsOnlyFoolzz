@@ -5372,7 +5372,17 @@ is art, not noise.
       objects `carry.gd` and the vat already understand
 - [ ] **AN6.4** Severing is at joints and through them — Half Sword's lesson is
       that a cut that lands between two joints still has to do something
-- [ ] **AN6.5** Weapon and angle decide the wound shape, RDR2's lesson
+- [x] **AN6.5** Weapon and angle decide the wound shape, RDR2's lesson —
+      `WoundMarks` keeps authored aspect profiles by damage source: a blade
+      leaves a long cut, a puncture a narrower opening and a ballistic entry a
+      compact hole. The real strike vector is projected onto the struck
+      surface, so a grazing round stretches along its travel while a
+      perpendicular round stays compact; that tangent also rotates the long
+      axis instead of aligning every wound to the body. Aspect and rotation
+      travel through the existing scar record, so loading cannot turn a slash
+      back into a circle. `wound_marks_test.gd`, 20 checks; the matched
+      damage/depth/seed comparison in
+      `captures/an6_5_weapon_angle_wounds.png` was inspected at 1280x720.
 - [ ] **AN6.6** The rig survives it — a body missing a torso section is still
       animating, still falling, still a thing that was alive
 - [ ] **AN6.7** Written up as instructions: the mesh layout, the rig, and the

@@ -1416,7 +1416,7 @@ func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, dama
 	# before, so a fresh hole shows the depth the body was already opened to and
 	# deepens on the next frame's refresh rather than predicting itself.
 	var layer := int(zone_depth.get(zone, 0))
-	var wound: Dictionary = WoundMarks.make(surface["at"], surface["normal"], damage, damage_type, layer)
+	var wound: Dictionary = WoundMarks.make(surface["at"], surface["normal"], damage, damage_type, layer, local_travel)
 	wound["depth"] = shot["fraction"]
 	wound["through"] = shot["through"]
 	# A hole that nearly went through looks nearly like one that did.
@@ -1426,7 +1426,7 @@ func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, dama
 	# --- and out the other side ------------------------------------------
 	if bool(shot["through"]):
 		var exit_at: Vector3 = local_point - (surface["normal"] as Vector3) * float(shot["thickness"])
-		var exit_wound: Dictionary = WoundMarks.make(exit_at, -(surface["normal"] as Vector3), damage, damage_type, layer)
+		var exit_wound: Dictionary = WoundMarks.make(exit_at, -(surface["normal"] as Vector3), damage, damage_type, layer, local_travel)
 		exit_wound["radius"] = float(exit_wound["radius"]) * WoundMarks.EXIT_SPREAD
 		exit_wound["depth"] = 1.0
 		exit_wound["through"] = true
