@@ -2853,7 +2853,7 @@ The last rung. Fifteen statements that are true of the demo when this game is fi
 - [ ] **P10.6** `v10` Combat, the handheld and the map are all fully present
 - [ ] **P10.7** `v10` It is playable without anybody explaining anything
 - [ ] **P10.8** `v10` It takes about thirty minutes and does not feel truncated
-- [ ] **P10.9** `v10` What it locks is content, never systems
+- [x] **P10.9** `v10` What it locks is content, never systems — `_enforce_demo_territory()` (`bone_yard_hunt.gd:1933-1959`) is the entire lock, and all it does on a border crossing is snap `player`/`player_body` back to the last position inside home ground, zero the velocity, set a prompt string and record one event. It never touches a weapon, a stat, a menu, the HUD, combat or any other script — nothing is disabled, only a patch of geography is unreachable. Combined with P10.2's grep (only two call sites of `is_demo()`/`run_mode` outside tests, both in this one function), every system in the game — combat, the handheld, screens, the Board — runs identically in DEMO and PLAY; only which holdings you can stand on differs
 - [ ] **P10.10** `v10` A save from the demo opens in the full game
 - [ ] **P10.11** `v10` It is the thing Greg can hand somebody without being in the room
 - [ ] **P10.12** `v10` It exports and runs on a machine with no Godot on it
