@@ -112,6 +112,47 @@ func _ready() -> void:
 		"release restores ordinary body collision")
 	check(is_zero_approx(hunt.body_motion.grapple_blend) and is_zero_approx(aimed.motion.grapple_blend),
 		"release clears both clinch poses")
+
+	# The teaching loop has to be repeatable, not merely survivable once. A
+	# release must hand the motor back immediately, then let C acquire the same
+	# live body again without retaining a collision exception or a zeroed player
+	# velocity from the previous constraint.
+	var released_from: Vector3 = hunt.player_body.global_position
+	hunt.grapple_drag_override = null
+	Input.action_press("move_forward")
+	for tick in range(4):
+		hunt._update_player(1.0 / 60.0)
+	Input.action_release("move_forward")
+	check(hunt.player_body.global_position.distance_to(released_from) > 0.01
+		and hunt.player_body.velocity.length() > 0.01,
+		"release returns locomotion without a frozen player velocity")
+
+	# Put the player back at deliberate contact range after proving ordinary
+	# movement, then repeat the public acquire path rather than assigning a
+	# target directly. This catches stale reciprocal exceptions on reacquire.
+	hunt.player_body.global_position = aimed.node.global_position - Vector3(0, 0, 1.5)
+	hunt.player_body.velocity = Vector3.ZERO
+	hunt.player = hunt.player_body.global_position + Vector3.UP * 0.6
+	hunt.yaw = 0.0
+	hunt.stamina = 100.0
+	hunt._start_grapple()
+	check(hunt.grapple_target == str(aimed.subject_id)
+		and hunt.player_body.get_collision_exceptions().has(aimed.node)
+		and aimed.node.get_collision_exceptions().has(hunt.player_body),
+		"a released body can be acquired again with one fresh reciprocal exception pair")
+	hunt.grapple_drag_override = Vector2(0, -1)
+	hunt.grapple_pushing_override = true
+	var reacquire_advantage: float = hunt.grapple_advantage
+	hunt._update_grapple(0.05)
+	hunt.grapple_drag_override = null
+	hunt.grapple_pushing_override = null
+	check(hunt.player_body.velocity.length() > 0.01 and hunt.grapple_advantage > reacquire_advantage
+		and hunt.grapple_target == str(aimed.subject_id),
+		"the reacquired clinch still owns live directional pressure rather than a stuck body")
+	hunt._break_grapple("TEST FINAL RELEASE")
+	check(not hunt.player_body.get_collision_exceptions().has(aimed.node)
+		and not aimed.node.get_collision_exceptions().has(hunt.player_body),
+		"the reacquired hold also restores ordinary collisions on release")
 	off_axis.node.queue_free()
 	aimed.node.queue_free()
 	print("GRAPPLE_PLAYABILITY_TEST_RESULT failures=", failures.size())

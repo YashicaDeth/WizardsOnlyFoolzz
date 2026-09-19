@@ -17,6 +17,7 @@ const ANATOMY := preload("res://systems/anatomy_component.gd")
 const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+const CARRY := preload("res://systems/carry.gd")
 
 const EYE_HEIGHT := 1.62
 const VAT_POSITION := Vector3(0, 0, 0)
@@ -42,6 +43,9 @@ var umbilicals: Array[Node3D] = []
 var glass_shards: Array[Dictionary] = []
 var door_marker: Node3D
 var line_index := -1
+var breakout_complete := false
+var first_acquisition_complete := false
+var objective_text := "ESCAPE THE FACILITY"
 
 # 0 submerged, 1 voiding, 2 breach, 3 floor, 4 aisle
 const BEATS := [
@@ -89,6 +93,12 @@ func _on_intake_filed(_state: Dictionary) -> void:
 		return
 	intake.queue_free()
 	intake = null
+	var filed_state := WorldHistory.subject("player")
+	var filed_anatomy: Dictionary = filed_state.get("anatomy", {})
+	anatomy.call("configure", "player", 5000.0, filed_anatomy.get("cybernetics", []))
+	anatomy.call("apply_hit", "torso", 26.0, 0.0, "blunt")
+	anatomy.call("apply_hit", "head", 14.0, 0.0, "blunt")
+	WorldHistory.register_subject("inventory", {"kind": "inventory", "items": []})
 	clock = 0.0
 	line_index = -1
 	phase = "submerged"
@@ -415,6 +425,8 @@ func _update_sequence(_delta: float) -> void:
 
 
 func _breach() -> void:
+	if breakout_complete:
+		return
 	phase = "floor"
 	opening_audio.cue("glass")
 	vat_glass.visible = false
@@ -447,6 +459,35 @@ func _breach() -> void:
 	puddle.mesh = disc
 	puddle.position = VAT_POSITION + Vector3(0, 0.02, 0)
 	add_child(puddle)
+	_record_breakout()
+
+
+## The first supernatural act remains physical: the player's suffering seizes
+## the implanted wetwire, the tube comes out, and a usable restraint enters the
+## shared carry model for later inventory readers.
+func _record_breakout() -> void:
+	breakout_complete = true
+	var player_state := WorldHistory.subject("player")
+	var anatomy_state: Dictionary = player_state.get("anatomy", {})
+	var grown: Array = (anatomy_state.get("cybernetics", []) as Array).duplicate()
+	if not grown.has("wetwire chip"):
+		grown.append("wetwire chip")
+	anatomy_state["cybernetics"] = grown
+	WorldHistory.begin_ledger_batch()
+	anatomy.call("configure", "player", 5000.0, grown)
+	anatomy.call("apply_hit", "torso", 26.0, 0.0, "blunt")
+	anatomy.call("apply_hit", "head", 14.0, 0.0, "blunt")
+	WorldHistory.amend_subject("player", {"status": "broke free", "anatomy": anatomy_state, "anatomy_state": anatomy.call("snapshot"), "memory": "The soul seized the wetwire and broke the vat."})
+	var carry := CARRY.new()
+	var item := {"label": "BROKEN MEDICAL RESTRAINT", "kind": "tool", "mass": 0.0, "perishes": false, "age": 0.0, "from": "growing_floor"}
+	carry.items.append(item)
+	carry.save_to_history()
+	first_acquisition_complete = true
+	PLAYER_ACTION_LEDGER.record("opening_breakout", {"location": "growing_floor", "implant": "wetwire chip", "acquisition": item.label})
+	OPENING.advance("broke_free")
+	WorldHistory.record_event("opening_breakout", {"location": "growing_floor", "implant": "wetwire chip", "item": item})
+	WorldHistory.commit_ledger_batch()
+	subtitle.text = "THE WETWIRE ANSWERS  //  RESTRAINT BROKEN"
 
 
 func _update_shards(delta: float) -> void:
@@ -518,7 +559,9 @@ func _update_hud() -> void:
 	]
 	if not can_move:
 		prompt.text = ""
+		$HUD/Objective.text = ""
 		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0
-	prompt.text = "[E] ENTER THE UNDERGROUND HEAT" if to_door.length() <= 3.4 else "OBJECTIVE: ESCAPE THE FACILITY   //   WASD MOVE   MOUSE LOOK"
+	$HUD/Objective.text = "OBJECTIVE\n" + objective_text
+	prompt.text = "[E] ENTER THE UNDERGROUND HEAT" if to_door.length() <= 3.4 else "WASD MOVE   //   MOUSE LOOK   //   E INTERACT"

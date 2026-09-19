@@ -33,6 +33,38 @@ const STORM_MOTES := 1500
 ## the air ends up moving with the player instead of past them.
 const RECENTRE_STEP := 6.0
 
+## Exhales and tricks are intentionally transient, but a player can trigger
+## them faster than their 2-4 second visual lifetime. Without a shared cap,
+## repeated smoking creates a growing set of particle servers and transparent
+## overdraw. Keep the nearby effects readable while bounding the route cost.
+static var _transient_smoke: Array[Node3D] = []
+
+static func transient_smoke_budget() -> int:
+	match WorldLook.quality:
+		WorldLook.Quality.ULTRA: return 20
+		WorldLook.Quality.HIGH: return 14
+		_: return 8
+
+static func transient_smoke_count() -> int:
+	_prune_transient_smoke()
+	return _transient_smoke.size()
+
+static func _prune_transient_smoke() -> void:
+	for index in range(_transient_smoke.size() - 1, -1, -1):
+		if not is_instance_valid(_transient_smoke[index]):
+			_transient_smoke.remove_at(index)
+
+static func _reserve_transient_smoke() -> void:
+	_prune_transient_smoke()
+	while _transient_smoke.size() >= transient_smoke_budget():
+		var oldest: Node3D = _transient_smoke.pop_front()
+		if is_instance_valid(oldest):
+			oldest.queue_free()
+
+static func _track_transient_smoke(node: Node3D) -> void:
+	if node != null and is_instance_valid(node):
+		_transient_smoke.append(node)
+
 ## W1.2. `chaos_magick()` decays on its own with nothing feeding it, so read
 ## on its own the air got *better* on every quiet night — the opposite of
 ## what "contamination has weather" asked for. A watermark fixes that without
@@ -146,6 +178,7 @@ func follow(at: Vector3) -> void:
 ## turbulence and settling logic, emitted once from the player's mouth and then
 ## left to drift through whatever light is really there.
 func emit_exhale(at: Vector3, direction: Vector3, density := 1.0, tint := Color(0.72, 0.74, 0.69)) -> GPUParticles3D:
+	_reserve_transient_smoke()
 	var plume := GPUParticles3D.new()
 	plume.name = "SmokeExhale"
 	plume.set_meta("smoke_tint", tint)
@@ -213,6 +246,7 @@ func emit_exhale(at: Vector3, direction: Vector3, density := 1.0, tint := Color(
 	if forward.length_squared() > 0.001:
 		plume.look_at(at + forward, Vector3.UP)
 	plume.emitting = true
+	_track_transient_smoke(plume)
 	get_tree().create_timer(plume.lifetime + 0.5).timeout.connect(plume.queue_free)
 	return plume
 
@@ -222,6 +256,7 @@ func emit_exhale(at: Vector3, direction: Vector3, density := 1.0, tint := Color(
 ## player's look direction — so an O expands and frays instead of being a flat
 ## sprite pasted over the camera.
 func emit_smoke_trick(at: Vector3, direction: Vector3, trick: String, density := 1.0, tint := Color(0.72, 0.74, 0.69)) -> Node3D:
+	_reserve_transient_smoke()
 	var rig := Node3D.new()
 	rig.name = "SmokeTrick_%s" % trick.replace(" ", "_")
 	rig.set_meta("smoke_tint", tint)
@@ -305,6 +340,7 @@ func emit_smoke_trick(at: Vector3, direction: Vector3, trick: String, density :=
 		rig.add_child(ring)
 		ring.emitting = true
 	get_tree().create_timer(3.8).timeout.connect(rig.queue_free)
+	_track_transient_smoke(rig)
 	return rig
 
 
