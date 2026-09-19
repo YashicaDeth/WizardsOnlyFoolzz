@@ -11,6 +11,7 @@ signal equipped(weapon_id: String)
 signal fired(weapon_id: String, report: Dictionary)
 signal reload_started(weapon_id: String)
 signal reload_finished(weapon_id: String)
+signal customization_changed(weapon_id: String, customization: Dictionary)
 
 const WEAPONS := {
 	"sword": {
@@ -37,6 +38,22 @@ const WEAPONS := {
 	},
 }
 const SLOT_ORDER := ["sword", "shotgun", "sidearm"]
+## AF10.10. These are attachment points on the object, not perks on its
+## holder. The future crafting screen may decide where a part comes from, but
+## it must install through this vocabulary so the Hunt, range and cab all read
+## the same weapon-owned record.
+const CUSTOMIZATION_SLOTS := {
+	"shotgun": ["sight", "muzzle", "stock"],
+	"sidearm": ["sight", "muzzle", "grip"],
+}
+const CUSTOMIZATION_SCALES := {
+	"damage_scale": Vector2(0.25, 2.0),
+	"impulse_scale": Vector2(0.25, 2.0),
+	"range_scale": Vector2(0.25, 2.0),
+	"spread_scale": Vector2(0.25, 2.0),
+	"cooldown_scale": Vector2(0.5, 2.0),
+	"reload_scale": Vector2(0.5, 2.0),
+}
 
 var current_id := "sword"
 var cooldown := 0.0
@@ -50,6 +67,12 @@ var ammo := {
 ## dict only ever gains an entry the first time something actually wears it,
 ## the same lazy shape `ammo` above would use if a fresh magazine were free.
 var condition: Dictionary = {}
+## AF10.10. One dictionary per weapon, then one installed part per physical
+## slot. Nothing is stored on a player, vehicle or range actor: any holder asks
+## `current()`/`weapon_definition()` and receives the numbers belonging to the
+## weapon it actually has. Part records remain data (id, label, provenance and
+## modifiers) so a later crafting/persistence layer can move them intact.
+var customization: Dictionary = {}
 var models: Dictionary = {}
 var hand: Node3D
 
@@ -153,7 +176,80 @@ func select_slot(slot: int) -> bool:
 
 
 func current() -> Dictionary:
-	return WEAPONS[current_id]
+	return weapon_definition(current_id)
+
+
+## The authored definition plus the parts fitted to this particular weapon.
+## Multipliers compose rather than overwrite, so two parts never fight over a
+## copied damage/spread field and removing either one recovers the base value.
+func weapon_definition(weapon_id: String) -> Dictionary:
+	if not WEAPONS.has(weapon_id):
+		return {}
+	var result: Dictionary = (WEAPONS[weapon_id] as Dictionary).duplicate(true)
+	for part_value in weapon_customization(weapon_id).values():
+		var part := part_value as Dictionary
+		var modifiers := part.get("modifiers", {}) as Dictionary
+		for scale_name in CUSTOMIZATION_SCALES:
+			if not modifiers.has(scale_name):
+				continue
+			var property_name := str(scale_name).trim_suffix("_scale")
+			if result.has(property_name):
+				result[property_name] = float(result[property_name]) * float(modifiers[scale_name])
+	return result
+
+
+func weapon_customization(weapon_id: String = "") -> Dictionary:
+	var key := weapon_id if weapon_id != "" else current_id
+	return (customization.get(key, {}) as Dictionary).duplicate(true)
+
+
+## Install a crafted/found part on the weapon itself. Unknown weapon slots are
+## refused instead of becoming silent holder perks. Modifier names are a small
+## mechanical vocabulary and are clamped here once, at the ownership boundary.
+func install_customization(weapon_id: String, slot: String, part: Dictionary) -> bool:
+	if not WEAPONS.has(weapon_id) or not CUSTOMIZATION_SLOTS.has(weapon_id):
+		return false
+	if slot not in (CUSTOMIZATION_SLOTS[weapon_id] as Array) or str(part.get("id", "")).is_empty():
+		return false
+	var fitted := part.duplicate(true)
+	var requested := fitted.get("modifiers", {}) as Dictionary
+	var modifiers: Dictionary = {}
+	for scale_name in requested:
+		if not CUSTOMIZATION_SCALES.has(scale_name):
+			continue
+		var bounds: Vector2 = CUSTOMIZATION_SCALES[scale_name]
+		modifiers[scale_name] = clampf(float(requested[scale_name]), bounds.x, bounds.y)
+	fitted["modifiers"] = modifiers
+	var installed := weapon_customization(weapon_id)
+	installed[slot] = fitted
+	customization[weapon_id] = installed
+	_sync_customization_meta(weapon_id)
+	customization_changed.emit(weapon_id, installed.duplicate(true))
+	return true
+
+
+func remove_customization(weapon_id: String, slot: String) -> Dictionary:
+	var installed := weapon_customization(weapon_id)
+	if not installed.has(slot):
+		return {}
+	var removed := (installed[slot] as Dictionary).duplicate(true)
+	installed.erase(slot)
+	if installed.is_empty():
+		customization.erase(weapon_id)
+	else:
+		customization[weapon_id] = installed
+	_sync_customization_meta(weapon_id)
+	customization_changed.emit(weapon_id, installed.duplicate(true))
+	return removed
+
+
+## Models are consumers too. Keeping the complete record on the weapon mount
+## gives authored attachment geometry a stable seam without teaching the hand,
+## player or vehicle what an optic is.
+func _sync_customization_meta(weapon_id: String) -> void:
+	var model := models.get(weapon_id) as Node3D
+	if model != null and is_instance_valid(model):
+		model.set_meta("weapon_customization", weapon_customization(weapon_id))
 
 
 ## AN2.4. 1.0 is unworn and new; 0.0 has nothing left to give.
@@ -194,6 +290,7 @@ func state() -> Dictionary:
 		"jammed": bool(jammed.get(current_id, false)),
 		"clearing_jam": jam_clear_remaining > 0.0,
 		"jam_clear_ratio": jam_clear_remaining / JAM_CLEAR_TIME if jam_clear_remaining > 0.0 else 0.0,
+		"customization": weapon_customization(current_id),
 	}
 
 
