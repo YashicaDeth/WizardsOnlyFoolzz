@@ -719,7 +719,10 @@ under-directed opening.
 - [x] ~~**D5.1** Elements to attributes, modality to a commitment axis~~
 - [x] ~~**D5.2** Ascendant sets starting Wire reach~~
 - [x] ~~**D5.3** Ruling House as the Skyrim-standing-stone blessing~~
-- [~] **D5.4** Derived wheel shipped and honest about it. Ephemeris still the open call
+- [~] **D5.4** Derived wheel shipped and honest about it. Greg chose real
+      ephemeris-grade planetary positions on 19 September; integrating that
+      data and letting planetary rulers personalise favour/communication
+      without creating a strictly superior birth remains the unfinished half
 
 ### D6 — The instrument route `BUILT`
 - [x] ~~**D6.1** Original items on real axes — five-factor plus dark triad~~
@@ -6902,6 +6905,54 @@ Greg: *"the higher you have to be to talk or even fight, conjure, evoke etc"*.
       from the implementation rather than authored by the agent that built
       it. Nothing here is ticked on a claim that was not re-run.
 
+## AX — The authored facility escape
+
+Direction locked by Greg's 19 September interview. This is the cross-system
+vertical slice described by `ARCHITECTURE/SYSTEM_MAP.md`: the existing vat,
+Derby and surface are ingredients, not permission to preserve the old automatic
+route. Items below describe connections between their owning systems; they do
+not make AX a second owner of anatomy, inventory, combat or the Black Mirror.
+
+### AX1 — The examination creates the player
+- [ ] **AX1.1** Character creation unfolds through a readable government examination, not one detached setup menu
+- [ ] **AX1.2** The unidentified visiting doctor is personally cruel, strangely sympathetic and important enough to have arrived only for this subject
+- [ ] **AX1.3** Direct body/face/proportion customisation, origins, anatomy, randomisation, presets, personality and natal data enter through one paced sequence
+- [ ] **AX1.4** Player choices remain mechanically true while the government's institutional diagnosis can be insulting or politically wrong
+- [ ] **AX1.5** A deliberate first pass takes roughly 10–15 minutes; a saved preset gives a returning player a fast route without losing the scene
+- [ ] **AX1.6** Explicit anatomy and the mosaic/censorship presentation are equally complete options
+
+### AX2 — The soul takes the implant
+- [ ] **AX2.1** The doctor's conclusion—that they now know how to break or kill the player—creates the immediate threat rather than a lore subtitle
+- [ ] **AX2.2** Accumulated suffering and refusal awaken the player's own soul/inner demon; no external entity grants or enters with the power
+- [ ] **AX2.3** Chaos magick visibly rewrites the government's brain implant into the player's interface and first usable ability
+- [ ] **AX2.4** The vat, restraints and mouth tube fail as one playable physical breakout rather than a cut to the corridor
+- [ ] **AX2.5** Reaching the departing doctor is an urgent optional pursuit, not a forced timer
+- [ ] **AX2.6** An apparent doctor kill remains a real victory; later medical reconstruction preserves his scars, memory and rivalry
+
+### AX3 — Acquisition teaches the game
+- [ ] **AX3.1** A broken medical restraint/tool is the first inspected and usable object
+- [ ] **AX3.2** Humiliation clothing comes from a dead failed subject and physically teaches body inventory/equipment
+- [ ] **AX3.3** The first biometric barrier accepts coercion, a living/unconscious/dead body, removed anatomy and—later—implant spoofing
+- [ ] **AX3.4** The first firearm is powerful, taken from a guard and ammunition-starved enough that melee still matters
+- [ ] **AX3.5** The Black Mirror is stolen from restricted technology storage as a rare prototype, not issued as an ordinary menu
+- [ ] **AX3.6** Every introduced interface is learned by doing the action that needs it; no permanent all-controls overlay substitutes for staging
+
+### AX4 — The facility is a place with routes
+- [ ] **AX4.1** Stealth/exploration, cooperation/betrayal, direct assault and recapture into the Derby are real routes through one connected facility
+- [ ] **AX4.2** Avoiding the Derby is a mastery route a perceptive first-time player can still discover
+- [ ] **AX4.3** Successful play is never revoked by an arbitrary recapture cutscene; containment has a demonstrated cause
+- [ ] **AX4.4** Different exits can reach different surface positions and relationships while handing into the same persistent world
+- [ ] **AX4.5** Until the player's death fiction is authored, opening death uses an honest ordinary reload rather than a counterfeit immortality explanation
+- [ ] **AX4.6** Every branch records its actions and consequences through the shared ledger and resumes from the correct stage
+
+### AX5 — The slice proves the wider game
+- [ ] **AX5.1** First- and third-person combat share anatomy, wound depth, ballistics and consequences throughout the facility
+- [ ] **AX5.2** The implanted external camera is introduced as technology, with cramped-space, darkness, injury and interference failure cases
+- [ ] **AX5.3** Nearby population stays inside the 5–20 fully simulated budget; distant people keep identity while expensive detail reduces smoothly
+- [ ] **AX5.4** The complete route holds the 60 FPS contract under its authored combat and aftermath load
+- [ ] **AX5.5** One recorded playthrough demonstrates creation, breakout, equipment, biometric choice, combat, Black Mirror theft, at least two routes and surface handoff
+- [ ] **AX5.6** Only after those sockets are proven does AW emit the friend-facing opening asset/model/texture/audio commission list
+
 ## Open questions — only you can answer these
 
 They block nothing else, but they change what gets built.
@@ -6916,12 +6967,17 @@ They block nothing else, but they change what gets built.
    urgent; see `DESIGN.md`.
 2. ~~**celloutz.xyz — mirror or fictionalise?**~~ **Fictionalise it**, somewhat
    rather than wholesale. I3 unblocked.
-3. **Ephemeris or derived wheel?** "Most accurate" charts need real planetary
-   longitudes from a table. Affects D5.4.
-4. ~~**Guns: common, or scarce and improvised?**~~ **Scarce**, and so is
-   everything else — the world is scrap and bionics, and crafting is how
-   weapons get upgraded. Most fighting is not gunfighting at all: cybernetics
-   make bodies fast and strong, so combat is physical.
+3. ~~**Ephemeris or derived wheel?**~~ **Real ephemeris-grade positions**, as
+   an integrated part of creation rather than a separate route. Planetary
+   rulers may personalise favour and communication without making one birth
+   strictly superior. D5.4 remains partially built because the current wheel
+   is derived, not because the direction is still open.
+4. ~~**Guns: common, or scarce and improvised?**~~ **The basic category is
+   available, but value is uneven rather than binary.** Industrial/common
+   firearms exist; reliable high-quality weapons, condition, ammunition,
+   attachments and catastrophic specialist rounds are valuable and scarce.
+   The world is scrap and bionics, crafting is the upgrade path, and most
+   fighting remains physical rather than an endless supply of gunfights.
 5. ~~**What persists between runs?**~~ **There are no runs.** Greg, 19
    September: it is not a roguelike, it is a save game — your game — with a
    main story, an end goal and a post-game you can keep playing. The

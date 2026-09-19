@@ -320,8 +320,11 @@ either is how this repository became hard to read.
   avoid: the Skyrim/Fallout pattern where you press through canned lines and
   it never feels like the question is yours.
 
-- **Guns are scarce, and so is everything else.** The world is scrap and
-  bionics. Crafting is how weapons get upgraded, not shops full of stock.
+- **Guns are unevenly available rather than simply common or absent.** Basic
+  industrial firearms exist, but reliable high-quality weapons, condition,
+  ammunition, attachments and catastrophic specialist rounds are valuable
+  and scarce. The world is scrap and bionics. Crafting is how weapons get
+  upgraded, not shops full of stock.
 
 - **Most fighting is not gunfighting.** Cybernetic upgrades make bodies fast
   and strong, so combat is physical: leaping around each other, super
