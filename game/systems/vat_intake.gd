@@ -589,10 +589,18 @@ func _finish_filing() -> void:
 	var state: Dictionary = sheet.apply_to_world()
 	state["refusals"] = refusals
 	state["filed_as"] = DoctorExamination.classify(sheet)
+	# AX1.5. The doc asks for "roughly 10-15 minutes" on a deliberate first pass.
+	# That is a claim about a human at a keyboard, so it cannot be asserted in a
+	# suite -- but it can stop being a guess. Every filing records how long the
+	# player actually took, and whether they came in on a preset, so a playtest
+	# produces the number instead of an opinion about the number.
 	WorldHistory.update_subject("player", {
 		"examination_refusals": refusals,
 		"institutional_classification": str(DoctorExamination.classify(sheet).label),
+		"examination_seconds": int(elapsed),
+		"examination_route": "preset:" + preset_loaded if preset_loaded != "" else "deliberate",
 	}, "examination_filed")
+	print("EXAMINATION FILED // %d:%02d // %s // %d refusals" % [int(elapsed) / 60, int(elapsed) % 60, ("PRESET " + preset_loaded) if preset_loaded != "" else "DELIBERATE", refusals])
 	filed.emit(state)
 
 
