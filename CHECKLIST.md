@@ -3980,12 +3980,21 @@ travels, hits something and leaves a mark on it.
 ### AF6 — The range
 The gore sandbox is where a weapon is learned (AU3.5). Same room, same bodies,
 same reset — a range that is a place rather than a menu of guns.
-- [ ] **AF6.1** Every weapon in `hunter_arsenal.gd` is physically present and
-      pick-up-able in the shed — Updated 2026-09-15: every weapon is reachable
-      now (AF6.4 below), by wheel/hotkey through a real `HunterArsenal`
-      instance in `gore_demo.gd` — but there is still no shed, no rack, no
-      physical pickup interaction. Switchable is not the same claim as
-      pick-up-able; this item is about the latter and stays open.
+- [x] **AF6.1** Every weapon in `hunter_arsenal.gd` is physically present and
+      pick-up-able in the shed — the Gore Sandbox now builds one lit, open
+      weapon shed carrying the sword, shotgun and sidearm as the exact authored
+      `HeldGear.build_weapon()` models used in the player's hands, not display
+      substitutes. They present their real profiles on the rack. Walking within
+      reach and pressing the room's existing `E` take verb equips that same
+      weapon through the live `HunterArsenal`, removes its physical model from
+      the rack and returns it when the drill resets; reaching from across the
+      room or changing weapons during reload/jam recovery is refused. Wheel and
+      hotkeys remain quick practice access, but they are no longer the only way
+      weapons exist in the room. `tests/gore_weapon_rack_test.gd` verifies the
+      complete shared weapon set, authored anchors, distance gate, rack-to-hand
+      transition and reset (15 checks); range, parity, training, arsenal and
+      reload suites remain green. Rendered and inspected at
+      `P:/GameDev/Temp/lane-8-guns-af6-1/gore_sandbox_weapon_rack.png`.
 - [ ] **AF6.2** Bullets are readable here: drop, drag, travel time, penetration
       shown against real bodies at real distances (AF2)
 - [ ] **AF6.3** The reset restores the bodies without restarting the scene

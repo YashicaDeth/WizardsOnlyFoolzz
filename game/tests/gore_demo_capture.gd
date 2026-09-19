@@ -38,6 +38,15 @@ func _ready() -> void:
 	await _settle(tree, 6)
 	await _shoot(tree, out_dir + "/gore_demo_room.png")
 
+	# AF6.1. Walk up to the shed and face the physical production weapon set.
+	# The capture has to show the rack before a take; the test covers the same
+	# model disappearing into the live held-gear path when E is pressed.
+	demo.eye = Vector3(-4.6, 1.68, 10.4)
+	demo.yaw = 0.0
+	demo.pitch = -0.02
+	await _settle(tree, 5)
+	await _shoot(tree, out_dir + "/gore_sandbox_weapon_rack.png")
+
 	# Put one of the actual anatomy bodies inside reach and take it into the
 	# shared captive pose. This proves C is teaching a physical clinch now, not
 	# toggling an unrelated menu state.
