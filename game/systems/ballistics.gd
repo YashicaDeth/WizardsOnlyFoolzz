@@ -82,6 +82,21 @@ const MAX_ROUNDS := 96
 const MAX_CASINGS := 180
 const GRAVITY := 9.81
 
+## Persistent brass and impact scars are useful evidence, but their meshes are
+## still real scene objects. Keep the authored high-quality ceiling while
+## giving the default PERFORMANCE route a smaller nearby-world budget.
+static func casing_budget() -> int:
+	match WorldLook.quality:
+		WorldLook.Quality.ULTRA: return MAX_CASINGS
+		WorldLook.Quality.HIGH: return 120
+		_: return 48
+
+static func wound_budget() -> int:
+	match WorldLook.quality:
+		WorldLook.Quality.ULTRA: return MAX_CASINGS
+		WorldLook.Quality.HIGH: return 120
+		_: return 96
+
 ## Rounds in flight. Plain dictionaries stepped by hand: a RigidBody per bullet
 ## would hand the physics server ninety bodies a second during a shotgun volley
 ## for no behaviour the integrator below does not already give.
@@ -162,7 +177,7 @@ func _eject(from: Vector3, along: Vector3, calibre: String) -> void:
 	# without a case gets the same answer for free.
 	if (spec["casing"] as Vector3).is_zero_approx():
 		return
-	if casings.size() >= MAX_CASINGS:
+	if casings.size() >= casing_budget():
 		_retire_casing(0)
 	var forward := along.normalized()
 	var right := forward.cross(Vector3.UP).normalized()
@@ -340,7 +355,7 @@ func rounds_in_flight() -> Array[Vector3]:
 ## QuadMesh: a dark, untextured quad is a black square wherever a player shoots
 ## the floor, which reads as a broken decal rather than a struck surface.
 func _mark(at: Vector3, normal: Vector3, energy: float) -> void:
-	if marks.size() >= MAX_CASINGS:
+	if marks.size() >= wound_budget():
 		var oldest: Node3D = marks.pop_front()
 		if is_instance_valid(oldest):
 			oldest.queue_free()
