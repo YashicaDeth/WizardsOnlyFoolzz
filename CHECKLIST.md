@@ -5370,10 +5370,30 @@ is art, not noise.
       1280x720 `an6_1_cavity_contents.png` holds radius, seed and depth constant
       beside the former closed crater so the visible interior is the only
       changed variable.
-- [ ] **AN6.2** Organs are separate bodies behind that opening and fall out
-      under physics when the cavity is breached
-- [ ] **AN6.3** Fallen organs persist, can be picked up, and are the same
-      objects `carry.gd` and the vat already understand
+- [x] **AN6.2** Organs are separate bodies behind that opening and fall out
+      under physics when the cavity is breached — built in `89c757a` and left
+      unticked there. `_spill_organ()` duplicates the exact mesh the X-ray
+      already shows (not a cosmetic blob on a hand-rolled trajectory), hands it
+      to a real `RigidBody3D` with a collision shape and a scatter impulse, and
+      registers it with `GoreChunks.register_organ()` — the same identity
+      contract `_throw_limb()` already gives a severed limb. Re-verified this
+      pass: `baseline_human_test` 87/87 ("the ruptured heart falls out as a
+      real physics body") and `chunk_test` 37/37 both clean, and the committed
+      `captures/an6_2_organ_physics.png` was reopened and shows the small
+      ruptured organ resting on the floor beside the X-rayed body it left.
+- [x] **AN6.3** Fallen organs persist, can be picked up, and are the same
+      objects `carry.gd` and the vat already understand — also landed in
+      `89c757a` and also left unticked. `register_organ()` gives an organ the
+      same `whole_organ`/`whole_limb`-shaped identity dictionary a severed limb
+      carries, so `carry.gd`'s existing `take_chunk()` resolves its label and a
+      `kind` of `"organ"` with no change on that side, and it rots, marks the
+      ground and obeys the shared `live_gore` budget exactly as every other
+      piece of a body already does — "persist" here means the same thing it
+      means for a severed limb elsewhere in this file: a real object sitting in
+      the world rather than a flash of cosmetic detail. `chunk_test.gd`'s
+      "AN6.2/AN6.3" block covers the full loop — organ ruptures, falls as a
+      `RigidBody3D`, is taken off the floor, and enters CARRY with its
+      `organ_id` intact — and passed clean this pass.
 - [ ] **AN6.4** Severing is at joints and through them — Half Sword's lesson is
       that a cut that lands between two joints still has to do something
 - [x] **AN6.5** Weapon and angle decide the wound shape, RDR2's lesson —
