@@ -234,6 +234,35 @@ func _test_organs() -> void:
 	check(missing.is_empty(), "every organ has geometry inside its zone (missing %s)" % str(missing))
 	check(not body.organ_parts["heart"].visible, "organs are not visible from outside the body")
 
+	# AN6.1: the wound itself is now the narrow view inside. A penetrating cut
+	# that reaches the organ layer carries the nearest organ's identity and uses
+	# that organ's actual mesh behind the opening; a shallow mark does neither.
+	var opened := _rig()
+	var gut := opened.organ_parts["gut"] as MeshInstance3D
+	var gut_surface := gut.global_position + Vector3(0.0, 0.0, 0.12)
+	opened.hit_at(gut_surface, 40.0, 8.0, "cut", Vector3(0.0, 0.0, -1.0))
+	var torso_wounds := opened.parts["torso"].get_node_or_null("Wounds") as Node3D
+	var cavity_count := 0
+	var cavity_source: Mesh = null
+	if torso_wounds != null:
+		for mark in torso_wounds.get_children():
+			var cavity := mark.get_node_or_null("CavityContents") as MeshInstance3D
+			if cavity != null:
+				cavity_count += 1
+				cavity_source = cavity.get_meta("source_mesh") as Mesh
+	var recorded_organs: Array = (opened.wound_marks.get("torso", []) as Array).map(func(wound): return str((wound as Dictionary).get("organ_id", "")))
+	check(cavity_count == 1 and cavity_source == gut.mesh, "a deep torso wound visibly opens onto the same gut mesh held inside the body (cavities %d, recorded %s, layer %d)" % [cavity_count, str(recorded_organs), opened.exposed_layer("torso")])
+	opened.anatomy.damage_organ("gut", 999.0)
+	opened._refresh_wounds("torso")
+	torso_wounds = opened.parts["torso"].get_node_or_null("Wounds") as Node3D
+	cavity_count = 0
+	if torso_wounds != null:
+		for mark in torso_wounds.get_children():
+			if mark.get_node_or_null("CavityContents") != null:
+				cavity_count += 1
+	check(cavity_count == 0, "the opening no longer shows an organ after that same organ has left the body")
+	opened.queue_free()
+
 	# A club breaks ribs. It does not perforate a liver — if blunt damage
 	# reached organs, every zone hit would be a lethal one.
 	for i in 6:
