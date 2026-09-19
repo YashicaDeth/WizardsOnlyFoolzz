@@ -40,5 +40,17 @@ func _ready() -> void:
 
 	check(not bool(AnatomyPresentation.treatment("elbow").ok), "an unregistered region is refused, not guessed at")
 
+	# AX1.3. The anatomy question the facility used to answer for you.
+	const SHEET := preload("res://systems/character_sheet.gd")
+	var sheet = SHEET.new()
+	check(sheet.anatomy_sex == "unformed", "a decanted body starts unformed - nothing was chosen for it")
+	check(CharacterSheet.ANATOMY_SEX.size() >= 4, "there is a real range of options (%d)" % CharacterSheet.ANATOMY_SEX.size())
+	for key in CharacterSheet.ANATOMY_SEX.keys():
+		check(CharacterSheet.ANATOMY_SEX_FILED.has(key), "%s has a filed institutional record" % key)
+	sheet.anatomy_sex = "intersex"
+	check(str(CharacterSheet.ANATOMY_SEX[sheet.anatomy_sex].name) == "INTERSEX", "the body is what the player chose")
+	check(str(CharacterSheet.ANATOMY_SEX_FILED[sheet.anatomy_sex]) != "INTERSEX", "and the facility files something else")
+	check(str(CharacterSheet.ANATOMY_SEX_FILED["intersex"]) == "F / STANDARD", "specifically F / STANDARD, because the form has no second box")
+
 	print("failures: %d" % failures.size())
 	get_tree().quit(1 if failures.size() > 0 else 0)

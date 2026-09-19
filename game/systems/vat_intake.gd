@@ -219,7 +219,9 @@ func _rows() -> int:
 		2:
 			return CharacterSheet.TRAITS.size()
 		3:
-			return 7
+			# AX1.3. Eight rows now: anatomy sits at the top of the body page,
+			# because it is the first thing the facility decided about you.
+			return 8
 		_:
 			return CharacterSheet.MODIFIERS.size()
 
@@ -249,18 +251,20 @@ func _commit() -> void:
 			# onto the same player body rather than a lore label.
 			match row:
 				0:
-					sheet.under_skin["blood"] = _cycle(["O-RUST", "A-ASH", "B-9", "AB-", "SAP", "NULL"], str(sheet.under_skin.get("blood", "O-RUST")))
+					sheet.anatomy_sex = _cycle(CharacterSheet.ANATOMY_SEX.keys(), sheet.anatomy_sex)
 				1:
-					sheet.under_skin["skeleton"] = _cycle(["standard", "dense", "hollow", "plated"], str(sheet.under_skin.get("skeleton", "standard")))
+					sheet.under_skin["blood"] = _cycle(["O-RUST", "A-ASH", "B-9", "AB-", "SAP", "NULL"], str(sheet.under_skin.get("blood", "O-RUST")))
 				2:
-					sheet.under_skin["organs"] = _cycle(["standard", "doubled", "salvaged", "communion"], str(sheet.under_skin.get("organs", "standard")))
+					sheet.under_skin["skeleton"] = _cycle(["standard", "dense", "hollow", "plated"], str(sheet.under_skin.get("skeleton", "standard")))
 				3:
-					sheet.appearance["face"] = fmod(float(sheet.appearance.get("face", 0.5)) + 0.17, 1.0)
+					sheet.under_skin["organs"] = _cycle(["standard", "doubled", "salvaged", "communion"], str(sheet.under_skin.get("organs", "standard")))
 				4:
-					sheet.appearance["wear"] = fmod(float(sheet.appearance.get("wear", 0.4)) + 0.2, 1.01)
+					sheet.appearance["face"] = fmod(float(sheet.appearance.get("face", 0.5)) + 0.17, 1.0)
 				5:
-					sheet.appearance["mutation"] = fmod(float(sheet.appearance.get("mutation", 0.0)) + 0.2, 1.01)
+					sheet.appearance["wear"] = fmod(float(sheet.appearance.get("wear", 0.4)) + 0.2, 1.01)
 				6:
+					sheet.appearance["mutation"] = fmod(float(sheet.appearance.get("mutation", 0.0)) + 0.2, 1.01)
+				7:
 					sheet.appearance["ink"] = fmod(float(sheet.appearance.get("ink", 0.0)) + 0.25, 1.01)
 				_:
 					sheet.appearance["piercings"] = fmod(float(sheet.appearance.get("piercings", 0.0)) + 0.25, 1.01)
@@ -433,6 +437,7 @@ func _draw_traits(rect: Rect2, ink: Color, y: float) -> void:
 
 func _draw_body(_rect: Rect2, ink: Color, y: float) -> void:
 	var rows := [
+		["ANATOMY", str((CharacterSheet.ANATOMY_SEX[sheet.anatomy_sex] as Dictionary).name)],
 		["BLOOD", str(sheet.under_skin.get("blood", "O-RUST"))],
 		["SKELETON", str(sheet.under_skin.get("skeleton", "standard")).to_upper()],
 		["ORGAN SET", str(sheet.under_skin.get("organs", "standard")).to_upper()],
@@ -446,6 +451,11 @@ func _draw_body(_rect: Rect2, ink: Color, y: float) -> void:
 		_row_mark(ink, Vector2(30, y - 9), index == row, false)
 		CellOutzType.draw_condensed(self, Vector2(50, y - 10), str(rows[index][0]), 11.0, ink * Color(1, 1, 1, 0.6), 0.8)
 		CellOutzType.draw_condensed(self, Vector2(190, y - 10), str(rows[index][1]), 12.0, ink, 0.9)
+		# AX1.3/AX1.4. The facility's word for the body it grew, beside the
+		# player's. INTERSEX files as "F / STANDARD" because the form has no
+		# second box -- the distortion is the paperwork's, never the body's.
+		if index == 0:
+			CellOutzType.draw_condensed(self, Vector2(340, y - 10), "FILED " + str(CharacterSheet.ANATOMY_SEX_FILED.get(sheet.anatomy_sex, "")), 8.0, HOT * Color(1, 1, 1, 0.72), 0.65)
 		y += 28.0
 	CellOutzType.draw_condensed(self, Vector2(30, y + 10), "WHAT IS UNDER THE SKIN IS WHAT THEY WILL FIND.", 8.0, ink * Color(1, 1, 1, 0.42), 0.7)
 

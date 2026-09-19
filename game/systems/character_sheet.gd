@@ -154,6 +154,28 @@ const ELEMENT_ATTRIBUTE := {"fire": "physical", "earth": "composure", "air": "re
 const BASE_POINTS := 6
 const BASE_ATTRIBUTE := 4
 
+## AX1.3. Clinical on purpose. These are the words on the facility's form, and
+## the facility does not editorialise -- it measures, files and moves on, which
+## is more unpleasant than if it sneered.
+const ANATOMY_SEX := {
+	"unformed": {"name": "UNFORMED", "note": "grown without the question being asked"},
+	"female": {"name": "FEMALE", "note": "grown to specification"},
+	"male": {"name": "MALE", "note": "grown to specification"},
+	"intersex": {"name": "INTERSEX", "note": "grown to specification; the form has no second box"},
+	"reconstructed": {"name": "RECONSTRUCTED", "note": "a previous instance was altered and this one inherited it"},
+}
+
+## What the institution writes down regardless of what the body is, which is
+## the same distortion AX1.4 applies to origin: your choice stays true and
+## their paperwork does not have to.
+const ANATOMY_SEX_FILED := {
+	"unformed": "UNSPECIFIED / GROWER'S DISCRETION",
+	"female": "F / STANDARD",
+	"male": "M / STANDARD",
+	"intersex": "F / STANDARD",
+	"reconstructed": "SEE PRIOR INSTANCE",
+}
+
 var route := "preset"
 var race := "decanted"
 var traits: Array = []
@@ -164,6 +186,16 @@ var instrument: Dictionary = {}
 ## so a marked, altered player is not a menu portrait that disappears on load.
 var appearance: Dictionary = {"face": 0.5, "build": 0.5, "wear": 0.4, "mutation": 0.0, "ink": 0.0, "piercings": 0.0}
 var under_skin: Dictionary = {"skeleton": "standard", "organs": "standard", "blood": "O-RUST", "grown_with": []}
+## AX1.3. The direction doc lists "anatomical sex options" among the things
+## creation has to offer, and the game had none at all -- the body was grown
+## without the question being asked, which in a game about a facility growing
+## you is the institution's answer rather than an absence.
+##
+## Written as anatomy rather than identity, because that is what the vat is
+## deciding and it is the only part the facility gets a say in. `UNFORMED` is
+## the default because a decanted body genuinely is: nothing was chosen for it
+## yet, and choosing is the player's first act of ownership over it.
+var anatomy_sex := "unformed"
 var display_name := "THE HUNTER"
 
 
