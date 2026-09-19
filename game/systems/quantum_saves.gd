@@ -8,11 +8,22 @@ const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
 ## its own history, bodies, time, flags and visual seed.
 const SLOT_COUNT := 3
 const SLOT_PATH_FORMAT := "user://quantum_branch_%d.json"
+## Every other save path in this project has a sandboxed twin that ATG_TEST_MODE
+## selects — `SAVES_DIR`/`TEST_SAVES_DIR` and `DEMO_SAVE_PATH`/
+## `TEST_DEMO_SAVE_PATH` in `world_history.gd`. These three did not, so the two
+## quantum suites wrote their branches straight over a real player's, and
+## permanently: a branch is the whole world, and nothing keeps a copy. Same
+## pattern, resolved in `slot_path()` so every read and write in this file goes
+## through the one decision.
+const TEST_SLOT_PATH_FORMAT := "user://test_quantum_branch_%d.json"
 const SCHEMA_VERSION := 1
 
 
 static func slot_path(slot: int) -> String:
-	return SLOT_PATH_FORMAT % clampi(slot, 0, SLOT_COUNT - 1)
+	var format := SLOT_PATH_FORMAT
+	if OS.get_environment("ATG_TEST_MODE") == "1":
+		format = TEST_SLOT_PATH_FORMAT
+	return format % clampi(slot, 0, SLOT_COUNT - 1)
 
 
 static func slots() -> Array[Dictionary]:

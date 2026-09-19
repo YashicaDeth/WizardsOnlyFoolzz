@@ -26,6 +26,8 @@ const TEST_SAVES_DIR := "user://test_saves"
 
 var active_slot_id := ""
 var slot_manifest: Array[Dictionary] = []
+## Test-only latch; see `_wipe_test_quantum_branches()` for why once.
+var _wiped_test_quantum := false
 ## P2.2. One runtime distinction, kept out of the saved world itself. The demo
 ## runs every real system and scene; this flag only chooses its route edges and
 ## the file those systems write to.
@@ -803,6 +805,28 @@ func _wipe_test_saves() -> void:
 	var demo_path := ProjectSettings.globalize_path(TEST_DEMO_SAVE_PATH)
 	if FileAccess.file_exists(TEST_DEMO_SAVE_PATH):
 		DirAccess.remove_absolute(demo_path)
+	_wipe_test_quantum_branches()
+
+
+## The sandboxed quantum branches (`quantum_saves.gd`), wiped once per run —
+## not on every `clear_history()` like the two above.
+##
+## Once is enough for what the wipe is for: a branch written by a previous run
+## must not be readable by this one, or a suite that forgot to save a branch
+## would pass on a stale file. More than once would be wrong. `begin_new()`
+## clears history on its way to writing a branch and deliberately leaves the
+## other two slots standing, which is the property both quantum suites are
+## built on — they save a branch, start a second world, then cross back. Wiping
+## on every clear would give test mode a rule the real game does not have, and
+## the suites would be testing that rule instead of the game's.
+func _wipe_test_quantum_branches() -> void:
+	if _wiped_test_quantum:
+		return
+	_wiped_test_quantum = true
+	for slot in QuantumSaves.SLOT_COUNT:
+		var path := QuantumSaves.slot_path(slot)
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 func _load_history() -> void:
