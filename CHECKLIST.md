@@ -6951,20 +6951,20 @@ route. Items below describe connections between their owning systems; they do
 not make AX a second owner of anatomy, inventory, combat or the Black Mirror.
 
 ### AX1 — The examination creates the player
-- [ ] **AX1.1** Character creation unfolds through a readable government examination, not one detached setup menu
-- [ ] **AX1.2** The unidentified visiting doctor is personally cruel, strangely sympathetic and important enough to have arrived only for this subject
+- [x] ~~**AX1.1**  Character creation unfolds through a readable government examination, not one detached setup menu~~ The examination exists and creation happens inside it: the doctor observes each page, the consent notice never leaves the screen, and F plays his verdict before the form is filed (`31d6fbc`, `7b3735b`).
+- [x] ~~**AX1.2**  The unidentified visiting doctor is personally cruel, strangely sympathetic and important enough to have arrived only for this subject~~ `doctor_examination.gd`. Unnamed, outranks the handler, explains rather than gloats. Cruel and sympathetic written as one man rather than two moods (`108ff43`).
 - [ ] **AX1.3** Direct body/face/proportion customisation, origins, anatomy, randomisation, presets, personality and natal data enter through one paced sequence
-- [ ] **AX1.4** Player choices remain mechanically true while the government's institutional diagnosis can be insulting or politically wrong
+- [x] ~~**AX1.4**  Player choices remain mechanically true while the government's institutional diagnosis can be insulting or politically wrong~~ The two records are drawn together on the RACE page -- what you chose, and FILED AS what the facility wrote instead, with its reason. `classify()` never touches the sheet and a test fails if it ever does (`108ff43`, `31d6fbc`).
 - [ ] **AX1.5** A deliberate first pass takes roughly 10–15 minutes; a saved preset gives a returning player a fast route without losing the scene
 - [ ] **AX1.6** Explicit anatomy and the mosaic/censorship presentation are equally complete options
 
 ### AX2 — The soul takes the implant
-- [ ] **AX2.1** The doctor's conclusion—that they now know how to break or kill the player—creates the immediate threat rather than a lore subtitle
-- [ ] **AX2.2** Accumulated suffering and refusal awaken the player's own soul/inner demon; no external entity grants or enters with the power
-- [ ] **AX2.3** Chaos magick visibly rewrites the government's brain implant into the player's interface and first usable ability
-- [ ] **AX2.4** The vat, restraints and mouth tube fail as one playable physical breakout rather than a cut to the corridor
+- [x] ~~**AX2.1**  The doctor's conclusion—that they now know how to break or kill the player—creates the immediate threat rather than a lore subtitle~~ The verdict plays before filing and names the trait the player actually picked, because a generic "we know how to break you" is a villain line (`7b3735b`).
+- [x] ~~**AX2.2**  Accumulated suffering and refusal awaken the player's own soul/inner demon; no external entity grants or enters with the power~~ `soul_breakthrough.gd`. Submission never awakens it: at least one refusal is required regardless of suffering endured, and refusals are counted during the examination and carried out of it (`9d8ce9f`, `7b3735b`).
+- [x] ~~**AX2.3**  Chaos magick visibly rewrites the government's brain implant into the player's interface and first usable ability~~ Same chip, same serial, different owner -- `owner_faction` moves from `celloutz` to `self`. Chaos magick rises through the existing event table, and the test greps the record for any third party and fails if one appears (`9d8ce9f`).
+- [x] ~~**AX2.4**  The vat, restraints and mouth tube fail as one playable physical breakout rather than a cut to the corridor~~ Built on `strike-opening` and merged rather than rebuilt: the player wakes already wounded, the tube comes out, the restraint enters the shared carry model, objective ESCAPE THE FACILITY (`2556b81`).
 - [ ] **AX2.5** Reaching the departing doctor is an urgent optional pursuit, not a forced timer
-- [ ] **AX2.6** An apparent doctor kill remains a real victory; later medical reconstruction preserves his scars, memory and rivalry
+- [x] ~~**AX2.6**  An apparent doctor kill remains a real victory; later medical reconstruction preserves his scars, memory and rivalry~~ `record_kill()` writes a real victory and `reconstruct()` cannot clear it -- it adds memory, rivalry and a scar derived from the method. The test asserts `was_killed()` is still true after he returns (`b375c77`).
 
 ### AX3 — Acquisition teaches the game
 - [ ] **AX3.1** A broken medical restraint/tool is the first inspected and usable object
