@@ -3995,8 +3995,27 @@ same reset — a range that is a place rather than a menu of guns.
       transition and reset (15 checks); range, parity, training, arsenal and
       reload suites remain green. Rendered and inspected at
       `P:/GameDev/Temp/lane-8-guns-af6-1/gore_sandbox_weapon_rack.png`.
-- [ ] **AF6.2** Bullets are readable here: drop, drag, travel time, penetration
-      shown against real bodies at real distances (AF2)
+- [x] **AF6.2** Bullets are readable here: drop, drag, travel time and
+      penetration are shown from the live round against the live body, not
+      copied into range-only numbers. `Ballistics` now carries its origin,
+      initial ray, accumulated distance and simulated flight time to impact;
+      the landing report trims the unused tail of the final physics step, so
+      its metres and milliseconds stop where the collider actually was rather
+      than at the frame's projected endpoint. Drop is measured below the
+      original muzzle ray and retained energy is the same drag-reduced energy
+      the range uses for damage. The sandbox now passes the round's real
+      calibre penetration and exact impact point through `BaselineHuman.hit_at`
+      instead of discarding both in `hit(zone)`, then reads the resulting wound
+      as armour-stopped, lodged by depth, or through. The field instrument
+      presents all five facts beside the body that produced them.
+      `gore_range_ballistics_test.gd` fires one real pistol round down a
+      measured 16-metre lane into a production `BaselineHuman` and verifies
+      travel, drop, drag and the backed wound; `ballistics_test.gd` protects
+      the landing report itself. Rendered and inspected at
+      `P:/GameDev/Temp/lane-8-guns-af6-2/gore_sandbox_ballistics_readout.png`:
+      the target remains visible and the readout resolves `14.2m`, `42ms`,
+      `1.2cm DROP` and `ARMOUR STOP`; inspection also caught energy rounding
+      hiding drag, so retained energy now keeps one decimal place.
 - [ ] **AF6.3** The reset restores the bodies without restarting the scene
 - [x] **AF6.4** What you learn transfers — the range uses the live ballistics
       and the live arsenal, never a demo copy of either —

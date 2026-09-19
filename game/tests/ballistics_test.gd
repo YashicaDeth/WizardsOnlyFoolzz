@@ -63,11 +63,14 @@ func _ready() -> void:
 		check(str(hit["calibre"]) == "rifle", "and knows what it was")
 		check(str(hit["shooter"]) == "player", "and who fired it")
 		check(float(hit["energy"]) > 0.0, "carrying energy")
+		check(float(hit["travelled"]) >= 39.0, "and reports the real distance it travelled")
+		check(float(hit["flight_time"]) > 0.0, "and its own simulated flight time")
 		# ---- it drops. Forty metres of rifle is a couple of centimetres.
 		var drop: float = 5.0 - float((hit["position"] as Vector3).y)
 		print("rifle drop over 40m: %.3f m" % drop)
 		check(drop > 0.0, "a round falls on the way")
 		check(drop < 1.0, "but not absurdly")
+		check(is_equal_approx(float(hit["drop"]), drop), "the landing report exposes that same physical drop")
 
 	# ---- drag: the light fast pellet loses more than the heavy slug.
 	hits.clear()

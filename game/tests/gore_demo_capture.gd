@@ -38,6 +38,25 @@ func _ready() -> void:
 	await _settle(tree, 6)
 	await _shoot(tree, out_dir + "/gore_demo_room.png")
 
+	# AF6.2. Put one live body at a measured distance down the camera axis and
+	# let the ordinary trigger path produce the range lesson. The photographed
+	# HUD has to name the round's own distance, time, drop, retained energy and
+	# penetration result while the struck body remains visible behind it.
+	var measured_holder := (demo.bodies[0] as Dictionary).get("holder") as Node3D
+	measured_holder.global_position = Vector3(0.0, 0.9, -8.0)
+	demo.yaw = 0.0
+	demo.pitch = -0.02
+	await _settle(tree, 4)
+	demo._fire()
+	var flight_frames := 0
+	while demo.last_shot_readout.is_empty() and flight_frames < 90:
+		await tree.physics_frame
+		flight_frames += 1
+	# Let contact shake return the field instrument to its rest transform; the
+	# readout persists, so the evidence frame can be read without erasing impact.
+	await _settle(tree, 24)
+	await _shoot(tree, out_dir + "/gore_sandbox_ballistics_readout.png")
+
 	# AF6.1. Walk up to the shed and face the physical production weapon set.
 	# The capture has to show the rack before a take; the test covers the same
 	# model disappearing into the live held-gear path when E is pressed.

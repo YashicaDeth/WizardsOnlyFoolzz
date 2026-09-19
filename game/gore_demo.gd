@@ -205,10 +205,6 @@ var _gear_recoil := 0.0
 var _shot_serial := 0
 ## Where each of this scene's rounds in flight was last seen, by serial.
 var _seen: Dictionary = {}
-## AF6.2. When each of this scene's rounds actually left the barrel, by
-## serial — the other half of a real travel-time readout, since `_on_round_hit()`
-## only ever learns when a round arrived.
-var _fire_time: Dictionary = {}
 ## AF6.2. What the range is supposed to teach: not a number invented for the
 ## HUD, but exactly the numbers `_on_round_hit()` already computes to resolve
 ## the hit itself — real distance, real travel time, and the real fraction of
@@ -606,7 +602,6 @@ func _fire() -> void:
 		# the camera axis so the crosshair stays honest, and the first segment
 		# of its trail is what makes it read as having come out of the barrel.
 		_seen[_shot_serial] = _muzzle_world(start)
-		_fire_time[_shot_serial] = Time.get_ticks_msec()
 	_muzzle_flash()
 	_gear_recoil = 1.0
 	# Muzzle side only: climb and a little roll, which is the gun moving, not a
@@ -639,7 +634,6 @@ func _fire_launcher() -> void:
 		"explosive": true,
 	})
 	_seen[_shot_serial] = start
-	_fire_time[_shot_serial] = Time.get_ticks_msec()
 	_muzzle_flash()
 	_gear_recoil = 1.0
 	_note("WARHEAD AWAY // %d REMAIN" % launcher_rounds)
@@ -701,13 +695,9 @@ func _on_round_hit(hit: Dictionary) -> void:
 		muzzle_position = _seen[serial]
 		_streak(_seen[serial], at)
 		_seen.erase(serial)
-	# AF6.2. The other half of the streak above: not where it travelled, but
-	# how long it took — real muzzle-to-target time, not a number the HUD
-	# invents. `_fire_time` has no entry once a round has already resolved,
-	# so a stale serial (should not happen; kept as a safety default) reads
-	# as zero travel rather than a huge, meaningless duration.
-	var fired_at_msec: int = int(_fire_time.get(serial, Time.get_ticks_msec()))
-	_fire_time.erase(serial)
+	# Flight time and drop arrive on the round's own report below. They are
+	# simulated ballistic facts, so slow motion and headless tests cannot turn
+	# them into different answers by changing how fast the host clock advances.
 	if bool(payload.get("explosive", false)):
 		_unmark_last()
 		_impact_burst(at, normal, Color("9c6230"))
@@ -753,8 +743,9 @@ func _on_round_hit(hit: Dictionary) -> void:
 	# real drag against a real distance is why it is not 1.0 every time.
 	last_shot_readout = {
 		"calibre": str(hit.get("calibre", "pistol")),
-		"distance": muzzle_position.distance_to(at),
-		"travel_ms": Time.get_ticks_msec() - fired_at_msec,
+		"distance": float(hit.get("travelled", muzzle_position.distance_to(at))),
+		"travel_ms": roundi(float(hit.get("flight_time", 0.0)) * 1000.0),
+		"drop_cm": float(hit.get("drop", 0.0)) * 100.0,
 		"energy_pct": carried,
 		"zone": zone,
 	}
@@ -764,7 +755,22 @@ func _on_round_hit(hit: Dictionary) -> void:
 	var damage := float(payload.get("damage", 46.0))
 	var impulse := float(payload.get("impulse", 30.0))
 	var damage_type := str(payload.get("damage_type", "ballistic"))
-	var result: Dictionary = rig.hit(zone, damage * carried, impulse * carried, damage_type, "", direction)
+	# Keep the exact impact point and the calibre's penetration budget. Calling
+	# `hit(zone)` here used to throw both away, so the range could never teach
+	# whether this live round lodged or opened an exit wound.
+	var result: Dictionary = rig.hit_at(
+		at, damage * carried, impulse * carried, damage_type, direction,
+		float(hit.get("penetration", -1.0)))
+	var penetration_report: Dictionary = result.get("penetration", {})
+	match int(penetration_report.get("result", Penetration.Result.GRAZE)):
+		Penetration.Result.STOPPED_BY_ARMOUR:
+			last_shot_readout["penetration"] = "ARMOUR STOP"
+		Penetration.Result.THROUGH:
+			last_shot_readout["penetration"] = "THROUGH"
+		Penetration.Result.BLIND:
+			last_shot_readout["penetration"] = "LODGED %d%%" % roundi(float(penetration_report.get("fraction", 0.0)) * 100.0)
+		_:
+			last_shot_readout["penetration"] = "GRAZE"
 	if not bool(result.get("accepted", true)):
 		_note("%s ALREADY GONE" % _spoken(zone))
 		return
@@ -1774,10 +1780,14 @@ func _paint_hud() -> void:
 			str(last_shot_readout.get("calibre", "?")).to_upper(),
 			float(last_shot_readout.get("distance", 0.0)),
 		])
-		lines.append("  %dms TRAVEL // %d%% ENERGY // %s" % [
+		lines.append("  %dms TRAVEL // %.1f%% ENERGY // %s" % [
 			int(last_shot_readout.get("travel_ms", 0)),
-			roundi(float(last_shot_readout.get("energy_pct", 1.0)) * 100.0),
+			float(last_shot_readout.get("energy_pct", 1.0)) * 100.0,
 			_spoken(str(last_shot_readout.get("zone", ""))),
+		])
+		lines.append("  %.1fcm DROP // %s" % [
+			float(last_shot_readout.get("drop_cm", 0.0)),
+			str(last_shot_readout.get("penetration", "NO BODY READ")),
 		])
 	var y := 40.0
 	for line: String in lines:
