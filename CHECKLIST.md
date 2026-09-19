@@ -7017,7 +7017,7 @@ not make AX a second owner of anatomy, inventory, combat or the Black Mirror.
 - [ ] **AX4.2** Avoiding the Derby is a mastery route a perceptive first-time player can still discover
 - [ ] **AX4.3** Successful play is never revoked by an arbitrary recapture cutscene; containment has a demonstrated cause
 - [ ] **AX4.4** Different exits can reach different surface positions and relationships while handing into the same persistent world
-- [ ] **AX4.5** Until the player's death fiction is authored, opening death uses an honest ordinary reload rather than a counterfeit immortality explanation
+- [x] ~~**AX4.5**  Until the player's death fiction is authored, opening death uses an honest ordinary reload rather than a counterfeit immortality explanation~~ `opening_death.gd`. Reloads, says it is a placeholder, records no event and files no permanent death -- a logged death is a death the world has taken a position on. `FICTION_AUTHORED` is false and flipping it makes the suite demand a real implementation, so the flag cannot be flipped quietly. The suite also greps the payload for revived/resurrect/clone/backup/immortal/reborn and fails if the placeholder ever starts explaining itself.
 - [ ] **AX4.6** Every branch records its actions and consequences through the shared ledger and resumes from the correct stage
 
 ### AX5 — The slice proves the wider game
