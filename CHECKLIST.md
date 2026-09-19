@@ -7021,7 +7021,7 @@ not make AX a second owner of anatomy, inventory, combat or the Black Mirror.
 - [ ] **AX4.6** Every branch records its actions and consequences through the shared ledger and resumes from the correct stage
 
 ### AX5 — The slice proves the wider game
-- [ ] **AX5.1** First- and third-person combat share anatomy, wound depth, ballistics and consequences throughout the facility
+- [x] ~~**AX5.1**  First- and third-person combat share anatomy, wound depth, ballistics and consequences throughout the facility~~ Already true and now guarded. `_resolve_strike`, `_attack`, `_resolve_firearm` and `apply_hit` contain no reference to the camera, there is exactly one `apply_hit` in the game, and `set_perspective()` touches nothing about damage. `perspective_parity_test.gd` reads the source and fails the day one of them starts branching on the view -- which is how this diverges in practice: not as a decision, as one reasonable line about third person needing a bit more reach.
 - [ ] **AX5.2** The implanted external camera is introduced as technology, with cramped-space, darkness, injury and interference failure cases
 - [ ] **AX5.3** Nearby population stays inside the 5–20 fully simulated budget; distant people keep identity while expensive detail reduces smoothly.
       **Measured, not yet true.** `tests/population_budget_test` seeds the
