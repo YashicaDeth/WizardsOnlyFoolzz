@@ -18,7 +18,7 @@ func _ready() -> void:
 		return
 	var derby := source("res://rift_derby.gd")
 	var lab := source("res://prototype_lab/lab.gd")
-	check(not derby.contains("KEY_R"), "the shipping derby has no reset key")
+	check(derby.contains("_reload_cab_gun()"), "the shipping derby keeps its ordinary cab-gun reload separate from reset controls")
 	check(not derby.contains("func _reset_round"), "the shipping derby carries no hidden round reset")
 	check(lab.contains("DEV_AFFORDANCES.available()"), "prototype reset and reseed controls share the development gate")
 	check(lab.contains("DEV_AFFORDANCES.accepts_command_line"), "automation hooks share the development gate")
