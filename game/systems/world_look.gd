@@ -41,6 +41,22 @@ const FIRMAMENT_SHADER := preload("res://shaders/firmament.gdshader")
 ## stop disagreeing with each other between scenes.
 enum Quality { ULTRA, HIGH, PERFORMANCE }
 
+## X1.2. The region's frame contract. PERFORMANCE is the tier held to this
+## budget; HIGH and ULTRA are deliberate exchanges of headroom for image
+## quality. Keeping the number beside the preset prevents benchmarks and the
+## settings screen from quietly testing different meanings of "performance".
+const FRAME_BUDGET_MS := 1000.0 / 60.0
+const QUALITY_RENDER_SCALE := {
+	Quality.ULTRA: 1.0,
+	Quality.HIGH: 0.9,
+	Quality.PERFORMANCE: 0.75,
+}
+const QUALITY_MSAA := {
+	Quality.ULTRA: Viewport.MSAA_4X,
+	Quality.HIGH: Viewport.MSAA_2X,
+	Quality.PERFORMANCE: Viewport.MSAA_DISABLED,
+}
+
 ## Static so it survives a scene change. Scenes build their Environment fresh on
 ## load, and an instance field would be rebuilt to the default every time.
 # Performance is the safe first-launch contract. The measured sandbox still
@@ -63,6 +79,17 @@ static func set_quality_name(value: String) -> void:
 		"ULTRA": quality = Quality.ULTRA
 		"PERFORMANCE": quality = Quality.PERFORMANCE
 		_: quality = Quality.HIGH
+
+
+## Applies the part of a graphics tier owned by the viewport rather than its
+## Environment. Render benchmarks must call both this and `apply_quality()` or
+## they are not measuring the preset a player actually receives.
+static func apply_viewport_quality(viewport: Viewport) -> void:
+	if viewport == null:
+		return
+	viewport.scaling_3d_scale = float(QUALITY_RENDER_SCALE[quality])
+	viewport.msaa_3d = int(QUALITY_MSAA[quality]) as Viewport.MSAA
+	viewport.use_taa = quality != Quality.PERFORMANCE
 
 
 ## Applies the current quality to an Environment. Separated from `environment()`

@@ -45,6 +45,24 @@ func _ready() -> void:
 	# renderer, and getting it backwards wastes the whole next session.
 	check(s["process_ms"] >= 0.0 and s["physics_ms"] >= 0.0, "the script/physics split reports non-negative times")
 
+	# X1.2. A fast contract check beside the slower rendered benchmarks: the
+	# budget and the complete viewport tiers must stay explicit even on a test
+	# runner where a hardware timing assertion would not be meaningful.
+	check(is_equal_approx(WorldLook.FRAME_BUDGET_MS, 1000.0 / 60.0), "the region has an explicit 16.67 ms / 60 FPS frame budget")
+	var quality_before := WorldLook.quality
+	var test_view := SubViewport.new()
+	add_child(test_view)
+	WorldLook.set_quality_name("ULTRA")
+	WorldLook.apply_viewport_quality(test_view)
+	check(is_equal_approx(test_view.scaling_3d_scale, 1.0) and test_view.msaa_3d == Viewport.MSAA_4X and test_view.use_taa,
+		"ULTRA's complete viewport cost is part of the measured preset")
+	WorldLook.set_quality_name("PERFORMANCE")
+	WorldLook.apply_viewport_quality(test_view)
+	check(is_equal_approx(test_view.scaling_3d_scale, 0.75) and test_view.msaa_3d == Viewport.MSAA_DISABLED and not test_view.use_taa,
+		"PERFORMANCE applies 75% scale with AA disabled")
+	test_view.queue_free()
+	WorldLook.quality = quality_before
+
 	var text: String = PerfProbe.call("_report", false)
 	check(text.contains("FRAME") and text.contains("OUTPUT") and text.contains("SPLIT"), "the plain-text dump carries the three sections that answer the question")
 	check(not text.contains("[color"), "the plain dump has no bbcode in it — it is meant to be read in Notepad")
