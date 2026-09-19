@@ -1,5 +1,16 @@
 # Living design notes
 
+19 September implementation note: the underground derby now opens with the
+gore festival the demo route previously named but never showed. During the
+colosseum's existing pre-heat lockout, the player remains in the real cab and
+watches an institutional press turn the previous human entrant into three
+strapped, bone-visible meat slabs marked as lot 0C-7. The apparatus retracts
+into the roof before the horn, so the spectacle neither becomes a cutscene nor
+an arena obstacle. It is confined to the captured-player colosseum; the surface
+derby does not inherit it. This supplies AP1.4's missing concrete beat and a
+candidate for P4.4, but P4.4 remains open until playtesting shows it is actually
+the moment a player retells.
+
 Art-direction decisions are indexed in `ART-DIRECTION-MINDMAP.md`. It is the
 boundary between confirmed visual rules, safe implementation work and choices
 that still require Greg; the detailed material brief remains
