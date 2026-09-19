@@ -5265,7 +5265,7 @@ institutions naming the same object differently, which is already this game's
 central rule.
 
 `systems/brain_index.gd` (`BrainIndex`) is the logic half of this section, held
-by `tests/brain_index_test.gd` at 72 checks. The render half — the organ, the
+by `tests/brain_index_test.gd` at 94 checks. The render half — the organ, the
 curved CRT, the wet — is untouched and its three boxes stay open below, honestly.
 
 - [ ] **AT1.1** The brain is a real organ at full detail, not an icon
@@ -5406,14 +5406,58 @@ This collapses four things nobody had a home for — inventory, codex, quest log
 tutorial — into the organ AT1 already says you open. There is no menu because
 the brain is the menu, and WETWIRE/MATERIA is already the naming for exactly
 this (two institutions, one index).
-- [ ] **AT2.1** Inventory is read from the brain, not from a separate bag screen
-- [ ] **AT2.2** Story, canon and quests are files in the same index
+- [x] ~~**AT2.1** Inventory is read from the brain, not from a separate bag screen~~
+      `BrainIndex.listing("carry", ...)` and `folder_counts()` special-case the
+      new CARRY folder to read live off `carry.gd` — the exact object C4's own
+      handheld page already reads — rather than inventing a second inventory
+      dataset for the brain to disagree with. Every row comes back `open`;
+      what is in your hands is never a secret from yourself, so there is
+      nothing to seal. `tests/brain_index_test.gd`, 5 new checks: empty bag
+      lists nothing, a carried chunk appears under its real identified label
+      (`LIVER`, not a generic slot), and `folder_counts` agrees with the
+      listing.
+- [ ] **AT2.2** Story, canon and quests are files in the same index — not
+      attempted; there is no story/quest/canon system anywhere in the project
+      yet for this to read from, and inventing placeholder lore files here
+      would be building the wrong half first.
 - [ ] **AT2.3** The tutorial lives in there as recallable files, not as a
-      first-run overlay you can never see again
-- [ ] **AT2.4** Every drug experience files itself as a record you can reopen
-- [ ] **AT2.5** Most of it is optional and the index says so (AT1.3)
-- [ ] **AT2.6** What the chip put there is distinguishable from what you put
-      there — and you cannot delete the chip's files (AT1.7)
+      first-run overlay you can never see again — not attempted, for the same
+      reason as AT2.2: no tutorial system exists yet to be filed.
+- [x] ~~**AT2.4** Every drug experience files itself as a record you can
+      reopen~~ No second log: `substances.gd`'s `take()` already writes
+      `substance_taken`, and `BrainIndex.drug_experiences()` reads it back as
+      one row per dose actually taken, strain and potency re-derived through
+      the same deterministic `roll_strain()` the carried baggie itself used
+      (keyed off the event's own sequence number, so the record and the item
+      agree without either storing the other's data). `read_experience(
+      sequence)` reopens one by that number; `listing("drugs")` carries these
+      dynamic rows alongside the folder's static lore entries. Kept distinct
+      from `read_entry()` on purpose — one row per dose, not one per
+      substance, because the second Bloom does not read like the first.
+      `tests/brain_index_test.gd`, 5 new checks.
+- [x] ~~**AT2.5** Most of it is optional and the index says so (AT1.3)~~ Reuses
+      AT1.3's own `optional_ratio()`/`required_entries()` rather than a second
+      measure — verified the ratio still holds above 0.8 and exactly three
+      entries are still required after AT2.6's chip file joined `ENTRIES`, and
+      confirmed neither CARRY's nor MATERIA's new dynamic rows are ever
+      counted as required (both mark `optional: true` unconditionally, since
+      what you are holding or have taken is never something the game cannot
+      run without). `tests/brain_index_test.gd`, 2 new checks.
+- [x] ~~**AT2.6** What the chip put there is distinguishable from what you put
+      there — and you cannot delete the chip's files (AT1.7)~~ `ENTRIES` gained
+      a `source` field, `"self"` (default, unchanged) or `"chip"`. A `"chip"`
+      entry (`the_terms`, the wetwire EULA nobody was ever shown past clause
+      one) is never sealed behind a keyword and never enters `wetwire_opened`
+      — `is_open()` reads it straight off whether the hardware exists at all,
+      so it is present the day the chip is and stays present after `revoke()`
+      (that call only flips fields on the same chip record, never clears it).
+      The other half is a genuinely new operation: `forget(entry_id)`, which
+      erases a remembered entry back out of `wetwire_opened` — refused outright
+      for a `"chip"` entry with "NOT YOURS TO DELETE" (there was never
+      anything of yours in `wetwire_opened` for it to remove), and refused for
+      an unremembered `"self"` entry with the ordinary "NOTHING TO FORGET".
+      `tests/brain_index_test.gd`, 9 new checks, including a never-wired
+      subject for whom the chip's file is correctly absent entirely.
 
 ### AT3 — The viewer: the orb, the CRT, and detective mode
 Greg: *"visual nodes of the brain neural networks visualised in TouchDesigner 3D

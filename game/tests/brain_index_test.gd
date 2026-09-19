@@ -174,5 +174,58 @@ func _ready() -> void:
 	BrainIndex.revoke("player", "TERMS")
 	check(not bool(BrainIndex.wire_from_above().get("ok", false)), "with the chip revoked there is no view from above at all")
 
+	# --- AT2: the brain is the file system ----------------------------------
+	# AT2.1. CARRY reads the exact same object C4's own page already reads —
+	# no second inventory dataset for the brain to disagree with.
+	WorldHistory.register_subject("inventory", {"items": []})
+	var carry_before := BrainIndex.carry_listing()
+	check(carry_before.is_empty(), "an empty bag lists nothing")
+	var carry := Carry.new()
+	carry.take_chunk({"layer_name": "organ", "organ_id": "liver", "zone": "torso", "subject_id": "some_body", "condition": 0.8})
+	var carry_after := BrainIndex.carry_listing()
+	check(carry_after.size() == 1, "a carried chunk shows up in the same call")
+	check(str(carry_after[0].title) == "LIVER", "as the real identified object, not a generic slot")
+	check(bool(carry_after[0].open), "and it is never sealed — you know what you are holding")
+	var carry_counts: Dictionary = BrainIndex.folder_counts()
+	check(int((carry_counts.get("carry", {}) as Dictionary).get("total", -1)) == 1, "folder_counts agrees with carry_listing")
+
+	# AT2.4. A dose files itself as a reopenable record without a second log.
+	check(BrainIndex.drug_experiences().is_empty(), "no doses taken yet, nothing to reopen")
+	Substances.take("player", "marrow_dust")
+	var experiences := BrainIndex.drug_experiences()
+	check(experiences.size() == 1, "taking one substance files exactly one experience")
+	var experience_sequence := int(experiences[0].sequence)
+	var reopened := BrainIndex.read_experience(experience_sequence)
+	check(bool(reopened.get("ok", false)) and str(reopened.get("substance_id", "")) == "marrow_dust", "and it can be reopened by that number")
+	check(str(reopened.get("title", "")) == str(experiences[0].title), "reading it back matches the listing's own row")
+	var drugs_listing := BrainIndex.listing("drugs")
+	var found_experience := false
+	for row in drugs_listing:
+		if str((row as Dictionary).get("id", "")) == "experience_%d" % experience_sequence:
+			found_experience = true
+	check(found_experience, "and MATERIA's own listing carries it alongside the static lore entries")
+
+	# AT2.5. Reuses AT1.3's own measure — a dynamic row never counts against it.
+	check(BrainIndex.optional_ratio() > 0.8, "still mostly optional with the chip's file added (%.0f%%)" % (BrainIndex.optional_ratio() * 100.0))
+	check(BrainIndex.required_entries().size() == 3, "still exactly three required entries")
+
+	# AT2.6. What the chip put there is not what you remembered. The chip was
+	# installed (and revoked, twice) earlier in this test — `is_open` for a
+	# chip file only ever asks whether the hardware exists at all, not whether
+	# it is currently live, so it is already true here.
+	check(BrainIndex.is_open("the_terms"), "the chip's own file is there because the chip is, not because of a keyword")
+	WorldHistory.register_subject("unwired_bystander", {"name": "NOBODY IN PARTICULAR", "kind": "person"})
+	check(not BrainIndex.is_open("the_terms", "unwired_bystander"), "and it is absent for anybody who was never wired at all")
+	check(not BrainIndex.opened().has("the_terms"), "and it was never added to what you remembered")
+	var mercy_unlock := BrainIndex.unlock("MERCY")
+	check(bool(mercy_unlock.get("ok", false)) and not (mercy_unlock.get("opened", []) as Array).has("the_terms"), "unlocking a real keyword never touches it either")
+	check(not bool(BrainIndex.forget("the_terms").get("ok", false)), "it cannot be forgotten")
+	check(str(BrainIndex.forget("the_terms").get("reason", "")) == "NOT YOURS TO DELETE", "for the one reason that matters — it was never yours")
+	BrainIndex.revoke("player", "TERMS AGAIN")
+	check(BrainIndex.is_open("the_terms"), "revoking the chip does not delete its paperwork either")
+	check(bool(BrainIndex.forget("the_table").get("ok", false)), "but a real memory can be let go of")
+	check(not BrainIndex.is_open("the_table"), "and it is actually gone")
+	check(not bool(BrainIndex.forget("the_table").get("ok", false)), "not twice")
+
 	print("BRAIN_INDEX_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
