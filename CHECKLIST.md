@@ -6956,7 +6956,7 @@ not make AX a second owner of anatomy, inventory, combat or the Black Mirror.
 - [ ] **AX1.3** Direct body/face/proportion customisation, origins, anatomy, randomisation, presets, personality and natal data enter through one paced sequence
 - [x] ~~**AX1.4**  Player choices remain mechanically true while the government's institutional diagnosis can be insulting or politically wrong~~ The two records are drawn together on the RACE page -- what you chose, and FILED AS what the facility wrote instead, with its reason. `classify()` never touches the sheet and a test fails if it ever does (`108ff43`, `31d6fbc`).
 - [ ] **AX1.5** A deliberate first pass takes roughly 10–15 minutes; a saved preset gives a returning player a fast route without losing the scene
-- [ ] **AX1.6** Explicit anatomy and the mosaic/censorship presentation are equally complete options
+- [x] ~~**AX1.6**  Explicit anatomy and the mosaic/censorship presentation are equally complete options~~ `anatomy_presentation.gd`. "Equally" is enforced rather than intended: `parity_gaps()` returns any region present in one presentation and not the other, and the suite fails when it is non-empty. The mosaic keeps silhouette and, on deep wounds, blood -- a censored build still has to say this person was opened (AN6 spent a section on that). Mosaic is the default; explicit is the opt-in.
 
 ### AX2 — The soul takes the implant
 - [x] ~~**AX2.1**  The doctor's conclusion—that they now know how to break or kill the player—creates the immediate threat rather than a lore subtitle~~ The verdict plays before filing and names the trait the player actually picked, because a generic "we know how to break you" is a villain line (`7b3735b`).
