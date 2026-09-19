@@ -3323,8 +3323,13 @@ pay.
       renderer's own counters and are trusted; the frame-timing pair is not,
       and needs a focused, interactive re-run before anything is budgeted
       against it — left for X1.2 rather than guessed at here.
-- [ ] **X1.2** A frame budget, stated, that the region is held to —
-      **unblocked, not yet done.** X1.1's frame timing is now trustworthy:
+- [x] **X1.2** A frame budget, stated, that the region is held to —
+      **closed from Greg's 19 September direction and a fresh current-tree
+      measurement.** Ordinary play is held to **60 FPS / 16.67 ms on Greg's
+      RTX 2060 SUPER**. **30 FPS / 33.33 ms is only the temporary playtest
+      floor** at which combat and gore remain usable, not the intended budget;
+      120 FPS is welcome headroom rather than the baseline contract. X1.1's
+      frame timing is now trustworthy:
       `tests/frame_bound_test` (`3e6a620`) stops reading the engine's
       monitors, which disagree with the wall clock by more than the frame
       is long, and instead changes one thing at a time with a stopwatch
@@ -3339,10 +3344,17 @@ pay.
       that. `--soak` rules out accumulation: over five idle minutes nodes
       plateau at 9275, collision pairs at 520, population at 20, orphans at
       zero.
-      What remains is the budget itself, and it needs Greg: **what frame
-      rate is this game held to, and on what machine?** 60 on the 2060
-      Super is a different project from 30 on something older, and the
-      number decides how much of the physics tick has to be given back.
+      Re-run on the merged 19 September tree at 1280x720 with vsync off: the
+      Hunt began at **27.51 ms / 36.3 FPS** and its same-scale control reached
+      **40.45 ms / 24.7 FPS** as the world settled. Quartering the pixels did
+      not shorten the frame; dropping physics from 60 Hz to 10 Hz cut it to
+      **17.34 ms**, so the present miss is simulation-bound. Silencing all 22
+      character rigs saved **5.35 ms**; disabling monitoring on 132 anatomy
+      hitboxes remained inside the 4.82 ms noise floor. The census found 681
+      static bodies, 654 owned by `ashbloom_world_generator.gd`. The contract
+      therefore does not authorize reducing render scale or removing anatomy:
+      the next measured work is the world/static-physics route and the work
+      executed at the physics tick.
 - [ ] **X1.3** The 238MB plugin referenced by no script (pairs with J1.3)
 - [ ] **X1.4** Bodies are the expensive thing — measure before optimising them
 - [ ] **X1.5** It has to hold up on a machine that is not Greg's

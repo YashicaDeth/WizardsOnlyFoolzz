@@ -42,6 +42,20 @@ ember-like magical force in the soul. The first playable breakthrough may be a
 vision, memory or newly gained ability that lets the player break containment.
 The full screenplay, named authority figure and exact breakthrough remain open.
 
+The player does **not** simply spawn into darkness or arrive at a detached
+character-creation menu. An authored opening flows into a visible, heavily
+surveilled and locked-down laboratory: bright enough to read, but bloodied,
+gory, clinically humiliating and filled with esoteric institutional art. The
+player is conscious inside a vat while a senior visiting doctor studies them.
+A tube prevents ordinary speech or screaming; the implanted brain interface
+can expose the player's answers to the examiner, making the examination itself
+the frame for choosing name, body and initial character traits. Story beats,
+brief playable observation and character creation should alternate in the
+Bethesda-style rhythm Greg described rather than front-loading either a long
+cutscene or a conventional setup screen. The doctor's identity, origin, exact
+vehicle (airship, aircraft or UFO), starting loadout choices and difficulty
+structure remain open.
+
 The opening facility is a large connected underground world, not a linear lab:
 
 - industrial prison and occult corporate laboratory;
