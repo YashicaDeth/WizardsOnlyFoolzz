@@ -5395,7 +5395,25 @@ is art, not noise.
       `RigidBody3D`, is taken off the floor, and enters CARRY with its
       `organ_id` intact — and passed clean this pass.
 - [ ] **AN6.4** Severing is at joints and through them — Half Sword's lesson is
-      that a cut that lands between two joints still has to do something
+      that a cut that lands between two joints still has to do something.
+      Partial: the mechanical half is in. `hit_at()` already keeps the exact
+      local point a blow landed at (AN6.1/AN6.5 both build on it); `LIMB_JOINTS`
+      names where an arm and a leg actually bend on that same axis — the same
+      pinches `ARM_PROFILE`/`LEG_PROFILE` are already sculpted with, an elbow
+      or knee near 0.0/-0.04, a wrist or ankle near -0.8 — and
+      `_joint_alignment_at()` scores a strike by how close it landed to one of
+      them. `_accumulate_sever_stress` now weighs by that score: a joint hit
+      accumulates sever stress at 1.6x, the dead centre of a shaft only 0.7x,
+      never zero. `baseline_human_test.gd`'s new `_test_joint_severing`
+      measures it directly — an identical repeated cut through the elbow
+      severs the arm in 4 swings against 6 through the mid-shaft — and the
+      existing `_test_severing` above it, which never gives `hit()` a real
+      point, is unchanged (87 -> 90 passes, still 0 failures) because a
+      caller with no position keeps the neutral 1.0 it always implicitly had.
+      Still missing: the stump itself does not yet shorten to end at the
+      joint that actually parted — every severed limb still leaves the body
+      as one whole piece regardless of where along it the blow landed, which
+      is the visual half of "at joints and through them" this does not close.
 - [x] **AN6.5** Weapon and angle decide the wound shape, RDR2's lesson —
       `WoundMarks` keeps authored aspect profiles by damage source: a blade
       leaves a long cut, a puncture a narrower opening and a ballistic entry a
