@@ -17,6 +17,7 @@ const ANATOMY := preload("res://systems/anatomy_component.gd")
 const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+const BRAIN_INDEX := preload("res://systems/brain_index.gd")
 
 const EYE_HEIGHT := 1.62
 const VAT_POSITION := Vector3(0, 0, 0)
@@ -92,6 +93,11 @@ func _on_intake_filed(_state: Dictionary) -> void:
 	clock = 0.0
 	line_index = -1
 	phase = "submerged"
+	# AP1.3/P10.5. Filing has already written the chosen anatomy by the time this
+	# signal arrives. Install the real head hardware now, while the player is
+	# still captured and before the wake event, so the sheet cannot overwrite it
+	# and the later X-ray discovers something that was already done to the body.
+	BRAIN_INDEX.install_chip("player", "celloutz", "growing_floor_intake")
 	WorldHistory.begin_ledger_batch()
 	OPENING.advance("woke")
 	FACILITY_TERRITORY.apply_event("opening_woke")
@@ -126,7 +132,6 @@ func _build_player() -> void:
 		"elo": 1000, "grudge": 0, "status": "decanted", "wounds": ["tank scarring", "raw throat"],
 		"memory": "Came out of a tank on the Growing Floor owing somebody a heat.",
 	})
-
 	for index in 4:
 		var cable := _umbilical(index)
 		umbilicals.append(cable)

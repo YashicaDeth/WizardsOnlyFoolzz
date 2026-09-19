@@ -1,5 +1,16 @@
 # Living design notes
 
+20 September implementation note: the opening's missing later procedure reveal
+now comes from the body rather than a flashback or lore card. Filing the intake
+sheet installs CellOutz's existing wetwire hardware in the player's real head
+before the wake event; it names the Growing Floor intake as installer and keeps
+its generated serial. The first X-ray in the Hunt now sweeps the player's own
+rig as well as other bodies and catches that tower feeding back from inside the
+skull, holding its serial and "installed while you were under" in the field
+register long enough to read. The recollection is derived from the installed
+part and records once, so a world without the procedure cannot receive the
+exposition and repeated scans cannot manufacture repeated memories.
+
 19 September implementation note: the underground derby now opens with the
 gore festival the demo route previously named but never showed. During the
 colosseum's existing pre-heat lockout, the player remains in the real cab and
