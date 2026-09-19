@@ -4050,7 +4050,28 @@ The last rung. Fifteen statements that are true of guns when this game is finish
       Both remain visible in the universal 3D reliquary with their live
       ammunition state. `combat_integration_test.gd` protects the common seam;
       `captures/full_use_inspection_demo.mp4` is the gameplay proof.
-- [ ] **AF10.10** `v10` Weapon customisation lives on the weapon
+- [x] **AF10.10** `v10` ~~Weapon customisation lives on the weapon~~
+      `HunterArsenal.customization` is keyed by weapon and physical slot, in
+      the same instance-owned shape as condition and ammunition rather than a
+      perk on the player, range or vehicle. `install_customization()` accepts
+      only attachment points authored for that firearm, keeps the fitted
+      part's identity/provenance, discards unknown holder bonuses and clamps
+      the small shared modifier vocabulary at the ownership boundary.
+      `weapon_definition()` composes those parts over the authored weapon, so
+      every existing consumer of `current()`, `begin_attack()` and
+      `shot_directions()` — the Hunt, Gore Sandbox and derby cab — reads the
+      same fitted damage, impulse, range, spread, cooldown and reload values.
+      The current state and physical weapon mount expose that same complete
+      attachment record for inventory UI and later authored geometry without
+      teaching the holder what an optic is. Holstering preserves it; another
+      weapon or another arsenal does not inherit it; removing a part returns
+      that same record and restores the base numbers. Verified by the new
+      `tests/weapon_customization_test.gd` (16 checks), plus `arsenal_test`,
+      `magazine_test`, `weapon_jam_test`, `firearm_aim_test`,
+      `firearm_momentum_test`, `reload_visual_test`, `ballistics_test`,
+      `deferred_damage_test`, `combat_integration_test`, `gore_demo_test`,
+      `gore_parity_test`, `derby_cab_fire_test` and `derby_cab_test`, all with
+      real output after restoring this worktree's required gitignored addons
 - [x] **AF10.11** `v10` ~~A gun carries momentum and swivels toward where you look~~
       AN1.7, already proven in `tests/firearm_momentum_test.gd`: `ARM_WEIGHTS`
       carries each firearm's own authored mass and reach, `_carry_current_weapon()`/
