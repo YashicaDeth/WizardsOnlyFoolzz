@@ -115,14 +115,17 @@ static func _named(id: String, losses: int) -> Dictionary:
 ## Returns null when LimboAI is not present, and every caller is expected to
 ## cope: the plugin is 119MB of GDExtension and a build that cannot run without
 ## it is a build with a single point of failure for no reason.
-static func build_tree(tactic: Dictionary) -> BehaviorTree:
+static func build_tree(tactic: Dictionary) -> Resource:
 	if not ClassDB.class_exists("BehaviorTree"):
 		return null
-	var tree := BehaviorTree.new()
+	# Instantiate optional GDExtension classes by name. Referring to their
+	# identifiers directly makes this script fail to parse on machines where
+	# LimboAI is absent, defeating the graceful fallback above.
+	var tree = ClassDB.instantiate("BehaviorTree")
 	# Kept deliberately shallow. The value of the tree here is that it is *per
 	# rival and swappable*, not that it is deep — a deep tree for an enemy that
 	# fights for eleven seconds is decoration.
-	var root := BTSelector.new()
+	var root = ClassDB.instantiate("BTSelector")
 	tree.set_root_task(root)
 	tree.set_meta("tactic", str(tactic.get("id", "press")))
 	tree.set_meta("keep_distance", float(tactic.get("keep_distance", 0.0)))
