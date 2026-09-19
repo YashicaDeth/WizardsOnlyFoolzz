@@ -3,6 +3,23 @@
 The working document. The design has outrun the build, so this is how the build
 catches up: **in segments, one at a time, slowly and surely.**
 
+## Canonical demo checkpoint — 20 September 2026
+
+The playable consolidation now lives on `codex/consolidated-demo`. It combines
+the validated first-30-minute strike with the later anatomy, frame-budget,
+pause/rebinding, handheld/brain-index, Wire/faction, and range/ballistics work.
+Old Orca lanes remain as history and backups; they are not separate builds the
+player must choose between. The stale broad rescue copies were deliberately not
+allowed to overwrite newer core files.
+
+The integrated checkpoint passes the opening, grappling, shipping-controls,
+pause/rebinding, ballistics, body/anatomy, wound-depth, brain-index, handheld
+ownership, derby cab-fire, gore-range, weapon-customisation, and performance
+probe suites. One optional-AI parse failure exposed during consolidation was
+fixed by making the LimboAI fallback genuinely optional. Generated Godot import
+metadata and manual visual/play-feel review are not counted as completed ledger
+work.
+
 ## Versions — how a segment gets better after it is done
 
 Greg, 2026-09-12: *"make it so you can click and change the a1 to a1v2 and its a
