@@ -26,5 +26,14 @@ func _ready() -> void:
 	image = get_viewport().get_texture().get_image()
 	image.save_png("%s/pause_settings.png" % out_dir)
 	print("CAPTURED: %s/pause_settings.png" % out_dir)
+	gate.page = "controls"
+	gate.highlighted = 0
+	gate._build_rows()
+	for _hold in 12:
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	image = get_viewport().get_texture().get_image()
+	image.save_png("%s/pause_controls.png" % out_dir)
+	print("CAPTURED: %s/pause_controls.png" % out_dir)
 	gate.close()
 	get_tree().quit()
