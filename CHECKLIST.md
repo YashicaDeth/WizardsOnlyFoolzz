@@ -3714,7 +3714,20 @@ where they are hit, and what comes off them stays.
       Named pools (`barricade_fragment`, `vehicle_part`) keep the two kinds
       of debris from evicting each other just because they now share a file.
 - [ ] **AB1.5** A vehicle deforms rather than losing hit points (pairs with V1.2)
-- [ ] **AB1.6** Measure the cost before committing; X exists because nothing here has been profiled
+- [x] ~~**AB1.6** Measure the cost before committing; X exists because nothing here has been profiled~~
+      `destruction_cost_test.gd` isolates the production destruction load at
+      1920x1080 PERFORMANCE before that load is expanded to walls or buildings:
+      all six derby barricades broken until the shared 14-fragment cap is full,
+      plus all six detachable panels from the player's car (inside the shared
+      eight-panel cap). Three rendered RTX 2060 SUPER runs measured the broken
+      fixture at 6.43, 7.47 and 6.83 ms median, with p95s of 7.67, 9.98 and
+      8.77 ms; all held the explicit 16.67 ms / 60 FPS frame budget. The
+      intact-to-broken deltas were -0.30, -0.71 and -0.41 ms, which is warm-up
+      and run-order noise rather than evidence destruction makes rendering
+      cheaper. The suite therefore reports that delta but does not assert a
+      fiction from it: it gates the absolute broken-state median and both live
+      body caps. This is an isolated cost measurement, not a claim that a full
+      twelve-car heat costs the same; X1.2 owns that whole-scene contract.
 
 ### AB2 — Damage the world keeps
 Greg: *"everything is measurably destroyable in the game and the environment
