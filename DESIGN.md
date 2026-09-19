@@ -12,6 +12,12 @@ be given to ascent or corruption, makes the derby mandatory, or presents the
 J birthday/resonance screen as an established ordinary-play action. Stable
 internal and save identifiers are not renamed by that vocabulary correction.
 
+The implementation dependency graph, whole-game mechanics mind map and safe
+parallel ownership boundaries live in `ARCHITECTURE/SYSTEM_MAP.md`. It replaces
+the obsolete Derby-only map and should be the first routing document read
+before dispatching parallel Orca workers; the checklist remains the detailed
+ledger rather than a substitute architecture.
+
 18 September implementation note: connected local territory work now has one
 visible consequence before the still-unresolved political or supernatural land
 decision. Resolving one order fractures the affected polygon on MAP; resolving

@@ -52,9 +52,46 @@ can expose the player's answers to the examiner, making the examination itself
 the frame for choosing name, body and initial character traits. Story beats,
 brief playable observation and character creation should alternate in the
 Bethesda-style rhythm Greg described rather than front-loading either a long
-cutscene or a conventional setup screen. The doctor's identity, origin, exact
-vehicle (airship, aircraft or UFO), starting loadout choices and difficulty
-structure remain open.
+cutscene or a conventional setup screen.
+
+The examiner is the government's highest-ranking visiting doctor: personally
+cruel, but strangely sympathetic rather than clinically empty. His name and
+full identity are withheld at first. He records the examination without
+consent, tells the player the answers have taught the institution how to break
+or kill them, and begins to leave before the next torture cycle. If an
+exceptionally skilled player reaches and apparently kills him, medical
+reconstruction can return him later with his memory and scars intact. The
+victory remains true and begins a personal rivalry; resurrection is not a
+cutscene retcon. His exact vehicle remains open.
+
+Creation is distributed through the examination rather than presented as one
+detached menu. It includes direct body/face/proportion customisation,
+randomisation and reusable presets; body origin; anatomical sex options;
+personality instrumentation; and birth date/place/time for a real natal chart.
+The player's mechanical choices remain accurate. What can be wrong is the
+government's insulting or politically distorted diagnosis of those choices.
+The player freely chooses their body origin while the facility assigns its own
+institutional classification. Exact birth time may be marked unknown rather
+than fabricated. A first deliberate pass should take roughly 10–15 minutes;
+saved presets give repeat players a much faster route.
+
+The breakthrough is the player's own soul: accumulated suffering, refusal to
+submit and the player's “inner demon” seize and rewrite the government brain
+implant into the chaos-magick interface. **There is no separate unknown entity
+granting or entering with the power.** The glass ruptures, restraints fail and
+the player tears the tube out. The doctor is an urgent revenge target, not a
+mandatory timed objective.
+
+The player emerges naked, wounded and helpless. Explicit anatomy may be
+enabled; a mosaic/censorship option provides an equally supported presentation.
+The opening teaches systems through physical acquisition rather than tutorial
+cards: a broken medical restraint/tool, humiliation clothing taken from a dead
+failed subject, a biometric guard encounter, a powerful but ammunition-starved
+firearm, then a prototype Black Mirror stolen from a restricted technology
+room. The outfit begins as institutional degradation and can become the
+player's owned identity. Biometric access admits coercing a living guard,
+presenting an unconscious/dead body or removing the required hand/finger/head;
+later implant spoofing is another earned answer.
 
 The opening facility is a large connected underground world, not a linear lab:
 
@@ -77,6 +114,15 @@ experiments and constructed fighters are consumed as entertainment in an
 underground vehicular colosseum. Turning its winning vehicle against the
 facility is a possible spectacular escape and a reason senior powers notice the
 player.
+
+The opening slice includes the meaningful facility routes—stealth,
+exploration, cooperation/betrayal, direct violence and possible recapture into
+the derby—until their exits reach the existing surface world. Different exits
+may produce different surface starting positions and relationships. Avoiding
+the derby is principally a mastery route, though a perceptive first-time player
+is allowed to discover it. Death/revival during this opening remains a focused
+design problem; until the game's death fiction is authored, ordinary reload is
+the honest implementation rather than pretending the question is solved.
 
 ## Factions and hierarchies
 
@@ -117,19 +163,26 @@ Local controlling structures can include fictional military bases, bandit
 camps, cartels, traffickers, organ markets and alien installations. Removing
 one can improve nearby life without instantly resolving the whole territory.
 The player may support local self-rule, install a faction or individual, claim
-control, extract value and leave a vacuum, or worsen/desolate the area. The
-exact transfer act and its cost are deliberately unresolved.
+control, extract value and leave a vacuum, or worsen/desolate the area. Direct
+player government is possible, but conspicuous new rule makes the territory a
+more attractive target for rival factions. The exact grounded transfer act can
+vary with the recipient rather than collapsing every political outcome into
+one occult button.
 
 Recovery should gradually improve population, happiness, productivity, work,
-trade, lights, services, buildings and defensive strength. Procedural rebuilding
-must preserve history: scars, foundations, survivors, reputation and the identity
-of whoever rebuilt remain visible and recorded.
+trade, lights, services, buildings and defensive strength. The player may set
+broad priorities while inhabitants, resources and procedural construction
+decide individual rebuilding. Even deliberate desolation can eventually
+recover, but scars, foundations, survivors, reputation and the identity of
+whoever rebuilt remain visible and recorded for a meaningful time.
 
-Recovered settlements can face occasional meaningful invasions, not constant
-maintenance spam. Allies may send a live request for help. Ignoring it can allow
-reoccupation, but earlier work still matters through defenders, resistance and
-relationships. Recovered territories can eventually contribute people and
-resources to large player-led assaults.
+Recovered settlements can face rare authored invasions, occasional simulation
+campaigns and retaliation deliberately provoked by the player—not constant
+maintenance spam. Allies may send a live request for help. Ignoring it can
+allow reoccupation, but earlier work still matters through defenders,
+resistance and relationships. Recovered territories can eventually contribute
+people and resources to large player-led assaults, with the player able to set
+preparation, leadership, objectives and tactical commands.
 
 Willing recruitment and psychic/neural domination are distinct. A dominated
 character remembers coercion, carries different social consequences and can
@@ -144,27 +197,51 @@ First person is embodied, precise and more demanding, but ordinary fights must
 remain brutal-and-manageable rather than nearly suicidal. It is strongest for
 roleplay, shooting, sniping, hand-cast magic and optional close combat.
 
-Third person is an earned combat stance, not merely another camera angle. It
+Third person is a technological combat stance, not merely another camera angle.
+Camera hardware is implanted from the beginning but imprisonment prevents the
+player controlling it; the chaos rewrite exposes it and early play stabilises
+it. The working physical form is a micro-camera/drone projected from a socket
+at the back of the head, combining a real external viewpoint with the implant's
+sensor reconstruction. It normally switches freely, but cramped interiors can
+force it close or back into first person, while darkness, injury, interference
+and particular enemies can disrupt it. A later free-flying drone mode is
+possible but is not part of the first combat implementation. Third person
 provides stronger crowd awareness, readable character animation, fluid combos,
-lock-on, dodging, executions and expressive traversal. Most actions can remain
-available in both perspectives with different strengths. A deployable
-cybernetic/360-degree camera is a promising explanation, particularly for
-collision, darkness, interference and hostile surveillance, but it is not yet
-permanent lore.
+lock-on, dodging, executions and expressive traversal.
 
 Combat should balance deliberate weapon positioning with expressive combos.
-Stamina exhaustion should be embodied through breath and reduced capability,
-but its exact failure behaviour remains open.
+Both perspectives resolve through the same anatomy, weapon condition, wound
+depth and ballistics. First person supplies precision, manual positioning,
+shooting, inspection, claustrophobic brawling and hand-cast magic; third person
+supplies crowd awareness, lock-on, longer combo grammar, directional dodges,
+throws, executions and expressive traversal. A bullet never changes damage
+because the camera changed.
 
-Grappling should begin with readable basic actions and expand through learned
-boxing or wrestling techniques. Physics make bodies responsive; inputs should
-still express an intended clinch, throw, takedown or control rather than produce
-unreadable accidental wrestling.
+Stamina is charged for meaningful exertion rather than every ordinary action.
+Exhaustion first produces breathing, weak guard, slower recovery and reduced
+capability. Forcing an already exhausted body costs consciousness, stresses
+muscle/heart and can eventually cause a stumble or collapse.
+
+Grappling should begin with mouse and movement-key direction—grab, pull, push,
+turn, restrain and strike—then expand through learned boxing or wrestling
+throws and takedowns. Physics make bodies responsive; inputs still express an
+intended action rather than producing unreadable accidental wrestling.
 
 Gun fights should be anatomy-driven and longer than the current casual one-shot
-encounters without becoming health-bar attrition. Armour, mutation, organs,
-bones, blood loss, limb function, incapacitation and supernatural anatomy must
-visibly explain durability. Different characters need believable power classes.
+encounters without becoming health-bar attrition. There are no rigid enemy
+tiers or arbitrary boss-health multipliers: recognisable anatomy profiles make
+durability legible through dense tissue, bone, armour, implants, displaced or
+duplicated organs and supernatural regeneration. “Boss” describes an
+encounter, not a social rank or hidden health multiplier. Actual destruction
+of the brain remains decisive; weak ammunition may fail to reach it, while
+rare destructive rounds can produce immediate catastrophic wounds. Important
+lethal impacts may receive a brief physical slow-motion/X-ray presentation
+without changing the result.
+
+Most strangers begin cautious or neutral. Personality, faction, territory,
+fear and the player's conduct escalate them; predators, raiders, traffickers
+and desperate aggressors may hunt on sight. Sandbox bodies begin harmless and
+become hostile only through a clear physical control.
 
 ## Inspection and smoking
 
@@ -198,9 +275,28 @@ become oppressive contextually rather than covering every corner permanently.
 - Border: artistic game framing, not currently literal eyewear.
 
 The Black Mirror is useful, desirable and compulsory. The player resents being
-chained to the same device that enables surveillance and control. Phones are
+chained to the same device that enables surveillance and control. The stolen
+prototype cannot be discarded: over the game the player hacks it, makes it
+theirs and cuts government control rather than throwing away a central tool.
+It is held physically in the live world; an enlarged view retains real danger.
+Its map can carry institutional manipulation and deliberate traps as well as
+incomplete knowledge—the device's source and confidence must therefore be
+legible rather than every marker being treated as divine truth. Phones are
 common, but advanced AI/LLM neural integration is not universal, and the
 player's device can be valuable to other people.
+
+Inventory exists independently because it precedes the Black Mirror. It is one
+body/equipment interface: the real dressed and wounded character, clothing,
+armour, weapons, attachments and combat stances. Selecting the brain enters the
+Brain Index inside the same object; memories, records, character documentation,
+working theories and the conspiracy board live there. Body searching uses the
+same physical grammar for pockets, clothing, weapons, implants, organs and
+neural data. Inventory may slow the world but never makes danger disappear;
+exact bindings wait for the binding audit rather than stealing another key.
+Ordinary HUD furniture remains quiet while the player is safe and healthy,
+then wakes for wounds, exhaustion, lungs, threats, navigation and operated
+equipment. The artistic frame can physically degrade, crack and misregister
+with the body/device state.
 
 At interview time, the G/phone interaction, unexplained J birthday/resonance
 flow and incomplete pointer/keyboard navigation were specifically rejected.
@@ -229,9 +325,9 @@ mind-map pass remains required.
 
 - the practical or supernatural act that transfers a territory;
 - what prevents every territory being given freely to one favourite faction;
-- the opening screenplay and named authority figures;
-- whether third person is literally an external cybernetic camera;
-- exact stamina-collapse behaviour;
+- the full opening screenplay and the examiner's deliberately hidden identity;
+- the opening death/revival fiction beyond ordinary reload;
+- final physical form and free-flight rules for the third-person micro-camera;
 - permanent addiction and drug balance;
 - angel/wizardsonlyfoolz relationship;
 - final visual hierarchy and territory-corruption art direction.
