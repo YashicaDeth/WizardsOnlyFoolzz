@@ -68,6 +68,11 @@ var line_offset := 0
 ## to be an index into a rota on a flat timer; it is now whatever the moment
 ## called for, held for as long as that particular line is worth holding.
 var handler_says := ""
+## AX1.2. The doctor is a second presence, not a second mood of the handler.
+## He speaks rarely and never about paperwork.
+var doctor_says := ""
+var doctor_life := 0.0
+var doctor_moment := 0
 ## D8.3. A procedure in progress: the beats left to play, and the shot each one
 ## wants. Input is suspended while it runs, because it is being done to you.
 var procedure: Array = []
@@ -150,6 +155,7 @@ func _transcribe(intent: String, success_context: String = "chose") -> void:
 func _process(delta: float) -> void:
 	elapsed += delta
 	handler_life = maxf(0.0, handler_life - delta)
+	doctor_life = maxf(0.0, doctor_life - delta)
 	transcript_life = maxf(0.0, transcript_life - delta)
 	if handler_life <= 0.0:
 		# A procedure runs itself to the end before he goes back to muttering.
@@ -172,9 +178,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	match event.keycode:
 		KEY_LEFT:
 			page = wrapi(page - 1, 0, PAGES.size())
+			_doctor_observe()
 			row = 0
 		KEY_RIGHT:
 			page = wrapi(page + 1, 0, PAGES.size())
+			_doctor_observe()
 			row = 0
 			_speak("page")
 		KEY_UP:
@@ -275,6 +283,7 @@ func _draw() -> void:
 	_draw_clipboard(board)
 	_draw_mirror(Rect2(Vector2(viewport.x * 0.79, 96), Vector2(viewport.x * 0.18, viewport.y * 0.52)))
 	_draw_handler(viewport)
+	_draw_doctor(viewport)
 
 
 ## You are looking out through it, so the whole screen is under water before
@@ -381,6 +390,13 @@ func _draw_races(_rect: Rect2, ink: Color, y: float) -> void:
 		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.race == str(keys[index]))
 		CellOutzType.draw_condensed(self, Vector2(50, y - 10), str(data.name), 12.0, ink, 0.9)
 		CellOutzType.draw_condensed(self, Vector2(50, y + 4), str(data.price).to_upper(), 7.0, ink * Color(1, 1, 1, 0.42), 0.6)
+		# AX1.4. What you picked, and what the facility wrote down instead. Shown
+		# together on purpose: the doc is explicit that the player's choice stays
+		# accurate and it is the institution's diagnosis that is distorted.
+		if sheet.race == str(keys[index]):
+			var filed := DoctorExamination.classify(sheet)
+			CellOutzType.draw_condensed(self, Vector2(300, y - 10), "FILED AS " + str(filed.label), 9.0, HOT * Color(1, 1, 1, 0.8), 0.7)
+			CellOutzType.draw_condensed(self, Vector2(300, y + 4), str(filed.note).to_upper(), 7.0, HOT * Color(1, 1, 1, 0.45), 0.6)
 		y += 30.0
 
 
@@ -480,6 +496,51 @@ func _draw_mirror(rect: Rect2) -> void:
 
 	CellOutzType.draw_condensed(self, rect.position + Vector2(10, rect.size.y - 34), "PREVIEW IS THROUGH GLASS", 8.0, INK * Color(1, 1, 1, 0.4), 0.7)
 	CellOutzType.draw_condensed(self, rect.position + Vector2(10, rect.size.y - 22), "AND THROUGH MEDIUM", 8.0, INK * Color(1, 1, 1, 0.28), 0.7)
+
+
+## AX1.2. He watches the page you are on, not the box you ticked. Arriving at
+## a page is the beat; choosing within it belongs to the handler and his form.
+func _doctor_observe() -> void:
+	doctor_moment += 1
+	var beat := DoctorExamination.observe(str(PAGES[page]).to_lower(), doctor_moment)
+	if beat.is_empty():
+		return
+	doctor_says = str(beat.get("line", ""))
+	doctor_life = float(beat.get("hold", 3.0))
+
+
+## He stands on the other side of the glass from the handler, and unlike the
+## handler he is lit — the doc has him studying you, which means you can see
+## him doing it. The consent notice never leaves the screen because he never
+## asked and never will.
+func _draw_doctor(viewport: Vector2) -> void:
+	# Top left, not top right: the right third of the screen is the face
+	# preview panel, and 8pt dark red on near-black was invisible in the
+	# capture. Opening the PNG is the only reason this was caught.
+	CellOutzType.draw_condensed(
+		self, Vector2(40, 34), DoctorExamination.CONSENT_NOTICE, 11.0,
+		HOT.lightened(0.25) * Color(1, 1, 1, 0.72 + 0.28 * sin(elapsed * 2.0)), 0.8,
+	)
+	# He stands between the handler and the form, lit, close enough to read.
+	# The right side belongs to the preview panel and drew over him entirely.
+	var head := Vector2(viewport.x * 0.31, viewport.y * 0.26)
+	draw_colored_polygon(PackedVector2Array([
+		head + Vector2(-58, 210), head + Vector2(-46, 26), head + Vector2(-20, -8),
+		head + Vector2(22, -8), head + Vector2(48, 26), head + Vector2(60, 210),
+	]), Color(0.07, 0.07, 0.08, 0.92))
+	draw_circle(head, 30.0, Color(0.09, 0.09, 0.10, 0.94))
+	if doctor_life <= 0.0 or doctor_says == "":
+		return
+	var band := Rect2(Vector2(viewport.x * 0.36, viewport.y - 92), Vector2(viewport.x * 0.30, 52))
+	draw_colored_polygon(PackedVector2Array([
+		band.position + Vector2(10, 0), band.position + Vector2(band.size.x, 0),
+		band.position + band.size - Vector2(10, 0), band.position + Vector2(0, band.size.y),
+	]), Color(0.05, 0.05, 0.06, 0.86))
+	CellOutzType.draw_condensed(self, band.position + Vector2(14, 12), "VISITING PHYSICIAN", 9.0, BRUISE, 0.7)
+	CellOutzType.draw_condensed(
+		self, band.position + Vector2(14, 30), doctor_says.to_upper(), 11.0,
+		PAPER * Color(1, 1, 1, clampf(doctor_life, 0.0, 1.0) * 0.95), 0.8,
+	)
 
 
 func _draw_handler(viewport: Vector2) -> void:
