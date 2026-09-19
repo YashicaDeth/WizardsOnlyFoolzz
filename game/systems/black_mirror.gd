@@ -35,6 +35,96 @@ const BELL := Color("c9a23a")
 const READING_EDGE := Color("07100e")
 const READING_CENTRE := Color("0c1b17")
 const READING_LIP := Color("6f9478")
+const NIGHT_PHOSPHOR := Color("b9f5cf")
+
+
+## Camera telemetry for the Black Mirror's rear sensor. This is deliberately a
+## camera model rather than a colour effect: exposure and gain adapt at
+## different rates, gain creates noise, clipped highlights bloom, focus hunts
+## under motion/low contrast, and the sensor reports a battery load for the
+## device controller to consume.
+static func night_vision_state(overrides: Dictionary = {}) -> Dictionary:
+	var state := {
+		"enabled": false,
+		"gain": 1.0,
+		"exposure": 1.0,
+		"noise": 0.0,
+		"bloom": 0.0,
+		"focus_distance": 3.0,
+		"focus_confidence": 1.0,
+		"battery": 1.0,
+		"battery_draw": 0.0,
+		"drain_per_second": 0.0025,
+		"sensor_temperature": 0.0,
+	}
+	state.merge(overrides, true)
+	return state
+
+
+## Advances a sensor state by one frame. `sample` accepts ambient_luminance
+## (0..1), highlight_luminance (0..1), subject_distance, contrast and motion.
+## Supplying battery in either dictionary is an integration hook for whatever
+## inventory/power system ultimately owns the handset charge.
+static func step_night_vision(previous: Dictionary, sample: Dictionary, delta: float) -> Dictionary:
+	var state := night_vision_state(previous)
+	var dt := maxf(0.0, delta)
+	if sample.has("battery"):
+		state.battery = clampf(float(sample.battery), 0.0, 1.0)
+	var requested := bool(sample.get("enabled", state.enabled))
+	state.enabled = requested and float(state.battery) > 0.001
+	if not state.enabled:
+		state.gain = move_toward(float(state.gain), 1.0, dt * 4.0)
+		state.exposure = move_toward(float(state.exposure), 1.0, dt * 2.0)
+		state.noise = move_toward(float(state.noise), 0.0, dt * 3.0)
+		state.bloom = move_toward(float(state.bloom), 0.0, dt * 4.0)
+		state.battery_draw = 0.0
+		return state
+
+	var ambient := clampf(float(sample.get("ambient_luminance", 0.05)), 0.0005, 1.0)
+	var highlights := clampf(float(sample.get("highlight_luminance", ambient)), 0.0, 1.0)
+	var contrast := clampf(float(sample.get("contrast", 0.5)), 0.0, 1.0)
+	var motion := clampf(float(sample.get("motion", 0.0)), 0.0, 1.0)
+	# Exposure reacts slowly; electronic gain catches up fast and is capped so
+	# darkness remains darkness instead of becoming a flat green daylight scene.
+	var target_exposure := clampf(0.18 / ambient, 0.7, 5.5)
+	var target_gain := clampf(0.32 / (ambient * target_exposure), 1.0, 18.0)
+	state.exposure = move_toward(float(state.exposure), target_exposure, dt * 1.4)
+	state.gain = move_toward(float(state.gain), target_gain, dt * 9.0)
+	var gain_pressure := clampf((float(state.gain) - 1.0) / 17.0, 0.0, 1.0)
+	state.sensor_temperature = move_toward(float(state.sensor_temperature), gain_pressure, dt * 0.18)
+	state.noise = clampf(gain_pressure * 0.62 + float(state.sensor_temperature) * 0.25 + motion * 0.13, 0.0, 1.0)
+	state.bloom = clampf(maxf(0.0, highlights * float(state.exposure) - 0.72) * (0.4 + gain_pressure), 0.0, 1.0)
+
+	var subject_distance := clampf(float(sample.get("subject_distance", state.focus_distance)), 0.25, 200.0)
+	var focus_speed := lerpf(8.0, 1.2, clampf((1.0 - contrast) * 0.7 + motion * 0.5, 0.0, 1.0))
+	state.focus_distance = move_toward(float(state.focus_distance), subject_distance, dt * focus_speed)
+	var focus_error := absf(float(state.focus_distance) - subject_distance) / maxf(subject_distance, 0.25)
+	state.focus_confidence = clampf(contrast * (1.0 - motion * 0.65) * (1.0 - minf(focus_error, 1.0)), 0.0, 1.0)
+
+	state.battery_draw = float(state.drain_per_second) * (1.0 + gain_pressure * 1.8 + float(state.bloom) * 0.35)
+	state.battery = maxf(0.0, float(state.battery) - float(state.battery_draw) * dt)
+	if float(state.battery) <= 0.001:
+		state.enabled = false
+	return state
+
+
+## Converts a captured colour after the telemetry has been stepped. The caller
+## can use this in a canvas shader equivalent later; keeping a deterministic CPU
+## reference here makes the sensor response testable and documents the contract.
+static func night_vision_sample(source: Color, state: Dictionary, sensor_uv: Vector2, clock: float) -> Color:
+	if not bool(state.get("enabled", false)):
+		return source
+	var luminance := source.r * 0.2126 + source.g * 0.7152 + source.b * 0.0722
+	var sensed_light := luminance * float(state.get("exposure", 1.0)) * float(state.get("gain", 1.0))
+	# Deterministic analogue grain and a faint rolling scan band. Neither changes
+	# scene geometry, so this remains safe as a shader/reference implementation.
+	var seed_value := sin(sensor_uv.dot(Vector2(12.9898, 78.233)) + floor(clock * 30.0) * 0.173) * 43758.5453
+	var grain := (fposmod(seed_value, 1.0) - 0.5) * float(state.get("noise", 0.0)) * 0.32
+	var scan := sin((sensor_uv.y + clock * 0.12) * 780.0) * 0.018
+	var resolved := clampf(sensed_light + grain + scan, 0.0, 1.0)
+	var phosphor := NIGHT_PHOSPHOR * resolved
+	var bloom := float(state.get("bloom", 0.0)) * smoothstep(0.68, 1.0, resolved)
+	return Color(clampf(phosphor.r + bloom * 0.35, 0.0, 1.0), clampf(phosphor.g + bloom * 0.55, 0.0, 1.0), clampf(phosphor.b + bloom * 0.42, 0.0, 1.0), source.a)
 
 
 ## The dark ground the whole device sits on. Drawn first; everything else is

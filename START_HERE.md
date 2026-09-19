@@ -1,21 +1,26 @@
-# START HERE — Lane 4
+# START HERE — Lane 7
 
-This worktree is lane 4. Read this file, then begin.
-Your branch is `lane-4-demo`. Stay inside the file family below.
+This worktree is lane 7. Read this file, then begin.
+Your branch is `lane-7-merge`. Stay inside the file family below.
 
 ---
 
-## Lane 4 — The demo
+## Lane 7 — Merging
 
-**Owns:** `P`-section scenes, the opening sequence, objective and pacing scripts
+**Owns:** nothing. Writes no features.
 
-**Target:** P 0% -> 40%
+**Target:** 99 commits unmerged across 9 branches -> 0
 
-**This is the most important lane and the least glamorous.** P is 0 of 45 — the
-demo, what a player does in the first ten minutes and why they keep going. Every
-other section is a system; this is the only one that is the game. Greg's own
-words: *"there needs to be a point of the game because right now it just seems
-really sandboxy."* The measurements agree with him exactly.
+**Read this one twice before deciding it is a waste of an account.** There are
+**99** finished commits sitting on `agent-b` (26), `origin/agent-b` (20),
+`claude/b-ladder` (15), `codex/sol-agent-1` (12), `agent-c` (11) and four
+others — and that number went *up* by 23 over the course of one day's work. That work is already
+done and is invisible to everyone. Six more agents writing into that makes the
+number grow, not shrink — authoring has never been the bottleneck here.
+
+This lane merges one branch at a time, runs the test suites after each, and
+stops to ask when two branches disagree about a file rather than picking a side.
+It is also the only lane that should ever resolve a conflict.
 
 ---
 
@@ -159,25 +164,6 @@ Still on the engine fallback font: `downed_resolution` (22), `world_index` (12),
    the cap height or every converted line lands low.
 5. GDScript cannot infer a type from `event.pressed` off a base `InputEvent`. Use
    `var x: bool = ...` and cast, or the whole file silently fails to compile.
-
-## 9. `addons/limboai/` is gitignored and a fresh worktree does not have it
-
-`rival_tactics.gd` hard-`preload()`s the LimboAI GDExtension, and
-`bone_yard_hunt.gd` hard-`preload()`s `rival_tactics.gd` — so a worktree
-missing the addon fails to compile the Hunt scene, the core of the demo, while
-tests that do not happen to instantiate it still print `PASS`. It cost real
-time here: `loop_smoke_test` reported `failures=0` with `bone_yard_hunt.gd`
-silently failing to load underneath it.
-
-`game/addons/limboai/` is in `.gitignore` (a ~150MB compiled binary), so
-`git worktree add` never brings it along. Same story for `game/addons/terrain_3d/`
-(~100MB, listed in `project.godot`'s `enabled` plugins, spams a plugin-load
-warning without it — does not break compilation, nothing preloads it).
-`setup/orca_worktree_setup.ps1` now copies both from
-`P:\GameDev\AllusionsTooGrandeur\game\addons\` on every new worktree. If a
-worktree predates this fix, copy them by hand and rebuild the class cache
-(`--headless --path game --import`) before trusting any suite that touches
-the Hunt.
 
 ## Blocked on Greg — do not guess these
 
