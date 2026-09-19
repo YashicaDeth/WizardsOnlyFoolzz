@@ -6906,16 +6906,29 @@ Greg: *"the higher you have to be to talk or even fight, conjure, evoke etc"*.
 
 They block nothing else, but they change what gets built.
 
-1. **Where is the art folder?** Blocks G1 entirely — the largest available
-   upgrade to the look.
-2. **celloutz.xyz — mirror or fictionalise?** Blocks I3.
+1. ~~**Where is the art folder?**~~ **Answered 19 September:**
+   `C:\Users\Greg\Desktop\Art Collections`, real and populated with Affinity,
+   Photoshop and After Effects sources. A smaller second set sits under the
+   Desktop's Personal Media Folder. His Instagram is also a source but **the
+   handle is not confirmed** — do not guess it. G1 is unblocked. What he
+   actually wants built is a commissioning ledger: click an entry, see what
+   the thing is, what it looks like now, and what he wants instead. Not
+   urgent; see `DESIGN.md`.
+2. ~~**celloutz.xyz — mirror or fictionalise?**~~ **Fictionalise it**, somewhat
+   rather than wholesale. I3 unblocked.
 3. **Ephemeris or derived wheel?** "Most accurate" charts need real planetary
    longitudes from a table. Affects D5.4.
-4. **Guns: common, or scarce and improvised?** Changes encounter design either
-   way. Built but undecided.
-5. **What persists between runs?** Roguelike structure was asked for, but
-   "bodies remember" is a pillar. These pull against each other.
-6. **Does the chassis roll?** Affects A7.4.
+4. ~~**Guns: common, or scarce and improvised?**~~ **Scarce**, and so is
+   everything else — the world is scrap and bionics, and crafting is how
+   weapons get upgraded. Most fighting is not gunfighting at all: cybernetics
+   make bodies fast and strong, so combat is physical.
+5. ~~**What persists between runs?**~~ **There are no runs.** Greg, 19
+   September: it is not a roguelike, it is a save game — your game — with a
+   main story, an end goal and a post-game you can keep playing. The
+   roguelike-versus-"bodies remember" tension was never real. Stop asking.
+6. **Does the chassis roll?** Affects A7.4. Asked again on 19 September;
+   Greg's answer was "I don't know", so it stays open rather than being
+   decided for him.
 7. ~~**How is the dark web gated?**~~ **Answered and built** — `signal_field.gd`
    gates it on physically standing at a terminal. Reversible by changing one
    table; the two terminals are in the Ossuary Works and the Communion.

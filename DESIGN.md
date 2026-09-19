@@ -262,6 +262,95 @@ Status: early concept, not a locked game bible. Compiled from Greg's shared conv
 - A violent demolition-derby activity with original world, vehicle, targets and presentation; it may take broad genre-level inspiration from arcade demolition derbies, but must not copy a specific game's protected content. BeamNG-level damage remains a research ambition needing a separate feasibility prototype.
 - Persistent multiplayer/server ambitions were mentioned as a far-future possibility. Rust-like human proximity chat is a future multiplayer consideration, not part of the clarified current player model.
 
+### Answered by Greg, 19 September 2026
+
+Spoken answers to the questions that had been blocking work. Recorded here
+because several had been asked across more than one session and the answer
+kept being lost. Where Greg said he did not know, that is written down as not
+knowing rather than filled in.
+
+Two answers from the same conversation are **not repeated here** because they
+already have homes: the 60 FPS budget is in the 19 September performance
+direction above and in X1.2, and the vat opening is in
+`DESIGN/PLAYER_DIRECTION_INTERVIEW_2026-09-18.md`. Adding second copies of
+either is how this repository became hard to read.
+
+- **It is not a roguelike, and the question should stop being asked.** It is a
+  save game — your game. There is a main story with an end goal, and a
+  post-game after you beat it, and you can keep playing for as long as you
+  want. Nothing about "what carries between runs" applies; there are no runs.
+  This supersedes the roguelike-versus-persistence tension recorded in the
+  checklist's open questions.
+
+- **Greg's art lives at `C:\Users\Greg\Desktop\Art Collections`.** Real and
+  populated — Affinity, Photoshop and After Effects sources alongside
+  exports. A second, smaller set sits under the Desktop's Personal Media
+  Folder in the edit-experiments and Allusions directories, including a
+  post-major-work set he wants used. His Instagram account is also a usable
+  source; **the exact handle still needs confirming** — he tried several
+  spellings aloud and none should be guessed at.
+
+- **What he actually wants from the art work is a commissioning tool.** An
+  art and asset ledger, with modelling and texture entries, presented like
+  the existing mind map: you click an entry and it tells you what the thing
+  is, what it looks like *now*, and what he wants instead. The purpose is
+  that he can hand it to friends and commission textures and assets from it.
+  Explicitly **not needed right now** — recorded so it is not lost.
+
+- **Liberating a holding.** A town is under occupation: bandits, a faction,
+  demons, spirits. The player learns about it through a quest or through
+  information found in the world, and the map shows where the occupiers'
+  facilities are. Three routes out of it, and the choice is the content:
+  - go there, talk to the occupying force, and help them hold the place —
+    that is **giving in to corruption**, not liberation;
+  - demand they let the people go, be refused, and take it by force;
+  - tell the townspeople or their elder that an attack is coming, and have
+    them fight alongside you.
+
+- **Dialogue.** Proximity voice is the primary channel — the town can be
+  talked to and argued with, and the third route above is meant to be won by
+  actually persuading them. Pre-written Fallout-style options sit *underneath*
+  as an alternative for players who want them. Greg is explicit about what to
+  avoid: the Skyrim/Fallout pattern where you press through canned lines and
+  it never feels like the question is yours.
+
+- **Guns are scarce, and so is everything else.** The world is scrap and
+  bionics. Crafting is how weapons get upgraded, not shops full of stock.
+
+- **Most fighting is not gunfighting.** Cybernetic upgrades make bodies fast
+  and strong, so combat is physical: leaping around each other, super
+  strength, a bat that sends you flying in third person. The energy he is
+  after is the Annoying Villager fight choreography, turned into something
+  playable.
+
+- **Combat stances, with a tree.** Stance changes playstyle — sneaky through
+  to melee — and is meant to make the same weapon feel like a different game
+  in different hands. Reference is **Nioh** (1/2/3) for multiple stances in a
+  souls-like.
+
+- **Carry becomes one inventory.** A character model on the right, inspectable
+  in 3D, that clothes and armour go onto. Clicking its brain opens the brain
+  index *inside* the inventory rather than as a separate screen. A weapons tab
+  reaches guns, attachments and further customisation. A combat tab at the top
+  reaches the stances. One screen, several tabs — not several screens.
+
+- **celloutz.xyz: fictionalise it**, somewhat rather than wholesale. The
+  in-world internet interface is still unbuilt and will be lore-heavy.
+
+- **The "is the spawn too dark" question is retired, not answered.** Greg's
+  reply was that the player does not simply spawn in at all — the opening is
+  the vat and the examination, written up in
+  `DESIGN/PLAYER_DIRECTION_INTERVIEW_2026-09-18.md`. The facility is lit
+  enough to read: surveilled, locked down, esoteric, Outlast-horrific. So
+  lighting effort belongs to building that, **not** to raising exposure on
+  the current spawn, and `G7.1` should be closed as superseded rather than
+  left waiting for a taste call on a scene that is being replaced.
+
+- **World scale**: not enormous. Fallout 4 sized at the very most.
+
+- **A7.4, does the chassis roll**: still open. Greg's answer was "I don't
+  know", so it stays unanswered rather than being decided for him.
+
 ## Influence register
 
 These entries describe what Greg said he values; proposed extraction is labelled. Liking a reference does not automatically import every mechanic from it.
