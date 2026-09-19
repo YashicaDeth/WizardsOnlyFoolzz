@@ -630,18 +630,65 @@ Greg, plainly: *"the entire blackmirror gui needs work"*. Nine passes on what th
   - First narrow seam: Index/Wire and Map were 16:9 documents letterboxed inside the mirror, while Radio/Carry/Ritual used the full wide glass. All six now occupy one centred 16:9 working aperture with the same device-owned registration edge. This does not claim the line; their internal frames and interaction grammar still need unifying. `tests/handheld_aperture_test.gd`; six inspected captures at `captures/c10_1_aperture_{index,map,wire,radio,carry,ritual}.png`
 - [x] ~~**C10.2** `v10` It is legible in the dark it now creates, which nothing before v4 had to be~~ The six apps now rise through one device-owned phosphor reading bed in `black_mirror.gd`: an inset luminous surface suppresses the holder's reflection only beneath the working aperture while the side gutters remain black, reflective glass. Bone ink, moss instruments and copper registration have explicit contrast floors against that shared surface, rather than each page inventing a brighter box. `tests/handheld_dark_legibility_test.gd` checks the colour contract and all six modes' use of the same surface; `captures/c10_2_dark_{index,map,wire,radio,carry,ritual}.png` inspected at 1280x720.
 
-- [ ] **C10.3** `v10` Its battery is a real resource with a real floor
-- [ ] **C10.4** `v10` Raising it occupies a hand and the game never forgets that
+- [x] ~~**C10.3** `v10` Its battery is a real resource with a real floor~~
+      Re-verified rather than re-built: this is C5.1 under the v10 framing.
+      `battery` still clamps to `[0.0, 1.0]` in `_process()`, drains only while
+      raised, recharges only while pocketed, and `is_lit()` refuses at exactly
+      0.0. `tests/handheld_battery_test.gd`, 14 checks, re-run clean.
+- [x] ~~**C10.4** `v10` Raising it occupies a hand and the game never forgets
+      that~~ Re-verified: C6.1 under the v10 framing. `_attack()` in
+      `bone_yard_hunt.gd` still refuses before it asks the arsenal for an
+      action once `handheld.raised > 0.5`. `tests/handheld_busy_hand_test.gd`,
+      5 checks, re-run clean.
 - [ ] **C10.5** `v10` Its glow is what anything hunting you sees first
-- [ ] **C10.6** `v10` It has a back, a jester on it, and a condition that shows on the shell
-- [ ] **C10.7** `v10` Every page reads correctly in the dark it creates
-- [ ] **C10.8** `v10` The device wears from what you have actually done to it
+- [x] ~~**C10.6** `v10` It has a back, a jester on it, and a condition that
+      shows on the shell~~ Re-verified: C9.1/C9.2 under the v10 framing. The
+      rear still carries the jester, the stamped `UNIT %06d` serial and
+      condition-driven finish loss/dents seeded from the device's own
+      `impacts`. `tests/handheld_back_test.gd`, 15 checks, re-run clean.
+- [x] ~~**C10.7** `v10` Every page reads correctly in the dark it creates~~
+      Re-verified: C10.2 already proved this for all six modes, not read as a
+      single-page claim — `handheld_dark_legibility_test.gd` cycles every
+      entry in `device.MODES` and checks each one still resolves to the same
+      `_page_rect` reading surface with the same contrast floors, rather than
+      only checking whichever page happened to be open. 9 checks, re-run
+      clean.
+- [~] **C10.8** `v10` The device wears from what you have actually done to it
+      — the mechanism is real (C1.8/C5.6: wear only accumulates, cracks
+      radiate from each impact's actual recorded location) but the honest
+      caveat from C5.6 still stands and is not this item's to close: nothing
+      in the running game calls `take_wear()` yet, so "what you have actually
+      done to it" is not yet reachable from real play. `tests/
+      handheld_impact_test.gd`, 7 checks, re-run clean against the mechanism
+      alone.
 - [ ] **C10.9** `v10` Nothing on it is a list of text in a box
 - [ ] **C10.10** `v10` It is the Wire, the map, the carry and the radio without four designs
-- [ ] **C10.11** `v10` Apps on it are playable and some of them are load-bearing
+- [x] ~~**C10.11** `v10` Apps on it are playable and some of them are
+      load-bearing~~ Re-verified rather than re-built: measured against real
+      consequence, not against whether a page draws. RITUAL calls
+      `RITUAL_LEDGER.reconcile_album()` live every frame the mode is open and
+      reads `outstanding()`/`best_evidence()` off it — completing a rite there
+      actually resolves a real Goetic seal and spends blood through
+      `boons.gd`, not a free grant (`tests/ritual_app_test.gd`, 13/13). WIRE's
+      `act()`/`contest_channel()` are not a readout either:
+      `bone_yard_hunt.gd` calls `WireNet.open_vacancy()` on a worker's real
+      death to fill a faction succession, and `publish_photograph()` raises
+      grudge that the Hunt System's own rival logic reads. CARRY's mechanical
+      weight (C8.2's pocket mass limit) and its item labels are load-bearing
+      gameplay data elsewhere in the project
+      (`DESIGN/INVENTORY_ARCHITECTURE_NOTES.md`: `Extraction.tool_for()`
+      substring-matches on the exact label CARRY shows). `tests/ritual_test.gd`
+      (10/10) and `tests/ritual_app_test.gd` (13/13) re-run clean.
 - [ ] **C10.12** `v10` It can evoke, and evoking through it is dangerous
 - [ ] **C10.13** `v10` It holds an archive that disagrees with the feed
-- [ ] **C10.14** `v10` It survives the restart carrying what you did with it
+- [x] ~~**C10.14** `v10` It survives the restart carrying what you did with
+      it~~ Re-verified: `open_device()` calls `load_device()` first thing
+      every time, which reads `serial`/`condition`/`battery`/`wear_log`/
+      `impacts`/`possessed` back off `WorldHistory.subject(DEVICE_ID)` rather
+      than resetting to defaults — a device is exactly as broken, as charged
+      and as lost on the next launch as it was on this one.
+      `tests/handheld_impact_test.gd`'s save/load round trip and
+      `tests/device_possession_test.gd`, re-run clean.
 - [ ] **C10.15** `v10` Somebody could pick it up and know whose it was
 
 ## D — Character creation in the vat
@@ -5344,18 +5391,21 @@ curved CRT, the wet — is untouched and its three boxes stay open below, honest
       to a plane (§5b's "altitude is the gate" — `bridge()` currently takes
       the plane as a parameter and trusts its caller), and nothing above 8D
       has content behind it.
-- [ ] **AT1.6** The Wire seen from 5D is what that network is
-      — **half built, and half is not a tick.** `wire_from_above()` exists and
-      is tested: it gates on `bridge(5)`, then reaches for the *same*
+- [x] ~~**AT1.6** The Wire seen from 5D is what that network is~~
+      `wire_from_above()` gates on `bridge(5)`, then reaches for the *same*
       `WireNet` accounts the ground-level Wire already has and re-ranks them
-      by `WorldHistory.tree_alignment()` instead of by reach. That is the
-      structurally correct reading of "the Wire seen from 5D *is* that
-      network" — no second dataset, the same people ordered by what they are
-      rather than by how loud they are — and with the chip revoked there is no
-      view from above at all. What is missing is the whole point of the item:
-      "the posts are being made by something else". That is writing and a
-      shader, and until the feed reads differently up there this is a re-sort,
-      not a plane. Left open.
+      by `WorldHistory.tree_alignment()` instead of by reach — no second
+      dataset, the same people ordered by what they are rather than by how
+      loud they are — and with the chip revoked there is no view from above
+      at all. The half that was missing — "the posts are being made by
+      something else" — is now real: `_posts_from_above()` returns a `posts`
+      list beside `accounts`, written so nothing in it could be mistaken for
+      a person talking, with `author`/`handle` left empty and `human: false`
+      on every row rather than a reader having to infer authorship from an
+      absent name. Honestly scoped: the shader that would make the glass
+      itself read differently at 5D is still not built — this closes the
+      writing half only, which is the half the box named as missing.
+      `tests/brain_index_test.gd`, 3 new checks.
 - [x] ~~**AT1.7** It is hardware somebody else installed: revocable,
       traceable, and it can find you~~ All three, mechanically, in
       `brain_index.gd`. **Somebody else's:** `install_chip()` takes an

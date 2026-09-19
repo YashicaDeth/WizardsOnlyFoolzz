@@ -171,6 +171,17 @@ func _ready() -> void:
 		if float((rows[i] as Dictionary).alignment) > float((rows[i - 1] as Dictionary).alignment):
 			descending = false
 	check(descending, "re-ranked by Tree alignment rather than by reach")
+
+	# AT1.6, the content half. Real posts, attributed to nobody.
+	var transmissions: Array = above.get("posts", [])
+	check(transmissions.size() >= 3, "and it now carries posts made by something else (%d)" % transmissions.size())
+	var any_human := false
+	for post in transmissions:
+		var row: Dictionary = post
+		if bool(row.get("human", true)) or str(row.get("author", "x")) != "" or str(row.get("handle", "x")) != "":
+			any_human = true
+	check(not any_human, "none of them are attributed to anyone at all")
+
 	BrainIndex.revoke("player", "TERMS")
 	check(not bool(BrainIndex.wire_from_above().get("ok", false)), "with the chip revoked there is no view from above at all")
 

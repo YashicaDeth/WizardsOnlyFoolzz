@@ -831,15 +831,19 @@ static func required_entries() -> Array:
 
 # -- the Wire from above ------------------------------------------------------
 
-## AT1.6, the half of it that is data. "The Wire seen from 5D is what that
-## network is" — so this deliberately builds **no second dataset**: it reaches
+## AT1.6. "The Wire seen from 5D is what that network is" — so this
+## deliberately builds **no second dataset** for the accounts half: it reaches
 ## for the same `WireNet` accounts the ground-level Wire already has and
 ## re-ranks them by Tree alignment instead of reach. The same people, ordered
 ## by what they are rather than by how loud they are, which is the only
-## difference Hod actually makes.
+## difference Hod makes to who they are.
 ##
-## Its box stays open: the *content* half of AT1.6 — "the posts are being made
-## by something else" — is writing and a shader, neither of which is here.
+## The other half of the design's own line — "the posts are being made by
+## something else" — is `_posts_from_above()`: real content, attributed to
+## nobody, sitting in the same `posts` list beside the accounts. What still
+## does not exist is the shader that would make the glass itself read
+## differently up here; that is a render concern and stays open honestly
+## rather than being claimed by writing alone.
 static func wire_from_above(subject_id: String = "player") -> Dictionary:
 	var gate := bridge(subject_id, 5, 0.0)
 	if not bool(gate.get("ok", false)):
@@ -858,4 +862,36 @@ static func wire_from_above(subject_id: String = "player") -> Dictionary:
 			"alignment": WorldHistory.tree_alignment(WorldHistory.subject(account_id)),
 		})
 	rows.sort_custom(func(a, b): return float(a.alignment) > float(b.alignment))
-	return {"ok": true, "plane": 5, "sephirah": "Hod", "accounts": rows}
+	return {"ok": true, "plane": 5, "sephirah": "Hod", "accounts": rows, "posts": _posts_from_above(subject_id)}
+
+
+## AT1.6, the content half. Not a second `FILLER` table in the ground-level
+## voice (that would just be more filler) — these lines are written so that
+## nothing in them could be mistaken for a person talking.
+const TRANSMISSIONS := [
+	"THE COUNT ON THIS PAGE WAS NEVER PEOPLE.",
+	"YOUR OWN HANDLE POSTED HERE WHILE YOU WERE OFFLINE. YOU WERE OFFLINE.",
+	"THERE IS A TIER ABOVE CROWN. IT DOES NOT SCROLL AND IT DOES NOT ANSWER.",
+	"EVERY ACCOUNT ON THIS FEED RESOLVES TO THE SAME PLACE FROM HERE.",
+	"THIS IS NOT ENGAGEMENT. THIS IS BEING COUNTED.",
+	"THE REPLIES BELOW THIS POST PREDATE IT.",
+	"NOBODY WROTE THIS. SOMETHING NOTICED THE SHAPE OF WHAT YOU WOULD READ NEXT.",
+]
+
+
+## Deterministic per read, the same seeding shape `feed()` already uses, so a
+## capture of this page is reproducible rather than a fresh roll every call.
+## `human` is the field a panel checks — `false` on every row here — rather
+## than a reader having to infer authorship from an absent name, the way a
+## genuinely unattributed human post (`"UNATTRIBUTED"` in `feed()`) would be.
+static func _posts_from_above(subject_id: String) -> Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = (hash(subject_id) + WorldHistory.next_sequence * 977) & 0x7fffffff
+	var pool := TRANSMISSIONS.duplicate()
+	var picked: Array = []
+	var count := mini(4, pool.size())
+	for i in count:
+		var index := rng.randi_range(0, pool.size() - 1)
+		picked.append({"body": str(pool[index]), "author": "", "handle": "", "human": false})
+		pool.remove_at(index)
+	return picked
