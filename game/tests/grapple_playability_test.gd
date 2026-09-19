@@ -117,7 +117,7 @@ func _ready() -> void:
 	# release must hand the motor back immediately, then let C acquire the same
 	# live body again without retaining a collision exception or a zeroed player
 	# velocity from the previous constraint.
-	var released_from := hunt.player_body.global_position
+	var released_from: Vector3 = hunt.player_body.global_position
 	hunt.grapple_drag_override = null
 	Input.action_press("move_forward")
 	for tick in range(4):
@@ -142,7 +142,7 @@ func _ready() -> void:
 		"a released body can be acquired again with one fresh reciprocal exception pair")
 	hunt.grapple_drag_override = Vector2(0, -1)
 	hunt.grapple_pushing_override = true
-	var reacquire_advantage := hunt.grapple_advantage
+	var reacquire_advantage: float = hunt.grapple_advantage
 	hunt._update_grapple(0.05)
 	hunt.grapple_drag_override = null
 	hunt.grapple_pushing_override = null
