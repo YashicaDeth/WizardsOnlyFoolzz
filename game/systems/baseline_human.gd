@@ -551,6 +551,7 @@ func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt",
 		# one before it.
 		if not did_sever:
 			_refresh_zone(zone)
+			_refresh_wounds(zone)
 	if bool(result.get("disabled", false)):
 		zone_disabled.emit(zone)
 	return result
@@ -1419,6 +1420,12 @@ func _record_wound(zone_id: String, global_point: Vector3, travel: Vector3, dama
 	var wound: Dictionary = WoundMarks.make(surface["at"], surface["normal"], damage, damage_type, layer, local_travel)
 	wound["depth"] = shot["fraction"]
 	wound["through"] = shot["through"]
+	# Keep the identity of what lay behind this exact opening. The wound can then
+	# show the body's real organ mesh while it is present, and the same window
+	# empties when that organ ruptures and becomes a loose physics body.
+	var nearest_organ := organ_nearest(global_point)
+	if not nearest_organ.is_empty() and str((ORGAN_LAYOUT[nearest_organ] as Dictionary).zone) == zone:
+		wound["organ_id"] = nearest_organ
 	# A hole that nearly went through looks nearly like one that did.
 	wound["radius"] = float(wound["radius"]) * lerpf(0.62, 1.0, float(shot["fraction"]))
 	wound_marks[zone] = WoundMarks.record(wound_marks.get(zone, []) as Array, wound)
@@ -1461,7 +1468,13 @@ func _refresh_wounds(zone_id: String) -> void:
 		# claim to show bone.
 		var shown: int = mini(int(wound.get("layer", 0)), depth)
 		var tint := Color(str(GoreChunks.LAYER_TINTS[clampi(shown, 0, GoreChunks.LAYER_TINTS.size() - 1)]))
-		holder.add_child(WoundMarks.build(wound, tint))
+		var contents: Mesh = null
+		var organ_id := str(wound.get("organ_id", ""))
+		if depth >= GoreChunks.Layer.ORGAN and anatomy.organ_ok(organ_id):
+			var organ := organ_parts.get(organ_id) as MeshInstance3D
+			if organ != null and is_instance_valid(organ):
+				contents = organ.mesh
+		holder.add_child(WoundMarks.build(wound, tint, contents))
 
 
 ## Reads `zone_depth`, the same ratchet `_shed_chunks` writes, so this survives

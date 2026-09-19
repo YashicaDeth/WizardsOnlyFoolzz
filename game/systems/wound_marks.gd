@@ -222,12 +222,12 @@ static func _vector(value: Variant, fallback: Vector3) -> Vector3:
 ## is pushed *into* the limb, and the colour runs dark at the middle out to torn
 ## tissue at the edge as vertex colour, which costs nothing and does the work an
 ## extra texture would.
-static func build(wound: Dictionary, tint: Color) -> MeshInstance3D:
+static func build(wound: Dictionary, tint: Color, cavity_contents: Mesh = null) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
 	var radius: float = float(wound.get("radius", 0.04))
 	var depth_fraction: float = clampf(float(wound.get("depth", 1.0)), 0.0, 1.0)
 	var aspect: float = maxf(1.0, float(wound.get("aspect", 1.0)))
-	node.mesh = _crater(radius, int(wound.get("seed", 0)), tint, str(wound.get("type", "ballistic")), depth_fraction, aspect)
+	node.mesh = _crater(radius, int(wound.get("seed", 0)), tint, str(wound.get("type", "ballistic")), depth_fraction, aspect, cavity_contents != null)
 
 	var material := StandardMaterial3D.new()
 	# The shape carries the colour now, so the material just lets it through.
@@ -239,8 +239,13 @@ static func build(wound: Dictionary, tint: Color) -> MeshInstance3D:
 	# A hole has no back face worth culling to, and a torn rim is legible from
 	# behind when a limb turns.
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	material.render_priority = 1
+	# Body first, cavity void next, organ after it, torn tunnel last. Explicit
+	# priorities make that authored stack stable even though the two inner meshes
+	# deliberately ignore the intact body's depth.
+	material.render_priority = 3
 	node.material_override = material
+	if cavity_contents != null:
+		_add_cavity_contents(node, cavity_contents, radius, depth_fraction, aspect)
 
 	var at: Vector3 = wound.get("at", Vector3.ZERO)
 	var normal: Vector3 = wound.get("normal", Vector3.UP)
@@ -254,6 +259,61 @@ static func build(wound: Dictionary, tint: Color) -> MeshInstance3D:
 	return node
 
 
+## The thing seen through a deep opening is not another painted layer. It is a
+## view of the same organ mesh the body carries internally, fitted behind the
+## irregular inner rim. `no_depth_test` is narrowly safe here because the copy
+## is smaller than that rim; the opaque procedural body surface would otherwise
+## cover it even though the authored wound geometry has opened a window.
+static func _add_cavity_contents(wound_node: MeshInstance3D, source: Mesh, radius: float, depth_fraction: float, aspect: float) -> void:
+	var sink := lerpf(0.25, 1.0, clampf(depth_fraction, 0.0, 1.0))
+	# Cover the uncut procedural limb surface behind the authored aperture. This
+	# is the dark space around an organ, not the contents themselves; without it
+	# the untouched skin mesh reads as a flesh-coloured floor behind the hole.
+	var cavity_void := MeshInstance3D.new()
+	cavity_void.name = "CavityVoid"
+	var void_mesh := SphereMesh.new()
+	# Oversized behind the tunnel; the higher-priority ragged wall masks it back
+	# to the irregular inner ring without asking the intact body mesh for a hole.
+	void_mesh.radius = radius * 0.82
+	void_mesh.height = radius * 1.64
+	cavity_void.mesh = void_mesh
+	cavity_void.position = Vector3(0.0, -radius * 0.94 * sink, 0.0)
+	cavity_void.scale = Vector3(sqrt(maxf(1.0, aspect)), 0.08, 1.0 / sqrt(maxf(1.0, aspect)))
+	var void_material := StandardMaterial3D.new()
+	void_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	void_material.albedo_color = WOUND_BLOOD.darkened(0.82)
+	void_material.no_depth_test = true
+	void_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	void_material.render_priority = 1
+	cavity_void.material_override = void_material
+	wound_node.add_child(cavity_void)
+
+	var contents := MeshInstance3D.new()
+	contents.name = "CavityContents"
+	contents.mesh = source.duplicate(true)
+	var bounds := contents.mesh.get_aabb().size
+	var source_span := maxf(bounds.x, maxf(bounds.y, bounds.z))
+	var fit := radius * 1.02 / maxf(source_span, 0.001)
+	contents.scale = Vector3.ONE * fit
+	contents.position = Vector3(radius * 0.04, -radius * 0.96 * sink, 0.0)
+	# A long cut reveals a correspondingly narrow strip of what is behind it.
+	contents.scale.z /= sqrt(maxf(1.0, aspect))
+	var material := _mesh_material(source)
+	if material != null:
+		material.no_depth_test = true
+		material.render_priority = 2
+		contents.material_override = material
+	contents.set_meta("source_mesh", source)
+	wound_node.add_child(contents)
+
+
+static func _mesh_material(source: Mesh) -> StandardMaterial3D:
+	if source.get_surface_count() <= 0:
+		return null
+	var original := source.surface_get_material(0) as StandardMaterial3D
+	return original.duplicate(true) as StandardMaterial3D if original != null else null
+
+
 ## The crater itself. A fan from a sunk centre out to a ragged rim, plus a lip
 ## ring outside it for the tissue pushed up around the hole.
 ##
@@ -264,7 +324,7 @@ static func build(wound: Dictionary, tint: Color) -> MeshInstance3D:
 ## crater's sink was a constant multiple of its radius, so a graze that barely
 ## broke the skin and a round that blew through the far side read as the same
 ## hole with a different rim width — a wider decal, not a deeper one.
-static func _crater(radius: float, seed_value: int, tint: Color, damage_type: String, depth_fraction: float = 1.0, aspect: float = 1.0) -> ArrayMesh:
+static func _crater(radius: float, seed_value: int, tint: Color, damage_type: String, depth_fraction: float = 1.0, aspect: float = 1.0, open_cavity: bool = false) -> ArrayMesh:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	# Tearing damage is more irregular than a punch, so it gets a rougher rim and
@@ -304,6 +364,7 @@ static func _crater(radius: float, seed_value: int, tint: Color, damage_type: St
 
 	var rim_start := vertices.size()
 	var lip_start := rim_start + segments
+	var inner_start := lip_start + segments
 	# Preserve roughly the same opening area while changing its silhouette. A
 	# slash should not gain damage merely because its authored profile is long.
 	var long_axis := sqrt(maxf(1.0, aspect))
@@ -323,13 +384,30 @@ static func _crater(radius: float, seed_value: int, tint: Color, damage_type: St
 		# than a flat ring painted around the hole.
 		vertices.append(Vector3(cos(angle) * r * long_axis, radius * 0.045, sin(angle) * r * short_axis))
 		colors.append(lip_colour)
+	if open_cavity:
+		for index in segments:
+			var angle := TAU * float(index) / float(segments)
+			var r := radius * 0.44
+			vertices.append(Vector3(cos(angle) * r * long_axis, -depth, sin(angle) * r * short_axis))
+			colors.append(deep)
 
 	for index in segments:
 		var next := (index + 1) % segments
-		# Fan: centre to rim.
-		indices.append(0)
-		indices.append(rim_start + next)
-		indices.append(rim_start + index)
+		if open_cavity:
+			# Tunnel: the inner ring is deliberately unfilled. The organ mesh behind
+			# it is what closes the view, so this remains a hole rather than a cone
+			# whose floor merely changed colour.
+			indices.append(inner_start + index)
+			indices.append(rim_start + next)
+			indices.append(rim_start + index)
+			indices.append(inner_start + index)
+			indices.append(inner_start + next)
+			indices.append(rim_start + next)
+		else:
+			# Fan: centre to rim.
+			indices.append(0)
+			indices.append(rim_start + next)
+			indices.append(rim_start + index)
 		# Skirt: rim out to lip.
 		indices.append(rim_start + index)
 		indices.append(rim_start + next)
