@@ -74,6 +74,11 @@ static func make(at: Vector3, normal: Vector3, damage: float, damage_type: Strin
 		"layer": layer,
 		"damage": damage,
 		"type": damage_type,
+		# Overwritten by `_record_wound` with `Penetration`'s own fraction once a
+		# round has actually crossed tissue. Left at 1.0 here so a caller with no
+		# penetration model (a punch, a claw) still gets the old full-depth crater
+		# rather than a mysteriously shallow one.
+		"depth": 1.0,
 		# Deterministic per wound so a given hole looks the same every frame
 		# rather than crawling.
 		"seed": randi(),
@@ -194,7 +199,8 @@ static func _vector(value: Variant, fallback: Vector3) -> Vector3:
 static func build(wound: Dictionary, tint: Color) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
 	var radius: float = float(wound.get("radius", 0.04))
-	node.mesh = _crater(radius, int(wound.get("seed", 0)), tint, str(wound.get("type", "ballistic")))
+	var depth_fraction: float = clampf(float(wound.get("depth", 1.0)), 0.0, 1.0)
+	node.mesh = _crater(radius, int(wound.get("seed", 0)), tint, str(wound.get("type", "ballistic")), depth_fraction)
 
 	var material := StandardMaterial3D.new()
 	# The shape carries the colour now, so the material just lets it through.
@@ -223,7 +229,15 @@ static func build(wound: Dictionary, tint: Color) -> MeshInstance3D:
 
 ## The crater itself. A fan from a sunk centre out to a ragged rim, plus a lip
 ## ring outside it for the tissue pushed up around the hole.
-static func _crater(radius: float, seed_value: int, tint: Color, damage_type: String) -> ArrayMesh:
+##
+## `depth_fraction` is `Penetration`'s own fraction for this wound — 0 at the
+## surface, 1 out the other side. AN6.1: a wound is an opening with depth, not
+## a decal, which means the depth has to answer to the same number that
+## decided whether the round stopped inside or went through. Without this the
+## crater's sink was a constant multiple of its radius, so a graze that barely
+## broke the skin and a round that blew through the far side read as the same
+## hole with a different rim width — a wider decal, not a deeper one.
+static func _crater(radius: float, seed_value: int, tint: Color, damage_type: String, depth_fraction: float = 1.0) -> ArrayMesh:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	# Tearing damage is more irregular than a punch, so it gets a rougher rim and
@@ -231,7 +245,11 @@ static func _crater(radius: float, seed_value: int, tint: Color, damage_type: St
 	var tearing := damage_type in TEARING
 	var segments := 11 if tearing else 14
 	var jitter := 0.42 if tearing else 0.22
-	var depth := radius * (0.75 if tearing else 0.95)
+	# A graze still has to read as an opening rather than a flat paint mark, so
+	# the floor is not zero — but it is well below a wound that actually went
+	# somewhere, which is the whole point of tying this to the fraction at all.
+	var sink := lerpf(0.25, 1.0, clampf(depth_fraction, 0.0, 1.0))
+	var depth := radius * (0.75 if tearing else 0.95) * sink
 
 	var vertices := PackedVector3Array()
 	var colors := PackedColorArray()

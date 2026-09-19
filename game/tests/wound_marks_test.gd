@@ -73,6 +73,22 @@ func _ready() -> void:
 	var organ: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "ballistic", 4)
 	check(float(organ["radius"]) > float(skin["radius"]), "a wound into the organ layer reads bigger than one that only broke skin")
 
+	# --- AN6.1: an opening with depth, not a decal --------------------------
+	# The crater's own sink has to answer to how far the round actually got,
+	# not just sit at a fixed multiple of the rim's radius — otherwise a graze
+	# and a through-and-through are the same hole with a different width.
+	var shallow_wound: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "ballistic", 0)
+	shallow_wound["seed"] = 7
+	shallow_wound["depth"] = 0.08
+	var deep_wound: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "ballistic", 0)
+	deep_wound["seed"] = 7
+	deep_wound["depth"] = 1.0
+	var shallow_node := MARKS.build(shallow_wound, Color.WHITE)
+	var deep_node := MARKS.build(deep_wound, Color.WHITE)
+	check(deep_node.mesh.get_aabb().size.y > shallow_node.mesh.get_aabb().size.y, "a wound that went deep sinks further than one that barely broke the surface (%.4f vs %.4f)" % [deep_node.mesh.get_aabb().size.y, shallow_node.mesh.get_aabb().size.y])
+	shallow_node.free()
+	deep_node.free()
+
 	# --- a graze is not a hole ---------------------------------------------
 	var before: int = (rig.wound_marks.get(zone_a, []) as Array).size()
 	rig.hit_at(left_of_centre, 1.0, 0.5, "blunt", Vector3(0, 0, -1))
