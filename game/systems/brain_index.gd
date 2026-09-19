@@ -252,13 +252,20 @@ static func install_chip(subject_id: String = "player", owner_faction: String = 
 	}
 	# The chip is hardware in the head, carried on the same cybernetics list
 	# every other implant is on, so the body panels find it without a special
-	# case and pulling it is the same operation as pulling anything else.
-	var anatomy: Dictionary = subject.get("anatomy_state", {})
-	var installed: Array = anatomy.get("cybernetics", [])
+	# case and pulling it is the same operation as pulling anything else. Before
+	# the first live rig exists that list belongs to the intake sheet; after a
+	# body has been snapshotted it belongs to anatomy_state. Writing an empty
+	# anatomy_state here would make BaselineHuman mistake it for a restored body
+	# and skip the rest of the factory loadout at decanting.
+	var has_live_anatomy := subject.get("anatomy_state") is Dictionary
+	var anatomy: Dictionary = (subject.get("anatomy_state", {}) if has_live_anatomy else subject.get("anatomy", {})).duplicate(true)
+	var installed: Array = (anatomy.get("cybernetics", []) as Array).duplicate(true)
 	installed.append(ImplantCatalog.resolve({"id": CHIP_IMPLANT_ID, "name": CHIP_IMPLANT_ID}))
 	anatomy["cybernetics"] = installed
 	WorldHistory.begin_ledger_batch()
-	WorldHistory.amend_subject(subject_id, {"wetwire_chip": record, "anatomy_state": anatomy})
+	var changes := {"wetwire_chip": record}
+	changes["anatomy_state" if has_live_anatomy else "anatomy"] = anatomy
+	WorldHistory.amend_subject(subject_id, changes)
 	WorldHistory.record_event("wetwire_installed", {
 		"subject_id": subject_id, "serial": serial, "owner_faction": owner_faction, "installed_by": installer_id,
 	})

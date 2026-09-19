@@ -151,6 +151,7 @@ const CARRION_SCAVENGER := preload("res://systems/carrion_scavenger.gd")
 const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 const SUBSTANCE_STATION := preload("res://systems/substance_station.gd")
 const FIELD_INVENTORY := preload("res://systems/field_inventory.gd")
+const BRAIN_INDEX := preload("res://systems/brain_index.gd")
 
 var player := Vector3(0, 1.5, 19)
 var sleep_site: Node3D
@@ -763,6 +764,10 @@ var q_tap_pending := false
 ## One wheel per hold. Set when a wheel opens, cleared when the key comes up.
 var wheel_spent := false
 var xray_active := false
+## AP1.3/P10.5. The first later look back into the player's own body holds the
+## procedure readout long enough to be read instead of losing it to the normal
+## body-count prompt on the next physics frame.
+var captivity_procedure_notice := 0.0
 ## How long the button has to be down before the segment becomes the radial.
 const XRAY_HOLD_TO_WHEEL := 0.35
 
@@ -6268,6 +6273,11 @@ func _take_photograph() -> Dictionary:
 ## of the point.
 func _all_rigs() -> Array:
 	var rigs: Array = []
+	# The player has always owned the same BaselineHuman rig as everybody else,
+	# but the X-ray sweep omitted it. Looking down or switching to third person
+	# can now expose the hardware the Growing Floor actually put in this body.
+	if player_rig != null and is_instance_valid(player_rig):
+		rigs.append(player_rig)
 	for actor in encounter_actors:
 		if actor.get("rig") != null and is_instance_valid(actor.rig):
 			rigs.append(actor.rig)
@@ -6284,6 +6294,7 @@ func _all_rigs() -> Array:
 ## B3.3, B3.4 and B3.6 in one place: the sweep, the range, and the point at
 ## which holding the button stops being an X-ray and becomes the wheel.
 func _update_xray(delta: float, holding: bool) -> void:
+	captivity_procedure_notice = maxf(0.0, captivity_procedure_notice - delta)
 	if holding and panel_mode.is_empty() and not resolution_ui.visible:
 		xray_held += delta
 		if not xray_active:
@@ -6300,7 +6311,12 @@ func _update_xray(delta: float, holding: bool) -> void:
 			# B3.6. This is where B3 becomes C2 — the empty seats on the cursor
 			# ring were always the rest of this wheel.
 			handheld.open_radial()
-		if not lit.is_empty():
+		if _reveal_captivity_procedure():
+			pass
+		elif captivity_procedure_notice > 0.0:
+			var chip := BRAIN_INDEX.chip("player")
+			prompt.text = "XRAY BACKSCATTER // FOREIGN TOWER IN YOUR SKULL // %s // INSTALLED WHILE YOU WERE UNDER" % str(chip.get("serial", "UNSERIALISED"))
+		elif not lit.is_empty():
 			prompt.text = "XRAY / %d BODIES IN REACH" % lit.size()
 		return
 	if xray_active:
@@ -6310,6 +6326,26 @@ func _update_xray(delta: float, holding: bool) -> void:
 		WorldXray.sweep(player, _all_rigs(), false)
 		if handheld.radial.is_open:
 			handheld.close_radial()
+
+
+## The recollection is derived from real installed hardware and happens once.
+## A run without the captured-installed chip gets no substitute exposition.
+func _reveal_captivity_procedure() -> bool:
+	if captivity_procedure_notice > 0.0 or WorldHistory.event_count("captivity_procedure_recalled") > 0:
+		return false
+	var chip := BRAIN_INDEX.chip("player")
+	if chip.is_empty():
+		return false
+	captivity_procedure_notice = 4.5
+	prompt.text = "XRAY BACKSCATTER // FOREIGN TOWER IN YOUR SKULL // %s // INSTALLED WHILE YOU WERE UNDER" % str(chip.get("serial", "UNSERIALISED"))
+	WorldHistory.record_event("captivity_procedure_recalled", {
+		"subject_id": "player",
+		"serial": str(chip.get("serial", "")),
+		"owner_faction": str(chip.get("owner_faction", "")),
+		"installed_by": str(chip.get("installed_by", "")),
+		"location": HUNT_LOCATION,
+	})
+	return true
 
 
 ## What the current hold affords, asked in one place so the prompt, the input

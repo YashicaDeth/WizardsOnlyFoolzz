@@ -89,7 +89,12 @@ func _ready() -> void:
 	check(bool(installed.get("ok", false)), "the chip is installed by somebody else (%s)" % str(installed.get("serial", "")))
 	check(not bool(BrainIndex.install_chip("player").get("ok", false)), "and it cannot be installed twice")
 	check(str(BrainIndex.chip().get("owner_faction", "")) == "celloutz", "it answers to celloutz, not to you")
-	var cybernetics: Array = (WorldHistory.subject("player").get("anatomy_state", {}) as Dictionary).get("cybernetics", [])
+	# There is no live body snapshot yet, so installation belongs to the intake
+	# anatomy. Creating a partial anatomy_state here would suppress the rest of
+	# the factory loadout when the first real rig is built.
+	var installed_subject := WorldHistory.subject("player")
+	check(not installed_subject.has("anatomy_state"), "installation before decanting does not counterfeit a restored body")
+	var cybernetics: Array = (installed_subject.get("anatomy", {}) as Dictionary).get("cybernetics", [])
 	var found_chip := false
 	for implant in cybernetics:
 		if str((implant as Dictionary).get("id", "")) == BrainIndex.CHIP_IMPLANT_ID:
