@@ -57,7 +57,10 @@ static func _prune_transient_smoke() -> void:
 static func _reserve_transient_smoke() -> void:
 	_prune_transient_smoke()
 	while _transient_smoke.size() >= transient_smoke_budget():
-		var oldest := _transient_smoke.pop_front()
+		# `pop_front()` returns Variant, and `:=` off a Variant is a warning --
+		# which this project treats as an error, so the whole file stopped
+		# parsing. Typed explicitly.
+		var oldest: Node3D = _transient_smoke.pop_front()
 		if is_instance_valid(oldest):
 			oldest.queue_free()
 
