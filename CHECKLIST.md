@@ -3639,6 +3639,29 @@ where they are hit, and what comes off them stays.
       vehicle work rather than a second implementation of the same
       primitive, AB3/AB1.6 to once more than one real object exists.
 - [ ] **AB1.2** Structures break where they are struck rather than swapping to a damaged model
+      The loop proved end to end without falsely checking this off: new
+      `systems/street_light.gd` — condition lives in `WorldHistory` through
+      `world_damage.gd` exactly like the handheld's own `condition` field,
+      four authored break states (intact/flickering/sparking/hanging) decide
+      which small authored look is showing rather than any mesh cracking in
+      real time, and the glass sheds once as real `world_debris.gd`-tracked
+      wreckage on crossing into "sparking." That is DESIGN/DESTRUCTION.md's
+      whole AB1.2 shape, proved on the cheapest, most visible target rather
+      than asked to hold up a building first. It was also built and then left
+      wired to nothing — `AshbloomWorldGenerator` now places one at every
+      other lot's street frontage, reachable by a bullet or a car, with a
+      subject id derived from district and lot so regenerating the same seed
+      reads the same fixture back. Walls and building shells are still not
+      struck-and-broken anywhere; that is the real remaining scope, not a
+      second implementation of this same primitive.
+      Verified: `street_light_test.gd` (18/18 — registration, all four
+      band crossings, exactly-once shedding on repeat hits within a band and
+      on overkill straight to worst, WorldHistory event recording, both the
+      direct `strike()` and vehicle `impact()` paths, and quality-scaled
+      debris budgets). `silhouette_test.gd` (rewritten from a bare `--script`
+      harness that never loads autoloads to a real scene; 6/6, confirms 30
+      real fixtures generated across 60 buildings and each one is a genuine
+      WorldHistory subject, not just a class that compiles).
 - [x] ~~**AB1.3** Debris is real, persists, and can be stood on or thrown~~
       New `systems/world_debris.gd`: both places destruction actually throws a
       real `RigidBody3D` — `breakable_prop.gd`'s barricade fragments and
