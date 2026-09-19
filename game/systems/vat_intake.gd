@@ -73,6 +73,10 @@ var handler_says := ""
 var doctor_says := ""
 var doctor_life := 0.0
 var doctor_moment := 0
+## AX2.2. Carried out of the examination and into the breakout.
+var refusals := 0
+## AX2.1. His closing beats, played before the form is actually filed.
+var verdict: Array = []
 ## D8.3. A procedure in progress: the beats left to play, and the shot each one
 ## wants. Input is suspended while it runs, because it is being done to you.
 var procedure: Array = []
@@ -156,6 +160,8 @@ func _process(delta: float) -> void:
 	elapsed += delta
 	handler_life = maxf(0.0, handler_life - delta)
 	doctor_life = maxf(0.0, doctor_life - delta)
+	if doctor_life <= 0.0 and not verdict.is_empty():
+		_advance_verdict()
 	transcript_life = maxf(0.0, transcript_life - delta)
 	if handler_life <= 0.0:
 		# A procedure runs itself to the end before he goes back to muttering.
@@ -192,7 +198,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_SPACE, KEY_ENTER, KEY_KP_ENTER:
 			_commit()
 		KEY_F:
-			filed.emit(sheet.apply_to_world())
+			# AX2.1. He does not let you leave without telling you what it was for.
+			# The verdict plays first; filing happens when he has finished.
+			if verdict.is_empty():
+				_begin_verdict()
+			else:
+				_finish_filing()
 		_:
 			return
 	get_viewport().set_input_as_handled()
@@ -265,6 +276,12 @@ func _commit() -> void:
 			# D8.3. The flag is set either way; the difference is that you watch
 			# it happen to you.
 			_play_procedure(key, accepted)
+			# AX2.2. Refusal during the examination is not flavour -- it is the half
+			# of the breakthrough the player chooses, and SoulBreakthrough will not
+			# awaken without it no matter how much the facility does to them.
+			if not accepted:
+				refusals += 1
+				_doctor_note_refusal()
 
 
 func _cycle(options: Array, current: String) -> String:
@@ -513,6 +530,45 @@ func _doctor_observe() -> void:
 ## handler he is lit — the doc has him studying you, which means you can see
 ## him doing it. The consent notice never leaves the screen because he never
 ## asked and never will.
+## AX2.2. He notices refusal specifically. The handler writes it down as an
+## answer; the doctor finds it interesting, which is worse.
+func _doctor_note_refusal() -> void:
+	var beat := DoctorExamination.observe("declined", refusals)
+	if beat.is_empty():
+		return
+	doctor_says = str(beat.get("line", ""))
+	doctor_life = float(beat.get("hold", 3.2))
+
+
+## AX2.1. The closing sequence. He explains what the examination was for,
+## which is worse than gloating, and then he starts to leave.
+func _begin_verdict() -> void:
+	verdict = DoctorExamination.verdict(sheet)
+	_advance_verdict()
+
+
+func _advance_verdict() -> void:
+	if verdict.is_empty():
+		_finish_filing()
+		return
+	var beat: Dictionary = verdict.pop_front()
+	doctor_says = str(beat.get("line", ""))
+	doctor_life = float(beat.get("hold", 3.2))
+
+
+## What the examination produced, plus the two numbers the breakout needs:
+## what was done to the player, and what they refused. AX2.2 reads these.
+func _finish_filing() -> void:
+	var state: Dictionary = sheet.apply_to_world()
+	state["refusals"] = refusals
+	state["filed_as"] = DoctorExamination.classify(sheet)
+	WorldHistory.update_subject("player", {
+		"examination_refusals": refusals,
+		"institutional_classification": str(DoctorExamination.classify(sheet).label),
+	}, "examination_filed")
+	filed.emit(state)
+
+
 func _draw_doctor(viewport: Vector2) -> void:
 	# Top left, not top right: the right third of the screen is the face
 	# preview panel, and 8pt dark red on near-black was invisible in the
