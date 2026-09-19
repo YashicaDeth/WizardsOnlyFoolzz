@@ -29,6 +29,24 @@ const LIMBS := ["left_arm", "right_arm", "left_leg", "right_leg"]
 const SEVERING_DAMAGE := ["cut", "shear", "ballistic"]
 const SEVER_THRESHOLD_RATIO := 0.85
 const SEVER_HEALTH_RATIO := 0.25
+## AN6.4. Where a limb actually bends, on the same -1..1 axis `BodyMesh`'s own
+## profiles use — and the same pinches those profiles are already authored
+## with (`ARM_PROFILE` narrows at 0.0, the elbow; `LEG_PROFILE` narrows at
+## -0.04, the knee; both bend again toward the wrist/ankle near -0.8). Half
+## Sword's lesson is that a blow through a joint parts a limb far more readily
+## than the same blow through the middle of a bone, so a strike's own landing
+## spot — already kept by `hit_at()` for `WoundMarks` — is what decides which
+## one it was.
+const LIMB_JOINTS := {
+	"left_arm": [0.0, -0.78], "right_arm": [0.0, -0.78],
+	"left_leg": [-0.04, -0.80], "right_leg": [-0.04, -0.80],
+}
+## A clean joint hit accumulates sever stress this much faster than the
+## uniform rate every strike used before AN6.4. Halfway between two joints —
+## the middle of a real bone — gets the floor rather than zero, so a cut that
+## lands there is a worse strike, never a wasted one.
+const JOINT_STRESS_BONUS := 1.6
+const MID_BONE_STRESS_FLOOR := 0.7
 ## Multiplier on a zone's own bleed rate when it is taken off entirely, rather
 ## than merely destroyed. Tuned so an untreated stump is a clock measured in
 ## tens of seconds, not minutes.
@@ -524,7 +542,7 @@ func _set_depth_override(piece: MeshInstance3D, enabled: bool) -> void:
 	material.render_priority = 4 if enabled else 0
 
 
-func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "", hit_direction := Vector3.ZERO) -> Dictionary:
+func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "", hit_direction := Vector3.ZERO, joint_alignment := 1.0) -> Dictionary:
 	var zone := canonical_zone(zone_id)
 	if severed.has(zone) and not anatomy.installed_parts.has(zone):
 		return {"accepted": false, "reason": "severed", "zone": zone, "severed": false}
@@ -533,7 +551,7 @@ func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt",
 		organ_id = _organ_in_zone(zone)
 	var result := anatomy.apply_hit(zone, damage, impulse, damage_type, organ_id)
 	var direction := _resolved_hit_direction(zone, hit_direction)
-	var did_sever := _accumulate_sever_stress(zone, float(result.get("damage", 0.0)), damage_type, direction)
+	var did_sever := _accumulate_sever_stress(zone, float(result.get("damage", 0.0)), damage_type, direction, joint_alignment)
 	if did_sever:
 		_sever_zone(zone, direction, result)
 	else:
@@ -565,12 +583,12 @@ func _resolved_hit_direction(zone: String, hit_direction: Vector3) -> Vector3:
 	return outward.normalized() if outward.length_squared() > 0.001 else Vector3.RIGHT
 
 
-func _accumulate_sever_stress(zone: String, damage: float, damage_type: String, direction: Vector3) -> bool:
+func _accumulate_sever_stress(zone: String, damage: float, damage_type: String, direction: Vector3, joint_alignment := 1.0) -> bool:
 	if not LIMBS.has(zone) or anatomy.installed_parts.has(zone) or not SEVERING_DAMAGE.has(damage_type):
 		return false
 	var directionality := lerpf(0.35, 1.0, 1.0 - absf(direction.dot(Vector3.UP)))
 	var damage_weight := 1.35 if damage_type == "shear" else (0.75 if damage_type == "ballistic" else 1.0)
-	var stress := float(sever_stress.get(zone, 0.0)) + damage * damage_weight * directionality
+	var stress := float(sever_stress.get(zone, 0.0)) + damage * damage_weight * directionality * joint_alignment
 	sever_stress[zone] = stress
 	var ceiling := float(AnatomyComponent.DEFAULT_ZONES[zone].health)
 	var remaining_ratio := zone_health(zone) / maxf(1.0, ceiling)
@@ -661,7 +679,34 @@ func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type :=
 		# surface, so keep the two answers consistent with each other.
 		if not organ_id.is_empty() and str((ORGAN_LAYOUT[organ_id] as Dictionary).zone) != zone:
 			organ_id = _organ_in_zone(zone)
-	return hit(zone, damage, impulse, damage_type, organ_id, hit_direction)
+	return hit(zone, damage, impulse, damage_type, organ_id, hit_direction, _joint_alignment_at(zone, global_point))
+
+
+## AN6.4. How close a strike landed to a real joint on this limb, as a
+## multiplier `_accumulate_sever_stress` applies to that strike's contribution.
+## Only `hit_at()` calls know a real world point, so a caller that goes
+## through the bare `hit()` API instead — every existing one before this —
+## gets the neutral 1.0 it always implicitly had. Torso and head carry no
+## entry in `LIMB_JOINTS` and also return 1.0, unaffected.
+func _joint_alignment_at(zone: String, global_point: Vector3) -> float:
+	var joints: Array = LIMB_JOINTS.get(zone, [])
+	if joints.is_empty():
+		return 1.0
+	var part := parts.get(zone) as Node3D
+	var spec: Dictionary = _layout.get(zone, {})
+	if part == null or not is_instance_valid(part) or spec.is_empty():
+		return 1.0
+	var limb_length: float = float((spec.get("size", Vector3(0.2, 0.6, 0.2)) as Vector3).y)
+	var local_y := part.to_local(global_point).y
+	var fraction := Penetration.height_fraction(Vector3(0, local_y, 0), limb_length)
+	var nearest := INF
+	for joint: float in joints:
+		nearest = minf(nearest, absf(fraction - joint))
+	# 0.4 is roughly the gap from a joint to the dead centre of the bone either
+	# side of it on this axis, so that midpoint is exactly where the floor
+	# bottoms out rather than at some arbitrary remaining distance.
+	var closeness := clampf(1.0 - nearest / 0.4, 0.0, 1.0)
+	return lerpf(MID_BONE_STRESS_FLOOR, JOINT_STRESS_BONUS, closeness)
 
 
 ## O3.2. An injured body has to *look* injured.

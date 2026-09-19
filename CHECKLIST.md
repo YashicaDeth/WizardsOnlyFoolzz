@@ -5370,12 +5370,50 @@ is art, not noise.
       1280x720 `an6_1_cavity_contents.png` holds radius, seed and depth constant
       beside the former closed crater so the visible interior is the only
       changed variable.
-- [ ] **AN6.2** Organs are separate bodies behind that opening and fall out
-      under physics when the cavity is breached
-- [ ] **AN6.3** Fallen organs persist, can be picked up, and are the same
-      objects `carry.gd` and the vat already understand
+- [x] **AN6.2** Organs are separate bodies behind that opening and fall out
+      under physics when the cavity is breached — built in `89c757a` and left
+      unticked there. `_spill_organ()` duplicates the exact mesh the X-ray
+      already shows (not a cosmetic blob on a hand-rolled trajectory), hands it
+      to a real `RigidBody3D` with a collision shape and a scatter impulse, and
+      registers it with `GoreChunks.register_organ()` — the same identity
+      contract `_throw_limb()` already gives a severed limb. Re-verified this
+      pass: `baseline_human_test` 87/87 ("the ruptured heart falls out as a
+      real physics body") and `chunk_test` 37/37 both clean, and the committed
+      `captures/an6_2_organ_physics.png` was reopened and shows the small
+      ruptured organ resting on the floor beside the X-rayed body it left.
+- [x] **AN6.3** Fallen organs persist, can be picked up, and are the same
+      objects `carry.gd` and the vat already understand — also landed in
+      `89c757a` and also left unticked. `register_organ()` gives an organ the
+      same `whole_organ`/`whole_limb`-shaped identity dictionary a severed limb
+      carries, so `carry.gd`'s existing `take_chunk()` resolves its label and a
+      `kind` of `"organ"` with no change on that side, and it rots, marks the
+      ground and obeys the shared `live_gore` budget exactly as every other
+      piece of a body already does — "persist" here means the same thing it
+      means for a severed limb elsewhere in this file: a real object sitting in
+      the world rather than a flash of cosmetic detail. `chunk_test.gd`'s
+      "AN6.2/AN6.3" block covers the full loop — organ ruptures, falls as a
+      `RigidBody3D`, is taken off the floor, and enters CARRY with its
+      `organ_id` intact — and passed clean this pass.
 - [ ] **AN6.4** Severing is at joints and through them — Half Sword's lesson is
-      that a cut that lands between two joints still has to do something
+      that a cut that lands between two joints still has to do something.
+      Partial: the mechanical half is in. `hit_at()` already keeps the exact
+      local point a blow landed at (AN6.1/AN6.5 both build on it); `LIMB_JOINTS`
+      names where an arm and a leg actually bend on that same axis — the same
+      pinches `ARM_PROFILE`/`LEG_PROFILE` are already sculpted with, an elbow
+      or knee near 0.0/-0.04, a wrist or ankle near -0.8 — and
+      `_joint_alignment_at()` scores a strike by how close it landed to one of
+      them. `_accumulate_sever_stress` now weighs by that score: a joint hit
+      accumulates sever stress at 1.6x, the dead centre of a shaft only 0.7x,
+      never zero. `baseline_human_test.gd`'s new `_test_joint_severing`
+      measures it directly — an identical repeated cut through the elbow
+      severs the arm in 4 swings against 6 through the mid-shaft — and the
+      existing `_test_severing` above it, which never gives `hit()` a real
+      point, is unchanged (87 -> 90 passes, still 0 failures) because a
+      caller with no position keeps the neutral 1.0 it always implicitly had.
+      Still missing: the stump itself does not yet shorten to end at the
+      joint that actually parted — every severed limb still leaves the body
+      as one whole piece regardless of where along it the blow landed, which
+      is the visual half of "at joints and through them" this does not close.
 - [x] **AN6.5** Weapon and angle decide the wound shape, RDR2's lesson —
       `WoundMarks` keeps authored aspect profiles by damage source: a blade
       leaves a long cut, a puncture a narrower opening and a ballistic entry a

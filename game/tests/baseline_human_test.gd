@@ -24,6 +24,7 @@ func _ready() -> void:
 	_test_hit_geometry()
 	_test_pain_posture()
 	_test_severing()
+	_test_joint_severing()
 	_test_prosthetic()
 	_test_gore()
 	_test_organs()
@@ -152,6 +153,40 @@ func _test_severing() -> void:
 		body.hit("torso", 40.0, 20.0, "blunt")
 	check(not body.severed.has("torso"), "a torso is never severed, however destroyed")
 	body.queue_free()
+
+
+## AN6.4. A cut through the elbow parts the arm faster than the identical cut
+## repeated through the middle of the upper-arm shaft — Half Sword's lesson
+## that a joint gives and a bone does not, but a shaft hit still has to count
+## for something rather than landing on a dead zone. `hit_at()` is what carries
+## a real position into the sever model; `hit()` alone (used throughout
+## `_test_severing` above) still cannot see one and keeps behaving exactly as
+## it always has.
+func _test_joint_severing() -> void:
+	var at_joint := _rig()
+	at_joint.gore = false
+	var elbow: Vector3 = (at_joint.parts.right_arm as Node3D).global_position
+	var joint_swings := 0
+	for swing in 8:
+		joint_swings += 1
+		var result := at_joint.hit_at(elbow, 15.0, 10.0, "cut", Vector3.RIGHT)
+		if bool(result.get("severed", false)):
+			break
+	check(at_joint.severed.has("right_arm"), "a cut repeated at the elbow eventually severs")
+
+	var mid_shaft := _rig()
+	mid_shaft.gore = false
+	var shaft_point: Vector3 = (mid_shaft.parts.right_arm as Node3D).global_position + Vector3(0, 0.155, 0)
+	var shaft_swings := 0
+	for swing in 8:
+		shaft_swings += 1
+		var result := mid_shaft.hit_at(shaft_point, 15.0, 10.0, "cut", Vector3.RIGHT)
+		if bool(result.get("severed", false)):
+			break
+	check(mid_shaft.severed.has("right_arm"), "the same cut repeated mid-shaft still eventually severs — it is a worse strike, not a wasted one")
+	check(joint_swings < shaft_swings, "the joint parts in fewer identical swings than the shaft (%d vs %d)" % [joint_swings, shaft_swings])
+	at_joint.queue_free()
+	mid_shaft.queue_free()
 
 
 func _test_pain_posture() -> void:
