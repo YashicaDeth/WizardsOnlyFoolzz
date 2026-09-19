@@ -576,6 +576,10 @@ func _begin_verdict() -> void:
 
 func _advance_verdict() -> void:
 	if verdict.is_empty():
+		# AX2.5. He does not wait to see what happens next. The window opens
+		# here, while the player is still in the vat and cannot use it yet,
+		# which is what makes reaching him afterwards urgent.
+		DoctorExamination.begin_departure()
 		_finish_filing()
 		return
 	var beat: Dictionary = verdict.pop_front()

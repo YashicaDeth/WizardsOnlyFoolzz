@@ -79,5 +79,36 @@ func _ready() -> void:
 	check(str(back.scar).contains("throat"), "and he carries the scar the method left (%s)" % back.scar)
 	check(not bool(DoctorExamination.reconstruct().ok), "he does not come back twice")
 
+	# AX2.5. Urgent, and optional, and those pull against each other.
+	WorldHistory.clear_history()
+	check(not DoctorExamination.reachable(), "he cannot be chased before he has left")
+	check(not bool(DoctorExamination.catch_up().ok), "and catching him before then fails")
+	DoctorExamination.begin_departure()
+	check(DoctorExamination.reachable(), "once the verdict ends he is reachable")
+	check(DoctorExamination.urgency() > 0.9, "and the window has just opened (%.2f)" % DoctorExamination.urgency())
+	WorldClock.set_hour(WorldClock.minutes() / 60.0 + 0.05)
+	check(DoctorExamination.urgency() < 0.9, "the window visibly closes as time passes (%.2f)" % DoctorExamination.urgency())
+	check(DoctorExamination.reachable(), "but he is still catchable partway through")
+	var got := DoctorExamination.catch_up()
+	check(bool(got.ok), "an urgent player reaches him")
+	check(DoctorExamination.was_caught(), "and the world records it")
+	check(not DoctorExamination.reachable(), "he cannot be caught twice")
+
+	# The optional half: missing him is silent.
+	WorldHistory.clear_history()
+	DoctorExamination.begin_departure()
+	WorldClock.set_hour(WorldClock.minutes() / 60.0 + 1.0)
+	check(not DoctorExamination.reachable(), "the window shuts on a slower player")
+	check(DoctorExamination.urgency() == 0.0, "and the pressure cue goes quiet rather than flashing")
+	check(not bool(DoctorExamination.catch_up().ok), "chasing a gone man fails")
+	check(not DoctorExamination.was_caught(), "he was not caught")
+	var events: Array = WorldHistory.events
+	var shouted := false
+	for event in events:
+		var kind := str(event.get("type", "")).to_lower()
+		if kind.contains("fail") or kind.contains("missed") or kind.contains("lost"):
+			shouted = true
+	check(not shouted, "and the game never records a failure for it - optional means silent")
+
 	print("failures: %d" % failures.size())
 	get_tree().quit(1 if failures.size() > 0 else 0)
