@@ -38,6 +38,36 @@ Global worker rules:
 - Run relevant Godot tests and provide visual evidence for visual claims.
 - Do not invent final lore, final art, or world-scale redesigns.
 
+### Project-scoped autonomy policy
+
+Workers have standing authority to complete routine engineering inside their
+assigned worktree and owned paths without asking Greg or waiting at a local
+multiple-choice prompt. This includes creating, moving, editing, or removing
+files within the owned slice; choosing implementation details; running Godot,
+profiling, capture, and test commands; recovering from ordinary tool failures;
+and staging and committing explicit owned paths. Workers should make the
+smallest reversible decision that satisfies the lane and continue.
+
+If a provider offers a lower-cost supported model because an account is near a
+usage limit, accept the economical model automatically and continue at medium
+reasoning. The coordinator may instead launch a lane on that economical model
+from the outset. A model-choice menu is not a user gameplay decision and must
+not be forwarded to Greg. If an update prompt blocks startup, the coordinator
+resolves it before dispatch rather than leaving the worker waiting for input.
+
+Ask Greg only when the answer would determine subjective gameplay feel, final
+art direction, authored lore, tone, accessibility preference, or a similarly
+meaningful player-facing choice. When safe, continue independent work while
+that question is pending. Escalate technical matters only for an ownership
+conflict or scope expansion that the coordinator must resolve.
+
+Standing authority does **not** include broad or unrelated deletion, Git reset,
+rebase or force-push, editing outside the assigned worktree/owned paths,
+credentials or account changes, purchases, public publishing, or external
+messages. Those remain explicit coordinator/user decisions. No worker may
+weaken global machine security or global Codex permissions; autonomy is scoped
+to this repository, its isolated worktree, and the assigned lane.
+
 ## Lane 1 — AX opening slice
 
 Orca task: `task_12522e9b7299`
