@@ -17,18 +17,30 @@ const DESIGN := Vector2(880, 620)
 var clock := 0.0
 var _factor := 1.0
 var _origin := Vector2.ZERO
-var _button: Button
+var _continue_button: Button
+var _front_button: Button
+var _leaving := false
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	_button = Button.new()
-	_button.name = "FrontDoor"
-	_button.text = ""
-	_button.position = Vector2(70, 532)
-	_button.size = Vector2(740, 54)
+	_continue_button = _make_button("ContinueFullGame", Vector2(70, 532), Vector2(480, 54))
+	_continue_button.pressed.connect(_continue_full_game)
+	add_child(_continue_button)
+	_front_button = _make_button("FrontDoor", Vector2(566, 532), Vector2(244, 54))
+	_front_button.pressed.connect(_request_front_door)
+	add_child(_front_button)
+	hide()
+
+
+func _make_button(button_name: String, at: Vector2, dimensions: Vector2) -> Button:
+	var button := Button.new()
+	button.name = button_name
+	button.text = ""
+	button.position = at
+	button.size = dimensions
 	for state in ["normal", "hover", "pressed", "focus"]:
 		var style := StyleBoxFlat.new()
 		style.bg_color = RED * Color(1, 1, 1, 0.20 if state != "normal" else 0.08)
@@ -37,18 +49,17 @@ func _ready() -> void:
 		style.border_width_top = 1
 		style.border_width_right = 1
 		style.border_width_bottom = 1
-		_button.add_theme_stylebox_override(state, style)
-	_button.pressed.connect(_request_front_door)
-	add_child(_button)
-	hide()
+		button.add_theme_stylebox_override(state, style)
+	return button
 
 
 func open_wall() -> void:
 	show()
 	clock = 0.0
+	_leaving = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().paused = true
-	_button.grab_focus()
+	_continue_button.grab_focus()
 	queue_redraw()
 
 
@@ -58,12 +69,46 @@ func _exit_tree() -> void:
 
 
 func _request_front_door() -> void:
+	if _leaving:
+		return
+	_leaving = true
 	get_tree().paused = false
 	front_door_requested.emit()
 
 
+## P10.10. The demo file stays isolated, but the world inside it is portable.
+## Copy the completed ledger into a new ordinary PLAY slot so bodies, wounds,
+## grudges, territory and the opening stage all survive together. Creating the
+## slot before restoring the snapshot keeps the dedicated demo file untouched.
+func promote_to_full_game() -> String:
+	if not WorldHistory.is_demo() or str(WorldHistory.subject("demo_run").get("status", "")) != "ended":
+		return ""
+	var completed_world := WorldHistory.snapshot()
+	var slot_id := WorldHistory.create_slot("DEMO SURVIVOR")
+	if slot_id.is_empty() or not WorldHistory.restore_snapshot(completed_world):
+		return ""
+	WorldHistory.begin_ledger_batch()
+	WorldHistory.amend_subject("demo_run", {"status": "continued", "continued_as": slot_id})
+	WorldHistory.record_event("demo_world_continued", {"slot_id": slot_id})
+	WorldHistory.commit_ledger_batch()
+	return slot_id
+
+
+func _continue_full_game() -> void:
+	if _leaving:
+		return
+	_leaving = true
+	var slot_id := promote_to_full_game()
+	if slot_id.is_empty():
+		_leaving = false
+		return
+	get_tree().paused = false
+	var destination := OpeningDirector.resume_destination()
+	Interstitial.travel(str(destination.get("scene", "res://bone_yard_hunt.tscn")), "demonstration debt carried into play")
+
+
 func _input(event: InputEvent) -> void:
-	if visible and event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE]:
+	if visible and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
 		_request_front_door()
 		get_viewport().set_input_as_handled()
 
@@ -74,8 +119,10 @@ func _process(delta: float) -> void:
 	clock += delta
 	_factor = clampf(minf(size.x / (DESIGN.x + 100.0), size.y / (DESIGN.y + 60.0)), 0.5, 1.4)
 	_origin = (size - DESIGN * _factor) * 0.5
-	_button.scale = Vector2.ONE * _factor
-	_button.position = _origin + Vector2(70, 532) * _factor
+	for entry: Array in [[_continue_button, Vector2(70, 532)], [_front_button, Vector2(566, 532)]]:
+		var button: Button = entry[0]
+		button.scale = Vector2.ONE * _factor
+		button.position = _origin + (entry[1] as Vector2) * _factor
 	queue_redraw()
 
 
@@ -107,8 +154,9 @@ func _draw() -> void:
 	CellOutzType.draw_text(self, Vector2(58, 416), "BALANCE DUE", 12.0, INK * Color(1, 1, 1, 0.7), 1.5)
 	CellOutzType.draw_stamped(self, Vector2(58, 444), "THE REST OF THE GAME", 27.0, RED, INK * Color(1, 1, 1, 0.12), 3.0)
 	CellOutzType.draw_condensed(self, Vector2(58, 486), "THIS ENDING HAS BEEN WRITTEN INTO YOUR RECORD", 10.0, ACID, 1.0)
-	CellOutzType.draw_text(self, Vector2(92, 548), "RETURN TO THE FRONT DOOR", 18.0, INK, 2.4)
-	CellOutzType.draw_condensed(self, Vector2(668, 553), "ENTER / ESC", 9.0, RED, 1.0)
+	CellOutzType.draw_text(self, Vector2(92, 548), "CONTINUE THIS WORLD IN PLAY", 14.0, INK, 1.8)
+	CellOutzType.draw_text(self, Vector2(588, 548), "FRONT DOOR", 14.0, INK, 1.8)
+	CellOutzType.draw_condensed(self, Vector2(775, 553), "ESC", 9.0, RED, 1.0)
 
 
 func _draw_line_item(y: float, number: String, label: String) -> void:
