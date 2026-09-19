@@ -38,6 +38,39 @@ Global worker rules:
 - Run relevant Godot tests and provide visual evidence for visual claims.
 - Do not invent final lore, final art, or world-scale redesigns.
 
+### Hard routing and ledger rule
+
+Treat `CHECKLIST.md`, `DESIGN.md`, `ARCHITECTURE/SYSTEM_MAP.md`, the connected
+ledger map, and its **Efficient Route** as one dependency/source-of-truth
+system. Before dispatching or resuming any sidebar lane, the coordinator must
+identify the exact ledger node, its current verified state, its dependencies,
+and its downstream unlock count. Prefer the smallest stable prerequisite that
+unlocks the most relevant first-30-minute work.
+
+Do not block on a cloud lookup or treat a failed cloud search as missing project
+context. Use locally available ledger/map artifacts and repository evidence. If
+the standalone ledger visualization source cannot be discovered, continue from
+`CHECKLIST.md`, `DESIGN.md`, `ARCHITECTURE/SYSTEM_MAP.md`, and this queue, and
+report the missing visualization only as documentation provenance—not as a
+gameplay blocker.
+
+Do not restart an old worktree merely because it exists. Most sidebar entries
+are preserved history. Integrate or resume work only when it is on the current
+Efficient Route, non-duplicative, conflict-safe, and testable against the
+authoritative integration build.
+
+The ledger must distinguish `implemented`, `integrated`, `verified`, `blocked`,
+`placeholder`, and `subjective-decision`. Advance a node only after the
+behavior exists in the integrated Godot build and passes its stated evidence
+or test gate. Implementation in an isolated lane is not integration, and
+integration without evidence is not verification.
+
+Keep one authoritative integration branch, stage explicit paths, preserve
+unrelated work, and route gameplay actions through the existing shared systems
+rather than adding duplicate writes. When this strike closes, derive the next
+Efficient Route queue from the remaining high-leverage unlocked nodes and give
+each queued lane explicit file ownership and acceptance tests.
+
 ### Project-scoped autonomy policy
 
 Workers have standing authority to complete routine engineering inside their
