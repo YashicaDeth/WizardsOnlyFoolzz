@@ -5355,19 +5355,21 @@ ugly and specific and never the same twice. The resolution is that the *skeleton
 and the organs* are simulated and the *surface* is authored — a hole is a real
 opening with real contents behind it, and what the wound looks like at its rim
 is art, not noise.
-- [ ] **AN6.1** A wound is an opening with depth, not a decal — you can see in
-      **Half in, deliberately not ticked.** `74c0fe7` gave the crater real
-      depth: `WoundMarks._crater()` now scales its sink by the wound's own
-      `depth`, which is `Penetration.resolve()`'s fraction. That number was
-      being produced and stored all along and nothing drew it, so the
-      fraction only ever reached the geometry through `radius` — a round
-      that left through the far side and one that barely broke skin were the
-      same hole at two widths. A through-and-through now sinks four times
-      further than a graze (`wound_marks_test`, and `wound_depth_capture`
-      photographs the ladder). What is **not** in is the second half of the
-      sentence: you cannot yet see *in*. The crater's interior is a shaded
-      cone tinted by the layer it opened, not a cavity with contents, and
-      contents are AN6.2. Tick this when there is something behind the hole.
+- [x] **AN6.1** A wound is an opening with depth, not a decal — you can see in
+      `74c0fe7` first tied the crater's sink to `Penetration.resolve()`'s real
+      depth fraction; this pass finishes the deliberately open half. A wound
+      now remembers the nearest organ behind its exact strike point. Once that
+      same zone is breached to the organ layer, its crater becomes an unfilled
+      tunnel onto a fitted copy of that organ's real mesh, with a dark cavity
+      around it rather than the intact skin surface or another layer tint. If
+      the organ ruptures and leaves as AN6.2's physics body, the window empties
+      on the same state. The post-hit refresh was also moved after exposure
+      depth changes, so the opening appears on the blow that made it rather
+      than one hit late. `wound_marks_test.gd` and `baseline_human_test.gd`
+      cover closed/deep, real-mesh and organ-gone states; the inspected
+      1280x720 `an6_1_cavity_contents.png` holds radius, seed and depth constant
+      beside the former closed crater so the visible interior is the only
+      changed variable.
 - [ ] **AN6.2** Organs are separate bodies behind that opening and fall out
       under physics when the cavity is breached
 - [ ] **AN6.3** Fallen organs persist, can be picked up, and are the same

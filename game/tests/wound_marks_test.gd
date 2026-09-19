@@ -105,8 +105,15 @@ func _ready() -> void:
 	var shallow_node := MARKS.build(shallow_wound, Color.WHITE)
 	var deep_node := MARKS.build(deep_wound, Color.WHITE)
 	check(deep_node.mesh.get_aabb().size.y > shallow_node.mesh.get_aabb().size.y, "a wound that went deep sinks further than one that barely broke the surface (%.4f vs %.4f)" % [deep_node.mesh.get_aabb().size.y, shallow_node.mesh.get_aabb().size.y])
+	var organ_mesh := SphereMesh.new()
+	organ_mesh.radius = 0.06
+	organ_mesh.height = 0.12
+	var opened_node := MARKS.build(deep_wound, Color.WHITE, organ_mesh)
+	var cavity := opened_node.get_node_or_null("CavityContents") as MeshInstance3D
+	check(cavity != null and cavity.mesh != organ_mesh and cavity.get_meta("source_mesh") == organ_mesh, "a breached crater opens onto a fitted copy of the supplied organ mesh, not another tint")
 	shallow_node.free()
 	deep_node.free()
+	opened_node.free()
 
 	# --- a graze is not a hole ---------------------------------------------
 	var before: int = (rig.wound_marks.get(zone_a, []) as Array).size()
