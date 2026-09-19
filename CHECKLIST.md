@@ -4016,7 +4016,14 @@ same reset — a range that is a place rather than a menu of guns.
       the target remains visible and the readout resolves `14.2m`, `42ms`,
       `1.2cm DROP` and `ARMOUR STOP`; inspection also caught energy rounding
       hiding drag, so retained energy now keeps one decimal place.
-- [ ] **AF6.3** The reset restores the bodies without restarting the scene
+- [x] **AF6.3** The reset restores the bodies without restarting the scene —
+      the implementation was already present and is now protected through its
+      public `R` input rather than rewritten. `gore_range_reset_test.gd`
+      damages a production body's torso, dirties the drill counters and presses
+      `R` through Godot's input queue. The range keeps the same instance, retires
+      all seven old rigs, builds seven new `BaselineHuman` targets with full
+      health in every canonical zone and clears the drill counters. A cosmetic
+      heal, stale array entry or scene reload cannot pass those checks.
 - [x] **AF6.4** What you learn transfers — the range uses the live ballistics
       and the live arsenal, never a demo copy of either —
       `gore_demo.gd` used to hardcode its own `SHOT_WEAPON`/`SHOT_GRIP`/
