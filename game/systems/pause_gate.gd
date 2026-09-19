@@ -52,6 +52,11 @@ func _ready() -> void:
 	screen.draw.connect(_draw_plate)
 	add_child(screen)
 	screen.visible = false
+	WorldHistory.register_subject(SETTINGS_ID, {
+		"hud_opacity": 0.9,
+		"hud_style": "rails",
+		"reduced_glitch": false,
+	})
 	_ensure_buses()
 	_restore_screen()
 	_apply_mix()
@@ -137,6 +142,30 @@ func _restore_screen() -> void:
 	_set_fullscreen(bool(stored["fullscreen"]), false)
 
 
+func _hud_opacity() -> float:
+	return clampf(float(WorldHistory.subject(SETTINGS_ID).get("hud_opacity", 0.9)), 0.25, 1.0)
+
+
+func _hud_style() -> String:
+	return "arcs" if str(WorldHistory.subject(SETTINGS_ID).get("hud_style", "rails")) == "arcs" else "rails"
+
+
+func _reduced_glitch() -> bool:
+	return bool(WorldHistory.subject(SETTINGS_ID).get("reduced_glitch", false))
+
+
+func _set_hud_opacity(value: float) -> void:
+	WorldHistory.update_subject(SETTINGS_ID, {"hud_opacity": clampf(value, 0.25, 1.0)}, "hud_setting_changed")
+
+
+func _cycle_hud_style() -> void:
+	WorldHistory.update_subject(SETTINGS_ID, {"hud_style": "arcs" if _hud_style() == "rails" else "rails"}, "hud_setting_changed")
+
+
+func _toggle_reduced_glitch() -> void:
+	WorldHistory.update_subject(SETTINGS_ID, {"reduced_glitch": not _reduced_glitch()}, "hud_setting_changed")
+
+
 ## Rows are rebuilt each frame the plate is open, because their labels carry
 ## live values. The row list is the menu — there is no scene to keep in sync.
 func _build_rows() -> void:
@@ -146,6 +175,12 @@ func _build_rows() -> void:
 		_rows.append({"id": "settings", "label": "SETTINGS", "value": ""})
 		_rows.append({"id": "menu", "label": "LEAVE TO THE FRONT DOOR", "value": ""})
 		return
+	if page == "hud":
+		_rows.append({"id": "hud_opacity", "label": "HUD OPACITY", "value": "%03d" % roundi(_hud_opacity() * 100.0), "slider": true})
+		_rows.append({"id": "hud_style", "label": "HUD STYLE", "value": _hud_style().to_upper()})
+		_rows.append({"id": "reduced_glitch", "label": "REDUCED GLITCH", "value": "ON" if _reduced_glitch() else "OFF"})
+		_rows.append({"id": "settings_back", "label": "BACK", "value": ""})
+		return
 	for bus_name in BUSES:
 		_rows.append({"id": "vol_%s" % bus_name, "label": bus_name.to_upper(), "value": "%03d" % roundi(_volume(bus_name) * 100.0), "slider": true})
 	_rows.append({"id": "gore", "label": "VIOLENCE", "value": _gore_mode()})
@@ -153,6 +188,7 @@ func _build_rows() -> void:
 	# was not. It belongs beside the other settings rather than in a key nobody
 	# is told about, and it persists like everything else here.
 	_rows.append({"id": "screen", "label": "SCREEN", "value": "FULL" if _fullscreen() else "WINDOWED"})
+	_rows.append({"id": "hud", "label": "DISPLAY / HUD", "value": ">"})
 	_rows.append({"id": "back", "label": "BACK", "value": ""})
 
 
@@ -225,6 +261,12 @@ func _nudge(direction: int) -> void:
 		_cycle_gore()
 	elif id == "screen":
 		_set_fullscreen(not _fullscreen())
+	elif id == "hud_opacity":
+		_set_hud_opacity(_hud_opacity() + 0.05 * float(direction))
+	elif id == "hud_style":
+		_cycle_hud_style()
+	elif id == "reduced_glitch":
+		_toggle_reduced_glitch()
 
 
 func _activate() -> void:
@@ -232,14 +274,17 @@ func _activate() -> void:
 	match id:
 		"resume":
 			close()
-		"settings":
+		"settings", "settings_back":
 			page = "settings"
+			highlighted = 0
+		"hud":
+			page = "hud"
 			highlighted = 0
 		"back":
 			page = "root"
 			highlighted = 0
-		"gore":
-			_cycle_gore()
+		"gore", "screen", "hud_opacity", "hud_style", "reduced_glitch":
+			_nudge(1)
 		"menu":
 			close()
 			Interstitial.travel("res://country_town_menu.tscn", "standing down")
@@ -287,29 +332,35 @@ func _draw_plate() -> void:
 	screen.draw_polyline(outline, COPPER * Color(1, 1, 1, 0.62 * eased), 2.0)
 
 	CellOutzType.draw_stamped(screen, Vector2(30, 26), "STOPPED", 30.0, ACID * Color(1, 1, 1, eased), ARTERIAL * Color(1, 1, 1, 0.3 * eased), 4.0)
-	CellOutzType.draw_text(screen, Vector2(30, 68), "CELLOUTZ / THE YARD IS STILL THERE", 10.0, INK * Color(1, 1, 1, 0.45 * eased), 1.4)
+	var subtitle := "DISPLAY / HUD" if page == "hud" else "SETTINGS" if page == "settings" else "CELLOUTZ / THE YARD IS STILL THERE"
+	CellOutzType.draw_text(screen, Vector2(30, 68), subtitle, 10.0, INK * Color(1, 1, 1, 0.45 * eased), 1.4)
 	screen.draw_line(Vector2(30, 84), Vector2(DESIGN.x - 30, 84), COPPER * Color(1, 1, 1, 0.4 * eased), 1.0)
 
+	var row_pitch := minf(52.0, (DESIGN.y - 190.0) / maxf(1.0, float(_rows.size() - 1)))
 	for index in _rows.size():
 		var row: Dictionary = _rows[index]
-		var top := 112.0 + index * 52.0
+		var top := 112.0 + index * row_pitch
 		var lit := index == highlighted
 		var accent := ACID if lit else INK
 		if lit:
-			screen.draw_rect(Rect2(24, top - 12, DESIGN.x - 48, 40), accent * Color(1, 1, 1, 0.12 * eased))
+			screen.draw_rect(Rect2(24, top - 12, DESIGN.x - 48, minf(40.0, row_pitch - 4.0)), accent * Color(1, 1, 1, 0.12 * eased))
 			var slide := 4.0 + sin(clock * 6.0) * 2.0
 			screen.draw_colored_polygon(PackedVector2Array([
 				Vector2(14 - slide, top - 2), Vector2(24 - slide, top + 7), Vector2(14 - slide, top + 16),
 			]), accent * Color(1, 1, 1, eased))
 		CellOutzType.draw_text(screen, Vector2(34, top), str(row.label), 17.0, accent * Color(1, 1, 1, (1.0 if lit else 0.7) * eased), 2.2)
 		if bool(row.get("slider", false)):
-			var level := _volume(str(row.id).trim_prefix("vol_"))
+			var level := _hud_opacity() if str(row.id) == "hud_opacity" else _volume(str(row.id).trim_prefix("vol_"))
 			var bar := Rect2(DESIGN.x - 210, top + 4, 130, 8)
 			screen.draw_rect(bar, Color(0, 0, 0, 0.5 * eased))
 			screen.draw_rect(Rect2(bar.position, Vector2(bar.size.x * level, bar.size.y)), accent * Color(1, 1, 1, 0.75 * eased))
 			screen.draw_rect(bar, INK * Color(1, 1, 1, 0.2 * eased), false, 1.0)
 		if not str(row.value).is_empty():
-			CellOutzType.draw_text(screen, Vector2(DESIGN.x - 68, top), str(row.value), 15.0, accent * Color(1, 1, 1, 0.9 * eased), 1.6)
+			var value_x := DESIGN.x - 34.0 - CellOutzType.width(str(row.value), 15.0, 1.6)
+			CellOutzType.draw_text(screen, Vector2(value_x, top), str(row.value), 15.0, accent * Color(1, 1, 1, 0.9 * eased), 1.6)
 
-	CellOutzType.draw_text(screen, Vector2(30, DESIGN.y - 28), "ESC RESUME   ARROWS MOVE   ENTER SELECT", 9.0, INK * Color(1, 1, 1, 0.4 * eased), 1.4)
+	if page == "hud":
+		CellOutzType.draw_text(screen, Vector2(34, 348), "OPACITY 25-100% / SAVED AUTOMATICALLY", 10.0, INK * Color(1, 1, 1, 0.5 * eased), 1.0)
+		CellOutzType.draw_text(screen, Vector2(34, 374), "REDUCED GLITCH CALMS CAMERA GRAIN", 10.0, INK * Color(1, 1, 1, 0.5 * eased), 1.0)
+	CellOutzType.draw_text(screen, Vector2(30, DESIGN.y - 28), "ESC RESUME  UP/DOWN MOVE  L/R ADJUST  ENTER SELECT", 9.0, INK * Color(1, 1, 1, 0.4 * eased), 1.0)
 	screen.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
