@@ -92,6 +92,12 @@ const CHAOS_MAGICK := {
 	# once-per-god-per-day guard in `gods.gd` is what stops a clear night
 	# ratcheting this on its own.
 	"god_seen": 0.05,
+	# AX2.3. The opening's breakthrough: the player's own soul takes the
+	# government chip and rewrites it. Weighted above a completed ritual
+	# because it is the first act of chaos magick in the game and the one the
+	# whole AJ ladder is built on top of -- and because it happens exactly
+	# once per run, so it cannot be farmed the way a ritual can.
+	"soul_seized_implant": 0.35,
 }
 
 ## Loses about half its charge every three in-world hours with nothing feeding
