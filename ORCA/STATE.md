@@ -7,6 +7,50 @@ Trunk: `codex/game-planning` at `642e1b5`.
 
 ---
 
+## Re-measured 19 September 2026 — this supersedes the counts below
+
+**Branches: 24 down to 14.** Ten were deleted, every one of them provably
+contained in trunk first. `agent-b`, `agent-c`, `claude/b-ladder`,
+`codex/hud-release-20260914`, `codex/sol-agent-2`, `lane-3-guns`,
+`rescue/b6-worktree` (a duplicate of `codex/b6-combat`'s tip) and the three
+`worktree-agent-*` leftovers from 12-13 September. Git refused three of them
+first because their `origin/` refs had diverged; each was checked with
+`git rev-list --count codex/game-planning..origin/<branch>` and each returned
+zero before being forced.
+
+**Five branches still hold unmerged work and were not touched:**
+`codex/sol-agent-1` (8), `integration-check-agent-a` (5),
+`codex/controls-ui-repair` (4), `agent-a-help` (3), `codex/b6-combat` (2).
+
+**1,792 lines were rescued out of an untracked worktree.** The
+`codex-b6-worktree` under `Documents\ChatGPT` held seven systems
+(`ashbloom_seals`, `celloutz_branding`, `pyramid_society`,
+`rabbit_hole_navigator`, `wire_browser`, `wire_site_catalog`), a shader, a
+design plan and eight test suites — **untracked, reachable from nothing in
+git, one folder deletion from gone.** Committed as `a6ed5b3` on
+`codex/b6-combat`. It is a rescue only: **the suites have not been run and
+nothing in it is claimed to work.** Whoever merges that branch owns verifying
+it.
+
+**Two silent faults in `lane-runner` were found and fixed:**
+
+- A `.running` lock is only removed by the agent that made it, so an agent
+  that never exits leaves one forever. `3a8eec6b.running` had been holding
+  the **`sircuteskingdom` Claude account out of the pool since 15 September —
+  102 hours**, a third of the Claude capacity, idle and invisible.
+  `lane-3-guns.running` had done the same to a lane. `dispatch.sh` now clears
+  any lock older than six hours.
+- `dispatch.sh` read `lanes.tsv` in fixed file order and `break`s at the first
+  lane it cannot staff, so the bottom of the file only ran when quota was
+  abundant, which it never is. **`lane-5-getting-in`, `lane-6-handheld` and
+  `lane-8-guns` had no log file at all: three of seven lanes had never
+  executed once.** Lanes are now ordered by their own log mtime, so
+  least-recently-run goes first and never-run sorts to the front.
+- `lanes.tsv` lane 3 pointed at `lane-3-guns`, superseded and 274 behind. It
+  now points at `lane-8-guns`. The old worktree is removed.
+
+---
+
 ## Quota — read this first
 
 **The account was at 100% weekly usage on 16 September. It resets Sep 19, 5am
