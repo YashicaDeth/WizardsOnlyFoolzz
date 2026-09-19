@@ -164,6 +164,13 @@ func _ready() -> void:
 		guns.fire(Vector3(0, 5, 0), Vector3.FORWARD, "buck", 0.1, 9, "t")
 	check(guns.rounds.size() <= guns.MAX_ROUNDS, "rounds in flight are capped")
 	check(guns.casings.size() <= guns.MAX_CASINGS, "brass on the floor is capped")
+	WorldLook.set_quality_name("PERFORMANCE")
+	check(guns.casing_budget() == 48, "performance route uses a nearby brass budget")
+	check(guns.wound_budget() == 96, "performance route uses a bounded impact-scar budget")
+	WorldLook.set_quality_name("HIGH")
+	check(guns.casing_budget() < guns.MAX_CASINGS and guns.wound_budget() < guns.MAX_CASINGS,
+		"high quality still bounds persistent ballistic objects")
+	WorldLook.set_quality_name("PERFORMANCE")
 
 	if failures.is_empty():
 		print("ballistics: sound")
