@@ -75,6 +75,8 @@ var doctor_life := 0.0
 var doctor_moment := 0
 ## AX2.2. Carried out of the examination and into the breakout.
 var refusals := 0
+## AX1.5. Which saved build a repeat player came back with, if any.
+var preset_loaded := ""
 ## AX2.1. His closing beats, played before the form is actually filed.
 var verdict: Array = []
 ## D8.3. A procedure in progress: the beats left to play, and the shot each one
@@ -232,6 +234,21 @@ func _commit() -> void:
 			sheet.route = ROUTES[row].to_lower()
 			if sheet.route == "random":
 				sheet.randomise()
+			elif sheet.route == "preset":
+				# AX1.5. The fast route for a repeat player. PRESET has been the
+				# first option on the first page since this screen was written and
+				# did nothing at all, which is a poor first promise to break.
+				var saved: Array = CharacterPresets.names()
+				if saved.is_empty():
+					_speak("slipped")
+					transcript = "WROTE: NO PRESET ON FILE"
+					transcript_life = 3.2
+				else:
+					CharacterPresets.apply(str(saved[0]), sheet)
+					preset_loaded = str(saved[0])
+					transcript = "WROTE: ON FILE ALREADY // %s" % preset_loaded
+					transcript_life = 3.6
+					_doctor_observe()
 			_transcribe(ROUTES[row])
 		1:
 			sheet.race = str(CharacterSheet.RACES.keys()[row])
