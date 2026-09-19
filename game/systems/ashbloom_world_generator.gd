@@ -1,6 +1,8 @@
 class_name AshbloomWorldGenerator
 extends Node3D
 
+const STREET_LIGHT := preload("res://systems/street_light.gd")
+
 const REGION_SIZE := Vector2(470, 370)
 const ROAD := Color("27221c")
 const WALLS := [Color("392a20"), Color("403326"), Color("2c3028"), Color("442722")]
@@ -42,6 +44,9 @@ func generate(seed_value: int = 774013) -> void:
 			var lot_center := Vector2(district_center.x + offset.x, district_center.z + offset.z)
 			lots.append(Rect2(lot_center - Vector2(width, depth) * 0.5, Vector2(width, depth)))
 			_build_enterable_shell(district_center + offset, Vector3(width, height, depth), WALLS[rng.randi_range(0, WALLS.size() - 1)], SIGNS[rng.randi_range(0, SIGNS.size() - 1)])
+			if lot % 2 == 0:
+				var light_at := Vector3(lot_center.x - width * 0.5 - 1.3, 0, lot_center.y + depth * 0.5 + 1.7)
+				_build_street_light("street_light_d%d_l%d" % [district, lot], light_at, clampf(height * 0.55, 3.4, 5.2))
 
 
 ## Local work has to change the walked place, not merely its dossier. These
@@ -116,6 +121,20 @@ func _build_holding_state_mark(row: Dictionary, state: String) -> void:
 	label.outline_size = 7
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	cluster.add_child(label)
+
+
+## AB1.2. Wires `street_light.gd`'s already-proven break loop into the actual
+## world rather than leaving it provable only in isolation — one lamp at every
+## other lot's street frontage, where a bullet or a car can actually reach it.
+## The subject id is derived from district and lot, not call order, so
+## regenerating the same seed reads the same `WorldHistory` fixture back
+## instead of minting a fresh one every load.
+func _build_street_light(id: String, at: Vector3, height: float) -> void:
+	var light: StreetLight = STREET_LIGHT.new()
+	light.name = "StreetLight_%s" % id
+	add_child(light)
+	light.position = at
+	light.build(id, height)
 
 
 func _build_road(at: Vector3, dimensions: Vector3) -> void:
