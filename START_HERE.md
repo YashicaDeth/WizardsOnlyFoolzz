@@ -17,6 +17,19 @@ Five items left in B and four of them are blocked on the quantum restart, which
 does not exist anywhere in the codebase — do not build it to close them. AN's
 `AN6.x` (a wound as an opening with depth you can see into, organs falling out
 through it) is the real work and it builds directly on `penetration.gd`.
+# START HERE — Lane 6
+
+This worktree is lane 6. Read this file, then begin.
+Your branch is `lane-6-handheld`. Stay inside the file family below.
+
+---
+
+## Lane 6 — The handheld and the brain
+
+**Owns:** `handheld_device.gd`, `world_index.gd`, `brain_index.gd`,
+`black_mirror.gd`, `wire_net.gd`
+
+**Target:** C 66.7% -> 85%, AT 17.2% -> 50%
 
 ---
 
