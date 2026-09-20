@@ -196,6 +196,16 @@ var under_skin: Dictionary = {"skeleton": "standard", "organs": "standard", "blo
 ## the default because a decanted body genuinely is: nothing was chosen for it
 ## yet, and choosing is the player's first act of ownership over it.
 var anatomy_sex := "unformed"
+## AX1.3. The face is seven named axes now, not one slider. `appearance.face`
+## is still written -- derived from these -- so the body rig and every older
+## reader keep working while the axes are the thing the player actually set.
+var face: Dictionary = FaceModel.blank()
+
+
+## Call after touching `face`. Keeps the legacy scalar the body rig reads in
+## step with the axes, so the two records can never disagree.
+func sync_face() -> void:
+	appearance["face"] = FaceModel.scalar(face)
 var display_name := "THE HUNTER"
 
 
@@ -613,3 +623,8 @@ func randomise(seed_value: int = 0) -> void:
 		"day": rng.randi_range(1, 28), "hour": rng.randi_range(0, 23), "minute": rng.randi_range(0, 59),
 	}
 	under_skin["blood"] = ["O-RUST", "A-ASH", "B-9", "AB-", "SAP", "UNKNOWN"][rng.randi_range(0, 5)]
+	# AX1.3. A random face, not random numbers. FaceModel correlates the skull
+	# axes so RANDOM produces a person rather than seven unrelated sliders,
+	# and the derived scalar keeps `appearance.face` honest for the body rig.
+	face = FaceModel.randomise(rng)
+	appearance["face"] = FaceModel.scalar(face)

@@ -36,7 +36,7 @@ const GOO := Color("3e4a2a")
 const PAPER := Color(0.86, 0.80, 0.63)
 
 const ROUTES := ["PRESET", "RANDOM", "CHART", "INSTRUMENT"]
-const PAGES := ["ROUTE", "RACE", "TRAITS", "BODY", "SCHEDULE"]
+const PAGES := ["ROUTE", "RACE", "TRAITS", "FACE", "BODY", "SCHEDULE"]
 
 ## What the handler says while he works. He is not talking to you so much as
 ## near you, which is the register the whole scene runs in.
@@ -221,8 +221,11 @@ func _rows() -> int:
 		2:
 			return CharacterSheet.TRAITS.size()
 		3:
-			# AX1.3. Eight rows now: anatomy sits at the top of the body page,
-			# because it is the first thing the facility decided about you.
+			# AX1.3. The face is seven named axes, its own page.
+			return FaceModel.ORDER.size()
+		4:
+			# Anatomy sits at the top of the body page, because it is the first
+			# thing the facility decided about you.
 			return 8
 		_:
 			return CharacterSheet.MODIFIERS.size()
@@ -384,6 +387,8 @@ func _draw_clipboard(rect: Rect2) -> void:
 		2:
 			_draw_traits(rect, ink, y)
 		3:
+			_draw_face(rect, ink, y)
+		4:
 			_draw_body(rect, ink, y)
 		_:
 			_draw_schedule(rect, ink, y)
@@ -450,6 +455,24 @@ func _draw_traits(rect: Rect2, ink: Color, y: float) -> void:
 		var cost_text := ("+%d" % -cost) if cost < 0 else "-%d" % cost
 		CellOutzType.draw_condensed(self, Vector2(rect.size.x - 62, y - 10), cost_text, 11.0, (MOSS if cost < 0 else HOT).darkened(0.35), 0.8)
 		y += 24.0
+
+
+## AX1.3. Seven axes, each read back in the facility's own words rather than
+## as a number -- a number would imply somebody measured carefully.
+func _draw_face(_rect: Rect2, ink: Color, y: float) -> void:
+	for index in FaceModel.ORDER.size():
+		var axis: String = FaceModel.ORDER[index]
+		var spec: Dictionary = FaceModel.AXES[axis]
+		_row_mark(ink, Vector2(30, y - 9), index == row, false)
+		CellOutzType.draw_condensed(self, Vector2(50, y - 10), str(spec.label), 11.0, ink * Color(1, 1, 1, 0.6), 0.8)
+		CellOutzType.draw_condensed(self, Vector2(190, y - 10), FaceModel.reading(sheet.face, axis), 12.0, ink, 0.9)
+		# The axis drawn as a mark on a strip, because the form has no numbers
+		# on it anywhere else either.
+		var strip := Rect2(Vector2(340, y - 14), Vector2(120, 4))
+		draw_rect(strip, ink * Color(1, 1, 1, 0.18))
+		draw_rect(Rect2(strip.position + Vector2(clampf(float(sheet.face.get(axis, 0.5)), 0.0, 1.0) * (strip.size.x - 6), -2), Vector2(6, 8)), HOT)
+		y += 28.0
+	CellOutzType.draw_condensed(self, Vector2(30, y + 10), "THEY WILL WRITE DOWN WHAT THEY THINK THEY SAW.", 8.0, ink * Color(1, 1, 1, 0.42), 0.7)
 
 
 func _draw_body(_rect: Rect2, ink: Color, y: float) -> void:

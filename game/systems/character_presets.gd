@@ -23,7 +23,7 @@ const STORE_ID := "character_presets"
 ## obvious, and `missing_fields()` below names it out loud.
 const SAVED_FIELDS := [
 	"route", "race", "traits", "modifiers", "birth", "instrument",
-	"appearance", "under_skin", "display_name", "anatomy_sex",
+	"appearance", "under_skin", "display_name", "anatomy_sex", "face",
 ]
 
 
