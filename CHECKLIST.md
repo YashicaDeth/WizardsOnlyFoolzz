@@ -7234,7 +7234,7 @@ not make AX a second owner of anatomy, inventory, combat or the Black Mirror.
 - [ ] **AX3.1** A broken medical restraint/tool is the first inspected and usable object
 - [ ] **AX3.2** Humiliation clothing comes from a dead failed subject and physically teaches body inventory/equipment
 - [x] ~~**AX3.3** The first biometric barrier accepts coercion, a living/unconscious/dead body, removed anatomy and—later—implant spoofing~~ `biometric_barrier.gd` authenticates the guard's stable subject identity and deliberately never consults life state. Whole living, unconscious and dead bodies, removed anatomy, and the gated later implant handshake converge on one recorded access path; unauthorized tissue and premature spoofing remain locked.
-- [ ] **AX3.4** The first firearm is powerful, taken from a guard and ammunition-starved enough that melee still matters
+- [x] ~~**AX3.4** The first firearm is powerful, taken from a guard and ammunition-starved enough that melee still matters~~ The barrier guard now owns one `CELL OUTZ BREACH NINE`; it transfers only after that exact actor is down, dead or disarmed. Its 52-damage shot is decisive, but the physical gun contains three rounds, has no reserve magazine, cannot reload and cannot be farmed from the same guard twice.
 - [ ] **AX3.5** The Black Mirror is stolen from restricted technology storage as a rare prototype, not issued as an ordinary menu
 - [ ] **AX3.6** Every introduced interface is learned by doing the action that needs it; no permanent all-controls overlay substitutes for staging
 
