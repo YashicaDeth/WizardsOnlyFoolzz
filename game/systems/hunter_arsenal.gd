@@ -36,6 +36,15 @@ const WEAPONS := {
 		"pellets": 1, "spread": 0.008, "magazine": 10, "reserve": 50,
 		"reload": 1.3, "damage_type": "ballistic",
 	},
+	"facility_sidearm": {
+		# The first firearm is a guard's service hand-cannon, not the ordinary
+		# surface pistol. One good hit can end a fight; its three rounds cannot
+		# replace the broken tools and melee weapons the escape already taught.
+		"label": "CELL OUTZ BREACH NINE", "kind": "firearm", "damage": 52.0,
+		"impulse": 30.0, "range": 68.0, "cooldown": 0.44,
+		"pellets": 1, "spread": 0.011, "magazine": 3, "reserve": 0,
+		"reload": 1.5, "damage_type": "ballistic",
+	},
 }
 const SLOT_ORDER := ["sword", "shotgun", "sidearm"]
 ## AF10.10. These are attachment points on the object, not perks on its
@@ -62,6 +71,7 @@ var shot_serial := 0
 var ammo := {
 	"shotgun": {"loaded": 5, "reserve": 25},
 	"sidearm": {"loaded": 10, "reserve": 50},
+	"facility_sidearm": {"loaded": 0, "reserve": 0, "spare_magazines": []},
 }
 ## AN2.4. Missing means unworn — a weapon starts at full condition and this
 ## dict only ever gains an entry the first time something actually wears it,
@@ -225,6 +235,31 @@ func install_customization(weapon_id: String, slot: String, part: Dictionary) ->
 	customization[weapon_id] = installed
 	_sync_customization_meta(weapon_id)
 	customization_changed.emit(weapon_id, installed.duplicate(true))
+	return true
+
+
+## AX3.4. Called by the guard's physical loadout, not by player creation. The
+## rounds passed here are the rounds left in that exact gun; no reserve magazine
+## is conjured when ownership changes.
+func acquire_facility_sidearm(rounds_left: int) -> bool:
+	if rounds_left <= 0:
+		return false
+	ammo["facility_sidearm"] = {
+		"loaded": mini(rounds_left, int(WEAPONS.facility_sidearm.magazine)),
+		"reserve": 0,
+		"spare_magazines": [],
+	}
+	current_id = "facility_sidearm"
+	if hand != null and not models.has(current_id):
+		var model := _build_weapon_model(current_id)
+		hand.add_child(model)
+		models[current_id] = model
+		var magazine := model.find_child("magazine", true, false) as Node3D
+		if magazine != null:
+			_magazine_nodes[current_id] = magazine
+			_magazine_rest[current_id] = magazine.position
+	_update_models()
+	equipped.emit(current_id)
 	return true
 
 
@@ -493,7 +528,8 @@ func _build_weapon_model(weapon_id: String) -> Node3D:
 	# leaves the weapon level in view space, which is what the trim terms were
 	# groping toward while the real rotation was being thrown away.
 	root.rotation = Vector3(-HUNTER_BODY_MOTION.FIRST_PERSON_ARM_RAISE, -0.34, 0.32)
-	var gear := HeldGear.build_weapon(weapon_id)
+	var visual_id := "sidearm" if weapon_id == "facility_sidearm" else weapon_id
+	var gear := HeldGear.build_weapon(visual_id)
 	# Hung off its grip rather than its origin. `HeldGear` builds each weapon
 	# around the shape of the object, so a sword's origin is where the guard
 	# meets the blade and not where a hand closes; mounted at the origin that
@@ -506,27 +542,27 @@ func _build_weapon_model(weapon_id: String) -> Node3D:
 	# overlay. The grip anchors already author exactly where those fingers close.
 	var right := HeldGear.build_humiliation_hand(1)
 	right.name = "RightGripHand"
-	HeldGear.set_pose(right, "trigger" if weapon_id in ["shotgun", "sidearm"] else "wrap")
+	HeldGear.set_pose(right, "trigger" if visual_id in ["shotgun", "sidearm"] else "wrap")
 	# Each class seats the palm around a slightly different section. The old one
 	# offset made the trigger hand acceptable on the sword, but buried the pistol
 	# tang in the palm and left the shotgun wrist hovering below its stock.
 	right.position = {
 		"shotgun": Vector3(0.016, -0.010, 0.006),
 		"sidearm": Vector3(0.014, -0.016, 0.008),
-	}.get(weapon_id, Vector3(0.019, -0.013, 0.0))
+	}.get(visual_id, Vector3(0.019, -0.013, 0.0))
 	right.rotation = Vector3(-PI * 0.5, 0.0, PI * 0.5)
 	right.set_meta("grip_rest_position", right.position)
 	right.set_meta("grip_rest_rotation", right.rotation)
 	right.set_meta("forearm_entry", Vector3(0.47, -0.53, -0.30))
 	root.add_child(right)
-	var off_anchor_name := "forend" if weapon_id == "shotgun" else ("grip_support" if weapon_id == "sidearm" else "grip_low")
+	var off_anchor_name := "forend" if visual_id == "shotgun" else ("grip_support" if visual_id == "sidearm" else "grip_low")
 	var off_anchor := gear.get_node_or_null("anchor_%s" % off_anchor_name) as Node3D
 	if off_anchor != null:
 		var left := HeldGear.build_humiliation_hand(-1)
 		left.name = "LeftGripHand"
-		HeldGear.set_pose(left, "cup" if weapon_id == "sidearm" else "wrap")
+		HeldGear.set_pose(left, "cup" if visual_id == "sidearm" else "wrap")
 		var placed := gear.transform * off_anchor.transform
-		var palm_clearance := Vector3(-0.017, -0.010, 0.005) if weapon_id == "shotgun" else Vector3(-0.016, -0.014, 0.006)
+		var palm_clearance := Vector3(-0.017, -0.010, 0.005) if visual_id == "shotgun" else Vector3(-0.016, -0.014, 0.006)
 		left.position = placed.origin + palm_clearance
 		left.rotation = placed.basis.get_euler() + Vector3(-PI * 0.5, 0.0, -PI * 0.5)
 		left.set_meta("grip_rest_position", left.position)
