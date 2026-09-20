@@ -73,6 +73,10 @@ var _rain_size := Vector2.ZERO
 var _wire_glow := 0.0
 var wire = null
 var posts: Array = []
+## C10.13. One physical switch on the WIRE page, not a seventh handheld app.
+## False is the endless, attention-costing feed; true is the finite event
+## register derived from the exact same `WorldHistory` records.
+var wire_archive := false
 
 ## I3.2. celloutz.xyz — and everything else `broken_web.gd` catalogued and
 ## nothing ever surfaced — as reachable places on the Wire rather than data
@@ -361,6 +365,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				rail_index = maxi(0, rail_index - 1)
 			KEY_DOWN:
 				rail_index = mini(_rail_cache.size() - 1, rail_index + 1)
+			KEY_A:
+				if page != 2:
+					return
+				toggle_wire_archive()
 			KEY_P:
 				# L2.1. Take the selected record off the index and carry it to
 				# the wall. The index does not know the board exists — it hands
@@ -447,20 +455,43 @@ func _unhandled_input(event: InputEvent) -> void:
 					queue_redraw()
 					return
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			feed_scroll += 42.0
-			if wire:
-				wire.scroll(1.0)
-			# A4.7. It does not end. Reaching the bottom loads more, which is
-			# the mechanic the design asks for - the feed is meant to farm you,
-			# and a scroll bar that fills up is an exit sign.
-			if feed_scroll > maxf(0.0, float(posts.size()) * 80.0 - 360.0):
-				posts.append_array(wire.feed(10, posts.size()))
+			scroll_wire(1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			feed_scroll = maxf(0.0, feed_scroll - 42.0)
+			scroll_wire(-1)
 		else:
 			return
 		get_viewport().set_input_as_handled()
 		queue_redraw()
+
+
+## Kept callable because the same switch can later be given a pointer target
+## without duplicating its state transition. Returning the state also makes the
+## input seam testable without synthesising OS keyboard state.
+func toggle_wire_archive() -> bool:
+	wire_archive = not wire_archive
+	feed_scroll = 0.0
+	queue_redraw()
+	return wire_archive
+
+
+## The archive is finite and free to read; the feed is endless and charges
+## attention. Keeping those two wheel behaviours on this switch prevents the
+## archive from secretly using the feed's cost and pagination behind its back.
+func scroll_wire(direction: int) -> void:
+	if direction == 0:
+		return
+	if wire_archive:
+		var archive_height := float(wire.archive(32).size()) * 57.0
+		feed_scroll = clampf(feed_scroll + 42.0 * signf(direction), 0.0, maxf(0.0, archive_height - 300.0))
+		return
+	feed_scroll = maxf(0.0, feed_scroll + 42.0 * signf(direction))
+	if direction > 0 and wire:
+		wire.scroll(1.0)
+		# A4.7. It does not end. Reaching the bottom loads more, which is
+		# the mechanic the design asks for - the feed is meant to farm you,
+		# and a scroll bar that fills up is an exit sign.
+		if feed_scroll > maxf(0.0, float(posts.size()) * 80.0 - 360.0):
+			posts.append_array(wire.feed(10, posts.size()))
 
 
 ## Binds a pooled icon to a subject and draws it at `rect`. Returns false when
@@ -1712,7 +1743,14 @@ func _draw_wire(rect: Rect2) -> void:
 
 	var feed := Rect2(rect.position + Vector2(split + 16, 0), Vector2(rect.size.x - split - 16, rect.size.y))
 	draw_line(feed.position + Vector2(-10, 0), feed.position + Vector2(-10, feed.size.y), INK * Color(1, 1, 1, 0.14), 1.0)
-	CellOutzType.draw_text(self, feed.position, "THE WIRE", 12.0, COPPER, 1.4)
+	var wire_heading := "THE ARCHIVE" if wire_archive else "THE WIRE"
+	CellOutzType.draw_text(self, feed.position, wire_heading, 12.0, COPPER, 1.4)
+	var switch_label := "[A] FEED" if wire_archive else "[A] ARCHIVE"
+	var switch_width := CellOutzType.width(switch_label, 9.0, 0.8)
+	CellOutzType.draw_text(self, Vector2(feed.end.x - switch_width, feed.position.y + 3), switch_label, 9.0, MOSS, 0.8)
+	if wire_archive:
+		_draw_wire_archive(feed)
+		return
 	var strain_label := "STRAIN %02d" % roundi(wire.strain)
 	var strain_width := CellOutzType.width(strain_label, 10.0, 0.8)
 	CellOutzType.draw_text(self, Vector2(feed.position.x + feed.size.x - strain_width, feed.position.y + 2), strain_label, 10.0, BRUISE.lerp(HOT, clampf(wire.strain / 40.0, 0, 1)), 0.8)
@@ -1739,6 +1777,34 @@ func _draw_wire(rect: Rect2) -> void:
 		if y > feed.position.y + 20.0:
 			_draw_post(feed, post, y)
 		y += 80.0
+
+
+## The archive is a ruled incident register, finite and newest-first. It does
+## not use the feed's cards, reach, replies or retelling depth because those
+## are precisely the platform's claims that this page exists to contradict.
+func _draw_wire_archive(rect: Rect2) -> void:
+	var font := ThemeDB.fallback_font
+	draw_line(rect.position + Vector2(0, 18), rect.position + Vector2(rect.size.x, 18), COPPER * Color(1, 1, 1, 0.3), 1.0)
+	draw_string(font, rect.position + Vector2(0, 36), "FINITE REGISTER / EXACT EVENT RECEIPTS / NEWEST FIRST", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 9, INK * Color(1, 1, 1, 0.5))
+	var records: Array = wire.archive(32)
+	var y := rect.position.y + 58.0 - feed_scroll
+	for record: Dictionary in records:
+		if y + 54.0 > rect.end.y:
+			break
+		if y + 47.0 < rect.position.y + 44.0:
+			y += 57.0
+			continue
+		var sequence := "#%06d" % int(record.get("sequence", 0))
+		CellOutzType.draw_text(self, Vector2(rect.position.x, y), sequence, 9.0, COPPER, 0.8)
+		var event_type := str(record.get("type", "UNKNOWN")).replace("_", " ").to_upper()
+		CellOutzType.draw_text(self, Vector2(rect.position.x + 82, y), event_type, 10.0, INK, 0.9)
+		var lines := CellOutzType.wrap_condensed(str(record.get("body", "")), rect.size.x - 28.0, 9.0, 0.72)
+		for index in mini(2, lines.size()):
+			CellOutzType.draw_condensed(self, Vector2(rect.position.x + 14, y + 18.0 + index * 13.0), str(lines[index]), 9.0, INK * Color(1, 1, 1, 0.68), 0.72)
+		draw_line(Vector2(rect.position.x, y + 47), Vector2(rect.end.x, y + 47), INK * Color(1, 1, 1, 0.10), 1.0)
+		y += 57.0
+	if records.is_empty():
+		CellOutzType.draw_text(self, rect.position + Vector2(0, 68), "NO ACTS RECORDED", 11.0, INK * Color(1, 1, 1, 0.45), 1.0)
 
 
 func _draw_post(feed: Rect2, post: Dictionary, y: float) -> void:

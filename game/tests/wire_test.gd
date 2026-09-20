@@ -197,6 +197,22 @@ func _ready() -> void:
 			deep_found += 1
 	check(deep_found > 0, "a terminal does (%d posts)" % deep_found)
 
+	# --- the archive and the feed --------------------------------------------
+	var exact_event := WorldHistory.record_event("npc_resolution", {
+		"subject_id": "mara_voss", "outcome": "spare", "location": "bone_yard",
+	})
+	var archive := clean.archive(3)
+	check(not archive.is_empty() and str(archive[0].id) == str(exact_event.id), "the archive is finite, newest-first and reads the real event receipt")
+	check(str(archive[0].body).contains("MARA VOSS") and str(archive[0].body).contains("OUTCOME SPARE"), "the archive names facts the receipt actually contains")
+	var archived_details: Dictionary = archive[0].details
+	archived_details["outcome"] = "kill"
+	check(str(WorldHistory.recent_events(1)[0].details.outcome) == "spare", "an archive row cannot mutate world history")
+	var comparison_feed := clean.feed(18, 41)
+	var sourced_reports := comparison_feed.filter(func(post): return str(post.get("source_event_id", "")) == str(exact_event.id))
+	check(not sourced_reports.is_empty(), "a feed retelling keeps the archive receipt it came from")
+	if not sourced_reports.is_empty():
+		check(str(sourced_reports[0].body) != str(archive[0].body), "the feed's retelling disagrees with the archive's factual record")
+
 	# --- distortion and strain ------------------------------------------------
 	var straight := "the crew already knew about their own captain"
 	check(clean.distort(straight, 3) != straight, "what spreads is not what was published")
