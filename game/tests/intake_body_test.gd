@@ -14,6 +14,7 @@ extends Node
 
 const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const SHEET := preload("res://systems/character_sheet.gd")
+const BASELINE_HUMAN := preload("res://systems/baseline_human.gd")
 
 var failures: Array[String] = []
 
@@ -34,6 +35,26 @@ func _ready() -> void:
 	var intake: Control = VAT_INTAKE.new()
 	add_child(intake)
 	await get_tree().process_frame
+
+	print("INTAKE BODY - visible FACE and BODY rows change their own data")
+	var brow_before := float(intake.sheet.face.get("brow", 0.5))
+	intake.page = 3
+	intake.row = 0
+	intake._commit()
+	check(not is_equal_approx(float(intake.sheet.face.get("brow", 0.5)), brow_before), "FACE/BROW changes the brow rather than an invisible body field")
+	intake.page = 4
+	check(intake._rows() == 9, "BODY exposes every one of its nine visible choices")
+	var anatomy_before: String = str(intake.sheet.anatomy_sex)
+	intake.row = 0
+	intake._commit()
+	check(intake.sheet.anatomy_sex != anatomy_before, "BODY/ANATOMY changes anatomy after the page split")
+	var build_before := float(intake.sheet.appearance.get("build", 0.5))
+	intake.row = 4
+	intake._commit()
+	check(not is_equal_approx(float(intake.sheet.appearance.get("build", 0.5)), build_before), "BODY/BUILD changes the build setting")
+	var compact := BASELINE_HUMAN.config_from_subject({"race": "decanted", "appearance": {"build": 0.0}, "anatomy": {}})
+	var heavy := BASELINE_HUMAN.config_from_subject({"race": "decanted", "appearance": {"build": 1.0}, "anatomy": {}})
+	check(float(compact.get("build", 0.0)) < float(heavy.get("build", 0.0)), "the stored BUILD setting changes the eventual world rig")
 
 	intake.sheet.race = "roadborn"
 	intake.sheet.under_skin["skeleton"] = "plated"

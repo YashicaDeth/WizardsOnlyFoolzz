@@ -24,6 +24,7 @@ const CellOutzType := preload("res://systems/celloutz_type.gd")
 const Grunge := preload("res://systems/celloutz_grunge.gd")
 const Motion := preload("res://systems/celloutz_motion.gd")
 const SHEET := preload("res://systems/character_sheet.gd")
+const VAT_BODY_PREVIEW := preload("res://systems/vat_body_preview.gd")
 
 signal filed(state: Dictionary)
 
@@ -32,11 +33,16 @@ const COPPER := Color("b0552a")
 const HOT := Color("a8281a")
 const MOSS := Color("8a9a4a")
 const BRUISE := Color("6b3f6e")
-const GOO := Color("3e4a2a")
+# The form is literally seen through the same bloody culture medium as the
+# 3D tank.  Keeping its UI wash green made the first frame look like a different
+# scene from the vat beneath it.
+const GOO := Color("70150e")
 const PAPER := Color(0.86, 0.80, 0.63)
 
 const ROUTES := ["PRESET", "RANDOM", "CHART", "INSTRUMENT"]
 const PAGES := ["ROUTE", "RACE", "TRAITS", "FACE", "BODY", "SCHEDULE"]
+const FORM_REVEAL_AT := 1.15
+const FORM_REVEAL_DURATION := 0.55
 
 ## What the handler says while he works. He is not talking to you so much as
 ## near you, which is the register the whole scene runs in.
@@ -91,6 +97,7 @@ var shot := "tank"
 var transcript := ""
 var transcript_life := 0.0
 var mirror_settle := 0.0
+var body_preview: Control
 
 
 func _ready() -> void:
@@ -100,6 +107,15 @@ func _ready() -> void:
 	var offset_rng := RandomNumberGenerator.new()
 	offset_rng.randomize()
 	line_offset = offset_rng.randi()
+	body_preview = VAT_BODY_PREVIEW.new()
+	body_preview.name = "LiveVatBodyPreview"
+	add_child(body_preview)
+	resized.connect(_layout_body_preview)
+	call_deferred("_layout_body_preview")
+	call_deferred("_refresh_body_preview")
+	# The player first sees the actual laboratory, examiner and terminal.  The
+	# paperwork arrives a beat later instead of replacing the room on frame one.
+	modulate.a = 0.0
 	set_process(true)
 	_speak()
 
@@ -164,6 +180,7 @@ func _transcribe(intent: String, success_context: String = "chose") -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	modulate.a = clampf((elapsed - FORM_REVEAL_AT) / FORM_REVEAL_DURATION, 0.0, 1.0)
 	handler_life = maxf(0.0, handler_life - delta)
 	doctor_life = maxf(0.0, doctor_life - delta)
 	if doctor_life <= 0.0 and verdict_started:
@@ -228,7 +245,7 @@ func _rows() -> int:
 		4:
 			# Anatomy sits at the top of the body page, because it is the first
 			# thing the facility decided about you.
-			return 8
+			return 9
 		_:
 			return CharacterSheet.MODIFIERS.size()
 
@@ -268,7 +285,16 @@ func _commit() -> void:
 				transcript = "WROTE: NO BUDGET"
 				transcript_life = 2.4
 		3:
-			# D7. Under the skin, because the kill cam will show it later. The
+			# FACE used to draw seven explicit choices while this branch silently
+			# changed body data.  The form now changes precisely the feature the
+			# player selected, then derives the old scalar every legacy body reader
+			# still understands.
+			var axis: String = FaceModel.ORDER[row]
+			sheet.face = FaceModel.cycle(sheet.face, axis)
+			sheet.sync_face()
+			_transcribe(FaceModel.reading(sheet.face, axis), "face")
+		4:
+			# Under the skin, because the kill cam will show it later. The
 			# last three entries make the human/evolved line a choice that grows
 			# onto the same player body rather than a lore label.
 			match row:
@@ -281,7 +307,7 @@ func _commit() -> void:
 				3:
 					sheet.under_skin["organs"] = _cycle(["standard", "doubled", "salvaged", "communion"], str(sheet.under_skin.get("organs", "standard")))
 				4:
-					sheet.appearance["face"] = fmod(float(sheet.appearance.get("face", 0.5)) + 0.17, 1.0)
+					sheet.appearance["build"] = fmod(float(sheet.appearance.get("build", 0.5)) + 0.17, 1.01)
 				5:
 					sheet.appearance["wear"] = fmod(float(sheet.appearance.get("wear", 0.4)) + 0.2, 1.01)
 				6:
@@ -308,6 +334,24 @@ func _commit() -> void:
 			if not accepted:
 				refusals += 1
 				_doctor_note_refusal()
+	_refresh_body_preview()
+
+
+## This is a visual construction only.  The preview never applies the sheet to
+## WorldHistory; the actual filing path remains the sole place that commits a
+## person to the game.
+func _refresh_body_preview() -> void:
+	if body_preview != null and is_instance_valid(body_preview):
+		body_preview.call("present_sheet", sheet)
+
+
+func _layout_body_preview() -> void:
+	if body_preview == null or not is_instance_valid(body_preview):
+		return
+	var mirror := Rect2(Vector2(size.x * 0.79, 96), Vector2(size.x * 0.18, size.y * 0.52))
+	body_preview.position = mirror.position + Vector2(8, 8)
+	body_preview.size = Vector2(maxf(1.0, mirror.size.x - 16.0), maxf(1.0, mirror.size.y - 56.0))
+	body_preview.visible = size.x >= 640.0 and size.y >= 400.0
 
 
 func _cycle(options: Array, current: String) -> String:
@@ -332,7 +376,10 @@ func _draw() -> void:
 ## You are looking out through it, so the whole screen is under water before
 ## anything else is drawn on top.
 func _draw_tank(viewport: Vector2) -> void:
-	draw_rect(Rect2(Vector2.ZERO, viewport), Color(0.06, 0.075, 0.05, 1.0))
+	# This is a red fluid veil, not an opaque painted replacement for the room.
+	# The real vat, computer and examiner remain visible through it, so the first
+	# impression is a 3D laboratory viewed from inside bloody culture medium.
+	draw_rect(Rect2(Vector2.ZERO, viewport), Color(0.30, 0.012, 0.007, 0.34))
 	for band in 26:
 		var travel := float(band) / 26.0
 		draw_rect(Rect2(Vector2(0, viewport.y * travel), Vector2(viewport.x, viewport.y / 26.0 + 1.0)), GOO * Color(1, 1, 1, 0.05 + sin(elapsed * 0.6 + travel * 7.0) * 0.02))
@@ -344,7 +391,7 @@ func _draw_tank(viewport: Vector2) -> void:
 		var speed := 0.12 + rng.randf() * 0.3
 		var height := fposmod(1.0 - (elapsed * speed + rng.randf()), 1.0)
 		var at := Vector2(column * viewport.x, height * viewport.y)
-		draw_circle(at, 1.5 + rng.randf() * 3.5, Color(0.75, 0.85, 0.7, 0.10))
+		draw_circle(at, 1.5 + rng.randf() * 3.5, Color(0.95, 0.48, 0.36, 0.12))
 	# The tube, in the corner of your own eye. It is always there.
 	draw_line(Vector2(viewport.x * 0.5, viewport.y), Vector2(viewport.x * 0.46, viewport.y * 0.78), Color(0.5, 0.45, 0.38, 0.5), 9.0)
 	draw_line(Vector2(viewport.x * 0.5, viewport.y), Vector2(viewport.x * 0.46, viewport.y * 0.78), Color(0.2, 0.18, 0.15, 0.6), 5.0)
@@ -483,7 +530,7 @@ func _draw_body(_rect: Rect2, ink: Color, y: float) -> void:
 		["BLOOD", str(sheet.under_skin.get("blood", "O-RUST"))],
 		["SKELETON", str(sheet.under_skin.get("skeleton", "standard")).to_upper()],
 		["ORGAN SET", str(sheet.under_skin.get("organs", "standard")).to_upper()],
-		["FACE", "SETTING %02d" % int(float(sheet.appearance.get("face", 0.5)) * 99.0)],
+		["BUILD", "%.0f%% // COMPACT / HEAVY" % (float(sheet.appearance.get("build", 0.5)) * 100.0)],
 		["WEAR", "%.0f%%" % (float(sheet.appearance.get("wear", 0.4)) * 100.0)],
 		["EVOLUTION", "%.0f%% // GROWTH / EYE / HORN" % (float(sheet.appearance.get("mutation", 0.0)) * 100.0)],
 		["INK", "%.0f%%" % (float(sheet.appearance.get("ink", 0.0)) * 100.0)],
@@ -532,7 +579,9 @@ func _mirror_distortion() -> Dictionary:
 	}
 
 
-## D7. A mirror on a swing arm, and the face in it is not quite yours yet.
+## D7. A mirror on a swing arm. Its reflection is a real 3D `BaselineHuman`
+## preview drawn by VatBodyPreview, rather than a silhouette pretending to be
+## the body the player will later inhabit.
 func _draw_mirror(rect: Rect2) -> void:
 	var arm_from := Vector2(rect.position.x - 40, rect.position.y - 30)
 	draw_line(arm_from, rect.position + Vector2(10, 10), Color(0.30, 0.26, 0.20), 6.0)
@@ -541,30 +590,8 @@ func _draw_mirror(rect: Rect2) -> void:
 	draw_rect(rect, Color(0.10, 0.12, 0.09))
 	draw_rect(rect.grow(6), Color(0.36, 0.30, 0.22), false, 2.0)
 
-	# The face, drawn as a wobbling silhouette. The wobble is the point: you are
-	# looking through growth medium at yourself and it will not hold still.
-	var centre := rect.position + rect.size * Vector2(0.5, 0.44)
-	var radius := rect.size.x * 0.30
-	var setting := float(sheet.appearance.get("face", 0.5))
-	var distortion := _mirror_distortion()
-	var phase: float = distortion.phase
-	var points := PackedVector2Array()
-	for index in 30:
-		var angle := TAU * float(index) / 30.0
-		var wobble := 1.0 + sin(angle * 3.0 + elapsed * 1.3 + phase) * float(distortion.amplitude) + sin(angle * 5.0 - elapsed * 0.9 + phase) * float(distortion.amplitude2)
-		var jaw := 1.0 + cos(angle) * (setting - 0.5) * 0.28
-		points.append(centre + Vector2(sin(angle) * radius * wobble * jaw, -cos(angle) * radius * 1.22 * wobble))
-	draw_colored_polygon(points, Color(0.42, 0.33, 0.29, 0.55))
-	var edge := points.duplicate()
-	edge.append(points[0])
-	draw_polyline(edge, INK * Color(1, 1, 1, 0.32), 1.4)
-	for eye in [-1.0, 1.0]:
-		draw_circle(centre + Vector2(eye * radius * 0.34, -radius * 0.18), radius * 0.09, Color(0.06, 0.05, 0.05, 0.8))
-	# The tube, in your mouth, in the mirror.
-	draw_line(centre + Vector2(0, radius * 0.5), centre + Vector2(-radius * 0.2, radius * 1.5), Color(0.5, 0.45, 0.38, 0.7), 5.0)
-
 	CellOutzType.draw_condensed(self, rect.position + Vector2(10, rect.size.y - 34), "PREVIEW IS THROUGH GLASS", 8.0, INK * Color(1, 1, 1, 0.4), 0.7)
-	CellOutzType.draw_condensed(self, rect.position + Vector2(10, rect.size.y - 22), "AND THROUGH MEDIUM", 8.0, INK * Color(1, 1, 1, 0.28), 0.7)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(10, rect.size.y - 22), "THE BODY IS NOT A DRAWING", 8.0, INK * Color(1, 1, 1, 0.28), 0.7)
 
 
 ## AX1.2. He watches the page you are on, not the box you ticked. Arriving at
@@ -649,13 +676,9 @@ func _draw_doctor(viewport: Vector2) -> void:
 	)
 
 func _draw_handler(viewport: Vector2) -> void:
-	# He is a silhouette above the glass. You never see him properly.
-	var head := Vector2(viewport.x * 0.17, viewport.y * 0.30)
-	draw_colored_polygon(PackedVector2Array([
-		head + Vector2(-70, 200), head + Vector2(-54, 30), head + Vector2(-22, -6),
-		head + Vector2(24, -6), head + Vector2(56, 30), head + Vector2(72, 200),
-	]), Color(0.04, 0.05, 0.04, 0.88))
-	draw_circle(head, 34.0, Color(0.04, 0.05, 0.04, 0.9))
+	# Do not paint a second fake silhouette over the world.  The physical
+	# examiner at the workstation is visible through the medium; this is only
+	# his transcription band and must never block the computer or his body.
 	var band := Rect2(Vector2(40, viewport.y - 92), Vector2(viewport.x * 0.32, 70))
 	draw_colored_polygon(PackedVector2Array([
 		band.position + Vector2(10, 0), band.position + Vector2(band.size.x, 0),

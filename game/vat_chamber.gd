@@ -21,6 +21,8 @@ const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const BRAIN_INDEX := preload("res://systems/brain_index.gd")
 const CARRY := preload("res://systems/carry.gd")
 const CLOTHING := preload("res://systems/clothing.gd")
+const BASELINE_HUMAN := preload("res://systems/baseline_human.gd")
+const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 
 const EYE_HEIGHT := 1.62
 const BODY_HALF_HEIGHT := 0.85
@@ -64,7 +66,8 @@ const FAILED_SUBJECT_ID := "growing_floor_failed_subject"
 const FIRST_OBJECT_REACH := 3.0
 var stuck_tank_marker: Node3D
 var stuck_tank_shell: MeshInstance3D
-var failed_subject_visual: MeshInstance3D
+var stuck_tank_culture: MeshInstance3D
+var failed_subject_visual: Node3D
 var stuck_tank_opened := false
 var inspect_held := false
 
@@ -89,6 +92,14 @@ const BEATS := [
 
 func _ready() -> void:
 	$WorldEnvironment.environment = WorldLook.environment("ossuary")
+	# The form itself already lays a translucent blood veil over the first shot.
+	# Leaving this at the old opaque value made the real examiner and laboratory
+	# disappear beneath two stacked UI tints before the player could meet them.
+	submerge_tint.color.a = 0.18
+	# The form is the opening, not a black loading screen.  Keep just enough
+	# fade to hold the red image together while the player sees the real room,
+	# doctor and terminal behind it; filing may still cut into the later wake-up.
+	fade.color.a = 0.08
 	_build_chamber()
 	_build_examination_station()
 	_build_vat()
@@ -197,10 +208,21 @@ func _build_vat() -> void:
 	glass.top_radius = 0.95
 	glass.bottom_radius = 0.95
 	glass.height = 3.1
+	# A closed cylinder puts a glowing circular cap directly against the trapped
+	# camera.  The tank needs walls and ribs, not a red balloon in the player's
+	# face, so its ends are open and the ceiling/floor dressing supplies the rest.
+	glass.cap_top = false
+	glass.cap_bottom = false
 	var glass_material := StandardMaterial3D.new()
-	glass_material.albedo_color = Color(0.38, 0.52, 0.44, 0.26)
+	# You wake in bloody growth fluid, not green aquarium water. The glass is
+	# smoke-brown so the red column still reads as liquid rather than a flat HUD
+	# wash over the whole room.
+	glass_material.albedo_color = Color(0.34, 0.11, 0.08, 0.34)
 	glass_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	glass_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# The player is inside this cylinder. Rendering both sides of transparent
+	# glass stacks two dark surfaces and turns the laboratory into a smeared
+	# black-red blob, so show only the inner face from the trapped viewpoint.
+	glass_material.cull_mode = BaseMaterial3D.CULL_FRONT
 	glass_material.metallic = 0.4
 	glass_material.roughness = 0.12
 	glass.material = glass_material
@@ -214,16 +236,21 @@ func _build_vat() -> void:
 	column.bottom_radius = 0.9
 	column.height = 2.9
 	var fluid_material := StandardMaterial3D.new()
-	fluid_material.albedo_color = Color(0.16, 0.3, 0.2, 0.5)
+	fluid_material.albedo_color = Color(0.36, 0.022, 0.014, 0.48)
 	fluid_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	fluid_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	fluid_material.emission_enabled = true
-	fluid_material.emission = Color(0.09, 0.2, 0.13)
-	fluid_material.emission_energy_multiplier = 0.7
+	fluid_material.emission = Color(0.19, 0.008, 0.004)
+	fluid_material.emission_energy_multiplier = 1.45
 	column.material = fluid_material
 	fluid.mesh = column
 	fluid.position = VAT_POSITION + Vector3(0, 1.5, 0)
 	add_child(fluid)
+	# A camera inside an alpha cylinder cannot look through it cleanly: its near
+	# cap and backface dominate the entire frame.  The player-facing blood is the
+	# intentional red veil/bubbles in the HUD; keep this volume for the room's
+	# light and drain choreography but do not render it into the captive camera.
+	fluid.visible = false
 
 	# Ribbed collar and base: the tank is grown onto the floor, not bolted to it.
 	for rib in 9:
@@ -240,8 +267,8 @@ func _build_vat() -> void:
 
 	var glow := OmniLight3D.new()
 	glow.position = VAT_POSITION + Vector3(0, 1.6, 0)
-	glow.light_color = Color("6fd39a")
-	glow.light_energy = 3.4
+	glow.light_color = Color("b22a19")
+	glow.light_energy = 4.1
 	glow.omni_range = 6.0
 	add_child(glow)
 
@@ -263,7 +290,7 @@ func _build_first_objects() -> void:
 	cylinder.bottom_radius = 0.8
 	cylinder.height = 2.8
 	var shell_material := StandardMaterial3D.new()
-	shell_material.albedo_color = Color(0.22, 0.24, 0.2, 0.6)
+	shell_material.albedo_color = Color(0.31, 0.055, 0.035, 0.42)
 	shell_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	shell_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	shell_material.roughness = 0.5
@@ -272,14 +299,25 @@ func _build_first_objects() -> void:
 	stuck_tank_shell.position = Vector3(0, 1.4, 0)
 	stuck_tank_marker.add_child(stuck_tank_shell)
 
-	failed_subject_visual = MeshInstance3D.new()
-	var occupant := CapsuleMesh.new()
-	occupant.radius = 0.27
-	occupant.height = 1.4
-	occupant.material = WorldLook.surface(Color("241a16"), "flesh", 41)
-	failed_subject_visual.mesh = occupant
-	failed_subject_visual.position = Vector3(0, 1.05, 0)
-	stuck_tank_marker.add_child(failed_subject_visual)
+	# The first tank is not a special low-detail prop.  Its body comes from the
+	# same rig as people encountered above ground, so opening it teaches the
+	# player what a wounded world body actually looks like.
+	failed_subject_visual = _build_cradled_vat_subject(Vector3.ZERO, 2, stuck_tank_marker)
+	stuck_tank_culture = MeshInstance3D.new()
+	var stuck_column := CylinderMesh.new()
+	stuck_column.top_radius = 0.74
+	stuck_column.bottom_radius = 0.74
+	stuck_column.height = 2.58
+	var stuck_culture_material := StandardMaterial3D.new()
+	stuck_culture_material.albedo_color = Color(0.38, 0.018, 0.011, 0.31)
+	stuck_culture_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	stuck_culture_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	stuck_culture_material.emission_enabled = true
+	stuck_culture_material.emission = Color(0.16, 0.004, 0.002)
+	stuck_column.material = stuck_culture_material
+	stuck_tank_culture.mesh = stuck_column
+	stuck_tank_culture.position = Vector3(0, 1.38, 0)
+	stuck_tank_marker.add_child(stuck_tank_culture)
 
 	for rib in 4:
 		var ring := MeshInstance3D.new()
@@ -396,7 +434,7 @@ func _build_examination_station() -> void:
 	desk_mesh.size = Vector3(2.25, 0.16, 0.72)
 	desk_mesh.material = WorldLook.surface(Color("241a16"), "rust", 913)
 	desk.mesh = desk_mesh
-	desk.position = Vector3(-0.15, 1.05, 0.25)
+	desk.position = Vector3(0.05, 1.05, 0.25)
 	station.add_child(desk)
 
 	# The physical monitor gives the player a point of attention in the room;
@@ -406,44 +444,113 @@ func _build_examination_station() -> void:
 	monitor_mesh.size = Vector3(1.06, 0.72, 0.10)
 	monitor_mesh.material = WorldLook.surface(Color("171b16"), "metal", 914)
 	monitor.mesh = monitor_mesh
-	monitor.position = Vector3(-0.15, 1.72, 0.18)
+	# Keep the monitor just right of centre.  The examiner works beside it on
+	# the left, never in front of the one thing the trapped player can read.
+	monitor.position = Vector3(0.52, 1.72, 0.28)
 	station.add_child(monitor)
 	for line_index in 9:
 		var code := MeshInstance3D.new()
 		var code_mesh := BoxMesh.new()
-		code_mesh.size = Vector3(0.22 + float((line_index * 37) % 52) * 0.011, 0.025, 0.018)
+		var code_width := 0.22 + float((line_index * 37) % 52) * 0.011
+		code_mesh.size = Vector3(code_width, 0.025, 0.018)
 		var code_material := StandardMaterial3D.new()
 		code_material.albedo_color = Color("86b56c") if line_index % 3 else Color("bd6c43")
 		code_material.emission_enabled = true
 		code_material.emission = code_material.albedo_color * 0.75
 		code_mesh.material = code_material
 		code.mesh = code_mesh
-		code.position = Vector3(-0.58, 1.94 - float(line_index) * 0.055, 0.115)
+		# The text sits on the monitor's camera-facing surface, aligned inside its
+		# frame rather than accidentally hovering behind it.
+		code.position = Vector3(0.05 + code_width * 0.5, 1.94 - float(line_index) * 0.055, 0.345)
 		station.add_child(code)
+	var keyboard := MeshInstance3D.new()
+	var keyboard_mesh := BoxMesh.new()
+	keyboard_mesh.size = Vector3(0.86, 0.045, 0.38)
+	keyboard_mesh.material = WorldLook.surface(Color("181612"), "metal", 921)
+	keyboard.mesh = keyboard_mesh
+	keyboard.position = Vector3(0.50, 1.16, 0.54)
+	station.add_child(keyboard)
 
 	# One examiner, anonymous and physically present.  He is shaped from the
 	# same primitive grammar as the rest of this prototype so an authored model
 	# can replace these nodes without changing the opening choreography.
 	var examiner := Node3D.new()
 	examiner.name = "UnknownExaminer"
-	examiner.position = Vector3(1.25, 0.0, 0.08)
+	# He works at the left of the terminal, never directly in front of the
+	# monitor. The trapped player can read its code before the form appears.
+	examiner.position = Vector3(-1.18, 0.0, 0.22)
 	station.add_child(examiner)
 	var torso := MeshInstance3D.new()
 	var torso_mesh := CapsuleMesh.new()
 	torso_mesh.radius = 0.28
 	torso_mesh.height = 1.28
-	torso_mesh.material = WorldLook.surface(Color("171512"), "cloth", 915)
+	torso_mesh.material = WorldLook.surface(Color("171118"), "cloth", 915)
 	torso.mesh = torso_mesh
 	torso.position = Vector3(0, 1.35, 0)
 	torso.rotation_degrees.x = 11.0
 	examiner.add_child(torso)
+	# A formal, almost ecclesiastical government coat: dark body, hard collar,
+	# and a state seal that reads as occult bureaucracy rather than a generic
+	# lab coat.  This is intentionally an example texture slot for the future
+	# authored uniform, not a second unnamed character.
+	var coat := MeshInstance3D.new()
+	var coat_mesh := CylinderMesh.new()
+	coat_mesh.top_radius = 0.30
+	coat_mesh.bottom_radius = 0.40
+	coat_mesh.height = 1.20
+	coat_mesh.material = WorldLook.surface(Color("21101b"), "cloth", 919)
+	coat.mesh = coat_mesh
+	coat.position = Vector3(0.0, 1.26, 0.025)
+	coat.rotation_degrees.x = 11.0
+	examiner.add_child(coat)
+	var collar := MeshInstance3D.new()
+	var collar_mesh := TorusMesh.new()
+	collar_mesh.inner_radius = 0.16
+	collar_mesh.outer_radius = 0.225
+	collar_mesh.material = WorldLook.surface(Color("5a3b20"), "metal", 920)
+	collar.mesh = collar_mesh
+	collar.position = Vector3(0.0, 1.91, 0.24)
+	collar.rotation_degrees.x = 90.0
+	examiner.add_child(collar)
+	# A deliberately neutral state seal: copper geometry on a severe coat, not
+	# an unrelated faction logo pasted onto the doctor.  It marks an example
+	# texture/insignia zone for later authored government art.
+	var seal_material := WorldLook.surface(Color("ad5a2c"), "metal", 922)
+	var seal_disc := MeshInstance3D.new()
+	var seal_disc_mesh := CylinderMesh.new()
+	seal_disc_mesh.top_radius = 0.145
+	seal_disc_mesh.bottom_radius = 0.145
+	seal_disc_mesh.height = 0.025
+	seal_disc_mesh.material = seal_material
+	seal_disc.mesh = seal_disc_mesh
+	seal_disc.position = Vector3(0.0, 1.48, 0.365)
+	seal_disc.rotation_degrees.x = 90.0
+	examiner.add_child(seal_disc)
+	for spoke_index in 6:
+		var spoke := MeshInstance3D.new()
+		var spoke_mesh := BoxMesh.new()
+		spoke_mesh.size = Vector3(0.019, 0.21, 0.02)
+		spoke_mesh.material = seal_material
+		spoke.mesh = spoke_mesh
+		spoke.position = Vector3(0.0, 1.48, 0.392)
+		spoke.rotation_degrees.z = float(spoke_index) * 60.0
+		examiner.add_child(spoke)
+	var seal_ring := MeshInstance3D.new()
+	var seal_ring_mesh := TorusMesh.new()
+	seal_ring_mesh.inner_radius = 0.092
+	seal_ring_mesh.outer_radius = 0.11
+	seal_ring_mesh.material = seal_material
+	seal_ring.mesh = seal_ring_mesh
+	seal_ring.position = Vector3(0.0, 1.48, 0.405)
+	seal_ring.rotation_degrees.x = 90.0
+	examiner.add_child(seal_ring)
 	var head := MeshInstance3D.new()
 	var head_mesh := SphereMesh.new()
 	head_mesh.radius = 0.20
 	head_mesh.height = 0.42
 	head_mesh.material = WorldLook.surface(Color("5a4235"), "flesh", 916)
 	head.mesh = head_mesh
-	head.position = Vector3(-0.08, 2.13, -0.06)
+	head.position = Vector3(-0.08, 2.13, 0.15)
 	examiner.add_child(head)
 	for side in [-1.0, 1.0]:
 		var arm := MeshInstance3D.new()
@@ -452,15 +559,22 @@ func _build_examination_station() -> void:
 		arm_mesh.height = 0.78
 		arm_mesh.material = WorldLook.surface(Color("24201a"), "cloth", 917 + int(side))
 		arm.mesh = arm_mesh
-		arm.position = Vector3(side * 0.31, 1.45, -0.22)
+		arm.position = Vector3(side * 0.31, 1.45, 0.10)
 		arm.rotation_degrees = Vector3(72.0, 0.0, side * 12.0)
 		examiner.add_child(arm)
 	var screen_light := OmniLight3D.new()
-	screen_light.position = Vector3(-0.15, 1.6, -0.18)
+	screen_light.position = Vector3(0.52, 1.6, 0.02)
 	screen_light.light_color = Color("8bbd79")
-	screen_light.light_energy = 2.0
+	screen_light.light_energy = 4.4
 	screen_light.omni_range = 3.4
 	station.add_child(screen_light)
+	var examination_light := OmniLight3D.new()
+	examination_light.name = "ExaminationLight"
+	examination_light.position = Vector3(-0.28, 2.75, 0.34)
+	examination_light.light_color = Color("d49162")
+	examination_light.light_energy = 3.0
+	examination_light.omni_range = 5.2
+	station.add_child(examination_light)
 
 
 func _dead_tank(at: Vector3, seed_value: int) -> void:
@@ -470,7 +584,7 @@ func _dead_tank(at: Vector3, seed_value: int) -> void:
 	cylinder.bottom_radius = 0.8
 	cylinder.height = 2.8
 	var shell_material := StandardMaterial3D.new()
-	shell_material.albedo_color = Color(0.2, 0.26, 0.22, 0.4)
+	shell_material.albedo_color = Color(0.31, 0.055, 0.035, 0.35)
 	shell_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	shell_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	shell_material.roughness = 0.4
@@ -478,16 +592,37 @@ func _dead_tank(at: Vector3, seed_value: int) -> void:
 	shell.mesh = cylinder
 	shell.position = at + Vector3(0, 1.4, 0)
 	add_child(shell)
-	# Whatever is inside is a silhouette and stays one.
-	var occupant := MeshInstance3D.new()
-	var body := CapsuleMesh.new()
-	body.radius = 0.26
-	body.height = 1.5 - float(seed_value % 3) * 0.2
-	body.material = WorldLook.surface(Color("241a16"), "flesh", seed_value)
-	occupant.mesh = body
-	occupant.position = at + Vector3(0, 1.1, 0)
-	occupant.rotation_degrees = Vector3(float(seed_value % 5) * 4.0, 0, float(seed_value % 7) * 3.0)
-	add_child(occupant)
+	var culture := MeshInstance3D.new()
+	var culture_column := CylinderMesh.new()
+	culture_column.top_radius = 0.74
+	culture_column.bottom_radius = 0.74
+	culture_column.height = 2.58
+	var culture_material := StandardMaterial3D.new()
+	culture_material.albedo_color = Color(0.38, 0.018, 0.011, 0.28)
+	culture_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	culture_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	culture_material.emission_enabled = true
+	culture_material.emission = Color(0.14, 0.004, 0.002)
+	culture_column.material = culture_material
+	culture.mesh = culture_column
+	culture.position = at + Vector3(0, 1.38, 0)
+	add_child(culture)
+	# The closest four tanks use the exact same body rig and appearance grammar
+	# as people in the overworld.  Farther down the corridor they deliberately
+	# collapse back to cheap silhouettes; they are too distant to justify full
+	# anatomy and that keeps the opening inside the performance budget.
+	if seed_value <= 2:
+		_build_cradled_vat_subject(at, seed_value)
+	else:
+		var occupant := MeshInstance3D.new()
+		var body := CapsuleMesh.new()
+		body.radius = 0.26
+		body.height = 1.5 - float(seed_value % 3) * 0.2
+		body.material = WorldLook.surface(Color("241a16"), "flesh", seed_value)
+		occupant.mesh = body
+		occupant.position = at + Vector3(0, 1.1, 0)
+		occupant.rotation_degrees = Vector3(float(seed_value % 5) * 4.0, 0, float(seed_value % 7) * 3.0)
+		add_child(occupant)
 	for rib in 4:
 		var ring := MeshInstance3D.new()
 		var torus := TorusMesh.new()
@@ -498,6 +633,43 @@ func _dead_tank(at: Vector3, seed_value: int) -> void:
 		ring.position = at + Vector3(0, 0.3 + float(rib) * 0.8, 0)
 		ring.rotation_degrees = Vector3(90, 0, 0)
 		add_child(ring)
+
+
+## A seated BaselineHuman makes the first visible other subjects recognisably
+## part of the same world as the player: hands, face, feet, clothing and a
+## body which could be wounded later.  Their frozen pose costs no AI, physics
+## thinking, or animation work while they remain background specimens.
+func _build_cradled_vat_subject(at: Vector3, seed_value: int, parent_node: Node3D = null) -> Node3D:
+	var identity := "vat_subject_%d_%d" % [seed_value, int(absf(at.x) * 10.0)]
+	var rig = BASELINE_HUMAN.new()
+	rig.name = "CradledSubject_%d" % seed_value
+	rig.position = at + Vector3(0.0, 0.34, 0.0)
+	rig.rotation_degrees = Vector3(0.0, 180.0 if at.x < 0.0 else 0.0, -10.0 if seed_value == 1 else 13.0)
+	rig.scale = Vector3.ONE * 0.92
+	var host: Node3D = self if parent_node == null else parent_node
+	host.add_child(rig)
+	rig.build(identity, {
+		"gore": false,
+		"seated": true,
+		"flesh": Color("6a4a43") if seed_value == 1 else Color("4d3833"),
+		"variation": 4 + seed_value * 5 + int(absf(at.x)),
+		"build": 0.92 + float(seed_value) * 0.04,
+	})
+	HUNTER_APPEARANCE.style_world_rig(rig, identity, false)
+	# Fold the seated pose inward around the tank's centre instead of presenting
+	# two relaxed mannequins.  One is still alive; the other is visibly failed.
+	for side in [-1.0, 1.0]:
+		var arm := rig.parts.get("left_arm" if side < 0.0 else "right_arm") as Node3D
+		if arm != null:
+			arm.rotation_degrees.z += side * 54.0
+			arm.rotation_degrees.x += 24.0
+	for leg_id in ["left_leg", "right_leg"]:
+		var leg := rig.parts.get(leg_id) as Node3D
+		if leg != null:
+			leg.rotation_degrees.x -= 38.0
+	if seed_value == 2:
+		rig.behead()
+	return rig
 
 
 func _slab(dimensions: Vector3, at: Vector3, kind: String, color: Color) -> void:
@@ -562,7 +734,7 @@ func _update_sequence(_delta: float) -> void:
 			# Suspended, drifting, breathing something thicker than air.
 			var t := clampf(clock / 3.2, 0.0, 1.0)
 			fade.color.a = clampf(1.0 - clock / 2.2, 0.0, 1.0)
-			submerge_tint.color.a = 0.42
+			submerge_tint.color.a = 0.26
 			camera.rotation = Vector3(sin(clock * 0.7) * 0.09 - 0.1, sin(clock * 0.4) * 0.16, cos(clock * 0.55) * 0.07)
 			camera.fov = 92.0 + sin(clock * 1.6) * 3.5
 			player.position.y = 1.35 + sin(clock * 0.8) * 0.06
@@ -576,7 +748,7 @@ func _update_sequence(_delta: float) -> void:
 			var height := lerpf(2.9, 0.25, ease(t, 0.7))
 			fluid.mesh.height = height
 			fluid.position.y = height * 0.5
-			submerge_tint.color.a = lerpf(0.42, 0.0, t)
+			submerge_tint.color.a = lerpf(0.26, 0.0, t)
 			camera.fov = lerpf(92.0, 78.0, t)
 			player.position.y = lerpf(1.35, 0.95, ease(t, 0.6))
 			camera.rotation = Vector3(sin(clock * 0.9) * 0.06 * (1.0 - t) - 0.1 * (1.0 - t), sin(clock * 0.5) * 0.1 * (1.0 - t), 0)
@@ -763,6 +935,8 @@ func _try_pry_stuck_tank() -> bool:
 	# the occupant underneath was always real geometry, not a reveal that
 	# pops into existence on the prompt.
 	stuck_tank_shell.visible = false
+	if stuck_tank_culture != null:
+		stuck_tank_culture.visible = false
 	subtitle.text = "THE BROKEN RESTRAINT BITES THE SEAM AND IT GIVES"
 	WorldHistory.record_event("opening_first_object_used", {"tool": RESTRAINT_LABEL, "target": FAILED_SUBJECT_ID})
 	return true

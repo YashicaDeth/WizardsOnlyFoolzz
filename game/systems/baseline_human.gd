@@ -1035,13 +1035,18 @@ static func config_from_subject(record: Dictionary) -> Dictionary:
 	var appearance: Dictionary = record.get("appearance", {}) if record.get("appearance") is Dictionary else {}
 	var sheet_anatomy: Dictionary = record.get("anatomy", {}) if record.get("anatomy") is Dictionary else {}
 	var wear := clampf(float(appearance.get("wear", 0.4)), 0.0, 1.0)
+	# Origin gives the body its broad silhouette, while the intake BUILD control
+	# makes a real, bounded difference inside that origin.  Before this, the form
+	# displayed a size setting but the player rig ignored it completely.
+	var selected_build := clampf(float(appearance.get("build", 0.5)), 0.0, 1.0)
+	var combined_build := clampf(float(race.get("build", 1.0)) * lerpf(0.86, 1.18, selected_build), 0.7, 1.4)
 	var config := {
 		# Face drives the rig's procedural variation, so two players with
 		# different faces are not the same generated head.
 		"variation": 1 + int(clampf(float(appearance.get("face", 0.5)), 0.0, 1.0) * 24.0),
 		"flesh": Color("7a6350").darkened(wear * 0.35),
 		"blood": blood_volume(str(sheet_anatomy.get("blood_type", "O-RUST"))),
-		"build": float(race.get("build", 1.0)),
+		"build": combined_build,
 		"cybernetics": grown_cybernetics(sheet_anatomy),
 	}
 	if record.get("anatomy_state") is Dictionary:

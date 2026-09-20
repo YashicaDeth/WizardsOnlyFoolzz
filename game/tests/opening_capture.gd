@@ -1,7 +1,7 @@
 extends Node
 
-## Visual proof for G6. Captures the three authored opening states from the
-## actual playable scene: handler intake, submerged wake, and the tank voiding.
+## Visual proof for G6. Captures the pre-form laboratory, the live 3D body form,
+## submerged wake, and the tank voiding from the actual playable scene.
 
 func _ready() -> void:
 	var out_dir := "P:/GameDev/Temp"
@@ -13,6 +13,10 @@ func _ready() -> void:
 	add_child(opening)
 	await _hold(30)
 	await _capture("%s/opening_intake.png" % out_dir)
+	# The room has a short beat before the paperwork arrives. Capture the form
+	# separately so a review cannot accidentally approve only the prelude.
+	await _hold(90)
+	await _capture("%s/opening_intake_form.png" % out_dir)
 
 	var state: Dictionary = opening.intake.sheet.apply_to_world()
 	opening.intake.filed.emit(state)

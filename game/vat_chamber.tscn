@@ -24,7 +24,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.101961, 0.203922, 0.145098, 0.619608)
+color = Color(0.225, 0.012, 0.008, 0.70)
 
 [node name="Fade" type="ColorRect" parent="HUD"]
 layout_mode = 1
