@@ -14,6 +14,7 @@ extends Node3D
 const OPENING := preload("res://systems/opening_director.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const ANATOMY := preload("res://systems/anatomy_component.gd")
+const IMPLANT_CATALOG := preload("res://systems/implant_catalog.gd")
 const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
@@ -562,14 +563,15 @@ func _record_breakout() -> void:
 	breakout_complete = true
 	var player_state := WorldHistory.subject("player")
 	var anatomy_state: Dictionary = player_state.get("anatomy", {})
-	# Anatomy snapshots store installed hardware by body zone. Older intake data
-	# may still contain a plain list, so resolve both forms before adding the
-	# chip; never push a string into the typed implant list.
-	var grown: Dictionary = {}
-	for implant: Dictionary in IMPLANT_CATALOG.list(anatomy_state.get("cybernetics", {})):
-		grown[str(implant.get("zone", "torso"))] = implant
-	var wetwire: Dictionary = IMPLANT_CATALOG.resolve("wetwire chip")
-	grown[str(wetwire.zone)] = wetwire
+	# WorldHistory migrates filed hardware to typed catalogue dictionaries. Keep
+	# the breakout on that same representation; appending the implant id string
+	# directly makes Godot reject the value and leaves the first implant absent.
+	var grown: Array = []
+	for part in IMPLANT_CATALOG.list(anatomy_state.get("cybernetics", [])):
+		grown.append(part)
+	var has_wetwire := grown.any(func(part: Dictionary) -> bool: return str(part.get("id", "")) == "wetwire chip")
+	if not has_wetwire:
+		grown.append(IMPLANT_CATALOG.resolve({"id": "wetwire chip", "name": "wetwire chip"}))
 	anatomy_state["cybernetics"] = grown
 	WorldHistory.begin_ledger_batch()
 	anatomy.call("configure", "player", 5000.0, grown)
