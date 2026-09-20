@@ -184,6 +184,14 @@ var pitch := -0.12
 ## the right way round for this project: third person is the abstract view, the
 ## one where you look at yourself as an object, and it should cost something.
 ##
+## AX5.2. Not a settings toggle, either — something CellOutz put in your skull
+## alongside the rest of the WETWIRE (see `DESIGN/THE_BRAIN.md`'s chip). `F`
+## has never turned on a camera *mode*; it has always been asking whether the
+## hardware is there to answer. `third_person_refusal()` and
+## `_announce_third_person_unlock()` are where that gets said out loud — the
+## first real kill is the moment the relay goes live, not a card that explains
+## a setting.
+##
 ## The condition is read out of `WorldHistory`, never stored — the same rule the
 ## Board runs on, so there is nothing to get out of sync.
 var third_person := false
@@ -6573,6 +6581,12 @@ func _announce_wall_run_unlock() -> void:
 ## kick, and a line of content. `third_person_unlock_felt` is recorded once
 ## and only once, so replaying this scene, or the check re-running every
 ## second, can never trigger the feeling twice.
+##
+## AX5.2. The line below used to read as a metaphor for detachment; it is not
+## one. This game's third person is real implanted optics going live for the
+## first time, the way `took_wire` is a real handheld you physically picked
+## up (`OpeningDirector`) — hardware CellOutz put in your skull, not a
+## setting you agreed to.
 func _check_third_person_unlock_feel() -> void:
 	if WorldHistory.event_count("third_person_unlock_felt") > 0:
 		return
@@ -6581,11 +6595,13 @@ func _check_third_person_unlock_feel() -> void:
 	WorldHistory.record_event("third_person_unlock_felt", {"location": HUNT_LOCATION})
 	if impact_feel != null:
 		impact_feel.strike(0.85, "unlock", false)
-	prompt.text = "SOMETHING IN YOU STEPS BACK, LOOKING — [F] TO LEAVE YOUR BODY"
+	prompt.text = "SOMETHING BEHIND YOUR EYES JUST CAME ONLINE — [F] TO SEE FROM OUTSIDE IT"
 
 
 ## What the player is told when they press the key too early. Never a silent
 ## refusal: a control that does nothing reads as a bug, and this one is content.
+## AX5.2. Named as hardware, not a locked menu option — there is nothing to
+## switch on yet, only wiring nobody has activated.
 func third_person_refusal() -> String:
 	return "FIRST CONTACT UNLOCKS THE OUTSIDE VIEW // LAND ONE HIT, THEN [F]"
 
@@ -6595,12 +6611,17 @@ func third_person_refusal() -> String:
 ## of jolt a real hit gets (through `impact_feel`, not a fresh effect system),
 ## and the moment is written to history so the Board can pin it like anything
 ## else that happened to the player, rather than it living only in a flag.
+##
+## AX5.2. `hardware` on the recorded event is additive, not a rename — nothing
+## reads it yet, but it names what actually happened for whatever eventually
+## does (the Board, a pin, an implant-condition system) rather than leaving it
+## implicit in a prompt string.
 func _announce_third_person_unlock() -> void:
-	prompt.text = "SOMETHING IN YOU STEPS BACK. [F] LEAVES YOUR OWN EYES NOW."
+	prompt.text = "THE IMPLANT SETTLES BEHIND YOUR EYES. [F] STEPS OUTSIDE YOUR OWN SKULL NOW."
 	if impact_feel != null:
 		impact_feel.kick += Vector2(0, -1.0) * 0.05
 		impact_feel.shake = maxf(impact_feel.shake, 0.6)
-	WorldHistory.record_event("third_person_unlocked", {"location": HUNT_LOCATION})
+	WorldHistory.record_event("third_person_unlocked", {"location": HUNT_LOCATION, "hardware": "ocular_relay"})
 
 
 ## AG2. The card's contents, written here rather than inside the card, because

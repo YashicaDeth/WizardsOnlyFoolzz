@@ -1007,6 +1007,56 @@ func distort(text: String, hops: int) -> String:
 
 # --- the feed --------------------------------------------------------------
 
+## C10.13. The archive and the feed read the same history and disagree about
+## it. The archive does not keep a second copy of events: every time it is
+## opened it projects the exact `WorldHistory` record into a finite, newest-
+## first register. `details` is duplicated so a screen cannot amend history by
+## editing a row it was handed.
+func archive(limit: int = 12) -> Array:
+	var events: Array = WorldHistory.recent_events(maxi(0, limit))
+	events.reverse()
+	var records: Array = []
+	for event: Dictionary in events:
+		var details: Dictionary = event.get("details", {})
+		records.append({
+			"id": str(event.get("id", "")),
+			"sequence": int(event.get("sequence", 0)),
+			"type": str(event.get("type", "unknown")),
+			"body": _archive_body(event),
+			"details": details.duplicate(true),
+		})
+	return records
+
+
+## A compact factual line for the physical register. It deliberately does no
+## rumour inference and invents no connective prose: event type, named subject,
+## place/outcome and changed fields are only printed when the record contains
+## them. The full exact dictionary remains beside it in `archive()`.
+func _archive_body(event: Dictionary) -> String:
+	var details: Dictionary = event.get("details", {})
+	var facts: Array[String] = []
+	var subject_id := str(details.get("subject_id", details.get("subject", "")))
+	if not subject_id.is_empty():
+		var subject_name := str(WorldHistory.subject(subject_id).get("name", subject_id))
+		facts.append("SUBJECT %s" % subject_name.to_upper())
+	for key in ["location", "outcome", "reason", "stage"]:
+		if details.has(key) and str(details[key]) != "":
+			facts.append("%s %s" % [str(key).to_upper(), str(details[key]).to_upper()])
+	var changes: Dictionary = details.get("changes", {})
+	var change_keys: Array = changes.keys()
+	change_keys.sort()
+	for key in change_keys:
+		facts.append("%s=%s" % [str(key).to_upper(), str(changes[key]).to_upper()])
+	var detail_keys: Array = details.keys()
+	detail_keys.sort()
+	for key in detail_keys:
+		if key in ["subject_id", "subject", "location", "outcome", "reason", "stage", "changes"]:
+			continue
+		if details[key] is Dictionary:
+			continue
+		facts.append("%s %s" % [str(key).to_upper(), str(details[key]).to_upper()])
+	return " / ".join(facts) if not facts.is_empty() else "NO FIELDS RECORDED"
+
 ## An endless scroll that is not sorted for the reader's benefit. Real world
 ## history is interleaved with the register the design names — doom, wellness
 ## frequency mysticism, conspiracy collage, engagement bait, bots arguing with
@@ -1070,11 +1120,14 @@ func feed(count: int = 14, seed_offset: int = 0) -> Array:
 	var traffic := network_activity()
 	var report_stride := 2 if traffic >= 0.72 else (3 if traffic >= 0.38 else 4)
 	for index in count:
-		# The proportion of live world reports now follows who is awake. Filler
-		# never disappears—the platform is still farming attention during quiet
-		# hours—but a crowded Wire carries events sooner and more often.
-		if index % report_stride == 1 and not reports.is_empty():
-			var event: Dictionary = reports[index % reports.size()]
+		# Roughly one post in three is the world actually reporting on itself.
+		# The rest is what the platform would rather you read.
+		if index % 3 == 1 and not reports.is_empty():
+			# Advance through the receipts one by one. `index % reports.size()`
+			# only ever selected two of six records at the 1,4,7... report slots,
+			# silently making the newest acts impossible to see in the feed.
+			var report_index := floori(float(index) / 3.0) % reports.size()
+			var event: Dictionary = reports[report_index]
 			posts.append(_report_post(event, rng, voices))
 			continue
 		var kind: String = kinds[rng.randi_range(0, kinds.size() - 1)]
@@ -1107,6 +1160,11 @@ func _report_post(event: Dictionary, rng: RandomNumberGenerator, _voices: Array)
 		"band": SIGNAL_SURFACE,
 		"replies": rng.randi_range(40, 900),
 		"hops": hops,
+		# The receipt survives the retelling. This is what lets the archive and
+		# feed be compared as two accounts of one act instead of two unrelated
+		# strings that merely look different.
+		"source_event_id": str(event.get("id", "")),
+		"source_sequence": int(event.get("sequence", 0)),
 	}
 
 
