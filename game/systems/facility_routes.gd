@@ -12,6 +12,13 @@ const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const ROUTE_STEALTH := "maintenance_ascent"
 const ROUTE_COOPERATION := "undercroft_compact"
 const ROUTE_ASSAULT := "executive_breach"
+const ROUTE_RECAPTURE := "containment_derby"
+
+const CONTAINMENT_MECHANISMS := {
+	"implant_suppression_lattice": "The rewritten brain implant is pinned by a tuned suppression lattice.",
+	"anesthetic_flood": "A marked ventilation sector floods with visible anesthetic.",
+	"electromagnetic_snare": "A powered floor snare arrests the escaped body's implants.",
+}
 
 const DISTRICTS := {
 	"growing_floor": {"name": "Growing Floor", "kind": "occult_laboratory"},
@@ -25,6 +32,10 @@ const DISTRICTS := {
 	"containment_concourse": {"name": "Containment Concourse", "kind": "industrial_prison"},
 	"executive_transit": {"name": "Executive Transit", "kind": "corporate_laboratory"},
 	"blast_shaft": {"name": "Executive Blast Shaft", "kind": "surface_exit"},
+	"processing_chute": {"name": "Reprocessing Chute", "kind": "industrial_prison"},
+	"underground_colosseum": {"name": "Underground Colosseum", "kind": "occult_entertainment"},
+	"lockdown_grid": {"name": "Lockdown Grid", "kind": "maintenance_network"},
+	"vehicle_sallyport": {"name": "Vehicle Sallyport", "kind": "surface_exit"},
 }
 
 const CONNECTIONS := [
@@ -38,6 +49,10 @@ const CONNECTIONS := [
 	["growing_floor", "containment_concourse"],
 	["containment_concourse", "executive_transit"],
 	["executive_transit", "blast_shaft"],
+	["growing_floor", "processing_chute"],
+	["processing_chute", "underground_colosseum"],
+	["underground_colosseum", "lockdown_grid"],
+	["lockdown_grid", "vehicle_sallyport"],
 ]
 
 const ROUTES := {
@@ -82,6 +97,16 @@ const ROUTES := {
 		"mastery_route": true,
 		"avoids_derby": true,
 	},
+	ROUTE_RECAPTURE: {
+		"approach": "recapture_into_derby",
+		"label": "CONTAINMENT / UNDERGROUND DERBY",
+		"steps": ["processing_chute", "underground_colosseum", "lockdown_grid", "vehicle_sallyport"],
+		"exit": "vehicle_sallyport",
+		"surface_position": Vector3(4.0, 0.0, -24.0),
+		"surface_relationships": {"ashline_wreckers": 12, "celloutz": -18},
+		"mastery_route": false,
+		"avoids_derby": false,
+	},
 }
 
 
@@ -98,6 +123,8 @@ static func ensure() -> Dictionary:
 			"pending_surface_handoff": {},
 			"route_choice": "",
 			"assault_control_points": [],
+			"derby_exit_earned": false,
+			"containment_mechanism": "",
 		})
 	return record
 
@@ -115,7 +142,9 @@ static func available_routes() -> Array[String]:
 
 static func begin(route_id: String) -> bool:
 	var definition := route(route_id)
-	if definition.is_empty():
+	# The derby is an institutional consequence, never a route selected from a
+	# menu.  Only `apply_recapture()` can enter it, with a demonstrated cause.
+	if definition.is_empty() or route_id == ROUTE_RECAPTURE:
 		return false
 	var record := ensure()
 	if not (record.get("pending_surface_handoff", {}) as Dictionary).is_empty():
@@ -126,6 +155,8 @@ static func begin(route_id: String) -> bool:
 		"route_steps": [],
 		"route_choice": "",
 		"assault_control_points": [],
+		"derby_exit_earned": false,
+		"containment_mechanism": "",
 	})
 	PLAYER_ACTION_LEDGER.record("facility_route_begun", {
 		"subject_id": "player",
@@ -151,6 +182,8 @@ static func traverse(district_id: String) -> bool:
 		var control_points: Array = record.get("assault_control_points", [])
 		if steps.size() >= control_points.size() or str(required[steps.size()]) != str(control_points[steps.size()]):
 			return false
+	if route_id == ROUTE_RECAPTURE and district_id == "lockdown_grid" and not bool(record.get("derby_exit_earned", false)):
+		return false
 	var from_id := str(record.get("current_district", "growing_floor"))
 	if not _connected(from_id, district_id):
 		return false
@@ -167,6 +200,51 @@ static func traverse(district_id: String) -> bool:
 	var choice_ready := not bool(definition.get("choice_required", false)) or not str(record.get("route_choice", "")).is_empty()
 	if steps.size() == expected.size() and choice_ready:
 		_complete(route_id, definition)
+	WorldHistory.commit_ledger_batch()
+	return true
+
+
+static func apply_recapture(mechanism_id: String, demonstrated_in_play: bool) -> bool:
+	if not demonstrated_in_play or not CONTAINMENT_MECHANISMS.has(mechanism_id):
+		return false
+	var record := ensure()
+	if not (record.get("pending_surface_handoff", {}) as Dictionary).is_empty():
+		# A successful escape is already true. It cannot be revoked to preserve
+		# the derby spine; any later pursuit belongs to the surface world.
+		return false
+	var interrupted_route := str(record.get("active_route", ""))
+	WorldHistory.begin_ledger_batch()
+	WorldHistory.amend_subject(SUBJECT, {
+		"active_route": ROUTE_RECAPTURE,
+		"current_district": "processing_chute",
+		"route_steps": ["processing_chute"],
+		"route_choice": "",
+		"containment_mechanism": mechanism_id,
+		"derby_exit_earned": false,
+	})
+	PLAYER_ACTION_LEDGER.record("facility_player_recaptured", {
+		"subject_id": "player", "route_id": ROUTE_RECAPTURE,
+		"interrupted_route": interrupted_route, "mechanism_id": mechanism_id,
+		"demonstrated_cause": CONTAINMENT_MECHANISMS[mechanism_id],
+		"destination": "res://underground_colosseum.tscn",
+	})
+	WorldHistory.commit_ledger_batch()
+	return true
+
+
+static func earn_derby_exit(demonstrated_cause: String) -> bool:
+	var record := ensure()
+	if str(record.get("active_route", "")) != ROUTE_RECAPTURE or demonstrated_cause.is_empty():
+		return false
+	var steps: Array = record.get("route_steps", [])
+	if steps != ["processing_chute", "underground_colosseum"]:
+		return false
+	WorldHistory.begin_ledger_batch()
+	WorldHistory.amend_subject(SUBJECT, {"derby_exit_earned": true})
+	PLAYER_ACTION_LEDGER.record("facility_derby_exit_earned", {
+		"subject_id": "player", "route_id": ROUTE_RECAPTURE,
+		"cause": demonstrated_cause,
+	})
 	WorldHistory.commit_ledger_batch()
 	return true
 

@@ -102,6 +102,7 @@ const MISFIRE_DIRECTOR := preload("res://systems/reality_misfire_director.gd")
 ## the race entirely rather than only hiding it.
 const SCRAP_SKIFF_PATH := "res://art/scrap_skiff.glb"
 const HUNTER_MOTOR := preload("res://systems/hunter_motor.gd")
+const FACILITY_ROUTES := preload("res://systems/facility_routes.gd")
 const LIVE_BODY_MIRROR := preload("res://systems/live_body_mirror.gd")
 const BLOOD_VEIL := preload("res://systems/blood_veil.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
@@ -815,6 +816,16 @@ func _ready() -> void:
 	# a static the hunt never reset.
 	BaselineHuman.clear_gore()
 	viscera_fx = BaselineHuman.apply_gore_setting()
+	# AX4.4. Every facility exit enters this same persistent surface scene, but
+	# not at the same spot or with the same friends. Consume the one-shot handoff
+	# before building the world so population, pursuit and the camera all inherit
+	# the authored arrival rather than teleporting after the first frame.
+	var facility_handoff := FACILITY_ROUTES.pending_surface_handoff()
+	if not facility_handoff.is_empty():
+		var arrival: Array = facility_handoff.get("surface_position", [])
+		if arrival.size() == 3:
+			player = Vector3(float(arrival[0]), float(arrival[1]) + 1.5, float(arrival[2]))
+		FACILITY_ROUTES.consume_surface_handoff()
 	_build_world()
 	handheld = HANDHELD.new()
 	handheld.name = "Handheld"
