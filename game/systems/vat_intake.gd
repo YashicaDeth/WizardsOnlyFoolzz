@@ -329,8 +329,13 @@ func _draw() -> void:
 
 ## You are looking out through it, so the whole screen is under water before
 ## anything else is drawn on top.
+##
+## SLICE, 20 September. The examination played against a flat near-black --
+## `_draw_lab_room()` is the other side of the glass, drawn first so the water
+## tint, the bubbles and the grain that follow all read as medium *between*
+## the player and a real room, not as the only thing there.
 func _draw_tank(viewport: Vector2) -> void:
-	draw_rect(Rect2(Vector2.ZERO, viewport), Color(0.06, 0.075, 0.05, 1.0))
+	_draw_lab_room(viewport)
 	for band in 26:
 		var travel := float(band) / 26.0
 		draw_rect(Rect2(Vector2(0, viewport.y * travel), Vector2(viewport.x, viewport.y / 26.0 + 1.0)), GOO * Color(1, 1, 1, 0.05 + sin(elapsed * 0.6 + travel * 7.0) * 0.02))
@@ -347,6 +352,116 @@ func _draw_tank(viewport: Vector2) -> void:
 	draw_line(Vector2(viewport.x * 0.5, viewport.y), Vector2(viewport.x * 0.46, viewport.y * 0.78), Color(0.5, 0.45, 0.38, 0.5), 9.0)
 	draw_line(Vector2(viewport.x * 0.5, viewport.y), Vector2(viewport.x * 0.46, viewport.y * 0.78), Color(0.2, 0.18, 0.15, 0.6), 5.0)
 	Grunge.grain(self, Rect2(Vector2.ZERO, viewport), 7717, 700)
+
+
+## The room on the other side of the glass. Direction doc, verbatim: "bright
+## enough to read, but bloodied, gory, clinically humiliating and filled with
+## esoteric institutional art." Lit rather than dark, then dressed until it
+## earns that second half of the sentence.
+##
+## Owns only what is behind and around the examination -- the clipboard, the
+## mirror and the examiner himself are drawn afterward, on top, by the calls
+## that already own them.
+func _draw_lab_room(viewport: Vector2) -> void:
+	draw_rect(Rect2(Vector2.ZERO, viewport), Color(0.15, 0.18, 0.14))
+	for strip in 5:
+		var travel := float(strip) / 5.0
+		var tone := Color(0.32, 0.37, 0.29).lerp(Color(0.11, 0.13, 0.10), travel)
+		draw_rect(Rect2(Vector2(0, viewport.y * travel), Vector2(viewport.x, viewport.y / 5.0 + 1.0)), tone)
+
+	_draw_background_tanks(viewport)
+	_draw_gurney_and_gore(viewport)
+	_draw_surveillance(viewport)
+	_draw_institutional_art(viewport)
+
+	# Grated floor, receding toward a vanishing point rather than sitting flat.
+	var floor_y := viewport.y * 0.86
+	draw_rect(Rect2(Vector2(0, floor_y), Vector2(viewport.x, viewport.y - floor_y)), Color(0.08, 0.09, 0.07))
+	var vanish := Vector2(viewport.x * 0.5, floor_y - 30.0)
+	for line in 14:
+		var x := float(line) / 13.0 * viewport.x
+		draw_line(Vector2(x, viewport.y), vanish, Color(0.03, 0.03, 0.03, 0.35), 1.0)
+
+
+## Other tanks, receding on both sides. `vat_chamber.gd` draws these in 3D for
+## the aisle after decanting; this is the 2D read of the same idea for the
+## examination, so a subject in the water is never the only one in the room.
+func _draw_background_tanks(viewport: Vector2) -> void:
+	for index in 6:
+		var side := -1.0 if index % 2 == 0 else 1.0
+		var depth := float(index / 2)
+		var scale := lerpf(1.0, 0.45, depth / 2.0)
+		var x := viewport.x * (0.5 + side * lerpf(0.34, 0.56, depth / 2.0))
+		var base_y := viewport.y * lerpf(0.80, 0.62, depth / 2.0)
+		var width := 44.0 * scale
+		var height := 150.0 * scale
+		draw_rect(Rect2(Vector2(x - width * 0.5, base_y - height), Vector2(width, height)), Color(0.20, 0.30, 0.22, 0.55 - depth * 0.12))
+		for rib in 4:
+			var ry := base_y - height + height * float(rib) / 3.0
+			draw_line(Vector2(x - width * 0.5 - 3.0, ry), Vector2(x + width * 0.5 + 3.0, ry), Color(0.09, 0.11, 0.08, 0.45 - depth * 0.1), 2.0)
+		# Most of them failed. A dark occupant silhouette, never given a face.
+		var occ_h := height * 0.6
+		draw_rect(Rect2(Vector2(x - width * 0.26, base_y - occ_h - height * 0.12), Vector2(width * 0.52, occ_h)), Color(0.05, 0.045, 0.04, 0.62 - depth * 0.12))
+
+
+## Clinically humiliating rather than clean sci-fi: an exam table with the
+## straps hanging open, and the blood that a growing floor actually produces.
+func _draw_gurney_and_gore(viewport: Vector2) -> void:
+	var at := Vector2(viewport.x * 0.05, viewport.y * 0.79)
+	draw_rect(Rect2(at, Vector2(92, 14)), Color(0.24, 0.23, 0.21))
+	draw_rect(Rect2(at, Vector2(92, 14)), Color(0.08, 0.07, 0.06), false, 1.5)
+	for leg in 2:
+		draw_line(at + Vector2(10.0 + leg * 70.0, 14), at + Vector2(10.0 + leg * 70.0, 46), Color(0.14, 0.13, 0.11), 4.0)
+	# Restraint straps, undone and hanging rather than in use -- somebody was
+	# here before the player and did not stay put.
+	draw_line(at + Vector2(6, 5), at + Vector2(4, 30), BRUISE.darkened(0.1) * Color(1, 1, 1, 0.8), 3.0)
+	draw_line(at + Vector2(84, 5), at + Vector2(88, 28), BRUISE.darkened(0.1) * Color(1, 1, 1, 0.8), 3.0)
+
+	Grunge.stain(self, at + Vector2(46, 32), 34.0, 4471, Grunge.DRIED, 0.32)
+	Grunge.run_down(self, at + Vector2(8, 14), 58.0, 4472, Grunge.WET)
+	Grunge.spatter(self, at + Vector2(72, 2), 4473, 22, Vector2(0.35, -1.0), Grunge.DRIED)
+	# A drip finding its way down the far wall, where the medium cannot reach.
+	Grunge.run_down(self, Vector2(viewport.x * 0.97, 12.0), viewport.y * 0.22, 4475, Grunge.WET)
+
+
+## Heavily surveilled: cameras with a live light, and a monitor running the
+## same degraded readout the player's own vitals will later fail into. The
+## doctor's on-screen notice already says the recording is happening without
+## consent; this is the room agreeing with him rather than leaving it as text.
+func _draw_surveillance(viewport: Vector2) -> void:
+	_draw_camera(Vector2(viewport.x * 0.58, 6.0))
+	_draw_camera(Vector2(viewport.x * 0.985, viewport.y * 0.12))
+
+	var monitor := Rect2(Vector2(viewport.x * 0.985 - 54.0, viewport.y * 0.30), Vector2(54, 40))
+	draw_rect(monitor.grow(3), Color(0.10, 0.09, 0.08))
+	draw_rect(monitor, Color(0.03, 0.10, 0.06))
+	Grunge.vital_interference(self, monitor, 0.45 + 0.2 * sin(elapsed * 0.7), elapsed, 91)
+	CellOutzType.draw_condensed(self, monitor.position + Vector2(4, 12), "SUBJECT VITAL", 6.0, MOSS * Color(1, 1, 1, 0.6), 0.5)
+
+
+func _draw_camera(at: Vector2) -> void:
+	draw_line(at, at + Vector2(0, 18), Color(0.12, 0.11, 0.10), 3.0)
+	var body := Rect2(at + Vector2(-10, 16), Vector2(20, 12))
+	draw_rect(body, Color(0.10, 0.10, 0.10))
+	draw_rect(body, Color(0.30, 0.28, 0.24), false, 1.0)
+	draw_circle(at + Vector2(9, 22), 3.5, Color(0.02, 0.02, 0.02))
+	var blink := 0.5 + 0.5 * sin(elapsed * 3.0 + at.x)
+	draw_circle(at + Vector2(-8, 18), 1.6, HOT * Color(1, 1, 1, 0.5 + blink * 0.5))
+
+
+## Esoteric institutional art, per the direction doc, drawn with the house
+## style rather than invented fresh: `celloutz_type.gd`'s seal vocabulary and
+## `celloutz_branding.gd`'s copy, the same source `_draw_clipboard()` already
+## stamps the form with.
+func _draw_institutional_art(viewport: Vector2) -> void:
+	var plaque := Vector2(viewport.x * 0.985 - 100.0, viewport.y * 0.54)
+	CellOutzType.draw_condensed(self, plaque, "CELLOUTZ", 13.0, PAPER * Color(1, 1, 1, 0.5), 0.8)
+	CellOutzType.draw_condensed(self, plaque + Vector2(0, 16), CellOutzBranding.copy_for("intake", "body_notice"), 7.0, PAPER * Color(1, 1, 1, 0.32), 0.6)
+	CellOutzType.draw_seal_corrupted(self, plaque + Vector2(20, 62), 26.0, 5533, HOT * Color(1, 1, 1, 0.30), 0.35, 6, 1.2)
+
+	# A second, older mark low on the wall behind the handler -- worn, half in
+	# shadow, the kind of thing nobody has looked at in years.
+	CellOutzType.draw_seal_corrupted(self, Vector2(viewport.x * 0.05, viewport.y * 0.46), 20.0, 7711, BRUISE * Color(1, 1, 1, 0.28), 0.5, 5, 1.0)
 
 
 func _draw_clipboard(rect: Rect2) -> void:
