@@ -38,6 +38,8 @@ func _ready() -> void:
 	check(absf(opening.camera.global_position.y - 1.62) < 0.12, "first steps retain standing eye height")
 	check(opening.player.position.z < start.z - 3.0 and opening.player.is_on_floor(), "first movement walks forward on the grating")
 	check(opening.breakout_complete and opening.first_acquisition_complete, "breakout and existing restraint acquisition survive the handoff")
+	var cybernetics: Array = WorldHistory.subject("player").get("anatomy_state", {}).get("cybernetics", [])
+	check(cybernetics.any(func(part): return str((part as Dictionary).get("id", "")) == "wetwire chip"), "the wetwire implant is installed as catalogue hardware")
 	check(opening.get_node("HUD/Objective").text.contains("ESCAPE THE FACILITY"), "escape purpose remains visible during the first steps")
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--capture="):
