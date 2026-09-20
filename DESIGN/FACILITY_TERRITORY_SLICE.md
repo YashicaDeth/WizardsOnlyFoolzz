@@ -108,6 +108,30 @@ without a parallel save format. A genuinely new quantum world does not carry
 territorial ownership across: the player persists under the existing body
 rules, while the facility begins controlled again.
 
+## Escape network
+
+`game/systems/facility_routes.gd` is the persistent adjacency and handoff
+authority for the ways through and out of Sublevel 0C. It keeps the canonical
+derby spine and adds three mastery routes through shared facility districts:
+
+- the Waste Gallery, Maintenance Cistern and Storm Outfall support stealth and
+  exploration;
+- the Ossuary Exchange and Undercroft Settlement support an honoured compact
+  or a later betrayal, with different lifts and faction consequences;
+- the Containment Concourse and Executive Transit support an extraordinarily
+  difficult direct breach whose three played control points cannot be skipped.
+
+Recapture is not selectable as a route. It accepts only a named containment
+mechanism demonstrated in play, remembers the interrupted attempt and feeds
+the existing Underground Colosseum. Once an exit handoff exists, the authority
+refuses to revoke that successful escape with another recapture.
+
+The Storm Outfall, Lantern Lift, stolen Freight Spur, Executive Blast Shaft
+and derby Vehicle Sallyport each own a distinct Ashbloom coordinate and faction
+standing change. `bone_yard_hunt.gd` consumes that handoff before building the
+surface world, so all exits enter the same persistent scene without collapsing
+to one spawn or one relationship state.
+
 ## Evidence
 
 - `game/tests/facility_territory_test.tscn`: 21/21 checks, including
@@ -142,6 +166,12 @@ rules, while the facility begins controlled again.
   seconds, H.264. The real cab fires nine travelling rounds into all three
   chamber relays; their live signatures go dark, the cab counter advances and
   the last relay completes liberation.
+- `game/tests/facility_stealth_route_test.tscn`: 11/11 checks.
+- `game/tests/facility_cooperation_route_test.tscn`: 20/20 checks across both
+  honour and betrayal.
+- `game/tests/facility_assault_route_test.tscn`: 14/14 checks.
+- `game/tests/facility_recapture_route_test.tscn`: 17/17 checks, including the
+  demonstrated-cause rule and the prohibition on revoking a successful escape.
 
 ## Honest boundary
 
