@@ -3507,7 +3507,7 @@ The last rung. Fifteen statements that are true of performance when this game is
 The game currently assumes a player who already knows what it is. It has no
 options a person would actually reach for and no way in that is not "start".
 
-- [ ] **Y1.1** Controls are rebindable
+- [x] **Y1.1** Controls are rebindable
 - [ ] **Y1.2** The violence tier from the warning card actually changes the build
 - [ ] **Y1.3** Text is legible at a normal viewing distance — the stencil is not free
 - [ ] **Y1.4** Colour is not the only carrier of meaning anywhere
