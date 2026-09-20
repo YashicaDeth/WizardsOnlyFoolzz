@@ -11,6 +11,7 @@ const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 const ROUTE_STEALTH := "maintenance_ascent"
 const ROUTE_COOPERATION := "undercroft_compact"
+const ROUTE_ASSAULT := "executive_breach"
 
 const DISTRICTS := {
 	"growing_floor": {"name": "Growing Floor", "kind": "occult_laboratory"},
@@ -21,6 +22,9 @@ const DISTRICTS := {
 	"undercroft_settlement": {"name": "Undercroft Settlement", "kind": "underground_settlement"},
 	"lantern_lift": {"name": "Lantern Freight Lift", "kind": "surface_exit"},
 	"stolen_freight_spur": {"name": "Stolen Freight Spur", "kind": "surface_exit"},
+	"containment_concourse": {"name": "Containment Concourse", "kind": "industrial_prison"},
+	"executive_transit": {"name": "Executive Transit", "kind": "corporate_laboratory"},
+	"blast_shaft": {"name": "Executive Blast Shaft", "kind": "surface_exit"},
 }
 
 const CONNECTIONS := [
@@ -31,6 +35,9 @@ const CONNECTIONS := [
 	["ossuary_exchange", "undercroft_settlement"],
 	["undercroft_settlement", "lantern_lift"],
 	["undercroft_settlement", "stolen_freight_spur"],
+	["growing_floor", "containment_concourse"],
+	["containment_concourse", "executive_transit"],
+	["executive_transit", "blast_shaft"],
 ]
 
 const ROUTES := {
@@ -64,6 +71,17 @@ const ROUTES := {
 			},
 		},
 	},
+	ROUTE_ASSAULT: {
+		"approach": "direct_assault",
+		"label": "EXECUTIVE BREACH",
+		"steps": ["containment_concourse", "executive_transit", "blast_shaft"],
+		"exit": "blast_shaft",
+		"surface_position": Vector3(30.0, 0.0, -14.0),
+		"surface_relationships": {"celloutz": -30, "ashline_wreckers": 5},
+		"required_control_points": ["concourse", "transit", "shaft"],
+		"mastery_route": true,
+		"avoids_derby": true,
+	},
 }
 
 
@@ -79,6 +97,7 @@ static func ensure() -> Dictionary:
 			"completed_routes": [],
 			"pending_surface_handoff": {},
 			"route_choice": "",
+			"assault_control_points": [],
 		})
 	return record
 
@@ -106,6 +125,7 @@ static func begin(route_id: String) -> bool:
 		"active_route": route_id,
 		"route_steps": [],
 		"route_choice": "",
+		"assault_control_points": [],
 	})
 	PLAYER_ACTION_LEDGER.record("facility_route_begun", {
 		"subject_id": "player",
@@ -126,6 +146,11 @@ static func traverse(district_id: String) -> bool:
 	var expected := _expected_steps(definition, str(record.get("route_choice", "")))
 	if steps.size() >= expected.size() or str(expected[steps.size()]) != district_id:
 		return false
+	if route_id == ROUTE_ASSAULT:
+		var required: Array = definition.required_control_points
+		var control_points: Array = record.get("assault_control_points", [])
+		if steps.size() >= control_points.size() or str(required[steps.size()]) != str(control_points[steps.size()]):
+			return false
 	var from_id := str(record.get("current_district", "growing_floor"))
 	if not _connected(from_id, district_id):
 		return false
@@ -142,6 +167,26 @@ static func traverse(district_id: String) -> bool:
 	var choice_ready := not bool(definition.get("choice_required", false)) or not str(record.get("route_choice", "")).is_empty()
 	if steps.size() == expected.size() and choice_ready:
 		_complete(route_id, definition)
+	WorldHistory.commit_ledger_batch()
+	return true
+
+
+static func record_assault_breakthrough(control_point: String, demonstrated_cause: String) -> bool:
+	var definition := route(ROUTE_ASSAULT)
+	var required: Array = definition.required_control_points
+	var record := ensure()
+	if str(record.get("active_route", "")) != ROUTE_ASSAULT or demonstrated_cause.is_empty():
+		return false
+	var cleared: Array = (record.get("assault_control_points", []) as Array).duplicate()
+	if cleared.size() >= required.size() or str(required[cleared.size()]) != control_point:
+		return false
+	cleared.append(control_point)
+	WorldHistory.begin_ledger_batch()
+	WorldHistory.amend_subject(SUBJECT, {"assault_control_points": cleared})
+	PLAYER_ACTION_LEDGER.record("facility_assault_breakthrough", {
+		"subject_id": "player", "route_id": ROUTE_ASSAULT,
+		"control_point": control_point, "cause": demonstrated_cause,
+	})
 	WorldHistory.commit_ledger_batch()
 	return true
 
