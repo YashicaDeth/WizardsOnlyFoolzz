@@ -18,6 +18,7 @@ const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const CARRY := preload("res://systems/carry.gd")
+const IMPLANT_CATALOG := preload("res://systems/implant_catalog.gd")
 
 const EYE_HEIGHT := 1.62
 const BODY_HALF_HEIGHT := 0.85
@@ -475,9 +476,14 @@ func _record_breakout() -> void:
 	breakout_complete = true
 	var player_state := WorldHistory.subject("player")
 	var anatomy_state: Dictionary = player_state.get("anatomy", {})
-	var grown: Array = (anatomy_state.get("cybernetics", []) as Array).duplicate()
-	if not grown.has("wetwire chip"):
-		grown.append("wetwire chip")
+	# Anatomy snapshots store installed hardware by body zone. Older intake data
+	# may still contain a plain list, so resolve both forms before adding the
+	# chip; never push a string into the typed implant list.
+	var grown: Dictionary = {}
+	for implant: Dictionary in IMPLANT_CATALOG.list(anatomy_state.get("cybernetics", {})):
+		grown[str(implant.get("zone", "torso"))] = implant
+	var wetwire: Dictionary = IMPLANT_CATALOG.resolve("wetwire chip")
+	grown[str(wetwire.zone)] = wetwire
 	anatomy_state["cybernetics"] = grown
 	WorldHistory.begin_ledger_batch()
 	anatomy.call("configure", "player", 5000.0, grown)
