@@ -563,7 +563,20 @@ func _record_breakout() -> void:
 	anatomy.call("configure", "player", 5000.0, grown)
 	anatomy.call("apply_hit", "torso", 26.0, 0.0, "blunt")
 	anatomy.call("apply_hit", "head", 14.0, 0.0, "blunt")
-	WorldHistory.amend_subject("player", {"status": "broke free", "anatomy": anatomy_state, "anatomy_state": anatomy.call("snapshot"), "memory": "The soul seized the wetwire and broke the vat."})
+	# AX2.2/AX2.3. The seizure is not narrated here, it is performed, and it is
+	# paid for by what the player actually did upstairs. `examination_refusals`
+	# was counted in vat_intake.gd every time they declined a procedure; the
+	# wounds above are the suffering. A player who refused nothing does not get
+	# this, and SoulBreakthrough is what says so rather than a branch here.
+	var endured := int(player_state.get("torture_cycles", 4))
+	var refused := int(player_state.get("examination_refusals", 0))
+	var seizure := SoulBreakthrough.seize("player", endured, refused)
+	var memory := "The soul seized the wetwire and broke the vat."
+	if not bool(seizure.get("ok", false)):
+		# It still breaks -- the glass is physical and the tube comes out either
+		# way. What a player who never refused does not get is the chip.
+		memory = "The vat broke. The chip still answers to them."
+	WorldHistory.amend_subject("player", {"status": "broke free", "anatomy": anatomy_state, "anatomy_state": anatomy.call("snapshot"), "memory": memory, "implant_seized": bool(seizure.get("ok", false))})
 	var carry := CARRY.new()
 	var item := {"label": "BROKEN MEDICAL RESTRAINT", "kind": "tool", "mass": 0.0, "perishes": false, "age": 0.0, "from": "growing_floor"}
 	carry.items.append(item)

@@ -183,3 +183,74 @@ static func reconstruct() -> Dictionary:
 ## Whether the player has ever killed him, which stays true after he is back.
 static func was_killed() -> bool:
 	return bool(WorldHistory.subject(FATE_SUBJECT).get("killed", false))
+
+
+## AX2.5. "Reaching the departing doctor is an urgent optional pursuit, not a
+## forced objective."
+##
+## Both halves of that are load-bearing and they pull against each other.
+## Urgent means a window that closes and a player who feels it closing.
+## Optional means the game does not notice when it shuts -- no failed
+## objective, no consolation line, no marker greying out. A game that tells
+## you that you missed something has made it mandatory and then punished you
+## for it, which is worse than not offering it.
+##
+## So the contract is: the window is real, missing it is silent, and catching
+## him is the exception rather than the intended path. The test asserts the
+## silence as hard as it asserts the window.
+
+## He starts leaving at the end of the verdict, while the player is still in
+## the vat. The window is the walk between the examination room and wherever
+## his vehicle is, and it is short because the next torture cycle is not.
+const DEPARTURE_WINDOW_MINUTES := 6.0
+const DEPARTURE_SUBJECT := "doctor_departure"
+
+
+## Called when the verdict finishes. He does not wait to see what happens next
+## -- the doc is explicit that he begins to leave before the next cycle.
+static func begin_departure() -> Dictionary:
+	var at := WorldClock.minutes()
+	var record := {"left_at_minute": at, "closes_at_minute": at + DEPARTURE_WINDOW_MINUTES, "caught": false}
+	WorldHistory.register_subject(DEPARTURE_SUBJECT, record)
+	return record
+
+
+## Whether he can still be reached. Returns false once for every reason --
+## never departed, window shut, already caught -- because the caller must not
+## be able to tell the difference and neither must the player.
+static func reachable() -> bool:
+	var record: Dictionary = WorldHistory.subject(DEPARTURE_SUBJECT)
+	if record.is_empty() or bool(record.get("caught", false)):
+		return false
+	return WorldClock.minutes() <= float(record.get("closes_at_minute", -1.0))
+
+
+## How much of the window is left, 1.0 to 0.0. For a diegetic pressure cue --
+## a door closing, an engine starting -- and never for a countdown UI, because
+## a timer on screen is the game admitting this is an objective.
+static func urgency() -> float:
+	var record: Dictionary = WorldHistory.subject(DEPARTURE_SUBJECT)
+	if record.is_empty() or not reachable():
+		return 0.0
+	var left := float(record.get("closes_at_minute", 0.0)) - WorldClock.minutes()
+	return clampf(left / DEPARTURE_WINDOW_MINUTES, 0.0, 1.0)
+
+
+## The player got to him. Not a scripted scene -- it records that the meeting
+## happened and hands back the fact, so the encounter itself belongs to
+## whatever room they caught him in.
+static func catch_up() -> Dictionary:
+	if not reachable():
+		return {"ok": false, "reason": "HE IS GONE"}
+	var record: Dictionary = WorldHistory.subject(DEPARTURE_SUBJECT).duplicate(true)
+	record["caught"] = true
+	record["caught_at_minute"] = WorldClock.minutes()
+	WorldHistory.update_subject(DEPARTURE_SUBJECT, record, "doctor_caught")
+	return {"ok": true, "caught": true}
+
+
+## Deliberately not a function: there is no `missed()`, no failure event and
+## nothing that fires when the window shuts. If a later pass adds one, it has
+## made an optional pursuit into a mandatory one the player has already lost.
+static func was_caught() -> bool:
+	return bool(WorldHistory.subject(DEPARTURE_SUBJECT).get("caught", false))

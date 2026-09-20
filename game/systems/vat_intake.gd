@@ -75,6 +75,8 @@ var doctor_life := 0.0
 var doctor_moment := 0
 ## AX2.2. Carried out of the examination and into the breakout.
 var refusals := 0
+## AX1.5. Which saved build a repeat player came back with, if any.
+var preset_loaded := ""
 ## AX2.1. His closing beats, played before the form is actually filed.
 var verdict: Array = []
 ## D8.3. A procedure in progress: the beats left to play, and the shot each one
@@ -219,7 +221,9 @@ func _rows() -> int:
 		2:
 			return CharacterSheet.TRAITS.size()
 		3:
-			return 7
+			# AX1.3. Eight rows now: anatomy sits at the top of the body page,
+			# because it is the first thing the facility decided about you.
+			return 8
 		_:
 			return CharacterSheet.MODIFIERS.size()
 
@@ -230,6 +234,21 @@ func _commit() -> void:
 			sheet.route = ROUTES[row].to_lower()
 			if sheet.route == "random":
 				sheet.randomise()
+			elif sheet.route == "preset":
+				# AX1.5. The fast route for a repeat player. PRESET has been the
+				# first option on the first page since this screen was written and
+				# did nothing at all, which is a poor first promise to break.
+				var saved: Array = CharacterPresets.names()
+				if saved.is_empty():
+					_speak("slipped")
+					transcript = "WROTE: NO PRESET ON FILE"
+					transcript_life = 3.2
+				else:
+					CharacterPresets.apply(str(saved[0]), sheet)
+					preset_loaded = str(saved[0])
+					transcript = "WROTE: ON FILE ALREADY // %s" % preset_loaded
+					transcript_life = 3.6
+					_doctor_observe()
 			_transcribe(ROUTES[row])
 		1:
 			sheet.race = str(CharacterSheet.RACES.keys()[row])
@@ -249,18 +268,20 @@ func _commit() -> void:
 			# onto the same player body rather than a lore label.
 			match row:
 				0:
-					sheet.under_skin["blood"] = _cycle(["O-RUST", "A-ASH", "B-9", "AB-", "SAP", "NULL"], str(sheet.under_skin.get("blood", "O-RUST")))
+					sheet.anatomy_sex = _cycle(CharacterSheet.ANATOMY_SEX.keys(), sheet.anatomy_sex)
 				1:
-					sheet.under_skin["skeleton"] = _cycle(["standard", "dense", "hollow", "plated"], str(sheet.under_skin.get("skeleton", "standard")))
+					sheet.under_skin["blood"] = _cycle(["O-RUST", "A-ASH", "B-9", "AB-", "SAP", "NULL"], str(sheet.under_skin.get("blood", "O-RUST")))
 				2:
-					sheet.under_skin["organs"] = _cycle(["standard", "doubled", "salvaged", "communion"], str(sheet.under_skin.get("organs", "standard")))
+					sheet.under_skin["skeleton"] = _cycle(["standard", "dense", "hollow", "plated"], str(sheet.under_skin.get("skeleton", "standard")))
 				3:
-					sheet.appearance["face"] = fmod(float(sheet.appearance.get("face", 0.5)) + 0.17, 1.0)
+					sheet.under_skin["organs"] = _cycle(["standard", "doubled", "salvaged", "communion"], str(sheet.under_skin.get("organs", "standard")))
 				4:
-					sheet.appearance["wear"] = fmod(float(sheet.appearance.get("wear", 0.4)) + 0.2, 1.01)
+					sheet.appearance["face"] = fmod(float(sheet.appearance.get("face", 0.5)) + 0.17, 1.0)
 				5:
-					sheet.appearance["mutation"] = fmod(float(sheet.appearance.get("mutation", 0.0)) + 0.2, 1.01)
+					sheet.appearance["wear"] = fmod(float(sheet.appearance.get("wear", 0.4)) + 0.2, 1.01)
 				6:
+					sheet.appearance["mutation"] = fmod(float(sheet.appearance.get("mutation", 0.0)) + 0.2, 1.01)
+				7:
 					sheet.appearance["ink"] = fmod(float(sheet.appearance.get("ink", 0.0)) + 0.25, 1.01)
 				_:
 					sheet.appearance["piercings"] = fmod(float(sheet.appearance.get("piercings", 0.0)) + 0.25, 1.01)
@@ -433,6 +454,7 @@ func _draw_traits(rect: Rect2, ink: Color, y: float) -> void:
 
 func _draw_body(_rect: Rect2, ink: Color, y: float) -> void:
 	var rows := [
+		["ANATOMY", str((CharacterSheet.ANATOMY_SEX[sheet.anatomy_sex] as Dictionary).name)],
 		["BLOOD", str(sheet.under_skin.get("blood", "O-RUST"))],
 		["SKELETON", str(sheet.under_skin.get("skeleton", "standard")).to_upper()],
 		["ORGAN SET", str(sheet.under_skin.get("organs", "standard")).to_upper()],
@@ -446,6 +468,11 @@ func _draw_body(_rect: Rect2, ink: Color, y: float) -> void:
 		_row_mark(ink, Vector2(30, y - 9), index == row, false)
 		CellOutzType.draw_condensed(self, Vector2(50, y - 10), str(rows[index][0]), 11.0, ink * Color(1, 1, 1, 0.6), 0.8)
 		CellOutzType.draw_condensed(self, Vector2(190, y - 10), str(rows[index][1]), 12.0, ink, 0.9)
+		# AX1.3/AX1.4. The facility's word for the body it grew, beside the
+		# player's. INTERSEX files as "F / STANDARD" because the form has no
+		# second box -- the distortion is the paperwork's, never the body's.
+		if index == 0:
+			CellOutzType.draw_condensed(self, Vector2(340, y - 10), "FILED " + str(CharacterSheet.ANATOMY_SEX_FILED.get(sheet.anatomy_sex, "")), 8.0, HOT * Color(1, 1, 1, 0.72), 0.65)
 		y += 28.0
 	CellOutzType.draw_condensed(self, Vector2(30, y + 10), "WHAT IS UNDER THE SKIN IS WHAT THEY WILL FIND.", 8.0, ink * Color(1, 1, 1, 0.42), 0.7)
 
@@ -549,6 +576,10 @@ func _begin_verdict() -> void:
 
 func _advance_verdict() -> void:
 	if verdict.is_empty():
+		# AX2.5. He does not wait to see what happens next. The window opens
+		# here, while the player is still in the vat and cannot use it yet,
+		# which is what makes reaching him afterwards urgent.
+		DoctorExamination.begin_departure()
 		_finish_filing()
 		return
 	var beat: Dictionary = verdict.pop_front()
@@ -562,10 +593,18 @@ func _finish_filing() -> void:
 	var state: Dictionary = sheet.apply_to_world()
 	state["refusals"] = refusals
 	state["filed_as"] = DoctorExamination.classify(sheet)
+	# AX1.5. The doc asks for "roughly 10-15 minutes" on a deliberate first pass.
+	# That is a claim about a human at a keyboard, so it cannot be asserted in a
+	# suite -- but it can stop being a guess. Every filing records how long the
+	# player actually took, and whether they came in on a preset, so a playtest
+	# produces the number instead of an opinion about the number.
 	WorldHistory.update_subject("player", {
 		"examination_refusals": refusals,
 		"institutional_classification": str(DoctorExamination.classify(sheet).label),
+		"examination_seconds": int(elapsed),
+		"examination_route": "preset:" + preset_loaded if preset_loaded != "" else "deliberate",
 	}, "examination_filed")
+	print("EXAMINATION FILED // %d:%02d // %s // %d refusals" % [int(elapsed) / 60, int(elapsed) % 60, ("PRESET " + preset_loaded) if preset_loaded != "" else "DELIBERATE", refusals])
 	filed.emit(state)
 
 
