@@ -67,6 +67,28 @@ static func collision_safe_camera(space: PhysicsDirectSpaceState3D, focus: Vecto
 	return obstruction.position + toward_focus * 0.24
 
 
+## The oldest unsolved problem in third person: what a chase camera does when
+## there is no room behind the player for one. `collision_safe_camera()` above
+## already answers "where does the camera actually go" by pulling it in to
+## whatever clearance exists; this answers "how much of a third-person shot is
+## even possible right now" — the fraction of the requested distance the
+## camera actually got to keep, from `focus` out toward `desired`, after
+## `collision_safe_camera()` stopped it at `achieved`.
+##
+## A corridor or a vat room narrow enough to jam the shoulder-cam into the
+## player's own back reads as a ratio near zero here; open ground behind the
+## player reads near one. The caller blends perspective by this number rather
+## than snapping, so the implant hands control back to your own eyes exactly
+## as fast as the room around you closes in, and gives it back the same way
+## once there is space for it again — never a hard cut, and never a camera
+## left sitting inside geometry.
+static func third_person_clearance_blend(focus: Vector3, desired: Vector3, achieved: Vector3) -> float:
+	var wanted := focus.distance_to(desired)
+	if wanted < 0.001:
+		return 1.0
+	return clampf(focus.distance_to(achieved) / wanted, 0.0, 1.0)
+
+
 ## `jump_impulse` must be applied here, inside the same move_and_slide() this
 ## call makes, not by the caller afterward: is_on_floor() only turns false
 ## once a slide has actually carried the body off the ground, so a caller
