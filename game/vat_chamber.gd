@@ -21,7 +21,6 @@ const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const BRAIN_INDEX := preload("res://systems/brain_index.gd")
 const CARRY := preload("res://systems/carry.gd")
 const CLOTHING := preload("res://systems/clothing.gd")
-const IMPLANT_CATALOG := preload("res://systems/implant_catalog.gd")
 
 const EYE_HEIGHT := 1.62
 const BODY_HALF_HEIGHT := 0.85
