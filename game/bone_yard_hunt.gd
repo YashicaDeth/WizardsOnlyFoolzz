@@ -81,6 +81,10 @@ const HUNT_LOCATION := "ashbloom_bone_yard"
 const SLEEP_SITE_POSITION := Vector3(2.6, 0.05, 18.0)
 const SLEEP_REACH := 3.4
 const SLEEP_WAKE_HOUR := 7.0
+## AX3.5. Near the sleep site rather than buried in the wrecks — the opening
+## teaches by physical acquisition, so the case the player learns from first
+## should not need a treasure hunt to find.
+const RESTRICTED_STORAGE_POSITION := Vector3(-2.6, 0.0, 18.0)
 const HANDHELD := preload("res://systems/handheld_device.gd")
 const ANATOMY_COMPONENT := preload("res://systems/anatomy_component.gd")
 const WORLD_GENERATOR := preload("res://systems/ashbloom_world_generator.gd")
@@ -143,6 +147,7 @@ const LIVING_MAP := preload("res://systems/living_map.gd")
 const ASHBLOOM_HOLDINGS := preload("res://systems/ashbloom_holdings.gd")
 const LOCAL_LAW := preload("res://systems/local_law.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
+const RESTRICTED_STORAGE := preload("res://systems/restricted_storage.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
 const PIN_BOARD := preload("res://systems/pin_board.gd")
 const DEMO_WALL := preload("res://systems/demo_wall.gd")
@@ -156,6 +161,15 @@ const BRAIN_INDEX := preload("res://systems/brain_index.gd")
 var player := Vector3(0, 1.5, 19)
 var sleep_site: Node3D
 var sleep_prompt_hold := 0.0
+## AX3. One generic "walk up, a prompt appears, press E to act" registry. An
+## object registers what pressing E does — a prompt and a Callable — instead
+## of this scene learning that object's rules, so the acquisition chain
+## (AX3.1-3.5: the restraint, the clothing, the barrier, the gun, the
+## prototype) reaches the player through one path with no new branch of logic
+## per item. Entries remove themselves once acted on, the same way
+## `dropped_handheld` going null already retires its own bespoke prompt.
+var world_interactables: Array[Dictionary] = []
+const WORLD_INTERACT_RANGE := 3.2
 var yaw := PI
 var pitch := -0.12
 ## Greg, 2026-09-12: *"the game should start probably in first person with the
@@ -1689,6 +1703,7 @@ func _physics_process(delta: float) -> void:
 	_update_hud()
 	_update_sleep_prompt(delta)
 	_update_dropped_handheld_prompt()
+	_update_world_interactable_prompt()
 
 
 ## B4.10v2. The world notices unattended flesh. This is deliberately part of
@@ -4293,6 +4308,12 @@ func _interact() -> void:
 	if dropped_handheld != null and is_instance_valid(dropped_handheld) and player.distance_to(dropped_handheld.global_position) <= 3.2:
 		_pick_up_handheld()
 		return
+	# AX3. The one entry point every registered object's offer reaches the
+	# player through, regardless of which system built the object.
+	var interactable := _nearest_interactable()
+	if not interactable.is_empty():
+		(interactable.get("action") as Callable).call()
+		return
 	if _try_sleep_at_site():
 		return
 	var downed := _nearest_downed()
@@ -4488,6 +4509,47 @@ func _update_dropped_handheld_persistence(delta: float) -> void:
 func _update_dropped_handheld_prompt() -> void:
 	if dropped_handheld != null and is_instance_valid(dropped_handheld) and panel_mode.is_empty() and player.distance_to(dropped_handheld.global_position) <= 3.2:
 		prompt.text = "[E] RECOVER BLACK MIRROR // %06d" % handheld.serial
+
+
+## AX3. Registers one object's offer: what to say while the player is in
+## range, what to do when they press E, and how close is close enough. The
+## object supplies all three; this scene stores them and never inspects what
+## kind of object it registered.
+func _register_interactable(node: Node3D, prompt_text: String, action: Callable, reach := WORLD_INTERACT_RANGE) -> void:
+	world_interactables.append({"node": node, "prompt": prompt_text, "action": action, "reach": reach})
+
+
+## Prunes anything freed since the last look (the same way `dropped_handheld`
+## going null already retires itself) and returns whichever registered object
+## is both in range and nearest, or an empty dictionary if none is.
+func _nearest_interactable() -> Dictionary:
+	var best := {}
+	var best_distance := INF
+	for entry: Dictionary in world_interactables.duplicate():
+		# Validity has to be checked on the untyped Variant `get()` returns —
+		# assigning a freed reference straight into a `Node3D` var first, then
+		# checking, logs "assign invalid previously freed instance" even though
+		# the very next line already discards it correctly.
+		if not is_instance_valid(entry.get("node")):
+			world_interactables.erase(entry)
+			continue
+		var node: Node3D = entry.get("node")
+		var distance := player.distance_to(node.global_position)
+		if distance <= float(entry.get("reach", WORLD_INTERACT_RANGE)) and distance < best_distance:
+			best_distance = distance
+			best = entry
+	return best
+
+
+## Lowest priority of the live prompts: the bespoke ones above already return
+## early out of `_process` order or hold the line with `sleep_prompt_hold`, so
+## this only ever shows when nothing more specific claimed the frame.
+func _update_world_interactable_prompt() -> void:
+	if not panel_mode.is_empty() or sleep_prompt_hold > 0.0:
+		return
+	var candidate := _nearest_interactable()
+	if not candidate.is_empty():
+		prompt.text = str(candidate.get("prompt", ""))
 
 
 func _pick_up_handheld() -> void:
@@ -7189,6 +7251,13 @@ func _build_world() -> void:
 	# ambient, which rendered the Expanse as an unreadable brown murk — the same
 	# fault the menu had. The roadmap already listed this scene as un-migrated.
 	$WorldEnvironment.environment = WorldLook.environment("ashbloom")
+	# AX3.5. Built first and deliberately dependency-free (no camera, no gods,
+	# no air) so the acquisition chain's one live object does not go missing
+	# whenever something later in this long function throws — which, on this
+	# trunk, `air = ContaminatedAir.new()` below currently does. That crash
+	# predates this file and is not this file's to fix; this call just refuses
+	# to sit downstream of it.
+	_build_restricted_storage()
 	# A7.1. The gods sit outside the firmament v6 broke open, so they are bound
 	# to the same sky material and driven by the same clock as everything else
 	# in A. `camera` is an `@onready`, which resolves before `_ready()` calls
@@ -7337,6 +7406,51 @@ func _build_sleep_site() -> void:
 	marker.outline_size = 8
 	marker.position = Vector3(0, 0.78, -0.72)
 	sleep_site.add_child(marker)
+
+
+## AX3.5. "Stolen from restricted technology storage as a rare prototype, not
+## issued as an ordinary menu." `restricted_storage.gd` already owns whether
+## the prototype is gone and what that costs (CellOutz's repossession order);
+## this is the one physical thing in the world that offers to trigger it,
+## registered through the same generic path any future acquisition-chain
+## object uses. Skipped entirely once the prototype is already gone, the same
+## way `_restore_dropped_handheld()` checks persisted state before deciding
+## whether to spawn anything.
+func _build_restricted_storage() -> void:
+	if RESTRICTED_STORAGE.is_breached():
+		return
+	var case_node := Node3D.new()
+	case_node.name = "RestrictedTechnologyStorage"
+	case_node.position = RESTRICTED_STORAGE_POSITION
+	add_child(case_node)
+	_add_mesh_to(case_node, BoxMesh.new(), Vector3(0, 0.55, 0), Color("23241f"), 0.0, Vector3(0.62, 1.1, 0.5))
+	_add_mesh_to(case_node, BoxMesh.new(), Vector3(0, 1.14, 0), Color("6e7378"), 0.05, Vector3(0.66, 0.04, 0.54))
+	var glass := MeshInstance3D.new()
+	var glass_mesh := BoxMesh.new()
+	glass_mesh.size = Vector3(0.5, 0.7, 0.06)
+	glass.mesh = glass_mesh
+	var glass_material := _material(Color("2a3340"), 0.0)
+	glass_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glass_material.albedo_color.a = 0.35
+	glass.material_override = glass_material
+	glass.position = Vector3(0, 0.72, 0.28)
+	case_node.add_child(glass)
+	_add_mesh_to(case_node, BoxMesh.new(), Vector3(0, 0.7, 0.02), Color("b0552a"), 0.4, Vector3(0.22, 0.05, 0.05))
+	var marker3 := Label3D.new()
+	marker3.text = "RESTRICTED TECHNOLOGY  //  DO NOT REMOVE"
+	marker3.font_size = 24
+	marker3.modulate = Color("a8281a")
+	marker3.outline_modulate = Color("170b09")
+	marker3.outline_size = 8
+	marker3.position = Vector3(0, 1.32, 0)
+	case_node.add_child(marker3)
+	_register_interactable(case_node, "[E] STEAL THE PROTOTYPE // RESTRICTED TECHNOLOGY", func() -> void:
+		var result := RESTRICTED_STORAGE.take_prototype({"location": HUNT_LOCATION})
+		if not bool(result.get("ok", false)):
+			return
+		prompt.text = "BLACK MIRROR TAKEN // A PROTOTYPE THE INSTITUTION WILL WANT BACK"
+		case_node.queue_free()
+	)
 
 
 ## A4.1. One place a light is made, so every light in the region is in the same
