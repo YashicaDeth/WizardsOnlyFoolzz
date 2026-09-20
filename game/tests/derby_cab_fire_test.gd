@@ -27,7 +27,8 @@ func _ready() -> void:
 		return
 	var tree := get_tree()
 	await tree.process_frame
-	var derby: Node = load("res://rift_derby.tscn").instantiate()
+	var scene_path := "res://underground_colosseum.tscn" if "--colosseum" in OS.get_cmdline_user_args() else "res://rift_derby.tscn"
+	var derby: Node = load(scene_path).instantiate()
 	tree.root.add_child(derby)
 	tree.current_scene = derby
 	for _settle in 10:
@@ -77,6 +78,12 @@ func _ready() -> void:
 	check(landed, "the cab round reached the wrecker and reduced its integrity")
 	check(int(derby.get("score")) > before_score, "landing the shot raised the score")
 
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--capture="):
+			await RenderingServer.frame_post_draw
+			var capture_error := get_viewport().get_texture().get_image().save_png(argument.trim_prefix("--capture="))
+			check(capture_error == OK, "rendered the real cab after a travelling round landed")
+
 	# AF1.8/AF10.8. The port from `gore_demo.gd` took `_on_round_hit()` but
 	# originally dropped `_on_round_expired()` — a cab round fired at open
 	# sky ran out of `Ballistics.MAX_RANGE` without ever reaching
@@ -104,6 +111,37 @@ func _ready() -> void:
 	var rounds_left_in_flight: Array = ballistics.get("rounds")
 	print("sky round expired=%s rounds_in_flight=%d" % [str(expired), rounds_left_in_flight.size()])
 	check(expired, "a cab round fired at open sky expires and clears its muzzle record rather than leaking it")
+
+	# Isolate landed-round consequences from physical rams. Consecutive arrivals
+	# can be closer than trigger cadence when the target moves toward the gun.
+	var followup: Node3D = targets[1]
+	followup.set_meta("integrity", 100)
+	followup.set_meta("hit_ready_msec", Time.get_ticks_msec() + 10000)
+	derby.set("integrity", 1)
+	var hit := {"payload": {"source": "derby_cab", "shot": 9001},
+		"collider": followup, "position": followup.global_position}
+	derby.call("_on_cab_round_hit", hit)
+	var first_hull := int(followup.get_meta("integrity"))
+	check(first_hull < 100, "a landed bullet bypasses the target's ram lockout")
+	check(int(derby.get("integrity")) == 1,
+		"shooting a distant wrecker never damages the player's hull")
+	check(str(derby.get("round_state")) == "active",
+		"a one-hull player can shoot without losing the heat")
+	hit.payload.shot = 9002
+	derby.call("_on_cab_round_hit", hit)
+	check(int(followup.get_meta("integrity")) < first_hull,
+		"each distinct arriving bullet damages the target without a ram cooldown")
+	# The same target still respects the collision debounce and actual rams
+	# still cost hull: separating bullets must not make driving invulnerable.
+	derby.set("integrity", 100)
+	derby.set("round_state", "active")
+	var before_ram := int(followup.get_meta("integrity"))
+	derby.call("_damage_target", followup, 9.0, 1.0)
+	check(int(followup.get_meta("integrity")) == before_ram,
+		"repeated chassis contact still respects the ram lockout")
+	followup.set_meta("hit_ready_msec", 0)
+	derby.call("_damage_target", followup, 9.0, 1.0)
+	check(int(derby.get("integrity")) < 100, "a real ram still costs player hull")
 
 	if failures.is_empty():
 		print("derby cab fire: fine")
