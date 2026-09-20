@@ -123,6 +123,8 @@ func _ready() -> void:
 	derby.call("_on_cab_round_hit", hit)
 	var first_hull := int(followup.get_meta("integrity"))
 	check(first_hull < 100, "a landed bullet bypasses the target's ram lockout")
+	check(str(derby.get_node("HUD/DynamicInterface").get("event_message")) == "CAB ROUND // WRECKER HIT",
+		"a landed wrecker round gives the driver an explicit hit confirmation")
 	check(int(derby.get("integrity")) == 1,
 		"shooting a distant wrecker never damages the player's hull")
 	check(str(derby.get("round_state")) == "active",

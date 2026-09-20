@@ -1691,6 +1691,7 @@ func _on_cab_round_hit(hit: Dictionary) -> void:
 	WorldHistory.begin_ledger_batch()
 	if struck != null and struck.get_script() == SERVICE_RING_RELAY:
 		struck.call("take_hit", "cab_round", 1.0)
+		_announce_cab_hit("RELAY")
 		WorldHistory.record_event("derby_shot_landed", {"venue": "underground_colosseum", "target": struck.name})
 	elif struck != null and targets.has(struck):
 		# A bullet is not a ram. It does less, and it does it from further away,
@@ -1701,8 +1702,19 @@ func _on_cab_round_hit(hit: Dictionary) -> void:
 		# already tuned against real play, not invented alongside the rest
 		# of this rewrite.
 		_damage_target(struck as Node3D, 9.0, 1.0, "", true)
+		_announce_cab_hit("WRECKER")
 		WorldHistory.record_event("derby_shot_landed", {"venue": "underground_colosseum" if is_colosseum else "rift_derby_quarry", "target": struck.name})
 	WorldHistory.commit_ledger_batch()
+
+
+func _announce_cab_hit(kind: String) -> void:
+	if dynamic_interface == null:
+		return
+	if dynamic_interface.has_method("announce_impact"):
+		dynamic_interface.announce_impact(0, false)
+	# Keep the existing physical HUD treatment and replace its generic impact
+	# label with the weapon-specific answer the driver needs to trust the gun.
+	dynamic_interface.set("event_message", "CAB ROUND // %s HIT" % kind)
 
 
 ## AF1.8/AF10.8. The port from `gore_demo.gd` took `_on_round_hit()` but
