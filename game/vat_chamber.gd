@@ -90,6 +90,7 @@ const BEATS := [
 func _ready() -> void:
 	$WorldEnvironment.environment = WorldLook.environment("ossuary")
 	_build_chamber()
+	_build_examination_station()
 	_build_vat()
 	_build_first_objects()
 	_build_player()
@@ -377,6 +378,89 @@ func _build_chamber() -> void:
 	exit_glow.light_energy = 5.5
 	exit_glow.omni_range = 8.0
 	add_child(exit_glow)
+
+
+## The first thing the player sees through the blood and curved glass is not a
+## UI mascot.  It is the one anonymous examiner at a real workstation.  The
+## screen is deliberately close enough to read as a screen full of code before
+## the character form occupies the right-hand side of the view.
+func _build_examination_station() -> void:
+	var station := Node3D.new()
+	station.name = "UnknownExaminerStation"
+	station.position = Vector3(0.0, 0.0, -2.65)
+	add_child(station)
+
+	# A low medical desk between the vat and the doctor.
+	var desk := MeshInstance3D.new()
+	var desk_mesh := BoxMesh.new()
+	desk_mesh.size = Vector3(2.25, 0.16, 0.72)
+	desk_mesh.material = WorldLook.surface(Color("241a16"), "rust", 913)
+	desk.mesh = desk_mesh
+	desk.position = Vector3(-0.15, 1.05, 0.25)
+	station.add_child(desk)
+
+	# The physical monitor gives the player a point of attention in the room;
+	# its green code strips are geometry, not a flat title card.
+	var monitor := MeshInstance3D.new()
+	var monitor_mesh := BoxMesh.new()
+	monitor_mesh.size = Vector3(1.06, 0.72, 0.10)
+	monitor_mesh.material = WorldLook.surface(Color("171b16"), "metal", 914)
+	monitor.mesh = monitor_mesh
+	monitor.position = Vector3(-0.15, 1.72, 0.18)
+	station.add_child(monitor)
+	for line_index in 9:
+		var code := MeshInstance3D.new()
+		var code_mesh := BoxMesh.new()
+		code_mesh.size = Vector3(0.22 + float((line_index * 37) % 52) * 0.011, 0.025, 0.018)
+		var code_material := StandardMaterial3D.new()
+		code_material.albedo_color = Color("86b56c") if line_index % 3 else Color("bd6c43")
+		code_material.emission_enabled = true
+		code_material.emission = code_material.albedo_color * 0.75
+		code_mesh.material = code_material
+		code.mesh = code_mesh
+		code.position = Vector3(-0.58, 1.94 - float(line_index) * 0.055, 0.115)
+		station.add_child(code)
+
+	# One examiner, anonymous and physically present.  He is shaped from the
+	# same primitive grammar as the rest of this prototype so an authored model
+	# can replace these nodes without changing the opening choreography.
+	var examiner := Node3D.new()
+	examiner.name = "UnknownExaminer"
+	examiner.position = Vector3(1.25, 0.0, 0.08)
+	station.add_child(examiner)
+	var torso := MeshInstance3D.new()
+	var torso_mesh := CapsuleMesh.new()
+	torso_mesh.radius = 0.28
+	torso_mesh.height = 1.28
+	torso_mesh.material = WorldLook.surface(Color("171512"), "cloth", 915)
+	torso.mesh = torso_mesh
+	torso.position = Vector3(0, 1.35, 0)
+	torso.rotation_degrees.x = 11.0
+	examiner.add_child(torso)
+	var head := MeshInstance3D.new()
+	var head_mesh := SphereMesh.new()
+	head_mesh.radius = 0.20
+	head_mesh.height = 0.42
+	head_mesh.material = WorldLook.surface(Color("5a4235"), "flesh", 916)
+	head.mesh = head_mesh
+	head.position = Vector3(-0.08, 2.13, -0.06)
+	examiner.add_child(head)
+	for side in [-1.0, 1.0]:
+		var arm := MeshInstance3D.new()
+		var arm_mesh := CapsuleMesh.new()
+		arm_mesh.radius = 0.09
+		arm_mesh.height = 0.78
+		arm_mesh.material = WorldLook.surface(Color("24201a"), "cloth", 917 + int(side))
+		arm.mesh = arm_mesh
+		arm.position = Vector3(side * 0.31, 1.45, -0.22)
+		arm.rotation_degrees = Vector3(72.0, 0.0, side * 12.0)
+		examiner.add_child(arm)
+	var screen_light := OmniLight3D.new()
+	screen_light.position = Vector3(-0.15, 1.6, -0.18)
+	screen_light.light_color = Color("8bbd79")
+	screen_light.light_energy = 2.0
+	screen_light.omni_range = 3.4
+	station.add_child(screen_light)
 
 
 func _dead_tank(at: Vector3, seed_value: int) -> void:
