@@ -90,14 +90,22 @@ func _ready() -> void:
 	else:
 		print("population costs %.2f ms a frame at %d bodies (%.3f ms/body)" % [population_cost, rigs.size(), population_cost / maxf(1.0, float(rigs.size()))])
 
-	# The distant-LOD half of AX5.3, read off the code rather than sampled: a
-	# frame-time benchmark cannot prove a smooth cost reduction does not exist
-	# anywhere, but it can report what `_cull_distant_roamers()` demonstrably
-	# does — a single hard cutoff at 230m, nothing between "fully simulated"
-	# and "gone". No reduced tick rate, no impostor, no identity-preserving
-	# cheap body anywhere it is called from.
-	check(false,
-		"distant population has no cheaper tier: _cull_distant_roamers() is a binary 230m cull, not a smooth detail reduction — AX5.3's distant half is unbuilt")
+	# The distant-LOD half of AX5.3, read off the code the same way. This
+	# block used to be `check(false, ...)` -- a deliberate marker that no
+	# cheaper tier existed anywhere. RoamerDetail is that tier, so the marker
+	# becomes a real assertion: the curve must descend, and only the outermost
+	# step may forget anything.
+	var near := RoamerDetail.tier_for(10.0)
+	var mid := RoamerDetail.tier_for(120.0)
+	var far := RoamerDetail.tier_for(200.0)
+	var gone := RoamerDetail.tier_for(400.0)
+	check(near != mid and mid != far and far != gone, "there are four distinct tiers between here and gone")
+	check(RoamerDetail.relative_cost(near) > RoamerDetail.relative_cost(mid), "a mid-range body costs less than a near one")
+	check(RoamerDetail.relative_cost(mid) > RoamerDetail.relative_cost(far), "and a far one costs less again - the curve descends")
+	check(RoamerDetail.tick_interval(mid) > RoamerDetail.tick_interval(near), "distance buys a slower tick rather than worse behaviour")
+	check(not RoamerDetail.frees(near) and not RoamerDetail.frees(mid) and not RoamerDetail.frees(far),
+		"nothing short of the outermost tier forgets a body - what the player did to it survives the walk away")
+	check(RoamerDetail.frees(gone), "and past the last tier it is genuinely released")
 
 	print("POPULATION_BUDGET_RESULT failures=", failures.size())
 	tree.quit(0 if failures.is_empty() else 1)

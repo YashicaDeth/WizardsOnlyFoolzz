@@ -8313,7 +8313,13 @@ func _cull_distant_roamers() -> void:
 		var node := actor.get("node") as Node3D
 		if node == null or not is_instance_valid(node):
 			continue
-		if player.distance_to(node.global_position) < ROAMER_CULL_RANGE:
+		# AX5.3. Was a single hard cutoff here: inside 230m fully simulated,
+		# outside it gone, and nothing in between. RoamerDetail replaces the
+		# cliff with a curve, and only its outermost tier frees anything -- a
+		# body you shot at 100m is still a body you shot when you walk back
+		# at 200m.
+		var tier := RoamerDetail.tier_for(player.distance_to(node.global_position))
+		if not RoamerDetail.apply(node, tier):
 			continue
 		node.queue_free()
 		encounter_actors.remove_at(index)
