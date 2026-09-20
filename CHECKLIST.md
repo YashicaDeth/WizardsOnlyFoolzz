@@ -7235,7 +7235,7 @@ not make AX a second owner of anatomy, inventory, combat or the Black Mirror.
 - [ ] **AX3.2** Humiliation clothing comes from a dead failed subject and physically teaches body inventory/equipment
 - [ ] **AX3.3** The first biometric barrier accepts coercion, a living/unconscious/dead body, removed anatomy and—later—implant spoofing
 - [ ] **AX3.4** The first firearm is powerful, taken from a guard and ammunition-starved enough that melee still matters
-- [ ] **AX3.5** The Black Mirror is stolen from restricted technology storage as a rare prototype, not issued as an ordinary menu
+- [x] ~~**AX3.5**  The Black Mirror is stolen from restricted technology storage as a rare prototype, not issued as an ordinary menu~~ `restricted_storage.gd` (9f6f945). The prototype starts unpossessed and `take_prototype()` is the one theft action, idempotent, raising the same CellOutz repossession order the derby win raises. Verified on trunk before ticking: restricted_storage 12/12.
 - [ ] **AX3.6** Every introduced interface is learned by doing the action that needs it; no permanent all-controls overlay substitutes for staging
 
 ### AX4 — The facility is a place with routes
@@ -7249,20 +7249,7 @@ not make AX a second owner of anatomy, inventory, combat or the Black Mirror.
 ### AX5 — The slice proves the wider game
 - [x] ~~**AX5.1**  First- and third-person combat share anatomy, wound depth, ballistics and consequences throughout the facility~~ Already true and now guarded. `_resolve_strike`, `_attack`, `_resolve_firearm` and `apply_hit` contain no reference to the camera, there is exactly one `apply_hit` in the game, and `set_perspective()` touches nothing about damage. `perspective_parity_test.gd` reads the source and fails the day one of them starts branching on the view -- which is how this diverges in practice: not as a decision, as one reasonable line about third person needing a bit more reach.
 - [ ] **AX5.2** The implanted external camera is introduced as technology, with cramped-space, darkness, injury and interference failure cases
-- [ ] **AX5.3** Nearby population stays inside the 5–20 fully simulated budget; distant people keep identity while expensive detail reduces smoothly.
-      **Measured, not yet true.** `tests/population_budget_test` seeds the
-      Bone Yard Hunt's roaming population through its own `_spawn_roamer()`
-      and settles at **14 living hostiles**, inside the 5-20 budget, with 22
-      `BaselineHuman` rigs total in the scene once the yard's standing workers
-      are counted. Toggling every rig's ticking in place found **no frame
-      cost this harness can separate from noise** at that population (control
-      7.36/7.63 ms vs silent 6.85 ms, inside a 0.75 ms floor) — the budget
-      half is cheap enough to not be the bottleneck. The distant half is not
-      built: `_cull_distant_roamers()` (`bone_yard_hunt.gd`) is a single hard
-      cutoff at 230m, full simulation on one side and gone on the other —
-      no reduced tick rate, no impostor, nothing that keeps identity while
-      shedding detail. Nothing in `game/systems` implements a cheaper distant
-      tier for people. That is the real gap, not a number to chase.
+- [x] ~~**AX5.3**  Nearby population stays inside the 5–20 fully simulated budget; distant people keep identity while expensive detail reduces smoothly. **Measured, not yet true.** `tests/population_budget_test` seeds the Bone Yard Hunt's roaming population through its own `_spawn_roamer()` and settles at **14 living hostiles**, inside the 5-20 budget, with 22 `BaselineHuman` rigs total in the scene once the yard's standing workers are counted. Toggling every rig's ticking in place found **no frame cost this harness can separate from noise** at that population (control 7.36/7.63 ms vs silent 6.85 ms, inside a 0.75 ms floor) — the budget half is cheap enough to not be the bottleneck. The distant half is not built: `_cull_distant_roamers()` (`bone_yard_hunt.gd`) is a single hard cutoff at 230m, full simulation on one side and gone on the other — no reduced tick rate, no impostor, nothing that keeps identity while shedding detail. Nothing in `game/systems` implements a cheaper distant tier for people. That is the real gap, not a number to chase.~~ Both halves. Near: the settled roamer population is 14, inside the 5-20 budget, reached rather than starved by placement failures (e437ab0). Far: `roamer_detail.gd` replaces a single 230m cliff with four tiers -- distance buys a slower tick rather than worse behaviour, and only the outermost tier frees anything, so a body you shot at 100m is still a body you shot at 200m. The suite asserts the cost curve descends rather than trusting the constants (94b6de9).
 - [ ] **AX5.4** The complete route holds the 60 FPS contract under its authored combat and aftermath load
 - [ ] **AX5.5** One recorded playthrough demonstrates creation, breakout, equipment, biometric choice, combat, Black Mirror theft, at least two routes and surface handoff
 - [ ] **AX5.6** Only after those sockets are proven does AW emit the friend-facing opening asset/model/texture/audio commission list
