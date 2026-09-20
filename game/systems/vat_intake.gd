@@ -79,6 +79,10 @@ var refusals := 0
 var preset_loaded := ""
 ## AX2.1. His closing beats, played before the form is actually filed.
 var verdict: Array = []
+## The closing sequence needs a state of its own: an empty queue means both
+## "not started" and "finished" otherwise, which used to make a single F press
+## replay the first beat forever instead of letting the doctor leave.
+var verdict_started := false
 ## D8.3. A procedure in progress: the beats left to play, and the shot each one
 ## wants. Input is suspended while it runs, because it is being done to you.
 var procedure: Array = []
@@ -162,7 +166,7 @@ func _process(delta: float) -> void:
 	elapsed += delta
 	handler_life = maxf(0.0, handler_life - delta)
 	doctor_life = maxf(0.0, doctor_life - delta)
-	if doctor_life <= 0.0 and not verdict.is_empty():
+	if doctor_life <= 0.0 and verdict_started:
 		_advance_verdict()
 	transcript_life = maxf(0.0, transcript_life - delta)
 	if handler_life <= 0.0:
@@ -202,10 +206,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_F:
 			# AX2.1. He does not let you leave without telling you what it was for.
 			# The verdict plays first; filing happens when he has finished.
-			if verdict.is_empty():
+			if not verdict_started:
 				_begin_verdict()
-			else:
-				_finish_filing()
 		_:
 			return
 	get_viewport().set_input_as_handled()
@@ -593,6 +595,7 @@ func _doctor_note_refusal() -> void:
 ## AX2.1. The closing sequence. He explains what the examination was for,
 ## which is worse than gloating, and then he starts to leave.
 func _begin_verdict() -> void:
+	verdict_started = true
 	verdict = DoctorExamination.verdict(sheet)
 	_advance_verdict()
 

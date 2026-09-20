@@ -22,10 +22,13 @@ func _ready() -> void:
 	file.pressed = true
 	opening.intake._unhandled_input(file)
 	var elapsed := 0.0
-	while not opening.can_move and elapsed < 12.0:
+	# One F now starts the doctor's full departure, rather than skipping it.  The
+	# small tailored verdict earns its pause, but the player must still be moving
+	# inside a short, bounded opening sequence.
+	while not opening.can_move and elapsed < 25.0:
 		await get_tree().physics_frame
 		elapsed += get_physics_process_delta_time()
-	check(opening.can_move and elapsed < 9.0, "filing reaches free movement within nine seconds on the live route")
+	check(opening.can_move and elapsed < 25.0, "one filing reaches free movement within twenty-five seconds on the live route")
 	var handoff_height: float = opening.camera.global_position.y
 	var lowest := handoff_height
 	var start: Vector3 = opening.player.position
