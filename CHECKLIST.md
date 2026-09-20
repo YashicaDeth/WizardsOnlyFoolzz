@@ -4071,6 +4071,12 @@ travels, hits something and leaves a mark on it.
       `combat_integration_test`, `derby_exit_test`, `tunnel_test`,
       `zone_precision_test`, `firearm_momentum_test`, `reload_visual_test`,
       `gore_demo_test`, `gore_parity_test` and `derby_cab_test` re-run clean.
+      A later live-route regression pass closed the two remaining cab-specific
+      seams: cab bullets no longer inherit the ram self-damage path or its
+      contact debounce, while actual chassis impacts still honour that
+      cooldown. Each landed cab round now creates explicit driver feedback.
+      `derby_cab_fire_test.gd` verifies all three claims alongside score,
+      expiry, and hull-integrity behaviour (2026-09-20).
 
 
 ### AF6 — The range
