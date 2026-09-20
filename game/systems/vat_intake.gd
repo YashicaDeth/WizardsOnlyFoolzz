@@ -609,34 +609,18 @@ func _finish_filing() -> void:
 
 
 func _draw_doctor(viewport: Vector2) -> void:
-	# Top left, not top right: the right third of the screen is the face
-	# preview panel, and 8pt dark red on near-black was invisible in the
-	# capture. Opening the PNG is the only reason this was caught.
+	# Greg, 20 September: "instead of two figures on the left only the 1 doctor
+	# / handler whos name is unkown". There were two silhouettes -- a bored
+	# clerk and a visiting physician -- and they are now one man. The clerk's
+	# form patter and the doctor's observations come out of the same mouth,
+	# which is worse for the player and simpler on screen.
+	#
+	# Only the recording notice is drawn here now, and it is the room's rather
+	# than his: he has never once looked at it.
 	CellOutzType.draw_condensed(
 		self, Vector2(40, 34), DoctorExamination.CONSENT_NOTICE, 11.0,
 		HOT.lightened(0.25) * Color(1, 1, 1, 0.72 + 0.28 * sin(elapsed * 2.0)), 0.8,
 	)
-	# He stands between the handler and the form, lit, close enough to read.
-	# The right side belongs to the preview panel and drew over him entirely.
-	var head := Vector2(viewport.x * 0.31, viewport.y * 0.26)
-	draw_colored_polygon(PackedVector2Array([
-		head + Vector2(-58, 210), head + Vector2(-46, 26), head + Vector2(-20, -8),
-		head + Vector2(22, -8), head + Vector2(48, 26), head + Vector2(60, 210),
-	]), Color(0.07, 0.07, 0.08, 0.92))
-	draw_circle(head, 30.0, Color(0.09, 0.09, 0.10, 0.94))
-	if doctor_life <= 0.0 or doctor_says == "":
-		return
-	var band := Rect2(Vector2(viewport.x * 0.36, viewport.y - 92), Vector2(viewport.x * 0.30, 52))
-	draw_colored_polygon(PackedVector2Array([
-		band.position + Vector2(10, 0), band.position + Vector2(band.size.x, 0),
-		band.position + band.size - Vector2(10, 0), band.position + Vector2(0, band.size.y),
-	]), Color(0.05, 0.05, 0.06, 0.86))
-	CellOutzType.draw_condensed(self, band.position + Vector2(14, 12), "VISITING PHYSICIAN", 9.0, BRUISE, 0.7)
-	CellOutzType.draw_condensed(
-		self, band.position + Vector2(14, 30), doctor_says.to_upper(), 11.0,
-		PAPER * Color(1, 1, 1, clampf(doctor_life, 0.0, 1.0) * 0.95), 0.8,
-	)
-
 
 func _draw_handler(viewport: Vector2) -> void:
 	# He is a silhouette above the glass. You never see him properly.
@@ -651,8 +635,16 @@ func _draw_handler(viewport: Vector2) -> void:
 		band.position + Vector2(10, 0), band.position + Vector2(band.size.x, 0),
 		band.position + band.size - Vector2(10, 0), band.position + Vector2(0, band.size.y),
 	]), Color(0.03, 0.035, 0.03, 0.82))
-	CellOutzType.draw_condensed(self, band.position + Vector2(14, 12), "HANDLER", 9.0, COPPER, 0.7)
-	var line: String = handler_says if handler_says != "" else HANDLER_LINES[handler_line % HANDLER_LINES.size()]
-	CellOutzType.draw_condensed(self, band.position + Vector2(14, 28), line.to_upper(), 11.0, INK * Color(1, 1, 1, clampf(handler_life, 0.0, 1.0) * 0.9), 0.8)
+	# One man, and the game does not know his name yet. The direction doc keeps
+	# it that way: "his name and full identity are withheld at first."
+	CellOutzType.draw_condensed(self, band.position + Vector2(14, 12), "EXAMINER  //  NAME WITHHELD", 9.0, COPPER, 0.7)
+	# An observation displaces the form patter -- same mouth, and he is not
+	# going to say both at once. Drawn in the paler ink so the player can hear
+	# the register change from clerk to physician without being told.
+	var speaking_as_doctor := doctor_life > 0.0 and doctor_says != ""
+	var line: String = doctor_says if speaking_as_doctor else (handler_says if handler_says != "" else HANDLER_LINES[handler_line % HANDLER_LINES.size()])
+	var life: float = doctor_life if speaking_as_doctor else handler_life
+	var ink_for_line: Color = PAPER if speaking_as_doctor else INK
+	CellOutzType.draw_condensed(self, band.position + Vector2(14, 28), line.to_upper(), 11.0, ink_for_line * Color(1, 1, 1, clampf(life, 0.0, 1.0) * 0.95), 0.8)
 	if transcript_life > 0.0:
 		CellOutzType.draw_condensed(self, band.position + Vector2(14, 50), transcript, 10.0, MOSS * Color(1, 1, 1, clampf(transcript_life, 0.0, 1.0)), 0.8)
