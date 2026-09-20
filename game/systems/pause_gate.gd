@@ -30,12 +30,31 @@ const DESIGN := Vector2(560, 470)
 ## Named so the mixer and the settings page cannot disagree about them.
 const BUSES := ["Master", "Music", "SFX", "Ambience"]
 
+## Y1.1. The only actions actually read by name elsewhere — `bone_yard_hunt.gd`,
+## `rift_derby.gd` and `vat_chamber.gd` all call `Input.get_vector`/`get_axis`
+## with these four, plus the two held modifiers. Jump and the rest of combat
+## are still hardcoded keys in Lane 1's files and are not rebindable from here.
+const CONTROL_ACTIONS := ["move_forward", "move_back", "move_left", "move_right", "sprint", "crouch"]
+const CONTROL_LABELS := {
+	"move_forward": "FORWARD",
+	"move_back": "BACK",
+	"move_left": "LEFT",
+	"move_right": "RIGHT",
+	"sprint": "SPRINT",
+	"crouch": "CROUCH",
+}
+
 var open := false
 var blend := 0.0
 var page := "root"
 var highlighted := 0
 var clock := 0.0
 var screen: Control
+## Set to an action name while waiting for the next key press; empty otherwise.
+var rebinding_action := ""
+## project.godot's own bindings, captured once before any stored rebind is
+## applied — what RESET TO DEFAULT puts back.
+var _default_binds: Dictionary = {}
 
 var _rows: Array[Dictionary] = []
 var _factor := 1.0
@@ -59,6 +78,8 @@ func _ready() -> void:
 	})
 	_ensure_buses()
 	_restore_screen()
+	_capture_default_binds()
+	_restore_keybinds()
 	_apply_mix()
 	set_process(true)
 
@@ -166,6 +187,55 @@ func _toggle_reduced_glitch() -> void:
 	WorldHistory.update_subject(SETTINGS_ID, {"reduced_glitch": not _reduced_glitch()}, "hud_setting_changed")
 
 
+func _capture_default_binds() -> void:
+	for action in CONTROL_ACTIONS:
+		var events := InputMap.action_get_events(action)
+		if not events.is_empty() and events[0] is InputEventKey:
+			_default_binds[action] = (events[0] as InputEventKey).physical_keycode
+
+
+## Applied once at startup, same as the screen mode above — read from
+## `project.godot`'s own defaults until a player has actually changed one.
+func _restore_keybinds() -> void:
+	var stored: Dictionary = WorldHistory.subject(SETTINGS_ID)
+	for action in CONTROL_ACTIONS:
+		var key := "keybind_%s" % action
+		if stored.has(key):
+			_bind_action(action, int(stored[key]))
+
+
+func _bind_action(action: String, physical_keycode: int) -> void:
+	InputMap.action_erase_events(action)
+	var key_event := InputEventKey.new()
+	key_event.physical_keycode = physical_keycode
+	InputMap.action_add_event(action, key_event)
+
+
+## The physical key, not the localised keycode — matches how `project.godot`
+## already stores its own defaults, and keeps working if the OS layout changes
+## underneath a saved rebind.
+func _apply_rebind(action: String, event: InputEventKey) -> void:
+	_bind_action(action, event.physical_keycode)
+	WorldHistory.register_subject(SETTINGS_ID, {})
+	WorldHistory.update_subject(SETTINGS_ID, {"keybind_%s" % action: event.physical_keycode}, "keybind_changed")
+
+
+func _reset_keybinds() -> void:
+	WorldHistory.register_subject(SETTINGS_ID, {})
+	for action in CONTROL_ACTIONS:
+		var default_keycode: int = int(_default_binds.get(action, 0))
+		if default_keycode != 0:
+			_bind_action(action, default_keycode)
+		WorldHistory.update_subject(SETTINGS_ID, {"keybind_%s" % action: default_keycode}, "keybind_reset")
+
+
+func _key_label(action: String) -> String:
+	var events := InputMap.action_get_events(action)
+	if events.is_empty() or not (events[0] is InputEventKey):
+		return "—"
+	return (events[0] as InputEventKey).as_text_physical_keycode()
+
+
 ## Rows are rebuilt each frame the plate is open, because their labels carry
 ## live values. The row list is the menu — there is no scene to keep in sync.
 func _build_rows() -> void:
@@ -181,6 +251,14 @@ func _build_rows() -> void:
 		_rows.append({"id": "reduced_glitch", "label": "REDUCED GLITCH", "value": "ON" if _reduced_glitch() else "OFF"})
 		_rows.append({"id": "settings_back", "label": "BACK", "value": ""})
 		return
+	if page == "controls":
+		for action in CONTROL_ACTIONS:
+			var label: String = str(CONTROL_LABELS.get(action, action.to_upper()))
+			var value := "PRESS KEY" if rebinding_action == action else _key_label(action)
+			_rows.append({"id": "bind_%s" % action, "label": label, "value": value})
+		_rows.append({"id": "ctrl_reset", "label": "RESET TO DEFAULT", "value": ""})
+		_rows.append({"id": "ctrl_back", "label": "BACK", "value": ""})
+		return
 	for bus_name in BUSES:
 		_rows.append({"id": "vol_%s" % bus_name, "label": bus_name.to_upper(), "value": "%03d" % roundi(_volume(bus_name) * 100.0), "slider": true})
 	_rows.append({"id": "gore", "label": "VIOLENCE", "value": _gore_mode()})
@@ -189,6 +267,8 @@ func _build_rows() -> void:
 	# is told about, and it persists like everything else here.
 	_rows.append({"id": "screen", "label": "SCREEN", "value": "FULL" if _fullscreen() else "WINDOWED"})
 	_rows.append({"id": "hud", "label": "DISPLAY / HUD", "value": ">"})
+	# Y1.1. Controls had no door on them anywhere in the project.
+	_rows.append({"id": "controls", "label": "CONTROLS", "value": ""})
 	_rows.append({"id": "back", "label": "BACK", "value": ""})
 
 
@@ -213,6 +293,7 @@ func open_gate() -> void:
 	page = "root"
 	highlighted = 0
 	clock = 0.0
+	rebinding_action = ""
 	screen.visible = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().paused = true
@@ -222,11 +303,20 @@ func close() -> void:
 	if not open:
 		return
 	open = false
+	rebinding_action = ""
 	get_tree().paused = false
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	if rebinding_action != "":
+		# Escape cancels rather than binding itself — it is the one key every
+		# other menu in the game already uses to back out.
+		if event.keycode != KEY_ESCAPE:
+			_apply_rebind(rebinding_action, event as InputEventKey)
+		rebinding_action = ""
+		get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_ESCAPE:
 		toggle()
@@ -285,12 +375,22 @@ func _activate() -> void:
 			highlighted = 0
 		"gore", "screen", "hud_opacity", "hud_style", "reduced_glitch":
 			_nudge(1)
+		"controls":
+			page = "controls"
+			highlighted = 0
+		"ctrl_back":
+			page = "settings"
+			highlighted = 0
+		"ctrl_reset":
+			_reset_keybinds()
 		"menu":
 			close()
 			Interstitial.travel("res://country_town_menu.tscn", "standing down")
 		_:
 			if id.begins_with("vol_"):
 				_nudge(1)
+			elif id.begins_with("bind_"):
+				rebinding_action = id.trim_prefix("bind_")
 
 
 func _process(delta: float) -> void:

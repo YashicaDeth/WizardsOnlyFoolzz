@@ -1256,20 +1256,17 @@ func _on_wrecker_impact(other: Node, closing_speed: float, self_share: float, wr
 		_finish_round("lost")
 
 
-func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: float = 1.0, gate_key: String = "hit_ready_msec") -> void:
+func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: float = 1.0, gate_key: String = "hit_ready_msec", cab_round: bool = false) -> void:
 	if round_state != "active":
 		return
 	var now: int = Time.get_ticks_msec()
-	# The ram cooldown and the gun cooldown are gated separately (`gate_key`).
-	# They used to share one `hit_ready_msec`, which meant a target still
-	# inside its 520ms ram-cooldown silently ate a gun shot too — in a
-	# crowded derby a target is rammed by *something* almost constantly, so
-	# the cab gun would visibly fire and connect (`round_hit` firing) while
-	# doing nothing, which from the seat looks exactly like "the gun doesn't
-	# shoot bullets."
-	if now < int(target.get_meta(gate_key, 0)):
-		return
-	target.set_meta(gate_key, now + 520)
+	# Chassis contacts need a debounce; distinct ballistic arrivals do not.
+	# The arsenal already gates firing cadence. A collision timer here would
+	# silently discard legitimate follow-up bullets (the pistol fires at 280ms).
+	if not cab_round:
+		if now < int(target.get_meta(gate_key, 0)):
+			return
+		target.set_meta(gate_key, now + 520)
 	var impact_energy: int = roundi(collision_speed * 10.0)
 	# Damage rises with the square of closing speed so a committed ram strips
 	# panels on the first contact instead of the fifth, and the share of the
@@ -1292,11 +1289,12 @@ func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: fl
 	# reverted, this one only costs a wrecker its acceleration and braking.
 	target.set("condition", clampf(float(target_integrity) / 100.0, 0.0, 1.0))
 	score += damage * 5
-	integrity = maxi(0, integrity - clampi(roundi(energy * 0.22 * (0.35 + 0.65 * (1.0 - self_share))), 1, 34))
-	# V1.1/V1.2. See the mirror note in `_on_vehicle_impact()`.
-	boat.condition = clampf(float(integrity) / 100.0, 0.0, 1.0)
 	var impact_direction := (target.global_position - boat.global_position).normalized()
-	_update_player_damage_visual(-impact_direction)
+	# Only physical contact transfers impact energy back into our chassis.
+	if not cab_round:
+		integrity = maxi(0, integrity - clampi(roundi(energy * 0.22 * (0.35 + 0.65 * (1.0 - self_share))), 1, 34))
+		boat.condition = clampf(float(integrity) / 100.0, 0.0, 1.0)
+		_update_player_damage_visual(-impact_direction)
 	_update_wrecker_damage_visual(target, target_integrity, impact_direction)
 	_update_detachable_parts(target, target_integrity, impact_direction)
 	if damage >= 28:
@@ -1693,6 +1691,7 @@ func _on_cab_round_hit(hit: Dictionary) -> void:
 	WorldHistory.begin_ledger_batch()
 	if struck != null and struck.get_script() == SERVICE_RING_RELAY:
 		struck.call("take_hit", "cab_round", 1.0)
+		_announce_cab_hit("RELAY")
 		WorldHistory.record_event("derby_shot_landed", {"venue": "underground_colosseum", "target": struck.name})
 	elif struck != null and targets.has(struck):
 		# A bullet is not a ram. It does less, and it does it from further away,
@@ -1702,9 +1701,20 @@ func _on_cab_round_hit(hit: Dictionary) -> void:
 		# through it: the two are different units, and this number was
 		# already tuned against real play, not invented alongside the rest
 		# of this rewrite.
-		_damage_target(struck as Node3D, 9.0, 1.0, "gun_hit_ready_msec")
+		_damage_target(struck as Node3D, 9.0, 1.0, "", true)
+		_announce_cab_hit("WRECKER")
 		WorldHistory.record_event("derby_shot_landed", {"venue": "underground_colosseum" if is_colosseum else "rift_derby_quarry", "target": struck.name})
 	WorldHistory.commit_ledger_batch()
+
+
+func _announce_cab_hit(kind: String) -> void:
+	if dynamic_interface == null:
+		return
+	if dynamic_interface.has_method("announce_impact"):
+		dynamic_interface.announce_impact(0, false)
+	# Keep the existing physical HUD treatment and replace its generic impact
+	# label with the weapon-specific answer the driver needs to trust the gun.
+	dynamic_interface.set("event_message", "CAB ROUND // %s HIT" % kind)
 
 
 ## AF1.8/AF10.8. The port from `gore_demo.gd` took `_on_round_hit()` but

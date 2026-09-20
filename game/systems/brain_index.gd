@@ -659,6 +659,8 @@ static func _record_subject_action(event_type: String, subject_id: String, detai
 		PLAYER_ACTION_LEDGER.record(event_type, details)
 	else:
 		WorldHistory.record_event(event_type, details)
+
+
 ## AT2.6, the other half of the distinction `is_open()` draws: a memory can be
 ## let go of, its own file. A `"chip"` entry refuses outright, permanently and
 ## for the one reason that matters — it was never yours to begin with, so

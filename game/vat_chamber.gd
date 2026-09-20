@@ -20,8 +20,11 @@ const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const BRAIN_INDEX := preload("res://systems/brain_index.gd")
 const CARRY := preload("res://systems/carry.gd")
 const CLOTHING := preload("res://systems/clothing.gd")
+const IMPLANT_CATALOG := preload("res://systems/implant_catalog.gd")
 
 const EYE_HEIGHT := 1.62
+const BODY_HALF_HEIGHT := 0.85
+const STANDING_EYE_OFFSET := EYE_HEIGHT - BODY_HALF_HEIGHT
 const VAT_POSITION := Vector3(0, 0, 0)
 ## P4.3: was 34.0 — a fresh body limps this at mobility_ratio speed (2.7 u/s),
 ## so the aisle alone cost ~10.6s of forced, agency-free walking after the
@@ -139,7 +142,7 @@ func _build_player() -> void:
 	var collider := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
 	capsule.radius = 0.34
-	capsule.height = 1.7
+	capsule.height = BODY_HALF_HEIGHT * 2.0
 	collider.shape = capsule
 	player.add_child(collider)
 	add_child(player)
@@ -499,7 +502,11 @@ func _update_sequence(_delta: float) -> void:
 		"floor":
 			# On hands and knees on the grating.
 			var t := clampf((clock - 5.6) / 3.2, 0.0, 1.0)
-			player.position.y = lerpf(0.62, EYE_HEIGHT, ease(t, 0.45))
+			# Keep the capsule grounded while the eye rises from hands and knees.
+			# Raising the capsule to eye height made gravity undo the stand-up
+			# as soon as movement began, leaving the eye at waist height.
+			player.position.y = BODY_HALF_HEIGHT
+			camera.position.y = lerpf(0.62, EYE_HEIGHT, ease(t, 0.45)) - BODY_HALF_HEIGHT
 			camera.rotation = Vector3(lerpf(-0.95, 0.0, ease(t, 0.5)), 0, lerpf(0.22, 0.0, ease(t, 0.5)))
 			camera.fov = lerpf(78.0, 74.0, t) + sin(clock * 2.4) * (1.0 - t) * 4.0
 			if t >= 1.0:
@@ -555,9 +562,14 @@ func _record_breakout() -> void:
 	breakout_complete = true
 	var player_state := WorldHistory.subject("player")
 	var anatomy_state: Dictionary = player_state.get("anatomy", {})
-	var grown: Array = (anatomy_state.get("cybernetics", []) as Array).duplicate()
-	if not grown.has("wetwire chip"):
-		grown.append("wetwire chip")
+	# Anatomy snapshots store installed hardware by body zone. Older intake data
+	# may still contain a plain list, so resolve both forms before adding the
+	# chip; never push a string into the typed implant list.
+	var grown: Dictionary = {}
+	for implant: Dictionary in IMPLANT_CATALOG.list(anatomy_state.get("cybernetics", {})):
+		grown[str(implant.get("zone", "torso"))] = implant
+	var wetwire: Dictionary = IMPLANT_CATALOG.resolve("wetwire chip")
+	grown[str(wetwire.zone)] = wetwire
 	anatomy_state["cybernetics"] = grown
 	WorldHistory.begin_ledger_batch()
 	anatomy.call("configure", "player", 5000.0, grown)
@@ -616,7 +628,7 @@ func _update_movement(delta: float) -> void:
 	camera.rotation = Vector3(pitch, 0, 0)
 	# A body that just came out of a tank does not walk well.
 	var stride := Vector2(player.velocity.x, player.velocity.z).length()
-	camera.position.y = sin(Time.get_ticks_msec() * 0.0055) * stride * 0.016
+	camera.position.y = STANDING_EYE_OFFSET + sin(Time.get_ticks_msec() * 0.0055) * stride * 0.016
 	camera.rotation.z = sin(Time.get_ticks_msec() * 0.0027) * stride * 0.008
 
 
