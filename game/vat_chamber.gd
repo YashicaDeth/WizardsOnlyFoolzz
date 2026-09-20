@@ -19,6 +19,7 @@ const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const BRAIN_INDEX := preload("res://systems/brain_index.gd")
 const CARRY := preload("res://systems/carry.gd")
+const CLOTHING := preload("res://systems/clothing.gd")
 
 const EYE_HEIGHT := 1.62
 const VAT_POSITION := Vector3(0, 0, 0)
@@ -48,6 +49,22 @@ var breakout_complete := false
 var first_acquisition_complete := false
 var objective_text := "ESCAPE THE FACILITY"
 
+## AX3.1/AX3.6. The Growing Floor's first two objects: the broken restraint
+## granted at the breach is inert cargo until the player actually does
+## something with it. This is the something — a jammed failure-tank the
+## restraint's sheared edge can bite into, the same E verb the door already
+## answers to, no separate tutorial prompt inventing a new one. AX3.2 hangs
+## its dead subject and their clothing on the same marker once it is open.
+const RESTRAINT_LABEL := "BROKEN MEDICAL RESTRAINT"
+const RESTRAINT_INSPECT_TEXT := "A hinge sheared clean at the pin. The broken edge is a wedge, if there is a seam to put it in."
+const FAILED_SUBJECT_ID := "growing_floor_failed_subject"
+const FIRST_OBJECT_REACH := 3.0
+var stuck_tank_marker: Node3D
+var stuck_tank_shell: MeshInstance3D
+var failed_subject_visual: MeshInstance3D
+var stuck_tank_opened := false
+var inspect_held := false
+
 # 0 submerged, 1 voiding, 2 breach, 3 floor, 4 aisle
 const BEATS := [
 	{"at": 0.8, "text": "AIRWAY OBSTRUCTED  //  FOREIGN TUBE"},
@@ -71,6 +88,7 @@ func _ready() -> void:
 	$WorldEnvironment.environment = WorldLook.environment("ossuary")
 	_build_chamber()
 	_build_vat()
+	_build_first_objects()
 	_build_player()
 	_build_intake()
 	opening_audio = OPENING_AUDIO.new()
@@ -224,6 +242,63 @@ func _build_vat() -> void:
 	add_child(glow)
 
 
+## AX3.1/AX3.2. One dedicated failure-tank, off the repeating decorative row
+## `_build_chamber()` draws, so opening it cannot collide with that loop's own
+## geometry or bay bookkeeping. Close enough to the vat that it is the first
+## thing worth walking to once the player can move at all.
+func _build_first_objects() -> void:
+	var at := Vector3(-3.4, 0.0, 2.6)
+	stuck_tank_marker = Node3D.new()
+	stuck_tank_marker.name = "FirstObjectTank"
+	stuck_tank_marker.position = at
+	add_child(stuck_tank_marker)
+
+	stuck_tank_shell = MeshInstance3D.new()
+	var cylinder := CylinderMesh.new()
+	cylinder.top_radius = 0.8
+	cylinder.bottom_radius = 0.8
+	cylinder.height = 2.8
+	var shell_material := StandardMaterial3D.new()
+	shell_material.albedo_color = Color(0.22, 0.24, 0.2, 0.6)
+	shell_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	shell_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	shell_material.roughness = 0.5
+	cylinder.material = shell_material
+	stuck_tank_shell.mesh = cylinder
+	stuck_tank_shell.position = Vector3(0, 1.4, 0)
+	stuck_tank_marker.add_child(stuck_tank_shell)
+
+	failed_subject_visual = MeshInstance3D.new()
+	var occupant := CapsuleMesh.new()
+	occupant.radius = 0.27
+	occupant.height = 1.4
+	occupant.material = WorldLook.surface(Color("241a16"), "flesh", 41)
+	failed_subject_visual.mesh = occupant
+	failed_subject_visual.position = Vector3(0, 1.05, 0)
+	stuck_tank_marker.add_child(failed_subject_visual)
+
+	for rib in 4:
+		var ring := MeshInstance3D.new()
+		var torus := TorusMesh.new()
+		torus.inner_radius = 0.8
+		torus.outer_radius = 0.88
+		torus.material = WorldLook.surface(Color("241d15"), "bone", 41 + rib)
+		ring.mesh = torus
+		ring.position = Vector3(0, 0.3 + float(rib) * 0.8, 0)
+		ring.rotation_degrees = Vector3(90, 0, 0)
+		stuck_tank_marker.add_child(ring)
+
+	# AX3.2. Registered now so the subject exists to strip clothing off of the
+	# moment the tank opens — non-destructive on repeat `_ready()` calls
+	# (`WorldHistory.register_subject` only fills in missing keys), so a
+	# resumed save cannot re-dress a subject the player already looted.
+	WorldHistory.register_subject(FAILED_SUBJECT_ID, {
+		"name": "SUBJECT 0C-4", "kind": "person", "status": "dead",
+		"memory": "Failed the same cycle you walked out of.",
+		"worn_layer": "humiliation_smock", "worn_condition": 1.0,
+	})
+
+
 func _build_chamber() -> void:
 	# Grated floor and a low wet ceiling.
 	_slab(Vector3(16.0, 0.4, AISLE_LENGTH + 8.0), Vector3(0, -0.2, -AISLE_LENGTH * 0.4), "dirt", Color("15120f"))
@@ -362,6 +437,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		_interact()
+	# AX3.1/AX3.6. The same HOLD-I verb the rest of the game already teaches
+	# with (see `bone_yard_hunt.gd`'s keys card), introduced here for the
+	# first time by doing rather than by that card, since the card belongs to
+	# a scene this run has not reached yet.
+	if event is InputEventKey and not event.echo and event.keycode == KEY_I:
+		inspect_held = event.pressed
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and phase != "submerged":
 		yaw -= event.relative.x * 0.0026
 		pitch = clampf(pitch - event.relative.y * 0.0024, -1.2, 1.0)
@@ -529,6 +610,10 @@ func _update_movement(delta: float) -> void:
 func _interact() -> void:
 	if not can_move:
 		return
+	if _try_pry_stuck_tank():
+		return
+	if _try_take_garment():
+		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0
 	if to_door.length() > 3.4:
@@ -538,6 +623,55 @@ func _interact() -> void:
 	opening_audio.cue("door")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Interstitial.travel("res://underground_colosseum.tscn", "racked for the tunnel heat // debt is in the meat")
+
+
+## AX3.1. What using the restraint actually does. Refused rather than silently
+## ignored when the tool is not yet carried, so E near the tank before the
+## breach reads as "nothing here yet" rather than as a broken prompt.
+func _carries_restraint() -> bool:
+	for entry in WorldHistory.subject("inventory").get("items", []):
+		if str((entry as Dictionary).get("label", "")) == RESTRAINT_LABEL:
+			return true
+	return false
+
+
+func _near_first_objects() -> bool:
+	if stuck_tank_marker == null:
+		return false
+	var to_tank := stuck_tank_marker.global_position - player.global_position
+	to_tank.y = 0.0
+	return to_tank.length() <= FIRST_OBJECT_REACH
+
+
+func _try_pry_stuck_tank() -> bool:
+	if stuck_tank_marker == null or stuck_tank_opened:
+		return false
+	if not _carries_restraint() or not _near_first_objects():
+		return false
+	stuck_tank_opened = true
+	# The shell that hid the occupant is what the restraint actually defeats;
+	# the occupant underneath was always real geometry, not a reveal that
+	# pops into existence on the prompt.
+	stuck_tank_shell.visible = false
+	subtitle.text = "THE BROKEN RESTRAINT BITES THE SEAM AND IT GIVES"
+	WorldHistory.record_event("opening_first_object_used", {"tool": RESTRAINT_LABEL, "target": FAILED_SUBJECT_ID})
+	return true
+
+
+## AX3.2. "Take clothing off a dead subject." Only reachable once the
+## restraint has actually opened the tank, and refused if the player is
+## already dressed — this is the one garment this beat, not a general strip
+## verb over every corpse the facility will ever contain.
+func _try_take_garment() -> bool:
+	if not stuck_tank_opened or not _near_first_objects():
+		return false
+	if CLOTHING.worn("player") != "bare":
+		return false
+	var result := CLOTHING.take_worn(FAILED_SUBJECT_ID, "player")
+	if not bool(result.get("ok", false)):
+		return false
+	subtitle.text = "%s // TAKEN, ALREADY TORN FROM THE PULL" % CLOTHING.worn_label("player")
+	return true
 
 
 ## The door press changes the player's status, the opening route and two
@@ -566,7 +700,30 @@ func _update_hud() -> void:
 		prompt.text = ""
 		$HUD/Objective.text = ""
 		return
+	$HUD/Objective.text = "OBJECTIVE\n" + objective_text
+	# AX3.1/AX3.6. INSPECT is a held state, not a menu, so it wins the prompt
+	# line for as long as it is held rather than opening anything separate.
+	if inspect_held:
+		prompt.text = _inspect_text()
+		return
+	if not stuck_tank_opened and _carries_restraint() and _near_first_objects():
+		prompt.text = "[E] PRY THE JAMMED TANK WITH THE BROKEN RESTRAINT"
+		return
+	if stuck_tank_opened and CLOTHING.worn("player") == "bare" and _near_first_objects():
+		prompt.text = "[E] TAKE THE CLOTHING OFF SUBJECT 0C-4"
+		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0
-	$HUD/Objective.text = "OBJECTIVE\n" + objective_text
-	prompt.text = "[E] ENTER THE UNDERGROUND HEAT" if to_door.length() <= 3.4 else "WASD MOVE   //   MOUSE LOOK   //   E INTERACT"
+	prompt.text = "[E] ENTER THE UNDERGROUND HEAT" if to_door.length() <= 3.4 else "WASD MOVE   //   MOUSE LOOK   //   E INTERACT   //   HOLD I INSPECT"
+
+
+## AX3.1/AX3.6. What HOLD I actually shows — the same held object every time,
+## named for what it is rather than a generic "inspecting..." placeholder, so
+## the verb teaches by answering a real question instead of just consuming a
+## key.
+func _inspect_text() -> String:
+	if _carries_restraint():
+		return "%s // %s" % [RESTRAINT_LABEL, RESTRAINT_INSPECT_TEXT]
+	if CLOTHING.worn("player") != "bare":
+		return "%s // TAKEN OFF SOMEBODY WHO DID NOT SURVIVE THE CYCLE" % CLOTHING.worn_label("player")
+	return "NOTHING IN HAND TO INSPECT"
