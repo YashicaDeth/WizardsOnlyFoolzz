@@ -209,7 +209,18 @@ func _build_enterable_shell(at: Vector3, dimensions: Vector3, color: Color, sign
 		_add_wall(building, Vector3(half_x + 0.06, storey, 0), Vector3(0.12, 0.14, dimensions.z * 0.96), color.darkened(0.36))
 		storey += STOREY
 	_post_bill(building, dimensions, generated_buildings.size())
+	# The silhouette kit is decoration, not a walkable shell.  In the live
+	# sandbox it accounted for the overwhelming majority of the generated
+	# district's draw calls *and* every little pipe/tarp cast a full shadow.
+	# Keep it close, where it breaks the box outline, then let distance hide it.
+	# The real walls, roof and collision above are deliberately left untouched.
+	var structural_children := building.get_child_count()
 	Silhouette.dress(building, dimensions, generated_buildings.size(), Callable(self, "_greeble_material"))
+	for child_index in range(structural_children, building.get_child_count()):
+		var detail := building.get_child(child_index)
+		if detail is MeshInstance3D:
+			(detail as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			(detail as GeometryInstance3D).visibility_range_end = 88.0
 	Silhouette.settle(building, generated_buildings.size())
 	var sign := Label3D.new()
 	sign.text = sign_text
