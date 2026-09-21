@@ -41,6 +41,20 @@ func _ready() -> void:
 	city._physics_process(0.1)
 	check(not city.patrol_alert, "a disabled sentinel cannot re-engage")
 
+	# The optional arcade tool is the direct, riskier answer to the same
+	# pressure beat.  Check it in a fresh district so the fuse has not already
+	# switched the sentinel off.
+	WorldHistory.record_event("service_arcade_breach_tool_taken", {"location": "service_arcade"})
+	var combat_city: Variant = load("res://buried_city.tscn").instantiate()
+	add_child(combat_city)
+	await get_tree().physics_frame
+	combat_city.player.global_position = combat_city.patrol.global_position + Vector3(0, 0, 5.0)
+	combat_city._discharge_breach_tool()
+	check(combat_city.breach_tool_ready, "the arcade breach tool carries into Lower Works")
+	check(combat_city.patrol_disabled and combat_city.sentinel_disable_reason == "breach_interrupted", "the breach tool can interrupt the live sentinel at close range")
+	check(WorldHistory.event_count("lower_works_sentinel_breached") == 1, "the direct encounter records its actual resolution")
+	combat_city.queue_free()
+
 	city._record_pit_entry()
 	check(OpeningDirector.reached("entered_pit"), "the elevator handoff records the derby stage")
 	check(WorldHistory.event_count("lower_works_entered_pit") == 1, "and creates one attributable exit event")

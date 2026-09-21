@@ -35,6 +35,9 @@ var patrol_alert := false
 var patrol_disabled := false
 var patrol_attack_cooldown := 0.0
 var blood := 100.0
+var breach_tool_ready := false
+var breach_flash: OmniLight3D
+var sentinel_disable_reason := ""
 
 
 func _ready() -> void:
@@ -47,6 +50,10 @@ func _ready() -> void:
 	_build_patrol()
 	_build_player()
 	_build_hud()
+	# The arcade's optional breach tool carries forward as a compact, deliberate
+	# first combat choice.  The fuse remains the quiet route; neither route is
+	# a false pickup that disappears at the next scene swap.
+	breach_tool_ready = WorldHistory.event_count("service_arcade_breach_tool_taken") > 0
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	WorldHistory.record_event("lower_works_entered", {"location": "lower_works"})
 
@@ -65,6 +72,13 @@ func _build_player() -> void:
 	camera.position.y = 0.77
 	camera.fov = 88.0
 	player.add_child(camera)
+	breach_flash = OmniLight3D.new()
+	breach_flash.name = "BreachFlash"
+	breach_flash.light_color = Color("f0a24b")
+	breach_flash.light_energy = 0.0
+	breach_flash.omni_range = 7.0
+	breach_flash.position = Vector3(0, 1.2, 0.3)
+	player.add_child(breach_flash)
 
 
 func _build_hud() -> void:
@@ -312,6 +326,8 @@ func _slab(dimensions: Vector3, at: Vector3, kind: String, color: Color) -> Stat
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+			_discharge_breach_tool()
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		yaw -= event.relative.x * 0.0026
@@ -330,6 +346,8 @@ func _physics_process(delta: float) -> void:
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	patrol_phase += delta
+	if breach_flash != null:
+		breach_flash.light_energy = move_toward(breach_flash.light_energy, 0.0, delta * 18.0)
 	_patrol_step(delta)
 	_update_hud()
 
@@ -380,23 +398,44 @@ func _interact() -> void:
 	if fuse_taken and not shortcut_open and _flat_distance(SHORTCUT_AT) <= 3.0:
 		shortcut_open = true
 		shortcut_gate.queue_free()
-		patrol_disabled = true
 		# The fuse has a tactical job as well as a route job: shunting this
 		# side circuit drops the only sentinel's local relay.  It turns the
 		# optional walk to the west gallery into a real safer route, instead of
 		# an impressive-looking gate that changes nothing once opened.
-		if patrol != null:
-			patrol.set_meta("state", "relay_disabled")
-			var eye := patrol.get_node_or_null("Eye") as OmniLight3D
-			if eye != null:
-				eye.light_color = Color("4d7044")
-				eye.light_energy = 0.35
+		_disable_sentinel("relay_disabled")
 		WorldHistory.record_event("lower_works_shortcut_powered", {"location": "lower_works", "sentinel_relay": "disabled"})
 		return
 	if _flat_distance(EXIT_AT) <= 4.0 and fuse_taken:
 		_record_pit_entry()
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		Interstitial.travel("res://underground_colosseum.tscn", "lower works elevator // the heat below is awake")
+
+
+func _discharge_breach_tool() -> void:
+	if not breach_tool_ready or patrol == null or patrol_disabled:
+		return
+	var separation := patrol.global_position - player.global_position
+	separation.y = 0.0
+	# The tool is an interruption, not a free long-range gun.  It has to be
+	# used during the sentinel's actual pressure beat.
+	if separation.length() > 8.0:
+		return
+	_disable_sentinel("breach_interrupted")
+	if breach_flash != null:
+		breach_flash.light_energy = 7.0
+	WorldHistory.record_event("lower_works_sentinel_breached", {"location": "lower_works", "range": snappedf(separation.length(), 0.1)})
+
+
+func _disable_sentinel(reason: String) -> void:
+	patrol_disabled = true
+	sentinel_disable_reason = reason
+	if patrol == null:
+		return
+	patrol.set_meta("state", reason)
+	var eye := patrol.get_node_or_null("Eye") as OmniLight3D
+	if eye != null:
+		eye.light_color = Color("4d7044")
+		eye.light_energy = 0.35
 
 
 func _record_pit_entry() -> void:
@@ -411,7 +450,7 @@ func _record_pit_entry() -> void:
 
 
 func _update_hud() -> void:
-	var guard_state := "SENTINEL RELAY DOWN" if patrol_disabled else ("SENTINEL ENGAGED" if patrol_alert else "SENTINEL PATROL")
+	var guard_state := ("SENTINEL INTERRUPTED" if sentinel_disable_reason == "breach_interrupted" else "SENTINEL RELAY DOWN") if patrol_disabled else ("SENTINEL ENGAGED" if patrol_alert else "SENTINEL PATROL")
 	status.text = "BLOOD %03d%%   PAIN 86   LOWER WORKS // %s" % [roundi(blood), guard_state]
 	objective.text = "OBJECTIVE // " + ("REACH THE HEAT ELEVATOR" if fuse_taken else "FIND A LIFT FUSE")
 	if not fuse_taken and _flat_distance(FUSE_AT) <= 2.4:
@@ -420,5 +459,7 @@ func _update_hud() -> void:
 		prompt.text = "[E] POWER SHORTCUT // DISABLE SENTINEL"
 	elif fuse_taken and _flat_distance(EXIT_AT) <= 4.0:
 		prompt.text = "[E] DESCEND TO THE UNDERGROUND HEAT"
+	elif breach_tool_ready and patrol_alert and not patrol_disabled:
+		prompt.text = "[LMB] DISCHARGE BREACH TOOL // INTERRUPT SENTINEL"
 	else:
 		prompt.text = "WASD MOVE   //   MOUSE LOOK   //   E INTERACT"
