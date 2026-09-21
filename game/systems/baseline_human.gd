@@ -1241,12 +1241,12 @@ func _dress_zone(zone_id: String, size: Vector3) -> void:
 	var length := size.z if _leg_points_forward(zone_id) else size.y
 	if old != null and is_instance_valid(old):
 		old.mesh = ClothingShell.shell_mesh(zone_id, length * 0.5)
-		old.material_override = ClothingShell.shell_material(integrity, ClothingShell.soak_of(self, zone_id))
+		old.material_override = ClothingShell.shell_material(integrity, ClothingShell.soak_of(self, zone_id), str(wardrobe.get("style", "plain")), zone_id)
 		return
 	var shell := MeshInstance3D.new()
 	shell.name = "Garment"
 	shell.mesh = ClothingShell.shell_mesh(zone_id, length * 0.5)
-	shell.material_override = ClothingShell.shell_material(integrity, ClothingShell.soak_of(self, zone_id))
+	shell.material_override = ClothingShell.shell_material(integrity, ClothingShell.soak_of(self, zone_id), str(wardrobe.get("style", "plain")), zone_id)
 	part.add_child(shell)
 
 

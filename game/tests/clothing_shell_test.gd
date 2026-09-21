@@ -131,6 +131,19 @@ func _ready() -> void:
 	var whole: StandardMaterial3D = GARMENT.shell_material(1.0)
 	check(cloth.albedo_color.v > whole.albedo_color.v, "a shredded garment reads threadbare beside a whole one")
 
+	# --- the humiliation rig arrives already punished ---------------------------------
+	var motley := GARMENT.humiliation_wardrobe()
+	check(motley.size() == 7, "the rig covers six zones plus what it is")
+	check(float(motley["head"]) < 1.0, "and the collar arrives damaged (%.2f)" % float(motley["head"]))
+	var wine: StandardMaterial3D = GARMENT.shell_material(1.0, 0.0, "jester", "torso")
+	var bone: StandardMaterial3D = GARMENT.shell_material(1.0, 0.0, "jester", "left_arm")
+	var undyed: StandardMaterial3D = GARMENT.shell_material(1.0)
+	check(not wine.albedo_color.is_equal_approx(bone.albedo_color), "motley reads per zone, not as one tint")
+	check(not wine.albedo_color.is_equal_approx(undyed.albedo_color), "and the punishment reads apart from work cloth")
+	var torn_ruff: StandardMaterial3D = GARMENT.shell_material(float(motley["head"]), 0.0, "jester", "head")
+	var whole_ruff: StandardMaterial3D = GARMENT.shell_material(1.0, 0.0, "jester", "head")
+	check(torn_ruff.albedo_color.v > whole_ruff.albedo_color.v, "the damaged ruff still threadbares like any cloth")
+
 	# --- blood stays in the weave --------------------------------------------------
 	var clad_zone := str(clad.get("zone", "torso"))
 	var soak: float = GARMENT.soak_of(rig, clad_zone)

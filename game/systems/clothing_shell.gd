@@ -54,6 +54,17 @@ static func fresh_wardrobe() -> Dictionary:
 	return wardrobe
 
 
+## The forced humiliation rig: the same six zones, but the collar arrives
+## already damaged per the asset ledger, because the punishment started before
+## the player ever saw the form. Style rides alongside as the `"style"` key so
+## the rig knows what it is wearing without a second lookup.
+static func humiliation_wardrobe() -> Dictionary:
+	var wardrobe := fresh_wardrobe()
+	wardrobe["head"] = 0.35
+	wardrobe["style"] = "jester"
+	return wardrobe
+
+
 ## What a blow does to the garment over a zone, and what is left for the skin.
 ## Returns `{absorbed, passed, breached, integrity}`. A zone with no entry is
 ## naked and passes everything, so undressed rigs behave exactly as before.
@@ -116,9 +127,22 @@ static func shell_mesh(zone_id: String, half_height: float) -> ArrayMesh:
 ## `soak` is blood dried into the weave, 0 clean to 1 saturated: it drags the
 ## cloth toward dried-blood dark, which is how a jacket that has been in a
 ## fight keeps showing it after the bleeding stops.
-static func shell_material(coverage: float, soak := 0.0) -> StandardMaterial3D:
+## `style` and `zone` pick the palette. Plain is undyed work cloth everywhere;
+## jester is the forced humiliation rig from DESIGN.md — black-wine body,
+## bone-and-blood cuffs, a locked ruff at the throat — per zone, so the
+## punishment reads at silhouette distance rather than as a tint. Bells and
+## restraint hardware are geometry and wait on the asset pass (COST-001);
+## what ships here is the cloth they hang off.
+const STYLES := {
+	"plain": {"torso": "2e2a26", "head": "2e2a26", "left_arm": "2e2a26", "right_arm": "2e2a26", "left_leg": "2e2a26", "right_leg": "2e2a26"},
+	"jester": {"torso": "3a1020", "head": "4a1428", "left_arm": "cfc2a4", "right_arm": "3a1020", "left_leg": "241418", "right_leg": "241418"},
+}
+
+
+static func shell_material(coverage: float, soak := 0.0, style := "plain", zone_id := "torso") -> StandardMaterial3D:
+	var palette: Dictionary = STYLES.get(style, STYLES["plain"])
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color("2e2a26").lightened((1.0 - clampf(coverage, 0.0, 1.0)) * 0.45)
+	material.albedo_color = Color(str(palette.get(zone_id, "2e2a26"))).lightened((1.0 - clampf(coverage, 0.0, 1.0)) * 0.45)
 	material.albedo_color = material.albedo_color.lerp(Color("3d0907"), clampf(soak, 0.0, 1.0) * 0.7)
 	material.roughness = 0.94
 	material.metallic = 0.0
