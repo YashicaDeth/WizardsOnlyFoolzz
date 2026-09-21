@@ -174,6 +174,9 @@ var severed: Array[String] = []
 ## Cutting force accumulates separately from health. A club can destroy an arm,
 ## but only a directional cutting/ballistic blow can take it off.
 var sever_stress: Dictionary = {}
+## Zones taken by a cut rather than whole: the remainder is still on the body,
+## so it keeps rendering and does not get a capsule stump.
+var cut_zones: Dictionary = {}
 ## Deepest `GoreChunks.Layer` any blow has reached, per zone. A body remembers
 ## how far it has been opened, not just how much health it has left.
 var zone_depth: Dictionary = {}
@@ -565,7 +568,7 @@ func _set_depth_override(piece: MeshInstance3D, enabled: bool) -> void:
 	material.render_priority = 4 if enabled else 0
 
 
-func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "", hit_direction := Vector3.ZERO, joint_alignment := 1.0) -> Dictionary:
+func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "", hit_direction := Vector3.ZERO, joint_alignment := 1.0, cut_point: Variant = null) -> Dictionary:
 	var zone := canonical_zone(zone_id)
 	if severed.has(zone) and not anatomy.installed_parts.has(zone):
 		return {"accepted": false, "reason": "severed", "zone": zone, "severed": false}
@@ -576,7 +579,7 @@ func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt",
 	var direction := _resolved_hit_direction(zone, hit_direction)
 	var did_sever := _accumulate_sever_stress(zone, float(result.get("damage", 0.0)), damage_type, direction, joint_alignment)
 	if did_sever:
-		_sever_zone(zone, direction, result)
+		_sever_zone(zone, direction, result, cut_point)
 	else:
 		_refresh_zone(zone)
 	result["severed"] = did_sever
@@ -618,7 +621,7 @@ func _accumulate_sever_stress(zone: String, damage: float, damage_type: String, 
 	return not severed.has(zone) and remaining_ratio <= SEVER_HEALTH_RATIO and stress >= ceiling * SEVER_THRESHOLD_RATIO
 
 
-func _sever_zone(zone: String, direction: Vector3, result: Dictionary) -> void:
+func _sever_zone(zone: String, direction: Vector3, result: Dictionary, cut_point: Variant = null) -> void:
 	if severed.has(zone):
 		return
 	var zone_state: Dictionary = anatomy.zones.get(zone, {})
@@ -635,8 +638,13 @@ func _sever_zone(zone: String, direction: Vector3, result: Dictionary) -> void:
 	# off is not a survivable plan for anyone, the player included.
 	anatomy.bleed_rate += float(AnatomyComponent.DEFAULT_ZONES[zone].bleed) * STUMP_BLEED
 	if gore:
-		_throw_limb(zone, direction)
-		_add_stump(zone)
+		# Cut where the blow actually landed, when the caller knew where that
+		# was. The cut face is the stump, so the capsule is only for blows that
+		# arrive without a point behind them.
+		var cut: bool = cut_point is Vector3 and _cut_limb(zone, cut_point as Vector3, direction)
+		if not cut:
+			_throw_limb(zone, direction)
+			_add_stump(zone)
 		_spray(_zone_origin(zone), (direction + Vector3.UP * 0.65).normalized(), 18)
 	_refresh_zone(zone)
 	limb_severed.emit(zone, result.duplicate(true))
@@ -707,7 +715,7 @@ func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type :=
 	# so a range or a HUD is told stopped/grazed/lodged/through instead of
 	# inferring it from the size of a capped wound-mark array. Neither is
 	# optional and neither conflicts with the other.
-	var result := hit(zone, damage, impulse, damage_type, organ_id, hit_direction, _joint_alignment_at(zone, global_point))
+	var result := hit(zone, damage, impulse, damage_type, organ_id, hit_direction, _joint_alignment_at(zone, global_point), global_point)
 	if not penetration_report.is_empty():
 		result["penetration"] = penetration_report
 	return result
@@ -1248,9 +1256,13 @@ func _refresh_zone(zone_id: String) -> void:
 	if gore and anatomy.fracture_kind(zone_id) == "compound" and ratio > 0.0 and not prosthetic:
 		_add_fracture(zone_id)
 	if severed.has(zone_id) and not prosthetic:
-		if gore:
+		# A zone taken whole leaves nothing to draw and needs a capsule of bone
+		# standing in for the joint. A zone that was *cut* still has the half
+		# nearer the torso on it, and that half's cut face is a better stump
+		# than the capsule ever was -- so it stays visible and gets no stub.
+		if gore and not cut_zones.has(zone_id):
 			_add_stump(zone_id)
-		part.visible = false
+		part.visible = cut_zones.has(zone_id)
 		var hitbox := get_node_or_null("%s_hitbox" % zone_id) as Area3D
 		if hitbox != null:
 			hitbox.monitorable = false
@@ -1660,6 +1672,97 @@ func _throw_limb(zone_id: String, hit_direction := Vector3.ZERO) -> void:
 		GoreChunks.live.erase(limb)
 		if is_instance_valid(limb):
 			limb.queue_free())
+
+
+## Cuts the limb where the blow landed, instead of taking the whole zone off at
+## its joint.
+##
+## `_throw_limb()` duplicates the entire limb and `_add_stump()` puts a capsule
+## of bone at the joint, so a blade through a mid-forearm took the arm off at
+## the shoulder and left behind the same stub a shotgun would. The zone was the
+## smallest thing a body could lose.
+##
+## `BodySlice` is cheap enough to use here for the reason its header sets out:
+## these meshes have no skin weights to rebuild. The half nearer the torso stays
+## on the body and its cut face *is* the stump; the rest is thrown.
+##
+## Returns false when it cannot cut, and the caller falls back to taking the
+## zone whole -- a blast, or any caller using `hit()` rather than `hit_at()`,
+## has no point to put a plane through.
+func _cut_limb(zone_id: String, global_point: Vector3, hit_direction: Vector3) -> bool:
+	var part := parts.get(zone_id) as MeshInstance3D
+	if part == null or not is_instance_valid(part) or not part.is_inside_tree() or part.mesh == null:
+		return false
+	if live_gore >= live_gore_budget():
+		return false
+	# A cross-section of the limb: the plane's normal runs along the limb's own
+	# long axis, which is local +Y for everything `BodyMesh` revolves. That is an
+	# amputation rather than a slash, and it is the best the rig can do until
+	# weapons report their edge -- at which point `BodySlice.plane_from_swing()`
+	# gives the plane the blade actually swept instead.
+	var plane := Plane(Vector3.UP, part.to_local(global_point))
+	var halves := BodySlice.split(part.mesh, plane)
+	# Whichever side of the cut the torso is on is the side that stays attached.
+	# It has to be the torso's own position and not the rig's origin: the rig is
+	# placed at the feet, which is below an arm, so using it kept the hand and
+	# threw the shoulder.
+	var anchor := global_position
+	var torso_part := parts.get("torso") as MeshInstance3D
+	if torso_part != null and is_instance_valid(torso_part):
+		anchor = torso_part.global_position
+	var keep_above := plane.distance_to(part.to_local(anchor)) >= 0.0
+	var kept: Mesh = halves.above if keep_above else halves.below
+	var lost: Mesh = halves.below if keep_above else halves.above
+	if kept == null or lost == null:
+		# The plane missed the limb, which happens when the hit point sits off
+		# the end of it. Taking the zone whole is the honest fallback.
+		return false
+
+	var limb := RigidBody3D.new()
+	limb.name = "%s_cut" % zone_id
+	limb.mass = 3.2
+	_gore_root().add_child(limb)
+	limb.global_transform = part.global_transform
+	var visual := MeshInstance3D.new()
+	visual.mesh = lost
+	visual.material_override = part.material_override
+	limb.add_child(visual)
+	# B4.1, as `_throw_limb()` has it: ink is on the arm, not on the person. A
+	# mod only travels if it was on the piece that left -- one above the cut
+	# stays on the body, which is the difference a partial cut can express and
+	# taking the whole zone could not.
+	for child in part.get_children():
+		if child is MeshInstance3D and (child as Node).has_meta("body_mod"):
+			var mod := child as MeshInstance3D
+			if (plane.distance_to(mod.position) >= 0.0) == keep_above:
+				continue
+			var carried := mod.duplicate() as MeshInstance3D
+			visual.add_child(carried)
+			carried.transform = mod.transform
+			mod.queue_free()
+
+	var shape_node := CollisionShape3D.new()
+	var shape := CapsuleShape3D.new()
+	var bounds := lost.get_aabb()
+	shape.radius = maxf(0.04, minf(bounds.size.x, bounds.size.z) * 0.5)
+	shape.height = maxf(shape.radius * 2.0 + 0.01, bounds.size.y)
+	shape_node.shape = shape
+	limb.add_child(shape_node)
+	GoreChunks.register_whole_limb(limb, zone_id, anatomy.subject_id)
+	var launch := hit_direction.normalized() if hit_direction.length_squared() > 0.001 else Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)).normalized()
+	limb.apply_central_impulse((launch * 2.25 + Vector3.UP * 1.8) * limb.mass)
+	limb.apply_torque_impulse(Vector3(randf_range(-3.0, 3.0), randf_range(-3.0, 3.0), randf_range(-3.0, 3.0)))
+	live_gore += 1
+	get_tree().create_timer(90.0).timeout.connect(func():
+		live_gore = maxi(0, live_gore - 1)
+		GoreChunks.live.erase(limb)
+		if is_instance_valid(limb):
+			limb.queue_free())
+
+	# What stays on the body is the remainder, cut face and all.
+	part.mesh = kept
+	cut_zones[zone_id] = true
+	return true
 
 
 func _add_stump(zone_id: String) -> void:
