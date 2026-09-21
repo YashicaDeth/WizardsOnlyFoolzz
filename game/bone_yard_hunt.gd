@@ -8150,6 +8150,9 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 		rig_config["restore"] = saved_actor.anatomy_state
 	rig.gore = viscera_fx
 	rig.build(subject_id, rig_config)
+	# The yard is done with naked bodies. Encounter rigs arrive in plain work
+	# cloth — the player alone wears motley, because the punishment is theirs.
+	rig.dress(ClothingShell.fresh_wardrobe())
 	HUNTER_APPEARANCE.style_world_rig(rig, subject_id, str(encounter.kind) == "hostile")
 	var actor_motion: HunterBodyMotion = HUNTER_BODY_MOTION.new()
 	actor_motion.name = "BodyMotion"
@@ -8652,6 +8655,9 @@ func _spawn_friend() -> void:
 	if nix.get("anatomy_state") is Dictionary:
 		nix_config["restore"] = nix.anatomy_state
 	friend_rig.build(FRIEND_ID, nix_config)
+	# Nix dresses like the yard: plain work cloth, same as everyone who was
+	# not sentenced to motley.
+	friend_rig.dress(ClothingShell.fresh_wardrobe())
 	HUNTER_APPEARANCE.style_world_rig(friend_rig, FRIEND_ID, false)
 	var label := Label3D.new()
 	label.text = "NIX ARDEN\n[E] TALK"
@@ -8678,6 +8684,8 @@ func _spawn_rival() -> void:
 	if mara_record.get("anatomy_state") is Dictionary:
 		mara_config["restore"] = mara_record.anatomy_state
 	enemy_rig.build(CAST.id_for(CAPTAIN_SLOT), mara_config)
+	# The captain dresses for the yard she hunts in, not the circus.
+	enemy_rig.dress(ClothingShell.fresh_wardrobe())
 	HUNTER_APPEARANCE.style_world_rig(enemy_rig, CAST.id_for(CAPTAIN_SLOT), true)
 	var label := Label3D.new()
 	label.text = "%s // ASHLINE CAPTAIN" % _captain_name()

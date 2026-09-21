@@ -42,6 +42,14 @@ func _ready() -> void:
 		var p_torso := (player_rig as BaselineHuman).parts.get("torso") as Node3D
 		check(p_torso != null and p_torso.get_node_or_null("Garment") != null, "with the motley rendered over the flesh")
 
+	# --- the yard dresses its people ------------------------------------------------
+	# Encounter rigs, Nix and Mara arrive in plain work cloth — only the
+	# player wears motley. Checked through the real boot and spawn paths.
+	for key in ["friend_rig", "enemy_rig"]:
+		var named = hunt.get(key)
+		var dressed := named != null and (named as BaselineHuman).wardrobe.size() == 6
+		check(dressed, "the %s arrives dressed" % key)
+
 	# --- a still hand earns no plane ------------------------------------------
 	var rest_speed: float = arm.head_speed()
 	print("head speed at rest: %.3f" % rest_speed)
@@ -76,6 +84,8 @@ func _ready() -> void:
 	var probe: Dictionary = hunt.get("encounter_actors")[-1]
 	(probe.node as Node3D).position = probe_at
 	hunt.set("lock_target", str(probe.subject_id))
+	var probe_rig = (probe as Dictionary).get("rig")
+	check(probe_rig != null and (probe_rig as BaselineHuman).wardrobe.size() == 6, "a spawned encounter body arrives dressed")
 	var arsenal = hunt.get("arsenal")
 	arsenal.cooldown = 0.0
 	var before := 0.0
