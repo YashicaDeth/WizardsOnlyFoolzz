@@ -74,6 +74,12 @@ const CAVITY := preload("res://systems/cavity.gd")
 const KILL_SHOT := preload("res://systems/kill_shot.gd")
 const KILL_CAM := preload("res://systems/kill_cam.gd")
 const LIMB_MOMENTUM := preload("res://systems/limb_momentum.gd")
+## The Hunt panel. Greg, on the range: it *"dosent have the lungs or the bottom
+## right bottom left and top right person stuff minimap 3d model of the weapon
+## or item your holding"*. All of that is one `Control` the Hunt has had all
+## along and the sandbox drew its own smaller version of -- so the range has
+## been showing a different game to the one it is a range for.
+const FIELD_HUD := preload("res://systems/gothic_field_hud.gd")
 
 const BODY_COUNT := 7
 const ARENA := 26.0
@@ -142,6 +148,7 @@ var ballistics: Node3D
 var impact_feel: Node
 var hud: Control
 var kill_cam: KillCam
+var field_hud: Control
 
 ## The arm the sword is on. The Hunt has had one since AN1 and the range never
 ## did, which is why a swing here landed square across a limb whatever it was
@@ -704,6 +711,32 @@ func _fire_launcher() -> void:
 ## blast's own crosshair targeting) rather than growing a second raycast path,
 ## the only new part is holding the hit to the weapon's own `reach` instead of
 ## the blast's much longer `TRACE_RANGE`.
+## The Hunt panel reads one dictionary, so this is the whole of the wiring.
+##
+## Fed with the range own numbers rather than plausible ones: the health is the
+## simulation health the dummies can actually take off you, the weapon is the
+## live arsenal entry, and the lungs are whatever the substance station has
+## done to you. A panel showing invented values would be worse than no panel,
+## because it would look exactly like a working one.
+func _feed_field_hud() -> void:
+	if field_hud == null or not is_instance_valid(field_hud):
+		return
+	var current: Dictionary = arsenal.current() if arsenal != null else {}
+	field_hud.call("set_state", {
+		"health": float(simulation_health),
+		"stamina": stamina,
+		"blood": clampf(float(simulation_health) / 100.0, 0.0, 1.0),
+		"weapon": current,
+		"bare": current.is_empty(),
+		"location": "THE GORE RANGE",
+		"world_stamp": "SANDBOX // %d ON THE FLOOR" % GoreChunks.live_count(),
+		"smoking": smoke_draw_slot >= 0,
+		"can_dodge": dodge_cooldown <= 0.0 and stamina >= 25.0,
+		"near_something": _near_pickup_source(),
+		"interact_verb": "take",
+	})
+
+
 ## Which way the player guard is held right now, from the mouse.
 func _player_guard() -> String:
 	if not guarding:
@@ -1811,6 +1844,7 @@ func _physics_process(delta: float) -> void:
 	if guarding:
 		guard_held += real_delta
 	_update_dummy_guards(real_delta)
+	_feed_field_hud()
 	if melee_windup >= 0.0:
 		melee_windup -= real_delta
 		if melee_windup < 0.0:
@@ -1889,6 +1923,13 @@ func _build_hud() -> void:
 	hud = Control.new()
 	hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Under the sandbox readouts, because it is the room the numbers sit in.
+	field_hud = Control.new()
+	field_hud.set_script(FIELD_HUD)
+	field_hud.name = "FieldInterface"
+	field_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	field_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(field_hud)
 	hud.draw.connect(_paint_hud)
 	layer.add_child(hud)
 	# Above the readouts, because when it fires it is the only thing to look at.
@@ -2023,13 +2064,10 @@ func _paint_hud() -> void:
 	# A damaged field instrument, not a clean debug overlay. The corners and
 	# centre sigil use the same copper/blood language as the front door and the
 	# handheld so this room reads as part of the game before anything is shot.
-	var frame := Color("862016")
-	hud.draw_line(Vector2(18, 18), Vector2(250, 18), frame * Color(1, 1, 1, 0.82), 2.0)
-	hud.draw_line(Vector2(18, 18), Vector2(18, 104), frame * Color(1, 1, 1, 0.82), 2.0)
-	hud.draw_line(Vector2(size.x - 18, 18), Vector2(size.x - 250, 18), frame * Color(1, 1, 1, 0.82), 2.0)
-	hud.draw_line(Vector2(size.x - 18, 18), Vector2(size.x - 18, 104), frame * Color(1, 1, 1, 0.82), 2.0)
-	hud.draw_line(Vector2(18, size.y - 18), Vector2(250, size.y - 18), frame * Color(1, 1, 1, 0.55), 2.0)
-	hud.draw_line(Vector2(size.x - 18, size.y - 18), Vector2(size.x - 250, size.y - 18), frame * Color(1, 1, 1, 0.55), 2.0)
+	# The corner frame is `gothic_field_hud._draw_screen_frame()` now. Drawing a
+	# second one over it puts two sets of copper corners a few pixels apart,
+	# which is the same mistake the Hunt already fixed once when it had two
+	# control strips (I3).
 	# `CellOutzType.draw_text` takes the top-left and `cap_height` is the cap, so
 	# a 20-cap title at y=34 ends at y=54 and the strapline started at exactly
 	# y=54 — no gap at all, and the title's own 2.6px stroke then ran straight
