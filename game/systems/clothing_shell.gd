@@ -65,6 +65,25 @@ static func humiliation_wardrobe() -> Dictionary:
 	return wardrobe
 
 
+## What the apocalypse left: every zone pre-torn, nothing whole. Survivors do
+## not arrive dressed — they arrive in what survived, which is why ruin cloth
+## absorbs almost nothing and bills almost a full restore.
+static func ruin_wardrobe() -> Dictionary:
+	var wardrobe := {"style": "plain"}
+	for zone in ZONES:
+		wardrobe[zone] = 0.15
+	return wardrobe
+
+
+## Sackcloth and the cap: ruin integrity in the dunce palette. The shamed read
+## without a single new mesh — the pale head against dun-drab body carries the
+## joke until the assets can tell it properly.
+static func penitent_wardrobe() -> Dictionary:
+	var wardrobe := ruin_wardrobe()
+	wardrobe["style"] = "dunce"
+	return wardrobe
+
+
 ## What a blow does to the garment over a zone, and what is left for the skin.
 ## Returns `{absorbed, passed, breached, integrity}`. A zone with no entry is
 ## naked and passes everything, so undressed rigs behave exactly as before.
@@ -136,6 +155,8 @@ static func shell_mesh(zone_id: String, half_height: float) -> ArrayMesh:
 const STYLES := {
 	"plain": {"torso": "2e2a26", "head": "2e2a26", "left_arm": "2e2a26", "right_arm": "2e2a26", "left_leg": "2e2a26", "right_leg": "2e2a26"},
 	"jester": {"torso": "3a1020", "head": "4a1428", "left_arm": "cfc2a4", "right_arm": "3a1020", "left_leg": "241418", "right_leg": "241418"},
+	"clown": {"torso": "8a8d94", "head": "b03030", "left_arm": "3060a8", "right_arm": "c8a028", "left_leg": "3060a8", "right_leg": "c8a028"},
+	"dunce": {"torso": "6b6257", "head": "c9bfa5", "left_arm": "6b6257", "right_arm": "6b6257", "left_leg": "4a453c", "right_leg": "4a453c"},
 }
 
 

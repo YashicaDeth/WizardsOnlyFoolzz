@@ -144,6 +144,18 @@ func _ready() -> void:
 	var whole_ruff: StandardMaterial3D = GARMENT.shell_material(1.0, 0.0, "jester", "head")
 	check(torn_ruff.albedo_color.v > whole_ruff.albedo_color.v, "the damaged ruff still threadbares like any cloth")
 
+	# --- the rest of the wardrobe ---------------------------------------------------
+	var clown: StandardMaterial3D = GARMENT.shell_material(1.0, 0.0, "clown", "right_arm")
+	var clown_head: StandardMaterial3D = GARMENT.shell_material(1.0, 0.0, "clown", "head")
+	check(not clown.albedo_color.is_equal_approx(clown_head.albedo_color), "clown reads per zone too, loud instead of dark")
+	var ruins := GARMENT.ruin_wardrobe()
+	check(float(ruins["torso"]) < 0.2, "ruin cloth arrives pre-torn (%.2f)" % float(ruins["torso"]))
+	var ruin_hit: Dictionary = GARMENT.resolve_hit(ruins, "torso", 30.0, "cut")
+	check(float(ruin_hit.absorbed) < 2.0, "and barely stops anything (%.1f)" % float(ruin_hit.absorbed))
+	check(GARMENT.price_to_mend(ruins) > GARMENT.MEND_PRICE_PER_FULL * 4, "but bills near-full to restore (%d scrip)" % GARMENT.price_to_mend(ruins))
+	var penitent := GARMENT.penitent_wardrobe()
+	check(str(penitent["style"]) == "dunce" and float(penitent["head"]) < 0.2, "the penitent wears the cap over ruins")
+
 	# --- blood stays in the weave --------------------------------------------------
 	var clad_zone := str(clad.get("zone", "torso"))
 	var soak: float = GARMENT.soak_of(rig, clad_zone)
