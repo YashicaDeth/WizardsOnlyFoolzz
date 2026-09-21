@@ -8,6 +8,7 @@ extends Node3D
 
 const OPENING := preload("res://systems/opening_director.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
+const RIVAL_TACTICS := preload("res://systems/rival_tactics.gd")
 
 const ENTRY := Vector3(0, 1.0, 16.0)
 const FUSE_AT := Vector3(11.2, 0.85, 1.8)
@@ -28,6 +29,11 @@ var shortcut_gate: StaticBody3D
 var fuse_visual: MeshInstance3D
 var patrol: Node3D
 var patrol_phase := 0.0
+var patrol_tactic: Dictionary = {}
+var patrol_tree: Resource
+var patrol_alert := false
+var patrol_attack_cooldown := 0.0
+var blood := 100.0
 
 
 func _ready() -> void:
@@ -256,12 +262,18 @@ func _build_fuse_branch() -> void:
 
 
 func _build_patrol() -> void:
-	# One low-cost patrol proves the district has a live security role.  It is
-	# intentionally one node, not a crowd or a replacement gore-body system.
+	# One Limbo-backed guard is a meaningful pressure beat without turning the
+	# district into a crowd simulation.  The behaviour tree stores the stance;
+	# this scene supplies movement and one inexpensive melee consequence.
 	patrol = Node3D.new()
 	patrol.name = "LowerWorksSentinel"
 	patrol.position = Vector3(0, 0, -16)
 	add_child(patrol)
+	patrol_tactic = RIVAL_TACTICS.tactic_for("lower_works_sentinel")
+	patrol_tree = RIVAL_TACTICS.build_tree(patrol_tactic)
+	if patrol_tree != null:
+		patrol.set_meta("behavior_tree", patrol_tree)
+	patrol.set_meta("tactic", str(patrol_tactic.get("id", "press")))
 	var shell := MeshInstance3D.new()
 	var mesh := CapsuleMesh.new()
 	mesh.radius = 0.38
@@ -316,9 +328,36 @@ func _physics_process(delta: float) -> void:
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	patrol_phase += delta
-	patrol.position.x = sin(patrol_phase * 0.55) * 6.2
-	patrol.rotation.y = cos(patrol_phase * 0.55) * 0.45
+	_patrol_step(delta)
 	_update_hud()
+
+
+func _patrol_step(delta: float) -> void:
+	if patrol == null or player == null:
+		return
+	patrol_attack_cooldown = maxf(0.0, patrol_attack_cooldown - delta)
+	var difference := player.global_position - patrol.global_position
+	difference.y = 0.0
+	var distance := difference.length()
+	patrol_alert = distance < 11.0
+	if not patrol_alert:
+		patrol.position.x = sin(patrol_phase * 0.55) * 6.2
+		patrol.rotation.y = cos(patrol_phase * 0.55) * 0.45
+		return
+	var action := RIVAL_TACTICS.approach(patrol_tactic, distance)
+	if distance > 0.1:
+		var direction := difference.normalized()
+		if action == "close":
+			patrol.global_position += direction * 1.55 * delta
+		elif action == "withdraw":
+			patrol.global_position -= direction * 1.1 * delta
+		patrol.global_position.x = clampf(patrol.global_position.x, -12.1, 12.1)
+		patrol.global_position.z = clampf(patrol.global_position.z, -35.0, 14.0)
+		patrol.look_at(patrol.global_position + direction, Vector3.UP, true)
+	if distance < 2.0 and patrol_attack_cooldown <= 0.0:
+		patrol_attack_cooldown = 1.25
+		blood = maxf(25.0, blood - 6.0)
+		WorldHistory.record_event("lower_works_sentinel_strike", {"location": "lower_works", "damage": 6})
 
 
 func _flat_distance(at: Vector3) -> float:
@@ -356,7 +395,8 @@ func _record_pit_entry() -> void:
 
 
 func _update_hud() -> void:
-	status.text = "BLOOD 100%   PAIN 86   LOWER WORKS // SENTINEL ACTIVE"
+	var guard_state := "SENTINEL ENGAGED" if patrol_alert else "SENTINEL PATROL"
+	status.text = "BLOOD %03d%%   PAIN 86   LOWER WORKS // %s" % [roundi(blood), guard_state]
 	objective.text = "OBJECTIVE // " + ("REACH THE HEAT ELEVATOR" if fuse_taken else "FIND A LIFT FUSE")
 	if not fuse_taken and _flat_distance(FUSE_AT) <= 2.4:
 		prompt.text = "[E] TAKE LIFT FUSE"
