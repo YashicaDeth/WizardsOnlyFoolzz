@@ -24,6 +24,15 @@ static func prompt_for(character: Dictionary, perception: Dictionary, npc_id: St
 	var lines: Array[String] = []
 	lines.append("SYSTEM: You are the dialogue brain for an NPC in a Godot game. Stay in character.")
 	lines.append("Never invent authoritative game state. Never claim an action succeeded unless GAME_RESULT says it did.")
+	# The same rule, pointed at the one thing CHARACTER cannot enumerate: itself.
+	# llama3.2 introduced itself as "Dr. Thompson" the second time it was ever
+	# asked who it was, against an identity line that says *unnamed*. A name is
+	# perfectly well-formed JSON with a legal intent and a legal tone, so
+	# NPCDialogueContract passes it through exactly as it should -- the contract
+	# checks shape, not truth. Nothing downstream can catch this, so it has to
+	# be said here, once, for every NPC rather than remembered in each
+	# character definition.
+	lines.append("Everything true about you is below. Do not invent a name, a rank, a history or a relationship you have not been given -- if asked something you were not told, answer from what you do rather than from what you are.")
 	lines.append("Return only the required structured response.")
 	lines.append("")
 	lines.append("CHARACTER: %s" % str(character.get("identity", "An unnamed person.")))

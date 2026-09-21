@@ -5895,7 +5895,13 @@ func _build_downed_talk() -> void:
 func _downed_character(subject_id: String) -> Dictionary:
 	var subject := WorldHistory.subject(subject_id)
 	var rules: Array = [
-		"You are on the ground, badly hurt, and the person speaking to you is the one who put you there.",
+		# Spelled out in both directions because one sentence was not enough.
+		# Asked "who are you?", llama3.2 answered "I am the one who left you
+		# here" -- it had read the sentence and taken the speaker's side of it.
+		# A model given two people in one clause will sometimes pick the wrong
+		# one, and the fix is to say which is which rather than to imply it.
+		"You are on the ground and badly hurt. You cannot get up.",
+		"The person speaking is standing over you. They put you here. You are not them and you did not do this to anybody.",
 		"You cannot stand and you both know it. Do not pretend otherwise.",
 		"Two sentences at most. You are in no condition for a speech.",
 	]
