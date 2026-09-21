@@ -687,6 +687,7 @@ const PERSPECTIVE_BLEND_RATE := 3.2
 var _unlock_feel_timer := 0.0
 var kill_cam: Control
 var voice_channel: Node
+var spoken: SpokenContact = null
 var downed_talk: NPCConversationComponent = null
 var downed_brain: NPCOllamaBrain = null
 var arsenal: Node
@@ -972,11 +973,21 @@ func _ready() -> void:
 	$HUD.add_child(keys_card)
 	_build_keys_card()
 	_order_hud_layers()
-	voice_channel = preload("res://systems/proximity_voice.gd").new()
-	voice_channel.name = "ProximityVoice"
-	add_child(voice_channel)
-	voice_channel.capture_finished.connect(_voice_captured)
-	voice_channel.capture_failed.connect(func(reason: String): resolution_ui.set_voice_state(reason))
+	# SpokenContact owns the capture and adds the recogniser beside it, so a
+	# downed NPC hears the words rather than only the fact of being spoken to.
+	# `voice_channel` still points at the capture half, because the status
+	# string, the positional acknowledgement and the witness recording all read
+	# it directly and none of that changes.
+	spoken = SpokenContact.new()
+	spoken.name = "SpokenContact"
+	add_child(spoken)
+	spoken.configure()
+	voice_channel = spoken.proximity
+	# Delivery goes through SpokenContact rather than straight off the capture:
+	# it waits for the transcript before handing the turn over, and hands over an
+	# empty one rather than nothing when Vosk has nothing to say.
+	spoken.contact.connect(_voice_heard)
+	spoken.failed.connect(func(reason: String): resolution_ui.set_voice_state(reason))
 	_build_downed_talk()
 	_build_expanse_systems()
 	_register_people()
@@ -5842,9 +5853,9 @@ func _voice_capture(holding: bool) -> void:
 		resolution_ui.set_voice_state("NO SUBJECT IN VOICE RANGE")
 		return
 	if holding:
-		voice_channel.begin(str(actor.subject_id), actor.rig.head_anchor)
+		spoken.begin(str(actor.subject_id), actor.rig.head_anchor)
 	else:
-		voice_channel.finish()
+		spoken.finish()
 
 
 ## One conversation component for whoever is being spoken to, rather than one
@@ -5899,7 +5910,11 @@ func _downed_answered(turn: Dictionary) -> void:
 	)
 
 
-func _voice_captured(subject_id: String, result: Dictionary) -> void:
+## A completed contact: who was addressed, what they actually said, and what
+## the capture measured. The transcript is empty when there is no recogniser on
+## this machine or Vosk heard nothing it would commit to, and that is a normal
+## outcome -- they were still spoken to.
+func _voice_heard(subject_id: String, transcript: String, result: Dictionary) -> void:
 	var actor := _actor_by_id(subject_id)
 	if actor.is_empty() or not bool(result.get("sent", false)):
 		resolution_ui.set_voice_state(voice_channel.status)
@@ -5925,7 +5940,12 @@ func _voice_captured(subject_id: String, result: Dictionary) -> void:
 		if downed_talk.npc_id != subject_id:
 			downed_brain.character = _downed_character(subject_id)
 			downed_talk.configure(subject_id, downed_brain.character, player_body, downed_brain)
-		downed_talk.hear("[the Hunter stands over you and speaks to you]")
+		# What the player actually said, when the machine could hear it. The
+		# bracketed line is the fallback for a box with no recogniser: the NPC is
+		# then answering the fact of being spoken to, which is what this path did
+		# before there were any words at all.
+		var said := transcript.strip_edges()
+		downed_talk.hear(said if not said.is_empty() else "[the Hunter stands over you and speaks to you]")
 	WorldHistory.begin_ledger_batch()
 	var contact := PLAYER_ACTION_LEDGER.record("proximity_voice_addressed", {"speaker": "player", "listener": subject_id, "duration": result.duration, "location": HUNT_LOCATION, "raw_audio_saved": false})
 	WorldHistory.amend_subject(subject_id, {"last_voice_contact": int(contact.get("sequence", WorldHistory.event_count())), "memory": "The Hunter spoke to me while I was downed."})
