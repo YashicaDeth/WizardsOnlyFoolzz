@@ -103,6 +103,7 @@ const STAGE_ON_ARRIVAL := {
 	# Without the entry, a second route into the arcade would record nothing and
 	# a resume would drop the player back in the vat they already escaped.
 	"res://service_arcade.tscn": "entered_arcade",
+	"res://buried_city.tscn": "entered_lower_works",
 	"res://rift_derby.tscn": "entered_pit",
 	"res://underground_colosseum.tscn": "entered_pit",
 	"res://bone_yard_hunt.tscn": "won_derby",
