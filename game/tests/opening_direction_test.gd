@@ -24,8 +24,24 @@ func _ready() -> void:
 
 	opening.intake.filed.emit({"race": "decanted"})
 	await get_tree().process_frame
-	check(opening.intake == null and opening.phase == "submerged", "filing the sheet begins decanting")
+	# Filing used to begin decanting on the same frame, with the examiner still
+	# at his terminal watching the tank fail. The examination ends first now.
+	check(opening.intake == null and opening.phase == "departure", "filing the sheet ends the examination rather than starting the escape")
 	check(OpeningDirector.reached("woke"), "the run begins only after the sheet is filed")
+
+	# Drive the departure without waiting on wall-clock: he walks, the staff
+	# door shuts behind him, and only then does the vat get its turn.
+	var examiner_start: float = opening.examiner_node.position.x
+	var door_start: float = opening.staff_door_panel.position.z
+	# Comfortably past DEPARTURE_SECONDS: at 1/30 per step, 120 steps is 4.0s
+	# and the walk plus the door plus the head coming back is 4.4s.
+	for _step in 150:
+		opening._update_departure(1.0 / 30.0)
+	check(opening.examiner_node.position.x > examiner_start + 3.0, "the examiner walks to his own door instead of standing there")
+	check(not opening.examiner_node.visible, "and is gone through it before the tank goes")
+	check(absf(opening.staff_door_panel.position.z - opening.STAFF_DOOR_AT.z) < 0.01 and not is_equal_approx(door_start, opening.STAFF_DOOR_AT.z), "the staff door closes behind him")
+	check(opening.phase == "submerged", "decanting begins only once he has left")
+	check(opening.get_node("HUD/Objective").text == "", "no escape objective while the man who filed you is still in the room")
 
 	opening.clock = 3.25
 	opening._update_sequence(0.05)
@@ -41,12 +57,21 @@ func _ready() -> void:
 
 	# K3.2. The opening reframed: CellOutz grew you, which is why the debt is
 	# in the meat. Checked as real scene content, not just prose in a design doc.
+	# The line is still said by the same man for the same reason; he says it on
+	# his way out now, which is the only stretch where he is still in the room.
+	# Searched across both tables so where it lives stays an authoring choice
+	# and what it has to say stays the contract.
 	var beat_texts: Array = opening.BEATS.map(func(beat): return str(beat.text))
-	var celloutz_line := beat_texts.filter(func(text): return text.contains("CellOutz"))
-	check(not celloutz_line.is_empty(), "the handler's own dialogue names CellOutz as the one who grew you")
+	var spoken: Array = beat_texts + opening.DEPARTURE_BEATS.map(func(beat): return str(beat.text))
+	var celloutz_line := spoken.filter(func(text): return text.contains("CellOutz"))
+	check(not celloutz_line.is_empty(), "the examiner's own dialogue names CellOutz as the one who grew you")
 	check(celloutz_line[0].contains("owns what it grew"), "and ties that directly to ownership of the debt")
 	check(celloutz_line[0].contains("Debt's in the meat"), "debt and ownership land as one comprehensible attributed beat")
-	check(beat_texts.back() == "OBJECTIVE  //  ESCAPE THE FACILITY", "the last opening beat states the first objective plainly")
+	# There used to be a beat that printed OBJECTIVE // ESCAPE THE FACILITY as a
+	# centred subtitle while HUD/Objective printed the same six words in the
+	# corner. One objective, one place -- so the contract is now that no spoken
+	# beat claims it and the HUD label is the only thing that does.
+	check(spoken.filter(func(text): return text.contains("OBJECTIVE")).is_empty(), "no subtitle beat duplicates the objective the HUD already shows")
 	opening.clock = 8.81
 	opening.phase = "floor"
 	opening._update_sequence(0.05)
