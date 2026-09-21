@@ -64,6 +64,27 @@ var smoking_look_down := 0.0
 var grapple_blend := 0.0
 var grapple_holder := false
 
+## The fight layer. `CombatStance` solves the poses; this holds how far through
+## each one the body is, and lays them over the locomotion the same way the
+## combat, smoking and grapple poses already do rather than replacing it -- a
+## body guarding while walking must keep walking.
+var guard_amount := 0.0
+var guard_kind := "melee"
+var parry_time := 0.0
+var stagger_time := 0.0
+var stagger_from := Vector3.ZERO
+var stagger_severity := 1.0
+var strafe_lateral := 0.0
+var strafe_approach := 0.0
+var lean_amount := 0.0
+var prone_amount := 0.0
+
+## How long a deflection and a fold last. The parry is short because it is the
+## window the player is being asked to read; the stagger outlasts it, which is
+## what makes a failed parry cost something.
+const PARRY_DURATION := 0.34
+const STAGGER_DURATION := 0.62
+
 
 func configure(body_rig: BaselineHuman) -> void:
 	rig = body_rig
@@ -127,6 +148,39 @@ func set_smoking_pose(amount: float, two_handed: bool, device_id := "") -> void:
 	smoking_look_down = smoking_blend * 0.18 if device_id == "bong" and first_person else 0.0
 
 
+## Raise or drop the guard. Held rather than triggered, because a guard is a
+## thing you are doing and not a thing that happened.
+func set_guard(amount: float, weapon_kind := "melee") -> void:
+	guard_amount = clampf(amount, 0.0, 1.0)
+	guard_kind = weapon_kind
+
+
+func trigger_parry() -> void:
+	parry_time = PARRY_DURATION
+
+
+## `from_local` is where the blow came from in the body own space, so the fold
+## can go away from it and the player can read which side opened up.
+func trigger_stagger(from_local: Vector3, severity := 1.0) -> void:
+	stagger_time = STAGGER_DURATION
+	stagger_from = from_local
+	stagger_severity = clampf(severity, 0.0, 2.0)
+
+
+## Footwork around something you are locked on to.
+func set_strafe(lateral: float, approach := 0.0) -> void:
+	strafe_lateral = clampf(lateral, -1.0, 1.0)
+	strafe_approach = clampf(approach, -1.0, 1.0)
+
+
+func set_lean(amount: float) -> void:
+	lean_amount = clampf(amount, -1.0, 1.0)
+
+
+func set_prone(amount: float) -> void:
+	prone_amount = clampf(amount, 0.0, 1.0)
+
+
 func set_grapple_pose(amount: float, is_holder: bool) -> void:
 	grapple_blend = clampf(amount, 0.0, 1.0)
 	grapple_holder = is_holder
@@ -151,6 +205,8 @@ func update(delta: float, velocity: Vector3, grounded: bool, sprinting: bool, cr
 	reload_time = maxf(0.0, reload_time - delta)
 	interaction_time = maxf(0.0, interaction_time - delta)
 	landing_time = maxf(0.0, landing_time - delta)
+	parry_time = maxf(0.0, parry_time - delta)
+	stagger_time = maxf(0.0, stagger_time - delta)
 	_choose_state(horizontal_speed, grounded, sprinting, crouching, dodging)
 	_pose(horizontal_speed, sprinting, crouching, dodging)
 	_update_camera_motion(horizontal_speed, sprinting, grounded)
@@ -366,6 +422,48 @@ func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: 
 	_sync_zone_hitbox("right_arm")
 	if not first_person:
 		_sync_zone_hitbox("torso")
+	_apply_fight_layer()
+
+
+## The fight, laid over whatever the body was already doing.
+##
+## Added to the finished locomotion pose rather than written over it, which is
+## the same thing the combat, smoking and grapple poses above already do. A
+## guard that replaced the pose underneath would freeze the legs of anybody
+## holding one up, and an enemy that stops walking the moment it raises a
+## weapon is the thing that makes procedural animation look procedural.
+##
+## Order is the priority: footwork first, then the guard over it, then the
+## deflection, and a stagger last because being folded beats everything you
+## were trying to do.
+func _apply_fight_layer() -> void:
+	var pose: Dictionary = {}
+	if absf(strafe_lateral) > 0.001 or absf(strafe_approach) > 0.001:
+		pose = CombatStance.blend(pose, CombatStance.strafe(strafe_lateral, strafe_approach), 1.0)
+	if absf(lean_amount) > 0.001:
+		pose = CombatStance.blend(pose, CombatStance.lean(lean_amount), 1.0)
+	if guard_amount > 0.0:
+		pose = CombatStance.blend(pose, CombatStance.guard(guard_amount, guard_kind), 1.0)
+	if parry_time > 0.0:
+		pose = CombatStance.blend(pose, CombatStance.parry(1.0 - parry_time / PARRY_DURATION), 1.0)
+	if prone_amount > 0.0:
+		pose = CombatStance.blend(pose, CombatStance.prone(prone_amount), 1.0)
+	if stagger_time > 0.0:
+		pose = CombatStance.blend(pose, CombatStance.stagger(1.0 - stagger_time / STAGGER_DURATION, stagger_from, stagger_severity), 1.0)
+	if pose.is_empty():
+		return
+	for zone_id: String in pose:
+		var part := rig.parts.get(zone_id) as Node3D
+		if part == null or not is_instance_valid(part):
+			continue
+		var layer: Dictionary = pose[zone_id]
+		part.position += layer.get("offset", Vector3.ZERO) as Vector3
+		part.rotation += layer.get("angles", Vector3.ZERO) as Vector3
+		_sync_zone_hitbox(zone_id)
+	# Prone is the rig going down, not six parts each pretending to. The zones
+	# above are only the shape it takes once it is there.
+	if prone_amount > 0.0:
+		rig.rotation.x = CombatStance.prone_root_pitch(prone_amount)
 
 
 func _set_zone_pose(zone_id: String, offset: Vector3, angles: Vector3) -> void:
