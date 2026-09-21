@@ -56,6 +56,13 @@ repo's history, to `npc_ollama_brain.gd` and to `cavity.gd`.
 
 The first `--import` after adding files takes minutes. It is not hung.
 
+**Runtime sibling nodes with the same `name` are not the same node.**
+`add_child` keeps duplicates by renaming the newcomer (`@BloodPrint@N`), and
+`get_node_or_null("BloodPrint")` returns only the first match. Counting or
+measuring through name lookups then silently reads one node instead of six —
+this overstated a footprint trail and hid a garment rebuild. Identify runtime
+spawn by metadata or a held reference, never by name.
+
 **`BodyMesh` profiles are normalised `-1..1`, and `scaled()` takes *half*
 height.** `BodyMesh.leg(0.84)` spans y −0.42…+0.42 about the origin, not
 0…0.84. Assuming otherwise puts your cut plane off the end of the limb.
