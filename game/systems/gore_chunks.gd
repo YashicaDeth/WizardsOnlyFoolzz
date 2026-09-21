@@ -446,6 +446,10 @@ static func _mark_ground(node: RigidBody3D) -> void:
 	if scene == null:
 		return
 	BaselineHuman.mark_ground_for_chunk(node.get_world_3d(), scene, node.global_position, node.linear_velocity, 0.22)
+	# A landed chunk is also a lot of blood in one place: the splat above is
+	# the spatter, and this is the stain it feeds. Two drops' worth — a chunk
+	# is bigger than a drip and smaller than a bleed-out.
+	BloodPool.keep(scene, node.global_position, 2.0)
 
 
 ## Per-layer voice for a hit: skin thuds, bone cracks, hardware clinks. Data
