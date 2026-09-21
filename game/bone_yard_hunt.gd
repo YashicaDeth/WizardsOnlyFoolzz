@@ -1710,20 +1710,37 @@ func _physics_process(delta: float) -> void:
 		_update_hud()
 		return
 	pulse += delta
+	# AP1. Charged per call, because nobody knows which of these is the frame.
+	# `process` has sat at 20.16ms against a 16.67ms budget since it was first
+	# measured, the brief has carried "script cost is unattributed" as its
+	# largest open item that whole time, and it has been guessed at twice.
+	# `ScriptCost` is free when off, which it is unless a probe turns it on.
+	var cost := ScriptCost.mark()
 	_update_smoking(delta)
+	cost = ScriptCost.lap("_update_smoking", cost)
 	_update_handheld_lamp(delta)
+	cost = ScriptCost.lap("_update_handheld_lamp", cost)
 	_update_dropped_handheld_persistence(delta)
+	cost = ScriptCost.lap("_update_dropped_handheld_persistence", cost)
 	_update_flame()
+	cost = ScriptCost.lap("_update_flame", cost)
 	_update_air()
+	cost = ScriptCost.lap("_update_air", cost)
 	_update_body_record(delta)
+	cost = ScriptCost.lap("_update_body_record", cost)
 	# W1.1. The world keeps time, and exactly one place advances it — a clock
 	# that two scenes both wind runs at double speed the moment anybody
 	# builds a third.
 	WorldClock.advance(delta)
+	cost = ScriptCost.lap("WorldClock.advance", cost)
 	_update_day_night()
+	cost = ScriptCost.lap("_update_day_night", cost)
 	_update_storm_exposure(delta)
+	cost = ScriptCost.lap("_update_storm_exposure", cost)
 	_update_altered_perception()
+	cost = ScriptCost.lap("_update_altered_perception", cost)
 	_update_perception(delta)
+	cost = ScriptCost.lap("_update_perception", cost)
 	dodge_remaining = maxf(0.0, dodge_remaining - delta)
 	# O2.7 v3. scale_for() only ever reached the encounter loop's actor_delta —
 	# the player is the other half of every exchange they are in and kept
@@ -1731,8 +1748,11 @@ func _physics_process(delta: float) -> void:
 	# whole point of a local freeze is that both bodies in contact feel it.
 	var player_delta: float = delta * impact_feel.scale_for("player")
 	_advance_arm(player_delta)
+	cost = ScriptCost.lap("_advance_arm", cost)
 	_update_held_inspection(delta)
+	cost = ScriptCost.lap("_update_held_inspection", cost)
 	_update_first_person_forearms()
+	cost = ScriptCost.lap("_update_first_person_forearms", cost)
 	# O2.7 v4. And the gore. Greg: *"gore and chunk physics still run at full
 	# speed through a hit, so a limb can leave a body that has not moved
 	# yet"*. The rig's own spray and organs take the exchange's clock;
@@ -1780,35 +1800,51 @@ func _physics_process(delta: float) -> void:
 			body_motion.set_guard(0.0, "melee")
 			body_motion.set_lean(0.0)
 	_update_player(delta)
+	cost = ScriptCost.lap("_update_player", cost)
 	_enforce_demo_territory()
+	cost = ScriptCost.lap("_enforce_demo_territory", cost)
 	_update_rival(delta)
+	cost = ScriptCost.lap("_update_rival", cost)
 	_update_encounter_actors(delta)
+	cost = ScriptCost.lap("_update_encounter_actors", cost)
 	_maintain_roamers(delta)
+	cost = ScriptCost.lap("_maintain_roamers", cost)
 	_update_carrion(delta)
+	cost = ScriptCost.lap("_update_carrion", cost)
 	_update_extraction(delta, Input.is_key_pressed(KEY_H))
+	cost = ScriptCost.lap("_update_extraction", cost)
 	# Q, not B. B is a stretch away from WASD with the left hand, and this is a
 	# *hold* — you are meant to be moving while you do it. Greg: "make the b
 	# slider change to like e or idk r or q"; E is interact and R is reload, so
 	# Q is the one of the three that is actually free.
 	_update_xray(delta, Input.is_key_pressed(KEY_Q))
+	cost = ScriptCost.lap("_update_xray", cost)
 	# Reports walk home in real time; F1.3's window only exists if it ticks.
 	# A report that reaches the faction holding the ground is also the only door
 	# into local unrest — the global event log never dispatches law by itself.
 	_answer_local_reports(witness_ledger.tick(delta))
+	cost = ScriptCost.lap("_answer_local_reports", cost)
 	if misfire_director != null:
 		misfire_director.call("update_player_position", player)
 	if not grapple_target.is_empty():
 		_update_grapple(delta)
 	_steer_lock(delta)
+	cost = ScriptCost.lap("_steer_lock", cost)
 	_unlock_feel_timer -= delta
 	if _unlock_feel_timer <= 0.0:
 		_unlock_feel_timer = 1.0
 		_check_third_person_unlock_feel()
 	_update_camera()
+	cost = ScriptCost.lap("_update_camera", cost)
 	_update_hud()
+	cost = ScriptCost.lap("_update_hud", cost)
 	_update_sleep_prompt(delta)
+	cost = ScriptCost.lap("_update_sleep_prompt", cost)
 	_update_dropped_handheld_prompt()
+	cost = ScriptCost.lap("_update_dropped_handheld_prompt", cost)
 	_update_world_interactable_prompt()
+	cost = ScriptCost.lap("_update_world_interactable_prompt", cost)
+	ScriptCost.frame()
 
 
 ## B4.10v2. The world notices unattended flesh. This is deliberately part of
