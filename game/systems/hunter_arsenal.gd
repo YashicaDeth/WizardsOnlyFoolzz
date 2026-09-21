@@ -36,6 +36,23 @@ const WEAPONS := {
 		"pellets": 1, "spread": 0.008, "magazine": 10, "reserve": 50,
 		"reload": 1.3, "damage_type": "ballistic",
 	},
+	"sniper": {
+		# The shot you take once. Everything about it is the opposite of the
+		# shotgun: it reaches across the whole bone yard, it is accurate enough
+		# that the zone you aimed at is the zone you hit, and it makes you pay for
+		# a miss with a bolt cycle you cannot hurry.
+		#
+		# 78 is calibrated against the anatomy rather than picked for feel. The
+		# sidearm's 24 already delivers 26.6 to the nearest organ and the brain
+		# has 18 points, so a head hit ruptures it. At 78 there is no argument: a
+		# clean head or heart hit is over. That is what makes the kill camera
+		# honest when it fires, rather than a flourish played over a wound the
+		# victim would have walked away from.
+		"label": "ASHLINE LONGVIEW", "kind": "firearm", "damage": 78.0,
+		"impulse": 46.0, "range": 240.0, "cooldown": 1.65,
+		"pellets": 1, "spread": 0.0015, "magazine": 4, "reserve": 16,
+		"reload": 3.2, "damage_type": "ballistic",
+	},
 	"facility_sidearm": {
 		# The first firearm is a guard's service hand-cannon, not the ordinary
 		# surface pistol. One good hit can end a fight; its three rounds cannot
@@ -46,6 +63,10 @@ const WEAPONS := {
 		"reload": 1.5, "damage_type": "ballistic",
 	},
 }
+## The hunter's own three. The sniper is not here for the same reason
+## `facility_sidearm` is not: it is a weapon you come into possession of, and
+## a rifle that reaches across the whole bone yard is not something the game
+## should hand you at spawn.
 const SLOT_ORDER := ["sword", "shotgun", "sidearm"]
 ## AF10.10. These are attachment points on the object, not perks on its
 ## holder. The future crafting screen may decide where a part comes from, but
@@ -241,6 +262,33 @@ func install_customization(weapon_id: String, slot: String, part: Dictionary) ->
 ## AX3.4. Called by the guard's physical loadout, not by player creation. The
 ## rounds passed here are the rounds left in that exact gun; no reserve magazine
 ## is conjured when ownership changes.
+## Picked up rather than issued, the same way the breach nine is. Takes the
+## rifle and whatever rounds came with it; a found weapon with an empty
+## magazine is still worth carrying, so zero rounds is allowed here where the
+## breach nine refuses it -- that one arrives mid-escape with what it has, and
+## this one can be scavenged for later.
+func acquire_sniper(rounds_left: int = -1) -> bool:
+	var magazine := int(WEAPONS.sniper.magazine)
+	var loaded := magazine if rounds_left < 0 else mini(rounds_left, magazine)
+	ammo["sniper"] = {
+		"loaded": loaded,
+		"reserve": int(WEAPONS.sniper.reserve) if rounds_left < 0 else maxi(0, rounds_left - loaded),
+		"spare_magazines": [],
+	}
+	current_id = "sniper"
+	if hand != null and not models.has(current_id):
+		var model := _build_weapon_model(current_id)
+		hand.add_child(model)
+		models[current_id] = model
+		var magazine_node := model.find_child("magazine", true, false) as Node3D
+		if magazine_node != null:
+			_magazine_nodes[current_id] = magazine_node
+			_magazine_rest[current_id] = magazine_node.position
+	_update_models()
+	equipped.emit(current_id)
+	return true
+
+
 func acquire_facility_sidearm(rounds_left: int) -> bool:
 	if rounds_left <= 0:
 		return false
