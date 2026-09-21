@@ -45,7 +45,12 @@ const EPSILON := 0.00001
 ## `section` is the cut face's boundary as unordered segment pairs, kept because
 ## the caller wants it: it is where blood comes from, where `GoreChunks` should
 ## spawn the exposed layer, and how wide the wound reads.
-static func split(mesh: Mesh, plane: Plane, surface_index := 0) -> Dictionary:
+## `cap` fills the cut face, which is what a severed limb wants: a closed
+## solid you can look at from any side. A body being opened wants the
+## opposite. Capping the torso you just cut into seals the hole with a flat
+## lid and the organs are behind it, so an opened chest reads as a chest that
+## was repainted. Passing false leaves the cut open and you can see in.
+static func split(mesh: Mesh, plane: Plane, surface_index := 0, cap := true) -> Dictionary:
 	var empty := {"above": null, "below": null, "section": [], "area": 0.0, "centre": Vector3.ZERO}
 	if mesh == null or mesh.get_surface_count() <= surface_index:
 		return empty
@@ -140,7 +145,7 @@ static func split(mesh: Mesh, plane: Plane, surface_index := 0) -> Dictionary:
 		}
 
 	var centre := _centroid(section)
-	var area := _cap(above, below, section, centre, plane)
+	var area := _cap(above, below, section, centre, plane, cap)
 	# A cut that clips a single corner leaves a sliver that is not worth being a
 	# separate object. Below three triangles there is nothing to look at.
 	var result := {
@@ -188,7 +193,7 @@ static func _rotate_to_lone(a: Vector3, b: Vector3, c: Vector3, up_a: bool, up_b
 ## generated ones.
 ##
 ## Returns the filled area, which is what the caller sizes the wound by.
-static func _cap(above: SurfaceTool, below: SurfaceTool, section: Array, centre: Vector3, plane: Plane) -> float:
+static func _cap(above: SurfaceTool, below: SurfaceTool, section: Array, centre: Vector3, plane: Plane, fill := true) -> float:
 	var area := 0.0
 	var index := 0
 	while index + 1 < section.size():
@@ -200,7 +205,11 @@ static func _cap(above: SurfaceTool, below: SurfaceTool, section: Array, centre:
 		var face := edge_a.cross(edge_b)
 		if face.length_squared() < EPSILON * EPSILON:
 			continue
+		# The area is measured either way: a caller sizing a wound by how much it
+		# opened needs the number whether or not the hole was filled in.
 		area += face.length() * 0.5
+		if not fill:
+			continue
 		# The cut face on the lower half looks along the plane normal, and the
 		# upper half's looks back down it. Winding is chosen from the actual
 		# cross product rather than assumed, because the segment's endpoints
