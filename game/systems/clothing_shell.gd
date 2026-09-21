@@ -96,9 +96,36 @@ static func shell_mesh(zone_id: String, half_height: float) -> ArrayMesh:
 
 ## Cloth, worn. Dark and rough, paling as it shreds so a breached garment reads
 ## threadbare at a glance rather than needing a second system to say so.
-static func shell_material(coverage: float) -> StandardMaterial3D:
+## `soak` is blood dried into the weave, 0 clean to 1 saturated: it drags the
+## cloth toward dried-blood dark, which is how a jacket that has been in a
+## fight keeps showing it after the bleeding stops.
+static func shell_material(coverage: float, soak := 0.0) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = Color("2e2a26").lightened((1.0 - clampf(coverage, 0.0, 1.0)) * 0.45)
+	material.albedo_color = material.albedo_color.lerp(Color("3d0907"), clampf(soak, 0.0, 1.0) * 0.7)
 	material.roughness = 0.94
 	material.metallic = 0.0
 	return material
+
+
+## Blood dried into the weave, per rig per zone. Integrity is what the garment
+## is; soak is what has happened to it — tracked apart so mending the tear
+## does not wash out the stain. Keyed by rig instance like the wet feet in
+## `Footprints`, and with the same cleanup debt: rigs are few and capped by
+## the population, so this is a note rather than a leak danger.
+static var _soak: Dictionary = {}
+
+
+static func stain(owner: Object, zone_id: String, amount: float) -> float:
+	if owner == null or amount <= 0.0:
+		return 0.0
+	var key := "%d:%s" % [owner.get_instance_id(), zone_id]
+	var soaked := clampf(float(_soak.get(key, 0.0)) + amount, 0.0, 1.0)
+	_soak[key] = soaked
+	return soaked
+
+
+static func soak_of(owner: Object, zone_id: String) -> float:
+	if owner == null:
+		return 0.0
+	return float(_soak.get("%d:%s" % [owner.get_instance_id(), zone_id], 0.0))

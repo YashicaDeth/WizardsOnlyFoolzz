@@ -193,6 +193,11 @@ var _drip_owed := 0.0
 ## dries the streaks running down it.
 var _bleed_seconds := 0.0
 var gore := true
+## What this body wears, zone to integrity 0..1. Empty is naked: `ClothingShell`
+## passes everything through, so undressed rigs — every existing test — behave
+## exactly as before. Dress a rig with `ClothingShell.fresh_wardrobe()` and the
+## cloth eats the blow before skin does, one way, until something mends it.
+var wardrobe: Dictionary = {}
 ## D4.2. How big this body is, from the race on the sheet. Every body in the
 ## world used to be exactly the same size whatever the sheet said, because the
 ## factor existed and nothing read it.
@@ -272,6 +277,7 @@ func build(id: String, config: Dictionary = {}) -> void:
 		part.set_meta("rest_scale", part.scale)
 		add_child(part)
 		parts[zone_id] = part
+		_dress_zone(zone_id, spec.size)
 
 		var hitbox := Area3D.new()
 		hitbox.name = "%s_hitbox" % zone_id
@@ -575,7 +581,20 @@ func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt",
 	var penetrates := damage_type in ["cut", "puncture", "ballistic", "shear"]
 	if penetrates and organ_id.is_empty():
 		organ_id = _organ_in_zone(zone)
-	var result := anatomy.apply_hit(zone, damage, impulse, damage_type, organ_id)
+	# Cloth before skin. A naked zone passes everything, so this line is free
+	# for every rig that was never dressed — the audit that proves it is
+	# `clothing_shell_test`'s "naked is unchanged" plus the untouched suites.
+	var cloth := ClothingShell.resolve_hit(wardrobe, zone, damage, damage_type)
+	var result := anatomy.apply_hit(zone, damage - float(cloth.absorbed), impulse, damage_type, organ_id)
+	result["cloth_absorbed"] = float(cloth.absorbed)
+	result["cloth_breached"] = bool(cloth.breached)
+	result["cloth_integrity"] = float(cloth.integrity)
+	if float(cloth.absorbed) > 0.0:
+		# Blood that met cloth stays in it. About seven solid hits to a fully
+		# saturated garment — slower than the two hits that tear it, so
+		# soaking is the stain a fight leaves, not the fight itself.
+		ClothingShell.stain(self, zone, damage * 0.005)
+		_dress_zone(zone, (_layout.get(zone, {}) as Dictionary).get("size", Vector3.ONE))
 	var direction := _resolved_hit_direction(zone, hit_direction)
 	var did_sever := _accumulate_sever_stress(zone, float(result.get("damage", 0.0)), damage_type, direction, joint_alignment)
 	if did_sever:
@@ -1189,6 +1208,40 @@ func _zone_mesh(zone_id: String, size: Vector3) -> Mesh:
 ## generated limb is swept along Z instead of Y.
 func _leg_points_forward(zone_id: String) -> bool:
 	return _seated and zone_id.ends_with("_leg")
+
+
+## Dress the rig: assign a wardrobe and render every garment it covers. Called
+## after `build()` because wardrobes come from content — loot, presets, the
+## sheet — not from the body itself. Undress by assigning an empty dict.
+func dress(wardrobe_: Dictionary) -> void:
+	wardrobe = wardrobe_
+	for zone_id in ZONES:
+		_dress_zone(zone_id, (_layout.get(zone_id, {}) as Dictionary).get("size", Vector3.ONE))
+
+
+## The garment over a zone, if it has one. A shell child of the part itself so
+## it inherits every transform — including a severed limb's flight, which is
+## how a torn-off clothed arm keeps its sleeve. Rebuilt rather than tweaked
+## because garments are few and hits are sparse; the churn argument that made
+## streaks reuse their node does not apply here either.
+func _dress_zone(zone_id: String, size: Vector3) -> void:
+	var part := parts.get(zone_id) as MeshInstance3D
+	if part == null or not is_instance_valid(part):
+		return
+	var old := part.get_node_or_null("Garment") as MeshInstance3D
+	var integrity := float(wardrobe.get(zone_id, 0.0))
+	if integrity <= 0.0:
+		if old != null and is_instance_valid(old):
+			old.queue_free()
+		return
+	var length := size.z if _leg_points_forward(zone_id) else size.y
+	var shell := MeshInstance3D.new()
+	shell.name = "Garment"
+	shell.mesh = ClothingShell.shell_mesh(zone_id, length * 0.5)
+	shell.material_override = ClothingShell.shell_material(integrity, ClothingShell.soak_of(self, zone_id))
+	part.add_child(shell)
+	if old != null and is_instance_valid(old):
+		old.queue_free()
 
 
 func _zone_material(zone_id: String, tint: Color, kind := "flesh") -> StandardMaterial3D:
@@ -1873,6 +1926,10 @@ func _land_splat(at: Vector3, size: float, velocity := Vector3.DOWN) -> void:
 	)
 	splats.append(splat)
 	_remember_blood(root, splat)
+	# The spatter above and the stain below are one event: every landed drop
+	# also feeds the pool set, which is what finally makes a body bleeding out
+	# onto one spot leave a stain that grows.
+	BloodPool.keep(root, landed, BloodPool.DROP_VOLUME)
 	while splats.size() > splat_budget():
 		var oldest: Node3D = splats.pop_front()
 		if is_instance_valid(oldest):
@@ -1895,6 +1952,7 @@ static func clear_gore() -> void:
 			splat.queue_free()
 	splats.clear()
 	blood_records.clear()
+	BloodPool.clear()
 	live_gore = 0
 
 

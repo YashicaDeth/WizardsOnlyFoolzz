@@ -207,6 +207,20 @@ static func pool_count(root: Node) -> int:
 	return (_pool_sets.get(_scene_key(root), []) as Array).size()
 
 
+## How much pooled blood is under a point: the volume of every pool whose edge
+## reaches it. Dry floor reads 0.0, the middle of a bleed reads its volume.
+## What feet ask before deciding whether they print.
+static func volume_at(root: Node, at: Vector3) -> float:
+	if root == null:
+		return 0.0
+	var total := 0.0
+	for pool: Dictionary in _pool_sets.get(_scene_key(root), []):
+		var flat := Vector2(at.x, at.z) - Vector2(pool.pos.x, pool.pos.z)
+		if flat.length() <= float(pool.radius):
+			total += float(pool.volume)
+	return total
+
+
 static func clear() -> void:
 	for key in _pool_nodes:
 		for node in _pool_nodes[key]:

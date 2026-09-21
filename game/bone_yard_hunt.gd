@@ -1017,6 +1017,9 @@ func _ready() -> void:
 	player_body.add_child(body_motion)
 	body_motion.configure(player_rig)
 	body_motion.set_perspective(not third_person)
+	# Feet cross gore and the floor used to forget. The gait already reports
+	# every footfall and nobody listened — this is the listener.
+	body_motion.foot_planted.connect(_on_player_foot_planted)
 	WorldHistory.register_subject("inventory", {"items": []})
 	field_inventory = FIELD_INVENTORY.new()
 	field_inventory.name = "FieldInventory"
@@ -2285,8 +2288,18 @@ func _attack(heavy := false) -> void:
 		strike_windup = float(report.windup)
 
 
-## The angle the current swing earns, for the cut it is about to make.
-##
+## A footfall lands, and wet feet write. The print sits a quarter stride ahead
+## under the stepping foot, offset to its side — alternating with the gait, so
+## the trail reads left-right rather than a centre line.
+func _on_player_foot_planted(side: String) -> void:
+	if body_motion == null or player_body == null or not is_instance_valid(player_body):
+		return
+	var facing := Vector3(sin(yaw), 0.0, cos(yaw))
+	var lateral := Vector3(facing.z, 0.0, -facing.x) * (0.12 if side == "left" else -0.12)
+	Footprints.step(self, player_body, player_body.global_position + facing * 0.25 + lateral, side)
+
+
+## The angle the current swing earns, for the cut it is about to make.##
 ## `LimbMomentum.cut_plane()` reported the swept plane with no caller — built
 ## and never wired, the failure this project keeps repeating. A still hand
 ## earns no plane: standing with a sword is not a swing, and a plane claimed
