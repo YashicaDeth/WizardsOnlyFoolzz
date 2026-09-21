@@ -168,8 +168,9 @@ func _ready() -> void:
 	check(guns.rounds.size() <= guns.MAX_ROUNDS, "rounds in flight are capped")
 	check(guns.casings.size() <= guns.MAX_CASINGS, "brass on the floor is capped")
 	WorldLook.set_quality_name("PERFORMANCE")
-	check(guns.casing_budget() == 48, "performance route uses a nearby brass budget")
-	check(guns.wound_budget() == 96, "performance route uses a bounded impact-scar budget")
+	check(guns.round_budget() == 32, "performance route uses a bounded in-flight round budget")
+	check(guns.casing_budget() == 32, "performance route uses a nearby brass budget")
+	check(guns.wound_budget() == 64, "performance route uses a bounded impact-scar budget")
 	WorldLook.set_quality_name("HIGH")
 	check(guns.casing_budget() < guns.MAX_CASINGS and guns.wound_budget() < guns.MAX_CASINGS,
 		"high quality still bounds persistent ballistic objects")

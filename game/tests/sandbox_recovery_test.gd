@@ -23,10 +23,18 @@ func _ready() -> void:
 	var previous_quality := WorldLook.quality
 	WorldLook.set_quality_name("PERFORMANCE")
 	check(WorldLook.quality_name() == "PERFORMANCE", "a fresh safe-quality route disables the costly fullscreen tier")
-	check(GoreChunks.chunk_budget() == 36, "performance quality caps persistent rigid gore at 36")
+	check(GoreChunks.chunk_budget() == 24, "performance quality caps persistent rigid gore at 24")
+	check(GoreChunks.active_physics_budget() == 18, "performance quality keeps at most 18 loose pieces actively simulating")
 	check(GoreChunks.impact_voice_budget() == 8, "performance quality prevents impact sounds from becoming an unbounded wall")
 	check(BaselineHuman.live_gore_budget() == 52, "performance quality caps transient body effects at 52")
 	check(BaselineHuman.splat_budget() == 96, "performance quality prevents hundreds of permanent blood draw objects")
+	check(Ballistics.round_budget() == 32 and Ballistics.casing_budget() == 32 and Ballistics.wound_budget() == 64, "performance quality bounds active rounds, brass and impact scars")
+
+	var loose_limb := RigidBody3D.new()
+	add_child(loose_limb)
+	GoreChunks.register_whole_limb(loose_limb, "left_arm", "sandbox_budget_probe")
+	check(loose_limb.collision_layer == (1 << 5) and loose_limb.collision_mask == 1, "loose gore collides with the room, not every other loose piece")
+	GoreChunks.clear()
 
 	var demo = load("res://gore_demo.tscn").instantiate()
 	add_child(demo)

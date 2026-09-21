@@ -47,14 +47,26 @@ const ORGAN_TINTS := {
 ## Chunks are rigid bodies, so this cap is a frame-rate contract rather than an
 ## aesthetic one. The same reasoning as `BaselineHuman.MAX_LIVE_GORE`: twelve
 ## drivers shedding unbounded physics bodies in a pileup is a bug, not atmosphere.
-const MAX_CHUNKS := 90
+const MAX_CHUNKS := 72
 
 
 static func chunk_budget() -> int:
 	match WorldLook.quality:
 		WorldLook.Quality.ULTRA: return MAX_CHUNKS
-		WorldLook.Quality.HIGH: return 60
-		_: return 36
+		WorldLook.Quality.HIGH: return 48
+		_: return 24
+
+
+## The number of loose pieces that may be actively talking to the physics
+## server.  It is intentionally lower than `chunk_budget()`: the rest can stay
+## as readable, takeable evidence after they settle, but they must not turn a
+## pile of fragments into a growing collision problem while the player keeps
+## firing.  Whole limbs and organs are protected when the budget is reclaimed.
+static func active_physics_budget() -> int:
+	match WorldLook.quality:
+		WorldLook.Quality.ULTRA: return 44
+		WorldLook.Quality.HIGH: return 30
+		_: return 18
 
 ## A chunk that survives this long has fully rotted: discoloured, and a scent
 ## source other systems can query. Most chunks never see it - the cap and the
@@ -89,6 +101,8 @@ static func register_whole_limb(node: RigidBody3D, zone: String, subject_id: Str
 		return {}
 	if live.size() >= chunk_budget():
 		_recycle_oldest()
+	_make_room_for_physics()
+	_configure_chunk_physics(node)
 	var info := {
 		"layer": -1,
 		"layer_name": "limb",
@@ -122,6 +136,8 @@ static func register_organ(node: RigidBody3D, organ_id: String, zone: String, su
 		return {}
 	if live.size() >= chunk_budget():
 		_recycle_oldest()
+	_make_room_for_physics()
+	_configure_chunk_physics(node)
 	var info := {
 		"layer": Layer.ORGAN,
 		"layer_name": "organ",
@@ -178,6 +194,12 @@ static func burst(host: Node3D, origin: Vector3, heading: Vector3, info: Diction
 			count = 1
 		var layer_produced := 0
 		for index in count:
+			# A shower of anonymous tissue is the first thing to give way under
+			# pressure.  The identified limb or organ survives; a new flap does
+			# not get to make the sandbox unplayable just because a blast hit a
+			# crowd at once.
+			if not _make_room_for_physics():
+				break
 			if live.size() >= chunk_budget():
 				_recycle_oldest()
 			var chunk := _make_chunk(layer, zone, subject_id, info, rng)
@@ -232,6 +254,7 @@ static func _make_chunk(layer: int, zone: String, subject_id: String, info: Dict
 	body.name = "chunk_%s_%s" % [LAYER_NAMES[layer], zone]
 	body.mass = [0.12, 0.18, 0.4, 0.6, 0.5, 0.9][layer]
 	body.continuous_cd = true
+	_configure_chunk_physics(body)
 
 	var mesh_instance := MeshInstance3D.new()
 	var extent := 0.05
@@ -396,6 +419,11 @@ static func _watch_chunk(node: RigidBody3D) -> void:
 	node.sleeping_state_changed.connect(func():
 		if is_instance_valid(node) and node.sleeping:
 			_mark_ground(node)
+			# A settled fragment has already done the only physical work the
+			# sandbox needs from it.  Freezing removes it from broad-phase contact
+			# work but keeps the visual, identity and pickup path intact.  A later
+			# blast explicitly unfreezes the pieces it reaches.
+			node.set_deferred("freeze", true)
 	)
 	_track_rolling(node)
 
@@ -636,12 +664,67 @@ static func _spawn_flies(node: RigidBody3D) -> void:
 		swarm.add_child(fly)
 
 
-static func _recycle_oldest() -> void:
-	while not live.is_empty():
-		var oldest: Node3D = live.pop_front()
-		if is_instance_valid(oldest):
-			oldest.queue_free()
-			return
+static func _configure_chunk_physics(body: RigidBody3D) -> void:
+	# Chunks need to hit the room, not endlessly collide with each other.  The
+	# old default layer made every limb, organ and tissue flap another obstacle
+	# for every other one, which is exactly the n-squared pile-up behind the
+	# reported firing hitch.  Raycasts still see this layer, so shots can stop
+	# in loose gore as before.
+	body.collision_layer = 1 << 5
+	body.collision_mask = 1
+	body.contact_monitor = false
+	body.max_contacts_reported = 0
+	body.can_sleep = true
+
+
+static func _active_physics_count() -> int:
+	prune()
+	var active := 0
+	for chunk in live:
+		var body := chunk as RigidBody3D
+		if body != null and is_instance_valid(body) and not body.freeze and not body.sleeping:
+			active += 1
+	return active
+
+
+## Makes room for a new moving piece without discarding the named evidence
+## players can inspect and carry.  Returns false only when the room already
+## contains the complete protected set, in which case no new anonymous fragment
+## should be born this frame.
+static func _make_room_for_physics() -> bool:
+	while _active_physics_count() >= active_physics_budget():
+		if not _recycle_oldest(true):
+			return false
+	return true
+
+
+static func _is_whole_piece(node: Node3D) -> bool:
+	var info := identify(node)
+	return bool(info.get("whole_limb", false)) or bool(info.get("whole_organ", false))
+
+
+## Prefer disposable tissue when a budget is full.  A detached arm or heart is
+## gameplay evidence; a ten-second-old flap is not.
+static func _recycle_oldest(prefer_fragment := false) -> bool:
+	prune()
+	var chosen := -1
+	for index in live.size():
+		var candidate := live[index]
+		if is_instance_valid(candidate) and not _is_whole_piece(candidate):
+			chosen = index
+			break
+	if chosen < 0 and not prefer_fragment:
+		for index in live.size():
+			if is_instance_valid(live[index]):
+				chosen = index
+				break
+	if chosen < 0:
+		return false
+	var oldest: Node3D = live[chosen]
+	live.remove_at(chosen)
+	if is_instance_valid(oldest):
+		oldest.queue_free()
+	return true
 
 
 static func clear() -> void:

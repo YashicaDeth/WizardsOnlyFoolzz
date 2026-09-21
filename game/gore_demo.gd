@@ -553,7 +553,12 @@ func _blast_light(at: Vector3, force: float) -> void:
 		if distance > reach or distance < 0.001:
 			continue
 		var lift := (away.normalized() * 0.75 + Vector3.UP * 0.65).normalized()
-		(chunk as RigidBody3D).apply_central_impulse(lift * (1.0 - distance / reach) * force * 0.16)
+		var body := chunk as RigidBody3D
+		# GoreChunks freezes settled evidence to remove its ongoing physics cost.
+		# A new blast is an explicit reason to wake it again.
+		if body.freeze:
+			body.freeze = false
+		body.apply_central_impulse(lift * (1.0 - distance / reach) * force * 0.16)
 
 
 ## The trigger, and nothing but the trigger for a firearm — one real round
