@@ -1,0 +1,234 @@
+extends Node3D
+
+## THE SERVICE ARCADE — the first real district after the Growing Floor.
+## A short, original hub-and-spoke slice: the vat corridor opens into a tall
+## service artery, the player retrieves one access card, opens one pressure
+## gate, and reaches the pit.  It replaces the old immediate car handoff with
+## a readable piece of facility geography.
+
+const ENTRY := Vector3(0, 1.0, 4.0)
+const CARD_AT := Vector3(-3.8, 0.95, -20.0)
+const GATE_AT := Vector3(0, 0.0, -48.0)
+const EXIT_AT := Vector3(0, 0.0, -55.0)
+
+var player: CharacterBody3D
+var camera: Camera3D
+var yaw := 0.0
+var pitch := -0.04
+var card_taken := false
+var gate_open := false
+var gate_body: StaticBody3D
+var gate_panel: Node3D
+var card_visual: MeshInstance3D
+
+@onready var objective: Label = $HUD/Objective
+@onready var prompt: Label = $HUD/Prompt
+@onready var vitals: Label = $HUD/Vitals
+
+func _ready() -> void:
+	$WorldEnvironment.environment = WorldLook.environment("ossuary")
+	_build_shell()
+	_build_landmarks()
+	_build_player()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+func _build_player() -> void:
+	player = CharacterBody3D.new()
+	player.position = ENTRY
+	add_child(player)
+	var collider := CollisionShape3D.new()
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = 0.34
+	capsule.height = 1.7
+	collider.shape = capsule
+	player.add_child(collider)
+	camera = Camera3D.new()
+	camera.fov = 88.0
+	camera.position.y = 0.77
+	player.add_child(camera)
+
+func _build_shell() -> void:
+	# Collision is intentionally simpler than dressing: one stable floor and
+	# sidewalls under every arch means no void falls or physics caught on pipes.
+	_slab(Vector3(15.0, 0.4, 66.0), Vector3(0, -0.2, -27.0), "dirt", Color("171410"))
+	_slab(Vector3(15.0, 0.35, 66.0), Vector3(0, 8.0, -27.0), "rust", Color("100d0b"))
+	_slab(Vector3(0.45, 8.2, 66.0), Vector3(-7.25, 4.0, -27.0), "rust", Color("211a15"))
+	_slab(Vector3(0.45, 8.2, 66.0), Vector3(7.25, 4.0, -27.0), "rust", Color("211a15"))
+	_slab(Vector3(15.0, 8.2, 0.45), Vector3(0, 4.0, 5.5), "rust", Color("211a15"))
+	_slab(Vector3(15.0, 8.2, 0.45), Vector3(0, 4.0, -58.5), "rust", Color("211a15"))
+	for bay in 13:
+		var z := 2.5 - float(bay) * 4.5
+		_build_arch(z, bay)
+		if bay % 2 == 0:
+			_build_side_lab(z - 1.2, bay)
+		var light := OmniLight3D.new()
+		light.position = Vector3(0, 6.7, z)
+		light.light_color = Color("b64027") if bay % 3 else Color("77924f")
+		light.light_energy = 2.2
+		light.omni_range = 8.5
+		add_child(light)
+
+func _build_arch(z: float, index: int) -> void:
+	# Two tall piers plus a raised beam read as a vault from the playable floor;
+	# the beam is decoration so it cannot snag the player.
+	for side in [-1.0, 1.0]:
+		var pier := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(0.55, 5.5, 0.55)
+		mesh.material = WorldLook.surface(Color("34291e"), "bone", 120 + index)
+		pier.mesh = mesh
+		pier.position = Vector3(side * 5.85, 2.75, z)
+		add_child(pier)
+	var lintel := MeshInstance3D.new()
+	var top := BoxMesh.new()
+	top.size = Vector3(12.2, 0.52, 0.55)
+	top.material = WorldLook.surface(Color("34291e"), "bone", 220 + index)
+	lintel.mesh = top
+	lintel.position = Vector3(0, 5.45, z)
+	add_child(lintel)
+
+func _build_side_lab(z: float, seed: int) -> void:
+	for side in [-1.0, 1.0]:
+		var tank := MeshInstance3D.new()
+		var cylinder := CylinderMesh.new()
+		cylinder.top_radius = 0.78
+		cylinder.bottom_radius = 0.78
+		cylinder.height = 2.9
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.28, 0.045, 0.03, 0.34)
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		mat.emission_enabled = true
+		mat.emission = Color(0.14, 0.004, 0.002)
+		cylinder.material = mat
+		tank.mesh = cylinder
+		tank.position = Vector3(side * 4.25, 1.45, z)
+		add_child(tank)
+		# A body-shaped silhouette, intentionally static and distant: ambience,
+		# not an expensive crowd system.
+		var subject := MeshInstance3D.new()
+		var body := CapsuleMesh.new()
+		body.radius = 0.25
+		body.height = 1.55
+		body.material = WorldLook.surface(Color("4d322d"), "flesh", seed * 9 + int(side))
+		subject.mesh = body
+		subject.position = tank.position + Vector3(0, -0.12, 0)
+		subject.rotation_degrees.z = side * 13.0
+		add_child(subject)
+
+func _build_landmarks() -> void:
+	# Card station — a clearly lit side objective with a physical, original card.
+	var pedestal := MeshInstance3D.new()
+	var pedestal_mesh := BoxMesh.new()
+	pedestal_mesh.size = Vector3(0.8, 1.1, 0.7)
+	pedestal_mesh.material = WorldLook.surface(Color("241b15"), "metal", 401)
+	pedestal.mesh = pedestal_mesh
+	pedestal.position = CARD_AT + Vector3(0, -0.45, 0)
+	add_child(pedestal)
+	card_visual = MeshInstance3D.new()
+	var card_mesh := BoxMesh.new()
+	card_mesh.size = Vector3(0.36, 0.08, 0.54)
+	var card_mat := StandardMaterial3D.new()
+	card_mat.albedo_color = Color("d36d30")
+	card_mat.emission_enabled = true
+	card_mat.emission = Color("7a230f")
+	card_mesh.material = card_mat
+	card_visual.mesh = card_mesh
+	card_visual.position = CARD_AT
+	add_child(card_visual)
+	var card_light := OmniLight3D.new()
+	card_light.position = CARD_AT + Vector3(0, 1.0, 0)
+	card_light.light_color = Color("ff7131")
+	card_light.light_energy = 3.6
+	card_light.omni_range = 4.0
+	add_child(card_light)
+	# Pressure gate is a real collision barrier until the card is used.
+	gate_body = _slab(Vector3(5.0, 5.5, 0.45), GATE_AT + Vector3(0, 2.75, 0), "metal", Color("3b2119"))
+	gate_panel = Node3D.new()
+	gate_panel.position = GATE_AT
+	add_child(gate_panel)
+	for side in [-1.0, 1.0]:
+		var fin := MeshInstance3D.new()
+		var fin_mesh := BoxMesh.new()
+		fin_mesh.size = Vector3(2.35, 5.3, 0.25)
+		fin_mesh.material = WorldLook.surface(Color("43241a"), "metal", 520 + int(side))
+		fin.mesh = fin_mesh
+		fin.position = Vector3(side * 1.25, 2.65, -0.26)
+		gate_panel.add_child(fin)
+	var gate_light := OmniLight3D.new()
+	gate_light.position = GATE_AT + Vector3(0, 3.8, 1.0)
+	gate_light.light_color = Color("d84a27")
+	gate_light.light_energy = 5.0
+	gate_light.omni_range = 8.0
+	add_child(gate_light)
+
+func _slab(dimensions: Vector3, at: Vector3, kind: String, color: Color) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.position = at
+	add_child(body)
+	var visual := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = dimensions
+	mesh.material = WorldLook.surface(color, kind, int(at.x * 13.0 + at.z * 17.0))
+	visual.mesh = mesh
+	body.add_child(visual)
+	var collider := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = dimensions
+	collider.shape = shape
+	body.add_child(collider)
+	return body
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		yaw -= event.relative.x * 0.0026
+		pitch = clampf(pitch - event.relative.y * 0.0024, -1.15, 0.95)
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
+		_interact()
+
+func _physics_process(delta: float) -> void:
+	var input := Vector3(Input.get_axis("move_left", "move_right"), 0.0, Input.get_axis("move_forward", "move_back"))
+	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
+	player.velocity.x = move_toward(player.velocity.x, direction.x * 3.4, 16.0 * delta)
+	player.velocity.z = move_toward(player.velocity.z, direction.z * 3.4, 16.0 * delta)
+	player.velocity.y = -2.0 if player.is_on_floor() else player.velocity.y - 18.0 * delta
+	player.move_and_slide()
+	player.rotation.y = yaw
+	camera.rotation = Vector3(pitch, 0, 0)
+	_update_hud()
+
+func _flat_distance(at: Vector3) -> float:
+	var delta := at - player.global_position
+	delta.y = 0.0
+	return delta.length()
+
+func _interact() -> void:
+	if not card_taken and _flat_distance(CARD_AT) <= 2.3:
+		card_taken = true
+		card_visual.visible = false
+		WorldHistory.record_event("service_arcade_keycard_taken", {"location": "service_arcade"})
+		return
+	if not gate_open and _flat_distance(GATE_AT) <= 3.2 and card_taken:
+		gate_open = true
+		gate_body.queue_free()
+		gate_panel.position.y = 5.8
+		WorldHistory.record_event("service_arcade_pressure_gate_opened", {"location": "service_arcade"})
+		return
+	if gate_open and _flat_distance(EXIT_AT) <= 3.0:
+		WorldHistory.record_event("service_arcade_entered_pit", {"location": "service_arcade"})
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		Interstitial.travel("res://underground_colosseum.tscn", "pressure gate open // the heat below is awake")
+
+func _update_hud() -> void:
+	vitals.text = "BLOOD 100%   PAIN 86   DECANTED"
+	objective.text = "OBJECTIVE\n" + ("REACH THE PRESSURE GATE" if card_taken else "FIND A STAFF ACCESS CARD")
+	if not card_taken and _flat_distance(CARD_AT) <= 2.3:
+		prompt.text = "[E] TAKE STAFF ACCESS CARD"
+	elif not gate_open and _flat_distance(GATE_AT) <= 3.2:
+		prompt.text = "[E] OPEN PRESSURE GATE" if card_taken else "PRESSURE GATE // STAFF CARD REQUIRED"
+	elif gate_open and _flat_distance(EXIT_AT) <= 3.0:
+		prompt.text = "[E] ENTER THE UNDERGROUND HEAT"
+	else:
+		prompt.text = "WASD MOVE   //   MOUSE LOOK   //   E INTERACT"
