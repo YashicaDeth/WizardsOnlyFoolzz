@@ -130,6 +130,8 @@ const HANDHELD_LAMP_BASE_ROTATION := Vector3(-6.0, 4.0, 0.0)
 const HANDHELD_WAVE_POSITION := Vector2(0.28, 0.16)
 const HANDHELD_WAVE_ANGLE := Vector2(18.0, 10.0)
 const BALLISTICS := preload("res://systems/ballistics.gd")
+const KILL_SHOT := preload("res://systems/kill_shot.gd")
+const CAVITY := preload("res://systems/cavity.gd")
 const LIMB_MOMENTUM := preload("res://systems/limb_momentum.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
@@ -2647,7 +2649,8 @@ func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bo
 		hit_motion.trigger_hit(direction, damage / maxf(zone_max, 1.0))
 	if actor.rig != null and is_instance_valid(actor.rig):
 		actor.rig.favour_injuries()
-	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": actor.rig.snapshot()}, "anatomy_changed")
+	var anatomy_snapshot: Dictionary = actor.rig.snapshot()
+	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": anatomy_snapshot}, "anatomy_changed")
 	WorldHistory.record_event("firearm_anatomy_hit", {
 		"subject_id": actor.subject_id, "weapon": weapon, "zones": zones,
 		"damage": snappedf(float(result.get("damage", 0.0)), 0.1), "ruptures": ruptures, "severed": severed,
@@ -2655,6 +2658,7 @@ func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bo
 	})
 	var fake_attack := {"damage": damage, "impulse": impulse, "damage_type": damage_type, "weapon": weapon, "heavy": bool(payload.get("heavy", false))}
 	if actor.anatomy.dead:
+		_try_firearm_killcam(actor, weapon, zone_id, direction, anatomy_snapshot)
 		_kill_encounter_actor(encounter_actors.find(actor), weapon)
 	elif actor.anatomy.downed:
 		actor.state = "downed"
@@ -2668,6 +2672,24 @@ func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bo
 	_settle_shot(shot_id, true, str(actor.subject_id))
 	WorldHistory.commit_ledger_batch()
 	return true
+
+
+## The round decides this only after the rig has resolved the hit.  A sniper
+## camera is earned by a real immediate vital rupture, never merely because a
+## rifle was fired or because somebody was already bleeding out.
+func _try_firearm_killcam(actor: Dictionary, weapon: String, zone_id: String, direction: Vector3, snapshot: Dictionary) -> void:
+	if kill_cam == null or kill_cam.active:
+		return
+	var finish := KILL_SHOT.earned(weapon, zone_id, snapshot)
+	if finish.is_empty():
+		return
+	kill_cam.trigger(
+		str(actor.get("display_name", "UNKNOWN")),
+		str(finish.get("zone", zone_id)),
+		direction,
+		str(finish.get("label", weapon.to_upper())),
+		snapshot
+	)
 
 
 ## AF1.1. One trigger pull can fire several rounds (a shotgun's pellets),
@@ -4741,6 +4763,14 @@ func _update_extraction(delta: float, holding: bool) -> void:
 
 func _finish_extraction(body: Dictionary) -> void:
 	var rig := body.rig as BaselineHuman
+	var zone := str(extraction_session.get("zone", ""))
+	# The timer has reached an actual target now.  Turn that completion into a
+	# physical opened cavity before taking the part, so the player sees the
+	# opening and the organ that was inside it rather than looting a closed mesh.
+	if not CAVITY.is_open(rig, zone):
+		var body_node := body.get("node") as Node3D
+		var facing := player - body_node.global_position if body_node != null and is_instance_valid(body_node) else Vector3.FORWARD
+		CAVITY.open_zone(rig, zone, facing)
 	var snapshot: Dictionary = rig.anatomy.snapshot()
 	var extracted := Extraction.extract(extraction_session, snapshot)
 	extraction_session = {}
