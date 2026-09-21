@@ -49,6 +49,9 @@ var _memories: Array[String] = []
 ## Section 2's output pipeline. Defaults to the best voice the machine has and
 ## degrades to subtitles-only where there is none, so no caller has to choose.
 var voice: NPCSpeechOutput.Voice
+## The floating 3D bubble is for overhearing an NPC across a room. While a full
+## dialogue screen is open it is the same line twice, so the screen turns it off.
+var suppress_bubble := false
 
 const MAX_MEMORIES := 6
 
@@ -238,7 +241,7 @@ func memories() -> Array[String]:
 
 func _say(text: String) -> void:
 	_bubble.text = text
-	_bubble.visible = true
+	_bubble.visible = not suppress_bubble
 	# Hold the subtitle for as long as the line plausibly takes to say, rather
 	# than a flat 3.6s: a four-word answer and a two-sentence one held for the
 	# same beat is what makes a talking NPC feel like a slideshow.

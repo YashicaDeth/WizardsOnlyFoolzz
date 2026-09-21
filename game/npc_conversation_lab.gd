@@ -43,8 +43,22 @@ var doctor: NPCConversationComponent
 var hud: NPCDebugHUD
 var entry: LineEdit
 var voice_in: VoiceInput
+var mic: MicLevel
+var talk_ui: NPCDialogueUI
+var in_conversation := false
 var yaw := 0.0
 var pitch := 0.0
+
+## The canned half of the conversation. The spec: "Scripted quest choices can
+## coexist with free speech." So these sit in the same list as the microphone.
+const OPTIONS: Array[String] = [
+	"Where am I?",
+	"Who are you?",
+	"Let me out of here.",
+	"What did you do to me?",
+	"[V] SPEAK FREELY",
+	"[LEAVE]",
+]
 
 
 func _ready() -> void:
@@ -55,6 +69,7 @@ func _ready() -> void:
 	_build_player()
 	_build_doctor()
 	_build_hud()
+	_build_talk_ui()
 	_build_voice()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -62,6 +77,46 @@ func _ready() -> void:
 ## Real microphone where one is usable, typed input where it is not. The whole
 ## point of the fallback is that the conversation loop above it cannot tell the
 ## difference -- both paths arrive at `_on_said()`.
+## The Fallout-style panel, plus the live microphone meter that draws into it.
+func _build_talk_ui() -> void:
+	talk_ui = NPCDialogueUI.new()
+	talk_ui.visible = false
+	hud.get_parent().add_child(talk_ui)
+	talk_ui.option_chosen.connect(_on_option)
+	talk_ui.closed.connect(_leave_conversation)
+	mic = MicLevel.new()
+	add_child(mic)
+	mic.start()
+
+
+func _enter_conversation() -> void:
+	if in_conversation:
+		return
+	in_conversation = true
+	doctor.suppress_bubble = true
+	talk_ui.open(str(DOCTOR.name), OPTIONS)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+func _leave_conversation() -> void:
+	in_conversation = false
+	doctor.suppress_bubble = false
+	talk_ui.visible = false
+	if voice_in != null:
+		voice_in.set_listening(false)
+	talk_ui.listening = false
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _on_option(option: String) -> void:
+	if option.begins_with("[LEAVE]"):
+		_leave_conversation()
+		return
+	if option.begins_with("[V]"):
+		return
+	_on_said(option)
+
+
 func _build_voice() -> void:
 	voice_in = VoiceInput.new()
 	add_child(voice_in)
@@ -143,6 +198,9 @@ func _build_hud() -> void:
 	layer.layer = 64
 	add_child(layer)
 	hud = NPCDebugHUD.new()
+	# Off by default. It is a developer instrument, not part of the game, and
+	# Greg is right that having it permanently on screen is not a UI.
+	hud.visible = false
 	layer.add_child(hud)
 	hud.watch(doctor)
 
@@ -158,7 +216,7 @@ func _build_hud() -> void:
 	layer.add_child(entry)
 
 	var help := Label.new()
-	help.text = "WASD MOVE   //   MOUSE LOOK   //   HOLD V TO SPEAK   //   ESC RELEASE MOUSE"
+	help.text = "WASD MOVE   //   MOUSE LOOK   //   E TALK   //   F3 DEBUG"
 	help.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	help.offset_top = -34.0
 	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -169,8 +227,27 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		yaw -= event.relative.x * 0.0022
 		pitch = clampf(pitch - event.relative.y * 0.0022, -1.4, 1.4)
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F3:
+		hud.visible = not hud.visible
+		hud.queue_redraw()
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		if in_conversation:
+			_leave_conversation()
+		else:
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	# E opens the conversation, and only within the examiner's own interaction
+	# radius -- the same distance he uses to decide he is being spoken to.
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
+		if not in_conversation and doctor.attending:
+			_enter_conversation()
+	if in_conversation and event is InputEventKey and event.pressed:
+		match event.keycode:
+			KEY_UP:
+				talk_ui.move_selection(-1)
+			KEY_DOWN:
+				talk_ui.move_selection(1)
+			KEY_ENTER, KEY_KP_ENTER:
+				talk_ui.choose()
 	if event is InputEventMouseButton and event.pressed and not entry.visible:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	# Hold V. The same verb the spec asks for, standing in for push-to-talk:
@@ -180,7 +257,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			# True push-to-talk: the recogniser hears only while the key is down.
 			voice_in.set_listening(event.pressed)
 			hud.listening = event.pressed
+			talk_ui.listening = event.pressed
 			hud.queue_redraw()
+			return
+		if not in_conversation:
 			return
 		if event.pressed and not entry.visible:
 			_open_channel()
@@ -214,6 +294,12 @@ func _on_said(text: String) -> void:
 	hud.note_turn({"transcript": said})
 	if bool(turn.get("ok", false)):
 		hud.note_turn(turn)
+		if talk_ui != null:
+			talk_ui.say(str(turn.get("speech", "")), str(turn.get("tone", "neutral")))
+			# Hostility keeps the waveform hot after the shouting stops, so the
+			# colour tracks the conversation rather than the decibels.
+			var hot := 1.0 if str(turn.get("tone", "")) == "hostile" else (0.6 if str(turn.get("intent", "")).contains("threat") else 0.0)
+			talk_ui.set_aggression(hot)
 	else:
 		# A refusal is shown rather than swallowed. "He did not think you were
 		# talking to him" is a real answer and the HUD should say so.
@@ -221,8 +307,13 @@ func _on_said(text: String) -> void:
 		hud.queue_redraw()
 
 
+func _process(_delta: float) -> void:
+	if talk_ui != null and mic != null:
+		talk_ui.push_level(mic.level if talk_ui.listening else 0.0)
+
+
 func _physics_process(delta: float) -> void:
-	if entry.visible:
+	if entry.visible or in_conversation:
 		return
 	var input := Vector3(
 		Input.get_axis("move_left", "move_right"), 0.0,
