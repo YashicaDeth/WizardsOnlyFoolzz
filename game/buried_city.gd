@@ -32,6 +32,7 @@ var patrol_phase := 0.0
 var patrol_tactic: Dictionary = {}
 var patrol_tree: Resource
 var patrol_alert := false
+var patrol_disabled := false
 var patrol_attack_cooldown := 0.0
 var blood := 100.0
 
@@ -283,6 +284,7 @@ func _build_patrol() -> void:
 	shell.position.y = 1.0
 	patrol.add_child(shell)
 	var eye := OmniLight3D.new()
+	eye.name = "Eye"
 	eye.position = Vector3(0, 1.45, 0.25)
 	eye.light_color = Color("d85131")
 	eye.light_energy = 1.5
@@ -335,6 +337,9 @@ func _physics_process(delta: float) -> void:
 func _patrol_step(delta: float) -> void:
 	if patrol == null or player == null:
 		return
+	if patrol_disabled:
+		patrol_alert = false
+		return
 	patrol_attack_cooldown = maxf(0.0, patrol_attack_cooldown - delta)
 	var difference := player.global_position - patrol.global_position
 	difference.y = 0.0
@@ -375,7 +380,18 @@ func _interact() -> void:
 	if fuse_taken and not shortcut_open and _flat_distance(SHORTCUT_AT) <= 3.0:
 		shortcut_open = true
 		shortcut_gate.queue_free()
-		WorldHistory.record_event("lower_works_shortcut_powered", {"location": "lower_works"})
+		patrol_disabled = true
+		# The fuse has a tactical job as well as a route job: shunting this
+		# side circuit drops the only sentinel's local relay.  It turns the
+		# optional walk to the west gallery into a real safer route, instead of
+		# an impressive-looking gate that changes nothing once opened.
+		if patrol != null:
+			patrol.set_meta("state", "relay_disabled")
+			var eye := patrol.get_node_or_null("Eye") as OmniLight3D
+			if eye != null:
+				eye.light_color = Color("4d7044")
+				eye.light_energy = 0.35
+		WorldHistory.record_event("lower_works_shortcut_powered", {"location": "lower_works", "sentinel_relay": "disabled"})
 		return
 	if _flat_distance(EXIT_AT) <= 4.0 and fuse_taken:
 		_record_pit_entry()
@@ -395,13 +411,13 @@ func _record_pit_entry() -> void:
 
 
 func _update_hud() -> void:
-	var guard_state := "SENTINEL ENGAGED" if patrol_alert else "SENTINEL PATROL"
+	var guard_state := "SENTINEL RELAY DOWN" if patrol_disabled else ("SENTINEL ENGAGED" if patrol_alert else "SENTINEL PATROL")
 	status.text = "BLOOD %03d%%   PAIN 86   LOWER WORKS // %s" % [roundi(blood), guard_state]
 	objective.text = "OBJECTIVE // " + ("REACH THE HEAT ELEVATOR" if fuse_taken else "FIND A LIFT FUSE")
 	if not fuse_taken and _flat_distance(FUSE_AT) <= 2.4:
 		prompt.text = "[E] TAKE LIFT FUSE"
 	elif fuse_taken and not shortcut_open and _flat_distance(SHORTCUT_AT) <= 3.0:
-		prompt.text = "[E] POWER SERVICE SHORTCUT"
+		prompt.text = "[E] POWER SHORTCUT // DISABLE SENTINEL"
 	elif fuse_taken and _flat_distance(EXIT_AT) <= 4.0:
 		prompt.text = "[E] DESCEND TO THE UNDERGROUND HEAT"
 	else:
