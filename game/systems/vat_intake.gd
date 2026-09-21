@@ -37,11 +37,11 @@ const BRUISE := Color("6b3f6e")
 # 3D tank.  Keeping its UI wash green made the first frame look like a different
 # scene from the vat beneath it.
 const GOO := Color("70150e")
-const PAPER := Color(0.86, 0.80, 0.63)
+const PAPER := Color(0.12, 0.075, 0.06)
 
 const ROUTES := ["PRESET", "RANDOM", "CHART", "INSTRUMENT"]
 const PAGES := ["ROUTE", "RACE", "TRAITS", "FACE", "BODY", "SCHEDULE"]
-const FORM_REVEAL_AT := 1.15
+const FORM_REVEAL_AT := 5.5
 const FORM_REVEAL_DURATION := 0.55
 
 ## What the handler says while he works. He is not talking to you so much as
@@ -98,6 +98,8 @@ var transcript := ""
 var transcript_life := 0.0
 var mirror_settle := 0.0
 var body_preview: Control
+var intake_armed := false
+var touched_pages: Dictionary = {}
 
 
 func _ready() -> void:
@@ -181,6 +183,11 @@ func _transcribe(intent: String, success_context: String = "chose") -> void:
 func _process(delta: float) -> void:
 	elapsed += delta
 	modulate.a = clampf((elapsed - FORM_REVEAL_AT) / FORM_REVEAL_DURATION, 0.0, 1.0)
+	if not intake_armed and elapsed >= FORM_REVEAL_AT:
+		intake_armed = true
+		transcript = "NEURALACE ENGAGED  //  EXAMINER TERMINAL CONNECTED"
+		transcript_life = 4.0
+		_speak("page")
 	handler_life = maxf(0.0, handler_life - delta)
 	doctor_life = maxf(0.0, doctor_life - delta)
 	if doctor_life <= 0.0 and verdict_started:
@@ -198,6 +205,9 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	if not intake_armed:
+		get_viewport().set_input_as_handled()
 		return
 	# D8.3. While he is putting something into you, you are not filling in a
 	# form. The scene runs to the end of its beats before it hands you back.
@@ -218,13 +228,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			row = maxi(0, row - 1)
 		KEY_DOWN:
 			row = mini(_rows() - 1, row + 1)
-		KEY_SPACE, KEY_ENTER, KEY_KP_ENTER:
+		KEY_ENTER, KEY_KP_ENTER:
 			_commit()
 		KEY_F:
 			# AX2.1. He does not let you leave without telling you what it was for.
 			# The verdict plays first; filing happens when he has finished.
-			if not verdict_started:
+			if not verdict_started and _can_file():
 				_begin_verdict()
+			elif not verdict_started:
+				transcript = "EXAMINATION INCOMPLETE  //  CONFIRM EACH TAB"
+				transcript_life = 3.2
 		_:
 			return
 	get_viewport().set_input_as_handled()
@@ -251,6 +264,7 @@ func _rows() -> int:
 
 
 func _commit() -> void:
+	touched_pages[page] = true
 	match page:
 		0:
 			sheet.route = ROUTES[row].to_lower()
@@ -336,6 +350,9 @@ func _commit() -> void:
 				_doctor_note_refusal()
 	_refresh_body_preview()
 
+func _can_file() -> bool:
+	return touched_pages.size() == PAGES.size() and sheet.route != "" and sheet.race != ""
+
 
 ## This is a visual construction only.  The preview never applies the sheet to
 ## WorldHistory; the actual filing path remains the sole place that commits a
@@ -403,21 +420,23 @@ func _draw_tank(viewport: Vector2) -> void:
 
 
 func _draw_clipboard(rect: Rect2) -> void:
-	# A board with paper on it, held at an angle by somebody standing over you.
+	# An invasive terminal, not a clean clipboard.
 	draw_set_transform(rect.position + Vector2(0, 12), -0.022, Vector2.ONE)
 	var board := Rect2(Vector2.ZERO, rect.size)
-	draw_rect(board, Color(0.16, 0.13, 0.10))
-	draw_rect(board, Color(0.30, 0.24, 0.17), false, 2.0)
+	draw_rect(board, Color(0.045, 0.022, 0.02, 0.96))
+	draw_rect(board, Color(0.48, 0.13, 0.07, 0.8), false, 2.0)
 	var sheet_rect := Rect2(Vector2(12, 34), rect.size - Vector2(24, 52))
-	draw_rect(sheet_rect, PAPER * Color(1, 1, 1, 0.92))
-	Grunge.stain(self, sheet_rect.position + sheet_rect.size * Vector2(0.8, 0.12), 60.0, 881, Grunge.BILE, 0.16)
-	Grunge.stain(self, sheet_rect.position + sheet_rect.size * Vector2(0.15, 0.9), 44.0, 883, Grunge.RUST, 0.13)
-	# The clip.
-	draw_rect(Rect2(Vector2(rect.size.x * 0.5 - 34, 6), Vector2(68, 22)), Color(0.42, 0.38, 0.30))
-	draw_rect(Rect2(Vector2(rect.size.x * 0.5 - 34, 6), Vector2(68, 22)), Color(0.18, 0.15, 0.12), false, 1.5)
+	draw_rect(sheet_rect, PAPER)
+	for rail in 5:
+		var x := 18.0 + float(rail) * (rect.size.x - 36.0) / 4.0
+		draw_line(Vector2(x, 38), Vector2(x + sin(elapsed + rail) * 5.0, rect.size.y - 20), Color(0.34, 0.07, 0.04, 0.38), 1.0)
+	Grunge.stain(self, sheet_rect.position + sheet_rect.size * Vector2(0.8, 0.12), 60.0, 881, Grunge.BILE, 0.20)
+	Grunge.stain(self, sheet_rect.position + sheet_rect.size * Vector2(0.15, 0.9), 44.0, 883, Grunge.RUST, 0.19)
+	draw_rect(Rect2(Vector2(rect.size.x * 0.5 - 44, 6), Vector2(88, 22)), Color(0.32, 0.06, 0.03))
+	draw_rect(Rect2(Vector2(rect.size.x * 0.5 - 44, 6), Vector2(88, 22)), HOT, false, 1.5)
 
-	var ink := Color(0.16, 0.12, 0.10)
-	CellOutzType.draw_stamped(self, Vector2(26, 46), "INTAKE", 20.0, ink, HOT * Color(1, 1, 1, 0.22), 1.6)
+	var ink := INK
+	CellOutzType.draw_stamped(self, Vector2(26, 46), "NEURAL INTAKE", 20.0, ink, HOT * Color(1, 1, 1, 0.32), 1.6)
 	CellOutzType.draw_condensed(self, Vector2(26, 72), "CELLOUTZ GROWING FLOOR // FORM CZ-00/I // ONE PER BODY", 9.0, ink * Color(1, 1, 1, 0.6), 0.7)
 
 	# Page tabs along the top of the paper.
@@ -456,7 +475,7 @@ func _draw_clipboard(rect: Rect2) -> void:
 		CellOutzType.draw_condensed(self, Vector2(column, footer + 12), "%04.1f" % float(values[key]), 14.0, ink, 0.9)
 		column += rect.size.x * 0.22
 	CellOutzType.draw_condensed(self, Vector2(26, footer + 36), "%s // %s RISING // %s" % [sheet.sun_sign(), sheet.ascendant(), sheet.modality().to_upper()], 9.0, ink * Color(1, 1, 1, 0.55), 0.7)
-	CellOutzType.draw_condensed(self, Vector2(rect.size.x - 150, footer + 36), "F TO FILE", 10.0, HOT, 0.8)
+	CellOutzType.draw_condensed(self, Vector2(rect.size.x - 190, footer + 36), "ENTER CONFIRMS // F FILES", 8.0, HOT, 0.8)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -687,7 +706,9 @@ func _draw_handler(viewport: Vector2) -> void:
 	# Do not paint a second fake silhouette over the world.  The physical
 	# examiner at the workstation is visible through the medium; this is only
 	# his transcription band and must never block the computer or his body.
-	var band := Rect2(Vector2(40, viewport.y - 92), Vector2(viewport.x * 0.32, 70))
+	# Kept off the bottom edge where it was easy to miss during the actual
+	# examination. This is the live transcript panel, not a subtitle crawl.
+	var band := Rect2(Vector2(40, viewport.y * 0.56), Vector2(viewport.x * 0.31, 104))
 	draw_colored_polygon(PackedVector2Array([
 		band.position + Vector2(10, 0), band.position + Vector2(band.size.x, 0),
 		band.position + band.size - Vector2(10, 0), band.position + Vector2(0, band.size.y),
