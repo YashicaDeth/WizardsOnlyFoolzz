@@ -161,6 +161,7 @@ const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 const SUBSTANCE_STATION := preload("res://systems/substance_station.gd")
 const FIELD_INVENTORY := preload("res://systems/field_inventory.gd")
 const CASE_MENU := preload("res://systems/case_menu.gd")
+const CONTACT_MENU := preload("res://systems/contact_menu.gd")
 const BRAIN_INDEX := preload("res://systems/brain_index.gd")
 
 var player := Vector3(0, 1.5, 19)
@@ -632,6 +633,7 @@ var world_index: Control
 ## route into inventory during ordinary play.
 var field_inventory: FieldInventory
 var case_menu: CaseMenu
+var contact_menu: ContactMenu
 ## L. The Board was built across twenty-odd segments and instantiated only in
 ## tests — there has never been a key that opens it, which is why Greg could not
 ## remember how to reach it. There is one now.
@@ -1038,6 +1040,10 @@ func _ready() -> void:
 	case_menu.name = "CaseMenu"
 	$HUD.add_child(case_menu)
 	case_menu.close_requested.connect(_toggle_cases)
+	contact_menu = CONTACT_MENU.new()
+	contact_menu.name = "ContactMenu"
+	$HUD.add_child(contact_menu)
+	contact_menu.close_requested.connect(_toggle_contact)
 	_spawn_friend()
 	# AE.1. The captain is still spawned exactly as she always was, and this
 	# runs alongside her rather than instead of her or through her. The order
@@ -1411,6 +1417,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if panel_mode == "cases" and case_menu != null and case_menu.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
+	if panel_mode == "contact" and contact_menu != null and contact_menu.handle_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	# Full-size readers own their navigation keys. LivingMap is a Control, but it
 	# does not take keyboard focus merely by becoming visible; without this route
 	# L fell through to the field's Black Mirror lens and appeared to turn the
@@ -1594,10 +1603,20 @@ func _unhandled_input(event: InputEvent) -> void:
 					_toggle_panel("index")
 			KEY_M: _toggle_panel("map")
 			KEY_T: _toggle_panel("tree")
-			KEY_J: _toggle_artwork()
+			# Greg: *"j shouldent be anything if anything j should be the
+			# inventory button not just this other button for nothing"*. J sat
+			# next to the movement hand on a panel nobody reaches for, while the
+			# bag -- the screen you open constantly -- was over on O. O still
+			# works; this is the one under your fingers.
+			KEY_J: _toggle_inventory()
+			# Moved rather than dropped. Every letter on the board is already
+			# spoken for, so the artwork goes to the function row with the other
+			# panels rather than losing its only way in.
+			KEY_F9: _toggle_artwork()
 			KEY_P: _toggle_panel("board")
 			KEY_O: _toggle_inventory()
 			KEY_U: _toggle_cases()
+			KEY_F8: _toggle_contact()
 			# Agent 1 brief. The Black Mirror as a lens, not just a shutter — N
 			# still snaps a photo instantly, unchanged; L holds the view amplified
 			# so looking through it is a real choice you can hold rather than a
@@ -6930,6 +6949,7 @@ func _build_keys_card() -> void:
 		{"group": "WHAT YOU CARRY", "rows": [
 			["O", "FIELD INVENTORY / BODY / LOOT"],
 			["U", "DEAD CLOUD EXCHANGE // CASES"],
+			["F8", "CONTACT // PEOPLE, ENTITIES, MATERIA"],
 			["G", "RAISE / LOWER BLACK MIRROR"],
 			["TAB", "INDEX / NEXT DEVICE APP"],
 			["CLICK / F1-F7", "SELECT DEVICE APP"],
@@ -7021,6 +7041,7 @@ func _toggle_panel(mode: String) -> void:
 	var covering: bool = living_map.visible or world_index.visible or pin_board.visible
 	covering = covering or (field_inventory != null and field_inventory.visible)
 	covering = covering or (case_menu != null and case_menu.visible)
+	covering = covering or (contact_menu != null and contact_menu.visible)
 	prompt.visible = not covering
 	# The old ArchivePanel is dead. It was a Label in a box and it is exactly
 	# what "no more of this tutorial look" was about.
@@ -7045,6 +7066,8 @@ func _close_panel_views() -> void:
 		field_inventory.close_inventory()
 	if case_menu != null:
 		case_menu.close_menu()
+	if contact_menu != null:
+		contact_menu.close_menu()
 	if world_index.visible:
 		world_index.close()
 		world_index.visible = false
@@ -7094,6 +7117,31 @@ func _toggle_cases() -> void:
 			_pointer.visible = true
 	else:
 		case_menu.close_menu()
+		panel_mode = ""
+		prompt.visible = true
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if _pointer != null and is_instance_valid(_pointer):
+			_pointer.visible = false
+
+
+## Who you carry and what noticed you, on F8. Same mutual exclusion as every
+## other full-size reader; the index owns every rule this surface shows.
+func _toggle_contact() -> void:
+	var opening := panel_mode != "contact"
+	if opening:
+		firearm_aiming = false
+		if handheld.is_open:
+			handheld.close_device()
+		keys_card.close()
+		_close_panel_views()
+		panel_mode = "contact"
+		contact_menu.open_menu()
+		prompt.visible = false
+		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
+		if _pointer != null and is_instance_valid(_pointer):
+			_pointer.visible = true
+	else:
+		contact_menu.close_menu()
 		panel_mode = ""
 		prompt.visible = true
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
