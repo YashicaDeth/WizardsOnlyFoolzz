@@ -148,11 +148,24 @@ people read instead of looking.
 - "Nothing anywhere uses a `MultiMesh`" is no longer true: `LabDressing` puts
   1829 instances of Lower Works detail into 12 batches and is the worked
   example to copy. The districts themselves are still un-instanced.
-- **Script cost is the other half and nobody has attributed it.** `process` at
-  20ms is the ~25 `_update_*` calls in `bone_yard_hunt._physics_process`, and
-  which one is eating it is unknown. The same trick the perf probe used on
-  draw calls would find it in an afternoon. Nothing else on this list is worth
-  as much.
+- **Script cost is attributed now, and the answer was not what this file
+  said.** Run `game/tests/script_cost_probe.tscn` **windowed** to reproduce.
+  At 39.4 fps: `process` 19.49ms, `physics` 12.99ms, and all twenty-nine
+  instrumented `_update_*` calls together **6.20ms**. Deleting every one of
+  them would leave 13.29ms of a 19.49ms process frame untouched.
+
+  This file used to say "`process` at 20ms is the ~25 `_update_*` calls in
+  `bone_yard_hunt._physics_process`". That could never have been true:
+  `_physics_process` work is counted by `TIME_PHYSICS_PROCESS`, and
+  `bone_yard_hunt` has no `_process` at all. **The 20ms belongs to other
+  nodes' `_process` callbacks.** `BaselineHuman` has one and the hunt stands
+  a lot of bodies up, which is the first place to look.
+- Inside the 6.20ms that *is* script, three calls are 78% of it:
+  `_update_perception` 2.03ms, `_maintain_roamers` 1.54ms,
+  `_update_encounter_actors` 1.29ms. The other twenty-six share 1.34ms, most
+  of them under 100us -- a tail nobody needs to touch. Worth an afternoon
+  each, but only after the 13.29ms, which is twice as large as all of this
+  put together.
 
 ### Three tests that are not telling anybody anything
 
