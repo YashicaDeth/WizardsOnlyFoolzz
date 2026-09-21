@@ -58,6 +58,15 @@ func _ready() -> void:
 	check(mended > 0.0 and mended <= 1.0, "cloth comes back by repair (%.2f)" % mended)
 	check(GARMENT.mend(wardrobe, "torso", 99.0) == 1.0, "and never past whole — mending is not armour")
 
+	# --- shredding has a price ------------------------------------------------------
+	check(GARMENT.price_to_mend(GARMENT.fresh_wardrobe()) == 0, "whole cloth costs nothing to mend")
+	var torn := GARMENT.fresh_wardrobe()
+	GARMENT.resolve_hit(torn, "torso", 30.0, "cut")
+	GARMENT.resolve_hit(torn, "torso", 30.0, "cut")
+	var bill: int = GARMENT.price_to_mend(torn)
+	check(bill == GARMENT.MEND_PRICE_PER_FULL, "a breached jacket bills a full restore (%d scrip)" % bill)
+	check(GARMENT.price_to_mend({}) == 0, "and nakedness is not damage — nothing to mend, nothing billed")
+
 	# --- the rig wears it, tears it, stains it ---------------------------------------
 	var rig: BaselineHuman = HUMAN.new()
 	add_child(rig)

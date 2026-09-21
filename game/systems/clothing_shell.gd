@@ -84,6 +84,23 @@ static func mend(wardrobe: Dictionary, zone_id: String, amount: float) -> float:
 	return patched
 
 
+## What a tailor charges to make a wardrobe whole again, in rust scrip. Missing
+## zones are naked, not damaged — there is nothing to mend, so they price at
+## zero. This is the hook a vendor calls: it prices and `mend()` repairs, and
+## the wallet moves through the existing inventory pattern, which is where a
+## tailor belongs rather than in here. Who sells it and where is a content
+## decision, not a systems one.
+const MEND_PRICE_PER_FULL := 20
+
+
+static func price_to_mend(wardrobe: Dictionary) -> int:
+	var total := 0.0
+	for zone in ZONES:
+		if wardrobe.has(zone):
+			total += (1.0 - clampf(float(wardrobe.get(zone, 0.0)), 0.0, 1.0)) * MEND_PRICE_PER_FULL
+	return int(ceil(total))
+
+
 ## The garment mesh for a zone: its own flesh profile revolved one lift further
 ## out. Same silhouette language as the body under it, which is what makes a
 ## tear read as torn clothing rather than a second wound.
