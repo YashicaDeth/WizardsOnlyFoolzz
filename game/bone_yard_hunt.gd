@@ -685,6 +685,8 @@ const PERSPECTIVE_BLEND_RATE := 3.2
 var _unlock_feel_timer := 0.0
 var kill_cam: Control
 var voice_channel: Node
+var downed_talk: NPCConversationComponent = null
+var downed_brain: NPCOllamaBrain = null
 var arsenal: Node
 ## AU7.6/AU7.9. Six cycles through the five smokeables. RMB then belongs to a
 ## real held draw until it is released; selecting a weapon puts the object away.
@@ -973,6 +975,7 @@ func _ready() -> void:
 	add_child(voice_channel)
 	voice_channel.capture_finished.connect(_voice_captured)
 	voice_channel.capture_failed.connect(func(reason: String): resolution_ui.set_voice_state(reason))
+	_build_downed_talk()
 	_build_expanse_systems()
 	_register_people()
 	player_body = CharacterBody3D.new()
@@ -5814,6 +5817,58 @@ func _voice_capture(holding: bool) -> void:
 		voice_channel.finish()
 
 
+## One conversation component for whoever is being spoken to, rather than one
+## per actor: roamers spawn and are culled constantly, and a component on each
+## would be a brain and a speaker per body on the road. The relationship is
+## keyed by subject id inside `NPCRelationship`, so reconfiguring it for a
+## different person loses nothing.
+func _build_downed_talk() -> void:
+	downed_brain = NPCOllamaBrain.new({})
+	downed_talk = NPCConversationComponent.new()
+	downed_talk.name = "DownedTalk"
+	# The bubble is for overhearing somebody across a room. This NPC is on the
+	# floor in front of you and the resolution window is already showing their
+	# line, so a second copy floating over them is noise.
+	downed_talk.suppress_bubble = true
+	add_child(downed_talk)
+	downed_talk.answered.connect(_downed_answered)
+
+
+## Everything the model is allowed to know about the person on the floor. It is
+## what they could have come by honestly -- their own name, their own grudge,
+## what was done to them -- and nothing about the player's inventory, plans or
+## anything else section 4 keeps out of a prompt.
+func _downed_character(subject_id: String) -> Dictionary:
+	var subject := WorldHistory.subject(subject_id)
+	var rules: Array = [
+		"You are on the ground, badly hurt, and the person speaking to you is the one who put you there.",
+		"You cannot stand and you both know it. Do not pretend otherwise.",
+		"Two sentences at most. You are in no condition for a speech.",
+	]
+	if int(subject.get("grudge", 0)) >= 40:
+		rules.append("You know this voice and you hate it. Say so plainly rather than threatening at length.")
+	if _accepts_recruitment(subject):
+		rules.append("You would take an offer if one were made. You are not going to beg for it.")
+	return {
+		"name": str(subject.get("name", "UNKNOWN")),
+		"identity": "%s, downed on the road outside Ashbloom." % str(subject.get("name", "Someone")),
+		"voice": "Hurt, short of breath, and not giving anything away for free.",
+		"rules": rules,
+		"location": HUNT_LOCATION,
+	}
+
+
+## The model answered. The canned line already went up when the player spoke,
+## so this replaces it rather than arriving into silence.
+func _downed_answered(turn: Dictionary) -> void:
+	if not bool(turn.get("ok", false)) or str(turn.get("speech", "")).is_empty():
+		return
+	resolution_ui.set_voice_state(
+		"VOICE RECEIVED / %s" % ("SPOKEN" if bool(turn.get("from_model", false)) else "POSITIONAL REPLY"),
+		1.0, str(turn.get("speech", "")),
+	)
+
+
 func _voice_captured(subject_id: String, result: Dictionary) -> void:
 	var actor := _actor_by_id(subject_id)
 	if actor.is_empty() or not bool(result.get("sent", false)):
@@ -5823,6 +5878,24 @@ func _voice_captured(subject_id: String, result: Dictionary) -> void:
 	var reply := "You have my attention. Make the offer." if _accepts_recruitment(subject) else "I heard you. It changes nothing yet."
 	if int(subject.get("grudge", 0)) >= 40:
 		reply = "I know your voice. I still hate you."
+	# The three lines above are now the floor, not the ceiling. They go up
+	# immediately so the player is never answered by silence, and a model-written
+	# line replaces them a second later through `answered` if one arrives.
+	#
+	# `ProximityVoice` captures level and duration only -- there is no recogniser
+	# on this path, so there is no transcript of what the player actually said.
+	# What the NPC is answering is the fact of being spoken to while down, which
+	# is real, and the prompt carries their own grudge and history. Moving vosk
+	# onto this path is what would make it a conversation rather than a reply.
+	if downed_talk != null and is_instance_valid(downed_talk):
+		downed_talk.global_position = actor.node.global_position
+		# Reconfigured only when the person changes. `configure()` rebuilds the
+		# component's speech bubble, so calling it for every sentence spoken to
+		# the same body would leave a Label3D behind each time.
+		if downed_talk.npc_id != subject_id:
+			downed_brain.character = _downed_character(subject_id)
+			downed_talk.configure(subject_id, downed_brain.character, player_body, downed_brain)
+		downed_talk.hear("[the Hunter stands over you and speaks to you]")
 	WorldHistory.begin_ledger_batch()
 	var contact := PLAYER_ACTION_LEDGER.record("proximity_voice_addressed", {"speaker": "player", "listener": subject_id, "duration": result.duration, "location": HUNT_LOCATION, "raw_audio_saved": false})
 	WorldHistory.amend_subject(subject_id, {"last_voice_contact": int(contact.get("sequence", WorldHistory.event_count())), "memory": "The Hunter spoke to me while I was downed."})
