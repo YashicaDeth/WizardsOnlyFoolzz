@@ -75,6 +75,23 @@ func _ready() -> void:
 	check(not organs.has("brain"), "opening a chest does not expose a brain")
 	check(not Cavity.is_open(rig, "head"), "and the head is still shut")
 
+	print("-- a limb is opened once, not once per implant --")
+	# Implants live in arms and legs (`implant_catalog.gd`), and no organ does.
+	# `is_open` used to answer purely by looking for a visible organ, so a limb
+	# could never report open, and `_finish_extraction` cut a fresh wall off it
+	# for every implant robbed out of it -- the arm got shorter each time.
+	var limb := rig.parts.left_arm as MeshInstance3D
+	var limb_faces := triangles_in(limb.mesh)
+	var first_dig := Cavity.open_zone(rig, "left_arm", -limb.global_transform.basis.z)
+	check(not first_dig.is_empty(), "an arm opens for the hardware in it")
+	check(triangles_in(limb.mesh) != limb_faces, "and the arm on the body is not the mesh it was")
+	check(Cavity.is_open(rig, "left_arm"), "a limb with no organ in it still reports open")
+	var opened_faces := triangles_in(limb.mesh)
+	var second_dig := Cavity.open_zone(rig, "left_arm", -limb.global_transform.basis.z)
+	check(second_dig.is_empty(), "a second dig into the same arm is refused")
+	check(triangles_in(limb.mesh) == opened_faces, "so robbing two implants out of one arm does not whittle it away")
+	check(not Cavity.is_open(rig, "right_arm"), "and the other arm is still shut")
+
 	print("-- a cut that finds nothing changes nothing --")
 	var arm := rig.parts.right_arm as MeshInstance3D
 	var arm_before := triangles_in(arm.mesh)
