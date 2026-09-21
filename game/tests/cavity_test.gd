@@ -86,10 +86,10 @@ func _ready() -> void:
 	check(not first_dig.is_empty(), "an arm opens for the hardware in it")
 	check(triangles_in(limb.mesh) != limb_faces, "and the arm on the body is not the mesh it was")
 	check(Cavity.is_open(rig, "left_arm"), "a limb with no organ in it still reports open")
-	var opened_faces := triangles_in(limb.mesh)
+	var limb_opened_faces := triangles_in(limb.mesh)
 	var second_dig := Cavity.open_zone(rig, "left_arm", -limb.global_transform.basis.z)
 	check(second_dig.is_empty(), "a second dig into the same arm is refused")
-	check(triangles_in(limb.mesh) == opened_faces, "so robbing two implants out of one arm does not whittle it away")
+	check(triangles_in(limb.mesh) == limb_opened_faces, "so robbing two implants out of one arm does not whittle it away")
 	check(not Cavity.is_open(rig, "right_arm"), "and the other arm is still shut")
 
 	print("-- a cut that finds nothing changes nothing --")

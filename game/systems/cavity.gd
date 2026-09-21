@@ -31,6 +31,18 @@ const WALL_DEPTH := 0.055
 ## than a body that has been opened.
 const MIN_OPENING_AREA := 0.0015
 
+## Openness is recorded on the part, not inferred from a visible organ.
+##
+## Inference only ever answered correctly for the two zones that have organs in
+## them. `implant_catalog.gd` puts hardware in arms and legs, `ORGAN_LAYOUT`
+## puts nothing there, so a limb reported shut however far it had been opened --
+## and `_finish_extraction` cut a fresh wall off it for every implant robbed out
+## of it. Two implants out of one arm and the arm was visibly shorter.
+##
+## Metadata rather than a marker child, because sibling nodes that share a name
+## are not the same node and a name lookup finds only the first.
+const OPEN_MARK := &"cavity_open"
+
 
 ## Cut the wall off a part, leaving it open.
 ##
@@ -87,10 +99,16 @@ static func open_zone(rig: Node, zone_id: String, facing: Vector3) -> Dictionary
 	var part := parts.get(zone_id) as MeshInstance3D
 	if part == null or not is_instance_valid(part):
 		return {}
+	# A body is opened once. A second cut is taken from the middle of what the
+	# first one left, so it does not re-open the same hole -- it takes another
+	# slab off and hands back a smaller body than it was given.
+	if is_open(rig, zone_id):
+		return {}
 	var cut := open(part, facing)
 	if cut.is_empty() or cut.opened == null:
 		return {}
 	part.mesh = cut.opened
+	part.set_meta(OPEN_MARK, true)
 	var revealed := _reveal_organs(rig, zone_id)
 	cut["organs"] = revealed
 	cut["zone"] = zone_id
@@ -121,6 +139,13 @@ static func _reveal_organs(rig: Node, zone_id: String) -> Array:
 static func is_open(rig: Node, zone_id: String) -> bool:
 	if rig == null or not is_instance_valid(rig):
 		return false
+	var parts: Dictionary = rig.get("parts") if "parts" in rig else {}
+	var part := parts.get(zone_id) as Node3D
+	if part != null and is_instance_valid(part) and bool(part.get_meta(OPEN_MARK, false)):
+		return true
+	# A visible organ still counts, because the layer-exposure path opens a
+	# chest without ever coming through here. It is the fallback rather than the
+	# answer: only two zones own an organ, so it cannot speak for a limb.
 	var organ_parts: Dictionary = rig.get("organ_parts") if "organ_parts" in rig else {}
 	for organ_id in BaselineHuman.ORGAN_LAYOUT:
 		if str((BaselineHuman.ORGAN_LAYOUT[organ_id] as Dictionary).get("zone", "")) != zone_id:
