@@ -40,7 +40,21 @@ static func revolve(rings: Array, segments: int = SEGMENTS) -> ArrayMesh:
 	# Cap both ends so a severed limb is not a hollow tube when you look into it.
 	_cap(surface, rings[0], segments, true)
 	_cap(surface, rings[rings.size() - 1], segments, false)
+	# Welded before the normals are generated and unwelded after.
+	#
+	# `generate_normals()` averages across vertices that share a position, and
+	# `_tri()` emits three fresh vertices per triangle, so nothing shared one
+	# and every face got its own flat normal. A sixteen-sided revolve shaded
+	# that way reads as faceted -- Greg: bodies with "square bodies" -- even
+	# though the silhouette underneath is perfectly round. Indexing merges the
+	# seams so the normals average into a smooth surface.
+	#
+	# `deindex()` puts it back to the un-indexed triangle soup it was, because
+	# `BodySlice` walks these meshes to cut them and this is not the commit to
+	# change the topology it walks. Only the normals are different.
+	surface.index()
 	surface.generate_normals()
+	surface.deindex()
 	return surface.commit()
 
 

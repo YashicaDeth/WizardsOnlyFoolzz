@@ -73,6 +73,7 @@ const SKULL_BURST := preload("res://systems/skull_burst.gd")
 const CAVITY := preload("res://systems/cavity.gd")
 const KILL_SHOT := preload("res://systems/kill_shot.gd")
 const KILL_CAM := preload("res://systems/kill_cam.gd")
+const LIMB_MOMENTUM := preload("res://systems/limb_momentum.gd")
 
 const BODY_COUNT := 7
 const ARENA := 26.0
@@ -141,6 +142,24 @@ var ballistics: Node3D
 var impact_feel: Node
 var hud: Control
 var kill_cam: KillCam
+
+## The arm the sword is on. The Hunt has had one since AN1 and the range never
+## did, which is why a swing here landed square across a limb whatever it was
+## doing while the Hunt cut at the angle it was swung at. Same arm now, so the
+## range is where you can actually learn what a blade does.
+var arm: LimbMomentum
+## Mouse movement since the last physics frame, which is what moves the arm.
+## Accumulated rather than read live, because input and physics do not tick
+## together and a swing built from one frame of mouse is not a swing.
+var _look_delta := Vector2.ZERO
+var guarding := false
+var guard_aim := Vector2.ZERO
+var guard_held := 0.0
+var swing_released_side := ""
+var third_person := false
+var last_read: Dictionary = {}
+var pending_melee: Dictionary = {}
+var melee_windup := -1.0
 
 var yaw := 0.0
 var pitch := -0.12
@@ -250,6 +269,9 @@ func _ready() -> void:
 	ballistics.round_expired.connect(_on_round_expired)
 	arsenal = HunterArsenal.new()
 	add_child(arsenal)
+	# The arm exists before the first swing does, same as AN1.2 in the Hunt.
+	arm = LIMB_MOMENTUM.new()
+	arm.carry(1.4, 0.55)
 	# Starts on the sidearm — the same weapon the range always opened on before
 	# AF6, so nobody's muscle memory for "LMB shoots a pistol" breaks. Switching
 	# away from it is the new part, not the default.
@@ -457,6 +479,9 @@ func _spawn_body(index: int) -> void:
 		"motion": motion,
 		"id": "demo_body_%d" % index,
 		"attack_ready": 0.35 + float(index) * 0.12,
+		"guard": BladeRead.SIDES[index % BladeRead.SIDES.size()],
+		"guard_age": 1.0,
+		"guard_hold": 1.4 + float(index % 4) * 0.4,
 	})
 
 
@@ -676,22 +701,108 @@ func _fire_launcher() -> void:
 ## blast's own crosshair targeting) rather than growing a second raycast path,
 ## the only new part is holding the hit to the weapon's own `reach` instead of
 ## the blast's much longer `TRACE_RANGE`.
+## Which way the player guard is held right now, from the mouse.
+func _player_guard() -> String:
+	if not guarding:
+		return ""
+	var side := BladeRead.guard_side(guard_aim)
+	# Neutral until the mouse says otherwise, rather than snapping to whatever
+	# the first pixel of drift happened to be.
+	return side if not side.is_empty() else BladeRead.HIGH
+
+
+## The dummies hold a guard and change it, which is the only way the read is
+## worth anything: a target with no guard means every swing lands and there is
+## nothing to learn. Posed through `CombatStance` so what they are holding is
+## visible on the body rather than only true in a variable.
+func _update_dummy_guards(real_delta: float) -> void:
+	for entry: Dictionary in bodies:
+		var rig := entry.get("rig") as BaselineHuman
+		if rig == null or not is_instance_valid(rig) or rig.anatomy.dead:
+			continue
+		var age := float(entry.get("guard_age", 0.0)) + real_delta
+		var side := str(entry.get("guard", ""))
+		if side.is_empty() or age > float(entry.get("guard_hold", 2.0)):
+			side = BladeRead.SIDES[randi() % BladeRead.SIDES.size()]
+			age = 0.0
+			entry["guard_hold"] = randf_range(1.4, 3.2)
+		entry["guard"] = side
+		entry["guard_age"] = age
+		var motion := entry.get("motion") as HunterBodyMotion
+		if motion != null and is_instance_valid(motion):
+			motion.set_guard(BladeRead.guard_height(side))
+			motion.set_lean(BladeRead.guard_lean(side))
+
+
 func _melee_swing() -> void:
+	if not pending_melee.is_empty():
+		_note("RECOVER THE BLADE")
+		return
 	var attack: Dictionary = arsenal.begin_attack()
 	if not bool(attack.get("accepted", false)):
 		return
 	_gear_recoil = 1.0
+	swing_released_side = BladeRead.swing_side(arm.velocity)
+	attack["released_side"] = swing_released_side
+	pending_melee = attack
+	melee_windup = maxf(0.01, float(attack.get("windup", 0.12)))
+
+
+## Contact resolves after the weapon's real wind-up. Mouse motion received in
+## that interval continues to drive LimbMomentum, so first-person contact can
+## differ from release (a drag); lock-style third person keeps the release read.
+func _resolve_melee_swing() -> void:
+	var attack := pending_melee
+	pending_melee = {}
+	melee_windup = -1.0
+	if attack.is_empty():
+		return
 	var along := -camera.global_transform.basis.z
 	var start := camera.global_position + along * 0.6
 	var reach := float(attack.get("range", 3.0))
 	var found := _trace_body(start, along)
+	var released_side := str(attack.get("released_side", ""))
 	if found.is_empty() or camera.global_position.distance_to(found.get("position", start)) > reach:
-		_note("MISS")
+		# A miss carries through and has to be caught, which is why whiffing a
+		# committed swing is a real cost rather than a free probe.
+		arm.whiff()
+		_note("MISS // %s" % released_side.to_upper() if not released_side.is_empty() else "MISS")
 		return
 	var rig: BaselineHuman = found["rig"]
 	var zone: String = found["zone"]
 	var damage_type := str(attack.get("damage_type", "cut"))
-	var result: Dictionary = rig.hit(zone, float(attack.get("damage", 0.0)), float(attack.get("impulse", 0.0)), damage_type, "", along)
+	var landed: Vector3 = found.get("position", start)
+
+	# Which way this swing is going, off the arm rather than off the camera.
+	# In first person that is read here, at contact, so the mouse is still
+	# steering and a drag lands where it was dragged to. In third person the
+	# direction was locked when it was released and the player is wearing it.
+	var contact_side := BladeRead.swing_side(arm.velocity)
+	var side := BladeRead.committed_side(released_side, contact_side, not third_person)
+	var defender := _entry_for(rig)
+	var read: Dictionary = BladeRead.resolve(
+		str(defender.get("guard", "")), float(defender.get("guard_age", 99.0)), side, arm.head_speed())
+	last_read = {"swing": side, "guard": str(defender.get("guard", "")), "outcome": str(read.get("outcome", "none"))}
+	var through := float(read.get("through", 1.0))
+	if str(read.outcome) == "parry":
+		# Turned. The arm takes the whole of its own commitment back.
+		arm.strike(1.0, -along)
+		_kick(1.0, "cut", false, HITSTOP_SHOT)
+		var defender_motion := defender.get("motion") as HunterBodyMotion
+		if defender_motion != null and is_instance_valid(defender_motion):
+			defender_motion.trigger_parry()
+		_note("PARRIED // %s MET %s" % [str(read.guard).to_upper(), side.to_upper()])
+		return
+	if str(read.outcome) == "block":
+		_note("BLOCKED // %s" % side.to_upper())
+
+	# The cut lands on the plane the edge actually swept, which is what makes
+	# an overhead and a level slash take an arm off along different lines.
+	var commitment := arm.commitment()
+	var earned_damage := float(attack.get("damage", 0.0)) * lerpf(0.35, 1.35, commitment)
+	var result: Dictionary = rig.hit_at(
+		landed, earned_damage * through, float(attack.get("impulse", 0.0)) * through,
+		damage_type, along, -1.0, arm.cut_plane(camera.global_transform.basis, landed))
 	if not bool(result.get("accepted", true)):
 		_note("%s ALREADY GONE" % _spoken(zone))
 		return
@@ -700,7 +811,26 @@ func _melee_swing() -> void:
 	if off:
 		severed_total += 1
 	_kick(0.9, damage_type, off, HITSTOP_SHOT)
-	_note("%s OFF" % _spoken(zone) if off else "HIT // %s" % _spoken(zone))
+	arm.strike(_melee_bite(off), -along)
+	var defender_hit := defender.get("motion") as HunterBodyMotion
+	if defender_hit != null and is_instance_valid(defender_hit):
+		defender_hit.trigger_stagger(rig.to_local(camera.global_position), 1.0 if off else 0.6)
+	_note("%s OFF // %s" % [_spoken(zone), side.to_upper()] if off else "HIT // %s // %s" % [_spoken(zone), side.to_upper()])
+	_try_finisher(rig, str(arsenal.current_id), zone, along, float(result.get("damage", 0.0)), damage_type)
+
+
+## How hard the blade is stopped. Taking a limb off is barely stopped at all;
+## meeting one that stays on is what jars the arm.
+func _melee_bite(severed: bool) -> float:
+	return 0.25 if severed else 0.75
+
+
+## The bodies entry for a rig, so a swing can ask what its target was holding.
+func _entry_for(rig: BaselineHuman) -> Dictionary:
+	for entry: Dictionary in bodies:
+		if entry.get("rig") == rig:
+			return entry
+	return {}
 
 
 ## Where a round of this scene's ended up, on the frame it actually got there.
@@ -1114,7 +1244,15 @@ func _advance_shot_feel(real_delta: float) -> void:
 
 	if view_gear != null and is_instance_valid(view_gear):
 		_gear_recoil = maxf(0.0, _gear_recoil - real_delta * GEAR_RETURN)
-		view_gear.position = _gear_rest + Vector3(0.0, 0.006, GEAR_RECOIL) * _gear_recoil
+		var recoil := Vector3(0.0, 0.006, GEAR_RECOIL) * _gear_recoil
+		if arm != null and arsenal != null and str(arsenal.current().get("kind", "")) == "melee":
+			# The visible sword follows the same spring-driven hand that decides
+			# speed, direction and cut plane; it is not a disconnected recoil prop.
+			view_gear.position = _gear_rest + (arm.at - arm.anchor) + recoil
+			view_gear.rotation = Vector3(arm.tilt.x, arm.tilt.y, 0.0)
+		else:
+			view_gear.position = _gear_rest + recoil
+			view_gear.rotation = Vector3.ZERO
 
 	if ballistics == null or not is_instance_valid(ballistics):
 		return
@@ -1148,7 +1286,11 @@ func _cut() -> void:
 		return
 	var rig := found["rig"] as BaselineHuman
 	var zone := str(found["zone"])
-	var result := rig.hit(zone, 58.0, 72.0, "cut", "", along)
+	var landed: Vector3 = found.get("position", rig.global_position)
+	var plane: Variant = null
+	if arm != null and arm.head_speed() > LimbMomentum.IDLE_SPEED:
+		plane = arm.cut_plane(camera.global_transform.basis, landed)
+	var result := rig.hit_at(landed, 58.0, 72.0, "cut", along, -1.0, plane)
 	if not bool(result.get("accepted", true)):
 		_note("%s ALREADY GONE" % _spoken(zone))
 		return
@@ -1255,8 +1397,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var motion := event as InputEventMouseMotion
-		yaw -= motion.relative.x * 0.0026
-		pitch = clampf(pitch - motion.relative.y * 0.0024, -1.2, 0.9)
+		var turn := Vector2(motion.relative.x * 0.0026, motion.relative.y * 0.0024)
+		yaw -= turn.x
+		pitch = clampf(pitch - turn.y, -1.2, 0.9)
+		# The same movement that turns the head swings the blade. This is the
+		# whole of the Mordhau input model and it costs one line, because
+		# `LimbMomentum.advance()` has always taken a look delta.
+		_look_delta += turn
+		if guarding:
+			guard_aim += motion.relative
 	if event is InputEventMouseButton:
 		var click := event as InputEventMouseButton
 		if click.button_index == MOUSE_BUTTON_LEFT and click.pressed:
@@ -1272,8 +1421,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif click.button_index == MOUSE_BUTTON_RIGHT:
 			if launcher_equipped or str(arsenal.current().get("kind", "")) == "firearm":
 				firearm_aiming = click.pressed
-			elif click.pressed:
-				_melee_swing()
+			else:
+				# Held, and the mouse picks the side while it is held. Right
+				# was the melee swing before; swinging belongs on left with
+				# everything else that attacks, and a blade needs the other
+				# button for the half of a sword fight that is not attacking.
+				guarding = click.pressed
+				guard_aim = Vector2.ZERO
+				guard_held = 0.0
+				if not click.pressed:
+					_note("GUARD DOWN")
 		elif click.pressed and (click.button_index == MOUSE_BUTTON_WHEEL_UP or click.button_index == MOUSE_BUTTON_WHEEL_DOWN):
 			# AF6.1. Cycling rather than reserving three more number keys, since
 			# 1-4 already belong to the carry/substance slots and doubling a key
@@ -1309,6 +1466,11 @@ func _unhandled_input(event: InputEvent) -> void:
 					jump_queued = true
 			KEY_E: _take_station_item()
 			KEY_F: _open_nearest_body()
+			KEY_V:
+				third_person = not third_person
+				# The registers differ in when the swing direction is read, so
+				# say which one is running rather than leaving it to be felt.
+				_note("THIRD PERSON // COMMITTED SWINGS" if third_person else "FIRST PERSON // DRAG YOUR SWINGS")
 			KEY_G:
 				if handheld != null:
 					handheld.toggle_device()
@@ -1636,6 +1798,20 @@ func _physics_process(delta: float) -> void:
 	var move := _sandbox_move_input()
 	var move_speed := 7.0 * (0.68 if firearm_aiming else 1.0)
 	walk = walk.lerp(move * move_speed, clampf(real_delta * 14.0, 0.0, 1.0))
+	# The arm and guard run in real seconds: sandbox slow motion bends the world,
+	# not the player's input. The delta is already radians, matching the Hunt.
+	if arm != null:
+		var forward := Vector3(sin(yaw), 0.0, cos(yaw))
+		var right := Vector3(forward.z, 0.0, -forward.x)
+		arm.advance(real_delta, _look_delta, Vector3(walk.dot(right), walk.y, -walk.dot(forward)))
+		_look_delta = Vector2.ZERO
+	if guarding:
+		guard_held += real_delta
+	_update_dummy_guards(real_delta)
+	if melee_windup >= 0.0:
+		melee_windup -= real_delta
+		if melee_windup < 0.0:
+			_resolve_melee_swing()
 	if dodge_remaining > 0.0:
 		eye += dodge_direction * 16.0 * real_delta
 	else:
@@ -1870,6 +2046,7 @@ func _paint_hud() -> void:
 			["SPACE", "JUMP/MOVE+DODGE"], ["C", "GRAPPLE/LET GO"], ["H", "DUMMY/ENEMY"],
 			["6-8", "MELEE/FIREARMS"], ["9", "BREACH LAUNCHER"], ["WHEEL", "CYCLE"], ["T", "RELOAD"],
 			["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"], ["F", "OPEN BODY"],
+			["RMB", "GUARD (MOUSE PICKS SIDE)"], ["V", "1ST/3RD PERSON"],
 			["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["CTRL", "CROUCH"], ["F1", "LESS CONTROLS"],
 		]
 	var row_size := 3 if compact and not controls_expanded else (7 if controls_expanded else 4)
