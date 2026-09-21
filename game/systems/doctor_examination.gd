@@ -65,11 +65,17 @@ const OBSERVATIONS := {
 ## AX2.1. What he says before he leaves, and the whole reason the examination
 ## is not a menu: he tells the player what it was for. He does not gloat. He
 ## explains, because explaining is worse.
+## Held tight on purpose. The verdict is the longest stretch in the opening
+## where the player cannot act, and it now has the examiner's walk to the door
+## after it rather than the vat failing under him. At the old holds the two
+## together ran the route to 26 seconds from one keypress, which
+## `opening_handoff_test` is right to refuse. Same four sentences, less waiting
+## between them.
 const VERDICT_CLOSE := [
-	{"line": "That is the examination. Thank you — I mean that.", "hold": 3.0},
-	{"line": "You have told me how you are put together.", "hold": 3.0},
-	{"line": "Which means you have told me how to take you apart.", "hold": 3.6},
-	{"line": "Someone will be along. It will not be me.", "hold": 3.2},
+	{"line": "That is the examination. Thank you — I mean that.", "hold": 2.6},
+	{"line": "You have told me how you are put together.", "hold": 2.6},
+	{"line": "Which means you have told me how to take you apart.", "hold": 3.0},
+	{"line": "Someone will be along. It will not be me.", "hold": 2.8},
 ]
 
 ## He records it without asking. The notice is on screen for the player, not

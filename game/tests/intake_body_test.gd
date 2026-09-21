@@ -56,6 +56,32 @@ func _ready() -> void:
 	var heavy := BASELINE_HUMAN.config_from_subject({"race": "decanted", "appearance": {"build": 1.0}, "anatomy": {}})
 	check(float(compact.get("build", 0.0)) < float(heavy.get("build", 0.0)), "the stored BUILD setting changes the eventual world rig")
 
+	# AX1.4. ANATOMY was the last row on the form that changed nothing a player
+	# could see: the sheet held it, the page drew it back, presets saved it, and
+	# no renderer ever read it. The brief is explicit that a control which does
+	# not change anything must be removed rather than pretended at, so this is
+	# the check that keeps it earning its place on the page.
+	var female := BASELINE_HUMAN.config_from_subject({"race": "decanted", "anatomy_sex": "female", "anatomy": {}})
+	var male := BASELINE_HUMAN.config_from_subject({"race": "decanted", "anatomy_sex": "male", "anatomy": {}})
+	var unformed := BASELINE_HUMAN.config_from_subject({"race": "decanted", "anatomy_sex": "unformed", "anatomy": {}})
+	check(float(female.get("frame", -1.0)) < float(male.get("frame", -1.0)), "BODY/ANATOMY reaches the rig as a real frame value")
+	check(is_equal_approx(float(unformed.get("frame", -1.0)), 0.5), "UNFORMED is the neutral silhouette, not a fifth invented shape")
+	var narrow := BASELINE_HUMAN.new()
+	var broad := BASELINE_HUMAN.new()
+	add_child(narrow)
+	add_child(broad)
+	narrow.build("anatomy_narrow", {"gore": false, "frame": 0.0})
+	broad.build("anatomy_broad", {"gore": false, "frame": 1.0})
+	var narrow_torso: Vector3 = (narrow._layout.torso as Dictionary).size
+	var broad_torso: Vector3 = (broad._layout.torso as Dictionary).size
+	var narrow_leg: Vector3 = (narrow._layout.left_leg as Dictionary).size
+	var broad_leg: Vector3 = (broad._layout.left_leg as Dictionary).size
+	check(narrow_torso.x < broad_torso.x, "a narrow frame builds narrower shoulders (%.3f < %.3f)" % [narrow_torso.x, broad_torso.x])
+	check(narrow_leg.x > broad_leg.x, "...and wider hips on the same body (%.3f > %.3f)" % [narrow_leg.x, broad_leg.x])
+	check(is_equal_approx(narrow_torso.y, broad_torso.y), "frame moves width only - it never changes how tall the body is")
+	narrow.queue_free()
+	broad.queue_free()
+
 	intake.sheet.race = "roadborn"
 	intake.sheet.under_skin["skeleton"] = "plated"
 	var rigid: Dictionary = intake._mirror_distortion()

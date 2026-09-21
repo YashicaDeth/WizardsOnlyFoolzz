@@ -54,6 +54,21 @@ var breakout_complete := false
 var first_acquisition_complete := false
 var objective_text := "ESCAPE THE FACILITY"
 
+## The examination has to end before the escape begins. Filing used to drop
+## the player straight into "voiding" with the examiner still standing at his
+## terminal, so the objective arrived while the man who put you in the tank
+## was watching you leave it. He now walks out of his own staff door and shuts
+## it, and only then does the vat fail.
+var examiner_node: Node3D
+var staff_door_panel: Node3D
+var departure_clock := 0.0
+var departure_line := -1
+## Set into the right-hand wall level with the workstation, so he leaves the
+## way staff leave rather than walking the player's escape route. It is not the
+## pit door at the far end and it is never openable by the player.
+const STAFF_DOOR_AT := Vector3(6.95, 0.0, -2.49)
+const DEPARTURE_SECONDS := 4.4
+
 ## AX3.1/AX3.6. The Growing Floor's first two objects: the broken restraint
 ## granted at the breach is inert cargo until the player actually does
 ## something with it. This is the something — a jammed failure-tank the
@@ -75,12 +90,23 @@ var inspect_held := false
 const BEATS := [
 	{"at": 0.8, "text": "AIRWAY OBSTRUCTED  //  FOREIGN TUBE"},
 	{"at": 3.2, "text": "TANK 0C-7  //  CYCLE ABORTED  //  VOIDING"},
-	{"at": 5.8, "text": "HANDLER: \"Decant is stable. Rack them for the heat.\""},
-	{"at": 7.4, "text": "HANDLER: \"Debt's in the meat. CellOutz owns what it grew.\""},
-	# K3.2. "The opening reframed: CellOutz grew you, which is why the debt is
-	# in the meat" — DESIGN/COSMOLOGY.md. It is one attributed sentence now,
-	# rather than two lore lines racing each other while the player is helpless.
-	{"at": 9.0, "text": "OBJECTIVE  //  ESCAPE THE FACILITY"},
+	# The two HANDLER lines that used to sit at 5.8 and 7.4 have moved into
+	# DEPARTURE_BEATS. He says them on his way out, which is the only time he
+	# is still in the room: the vat does not fail until the door shuts behind
+	# him. What is left here is the tank talking, not a person.
+	#
+	# There was a fifth beat that printed "OBJECTIVE // ESCAPE THE FACILITY"
+	# across the middle of the screen while `$HUD/Objective` printed the same
+	# words in the corner. One objective, one place: the HUD label.
+]
+
+## K3.2. "The opening reframed: CellOutz grew you, which is why the debt is in
+## the meat" — DESIGN/COSMOLOGY.md. Sparse and played, not a cutscene: he files,
+## says two sentences to nobody in particular, and leaves.
+const DEPARTURE_BEATS := [
+	{"at": 0.25, "text": "EXAMINER: \"Decant is stable. Rack them for the heat.\""},
+	{"at": 2.05, "text": "EXAMINER: \"Debt's in the meat. CellOutz owns what it grew.\""},
+	{"at": 3.95, "text": "STAFF DOOR  //  SEALED"},
 ]
 
 @onready var subtitle: Label = $HUD/Subtitle
@@ -135,7 +161,12 @@ func _on_intake_filed(_state: Dictionary) -> void:
 	WorldHistory.register_subject("inventory", {"kind": "inventory", "items": []})
 	clock = 0.0
 	line_index = -1
-	phase = "submerged"
+	# The examination ends before the escape begins. Filing used to set
+	# "submerged" here, so the vat started failing while the man who filed the
+	# form was still standing at his terminal watching it happen.
+	departure_clock = 0.0
+	departure_line = -1
+	phase = "departure"
 	# AP1.3/P10.5. Filing has already written the chosen anatomy by the time this
 	# signal arrives. Install the real head hardware now, while the player is
 	# still captured and before the wake event, so the sheet cannot overwrite it
@@ -185,7 +216,11 @@ func _umbilical(index: int) -> Node3D:
 	add_child(root)
 	var angle := TAU * float(index) / 4.0 + 0.4
 	var anchor := VAT_POSITION + Vector3(cos(angle) * 0.62, 3.05, sin(angle) * 0.62)
-	var target := VAT_POSITION + Vector3(cos(angle) * 0.16, 1.45, sin(angle) * 0.16)
+	# The inner end used to stop 0.16m from an 88-degree lens, which put two
+	# 5cm flesh spheres across a third of the opening frame and hid the room
+	# the player is supposed to be reading. The cables now land on the torso,
+	# below the eyeline and outside the near field, where they read as cables.
+	var target := VAT_POSITION + Vector3(cos(angle) * 0.42, 1.12, sin(angle) * 0.42)
 	# Drawn as a chain of segments so it reads as gut, not as a straight pipe.
 	for segment in 7:
 		var t := float(segment) / 6.0
@@ -235,10 +270,18 @@ func _build_vat() -> void:
 	column.top_radius = 0.9
 	column.bottom_radius = 0.9
 	column.height = 2.9
+	# Open-ended for the same reason the glass around it is: a closed alpha
+	# cylinder puts its near cap flat against a camera standing inside it.
+	column.cap_top = false
+	column.cap_bottom = false
 	var fluid_material := StandardMaterial3D.new()
 	fluid_material.albedo_color = Color(0.36, 0.022, 0.014, 0.48)
 	fluid_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	fluid_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# Show only the far inner wall from the trapped viewpoint, exactly as
+	# `glass_material` above does. Rendering both faces stacked two tints and
+	# turned the laboratory into a flat smear, which is what the previous fix
+	# was reacting to when it hid this volume entirely.
+	fluid_material.cull_mode = BaseMaterial3D.CULL_FRONT
 	fluid_material.emission_enabled = true
 	fluid_material.emission = Color(0.19, 0.008, 0.004)
 	fluid_material.emission_energy_multiplier = 1.45
@@ -246,11 +289,10 @@ func _build_vat() -> void:
 	fluid.mesh = column
 	fluid.position = VAT_POSITION + Vector3(0, 1.5, 0)
 	add_child(fluid)
-	# A camera inside an alpha cylinder cannot look through it cleanly: its near
-	# cap and backface dominate the entire frame.  The player-facing blood is the
-	# intentional red veil/bubbles in the HUD; keep this volume for the room's
-	# light and drain choreography but do not render it into the captive camera.
-	fluid.visible = false
+	# Rendered again. Hiding it left the opening's red as a single flat 2D rect
+	# over the whole screen, which is a colour filter rather than a liquid: the
+	# far wall and the desk two metres away were tinted identically. With the
+	# volume back, distance reads, and the column visibly drains during voiding.
 
 	# Ribbed collar and base: the tank is grown onto the floor, not bolted to it.
 	for rib in 9:
@@ -444,9 +486,11 @@ func _build_examination_station() -> void:
 	monitor_mesh.size = Vector3(1.06, 0.72, 0.10)
 	monitor_mesh.material = WorldLook.surface(Color("171b16"), "metal", 914)
 	monitor.mesh = monitor_mesh
-	# Keep the monitor just right of centre.  The examiner works beside it on
-	# the left, never in front of the one thing the trapped player can read.
-	monitor.position = Vector3(0.52, 1.72, 0.28)
+	# The screen takes the right half of the desk, the examiner the left, and
+	# the keyboard sits between them under his hand. He used to stand 1.7m off
+	# to the side, which read as a man near a computer he had nothing to do
+	# with; the two now occupy one workstation without overlapping at all.
+	monitor.position = Vector3(0.60, 1.88, 0.28)
 	station.add_child(monitor)
 	for line_index in 9:
 		var code := MeshInstance3D.new()
@@ -461,14 +505,15 @@ func _build_examination_station() -> void:
 		code.mesh = code_mesh
 		# The text sits on the monitor's camera-facing surface, aligned inside its
 		# frame rather than accidentally hovering behind it.
-		code.position = Vector3(0.05 + code_width * 0.5, 1.94 - float(line_index) * 0.055, 0.345)
+		code.position = Vector3(0.20 + code_width * 0.5, 2.10 - float(line_index) * 0.055, 0.345)
 		station.add_child(code)
 	var keyboard := MeshInstance3D.new()
 	var keyboard_mesh := BoxMesh.new()
 	keyboard_mesh.size = Vector3(0.86, 0.045, 0.38)
 	keyboard_mesh.material = WorldLook.surface(Color("181612"), "metal", 921)
 	keyboard.mesh = keyboard_mesh
-	keyboard.position = Vector3(0.50, 1.16, 0.54)
+	# Between the man and the screen, where a hand can actually reach it.
+	keyboard.position = Vector3(0.22, 1.16, 0.54)
 	station.add_child(keyboard)
 
 	# One examiner, anonymous and physically present.  He is shaped from the
@@ -476,18 +521,25 @@ func _build_examination_station() -> void:
 	# can replace these nodes without changing the opening choreography.
 	var examiner := Node3D.new()
 	examiner.name = "UnknownExaminer"
-	# He works at the left of the terminal, never directly in front of the
-	# monitor. The trapped player can read its code before the form appears.
-	examiner.position = Vector3(-1.18, 0.0, 0.22)
+	# Standing at the left of his own desk, one metre closer in than before, so
+	# the man and the terminal read as one workstation. His head spans roughly
+	# x -0.36..0.04 and the monitor starts at 0.07: adjacent, never overlapping.
+	# Greg, 21 September: "more to the left of the lap and not directly in
+	# front of it."
+	examiner.position = Vector3(-0.16, 0.0, 0.16)
 	station.add_child(examiner)
+	examiner_node = examiner
 	var torso := MeshInstance3D.new()
 	var torso_mesh := CapsuleMesh.new()
-	torso_mesh.radius = 0.28
-	torso_mesh.height = 1.28
+	torso_mesh.radius = 0.24
+	torso_mesh.height = 1.34
 	torso_mesh.material = WorldLook.surface(Color("171118"), "cloth", 915)
 	torso.mesh = torso_mesh
 	torso.position = Vector3(0, 1.35, 0)
-	torso.rotation_degrees.x = 11.0
+	# Leaning in over the keyboard: the posture of somebody filling in a form
+	# about a person who is in the room. A narrower capsule under the coat also
+	# stops the silhouette reading as a bean.
+	torso.rotation_degrees.x = 18.0
 	examiner.add_child(torso)
 	# A formal, almost ecclesiastical government coat: dark body, hard collar,
 	# and a state seal that reads as occult bureaucracy rather than a generic
@@ -501,7 +553,7 @@ func _build_examination_station() -> void:
 	coat_mesh.material = WorldLook.surface(Color("21101b"), "cloth", 919)
 	coat.mesh = coat_mesh
 	coat.position = Vector3(0.0, 1.26, 0.025)
-	coat.rotation_degrees.x = 11.0
+	coat.rotation_degrees.x = 18.0
 	examiner.add_child(coat)
 	var collar := MeshInstance3D.new()
 	var collar_mesh := TorusMesh.new()
@@ -515,35 +567,42 @@ func _build_examination_station() -> void:
 	# A deliberately neutral state seal: copper geometry on a severe coat, not
 	# an unrelated faction logo pasted onto the doctor.  It marks an example
 	# texture/insignia zone for later authored government art.
-	var seal_material := WorldLook.surface(Color("ad5a2c"), "metal", 922)
-	var seal_disc := MeshInstance3D.new()
-	var seal_disc_mesh := CylinderMesh.new()
-	seal_disc_mesh.top_radius = 0.145
-	seal_disc_mesh.bottom_radius = 0.145
-	seal_disc_mesh.height = 0.025
-	seal_disc_mesh.material = seal_material
-	seal_disc.mesh = seal_disc_mesh
-	seal_disc.position = Vector3(0.0, 1.48, 0.365)
-	seal_disc.rotation_degrees.x = 90.0
-	examiner.add_child(seal_disc)
-	for spoke_index in 6:
-		var spoke := MeshInstance3D.new()
-		var spoke_mesh := BoxMesh.new()
-		spoke_mesh.size = Vector3(0.019, 0.21, 0.02)
-		spoke_mesh.material = seal_material
-		spoke.mesh = spoke_mesh
-		spoke.position = Vector3(0.0, 1.48, 0.392)
-		spoke.rotation_degrees.z = float(spoke_index) * 60.0
-		examiner.add_child(spoke)
+	# Six radial spokes inside a ring is a ship's wheel, which is what it read
+	# as on screen. Greg, 21 September: "no steering-wheel-like prop." The
+	# restrained version is a breast badge, not a medallion: a small dark plate,
+	# one thin ring, and a single vertical bar crossed near the top. Esoteric
+	# because of what it omits, and small enough to stay a costume detail.
+	var seal_material := WorldLook.surface(Color("9a5730"), "metal", 922)
+	var badge := MeshInstance3D.new()
+	var badge_mesh := BoxMesh.new()
+	badge_mesh.size = Vector3(0.115, 0.145, 0.016)
+	badge_mesh.material = WorldLook.surface(Color("14090f"), "metal", 923)
+	badge.mesh = badge_mesh
+	badge.position = Vector3(-0.115, 1.54, 0.345)
+	examiner.add_child(badge)
 	var seal_ring := MeshInstance3D.new()
 	var seal_ring_mesh := TorusMesh.new()
-	seal_ring_mesh.inner_radius = 0.092
-	seal_ring_mesh.outer_radius = 0.11
+	seal_ring_mesh.inner_radius = 0.030
+	seal_ring_mesh.outer_radius = 0.040
 	seal_ring_mesh.material = seal_material
 	seal_ring.mesh = seal_ring_mesh
-	seal_ring.position = Vector3(0.0, 1.48, 0.405)
+	seal_ring.position = Vector3(-0.115, 1.565, 0.356)
 	seal_ring.rotation_degrees.x = 90.0
 	examiner.add_child(seal_ring)
+	var seal_stem := MeshInstance3D.new()
+	var seal_stem_mesh := BoxMesh.new()
+	seal_stem_mesh.size = Vector3(0.010, 0.095, 0.012)
+	seal_stem_mesh.material = seal_material
+	seal_stem.mesh = seal_stem_mesh
+	seal_stem.position = Vector3(-0.115, 1.518, 0.356)
+	examiner.add_child(seal_stem)
+	var seal_bar := MeshInstance3D.new()
+	var seal_bar_mesh := BoxMesh.new()
+	seal_bar_mesh.size = Vector3(0.052, 0.010, 0.012)
+	seal_bar_mesh.material = seal_material
+	seal_bar.mesh = seal_bar_mesh
+	seal_bar.position = Vector3(-0.115, 1.500, 0.356)
+	examiner.add_child(seal_bar)
 	var head := MeshInstance3D.new()
 	var head_mesh := SphereMesh.new()
 	head_mesh.radius = 0.20
@@ -575,6 +634,42 @@ func _build_examination_station() -> void:
 	examination_light.light_energy = 3.0
 	examination_light.omni_range = 5.2
 	station.add_child(examination_light)
+	_build_staff_door()
+
+
+## The door he leaves by. A lit frame in the right-hand wall with a panel that
+## slides shut behind him, so the examination visibly ends before the escape
+## begins. The player never opens this one -- their way out is the pit door at
+## the far end of the aisle, and this closing is the cue that they are alone.
+func _build_staff_door() -> void:
+	var frame := MeshInstance3D.new()
+	var frame_mesh := BoxMesh.new()
+	frame_mesh.size = Vector3(0.18, 2.55, 1.55)
+	frame_mesh.material = WorldLook.surface(Color("2b211a"), "rust", 930)
+	frame.mesh = frame_mesh
+	frame.position = STAFF_DOOR_AT + Vector3(0.42, 1.28, 0)
+	add_child(frame)
+
+	var jamb_light := OmniLight3D.new()
+	jamb_light.position = STAFF_DOOR_AT + Vector3(-0.15, 2.25, 0)
+	jamb_light.light_color = Color("c8b47a")
+	jamb_light.light_energy = 2.2
+	jamb_light.omni_range = 3.6
+	add_child(jamb_light)
+
+	staff_door_panel = Node3D.new()
+	staff_door_panel.name = "StaffDoorPanel"
+	# Parked clear of the opening. `_update_sequence`'s departure beat slides it
+	# back across once he is through.
+	staff_door_panel.position = STAFF_DOOR_AT + Vector3(0.30, 0.0, -1.42)
+	add_child(staff_door_panel)
+	var panel := MeshInstance3D.new()
+	var panel_mesh := BoxMesh.new()
+	panel_mesh.size = Vector3(0.12, 2.35, 1.42)
+	panel_mesh.material = WorldLook.surface(Color("3a2c1e"), "metal", 931)
+	panel.mesh = panel_mesh
+	panel.position = Vector3(0, 1.18, 0)
+	staff_door_panel.add_child(panel)
 
 
 func _dead_tank(at: Vector3, seed_value: int) -> void:
@@ -712,6 +807,12 @@ func _physics_process(delta: float) -> void:
 		if opening_audio != null:
 			opening_audio.set_phase("intake")
 		return
+	# Departure runs on its own clock so the vat's beat table keeps the timings
+	# it was tuned with instead of every entry needing a +4.4 offset.
+	if phase == "departure":
+		_update_departure(delta)
+		_update_hud()
+		return
 	clock += delta
 	_update_beats()
 	_update_sequence(delta)
@@ -719,6 +820,52 @@ func _physics_process(delta: float) -> void:
 	if can_move:
 		_update_movement(delta)
 	_update_hud()
+
+
+## He turns away, walks out of his own door, and the door shuts. The player is
+## still in the tank for all of it and still cannot act -- that is the point of
+## the beat. Only when the panel is closed does `phase` hand over to the vat.
+func _update_departure(delta: float) -> void:
+	departure_clock += delta
+	if opening_audio != null:
+		opening_audio.set_phase("intake")
+	for index in DEPARTURE_BEATS.size():
+		if departure_clock >= float(DEPARTURE_BEATS[index].at) and index > departure_line:
+			departure_line = index
+			subtitle.text = str(DEPARTURE_BEATS[index].text)
+
+	# He straightens, turns to the door, then walks. Station-local x, because
+	# the examiner hangs off the workstation node rather than off the chamber.
+	if examiner_node != null and is_instance_valid(examiner_node):
+		var turn := clampf(departure_clock / 0.55, 0.0, 1.0)
+		examiner_node.rotation.y = lerpf(0.0, -PI * 0.5, ease(turn, 0.6))
+		var walk := clampf((departure_clock - 0.55) / 2.75, 0.0, 1.0)
+		examiner_node.position.x = lerpf(-0.16, STAFF_DOOR_AT.x, ease(walk, 0.85))
+		# Through the doorway and out of the room, rather than standing in it
+		# while the panel closes across him.
+		if walk >= 1.0:
+			examiner_node.visible = false
+
+	# The panel slides back across once he is through.
+	if staff_door_panel != null and is_instance_valid(staff_door_panel):
+		var shut := clampf((departure_clock - 3.35) / 0.95, 0.0, 1.0)
+		staff_door_panel.position.z = STAFF_DOOR_AT.z + lerpf(-1.42, 0.0, ease(shut, 0.4))
+
+	# You are still tied into the tank, so you cannot look away from it, but the
+	# head does turn to watch the one person in the room leave.
+	if camera != null and examiner_node != null and is_instance_valid(examiner_node):
+		var to_him := examiner_node.global_position - camera.global_position
+		var want_yaw := atan2(-to_him.x, -to_him.z)
+		var hold := clampf((departure_clock - 3.6) / 0.8, 0.0, 1.0)
+		camera.rotation.y = lerp_angle(camera.rotation.y, lerpf(want_yaw, 0.0, hold), clampf(delta * 3.4, 0.0, 1.0))
+		camera.rotation.x = -0.1 + sin(departure_clock * 0.7) * 0.03
+
+	if departure_clock >= DEPARTURE_SECONDS:
+		phase = "submerged"
+		clock = 0.0
+		line_index = -1
+		subtitle.text = ""
+		WorldHistory.record_event("opening_examiner_departed", {"location": "growing_floor"})
 
 
 func _update_beats() -> void:
@@ -900,8 +1047,11 @@ func _interact() -> void:
 	to_door.y = 0.0
 	if to_door.length() > 3.4:
 		return
-	if not _record_pit_entry():
-		return
+	# Filing the stage can legitimately refuse -- it is write-once and a resumed
+	# world may already have it -- but that is not a reason to refuse the door.
+	# It used to `return` here, which left a player whose world already recorded
+	# `entered_pit` standing at the only exit pressing E at nothing.
+	_record_pit_entry()
 	opening_audio.cue("door")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	Interstitial.travel("res://underground_colosseum.tscn", "racked for the tunnel heat // debt is in the meat")
@@ -980,7 +1130,11 @@ func _update_hud() -> void:
 		int(snapshot.pain),
 		"DECANTED",
 	]
-	if not can_move:
+	# The objective belongs to the escape, and the escape does not exist until
+	# the tank has actually broken. Gated on the breakout rather than on
+	# movement alone so no future phase can hand back control early and put
+	# ESCAPE THE FACILITY on screen while the examiner is still in the room.
+	if not can_move or not breakout_complete:
 		prompt.text = ""
 		$HUD/Objective.text = ""
 		return

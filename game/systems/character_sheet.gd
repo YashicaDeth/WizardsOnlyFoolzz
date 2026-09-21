@@ -476,6 +476,10 @@ func apply_to_world() -> Dictionary:
 		# D. What you chose to look like was collected on the sheet and then
 		# never filed, so the body could not read it even in principle.
 		"appearance": appearance.duplicate(),
+		# AX1.4. The same omission, one field over: ANATOMY was collected and
+		# drawn back but never filed, so the overworld body was built without
+		# it. `BaselineHuman.config_from_subject` reads it here.
+		"anatomy_sex": anatomy_sex,
 		# N2.1/N2.2. Marked at creation, in the game's own register rather
 		# than an error state — an overspent build reads as a run the game
 		# already knows is broken, not a mistake nobody flagged.

@@ -379,7 +379,11 @@ func _draw_tank(viewport: Vector2) -> void:
 	# This is a red fluid veil, not an opaque painted replacement for the room.
 	# The real vat, computer and examiner remain visible through it, so the first
 	# impression is a 3D laboratory viewed from inside bloody culture medium.
-	draw_rect(Rect2(Vector2.ZERO, viewport), Color(0.30, 0.012, 0.007, 0.34))
+	#
+	# Held deliberately low: `vat_chamber.gd` renders the actual fluid column
+	# again, so this is the film on the glass in front of the eye, not the
+	# medium itself. At the old 0.34 the two stacked into an opaque brown wash.
+	draw_rect(Rect2(Vector2.ZERO, viewport), Color(0.30, 0.012, 0.007, 0.20))
 	for band in 26:
 		var travel := float(band) / 26.0
 		draw_rect(Rect2(Vector2(0, viewport.y * travel), Vector2(viewport.x, viewport.y / 26.0 + 1.0)), GOO * Color(1, 1, 1, 0.05 + sin(elapsed * 0.6 + travel * 7.0) * 0.02))

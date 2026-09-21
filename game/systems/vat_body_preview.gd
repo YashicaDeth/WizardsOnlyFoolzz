@@ -77,6 +77,10 @@ func present_sheet(sheet: CharacterSheet) -> void:
 	appearance["name"] = sheet.display_name
 	present({
 		"race": sheet.race,
+		# The ANATOMY row used to stop here: the sheet held it, the form drew it
+		# back, and the body never saw it. It reaches the rig now, so cycling
+		# that row visibly changes the specimen in the tank.
+		"anatomy_sex": sheet.anatomy_sex,
 		"appearance": appearance,
 		"anatomy": {
 			"blood_type": str(sheet.under_skin.get("blood", "O-RUST")),

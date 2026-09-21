@@ -195,6 +195,14 @@ var gore := true
 ## factor existed and nothing read it.
 var build_factor := 1.0
 
+## AX1.4. Shoulder-to-hip ratio, 0 narrow-shouldered and wide-hipped through
+## 1 broad-shouldered and narrow-hipped, 0.5 neither. The intake's ANATOMY row
+## was the last control on the form that changed nothing anywhere: it was
+## written to the sheet, drawn back to the player, saved into presets, and read
+## by no renderer and no system. It drives this, the same way the BUILD row was
+## wired to `build_factor` when it had the same problem.
+var frame_factor := 0.5
+
 var _layout: Dictionary = {}
 var _flesh := Color("6b5842")
 var _seated := false
@@ -242,6 +250,7 @@ func build(id: String, config: Dictionary = {}) -> void:
 	_flesh = config.get("flesh", Color("6b5842")) as Color
 	_variation = int(config.get("variation", 0))
 	build_factor = clampf(float(config.get("build", 1.0)), 0.7, 1.4)
+	frame_factor = clampf(float(config.get("frame", 0.5)), 0.0, 1.0)
 	var layout := _scaled_layout(SEATED if _seated else STANDING)
 	_layout = layout
 
@@ -396,15 +405,29 @@ func zone_nearest(global_point: Vector3) -> String:
 ## both grows the whole silhouette upward from the ground rather than sinking
 ## a big body into it.
 func _scaled_layout(source: Dictionary) -> Dictionary:
-	if is_equal_approx(build_factor, 1.0):
+	if is_equal_approx(build_factor, 1.0) and is_equal_approx(frame_factor, 0.5):
 		return source.duplicate(true)
+	# Build scales the whole body. Frame redistributes width between the chest
+	# and the hips without changing the body's mass or its height, so a hitbox
+	# stays a hitbox and every zone keeps its meaning: the shoulders come in as
+	# the stance widens and vice versa. Bounded deliberately tight -- this is a
+	# silhouette the player can recognise, not a character-sheet caricature.
+	var shoulder := lerpf(0.90, 1.10, frame_factor)
+	var hip := lerpf(1.10, 0.92, frame_factor)
 	var out := {}
 	for zone_id in source:
 		var spec: Dictionary = source[zone_id]
-		out[zone_id] = {
-			"at": (spec.at as Vector3) * build_factor,
-			"size": (spec.size as Vector3) * build_factor,
-		}
+		var size := (spec.size as Vector3) * build_factor
+		var at := (spec.at as Vector3) * build_factor
+		match zone_id:
+			"torso":
+				size.x *= shoulder
+			"left_arm", "right_arm":
+				at.x *= shoulder
+			"left_leg", "right_leg":
+				size.x *= hip
+				at.x *= hip
+		out[zone_id] = {"at": at, "size": size}
 	return out
 
 
@@ -1047,11 +1070,32 @@ static func config_from_subject(record: Dictionary) -> Dictionary:
 		"flesh": Color("7a6350").darkened(wear * 0.35),
 		"blood": blood_volume(str(sheet_anatomy.get("blood_type", "O-RUST"))),
 		"build": combined_build,
+		"frame": frame_from_anatomy_sex(str(record.get("anatomy_sex", "unformed"))),
 		"cybernetics": grown_cybernetics(sheet_anatomy),
 	}
 	if record.get("anatomy_state") is Dictionary:
 		config["restore"] = record.anatomy_state
 	return config
+
+
+## AX1.4. The intake's ANATOMY row, as a silhouette. UNFORMED is the neutral
+## middle because the facility grew it "without the question being asked", and
+## RECONSTRUCTED sits just off-centre because a previous instance was altered
+## and this one inherited the result -- neither is a third shape the rig has to
+## invent. The player's choice drives the body; what the institution writes on
+## the form is `CharacterSheet.ANATOMY_SEX_FILED` and stays a separate lie.
+static func frame_from_anatomy_sex(anatomy_sex: String) -> float:
+	match anatomy_sex:
+		"female":
+			return 0.18
+		"male":
+			return 0.86
+		"intersex":
+			return 0.60
+		"reconstructed":
+			return 0.38
+		_:
+			return 0.5
 
 
 ## Blood type is a choice on the intake sheet, so it has to mean something.
