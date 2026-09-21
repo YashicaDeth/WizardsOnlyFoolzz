@@ -19,7 +19,10 @@ func _ready() -> void:
 	await get_tree().process_frame
 	arcade.player.global_position = arcade.CARD_AT
 	arcade._interact()
-	check(arcade.card_taken and not arcade.card_visual.visible, "the orange card can be collected at its physical pedestal")
+	check(arcade.card_taken and not arcade.card_visual.visible and not arcade.card_label.visible, "the orange card can be collected at its physical pedestal without leaving a stale take prompt")
+	arcade.player.global_position = arcade.WEAPON_AT
+	arcade._interact()
+	check(arcade.weapon_taken and not arcade.weapon_visual.visible and not arcade.weapon_label.visible, "the breach tool visibly confirms its pickup too")
 	arcade.player.global_position = arcade.GATE_AT
 	arcade._interact()
 	check(arcade.gate_open and arcade.gate_body.is_queued_for_deletion(), "the pressure gate opens after the card is collected")

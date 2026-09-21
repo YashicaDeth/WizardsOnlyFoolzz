@@ -24,8 +24,10 @@ var gate_body: StaticBody3D
 var gate_panel: Node3D
 var card_visual: MeshInstance3D
 var card_beacon: OmniLight3D
+var card_label: Label3D
 var weapon_taken := false
 var weapon_visual: MeshInstance3D
+var weapon_label: Label3D
 var lower_works_requested := false
 
 @onready var objective: Label = $HUD/Objective
@@ -150,7 +152,7 @@ func _build_landmarks() -> void:
 	card_light.omni_range = 4.0
 	add_child(card_light)
 	card_beacon = card_light
-	var card_label := Label3D.new()
+	card_label = Label3D.new()
 	card_label.text = "STAFF ACCESS CARD\n[ E ] TAKE"
 	card_label.font_size = 42
 	card_label.outline_size = 8
@@ -167,7 +169,7 @@ func _build_landmarks() -> void:
 	weapon_visual.position = WEAPON_AT
 	weapon_visual.rotation_degrees.y = 34.0
 	add_child(weapon_visual)
-	var weapon_label := Label3D.new()
+	weapon_label = Label3D.new()
 	weapon_label.text = "BREACH TOOL\n[ E ] ARM"
 	weapon_label.font_size = 36
 	weapon_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -246,11 +248,13 @@ func _interact() -> void:
 		card_taken = true
 		card_visual.visible = false
 		card_beacon.visible = false
+		card_label.visible = false
 		WorldHistory.record_event("service_arcade_keycard_taken", {"location": "service_arcade"})
 		return
 	if not weapon_taken and _flat_distance(WEAPON_AT) <= 2.3:
 		weapon_taken = true
 		weapon_visual.visible = false
+		weapon_label.visible = false
 		WorldHistory.record_event("service_arcade_breach_tool_taken", {"location": "service_arcade"})
 		return
 	if not gate_open and _flat_distance(GATE_AT) <= 3.2 and card_taken:
