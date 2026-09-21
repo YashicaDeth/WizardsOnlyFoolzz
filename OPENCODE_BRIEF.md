@@ -104,24 +104,21 @@ Checked and correct as of the last commit on this file. If you finish one,
 delete it -- a stale brief is worse than no brief, because this is the file
 people read instead of looking.
 
-- `anatomy_traversal_test` — 2 real failures about vaulting a low wall.
-  Pre-existing and unrelated to the gore work. Verified by stashing, so they
-  are not a side effect of anything recent. `_vault_target()` in
-  `bone_yard_hunt.gd` is where they live. **Nobody has claimed these.**
-- Three finished systems are waiting on one call each, all of them in
-  `bone_yard_hunt.gd`:
-  - `Cavity.open_zone()` — `_update_extraction()` runs a nine-second dig over
-    a torso that never opens. This cuts the wall away and reveals the organs.
-  - `KillShot.earned()` — the kill camera only fires on melee executions. This
-    decides when a shot earns one, and refuses over survivable wounds.
-  - `SpokenContact` — `_voice_captured()` has no transcript, so a downed NPC
-    answers the *fact* of being spoken to. This adds the words.
-- The local model names itself. `npc_conversation_lab`'s character bible says
-  *unnamed* examiner and `llama3.2:3b` introduced itself as "Dr. Thompson".
-  That is a prompt rule, not a code bug.
+- The local model names itself. `npc_conversation_lab`'s DOCTOR now has a rule
+  against it and three live runs confirmed it holds, but no other character
+  definition has that rule and every one of them is a blank the model will
+  fill. `_downed_character()` in `bone_yard_hunt.gd` builds one per subject.
 - Performance, measured rather than suspected: 39 fps, `process` 20.16ms
   against a 16.67ms budget, `physics` 10.94ms. `ProceduralAshbloomDistricts`
-  owns 2141 visible meshes -- more than everything else in the scene combined
-  -- and nothing anywhere uses a `MultiMesh`. `tools/run_tests.sh` will not
-  help here; `game/tests/sandbox_perf_probe.tscn` is the thing to re-run, and
-  it must run windowed because headless skips rendering entirely.
+  owned 2141 visible meshes -- more than everything else combined -- and
+  nothing anywhere uses a `MultiMesh`. One culling pass has landed since
+  (`af6f4a0`); re-run `game/tests/sandbox_perf_probe.tscn` before doing more,
+  and run it **windowed**, because headless skips rendering entirely and
+  reports a GPU-bound scene as healthy.
+- Script cost is the other half and is unattributed. `process` at 20ms is the
+  ~25 `_update_*` calls in `bone_yard_hunt._physics_process`, and nobody knows
+  which. The same trick the perf probe used on draw calls would find it.
+- `SpokenContact` gives the overworld a transcript, but only for a **downed**
+  subject through the resolution window. Nothing on a standing NPC can be
+  spoken to yet, and `NPCConversationComponent` is still absent from the
+  hunt's living actors.
