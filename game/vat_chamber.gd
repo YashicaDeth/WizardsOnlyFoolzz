@@ -63,6 +63,11 @@ var examiner_node: Node3D
 var staff_door_panel: Node3D
 var departure_clock := 0.0
 var departure_line := -1
+var vat_struts: Array[MeshInstance3D] = []
+## How long the breach still shakes the camera. The glass used to simply stop
+## being rendered, which Greg described as "I don't even smash out of the glass
+## tube" -- there was no event, only an absence.
+var breach_shake := 0.0
 ## Set into the right-hand wall level with the workstation, so he leaves the
 ## way staff leave rather than walking the player's escape route. It is not the
 ## pit door at the far end and it is never openable by the player.
@@ -336,6 +341,28 @@ func _build_vat() -> void:
 	# straight across the middle of the opening frame, all the way around the
 	# player. Raised to the top of the fluid, it reads as light coming down
 	# through the medium, which is what it was always meant to be.
+	# Greg, playing it: *"There's no vat. I'm still allowed out of the damn
+	# vat."* From inside, front-culled glass and front-culled medium are a red
+	# haze -- correct for seeing through, useless for knowing you are shut in.
+	# Six vertical struts at the glass line fix that: they frame the view like
+	# the inside of a cage, they read at every camera angle, and unlike the
+	# rings they never cross the middle of the frame. They are also what stays
+	# standing after the glass goes, so the breach has something to have broken.
+	for strut in 6:
+		# Phased so the player's forward view falls exactly in the gap between
+		# two struts. At the old 0.32 offset one of them stood 0.2 radians off
+		# dead-ahead, straight down the sightline to the examiner's terminal:
+		# the bars are meant to frame that view, not block it.
+		var angle := TAU * float(strut) / 6.0
+		var bar := MeshInstance3D.new()
+		var bar_mesh := BoxMesh.new()
+		bar_mesh.size = Vector3(0.075, 3.05, 0.075)
+		bar_mesh.material = WorldLook.surface(Color("3a2e20") if strut % 2 == 0 else Color("2b2118"), "bone", 950 + strut)
+		bar.mesh = bar_mesh
+		bar.position = VAT_POSITION + Vector3(cos(angle) * 0.97, 1.55, sin(angle) * 0.97)
+		vat_struts.append(bar)
+		add_child(bar)
+
 	var glow := OmniLight3D.new()
 	glow.position = VAT_POSITION + Vector3(0, 2.85, 0)
 	glow.light_color = Color("b22a19")
@@ -869,6 +896,15 @@ func _physics_process(delta: float) -> void:
 	_update_shards(delta)
 	if can_move:
 		_update_movement(delta)
+	# Applied last, on top of whatever the sequence or the movement code just
+	# set, so the breach is felt through both the scripted stand-up and the
+	# first steps rather than being overwritten by either.
+	if breach_shake > 0.0:
+		breach_shake = maxf(0.0, breach_shake - delta)
+		var force := breach_shake * breach_shake * 0.16
+		camera.rotation.x += sin(clock * 47.0) * force
+		camera.rotation.y += sin(clock * 38.0) * force
+		camera.rotation.z += sin(clock * 53.0) * force * 1.4
 	_update_hud()
 
 
@@ -994,19 +1030,34 @@ func _breach() -> void:
 	umbilicals.clear()
 	WorldHistory.record_event("opening_tank_breached", {"tank": "0C-7"})
 	# Glass and fluid go outward across the grating.
-	for index in 22:
+	#
+	# This used to be 22 pale two-centimetre boxes in desaturated green, thrown
+	# from one point at the player's waist. On screen that is confetti, and the
+	# tank simply stopped existing on the same frame. The shards are bigger, red
+	# like the glass they came from, launched from all around the player at the
+	# radius the wall actually stood at, and the camera is hit hard enough to
+	# know something broke. The struts stay up, so what is left afterwards is a
+	# broken tank rather than an empty floor.
+	breach_shake = 0.9
+	for index in 46:
 		var shard := MeshInstance3D.new()
 		var mesh := BoxMesh.new()
-		mesh.size = Vector3(0.05 + randf() * 0.11, 0.02, 0.07 + randf() * 0.13)
+		mesh.size = Vector3(0.11 + randf() * 0.22, 0.015, 0.14 + randf() * 0.26)
 		var shard_material := StandardMaterial3D.new()
-		shard_material.albedo_color = Color(0.4, 0.55, 0.47, 0.5) if index % 3 else Color(0.12, 0.24, 0.16, 0.8)
+		shard_material.albedo_color = Color(0.52, 0.17, 0.13, 0.62) if index % 3 else Color(0.28, 0.08, 0.06, 0.78)
 		shard_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		shard_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		shard_material.emission_enabled = true
+		shard_material.emission = Color(0.24, 0.05, 0.03)
+		shard_material.emission_energy_multiplier = 0.9
 		mesh.material = shard_material
 		shard.mesh = mesh
-		shard.position = VAT_POSITION + Vector3(0, 1.1, 0)
+		# From the wall, not from a point inside the player's chest.
+		var around := TAU * randf()
+		shard.position = VAT_POSITION + Vector3(cos(around) * 0.92, 0.5 + randf() * 2.3, sin(around) * 0.92)
 		add_child(shard)
-		var out := Vector3(randf_range(-1.0, 1.0), randf_range(0.1, 0.7), randf_range(-1.0, 1.0)).normalized()
-		glass_shards.append({"node": shard, "velocity": out * randf_range(2.5, 6.0), "life": 3.0})
+		var out := Vector3(cos(around), randf_range(0.05, 0.55), sin(around)).normalized()
+		glass_shards.append({"node": shard, "velocity": out * randf_range(3.2, 7.5), "life": 3.4})
 	# Spreading puddle.
 	var puddle := MeshInstance3D.new()
 	var disc := CylinderMesh.new()

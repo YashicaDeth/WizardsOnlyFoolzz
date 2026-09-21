@@ -15,6 +15,7 @@ extends Node
 const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const SHEET := preload("res://systems/character_sheet.gd")
 const BASELINE_HUMAN := preload("res://systems/baseline_human.gd")
+const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 
 var failures: Array[String] = []
 
@@ -66,6 +67,33 @@ func _ready() -> void:
 	var unformed := BASELINE_HUMAN.config_from_subject({"race": "decanted", "anatomy_sex": "unformed", "anatomy": {}})
 	check(float(female.get("frame", -1.0)) < float(male.get("frame", -1.0)), "BODY/ANATOMY reaches the rig as a real frame value")
 	check(is_equal_approx(float(unformed.get("frame", -1.0)), 0.5), "UNFORMED is the neutral silhouette, not a fifth invented shape")
+	# AX1.3. The face axes reached the rig only as a material seed, so
+	# `face_model_test`'s "moving an axis changes the body the rig builds" was
+	# true of an integer and false of the head. Greg found it by playing:
+	# "Brow, jaw, none of this actually changes." This checks the mesh.
+	var faces := {}
+	for axis_test in [["jaw_low", "jaw", 0.0], ["jaw_high", "jaw", 1.0], ["brow_low", "brow", 0.0], ["brow_high", "brow", 1.0], ["mouth_low", "mouth", 0.0], ["mouth_high", "mouth", 1.0]]:
+		var label := str(axis_test[0])
+		var axes := FaceModel.blank()
+		axes[str(axis_test[1])] = float(axis_test[2])
+		var subject := BASELINE_HUMAN.new()
+		add_child(subject)
+		subject.build("face_probe_" + label, {"gore": false})
+		var look = HUNTER_APPEARANCE.new()
+		subject.add_child(look)
+		look.configure(subject, {"axes": axes})
+		faces[label] = {
+			"jaw": (look.details["Jaw_Line"] as MeshInstance3D).mesh.size,
+			"brow": (look.details["Brow_Ridge"] as MeshInstance3D).mesh.size,
+			"mouth": (look.details["Mouth_Upper"] as MeshInstance3D).mesh.size,
+		}
+		subject.queue_free()
+	check(faces["jaw_low"].jaw.x < faces["jaw_high"].jaw.x, "a broad JAW builds a wider jaw than a narrow one (%.3f < %.3f)" % [faces["jaw_low"].jaw.x, faces["jaw_high"].jaw.x])
+	check(faces["jaw_low"].mouth.x < faces["jaw_high"].mouth.x, "...and the mouth widens across it rather than floating free")
+	check(faces["brow_low"].brow.y < faces["brow_high"].brow.y, "a heavy BROW builds a heavier ridge than a fine one (%.3f < %.3f)" % [faces["brow_low"].brow.y, faces["brow_high"].brow.y])
+	check(is_equal_approx(faces["brow_low"].jaw.x, faces["brow_high"].jaw.x), "and moving BROW does not silently move the jaw as well")
+	check(faces["mouth_low"].mouth.y < faces["mouth_high"].mouth.y, "a full MOUTH builds a fuller lip than a thin one (%.3f < %.3f)" % [faces["mouth_low"].mouth.y, faces["mouth_high"].mouth.y])
+
 	var narrow := BASELINE_HUMAN.new()
 	var broad := BASELINE_HUMAN.new()
 	add_child(narrow)

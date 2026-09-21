@@ -206,6 +206,13 @@ var face: Dictionary = FaceModel.blank()
 ## step with the axes, so the two records can never disagree.
 func sync_face() -> void:
 	appearance["face"] = FaceModel.scalar(face)
+	# Greg, playing it: "Brow, jaw, none of this actually changes." He was
+	# right. The scalar above only ever reached the rig as a material seed, so
+	# seven named controls moved a texture and nothing else. The axes ride
+	# inside `appearance` now, which is the dictionary both the preview and
+	# `apply_to_world()` already carry, so `HunterAppearance._build_face()` can
+	# put them on the actual skull without a new channel to keep in step.
+	appearance["axes"] = face.duplicate(true)
 var display_name := "THE HUNTER"
 
 
