@@ -64,6 +64,17 @@ reads exactly like the slow first `--import`. Tell them apart by CPU -- an
 import is busy, a hung test is not. A reused variable name cost five minutes
 this way.
 
+**A patch anchored on text that appears twice silently edits the wrong one.**
+Scripted edits over these files are the fastest way to work, and a
+`replace(old, new, 1)` whose anchor is not unique will land the change
+somewhere that parses differently and not tell you. `var move :=
+_sandbox_move_input()` appears in `gore_demo.gd` both inside the `KEY_SPACE`
+match branch and in `_physics_process`; a physics block aimed at the second
+went into the first, and the result was a parse error forty lines away
+(`Expected indented block after match pattern block`) and a black window.
+Grep the anchor and count the hits before replacing on it, or anchor on
+something only one of them has.
+
 **Two Godot instances against one project fail spuriously.** Codex runs the
 engine too and they share `game/.godot/`. A suite that overlaps another run
 reports `exit=127` and `(no marker)` for scenes that pass perfectly well on
