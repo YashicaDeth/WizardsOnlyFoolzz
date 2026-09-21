@@ -46,6 +46,9 @@ var last_latency_ms := 0
 var _speech_left := 0.0
 var _bubble: Label3D
 var _memories: Array[String] = []
+## Section 2's output pipeline. Defaults to the best voice the machine has and
+## degrades to subtitles-only where there is none, so no caller has to choose.
+var voice: NPCSpeechOutput.Voice
 
 const MAX_MEMORIES := 6
 
@@ -57,6 +60,8 @@ func configure(id: String, character_definition: Dictionary, target: Node3D, dia
 	# Defaults to the offline brain deliberately. A component that cannot think
 	# without credentials is a component that cannot be playtested.
 	brain = dialogue_brain if dialogue_brain != null else NPCDialogueBrain.MockBrain.new(character_definition)
+	if voice == null:
+		voice = NPCSpeechOutput.make(str(character_definition.get("voice_language", "en_AU")))
 	if not WorldHistory.subject(npc_id).has("kind"):
 		WorldHistory.register_subject(npc_id, {
 			"name": str(character_definition.get("name", "UNKNOWN")),
@@ -234,5 +239,10 @@ func memories() -> Array[String]:
 func _say(text: String) -> void:
 	_bubble.text = text
 	_bubble.visible = true
-	_speech_left = speech_seconds
+	# Hold the subtitle for as long as the line plausibly takes to say, rather
+	# than a flat 3.6s: a four-word answer and a two-sentence one held for the
+	# same beat is what makes a talking NPC feel like a slideshow.
+	_speech_left = maxf(speech_seconds, float(text.length()) * 0.055)
+	if voice != null:
+		voice.speak(text)
 	npc_speech_started.emit(npc_id, text)
