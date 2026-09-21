@@ -8,6 +8,10 @@ extends Node
 ## outright, a merely-hurt body still gets through but slower, and a
 ## healthy jump is not the same height as a hobbled one.
 
+## High enough that nothing the bone yard builds reaches it, so the vault
+## rays only ever meet the walls this test put there itself.
+const ARENA_Y := 400.0
+
 var failures: Array[String] = []
 
 
@@ -47,18 +51,42 @@ func _ready() -> void:
 	hunt.set_physics_process(false)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	hunt.player_body.position = Vector3(0, 0.9, 19)
+	# Built well above the world rather than inside it. This used to stand the
+	# player at (0, 0.9, 19) on the bone yard itself and assume the space over
+	# the low wall was empty. It is not: the vault ceiling ray hit a StaticBody
+	# whose instance id was thousands lower than the test's own walls -- world
+	# geometry, there long before this ran -- so `_vault_target()` refused the
+	# vault, correctly, and the suite read that as the game being broken.
+	#
+	# Both of its failures were that one cause, and the checks that passed passed
+	# only because a vault refused for the wrong reason still looks refused. An
+	# arena of its own makes the suite independent of whatever the districts grow
+	# next, which is what let this rot in the first place.
+	var arena_floor := _make_wall(Vector3(0, ARENA_Y - 0.5, 19), Vector3(30.0, 1.0, 60.0))
+	add_child(arena_floor)
+	await get_tree().physics_frame
+	hunt.player_body.position = Vector3(0, ARENA_Y + 0.9, 19)
 	hunt.player_body.velocity = Vector3.ZERO
 	hunt.yaw = 0.0
 	await _settle(hunt)
 	var forward: Vector3 = hunt.HUNTER_MOTOR.wish_direction(Vector2(0, -1), hunt.yaw)
 	var side: Vector3 = Vector3(forward.z, 0.0, -forward.x)
-	var low_wall := _make_wall(Vector3(0, 0.4, 19.5), Vector3(2.0, 0.8, 0.4))
+	var low_wall := _make_wall(Vector3(0, ARENA_Y + 0.4, 19.5), Vector3(2.0, 0.8, 0.4))
 	add_child(low_wall)
-	var tall_wall := _make_wall(Vector3(0, 1.4, 19) + side * 0.9, Vector3(0.4, 3.0, 40.0))
+	var tall_wall := _make_wall(Vector3(0, ARENA_Y + 1.4, 19) + side * 0.9, Vector3(0.4, 3.0, 40.0))
 	add_child(tall_wall)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
+	var feet: Vector3 = hunt.player_body.position + Vector3.UP * -0.9
+	var space: PhysicsDirectSpaceState3D = hunt.get_world_3d().direct_space_state
+	var exclusions: Array[RID] = hunt.call("_player_collision_exclusions")
+	var low_query := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * 0.4, feet + Vector3.UP * 0.4 + forward * hunt.VAULT_REACH)
+	low_query.exclude = exclusions
+	var low_hit: Dictionary = space.intersect_ray(low_query)
+	var high_query := PhysicsRayQueryParameters3D.create(feet + Vector3.UP * hunt._vault_ceiling(), feet + Vector3.UP * hunt._vault_ceiling() + forward * hunt.VAULT_REACH)
+	high_query.exclude = exclusions
+	var high_hit: Dictionary = space.intersect_ray(high_query)
+	print("VAULT_DIAG floor=", hunt.player_body.is_on_floor(), " feet=", feet, " forward=", forward, " low=", low_hit.get("position", Vector3.ZERO), " low_collider=", (low_hit.get("collider") as Node).get_path() if low_hit.has("collider") else "none", " high=", high_hit.get("position", Vector3.ZERO), " high_collider=", (high_hit.get("collider") as Node).get_path() if high_hit.has("collider") else "none")
 
 	print("AD1.6 - a healthy body clears the gate and vaults/runs at full strength")
 	check(hunt.player_rig.anatomy.mobility_ratio() >= 0.999, "starts fully healthy")
@@ -69,7 +97,7 @@ func _ready() -> void:
 	check(is_equal_approx(healthy_jump_velocity, hunt.JUMP_IMPULSE), "a healthy jump gets the full, unscaled impulse (%.2f)" % healthy_jump_velocity)
 
 	print("AD1.6 - one leg destroyed reads as a real, literal 'broken leg'")
-	hunt.player_body.position = Vector3(0, 0.9, 19)
+	hunt.player_body.position = Vector3(0, ARENA_Y + 0.9, 19)
 	hunt.player_body.velocity = Vector3.ZERO
 	await _settle(hunt)
 	hunt.player_rig.anatomy.zones.left_leg.health = 0.0
@@ -87,7 +115,7 @@ func _ready() -> void:
 	hunt.player_rig.anatomy.zones.right_leg.health = 60.0
 	var bruised: float = hunt.player_rig.anatomy.mobility_ratio()
 	check(bruised >= hunt.PLAYER_INJURY_FLOOR, "a bruised, not broken, pair of legs clears the same floor (%.2f)" % bruised)
-	hunt.player_body.position = Vector3(0, 0.9, 19)
+	hunt.player_body.position = Vector3(0, ARENA_Y + 0.9, 19)
 	hunt.player_body.velocity = Vector3.ZERO
 	await _settle(hunt)
 	var bruised_target: Dictionary = hunt._vault_target(forward)
