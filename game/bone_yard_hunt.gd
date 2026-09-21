@@ -1120,6 +1120,11 @@ func _build_player_rig() -> void:
 	config["gore"] = viscera_fx
 	player_rig.gore = viscera_fx
 	player_rig.build("player", config)
+	# DESIGN.md:245. The elites dress you, not the mirror: the player wakes in
+	# the forced humiliation rig, collar already damaged. Re-issued whole on
+	# every build — CellOutz re-dresses its bodies, which is also what keeps a
+	# scene change from having to solve wardrobe persistence today.
+	player_rig.dress(ClothingShell.humiliation_wardrobe())
 	# B8.1. The one thing that makes this body different from the one lying in
 	# the road: it takes every wound through the same anatomy, and death does not
 	# take. AP2.1, "the spirit cannot be banished by violence."

@@ -33,6 +33,15 @@ func _ready() -> void:
 		_report()
 		return
 
+	# --- the player wakes dressed ------------------------------------------------
+	# DESIGN.md:245 — the elites dress you. Asserted here rather than in a
+	# clothing unit because the build site is the thing being tested.
+	var player_rig = hunt.get("player_rig")
+	check(player_rig != null and str(player_rig.wardrobe.get("style", "")) == "jester", "the player wakes in the humiliation rig")
+	if player_rig != null:
+		var p_torso := (player_rig as BaselineHuman).parts.get("torso") as Node3D
+		check(p_torso != null and p_torso.get_node_or_null("Garment") != null, "with the motley rendered over the flesh")
+
 	# --- a still hand earns no plane ------------------------------------------
 	var rest_speed: float = arm.head_speed()
 	print("head speed at rest: %.3f" % rest_speed)
