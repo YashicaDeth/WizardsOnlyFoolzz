@@ -1178,6 +1178,24 @@ func _note(text: String) -> void:
 
 # ---------------------------------------------------------------- the loop
 func _unhandled_input(event: InputEvent) -> void:
+	# The raised handheld owns the player's attention.  Letting the range keep
+	# interpreting its keys made G look open while mouse, weapon, and movement
+	# commands continued underneath it.
+	if handheld != null and handheld.is_open:
+		if event is InputEventKey and not event.echo:
+			var device_key := event as InputEventKey
+			if device_key.pressed and device_key.keycode in [KEY_G, KEY_ESCAPE]:
+				handheld.close_device()
+				get_viewport().set_input_as_handled()
+				return
+			if handheld.handle_input(event):
+				get_viewport().set_input_as_handled()
+				return
+		# A device page is never a transparent overlay.  Unclaimed keys are
+		# intentionally swallowed instead of firing, dodging, or changing gear.
+		if event is InputEventKey:
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var motion := event as InputEventMouseMotion
 		yaw -= motion.relative.x * 0.0026
@@ -1236,6 +1254,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_G:
 				if handheld != null:
 					handheld.toggle_device()
+					get_viewport().set_input_as_handled()
+					return
 			KEY_Q: _cut()
 			KEY_R: _reset()
 			KEY_X: _set_xray(not xray)
@@ -1373,6 +1393,21 @@ func _take_station_item() -> void:
 		return
 	# The signal appends the actual data; this only narrates the physical action.
 	_note("TAKEN // %s" % str(taken.get("label", "UNMARKED")))
+
+
+## A carry prompt is contextual information, not a permanent watermark.  It
+## appears only when an item can actually be taken or when the player has
+## something in a carried slot to use.
+func _near_pickup_source() -> bool:
+	if station != null and is_instance_valid(station) and eye.distance_to(station.global_position) <= WEAPON_PICKUP_REACH:
+		return true
+	for pickup: Dictionary in weapon_pickups:
+		if not bool(pickup.get("available", false)):
+			continue
+		var model := pickup.get("model") as Node3D
+		if model != null and is_instance_valid(model) and eye.distance_to(model.global_position) <= WEAPON_PICKUP_REACH:
+			return true
+	return false
 
 
 ## AF6.1. E takes the nearest authored gun or blade only when the player has
@@ -1572,13 +1607,20 @@ func _build_hud() -> void:
 	handheld = HandheldDevice.new()
 	handheld.name = "SandboxHandheld"
 	layer.add_child(handheld)
+	# The sandbox is a real 3D region, so its handheld gets the same live
+	# satellite feed as the main world instead of falling back to the facility
+	# chart with no world source attached.
+	handheld.bind(self, null, Callable())
 	psychedelic = PSYCHEDELIC_RIG.new()
 	psychedelic.name = "SandboxPsychedelic"
 	layer.add_child(psychedelic)
 	mode_button = Button.new()
 	mode_button.name = "TrainingMode"
-	mode_button.position = Vector2(476, 24)
-	mode_button.size = Vector2(328, 38)
+	mode_button.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	mode_button.offset_left = -164.0
+	mode_button.offset_top = 24.0
+	mode_button.offset_right = 164.0
+	mode_button.offset_bottom = 62.0
 	mode_button.focus_mode = Control.FOCUS_NONE
 	mode_button.add_theme_font_size_override("font_size", 14)
 	var normal := StyleBoxFlat.new()
@@ -1701,7 +1743,8 @@ func _paint_hud() -> void:
 	CellOutzType.draw_text(hud, Vector2(26, 32), "GORE SANDBOX", 20.0, bone * Color(1, 1, 1, 0.85), 2.0)
 	CellOutzType.draw_condensed(hud, Vector2(26, 62), "WIZARDS ONLY FOOLS  //  NOTHING HERE IS A MOCK-UP", 9.0, bone * Color(1, 1, 1, 0.4), 2.2)
 
-	var keys := [
+	var compact := size.x < 900.0 or size.y < 560.0
+	var keys := [["F1", "CONTROLS"], ["G", "DEVICE"], ["H", "DUMMIES"]] if compact else [
 		["WASD", "MOVE/DRAG"], ["LMB", "FIRE/PRESS"], ["RMB", "AIM/HEAVY"],
 		["SPACE", "JUMP/MOVE+DODGE"], ["C", "GRAPPLE/LET GO"], ["H", "DUMMY/ENEMY"],
 		["6-9", "WEAPONS"], ["F1", "MORE CONTROLS"],
@@ -1714,7 +1757,7 @@ func _paint_hud() -> void:
 			["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"],
 			["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["CTRL", "CROUCH"], ["F1", "LESS CONTROLS"],
 		]
-	var row_size := 7 if controls_expanded else 4
+	var row_size := 3 if compact and not controls_expanded else (7 if controls_expanded else 4)
 	var row_count := ceili(float(keys.size()) / float(row_size))
 	for index in keys.size():
 		var pair: Array = keys[index]
@@ -1772,6 +1815,17 @@ func _paint_hud() -> void:
 		# there for seconds on end while slow motion is held.
 		"IN FLIGHT  %03d" % _rounds_in_flight(),
 	]
+	# At small window sizes the old readout tried to preserve every internal
+	# counter, drew itself outside the screen, and hid the actual game.  The
+	# compact panel says only what a player can act on; F1 remains the route to
+	# the fuller reference rather than a permanent debug flood.
+	if compact:
+		var compact_weapon := "%s // %d" % [str(arsenal.current().get("label", "WEAPON")).to_upper(), int(arsenal_state.get("loaded", 0))] if not launcher_equipped else "BREACH // %d" % launcher_rounds
+		lines = [
+			compact_weapon,
+			"%s // STAMINA %03d" % ["AIM" if firearm_aiming else "READY", roundi(stamina)],
+			"%s // %d UP" % ["ENEMIES" if enemies_enabled else "DUMMIES", standing],
+		]
 	# AF6.2. The last shot, read back rather than only felt: real distance,
 	# real travel time, and how much muzzle energy actually survived the
 	# trip — drag's real effect against a real number, not a cosmetic stat.
@@ -1790,17 +1844,21 @@ func _paint_hud() -> void:
 			str(last_shot_readout.get("penetration", "NO BODY READ")),
 		])
 	var y := 40.0
+	var telemetry_cap := 8.5 if compact else 11.0
+	var telemetry_spacing := 14.0 if compact else 18.0
 	for line: String in lines:
-		var width := CellOutzType.width_condensed(line, 11.0, 2.0)
-		CellOutzType.draw_condensed(hud, Vector2(right_edge - width, y), line, 11.0, acid * Color(1, 1, 1, 0.8), 2.0)
-		y += 18.0
+		var width := CellOutzType.width_condensed(line, telemetry_cap, 2.0)
+		CellOutzType.draw_condensed(hud, Vector2(right_edge - width, y), line, telemetry_cap, acid * Color(1, 1, 1, 0.8), 2.0)
+		y += telemetry_spacing
 	var carry_line := "CARRY  "
 	for index in carried_substances.size():
 		carry_line += "%d:%s  " % [index + 1, str((carried_substances[index] as Dictionary).get("id", "?")).to_upper()]
-	if carried_substances.is_empty():
-		carry_line += "EMPTY // [E] AT STATION OR WEAPON RACK"
-	var carry_width := CellOutzType.width_condensed(carry_line, 10.0, 1.8)
-	CellOutzType.draw_condensed(hud, Vector2(right_edge - carry_width, y + 10.0), carry_line, 10.0, bone * Color(1, 1, 1, 0.62), 1.8)
+	if carried_substances.is_empty() and _near_pickup_source():
+		carry_line += "EMPTY // [E] TAKE"
+	if not carried_substances.is_empty() or _near_pickup_source():
+		var carry_cap := 8.5 if compact else 10.0
+		var carry_width := CellOutzType.width_condensed(carry_line, carry_cap, 1.8)
+		CellOutzType.draw_condensed(hud, Vector2(right_edge - carry_width, y + 10.0), carry_line, carry_cap, bone * Color(1, 1, 1, 0.62), 1.8)
 
 	if xray:
 		var tag := "X-RAY"
