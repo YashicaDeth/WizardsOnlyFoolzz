@@ -51,8 +51,8 @@ TEMP=P:/GameDev/Temp TMP=P:/GameDev/Temp "P:/GameDev/Tools/Godot-4.7.2/Godot_v4.
 That pass writes `foo.gd.uid` and registers the class in
 `.godot/global_script_class_cache.cfg`. **Commit the `.uid` with the script.**
 A script committed without it is a type nobody can reference, and nothing warns
-you — it is not an error, it is simply absent. This has already happened once in
-this repo's history.
+you — it is not an error, it is simply absent. This has happened twice in this
+repo's history, to `npc_ollama_brain.gd` and to `cavity.gd`.
 
 The first `--import` after adding files takes minutes. It is not hung.
 
@@ -100,14 +100,28 @@ changes what a body does needs a test in `game/tests/` with its own `.tscn`.
 
 ## 6. Open items
 
+Checked and correct as of the last commit on this file. If you finish one,
+delete it -- a stale brief is worse than no brief, because this is the file
+people read instead of looking.
+
 - `anatomy_traversal_test` — 2 real failures about vaulting a low wall.
-  Pre-existing and unrelated to recent gore work. Verified by stashing.
-- Weapons do not report their blade edge, so `BaselineHuman._cut_limb()` cuts
-  square across a limb. Feeding `BodySlice.plane_from_swing()` the sword's
-  frame-to-frame sweep (last frame's tip and base, this frame's tip and base)
-  would give cuts at the angle actually swung.
-- Blood has wounds, streaks and per-drop splats, but no pooling that grows and
-  merges, no footprint tracking, and no soaking into clothing.
-- `NPCOllamaBrain` works against a local Ollama (`llama3.2:3b`) but is not wired
-  into `npc_conversation_lab`. The model also names itself — the character bible
-  says *unnamed* examiner, so the prompt needs a rule against it.
+  Pre-existing and unrelated to the gore work. Verified by stashing, so they
+  are not a side effect of anything recent. `_vault_target()` in
+  `bone_yard_hunt.gd` is where they live. **Nobody has claimed these.**
+- Three finished systems are waiting on one call each, all of them in
+  `bone_yard_hunt.gd`:
+  - `Cavity.open_zone()` — `_update_extraction()` runs a nine-second dig over
+    a torso that never opens. This cuts the wall away and reveals the organs.
+  - `KillShot.earned()` — the kill camera only fires on melee executions. This
+    decides when a shot earns one, and refuses over survivable wounds.
+  - `SpokenContact` — `_voice_captured()` has no transcript, so a downed NPC
+    answers the *fact* of being spoken to. This adds the words.
+- The local model names itself. `npc_conversation_lab`'s character bible says
+  *unnamed* examiner and `llama3.2:3b` introduced itself as "Dr. Thompson".
+  That is a prompt rule, not a code bug.
+- Performance, measured rather than suspected: 39 fps, `process` 20.16ms
+  against a 16.67ms budget, `physics` 10.94ms. `ProceduralAshbloomDistricts`
+  owns 2141 visible meshes -- more than everything else in the scene combined
+  -- and nothing anywhere uses a `MultiMesh`. `tools/run_tests.sh` will not
+  help here; `game/tests/sandbox_perf_probe.tscn` is the thing to re-run, and
+  it must run windowed because headless skips rendering entirely.
