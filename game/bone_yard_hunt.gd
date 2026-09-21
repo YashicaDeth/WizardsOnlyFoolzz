@@ -160,6 +160,7 @@ const CARRION_SCAVENGER := preload("res://systems/carrion_scavenger.gd")
 const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 const SUBSTANCE_STATION := preload("res://systems/substance_station.gd")
 const FIELD_INVENTORY := preload("res://systems/field_inventory.gd")
+const CASE_MENU := preload("res://systems/case_menu.gd")
 const BRAIN_INDEX := preload("res://systems/brain_index.gd")
 
 var player := Vector3(0, 1.5, 19)
@@ -630,6 +631,7 @@ var world_index: Control
 ## CARRY app remains a second physical view of this same data, not the only
 ## route into inventory during ordinary play.
 var field_inventory: FieldInventory
+var case_menu: CaseMenu
 ## L. The Board was built across twenty-odd segments and instantiated only in
 ## tests — there has never been a key that opens it, which is why Greg could not
 ## remember how to reach it. There is one now.
@@ -1032,6 +1034,10 @@ func _ready() -> void:
 	$HUD.add_child(field_inventory)
 	field_inventory.close_requested.connect(_toggle_inventory)
 	field_inventory.activate_requested.connect(_activate_inventory_item)
+	case_menu = CASE_MENU.new()
+	case_menu.name = "CaseMenu"
+	$HUD.add_child(case_menu)
+	case_menu.close_requested.connect(_toggle_cases)
 	_spawn_friend()
 	# AE.1. The captain is still spawned exactly as she always was, and this
 	# runs alongside her rather than instead of her or through her. The order
@@ -1402,6 +1408,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if panel_mode == "inventory" and field_inventory != null and field_inventory.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
+	if panel_mode == "cases" and case_menu != null and case_menu.handle_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	# Full-size readers own their navigation keys. LivingMap is a Control, but it
 	# does not take keyboard focus merely by becoming visible; without this route
 	# L fell through to the field's Black Mirror lens and appeared to turn the
@@ -1588,6 +1597,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_J: _toggle_artwork()
 			KEY_P: _toggle_panel("board")
 			KEY_O: _toggle_inventory()
+			KEY_U: _toggle_cases()
 			# Agent 1 brief. The Black Mirror as a lens, not just a shutter — N
 			# still snaps a photo instantly, unchanged; L holds the view amplified
 			# so looking through it is a real choice you can hold rather than a
@@ -6919,6 +6929,7 @@ func _build_keys_card() -> void:
 		]},
 		{"group": "WHAT YOU CARRY", "rows": [
 			["O", "FIELD INVENTORY / BODY / LOOT"],
+			["U", "DEAD CLOUD EXCHANGE // CASES"],
 			["G", "RAISE / LOWER BLACK MIRROR"],
 			["TAB", "INDEX / NEXT DEVICE APP"],
 			["CLICK / F1-F7", "SELECT DEVICE APP"],
@@ -7009,6 +7020,7 @@ func _toggle_panel(mode: String) -> void:
 	# nothing breaks on arrival, it breaks the first time you open a panel.
 	var covering: bool = living_map.visible or world_index.visible or pin_board.visible
 	covering = covering or (field_inventory != null and field_inventory.visible)
+	covering = covering or (case_menu != null and case_menu.visible)
 	prompt.visible = not covering
 	# The old ArchivePanel is dead. It was a Label in a box and it is exactly
 	# what "no more of this tutorial look" was about.
@@ -7031,6 +7043,8 @@ func _close_panel_views() -> void:
 	living_map.close_map()
 	if field_inventory != null:
 		field_inventory.close_inventory()
+	if case_menu != null:
+		case_menu.close_menu()
 	if world_index.visible:
 		world_index.close()
 		world_index.visible = false
@@ -7055,6 +7069,31 @@ func _toggle_inventory() -> void:
 			_pointer.visible = true
 	else:
 		field_inventory.close_inventory()
+		panel_mode = ""
+		prompt.visible = true
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if _pointer != null and is_instance_valid(_pointer):
+			_pointer.visible = false
+
+
+## The dead cloud's shopfront, on U. Same mutual exclusion as every other
+## full-size reader: opening it shuts the rest, closing it gives the mouse back.
+func _toggle_cases() -> void:
+	var opening := panel_mode != "cases"
+	if opening:
+		firearm_aiming = false
+		if handheld.is_open:
+			handheld.close_device()
+		keys_card.close()
+		_close_panel_views()
+		panel_mode = "cases"
+		case_menu.open_menu(handheld.carry, player_rig)
+		prompt.visible = false
+		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
+		if _pointer != null and is_instance_valid(_pointer):
+			_pointer.visible = true
+	else:
+		case_menu.close_menu()
 		panel_mode = ""
 		prompt.visible = true
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
