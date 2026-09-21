@@ -28,6 +28,8 @@ func _ready() -> void:
 	arcade.player.global_position = arcade.GATE_AT + Vector3(0, 0, 4.2)
 	arcade._physics_process(0.016)
 	check(arcade.gate_open, "approaching the gate opens it if a transition-frame E press was missed")
+	arcade._interact()
+	check(arcade.lower_works_requested, "the opened gate's own control threshold carries the player onward instead of leaving them in the arcade")
 	arcade.queue_free()
 	print("SERVICE_ARCADE_ROUTE_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

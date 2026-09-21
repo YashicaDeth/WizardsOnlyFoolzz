@@ -26,6 +26,7 @@ var card_visual: MeshInstance3D
 var card_beacon: OmniLight3D
 var weapon_taken := false
 var weapon_visual: MeshInstance3D
+var lower_works_requested := false
 
 @onready var objective: Label = $HUD/Objective
 @onready var prompt: Label = $HUD/Prompt
@@ -255,9 +256,12 @@ func _interact() -> void:
 	if not gate_open and _flat_distance(GATE_AT) <= 3.2 and card_taken:
 		_open_gate()
 		return
-	if gate_open and _flat_distance(EXIT_AT) <= 3.0:
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-		Interstitial.travel("res://buried_city.tscn", "pressure gate open // lower works transit unlocked")
+	# Do not make the player hunt for an invisible, second trigger after the
+	# pressure gate has visibly opened.  The control panel and the threshold both
+	# lead onward; this is especially important when the original E press was
+	# consumed by the gate-opening frame.
+	if gate_open and (_flat_distance(GATE_AT) <= 4.4 or _flat_distance(EXIT_AT) <= 3.0):
+		_enter_lower_works()
 
 func _open_gate() -> void:
 	if gate_open:
@@ -267,6 +271,15 @@ func _open_gate() -> void:
 		gate_body.queue_free()
 	gate_panel.position.y = 5.8
 	WorldHistory.record_event("service_arcade_pressure_gate_opened", {"location": "service_arcade"})
+
+func _enter_lower_works() -> void:
+	if lower_works_requested:
+		return
+	lower_works_requested = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	# Tests assert the handoff without replacing their own scene tree.
+	if OS.get_environment("ATG_TEST_MODE") != "1":
+		Interstitial.travel("res://buried_city.tscn", "pressure gate open // lower works transit unlocked")
 
 func _record_pit_entry() -> void:
 	if OPENING.reached("entered_pit"):
@@ -287,7 +300,9 @@ func _update_hud() -> void:
 		prompt.text = "[E] TAKE STAFF ACCESS CARD"
 	elif not gate_open and _flat_distance(GATE_AT) <= 3.2:
 		prompt.text = "[E] OPEN PRESSURE GATE" if card_taken else "PRESSURE GATE // STAFF CARD REQUIRED"
-	elif gate_open and _flat_distance(EXIT_AT) <= 3.0:
-		prompt.text = "[E] ENTER THE UNDERGROUND HEAT"
+	elif gate_open and (_flat_distance(GATE_AT) <= 4.4 or _flat_distance(EXIT_AT) <= 3.0):
+		prompt.text = "[E] ENTER LOWER WORKS"
+	elif gate_open:
+		prompt.text = "PRESSURE GATE UNSEALED // MOVE THROUGH"
 	else:
 		prompt.text = "WASD MOVE   //   MOUSE LOOK   //   E INTERACT"
