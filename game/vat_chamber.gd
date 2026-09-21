@@ -1042,14 +1042,23 @@ func _breach() -> void:
 	for index in 46:
 		var shard := MeshInstance3D.new()
 		var mesh := BoxMesh.new()
-		mesh.size = Vector3(0.11 + randf() * 0.22, 0.015, 0.14 + randf() * 0.26)
+		# Wide size spread and real thinness: 46 shards all within a whisker of
+		# the same size read as a pattern, not as something that shattered.
+		var span := randf()
+		mesh.size = Vector3(0.05 + span * 0.30, 0.008, 0.06 + span * span * 0.34)
 		var shard_material := StandardMaterial3D.new()
-		shard_material.albedo_color = Color(0.52, 0.17, 0.13, 0.62) if index % 3 else Color(0.28, 0.08, 0.06, 0.78)
+		# Emission at 0.9 over a 0.62 alpha made these read as flat opaque red
+		# cards rather than glass -- the glow cancelled out the transparency the
+		# alpha was buying. Held low, and tinted toward the smoke-brown of the
+		# glass they came off rather than pure blood.
+		shard_material.albedo_color = Color(0.46, 0.20, 0.15, 0.34) if index % 3 else Color(0.30, 0.12, 0.09, 0.46)
 		shard_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		shard_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		shard_material.metallic = 0.35
+		shard_material.roughness = 0.14
 		shard_material.emission_enabled = true
-		shard_material.emission = Color(0.24, 0.05, 0.03)
-		shard_material.emission_energy_multiplier = 0.9
+		shard_material.emission = Color(0.16, 0.04, 0.03)
+		shard_material.emission_energy_multiplier = 0.22
 		mesh.material = shard_material
 		shard.mesh = mesh
 		# From the wall, not from a point inside the player's chest.
