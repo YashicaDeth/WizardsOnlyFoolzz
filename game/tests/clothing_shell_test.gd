@@ -7,6 +7,7 @@ extends Node
 
 const GARMENT := preload("res://systems/clothing_shell.gd")
 const HUMAN := preload("res://systems/baseline_human.gd")
+const PURSE := preload("res://systems/carry.gd")
 
 var failures: Array[String] = []
 
@@ -58,7 +59,21 @@ func _ready() -> void:
 	check(mended > 0.0 and mended <= 1.0, "cloth comes back by repair (%.2f)" % mended)
 	check(GARMENT.mend(wardrobe, "torso", 99.0) == 1.0, "and never past whole — mending is not armour")
 
-	# --- shredding has a price ------------------------------------------------------
+	# --- the till: mending spends scrip, or refuses ------------------------------------
+	WorldHistory.register_subject("inventory", {"items": [], "rust_scrip": 30})
+	var purse = PURSE.new()
+	var till_ward := GARMENT.fresh_wardrobe()
+	GARMENT.resolve_hit(till_ward, "torso", 30.0, "cut")
+	GARMENT.resolve_hit(till_ward, "torso", 30.0, "cut")
+	var mend_bill: int = GARMENT.price_to_mend(till_ward)
+	var sale: Dictionary = purse.spend_on_mending(till_ward)
+	check(bool(sale.get("ok", false)), "a torn wardrobe mends for %d scrip" % mend_bill)
+	check(int(sale.get("wallet", -1)) == 30 - mend_bill, "taken from the wallet, not the air (%d left)" % int(sale.get("wallet", -1)))
+	check(float(till_ward["torso"]) == 1.0, "and the jacket comes back whole")
+	check(not bool(purse.spend_on_mending(till_ward).get("ok", true)), "whole cloth refuses the till")
+	WorldHistory.register_subject("inventory", {"items": [], "rust_scrip": 0})
+	var broke: Dictionary = purse.spend_on_mending(GARMENT.ruin_wardrobe())
+	check(not bool(broke.get("ok", true)) and str(broke.get("reason", "")) == "NOT ENOUGH SCRIP", "an empty wallet is refused with the reason")
 	check(GARMENT.price_to_mend(GARMENT.fresh_wardrobe()) == 0, "whole cloth costs nothing to mend")
 	var torn := GARMENT.fresh_wardrobe()
 	GARMENT.resolve_hit(torn, "torso", 30.0, "cut")

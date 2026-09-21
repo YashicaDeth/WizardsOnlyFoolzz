@@ -515,6 +515,29 @@ func repay(amount: int, lender_faction: String) -> Dictionary:
 	return {"ok": true, "paid": paid, "owed": int(debts[lender_faction]), "wallet": wallet - paid}
 
 
+## Clothes come back by purchase, and this is the till. Prices the wardrobe's
+## damage through `ClothingShell`, spends rust scrip through the same guarded
+## pattern as `repay()` — capped at the wallet, never below zero — mends every
+## zone it priced, and records the receipt. Nothing owed, nothing to mend, or
+## nothing in the wallet all refuse with a reason instead of half-applying.
+func spend_on_mending(wardrobe: Dictionary) -> Dictionary:
+	var price := ClothingShell.price_to_mend(wardrobe)
+	if price <= 0:
+		return {"ok": false, "reason": "NOTHING TO MEND"}
+	var inventory := WorldHistory.subject("inventory")
+	var wallet := int(inventory.get("rust_scrip", 0))
+	if wallet < price:
+		return {"ok": false, "reason": "NOT ENOUGH SCRIP"}
+	for zone in ClothingShell.ZONES:
+		if wardrobe.has(zone):
+			ClothingShell.mend(wardrobe, zone, 1.0)
+	WorldHistory.begin_ledger_batch()
+	WorldHistory.update_subject("inventory", {"rust_scrip": wallet - price}, "carry_changed")
+	PLAYER_ACTION_LEDGER.record("clothes_mended", {"spent": price, "wallet": wallet - price})
+	WorldHistory.commit_ledger_batch()
+	return {"ok": true, "spent": price, "wallet": wallet - price}
+
+
 ## AL1.2. The bank does not lend against nothing. `borrow()` already writes a
 ## real debt against a real lender; this is the other half — a real lien
 ## written onto one exact carried item, named and found on inspection,

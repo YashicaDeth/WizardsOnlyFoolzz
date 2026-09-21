@@ -56,6 +56,8 @@ func handle_input(event: InputEvent) -> bool:
 					activate_requested.emit(selected)
 			KEY_P:
 				_toggle_pocket()
+			KEY_M:
+				_mend_cloth()
 			_:
 				return false
 		return true
@@ -78,12 +80,38 @@ func _step(by: int) -> void:
 	queue_redraw()
 
 
+func _cloth_mean() -> float:
+	# Mean garment cover across the six zones. Bare zones count as zero cover,
+	# so an undressed rig reads 0% and a half-shredded one reads the middle.
+	if body == null:
+		return 0.0
+	var total := 0.0
+	for zone_id in ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"]:
+		total += clampf(float(body.wardrobe.get(zone_id, 0.0)), 0.0, 1.0)
+	return total / 6.0
+
+
 func _toggle_pocket() -> void:
 	if carry == null or selected < 0 or selected >= carry.items.size():
 		return
 	var item: Dictionary = carry.items[selected]
 	var result: Dictionary = carry.unpocket(selected) if bool(item.get("pocketed", false)) else carry.pocket(selected)
 	set_meta("last_result", str(result.get("reason", "POCKET UPDATED" if bool(result.get("ok", false)) else "REFUSED")))
+	queue_redraw()
+
+
+## Clothes come back by purchase, from this menu. Prices through
+## `ClothingShell`, spends through `Carry`, refreshes the body's garments so
+## the mended cloth shows immediately rather than on the next hit.
+func _mend_cloth() -> void:
+	if carry == null or body == null:
+		return
+	var result: Dictionary = carry.spend_on_mending(body.wardrobe)
+	if bool(result.get("ok", false)):
+		body.dress(body.wardrobe)
+		set_meta("last_result", "CLOTH MENDED // %d SCRIP" % int(result.get("spent", 0)))
+	else:
+		set_meta("last_result", str(result.get("reason", "REFUSED")))
 	queue_redraw()
 
 
@@ -102,7 +130,7 @@ func _draw() -> void:
 	draw_rect(plate, GLASS)
 	draw_rect(plate, INK * Color(1, 1, 1, 0.56), false, 2.0)
 	draw_string(font, plate.position + Vector2(28, 38), "FIELD INVENTORY // ONE BODY, ONE BAG", HORIZONTAL_ALIGNMENT_LEFT, -1, 21, INK)
-	draw_string(font, plate.position + Vector2(28, 62), "O / ESC CLOSE   UP/DOWN SELECT   ENTER USE OR WIELD   P POCKET", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, INK * Color(1, 1, 1, 0.65))
+	draw_string(font, plate.position + Vector2(28, 62), "O / ESC CLOSE   UP/DOWN SELECT   ENTER USE OR WIELD   P POCKET   M MEND CLOTH", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, INK * Color(1, 1, 1, 0.65))
 
 	var body_rect := Rect2(plate.position + Vector2(28, 88), Vector2(250, plate.size.y - 116))
 	var bag_rect := Rect2(Vector2(body_rect.end.x + 24, body_rect.position.y), Vector2(plate.size.x - body_rect.size.x - 330, body_rect.size.y))
@@ -129,7 +157,14 @@ func _draw_body(font: Font, rect: Rect2) -> void:
 		var track := Rect2(Vector2(rect.position.x + 126, y - 10), Vector2(102, 8))
 		draw_rect(track, Color(0.12, 0.10, 0.08))
 		draw_rect(Rect2(track.position, Vector2(track.size.x * ratio, track.size.y)), BLOOD.lerp(MOSS, ratio))
+		# The cloth over the wound, on the same row: flesh above, garment
+		# below, so a glance reads which zones are bare before a fight.
+		var cover := clampf(float(body.wardrobe.get(zone_id, 0.0)), 0.0, 1.0)
+		var hem := Rect2(Vector2(track.position.x, track.end.y + 2), Vector2(track.size.x, 4))
+		draw_rect(hem, Color(0.12, 0.10, 0.08))
+		draw_rect(Rect2(hem.position, Vector2(hem.size.x * cover, hem.size.y)), INK.lerp(Color("3d0907"), 1.0 - cover))
 		y += 38.0
+	draw_string(font, Vector2(rect.position.x + 18, rect.end.y - 72), "CLOTH  %d%% // M MEND (%d)" % [roundi(_cloth_mean() * 100.0), ClothingShell.price_to_mend(body.wardrobe)], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, INK)
 	draw_string(font, Vector2(rect.position.x + 18, rect.end.y - 48), "BLOOD  %d ML" % roundi(body.anatomy.blood_remaining), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, BLOOD)
 	draw_string(font, Vector2(rect.position.x + 18, rect.end.y - 24), "PAIN   %d" % roundi(body.anatomy.pain), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, INK)
 
