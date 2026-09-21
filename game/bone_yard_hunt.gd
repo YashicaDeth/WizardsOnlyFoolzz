@@ -1484,6 +1484,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			_cycle_lock(1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			_cycle_lock(-1)
+	elif event is InputEventMouseButton and event.pressed and arsenal != null:
+		# Unlocked, the wheel is the weapon wheel. The number keys only reach
+		# the three issued slots, so a rifle or a breach nine picked up in the
+		# world had no key at all once you switched off it -- this is the way
+		# back to it, and it wraps, so there is no dead end.
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_cycle_carried_weapon(1)
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_cycle_carried_weapon(-1)
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
 		if smoke_model != null and is_instance_valid(smoke_model) and not smoke_weapon_drawn:
 			if event.pressed:
@@ -3871,6 +3880,17 @@ func bare_hand_attack(heavy := false) -> Dictionary:
 		"cooldown": 0.42 if heavy else 0.26,
 		"heavy": heavy,
 	}
+
+
+## Step the wheel through everything in hand, issued or found.
+func _cycle_carried_weapon(step: int) -> void:
+	if arsenal == null:
+		return
+	var held: Array[String] = arsenal.carried()
+	if held.size() <= 1:
+		return
+	var at := held.find(str(arsenal.current_id))
+	_equip_weapon(posmod((at if at >= 0 else 0) + step, held.size()))
 
 
 func _equip_weapon(slot: int) -> void:

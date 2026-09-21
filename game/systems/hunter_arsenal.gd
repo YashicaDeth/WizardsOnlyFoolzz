@@ -94,6 +94,12 @@ var ammo := {
 	"sidearm": {"loaded": 10, "reserve": 50},
 	"facility_sidearm": {"loaded": 0, "reserve": 0, "spare_magazines": []},
 }
+## Weapons picked up rather than issued.
+##
+## Tracked separately and explicitly, because `ammo` cannot answer the
+## question: `facility_sidearm` has an entry in it from the start, at zero
+## rounds, so "has an ammo record" is true for a gun nobody has ever held.
+var acquired: Dictionary = {}
 ## AN2.4. Missing means unworn — a weapon starts at full condition and this
 ## dict only ever gains an entry the first time something actually wears it,
 ## the same lazy shape `ammo` above would use if a fresh magazine were free.
@@ -197,13 +203,59 @@ func _update_reload_visual() -> void:
 		magazine.position = (rest + MAGAZINE_DROP).lerp(rest, (progress - 0.66) / 0.34)
 
 
+## Everything actually in hand: the issued three, then anything picked up.
+##
+## `SLOT_ORDER` is what the hunter is *issued* and stays three, which is what
+## the rack and the loadout are built on. What they are *carrying* is a
+## different question, and it is the one the number keys should have been
+## asking all along.
+func carried() -> Array[String]:
+	var held: Array[String] = []
+	held.assign(SLOT_ORDER)
+	for weapon_id: String in acquired:
+		if not held.has(weapon_id):
+			held.append(weapon_id)
+	return held
+
+
+## Select by position in what you are carrying.
+##
+## This used to index `SLOT_ORDER` and refuse anything past its three entries,
+## and `acquire_sniper()` / `acquire_facility_sidearm()` set `current_id`
+## directly without going through a slot at all. So a rifle you picked up was
+## in your hands right up until you pressed 1, and then it was gone -- still
+## owned, still loaded, still in `models`, and unreachable by any input in the
+## game. Greg: *"you pretty quickly cant reaccess the guns you loaded in on
+## your character"*. That was this line.
+##
+## Positions 0-2 are unchanged, so every existing caller that looks a weapon up
+## with `SLOT_ORDER.find()` still lands on the same index.
 func select_slot(slot: int) -> bool:
-	if slot < 0 or slot >= SLOT_ORDER.size() or reload_remaining > 0.0 or jam_clear_remaining > 0.0:
+	var held := carried()
+	if slot < 0 or slot >= held.size() or reload_remaining > 0.0 or jam_clear_remaining > 0.0:
 		return false
-	current_id = SLOT_ORDER[slot]
+	current_id = held[slot]
 	_update_models()
 	equipped.emit(current_id)
 	return true
+
+
+## The same thing by name, for callers that know what they want rather than
+## where it sits -- a rack pickup, a loadout, a save being restored.
+func select_weapon(weapon_id: String) -> bool:
+	return select_slot(carried().find(weapon_id))
+
+
+## Step through what you are carrying. `step` is +1 or -1 and it wraps, so
+## there is always a way back round to a weapon rather than a dead end.
+func cycle(step: int) -> bool:
+	var held := carried()
+	if held.size() <= 1:
+		return false
+	var at := held.find(current_id)
+	if at < 0:
+		at = 0
+	return select_slot(posmod(at + step, held.size()))
 
 
 func current() -> Dictionary:
@@ -276,6 +328,7 @@ func acquire_sniper(rounds_left: int = -1) -> bool:
 		"spare_magazines": [],
 	}
 	current_id = "sniper"
+	acquired["sniper"] = true
 	if hand != null and not models.has(current_id):
 		var model := _build_weapon_model(current_id)
 		hand.add_child(model)
@@ -298,6 +351,7 @@ func acquire_facility_sidearm(rounds_left: int) -> bool:
 		"spare_magazines": [],
 	}
 	current_id = "facility_sidearm"
+	acquired["facility_sidearm"] = true
 	if hand != null and not models.has(current_id):
 		var model := _build_weapon_model(current_id)
 		hand.add_child(model)
