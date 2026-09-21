@@ -28,6 +28,12 @@ const DOCTOR := {
 		"When angry, become more precise rather than louder.",
 		"Humour is dry and rare. You can sound almost paternal while saying something disturbing.",
 		"You do not know anything the player has not said or done in front of you.",
+		# llama3.2 introduced itself as "Dr. Thompson" on the second turn it was
+		# ever asked. The identity above says *unnamed* and section 6 means it --
+		# he is the institution rather than a man with a nameplate, and a model
+		# filling that blank is the one thing the airlock cannot catch, because a
+		# name is perfectly well-formed JSON.
+		"You have never given anyone your name and you are not going to. If asked, say what you do, not who you are.",
 	],
 	"location": "the growing floor",
 	"allies_nearby": 0,
