@@ -157,6 +157,28 @@ static func register_organ(node: RigidBody3D, organ_id: String, zone: String, su
 	return info
 
 
+## What a broken bone in this zone actually looks like.
+##
+## Every zone threw `long_bone()`, so a skull shattered into femur shards and
+## so did a ribcage -- the one shape in the body that only a limb has. The bone
+## that breaks should be the bone that was there: a cranium comes away as
+## curved plate, a chest as a length of rib, and a limb as the long bone it is.
+##
+## Returned rather than assigned so the choice can be tested on its own. The
+## two arc shapes lie in XZ with their thickness in Y, which is what makes a
+## plate read as flat; `long_bone()` revolves along Y, which is what makes a
+## shaft read as long.
+static func bone_fragment(zone: String, rng: RandomNumberGenerator) -> Dictionary:
+	match zone:
+		"head":
+			var plate := rng.randf_range(0.030, 0.052)
+			return {"mesh": BodyMesh.arc_tube(plate, plate * 0.74, 0.0065, PI * 0.16, PI * 0.60, 6), "extent": plate}
+		"torso":
+			var rib := rng.randf_range(0.052, 0.092)
+			return {"mesh": BodyMesh.arc_tube(rib, rib * 0.64, 0.0085, PI * 0.16, PI * 0.68, 6), "extent": rib}
+	return {"mesh": BodyMesh.long_bone(rng.randf_range(0.06, 0.13), rng.randf_range(0.007, 0.013)), "extent": 0.07}
+
+
 ## The slab a cut took off -- a cranium, a chest wall.
 ##
 ## It is neither of the other two kinds and had nowhere to go. A `burst()`
@@ -315,8 +337,9 @@ static func _make_chunk(layer: int, zone: String, subject_id: String, info: Dict
 			mesh_instance.mesh = BodyMesh.twisted_strand(strand_length, strand_radius, mesh_seed)
 			extent = strand_length * 0.5
 		Layer.BONE:
-			mesh_instance.mesh = BodyMesh.long_bone(rng.randf_range(0.06, 0.13), rng.randf_range(0.007, 0.013))
-			extent = 0.07
+			var fragment := bone_fragment(zone, rng)
+			mesh_instance.mesh = fragment.mesh as ArrayMesh
+			extent = float(fragment.extent)
 		Layer.ORGAN:
 			mesh_instance.mesh = BodyMesh.lump(0.055, mesh_seed, 10)
 			extent = 0.055

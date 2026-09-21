@@ -35,8 +35,10 @@ TIMEOUT="${ATG_TEST_TIMEOUT:-200}"
 # touched most. Not a substitute for --all, just the set worth the wait.
 CORE=(
   baseline_human_test body_slice_test body_cut_test cavity_test
+  bone_fragment_test
   npc_conversation_test npc_relationship_test npc_async_turn_test
   npc_voice_test spoken_contact_test kill_shot_test sniper_killcam_test
+  skull_burst_test
   world_clock_test opening_handoff_test opening_direction_test
   arsenal_test armor_resolution_test blood_flow_test
 )
