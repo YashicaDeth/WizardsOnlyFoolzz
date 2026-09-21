@@ -22,6 +22,7 @@ var gate_open := false
 var gate_body: StaticBody3D
 var gate_panel: Node3D
 var card_visual: MeshInstance3D
+var card_beacon: OmniLight3D
 
 @onready var objective: Label = $HUD/Objective
 @onready var prompt: Label = $HUD/Prompt
@@ -144,6 +145,16 @@ func _build_landmarks() -> void:
 	card_light.light_energy = 3.6
 	card_light.omni_range = 4.0
 	add_child(card_light)
+	card_beacon = card_light
+	var card_label := Label3D.new()
+	card_label.text = "STAFF ACCESS CARD\n[ E ] TAKE"
+	card_label.font_size = 42
+	card_label.outline_size = 8
+	card_label.modulate = Color("f0a45c")
+	card_label.outline_modulate = Color("1b0805")
+	card_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	card_label.position = CARD_AT + Vector3(0, 0.85, 0)
+	add_child(card_label)
 	# Pressure gate is a real collision barrier until the card is used.
 	gate_body = _slab(Vector3(5.0, 5.5, 0.45), GATE_AT + Vector3(0, 2.75, 0), "metal", Color("3b2119"))
 	gate_panel = Node3D.new()
@@ -199,6 +210,11 @@ func _physics_process(delta: float) -> void:
 	player.move_and_slide()
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
+	# The arcade is a route, not a lockout puzzle. If the card was collected,
+	# entering the obvious pressure-gate threshold opens it even if an input
+	# event was swallowed by the transition frame.
+	if card_taken and not gate_open and _flat_distance(GATE_AT) <= 4.4:
+		_open_gate()
 	_update_hud()
 
 func _flat_distance(at: Vector3) -> float:
@@ -210,18 +226,25 @@ func _interact() -> void:
 	if not card_taken and _flat_distance(CARD_AT) <= 2.3:
 		card_taken = true
 		card_visual.visible = false
+		card_beacon.visible = false
 		WorldHistory.record_event("service_arcade_keycard_taken", {"location": "service_arcade"})
 		return
 	if not gate_open and _flat_distance(GATE_AT) <= 3.2 and card_taken:
-		gate_open = true
-		gate_body.queue_free()
-		gate_panel.position.y = 5.8
-		WorldHistory.record_event("service_arcade_pressure_gate_opened", {"location": "service_arcade"})
+		_open_gate()
 		return
 	if gate_open and _flat_distance(EXIT_AT) <= 3.0:
 		_record_pit_entry()
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		Interstitial.travel("res://underground_colosseum.tscn", "pressure gate open // the heat below is awake")
+
+func _open_gate() -> void:
+	if gate_open:
+		return
+	gate_open = true
+	if gate_body != null:
+		gate_body.queue_free()
+	gate_panel.position.y = 5.8
+	WorldHistory.record_event("service_arcade_pressure_gate_opened", {"location": "service_arcade"})
 
 func _record_pit_entry() -> void:
 	if OPENING.reached("entered_pit"):
@@ -235,7 +258,7 @@ func _record_pit_entry() -> void:
 
 func _update_hud() -> void:
 	vitals.text = "BLOOD 100%   PAIN 86   DECANTED"
-	objective.text = "OBJECTIVE\n" + ("REACH THE PRESSURE GATE" if card_taken else "FIND A STAFF ACCESS CARD")
+	objective.text = "OBJECTIVE\n" + ("FOLLOW THE HEAT" if gate_open else ("REACH THE PRESSURE GATE" if card_taken else "FIND THE ORANGE STAFF CARD"))
 	if not card_taken and _flat_distance(CARD_AT) <= 2.3:
 		prompt.text = "[E] TAKE STAFF ACCESS CARD"
 	elif not gate_open and _flat_distance(GATE_AT) <= 3.2:
