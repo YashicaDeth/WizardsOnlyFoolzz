@@ -10,6 +10,7 @@ const OPENING := preload("res://systems/opening_director.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const ENTRY := Vector3(0, 1.0, 4.0)
 const CARD_AT := Vector3(-3.8, 0.95, -20.0)
+const WEAPON_AT := Vector3(3.8, 0.78, -11.5)
 const GATE_AT := Vector3(0, 0.0, -48.0)
 const EXIT_AT := Vector3(0, 0.0, -55.0)
 
@@ -23,6 +24,8 @@ var gate_body: StaticBody3D
 var gate_panel: Node3D
 var card_visual: MeshInstance3D
 var card_beacon: OmniLight3D
+var weapon_taken := false
+var weapon_visual: MeshInstance3D
 
 @onready var objective: Label = $HUD/Objective
 @onready var prompt: Label = $HUD/Prompt
@@ -155,6 +158,21 @@ func _build_landmarks() -> void:
 	card_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	card_label.position = CARD_AT + Vector3(0, 0.85, 0)
 	add_child(card_label)
+	weapon_visual = MeshInstance3D.new()
+	var weapon_mesh := BoxMesh.new()
+	weapon_mesh.size = Vector3(0.16, 0.16, 1.15)
+	weapon_mesh.material = WorldLook.surface(Color("6d3a22"), "metal", 710)
+	weapon_visual.mesh = weapon_mesh
+	weapon_visual.position = WEAPON_AT
+	weapon_visual.rotation_degrees.y = 34.0
+	add_child(weapon_visual)
+	var weapon_label := Label3D.new()
+	weapon_label.text = "BREACH TOOL\n[ E ] ARM"
+	weapon_label.font_size = 36
+	weapon_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	weapon_label.modulate = Color("e58b42")
+	weapon_label.position = WEAPON_AT + Vector3(0, 0.7, 0)
+	add_child(weapon_label)
 	# Pressure gate is a real collision barrier until the card is used.
 	gate_body = _slab(Vector3(5.0, 5.5, 0.45), GATE_AT + Vector3(0, 2.75, 0), "metal", Color("3b2119"))
 	gate_panel = Node3D.new()
@@ -229,6 +247,11 @@ func _interact() -> void:
 		card_beacon.visible = false
 		WorldHistory.record_event("service_arcade_keycard_taken", {"location": "service_arcade"})
 		return
+	if not weapon_taken and _flat_distance(WEAPON_AT) <= 2.3:
+		weapon_taken = true
+		weapon_visual.visible = false
+		WorldHistory.record_event("service_arcade_breach_tool_taken", {"location": "service_arcade"})
+		return
 	if not gate_open and _flat_distance(GATE_AT) <= 3.2 and card_taken:
 		_open_gate()
 		return
@@ -258,7 +281,9 @@ func _record_pit_entry() -> void:
 
 func _update_hud() -> void:
 	vitals.text = "BLOOD 100%   PAIN 86   DECANTED"
-	objective.text = "OBJECTIVE\n" + ("FOLLOW THE HEAT" if gate_open else ("REACH THE PRESSURE GATE" if card_taken else "FIND THE ORANGE STAFF CARD"))
+	objective.text = "OBJECTIVE\n" + ("FOLLOW THE HEAT" if gate_open else ("REACH THE PRESSURE GATE" if card_taken and weapon_taken else ("FIND THE BREACH TOOL" if not weapon_taken else "FIND THE ORANGE STAFF CARD")))
+	if weapon_taken:
+		vitals.text += "   BREACH TOOL // READY"
 	if not card_taken and _flat_distance(CARD_AT) <= 2.3:
 		prompt.text = "[E] TAKE STAFF ACCESS CARD"
 	elif not gate_open and _flat_distance(GATE_AT) <= 3.2:
