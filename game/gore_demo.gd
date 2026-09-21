@@ -80,6 +80,11 @@ const LIMB_MOMENTUM := preload("res://systems/limb_momentum.gd")
 ## along and the sandbox drew its own smaller version of -- so the range has
 ## been showing a different game to the one it is a range for.
 const FIELD_HUD := preload("res://systems/gothic_field_hud.gd")
+## The satellite the minimap is a picture from. `gothic_field_hud._draw_minimap`
+## returns on the first line when `minimap_texture` is null, so the panel came
+## across with its bottom-left corner simply missing -- the one thing Greg
+## pointed at. The image is the live region camera, not a radar the HUD draws.
+const LIVING_MAP := preload("res://systems/living_map.gd")
 
 const BODY_COUNT := 7
 const ARENA := 26.0
@@ -149,6 +154,7 @@ var impact_feel: Node
 var hud: Control
 var kill_cam: KillCam
 var field_hud: Control
+var living_map: Control
 
 ## The arm the sword is on. The Hunt has had one since AN1 and the range never
 ## did, which is why a swing here landed square across a limb whatever it was
@@ -722,7 +728,17 @@ func _feed_field_hud() -> void:
 	if field_hud == null or not is_instance_valid(field_hud):
 		return
 	var current: Dictionary = arsenal.current() if arsenal != null else {}
+	# `update_minimap` refuses while the full map is open, which it never is
+	# here, and returns null until the satellite has a frame -- the panel
+	# handles null by drawing nothing, so the corner fills in when it is ready
+	# rather than needing to be waited for.
+	var local_map: Texture2D = null
+	if living_map != null and is_instance_valid(living_map):
+		living_map.call("observe", eye, yaw)
+		local_map = living_map.call("update_minimap", get_process_delta_time()) as Texture2D
 	field_hud.call("set_state", {
+		"minimap_texture": local_map,
+		"minimap_heading": yaw,
 		"health": float(simulation_health),
 		"stamina": stamina,
 		"blood": clampf(float(simulation_health) / 100.0, 0.0, 1.0),
@@ -1930,6 +1946,14 @@ func _build_hud() -> void:
 	field_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	field_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(field_hud)
+	# Never shown as a full screen here: the range is one room and there is
+	# nowhere to travel to. It is carried purely for the satellite feeding the
+	# corner of the panel.
+	living_map = LIVING_MAP.new()
+	living_map.name = "LivingMap"
+	living_map.visible = false
+	layer.add_child(living_map)
+	living_map.call("attach_world", get_world_3d())
 	hud.draw.connect(_paint_hud)
 	layer.add_child(hud)
 	# Above the readouts, because when it fires it is the only thing to look at.
