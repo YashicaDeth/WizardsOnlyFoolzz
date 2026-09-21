@@ -36,6 +36,7 @@ const WORLD_INDEX := preload("res://systems/world_index.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const WIRE_RADIO := preload("res://systems/wire_radio.gd")
 const CARRY := preload("res://systems/carry.gd")
+const BRAIN_INDEX := preload("res://systems/brain_index.gd")
 const SIGNAL_FIELD := preload("res://systems/signal_field.gd")
 const RADIAL := preload("res://systems/radial_menu.gd")
 const RADIO_AUDIO := preload("res://systems/radio_audio.gd")
@@ -114,6 +115,10 @@ var page_transition_style := "shutter"
 ## Which thing in the bag is under the hand. The CARRY page had no selection at
 ## all, which was fine when it was a table and is not now that it is objects.
 var carry_index := 0
+## The brain is reached through the body shown on the carry page.  It belongs
+## to the player, not to the generic INDEX tabs.
+var brain_index_open := false
+var brain_index_hotspot := Rect2()
 ## A radio lead requires a deliberate continuous hold. Page visibility is not
 ## input: merely looking at RADIO must never finish a lock by itself.
 var radio_lock_held := false
@@ -597,7 +602,11 @@ func _gui_input(event: InputEvent) -> void:
 				radio.release_lock()
 			accept_event()
 		elif button.pressed and _content_rect.has_point(button.position) and displayed_mode() == "CARRY":
-			pin_selected_part()
+			if brain_index_hotspot.has_point(button.position):
+				brain_index_open = not brain_index_open
+				queue_redraw()
+			else:
+				pin_selected_part()
 			accept_event()
 	elif button.pressed and button.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 		var direction := -1 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 1
@@ -1888,15 +1897,27 @@ func _draw_carry_loadout(rect: Rect2, alpha: float) -> void:
 func _draw_carry_inspection(rect: Rect2, alpha: float) -> void:
 	draw_rect(rect, Color(0, 0, 0, 0.24 * alpha))
 	draw_rect(rect, CASE_EDGE * Color(1, 1, 1, 0.38 * alpha), false, 1.0)
-	CellOutzType.draw_condensed(self, rect.position + Vector2(10, 10), "HAND / INSPECTION", 9.0, AMBER * Color(1, 1, 1, alpha), 0.68)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(10, 10), "BODY / NEURAL ACCESS", 9.0, AMBER * Color(1, 1, 1, alpha), 0.68)
+	var silhouette := rect.get_center() + Vector2(0, 8)
+	# The player is deliberately present in their own inventory.  The head is a
+	# hardware access point, not decorative character-paper-doll art.
+	brain_index_hotspot = Rect2(silhouette + Vector2(-18, -rect.size.y * 0.31), Vector2(36, 36))
+	draw_circle(brain_index_hotspot.get_center(), 16, Color("55342a") * Color(1, 1, 1, 0.8 * alpha))
+	draw_circle(brain_index_hotspot.get_center(), 16, (AMBER if brain_index_open else CASE_EDGE) * Color(1, 1, 1, alpha), false, 1.0)
+	draw_rect(Rect2(silhouette + Vector2(-14, -rect.size.y * 0.16), Vector2(28, rect.size.y * 0.36)), Color("34221d") * Color(1, 1, 1, 0.82 * alpha))
+	draw_line(silhouette + Vector2(-30, -rect.size.y * 0.09), silhouette + Vector2(30, -rect.size.y * 0.09), CASE_EDGE * Color(1, 1, 1, 0.6 * alpha), 3.0)
+	CellOutzType.draw_condensed(self, brain_index_hotspot.position + Vector2(-12, 39), "BRAIN CHIP", 6.0, AMBER * Color(1, 1, 1, 0.9 * alpha), 0.46)
+	if brain_index_open:
+		_draw_brain_index_overlay(rect, alpha)
+		return
 	if carry.items.is_empty():
-		CellOutzType.draw_condensed(self, rect.position + Vector2(13, 40), "NO OBJECT SELECTED", 9.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.62)
+		CellOutzType.draw_condensed(self, rect.position + Vector2(13, rect.end.y - 30), "NO OBJECT SELECTED", 9.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.62)
 		return
 	carry_index = posmod(carry_index, carry.items.size())
 	var item: Dictionary = carry.items[carry_index]
 	var kind := "limb" if bool(item.get("whole_limb", false)) else str(item.get("kind", "goods"))
-	var centre := rect.get_center() + Vector2(0, 5)
-	var radius := minf(rect.size.x, rect.size.y) * 0.23
+	var centre := rect.get_center() + Vector2(0, rect.size.y * 0.19)
+	var radius := minf(rect.size.x, rect.size.y) * 0.17
 	draw_arc(centre, radius + 12, 0.0, TAU, 22, AMBER * Color(1, 1, 1, (0.48 + 0.2 * sin(elapsed * 3.0)) * alpha), 1.2)
 	draw_line(centre + Vector2(-radius - 19, 0), centre + Vector2(radius + 19, 0), CASE_EDGE * Color(1, 1, 1, 0.24 * alpha), 1.0)
 	draw_line(centre + Vector2(0, -radius - 19), centre + Vector2(0, radius + 19), CASE_EDGE * Color(1, 1, 1, 0.24 * alpha), 1.0)
@@ -1905,6 +1926,28 @@ func _draw_carry_inspection(rect: Rect2, alpha: float) -> void:
 	CellOutzType.draw_condensed(self, Vector2(rect.get_center().x - CellOutzType.width_condensed(name, 9.0, 0.65) * 0.5, rect.end.y - 38), name, 9.0, INK * Color(1, 1, 1, alpha), 0.65)
 	var specimen := "%0.1f KG // %s" % [float(item.get("mass", 0.0)), "POCKET" if bool(item.get("pocketed", false)) else "BAG"]
 	CellOutzType.draw_condensed(self, Vector2(rect.get_center().x - CellOutzType.width_condensed(specimen, 7.0, 0.55) * 0.5, rect.end.y - 23), specimen, 7.0, CASE_EDGE * Color(1, 1, 1, 0.8 * alpha), 0.55)
+
+
+func _draw_brain_index_overlay(rect: Rect2, alpha: float) -> void:
+	var panel := Rect2(rect.position + Vector2(7, 26), rect.size - Vector2(14, 33))
+	draw_rect(panel, Color("120b0a") * Color(1, 1, 1, 0.96 * alpha))
+	draw_rect(panel, AMBER * Color(1, 1, 1, alpha), false, 1.0)
+	CellOutzType.draw_condensed(self, panel.position + Vector2(8, 8), "WETWIRE // BRAIN INDEX", 9.0, AMBER * Color(1, 1, 1, alpha), 0.66)
+	var chip: Dictionary = BRAIN_INDEX.chip("player")
+	var owner := str(chip.get("owner_faction", "NOT DETECTED")).to_upper()
+	CellOutzType.draw_condensed(self, panel.position + Vector2(8, 22), "CHIP OWNER: " + owner, 7.0, CASE_EDGE * Color(1, 1, 1, alpha), 0.54)
+	var folders: Dictionary = BRAIN_INDEX.folder_counts("player")
+	var folder_ids := ["memory", "combat", "people", "places", "carry", "trauma"]
+	for index in folder_ids.size():
+		var folder_id: String = folder_ids[index]
+		var details: Dictionary = folders.get(folder_id, {})
+		var name := str((BRAIN_INDEX.FOLDERS.get(folder_id, {}) as Dictionary).get("label", folder_id)).to_upper()
+		var state := "%02d / %02d" % [int(details.get("open", 0)), int(details.get("total", 0))]
+		var line := panel.position + Vector2(9, 39 + float(index) * 17.0)
+		draw_rect(Rect2(line - Vector2(2, 2), Vector2(panel.size.x - 14, 13)), Color(0.12, 0.06, 0.04, 0.7 * alpha))
+		CellOutzType.draw_condensed(self, line, _fit(name, panel.size.x - 55, 7.0, 0.55), 7.0, INK * Color(1, 1, 1, alpha), 0.55)
+		CellOutzType.draw_condensed(self, Vector2(panel.end.x - 35, line.y), state, 7.0, MOSS * Color(1, 1, 1, alpha), 0.55)
+	CellOutzType.draw_condensed(self, panel.position + Vector2(8, panel.size.y - 15), "CLICK HEAD TO CLOSE", 7.0, CASE_EDGE * Color(1, 1, 1, 0.8 * alpha), 0.52)
 
 
 func _draw_carry_grid(rect: Rect2, alpha: float) -> void:
