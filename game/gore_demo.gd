@@ -2072,8 +2072,23 @@ func _paint_hud() -> void:
 	# a 20-cap title at y=34 ends at y=54 and the strapline started at exactly
 	# y=54 — no gap at all, and the title's own 2.6px stroke then ran straight
 	# through the line below it. Set on a real leading instead.
-	CellOutzType.draw_text(hud, Vector2(26, 32), "GORE SANDBOX", 20.0, bone * Color(1, 1, 1, 0.85), 2.0)
-	CellOutzType.draw_condensed(hud, Vector2(26, 62), "WIZARDS ONLY FOOLS  //  NOTHING HERE IS A MOCK-UP", 9.0, bone * Color(1, 1, 1, 0.4), 2.2)
+	# Everything this scene draws that the Hunt does not is reference material,
+	# and it now lives behind F1 rather than on top of the game.
+	#
+	# Greg, looking at the range beside the world: *"remove this green text top
+	# right and the controls at the bottom"*, *"make it all match and the
+	# same"*. The green telemetry sat directly over the vitals vessels
+	# `gothic_field_hud` draws, and the key strip sat directly over the one it
+	# draws too -- the exact double strip the Hunt removed for itself in I3,
+	# rebuilt here by adding the Hunt panel underneath the sandbox one.
+	#
+	# The rule now is simply: if the Hunt does not show it, it is behind F1.
+	if controls_expanded:
+		# Something to read it against. The reference is text over a live 3D
+		# scene, and at a glance the two were indistinguishable.
+		hud.draw_rect(Rect2(0, 0, size.x, size.y), Color(0.02, 0.015, 0.02, 0.86))
+		CellOutzType.draw_text(hud, Vector2(26, 32), "GORE SANDBOX", 20.0, bone * Color(1, 1, 1, 0.85), 2.0)
+		CellOutzType.draw_condensed(hud, Vector2(26, 62), "WIZARDS ONLY FOOLS  //  NOTHING HERE IS A MOCK-UP", 9.0, bone * Color(1, 1, 1, 0.4), 2.2)
 
 	var compact := size.x < 900.0 or size.y < 560.0
 	var keys := [["F1", "CONTROLS"], ["G", "DEVICE"], ["H", "DUMMIES"]] if compact else [
@@ -2090,6 +2105,10 @@ func _paint_hud() -> void:
 			["RMB", "GUARD (MOUSE PICKS SIDE)"], ["V", "1ST/3RD PERSON"],
 			["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["CTRL", "CROUCH"], ["F1", "LESS CONTROLS"],
 		]
+	# Emptied rather than branched around, so the layout below stays one code
+	# path and cannot drift from the expanded one.
+	if not controls_expanded:
+		keys = []
 	var row_size := 3 if compact and not controls_expanded else (7 if controls_expanded else 4)
 	var row_count := ceili(float(keys.size()) / float(row_size))
 	for index in keys.size():
@@ -2176,6 +2195,11 @@ func _paint_hud() -> void:
 			float(last_shot_readout.get("drop_cm", 0.0)),
 			str(last_shot_readout.get("penetration", "NO BODY READ")),
 		])
+	# The green block. It is the single worst offender: it drew straight over
+	# the blood and stamina vessels in the top right corner of the Hunt panel,
+	# so the two readouts were legible only in the gaps between each other.
+	if not controls_expanded:
+		lines = []
 	var y := 40.0
 	var telemetry_cap := 8.5 if compact else 11.0
 	var telemetry_spacing := 14.0 if compact else 18.0
@@ -2188,7 +2212,7 @@ func _paint_hud() -> void:
 		carry_line += "%d:%s  " % [index + 1, str((carried_substances[index] as Dictionary).get("id", "?")).to_upper()]
 	if carried_substances.is_empty() and _near_pickup_source():
 		carry_line += "EMPTY // [E] TAKE"
-	if not carried_substances.is_empty() or _near_pickup_source():
+	if controls_expanded and (not carried_substances.is_empty() or _near_pickup_source()):
 		var carry_cap := 8.5 if compact else 10.0
 		var carry_width := CellOutzType.width_condensed(carry_line, carry_cap, 1.8)
 		CellOutzType.draw_condensed(hud, Vector2(right_edge - carry_width, y + 10.0), carry_line, carry_cap, bone * Color(1, 1, 1, 0.62), 1.8)
@@ -2204,6 +2228,13 @@ func _paint_hud() -> void:
 		var label_width := CellOutzType.width(label, 26.0, 6.0)
 		CellOutzType.draw_text(hud, Vector2(size.x * 0.5 - label_width * 0.5, size.y * 0.5 - 120.0),
 			label, 26.0, acid * Color(1, 1, 1, slowed * 0.5), 6.0)
+
+	# One line, bottom right, so a scene with its chrome hidden still tells you
+	# the chrome exists. It is the only permanent sandbox-only mark left.
+	var hint := "F1  REFERENCE"
+	var hint_width := CellOutzType.width_condensed(hint, 8.5, 1.6)
+	CellOutzType.draw_condensed(hud, Vector2(size.x - 26.0 - hint_width, size.y - 30.0), hint, 8.5,
+		bone * Color(1, 1, 1, 0.22), 1.6)
 
 	if note_life > 0.0 and last_note != "":
 		var note_width := CellOutzType.width(last_note, 17.0, 3.0)
