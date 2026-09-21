@@ -26,9 +26,17 @@ TEMP=P:/GameDev/Temp TMP=P:/GameDev/Temp ATG_TEST_MODE=1 "P:/GameDev/Tools/Godot
 
 Use the `_console` binary — the other one swallows stdout on Windows.
 
-Tests print `PASS `/`FAIL ` per check and end with `<NAME>_TEST_RESULT
-failures=N`. A few older ones print `failures: N` instead, so grepping only for
-`_TEST_RESULT` will silently miss them. Grep for `^FAIL` as well.
+Or run a set and have them reported uniformly:
+
+```bash
+tools/run_tests.sh --core
+```
+
+Only 268 of the 495 scenes end with `<NAME>_RESULT failures=N`. The rest print
+`failures: N`, or a sentence, or only `ok`/`PASS` lines with no summary at all,
+so grepping the suite for failures finds nothing and says nothing -- which
+reads exactly like everything passing. The runner goes by exit code and counts
+`^FAIL` lines too. If you run a scene by hand, do both.
 
 ## 3. Traps that cost real time
 
