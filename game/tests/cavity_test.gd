@@ -92,6 +92,37 @@ func _ready() -> void:
 	check(triangles_in(limb.mesh) == limb_opened_faces, "so robbing two implants out of one arm does not whittle it away")
 	check(not Cavity.is_open(rig, "right_arm"), "and the other arm is still shut")
 
+	print("-- a body standing at an angle opens the same as one standing square --")
+	# `reach` was taken from the bounding box, which is the support of the box
+	# rather than of the mesh inside it. That is exact only when the cut runs
+	# down an axis, so a body standing at any other angle put the plane outside
+	# its own surface and the cut silently found nothing. Bodies stand at
+	# whatever angle they died at, so this was nearly all of them.
+	var turned := BaselineHuman.new()
+	add_child(turned)
+	turned.build("turned_subject", {})
+	# Deliberately off-axis: the failing case measured 0.143 against a skull
+	# that ends at 0.106, and a round number like 90 degrees would hide it.
+	turned.rotation.y = deg_to_rad(64.0)
+	var turned_head := turned.parts.head as MeshInstance3D
+	var turned_before := triangles_in(turned_head.mesh)
+	var turned_cut := Cavity.open_zone(turned, "head", -turned_head.global_transform.basis.z)
+	check(not turned_cut.is_empty(), "a head on a body turned 64 degrees still opens")
+	check(float(turned_cut.get("area", 0.0)) > 0.0, "with a real opening (%.5f)" % float(turned_cut.get("area", 0.0)))
+	check(triangles_in(turned_head.mesh) != turned_before, "and the mesh on the body actually changed")
+	# The cut is taken in world space, so the answer must not depend on which
+	# way the body happens to be facing.
+	var square := BaselineHuman.new()
+	add_child(square)
+	square.build("square_subject", {})
+	var square_head := square.parts.head as MeshInstance3D
+	var square_cut := Cavity.open_zone(square, "head", -square_head.global_transform.basis.z)
+	var turned_area := float(turned_cut.get("area", 0.0))
+	var square_area := float(square_cut.get("area", 0.0))
+	check(absf(turned_area - square_area) < 0.004, "and opens about as wide either way (%.5f against %.5f)" % [turned_area, square_area])
+	turned.queue_free()
+	square.queue_free()
+
 	print("-- a cut that finds nothing changes nothing --")
 	var arm := rig.parts.right_arm as MeshInstance3D
 	var arm_before := triangles_in(arm.mesh)

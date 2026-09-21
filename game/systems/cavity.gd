@@ -67,7 +67,7 @@ static func open(part: MeshInstance3D, facing: Vector3, depth := WALL_DEPTH) -> 
 	# How far the body reaches along the cut direction, so the plane sits under
 	# the near surface rather than at some fixed distance from the middle -- a
 	# chest and a forearm are opened by the same call.
-	var reach := absf(bounds.size.dot(local_normal.abs())) * 0.5
+	var reach := _support(part.mesh, centre, local_normal)
 	if reach <= depth:
 		return nothing
 	var plane := Plane(local_normal, centre + local_normal * (reach - depth))
@@ -84,6 +84,32 @@ static func open(part: MeshInstance3D, facing: Vector3, depth := WALL_DEPTH) -> 
 		"area": float(halves.area),
 		"centre": halves.centre,
 	}
+
+
+## How far the part actually reaches along the cut direction.
+##
+## This was taken from the bounding box -- `size.dot(normal.abs()) * 0.5` --
+## which is the support of the *box*, and exact only when the direction is
+## axis-aligned. A body standing at any other angle makes it an overestimate,
+## because the mesh is inscribed in its box rather than filling it. A head at
+## sixty-four degrees measured 0.143 where the skull actually ends at 0.106, so
+## the plane was placed five millimetres outside the mesh, `BodySlice` found
+## nothing on one side of it, and `open()` returned "no opening worth making".
+##
+## It failed silently and it failed for nearly everybody: bodies stand at
+## whatever angle they died at, and only one square to the cut measured right.
+## Reading the vertices is exact for any mesh and any direction, and it happens
+## once per dig rather than per frame.
+static func _support(mesh: Mesh, centre: Vector3, direction: Vector3) -> float:
+	var reach := 0.0
+	for surface_index in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(surface_index)
+		if arrays.is_empty() or arrays[Mesh.ARRAY_VERTEX] == null:
+			continue
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		for vertex in vertices:
+			reach = maxf(reach, (vertex - centre).dot(direction))
+	return reach
 
 
 ## The same cut, applied to a rig's zone, with whatever is inside that zone

@@ -67,6 +67,12 @@ const SMOKEABLES := preload("res://systems/smokeables.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
 const HELD_GEAR := preload("res://systems/held_gear.gd")
 const BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
+# The range exists to show what the gore systems do, and had none of the ones
+# built since. Greg: *"make the gore sandbox have all the main game changes"*.
+const SKULL_BURST := preload("res://systems/skull_burst.gd")
+const CAVITY := preload("res://systems/cavity.gd")
+const KILL_SHOT := preload("res://systems/kill_shot.gd")
+const KILL_CAM := preload("res://systems/kill_cam.gd")
 
 const BODY_COUNT := 7
 const ARENA := 26.0
@@ -134,6 +140,7 @@ var bodies: Array = []
 var ballistics: Node3D
 var impact_feel: Node
 var hud: Control
+var kill_cam: KillCam
 
 var yaw := 0.0
 var pitch := -0.12
@@ -369,6 +376,18 @@ func _build_weapon_rack() -> void:
 		weapon_rack.add_child(model)
 		weapon_pickups.append({"weapon": weapon_id, "model": model, "available": true})
 
+	# The rifle is deliberately not in `SLOT_ORDER` -- `arsenal_test` asserts
+	# the hunter carries three -- so the range had no weapon that could earn
+	# the X-ray finisher, and the finisher is most of what there is to see.
+	# It is found here, which is how it is found in the world too.
+	var rifle := HELD_GEAR.build_weapon("sniper")
+	rifle.name = "sniper_pickup"
+	rifle.position = Vector3(1.12, 0.46, 0.12)
+	rifle.rotation = Vector3(0.0, PI * 0.5, 0.0)
+	rifle.scale = Vector3.ONE * 1.2
+	weapon_rack.add_child(rifle)
+	weapon_pickups.append({"weapon": "sniper", "model": rifle, "available": true})
+
 
 func _rack_box(label: String, at: Vector3, dimensions: Vector3, tint: Color) -> void:
 	var piece := MeshInstance3D.new()
@@ -418,6 +437,12 @@ func _spawn_body(index: int) -> void:
 	# makes, so the two cannot drift apart again. Odd bodies come armed, which is
 	# also what makes the range a place a fight could start rather than a rack.
 	HunterAppearance.style_world_rig(rig, "demo_body_%d" % index, index % 2 == 1)
+	# Clothing landed after the range did, so every dummy here was still bare
+	# and a round hitting one skipped the cloth layer entirely -- the sandbox
+	# was quietly teaching the wrong damage numbers. Every third body wears the
+	# humiliation rig, so the motley is something you can stand in front of and
+	# shoot rather than only a palette in a test.
+	rig.dress(ClothingShell.humiliation_wardrobe() if index % 3 == 0 else ClothingShell.fresh_wardrobe())
 	var motion: HunterBodyMotion = BODY_MOTION.new()
 	motion.name = "BodyMotion"
 	holder.add_child(motion)
@@ -785,6 +810,33 @@ func _on_round_hit(hit: Dictionary) -> void:
 		severed_total += 1
 	_kick(0.7 * carried, damage_type, off, HITSTOP_SHOT)
 	_note("%s OFF" % _spoken(zone) if off else "HIT // %s" % _spoken(zone))
+	_try_finisher(rig, str(payload.get("weapon", arsenal.current_id)), zone, direction,
+		float(result.get("damage", damage * carried)), damage_type)
+
+
+## What a lethal round earns, resolved after the rig has answered for the hit.
+##
+## Both of these were wired into the Hunt and neither reached the range, which
+## is the wrong way round: the range is where you find out what a weapon does.
+func _try_finisher(rig: BaselineHuman, weapon: String, zone: String, direction: Vector3, damage: float, damage_type: String) -> void:
+	if rig == null or not is_instance_valid(rig):
+		return
+	var snapshot: Dictionary = rig.snapshot()
+	if not bool(snapshot.get("dead", false)):
+		return
+	# The head comes apart before the camera runs, so the plate plays over a
+	# body already in the state you will walk up to when it ends.
+	if SKULL_BURST.earned(zone, damage, damage_type, snapshot):
+		var burst: Dictionary = SKULL_BURST.open(rig, direction)
+		if not burst.is_empty():
+			_note("CRANIUM OFF // %s" % weapon.to_upper())
+	if kill_cam == null or kill_cam.active:
+		return
+	var finish: Dictionary = KILL_SHOT.earned(weapon, zone, snapshot)
+	if finish.is_empty():
+		return
+	kill_cam.trigger(str(rig.name).to_upper(), str(finish.get("zone", zone)), direction,
+		str(finish.get("label", weapon.to_upper())), snapshot)
 
 
 ## Range bodies already share anatomy with the Hunt; they now share the hit
@@ -1256,6 +1308,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				else:
 					jump_queued = true
 			KEY_E: _take_station_item()
+			KEY_F: _open_nearest_body()
 			KEY_G:
 				if handheld != null:
 					handheld.toggle_device()
@@ -1419,6 +1472,52 @@ func _near_pickup_source() -> bool:
 ## physically walked into reach. The rack model disappears in the same action
 ## that equips the live arsenal entry, so this cannot read as a display prop
 ## beside a hotkey swap.
+## `Cavity`, on a body you are standing over.
+##
+## The Hunt only reaches this through a timed extraction, so the geometry half
+## of opening somebody -- the wall coming away, the organs behind it becoming
+## visible -- was effectively unreachable anywhere you could stand and look at
+## it. Here it is a key.
+func _open_nearest_body() -> void:
+	var nearest: BaselineHuman = null
+	var nearest_distance := 2.8
+	for entry: Dictionary in bodies:
+		var candidate := entry.get("rig") as BaselineHuman
+		if candidate == null or not is_instance_valid(candidate):
+			continue
+		var distance := eye.distance_to(candidate.global_position)
+		if distance <= nearest_distance:
+			nearest = candidate
+			nearest_distance = distance
+	if nearest == null:
+		_note("NOTHING IN REACH TO OPEN")
+		return
+	# Chest first, then the head, so a second press on the same body does
+	# something rather than refusing.
+	var zone := "torso" if not CAVITY.is_open(nearest, "torso") else "head"
+	if CAVITY.is_open(nearest, zone):
+		_note("ALREADY OPEN // BOTH")
+		return
+	# From the body toward the hands, so the wall that comes away is the one
+	# between you and the inside -- and flattened, because these bodies are
+	# standing. Leaving the vertical in means reaching down into a chest from
+	# above the shoulder, and the plane then takes a cap off the top of the
+	# torso too small to clear `MIN_OPENING_AREA`, so the dig silently did
+	# nothing. `bone_yard_hunt` zeroes the same component for the same reason.
+	var facing := eye - nearest.global_position
+	facing.y = 0.0
+	if facing.length_squared() < 0.0001:
+		facing = Vector3.FORWARD
+	var cut: Dictionary = CAVITY.open_zone(nearest, zone, facing)
+	if cut.is_empty():
+		_note("NOTHING WORTH OPENING THERE")
+		return
+	# The slab is a real piece rather than geometry that stopped existing.
+	CAVITY.shed_wall(nearest, cut, facing, GoreChunks.Layer.MUSCLE)
+	var organs: Array = cut.get("organs", [])
+	_note("OPENED // %s%s" % [_spoken(zone), "" if organs.is_empty() else " // " + ", ".join(organs).to_upper()])
+
+
 func _take_nearest_weapon() -> bool:
 	var nearest: Dictionary = {}
 	var nearest_distance := WEAPON_PICKUP_REACH
@@ -1436,11 +1535,16 @@ func _take_nearest_weapon() -> bool:
 		return false
 	var weapon_id := str(nearest.get("weapon", ""))
 	var slot := HunterArsenal.SLOT_ORDER.find(weapon_id)
-	if slot < 0:
+	if weapon_id == "sniper":
+		# Not a slot. It is acquired rather than selected, which is the same
+		# call the world makes when the rifle is found.
+		if not arsenal.acquire_sniper():
+			return false
+	elif slot < 0:
 		return false
 	# Use the same refusal the hotkeys use: a half-finished reload or jam clear
 	# cannot strand its timer merely because the replacement came off a wall.
-	if weapon_id != arsenal.current_id and not arsenal.select_slot(slot):
+	elif weapon_id != arsenal.current_id and not arsenal.select_slot(slot):
 		_note("CAN'T TAKE // HANDS BUSY")
 		return true
 	launcher_equipped = false
@@ -1608,6 +1712,12 @@ func _build_hud() -> void:
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.draw.connect(_paint_hud)
 	layer.add_child(hud)
+	# Above the readouts, because when it fires it is the only thing to look at.
+	kill_cam = KILL_CAM.new()
+	kill_cam.name = "KillCam"
+	kill_cam.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	kill_cam.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(kill_cam)
 	# Same damaged CellOutz hardware as the Hunt, not a sandbox text panel.
 	handheld = HandheldDevice.new()
 	handheld.name = "SandboxHandheld"
@@ -1759,7 +1869,7 @@ func _paint_hud() -> void:
 			["WASD", "MOVE/DRAG"], ["LMB", "FIRE/PRESS"], ["RMB", "AIM/HEAVY"],
 			["SPACE", "JUMP/MOVE+DODGE"], ["C", "GRAPPLE/LET GO"], ["H", "DUMMY/ENEMY"],
 			["6-8", "MELEE/FIREARMS"], ["9", "BREACH LAUNCHER"], ["WHEEL", "CYCLE"], ["T", "RELOAD"],
-			["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"],
+			["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"], ["F", "OPEN BODY"],
 			["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["CTRL", "CROUCH"], ["F1", "LESS CONTROLS"],
 		]
 	var row_size := 3 if compact and not controls_expanded else (7 if controls_expanded else 4)

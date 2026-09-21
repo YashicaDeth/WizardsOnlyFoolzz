@@ -23,7 +23,19 @@ func _ready() -> void:
 	await get_tree().physics_frame
 
 	var pickups: Array = demo.get("weapon_pickups")
-	check(pickups.size() == HunterArsenal.SLOT_ORDER.size(), "the shed carries every production arsenal weapon")
+	# The three issued weapons, and then the rifle. The rifle is deliberately
+	# not in `SLOT_ORDER` -- `arsenal_test` asserts the hunter carries three,
+	# and the rifle is found rather than issued -- but the range needs one on
+	# the wall, because without it nothing in the sandbox can earn the X-ray
+	# finisher and `KillShot` is unreachable in the one scene built to show it.
+	#
+	# The set is still pinned. The point of this check is that the rack cannot
+	# quietly drift from the arsenal, and that holds just as well against a
+	# list of four as against a list of three.
+	var expected: Array[String] = []
+	expected.assign(HunterArsenal.SLOT_ORDER)
+	expected.append("sniper")
+	check(pickups.size() == expected.size(), "the shed carries every issued weapon, and the found rifle")
 	var identities: Array[String] = []
 	for pickup: Dictionary in pickups:
 		var weapon_id := str(pickup.get("weapon", ""))
@@ -31,7 +43,7 @@ func _ready() -> void:
 		identities.append(weapon_id)
 		check(model != null and is_instance_valid(model) and model.visible, "%s is a visible physical model on the rack" % weapon_id)
 		check(model != null and model.get_node_or_null("anchor_grip") != null, "%s uses the authored HeldGear weapon, not a display substitute" % weapon_id)
-	check(identities == HunterArsenal.SLOT_ORDER, "the rack and HunterArsenal name the same complete set")
+	check(identities == expected, "the rack and HunterArsenal name the same complete set")
 
 	var before := str(demo.get("arsenal").current_id)
 	demo.set("eye", Vector3(20.0, 1.68, 20.0))
