@@ -175,6 +175,22 @@ const PRESETS := {
 		"fog": "1e0908", "fog_density": 0.0060, "volumetric": 0.009,
 		"ambient": 0.40, "saturation": 0.92, "contrast": 1.28, "exposure": 1.0,
 	},
+	# The Lower Works, for exactly the reason `front_door` above exists. It was
+	# running `ossuary` too, and Greg's note on it -- *"this map is super
+	# scuffed"* -- is the same complaint in the same words as the title shot:
+	# mauve from zenith to ground, and 0.02 fog erasing every surface the
+	# material system produces. The district is also indoors and underground,
+	# where a sky-coloured haze forty metres down a sealed tunnel was never
+	# right to begin with.
+	#
+	# So: near-black warm rock, and fog at a third of ossuary's, which is what
+	# lets the rust-orange and sodium-green bay lamps do the colouring instead
+	# of a flat violet wash sitting in front of them.
+	"lower_works": {
+		"zenith": "07090a", "horizon": "1b1512", "ground": "0c0a08",
+		"fog": "1d1a16", "fog_density": 0.0065, "volumetric": 0.010,
+		"ambient": 0.46, "saturation": 0.96, "contrast": 1.26, "exposure": 1.05,
+	},
 }
 
 static var _noise_cache: Dictionary = {}

@@ -9,6 +9,7 @@ extends Node3D
 const OPENING := preload("res://systems/opening_director.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const RIVAL_TACTICS := preload("res://systems/rival_tactics.gd")
+const LAB_DRESSING := preload("res://systems/lab_dressing.gd")
 
 const ENTRY := Vector3(0, 1.0, 16.0)
 const FUSE_AT := Vector3(11.2, 0.85, 1.8)
@@ -42,7 +43,13 @@ var sentinel_disable_reason := ""
 
 func _ready() -> void:
 	var environment := WorldEnvironment.new()
-	environment.environment = WorldLook.environment("ossuary")
+	# Not `ossuary`. It is mauve from zenith to ground and carries the densest
+	# fog of any preset in `world_look.gd`, and the note beside that preset
+	# already worked out what it does to a district: the fog "is why the street
+	# reads as untextured blocks". The front door was moved off it for exactly
+	# that; this is a sealed tunnel forty metres underground, where a
+	# sky-coloured haze was never the right answer in the first place.
+	environment.environment = WorldLook.environment("lower_works")
 	add_child(environment)
 	_build_city_shell()
 	_build_landmark_lift()
@@ -132,6 +139,19 @@ func _build_city_shell() -> void:
 	for side in [-1.0, 1.0]:
 		_build_gallery(side, -2.0)
 		_build_gallery(side, -24.0)
+
+	# The dressing goes on last, over finished architecture. It adds no
+	# collider, so every route test that drives this district still drives the
+	# same shape it always did -- and it is instanced, so seventy metres of
+	# panelling, jars, spatter and hanging meat costs about a dozen draws
+	# rather than the two thousand loose meshes the districts already carry.
+	#
+	# The reserved stretches are the two gallery pairs and the lift floor: the
+	# tanks and slabs stand tall enough to grow up through a walkway, and a
+	# specimen tank through the floor somebody walks on reads as broken.
+	LAB_DRESSING.dress(self, -46.0, 15.0, 14.4, 11.6, 7314, [
+		Vector2(-9.0, 5.0), Vector2(-31.0, -17.0), Vector2(-42.0, -33.0),
+	])
 
 
 func _build_vault(z: float, index: int) -> void:
