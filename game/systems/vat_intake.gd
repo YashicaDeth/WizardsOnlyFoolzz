@@ -61,6 +61,9 @@ var row := 0
 var elapsed := 0.0
 var handler_line := 0
 var handler_life := 0.0
+## Enforced silence after a line, so he is not speaking every second he is not
+## already speaking.
+var handler_quiet := 0.0
 ## D3.5 v2. `line_for()` indexes each pool with `handler_line % pool.size()`,
 ## and `handler_line` used to start at zero every single decanting — so the
 ## first idle line was always the same line, then the same second one, in
@@ -125,11 +128,25 @@ func _ready() -> void:
 ## D3.4. He answers the moment rather than reading down a list. The hold comes
 ## with the line, so the pause after a mistranscription is not the pause after
 ## ticking a box.
+## How long he stays quiet after finishing a line. Idle muttering gets the long
+## gap; a reaction to something the player just did gets the short one, because
+## a man answering you is not the same as a man filling silence.
+const IDLE_GAP := Vector2(5.0, 9.0)
+const REACTION_GAP := Vector2(1.6, 2.8)
+
+
 func _speak(context: String = "idle") -> void:
 	handler_line += 1
 	var beat := IntakeDirection.line_for(context, handler_line + line_offset)
 	handler_says = str(beat.line)
 	handler_life = float(beat.hold)
+	# He used to start the next line the instant the last one expired, which
+	# meant he never stopped talking for the whole examination -- the pools just
+	# cycled, forever, whether or not the player had done anything. Silence is
+	# what makes him a man working near you rather than a man narrating at you,
+	# and it is what gives the lines that *are* reactions room to land.
+	var gap: Vector2 = IDLE_GAP if context == "idle" else REACTION_GAP
+	handler_quiet = randf_range(gap.x, gap.y)
 
 
 ## D8.3. Signing for something is a thing he does to you, on camera, saying what
@@ -189,6 +206,7 @@ func _process(delta: float) -> void:
 		transcript_life = 4.0
 		_speak("page")
 	handler_life = maxf(0.0, handler_life - delta)
+	handler_quiet = maxf(0.0, handler_quiet - delta)
 	doctor_life = maxf(0.0, doctor_life - delta)
 	if doctor_life <= 0.0 and verdict_started:
 		_advance_verdict()
@@ -197,7 +215,7 @@ func _process(delta: float) -> void:
 		# A procedure runs itself to the end before he goes back to muttering.
 		if not procedure.is_empty():
 			_advance_procedure()
-		else:
+		elif handler_quiet <= 0.0:
 			_speak()
 	mirror_settle = Motion.approach(mirror_settle, 1.0 if page == 3 else 0.0, delta, Motion.PANEL)
 	queue_redraw()
