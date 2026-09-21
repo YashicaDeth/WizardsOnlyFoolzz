@@ -2269,6 +2269,21 @@ func _attack(heavy := false) -> void:
 		strike_windup = float(report.windup)
 
 
+## The angle the current swing earns, for the cut it is about to make.
+##
+## `LimbMomentum.cut_plane()` reported the swept plane with no caller — built
+## and never wired, the failure this project keeps repeating. A still hand
+## earns no plane: standing with a sword is not a swing, and a plane claimed
+## there would cut at whatever angle the spring happened to be settling toward.
+## Null falls back to the honest cross-section in `_cut_limb`.
+func _melee_cut_plane(aim: Vector3) -> Variant:
+	if arm == null or camera == null or not is_instance_valid(camera):
+		return null
+	if arm.head_speed() <= LimbMomentum.IDLE_SPEED:
+		return null
+	return arm.cut_plane(camera.global_transform.basis, aim)
+
+
 func _resolve_strike() -> void:
 	var report := pending_attack
 	# AN2.1. Whatever happens next, the swing is spent. Landing bounces the
@@ -2348,7 +2363,7 @@ func _resolve_strike() -> void:
 		if lateral.length() > 0.45:
 			lateral = lateral.normalized() * 0.45
 		var aim := enemy.global_position + Vector3(lateral.x, look.y * 4.1 * 1.2, lateral.z)
-		var hit_record := enemy_rig.hit_at(aim, float(damage), float(damage) * 0.8, "cut", look)
+		var hit_record := enemy_rig.hit_at(aim, float(damage), float(damage) * 0.8, "cut", look, -1.0, _melee_cut_plane(aim))
 		body_zone = str(hit_record.get("zone", "torso"))
 		WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
 	if enemy_rig != null and is_instance_valid(enemy_rig):
@@ -2459,7 +2474,7 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		if lateral.length() > 0.45:
 			lateral = lateral.normalized() * 0.45
 		var aim := target.global_position + Vector3(lateral.x, look.y * reach * 1.2, lateral.z)
-		result = rig.hit_at(aim, float(attack.damage), float(attack.impulse), str(attack.damage_type), look)
+		result = rig.hit_at(aim, float(attack.damage), float(attack.impulse), str(attack.damage_type), look, -1.0, _melee_cut_plane(aim))
 		zone = str(result.get("zone", "torso"))
 	else:
 		result = anatomy.call("apply_hit", zone, float(attack.damage), float(attack.impulse), str(attack.damage_type))
