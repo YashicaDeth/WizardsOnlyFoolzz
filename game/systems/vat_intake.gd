@@ -703,19 +703,33 @@ func _draw_doctor(viewport: Vector2) -> void:
 	)
 
 func _draw_handler(viewport: Vector2) -> void:
-	# Do not paint a second fake silhouette over the world.  The physical
-	# examiner at the workstation is visible through the medium; this is only
-	# his transcription band and must never block the computer or his body.
-	# Kept off the bottom edge where it was easy to miss during the actual
-	# examination. This is the live transcript panel, not a subtitle crawl.
-	var band := Rect2(Vector2(40, viewport.y * 0.56), Vector2(viewport.x * 0.31, 104))
-	draw_colored_polygon(PackedVector2Array([
-		band.position + Vector2(10, 0), band.position + Vector2(band.size.x, 0),
-		band.position + band.size - Vector2(10, 0), band.position + Vector2(0, band.size.y),
-	]), Color(0.03, 0.035, 0.03, 0.82))
-	# One man, and the game does not know his name yet. The direction doc keeps
-	# it that way: "his name and full identity are withheld at first."
-	CellOutzType.draw_condensed(self, band.position + Vector2(14, 12), "EXAMINER  //  NAME WITHHELD", 9.0, COPPER, 0.7)
+	# The old text-only band was visually unmoored: it could have come from a
+	# radio, a quest system, or nowhere.  This is a deliberately bad live feed
+	# of the one examiner standing across the vat.  His face points back at the
+	# player while the real terminal, live body preview, and form stay readable.
+	var feed := Rect2(Vector2(40, viewport.y * 0.39), Vector2(viewport.x * 0.27, viewport.y * 0.34))
+	draw_rect(feed, Color(0.018, 0.018, 0.015, 0.88))
+	draw_rect(feed, COPPER * Color(1, 1, 1, 0.56), false, 1.0)
+	# Framed shoulders and an examiner who faces the tank camera.  It is a
+	# terminal view, not a duplicate in-world NPC; the physical man remains by
+	# the workstation behind it.
+	var head := feed.position + Vector2(feed.size.x * 0.5, feed.size.y * 0.30)
+	draw_circle(head, feed.size.x * 0.115, Color("7d4336") * Color(1, 1, 1, 0.72))
+	draw_circle(head + Vector2(-feed.size.x * 0.04, 0), 2.0, PAPER.lightened(0.3))
+	draw_circle(head + Vector2(feed.size.x * 0.04, 0), 2.0, PAPER.lightened(0.3))
+	draw_line(head + Vector2(-feed.size.x * 0.045, feed.size.x * 0.055), head + Vector2(feed.size.x * 0.045, feed.size.x * 0.055), HOT.darkened(0.2), 1.0)
+	var shoulders := PackedVector2Array([
+		head + Vector2(-feed.size.x * 0.18, feed.size.y * 0.16),
+		head + Vector2(feed.size.x * 0.18, feed.size.y * 0.16),
+		feed.position + Vector2(feed.size.x * 0.78, feed.size.y * 0.70),
+		feed.position + Vector2(feed.size.x * 0.22, feed.size.y * 0.70),
+	])
+	draw_colored_polygon(shoulders, Color("211b18") * Color(1, 1, 1, 0.95))
+	draw_line(feed.position + Vector2(8, feed.size.y * 0.72), Vector2(feed.end.x - 8, feed.position.y + feed.size.y * 0.72), Color(0.36, 0.30, 0.22, 0.5), 1.0)
+	# One man, and the game does not know his name yet.  His nameplate belongs
+	# to the feed rather than hovering in world space.
+	CellOutzType.draw_condensed(self, feed.position + Vector2(10, 10), "EXAMINER // LIVE OBSERVATION", 8.0, COPPER, 0.64)
+	CellOutzType.draw_condensed(self, feed.position + Vector2(10, feed.size.y * 0.74), "NAME WITHHELD // WATCHING TANK 0C-7", 7.0, INK * Color(1, 1, 1, 0.55), 0.55)
 	# An observation displaces the form patter -- same mouth, and he is not
 	# going to say both at once. Drawn in the paler ink so the player can hear
 	# the register change from clerk to physician without being told.
@@ -723,6 +737,15 @@ func _draw_handler(viewport: Vector2) -> void:
 	var line: String = doctor_says if speaking_as_doctor else (handler_says if handler_says != "" else HANDLER_LINES[handler_line % HANDLER_LINES.size()])
 	var life: float = doctor_life if speaking_as_doctor else handler_life
 	var ink_for_line: Color = PAPER if speaking_as_doctor else INK
-	CellOutzType.draw_condensed(self, band.position + Vector2(14, 28), line.to_upper(), 11.0, ink_for_line * Color(1, 1, 1, clampf(life, 0.0, 1.0) * 0.95), 0.8)
+	var dialogue := Rect2(feed.position + Vector2(8, feed.size.y * 0.78), Vector2(feed.size.x - 16, feed.size.y * 0.18))
+	draw_rect(dialogue, Color(0.08, 0.045, 0.03, 0.84))
+	CellOutzType.draw_condensed(self, dialogue.position + Vector2(7, 7), _fit_handler_line(line.to_upper(), dialogue.size.x - 12), 8.0, ink_for_line * Color(1, 1, 1, clampf(life, 0.0, 1.0) * 0.95), 0.58)
 	if transcript_life > 0.0:
-		CellOutzType.draw_condensed(self, band.position + Vector2(14, 50), transcript, 10.0, MOSS * Color(1, 1, 1, clampf(transcript_life, 0.0, 1.0)), 0.8)
+		CellOutzType.draw_condensed(self, dialogue.position + Vector2(7, dialogue.size.y - 8), _fit_handler_line(transcript, dialogue.size.x - 12), 7.0, MOSS * Color(1, 1, 1, clampf(transcript_life, 0.0, 1.0)), 0.52)
+
+
+func _fit_handler_line(text: String, width: float) -> String:
+	var clipped := text
+	while clipped.length() > 1 and CellOutzType.width_condensed(clipped + ".", 8.0, 0.58) > width:
+		clipped = clipped.left(-1)
+	return clipped.strip_edges() + ("." if clipped.length() < text.length() else "")
