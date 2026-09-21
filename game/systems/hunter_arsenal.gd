@@ -23,7 +23,7 @@ const WEAPONS := {
 		"label": "BONE YARD 12G", "kind": "firearm", "damage": 16.0,
 		"impulse": 34.0, "range": 42.0, "cooldown": 0.92,
 		"pellets": 10, "spread": 0.075, "magazine": 5, "reserve": 25,
-		"reload": 2.15, "damage_type": "ballistic",
+		"reload": 2.15, "damage_type": "ballistic", "calibre": "buck",
 	},
 	"sidearm": {
 		# A first accurate hit should open a fight, not silently finish it. At
@@ -34,7 +34,7 @@ const WEAPONS := {
 		"label": "MERCY NINE", "kind": "firearm", "damage": 24.0,
 		"impulse": 18.0, "range": 76.0, "cooldown": 0.28,
 		"pellets": 1, "spread": 0.008, "magazine": 10, "reserve": 50,
-		"reload": 1.3, "damage_type": "ballistic",
+		"reload": 1.3, "damage_type": "ballistic", "calibre": "pistol",
 	},
 	"sniper": {
 		# The shot you take once. Everything about it is the opposite of the
@@ -51,7 +51,7 @@ const WEAPONS := {
 		"label": "ASHLINE LONGVIEW", "kind": "firearm", "damage": 78.0,
 		"impulse": 46.0, "range": 240.0, "cooldown": 1.65,
 		"pellets": 1, "spread": 0.0015, "magazine": 4, "reserve": 16,
-		"reload": 3.2, "damage_type": "ballistic",
+		"reload": 3.2, "damage_type": "ballistic", "calibre": "rifle",
 	},
 	"facility_sidearm": {
 		# The first firearm is a guard's service hand-cannon, not the ordinary
@@ -60,7 +60,7 @@ const WEAPONS := {
 		"label": "CELL OUTZ BREACH NINE", "kind": "firearm", "damage": 52.0,
 		"impulse": 30.0, "range": 68.0, "cooldown": 0.44,
 		"pellets": 1, "spread": 0.011, "magazine": 3, "reserve": 0,
-		"reload": 1.5, "damage_type": "ballistic",
+		"reload": 1.5, "damage_type": "ballistic", "calibre": "pistol",
 	},
 }
 ## The hunter's own three. The sniper is not here for the same reason
@@ -405,6 +405,7 @@ func begin_attack(heavy := false) -> Dictionary:
 		"damage": float(definition.damage) * (1.55 if heavy and definition.kind == "melee" else 1.0),
 		"impulse": float(definition.impulse) * (1.4 if heavy else 1.0),
 		"damage_type": definition.damage_type,
+		"calibre": str(definition.get("calibre", "")),
 		"windup": float(definition.get("windup", 0.0)) * (1.35 if heavy else 1.0),
 		"stamina": float(definition.get("stamina", 0.0)) * (1.55 if heavy else 1.0),
 		"pellets": int(definition.get("pellets", 1)),

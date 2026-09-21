@@ -640,7 +640,10 @@ func _fire() -> void:
 	# `_resolve_firearm()` exactly, calibre included, so the range and the Hunt
 	# can never quietly disagree about what "buck" means.
 	var directions: Array[Vector3] = arsenal.shot_directions(along, Vector3.UP, 0.38 if firearm_aiming else 1.0)
-	var calibre := "buck" if directions.size() > 1 else "pistol"
+	# Damage and spread are not the whole gun. The sniper must launch Ballistics'
+	# rifle profile (velocity, drag, mass and penetration), not a pistol round
+	# wearing rifle damage because both happen to fire one projectile.
+	var calibre := str(attack.get("calibre", "buck" if directions.size() > 1 else "pistol"))
 	spent += 1
 	for direction in directions:
 		_shot_serial += 1

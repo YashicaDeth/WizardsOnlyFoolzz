@@ -319,6 +319,11 @@ const ARC_STEP_BONUS := 0.25
 var guarding := false
 var guard_raised := 0.0
 var guard_stamina_drain := 14.0
+## Directional guard is chosen with the mouse while the blade is raised. X is
+## retained as a keyboard fallback, but RMB is the production first-person bind.
+var guard_aim := Vector2.ZERO
+var guard_side := ""
+var last_blade_read: Dictionary = {}
 ## AG4.1. Out of breath. Set when stamina bottoms out, cleared only once enough
 ## has come back to be worth spending — see `_move_player`.
 ## AG4.2. Blood on the lens. Fed by `_spawn_blood`, which every blood event in
@@ -1471,8 +1476,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			firearm_aiming = event.pressed
 			if event.pressed:
 				prompt.text = "%s // AIMING" % str(arsenal.current().get("label", "FIREARM"))
-		elif event.pressed:
-			_attack(true)
+		else:
+			# A melee right button belongs to defence. The old heavy-attack call
+			# made the existing guard/parry path unreachable from the mouse.
+			if event.pressed:
+				guard_aim = Vector2.ZERO
+				guard_side = BladeRead.HIGH
 	# Once a cigarette or hand-roll is parked at the lips, the mouse belongs to
 	# the weapon again. Holding Alt is the small, deliberate breathing control:
 	# it draws on the same live object, then release resolves the same exhale.
@@ -1631,6 +1640,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			field_interface.rotate_pulmonary(event.relative)
 		else:
 			apply_look(Vector2(event.relative.x * 0.0026, event.relative.y * 0.0024))
+			if guarding or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+				guard_aim += event.relative
+				var aimed_side := BladeRead.guard_side(guard_aim)
+				if not aimed_side.is_empty():
+					guard_side = aimed_side
 
 
 func _pulmonary_diagnostic_active() -> bool:
@@ -1708,16 +1722,25 @@ func _physics_process(delta: float) -> void:
 	# X leans on somebody while a clinch is up, so the guard only claims the key
 	# when there is nobody in your hands. A control that does two things at once
 	# is worse than a control that does nothing.
-	var wants_guard := Input.is_key_pressed(KEY_X) and panel_mode.is_empty() and not resolution_ui.visible and grapple_target.is_empty() and dodge_remaining <= 0.0
+	var holding_melee_guard := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and arsenal != null and str(arsenal.current().get("kind", "")) != "firearm"
+	var wants_guard := (holding_melee_guard or Input.is_key_pressed(KEY_X)) and panel_mode.is_empty() and not resolution_ui.visible and grapple_target.is_empty() and dodge_remaining <= 0.0
 	if wants_guard and guard_strength() > 0.0 and stamina > 1.0 and not stumbling():
 		if not guarding:
 			guard_raised = 0.0
 		guarding = true
 		guard_raised += delta
 		stamina = maxf(0.0, stamina - guard_stamina_drain * delta)
+		if guard_side.is_empty():
+			guard_side = BladeRead.HIGH
+		if body_motion != null:
+			body_motion.set_guard(BladeRead.guard_height(guard_side), "melee")
+			body_motion.set_lean(BladeRead.guard_lean(guard_side))
 	else:
 		guarding = false
 		guard_raised = 0.0
+		if body_motion != null:
+			body_motion.set_guard(0.0, "melee")
+			body_motion.set_lean(0.0)
 	_update_player(delta)
 	_enforce_demo_territory()
 	_update_rival(delta)
@@ -2262,6 +2285,8 @@ func _attack(heavy := false) -> void:
 	# the damage number when `momentum_damage` says so (AN1.8).
 	last_commitment = arm.commitment() if arm != null else 0.0
 	report["commitment"] = last_commitment
+	if str(report.get("kind", "")) != "firearm" and arm != null:
+		report["released_side"] = BladeRead.swing_side(arm.velocity)
 	# AN2.1. Committing to a heavy blow leaves you open whether or not it
 	# lands — the vulnerability is in throwing it, not in missing with it.
 	# Firearms carry no such wind-up; `arm.commitment()` still measures barrel
@@ -2319,6 +2344,26 @@ func _melee_cut_plane(aim: Vector3) -> Variant:
 	return arm.cut_plane(camera.global_transform.basis, aim)
 
 
+## The single FP/TP split. Kept callable so a regression test can prove that
+## contact-time mouse steering remains live without manufacturing a body hit.
+func _committed_attack_side(report: Dictionary) -> String:
+	if arm == null:
+		return str(report.get("released_side", ""))
+	var released_side := str(report.get("released_side", ""))
+	var contact_side := BladeRead.swing_side(arm.velocity)
+	# A lock is the Souls register even if the camera has not yet completed its
+	# shoulder blend. Free first person keeps steering until contact.
+	var first_person_read := not third_person and lock_target.is_empty()
+	var committed := BladeRead.committed_side(released_side, contact_side, first_person_read)
+	last_blade_read = {
+		"released": released_side,
+		"contact": contact_side,
+		"committed": committed,
+		"first_person": first_person_read,
+	}
+	return committed
+
+
 func _resolve_strike() -> void:
 	var report := pending_attack
 	# AN2.1. Whatever happens next, the swing is spent. Landing bounces the
@@ -2328,6 +2373,8 @@ func _resolve_strike() -> void:
 	if report.is_empty():
 		report = {"damage": 24.0, "impulse": 18.0, "damage_type": "cut", "range": 4.1, "weapon": "sword"}
 	pending_attack = {}
+	if not report.is_empty() and str(report.get("kind", "")) != "firearm" and arm != null:
+		report["swing_side"] = _committed_attack_side(report)
 	# AD3.3. A round crossing the arc is a physical thing that can be met.
 	# Checked before anything else the swing could reach, because a round in
 	# the path is the most immediate thing in it — and because a build that
@@ -2802,7 +2849,7 @@ func _resolve_firearm(attack: Dictionary) -> void:
 		# than one stuck pending forever.
 		_pending_shots.erase(shot_id)
 		return
-	var calibre := "buck" if directions.size() > 1 else "pistol"
+	var calibre := str(attack.get("calibre", "buck" if directions.size() > 1 else "pistol"))
 	for direction in directions:
 		var payload := {
 			"shot_id": shot_id,
@@ -3955,7 +4002,7 @@ const GUARD_ARC_DOT := -0.17
 ## thing as flanking the player. Returns the surviving fraction of the
 ## damage, and whether it was parried — a parry is the first moments of the
 ## guard and gives the initiative straight back.
-func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF) -> Dictionary:
+func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF, incoming_side := "") -> Dictionary:
 	if not guarding:
 		return {"damage": damage, "blocked": false, "parried": false}
 	if attacker_position != Vector3.INF:
@@ -3968,7 +4015,19 @@ func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF) -> Di
 			# would have turned goes through whole.
 			prompt.text = "STRUCK FROM OUTSIDE YOUR GUARD"
 			return {"damage": damage, "blocked": false, "parried": false}
-	var parried := guard_raised <= PARRY_WINDOW
+	var side := str(incoming_side)
+	if side.is_empty():
+		# Legacy callers did not classify a swing. Keeping the current guard as
+		# their side preserves their old frontal block while new melee exchanges
+		# require an actual directional match.
+		side = guard_side if not guard_side.is_empty() else BladeRead.HIGH
+	var held_side := guard_side if not guard_side.is_empty() else BladeRead.HIGH
+	var read := BladeRead.resolve(held_side, guard_raised, side, maxf(1.0, damage * 0.5))
+	last_blade_read = {"guard": held_side, "swing": side, "outcome": str(read.outcome)}
+	if str(read.outcome) == "open":
+		prompt.text = "WRONG GUARD // %s CAME THROUGH" % side.to_upper()
+		return {"damage": damage, "blocked": false, "parried": false, "outcome": "open"}
+	var parried := guard_raised <= PARRY_WINDOW and str(read.outcome) == "parry"
 	if parried:
 		# Nothing gets through a parry, and it costs the attacker instead of you.
 		impact_feel.strike(0.85, "cut", false)
@@ -3979,7 +4038,7 @@ func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF) -> Di
 	# the rest of it still arrives.
 	# Blocking is not standing still: the blow still moves you.
 	lose_footing(FOOTING_BLOCKED * clampf(damage / 20.0, 0.3, 1.6), "")
-	var through: float = damage * lerpf(1.0, GUARD_DAMAGE_SCALE, guard_strength())
+	var through: float = damage * lerpf(1.0, float(read.get("through", GUARD_DAMAGE_SCALE)), guard_strength())
 	stamina = maxf(0.0, stamina - damage * 0.45)
 	impact_feel.strike(0.3, "blunt", false)
 	WorldHistory.record_event("player_blocked", {"location": HUNT_LOCATION})
@@ -5414,13 +5473,18 @@ func _update_encounter_actors(delta: float) -> void:
 			# O5.10 v2. A stumbling fighter cannot wind up an attack at all —
 			# the same "the guard will not hold" rule the player's own footing
 			# already enforces, on the other side of the fight.
+			if float(actor.get("attack_time", 0.0)) <= 0.0:
+				var sequence := int(actor.get("attack_sequence", 0))
+				var side_index := posmod(hash(str(actor.get("subject_id", index))) + sequence, BladeRead.SIDES.size())
+				actor["attack_side"] = BladeRead.SIDES[side_index]
+				actor["attack_sequence"] = sequence + 1
 			var pressing := 2.2 if strike_windup >= 0.0 else 1.0
 			actor["attack_time"] = float(actor.get("attack_time", 0.0)) + actor_delta * pressing
 			var attack_cycle := _actor_attack_cycle(actor)
 			if actor_motion != null:
 				actor_motion.set_combat_pose(clampf(float(actor.attack_time) / maxf(attack_cycle * 0.57, 0.01), 0.0, 1.0), "melee")
 			if float(actor.attack_time) > attack_cycle * 0.57:
-				prompt.text = "%s RAISES THEIR WEAPON" % str(actor.display_name).to_upper()
+				prompt.text = "%s RAISES FROM %s" % [str(actor.display_name).to_upper(), str(actor.get("attack_side", BladeRead.HIGH)).to_upper()]
 			if float(actor.attack_time) >= attack_cycle:
 				actor.attack_time = 0.0
 				if actor_motion != null:
@@ -5431,7 +5495,7 @@ func _update_encounter_actors(delta: float) -> void:
 					# hands the initiative back; a block takes the edge off and
 					# spends stamina instead of blood.
 					var incoming := float(_actor_attack_damage(actor))
-					var guarded: Dictionary = guard_absorb(incoming, node.global_position)
+					var guarded: Dictionary = guard_absorb(incoming, node.global_position, str(actor.get("attack_side", "")))
 					if bool(guarded.get("parried", false)):
 						# The attacker eats their own commitment. This wrote to
 						# "stagger" and "cooldown" — neither of which anything
