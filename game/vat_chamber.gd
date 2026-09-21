@@ -1176,7 +1176,10 @@ func _interact() -> void:
 	_record_pit_entry()
 	opening_audio.cue("door")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	Interstitial.travel("res://underground_colosseum.tscn", "racked for the tunnel heat // debt is in the meat")
+	# The pit does not begin at the end of one short vat aisle. The player now
+	# emerges into the Service Arcade first: a real, collision-safe facility
+	# district with a staff card and pressure gate before the vehicle heat.
+	Interstitial.travel("res://service_arcade.tscn", "service artery unlocked // find a way below")
 
 
 ## AX3.1. What using the restraint actually does. Refused rather than silently

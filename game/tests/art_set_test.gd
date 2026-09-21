@@ -22,8 +22,20 @@ func _ready() -> void:
 	ArtSet.rescan()
 
 	check(ArtSet.has_art(), "the derived art set is present")
-	for kind in ArtSet.KINDS:
+	# `tools/art_pipeline.py` derives these three from Greg's collections, so
+	# their folders being empty means the pipeline did not run.
+	for kind in ["body", "plate", "wire"]:
 		check(not ArtSet.sheets(kind).is_empty(), "%s sheets load (%d)" % [kind, ArtSet.sheets(kind).size()])
+
+	# `slab` is hand-made architecture art rather than pipeline output, so it is
+	# legitimately empty until Greg draws some. That is the class's stated
+	# contract -- "everything here degrades to nothing" -- and it is the half of
+	# it nothing was checking: asserting every kind is populated would make a
+	# kind awaiting art indistinguishable from a kind that is broken.
+	for kind in ArtSet.KINDS:
+		check(ArtSet.sheets(kind) is Array, "%s answers with a list whether or not it has art" % kind)
+	var empty_pick: Texture2D = ArtSet.pick("slab", 7) if ArtSet.sheets("slab").is_empty() else null
+	check(empty_pick == null, "a kind with no art picks null instead of erroring")
 
 	# A seed picks the same sheet every time, or a body's skin would change
 	# between frames.
@@ -36,9 +48,21 @@ func _ready() -> void:
 	# G1.3: it reaches a real material.
 	var flesh := WorldLook.surface(Color("6b5842"), "flesh", 4)
 	check(flesh.detail_enabled and flesh.detail_albedo != null, "flesh materials carry an art detail layer")
-	# And only flesh — the same sheets on every wall would be wallpaper.
+	# Architecture takes its own sheets from `slab`, not the body's. Asserting
+	# "structural surfaces are left alone" was right while flesh was the only
+	# kind that could carry art, and becomes a tripwire the moment a single PNG
+	# lands in `art/derived/slab` -- so it checks the rule that actually holds:
+	# a wall never wears a body sheet, and only takes a detail layer when slab
+	# art exists to give it.
 	var rust := WorldLook.surface(Color("6b5842"), "rust", 4)
-	check(not rust.detail_enabled, "structural surfaces are left alone")
+	var slab_art_exists := not ArtSet.sheets("slab").is_empty()
+	check(rust.detail_enabled == slab_art_exists, "walls take a detail layer exactly when slab art exists (%s)" % ("present" if slab_art_exists else "none yet"))
+	if slab_art_exists:
+		check(not ArtSet.sheets("body").has(rust.detail_albedo), "a wall never wears one of the body sheets")
+	# Polished and transparent surfaces stay clean either way: a grime sheet
+	# over chrome or pressure glass reads as dirt on the lens, not a surface.
+	var chrome := WorldLook.surface(Color("6b5842"), "chrome", 4)
+	check(not chrome.detail_enabled, "chrome is never given a grime sheet")
 	# The procedural contamination is still underneath it, not replaced.
 	check(flesh.albedo_texture != null, "the generated contamination still sits under the art")
 

@@ -584,6 +584,20 @@ static func _apply_grain(material: StandardMaterial3D, scale: float, strength: f
 			material.detail_albedo = sheet
 			material.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MIX
 			material.detail_uv_layer = BaseMaterial3D.DETAIL_UV_1
+	elif kind in ["rust", "dirt", "bone", "paint"]:
+		# The architecture half of the same idea. Flesh was the only surface in
+		# the game that could carry hand-made art, which was fine while the
+		# game was one room and wrong the moment it became a buried city: the
+		# walls, floors and pipe of an underground are most of what a player
+		# looks at. `chrome` and `glass` are deliberately left out -- a grime
+		# sheet over polished steel or pressure glass reads as dirt on the
+		# lens, not as a surface.
+		var slab_sheet: Texture2D = ArtSet.pick("slab", seed_value)
+		if slab_sheet != null:
+			material.detail_enabled = true
+			material.detail_albedo = slab_sheet
+			material.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+			material.detail_uv_layer = BaseMaterial3D.DETAIL_UV_1
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	# The tint now lives in the texture, so leave the multiplier neutral or the
 	# surface is coloured twice and goes muddy. The alpha is kept: glass carries
