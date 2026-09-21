@@ -84,6 +84,7 @@ static func has_credentials() -> bool:
 ## the right shape. Everything downstream of it is the real system.
 class MockBrain extends RefCounted:
 	var character: Dictionary = {}
+	var _idle_index := -1
 
 	func _init(character_definition: Dictionary = {}) -> void:
 		character = character_definition
@@ -92,7 +93,8 @@ class MockBrain extends RefCounted:
 		var said := transcript.to_lower()
 		var armed := bool(perception.get("player_weapon_drawn", false))
 		var disposition := NPCRelationship.disposition(npc_id)
-		var demanding := _mentions(said, ["give me", "hand over", "your money", "valuables", "everything you"])
+		var familiar := float(NPCRelationship.state(npc_id).get("familiarity", 0.0))
+		var demanding := _mentions(said, ["give me", "hand over", "your money", "valuables", "everything you", "wallet"])
 
 		if armed and demanding:
 			return _reply("threaten_and_rob", "cold",
@@ -104,23 +106,90 @@ class MockBrain extends RefCounted:
 			return _reply("threaten", "clinical",
 				"You can lower the weapon. Or you can discover why that would have been the sensible choice.",
 				{"type": "none"}, "They drew a weapon on me.", {"fear": 0.45})
-		if _mentions(said, ["hello", "hey", "hi ", "you there", "excuse me"]):
-			var greeting := "Interesting. You remembered." if disposition in ["friendly", "companion"] else "You're awake, then. Come closer, I don't shout."
-			return _reply("greet", "warm" if disposition == "friendly" else "clinical", greeting, {"type": "turn_to_face", "target": "player"}, "", {})
-		if _mentions(said, ["help", "please", "need"]):
-			return _reply("request_help", "neutral",
-				"Ask me properly and I'll tell you whether it's possible.",
-				{"type": "consider_request", "target": "player"}, "", {})
-		if _mentions(said, ["who are you", "your name", "what are you"]):
+		if _mentions(said, ["hello", "hi", "hey", "yo", "greetings", "you there", "excuse me", "morning", "evening"]):
+			return _reply("greet", "warm" if disposition in ["friendly", "companion"] else "clinical",
+				_greeting(disposition, familiar), {"type": "turn_to_face", "target": "player"}, "", {})
+		if _mentions(said, ["who are you", "your name", "what are you", "what do i call you"]):
 			return _reply("ask_question", "clinical",
-				"No. That's not what I asked you. Try again.", {"type": "none"}, "", {})
-		return _reply("smalltalk", "neutral",
-			"You're frightened. That's useful information, but it isn't an argument.",
-			{"type": "none"}, "", {"fear": 0.2})
+				"Names are for people who expect to be looked up. Mine is not on your form.",
+				{"type": "none"}, "They asked for my name.", {})
+		if _mentions(said, ["where am i", "what is this place", "what place", "where is this"]):
+			return _reply("answer_question", "clinical",
+				"A growing floor. You were made here, which is a different thing from being born here.",
+				{"type": "offer_information", "target": "player"}, "They did not know where they were.", {})
+		if _mentions(said, ["why", "what did you do", "what have you done", "what am i"]):
+			return _reply("answer_question", "clinical",
+				"Because somebody paid for it. That is almost always the answer, and people rarely like it.",
+				{"type": "none"}, "", {})
+		if _mentions(said, ["let me out", "release me", "free me", "let me go"]):
+			return _reply("refuse", "cold",
+				"No. Not because I enjoy saying it. Because the door does not answer to me either.",
+				{"type": "refuse"}, "They asked to be let out.", {})
+		if _mentions(said, ["help", "please", "i need"]):
+			return _reply("request_help", "neutral",
+				"Ask me properly and I will tell you whether it is possible.",
+				{"type": "consider_request", "target": "player"}, "", {})
+		if _mentions(said, ["thank", "cheers", "appreciate"]):
+			return _reply("smalltalk", "amused",
+				"Don't. I have not done you a kindness, I have done you a procedure.",
+				{"type": "none"}, "", {})
+		if _mentions(said, ["fuck", "bastard", "idiot", "hate you", "shut up", "prick", "cunt"]):
+			return _reply("insult", "cold",
+				"Noted. It changes nothing, but I will write it down if it helps.",
+				{"type": "none"}, "They swore at me.", {"anger": 0.2})
+		if _mentions(said, ["kill you", "hurt you", "break your", "i'll end"]):
+			return _reply("threaten", "clinical",
+				"With what? I am asking sincerely. It matters to how this goes.",
+				{"type": "none"}, "They threatened me without a weapon.", {"fear": 0.2})
+		if _mentions(said, ["bye", "goodbye", "see you", "later", "leaving"]):
+			return _reply("farewell", "neutral",
+				"Mm. Someone will be along. It will not be me.",
+				{"type": "end_conversation"}, "", {})
+		if said.ends_with("?"):
+			return _reply("ask_question", "clinical",
+				"That is a question I am allowed to hear and not required to answer.",
+				{"type": "none"}, "", {})
+		return _reply("smalltalk", "neutral", _idle(disposition), {"type": "none"}, "", {})
 
+	## The catch-all used to be one line, and it presumed the player was
+	## frightened -- so a player typing "hi" was told they were afraid, forever.
+	## Rotated by familiarity so repetition reads as a man getting bored of you
+	## rather than as a broken script.
+	func _idle(disposition: String) -> String:
+		var pool := [
+			"Mm.",
+			"You can keep talking. I am listening in the way that I listen.",
+			"That is not an answer to anything I asked.",
+			"You're frightened. That's useful information, but it isn't an argument.",
+			"Interesting. Not useful, but interesting.",
+			"I have done four hundred of these. You are not the strangest.",
+		]
+		if disposition in ["cowed", "hostile"]:
+			pool = [
+				"We are past the part where talking helps you.",
+				"Say it again. Slower. I want to be sure I heard it.",
+				"No.",
+			]
+		_idle_index = (_idle_index + 1) % pool.size()
+		return str(pool[_idle_index])
+
+	func _greeting(disposition: String, familiar: float) -> String:
+		if disposition in ["friendly", "companion"]:
+			return "Interesting. You remembered."
+		if disposition in ["cowed", "hostile"]:
+			return "You again."
+		if familiar >= 12.0:
+			return "Back already. Sit still, it makes this faster."
+		return "You're awake, then. Come closer, I don't shout."
+
+	## Word-boundary matching, not substring. The greeting list used to contain
+	## "hi " with a trailing space to stop it firing inside "this" and "which",
+	## which meant a player typing exactly "hi" never matched it at all and fell
+	## through to the catch-all every time.
 	func _mentions(text: String, needles: Array) -> bool:
+		var padded := " " + text.replace(",", " ").replace(".", " ").replace("!", " ").replace("?", " ") + " "
 		for needle in needles:
-			if text.contains(str(needle)):
+			if padded.contains(" " + str(needle) + " ") or padded.contains(" " + str(needle)):
 				return true
 		return false
 
