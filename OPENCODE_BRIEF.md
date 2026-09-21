@@ -56,6 +56,21 @@ repo's history, to `npc_ollama_brain.gd` and to `cavity.gd`.
 
 The first `--import` after adding files takes minutes. It is not hung.
 
+**A parse error in a test script hangs the run rather than failing it.**
+`_ready()` aborts before it reaches `get_tree().quit()`, so headless Godot sits
+in its main loop forever. Nothing is written while it does: stdout is not
+flushed until the process exits, so the log stays empty and four idle minutes
+reads exactly like the slow first `--import`. Tell them apart by CPU -- an
+import is busy, a hung test is not. A reused variable name cost five minutes
+this way.
+
+**Two Godot instances against one project fail spuriously.** Codex runs the
+engine too and they share `game/.godot/`. A suite that overlaps another run
+reports `exit=127` and `(no marker)` for scenes that pass perfectly well on
+their own; `cavity_test` did exactly that while a second run was going. Check
+for other `Godot_v4.7.2` processes before believing a failure, and re-run the
+suite alone before reporting it.
+
 **Runtime sibling nodes with the same `name` are not the same node.**
 `add_child` keeps duplicates by renaming the newcomer (`@BloodPrint@N`), and
 `get_node_or_null("BloodPrint")` returns only the first match. Counting or
@@ -111,10 +126,6 @@ Checked and correct as of the last commit on this file. If you finish one,
 delete it -- a stale brief is worse than no brief, because this is the file
 people read instead of looking.
 
-- The local model names itself. `npc_conversation_lab`'s DOCTOR now has a rule
-  against it and three live runs confirmed it holds, but no other character
-  definition has that rule and every one of them is a blank the model will
-  fill. `_downed_character()` in `bone_yard_hunt.gd` builds one per subject.
 - Performance, measured rather than suspected: 39 fps, `process` 20.16ms
   against a 16.67ms budget, `physics` 10.94ms. `ProceduralAshbloomDistricts`
   owned 2141 visible meshes -- more than everything else combined -- and
