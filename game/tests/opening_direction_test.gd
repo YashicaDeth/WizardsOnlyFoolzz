@@ -79,6 +79,15 @@ func _ready() -> void:
 	opening._update_hud()
 	check(opening.get_node("HUD/Objective").text.contains("ESCAPE THE FACILITY"), "the escape objective remains legible when control arrives")
 
+	# The resume ladder, walked in order. Nothing covered this, and it is where
+	# inserting the Service Arcade went wrong: the vat door advanced straight to
+	# `entered_pit` while travelling to the arcade, so stepping into the new
+	# area and quitting resumed you in the colosseum with the arcade skipped
+	# entirely. Every test passed, because each half was correct on its own.
+	check(str(OpeningDirector.resume_destination().scene) == "res://vat_chamber.tscn", "a run that has not left the tank resumes in the tank")
+	OpeningDirector.advance("entered_arcade")
+	check(str(OpeningDirector.resume_destination().scene) == "res://service_arcade.tscn", "a run that reached the arcade resumes in the arcade, not past it")
+	check(Interstitial.STAGE_ON_ARRIVAL.get("res://service_arcade.tscn", "") == "entered_arcade", "arriving at the arcade records the arcade, whichever route got there")
 	OpeningDirector.advance("entered_pit")
 	check(str(OpeningDirector.resume_destination().scene) == "res://underground_colosseum.tscn", "an unfinished heat resumes in the real underground colosseum")
 	OpeningDirector.advance("won_derby")

@@ -96,6 +96,13 @@ var _rain: Array = []
 ## what `resume_destination()` actually needs, not literal victory.
 const STAGE_ON_ARRIVAL := {
 	"res://vat_chamber.tscn": "woke",
+	# The arcade sits between the vat and the pit. `vat_chamber.gd` also
+	# advances this stage on its way out, and `advance()` is write-once, so the
+	# two cannot disagree -- but the whole point of this table is that arriving
+	# somewhere records it, rather than every departing scene remembering to.
+	# Without the entry, a second route into the arcade would record nothing and
+	# a resume would drop the player back in the vat they already escaped.
+	"res://service_arcade.tscn": "entered_arcade",
 	"res://rift_derby.tscn": "entered_pit",
 	"res://underground_colosseum.tscn": "entered_pit",
 	"res://bone_yard_hunt.tscn": "won_derby",
