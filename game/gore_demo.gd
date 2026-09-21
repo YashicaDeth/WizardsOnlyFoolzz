@@ -1082,6 +1082,9 @@ func _unmark_last() -> void:
 func _build_view_gear() -> void:
 	view_gear = HELD_GEAR.new()
 	view_gear.name = "ViewGear"
+	# The same hands the world puts on the same weapons. Set before the node
+	# enters the tree, because that is when they are built.
+	view_gear.gloved = true
 	# On the camera, because in this room the camera *is* the player — there is
 	# no body and so no arm pose for the weapon to be hung off and cancelled
 	# against, which is the only part of the Hunt's viewmodel path that cannot

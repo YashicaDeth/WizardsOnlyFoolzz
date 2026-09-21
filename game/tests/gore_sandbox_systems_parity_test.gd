@@ -64,6 +64,23 @@ func _ready() -> void:
 	check(has_rifle, "the rack carries the rifle, which is not in SLOT_ORDER")
 	check(demo.get("kill_cam") != null, "and the sandbox owns a kill camera")
 
+	print("-- the same hands the world puts on the same weapons --")
+	# `hunter_arsenal._build_weapon_model()` mounts `build_humiliation_hand()`
+	# on every Hunt weapon, and a `HeldGear` instance built bare `_flesh` ones,
+	# so the range showed pink hands where the world shows the rig gloves.
+	var bare_hand := HeldGear.build_hand(1)
+	var rig_hand := HeldGear.build_humiliation_hand(1)
+	check(not rig_hand.scale.is_equal_approx(bare_hand.scale), "the rig glove is not the same object as a bare hand")
+	var gear := demo.get("view_gear") as Node3D
+	check(gear != null and is_instance_valid(gear), "the range holds its gear")
+	check(bool(gear.get("gloved")), "and asks for the gloves rather than bare flesh")
+	var held_right := gear.get("right_hand") as Node3D
+	check(held_right != null and is_instance_valid(held_right), "which built a right hand")
+	if held_right != null and is_instance_valid(held_right):
+		check(held_right.scale.is_equal_approx(rig_hand.scale), "and it is the rig glove, not the bare one")
+	bare_hand.queue_free()
+	rig_hand.queue_free()
+
 	print("-- a body can be opened by hand --")
 	var subject := (bodies[0] as Dictionary).get("rig") as BaselineHuman
 	check(not Cavity.is_open(subject, "torso"), "a body on the range starts shut")
