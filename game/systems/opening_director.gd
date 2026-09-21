@@ -6,13 +6,14 @@ extends RefCounted
 ## player is in it. Stages advance forward only.
 ##
 ##   woke        -> conscious on the slab in the Cut Room
+##   entered_arcade -> escaped the Growing Floor into the service artery
 ##   entered_pit -> walked out to the derby under duress
 ##   won_derby   -> earned the way out
 ##   took_wire   -> picked up the handheld
 ##   left_facility -> out into the Ashbloom Expanse
 
 const SUBJECT := "opening_run"
-const STAGES := ["none", "woke", "broke_free", "entered_pit", "won_derby", "took_wire", "left_facility"]
+const STAGES := ["none", "woke", "broke_free", "entered_arcade", "entered_pit", "won_derby", "took_wire", "left_facility"]
 
 
 static func stage() -> String:
@@ -36,6 +37,8 @@ static func resume_destination() -> Dictionary:
 		return {"scene": "res://bone_yard_hunt.tscn", "caption": "walking out into the ashbloom expanse"}
 	if reached("entered_pit"):
 		return {"scene": "res://underground_colosseum.tscn", "caption": "the underground colosseum // heat one"}
+	if reached("entered_arcade"):
+		return {"scene": "res://service_arcade.tscn", "caption": "the service arcade // find a way below"}
 	return {"scene": "res://vat_chamber.tscn", "caption": "the growing floor // decanting"}
 
 

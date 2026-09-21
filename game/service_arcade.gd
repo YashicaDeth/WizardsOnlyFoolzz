@@ -6,6 +6,8 @@ extends Node3D
 ## gate, and reaches the pit.  It replaces the old immediate car handoff with
 ## a readable piece of facility geography.
 
+const OPENING := preload("res://systems/opening_director.gd")
+const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const ENTRY := Vector3(0, 1.0, 4.0)
 const CARD_AT := Vector3(-3.8, 0.95, -20.0)
 const GATE_AT := Vector3(0, 0.0, -48.0)
@@ -217,9 +219,19 @@ func _interact() -> void:
 		WorldHistory.record_event("service_arcade_pressure_gate_opened", {"location": "service_arcade"})
 		return
 	if gate_open and _flat_distance(EXIT_AT) <= 3.0:
-		WorldHistory.record_event("service_arcade_entered_pit", {"location": "service_arcade"})
+		_record_pit_entry()
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		Interstitial.travel("res://underground_colosseum.tscn", "pressure gate open // the heat below is awake")
+
+func _record_pit_entry() -> void:
+	if OPENING.reached("entered_pit"):
+		return
+	WorldHistory.begin_ledger_batch()
+	OPENING.advance("entered_pit")
+	FACILITY_TERRITORY.apply_event("opening_entered_pit")
+	WorldHistory.amend_subject("player", {"status": "racked for a heat"})
+	WorldHistory.record_event("service_arcade_entered_pit", {"location": "service_arcade"})
+	WorldHistory.commit_ledger_batch()
 
 func _update_hud() -> void:
 	vitals.text = "BLOOD 100%   PAIN 86   DECANTED"

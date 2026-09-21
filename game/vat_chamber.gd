@@ -1173,7 +1173,7 @@ func _interact() -> void:
 	# world may already have it -- but that is not a reason to refuse the door.
 	# It used to `return` here, which left a player whose world already recorded
 	# `entered_pit` standing at the only exit pressing E at nothing.
-	_record_pit_entry()
+	_record_service_arcade_entry()
 	opening_audio.cue("door")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	# The pit does not begin at the end of one short vat aisle. The player now
@@ -1236,14 +1236,13 @@ func _try_take_garment() -> bool:
 ## The door press changes the player's status, the opening route and two
 ## territory sectors. It is still one authored act and must not be filed again
 ## while the asynchronous scene handoff is in flight.
-func _record_pit_entry() -> bool:
-	if OPENING.reached("entered_pit"):
+func _record_service_arcade_entry() -> bool:
+	if OPENING.reached("entered_arcade"):
 		return false
 	WorldHistory.begin_ledger_batch()
-	OPENING.advance("entered_pit")
-	FACILITY_TERRITORY.apply_event("opening_entered_pit")
-	WorldHistory.amend_subject("player", {"status": "racked for a heat"})
-	PLAYER_ACTION_LEDGER.record("opening_entered_pit", {"location": "growing_floor", "destination": "underground_colosseum"})
+	OPENING.advance("entered_arcade")
+	WorldHistory.amend_subject("player", {"status": "loose in the service arcade"})
+	PLAYER_ACTION_LEDGER.record("opening_entered_arcade", {"location": "growing_floor", "destination": "service_arcade"})
 	WorldHistory.commit_ledger_batch()
 	return true
 
