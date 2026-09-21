@@ -194,13 +194,24 @@ believe a green suite run until they are in it.
 - `CorpseContents` lists what is on a body and gates organs on the cavity
   being open and hardware on the dig reaching `Layer.CYBERNETIC`. No panel
   draws it yet. `FieldInventory` is the thing to model it on.
-- The sandbox viewmodel has no body. The Hunt hangs weapons off
+- The sandbox viewmodel has **no arms**. The hands are right now -- it asks
+  `HeldGear` for `gloved` hands, which is what the Hunt mounts on every weapon
+  -- but there is still no rig behind them. The Hunt hangs weapons off
   `player_rig.parts.right_arm` via `arsenal.configure()`, with the mount
   carrying a counter-rotation of `-FIRST_PERSON_ARM_RAISE` and `_pose_weapon()`
-  applying `LimbMomentum` lag inside hand space. The sandbox parents a
-  `HeldGear` to the camera instead, so there are no arms in frame. Read the
-  comment in `hunter_arsenal._build_weapon_model` before attempting the port:
-  it names the exact bug two previous attempts hit.
+  applying `LimbMomentum` lag inside hand space; the range parents a `HeldGear`
+  to the camera instead. Read the comment in
+  `hunter_arsenal._build_weapon_model` before attempting the port: it names the
+  exact bug two previous attempts hit.
+
+### A watchdog commits for you
+
+Something sweeps uncommitted tracked files into commits titled `Rescue: N
+tracked files left uncommitted`, and untracked ones into whatever the other
+agent is committing at the time. Work left sitting in the tree does not stay
+yours and does not keep its reasoning -- a fix with a written-out commit
+message lost it that way today. Commit promptly, and put the *why* in the code
+comment rather than only in the message.
 
 ### Still open from before
 
