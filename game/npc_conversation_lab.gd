@@ -45,6 +45,11 @@ var entry: LineEdit
 var voice_in: VoiceInput
 var mic: MicLevel
 var talk_ui: NPCDialogueUI
+## The examiner's actual voice. `NPCSpeechOutput` has been finished and unused
+## since it was written -- the lab showed his lines as subtitles and never asked
+## anything to say them, so the one character in this game with a voice
+## direction has been mute.
+var voice: NPCSpeechOutput.Voice
 var in_conversation := false
 var yaw := 0.0
 var pitch := 0.0
@@ -118,6 +123,11 @@ func _on_option(option: String) -> void:
 
 
 func _build_voice() -> void:
+	# Section 6 wants an Australian male, 55-65. `make()` takes the closest
+	# thing the machine actually has and falls back to silence rather than
+	# failing, so a box with no speech installed still runs the lab with
+	# subtitles.
+	voice = NPCSpeechOutput.make("en_AU", self)
 	voice_in = VoiceInput.new()
 	add_child(voice_in)
 	voice_in.utterance_final.connect(_on_heard)
@@ -296,6 +306,12 @@ func _on_said(text: String) -> void:
 		hud.note_turn(turn)
 		if talk_ui != null:
 			talk_ui.say(str(turn.get("speech", "")), str(turn.get("tone", "neutral")))
+			# Out loud as well as on screen. Interrupting is deliberate: if the
+			# player talks over him he stops, the way a man being interrupted
+			# does, rather than queueing a backlog of lines nobody is waiting
+			# for any more.
+			if voice != null:
+				voice.speak(str(turn.get("speech", "")), true)
 			# Hostility keeps the waveform hot after the shouting stops, so the
 			# colour tracks the conversation rather than the decibels.
 			var hot := 1.0 if str(turn.get("tone", "")) == "hostile" else (0.6 if str(turn.get("intent", "")).contains("threat") else 0.0)
