@@ -137,16 +137,73 @@ Checked and correct as of the last commit on this file. If you finish one,
 delete it -- a stale brief is worse than no brief, because this is the file
 people read instead of looking.
 
-- Performance, measured rather than suspected: 39 fps, `process` 20.16ms
-  against a 16.67ms budget, `physics` 10.94ms. `ProceduralAshbloomDistricts`
-  owned 2141 visible meshes -- more than everything else combined -- and
-  nothing anywhere uses a `MultiMesh`. One culling pass has landed since
-  (`af6f4a0`); re-run `game/tests/sandbox_perf_probe.tscn` before doing more,
-  and run it **windowed**, because headless skips rendering entirely and
-  reports a GPU-bound scene as healthy.
-- Script cost is the other half and is unattributed. `process` at 20ms is the
-  ~25 `_update_*` calls in `bone_yard_hunt._physics_process`, and nobody knows
-  which. The same trick the perf probe used on draw calls would find it.
+### Performance, still the biggest unexamined thing
+
+- Measured rather than suspected: 39 fps, `process` 20.16ms against a 16.67ms
+  budget, `physics` 10.94ms. `ProceduralAshbloomDistricts` owned 2141 visible
+  meshes, more than everything else combined. Re-run
+  `game/tests/sandbox_perf_probe.tscn` before doing more, and run it
+  **windowed** -- headless skips rendering entirely and reports a GPU-bound
+  scene as healthy.
+- "Nothing anywhere uses a `MultiMesh`" is no longer true: `LabDressing` puts
+  1829 instances of Lower Works detail into 12 batches and is the worked
+  example to copy. The districts themselves are still un-instanced.
+- **Script cost is the other half and nobody has attributed it.** `process` at
+  20ms is the ~25 `_update_*` calls in `bone_yard_hunt._physics_process`, and
+  which one is eating it is unknown. The same trick the perf probe used on
+  draw calls would find it in an afternoon. Nothing else on this list is worth
+  as much.
+
+### Three tests that are not telling anybody anything
+
+None of these are in `--core`, which is why they went unnoticed. Do not
+believe a green suite run until they are in it.
+
+- `gore_demo_test` is **unstable on identical code**. Four runs on a clean
+  tree: one segfault (exit 139), three passes. Other runs fail two
+  dismemberment checks instead, and one produced a banner and nothing else
+  (exit 127). Crash, fail or pass from the same source.
+- `chunk_test` crashes at `chunk_test.gd:184` on an out-of-bounds index, so
+  the last five checks in it never run. Pre-existing since 15606d9
+  (2026-09-12). The BONE chunk it reaches for has probably been recycled by
+  then -- `_recycle_oldest()` prefers fragments -- but establish that rather
+  than guarding the index.
+- `climb_test` fails 2. Almost certainly the same defect as c175a0e: test
+  geometry standing in the bone yard where real world colliders reach into its
+  raycasts. That fix gave the test its own arena; this one needs the same, and
+  c175a0e also had a *second* player placement that was missed on the first
+  pass.
+
+### Combat, built and not all bound
+
+- `CombatStance` (guard, parry, stagger, lock-on strafe, lean, prone) and
+  `BladeRead` (the directional read, Mordhau-at-contact vs Souls-at-release)
+  are done and tested. `HunterBodyMotion` applies them. They are bound to
+  input in **the sandbox only** -- the Hunt still has `guard_raised`,
+  `PARRY_WINDOW` and `lock_target` doing their own thing without the poses.
+- A parry has no spark. The pose, the arm jar and the readout all land, and
+  nothing flashes at the moment of contact, which is most of what sells it.
+- The Hunt already owns wallrunning, climbing, ledges, mantling, vaulting,
+  sliding, parry, block, third person and lock-on -- all of it inside
+  `bone_yard_hunt.gd` rather than in systems another scene could call. The
+  sandbox has dodge, grapple and crouch. Extracting those verbs is the same
+  shape of job as the gore parity pass and is mostly mechanical.
+
+### Two things that exist and nothing shows
+
+- `CorpseContents` lists what is on a body and gates organs on the cavity
+  being open and hardware on the dig reaching `Layer.CYBERNETIC`. No panel
+  draws it yet. `FieldInventory` is the thing to model it on.
+- The sandbox viewmodel has no body. The Hunt hangs weapons off
+  `player_rig.parts.right_arm` via `arsenal.configure()`, with the mount
+  carrying a counter-rotation of `-FIRST_PERSON_ARM_RAISE` and `_pose_weapon()`
+  applying `LimbMomentum` lag inside hand space. The sandbox parents a
+  `HeldGear` to the camera instead, so there are no arms in frame. Read the
+  comment in `hunter_arsenal._build_weapon_model` before attempting the port:
+  it names the exact bug two previous attempts hit.
+
+### Still open from before
+
 - `SpokenContact` gives the overworld a transcript, but only for a **downed**
   subject through the resolution window. Nothing on a standing NPC can be
   spoken to yet, and `NPCConversationComponent` is still absent from the
