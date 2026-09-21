@@ -225,6 +225,21 @@ func steady(amount := 0.6) -> void:
 	spin = spin.lerp(Vector2.ZERO, pull)
 
 
+## The plane the edge swept, in world space.
+##
+## `BodySlice.plane_from_swing()` wants the line of the cutting edge and the
+## direction of travel, and this arm has had both all along: the blade runs from
+## the hand at the origin out to the head at `at`, and `velocity` is how that
+## head is moving. Both are in view space, so the holder's basis carries them
+## into the world the body being cut is standing in.
+##
+## This is what makes a cut land at the angle it was swung at. Without it the
+## rig cuts square across a limb whatever the blow was doing, so an overhead and
+## a level slash take an arm off along the same line.
+func cut_plane(holder: Basis, through: Vector3) -> Plane:
+	return BodySlice.plane_from_swing(through, holder * at, holder * velocity)
+
+
 ## Set the weapon this is carrying. One call rather than four assignments, so a
 ## weapon swap cannot half-apply.
 func carry(weapon_mass: float, weapon_reach: float, arm_stiffness := 58.0) -> void:

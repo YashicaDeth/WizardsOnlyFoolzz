@@ -568,7 +568,7 @@ func _set_depth_override(piece: MeshInstance3D, enabled: bool) -> void:
 	material.render_priority = 4 if enabled else 0
 
 
-func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "", hit_direction := Vector3.ZERO, joint_alignment := 1.0, cut_point: Variant = null) -> Dictionary:
+func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "", hit_direction := Vector3.ZERO, joint_alignment := 1.0, cut_point: Variant = null, cut_plane: Variant = null) -> Dictionary:
 	var zone := canonical_zone(zone_id)
 	if severed.has(zone) and not anatomy.installed_parts.has(zone):
 		return {"accepted": false, "reason": "severed", "zone": zone, "severed": false}
@@ -579,7 +579,7 @@ func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt",
 	var direction := _resolved_hit_direction(zone, hit_direction)
 	var did_sever := _accumulate_sever_stress(zone, float(result.get("damage", 0.0)), damage_type, direction, joint_alignment)
 	if did_sever:
-		_sever_zone(zone, direction, result, cut_point)
+		_sever_zone(zone, direction, result, cut_point, cut_plane)
 	else:
 		_refresh_zone(zone)
 	result["severed"] = did_sever
@@ -621,7 +621,7 @@ func _accumulate_sever_stress(zone: String, damage: float, damage_type: String, 
 	return not severed.has(zone) and remaining_ratio <= SEVER_HEALTH_RATIO and stress >= ceiling * SEVER_THRESHOLD_RATIO
 
 
-func _sever_zone(zone: String, direction: Vector3, result: Dictionary, cut_point: Variant = null) -> void:
+func _sever_zone(zone: String, direction: Vector3, result: Dictionary, cut_point: Variant = null, cut_plane: Variant = null) -> void:
 	if severed.has(zone):
 		return
 	var zone_state: Dictionary = anatomy.zones.get(zone, {})
@@ -641,7 +641,7 @@ func _sever_zone(zone: String, direction: Vector3, result: Dictionary, cut_point
 		# Cut where the blow actually landed, when the caller knew where that
 		# was. The cut face is the stump, so the capsule is only for blows that
 		# arrive without a point behind them.
-		var cut: bool = cut_point is Vector3 and _cut_limb(zone, cut_point as Vector3, direction)
+		var cut: bool = cut_point is Vector3 and _cut_limb(zone, cut_point as Vector3, direction, cut_plane)
 		if not cut:
 			_throw_limb(zone, direction)
 			_add_stump(zone)
@@ -698,7 +698,7 @@ func mark_opened(zone_id: String, layer: int) -> int:
 ## and never read by anything. Left at -1 it is derived from the damage type, so
 ## every existing caller keeps working and a caller that knows what it fired
 ## gets a wound that reflects it.
-func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt", hit_direction := Vector3.ZERO, penetration := -1.0) -> Dictionary:
+func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt", hit_direction := Vector3.ZERO, penetration := -1.0, cut_plane: Variant = null) -> Dictionary:
 	var zone := zone_nearest(global_point)
 	# Kept before `hit()` resolves, because `hit()` may sever the limb and the
 	# point has to be recorded against the limb that was actually struck.
@@ -715,7 +715,7 @@ func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type :=
 	# so a range or a HUD is told stopped/grazed/lodged/through instead of
 	# inferring it from the size of a capped wound-mark array. Neither is
 	# optional and neither conflicts with the other.
-	var result := hit(zone, damage, impulse, damage_type, organ_id, hit_direction, _joint_alignment_at(zone, global_point), global_point)
+	var result := hit(zone, damage, impulse, damage_type, organ_id, hit_direction, _joint_alignment_at(zone, global_point), global_point, cut_plane)
 	if not penetration_report.is_empty():
 		result["penetration"] = penetration_report
 	return result
@@ -1689,18 +1689,26 @@ func _throw_limb(zone_id: String, hit_direction := Vector3.ZERO) -> void:
 ## Returns false when it cannot cut, and the caller falls back to taking the
 ## zone whole -- a blast, or any caller using `hit()` rather than `hit_at()`,
 ## has no point to put a plane through.
-func _cut_limb(zone_id: String, global_point: Vector3, hit_direction: Vector3) -> bool:
+func _cut_limb(zone_id: String, global_point: Vector3, hit_direction: Vector3, cut_plane: Variant = null) -> bool:
 	var part := parts.get(zone_id) as MeshInstance3D
 	if part == null or not is_instance_valid(part) or not part.is_inside_tree() or part.mesh == null:
 		return false
 	if live_gore >= live_gore_budget():
 		return false
-	# A cross-section of the limb: the plane's normal runs along the limb's own
-	# long axis, which is local +Y for everything `BodyMesh` revolves. That is an
-	# amputation rather than a slash, and it is the best the rig can do until
-	# weapons report their edge -- at which point `BodySlice.plane_from_swing()`
-	# gives the plane the blade actually swept instead.
+	# The blade's own plane when the blow reported one, so a cut lands at the
+	# angle it was swung at. Its orientation is the swing's; its position is the
+	# hit point, because that is where the edge actually met the limb.
+	#
+	# Without one, fall back to a cross-section: normal along the limb's own long
+	# axis, which is local +Y for everything `BodyMesh` revolves. That is an
+	# amputation rather than a slash, and it is all a blow with no swing behind
+	# it -- a blast, a fall -- can honestly claim.
 	var plane := Plane(Vector3.UP, part.to_local(global_point))
+	if cut_plane is Plane:
+		var swung := (cut_plane as Plane).normal
+		var local_normal := (part.global_transform.basis.inverse() * swung).normalized()
+		if local_normal.length_squared() > 0.5:
+			plane = Plane(local_normal, part.to_local(global_point))
 	var halves := BodySlice.split(part.mesh, plane)
 	# Whichever side of the cut the torso is on is the side that stays attached.
 	# It has to be the torso's own position and not the rig's origin: the rig is
