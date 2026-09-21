@@ -46,10 +46,23 @@ const MONTH_NAMES := [
 ]
 const UNCOUNTED_DAYS := ["THE FOOL", "THE WOUND", "THE MIRROR", "THE WIRE", "THE FLAME"]
 
-## Where the day starts. Not midnight: a run opens in the late afternoon, so the
-## first thing a new player meets is the light going, which is the register this
-## world is in.
-const OPENING_MINUTE := 16.5 * MINUTES_PER_HOUR
+## Where the day starts. Not midnight: a run opens in the afternoon, so the first
+## thing a new player meets is the light going, which is the register this world
+## is in.
+##
+## It opened at 16:30, and that put the light going *before the player had it*.
+## Full daylight runs to 18:30, which from 16:30 is two world hours -- five real
+## minutes at MINUTES_PER_SECOND. The opening alone spends that: the examination
+## takes about half a minute of it, the derby the rest, and the player surfaces
+## into the bone yard after dark, where `_update_day_night()` drops the sun to
+## 0.08 because night here is authored to be genuinely black.
+##
+## 13:00 keeps the register -- it is still the afternoon, the light still goes
+## while you watch -- and gives the opening chain somewhere to happen first.
+## The rate is the deeper lever and is deliberately not touched here: at 0.4
+## world-minutes a second a whole day is an hour of play, which is a pacing
+## decision for the game rather than a bug in this constant.
+const OPENING_MINUTE := 13.0 * MINUTES_PER_HOUR
 
 
 ## Advance the world by a frame. Called once, by whichever scene owns the world;
