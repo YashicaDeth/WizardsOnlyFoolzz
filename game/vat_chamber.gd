@@ -63,6 +63,7 @@ var examiner_node: Node3D
 var staff_door_panel: Node3D
 var departure_clock := 0.0
 var departure_line := -1
+var arrival_clock := 0.0
 var vat_struts: Array[MeshInstance3D] = []
 ## How long the breach still shakes the camera. The glass used to simply stop
 ## being rendered, which Greg described as "I don't even smash out of the glass
@@ -133,6 +134,10 @@ func _ready() -> void:
 	fade.color.a = 0.08
 	_build_chamber()
 	_build_examination_station()
+	# The examiner is not born at the keyboard. He enters after the player wakes.
+	if examiner_node != null:
+		examiner_node.position.x = STAFF_DOOR_AT.x
+		examiner_node.visible = false
 	_build_vat()
 	_build_first_objects()
 	_build_player()
@@ -171,6 +176,12 @@ func _on_intake_filed(_state: Dictionary) -> void:
 	# form was still standing at his terminal watching it happen.
 	departure_clock = 0.0
 	departure_line = -1
+	# Tests and saves can file directly; ensure departure always begins from the
+	# terminal even when its arrival beat was skipped.
+	if examiner_node != null:
+		examiner_node.visible = true
+		examiner_node.position.x = -0.16
+		examiner_node.rotation.y = 0.0
 	phase = "departure"
 	# AP1.3/P10.5. Filing has already written the chosen anatomy by the time this
 	# signal arrives. Install the real head hardware now, while the player is
@@ -883,6 +894,7 @@ func _physics_process(delta: float) -> void:
 	if phase == "intake":
 		if opening_audio != null:
 			opening_audio.set_phase("intake")
+		_update_arrival(delta)
 		return
 	# Departure runs on its own clock so the vat's beat table keeps the timings
 	# it was tuned with instead of every entry needing a +4.4 offset.
@@ -906,6 +918,28 @@ func _physics_process(delta: float) -> void:
 		camera.rotation.y += sin(clock * 38.0) * force
 		camera.rotation.z += sin(clock * 53.0) * force * 1.4
 	_update_hud()
+
+## The intake does not begin as a menu. You wake, the examiner enters, looks
+## through the glass, and only then wakes the terminal that engages the chip.
+func _update_arrival(delta: float) -> void:
+	arrival_clock += delta
+	if examiner_node == null or not is_instance_valid(examiner_node):
+		return
+	if arrival_clock >= 0.35:
+		examiner_node.visible = true
+	var walk := clampf((arrival_clock - 0.35) / 2.15, 0.0, 1.0)
+	examiner_node.position.x = lerpf(STAFF_DOOR_AT.x, -0.16, ease(walk, 0.78))
+	# He first faces the tank, then turns into his own terminal. The object of
+	# attention changes before the UI arrives, which makes the intake a result
+	# of something he physically did in the room.
+	var turn := clampf((arrival_clock - 2.55) / 0.85, 0.0, 1.0)
+	examiner_node.rotation.y = lerpf(PI, 0.0, ease(turn, 0.55))
+	if arrival_clock >= 0.70 and arrival_clock < 2.45:
+		subtitle.text = "EXAMINER // SUBJECT CONSCIOUS"
+	elif arrival_clock >= 3.15 and arrival_clock < 5.5:
+		subtitle.text = "NEURALACE TERMINAL // LINK ESTABLISHING"
+	else:
+		subtitle.text = ""
 
 
 ## He turns away, walks out of his own door, and the door shuts. The player is
