@@ -45,6 +45,10 @@ var options: Array[String] = []
 var selected := 0
 var listening := false
 var npc_line := ""
+## A brain that has to ask a model takes about a second. Without something on
+## screen for that second the player reads the pause as the game having ignored
+## them, and says it again.
+var thinking := false
 var tone := "neutral"
 
 ## A ring of recent microphone amplitudes. Ring rather than an append-and-trim
@@ -83,6 +87,15 @@ func close() -> void:
 func say(line: String, line_tone: String) -> void:
 	npc_line = line
 	tone = line_tone
+	thinking = false
+	queue_redraw()
+
+
+## He has been asked something and has not answered yet.
+func set_thinking(value: bool) -> void:
+	if thinking == value:
+		return
+	thinking = value
 	queue_redraw()
 
 
@@ -118,7 +131,16 @@ func _draw() -> void:
 	var name_at := Vector2(view.x - 34.0, view.y * 0.22)
 	_text(font, name_at - Vector2(font.get_string_size(speaker, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x, 0), speaker, 22, TEXT)
 
-	if not npc_line.is_empty():
+	if thinking:
+		# Deliberately the same plate the line will arrive in, so the answer
+		# replaces the wait in place rather than the box appearing underneath
+		# the player's eye a second after they stopped looking at it.
+		var wait_box := Rect2(Vector2(view.x * 0.16, view.y * 0.30), Vector2(view.x * 0.68, 78.0))
+		draw_rect(wait_box, PLATE)
+		_frame(wait_box, TONE_COLOURS.get(tone, RULE))
+		var dots := ".".repeat(1 + int(fmod(_clock * 2.0, 3.0)))
+		_text(font, wait_box.position + Vector2(14.0, 30.0), dots, 22, RULE)
+	elif not npc_line.is_empty():
 		var line_box := Rect2(Vector2(view.x * 0.16, view.y * 0.30), Vector2(view.x * 0.68, 78.0))
 		draw_rect(line_box, PLATE)
 		_frame(line_box, TONE_COLOURS.get(tone, RULE))

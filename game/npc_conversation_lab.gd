@@ -45,11 +45,6 @@ var entry: LineEdit
 var voice_in: VoiceInput
 var mic: MicLevel
 var talk_ui: NPCDialogueUI
-## The examiner's actual voice. `NPCSpeechOutput` has been finished and unused
-## since it was written -- the lab showed his lines as subtitles and never asked
-## anything to say them, so the one character in this game with a voice
-## direction has been mute.
-var voice: NPCSpeechOutput.Voice
 var in_conversation := false
 var yaw := 0.0
 var pitch := 0.0
@@ -123,11 +118,6 @@ func _on_option(option: String) -> void:
 
 
 func _build_voice() -> void:
-	# Section 6 wants an Australian male, 55-65. `make()` takes the closest
-	# thing the machine actually has and falls back to silence rather than
-	# failing, so a box with no speech installed still runs the lab with
-	# subtitles.
-	voice = NPCSpeechOutput.make("en_AU", self)
 	voice_in = VoiceInput.new()
 	add_child(voice_in)
 	voice_in.utterance_final.connect(_on_heard)
@@ -199,7 +189,17 @@ func _build_doctor() -> void:
 	doctor.position = Vector3(0, 0, -3.0)
 	add_child(doctor)
 	doctor.add_child(rig)
-	doctor.configure(NPC_ID, DOCTOR, player)
+	# The local model where one is running, the mock where none is. The brain is
+	# a Node because it owns an HTTPRequest, and `probe()` settles asynchronously
+	# in its `_ready`, so an examiner on a machine with no Ollama simply answers
+	# from the mock instead of stalling on a connection that is not coming.
+	var thinking: Object = null
+	if OS.get_environment("ATG_NO_LOCAL_MODEL") != "1":
+		thinking = NPCOllamaBrain.new(DOCTOR)
+	doctor.configure(NPC_ID, DOCTOR, player, thinking)
+	# An async brain answers on a later frame, so the turn arrives here rather
+	# than being returned from `hear()`.
+	doctor.answered.connect(_show_turn)
 	doctor.set_process(true)
 
 
@@ -302,16 +302,28 @@ func _on_said(text: String) -> void:
 		return
 	var turn := doctor.hear(said)
 	hud.note_turn({"transcript": said})
+	# A model-backed brain has not answered yet. Saying so is the honest state:
+	# the alternative is a blank pause the player reads as the game ignoring
+	# them, or a refusal shown for a turn that has not been refused.
+	if bool(turn.get("pending", false)):
+		hud.intent = "(thinking)"
+		hud.queue_redraw()
+		if talk_ui != null:
+			talk_ui.set_thinking(true)
+		return
+	_show_turn(turn)
+
+
+## One finished turn, from either brain. Connected to `answered` as well as
+## called directly, so the async path and the synchronous one put exactly the
+## same thing on screen.
+func _show_turn(turn: Dictionary) -> void:
+	if talk_ui != null:
+		talk_ui.set_thinking(false)
 	if bool(turn.get("ok", false)):
 		hud.note_turn(turn)
 		if talk_ui != null:
 			talk_ui.say(str(turn.get("speech", "")), str(turn.get("tone", "neutral")))
-			# Out loud as well as on screen. Interrupting is deliberate: if the
-			# player talks over him he stops, the way a man being interrupted
-			# does, rather than queueing a backlog of lines nobody is waiting
-			# for any more.
-			if voice != null:
-				voice.speak(str(turn.get("speech", "")), true)
 			# Hostility keeps the waveform hot after the shouting stops, so the
 			# colour tracks the conversation rather than the decibels.
 			var hot := 1.0 if str(turn.get("tone", "")) == "hostile" else (0.6 if str(turn.get("intent", "")).contains("threat") else 0.0)

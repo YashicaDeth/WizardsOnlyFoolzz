@@ -23,6 +23,10 @@ signal relationship_changed(npc_id: String, dimension: String, old_value: float,
 signal requested_action(npc_id: String, action: Dictionary)
 signal validated_action(npc_id: String, result: Dictionary)
 signal attention_changed(npc_id: String, attending: bool)
+## A turn that could not be answered on the frame it was heard. `hear()` returns
+## a pending marker for an async brain and this carries the finished turn when
+## it lands, with the same shape `hear()` returns for a synchronous one.
+signal answered(turn: Dictionary)
 
 ## Section 4: "within hearing radius, speech can be heard; within interaction
 ## radius and with attention acquired, the NPC may treat speech as directed at
@@ -36,7 +40,9 @@ signal attention_changed(npc_id: String, attending: bool)
 
 var npc_id := "npc"
 var character: Dictionary = {}
-var brain: RefCounted
+## Not `RefCounted`: a brain that has to reach a model over HTTP needs to be in
+## the tree to own an `HTTPRequest`, so `NPCOllamaBrain` is a Node.
+var brain: Object
 var player: Node3D
 
 var attending := false
@@ -46,6 +52,10 @@ var last_latency_ms := 0
 var _speech_left := 0.0
 var _bubble: Label3D
 var _memories: Array[String] = []
+## The turn an async brain is still thinking about, held so `_resolve()` can be
+## given the perception the player was actually heard under rather than a fresh
+## one measured whenever the model happened to answer.
+var _pending: Dictionary = {}
 ## Section 2's output pipeline. Defaults to the best voice the machine has and
 ## degrades to subtitles-only where there is none, so no caller has to choose.
 var voice: NPCSpeechOutput.Voice
@@ -56,7 +66,7 @@ var suppress_bubble := false
 const MAX_MEMORIES := 6
 
 
-func configure(id: String, character_definition: Dictionary, target: Node3D, dialogue_brain: RefCounted = null) -> void:
+func configure(id: String, character_definition: Dictionary, target: Node3D, dialogue_brain: Object = null) -> void:
 	npc_id = id
 	character = character_definition
 	player = target
@@ -64,7 +74,7 @@ func configure(id: String, character_definition: Dictionary, target: Node3D, dia
 	# without credentials is a component that cannot be playtested.
 	brain = dialogue_brain if dialogue_brain != null else NPCDialogueBrain.MockBrain.new(character_definition)
 	if voice == null:
-		voice = NPCSpeechOutput.make(str(character_definition.get("voice_language", "en_AU")))
+		voice = NPCSpeechOutput.make(str(character_definition.get("voice_language", "en_AU")), self)
 	if not WorldHistory.subject(npc_id).has("kind"):
 		WorldHistory.register_subject(npc_id, {
 			"name": str(character_definition.get("name", "UNKNOWN")),
@@ -161,7 +171,36 @@ func hear(transcript: String) -> Dictionary:
 	thinking = true
 	npc_thinking.emit(npc_id)
 
-	var reply: Dictionary = brain.respond(transcript, perception, npc_id)
+	# A brain that has to ask a model cannot answer on the frame it was asked.
+	# The turn is dispatched and `answered` carries it back when it lands.
+	#
+	# What is deliberately *not* duplicated is everything after the brain. The
+	# ruling, the relationship move, the memory and the spoken line are one
+	# function either way, because an NPC backed by a language model must not
+	# get a different set of rules from one backed by the mock -- that is the
+	# whole architecture, and two copies of it would drift apart in a week.
+	if brain.has_method("respond_async"):
+		_pending = {"transcript": transcript, "perception": perception, "started": started}
+		if not brain.replied.is_connected(_on_brain_replied):
+			brain.replied.connect(_on_brain_replied)
+		brain.respond_async(transcript, perception, npc_id, memories())
+		return {"ok": false, "reason": "thinking", "pending": true}
+
+	return _resolve(brain.respond(transcript, perception, npc_id), transcript, perception, started)
+
+
+## The async brain has come back. `NPCOllamaBrain` guarantees this lands on a
+## later frame than the call, so a caller awaiting `answered` cannot miss it.
+func _on_brain_replied(reply: Dictionary) -> void:
+	if _pending.is_empty():
+		return
+	var pending: Dictionary = _pending
+	_pending = {}
+	answered.emit(_resolve(reply, str(pending.transcript), pending.perception, int(pending.started)))
+
+
+## Everything a turn does once something has spoken, whichever brain spoke.
+func _resolve(reply: Dictionary, transcript: String, perception: Dictionary, started: int) -> Dictionary:
 	# Section 4 again: inside hearing radius but outside interaction radius, an
 	# NPC hears speech without assuming it was meant for them. Overhearing is
 	# not being spoken to.
