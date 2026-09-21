@@ -256,9 +256,8 @@ func _interact() -> void:
 		_open_gate()
 		return
 	if gate_open and _flat_distance(EXIT_AT) <= 3.0:
-		_record_pit_entry()
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-		Interstitial.travel("res://underground_colosseum.tscn", "pressure gate open // the heat below is awake")
+		Interstitial.travel("res://buried_city.tscn", "pressure gate open // lower works transit unlocked")
 
 func _open_gate() -> void:
 	if gate_open:
