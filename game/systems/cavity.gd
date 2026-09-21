@@ -92,7 +92,7 @@ static func open(part: MeshInstance3D, facing: Vector3, depth := WALL_DEPTH) -> 
 ## Organs are built `visible = false` and stay that way until something opens
 ## the body -- which until now nothing actually did, so the organ meshes were
 ## only ever seen through the layer-exposure path. This is the other way in.
-static func open_zone(rig: Node, zone_id: String, facing: Vector3) -> Dictionary:
+static func open_zone(rig: Node, zone_id: String, facing: Vector3, depth := WALL_DEPTH) -> Dictionary:
 	if rig == null or not is_instance_valid(rig):
 		return {}
 	var parts: Dictionary = rig.get("parts") if "parts" in rig else {}
@@ -104,7 +104,7 @@ static func open_zone(rig: Node, zone_id: String, facing: Vector3) -> Dictionary
 	# slab off and hands back a smaller body than it was given.
 	if is_open(rig, zone_id):
 		return {}
-	var cut := open(part, facing)
+	var cut := open(part, facing, depth)
 	if cut.is_empty() or cut.opened == null:
 		return {}
 	part.mesh = cut.opened
@@ -113,6 +113,58 @@ static func open_zone(rig: Node, zone_id: String, facing: Vector3) -> Dictionary
 	cut["organs"] = revealed
 	cut["zone"] = zone_id
 	return cut
+
+
+## Give the wall that came away a body of its own.
+##
+## `open()` has always returned the removed slab under `wall`, and every caller
+## has always thrown it away -- the front of a chest was cut off and then
+## silently ceased to exist, which is the one part of opening somebody that a
+## player would expect to be able to pick up. It is a real `RigidBody3D` with a
+## real identity, so it falls, rots, and sells like any other piece.
+##
+## `heading` is where it is pushed: the direction the round was travelling, or
+## the way the hands went in. Returns null when there was nothing to shed,
+## which includes the perfectly ordinary case of a cut that found nothing.
+static func shed_wall(rig: Node3D, cut: Dictionary, heading := Vector3.ZERO, layer := GoreChunks.Layer.BONE) -> RigidBody3D:
+	if rig == null or not is_instance_valid(rig) or not rig.is_inside_tree():
+		return null
+	var wall := cut.get("wall") as ArrayMesh
+	if wall == null:
+		return null
+	var zone := str(cut.get("zone", ""))
+	var parts: Dictionary = rig.get("parts") if "parts" in rig else {}
+	var part := parts.get(zone) as MeshInstance3D
+	if part == null or not is_instance_valid(part):
+		return null
+	var shape := wall.create_convex_shape()
+	if shape == null:
+		return null
+	var body := RigidBody3D.new()
+	body.name = "ShedWall"
+	var view := MeshInstance3D.new()
+	view.mesh = wall
+	# The outside of a cranium is still a head: the slab keeps the surface it
+	# had on the body rather than turning into untextured geometry in mid-air.
+	view.material_override = part.material_override
+	body.add_child(view)
+	var collider := CollisionShape3D.new()
+	collider.shape = shape
+	body.add_child(collider)
+	var scene := rig.get_tree().current_scene
+	if scene == null or not is_instance_valid(scene):
+		body.queue_free()
+		return null
+	scene.add_child(body)
+	# The wall's vertices are in the part's own space, so standing it in the
+	# part's transform puts it exactly where it was before it came off.
+	body.global_transform = part.global_transform
+	var subject_id := str(rig.get("subject_id")) if "subject_id" in rig else ""
+	GoreChunks.register_wall(body, zone, subject_id, layer)
+	var push := heading.normalized() if heading.length_squared() > 0.001 else Vector3.UP
+	body.apply_impulse((push * 2.2 + Vector3.UP * 1.1) * body.mass)
+	body.angular_velocity = Vector3(randf_range(-7, 7), randf_range(-7, 7), randf_range(-7, 7))
+	return body
 
 
 ## Which organs live in this zone, made visible. Read from `ORGAN_LAYOUT` rather

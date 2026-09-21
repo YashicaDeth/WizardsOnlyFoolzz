@@ -157,6 +157,46 @@ static func register_organ(node: RigidBody3D, organ_id: String, zone: String, su
 	return info
 
 
+## The slab a cut took off -- a cranium, a chest wall.
+##
+## It is neither of the other two kinds and had nowhere to go. A `burst()`
+## fragment is debris torn loose *around* a wound; a whole limb is something
+## that was severed. This is the piece of the body that was in the way, and
+## `Cavity` had no way to hand it over, so it built the mesh and dropped it on
+## the floor of the function that made it -- a chest was opened and the front of
+## it simply stopped existing.
+##
+## Same identity contract as the other two, because the reasons are the same:
+## the Choir buys a skull as a specific thing off a specific person, and a
+## ritual that says "photograph a gored head" has to be able to check that what
+## is in frame is one.
+static func register_wall(node: RigidBody3D, zone: String, subject_id: String, layer: int = Layer.BONE) -> Dictionary:
+	if node == null or not is_instance_valid(node):
+		return {}
+	if live.size() >= chunk_budget():
+		_recycle_oldest()
+	_make_room_for_physics()
+	_configure_chunk_physics(node)
+	var safe_layer := clampi(layer, 0, Layer.CYBERNETIC)
+	var info := {
+		"layer": safe_layer,
+		"layer_name": str(LAYER_NAMES[safe_layer]),
+		"whole_wall": true,
+		"zone": zone,
+		"subject_id": subject_id,
+		"organ_id": "",
+		"implant": "",
+		"condition": 1.0,
+		"taken": false,
+		"spawn_msec": Time.get_ticks_msec(),
+	}
+	node.set_meta("chunk", info)
+	live.append(node)
+	_watch_chunk(node)
+	_schedule_rot(node)
+	return info
+
+
 ## How deep a blow reached, as a `Layer`. The zone's current condition is part of
 ## the answer — the second cut into the same arm goes further than the first,
 ## which is the whole reason a fight escalates visually.

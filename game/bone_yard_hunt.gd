@@ -132,6 +132,7 @@ const HANDHELD_WAVE_ANGLE := Vector2(18.0, 10.0)
 const BALLISTICS := preload("res://systems/ballistics.gd")
 const KILL_SHOT := preload("res://systems/kill_shot.gd")
 const CAVITY := preload("res://systems/cavity.gd")
+const SKULL_BURST := preload("res://systems/skull_burst.gd")
 const LIMB_MOMENTUM := preload("res://systems/limb_momentum.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
@@ -2682,6 +2683,7 @@ func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bo
 	})
 	var fake_attack := {"damage": damage, "impulse": impulse, "damage_type": damage_type, "weapon": weapon, "heavy": bool(payload.get("heavy", false))}
 	if actor.anatomy.dead:
+		_try_skull_burst(actor, zone_id, damage, damage_type, direction, anatomy_snapshot)
 		_try_firearm_killcam(actor, weapon, zone_id, direction, anatomy_snapshot)
 		_kill_encounter_actor(encounter_actors.find(actor), weapon)
 	elif actor.anatomy.downed:
@@ -2696,6 +2698,22 @@ func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bo
 	_settle_shot(shot_id, true, str(actor.subject_id))
 	WorldHistory.commit_ledger_batch()
 	return true
+
+
+## Before the camera, so the X-ray plate plays over a body that is already in
+## the state the player will walk up to when it ends. The head was the one zone
+## nothing could ever take a piece off -- `BaselineHuman.LIMBS` has four limbs
+## in it and the head is not one of them -- so a rifle round that killed through
+## the brain left an unmarked head on the corpse.
+func _try_skull_burst(actor: Dictionary, zone_id: String, damage: float, damage_type: String, direction: Vector3, snapshot: Dictionary) -> void:
+	var rig := actor.get("rig") as BaselineHuman
+	if rig == null or not is_instance_valid(rig):
+		return
+	if not SKULL_BURST.earned(zone_id, damage, damage_type, snapshot):
+		return
+	# `direction` is where the round was going, so the piece that leaves is the
+	# exit side rather than the face the shooter was looking at.
+	SKULL_BURST.open(rig, direction)
 
 
 ## The round decides this only after the rig has resolved the hit.  A sniper
