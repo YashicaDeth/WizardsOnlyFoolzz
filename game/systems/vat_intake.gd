@@ -594,7 +594,11 @@ func _draw_mirror(rect: Rect2) -> void:
 	draw_rect(rect, Color(0.10, 0.12, 0.09))
 	draw_rect(rect.grow(6), Color(0.36, 0.30, 0.22), false, 2.0)
 
-	CellOutzType.draw_condensed(self, rect.position + Vector2(10, rect.size.y - 34), "PREVIEW IS THROUGH GLASS", 8.0, INK * Color(1, 1, 1, 0.4), 0.7)
+	# "PREVIEW IS THROUGH GLASS" used to be the only glass in this panel: the
+	# body stood on flat black and the caption asserted the tank. VatBodyPreview
+	# builds the tank now, so the label can say what the picture is instead of
+	# standing in for it.
+	CellOutzType.draw_condensed(self, rect.position + Vector2(10, rect.size.y - 34), "TANK 0C-7  //  LIVE", 8.0, INK * Color(1, 1, 1, 0.4), 0.7)
 	CellOutzType.draw_condensed(self, rect.position + Vector2(10, rect.size.y - 22), "THE BODY IS NOT A DRAWING", 8.0, INK * Color(1, 1, 1, 0.28), 0.7)
 
 

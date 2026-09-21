@@ -57,7 +57,82 @@ func _ready() -> void:
 	_add_light("WarmKey", Vector3(-1.2, 2.3, -1.6), Color("d76d45"), 2.7, 6.0)
 	_add_light("ColdFill", Vector3(1.3, 1.25, -1.2), Color("728d83"), 1.25, 5.0)
 	_add_light("BloodRim", Vector3(0.0, 0.85, 1.4), Color("8e1714"), 1.4, 4.0)
+	_build_tank()
 	set_process(true)
+
+
+## The panel captioned itself "PREVIEW IS THROUGH GLASS" while showing a body
+## on a flat black background: there was no glass, no medium and no tube, so
+## the caption was doing the work the image was supposed to do. This builds the
+## container the caption was already claiming -- the same tank the player is in,
+## seen from outside, which is the whole point of the right-hand panel.
+func _build_tank() -> void:
+	var glass := MeshInstance3D.new()
+	var glass_mesh := CylinderMesh.new()
+	glass_mesh.top_radius = 0.72
+	glass_mesh.bottom_radius = 0.72
+	glass_mesh.height = 2.05
+	glass_mesh.cap_top = false
+	glass_mesh.cap_bottom = false
+	var glass_material := StandardMaterial3D.new()
+	glass_material.albedo_color = Color(0.34, 0.11, 0.08, 0.17)
+	glass_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glass_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	glass_material.metallic = 0.4
+	glass_material.roughness = 0.12
+	glass_mesh.material = glass_material
+	glass.mesh = glass_mesh
+	glass.position = Vector3(0.0, 0.92, 0.0)
+	stage.add_child(glass)
+
+	var medium := MeshInstance3D.new()
+	var medium_mesh := CylinderMesh.new()
+	medium_mesh.top_radius = 0.67
+	medium_mesh.bottom_radius = 0.67
+	medium_mesh.height = 1.92
+	medium_mesh.cap_top = false
+	medium_mesh.cap_bottom = false
+	var medium_material := StandardMaterial3D.new()
+	medium_material.albedo_color = Color(0.36, 0.022, 0.014, 0.16)
+	medium_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	medium_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	medium_material.emission_enabled = true
+	medium_material.emission = Color(0.19, 0.008, 0.004)
+	medium_material.emission_energy_multiplier = 0.55
+	medium_mesh.material = medium_material
+	medium.mesh = medium_mesh
+	medium.position = Vector3(0.0, 0.90, 0.0)
+	stage.add_child(medium)
+
+	# Collar and base only. A ring at the specimen's own head height would sit
+	# straight across its face, which is the one thing this panel exists to show.
+	for rib in [-0.02, 0.10, 1.80, 1.92]:
+		var ring := MeshInstance3D.new()
+		var torus := TorusMesh.new()
+		torus.inner_radius = 0.72
+		torus.outer_radius = 0.78
+		torus.material = WorldLook.surface(Color("2e2419"), "bone", 940 + int(rib * 10.0))
+		ring.mesh = torus
+		ring.position = Vector3(0.0, rib, 0.0)
+		ring.rotation_degrees = Vector3(90, 0, 0)
+		stage.add_child(ring)
+
+	# The tube. Greg's brief: "a tube in your mouth that's visible too." It hangs
+	# from the tank's crown into the face, so the state the player is in is
+	# visible on the body they are choosing rather than only described.
+	var feed := MeshInstance3D.new()
+	var feed_mesh := CylinderMesh.new()
+	feed_mesh.top_radius = 0.020
+	feed_mesh.bottom_radius = 0.016
+	feed_mesh.height = 0.60
+	feed_mesh.material = WorldLook.surface(Color("6b5a4a"), "flesh", 944)
+	feed.mesh = feed_mesh
+	# Off the centre line and down to the seated rig's mouth (head sits at y
+	# 1.28 once the rig's own offset is added). Dead centre and thicker, it
+	# bisected the face the panel exists to let the player read.
+	feed.position = Vector3(0.055, 1.60, -0.115)
+	feed.rotation_degrees = Vector3(10, 0, 0)
+	stage.add_child(feed)
 
 
 func _add_light(label: String, at: Vector3, color: Color, energy: float, reach: float) -> void:

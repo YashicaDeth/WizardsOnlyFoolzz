@@ -106,7 +106,7 @@ const BEATS := [
 const DEPARTURE_BEATS := [
 	{"at": 0.25, "text": "EXAMINER: \"Decant is stable. Rack them for the heat.\""},
 	{"at": 2.05, "text": "EXAMINER: \"Debt's in the meat. CellOutz owns what it grew.\""},
-	{"at": 3.95, "text": "STAFF DOOR  //  SEALED"},
+	{"at": 3.70, "text": "STAFF DOOR  //  SEALED"},
 ]
 
 @onready var subtitle: Label = $HUD/Subtitle
@@ -216,18 +216,31 @@ func _umbilical(index: int) -> Node3D:
 	add_child(root)
 	var angle := TAU * float(index) / 4.0 + 0.4
 	var anchor := VAT_POSITION + Vector3(cos(angle) * 0.62, 3.05, sin(angle) * 0.62)
-	# The inner end used to stop 0.16m from an 88-degree lens, which put two
-	# 5cm flesh spheres across a third of the opening frame and hid the room
-	# the player is supposed to be reading. The cables now land on the torso,
-	# below the eyeline and outside the near field, where they read as cables.
-	var target := VAT_POSITION + Vector3(cos(angle) * 0.42, 1.12, sin(angle) * 0.42)
+	# The inner end used to stop 0.16m from an 88-degree lens, which put 5cm
+	# flesh spheres across a third of the opening frame. 0.42 was not far
+	# enough either -- the arithmetic is unforgiving at this FOV, where a 3.7cm
+	# sphere half a metre out still lands ~100px wide. They enter low on the
+	# abdomen instead, roughly 1.1m from the eye, where they read as cables
+	# going into a body rather than as objects stuck to the lens.
+	# Four cables 90 degrees apart means one of them always points roughly where
+	# the player is looking, so they splay instead: the more forward a cable is,
+	# the lower and wider it enters the body. The sightline from the tank to the
+	# examiner's terminal is the one thing in this shot that must stay clear.
+	var forwardness := clampf(-sin(angle), 0.0, 1.0)
+	var target := VAT_POSITION + Vector3(
+		cos(angle) * lerpf(0.58, 0.74, forwardness),
+		lerpf(0.95, 0.52, forwardness),
+		sin(angle) * lerpf(0.58, 0.74, forwardness),
+	)
 	# Drawn as a chain of segments so it reads as gut, not as a straight pipe.
 	for segment in 7:
 		var t := float(segment) / 6.0
 		var point := anchor.lerp(target, t) + Vector3(sin(t * 5.0) * 0.07, 0, cos(t * 4.0) * 0.07)
 		var link := MeshInstance3D.new()
 		var mesh := SphereMesh.new()
-		mesh.radius = 0.055 - t * 0.018
+		# Tapering harder toward the body: the wide end is the one hanging from
+		# the ceiling, far away, and the near end is the one entering the skin.
+		mesh.radius = 0.055 - t * 0.030
 		mesh.height = mesh.radius * 2.2
 		mesh.material = WorldLook.surface(Color("4a3128") if segment % 2 == 0 else Color("38261f"), "flesh", index * 7 + segment)
 		link.mesh = mesh
@@ -295,22 +308,38 @@ func _build_vat() -> void:
 	# volume back, distance reads, and the column visibly drains during voiding.
 
 	# Ribbed collar and base: the tank is grown onto the floor, not bolted to it.
+	#
+	# Nine evenly spaced rings meant three of them sat at the captive camera's
+	# own height, a metre away, where a torus seen from inside its own hole
+	# reads as an unidentifiable tan mass sweeping across a third of the frame
+	# rather than as a rib. Greg's brief: "remove repeated green rings ...
+	# floating ribs". They are a collar and a base now, with the eye's band
+	# left clear, and they sit tight against the glass instead of hovering
+	# 11cm off it.
 	for rib in 9:
 		var height := 0.2 + float(rib) * 0.36
+		if height > 0.95 and height < 2.55:
+			continue
 		var ring := MeshInstance3D.new()
 		var torus := TorusMesh.new()
 		torus.inner_radius = 0.95
-		torus.outer_radius = 1.06 + (0.05 if rib % 3 == 0 else 0.0)
+		torus.outer_radius = 1.01 + (0.03 if rib % 3 == 0 else 0.0)
 		torus.material = WorldLook.surface(Color("2e2419") if rib % 2 == 0 else Color("241c15"), "bone", rib)
 		ring.mesh = torus
 		ring.position = VAT_POSITION + Vector3(0, height, 0)
 		ring.rotation_degrees = Vector3(90, 0, 0)
 		add_child(ring)
 
+	# High in the column, not at eye level. An omni light sitting on the
+	# cylinder's own axis at the camera's exact height lights the inner wall
+	# brightest at that height and nowhere else, which drew a hard bright band
+	# straight across the middle of the opening frame, all the way around the
+	# player. Raised to the top of the fluid, it reads as light coming down
+	# through the medium, which is what it was always meant to be.
 	var glow := OmniLight3D.new()
-	glow.position = VAT_POSITION + Vector3(0, 1.6, 0)
+	glow.position = VAT_POSITION + Vector3(0, 2.85, 0)
 	glow.light_color = Color("b22a19")
-	glow.light_energy = 4.1
+	glow.light_energy = 3.4
 	glow.omni_range = 6.0
 	add_child(glow)
 
@@ -412,6 +441,12 @@ func _build_chamber() -> void:
 	for bay in bay_count:
 		var z := 2.0 - float(bay) * 3.1
 		for side in [-1.0, 1.0]:
+			# The arches stand at x = 6.9, which is exactly where the examiner's
+			# staff door is set into the right-hand wall -- one of them stood
+			# squarely in front of it and the seal happened behind a rib. The
+			# doorway gets its bay to itself; repetition can spare one.
+			if side > 0.0 and absf(z - STAFF_DOOR_AT.z) < 1.8:
+				continue
 			for vertebra in 5:
 				var t := float(vertebra) / 4.0
 				var arch := MeshInstance3D.new()
@@ -652,10 +687,25 @@ func _build_staff_door() -> void:
 
 	var jamb_light := OmniLight3D.new()
 	jamb_light.position = STAFF_DOOR_AT + Vector3(-0.15, 2.25, 0)
-	jamb_light.light_color = Color("c8b47a")
-	jamb_light.light_energy = 2.2
-	jamb_light.omni_range = 3.6
+	jamb_light.light_color = Color("e8d09a")
+	jamb_light.light_energy = 4.6
+	jamb_light.omni_range = 4.4
 	add_child(jamb_light)
+	# The doorway has to read from inside the tank, across the room and through
+	# the medium, or "he leaves and it shuts" is a subtitle rather than a beat.
+	# A lit lintel strip does that without lighting the whole right-hand wall.
+	var lintel := MeshInstance3D.new()
+	var lintel_mesh := BoxMesh.new()
+	lintel_mesh.size = Vector3(0.06, 0.07, 1.45)
+	var lintel_material := StandardMaterial3D.new()
+	lintel_material.albedo_color = Color("e8d09a")
+	lintel_material.emission_enabled = true
+	lintel_material.emission = Color("e8d09a")
+	lintel_material.emission_energy_multiplier = 2.6
+	lintel_mesh.material = lintel_material
+	lintel.mesh = lintel_mesh
+	lintel.position = STAFF_DOOR_AT + Vector3(0.30, 2.46, 0)
+	add_child(lintel)
 
 	staff_door_panel = Node3D.new()
 	staff_door_panel.name = "StaffDoorPanel"
@@ -837,9 +887,9 @@ func _update_departure(delta: float) -> void:
 	# He straightens, turns to the door, then walks. Station-local x, because
 	# the examiner hangs off the workstation node rather than off the chamber.
 	if examiner_node != null and is_instance_valid(examiner_node):
-		var turn := clampf(departure_clock / 0.55, 0.0, 1.0)
+		var turn := clampf(departure_clock / 0.50, 0.0, 1.0)
 		examiner_node.rotation.y = lerpf(0.0, -PI * 0.5, ease(turn, 0.6))
-		var walk := clampf((departure_clock - 0.55) / 2.75, 0.0, 1.0)
+		var walk := clampf((departure_clock - 0.50) / 2.45, 0.0, 1.0)
 		examiner_node.position.x = lerpf(-0.16, STAFF_DOOR_AT.x, ease(walk, 0.85))
 		# Through the doorway and out of the room, rather than standing in it
 		# while the panel closes across him.
@@ -848,15 +898,22 @@ func _update_departure(delta: float) -> void:
 
 	# The panel slides back across once he is through.
 	if staff_door_panel != null and is_instance_valid(staff_door_panel):
-		var shut := clampf((departure_clock - 3.35) / 0.95, 0.0, 1.0)
+		# Starts the instant he is through at 2.95 and is shut by 3.70, so the
+		# seal happens while the player is still looking at it rather than
+		# behind a head that has already turned back to the tank.
+		var shut := clampf((departure_clock - 2.95) / 0.75, 0.0, 1.0)
 		staff_door_panel.position.z = STAFF_DOOR_AT.z + lerpf(-1.42, 0.0, ease(shut, 0.4))
 
 	# You are still tied into the tank, so you cannot look away from it, but the
 	# head does turn to watch the one person in the room leave.
 	if camera != null and examiner_node != null and is_instance_valid(examiner_node):
 		var to_him := examiner_node.global_position - camera.global_position
-		var want_yaw := atan2(-to_him.x, -to_him.z)
-		var hold := clampf((departure_clock - 3.6) / 0.8, 0.0, 1.0)
+		# Clamped to a head-turn. Tracking him all the way to the door meant a
+		# ninety-degree swivel that put the nearest vertebral arch across the
+		# whole frame -- and a body suspended in a tank with a tube in its mouth
+		# does not swivel anyway. He walks out of the edge of your vision.
+		var want_yaw := clampf(atan2(-to_him.x, -to_him.z), -0.95, 0.95)
+		var hold := clampf((departure_clock - 3.80) / 0.60, 0.0, 1.0)
 		camera.rotation.y = lerp_angle(camera.rotation.y, lerpf(want_yaw, 0.0, hold), clampf(delta * 3.4, 0.0, 1.0))
 		camera.rotation.x = -0.1 + sin(departure_clock * 0.7) * 0.03
 
@@ -880,7 +937,12 @@ func _update_sequence(_delta: float) -> void:
 		"submerged":
 			# Suspended, drifting, breathing something thicker than air.
 			var t := clampf(clock / 3.2, 0.0, 1.0)
-			fade.color.a = clampf(1.0 - clock / 2.2, 0.0, 1.0)
+			# This used to ramp from fully black, because "submerged" was what
+			# filing cut to and the fade covered that cut. The examiner's
+			# departure runs between them now, so the player has been watching
+			# this room without interruption -- and blacking out on entry put a
+			# full-screen fade over the exact frame where his door seals.
+			fade.color.a = 0.08
 			submerge_tint.color.a = 0.26
 			camera.rotation = Vector3(sin(clock * 0.7) * 0.09 - 0.1, sin(clock * 0.4) * 0.16, cos(clock * 0.55) * 0.07)
 			camera.fov = 92.0 + sin(clock * 1.6) * 3.5
