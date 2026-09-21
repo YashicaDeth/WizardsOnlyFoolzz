@@ -322,6 +322,13 @@ func _show_turn(turn: Dictionary) -> void:
 		talk_ui.set_thinking(false)
 	if bool(turn.get("ok", false)):
 		hud.note_turn(turn)
+		# Says plainly which brain answered. The fallback is silent by design,
+		# so without this a model that never connected looks identical to a
+		# model that is simply terse.
+		print("EXAMINER // %s // %dms // %s" % [
+			"MODEL" if bool(turn.get("from_model", false)) else "fallback",
+			int(turn.get("latency_ms", 0)), str(turn.get("speech", "")),
+		])
 		if talk_ui != null:
 			talk_ui.say(str(turn.get("speech", "")), str(turn.get("tone", "neutral")))
 			# Hostility keeps the waveform hot after the shouting stops, so the

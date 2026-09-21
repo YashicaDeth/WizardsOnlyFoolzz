@@ -73,6 +73,13 @@ func configure(id: String, character_definition: Dictionary, target: Node3D, dia
 	# Defaults to the offline brain deliberately. A component that cannot think
 	# without credentials is a component that cannot be playtested.
 	brain = dialogue_brain if dialogue_brain != null else NPCDialogueBrain.MockBrain.new(character_definition)
+	# A brain that reaches a model owns an HTTPRequest, so it is a Node -- and a
+	# Node outside the tree never gets `_ready()`. It therefore never probes,
+	# never becomes available, and every single turn falls back to the mock
+	# without one line anywhere saying so. From the player's side that is an
+	# examiner who repeats himself forever, which is exactly how it was found.
+	if brain is Node and not (brain as Node).is_inside_tree():
+		add_child(brain as Node)
 	if voice == null:
 		voice = NPCSpeechOutput.make(str(character_definition.get("voice_language", "en_AU")), self)
 	if not WorldHistory.subject(npc_id).has("kind"):
@@ -240,7 +247,13 @@ func _resolve(reply: Dictionary, transcript: String, perception: Dictionary, sta
 	_say(spoken)
 	thinking = false
 	last_latency_ms = Time.get_ticks_msec() - started
+	# Whether the line came from a model or from the fallback, so "is the local
+	# model actually running" stops being something you infer from whether he
+	# is repeating himself. A silent fallback is the failure mode this whole
+	# path has, and it should be readable on the debug HUD rather than guessed.
+	var from_model := brain.has_method("respond_async") and str(brain.get("last_error") if "last_error" in brain else "").is_empty()
 	last_turn = {
+		"from_model": from_model,
 		"transcript": transcript,
 		"intent": str(reply.intent),
 		"tone": str(reply.tone),

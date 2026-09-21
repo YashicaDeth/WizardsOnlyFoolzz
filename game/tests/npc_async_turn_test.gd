@@ -68,6 +68,12 @@ func _ready() -> void:
 	component.configure(NPC, {"name": "EXAMINER", "identity": "An examiner."}, player, brain)
 	await get_tree().process_frame
 
+	# The defect this suite missed the first time. A Node brain left outside the
+	# tree never runs `_ready()`, so `NPCOllamaBrain` never probes, never reports
+	# itself available, and quietly answers from the mock forever. The stub does
+	# not need `_ready()`, which is why every other check here still passed.
+	check(brain.is_inside_tree(), "a Node brain is put in the tree, or it never gets _ready()")
+
 	# Connected before the turn is dispatched, and through a Dictionary rather
 	# than a bare local: GDScript lambdas capture locals by *value*, so
 	# `turn = finished` inside one assigns to the closure's own copy and the
