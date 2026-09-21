@@ -23,6 +23,7 @@ var last_action: Dictionary = {}
 var thinking := false
 var attending := false
 var listening := false
+var voice_status := "off"
 
 
 func _ready() -> void:
@@ -65,7 +66,14 @@ func _draw() -> void:
 		status = "ATTENDING"
 		status_tint = INK
 	_line(font, Vector2(24, y), status, 13, status_tint)
-	y += 26.0
+	y += 18.0
+	# Which input path is live, always. "Hold V does nothing" and "hold V is
+	# listening and heard silence" look identical without it.
+	var mic := "MIC  %s" % voice_status.to_upper()
+	if voice_status in ["off", "missing_model", "no_python", "missing_listener"]:
+		mic += "   (TYPED INPUT)"
+	_line(font, Vector2(24, y), mic, 11, MOSS if voice_status in ["ready", "listening"] else DIM)
+	y += 24.0
 
 	if not transcript.is_empty():
 		_line(font, Vector2(24, y), "HEARD    \"%s\"" % transcript, 13, INK)

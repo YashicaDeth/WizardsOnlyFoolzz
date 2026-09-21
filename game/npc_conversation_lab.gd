@@ -42,6 +42,7 @@ var camera: Camera3D
 var doctor: NPCConversationComponent
 var hud: NPCDebugHUD
 var entry: LineEdit
+var voice_in: VoiceInput
 var yaw := 0.0
 var pitch := 0.0
 
@@ -54,7 +55,28 @@ func _ready() -> void:
 	_build_player()
 	_build_doctor()
 	_build_hud()
+	_build_voice()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+## Real microphone where one is usable, typed input where it is not. The whole
+## point of the fallback is that the conversation loop above it cannot tell the
+## difference -- both paths arrive at `_on_said()`.
+func _build_voice() -> void:
+	voice_in = VoiceInput.new()
+	add_child(voice_in)
+	voice_in.utterance_final.connect(_on_heard)
+	voice_in.status_changed.connect(func(state):
+		hud.voice_status = state
+		hud.queue_redraw())
+	voice_in.start()
+
+
+func _on_heard(text: String) -> void:
+	# Arrives from the recogniser rather than the keyboard, so the channel is
+	# already closed by the time this fires.
+	hud.listening = false
+	_on_said(text)
 
 
 func _build_room() -> void:
@@ -154,6 +176,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Hold V. The same verb the spec asks for, standing in for push-to-talk:
 	# press to open the channel, release to send what was captured.
 	if event is InputEventKey and event.keycode == KEY_V and not event.echo:
+		if voice_in != null and voice_in.available():
+			# True push-to-talk: the recogniser hears only while the key is down.
+			voice_in.set_listening(event.pressed)
+			hud.listening = event.pressed
+			hud.queue_redraw()
+			return
 		if event.pressed and not entry.visible:
 			_open_channel()
 		elif not event.pressed and entry.visible and entry.text.strip_edges().is_empty():
