@@ -1228,20 +1228,26 @@ func _dress_zone(zone_id: String, size: Vector3) -> void:
 	var part := parts.get(zone_id) as MeshInstance3D
 	if part == null or not is_instance_valid(part):
 		return
-	var old := part.get_node_or_null("Garment") as MeshInstance3D
 	var integrity := float(wardrobe.get(zone_id, 0.0))
+	var old := part.get_node_or_null("Garment") as MeshInstance3D
 	if integrity <= 0.0:
 		if old != null and is_instance_valid(old):
+			part.remove_child(old)
 			old.queue_free()
 		return
+	# Reused, not rebuilt: the garment keeps its node identity across hits, so
+	# the streak hanging on it survives a refresh instead of regrowing every
+	# time the cloth takes a hit.
 	var length := size.z if _leg_points_forward(zone_id) else size.y
+	if old != null and is_instance_valid(old):
+		old.mesh = ClothingShell.shell_mesh(zone_id, length * 0.5)
+		old.material_override = ClothingShell.shell_material(integrity, ClothingShell.soak_of(self, zone_id))
+		return
 	var shell := MeshInstance3D.new()
 	shell.name = "Garment"
 	shell.mesh = ClothingShell.shell_mesh(zone_id, length * 0.5)
 	shell.material_override = ClothingShell.shell_material(integrity, ClothingShell.soak_of(self, zone_id))
 	part.add_child(shell)
-	if old != null and is_instance_valid(old):
-		old.queue_free()
 
 
 func _zone_material(zone_id: String, tint: Color, kind := "flesh") -> StandardMaterial3D:
@@ -1517,16 +1523,30 @@ func _refresh_streaks(sites: Array) -> void:
 	for site: Dictionary in sites:
 		var part := site["part"] as Node3D
 		var wound: Dictionary = site["wound"]
-		var streak := part.get_node_or_null("BloodStreak") as MeshInstance3D
+		# A dressed wound bleeds through cloth: the run hangs on the garment,
+		# one cloth-thickness further out, rather than sinking into the jacket
+		# it should be running down.
+		var holder := part
+		var lift := 0.003
+		var garment := part.get_node_or_null("Garment") as Node3D
+		if garment != null and is_instance_valid(garment):
+			holder = garment
+			lift += ClothingShell.CLOTH_LIFT
+			# The wound was dressed after it started bleeding: the old run on
+			# bare skin is under the jacket now, so it goes rather than doubling.
+			var stale := part.get_node_or_null("BloodStreak") as MeshInstance3D
+			if stale != null and is_instance_valid(stale):
+				stale.queue_free()
+		var streak := holder.get_node_or_null("BloodStreak") as MeshInstance3D
 		if streak == null or not is_instance_valid(streak):
 			streak = BloodFlow.build_streak(BloodFlow.STREAK_WIDTH, length, age)
 			streak.name = "BloodStreak"
-			part.add_child(streak)
+			holder.add_child(streak)
 		else:
 			streak.mesh = BloodFlow.streak_mesh(BloodFlow.STREAK_WIDTH, length)
 			streak.material_override = BloodFlow.streak_material(age)
 		streak.transform = BloodFlow.streak_transform(
-			part, wound.get("at", Vector3.ZERO) as Vector3, wound.get("normal", Vector3.UP) as Vector3, length)
+			holder, wound.get("at", Vector3.ZERO) as Vector3, wound.get("normal", Vector3.UP) as Vector3, length, lift)
 
 
 ## Keep where a round landed, and show it there.

@@ -79,6 +79,38 @@ func _ready() -> void:
 	check(float(clad.get("cloth_absorbed", 0.0)) > 0.0, "a dressed rig eats part of the round in the cloth (%.1f)" % float(clad.get("cloth_absorbed", 0.0)))
 	check(float(clad.get("damage", 0.0)) < float(naked.get("damage", 0.0)), "so less reaches the anatomy (%.1f vs %.1f)" % [float(clad.get("damage", 0.0)), float(naked.get("damage", 0.0))])
 
+	# --- blood runs down the jacket, not into it --------------------------------------
+	var bleeder: BaselineHuman = HUMAN.new()
+	add_child(bleeder)
+	bleeder.build("streak_dummy", {})
+	await get_tree().process_frame
+	bleeder.dress(GARMENT.fresh_wardrobe())
+	var b_torso := bleeder.parts.get("torso") as Node3D
+	var b_at := b_torso.global_position + Vector3(-0.04, 0.10, 0.16)
+	bleeder.hit_at(b_at, 34.0, 7.0, "ballistic", Vector3(0, 0, -1))
+	# Streaks need real bleed time, and headless frames run at wildly varying
+	# rates — wait for the seconds, not a frame count, or the length gate
+	# flakes by milliseconds.
+	var waited := 0
+	while float(bleeder.get("_bleed_seconds")) < 1.5 and waited < 400:
+		await get_tree().process_frame
+		waited += 1
+	var garment_node := b_torso.get_node_or_null("Garment") as Node3D
+	check(garment_node != null and garment_node.get_node_or_null("BloodStreak") != null, "a dressed wound runs down the garment")
+	var bare_bleeder: BaselineHuman = HUMAN.new()
+	add_child(bare_bleeder)
+	bare_bleeder.build("streak_bare", {})
+	await get_tree().process_frame
+	var bb_torso := bare_bleeder.parts.get("torso") as Node3D
+	bare_bleeder.hit_at(bb_torso.global_position + Vector3(-0.04, 0.10, 0.16), 34.0, 7.0, "ballistic", Vector3(0, 0, -1))
+	waited = 0
+	while float(bare_bleeder.get("_bleed_seconds")) < 1.5 and waited < 400:
+		await get_tree().process_frame
+		waited += 1
+	check(bb_torso.get_node_or_null("BloodStreak") != null, "while bare skin still runs directly")
+	bleeder.queue_free()
+	bare_bleeder.queue_free()
+
 	# --- the shell is the body's own silhouette, further out -----------------------
 	var skin: ArrayMesh = BodyMesh.leg(0.42)
 	var shell: ArrayMesh = GARMENT.shell_mesh("left_leg", 0.42)

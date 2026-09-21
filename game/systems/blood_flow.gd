@@ -119,14 +119,16 @@ static func streak_material(age: float) -> StandardMaterial3D:
 ## Down is world down, not limb down: blood runs the way gravity points, so a
 ## streak on an arm held out sideways runs across the arm rather than along it,
 ## and that is the whole reason it reads as a fluid rather than as a texture.
-static func streak_transform(part: Node3D, wound_at: Vector3, wound_normal: Vector3, length: float) -> Transform3D:
+static func streak_transform(part: Node3D, wound_at: Vector3, wound_normal: Vector3, length: float, lift := 0.003) -> Transform3D:
 	var world_down := Vector3.DOWN
 	var local_down: Vector3 = (part.global_transform.basis.inverse() * world_down)
 	if local_down.length_squared() < 0.0001:
 		local_down = Vector3.DOWN
 	local_down = local_down.normalized()
 	# Held just off the surface so it lies on the skin instead of inside it.
-	var origin: Vector3 = wound_at + wound_normal.normalized() * 0.003 + local_down * (length * 0.5)
+	# The lift is a parameter because a streak hanging on a garment rides one
+	# cloth-thickness further out than one hanging on bare skin.
+	var origin: Vector3 = wound_at + wound_normal.normalized() * lift + local_down * (length * 0.5)
 	# `up` points the prism's taper. Downward, so it is wide at the wound and
 	# thin where it runs out.
 	var up := local_down
