@@ -77,13 +77,15 @@ func probe() -> void:
 ## awaits the signal rather than the return. The component treats a brain that
 ## is still thinking as a brain that has not spoken yet.
 func respond_async(transcript: String, perception: Dictionary, npc_id: String, memories: Array = []) -> void:
-	if _pending or not available:
-		_deliver(fallback.respond(transcript, perception, npc_id))
-		return
+	# Stamped before the early exits, so a fallback reports the time it actually
+	# took instead of the time since whichever turn last reached the model.
+	_started_ms = Time.get_ticks_msec()
 	_npc_id = npc_id
+	if _pending or not available:
+		_deliver_soon(fallback.respond(transcript, perception, npc_id))
+		return
 	_memories = memories
 	_pending = true
-	_started_ms = Time.get_ticks_msec()
 	thinking_started.emit()
 
 	var prompt := NPCDialogueBrain.prompt_for(character, perception, npc_id, transcript, memories)
@@ -109,7 +111,7 @@ func respond_async(transcript: String, perception: Dictionary, npc_id: String, m
 	if error != OK:
 		_pending = false
 		last_error = "request failed: %d" % error
-		_deliver(fallback.respond(transcript, perception, npc_id))
+		_deliver_soon(fallback.respond(transcript, perception, npc_id))
 
 
 func _on_response(_result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
@@ -136,6 +138,19 @@ func _on_response(_result: int, code: int, _headers: PackedStringArray, body: Pa
 
 func _fallback_now() -> Dictionary:
 	return fallback.respond("", {"distance": 1.0}, _npc_id)
+
+
+## The HTTP path can only answer on a later frame. The immediate paths have to
+## answer on one too, or they are not the same function from the caller's side:
+## the documented usage is `await brain.replied`, and a signal emitted before
+## `respond_async()` has even returned fires while the caller is still several
+## statements short of its `await`. The caller then waits for an emission that
+## has already been and gone -- forever, and precisely when the model is
+## unavailable, which is the case the fallback exists to cover.
+##
+## One deferred frame costs nothing here and makes both paths indistinguishable.
+func _deliver_soon(reply: Dictionary) -> void:
+	_deliver.call_deferred(reply)
 
 
 func _deliver(reply: Dictionary) -> void:
