@@ -58,6 +58,14 @@ func _ready() -> void:
 	check(not bool(shotgun.get("available", true)) and not shotgun_model.visible, "the exact shotgun leaves the rack when it enters the hands")
 	var view_gear := demo.get("view_gear") as HeldGear
 	check(view_gear != null and view_gear.weapon != null and view_gear.weapon.name == "shotgun_model", "the authored shotgun is visibly present in the player's hands")
+	demo.call("_update_view_forearms")
+	var right_forearm := view_gear.right_hand.get_node_or_null("FirstPersonForearm") as Node3D
+	var left_forearm := view_gear.left_hand.get_node_or_null("FirstPersonForearm") as Node3D
+	check(right_forearm != null and left_forearm != null and right_forearm.top_level and left_forearm.top_level,
+		"both hands continue through visible first-person forearms")
+	var right_sleeve := right_forearm.get_node_or_null("TaperedSleeve") as MeshInstance3D
+	check(right_sleeve != null and (right_sleeve.mesh as CylinderMesh).height > 0.08,
+		"the sleeve reaches from the frame edge to the live weapon wrist")
 
 	demo.call("_reset")
 	await get_tree().process_frame

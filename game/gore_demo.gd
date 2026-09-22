@@ -1092,6 +1092,10 @@ func _build_view_gear() -> void:
 	camera.add_child(view_gear)
 	view_gear.take(arsenal.current_id)
 	_gear_rest = view_gear.position
+	# `HeldGear` already gives the range the production hands and costumed
+	# forearms.  Unlike the Hunt, this scene has no body-motion pass to stretch
+	# those sleeves from the frame edge to the live wrists, so do that here.
+	_update_view_forearms()
 
 	muzzle_point = Node3D.new()
 	muzzle_point.name = "Muzzle"
@@ -1136,6 +1140,35 @@ func _refresh_muzzle_anchor() -> void:
 		var anchor := view_gear.weapon.get_node_or_null("anchor_muzzle") as Node3D
 		if anchor != null:
 			muzzle_point.position = view_gear.transform * (view_gear.weapon.transform * anchor.position)
+
+
+## The weapon model is not a floating prop: the same gloves and sleeves used
+## in the Hunt have to reach the bottom of the first-person frame here too.
+## `top_level` makes each sleeve camera-composed after HeldGear moves a hand
+## for recoil or a new grip; recalculating it in `_advance_shot_feel()` keeps
+## that continuity rather than freezing the wrist in the old pose.
+func _update_view_forearms() -> void:
+	if camera == null or not is_instance_valid(camera) or view_gear == null or not is_instance_valid(view_gear):
+		return
+	for hand in [view_gear.right_hand, view_gear.left_hand]:
+		if hand == null or not is_instance_valid(hand):
+			continue
+		var forearm := hand.get_node_or_null("FirstPersonForearm") as Node3D
+		var sleeve := forearm.get_node_or_null("TaperedSleeve") as MeshInstance3D if forearm != null else null
+		if forearm == null or sleeve == null:
+			continue
+		forearm.visible = true
+		forearm.top_level = true
+		var side := int(hand.get_meta("screen_entry_side", 1))
+		var start: Vector3 = camera.to_global(Vector3(0.43 * float(side), -0.49, -0.30))
+		var end: Vector3 = hand.to_global(Vector3(0.0, 0.0, -0.035))
+		var along: Vector3 = end - start
+		var length := maxf(along.length(), 0.08)
+		forearm.global_transform = Transform3D(Basis(Quaternion(Vector3.UP, along.normalized())), start)
+		var sleeve_mesh := sleeve.mesh as CylinderMesh
+		if sleeve_mesh != null:
+			sleeve_mesh.height = length
+		sleeve.position.y = length * 0.5
 
 
 ## AF6.1. Every `HunterArsenal` weapon reachable in the sandbox, not just the
@@ -1308,6 +1341,7 @@ func _advance_shot_feel(real_delta: float) -> void:
 		else:
 			view_gear.position = _gear_rest + recoil
 			view_gear.rotation = Vector3.ZERO
+		_update_view_forearms()
 
 	if ballistics == null or not is_instance_valid(ballistics):
 		return
