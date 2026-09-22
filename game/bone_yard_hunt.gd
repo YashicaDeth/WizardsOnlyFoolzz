@@ -8376,6 +8376,24 @@ func _build_world() -> void:
 	sun.light_color = Color("c89572")
 	sun.light_energy = 1.4
 	sun.shadow_enabled = true
+	# The sun was left on every Godot default, which is 100 metres of shadow
+	# across four parallel cascades. There are 3133 visible shadow casters in
+	# this scene, so every one of them inside that hundred metres was being
+	# rendered again into as many as four cascades, every frame, on top of the
+	# 5984 draw calls the visible pass already costs.
+	#
+	# Measured rather than assumed: `process` sits at 16.96ms against a 16.67ms
+	# budget with only eighty nodes running `_process` at all, so the frame was
+	# never script cost -- it is the renderer, and this is the largest dial on
+	# it that does not change what the scene contains.
+	#
+	# Fifty-five metres because that is past the far side of any district the
+	# player is standing in, and the fog at this preset has eaten the ground
+	# well before it. Two splits rather than four for the same reason: the
+	# cascades exist to keep near shadows sharp, and the near one is the only
+	# one anybody looks at.
+	sun.directional_shadow_max_distance = 55.0
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	add_child(sun)
 
 
