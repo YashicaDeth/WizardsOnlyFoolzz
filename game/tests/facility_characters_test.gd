@@ -78,6 +78,15 @@ func _ready() -> void:
 	check(str(FacilityCharacters.for_role({"role": "sentinel", "name": "UNIT"}).get("identity", "")).contains("facility guard"), "a sentinel is a guard by another name")
 	# Everybody else is generated from the record, and putting facility
 	# dialogue in a scavenger's mouth would be worse than saying nothing.
+	# `role` in this game is prose, not an enum. An exact match would never
+	# have fired for anybody, so the authored guard would have been written and
+	# unreachable -- which is the failure this whole week keeps turning up.
+	check(str(FacilityCharacters.for_role({"role": "Facility guard", "name": "HOLT"}).get("identity", "")).contains("facility guard"), "a role written as prose still matches")
+	check(str(FacilityCharacters.for_role({"role": "Sentinel relay operator"}).get("identity", "")).contains("facility guard"), "and so does one with the word buried in it")
+	# And the other way: the roamers really are filed as "Yard salvage hand"
+	# and "Haul foreman", and none of them is staff.
+	check(FacilityCharacters.for_role({"role": "Yard salvage hand"}).is_empty(), "a yard salvage hand is not a guard")
+	check(FacilityCharacters.for_role({"role": "Haul foreman"}).is_empty(), "and neither is a haul foreman")
 	check(FacilityCharacters.for_role({"role": "scavenger"}).is_empty(), "a scavenger is not answered as staff")
 	check(FacilityCharacters.for_role({}).is_empty(), "and neither is somebody with no role at all")
 

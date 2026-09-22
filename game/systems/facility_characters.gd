@@ -94,9 +94,18 @@ static func guard(subject: Dictionary = {}, allies := 0) -> Dictionary:
 ## a roamer on the road is generated from what the world knows about them, and
 ## pretending otherwise would put facility dialogue in the mouth of a scavenger.
 static func for_role(subject: Dictionary, allies := 0) -> Dictionary:
-	match str(subject.get("role", "")).to_lower():
-		"examiner":
+	# Matched as prose rather than as an enum, because `role` in this game is
+	# prose: the roamers on the road are filed as "Yard salvage hand", "Haul
+	# foreman" and "Signal keeper", and an exact match against "guard" would
+	# never have fired for anybody. Written as a whole-word check so a "Yard
+	# salvage hand" is not read as staff on the strength of the word "yard".
+	var role := str(subject.get("role", "")).to_lower()
+	if role.is_empty():
+		return {}
+	var words := role.replace("-", " ").replace("_", " ").split(" ", false)
+	for word: String in words:
+		if word == "examiner":
 			return examiner()
-		"guard", "facility_guard", "sentinel":
+		if word in ["guard", "sentinel", "warden", "orderly"]:
 			return guard(subject, allies)
 	return {}

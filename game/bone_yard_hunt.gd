@@ -6565,9 +6565,25 @@ func _standing_character(subject_id: String) -> Dictionary:
 		rules.append("You would hear an offer out. You are not going to ask for one.")
 	if _recent_hostility():
 		rules.append("There has just been violence nearby. You are watching their hands.")
+	# What the record already knows about them, which is more than "a person".
+	# The roamers are filed with a trade and a post -- a Haul foreman at mid
+	# road west, a Signal keeper on the wreck line -- and none of it was
+	# reaching the prompt, so every one of them answered as an interchangeable
+	# stranger while the game had them written down as somebody.
+	var role := str(subject.get("role", ""))
+	var post := str(subject.get("post", ""))
+	var identity := "%s, on the road outside Ashbloom, on their feet and armed." % name
+	if not role.is_empty():
+		identity = "%s, %s on the road outside Ashbloom, on their feet and armed." % [name, role.to_lower()]
+		rules.append("You are a %s. You were working when they turned up and you would rather be getting on with it." % role.to_lower())
+	if not post.is_empty():
+		rules.append("You work %s and you know this ground better than they do." % post)
+	var faction := str(subject.get("faction", ""))
+	if not faction.is_empty():
+		rules.append("You are %s. You do not speak for them and you are not going to pretend to." % faction)
 	return {
 		"name": name,
-		"identity": "%s, on the road outside Ashbloom, on their feet and armed." % name,
+		"identity": identity,
 		"voice": "Wary, economical, and ready to walk away.",
 		"rules": rules,
 		"location": HUNT_LOCATION,

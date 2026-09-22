@@ -134,6 +134,23 @@ func _ready() -> void:
 	check(str(standing_def.get("identity", "")).contains("on their feet"), "which their identity line says too")
 	check(str(standing_def.get("voice", "")) != str(downed_def.get("voice", "")), "and the two do not speak in the same voice")
 
+	# The record already knows they are a Haul foreman at mid road west with the
+	# Gate Lanterns, and none of it was reaching the prompt, so everyone
+	# answered as an interchangeable stranger while the game had them written
+	# down as somebody.
+	WorldHistory.register_subject("filed_subject", {
+		"name": "ARDEN", "kind": "person", "role": "Haul foreman",
+		"post": "mid road west", "faction": "Gate Lanterns",
+	})
+	var filed: Dictionary = hunt.call("_standing_character", "filed_subject")
+	var filed_rules := ", ".join(PackedStringArray(filed.get("rules", []))).to_lower()
+	check(str(filed.get("identity", "")).contains("haul foreman"), "a roamer answers as the trade the record filed them under")
+	check(filed_rules.contains("mid road west"), "and knows the ground they work")
+	check(filed_rules.contains("gate lanterns"), "and who they run with")
+	# Still generated, not authored: a foreman is not staff and must not be
+	# handed facility dialogue.
+	check(not filed_rules.contains("procedure first"), "without being mistaken for facility staff")
+
 	print("-- and a machine with no microphone can still talk --")
 	# Vosk needs a Python process, a model on disk and a working input device.
 	# Without all three the overworld could not be spoken to at all, which is
