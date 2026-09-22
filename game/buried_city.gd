@@ -17,6 +17,28 @@ const SHORTCUT_AT := Vector3(-10.2, 0.0, -8.0)
 const LIFT_AT := Vector3(0, 0.0, -38.0)
 const EXIT_AT := Vector3(0, 0.0, -47.0)
 
+## AD3. The third way down.
+##
+## There were two: spend the fuse on the shortcut, or spend the breach tool on
+## the sentinel. Both cost you something you carried in, and a player who
+## arrived with neither had no route at all except walking into it.
+##
+## This one costs time and nerve instead. The west galleries were already
+## built, already dressed and doing nothing -- walkways twelve metres long at
+## head height with a rail and a row of pods, which the player could look at
+## and never stand on. A ramp at each end and a catwalk across the gap turns
+## the scenery into the route, and the district does not get any bigger, which
+## is the whole constraint: another way through, not another map.
+##
+## The deck is the top of a gallery floor: they are authored at y=1.9 with a
+## 0.35 slab, so their walking surface is 2.075 and everything here matches it
+## rather than guessing.
+const GANTRY_RUN := -10.0
+const GANTRY_DECK := 2.075
+## How far above the sentinel puts you out of its reach. It is a ground
+## machine on tracks and the gantry is over its head.
+const GANTRY_CLEARANCE := 1.4
+
 var player: CharacterBody3D
 var camera: Camera3D
 var objective: Label
@@ -52,6 +74,7 @@ func _ready() -> void:
 	environment.environment = WorldLook.environment("lower_works")
 	add_child(environment)
 	_build_city_shell()
+	_build_gantry()
 	_build_landmark_lift()
 	_build_fuse_branch()
 	_build_patrol()
@@ -152,6 +175,43 @@ func _build_city_shell() -> void:
 	LAB_DRESSING.dress(self, -46.0, 15.0, 14.4, 11.6, 7314, [
 		Vector2(-9.0, 5.0), Vector2(-31.0, -17.0), Vector2(-42.0, -33.0),
 	])
+
+
+## The ramps and the catwalk that make the galleries a route.
+##
+## Ramps rather than steps because the Lower Works player has no jump and
+## `CharacterBody3D` does not climb stairs on its own -- a staircase here would
+## be a wall with a pattern on it. Both slopes are about seventeen degrees,
+## well inside the forty-five `move_and_slide` will walk up.
+func _build_gantry() -> void:
+	# Rising toward -Z: a positive rotation about X takes the +Z end down, so
+	# the far end of the ramp is the high one.
+	var climb := atan2(GANTRY_DECK, 7.0)
+	var up := _slab(Vector3(3.0, 0.3, 7.3), Vector3(GANTRY_RUN, GANTRY_DECK * 0.5, 8.0), "rust", Color("241a13"))
+	up.name = "GantryRampUp"
+	up.rotation.x = climb
+
+	# The gap between the two galleries, which sit at z=-2 and z=-24 and so
+	# leave ten metres of air between their near edges.
+	var span := _slab(Vector3(2.4, 0.3, 10.0), Vector3(GANTRY_RUN, GANTRY_DECK - 0.15, -13.0), "rust", Color("1f1811"))
+	span.name = "GantryCatwalk"
+
+	# Down at the far end, landing short of the lift rather than on it.
+	var down := _slab(Vector3(3.0, 0.3, 7.3), Vector3(GANTRY_RUN, GANTRY_DECK * 0.5, -33.5), "rust", Color("241a13"))
+	down.name = "GantryRampDown"
+	down.rotation.x = -climb
+
+	# A rail on the open side only. It is there to read as a walkway from the
+	# floor below and to stop a player stepping off it in the dark, not to box
+	# the route in.
+	for section in 3:
+		var rail := MeshInstance3D.new()
+		var rail_mesh := BoxMesh.new()
+		rail_mesh.size = Vector3(0.12, 0.5, 9.0)
+		rail_mesh.material = WorldLook.surface(Color("5d3020"), "metal", 4800 + section)
+		rail.mesh = rail_mesh
+		rail.position = Vector3(GANTRY_RUN + 1.3, GANTRY_DECK + 0.25, -2.0 - float(section) * 11.0)
+		add_child(rail)
 
 
 func _build_vault(z: float, index: int) -> void:
@@ -380,6 +440,14 @@ func _patrol_step(delta: float) -> void:
 		return
 	patrol_attack_cooldown = maxf(0.0, patrol_attack_cooldown - delta)
 	var difference := player.global_position - patrol.global_position
+	# How far over its head you are, taken before the height is flattened out.
+	#
+	# The flattening is right for a chase across a floor and wrong for
+	# everything else: it meant the sentinel could strike a player standing on
+	# a walkway two metres above it, because to this function they were in the
+	# same place. With the gantry there to walk on, that stopped being a corner
+	# case and became the route.
+	var overhead: float = player.global_position.y - patrol.global_position.y
 	difference.y = 0.0
 	var distance := difference.length()
 	patrol_alert = distance < 11.0
@@ -397,7 +465,11 @@ func _patrol_step(delta: float) -> void:
 		patrol.global_position.x = clampf(patrol.global_position.x, -12.1, 12.1)
 		patrol.global_position.z = clampf(patrol.global_position.z, -35.0, 14.0)
 		patrol.look_at(patrol.global_position + direction, Vector3.UP, true)
-	if distance < 2.0 and patrol_attack_cooldown <= 0.0:
+	# It follows you along the floor and cannot touch you while you are up
+	# there. That is the trade the gantry offers: safe passage, in the open,
+	# with the thing that wants you keeping pace underneath and waiting at the
+	# bottom of the far ramp.
+	if distance < 2.0 and patrol_attack_cooldown <= 0.0 and overhead <= GANTRY_CLEARANCE:
 		patrol_attack_cooldown = 1.25
 		blood = maxf(25.0, blood - 6.0)
 		WorldHistory.record_event("lower_works_sentinel_strike", {"location": "lower_works", "damage": 6})
