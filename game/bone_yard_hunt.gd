@@ -1187,6 +1187,11 @@ func _build_player_rig() -> void:
 	# every build — CellOutz re-dresses its bodies, which is also what keeps a
 	# scene change from having to solve wardrobe persistence today.
 	player_rig.dress(ClothingShell.humiliation_wardrobe())
+	# The same rule the world rigs get through `style_world_rig`. The player
+	# never goes through it -- they are built here rather than styled from a
+	# name -- so their 124 casters were the largest single body in the scene
+	# and the one you see least of, being inside it.
+	WorldLook.stop_small_shadows(player_rig)
 	# B8.1. The one thing that makes this body different from the one lying in
 	# the road: it takes every wound through the same anatomy, and death does not
 	# take. AP2.1, "the spirit cannot be banished by violence."

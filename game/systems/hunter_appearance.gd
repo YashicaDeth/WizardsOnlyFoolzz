@@ -29,6 +29,13 @@ static func style_world_rig(rig: BaselineHuman, identity: String, armed: bool) -
 		"piercings": 0.15 + float((seed / 31) % 35) / 100.0,
 		"mutation": (0.22 + float((seed / 7) % 35) / 100.0) if armed else 0.08,
 	})
+	# The body casts a shadow; the ink, the piercings and the tooth detail do
+	# not. Styling a world rig adds dozens of centimetre-scale meshes to it --
+	# about seventy-six per person in the hunt -- and every one was being drawn
+	# into the sun cascades every frame at the same cost as a building. The
+	# limbs and torso are well over the threshold and keep theirs, which is the
+	# only shadow of a person anybody actually reads.
+	WorldLook.stop_small_shadows(rig)
 	if not armed:
 		return
 	var arm := rig.parts.get("right_arm") as Node3D
