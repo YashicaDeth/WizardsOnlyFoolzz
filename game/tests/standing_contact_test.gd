@@ -221,6 +221,22 @@ func _ready() -> void:
 	hunt.call("_talk_option", "Put it down and walk away.")
 	check(WorldHistory.event_count("proximity_voice_addressed") == orphan_before, "and a line chosen with the panel shut says nothing")
 
+	print("-- they can tell whether you are holding something --")
+	# `perceive()` has always reported `player_weapon_drawn` off
+	# `WorldHistory.subject("player").weapon_drawn`, and nothing ever set that
+	# field. Permanently false meant `NPCActionValidator` could never rule
+	# `consider_robbery_compliance` or `attack`, both of which are gated behind
+	# `needs_threat` -- so surrender at gunpoint was unreachable, and the model
+	# was never told there was a weapon in the room.
+	hunt.call("_equip_weapon", 0)
+	check(bool(WorldHistory.subject("player").get("weapon_drawn", false)), "drawing a weapon is written down")
+	var armed_perception: Dictionary = (hunt.get("downed_talk") as NPCConversationComponent).perceive()
+	check(bool(armed_perception.get("player_weapon_drawn", false)), "and an NPC perceiving you can see it")
+	hunt.call("_put_the_weapons_down")
+	check(not bool(WorldHistory.subject("player").get("weapon_drawn", true)), "putting them down is written down too")
+	check(not bool((hunt.get("downed_talk") as NPCConversationComponent).perceive().get("player_weapon_drawn", true)), "and they can see that as well")
+	hunt.call("_equip_weapon", 0)
+
 	print("-- the whole loop, once, the way a demo walks it --")
 	# Every piece above is tested on its own. This is the one that matters for
 	# somebody sitting down in front of it: walk up, open the panel, say a

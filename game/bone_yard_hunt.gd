@@ -3065,6 +3065,7 @@ func _put_the_weapons_down() -> void:
 	_put_smokeable_away(false)
 	_clear_carried_limb_model()
 	bare_handed = true
+	_record_weapon_drawn()
 	if arsenal != null:
 		for model in arsenal.models.values():
 			(model as Node3D).visible = false
@@ -3115,6 +3116,7 @@ func _equip_smokeable(device_id: String) -> void:
 	_clear_carried_limb_model(false)
 	bare_handed = false
 	smoke_weapon_drawn = false
+	_record_weapon_drawn()
 	for model in arsenal.models.values():
 		(model as Node3D).visible = false
 	smoke_model = SMOKEABLES.build(device_id, float(smoke_spent.get(device_id, 0.0)))
@@ -3999,6 +4001,7 @@ func _equip_weapon(slot: int) -> void:
 		_put_smokeable_away(false)
 	bare_handed = false
 	_clear_carried_limb_model()
+	_record_weapon_drawn()
 	if arsenal.select_slot(slot):
 		firearm_aiming = false
 		smoke_weapon_drawn = preserve_mouth_smoke
@@ -6403,6 +6406,37 @@ func _typed_said(text: String) -> void:
 	if said.is_empty() or subject_id.is_empty():
 		return
 	_voice_heard(subject_id, said, {"sent": true, "duration": 1.0, "peak": 1.0})
+
+
+## Whether you are holding something, written where anybody can read it.
+##
+## The single most relevant fact in a conversation with an armed stranger, and
+## nothing in the game recorded it. `NPCConversationComponent.perceive()` has
+## always reported `player_weapon_drawn` off
+## `WorldHistory.subject("player").weapon_drawn`, and nothing ever set that
+## field -- every other match in the codebase is `smoke_weapon_drawn`, which is
+## about cigarettes. So it was permanently false, and the consequences ran the
+## whole length of the conversation system:
+##
+##   - `NPCActionValidator.ALLOWED` gates `consider_robbery_compliance` and
+##     `attack` behind `needs_threat`, so neither could ever be ruled unless
+##     there had already been violence. Surrender at gunpoint was unreachable.
+##   - `MockBrain` has two branches that begin `if armed` and neither could run.
+##   - `npc_dialogue_brain.prompt_for()` never told the model you were armed,
+##     which is why one asked to put it down and walk away answered "Mm." with
+##     intent "smalltalk". It did not know there was a weapon in the room.
+##
+## Written on change rather than per frame, because it changes when your hands
+## do and a field rewritten sixty times a second is a ledger nobody can read.
+## `amend_subject` rather than `update_subject`: this is a fact about the
+## present, not an event worth a line in the history.
+func _record_weapon_drawn() -> void:
+	if arsenal == null:
+		return
+	var drawn := not bare_handed and str(arsenal.current().get("kind", "")) in ["melee", "firearm"]
+	if bool(WorldHistory.subject("player").get("weapon_drawn", false)) == drawn:
+		return
+	WorldHistory.amend_subject("player", {"weapon_drawn": drawn})
 
 
 ## What the NPC decided, made true in the world.
