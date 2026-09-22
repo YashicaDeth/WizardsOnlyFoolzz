@@ -754,6 +754,64 @@ static func _surface_maps(kind: String, tint: Color, seed_value: int) -> Diction
 static var _firmament_map: ImageTexture = null
 
 
+## Stop small things casting shadows.
+##
+## A shadow caster costs a full re-render of that mesh into every cascade of
+## every shadowed light, and it costs exactly the same whether the mesh is a
+## warehouse or a baggie on a bench. The hunt was carrying 3133 visible
+## casters, and among them were 35 grinder parts, 24 baggies, 17 blisters and
+## 16 weights -- centimetre props whose shadows nobody has ever seen and which
+## were being drawn into the sun cascades every frame alongside the buildings.
+##
+## The rule is a size, not a list, so it keeps working when somebody adds
+## another prop: below the threshold along its longest axis, it stops casting.
+## Returns how many it switched off, because a helper that silently does
+## nothing is worse than no helper.
+static func stop_small_shadows(root: Node, longest_axis := 0.25) -> int:
+	if root == null or not is_instance_valid(root):
+		return 0
+	var stopped := 0
+	for node in _descendants(root):
+		var mesh := node as MeshInstance3D
+		if mesh == null or mesh.mesh == null:
+			continue
+		if mesh.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+			continue
+		# The mesh's own bounds, scaled by whatever the node is wearing: a
+		# quarter-metre box scaled up four times is a metre of object.
+		var size: Vector3 = mesh.mesh.get_aabb().size * mesh.scale
+		if maxf(size.x, maxf(size.y, size.z)) <= longest_axis:
+			mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			stopped += 1
+	return stopped
+
+
+## Stop everything under here casting, whatever its size.
+##
+## For things that are not in the world at all. The hunt draws 3D previews
+## inside HUD panels -- an inspected part, a held object, a body diagram -- and
+## every one of them was casting a real shadow into the district behind the
+## panel it is drawn in.
+static func stop_all_shadows(root: Node) -> int:
+	if root == null or not is_instance_valid(root):
+		return 0
+	var stopped := 0
+	for node in _descendants(root):
+		var mesh := node as MeshInstance3D
+		if mesh == null or mesh.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+			continue
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		stopped += 1
+	return stopped
+
+
+static func _descendants(node: Node) -> Array:
+	var out: Array = [node]
+	for child in node.get_children():
+		out.append_array(_descendants(child))
+	return out
+
+
 static func firmament() -> ImageTexture:
 	if _firmament_map != null:
 		return _firmament_map

@@ -84,6 +84,23 @@ func _ready() -> void:
 		caster_total += 1
 	print("PROCESS_CENSUS shadow_casters=%d" % caster_total)
 	_rank("CASTER", casters)
+	# One level deeper inside the two owners that cannot plausibly need them,
+	# so the fix is aimed at nodes rather than at a subsystem name.
+	for branch in ["HUD", "SubstanceStation"]:
+		var root := hunt.get_node_or_null(NodePath(branch))
+		if root == null:
+			continue
+		var inner: Dictionary = {}
+		for node in _every(root):
+			if not (node is MeshInstance3D):
+				continue
+			var mesh := node as MeshInstance3D
+			if not mesh.is_visible_in_tree() or mesh.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+				continue
+			var parent := mesh.get_parent()
+			inner[str(parent.name) if parent != null else "?"] = int(inner.get(str(parent.name) if parent != null else "?", 0)) + 1
+		print("PROCESS_CENSUS_INSIDE %s" % branch)
+		_rank("INSIDE", inner)
 	get_tree().quit(0)
 
 

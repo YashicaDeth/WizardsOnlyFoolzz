@@ -1035,6 +1035,12 @@ func _ready() -> void:
 	# empty one rather than nothing when Vosk has nothing to say.
 	spoken.contact.connect(_voice_heard)
 	spoken.failed.connect(func(reason: String): resolution_ui.set_voice_state(reason))
+	# Nothing drawn inside a HUD panel is in the world. The hunt shows 3D
+	# previews in its panels -- an inspected part, a held object, a body
+	# diagram -- and every one of them was casting a real shadow into the
+	# district behind the panel it is drawn in. 72 casters, none of which
+	# anybody could ever have seen the shadow of.
+	WorldLook.stop_all_shadows($HUD)
 	_build_downed_talk()
 	_build_talk_entry()
 	_build_talk_panel()
