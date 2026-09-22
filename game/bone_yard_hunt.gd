@@ -9336,6 +9336,26 @@ func _spawn_roamer(anywhere: bool = false) -> void:
 	# Their own name and their own standing, off the same generator the derby
 	# captain comes from, so a roamer reads as somebody rather than as a copy.
 	var who: Dictionary = CastNames.person("roamer_%d_%d" % [WorldHistory.run_salt, _roamer_serial])
+	# Put them in the record, not just in a summary string.
+	#
+	# `CastNames.person()` already produces a name, a trade and a faction for
+	# every roamer, and all of it but the name was being spent on one line of
+	# flavour text and thrown away. Nothing downstream could see who they were:
+	# `_standing_character()` read an empty subject and answered as "Someone",
+	# the contact menu had nobody to list, and the relationship keyed by
+	# subject id had no person on the other end of it.
+	#
+	# `_spawn_encounter_actor` derives the id the same way and reads any saved
+	# record first, so this only fills in somebody who is genuinely new.
+	var roamer_subject := "roamer_%d_actor" % _roamer_serial
+	if not WorldHistory.subject(roamer_subject).has("kind"):
+		WorldHistory.register_subject(roamer_subject, {
+			"name": str(who.get("name", "Ashline Tollkeeper")),
+			"kind": "person",
+			"role": str(who.get("role", "")),
+			"faction": str(who.get("faction", "")),
+			"faction_id": str(who.get("faction_id", "")),
+		})
 	_spawn_encounter_actor({
 		"instance_id": "roamer_%d" % _roamer_serial,
 		"kind": "hostile",

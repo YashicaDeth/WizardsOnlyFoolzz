@@ -106,6 +106,10 @@ static func for_role(subject: Dictionary, allies := 0) -> Dictionary:
 	for word: String in words:
 		if word == "examiner":
 			return examiner()
-		if word in ["guard", "sentinel", "warden", "orderly"]:
+		# Deliberately narrow. "warden" was in this list for one commit, and
+		# `CastNames.ROLES` contains "Yard Warden" -- a scrap-yard boss on the
+		# road, who would have been handed CellOutz facility dialogue every
+		# time one was rolled. A word has to be unambiguously staff to be here.
+		if word in ["guard", "sentinel"]:
 			return guard(subject, allies)
 	return {}

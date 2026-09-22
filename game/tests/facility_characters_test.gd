@@ -87,6 +87,12 @@ func _ready() -> void:
 	# and "Haul foreman", and none of them is staff.
 	check(FacilityCharacters.for_role({"role": "Yard salvage hand"}).is_empty(), "a yard salvage hand is not a guard")
 	check(FacilityCharacters.for_role({"role": "Haul foreman"}).is_empty(), "and neither is a haul foreman")
+	# "Yard Warden" is a real entry in `CastNames.ROLES` and is a scrap-yard
+	# boss on the road, not CellOutz staff. "warden" was in the match list for
+	# one commit and would have handed him facility dialogue every time one was
+	# rolled.
+	check(FacilityCharacters.for_role({"role": "Yard Warden"}).is_empty(), "and a yard warden is a road boss, not facility staff")
+	check(FacilityCharacters.for_role({"role": "Pit Marshal"}).is_empty(), "nor is a pit marshal")
 	check(FacilityCharacters.for_role({"role": "scavenger"}).is_empty(), "a scavenger is not answered as staff")
 	check(FacilityCharacters.for_role({}).is_empty(), "and neither is somebody with no role at all")
 
