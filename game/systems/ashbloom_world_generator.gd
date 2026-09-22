@@ -176,27 +176,28 @@ func _build_enterable_shell(at: Vector3, dimensions: Vector3, color: Color, sign
 	var collision_body := StaticBody3D.new()
 	collision_body.name = "Collision"
 	building.add_child(collision_body)
+	# Collected rather than built one at a time. See `_commit_walls()`.
+	var walls: Array[Dictionary] = []
 	var wall_thickness := 0.45
 	var half_x := dimensions.x * 0.5
 	var half_z := dimensions.z * 0.5
 	var door_width := minf(2.4, dimensions.x * 0.28)
-	_add_wall(building, Vector3(-half_x + (dimensions.x - door_width) * 0.25, dimensions.y * 0.5, half_z), Vector3((dimensions.x - door_width) * 0.5, dimensions.y, wall_thickness), color)
-	_add_wall(building, Vector3(half_x - (dimensions.x - door_width) * 0.25, dimensions.y * 0.5, half_z), Vector3((dimensions.x - door_width) * 0.5, dimensions.y, wall_thickness), color)
+	walls.append({"at": Vector3(-half_x + (dimensions.x - door_width) * 0.25, dimensions.y * 0.5, half_z), "size": Vector3((dimensions.x - door_width) * 0.5, dimensions.y, wall_thickness), "color": color})
+	walls.append({"at": Vector3(half_x - (dimensions.x - door_width) * 0.25, dimensions.y * 0.5, half_z), "size": Vector3((dimensions.x - door_width) * 0.5, dimensions.y, wall_thickness), "color": color})
 	# M4.1. The lintel. Without it the doorway is a slot to the roof and the
 	# building states no scale at all.
 	var head := minf(DOOR_HEIGHT, dimensions.y - 0.6)
 	if dimensions.y > head + 0.3:
-		_add_wall(
-			building,
-			Vector3(0, head + (dimensions.y - head) * 0.5, half_z),
-			Vector3(door_width, dimensions.y - head, wall_thickness),
-			color
-		)
-	_add_wall(building, Vector3(0, dimensions.y * 0.5, -half_z), Vector3(dimensions.x, dimensions.y, wall_thickness), color)
-	_add_wall(building, Vector3(-half_x, dimensions.y * 0.5, 0), Vector3(wall_thickness, dimensions.y, dimensions.z), color)
-	_add_wall(building, Vector3(half_x, dimensions.y * 0.5, 0), Vector3(wall_thickness, dimensions.y, dimensions.z), color)
-	_add_wall(building, Vector3(0, -0.12, 0), Vector3(dimensions.x, 0.22, dimensions.z), Color("211a16"))
-	_add_wall(building, Vector3(0, dimensions.y, 0), Vector3(dimensions.x + 0.7, 0.32, dimensions.z + 0.7), color.darkened(0.18))
+		walls.append({
+			"at": Vector3(0, head + (dimensions.y - head) * 0.5, half_z),
+			"size": Vector3(door_width, dimensions.y - head, wall_thickness),
+			"color": color,
+		})
+	walls.append({"at": Vector3(0, dimensions.y * 0.5, -half_z), "size": Vector3(dimensions.x, dimensions.y, wall_thickness), "color": color})
+	walls.append({"at": Vector3(-half_x, dimensions.y * 0.5, 0), "size": Vector3(wall_thickness, dimensions.y, dimensions.z), "color": color})
+	walls.append({"at": Vector3(half_x, dimensions.y * 0.5, 0), "size": Vector3(wall_thickness, dimensions.y, dimensions.z), "color": color})
+	walls.append({"at": Vector3(0, -0.12, 0), "size": Vector3(dimensions.x, 0.22, dimensions.z), "color": Color("211a16")})
+	walls.append({"at": Vector3(0, dimensions.y, 0), "size": Vector3(dimensions.x + 0.7, 0.32, dimensions.z + 0.7), "color": color.darkened(0.18)})
 	# G4. Texture does not change an outline. A box with brilliant grime on it is
 	# still a box, and what reads at distance is the edge — so the edge gets
 	# broken, hung with junk, and knocked off plumb.
@@ -205,9 +206,10 @@ func _build_enterable_shell(at: Vector3, dimensions: Vector3, color: Color, sign
 	# which is the second thing after a door that states scale.
 	var storey := STOREY
 	while storey < dimensions.y - 0.4:
-		_add_wall(building, Vector3(0, storey, half_z + 0.06), Vector3(dimensions.x * 0.96, 0.14, 0.12), color.darkened(0.36))
-		_add_wall(building, Vector3(half_x + 0.06, storey, 0), Vector3(0.12, 0.14, dimensions.z * 0.96), color.darkened(0.36))
+		walls.append({"at": Vector3(0, storey, half_z + 0.06), "size": Vector3(dimensions.x * 0.96, 0.14, 0.12), "color": color.darkened(0.36)})
+		walls.append({"at": Vector3(half_x + 0.06, storey, 0), "size": Vector3(0.12, 0.14, dimensions.z * 0.96), "color": color.darkened(0.36)})
 		storey += STOREY
+	_commit_walls(building, collision_body, walls, generated_buildings.size())
 	_post_bill(building, dimensions, generated_buildings.size())
 	# The silhouette kit is decoration, not a walkable shell.  In the live
 	# sandbox it accounted for the overwhelming majority of the generated
@@ -232,6 +234,65 @@ func _build_enterable_shell(at: Vector3, dimensions: Vector3, color: Color, sign
 	sign.modulate = Color("e26a36")
 	sign.outline_size = 5
 	building.add_child(sign)
+
+
+## One building, one draw call, and the collision it always had.
+##
+## Every wall used to be its own `MeshInstance3D` with its own `BoxMesh` and
+## its own `StandardMaterial3D` -- `_material()` takes a fresh seed per call,
+## so fifty shells produced around eighteen hundred meshes and as many
+## generated grain textures, which is most of the region's draw calls and a
+## good deal of its 319MB of static memory.
+##
+## They are all boxes of the same shape at different sizes, which is exactly
+## what a `MultiMesh` is for: one unit cube, and a transform per instance
+## carrying the size as scale. The colour that used to live in eight hundred
+## separate materials rides along as a per-instance colour against one material
+## per building, which keeps the grain and the per-building variation while
+## losing the per-wall duplication nobody could see anyway.
+##
+## Batched per building rather than per district on purpose. One batch for the
+## whole region would be a single object with one bounding box, drawn in full
+## whenever any part of it was on screen; per building keeps every shell
+## culling independently, which is what the visibility work already relies on.
+##
+## The collision is untouched and still one `BoxShape3D` per wall on the
+## building's own body, because none of this is about what the player can walk
+## into.
+func _commit_walls(building: Node3D, body: StaticBody3D, walls: Array[Dictionary], seed_value: int) -> void:
+	if walls.is_empty():
+		return
+	for wall: Dictionary in walls:
+		var collision := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = wall["size"] as Vector3
+		collision.shape = shape
+		collision.position = wall["at"] as Vector3
+		body.add_child(collision)
+
+	var unit := BoxMesh.new()
+	unit.size = Vector3.ONE
+	var batch := MultiMesh.new()
+	batch.transform_format = MultiMesh.TRANSFORM_3D
+	# The whole reason one material can stand in for eight hundred.
+	batch.use_colors = true
+	batch.mesh = unit
+	batch.instance_count = walls.size()
+	for index in walls.size():
+		var wall: Dictionary = walls[index]
+		var size: Vector3 = wall["size"]
+		batch.set_instance_transform(index, Transform3D(Basis().scaled(size), wall["at"] as Vector3))
+		batch.set_instance_color(index, wall["color"] as Color)
+
+	var shell := MultiMeshInstance3D.new()
+	shell.name = "Walls"
+	shell.multimesh = batch
+	# White albedo so the instance colour is the colour, with the generated
+	# grain still multiplying over the top of it.
+	var surface := _material(Color.WHITE, 0.0)
+	surface.vertex_color_use_as_albedo = true
+	shell.material_override = surface
+	building.add_child(shell)
 
 
 func _add_wall(parent: Node3D, at: Vector3, dimensions: Vector3, color: Color) -> void:

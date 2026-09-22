@@ -86,7 +86,7 @@ func _ready() -> void:
 	_rank("CASTER", casters)
 	# One level deeper inside the two owners that cannot plausibly need them,
 	# so the fix is aimed at nodes rather than at a subsystem name.
-	for branch in ["HUD", "SubstanceStation"]:
+	for branch in ["HUD", "SubstanceStation", "ProceduralAshbloomDistricts"]:
 		var root := hunt.get_node_or_null(NodePath(branch))
 		if root == null:
 			continue
@@ -95,7 +95,7 @@ func _ready() -> void:
 			if not (node is MeshInstance3D):
 				continue
 			var mesh := node as MeshInstance3D
-			if not mesh.is_visible_in_tree() or mesh.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+			if not mesh.is_visible_in_tree():
 				continue
 			var parent := mesh.get_parent()
 			inner[str(parent.name) if parent != null else "?"] = int(inner.get(str(parent.name) if parent != null else "?", 0)) + 1
