@@ -134,6 +134,35 @@ func _ready() -> void:
 	check(str(standing_def.get("identity", "")).contains("on their feet"), "which their identity line says too")
 	check(str(standing_def.get("voice", "")) != str(downed_def.get("voice", "")), "and the two do not speak in the same voice")
 
+	print("-- and a machine with no microphone can still talk --")
+	# Vosk needs a Python process, a model on disk and a working input device.
+	# Without all three the overworld could not be spoken to at all, which is
+	# most machines and every demo box.
+	var entry := hunt.get("talk_entry") as LineEdit
+	check(entry != null and is_instance_valid(entry), "there is a line to type in")
+	check(not entry.visible, "and it stays out of the way until it is needed")
+	actors.clear()
+	var typist := _actor(hunt, "typed_subject", here + facing * 2.0, false)
+	actors.append(typist)
+	hunt.call("_open_typed_talk", "typed_subject")
+	check(entry.visible, "addressing somebody without a microphone raises it")
+	check(str(hunt.get("talk_entry_subject")) == "typed_subject", "aimed at the person you are addressing")
+
+	var spoke_before := WorldHistory.event_count("proximity_voice_addressed")
+	hunt.call("_typed_said", "  put it down  ")
+	check(WorldHistory.event_count("proximity_voice_addressed") == spoke_before + 1, "typing at them reaches the same path speaking does")
+	check(not entry.visible, "and the line closes behind it")
+	check(str(hunt.get("talk_entry_subject")).is_empty(), "with nobody still addressed")
+	check(str(WorldHistory.subject("typed_subject").get("memory", "")).contains("spoke to me"), "they remember being spoken to")
+
+	# Enter on an empty box plainly means "never mind", not "say nothing at
+	# somebody".
+	hunt.call("_open_typed_talk", "typed_subject")
+	var quiet_before := WorldHistory.event_count("proximity_voice_addressed")
+	hunt.call("_typed_said", "   ")
+	check(WorldHistory.event_count("proximity_voice_addressed") == quiet_before, "submitting nothing says nothing")
+	check(not entry.visible, "but still puts the line away")
+
 	hunt.queue_free()
 	print("STANDING_CONTACT_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

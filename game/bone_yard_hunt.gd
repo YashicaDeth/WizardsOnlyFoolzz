@@ -707,6 +707,12 @@ var spoken: SpokenContact = null
 ## state because the release has to go to whichever of the two claimed the
 ## press, and the world can change under a held key.
 var talking_to_standing := false
+## The typed half. Built hidden and only ever raised on a machine with no
+## recogniser, which is most machines: Vosk needs a Python process, a model on
+## disk and a microphone, and a demo that cannot be talked to at all on a box
+## missing any of the three is a demo where half this system does not exist.
+var talk_entry: LineEdit
+var talk_entry_subject := ""
 var downed_talk: NPCConversationComponent = null
 var downed_brain: NPCOllamaBrain = null
 var arsenal: Node
@@ -1008,6 +1014,7 @@ func _ready() -> void:
 	spoken.contact.connect(_voice_heard)
 	spoken.failed.connect(func(reason: String): resolution_ui.set_voice_state(reason))
 	_build_downed_talk()
+	_build_talk_entry()
 	_build_expanse_systems()
 	_register_people()
 	player_body = CharacterBody3D.new()
@@ -1454,6 +1461,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if handheld != null and handheld.is_open and handheld.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
+	if talk_entry != null and is_instance_valid(talk_entry) and talk_entry.visible:
+		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+			_close_typed_talk()
+			get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.keycode == KEY_V and not event.echo:
 		# V is already contextual here -- in a clinch it persuades, otherwise it
 		# raises the reliquary -- and speaking takes the layer above both. It is
@@ -1465,9 +1477,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		# roamer who wanders into range.
 		if event.pressed and grapple_target.is_empty() and panel_mode.is_empty() and not _nearest_standing().is_empty():
 			var heard := _nearest_standing()
-			_voice_capture(true)
-			prompt.text = "SPEAKING TO %s // RELEASE V" % str(WorldHistory.subject(str(heard.subject_id)).get("name", "THEM")).to_upper()
-			talking_to_standing = true
+			# Whichever half this machine can actually run. Holding V to speak
+			# needs a recogniser behind it; without one the same key opens a
+			# line to type instead, so the conversation exists either way.
+			if spoken != null and spoken.transcribes():
+				_voice_capture(true)
+				prompt.text = "SPEAKING TO %s // RELEASE V" % str(WorldHistory.subject(str(heard.subject_id)).get("name", "THEM")).to_upper()
+				talking_to_standing = true
+			else:
+				_open_typed_talk(str(heard.subject_id))
 		elif event.pressed and grapple_target.is_empty() and panel_mode.is_empty():
 			pulmonary_held = true
 			prompt.text = "PULMONARY RELIQUARY // MOVE MOUSE / WHEEL // RELEASE V"
@@ -6228,6 +6246,68 @@ func _build_downed_talk() -> void:
 	downed_talk.answered.connect(_downed_answered)
 	# The half nothing was listening to. See `_npc_acted`.
 	downed_talk.validated_action.connect(_npc_acted)
+
+
+## A line to type when there is no microphone worth using.
+##
+## `npc_conversation_lab` has had this from the start and says why in its own
+## header -- "real microphone where one is usable, typed input where it is not"
+## -- and the overworld never got it, so speaking to anybody in the actual game
+## required a working Vosk install. The words go down exactly the same path a
+## transcript does, because to everything downstream they are the same thing:
+## a string somebody said to somebody.
+func _build_talk_entry() -> void:
+	talk_entry = LineEdit.new()
+	talk_entry.name = "TalkEntry"
+	talk_entry.placeholder_text = "SAY SOMETHING / ENTER TO SPEAK / ESC TO STOP"
+	talk_entry.visible = false
+	talk_entry.anchors_preset = Control.PRESET_BOTTOM_WIDE
+	talk_entry.offset_left = 180.0
+	talk_entry.offset_right = -180.0
+	talk_entry.offset_top = -132.0
+	talk_entry.offset_bottom = -96.0
+	talk_entry.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	talk_entry.add_theme_color_override("font_color", Color(0.95, 0.55, 0.35))
+	$HUD.add_child(talk_entry)
+	talk_entry.text_submitted.connect(_typed_said)
+
+
+## Raise it on whoever is being addressed.
+func _open_typed_talk(subject_id: String) -> void:
+	if talk_entry == null or not is_instance_valid(talk_entry):
+		return
+	talk_entry_subject = subject_id
+	talk_entry.text = ""
+	talk_entry.visible = true
+	talk_entry.grab_focus()
+	# The mouse would otherwise still be turning the head while somebody types.
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	prompt.text = "SPEAKING TO %s // TYPE AND PRESS ENTER" % str(WorldHistory.subject(subject_id).get("name", "THEM")).to_upper()
+
+
+func _close_typed_talk() -> void:
+	if talk_entry == null or not is_instance_valid(talk_entry):
+		return
+	talk_entry.release_focus()
+	talk_entry.visible = false
+	talk_entry_subject = ""
+	if panel_mode.is_empty():
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+## Typed words arrive as a finished contact, because that is what they are.
+##
+## The payload is the shape `_voice_heard` already takes, with the measurements
+## a microphone would have supplied filled in as "yes, and clearly". Empty
+## submissions close the line rather than sending silence at somebody, which is
+## what pressing enter on an empty box plainly means.
+func _typed_said(text: String) -> void:
+	var said := text.strip_edges()
+	var subject_id := talk_entry_subject
+	_close_typed_talk()
+	if said.is_empty() or subject_id.is_empty():
+		return
+	_voice_heard(subject_id, said, {"sent": true, "duration": 1.0, "peak": 1.0})
 
 
 ## What the NPC decided, made true in the world.
