@@ -1485,6 +1485,17 @@ func _bleed(delta: float) -> void:
 	_refresh_streaks(sites)
 
 
+## The body process is called for every standing person.  Keep an intact body
+## out of `_bleed()` entirely: that method walks anatomy and wound collections,
+## but there is nothing to render until a real wound opens.  This predicate is
+## deliberately narrower than "not dead" so a living, untreated wound wakes on
+## the next frame, while loose drops continue to simulate in `_process()`.
+func _needs_bleed_update() -> bool:
+	if not gore or anatomy == null:
+		return false
+	return anatomy.bleed_rate + anatomy.internal_bleed_rate * 0.12 >= BloodFlow.MIN_BLEED
+
+
 ## Every wound currently open enough to run, as {part, at, normal}. A severed
 ## limb is not in here — its stump bleeds, and the stump is its own zone.
 func _bleeding_sites() -> Array:
@@ -1888,7 +1899,8 @@ func _process(delta: float) -> void:
 	# Everything this rig animates runs on the exchange's clock, not the world's.
 	var own_delta := delta * motion_scale
 	_apply_pain_posture(own_delta)
-	_bleed(own_delta)
+	if _needs_bleed_update():
+		_bleed(own_delta)
 	if _loose.is_empty():
 		return
 	delta = own_delta
