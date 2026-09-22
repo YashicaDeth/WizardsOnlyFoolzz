@@ -167,7 +167,7 @@ people read instead of looking.
   each, but only after the 13.29ms, which is twice as large as all of this
   put together.
 
-### One test that still needs its own arena
+### Tests restored to useful coverage
 
 `chunk_test` now proves the scavenger leaves an aged bone at the moment the
 bone exists, rather than indexing a disposable fragment after later test work
@@ -176,11 +176,9 @@ has correctly exhausted the gore budget. It is in `--core` now. The related
 also promoted to `--core`; retain the watchdog timer and investigate if it
 ever flakes again rather than trusting one green result.
 
-- `climb_test` fails 2. Almost certainly the same defect as c175a0e: test
-  geometry standing in the bone yard where real world colliders reach into its
-  raycasts. That fix gave the test its own arena; this one needs the same, and
-  c175a0e also had a *second* player placement that was missed on the first
-  pass.
+`climb_test` is now also isolated at `ARENA_Y = 400`, with its own floor. It
+passes the tall-wall climb, low-wall vault handoff, mantle, real vertical
+travel, and removed-wall recovery checks, and is in `--core`.
 
 ### Combat, built and not all bound
 
