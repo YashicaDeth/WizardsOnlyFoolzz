@@ -6226,6 +6226,103 @@ func _build_downed_talk() -> void:
 	downed_talk.suppress_bubble = true
 	add_child(downed_talk)
 	downed_talk.answered.connect(_downed_answered)
+	# The half nothing was listening to. See `_npc_acted`.
+	downed_talk.validated_action.connect(_npc_acted)
+
+
+## What the NPC decided, made true in the world.
+##
+## `NPCConversationComponent` has run the whole loop since it was written --
+## perceive, brain proposes, validator rules, relationship moves, NPC speaks
+## from what actually happened -- and the hunt listened to none of it.
+## `validated_action` had no connection in this scene at all. So somebody could
+## rule that they were going to run, or comply, or shout for help, say so out
+## loud, and then stand exactly where they were. The conversation was a speech
+## bubble over a state machine that could not hear it.
+##
+## Nothing new is invented here. Every outcome is an existing state the
+## encounter loop already drives, reached through `disposition`, which is what
+## line 5559 reads to decide whether somebody is still swinging at you. And
+## every one of them goes into the record the same way sparing and recruiting
+## already do, because a person who yielded to you and a person you spared are
+## the same fact about the world and have to survive a reload identically.
+func _npc_acted(npc_id: String, result: Dictionary) -> void:
+	var actor := _actor_by_id(npc_id)
+	if actor.is_empty() or actor.rig == null or not is_instance_valid(actor.rig):
+		return
+	if actor.rig.anatomy.dead:
+		return
+	var action := str(result.get("action", "none"))
+	var subject := WorldHistory.subject(npc_id)
+	var name := str(subject.get("name", "THEY")).to_upper()
+	match action:
+		"attack":
+			# Talking your way into a fight is a real outcome and the only one
+			# here that costs you something immediately.
+			actor.disposition = "hostile"
+			actor.state = "hunting"
+			actor.tracking_player = true
+			WorldHistory.update_subject(npc_id, {
+				"disposition": "hostile",
+				"grudge": int(subject.get("grudge", 0)) + 10,
+				"memory": "The Hunter spoke to me and I decided to take them.",
+			}, "npc_turned_hostile")
+			prompt.text = "%s // DECIDES AGAINST YOU" % name
+		"flee":
+			# `state == "fleeing"` is already driven at 5585; this is only the
+			# decision to enter it.
+			actor.state = "fleeing"
+			actor.disposition = "neutral"
+			WorldHistory.update_subject(npc_id, {
+				"disposition": "neutral",
+				"memory": "The Hunter spoke to me and I left rather than find out.",
+			}, "npc_fled_conversation")
+			prompt.text = "%s // BREAKS AWAY" % name
+		"comply", "consider_robbery_compliance":
+			# Surrender. The same shape as sparing somebody on the floor, and
+			# deliberately so: `spare()` puts the rig down and `neutral` is what
+			# stops them swinging.
+			actor.rig.spare()
+			actor.disposition = "neutral"
+			actor.state = "spared"
+			actor.attack_time = 0.0
+			WorldHistory.update_subject(npc_id, {
+				"status": "spared",
+				"disposition": "neutral",
+				"memory": "The Hunter spoke to me and I gave it up rather than fight.",
+				"anatomy_state": actor.rig.snapshot(),
+			}, "npc_yielded")
+			prompt.text = "%s // YIELDS" % name
+		"call_for_help":
+			# Everyone still hostile and still close enough to have heard it.
+			var roused := 0
+			for other in encounter_actors:
+				if other == actor or not is_instance_valid(other.get("node") as Node3D):
+					continue
+				if str(other.get("disposition", "hostile")) != "hostile":
+					continue
+				if player.distance_to((other.node as Node3D).global_position) > SHOUT_CARRIES:
+					continue
+				other.tracking_player = true
+				roused += 1
+			WorldHistory.update_subject(npc_id, {
+				"memory": "The Hunter spoke to me and I called the others.",
+			}, "npc_called_for_help")
+			prompt.text = "%s // CALLS OUT" % name if roused == 0 else "%s // CALLS OUT // %d ANSWER" % [name, roused]
+		"end_conversation":
+			prompt.text = "%s // DONE TALKING" % name
+	# Recorded whatever it was, including the refusals that change nothing in
+	# the world, because "I asked and they would not" is a fact about this
+	# person that the next conversation should be able to read.
+	PLAYER_ACTION_LEDGER.record("npc_conversation_ruling", {
+		"speaker": "player", "listener": npc_id, "action": action, "location": HUNT_LOCATION,
+	})
+
+
+## How far a shout carries. Short: this is somebody calling out in the open,
+## not an alarm, and a cry that pulled the whole yard would make talking to
+## anybody strictly worse than shooting them.
+const SHOUT_CARRIES := 18.0
 
 
 ## Everything the model is allowed to know about the person on the floor. It is
