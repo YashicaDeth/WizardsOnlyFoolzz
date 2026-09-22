@@ -326,6 +326,11 @@ var guard_stamina_drain := 14.0
 var guard_aim := Vector2.ZERO
 var guard_side := ""
 var last_blade_read: Dictionary = {}
+## A timed parry used to change only numbers and text.  Keep the most recent
+## burst as a reference for the tiny presentation test; it is never used as
+## gameplay state.
+var parry_spark_count := 0
+var last_parry_spark: Node3D
 ## AG4.1. Out of breath. Set when stamina bottoms out, cleared only once enough
 ## has come back to be worth spending — see `_move_player`.
 ## AG4.2. Blood on the lens. Fed by `_spawn_blood`, which every blood event in
@@ -698,6 +703,10 @@ var _unlock_feel_timer := 0.0
 var kill_cam: Control
 var voice_channel: Node
 var spoken: SpokenContact = null
+## Whether the V being held is a sentence rather than the reliquary. Held as
+## state because the release has to go to whichever of the two claimed the
+## press, and the world can change under a held key.
+var talking_to_standing := false
 var downed_talk: NPCConversationComponent = null
 var downed_brain: NPCOllamaBrain = null
 var arsenal: Node
@@ -1446,10 +1455,26 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event is InputEventKey and event.keycode == KEY_V and not event.echo:
-		if event.pressed and grapple_target.is_empty() and panel_mode.is_empty():
+		# V is already contextual here -- in a clinch it persuades, otherwise it
+		# raises the reliquary -- and speaking takes the layer above both. It is
+		# the same key the conversation lab talks on, so the one place in the
+		# game where this already worked and the world now agree.
+		#
+		# Only when somebody is actually in front of you: the reliquary is a
+		# thing you hold up on an empty road and must not be stolen by every
+		# roamer who wanders into range.
+		if event.pressed and grapple_target.is_empty() and panel_mode.is_empty() and not _nearest_standing().is_empty():
+			var heard := _nearest_standing()
+			_voice_capture(true)
+			prompt.text = "SPEAKING TO %s // RELEASE V" % str(WorldHistory.subject(str(heard.subject_id)).get("name", "THEM")).to_upper()
+			talking_to_standing = true
+		elif event.pressed and grapple_target.is_empty() and panel_mode.is_empty():
 			pulmonary_held = true
 			prompt.text = "PULMONARY RELIQUARY // MOVE MOUSE / WHEEL // RELEASE V"
 		elif not event.pressed:
+			if talking_to_standing:
+				talking_to_standing = false
+				_voice_capture(false)
 			pulmonary_held = false
 	if _pulmonary_diagnostic_active() and event is InputEventMouseButton:
 		if event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -4116,6 +4141,7 @@ func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF, incom
 	if parried:
 		# Nothing gets through a parry, and it costs the attacker instead of you.
 		impact_feel.strike(0.85, "cut", false)
+		_emit_parry_spark(attacker_position)
 		prompt.text = "TURNED IT"
 		WorldHistory.record_event("player_parried", {"location": HUNT_LOCATION})
 		return {"damage": 0.0, "blocked": true, "parried": true}
@@ -4128,6 +4154,61 @@ func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF, incom
 	impact_feel.strike(0.3, "blunt", false)
 	WorldHistory.record_event("player_blocked", {"location": HUNT_LOCATION})
 	return {"damage": through, "blocked": true, "parried": false}
+
+
+## A parry needs a physical punctuation mark at the contact, otherwise the
+## player reads it as a normal blocked hit with a different damage number.
+## This is deliberately a single short-lived light and seven uncolliding
+## sparks; it adds feedback to a crowded fight without becoming another
+## persistent-gore budget.
+func _emit_parry_spark(attacker_position: Vector3) -> void:
+	var contact := player + Vector3(0.0, 1.05, 0.0)
+	if attacker_position != Vector3.INF:
+		var toward_attacker := attacker_position - player
+		toward_attacker.y = 0.0
+		if toward_attacker.length_squared() > 0.001:
+			contact += toward_attacker.normalized() * 0.42
+	else:
+		contact += Vector3(sin(yaw), 0.0, cos(yaw)) * 0.42
+	var burst := Node3D.new()
+	burst.name = "ParrySpark"
+	add_child(burst)
+	burst.global_position = contact
+	last_parry_spark = burst
+	parry_spark_count += 1
+
+	var light := OmniLight3D.new()
+	light.light_color = Color("ffe09a")
+	light.light_energy = 4.6
+	light.omni_range = 2.5
+	light.shadow_enabled = false
+	burst.add_child(light)
+	var flare_material := StandardMaterial3D.new()
+	flare_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	flare_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	flare_material.albedo_color = Color("fff0bb")
+	flare_material.emission_enabled = true
+	flare_material.emission = Color("ff9c35")
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(light, "light_energy", 0.0, 0.10)
+	for index in 7:
+		var shard := MeshInstance3D.new()
+		var shard_mesh := SphereMesh.new()
+		shard_mesh.radius = 0.026
+		shard_mesh.height = 0.074
+		shard_mesh.radial_segments = 4
+		shard_mesh.rings = 2
+		shard.mesh = shard_mesh
+		shard.material_override = flare_material
+		shard.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		burst.add_child(shard)
+		var angle := TAU * float(index) / 7.0 + 0.23
+		var drift := Vector3(cos(angle), 0.22 + float(index % 3) * 0.09, sin(angle)) * (0.28 + float(index % 2) * 0.10)
+		tween.tween_property(shard, "position", drift, 0.13)
+		tween.tween_property(shard, "scale", Vector3.ZERO, 0.16)
+	tween.chain().tween_callback(func() -> void:
+		if is_instance_valid(burst):
+			burst.queue_free())
 
 
 ## AS1.1/AS1.3. Whether the torch is lit and how strong is entirely
@@ -4523,6 +4604,38 @@ func _nearest_corpse_loot_cache(reach: float) -> Node3D:
 	return nearest
 
 
+## E on a body with no tied stash left opens the inventory on them instead of
+## printing a string: pockets and garments take, open cavities show, sealed
+## zones stay sealed. No cache, no collect — the prompt path is untouched.
+func _open_nearest_corpse(reach: float) -> bool:
+	var nearest: Dictionary = {}
+	var nearest_distance := reach
+	for body in dead_bodies:
+		var node := body.get("node") as Node3D
+		var rig := body.get("rig") as BaselineHuman
+		if node == null or not is_instance_valid(node) or rig == null or not is_instance_valid(rig):
+			continue
+		var distance := player.distance_to(node.global_position)
+		if distance <= nearest_distance:
+			nearest_distance = distance
+			nearest = body
+	if nearest.is_empty():
+		return false
+	firearm_aiming = false
+	if handheld.is_open:
+		handheld.close_device()
+	keys_card.close()
+	_close_panel_views()
+	panel_mode = "inventory"
+	field_inventory.open_inventory(handheld.carry, player_rig, arsenal)
+	field_inventory.open_corpse(nearest.get("rig"), nearest.get("loot", []))
+	prompt.visible = false
+	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
+	if _pointer != null and is_instance_valid(_pointer):
+		_pointer.visible = true
+	return true
+
+
 func _collect_loot_cache(cache: Node3D) -> bool:
 	if cache == null or not is_instance_valid(cache) or not loose_loot.has(cache):
 		return false
@@ -4577,6 +4690,8 @@ func _interact() -> void:
 		return
 	var corpse_cache := _nearest_corpse_loot_cache(3.2)
 	if corpse_cache != null and _collect_loot_cache(corpse_cache):
+		return
+	if _open_nearest_corpse(3.2):
 		return
 	var chunk := _nearest_takeable_chunk(3.2)
 	if chunk != null:
@@ -5856,6 +5971,59 @@ func _actor_by_id(id: String) -> Dictionary:
 			return actor
 	return {}
 
+## How close you have to be to talk to somebody still on their feet, and how
+## nearly you have to be facing them.
+##
+## Both are conversation figures rather than combat ones. The range matches the
+## one the resolution window already uses for a body on the floor, so speaking
+## to the living and the dying reach the same distance. The dot is generous --
+## about a sixty degree cone -- because this is talking to a person, not
+## putting a crosshair on them.
+const TALK_RANGE := 5.5
+const TALK_FACING := 0.45
+
+
+## The person you are addressing when nobody is on the floor in front of you.
+##
+## In front of, not merely near. A fight has people on several sides of you and
+## shouting at whichever one happens to be nearest -- including one behind your
+## back -- is not what the player meant by speaking.
+func _nearest_standing() -> Dictionary:
+	var nearest: Dictionary = {}
+	var distance := TALK_RANGE
+	var facing := -camera.global_transform.basis.z
+	for actor in encounter_actors:
+		if not is_instance_valid(actor.node) or actor.rig == null or not is_instance_valid(actor.rig):
+			continue
+		# The dead do not answer and the downed have their own window.
+		if actor.rig.anatomy.dead or actor.rig.is_downed():
+			continue
+		var toward: Vector3 = actor.node.global_position - player
+		var candidate := toward.length()
+		if candidate > distance or candidate < 0.01:
+			continue
+		if facing.dot(toward.normalized()) < TALK_FACING:
+			continue
+		distance = candidate
+		nearest = actor
+	return nearest
+
+
+## Whoever speaking would reach right now.
+##
+## The window first, because a body you have opened the resolution form over is
+## unambiguously the one you are addressing. Only when there is no such body
+## does this look up at whoever is standing in front of you -- which is the
+## whole of what was missing. `SpokenContact` never restricted anything: it
+## takes the subject id it is handed, and `_voice_capture` only ever handed it
+## `resolution_target`, which is set by the downed window and by nothing else.
+func _addressable_actor() -> Dictionary:
+	var downed := _actor_by_id(resolution_target)
+	if not downed.is_empty() and player.distance_to(downed.node.global_position) <= TALK_RANGE:
+		return downed
+	return _nearest_standing()
+
+
 func _nearest_downed() -> Dictionary:
 	var nearest: Dictionary = {}
 	var distance := 4.0
@@ -6033,8 +6201,8 @@ func _refresh_ascent_job_market() -> void:
 
 
 func _voice_capture(holding: bool) -> void:
-	var actor := _actor_by_id(resolution_target)
-	if actor.is_empty() or player.distance_to(actor.node.global_position) > 5.5:
+	var actor := _addressable_actor()
+	if actor.is_empty():
 		resolution_ui.set_voice_state("NO SUBJECT IN VOICE RANGE")
 		return
 	if holding:
@@ -6090,6 +6258,48 @@ func _downed_character(subject_id: String) -> Dictionary:
 	}
 
 
+## The same, for somebody who is not on the floor.
+##
+## Kept apart from `_downed_character()` rather than switched inside it,
+## because almost every line differs: the downed rules are all about being
+## unable to get up and are actively wrong for a person standing in front of
+## you with a weapon. The shared part is what the model is allowed to know,
+## which is their own name, their own grudge, and nothing of the player.
+func _standing_character(subject_id: String) -> Dictionary:
+	var subject := WorldHistory.subject(subject_id)
+	var name := str(subject.get("name", "Someone"))
+	var rules: Array = [
+		# The same naming rule every character gets, said here too because this
+		# one is being handed a name and could reasonably invent a second.
+		"You are standing on the road outside Ashbloom and you are not hurt.",
+		"The person speaking to you is armed and is not your friend. You have not agreed to anything.",
+		"Two sentences at most. This is a exchange in the open, not a speech.",
+	]
+	var grudge := int(subject.get("grudge", 0))
+	if grudge >= 40:
+		rules.append("You know this voice and you hate it. Tell them to leave rather than threatening at length.")
+	elif grudge >= 15:
+		rules.append("You do not trust them and you are not hiding it.")
+	if _accepts_recruitment(subject):
+		rules.append("You would hear an offer out. You are not going to ask for one.")
+	if _recent_hostility():
+		rules.append("There has just been violence nearby. You are watching their hands.")
+	return {
+		"name": name,
+		"identity": "%s, on the road outside Ashbloom, on their feet and armed." % name,
+		"voice": "Wary, economical, and ready to walk away.",
+		"rules": rules,
+		"location": HUNT_LOCATION,
+	}
+
+
+## Whether anything has been killed or downed here recently enough to be
+## standing in the air between you. Read off the ledger rather than a timer,
+## the same way everything else in this scene reads the record.
+func _recent_hostility() -> bool:
+	return WorldHistory.event_count("firearm_anatomy_hit") > 0 or WorldHistory.event_count("execution") > 0
+
+
 ## The model answered. The canned line already went up when the player spoke,
 ## so this replaces it rather than arriving into silence.
 func _downed_answered(turn: Dictionary) -> void:
@@ -6111,38 +6321,59 @@ func _voice_heard(subject_id: String, transcript: String, result: Dictionary) ->
 		resolution_ui.set_voice_state(voice_channel.status)
 		return
 	var subject := WorldHistory.subject(subject_id)
-	var reply := "You have my attention. Make the offer." if _accepts_recruitment(subject) else "I heard you. It changes nothing yet."
-	if int(subject.get("grudge", 0)) >= 40:
-		reply = "I know your voice. I still hate you."
-	# The three lines above are now the floor, not the ceiling. They go up
-	# immediately so the player is never answered by silence, and a model-written
-	# line replaces them a second later through `answered` if one arrives.
-	#
-	# `ProximityVoice` captures level and duration only -- there is no recogniser
-	# on this path, so there is no transcript of what the player actually said.
-	# What the NPC is answering is the fact of being spoken to while down, which
-	# is real, and the prompt carries their own grudge and history. Moving vosk
-	# onto this path is what would make it a conversation rather than a reply.
+	# On the floor or on their feet. Everything below differs by it: what they
+	# are willing to say, what they remember afterwards, and where the answer
+	# is shown, because a person standing in front of you has no resolution
+	# window open over them to put it in.
+	var downed: bool = actor.rig.is_downed()
+	var grudge := int(subject.get("grudge", 0))
+	var reply := ""
+	if downed:
+		reply = "You have my attention. Make the offer." if _accepts_recruitment(subject) else "I heard you. It changes nothing yet."
+		if grudge >= 40:
+			reply = "I know your voice. I still hate you."
+	else:
+		reply = "Say it, then." if _accepts_recruitment(subject) else "What."
+		if grudge >= 40:
+			reply = "Keep walking."
+	# The lines above are the floor, not the ceiling. They go up immediately so
+	# the player is never answered by silence, and a model-written line
+	# replaces them a second later through `answered` if one arrives.
 	if downed_talk != null and is_instance_valid(downed_talk):
 		downed_talk.global_position = actor.node.global_position
 		# Reconfigured only when the person changes. `configure()` rebuilds the
 		# component's speech bubble, so calling it for every sentence spoken to
 		# the same body would leave a Label3D behind each time.
 		if downed_talk.npc_id != subject_id:
-			downed_brain.character = _downed_character(subject_id)
+			# A bubble over a body on the floor in front of you duplicates the
+			# line the resolution window is already showing. Over somebody
+			# standing across the road it is the only place the line appears,
+			# so it is the difference between a conversation and silence.
+			downed_talk.suppress_bubble = downed
+			downed_brain.character = _downed_character(subject_id) if downed else _standing_character(subject_id)
 			downed_talk.configure(subject_id, downed_brain.character, player_body, downed_brain)
 		# What the player actually said, when the machine could hear it. The
 		# bracketed line is the fallback for a box with no recogniser: the NPC is
 		# then answering the fact of being spoken to, which is what this path did
 		# before there were any words at all.
 		var said := transcript.strip_edges()
-		downed_talk.hear(said if not said.is_empty() else "[the Hunter stands over you and speaks to you]")
+		if said.is_empty():
+			said = "[the Hunter stands over you and speaks to you]" if downed else "[the Hunter stops in front of you and speaks]"
+		downed_talk.hear(said)
 	WorldHistory.begin_ledger_batch()
 	var contact := PLAYER_ACTION_LEDGER.record("proximity_voice_addressed", {"speaker": "player", "listener": subject_id, "duration": result.duration, "location": HUNT_LOCATION, "raw_audio_saved": false})
-	WorldHistory.amend_subject(subject_id, {"last_voice_contact": int(contact.get("sequence", WorldHistory.event_count())), "memory": "The Hunter spoke to me while I was downed."})
+	WorldHistory.amend_subject(subject_id, {
+		"last_voice_contact": int(contact.get("sequence", WorldHistory.event_count())),
+		"memory": "The Hunter spoke to me while I was downed." if downed else "The Hunter stopped and spoke to me on the road.",
+	})
 	WorldHistory.commit_ledger_batch()
 	voice_channel.play_positional_acknowledgement(actor.rig.head_anchor)
-	resolution_ui.set_voice_state("VOICE RECEIVED / POSITIONAL REPLY", float(result.peak), reply)
+	if downed:
+		resolution_ui.set_voice_state("VOICE RECEIVED / POSITIONAL REPLY", float(result.peak), reply)
+	else:
+		# No window is open over somebody standing, so the prompt line carries
+		# it until the bubble catches up with the model line.
+		prompt.text = "%s // %s" % [str(subject.get("name", "THEY")).to_upper(), reply]
 
 
 func _rival_retreats(message: String) -> void:

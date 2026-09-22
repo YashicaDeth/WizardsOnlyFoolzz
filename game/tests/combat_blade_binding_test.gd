@@ -52,6 +52,8 @@ func _ready() -> void:
 	var parry: Dictionary = hunt.guard_absorb(20.0, Vector3.INF, BladeRead.LEFT)
 	check(bool(parry.parried) and is_zero_approx(float(parry.damage)),
 		"the matching side inside PARRY_WINDOW is a full parry")
+	check(hunt.parry_spark_count == 1 and is_instance_valid(hunt.last_parry_spark),
+		"a timed parry has a real contact spark rather than only a damage outcome")
 	hunt.guard_raised = BladeRead.PARRY_WINDOW + 0.1
 	var block: Dictionary = hunt.guard_absorb(20.0, Vector3.INF, BladeRead.LEFT)
 	check(bool(block.blocked) and not bool(block.parried) and float(block.damage) > 0.0,
