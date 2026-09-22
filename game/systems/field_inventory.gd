@@ -18,6 +18,12 @@ var body: BaselineHuman
 var arsenal: HunterArsenal
 var selected := 0
 var row_rects: Array[Dictionary] = []
+## A corpse under inspection, when the bag is showing what is on them rather
+## than what is on you. Set by `open_corpse()`, cleared by `open_inventory()` —
+## a stale body must never survive into your own bag view.
+var inspect_rig: BaselineHuman = null
+var inspect_pockets: Array = []
+var corpse_rows: Array = []
 
 
 func _init() -> void:
@@ -31,7 +37,20 @@ func open_inventory(carry_model: Carry, body_rig: BaselineHuman, weapon_model: H
 	carry = carry_model
 	body = body_rig
 	arsenal = weapon_model
+	inspect_rig = null
+	inspect_pockets = []
 	selected = clampi(selected, 0, maxi(0, carry.items.size() - 1))
+	visible = true
+	queue_redraw()
+
+
+## Somebody else's pockets, garments and open cavities, listed through
+## `CorpseContents` — which owns the gate, so organs behind unopened zones
+## show as sealed and stay that way no matter what the panel wants.
+func open_corpse(rig: BaselineHuman, pockets: Array = []) -> void:
+	inspect_rig = rig
+	inspect_pockets = pockets.duplicate()
+	selected = 0
 	visible = true
 	queue_redraw()
 
@@ -52,7 +71,9 @@ func handle_input(event: InputEvent) -> bool:
 			KEY_DOWN, KEY_S:
 				_step(1)
 			KEY_ENTER, KEY_KP_ENTER:
-				if carry != null and not carry.items.is_empty():
+				if inspect_rig != null:
+					_take_corpse_row()
+				elif carry != null and not carry.items.is_empty():
 					activate_requested.emit(selected)
 			KEY_P:
 				_toggle_pocket()
@@ -73,7 +94,9 @@ func handle_input(event: InputEvent) -> bool:
 
 
 func _step(by: int) -> void:
-	if carry == null or carry.items.is_empty():
+	if inspect_rig != null:
+		selected = posmod(selected + by, maxi(1, _corpse_rows().size()))
+	elif carry == null or carry.items.is_empty():
 		selected = 0
 	else:
 		selected = posmod(selected + by, carry.items.size())
@@ -89,6 +112,59 @@ func _cloth_mean() -> float:
 	for zone_id in ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"]:
 		total += clampf(float(body.wardrobe.get(zone_id, 0.0)), 0.0, 1.0)
 	return total / 6.0
+
+
+## One flat takeable list over whatever `CorpseContents` reports. Pockets and
+## garments take; organs and implants show with the dig they still need, and
+## sealed zones show as sealed — the gate stays in the listing, not here.
+func _corpse_rows() -> Array:
+	var rows: Array = []
+	if inspect_rig == null:
+		return rows
+	var found: Dictionary = CorpseContents.of(inspect_rig, inspect_pockets)
+	for entry: Dictionary in found.get("pockets", []):
+		rows.append({"label": str(entry.get("label", "")), "kind": "pocket", "payload": entry})
+	for entry: Dictionary in found.get("worn", []):
+		rows.append({"label": "%s // %d%%" % [str(entry.get("label", "")), roundi(float(entry.get("condition", 0.0)) * 100.0)], "kind": "garment", "payload": entry})
+	for entry: Dictionary in found.get("organs", []):
+		rows.append({"label": "%s // NEEDS THE DIG" % str(entry.get("label", "")), "kind": "organ", "payload": entry})
+	for entry: Dictionary in found.get("implanted", []):
+		rows.append({"label": "%s // NEEDS THE DIG" % str(entry.get("label", "")), "kind": "implant", "payload": entry})
+	for zone in found.get("sealed", []):
+		rows.append({"label": "%s // SEALED" % str(zone).replace("_", " ").to_upper(), "kind": "sealed", "payload": {}})
+	return rows
+
+
+## Take the selected corpse row. Pockets move to the bag; a garment comes off
+## their body (wardrobe erased, shell refreshed) and goes in as goods. Organs,
+## implants and sealed zones refuse with the reason — taking those is the
+## extraction dig's job, not this panel's.
+func _take_corpse_row() -> void:
+	var rows := _corpse_rows()
+	if selected < 0 or selected >= rows.size():
+		return
+	var row: Dictionary = rows[selected]
+	var kind := str(row.get("kind", ""))
+	if kind == "pocket":
+		var label := str((row.get("payload", {}) as Dictionary).get("label", "OBJECT"))
+		inspect_pockets = inspect_pockets.filter(func(p): return str((p as Dictionary).get("label", p) if p is Dictionary else p).to_upper() != label)
+		carry.items.append({"label": label, "kind": "goods", "mass": 0.5, "perishes": false, "age": 0.0, "condition": 1.0})
+		carry.save_to_history()
+		set_meta("last_result", "%s TAKEN" % label)
+	elif kind == "garment":
+		var zone := str((row.get("payload", {}) as Dictionary).get("zone", ""))
+		var style := str((row.get("payload", {}) as Dictionary).get("style", "plain"))
+		inspect_rig.wardrobe.erase(zone)
+		inspect_rig.dress(inspect_rig.wardrobe)
+		carry.items.append({"label": "%s %s" % [style.to_upper(), zone.replace("_", " ").to_upper()], "kind": "garment", "mass": 1.2, "perishes": false, "age": 0.0, "condition": 1.0})
+		carry.save_to_history()
+		set_meta("last_result", "%s STRIPPED" % zone.replace("_", " ").to_upper())
+	elif kind == "organ" or kind == "implant":
+		set_meta("last_result", "NEEDS THE DIG")
+	else:
+		set_meta("last_result", "SEALED")
+	selected = clampi(selected, 0, maxi(0, _corpse_rows().size() - 1))
+	queue_redraw()
 
 
 func _toggle_pocket() -> void:
@@ -171,6 +247,9 @@ func _draw_body(font: Font, rect: Rect2) -> void:
 
 func _draw_bag(font: Font, rect: Rect2) -> void:
 	row_rects.clear()
+	if inspect_rig != null:
+		_draw_corpse(font, rect)
+		return
 	var total := carry.total_mass() if carry != null else 0.0
 	draw_string(font, rect.position + Vector2(18, 28), "LOOT / %0.1f OF %0.0f KG" % [total, Carry.CAPACITY], HORIZONTAL_ALIGNMENT_LEFT, -1, 17, MOSS if total <= Carry.CAPACITY else BLOOD)
 	if carry == null or carry.items.is_empty():
@@ -198,6 +277,35 @@ func _draw_bag(font: Font, rect: Rect2) -> void:
 	var result := str(get_meta("last_result", ""))
 	if not result.is_empty():
 		draw_string(font, Vector2(rect.position.x + 18, rect.end.y - 12), result, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, BLOOD)
+
+
+## Somebody else's effects, drawn where the bag goes. Takeable rows take;
+## everything the dig still owns says so on its own row.
+func _draw_corpse(font: Font, rect: Rect2) -> void:
+	corpse_rows = _corpse_rows()
+	draw_string(font, rect.position + Vector2(18, 28), "DEAD // CONTENTS", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, BLOOD)
+	if corpse_rows.is_empty():
+		draw_string(font, rect.position + Vector2(18, 62), "NOTHING ON THEM.", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, INK * Color(1, 1, 1, 0.45))
+		return
+	var y := rect.position.y + 48.0
+	var max_rows := maxi(1, floori((rect.size.y - 58.0) / 30.0))
+	var first := clampi(selected - floori(float(max_rows) * 0.5), 0, maxi(0, corpse_rows.size() - max_rows))
+	for index in range(first, mini(corpse_rows.size(), first + max_rows)):
+		var row: Dictionary = corpse_rows[index]
+		var line := Rect2(Vector2(rect.position.x + 10, y), Vector2(rect.size.x - 20, 26))
+		if index == selected:
+			draw_rect(line, BLOOD * Color(1, 1, 1, 0.25))
+			draw_rect(line, BLOOD, false, 1.0)
+		var ink := INK
+		if str(row.get("kind", "")) == "sealed":
+			ink = INK * Color(1, 1, 1, 0.45)
+		elif str(row.get("kind", "")) in ["organ", "implant"]:
+			ink = BLOOD.lightened(0.2)
+		draw_string(font, line.position + Vector2(10, 17), str(row.get("label", "")), HORIZONTAL_ALIGNMENT_LEFT, line.size.x - 20, 12, ink)
+		y += 30.0
+	var outcome := str(get_meta("last_result", ""))
+	if not outcome.is_empty():
+		draw_string(font, Vector2(rect.position.x + 18, rect.end.y - 12), outcome, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, BLOOD)
 
 
 func _draw_gear(font: Font, rect: Rect2) -> void:
