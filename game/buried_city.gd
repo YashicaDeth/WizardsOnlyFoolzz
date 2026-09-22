@@ -38,6 +38,21 @@ const GANTRY_DECK := 2.075
 ## How far above the sentinel puts you out of its reach. It is a ground
 ## machine on tracks and the gantry is over its head.
 const GANTRY_CLEARANCE := 1.4
+## The floor the ramps start from and the slab they are cut out of. Named
+## because the first pair were placed by eye and the arithmetic that failed was
+## invisible in the numbers.
+## How the player moves down here.
+const WALK_SPEED := 3.65
+const SPRINT_SCALE := 1.7
+## Enough to clear the 0.45 kerbs and the pipe runs, and not enough to reach
+## the gantry deck -- the ramps are the way up and a jump that skipped them
+## would make the route pointless the day it was built.
+const JUMP_SPEED := 4.6
+const GANTRY_FLOOR := 0.005
+const GANTRY_THICK := 0.3
+## Horizontal reach of each ramp. Long enough that the top end overlaps the
+## gallery edge instead of stopping short of it.
+const GANTRY_REACH := 7.7
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -184,10 +199,30 @@ func _build_city_shell() -> void:
 ## be a wall with a pattern on it. Both slopes are about seventeen degrees,
 ## well inside the forty-five `move_and_slide` will walk up.
 func _build_gantry() -> void:
-	# Rising toward -Z: a positive rotation about X takes the +Z end down, so
-	# the far end of the ramp is the high one.
-	var climb := atan2(GANTRY_DECK, 7.0)
-	var up := _slab(Vector3(3.0, 0.3, 7.3), Vector3(GANTRY_RUN, GANTRY_DECK * 0.5, 8.0), "rust", Color("241a13"))
+	# Both ramps are derived from the two surfaces they have to meet rather
+	# than positioned by eye, because the first version was placed by eye and
+	# did not work. Greg: *"the ramps arent working"*. Two faults, and either
+	# one alone was enough to stop a player with no jump.
+	#
+	# The centre sat at half the deck height, which put the slab's *top* a
+	# further 0.15 above the floor at the bottom end -- a step, and
+	# `CharacterBody3D` does not climb steps by itself, so the route began with
+	# a lip that could not be crossed. The surface offset is
+	# `(thickness / 2) / cos(angle)` and it has to come out of the centre
+	# height, not be ignored.
+	#
+	# And the top end stopped at z=4.5 while the gallery it was supposed to
+	# reach ends at z=4.0, leaving half a metre of air at the top of a climb
+	# nobody could make anyway.
+	var rise := GANTRY_DECK - GANTRY_FLOOR
+	var climb := atan2(rise, GANTRY_REACH)
+	var surface := (GANTRY_THICK * 0.5) / cos(climb)
+	var length := sqrt(GANTRY_REACH * GANTRY_REACH + rise * rise)
+	var centre_y := GANTRY_FLOOR + rise * 0.5 - surface
+
+	# Up: the high end is the -Z one, and a positive rotation about X takes the
+	# +Z end down. It overlaps the gallery edge rather than meeting it exactly.
+	var up := _slab(Vector3(3.0, GANTRY_THICK, length), Vector3(GANTRY_RUN, centre_y, 7.65), "rust", Color("241a13"))
 	up.name = "GantryRampUp"
 	up.rotation.x = climb
 
@@ -197,9 +232,26 @@ func _build_gantry() -> void:
 	span.name = "GantryCatwalk"
 
 	# Down at the far end, landing short of the lift rather than on it.
-	var down := _slab(Vector3(3.0, 0.3, 7.3), Vector3(GANTRY_RUN, GANTRY_DECK * 0.5, -33.5), "rust", Color("241a13"))
+	var down := _slab(Vector3(3.0, GANTRY_THICK, length), Vector3(GANTRY_RUN, centre_y, -33.65), "rust", Color("241a13"))
 	down.name = "GantryRampDown"
 	down.rotation.x = -climb
+
+	# Light where the route is. Every lamp in the district hangs on the centre
+	# line at x=0 with a ten metre range, so the west galleries -- which is
+	# where this whole route runs -- were the darkest ground in the Lower
+	# Works, and the ramps were unlit objects in it. A player cannot take a
+	# route they cannot find.
+	for post in 4:
+		var lamp := OmniLight3D.new()
+		lamp.name = "GantryLamp%d" % post
+		lamp.position = Vector3(GANTRY_RUN + 1.0, GANTRY_DECK + 2.6, 9.0 - float(post) * 14.0)
+		# Cooler than the bay lamps on purpose: the route reads as its own
+		# thing from the floor rather than as more of the same corridor.
+		lamp.light_color = Color("7fa8b8")
+		lamp.light_energy = 2.1
+		lamp.omni_range = 13.0
+		lamp.shadow_enabled = false
+		add_child(lamp)
 
 	# A rail on the open side only. It is there to read as a walkway from the
 	# floor below and to stop a player stepping off it in the dark, not to box
@@ -419,9 +471,22 @@ func _unhandled_input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	var input := Vector3(Input.get_axis("move_left", "move_right"), 0.0, Input.get_axis("move_forward", "move_back"))
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
-	player.velocity.x = move_toward(player.velocity.x, direction.x * 3.65, 17.0 * delta)
-	player.velocity.z = move_toward(player.velocity.z, direction.z * 3.65, 17.0 * delta)
-	player.velocity.y = -2.0 if player.is_on_floor() else player.velocity.y - 18.0 * delta
+	# Greg: *"maybe jumping and running should maybe be unlocked"*. They should.
+	# This district walked at one speed with no way off the ground, which is
+	# slow to cross and gives the player nothing to do about a machine that
+	# follows them. `sprint` is already an action in the project; jump is Space,
+	# read directly the way every other key in this scene is.
+	var pace := WALK_SPEED * (SPRINT_SCALE if Input.is_action_pressed("sprint") else 1.0)
+	player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 17.0 * delta)
+	player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 17.0 * delta)
+	if player.is_on_floor():
+		# The downward bias keeps them on slopes rather than skipping off the
+		# ramps, so the jump has to be written after it rather than into it.
+		player.velocity.y = -2.0
+		if Input.is_key_pressed(KEY_SPACE):
+			player.velocity.y = JUMP_SPEED
+	else:
+		player.velocity.y -= 18.0 * delta
 	player.move_and_slide()
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)

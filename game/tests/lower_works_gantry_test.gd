@@ -68,10 +68,50 @@ func _ready() -> void:
 	# a wall here.
 	check(is_equal_approx(span.position.y + 0.15, city.GANTRY_DECK), "the catwalk surface is the gallery deck (%.3f)" % (span.position.y + 0.15))
 	check(is_equal_approx(up.position.x, city.GANTRY_RUN) and is_equal_approx(span.position.x, city.GANTRY_RUN), "and all of it runs down the west galleries")
-	# The ramps have to start on the floor and end on the deck, or the route
-	# has a lip at one end that a player with no jump cannot cross.
-	var up_high: float = up.position.y + sin(absf(up.rotation.x)) * 3.65
-	check(absf(up_high - city.GANTRY_DECK) < 0.35, "the ramp up arrives at deck height (%.2f against %.2f)" % [up_high, city.GANTRY_DECK])
+	# Both ends of both ramps, measured off the actual collision box rather
+	# than from a remembered length.
+	#
+	# The first version of this check hard-coded half the ramp length and
+	# allowed 35cm of slop, so when the ramp was rebuilt longer the formula
+	# went stale and the check passed anyway -- it reported 1.83 against 2.08
+	# and called it arrival. That tolerance is exactly why a ramp with a step
+	# at the bottom and a gap at the top shipped as "12 checks, failures=0".
+	# A lip of 15cm stops a player with no jump, so the tolerance is 5cm.
+	for ramp: StaticBody3D in [up, down]:
+		var box := (ramp.get_child(1) as CollisionShape3D).shape as BoxShape3D
+		var pitch := absf(ramp.rotation.x)
+		var half_along: float = box.size.z * 0.5 * sin(pitch)
+		# The top face sits this far above the centre line, measured up the
+		# vertical rather than along the slab, which is the term the broken
+		# version left out entirely.
+		var face: float = (box.size.y * 0.5) / cos(pitch)
+		var high: float = ramp.position.y + half_along + face
+		var low: float = ramp.position.y - half_along + face
+		check(absf(high - city.GANTRY_DECK) < 0.05, "%s reaches the deck (%.3f against %.3f)" % [ramp.name, high, city.GANTRY_DECK])
+		check(absf(low - city.GANTRY_FLOOR) < 0.05, "%s meets the floor without a step (%.3f)" % [ramp.name, low])
+
+	print("-- and you can run and jump now --")
+	check(city.SPRINT_SCALE > 1.0, "sprinting is faster than walking (x%.2f)" % city.SPRINT_SCALE)
+	check(city.JUMP_SPEED > 0.0, "and there is a jump at all")
+	# The apex, against the gravity this scene actually applies. A jump that
+	# reached the deck would make the ramps decorative the day they were built,
+	# and the whole route is that the height has to be earned by walking to it.
+	var apex: float = (city.JUMP_SPEED * city.JUMP_SPEED) / (2.0 * 18.0)
+	check(apex < city.GANTRY_DECK, "but it cannot reach the gantry deck (%.2f against %.2f)" % [apex, city.GANTRY_DECK])
+	# It does have to clear the kerbs and pipe runs, or it is a jump that does
+	# nothing and may as well not be bound.
+	check(apex > 0.45, "while still clearing the kerbs (%.2f)" % apex)
+
+	print("-- and the route is lit --")
+	# Every lamp in the district hangs on the centre line with a ten metre
+	# range, so the west galleries were the darkest ground in the Lower Works
+	# and the ramps were unlit objects standing in it.
+	var lamps := 0
+	for child in city.get_children():
+		if child is OmniLight3D and str(child.name).begins_with("GantryLamp"):
+			lamps += 1
+			check(absf((child as OmniLight3D).position.x - city.GANTRY_RUN) < 3.0, "a gantry lamp is over the route rather than the centre line")
+	check(lamps >= 3, "the route is lit along its length (%d lamps)" % lamps)
 
 	print("-- and the sentinel cannot reach up there --")
 	var patrol := city.get("patrol") as Node3D
