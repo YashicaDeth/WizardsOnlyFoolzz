@@ -167,20 +167,15 @@ people read instead of looking.
   each, but only after the 13.29ms, which is twice as large as all of this
   put together.
 
-### Three tests that are not telling anybody anything
+### One test that still needs its own arena
 
-None of these are in `--core`, which is why they went unnoticed. Do not
-believe a green suite run until they are in it.
+`chunk_test` now proves the scavenger leaves an aged bone at the moment the
+bone exists, rather than indexing a disposable fragment after later test work
+has correctly exhausted the gore budget. It is in `--core` now. The related
+`gore_demo_test` passed three consecutive full runs after that repair and is
+also promoted to `--core`; retain the watchdog timer and investigate if it
+ever flakes again rather than trusting one green result.
 
-- `gore_demo_test` is **unstable on identical code**. Four runs on a clean
-  tree: one segfault (exit 139), three passes. Other runs fail two
-  dismemberment checks instead, and one produced a banner and nothing else
-  (exit 127). Crash, fail or pass from the same source.
-- `chunk_test` crashes at `chunk_test.gd:184` on an out-of-bounds index, so
-  the last five checks in it never run. Pre-existing since 15606d9
-  (2026-09-12). The BONE chunk it reaches for has probably been recycled by
-  then -- `_recycle_oldest()` prefers fragments -- but establish that rather
-  than guarding the index.
 - `climb_test` fails 2. Almost certainly the same defect as c175a0e: test
   geometry standing in the bone yard where real world colliders reach into its
   raycasts. That fix gave the test its own arena; this one needs the same, and
