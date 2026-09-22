@@ -713,6 +713,28 @@ var talking_to_standing := false
 ## missing any of the three is a demo where half this system does not exist.
 var talk_entry: LineEdit
 var talk_entry_subject := ""
+## The panel, and who it is open on.
+##
+## `NPCDialogueUI` has existed and been used only by the conversation lab. The
+## overworld had no way to say anything without a microphone or a keyboard full
+## of prose, which is no way to hand somebody a demo.
+var talk_ui: NPCDialogueUI
+var talk_subject := ""
+
+## What the Hunter can say without typing it.
+##
+## The spec allows this in as many words -- "scripted quest choices can coexist
+## with free speech" -- and these are not a replacement for speaking. They are
+## the same sentences going down the same path: chosen or typed or spoken, the
+## NPC hears a string and rules on it, and `_npc_acted` makes the ruling true.
+## Nothing here surrenders anybody by pressing a button.
+const TALK_OPTIONS: Array[String] = [
+	"Put it down and walk away.",
+	"I am not here for you.",
+	"Who are you with?",
+	"[SPEAK]",
+	"[LEAVE]",
+]
 var downed_talk: NPCConversationComponent = null
 var downed_brain: NPCOllamaBrain = null
 var arsenal: Node
@@ -1015,6 +1037,7 @@ func _ready() -> void:
 	spoken.failed.connect(func(reason: String): resolution_ui.set_voice_state(reason))
 	_build_downed_talk()
 	_build_talk_entry()
+	_build_talk_panel()
 	_build_expanse_systems()
 	_register_people()
 	player_body = CharacterBody3D.new()
@@ -1477,15 +1500,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		# roamer who wanders into range.
 		if event.pressed and grapple_target.is_empty() and panel_mode.is_empty() and not _nearest_standing().is_empty():
 			var heard := _nearest_standing()
-			# Whichever half this machine can actually run. Holding V to speak
-			# needs a recogniser behind it; without one the same key opens a
-			# line to type instead, so the conversation exists either way.
-			if spoken != null and spoken.transcribes():
-				_voice_capture(true)
-				prompt.text = "SPEAKING TO %s // RELEASE V" % str(WorldHistory.subject(str(heard.subject_id)).get("name", "THEM")).to_upper()
-				talking_to_standing = true
-			else:
-				_open_typed_talk(str(heard.subject_id))
+			# The panel first, and the microphone or the typed line from inside
+			# it. Going straight to push-to-talk meant the only way to find out
+			# you could speak to somebody was to already know.
+			_open_talk_panel(str(heard.subject_id))
 		elif event.pressed and grapple_target.is_empty() and panel_mode.is_empty():
 			pulmonary_held = true
 			prompt.text = "PULMONARY RELIQUARY // MOVE MOUSE / WHEEL // RELEASE V"
@@ -6248,6 +6266,83 @@ func _build_downed_talk() -> void:
 	downed_talk.validated_action.connect(_npc_acted)
 
 
+## The panel you talk through.
+##
+## Authored lines rather than only free speech, because a demo handed to
+## somebody who has never played this cannot begin with "type a sentence at the
+## armed man". Everything chosen here goes through `hear()` exactly as a
+## transcript does.
+func _build_talk_panel() -> void:
+	talk_ui = NPCDialogueUI.new()
+	talk_ui.name = "TalkPanel"
+	talk_ui.visible = false
+	$HUD.add_child(talk_ui)
+	talk_ui.option_chosen.connect(_talk_option)
+	talk_ui.closed.connect(_close_talk_panel)
+	talk_ui.speak_pressed.connect(func(held: bool): _talk_speak(held))
+
+
+func _open_talk_panel(subject_id: String) -> void:
+	if talk_ui == null or not is_instance_valid(talk_ui):
+		return
+	talk_subject = subject_id
+	var subject := WorldHistory.subject(subject_id)
+	# The bubble would otherwise repeat every line the panel is already
+	# showing, a foot above the panel.
+	if downed_talk != null and is_instance_valid(downed_talk):
+		downed_talk.suppress_bubble = true
+	talk_ui.open(str(subject.get("name", "THEY")).to_upper(), TALK_OPTIONS)
+	# How close they already are to deciding against you, so the panel can show
+	# it before they say anything.
+	talk_ui.set_aggression(clampf(float(int(subject.get("grudge", 0))) / 100.0, 0.0, 1.0))
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+func _close_talk_panel() -> void:
+	if talk_ui != null and is_instance_valid(talk_ui):
+		talk_ui.close()
+	talk_subject = ""
+	_close_typed_talk()
+	if panel_mode.is_empty():
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+## A line chosen off the panel. It is said, not applied: the NPC still rules on
+## it, and what they decide is what happens.
+func _talk_option(text: String) -> void:
+	if talk_subject.is_empty():
+		return
+	if text.begins_with("[LEAVE]"):
+		_close_talk_panel()
+		return
+	if text.begins_with("[SPEAK]"):
+		_talk_speak(true)
+		return
+	_say_to(talk_subject, text)
+
+
+## Free speech off the panel: the microphone where the machine has one, the
+## typed line where it does not.
+func _talk_speak(held: bool) -> void:
+	if talk_subject.is_empty():
+		return
+	if spoken != null and spoken.transcribes():
+		_voice_capture(held)
+		if talk_ui != null and is_instance_valid(talk_ui):
+			talk_ui.listening = held
+		return
+	if held:
+		_open_typed_talk(talk_subject)
+
+
+## One way in for everything said to somebody, however it was said.
+func _say_to(subject_id: String, said: String) -> void:
+	var words := said.strip_edges()
+	if words.is_empty():
+		return
+	_voice_heard(subject_id, words, {"sent": true, "duration": 1.0, "peak": 1.0})
+
+
 ## A line to type when there is no microphone worth using.
 ##
 ## `npc_conversation_lab` has had this from the start and says why in its own
@@ -6511,6 +6606,10 @@ func _recent_hostility() -> bool:
 func _downed_answered(turn: Dictionary) -> void:
 	if not bool(turn.get("ok", false)) or str(turn.get("speech", "")).is_empty():
 		return
+	# The panel is the only place the line appears while it is open, because
+	# opening it suppressed the bubble that would otherwise carry it.
+	if talk_ui != null and is_instance_valid(talk_ui) and not talk_subject.is_empty():
+		talk_ui.say(str(turn.get("speech", "")), str(turn.get("tone", "flat")))
 	resolution_ui.set_voice_state(
 		"VOICE RECEIVED / %s" % ("SPOKEN" if bool(turn.get("from_model", false)) else "POSITIONAL REPLY"),
 		1.0, str(turn.get("speech", "")),

@@ -163,6 +163,47 @@ func _ready() -> void:
 	check(WorldHistory.event_count("proximity_voice_addressed") == quiet_before, "submitting nothing says nothing")
 	check(not entry.visible, "but still puts the line away")
 
+	print("-- and a panel to say it through --")
+	# A demo handed to somebody who has never played this cannot begin with
+	# "type a sentence at the armed man".
+	var panel := hunt.get("talk_ui") as NPCDialogueUI
+	check(panel != null and is_instance_valid(panel), "there is a panel to talk through")
+	check(not panel.visible, "and it stays shut until somebody is addressed")
+	actors.clear()
+	var talked_to := _actor(hunt, "panel_subject", here + facing * 2.0, false)
+	actors.append(talked_to)
+	hunt.call("_open_talk_panel", "panel_subject")
+	check(panel.visible, "addressing somebody opens it")
+	check(str(hunt.get("talk_subject")) == "panel_subject", "on them")
+
+	# Chosen lines are said, not applied. The NPC still rules on them, which is
+	# what stops the panel being a surrender button.
+	var said_before := WorldHistory.event_count("proximity_voice_addressed")
+	hunt.call("_talk_option", "Put it down and walk away.")
+	check(WorldHistory.event_count("proximity_voice_addressed") == said_before + 1, "choosing a line says it down the same path speech takes")
+	check(str(WorldHistory.subject("panel_subject").get("memory", "")).contains("spoke to me"), "and they heard it")
+
+	# Speaking freely takes whichever half this machine can run, and the suite
+	# has to pass on both -- the same rule `spoken_contact_test` states, because
+	# Vosk needs a Python process, a model on disk and an input device, and the
+	# machine that has none of them is exactly the one the fallback is for.
+	var talker: SpokenContact = hunt.get("spoken")
+	hunt.call("_talk_option", "[SPEAK]")
+	if talker != null and talker.transcribes():
+		check(panel.listening, "speaking freely opens the microphone where there is one")
+		hunt.call("_talk_speak", false)
+	else:
+		check((hunt.get("talk_entry") as LineEdit).visible, "and the typed line where there is not")
+		hunt.call("_close_typed_talk")
+
+	hunt.call("_talk_option", "[LEAVE]")
+	check(not panel.visible, "leaving closes the panel")
+	check(str(hunt.get("talk_subject")).is_empty(), "and nobody is being addressed afterwards")
+	# A chosen line with nobody addressed must not go anywhere.
+	var orphan_before := WorldHistory.event_count("proximity_voice_addressed")
+	hunt.call("_talk_option", "Put it down and walk away.")
+	check(WorldHistory.event_count("proximity_voice_addressed") == orphan_before, "and a line chosen with the panel shut says nothing")
+
 	hunt.queue_free()
 	print("STANDING_CONTACT_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
