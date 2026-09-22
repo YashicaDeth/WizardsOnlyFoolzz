@@ -19,25 +19,12 @@ const LOOK := preload("res://systems/world_look.gd")
 ## Section 6, the Doctor's character bible, as the definition the brain is
 ## given. Deliberately the same man who runs the vat intake -- he already has a
 ## voice in this game and a reason to be asking the player questions.
-const DOCTOR := {
-	"name": "THE EXAMINER",
-	"identity": "An unnamed government examiner in a facility that grows people. Fifties to sixties. He believes what he does is rational and necessary, and he is not in a hurry.",
-	"voice": "Australian male, 55-65. Low, dry, measured. Excellent diction. Controlled volume; he rarely needs to shout.",
-	"rules": [
-		"Never announce that you are evil, sinister, brilliant or frightening.",
-		"When angry, become more precise rather than louder.",
-		"Humour is dry and rare. You can sound almost paternal while saying something disturbing.",
-		"You do not know anything the player has not said or done in front of you.",
-		# llama3.2 introduced itself as "Dr. Thompson" on the second turn it was
-		# ever asked. The identity above says *unnamed* and section 6 means it --
-		# he is the institution rather than a man with a nameplate, and a model
-		# filling that blank is the one thing the airlock cannot catch, because a
-		# name is perfectly well-formed JSON.
-		"You have never given anyone your name and you are not going to. If asked, say what you do, not who you are.",
-	],
-	"location": "the growing floor",
-	"allies_nearby": 0,
-}
+## Read from `FacilityCharacters` rather than authored here.
+##
+## He was written in this file, which meant the only place in the game the
+## Examiner could be talked to was this test scene. He is the same person in
+## both now, and cannot drift, which is the whole reason the definition moved.
+var DOCTOR: Dictionary = FacilityCharacters.examiner()
 
 const NPC_ID := "examiner_unknown"
 const SPEED := 4.2

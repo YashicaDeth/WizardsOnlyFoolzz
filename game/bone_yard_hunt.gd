@@ -6444,6 +6444,15 @@ func _downed_character(subject_id: String) -> Dictionary:
 ## which is their own name, their own grudge, and nothing of the player.
 func _standing_character(subject_id: String) -> Dictionary:
 	var subject := WorldHistory.subject(subject_id)
+	# Somebody the story actually wrote gets answered as themselves.
+	#
+	# The rest of this function generates a person out of what `WorldHistory`
+	# knows, which is right for a roamer on the road and wrong for staff: an
+	# Examiner improvised from a grudge score is not the Examiner. Empty for
+	# everybody the story has not written, which is nearly everybody.
+	var authored := FacilityCharacters.for_role(subject, _hostiles_near(subject_id))
+	if not authored.is_empty():
+		return authored
 	var name := str(subject.get("name", "Someone"))
 	var rules: Array = [
 		# The same naming rule every character gets, said here too because this
@@ -6468,6 +6477,26 @@ func _standing_character(subject_id: String) -> Dictionary:
 		"rules": rules,
 		"location": HUNT_LOCATION,
 	}
+
+
+## How many other hostiles are standing close enough to count as being with
+## them. A guard alone talks differently from a guard with three others, and
+## that is the difference between somebody who can be talked down and somebody
+## who does not have to be.
+func _hostiles_near(subject_id: String) -> int:
+	var actor := _actor_by_id(subject_id)
+	if actor.is_empty():
+		return 0
+	var at: Vector3 = (actor.node as Node3D).global_position
+	var count := 0
+	for other in encounter_actors:
+		if other == actor or not is_instance_valid(other.get("node") as Node3D):
+			continue
+		if str(other.get("disposition", "hostile")) != "hostile":
+			continue
+		if at.distance_to((other.node as Node3D).global_position) <= SHOUT_CARRIES:
+			count += 1
+	return count
 
 
 ## Whether anything has been killed or downed here recently enough to be
