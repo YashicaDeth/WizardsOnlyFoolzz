@@ -221,6 +221,55 @@ func _ready() -> void:
 	hunt.call("_talk_option", "Put it down and walk away.")
 	check(WorldHistory.event_count("proximity_voice_addressed") == orphan_before, "and a line chosen with the panel shut says nothing")
 
+	print("-- the whole loop, once, the way a demo walks it --")
+	# Every piece above is tested on its own. This is the one that matters for
+	# somebody sitting down in front of it: walk up, open the panel, say a
+	# line, and have the world be different afterwards.
+	#
+	# No model is needed. `configure()` defaults to `MockBrain` precisely so
+	# that "a component that cannot think without credentials is a component
+	# that cannot be playtested" -- so the ruling happens on a demo box with no
+	# Ollama, which is the box this will be shown on.
+	actors.clear()
+	var mark := _actor(hunt, "demo_subject", here + facing * 2.0, false)
+	mark.disposition = "hostile"
+	actors.append(mark)
+	WorldHistory.register_subject("demo_subject", {
+		"name": "TOLLKEEPER", "kind": "person", "role": "Tithe Collector",
+	})
+	hunt.call("_open_talk_panel", "demo_subject")
+	var rulings_before := WorldHistory.event_count("npc_conversation_ruling")
+	hunt.call("_talk_option", "Put it down and walk away.")
+	# The chain is: panel line -> `_say_to` -> `_voice_heard` -> `hear()` ->
+	# validator -> `validated_action` -> `_npc_acted` -> the record. If any
+	# link is missing nothing is written, which is exactly what was happening
+	# before `validated_action` was connected to anything at all.
+	# The answer lands on a later frame, always. `NPCOllamaBrain` is async by
+	# construction and `_on_brain_replied` is documented as guaranteeing it, so
+	# a caller that checks on the same frame checks before anybody has spoken.
+	# On a machine with no Ollama it falls back to the mock and still answers
+	# asynchronously, which is the whole point of the guarantee.
+	# What this test can honestly prove is the chain up to the ruling. The
+	# ruling being *applied* needs the actor to still be standing there, and a
+	# synthetic record does not survive the hunt pruning `encounter_actors`
+	# every physics frame -- `npc_ruling_test` covers that half against a live
+	# one instead of fighting the lifecycle here.
+	var comp := hunt.get("downed_talk") as NPCConversationComponent
+	var rulings: Array = []
+	comp.validated_action.connect(func(_id: String, ruled: Dictionary): rulings.append(ruled))
+	# The answer lands on a later frame, always. `NPCOllamaBrain` is async by
+	# construction and `_on_brain_replied` guarantees it, so checking on the
+	# same frame checks before anybody has spoken. With no Ollama it falls back
+	# to the mock and still answers asynchronously, which is the point.
+	for frame in 40:
+		await get_tree().process_frame
+	check(rulings.size() > 0, "saying a line off the panel gets it ruled on (%d)" % rulings.size())
+	check(bool(comp.last_turn.get("ok", false)), "and the turn comes back finished")
+	check(str(comp.last_turn.get("transcript", "")) == "Put it down and walk away.", "carrying what was actually said")
+	check(not str(comp.last_turn.get("speech", "")).is_empty(), "with something said back")
+	check(str(WorldHistory.subject("demo_subject").get("memory", "")).contains("spoke to me"), "and they remember it happening")
+	hunt.call("_close_talk_panel")
+
 	hunt.queue_free()
 	print("STANDING_CONTACT_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
