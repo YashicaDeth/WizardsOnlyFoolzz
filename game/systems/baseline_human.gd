@@ -868,10 +868,30 @@ func _on_went_down() -> void:
 func _apply_pain_posture(delta: float) -> void:
 	if anatomy == null or anatomy.downed or anatomy.dead:
 		return
+	# Most bodies in the yard are intact and warm.  Their posture is exactly
+	# upright, yet before this guard every one allocated the posture dictionary
+	# and lerped two zeroes every rendered frame.  Keep the full path alive for
+	# damage, cold, and for the short return-to-neutral after treatment; a calm
+	# neutral rig has no visual work to do.
+	if not _needs_pose_update() and absf(rotation.x) < 0.0005 and absf(rotation.z) < 0.0005:
+		return
 	var posture := anatomy.posture()
 	var ease := clampf(delta * 8.0, 0.0, 1.0)
 	rotation.x = lerpf(rotation.x, float(posture.hunch), ease)
 	rotation.z = lerpf(rotation.z, float(posture.lean), ease)
+
+
+## Kept separate so the idle fast path is testable.  A leg injury matters even
+## if pain has been stabilised: its uneven health is what creates the lean.
+func _needs_pose_update() -> bool:
+	if anatomy == null or anatomy.downed or anatomy.dead:
+		return false
+	if anatomy.pain > 0.01 or anatomy.chilled > 0.01:
+		return true
+	var left_leg: Dictionary = anatomy.zones.get("left_leg", {})
+	var right_leg: Dictionary = anatomy.zones.get("right_leg", {})
+	return float(left_leg.get("health", 0.0)) < float(AnatomyComponent.DEFAULT_ZONES.left_leg.health) \
+		or float(right_leg.get("health", 0.0)) < float(AnatomyComponent.DEFAULT_ZONES.right_leg.health)
 
 
 ## The resolutions the downed window exists for. Each is a different answer to
