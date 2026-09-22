@@ -53,6 +53,14 @@ const GANTRY_THICK := 0.3
 ## Horizontal reach of each ramp. Long enough that the top end overlaps the
 ## gallery edge instead of stopping short of it.
 const GANTRY_REACH := 7.7
+## Where the bay lamps hang and how far they carry.
+##
+## The range has to clear the height before any of it reaches the floor at all,
+## and then clear it by enough to cross the room: reach across the floor is
+## `sqrt(range^2 - height^2)`, so 20 against 8.7 carries 18 metres and covers
+## a corridor whose walls are 14.4 out from the centre line.
+const BAY_LAMP_HEIGHT := 8.7
+const BAY_LAMP_RANGE := 20.0
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -167,12 +175,39 @@ func _build_city_shell() -> void:
 		if bay % 3 == 0:
 			_build_hanging_cable(Vector3(0, 10.8, z + 1.1), bay)
 		var light := OmniLight3D.new()
-		light.position = Vector3(0, 8.7, z)
+		light.name = "BayLamp%d" % bay
+		light.position = Vector3(0.0, BAY_LAMP_HEIGHT, z)
 		light.light_color = Color("b64b2b") if bay % 3 else Color("718d5d")
-		light.light_energy = 2.4
-		light.omni_range = 10.0
+		# Hung at 8.7 with a range of 10, which is a lamp that lights almost
+		# nothing. An omni range is a sphere, so the reach across the floor is
+		# `sqrt(range^2 - height^2)` -- at 10 and 8.7 that is 4.9 metres, in a
+		# corridor 28.8 metres wide. The side walls are 16.8 metres away and
+		# were outside the sphere entirely, so eleven lamps lit a narrow strip
+		# down the centre line and the rest of the district was black.
+		#
+		# The lift beam next door has always been range 19 at a similar height,
+		# which is exactly why it is the one thing in here anybody can see, and
+		# why the district's own design note says navigation is by a real
+		# object rather than an arrow. It was the only object lit well enough
+		# to navigate by.
+		light.light_energy = 1.9
+		light.omni_range = BAY_LAMP_RANGE
 		light.shadow_enabled = false
 		add_child(light)
+		# Low on the walls, every third bay, alternating sides. The ceiling
+		# lamps wash the floor and leave the walls flat; these are what make
+		# the panelling and the racking `LabDressing` puts along them read as
+		# surfaces rather than as a dark edge to the corridor.
+		if bay % 3 == 1:
+			var side := 1.0 if (bay / 3) % 2 == 0 else -1.0
+			var sconce := OmniLight3D.new()
+			sconce.name = "WallSconce%d" % bay
+			sconce.position = Vector3(side * 13.4, 3.4, z)
+			sconce.light_color = Color("c2662f")
+			sconce.light_energy = 1.6
+			sconce.omni_range = 9.5
+			sconce.shadow_enabled = false
+			add_child(sconce)
 	# Wide side galleries make the world read as a city rather than a hallway.
 	for side in [-1.0, 1.0]:
 		_build_gallery(side, -2.0)

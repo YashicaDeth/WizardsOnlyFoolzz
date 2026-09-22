@@ -113,6 +113,33 @@ func _ready() -> void:
 			check(absf((child as OmniLight3D).position.x - city.GANTRY_RUN) < 3.0, "a gantry lamp is over the route rather than the centre line")
 	check(lamps >= 3, "the route is lit along its length (%d lamps)" % lamps)
 
+	print("-- and the district is lit far enough to cross --")
+	# An omni range is a sphere, so a ceiling lamp reaches
+	# `sqrt(range^2 - height^2)` across the floor beneath it. The bay lamps hung
+	# at 8.7 with a range of 10, which is 4.9 metres of floor in a corridor
+	# 28.8 wide -- the side walls are 16.8 away and were outside the sphere
+	# entirely. Eleven lamps lit a strip down the centre line and nothing else.
+	var reach: float = sqrt(city.BAY_LAMP_RANGE * city.BAY_LAMP_RANGE - city.BAY_LAMP_HEIGHT * city.BAY_LAMP_HEIGHT)
+	check(city.BAY_LAMP_RANGE > city.BAY_LAMP_HEIGHT, "a ceiling lamp reaches the floor at all")
+	# 14.4 is the inside face of the side walls.
+	check(reach >= 14.4, "and carries across the whole corridor (%.1fm against 14.4)" % reach)
+	var bay_lamps := 0
+	var sconces := 0
+	for child in city.get_children():
+		if not (child is OmniLight3D):
+			continue
+		var name := str(child.name)
+		if name.begins_with("BayLamp"):
+			bay_lamps += 1
+			check((child as OmniLight3D).omni_range >= city.BAY_LAMP_RANGE, "%s carries as far as the others" % name)
+		elif name.begins_with("WallSconce"):
+			sconces += 1
+			check(absf((child as OmniLight3D).position.x) > 12.0, "%s is actually on a wall" % name)
+	check(bay_lamps >= 10, "every bay is lit (%d)" % bay_lamps)
+	# The ceiling lamps wash the floor and leave the walls flat, which is what
+	# the dressing hangs on.
+	check(sconces >= 3, "and the walls get their own light (%d sconces)" % sconces)
+
 	print("-- and the sentinel cannot reach up there --")
 	var patrol := city.get("patrol") as Node3D
 	var player := city.get("player") as CharacterBody3D
