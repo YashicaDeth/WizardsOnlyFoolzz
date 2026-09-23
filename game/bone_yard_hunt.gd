@@ -355,6 +355,7 @@ var lock_ring: LockRing = null
 var strike_smear: StrikeSmear = null
 var strike_audio: StrikeAudio = null
 var dust_puff: DustPuff = null
+var hit_flash: HitFlash = null
 ## After a strike lands, the body faces it this long (third-person turn-in).
 const STRIKE_FACE_SECONDS := 0.35
 var strike_face_yaw := 0.0
@@ -978,6 +979,8 @@ func _ready() -> void:
 	add_child(strike_audio)
 	dust_puff = DustPuff.new()
 	add_child(dust_puff)
+	hit_flash = HitFlash.new()
+	add_child(hit_flash)
 	_carry_current_weapon()
 	# AF1. Rounds and brass live in the world, not in the HUD.
 	ballistics = BALLISTICS.new()
@@ -2741,6 +2744,8 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		prompt.text = "%s IS OPENED UP" % str(actor.display_name).to_upper()
 	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": anatomy.call("snapshot")}, "anatomy_changed")
 	_spawn_blood(target.global_position + Vector3(0, 1.1, 0), roundi(float(attack.damage)))
+	if hit_flash != null:
+		hit_flash.burst(target.global_position + Vector3(0, 1.1, 0), strike_dir, float(attack.damage) / 30.0)
 	var hit_motion := actor.get("motion") as HunterBodyMotion
 	if hit_motion != null and is_instance_valid(hit_motion):
 		var zone_max: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone, {}) as Dictionary).get("health", 100.0))

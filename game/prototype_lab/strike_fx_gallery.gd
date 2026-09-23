@@ -10,6 +10,7 @@ var trail: StrikeTrail
 var ring: LockRing
 var smear: StrikeSmear
 var dust: DustPuff
+var flash: HitFlash
 var _dust_clock := 0.3
 var target: Node3D
 var clock := 0.0
@@ -59,6 +60,8 @@ func _ready() -> void:
 	add_child(smear)
 	dust = DustPuff.new()
 	add_child(dust)
+	flash = HitFlash.new()
+	add_child(flash)
 	var cam := Camera3D.new()
 	cam.position = Vector3(2.6, 2.6, 3.2)
 	add_child(cam)
@@ -91,6 +94,8 @@ func _shoot(path: String) -> void:
 	for frame in 50:
 		if frame == 42:
 			dust.burst(Vector3(-1.4, 0.0, -0.4), Vector3(1, 0, 0))
+		if frame == 47:
+			flash.burst(target.position + Vector3(0.2, 0.2, 0.3), Vector3(0.3, 0, -1), 1.0)
 		await get_tree().process_frame
 	get_viewport().get_texture().get_image().save_png(path)
 	print("SHOT ", path)
