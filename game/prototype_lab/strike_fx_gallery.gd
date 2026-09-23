@@ -62,6 +62,8 @@ func _ready() -> void:
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--shot="):
 			_shoot(argument.trim_prefix("--shot="))
+		elif argument == "--perf":
+			_perf()
 
 
 func _process(delta: float) -> void:
@@ -82,3 +84,53 @@ func _shoot(path: String) -> void:
 	get_viewport().get_texture().get_image().save_png(path)
 	print("SHOT ", path)
 	get_tree().quit(0)
+
+
+## `-- --perf`: five fighters' worth of blades swinging with trail, cable and
+## smear, against the same five with the effects off. Prints mean frame time.
+var _fx_rigs: Array[Dictionary] = []
+
+
+func _perf() -> void:
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	for i in 5:
+		var p := Node3D.new()
+		p.position = Vector3(-3.0 + i * 1.5, 1.2, -1.0)
+		add_child(p)
+		var h := Node3D.new()
+		p.add_child(h)
+		var b := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(0.05, 0.02, 1.1)
+		b.mesh = box
+		b.position = Vector3(0, 0, -0.55)
+		h.add_child(b)
+		var t := StrikeTrail.new()
+		add_child(t)
+		var s := StrikeSmear.new()
+		add_child(s)
+		_fx_rigs.append({"pivot": p, "holder": h, "trail": t, "smear": s})
+	var results := {}
+	for mode in ["off", "on"]:
+		for _warm in 60:
+			await get_tree().process_frame
+		var frames := 300
+		var start := Time.get_ticks_usec()
+		for _f in frames:
+			await get_tree().process_frame
+		results[mode] = float(Time.get_ticks_usec() - start) / 1000.0 / frames
+		_fx_on = true
+	print("PERF strike fx x5: off %.2f ms/frame, on %.2f ms/frame, cost %.2f ms" % [results.off, results.on, results.on - results.off])
+	get_tree().quit(0)
+
+
+var _fx_on := false
+
+
+func _physics_process(delta: float) -> void:
+	for i in _fx_rigs.size():
+		var rig: Dictionary = _fx_rigs[i]
+		(rig.pivot as Node3D).rotation = Vector3(0.3, clock * (7.0 + i), 0.35)
+		if _fx_on:
+			(rig.trail as StrikeTrail).feed_weapon(rig.holder, delta, 0.9)
+			(rig.smear as StrikeSmear).feed(rig.holder, (rig.holder as Node3D).global_transform * (rig.trail as StrikeTrail).tip_local(rig.holder), delta, 0.9)
