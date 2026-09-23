@@ -352,6 +352,10 @@ var arm: LimbMomentum = null
 ## What a swing leaves in the air, and the wire under a locked target.
 var strike_trail: StrikeTrail = null
 var lock_ring: LockRing = null
+## After a strike lands, the body faces it this long (third-person turn-in).
+const STRIKE_FACE_SECONDS := 0.35
+var strike_face_yaw := 0.0
+var strike_face_time := 0.0
 ## Mouse movement this frame, in radians, accumulated in `_unhandled_input` and
 ## spent in `_physics_process`. It has to be a frame total rather than a
 ## per-event value: a 1000Hz mouse delivers several motion events per frame and
@@ -2632,6 +2636,8 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	var best_aim_score := INF
 	var reach := float(attack.get("range", 4.1))
 	var view := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+	# Omnidirectional in third person: the blow follows the push, not the camera.
+	var strike_dir := StrikeHeading.heading(view, HUNTER_MOTOR.wish_direction(Input.get_vector("move_left", "move_right", "move_forward", "move_back"), yaw), third_person)
 	for index in encounter_actors.size():
 		var candidate: Dictionary = encounter_actors[index]
 		var node := candidate.get("node") as Node3D
@@ -2669,7 +2675,7 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		# *zone* on the body already picked — `hit_at()` reads it to tell a head
 		# from a thigh — so folding pitch in here means looking up or down
 		# refuses the body you are standing in front of.
-		var flat_view := Vector3(view.x, 0.0, view.z)
+		var flat_view := strike_dir
 		var flat_to := Vector3(node.global_position.x - player.x, 0.0, node.global_position.z - player.z)
 		var aim_dot := 1.0
 		if flat_view.length_squared() > 0.0001 and flat_to.length_squared() > 0.0001:
@@ -2686,9 +2692,14 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	var actor: Dictionary = encounter_actors[nearest_index]
 	_provoke_actor(actor)
 	var target: Node3D = actor.node as Node3D
-	var facing := Vector3(sin(yaw), 0, cos(yaw)).normalized().dot((target.global_position - player).normalized())
+	var facing := strike_dir.dot((target.global_position - player).normalized())
 	if facing < 0.12:
 		return false
+	# The hunter turns into the blow for a moment, so a strike behind you is
+	# seen landing rather than connecting through your back.
+	var turn := target.global_position - player
+	strike_face_yaw = atan2(turn.x, turn.z) + PI
+	strike_face_time = STRIKE_FACE_SECONDS
 	var anatomy: Node = actor.anatomy as Node
 	var rig := actor.get("rig") as BaselineHuman
 	var zone := "torso"
@@ -8113,6 +8124,7 @@ func _update_held_reliquary() -> void:
 ## The swing's trail follows whatever is actually in the hand, and the lock
 ## ring follows whoever the camera is actually framing. Both only read state.
 func _update_strike_fx(delta: float) -> void:
+	strike_face_time = maxf(0.0, strike_face_time - delta)
 	if strike_trail != null:
 		var held: Node3D = null
 		if carried_limb_index >= 0 and carried_limb_model != null and is_instance_valid(carried_limb_model):
@@ -8262,6 +8274,8 @@ func _update_camera() -> void:
 		if locked_body != null and third_person:
 			var toward := locked_body.global_position - player
 			facing = atan2(toward.x, toward.z) + PI
+		elif strike_face_time > 0.0 and third_person:
+			facing = strike_face_yaw
 		player_rig.rotation.y = lerp_angle(player_rig.rotation.y, facing, clampf(get_physics_process_delta_time() * 12.0, 0.0, 1.0))
 		# The first-person camera sits inside the skull, so the head would fill
 		# the view. Fading this on the blend instead of the toggle means the
