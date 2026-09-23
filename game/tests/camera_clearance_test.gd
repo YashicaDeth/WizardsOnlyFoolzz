@@ -74,6 +74,7 @@ func _ready() -> void:
 	_run_camera_frames(hunt, 40)
 	var open_reach := _camera_reach(hunt)
 	check(hunt.perspective_blend > 0.9 and open_reach > 1.5, "third person opens up all the way with nothing behind the player (%.2f m)" % open_reach)
+	check(not hunt.body_motion.first_person, "the arms leave the lens once the camera is out behind the body")
 
 	print("AX5.2 - a wall immediately behind the player is the corridor case")
 	hunt.perspective_blend = 0.0
@@ -84,6 +85,7 @@ func _ready() -> void:
 	var cramped_reach := _camera_reach(hunt)
 	check(cramped_reach < 0.3, "a 0.6m gap hands the view back to the eye, not a camera jammed against the wall (%.2f m)" % cramped_reach)
 	check(hunt.perspective_blend > 0.9, "and the request for third person is kept, not forgotten")
+	check(hunt.body_motion.first_person, "a camera forced into the eye gets first-person arms back")
 
 	print("AX5.2 - the room comes back, so does the shot")
 	behind_wall.queue_free()

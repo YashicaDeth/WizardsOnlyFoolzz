@@ -8331,6 +8331,11 @@ func _update_camera() -> void:
 		var head := player_rig.parts.get("head") as Node3D
 		if head != null and is_instance_valid(head):
 			head.visible = camera_blend > 0.5
+	# The arms follow the camera actually used, like the head: a room that
+	# forces the eye gets first-person arms, and nothing that sets
+	# third_person without the F key leaves them stretched back to the lens.
+	if body_motion != null:
+		body_motion.set_perspective(camera_blend <= 0.5)
 
 
 ## The pointer, in the project's own hand rather than the operating system's. A
