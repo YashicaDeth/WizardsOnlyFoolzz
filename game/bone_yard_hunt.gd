@@ -354,6 +354,7 @@ var strike_trail: StrikeTrail = null
 var lock_ring: LockRing = null
 var strike_smear: StrikeSmear = null
 var strike_audio: StrikeAudio = null
+var dust_puff: DustPuff = null
 ## After a strike lands, the body faces it this long (third-person turn-in).
 const STRIKE_FACE_SECONDS := 0.35
 var strike_face_yaw := 0.0
@@ -975,6 +976,8 @@ func _ready() -> void:
 	add_child(strike_smear)
 	strike_audio = StrikeAudio.new()
 	add_child(strike_audio)
+	dust_puff = DustPuff.new()
+	add_child(dust_puff)
 	_carry_current_weapon()
 	# AF1. Rounds and brass live in the world, not in the HUD.
 	ballistics = BALLISTICS.new()
@@ -4593,6 +4596,8 @@ func _dodge() -> void:
 	var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	dodge_direction = _combat_dodge_direction(move)
 	dodge_remaining = 0.28
+	if dust_puff != null:
+		dust_puff.burst(player_body.global_position, dodge_direction)
 	# Evasion owns the body for its short window. Do not drag a shouldered gun
 	# or raised guard through it and then snap those poses off a frame later.
 	firearm_aiming = false
