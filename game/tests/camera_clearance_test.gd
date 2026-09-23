@@ -1,9 +1,10 @@
 extends Node
 
 ## AX5.2. Cramped-space handling. `HunterMotor.third_person_clearance_blend()`
-## is pure math (three points in, a ratio out) and gets exercised directly
-## with no scene at all; the second half proves the number actually reaches
-## `bone_yard_hunt.gd`'s own `perspective_blend` by putting a real wall
+## is pure math (how far the collision-safe chase camera got from the eye,
+## eased 0.55-1.65 m; 68c40b3 replaced the original three-point ratio) and is
+## exercised directly; the second half proves it reaches the real camera in
+## `bone_yard_hunt.gd` (`perspective_blend` is only the request now) by putting a real wall
 ## immediately behind the player and watching third person fail to fully
 ## open, then watching it recover once the wall is gone — a corridor and a
 ## vat room are both just "the wall behind you is close", so this is the
@@ -40,18 +41,22 @@ func _run_camera_frames(hunt, count: int) -> void:
 		hunt._update_camera()
 
 
+## How far the real camera stands back from the player, flat on the ground.
+func _camera_reach(hunt) -> float:
+	var offset: Vector3 = hunt.camera.global_position - hunt.player_body.global_position
+	return Vector2(offset.x, offset.z).length()
+
+
 func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		get_tree().quit(2)
 		return
 
 	print("AX5.2 - the pure ratio")
-	check(is_equal_approx(HUNTER_MOTOR.third_person_clearance_blend(Vector3.ZERO, Vector3(0, 0, -5), Vector3(0, 0, -5)), 1.0),
-		"an unobstructed shot keeps the whole distance it asked for")
-	check(is_equal_approx(HUNTER_MOTOR.third_person_clearance_blend(Vector3.ZERO, Vector3(0, 0, -5), Vector3(0, 0, -0.5)), 0.1),
-		"a shot stopped a tenth of the way out reads back as a tenth of clearance")
-	check(HUNTER_MOTOR.third_person_clearance_blend(Vector3.ZERO, Vector3.ZERO, Vector3(0, 0, -5)) == 1.0,
-		"asking for zero distance is never starved for room, whatever `achieved` says")
+	var blend := func(gap: float) -> float: return HUNTER_MOTOR.third_person_clearance_blend(Vector3.ZERO, Vector3(0, 0, gap))
+	check(is_equal_approx(blend.call(3.0), 1.0), "a chase camera with room behind it keeps the whole shot")
+	check(is_zero_approx(blend.call(0.3)), "a camera pinned at the eye gives the view back to first person")
+	check(blend.call(0.8) < blend.call(1.2) and blend.call(1.2) < blend.call(1.6), "clearance eases in between, never snapping")
 
 	WorldHistory.clear_history()
 	var hunt = load("res://bone_yard_hunt.tscn").instantiate()
@@ -67,7 +72,8 @@ func _ready() -> void:
 
 	print("AX5.2 - open ground behind the player still earns the full shot")
 	_run_camera_frames(hunt, 40)
-	check(hunt.perspective_blend > 0.9, "third person opens up all the way with nothing behind the player (%.3f)" % hunt.perspective_blend)
+	var open_reach := _camera_reach(hunt)
+	check(hunt.perspective_blend > 0.9 and open_reach > 1.5, "third person opens up all the way with nothing behind the player (%.2f m)" % open_reach)
 
 	print("AX5.2 - a wall immediately behind the player is the corridor case")
 	hunt.perspective_blend = 0.0
@@ -75,14 +81,16 @@ func _ready() -> void:
 	add_child(behind_wall)
 	await get_tree().physics_frame
 	_run_camera_frames(hunt, 40)
-	check(hunt.perspective_blend < 0.5, "third person cannot open past the clearance a 0.6m gap actually leaves (%.3f)" % hunt.perspective_blend)
-	check(hunt.perspective_blend >= 0.0, "and never goes negative doing it")
+	var cramped_reach := _camera_reach(hunt)
+	check(cramped_reach < 0.3, "a 0.6m gap hands the view back to the eye, not a camera jammed against the wall (%.2f m)" % cramped_reach)
+	check(hunt.perspective_blend > 0.9, "and the request for third person is kept, not forgotten")
 
 	print("AX5.2 - the room comes back, so does the shot")
 	behind_wall.queue_free()
 	await get_tree().physics_frame
 	_run_camera_frames(hunt, 40)
-	check(hunt.perspective_blend > 0.9, "clearing the corridor lets the same camera earn the full shot back (%.3f)" % hunt.perspective_blend)
+	var back_reach := _camera_reach(hunt)
+	check(back_reach > 1.5, "clearing the corridor lets the same camera earn the full shot back (%.2f m)" % back_reach)
 
 	print("CAMERA_CLEARANCE_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
