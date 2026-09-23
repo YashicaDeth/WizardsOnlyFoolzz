@@ -352,6 +352,7 @@ var arm: LimbMomentum = null
 ## What a swing leaves in the air, and the wire under a locked target.
 var strike_trail: StrikeTrail = null
 var lock_ring: LockRing = null
+var strike_smear: StrikeSmear = null
 ## After a strike lands, the body faces it this long (third-person turn-in).
 const STRIKE_FACE_SECONDS := 0.35
 var strike_face_yaw := 0.0
@@ -969,6 +970,8 @@ func _ready() -> void:
 	add_child(strike_trail)
 	lock_ring = LockRing.new()
 	add_child(lock_ring)
+	strike_smear = StrikeSmear.new()
+	add_child(strike_smear)
 	_carry_current_weapon()
 	# AF1. Rounds and brass live in the world, not in the HUD.
 	ballistics = BALLISTICS.new()
@@ -8131,7 +8134,11 @@ func _update_strike_fx(delta: float) -> void:
 			held = carried_limb_model
 		elif arsenal != null and not bare_handed and arsenal.models.has(arsenal.current_id):
 			held = arsenal.models[arsenal.current_id] as Node3D
-		strike_trail.feed_weapon(held, delta, arm.commitment() if arm != null else 0.0)
+		var commit := arm.commitment() if arm != null else 0.0
+		strike_trail.feed_weapon(held, delta, commit)
+		if strike_smear != null:
+			var tip := held.global_transform * strike_trail.tip_local(held) if held != null and is_instance_valid(held) else Vector3.ZERO
+			strike_smear.feed(held, tip, delta, commit)
 	if lock_ring != null:
 		var focus := _camera_combat_focus()
 		if focus != null and is_instance_valid(focus):

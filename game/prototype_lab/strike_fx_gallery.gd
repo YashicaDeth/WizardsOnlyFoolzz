@@ -8,6 +8,7 @@ var pivot: Node3D
 var blade: Node3D
 var trail: StrikeTrail
 var ring: LockRing
+var smear: StrikeSmear
 var target: Node3D
 var clock := 0.0
 
@@ -52,6 +53,8 @@ func _ready() -> void:
 	add_child(trail)
 	ring = LockRing.new()
 	add_child(ring)
+	smear = StrikeSmear.new()
+	add_child(smear)
 	var cam := Camera3D.new()
 	cam.position = Vector3(2.6, 2.6, 3.2)
 	add_child(cam)
@@ -66,7 +69,10 @@ func _process(delta: float) -> void:
 	# A full round-the-body sweep, tilting as it goes, the way a spinning whip
 	# cut comes over and around rather than only forward.
 	pivot.rotation = Vector3(sin(clock * 3.0) * 0.5, clock * 7.5, 0.35)
-	trail.feed_weapon(blade.get_parent() as Node3D, delta, clampf(0.5 + 0.5 * sin(clock * 2.0), 0.0, 1.0))
+	var commit := clampf(0.5 + 0.5 * sin(clock * 2.0), 0.0, 1.0)
+	var holder := blade.get_parent() as Node3D
+	trail.feed_weapon(holder, delta, commit)
+	smear.feed(holder, holder.global_transform * trail.tip_local(holder), delta, commit)
 	ring.follow(Vector3(target.position.x, 0.0, target.position.z))
 
 
