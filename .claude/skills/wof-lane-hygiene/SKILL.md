@@ -58,7 +58,9 @@ git stash push -- <your files> && tools/run_tests.sh <suite>; git stash pop
 
 Fails either way = pre-existing; say so in the commit, do not "fix" it in
 passing. Known on `codex/primary` 2026-09-24: `hud_night_camera_test`
-times out, `momentum_carry_test` fails "a real vault target is found".
+times out, `momentum_carry_test` fails "a real vault target is found",
+and `chunk_test` passes its checks but crashes on exit (code 139) in about
+three runs of four. A 139 with `failures=0` on that suite is not yours.
 
 ## Commit
 
