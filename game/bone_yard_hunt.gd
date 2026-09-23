@@ -8174,7 +8174,7 @@ func _update_strike_fx(delta: float) -> void:
 		if locked_node != null and camera != null and not camera.is_position_behind(locked_node.global_position) and panel_mode.is_empty():
 			var body_anatomy = locked_actor.get("anatomy")
 			var zones: Dictionary = body_anatomy.zones if body_anatomy != null else {}
-			lock_readout.show_for(camera.unproject_position(locked_node.global_position + Vector3.UP * 2.0), str(locked_actor.get("display_name", "")), zones, ANATOMY_COMPONENT.DEFAULT_ZONES)
+			lock_readout.show_for(camera.unproject_position(locked_node.global_position + Vector3.UP * 1.1), str(locked_actor.get("display_name", "")), zones, ANATOMY_COMPONENT.DEFAULT_ZONES)
 		else:
 			lock_readout.hide_readout()
 	if lock_ring != null:

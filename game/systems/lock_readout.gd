@@ -61,7 +61,13 @@ func _draw() -> void:
 	if _fade <= 0.001:
 		return
 	var unit := 28.0
-	var at := _anchor + Vector2(0, -unit * 2.4)
+	# Beside the body, not over it: the game already labels the locked target
+	# above its head, and the first in-scene capture put this figure on top of
+	# that label and down into the prompt band. Clamped clear of the HUD's top
+	# and bottom bands so it never lands on an instrument.
+	var at := _anchor + Vector2(unit * 2.4, 0)
+	at.x = clampf(at.x, unit * 1.5, size.x - unit * 1.5)
+	at.y = clampf(at.y, 150.0 + unit * 1.9, size.y - 200.0 - unit * 1.7)
 	var a := _fade
 	for zone_id in PLAN:
 		var r := zone_ratio(zone_id)
@@ -75,9 +81,12 @@ func _draw() -> void:
 		if r <= 0.001:
 			draw_line(rect.position, rect.end, ARTERIAL * Color(1, 1, 1, a), 2.0)
 			draw_line(Vector2(rect.end.x, rect.position.y), Vector2(rect.position.x, rect.end.y), ARTERIAL * Color(1, 1, 1, a), 2.0)
-	var label := subject_name.to_upper()
-	var width := CellOutzType.width_condensed(label, 8.0, 0.8)
-	CellOutzType.draw_condensed(self, at + Vector2(-width * 0.5, unit * 1.75), label, 8.0, BONE * Color(1, 1, 1, 0.8 * a), 0.8)
+	# A thin leader back to the body, so the figure is read as theirs — only
+	# while the body itself is inside the safe band, or the line would cross
+	# the prompts to reach a point near the frame edge.
+	var safe := Rect2(Vector2(0, 150), size - Vector2(0, 350))
+	if safe.has_point(_anchor):
+		draw_line(_anchor, at + Vector2(-unit * 0.95, 0), BONE * Color(1, 1, 1, 0.35 * a), 1.0)
 
 
 func _zone_rect(zone_id: String, centre: Vector2, unit: float) -> Rect2:
