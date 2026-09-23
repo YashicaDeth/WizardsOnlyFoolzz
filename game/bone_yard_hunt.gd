@@ -356,6 +356,7 @@ var strike_smear: StrikeSmear = null
 var strike_audio: StrikeAudio = null
 var dust_puff: DustPuff = null
 var hit_flash: HitFlash = null
+var threat_compass: ThreatCompass = null
 ## After a strike lands, the body faces it this long (third-person turn-in).
 const STRIKE_FACE_SECONDS := 0.35
 var strike_face_yaw := 0.0
@@ -981,6 +982,9 @@ func _ready() -> void:
 	add_child(dust_puff)
 	hit_flash = HitFlash.new()
 	add_child(hit_flash)
+	threat_compass = ThreatCompass.new()
+	threat_compass.name = "ThreatCompass"
+	$HUD.add_child(threat_compass)
 	_carry_current_weapon()
 	# AF1. Rounds and brass live in the world, not in the HUD.
 	ballistics = BALLISTICS.new()
@@ -5766,6 +5770,8 @@ func _update_encounter_actors(delta: float) -> void:
 			var pressing := 2.2 if strike_windup >= 0.0 else 1.0
 			actor["attack_time"] = float(actor.get("attack_time", 0.0)) + actor_delta * pressing
 			var attack_cycle := _actor_attack_cycle(actor)
+			if threat_compass != null:
+				threat_compass.report(str(actor.get("subject_id", index)), node.global_position, float(actor.attack_time) / maxf(attack_cycle, 0.01))
 			if actor_motion != null:
 				actor_motion.set_combat_pose(clampf(float(actor.attack_time) / maxf(attack_cycle * 0.57, 0.01), 0.0, 1.0), "melee")
 			if float(actor.attack_time) > attack_cycle * 0.57:
@@ -5789,6 +5795,8 @@ func _update_encounter_actors(delta: float) -> void:
 						_actor_lose_footing(actor, 0.45, "%s LOSES THEIR FOOTING // PRESS THE OPENING" % str(actor.display_name).to_upper())
 					var health_after := health - roundi(float(guarded.get("damage", incoming)))
 					_wound_player(node.global_position, maxf(5.0, 15.0 * _actor_combat_ratio(actor)), "cut")
+					if hit_flash != null and third_person:
+						hit_flash.burst(player + Vector3(0, 1.2, 0), player - node.global_position, incoming / 30.0)
 					# AE10.13. Ordinary hostiles keep the old one-health floor: the
 					# undying player is not silently killed by a roaming damage tick.
 					# A physical law team is different. Its finishing blow performs the
@@ -8141,6 +8149,8 @@ func _update_held_reliquary() -> void:
 ## ring follows whoever the camera is actually framing. Both only read state.
 func _update_strike_fx(delta: float) -> void:
 	strike_face_time = maxf(0.0, strike_face_time - delta)
+	if threat_compass != null:
+		threat_compass.visible = panel_mode.is_empty() and not resolution_ui.visible
 	if strike_trail != null:
 		var held: Node3D = null
 		if carried_limb_index >= 0 and carried_limb_model != null and is_instance_valid(carried_limb_model):
