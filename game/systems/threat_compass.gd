@@ -70,10 +70,13 @@ func _draw() -> void:
 		colour.a = 0.55 + 0.45 * p
 		var width := lerpf(5.0, 15.0, p)
 		# Squash the ring to the frame so side threats sit at the side edges.
+		# Vertically it stops short of the edges: at 0.44 the "behind" arc sat
+		# on the interaction prompt in the real Hunt (first in-scene capture);
+		# 0.36 keeps it above the prompt band and below the top instruments.
 		var points := PackedVector2Array()
 		for i in 13:
 			var a := screen_angle - span * 0.5 + span * float(i) / 12.0
-			points.append(centre + Vector2(cos(a) * size.x * 0.46, sin(a) * size.y * 0.44))
+			points.append(centre + Vector2(cos(a) * size.x * 0.46, sin(a) * size.y * 0.36))
 		# A dark underlay so the arc reads over any world, however busy.
 		draw_polyline(points, Color(0, 0, 0, 0.55), width + 5.0)
 		draw_polyline(points, colour, width)

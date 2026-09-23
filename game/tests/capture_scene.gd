@@ -160,6 +160,17 @@ func _ready() -> void:
 			await get_tree().physics_frame
 		for _draw_hold in 6:
 			await get_tree().process_frame
+	elif trigger == "threat":
+		# Three enemies winding up around the player -- behind and due, to the
+		# left mid-swing, ahead-right just starting -- so the ThreatCompass
+		# arcs are seen against the real HUD's edge instruments.
+		var fwd := Vector3(sin(scene.yaw), 0, cos(scene.yaw))
+		var right := Vector3(fwd.z, 0, -fwd.x)
+		for _hold in 20:
+			scene.threat_compass.report("behind", scene.player - fwd * 4.0, 0.95)
+			scene.threat_compass.report("left", scene.player - right * 4.0, 0.5)
+			scene.threat_compass.report("ahead_right", scene.player + (fwd + right) * 3.0, 0.15)
+			await get_tree().process_frame
 	elif trigger == "walk":
 		# Move off the spawn so the shot is the travelling camera, not the
 		# vehicle the player has just climbed out of.
