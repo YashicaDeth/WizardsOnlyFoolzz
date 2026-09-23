@@ -357,6 +357,7 @@ var strike_audio: StrikeAudio = null
 var dust_puff: DustPuff = null
 var hit_flash: HitFlash = null
 var threat_compass: ThreatCompass = null
+var lock_readout: LockReadout = null
 ## After a strike lands, the body faces it this long (third-person turn-in).
 const STRIKE_FACE_SECONDS := 0.35
 var strike_face_yaw := 0.0
@@ -985,6 +986,9 @@ func _ready() -> void:
 	threat_compass = ThreatCompass.new()
 	threat_compass.name = "ThreatCompass"
 	$HUD.add_child(threat_compass)
+	lock_readout = LockReadout.new()
+	lock_readout.name = "LockReadout"
+	$HUD.add_child(lock_readout)
 	_carry_current_weapon()
 	# AF1. Rounds and brass live in the world, not in the HUD.
 	ballistics = BALLISTICS.new()
@@ -8164,6 +8168,15 @@ func _update_strike_fx(delta: float) -> void:
 			strike_smear.feed(held, tip, delta, commit)
 			if strike_audio != null:
 				strike_audio.feed(tip, delta, commit, held != null and is_instance_valid(held))
+	if lock_readout != null:
+		var locked_actor := _actor_by_id(lock_target) if not lock_target.is_empty() else {}
+		var locked_node := locked_actor.get("node") as Node3D if not locked_actor.is_empty() else null
+		if locked_node != null and camera != null and not camera.is_position_behind(locked_node.global_position) and panel_mode.is_empty():
+			var body_anatomy = locked_actor.get("anatomy")
+			var zones: Dictionary = body_anatomy.zones if body_anatomy != null else {}
+			lock_readout.show_for(camera.unproject_position(locked_node.global_position + Vector3.UP * 2.0), str(locked_actor.get("display_name", "")), zones, ANATOMY_COMPONENT.DEFAULT_ZONES)
+		else:
+			lock_readout.hide_readout()
 	if lock_ring != null:
 		var focus := _camera_combat_focus()
 		if focus != null and is_instance_valid(focus):
