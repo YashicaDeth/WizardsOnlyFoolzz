@@ -105,6 +105,9 @@ it in is worth more than polishing it.
 
 ## 4. The combat rework is one boolean away
 
+> **Update 2026-09-24:** flipped. `momentum_damage := true` on `codex/primary`.
+> The rest of this section is history; do not ask Greg again.
+
 `game/bone_yard_hunt.gd` — `var momentum_damage := false`
 
 The whole AN rework — *"the blow is something the player performs, not something
@@ -114,6 +117,13 @@ items **O5.1** and **O5.2** close when it flips. Combat has been reworked four
 times; the fifth is a flag. Do not rebuild it — ask Greg whether to flip it.
 
 ## 5. Nothing is merged, and that is the biggest risk to the project
+
+> **Update 2026-09-24:** measured again, the backlog is **24 commits on 7
+> branches**, not 132 (`agent-a-help` 3, `codex/b6-combat` 2,
+> `codex/controls-ui-repair` 4, `codex/final-demo-integration` 1,
+> `codex/sol-agent-1` 8, `integration-check-agent-a` 5, `lane-6-handheld` 1).
+> The save-system split below is decided: HEAD's path logic wins
+> (`ORCA/DECISIONS.md` §3).
 
 Across all branches: **1,670 distinct checklist items, 639 done somewhere, ~1,013
 open everywhere.** But **167 items are ticked on a lane and still open on main**,
@@ -176,12 +186,18 @@ Still on the engine fallback font: `downed_resolution` (22), `world_index` (12),
 
 ## Blocked on Greg — do not guess these
 
-1. The four **Horsemen's names** (blocks K2).
-2. **Cast display names** (blocks I0.9).
-3. **celloutz.xyz**: mirror the real site or fictionalise it (blocks I3).
-4. **What persists between runs** — and now also *which save system wins*, given
-   main and lane 1 built two.
-5. **AC1.1**: simulated fluid, or painted fluid done well.
-6. Is the **Board** a physical wall, or on the black mirror.
-7. The **Instagram and forum URLs** for the celloutz site.
-8. Whether to flip **`momentum_damage`** (§4).
+Re-checked 2026-09-24 against `CHECKLIST.md` and `ORCA/DECISIONS.md`. Answered
+items stay listed so nobody asks twice. The live list with answer boxes is
+`DESIGN/dust-to-bones.html`.
+
+1. ~~The four **Horsemen's names**~~ — answered 12 Sep: War, Famine,
+   Pestilence, Death (K2, built).
+2. **Cast display names** (blocks I0.9). Open.
+3. ~~**celloutz.xyz**: mirror or fictionalise~~ — fictionalise it, somewhat
+   rather than wholesale (I3 unblocked).
+4. ~~**What persists between runs** / which save system wins~~ — there are no
+   runs (one save, a story, an ending, a post-game); HEAD's save path wins.
+5. **AC1.1**: simulated fluid, or painted fluid done well. Open.
+6. Is the **Board** a physical wall, or on the black mirror. Open.
+7. The **Instagram and forum URLs** for the celloutz site. Open.
+8. ~~Whether to flip **`momentum_damage`**~~ — flipped (§4).
