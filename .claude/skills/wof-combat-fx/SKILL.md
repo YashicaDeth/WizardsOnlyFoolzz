@@ -31,6 +31,10 @@ Eight effects already follow this shape. Copy it; do not invent a new one.
 3. **Reads real motion.** Trails come from the weapon's measured tip
    (`StrikeTrail.tip_local`), not a guessed offset; effects draw nothing when
    the weapon is still.
+   Measure the **weapon, not the mount**: an arsenal mount also holds the
+   gripping hand, and a ~4 m forearm is attached under it at runtime. Use
+   `StrikeTrail.weapon_part(mount)` (the `<id>_model` subtree) for any tip,
+   reach or mesh choice.
 4. **Hitstop is off-limits** unless Greg asks: `impact_feel.gd` v4 records
    his "loud is not the same as satisfying".
 5. **Contact is inside the body.** A hit marker needs `no_depth_test`.
@@ -41,6 +45,14 @@ Eight effects already follow this shape. Copy it; do not invent a new one.
 
 ## Prove it
 
+- **Swing like a player.** Commitment comes from mouse motion; a scripted
+  `_attack()` has commitment 0 and shows the faintest version of every
+  effect. `--trigger=swing` feeds a mouse sweep; set `SWING_FRAMES` to pick
+  the instant.
+- **Probe, then fix.** When an effect does not show, print its state in the
+  capture (active? samples? tip? layers? what meshes does it hold?) before
+  changing a number. Two guesses this pass were wrong; the probe found the
+  forearm in one run.
 - **Then check it in the real Hunt, not only the gallery.** Galleries have no
   other HUD to collide with. `tests/capture_scene.tscn -- --scene=res://bone_yard_hunt.tscn`
   (add `--trigger=lock` for a real locked hostile). Three fixes this pass
