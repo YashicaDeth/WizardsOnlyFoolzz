@@ -237,7 +237,9 @@ func _draw_monitor(anchor: Vector2, phase: float, heart: bool) -> void:
 # --- the pocket rack -------------------------------------------------------------
 
 func _draw_pockets() -> void:
-	var origin := Vector2(size.x - 262.0, size.y - 230.0)
+	# Left of the held-object reliquary (bottom-right) and above the control
+	# strip: the first in-scene capture put the rack on top of the reliquary.
+	var origin := Vector2(size.x - 400.0, size.y - 172.0)
 	draw_line(origin + Vector2(-8, 52), origin + Vector2(POCKETS * 34.0 + 2, 52), BONE * Color(1, 1, 1, 0.4), 2.0)
 	for i in POCKETS:
 		var at := origin + Vector2(i * 34.0, 0)
