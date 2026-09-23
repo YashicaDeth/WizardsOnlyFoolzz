@@ -82,6 +82,8 @@ var _runnels: Array = []
 ## transition is exactly the hitch a loading screen exists to hide.
 var _specimen: XraySpecimen = null
 var _rain: Array = []
+## The seam wipe (`TransitionKit`). Null falls back to the plain alpha fade.
+var wipe: TransitionKit = null
 
 ## P1.1/P2.4. `OpeningDirector.advance()` had no caller anywhere in real
 ## gameplay — only in tests — so `stage()` never left "none" and
@@ -120,6 +122,9 @@ func _ready() -> void:
 	screen.draw.connect(_draw_plate)
 	add_child(screen)
 	screen.visible = false
+	wipe = TransitionKit.new()
+	wipe.name = "Wipe"
+	add_child(wipe)
 
 
 func _ensure_specimen() -> void:
@@ -215,8 +220,17 @@ func release() -> void:
 	screen.visible = false
 
 
+## Every seam in the game passes through here, so this is where the wipe lives:
+## cover the old frame, flip the plate underneath, uncover. The style is seeded
+## off the destination, so the same door always opens the same way.
 func _fade(target: float) -> void:
 	var tree := get_tree()
+	if wipe != null:
+		wipe.set_style(_seal_seed)
+		await wipe.cover()
+		alpha = target
+		await wipe.reveal()
+		return
 	while not is_equal_approx(alpha, target):
 		alpha = move_toward(alpha, target, tree.root.get_process_delta_time() / FADE)
 		await tree.process_frame
