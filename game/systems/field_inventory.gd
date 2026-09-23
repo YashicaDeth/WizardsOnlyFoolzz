@@ -199,28 +199,61 @@ func _process(_delta: float) -> void:
 func _draw() -> void:
 	if not visible:
 		return
-	var font := ThemeDB.fallback_font
 	var screen := Rect2(Vector2.ZERO, size)
 	draw_rect(screen, Color(0.01, 0.012, 0.01, 0.90))
 	var plate := Rect2(size * Vector2(0.055, 0.07), size * Vector2(0.89, 0.86))
-	draw_rect(plate, GLASS)
-	draw_rect(plate, INK * Color(1, 1, 1, 0.56), false, 2.0)
-	draw_string(font, plate.position + Vector2(28, 38), "FIELD INVENTORY // ONE BODY, ONE BAG", HORIZONTAL_ALIGNMENT_LEFT, -1, 21, INK)
-	draw_string(font, plate.position + Vector2(28, 62), "O / ESC CLOSE   UP/DOWN SELECT   ENTER USE OR WIELD   P POCKET   M MEND CLOTH", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, INK * Color(1, 1, 1, 0.65))
+	# The bag is a reliquary cabinet: planked wood, iron corners, a gear train
+	# down the side. Layout and hit areas are unchanged underneath.
+	GothicFrame.draw_cabinet(self, plate, float(Time.get_ticks_msec()) / 1000.0)
+	_t(plate.position + Vector2(28, 38), "FIELD INVENTORY // ONE BODY, ONE BAG", 21, INK, plate.size.x - 56)
+	_t(plate.position + Vector2(28, 62), "O / ESC CLOSE   ↑↓ SELECT   ENTER USE OR WIELD   P POCKET   M MEND CLOTH", 12, INK * Color(1, 1, 1, 0.6), plate.size.x - 56)
 
 	var body_rect := Rect2(plate.position + Vector2(28, 88), Vector2(250, plate.size.y - 116))
 	var bag_rect := Rect2(Vector2(body_rect.end.x + 24, body_rect.position.y), Vector2(plate.size.x - body_rect.size.x - 330, body_rect.size.y))
 	var gear_rect := Rect2(Vector2(bag_rect.end.x + 24, body_rect.position.y), Vector2(250, body_rect.size.y))
 	for panel in [body_rect, bag_rect, gear_rect]:
-		draw_rect(panel, Color(0.04, 0.045, 0.035, 0.92))
-		draw_rect(panel, INK * Color(1, 1, 1, 0.22), false, 1.0)
-	_draw_body(font, body_rect)
-	_draw_bag(font, bag_rect)
-	_draw_gear(font, gear_rect)
+		GothicFrame.draw_chrome_plate(self, panel, Color(0.035, 0.03, 0.025, 0.94))
+	_draw_body(body_rect)
+	_draw_bag(bag_rect)
+	_draw_gear(gear_rect)
 
 
-func _draw_body(font: Font, rect: Rect2) -> void:
-	draw_string(font, rect.position + Vector2(18, 28), "BODY", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, BLOOD)
+## Every line in the house face. `at.y` is a baseline and `px` the size the
+## engine font used, so converted lines sit where they did. Anything wider than
+## `room` is set smaller rather than run out of its compartment: the stencil
+## face does not wrap.
+func _t(at: Vector2, value: String, px: float, color: Color, room := -1.0) -> float:
+	var cap := px * 0.72
+	var tracking := px * 0.08
+	var text := value.to_upper()
+	if room > 0.0:
+		var natural := CellOutzType.width(text, cap, tracking)
+		if natural > room:
+			cap *= room / natural
+			tracking *= room / natural
+	return CellOutzType.draw_text(self, Vector2(at.x, at.y - cap), text, cap, color, tracking)
+
+
+func _t_right(right: float, baseline: float, value: String, px: float, color: Color) -> void:
+	var cap := px * 0.72
+	var tracking := px * 0.08
+	var width := CellOutzType.width(value.to_upper(), cap, tracking)
+	CellOutzType.draw_text(self, Vector2(right - width, baseline - cap), value.to_upper(), cap, color, tracking)
+
+
+## A small stoppered jar, filled by what kind of thing the row is.
+func _jar(at: Vector2, kind: String, live := true) -> void:
+	var fill := BLOOD if kind in ["organ", "limb", "chunk", "meat", "implant"] else (Color("7a55c9") if kind in ["substance", "smokeable", "drug"] else (MOSS if kind in ["garment", "pocket"] else INK.darkened(0.4)))
+	var body_rect := Rect2(at + Vector2(0, 5), Vector2(14, 22))
+	draw_rect(body_rect, Color(0.02, 0.03, 0.03, 0.8))
+	if live:
+		draw_rect(Rect2(body_rect.position + Vector2(2, 7), body_rect.size - Vector2(4, 9)), fill * Color(1, 1, 1, 0.85))
+	draw_rect(body_rect, INK * Color(1, 1, 1, 0.45), false, 1.0)
+	draw_rect(Rect2(at + Vector2(2, 0), Vector2(10, 5)), GothicFrame.BRASS)
+
+
+func _draw_body(rect: Rect2) -> void:
+	_t(rect.position + Vector2(18, 28), "BODY", 17, BLOOD)
 	if body == null or body.anatomy == null:
 		return
 	var y := rect.position.y + 58.0
@@ -228,8 +261,8 @@ func _draw_body(font: Font, rect: Rect2) -> void:
 		var zone: Dictionary = body.anatomy.zones.get(zone_id, {})
 		var ceiling: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone_id, {}) as Dictionary).get("health", 100.0))
 		var ratio := clampf(float(zone.get("health", ceiling)) / maxf(ceiling, 1.0), 0.0, 1.0)
-		var label: String = str(zone_id).replace("_", " ").to_upper()
-		draw_string(font, Vector2(rect.position.x + 18, y), label, HORIZONTAL_ALIGNMENT_LEFT, 105, 12, INK)
+		var label: String = str(zone_id).replace("_", " ")
+		_t(Vector2(rect.position.x + 18, y), label, 12, INK, 100)
 		var track := Rect2(Vector2(rect.position.x + 126, y - 10), Vector2(102, 8))
 		draw_rect(track, Color(0.12, 0.10, 0.08))
 		draw_rect(Rect2(track.position, Vector2(track.size.x * ratio, track.size.y)), BLOOD.lerp(MOSS, ratio))
@@ -240,20 +273,20 @@ func _draw_body(font: Font, rect: Rect2) -> void:
 		draw_rect(hem, Color(0.12, 0.10, 0.08))
 		draw_rect(Rect2(hem.position, Vector2(hem.size.x * cover, hem.size.y)), INK.lerp(Color("3d0907"), 1.0 - cover))
 		y += 38.0
-	draw_string(font, Vector2(rect.position.x + 18, rect.end.y - 72), "CLOTH  %d%% // M MEND (%d)" % [roundi(_cloth_mean() * 100.0), ClothingShell.price_to_mend(body.wardrobe)], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, INK)
-	draw_string(font, Vector2(rect.position.x + 18, rect.end.y - 48), "BLOOD  %d ML" % roundi(body.anatomy.blood_remaining), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, BLOOD)
-	draw_string(font, Vector2(rect.position.x + 18, rect.end.y - 24), "PAIN   %d" % roundi(body.anatomy.pain), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, INK)
+	_t(Vector2(rect.position.x + 18, rect.end.y - 72), "CLOTH  %d%% // M MEND (%d)" % [roundi(_cloth_mean() * 100.0), ClothingShell.price_to_mend(body.wardrobe)], 13, INK, rect.size.x - 36)
+	_t(Vector2(rect.position.x + 18, rect.end.y - 48), "BLOOD  %d ML" % roundi(body.anatomy.blood_remaining), 13, BLOOD)
+	_t(Vector2(rect.position.x + 18, rect.end.y - 24), "PAIN   %d" % roundi(body.anatomy.pain), 13, INK)
 
 
-func _draw_bag(font: Font, rect: Rect2) -> void:
+func _draw_bag(rect: Rect2) -> void:
 	row_rects.clear()
 	if inspect_rig != null:
-		_draw_corpse(font, rect)
+		_draw_corpse(rect)
 		return
 	var total := carry.total_mass() if carry != null else 0.0
-	draw_string(font, rect.position + Vector2(18, 28), "LOOT / %0.1f OF %0.0f KG" % [total, Carry.CAPACITY], HORIZONTAL_ALIGNMENT_LEFT, -1, 17, MOSS if total <= Carry.CAPACITY else BLOOD)
+	_t(rect.position + Vector2(18, 28), "LOOT / %0.1f OF %0.0f KG" % [total, Carry.CAPACITY], 17, MOSS if total <= Carry.CAPACITY else BLOOD)
 	if carry == null or carry.items.is_empty():
-		draw_string(font, rect.position + Vector2(18, 62), "NOTHING CARRIED.", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, INK * Color(1, 1, 1, 0.45))
+		_t(rect.position + Vector2(18, 62), "NOTHING CARRIED.", 14, INK * Color(1, 1, 1, 0.45))
 		return
 	var y := rect.position.y + 48.0
 	var max_rows := maxi(1, floori((rect.size.y - 58.0) / 43.0))
@@ -262,30 +295,34 @@ func _draw_bag(font: Font, rect: Rect2) -> void:
 		var item: Dictionary = carry.items[index]
 		var row := Rect2(Vector2(rect.position.x + 10, y), Vector2(rect.size.x - 20, 38))
 		row_rects.append({"rect": row, "index": index})
+		# Each thing sits on its own shelf: a plank under the row, lit when chosen.
+		draw_rect(Rect2(row.position + Vector2(0, row.size.y - 3), Vector2(row.size.x, 5)), GothicFrame.WOOD_LIGHT)
+		draw_line(row.position + Vector2(0, row.size.y + 2), row.position + Vector2(row.size.x, row.size.y + 2), Color(0, 0, 0, 0.6), 1.0)
 		if index == selected:
-			draw_rect(row, BLOOD * Color(1, 1, 1, 0.25))
+			draw_rect(row, BLOOD * Color(1, 1, 1, 0.22))
 			draw_rect(row, BLOOD, false, 1.0)
+		_jar(row.position + Vector2(6, 4), str(item.get("kind", "goods")))
 		var pocket := " [POCKET]" if bool(item.get("pocketed", false)) else ""
-		draw_string(font, row.position + Vector2(10, 16), str(item.get("label", "OBJECT")) + pocket, HORIZONTAL_ALIGNMENT_LEFT, row.size.x - 90, 12, INK)
-		draw_string(font, row.position + Vector2(row.size.x - 72, 16), "%0.1f KG" % float(item.get("mass", 0.5)), HORIZONTAL_ALIGNMENT_RIGHT, 62, 11, INK * Color(1, 1, 1, 0.6))
+		_t(row.position + Vector2(28, 16), str(item.get("label", "OBJECT")) + pocket, 12, INK, row.size.x - 110)
+		_t_right(row.end.x - 10, row.position.y + 16, "%0.1f KG" % float(item.get("mass", 0.5)), 11, INK * Color(1, 1, 1, 0.6))
 		var provenance := str(item.get("from", ""))
-		var detail := "%s // %s" % [str(item.get("kind", "goods")).to_upper(), carry.condition_label(item)]
+		var detail := "%s // %s" % [str(item.get("kind", "goods")), carry.condition_label(item)]
 		if not provenance.is_empty():
-			detail += " // FROM %s" % provenance.to_upper().replace("_", " ")
-		draw_string(font, row.position + Vector2(10, 32), detail, HORIZONTAL_ALIGNMENT_LEFT, row.size.x - 20, 9, INK * Color(1, 1, 1, 0.48))
+			detail += " // FROM %s" % provenance.replace("_", " ")
+		_t(row.position + Vector2(28, 31), detail, 9, INK * Color(1, 1, 1, 0.48), row.size.x - 40)
 		y += 43.0
 	var result := str(get_meta("last_result", ""))
 	if not result.is_empty():
-		draw_string(font, Vector2(rect.position.x + 18, rect.end.y - 12), result, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, BLOOD)
+		_t(Vector2(rect.position.x + 18, rect.end.y - 12), result, 11, BLOOD, rect.size.x - 36)
 
 
 ## Somebody else's effects, drawn where the bag goes. Takeable rows take;
 ## everything the dig still owns says so on its own row.
-func _draw_corpse(font: Font, rect: Rect2) -> void:
+func _draw_corpse(rect: Rect2) -> void:
 	corpse_rows = _corpse_rows()
-	draw_string(font, rect.position + Vector2(18, 28), "DEAD // CONTENTS", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, BLOOD)
+	_t(rect.position + Vector2(18, 28), "DEAD // CONTENTS", 17, BLOOD)
 	if corpse_rows.is_empty():
-		draw_string(font, rect.position + Vector2(18, 62), "NOTHING ON THEM.", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, INK * Color(1, 1, 1, 0.45))
+		_t(rect.position + Vector2(18, 62), "NOTHING ON THEM.", 14, INK * Color(1, 1, 1, 0.45))
 		return
 	var y := rect.position.y + 48.0
 	var max_rows := maxi(1, floori((rect.size.y - 58.0) / 30.0))
@@ -297,29 +334,32 @@ func _draw_corpse(font: Font, rect: Rect2) -> void:
 			draw_rect(line, BLOOD * Color(1, 1, 1, 0.25))
 			draw_rect(line, BLOOD, false, 1.0)
 		var ink := INK
-		if str(row.get("kind", "")) == "sealed":
+		var kind := str(row.get("kind", ""))
+		if kind == "sealed":
 			ink = INK * Color(1, 1, 1, 0.45)
-		elif str(row.get("kind", "")) in ["organ", "implant"]:
+		elif kind in ["organ", "implant"]:
 			ink = BLOOD.lightened(0.2)
-		draw_string(font, line.position + Vector2(10, 17), str(row.get("label", "")), HORIZONTAL_ALIGNMENT_LEFT, line.size.x - 20, 12, ink)
+		_t(line.position + Vector2(10, 17), str(row.get("label", "")), 12, ink, line.size.x - 20)
 		y += 30.0
 	var outcome := str(get_meta("last_result", ""))
 	if not outcome.is_empty():
-		draw_string(font, Vector2(rect.position.x + 18, rect.end.y - 12), outcome, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, BLOOD)
+		_t(Vector2(rect.position.x + 18, rect.end.y - 12), outcome, 11, BLOOD, rect.size.x - 36)
 
 
-func _draw_gear(font: Font, rect: Rect2) -> void:
-	draw_string(font, rect.position + Vector2(18, 28), "WEAPONS", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, INK)
+func _draw_gear(rect: Rect2) -> void:
+	_t(rect.position + Vector2(18, 28), "WEAPONS", 17, INK)
 	if arsenal == null:
 		return
 	var y := rect.position.y + 62.0
 	for weapon_id in HunterArsenal.SLOT_ORDER:
 		var spec: Dictionary = HunterArsenal.WEAPONS[weapon_id]
 		var active: bool = arsenal.current_id == str(weapon_id)
-		draw_string(font, Vector2(rect.position.x + 18, y), ("> " if active else "  ") + str(spec.label), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, BLOOD if active else INK)
+		# A rack peg per slot; the wielded one hangs lit.
+		draw_circle(Vector2(rect.position.x + 12, y - 5), 3.0, GothicFrame.BRASS if active else GothicFrame.IRON)
+		_t(Vector2(rect.position.x + 22, y), str(spec.label), 13, BLOOD if active else INK, rect.size.x - 40)
 		var state: Dictionary = arsenal.ammo.get(weapon_id, {})
 		var detail := "%d / %d" % [int(state.get("loaded", -1)), int(state.get("reserve", -1))] if str(spec.kind) == "firearm" else "%d%% EDGE" % roundi(arsenal.weapon_condition(weapon_id) * 100.0)
-		draw_string(font, Vector2(rect.position.x + 32, y + 18), detail, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, INK * Color(1, 1, 1, 0.55))
+		_t(Vector2(rect.position.x + 32, y + 18), detail, 10, INK * Color(1, 1, 1, 0.55))
 		y += 58.0
-	draw_string(font, Vector2(rect.position.x + 18, rect.end.y - 44), "ENTER WIELDS A", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK * Color(1, 1, 1, 0.55))
-	draw_string(font, Vector2(rect.position.x + 18, rect.end.y - 26), "SELECTED WHOLE LIMB", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, INK * Color(1, 1, 1, 0.55))
+	_t(Vector2(rect.position.x + 18, rect.end.y - 44), "ENTER WIELDS A", 11, INK * Color(1, 1, 1, 0.55))
+	_t(Vector2(rect.position.x + 18, rect.end.y - 26), "SELECTED WHOLE LIMB", 11, INK * Color(1, 1, 1, 0.55))
