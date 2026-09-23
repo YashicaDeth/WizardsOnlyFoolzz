@@ -38,6 +38,9 @@ func _ready() -> void:
 		if argument.begins_with("--shots="):
 			_shoot(argument.trim_prefix("--shots="))
 			return
+		if argument == "--reel":
+			_reel()
+			return
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -101,4 +104,13 @@ func _shoot(dir: String) -> void:
 			var path := "%s/%s_%02d.png" % [dir, TransitionKit.STYLES[i], int(point * 100)]
 			image.save_png(path)
 			print("SHOT %s" % path)
+	get_tree().quit(0)
+
+
+## `-- --reel`: every wipe in order, for Movie Maker (`--write-movie`).
+func _reel() -> void:
+	await get_tree().create_timer(0.4).timeout
+	for i in TransitionKit.STYLES.size():
+		await play(i)
+		await get_tree().create_timer(0.35).timeout
 	get_tree().quit(0)

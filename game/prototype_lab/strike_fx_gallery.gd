@@ -88,6 +88,8 @@ func _process(delta: float) -> void:
 	if _dust_clock <= 0.0:
 		_dust_clock = 0.7
 		dust.burst(Vector3(-1.4, 0.0, -0.4), Vector3(1, 0, 0))
+		# And a landed blow on the target between dodges, for the recorded reel.
+		flash.burst(target.position + Vector3(0.2, 0.2, 0.3), Vector3(0.3, 0, -1), 1.0)
 
 
 func _shoot(path: String) -> void:
