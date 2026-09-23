@@ -617,3 +617,34 @@ static func seal_stroke_points(stroke: Array, at: Vector2, radius: float, rotati
 
 ## Draw one mark from authored stroke paths. The doubled ghost makes it read as
 ## a stamped, failing instrument rather than pristine diagram linework.
+
+
+## Drop-in for `CanvasItem.draw_string(font, ...)`: the same arguments after the
+## font, the same meaning. `pos.y` is a baseline, `room` a box width (-1 for
+## none) that alignment works within, and a line wider than its box is set
+## smaller rather than run out of it, because this face does not wrap. Exists
+## so the last engine-font screens convert mechanically, call for call.
+static func draw_string_compat(canvas: CanvasItem, pos: Vector2, text: String, alignment := HORIZONTAL_ALIGNMENT_LEFT, room := -1.0, font_size := 16, color := Color.WHITE) -> void:
+	var cap := float(font_size) * 0.72
+	var tracking := float(font_size) * 0.08
+	var drawn := width(text, cap, tracking)
+	if room > 0.0 and drawn > room and drawn > 0.0:
+		cap *= room / drawn
+		tracking *= room / drawn
+		drawn = room
+	var x := pos.x
+	if room > 0.0:
+		if alignment == HORIZONTAL_ALIGNMENT_RIGHT:
+			x = pos.x + room - drawn
+		elif alignment == HORIZONTAL_ALIGNMENT_CENTER:
+			x = pos.x + (room - drawn) * 0.5
+	draw_text(canvas, Vector2(x, pos.y - cap), text, cap, color, tracking)
+
+
+## Drop-in for `Font.get_string_size(text, alignment, width, font_size)`,
+## measuring what `draw_string_compat` will actually draw.
+static func string_size_compat(text: String, _alignment := HORIZONTAL_ALIGNMENT_LEFT, room := -1.0, font_size := 16) -> Vector2:
+	var measured := width(text, float(font_size) * 0.72, float(font_size) * 0.08)
+	if room > 0.0:
+		measured = minf(measured, room)
+	return Vector2(measured, float(font_size))

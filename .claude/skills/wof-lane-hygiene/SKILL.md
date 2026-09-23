@@ -33,6 +33,11 @@ three times.
   top-left; `event.pressed` off a base `InputEvent` needs an explicit
   `var x: bool =` or the whole file silently fails to compile.
 - Mixed-case text in `CellOutzType` reads as missing glyphs: it is caps only.
+- Labels, headers and numerals go in `CellOutzType`
+  (`draw_string_compat` / `string_size_compat` take `draw_string`'s own
+  arguments). **Wrapped prose stays in a real font** — `world_index.gd`,
+  `pin_board.gd` and `character_archive._draw_wrapped` state this rule;
+  converting a paragraph breaks it.
 
 ## Test
 
