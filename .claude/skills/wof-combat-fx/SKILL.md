@@ -7,7 +7,7 @@ metadata:
 
 # Combat effects
 
-Seven effects already follow this shape. Copy it; do not invent a new one.
+Eight effects already follow this shape. Copy it; do not invent a new one.
 
 | Component | Fed from | Reads |
 |---|---|---|
@@ -18,6 +18,7 @@ Seven effects already follow this shape. Copy it; do not invent a new one.
 | `DustPuff` (dodge ash) | `_dodge()` | `dodge_direction` |
 | `HitFlash` (contact star) | melee hit, beside `_spawn_blood` | `strike_dir`, damage |
 | `ThreatCompass` (edge arcs, HUD) | enemy wind-up in the actor loop | attacker position, wind-up progress |
+| `LockReadout` (X-ray body over the lock, HUD) | `_update_strike_fx()` | locked actor's AnatomyComponent zones — never a health bar |
 
 ## Rules
 
