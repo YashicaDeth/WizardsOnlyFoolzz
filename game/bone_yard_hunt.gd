@@ -353,6 +353,7 @@ var arm: LimbMomentum = null
 var strike_trail: StrikeTrail = null
 var lock_ring: LockRing = null
 var strike_smear: StrikeSmear = null
+var strike_audio: StrikeAudio = null
 ## After a strike lands, the body faces it this long (third-person turn-in).
 const STRIKE_FACE_SECONDS := 0.35
 var strike_face_yaw := 0.0
@@ -972,6 +973,8 @@ func _ready() -> void:
 	add_child(lock_ring)
 	strike_smear = StrikeSmear.new()
 	add_child(strike_smear)
+	strike_audio = StrikeAudio.new()
+	add_child(strike_audio)
 	_carry_current_weapon()
 	# AF1. Rounds and brass live in the world, not in the HUD.
 	ballistics = BALLISTICS.new()
@@ -8139,6 +8142,8 @@ func _update_strike_fx(delta: float) -> void:
 		if strike_smear != null:
 			var tip := held.global_transform * strike_trail.tip_local(held) if held != null and is_instance_valid(held) else Vector3.ZERO
 			strike_smear.feed(held, tip, delta, commit)
+			if strike_audio != null:
+				strike_audio.feed(tip, delta, commit, held != null and is_instance_valid(held))
 	if lock_ring != null:
 		var focus := _camera_combat_focus()
 		if focus != null and is_instance_valid(focus):
