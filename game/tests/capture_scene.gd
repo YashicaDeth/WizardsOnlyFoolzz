@@ -160,6 +160,24 @@ func _ready() -> void:
 			await get_tree().physics_frame
 		for _draw_hold in 6:
 			await get_tree().process_frame
+	elif trigger == "swing":
+		# Third person: a real dodge (ash), then a real committed swing, shot
+		# a few frames in so the trail, cable and smear are drawn from the
+		# weapon's actual motion against the Hunt's own light and fog.
+		scene.third_person = true
+		# The blend runs on physics frames; wait until the camera has really
+		# pulled back, or the shot is first person.
+		for _settle in 180:
+			await get_tree().physics_frame
+			if scene.perspective_blend >= 0.99:
+				break
+		scene._dodge()
+		for _step in 6:
+			await get_tree().physics_frame
+		scene._attack(true)
+		for _swing in 9:
+			await get_tree().physics_frame
+		await get_tree().process_frame
 	elif trigger == "threat":
 		# Three enemies winding up around the player -- behind and due, to the
 		# left mid-swing, ahead-right just starting -- so the ThreatCompass

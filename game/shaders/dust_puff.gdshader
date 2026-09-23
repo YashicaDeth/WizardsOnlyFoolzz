@@ -26,5 +26,9 @@ void fragment() {
 	float body = smoothstep(1.0, 0.25, r);
 	float wisps = noise(UV * 9.0 + seed) * 0.5 + 0.5;
 	ALBEDO = tint.rgb * (0.8 + 0.2 * wisps);
-	ALPHA = body * wisps * fade * tint.a;
+	// Never fog the lens: ash within ~3 m of the camera thins to nothing, so a
+	// dodge with the camera at the eye (first person, or a third-person camera
+	// pushed in by a wall) cannot fill the frame. Caught in-scene.
+	float from_eye = -VERTEX.z;
+	ALPHA = body * wisps * fade * tint.a * smoothstep(1.2, 3.2, from_eye);
 }

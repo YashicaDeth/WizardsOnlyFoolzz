@@ -28,6 +28,11 @@ func _ready() -> void:
 	_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	_material.albedo_color = Color(1.0, 0.55, 0.3, 0.5)
 	_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# Afterimages right at the lens washed the whole frame out (caught
+	# in-scene); they fade out inside ~2 m of the camera.
+	_material.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA
+	_material.distance_fade_min_distance = 0.9
+	_material.distance_fade_max_distance = 2.2
 
 
 ## One frame of the held weapon. `tip` is its far end in world space.

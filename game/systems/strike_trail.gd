@@ -33,6 +33,10 @@ func _ready() -> void:
 	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mat.no_depth_test = false
+	# Same as the smear: a trail at the lens is a smear across the screen.
+	mat.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA
+	mat.distance_fade_min_distance = 0.9
+	mat.distance_fade_max_distance = 2.2
 	material_override = mat
 
 
