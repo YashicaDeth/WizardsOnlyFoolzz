@@ -349,6 +349,9 @@ var _pending_shots: Dictionary = {}
 ## AN1.2. The arm the weapon hangs off. Fed the same mouse delta the camera
 ## turns by, so the weapon is thrown by you turning rather than by a curve.
 var arm: LimbMomentum = null
+## What a swing leaves in the air, and the wire under a locked target.
+var strike_trail: StrikeTrail = null
+var lock_ring: LockRing = null
 ## Mouse movement this frame, in radians, accumulated in `_unhandled_input` and
 ## spent in `_physics_process`. It has to be a frame total rather than a
 ## per-event value: a 1000Hz mouse delivers several motion events per frame and
@@ -958,6 +961,10 @@ func _ready() -> void:
 	# and the panel they opened.
 	# AN1.2. The arm exists before the first swing does.
 	arm = LIMB_MOMENTUM.new()
+	strike_trail = StrikeTrail.new()
+	add_child(strike_trail)
+	lock_ring = LockRing.new()
+	add_child(lock_ring)
 	_carry_current_weapon()
 	# AF1. Rounds and brass live in the world, not in the HUD.
 	ballistics = BALLISTICS.new()
@@ -1908,6 +1915,7 @@ func _physics_process(delta: float) -> void:
 		_check_third_person_unlock_feel()
 	_update_camera()
 	cost = ScriptCost.lap("_update_camera", cost)
+	_update_strike_fx(delta)
 	_update_hud()
 	cost = ScriptCost.lap("_update_hud", cost)
 	_update_sleep_prompt(delta)
@@ -8100,6 +8108,24 @@ func _update_held_reliquary() -> void:
 			held_reliquary.show_item(held_weapon, str(state.get("label", arsenal.current_id)), detail)
 			return
 	held_reliquary.clear_item()
+
+
+## The swing's trail follows whatever is actually in the hand, and the lock
+## ring follows whoever the camera is actually framing. Both only read state.
+func _update_strike_fx(delta: float) -> void:
+	if strike_trail != null:
+		var held: Node3D = null
+		if carried_limb_index >= 0 and carried_limb_model != null and is_instance_valid(carried_limb_model):
+			held = carried_limb_model
+		elif arsenal != null and not bare_handed and arsenal.models.has(arsenal.current_id):
+			held = arsenal.models[arsenal.current_id] as Node3D
+		strike_trail.feed_weapon(held, delta, arm.commitment() if arm != null else 0.0)
+	if lock_ring != null:
+		var focus := _camera_combat_focus()
+		if focus != null and is_instance_valid(focus):
+			lock_ring.follow(focus.global_position)
+		else:
+			lock_ring.release()
 
 
 func _update_camera() -> void:
