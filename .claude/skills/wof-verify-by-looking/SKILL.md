@@ -47,6 +47,21 @@ locked target). Run it windowed (not `--headless`) with `--resolution`.
 - If you could not open the image, say so in the commit instead of claiming
   the result. `[NOT YET SEEN RENDERED]` in a title is honest and fine.
 
+## Motion: record it
+
+A still cannot show a wipe, a trail or a swing. Godot's Movie Maker renders a
+scene deterministically at a fixed frame rate, however slow the machine:
+
+```bash
+"$G" --path game --resolution 1280x720 --write-movie P:/GameDev/Temp/clip.avi \
+  --fixed-fps 30 --quit-after 180 res://prototype_lab/strike_fx_gallery.tscn
+# transition_gallery plays every wipe with: ... transition_gallery.tscn -- --reel
+python -c "import imageio_ffmpeg,subprocess;subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(),'-y','-i','P:/GameDev/Temp/clip.avi','-c:v','libx264','-pix_fmt','yuv420p','P:/GameDev/Temp/clip.mp4'])"
+```
+
+Check it with a contact sheet (`-vf fps=2,scale=320:-2,tile=4x3`) and send
+the MP4 to Greg — it is the thing he actually judges.
+
 ## New worktree first run
 
 A fresh worktree has no `.godot/` cache and no class registry, so new
