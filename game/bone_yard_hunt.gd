@@ -5800,7 +5800,8 @@ func _update_encounter_actors(delta: float) -> void:
 					var health_after := health - roundi(float(guarded.get("damage", incoming)))
 					_wound_player(node.global_position, maxf(5.0, 15.0 * _actor_combat_ratio(actor)), "cut")
 					if hit_flash != null and third_person:
-						hit_flash.burst(player + Vector3(0, 1.2, 0), player - node.global_position, incoming / 30.0)
+						# `player` is already about eye height (body + 0.6 m); the chest is just below.
+						hit_flash.burst(player + Vector3(0, -0.3, 0), player - node.global_position, incoming / 30.0)
 					# AE10.13. Ordinary hostiles keep the old one-health floor: the
 					# undying player is not silently killed by a roaming damage tick.
 					# A physical law team is different. Its finishing blow performs the
