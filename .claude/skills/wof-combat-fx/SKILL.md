@@ -41,6 +41,11 @@ Eight effects already follow this shape. Copy it; do not invent a new one.
 
 ## Prove it
 
+- **Then check it in the real Hunt, not only the gallery.** Galleries have no
+  other HUD to collide with. `tests/capture_scene.tscn -- --scene=res://bone_yard_hunt.tscn`
+  (add `--trigger=lock` for a real locked hostile). Three fixes this pass
+  were only visible there: the pocket rack on the reliquary, the lock
+  readout in the prompt band, and a leader line crossing the prompts.
 - Stage it in `prototype_lab/strike_fx_gallery.tscn`. Trigger one-shot
   effects a few frames before `--shot` so the capture cannot fall between
   them. Crop and zoom the result and look (`wof-verify-by-looking`).
