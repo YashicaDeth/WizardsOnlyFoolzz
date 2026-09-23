@@ -192,6 +192,43 @@ func _ready() -> void:
 			scene._look_delta = Vector2(-38.0, 6.0)
 			await get_tree().physics_frame
 		await get_tree().process_frame
+	elif trigger == "reel":
+		# A short played sequence for a video: open ground, third person, two
+		# hostiles, lock on, then dodge-and-swing exchanges thrown with real
+		# mouse sweeps, alternating direction like a player would.
+		scene.yaw = 2.7
+		for step in 40:
+			scene.player_body.position = scene.player_body.position + Vector3(-0.42, 0, -0.2)
+			scene.player = scene.player_body.position + Vector3.UP * 0.6
+			await get_tree().physics_frame
+		scene.third_person = true
+		for _settle in 90:
+			await get_tree().physics_frame
+		var fwd := Vector3(sin(scene.yaw), 0, cos(scene.yaw))
+		var right := Vector3(fwd.z, 0, -fwd.x)
+		for i in 2:
+			var at: Vector3 = scene.player + fwd * 4.0 + right * (1.4 if i == 0 else -1.6) + Vector3.DOWN * 0.6
+			scene._spawn_encounter_actor({"instance_id": "reel_%d" % i, "kind": "hostile"}, at)
+			scene.encounter_actors.back().node.position = at
+		for _look in 30:
+			await get_tree().physics_frame
+		scene._toggle_lock()
+		for exchange in 4:
+			# One dodge in two: five straight ones drained stamina (the last
+			# blow was refused) and carried the hunter into a building.
+			if exchange % 2 == 1:
+				scene._dodge()
+				for _step in 8:
+					await get_tree().physics_frame
+			scene._attack(exchange % 2 == 0)
+			var sweep := Vector2(-38.0 if exchange % 2 == 0 else 38.0, 6.0)
+			for _swing in 12:
+				scene._look_delta = sweep
+				await get_tree().physics_frame
+			for _recover in 40:
+				await get_tree().physics_frame
+		for _hold in 45:
+			await get_tree().physics_frame
 	elif trigger == "threat":
 		# Three enemies winding up around the player -- behind and due, to the
 		# left mid-swing, ahead-right just starting -- so the ThreatCompass
