@@ -7940,6 +7940,7 @@ func _update_hud() -> void:
 			"weapon": arsenal.state() if arsenal != null else {},
 			"wound_regions": _interface_wound_regions(),
 			"lock_screen": lock_screen,
+			"pockets": handheld.carry.pocketed_items() if handheld != null and handheld.get("carry") != null else [],
 		})
 
 
