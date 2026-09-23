@@ -124,6 +124,16 @@ times; the fifth is a flag. Do not rebuild it — ask Greg whether to flip it.
 > `codex/sol-agent-1` 8, `integration-check-agent-a` 5, `lane-6-handheld` 1).
 > The save-system split below is decided: HEAD's path logic wins
 > (`ORCA/DECISIONS.md` §3).
+>
+> **Audited 2026-09-24** (every branch test-merged, commits matched by content):
+> five of the seven are superseded by later work in primary
+> (`codex/b6-combat`, `agent-a-help`, `integration-check-agent-a`,
+> `codex/final-demo-integration`, `lane-6-handheld` AX-LAB, which a real 3D
+> lab replaced). The underground network (AL1.7, AL2.1-AL2.4) from
+> `codex/sol-agent-1` is integrated and passing on
+> `claude/integrate-sol-agent-1`. Genuinely open: ControlBindings and the
+> materia WIP on `codex/controls-ui-repair`, and the sky agency (AK) on
+> `codex/sol-agent-1`, which is Greg's call. Do not merge the superseded ones.
 
 Across all branches: **1,670 distinct checklist items, 639 done somewhere, ~1,013
 open everywhere.** But **167 items are ticked on a lane and still open on main**,
