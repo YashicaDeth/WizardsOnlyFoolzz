@@ -164,6 +164,13 @@ func _ready() -> void:
 		# Third person: a real dodge (ash), then a real committed swing, shot
 		# a few frames in so the trail, cable and smear are drawn from the
 		# weapon's actual motion against the Hunt's own light and fog.
+		# Open ground first (the lock trigger's walk): at the spawn a wall pulls
+		# the third-person camera back into the eye.
+		scene.yaw = 2.7
+		for step in 40:
+			scene.player_body.position = scene.player_body.position + Vector3(-0.42, 0, -0.2)
+			scene.player = scene.player_body.position + Vector3.UP * 0.6
+			await get_tree().physics_frame
 		scene.third_person = true
 		# The blend runs on physics frames; wait until the camera has really
 		# pulled back, or the shot is first person.
@@ -175,7 +182,14 @@ func _ready() -> void:
 		for _step in 6:
 			await get_tree().physics_frame
 		scene._attack(true)
-		for _swing in 9:
+		# SWING_FRAMES picks the instant of the swing to photograph.
+		var swing_frames := int(OS.get_environment("SWING_FRAMES")) if OS.get_environment("SWING_FRAMES") != "" else 9
+		for _swing in swing_frames:
+			# Thrown the way a player throws it: a hard mouse sweep across the
+			# swing, which is what LimbMomentum reads as commitment. A scripted
+			# attack with no look motion has commitment 0 and draws the faintest
+			# possible trail -- invisible in the Hunt's light.
+			scene._look_delta = Vector2(-38.0, 6.0)
 			await get_tree().physics_frame
 		await get_tree().process_frame
 	elif trigger == "threat":

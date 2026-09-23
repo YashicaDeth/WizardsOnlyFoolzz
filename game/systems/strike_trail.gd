@@ -35,20 +35,32 @@ func _ready() -> void:
 	mat.no_depth_test = false
 	# Same as the smear: a trail at the lens is a smear across the screen.
 	mat.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA
-	mat.distance_fade_min_distance = 0.9
-	mat.distance_fade_max_distance = 2.2
+	mat.distance_fade_min_distance = 0.8
+	mat.distance_fade_max_distance = 1.8
 	material_override = mat
 
 
-## The far end of a weapon, in its own space: the point of its mesh bounds
-## farthest from the grip (the model origin). Measured once per model.
+## The weapon's own geometry under a mount. An arsenal mount holds the
+## `<id>_model` node *and* the gripping hand, and more meshes (a forearm rod
+## nearly 4 m long) get attached under that hand at runtime. Measuring the
+## whole mount put the "tip" at the end of the forearm, so the trail was drawn
+## nowhere near the blade (found in-scene). Only the model subtree counts.
+static func weapon_part(model: Node3D) -> Node3D:
+	for child in model.get_children():
+		if child is Node3D and str(child.name).ends_with("_model"):
+			return child
+	return model
+
+
+## The far end of a weapon, in the mount's space: the point of the weapon's
+## own mesh bounds farthest from the grip. Measured once per model.
 func tip_local(model: Node3D) -> Vector3:
 	var key := model.get_instance_id()
 	if _tips.has(key):
 		return _tips[key]
 	var best := Vector3(0, 0, -0.6)
 	var best_len := 0.0
-	for child in model.find_children("*", "MeshInstance3D", true, false):
+	for child in weapon_part(model).find_children("*", "MeshInstance3D", true, false):
 		var mi := child as MeshInstance3D
 		if mi.mesh == null:
 			continue
@@ -111,9 +123,11 @@ func _rebuild() -> void:
 		var fade_b := 1.0 - age / LIFE
 		var hot := clampf(float(b.hot), 0.0, 1.0)
 		var edge := EMBER.lerp(HOT, hot)
-		# Inner third (near the hand) is faint; the edge carries the colour.
-		var ia: Vector3 = (a.base as Vector3).lerp(a.tip, 0.35)
-		var ib: Vector3 = (b.base as Vector3).lerp(b.tip, 0.35)
+		# Only the outer band, near the tip: a ribbon, not a fan. From 0.35 the
+		# grip-side quads ballooned into planks across the whole lower screen
+		# once a real (committed) swing ran past an over-the-shoulder camera.
+		var ia: Vector3 = (a.base as Vector3).lerp(a.tip, 0.65)
+		var ib: Vector3 = (b.base as Vector3).lerp(b.tip, 0.65)
 		_quad(ia, a.tip, ib, b.tip, Color(edge, 0.0), Color(edge, fade_a * (0.35 + hot * 0.5)), Color(edge, 0.0), Color(edge, fade_b * (0.35 + hot * 0.5)))
 	if drew:
 		_mesh.surface_end()
