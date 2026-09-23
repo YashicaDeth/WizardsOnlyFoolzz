@@ -7,7 +7,7 @@ metadata:
 
 # Combat effects
 
-Six effects already follow this shape. Copy it; do not invent a new one.
+Seven effects already follow this shape. Copy it; do not invent a new one.
 
 | Component | Fed from | Reads |
 |---|---|---|
@@ -17,6 +17,7 @@ Six effects already follow this shape. Copy it; do not invent a new one.
 | `LockRing` (ground wire) | `_update_strike_fx()` | `_camera_combat_focus()` |
 | `DustPuff` (dodge ash) | `_dodge()` | `dodge_direction` |
 | `HitFlash` (contact star) | melee hit, beside `_spawn_blood` | `strike_dir`, damage |
+| `ThreatCompass` (edge arcs, HUD) | enemy wind-up in the actor loop | attacker position, wind-up progress |
 
 ## Rules
 
