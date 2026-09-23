@@ -220,6 +220,27 @@ func release() -> void:
 	screen.visible = false
 
 
+## A seam with nothing to load and nothing to say: the wipe covers, the scene
+## swaps behind it, the wipe opens. No transit plate — for the splash into the
+## menu, where a loading screen would be a pause pretending to be content.
+func wipe_to(scene_path: String) -> void:
+	if travelling:
+		return
+	travelling = true
+	var tree := get_tree()
+	if wipe != null:
+		wipe.set_style(hash(scene_path))
+		await wipe.cover()
+	var error := tree.change_scene_to_file(scene_path)
+	if error != OK:
+		push_error("Interstitial could not reach %s (%d)" % [scene_path, error])
+	await tree.process_frame
+	if wipe != null:
+		await wipe.reveal()
+	travelling = false
+	arrived.emit()
+
+
 ## Every seam in the game passes through here, so this is where the wipe lives:
 ## cover the old frame, flip the plate underneath, uncover. The style is seeded
 ## off the destination, so the same door always opens the same way.
