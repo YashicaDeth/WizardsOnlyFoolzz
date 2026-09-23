@@ -104,8 +104,9 @@ func _shoot(path: String) -> void:
 	get_tree().quit(0)
 
 
-## `-- --perf`: five fighters' worth of blades swinging with trail, cable and
-## smear, against the same five with the effects off. Prints mean frame time.
+## `-- --perf`: five fighters swinging with trail, cable and smear, dodging
+## (dust) and landing blows (flash), against the same five with the effects
+## off. Prints mean frame time.
 var _fx_rigs: Array[Dictionary] = []
 
 
@@ -138,11 +139,12 @@ func _perf() -> void:
 			await get_tree().process_frame
 		results[mode] = float(Time.get_ticks_usec() - start) / 1000.0 / frames
 		_fx_on = true
-	print("PERF strike fx x5: off %.2f ms/frame, on %.2f ms/frame, cost %.2f ms" % [results.off, results.on, results.on - results.off])
+	print("PERF combat fx x5 (trail, cable, smear, dust, flash): off %.2f ms/frame, on %.2f ms/frame, cost %.2f ms" % [results.off, results.on, results.on - results.off])
 	get_tree().quit(0)
 
 
 var _fx_on := false
+var _perf_tick := 0
 
 
 func _physics_process(delta: float) -> void:
@@ -152,3 +154,10 @@ func _physics_process(delta: float) -> void:
 		if _fx_on:
 			(rig.trail as StrikeTrail).feed_weapon(rig.holder, delta, 0.9)
 			(rig.smear as StrikeSmear).feed(rig.holder, (rig.holder as Node3D).global_transform * (rig.trail as StrikeTrail).tip_local(rig.holder), delta, 0.9)
+			# A heavy fight: each fighter dodges about every 0.5 s and lands a
+			# blow about every 0.33 s, through the shared dust and flash pools.
+			_perf_tick += 1
+			if _perf_tick % 30 == i * 6:
+				dust.burst((rig.pivot as Node3D).global_position - Vector3(0, 1.2, 0), Vector3(1, 0, 0))
+			if _perf_tick % 20 == i * 4:
+				flash.burst((rig.pivot as Node3D).global_position, Vector3(0, 0, -1), 1.0)

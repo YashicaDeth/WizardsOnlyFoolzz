@@ -48,4 +48,5 @@ Eight effects already follow this shape. Copy it; do not invent a new one.
   driven, bounded pool, gone after its life. Run randomised tests more than
   once; measure relative to spawn, not absolute position.
 - Cost: `strike_fx_gallery.tscn -- --perf` (vsync off, five fighters, on vs
-  off). Last measured: trail + cable + smear = 0.33 ms/frame.
+  off). Last measured (heavy fight: five fighters swinging, dodging and
+  landing blows): trail + cable + smear + dust + flash = 0.43-0.46 ms/frame.
