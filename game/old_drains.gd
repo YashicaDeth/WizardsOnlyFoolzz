@@ -369,7 +369,7 @@ func _interact() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	surface_requested = true
 	if OS.get_environment("ATG_TEST_MODE") != "1":
-		Interstitial.travel("res://bone_yard_hunt.tscn", "storm outfall // out into the ashbloom expanse")
+		Interstitial.travel("res://blood_waterfall_exit.tscn", "storm outfall // out over the dry falls")
 
 
 func _flat_distance(at: Vector3) -> float:
