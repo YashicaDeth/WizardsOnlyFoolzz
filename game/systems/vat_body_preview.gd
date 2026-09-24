@@ -22,6 +22,10 @@ var _signature := ""
 ## the face sliders "are pretty fake" -- the axes do move the skull, by a
 ## centimetre or two, on a body framed from three metres away.
 var face_focus := 0.0
+## The Brain Index hub turns the body with the mouse; this is added to the
+## idle sway, and freezes the sway while someone is holding it.
+var spin_offset := 0.0
+var held := false
 var _focus_target := 0.0
 const BODY_EYE := Vector3(0.0, 1.20, -3.9)
 const BODY_LOOK := Vector3(0.0, 1.05, 0.0)
@@ -214,5 +218,25 @@ func _process(delta: float) -> void:
 	if rig != null and is_instance_valid(rig):
 		# Just enough movement to establish this as a body in a vat, not a menu
 		# sprite.  It never spins all the way around or interrupts face reading.
-		rig.rotation.y = sin(_clock * 0.42) * 0.22 * (1.0 - face_focus * 0.85)
+		rig.rotation.y = spin_offset + (0.0 if held else sin(_clock * 0.42) * 0.22 * (1.0 - face_focus * 0.85))
 		rig.rotation.z = sin(_clock * 0.66) * 0.025
+
+
+## Where each body part sits in this preview's own pixels, for clicking a part
+## (the hub). Front-facing parts only: something turned away is not offered.
+func part_positions() -> Dictionary:
+	var out := {}
+	if rig == null or not is_instance_valid(rig) or camera == null:
+		return out
+	for zone in rig.parts:
+		var part := rig.parts[zone] as Node3D
+		if part == null or not is_instance_valid(part) or not part.is_visible_in_tree():
+			continue
+		if camera.is_position_behind(part.global_position):
+			continue
+		var at := camera.unproject_position(part.global_position)
+		# Viewport pixels to this container's pixels (stretch keeps them equal
+		# in size, but the ratio is kept honest in case it is shrunk).
+		var ratio := size / Vector2(viewport.size) if viewport.size.x > 0 else Vector2.ONE
+		out[zone] = at * ratio
+	return out

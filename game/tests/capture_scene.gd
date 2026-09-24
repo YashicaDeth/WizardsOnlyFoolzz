@@ -272,6 +272,18 @@ func _ready() -> void:
 				await get_tree().physics_frame
 		for _f in 40:
 			await get_tree().physics_frame
+	elif trigger == "hub" or trigger == "hub_index":
+		# The Brain Index hub with something in the bag and a part selected.
+		for info in [{"layer_name": "organ", "organ_id": "left_kidney"}, {"layer_name": "bone", "zone": "left_arm"}, {"layer_name": "cybernetic", "implant": "optic relay"}, {"layer_name": "muscle", "zone": "right_leg"}]:
+			scene.handheld.carry.take_chunk(info)
+		scene._toggle_panel("hub")
+		if trigger == "hub_index":
+			scene.brain_hub.tab = 2
+		for _f in 30:
+			await get_tree().process_frame
+		scene.brain_hub.selected_zone = "left_arm"
+		for _f in 5:
+			await get_tree().process_frame
 	elif trigger == "threat":
 		# Three enemies winding up around the player -- behind and due, to the
 		# left mid-swing, ahead-right just starting -- so the ThreatCompass

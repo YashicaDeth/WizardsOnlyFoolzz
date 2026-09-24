@@ -358,6 +358,8 @@ var dust_puff: DustPuff = null
 var hit_flash: HitFlash = null
 ## Blob tracking over the fight (item 4): hit markers and enemy awareness.
 var block_tracker: BlockTracker = null
+## Tab: the Brain Index hub (Greg, 2026-09-24).
+var brain_hub: BrainIndexHub = null
 ## Arriving hurt: the pain of the decant eases over the first minute, unless
 ## something new hurts you (Greg, 2026-09-24). Seconds left, and where from.
 const ARRIVAL_EASE_SECONDS := 60.0
@@ -1123,6 +1125,10 @@ func _ready() -> void:
 	$HUD.add_child(field_inventory)
 	field_inventory.close_requested.connect(_toggle_inventory)
 	field_inventory.activate_requested.connect(_activate_inventory_item)
+	brain_hub = BrainIndexHub.new()
+	brain_hub.name = "BrainIndexHub"
+	$HUD.add_child(brain_hub)
+	brain_hub.open_surface.connect(_on_hub_surface)
 	case_menu = CASE_MENU.new()
 	case_menu.name = "CaseMenu"
 	$HUD.add_child(case_menu)
@@ -1503,6 +1509,9 @@ func _register_people() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if resolution_ui.visible or kill_cam.active:
 		return
+	if panel_mode == "hub" and brain_hub != null and brain_hub.handle_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	if panel_mode == "inventory" and field_inventory != null and field_inventory.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
@@ -1720,10 +1729,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_G: _toggle_handheld_surface()
 			KEY_TAB:
 				# The handheld owns Tab while raised: one object, modes on it.
+				# Otherwise Tab is the Brain Index hub; the world index it used
+				# to open is the hub's TASKS tab.
 				if handheld.is_open:
 					handheld.cycle_mode(1)
 				else:
-					_toggle_panel("index")
+					_toggle_panel("hub")
 			KEY_M: _toggle_panel("map")
 			KEY_T: _toggle_panel("tree")
 			# Greg: *"j shouldent be anything if anything j should be the
@@ -7768,6 +7779,13 @@ func _order_hud_layers() -> void:
 		slot += 1
 
 
+func _on_hub_surface(surface: String) -> void:
+	if surface == "close":
+		_toggle_panel("hub")
+	else:
+		_toggle_panel(surface)
+
+
 func _toggle_panel(mode: String) -> void:
 	var opening := panel_mode != mode
 	if opening:
@@ -7793,6 +7811,11 @@ func _toggle_panel(mode: String) -> void:
 		world_index.open()
 	elif world_index.visible:
 		world_index.close()
+	if brain_hub != null:
+		if panel_mode == "hub":
+			brain_hub.open(handheld.carry, arsenal, player_rig)
+		else:
+			brain_hub.close()
 	if panel_mode == "board":
 		pin_board.open()
 	elif pin_board.visible:
@@ -7810,6 +7833,7 @@ func _toggle_panel(mode: String) -> void:
 	# nothing breaks on arrival, it breaks the first time you open a panel.
 	var covering: bool = living_map.visible or world_index.visible or pin_board.visible
 	covering = covering or (field_inventory != null and field_inventory.visible)
+	covering = covering or (brain_hub != null and brain_hub.visible)
 	covering = covering or (case_menu != null and case_menu.visible)
 	covering = covering or (contact_menu != null and contact_menu.visible)
 	prompt.visible = not covering
