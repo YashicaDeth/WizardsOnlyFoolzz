@@ -784,6 +784,11 @@ we can make nudity and censors".
 - **Anyone can block** (Greg, in answer to whether an enemy who hasn't
   noticed you can defend): the tier decides it whether or not they are
   aware. A fighter inside their own wind-up is always open.
+- *Built (assistant proposal, open to Greg):* a sparring post near Nix in
+  the Hunt. E brings out a partner of your tier, and blows are padded:
+  they count, they don't wound. First to five clean hits wins, and the next
+  partner is a tier higher. After each blow and each bout, the partner says
+  what beat you.
 
 ## Influence register
 

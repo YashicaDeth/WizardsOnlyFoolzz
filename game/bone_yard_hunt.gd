@@ -1161,6 +1161,7 @@ func _ready() -> void:
 	$HUD.add_child(contact_menu)
 	contact_menu.close_requested.connect(_toggle_contact)
 	_spawn_friend()
+	_build_sparring_post()
 	# AE.1. The captain is still spawned exactly as she always was, and this
 	# runs alongside her rather than instead of her or through her. The order
 	# matters: `_spawn_rival()` owns the Ashline captain and stays untouched,
@@ -2798,6 +2799,8 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	var defence := FighterTier.defend(str(actor.get("tier", "hunter")), str(actor.subject_id), defence_sequence, committed or _actor_stumbling(actor))
 	if defence == "parry":
 		fight_stats["they_parried"] = int(fight_stats.get("they_parried", 0)) + 1
+		if bool(actor.get("sparring", false)):
+			_spar_said(actor, "TURNED. YOU SWUNG INTO MY GUARD. WAIT FOR MY WIND-UP.")
 		lose_footing(0.5, "%s TURNED YOUR BLOW // CATCH THEM MID-SWING" % str(actor.display_name).to_upper())
 		impact_feel.strike(0.7, "cut", false)
 		return true
@@ -2810,6 +2813,10 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		fight_stats["landed"] = int(fight_stats.get("landed", 0)) + 1
 		if committed:
 			fight_stats["punished"] = int(fight_stats.get("punished", 0)) + 1
+	# Sparring: a clean hit is a point, a blocked one is not; nobody bleeds.
+	if bool(actor.get("sparring", false)):
+		_spar_landed(actor, defence)
+		return true
 	# The hunter turns into the blow for a moment, so a strike behind you is
 	# seen landing rather than connecting through your back.
 	var turn := target.global_position - player
@@ -5929,6 +5936,11 @@ func _update_encounter_actors(delta: float) -> void:
 						# ever read — so a parry cost the enemy nothing beyond
 						# the damage it already blocked. Real footing loss now.
 						_actor_lose_footing(actor, 0.45, "%s LOSES THEIR FOOTING // PRESS THE OPENING" % str(actor.display_name).to_upper())
+					# A sparring partner's blows are padded: they count, they do
+					# not wound.
+					if bool(actor.get("sparring", false)):
+						_spar_struck(actor, guarded)
+						continue
 					var health_after := health - roundi(float(guarded.get("damage", incoming)))
 					_wound_player(node.global_position, maxf(5.0, 15.0 * _actor_combat_ratio(actor)), "cut")
 					if hit_flash != null and third_person:
@@ -6066,6 +6078,104 @@ func _tick_fight(delta: float) -> void:
 	_fight_readout_time = 8.0
 	WorldHistory.record_event("fight_summarised", {"stats": fight_stats.duplicate(true)})
 	fight_stats.clear()
+
+
+# --- sparring (Greg, 24 September: "sparring in the Hunt") ----------------
+
+## A post near Nix where a partner fights you with padded blows: first to
+## five clean hits. Winning moves the next partner up a tier (scavenger,
+## hunter, captain, elite); after each bout they say what beat you.
+const SPAR_SUBJECT := "sparring"
+const SPAR_POINTS := 5
+const SPAR_POST_AT := Vector3(14.5, 0.0, 8.0)
+var spar_bout: Dictionary = {}
+
+
+func spar_tier() -> String:
+	return str(WorldHistory.subject(SPAR_SUBJECT).get("tier", "scavenger"))
+
+
+func _build_sparring_post() -> void:
+	var post := Node3D.new()
+	post.name = "SparringPost"
+	post.position = SPAR_POST_AT
+	add_child(post)
+	_add_mesh_to(post, CylinderMesh.new(), Vector3(0, 1.0, 0), Color("5a4634"), 0.8, Vector3(0.3, 1.0, 0.3))
+	_add_mesh_to(post, BoxMesh.new(), Vector3(0, 1.7, 0), Color("8a2a1e"), 0.6, Vector3(0.9, 0.12, 0.12))
+	_register_interactable(post, "[E] SPAR // PADDED BLOWS, FIRST TO FIVE", _start_spar)
+
+
+func _start_spar() -> void:
+	if not spar_bout.is_empty():
+		return
+	var tier := spar_tier()
+	var at := player + Vector3(sin(yaw), 0.0, cos(yaw)) * 3.0
+	at.y = player.y - 1.6
+	var spawned := _spawn_encounter_actor({
+		"instance_id": "spar_%d" % WorldHistory.event_count("spar_bout_started"),
+		"kind": "hostile", "tier": tier, "name": "SPARRING PARTNER",
+		"loot": ["nothing"],
+	}, at)
+	var partner: Dictionary = encounter_actors.back()
+	partner["sparring"] = true
+	partner["display_name"] = "%s PARTNER" % str(FighterTier.spec(tier).label)
+	spar_bout = {"subject_id": str(partner.subject_id), "tier": tier, "landed": 0, "taken": 0}
+	fight_stats.clear()
+	WorldHistory.record_event("spar_bout_started", {"tier": tier})
+	prompt.text = "SPAR // %s // FIRST TO FIVE CLEAN HITS. WATCH THE RED MARK AND GUARD THAT SIDE." % str(FighterTier.spec(tier).label)
+
+
+func _spar_said(actor: Dictionary, line: String) -> void:
+	prompt.text = "%s: %s" % [str(actor.display_name), line]
+
+
+func _spar_landed(actor: Dictionary, defence: String) -> void:
+	if spar_bout.is_empty() or str(actor.subject_id) != str(spar_bout.subject_id):
+		return
+	if defence == "block":
+		_spar_said(actor, "BLOCKED. I SAW IT COMING FROM THAT SIDE.")
+		return
+	spar_bout["landed"] = int(spar_bout.landed) + 1
+	impact_feel.strike(0.4, "blunt", false)
+	prompt.text = "CLEAN HIT // %d - %d" % [int(spar_bout.landed), int(spar_bout.taken)]
+	if int(spar_bout.landed) >= SPAR_POINTS:
+		_end_spar(actor, true)
+
+
+func _spar_struck(actor: Dictionary, guarded: Dictionary) -> void:
+	if spar_bout.is_empty() or str(actor.subject_id) != str(spar_bout.subject_id):
+		return
+	if bool(guarded.get("parried", false)):
+		_spar_said(actor, "GOOD PARRY. NOW HIT ME WHILE I RECOVER.")
+		return
+	if bool(guarded.get("blocked", false)):
+		_spar_said(actor, "BLOCKED. RIGHT SIDE, RIGHT TIME.")
+		return
+	spar_bout["taken"] = int(spar_bout.taken) + 1
+	lose_footing(0.2, "")
+	_spar_said(actor, "TOUCH. IT CAME FROM %s AND YOUR GUARD WAS NOT THERE." % str(actor.get("attack_side", "high")).to_upper())
+	if int(spar_bout.taken) >= SPAR_POINTS:
+		_end_spar(actor, false)
+
+
+func _end_spar(actor: Dictionary, won: bool) -> void:
+	var tier := str(spar_bout.tier)
+	var next := tier
+	if won:
+		var at := FighterTier.ORDER.find(tier)
+		next = str(FighterTier.ORDER[mini(at + 1, FighterTier.ORDER.size() - 1)])
+		WorldHistory.update_subject(SPAR_SUBJECT, {"tier": next, "best": next}, "spar_tier_up")
+	WorldHistory.record_event("spar_bout_ended", {"tier": tier, "won": won, "landed": int(spar_bout.landed), "taken": int(spar_bout.taken)})
+	var tip := fight_summary(fight_stats).get_slice("\n", 2)
+	prompt.text = ("YOU WIN %d - %d. NEXT PARTNER: %s." % [int(spar_bout.landed), int(spar_bout.taken), str(FighterTier.spec(next).label)] if won else "YOU LOSE %d - %d. %s" % [int(spar_bout.landed), int(spar_bout.taken), tip if not tip.is_empty() else "WATCH THE RED MARK AND GUARD THAT SIDE."])
+	# The partner steps out of the ring.
+	actor["dead"] = true
+	actor["disposition"] = "friendly"
+	var node := actor.get("node") as Node3D
+	if node != null and is_instance_valid(node):
+		node.visible = false
+	_show_telegraph(actor, node, false)
+	spar_bout = {}
 
 
 func _complete_local_law_arrest(actor: Dictionary) -> void:
