@@ -1257,6 +1257,10 @@ func _dress_zone(zone_id: String, size: Vector3) -> void:
 		return
 	var integrity := float(wardrobe.get(zone_id, 0.0))
 	var old := part.get_node_or_null("Garment") as MeshInstance3D
+	# A zone can be covered without a shell over it: a cap protects the head
+	# while its own geometry, not a sleeve over the face, is what shows.
+	if zone_id in wardrobe.get("no_shell", []):
+		integrity = 0.0
 	if integrity <= 0.0:
 		if old != null and is_instance_valid(old):
 			part.remove_child(old)
@@ -1268,13 +1272,24 @@ func _dress_zone(zone_id: String, size: Vector3) -> void:
 	var length := size.z if _leg_points_forward(zone_id) else size.y
 	if old != null and is_instance_valid(old):
 		old.mesh = ClothingShell.shell_mesh(zone_id, length * 0.5)
-		old.material_override = ClothingShell.shell_material(integrity, ClothingShell.soak_of(self, zone_id), str(wardrobe.get("style", "plain")), zone_id)
+		old.material_override = _garment_material(zone_id, integrity)
 		return
 	var shell := MeshInstance3D.new()
 	shell.name = "Garment"
 	shell.mesh = ClothingShell.shell_mesh(zone_id, length * 0.5)
-	shell.material_override = ClothingShell.shell_material(integrity, ClothingShell.soak_of(self, zone_id), str(wardrobe.get("style", "plain")), zone_id)
+	shell.material_override = _garment_material(zone_id, integrity)
 	part.add_child(shell)
+
+
+## The cloth on one zone. A wardrobe built from worn parts (`Outfit`) names a
+## style per zone and may carry a skin for it; an older whole-body wardrobe
+## has one "style" for everything, and still works unchanged.
+func _garment_material(zone_id: String, integrity: float) -> Material:
+	var skins: Dictionary = wardrobe.get("skins", {})
+	if skins.has(zone_id):
+		return WeaponSkins.material_for(skins[zone_id])
+	var style := str((wardrobe.get("styles", {}) as Dictionary).get(zone_id, wardrobe.get("style", "plain")))
+	return ClothingShell.shell_material(integrity, ClothingShell.soak_of(self, zone_id), style, zone_id)
 
 
 func _zone_material(zone_id: String, tint: Color, kind := "flesh") -> StandardMaterial3D:

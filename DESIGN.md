@@ -703,6 +703,39 @@ above were built on the remaster and win until Greg says otherwise.
   overworld that still teach, quietly, and that segments into complete
   personal exploration.
 
+### Answered by Greg in question boxes, 24 September 2026 (skins, cases, the jester)
+
+Greg: "first thing do clothes and the inventory model weapon and skins and
+cases using textures make a csgo case type thing with gun and knife skin
+raritys with gold being the 0.01% make it sellable on economy for heaps",
+"make the jester outfit clothing parts you can put on", and "then from there
+we can make nudity and censors".
+
+- **This comes first**, ahead of the rest of the first-30 checklist.
+- **Cases come from loot and from the shop:** they drop from bodies,
+  contracts and caches, and can be bought with scrip.
+- **A CS-style rarity ladder**, with the game's own tier names: 79.92%,
+  15.98%, 3.2%, 0.63%, 0.26%, and **gold at 0.01%**.
+- **Skins go on** guns, knives and blades, clothes (jester parts included)
+  and the breach tool / ram.
+- **Skins sell on a market on the Wire** for in-game scrip, priced by
+  rarity, wear and how many exist in the world. Gold sells for a fortune.
+  No real money.
+- **Skins are procedural patterns made in the engine**, each drop with its
+  own pattern seed.
+- **Wear rolls on the drop and keeps wearing:** fighting scuffs and bloods
+  a skin further, and clean ones sell for more.
+- **The jester outfit is four parts you put on:**
+  - the belled cap
+  - the ruff collar with the motley doublet
+  - gloves with sleeves
+  - pantaloons with curled shoes
+- **It is forced on, then yours:** the facility dresses you in it with a
+  locked collar. Once you break the lock, every part is an ordinary item
+  you can wear, remove, skin or sell.
+- **Next after this:** nudity and censors, building on the explicit /
+  mosaic presentation option (`AnatomyPresentation`).
+
 ## Influence register
 
 These entries describe what Greg said he values; proposed extraction is labelled. Liking a reference does not automatically import every mechanic from it.

@@ -162,6 +162,38 @@ func configure(rig: BaselineHuman) -> void:
 	_update_models()
 
 
+## Paint each held model with the skin applied to it (`SkinLoadout`), or its
+## own finish when none is. Called on arrival and whenever a skin changes or
+## wears.
+func apply_skins() -> void:
+	for weapon_id: String in models:
+		var model := models[weapon_id] as Node3D
+		if model == null or not is_instance_valid(model):
+			continue
+		var item := SkinLoadout.applied(weapon_id)
+		var original: Dictionary = _unskinned.get(weapon_id, {})
+		if original.is_empty():
+			original = _collect_materials(model, {})
+			_unskinned[weapon_id] = original
+		if item.is_empty():
+			for node: MeshInstance3D in original:
+				if is_instance_valid(node):
+					node.material_override = original[node]
+		else:
+			WeaponSkins.apply_to(model, item)
+
+
+var _unskinned: Dictionary = {}
+
+
+func _collect_materials(node: Node, found: Dictionary) -> Dictionary:
+	if node is MeshInstance3D:
+		found[node] = (node as MeshInstance3D).material_override
+	for child in node.get_children():
+		found = _collect_materials(child, found)
+	return found
+
+
 func tick(delta: float) -> void:
 	cooldown = maxf(0.0, cooldown - delta)
 	if jam_clear_remaining > 0.0:
