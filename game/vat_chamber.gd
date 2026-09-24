@@ -828,7 +828,8 @@ func _build_staff_door() -> void:
 	staff_door_panel.name = "StaffDoorPanel"
 	# Parked clear of the opening. `_update_sequence`'s departure beat slides it
 	# back across once he is through.
-	staff_door_panel.position = STAFF_DOOR_AT + Vector3(0.30, 0.0, -1.42)
+	# Shut: since 24 September he comes and goes by his own door behind the vat.
+	staff_door_panel.position = STAFF_DOOR_AT + Vector3(0.30, 0.0, 0.0)
 	add_child(staff_door_panel)
 	var panel := MeshInstance3D.new()
 	var panel_mesh := BoxMesh.new()
@@ -1070,14 +1071,6 @@ func _update_departure(delta: float) -> void:
 		# while the panel closes across him.
 		if walk >= 1.0:
 			examiner_node.visible = false
-
-	# The panel slides back across once he is through.
-	if staff_door_panel != null and is_instance_valid(staff_door_panel):
-		# Starts the instant he is through at 2.95 and is shut by 3.70, so the
-		# seal happens while the player is still looking at it rather than
-		# behind a head that has already turned back to the tank.
-		var shut := clampf((departure_clock - 2.95) / 0.75, 0.0, 1.0)
-		staff_door_panel.position.z = STAFF_DOOR_AT.z + lerpf(-1.42, 0.0, ease(shut, 0.4))
 
 	# You are still tied into the tank, so you cannot look away from it, but the
 	# head does turn to watch the one person in the room leave.
