@@ -534,6 +534,20 @@ another account's organisation and could not be read from this one.
 - **Workflow:** merge each verified piece into `claude/dust-to-bones-look`,
   and send a split-zip Windows build after each piece.
 
+### Answered by Greg in question boxes, 24 September 2026 (routes out)
+
+- **The heat elevator goes up to the overworld.** With the derby shelved
+  as an exit, the Lower Works lift carries the player up and out into the
+  Ashbloom Expanse near the facility, not into the colosseum heat.
+- **The drain tunnels are a new walkable route:** an old ("super old")
+  drain network reached from Lower Works that surfaces in a different part
+  of the map, so the overworld starts differently depending on how you
+  left. These are the demo's two routes out.
+- **The floor light glitch was the pale pixel disc under the broken tank**
+  (the breakout puddle). Fixed: a dark, wet puddle.
+- **Job posters and business cards wait** until minutes 0-30 work end to
+  end; they live in the Hunt.
+
 Open: one of Hornee's eyes is a real drink brand's bottle cap with its
 wordmark. Keep it on the shipped model, or swap it for an in-world mark?
 

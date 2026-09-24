@@ -45,13 +45,26 @@ answers.
       instead of the automatic breach. Merged at `e437d5c`.
 - [ ] **Clothing renders on every rig.** Garments from `ClothingShell` show only
       as a thin outline today, so a dressed body looks bare.
-- [ ] **The lab**: overall lighting and the light glitch on the floor.
+- [ ] **The lab**: overall lighting and the light glitch on the floor. The
+      glitch (the breakout puddle's pale pixel disc) is fixed at `3d03fa6`;
+      Lower Works' darkness is still to judge in the Forward+ renderer.
 - [ ] **The VFX pack**: X-ray anatomy loading screen that blurs into
       datamosh/CRT/dither, the pixel transition replaced, block-tracked hit
       markers and wound/brain indicators, receipt-paper pages (Wire, bounties,
       contracts, job posters, business cards). Night vision only once you hold
       the phone.
+- [ ] **The heat elevator goes up to the overworld** (Greg, 24 September):
+      the Lower Works lift surfaces near the facility instead of dropping into
+      the colosseum derby, which is shelved as an exit.
+- [ ] **The drain tunnels route**: a new walkable "super old" drain network
+      from Lower Works that surfaces in a different part of the map, so the
+      overworld starts differently depending on how you left.
 - [ ] **Hollis gets a real model**, one Greg provides or picks (CC-BY credited).
+
+After minutes 0-30 work end to end (Greg, 24 September): job posters with
+tear-off tabs pasted on the Hunt's walls, and business cards handed over by
+people you meet (kept in Carry, adding a Wire contact); the receipt-paper
+`flyer` and `card` stocks in `ThermalPrint` are built for them and unused.
 
 Waiting on Greg, not on an agent: removing Hollis's hand needs a blade the
 facility has not given the player yet; where the D-section door should
