@@ -26,7 +26,9 @@ extends Node
 
 ## Long enough for the whole authored opening with headroom, short enough that a
 ## sequence which stops advancing fails rather than hanging the suite.
-const HANDOFF_BUDGET := 45.0
+## 75 s since 2026-09-24: every line of his closing verdict is now held long
+## enough to read (Greg: the text went by too fast), not a flat three seconds.
+const HANDOFF_BUDGET := 75.0
 
 var failures: Array[String] = []
 var opening: Node

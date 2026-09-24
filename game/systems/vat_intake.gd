@@ -115,7 +115,7 @@ const PROSE_SIZE := 17
 ## Characters per second his line types out at, and reading speed for the hold
 ## after it: a 90-character line used to be gone in about four seconds.
 const REVEAL_RATE := 30.0
-const READ_RATE := 14.0
+const READ_RATE := 18.0
 var examiner_feed: Control
 var revealed := 0.0
 var _shown_text := ""
