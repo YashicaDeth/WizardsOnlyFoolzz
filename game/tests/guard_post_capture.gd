@@ -30,6 +30,14 @@ func _ready() -> void:
 	await _hold(20)
 	await _capture("%s/guard_post_close.png" % out_dir)
 
+	# One ram swing: the block tracker boxes the part it struck.
+	post.strike(arcade.player.global_position)
+	await _hold(4)
+	await _capture("%s/guard_post_hit.png" % out_dir)
+	# Put him back on his feet for the coercion shot.
+	post.guard.anatomy.stabilise()
+	post.guard.rotation.x = 0.0
+
 	arcade._interact()
 	for _frame in 40:
 		arcade._physics_process(1.0 / 30.0)

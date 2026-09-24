@@ -21,6 +21,8 @@ extends Node3D
 
 signal shot(damage: float)
 signal door_opened(method: String)
+## Where a ram swing landed on him, for the host's hit markers.
+signal struck(at: Vector3, zone: String, damage: float, kind: String)
 
 const BODY := preload("res://systems/baseline_human.gd")
 const BARRIER := preload("res://systems/biometric_barrier.gd")
@@ -295,6 +297,19 @@ func player_killed() -> void:
 	_say("%s: \"Stay down.\"" % GUARD_NAME, 2.0)
 
 
+func _torso_position() -> Vector3:
+	var torso := guard.parts.get("torso") as Node3D if guard != null else null
+	return torso.global_position if torso != null and is_instance_valid(torso) else guard.global_position + Vector3(0, 1.1, 0)
+
+
+## The block tracker's awareness box: Hollis is on you once he has warned you,
+## for as long as he can still shoot.
+func watcher_entries() -> Array:
+	if not warned or not guard_active():
+		return []
+	return [{"at": _torso_position(), "certainty": 1.0}]
+
+
 ## LMB with the ram in hand. Returns true when the swing was his to take, so
 ## the host does not also spend it on a gate.
 func strike(player_position: Vector3) -> bool:
@@ -302,7 +317,8 @@ func strike(player_position: Vector3) -> bool:
 		return false
 	var direction := guard.global_position - player_position
 	direction.y = 0.0
-	guard.hit("torso", RAM_DAMAGE, 12.0, "blunt", "", direction.normalized())
+	var result: Dictionary = guard.hit("torso", RAM_DAMAGE, 12.0, "blunt", "", direction.normalized())
+	struck.emit(_torso_position(), "torso", float(result.get("damage", RAM_DAMAGE)), "blunt")
 	WorldHistory.record_event("facility_guard_rammed", {"subject_id": GUARD_ID, "downed": guard_down()})
 	WorldHistory.amend_subject(GUARD_ID, {"anatomy_state": guard.anatomy.snapshot()})
 	if guard_down():

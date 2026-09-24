@@ -197,7 +197,14 @@ func _build_city_shell() -> void:
 		# why the district's own design note says navigation is by a real
 		# object rather than an arrow. It was the only object lit well enough
 		# to navigate by.
-		light.light_energy = 1.9
+		# Greg on first launch (Dust to Bones, 24 September): Lower Works is
+		# "too dark". Measured in the Forward+ renderer at the opening hour, the
+		# entry view averaged 2.8/255 with 95% of the frame near-black: range
+		# was fixed above, but 1.9 hung 8.7 m up still delivers almost nothing
+		# to the floor. At 9.5 (sconces 6.4) it averages 15.3 with half the
+		# frame still in shadow -- vaults, galleries and the lift read, and it
+		# stays darker than the decant room (30-45).
+		light.light_energy = 9.5
 		light.omni_range = BAY_LAMP_RANGE
 		light.shadow_enabled = false
 		add_child(light)
@@ -211,7 +218,7 @@ func _build_city_shell() -> void:
 			sconce.name = "WallSconce%d" % bay
 			sconce.position = Vector3(side * 13.4, 3.4, z)
 			sconce.light_color = Color("c2662f")
-			sconce.light_energy = 1.6
+			sconce.light_energy = 6.4
 			sconce.omni_range = 9.5
 			sconce.shadow_enabled = false
 			add_child(sconce)

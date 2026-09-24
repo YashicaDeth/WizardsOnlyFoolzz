@@ -55,6 +55,7 @@ func _ready() -> void:
 	arcade.player.global_position = in_range
 	arcade._physics_process(0.016)
 	check(post.warned, "he warns you when you come into view")
+	check(arcade.block_tracker.watchers.size() == 1, "once he has seen you he carries an awareness box")
 	check(arcade.blood == 100.0 and WorldHistory.event_count("facility_guard_fired") == 1, "his first shot inside range is a warning")
 	post.fire_cooldown = 0.0
 	arcade.player.global_position = in_range
@@ -104,6 +105,8 @@ func _ready() -> void:
 		check(post.strike(arcade.player.global_position), "ram swing %d lands on Hollis" % (swings + 1))
 		swings += 1
 	check(post.guard_down() and swings <= 3, "the ram puts him down in %d swings" % swings)
+	check(arcade.block_tracker.hits.size() == swings and str(arcade.block_tracker.hits[0].zone) == "torso", "every swing puts a block-tracked hit box on the part it struck")
+	check(arcade.block_tracker.camera == arcade.camera, "the tracker draws through the player's own camera")
 	check(not post.door_open, "a downed guard does not open anything by himself")
 	arcade._interact()
 	check(post.door_open, "dragging his hand to the reader opens the door")

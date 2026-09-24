@@ -45,6 +45,10 @@ var weapon_visual: Node3D
 var weapon_label: Label3D
 var lower_works_requested := false
 var guard_post: FacilityGuardPost
+## The Hunt's block-tracked hit markers (Greg, 24 September: the VFX pack),
+## over the one fight in the first 30 minutes: a box on the part the ram
+## struck, and a faint amber box on Hollis while he has you in his sights.
+var block_tracker: BlockTracker
 var blood := 100.0
 var post_message := ""
 var post_message_timer := 0.0
@@ -69,6 +73,10 @@ func _ready() -> void:
 	_build_player()
 	_restore_from_history()
 	_build_remains()
+	block_tracker = BlockTracker.new()
+	block_tracker.name = "BlockTracker"
+	$HUD.add_child(block_tracker)
+	block_tracker.camera = camera
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _build_player() -> void:
@@ -209,6 +217,9 @@ func _build_guard_post() -> void:
 	add_child(guard_post)
 	guard_post.build()
 	guard_post.shot.connect(_on_shot)
+	guard_post.struck.connect(func(at: Vector3, zone: String, damage: float, kind: String) -> void:
+		if block_tracker != null:
+			block_tracker.report_hit(at, zone, damage, kind))
 
 
 func _on_shot(damage: float) -> void:
@@ -378,6 +389,7 @@ func _physics_process(delta: float) -> void:
 	if card_taken and not gate_open and _flat_distance(GATE_AT) <= 4.4:
 		_open_gate()
 	guard_post.step(delta, player.global_position)
+	block_tracker.watch(guard_post.watcher_entries())
 	post_message_timer = maxf(0.0, post_message_timer - delta)
 	_update_hud()
 
