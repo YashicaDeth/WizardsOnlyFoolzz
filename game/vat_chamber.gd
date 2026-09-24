@@ -762,61 +762,13 @@ func _build_staff_door() -> void:
 
 
 func _dead_tank(at: Vector3, seed_value: int) -> void:
-	var shell := MeshInstance3D.new()
-	var cylinder := CylinderMesh.new()
-	cylinder.top_radius = 0.8
-	cylinder.bottom_radius = 0.8
-	cylinder.height = 2.8
-	var shell_material := StandardMaterial3D.new()
-	shell_material.albedo_color = Color(0.31, 0.055, 0.035, 0.35)
-	shell_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	shell_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	shell_material.roughness = 0.4
-	cylinder.material = shell_material
-	shell.mesh = cylinder
-	shell.position = at + Vector3(0, 1.4, 0)
-	add_child(shell)
-	var culture := MeshInstance3D.new()
-	var culture_column := CylinderMesh.new()
-	culture_column.top_radius = 0.74
-	culture_column.bottom_radius = 0.74
-	culture_column.height = 2.58
-	var culture_material := StandardMaterial3D.new()
-	culture_material.albedo_color = Color(0.38, 0.018, 0.011, 0.28)
-	culture_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	culture_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	culture_material.emission_enabled = true
-	culture_material.emission = Color(0.14, 0.004, 0.002)
-	culture_column.material = culture_material
-	culture.mesh = culture_column
-	culture.position = at + Vector3(0, 1.38, 0)
-	add_child(culture)
-	# The closest four tanks use the exact same body rig and appearance grammar
-	# as people in the overworld.  Farther down the corridor they deliberately
-	# collapse back to cheap silhouettes; they are too distant to justify full
-	# anatomy and that keeps the opening inside the performance budget.
-	if seed_value <= 2:
-		_build_cradled_vat_subject(at, seed_value)
-	else:
-		var occupant := MeshInstance3D.new()
-		var body := CapsuleMesh.new()
-		body.radius = 0.26
-		body.height = 1.5 - float(seed_value % 3) * 0.2
-		body.material = WorldLook.surface(Color("241a16"), "flesh", seed_value)
-		occupant.mesh = body
-		occupant.position = at + Vector3(0, 1.1, 0)
-		occupant.rotation_degrees = Vector3(float(seed_value % 5) * 4.0, 0, float(seed_value % 7) * 3.0)
-		add_child(occupant)
-	for rib in 4:
-		var ring := MeshInstance3D.new()
-		var torus := TorusMesh.new()
-		torus.inner_radius = 0.8
-		torus.outer_radius = 0.88
-		torus.material = WorldLook.surface(Color("241d15"), "bone", seed_value + rib)
-		ring.mesh = torus
-		ring.position = at + Vector3(0, 0.3 + float(rib) * 0.8, 0)
-		ring.rotation_degrees = Vector3(90, 0, 0)
-		add_child(ring)
+	# LabVat is the hardware (Greg, 2026-09-24: no more ringed cylinders with
+	# capsules in them). The nearest three keep their seated adults -- one is
+	# still alive and one has visibly failed -- and the rest hold curled bodies.
+	var near := seed_value <= 2
+	LabVat.build(self, at, seed_value, 2.4, 0.8, not near, seed_value <= 5)
+	if near:
+		_build_cradled_vat_subject(at + Vector3(0, 0.42, 0), seed_value)
 
 
 ## A seated BaselineHuman makes the first visible other subjects recognisably

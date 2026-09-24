@@ -78,53 +78,31 @@ func _build_shell() -> void:
 		light.omni_range = 8.5
 		add_child(light)
 
-func _build_arch(z: float, index: int) -> void:
+func _build_arch(z: float, _index: int) -> void:
 	# Two tall piers plus a raised beam read as a vault from the playable floor;
 	# the beam is decoration so it cannot snag the player.
 	for side in [-1.0, 1.0]:
 		var pier := MeshInstance3D.new()
 		var mesh := BoxMesh.new()
 		mesh.size = Vector3(0.55, 5.5, 0.55)
-		mesh.material = WorldLook.surface(Color("34291e"), "bone", 120 + index)
+		mesh.material = LabSurface.material("grime")
 		pier.mesh = mesh
 		pier.position = Vector3(side * 5.85, 2.75, z)
 		add_child(pier)
 	var lintel := MeshInstance3D.new()
 	var top := BoxMesh.new()
 	top.size = Vector3(12.2, 0.52, 0.55)
-	top.material = WorldLook.surface(Color("34291e"), "bone", 220 + index)
+	top.material = LabSurface.material("plate")
 	lintel.mesh = top
 	lintel.position = Vector3(0, 5.45, z)
 	add_child(lintel)
 
 func _build_side_lab(z: float, seed: int) -> void:
+	# Real vats with curled bodies in them (Greg, 2026-09-24), not red columns
+	# around pill-shaped silhouettes.
 	for side in [-1.0, 1.0]:
-		var tank := MeshInstance3D.new()
-		var cylinder := CylinderMesh.new()
-		cylinder.top_radius = 0.78
-		cylinder.bottom_radius = 0.78
-		cylinder.height = 2.9
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color(0.28, 0.045, 0.03, 0.34)
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-		mat.emission_enabled = true
-		mat.emission = Color(0.14, 0.004, 0.002)
-		cylinder.material = mat
-		tank.mesh = cylinder
-		tank.position = Vector3(side * 4.25, 1.45, z)
-		add_child(tank)
-		# A body-shaped silhouette, intentionally static and distant: ambience,
-		# not an expensive crowd system.
-		var subject := MeshInstance3D.new()
-		var body := CapsuleMesh.new()
-		body.radius = 0.25
-		body.height = 1.55
-		body.material = WorldLook.surface(Color("4d322d"), "flesh", seed * 9 + int(side))
-		subject.mesh = body
-		subject.position = tank.position + Vector3(0, -0.12, 0)
-		subject.rotation_degrees.z = side * 13.0
-		add_child(subject)
+		LabVat.build(self, Vector3(side * 4.25, 0.0, z), seed * 2 + (1 if side > 0.0 else 0), 2.3, 0.72)
+
 
 func _build_landmarks() -> void:
 	# Card station — a clearly lit side objective with a physical, original card.
