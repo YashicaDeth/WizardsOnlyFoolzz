@@ -31,6 +31,8 @@ signal filed(state: Dictionary)
 
 const INK := Color("e6d4ac")
 const COPPER := Color("b0552a")
+## Height of the SUBJECT / TANK header band over the vat panel.
+const NAME_BAND := 50.0
 const HOT := Color("a8281a")
 const MOSS := Color("8a9a4a")
 const BRUISE := Color("6b3f6e")
@@ -542,8 +544,10 @@ func _layout_body_preview() -> void:
 	if body_preview == null or not is_instance_valid(body_preview):
 		return
 	var mirror := _vat_rect()
-	body_preview.position = mirror.position + Vector2(8, 8)
-	body_preview.size = Vector2(maxf(1.0, mirror.size.x - 16.0), maxf(1.0, mirror.size.y - 56.0))
+	# The live tank starts under the SUBJECT header band (Greg, 24 September:
+	# a band above the vat panel, not text drawn under the picture).
+	body_preview.position = mirror.position + Vector2(8, 8 + NAME_BAND)
+	body_preview.size = Vector2(maxf(1.0, mirror.size.x - 16.0), maxf(1.0, mirror.size.y - 56.0 - NAME_BAND))
 	body_preview.visible = size.x >= 640.0 and size.y >= 400.0
 	if examiner_feed != null and is_instance_valid(examiner_feed):
 		var feed := _feed_rect()
@@ -835,8 +839,15 @@ func _draw_mirror(rect: Rect2) -> void:
 	# body stood on flat black and the caption asserted the tank. VatBodyPreview
 	# builds the tank now, so the label can say what the picture is instead of
 	# standing in for it.
-	CellOutzType.draw_condensed(self, rect.position + Vector2(10, rect.size.y - 34), "TANK 0C-7  //  LIVE", 8.0, INK * Color(1, 1, 1, 0.4), 0.7)
-	CellOutzType.draw_condensed(self, rect.position + Vector2(10, rect.size.y - 22), "THE BODY IS NOT A DRAWING", 8.0, INK * Color(1, 1, 1, 0.28), 0.7)
+	# Greg on first launch: "the name / tank line readable"; then (24 September)
+	# bigger and more prominent: a header over the vat panel, not a caption.
+	var subject_name := str(sheet.display_name).to_upper() if sheet != null else "UNNAMED"
+	var header := Rect2(rect.position, Vector2(rect.size.x, NAME_BAND))
+	draw_rect(header, Color(0.02, 0.018, 0.015, 0.88))
+	draw_line(header.position + Vector2(0, header.size.y), header.end, COPPER * Color(1, 1, 1, 0.7), 1.0)
+	CellOutzType.draw_condensed(self, header.position + Vector2(12, 7), "SUBJECT  %s" % subject_name, 21.0, INK, 0.7)
+	CellOutzType.draw_condensed(self, header.position + Vector2(12, 32), "TANK 0C-7  //  LIVE", 12.0, COPPER, 0.7)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(10, rect.size.y - 16), "THE BODY IS NOT A DRAWING", 9.0, INK * Color(1, 1, 1, 0.45), 0.7)
 
 
 ## AX1.2. He watches the page you are on, not the box you ticked. Arriving at

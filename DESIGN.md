@@ -564,6 +564,23 @@ another account's organisation and could not be read from this one.
   costs something. Once these are done, minutes 0-30 count as right enough
   to start minutes 30-60 (furthering the tutorial and the starting stage).
 
+### Answered by Greg in question boxes, 24 September 2026 (the examiner)
+
+- **The examiner has an ordinary human face**, not the player's grown-wrong
+  tank face: matched eyes, no exposed teeth.
+- **His coat is stained and bloodied** from the procedures, not clean white.
+- **The name line becomes a proper header** over the vat panel, bigger and
+  more prominent than a caption.
+- **Better lip sync now:** jaw and lips move with the vowels and consonants
+  of what he is saying, on the new face.
+
+### Answered by Greg in question boxes, 24 September 2026 (intake GUI)
+
+- The SUBJECT / TANK name header is its own band above the vat picture.
+- The examiner reads well now (ordinary face, stained coat, lip sync): keep.
+- Next on the intake GUI: animated tabs, the answer box and transcript, and
+  the stats strip. Keep the current red/copper palette and CellOutz type.
+
 Open: one of Hornee's eyes is a real drink brand's bottle cap with its
 wordmark. Keep it on the shipped model, or swap it for an in-world mark?
 

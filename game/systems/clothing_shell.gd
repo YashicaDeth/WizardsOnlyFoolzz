@@ -157,6 +157,10 @@ const STYLES := {
 	"jester": {"torso": "3a1020", "head": "4a1428", "left_arm": "cfc2a4", "right_arm": "3a1020", "left_leg": "241418", "right_leg": "241418"},
 	"clown": {"torso": "8a8d94", "head": "b03030", "left_arm": "3060a8", "right_arm": "c8a028", "left_leg": "3060a8", "right_leg": "c8a028"},
 	"dunce": {"torso": "6b6257", "head": "c9bfa5", "left_arm": "6b6257", "right_arm": "6b6257", "left_leg": "4a453c", "right_leg": "4a453c"},
+	# Staff: an off-white clinical coat over dark trousers. The examiner wears
+	# it (Greg, Dust to Bones: "a better examiner model"); placeholder cloth
+	# until an authored model replaces him.
+	"clinical": {"torso": "cfcbbd", "head": "cfcbbd", "left_arm": "c4c0b2", "right_arm": "c4c0b2", "left_leg": "2a2926", "right_leg": "2a2926"},
 }
 
 
