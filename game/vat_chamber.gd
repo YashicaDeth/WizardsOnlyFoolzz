@@ -333,19 +333,9 @@ func _build_vat() -> void:
 	# floating ribs". They are a collar and a base now, with the eye's band
 	# left clear, and they sit tight against the glass instead of hovering
 	# 11cm off it.
-	for rib in 9:
-		var height := 0.2 + float(rib) * 0.36
-		if height > 0.95 and height < 2.55:
-			continue
-		var ring := MeshInstance3D.new()
-		var torus := TorusMesh.new()
-		torus.inner_radius = 0.95
-		torus.outer_radius = 1.01 + (0.03 if rib % 3 == 0 else 0.0)
-		torus.material = WorldLook.surface(Color("2e2419") if rib % 2 == 0 else Color("241c15"), "bone", rib)
-		ring.mesh = torus
-		ring.position = VAT_POSITION + Vector3(0, height, 0)
-		ring.rotation_degrees = Vector3(90, 0, 0)
-		add_child(ring)
+	# Greg, first launch (2026-09-24): no more stacked rings. A plate-steel
+	# base band and crown band, the same hardware as every LabVat.
+	_vat_bands(self, VAT_POSITION, 1.02, 3.1)
 
 	# High in the column, not at eye level. An omni light sitting on the
 	# cylinder's own axis at the camera's exact height lights the inner wall
@@ -429,16 +419,7 @@ func _build_first_objects() -> void:
 	stuck_tank_culture.position = Vector3(0, 1.38, 0)
 	stuck_tank_marker.add_child(stuck_tank_culture)
 
-	for rib in 4:
-		var ring := MeshInstance3D.new()
-		var torus := TorusMesh.new()
-		torus.inner_radius = 0.8
-		torus.outer_radius = 0.88
-		torus.material = WorldLook.surface(Color("241d15"), "bone", 41 + rib)
-		ring.mesh = torus
-		ring.position = Vector3(0, 0.3 + float(rib) * 0.8, 0)
-		ring.rotation_degrees = Vector3(90, 0, 0)
-		stuck_tank_marker.add_child(ring)
+	_vat_bands(stuck_tank_marker, Vector3.ZERO, 0.86, 2.8)
 
 	# AX3.2. Registered now so the subject exists to strip clothing off of the
 	# moment the tank opens — non-destructive on repeat `_ready()` calls
@@ -547,25 +528,53 @@ func _build_examination_station() -> void:
 	# A low medical desk between the vat and the doctor.
 	var desk := MeshInstance3D.new()
 	var desk_mesh := BoxMesh.new()
-	desk_mesh.size = Vector3(2.25, 0.16, 0.72)
-	desk_mesh.material = WorldLook.surface(Color("241a16"), "rust", 913)
+	desk_mesh.size = Vector3(2.25, 0.07, 0.78)
+	desk_mesh.material = LabSurface.material("plate")
 	desk.mesh = desk_mesh
-	desk.position = Vector3(0.05, 1.05, 0.25)
+	desk.position = Vector3(0.05, 0.86, 0.25)
 	station.add_child(desk)
+	# Greg, first launch (2026-09-24): "this floating table". It stands now.
+	for corner in [Vector2(-1.0, -0.33), Vector2(1.1, -0.33), Vector2(-1.0, 0.6), Vector2(1.1, 0.6)]:
+		var leg := MeshInstance3D.new()
+		var leg_mesh := BoxMesh.new()
+		leg_mesh.size = Vector3(0.06, 0.84, 0.06)
+		leg_mesh.material = LabSurface.material("grime")
+		leg.mesh = leg_mesh
+		leg.position = Vector3(corner.x, 0.42, corner.y)
+		station.add_child(leg)
 
 	# The physical monitor gives the player a point of attention in the room;
 	# its green code strips are geometry, not a flat title card.
 	var monitor := MeshInstance3D.new()
 	var monitor_mesh := BoxMesh.new()
-	monitor_mesh.size = Vector3(1.06, 0.72, 0.10)
-	monitor_mesh.material = WorldLook.surface(Color("171b16"), "metal", 914)
+	monitor_mesh.size = Vector3(1.10, 0.76, 0.16)
+	monitor_mesh.material = LabSurface.material("plate")
 	monitor.mesh = monitor_mesh
 	# The screen takes the right half of the desk, the examiner the left, and
 	# the keyboard sits between them under his hand. He used to stand 1.7m off
 	# to the side, which read as a man near a computer he had nothing to do
 	# with; the two now occupy one workstation without overlapping at all.
-	monitor.position = Vector3(0.60, 1.88, 0.28)
+	monitor.position = Vector3(0.60, 1.50, 0.28)
 	station.add_child(monitor)
+	var screen := MeshInstance3D.new()
+	var screen_mesh := QuadMesh.new()
+	screen_mesh.size = Vector2(0.96, 0.62)
+	var screen_material := StandardMaterial3D.new()
+	screen_material.albedo_color = Color("07120c")
+	screen_material.emission_enabled = true
+	screen_material.emission = Color("0d2a1a")
+	screen_mesh.material = screen_material
+	screen.mesh = screen_mesh
+	screen.position = Vector3(0.60, 1.50, 0.365)
+	screen.rotation_degrees.y = 180.0
+	station.add_child(screen)
+	var stand := MeshInstance3D.new()
+	var stand_mesh := BoxMesh.new()
+	stand_mesh.size = Vector3(0.10, 0.30, 0.10)
+	stand_mesh.material = LabSurface.material("grime")
+	stand.mesh = stand_mesh
+	stand.position = Vector3(0.60, 1.03, 0.22)
+	station.add_child(stand)
 	for line_index in 9:
 		var code := MeshInstance3D.new()
 		var code_mesh := BoxMesh.new()
@@ -579,15 +588,15 @@ func _build_examination_station() -> void:
 		code.mesh = code_mesh
 		# The text sits on the monitor's camera-facing surface, aligned inside its
 		# frame rather than accidentally hovering behind it.
-		code.position = Vector3(0.20 + code_width * 0.5, 2.10 - float(line_index) * 0.055, 0.345)
+		code.position = Vector3(0.20 + code_width * 0.5, 1.72 - float(line_index) * 0.055, 0.375)
 		station.add_child(code)
 	var keyboard := MeshInstance3D.new()
 	var keyboard_mesh := BoxMesh.new()
 	keyboard_mesh.size = Vector3(0.86, 0.045, 0.38)
-	keyboard_mesh.material = WorldLook.surface(Color("181612"), "metal", 921)
+	keyboard_mesh.material = LabSurface.material("plate")
 	keyboard.mesh = keyboard_mesh
 	# Between the man and the screen, where a hand can actually reach it.
-	keyboard.position = Vector3(0.22, 1.16, 0.54)
+	keyboard.position = Vector3(0.22, 0.915, 0.54)
 	station.add_child(keyboard)
 
 	# One examiner, anonymous and physically present.  He is shaped from the
@@ -603,98 +612,17 @@ func _build_examination_station() -> void:
 	examiner.position = Vector3(-0.16, 0.0, 0.16)
 	station.add_child(examiner)
 	examiner_node = examiner
-	var torso := MeshInstance3D.new()
-	var torso_mesh := CapsuleMesh.new()
-	torso_mesh.radius = 0.24
-	torso_mesh.height = 1.34
-	torso_mesh.material = WorldLook.surface(Color("171118"), "cloth", 915)
-	torso.mesh = torso_mesh
-	torso.position = Vector3(0, 1.35, 0)
-	# Leaning in over the keyboard: the posture of somebody filling in a form
-	# about a person who is in the room. A narrower capsule under the coat also
-	# stops the silhouette reading as a bean.
-	torso.rotation_degrees.x = 18.0
-	examiner.add_child(torso)
-	# A formal, almost ecclesiastical government coat: dark body, hard collar,
-	# and a state seal that reads as occult bureaucracy rather than a generic
-	# lab coat.  This is intentionally an example texture slot for the future
-	# authored uniform, not a second unnamed character.
-	var coat := MeshInstance3D.new()
-	var coat_mesh := CylinderMesh.new()
-	coat_mesh.top_radius = 0.30
-	coat_mesh.bottom_radius = 0.40
-	coat_mesh.height = 1.20
-	coat_mesh.material = WorldLook.surface(Color("21101b"), "cloth", 919)
-	coat.mesh = coat_mesh
-	coat.position = Vector3(0.0, 1.26, 0.025)
-	coat.rotation_degrees.x = 18.0
-	examiner.add_child(coat)
-	var collar := MeshInstance3D.new()
-	var collar_mesh := TorusMesh.new()
-	collar_mesh.inner_radius = 0.16
-	collar_mesh.outer_radius = 0.225
-	collar_mesh.material = WorldLook.surface(Color("5a3b20"), "metal", 920)
-	collar.mesh = collar_mesh
-	collar.position = Vector3(0.0, 1.91, 0.24)
-	collar.rotation_degrees.x = 90.0
-	examiner.add_child(collar)
-	# A deliberately neutral state seal: copper geometry on a severe coat, not
-	# an unrelated faction logo pasted onto the doctor.  It marks an example
-	# texture/insignia zone for later authored government art.
-	# Six radial spokes inside a ring is a ship's wheel, which is what it read
-	# as on screen. Greg, 21 September: "no steering-wheel-like prop." The
-	# restrained version is a breast badge, not a medallion: a small dark plate,
-	# one thin ring, and a single vertical bar crossed near the top. Esoteric
-	# because of what it omits, and small enough to stay a costume detail.
-	var seal_material := WorldLook.surface(Color("9a5730"), "metal", 922)
-	var badge := MeshInstance3D.new()
-	var badge_mesh := BoxMesh.new()
-	badge_mesh.size = Vector3(0.115, 0.145, 0.016)
-	badge_mesh.material = WorldLook.surface(Color("14090f"), "metal", 923)
-	badge.mesh = badge_mesh
-	badge.position = Vector3(-0.115, 1.54, 0.345)
-	examiner.add_child(badge)
-	var seal_ring := MeshInstance3D.new()
-	var seal_ring_mesh := TorusMesh.new()
-	seal_ring_mesh.inner_radius = 0.030
-	seal_ring_mesh.outer_radius = 0.040
-	seal_ring_mesh.material = seal_material
-	seal_ring.mesh = seal_ring_mesh
-	seal_ring.position = Vector3(-0.115, 1.565, 0.356)
-	seal_ring.rotation_degrees.x = 90.0
-	examiner.add_child(seal_ring)
-	var seal_stem := MeshInstance3D.new()
-	var seal_stem_mesh := BoxMesh.new()
-	seal_stem_mesh.size = Vector3(0.010, 0.095, 0.012)
-	seal_stem_mesh.material = seal_material
-	seal_stem.mesh = seal_stem_mesh
-	seal_stem.position = Vector3(-0.115, 1.518, 0.356)
-	examiner.add_child(seal_stem)
-	var seal_bar := MeshInstance3D.new()
-	var seal_bar_mesh := BoxMesh.new()
-	seal_bar_mesh.size = Vector3(0.052, 0.010, 0.012)
-	seal_bar_mesh.material = seal_material
-	seal_bar.mesh = seal_bar_mesh
-	seal_bar.position = Vector3(-0.115, 1.500, 0.356)
-	examiner.add_child(seal_bar)
-	var head := MeshInstance3D.new()
-	var head_mesh := SphereMesh.new()
-	head_mesh.radius = 0.20
-	head_mesh.height = 0.42
-	head_mesh.material = WorldLook.surface(Color("5a4235"), "flesh", 916)
-	head.mesh = head_mesh
-	head.position = Vector3(-0.08, 2.13, 0.15)
-	examiner.add_child(head)
-	for side in [-1.0, 1.0]:
-		var arm := MeshInstance3D.new()
-		var arm_mesh := CapsuleMesh.new()
-		arm_mesh.radius = 0.09
-		arm_mesh.height = 0.78
-		arm_mesh.material = WorldLook.surface(Color("24201a"), "cloth", 917 + int(side))
-		arm.mesh = arm_mesh
-		arm.position = Vector3(side * 0.31, 1.45, 0.10)
-		arm.rotation_degrees = Vector3(72.0, 0.0, side * 12.0)
-		examiner.add_child(arm)
+	# The same man the intake's live feed shows (ExaminerFeed): a BaselineHuman
+	# in the same build, turned half round because its face is built on -Z and
+	# this node's "working" facing is +Z.
+	var body := BASELINE_HUMAN.new()
+	body.name = "ExaminerBody"
+	body.rotation.y = PI
+	examiner.add_child(body)
+	body.build("intake_examiner", BASELINE_HUMAN.config_from_subject({"race": "decanted"}).merged({"gore": false}, true))
+	var look := HUNTER_APPEARANCE.new()
+	body.add_child(look)
+	look.configure(body, {"axes": {"brow": 0.7, "jaw": 0.6, "cheek": 0.2, "eyes": 0.3, "nose": 0.55, "mouth": 0.4}})
 	var screen_light := OmniLight3D.new()
 	screen_light.position = Vector3(0.52, 1.6, 0.02)
 	screen_light.light_color = Color("8bbd79")
@@ -709,6 +637,45 @@ func _build_examination_station() -> void:
 	examination_light.omni_range = 5.2
 	station.add_child(examination_light)
 	_build_staff_door()
+	_hang_cameras()
+
+
+## "Cameras everywhere" (Greg, 2026-09-24), and the consent notice says the
+## examination is recorded: four wall cameras, each turned on the vat, with a
+## red tally light.
+func _hang_cameras() -> void:
+	for mount in [Vector3(-7.2, 3.7, 2.8), Vector3(7.2, 3.7, 2.8), Vector3(-7.2, 3.7, -6.5), Vector3(7.2, 3.7, -6.5)]:
+		var rig := Node3D.new()
+		rig.name = "Cctv"
+		add_child(rig)
+		rig.position = mount
+		rig.look_at_from_position(mount, VAT_POSITION + Vector3(0, 1.4, 0), Vector3.UP)
+		var housing := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(0.22, 0.2, 0.46)
+		box.material = LabSurface.material("grime")
+		housing.mesh = box
+		rig.add_child(housing)
+		var lens := MeshInstance3D.new()
+		var lens_mesh := CylinderMesh.new()
+		lens_mesh.top_radius = 0.06
+		lens_mesh.bottom_radius = 0.07
+		lens_mesh.height = 0.08
+		var glass := StandardMaterial3D.new()
+		glass.albedo_color = Color("0a0c0d")
+		glass.metallic = 0.6
+		glass.roughness = 0.1
+		lens_mesh.material = glass
+		lens.mesh = lens_mesh
+		lens.rotation_degrees.x = 90.0
+		lens.position = Vector3(0, 0, -0.26)
+		rig.add_child(lens)
+		var tally := OmniLight3D.new()
+		tally.light_color = Color("ff2a1a")
+		tally.light_energy = 0.6
+		tally.omni_range = 0.6
+		tally.position = Vector3(0.08, 0.08, -0.22)
+		rig.add_child(tally)
 
 
 ## The door he leaves by. A lit frame in the right-hand wall with a panel that
@@ -759,6 +726,27 @@ func _build_staff_door() -> void:
 	panel.mesh = panel_mesh
 	panel.position = Vector3(0, 1.18, 0)
 	staff_door_panel.add_child(panel)
+
+
+## Open steel bands at a vat's foot and crown. Open-ended so the view from
+## inside the tank is through them, not into a lid.
+func _vat_bands(parent: Node3D, at: Vector3, radius: float, glass_top: float) -> void:
+	var plate := LabSurface.material("plate")
+	for band in [[0.2, 0.4], [glass_top - 0.1, 0.36]]:
+		var node := MeshInstance3D.new()
+		var tube := CylinderMesh.new()
+		tube.top_radius = radius
+		tube.bottom_radius = radius
+		tube.height = band[1]
+		tube.cap_top = false
+		tube.cap_bottom = false
+		tube.radial_segments = 28
+		var material := plate.duplicate() as StandardMaterial3D
+		material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		tube.material = material
+		node.mesh = tube
+		node.position = at + Vector3(0, band[0], 0)
+		parent.add_child(node)
 
 
 func _dead_tank(at: Vector3, seed_value: int) -> void:
