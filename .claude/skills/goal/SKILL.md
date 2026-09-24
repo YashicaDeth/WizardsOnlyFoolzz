@@ -29,14 +29,17 @@ answers.
 - [x] **Hollis and the biometric door** (AX beat 5, AX3.3-AX3.4) in the Service
       Arcade: coerce him or put him down, his hand opens the door, his gun goes
       into Carry. `FacilityGuardPost`, merged at `c068775`.
-- [ ] **Death is rebirth in a vat.** You wake in the vat of whoever claims you
+- [x] **Death is rebirth in a vat.** You wake in the vat of whoever claims you
       (CellOutz, a rival, a cult). Nothing carried survives: gear, gun and
       clothes stay where you died to be looted or recovered. The character
-      preset, memories and the world's record carry over. First wire
-      `CharacterPresets.save()` (nothing calls it; the intake's PRESET route
-      answers "NO PRESET ON FILE" for everyone).
-- [ ] **Hollis escalates**: warning shots, then wounds, then lethal once death
-      exists; he remembers you after your rebirth.
+      preset, memories and the world's record carry over. `VatRebirth`;
+      filing the examination now saves the preset. Merged at `17557ec`.
+      Still open: only Hollis can kill you on the route so far (the Lower
+      Works sentinel and the derby do not), and the other claimants' vats
+      share the Growing Floor scene until their rooms exist.
+- [x] **Hollis escalates**: one warning shot, then wounds, then lethal; after
+      killing you he knows you ("You again") and skips the warning. Merged at
+      `17557ec`.
 - [ ] **The opening's wires beat**: END ALL SUFFERING, the player tears the
       umbilicals out, GET REVENGE, then the glass goes. A first version for the
       old vat is commit `f461a93`; port it onto the reworked Growing Floor
