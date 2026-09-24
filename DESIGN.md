@@ -819,6 +819,9 @@ we can make nudity and censors".
   face it. The screen is the terminal aimed at the subject, which is what
   the intake is shown on. He works it from the end of the desk, and walks
   round its corner and past the tank to his door (`station_placement_test`).
+- **Greg confirmed (question boxes, 24 September):** keep the desk beside
+  the tank; the screen faces the tank; work continues straight down
+  `DESIGN/GOAL_LOOP_2.md`.
 
 ## Influence register
 
