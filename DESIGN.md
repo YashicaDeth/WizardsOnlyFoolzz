@@ -621,6 +621,18 @@ earned by not fighting and spent by betrayal. The ambiguities worth asking
 about are whether diplomacy has a tree of its own, and whether "many
 enemies" means stealth missions field more of them.
 
+### Answered by Greg in question boxes, 24 September 2026 (after the lanes)
+
+- **The blood waterfall is where the derby tunnels come out**, as he
+  described: crash in the derby, drive the GTA-style tunnels, surface at the
+  waterfall. The walking old drains keep their own storm outfall.
+- **The doctor leaves through the door behind the vat**: the player watches
+  him walk out through the door they will break down. One door, one revenge.
+- **Blood opens the trees both ways**: small nodes open by themselves once a
+  weapon has earned enough; bigger ones cost blood, spent as fuel.
+- **Random events often, GTA-style**: roughly one every one to two minutes,
+  so the world feels crowded and crazy.
+
 ### Answered by Greg in question boxes, 24 September 2026 (the Support Unit)
 
 - **Guards are numbers only**: CELLOUTZ SECURITY 04, 11, 17 and so on.
