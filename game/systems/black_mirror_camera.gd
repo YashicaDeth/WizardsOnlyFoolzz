@@ -3,6 +3,13 @@ extends Control
 
 const Mirror := preload("res://systems/black_mirror.gd")
 const SENSOR_SHADER := preload("res://shaders/black_mirror_sensor.gdshader")
+const DEPTH_SHADER := preload("res://shaders/black_mirror_depth.gdshader")
+const MODES := ["night", "depth"]
+## Which of the phone's cameras is up: the low-light sensor, or the LiDAR-style
+## depth image (Greg, 2026-09-24). Shift+L cycles it while the phone is raised.
+var mode := "night"
+var depth_quad: MeshInstance3D
+var depth_environment: Environment
 var active := false
 var sensor := Mirror.night_vision_state()
 var source_camera: Camera3D
@@ -38,6 +45,7 @@ func bind(camera: Camera3D, environment: Environment) -> void:
 func set_active(enabled: bool) -> void:
 	active = enabled and float(sensor.battery) > 0.001
 	visible = active
+	_apply_mode()
 	if is_instance_valid(source_camera):
 		if active and source_environment != null:
 			sensor_environment = source_environment.duplicate(true)
@@ -51,7 +59,47 @@ func set_active(enabled: bool) -> void:
 	if not active:
 		WorldHistory.amend_subject("mirror_power", {"kind": "device", "charge": sensor.battery})
 
+func cycle_mode() -> String:
+	mode = MODES[(MODES.find(mode) + 1) % MODES.size()]
+	_apply_mode()
+	return mode
+
+
+## The depth image is a quad on the camera itself, because only a 3D pass can
+## read the depth buffer; the night sensor is the 2D screen pass it always was.
+func _apply_mode() -> void:
+	var depth := active and mode == "depth"
+	if effect != null:
+		effect.visible = not depth
+	if depth and depth_quad == null and is_instance_valid(source_camera):
+		depth_quad = MeshInstance3D.new()
+		depth_quad.name = "BlackMirrorDepth"
+		var quad := QuadMesh.new()
+		var material_value := ShaderMaterial.new()
+		material_value.shader = DEPTH_SHADER
+		quad.material = material_value
+		depth_quad.mesh = quad
+		depth_quad.extra_cull_margin = 16384.0
+		depth_quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		source_camera.add_child(depth_quad)
+	if depth_quad != null and is_instance_valid(depth_quad):
+		depth_quad.visible = depth
+	# The depth image is data, not a picture: no grade, glow or tonemap on it.
+	if is_instance_valid(source_camera) and active:
+		if depth:
+			if depth_environment == null:
+				depth_environment = Environment.new()
+				depth_environment.background_mode = Environment.BG_COLOR
+				depth_environment.background_color = Color.BLACK
+				depth_environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+			source_camera.environment = depth_environment
+		elif sensor_environment != null:
+			source_camera.environment = sensor_environment
+
+
 func _exit_tree() -> void:
+	if depth_quad != null and is_instance_valid(depth_quad):
+		depth_quad.queue_free()
 	if is_instance_valid(source_camera):
 		source_camera.environment = null
 
@@ -102,6 +150,7 @@ func _draw_camera() -> void:
 	var strip := "REC   %02d:%02d:%02d     %s     %02d%% CELL" % [elapsed / 3600, (elapsed / 60) % 60, elapsed % 60, WorldClock.stamp(), roundi(sensor.battery * 100.0)]
 	var strip_width := font.get_string_size(strip, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
 	var left := size.x * 0.5 - strip_width * 0.5
+	overlay.draw_rect(Rect2(Vector2(left - 30, 26), Vector2(strip_width + 44, 40)), Color(0, 0, 0, 0.45))
 	if fmod(clock, 1.2) < 0.8:
 		overlay.draw_circle(Vector2(left - 16, 42), 7.0, red)
 	overlay.draw_string(font, Vector2(left, 48), "REC", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, red)
@@ -109,6 +158,8 @@ func _draw_camera() -> void:
 	var cell := Rect2(Vector2(left, 58), Vector2(strip_width, 3))
 	overlay.draw_rect(cell, ink * Color(1, 1, 1, 0.15))
 	overlay.draw_rect(Rect2(cell.position, Vector2(cell.size.x * float(sensor.battery), cell.size.y)), ink * Color(1, 1, 1, 0.7))
-	var readout := "BLACK MIRROR  /  LOW-LIGHT     GAIN x%.1f   EXP %.1f   FOCUS %.1fm     N RECORD  ·  L LOWER" % [sensor.gain, sensor.exposure, sensor.focus_distance]
+	var readout := ("BLACK MIRROR  /  DEPTH     " if mode == "depth" else "BLACK MIRROR  /  LOW-LIGHT     ") + "GAIN x%.1f   EXP %.1f   FOCUS %.1fm     N RECORD  ·  SHIFT+L MODE  ·  L LOWER" % [sensor.gain, sensor.exposure, sensor.focus_distance]
 	var readout_width := font.get_string_size(readout, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
+	# A dark backing, so the readout holds on the depth image's white as well.
+	overlay.draw_rect(Rect2(Vector2(size.x * 0.5 - readout_width * 0.5 - 10, size.y - 106), Vector2(readout_width + 20, 22)), Color(0, 0, 0, 0.55))
 	overlay.draw_string(font, Vector2(size.x * 0.5 - readout_width * 0.5, size.y - 90), readout, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ink * Color(1, 1, 1, 0.75))

@@ -1733,7 +1733,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			# still snaps a photo instantly, unchanged; L holds the view amplified
 			# so looking through it is a real choice you can hold rather than a
 			# single instant.
-			KEY_L: _toggle_black_mirror()
+			KEY_L:
+				# Shift+L swaps the raised phone between its low-light sensor and
+				# its depth camera; plain L raises and lowers it.
+				if event.shift_pressed and black_mirror_active and _mirror != null:
+					prompt.text = "BLACK MIRROR // " + _mirror.cycle_mode().to_upper()
+				else:
+					_toggle_black_mirror()
 			KEY_C: _start_grapple()
 			KEY_Z: _toggle_lock()
 			KEY_E: _interact()
