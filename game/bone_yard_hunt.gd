@@ -325,6 +325,13 @@ var guard_stamina_drain := 14.0
 ## retained as a keyboard fallback, but RMB is the production first-person bind.
 var guard_aim := Vector2.ZERO
 var guard_side := ""
+## What happened in the current fight, for the readout when it ends (Greg,
+## 24 September: "a stats readout" is one of the ways to learn the curve).
+var fight_stats: Dictionary = {}
+var _fight_quiet := 0.0
+var fight_readout: Label
+var _fight_readout_time := 0.0
+const FIGHT_QUIET_SECONDS := 6.0
 var last_blade_read: Dictionary = {}
 ## A timed parry used to change only numbers and text.  Keep the most recent
 ## burst as a reference for the tiny presentation test; it is never used as
@@ -1858,6 +1865,7 @@ func _captain_name() -> String:
 
 
 func _physics_process(delta: float) -> void:
+	_tick_fight(delta)
 	if kill_cam.active:
 		return
 	# The resolution window does not stop the world. Standing over someone
@@ -2779,6 +2787,29 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	var facing := strike_dir.dot((target.global_position - player).normalized())
 	if facing < 0.12:
 		return false
+	# Greg, 24 September: they defend by tier. A fighter inside their own
+	# wind-up is committed and open; otherwise they may block the swing or
+	# turn it, which costs you footing.
+	fight_stats["swings"] = int(fight_stats.get("swings", 0)) + 1
+	_fight_active()
+	var defence_sequence := int(actor.get("defence_sequence", 0))
+	actor["defence_sequence"] = defence_sequence + 1
+	var committed := float(actor.get("attack_time", 0.0)) > _actor_attack_cycle(actor) * float(FighterTier.spec(str(actor.get("tier", "hunter"))).telegraph)
+	var defence := FighterTier.defend(str(actor.get("tier", "hunter")), str(actor.subject_id), defence_sequence, committed or _actor_stumbling(actor))
+	if defence == "parry":
+		fight_stats["they_parried"] = int(fight_stats.get("they_parried", 0)) + 1
+		lose_footing(0.5, "%s TURNED YOUR BLOW // CATCH THEM MID-SWING" % str(actor.display_name).to_upper())
+		impact_feel.strike(0.7, "cut", false)
+		return true
+	if defence == "block":
+		fight_stats["they_blocked"] = int(fight_stats.get("they_blocked", 0)) + 1
+		attack = attack.duplicate()
+		attack["damage"] = float(attack.get("damage", 0.0)) * 0.25
+		prompt.text = "%s BLOCKED IT" % str(actor.display_name).to_upper()
+	else:
+		fight_stats["landed"] = int(fight_stats.get("landed", 0)) + 1
+		if committed:
+			fight_stats["punished"] = int(fight_stats.get("punished", 0)) + 1
 	# The hunter turns into the blow for a moment, so a strike behind you is
 	# seen landing rather than connecting through your back.
 	var turn := target.global_position - player
@@ -5855,8 +5886,13 @@ func _update_encounter_actors(delta: float) -> void:
 			# already enforces, on the other side of the fight.
 			if float(actor.get("attack_time", 0.0)) <= 0.0:
 				var sequence := int(actor.get("attack_sequence", 0))
-				var side_index := posmod(hash(str(actor.get("subject_id", index))) + sequence, BladeRead.SIDES.size())
-				actor["attack_side"] = BladeRead.SIDES[side_index]
+				var tier := str(actor.get("tier", "hunter"))
+				var fighter_id := str(actor.get("subject_id", index))
+				# Lower tiers work round their sides; higher ones read the guard
+				# you are holding and go for the side it leaves open, and some
+				# wind-ups are feints that change side late.
+				actor["attack_side"] = FighterTier.choose_side(tier, fighter_id, sequence, guard_side if guarding else "")
+				actor["feint_to"] = FighterTier.feint_side(tier, fighter_id, sequence, str(actor.attack_side))
 				actor["attack_sequence"] = sequence + 1
 			var pressing := 2.2 if strike_windup >= 0.0 else 1.0
 			actor["attack_time"] = float(actor.get("attack_time", 0.0)) + actor_delta * pressing
@@ -5865,10 +5901,18 @@ func _update_encounter_actors(delta: float) -> void:
 				threat_compass.report(str(actor.get("subject_id", index)), node.global_position, float(actor.attack_time) / maxf(attack_cycle, 0.01))
 			if actor_motion != null:
 				actor_motion.set_combat_pose(clampf(float(actor.attack_time) / maxf(attack_cycle * 0.57, 0.01), 0.0, 1.0), "melee")
-			if float(actor.attack_time) > attack_cycle * 0.57:
+			var telegraph_from := float(FighterTier.spec(str(actor.get("tier", "hunter"))).telegraph)
+			if not str(actor.get("feint_to", "")).is_empty() and float(actor.attack_time) > attack_cycle * FighterTier.FEINT_AT:
+				actor["attack_side"] = str(actor.feint_to)
+				actor["feint_to"] = ""
+				fight_stats["feints_seen"] = int(fight_stats.get("feints_seen", 0)) + 1
+				prompt.text = "FEINT // %s SWITCHES TO %s" % [str(actor.display_name).to_upper(), str(actor.attack_side).to_upper()]
+			elif float(actor.attack_time) > attack_cycle * telegraph_from:
 				prompt.text = "%s RAISES FROM %s" % [str(actor.display_name).to_upper(), str(actor.get("attack_side", BladeRead.HIGH)).to_upper()]
+			_show_telegraph(actor, node, float(actor.attack_time) / maxf(attack_cycle, 0.01) >= telegraph_from)
 			if float(actor.attack_time) >= attack_cycle:
 				actor.attack_time = 0.0
+				_show_telegraph(actor, node, false)
 				if actor_motion != null:
 					actor_motion.set_combat_pose(0.0, "")
 					actor_motion.trigger_attack(0.62, "melee")
@@ -5878,6 +5922,7 @@ func _update_encounter_actors(delta: float) -> void:
 					# spends stamina instead of blood.
 					var incoming := float(_actor_attack_damage(actor))
 					var guarded: Dictionary = guard_absorb(incoming, node.global_position, str(actor.get("attack_side", "")))
+					_note_incoming(str(actor.get("attack_side", "")), guarded)
 					if bool(guarded.get("parried", false)):
 						# The attacker eats their own commitment. This wrote to
 						# "stagger" and "cooldown" — neither of which anything
@@ -5898,6 +5943,122 @@ func _update_encounter_actors(delta: float) -> void:
 						_complete_local_law_arrest(actor)
 						return
 					health = maxi(1, health_after)
+
+
+# --- telegraphs and the fight readout (Greg, 24 September) ------------------
+
+## Where the next swing comes from, on the fighter, in the same red as the
+## body-cam's REC: over the head for high, at the knees for low, and on your
+## left or right of them for the sides. Tiers decide how early it shows.
+func _show_telegraph(actor: Dictionary, node: Node3D, on: bool) -> void:
+	var mark := actor.get("telegraph_mark") as Label3D
+	if mark == null or not is_instance_valid(mark):
+		if not on:
+			return
+		mark = Label3D.new()
+		mark.name = "Telegraph"
+		mark.font_size = 72
+		mark.outline_size = 14
+		mark.modulate = Color("ff3a26")
+		mark.outline_modulate = Color(0, 0, 0, 0.85)
+		mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		mark.no_depth_test = true
+		mark.pixel_size = 0.004
+		add_child(mark)
+		actor["telegraph_mark"] = mark
+	mark.visible = on
+	if not on:
+		return
+	var side := str(actor.get("attack_side", BladeRead.HIGH))
+	var toward := node.global_position - player
+	toward.y = 0.0
+	var right := toward.normalized().cross(Vector3.UP) if toward.length_squared() > 0.001 else Vector3.RIGHT
+	var at := node.global_position + Vector3(0, 1.3, 0)
+	match side:
+		BladeRead.HIGH:
+			at = node.global_position + Vector3(0, 2.2, 0)
+			mark.text = "HIGH"
+		BladeRead.LOW:
+			at = node.global_position + Vector3(0, 0.45, 0)
+			mark.text = "LOW"
+		BladeRead.LEFT:
+			at += -right * 0.6
+			mark.text = "LEFT"
+		_:
+			at += right * 0.6
+			mark.text = "RIGHT"
+	mark.global_position = at
+	mark.modulate.a = 0.55 + 0.45 * absf(sin(Time.get_ticks_msec() * 0.012))
+
+
+func _fight_active() -> void:
+	_fight_quiet = FIGHT_QUIET_SECONDS
+
+
+func _note_incoming(side: String, guarded: Dictionary) -> void:
+	_fight_active()
+	if bool(guarded.get("parried", false)):
+		fight_stats["parries"] = int(fight_stats.get("parries", 0)) + 1
+	elif bool(guarded.get("blocked", false)):
+		fight_stats["blocks"] = int(fight_stats.get("blocks", 0)) + 1
+	else:
+		var by_side: Dictionary = fight_stats.get("hit_from", {})
+		by_side[side] = int(by_side.get(side, 0)) + 1
+		fight_stats["hit_from"] = by_side
+
+
+## The readout, once a fight has gone quiet: what you did, what they did, and
+## the side that beat you most, so the next fight has something to fix.
+static func fight_summary(stats: Dictionary) -> String:
+	var swings := int(stats.get("swings", 0))
+	var landed := int(stats.get("landed", 0))
+	var lines := ["FIGHT OVER // YOUR SWINGS %d  LANDED %d  BLOCKED %d  TURNED %d  CAUGHT MID-SWING %d" % [
+		swings, landed, int(stats.get("they_blocked", 0)), int(stats.get("they_parried", 0)), int(stats.get("punished", 0))]]
+	var by_side: Dictionary = stats.get("hit_from", {})
+	var taken := 0
+	var worst := ""
+	for side: String in by_side:
+		taken += int(by_side[side])
+		if worst.is_empty() or int(by_side[side]) > int(by_side[worst]):
+			worst = side
+	lines.append("YOU BLOCKED %d  PARRIED %d  WERE HIT %d  FEINTS SEEN %d" % [int(stats.get("blocks", 0)), int(stats.get("parries", 0)), taken, int(stats.get("feints_seen", 0))])
+	if not worst.is_empty():
+		lines.append("WHAT BEAT YOU: SWINGS FROM %s. HOLD THE GUARD THAT WAY WHEN IT SHOWS." % worst.to_upper())
+	elif swings > 0 and landed * 2 < swings:
+		lines.append("MOST OF YOUR SWINGS WERE STOPPED. HIT THEM WHILE THEY WIND UP.")
+	return "\n".join(lines)
+
+
+func _tick_fight(delta: float) -> void:
+	if _fight_readout_time > 0.0:
+		_fight_readout_time -= delta
+		if _fight_readout_time <= 0.0 and fight_readout != null:
+			fight_readout.visible = false
+	if _fight_quiet <= 0.0:
+		return
+	_fight_quiet -= delta
+	if _fight_quiet > 0.0:
+		return
+	if int(fight_stats.get("swings", 0)) + (fight_stats.get("hit_from", {}) as Dictionary).size() + int(fight_stats.get("blocks", 0)) == 0:
+		fight_stats.clear()
+		return
+	if fight_readout == null:
+		fight_readout = Label.new()
+		fight_readout.name = "FightReadout"
+		fight_readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		fight_readout.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+		fight_readout.position = Vector2(-520, 96)
+		fight_readout.size = Vector2(1040, 90)
+		fight_readout.add_theme_font_size_override("font_size", 15)
+		fight_readout.add_theme_color_override("font_color", Color("e8e1d2"))
+		fight_readout.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+		fight_readout.add_theme_constant_override("outline_size", 6)
+		$HUD.add_child(fight_readout)
+	fight_readout.text = fight_summary(fight_stats)
+	fight_readout.visible = true
+	_fight_readout_time = 8.0
+	WorldHistory.record_event("fight_summarised", {"stats": fight_stats.duplicate(true)})
+	fight_stats.clear()
 
 
 func _complete_local_law_arrest(actor: Dictionary) -> void:
@@ -6002,7 +6163,7 @@ func _actor_attack_cycle(actor: Dictionary) -> float:
 	# O6.1. A fist comes back faster than a weapon does — the same reason the
 	# player's own bare-hand attacks run at a shorter cooldown than a cleaver.
 	var unarmed := NPC_UNARMED_CYCLE_SCALE if bool(actor.get("disarmed", false)) else 1.0
-	return lerpf(2.4, 1.4, _actor_combat_ratio(actor)) * lerpf(1.6, 1.0, _actor_footing(actor)) * unarmed
+	return lerpf(2.4, 1.4, _actor_combat_ratio(actor)) * lerpf(1.6, 1.0, _actor_footing(actor)) * unarmed * float(FighterTier.spec(str(actor.get("tier", "hunter"))).cycle)
 
 
 func _actor_attack_damage(actor: Dictionary) -> int:
@@ -9279,6 +9440,10 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 	var initial_state := "hunting" if initial_disposition == "hostile" else "idle"
 	encounter_actors.append({"subject_id": subject_id, "display_name": display_name, "node": actor, "rig": rig, "motion": actor_motion, "anatomy": anatomy, "state": initial_state, "disposition": initial_disposition, "speed": 3.7, "loot": loot, "loot_at_risk": false, "dead": false})
 	encounter_actors.back()["encounter_id"] = str(encounter.get("instance_id", ""))
+	# Greg, 24 September: difficulty is who you fight (`FighterTier`).
+	var tier_source := encounter.duplicate()
+	tier_source["name"] = display_name
+	encounter_actors.back()["tier"] = FighterTier.tier_for(tier_source, returning_rival)
 	if returning_rival:
 		encounter_actors.back()["returning_rival"] = true
 	if str(saved_actor.get("status", "")) in ["spared", "recruited"]:

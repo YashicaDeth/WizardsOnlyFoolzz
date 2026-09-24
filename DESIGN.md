@@ -764,6 +764,24 @@ we can make nudity and censors".
   Your old body stays where you fell (`RebirthSite`), with what you
   carried and any jester parts you wore, and E beside it takes them back.
 
+### Answered by Greg in question boxes, 24 September 2026 (the combat overhaul)
+
+- **Swing direction is a mouse flick at the click,** as in Mordhau or
+  Chivalry: the way the mouse is moving sets the swing (overhead, left,
+  right, stab, underhand, anything between), in first and third person.
+- **Blocking is directional, with parry timing.** Hold block and point the
+  mouse toward the incoming swing to stop it. Block just as it lands to
+  parry and stagger. The wrong side goes through.
+- **Learning the skill curve, all four:**
+  - telegraphs you can read (wind-ups show direction; faster fighters
+    telegraph less)
+  - a sparring partner in the Hunt
+  - moves (feints, combos, counters) that unlock through the blood trees
+  - a stats readout after a fight
+- **The difficulty tiers are who you fight:** scavengers, hunters, Ashline
+  captains, elites. Each has measured block, parry and feint rates, tuned so
+  a skilled player can beat each tier. There is no menu setting.
+
 ## Influence register
 
 These entries describe what Greg said he values; proposed extraction is labelled. Liking a reference does not automatically import every mechanic from it.
