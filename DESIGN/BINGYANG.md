@@ -75,6 +75,12 @@ the player is what came out whole, and bingyangers are what came out wrong.
 - **Mortality:** they die like anyone. Same anatomy, the guard can shoot
   them, the player can kill them, and the world records it.
 
+### The exception in the drains (later the same day)
+
+- **One bingyanger was freed long ago**, by an earlier cycle rather than the
+  player. It lives in the old drains, is always hostile, and hunts whoever
+  takes the drain route out.
+
 ## Assistant proposals, not confirmed
 
 - **Freed from either place.** Greg chose both "the Support Unit ward" and

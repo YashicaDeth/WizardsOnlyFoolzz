@@ -49,6 +49,9 @@ var district := ""
 var district_timer := 0.0
 var surfaced := false
 var surface_requested := false
+## Greg, 24 September: something hunts you down here, "a bingyanger, freed
+## long ago". See `systems/drain_stalker.gd`.
+var stalker: DrainStalker
 
 
 func _ready() -> void:
@@ -59,6 +62,7 @@ func _ready() -> void:
 	_build_cistern()
 	_build_outfall()
 	_build_player()
+	_build_stalker()
 	_build_hud()
 	# The route begins when you drop in. A world that already started it (a
 	# resumed run) keeps its steps; begin() refuses a second start.
@@ -260,6 +264,20 @@ func _build_player() -> void:
 		LabSurface.hold_in_view(camera, LabSurface.breach_tool())
 
 
+func _build_stalker() -> void:
+	stalker = DrainStalker.new()
+	stalker.name = "DrainBingyanger"
+	add_child(stalker)
+	# Along the walkways and round the cistern, starting far enough in that
+	# the drop point is quiet.
+	var round: Array[Vector3] = [
+		Vector3(-2.0, 0.0, -14.0), Vector3(2.0, 0.0, -22.0), Vector3(-4.5, 0.0, -32.0),
+		Vector3(4.5, 0.0, -40.0), Vector3(2.0, 0.0, -24.0), Vector3(-2.0, 0.0, -8.0),
+	]
+	stalker.build(round)
+	stalker.bind(player)
+
+
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	layer.layer = 10
@@ -287,6 +305,9 @@ func _build_hud() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		var clicked: bool = event.pressed
+		if clicked and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and VatRebirth.carries("BREACH TOOL"):
+			stalker.discharge(player.global_position)
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		yaw -= event.relative.x * 0.0026
@@ -298,7 +319,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	var input := Vector3(Input.get_axis("move_left", "move_right"), 0.0, Input.get_axis("move_forward", "move_back"))
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
-	var pace := WALK_SPEED * (1.6 if Input.is_action_pressed("sprint") else 1.0)
+	var creeping := Input.is_action_pressed("crouch")
+	var pace := WALK_SPEED * (1.6 if Input.is_action_pressed("sprint") else 1.0) * (0.45 if creeping else 1.0)
+	camera.position.y = move_toward(camera.position.y, 0.3 if creeping else 0.77, delta * 3.0)
 	player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
 	player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
 	player.velocity.y = -2.0 if player.is_on_floor() else player.velocity.y - 18.0 * delta
@@ -356,7 +379,8 @@ func _flat_distance(at: Vector3) -> float:
 
 
 func _update_hud() -> void:
-	status.text = "OLD DRAINS // %s" % str(DISTRICT_LABELS.get(district, "BELOW THE LOWER WORKS"))
+	var hunted := "SOMETHING IS HUNTING YOU" if stalker.state == "hunt" else ("IT IS STUNNED" if stalker.state == "stunned" else "SOMETHING IS DOWN HERE")
+	status.text = "BLOOD %03d%%   OLD DRAINS // %s   //   %s" % [roundi(stalker.blood), str(DISTRICT_LABELS.get(district, "BELOW THE LOWER WORKS")), hunted]
 	objective.text = "OBJECTIVE // FOLLOW THE WATER OUT"
 	if surfaced:
 		prompt.text = ""
@@ -365,4 +389,4 @@ func _update_hud() -> void:
 	elif district_timer > 0.0:
 		prompt.text = str(DISTRICT_LABELS.get(district, ""))
 	else:
-		prompt.text = "WASD MOVE   //   MOUSE LOOK   //   E INTERACT"
+		prompt.text = "WASD MOVE   //   CTRL CREEP, IT HUNTS BY SOUND   //   E INTERACT" + ("   //   LMB DISCHARGE THE BREACH TOOL" if VatRebirth.carries("BREACH TOOL") else "")

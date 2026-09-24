@@ -602,6 +602,14 @@ earned by not fighting and spent by betrayal. The ambiguities worth asking
 about are whether diplomacy has a tree of its own, and whether "many
 enemies" means stealth missions field more of them.
 
+### Answered by Greg in question boxes, 24 September 2026 (the drains)
+
+- **Something hunts you in the old drains**, so the second route costs
+  something the way the sentinel does on the lift route.
+- **It is a bingyanger, freed long ago**: an escapee from an earlier cycle,
+  always hostile, living in the drains. An exception to "bingyangers are only
+  the ones you free".
+
 ### Answered by Greg, 24 September 2026 (cloud session: lore, routes, the first hour)
 
 Recorded in the lane-6-based cloud session and merged here; where this and
