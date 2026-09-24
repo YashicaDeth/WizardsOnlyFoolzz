@@ -16,6 +16,7 @@ extends Node3D
 const OPENING := preload("res://systems/opening_director.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const ANATOMY := preload("res://systems/anatomy_component.gd")
+const LAB_CABLES := preload("res://systems/lab_cables.gd")
 const IMPLANT_CATALOG := preload("res://systems/implant_catalog.gd")
 const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
@@ -63,6 +64,8 @@ var opening_audio: Node
 var fluid: MeshInstance3D
 var vat_glass: MeshInstance3D
 var umbilicals: Array[Node3D] = []
+## What the lab's wiring built: cable and mesh counts, and how low it hangs.
+var cable_report: Dictionary = {}
 var glass_shards: Array[Dictionary] = []
 var door_marker: Node3D
 var line_index := -1
@@ -553,6 +556,8 @@ func _build_chamber() -> void:
 	# before the door as the original 11-bay/34.0 layout) so shortening the
 	# aisle cannot leave dressing poking past the end wall or the door.
 	var bay_count := roundi((AISLE_LENGTH - 3.0) / 3.1) + 1
+	var bay_zs: Array = []
+	var tank_centres: Array = []
 	for bay in bay_count:
 		var z := 2.0 - float(bay) * 3.1
 		for side in [-1.0, 1.0]:
@@ -573,22 +578,13 @@ func _build_chamber() -> void:
 				arch.position = Vector3(side * (6.9 - t * 1.5), 0.5 + t * 3.3, z)
 				arch.rotation_degrees = Vector3(0, 0, side * (8.0 + t * 46.0))
 				add_child(arch)
-			# Conduit running the length, sagging between bays.
-			var gut := MeshInstance3D.new()
-			var tube := CylinderMesh.new()
-			tube.top_radius = 0.11
-			tube.bottom_radius = 0.13
-			tube.height = 3.1
-			tube.material = WorldLook.surface(Color("3a2a22"), "flesh", bay + 3)
-			gut.mesh = tube
-			gut.position = Vector3(side * 6.2, 3.55 + sin(float(bay)) * 0.12, z - 1.5)
-			gut.rotation_degrees = Vector3(90, 0, 0)
-			add_child(gut)
 
+		bay_zs.append(z)
 		# Other tanks, most of them failed.
 		if bay > 0:
 			for side in [-1.0, 1.0]:
 				_dead_tank(Vector3(side * 4.4, 0, z), bay)
+				tank_centres.append(Vector3(side * 4.4, 0, z))
 
 		var strip := OmniLight3D.new()
 		strip.position = Vector3(0, 3.8, z)
@@ -596,6 +592,11 @@ func _build_chamber() -> void:
 		strip.light_energy = 1.5
 		strip.omni_range = 6.5
 		add_child(strip)
+
+	# Greg: "intricate Lain / Evangelion wiring, not one long tube". The
+	# conduit that ran the length of each side is now bundles of cable, hung
+	# from every bay, dropping into every tank and swagged across overhead.
+	cable_report = LAB_CABLES.wire(self, bay_zs, tank_centres, 4.12, 7.35, 4417, [STAFF_DOOR_AT])
 
 	# The pit door at the far end.
 	door_marker = Node3D.new()

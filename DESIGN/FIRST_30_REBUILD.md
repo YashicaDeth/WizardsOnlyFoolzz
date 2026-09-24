@@ -152,8 +152,13 @@ A line is ticked only when all of these hold:
 
 ## II. Greg's jobs from the walkthroughs that are still open
 
-- [ ] **The lab's cables:** intricate Lain / Evangelion wiring, not one long
+- [x] **The lab's cables:** intricate Lain / Evangelion wiring, not one long
       tube.
+  - *Built:* the side conduit is gone. In its place are 336 cables in five
+    sheaths: ceiling bundles hung from every bay, drops into every tank,
+    slack across the floor to the walls, heavy swags over the aisle, and
+    deep loops down the sides. A few lines glow. None hang below 2.95 m
+    over the aisle, and none are solid (`lab_cables_test`).
 - [ ] **More cameras,** and every door you can reach answers when you use it.
 - [ ] **Brain Index hub:**
   - a large opaque overlay, with your 3D body in a vat on the right that you
