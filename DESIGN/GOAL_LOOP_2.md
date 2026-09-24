@@ -112,7 +112,12 @@ here, so this is the list, and the page should link it.
 
 ### What's missing, in order (each one: build, render, test, merge, build)
 
-- [ ] **0.1 Bullets and blades break things.** Route every Hunt gunshot and
+- [x] **0.1 Bullets and blades break things.** *Built:* `WorldBreak` is
+      the one way in. A round's world hit and a blade's wall hit both
+      reach it, and it speaks each breakable's language (streetlight
+      condition, prop integrity, door weapon). There's a breakable yard by
+      the sparring post: two streetlights shoot down to hanging, and two
+      barricades burst into fragments that stay. `world_break_test`. Route every Hunt gunshot and
       melee hit that lands on something other than a body into one
       `WorldDamage` call. Streetlights, doors and props then react to
       gunfire and blows everywhere, not only where one scene wired them.

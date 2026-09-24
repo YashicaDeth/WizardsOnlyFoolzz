@@ -87,6 +87,9 @@ const SLEEP_WAKE_HOUR := 7.0
 const RESTRICTED_STORAGE_POSITION := Vector3(-2.6, 0.0, 18.0)
 const HANDHELD := preload("res://systems/handheld_device.gd")
 const ANATOMY_COMPONENT := preload("res://systems/anatomy_component.gd")
+const WORLD_BREAK := preload("res://systems/world_break.gd")
+const STREET_LIGHT := preload("res://systems/street_light.gd")
+const BREAKABLE_PROP := preload("res://systems/breakable_prop.gd")
 const WORLD_GENERATOR := preload("res://systems/ashbloom_world_generator.gd")
 const MISFIRE_DIRECTOR := preload("res://systems/reality_misfire_director.gd")
 ## AP1.6. Was `preload()` — evaluated at script compile time, which meant
@@ -441,6 +444,8 @@ var body_motion: Node
 var hunter_appearance: Node
 var crouching := false
 var strike_windup := -1.0
+## The last breakable a blow or round landed on, for the HUD and tests.
+var last_world_break: Dictionary = {}
 ## The blood-tree moves (Greg, 24 September). Riposte: until when the next
 ## blow after a parry cannot be stopped. Combo: who the last clean hits went
 ## into, how many, and when the last one landed.
@@ -1172,6 +1177,7 @@ func _ready() -> void:
 	contact_menu.close_requested.connect(_toggle_contact)
 	_spawn_friend()
 	_build_sparring_post()
+	_build_breakables()
 	# AE.1. The captain is still spawned exactly as she always was, and this
 	# runs alongside her rather than instead of her or through her. The order
 	# matters: `_spawn_rival()` owns the Ashline captain and stays untouched,
@@ -2677,6 +2683,11 @@ func _resolve_strike() -> void:
 		ballistics.mark_impact(wall_hit.position, wall_hit.normal, float(report.get("damage", 24.0)) * 0.05)
 		PLAYER_ACTION_LEDGER.record("melee_struck_wall", {"weapon": str(report.get("weapon", "")), "location": HUNT_LOCATION})
 		prompt.text = "STEEL ON STONE"
+		# Whatever the blade met, if it can break, it takes the blow.
+		var broke: Dictionary = WORLD_BREAK.hit(wall_hit.get("collider"), float(report.get("damage", 24.0)), "melee", wall_hit.position, Vector3(sin(yaw), 0.0, cos(yaw)), str(report.get("weapon", "")), "melee")
+		if not broke.is_empty():
+			prompt.text = "IT GIVES" if not bool(broke.get("broken", false)) else "IT BREAKS APART"
+			last_world_break = broke
 		connected = true
 		return
 	if enemy == null or not enemy.visible or enemy_retreating:
@@ -2963,6 +2974,11 @@ func _on_round_hit(hit: Dictionary) -> void:
 	# reached, exactly the way `_trace_actor()`'s instant raycast already did.
 	if struck != null and struck is Node and _resolve_body_hit(struck as Node, hit, payload):
 		return
+	# A round that met something breakable breaks it a little, or all the way.
+	if struck != null:
+		var broke: Dictionary = WORLD_BREAK.hit(struck, float(payload.get("damage", 20.0)), "round", hit.get("position", Vector3.ZERO), hit.get("direction", Vector3.FORWARD), str(payload.get("weapon", "")), "firearm")
+		if not broke.is_empty():
+			last_world_break = broke
 	WorldHistory.record_event("round_struck_world", {
 		"calibre": str(hit.get("calibre", "")),
 		"energy": snappedf(float(hit.get("energy", 0.0)), 0.01),
@@ -3223,7 +3239,7 @@ func _attack_wall(reach: float) -> Dictionary:
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
 		return {}
-	return {"position": hit.position, "normal": hit.normal}
+	return {"position": hit.position, "normal": hit.normal, "collider": hit.get("collider")}
 
 
 func _player_collision_exclusions() -> Array[RID]:
@@ -6265,6 +6281,40 @@ func _build_sparring_post() -> void:
 	_add_mesh_to(post, CylinderMesh.new(), Vector3(0, 1.0, 0), Color("5a4634"), 0.8, Vector3(0.3, 1.0, 0.3))
 	_add_mesh_to(post, BoxMesh.new(), Vector3(0, 1.7, 0), Color("8a2a1e"), 0.6, Vector3(0.9, 0.12, 0.12))
 	_register_interactable(post, "[E] SPAR // PADDED BLOWS, FIRST TO FIVE", _start_spar)
+
+
+## The first things in the Hunt that break (DESIGN/GOAL_LOOP_2.md 0.1): two
+## streetlights and two scrap barricades by the sparring post. Rounds and
+## blades reach them through `WorldBreak`, the lights keep their condition in
+## WorldHistory, and a barricade bursts into capped, persistent fragments.
+const BREAKABLE_YARD := [
+	["light", "hunt_yard_light_west", Vector3(10.5, 0.0, 4.0)],
+	["light", "hunt_yard_light_east", Vector3(18.5, 0.0, 4.0)],
+	["barricade", "hunt_yard_barricade_west", Vector3(12.0, 0.0, 11.5)],
+	["barricade", "hunt_yard_barricade_east", Vector3(17.0, 0.0, 11.5)],
+]
+var breakables: Array[Node3D] = []
+
+
+func _build_breakables() -> void:
+	for spec in BREAKABLE_YARD:
+		var piece: Node3D
+		if str(spec[0]) == "light":
+			var light = STREET_LIGHT.new()
+			light.name = str(spec[1])
+			light.position = spec[2]
+			add_child(light)
+			light.build(str(spec[1]), 4.4)
+			piece = light
+		else:
+			var prop = BREAKABLE_PROP.new()
+			prop.name = str(spec[1])
+			# Its box is centred on its origin, so it stands on half its height.
+			prop.position = spec[2] + Vector3(0, 1.35 * 0.5, 0)
+			add_child(prop)
+			prop.build("scrap_barricade", Vector3(2.4, 1.35, 0.42), 28.0)
+			piece = prop
+		breakables.append(piece)
 
 
 func _start_spar() -> void:

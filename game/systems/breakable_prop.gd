@@ -68,6 +68,22 @@ func impact(closing_speed: float, direction := Vector3.FORWARD, contribution := 
 	return {"accepted": true, "broken": true, "damage": damage, "integrity": integrity, "fragments": _fragments.size()}
 
 
+## A blow or a round rather than a car: the damage is already known, so it
+## goes straight onto integrity (`WorldBreak` scales it per weapon).
+func strike(damage: float, direction := Vector3.FORWARD) -> Dictionary:
+	if broken:
+		return {"accepted": false, "broken": true, "damage": 0.0, "integrity": integrity}
+	if damage <= 0.0:
+		return {"accepted": false, "broken": false, "damage": 0.0, "integrity": integrity}
+	integrity = maxf(0.0, integrity - damage)
+	if integrity > 0.0:
+		_dent(direction, damage / max_integrity)
+		return {"accepted": true, "broken": false, "damage": damage, "integrity": integrity}
+	# A blow scatters the pieces a step or two, not across the yard.
+	_fracture(direction, MIN_DAMAGE_SPEED + damage * 0.2)
+	return {"accepted": true, "broken": true, "damage": damage, "integrity": integrity, "fragments": _fragments.size()}
+
+
 func fragment_count() -> int:
 	var live := 0
 	for fragment in _fragments:
