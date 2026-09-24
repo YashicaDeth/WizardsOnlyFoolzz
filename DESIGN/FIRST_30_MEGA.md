@@ -1361,14 +1361,14 @@ Greg writes or approves every line; the generated voice is placeholder.
 ## V.7 The demo end card: every field
 
 - [ ] Shows the time you took, from the world record, not a separate tally.
-- [ ] Shows the route you chose, from the world record, not a separate tally.
-- [ ] Shows deaths and rebirths, from the world record, not a separate tally.
-- [ ] Shows who you killed, from the world record, not a separate tally.
-- [ ] Shows who you freed, from the world record, not a separate tally.
-- [ ] Shows tanks you smashed, from the world record, not a separate tally.
-- [ ] Shows what you broke, from the world record, not a separate tally.
+- [x] Shows the route you chose, from the world record, not a separate tally.
+- [x] Shows deaths and rebirths, from the world record, not a separate tally.
+- [x] Shows who you killed, from the world record, not a separate tally.
+- [x] Shows who you freed, from the world record, not a separate tally.
+- [x] Shows tanks you smashed, from the world record, not a separate tally.
+- [x] Shows what you broke, from the world record, not a separate tally.
 - [ ] Shows blood earned per tree, from the world record, not a separate tally.
-- [ ] Shows moves you used, from the world record, not a separate tally.
+- [x] Shows moves you used, from the world record, not a separate tally.
 - [ ] Shows the case you opened, if any, from the world record, not a separate tally.
 - [ ] Shows the wishlist link, from the world record, not a separate tally.
 - [ ] Shows the Discord link, from the world record, not a separate tally.
