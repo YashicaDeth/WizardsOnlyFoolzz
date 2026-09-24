@@ -14,7 +14,8 @@ answer goes into `DESIGN.md` the same turn.
 
 ## Paste this to start it
 
-> /goal Work `DESIGN/GOAL_LOOP_2.md` top-down, on your own, all night.
+> /goal Work `DESIGN/GOAL_LOOP_2.md` top-down, on your own, all night:
+> section 0 (destruction physics) first, then everything after it in order.
 > Branch `claude/dust-to-bones-look`. Read `AGENTS.md`, `DESIGN.md` and the
 > project skills first.
 >
@@ -81,8 +82,61 @@ Rules that always hold:
   - the lab's cables
 - **Recheck:** all four ways out reach the Hunt at their own point, and the
   recheck list passed (`DESIGN/RECHECK_2026-09-24.md`).
+- **The Growing Floor:**
+  - the examiner's workstation moved off the aisle, beside the tank
+  - the other tanks can be smashed, draining their fluid and freeing their
+    subject
 
 ---
+
+## 0. TOP PRIORITY: destruction physics (Greg, 24 September)
+
+Greg: "does the game have destruction physics yet? If not, pull them all up
+on the Dust to Bones map and add them to the top priority of the checklist."
+
+The Dust to Bones page sits in another account and can't be edited from
+here, so this is the list, and the page should link it.
+
+### What exists today
+
+| System | What it does | Where it's wired | Test |
+|---|---|---|---|
+| `BodySlice`, `GoreChunks` | Limbs sever along the cut plane and fly as rigid chunks; heads burst | Every body, everywhere | body_slice, chunk, skull_burst |
+| `BreakableDoor` + `WorldDebris` | Condition 0-1, break states, persistent fragments | The doctor's door, Support Unit cells | breakable_door |
+| `BreakableProp` | One collider while intact, then capped rigid fragments | **Derby only** | breakable_prop, derby_breakables |
+| Derby cars | Panels, doors and hoods detach as debris | Derby | derby_breakables, derby_impact |
+| `StreetLight` | Four break states, shed glass | Placed by the Ashbloom generator, but **nothing hits it** | street_light |
+| `WorldDamage` | Condition kept in WorldHistory, which is the rule for all of it | Streetlights and doors only | world_damage |
+| `VatSmash` (new) | Growing Floor tanks crack, break, drain and free their subject | Growing Floor | vat_smash |
+| Wall strikes | A blade hitting a wall jars the arm and wears the edge | Hunt | wall_strike |
+
+### What's missing, in order (each one: build, render, test, merge, build)
+
+- [ ] **0.1 Bullets and blades break things.** Route every Hunt gunshot and
+      melee hit that lands on something other than a body into one
+      `WorldDamage` call. Streetlights, doors and props then react to
+      gunfire and blows everywhere, not only where one scene wired them.
+- [ ] **0.2 `BreakableProp` out of the derby.** Crates, barrels, lockers,
+      jars, monitors and chairs in the Hunt, the Service Arcade, the Lower
+      Works and the drains, each with its own fragments and the shared
+      debris cap.
+- [ ] **0.3 Glass.** Windows, observation glass, screens and bottles shatter
+      into real, persistent shards. The vat shards become physics shards
+      instead of scripted ones, landing and staying on the grating.
+- [ ] **0.4 Walls and cover that give.** Plasterboard, fences and
+      barricades take condition and open holes in authored stages. No voxel
+      fracture: the scope in `DESIGN/DESTRUCTION.md` stands.
+- [ ] **0.5 Explosions.** Canisters, gas lines or a grenade: one impulse
+      that pushes debris and bodies, damages everything in range through
+      `WorldDamage`, and records it.
+- [ ] **0.6 Vehicles outside the derby.** Hunt cars take the derby's panel
+      damage, detaching parts and denting condition.
+- [ ] **0.7 The world remembers.** Broken things stay broken across scene
+      loads, and whoever owns a holding repairs it over game time.
+- [ ] **0.8 Budget and feel.** A frame-cost cap per scene for live debris,
+      hitstop on breaks (`wof-combat-fx`), and a sound for each material.
+- **ASK after 0.1-0.3:** "Enough breakage, too much, or which things should
+  break next?"
 
 ## A. Close out minutes 0-30
 
