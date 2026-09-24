@@ -360,6 +360,7 @@ var hit_flash: HitFlash = null
 var block_tracker: BlockTracker = null
 ## Tab: the Brain Index hub (Greg, 2026-09-24).
 var brain_hub: BrainIndexHub = null
+var photo_mode: PhotoMode = null
 ## Arriving hurt: the pain of the decant eases over the first minute, unless
 ## something new hurts you (Greg, 2026-09-24). Seconds left, and where from.
 const ARRIVAL_EASE_SECONDS := 60.0
@@ -1129,6 +1130,8 @@ func _ready() -> void:
 	brain_hub.name = "BrainIndexHub"
 	$HUD.add_child(brain_hub)
 	brain_hub.open_surface.connect(_on_hub_surface)
+	photo_mode = PhotoMode.new()
+	add_child(photo_mode)
 	case_menu = CASE_MENU.new()
 	case_menu.name = "CaseMenu"
 	$HUD.add_child(case_menu)
@@ -1747,6 +1750,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			# spoken for, so the artwork goes to the function row with the other
 			# panels rather than losing its only way in.
 			KEY_F9: _toggle_artwork()
+			# Item 6: photo mode freezes the world around a free camera. F10 is
+			# provisional; every letter is spoken for.
+			KEY_F10:
+				if panel_mode.is_empty():
+					photo_mode.rigs = _all_rigs()
+					photo_mode.location = HUNT_LOCATION
+					photo_mode.enter(camera, player_body.global_position)
 			KEY_P: _toggle_panel("board")
 			KEY_O: _toggle_inventory()
 			KEY_U: _toggle_cases()
