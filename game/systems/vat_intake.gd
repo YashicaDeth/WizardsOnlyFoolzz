@@ -113,14 +113,29 @@ var touched_pages: Dictionary = {}
 # long enough to read, in a real font at a readable size, and the form takes
 # the mouse as well as the keys.
 const EXAMINER_FEED := preload("res://systems/examiner_feed.gd")
-const PROSE_SIZE := 17
+## Greg, 24 September: his line bigger, typed at reading pace with a cursor.
+const PROSE_SIZE := 20
 ## Characters per second his line types out at, and reading speed for the hold
 ## after it: a 90-character line used to be gone in about four seconds.
-const REVEAL_RATE := 30.0
+const REVEAL_RATE := 22.0
 const READ_RATE := 18.0
 var examiner_feed: Control
 var revealed := 0.0
 var _shown_text := ""
+## His earlier lines, newest last, kept above the current one and fading.
+var said_history: Array[String] = []
+const HISTORY_LINES := 2
+## Tabs print in (Greg, 24 September): 0 as the page starts feeding out of the
+## terminal's printer, 1 once it has all printed.
+var page_print := 1.0
+var _printed_page := -1
+const PRINT_SECONDS := 0.85
+## The stats strip's gauges ease toward the sheet's real values, and a change
+## flashes its size beside the number.
+var _gauge_shown: Dictionary = {}
+var _gauge_delta: Dictionary = {}
+var _gauge_flash: Dictionary = {}
+const GAUGE_MAX := 12.0
 ## Answers to the question he is asking right now, if he is asking one.
 var answers: Array = []
 ## V: what you thought out loud, typed or heard by the tank's pickup.
@@ -264,8 +279,17 @@ func _process(delta: float) -> void:
 	mirror_settle = Motion.approach(mirror_settle, 1.0 if page == 3 else 0.0, delta, Motion.PANEL)
 	var line := _current_line()
 	if line != _shown_text:
+		if not _shown_text.is_empty():
+			said_history.append(_shown_text)
+			while said_history.size() > HISTORY_LINES:
+				said_history.pop_front()
 		_shown_text = line
 		revealed = 0.0
+	if page != _printed_page:
+		_printed_page = page
+		page_print = 0.0
+	page_print = minf(1.0, page_print + delta / PRINT_SECONDS)
+	_update_gauges(delta)
 	revealed = minf(revealed + delta * REVEAL_RATE, float(line.length()))
 	thought_life = maxf(0.0, thought_life - delta)
 	if examiner_feed != null and is_instance_valid(examiner_feed):
@@ -684,19 +708,69 @@ func _draw_clipboard(rect: Rect2) -> void:
 			_draw_schedule(rect, ink, y)
 
 	# The running total, at the foot of the form where a clerk would put it.
-	var values := sheet.attributes()
 	var footer := rect.size.y - 74.0
+	_draw_print_feed(rect, 110.0, footer - 16.0)
 	draw_line(Vector2(26, footer - 12), Vector2(rect.size.x - 26, footer - 12), ink * Color(1, 1, 1, 0.3), 1.0)
-	var column := 26.0
-	for key in CharacterSheet.ATTRIBUTES:
-		CellOutzType.draw_condensed(self, Vector2(column, footer), str(key).substr(0, 4).to_upper(), 8.0, ink * Color(1, 1, 1, 0.5), 0.7)
-		CellOutzType.draw_condensed(self, Vector2(column, footer + 12), "%04.1f" % float(values[key]), 14.0, ink, 0.9)
-		column += rect.size.x * 0.22
+	_draw_gauges(rect, ink, footer)
 	CellOutzType.draw_condensed(self, Vector2(26, footer + 36), "%s // %s RISING // %s" % [sheet.sun_sign(), sheet.ascendant(), sheet.modality().to_upper()], 9.0, ink * Color(1, 1, 1, 0.55), 0.7)
 	var done := touched_pages.size()
 	var hint := ("CONFIRMED %d/%d  //  CLICK OR ENTER CONFIRMS THIS TAB" % [done, PAGES.size()]) if done < PAGES.size() else "ALL %d CONFIRMED  //  F FILES YOU" % PAGES.size()
 	CellOutzType.draw_condensed(self, Vector2(rect.size.x - 26 - CellOutzType.width_condensed(hint, 9.0, 0.8), footer + 52), hint, 9.0, HOT if done < PAGES.size() else MOSS, 0.8)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _update_gauges(delta: float) -> void:
+	if sheet == null:
+		return
+	var values := sheet.attributes()
+	for key in CharacterSheet.ATTRIBUTES:
+		var actual := float(values[key])
+		if not _gauge_shown.has(key):
+			_gauge_shown[key] = actual
+			continue
+		var target_before: float = float(_gauge_delta.get(key + "_target", actual))
+		if not is_equal_approx(target_before, actual):
+			_gauge_delta[key] = actual - float(_gauge_shown[key])
+			_gauge_flash[key] = 1.6
+		_gauge_delta[key + "_target"] = actual
+		_gauge_shown[key] = move_toward(float(_gauge_shown[key]), actual, delta * 4.0)
+		_gauge_flash[key] = maxf(0.0, float(_gauge_flash.get(key, 0.0)) - delta)
+
+
+## The page feeding out of the printer: everything below the print head is
+## still blank paper, the head itself is a hot line, and the last lines it laid
+## down are still wet.
+func _draw_print_feed(rect: Rect2, top: float, bottom: float) -> void:
+	if page_print >= 1.0:
+		return
+	var head := lerpf(top, bottom, ease(page_print, 0.7))
+	draw_rect(Rect2(Vector2(14, head), Vector2(rect.size.x - 28, bottom - head)), PAPER)
+	draw_rect(Rect2(Vector2(14, head - 22), Vector2(rect.size.x - 28, 22)), HOT * Color(1, 1, 1, 0.07 * (1.0 - page_print)))
+	draw_line(Vector2(14, head), Vector2(rect.size.x - 14, head), HOT, 2.0)
+	draw_line(Vector2(14, head + 3), Vector2(rect.size.x - 14, head + 3), Color(0.02, 0.01, 0.01, 0.8), 3.0)
+
+
+func _draw_gauges(rect: Rect2, ink: Color, footer: float) -> void:
+	var column := 26.0
+	var span := rect.size.x * 0.19
+	for key in CharacterSheet.ATTRIBUTES:
+		var shown := float(_gauge_shown.get(key, sheet.attributes()[key]))
+		CellOutzType.draw_condensed(self, Vector2(column, footer - 4), str(key).substr(0, 4).to_upper(), 9.0, ink * Color(1, 1, 1, 0.6), 0.7)
+		CellOutzType.draw_condensed(self, Vector2(column + 40, footer - 8), "%04.1f" % shown, 16.0, ink, 0.9)
+		var bar := Rect2(Vector2(column, footer + 16), Vector2(span, 7))
+		draw_rect(bar, ink * Color(1, 1, 1, 0.12))
+		draw_rect(Rect2(bar.position, Vector2(span * clampf(shown / GAUGE_MAX, 0.0, 1.0), bar.size.y)), COPPER.lerp(HOT, 0.3))
+		for notch in 4:
+			var x := bar.position.x + span * float(notch + 1) / 4.0
+			draw_line(Vector2(x, bar.position.y), Vector2(x, bar.end.y), PAPER, 1.0)
+		var flash := float(_gauge_flash.get(key, 0.0))
+		var change := float(_gauge_delta.get(key, 0.0))
+		if flash > 0.0 and absf(change) >= 0.05:
+			var tag := "%+.1f" % change
+			# Above the number, not beside it: beside it the tag ran into the
+			# value it was describing (first capture read "04.5.0").
+			CellOutzType.draw_condensed(self, Vector2(column + span - CellOutzType.width_condensed(tag, 11.0, 0.8), footer - 22), tag, 11.0, (MOSS if change > 0.0 else HOT) * Color(1, 1, 1, clampf(flash, 0.0, 1.0)), 0.8)
+		column += rect.size.x * 0.22
 
 
 func _row_mark(ink: Color, at: Vector2, active: bool, ticked: bool) -> void:
@@ -958,10 +1032,21 @@ func _draw_handler(_viewport: Vector2) -> void:
 	var fade := clampf((doctor_life if speaking_as_doctor else handler_life) * 1.5, 0.0, 1.0)
 	var text_width := reply.size.x - 24.0
 	var y := reply.position.y + 14.0
-	CellOutzType.draw_condensed(self, Vector2(reply.position.x + 12, y), "HE SAYS", 8.0, COPPER, 0.7)
+	CellOutzType.draw_condensed(self, Vector2(reply.position.x + 12, y), "HE SAYS", 9.0, COPPER, 0.7)
 	y += 16.0
-	draw_multiline_string(font, Vector2(reply.position.x + 12, y + PROSE_SIZE), shown, HORIZONTAL_ALIGNMENT_LEFT, text_width, PROSE_SIZE, 5, voice_ink * Color(1, 1, 1, fade))
-	y += PROSE_SIZE * 1.35 * 4.0 + 10.0
+	# What he already said, above, fading the older it is.
+	for index in said_history.size():
+		var age := said_history.size() - index
+		var old := said_history[index]
+		draw_string(font, Vector2(reply.position.x + 12, y + 12), old.left(64) + ("..." if old.length() > 64 else ""), HORIZONTAL_ALIGNMENT_LEFT, text_width, 12, voice_ink * Color(1, 1, 1, 0.42 / float(age)))
+		y += 17.0
+	if not said_history.is_empty():
+		y += 4.0
+	# A cursor rides the end of the line while he is still typing it.
+	var typing := revealed < float(line.length())
+	var cursor := "_" if typing and fmod(elapsed, 0.5) < 0.3 else ""
+	draw_multiline_string(font, Vector2(reply.position.x + 12, y + PROSE_SIZE), shown + cursor, HORIZONTAL_ALIGNMENT_LEFT, text_width, PROSE_SIZE, 4, voice_ink * Color(1, 1, 1, fade))
+	y += PROSE_SIZE * 1.3 * 4.0 + 8.0
 	if transcript_life > 0.0:
 		draw_string(font, Vector2(reply.position.x + 12, y), transcript, HORIZONTAL_ALIGNMENT_LEFT, text_width, 13, MOSS * Color(1, 1, 1, clampf(transcript_life, 0.0, 1.0)))
 		y += 22.0
@@ -975,7 +1060,9 @@ func _draw_handler(_viewport: Vector2) -> void:
 		var hot := button.has_point(mouse)
 		draw_rect(button, HOT * Color(1, 1, 1, 0.28 if hot else 0.12))
 		draw_rect(button, HOT * Color(1, 1, 1, 0.7), false, 1.0)
-		draw_string(font, button.position + Vector2(10, 19), "%d   %s" % [index + 1, str(answers[index])], HORIZONTAL_ALIGNMENT_LEFT, text_width - 20, 15, INK)
+		# Each answer is something an eye does (Greg, 24 September).
+		var icon_end := _draw_blink_icon(button.position + Vector2(12, 14), str(answers[index]), hot)
+		draw_string(font, Vector2(icon_end + 10, button.position.y + 19), "%d   %s" % [index + 1, str(answers[index])], HORIZONTAL_ALIGNMENT_LEFT, text_width - (icon_end - button.position.x) - 20, 15, INK)
 		y += 34.0
 
 	if thought_life > 0.0 and thought != "":
@@ -985,6 +1072,30 @@ func _draw_handler(_viewport: Vector2) -> void:
 	var keys := "[V] THINK OUT LOUD" + ("   //   [1-%d] ANSWER" % answers.size() if not answers.is_empty() else "") + "   //   TUBE IN: YOU CANNOT SPEAK"
 	if thought_edit == null or not thought_edit.visible:
 		CellOutzType.draw_condensed(self, Vector2(reply.position.x + 12, reply.end.y - 18), keys, 8.0, INK * Color(1, 1, 1, 0.55), 0.7)
+
+
+## One eye per blink the answer asks for, drawn shut; an open eye for
+## anything else (a stare). Returns the x the label should start at.
+func _draw_blink_icon(at: Vector2, answer: String, hot: bool) -> float:
+	var upper := answer.to_upper()
+	var blinks := 2 if upper.contains("TWICE") else (1 if upper.contains("ONCE") or upper.contains("BLINK") else 0)
+	var ink := INK if hot else INK * Color(1, 1, 1, 0.75)
+	var x := at.x
+	for eye in maxi(1, blinks):
+		var centre := Vector2(x + 9, at.y)
+		if blinks == 0:
+			# Open: lids, and the pupil.
+			draw_arc(centre + Vector2(0, 5), 9.0, PI * 1.15, PI * 1.85, 10, ink, 1.4)
+			draw_arc(centre + Vector2(0, -5), 9.0, PI * 0.15, PI * 0.85, 10, ink, 1.4)
+			draw_circle(centre, 2.6, HOT if hot else ink)
+		else:
+			# Shut: the lid line and three lashes.
+			draw_arc(centre + Vector2(0, -6), 9.0, PI * 0.15, PI * 0.85, 10, ink, 1.6)
+			for lash in 3:
+				var lx := centre.x - 5.0 + float(lash) * 5.0
+				draw_line(Vector2(lx, centre.y + 2.5), Vector2(lx + (float(lash) - 1.0) * 1.5, centre.y + 6.0), ink, 1.2)
+		x += 22.0
+	return x
 
 
 func _fit_handler_line(text: String, width: float) -> String:

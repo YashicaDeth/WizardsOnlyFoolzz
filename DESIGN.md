@@ -581,6 +581,17 @@ another account's organisation and could not be read from this one.
 - Next on the intake GUI: animated tabs, the answer box and transcript, and
   the stats strip. Keep the current red/copper palette and CellOutz type.
 
+### Answered by Greg in question boxes, 24 September 2026 (intake GUI detail)
+
+- **Tabs print in:** switching to an intake tab feeds the page out line by
+  line like a thermal receipt printer, ink still wet.
+- **Answer box:** his line bigger and typed out at reading pace with a
+  cursor; answers drawn as blink choices (eye icons), not plain buttons;
+  earlier lines kept above as a faded scrolling transcript.
+- **Stats strip:** each stat a small gauge that fills, animating when a
+  choice changes it, with the change flashing (+0.4).
+- A new Windows build after these three.
+
 Open: one of Hornee's eyes is a real drink brand's bottle cap with its
 wordmark. Keep it on the shipped model, or swap it for an in-world mark?
 
