@@ -621,6 +621,40 @@ earned by not fighting and spent by betrayal. The ambiguities worth asking
 about are whether diplomacy has a tree of its own, and whether "many
 enemies" means stealth missions field more of them.
 
+### Answered by Greg by voice, 25 September 2026 (the overnight questions)
+
+- **The doctor's name is withheld** in minutes 0–30; the name is the reward
+  for following him to the roof. One line of his history can be found in his
+  examination room.
+- **The doctor's lines** (two when questioned, four in the 3D call): Greg
+  writes these himself; he is the story's first villain. Placeholders stay
+  until then.
+- **Bingyanger lines: five per register** (horror, funny-insane, prophetic).
+  "Bingyang" is a joke name for now and may change later.
+- **Blood trees keep the four-style structure** (BLADE/BLUNT, IRON, MEAT,
+  HUSH); the node names get renamed.
+- **The splinter monks trade** visions, map knowledge and hidden things, and
+  also items and companions (for example the zombie minion), for blood and
+  memories.
+- **The spirits stay ambiguous**: the monks call them the light of the dead;
+  the game never confirms it.
+- **Wizard eyes** (new): once earned, a key used with the phone (L or K)
+  switches from phone vision to wizard eyes, which shows every spirit. It is
+  like seeing into the Wire.
+- **The Wire's people** (new): everyone on the Wire has a different online
+  persona: an alias, an account, a custom avatar (procedural pixel art and
+  generated assets) and website lore.
+- **Why the splinter left**: they believe they reached the last stage, and the
+  guild calls it heresy.
+- **Calling rules kept**: anyone you have met; the dead don't answer, the
+  doctor always refuses, enemies refuse and screen you, friends accept.
+- **One Hollis only**, at the end of the Support Unit. The Service Arcade's
+  door guard becomes a numbered CellOutz guard.
+- **The doctor route's surface arrival** stays at (-20, 0, -30), CellOutz -12.
+- **Balance waits** until Greg has played v0.1.
+- **Sketchfab**: Greg can't drop the zips; he asked for them to be found and
+  fetched another way.
+
 ### Answered by Greg in question boxes, 24 September 2026 (after the lanes)
 
 - **The blood waterfall is where the derby tunnels come out**, as he
