@@ -170,6 +170,14 @@ func passable() -> bool:
 	return broken
 
 
+## Someone with the right hand opening it the ordinary way: 0 shut, 1 wide.
+## Only while it is whole; a broken door has nothing to swing.
+func set_ajar(amount: float) -> void:
+	if broken or _pivot == null or state == "unlocked" or state == "hanging":
+		return
+	_pivot.rotation.y = deg_to_rad(-85.0) * clampf(amount, 0.0, 1.0)
+
+
 ## Where on the door a crosshair is, as the body it would hit, for the owner's
 ## raycast. Everything that can take a blow carries this meta.
 static func door_of(collider: Object) -> BreakableDoor:

@@ -77,6 +77,10 @@ var objective_text := "ESCAPE THE FACILITY"
 ## it, and only then does the vat fail.
 var examiner_node: Node3D
 var staff_door_panel: Node3D
+## Where the examiner stands at his terminal, and whether his door has been
+## heard shutting behind him.
+var examiner_post := Vector3.ZERO
+var examiner_door_heard := false
 var departure_clock := 0.0
 var departure_line := -1
 var arrival_clock := 0.0
@@ -167,7 +171,7 @@ func _ready() -> void:
 	_build_examination_station()
 	# The examiner is not born at the keyboard. He enters after the player wakes.
 	if examiner_node != null:
-		examiner_node.position.x = STAFF_DOOR_AT.x
+		examiner_post = examiner_node.global_position
 		examiner_node.visible = false
 	_build_vat()
 	_build_first_objects()
@@ -981,6 +985,31 @@ func _physics_process(delta: float) -> void:
 		camera.rotation.z += sin(clock * 53.0) * force * 1.4
 	_update_hud()
 
+## From his door behind the vat, round the tank's right side, to his terminal
+## (`inbound`), or the reverse. `t` is 0..1 along the whole walk.
+func _examiner_path(t: float, inbound: bool) -> Vector3:
+	var door: Vector3 = DoctorRoute.DOOR_AT
+	var points: Array[Vector3] = [
+		examiner_post,
+		Vector3(1.9, examiner_post.y, examiner_post.z + 0.6),
+		Vector3(2.0, examiner_post.y, 1.4),
+		Vector3(door.x, examiner_post.y, door.z - 0.6),
+		Vector3(door.x, examiner_post.y, door.z + 0.9),
+	]
+	if inbound:
+		points.reverse()
+	var total := 0.0
+	for index in points.size() - 1:
+		total += points[index].distance_to(points[index + 1])
+	var along := clampf(t, 0.0, 1.0) * total
+	for index in points.size() - 1:
+		var leg := points[index].distance_to(points[index + 1])
+		if along <= leg or index == points.size() - 2:
+			return points[index].lerp(points[index + 1], clampf(along / maxf(leg, 0.001), 0.0, 1.0))
+		along -= leg
+	return points[-1]
+
+
 ## The intake does not begin as a menu. You wake, the examiner enters, looks
 ## through the glass, and only then wakes the terminal that engages the chip.
 func _update_arrival(delta: float) -> void:
@@ -990,7 +1019,11 @@ func _update_arrival(delta: float) -> void:
 	if arrival_clock >= 0.35:
 		examiner_node.visible = true
 	var walk := clampf((arrival_clock - 0.35) / 2.15, 0.0, 1.0)
-	examiner_node.position.x = lerpf(STAFF_DOOR_AT.x, -0.16, ease(walk, 0.78))
+	# Greg, 24 September: he comes and goes by the door behind the vat -- the
+	# one the player will break down to follow him.
+	examiner_node.global_position = _examiner_path(ease(walk, 0.78), true)
+	if doctor_route != null and doctor_route.door != null:
+		doctor_route.door.set_ajar(1.0 - clampf((walk - 0.08) / 0.14, 0.0, 1.0) if arrival_clock >= 0.2 else 0.0)
 	# He first faces the tank, then turns into his own terminal. The object of
 	# attention changes before the UI arrives, which makes the intake a result
 	# of something he physically did in the room.
@@ -1022,7 +1055,17 @@ func _update_departure(delta: float) -> void:
 		var turn := clampf(departure_clock / 0.50, 0.0, 1.0)
 		examiner_node.rotation.y = lerpf(0.0, -PI * 0.5, ease(turn, 0.6))
 		var walk := clampf((departure_clock - 0.50) / 2.45, 0.0, 1.0)
-		examiner_node.position.x = lerpf(-0.16, STAFF_DOOR_AT.x, ease(walk, 0.85))
+		examiner_node.global_position = _examiner_path(ease(walk, 0.85), false)
+		var heading := _examiner_path(minf(1.0, ease(walk, 0.85) + 0.05), false) - examiner_node.global_position
+		if walk > 0.02 and heading.length() > 0.001:
+			examiner_node.global_rotation.y = atan2(-heading.x, -heading.z)
+		# His door swings for him and shuts behind him.
+		if doctor_route != null and doctor_route.door != null:
+			doctor_route.door.set_ajar(clampf((walk - 0.72) / 0.12, 0.0, 1.0) - clampf((departure_clock - 3.1) / 0.5, 0.0, 1.0))
+		if walk >= 0.97 and not examiner_door_heard:
+			examiner_door_heard = true
+			if opening_audio != null:
+				opening_audio.cue("door")
 		# Through the doorway and out of the room, rather than standing in it
 		# while the panel closes across him.
 		if walk >= 1.0:
@@ -1519,7 +1562,7 @@ func _update_hud() -> void:
 	var to_staff := STAFF_DOOR_AT - player.global_position
 	to_staff.y = 0.0
 	if to_staff.length() <= 2.4:
-		prompt.text = "STAFF DOOR // SEALED BEHIND HIM // STAFF ACCESS REQUIRED"
+		prompt.text = "STAFF DOOR // SEALED // STAFF ACCESS REQUIRED"
 		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0
