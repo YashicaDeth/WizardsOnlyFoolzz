@@ -1,23 +1,24 @@
 # Cutscene art slots
 
-`cutscenes/art_slot_stage.tscn` is a side-on cutscene stage made of named slots.
-Every slot draws a rough placeholder (labelled with its name) until you put a PNG
-with the same name in this folder. Your file then replaces the placeholder with no
-code change. Run the stage with:
+`cutscenes/art_slot_stage.tscn` is a neutral cutscene stage made of named layers.
+Each slot draws a plain labelled grey block until you put a PNG with the same name
+in this folder; your file then replaces it with no code change. The placeholders
+suggest nothing about content: what each layer shows is yours.
 
     Godot --path game res://cutscenes/art_slot_stage.tscn
 
-| File | What it is | Notes |
+| File | Layer | Notes |
 |---|---|---|
-| `backdrop.png` | Deep background behind everything | Stretched to the stage |
-| `bg_skulls.png` | Back row of large spiked skulls | Tiles horizontally, drifts slowly (parallax 0.25) |
-| `floor_top.png` | The walkable ledge surface | Tiles horizontally, a thin strip |
-| `floor_worms.png` | Band of worms / guts under the ledge | Tiles horizontally, scrolls with the camera |
-| `actor_runner.png` | The character that runs and leaps | About 1:2 (width:height), transparent background |
-| `actor_jar.png` | A body in a jar that rides up and down | About 3:5, transparent background |
-| `prop_orb.png` | An eye or orb that rolls along the ledge | Square, transparent background; it spins |
-| `frame.png` | Ornate border over everything | Full screen, transparent middle |
+| `bg_far.png` | Furthest background | Tiles horizontally, drifts slowest |
+| `bg_mid.png` | Middle background | Tiles, drifts a little faster |
+| `bg_near.png` | Nearest background | Tiles, drifts faster again |
+| `ground.png` | The surface actors stand on | Tiles, a thin strip |
+| `ground_under.png` | What is below the surface | Tiles |
+| `actor_a.png` | First character | Transparent background |
+| `actor_b.png` | Second character | Transparent background |
+| `prop.png` | A prop | Transparent background |
+| `frame.png` | Border over everything | Full screen, transparent middle |
 
-Tiling slots scale to the band's height, so draw them at any height and keep the
-left and right edges seamless. For animated characters later, the next step is a
-sprite sheet per actor; ask and the slot will read frames from it.
+Tiling layers scale to their band's height; keep their left and right edges
+seamless. Positions, sizes and any movement are set per scene once you decide
+what the scenes are; sprite sheets for animated actors can be added the same way.
