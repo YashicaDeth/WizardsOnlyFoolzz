@@ -47,7 +47,8 @@ func _ready() -> void:
 	var intake: Control = VAT_INTAKE.new()
 	add_child(intake)
 	await get_tree().process_frame
-	intake.page = 4
+	# By name: a FACE page moved SCHEDULE from 4 to 5 and this sat on BODY.
+	intake.page = VAT_INTAKE.PAGES.find("SCHEDULE")
 	intake.row = 0
 	var key := str(CharacterSheet.MODIFIERS.keys()[0])
 	intake._commit()
