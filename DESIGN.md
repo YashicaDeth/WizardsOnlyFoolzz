@@ -382,6 +382,17 @@ either is how this repository became hard to read.
 - **A7.4, does the chassis roll**: still open. Greg's answer was "I don't
   know", so it stays unanswered rather than being decided for him.
 
+### Answered by Greg, 24 September 2026
+
+- **Bingyang, bingyangas, bingyangers.** Bingyang is the madness and mutation
+  the vats and the torture produce. A **bingyanga** is a mutated vat subject
+  held and tortured in the facility's Mental and Physical Support Unit,
+  insane like Outlast's asylum patients. A **bingyanger** is one the player
+  has freed: mutated like a Fallout ghoul, clinically insane, talking in
+  crazy voice lines, and randomly friendly or hostile, re-rolled every
+  meeting. They come from the same vats as the player. Full definitions,
+  decisions and open questions: `DESIGN/BINGYANG.md`.
+
 ## Influence register
 
 These entries describe what Greg said he values; proposed extraction is labelled. Liking a reference does not automatically import every mechanic from it.
