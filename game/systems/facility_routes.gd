@@ -18,6 +18,11 @@ const ROUTE_RECAPTURE := "containment_derby"
 ## route out; the old drains (ROUTE_STEALTH, walked in `old_drains.tscn`) are
 ## the second.
 const ROUTE_HEAT_ELEVATOR := "heat_elevator_ascent"
+## Greg, 24 September (DESIGN/ESCAPE_ROUTES.md): the third way out is chasing
+## the doctor. Through his examination room, down the support unit corridor to
+## his vehicle bay, where he turns out to be a hologram; the bay's ramp is the
+## way up. The bay is played in `doctor_vehicle_bay.tscn`.
+const ROUTE_DOCTOR := "doctor_pursuit"
 
 const CONTAINMENT_MECHANISMS := {
 	"implant_suppression_lattice": "The rewritten brain implant is pinned by a tuned suppression lattice.",
@@ -44,6 +49,11 @@ const DISTRICTS := {
 	# The Lower Works lift. The Service Arcade and Lower Works themselves are
 	# not districts of this graph yet, so it hangs off the facility interior.
 	"heat_elevator": {"name": "Lower Works Heat Elevator", "kind": "surface_exit"},
+	# The doctor's way out: the room he watched from behind the player's vat,
+	# the support unit his staff use, and the bay his vehicle waits in.
+	"examination_room": {"name": "Examination Room", "kind": "corporate_laboratory"},
+	"support_unit": {"name": "Support Unit", "kind": "maintenance_network"},
+	"doctor_vehicle_bay": {"name": "The Doctor's Vehicle Bay", "kind": "surface_exit"},
 }
 
 const CONNECTIONS := [
@@ -62,6 +72,9 @@ const CONNECTIONS := [
 	["underground_colosseum", "lockdown_grid"],
 	["lockdown_grid", "vehicle_sallyport"],
 	["growing_floor", "heat_elevator"],
+	["growing_floor", "examination_room"],
+	["examination_room", "support_unit"],
+	["support_unit", "doctor_vehicle_bay"],
 ]
 
 const ROUTES := {
@@ -115,6 +128,19 @@ const ROUTES := {
 		# here, and the lift that replaced it as the way up comes out beside it.
 		"surface_position": Vector3(4.0, 0.0, -24.0),
 		"surface_relationships": {},
+		"mastery_route": false,
+		"avoids_derby": true,
+	},
+	ROUTE_DOCTOR: {
+		"approach": "pursuit",
+		"label": "CHASING THE DOCTOR",
+		"steps": ["examination_room", "support_unit", "doctor_vehicle_bay"],
+		"exit": "doctor_vehicle_bay",
+		# Assistant placement, not Greg's: north-west of the start, clear of
+		# the outfall (west), the sallyport (south) and the ridge (east).
+		"surface_position": Vector3(-20.0, 0.0, -30.0),
+		# Breaking into a CellOutz officer's private bay is noticed.
+		"surface_relationships": {"celloutz": -12},
 		"mastery_route": false,
 		"avoids_derby": true,
 	},
@@ -173,6 +199,10 @@ static func begin(route_id: String) -> bool:
 	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(SUBJECT, {
 		"active_route": route_id,
+		# Every chosen route starts from the Growing Floor. Without this a
+		# route abandoned halfway left `current_district` deep in another
+		# branch, and the next route's first step was refused as unconnected.
+		"current_district": "growing_floor",
 		"route_steps": [],
 		"route_choice": "",
 		"assault_control_points": [],

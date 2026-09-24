@@ -27,6 +27,7 @@ const BASELINE_HUMAN := preload("res://systems/baseline_human.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const VAT_REBIRTH := preload("res://systems/vat_rebirth.gd")
 const WOUND_CATALOG := preload("res://systems/wound_catalog.gd")
+const DOCTOR_ROUTE := preload("res://systems/doctor_route.gd")
 
 const EYE_HEIGHT := 1.62
 const BODY_HALF_HEIGHT := 0.85
@@ -45,7 +46,9 @@ const DRAINED_AT := 5.6
 ## Tugs it takes to tear one umbilical out. The first ones only hurt.
 const WIRE_TUGS := 3
 ## How long GET REVENGE holds before the glass goes.
-const REVENGE_HOLD := 1.8
+const REVENGE_HOLD := 2.8
+## How long END ALL SUFFERING owns the screen before the wires can be seen.
+const END_CARD_SECONDS := 3.4
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -74,6 +77,10 @@ var objective_text := "ESCAPE THE FACILITY"
 ## it, and only then does the vat fail.
 var examiner_node: Node3D
 var staff_door_panel: Node3D
+## Where the examiner stands at his terminal, and whether his door has been
+## heard shutting behind him.
+var examiner_post := Vector3.ZERO
+var examiner_door_heard := false
 var departure_clock := 0.0
 var departure_line := -1
 var arrival_clock := 0.0
@@ -111,9 +118,16 @@ var active_beats: Array = BEATS
 var title: Label
 ## The HUD as body-cam footage (Greg, 24 September).
 var osd: BodyCamOSD
+## Greg: the task titles "in massive celloutz style font, bloody and bony ...
+## moving around 4d, inverting, going crazy, and after that flashes". The
+## card bursts in over everything; the flickering `title` label is what stays
+## on screen while the player works at the wires.
+var mission_card: Control
 var wired_clock := 0.0
 var revenge_at := -1.0
 var jolt := 0.0
+## His door behind the vat, his room and the lift down (DoctorRoute).
+var doctor_route: Node3D
 
 # 0 submerged, 1 voiding, 2 breach, 3 floor, 4 aisle
 const BEATS := [
@@ -159,11 +173,14 @@ func _ready() -> void:
 	_build_examination_station()
 	# The examiner is not born at the keyboard. He enters after the player wakes.
 	if examiner_node != null:
-		examiner_node.position.x = STAFF_DOOR_AT.x
+		examiner_post = examiner_node.global_position
 		examiner_node.visible = false
 	_build_vat()
 	_build_first_objects()
 	_build_player()
+	doctor_route = DOCTOR_ROUTE.new()
+	add_child(doctor_route)
+	doctor_route.build(self)
 	_build_title()
 	_build_intake()
 	osd = BodyCamOSD.new()
@@ -189,6 +206,10 @@ func _build_title() -> void:
 	title.visible = false
 	$HUD.add_child(title)
 	$HUD.move_child(title, $HUD/Subtitle.get_index())
+	mission_card = MissionCard.new()
+	mission_card.name = "MissionCard"
+	mission_card.visible = false
+	$HUD.add_child(mission_card)
 
 
 ## G6.1/G6.3. Character creation was built but never connected to the opening:
@@ -511,7 +532,8 @@ func _build_chamber() -> void:
 	_slab(Vector3(16.0, 0.35, AISLE_LENGTH + 8.0), Vector3(0, 4.3, -AISLE_LENGTH * 0.4), "rust", Color("100d0b"))
 	_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(-7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
 	_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
-	_slab(Vector3(16.0, 4.4, 0.5), Vector3(0, 2.2, 3.6), "rust", Color("19140f"))
+	# The near wall is DoctorRoute's: the same wall in pieces, around his door
+	# and the observation glass.
 	# Greg, playing the build: "you walk to the end of this room and then
 	# there's just a skybox... I just fell out of the skybox."
 	#
@@ -814,7 +836,8 @@ func _build_staff_door() -> void:
 	staff_door_panel.name = "StaffDoorPanel"
 	# Parked clear of the opening. `_update_sequence`'s departure beat slides it
 	# back across once he is through.
-	staff_door_panel.position = STAFF_DOOR_AT + Vector3(0.30, 0.0, -1.42)
+	# Shut: since 24 September he comes and goes by his own door behind the vat.
+	staff_door_panel.position = STAFF_DOOR_AT + Vector3(0.30, 0.0, 0.0)
 	add_child(staff_door_panel)
 	var panel := MeshInstance3D.new()
 	var panel_mesh := BoxMesh.new()
@@ -916,6 +939,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if doctor_route != null and doctor_route.handle_input(event):
+		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		if phase == "wired":
 			_tug_wire(_aimed_wire())
@@ -969,6 +994,31 @@ func _physics_process(delta: float) -> void:
 		camera.rotation.z += sin(clock * 53.0) * force * 1.4
 	_update_hud()
 
+## From his door behind the vat, round the tank's right side, to his terminal
+## (`inbound`), or the reverse. `t` is 0..1 along the whole walk.
+func _examiner_path(t: float, inbound: bool) -> Vector3:
+	var door: Vector3 = DoctorRoute.DOOR_AT
+	var points: Array[Vector3] = [
+		examiner_post,
+		Vector3(1.9, examiner_post.y, examiner_post.z + 0.6),
+		Vector3(2.0, examiner_post.y, 1.4),
+		Vector3(door.x, examiner_post.y, door.z - 0.6),
+		Vector3(door.x, examiner_post.y, door.z + 0.9),
+	]
+	if inbound:
+		points.reverse()
+	var total := 0.0
+	for index in points.size() - 1:
+		total += points[index].distance_to(points[index + 1])
+	var along := clampf(t, 0.0, 1.0) * total
+	for index in points.size() - 1:
+		var leg := points[index].distance_to(points[index + 1])
+		if along <= leg or index == points.size() - 2:
+			return points[index].lerp(points[index + 1], clampf(along / maxf(leg, 0.001), 0.0, 1.0))
+		along -= leg
+	return points[-1]
+
+
 ## The intake does not begin as a menu. You wake, the examiner enters, looks
 ## through the glass, and only then wakes the terminal that engages the chip.
 func _update_arrival(delta: float) -> void:
@@ -978,7 +1028,11 @@ func _update_arrival(delta: float) -> void:
 	if arrival_clock >= 0.35:
 		examiner_node.visible = true
 	var walk := clampf((arrival_clock - 0.35) / 2.15, 0.0, 1.0)
-	examiner_node.position.x = lerpf(STAFF_DOOR_AT.x, -0.16, ease(walk, 0.78))
+	# Greg, 24 September: he comes and goes by the door behind the vat -- the
+	# one the player will break down to follow him.
+	examiner_node.global_position = _examiner_path(ease(walk, 0.78), true)
+	if doctor_route != null and doctor_route.door != null:
+		doctor_route.door.set_ajar(1.0 - clampf((walk - 0.08) / 0.14, 0.0, 1.0) if arrival_clock >= 0.2 else 0.0)
 	# He first faces the tank, then turns into his own terminal. The object of
 	# attention changes before the UI arrives, which makes the intake a result
 	# of something he physically did in the room.
@@ -1010,19 +1064,21 @@ func _update_departure(delta: float) -> void:
 		var turn := clampf(departure_clock / 0.50, 0.0, 1.0)
 		examiner_node.rotation.y = lerpf(0.0, -PI * 0.5, ease(turn, 0.6))
 		var walk := clampf((departure_clock - 0.50) / 2.45, 0.0, 1.0)
-		examiner_node.position.x = lerpf(-0.16, STAFF_DOOR_AT.x, ease(walk, 0.85))
+		examiner_node.global_position = _examiner_path(ease(walk, 0.85), false)
+		var heading := _examiner_path(minf(1.0, ease(walk, 0.85) + 0.05), false) - examiner_node.global_position
+		if walk > 0.02 and heading.length() > 0.001:
+			examiner_node.global_rotation.y = atan2(-heading.x, -heading.z)
+		# His door swings for him and shuts behind him.
+		if doctor_route != null and doctor_route.door != null:
+			doctor_route.door.set_ajar(clampf((walk - 0.72) / 0.12, 0.0, 1.0) - clampf((departure_clock - 3.1) / 0.5, 0.0, 1.0))
+		if walk >= 0.97 and not examiner_door_heard:
+			examiner_door_heard = true
+			if opening_audio != null:
+				opening_audio.cue("door")
 		# Through the doorway and out of the room, rather than standing in it
 		# while the panel closes across him.
 		if walk >= 1.0:
 			examiner_node.visible = false
-
-	# The panel slides back across once he is through.
-	if staff_door_panel != null and is_instance_valid(staff_door_panel):
-		# Starts the instant he is through at 2.95 and is shut by 3.70, so the
-		# seal happens while the player is still looking at it rather than
-		# behind a head that has already turned back to the tank.
-		var shut := clampf((departure_clock - 2.95) / 0.75, 0.0, 1.0)
-		staff_door_panel.position.z = STAFF_DOOR_AT.z + lerpf(-1.42, 0.0, ease(shut, 0.4))
 
 	# You are still tied into the tank, so you cannot look away from it, but the
 	# head does turn to watch the one person in the room leave.
@@ -1119,6 +1175,7 @@ func _begin_wired() -> void:
 	title.text = "END ALL SUFFERING"
 	title.modulate.a = 1.0
 	title.visible = true
+	mission_card.play("end_all_suffering", "END ALL SUFFERING", END_CARD_SECONDS)
 	subtitle.text = "The wires are still in you."
 	opening_audio.set_phase("wired")
 	WorldHistory.record_event("opening_wired", {"tank": "0C-7"})
@@ -1157,6 +1214,10 @@ func _aimed_wire() -> Node3D:
 func _tug_wire(cable: Node3D) -> void:
 	if phase != "wired" or revenge_at >= 0.0 or cable == null or not umbilicals.has(cable):
 		return
+	# Reaching for a wire cuts the card short: the player acting beats the
+	# screen telling them to.
+	if mission_card != null and mission_card.playing:
+		mission_card.skip()
 	var pulls := int(cable.get_meta("pulls", 0)) + 1
 	cable.set_meta("pulls", pulls)
 	jolt = 1.0
@@ -1197,6 +1258,7 @@ func _rip_wire(cable: Node3D) -> void:
 func _all_wires_out() -> void:
 	revenge_at = wired_clock
 	title.text = "GET REVENGE"
+	mission_card.play("get_revenge", "GET REVENGE", REVENGE_HOLD)
 	subtitle.text = ""
 	opening_audio.cue("revenge")
 	# Wounds are catalogue dictionaries once WorldHistory has normalised them
@@ -1497,12 +1559,16 @@ func _update_hud() -> void:
 		prompt.text = "[E] TAKE THE CLOTHING OFF SUBJECT 0C-4"
 		osd.point_at(stuck_tank_marker.global_position + Vector3(0, 1.1, 0))
 		return
+	var route_prompt: String = doctor_route.prompt_text() if doctor_route != null else ""
+	if route_prompt != "":
+		prompt.text = route_prompt
+		return
 	# The door he left by: locked, and it says so (Greg, 2026-09-24: you should
 	# be able to interact with it). Staff access is found further on.
 	var to_staff := STAFF_DOOR_AT - player.global_position
 	to_staff.y = 0.0
 	if to_staff.length() <= 2.4:
-		prompt.text = "STAFF DOOR // SEALED BEHIND HIM // STAFF ACCESS REQUIRED"
+		prompt.text = "STAFF DOOR // SEALED // STAFF ACCESS REQUIRED"
 		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0

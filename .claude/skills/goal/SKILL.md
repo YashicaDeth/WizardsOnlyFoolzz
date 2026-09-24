@@ -75,8 +75,10 @@ Then, in this order (Greg, 24 September, "what next"):
 - [ ] **The combat overhaul**: omnidirectional swinging on both sides, a skill
       curve you can learn and read, AI difficulties tuned to what is
       achievable. Big job; `momentum_damage` is already on.
-- [ ] **Threats in the old drains**, so the second route costs something the
-      way the sentinel does on the lift route.
+- [x] **Threats in the old drains**, so the second route costs something the
+      way the sentinel does on the lift route. A bingyanger freed long ago
+      (Greg) hunts by sound: `DrainStalker`, blood to the sentinel's 25% floor,
+      creep to slip it, breach tool to stun it. Merged in the cloud session.
 
 After those, minutes 0-30 count as right enough (Greg): **start minutes 30-60**,
 furthering the tutorial and the starting stage.

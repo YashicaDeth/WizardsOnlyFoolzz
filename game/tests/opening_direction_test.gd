@@ -39,9 +39,14 @@ func _ready() -> void:
 	# and the walk plus the door plus the head coming back is 4.4s.
 	for _step in 150:
 		opening._update_departure(1.0 / 30.0)
-	check(opening.examiner_node.position.x > examiner_start + 3.0, "the examiner walks to his own door instead of standing there")
+	# Greg, 24 September: he leaves by the door behind the vat, the one the
+	# player will break down to follow him.
+	var his_door: Vector3 = DoctorRoute.DOOR_AT
+	var gone_to := Vector2(opening.examiner_node.global_position.x - his_door.x, opening.examiner_node.global_position.z - his_door.z)
+	check(gone_to.length() < 1.2, "the examiner walks out through his door behind the vat (%.2f m from it)" % gone_to.length())
+	check(opening.examiner_door_heard, "and the door is heard shutting behind him")
 	check(not opening.examiner_node.visible, "and is gone through it before the tank goes")
-	check(absf(opening.staff_door_panel.position.z - opening.STAFF_DOOR_AT.z) < 0.01 and not is_equal_approx(door_start, opening.STAFF_DOOR_AT.z), "the staff door closes behind him")
+	check(absf(opening.staff_door_panel.position.z - opening.STAFF_DOOR_AT.z) < 0.01 and is_equal_approx(door_start, opening.STAFF_DOOR_AT.z), "the staff door stays shut: it is not his way out")
 	check(opening.phase == "submerged", "decanting begins only once he has left")
 	check(opening.get_node("HUD/Objective").text == "", "no escape objective while the man who filed you is still in the room")
 

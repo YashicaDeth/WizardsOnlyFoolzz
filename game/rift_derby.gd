@@ -2,6 +2,11 @@ extends Node3D
 
 ## The authored Bone Yard kit was modelled for a 29m bowl, which plays as a
 ## playpen. The whole venue is scaled up together so the geometry still matches.
+## Greg, 24 September: the derby comes out through the old tunnels at the dry
+## blood waterfall, not straight onto the surface. The drivable tunnel stretch
+## between them is its own piece; until it exists the derby lands at the falls.
+const DERBY_EXIT_SCENE := "res://blood_waterfall_exit.tscn"
+const DERBY_EXIT_CAPTION := "through the old tunnels // out over the dry falls"
 const ARENA_SCALE := 1.85
 ## Kept equal to ARENA_SCALE for now. Greg asked for a bigger arena and a
 ## uniform multiplier does not deliver one: at 2.15 and 2.45 the wreckers drift
@@ -1944,7 +1949,7 @@ func _update_climb_out(delta: float) -> void:
 		if is_colosseum:
 			_begin_ringmaster_encounter()
 		else:
-			Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
+			Interstitial.travel(DERBY_EXIT_SCENE, DERBY_EXIT_CAPTION)
 
 
 func _update_hud() -> void:
@@ -2080,7 +2085,7 @@ func _leave_derby(result: String) -> void:
 		return
 	leaving = true
 	WorldHistory.record_event("derby_result_accepted", {"result": result, "score": score, "disabled": disabled_count})
-	Interstitial.travel("res://bone_yard_hunt.tscn", "walking out into the ashbloom expanse")
+	Interstitial.travel(DERBY_EXIT_SCENE, DERBY_EXIT_CAPTION)
 
 
 func _finish_round(result: String) -> void:

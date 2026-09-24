@@ -601,6 +601,25 @@ another account's organisation and could not be read from this one.
   in the world, not a line of text at the bottom.
 - The intake is good for now.
 
+### Answered by Greg in question boxes, 24 September 2026 (blood)
+
+- **Blood comes from all of:** kills, damage dealt, your own blood lost, and
+  finishers, which pay the most. (His earlier words: fighting "unlocks the
+  understanding of the blood based combat point and blood fuel xp for weapon
+  combat trees unlocking stuff".)
+- *Built 24 September (assistant proposal, open to Greg):* `BloodLedger`
+  credits blood per weapon from what `WorldHistory` already records (hits,
+  kills, executions, the player's own blood dropping, Hollis rammed down, the
+  Lower Works sentinel breached), so the first fight pays out on arrival in
+  the Hunt. Four placeholder trees, BLADE / BLUNT, IRON, MEAT and HUSH
+  (stealth, credited when nobody can see you), spend a style's blood as fuel;
+  key 7 in the Hunt opens them. Proposed rates: 1 blood per 4 damage dealt,
+  12 per kill, 15 per takedown, 30 per finisher (replacing the kill), 1 per
+  40 ml of your own blood. Only the blade and gun nodes change numbers so far
+  (cleaver damage and cooldown, every gun's spread, reload and damage); the
+  martial and stealth nodes are recorded but not wired. Open: node names and
+  effects, the numbers, spend-as-fuel versus unlock-at-threshold, and the key.
+
 Open: one of Hornee's eyes is a real drink brand's bottle cap with its
 wordmark. Keep it on the shipped model, or swap it for an in-world mark?
 
@@ -610,6 +629,79 @@ fight would otherwise destroy; kinship and trust are the other currency,
 earned by not fighting and spent by betrayal. The ambiguities worth asking
 about are whether diplomacy has a tree of its own, and whether "many
 enemies" means stealth missions field more of them.
+
+### Answered by Greg in question boxes, 24 September 2026 (after the lanes)
+
+- **The blood waterfall is where the derby tunnels come out**, as he
+  described: crash in the derby, drive the GTA-style tunnels, surface at the
+  waterfall. The walking old drains keep their own storm outfall.
+- **The doctor leaves through the door behind the vat**: the player watches
+  him walk out through the door they will break down. One door, one revenge.
+- **Blood opens the trees both ways**: small nodes open by themselves once a
+  weapon has earned enough; bigger ones cost blood, spent as fuel.
+- **Random events often, GTA-style**: roughly one every one to two minutes,
+  so the world feels crowded and crazy.
+
+### Answered by Greg in question boxes, 24 September 2026 (the Support Unit)
+
+- **Guards are numbers only**: CELLOUTZ SECURITY 04, 11, 17 and so on.
+  Faceless staff; Hollis is the one with a name.
+- **What the Unit does to bingyangas: all four.** Harvesting (organs and
+  fluids, which CellOutz sells back), reconditioning (screens, sound and chip
+  pulses trying to rewrite the mutation into a sellable body), testing
+  (weapons, drugs and implants tried on them first), and keeping them for
+  the derby (fighters and crowd meat for the underground heats).
+- **Camera hacking, once earned, is look and hold**: with the rewritten
+  implant, hold a key on a camera and it loops its feed for 20 seconds with
+  a sigil glitch on the lens. *Built:* Q held 1.2 s; "earned" is read as
+  `implant_seized` from the breakout (assistant reading).
+
+### Answered by Greg in question boxes, 24 September 2026 (the drains)
+
+- **Something hunts you in the old drains**, so the second route costs
+  something the way the sentinel does on the lift route.
+- **It is a bingyanger, freed long ago**: an escapee from an earlier cycle,
+  always hostile, living in the drains. An exception to "bingyangers are only
+  the ones you free".
+
+### Answered by Greg, 24 September 2026 (cloud session: lore, routes, the first hour)
+
+Recorded in the lane-6-based cloud session and merged here; where this and
+the sections above disagree (rebirth, where Hollis stands), the sections
+above were built on the remaster and win until Greg says otherwise.
+
+- **Bingyang, bingyangas, bingyangers.** Bingyang is the madness and mutation
+  the vats and the torture produce. A **bingyanga** is a mutated vat subject
+  held and tortured in the facility's Mental and Physical Support Unit,
+  insane like Outlast's asylum patients. A **bingyanger** is one the player
+  has freed: mutated like a Fallout ghoul, clinically insane, talking in
+  crazy voice lines, and randomly friendly or hostile, re-rolled every
+  meeting. They come from the same vats as the player. Full definitions,
+  decisions and open questions: `DESIGN/BINGYANG.md`.
+
+- **A third way out: chasing the doctor.** Break down the door behind your
+  vat with any weapon (destruction physics, wanted as soon as possible),
+  chase him to his vehicle bay, and find he is a hologram. He calls you in
+  3D from the elevator and the roof helicopter, and you come away with
+  information, a task and a cybernetic that lets you call and summon NPCs
+  from the Brain Index, Sims-phone style.
+- **The derby route, in full:** after the crash, get out or keep driving
+  through a gate into GTA-style tunnels, out to a drain exit at a dried-up
+  waterfall of blood and gore with destroyed trees. Both routes:
+  `DESIGN/ESCAPE_ROUTES.md`.
+- **Arriving and exploring.** Every exit gets a real reveal: the camera
+  rises from where you came out, sweeps the overworld and marks the nearby
+  settlements. Hundreds of GTA/RDR2-style random events are generated from
+  written parts, each a mini cutscene that can become a quest, a trade or a
+  boss fight (a crazed driver, wizard monks casting hologram-like spirit
+  visions). The monks are a splinter of the wizardsonlyfoolz, dressed as
+  Orthodox monks in blood-stained, creased habits with destroyed sigils. An
+  in-game curiosity bot plays for hours to learn which exploration is the
+  most fun. See `DESIGN/OVERWORLD_EVENTS.md`.
+- **The shape of the first hour.** The facility breakout is the first 30
+  minutes and is itself a subtle tutorial. It bridges into 30 minutes of
+  overworld that still teach, quietly, and that segments into complete
+  personal exploration.
 
 ## Influence register
 

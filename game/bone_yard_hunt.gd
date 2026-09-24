@@ -361,6 +361,8 @@ var block_tracker: BlockTracker = null
 ## Tab: the Brain Index hub (Greg, 2026-09-24).
 var brain_hub: BrainIndexHub = null
 var photo_mode: PhotoMode = null
+## The camera rise over the overworld from wherever a facility route surfaced.
+var exit_reveal: ExitReveal = null
 ## Arriving hurt: the pain of the decant eases over the first minute, unless
 ## something new hurts you (Greg, 2026-09-24). Seconds left, and where from.
 const ARRIVAL_EASE_SECONDS := 60.0
@@ -369,6 +371,8 @@ var _arrival_ease := -1.0
 var _arrival_pain_from := 0.0
 var threat_compass: ThreatCompass = null
 var lock_readout: LockReadout = null
+## Blood: per-weapon, per-style experience from fighting, and its trees (7).
+var blood_ledger: BloodLedger = null
 ## After a strike lands, the body faces it this long (third-person turn-in).
 const STRIKE_FACE_SECONDS := 0.35
 var strike_face_yaw := 0.0
@@ -413,6 +417,8 @@ var enemy_retreating := false
 var pulse := 0.0
 var generated_world: Node3D
 var misfire_director: Node3D
+## Overworld random events (DESIGN/OVERWORLD_EVENTS.md); off under ATG_TEST_MODE.
+var overworld_events: OverworldEventDirector
 var encounter_actors: Array[Dictionary] = []
 var loose_loot: Array[Node3D] = []
 ## AU3.5/AU3.6. The same station the shed and the sandbox drop. Nothing
@@ -1112,6 +1118,8 @@ func _ready() -> void:
 	player_body.add_child(arsenal)
 	arsenal.configure(player_rig)
 	arsenal.reload_finished.connect(_on_weapon_reload_finished)
+	blood_ledger = BloodLedger.new()
+	blood_ledger.attach(self)
 	body_motion = HUNTER_BODY_MOTION.new()
 	body_motion.name = "HunterBodyMotion"
 	player_body.add_child(body_motion)
@@ -1169,6 +1177,7 @@ func _ready() -> void:
 		}, player + Vector3(4.0, 0, -6.0))
 	_update_camera()
 	WorldHistory.record_event("player_entered_hunt_ground", {"location": HUNT_LOCATION, "hunt_id": CAST.id_for(CAPTAIN_SLOT)})
+	exit_reveal = ExitReveal.attach(self, facility_handoff, camera)
 	# A wreck in the derby already routed the player through `DefeatRouter`
 	# before this scene loaded (`rift_derby.gd::_finish_round`), so a lost heat
 	# and a lost fight land in the same captivity rather than one of them being
@@ -1686,6 +1695,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_4: _equip_carried_limb()
 			KEY_5: _put_the_weapons_down()
 			KEY_6: _cycle_smokeable()
+			KEY_7: blood_ledger.toggle_tree()
 			KEY_Y: _toggle_mouth_hold()
 			KEY_B:
 				if not grapple_target.is_empty():
@@ -1967,6 +1977,8 @@ func _physics_process(delta: float) -> void:
 	cost = ScriptCost.lap("_answer_local_reports", cost)
 	if misfire_director != null:
 		misfire_director.call("update_player_position", player)
+	if overworld_events != null:
+		overworld_events.tick(delta, player)
 	if not grapple_target.is_empty():
 		_update_grapple(delta)
 	_steer_lock(delta)
@@ -9081,6 +9093,8 @@ func _build_expanse_systems() -> void:
 	add_child(misfire_director)
 	misfire_director.connect("misfire_triggered", _on_reality_misfire)
 	misfire_director.call("generate", 774013, Vector2(470, 370), 18)
+	overworld_events = OverworldEventDirector.new()
+	add_child(overworld_events)
 	if living_map != null:
 		living_map.bind(generated_world, misfire_director, _map_contacts)
 		# The field radar and the opened map share this one sleeping satellite.
