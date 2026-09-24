@@ -1141,6 +1141,7 @@ func _ready() -> void:
 	brain_hub.name = "BrainIndexHub"
 	$HUD.add_child(brain_hub)
 	brain_hub.open_surface.connect(_on_hub_surface)
+	brain_hub.blood_ledger = blood_ledger
 	photo_mode = PhotoMode.new()
 	add_child(photo_mode)
 	case_menu = CASE_MENU.new()
