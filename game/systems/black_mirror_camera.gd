@@ -93,6 +93,15 @@ func _draw_camera() -> void:
 		overlay.draw_line(corner, corner + Vector2(48 * sign_x, 0), ink * Color(1,1,1,0.55), 1)
 		overlay.draw_line(corner, corner + Vector2(0, 22 * sign_y), ink * Color(1,1,1,0.55), 1)
 	var font := ThemeDB.fallback_font
+	# A phone recording, not a military scope (Greg, 2026-09-24): the red REC
+	# dot, the clock burned into the corner, the cell in the other.
+	if fmod(clock, 1.2) < 0.8:
+		overlay.draw_circle(Vector2(46, 48), 7.0, Color("ff3b30"))
+	overlay.draw_string(font, Vector2(60, 54), "REC", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("ff3b30"))
+	var elapsed := int(clock)
+	overlay.draw_string(font, Vector2(104, 54), "%02d:%02d:%02d" % [elapsed / 3600, (elapsed / 60) % 60, elapsed % 60], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, ink)
+	var stamp := WorldClock.stamp()
+	overlay.draw_string(font, Vector2(size.x - 34 - font.get_string_size(stamp, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x, 54), stamp, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, ink)
 	overlay.draw_string(font, Vector2(34, size.y - 57), "BLACK MIRROR  /  LOW-LIGHT SENSOR", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ink)
 	overlay.draw_string(font, Vector2(34, size.y - 36), "GAIN ×%.1f   EXP %.1f   FOCUS %.1fm    N RECORD · L LOWER" % [sensor.gain, sensor.exposure, sensor.focus_distance], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, ink * Color(1,1,1,0.65))
 	var power := Rect2(size.x - 134, size.y - 58, 86, 5)

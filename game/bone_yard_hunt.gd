@@ -4907,6 +4907,8 @@ func _update_sleep_prompt(delta: float) -> void:
 ## The signal is the seam between them, producing one physical, colliding body
 ## whose payload is the exact serial/condition/charge that just left the HUD.
 func _on_handheld_dropped(payload: Dictionary) -> void:
+	if black_mirror_active:
+		_toggle_black_mirror()
 	if dropped_handheld != null and is_instance_valid(dropped_handheld):
 		return
 	var forward := -camera.global_transform.basis.z.normalized()
@@ -7290,14 +7292,48 @@ func _black_mirror_environment() -> Environment:
 ## for at night and reads as barely more than a tint at noon, rather than one
 ## fixed amplification regardless of the hour.
 func _toggle_black_mirror() -> void:
+	# Night vision is the phone's camera (Greg, 2026-09-24): no phone in hand,
+	# nothing to raise.
+	if not black_mirror_active and dropped_handheld != null and is_instance_valid(dropped_handheld):
+		prompt.text = "THE BLACK MIRROR IS ON THE GROUND"
+		return
+	if not black_mirror_active and (handheld == null or not is_instance_valid(handheld) or not handheld.possessed):
+		prompt.text = "NO PHONE IN HAND"
+		return
 	black_mirror_active = not black_mirror_active
+	var sensor := _mirror_sensor()
 	if not black_mirror_active:
+		sensor.set_active(false)
 		camera.environment = null
 		return
 	var graded := _black_mirror_environment()
 	var darkness := 1.0 - WorldClock.daylight()
 	graded.adjustment_brightness = lerpf(1.05, 3.4, darkness)
-	camera.environment = graded
+	# The grade is the sensor's source: BlackMirrorCamera copies it and adds its
+	# own exposure, gain noise, focus hunt and battery on top, with the phone
+	# feed drawn over the screen.
+	sensor.bind(camera, graded)
+	sensor.set_active(true)
+	if not sensor.active:
+		# A dead cell still lets you look through the glass, just not amplified.
+		camera.environment = graded
+
+
+## BlackMirrorCamera existed, complete, and nothing ever made one. It lives on
+## the HUD layer and is made the first time the phone is raised.
+var _mirror: BlackMirrorCamera
+
+
+func _mirror_sensor() -> BlackMirrorCamera:
+	if _mirror == null or not is_instance_valid(_mirror):
+		_mirror = BlackMirrorCamera.new()
+		_mirror.name = "BlackMirrorSensor"
+		$HUD.add_child(_mirror)
+		# Directly above the field lens: that is a full-screen screen-reading
+		# pass too, and anything under it is painted over by its copy of the
+		# frame -- which is how the whole feed and its REC overlay went missing.
+		$HUD.move_child(_mirror, field_lens.get_index() + 1 if field_lens != null else 0)
+	return _mirror
 
 
 func _take_photograph() -> Dictionary:
