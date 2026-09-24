@@ -415,6 +415,8 @@ var enemy_retreating := false
 var pulse := 0.0
 var generated_world: Node3D
 var misfire_director: Node3D
+## Overworld random events (DESIGN/OVERWORLD_EVENTS.md); off under ATG_TEST_MODE.
+var overworld_events: OverworldEventDirector
 var encounter_actors: Array[Dictionary] = []
 var loose_loot: Array[Node3D] = []
 ## AU3.5/AU3.6. The same station the shed and the sandbox drop. Nothing
@@ -1972,6 +1974,8 @@ func _physics_process(delta: float) -> void:
 	cost = ScriptCost.lap("_answer_local_reports", cost)
 	if misfire_director != null:
 		misfire_director.call("update_player_position", player)
+	if overworld_events != null:
+		overworld_events.tick(delta, player)
 	if not grapple_target.is_empty():
 		_update_grapple(delta)
 	_steer_lock(delta)
@@ -9086,6 +9090,8 @@ func _build_expanse_systems() -> void:
 	add_child(misfire_director)
 	misfire_director.connect("misfire_triggered", _on_reality_misfire)
 	misfire_director.call("generate", 774013, Vector2(470, 370), 18)
+	overworld_events = OverworldEventDirector.new()
+	add_child(overworld_events)
 	if living_map != null:
 		living_map.bind(generated_world, misfire_director, _map_contacts)
 		# The field radar and the opened map share this one sleeping satellite.
