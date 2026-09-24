@@ -120,7 +120,7 @@ it, it's rendered and looked at, it has a test, and it's merged and built
       the Wire's paper collage bleeding at the edges.
 - [ ] Menu items are set in the game's stencil face (`CellOutzType`), never
       Godot's fallback font.
-- [ ] Hover makes an item glitch-shift, with a tick sound.
+- [x] Hover slides the item out with a drip tick, and blood pours under it (`menu_blood.gd`).
 - [ ] Selecting an item makes the blood pour down it, then the screen goes.
 - [ ] It works with keyboard, mouse and gamepad, and the focus is always
       visible.
@@ -489,9 +489,8 @@ Every line below is **(rec)** unless it cites Greg.
 - [x] The live logo: burn in, wet run, heartbeat, a tear every 5.5 s.
 - [ ] See: the Algiz label pulses in time with the logo's beat, not on its
       own sine.
-- [ ] See: the menu items type on, one at a time, after the logo lands.
-- [ ] See: the hovered item is underlined in blood, with the others
-      dimmed.
+- [x] See: the menu items type on, one at a time, after the logo lands.
+- [x] See: the hovered item is underlined in blood, with drips (dimming the others still open).
 - [ ] See: ENTER CELLOUTZ.NET opens the site, with a confirm.
 - [ ] See: the hexagram panel on the right shows the selected item's
       preview (demo footage, the locked full game, the sandbox).

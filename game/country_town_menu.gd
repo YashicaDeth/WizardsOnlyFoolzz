@@ -10,6 +10,11 @@ const LOGO_FX := preload("res://shaders/logo_fx.gdshader")
 const BOOT_SPLASH := preload("res://boot_splash.gd")
 const LOGO_EMBERS := preload("res://systems/logo_embers.gd")
 const LOGO_AUDIO := preload("res://systems/logo_audio.gd")
+const MENU_BLOOD := preload("res://systems/menu_blood.gd")
+## Seconds each menu line takes to type on, and the gap between lines.
+const TYPE_SECONDS := 0.28
+const TYPE_STAGGER := 0.07
+var menu_blood: Control
 var title_embers: Control
 var title_audio: Node
 var _title_tearing := false
@@ -196,6 +201,9 @@ func _play_title_sequence() -> void:
 	title_audio = LOGO_AUDIO.new()
 	title_audio.name = "TitleLogoAudio"
 	add_child(title_audio)
+	menu_blood = MENU_BLOOD.new()
+	menu_blood.name = "MenuBlood"
+	$HUD.add_child(menu_blood)
 	$HUD/TitleLogo.modulate.a = 0.0
 	$HUD/Algiz.modulate.a = 0.0
 	$HUD/TitleLogo.scale = Vector2(0.90, 0.90)
@@ -222,8 +230,16 @@ func _play_title_sequence() -> void:
 	tween.parallel().tween_property($HUD/TitleLogo, "scale", Vector2.ONE, 0.52).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.parallel().tween_method(func(value: float) -> void: title_fx.set_shader_parameter("reveal", value), 0.0, 1.0, 0.95)
 	tween.tween_property(intro_veil, "color:a", 0.0, 0.72)
-	for button in menu_buttons:
+	var typing := OS.get_environment("ATG_TEST_MODE") != "1"
+	for index in menu_buttons.size():
+		var button: Button = menu_buttons[index]
 		tween.parallel().tween_property(button, "modulate:a", 1.0, 0.32)
+		# The menu types on after the logo lands, one line after another.
+		# Tests read the labels straight away, so they get them whole.
+		if typing:
+			var full := button.text
+			button.text = ""
+			tween.parallel().tween_method(func(shown: float) -> void: button.text = typed(full, shown), 0.0, 1.0, TYPE_SECONDS).set_delay(TYPE_STAGGER * float(index))
 	tween.tween_callback(func() -> void:
 		if is_instance_valid(intro_veil):
 			intro_veil.queue_free())
@@ -573,7 +589,20 @@ func _process(delta: float) -> void:
 	$HUD/Algiz.modulate.a = 0.72 + sin(ui_time * 2.1) * 0.18
 
 
+## `full` with the first `shown` (0..1) of its characters typed, and a
+## block cursor while it types.
+static func typed(full: String, shown: float) -> String:
+	var count := roundi(clampf(shown, 0.0, 1.0) * float(full.length()))
+	if count >= full.length():
+		return full
+	return full.left(count) + "█"
+
+
 func _focus_button(button: Button) -> void:
+	if menu_blood != null:
+		menu_blood.point_at(button)
+	if title_audio != null:
+		title_audio.cue("drip")
 	var tween := create_tween().set_parallel(true)
 	tween.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
 	tween.tween_property(button, "position:x", 72.0, 0.18)
@@ -581,6 +610,8 @@ func _focus_button(button: Button) -> void:
 
 
 func _unfocus_button(button: Button) -> void:
+	if menu_blood != null:
+		menu_blood.release(button)
 	var tween := create_tween().set_parallel(true)
 	tween.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
 	tween.tween_property(button, "position:x", 50.0, 0.22)

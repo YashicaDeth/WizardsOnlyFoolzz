@@ -12,3 +12,7 @@ func _ready() -> void:
 	get_tree().root.add_child.call_deferred(menu)
 	await get_tree().process_frame
 	get_tree().current_scene = menu
+	# Hover the first door once the menu has typed on, to show the blood.
+	await get_tree().create_timer(4.2).timeout
+	var first: Button = menu.menu_buttons[0]
+	first.mouse_entered.emit()
