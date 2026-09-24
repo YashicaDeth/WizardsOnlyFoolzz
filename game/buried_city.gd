@@ -128,6 +128,7 @@ func _build_player() -> void:
 	camera.position.y = 0.77
 	camera.fov = 88.0
 	player.add_child(camera)
+	LabSurface.attach_body_cam(camera)
 	breach_flash = OmniLight3D.new()
 	breach_flash.name = "BreachFlash"
 	breach_flash.light_color = Color("f0a24b")
@@ -476,14 +477,15 @@ func _build_patrol() -> void:
 	patrol.add_child(eye)
 
 
-func _slab(dimensions: Vector3, at: Vector3, kind: String, color: Color) -> StaticBody3D:
+func _slab(dimensions: Vector3, at: Vector3, _kind: String, _color: Color) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = at
 	add_child(body)
 	var visual := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = dimensions
-	mesh.material = WorldLook.surface(color, kind, int(at.x * 37.0 + at.z * 23.0))
+	# Real lab surfaces (Greg, 2026-09-24), chosen by the slab's shape.
+	mesh.material = LabSurface.for_slab(dimensions, at)
 	visual.mesh = mesh
 	body.add_child(visual)
 	var collider := CollisionShape3D.new()

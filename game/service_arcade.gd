@@ -55,6 +55,7 @@ func _build_player() -> void:
 	camera.fov = 88.0
 	camera.position.y = 0.77
 	player.add_child(camera)
+	LabSurface.attach_body_cam(camera)
 
 func _build_shell() -> void:
 	# Collision is intentionally simpler than dressing: one stable floor and
@@ -196,14 +197,15 @@ func _build_landmarks() -> void:
 	gate_light.omni_range = 8.0
 	add_child(gate_light)
 
-func _slab(dimensions: Vector3, at: Vector3, kind: String, color: Color) -> StaticBody3D:
+func _slab(dimensions: Vector3, at: Vector3, _kind: String, _color: Color) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = at
 	add_child(body)
 	var visual := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = dimensions
-	mesh.material = WorldLook.surface(color, kind, int(at.x * 13.0 + at.z * 17.0))
+	# Real lab surfaces (Greg, 2026-09-24), chosen by the slab's shape.
+	mesh.material = LabSurface.for_slab(dimensions, at)
 	visual.mesh = mesh
 	body.add_child(visual)
 	var collider := CollisionShape3D.new()

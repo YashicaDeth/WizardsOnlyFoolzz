@@ -210,6 +210,7 @@ func _build_player() -> void:
 	camera = Camera3D.new()
 	camera.fov = 88.0
 	player.add_child(camera)
+	LabSurface.attach_body_cam(camera)
 
 	anatomy = ANATOMY.new()
 	player.add_child(anatomy)
@@ -855,14 +856,15 @@ func _build_cradled_vat_subject(at: Vector3, seed_value: int, parent_node: Node3
 	return rig
 
 
-func _slab(dimensions: Vector3, at: Vector3, kind: String, color: Color) -> void:
+func _slab(dimensions: Vector3, at: Vector3, _kind: String, _color: Color) -> void:
 	var body := StaticBody3D.new()
 	body.position = at
 	add_child(body)
 	var mesh_instance := MeshInstance3D.new()
 	var box := BoxMesh.new()
 	box.size = dimensions
-	box.material = WorldLook.surface(color, kind, int(at.x * 31.0 + at.z * 17.0))
+	# Real lab surfaces (Greg, 2026-09-24), chosen by the slab's shape.
+	box.material = LabSurface.for_slab(dimensions, at)
 	mesh_instance.mesh = box
 	body.add_child(mesh_instance)
 	var collision := CollisionShape3D.new()
