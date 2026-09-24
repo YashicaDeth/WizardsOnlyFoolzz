@@ -258,6 +258,20 @@ func _ready() -> void:
 		scene.player_rig.anatomy.apply_hit("head", 18.0, 0.0, "blunt")
 		for _hold in 5:
 			await get_tree().process_frame
+	elif trigger == "clicks":
+		# First person, sword, a run of plain LMB swings and a held guard: the
+		# walkthrough's "arms flip back and forth" (2026-09-24).
+		scene.yaw = 2.7
+		for step in 30:
+			scene.player_body.position = scene.player_body.position + Vector3(-0.42, 0, -0.2)
+			scene.player = scene.player_body.position + Vector3.UP * 0.6
+			await get_tree().physics_frame
+		for swing in 4:
+			scene._attack(false)
+			for _f in 24:
+				await get_tree().physics_frame
+		for _f in 40:
+			await get_tree().physics_frame
 	elif trigger == "threat":
 		# Three enemies winding up around the player -- behind and due, to the
 		# left mid-swing, ahead-right just starting -- so the ThreatCompass

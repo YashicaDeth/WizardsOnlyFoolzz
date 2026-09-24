@@ -2425,6 +2425,10 @@ func _attack(heavy := false) -> void:
 	if resolution_ui.visible or kill_cam.active or player_rig.is_downed() or player_rig.anatomy.dead:
 		return
 	if smoke_model != null and is_instance_valid(smoke_model) and not smoke_weapon_drawn:
+		# A click with a smokeable in hand used to do nothing at all, which read
+		# as being stuck on it (Greg, 2026-09-24). It pockets the smokeable and
+		# draws the weapon you were carrying; the next click swings.
+		_equip_weapon(maxi(arsenal.carried().find(str(arsenal.current_id)), 0))
 		return
 	# In a clinch the strike button is the press, not a swing.
 	if not grapple_target.is_empty():
@@ -4068,6 +4072,12 @@ func _cycle_carried_weapon(step: int) -> void:
 
 
 func _equip_weapon(slot: int) -> void:
+	# The same weapon key again while a smoke is kept at the lips puts the
+	# smoke away: the way out of lip-holding that did not exist.
+	if smoke_weapon_drawn and smoke_model != null and is_instance_valid(smoke_model) and arsenal.carried().find(str(arsenal.current_id)) == slot:
+		_put_smokeable_away(false)
+		prompt.text = ""
+		return
 	var preserve_mouth_smoke := false
 	if smoke_model != null and is_instance_valid(smoke_model) and smoke_mouth_held:
 		var smoke_id := str(smoke_model.get_meta("device_id", ""))
@@ -8256,7 +8266,10 @@ func _update_strike_fx(delta: float) -> void:
 			held = arsenal.models[arsenal.current_id] as Node3D
 		var commit := arm.commitment() if arm != null else 0.0
 		strike_trail.feed_weapon(held, delta, commit)
-		if strike_smear != null:
+		# Afterimages are a third-person read of the swing. In first person a
+		# ghost blade flicking over the real one read as the arm itself
+		# jumping back and forth (Greg's walkthrough, 2026-09-24).
+		if strike_smear != null and not body_motion.first_person:
 			var tip := held.global_transform * strike_trail.tip_local(held) if held != null and is_instance_valid(held) else Vector3.ZERO
 			strike_smear.feed(held, tip, delta, commit)
 			if strike_audio != null:
