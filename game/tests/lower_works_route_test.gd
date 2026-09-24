@@ -55,6 +55,11 @@ func _ready() -> void:
 	check(WorldHistory.event_count("lower_works_sentinel_breached") == 1, "the direct encounter records its actual resolution")
 	combat_city.queue_free()
 
+	# Standing at the elevator you can see is enough to be offered the way down.
+	city.player.global_position = city.LIFT_AT + Vector3(0, 0.9, 3.2)
+	city._update_hud()
+	check(city.prompt.text.contains("DESCEND"), "the elevator you can see offers the descent (%s)" % city.prompt.text)
+
 	city._record_pit_entry()
 	check(OpeningDirector.reached("entered_pit"), "the elevator handoff records the derby stage")
 	check(WorldHistory.event_count("lower_works_entered_pit") == 1, "and creates one attributable exit event")

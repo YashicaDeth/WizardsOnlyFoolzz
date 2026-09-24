@@ -15,7 +15,10 @@ const ENTRY := Vector3(0, 1.0, 16.0)
 const FUSE_AT := Vector3(11.2, 0.85, 1.8)
 const SHORTCUT_AT := Vector3(-10.2, 0.0, -8.0)
 const LIFT_AT := Vector3(0, 0.0, -38.0)
-const EXIT_AT := Vector3(0, 0.0, -47.0)
+## The trigger is the elevator you can see. It sat 9 m past the cage, at
+## z -47, so standing at the lift and pressing E did nothing and the prompt
+## never showed: the run ended here for Greg on first launch (2026-09-24).
+const EXIT_AT := LIFT_AT
 
 ## AD3. The third way down.
 ##
