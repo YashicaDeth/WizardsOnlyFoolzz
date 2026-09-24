@@ -210,6 +210,8 @@ var build_factor := 1.0
 ## by no renderer and no system. It drives this, the same way the BUILD row was
 ## wired to `build_factor` when it had the same problem.
 var frame_factor := 0.5
+## The intake's ANATOMY answer, for the forms `BodyForms` builds.
+var anatomy_sex := "unformed"
 
 var _layout: Dictionary = {}
 var _flesh := Color("6b5842")
@@ -259,6 +261,7 @@ func build(id: String, config: Dictionary = {}) -> void:
 	_variation = int(config.get("variation", 0))
 	build_factor = clampf(float(config.get("build", 1.0)), 0.7, 1.4)
 	frame_factor = clampf(float(config.get("frame", 0.5)), 0.0, 1.0)
+	anatomy_sex = str(config.get("anatomy_sex", "unformed"))
 	var layout := _scaled_layout(SEATED if _seated else STANDING)
 	_layout = layout
 
@@ -341,6 +344,8 @@ func build(id: String, config: Dictionary = {}) -> void:
 		for organ_id in organ_parts:
 			if not anatomy.organ_ok(organ_id):
 				_hide_organ(str(organ_id))
+	# A body nobody has dressed is naked: its forms, and their censor.
+	BodyForms.refresh(self)
 
 
 ## The old torso ended at a vertical wall and the arm began as another separate
@@ -1125,6 +1130,7 @@ static func config_from_subject(record: Dictionary) -> Dictionary:
 		"blood": blood_volume(str(sheet_anatomy.get("blood_type", "O-RUST"))),
 		"build": combined_build,
 		"frame": frame_from_anatomy_sex(str(record.get("anatomy_sex", "unformed"))),
+		"anatomy_sex": str(record.get("anatomy_sex", "unformed")),
 		"cybernetics": grown_cybernetics(sheet_anatomy),
 	}
 	if record.get("anatomy_state") is Dictionary:
@@ -1244,6 +1250,9 @@ func dress(wardrobe_: Dictionary) -> void:
 	wardrobe = wardrobe_
 	for zone_id in ZONES:
 		_dress_zone(zone_id, (_layout.get(zone_id, {}) as Dictionary).get("size", Vector3.ONE))
+	# What the clothes no longer cover shows, under the censor unless the
+	# player turned it off (Greg, 24 September).
+	BodyForms.refresh(self)
 
 
 ## The garment over a zone, if it has one. A shell child of the part itself so

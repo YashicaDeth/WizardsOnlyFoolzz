@@ -736,6 +736,22 @@ we can make nudity and censors".
 - **Next after this:** nudity and censors, building on the explicit /
   mosaic presentation option (`AnatomyPresentation`).
 
+### Answered by Greg in question boxes, 24 September 2026 (what next, the censor)
+
+- **Order:** nudity and censors, then rebirth from every killer in minutes
+  0-30, then the Brain Index hub, then the combat overhaul ("all of that
+  above in that order").
+- **The censor is a body-cam glitch**, not a mosaic or black bars.
+- **It is on by default.** It turns off in the title screen's settings.
+- **Merge the HUD, the spine, the sites and the skins** into
+  `claude/dust-to-bones-look`. Done at `6c09d4c`.
+- *Built (assistant proposal, open to Greg):* the chest, groin and buttocks
+  are simple, clinical forms shaped by the intake's ANATOMY answer and the
+  body's frame. They show only where no clothing covers them (`BodyForms`).
+  When the censor is on, each exposed region sits under a volume that
+  re-reads the screen as a tearing, scanlined body-cam feed
+  (`censor_glitch.gdshader`).
+
 ## Influence register
 
 These entries describe what Greg said he values; proposed extraction is labelled. Liking a reference does not automatically import every mechanic from it.

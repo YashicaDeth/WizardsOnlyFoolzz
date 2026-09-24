@@ -501,6 +501,24 @@ func _build_gore_setting() -> void:
 	box.move_child(button, box.get_child_count() - 2)
 	button.pressed.connect(_cycle_gore.bind(button))
 	gore_button = button
+	# Greg, 24 September: nudity is censored by a body-cam glitch, on by
+	# default; this is where it turns off. `AnatomyPresentation` holds it.
+	var censor := Button.new()
+	censor.name = "Censor"
+	censor.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	censor.text = _censor_label()
+	box.add_child(censor)
+	box.move_child(censor, box.get_child_count() - 2)
+	censor.pressed.connect(_toggle_censor.bind(censor))
+
+
+func _censor_label() -> String:
+	return "CENSOR: %s" % ("OFF" if AnatomyPresentation.is_explicit() else "ON (BODY-CAM GLITCH)")
+
+
+func _toggle_censor(button: Button) -> void:
+	AnatomyPresentation.set_mode("MOSAIC" if AnatomyPresentation.is_explicit() else "EXPLICIT")
+	button.text = _censor_label()
 
 
 func _cycle_gore(button: Button) -> void:
