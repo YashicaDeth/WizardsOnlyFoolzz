@@ -556,6 +556,14 @@ another account's organisation and could not be read from this one.
   relationship changes (Gate Lanterns up, CellOutz down). Nothing threatens
   the player in the drains yet.
 
+### Answered by Greg in question boxes, 24 September 2026 (what next)
+
+- **Next, all four, then minutes 30-60:** a better examiner model and the
+  readable name line on the intake; animated, skeuomorphic intake pages;
+  the combat overhaul; and threats in the old drains so the second route
+  costs something. Once these are done, minutes 0-30 count as right enough
+  to start minutes 30-60 (furthering the tutorial and the starting stage).
+
 Open: one of Hornee's eyes is a real drink brand's bottle cap with its
 wordmark. Keep it on the shipped model, or swap it for an in-world mark?
 

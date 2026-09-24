@@ -64,6 +64,23 @@ answers.
       routes end to end, into the Hunt.
 - [ ] **Hollis gets a real model**, one Greg provides or picks (CC-BY credited).
 
+Then, in this order (Greg, 24 September, "what next"):
+
+- [ ] **Intake: the examiner and the name line.** A better 3D examiner, his
+      mouth moving with his voice (first pass `6e5efb0`), and the name / tank
+      line readable on the intake screen.
+- [ ] **Animated intake pages**: every tab animated and skeuomorphic (ink,
+      blood, metal, parts swinging out on gears). After Effects / Photoshop
+      pieces allowed.
+- [ ] **The combat overhaul**: omnidirectional swinging on both sides, a skill
+      curve you can learn and read, AI difficulties tuned to what is
+      achievable. Big job; `momentum_damage` is already on.
+- [ ] **Threats in the old drains**, so the second route costs something the
+      way the sentinel does on the lift route.
+
+After those, minutes 0-30 count as right enough (Greg): **start minutes 30-60**,
+furthering the tutorial and the starting stage.
+
 After minutes 0-30 work end to end (Greg, 24 September): job posters with
 tear-off tabs pasted on the Hunt's walls, and business cards handed over by
 people you meet (kept in Carry, adding a Wire contact); the receipt-paper
