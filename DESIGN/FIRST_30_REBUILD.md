@@ -67,9 +67,15 @@ A line is ticked only when all of these hold:
 - [x] Each face slider moves only its own feature (`fd3e3dd`).
 - [x] The examiner comes and goes by his own door behind the vat (`da96036`).
 - [ ] A better 3D examiner model: authored or CC-BY, not the rig head.
-- [ ] Animated intake pages:
+- [x] Animated intake pages (first pass, drawn in the engine):
   - ink, blood, metal, and parts swinging out on gears
   - After Effects and Photoshop pieces allowed
+  - *Built:* each page swings in on a riveted steel arm from a gear train at
+    the form's edge, overshoots and settles. Ink bleeds behind the print
+    head. Every page change runs blood down from the clip, and it dries
+    there (up to four runs). `intake_pages_test`, clip from
+    `intake_gui_capture -- --clip`. Hand-made After Effects or Photoshop
+    pieces can replace any part of it.
 - [ ] Use the intake's blank space (Walkthrough 2).
 - [ ] Wire `AnatomyPresentation` (the explicit / mosaic option, equally
       complete).
