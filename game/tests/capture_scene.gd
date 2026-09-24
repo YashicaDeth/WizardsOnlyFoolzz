@@ -229,6 +229,11 @@ func _ready() -> void:
 				await get_tree().physics_frame
 		for _hold in 45:
 			await get_tree().physics_frame
+	elif trigger == "holdtool":
+		# The arcade's breach tool, in hand, as picking it up leaves it.
+		LabSurface.hold_in_view(scene.camera, scene.weapon_visual)
+		for _hold in 10:
+			await get_tree().process_frame
 	elif trigger == "threat":
 		# Three enemies winding up around the player -- behind and due, to the
 		# left mid-swing, ahead-right just starting -- so the ThreatCompass

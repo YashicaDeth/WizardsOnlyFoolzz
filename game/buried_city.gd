@@ -129,6 +129,8 @@ func _build_player() -> void:
 	camera.fov = 88.0
 	player.add_child(camera)
 	LabSurface.attach_body_cam(camera)
+	if WorldHistory.event_count("service_arcade_breach_tool_taken") > 0:
+		LabSurface.hold_in_view(camera, LabSurface.breach_tool())
 	breach_flash = OmniLight3D.new()
 	breach_flash.name = "BreachFlash"
 	breach_flash.light_color = Color("f0a24b")

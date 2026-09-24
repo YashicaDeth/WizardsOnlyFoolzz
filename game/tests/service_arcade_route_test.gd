@@ -22,7 +22,8 @@ func _ready() -> void:
 	check(arcade.card_taken and not arcade.card_visual.visible and not arcade.card_label.visible, "the orange card can be collected at its physical pedestal without leaving a stale take prompt")
 	arcade.player.global_position = arcade.WEAPON_AT
 	arcade._interact()
-	check(arcade.weapon_taken and not arcade.weapon_visual.visible and not arcade.weapon_label.visible, "the breach tool visibly confirms its pickup too")
+	# It leaves the floor for your hands rather than vanishing (2026-09-24).
+	check(arcade.weapon_taken and arcade.weapon_visual.get_parent() == arcade.camera and not arcade.weapon_label.visible, "the breach tool visibly confirms its pickup: it is in your hands")
 	arcade.player.global_position = arcade.GATE_AT
 	arcade._interact()
 	check(arcade.gate_open and arcade.gate_body.is_queued_for_deletion(), "the pressure gate opens after the card is collected")

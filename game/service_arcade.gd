@@ -26,7 +26,7 @@ var card_visual: MeshInstance3D
 var card_beacon: OmniLight3D
 var card_label: Label3D
 var weapon_taken := false
-var weapon_visual: MeshInstance3D
+var weapon_visual: Node3D
 var weapon_label: Label3D
 var lower_works_requested := false
 
@@ -140,13 +140,10 @@ func _build_landmarks() -> void:
 	card_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	card_label.position = CARD_AT + Vector3(0, 0.85, 0)
 	add_child(card_label)
-	weapon_visual = MeshInstance3D.new()
-	var weapon_mesh := BoxMesh.new()
-	weapon_mesh.size = Vector3(0.16, 0.16, 1.15)
-	weapon_mesh.material = WorldLook.surface(Color("6d3a22"), "metal", 710)
-	weapon_visual.mesh = weapon_mesh
-	weapon_visual.position = WEAPON_AT
-	weapon_visual.rotation_degrees.y = 34.0
+	# The real tool, lying where it was dropped (Greg, 2026-09-24).
+	weapon_visual = LabSurface.breach_tool()
+	weapon_visual.position = WEAPON_AT + Vector3(0, 0.08, 0)
+	weapon_visual.rotation_degrees = Vector3(0, 34.0, 90.0)
 	add_child(weapon_visual)
 	weapon_label = Label3D.new()
 	weapon_label.text = "BREACH TOOL\n[ E ] ARM"
@@ -233,7 +230,8 @@ func _interact() -> void:
 		return
 	if not weapon_taken and _flat_distance(WEAPON_AT) <= 2.3:
 		weapon_taken = true
-		weapon_visual.visible = false
+		# Taking it puts it in your hands, where you can see it.
+		LabSurface.hold_in_view(camera, weapon_visual)
 		weapon_label.visible = false
 		WorldHistory.record_event("service_arcade_breach_tool_taken", {"location": "service_arcade"})
 		return

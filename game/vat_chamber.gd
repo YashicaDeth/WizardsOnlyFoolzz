@@ -507,6 +507,30 @@ func _build_chamber() -> void:
 	door_marker.position = Vector3(0, 0, -AISLE_LENGTH + 2.0)
 	add_child(door_marker)
 	_slab(Vector3(3.4, 3.4, 0.3), Vector3(0, 1.7, -AISLE_LENGTH + 1.6), "rust", Color("3d2a19"))
+	# A door you can read (Greg, 2026-09-24: "just supposed to walk through
+	# this big white light?"): plate panel, a frame, and a lit sign.
+	var panel := MeshInstance3D.new()
+	var panel_mesh := BoxMesh.new()
+	panel_mesh.size = Vector3(2.2, 2.9, 0.08)
+	panel_mesh.material = LabSurface.material("plate")
+	panel.mesh = panel_mesh
+	panel.position = Vector3(0, 1.45, -AISLE_LENGTH + 1.8)
+	add_child(panel)
+	for side in [-1.0, 1.0]:
+		var post := MeshInstance3D.new()
+		var post_mesh := BoxMesh.new()
+		post_mesh.size = Vector3(0.18, 3.2, 0.24)
+		post_mesh.material = LabSurface.material("grime")
+		post.mesh = post_mesh
+		post.position = Vector3(side * 1.2, 1.6, -AISLE_LENGTH + 1.85)
+		add_child(post)
+	var sign := Label3D.new()
+	sign.text = "SERVICE ARCADE  //  STAFF ONLY\nPIT ACCESS BELOW"
+	sign.font_size = 42
+	sign.outline_size = 8
+	sign.modulate = Color("ff9a4a")
+	sign.position = Vector3(0, 3.35, -AISLE_LENGTH + 1.9)
+	add_child(sign)
 	var exit_glow := OmniLight3D.new()
 	exit_glow.position = Vector3(0, 1.2, -AISLE_LENGTH + 2.6)
 	exit_glow.light_color = Color("ff8f3c")
@@ -1252,7 +1276,9 @@ func _update_hud() -> void:
 		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0
-	prompt.text = "[E] ENTER THE UNDERGROUND HEAT" if to_door.length() <= 3.4 else "WASD MOVE   //   MOUSE LOOK   //   E INTERACT   //   HOLD I INSPECT"
+	# HOLD I is only offered when something is in hand to look at.
+	var inspect_hint := "   //   HOLD I INSPECT" if _inspect_text() != "NOTHING IN HAND TO INSPECT" else ""
+	prompt.text = "[E] ENTER THE UNDERGROUND HEAT" if to_door.length() <= 3.4 else "WASD MOVE   //   MOUSE LOOK   //   E INTERACT" + inspect_hint
 
 
 ## AX3.1/AX3.6. What HOLD I actually shows — the same held object every time,

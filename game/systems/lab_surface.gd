@@ -78,3 +78,57 @@ static func attach_body_cam(camera: Camera3D) -> SpotLight3D:
 	lamp.position = Vector3(0.18, -0.12, 0.0)
 	camera.add_child(lamp)
 	return lamp
+
+
+## The breach tool: a pneumatic ram with a charge canister and two prongs.
+## Greg on first launch: it "doesn't look like anything" when picked up.
+## One model for the floor, the hand, and Lower Works.
+static func breach_tool() -> Node3D:
+	var tool := Node3D.new()
+	tool.name = "BreachTool"
+	var plate := material("plate")
+	var grime := material("grime")
+	var barrel := MeshInstance3D.new()
+	var barrel_mesh := CylinderMesh.new()
+	barrel_mesh.top_radius = 0.045
+	barrel_mesh.bottom_radius = 0.055
+	barrel_mesh.height = 0.95
+	barrel_mesh.material = plate
+	barrel.mesh = barrel_mesh
+	barrel.rotation_degrees.x = 90.0
+	tool.add_child(barrel)
+	var canister := MeshInstance3D.new()
+	var canister_mesh := CylinderMesh.new()
+	canister_mesh.top_radius = 0.075
+	canister_mesh.bottom_radius = 0.075
+	canister_mesh.height = 0.30
+	canister_mesh.material = grime
+	canister.mesh = canister_mesh
+	canister.rotation_degrees.x = 90.0
+	canister.position = Vector3(0.0, -0.09, 0.22)
+	tool.add_child(canister)
+	for side in [-1.0, 1.0]:
+		var prong := MeshInstance3D.new()
+		var prong_mesh := BoxMesh.new()
+		prong_mesh.size = Vector3(0.02, 0.02, 0.16)
+		prong_mesh.material = material("rust")
+		prong.mesh = prong_mesh
+		prong.position = Vector3(side * 0.035, 0.0, -0.54)
+		tool.add_child(prong)
+	var charge := OmniLight3D.new()
+	charge.name = "Charge"
+	charge.light_color = Color("f0a24b")
+	charge.light_energy = 0.5
+	charge.omni_range = 0.8
+	charge.position = Vector3(0.0, -0.09, 0.22)
+	tool.add_child(charge)
+	return tool
+
+
+## Put a tool in view, lower right, the way a body cam sees a held object.
+static func hold_in_view(camera: Camera3D, tool: Node3D) -> void:
+	if tool.get_parent() != null:
+		tool.get_parent().remove_child(tool)
+	camera.add_child(tool)
+	tool.position = Vector3(0.34, -0.30, -0.62)
+	tool.rotation_degrees = Vector3(4.0, 8.0, -6.0)
