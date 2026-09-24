@@ -33,6 +33,21 @@ func _ready() -> void:
 	rig.set_state({"menu_open": true})
 	check(not rig.visible, "a full-sheet panel owns the screen")
 
+	var calm := NerveRig.new()
+	add_child(calm)
+	calm.set_process(false)
+	calm.set_state({"health": 100.0, "stamina": 100.0})
+	for _second in 4 * 10:
+		calm.step_presence(0.1)
+	check(is_equal_approx(calm.presence, NerveRig.IDLE_PRESENCE), "a whole, untouched body recedes (%.2f)" % calm.presence)
+	calm.set_state({"health": 100.0, "stamina": 92.0})
+	calm.step_presence(0.2)
+	check(calm.presence > 0.95, "spending stamina brings it straight back (%.2f)" % calm.presence)
+	calm.set_state({"health": 55.0, "stamina": 100.0})
+	for _second in 10 * 10:
+		calm.step_presence(0.1)
+	check(calm.presence > 0.95, "a hurt body never fades, however long it waits (%.2f)" % calm.presence)
+
 	var hud := preload("res://systems/gothic_field_hud.gd").new()
 	add_child(hud)
 	hud.set_state({"health": 25.0, "pockets": [{"label": "x"}]})

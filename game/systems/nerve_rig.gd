@@ -12,6 +12,9 @@ extends Control
 ## Two CRTs hang on cable from the top edge: the heart trace and the brain trace.
 ## A rack under them holds the three pockets `carry.gd` actually allows.
 ## Driven by `GothicFieldHud.set_state()`, so it has no numbers of its own.
+##
+## A whole, untouched body recedes to IDLE_PRESENCE and comes straight back the
+## moment anything it shows drops or changes (Greg, 2026-09-24).
 
 const CellOutzType := preload("res://systems/celloutz_type.gd")
 const BONE := Color("ead4ad")
@@ -24,6 +27,9 @@ const VIOLET := Color("7a55c9")
 const VOID := Color(0.018, 0.008, 0.012, 0.88)
 const VERTEBRAE := 12
 const POCKETS := 3
+const IDLE_PRESENCE := 0.18
+## Seconds a change keeps the rig fully lit before it may start to recede.
+const ACTIVITY_HOLD := 2.5
 
 var health := 100.0
 var blood := 1.0
@@ -38,6 +44,9 @@ var mood := "STEADY"
 var elapsed := 0.0
 var _drips: Array[Vector2] = []
 var _drip_clock := 0.0
+var presence := 1.0
+var _activity := ACTIVITY_HOLD
+var _last_reading := []
 
 
 func _ready() -> void:
@@ -58,6 +67,28 @@ func set_state(values: Dictionary) -> void:
 	pockets = values.get("pockets", pockets)
 	mood = str(values.get("mood", mood))
 	visible = not bool(values.get("menu_open", false))
+	var reading := [health, blood, stamina, pain, consciousness, magick, filled_pockets()]
+	if not _last_reading.is_empty():
+		for i in reading.size():
+			if absf(float(reading[i]) - float(_last_reading[i])) > 0.001:
+				_activity = ACTIVITY_HOLD
+				break
+	_last_reading = reading
+
+
+## How much the body is asking to be seen: any shortfall, scaled so a body at
+## 60% of anything is already fully lit.
+func need() -> float:
+	var worst := maxf(maxf(1.0 - health / 100.0, 1.0 - stamina / 100.0), maxf(1.0 - blood, maxf(pain / 100.0, 1.0 - consciousness / 100.0)))
+	return clampf(worst * 2.5, 0.0, 1.0)
+
+
+## Comes up fast, goes down slowly, so a hit is never read through a faded rig.
+func step_presence(delta: float) -> void:
+	_activity = maxf(_activity - delta, 0.0)
+	var target := 1.0 if _activity > 0.0 else lerpf(IDLE_PRESENCE, 1.0, need())
+	presence = move_toward(presence, target, delta * (6.0 if target > presence else 0.8))
+	self_modulate.a = presence
 
 
 func intact_vertebrae() -> int:
@@ -70,6 +101,7 @@ func filled_pockets() -> int:
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	step_presence(delta)
 	# Blood loss drips from the lowest seated vertebra; the rate is the loss.
 	var loss := 1.0 - blood
 	_drip_clock += delta * loss * 3.0
