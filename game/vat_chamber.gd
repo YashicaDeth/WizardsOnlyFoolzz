@@ -17,6 +17,7 @@ const OPENING := preload("res://systems/opening_director.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const ANATOMY := preload("res://systems/anatomy_component.gd")
 const LAB_CABLES := preload("res://systems/lab_cables.gd")
+const VAT_SMASH := preload("res://systems/vat_smash.gd")
 const IMPLANT_CATALOG := preload("res://systems/implant_catalog.gd")
 const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
@@ -66,6 +67,8 @@ var vat_glass: MeshInstance3D
 var umbilicals: Array[Node3D] = []
 ## What the lab's wiring built: cable and mesh counts, and how low it hangs.
 var cable_report: Dictionary = {}
+## The other tanks, which can be smashed once you are out of your own.
+var vat_smash
 var glass_shards: Array[Dictionary] = []
 var door_marker: Node3D
 var line_index := -1
@@ -181,6 +184,7 @@ func _ready() -> void:
 	# fade to hold the red image together while the player sees the real room,
 	# doctor and terminal behind it; filing may still cut into the later wake-up.
 	fade.color.a = 0.08
+	vat_smash = VAT_SMASH.new(self)
 	_build_chamber()
 	_build_examination_station()
 	# The examiner is not born at the keyboard. He enters after the player wakes.
@@ -887,9 +891,19 @@ func _dead_tank(at: Vector3, seed_value: int) -> void:
 	# capsules in them). The nearest three keep their seated adults -- one is
 	# still alive and one has visibly failed -- and the rest hold curled bodies.
 	var near := seed_value <= 2
-	LabVat.build(self, at, seed_value, 2.4, 0.8, not near, seed_value <= 5)
+	var root := LabVat.build(self, at, seed_value, 2.4, 0.8, not near, seed_value <= 5)
+	var cradled: Node3D = null
 	if near:
-		_build_cradled_vat_subject(at + Vector3(0, 0.42, 0), seed_value)
+		cradled = _build_cradled_vat_subject(at + Vector3(0, 0.42, 0), seed_value)
+	if vat_smash != null:
+		vat_smash.register(root, at, seed_value, cradled)
+
+
+## A freed subject that turned on you hits the body you just got back.
+func _on_freed_subject_struck(damage: float) -> void:
+	if anatomy != null:
+		anatomy.call("apply_hit", "torso", damage, 0.0, "blunt")
+	breach_shake = maxf(breach_shake, 0.2)
 
 
 ## A seated BaselineHuman makes the first visible other subjects recognisably
@@ -952,6 +966,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	# Post creation, any other tank you are looking at up close can be
+	# smashed open: the glass, the medium, and whoever is inside.
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and breakout_complete and can_move and vat_smash != null:
+		var tank: int = vat_smash.aimed(camera)
+		if tank >= 0:
+			vat_smash.strike(tank, doctor_route.held_weapon() if doctor_route != null else "")
+			return
 	if doctor_route != null and doctor_route.handle_input(event):
 		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
@@ -994,6 +1015,8 @@ func _physics_process(delta: float) -> void:
 	_update_beats()
 	_update_sequence(delta)
 	_update_shards(delta)
+	if vat_smash != null:
+		vat_smash.step(delta)
 	if can_move:
 		_update_movement(delta)
 	# Applied last, on top of whatever the sequence or the movement code just
@@ -1573,6 +1596,10 @@ func _update_hud() -> void:
 	if stuck_tank_opened and CLOTHING.worn("player") == "bare" and CLOTHING.worn(FAILED_SUBJECT_ID) != "bare" and _near_first_objects():
 		prompt.text = "[E] TAKE THE CLOTHING OFF SUBJECT 0C-4"
 		osd.point_at(stuck_tank_marker.global_position + Vector3(0, 1.1, 0))
+		return
+	var smash_prompt: String = vat_smash.prompt_for(camera, doctor_route.held_weapon() if doctor_route != null else "") if vat_smash != null and breakout_complete else ""
+	if smash_prompt != "":
+		prompt.text = smash_prompt
 		return
 	var route_prompt: String = doctor_route.prompt_text() if doctor_route != null else ""
 	if route_prompt != "":
