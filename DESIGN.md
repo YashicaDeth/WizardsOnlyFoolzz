@@ -752,6 +752,18 @@ we can make nudity and censors".
   re-reads the screen as a tearing, scanlined body-cam feed
   (`censor_glitch.gdshader`).
 
+### Answered by Greg in question boxes, 24 September 2026 (derby loss)
+
+- **A wreck in the derby is a capture; a crush is a death.** Losing the
+  derby normally keeps the existing capture: the Captain drags you out
+  alive, and you arrive in the Bone Yard as her prisoner. If the killing
+  blow slams the hull well past zero (a crush), you die, and you regrow in
+  the vat of whoever claims you, now the Captain.
+- *Built:* the Lower Works sentinel and the drain bingyanger no longer stop
+  at a quarter of your blood. They can kill you, and you wake in a vat.
+  Your old body stays where you fell (`RebirthSite`), with what you
+  carried and any jester parts you wore, and E beside it takes them back.
+
 ## Influence register
 
 These entries describe what Greg said he values; proposed extraction is labelled. Liking a reference does not automatically import every mechanic from it.

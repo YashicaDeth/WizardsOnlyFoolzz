@@ -90,6 +90,8 @@ var patrol_alert := false
 var patrol_disabled := false
 var patrol_attack_cooldown := 0.0
 var blood := 100.0
+## Where your old bodies lie if the sentinel kills you (`RebirthSite`).
+var rebirth_site: RebirthSite
 var breach_tool_ready := false
 var breach_flash: OmniLight3D
 var sentinel_disable_reason := ""
@@ -112,6 +114,9 @@ func _ready() -> void:
 	_build_fuse_branch()
 	_build_patrol()
 	_build_player()
+	rebirth_site = RebirthSite.new()
+	add_child(rebirth_site)
+	rebirth_site.setup("lower_works", player)
 	_build_hud()
 	# The arcade's optional breach tool carries forward as a compact, deliberate
 	# first combat choice.  The fuse remains the quiet route; neither route is
@@ -639,8 +644,13 @@ func _patrol_step(delta: float) -> void:
 	# bottom of the far ramp.
 	if distance < 2.0 and patrol_attack_cooldown <= 0.0 and overhead <= GANTRY_CLEARANCE:
 		patrol_attack_cooldown = 1.25
-		blood = maxf(25.0, blood - 6.0)
+		# Greg, 24 September: every killer in minutes 0-30 sends you to the
+		# vat. The sentinel used to stop at a quarter of your blood; now it
+		# finishes what it starts, and your old body stays down here.
+		blood = maxf(0.0, blood - 6.0)
 		WorldHistory.record_event("lower_works_sentinel_strike", {"location": "lower_works", "damage": 6})
+		if blood <= 0.0:
+			rebirth_site.die("cut down by the Lower Works sentinel", "lower_works_sentinel")
 
 
 func _flat_distance(at: Vector3) -> float:
@@ -650,6 +660,8 @@ func _flat_distance(at: Vector3) -> float:
 
 
 func _interact() -> void:
+	if not rebirth_site.try_recover().is_empty():
+		return
 	if not fuse_taken and _flat_distance(FUSE_AT) <= 2.4:
 		fuse_taken = true
 		fuse_visual.visible = false
@@ -739,7 +751,9 @@ func _update_hud() -> void:
 	var guard_state := ("SENTINEL INTERRUPTED" if sentinel_disable_reason == "breach_interrupted" else "SENTINEL RELAY DOWN") if patrol_disabled else ("SENTINEL ENGAGED" if patrol_alert else "SENTINEL PATROL")
 	status.text = "BLOOD %03d%%   PAIN 86   LOWER WORKS // %s" % [roundi(blood), guard_state]
 	objective.text = "OBJECTIVE // " + ("REACH THE HEAT ELEVATOR" if fuse_taken else "FIND A LIFT FUSE")
-	if not fuse_taken and _flat_distance(FUSE_AT) <= 2.4:
+	if not rebirth_site.nearest().is_empty():
+		prompt.text = "[E] TAKE BACK WHAT YOUR OLD BODY HOLDS"
+	elif not fuse_taken and _flat_distance(FUSE_AT) <= 2.4:
 		prompt.text = "[E] TAKE LIFT FUSE"
 		osd.point_at(FUSE_AT + Vector3(0, 0.3, 0))
 	elif fuse_taken and not shortcut_open and _flat_distance(SHORTCUT_AT) <= 3.0:

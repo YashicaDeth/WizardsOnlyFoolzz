@@ -277,6 +277,11 @@ func _build_stalker() -> void:
 	]
 	stalker.build(round)
 	stalker.bind(player)
+	# Greg, 24 September: it can kill you now, and you wake in the vat.
+	stalker.struck.connect(_on_stalker_struck)
+	rebirth_site = RebirthSite.new()
+	add_child(rebirth_site)
+	rebirth_site.setup("old_drains", player)
 
 
 func _build_hud() -> void:
@@ -358,7 +363,17 @@ func _enter(district_id: String) -> void:
 		district_timer = 3.0
 
 
+var rebirth_site: RebirthSite
+
+
+func _on_stalker_struck(_damage: float) -> void:
+	if stalker.blood <= 0.0:
+		rebirth_site.die("taken by the bingyanger in the old drains", DrainStalker.SUBJECT_ID)
+
+
 func _interact() -> void:
+	if not rebirth_site.try_recover().is_empty():
+		return
 	if surfaced or _flat_distance(EXIT_AT) > EXIT_REACH:
 		return
 	_enter("waste_gallery")
@@ -390,6 +405,8 @@ func _update_hud() -> void:
 	objective.text = "OBJECTIVE // FOLLOW THE WATER OUT"
 	if surfaced:
 		prompt.text = ""
+	elif not rebirth_site.nearest().is_empty():
+		prompt.text = "[E] TAKE BACK WHAT YOUR OLD BODY HOLDS"
 	elif _flat_distance(EXIT_AT) <= EXIT_REACH:
 		prompt.text = "[E] FORCE THE GRATE // CLIMB OUT"
 		osd.point_at(EXIT_AT + Vector3(0, 1.8, -1.2))

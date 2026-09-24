@@ -1215,7 +1215,7 @@ func _on_vehicle_impact(other: Node, closing_speed: float, self_share: float) ->
 	elif closing_speed > 7.0:
 		# First-pass softening, same user feedback as `_on_wrecker_impact()`:
 		# was `closing_speed * 0.4`. Not a definitive rebalance.
-		integrity = maxi(0, integrity - roundi(closing_speed * 0.3))
+		_take_hull(roundi(closing_speed * 0.3))
 		# V1.1/V1.2. `integrity` stays the tuned, authoritative number — this
 		# only mirrors it into the chassis's own generic `condition` field so
 		# handling degradation and the engine's damage rattle read the same
@@ -1242,7 +1242,7 @@ func _on_wrecker_impact(other: Node, closing_speed: float, self_share: float, wr
 	# quickly"): was `0.55 * ... , 1, 18`. Not a definitive rebalance — just
 	# less punishing per hit until it's played more.
 	var damage := clampi(roundi(closing_speed * 0.4 * (0.4 + attacker_share * 0.6)), 1, 14)
-	integrity = maxi(0, integrity - damage)
+	_take_hull(damage)
 	# V1.1/V1.2. See the mirror note in `_on_vehicle_impact()`.
 	boat.condition = clampf(float(integrity) / 100.0, 0.0, 1.0)
 	_update_player_damage_visual((boat.global_position - wrecker.global_position).normalized())
@@ -1297,7 +1297,7 @@ func _damage_target(target: Node3D, collision_speed: float = 0.0, self_share: fl
 	var impact_direction := (target.global_position - boat.global_position).normalized()
 	# Only physical contact transfers impact energy back into our chassis.
 	if not cab_round:
-		integrity = maxi(0, integrity - clampi(roundi(energy * 0.22 * (0.35 + 0.65 * (1.0 - self_share))), 1, 34))
+		_take_hull(clampi(roundi(energy * 0.22 * (0.35 + 0.65 * (1.0 - self_share))), 1, 34))
 		boat.condition = clampf(float(integrity) / 100.0, 0.0, 1.0)
 		_update_player_damage_visual(-impact_direction)
 	_update_wrecker_damage_visual(target, target_integrity, impact_direction)
@@ -2085,7 +2085,27 @@ func _leave_derby(result: String) -> void:
 		return
 	leaving = true
 	WorldHistory.record_event("derby_result_accepted", {"result": result, "score": score, "disabled": disabled_count})
+	if result == "lost" and not derby_rebirth.is_empty():
+		Interstitial.travel(str(derby_rebirth.scene), "wrecked // %s grows you back" % str(derby_rebirth.vat.label).to_lower())
+		return
 	Interstitial.travel(DERBY_EXIT_SCENE, DERBY_EXIT_CAPTION)
+
+
+## Set when a crush killed you: where the next body grows.
+var derby_rebirth: Dictionary = {}
+## How far the blow that emptied the hull went past zero. A wreck finished
+## off gently is a capture; one slammed well past it is a death.
+var last_overkill := 0
+const CRUSH_OVERKILL := 10
+
+
+func _take_hull(amount: int) -> void:
+	last_overkill = amount - integrity
+	integrity = maxi(0, integrity - amount)
+
+
+func crushed() -> bool:
+	return integrity <= 0 and last_overkill >= CRUSH_OVERKILL
 
 
 func _finish_round(result: String) -> void:
@@ -2120,6 +2140,11 @@ func _finish_round(result: String) -> void:
 		# a forfeitable body (F5); routing the wreck through it too means the
 		# Captain is the one who has you when the scene changes, not the count.
 		DEFEAT_ROUTER.route(CAST.id_for(CAPTAIN_SLOT), "rift_derby_quarry")
+		# Greg, 24 September: a wreck is a capture (the Captain drags you out
+		# alive, as before); a car crushed far past zero is a death, and the
+		# Captain who owns the body now is whose vat grows the next one.
+		if crushed():
+			derby_rebirth = VatRebirth.die(venue, "crushed in the derby", CAST.id_for(CAPTAIN_SLOT), Vector3.ZERO)
 
 
 func _add_authored_environment_collision(root_node: Node) -> void:

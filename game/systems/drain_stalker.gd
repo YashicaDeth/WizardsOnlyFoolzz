@@ -14,8 +14,9 @@ extends Node3D
 ## - **Slipping it** is going quiet until it loses the trail, or discharging
 ##   the breach tool into it, which stuns it the way it interrupts the
 ##   sentinel.
-## - **If it reaches you it tears at you:** blood, the same currency and the
-##   same 25% floor as the sentinel, so the route is costly and not a death.
+## - **If it reaches you it tears at you:** blood, the same currency as the
+##   sentinel, and no floor any more (Greg, 24 September): it can kill you, and
+##   the vat of whoever claims you grows you back.
 ##
 ## Everything it does is filed in `WorldHistory`, and it talks: the lines are
 ## horror, funny-insane and prophetic, per Greg, spoken in the game's generated
@@ -36,7 +37,7 @@ const PROWL_SPEED := 0.9
 const REACH := 1.5
 const STRIKE_BLOOD := 8.0
 const STRIKE_COOLDOWN := 1.5
-const BLOOD_FLOOR := 25.0
+const BLOOD_FLOOR := 0.0
 const STUN_SECONDS := 9.0
 const BREACH_RANGE := 7.0
 
