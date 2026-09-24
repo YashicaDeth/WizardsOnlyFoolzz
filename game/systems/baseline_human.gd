@@ -1110,10 +1110,17 @@ static func config_from_subject(record: Dictionary) -> Dictionary:
 	# displayed a size setting but the player rig ignored it completely.
 	var selected_build := clampf(float(appearance.get("build", 0.5)), 0.0, 1.0)
 	var combined_build := clampf(float(race.get("build", 1.0)) * lerpf(0.86, 1.18, selected_build), 0.7, 1.4)
+	# Face drives the rig's procedural variation, so two players with
+	# different faces are not the same generated head -- except when the face
+	# has named axes. Then the axes shape the skull themselves, and a skin
+	# re-rolled from their combined scalar made every slider repaint the whole
+	# face (Greg, 2026-09-24: "each slider is changing the entire thing"). The
+	# skin then follows who the person is, and holds still while you edit.
+	var variation := 1 + int(clampf(float(appearance.get("face", 0.5)), 0.0, 1.0) * 24.0)
+	if appearance.get("axes") is Dictionary and not (appearance.axes as Dictionary).is_empty():
+		variation = 1 + posmod(hash(str(appearance.get("name", "THE HUNTER"))), 24)
 	var config := {
-		# Face drives the rig's procedural variation, so two players with
-		# different faces are not the same generated head.
-		"variation": 1 + int(clampf(float(appearance.get("face", 0.5)), 0.0, 1.0) * 24.0),
+		"variation": variation,
 		"flesh": Color("7a6350").darkened(wear * 0.35),
 		"blood": blood_volume(str(sheet_anatomy.get("blood_type", "O-RUST"))),
 		"build": combined_build,

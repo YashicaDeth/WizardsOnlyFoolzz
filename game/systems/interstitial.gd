@@ -281,6 +281,11 @@ func _process(delta: float) -> void:
 
 func _draw_plate() -> void:
 	var size := screen.size
+	# The film is a child node, not a draw call: when the plate stops drawing it
+	# keeps its last frame on screen unless it is hidden here. Greg saw the
+	# X-ray body hang over the new scene after arriving (2026-09-24).
+	if _film != null and is_instance_valid(_film):
+		_film.visible = alpha > 0.01
 	if alpha <= 0.01 or size.x < 1.0:
 		return
 	screen.draw_rect(Rect2(Vector2.ZERO, size), VOID * Color(1, 1, 1, alpha))
