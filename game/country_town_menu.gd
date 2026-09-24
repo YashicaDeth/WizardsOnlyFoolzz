@@ -6,6 +6,11 @@ const MENU_PLATE := preload("res://systems/menu_plate.gd")
 const DECANTING_PROLOGUE := preload("res://systems/decanting_prologue.gd")
 const SPLASH_BACKDROP := preload("res://systems/splash_backdrop.gd")
 const REGAL_FRAME := preload("res://systems/regal_frame.gd")
+const LOGO_FX := preload("res://shaders/logo_fx.gdshader")
+const BOOT_SPLASH := preload("res://boot_splash.gd")
+## Seconds between the title logo's short glitch tears.
+const TITLE_GLITCH_EVERY := 5.5
+var title_fx: ShaderMaterial
 const CRT_GLASS := preload("res://systems/crt_glass.gd")
 const EYE_GLARE := preload("res://systems/eye_glare.gd")
 
@@ -168,6 +173,17 @@ func _play_title_sequence() -> void:
 	splash_glass.name = "SplashGlass"
 	splash_glass_layer.add_child(splash_glass)
 	_use_canvas_background()
+	# Greg, 24 September: the real logo re-animated, here calmer than in the
+	# splash: it burns in, then breathes behind the menu, bleeding down its
+	# drips and glitching now and then.
+	title_fx = ShaderMaterial.new()
+	title_fx.shader = LOGO_FX
+	title_fx.set_shader_parameter("calm", 0.6)
+	title_fx.set_shader_parameter("drips_on", 0.0)
+	title_fx.set_shader_parameter("drip_flow", 1.0)
+	title_fx.set_shader_parameter("drip_top", 0.62)
+	title_fx.set_shader_parameter("reveal", 0.0)
+	$HUD/TitleLogo.material = title_fx
 	$HUD/TitleLogo.modulate.a = 0.0
 	$HUD/Algiz.modulate.a = 0.0
 	$HUD/TitleLogo.scale = Vector2(0.90, 0.90)
@@ -192,6 +208,7 @@ func _play_title_sequence() -> void:
 	tween.tween_property($HUD/Algiz, "modulate:a", 1.0, 0.18)
 	tween.parallel().tween_property($HUD/TitleLogo, "modulate:a", 1.0, 0.36)
 	tween.parallel().tween_property($HUD/TitleLogo, "scale", Vector2.ONE, 0.52).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_method(func(value: float) -> void: title_fx.set_shader_parameter("reveal", value), 0.0, 1.0, 0.95)
 	tween.tween_property(intro_veil, "color:a", 0.0, 0.72)
 	for button in menu_buttons:
 		tween.parallel().tween_property(button, "modulate:a", 1.0, 0.32)
@@ -533,6 +550,11 @@ func _process(delta: float) -> void:
 		wreck.rotate_y(delta * 0.28)
 		wreck.position.y = 4.4 + sin(Time.get_ticks_msec() * 0.0014) * 0.22
 	$HUD/TitleLogo.position.y = sin(ui_time * 0.72) * 2.0
+	if title_fx != null:
+		title_fx.set_shader_parameter("beat", BOOT_SPLASH.heartbeat(ui_time) * 0.6)
+		# A short tear every few seconds, so the name keeps reading between.
+		var burst := fmod(ui_time, TITLE_GLITCH_EVERY) < 0.22 and ui_time > 2.0
+		title_fx.set_shader_parameter("glitch", 0.75 if burst else 0.05)
 	$HUD/Algiz.modulate.a = 0.72 + sin(ui_time * 2.1) * 0.18
 
 

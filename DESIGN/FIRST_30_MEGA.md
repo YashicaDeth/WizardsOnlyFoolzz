@@ -101,8 +101,8 @@ it, it's rendered and looked at, it has a test, and it's merged and built
       when the seal locks.
 - [ ] **Sound.** A sub thump when the seal locks, a static crackle with the
       glitch, and a drip tick with each fall.
-- [ ] The same animation plays on the title screen, behind the menu,
-      calmer.
+- [x] The same animation plays on the title screen, behind the menu,
+      calmer (`country_town_menu.gd`, the wet run down its drips).
 - [ ] It can be skipped, and it's never longer than 6 s on first launch.
 - [ ] A clip of it goes on wizardsonlyfoolz.net and the Instagram.
 - [ ] (rec) A 9:16 version for Reels, and a 1:1 loop for the profile.
@@ -114,7 +114,7 @@ it, it's rendered and looked at, it has a test, and it's merged and built
 ### B1. The title screen
 - [x] Main menu with START GAME, Demo, Full Game (locked), Sandbox,
       Support, and settings (`country_town_menu.gd`).
-- [ ] The live logo animation (A3) sits above the menu.
+- [x] The live logo animation (A3) sits above the menu.
 - [ ] The background is a slow camera over the country town at dusk, with
       the Wire's paper collage bleeding at the edges.
 - [ ] Menu items are set in the game's stencil face (`CellOutzType`), never

@@ -24,6 +24,11 @@ uniform float assemble : hint_range(0.0, 1.0) = 1.0;
 uniform float drips_on : hint_range(0.0, 1.0) = 1.0;
 uniform float calm : hint_range(0.0, 1.0) = 0.0;
 uniform vec4 ember : source_color = vec4(1.0, 0.45, 0.12, 1.0);
+// For logo images whose drips aren't the six straight ones (the title
+// screen's curving drips): no stretching, just fresh blood running down
+// everything below `drip_top`, as a wet pulse.
+uniform float drip_flow : hint_range(0.0, 1.0) = 0.0;
+uniform float drip_top : hint_range(0.0, 1.0) = 0.62;
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453);
@@ -132,6 +137,13 @@ void fragment() {
 		float rim = smoothstep(0.06, 0.0, abs(edge - n)) * (1.0 - step(0.999, reveal));
 		col = mix(col, ember.rgb * 1.35, rim * alpha);
 		alpha *= max(shown, rim);
+		// Fresh blood running down the drips.
+		if (drip_flow > 0.0 && UV.y > drip_top) {
+			float f = fract((UV.y - drip_top) * 2.6 - t * 0.28 + hash(vec2(floor(UV.x * 40.0), 1.0)) * 0.6);
+			float pulse = exp(-pow((f - 0.12) * 12.0, 2.0));
+			col = mix(col, vec3(0.75, 0.04, 0.03), pulse * 0.7 * drip_flow);
+			col += vec3(0.35, 0.05, 0.03) * pulse * drip_flow;
+		}
 		// CRT: faint scanlines and a rolling bar.
 		float scan = 0.93 + 0.07 * sin(SCREEN_UV.y * 900.0);
 		float roll = 1.0 + 0.12 * smoothstep(0.04, 0.0, abs(fract(SCREEN_UV.y - t * 0.12) - 0.5)) * (1.0 - calm * 0.5);
