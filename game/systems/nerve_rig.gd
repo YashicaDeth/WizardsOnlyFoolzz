@@ -25,7 +25,18 @@ const PHOSPHOR := Color("6fe0c8")
 const FLESH := Color("b98287")
 const VIOLET := Color("7a55c9")
 const VOID := Color(0.018, 0.008, 0.012, 0.88)
-const VERTEBRAE := 12
+## Every vertebra a person has (Greg, 24 September: "33 vertebrae accurate"),
+## the same count `AnatomyComponent.SPINE_VERTEBRAE` damages.
+const VERTEBRAE := 33
+const GUNMETAL := Color("3b4046")
+const GUNMETAL_DEEP := Color("1b1f22")
+const CHROME := Color("b9c2c8")
+const MARROW := Color("5a1210")
+## Replaced outright in chrome, until installed cybernetics say which: the
+## atlas and axis under the skull port, and the thoracolumbar junction where
+## a spine breaks.
+const CHROME_SEGMENTS := [0, 1, 18, 19]
+const FIBRES := 5
 const POCKETS := 3
 const IDLE_PRESENCE := 0.18
 ## Seconds a change keeps the rig fully lit before it may start to recede.
@@ -136,9 +147,12 @@ func _draw_tracking() -> void:
 		var centre := _brain_centre()
 		boxes.append({"rect": Rect2(centre - Vector2(52, 40), Vector2(104, 80)), "tag": "PAIN %02d  CONSC %02d" % [roundi(pain), roundi(consciousness)], "ink": TEAL.lightened(0.3) if pain < 60.0 else BLOOD.lightened(0.25)})
 	var seated := intact_vertebrae()
-	for index in range(seated, VERTEBRAE):
-		var at := _spine_point(index) + Vector2(7, 2)
-		boxes.append({"rect": Rect2(at - Vector2(16, 9), Vector2(32, 18)), "tag": "L%02d" % (index + 1), "ink": BLOOD.lightened(0.3)})
+	if seated < VERTEBRAE:
+		# One box round the whole lost run, named by its real vertebrae.
+		var first := _spine_point(seated) + Vector2(7, 0)
+		var last := _spine_point(VERTEBRAE - 1) + Vector2(7, 4)
+		var tag := "%s-%s LOST" % [layout()[seated].label, layout()[VERTEBRAE - 1].label]
+		boxes.append({"rect": Rect2(first - Vector2(22, 8), Vector2(44, last.y - first.y + 16)), "tag": tag, "ink": BLOOD.lightened(0.3)})
 	if blood < 0.9:
 		var bleed := _spine_point(maxi(seated - 1, 0))
 		boxes.append({"rect": Rect2(bleed + Vector2(-20, 10), Vector2(40, 34)), "tag": "BLEED %02d%%" % roundi(blood * 100.0), "ink": BLOOD.lightened(0.15)})
@@ -168,60 +182,255 @@ func _brain_centre() -> Vector2:
 	return Vector2(size.x - 92.0, 66.0) + slip + throb
 
 
+## Where each vertebra sits, top down: its name, its height down the column
+## from the atlas, its body's half-width, how far its housing reaches out to
+## the transverse processes, and its region. Built once; a column of 33 real
+## vertebrae is ~320 px, close to the old twelve at 20 px each.
+static var _layout: Array = []
+
+
+static func layout() -> Array:
+	if not _layout.is_empty():
+		return _layout
+	var y := 0.0
+	for i in VERTEBRAE:
+		var entry := {}
+		if i < 7:
+			entry = {"label": "C%d" % (i + 1), "region": "cervical", "gap": 8.0, "hw": 5.5 + i * 0.45, "reach": 4.0}
+		elif i < 19:
+			entry = {"label": "T%d" % (i - 6), "region": "thoracic", "gap": 11.0, "hw": 8.0 + (i - 7) * 0.35, "reach": 7.0}
+		elif i < 24:
+			entry = {"label": "L%d" % (i - 18), "region": "lumbar", "gap": 14.0, "hw": 12.0 + (i - 19) * 0.5, "reach": 9.0}
+		elif i < 29:
+			# The sacrum: five fused into one plate, narrowing to its apex.
+			entry = {"label": "S%d" % (i - 23), "region": "sacral", "gap": 8.0, "hw": 15.0 - (i - 24) * 2.2, "reach": 0.0}
+		else:
+			entry = {"label": "Co%d" % (i - 28), "region": "coccygeal", "gap": 5.0, "hw": 4.0 - (i - 29) * 0.7, "reach": 0.0}
+		entry["y"] = y
+		y += float(entry.gap)
+		_layout.append(entry)
+	return _layout
+
+
 func _spine_point(index: int) -> Vector2:
-	var top := _brain_centre() + Vector2(6, 38)
-	var t := float(index) / float(VERTEBRAE - 1)
-	var sway := sin(elapsed * 0.9 + t * 2.4) * (4.0 + t * 9.0)
-	# A real column curves: a shallow S, not a plumb line.
-	return top + Vector2(sway + sin(t * PI * 1.6) * 16.0, float(index) * 20.0)
+	var top := _brain_centre() + Vector2(6, 40)
+	var entries := layout()
+	var entry: Dictionary = entries[clampi(index, 0, VERTEBRAE - 1)]
+	var t := float(entry.y) / float(entries[VERTEBRAE - 1].y)
+	var sway := sin(elapsed * 0.9 + t * 2.4) * (3.0 + t * 7.0)
+	# The column's real curves, seen from behind as a lean: cervical and lumbar
+	# one way, thoracic and sacral the other.
+	return top + Vector2(sway + sin(t * TAU) * 9.0, float(entry.y))
 
 
+## Greg, 24 September: the old column read as a copy of its Garden of Giants
+## reference. It is now built, not grown: 33 vertebrae (7 cervical, 12
+## thoracic, 5 lumbar, the fused sacrum and coccyx), each clamped in a
+## machined gunmetal housing with its bone showing between the plates, a few
+## replaced outright in chrome, wired housing to housing, with a fibre-optic
+## bundle up the middle carrying the stamina light. CellOutz copper and teal
+## on gunmetal. What each mark means has not changed.
 func _draw_spine() -> void:
 	var seated := intact_vertebrae()
-	var lit := stamina / 100.0
-	var cord := PackedVector2Array()
+	var entries := layout()
+	var lit_count := int(round(stamina / 100.0 * float(VERTEBRAE - 1)))
+	var points := PackedVector2Array()
 	for i in VERTEBRAE:
-		cord.append(_spine_point(i))
-	# The cord first, so the bone sits over it. Its glow runs down from the brain
-	# as far as stamina reaches, with a pulse travelling along it.
-	draw_polyline(cord, Color(0.2, 0.08, 0.06, 0.8), 3.0)
-	var lit_count := int(round(lit * (VERTEBRAE - 1)))
-	if lit_count > 0:
-		var glow := cord.slice(0, lit_count + 1)
-		draw_polyline(glow, COPPER * Color(1, 1, 1, 0.9), 2.0)
-		var pulse_at := fposmod(elapsed * 1.6, 1.0) * float(lit_count)
-		var i0 := int(pulse_at)
-		if i0 < lit_count:
-			draw_circle(cord[i0].lerp(cord[i0 + 1], pulse_at - float(i0)), 3.2, Color(1, 0.8, 0.5, 0.9))
+		points.append(_spine_point(i))
+	_draw_skull_port(points[0])
+	_draw_cables(points, seated)
+	var seam := BLOOD.lerp(Color(0.25, 0.02, 0.02), 1.0 - blood)
 	for i in VERTEBRAE:
-		var at := cord[i]
-		var width := 22.0 - float(i) * 0.7
-		var loose := i >= seated
-		var tone := BONE
-		if loose:
-			# A lost vertebra is still there as an outline, knocked out of line.
-			at += Vector2(7.0 + sin(elapsed * 2.0 + i) * 2.0, 2.0)
-			tone = BONE * Color(0.5, 0.45, 0.42, 0.35)
-		# A vertebral body: waisted sides, flared end-plates, wings out to the
-		# transverse processes and a spinous tip behind. Drawn as bone, not a box.
-		var hw := width * 0.5
-		var shape := PackedVector2Array([
-			at + Vector2(-hw, -6), at + Vector2(-hw - 9, -3), at + Vector2(-hw - 10, 0),
-			at + Vector2(-hw * 0.8, 1), at + Vector2(-hw, 6), at + Vector2(-3, 7),
-			at + Vector2(0, 11), at + Vector2(3, 7), at + Vector2(hw, 6),
-			at + Vector2(hw * 0.8, 1), at + Vector2(hw + 10, 0), at + Vector2(hw + 9, -3),
-			at + Vector2(hw, -6), at + Vector2(0, -7.5),
-		])
-		if not loose:
-			draw_colored_polygon(shape, BONE.darkened(0.18))
-			draw_colored_polygon(PackedVector2Array([at + Vector2(-hw * 0.9, 1), at + Vector2(hw * 0.9, 1), at + Vector2(hw, 6), at + Vector2(-hw, 6)]), BONE.darkened(0.45))
-			draw_circle(at + Vector2(0, -1), 2.4, BLOOD.lerp(Color(0.3, 0.02, 0.02), 1.0 - blood))
-		var closed := shape.duplicate()
-		closed.append(shape[0])
-		draw_polyline(closed, Color(0.12, 0.05, 0.04, 0.9) if not loose else tone, 1.2)
+		var entry: Dictionary = entries[i]
+		# Exposed tissue in the gap below each seated vertebra: disc, meat, wet.
+		if i < seated - 1:
+			var mid := points[i].lerp(points[i + 1], 0.5)
+			var hw := float(entry.hw) * 0.8
+			draw_line(mid - Vector2(hw, 0), mid + Vector2(hw, 0), MARROW, 2.4)
+			draw_line(mid - Vector2(hw * 0.6, 0.6), mid + Vector2(hw * 0.5, 0.6), seam, 1.0)
+		_draw_vertebra(i, points[i], i >= seated, i < lit_count)
+	# The bundle runs down a channel cut through the middle of every housing,
+	# over the bone, so its light is the brightest thing on the column.
+	_draw_fibres(points, seated, lit_count)
+	if seated < VERTEBRAE:
+		_draw_break(points[maxi(seated - 1, 0)], seated, seam)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	for drip in _drips:
 		draw_line(drip, drip + Vector2(0, 7), BLOOD, 2.2)
 		draw_circle(drip + Vector2(0, 7), 2.2, BLOOD)
+
+
+## Where the column plugs into the skull: a bolted gunmetal plate at the stem.
+func _draw_skull_port(atlas: Vector2) -> void:
+	var plate := Rect2(atlas + Vector2(-9, -9), Vector2(18, 5))
+	draw_rect(plate, GUNMETAL)
+	draw_line(plate.position, plate.position + Vector2(plate.size.x, 0), CHROME * Color(1, 1, 1, 0.5), 1.0)
+	draw_circle(plate.position + Vector2(2.5, 2.5), 1.2, COPPER)
+	draw_circle(plate.end - Vector2(2.5, 2.5), 1.2, COPPER)
+
+
+## Five strands down the middle, dark glass until stamina lights them from the
+## top, each with its own packet of light travelling down.
+func _draw_fibres(points: PackedVector2Array, seated: int, lit_count: int) -> void:
+	var entries := layout()
+	var reach := mini(seated, VERTEBRAE)
+	if reach < 2:
+		return
+	var channel := points.slice(0, reach)
+	draw_polyline(channel, GUNMETAL_DEEP, 5.0)
+	for f in FIBRES:
+		var spread := (float(f) - float(FIBRES - 1) * 0.5) / float(FIBRES - 1)
+		var strand := PackedVector2Array()
+		for i in reach:
+			var twist := cos(float(entries[i].y) * 0.06 + float(f) * 1.3) * 0.35
+			strand.append(points[i] + Vector2(spread * 2.2 + twist * 0.8, 0))
+		draw_polyline(strand, TEAL.darkened(0.55), 0.8)
+		var lit_to := mini(lit_count, reach - 1)
+		if lit_to < 1:
+			continue
+		var lit := strand.slice(0, lit_to + 1)
+		draw_polyline(lit, PHOSPHOR * Color(1, 1, 1, 0.12), 6.0)
+		draw_polyline(lit, TEAL.lightened(0.35), 0.8)
+		var along := fposmod(elapsed * (0.55 + 0.17 * f) + f * 0.37, 1.0) * float(lit_to)
+		var i0 := int(along)
+		if i0 < lit_to:
+			var head := lit[i0].lerp(lit[i0 + 1], along - float(i0))
+			draw_circle(head, 2.6, PHOSPHOR * Color(1, 1, 1, 0.35))
+			draw_circle(head, 1.2, Color(0.9, 1.0, 0.97))
+
+
+## Black cable looped housing to housing down alternate sides, sagging outward.
+## A cable whose lower end has gone with its vertebra hangs torn and sparks.
+func _draw_cables(points: PackedVector2Array, seated: int) -> void:
+	var entries := layout()
+	var i := 1
+	var side := 1.0
+	while i + 3 < 24:
+		var a: Dictionary = entries[i]
+		var b: Dictionary = entries[i + 3]
+		var start := points[i] + Vector2(side * (float(a.hw) + float(a.reach) * 0.7), 0)
+		var finish := points[i + 3] + Vector2(side * (float(b.hw) + float(b.reach) * 0.7), 0)
+		if i >= seated:
+			break
+		var torn := i + 3 >= seated
+		if torn:
+			finish = start + Vector2(side * 6.0 + sin(elapsed * 2.1 + i) * 2.0, 20.0)
+		var bow := start.lerp(finish, 0.5) + Vector2(side * (9.0 + sin(elapsed * 1.3 + i) * 1.5), 0)
+		var cable := PackedVector2Array()
+		for s in 9:
+			var t := float(s) / 8.0
+			cable.append(start.lerp(bow, t).lerp(bow.lerp(finish, t), t))
+		draw_polyline(cable, Color("121416"), 2.0)
+		draw_polyline(cable, COPPER * Color(1, 1, 1, 0.35), 0.7)
+		if torn:
+			_draw_frayed(finish, side)
+		i += 3
+		side = -side
+
+
+func _draw_frayed(end: Vector2, side: float) -> void:
+	for strand in 3:
+		var tip := end + Vector2(side * (strand - 1) * 2.5, 3.0 + strand)
+		draw_line(end, tip, COPPER, 0.8)
+		if sin(elapsed * 23.0 + strand * 2.1 + end.y) > 0.6:
+			draw_circle(tip, 1.6, Color(1.0, 0.85, 0.55, 0.9))
+
+
+## One vertebra in its local frame. Seated: bone between two machined clamp
+## plates bolted in copper, or all chrome where it has been replaced. Lost:
+## the housing knocked out of line, cracked, the bone broken inside it.
+func _draw_vertebra(index: int, at: Vector2, loose: bool, lit: bool) -> void:
+	var entry: Dictionary = layout()[index]
+	var hw := float(entry.hw)
+	var hh := maxf(float(entry.gap) * 0.36, 1.6)
+	var reach := float(entry.reach)
+	var region := str(entry.region)
+	var fade := 1.0
+	var tilt := 0.0
+	if loose:
+		at += Vector2(4.0 + sin(elapsed * 2.0 + index) * 1.5, 1.5)
+		tilt = sin(float(index) * 1.7) * 0.18
+		fade = 0.28
+	draw_set_transform(at, tilt, Vector2.ONE)
+	var ink := Color(1, 1, 1, fade)
+	var edge := GUNMETAL_DEEP * Color(1, 1, 1, 0.95 * fade)
+	var body := PackedVector2Array([
+		Vector2(-hw * 0.55, -hh), Vector2(hw * 0.55, -hh), Vector2(hw * 0.7, -hh * 0.3),
+		Vector2(hw * 0.55, hh), Vector2(-hw * 0.55, hh), Vector2(-hw * 0.7, -hh * 0.3),
+	])
+	if region == "sacral" or region == "coccygeal":
+		# Fused bone, braced: a plate across its back, foramina either side.
+		draw_colored_polygon(body, BONE.darkened(0.2) * ink)
+		if region == "sacral":
+			draw_rect(Rect2(Vector2(-hw * 0.3, -hh), Vector2(hw * 0.6, hh * 2.0)), GUNMETAL * ink)
+			draw_circle(Vector2(-hw * 0.5, 0), 1.3, MARROW * ink)
+			draw_circle(Vector2(hw * 0.5, 0), 1.3, MARROW * ink)
+		_close(body, edge)
+	elif index in CHROME_SEGMENTS:
+		var shell := PackedVector2Array([
+			Vector2(-hw - reach * 0.6, -hh * 0.7), Vector2(-hw * 0.6, -hh), Vector2(hw * 0.6, -hh),
+			Vector2(hw + reach * 0.6, -hh * 0.7), Vector2(hw + reach * 0.6, hh * 0.5), Vector2(hw * 0.6, hh),
+			Vector2(0, hh + 2.5), Vector2(-hw * 0.6, hh), Vector2(-hw - reach * 0.6, hh * 0.5),
+		])
+		draw_colored_polygon(shell, CHROME.darkened(0.35) * ink)
+		draw_colored_polygon(PackedVector2Array([shell[0], shell[1], shell[2], shell[3], Vector2(hw, -hh * 0.2), Vector2(-hw, -hh * 0.2)]), CHROME * ink)
+		draw_line(Vector2(-hw * 0.8, hh * 0.35), Vector2(hw * 0.8, hh * 0.35), GUNMETAL_DEEP * Color(1, 1, 1, 0.6 * fade), 0.8)
+		_close(shell, edge)
+	else:
+		# Bone in the middle, with its spinous tip behind.
+		draw_colored_polygon(body, BONE.darkened(0.12) * ink)
+		draw_colored_polygon(PackedVector2Array([Vector2(-2, hh * 0.5), Vector2(2, hh * 0.5), Vector2(0, hh + 3.0)]), BONE.darkened(0.3) * ink)
+		if region == "thoracic":
+			# Rib heads leaving the housing, cut short.
+			draw_line(Vector2(-hw - reach, 0), Vector2(-hw - reach - 5, 3), BONE.darkened(0.25) * ink, 1.4)
+			draw_line(Vector2(hw + reach, 0), Vector2(hw + reach + 5, 3), BONE.darkened(0.25) * ink, 1.4)
+		for side in [-1.0, 1.0]:
+			var inner := hw * 0.45
+			var plate := PackedVector2Array([
+				Vector2(side * inner, -hh - 0.8), Vector2(side * (hw + reach), -hh * 0.55),
+				Vector2(side * (hw + reach), hh * 0.35), Vector2(side * inner, hh + 0.8),
+			])
+			draw_colored_polygon(plate, GUNMETAL * ink)
+			draw_line(plate[0], plate[1], CHROME * Color(1, 1, 1, 0.45 * fade), 0.8)
+			_close(plate, edge)
+			draw_circle(Vector2(side * (hw + reach - 2.0), -hh * 0.1), 1.1, COPPER * ink)
+		_close(body, edge * Color(1, 1, 1, 0.6))
+	if loose:
+		# The crack through the housing, and the bone split inside it.
+		draw_line(Vector2(-hw * 0.3, -hh), Vector2(hw * 0.1, hh), BLOOD * Color(1, 1, 1, 0.8), 1.2)
+	else:
+		# Its status light: teal where the bundle is carrying, dark where not.
+		draw_circle(Vector2(0, -hh * 0.15), 1.1, TEAL.lightened(0.3) if lit else GUNMETAL_DEEP)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _close(shape: PackedVector2Array, color: Color) -> void:
+	var closed := shape.duplicate()
+	closed.append(shape[0])
+	draw_polyline(closed, color, 1.0)
+
+
+## Where the column ends early: the fibres torn out of the last housing,
+## splayed and sparking, over a ragged wet wound.
+func _draw_break(last: Vector2, seated: int, seam: Color) -> void:
+	var hw := float(layout()[maxi(seated - 1, 0)].hw)
+	var base := last + Vector2(0, 5)
+	# Ragged meat as overlapping blobs, not a polygon: a wavy outline at this
+	# size is too thin for the triangulator and would vanish on some frames.
+	for step in 7:
+		var t := float(step) / 6.0
+		var at := base + Vector2(lerpf(-hw, hw, t) * 0.8, 1.5 + sin(t * 11.0 + float(seated)) * 1.5)
+		draw_circle(at, 2.2 + fposmod(t * 7.3, 1.0) * 1.6, MARROW)
+	for step in 5:
+		var t := float(step) / 4.0
+		draw_circle(base + Vector2(lerpf(-hw, hw, t) * 0.7, 3.0 + sin(t * 9.0) * 1.0), 1.0, seam)
+	draw_line(base + Vector2(-hw * 0.2, 0), base + Vector2(-hw * 0.35, 8), BONE, 1.6)
+	for f in FIBRES:
+		var spread := (float(f) - float(FIBRES - 1) * 0.5) * 2.2
+		var tip := base + Vector2(spread * 1.6, 9.0 + float(f % 2) * 4.0)
+		draw_line(base + Vector2(spread * 0.5, 0), tip, TEAL.darkened(0.2), 0.8)
+		if sin(elapsed * 19.0 + f * 1.9) > 0.5:
+			draw_circle(tip, 1.6, PHOSPHOR if f % 2 == 0 else Color(1.0, 0.8, 0.5))
 
 
 func _draw_brain() -> void:
