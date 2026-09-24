@@ -167,6 +167,12 @@ static func shell_material(coverage: float, soak := 0.0, style := "plain", zone_
 	material.albedo_color = material.albedo_color.lerp(Color("3d0907"), clampf(soak, 0.0, 1.0) * 0.7)
 	material.roughness = 0.94
 	material.metallic = 0.0
+	# BodyMesh.revolve() winds its faces inward, so with Godot's default back
+	# culling only the far inside of the shell drew: every garment on every rig
+	# showed as a thin dark outline around bare skin. The skin material already
+	# draws both sides for the same reason (and for severed openings); the
+	# cloth now does too, and the back-face normal flip lights its outside.
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return material
 
 

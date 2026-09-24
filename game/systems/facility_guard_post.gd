@@ -189,10 +189,13 @@ func _build_guard() -> void:
 	guard.name = "Hollis"
 	add_child(guard)
 	guard.build(GUARD_ID, {"flesh": Color("5c4a3a"), "variation": 3})
-	# Dressed: the first capture showed a bare flesh rig, which reads as a
-	# failed subject rather than as staff. Plain cloth is the rig's default
-	# garment; a uniform proper waits on the art pass.
-	guard.dress(ClothingShell.fresh_wardrobe())
+	# Dressed in plain cloth, the rig's default garment; a real CellOutz
+	# security model waits on Greg (DESIGN.md, 24 September).
+	var uniform := ClothingShell.fresh_wardrobe()
+	# Bare-headed: a full wardrobe hoods the head too, and the man whose face
+	# the player has to remember should have one.
+	uniform.erase("head")
+	guard.dress(uniform)
 	guard.position = GUARD_AT
 	# The rig's forward is -z; he faces the way the player comes.
 	guard.rotation.y = PI
