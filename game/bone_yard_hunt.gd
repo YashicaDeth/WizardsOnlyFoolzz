@@ -361,6 +361,8 @@ var block_tracker: BlockTracker = null
 ## Tab: the Brain Index hub (Greg, 2026-09-24).
 var brain_hub: BrainIndexHub = null
 var photo_mode: PhotoMode = null
+## The camera rise over the overworld from wherever a facility route surfaced.
+var exit_reveal: ExitReveal = null
 ## Arriving hurt: the pain of the decant eases over the first minute, unless
 ## something new hurts you (Greg, 2026-09-24). Seconds left, and where from.
 const ARRIVAL_EASE_SECONDS := 60.0
@@ -1175,6 +1177,7 @@ func _ready() -> void:
 		}, player + Vector3(4.0, 0, -6.0))
 	_update_camera()
 	WorldHistory.record_event("player_entered_hunt_ground", {"location": HUNT_LOCATION, "hunt_id": CAST.id_for(CAPTAIN_SLOT)})
+	exit_reveal = ExitReveal.attach(self, facility_handoff, camera)
 	# A wreck in the derby already routed the player through `DefeatRouter`
 	# before this scene loaded (`rift_derby.gd::_finish_round`), so a lost heat
 	# and a lost fight land in the same captivity rather than one of them being
