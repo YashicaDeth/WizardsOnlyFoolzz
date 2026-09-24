@@ -22,6 +22,7 @@ extends RefCounted
 ## Nothing here reaches for the real internet. Every site is authored fiction in
 ## this world's own voice.
 
+const Branding := preload("res://systems/celloutz_branding.gd")
 const INK := Color("dce6ba")
 const ACID := Color("b4da48")
 const ARTERIAL := Color("c81f16")
@@ -280,6 +281,9 @@ static func popup(canvas: CanvasItem, rect: Rect2, title: String, body: String, 
 ## a template with a palette swap is a platform again, and a platform is the
 ## thing this is supposed to be the opposite of.
 static func draw_site(canvas: CanvasItem, rect: Rect2, entry: Dictionary, clock: float) -> void:
+	# The support desk speaks in the shared CellOutz voice, not its own copy.
+	if str(entry.get("id", "")) == Branding.SUPPORT_SITE_ID:
+		entry = entry.merged({"strap": Branding.copy_for("support", "strap"), "lines": Branding.support_lines()}, true)
 	var colours := palette(str(entry.get("palette", "moss")))
 	var ground: Color = colours.ground
 	var ink: Color = colours.ink
@@ -359,7 +363,7 @@ static func draw_site(canvas: CanvasItem, rect: Rect2, entry: Dictionary, clock:
 			# who were paid, which is why it is the emptiest.
 			canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x, 46)), accent * Color(1, 1, 1, 0.16))
 			CellOutzType.draw_text(canvas, rect.position + Vector2(16, 14), "CELLOUTZ", 18.0, accent, 3.0)
-			CellOutzType.draw_condensed(canvas, rect.position + Vector2(150, 20), "SUPPORT CENTRE", 11.0, ink * Color(1, 1, 1, 0.6), 0.9)
+			CellOutzType.draw_condensed(canvas, rect.position + Vector2(150, 20), Branding.copy_for("support", "section_label", "SUPPORT CENTRE"), 11.0, ink * Color(1, 1, 1, 0.6), 0.9)
 			CellOutzType.draw_string_compat(canvas, rect.position + Vector2(16, 74), str(entry.strap), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 32, 13, ink * Color(1, 1, 1, 0.8))
 			var oy := rect.position.y + 104.0
 			for line in lines:

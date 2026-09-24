@@ -25,6 +25,7 @@ const Grunge := preload("res://systems/celloutz_grunge.gd")
 const Motion := preload("res://systems/celloutz_motion.gd")
 const SHEET := preload("res://systems/character_sheet.gd")
 const VAT_BODY_PREVIEW := preload("res://systems/vat_body_preview.gd")
+const Branding := preload("res://systems/celloutz_branding.gd")
 
 signal filed(state: Dictionary)
 
@@ -455,7 +456,7 @@ func _draw_clipboard(rect: Rect2) -> void:
 
 	var ink := INK
 	CellOutzType.draw_stamped(self, Vector2(26, 46), "NEURAL INTAKE", 20.0, ink, HOT * Color(1, 1, 1, 0.32), 1.6)
-	CellOutzType.draw_condensed(self, Vector2(26, 72), "CELLOUTZ GROWING FLOOR // FORM CZ-00/I // ONE PER BODY", 9.0, ink * Color(1, 1, 1, 0.6), 0.7)
+	CellOutzType.draw_condensed(self, Vector2(26, 72), Branding.copy_for("intake", "header"), 9.0, ink * Color(1, 1, 1, 0.6), 0.7)
 
 	# Page tabs along the top of the paper.
 	var tab_x := 26.0
@@ -587,7 +588,7 @@ func _draw_body(_rect: Rect2, ink: Color, y: float) -> void:
 		if index == 0:
 			CellOutzType.draw_condensed(self, Vector2(340, y - 10), "FILED " + str(CharacterSheet.ANATOMY_SEX_FILED.get(sheet.anatomy_sex, "")), 8.0, HOT * Color(1, 1, 1, 0.72), 0.65)
 		y += 28.0
-	CellOutzType.draw_condensed(self, Vector2(30, y + 10), "WHAT IS UNDER THE SKIN IS WHAT THEY WILL FIND.", 8.0, ink * Color(1, 1, 1, 0.42), 0.7)
+	CellOutzType.draw_condensed(self, Vector2(30, y + 10), Branding.copy_for("intake", "body_notice"), 8.0, ink * Color(1, 1, 1, 0.42), 0.7)
 
 
 func _draw_schedule(_rect: Rect2, ink: Color, y: float) -> void:
