@@ -43,5 +43,14 @@ func _ready() -> void:
 	splash._update_mark_visibility()
 	check(float(splash.mark_material.get_shader_parameter("reveal")) >= 0.999, "the wordmark has fully burned in")
 	check(float(splash.mark_material.get_shader_parameter("glitch")) < 0.4, "and settles so the name reads")
+	check(splash.logo_audio.played.has("burn") and splash.logo_audio.played.has("lock") and splash.logo_audio.played.has("beat"), "the seal burns, clanks as it locks, and beats (%s)" % str(splash.logo_audio.played))
+	check(splash.logo_audio.played.has("tear"), "the wordmark tears in with static")
+	check(splash.embers.amount > 0.9, "and embers rise off the settled mark")
+	splash.embers.size = Vector2(800, 300)
+	for _step in 30:
+		splash.embers.step(0.1)
+	check(splash.embers.embers.size() > 5 and splash.embers.embers.size() <= splash.embers.MAX_EMBERS, "a capped handful of embers in the air (%d)" % splash.embers.embers.size())
+	for kind in ["burn", "lock", "tear", "beat", "drip"]:
+		check((splash.LOGO_AUDIO.wave(kind) as AudioStreamWAV).data.size() > 1000, "the %s sound is generated" % kind)
 	print("LOGO_FX_TEST_RESULT failures=%d" % failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

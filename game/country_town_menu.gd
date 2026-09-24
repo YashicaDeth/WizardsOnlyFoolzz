@@ -8,6 +8,11 @@ const SPLASH_BACKDROP := preload("res://systems/splash_backdrop.gd")
 const REGAL_FRAME := preload("res://systems/regal_frame.gd")
 const LOGO_FX := preload("res://shaders/logo_fx.gdshader")
 const BOOT_SPLASH := preload("res://boot_splash.gd")
+const LOGO_EMBERS := preload("res://systems/logo_embers.gd")
+const LOGO_AUDIO := preload("res://systems/logo_audio.gd")
+var title_embers: Control
+var title_audio: Node
+var _title_tearing := false
 ## Seconds between the title logo's short glitch tears.
 const TITLE_GLITCH_EVERY := 5.5
 var title_fx: ShaderMaterial
@@ -184,6 +189,13 @@ func _play_title_sequence() -> void:
 	title_fx.set_shader_parameter("drip_top", 0.62)
 	title_fx.set_shader_parameter("reveal", 0.0)
 	$HUD/TitleLogo.material = title_fx
+	title_embers = LOGO_EMBERS.new()
+	title_embers.name = "Embers"
+	title_embers.amount = 0.45
+	$HUD/TitleLogo.add_child(title_embers)
+	title_audio = LOGO_AUDIO.new()
+	title_audio.name = "TitleLogoAudio"
+	add_child(title_audio)
 	$HUD/TitleLogo.modulate.a = 0.0
 	$HUD/Algiz.modulate.a = 0.0
 	$HUD/TitleLogo.scale = Vector2(0.90, 0.90)
@@ -555,6 +567,9 @@ func _process(delta: float) -> void:
 		# A short tear every few seconds, so the name keeps reading between.
 		var burst := fmod(ui_time, TITLE_GLITCH_EVERY) < 0.22 and ui_time > 2.0
 		title_fx.set_shader_parameter("glitch", 0.75 if burst else 0.05)
+		if burst and not _title_tearing:
+			title_audio.cue("tear")
+		_title_tearing = burst
 	$HUD/Algiz.modulate.a = 0.72 + sin(ui_time * 2.1) * 0.18
 
 

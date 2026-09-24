@@ -44,6 +44,8 @@ enum Stage { CELLOUTZ, GRANDEUR, MARK, DONE }
 ## assemble and spark as they lock, the wordmark burns and glitches in, then
 ## breathes (rust crawl, drips running, a sheen sweep, a heartbeat).
 const LOGO_FX := preload("res://shaders/logo_fx.gdshader")
+const LOGO_EMBERS := preload("res://systems/logo_embers.gd")
+const LOGO_AUDIO := preload("res://systems/logo_audio.gd")
 const HEART_RATE := 1.15
 const SEAL_ASSEMBLE_SECONDS := 1.05
 
@@ -80,6 +82,11 @@ var mark_material: ShaderMaterial
 ## Sparks thrown off where the seal's arcs lock: position, velocity, life.
 var sparks: Array[Dictionary] = []
 var seal_locked := false
+var embers: Control
+var logo_audio: Node
+var _burn_cued := false
+var _tear_cued := false
+var _last_beat := -1
 var grandeur_material: ShaderMaterial
 var backdrop: SplashBackdrop
 var frame: RegalFrame
@@ -172,6 +179,13 @@ func _build_mark_layer() -> void:
 	grandeur_rect = _build_reveal_rect(GRANDEUR_PATH, grandeur_material)
 	seal_rect = _build_reveal_rect(WOF_SEAL_PATH, seal_material)
 	mark_rect = _build_reveal_rect(WOF_STACKED_PATH, mark_material)
+	embers = LOGO_EMBERS.new()
+	embers.name = "Embers"
+	embers.amount = 0.0
+	mark_rect.add_child(embers)
+	logo_audio = LOGO_AUDIO.new()
+	logo_audio.name = "LogoAudio"
+	add_child(logo_audio)
 
 
 func _build_reveal_rect(path: String, material: ShaderMaterial) -> TextureRect:
@@ -288,9 +302,17 @@ func _update_mark_visibility() -> void:
 		seal_material.set_shader_parameter("beat", heartbeat(stage_clock))
 		# A burst of glitch as it arrives, and a kick when it locks.
 		seal_material.set_shader_parameter("glitch", clampf(0.9 - stage_clock * 1.2, 0.0, 1.0) + (0.6 if assembled >= 1.0 and stage_clock < SEAL_ASSEMBLE_SECONDS + 0.12 else 0.0))
+		if not _burn_cued:
+			_burn_cued = true
+			logo_audio.cue("burn")
 		if assembled >= 1.0 and not seal_locked:
 			seal_locked = true
 			_throw_sparks()
+			logo_audio.cue("lock")
+		var beat_index := floori(stage_clock * HEART_RATE)
+		if beat_index != _last_beat:
+			_last_beat = beat_index
+			logo_audio.cue("beat")
 		var seal_scale := lerpf(0.56, 0.82, seal_reveal) * (1.0 + sin(stage_clock * 1.6) * 0.012)
 		seal_rect.size = seal_rect.texture.get_size() * seal_scale
 		seal_rect.position = size * 0.5 - seal_rect.size * 0.5
@@ -301,6 +323,10 @@ func _update_mark_visibility() -> void:
 		mark_material.set_shader_parameter("beat", heartbeat(stage_clock))
 		# It tears in hard, then settles to an occasional flicker.
 		mark_material.set_shader_parameter("glitch", clampf(1.0 - since * 0.8, 0.12, 1.0) if since > 0.0 else 0.0)
+		if since > 0.0 and not _tear_cued:
+			_tear_cued = true
+			logo_audio.cue("tear")
+		embers.amount = mark_reveal * out_alpha
 		var mark_size := size.x * 0.52
 		var aspect: float = mark_rect.texture.get_size().y / mark_rect.texture.get_size().x
 		mark_rect.size = Vector2(mark_size, mark_size * aspect)

@@ -97,10 +97,11 @@ it, it's rendered and looked at, it has a test, and it's merged and built
       held low enough that the name always reads.
 - [x] **Heartbeat.** The whole mark pulses faintly with a heartbeat, and
       the pulse sets the glitch intensity.
-- [x] **Sparks and embers.** (sparks at the lock; rising embers still to do) A few embers rise from the letters; sparks fly
+- [x] **Sparks and embers.** Sparks at the lock; embers rise off the mark in the splash and on the title (`logo_embers.gd`). A few embers rise from the letters; sparks fly
       when the seal locks.
-- [ ] **Sound.** A sub thump when the seal locks, a static crackle with the
-      glitch, and a drip tick with each fall.
+- [x] **Sound.** A burn riser, a metal clank as the seal locks, static on
+      the tear, and a heartbeat thump (`logo_audio.gd`; the drip tick is
+      generated but not yet cued).
 - [x] The same animation plays on the title screen, behind the menu,
       calmer (`country_town_menu.gd`, the wet run down its drips).
 - [ ] It can be skipped, and it's never longer than 6 s on first launch.
@@ -463,13 +464,12 @@ Every line below is **(rec)** unless it cites Greg.
 - [ ] See: the four arcs lock in order (top, right, bottom, left), each
       with its own spark burst.
 - [ ] See: the wordmark's spikes glint once each as the sheen passes.
-- [ ] See: embers rise off the wordmark for its whole hold (A3's open
-      half).
+- [x] See: embers rise off the wordmark for its whole hold.
 - [ ] See: the collage backdrop dims while the mark burns, then comes back.
 - [ ] Hear: a riser under the seal's burn, and a metal clank on each arc
       lock.
 - [ ] Hear: a vinyl-crackle bed that ducks when the wordmark lands.
-- [ ] Hear: one low heartbeat thump per shader beat.
+- [x] Hear: one low heartbeat thump per shader beat.
 - [ ] Touch: any key skips to the next card, and holding skips all.
 - [ ] Record: launches counted in the settings subject.
 - [ ] Test: `logo_fx_test` and `boot_splash_timing_test` stay green.
