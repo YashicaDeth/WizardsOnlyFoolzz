@@ -412,6 +412,10 @@ either is how this repository became hard to read.
   Orthodox monks in blood-stained, creased habits with destroyed sigils. An
   in-game curiosity bot plays for hours to learn which exploration is the
   most fun. See `DESIGN/OVERWORLD_EVENTS.md`.
+- **The shape of the first hour.** The facility breakout is the first 30
+  minutes and is itself a subtle tutorial. It bridges into 30 minutes of
+  overworld that still teach, quietly, and that segments into complete
+  personal exploration.
 
 ## Influence register
 
