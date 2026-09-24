@@ -358,6 +358,12 @@ var dust_puff: DustPuff = null
 var hit_flash: HitFlash = null
 ## Blob tracking over the fight (item 4): hit markers and enemy awareness.
 var block_tracker: BlockTracker = null
+## Arriving hurt: the pain of the decant eases over the first minute, unless
+## something new hurts you (Greg, 2026-09-24). Seconds left, and where from.
+const ARRIVAL_EASE_SECONDS := 60.0
+const ARRIVAL_PAIN_FLOOR := 12.0
+var _arrival_ease := -1.0
+var _arrival_pain_from := 0.0
 var threat_compass: ThreatCompass = null
 var lock_readout: LockReadout = null
 ## After a strike lands, the body faces it this long (third-person turn-in).
@@ -1951,6 +1957,7 @@ func _physics_process(delta: float) -> void:
 	_update_camera()
 	cost = ScriptCost.lap("_update_camera", cost)
 	_update_strike_fx(delta)
+	_ease_arrival_pain(delta)
 	_update_hud()
 	cost = ScriptCost.lap("_update_hud", cost)
 	_update_sleep_prompt(delta)
@@ -8204,6 +8211,27 @@ func _update_held_reliquary() -> void:
 
 ## The swing's trail follows whatever is actually in the hand, and the lock
 ## ring follows whoever the camera is actually framing. Both only read state.
+func _ease_arrival_pain(delta: float) -> void:
+	if player_rig == null or player_rig.anatomy == null:
+		return
+	var anatomy_now = player_rig.anatomy
+	if _arrival_ease == -1.0:
+		# First frame here: arriving hurting starts the ease, arriving well
+		# never does.
+		_arrival_ease = ARRIVAL_EASE_SECONDS if float(anatomy_now.pain) > ARRIVAL_PAIN_FLOOR + 8.0 else 0.0
+		_arrival_pain_from = float(anatomy_now.pain)
+		return
+	if _arrival_ease <= 0.0:
+		return
+	_arrival_ease = maxf(0.0, _arrival_ease - delta)
+	var target := lerpf(ARRIVAL_PAIN_FLOOR, _arrival_pain_from, _arrival_ease / ARRIVAL_EASE_SECONDS)
+	if float(anatomy_now.pain) > target + 4.0:
+		# Something new hurt you: that pain is yours to keep.
+		_arrival_ease = 0.0
+		return
+	anatomy_now.pain = minf(float(anatomy_now.pain), target)
+
+
 func _update_strike_fx(delta: float) -> void:
 	strike_face_time = maxf(0.0, strike_face_time - delta)
 	if block_tracker != null:

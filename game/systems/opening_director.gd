@@ -14,6 +14,7 @@ extends RefCounted
 ##   left_facility -> out into the Ashbloom Expanse
 
 const SUBJECT := "opening_run"
+const SURFACE_HOUR := 10.0
 const STAGES := ["none", "woke", "broke_free", "entered_arcade", "entered_lower_works", "entered_pit", "won_derby", "took_wire", "left_facility"]
 
 
@@ -52,6 +53,12 @@ static func advance(target: String) -> void:
 	# update_subject owns first registration and its event atomically; include
 	# the opening schema in that first mutation instead of saving it beforehand.
 	WorldHistory.update_subject(SUBJECT, {"kind": "run", "debt": 1, "stage": target}, "opening_stage_%s" % target)
+	# You surface in the morning (Greg, 2026-09-24): the Hunt used to open
+	# at whatever hour the facility and the derby had run the clock to --
+	# 21:55 on his walkthrough, too dark to read the district. Forward only,
+	# like every clock change; this fires once, as you climb out.
+	if target == "left_facility":
+		WorldClock.set_hour(SURFACE_HOUR)
 
 
 ## The player owns the handheld only after physically picking it up.
