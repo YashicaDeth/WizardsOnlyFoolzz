@@ -45,7 +45,9 @@ const DRAINED_AT := 5.6
 ## Tugs it takes to tear one umbilical out. The first ones only hurt.
 const WIRE_TUGS := 3
 ## How long GET REVENGE holds before the glass goes.
-const REVENGE_HOLD := 1.8
+const REVENGE_HOLD := 2.8
+## How long END ALL SUFFERING owns the screen before the wires can be seen.
+const END_CARD_SECONDS := 3.4
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -109,6 +111,11 @@ var inspect_held := false
 var rebirth := false
 var active_beats: Array = BEATS
 var title: Label
+## Greg: the task titles "in massive celloutz style font, bloody and bony ...
+## moving around 4d, inverting, going crazy, and after that flashes". The
+## card bursts in over everything; the flickering `title` label is what stays
+## on screen while the player works at the wires.
+var mission_card: Control
 var wired_clock := 0.0
 var revenge_at := -1.0
 var jolt := 0.0
@@ -181,6 +188,10 @@ func _build_title() -> void:
 	title.visible = false
 	$HUD.add_child(title)
 	$HUD.move_child(title, $HUD/Subtitle.get_index())
+	mission_card = MissionCard.new()
+	mission_card.name = "MissionCard"
+	mission_card.visible = false
+	$HUD.add_child(mission_card)
 
 
 ## G6.1/G6.3. Character creation was built but never connected to the opening:
@@ -1111,6 +1122,7 @@ func _begin_wired() -> void:
 	title.text = "END ALL SUFFERING"
 	title.modulate.a = 1.0
 	title.visible = true
+	mission_card.play("end_all_suffering", "END ALL SUFFERING", END_CARD_SECONDS)
 	subtitle.text = "The wires are still in you."
 	opening_audio.set_phase("wired")
 	WorldHistory.record_event("opening_wired", {"tank": "0C-7"})
@@ -1149,6 +1161,10 @@ func _aimed_wire() -> Node3D:
 func _tug_wire(cable: Node3D) -> void:
 	if phase != "wired" or revenge_at >= 0.0 or cable == null or not umbilicals.has(cable):
 		return
+	# Reaching for a wire cuts the card short: the player acting beats the
+	# screen telling them to.
+	if mission_card != null and mission_card.playing:
+		mission_card.skip()
 	var pulls := int(cable.get_meta("pulls", 0)) + 1
 	cable.set_meta("pulls", pulls)
 	jolt = 1.0
@@ -1189,6 +1205,7 @@ func _rip_wire(cable: Node3D) -> void:
 func _all_wires_out() -> void:
 	revenge_at = wired_clock
 	title.text = "GET REVENGE"
+	mission_card.play("get_revenge", "GET REVENGE", REVENGE_HOLD)
 	subtitle.text = ""
 	opening_audio.cue("revenge")
 	# Wounds are catalogue dictionaries once WorldHistory has normalised them
