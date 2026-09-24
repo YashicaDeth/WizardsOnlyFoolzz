@@ -1,0 +1,231 @@
+# Goal loop 2: finish minutes 0-30, then build minutes 30-60
+
+Written 24 September 2026. It follows `DESIGN/GOAL_LOOP.md`, and everything
+done there is folded in here.
+
+Greg said that once the examiner, the intake pages, the combat overhaul and
+the drain threats are done, minutes 0-30 are "right enough", and work moves
+on to minutes 30-60: more tutorial, and the starting stage. This list does
+that.
+
+**(rec)** marks an assistant proposal, which stays a proposal until Greg
+says yes. **ASK** marks a question box, recommended option first, and the
+answer goes into `DESIGN.md` the same turn.
+
+## Paste this to start it
+
+> /goal Work `DESIGN/GOAL_LOOP_2.md` top-down, on your own, all night.
+> Branch `claude/dust-to-bones-look`. Read `AGENTS.md`, `DESIGN.md` and the
+> project skills first.
+>
+> For every item:
+> - Build the smallest version a player can do in the real route.
+> - Record it in WorldHistory.
+> - Render it and open the PNG; anything that moves gets a clip.
+> - Add one small test, and get the core suite green.
+> - Merge it.
+> - Send me a Windows build named `WOF-<commit>` (split zip plus JOIN
+>   bat). No editor bridge; LimboAI included.
+>
+> After every item, improve one skill, test or tool before starting the
+> next one.
+>
+> Ask me question boxes, recommended option first, at every ASK below, and
+> record my answers in `DESIGN.md` straight away. Don't wait on me: if an
+> ASK blocks an item, build the recommended option behind the question and
+> move on.
+>
+> Report what you actually verified and what you couldn't. Go.
+
+## How a round goes
+
+1. **Pick** the next unticked item.
+   - Run `wof-wire-before-polish` first: wire what already exists before
+     writing anything new.
+2. **Build** the smallest playable version.
+3. **Prove it:**
+   - a render, or a clip for motion
+   - one test
+   - `--core` green
+4. **Ship it:**
+   - merge
+   - a versioned build
+   - a line in its checklist entry
+5. **Ask** that item's ASK questions.
+6. **Push the limit:** one skill, test or tool made better, committed.
+7. Tick the item with its commit.
+
+Rules that always hold:
+- Stage by explicit path.
+- Never commit `.import` or `.uid` churn.
+- Never run `git clean` without paths.
+- Never skip a test to get green.
+- Only use subagents when they save real time, and brief them with
+  `wof-agent-brief`.
+
+---
+
+## Done going in (for reference)
+
+- **Skins and exchange:** skins, cases, the Wire exchange, and the jester
+  set as parts.
+- **Nudity and censors:** a body-cam glitch censor, on by default.
+- **Rebirth:** every killer in minutes 0-30 sends you to the rebirth vat.
+- **Brain Index hub:** Carry, Combat, Brain Index, Tasks and Map.
+- **Combat:**
+  - tiers, telegraphs, and enemy block and parry
+  - the fight readout and sparring
+  - the blood-tree moves: FEINT, COMBO, RIPOSTE, HIP COUNTER, BACKSTAB
+- **The intake and the lab:**
+  - animated intake pages (gears, ink, blood)
+  - the lab's cables
+- **Recheck:** all four ways out reach the Hunt at their own point, and the
+  recheck list passed (`DESIGN/RECHECK_2026-09-24.md`).
+
+---
+
+## A. Close out minutes 0-30
+
+- [ ] **Stopwatch every route (rec).** A route replay test times each of the
+      four ways out, from the first frame to the Hunt. It writes a table
+      into `FIRST_30_REBUILD.md`, so pacing changes show up as numbers.
+  - **ASK:** "Which route felt longest, and was that good or bad?"
+- [ ] **Threats in the old drains.** The drain stalker is there; give the
+      drains a second threat, or a chase, so the second route costs
+      something.
+  - **ASK:** "Chase, ambush, or something that hunts by sound?"
+- [ ] **A better 3D examiner:** an authored model, or a credited CC-BY one,
+      instead of the rig head. He needs an ordinary face and a bloodied
+      coat.
+  - **ASK, with side-by-side renders:** "Which examiner?"
+- [ ] **Use the intake's blank space** (Walkthrough 2): the empty paper
+      under short pages gets the subject photo, stamps, or the procedure
+      log.
+  - **ASK:** "What goes in the blank space?"
+- [ ] **The breakthrough reads as your soul seizing the implant:** wetwire
+      feedback, and the chaos-magick interface waking at GET REVENGE.
+  - **ASK first:** "The exact beat, and does third person unlock here?"
+- [ ] **Carry icons:** a real icon for every item kind, including skins,
+      cases, garments, guns and smokeables. No placeholder boxes left.
+- [ ] **Breach-tool melee.** The ram swings, blocks and parries under the
+      same tier rules as the cleaver.
+- [ ] **More cameras, and doors that answer.** Every door you can reach in
+      minutes 0-30 does something when used: opens, is locked with a
+      reason, or can be broken. More cameras on the lab and the arcade.
+  - **ASK with renders:** "Is this the wiring and camera density you
+    meant?"
+- [ ] **The derby's slow-motion kill cam,** on the real body.
+  - **ASK after the first one plays:** "How slow, how long, how often?"
+- [ ] **Rooms for the other claimants' vats** (a rival, a cult).
+  - **ASK first:** "Who are the rival and the cult, and what does their vat
+    room look like?"
+- [ ] **Clean-ups:**
+  - retire or rename `RunLifecycle`
+  - replace `OpeningDeath` with `VatRebirth`
+  - confirm `BlackMirrorCamera` is called in the route
+- [ ] **The Handheld:** carry gets its own key, and it's made clear what I
+      and U open.
+
+## B. The first minute on the surface
+
+- [ ] **The first thing you meet up top:** a person, a job poster or a
+      threat, within 60 seconds of arriving by any of the four routes.
+  - **ASK first:** "Who or what is the first thing you meet up top?"
+- [ ] **A reason to go somewhere:** the stamped objective points at one
+      place, and the map marks it.
+- [ ] **The first fight is a readable tier.** A scavenger, telegraphing,
+      where the Nix sparring post can teach it first.
+
+## C. Minutes 30-60: the tutorial and the starting stage
+
+Greg: "furthering the tutorial and the starting stage". Each item is the
+smallest playable version first.
+
+- [ ] **Write the 30-60 spine** in `DESIGN/THIRTY_TO_SIXTY.md`: beats,
+      places and what each one teaches. A proposal for Greg.
+  - **ASK before building:** "Does this spine match the game in your
+    head? What's missing?"
+- [ ] **The first job:** taken from a person or a poster, done in the Hunt,
+      and paid in scrip. It's recorded in the ledger and the world
+      remembers it.
+- [ ] **Teach by doing:** each system the player hasn't touched yet
+      (exchange, blood tree, sparring, smokeables, the handheld) gets one
+      diegetic prompt the first time it matters, never a tutorial screen.
+- [ ] **The first real death in the Hunt** goes through the rebirth vat.
+      Your body stays on the surface, and you can walk back to it.
+  - **ASK after:** "Did the walk back feel like a cost or a chore?"
+- [ ] **A first home or safe place:** somewhere to sleep, stash things and
+      change clothes (the wardrobe), and a place the Brain Index hub
+      belongs to.
+  - **ASK:** "Where is home: a shed, a squat, the doctor's bay, or a
+    vat?"
+- [ ] **The first case drop and the first sale** happen by minute 45,
+      paced by drops, not handed out.
+- [ ] **The first rival:** a named hunter who remembers you, and turns up
+      again (the rival registry and return already exist; wire them into
+      the first hour).
+- [ ] **A second place on the map** worth walking to, with its own
+      threat, loot and one secret.
+- [ ] **An end to the first hour:** a clear moment that says the tutorial
+      is over (a card, a call, or a door opening), recorded in the world.
+  - **ASK:** "What ends the first hour?"
+
+## D. Feel, sound and speed
+
+- [ ] **A sound pass per beat** (law 15): the vat draining, the wires, the
+      glass, Hollis's warning shot, the gate, the lift, a case opening, gold
+      dropping.
+- [ ] **A frame-time budget per scene,** measured in Forward+ and written
+      down, with the worst scene fixed first.
+- [ ] **One controls sheet:** the same key caps in every scene, and a
+      decision on the `ControlBindings` branch.
+- [ ] **Hitstop and camera on the blood-tree moves:** a feint, a backstab
+      and a hip counter each land with their own feel (`wof-combat-fx`).
+
+## E. Tools that make every round faster
+
+- [ ] **A `wof-build` skill:** one command that exports, versions, zips,
+      splits, writes release notes and drafts the GitHub Release.
+- [ ] **A `wof-playtest` skill:** logs narrated playtests into
+      `playtests/<date>.md` and turns them into checklist lines.
+- [ ] **A `wof-footage` skill:** the movie-writer reels, the 9:16 Reel and
+      the 4:5 carousel, as one command.
+- [ ] **Stale briefs:** `START_HERE.md` brought up to date.
+- [ ] **Before merging anything visual,** a clip of it in the real route,
+      not only a still.
+
+## F. The site and the community
+
+- [ ] **Make wizardsonlyfoolz.net go live.** These steps are Greg's: turn on
+      Pages from `/docs`, and point DNS at it. Claude checks it afterwards.
+- [ ] **Every build becomes a GitHub Release,** and the site's download
+      button finds the latest one.
+- [ ] **New footage on the site** after every item that moves.
+
+## G. Question checkpoints while Greg plays
+
+| When | What to ask |
+|---|---|
+| Before | What to try first, and what still bugs him from last time |
+| After the intake | Did the pages and the examiner hold his attention? Is the blood too much or right? |
+| At the breakout | Did tearing the wires feel like his choice? |
+| At Hollis | Coerce or kill, and why? |
+| First death | Did waking in the vat read? Did he care what he lost? |
+| Route choice | Why that route? Did he know the others existed? |
+| First fight | Were the telegraphs readable? Did he find a move? Which tier felt unfair? |
+| The surface | What did he want to do first? |
+| The exchange | Was the case worth opening? Sell or keep? |
+| End of session | His top 3 fixes, in order. They go to the top of this list |
+
+## H. Waiting on Greg
+
+- Hollis's model.
+- The examiner model.
+- The doctor's name, history and vehicle.
+- The anatomy downloads.
+- When third person unlocks, and the breakthrough beat.
+- Where the Board lives.
+- The blade for Hollis's hand.
+- The sky agency.
+- How humiliating the jester outfit is.
+- The map glitching (Walkthrough 2).
