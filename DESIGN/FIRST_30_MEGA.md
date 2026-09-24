@@ -438,3 +438,209 @@ it, it's rendered and looked at, it has a test, and it's merged and built
 - The blade for Hollis's hand.
 - When third person unlocks, and the breakthrough beat.
 - Where the Board lives, and the sky agency.
+
+---
+
+# Part II: room by room, beat by beat
+
+Each room gets the same six questions:
+- **See:** what reads on screen.
+- **Hear:** its sound.
+- **Touch:** what E, click and HOLD I do.
+- **Break:** what gives under a blow or a round.
+- **Record:** what WorldHistory remembers.
+- **Test:** how it's proven.
+
+Every line below is **(rec)** unless it cites Greg.
+
+## II.1 The boot splash, frame by frame
+- [ ] See: the CellOutz card's static resolves into its letters, never a
+      plain fade.
+- [ ] See: the Grandeur card's drip pour matches the logo's drip colour
+      exactly.
+- [ ] See: the seal's burn starts at its centre rune and spreads out to the
+      arcs.
+- [ ] See: the four arcs lock in order (top, right, bottom, left), each
+      with its own spark burst.
+- [ ] See: the wordmark's spikes glint once each as the sheen passes.
+- [ ] See: embers rise off the wordmark for its whole hold (A3's open
+      half).
+- [ ] See: the collage backdrop dims while the mark burns, then comes back.
+- [ ] Hear: a riser under the seal's burn, and a metal clank on each arc
+      lock.
+- [ ] Hear: a vinyl-crackle bed that ducks when the wordmark lands.
+- [ ] Hear: one low heartbeat thump per shader beat.
+- [ ] Touch: any key skips to the next card, and holding skips all.
+- [ ] Record: launches counted in the settings subject.
+- [ ] Test: `logo_fx_test` and `boot_splash_timing_test` stay green.
+- [ ] Test: a movie-writer clip of the splash is regenerated per release.
+
+## II.2 The content warning
+- [ ] See: WARNING in the stencil face, with the CellOutz liability notice.
+- [ ] See: CLINICAL, FIELD CONDITIONS and UNRESTRICTED as a focused list.
+- [ ] See: the choice previews what it hides (a blurred sample).
+- [ ] Hear: a relay click per option and a stamp on confirm.
+- [ ] Touch: 1-3, up and down, Enter, the mouse and a pad all work.
+- [ ] Record: the choice and the time it was made.
+- [ ] Test: it shows once, then only from settings.
+- **ASK:** "Is the default choice UNRESTRICTED, FIELD, or none selected?"
+
+## II.3 The title screen, piece by piece
+- [x] The live logo: burn in, wet run, heartbeat, a tear every 5.5 s.
+- [ ] See: the Algiz label pulses in time with the logo's beat, not on its
+      own sine.
+- [ ] See: the menu items type on, one at a time, after the logo lands.
+- [ ] See: the hovered item is underlined in blood, with the others
+      dimmed.
+- [ ] See: ENTER CELLOUTZ.NET opens the site, with a confirm.
+- [ ] See: the hexagram panel on the right shows the selected item's
+      preview (demo footage, the locked full game, the sandbox).
+- [ ] See: the footer line scrolls: WORLD BUILD // EVERY ACTION LEAVES A
+      WITNESS.
+- [ ] Hear: a hover tick, a select thud, a back click.
+- [ ] Hear: title music ducks under the logo's tear bursts.
+- [ ] Touch: the arrow keys wrap around, and Esc backs out of any panel.
+- [ ] Touch: the mouse wheel scrolls the menu on small windows.
+- [ ] Record: which door was chosen, and how long it took.
+- [ ] Test: a title capture at 720p, 1080p and 1440p, with nothing cut
+      off.
+- [ ] Test: a gamepad-only walk from the title into the vat.
+
+## II.4 Settings, line by line
+- [ ] Graphics: preset, render scale, AA, vsync, bloom, colour grade,
+      shadows, max FPS.
+- [ ] Display: fullscreen, borderless, windowed, and monitor choice.
+- [ ] Gore: OFF, REDUCED, FULL; censor on or off.
+- [ ] Audio: master, music, effects, voices, UI, and mono audio.
+- [ ] Controls: every action rebindable, conflicts warned, reset per
+      action.
+- [ ] Camera: FOV, sensitivity, invert, head bob, shake, and third-person
+      distance.
+- [ ] HUD: scale, opacity, and the body-cam overlay strength.
+- [ ] Accessibility: reduce flashing, subtitles, subtitle background, and
+      hold versus toggle for block, crouch and sprint.
+- [ ] Every row has a one-line description under it.
+- [ ] Changes are saved on leave, with no Apply button needed.
+- [ ] Test: each setting persists across a restart.
+
+## II.5 The Growing Floor, object by object
+- [ ] Your tank: See the cracks from your wire tugs appear before the glass
+      goes.
+- [ ] Your tank: Hear the glass groan with each tug.
+- [x] Your tank: the glass goes on GET REVENGE.
+- [x] The other tanks: smash, drain and free the subject.
+- [ ] The other tanks: See a subject press its hands to the glass when you
+      come near.
+- [ ] The other tanks: Hear muffled knocking from the ones still full.
+- [ ] The other tanks: Record which ones you left full; the world
+      remembers who you didn't free.
+- [ ] The jammed tank: See its pry marks after you open it.
+- [ ] The dead subject: See the smock gone from the body once you take it.
+- [ ] The station: Touch reading the screen shows your filed sheet.
+- [ ] The station: Break the monitor with a round or a blow; it sparks and
+      goes dark.
+- [ ] The station: Break the keyboard; keys scatter.
+- [ ] The cables: Touch pulling one down, with sparks.
+- [ ] The cables: Break a lit line by shooting it; it flickers out.
+- [ ] Cameras: See each one turn to follow you, with a red lens.
+- [ ] Cameras: Break one to cut what the alarm sees.
+- [ ] Cameras: Record what they saw you do.
+- [ ] The staff door: Touch the keypad: STAFF ACCESS REQUIRED.
+- [ ] His door: See its damage states; Hear each blow.
+- [ ] The observation window: See the examination room through it.
+- [ ] The observation window: Break the glass (destruction 0.3).
+- [ ] The pit door: See it lit, readable, with a heat haze.
+- [ ] The floor: See wet footprints; the puddle ripples when stepped in.
+- [ ] Test: every tank can be broken; every door answers; no prop blocks
+      the aisle.
+
+## II.6 The Service Arcade, object by object
+- [ ] The ram and the card: See them lit where they lie.
+- [ ] Hollis: See the real model, credited. **ASK.**
+- [ ] Hollis: Hear his warning, then his escalation lines.
+- [ ] Hollis: Touch coerce, threaten, fight, or sneak past.
+- [ ] Hollis: Record how he was dealt with, and his memory of you.
+- [ ] The reader: See his hand on it, and the door unlock.
+- [ ] Machines: Break the arcade cabinets; screens shatter, sparks.
+- [ ] Machines: Touch playing one, a short joke screen.
+- [ ] Vending: Break or pay; it drops something.
+- [ ] The pressure gate: See the pressure gauge move as it opens.
+- [ ] Test: each way past Hollis reaches the gate.
+
+## II.7 The Lower Works, object by object
+- [ ] The sentinel: See its patrol light sweep; Hear its servo whine.
+- [ ] The sentinel: Break its lamp to blind it for a few seconds.
+- [ ] The fuse: See the arc when it's seated.
+- [ ] The lift: See the heat shimmer rise; Hear the chain.
+- [ ] Barricades: Break them into fragments (0.2); Touch climb over.
+- [ ] Pipes: Break a pipe; it vents steam that hides you.
+- [ ] Gas canisters: Break one and it explodes (0.5).
+- [ ] The drain hatch: See it rusted; Touch prying it open.
+- [ ] Test: the sentinel can kill you, and you wake in the vat.
+
+## II.8 The old drains and the dry falls
+- [ ] The water: See ripples; Hear splashes per step.
+- [ ] The stalker: See it only by its shape in the dark; Hear it by sound.
+- [ ] Freed subjects: See them here if you freed any.
+- [ ] Freed subjects: Hear their lines echo.
+- [ ] Grates: Break them to take a shortcut.
+- [ ] The dry falls: See blood run down the rock; Touch sliding down the
+      track.
+- [ ] The gorge trees: Break the snapped trunks further.
+- [ ] Test: the drains route and the falls route both land at their
+      point.
+
+## II.9 The Support Unit and the doctor's bay
+- [ ] Cells: See each bingyanga; Hear each plead.
+- [ ] Cells: Touch opening; Break the glass.
+- [ ] Guards: See them respond to screams; Hear radio chatter.
+- [ ] The doctor's bay: See the hologram doctor; Hear the call.
+- [ ] The ramp: Touch walking up it; Record the route.
+- [ ] Test: every cell opens, and every freed one rolls a mood.
+
+## II.10 The derby
+- [ ] The arena: See the crowd; Hear the announcer.
+- [ ] Cars: Break panels, doors and hoods (built); a slow-motion kill cam
+      on the real body. **ASK.**
+- [ ] The tunnels: See GTA-style tunnels to the falls.
+- [ ] Test: wreck equals capture, crush equals death, and both are
+      recorded.
+
+## II.11 Arrival in the Hunt
+- [ ] See: the arrival card with the route's name.
+- [ ] See: the first person, poster or threat within 60 s. **ASK.**
+- [x] The breakable yard by the sparring post.
+- [ ] Touch: the sparring post, the Wire exchange (U), the Brain Index
+      (Tab), and the blood tree (7).
+- [ ] Record: the arrival route, the time, and the first act up top.
+- [ ] Test: a route replay reaches the Hunt and logs its time.
+
+---
+
+# Part III: the test matrix for the demo
+
+| Check | How | Pass |
+|---|---|---|
+| Boots to the title | Launch the exe on Windows | Under 10 s, no errors |
+| Title logo animates | Movie-writer clip | Burn, run, beat and tear all visible |
+| Content warning once | Two launches | Shown on the first only |
+| Every route reaches the Hunt | `first_thirty_route_test` | 4 of 4 |
+| Every killer rebirths | `rebirth_every_killer_test` | All killers |
+| Tanks break | `vat_smash_test` | Glass, fluid and subject |
+| World breaks | `world_break_test` | Lights and barricades |
+| Combat moves | `blood_moves_test` | 5 of 5 |
+| Settings persist | A restart test | Every row |
+| 60 fps | Frame-cost probe per scene | Under 16.6 ms on the reference PC |
+| No softlocks | A route replay on each route | No stuck state |
+| Demo end card | Reach the end point | Shows the stats and links |
+
+# Part IV: the demo release
+- [ ] A demo build with the demo flag, and the full-game door locked.
+- [ ] Store capsules (460x215, 600x900, 231x87) from the lockup.
+- [ ] A trailer cut from movie-writer clips: splash, vat, wires, smash,
+      Hollis, derby, Hunt.
+- [ ] The site's download button points at the demo release.
+- [ ] Release notes written for players, not developers.
+- [ ] A feedback form linked from the end card and the site.
+- [ ] Discord invite once it exists.
+- **ASK:** "itch.io first, Steam next fest, or both?"
