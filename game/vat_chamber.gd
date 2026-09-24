@@ -23,6 +23,7 @@ const CARRY := preload("res://systems/carry.gd")
 const CLOTHING := preload("res://systems/clothing.gd")
 const BASELINE_HUMAN := preload("res://systems/baseline_human.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
+const VAT_REBIRTH := preload("res://systems/vat_rebirth.gd")
 
 const EYE_HEIGHT := 1.62
 const BODY_HALF_HEIGHT := 0.85
@@ -91,6 +92,10 @@ var stuck_tank_culture: MeshInstance3D
 var failed_subject_visual: Node3D
 var stuck_tank_opened := false
 var inspect_held := false
+## Death is rebirth in a vat (Greg, 24 September). A regrown body wakes here
+## with no examination: the record, the preset and the memories are kept.
+var rebirth := false
+var active_beats: Array = BEATS
 
 # 0 submerged, 1 voiding, 2 breach, 3 floor, 4 aisle
 const BEATS := [
@@ -152,10 +157,39 @@ func _ready() -> void:
 ## handler now owns the first beat, and filing the sheet is what starts the
 ## camera sequence rather than a timer running behind the form.
 func _build_intake() -> void:
+	if VAT_REBIRTH.is_pending():
+		_begin_rebirth()
+		return
 	intake = VAT_INTAKE.new()
 	intake.name = "Intake"
 	$HUD.add_child(intake)
 	intake.filed.connect(_on_intake_filed)
+
+
+## Regrown, not examined. The world carried on: the tank opens straight onto
+## the voiding, and whatever this body's last life opened stays open.
+func _begin_rebirth() -> void:
+	rebirth = true
+	var player_state := WorldHistory.subject("player")
+	var body_anatomy: Dictionary = player_state.get("anatomy", {})
+	anatomy.call("configure", "player", 5000.0, body_anatomy.get("cybernetics", []))
+	anatomy.call("apply_hit", "torso", 26.0, 0.0, "blunt")
+	anatomy.call("apply_hit", "head", 14.0, 0.0, "blunt")
+	var vat := VAT_REBIRTH.vat_for(VAT_REBIRTH.claimant())
+	active_beats = [
+		{"at": 0.4, "text": "REGROWTH COMPLETE  //  BODY %d" % int(player_state.get("body_number", 2))},
+		{"at": 1.8, "text": "%s  //  YOUR OLD BODY IS WHERE YOU LEFT IT" % str(vat.label)},
+		{"at": 3.2, "text": "TANK 0C-7  //  CYCLE ABORTED  //  VOIDING"},
+	]
+	if WorldHistory.event_count("opening_first_object_used") > 0 and stuck_tank_shell != null:
+		stuck_tank_opened = true
+		stuck_tank_shell.visible = false
+		if stuck_tank_culture != null:
+			stuck_tank_culture.visible = false
+	clock = 0.0
+	line_index = -1
+	phase = "submerged"
+	WorldHistory.record_event("opening_regrown", {"location": "growing_floor", "claimant": VAT_REBIRTH.claimant(), "body_number": int(player_state.get("body_number", 2))})
 
 
 func _on_intake_filed(_state: Dictionary) -> void:
@@ -962,10 +996,10 @@ func _update_departure(delta: float) -> void:
 
 
 func _update_beats() -> void:
-	for index in BEATS.size():
-		if clock >= float(BEATS[index].at) and index > line_index:
+	for index in active_beats.size():
+		if clock >= float(active_beats[index].at) and index > line_index:
 			line_index = index
-			subtitle.text = str(BEATS[index].text)
+			subtitle.text = str(active_beats[index].text)
 
 
 func _update_sequence(_delta: float) -> void:
@@ -1124,6 +1158,7 @@ func _record_breakout() -> void:
 	OPENING.advance("broke_free")
 	WorldHistory.record_event("opening_breakout", {"location": "growing_floor", "implant": "wetwire chip", "item": item})
 	WorldHistory.commit_ledger_batch()
+	VAT_REBIRTH.complete()
 	subtitle.text = "THE WETWIRE ANSWERS  //  RESTRAINT BROKEN"
 
 
@@ -1271,7 +1306,7 @@ func _update_hud() -> void:
 	if not stuck_tank_opened and _carries_restraint() and _near_first_objects():
 		prompt.text = "[E] PRY THE JAMMED TANK WITH THE BROKEN RESTRAINT"
 		return
-	if stuck_tank_opened and CLOTHING.worn("player") == "bare" and _near_first_objects():
+	if stuck_tank_opened and CLOTHING.worn("player") == "bare" and CLOTHING.worn(FAILED_SUBJECT_ID) != "bare" and _near_first_objects():
 		prompt.text = "[E] TAKE THE CLOTHING OFF SUBJECT 0C-4"
 		return
 	# The door he left by: locked, and it says so (Greg, 2026-09-24: you should

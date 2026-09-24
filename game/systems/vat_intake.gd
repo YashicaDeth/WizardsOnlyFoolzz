@@ -902,6 +902,12 @@ func _finish_filing() -> void:
 		"examination_seconds": int(elapsed),
 		"examination_route": "preset:" + preset_loaded if preset_loaded != "" else "deliberate",
 	}, "examination_filed")
+	# Greg, 24 September: "don't forget the save character preset so you can
+	# reload it if you die without wasting time". CharacterPresets.save() had
+	# no caller, so PRESET answered NO PRESET ON FILE for everyone. Every filed
+	# examination now writes its sheet under the name on it; a regrown body
+	# never sees this form, and a new run can take the PRESET route.
+	CharacterPresets.save(sheet.display_name, sheet)
 	print("EXAMINATION FILED // %d:%02d // %s // %d refusals" % [int(elapsed) / 60, int(elapsed) % 60, ("PRESET " + preset_loaded) if preset_loaded != "" else "DELIBERATE", refusals])
 	filed.emit(state)
 

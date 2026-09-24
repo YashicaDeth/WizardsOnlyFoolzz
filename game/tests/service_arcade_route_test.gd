@@ -35,7 +35,9 @@ func _ready() -> void:
 	arcade._interact()
 	check(arcade.lower_works_requested, "the opened gate's own control threshold carries the player onward instead of leaving them in the arcade")
 	arcade.queue_free()
-	# The breach tool opens the gate without the card (2026-09-24).
+	# The breach tool opens the gate without the card (2026-09-24). A fresh
+	# world: the arcade now remembers its open gate and empty pedestals.
+	WorldHistory.clear_history()
 	var forced: Variant = load("res://service_arcade.tscn").instantiate()
 	add_child(forced)
 	await get_tree().physics_frame

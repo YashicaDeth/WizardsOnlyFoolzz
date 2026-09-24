@@ -55,12 +55,11 @@ func _ready() -> void:
 	arcade.player.global_position = in_range
 	arcade._physics_process(0.016)
 	check(post.warned, "he warns you when you come into view")
-	check(arcade.blood < 100.0, "inside his range he shoots, and the shot costs blood")
-	for tick in 60:
-		post.fire_cooldown = 0.0
-		arcade.player.global_position = in_range
-		arcade._physics_process(0.016)
-	check(is_equal_approx(arcade.blood, arcade.BLOOD_FLOOR), "his shots bleed you to the floor and no further while death is unbuilt")
+	check(arcade.blood == 100.0 and WorldHistory.event_count("facility_guard_fired") == 1, "his first shot inside range is a warning")
+	post.fire_cooldown = 0.0
+	arcade.player.global_position = in_range
+	arcade._physics_process(0.016)
+	check(arcade.blood < 100.0, "the next one lands and costs blood")
 	arcade.player.global_position = post.guard.global_position + Vector3(0, 0, 1.2)
 	arcade._interact()
 	check(not post.door_open, "with nothing to meet him with, E at the guard opens nothing")

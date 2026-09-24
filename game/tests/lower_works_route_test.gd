@@ -45,6 +45,10 @@ func _ready() -> void:
 	# pressure beat.  Check it in a fresh district so the fuse has not already
 	# switched the sentinel off.
 	WorldHistory.record_event("service_arcade_breach_tool_taken", {"location": "service_arcade"})
+	# Lower Works reads the tool from Carry now, so a death can take it away.
+	var carry := Carry.new()
+	carry.items.append({"label": "BREACH TOOL", "kind": "tool", "mass": 4.0, "perishes": false, "age": 0.0})
+	carry.save_to_history()
 	var combat_city: Variant = load("res://buried_city.tscn").instantiate()
 	add_child(combat_city)
 	await get_tree().physics_frame

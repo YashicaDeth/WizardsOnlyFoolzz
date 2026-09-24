@@ -47,7 +47,10 @@ const WARN_RANGE := 11.0
 const FIRE_RANGE := 7.5
 const REACH := 2.4
 const FIRE_COOLDOWN := 1.6
-const SHOT_DAMAGE := 8.0
+## Greg, 24 September: warning shots, then wounds, then lethal. One shot over
+## your head, then every shot lands; six landed shots empty a fresh body.
+const WARNING_SHOTS := 1
+const SHOT_DAMAGE := 18.0
 ## One swing of the ram. Blunt, to the chest; three put a man down.
 const RAM_DAMAGE := 55.0
 
@@ -64,6 +67,9 @@ var reader_label: Label3D
 var speech: Label3D
 var muzzle: OmniLight3D
 var speech_timer := 0.0
+var warning_shots_left := WARNING_SHOTS
+## He has killed the player before and knows what comes back out of the vat.
+var knows_player := false
 
 
 func build() -> void:
@@ -80,6 +86,34 @@ func build() -> void:
 		"name": GUARD_NAME, "kind": "person", "role": "D-section door guard", "faction": "CellOutz Security",
 		"status": "on post", "memory": "Holds the biometric door in the Service Arcade.",
 	})
+	_restore_from_history()
+
+
+## The world does not rewind (Greg, 24 September): a player regrown in a vat
+## walks back into the arcade Hollis left, not a fresh one. His body, his gun,
+## his door and whether he has killed you before all come from the record.
+func _restore_from_history() -> void:
+	var record := WorldHistory.subject(GUARD_ID)
+	var saved: Dictionary = record.get("anatomy_state", {})
+	if not saved.is_empty():
+		guard.anatomy.restore(saved)
+		if guard.anatomy.downed or guard.anatomy.dead:
+			guard.rotation.x = -PI * 0.46
+	if str(record.get("status", "")) == "coerced":
+		coerced = true
+		guard.set_meta("disarmed", true)
+	if WorldHistory.event_count("facility_guard_weapon_taken") > 0:
+		loadout.gun_available = false
+		guard.set_meta("facility_weapon", "")
+		guard.set_meta("facility_rounds", 0)
+	knows_player = int(record.get("killed_player", 0)) > 0
+	if knows_player:
+		warning_shots_left = 0
+	for event in WorldHistory.events:
+		var details: Dictionary = event.get("details", {})
+		if str(event.get("type", "")) == "facility_biometric_access" and str(details.get("barrier_id", "")) == barrier.barrier_id:
+			_open_door("restored")
+			break
 
 
 func _build_wall() -> void:
@@ -228,14 +262,34 @@ func step(delta: float, player_position: Vector3) -> void:
 		guard.rotation.y = atan2(-to_player.x, -to_player.z)
 	if not warned:
 		warned = true
-		_say("%s: \"Back in your tank, meat.\"" % GUARD_NAME)
+		if knows_player:
+			_say("%s: \"You again. They grew you back.\"" % GUARD_NAME, 2.8)
+		else:
+			_say("%s: \"Back in your tank, meat.\"" % GUARD_NAME)
 	if distance <= FIRE_RANGE and fire_cooldown <= 0.0:
 		fire_cooldown = FIRE_COOLDOWN
 		if muzzle != null:
 			muzzle.light_energy = 9.0
+		if warning_shots_left > 0:
+			# Over your head. The only one you get.
+			warning_shots_left -= 1
+			_say("%s: \"Next one's in you.\"" % GUARD_NAME, 1.6)
+			WorldHistory.record_event("facility_guard_fired", {"subject_id": GUARD_ID, "damage": 0.0, "warning": true})
+			return
 		_say("%s FIRES" % GUARD_NAME, 0.7)
 		WorldHistory.record_event("facility_guard_fired", {"subject_id": GUARD_ID, "damage": SHOT_DAMAGE})
 		shot.emit(SHOT_DAMAGE)
+
+
+## The host tells him when his shooting killed the player. He remembers it,
+## and he will know them when the vat sends them back.
+func player_killed() -> void:
+	var record := WorldHistory.subject(GUARD_ID)
+	WorldHistory.amend_subject(GUARD_ID, {
+		"killed_player": int(record.get("killed_player", 0)) + 1,
+		"memory": "Shot the decanted subject dead at his door. CellOutz will grow it back.",
+	})
+	_say("%s: \"Stay down.\"" % GUARD_NAME, 2.0)
 
 
 ## LMB with the ram in hand. Returns true when the swing was his to take, so
@@ -247,6 +301,7 @@ func strike(player_position: Vector3) -> bool:
 	direction.y = 0.0
 	guard.hit("torso", RAM_DAMAGE, 12.0, "blunt", "", direction.normalized())
 	WorldHistory.record_event("facility_guard_rammed", {"subject_id": GUARD_ID, "downed": guard_down()})
+	WorldHistory.amend_subject(GUARD_ID, {"anatomy_state": guard.anatomy.snapshot()})
 	if guard_down():
 		coerced = false
 		WorldHistory.amend_subject(GUARD_ID, {

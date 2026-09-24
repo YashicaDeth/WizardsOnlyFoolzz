@@ -109,7 +109,8 @@ func _ready() -> void:
 	# The arcade's optional breach tool carries forward as a compact, deliberate
 	# first combat choice.  The fuse remains the quiet route; neither route is
 	# a false pickup that disappears at the next scene swap.
-	breach_tool_ready = WorldHistory.event_count("service_arcade_breach_tool_taken") > 0
+	# Carried, not merely once taken: a death leaves it on the old body.
+	breach_tool_ready = VatRebirth.carries("BREACH TOOL")
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	WorldHistory.record_event("lower_works_entered", {"location": "lower_works"})
 
@@ -129,7 +130,7 @@ func _build_player() -> void:
 	camera.fov = 88.0
 	player.add_child(camera)
 	LabSurface.attach_body_cam(camera)
-	if WorldHistory.event_count("service_arcade_breach_tool_taken") > 0:
+	if VatRebirth.carries("BREACH TOOL"):
 		LabSurface.hold_in_view(camera, LabSurface.breach_tool())
 	breach_flash = OmniLight3D.new()
 	breach_flash.name = "BreachFlash"

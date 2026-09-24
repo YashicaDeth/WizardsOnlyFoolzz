@@ -7,6 +7,14 @@ extends Node3D
 ## a readable piece of facility geography.
 
 const OPENING := preload("res://systems/opening_director.gd")
+const CARRY := preload("res://systems/carry.gd")
+const VAT_REBIRTH := preload("res://systems/vat_rebirth.gd")
+## Both tools live in Carry, so dying really does leave them on the old body
+## (Greg, 24 September: nothing carried survives a death).
+const CARD_LABEL := "STAFF ACCESS CARD"
+const TOOL_LABEL := "BREACH TOOL"
+const LOCATION := "service_arcade"
+const REMAINS_REACH := 2.4
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const ENTRY := Vector3(0, 1.0, 4.0)
 const CARD_AT := Vector3(-3.8, 0.95, -20.0)
@@ -18,9 +26,8 @@ const EXIT_AT := Vector3(0, 0.0, -55.0)
 ## Arch 7 stands at z = -29 and arch 8 at -33.5; the side labs sit at -25.7
 ## and -34.7, so the wall at -31.5 touches none of them.
 const GUARD_POST_AT := Vector3(0, 0.0, -31.5)
-## His shots bleed you but, like the sentinel's below, do not finish you: the
-## death that would (rebirth in a vat) is not built yet.
-const BLOOD_FLOOR := 25.0
+## His shots can kill you now. Death is rebirth in the claimant's vat
+## (`VatRebirth`); what you carried stays here on the body you leave.
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -41,6 +48,14 @@ var guard_post: FacilityGuardPost
 var blood := 100.0
 var post_message := ""
 var post_message_timer := 0.0
+## Whether each tool is still lying where the facility left it. Separate from
+## carrying it: a tool taken and then lost to a death is on your old body, not
+## back on its pedestal.
+var card_on_pedestal := true
+var weapon_on_floor := true
+var remains_nodes: Dictionary = {}
+var died := false
+var rebirth_request: Dictionary = {}
 
 @onready var objective: Label = $HUD/Objective
 @onready var prompt: Label = $HUD/Prompt
@@ -52,6 +67,8 @@ func _ready() -> void:
 	_build_landmarks()
 	_build_guard_post()
 	_build_player()
+	_restore_from_history()
+	_build_remains()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _build_player() -> void:
@@ -191,7 +208,108 @@ func _build_guard_post() -> void:
 	guard_post.position = GUARD_POST_AT
 	add_child(guard_post)
 	guard_post.build()
-	guard_post.shot.connect(func(damage: float) -> void: blood = maxf(BLOOD_FLOOR, blood - damage))
+	guard_post.shot.connect(_on_shot)
+
+
+func _on_shot(damage: float) -> void:
+	if died:
+		return
+	blood = maxf(0.0, blood - damage)
+	if blood <= 0.0:
+		_die("shot by Hollis at the D-section door", FacilityGuardPost.GUARD_ID)
+
+
+## Everything carried and worn stays here on the body; the claimant's vat grows
+## the player back. The world keeps what they did.
+func _die(cause: String, killed_by: String) -> void:
+	died = true
+	var at := player.global_position
+	at.y = 0.0
+	rebirth_request = VAT_REBIRTH.die(LOCATION, cause, killed_by, at)
+	if killed_by == FacilityGuardPost.GUARD_ID:
+		guard_post.player_killed()
+	card_taken = false
+	if weapon_taken and weapon_visual != null and is_instance_valid(weapon_visual):
+		weapon_visual.visible = false
+	weapon_taken = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if OS.get_environment("ATG_TEST_MODE") != "1":
+		Interstitial.travel(str(rebirth_request.scene), "you died // %s grows you back" % str(rebirth_request.vat.label).to_lower())
+
+
+## The arcade is the same place the second time. Pedestals stay empty once
+## their tool has gone, the gate stays open, and what the player still carries
+## decides what is in their hands.
+func _restore_from_history() -> void:
+	if WorldHistory.event_count("service_arcade_keycard_taken") > 0:
+		card_on_pedestal = false
+		card_visual.visible = false
+		card_beacon.visible = false
+		card_label.visible = false
+	card_taken = VAT_REBIRTH.carries(CARD_LABEL)
+	if WorldHistory.event_count("service_arcade_breach_tool_taken") > 0:
+		weapon_on_floor = false
+		weapon_label.visible = false
+		weapon_visual.visible = false
+	if VAT_REBIRTH.carries(TOOL_LABEL):
+		weapon_taken = true
+		weapon_visual.visible = true
+		LabSurface.hold_in_view(camera, weapon_visual)
+	if WorldHistory.event_count("service_arcade_pressure_gate_opened") > 0:
+		_open_gate()
+
+
+## Each body the player left here lies where they fell, holding what they held.
+func _build_remains() -> void:
+	for remains in VAT_REBIRTH.remains_at(LOCATION):
+		var body := BaselineHuman.new()
+		body.name = str(remains.id)
+		add_child(body)
+		body.build(str(remains.id), {"flesh": Color("6b5842"), "variation": int(remains.get("body_number", 1))})
+		body.position = VAT_REBIRTH.remains_position(remains)
+		# A corpse, not a sleeper: a living rig eases itself back upright every
+		# frame (seen on the first capture, where the old body stood up).
+		body.anatomy.dead = true
+		body.rotation.x = -PI * 0.46
+		var tag := Label3D.new()
+		tag.text = "YOUR OLD BODY"
+		tag.font_size = 30
+		tag.outline_size = 8
+		tag.modulate = Color("d9c3a4")
+		tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		tag.position = body.position + Vector3(0, 0.9, 0)
+		add_child(tag)
+		remains_nodes[str(remains.id)] = [body, tag]
+
+
+func _nearest_remains() -> String:
+	for remains_id in remains_nodes:
+		var body: Node3D = remains_nodes[remains_id][0]
+		if _flat_distance(body.global_position) <= REMAINS_REACH:
+			return str(remains_id)
+	return ""
+
+
+func _recover_remains(remains_id: String) -> bool:
+	var result := VAT_REBIRTH.recover(remains_id)
+	if not bool(result.get("ok", false)):
+		return false
+	card_taken = VAT_REBIRTH.carries(CARD_LABEL)
+	if VAT_REBIRTH.carries(TOOL_LABEL) and not weapon_taken:
+		weapon_taken = true
+		weapon_visual.visible = true
+		LabSurface.hold_in_view(camera, weapon_visual)
+	var tag: Label3D = remains_nodes[remains_id][1]
+	tag.text = "STRIPPED"
+	post_message = "TAKEN BACK OFF YOUR OLD BODY // %d THINGS" % int(result.get("items", 0))
+	post_message_timer = 2.4
+	return true
+
+
+func _carry_add(item: Dictionary) -> void:
+	var carry := CARRY.new()
+	carry.items.append(item)
+	carry.save_to_history()
 
 
 func _slab(dimensions: Vector3, at: Vector3, _kind: String, _color: Color) -> StaticBody3D:
@@ -269,23 +387,32 @@ func _flat_distance(at: Vector3) -> float:
 	return delta.length()
 
 func _interact() -> void:
+	if died:
+		return
+	var remains_id := _nearest_remains()
+	if not remains_id.is_empty() and _recover_remains(remains_id):
+		return
 	var said := guard_post.interact(player.global_position, weapon_taken)
 	if not said.is_empty():
 		post_message = said
 		post_message_timer = 2.4
 		return
-	if not card_taken and _flat_distance(CARD_AT) <= 2.3:
+	if card_on_pedestal and _flat_distance(CARD_AT) <= 2.3:
+		card_on_pedestal = false
 		card_taken = true
 		card_visual.visible = false
 		card_beacon.visible = false
 		card_label.visible = false
+		_carry_add({"label": CARD_LABEL, "kind": "key", "mass": 0.02, "perishes": false, "age": 0.0, "from": LOCATION})
 		WorldHistory.record_event("service_arcade_keycard_taken", {"location": "service_arcade"})
 		return
-	if not weapon_taken and _flat_distance(WEAPON_AT) <= 2.3:
+	if weapon_on_floor and _flat_distance(WEAPON_AT) <= 2.3:
+		weapon_on_floor = false
 		weapon_taken = true
 		# Taking it puts it in your hands, where you can see it.
 		LabSurface.hold_in_view(camera, weapon_visual)
 		weapon_label.visible = false
+		_carry_add({"label": TOOL_LABEL, "kind": "tool", "mass": 4.0, "perishes": false, "age": 0.0, "from": LOCATION})
 		WorldHistory.record_event("service_arcade_breach_tool_taken", {"location": "service_arcade"})
 		return
 	if not gate_open and _flat_distance(GATE_AT) <= 3.2 and card_taken:
@@ -305,7 +432,8 @@ func _open_gate() -> void:
 	if gate_body != null:
 		gate_body.queue_free()
 	gate_panel.position.y = 5.8
-	WorldHistory.record_event("service_arcade_pressure_gate_opened", {"location": "service_arcade"})
+	if WorldHistory.event_count("service_arcade_pressure_gate_opened") == 0:
+		WorldHistory.record_event("service_arcade_pressure_gate_opened", {"location": "service_arcade"})
 
 func _enter_lower_works() -> void:
 	if lower_works_requested:
@@ -329,17 +457,25 @@ func _record_pit_entry() -> void:
 func _update_hud() -> void:
 	vitals.text = "BLOOD %d%%   PAIN 86   DECANTED" % roundi(blood)
 	var past_guard := "REACH THE PRESSURE GATE" if guard_post.door_open else "GET THROUGH THE D-SECTION DOOR"
-	objective.text = "OBJECTIVE\n" + ("FOLLOW THE HEAT" if gate_open else (past_guard if card_taken and weapon_taken else ("FIND THE BREACH TOOL" if not weapon_taken else "FIND THE ORANGE STAFF CARD")))
+	var has_remains := false
+	for remains_id in remains_nodes:
+		has_remains = has_remains or (remains_nodes[remains_id][1] as Label3D).text != "STRIPPED"
+	if has_remains and not (card_taken and weapon_taken):
+		objective.text = "OBJECTIVE\nRECOVER YOUR GEAR FROM YOUR OLD BODY"
+	else:
+		objective.text = "OBJECTIVE\n" + ("FOLLOW THE HEAT" if gate_open else (past_guard if card_taken and weapon_taken else ("FIND THE BREACH TOOL" if not weapon_taken else "FIND THE ORANGE STAFF CARD")))
 	if weapon_taken:
 		vitals.text += "   BREACH TOOL // READY"
 	var post_prompt := guard_post.prompt_for(player.global_position, weapon_taken)
+	if not _nearest_remains().is_empty() and (remains_nodes[_nearest_remains()][1] as Label3D).text != "STRIPPED":
+		post_prompt = "[E] TAKE YOUR GEAR BACK OFF YOUR OLD BODY"
 	if post_message_timer > 0.0:
 		prompt.text = post_message
 	elif not post_prompt.is_empty() and not inspect_held:
 		prompt.text = post_prompt
 	elif inspect_held:
 		prompt.text = "BREACH TOOL // PNEUMATIC RAM, ONE CHARGE CANISTER // CLICK AT A LOCKED DOOR" if weapon_taken else "NOTHING IN HAND TO INSPECT"
-	elif not card_taken and _flat_distance(CARD_AT) <= 2.3:
+	elif card_on_pedestal and _flat_distance(CARD_AT) <= 2.3:
 		prompt.text = "[E] TAKE STAFF ACCESS CARD"
 	elif not gate_open and _flat_distance(GATE_AT) <= 3.2:
 		if card_taken:
