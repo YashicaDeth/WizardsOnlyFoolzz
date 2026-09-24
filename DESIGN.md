@@ -592,6 +592,15 @@ another account's organisation and could not be read from this one.
   choice changes it, with the change flashing (+0.4).
 - A new Windows build after these three.
 
+### Answered by Greg in question boxes, 24 September 2026 (in-game HUD)
+
+- Next GUI pass: the in-game HUD (vat, arcade, Lower Works, drains).
+- It becomes a **body-cam OSD**: REC dot, timestamp, vitals as a thin
+  readout, the objective as a stamped line; matching the Outlast lab look.
+- Prompts become a **drawn [E] key cap with the verb, placed near the thing**
+  in the world, not a line of text at the bottom.
+- The intake is good for now.
+
 Open: one of Hornee's eyes is a real drink brand's bottle cap with its
 wordmark. Keep it on the shipped model, or swap it for an in-world mark?
 

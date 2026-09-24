@@ -45,6 +45,7 @@ var pitch := -0.05
 var objective: Label
 var status: Label
 var prompt: Label
+var osd: BodyCamOSD
 var district := ""
 var district_timer := 0.0
 var surfaced := false
@@ -283,6 +284,11 @@ func _build_hud() -> void:
 	prompt.add_theme_font_size_override("font_size", 15)
 	prompt.add_theme_color_override("font_color", Color("dd9851"))
 	layer.add_child(prompt)
+	osd = BodyCamOSD.new()
+	osd.name = "BodyCamOSD"
+	layer.add_child(osd)
+	osd.adopt(status, objective, prompt, "BELOW 0C  //  OLD DRAINS")
+	osd.camera = camera
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -362,6 +368,7 @@ func _update_hud() -> void:
 		prompt.text = ""
 	elif _flat_distance(EXIT_AT) <= EXIT_REACH:
 		prompt.text = "[E] FORCE THE GRATE // CLIMB OUT"
+		osd.point_at(EXIT_AT + Vector3(0, 1.8, -1.2))
 	elif district_timer > 0.0:
 		prompt.text = str(DISTRICT_LABELS.get(district, ""))
 	else:

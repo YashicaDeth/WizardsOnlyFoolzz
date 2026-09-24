@@ -109,6 +109,8 @@ var inspect_held := false
 var rebirth := false
 var active_beats: Array = BEATS
 var title: Label
+## The HUD as body-cam footage (Greg, 24 September).
+var osd: BodyCamOSD
 var wired_clock := 0.0
 var revenge_at := -1.0
 var jolt := 0.0
@@ -164,6 +166,12 @@ func _ready() -> void:
 	_build_player()
 	_build_title()
 	_build_intake()
+	osd = BodyCamOSD.new()
+	osd.name = "BodyCamOSD"
+	$HUD.add_child(osd)
+	osd.adopt(vitals, $HUD/Objective, prompt, "SUBLEVEL 0C  //  GROWING FLOOR")
+	osd.camera = camera
+	osd.visible = intake == null
 	opening_audio = OPENING_AUDIO.new()
 	add_child(opening_audio)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -1449,6 +1457,8 @@ func _record_service_arcade_entry() -> bool:
 
 
 func _update_hud() -> void:
+	if osd != null:
+		osd.visible = intake == null
 	var snapshot: Dictionary = anatomy.call("snapshot")
 	vitals.text = "BLOOD %d%%   PAIN %02d   %s" % [
 		roundi(float(snapshot.blood) / maxf(1.0, float(snapshot.blood_capacity)) * 100.0),
@@ -1461,6 +1471,7 @@ func _update_hud() -> void:
 			prompt.text = ""
 		elif _aimed_wire() != null:
 			prompt.text = "[E] RIP IT OUT   //   %d LEFT" % umbilicals.size()
+			osd.point_at((_aimed_wire().get_child(3) as Node3D).global_position)
 		else:
 			prompt.text = "MOUSE LOOK   //   FIND THE WIRES   //   %d LEFT" % umbilicals.size()
 		return
@@ -1480,9 +1491,11 @@ func _update_hud() -> void:
 		return
 	if not stuck_tank_opened and _carries_restraint() and _near_first_objects():
 		prompt.text = "[E] PRY THE JAMMED TANK WITH THE BROKEN RESTRAINT"
+		osd.point_at(stuck_tank_marker.global_position + Vector3(0, 1.3, 0))
 		return
 	if stuck_tank_opened and CLOTHING.worn("player") == "bare" and CLOTHING.worn(FAILED_SUBJECT_ID) != "bare" and _near_first_objects():
 		prompt.text = "[E] TAKE THE CLOTHING OFF SUBJECT 0C-4"
+		osd.point_at(stuck_tank_marker.global_position + Vector3(0, 1.1, 0))
 		return
 	# The door he left by: locked, and it says so (Greg, 2026-09-24: you should
 	# be able to interact with it). Staff access is found further on.
@@ -1496,6 +1509,8 @@ func _update_hud() -> void:
 	# HOLD I is only offered when something is in hand to look at.
 	var inspect_hint := "   //   HOLD I INSPECT" if _inspect_text() != "NOTHING IN HAND TO INSPECT" else ""
 	prompt.text = "[E] ENTER THE UNDERGROUND HEAT" if to_door.length() <= 3.4 else "WASD MOVE   //   MOUSE LOOK   //   E INTERACT" + inspect_hint
+	if to_door.length() <= 3.4:
+		osd.point_at(door_marker.global_position + Vector3(0, 1.6, 0))
 
 
 ## AX3.1/AX3.6. What HOLD I actually shows — the same held object every time,

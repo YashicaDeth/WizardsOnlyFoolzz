@@ -75,6 +75,7 @@ var camera: Camera3D
 var objective: Label
 var prompt: Label
 var status: Label
+var osd: BodyCamOSD
 var yaw := 0.0
 var pitch := -0.05
 var fuse_taken := false
@@ -170,6 +171,11 @@ func _build_hud() -> void:
 	prompt.add_theme_font_size_override("font_size", 15)
 	prompt.add_theme_color_override("font_color", Color("dd9851"))
 	layer.add_child(prompt)
+	osd = BodyCamOSD.new()
+	osd.name = "BodyCamOSD"
+	layer.add_child(osd)
+	osd.adopt(status, objective, prompt, "SUBLEVEL 0C  //  LOWER WORKS")
+	osd.camera = camera
 
 
 func _build_city_shell() -> void:
@@ -735,12 +741,16 @@ func _update_hud() -> void:
 	objective.text = "OBJECTIVE // " + ("REACH THE HEAT ELEVATOR" if fuse_taken else "FIND A LIFT FUSE")
 	if not fuse_taken and _flat_distance(FUSE_AT) <= 2.4:
 		prompt.text = "[E] TAKE LIFT FUSE"
+		osd.point_at(FUSE_AT + Vector3(0, 0.3, 0))
 	elif fuse_taken and not shortcut_open and _flat_distance(SHORTCUT_AT) <= 3.0:
 		prompt.text = "[E] POWER SHORTCUT // DISABLE SENTINEL"
+		osd.point_at(SHORTCUT_AT + Vector3(0, 1.4, 0))
 	elif _flat_distance(DRAIN_AT) <= DRAIN_REACH:
 		prompt.text = "[E] DROP INTO THE OLD DRAINS"
+		osd.point_at(DRAIN_AT + Vector3(0, 0.2, 0))
 	elif fuse_taken and _flat_distance(EXIT_AT) <= 4.0:
 		prompt.text = "[E] RIDE THE HEAT ELEVATOR UP"
+		osd.point_at(LIFT_AT + Vector3(0, 2.2, 0))
 	elif breach_tool_ready and patrol_alert and not patrol_disabled:
 		prompt.text = "[LMB] DISCHARGE BREACH TOOL // INTERRUPT SENTINEL"
 	else:

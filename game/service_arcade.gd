@@ -49,6 +49,7 @@ var guard_post: FacilityGuardPost
 ## over the one fight in the first 30 minutes: a box on the part the ram
 ## struck, and a faint amber box on Hollis while he has you in his sights.
 var block_tracker: BlockTracker
+var osd: BodyCamOSD
 var blood := 100.0
 var post_message := ""
 var post_message_timer := 0.0
@@ -77,6 +78,11 @@ func _ready() -> void:
 	block_tracker.name = "BlockTracker"
 	$HUD.add_child(block_tracker)
 	block_tracker.camera = camera
+	osd = BodyCamOSD.new()
+	osd.name = "BodyCamOSD"
+	$HUD.add_child(osd)
+	osd.adopt(vitals, objective, prompt, "SUBLEVEL 0C  //  SERVICE ARCADE")
+	osd.camera = camera
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _build_player() -> void:
@@ -481,6 +487,9 @@ func _update_hud() -> void:
 	var post_prompt := guard_post.prompt_for(player.global_position, weapon_taken)
 	if not _nearest_remains().is_empty() and (remains_nodes[_nearest_remains()][1] as Label3D).text != "STRIPPED":
 		post_prompt = "[E] TAKE YOUR GEAR BACK OFF YOUR OLD BODY"
+		osd.point_at((remains_nodes[_nearest_remains()][0] as Node3D).global_position + Vector3(0, 0.6, 0))
+	elif post_prompt.begins_with("["):
+		osd.point_at(guard_post.guard.global_position + Vector3(0, 1.3, 0))
 	if post_message_timer > 0.0:
 		prompt.text = post_message
 	elif not post_prompt.is_empty() and not inspect_held:
@@ -489,15 +498,19 @@ func _update_hud() -> void:
 		prompt.text = "BREACH TOOL // PNEUMATIC RAM, ONE CHARGE CANISTER // CLICK AT A LOCKED DOOR" if weapon_taken else "NOTHING IN HAND TO INSPECT"
 	elif card_on_pedestal and _flat_distance(CARD_AT) <= 2.3:
 		prompt.text = "[E] TAKE STAFF ACCESS CARD"
+		osd.point_at(CARD_AT + Vector3(0, 0.3, 0))
 	elif not gate_open and _flat_distance(GATE_AT) <= 3.2:
 		if card_taken:
 			prompt.text = "[E] OPEN PRESSURE GATE"
+			osd.point_at(GATE_AT + Vector3(0, 2.0, 0))
 		elif weapon_taken:
 			prompt.text = "[LMB] BREACH THE PRESSURE GATE   //   OR FIND THE STAFF CARD"
+			osd.point_at(GATE_AT + Vector3(0, 2.0, 0))
 		else:
 			prompt.text = "PRESSURE GATE // STAFF CARD REQUIRED"
 	elif gate_open and (_flat_distance(GATE_AT) <= 4.4 or _flat_distance(EXIT_AT) <= 3.0):
 		prompt.text = "[E] ENTER LOWER WORKS"
+		osd.point_at(GATE_AT + Vector3(0, 1.6, -2.0))
 	elif gate_open:
 		prompt.text = "PRESSURE GATE UNSEALED // MOVE THROUGH"
 	else:
