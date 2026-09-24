@@ -34,17 +34,17 @@ func _ready() -> void:
 	for _open in 4:
 		await get_tree().process_frame
 	var map: Control = hunt.living_map
-	check(hunt.panel_mode == "map" and map.visible and map.facility_sheet,
-		"M opens the known underground facility layer as an interactive map")
+	check(hunt.panel_mode == "map" and map.visible and not map.facility_sheet,
+		"M opens on the surface satellite, the view Greg wants first")
 	check(hunt._pointer.visible,
 		"the full map raises its moving custom pointer instead of an aiming reticle")
 	hunt.black_mirror_active = false
 	hunt._unhandled_input(_key(KEY_L))
-	check(not map.facility_sheet and not hunt.black_mirror_active and hunt.panel_mode == "map",
-		"L changes to the surface satellite layer without activating the black-and-white field lens")
+	check(map.facility_sheet and not hunt.black_mirror_active and hunt.panel_mode == "map",
+		"L changes to the underground facility layer without activating the black-and-white field lens")
 	hunt._unhandled_input(_key(KEY_L))
 	await get_tree().process_frame
-	check(map.facility_sheet, "L changes back to the underground facility layer")
+	check(not map.facility_sheet, "L changes back to the surface satellite")
 	# Clicking a rendered sector selects it and keeps the pointer free. This is
 	# the exact interaction the narrated playtest reported as doing nothing.
 	# Headless CanvasItems do not execute `_draw`, so publish the same hit rect a

@@ -183,9 +183,11 @@ func open_map() -> void:
 	pan = Vector2.ZERO
 	if satellite_available:
 		FACILITY.publish_target_ping(player_at)
+	# The satellite is what you see first (Greg, 2026-09-24); L turns to the
+	# facility sheet once that route exists.
+	facility_sheet = false
 	var territory := WorldHistory.subject(FACILITY.SUBJECT)
-	facility_sheet = not territory.is_empty()
-	if facility_sheet and facility_selected < 0:
+	if not territory.is_empty() and facility_selected < 0:
 		facility_selected = _first_revealed_facility_sector()
 	queue_redraw()
 
