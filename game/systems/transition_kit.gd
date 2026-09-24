@@ -7,7 +7,7 @@ extends CanvasLayer
 ## it for every scene change; anything else that needs a hard seam hidden can
 ## own one too.
 
-const STYLES := ["burn", "elevator", "scroll", "flesh", "crt"]
+const STYLES := ["datamosh", "elevator", "scroll", "flesh", "crt"]
 const COVER_SECONDS := 0.42
 const REVEAL_SECONDS := 0.5
 

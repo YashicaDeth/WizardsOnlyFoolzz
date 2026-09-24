@@ -4,8 +4,11 @@ shader_type canvas_item;
 // screen fully covered. Covering and uncovering run the same curve, so a
 // reveal is the cover played backwards and the seam always matches.
 //
-// 0 BURN      the screen breaks into cells that catch and char out (ref: the
-//             dragon title pixel-burning away)
+// 0 DATAMOSH  the picture itself corrupts: macroblocks drift on broken
+//             motion vectors, channels split, a Bayer dither crushes the
+//             colour, scanlines run over it, and it all sinks into dithered
+//             black. Replaced BURN, the pixel-cell wipe Greg disliked on
+//             first launch (2026-09-24).
 // 1 ELEVATOR  two riveted blast doors slam shut, hazard banding, a red lamp
 //             on the seam (ref: the OPEN elevator doors)
 // 2 SCROLL    a parchment unrolls down over everything (ref: the scroll panels)
@@ -18,6 +21,7 @@ uniform int style = 0;
 uniform float progress : hint_range(0.0, 1.0) = 0.0;
 uniform vec2 rect_size = vec2(1920.0, 1080.0);
 uniform float seed = 0.0;
+uniform sampler2D screen_tex : hint_screen_texture, filter_nearest;
 
 const vec3 VOID = vec3(0.039, 0.020, 0.016);
 const vec3 EMBER = vec3(1.0, 0.45, 0.08);
@@ -49,27 +53,39 @@ float fbm(vec2 p) {
 	return v;
 }
 
-vec4 burn(vec2 uv, vec2 px) {
-	float cells = 64.0;
-	vec2 grid = vec2(cells, cells * rect_size.y / rect_size.x);
-	vec2 cell = floor(uv * grid);
-	// Burn travels from the lower edge up, ragged by per-cell noise.
-	float threshold = (1.0 - uv.y) * 0.55 + hash21(cell) * 0.45;
-	float p = progress * 1.18;
-	float band = 0.09;
-	if (p < threshold - band) {
-		return vec4(0.0);
-	}
-	if (p < threshold) {
-		float t = 1.0 - (threshold - p) / band;
-		vec3 c = mix(EMBER, HOT, t * t);
-		float flicker = 0.75 + 0.25 * sin(TIME * 40.0 + hash21(cell + 3.1) * 30.0);
-		return vec4(c * flicker, 0.55 + 0.45 * t);
-	}
-	float char_amount = clamp((p - threshold) / 0.25, 0.0, 1.0);
-	vec3 soot = VOID + vec3(0.05, 0.02, 0.01) * fbm(uv * 14.0);
-	vec3 c = mix(EMBER * 0.35, soot, char_amount);
-	return vec4(c, 1.0);
+float bayer4(vec2 px) {
+	int x = int(mod(px.x, 4.0));
+	int y = int(mod(px.y, 4.0));
+	int index = x + y * 4;
+	float m[16] = float[](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+	return m[index] / 16.0 - 0.5;
+}
+
+vec4 datamosh(vec2 uv, vec2 screen_uv, vec2 px) {
+	float p = progress;
+	vec2 block = floor(px / 24.0);
+	// Blocks jump on a stepped clock, the way a broken stream stutters.
+	float tick = floor(TIME * 12.0);
+	vec2 motion = vec2(hash21(block + tick * 0.013), hash21(block.yx + 7.3 + tick * 0.007)) - 0.5;
+	float moshed = step(1.0 - p * 1.25, hash21(block + 3.7));
+	// Columns also bleed downward, the smear of a frame that never keyed.
+	float bleed = p * p * 0.12 * hash21(vec2(block.x, 1.9));
+	vec2 source = screen_uv + motion * p * 0.22 * moshed + vec2(0.0, -bleed);
+	float split = 0.006 * p;
+	vec3 c = vec3(
+		texture(screen_tex, source + vec2(split, 0.0)).r,
+		texture(screen_tex, source).g,
+		texture(screen_tex, source - vec2(split, 0.0)).b);
+	// The dither tightens as the picture fails: 32 levels down to 3.
+	float levels = mix(32.0, 3.0, p);
+	c = floor(c * levels + bayer4(px) + 0.5) / levels;
+	c *= 0.82 + 0.18 * sin(px.y * 3.14159);
+	c = mix(c, c * vec3(1.0, 0.38, 0.32), p * 0.55);
+	// The last stretch hides the swap: dithered black with a few live pixels.
+	float dark = smoothstep(0.7, 1.0, p);
+	vec3 dead = VOID + BLOOD * 0.5 * step(0.82, hash21(floor(px / 4.0) + tick)) * (1.0 - dark * 0.7);
+	c = mix(c, dead, dark);
+	return vec4(c, smoothstep(0.0, 0.06, p));
 }
 
 vec4 elevator(vec2 uv, vec2 px) {
@@ -167,7 +183,7 @@ void fragment() {
 	vec2 px = uv * rect_size;
 	vec4 c = vec4(0.0);
 	if (style == 0) {
-		c = burn(uv, px);
+		c = datamosh(uv, SCREEN_UV, px);
 	} else if (style == 1) {
 		c = elevator(uv, px);
 	} else if (style == 2) {
