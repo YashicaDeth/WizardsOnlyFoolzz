@@ -1,5 +1,7 @@
 extends Node
 
+const WOUND_CATALOG := preload("res://systems/wound_catalog.gd")
+
 var failures: Array[String] = []
 
 
@@ -74,10 +76,16 @@ func _ready() -> void:
 	check(float(opening.anatomy.call("snapshot").pain) > pain_before, "tearing the wires out hurts")
 	check(opening.opening_audio.played_cues.has("tug") and opening.opening_audio.played_cues.has("rip"), "tugging and tearing have their own sound events")
 	check(opening.title.text == "GET REVENGE" and opening.opening_audio.played_cues.has("revenge"), "the last wire turns the screen to GET REVENGE")
+	var wound_labels: Array = (WorldHistory.subject("player").get("wounds", []) as Array).map(func(wound): return WOUND_CATALOG.label(wound))
+	check(wound_labels.has("torn wire sockets"), "the torn wire sockets are recorded as a wound on the body")
 	check(opening.vat_glass.visible and not opening.breakout_complete, "GET REVENGE holds before the glass goes")
 	opening._physics_process(opening.REVENGE_HOLD + 0.1)
 	check(opening.phase == "floor" and not opening.vat_glass.visible, "the glass goes after GET REVENGE")
 	check(opening.opening_audio.played_cues.has("glass"), "the breach has its own sound event")
+	var puddle := opening.get_node_or_null("Puddle") as MeshInstance3D
+	var spill: StandardMaterial3D = puddle.mesh.material if puddle != null else null
+	check(spill != null and spill.albedo_texture == null and spill.albedo_color.v < 0.1 and spill.roughness < 0.2,
+		"the spilled fluid is dark and wet, not the grained floor texture that lit up as a pale pixel disc")
 	check(opening.breakout_complete and opening.first_acquisition_complete, "the soul/implant breakout completes instead of stalling in the vat")
 	check(OpeningDirector.reached("broke_free"), "breakout is persisted as an opening stage")
 	var carried: Array = WorldHistory.subject("inventory").get("items", [])

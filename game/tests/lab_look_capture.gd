@@ -12,6 +12,9 @@ func _ready() -> void:
 			out_dir = argument.trim_prefix("--out=")
 	get_window().size = Vector2i(1280, 720)
 	WorldHistory.clear_history()
+	# Pinned like capture_scene.gd: world_minute persists and a cleared history
+	# starts at midnight, which shoots every lit room as if the sun were down.
+	WorldHistory.world_minute = WorldClock.OPENING_MINUTE
 	var vat = load("res://vat_chamber.tscn").instantiate()
 	add_child(vat)
 	vat.set_physics_process(false)
@@ -37,6 +40,7 @@ func _ready() -> void:
 		await _capture("%s/lab_%s.png" % [out_dir, str(shot[0])])
 	vat.queue_free()
 	await _hold(2)
+	WorldHistory.world_minute = WorldClock.OPENING_MINUTE
 	var city = load("res://buried_city.tscn").instantiate()
 	add_child(city)
 	city.set_physics_process(false)

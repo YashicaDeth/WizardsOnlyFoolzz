@@ -26,6 +26,7 @@ const CLOTHING := preload("res://systems/clothing.gd")
 const BASELINE_HUMAN := preload("res://systems/baseline_human.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const VAT_REBIRTH := preload("res://systems/vat_rebirth.gd")
+const WOUND_CATALOG := preload("res://systems/wound_catalog.gd")
 
 const EYE_HEIGHT := 1.62
 const BODY_HALF_HEIGHT := 0.85
@@ -1190,9 +1191,13 @@ func _all_wires_out() -> void:
 	title.text = "GET REVENGE"
 	subtitle.text = ""
 	opening_audio.cue("revenge")
-	var wounds: Array = (WorldHistory.subject("player").get("wounds", []) as Array).duplicate()
-	if not wounds.has("torn wire sockets"):
-		wounds.append("torn wire sockets")
+	# Wounds are catalogue dictionaries once WorldHistory has normalised them
+	# (WoundCatalog), not prose strings; a string here is rejected by the typed
+	# array and the wound silently never lands.
+	var wounds: Array = (WorldHistory.subject("player").get("wounds", []) as Array).duplicate(true)
+	var has_sockets := wounds.any(func(wound) -> bool: return WOUND_CATALOG.label(wound) == "torn wire sockets")
+	if not has_sockets:
+		wounds.append({"label": "torn wire sockets", "zone": "torso", "type": "tear", "severity": 0.3})
 	WorldHistory.amend_subject("player", {"wounds": wounds})
 	PLAYER_ACTION_LEDGER.record("opening_wires_torn_out", {"tank": "0C-7", "location": "growing_floor"})
 
@@ -1257,7 +1262,18 @@ func _breach() -> void:
 	disc.top_radius = 1.7
 	disc.bottom_radius = 1.7
 	disc.height = 0.02
-	disc.material = WorldLook.surface(Color("101a13"), "dirt", 4)
+	# The floor light glitch Greg saw (Dust to Bones, 24 September): this used
+	# WorldLook's "dirt", whose unfiltered grain and rim light turned a
+	# near-black puddle into a pale disc of green and yellow pixel blocks under
+	# the body-cam lamp. What spilled out of a tank is fluid: dark, and wet
+	# enough to hold the lamp as one highlight instead of lighting up.
+	var spill := StandardMaterial3D.new()
+	spill.albedo_color = Color("0b120d")
+	spill.roughness = 0.07
+	spill.metallic = 0.25
+	spill.metallic_specular = 0.7
+	disc.material = spill
+	puddle.name = "Puddle"
 	puddle.mesh = disc
 	puddle.position = VAT_POSITION + Vector3(0, 0.02, 0)
 	add_child(puddle)
