@@ -87,5 +87,32 @@ func _ready() -> void:
 	drifter.tick(WitnessLedger.REPORT_DELAY * 1.5)
 	check(not drifter.knowledge("unaffiliated").is_empty(), "somebody with no faction is still worth silencing")
 
+	# --- AE10.10: testimony can be bought before it lands --------------------
+	WorldHistory.clear_history()
+	WorldHistory.register_subject("player", {"name": "THE HUNTER", "kind": "person"})
+	WorldHistory.register_subject("inventory", {"items": [], "rust_scrip": 30})
+	WorldHistory.register_subject("paid_witness", {"name": "Paid Witness", "kind": "person", "faction_id": "ashline_wreckers"})
+	var paid := WitnessLedger.new()
+	var bought_event := paid.record("execution", {"subject": "player", "victim": "paid_target"}, ["paid_witness"])
+	check(paid.reports_carried_by("paid_witness") == 1, "the price belongs to the exact account this witness carries")
+	var purchase := paid.buy("paid_witness")
+	check(bool(purchase.get("ok", false)) and int(purchase.get("price", 0)) == WitnessLedger.REPORT_PRICE,
+		"one pending account can be bought for its authored rust-scrip price")
+	check(int(WorldHistory.subject("inventory").get("rust_scrip", -1)) == 30 - WitnessLedger.REPORT_PRICE,
+		"buying testimony spends the persistent wallet rather than a dialogue token")
+	check(str(purchase.get("action_id", "")) != "" and WorldHistory.event_count("report_bought") == 1,
+		"the exchange receives one durable player-action receipt")
+	paid.tick(WitnessLedger.REPORT_DELAY * 2.0)
+	check(not paid.faction_knows("ashline_wreckers", int(bought_event.sequence)),
+		"a bought pending account never reaches faction knowledge")
+	var already_gone := paid.buy("paid_witness")
+	check(not bool(already_gone.get("ok", true)), "knowledge already delivered or buried cannot be bought retroactively")
+	var poor := WitnessLedger.new()
+	poor.record("execution", {"subject": "player", "victim": "second_target"}, ["paid_witness"])
+	WorldHistory.amend_subject("inventory", {"rust_scrip": 0})
+	var refused_purchase := poor.buy("paid_witness")
+	check(not bool(refused_purchase.get("ok", true)) and poor.reports_carried_by("paid_witness") == 1,
+		"insufficient scrip leaves the report in the witness's hands")
+
 	print("WITNESS_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

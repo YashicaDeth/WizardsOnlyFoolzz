@@ -19,6 +19,7 @@ func _ready() -> void:
 		return
 	WorldHistory.clear_history()
 	ModernGods.seed_gods()
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "all modern gods seed in one closed schema transaction")
 
 	for god_id in ModernGods.GODS:
 		var subject := WorldHistory.subject(god_id)
@@ -66,6 +67,7 @@ func _ready() -> void:
 	for event in verdict_events:
 		distinct_gods[str((event.get("details", {}) as Dictionary).get("god_id", ""))] = true
 	check(distinct_gods.size() == ModernGods.GODS.size(), "and each event is attributed to its own god, not anonymous")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "all gods' attention, separate opinions and standing consequences close one death transaction")
 
 	# --- asking a subset only asks that subset -------------------------------
 	WorldHistory.clear_history()

@@ -53,6 +53,7 @@ func _ready() -> void:
 	# --- E4.3: the same boost costs more the second time --------------------
 	var second := Boons.grant("player", "iron_nerve", "pain_resist", 0.4, 999.0, "blood", 300.0)
 	check(float(second.get("cost_paid", 0.0)) > float(granted.get("cost_paid", 0.0)), "the second iron_nerve costs more than the first (%.0f > %.0f)" % [second.get("cost_paid", 0.0), granted.get("cost_paid", 0.0)])
+	check(WorldHistory.event_count("boon_granted") == 5 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "each successful grant records once and closes its nested body transaction")
 
 	# --- taking the same boost again refreshes it rather than stacking it ---
 	check(is_equal_approx(Boons.stat_bonus("player", "pain_resist"), 0.4), "retaking the same boost refreshes it instead of stacking (still 0.4, not 0.8)")

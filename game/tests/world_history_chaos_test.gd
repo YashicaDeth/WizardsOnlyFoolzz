@@ -37,15 +37,15 @@ func _ready() -> void:
 	check(WorldHistory.chaos_magick() <= 1.0, "it never exceeds full")
 
 	# And it decays over game-time with nothing feeding it. `advance()` takes
-	# real seconds and MINUTES_PER_SECOND is 1.0, so passing minutes directly
-	# advances the clock by that many game-minutes.
+	# real seconds, so convert the authored world-minute half-life through the
+	# clock rate rather than quietly depending on a particular day length.
 	var before_wait := WorldHistory.chaos_magick()
-	WorldClock.advance(WorldHistory.CHAOS_MAGICK_HALF_LIFE_MINUTES)
+	WorldClock.advance(WorldHistory.CHAOS_MAGICK_HALF_LIFE_MINUTES / WorldClock.MINUTES_PER_SECOND)
 	var after_wait := WorldHistory.chaos_magick()
 	check(after_wait < before_wait * 0.6, "a half-life of quiet actually halves it")
 	check(after_wait > 0.0, "but it has not vanished outright")
 
-	WorldClock.advance(WorldHistory.CHAOS_MAGICK_HALF_LIFE_MINUTES * 20.0)
+	WorldClock.advance(WorldHistory.CHAOS_MAGICK_HALF_LIFE_MINUTES * 20.0 / WorldClock.MINUTES_PER_SECOND)
 	check(WorldHistory.chaos_magick() < 0.001, "and a long enough quiet settles it to nothing")
 
 	if failures.is_empty():

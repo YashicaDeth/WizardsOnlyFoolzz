@@ -35,14 +35,7 @@ const TIERS := [
 	},
 ]
 
-const BODY := """CELLOUTZ CORPORATION accepts no responsibility for what this
-product depicts, implies, or causes you to consider.
-
-This is a work of fiction. The organs are fictional. The
-company is fictional. The company's opinion of you is not.
-
-Nothing here should be attempted, recreated or reported.
-Anyone doing so is acting alone and we will say so loudly."""
+const Branding := preload("res://systems/celloutz_branding.gd")
 
 const VOID := Color("060b09")
 const INK := Color("dce6ba")
@@ -115,7 +108,6 @@ func _highlight(index: int) -> void:
 
 func _choose(index: int) -> void:
 	var mode := str(TIERS[index].id)
-	WorldHistory.register_subject("settings", {"gore": mode})
 	WorldHistory.update_subject("settings", {"gore": mode}, "gore_setting_chosen")
 	BaselineHuman.apply_gore_setting()
 	hide()
@@ -218,7 +210,7 @@ func _draw() -> void:
 
 	var beat := 0.5 + 0.5 * sin(clock * 2.4)
 	CellOutzType.draw_stamped(self, Vector2(60, 40), "WARNING", 44.0, ARTERIAL * Color(1, 1, 1, 0.8 + beat * 0.2), ARTERIAL * Color(1, 1, 1, 0.2), 5.0)
-	CellOutzType.draw_text(self, Vector2(60, 96), "CELLOUTZ CORPORATION / LIABILITY NOTICE 11-B", 11.0, BILE, 1.4)
+	CellOutzType.draw_text(self, Vector2(60, 96), Branding.copy_for("warning", "heading"), 11.0, BILE, 1.4)
 	draw_line(Vector2(60, 118), Vector2(DESIGN.x - 60, 118), ARTERIAL * Color(1, 1, 1, 0.4), 1.0)
 
 	# This is the first prose anybody reads in the game, and it was set in the
@@ -228,7 +220,7 @@ func _draw() -> void:
 	# line exactly where it already sat.
 	var body_cap := 11.0
 	var line_y := 152.0
-	for line in BODY.split("\n"):
+	for line in Branding.copy_for("warning", "body").split("\n"):
 		CellOutzType.draw_condensed(self, Vector2(60, line_y - body_cap), line, body_cap,
 			INK * Color(1, 1, 1, 0.82), 1.0)
 		line_y += 22.0
@@ -269,6 +261,8 @@ func _draw() -> void:
 		CellOutzType.draw_condensed(self, Vector2(60, note_y), line, 10.0, INK * Color(1, 1, 1, 0.78), 1.0)
 		note_y += 14.0
 
+	CellOutzType.draw_condensed(self, Vector2(60, DESIGN.y - 40), Branding.copy_for("warning", "footer"), 8.5,
+		BILE * Color(1, 1, 1, 0.52), 1.0)
 	CellOutzType.draw_condensed(self, Vector2(60, DESIGN.y - 28), "THIS CHOICE CAN BE CHANGED LATER. THE BODIES CANNOT.", 9.0,
 		BILE * Color(1, 1, 1, 0.65), 1.2)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

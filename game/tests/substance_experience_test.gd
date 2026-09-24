@@ -96,6 +96,7 @@ func _ready() -> void:
 	var began := SX.begin("player", "choir_bloom", 100.0, 1.0)
 	check(bool(began.get("ok", false)), "a dose can be started")
 	check(SX.tolerance("player", "choir_bloom") == 1, "and it is remembered as tolerance")
+	check(WorldHistory.event_count("substance_experience_began") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "dose history, tolerance and the experience fact close one derived transaction")
 	var mid := SX.dials_for("player", 100.0 + fresh * 0.5)
 	check(float(mid["lut_strength"]) > 0.0, "mid-dose the rig is being driven")
 	var over := SX.dials_for("player", 100.0 + fresh + 60.0)

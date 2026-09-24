@@ -36,6 +36,23 @@ Every test is a scene. `ATG_TEST_MODE=1` is required or they refuse to run.
 TEMP=P:/GameDev/Temp TMP=P:/GameDev/Temp ATG_TEST_MODE=1 "P:/GameDev/Tools/Godot-4.7.2/Godot_v4.7.2-stable_win64.exe" --headless --path game res://tests/<name>.tscn
 ```
 
+Or run a set of them and have the results reported the same way whatever each
+one prints:
+
+```bash
+tools/run_tests.sh --core          # the ones worth running before a commit
+tools/run_tests.sh npc_ gore       # everything matching either
+tools/run_tests.sh --list npc_     # show what would run, run nothing
+```
+
+That exists because only 268 of the 495 scenes end with `<NAME>_RESULT
+failures=N`. The rest print `failures: N`, or a sentence, or -- like
+`handheld_satellite_test` -- only `ok` and `PASS` lines with no summary, so
+grepping the suite for failures finds nothing and says nothing, which reads
+exactly like everything passing. The runner goes by exit code, and counts FAIL
+lines as well so a suite that returns zero while printing failures is reported
+rather than believed.
+
 The ones worth knowing:
 
 | Test | What it proves |
@@ -55,6 +72,12 @@ Rebuild the class cache after adding a new `class_name` (or Godot will not see i
 
 ```bash
 TEMP=P:/GameDev/Temp TMP=P:/GameDev/Temp "P:/GameDev/Tools/Godot-4.7.2/Godot_v4.7.2-stable_win64.exe" --headless --path game --import
+```
+
+Fail the build if editor parsing introduces a project-owned script warning or error (addon and engine-shutdown noise is excluded):
+
+```powershell
+./tools/verify-godot-diagnostics.ps1 -Godot P:/GameDev/Tools/Godot-4.7.2/Godot_v4.7.2-stable_win64_console.exe
 ```
 
 ---

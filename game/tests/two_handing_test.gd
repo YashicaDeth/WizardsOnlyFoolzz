@@ -33,12 +33,22 @@ func _ready() -> void:
 	print("AN2.5 - the sword actually has a real choice to cycle through")
 	hunt._equip_weapon(0) # sword
 	check(hunt.current_grip == "two_hand", "a fresh draw starts at HeldGear's own default (two_hand)")
+	var sword_mount := hunt.arsenal.models["sword"] as Node3D
+	var sword_model := sword_mount.get_node("sword_model") as Node3D
+	var left_hand := sword_mount.get_node("LeftGripHand") as Node3D
+	var two_hand_position := left_hand.position
+	var grip_receipts_before := PlayerActionLedger.count("grip_changed")
 	hunt._cycle_grip()
 	check(hunt.current_grip == "one_hand", "cycling once moves to one_hand")
 	hunt._cycle_grip()
 	check(hunt.current_grip == "half_sword", "cycling again reaches half_sword")
+	var blade_anchor := sword_model.get_node("anchor_blade_grip") as Node3D
+	var blade_grip_position: Vector3 = (sword_model.transform * blade_anchor.transform).origin
+	check(left_hand.position.distance_to(blade_grip_position) < 0.05 and left_hand.position.distance_to(two_hand_position) > 0.2,
+		"half-swording visibly moves the off hand from the low grip onto the blade")
 	hunt._cycle_grip()
 	check(hunt.current_grip == "two_hand", "and wraps back around")
+	check(PlayerActionLedger.count("grip_changed") == grip_receipts_before + 3, "each accepted grip change receives exactly one action receipt")
 
 	print("AN2.5 - the reach and the stiffness actually differ, not just the label")
 	hunt.current_grip = "two_hand"

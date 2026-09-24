@@ -36,11 +36,15 @@ const WORLD_INDEX := preload("res://systems/world_index.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const WIRE_RADIO := preload("res://systems/wire_radio.gd")
 const CARRY := preload("res://systems/carry.gd")
+const BRAIN_INDEX := preload("res://systems/brain_index.gd")
 const SIGNAL_FIELD := preload("res://systems/signal_field.gd")
 const RADIAL := preload("res://systems/radial_menu.gd")
 const RADIO_AUDIO := preload("res://systems/radio_audio.gd")
+const PAGE_AUDIO := preload("res://systems/black_mirror_transition_audio.gd")
+const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 const RESONANCE_READOUT := preload("res://systems/resonance_readout.gd")
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 ## L2.1. A part in the bag is worth putting on the wall. The handheld does not
 ## know the board exists — it hands the reference up, the way the index does.
@@ -58,6 +62,26 @@ signal dropped(payload: Dictionary)
 ## drawn on every dossier and the archive is a page rather than a mode. Listing
 ## them again here would recreate the six-panel problem inside the fix for it.
 const MODES := ["INDEX", "MAP", "WIRE", "RADIO", "CARRY", "RITUAL", "FIELD"]
+## I3.1 v3. Apps can keep their own information architecture, but the device
+## owns how every one identifies itself and how the hand operates it.
+const PAGE_ROLES := {
+	"INDEX": "RECORD / DOSSIER",
+	"MAP": "SATELLITE / GROUND",
+	"WIRE": "NETWORK / SITES",
+	"RADIO": "RECEIVER / BAND",
+	"CARRY": "CUSTODY / OBJECTS",
+	"RITUAL": "EVIDENCE / RITE",
+	"FIELD": "RESONANCE / PRACTICE",
+}
+const PAGE_ACTIONS := {
+	"INDEX": "POINT / OPEN RECORD",
+	"MAP": "LEAN / SURVEY",
+	"WIRE": "POINT / FOLLOW LINK",
+	"RADIO": "TUNE / HOLD",
+	"CARRY": "STEP / PIN OBJECT",
+	"RITUAL": "N / RECORD EVIDENCE",
+	"FIELD": "READ / PRACTISE",
+}
 
 const CASE := Color("1b1713")
 const CASE_EDGE := Color("6d5a44")
@@ -76,9 +100,28 @@ const SCREEN_SPILL := Color("9bd4b0")
 const PAGE_ASPECT := 16.0 / 9.0
 
 var mode_index := 0
+## I3.2 v3. `mode_index` is where the hand asked to go; this is the page still
+## visible behind the sliding shutter. They become equal only under full cover.
+var displayed_mode_index := 0
+var pending_mode_index := -1
+var page_transition := 1.0
+var page_transition_direction := 1.0
+var page_transition_from := "INDEX"
+const PAGE_TRANSITION_SECONDS := 0.52
+const PAGE_TRANSITION_STYLES := ["shutter", "corruption", "carousel"]
+## The comparison is deliberately non-binding. Production continues to use the
+## tested shutter until Greg chooses after seeing all three at equal timing.
+var page_transition_style := "shutter"
 ## Which thing in the bag is under the hand. The CARRY page had no selection at
 ## all, which was fine when it was a table and is not now that it is objects.
 var carry_index := 0
+## The brain is reached through the body shown on the carry page.  It belongs
+## to the player, not to the generic INDEX tabs.
+var brain_index_open := false
+var brain_index_hotspot := Rect2()
+## A radio lead requires a deliberate continuous hold. Page visibility is not
+## input: merely looking at RADIO must never finish a lock by itself.
+var radio_lock_held := false
 var raised := 0.0
 var is_open := false
 var elapsed := 0.0
@@ -99,6 +142,13 @@ const HELD_OFFSET_X := 0.045
 ## it now comes back from `WorldHistory` rather than starting at 0.78 forever.
 const DEVICE_ID := "handheld"
 var serial := 0
+## C10.15. Stamped once, from whoever's device this was when it first existed,
+## and never rewritten afterward — the same reason `serial` never regenerates.
+## `drop()`/`confiscate()`/`repossess()` all leave it untouched, so a device
+## that changed hands still says who it was made for rather than who is
+## currently holding it. Defaults to `carry.gd`'s own "THE HUNTER" fallback so
+## the two files never disagree about what an unnamed player is called.
+var owner_name := ""
 var condition := 0.78
 ## C1.7 `v2`. "It can be dropped, and it can be taken off you." Reloaded on
 ## every `open_device()` the same as `condition`/`battery` already are, so a
@@ -115,6 +165,11 @@ var possessed := true
 var battery := 1.0
 const BATTERY_DRAIN_PER_SECOND := 1.0 / 480.0
 const BATTERY_RECHARGE_PER_SECOND := 1.0 / 1800.0
+## C7.2. The satellite page drives the panel and world-facing emitter harder
+## than the quiet document pages. It buys a wider readable pool at the cost of
+## charge and a source that can be picked out from farther away.
+const MAP_BATTERY_MULTIPLIER := 2.0
+const MAP_LIGHT_MULTIPLIER := 1.3
 ## AS1.1/AS1.5. How far the lamp throws light when it is lit. One constant
 ## shared by the light `bone_yard_hunt.gd` actually places in the world and by
 ## `light_radius()` below, so the two can never quietly disagree.
@@ -135,6 +190,7 @@ var carry: Carry
 var signal_field: SignalField
 var radial: Control
 var radio_audio: Node
+var page_audio: Node
 
 ## A6.6 v2. The faults, with their character.
 ##
@@ -167,9 +223,14 @@ var _clip: Control
 var _overlay: Control
 var _index: Control
 var _map: Control
+## A10.7. Kept so the world can be handed over later than `bind`. A generator
+## that is not in the tree yet has no `World3D` to give, and the device is
+## built before the region in at least one scene.
+var _world_source: Node = null
 var _device_rect := Rect2()
 var _screen_rect := Rect2()
 var _page_rect := Rect2()
+var _content_rect := Rect2()
 
 ## I0.10 v2. "Panels are hosted at one fixed size inside the handheld; a map
 ## you cannot lean into is a picture of a map." `device_size` used to be a
@@ -187,6 +248,15 @@ var lean := 0.0
 var lean_override: Variant = null
 const LEAN_KEY := KEY_L
 const LEAN_SCALE := 1.32
+## C6.2. Leaning into a hosted page also braces the device for a deliberate
+## wave. WASD still moves the body; its direction now carries through the
+## wrist and beam as well, which lets the player put the light around an edge
+## before their camera follows. A vector override keeps the physical gesture
+## testable without synthesising keyboard state.
+var wave := Vector2.ZERO
+var wave_input_override: Variant = null
+const WAVE_SCREEN_FRACTION := Vector2(0.055, 0.035)
+const WAVE_RESPONSE := 5.0
 
 ## C9.1 `v9`. The rear is not another page. Holding O turns the same object
 ## through its edge; releasing it returns to the mirror. `turn_override` is the
@@ -197,6 +267,7 @@ var turn := 0.0
 var turn_override: Variant = null
 const TURN_KEY := KEY_O
 var _turned_rect := Rect2()
+var _tab_rects: Array[Rect2] = []
 
 ## C1.7 `v2`. Deliberately letting go, as its own key rather than folded onto
 ## G (which raises and lowers) or Escape (which just closes the panel without
@@ -207,7 +278,8 @@ var _turned_rect := Rect2()
 ## key should be free to fire every frame. `drop_key_override` follows
 ## `lean_override`'s own reason: a headless test cannot rely on
 ## `Input.is_key_pressed`.
-const DROP_KEY := KEY_K
+const DROP_KEY := KEY_DELETE
+const DROP_KEY_LABEL := "DELETE"
 var drop_key_override: Variant = null
 var _drop_key_was_down := false
 
@@ -270,6 +342,11 @@ func _ready() -> void:
 	_index = WORLD_INDEX.new()
 	_index.name = "IndexPanel"
 	_clip.add_child(_index)
+	# The hosted INDEX is still the same instrument. Bubble its physical pin
+	# action through the device so the scene's one Board owns the resulting card
+	# whether INDEX was opened full-size or through the Black Mirror aperture.
+	_index.pin_requested.connect(func(ref: String, kind: String, title: String):
+		pin_requested.emit(ref, kind, title))
 	_map = LIVING_MAP.new()
 	_map.name = "MapPanel"
 	_clip.add_child(_map)
@@ -291,13 +368,37 @@ func _ready() -> void:
 	radio_audio = RADIO_AUDIO.new()
 	radio_audio.name = "RadioAudio"
 	add_child(radio_audio)
+	page_audio = PAGE_AUDIO.new()
+	page_audio.name = "PageTransitionAudio"
+	add_child(page_audio)
 	set_process(true)
+
+
+## A10.7. The world the map looks down on, taken from whatever owns the region.
+## Guarded rather than assumed: a generator that is not a `Node3D`, or not yet
+## in the tree, simply does not produce one and the map stays a chart until it
+## does.
+func _attach_map_world() -> void:
+	if _map == null or not _map.has_method("attach_world"):
+		return
+	var source := _world_source if _world_source != null else get_parent()
+	if source is Node3D and source.is_inside_tree():
+		_map.call("attach_world", (source as Node3D).get_world_3d())
 
 
 ## Handed the live world so the hosted panels and the radio read real state.
 func bind(generator: Node, director: Node, contacts: Callable) -> void:
+	_world_source = generator
 	if _map.has_method("bind"):
 		_map.bind(generator, director, contacts)
+	# A10.7. The MAP page is the satellite, not a second drawing of the same
+	# region. `LivingMap.attach_world` is what builds the downward camera, and
+	# it is deliberately never called by the map itself — "the map never goes
+	# looking for one". Nothing called it on this path, so reaching the map
+	# through the device left `satellite` null, `_satellite_ready()` false, and
+	# the black mirror showing the drawn chart on a dark plate while the
+	# satellite worked perfectly well anywhere a scene wired it directly.
+	_attach_map_world()
 	# A9.2. The town's footprints already exist on the generator; the radio
 	# borrows them rather than keeping a second copy that can drift.
 	if generator != null and "lots" in generator:
@@ -313,13 +414,23 @@ func load_device() -> void:
 		# A new device is nearly intact and gets its own identity. Not random per
 		# session: written down, so it is this device from now on.
 		serial = randi() % 900000 + 100000
+		# C10.15. Stamped from whoever the player is right now, once, the same
+		# moment the serial itself is fixed for good.
+		owner_name = str(WorldHistory.subject("player").get("name", "THE HUNTER"))
 		condition = 0.94
 		battery = 1.0
 		wear_log = []
 		battery = 1.0
+		# The first useful fact this device knows is where its owner just escaped
+		# from. Start on MAP only for that real opening route; isolated UI tests
+		# and old worlds with no facility record retain the historic INDEX start.
+		if not WorldHistory.subject(FACILITY_TERRITORY.SUBJECT).is_empty():
+			mode_index = MODES.find("MAP")
+			displayed_mode_index = mode_index
 		save_device()
 		return
 	serial = int(record.get("serial", 90211))
+	owner_name = str(record.get("owner_name", "THE HUNTER"))
 	condition = clampf(float(record.get("condition", 0.78)), 0.0, 1.0)
 	# AS1.3. A save from before the battery existed opens full rather than
 	# empty — the honest read of "nobody has ever drained this yet".
@@ -330,17 +441,22 @@ func load_device() -> void:
 	# C1.7 `v2`. A save from before this existed opens possessed — the honest
 	# read of "nobody has ever lost this yet".
 	possessed = bool(record.get("possessed", true))
+	var remembered_mode := MODES.find(str(record.get("preferred_mode", current_mode())).to_upper())
+	if remembered_mode >= 0:
+		mode_index = remembered_mode
+		displayed_mode_index = remembered_mode
 
 
 func save_device() -> void:
-	WorldHistory.register_subject(DEVICE_ID, {})
 	WorldHistory.update_subject(DEVICE_ID, {
 		"serial": serial,
+		"owner_name": owner_name,
 		"condition": snappedf(condition, 0.001),
 		"battery": snappedf(battery, 0.001),
 		"wear_log": wear_log.duplicate(),
 		"impacts": impacts.duplicate(true),
 		"possessed": possessed,
+		"preferred_mode": current_mode(),
 		"kind": "object",
 	}, "device_changed")
 
@@ -355,20 +471,37 @@ func save_device() -> void:
 ## identity (serial, condition, wear) — what a caller elsewhere (the world
 ## scene owns 3D space, not this file) needs to actually place a dropped
 ## unit in the world rather than just deleting the player's access to it.
-func _lose_possession(event_type: String, details: Dictionary) -> Dictionary:
+func _lose_possession(event_type: String, details: Dictionary, player_act := false) -> Dictionary:
 	if not possessed:
 		return {"ok": false, "reason": "ALREADY NOT IN HAND"}
+	# `drop()` already owns a wider wear transaction; confiscation enters here
+	# directly. A nested batch makes both paths atomic without duplicating them.
+	WorldHistory.begin_ledger_batch()
 	close_device()
 	possessed = false
 	save_device()
 	var payload := details.duplicate(true)
 	payload["serial"] = serial
-	WorldHistory.record_event(event_type, payload)
-	return {"ok": true, "serial": serial, "condition": condition, "wear_log": wear_log.duplicate(), "impacts": impacts.duplicate(true)}
+	if player_act:
+		PLAYER_ACTION_LEDGER.record(event_type, payload)
+	else:
+		WorldHistory.record_event(event_type, payload)
+	WorldHistory.commit_ledger_batch()
+	return {"ok": true, "serial": serial, "condition": condition, "battery": battery, "wear_log": wear_log.duplicate(), "impacts": impacts.duplicate(true)}
 
 
 func drop() -> Dictionary:
-	var result := _lose_possession("device_dropped", {})
+	# C10.8. A deliberate drop is not a free inventory toggle. The lower glass
+	# takes the small, repeatable impact before possession leaves, so the exact
+	# same persisted object is the one that lands damaged in the world.
+	if not possessed:
+		return {"ok": false, "reason": "ALREADY NOT IN HAND"}
+	# Wear, possession, device persistence and the one player receipt are one
+	# deliberate gesture even though condition and ownership both change.
+	WorldHistory.begin_ledger_batch()
+	take_wear(0.025, "deliberate drop", Vector2(0.52, 0.88))
+	var result := _lose_possession("device_dropped", {}, true)
+	WorldHistory.commit_ledger_batch()
 	if bool(result.get("ok", false)):
 		dropped.emit(result)
 	return result
@@ -381,12 +514,16 @@ func confiscate(reason := "") -> Dictionary:
 ## The other half — found again, bought back, or handed back by whoever took
 ## it. Wear travels with it either way: this is the same physical object
 ## coming back, not a fresh one replacing it.
-func repossess() -> void:
+func repossess(details: Dictionary = {}) -> void:
 	if possessed:
 		return
+	WorldHistory.begin_ledger_batch()
 	possessed = true
 	save_device()
-	WorldHistory.record_event("device_repossessed", {"serial": serial})
+	var payload := details.duplicate(true)
+	payload["serial"] = serial
+	PLAYER_ACTION_LEDGER.record("device_repossessed", payload)
+	WorldHistory.commit_ledger_batch()
 
 
 ## Something happened to it. Wear only ever goes one way — a cracked screen does
@@ -432,15 +569,87 @@ func open_device() -> void:
 		return
 	is_open = true
 	visible = true
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	set_mode(current_mode())
 
 
 func close_device() -> void:
 	is_open = false
+	radio_lock_held = false
+	radio.release_lock()
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# AS1.3. The natural checkpoint for a number that otherwise only changes a
 	# little every frame — saving on every tick it drains would mean writing
 	# the whole history file to disk sixty times a second for nothing.
 	save_device()
+
+
+## The labels painted along the phone's bottom edge are controls, not a legend.
+## Hosted pages keep their own pointer handling inside the aperture; this only
+## owns the physical tab rail around them.
+func _gui_input(event: InputEvent) -> void:
+	if not is_open or not (event is InputEventMouseButton):
+		return
+	var button := event as InputEventMouseButton
+	if button.button_index == MOUSE_BUTTON_LEFT:
+		var tab := tab_index_at(button.position)
+		if button.pressed and tab >= 0:
+			jump_to_mode(tab)
+			accept_event()
+		elif _content_rect.has_point(button.position) and displayed_mode() == "RADIO":
+			radio_lock_held = button.pressed
+			if not radio_lock_held:
+				radio.release_lock()
+			accept_event()
+		elif button.pressed and _content_rect.has_point(button.position) and displayed_mode() == "CARRY":
+			if brain_index_hotspot.has_point(button.position):
+				brain_index_open = not brain_index_open
+				queue_redraw()
+			else:
+				pin_selected_part()
+			accept_event()
+	elif button.pressed and button.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		var direction := -1 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 1
+		match displayed_mode():
+			"RADIO": radio.tune(float(direction) * 0.2)
+			"CARRY": step_carry(direction)
+			_: cycle_mode(direction)
+		accept_event()
+
+
+## Native phone pages own their own keys before the Hunt can interpret the
+## same P as BOARD or the same Space as DODGE. Hosted pages keep handling their
+## own events; this route exists only for controls drawn directly by this node.
+func handle_input(event: InputEvent) -> bool:
+	if not is_open or not (event is InputEventKey) or event.echo:
+		return false
+	var key := event as InputEventKey
+	match displayed_mode():
+		"RADIO":
+			if key.keycode in [KEY_LEFT, KEY_RIGHT] and key.pressed:
+				radio.tune(-0.2 if key.keycode == KEY_LEFT else 0.2)
+				queue_redraw()
+				return true
+			if key.keycode in [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]:
+				radio_lock_held = key.pressed
+				if not radio_lock_held:
+					radio.release_lock()
+				return true
+		"CARRY":
+			if key.pressed and key.keycode in [KEY_LEFT, KEY_UP, KEY_RIGHT, KEY_DOWN]:
+				step_carry(-1 if key.keycode in [KEY_LEFT, KEY_UP] else 1)
+				return true
+			if key.pressed and key.keycode in [KEY_P, KEY_ENTER, KEY_KP_ENTER]:
+				pin_selected_part()
+				return true
+	return false
+
+
+func tab_index_at(local_position: Vector2) -> int:
+	for index in _tab_rects.size():
+		if _tab_rects[index].has_point(local_position):
+			return index
+	return -1
 
 
 func toggle_device() -> void:
@@ -472,6 +681,28 @@ func close_radial() -> void:
 
 func current_mode() -> String:
 	return MODES[mode_index]
+
+
+func displayed_mode() -> String:
+	return MODES[displayed_mode_index]
+
+
+func set_page_transition_style(style: String) -> bool:
+	var candidate := style.to_lower()
+	if not PAGE_TRANSITION_STYLES.has(candidate):
+		return false
+	page_transition_style = candidate
+	return true
+
+
+func page_transition_contract() -> Dictionary:
+	return {
+		"style": page_transition_style,
+		"duration": PAGE_TRANSITION_SECONDS,
+		"swap_at": 0.5,
+		"keeps_fallback": page_transition_style == "shutter",
+		"fully_occludes": true,
+	}
 
 
 func cycle_mode(step: int) -> void:
@@ -517,24 +748,89 @@ func set_mode(mode: String) -> void:
 	if found < 0:
 		return
 	mode_index = found
+	# Opening the page already physically present is reconciliation, not a page
+	# change. This keeps loading and repossession immediate while every actual
+	# app change travels through the shutter below.
+	if found == displayed_mode_index and pending_mode_index < 0:
+		_activate_mode(found)
+		return
+	page_transition_from = displayed_mode()
+	pending_mode_index = found
+	page_transition = 0.0
+	var forward := posmod(found - displayed_mode_index, MODES.size())
+	var backward := posmod(displayed_mode_index - found, MODES.size())
+	page_transition_direction = 1.0 if forward <= backward else -1.0
+	if page_audio != null and page_audio.has_method("play_transition"):
+		page_audio.call("play_transition", page_transition_style)
+	queue_redraw()
+	if _overlay != null:
+		_overlay.queue_redraw()
+
+
+func _activate_mode(index: int) -> void:
+	if displayed_mode() == "RADIO" and MODES[clampi(index, 0, MODES.size() - 1)] != "RADIO":
+		radio_lock_held = false
+		radio.release_lock()
+	displayed_mode_index = clampi(index, 0, MODES.size() - 1)
+	var mode := displayed_mode()
 	# WIRE is not a separate surface — it is the index already open on its own
 	# page. Duplicating it would be the six-panel problem again in miniature.
-	if current_mode() == "WIRE" and "page" in _index:
+	if mode == "WIRE" and "page" in _index:
 		_index.set("page", 2)
-	elif current_mode() == "INDEX" and "page" in _index and int(_index.get("page")) == 2:
+	elif mode == "INDEX" and "page" in _index and int(_index.get("page")) == 2:
 		_index.set("page", 0)
 	# Both hosted panels gate their own drawing on an open flag, so entering a
 	# mode has to open the panel as well as show it.
-	if current_mode() == "MAP" and _map.has_method("open_map"):
+	if mode == "MAP" and _map.has_method("open_map"):
+		# Cheap and idempotent: `attach_world` returns immediately once the
+		# camera exists, so this is the retry for a device built before the
+		# region it looks down on.
+		_attach_map_world()
 		_map.open_map()
-	if current_mode() in ["INDEX", "WIRE"] and _index.has_method("open"):
+	elif _map.has_method("close_map"):
+		# A10.8. Nothing renders while the map is shut — which was true of the
+		# map and not of the device, because leaving the page only ever set
+		# `visible`. The satellite kept rendering behind the WIRE page.
+		_map.close_map()
+	if mode in ["INDEX", "WIRE"] and _index.has_method("open"):
 		_index.open()
-	if current_mode() == "RITUAL":
+	if mode == "RITUAL":
 		# A camera frame can outlive the version that first asked for it. Reconcile
 		# here rather than in `_draw`, so opening a page cannot award evidence more
 		# than once merely because it redraws at sixty frames per second.
 		RITUAL_LEDGER.reconcile_album()
-	mode_changed.emit(current_mode())
+	mode_changed.emit(mode)
+
+
+func _advance_page_transition(delta: float) -> void:
+	if pending_mode_index < 0:
+		page_transition = 1.0
+		return
+	var before := page_transition
+	page_transition = minf(1.0, page_transition + maxf(delta, 0.0) / PAGE_TRANSITION_SECONDS)
+	if before < 0.5 and page_transition >= 0.5:
+		_activate_mode(pending_mode_index)
+	if page_transition >= 1.0:
+		pending_mode_index = -1
+
+
+func page_transition_coverage() -> float:
+	if pending_mode_index < 0:
+		return 0.0
+	if page_transition <= 0.5:
+		return Motion.ease_out(page_transition * 2.0)
+	return 1.0 - Motion.ease_out((page_transition - 0.5) * 2.0)
+
+
+func page_contract(mode: String) -> Dictionary:
+	var id := mode.to_upper()
+	return {
+		"mode": id,
+		"role": str(PAGE_ROLES.get(id, "UNREGISTERED PAGE")),
+		"action": str(PAGE_ACTIONS.get(id, "OPERATE")),
+		"index": MODES.find(id) + 1,
+		"count": MODES.size(),
+	}
 
 
 ## Where the character is standing. Reception, coverage and which parts of the
@@ -542,16 +838,20 @@ func set_mode(mode: String) -> void:
 func stand_at(world_position: Vector2) -> void:
 	radio.stand_at(world_position)
 	signal_field.stand_at(world_position)
+	var signal_reading: Dictionary = signal_field.reading()
 	if "signal_grade" in _index:
-		_index.set("signal_grade", signal_field.grade())
+		_index.set("signal_grade", int(signal_reading.get("grade", SignalField.NONE)))
 	# I3.2. Which BrokenWeb sites are reachable is a property of exactly where
 	# the player is standing, the same as signal itself.
 	if "current_emitter_id" in _index:
-		_index.set("current_emitter_id", str(signal_field.reading().get("id", "")))
+		_index.set("current_emitter_id", str(signal_reading.get("id", "")))
+	if _map != null and _map.has_method("set_satellite_available"):
+		_map.call("set_satellite_available", int(signal_reading.get("grade", SignalField.NONE)) != SignalField.NONE, str(signal_reading.get("source", "")))
 
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	_advance_page_transition(delta)
 	# C1.7 `v2`. Checked against `possessed` rather than `is_open` — a device
 	# in your pocket is still yours to drop, the same as one in your hand.
 	# Edge-detected so holding the key down cannot fire `drop()` every frame.
@@ -590,9 +890,14 @@ func _process(delta: float) -> void:
 	# I0.10 v2. Only worth doing while there is something to lean into — the
 	# radio and CARRY have no hosted panel to gain detail from, and leaning
 	# in on a fixed readout would just be a camera trick.
-	var leanable := is_open and current_mode() in ["INDEX", "MAP", "WIRE"]
+	var leanable := is_open and displayed_mode() in ["INDEX", "MAP", "WIRE"]
 	var lean_key_held: bool = lean_override if lean_override != null else Input.is_key_pressed(LEAN_KEY)
 	lean = Motion.blend(lean, delta, Motion.PANEL, leanable and lean_key_held)
+	var wave_input := Vector2.ZERO
+	if leanable and lean_key_held:
+		wave_input = wave_input_override if wave_input_override != null else Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+		wave_input = wave_input.limit_length(1.0)
+	wave = wave.move_toward(wave_input, delta * WAVE_RESPONSE)
 	var leaned_size := base_size * lerpf(1.0, LEAN_SCALE, lean)
 	var device_size := Vector2(minf(leaned_size.x, size.x * 0.98), minf(leaned_size.y, size.y * 0.98))
 	var resting := Vector2((size.x - device_size.x) * 0.5, size.y + 60.0)
@@ -606,6 +911,7 @@ func _process(delta: float) -> void:
 	# consumer (`_screen_rect`, `_clip`, `_overlay`) is positioned from this
 	# rect explicitly rather than through the node's transform.
 	var lifted := Vector2((size.x - device_size.x) * 0.5 + size.x * HELD_OFFSET_X, (size.y - device_size.y) * 0.5)
+	lifted += Vector2(wave.x * size.x * WAVE_SCREEN_FRACTION.x, wave.y * size.y * WAVE_SCREEN_FRACTION.y)
 	_device_rect = Rect2(resting.lerp(lifted, Motion.ease_out(raised)), device_size)
 	# A horizontal turn preserves the object's centre while its visible width
 	# collapses to an edge and opens on the other face. The tiny floor avoids a
@@ -617,6 +923,13 @@ func _process(delta: float) -> void:
 	)
 	_screen_rect = Rect2(_turned_rect.position + Vector2(26, 62), _turned_rect.size - Vector2(52, 104))
 	_page_rect = _aspect_fit(_screen_rect, PAGE_ASPECT)
+	var chrome_top := clampf(_page_rect.size.y * 0.055, 24.0, 34.0)
+	var chrome_bottom := clampf(_page_rect.size.y * 0.043, 20.0, 29.0)
+	var chrome_side := clampf(_page_rect.size.x * 0.011, 8.0, 13.0)
+	_content_rect = Rect2(
+		_page_rect.position + Vector2(chrome_side, chrome_top),
+		_page_rect.size - Vector2(chrome_side * 2.0, chrome_top + chrome_bottom)
+	)
 	_clip.position = _page_rect.position
 	_clip.size = Vector2(maxf(_page_rect.size.x, 1.0), maxf(_page_rect.size.y, 1.0))
 	var front_visible := not showing_back() and _screen_rect.size.x > 2.0
@@ -625,7 +938,7 @@ func _process(delta: float) -> void:
 	_overlay.size = size
 	_overlay.visible = front_visible
 
-	var mode := current_mode()
+	var mode := displayed_mode()
 	var showing_index := mode == "INDEX" or mode == "WIRE"
 	_index.visible = showing_index and front_visible
 	_map.visible = mode == "MAP" and front_visible
@@ -651,10 +964,12 @@ func _process(delta: float) -> void:
 		radio_audio.tune_to(str(heard.get("kind", "static")), float(heard.get("strength", 0.0)))
 	else:
 		radio_audio.silence()
-	if mode == "RADIO":
+	if mode == "RADIO" and radio_lock_held:
 		var found := radio.hold(delta)
 		if found != "":
 			lead_found.emit(found)
+	elif mode == "RADIO":
+		radio.release_lock()
 	_overlay.queue_redraw()
 	queue_redraw()
 
@@ -685,15 +1000,15 @@ func _draw() -> void:
 	# dim phosphor bed. Hosted and device-native pages both land above this.
 	BlackMirror.draw_reading_bed(self, _page_rect, alpha, screen_luminance())
 	# The modes with no hosted panel draw straight onto the screen.
-	var mode := current_mode()
+	var mode := displayed_mode()
 	if mode == "RADIO":
-		_draw_radio(_page_rect, alpha)
+		_draw_radio(_content_rect, alpha)
 	elif mode == "CARRY":
-		_draw_carry(_page_rect, alpha)
+		_draw_carry(_content_rect, alpha)
 	elif mode == "RITUAL":
-		_draw_ritual(_page_rect, alpha)
+		_draw_ritual(_content_rect, alpha)
 	elif mode == "FIELD":
-		_draw_resonance(_page_rect, alpha)
+		_draw_resonance(_content_rect, alpha)
 
 
 ## C4.2 `v4`. One answer for how much light the glass itself is giving off.
@@ -871,6 +1186,11 @@ func _draw_back(rect: Rect2, alpha: float) -> void:
 	# the shell, so unlike the reflection it does not sway when the device moves.
 	var jester_at := Vector2(rect.position.x + rect.size.x * 0.39, rect.get_center().y - 16.0)
 	BlackMirror.draw_jester(self, jester_at, minf(rect.size.x, rect.size.y) * 0.48, alpha, 0.0)
+	# C10.15. Whoever picks this up reads whose it was off the case itself —
+	# stamped once with `owner_name` (see its own doc comment) and never the
+	# current holder, so a dropped or confiscated unit still names the person
+	# it was made for.
+	CellOutzType.draw_condensed(self, Vector2(rect.position.x + 44, rect.end.y - 92), "PROPERTY OF %s" % owner_name.to_upper(), 9.0, CASE_EDGE * Color(1, 1, 1, 0.82 * alpha), 0.8)
 	CellOutzType.draw_stamped(self, Vector2(rect.position.x + 42, rect.end.y - 76), "WIZARDS ONLY FOOLZ", 17.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.28 * alpha), 1.3)
 	CellOutzType.draw_condensed(self, Vector2(rect.position.x + 44, rect.end.y - 43), "UNIT %06d // RELEASE O: MIRROR" % serial, 9.0, CASE_EDGE * Color(1, 1, 1, 0.82 * alpha), 0.8)
 
@@ -902,12 +1222,14 @@ func _draw_back(rect: Rect2, alpha: float) -> void:
 
 
 func _draw_tabs(rect: Rect2, alpha: float) -> void:
-	var x := rect.position.x + 26.0
-	var y := rect.position.y + rect.size.y - 34.0
+	_tab_rects = tab_layout(rect)
 	for index in MODES.size():
 		var label: String = MODES[index]
-		var width := CellOutzType.width(label, 11.0, 1.0) + 26.0
-		var active := index == mode_index
+		var tab_rect := _tab_rects[index]
+		var x := tab_rect.position.x
+		var y := tab_rect.position.y
+		var width := tab_rect.size.x
+		var active := index == displayed_mode_index
 		var tint: Color = AMBER if active else CASE_EDGE
 		var shape := PackedVector2Array([
 			Vector2(x, y), Vector2(x + width, y),
@@ -925,10 +1247,28 @@ func _draw_tabs(rect: Rect2, alpha: float) -> void:
 		# jumps to, the same register a real handheld prints a function key
 		# legend in.
 		CellOutzType.draw_condensed(self, Vector2(x + 6, y - 10), "F%d" % (index + 1), 8.0, tint * Color(1, 1, 1, 0.7 * alpha), 0.6)
+
+
+## Pure geometry companion to `_draw_tabs`, shared with hit-testing and tests.
+## Keeping the painted rail and clickable rail derived from one calculation
+## prevents the interaction from drifting away when a label changes width.
+func tab_layout(rect: Rect2) -> Array[Rect2]:
+	var result: Array[Rect2] = []
+	var x := rect.position.x + 26.0
+	var y := rect.position.y + rect.size.y - 34.0
+	for label: String in MODES:
+		var width := CellOutzType.width(label, 11.0, 1.0) + 26.0
+		result.append(Rect2(Vector2(x, y), Vector2(width, 22.0)))
 		x += width + 8.0
+	return result
 
 
 func _draw_status(rect: Rect2, alpha: float) -> void:
+	# The date is device-owned registration, not content authored seven times.
+	# It therefore remains in exactly the same place while every app changes
+	# beneath it — the second narrow seam toward C10.1's one coherent GUI.
+	CellOutzType.draw_condensed(self, rect.position + Vector2(190, 47), _calendar_header_text(), 8.0,
+		MOSS * Color(1, 1, 1, 0.82 * alpha), 0.72)
 	# C5. Signal first, because it is the thing that decides whether half the
 	# device works, and "no signal" is useless without saying what would fix it.
 	var reading: Dictionary = signal_field.reading()
@@ -962,10 +1302,16 @@ func _draw_status(rect: Rect2, alpha: float) -> void:
 	var cell_label := "CELL %02d%%" % roundi(charge * 100.0)
 	var cell_width := CellOutzType.width_condensed(cell_label, 10.0, 0.9)
 	CellOutzType.draw_condensed(self, Vector2(rect.position.x + rect.size.x - 30 - cell_width, rect.position.y + rect.size.y - 30), cell_label, 10.0, tint * Color(1, 1, 1, alpha), 0.9)
+	if displayed_mode() == "MAP":
+		CellOutzType.draw_condensed(self, Vector2(rect.position.x + rect.size.x - 250, rect.position.y + rect.size.y - 30), "SAT DRAW x%.1f" % MAP_BATTERY_MULTIPLIER, 8.0, AMBER * Color(1, 1, 1, 0.9 * alpha), 0.72)
 	for cell in 8:
 		var lit := float(cell) / 8.0 < charge
 		var bar := Rect2(Vector2(rect.position.x + rect.size.x - 150 + cell * 9.0, rect.position.y + rect.size.y - 30), Vector2(6, 11))
 		draw_rect(bar, (tint if lit else CASE_EDGE * Color(1, 1, 1, 0.3)) * Color(1, 1, 1, alpha))
+
+
+func _calendar_header_text() -> String:
+	return "%s // %s" % [WorldClock.calendar_stamp(), WorldClock.stamp()]
 
 
 ## C1.5. Drawn by the overlay child so it lands on top of whatever panel is
@@ -1002,9 +1348,21 @@ func _drive_backlight(delta: float) -> void:
 ## the light should not snap on at full draw the instant the key is pressed.
 func _drive_battery(delta: float) -> void:
 	if raised > 0.5:
-		battery = clampf(battery - BATTERY_DRAIN_PER_SECOND * delta, 0.0, 1.0)
+		battery = clampf(battery - BATTERY_DRAIN_PER_SECOND * battery_draw_multiplier() * delta, 0.0, 1.0)
 	else:
 		battery = clampf(battery + BATTERY_RECHARGE_PER_SECOND * delta, 0.0, 1.0)
+
+
+func battery_draw_multiplier() -> float:
+	return MAP_BATTERY_MULTIPLIER if displayed_mode() == "MAP" else 1.0
+
+
+func emitted_light_multiplier() -> float:
+	return MAP_LIGHT_MULTIPLIER if displayed_mode() == "MAP" else 1.0
+
+
+func wave_vector() -> Vector2:
+	return wave
 
 
 ## AS1.1. Whether the lamp is actually throwing light right now — raised
@@ -1032,7 +1390,7 @@ func battery_percent() -> float:
 ## the day it does, rather than that system inventing its own answer to
 ## "is the player lit right now".
 func light_radius() -> float:
-	return LAMP_RANGE if is_lit() else 0.0
+	return LAMP_RANGE * emitted_light_multiplier() if is_lit() else 0.0
 
 
 ## A6.6 v2. Whether a fault is currently expressing itself. A fault with no
@@ -1054,6 +1412,8 @@ func _draw_damage() -> void:
 	var rect := _screen_rect
 	var wear := 1.0 - clampf(condition, 0.0, 1.0)
 	_draw_page_registration(alpha)
+	_draw_page_chrome(alpha)
+	_draw_page_transition(alpha)
 	for scan in range(0, int(rect.size.y), 3):
 		_overlay.draw_line(Vector2(rect.position.x, rect.position.y + scan), Vector2(rect.end.x, rect.position.y + scan), Color(0, 0, 0, 0.12 * alpha), 1.0)
 
@@ -1142,6 +1502,144 @@ func _draw_page_registration(alpha: float) -> void:
 		var inward_y := 1.0 if at.y == _page_rect.position.y else -1.0
 		_overlay.draw_line(at, at + Vector2(corner * inward_x, 0), AMBER * Color(1, 1, 1, 0.62 * alpha), 1.4)
 		_overlay.draw_line(at, at + Vector2(0, corner * inward_y), AMBER * Color(1, 1, 1, 0.62 * alpha), 1.4)
+
+
+## I3.1 v3. One registration language around all seven apps. The content can
+## remain a dossier, a satellite picture or an instrument; identity, position,
+## navigation and the primary verb never move or change type treatment.
+func _draw_page_chrome(alpha: float) -> void:
+	if _page_rect.size.x <= 2.0 or _content_rect.size.x <= 2.0:
+		return
+	var contract := page_contract(displayed_mode())
+	var top := Rect2(_page_rect.position, Vector2(_page_rect.size.x, _content_rect.position.y - _page_rect.position.y))
+	var bottom := Rect2(Vector2(_page_rect.position.x, _content_rect.end.y), Vector2(_page_rect.size.x, _page_rect.end.y - _content_rect.end.y))
+	_overlay.draw_rect(top, Color(0.012, 0.020, 0.017, 0.91 * alpha))
+	_overlay.draw_rect(bottom, Color(0.010, 0.016, 0.014, 0.92 * alpha))
+	_overlay.draw_line(Vector2(_page_rect.position.x, top.end.y), Vector2(_page_rect.end.x, top.end.y), MOSS * Color(1, 1, 1, 0.42 * alpha), 1.0)
+	_overlay.draw_line(Vector2(_page_rect.position.x, bottom.position.y), Vector2(_page_rect.end.x, bottom.position.y), CASE_EDGE * Color(1, 1, 1, 0.52 * alpha), 1.0)
+	var page_code := "%02d/%02d" % [int(contract.index), int(contract.count)]
+	CellOutzType.draw_text(_overlay, top.position + Vector2(12, 7), str(contract.mode), 12.0, INK * Color(1, 1, 1, alpha), 1.0)
+	CellOutzType.draw_condensed(_overlay, top.position + Vector2(118, 9), str(contract.role), 9.0, MOSS * Color(1, 1, 1, 0.82 * alpha), 0.72)
+	var code_width := CellOutzType.width_condensed(page_code, 9.0, 0.72)
+	CellOutzType.draw_condensed(_overlay, Vector2(top.end.x - code_width - 12, top.position.y + 9), page_code, 9.0, AMBER * Color(1, 1, 1, alpha), 0.72)
+	CellOutzType.draw_condensed(_overlay, bottom.position + Vector2(12, 6), "TAB / NEXT PAGE", 8.0, CASE_EDGE * Color(1, 1, 1, 0.86 * alpha), 0.66)
+	var action := str(contract.action)
+	var action_width := CellOutzType.width_condensed(action, 8.0, 0.66)
+	CellOutzType.draw_condensed(_overlay, Vector2(bottom.end.x - action_width - 12, bottom.position.y + 6), action, 8.0, AMBER * Color(1, 1, 1, 0.88 * alpha), 0.66)
+
+
+## I3.2 v3. The old page changes only while the work surface is physically
+## occluded. The shutter crosses in the direction of travel, closes fully,
+## swaps the page behind itself, then leaves by the opposite edge.
+func _draw_page_transition(alpha: float) -> void:
+	match page_transition_style:
+		"corruption":
+			_draw_page_corruption(alpha)
+		"carousel":
+			_draw_page_carousel(alpha)
+		_:
+			_draw_page_shutter(alpha)
+
+
+func _draw_page_shutter(alpha: float) -> void:
+	var coverage := page_transition_coverage()
+	if coverage <= 0.001 or _content_rect.size.x <= 2.0:
+		return
+	var width := _content_rect.size.x * coverage
+	var entering := page_transition <= 0.5
+	var from_right := page_transition_direction > 0.0
+	var x := _content_rect.position.x
+	if entering == from_right:
+		x = _content_rect.end.x - width
+	var shutter := Rect2(Vector2(x, _content_rect.position.y), Vector2(width, _content_rect.size.y))
+	_overlay.draw_rect(shutter, Color(0.012, 0.009, 0.011, 0.985 * alpha))
+	for rib in 7:
+		var rib_x := shutter.position.x + shutter.size.x * float(rib + 1) / 8.0
+		_overlay.draw_line(Vector2(rib_x, shutter.position.y), Vector2(rib_x, shutter.end.y), CASE_EDGE * Color(1, 1, 1, 0.18 * alpha), 1.0)
+	var leading_x := shutter.position.x if entering == from_right else shutter.end.x
+	_overlay.draw_line(Vector2(leading_x, shutter.position.y), Vector2(leading_x, shutter.end.y), AMBER * Color(1, 1, 1, 0.85 * alpha), 2.0)
+	if coverage > 0.46:
+		var destination: String = MODES[pending_mode_index] if pending_mode_index >= 0 else displayed_mode()
+		var transit := "%s  >  %s" % [page_transition_from, destination]
+		var transit_width := CellOutzType.width_condensed(transit, 10.0, 0.8)
+		CellOutzType.draw_condensed(_overlay, shutter.get_center() + Vector2(-transit_width * 0.5, -4), transit, 10.0, AMBER * Color(1, 1, 1, coverage * alpha), 0.8)
+
+
+## Comparison candidate 2. The page is lost in a bad decode that travels along
+## the existing glass fractures. Rectangular packets are deliberately opaque at
+## the midpoint: this remains physical concealment, not a cross-fade in costume.
+func _draw_page_corruption(alpha: float) -> void:
+	var coverage := page_transition_coverage()
+	if coverage <= 0.001 or _content_rect.size.x <= 2.0:
+		return
+	var bands := 14
+	for band in bands:
+		var band_height := _content_rect.size.y / float(bands)
+		var stagger := fmod(float((band * 7) % bands) / float(bands) * 0.19, 0.19)
+		var local_coverage := clampf((coverage - stagger) / 0.81, 0.0, 1.0)
+		var width := _content_rect.size.x * local_coverage
+		var from_right := (band % 2 == 0) == (page_transition_direction > 0.0)
+		var x := _content_rect.end.x - width if from_right else _content_rect.position.x
+		var packet := Rect2(Vector2(x, _content_rect.position.y + band_height * band), Vector2(width, band_height + 1.0))
+		_overlay.draw_rect(packet, Color(0.008, 0.014, 0.012, 0.99 * alpha))
+		if width > 8.0:
+			var tear_x := packet.position.x if from_right else packet.end.x
+			_overlay.draw_line(Vector2(tear_x, packet.position.y), Vector2(tear_x, packet.end.y), (MOSS if band % 3 else ALERT) * Color(1, 1, 1, 0.75 * alpha), 1.0)
+	# Fractures do the indexing; their intersections carry brief corrupt packets.
+	for index in 7:
+		var seed := float(index + 1)
+		var origin := _content_rect.position + Vector2(_content_rect.size.x * fmod(seed * 0.173, 0.94), _content_rect.size.y * fmod(seed * 0.311, 0.92))
+		var reach := _content_rect.size.x * coverage * (0.06 + fmod(seed * 0.07, 0.08))
+		_overlay.draw_line(origin - Vector2(reach, reach * 0.22), origin + Vector2(reach, -reach * 0.31), INK * Color(1, 1, 1, 0.30 * coverage * alpha), 1.0)
+	if coverage > 0.54:
+		_draw_transition_label("DECODE FAILURE", coverage, alpha)
+
+
+## Comparison candidate 3. A wheel of dark leaves rotates through the mirror.
+## It is an occult mechanism rather than a menu flourish: indexed teeth, a
+## centre bearing and a full physical cover before the page underneath changes.
+func _draw_page_carousel(alpha: float) -> void:
+	var coverage := page_transition_coverage()
+	if coverage <= 0.001 or _content_rect.size.x <= 2.0:
+		return
+	var centre := _content_rect.get_center()
+	var rotation := page_transition_direction * page_transition * TAU * 0.32
+	# Eight leaves terminate on the aperture perimeter. At coverage 1 their fan
+	# tiles the rectangle exactly, so the mechanism never spills over the glass
+	# and never leaves a corner exposing the page during its midpoint swap.
+	var rim := PackedVector2Array([
+		_content_rect.position,
+		Vector2(centre.x, _content_rect.position.y),
+		Vector2(_content_rect.end.x, _content_rect.position.y),
+		Vector2(_content_rect.end.x, centre.y),
+		_content_rect.end,
+		Vector2(centre.x, _content_rect.end.y),
+		Vector2(_content_rect.position.x, _content_rect.end.y),
+		Vector2(_content_rect.position.x, centre.y),
+		_content_rect.position,
+	])
+	for leaf in 8:
+		var outer_a := centre.lerp(rim[leaf], coverage)
+		var outer_b := centre.lerp(rim[leaf + 1], coverage)
+		_overlay.draw_colored_polygon(PackedVector2Array([centre, outer_a, outer_b]), Color(0.012, 0.009, 0.012, 0.99 * alpha))
+		_overlay.draw_line(centre, outer_a, CASE_EDGE * Color(1, 1, 1, 0.40 * alpha), 1.4)
+	for tooth in 12:
+		var angle := -rotation + TAU * float(tooth) / 12.0
+		var ellipse := Vector2(cos(angle) * _content_rect.size.x * 0.30, sin(angle) * _content_rect.size.y * 0.30) * coverage
+		var at := centre + ellipse
+		_overlay.draw_circle(at, maxf(1.0, _content_rect.size.y * coverage * 0.007), AMBER * Color(1, 1, 1, 0.68 * alpha))
+	var hub_radius := maxf(3.0, _content_rect.size.y * coverage * 0.09)
+	_overlay.draw_circle(centre, hub_radius, CASE * Color(1, 1, 1, alpha))
+	_overlay.draw_arc(centre, maxf(4.0, hub_radius * 1.35), 0.0, TAU, 32, MOSS * Color(1, 1, 1, 0.72 * alpha), 1.4)
+	if coverage > 0.54:
+		_draw_transition_label("INDEXING MIRROR", coverage, alpha)
+
+
+func _draw_transition_label(label: String, coverage: float, alpha: float) -> void:
+	var destination: String = MODES[pending_mode_index] if pending_mode_index >= 0 else displayed_mode()
+	var transit := "%s  //  %s  //  %s" % [page_transition_from, label, destination]
+	var width := CellOutzType.width_condensed(transit, 10.0, 0.8)
+	CellOutzType.draw_condensed(_overlay, _content_rect.get_center() + Vector2(-width * 0.5, -4), transit, 10.0, AMBER * Color(1, 1, 1, coverage * alpha), 0.8)
 
 
 # --- the three modes that have no hosted panel ----------------------------
@@ -1296,6 +1794,7 @@ func _draw_radio(rect: Rect2, alpha: float) -> void:
 	var dial_width := CellOutzType.width("%06.2f" % radio.khz, 26.0, 1.4)
 	CellOutzType.draw_condensed(self, rect.position + Vector2(24 + dial_width + 22, 178), str(signal_state.get("name", "CARRIER")), 11.0, MOSS * Color(1, 1, 1, alpha), 0.9)
 	_draw_radio_spectrum(rect, alpha)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(24, 202), "WHEEL / LEFT RIGHT: TUNE    HOLD CLICK / SPACE: LOCK", 8.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.62)
 
 	# What is coming out of it. Worn type, scaled by how badly it is coming in -
 	# a weak signal is heard *wrongly*, not quietly.
@@ -1342,132 +1841,153 @@ func _draw_radio_spectrum(rect: Rect2, alpha: float) -> void:
 ## person they came off and throwing that away at the point of carrying it would
 ## break B5, the ritual camera and the organ trade all at once.
 func _draw_carry(rect: Rect2, alpha: float) -> void:
-	CellOutzType.draw_stamped(self, rect.position + Vector2(24, 22), "CARRIED", 18.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.3 * alpha), 1.4)
+	# CARRY is the field inventory rather than a second, clean "menu".  It keeps
+	# the physical device language, but gives the player three immediately legible
+	# jobs: what is equipped, what is selected, and what remains in the bag.
+	var top := rect.position.y + 18.0
+	var nav := ["TASKS", "CARRY", "MAP", "ARCHIVE"]
+	for nav_index in nav.size():
+		var word: String = nav[nav_index]
+		var nav_x := rect.position.x + 28.0 + float(nav_index) * 92.0
+		var active := word == "CARRY"
+		CellOutzType.draw_condensed(self, Vector2(nav_x, top), word, 9.0, (AMBER if active else CASE_EDGE) * Color(1, 1, 1, alpha), 0.72)
+		if active:
+			draw_line(Vector2(nav_x, top + 13), Vector2(nav_x + 54, top + 13), AMBER * Color(1, 1, 1, alpha), 1.2)
+	draw_line(Vector2(rect.position.x + 20, top + 19), Vector2(rect.end.x - 20, top + 19), CASE_EDGE * Color(1, 1, 1, 0.45 * alpha), 1.0)
+	CellOutzType.draw_stamped(self, rect.position + Vector2(24, 50), "CUSTODY / OBJECTS", 15.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.3 * alpha), 1.1)
 	var burden: float = carry.burden()
 	var tone: Color = ALERT if burden > 1.0 else MOSS
 	var load_text := "%0.1f / %0.0f KG" % [carry.total_mass(), Carry.CAPACITY]
 	var load_width := CellOutzType.width_condensed(load_text, 12.0, 0.9)
-	CellOutzType.draw_condensed(self, Vector2(rect.end.x - 26 - load_width, rect.position.y + 26), load_text, 12.0, tone * Color(1, 1, 1, alpha), 0.9)
-	var track := Rect2(rect.position + Vector2(24, 52), Vector2(rect.size.x - 48, 8))
+	CellOutzType.draw_condensed(self, Vector2(rect.end.x - 26 - load_width, rect.position.y + 50), load_text, 12.0, tone * Color(1, 1, 1, alpha), 0.9)
+	var track := Rect2(rect.position + Vector2(24, 72), Vector2(rect.size.x - 48, 6))
 	draw_rect(track, INK * Color(1, 1, 1, 0.10 * alpha))
 	draw_rect(Rect2(track.position, Vector2(track.size.x * minf(burden, 1.0), track.size.y)), tone * Color(1, 1, 1, alpha))
 	if burden > 1.0:
 		draw_rect(Rect2(track.position + Vector2(0, -3), Vector2(track.size.x * clampf(burden - 1.0, 0.0, 1.0), 3)), ALERT * Color(1, 1, 1, alpha))
+	CellOutzType.draw_condensed(self, rect.position + Vector2(24, 86), "ARROWS / WHEEL: SELECT     P / ENTER: PIN TO BOARD", 8.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.62)
 
-	if carry.items.is_empty():
-		CellOutzType.draw_condensed(self, rect.position + Vector2(24, 88), "NOTHING ON YOU WORTH LISTING.", 12.0, INK * Color(1, 1, 1, 0.4 * alpha), 0.9)
+	var content_top := rect.position.y + 104.0
+	var footer_y := rect.end.y - 42.0
+	var left := Rect2(Vector2(rect.position.x + 22, content_top), Vector2(rect.size.x * 0.25, footer_y - content_top - 8))
+	var centre := Rect2(Vector2(left.end.x + 12, content_top), Vector2(rect.size.x * 0.28, footer_y - content_top - 8))
+	var grid := Rect2(Vector2(centre.end.x + 12, content_top), Vector2(rect.end.x - centre.end.x - 34, footer_y - content_top - 8))
+	_draw_carry_loadout(left, alpha)
+	_draw_carry_inspection(centre, alpha)
+	_draw_carry_grid(grid, alpha)
+	_draw_carry_quick_access(Rect2(Vector2(rect.position.x + 22, footer_y), Vector2(rect.size.x - 44, 31)), alpha)
+
+
+func _draw_carry_loadout(rect: Rect2, alpha: float) -> void:
+	draw_rect(rect, Color(0.02, 0.015, 0.012, 0.36 * alpha))
+	draw_rect(rect, CASE_EDGE * Color(1, 1, 1, 0.38 * alpha), false, 1.0)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(10, 10), "LOADOUT", 10.0, AMBER * Color(1, 1, 1, alpha), 0.75)
+	var slots := [["MAIN HAND", "UNARMED"], ["SIDEARM", "EMPTY"], ["BREACH TOOL", "UNASSIGNED"], ["OUTER LAYER", "PATIENT ISSUE"], ["CARRY RIG", "BODY / 28 KG"]]
+	var row_height := minf(39.0, (rect.size.y - 31.0) / float(slots.size()))
+	for slot_index in slots.size():
+		var at := rect.position + Vector2(8, 28 + float(slot_index) * row_height)
+		var slot_rect := Rect2(at, Vector2(rect.size.x - 16, row_height - 5))
+		draw_rect(slot_rect, Color(0.04, 0.025, 0.019, 0.5 * alpha))
+		draw_rect(slot_rect, CASE_EDGE * Color(1, 1, 1, 0.28 * alpha), false, 1.0)
+		draw_line(slot_rect.position + Vector2(3, slot_rect.size.y * 0.5), slot_rect.position + Vector2(8, slot_rect.size.y * 0.5), AMBER * Color(1, 1, 1, 0.7 * alpha), 1.0)
+		CellOutzType.draw_condensed(self, slot_rect.position + Vector2(12, 5), str(slots[slot_index][0]), 8.0, INK * Color(1, 1, 1, 0.8 * alpha), 0.62)
+		CellOutzType.draw_condensed(self, slot_rect.position + Vector2(12, 17), str(slots[slot_index][1]), 7.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.56)
+
+
+func _draw_carry_inspection(rect: Rect2, alpha: float) -> void:
+	draw_rect(rect, Color(0, 0, 0, 0.24 * alpha))
+	draw_rect(rect, CASE_EDGE * Color(1, 1, 1, 0.38 * alpha), false, 1.0)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(10, 10), "BODY / NEURAL ACCESS", 9.0, AMBER * Color(1, 1, 1, alpha), 0.68)
+	var silhouette := rect.get_center() + Vector2(0, 8)
+	# The player is deliberately present in their own inventory.  The head is a
+	# hardware access point, not decorative character-paper-doll art.
+	brain_index_hotspot = Rect2(silhouette + Vector2(-18, -rect.size.y * 0.31), Vector2(36, 36))
+	draw_circle(brain_index_hotspot.get_center(), 16, Color("55342a") * Color(1, 1, 1, 0.8 * alpha))
+	draw_circle(brain_index_hotspot.get_center(), 16, (AMBER if brain_index_open else CASE_EDGE) * Color(1, 1, 1, alpha), false, 1.0)
+	draw_rect(Rect2(silhouette + Vector2(-14, -rect.size.y * 0.16), Vector2(28, rect.size.y * 0.36)), Color("34221d") * Color(1, 1, 1, 0.82 * alpha))
+	draw_line(silhouette + Vector2(-30, -rect.size.y * 0.09), silhouette + Vector2(30, -rect.size.y * 0.09), CASE_EDGE * Color(1, 1, 1, 0.6 * alpha), 3.0)
+	CellOutzType.draw_condensed(self, brain_index_hotspot.position + Vector2(-12, 39), "BRAIN CHIP", 6.0, AMBER * Color(1, 1, 1, 0.9 * alpha), 0.46)
+	if brain_index_open:
+		_draw_brain_index_overlay(rect, alpha)
 		return
+	if carry.items.is_empty():
+		CellOutzType.draw_condensed(self, rect.position + Vector2(13, rect.end.y - 30), "NO OBJECT SELECTED", 9.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.62)
+		return
+	carry_index = posmod(carry_index, carry.items.size())
+	var item: Dictionary = carry.items[carry_index]
+	var kind := "limb" if bool(item.get("whole_limb", false)) else str(item.get("kind", "goods"))
+	var centre := rect.get_center() + Vector2(0, rect.size.y * 0.19)
+	var radius := minf(rect.size.x, rect.size.y) * 0.17
+	draw_arc(centre, radius + 12, 0.0, TAU, 22, AMBER * Color(1, 1, 1, (0.48 + 0.2 * sin(elapsed * 3.0)) * alpha), 1.2)
+	draw_line(centre + Vector2(-radius - 19, 0), centre + Vector2(radius + 19, 0), CASE_EDGE * Color(1, 1, 1, 0.24 * alpha), 1.0)
+	draw_line(centre + Vector2(0, -radius - 19), centre + Vector2(0, radius + 19), CASE_EDGE * Color(1, 1, 1, 0.24 * alpha), 1.0)
+	_draw_carried(centre, radius, kind, carry.freshness(item), str(item.get("lien", "")), alpha)
+	var name := _fit(str(item.get("label", "UNKNOWN")).to_upper(), rect.size.x - 20, 9.0, 0.65)
+	CellOutzType.draw_condensed(self, Vector2(rect.get_center().x - CellOutzType.width_condensed(name, 9.0, 0.65) * 0.5, rect.end.y - 38), name, 9.0, INK * Color(1, 1, 1, alpha), 0.65)
+	var specimen := "%0.1f KG // %s" % [float(item.get("mass", 0.0)), "POCKET" if bool(item.get("pocketed", false)) else "BAG"]
+	CellOutzType.draw_condensed(self, Vector2(rect.get_center().x - CellOutzType.width_condensed(specimen, 7.0, 0.55) * 0.5, rect.end.y - 23), specimen, 7.0, CASE_EDGE * Color(1, 1, 1, 0.8 * alpha), 0.55)
 
-	# I0.4. This was a spreadsheet: name, condition and weight in aligned
-	# columns with half the page blank. You are carrying pieces of people, and a
-	# packing manifest is the one presentation that makes that ordinary. They are
-	# drawn as objects in a bag now — sized by their real mass, shaped by what
-	# they are, tinted by how fresh they are, and tagged with whose they were.
-	# Playtest, 12 Sep: the first player filled the bag and the page became a
-	# wall of overlapping labels. A bag with fourteen skin chunks in it is not
-	# fourteen things to a person carrying it — it is "skin, fourteen of them".
-	# Grouped by what they are and whose they were, so a full bag reads.
-	var groups: Array = []
-	var seen: Dictionary = {}
-	for item: Dictionary in carry.items:
-		var key := "%s|%s|%s" % [str(item.get("label", "")), str(item.get("from", "")), str(item.get("kind", ""))]
-		if seen.has(key):
-			var existing_index: int = seen[key]
-			var existing_group: Dictionary = groups[existing_index]
-			existing_group["count"] = int(existing_group["count"]) + 1
-			existing_group["mass"] = float(existing_group["mass"]) + float(item.get("mass", 0.5))
-			# The group is as stale as its freshest member is not.
-			existing_group["fresh"] = minf(float(existing_group["fresh"]), carry.freshness(item))
-			continue
-		seen[key] = groups.size()
-		groups.append({
-			"item": item,
-			"count": 1,
-			"mass": float(item.get("mass", 0.5)),
-			"fresh": carry.freshness(item),
-		})
+
+func _draw_brain_index_overlay(rect: Rect2, alpha: float) -> void:
+	var panel := Rect2(rect.position + Vector2(7, 26), rect.size - Vector2(14, 33))
+	draw_rect(panel, Color("120b0a") * Color(1, 1, 1, 0.96 * alpha))
+	draw_rect(panel, AMBER * Color(1, 1, 1, alpha), false, 1.0)
+	CellOutzType.draw_condensed(self, panel.position + Vector2(8, 8), "WETWIRE // BRAIN INDEX", 9.0, AMBER * Color(1, 1, 1, alpha), 0.66)
+	var chip: Dictionary = BRAIN_INDEX.chip("player")
+	var owner := str(chip.get("owner_faction", "NOT DETECTED")).to_upper()
+	CellOutzType.draw_condensed(self, panel.position + Vector2(8, 22), "CHIP OWNER: " + owner, 7.0, CASE_EDGE * Color(1, 1, 1, alpha), 0.54)
+	var folders: Dictionary = BRAIN_INDEX.folder_counts("player")
+	var folder_ids := ["memory", "combat", "people", "places", "carry", "trauma"]
+	for index in folder_ids.size():
+		var folder_id: String = folder_ids[index]
+		var details: Dictionary = folders.get(folder_id, {})
+		var name := str((BRAIN_INDEX.FOLDERS.get(folder_id, {}) as Dictionary).get("label", folder_id)).to_upper()
+		var state := "%02d / %02d" % [int(details.get("open", 0)), int(details.get("total", 0))]
+		var line := panel.position + Vector2(9, 39 + float(index) * 17.0)
+		draw_rect(Rect2(line - Vector2(2, 2), Vector2(panel.size.x - 14, 13)), Color(0.12, 0.06, 0.04, 0.7 * alpha))
+		CellOutzType.draw_condensed(self, line, _fit(name, panel.size.x - 55, 7.0, 0.55), 7.0, INK * Color(1, 1, 1, alpha), 0.55)
+		CellOutzType.draw_condensed(self, Vector2(panel.end.x - 35, line.y), state, 7.0, MOSS * Color(1, 1, 1, alpha), 0.55)
+	CellOutzType.draw_condensed(self, panel.position + Vector2(8, panel.size.y - 15), "CLICK HEAD TO CLOSE", 7.0, CASE_EDGE * Color(1, 1, 1, 0.8 * alpha), 0.52)
+
+
+func _draw_carry_grid(rect: Rect2, alpha: float) -> void:
+	draw_rect(rect, Color(0, 0, 0, 0.28 * alpha))
+	draw_rect(rect, CASE_EDGE * Color(1, 1, 1, 0.38 * alpha), false, 1.0)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(10, 10), "CARRIED / %02d" % carry.items.size(), 9.0, AMBER * Color(1, 1, 1, alpha), 0.7)
 	var columns := 3
-	var rows := maxi(int(ceil(float(groups.size()) / float(columns))), 1)
-	var row_height := 108.0
-	var bag_bottom := rect.end.y - 42.0
-	var bag_top := maxf(rect.position.y + 72.0, bag_bottom - 96.0 - float(rows) * row_height)
-	var bag := Rect2(Vector2(rect.position.x + 24.0, bag_top), Vector2(rect.size.x - 48.0, bag_bottom - bag_top))
-	draw_rect(bag, Color(0, 0, 0, 0.22 * alpha))
-	draw_rect(bag, INK * Color(1, 1, 1, 0.10 * alpha), false, 1.0)
-	# A slack line across the top: the mouth of the bag, sagging under the load.
-	var sag := 6.0 + burden * 16.0
-	var mouth := PackedVector2Array()
-	for step in 13:
-		var t := float(step) / 12.0
-		mouth.append(bag.position + Vector2(bag.size.x * t, sin(t * PI) * sag))
-	draw_polyline(mouth, INK * Color(1, 1, 1, 0.22 * alpha), 1.5)
-	# Things settle to the bottom of a bag. Rows fill upward from the floor, so
-	# the empty space is under the slack mouth rather than below the contents
-	# like unused rows of a table.
-	var floor_y := bag.end.y - 58.0
-	var ceiling := bag.position.y + 40.0
-	if rows > 1:
-		row_height = minf(row_height, (floor_y - ceiling) / float(rows - 1))
-	var top_row := floor_y - float(rows - 1) * row_height
-	var spread := (bag.size.x - 120.0) / float(columns - 1)
-	var cell_width := spread - 14.0
-	for index in groups.size():
-		var group: Dictionary = groups[index]
-		var item: Dictionary = group["item"]
-		var count: int = int(group["count"])
-		var fresh: float = float(group["fresh"])
-		# A pile of ten reads bigger than one, but not ten times bigger.
-		var mass := clampf(float(group["mass"]) / maxf(sqrt(float(count)), 1.0), 0.1, 4.0)
-		# Carry files layer names as kinds, so a severed arm arrives as "muscle"
-		# with whole_limb set. Shape follows what the thing actually is.
-		var kind := str(item.get("kind", "goods"))
-		if bool(item.get("whole_limb", false)):
-			kind = "limb"
-		# Each object takes the room its mass earns rather than a fixed line.
-		var radius := 19.0 + mass * 13.0
-		if kind != "organ" and kind != "cybernetic" and kind != "bone" and kind != "limb":
-			radius = maxf(radius, 23.0)
+	var cell_size := Vector2((rect.size.x - 18) / float(columns), minf(67.0, (rect.size.y - 31) / 3.0))
+	for index in 9:
 		var column := index % columns
 		@warning_ignore("integer_division")
 		var row := index / columns
-		var at := Vector2(bag.position.x + 60.0 + float(column) * spread, top_row + float(row) * row_height)
-		# Nothing in a bag sits on a grid. Nudged off it, deterministically.
-		at += Vector2(sin(float(index) * 2.7) * 13.0, cos(float(index) * 1.9) * 9.0)
-		at.y = clampf(at.y, ceiling, floor_y)
-		if index == posmod(carry_index, maxi(carry.items.size(), 1)):
-			# Under the hand. A ring of pencil round the thing, not a highlight
-			# box — this page has no boxes left in it.
-			draw_arc(at, radius + 11.0, 0.0, TAU, 26, AMBER * Color(1, 1, 1, (0.5 + 0.25 * sin(elapsed * 3.0)) * alpha), 1.4)
-			CellOutzType.draw_condensed(self, at + Vector2(-radius, -radius - 17.0), "P TO PIN", 7.0, AMBER * Color(1, 1, 1, 0.7 * alpha), 0.6)
-		# A shadow underneath, so the thing is resting on something.
-		draw_colored_polygon(_ellipse_points(at + Vector2(0, radius * 0.92), radius * 0.95, radius * 0.22, 14), Color(0, 0, 0, 0.35 * alpha))
-		if count > 1:
-			for behind in mini(count - 1, 3):
-				var shove := Vector2(-4.0 - float(behind) * 3.0, -3.0 - float(behind) * 2.5)
-				_draw_carried(at + shove, radius * (0.94 - float(behind) * 0.05), kind, fresh, "", alpha * 0.45)
-		_draw_carried(at, radius, kind, fresh, str(item.get("lien", "")), alpha)
-		var shown := str(item.get("label", "")).to_upper()
-		if count > 1:
-			shown += "  x%d" % count
-		var label := _fit(shown, cell_width, 9.0, 0.7)
-		var label_width := CellOutzType.width_condensed(label, 9.0, 0.7)
-		CellOutzType.draw_condensed(self, at + Vector2(-label_width * 0.5, radius + 12.0), label, 9.0, INK * Color(1, 1, 1, 0.85 * alpha), 0.7)
-		var from := str(item.get("from", ""))
-		if from != "":
-			# A tag on a short string, low and to the right of the thing it is
-			# tied to. Somebody's name on your property is a label somebody else
-			# tied on, and it has to read as belonging to that object.
-			var origin := _fit(str(WorldHistory.subject(from).get("name", from)).to_upper(), cell_width * 0.8, 7.0, 0.6)
-			var tag_width := CellOutzType.width_condensed(origin, 7.0, 0.6)
-			var tag := Rect2(at + Vector2(radius * 0.86, radius * 0.46), Vector2(tag_width + 11.0, 13.0))
-			var knot := at + Vector2(radius * 0.42, radius * 0.18)
-			if tag.end.x > bag.end.x - 8.0:
-				tag.position.x = at.x - radius * 0.86 - tag.size.x
-				knot = at + Vector2(-radius * 0.42, radius * 0.18)
-			draw_line(knot, tag.position + Vector2(tag.size.x * 0.5, 3), INK * Color(1, 1, 1, 0.3 * alpha), 1.0)
-			draw_rect(tag, Color("d9c49a") * Color(1, 1, 1, 0.13 * alpha))
-			draw_rect(tag, INK * Color(1, 1, 1, 0.22 * alpha), false, 1.0)
-			CellOutzType.draw_condensed(self, tag.position + Vector2(5, 3), origin, 7.0, Color("d9c49a") * Color(1, 1, 1, 0.7 * alpha), 0.6)
+		var cell := Rect2(rect.position + Vector2(7 + float(column) * cell_size.x, 25 + float(row) * cell_size.y), cell_size - Vector2(5, 5))
+		var occupied := index < carry.items.size()
+		draw_rect(cell, Color(0.04, 0.03, 0.025, (0.68 if occupied else 0.26) * alpha))
+		draw_rect(cell, (AMBER if index == carry_index else CASE_EDGE) * Color(1, 1, 1, (0.78 if index == carry_index else 0.32) * alpha), false, 1.0)
+		if not occupied:
+			continue
+		var item: Dictionary = carry.items[index]
+		var kind := "limb" if bool(item.get("whole_limb", false)) else str(item.get("kind", "goods"))
+		var icon_at := cell.position + Vector2(cell.size.x * 0.5, cell.size.y * 0.43)
+		_draw_carried(icon_at, minf(cell.size.x, cell.size.y) * 0.22, kind, carry.freshness(item), "", alpha)
+		var label := _fit(str(item.get("label", "ITEM")).to_upper(), cell.size.x - 8, 7.0, 0.52)
+		CellOutzType.draw_condensed(self, cell.position + Vector2(4, cell.end.y - 13), label, 7.0, INK * Color(1, 1, 1, 0.85 * alpha), 0.52)
+
+
+func _draw_carry_quick_access(rect: Rect2, alpha: float) -> void:
+	draw_line(rect.position, Vector2(rect.end.x, rect.position.y), CASE_EDGE * Color(1, 1, 1, 0.38 * alpha), 1.0)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(0, 10), "POCKET / QUICK ACCESS", 8.0, AMBER * Color(1, 1, 1, alpha), 0.62)
+	var pockets := carry.pocketed_items()
+	for slot in Carry.POCKET_CAPACITY:
+		var at := rect.position + Vector2(132 + float(slot) * 54.0, 4)
+		var slot_rect := Rect2(at, Vector2(47, 23))
+		draw_rect(slot_rect, Color(0.04, 0.025, 0.019, 0.6 * alpha))
+		draw_rect(slot_rect, CASE_EDGE * Color(1, 1, 1, 0.4 * alpha), false, 1.0)
+		CellOutzType.draw_condensed(self, slot_rect.position + Vector2(3, 3), "F%d" % (slot + 1), 6.0, CASE_EDGE * Color(1, 1, 1, 0.7 * alpha), 0.5)
+		if slot < pockets.size():
+			var label := _fit(str((pockets[slot] as Dictionary).get("label", "ITEM")).to_upper(), 34.0, 6.0, 0.45)
+			CellOutzType.draw_condensed(self, slot_rect.position + Vector2(10, 12), label, 6.0, INK * Color(1, 1, 1, alpha), 0.45)
+	CellOutzType.draw_condensed(self, Vector2(rect.end.x - 118, rect.position.y + 10), "P: PIN // 1-3: POCKET", 7.0, CASE_EDGE * Color(1, 1, 1, 0.7 * alpha), 0.5)
 
 
 ## Trims a label to the room its own cell has. Nothing on this page is allowed
@@ -1585,10 +2105,19 @@ func _fit_into_aperture(panel: Control) -> void:
 	var design := get_viewport_rect().size
 	if design.x <= 1.0 or design.y <= 1.0:
 		design = Vector2(1280, 720)
+	# Hosted pages are explicitly sized and scaled below. Their own fullscreen
+	# ready paths leave stretch anchors behind, which made every assignment emit
+	# a layout warning even though the final pixels happened to fit.
+	panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	panel.size = design
-	var fit := minf(_clip.size.x / design.x, _clip.size.y / design.y)
+	# I3.1 v3. The header/footer are device-owned. Hosted pages receive the same
+	# remaining work surface as native ones instead of painting underneath the
+	# common registration and becoming seven subtly different layouts again.
+	var available := _content_rect.size
+	var local_origin := _content_rect.position - _page_rect.position
+	var fit := minf(available.x / design.x, available.y / design.y)
 	panel.scale = Vector2(fit, fit)
-	panel.position = (_clip.size - design * fit) * 0.5
+	panel.position = local_origin + (available - design * fit) * 0.5
 
 
 static func _aspect_fit(outer: Rect2, aspect: float) -> Rect2:

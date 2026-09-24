@@ -14,7 +14,10 @@ extends Control
 
 const Grunge := preload("res://systems/celloutz_grunge.gd")
 const Motion := preload("res://systems/celloutz_motion.gd")
+const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
 const SATELLITE := preload("res://systems/satellite_view.gd")
+const FACILITY := preload("res://systems/facility_territory.gd")
+const HOLDINGS := preload("res://systems/ashbloom_holdings.gd")
 
 const SURVEY_ID := "ashbloom_survey"
 const CELL := 22.0
@@ -30,13 +33,7 @@ const BILE := Color("9a8c3f")
 const SCAN := Color("8a9a4a")
 const BONE := Color("ead4ad")
 
-const DISTRICTS := [
-	{"at": Vector2(-150, -122), "name": "BLACK MILE YARDS", "note": "raider highway, tolls"},
-	{"at": Vector2(130, -122), "name": "SOFT ROT COMMUNION", "note": "fungal forest, shifting"},
-	{"at": Vector2(-155, 0), "name": "THE BONE YARD", "note": "quarry, Ashline ground"},
-	{"at": Vector2(135, 0), "name": "OSSUARY WORKS", "note": "sealed anatomy industry"},
-	{"at": Vector2(65, 115), "name": "TUNNEL MOUTH", "note": "floodlit trade route"},
-]
+const DISTRICTS := HOLDINGS.DEFINITIONS
 ## The three road slabs `ashbloom_world_generator.gd` lays down, in plan view.
 const ROADS := [
 	Rect2(-9, -185, 18, 370),
@@ -57,11 +54,16 @@ var zoom := 1.25
 ## without it and simply draws its chart on a dark plate, which is what every
 ## test and every scene with no 3D world gets.
 var satellite: SubViewport = null
+## Underground dead zones keep the remembered chart but deny every live orbital
+## affordance: image, minimap, player fix and corporate acquisition ping.
+var satellite_available := true
+var satellite_block_reason := ""
 ## 0 = high above, looking down. 1 = standing in the street. Driven by the same
 ## zoom the chart already had, so there is one control rather than two.
 var descent := 0.0
 ## Counts down to the next satellite render. See `_draw`.
 var _satellite_due := 0.0
+var _minimap_due := 0.0
 var pan := Vector2.ZERO
 var follow := true
 var dragging := false
@@ -74,8 +76,23 @@ var _chart := Rect2()
 ## A6.2/A6.3. Discovered places, the one under the cursor, and where travel is
 ## being committed to.
 var _place_rects: Array = []
+## Reserved in chart coordinates during one draw pass so district, objective
+## and moving-contact labels negotiate the same scarce ink instead of printing
+## through one another.
+var _map_label_rects: Array[Rect2] = []
 var hovered_place := -1
 var selected_place := -1
+## The Black Mirror opens on the facility sheet while that route has ever been
+## seen. L flips between it and the Ashbloom satellite: one MAP application,
+## two physical survey sheets, rather than a second territory menu.
+var facility_sheet := false
+var facility_hover := -1
+var facility_selected := -1
+var _facility_rects: Array = []
+## Local arrival animation only. Persistent truth lives in AshbloomHoldings;
+## this is how strongly that truth has physically developed on this sheet.
+var _holding_reveal: Dictionary = {}
+var _holding_polygons: Dictionary = {}
 var travel_hold := 0.0
 signal travel_requested(place: Dictionary)
 
@@ -85,6 +102,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	_hatch = _build_hatch()
+	_holding_polygons = HOLDINGS.polygons()
 	visible = false
 	set_process(true)
 	_load_survey()
@@ -120,6 +138,7 @@ func _load_survey() -> void:
 func observe(world_position: Vector3, yaw: float) -> void:
 	player_at = Vector2(world_position.x, world_position.z)
 	player_yaw = yaw
+	HOLDINGS.observe(player_at)
 	var base := Vector2i(roundi(player_at.x / CELL), roundi(player_at.y / CELL))
 	var added := false
 	for dx in range(-SURVEY_RADIUS, SURVEY_RADIUS + 1):
@@ -150,10 +169,26 @@ func attach_world(world: World3D) -> void:
 	add_child(satellite)
 
 
+func set_satellite_available(available: bool, reason := "") -> void:
+	satellite_available = available
+	satellite_block_reason = reason if not available else ""
+	if not available:
+		_sleep_satellite()
+	queue_redraw()
+
+
 func open_map() -> void:
 	visible = true
 	follow = true
 	pan = Vector2.ZERO
+	if satellite_available:
+		FACILITY.publish_target_ping(player_at)
+	# The satellite is what you see first (Greg, 2026-09-24); L turns to the
+	# facility sheet once that route exists.
+	facility_sheet = false
+	var territory := WorldHistory.subject(FACILITY.SUBJECT)
+	if not territory.is_empty() and facility_selected < 0:
+		facility_selected = _first_revealed_facility_sector()
 	queue_redraw()
 
 
@@ -168,6 +203,20 @@ func close_map() -> void:
 	visible = false
 
 
+## The pocket feed reuses the exact satellite camera the full map owns. It is
+## deliberately slow (eight frames a second) and close around the player: a
+## navigational instrument, not a second always-on render of the whole region.
+func update_minimap(delta: float) -> Texture2D:
+	if not satellite_available or visible or satellite == null or not is_instance_valid(satellite):
+		return null
+	satellite.call("observe", Vector3(player_at.x, 0.0, player_at.y), player_yaw, 0.0, delta, Vector2(120, 120))
+	_minimap_due -= delta
+	if _minimap_due <= 0.0:
+		_minimap_due = 1.0 / 8.0
+		satellite.call("request_frame")
+	return satellite.get_texture()
+
+
 func _handle_travel(delta: float) -> void:
 	if selected_place < 0:
 		travel_hold = 0.0
@@ -179,17 +228,37 @@ func _handle_travel(delta: float) -> void:
 	if Input.is_key_pressed(KEY_T):
 		travel_hold = minf(1.0, travel_hold + delta * 0.85)
 		if travel_hold >= 1.0:
-			travel_requested.emit(district)
-			WorldHistory.record_event("map_travel", {"subject": "player", "place": str(district.get("name", ""))})
+			_commit_travel(district)
 			travel_hold = 0.0
 	else:
 		travel_hold = maxf(0.0, travel_hold - delta * 2.2)
+
+
+## Holding T resolves once, here. The signal may start a scene transition, but
+## the choice that requested it already has a durable identity in the ledger.
+func _commit_travel(district: Dictionary) -> void:
+	travel_requested.emit(district)
+	PlayerActionLedger.record("map_travel", {
+		"subject": "player",
+		"place": str(district.get("name", "")),
+		"place_id": str(district.get("id", district.get("record", ""))),
+	})
 
 
 func _process(delta: float) -> void:
 	if not visible:
 		return
 	clock += delta
+	for row: Dictionary in HOLDINGS.overview().holdings:
+		var id := str(row.id)
+		var current := float(_holding_reveal.get(id, 0.0))
+		var target := 1.0 if bool(row.revealed) else 0.0
+		_holding_reveal[id] = move_toward(current, target, delta * 0.72)
+	# Looking through the corporate lens lets it look back. The authority
+	# de-duplicates within its coarse cell, so this is cheap and only writes when
+	# the carried device has crossed into a genuinely new search area.
+	if satellite_available:
+		FACILITY.publish_target_ping(player_at)
 	_handle_travel(delta)
 	queue_redraw()
 
@@ -204,6 +273,9 @@ func _place_under(point: Vector2) -> int:
 
 
 func _gui_input(event: InputEvent) -> void:
+	if facility_sheet:
+		_handle_facility_input(event)
+		return
 	if event is InputEventMouseMotion:
 		hovered_place = _place_under(event.position)
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -231,6 +303,58 @@ func _gui_input(event: InputEvent) -> void:
 	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F:
 		follow = true
 		pan = Vector2.ZERO
+	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_L:
+		facility_sheet = true
+		facility_selected = _first_revealed_facility_sector()
+		queue_redraw()
+
+
+func _handle_facility_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		facility_hover = _facility_under((event as InputEventMouseMotion).position)
+		queue_redraw()
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		var found := _facility_under((event as InputEventMouseButton).position)
+		if found >= 0:
+			facility_selected = found
+			queue_redraw()
+	elif event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_L:
+				facility_sheet = false
+			KEY_LEFT, KEY_UP:
+				_select_facility(-1)
+			KEY_RIGHT, KEY_DOWN:
+				_select_facility(1)
+		queue_redraw()
+
+
+func _facility_under(point: Vector2) -> int:
+	for entry: Dictionary in _facility_rects:
+		if (entry.rect as Rect2).has_point(point):
+			return int(entry.index)
+	return -1
+
+
+func _first_revealed_facility_sector() -> int:
+	var rows: Array = FACILITY.overview().sectors
+	for index in rows.size():
+		if bool(rows[index].revealed):
+			return index
+	return -1
+
+
+func _select_facility(step: int) -> void:
+	var rows: Array = FACILITY.overview().sectors
+	if rows.is_empty():
+		facility_selected = -1
+		return
+	var start := facility_selected if facility_selected >= 0 else 0
+	for offset in range(1, rows.size() + 1):
+		var candidate := wrapi(start + step * offset, 0, rows.size())
+		if bool(rows[candidate].revealed):
+			facility_selected = candidate
+			return
 
 
 ## Greg, on the second playtest: *"the map is incredibly laggy right now"*.
@@ -307,6 +431,11 @@ func _draw() -> void:
 	if chart_size.x <= 1.0 or chart_size.y <= 1.0:
 		return
 	_chart = Rect2(Vector2(margin, margin + 34.0), chart_size)
+	if facility_sheet:
+		_draw_facility_sheet()
+		if not satellite_available:
+			_draw_satellite_block()
+		return
 	# The floor depends on the chart, which depends on the window, so it is
 	# applied here rather than only where the wheel is read — a map opened on a
 	# smaller window would otherwise keep a zoom that window cannot justify.
@@ -318,7 +447,7 @@ func _draw() -> void:
 	# A10.1/A10.2. The region itself, under everything else. The chart's marks,
 	# roads and contacts still draw on top — what changes is what they draw on
 	# top *of*: the world in its own materials rather than a dark plate.
-	if satellite != null and is_instance_valid(satellite):
+	if satellite_available and satellite != null and is_instance_valid(satellite):
 		# Zoom already ran 0.6-3.0 for the chart; reuse it rather than inventing
 		# a second control the player has to learn.
 		descent = clampf(inverse_lerp(0.8, 2.8, zoom), 0.0, 1.0)
@@ -377,11 +506,19 @@ func _draw() -> void:
 	_draw_lots()
 	# Over the plan, not under it: unwalked ground is supposed to withhold what
 	# is standing on it, which it cannot do from underneath.
-	_draw_unsurveyed()
+	# The live satellite already received `_draw_unwalked_veil`; adding the
+	# printed-sheet hatch as circles per cell turned it into a giant polka-dot
+	# grid and hid the terrain the layer exists to show.
+	if not _satellite_live():
+		_draw_unsurveyed()
+	_draw_holdings()
+	_map_label_rects.clear()
 	_draw_districts()
 	_draw_misfires()
 	_draw_contacts()
-	_draw_player()
+	_draw_celloutz_target_area()
+	if satellite_available:
+		_draw_player()
 	_draw_places()
 	if tilt > 0.0:
 		draw_set_transform_matrix(Transform2D.IDENTITY)
@@ -400,6 +537,45 @@ func _draw() -> void:
 	if selected_place >= 0:
 		_draw_place_panel()
 	_draw_cracks()
+	if not satellite_available:
+		_draw_satellite_block()
+
+
+func _draw_satellite_block() -> void:
+	var reason := satellite_block_reason.to_upper()
+	var title := "SATELLITE OCCLUDED // LOCAL MEMORY ONLY"
+	var width := CellOutzType.width_condensed(title, 11.0, 0.82)
+	var at := Vector2(_chart.get_center().x - width * 0.5, _chart.position.y + 22.0)
+	draw_rect(Rect2(at - Vector2(10, 15), Vector2(width + 20, 25)), VOID * Color(1, 1, 1, 0.88))
+	CellOutzType.draw_condensed(self, at, title, 11.0, ARTERIAL, 0.82)
+	if not reason.is_empty():
+		var reason_width := CellOutzType.width_condensed(reason, 8.0, 0.68)
+		CellOutzType.draw_condensed(self, Vector2(_chart.get_center().x - reason_width * 0.5, at.y + 17.0), reason, 8.0, INK * Color(1, 1, 1, 0.7), 0.68)
+
+
+func _draw_celloutz_target_area() -> void:
+	var area := FACILITY.target_area()
+	if area.is_empty():
+		return
+	var centre_world := Vector2(float(area.get("x", 0.0)), float(area.get("z", 0.0)))
+	var centre := _to_screen(centre_world)
+	var radius := float(area.get("radius", FACILITY.TARGET_PING_RADIUS)) * zoom
+	if not _chart.grow(radius).has_point(centre):
+		return
+	# Broken arcs communicate an estimated search area. A solid circle would
+	# falsely promise that CellOutz knows the player's boundary exactly.
+	var turn := clock * 0.23
+	for segment in 10:
+		var start := turn + TAU * float(segment) / 10.0
+		draw_arc(centre, radius, start, start + TAU * 0.058, 8, ARTERIAL * Color(1, 1, 1, 0.82), 2.0, true)
+	var sweep := Vector2(cos(clock * 0.7), sin(clock * 0.7))
+	draw_line(centre - sweep * radius * 0.72, centre + sweep * radius * 0.72, ARTERIAL * Color(1, 1, 1, 0.18), 1.0)
+	draw_circle(centre, 4.0 + sin(clock * 2.2) * 1.2, ARTERIAL * Color(1, 1, 1, 0.82))
+	var label := "CELLOUTZ TARGET AREA // +/- %d M" % roundi(float(area.get("radius", 0.0)))
+	var label_at := centre + Vector2(-radius, -radius - 17.0)
+	label_at.x = clampf(label_at.x, _chart.position.x + 8.0, _chart.end.x - CellOutzType.width_condensed(label, 8.0, 0.7) - 8.0)
+	label_at.y = clampf(label_at.y, _chart.position.y + 8.0, _chart.end.y - 18.0)
+	CellOutzType.draw_condensed(self, label_at, label, 8.0, ARTERIAL, 0.7)
 
 
 func _draw_grid() -> void:
@@ -443,7 +619,14 @@ func _draw_unwalked_veil() -> void:
 	var top_left := _to_screen(Vector2(-half_region.x, -half_region.y))
 	var bottom_right := _to_screen(Vector2(half_region.x, half_region.y))
 	var region := Rect2(top_left, bottom_right - top_left).abs()
-	var outside := Color(0.46, 0.47, 0.44, 0.86)
+	# Dark, not bright. At 0.46 grey-green over 0.86 alpha the ground beyond the
+	# surveyed region was the lightest thing on the sheet -- so at any zoom
+	# where the region did not fill the chart, most of the screen was a flat
+	# pale wash and the surveyed part read as a stain on it. The correction for
+	# "the edges looked best-surveyed" overshot into "the unknown is the
+	# brightest". Unknown ground is now near-black: the part you have actually
+	# walked is the part that glows, which is the whole job of a survey sheet.
+	var outside := Color(0.055, 0.065, 0.055, 0.90)
 	if region.position.y > _chart.position.y:
 		draw_rect(Rect2(_chart.position, Vector2(_chart.size.x, region.position.y - _chart.position.y)).intersection(_chart), outside)
 	if region.end.y < _chart.end.y:
@@ -482,14 +665,11 @@ func _draw_unwalked_veil() -> void:
 			# have properly walked clears fast — the satisfying part is the last bit
 			# coming off, the way wiping a window is.
 			var veil := pow(1.0 - clearness, 1.45)
-			# On the satellite view this used to redraw each unseen cell as a
-			# fully square grey slab.  The world was correct underneath, but the
-			# exploration boundary read as a grid of apartment blocks.  A soft,
-			# overlapping survey bloom keeps the information while letting the
-			# actual terrain remain the dominant shape.
+			# Adjacent cells share exactly the same edge, producing one continuous
+			# grey survey veil. The former circle per cell made the satellite a
+			# polka-dot pattern and obscured the geography it was meant to reveal.
 			if _satellite_live():
-				var bloom_radius := minf(step * 0.73, minf(patch.size.x, patch.size.y) * 0.73)
-				draw_circle(patch.get_center(), bloom_radius, Color(0.46, 0.47, 0.44, veil * 0.48), true, -1.0, true)
+				draw_rect(patch, Color(0.46, 0.47, 0.44, veil * 0.36))
 			else:
 				draw_rect(patch, Color(0.46, 0.47, 0.44, veil * 0.88))
 			# A breath of haze that lingers even on cleared ground, so the map never
@@ -548,7 +728,7 @@ func _draw_roads() -> void:
 ## when no scene has handed the map a world, and it has to stay legible on its
 ## own.
 func _satellite_live() -> bool:
-	return satellite != null and is_instance_valid(satellite) and satellite.get_texture() != null
+	return satellite_available and satellite != null and is_instance_valid(satellite) and satellite.get_texture() != null
 
 
 func _draw_lots() -> void:
@@ -579,23 +759,125 @@ func _draw_districts() -> void:
 	for district in DISTRICTS:
 		var at: Vector2 = district.at
 		var screen := _to_screen(at)
-		var charted := is_surveyed(at)
-		var radius := 58.0 * zoom
-		var tint := SPORE if charted else INK
-		draw_arc(screen, radius, 0.0, TAU, 40, tint * Color(1, 1, 1, 0.2 if charted else 0.08), 1.0)
+		var state := HOLDINGS.holding(str(district.id))
+		var charted := bool(state.get("revealed", false))
+		var tint := _holding_tone(str(state.get("held_by", district.held_by))) if charted else INK
 		if not _chart.has_point(screen):
 			continue
-		if not charted and not _chart.has_point(screen):
-			continue
-		var label := str(district.name) if charted else "UNSURVEYED SECTOR"
+		# Every uncharted district printed the identical words, so a sheet with
+		# three unknowns said UNSURVEYED SECTOR three times and none of them
+		# told you which was which. A real survey sheet numbers what it has not
+		# been to yet.
+		var label := str(district.name) if charted else "SECTOR %02d / UNSURVEYED" % (DISTRICTS.find(district) + 1)
 		# Held inside the sheet. A name that escapes the chart prints over the
 		# title and reads as a caption on the device instead of a place.
-		var name_at := screen + Vector2(-radius * 0.5, -radius - 18.0)
-		name_at.y = maxf(name_at.y, _chart.position.y + 8.0)
-		name_at.x = clampf(name_at.x, _chart.position.x + 8.0, _chart.end.x - CellOutzType.width_condensed(label.to_upper(), 11.0, 1.0) - 8.0)
+		var label_width := CellOutzType.width_condensed(label.to_upper(), 11.0, 1.0)
+		var name_at := _reserve_map_label(screen, Vector2(label_width, 36.0), [
+			Vector2(-label_width * 0.5, -29.0), Vector2(10.0, -29.0),
+			Vector2(-label_width - 10.0, -29.0), Vector2(-label_width * 0.5, 12.0),
+		])
 		CellOutzType.draw_condensed(self, name_at, label.to_upper(), 11.0, tint * Color(1, 1, 1, 0.9 if charted else 0.3), 1.0)
 		if charted:
-			CellOutzType.draw_condensed(self, name_at + Vector2(0, 14.0), str(district.note).to_upper(), 7.0, INK * Color(1, 1, 1, 0.4), 0.7)
+			var holder := str(state.get("held_by", district.held_by)).replace("_", " ").to_upper()
+			CellOutzType.draw_condensed(self, name_at + Vector2(0, 14.0), "CONTROL / %s" % holder, 7.0, tint * Color(1, 1, 1, 0.55), 0.7)
+			var required := int(state.get("local_work_required", 0))
+			if required > 0:
+				var work_state := str(state.get("local_work_state", "held"))
+				var work_label := "DECISION OPEN" if work_state == "ready_for_decision" else "LOCAL CLAIM %d/%d" % [int(state.get("local_work_completed", 0)), required]
+				CellOutzType.draw_condensed(self, name_at + Vector2(0, 25.0), work_label, 7.0, SPORE if work_state == "ready_for_decision" else tint * Color(1, 1, 1, 0.66), 0.7)
+
+
+func _draw_holdings() -> void:
+	for row: Dictionary in HOLDINGS.overview().holdings:
+		var id := str(row.id)
+		var world_polygon: PackedVector2Array = _holding_polygons.get(id, PackedVector2Array())
+		if world_polygon.size() < 3:
+			continue
+		var full := PackedVector2Array()
+		for point: Vector2 in world_polygon:
+			full.append(_to_screen(point))
+		var revealed := bool(row.revealed)
+		var tone := _holding_tone(str(row.held_by)) if revealed else INK
+		var blend := float(_holding_reveal.get(id, 0.0)) if revealed else 0.0
+		var work_state := str(row.get("local_work_state", "held"))
+		# Unknown land keeps a complete faint silhouette: enough shape to pull at
+		# the player. Known land develops outward from its settlement like an old
+		# instant photograph, making the reveal one event rather than many pixels.
+		var closed := full.duplicate()
+		closed.append(full[0])
+		draw_polyline(closed, tone * Color(1, 1, 1, 0.16 if not revealed else 0.24), 1.0)
+		if blend <= 0.001:
+			continue
+		var centre := _to_screen(row.at)
+		var reveal := holding_reveal_profile(blend)
+		var eased := float(reveal.coverage)
+		var arriving := PackedVector2Array()
+		for point: Vector2 in full:
+			arriving.append(centre.lerp(point, eased))
+		draw_colored_polygon(arriving, tone * Color(1, 1, 1, 0.035 + blend * 0.055))
+		var arriving_closed := arriving.duplicate()
+		arriving_closed.append(arriving[0])
+		# The moving edge is the cleaning action: pale and thick at mid-travel,
+		# relaxing into the holder-coloured border once the glass is clear.
+		var wipe_tone := BONE.lerp(tone, blend)
+		draw_polyline(arriving_closed, wipe_tone * Color(1, 1, 1, float(reveal.edge_alpha)), float(reveal.edge_width))
+		var work_profile := holding_work_profile(work_state, Time.get_ticks_msec() / 1000.0)
+		if bool(work_profile.visible):
+			# A broken claim fractures inward from every border vertex. It reads
+			# over satellite terrain at any zoom and leaves the holder colour in
+			# place until the player performs the separate land decision.
+			for vertex in full.size():
+				var edge: Vector2 = full[vertex]
+				var next: Vector2 = full[(vertex + 1) % full.size()]
+				var bite := edge.lerp(next, 0.22)
+				draw_line(edge, centre.lerp(bite, 0.28), ARTERIAL * Color(1, 1, 1, float(work_profile.crack_alpha)), float(work_profile.crack_width))
+			if bool(work_profile.decision_open):
+				draw_polyline(arriving_closed, SPORE * Color(1, 1, 1, float(work_profile.pulse_alpha)), 2.4)
+		if float(reveal.streak_alpha) > 0.01:
+			for vertex in range(0, full.size(), 2):
+				var streak_end: Vector2 = arriving[vertex]
+				var streak_start := centre.lerp(full[vertex], maxf(0.0, eased - 0.10))
+				draw_line(streak_start, streak_end, BONE * Color(1, 1, 1, float(reveal.streak_alpha)), 1.0)
+
+
+## Testable timing contract for the holding reveal. Coverage only advances;
+## the bright cleaning lip peaks halfway and is gone once the new border rests.
+static func holding_reveal_profile(blend: float) -> Dictionary:
+	var clamped := clampf(blend, 0.0, 1.0)
+	var front := sin(clamped * PI)
+	return {
+		"coverage": 1.0 - pow(1.0 - clamped, 3.0),
+		"edge_alpha": 0.35 + clamped * 0.40 + front * 0.38,
+		"edge_width": 1.6 + front * 2.6,
+		"streak_alpha": front * 0.32,
+	}
+
+
+## The map treatment is data-testable independently of a framebuffer. A single
+## completed job scars the old claim; the full connected set adds a slow living
+## border, announcing an available decision without assigning the land.
+static func holding_work_profile(state: String, elapsed: float) -> Dictionary:
+	if state not in ["disrupted", "ready_for_decision"]:
+		return {"visible": false, "decision_open": false, "crack_alpha": 0.0, "crack_width": 0.0, "pulse_alpha": 0.0}
+	var open := state == "ready_for_decision"
+	return {
+		"visible": true,
+		"decision_open": open,
+		"crack_alpha": 0.52 if open else 0.34,
+		"crack_width": 1.6 if open else 1.15,
+		"pulse_alpha": (0.42 + sin(elapsed * 1.7) * 0.14) if open else 0.0,
+	}
+
+
+func _holding_tone(holder: String) -> Color:
+	var axis := 0.0
+	if WorldHistory.FACTION_TREE_AXIS.has(holder):
+		axis = float((WorldHistory.FACTION_TREE_AXIS[holder] as Dictionary).get("axis", 0.0))
+	if axis < -0.2:
+		return ARTERIAL
+	if axis > 0.2:
+		return SPORE
+	return BILE
 
 
 func _draw_misfires() -> void:
@@ -643,6 +925,8 @@ func _draw_contacts() -> void:
 			"neutral", "spared": tint = BILE
 			"downed": tint = BILE
 			"loot": tint = BONE
+			"work_raid": tint = ACID
+			"work_collection": tint = SCAN
 		if state == "loot":
 			draw_rect(Rect2(screen - Vector2(3, 3), Vector2(6, 6)), tint * Color(1, 1, 1, 0.8))
 			continue
@@ -653,6 +937,23 @@ func _draw_contacts() -> void:
 		# mark that has not been drawn. These are told apart by shape, so the
 		# key could be deleted rather than restyled.
 		match state:
+			"work_raid":
+				# Four blades around an empty centre: a place to break open, not
+				# another person pretending to be a quest marker.
+				draw_colored_polygon(PackedVector2Array([
+					screen + Vector2(0, -7), screen + Vector2(7, 0),
+					screen + Vector2(0, 7), screen + Vector2(-7, 0),
+				]), tint * Color(1, 1, 1, 0.28))
+				draw_polyline(PackedVector2Array([
+					screen + Vector2(0, -7), screen + Vector2(7, 0), screen + Vector2(0, 7),
+					screen + Vector2(-7, 0), screen + Vector2(0, -7),
+				]), tint, 1.6)
+				draw_line(screen - Vector2(3, 0), screen + Vector2(3, 0), tint, 1.2)
+			"work_collection":
+				# A bracketed cache, kept distinct from the plain filled square
+				# used for incidental loot.
+				draw_rect(Rect2(screen - Vector2(6, 6), Vector2(12, 12)), tint, false, 1.6)
+				draw_circle(screen, 2.0, tint)
 			"hostile":
 				# Point down: a thing coming at you.
 				draw_colored_polygon(PackedVector2Array([
@@ -672,7 +973,41 @@ func _draw_contacts() -> void:
 		draw_arc(screen, 9.0 + beat * 4.0, 0.0, TAU, 14, tint * Color(1, 1, 1, 0.4 - beat * 0.2), 1.0)
 		var label := str(contact.get("name", ""))
 		if not label.is_empty():
-			CellOutzType.draw_condensed(self, screen + Vector2(10, -10), label.to_upper(), 8.0, tint * Color(1, 1, 1, 0.9), 0.7)
+			var width := CellOutzType.width_condensed(label.to_upper(), 8.0, 0.7)
+			var label_at := _reserve_map_label(screen, Vector2(width, 13.0), [
+				Vector2(10, -16), Vector2(10, 9), Vector2(-width - 10, -16),
+				Vector2(-width - 10, 9), Vector2(10, -34), Vector2(-width * 0.5, 18),
+			])
+			CellOutzType.draw_condensed(self, label_at, label.to_upper(), 8.0, tint * Color(1, 1, 1, 0.9), 0.7)
+
+
+## Chooses the first clear authored register, then the least-overlapping one if
+## the chart is genuinely dense. Clamped to the chart so avoiding one label can
+## never push another through the bezel.
+func _reserve_map_label(anchor: Vector2, label_size: Vector2, offsets: Array) -> Vector2:
+	var best := anchor
+	var best_rect := Rect2(anchor, label_size)
+	var best_overlap := INF
+	for offset_variant in offsets:
+		var offset: Vector2 = offset_variant
+		var candidate := anchor + offset
+		candidate.x = clampf(candidate.x, _chart.position.x + 7.0, _chart.end.x - label_size.x - 7.0)
+		candidate.y = clampf(candidate.y, _chart.position.y + 7.0, _chart.end.y - label_size.y - 7.0)
+		var rect := Rect2(candidate - Vector2(2, 2), label_size + Vector2(4, 4))
+		var overlap := 0.0
+		for occupied: Rect2 in _map_label_rects:
+			var intersection := rect.intersection(occupied)
+			if intersection.has_area():
+				overlap += intersection.get_area()
+		if is_zero_approx(overlap):
+			_map_label_rects.append(rect)
+			return candidate
+		if overlap < best_overlap:
+			best_overlap = overlap
+			best = candidate
+			best_rect = rect
+	_map_label_rects.append(best_rect)
+	return best
 
 
 func _draw_player() -> void:
@@ -715,7 +1050,8 @@ func _draw_frame() -> void:
 		var dy := -14.0 if corner.y > 0.5 else 14.0
 		draw_line(at, at + Vector2(dx, 0), ACID, 2.0)
 		draw_line(at, at + Vector2(0, dy), ACID, 2.0)
-	CellOutzType.draw_stamped(self, Vector2(26, 10), "LIVING MAP", 20.0, ACID, ARTERIAL * Color(1, 1, 1, 0.25), 3.4)
+	var layer_title := "LIVING MAP / UNDERGROUND FACILITY" if facility_sheet else "LIVING MAP / SURFACE SATELLITE"
+	CellOutzType.draw_stamped(self, Vector2(26, 10), layer_title, 20.0, ACID, ARTERIAL * Color(1, 1, 1, 0.25), 3.4)
 	_draw_title_block()
 
 
@@ -807,7 +1143,7 @@ func _draw_places() -> void:
 		var screen := _to_screen(world_at)
 		if not _chart.has_point(screen):
 			continue
-		var charted := is_surveyed(world_at)
+		var charted := bool(HOLDINGS.holding(str(district.id)).get("revealed", false))
 		var box := Rect2(screen - Vector2(9, 9), Vector2(18, 18))
 		_place_rects.append({"index": index, "rect": box, "at": world_at})
 		var tint: Color = SPORE if charted else INK * Color(1, 1, 1, 0.3)
@@ -838,10 +1174,12 @@ func _draw_place_panel() -> void:
 	for line: String in CellOutzType.wrap_condensed(str(district.get("note", "")).to_upper(), panel.size.x - 32.0, 9.0, 0.7):
 		CellOutzType.draw_condensed(self, panel.position + Vector2(16, note_y), line, 9.0, INK * Color(1, 1, 1, 0.7), 0.7)
 		note_y += 13.0
-	var charted := is_surveyed(district.get("at", Vector2.ZERO))
-	var status := "SURVEYED" if charted else "UNWALKED \u2014 NO ROUTE"
-	CellOutzType.draw_text(self, panel.position + Vector2(14, 82), status, 10.0, SPORE if charted else ARTERIAL, 1.0)
-	if charted:
+	var holding_state := HOLDINGS.holding(str(district.id))
+	var charted := bool(holding_state.get("revealed", false))
+	var route_ready := is_surveyed(district.get("at", Vector2.ZERO))
+	var status := ("CONTROL / %s" % str(holding_state.get("held_by", district.held_by)).replace("_", " ").to_upper()) if charted else "UNWALKED // NO ROUTE"
+	CellOutzType.draw_text(self, panel.position + Vector2(14, 82), status, 10.0, _holding_tone(str(holding_state.get("held_by", ""))) if charted else ARTERIAL, 1.0)
+	if route_ready:
 		var bar := Rect2(panel.position + Vector2(14, 106), Vector2(panel.size.x - 28, 14))
 		draw_rect(bar, INK * Color(1, 1, 1, 0.10))
 		draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(travel_hold, 0.0, 1.0), bar.size.y)), ACID)
@@ -868,7 +1206,7 @@ func _draw_legend() -> void:
 	# Marginalia. Scrawled along the bottom edge at a slight angle, low enough
 	# in contrast to ignore once it is known, which is what a control hint is
 	# for. It is no longer a row of labels in a strip.
-	var scrawl := "DRAG TO PAN / WHEEL ZOOMS / F RECENTRES / M PUTS IT AWAY"
+	var scrawl := "DRAG TO PAN / WHEEL ZOOMS / F RECENTRES / L CHANGES LAYER / M PUTS IT AWAY"
 	# Ends clear of the keys card, which draws its own closed-state hint at
 	# `size.x - 128` on this exact same baseline (`keys_card.gd:96`). Ending at
 	# `size.x - 40` put this straight through it, so the one corner of the screen
@@ -877,3 +1215,106 @@ func _draw_legend() -> void:
 	CellOutzType.draw_condensed(self, Vector2.ZERO, scrawl, 8.0, ACID * Color(1, 1, 1, 0.45), 0.8)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
+
+func _draw_facility_sheet() -> void:
+	var overview := FACILITY.overview()
+	var rows: Array = overview.sectors
+	_facility_rects.clear()
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.035, 0.026, 0.019, 0.96))
+	draw_rect(_chart, PLATE)
+	Grunge.stain(self, _chart.position + _chart.size * Vector2(0.24, 0.70), 180.0, 991, Grunge.RUST, 0.06)
+	Grunge.stain(self, _chart.position + _chart.size * Vector2(0.76, 0.26), 150.0, 997, Grunge.BILE, 0.05)
+
+	# The routes are real scene adjacency, shown before the rooms so every line
+	# terminates underneath its destination rather than through its label.
+	for route: Array in overview.routes:
+		var a := _facility_row(rows, str(route[0]))
+		var b := _facility_row(rows, str(route[1]))
+		if a.is_empty() or b.is_empty():
+			continue
+		var from := _facility_at(a)
+		var to := _facility_at(b)
+		var known := bool(a.revealed) and bool(b.revealed)
+		draw_dashed_line(from, to, SPORE * Color(1, 1, 1, 0.72) if known else INK * Color(1, 1, 1, 0.13), 2.0, 8.0)
+
+	for index in rows.size():
+		var row: Dictionary = rows[index]
+		var at := _facility_at(row)
+		var revealed := bool(row.revealed)
+		var state := str(row.state)
+		var room := Rect2(at - Vector2(72, 38), Vector2(144, 76))
+		_facility_rects.append({"index": index, "rect": room.grow(8.0)})
+		var tone := ARTERIAL
+		if state == FACILITY.LIBERATED:
+			tone = SPORE
+		elif state == FACILITY.SURVEYED:
+			tone = BILE
+		var hot := index == facility_hover or index == facility_selected
+		draw_rect(room, tone * Color(1, 1, 1, 0.13 if revealed else 0.035))
+		draw_rect(room, tone * Color(1, 1, 1, 0.92 if hot else (0.48 if revealed else 0.14)), false, 2.2 if hot else 1.2)
+		# Corporate surveillance is a cone, not a generic eye icon: its footprint
+		# is an intentionally imprecise area the player can reason about.
+		if revealed and state != FACILITY.LIBERATED:
+			var sweep := 0.22 + 0.06 * sin(clock * 1.7 + float(index))
+			draw_arc(at, 51.0, -PI * sweep, PI * sweep, 18, ARTERIAL * Color(1, 1, 1, 0.34), 1.2)
+		var name := str(row.name).to_upper() if revealed else "REDACTED SECTOR"
+		var lines := CellOutzType.wrap_condensed(name, room.size.x - 12.0, 7.5, 0.66)
+		var name_y := -12.0 if lines.size() > 1 else -5.0
+		for line: String in lines:
+			var width := CellOutzType.width_condensed(line, 7.5, 0.66)
+			CellOutzType.draw_condensed(self, at + Vector2(-width * 0.5, name_y), line, 7.5, tone * Color(1, 1, 1, 0.95 if revealed else 0.25), 0.66)
+			name_y += 10.0
+		if revealed:
+			var state_label := state.to_upper()
+			var sw := CellOutzType.width_condensed(state_label, 7.0, 0.65)
+			CellOutzType.draw_condensed(self, at + Vector2(-sw * 0.5, 20), state_label, 7.0, tone, 0.65)
+
+	_draw_facility_header(overview)
+	if facility_selected >= 0 and facility_selected < rows.size():
+		_draw_facility_panel(rows[facility_selected])
+	_draw_frame()
+	_draw_bezel()
+	_draw_cracks()
+	var hint := "POINTER / ARROWS SELECT SECTOR   L SURFACE SATELLITE"
+	CellOutzType.draw_condensed(self, Vector2(28, size.y - 27), hint, 8.0, INK * Color(1, 1, 1, 0.5), 0.7)
+
+
+func _facility_row(rows: Array, id: String) -> Dictionary:
+	for row: Dictionary in rows:
+		if str(row.id) == id:
+			return row
+	return {}
+
+
+func _facility_at(row: Dictionary) -> Vector2:
+	var normal: Vector2 = row.get("at", Vector2.ZERO)
+	return _chart.position + Vector2(_chart.size.x * normal.x, _chart.size.y * normal.y)
+
+
+func _draw_facility_header(overview: Dictionary) -> void:
+	var box := Rect2(_chart.position + Vector2(16, 16), Vector2(258, 79))
+	draw_rect(box, VOID * Color(1, 1, 1, 0.9))
+	draw_rect(box, ACID * Color(1, 1, 1, 0.38), false, 1.0)
+	CellOutzType.draw_condensed(self, box.position + Vector2(11, 10), str(overview.name), 11.0, INK, 0.9)
+	CellOutzType.draw_condensed(self, box.position + Vector2(11, 30), "REGISTERED OWNER / CELLOUTZ", 8.0, ARTERIAL, 0.7)
+	CellOutzType.draw_condensed(self, box.position + Vector2(11, 46), "LIBERATED %d / %d" % [int(overview.liberated_count), (overview.sectors as Array).size()], 8.0, SPORE, 0.7)
+	CellOutzType.draw_condensed(self, box.position + Vector2(11, 61), "SURVEILLANCE %03d%%" % roundi(float(overview.surveillance) * 100.0), 8.0, BILE, 0.7)
+	var reaction := WorldHistory.subject(FACILITY.REACTION_SUBJECT)
+	if not reaction.is_empty():
+		var order := Rect2(Vector2(_chart.position.x + 16, _chart.end.y - 43), Vector2(420, 27))
+		draw_rect(order, ARTERIAL * Color(1, 1, 1, 0.13))
+		draw_rect(order, ARTERIAL * Color(1, 1, 1, 0.66), false, 1.2)
+		CellOutzType.draw_condensed(self, order.position + Vector2(10, 7), "%s // %s" % [str(reaction.get("name", "REPOSSESSION ORDER")), str(reaction.get("status", "circulating")).to_upper()], 9.0, ARTERIAL, 0.8)
+
+
+func _draw_facility_panel(row: Dictionary) -> void:
+	var panel := Rect2(Vector2(_chart.end.x - 350, _chart.position.y + 16), Vector2(330, 144))
+	draw_rect(panel, VOID * Color(1, 1, 1, 0.94))
+	draw_rect(panel, ACID * Color(1, 1, 1, 0.42), false, 1.2)
+	CellOutzType.draw_stamped(self, panel.position + Vector2(14, 14), str(row.name), 15.0, INK, ARTERIAL * Color(1, 1, 1, 0.25), 1.0)
+	CellOutzType.draw_condensed(self, panel.position + Vector2(14, 48), "STATE / %s" % str(row.state).to_upper(), 9.0, SPORE if str(row.state) == FACILITY.LIBERATED else BILE, 0.8)
+	CellOutzType.draw_condensed(self, panel.position + Vector2(14, 66), "OWNER / %s" % ("UNBOUND" if str(row.state) == FACILITY.LIBERATED else str(row.owner).to_upper()), 9.0, ARTERIAL, 0.8)
+	var y := 91.0
+	for line: String in CellOutzType.wrap_condensed(str(row.objective), panel.size.x - 28.0, 9.0, 0.75):
+		CellOutzType.draw_condensed(self, panel.position + Vector2(14, y), line, 9.0, INK * Color(1, 1, 1, 0.72), 0.75)
+		y += 14.0

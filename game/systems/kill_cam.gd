@@ -66,13 +66,49 @@ func trigger(display_name: String, zone: String, direction: Vector3, label: Stri
 
 func _seed_anatomy() -> void:
 	ruptures.clear()
-	if impact_zone != "torso":
+	if impact_zone == "head":
+		# A head hit used to fall into the branch below and clear every fragment,
+		# so the shot with the least survivable anatomy behind it produced the
+		# emptiest plate: a brain marked ruptured on a skull that never moved.
+		_seed_skull()
+	elif impact_zone != "torso":
 		fragments.clear()
 	for organ_id in ORGAN_POINTS:
 		var organ: Dictionary = anatomy_state.get("organs", {}).get(organ_id, {})
 		if organ.is_empty():
 			continue
 		ruptures.append({"id": organ_id, "at": ORGAN_POINTS[organ_id], "radius": 5.0 if organ_id == "spine" else 11.0, "color": BONE if organ_id == "spine" else BRUISE if "lung" in organ_id else BILE if organ_id in ["gut", "liver"] else ARTERIAL, "delay": 0.35 + ruptures.size() * 0.07, "ruptured": bool(organ.get("ruptured", false))})
+
+## The head, when the head is what was hit. The skull opens away from the
+## entry side the way the ribs already do, and the orbits go with it.
+##
+## The eyes are presentation, not anatomy: ORGAN_LAYOUT has no eye, and this
+## plate has always drawn things the body does not model, starting with its
+## ribs. What it must not do is invent a rupture the anatomy denies, which is
+## why the brain is still read from the real snapshot and only the orbits are
+## added here.
+func _seed_skull() -> void:
+	fragments.clear()
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var skull: Vector2 = ORGAN_POINTS["brain"]
+	for piece in 9:
+		var angle := TAU * float(piece) / 9.0
+		var outward := Vector2(cos(angle), sin(angle) * 0.8)
+		fragments.append({
+			"origin": skull + outward * rng.randf_range(9.0, 17.0),
+			"drift": outward * rng.randf_range(14.0, 30.0),
+			"spin": rng.randf_range(-4.2, 4.2),
+			"delay": 0.08 + float(piece) * 0.035 + (0.0 if signf(outward.x) == impact_from.x else 0.1),
+			"length": rng.randf_range(7.0, 15.0),
+		})
+	for side in [-1.0, 1.0]:
+		ruptures.append({
+			"id": "eye", "at": skull + Vector2(side * 9.0, 6.0), "radius": 5.5,
+			"color": ARTERIAL, "delay": 0.2 + (0.0 if side == impact_from.x else 0.08),
+			"ruptured": true,
+		})
+
 
 func cancel() -> void:
 	if not active:

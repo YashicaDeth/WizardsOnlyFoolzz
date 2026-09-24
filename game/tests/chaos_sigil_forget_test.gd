@@ -59,6 +59,7 @@ func _ready() -> void:
 	for event in WorldHistory.events:
 		events.append(str(event.get("type", "")))
 	check(events.count("sigil_fired") == 1, "exactly one fire really happened, the refused attempts recorded nothing")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "firing and consuming the pending charge close one transaction")
 
 	print("CHAOS_SIGIL_FORGET_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

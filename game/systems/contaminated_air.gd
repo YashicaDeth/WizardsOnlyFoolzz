@@ -33,6 +33,41 @@ const STORM_MOTES := 1500
 ## the air ends up moving with the player instead of past them.
 const RECENTRE_STEP := 6.0
 
+## Exhales and tricks are intentionally transient, but a player can trigger
+## them faster than their 2-4 second visual lifetime. Without a shared cap,
+## repeated smoking creates a growing set of particle servers and transparent
+## overdraw. Keep the nearby effects readable while bounding the route cost.
+static var _transient_smoke: Array[Node3D] = []
+
+static func transient_smoke_budget() -> int:
+	match WorldLook.quality:
+		WorldLook.Quality.ULTRA: return 20
+		WorldLook.Quality.HIGH: return 14
+		_: return 8
+
+static func transient_smoke_count() -> int:
+	_prune_transient_smoke()
+	return _transient_smoke.size()
+
+static func _prune_transient_smoke() -> void:
+	for index in range(_transient_smoke.size() - 1, -1, -1):
+		if not is_instance_valid(_transient_smoke[index]):
+			_transient_smoke.remove_at(index)
+
+static func _reserve_transient_smoke() -> void:
+	_prune_transient_smoke()
+	while _transient_smoke.size() >= transient_smoke_budget():
+		# `pop_front()` returns Variant, and `:=` off a Variant is a warning --
+		# which this project treats as an error, so the whole file stopped
+		# parsing. Typed explicitly.
+		var oldest: Node3D = _transient_smoke.pop_front()
+		if is_instance_valid(oldest):
+			oldest.queue_free()
+
+static func _track_transient_smoke(node: Node3D) -> void:
+	if node != null and is_instance_valid(node):
+		_transient_smoke.append(node)
+
 ## W1.2. `chaos_magick()` decays on its own with nothing feeding it, so read
 ## on its own the air got *better* on every quiet night — the opposite of
 ## what "contamination has weather" asked for. A watermark fixes that without
@@ -139,3 +174,211 @@ func follow(at: Vector3) -> void:
 		return
 	_centre = at
 	global_position = Vector3(at.x, at.y + 1.5, at.z)
+
+
+## AU7.7. A breath joins the same air system the world already uses. This is a
+## short-lived local plume, not a second weather layer: the same lit billboard,
+## turbulence and settling logic, emitted once from the player's mouth and then
+## left to drift through whatever light is really there.
+func emit_exhale(at: Vector3, direction: Vector3, density := 1.0, tint := Color(0.72, 0.74, 0.69)) -> GPUParticles3D:
+	_reserve_transient_smoke()
+	var plume := GPUParticles3D.new()
+	plume.name = "SmokeExhale"
+	plume.set_meta("smoke_tint", tint)
+	plume.one_shot = true
+	plume.amount = roundi(lerpf(15.0, 30.0, clampf(density / 2.4, 0.0, 1.0)))
+	plume.lifetime = lerpf(2.2, 3.8, clampf(density / 2.4, 0.0, 1.0))
+	plume.explosiveness = 0.86
+	plume.fixed_fps = 30
+	plume.visibility_aabb = AABB(Vector3(-2.5, -1.2, -2.5), Vector3(5.0, 4.5, 5.0))
+
+	var motion := ParticleProcessMaterial.new()
+	motion.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	motion.emission_sphere_radius = 0.035
+	motion.direction = Vector3(0.0, 0.08, -1.0)
+	motion.spread = 13.0
+	motion.initial_velocity_min = 0.32
+	motion.initial_velocity_max = lerpf(0.58, 1.05, clampf(density / 2.4, 0.0, 1.0))
+	# Smoke rises, then turbulence breaks the single stream into a breath.
+	motion.gravity = Vector3(0.0, 0.18, 0.0)
+	motion.damping_min = 0.12
+	motion.damping_max = 0.34
+	motion.turbulence_enabled = true
+	motion.turbulence_noise_strength = 0.62
+	motion.turbulence_noise_scale = 2.1
+	motion.turbulence_influence_min = 0.25
+	motion.turbulence_influence_max = 0.72
+	motion.angle_min = -32.0
+	motion.angle_max = 32.0
+	# Long narrow cards overlap into threads. Square cards, even with a radial
+	# texture, resolve as a stream of bright beads in front of the face.
+	motion.scale_min = 0.48
+	motion.scale_max = 1.0
+	plume.process_material = motion
+
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.020, 0.180)
+	var smoke := StandardMaterial3D.new()
+	smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	smoke.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	smoke.billboard_keep_scale = true
+	# Keep a stable grey under the close Zippo instead of accepting its tiny
+	# point light as a miniature sun. Low alpha makes this smoke, not neon.
+	smoke.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	smoke.albedo_texture = _soft_smoke_texture()
+	smoke.albedo_color = Color(tint.r, tint.g, tint.b, 0.032)
+	smoke.disable_receive_shadows = true
+	quad.material = smoke
+	motion.color_ramp = _smoke_lifetime_ramp(0.46)
+	plume.draw_pass_1 = quad
+	# A softer crossing layer stops the thin pass reading as hair. Both passes
+	# share the same particles, so this does not double the simulation cost.
+	plume.draw_passes = 2
+	var haze_quad := QuadMesh.new()
+	haze_quad.size = Vector2(0.095, 0.066)
+	var haze := smoke.duplicate() as StandardMaterial3D
+	haze.albedo_color = Color(tint.r, tint.g, tint.b, 0.014)
+	haze_quad.material = haze
+	plume.draw_pass_2 = haze_quad
+	plume.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	plume.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+
+	get_parent().add_child(plume)
+	plume.global_position = at
+	var forward := direction.normalized()
+	if forward.length_squared() > 0.001:
+		plume.look_at(at + forward, Vector3.UP)
+	plume.emitting = true
+	_track_transient_smoke(plume)
+	get_tree().create_timer(plume.lifetime + 0.5).timeout.connect(plume.queue_free)
+	return plume
+
+
+## A deliberate shape pushed through the fresh exhale. Ring emission is real
+## particle geometry — the puffs begin around a hollow circle and inherit the
+## player's look direction — so an O expands and frays instead of being a flat
+## sprite pasted over the camera.
+func emit_smoke_trick(at: Vector3, direction: Vector3, trick: String, density := 1.0, tint := Color(0.72, 0.74, 0.69)) -> Node3D:
+	_reserve_transient_smoke()
+	var rig := Node3D.new()
+	rig.name = "SmokeTrick_%s" % trick.replace(" ", "_")
+	rig.set_meta("smoke_tint", tint)
+	get_parent().add_child(rig)
+	rig.global_position = at
+	var forward := direction.normalized()
+	if forward.length_squared() > 0.001:
+		rig.look_at(at + forward, Vector3.UP)
+	var rings := 2 if trick == "DOUBLE O" else 1
+	for index in rings:
+		# A continuous, translucent core makes the trick legible on the first
+		# frame; particles around it provide the breakup and drift. Depending on
+		# random puffs alone produced a cloud whose intended O was only visible
+		# in a debugger.
+		if trick != "GHOST":
+			var core := MeshInstance3D.new()
+			core.name = "SmokeRingCore%d" % index
+			var torus := TorusMesh.new()
+			torus.inner_radius = 0.108
+			torus.outer_radius = 0.142
+			torus.rings = 40
+			torus.ring_segments = 10
+			var core_smoke := StandardMaterial3D.new()
+			core_smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			core_smoke.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			core_smoke.albedo_color = Color(tint.r, tint.g, tint.b, 0.09)
+			core_smoke.disable_receive_shadows = true
+			torus.material = core_smoke
+			core.mesh = torus
+			core.rotation.x = PI * 0.5
+			core.position = Vector3((float(index) - 0.5) * 0.07 if rings > 1 else 0.0, float(index) * 0.035, -0.05 - float(index) * 0.04)
+			rig.add_child(core)
+			var core_tween := core.create_tween().set_parallel(true)
+			core_tween.tween_property(core, "position:z", -1.25, 2.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			core_tween.tween_property(core, "scale", Vector3.ONE * 1.85, 2.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			core_tween.tween_property(core_smoke, "albedo_color", Color(tint.r, tint.g, tint.b, 0.0), 2.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		var ring := GPUParticles3D.new()
+		ring.name = "Ring%d" % index
+		ring.one_shot = true
+		ring.amount = roundi(lerpf(34.0, 56.0, clampf(density / 2.4, 0.0, 1.0)))
+		ring.lifetime = 3.2
+		ring.explosiveness = 0.94
+		ring.fixed_fps = 30
+		ring.position = Vector3((float(index) - 0.5) * 0.07 if rings > 1 else 0.0, float(index) * 0.035, -float(index) * 0.04)
+		var motion := ParticleProcessMaterial.new()
+		motion.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
+		motion.emission_ring_axis = Vector3(0.0, 0.0, 1.0)
+		motion.emission_ring_radius = 0.145 if trick != "GHOST" else 0.17
+		motion.emission_ring_inner_radius = 0.128 if trick != "GHOST" else 0.035
+		motion.emission_ring_height = 0.012
+		motion.direction = Vector3(0.0, 0.02, -1.0)
+		motion.spread = 4.0 if trick != "GHOST" else 12.0
+		motion.initial_velocity_min = 0.62
+		motion.initial_velocity_max = 0.88
+		motion.gravity = Vector3(0.0, 0.12, 0.0)
+		motion.damping_min = 0.08
+		motion.damping_max = 0.2
+		motion.turbulence_enabled = true
+		motion.turbulence_noise_strength = 0.28 if trick != "GHOST" else 0.72
+		motion.turbulence_noise_scale = 1.8
+		motion.turbulence_influence_min = 0.08
+		motion.turbulence_influence_max = 0.34
+		motion.scale_min = 0.62
+		motion.scale_max = 1.0
+		ring.process_material = motion
+		var quad := QuadMesh.new()
+		quad.size = Vector2(0.020, 0.046)
+		var smoke := StandardMaterial3D.new()
+		smoke.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		smoke.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		smoke.billboard_keep_scale = true
+		smoke.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		smoke.albedo_texture = _soft_smoke_texture()
+		smoke.albedo_color = Color(tint.r, tint.g, tint.b, 0.11)
+		smoke.disable_receive_shadows = true
+		quad.material = smoke
+		motion.color_ramp = _smoke_lifetime_ramp()
+		ring.draw_pass_1 = quad
+		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		ring.gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+		rig.add_child(ring)
+		ring.emitting = true
+	get_tree().create_timer(3.8).timeout.connect(rig.queue_free)
+	_track_transient_smoke(rig)
+	return rig
+
+
+## A radial alpha texture turns each billboard into a soft wisp. Without it a
+## particle is literally the full QuadMesh, which is why the first capture
+## looked like white cards flying out of the camera.
+func _soft_smoke_texture() -> GradientTexture2D:
+	var gradient := Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.34, 0.72, 1.0])
+	gradient.colors = PackedColorArray([
+		Color(1.0, 1.0, 1.0, 0.92),
+		Color(1.0, 1.0, 1.0, 0.62),
+		Color(1.0, 1.0, 1.0, 0.16),
+		Color(1.0, 1.0, 1.0, 0.0),
+	])
+	var texture := GradientTexture2D.new()
+	texture.width = 64
+	texture.height = 64
+	texture.fill = GradientTexture2D.FILL_RADIAL
+	texture.fill_from = Vector2(0.5, 0.5)
+	texture.fill_to = Vector2(1.0, 0.5)
+	texture.gradient = gradient
+	return texture
+
+
+func _smoke_lifetime_ramp(peak := 1.0) -> GradientTexture1D:
+	var gradient := Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, 0.035, 0.62, 1.0])
+	gradient.colors = PackedColorArray([
+		Color(1.0, 1.0, 1.0, 0.0),
+		Color(1.0, 1.0, 1.0, peak),
+		Color(0.92, 0.94, 0.88, peak * 0.58),
+		Color(0.86, 0.89, 0.82, 0.0),
+	])
+	var texture := GradientTexture1D.new()
+	texture.width = 64
+	texture.gradient = gradient
+	return texture

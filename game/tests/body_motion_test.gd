@@ -36,6 +36,7 @@ func _ready() -> void:
 	motion.set_perspective(true)
 	motion.update(0.1, Vector3(0, 0, 7), true, false, false, false)
 	check(motion.state == "walk", "real velocity selects walk locomotion")
+	var walking_leg_swing: float = absf(rig.parts.left_leg.rotation.x)
 	# AG5.5 retuned FIRST_PERSON_ARM_RAISE (now 0.62) to the exact value that
 	# cancels hunter_arsenal.gd's own arm-pitch counter-rotation - the fix for
 	# the floating-sword bug. This hardcoded ">0.7" predates that and started
@@ -46,11 +47,25 @@ func _ready() -> void:
 	var raised_floor: float = MOTION.FIRST_PERSON_ARM_RAISE - 0.4
 	check(rig.parts.right_arm.rotation.x > raised_floor and rig.parts.left_arm.rotation.x > raised_floor, "first person raises both real arms into view")
 	check(rig.get_node("right_arm_hitbox").position.is_equal_approx(rig.parts.right_arm.position), "animated anatomy hitbox follows visible arm")
+	motion.update(0.1, Vector3(0, 0, 11), true, true, false, false)
+	check(motion.state == "sprint" and absf(rig.parts.left_leg.rotation.x) > walking_leg_swing,
+		"running visibly opens the stride instead of sliding the bind pose faster")
 	motion.update(0.1, Vector3(0, 0, 3), true, false, true, false)
 	check(motion.state == "crouch", "crouch has its own full-body state")
 	motion.trigger_attack(0.5, "melee")
 	motion.update(0.1, Vector3.ZERO, true, false, false, false)
 	check(motion.state == "attack" and absf(rig.parts.right_arm.rotation.z) > 0.2, "attack layers a committed weapon-arm arc")
+	motion.attack_time = 0.0
+	motion.set_combat_pose(1.0, "firearm")
+	motion.update(0.016, Vector3(0, 0, 2.5), true, false, false, false)
+	check(rig.parts.right_arm.rotation.x > 0.8 and rig.parts.left_arm.rotation.x > 0.8,
+		"firearm preparation shoulders both arms while the legs continue moving")
+	check(rig.get_node("right_arm_hitbox").rotation.is_equal_approx(rig.parts.right_arm.rotation),
+		"the finished aiming pose carries the real arm hitbox with it")
+	motion.trigger_attack(0.34, "firearm")
+	motion.update(0.08, Vector3.ZERO, true, false, false, false)
+	check(motion.state == "shoot" and motion.attack_kind == "firearm",
+		"shooting owns a distinct full-body action rather than borrowing the melee swing")
 	motion.trigger_recoil(34.0)
 	motion.update(0.016, Vector3.ZERO, true, false, false, false)
 	check(motion.recoil_time > 0.0 and motion.camera_offset.length() < 0.2, "weapon recoil moves body and keeps camera motion restrained")

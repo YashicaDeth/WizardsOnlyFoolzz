@@ -178,8 +178,10 @@ and never on a real group of people. The crudeness stays; the target moves.
 
 Greg's closing note, and it is the one that unifies four screens.
 
-The Allusions artwork archive on `J`, the natal sigil, and progression become
-one object. Your Ruling House is where you stand on the wheel. Progression is
+The Allusions artwork archive, the natal sigil, and progression may eventually
+become one object inside the creator/progression route. They are deliberately
+not exposed on `J` during ordinary play before the player has supplied a birth
+or chosen the chart route. Your Ruling House is where you stand on the wheel. Progression is
 **walking the wheel** — each house governs a domain, unlocking a house unlocks
 what it governs, and the path you take between them is visible as a drawn
 figure on your own chart. By the end of a run the sigil is a record of what you
@@ -187,7 +189,9 @@ became, which is the same "bodies remember" pillar pointed at the interface.
 
 This is the same instinct as the handheld in `DESIGN/IN_GAME_INTERNET.md` —
 stop having six fullscreen panels on six keys — and both should be built toward
-each other rather than separately.
+each other rather than separately. Until that route exists, the underlying
+artwork and sigil controls remain dormant rather than presenting Greg's
+placeholder chart as the player's established identity.
 
 ## Build order
 

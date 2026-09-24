@@ -2,6 +2,7 @@ class_name WireNet
 extends RefCounted
 
 const WoundCatalog := preload("res://systems/wound_catalog.gd")
+const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
 
 ## The surviving internet, as a simulation rather than a screen.
 ##
@@ -63,6 +64,26 @@ var traced_by := ""
 
 var _accounts: Dictionary = {}
 var _coverage: Dictionary = {}
+
+## W1.4. Factions share the one WorldClock, but they do not share a shift.
+## These are communications windows, not a second simulation clock: patrols,
+## shops and bodies may still exist outside them. A faction subject may provide
+## `wire_hours: [start, end]`; this table is the stable baseline for the cast
+## already in the world. Equal endpoints mean an institutional 24-hour channel.
+const FACTION_WIRE_HOURS := {
+	"celloutz": [0.0, 0.0],
+	"ashline_wreckers": [18.0, 6.0],
+	"gate_lanterns": [5.0, 18.0],
+	"black_mile": [20.0, 8.0],
+	"soft_rot": [4.0, 16.0],
+	"choir_of_marrow": [22.0, 5.0],
+	"vanity_row": [12.0, 2.0],
+	"honeyvein": [7.0, 21.0],
+	"long_static": [0.0, 10.0],
+	"wizardsonlyfoolz": [19.0, 4.0],
+}
+
+const QUIET_ACTIVITY := 0.12
 
 
 func _init(grade: int = SIGNAL_SURFACE) -> void:
@@ -136,12 +157,14 @@ func _build_account(subject_id: String, subject: Dictionary) -> Dictionary:
 	var reach := 40 + influence * 46 + coverage * 120 + skill_reach + manufactured
 	reach = int(float(reach) * _ladder_split_penalty(relations))
 	var tier := _tier_for(reach)
+	var faction_id := str(subject.get("faction_id", ""))
+	var activity := faction_activity(faction_id)
 	return {
 		"id": subject_id,
 		"name": str(subject.get("name", subject_id)),
 		"handle": _handle(str(subject.get("name", subject_id))),
 		"faction": str(subject.get("faction", "Unbound")),
-		"faction_id": str(subject.get("faction_id", "")),
+		"faction_id": faction_id,
 		"role": str(subject.get("role", "unindexed")),
 		"reach": reach,
 		"influence": influence,
@@ -154,7 +177,8 @@ func _build_account(subject_id: String, subject: Dictionary) -> Dictionary:
 		"verified": bool(tier.verified),
 		"answers": float(tier.answers),
 		"band": _band_for(subject),
-		"last_seen": _last_seen(subject_id, subject),
+		"activity": activity,
+		"last_seen": _last_seen(subject_id, subject, activity),
 	}
 
 
@@ -191,8 +215,12 @@ func _band_for(subject: Dictionary) -> int:
 
 ## A dormant profile reading "last online two minutes ago" should be unsettling,
 ## so the number is real: it comes from the subject's status, not from decoration.
-func _last_seen(subject_id: String, subject: Dictionary) -> String:
+func _last_seen(subject_id: String, subject: Dictionary, activity := 1.0) -> String:
 	var status := str(subject.get("status", "")).to_lower()
+	var faction_id := str(subject.get("faction_id", ""))
+	if not faction_id.is_empty() and activity <= QUIET_ACTIVITY + 0.001 and status not in ["dead", "downed", "executed"]:
+		var schedule := faction_schedule(faction_id)
+		return "QUIET UNTIL %02d:00" % int(schedule.get("start", 0.0))
 	if status in ["active", "following", "hunting", "awake"]:
 		return "ONLINE NOW"
 	if status in ["roaming", "cultivating", "waiting"]:
@@ -202,6 +230,58 @@ func _last_seen(subject_id: String, subject: Dictionary) -> String:
 	if status in ["dead", "downed", "executed"]:
 		return "LAST POST STANDS"
 	return "%d DAYS AGO" % ((hash(subject_id) & 0x7f) % 900 + 4)
+
+
+## A continuous activity value rather than an online/offline switch. Inside a
+## shift it rises toward the middle and falls toward handover; outside it keeps
+## a small automated residue. Windows crossing midnight use the same math.
+func faction_schedule(faction_id: String) -> Dictionary:
+	var faction := WorldHistory.subject(faction_id)
+	var authored: Array = faction.get("wire_hours", [])
+	var hours: Array = authored if authored.size() >= 2 else FACTION_WIRE_HOURS.get(faction_id, [8.0, 20.0])
+	return {"start": float(hours[0]), "end": float(hours[1])}
+
+
+func faction_activity(faction_id: String, at := -1.0) -> float:
+	if faction_id.is_empty():
+		return 0.45
+	var schedule := faction_schedule(faction_id)
+	var start := fposmod(float(schedule.start), WorldClock.HOURS_PER_DAY)
+	var finish := fposmod(float(schedule.end), WorldClock.HOURS_PER_DAY)
+	if is_equal_approx(start, finish):
+		return 1.0
+	var hour_at: float = WorldClock.hour() if float(at) < 0.0 else fposmod(float(at), WorldClock.HOURS_PER_DAY)
+	var duration := fposmod(finish - start, WorldClock.HOURS_PER_DAY)
+	var elapsed := fposmod(hour_at - start, WorldClock.HOURS_PER_DAY)
+	if elapsed > duration:
+		return QUIET_ACTIVITY
+	var through := clampf(elapsed / duration, 0.0, 1.0)
+	return lerpf(0.62, 1.0, sin(through * PI))
+
+
+## Mean traffic across factions that actually have people on this reachable
+## Wire. No new population is invented just to make the gauge move.
+func network_activity() -> float:
+	var seen: Dictionary = {}
+	for account_data: Dictionary in _accounts.values():
+		var faction_id := str(account_data.get("faction_id", ""))
+		if not faction_id.is_empty():
+			seen[faction_id] = faction_activity(faction_id)
+	if seen.is_empty():
+		return 0.0
+	var total := 0.0
+	for value in seen.values():
+		total += float(value)
+	return clampf(total / float(seen.size()), 0.0, 1.0)
+
+
+func activity_band() -> String:
+	var activity := network_activity()
+	if activity >= 0.72:
+		return "CROWDED"
+	if activity >= 0.38:
+		return "RESTLESS"
+	return "QUIET"
 
 
 func accounts_by_reach() -> Array:
@@ -331,8 +411,10 @@ func open_vacancy(subject_id: String) -> Dictionary:
 			return existing
 	var vacancy := {"rank": rank, "former": subject_id, "opened_sequence": WorldHistory.next_sequence}
 	vacancies.append(vacancy)
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(faction_id, {"vacant_posts": vacancies})
 	WorldHistory.record_event("faction_post_vacated", {"faction_id": faction_id, "rank": rank, "former": subject_id})
+	WorldHistory.commit_ledger_batch()
 	return vacancy
 
 
@@ -355,6 +437,7 @@ func promote_successor(faction_id: String, rank: String = "") -> Dictionary:
 		return {}
 	var subject_id := str(successor.id)
 	var subject := WorldHistory.subject(subject_id)
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.update_subject(subject_id, {
 		"faction_rank": str(vacancy.rank),
 		"previous_role": str(subject.get("role", "unindexed")),
@@ -368,7 +451,13 @@ func promote_successor(faction_id: String, rank: String = "") -> Dictionary:
 		"debt_leverage": successor.debt_leverage, "wealth": successor.wealth,
 	})
 	rebuild()
-	return WorldHistory.subject(subject_id)
+	WorldHistory.commit_ledger_batch()
+	var promoted := WorldHistory.subject(subject_id)
+	# The caller already receives the promoted subject; include its stable id so
+	# consequences of succession (an inherited hunt, debt, command) can attach
+	# to the real person without re-deriving who won the post from rank labels.
+	promoted["id"] = subject_id
+	return promoted
 
 
 func _best_successor(faction_id: String, excluded_id: String) -> Dictionary:
@@ -512,9 +601,18 @@ func contest_channel(faction_id: String, action: String, subject_id: String = "p
 			control = 0.0
 			result.headline = "MAST CUT"
 			result.detail = "COVERAGE IS GONE FOR EVERYONE HERE, INCLUDING YOU."
+	# Control, the public act and every resulting grudge are one consequence
+	# chain. Player contests get a receipt; autonomous actors remain ordinary
+	# world events rather than being falsely charged to the player.
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(faction_id, {"signal_control": control})
-	WorldHistory.record_event("channel_contested", {"faction_id": faction_id, "action": action, "subject_id": subject_id, "control_after": control})
+	var details := {"faction_id": faction_id, "action": action, "subject_id": subject_id, "control_after": control}
+	if subject_id == "player":
+		PlayerActionLedger.record("channel_contested", details)
+	else:
+		WorldHistory.record_event("channel_contested", details)
 	_retaliate(faction_id, action, subject_id)
+	WorldHistory.commit_ledger_batch()
 	result["control_after"] = control
 	return result
 
@@ -804,13 +902,15 @@ func act(subject_id: String, action: String) -> Dictionary:
 			result.ok = false
 			result.headline = "UNKNOWN ACTION"
 	if result.ok:
+		WorldHistory.begin_ledger_batch()
 		exposure += int(result.exposure)
 		if int(result.grudge) != 0:
 			var subject: Dictionary = WorldHistory.subject(subject_id)
 			WorldHistory.update_subject(subject_id, {"grudge": int(subject.get("grudge", 0)) + int(result.grudge)}, "wire_action")
-		WorldHistory.record_event("wire_%s" % action, {"subject": subject_id, "exposure": exposure})
+		PlayerActionLedger.record("wire_%s" % action, {"actor": "player", "subject": subject_id, "exposure": exposure})
 		_accounts[subject_id]["grudge"] = int(_accounts[subject_id]["grudge"]) + int(result.grudge)
 		_accounts[subject_id]["reach"] = maxi(40, int(_accounts[subject_id]["reach"]) + int(result.reach))
+		WorldHistory.commit_ledger_batch()
 	return result
 
 
@@ -850,7 +950,10 @@ func publish_photograph(photo: Dictionary) -> Dictionary:
 		"grudge": 8 + carnage * 4,
 	}
 	strain += 0.6 + float(carnage) * 0.2
-	WorldHistory.record_event("photograph_published", {
+	# Publishing and every depicted person's durable reaction are one act.
+	WorldHistory.begin_ledger_batch()
+	PlayerActionLedger.record("photograph_published", {
+		"actor": "player",
 		"photo": str(photo.get("id", "")),
 		"subjects": named,
 		"carnage": carnage,
@@ -866,6 +969,7 @@ func publish_photograph(photo: Dictionary) -> Dictionary:
 			"grudge": mini(100, int(subject.get("grudge", 0)) + int(result.grudge)),
 			"memory": "There is a picture of me like that, and everyone has seen it.",
 		})
+	WorldHistory.commit_ledger_batch()
 	return result
 
 
@@ -902,6 +1006,56 @@ func distort(text: String, hops: int) -> String:
 
 
 # --- the feed --------------------------------------------------------------
+
+## C10.13. The archive and the feed read the same history and disagree about
+## it. The archive does not keep a second copy of events: every time it is
+## opened it projects the exact `WorldHistory` record into a finite, newest-
+## first register. `details` is duplicated so a screen cannot amend history by
+## editing a row it was handed.
+func archive(limit: int = 12) -> Array:
+	var events: Array = WorldHistory.recent_events(maxi(0, limit))
+	events.reverse()
+	var records: Array = []
+	for event: Dictionary in events:
+		var details: Dictionary = event.get("details", {})
+		records.append({
+			"id": str(event.get("id", "")),
+			"sequence": int(event.get("sequence", 0)),
+			"type": str(event.get("type", "unknown")),
+			"body": _archive_body(event),
+			"details": details.duplicate(true),
+		})
+	return records
+
+
+## A compact factual line for the physical register. It deliberately does no
+## rumour inference and invents no connective prose: event type, named subject,
+## place/outcome and changed fields are only printed when the record contains
+## them. The full exact dictionary remains beside it in `archive()`.
+func _archive_body(event: Dictionary) -> String:
+	var details: Dictionary = event.get("details", {})
+	var facts: Array[String] = []
+	var subject_id := str(details.get("subject_id", details.get("subject", "")))
+	if not subject_id.is_empty():
+		var subject_name := str(WorldHistory.subject(subject_id).get("name", subject_id))
+		facts.append("SUBJECT %s" % subject_name.to_upper())
+	for key in ["location", "outcome", "reason", "stage"]:
+		if details.has(key) and str(details[key]) != "":
+			facts.append("%s %s" % [str(key).to_upper(), str(details[key]).to_upper()])
+	var changes: Dictionary = details.get("changes", {})
+	var change_keys: Array = changes.keys()
+	change_keys.sort()
+	for key in change_keys:
+		facts.append("%s=%s" % [str(key).to_upper(), str(changes[key]).to_upper()])
+	var detail_keys: Array = details.keys()
+	detail_keys.sort()
+	for key in detail_keys:
+		if key in ["subject_id", "subject", "location", "outcome", "reason", "stage", "changes"]:
+			continue
+		if details[key] is Dictionary:
+			continue
+		facts.append("%s %s" % [str(key).to_upper(), str(details[key]).to_upper()])
+	return " / ".join(facts) if not facts.is_empty() else "NO FIELDS RECORDED"
 
 ## An endless scroll that is not sorted for the reader's benefit. Real world
 ## history is interleaved with the register the design names — doom, wellness
@@ -960,11 +1114,20 @@ func feed(count: int = 14, seed_offset: int = 0) -> Array:
 	if signal_grade >= SIGNAL_UNDERBELLY:
 		kinds.append("underbelly")
 	var voices := accounts_by_reach()
+	var active_voices: Array = voices.filter(func(voice: Dictionary): return float(voice.get("activity", 0.0)) > QUIET_ACTIVITY + 0.01)
+	if not active_voices.is_empty():
+		voices = active_voices
+	var traffic := network_activity()
+	var report_stride := 2 if traffic >= 0.72 else (3 if traffic >= 0.38 else 4)
 	for index in count:
 		# Roughly one post in three is the world actually reporting on itself.
 		# The rest is what the platform would rather you read.
 		if index % 3 == 1 and not reports.is_empty():
-			var event: Dictionary = reports[index % reports.size()]
+			# Advance through the receipts one by one. `index % reports.size()`
+			# only ever selected two of six records at the 1,4,7... report slots,
+			# silently making the newest acts impossible to see in the feed.
+			var report_index := floori(float(index) / 3.0) % reports.size()
+			var event: Dictionary = reports[report_index]
 			posts.append(_report_post(event, rng, voices))
 			continue
 		var kind: String = kinds[rng.randi_range(0, kinds.size() - 1)]
@@ -978,7 +1141,7 @@ func feed(count: int = 14, seed_offset: int = 0) -> Array:
 			"reach": int(voice.get("reach", 0)),
 			"verified": bool(voice.get("verified", false)) and kind != "bot",
 			"band": SIGNAL_UNDERBELLY if kind == "underbelly" else SIGNAL_SURFACE,
-			"replies": rng.randi_range(0, 340),
+			"replies": roundi(float(rng.randi_range(0, 340)) * lerpf(0.45, 1.55, traffic)),
 		})
 	return posts
 
@@ -997,6 +1160,11 @@ func _report_post(event: Dictionary, rng: RandomNumberGenerator, _voices: Array)
 		"band": SIGNAL_SURFACE,
 		"replies": rng.randi_range(40, 900),
 		"hops": hops,
+		# The receipt survives the retelling. This is what lets the archive and
+		# feed be compared as two accounts of one act instead of two unrelated
+		# strings that merely look different.
+		"source_event_id": str(event.get("id", "")),
+		"source_sequence": int(event.get("sequence", 0)),
 	}
 
 

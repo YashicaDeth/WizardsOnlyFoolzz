@@ -25,6 +25,7 @@ extends RefCounted
 ## `Carry.take_chunk()` already accepts.
 
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
+const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
 
 ## Seconds to clear one layer at speed 1.0. Sized so robbing an intact torso
 ## with bare hands is a real commitment (about nine seconds) while a limb you
@@ -250,14 +251,18 @@ static func notice(ledger: WitnessLedger, extracted: Dictionary, at: Vector3, ca
 		"owner_alive": owner_alive,
 		"location": location,
 	}
+	# The extraction fact, witness payload and living owner's memory are one
+	# player act. WitnessLedger still owns testimony; it only uses our receipt.
+	WorldHistory.begin_ledger_batch()
 	if ledger != null:
-		ledger.record("part_extracted", details, witnesses)
+		ledger.record("part_extracted", details, witnesses, true)
 	else:
-		WorldHistory.record_event("part_extracted", details)
+		PlayerActionLedger.record("part_extracted", details)
 	if owner_alive and owner != "":
 		var subject := WorldHistory.subject(owner)
 		WorldHistory.update_subject(owner, {
 			"grudge": mini(100, int(subject.get("grudge", 0)) + 26),
 			"memory": "The Hunter cut %s out of me while I was on the ground." % details.part,
 		}, "robbed_while_down")
+	WorldHistory.commit_ledger_batch()
 	return {"witnesses": witnesses, "stolen": not witnesses.is_empty() or owner_alive}

@@ -1,6 +1,7 @@
 extends Node
 
 const Quantum := preload("res://systems/quantum_saves.gd")
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 var failures: Array[String] = []
 
 
@@ -32,6 +33,10 @@ func _ready() -> void:
 	check(WorldHistory.subject("branch_a").get("name", "") == "FIRST WORLD", "restores first world bodies")
 	check(WorldHistory.subject("branch_b").is_empty(), "does not blend bodies between worlds")
 	check(WorldHistory.run_salt == 7001, "restores the world's visual seed")
+	var entered: Dictionary = WorldHistory.events[-1]
+	check(str(entered.get("type", "")) == "quantum_branch_entered" and str((entered.get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_") and PLAYER_ACTION_LEDGER.count("quantum_branch_entered") == 1,
+		"the crossing lands in the restored world as one identified player act")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "the restored snapshot, active slot and crossing receipt close one transaction")
 	check(Quantum.slots()[1].get("label", "") == "SECOND WORLD", "lists the second branch metadata")
 	print("QUANTUM_SAVES_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

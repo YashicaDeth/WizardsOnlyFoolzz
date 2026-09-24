@@ -60,6 +60,7 @@ const FAVOR_STEP := 0.15
 
 
 static func seed_gods() -> void:
+	WorldHistory.begin_ledger_batch()
 	for god_id in GODS:
 		var data: Dictionary = GODS[god_id]
 		WorldHistory.register_subject(god_id, {
@@ -67,6 +68,7 @@ static func seed_gods() -> void:
 			"threat": "NONE", "status": "watching", "memory": str(data.memory),
 			"attention": 0, "relations": {},
 		})
+	WorldHistory.commit_ledger_batch()
 
 
 ## AJ3.4. Attention is not spent the way AscentEntities' notice is (there is
@@ -162,6 +164,9 @@ static func record_death_verdicts(victim_id: String, killer_id: String, details:
 	if asked.is_empty():
 		asked = GODS.keys()
 	var results: Array = []
+	# All opinions answer one death. Preserve their individuality in the event
+	# log while persisting attention, verdicts and standings as one world turn.
+	WorldHistory.begin_ledger_batch()
 	for god_id in asked:
 		var result := verdict(str(god_id), victim_id, details)
 		if result.is_empty():
@@ -172,4 +177,5 @@ static func record_death_verdicts(victim_id: String, killer_id: String, details:
 			"label": result.label, "lean": result.lean,
 		})
 		_apply_consequence(str(god_id), killer_id, str(result.label))
+	WorldHistory.commit_ledger_batch()
 	return results

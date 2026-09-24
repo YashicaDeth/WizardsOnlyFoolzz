@@ -1,5 +1,7 @@
 extends Node
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 ## AV1.1-AV1.4, AV2.1-AV2.5, AV3.1. Ten sephiroth plus the one that is not on
 ## the map; four worlds as registers; altitude read from what substances.gd/
 ## meditation.gd already record rather than a menu; a petition that costs
@@ -94,13 +96,14 @@ func _ready() -> void:
 	var blood_after_petition := float(WorldHistory.subject("player").get("anatomy_state", {}).get("blood", 5000.0))
 	check(blood_after_petition < blood_before, "and the offering actually left the body (%.0f -> %.0f)" % [blood_before, blood_after_petition])
 	var petition_events := WorldHistory.events.filter(func(e): return str(e.get("type", "")) == "plane_petitioned")
-	check(petition_events.size() == 1, "the petition is a real recorded event later systems can read")
+	check(petition_events.size() == 1 and PLAYER_ACTION_LEDGER.count("plane_petitioned") == 1 and str((petition_events[0].get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_"), "the paid petition is one identified act later systems can read")
 
 	# --- AV1.4's other half: a licence to depart also costs something -------
 	var departed := PlaneLadder.depart("player", "yesod", "blood", 40.0)
 	check(bool(departed.get("ok", false)), "leaving is its own paid act")
 	var blood_after_departure := float(WorldHistory.subject("player").get("anatomy_state", {}).get("blood", 5000.0))
 	check(blood_after_departure < blood_after_petition, "and it costs something too, on the way out (%.0f -> %.0f)" % [blood_after_petition, blood_after_departure])
+	check(PLAYER_ACTION_LEDGER.count("plane_departed") == 1, "the paid departure has one player-action receipt")
 
 	# --- AV2.3: coming down mid-interaction is a real, remembered failure ---
 	WorldHistory.register_subject("faller", {"name": "Faller", "kind": "person"})
@@ -110,6 +113,7 @@ func _ready() -> void:
 	check(not bool(never_climbed.get("ok", false)), "but on a plane one step up with nothing taken, the same hold fails")
 	var failure_events := WorldHistory.events.filter(func(e): return str(e.get("type", "")) == "plane_altitude_failed" and str((e.get("details", {}) as Dictionary).get("subject_id", "")) == "faller")
 	check(failure_events.size() == 1, "and the failure is a real recorded event, not a silent no-op")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "offerings, crossings, plane memory and altitude failure always close their nested transactions")
 
 	# --- AV3.1: planes are real WorldHistory subjects, Da'ath is not --------
 	PlaneLadder.register_planes()

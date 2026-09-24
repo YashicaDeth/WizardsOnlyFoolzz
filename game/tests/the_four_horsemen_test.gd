@@ -20,6 +20,7 @@ func _ready() -> void:
 	WorldHistory.clear_history()
 	CosmologyFactions._seed()
 	TheFourHorsemen.seed_horsemen()
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "the four Horsemen seed in one closed schema transaction")
 
 	for horseman_id in ["war", "famine", "pestilence", "death"]:
 		var subject := WorldHistory.subject(horseman_id)

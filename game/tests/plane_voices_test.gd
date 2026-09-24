@@ -1,5 +1,7 @@
 extends Node
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 ## AV3.2-AV3.7. A relationship that accumulates across trips; standing
 ## expressed as how much of a line actually arrives rather than as a meter;
 ## withholding that names what it is keeping and hands over the identical
@@ -96,6 +98,7 @@ func _ready() -> void:
 	check(str(middle.label).begins_with("UNDECIDED"), "the middle pillar with nothing to read the death through genuinely has no opinion")
 	var verdict_events := WorldHistory.events.filter(func(e): return str(e.get("type", "")) == "plane_verdict")
 	check(verdict_events.size() == 10, "each opinion is recorded as its own attributed event, never summed into a score")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "all ten verdict facts and remembered relationships close one death transaction")
 
 	# The disagreement has a consequence: it moves each plane's own standing.
 	check(PlaneVoices.standing("gevurah", "player") > 0.0, "the plane that approved of the kill thinks better of you for it")
@@ -151,6 +154,8 @@ func _ready() -> void:
 	# --- AV3.5: a debt is real, and it is taken out of the body -------------
 	var owed := PlaneVoices.owe("gevurah", "player", "blood", 120.0, "a sight you could not afford")
 	check(bool(owed.get("ok", false)), "a plane will let you take something on credit")
+	var debt_events := WorldHistory.events.filter(func(event: Dictionary) -> bool: return str(event.get("type", "")) == "plane_debt_incurred")
+	check(PLAYER_ACTION_LEDGER.count("plane_debt_incurred") == 1 and not debt_events.is_empty() and str((debt_events.back().get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_"), "taking the debt is one identified player choice")
 	check(is_equal_approx(float(PlaneVoices.debt("gevurah", "player").get("amount", 0.0)), 120.0), "and the figure is stored on its own edge with you")
 	var figure := PlaneVoices.ask("gevurah", "player", "your_debt")
 	check(str(figure.get("answer", "")).contains("120"), "a creditor always tells you the figure, whatever it thinks of you")
@@ -192,6 +197,7 @@ func _ready() -> void:
 	check(PlaneVoices.standing("chokmah", "faller") < -faller_after_trip, "coming down mid-sentence costs a plane's regard more than a clean trip buys (AV2.3 into AV3.2)")
 	var fall_answer := PlaneVoices.ask("chokmah", "faller", "your_falls")
 	check(bool(fall_answer.get("known", false)) and bool(fall_answer.get("withheld", false)), "it knows exactly how many times you slid off it, and at that standing it will not say")
+	check(PLAYER_ACTION_LEDGER.count("plane_debt_incurred") == 3 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "each accepted debt receives one receipt while collection and default transactions always close")
 
 	print("PLANE_VOICES_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

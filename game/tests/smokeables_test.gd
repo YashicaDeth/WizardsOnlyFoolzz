@@ -27,8 +27,14 @@ func _ready() -> void:
 	for device_id: String in SMOKEABLES.CATALOG:
 		var node: Node3D = SMOKEABLES.build(device_id)
 		check(node != null and node.get_child_count() > 0, "%s is built from primitives, not nothing" % device_id)
+		check(node.get_node_or_null("anchor_grip") != null, "%s names where HeldGear closes the hand" % device_id)
 		check(SX.PROFILES.has(str((SMOKEABLES.CATALOG[device_id] as Dictionary)["substance"])),
 			"%s burns something with an authored curve" % device_id)
+		if device_id == "bong":
+			check(node.get_node_or_null("anchor_grip_support") != null, "the bong has a second physical handhold")
+			check(bool(node.get_meta("two_handed", false)), "and names itself as a two-hand object")
+		else:
+			check(node.get_node_or_null("anchor_grip_support") == null, "%s does not invent a second hand" % device_id)
 		node.free()
 
 	# --- the curve: a snatch is thin, the sweet spot is best, greed bites ----
@@ -83,6 +89,7 @@ func _ready() -> void:
 	check(not smoked.is_empty(), "smoking is a recorded event like anything else you do")
 	check(str((smoked[0].get("details", {}) as Dictionary).get("grade", "")) == SMOKEABLES.HARSH,
 		"and the record says which kind of draw it was")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "dose, tolerance, harsh body cost and smoking receipt close one hit transaction")
 
 	# --- tolerance reaches through the device --------------------------------
 	check(SX.tolerance("player", "choir_bloom") == 1, "a smoked dose counts toward tolerance like any other")
@@ -97,8 +104,11 @@ func _ready() -> void:
 	var stub: Node3D = SMOKEABLES.build("cigarette", 1.0)
 	var fresh_length: float = ((fresh.get_meta("parts") as Dictionary)["body"] as MeshInstance3D).mesh.height
 	var stub_length: float = ((stub.get_meta("parts") as Dictionary)["body"] as MeshInstance3D).mesh.height
+	var fresh_ash: float = (((fresh.get_meta("parts") as Dictionary)["ash"] as MeshInstance3D).mesh as CylinderMesh).height
+	var stub_ash: float = (((stub.get_meta("parts") as Dictionary)["ash"] as MeshInstance3D).mesh as CylinderMesh).height
 	check(stub_length < fresh_length * 0.4, "a spent cigarette is visibly shorter than a fresh one")
 	check(stub_length > 0.0, "and never burns away to nothing - you stub it out")
+	check(stub_ash > fresh_ash, "ash accumulates on the resting object instead of existing only during RMB")
 
 	# Monotonic, because a thing that got longer partway through would be a bug
 	# nobody would think to look for.
@@ -135,6 +145,8 @@ func _ready() -> void:
 	SMOKEABLES.set_draw(fresh, 1.0)
 	check(coal_material.emission_energy_multiplier > rest_energy, "drawing brightens the coal")
 	check(held_light.light_energy > rest_throw, "and it throws more light while you do it")
+	check(held_light.omni_range >= 6.0 and held_light.light_energy >= 4.0,
+		"a live draw casts a usable warm pool into the night")
 	var sweet_hue := coal_material.emission
 	SMOKEABLES.set_draw(fresh, 1.6)
 	check(coal_material.emission != sweet_hue,
@@ -156,7 +168,29 @@ func _ready() -> void:
 		"holding for the ideal is exactly heat 1.0, so the gauge and the grade agree")
 	check(SMOKEABLES.draw_heat("bong", 1.6) < 1.0, "and the bong wants longer before it reads full")
 
-	for node in [fresh, stub, tank_full, tank_dry, bowl_packed, bowl_ashed, built_at_rest, released]:
+	var bong_parts: Dictionary = bowl_packed.get_meta("parts")
+	var bong_chamber: MeshInstance3D = bong_parts["chamber_smoke"]
+	var bong_bubbles: Array = bong_parts["bubbles"]
+	SMOKEABLES.set_draw(bowl_packed, 0.0)
+	check(not bong_chamber.visible and (bong_bubbles as Array).all(func(bubble): return not (bubble as MeshInstance3D).visible),
+		"a resting bong has clear water and a clear chamber")
+	SMOKEABLES.set_draw(bowl_packed, 0.8)
+	check(bong_chamber.visible, "drawing continuously fills the bong chamber")
+	check((bong_bubbles as Array).all(func(bubble): return (bubble as MeshInstance3D).visible),
+		"and pulls visible bubbles through the water")
+	check((bong_parts["light"] as OmniLight3D).light_energy > 0.0,
+		"and lights the bowl during the same held draw")
+	check((bong_parts["light"] as OmniLight3D).omni_range >= 4.5,
+		"the burning bowl reaches beyond the prop into the nearby room")
+
+	var live_spliff := SMOKEABLES.build("spliff", 0.0)
+	var spliff_ash: MeshInstance3D = (live_spliff.get_meta("parts") as Dictionary)["ash"]
+	SMOKEABLES.set_draw(live_spliff, 0.55)
+	check(absf(spliff_ash.rotation.z) > 0.01, "a spliff visibly rolls as it is drawn")
+	SMOKEABLES.set_draw(live_spliff, 0.0)
+	check(is_zero_approx(spliff_ash.rotation.z), "and settles back into its authored rest")
+
+	for node in [fresh, stub, tank_full, tank_dry, bowl_packed, bowl_ashed, built_at_rest, released, live_spliff]:
 		(node as Node3D).free()
 
 	print("SMOKEABLES_TEST_RESULT failures=", failures.size())

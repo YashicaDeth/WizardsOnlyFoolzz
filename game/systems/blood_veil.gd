@@ -36,11 +36,11 @@ const FILM := Color("c25b3c")
 
 ## Past this many doses the glass is saturated and new ones replace old rather
 ## than stacking, so a long fight cannot end in an opaque red screen.
-const MAX_MARKS := 46
+const MAX_MARKS := 28
 ## Seconds for a mark to go from arterial to dry. Deliberately long.
-const DRYING := 22.0
+const DRYING := 14.0
 ## And how long after that before it is gone entirely.
-const FADING := 70.0
+const FADING := 32.0
 
 var marks: Array = []
 var _rng := RandomNumberGenerator.new()
@@ -70,7 +70,7 @@ func splash(strength: float, from := Vector2.ZERO) -> void:
 	if force <= 0.01:
 		return
 	sheen = minf(1.0, sheen + force * 0.8)
-	var count := 3 + roundi(force * 14.0)
+	var count := 2 + roundi(force * 7.0)
 	# Where on the glass it lands. A directional dose lands biased toward the
 	# side it came from, rather than evenly over the screen.
 	var anchor := size * 0.5

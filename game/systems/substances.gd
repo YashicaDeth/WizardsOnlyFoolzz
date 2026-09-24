@@ -17,6 +17,7 @@ extends RefCounted
 ## second economy.
 
 const AnatomyComponent := preload("res://systems/anatomy_component.gd")
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 ## AU1.2. "A drug is an object — a baggie, a blister, a tab, a weight." Each
 ## entry now names which of those it actually is, read by `carry.gd`'s
@@ -86,20 +87,31 @@ static func take(subject_id: String, substance_id: String, potency: float = 1.0)
 	var data: Dictionary = CATALOG[substance_id].duplicate()
 	data["pain_relief"] = float(data.pain_relief) * potency
 	data["consciousness_cost"] = float(data.consciousness_cost) * potency
-	var payment := Boons._pay(subject_id, str(data.cost_kind), float(data.cost_amount), str(data.get("cost_target", "")))
+	# One swallowed dose touches the body, anatomy, history and sometimes an
+	# entity contact. Keep all public events/signals, but persist the physical
+	# act once and route a player dose through the compact action ledger.
+	WorldHistory.begin_ledger_batch()
+	var payment := Boons.pay(subject_id, str(data.cost_kind), float(data.cost_amount), str(data.get("cost_target", "")))
 	if not bool(payment.get("ok", false)):
+		WorldHistory.commit_ledger_batch()
 		return payment
 	var anatomy: Dictionary = WorldHistory.subject(subject_id).get("anatomy_state", {})
 	anatomy["pain"] = clampf(float(anatomy.get("pain", 0.0)) - float(data.pain_relief), 0.0, 100.0)
 	anatomy["consciousness"] = clampf(float(anatomy.get("consciousness", 100.0)) - float(data.consciousness_cost), 0.0, 100.0)
 	WorldHistory.amend_subject(subject_id, {"anatomy_state": anatomy})
-	WorldHistory.record_event("substance_taken", {
+	var details := {
 		"subject_id": subject_id, "substance_id": substance_id,
 		"cost_kind": data.cost_kind, "cost_amount": data.cost_amount,
-	})
+		"potency": potency,
+	}
+	if subject_id == "player":
+		PLAYER_ACTION_LEDGER.record("substance_taken", details)
+	else:
+		WorldHistory.record_event("substance_taken", details)
 	var result := {"ok": true, "consciousness_after": float(anatomy.consciousness), "pain_after": float(anatomy.pain)}
 	if bool(data.get("door", false)):
 		result["glimpsed"] = _glimpse_one(subject_id, substance_id)
+	WorldHistory.commit_ledger_batch()
 	return result
 
 

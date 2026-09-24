@@ -38,6 +38,9 @@ const BrokenWeb := preload("res://systems/broken_web.gd")
 const BlackMirror := preload("res://systems/black_mirror.gd")
 const Sephiroth := preload("res://systems/sephiroth.gd")
 const PinBoardScript := preload("res://systems/pin_board.gd")
+const FacilityTerritory := preload("res://systems/facility_territory.gd")
+const AshbloomHoldings := preload("res://systems/ashbloom_holdings.gd")
+const HuntContracts := preload("res://systems/hunt_contracts.gd")
 
 ## Six live 3D heads is cheap; sixty would not be, and each icon owns a World3D.
 ## So they are a pool the pages draw into by slot rather than one per row.
@@ -55,7 +58,7 @@ const GROUND := Color(0.035, 0.026, 0.019, 0.90)
 ## AR1.1. Appended rather than inserted — WIRE and BODY's hardcoded page
 ## indices (2 and 3) are referenced elsewhere in this file by number, and a
 ## new page ahead of them would silently retarget those jumps.
-const PAGES := ["FILE", "PYRAMID", "WIRE", "BODY", "TREE"]
+const PAGES := ["FILE", "PYRAMID", "WIRE", "BODY", "TREE", "WORK"]
 
 var page := 0
 var rail_index := 0
@@ -73,6 +76,10 @@ var _rain_size := Vector2.ZERO
 var _wire_glow := 0.0
 var wire = null
 var posts: Array = []
+## C10.13. One physical switch on the WIRE page, not a seventh handheld app.
+## False is the endless, attention-costing feed; true is the finite event
+## register derived from the exact same `WorldHistory` records.
+var wire_archive := false
 
 ## I3.2. celloutz.xyz — and everything else `broken_web.gd` catalogued and
 ## nothing ever surfaced — as reachable places on the Wire rather than data
@@ -152,9 +159,21 @@ var _rail_cache: Array = []
 var _dead_pixels: Array = []
 
 
+## Item 5 (Greg, 2026-09-24): the contract prints as a thermal receipt and the
+## Wire as continuous tractor-feed paper. Each is a ThermalPrint laid over the
+## panel, re-printing what the page draws underneath it.
+var _receipt: ThermalPrint
+var _feed: ThermalPrint
+
+
 func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	_receipt = ThermalPrint.make("register")
+	_feed = ThermalPrint.make("feed")
+	for paper in [_receipt, _feed]:
+		paper.visible = false
+		add_child(paper)
 	# Offsets as well as anchors. A Control parented straight to a CanvasLayer
 	# has no parent rect to inherit from, so anchors alone leave it at zero size
 	# and `_draw` bails on its own minimum-size guard without drawing anything.
@@ -215,7 +234,12 @@ func refresh() -> void:
 ## So neither trusting the default nor requiring the field works: a subject is a
 ## person if somebody gave it a name.
 func _is_person(subject: Dictionary) -> bool:
-	if str(subject.get("kind", "")) == "faction":
+	var kind := str(subject.get("kind", ""))
+	if kind == "facility_sector":
+		return true
+	if kind == "place":
+		return bool(subject.get("revealed", false))
+	if kind in ["faction", "job", "object", "territory", "run"]:
 		return false
 	return str(subject.get("name", "")) != ""
 
@@ -253,12 +277,34 @@ func _rebuild_rail() -> void:
 					note += "  \u00b7  YOU"
 				if _matches(str(account.name), note):
 					_rail_cache.append({"id": str(account.id), "label": str(account.name), "note": note})
+		5:
+			for subject_id in WorldHistory.all_subjects():
+				var contract := WorldHistory.subject(str(subject_id))
+				if str(contract.get("job_class", "")) != "frequency_bounty":
+					continue
+				var label := str(contract.get("name", subject_id))
+				var note := "%s  ·  %s" % [str(contract.get("status", "offered")).to_upper(), str(contract.get("block_kind", "signal")).to_upper()]
+				if _matches(label, note + " " + str(contract.get("obstruction", ""))):
+					_rail_cache.append({"id": str(subject_id), "label": label, "note": note})
 
 
 func _process(delta: float) -> void:
 	if not visible:
 		return
 	elapsed += delta
+	# Paper only once the page has fully arrived, so the slide-in stays a
+	# screen and the print lands on it.
+	var settled := page_blend >= 1.0 and open_blend >= 0.99
+	var panel := _panel_rect().grow(10.0)
+	if settled and page == 5:
+		_receipt.cover(Rect2(panel.position - Vector2(16, 0), panel.size + Vector2(32, 0)))
+	else:
+		_receipt.visible = false
+	if settled and page == 2:
+		# The sprocket margins sit outside the text, not over it.
+		_feed.cover(Rect2(panel.position - Vector2(30, 0), panel.size + Vector2(60, 0)))
+	else:
+		_feed.visible = false
 	action_life = maxf(0.0, action_life - delta)
 	page_blend = Motion.blend(page_blend, delta, Motion.PANEL, true)
 	_wire_glow = Motion.blend(_wire_glow, delta, Motion.PANEL, PAGES[page] == "WIRE")
@@ -361,6 +407,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				rail_index = maxi(0, rail_index - 1)
 			KEY_DOWN:
 				rail_index = mini(_rail_cache.size() - 1, rail_index + 1)
+			KEY_A:
+				if page != 2:
+					return
+				toggle_wire_archive()
 			KEY_P:
 				# L2.1. Take the selected record off the index and carry it to
 				# the wall. The index does not know the board exists — it hands
@@ -369,12 +419,17 @@ func _unhandled_input(event: InputEvent) -> void:
 				if rail_index >= 0 and rail_index < _rail_cache.size():
 					var row: Dictionary = _rail_cache[rail_index]
 					var subject: Dictionary = WorldHistory.subject(str(row["id"]))
-					var row_kind := "record" if str(subject.get("kind", "")) == "faction" else "photo"
+					var row_kind := "record" if str(subject.get("kind", "")) in ["faction", "place", "facility_sector"] else "photo"
 					pin_requested.emit(str(row["id"]), row_kind, str(row["label"]))
 			KEY_TAB:
 				if page != 3 or not _inspector.handle_key(KEY_TAB):
 					return
 			KEY_ENTER, KEY_KP_ENTER:
+				if page == 5:
+					_accept_selected_contract()
+					get_viewport().set_input_as_handled()
+					queue_redraw()
+					return
 				# A4.5. Sending is an act, so it re-rolls deliberately rather
 				# than the panel re-rolling it behind your back every frame.
 				if page != 2 or _contact_for == "":
@@ -447,20 +502,43 @@ func _unhandled_input(event: InputEvent) -> void:
 					queue_redraw()
 					return
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			feed_scroll += 42.0
-			if wire:
-				wire.scroll(1.0)
-			# A4.7. It does not end. Reaching the bottom loads more, which is
-			# the mechanic the design asks for - the feed is meant to farm you,
-			# and a scroll bar that fills up is an exit sign.
-			if feed_scroll > maxf(0.0, float(posts.size()) * 80.0 - 360.0):
-				posts.append_array(wire.feed(10, posts.size()))
+			scroll_wire(1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			feed_scroll = maxf(0.0, feed_scroll - 42.0)
+			scroll_wire(-1)
 		else:
 			return
 		get_viewport().set_input_as_handled()
 		queue_redraw()
+
+
+## Kept callable because the same switch can later be given a pointer target
+## without duplicating its state transition. Returning the state also makes the
+## input seam testable without synthesising OS keyboard state.
+func toggle_wire_archive() -> bool:
+	wire_archive = not wire_archive
+	feed_scroll = 0.0
+	queue_redraw()
+	return wire_archive
+
+
+## The archive is finite and free to read; the feed is endless and charges
+## attention. Keeping those two wheel behaviours on this switch prevents the
+## archive from secretly using the feed's cost and pagination behind its back.
+func scroll_wire(direction: int) -> void:
+	if direction == 0:
+		return
+	if wire_archive:
+		var archive_height := float(wire.archive(32).size()) * 57.0
+		feed_scroll = clampf(feed_scroll + 42.0 * signf(direction), 0.0, maxf(0.0, archive_height - 300.0))
+		return
+	feed_scroll = maxf(0.0, feed_scroll + 42.0 * signf(direction))
+	if direction > 0 and wire:
+		wire.scroll(1.0)
+		# A4.7. It does not end. Reaching the bottom loads more, which is
+		# the mechanic the design asks for - the feed is meant to farm you,
+		# and a scroll bar that fills up is an exit sign.
+		if feed_scroll > maxf(0.0, float(posts.size()) * 80.0 - 360.0):
+			posts.append_array(wire.feed(10, posts.size()))
 
 
 ## Binds a pooled icon to a subject and draws it at `rect`. Returns false when
@@ -472,6 +550,11 @@ func _draw_icon(slot: int, subject_id: String, rect: Rect2) -> bool:
 	var icon: SubViewport = _icons[slot]
 	var subject: Dictionary = WorldHistory.subject(subject_id)
 	if subject.is_empty():
+		return false
+	# A recovered place file belongs in the same FILE register as a person, but
+	# it must never be rendered as an invented human head just because the icon
+	# pool knows how to build one from sparse subject data.
+	if str(subject.get("kind", "")) in ["facility_sector", "place"]:
 		return false
 	icon.set_subject(subject, _subject_tone(subject))
 	icon.set_xray(xray)
@@ -588,6 +671,16 @@ func _follow_link(link: Dictionary) -> void:
 			# treats as a link rather than a modal.
 			var id := str(link.get("id", ""))
 			viewing_site = "" if viewing_site == id else id
+		"holding_job":
+			var work := AshbloomHoldings.accept_work(str(link.get("id", "")))
+			if not work.is_empty():
+				last_action = "WORK ACCEPTED // %s" % str(work.get("name", "LOCAL ORDER"))
+				action_life = 2.4
+				_rebuild_links()
+		"hunt_contract":
+			_accept_contract(str(link.get("id", "")))
+		"contract_subject":
+			_jump_to_subject(str(link.get("id", "")))
 
 
 ## Wounds are recorded as prose, not as a zone id, so the link reads the zone
@@ -630,6 +723,44 @@ func _rebuild_links() -> void:
 		2:
 			_link_rects.append_array(_wire_link_rows(_panel_rect()))
 			_link_rects.append_array(_site_link_rows(_panel_rect()))
+		5:
+			_link_rects.append_array(_contract_link_rows(_panel_rect()))
+
+
+func _contract_link_rows(rect: Rect2) -> Array:
+	var entry := _selected()
+	if rect.size == Vector2.ZERO or entry.is_empty():
+		return []
+	var contract := WorldHistory.subject(str(entry.id))
+	if str(contract.get("job_class", "")) != "frequency_bounty":
+		return []
+	var rows: Array = [
+		{"kind": "contract_subject", "id": str(contract.get("patron_id", "")), "rect": Rect2(rect.position + Vector2(0, 72), Vector2(rect.size.x * 0.46, 54))},
+		{"kind": "contract_subject", "id": str(contract.get("target_id", "")), "rect": Rect2(rect.position + Vector2(rect.size.x * 0.52, 72), Vector2(rect.size.x * 0.48, 54))},
+	]
+	if str(contract.get("status", "")) == "offered":
+		rows.append({
+			"kind": "hunt_contract", "id": str(entry.id),
+			"rect": Rect2(rect.position + Vector2(0, rect.size.y - 82), Vector2(rect.size.x, 48)),
+		})
+	return rows
+
+
+func _accept_selected_contract() -> void:
+	var entry := _selected()
+	if not entry.is_empty():
+		_accept_contract(str(entry.id))
+
+
+func _accept_contract(contract_id: String) -> void:
+	var result := HuntContracts.accept(contract_id)
+	if bool(result.get("ok", false)):
+		last_action = "CONTRACT CONSUMED // %s PAID" % str(result.get("cost_kind", "COST")).to_upper()
+	else:
+		last_action = "REFUSED // %s" % str(result.get("reason", "CONTRACT UNAVAILABLE"))
+	action_life = 3.2
+	_rebuild_rail()
+	_rebuild_links()
 
 
 ## The FILE/PYRAMID/WIRE/BODY content rect, exactly as `_draw()` derives it
@@ -652,6 +783,17 @@ func _panel_rect() -> Rect2:
 func _file_link_rows(rect: Rect2, subject: Dictionary) -> Array:
 	if rect.size == Vector2.ZERO or subject.is_empty():
 		return []
+	if str(subject.get("kind", "")) == "place":
+		var holding_rows: Array = []
+		var holding_y := rect.position.y + 278.0
+		for job: Dictionary in AshbloomHoldings.work_orders(str(subject.get("holding_id", ""))):
+			if str(job.get("status", "")) == "offered":
+				holding_rows.append({
+					"kind": "holding_job", "id": str(job.id),
+					"rect": Rect2(rect.position.x - 4, holding_y - 15, rect.size.x * 0.53, 24),
+				})
+			holding_y += 30.0
+		return holding_rows
 	var right_x := rect.position.x + rect.size.x * 0.60
 	var right_width := rect.size.x * 0.40
 	var rows: Array = []
@@ -804,6 +946,8 @@ func _draw() -> void:
 			_draw_body(panel)
 		4:
 			_draw_tree(panel)
+		5:
+			_draw_contract(panel)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if page_blend < 1.0:
 		_draw_page_wipe(panel, eased)
@@ -941,7 +1085,7 @@ func _draw_rail(rect: Rect2) -> void:
 	# not a set of rows to page through — so the rail stays present (the
 	# frame reads as one made object, not four with a fifth bolted on) but
 	# empty, same as any other page would with nothing matching a search.
-	var heading: String = ["SUBJECTS", "FACTIONS", "ACCOUNTS", "BODIES", "PATHS"][page]
+	var heading: String = ["SUBJECTS", "FACTIONS", "ACCOUNTS", "BODIES", "PATHS", "CONTRACTS"][page]
 	CellOutzType.draw_text(self, rect.position, heading, 12.0, MOSS, 1.4)
 	var total := "%02d" % _rail_cache.size()
 	var total_width := CellOutzType.width(total, 10.0, 0.8)
@@ -1036,6 +1180,12 @@ func _draw_file(rect: Rect2) -> void:
 		draw_string(font, rect.position + Vector2(0, 20), "NO SUBJECT ON FILE.", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, INK * Color(1, 1, 1, 0.5))
 		return
 	var subject: Dictionary = WorldHistory.subject(str(entry.id))
+	if str(subject.get("kind", "")) == "facility_sector":
+		_draw_facility_file(rect, str(entry.id), subject)
+		return
+	if str(subject.get("kind", "")) == "place":
+		_draw_holding_file(rect, str(entry.id), subject)
+		return
 	CellOutzType.draw_stamped(self, rect.position, str(subject.get("name", entry.id)).to_upper(), 21.0, INK, COPPER * Color(1, 1, 1, 0.3), 1.4)
 	draw_string(font, rect.position + Vector2(2, 44), "%s   ·   %s" % [str(subject.get("role", "unindexed")).to_upper(), str(subject.get("faction", "Unbound")).to_upper()], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COPPER)
 
@@ -1193,6 +1343,129 @@ func _draw_file(rect: Rect2) -> void:
 		shown += 1
 	if shown == 0:
 		draw_string(font, Vector2(rect.position.x, base_y), "NOTHING ABOUT THEM HAS BEEN WRITTEN DOWN YET.", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, INK * Color(1, 1, 1, 0.4))
+
+
+func _draw_facility_file(rect: Rect2, subject_id: String, subject: Dictionary) -> void:
+	var font := ThemeDB.fallback_font
+	CellOutzType.draw_stamped(self, rect.position, str(subject.get("name", subject_id)).to_upper(), 21.0, INK, COPPER * Color(1, 1, 1, 0.3), 1.4)
+	draw_string(font, rect.position + Vector2(2, 44), "%s   ·   %s" % [str(subject.get("role", "TERRITORY FILE")).to_upper(), str(subject.get("faction", "UNKNOWN")).to_upper()], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COPPER)
+	var territory_id := str(subject.get("territory_id", ""))
+	var definition := FacilityTerritory.sector_def(territory_id)
+	var live := FacilityTerritory.sector(territory_id)
+	var state := str(live.get("state", subject.get("status", "controlled"))).to_upper()
+	var state_tone := SPORE if state == "LIBERATED" else (MOSS if state == "SURVEYED" else HOT)
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 78), "CURRENT STATE", 10.0, INK * Color(1, 1, 1, 0.48), 1.0)
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 105), state, 25.0, state_tone, 1.4)
+	CellOutzType.draw_text(self, rect.position + Vector2(250, 78), "REGISTERED OWNER", 10.0, INK * Color(1, 1, 1, 0.48), 1.0)
+	CellOutzType.draw_text(self, rect.position + Vector2(250, 105), "UNBOUND" if state == "LIBERATED" else str(live.get("owner", "celloutz")).to_upper(), 20.0, state_tone, 1.2)
+	draw_line(rect.position + Vector2(0, 126), rect.position + Vector2(rect.size.x, 126), INK * Color(1, 1, 1, 0.16), 1.0)
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 155), "RECOVERED DIRECTIVE", 11.0, MOSS, 1.2)
+	var y := rect.position.y + 182.0
+	for line: String in _wrap(str(definition.get("objective", subject.get("objective", ""))), 64):
+		draw_string(font, Vector2(rect.position.x, y), line, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.76, 14, INK * Color(1, 1, 1, 0.86))
+		y += 19.0
+
+	# A stripped floor-plan stamp links this recovered file back to the MAP
+	# without copying the whole map application into the dossier.
+	var stamp := Rect2(Vector2(rect.end.x - 176, rect.position.y + 146), Vector2(160, 126))
+	draw_rect(stamp, GROUND)
+	draw_rect(stamp, state_tone * Color(1, 1, 1, 0.55), false, 1.4)
+	for route: Array in FacilityTerritory.ROUTES:
+		var a := FacilityTerritory.sector_def(str(route[0]))
+		var b := FacilityTerritory.sector_def(str(route[1]))
+		if a.is_empty() or b.is_empty():
+			continue
+		var pa: Vector2 = stamp.position + stamp.size * (a.at as Vector2)
+		var pb: Vector2 = stamp.position + stamp.size * (b.at as Vector2)
+		draw_line(pa, pb, INK * Color(1, 1, 1, 0.22), 1.0)
+	for row: Dictionary in FacilityTerritory.SECTORS:
+		var point: Vector2 = stamp.position + stamp.size * (row.at as Vector2)
+		var selected := str(row.id) == territory_id
+		var marker := Rect2(point - Vector2(5, 4), Vector2(10, 8))
+		if selected:
+			draw_rect(marker, state_tone)
+		else:
+			draw_rect(marker, INK * Color(1, 1, 1, 0.24), false, 1.2)
+
+	CellOutzType.draw_text(self, Vector2(rect.position.x, rect.end.y - 64), "WHAT THE WORLD RECORDED", 11.0, MOSS, 1.2)
+	draw_line(Vector2(rect.position.x, rect.end.y - 47), Vector2(rect.end.x, rect.end.y - 47), MOSS * Color(1, 1, 1, 0.3), 1.0)
+	var shown := 0
+	for event in WorldHistory.recent_events(40):
+		var details: Dictionary = event.get("details", {})
+		if str(details.get("territory", "")) != FacilityTerritory.SUBJECT and str(details.get("subject_id", "")) != subject_id:
+			continue
+		draw_string(font, Vector2(rect.position.x + shown * 220.0, rect.end.y - 20), str(event.type).replace("_", " ").to_upper(), HORIZONTAL_ALIGNMENT_LEFT, 210, 11, COPPER)
+		shown += 1
+		if shown >= 3:
+			break
+
+
+## A place file uses the same live polygon MAP does. It does not borrow the
+## human dossier's head, wounds, blood or ELO just because FILE can draw those.
+func _draw_holding_file(rect: Rect2, subject_id: String, subject: Dictionary) -> void:
+	var font := ThemeDB.fallback_font
+	var holding_id := str(subject.get("holding_id", ""))
+	var definition := AshbloomHoldings.definition_for(holding_id)
+	var live := AshbloomHoldings.holding(holding_id)
+	var holder := str(live.get("held_by", subject.get("held_by", "unbound")))
+	var holder_record := WorldHistory.subject(holder)
+	var holder_name := str(holder_record.get("name", holder)).replace("_", " ").to_upper()
+	var tone := _subject_tone({"faction_id": holder})
+	CellOutzType.draw_stamped(self, rect.position, str(subject.get("name", subject_id)).to_upper(), 21.0, INK, COPPER * Color(1, 1, 1, 0.3), 1.4)
+	draw_string(font, rect.position + Vector2(2, 44), "ASHBLOOM HOLDING   //   FIELD-SURVEYED PLACE", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COPPER)
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 78), "CURRENT HOLDER", 10.0, INK * Color(1, 1, 1, 0.48), 1.0)
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 105), holder_name, 21.0, tone, 1.2)
+	CellOutzType.draw_text(self, rect.position + Vector2(330, 78), "REVEALED", 10.0, INK * Color(1, 1, 1, 0.48), 1.0)
+	CellOutzType.draw_text(self, rect.position + Vector2(330, 105), str(live.get("revealed_at", subject.get("revealed_at", "UNKNOWN"))).to_upper(), 11.0, MOSS, 0.9)
+	draw_line(rect.position + Vector2(0, 130), rect.position + Vector2(rect.size.x, 130), INK * Color(1, 1, 1, 0.16), 1.0)
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 160), "FIELD NOTE", 11.0, MOSS, 1.2)
+	var y := rect.position.y + 188.0
+	for line: String in _wrap(str(subject.get("note", definition.get("note", ""))).to_upper(), 46):
+		draw_string(font, Vector2(rect.position.x, y), line, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.48, 14, INK * Color(1, 1, 1, 0.82))
+		y += 19.0
+
+	var local_done := int(live.get("local_work_completed", 0))
+	var local_required := int(live.get("local_work_required", 0))
+	var local_state := str(live.get("local_work_state", "held"))
+	var pressure := "CLAIM DISRUPTED // DECISION OPEN" if local_state == "ready_for_decision" else "CLAIM PRESSURE %d/%d" % [local_done, local_required]
+	CellOutzType.draw_condensed(self, rect.position + Vector2(0, 234), pressure, 9.0, SPORE if local_state == "ready_for_decision" else COPPER, 0.76)
+	CellOutzType.draw_text(self, rect.position + Vector2(0, 266), "LOCAL WORK", 11.0, MOSS, 1.2)
+	var work_y := rect.position.y + 297.0
+	for job: Dictionary in AshbloomHoldings.work_orders(holding_id):
+		var status := str(job.get("status", "offered"))
+		var work_tone := MOSS if status == "completed" else (COPPER if status == "active" else INK)
+		var verb := "TAKE" if status == "offered" else status.to_upper()
+		CellOutzType.draw_condensed(self, Vector2(rect.position.x, work_y), "[%s] %s" % [verb, str(job.get("role", "LOCAL ORDER"))], 9.0, work_tone, 0.76)
+		CellOutzType.draw_condensed(self, Vector2(rect.position.x, work_y + 13), "%d/%d  %s" % [int(job.get("progress", 0)), int(job.get("required", 1)), str(job.get("brief", ""))], 8.0, INK * Color(1, 1, 1, 0.62), 0.62)
+		work_y += 30.0
+
+	var stamp := Rect2(Vector2(rect.end.x - 315, rect.position.y + 150), Vector2(295, 228))
+	draw_rect(stamp, GROUND)
+	draw_rect(stamp, tone * Color(1, 1, 1, 0.42), false, 1.2)
+	var polygons := AshbloomHoldings.polygons()
+	var half := AshbloomHoldings.REGION_SIZE * 0.5
+	for id in polygons:
+		var world_polygon: PackedVector2Array = polygons[id]
+		var plan := PackedVector2Array()
+		for point: Vector2 in world_polygon:
+			plan.append(stamp.position + Vector2(
+				(point.x + half.x) / AshbloomHoldings.REGION_SIZE.x * stamp.size.x,
+				(point.y + half.y) / AshbloomHoldings.REGION_SIZE.y * stamp.size.y))
+		if plan.size() < 3:
+			continue
+		var closed := plan.duplicate()
+		closed.append(plan[0])
+		var selected := str(id) == holding_id
+		if selected:
+			draw_colored_polygon(plan, tone * Color(1, 1, 1, 0.16))
+		draw_polyline(closed, tone * Color(1, 1, 1, 0.86 if selected else 0.16), 2.0 if selected else 0.8)
+	if not definition.is_empty():
+		var centre_world: Vector2 = definition.at
+		var centre := stamp.position + Vector2(
+			(centre_world.x + half.x) / AshbloomHoldings.REGION_SIZE.x * stamp.size.x,
+			(centre_world.y + half.y) / AshbloomHoldings.REGION_SIZE.y * stamp.size.y)
+		draw_circle(centre, 4.0, tone)
+	CellOutzType.draw_condensed(self, stamp.position + Vector2(8, stamp.size.y - 16), "MAP / LIVE HOLDING RECORD", 8.0, tone, 0.7)
 
 
 ## Naive word wrap. The memory line is the only free prose on the panel and it
@@ -1712,7 +1985,14 @@ func _draw_wire(rect: Rect2) -> void:
 
 	var feed := Rect2(rect.position + Vector2(split + 16, 0), Vector2(rect.size.x - split - 16, rect.size.y))
 	draw_line(feed.position + Vector2(-10, 0), feed.position + Vector2(-10, feed.size.y), INK * Color(1, 1, 1, 0.14), 1.0)
-	CellOutzType.draw_text(self, feed.position, "THE WIRE", 12.0, COPPER, 1.4)
+	var wire_heading := "THE ARCHIVE" if wire_archive else "THE WIRE"
+	CellOutzType.draw_text(self, feed.position, wire_heading, 12.0, COPPER, 1.4)
+	var switch_label := "[A] FEED" if wire_archive else "[A] ARCHIVE"
+	var switch_width := CellOutzType.width(switch_label, 9.0, 0.8)
+	CellOutzType.draw_text(self, Vector2(feed.end.x - switch_width, feed.position.y + 3), switch_label, 9.0, MOSS, 0.8)
+	if wire_archive:
+		_draw_wire_archive(feed)
+		return
 	var strain_label := "STRAIN %02d" % roundi(wire.strain)
 	var strain_width := CellOutzType.width(strain_label, 10.0, 0.8)
 	CellOutzType.draw_text(self, Vector2(feed.position.x + feed.size.x - strain_width, feed.position.y + 2), strain_label, 10.0, BRUISE.lerp(HOT, clampf(wire.strain / 40.0, 0, 1)), 0.8)
@@ -1739,6 +2019,34 @@ func _draw_wire(rect: Rect2) -> void:
 		if y > feed.position.y + 20.0:
 			_draw_post(feed, post, y)
 		y += 80.0
+
+
+## The archive is a ruled incident register, finite and newest-first. It does
+## not use the feed's cards, reach, replies or retelling depth because those
+## are precisely the platform's claims that this page exists to contradict.
+func _draw_wire_archive(rect: Rect2) -> void:
+	var font := ThemeDB.fallback_font
+	draw_line(rect.position + Vector2(0, 18), rect.position + Vector2(rect.size.x, 18), COPPER * Color(1, 1, 1, 0.3), 1.0)
+	draw_string(font, rect.position + Vector2(0, 36), "FINITE REGISTER / EXACT EVENT RECEIPTS / NEWEST FIRST", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 9, INK * Color(1, 1, 1, 0.5))
+	var records: Array = wire.archive(32)
+	var y := rect.position.y + 58.0 - feed_scroll
+	for record: Dictionary in records:
+		if y + 54.0 > rect.end.y:
+			break
+		if y + 47.0 < rect.position.y + 44.0:
+			y += 57.0
+			continue
+		var sequence := "#%06d" % int(record.get("sequence", 0))
+		CellOutzType.draw_text(self, Vector2(rect.position.x, y), sequence, 9.0, COPPER, 0.8)
+		var event_type := str(record.get("type", "UNKNOWN")).replace("_", " ").to_upper()
+		CellOutzType.draw_text(self, Vector2(rect.position.x + 82, y), event_type, 10.0, INK, 0.9)
+		var lines := CellOutzType.wrap_condensed(str(record.get("body", "")), rect.size.x - 28.0, 9.0, 0.72)
+		for index in mini(2, lines.size()):
+			CellOutzType.draw_condensed(self, Vector2(rect.position.x + 14, y + 18.0 + index * 13.0), str(lines[index]), 9.0, INK * Color(1, 1, 1, 0.68), 0.72)
+		draw_line(Vector2(rect.position.x, y + 47), Vector2(rect.end.x, y + 47), INK * Color(1, 1, 1, 0.10), 1.0)
+		y += 57.0
+	if records.is_empty():
+		CellOutzType.draw_text(self, rect.position + Vector2(0, 68), "NO ACTS RECORDED", 11.0, INK * Color(1, 1, 1, 0.45), 1.0)
 
 
 func _draw_post(feed: Rect2, post: Dictionary, y: float) -> void:
@@ -1785,6 +2093,77 @@ func _draw_post(feed: Rect2, post: Dictionary, y: float) -> void:
 		meta += "   \u00b7   %d RETELLINGS DEEP" % int(post.get("hops", 0))
 	draw_string(font, Vector2(feed.position.x + 12, y + 52), meta, HORIZONTAL_ALIGNMENT_LEFT, feed.size.x - 24, 9, INK * Color(1, 1, 1, 0.3))
 	draw_line(Vector2(feed.position.x + 12, y + 60), Vector2(feed.position.x + feed.size.x - 8, y + 60), INK * Color(1, 1, 1, 0.08), 1.0)
+
+
+# --- page six: one-use hunt work -------------------------------------------
+
+func _draw_contract(rect: Rect2) -> void:
+	var font := ThemeDB.fallback_font
+	var entry := _selected()
+	if entry.is_empty():
+		CellOutzType.draw_stamped(self, rect.position, "NO CONTRACTS CIRCULATING", 20.0, INK * Color(1, 1, 1, 0.5), COPPER * Color(1, 1, 1, 0.2), 1.3)
+		draw_string(font, rect.position + Vector2(2, 48), "TOP-TIER WORK APPEARS ONLY AFTER A REAL PATRON POSTS AN EXACT OBSTRUCTION.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 12, INK * Color(1, 1, 1, 0.48))
+		return
+	var contract := WorldHistory.subject(str(entry.id))
+	var status := str(contract.get("status", "offered")).to_upper()
+	var tone: Color = COPPER if status == "OFFERED" else (SPORE if status == "COMPLETED" else HOT)
+	CellOutzType.draw_stamped(self, rect.position, str(contract.get("block_kind", "signal")).to_upper() + " OBSTRUCTION", 21.0, INK, tone * Color(1, 1, 1, 0.34), 1.4)
+	var status_width := CellOutzType.width(status, 13.0, 1.0)
+	CellOutzType.draw_text(self, Vector2(rect.end.x - status_width, rect.position.y + 5), status, 13.0, tone, 1.0)
+	draw_string(font, rect.position + Vector2(2, 44), str(contract.get("obstruction", "UNSPECIFIED INTERFERENCE")), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 4, 13, INK * Color(1, 1, 1, 0.82))
+	draw_line(rect.position + Vector2(0, 58), rect.position + Vector2(rect.size.x, 58), INK * Color(1, 1, 1, 0.15), 1.0)
+
+	var patron_id := str(contract.get("patron_id", ""))
+	var target_id := str(contract.get("target_id", ""))
+	var patron := WorldHistory.subject(patron_id)
+	var target := WorldHistory.subject(target_id)
+	var split := rect.size.x * 0.48
+	var patron_rect := Rect2(rect.position + Vector2(0, 72), Vector2(split, 54))
+	var target_rect := Rect2(rect.position + Vector2(rect.size.x * 0.52, 72), Vector2(rect.size.x * 0.48, 54))
+	for card in [
+		{"rect": patron_rect, "label": "PATRON // %s" % str(contract.get("patron_side", "unknown")).to_upper(), "name": str(patron.get("name", patron_id)), "tone": SPORE if str(contract.get("patron_side", "")) == "ascent" else HOT},
+		{"rect": target_rect, "label": "EXACT TARGET", "name": str(target.get("name", target_id)), "tone": COPPER},
+	]:
+		var card_rect: Rect2 = card.rect
+		var hovered := card_rect.has_point(cursor_at)
+		draw_rect(card_rect, (card.tone as Color) * Color(1, 1, 1, 0.10 if hovered else 0.045))
+		draw_line(card_rect.position, card_rect.position + Vector2(card_rect.size.x, 0), (card.tone as Color) * Color(1, 1, 1, 0.55), 1.4)
+		CellOutzType.draw_text(self, card_rect.position + Vector2(8, 9), str(card.label), 9.0, (card.tone as Color) * Color(1, 1, 1, 0.85), 0.9)
+		draw_string(font, card_rect.position + Vector2(8, 39), str(card.name).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, card_rect.size.x - 16, 13, INK)
+
+	var cy := rect.position.y + 154.0
+	CellOutzType.draw_text(self, Vector2(rect.position.x, cy), "PRICE OF TAKING IT", 11.0, MOSS, 1.2)
+	draw_line(Vector2(rect.position.x, cy + 18), Vector2(rect.end.x, cy + 18), MOSS * Color(1, 1, 1, 0.32), 1.0)
+	var cost_kind := str(contract.get("cost_kind", "unknown")).to_upper()
+	var cost_amount := float(contract.get("cost_amount", 0.0))
+	var cost_target := str(contract.get("cost_target", "")).replace("_", " ").to_upper()
+	var cost_text := "%.0f %s" % [cost_amount, cost_kind]
+	if not cost_target.is_empty():
+		cost_text += " // " + cost_target
+	CellOutzType.draw_stamped(self, Vector2(rect.position.x, cy + 34), cost_text, 24.0, HOT, INK * Color(1, 1, 1, 0.18), 1.4)
+	draw_string(font, Vector2(rect.position.x + 2, cy + 72), "NO CURRENCY. THE CONTRACT ENTERS THROUGH THE BODY OR THE STANDING LEDGER.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 11, INK * Color(1, 1, 1, 0.48))
+
+	var target_status := str(target.get("status", "UNKNOWN")).to_upper()
+	var sy := cy + 112.0
+	CellOutzType.draw_text(self, Vector2(rect.position.x, sy), "TARGET NOW", 10.0, MOSS, 1.1)
+	CellOutzType.draw_text(self, Vector2(rect.position.x + 132, sy - 2), target_status, 14.0, HOT if target_status == "ACTIVE" else INK, 0.9)
+	if not str(contract.get("target_outcome", "")).is_empty():
+		draw_string(font, Vector2(rect.position.x + 2, sy + 32), "RECORDED OUTCOME // %s" % str(contract.target_outcome).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x, 12, SPORE)
+
+	var action_rect := Rect2(rect.position + Vector2(0, rect.size.y - 82), Vector2(rect.size.x, 48))
+	if status == "OFFERED":
+		var hot := action_rect.has_point(cursor_at)
+		draw_colored_polygon(PackedVector2Array([
+			action_rect.position + Vector2(8, 0), action_rect.position + Vector2(action_rect.size.x, 0),
+			action_rect.end - Vector2(8, 0), action_rect.position + Vector2(0, action_rect.size.y),
+		]), HOT * Color(1, 1, 1, 0.22 if hot else 0.13))
+		draw_polyline(PackedVector2Array([action_rect.position + Vector2(8, 0), action_rect.position + Vector2(action_rect.size.x, 0), action_rect.end - Vector2(8, 0), action_rect.position + Vector2(0, action_rect.size.y), action_rect.position + Vector2(8, 0)]), HOT * Color(1, 1, 1, 0.72), 1.5)
+		CellOutzType.draw_stamped(self, action_rect.position + Vector2(18, 13), "[ENTER / CLICK] CONSUME CONTRACT", 15.0, INK, HOT * Color(1, 1, 1, 0.34), 1.1)
+	else:
+		var notice := "CONTRACT ACTIVE // OFFER TOKEN SPENT" if status == "ACTIVE" else "CONTRACT CLOSED // %s" % str(contract.get("target_outcome", "RESOLVED")).to_upper()
+		CellOutzType.draw_stamped(self, action_rect.position + Vector2(8, 13), notice, 14.0, tone, INK * Color(1, 1, 1, 0.18), 1.0)
+	if action_life > 0.0 and not last_action.is_empty():
+		draw_string(font, action_rect.position + Vector2(4, -12), last_action, HORIZONTAL_ALIGNMENT_LEFT, action_rect.size.x, 11, SPORE if last_action.begins_with("CONTRACT") else HOT)
 
 
 # --- page four: the body ---------------------------------------------------
@@ -1846,8 +2225,8 @@ func _draw_gore(plate: Rect2) -> void:
 ## The stamp a clerk hit the page with, per page, because this is a processed
 ## document in a system that does not care about the person it describes.
 func _draw_stamp(plate: Rect2) -> void:
-	var text: String = ["NO FIXED ABODE", "NO REFUNDS", "UNVERIFIED", "SPECIMEN", "UNCHARTED"][page]
-	var tint: Color = [Grunge.DRIED, Grunge.RUST, Grunge.BILE, Grunge.DRIED, Grunge.BILE][page]
+	var text: String = ["NO FIXED ABODE", "NO REFUNDS", "UNVERIFIED", "SPECIMEN", "UNCHARTED", "ONE USE ONLY"][page]
+	var tint: Color = [Grunge.DRIED, Grunge.RUST, Grunge.BILE, Grunge.DRIED, Grunge.BILE, Grunge.RUST][page]
 	Grunge.stamp(self, plate.position + Vector2(plate.size.x - 258, 92), text, 15.0, -0.16, tint, 300 + page)
 
 

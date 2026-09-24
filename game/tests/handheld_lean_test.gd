@@ -45,10 +45,21 @@ func _ready() -> void:
 	var leaned_size: Vector2 = device._device_rect.size
 	_check(leaned_size.x > resting_size.x * 1.1, "holding lean grows the device well past its resting size (%.0f -> %.0f)" % [resting_size.x, leaned_size.x])
 
+	# C6.2. A direction held in the braced posture travels into the physical
+	# device instead of remaining an unused movement input.
+	var leaned_center: Vector2 = device._device_rect.get_center()
+	device.wave_input_override = Vector2(1.0, -1.0).normalized()
+	_settle(device, 20)
+	var waved_center: Vector2 = device._device_rect.get_center()
+	_check(device.wave_vector().x > 0.6 and device.wave_vector().y < -0.6, "lean plus direction produces a full deliberate wave vector")
+	_check(waved_center.x > leaned_center.x and waved_center.y < leaned_center.y, "the held object visibly follows the wrist around the edge")
+
 	device.lean_override = false
+	device.wave_input_override = Vector2.ZERO
 	_settle(device, 40)
 	var released_size: Vector2 = device._device_rect.size
 	_check(is_equal_approx(released_size.x, resting_size.x), "letting go eases the device back down to its resting size rather than leaving it enlarged (%.0f -> %.0f)" % [leaned_size.x, released_size.x])
+	_check(device.wave_vector().length() < 0.01, "releasing the brace returns the wrist and beam to centre")
 
 	print("I0.10 v2 - leaning only does something where there is a panel to lean into")
 	device.set_mode("RADIO")

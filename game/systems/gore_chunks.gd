@@ -47,7 +47,26 @@ const ORGAN_TINTS := {
 ## Chunks are rigid bodies, so this cap is a frame-rate contract rather than an
 ## aesthetic one. The same reasoning as `BaselineHuman.MAX_LIVE_GORE`: twelve
 ## drivers shedding unbounded physics bodies in a pileup is a bug, not atmosphere.
-const MAX_CHUNKS := 90
+const MAX_CHUNKS := 72
+
+
+static func chunk_budget() -> int:
+	match WorldLook.quality:
+		WorldLook.Quality.ULTRA: return MAX_CHUNKS
+		WorldLook.Quality.HIGH: return 48
+		_: return 24
+
+
+## The number of loose pieces that may be actively talking to the physics
+## server.  It is intentionally lower than `chunk_budget()`: the rest can stay
+## as readable, takeable evidence after they settle, but they must not turn a
+## pile of fragments into a growing collision problem while the player keeps
+## firing.  Whole limbs and organs are protected when the budget is reclaimed.
+static func active_physics_budget() -> int:
+	match WorldLook.quality:
+		WorldLook.Quality.ULTRA: return 44
+		WorldLook.Quality.HIGH: return 30
+		_: return 18
 
 ## A chunk that survives this long has fully rotted: discoloured, and a scent
 ## source other systems can query. Most chunks never see it - the cap and the
@@ -64,6 +83,14 @@ const STACK_FALLOFF := 0.62
 const STACK_STAGGER := 0.012
 
 static var live: Array[Node3D] = []
+static var impact_voices: Array[AudioStreamPlayer3D] = []
+
+
+static func impact_voice_budget() -> int:
+	match WorldLook.quality:
+		WorldLook.Quality.ULTRA: return 24
+		WorldLook.Quality.HIGH: return 14
+		_: return 8
 
 
 ## A severed limb is a chunk too, but it is an entire body zone rather than one
@@ -72,12 +99,111 @@ static var live: Array[Node3D] = []
 static func register_whole_limb(node: RigidBody3D, zone: String, subject_id: String) -> Dictionary:
 	if node == null or not is_instance_valid(node):
 		return {}
-	if live.size() >= MAX_CHUNKS:
+	if live.size() >= chunk_budget():
 		_recycle_oldest()
+	_make_room_for_physics()
+	_configure_chunk_physics(node)
 	var info := {
 		"layer": -1,
 		"layer_name": "limb",
 		"whole_limb": true,
+		"zone": zone,
+		"subject_id": subject_id,
+		"organ_id": "",
+		"implant": "",
+		"condition": 1.0,
+		"taken": false,
+		"spawn_msec": Time.get_ticks_msec(),
+	}
+	node.set_meta("chunk", info)
+	live.append(node)
+	_watch_chunk(node)
+	_schedule_rot(node)
+	return info
+
+
+## AN6.2. The organ itself leaving the body, not a gib of it — `burst()`'s own
+## `Layer.ORGAN` pieces are debris torn loose *around* the cavity a blow just
+## opened, keyed to whatever organ that blow was nearest and thrown whether or
+## not the organ actually failed. This is the organ, whole, registered the
+## moment its own health reaches zero, so it exists exactly once per organ per
+## body rather than once per hit that happened to reach it. Same identity
+## contract as `register_whole_limb()` — real `RigidBody3D`, real rot, and
+## `whole_organ` reads the same way `whole_limb` does, which is what lets
+## `carry.gd` pick it up (AN6.3) rather than a piece nothing downstream can find.
+static func register_organ(node: RigidBody3D, organ_id: String, zone: String, subject_id: String) -> Dictionary:
+	if node == null or not is_instance_valid(node):
+		return {}
+	if live.size() >= chunk_budget():
+		_recycle_oldest()
+	_make_room_for_physics()
+	_configure_chunk_physics(node)
+	var info := {
+		"layer": Layer.ORGAN,
+		"layer_name": "organ",
+		"whole_organ": true,
+		"zone": zone,
+		"subject_id": subject_id,
+		"organ_id": organ_id,
+		"implant": "",
+		"condition": 1.0,
+		"taken": false,
+		"spawn_msec": Time.get_ticks_msec(),
+	}
+	node.set_meta("chunk", info)
+	live.append(node)
+	_watch_chunk(node)
+	_schedule_rot(node)
+	return info
+
+
+## What a broken bone in this zone actually looks like.
+##
+## Every zone threw `long_bone()`, so a skull shattered into femur shards and
+## so did a ribcage -- the one shape in the body that only a limb has. The bone
+## that breaks should be the bone that was there: a cranium comes away as
+## curved plate, a chest as a length of rib, and a limb as the long bone it is.
+##
+## Returned rather than assigned so the choice can be tested on its own. The
+## two arc shapes lie in XZ with their thickness in Y, which is what makes a
+## plate read as flat; `long_bone()` revolves along Y, which is what makes a
+## shaft read as long.
+static func bone_fragment(zone: String, rng: RandomNumberGenerator) -> Dictionary:
+	match zone:
+		"head":
+			var plate := rng.randf_range(0.030, 0.052)
+			return {"mesh": BodyMesh.arc_tube(plate, plate * 0.74, 0.0065, PI * 0.16, PI * 0.60, 6), "extent": plate}
+		"torso":
+			var rib := rng.randf_range(0.052, 0.092)
+			return {"mesh": BodyMesh.arc_tube(rib, rib * 0.64, 0.0085, PI * 0.16, PI * 0.68, 6), "extent": rib}
+	return {"mesh": BodyMesh.long_bone(rng.randf_range(0.06, 0.13), rng.randf_range(0.007, 0.013)), "extent": 0.07}
+
+
+## The slab a cut took off -- a cranium, a chest wall.
+##
+## It is neither of the other two kinds and had nowhere to go. A `burst()`
+## fragment is debris torn loose *around* a wound; a whole limb is something
+## that was severed. This is the piece of the body that was in the way, and
+## `Cavity` had no way to hand it over, so it built the mesh and dropped it on
+## the floor of the function that made it -- a chest was opened and the front of
+## it simply stopped existing.
+##
+## Same identity contract as the other two, because the reasons are the same:
+## the Choir buys a skull as a specific thing off a specific person, and a
+## ritual that says "photograph a gored head" has to be able to check that what
+## is in frame is one.
+static func register_wall(node: RigidBody3D, zone: String, subject_id: String, layer: int = Layer.BONE) -> Dictionary:
+	if node == null or not is_instance_valid(node):
+		return {}
+	if live.size() >= chunk_budget():
+		_recycle_oldest()
+	_make_room_for_physics()
+	_configure_chunk_physics(node)
+	var safe_layer := clampi(layer, 0, Layer.CYBERNETIC)
+	var info := {
+		"layer": safe_layer,
+		"layer_name": str(LAYER_NAMES[safe_layer]),
+		"whole_wall": true,
 		"zone": zone,
 		"subject_id": subject_id,
 		"organ_id": "",
@@ -130,7 +256,13 @@ static func burst(host: Node3D, origin: Vector3, heading: Vector3, info: Diction
 			count = 1
 		var layer_produced := 0
 		for index in count:
-			if live.size() >= MAX_CHUNKS:
+			# A shower of anonymous tissue is the first thing to give way under
+			# pressure.  The identified limb or organ survives; a new flap does
+			# not get to make the sandbox unplayable just because a blast hit a
+			# crowd at once.
+			if not _make_room_for_physics():
+				break
+			if live.size() >= chunk_budget():
 				_recycle_oldest()
 			var chunk := _make_chunk(layer, zone, subject_id, info, rng)
 			if chunk == null:
@@ -156,7 +288,7 @@ static func burst(host: Node3D, origin: Vector3, heading: Vector3, info: Diction
 		# the camera, is what "loud" was. They are staggered and weighted now so
 		# the burst actually is a sequence: quiet entry ticks building to the
 		# deepest layer, which is the one worth hearing.
-		if layer_produced > 0:
+		if layer_produced > 0 and (WorldLook.quality != WorldLook.Quality.PERFORMANCE or layer == depth):
 			play_impact(host, origin, layer, stack_level(layer, depth), float(layer) * STACK_STAGGER)
 	return produced
 
@@ -184,6 +316,7 @@ static func _make_chunk(layer: int, zone: String, subject_id: String, info: Dict
 	body.name = "chunk_%s_%s" % [LAYER_NAMES[layer], zone]
 	body.mass = [0.12, 0.18, 0.4, 0.6, 0.5, 0.9][layer]
 	body.continuous_cd = true
+	_configure_chunk_physics(body)
 
 	var mesh_instance := MeshInstance3D.new()
 	var extent := 0.05
@@ -204,8 +337,9 @@ static func _make_chunk(layer: int, zone: String, subject_id: String, info: Dict
 			mesh_instance.mesh = BodyMesh.twisted_strand(strand_length, strand_radius, mesh_seed)
 			extent = strand_length * 0.5
 		Layer.BONE:
-			mesh_instance.mesh = BodyMesh.long_bone(rng.randf_range(0.06, 0.13), rng.randf_range(0.007, 0.013))
-			extent = 0.07
+			var fragment := bone_fragment(zone, rng)
+			mesh_instance.mesh = fragment.mesh as ArrayMesh
+			extent = float(fragment.extent)
 		Layer.ORGAN:
 			mesh_instance.mesh = BodyMesh.lump(0.055, mesh_seed, 10)
 			extent = 0.055
@@ -348,6 +482,11 @@ static func _watch_chunk(node: RigidBody3D) -> void:
 	node.sleeping_state_changed.connect(func():
 		if is_instance_valid(node) and node.sleeping:
 			_mark_ground(node)
+			# A settled fragment has already done the only physical work the
+			# sandbox needs from it.  Freezing removes it from broad-phase contact
+			# work but keeps the visual, identity and pickup path intact.  A later
+			# blast explicitly unfreezes the pieces it reaches.
+			node.set_deferred("freeze", true)
 	)
 	_track_rolling(node)
 
@@ -370,6 +509,10 @@ static func _mark_ground(node: RigidBody3D) -> void:
 	if scene == null:
 		return
 	BaselineHuman.mark_ground_for_chunk(node.get_world_3d(), scene, node.global_position, node.linear_velocity, 0.22)
+	# A landed chunk is also a lot of blood in one place: the splat above is
+	# the spatter, and this is the stain it feeds. Two drops' worth — a chunk
+	# is bigger than a drip and smaller than a bleed-out.
+	BloodPool.keep(scene, node.global_position, 2.0)
 
 
 ## Per-layer voice for a hit: skin thuds, bone cracks, hardware clinks. Data
@@ -462,6 +605,14 @@ static func play_impact(host: Node3D, at: Vector3, layer: int, level := 1.0, del
 	var scene := host.get_tree().current_scene
 	if scene == null:
 		return
+	for index in range(impact_voices.size() - 1, -1, -1):
+		if not is_instance_valid(impact_voices[index]):
+			impact_voices.remove_at(index)
+	while impact_voices.size() >= impact_voice_budget():
+		var oldest: AudioStreamPlayer3D = impact_voices.pop_front()
+		if is_instance_valid(oldest):
+			oldest.stop()
+			oldest.queue_free()
 	var profile := impact_profile(layer)
 	profile["gain"] = float(profile.get("gain", 0.5)) * maxf(level, 0.0)
 	var player := AudioStreamPlayer3D.new()
@@ -475,14 +626,23 @@ static func play_impact(host: Node3D, at: Vector3, layer: int, level := 1.0, del
 	# the SFX slider could not touch it.
 	AudioBus.route(player, "Gore")
 	scene.add_child(player)
+	impact_voices.append(player)
 	player.global_position = at
 	player.play()
 	var playback := player.get_stream_playback() as AudioStreamGeneratorPlayback
 	if playback != null:
 		_fill_impact_buffer(playback, profile)
+	# Capture the integer id, not the Node. The voice limiter may retire this
+	# player before its own timer; a lambda retaining a freed Object emits an
+	# engine error precisely during dense combat—the audio bug we are avoiding.
+	var player_id := player.get_instance_id()
 	player.get_tree().create_timer(0.25).timeout.connect(func():
-		if is_instance_valid(player):
-			player.queue_free())
+		var finished := instance_from_id(player_id) as AudioStreamPlayer3D
+		if finished != null and is_instance_valid(finished):
+			finished.queue_free()
+		for voice_index in range(impact_voices.size() - 1, -1, -1):
+			if not is_instance_valid(impact_voices[voice_index]) or impact_voices[voice_index].get_instance_id() == player_id:
+				impact_voices.remove_at(voice_index))
 
 
 static func _fill_impact_buffer(playback: AudioStreamGeneratorPlayback, profile: Dictionary) -> void:
@@ -571,12 +731,67 @@ static func _spawn_flies(node: RigidBody3D) -> void:
 		swarm.add_child(fly)
 
 
-static func _recycle_oldest() -> void:
-	while not live.is_empty():
-		var oldest: Node3D = live.pop_front()
-		if is_instance_valid(oldest):
-			oldest.queue_free()
-			return
+static func _configure_chunk_physics(body: RigidBody3D) -> void:
+	# Chunks need to hit the room, not endlessly collide with each other.  The
+	# old default layer made every limb, organ and tissue flap another obstacle
+	# for every other one, which is exactly the n-squared pile-up behind the
+	# reported firing hitch.  Raycasts still see this layer, so shots can stop
+	# in loose gore as before.
+	body.collision_layer = 1 << 5
+	body.collision_mask = 1
+	body.contact_monitor = false
+	body.max_contacts_reported = 0
+	body.can_sleep = true
+
+
+static func _active_physics_count() -> int:
+	prune()
+	var active := 0
+	for chunk in live:
+		var body := chunk as RigidBody3D
+		if body != null and is_instance_valid(body) and not body.freeze and not body.sleeping:
+			active += 1
+	return active
+
+
+## Makes room for a new moving piece without discarding the named evidence
+## players can inspect and carry.  Returns false only when the room already
+## contains the complete protected set, in which case no new anonymous fragment
+## should be born this frame.
+static func _make_room_for_physics() -> bool:
+	while _active_physics_count() >= active_physics_budget():
+		if not _recycle_oldest(true):
+			return false
+	return true
+
+
+static func _is_whole_piece(node: Node3D) -> bool:
+	var info := identify(node)
+	return bool(info.get("whole_limb", false)) or bool(info.get("whole_organ", false))
+
+
+## Prefer disposable tissue when a budget is full.  A detached arm or heart is
+## gameplay evidence; a ten-second-old flap is not.
+static func _recycle_oldest(prefer_fragment := false) -> bool:
+	prune()
+	var chosen := -1
+	for index in live.size():
+		var candidate := live[index]
+		if is_instance_valid(candidate) and not _is_whole_piece(candidate):
+			chosen = index
+			break
+	if chosen < 0 and not prefer_fragment:
+		for index in live.size():
+			if is_instance_valid(live[index]):
+				chosen = index
+				break
+	if chosen < 0:
+		return false
+	var oldest: Node3D = live[chosen]
+	live.remove_at(chosen)
+	if is_instance_valid(oldest):
+		oldest.queue_free()
+	return true
 
 
 static func clear() -> void:

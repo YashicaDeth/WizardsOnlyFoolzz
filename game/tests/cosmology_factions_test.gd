@@ -93,6 +93,7 @@ func _ready() -> void:
 	# --- wizardsonlyfoolz stays clear of the open Gate Lanterns question ----
 	var wof := WorldHistory.subject("wizardsonlyfoolz")
 	check(not (wof.get("relations", {}) as Dictionary).has("gate_lanterns"), "wizardsonlyfoolz takes no position on Gate Lanterns — still open per COSMOLOGY.md")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "initial and repeated faction seeding close one coalesced schema transaction")
 
 	print("COSMOLOGY_FACTIONS_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

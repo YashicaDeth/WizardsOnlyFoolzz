@@ -1,6 +1,8 @@
 class_name CharacterSheet
 extends RefCounted
 
+const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
+
 ## Who you are, as data rather than as a hardcoded dictionary.
 ##
 ## D1. `bone_yard_hunt.gd` registers the player with literal values — elo 1000,
@@ -152,6 +154,28 @@ const ELEMENT_ATTRIBUTE := {"fire": "physical", "earth": "composure", "air": "re
 const BASE_POINTS := 6
 const BASE_ATTRIBUTE := 4
 
+## AX1.3. Clinical on purpose. These are the words on the facility's form, and
+## the facility does not editorialise -- it measures, files and moves on, which
+## is more unpleasant than if it sneered.
+const ANATOMY_SEX := {
+	"unformed": {"name": "UNFORMED", "note": "grown without the question being asked"},
+	"female": {"name": "FEMALE", "note": "grown to specification"},
+	"male": {"name": "MALE", "note": "grown to specification"},
+	"intersex": {"name": "INTERSEX", "note": "grown to specification; the form has no second box"},
+	"reconstructed": {"name": "RECONSTRUCTED", "note": "a previous instance was altered and this one inherited it"},
+}
+
+## What the institution writes down regardless of what the body is, which is
+## the same distortion AX1.4 applies to origin: your choice stays true and
+## their paperwork does not have to.
+const ANATOMY_SEX_FILED := {
+	"unformed": "UNSPECIFIED / GROWER'S DISCRETION",
+	"female": "F / STANDARD",
+	"male": "M / STANDARD",
+	"intersex": "F / STANDARD",
+	"reconstructed": "SEE PRIOR INSTANCE",
+}
+
 var route := "preset"
 var race := "decanted"
 var traits: Array = []
@@ -162,6 +186,33 @@ var instrument: Dictionary = {}
 ## so a marked, altered player is not a menu portrait that disappears on load.
 var appearance: Dictionary = {"face": 0.5, "build": 0.5, "wear": 0.4, "mutation": 0.0, "ink": 0.0, "piercings": 0.0}
 var under_skin: Dictionary = {"skeleton": "standard", "organs": "standard", "blood": "O-RUST", "grown_with": []}
+## AX1.3. The direction doc lists "anatomical sex options" among the things
+## creation has to offer, and the game had none at all -- the body was grown
+## without the question being asked, which in a game about a facility growing
+## you is the institution's answer rather than an absence.
+##
+## Written as anatomy rather than identity, because that is what the vat is
+## deciding and it is the only part the facility gets a say in. `UNFORMED` is
+## the default because a decanted body genuinely is: nothing was chosen for it
+## yet, and choosing is the player's first act of ownership over it.
+var anatomy_sex := "unformed"
+## AX1.3. The face is seven named axes now, not one slider. `appearance.face`
+## is still written -- derived from these -- so the body rig and every older
+## reader keep working while the axes are the thing the player actually set.
+var face: Dictionary = FaceModel.blank()
+
+
+## Call after touching `face`. Keeps the legacy scalar the body rig reads in
+## step with the axes, so the two records can never disagree.
+func sync_face() -> void:
+	appearance["face"] = FaceModel.scalar(face)
+	# Greg, playing it: "Brow, jaw, none of this actually changes." He was
+	# right. The scalar above only ever reached the rig as a material seed, so
+	# seven named controls moved a texture and nothing else. The axes ride
+	# inside `appearance` now, which is the dictionary both the preview and
+	# `apply_to_world()` already carry, so `HunterAppearance._build_face()` can
+	# put them on the actual skull without a new channel to keep in step.
+	appearance["axes"] = face.duplicate(true)
 var display_name := "THE HUNTER"
 
 
@@ -432,6 +483,10 @@ func apply_to_world() -> Dictionary:
 		# D. What you chose to look like was collected on the sheet and then
 		# never filed, so the body could not read it even in principle.
 		"appearance": appearance.duplicate(),
+		# AX1.4. The same omission, one field over: ANATOMY was collected and
+		# drawn back but never filed, so the overworld body was built without
+		# it. `BaselineHuman.config_from_subject` reads it here.
+		"anatomy_sex": anatomy_sex,
 		# N2.1/N2.2. Marked at creation, in the game's own register rather
 		# than an error state — an overspent build reads as a run the game
 		# already knows is broken, not a mistake nobody flagged.
@@ -475,8 +530,13 @@ func apply_to_world() -> Dictionary:
 		if not modifiers.has(str(key)):
 			declined.append(str(key))
 	state["declined_modifiers"] = declined
-	WorldHistory.register_subject("player", state)
-	WorldHistory.update_subject("player", state, "sheet_filed")
+	# Filing is one intake decision even when it also creates the subject,
+	# records declined modifications and opens a broken achievement run.
+	WorldHistory.begin_ledger_batch()
+	WorldHistory.amend_subject("player", state)
+	PlayerActionLedger.record("sheet_filed", {
+		"actor": "player", "subject_id": "player", "changes": state.duplicate(true),
+	})
 	if not declined.is_empty():
 		WorldHistory.record_event("modifiers_declined", {"subject": "player", "declined": declined})
 	# N2.2. Achievement-run register, not an error dialog: the event names
@@ -484,6 +544,7 @@ func apply_to_world() -> Dictionary:
 	# record the world keeps.
 	if bool(state.get("broken_run", false)):
 		WorldHistory.record_event("achievement_run_started", {"overspent_by": int(state.get("overspent_by", 0))})
+	WorldHistory.commit_ledger_batch()
 	return state
 
 
@@ -573,3 +634,8 @@ func randomise(seed_value: int = 0) -> void:
 		"day": rng.randi_range(1, 28), "hour": rng.randi_range(0, 23), "minute": rng.randi_range(0, 59),
 	}
 	under_skin["blood"] = ["O-RUST", "A-ASH", "B-9", "AB-", "SAP", "UNKNOWN"][rng.randi_range(0, 5)]
+	# AX1.3. A random face, not random numbers. FaceModel correlates the skull
+	# axes so RANDOM produces a person rather than seven unrelated sliders,
+	# and the derived scalar keeps `appearance.face` honest for the body rig.
+	face = FaceModel.randomise(rng)
+	appearance["face"] = FaceModel.scalar(face)

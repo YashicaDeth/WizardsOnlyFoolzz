@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="Wizards Only Fools"
-run/main_scene="res://boot_splash.tscn"
+config/name="Wizards Only Fools Current Version"
+run/main_scene="res://country_town_menu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
 [audio]
@@ -21,7 +21,6 @@ driver/enable_input=true
 [autoload]
 
 DialogueManager="*res://addons/dialogue_manager/dialogue_manager.gd"
-MCPGameBridge="res://addons/godot_mcp/game_bridge/mcp_game_bridge.gd"
 WorldHistory="*res://systems/world_history.gd"
 CosmologyFactions="*res://systems/cosmology_factions.gd"
 Interstitial="*res://systems/interstitial.gd"
@@ -43,14 +42,7 @@ window/size/window_height_override=720
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg", "res://addons/dialogue_manager/plugin.cfg", "res://addons/gdUnit4/plugin.cfg", "res://addons/terrain_3d/plugin.cfg", "res://addons/proton_scatter/plugin.cfg")
-
-[godot_mcp]
-
-bind_mode=0
-custom_bind_ip=""
-port_override_enabled=false
-port_override=6550
+enabled=PackedStringArray("res://addons/dialogue_manager/plugin.cfg", "res://addons/gdUnit4/plugin.cfg", "res://addons/terrain_3d/plugin.cfg", "res://addons/proton_scatter/plugin.cfg")
 
 [input]
 

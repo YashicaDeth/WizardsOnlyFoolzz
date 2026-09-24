@@ -1,5 +1,7 @@
 extends Node
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 ## AQ1.1-AQ1.5. The godhead is not revealed, it accumulates — so the thing to
 ## test is whether attention actually tracks what the player did, and whether
 ## taking its advice genuinely costs.
@@ -70,10 +72,13 @@ func _ready() -> void:
 	# It survives being written down.
 	check(WorldHistory.flag("godhead_heeded", []).size() == 1, "what was accepted persists")
 	var recorded := false
+	var heeded_event: Dictionary = {}
 	for event: Dictionary in WorldHistory.events:
 		if str(event.get("type", "")) == "godhead_lesson_heeded":
 			recorded = true
+			heeded_event = event
 	check(recorded, "and it is in the record for the Board to pin")
+	check(PLAYER_ACTION_LEDGER.count("godhead_lesson_heeded") == 1 and str((heeded_event.get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_"), "the accepted lesson and its persistent claim share one identified action")
 
 	# ---- refusing is possible and is not silent.
 	Godhead.refuse("attention")
@@ -82,6 +87,7 @@ func _ready() -> void:
 		if str(event.get("type", "")) == "godhead_lesson_refused":
 			refused = true
 	check(refused, "refusing is recorded too")
+	check(PLAYER_ACTION_LEDGER.count("godhead_lesson_refused") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "refusal is also one closed player choice")
 
 	# ---- AQ1.3: it summons, past a threshold well beyond being merely visible.
 	check(not Godhead.can_summon(), "it still cannot summon")

@@ -43,6 +43,7 @@ extends RefCounted
 ## only one that reads what already happened.
 
 const SubstancesTable := preload("res://systems/substances.gd")
+const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
 
 ## AV1.1. Ten sephiroth, ordered low to high, each a real place with its own
 ## tradition name. `order` is also what AV2's floors scale against — Malkuth
@@ -213,18 +214,26 @@ static func petition(subject_id: String, plane_id: String, seal: String, offerin
 	# plane you can afford while dodging the one you cannot. A default here
 	# does not block the petition; it just means you arrive owing more and
 	# audible to fewer of them (`PlaneVoices.clarity()`).
+	WorldHistory.begin_ledger_batch()
 	var collected := PlaneVoices.collect_due(subject_id)
 	var payment := Boons.pay(subject_id, offering_kind, offering_amount, offering_target)
 	if not bool(payment.get("ok", false)):
+		WorldHistory.commit_ledger_batch()
 		return payment
-	WorldHistory.record_event("plane_petitioned", {
+	var details := {
+		"actor": subject_id,
 		"subject_id": subject_id, "plane_id": plane_id, "seal": seal,
 		"offering_kind": offering_kind, "offering_amount": offering_amount,
 		"altitude_at_petition": altitude(subject_id),
-	})
+	}
+	if subject_id == "player":
+		PlayerActionLedger.record("plane_petitioned", details)
+	else:
+		WorldHistory.record_event("plane_petitioned", details)
 	# AV3.2. The trip is now on the record; fold it into what this plane
 	# remembers about the subject.
 	PlaneVoices.remember(plane_id, subject_id)
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "plane_id": plane_id, "collected": collected}
 
 
@@ -233,11 +242,18 @@ static func petition(subject_id: String, plane_id: String, seal: String, offerin
 static func depart(subject_id: String, plane_id: String, offering_kind: String, offering_amount: float, offering_target: String = "") -> Dictionary:
 	if plane_id == DAATH or not PLANES.has(plane_id):
 		return {"ok": false, "reason": "NOT A PLACE YOU COULD HAVE BEEN"}
+	WorldHistory.begin_ledger_batch()
 	var payment := Boons.pay(subject_id, offering_kind, offering_amount, offering_target)
 	if not bool(payment.get("ok", false)):
+		WorldHistory.commit_ledger_batch()
 		return payment
-	WorldHistory.record_event("plane_departed", {"subject_id": subject_id, "plane_id": plane_id})
+	var details := {"actor": subject_id, "subject_id": subject_id, "plane_id": plane_id}
+	if subject_id == "player":
+		PlayerActionLedger.record("plane_departed", details)
+	else:
+		WorldHistory.record_event("plane_departed", details)
 	PlaneVoices.remember(plane_id, subject_id)
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true}
 
 
@@ -249,6 +265,7 @@ static func depart(subject_id: String, plane_id: String, offering_kind: String, 
 static func sustain_or_fail(subject_id: String, plane_id: String, floor_name: String) -> Dictionary:
 	if has_floor(subject_id, plane_id, floor_name):
 		return {"ok": true}
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.record_event("plane_altitude_failed", {
 		"subject_id": subject_id, "plane_id": plane_id, "floor": floor_name,
 		"altitude_at_failure": altitude(subject_id),
@@ -256,6 +273,7 @@ static func sustain_or_fail(subject_id: String, plane_id: String, floor_name: St
 	# AV3.2/AV2.3. The entity remembers the fall, and it costs more standing
 	# than a clean trip ever earned.
 	PlaneVoices.remember(plane_id, subject_id)
+	WorldHistory.commit_ledger_batch()
 	return {"ok": false, "reason": "CAME DOWN MID-%s" % floor_name.to_upper()}
 
 
@@ -267,9 +285,11 @@ static func sustain_or_fail(subject_id: String, plane_id: String, floor_name: St
 ## be able to ask WorldHistory about a relationship with a place that is not
 ## on the map.
 static func register_planes() -> void:
+	WorldHistory.begin_ledger_batch()
 	for plane_id in reachable_planes():
 		var data: Dictionary = PLANES[plane_id]
 		WorldHistory.register_subject(plane_id, {
 			"name": str(data.name), "kind": "plane", "role": str(data.role),
 			"order": int(data.order), "relations": {},
 		})
+	WorldHistory.commit_ledger_batch()

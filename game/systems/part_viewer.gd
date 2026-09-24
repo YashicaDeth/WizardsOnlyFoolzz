@@ -39,6 +39,11 @@ var _base_fit := 1.0
 var _ruptured := false
 var _compressed := false
 var _brain_display: SubViewport
+var _pulmonary_mode := false
+var _pulmonary_fill := 0.0
+var _pulmonary_cough := 0.0
+var _pulmonary_stain := 0.0
+var _smoke_volumes: Array[MeshInstance3D] = []
 
 
 func _ready() -> void:
@@ -80,6 +85,8 @@ func _ready() -> void:
 ## `part` is {kind, id, zone}. `state` carries the real condition so a ruptured
 ## organ and a healthy one do not look the same.
 func show_part(part: Dictionary, state: float) -> void:
+	_pulmonary_mode = false
+	_smoke_volumes.clear()
 	condition = clampf(state, 0.0, 1.0)
 	_ruptured = bool(part.get("ruptured", false)) or (str(part.get("kind", "")) == "organ" and condition <= 0.05)
 	_compressed = bool(part.get("compressed", false)) and not _ruptured
@@ -108,6 +115,100 @@ func show_part(part: Dictionary, state: float) -> void:
 			_build_implant(part)
 	_apply_condition()
 	_fit()
+
+
+## The field diagnostic uses the same authored lobes as ordinary organ
+## inspection, but seats the pair together so the player can read breathing,
+## smoke load and lasting tissue damage as one live specimen. The values are
+## supplied by AnatomyComponent; this viewer never owns a second lung state.
+func show_pulmonary_pair(state: float, stain: float, fill: float, cough: float) -> void:
+	condition = clampf(state, 0.0, 1.0)
+	_pulmonary_stain = clampf(stain, 0.0, 1.0)
+	_pulmonary_fill = clampf(fill, 0.0, 1.0)
+	_pulmonary_cough = clampf(cough, 0.0, 1.0)
+	_ruptured = condition <= 0.05
+	_compressed = false
+	if _spec != "pulmonary_pair":
+		_spec = "pulmonary_pair"
+		_pulmonary_mode = true
+		for child in _pivot.get_children():
+			_pivot.remove_child(child)
+			child.queue_free()
+		_smoke_volumes.clear()
+		var left_start := _pivot.get_child_count()
+		_build_organ("left_lung")
+		_shift_children_from(left_start, -0.052)
+		var right_start := _pivot.get_child_count()
+		_build_organ("right_lung")
+		_shift_children_from(right_start, 0.052)
+		_build_pulmonary_airway()
+		for child in _pivot.get_children():
+			if child is MeshInstance3D:
+				child.set_meta("pulmonary_tissue", true)
+		_build_smoke_volume(-1.0)
+		_build_smoke_volume(1.0)
+		_fit()
+	_pulmonary_mode = true
+	_apply_condition()
+	_update_smoke_volumes()
+
+
+func _shift_children_from(first: int, x_offset: float) -> void:
+	for index in range(first, _pivot.get_child_count()):
+		var child := _pivot.get_child(index) as Node3D
+		if child != null:
+			child.position.x += x_offset
+
+
+func _build_pulmonary_airway() -> void:
+	var trachea := CylinderMesh.new()
+	trachea.top_radius = 0.012
+	trachea.bottom_radius = 0.018
+	trachea.height = 0.13
+	var stem := _piece(trachea, Vector3(0, 0.145, 0), Color("77504c"), false)
+	stem.name = "Trachea"
+	for side in [-1.0, 1.0]:
+		var bronchus := CylinderMesh.new()
+		bronchus.top_radius = 0.008
+		bronchus.bottom_radius = 0.012
+		bronchus.height = 0.105
+		var branch := _piece(bronchus, Vector3(side * 0.035, 0.075, 0), Color("70433f"), false)
+		branch.name = "MainBronchus"
+		branch.rotation_degrees.z = side * 43.0
+
+
+func _build_smoke_volume(side: float) -> void:
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.070
+	mesh.height = 0.15
+	mesh.radial_segments = 14
+	mesh.rings = 7
+	var volume := MeshInstance3D.new()
+	volume.name = "InhaledSmoke"
+	volume.mesh = mesh
+	volume.position = Vector3(side * 0.092, -0.006, 0.012)
+	volume.scale = Vector3(0.74, 1.18, 0.56)
+	var material := StandardMaterial3D.new()
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = Color(0.56, 0.63, 0.58, 0.0)
+	material.emission_enabled = true
+	material.emission = Color("87958c")
+	material.emission_energy_multiplier = 0.22
+	volume.material_override = material
+	volume.set_meta("smoke_volume", true)
+	_pivot.add_child(volume)
+	_smoke_volumes.append(volume)
+
+
+func _update_smoke_volumes() -> void:
+	for volume in _smoke_volumes:
+		if not is_instance_valid(volume):
+			continue
+		var material := volume.material_override as StandardMaterial3D
+		if material != null:
+			material.albedo_color.a = 0.04 + _pulmonary_fill * 0.34
+		volume.visible = _pulmonary_fill > 0.01
 
 
 func _build_organ(organ_id: String, compressed := false) -> void:
@@ -447,8 +548,13 @@ func _apply_condition() -> void:
 		var material := piece.material_override as StandardMaterial3D
 		if material == null:
 			continue
+		if bool(piece.get_meta("smoke_volume", false)):
+			continue
 		var base: Color = piece.get_meta("base_color", material.albedo_color)
-		material.albedo_color = base.lerp(Color("221114"), (1.0 - condition) * 0.72)
+		var tissue := base
+		if _pulmonary_mode and bool(piece.get_meta("pulmonary_tissue", false)):
+			tissue = tissue.lerp(Color("241817"), _pulmonary_stain * 0.68)
+		material.albedo_color = tissue.lerp(Color("221114"), (1.0 - condition) * 0.72)
 		material.emission_enabled = condition < 0.35
 		material.emission = Color("6d100e") * (1.0 - condition) * 0.4
 
@@ -487,10 +593,15 @@ func _apply_zoom() -> void:
 
 
 func view_state() -> Dictionary:
-	return {"rotation": view_rotation, "zoom": zoom, "ruptured": _ruptured, "compressed": _compressed, "pieces": _pivot.get_child_count()}
+	return {"rotation": view_rotation, "zoom": zoom, "ruptured": _ruptured, "compressed": _compressed, "pieces": _pivot.get_child_count(), "pulmonary": _pulmonary_mode, "fill": _pulmonary_fill, "stain": _pulmonary_stain, "cough": _pulmonary_cough, "condition": condition}
 
 
 func _process(delta: float) -> void:
 	elapsed += delta
 	_pivot.rotation.y = elapsed * spin_speed + view_rotation.x
-	_pivot.rotation.x = sin(elapsed * 0.6) * 0.11 + view_rotation.y
+	var cough_jolt := sin(elapsed * 34.0) * _pulmonary_cough * 0.035 if _pulmonary_mode else 0.0
+	_pivot.rotation.x = sin(elapsed * 0.6) * 0.11 + view_rotation.y + cough_jolt
+	if _pulmonary_mode:
+		var breath := 1.0 + sin(elapsed * (2.8 if _pulmonary_fill > 0.08 else 1.2)) * (0.018 + _pulmonary_fill * 0.025)
+		_pivot.scale = Vector3.ONE * _base_fit * zoom * breath
+		_update_smoke_volumes()

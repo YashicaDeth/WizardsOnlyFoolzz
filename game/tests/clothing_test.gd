@@ -33,6 +33,7 @@ func _ready() -> void:
 	check(bool(result.get("ok", false)), "a real layer is accepted")
 	check(Clothing.worn("player") == "storm_oilskin", "and it is what you are actually wearing now")
 	check(float(Clothing.stats("player").get("warmth", 0.0)) > 0.3, "oilskin actually has real warmth in it")
+	check(PlayerActionLedger.count("layer_worn") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "wearing state and its public fact close as one player action")
 
 	var nobody := Clothing.wear("a_subject_that_does_not_exist", "bare")
 	check(not bool(nobody.get("ok", true)), "you cannot dress a subject that does not exist")
@@ -44,6 +45,7 @@ func _ready() -> void:
 	Clothing.wear("wearer", "gate_lantern_wrap")
 	var dressed_alignment: float = WorldHistory.tree_alignment(WorldHistory.subject("wearer"))
 	check(dressed_alignment > bare_alignment, "a layer with a positive bias actually moves where you sit (%.3f -> %.3f)" % [bare_alignment, dressed_alignment])
+	check(PlayerActionLedger.count("layer_worn") == 1, "dressing an NPC remains a world event, not a falsely attributed player action")
 
 	# AS3.2. Pockets: a small, named capacity, not a mass.
 	check(Clothing.pocketed("player").is_empty(), "pockets start empty")

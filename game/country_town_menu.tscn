@@ -109,9 +109,9 @@ flat = true
 [node name="SettingsPanel" type="PanelContainer" parent="HUD"]
 visible = false
 offset_left = 50.0
-offset_top = 392.0
-offset_right = 420.0
-offset_bottom = 674.0
+offset_top = 250.0
+offset_right = 470.0
+offset_bottom = 690.0
 theme_override_styles/panel = SubResource("panel")
 
 [node name="VBox" type="VBoxContainer" parent="HUD/SettingsPanel"]
@@ -120,9 +120,9 @@ text = "DISPLAY // SIGNAL CALIBRATION"
 [node name="Effects" type="Button" parent="HUD/SettingsPanel/VBox"]
 text = "BLOOM: ON"
 [node name="Graphics" type="Button" parent="HUD/SettingsPanel/VBox"]
-text = "GRAPHICS: ULTRA"
+text = "GRAPHICS: PERFORMANCE"
 [node name="Resolution" type="Button" parent="HUD/SettingsPanel/VBox"]
-text = "RENDER SCALE: 100%"
+text = "RENDER SCALE: 75%"
 [node name="AntiAliasing" type="Button" parent="HUD/SettingsPanel/VBox"]
 text = "ANTI-ALIASING: TAA + MSAA 4X"
 [node name="VSync" type="Button" parent="HUD/SettingsPanel/VBox"]

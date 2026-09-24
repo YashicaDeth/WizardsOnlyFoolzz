@@ -1,5 +1,7 @@
 extends Node
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 ## The Wire's claims are all comparative — reach is not skill, Crowns do not
 ## answer, being hated is access, hostile actions cost — so the checks are
 ## bounded from both sides. A pass here means the *ordering* holds, not merely
@@ -177,6 +179,9 @@ func _ready() -> void:
 
 	var fabricate := clean.act("iris_coil", "fabricate")
 	check(bool(fabricate.ok) and str(fabricate.detail) != "", "fabrication always resolves one way or the other")
+	var action_events := WorldHistory.events.filter(func(event: Dictionary) -> bool: return str(event.get("type", "")) in ["wire_expose", "wire_swarm", "wire_fabricate"])
+	check(action_events.size() == 3 and action_events.all(func(event: Dictionary) -> bool: return str((event.get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_")), "every landed Wire verb has one durable player-action identity")
+	check(PLAYER_ACTION_LEDGER.count("wire_expose") == 1 and PLAYER_ACTION_LEDGER.count("wire_swarm") == 1 and PLAYER_ACTION_LEDGER.count("wire_fabricate") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "Wire actions summarize once and close their target mutation transaction")
 
 	# --- the feed -------------------------------------------------------------
 	var posts := clean.feed(18)
@@ -196,6 +201,22 @@ func _ready() -> void:
 		if int(post.band) > WireNet.SIGNAL_SURFACE:
 			deep_found += 1
 	check(deep_found > 0, "a terminal does (%d posts)" % deep_found)
+
+	# --- the archive and the feed --------------------------------------------
+	var exact_event := WorldHistory.record_event("npc_resolution", {
+		"subject_id": "mara_voss", "outcome": "spare", "location": "bone_yard",
+	})
+	var archive := clean.archive(3)
+	check(not archive.is_empty() and str(archive[0].id) == str(exact_event.id), "the archive is finite, newest-first and reads the real event receipt")
+	check(str(archive[0].body).contains("MARA VOSS") and str(archive[0].body).contains("OUTCOME SPARE"), "the archive names facts the receipt actually contains")
+	var archived_details: Dictionary = archive[0].details
+	archived_details["outcome"] = "kill"
+	check(str(WorldHistory.recent_events(1)[0].details.outcome) == "spare", "an archive row cannot mutate world history")
+	var comparison_feed := clean.feed(18, 41)
+	var sourced_reports := comparison_feed.filter(func(post): return str(post.get("source_event_id", "")) == str(exact_event.id))
+	check(not sourced_reports.is_empty(), "a feed retelling keeps the archive receipt it came from")
+	if not sourced_reports.is_empty():
+		check(str(sourced_reports[0].body) != str(archive[0].body), "the feed's retelling disagrees with the archive's factual record")
 
 	# --- distortion and strain ------------------------------------------------
 	var straight := "the crew already knew about their own captain"

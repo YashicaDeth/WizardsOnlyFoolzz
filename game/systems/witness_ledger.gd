@@ -1,6 +1,8 @@
 class_name WitnessLedger
 extends RefCounted
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 ## Who saw it, whether they lived to say so, and what the world ended up
 ## believing as a result.
 ##
@@ -41,12 +43,22 @@ const WIRE_FORCE := 0.45
 ## How far a witness can be and still see it. Generous, because the failure mode
 ## that matters is a killing nobody reports, not one somebody implausibly saw.
 const SIGHT_RANGE := 34.0
+## AE10.10. Buying testimony uses the one currency the world already has. The
+## price is per account, not per witness, so somebody carrying three separate
+## wrongs is materially harder to buy than somebody carrying one.
+const REPORT_PRICE := 12
+## Below this the body's own perception is already visibly breaking down (the
+## Hunt drives its full-screen altered-perception treatment from the same
+## consciousness value). Testimony can invert the one binary resolution this
+## witness actually had to distinguish; there is no hidden random falsehood.
+const CLEAR_TESTIMONY_AT := 45.0
 
 ## Pending reports in flight. Runtime only: a report that has not landed is not
 ## knowledge, so persisting it would be persisting the wrong thing.
 var pending: Array = []
 var delivered := 0
 var cut := 0
+var bought := 0
 
 
 ## Who was close enough to see it. `candidates` is [{id, at, alive}] so the
@@ -68,10 +80,12 @@ static func witnesses_of(at: Vector3, candidates: Array, exclude: String = "") -
 
 ## F1.1. Records the act, and separately puts a report in flight for each
 ## witness. The event is true the moment it happens; the knowledge is not.
-func record(event_type: String, details: Dictionary, witness_ids: Array) -> Dictionary:
+func record(event_type: String, details: Dictionary, witness_ids: Array, as_player_action: bool = false) -> Dictionary:
 	var full := details.duplicate()
 	full["witnesses"] = witness_ids.duplicate()
-	var event := WorldHistory.record_event(event_type, full)
+	# Most callers describe world acts. A caller that owns an explicit player
+	# verb may opt into the shared receipt route without rebuilding testimony.
+	var event := PLAYER_ACTION_LEDGER.record(event_type, full) if as_player_action else WorldHistory.record_event(event_type, full)
 	for witness_id in witness_ids:
 		var subject: Dictionary = WorldHistory.subject(str(witness_id))
 		var faction := str(subject.get("faction_id", ""))
@@ -85,9 +99,28 @@ func record(event_type: String, details: Dictionary, witness_ids: Array) -> Dict
 			"witness": str(witness_id),
 			"faction": faction,
 			"remaining": REPORT_DELAY,
-			"details": details.duplicate(),
+			"details": _testimony_details(event_type, details, subject),
 		})
 	return event
+
+
+## What the body can honestly carry home. WorldHistory keeps `details`
+## unchanged above; only this witness's account is affected. Restrict the
+## mistake to the authored opposite outcomes instead of mutating arbitrary
+## fields or inventing a random suspect the witness never saw.
+static func _testimony_details(event_type: String, details: Dictionary, witness: Dictionary) -> Dictionary:
+	var testimony := details.duplicate(true)
+	if event_type != "npc_resolution":
+		return testimony
+	var anatomy: Dictionary = witness.get("anatomy_state", {}) if witness.get("anatomy_state", {}) is Dictionary else {}
+	if anatomy.is_empty() and witness.get("anatomy", {}) is Dictionary:
+		anatomy = witness.get("anatomy", {}) as Dictionary
+	if float(anatomy.get("consciousness", 100.0)) >= CLEAR_TESTIMONY_AT:
+		return testimony
+	match str(testimony.get("outcome", "")):
+		"execute": testimony["outcome"] = "spare"
+		"spare": testimony["outcome"] = "execute"
+	return testimony
 
 
 ## F1.2. Time passes and reports land. Returns the reports that arrived this
@@ -116,14 +149,22 @@ func _deliver(report: Dictionary) -> void:
 	# distortion at the point of report; `DESIGN/HUNT_SYSTEM.md` adds more per
 	# hop when F2 propagates it onward from here.
 	var wire := WireNet.new(WireNet.SIGNAL_SURFACE)
+	var testimony: Dictionary = (report.get("details", {}) as Dictionary).duplicate(true)
+	var account_subject := str(report["type"]).replace("_", " ")
+	if not str(testimony.get("outcome", "")).is_empty():
+		account_subject += ": %s" % str(testimony.outcome)
 	entries.append({
 		"sequence": int(report["sequence"]),
 		"type": str(report["type"]),
 		"told_by": str(report["witness"]),
-		"account": wire.distort("%s, as told by the one who walked back" % str(report["type"]).replace("_", " "), 1),
+		"account": wire.distort("%s, as told by the one who walked back" % account_subject, 1),
+		"testimony": testimony,
 	})
-	WorldHistory.register_subject(record_id, {"kind": "knowledge", "faction": faction, "entries": []})
-	WorldHistory.update_subject(record_id, {"entries": entries}, "faction_learned")
+	WorldHistory.update_subject(record_id, {
+		"kind": "knowledge",
+		"faction": faction,
+		"entries": entries,
+	}, "faction_learned")
 	delivered += 1
 	# F2. Getting home is not the end of it. The witness tells the people they
 	# actually know, and it travels from there until nobody repeats it.
@@ -149,6 +190,50 @@ func silence(subject_id: String) -> int:
 	if lost > 0:
 		WorldHistory.record_event("report_cut", {"subject": subject_id, "reports": lost})
 	return lost
+
+
+func reports_carried_by(subject_id: String) -> int:
+	return pending.filter(func(report: Dictionary): return str(report.get("witness", "")) == subject_id).size()
+
+
+## AE10.10. Pay the person who is physically carrying the account before it
+## lands. This is neither murder nor retroactive deletion from faction
+## knowledge: only pending reports can be bought. Inventory, witness memory,
+## removed testimony and the action receipt settle in one nested ledger batch.
+func buy(subject_id: String, buyer_id: String = "player") -> Dictionary:
+	var carried: Array = pending.filter(func(report: Dictionary): return str(report.get("witness", "")) == subject_id)
+	if carried.is_empty():
+		return {"ok": false, "reason": "THEY ARE CARRYING NO REPORT"}
+	var inventory := WorldHistory.subject("inventory")
+	var price := carried.size() * REPORT_PRICE
+	var wallet := int(inventory.get("rust_scrip", 0))
+	if wallet < price:
+		return {"ok": false, "reason": "NEED %d RUST SCRIP" % price, "price": price, "wallet": wallet}
+	var sequences: Array = carried.map(func(report: Dictionary): return int(report.get("sequence", -1)))
+	WorldHistory.begin_ledger_batch()
+	pending = pending.filter(func(report: Dictionary): return str(report.get("witness", "")) != subject_id)
+	bought += carried.size()
+	WorldHistory.amend_subject("inventory", {"rust_scrip": wallet - price})
+	var witness := WorldHistory.subject(subject_id)
+	WorldHistory.amend_subject(subject_id, {
+		"bribes_taken": int(witness.get("bribes_taken", 0)) + price,
+		"memory": "Took rust scrip to bury %d pending account%s." % [carried.size(), "" if carried.size() == 1 else "s"],
+	})
+	var details := {
+		"actor": buyer_id, "subject_id": subject_id, "reports": carried.size(),
+		"source_sequences": sequences, "price": price, "currency": "rust_scrip",
+	}
+	var event: Dictionary
+	if buyer_id == "player":
+		event = PLAYER_ACTION_LEDGER.record("report_bought", details)
+	else:
+		event = WorldHistory.record_event("report_bought", details)
+	WorldHistory.commit_ledger_batch()
+	return {
+		"ok": true, "reports": carried.size(), "price": price,
+		"wallet": wallet - price, "source_sequences": sequences,
+		"action_id": str((event.get("details", {}) as Dictionary).get("action_id", "")),
+	}
 
 
 # --- F2: grudges travel real edges -----------------------------------------

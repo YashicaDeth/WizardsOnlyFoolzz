@@ -17,20 +17,104 @@ func _ready() -> void:
 	add_child(hunt)
 	hunt.set_physics_process(false)
 	await get_tree().physics_frame
+	# I9. The world-side half of universal inspection: the pickup remains on its
+	# table while the same reliquary that presents held weapons presents its live
+	# geometry. This is checked before relocating to the isolated combat range.
+	var station_pickups: Array = hunt.substance_station.pickups()
+	var ground_pickup: Dictionary = station_pickups[0]
+	hunt.player = (ground_pickup["node"] as Node3D).global_position
+	var inspect_press := InputEventKey.new()
+	inspect_press.keycode = KEY_I
+	inspect_press.pressed = true
+	var inspect_release := InputEventKey.new()
+	inspect_release.keycode = KEY_I
+	inspect_release.pressed = false
+	hunt._equip_weapon(1)
+	hunt._unhandled_input(inspect_press)
+	check(str((WorldHistory.recent_events(1)[0] as Dictionary).get("type", "")) == "held_item_inspected" and hunt.inspected_world_item.is_empty(),
+		"a held weapon owns I even while a world pickup is within inspection range")
+	hunt._unhandled_input(inspect_release)
+	hunt._put_the_weapons_down()
+	check((hunt.arsenal.models.values() as Array).all(func(model): return not (model as Node3D).visible),
+		"slot 5 physically clears every weapon model before world inspection")
+	hunt._unhandled_input(inspect_press)
+	check(str((WorldHistory.recent_events(1)[0] as Dictionary).get("type", "")) == "world_item_inspected" and not hunt.inspected_world_item.is_empty(),
+		"slot 5 frees the same I verb to inspect the nearby world object")
+	hunt._unhandled_input(inspect_release)
+	var world_preview: Dictionary = hunt._nearest_world_item_for_inspection()
+	hunt.inspected_world_item = world_preview
+	hunt.inspect_held = true
+	hunt._update_held_reliquary()
+	check(not world_preview.is_empty() and hunt.held_reliquary.displayed_source_id == (ground_pickup["node"] as Node3D).get_instance_id(),
+		"I presents a nearby world pickup through the universal 3D reliquary")
+	check((hunt.substance_station.pickups() as Array).size() == station_pickups.size(),
+		"world inspection leaves the real pickup on its table")
+	var lifted_events_before := WorldHistory.event_count("substance_lifted")
+	var lifted_receipts_before := PlayerActionLedger.count("substance_lifted")
+	hunt._interact()
+	check((hunt.substance_station.pickups() as Array).size() == station_pickups.size() - 1,
+		"E still takes the inspected world pickup through its established interaction")
+	check(WorldHistory.event_count("substance_lifted") == lifted_events_before + 1,
+		"one physical lift emits one substance event rather than the former duplicate pair")
+	check(PlayerActionLedger.count("substance_lifted") == lifted_receipts_before + 1,
+		"the lift receives one durable action-ledger receipt")
+	var lifted_event: Dictionary = WorldHistory.recent_events(1)[0]
+	check(not str((lifted_event.get("details", {}) as Dictionary).get("action_id", "")).is_empty(),
+		"the established substance event carries its stable action id")
+	hunt.inspect_held = false
+	hunt.inspected_world_item.clear()
 	hunt.player_body.position = Vector3(175, 0.9, 125)
 	hunt.player = hunt.player_body.position + Vector3.UP * 0.6
+	# The remaining takeable families use the same adapter, not bespoke panels.
+	hunt._spawn_dropped_handheld({"serial": 73421, "condition": 0.72, "battery": 0.4}, hunt.player, false)
+	var device_preview: Dictionary = hunt._nearest_world_item_for_inspection()
+	check(str(device_preview.get("item_id", "")) == "black_mirror" and device_preview.get("source") == hunt.dropped_handheld,
+		"the dropped Black Mirror enters the same world inspection grammar")
+	hunt.dropped_handheld.queue_free()
+	hunt.dropped_handheld = null
+	var cache: Node3D = hunt._spawn_loot_cache(hunt.player, ["rust scrip", "field dressing"])
+	var cache_preview: Dictionary = hunt._nearest_world_item_for_inspection()
+	check(str(cache_preview.get("kind", "")) == "cache" and str(cache_preview.get("detail", "")) == "2 ITEMS",
+		"a salvage cache enters the same grammar with its live contents summarized")
+	var cache_items_before: int = (WorldHistory.subject("inventory").get("items", []) as Array).size()
+	var cache_events_before := WorldHistory.event_count("loot_collected")
+	var cache_receipts_before := PlayerActionLedger.count("loot_collected")
+	hunt._interact()
+	check(not hunt.loose_loot.has(cache) and (WorldHistory.subject("inventory").get("items", []) as Array).size() == cache_items_before + 2,
+		"E takes the inspected cache and moves its exact contents into inventory")
+	check(WorldHistory.event_count("loot_collected") == cache_events_before + 1 and PlayerActionLedger.count("loot_collected") == cache_receipts_before + 1,
+		"one cache pickup emits one event and one durable action receipt")
 	hunt.yaw = 0.0
 	hunt.pitch = 0.0
 	hunt.third_person = false
 	hunt._update_camera()
+	var inspection_subject: Dictionary = hunt._spawn_encounter_actor({
+		"instance_id": "inspection_subject", "kind": "friendly", "display_name": "MERCY BELL",
+	}, hunt.player + Vector3(0, -0.5, 1.2))
+	inspection_subject.node.position = hunt.player + Vector3(0, -0.5, 1.2)
+	var subject_preview: Dictionary = hunt._nearest_world_item_for_inspection()
+	hunt.inspected_world_item = subject_preview
+	hunt.inspect_held = true
+	hunt._update_held_reliquary()
+	check(str(subject_preview.get("kind", "")) == "person" and subject_preview.get("source") == inspection_subject.node,
+		"a nearby living person enters the same world inspection grammar")
+	check(int(hunt.held_reliquary.mesh_count) > 0 and hunt.held_reliquary.displayed_source_id == inspection_subject.node.get_instance_id(),
+		"person inspection presents that subject's live body geometry")
+	hunt.inspect_held = false
+	hunt.inspected_world_item.clear()
+	hunt.encounter_actors.erase(inspection_subject)
+	inspection_subject.node.queue_free()
 	hunt._spawn_encounter_actor({"instance_id": "armed_target", "kind": "hostile", "summary": "ballistic target"}, hunt.player + Vector3(0, 0, 6))
 	var actor: Dictionary = hunt.encounter_actors.back()
 	actor.node.position = hunt.player + Vector3(0, -0.5, 6)
 	await get_tree().physics_frame
 	hunt._equip_weapon(1)
 	var shell_before := int(hunt.arsenal.ammo.shotgun.loaded)
+	var trigger_receipts_before := PlayerActionLedger.count("weapon_fired")
 	hunt._attack()
 	check(int(hunt.arsenal.ammo.shotgun.loaded) == shell_before - 1, "live Hunt input fires a chambered shotgun shell")
+	check(PlayerActionLedger.count("weapon_fired") == trigger_receipts_before + 1,
+		"one trigger pull receives one player-action receipt rather than one per pellet")
 	# AF1.1. Damage now resolves when the round actually lands, not on the
 	# frame the trigger went down — `hunt.set_physics_process(false)` above
 	# only stops `hunt`'s own callback; `ballistics`, a real child node with
@@ -38,6 +122,8 @@ func _ready() -> void:
 	for _tick in 10:
 		await get_tree().physics_frame
 	check(actor.anatomy.wounds.size() > 0, "live pellets resolve against the NPC BaselineHuman")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")),
+		"every delayed pellet closes its anatomy and response transaction on impact")
 	var wounded_zones: Array[String] = []
 	for wound in actor.anatomy.wounds:
 		var zone := str(wound.get("zone", ""))
@@ -50,6 +136,18 @@ func _ready() -> void:
 	# this pull records is easily buried in that pellet-level detail within
 	# a 12-event window; widened rather than special-cased around it.
 	check(WorldHistory.recent_events(24).any(func(event): return str(event.get("type", "")) == "weapon_fired"), "weapon discharge enters world history")
+	var fired_events: Array = WorldHistory.events.filter(func(event: Dictionary): return str(event.get("type", "")) == "weapon_fired")
+	check(not fired_events.is_empty() and not str(((fired_events.back() as Dictionary).get("details", {}) as Dictionary).get("action_id", "")).is_empty(),
+		"the established weapon event carries the trigger pull's stable action id")
+	var reload_receipts_before := PlayerActionLedger.count("weapon_reloaded")
+	hunt.arsenal.cooldown = 0.0
+	hunt._reload_weapon()
+	hunt.arsenal.tick(float(hunt.arsenal.current().reload) + 0.01)
+	check(PlayerActionLedger.count("weapon_reloaded") == reload_receipts_before + 1,
+		"a completed physical reload receives one durable action receipt")
+	var reload_event: Dictionary = WorldHistory.events.filter(func(event: Dictionary): return str(event.get("type", "")) == "weapon_reloaded").back()
+	check(int((reload_event.get("details", {}) as Dictionary).get("loaded", 0)) == int(hunt.arsenal.current().magazine),
+		"the reload receipt records the ammunition state after the magazine arrives")
 
 	# Lock-on: the verb that makes third-person combat aimable at all.
 	hunt.third_person = true
@@ -76,6 +174,7 @@ func _ready() -> void:
 	hunt._attack_nearest_encounter_actor({"damage": 20.0, "impulse": 10.0, "damage_type": "cut", "range": 9.0, "weapon": "cleaver"})
 	check(decoy.anatomy.wounds.size() == decoy_wounds, "a nearer body does not steal a locked strike")
 	check(locked_actor.anatomy.wounds.size() > locked_wounds, "the locked target takes the strike")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")), "the landed swing closes anatomy, response and its receipt together")
 	hunt._toggle_lock()
 	check(hunt.lock_target.is_empty(), "lock releases")
 
@@ -84,6 +183,7 @@ func _ready() -> void:
 	# to slow and weaken subsequent attacks.
 	var full_cycle: float = hunt._actor_attack_cycle(locked_actor)
 	var full_damage: int = hunt._actor_attack_damage(locked_actor)
+	var severing_events_before := WorldHistory.event_count("limb_severed_in_combat")
 	locked_actor.rig.hit("right_arm", 44.0, 28.0, "cut", "", Vector3.RIGHT)
 	var sever: Dictionary = locked_actor.rig.hit("right_arm", 44.0, 28.0, "cut", "", Vector3.RIGHT)
 	check(bool(sever.get("severed", false)), "a directional blow severs a live encounter actor mid-fight")
@@ -91,7 +191,8 @@ func _ready() -> void:
 	check(locked_actor.state == "maimed" and not locked_actor.anatomy.dead and not locked_actor.anatomy.downed, "the maimed actor remains alive, standing and hostile")
 	check(hunt._actor_attack_cycle(locked_actor) > full_cycle, "the one-armed fighter attacks more slowly")
 	check(hunt._actor_attack_damage(locked_actor) < full_damage, "the one-armed fighter hits less hard")
-	check(WorldHistory.recent_events(20).any(func(event): return str(event.get("type", "")) == "limb_severed_in_combat"), "mid-fight limb loss enters persistent world history")
+	check(WorldHistory.event_count("limb_severed_in_combat") == severing_events_before + 1, "mid-fight limb loss enters persistent world history exactly once")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")), "maimed body state and its one public severing fact close together")
 	for candidate in hunt.encounter_actors:
 		candidate.disposition = "friendly"
 	locked_actor.disposition = "hostile"
@@ -107,18 +208,40 @@ func _ready() -> void:
 	hunt.add_child(loose_limb)
 	loose_limb.global_position = hunt.player
 	GoreChunks.register_whole_limb(loose_limb, "left_arm", "carry_victim")
+	var body_part_preview: Dictionary = hunt._nearest_world_item_for_inspection()
+	check(str(body_part_preview.get("kind", "")) == "body_part" and body_part_preview.get("source") == loose_limb,
+		"a takeable body part enters the same world inspection grammar")
 	var carry_before: int = hunt.handheld.carry.items.size()
 	hunt._interact()
 	check(hunt.handheld.carry.items.size() == carry_before + 1 and str(hunt.handheld.carry.items.back().kind) == "limb", "E picks the physical limb up into the real CARRY inventory")
 	hunt._equip_carried_limb()
 	check(hunt.carried_limb_index >= 0 and hunt.carried_limb_model != null, "slot 4 visibly equips the carried limb")
+	var carried_hand := hunt.carried_limb_model.get_node_or_null("CarriedLimbGripHand") as Node3D
+	check(carried_hand != null and carried_hand.get_node_or_null("HumiliationCuff") != null,
+		"the improvised limb is visibly held by the same costumed articulated hand")
+	check(carried_hand != null and carried_hand.get_node_or_null("FirstPersonForearm") != null,
+		"the limb grip continues into an authored lower-right arm")
+	hunt._update_hud()
+	var limb_reliquary: Control = hunt.held_reliquary as Control
+	check(limb_reliquary != null and int(limb_reliquary.displayed_source_id) == hunt.carried_limb_model.get_instance_id() and int(limb_reliquary.mesh_count) > 0,
+		"the same carried limb appears as real rotating geometry in the universal held-item reliquary")
+	var limb_rest_rotation: Vector3 = hunt.carried_limb_model.rotation
+	hunt.inspect_held = true
+	for _inspect_limb in 18:
+		hunt._update_held_inspection(1.0 / 60.0)
+	check(hunt.carried_limb_model.rotation.distance_to(limb_rest_rotation) > 0.25,
+		"inspection hefts the dead weight and turns its cut end toward the player")
+	hunt.inspect_held = false
 	hunt.lock_target = str(locked_actor.subject_id)
 	hunt.attack_cooldown = 0.0
 	var target_wounds: int = locked_actor.anatomy.wounds.size()
 	var limb_condition: float = float(hunt.handheld.carry.items[hunt.carried_limb_index].condition)
+	var melee_receipts_before := PlayerActionLedger.count("npc_anatomy_hit")
 	hunt._attack()
 	hunt._resolve_strike()
 	check(locked_actor.anatomy.wounds.size() > target_wounds, "the severed limb hits an NPC through the normal melee resolver")
+	check(PlayerActionLedger.count("npc_anatomy_hit") == melee_receipts_before + 1,
+		"one connecting melee swing receives one action receipt")
 	check(float(hunt.handheld.carry.items[hunt.carried_limb_index].condition) < limb_condition, "the improvised limb loses condition when swung")
 	var sale: Dictionary = hunt._sell_first_carried_part()
 	check(int(sale.get("price", 0)) > 0 and hunt.carried_limb_index == -1, "a broker can buy the same carried limb and unequip it cleanly")
@@ -195,6 +318,7 @@ func _ready() -> void:
 	hunt._player_lost_limb("left_arm")
 	check(hunt._player_swing_scale() < healthy_swing, "a one-armed player hits softer")
 	check(WorldHistory.recent_events(10).any(func(event): return str(event.get("type", "")) == "player_limb_severed"), "the player's maiming enters world history like anyone else's")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "maiming state, forced drop and severing fact close one injury transaction")
 	if held_before >= 0:
 		check(hunt.carried_limb_index == -1, "the arm that was holding something drops it")
 	hunt.player_rig.hit("left_leg", 90.0, 30.0, "cut", "", Vector3.LEFT)

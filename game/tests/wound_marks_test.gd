@@ -73,6 +73,48 @@ func _ready() -> void:
 	var organ: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "ballistic", 4)
 	check(float(organ["radius"]) > float(skin["radius"]), "a wound into the organ layer reads bigger than one that only broke skin")
 
+	# --- AN6.5: weapon and angle author the silhouette -----------------------
+	var straight_round: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "ballistic", 0, Vector3.DOWN)
+	var grazing_round: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "ballistic", 0, Vector3(1.0, -0.12, 0.0))
+	var straight_cut: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "cut", 0, Vector3.DOWN)
+	check(float(straight_cut["aspect"]) > float(straight_round["aspect"]), "a blade authors a longer opening than a round at the same damage and angle")
+	check(float(grazing_round["aspect"]) > float(straight_round["aspect"]), "a grazing round stretches along its real path instead of stamping the perpendicular entry")
+	var along_x: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "ballistic", 0, Vector3(1.0, -0.12, 0.0))
+	var along_z: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "ballistic", 0, Vector3(0.0, -0.12, 1.0))
+	check(absf(float(along_x["shape_rotation"]) - float(along_z["shape_rotation"])) > 1.0, "the long axis follows the strike tangent rather than a fixed body axis")
+	var slash_node := MARKS.build(straight_cut, Color.WHITE)
+	var round_node := MARKS.build(straight_round, Color.WHITE)
+	var slash_bounds: Vector3 = slash_node.mesh.get_aabb().size
+	var round_bounds: Vector3 = round_node.mesh.get_aabb().size
+	check(slash_bounds.x / maxf(slash_bounds.z, 0.0001) > round_bounds.x / maxf(round_bounds.z, 0.0001), "the authored blade profile reaches the actual crater geometry")
+	slash_node.free()
+	round_node.free()
+	var restored_shape: Dictionary = MARKS.from_record(MARKS.to_record(grazing_round))
+	check(is_equal_approx(float(restored_shape["aspect"]), float(grazing_round["aspect"])) and is_equal_approx(float(restored_shape["shape_rotation"]), float(grazing_round["shape_rotation"])), "the authored silhouette survives the same save record as the wound")
+
+	# --- AN6.1: an opening with depth, not a decal --------------------------
+	# The crater's own sink has to answer to how far the round actually got,
+	# not just sit at a fixed multiple of the rim's radius — otherwise a graze
+	# and a through-and-through are the same hole with a different width.
+	var shallow_wound: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "ballistic", 0)
+	shallow_wound["seed"] = 7
+	shallow_wound["depth"] = 0.08
+	var deep_wound: Dictionary = MARKS.make(Vector3.ZERO, Vector3.UP, 40.0, "ballistic", 0)
+	deep_wound["seed"] = 7
+	deep_wound["depth"] = 1.0
+	var shallow_node := MARKS.build(shallow_wound, Color.WHITE)
+	var deep_node := MARKS.build(deep_wound, Color.WHITE)
+	check(deep_node.mesh.get_aabb().size.y > shallow_node.mesh.get_aabb().size.y, "a wound that went deep sinks further than one that barely broke the surface (%.4f vs %.4f)" % [deep_node.mesh.get_aabb().size.y, shallow_node.mesh.get_aabb().size.y])
+	var organ_mesh := SphereMesh.new()
+	organ_mesh.radius = 0.06
+	organ_mesh.height = 0.12
+	var opened_node := MARKS.build(deep_wound, Color.WHITE, organ_mesh)
+	var cavity := opened_node.get_node_or_null("CavityContents") as MeshInstance3D
+	check(cavity != null and cavity.mesh != organ_mesh and cavity.get_meta("source_mesh") == organ_mesh, "a breached crater opens onto a fitted copy of the supplied organ mesh, not another tint")
+	shallow_node.free()
+	deep_node.free()
+	opened_node.free()
+
 	# --- a graze is not a hole ---------------------------------------------
 	var before: int = (rig.wound_marks.get(zone_a, []) as Array).size()
 	rig.hit_at(left_of_centre, 1.0, 0.5, "blunt", Vector3(0, 0, -1))

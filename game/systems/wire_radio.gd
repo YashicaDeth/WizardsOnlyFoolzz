@@ -407,5 +407,12 @@ func hold(delta: float) -> String:
 	return name
 
 
+## Releasing the physical lock control loses the partial lock. Previously the
+## handheld called `hold()` every frame merely because RADIO was visible, so a
+## player could discover a lead without touching the receiver at all.
+func release_lock() -> void:
+	lock_seconds = 0.0
+
+
 func lock_progress() -> float:
 	return clampf(lock_seconds / LOCK_SECONDS, 0.0, 1.0)

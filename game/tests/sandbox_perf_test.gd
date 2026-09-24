@@ -25,6 +25,12 @@ func _ready() -> void:
 		return
 	var tree := get_tree()
 	get_window().size = Vector2i(1920, 1080)
+	# Measuring three quality levels behind a 60 Hz present cap only measures
+	# the monitor: all three report ~16.6ms and tiny scheduling noise can make
+	# PERFORMANCE look slower than ULTRA. The sandbox complaint was frame cost,
+	# so remove presentation throttling for this benchmark.
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	Engine.max_fps = 0
 	await tree.process_frame
 
 	var demo: Node = load("res://gore_demo.tscn").instantiate()
@@ -36,6 +42,7 @@ func _ready() -> void:
 	var results := {}
 	for level: String in LEVELS:
 		WorldLook.set_quality_name(level)
+		WorldLook.apply_viewport_quality(get_viewport())
 		# Re-tune the live environment the same way the settings panel does.
 		for child in demo.get_children():
 			if child is WorldEnvironment and child.environment != null:
@@ -56,6 +63,8 @@ func _ready() -> void:
 	var perf: float = results["PERFORMANCE"]
 	print("PERFORMANCE is %.2fx ULTRA" % (perf / maxf(0.0001, ultra)))
 	check(perf > ultra, "PERFORMANCE is actually faster than ULTRA — the setting does something")
+	check(1000.0 / maxf(0.001, perf) <= WorldLook.FRAME_BUDGET_MS,
+		"PERFORMANCE holds the 16.67 ms / 60 FPS frame budget (%.2f ms)" % (1000.0 / maxf(0.001, perf)))
 
 	if failures.is_empty():
 		print("sandbox perf: measured")

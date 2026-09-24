@@ -84,6 +84,26 @@ func _ready() -> void:
 	check(not bare_layers.has(GoreChunks.Layer.CYBERNETIC), "a body with no implant sheds no hardware, however deep the hit")
 	check(not bare_layers.has(GoreChunks.Layer.ORGAN), "and no organ where the limb has none")
 	check(bare_layers.has(GoreChunks.Layer.BONE), "but it does reach bone")
+	# Pin this claim while the bone is actually present.  The rest of this file
+	# deliberately creates more than the live-gore budget, and a later `[0]`
+	# was asking for an old disposable fragment after that system had correctly
+	# recycled it.  A scavenger placed on an aged bone is the behavior that
+	# matters: it must refuse the bone, not merely have a predicate somewhere.
+	var bare_bone: Node3D
+	for piece in GoreChunks.from_subject("bare_probe"):
+		if int(GoreChunks.identify(piece).get("layer", -1)) == GoreChunks.Layer.BONE:
+			bare_bone = piece as Node3D
+			break
+	check(bare_bone != null, "the exposed arm leaves a real bone fragment to read")
+	if bare_bone != null:
+		var old_bone_info: Dictionary = GoreChunks.identify(bare_bone)
+		old_bone_info["spawn_msec"] = Time.get_ticks_msec() - int(GoreChunks.ROT_SECONDS * 1000.0)
+		bare_bone.set_meta("chunk", old_bone_info)
+		var bone_scavenger := CarrionScavenger.new()
+		add_child(bone_scavenger)
+		bone_scavenger.global_position = bare_bone.global_position + Vector3(0.1, 0.0, 0.0)
+		bone_scavenger._process(1.0)
+		check(not CarrionScavenger.can_eat(bare_bone) and GoreChunks.live.has(bare_bone), "scavengers leave an aged bone behind for the world to read")
 	var whole_limb: Node3D
 	for piece in GoreChunks.from_subject("bare_probe"):
 		if bool(GoreChunks.identify(piece).get("whole_limb", false)):
@@ -100,6 +120,26 @@ func _ready() -> void:
 	var sold := carry.sell(0)
 	check(quoted > 0 and int(sold.get("price", 0)) == quoted, "a whole limb receives a real condition-and-freshness sale price")
 	check(int(WorldHistory.subject("inventory").get("rust_scrip", 0)) == quoted, "selling the limb pays into the persistent rust-scrip wallet")
+	var sale_events := WorldHistory.events.filter(func(event: Dictionary): return str(event.get("type", "")) == "carried_part_sold")
+	check(sale_events.size() == 1 and str((sale_events[0].get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_") and int(WorldHistory.get("_ledger_batch_depth")) == 0, "the sale mutation and public market fact share one closed player-action receipt")
+
+	# --- AN6.2/AN6.3: a ruptured organ is a whole physics body, identified the
+	# same way a severed limb is, and CARRY already knows what to do with it ---
+	# The blood spray from every hit above this point shares this same budget
+	# (`_throw_limb()` is gated by it too), and PERFORMANCE quality's default
+	# cap of 52 is well under what this file has already spent — reset it so
+	# the rupture below is not silently swallowed by unrelated cosmetic spray.
+	BaselineHuman.live_gore = 0
+	rig.hit("torso", 90.0, 20.0, "cut", "liver")
+	await get_tree().physics_frame
+	var whole_organ: Node3D
+	for piece in GoreChunks.from_subject("chunk_probe"):
+		if bool(GoreChunks.identify(piece).get("whole_organ", false)) and str(GoreChunks.identify(piece).get("organ_id", "")) == "liver":
+			whole_organ = piece
+			break
+	check(whole_organ != null and whole_organ is RigidBody3D, "a ruptured organ falls out as a real physics body, not a gib or a scripted trajectory")
+	var carried_organ := carry.take_chunk(GoreChunks.take(whole_organ))
+	check(str(carried_organ.get("kind", "")) == "organ" and str(carried_organ.get("organ_id", "")) == "liver", "the whole organ enters CARRY the same way a whole limb does")
 
 	# --- the body remembers how far it was opened ----------------------------
 	check(rig.exposed_layer("torso") >= GoreChunks.Layer.MUSCLE, "the zone records its deepest breach (%d)" % rig.exposed_layer("torso"))
@@ -161,7 +201,6 @@ func _ready() -> void:
 	scavenger.global_position = (rot_target as Node3D).global_position + Vector3(0.1, 0.0, 0.0)
 	scavenger._process(1.0)
 	check(not GoreChunks.live.has(rot_target), "a carrion scavenger follows rot and consumes the flesh")
-	check(not CarrionScavenger.can_eat(GoreChunks.from_subject("bare_probe").filter(func(piece): return int(GoreChunks.identify(piece).get("layer", -1)) == GoreChunks.Layer.BONE)[0]), "scavengers leave bone behind for the world to read")
 
 	# --- picking a piece up --------------------------------------------------
 	var target: Node = GoreChunks.from_subject("chunk_probe")[0]

@@ -30,12 +30,31 @@ const DESIGN := Vector2(560, 470)
 ## Named so the mixer and the settings page cannot disagree about them.
 const BUSES := ["Master", "Music", "SFX", "Ambience"]
 
+## Y1.1. The only actions actually read by name elsewhere — `bone_yard_hunt.gd`,
+## `rift_derby.gd` and `vat_chamber.gd` all call `Input.get_vector`/`get_axis`
+## with these four, plus the two held modifiers. Jump and the rest of combat
+## are still hardcoded keys in Lane 1's files and are not rebindable from here.
+const CONTROL_ACTIONS := ["move_forward", "move_back", "move_left", "move_right", "sprint", "crouch"]
+const CONTROL_LABELS := {
+	"move_forward": "FORWARD",
+	"move_back": "BACK",
+	"move_left": "LEFT",
+	"move_right": "RIGHT",
+	"sprint": "SPRINT",
+	"crouch": "CROUCH",
+}
+
 var open := false
 var blend := 0.0
 var page := "root"
 var highlighted := 0
 var clock := 0.0
 var screen: Control
+## Set to an action name while waiting for the next key press; empty otherwise.
+var rebinding_action := ""
+## project.godot's own bindings, captured once before any stored rebind is
+## applied — what RESET TO DEFAULT puts back.
+var _default_binds: Dictionary = {}
 
 var _rows: Array[Dictionary] = []
 var _factor := 1.0
@@ -52,8 +71,15 @@ func _ready() -> void:
 	screen.draw.connect(_draw_plate)
 	add_child(screen)
 	screen.visible = false
+	WorldHistory.register_subject(SETTINGS_ID, {
+		"hud_opacity": 0.9,
+		"hud_style": "rails",
+		"reduced_glitch": false,
+	})
 	_ensure_buses()
 	_restore_screen()
+	_capture_default_binds()
+	_restore_keybinds()
 	_apply_mix()
 	set_process(true)
 
@@ -95,7 +121,6 @@ func _apply_mix() -> void:
 
 
 func _set_volume(bus_name: String, level: float) -> void:
-	WorldHistory.register_subject(SETTINGS_ID, {})
 	WorldHistory.update_subject(SETTINGS_ID, {"volume_%s" % bus_name.to_lower(): clampf(level, 0.0, 1.0)}, "audio_setting_changed")
 	_apply_mix()
 
@@ -107,7 +132,6 @@ func _gore_mode() -> String:
 func _cycle_gore() -> void:
 	const ORDER := ["FULL", "REDUCED", "OFF"]
 	var next: String = ORDER[(maxi(0, ORDER.find(_gore_mode())) + 1) % ORDER.size()]
-	WorldHistory.register_subject(SETTINGS_ID, {})
 	WorldHistory.update_subject(SETTINGS_ID, {"gore": next}, "gore_setting_chosen")
 	BaselineHuman.apply_gore_setting()
 
@@ -120,10 +144,13 @@ func _fullscreen() -> bool:
 	return DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]
 
 
-func _set_fullscreen(on: bool) -> void:
-	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_WINDOWED)
-	WorldHistory.register_subject(SETTINGS_ID, {})
-	WorldHistory.update_subject(SETTINGS_ID, {"fullscreen": on}, "screen_setting_changed")
+func _set_fullscreen(on: bool, persist := true) -> void:
+	# Headless verification has no window to resize; the preference still needs
+	# to be testable and persist without asking the dummy display server to wait.
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_WINDOWED)
+	if persist:
+		WorldHistory.update_subject(SETTINGS_ID, {"fullscreen": on}, "screen_setting_changed")
 
 
 ## Applied once at startup, because a setting that is saved and never reapplied
@@ -132,7 +159,81 @@ func _restore_screen() -> void:
 	var stored: Dictionary = WorldHistory.subject(SETTINGS_ID)
 	if not stored.has("fullscreen"):
 		return
-	_set_fullscreen(bool(stored["fullscreen"]))
+	# Applying a preference is not the player changing it again.
+	_set_fullscreen(bool(stored["fullscreen"]), false)
+
+
+func _hud_opacity() -> float:
+	return clampf(float(WorldHistory.subject(SETTINGS_ID).get("hud_opacity", 0.9)), 0.25, 1.0)
+
+
+func _hud_style() -> String:
+	return "arcs" if str(WorldHistory.subject(SETTINGS_ID).get("hud_style", "rails")) == "arcs" else "rails"
+
+
+func _reduced_glitch() -> bool:
+	return bool(WorldHistory.subject(SETTINGS_ID).get("reduced_glitch", false))
+
+
+func _set_hud_opacity(value: float) -> void:
+	WorldHistory.update_subject(SETTINGS_ID, {"hud_opacity": clampf(value, 0.25, 1.0)}, "hud_setting_changed")
+
+
+func _cycle_hud_style() -> void:
+	WorldHistory.update_subject(SETTINGS_ID, {"hud_style": "arcs" if _hud_style() == "rails" else "rails"}, "hud_setting_changed")
+
+
+func _toggle_reduced_glitch() -> void:
+	WorldHistory.update_subject(SETTINGS_ID, {"reduced_glitch": not _reduced_glitch()}, "hud_setting_changed")
+
+
+func _capture_default_binds() -> void:
+	for action in CONTROL_ACTIONS:
+		var events := InputMap.action_get_events(action)
+		if not events.is_empty() and events[0] is InputEventKey:
+			_default_binds[action] = (events[0] as InputEventKey).physical_keycode
+
+
+## Applied once at startup, same as the screen mode above — read from
+## `project.godot`'s own defaults until a player has actually changed one.
+func _restore_keybinds() -> void:
+	var stored: Dictionary = WorldHistory.subject(SETTINGS_ID)
+	for action in CONTROL_ACTIONS:
+		var key := "keybind_%s" % action
+		if stored.has(key):
+			_bind_action(action, int(stored[key]))
+
+
+func _bind_action(action: String, physical_keycode: int) -> void:
+	InputMap.action_erase_events(action)
+	var key_event := InputEventKey.new()
+	key_event.physical_keycode = physical_keycode
+	InputMap.action_add_event(action, key_event)
+
+
+## The physical key, not the localised keycode — matches how `project.godot`
+## already stores its own defaults, and keeps working if the OS layout changes
+## underneath a saved rebind.
+func _apply_rebind(action: String, event: InputEventKey) -> void:
+	_bind_action(action, event.physical_keycode)
+	WorldHistory.register_subject(SETTINGS_ID, {})
+	WorldHistory.update_subject(SETTINGS_ID, {"keybind_%s" % action: event.physical_keycode}, "keybind_changed")
+
+
+func _reset_keybinds() -> void:
+	WorldHistory.register_subject(SETTINGS_ID, {})
+	for action in CONTROL_ACTIONS:
+		var default_keycode: int = int(_default_binds.get(action, 0))
+		if default_keycode != 0:
+			_bind_action(action, default_keycode)
+		WorldHistory.update_subject(SETTINGS_ID, {"keybind_%s" % action: default_keycode}, "keybind_reset")
+
+
+func _key_label(action: String) -> String:
+	var events := InputMap.action_get_events(action)
+	if events.is_empty() or not (events[0] is InputEventKey):
+		return "—"
+	return (events[0] as InputEventKey).as_text_physical_keycode()
 
 
 ## Rows are rebuilt each frame the plate is open, because their labels carry
@@ -144,6 +245,20 @@ func _build_rows() -> void:
 		_rows.append({"id": "settings", "label": "SETTINGS", "value": ""})
 		_rows.append({"id": "menu", "label": "LEAVE TO THE FRONT DOOR", "value": ""})
 		return
+	if page == "hud":
+		_rows.append({"id": "hud_opacity", "label": "HUD OPACITY", "value": "%03d" % roundi(_hud_opacity() * 100.0), "slider": true})
+		_rows.append({"id": "hud_style", "label": "HUD STYLE", "value": _hud_style().to_upper()})
+		_rows.append({"id": "reduced_glitch", "label": "REDUCED GLITCH", "value": "ON" if _reduced_glitch() else "OFF"})
+		_rows.append({"id": "settings_back", "label": "BACK", "value": ""})
+		return
+	if page == "controls":
+		for action in CONTROL_ACTIONS:
+			var label: String = str(CONTROL_LABELS.get(action, action.to_upper()))
+			var value := "PRESS KEY" if rebinding_action == action else _key_label(action)
+			_rows.append({"id": "bind_%s" % action, "label": label, "value": value})
+		_rows.append({"id": "ctrl_reset", "label": "RESET TO DEFAULT", "value": ""})
+		_rows.append({"id": "ctrl_back", "label": "BACK", "value": ""})
+		return
 	for bus_name in BUSES:
 		_rows.append({"id": "vol_%s" % bus_name, "label": bus_name.to_upper(), "value": "%03d" % roundi(_volume(bus_name) * 100.0), "slider": true})
 	_rows.append({"id": "gore", "label": "VIOLENCE", "value": _gore_mode()})
@@ -151,6 +266,9 @@ func _build_rows() -> void:
 	# was not. It belongs beside the other settings rather than in a key nobody
 	# is told about, and it persists like everything else here.
 	_rows.append({"id": "screen", "label": "SCREEN", "value": "FULL" if _fullscreen() else "WINDOWED"})
+	_rows.append({"id": "hud", "label": "DISPLAY / HUD", "value": ">"})
+	# Y1.1. Controls had no door on them anywhere in the project.
+	_rows.append({"id": "controls", "label": "CONTROLS", "value": ""})
 	_rows.append({"id": "back", "label": "BACK", "value": ""})
 
 
@@ -175,6 +293,7 @@ func open_gate() -> void:
 	page = "root"
 	highlighted = 0
 	clock = 0.0
+	rebinding_action = ""
 	screen.visible = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().paused = true
@@ -184,11 +303,20 @@ func close() -> void:
 	if not open:
 		return
 	open = false
+	rebinding_action = ""
 	get_tree().paused = false
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	if rebinding_action != "":
+		# Escape cancels rather than binding itself — it is the one key every
+		# other menu in the game already uses to back out.
+		if event.keycode != KEY_ESCAPE:
+			_apply_rebind(rebinding_action, event as InputEventKey)
+		rebinding_action = ""
+		get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_ESCAPE:
 		toggle()
@@ -223,6 +351,12 @@ func _nudge(direction: int) -> void:
 		_cycle_gore()
 	elif id == "screen":
 		_set_fullscreen(not _fullscreen())
+	elif id == "hud_opacity":
+		_set_hud_opacity(_hud_opacity() + 0.05 * float(direction))
+	elif id == "hud_style":
+		_cycle_hud_style()
+	elif id == "reduced_glitch":
+		_toggle_reduced_glitch()
 
 
 func _activate() -> void:
@@ -230,20 +364,33 @@ func _activate() -> void:
 	match id:
 		"resume":
 			close()
-		"settings":
+		"settings", "settings_back":
 			page = "settings"
+			highlighted = 0
+		"hud":
+			page = "hud"
 			highlighted = 0
 		"back":
 			page = "root"
 			highlighted = 0
-		"gore":
-			_cycle_gore()
+		"gore", "screen", "hud_opacity", "hud_style", "reduced_glitch":
+			_nudge(1)
+		"controls":
+			page = "controls"
+			highlighted = 0
+		"ctrl_back":
+			page = "settings"
+			highlighted = 0
+		"ctrl_reset":
+			_reset_keybinds()
 		"menu":
 			close()
 			Interstitial.travel("res://country_town_menu.tscn", "standing down")
 		_:
 			if id.begins_with("vol_"):
 				_nudge(1)
+			elif id.begins_with("bind_"):
+				rebinding_action = id.trim_prefix("bind_")
 
 
 func _process(delta: float) -> void:
@@ -285,29 +432,35 @@ func _draw_plate() -> void:
 	screen.draw_polyline(outline, COPPER * Color(1, 1, 1, 0.62 * eased), 2.0)
 
 	CellOutzType.draw_stamped(screen, Vector2(30, 26), "STOPPED", 30.0, ACID * Color(1, 1, 1, eased), ARTERIAL * Color(1, 1, 1, 0.3 * eased), 4.0)
-	CellOutzType.draw_text(screen, Vector2(30, 68), "CELLOUTZ / THE YARD IS STILL THERE", 10.0, INK * Color(1, 1, 1, 0.45 * eased), 1.4)
+	var subtitle := "DISPLAY / HUD" if page == "hud" else "SETTINGS" if page == "settings" else "CELLOUTZ / THE YARD IS STILL THERE"
+	CellOutzType.draw_text(screen, Vector2(30, 68), subtitle, 10.0, INK * Color(1, 1, 1, 0.45 * eased), 1.4)
 	screen.draw_line(Vector2(30, 84), Vector2(DESIGN.x - 30, 84), COPPER * Color(1, 1, 1, 0.4 * eased), 1.0)
 
+	var row_pitch := minf(52.0, (DESIGN.y - 190.0) / maxf(1.0, float(_rows.size() - 1)))
 	for index in _rows.size():
 		var row: Dictionary = _rows[index]
-		var top := 112.0 + index * 52.0
+		var top := 112.0 + index * row_pitch
 		var lit := index == highlighted
 		var accent := ACID if lit else INK
 		if lit:
-			screen.draw_rect(Rect2(24, top - 12, DESIGN.x - 48, 40), accent * Color(1, 1, 1, 0.12 * eased))
+			screen.draw_rect(Rect2(24, top - 12, DESIGN.x - 48, minf(40.0, row_pitch - 4.0)), accent * Color(1, 1, 1, 0.12 * eased))
 			var slide := 4.0 + sin(clock * 6.0) * 2.0
 			screen.draw_colored_polygon(PackedVector2Array([
 				Vector2(14 - slide, top - 2), Vector2(24 - slide, top + 7), Vector2(14 - slide, top + 16),
 			]), accent * Color(1, 1, 1, eased))
 		CellOutzType.draw_text(screen, Vector2(34, top), str(row.label), 17.0, accent * Color(1, 1, 1, (1.0 if lit else 0.7) * eased), 2.2)
 		if bool(row.get("slider", false)):
-			var level := _volume(str(row.id).trim_prefix("vol_"))
+			var level := _hud_opacity() if str(row.id) == "hud_opacity" else _volume(str(row.id).trim_prefix("vol_"))
 			var bar := Rect2(DESIGN.x - 210, top + 4, 130, 8)
 			screen.draw_rect(bar, Color(0, 0, 0, 0.5 * eased))
 			screen.draw_rect(Rect2(bar.position, Vector2(bar.size.x * level, bar.size.y)), accent * Color(1, 1, 1, 0.75 * eased))
 			screen.draw_rect(bar, INK * Color(1, 1, 1, 0.2 * eased), false, 1.0)
 		if not str(row.value).is_empty():
-			CellOutzType.draw_text(screen, Vector2(DESIGN.x - 68, top), str(row.value), 15.0, accent * Color(1, 1, 1, 0.9 * eased), 1.6)
+			var value_x := DESIGN.x - 34.0 - CellOutzType.width(str(row.value), 15.0, 1.6)
+			CellOutzType.draw_text(screen, Vector2(value_x, top), str(row.value), 15.0, accent * Color(1, 1, 1, 0.9 * eased), 1.6)
 
-	CellOutzType.draw_text(screen, Vector2(30, DESIGN.y - 28), "ESC RESUME   ARROWS MOVE   ENTER SELECT", 9.0, INK * Color(1, 1, 1, 0.4 * eased), 1.4)
+	if page == "hud":
+		CellOutzType.draw_text(screen, Vector2(34, 348), "OPACITY 25-100% / SAVED AUTOMATICALLY", 10.0, INK * Color(1, 1, 1, 0.5 * eased), 1.0)
+		CellOutzType.draw_text(screen, Vector2(34, 374), "REDUCED GLITCH CALMS CAMERA GRAIN", 10.0, INK * Color(1, 1, 1, 0.5 * eased), 1.0)
+	CellOutzType.draw_text(screen, Vector2(30, DESIGN.y - 28), "ESC RESUME  UP/DOWN MOVE  L/R ADJUST  ENTER SELECT", 9.0, INK * Color(1, 1, 1, 0.4 * eased), 1.0)
 	screen.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

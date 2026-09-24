@@ -26,6 +26,8 @@ const TEST_SAVES_DIR := "user://test_saves"
 
 var active_slot_id := ""
 var slot_manifest: Array[Dictionary] = []
+## Test-only latch; see `_wipe_test_quantum_branches()` for why once.
+var _wiped_test_quantum := false
 ## P2.2. One runtime distinction, kept out of the saved world itself. The demo
 ## runs every real system and scene; this flag only chooses its route edges and
 ## the file those systems write to.
@@ -71,6 +73,13 @@ var flags: Dictionary = {}
 var chaos_magick_level := 0.0
 var chaos_magick_at_minute := 0.0
 
+## A physical act can touch several ledgers at once: dose, anatomy, consumed
+## object and the event itself. Those mutations still emit normally as they
+## happen, but a short batch coalesces their disk persistence into one write.
+## Nested callers are safe; only the outermost commit flushes.
+var _ledger_batch_depth := 0
+var _ledger_batch_dirty := false
+
 ## What bumps it, and by how much. Ritual work is the only source at the
 ## moment this was written — the honest answer for a system this new is that
 ## the table grows as other occult acts get recorded, not that one was
@@ -83,6 +92,12 @@ const CHAOS_MAGICK := {
 	# once-per-god-per-day guard in `gods.gd` is what stops a clear night
 	# ratcheting this on its own.
 	"god_seen": 0.05,
+	# AX2.3. The opening's breakthrough: the player's own soul takes the
+	# government chip and rewrites it. Weighted above a completed ritual
+	# because it is the first act of chaos magick in the game and the one the
+	# whole AJ ladder is built on top of -- and because it happens exactly
+	# once per run, so it cannot be farmed the way a ritual can.
+	"soul_seized_implant": 0.35,
 }
 
 ## Loses about half its charge every three in-world hours with nothing feeding
@@ -120,6 +135,19 @@ func flag(key: String, fallback: Variant = null) -> Variant:
 func set_flag(key: String, value: Variant) -> void:
 	flags[key] = value
 	_save_history()
+
+
+func begin_ledger_batch() -> void:
+	_ledger_batch_depth += 1
+
+
+func commit_ledger_batch() -> void:
+	if _ledger_batch_depth <= 0:
+		return
+	_ledger_batch_depth -= 1
+	if _ledger_batch_depth == 0 and _ledger_batch_dirty:
+		_ledger_batch_dirty = false
+		_save_history()
 
 
 func record_event(event_type: String, details: Dictionary = {}) -> Dictionary:
@@ -426,11 +454,16 @@ func tree_axis_label(value: float) -> String:
 
 func update_subject(subject_id: String, changes: Dictionary, event_type: String = "subject_updated") -> Dictionary:
 	changes = _normalise_body_records(changes)
+	# A first update may also have to register the subject. Keep that schema
+	# creation, the actual mutation and its public event under one flush even
+	# when the caller did not need a wider action transaction.
+	begin_ledger_batch()
 	var updated := register_subject(subject_id, {})
 	for key in changes:
 		updated[key] = changes[key]
 	subjects[subject_id] = updated
 	record_event(event_type, {"subject_id": subject_id, "changes": changes.duplicate(true)})
+	commit_ledger_batch()
 	subject_changed.emit(subject_id, updated.duplicate(true))
 	return updated.duplicate(true)
 
@@ -441,11 +474,15 @@ func update_subject(subject_id: String, changes: Dictionary, event_type: String 
 ## rumour is actually about. Used by F2's propagation.
 func amend_subject(subject_id: String, changes: Dictionary) -> Dictionary:
 	changes = _normalise_body_records(changes)
+	# Registration plus a silent amendment is likewise one mutation. This is
+	# nested-safe beneath every explicit gameplay ledger batch.
+	begin_ledger_batch()
 	var updated := register_subject(subject_id, {})
 	for key in changes:
 		updated[key] = changes[key]
 	subjects[subject_id] = updated
 	_save_history()
+	commit_ledger_batch()
 	subject_changed.emit(subject_id, updated.duplicate(true))
 	return updated.duplicate(true)
 
@@ -541,11 +578,12 @@ func complete_demo(ending: String, details: Dictionary = {}) -> bool:
 	var run := subject("demo_run")
 	if str(run.get("status", "")) == "ended":
 		return false
-	register_subject("demo_run", {"status": "active", "ending": ""})
+	begin_ledger_batch()
 	amend_subject("demo_run", {"status": "ended", "ending": ending})
 	var record := details.duplicate(true)
 	record["ending"] = ending
 	record_event("demo_ending_reached", record)
+	commit_ledger_batch()
 	return true
 
 
@@ -773,6 +811,28 @@ func _wipe_test_saves() -> void:
 	var demo_path := ProjectSettings.globalize_path(TEST_DEMO_SAVE_PATH)
 	if FileAccess.file_exists(TEST_DEMO_SAVE_PATH):
 		DirAccess.remove_absolute(demo_path)
+	_wipe_test_quantum_branches()
+
+
+## The sandboxed quantum branches (`quantum_saves.gd`), wiped once per run —
+## not on every `clear_history()` like the two above.
+##
+## Once is enough for what the wipe is for: a branch written by a previous run
+## must not be readable by this one, or a suite that forgot to save a branch
+## would pass on a stale file. More than once would be wrong. `begin_new()`
+## clears history on its way to writing a branch and deliberately leaves the
+## other two slots standing, which is the property both quantum suites are
+## built on — they save a branch, start a second world, then cross back. Wiping
+## on every clear would give test mode a rule the real game does not have, and
+## the suites would be testing that rule instead of the game's.
+func _wipe_test_quantum_branches() -> void:
+	if _wiped_test_quantum:
+		return
+	_wiped_test_quantum = true
+	for slot in QuantumSaves.SLOT_COUNT:
+		var path := QuantumSaves.slot_path(slot)
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 func _load_history() -> void:
@@ -809,6 +869,9 @@ func _load_history() -> void:
 
 
 func _save_history() -> void:
+	if _ledger_batch_depth > 0:
+		_ledger_batch_dirty = true
+		return
 	# The legacy path is the real player's save; test mode never writes it.
 	# A slot path under test mode is `TEST_SAVES_DIR`, a sandbox `clear_history()`
 	# wipes on every test's own setup — writing there is exactly what lets

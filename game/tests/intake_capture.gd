@@ -26,13 +26,23 @@ func _ready() -> void:
 	intake.sheet.toggle_trait("the_tube_stayed_in")
 	intake.sheet.modifiers.append("neuralace")
 
-	var pages := {"route": 0, "race": 1, "traits": 2, "body": 3, "schedule": 4}
+	# Past the fade-in, with a question on the table and a thought in the air,
+	# so every panel of the first-launch layout (2026-09-24) is in the shot.
+	intake.elapsed = 6.0
+	intake.touched_pages = {0: true, 1: true}
+	var pages := {"route": 0, "race": 1, "traits": 2, "face": 3, "body": 4, "schedule": 5}
 	for label in pages:
 		intake.page = int(pages[label])
 		intake.row = 1
+		intake.handler_says = "Any pain? One blink yes, two no. Doesn't change anything, it's just a box."
+		intake.handler_life = 30.0
+		intake.doctor_life = 0.0
+		intake.answers = ["BLINK ONCE", "BLINK TWICE", "STARE"]
+		intake.thought = "Where is the second tank going?"
+		intake.thought_life = 5.0
 		intake.transcript = "WROTE: YES"
 		intake.transcript_life = 3.0
-		for _settle in 20:
+		for _settle in 90:
 			await get_tree().process_frame
 		intake.transcript_life = 3.0
 		intake.queue_redraw()

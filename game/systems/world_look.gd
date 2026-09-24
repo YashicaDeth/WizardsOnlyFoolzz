@@ -41,9 +41,29 @@ const FIRMAMENT_SHADER := preload("res://shaders/firmament.gdshader")
 ## stop disagreeing with each other between scenes.
 enum Quality { ULTRA, HIGH, PERFORMANCE }
 
+## X1.2. The region's frame contract. PERFORMANCE is the tier held to this
+## budget; HIGH and ULTRA are deliberate exchanges of headroom for image
+## quality. Keeping the number beside the preset prevents benchmarks and the
+## settings screen from quietly testing different meanings of "performance".
+const FRAME_BUDGET_MS := 1000.0 / 60.0
+const QUALITY_RENDER_SCALE := {
+	Quality.ULTRA: 1.0,
+	Quality.HIGH: 0.9,
+	Quality.PERFORMANCE: 0.75,
+}
+const QUALITY_MSAA := {
+	Quality.ULTRA: Viewport.MSAA_4X,
+	Quality.HIGH: Viewport.MSAA_2X,
+	Quality.PERFORMANCE: Viewport.MSAA_DISABLED,
+}
+
 ## Static so it survives a scene change. Scenes build their Environment fresh on
 ## load, and an instance field would be rebuilt to the default every time.
-static var quality: Quality = Quality.HIGH
+# Performance is the safe first-launch contract. The measured sandbox still
+# preserves the authored distance fog and colour work at this level, while
+# avoiding three fullscreen effects before the player has chosen to pay for
+# them. HIGH and ULTRA remain one click away in Settings.
+static var quality: Quality = Quality.PERFORMANCE
 
 
 ## Named for the settings panel, which shows the word rather than the enum.
@@ -59,6 +79,17 @@ static func set_quality_name(value: String) -> void:
 		"ULTRA": quality = Quality.ULTRA
 		"PERFORMANCE": quality = Quality.PERFORMANCE
 		_: quality = Quality.HIGH
+
+
+## Applies the part of a graphics tier owned by the viewport rather than its
+## Environment. Render benchmarks must call both this and `apply_quality()` or
+## they are not measuring the preset a player actually receives.
+static func apply_viewport_quality(viewport: Viewport) -> void:
+	if viewport == null:
+		return
+	viewport.scaling_3d_scale = float(QUALITY_RENDER_SCALE[quality])
+	viewport.msaa_3d = int(QUALITY_MSAA[quality]) as Viewport.MSAA
+	viewport.use_taa = quality != Quality.PERFORMANCE
 
 
 ## Applies the current quality to an Environment. Separated from `environment()`
@@ -143,6 +174,22 @@ const PRESETS := {
 		"zenith": "0a0406", "horizon": "3a0d0a", "ground": "120607",
 		"fog": "1e0908", "fog_density": 0.0060, "volumetric": 0.009,
 		"ambient": 0.40, "saturation": 0.92, "contrast": 1.28, "exposure": 1.0,
+	},
+	# The Lower Works, for exactly the reason `front_door` above exists. It was
+	# running `ossuary` too, and Greg's note on it -- *"this map is super
+	# scuffed"* -- is the same complaint in the same words as the title shot:
+	# mauve from zenith to ground, and 0.02 fog erasing every surface the
+	# material system produces. The district is also indoors and underground,
+	# where a sky-coloured haze forty metres down a sealed tunnel was never
+	# right to begin with.
+	#
+	# So: near-black warm rock, and fog at a third of ossuary's, which is what
+	# lets the rust-orange and sodium-green bay lamps do the colouring instead
+	# of a flat violet wash sitting in front of them.
+	"lower_works": {
+		"zenith": "07090a", "horizon": "1b1512", "ground": "0c0a08",
+		"fog": "1d1a16", "fog_density": 0.0065, "volumetric": 0.010,
+		"ambient": 0.46, "saturation": 0.96, "contrast": 1.26, "exposure": 1.05,
 	},
 }
 
@@ -553,6 +600,20 @@ static func _apply_grain(material: StandardMaterial3D, scale: float, strength: f
 			material.detail_albedo = sheet
 			material.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MIX
 			material.detail_uv_layer = BaseMaterial3D.DETAIL_UV_1
+	elif kind in ["rust", "dirt", "bone", "paint"]:
+		# The architecture half of the same idea. Flesh was the only surface in
+		# the game that could carry hand-made art, which was fine while the
+		# game was one room and wrong the moment it became a buried city: the
+		# walls, floors and pipe of an underground are most of what a player
+		# looks at. `chrome` and `glass` are deliberately left out -- a grime
+		# sheet over polished steel or pressure glass reads as dirt on the
+		# lens, not as a surface.
+		var slab_sheet: Texture2D = ArtSet.pick("slab", seed_value)
+		if slab_sheet != null:
+			material.detail_enabled = true
+			material.detail_albedo = slab_sheet
+			material.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+			material.detail_uv_layer = BaseMaterial3D.DETAIL_UV_1
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	# The tint now lives in the texture, so leave the multiplier neutral or the
 	# surface is coloured twice and goes muddy. The alpha is kept: glass carries
@@ -691,6 +752,64 @@ static func _surface_maps(kind: String, tint: Color, seed_value: int) -> Diction
 ## Generated, cached and never regenerated: the break is a fact about the world
 ## and every scene that looks up is looking at the same one.
 static var _firmament_map: ImageTexture = null
+
+
+## Stop small things casting shadows.
+##
+## A shadow caster costs a full re-render of that mesh into every cascade of
+## every shadowed light, and it costs exactly the same whether the mesh is a
+## warehouse or a baggie on a bench. The hunt was carrying 3133 visible
+## casters, and among them were 35 grinder parts, 24 baggies, 17 blisters and
+## 16 weights -- centimetre props whose shadows nobody has ever seen and which
+## were being drawn into the sun cascades every frame alongside the buildings.
+##
+## The rule is a size, not a list, so it keeps working when somebody adds
+## another prop: below the threshold along its longest axis, it stops casting.
+## Returns how many it switched off, because a helper that silently does
+## nothing is worse than no helper.
+static func stop_small_shadows(root: Node, longest_axis := 0.25) -> int:
+	if root == null or not is_instance_valid(root):
+		return 0
+	var stopped := 0
+	for node in _descendants(root):
+		var mesh := node as MeshInstance3D
+		if mesh == null or mesh.mesh == null:
+			continue
+		if mesh.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+			continue
+		# The mesh's own bounds, scaled by whatever the node is wearing: a
+		# quarter-metre box scaled up four times is a metre of object.
+		var size: Vector3 = mesh.mesh.get_aabb().size * mesh.scale
+		if maxf(size.x, maxf(size.y, size.z)) <= longest_axis:
+			mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			stopped += 1
+	return stopped
+
+
+## Stop everything under here casting, whatever its size.
+##
+## For things that are not in the world at all. The hunt draws 3D previews
+## inside HUD panels -- an inspected part, a held object, a body diagram -- and
+## every one of them was casting a real shadow into the district behind the
+## panel it is drawn in.
+static func stop_all_shadows(root: Node) -> int:
+	if root == null or not is_instance_valid(root):
+		return 0
+	var stopped := 0
+	for node in _descendants(root):
+		var mesh := node as MeshInstance3D
+		if mesh == null or mesh.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+			continue
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		stopped += 1
+	return stopped
+
+
+static func _descendants(node: Node) -> Array:
+	var out: Array = [node]
+	for child in node.get_children():
+		out.append_array(_descendants(child))
+	return out
 
 
 static func firmament() -> ImageTexture:

@@ -24,6 +24,7 @@ func _ready() -> void:
 	_test_hit_geometry()
 	_test_pain_posture()
 	_test_severing()
+	_test_joint_severing()
 	_test_prosthetic()
 	_test_gore()
 	_test_organs()
@@ -154,13 +155,53 @@ func _test_severing() -> void:
 	body.queue_free()
 
 
+## AN6.4. A cut through the elbow parts the arm faster than the identical cut
+## repeated through the middle of the upper-arm shaft — Half Sword's lesson
+## that a joint gives and a bone does not, but a shaft hit still has to count
+## for something rather than landing on a dead zone. `hit_at()` is what carries
+## a real position into the sever model; `hit()` alone (used throughout
+## `_test_severing` above) still cannot see one and keeps behaving exactly as
+## it always has.
+func _test_joint_severing() -> void:
+	var at_joint := _rig()
+	at_joint.gore = false
+	var elbow: Vector3 = (at_joint.parts.right_arm as Node3D).global_position
+	var joint_swings := 0
+	for swing in 8:
+		joint_swings += 1
+		var result := at_joint.hit_at(elbow, 15.0, 10.0, "cut", Vector3.RIGHT)
+		if bool(result.get("severed", false)):
+			break
+	check(at_joint.severed.has("right_arm"), "a cut repeated at the elbow eventually severs")
+
+	var mid_shaft := _rig()
+	mid_shaft.gore = false
+	var shaft_point: Vector3 = (mid_shaft.parts.right_arm as Node3D).global_position + Vector3(0, 0.155, 0)
+	var shaft_swings := 0
+	for swing in 8:
+		shaft_swings += 1
+		var result := mid_shaft.hit_at(shaft_point, 15.0, 10.0, "cut", Vector3.RIGHT)
+		if bool(result.get("severed", false)):
+			break
+	check(mid_shaft.severed.has("right_arm"), "the same cut repeated mid-shaft still eventually severs — it is a worse strike, not a wasted one")
+	check(joint_swings < shaft_swings, "the joint parts in fewer identical swings than the shaft (%d vs %d)" % [joint_swings, shaft_swings])
+	at_joint.queue_free()
+	mid_shaft.queue_free()
+
+
 func _test_pain_posture() -> void:
 	var body := _rig()
 	body.gore = false
+	check(not body._needs_pose_update(), "an intact warm body takes the zero-work posture path")
+	check(not body._needs_bleed_update(), "an intact body skips the no-op bleed pass")
+	check(not body.anatomy._needs_simulation(), "an intact body skips autonomous anatomy simulation")
 	var mobility_before := body.anatomy.mobility_ratio()
 	body.hit("torso", 24.0, 10.0, "blunt")
 	var posture := body.anatomy.posture()
 	check(str(posture.state) == "guarded" and float(posture.hunch) < 0.0, "ordinary pain produces a guarded posture before a performance penalty")
+	check(body._needs_pose_update(), "pain wakes the body posture path")
+	check(not body._needs_bleed_update(), "effects disabled still skip bleed updates after a wound")
+	check(body.anatomy._needs_simulation(), "a real wound wakes autonomous anatomy simulation")
 	check(is_equal_approx(body.anatomy.mobility_ratio(), mobility_before), "guarded pain does not yet reduce mobility")
 	body._apply_pain_posture(1.0)
 	check(body.rotation.x < -0.01, "the rig visibly hunches when its anatomy reports pain")
@@ -175,6 +216,18 @@ func _test_pain_posture() -> void:
 			marked += 1
 	check(marked > 0, "the 3D spine carries the same damaged vertebrae the X-ray reports")
 	body.queue_free()
+
+	var cold := _rig()
+	cold.gore = false
+	cold.anatomy.chilled = 0.3
+	check(cold._needs_pose_update(), "cold wakes the body posture path without a combat wound")
+	cold.queue_free()
+
+	var bleeding := _rig()
+	bleeding.gore = true
+	bleeding.hit("torso", 24.0, 10.0, "cut")
+	check(bleeding._needs_bleed_update(), "an open wound wakes the live bleed path")
+	bleeding.queue_free()
 
 
 func _test_downed() -> void:
@@ -234,6 +287,35 @@ func _test_organs() -> void:
 	check(missing.is_empty(), "every organ has geometry inside its zone (missing %s)" % str(missing))
 	check(not body.organ_parts["heart"].visible, "organs are not visible from outside the body")
 
+	# AN6.1: the wound itself is now the narrow view inside. A penetrating cut
+	# that reaches the organ layer carries the nearest organ's identity and uses
+	# that organ's actual mesh behind the opening; a shallow mark does neither.
+	var opened := _rig()
+	var gut := opened.organ_parts["gut"] as MeshInstance3D
+	var gut_surface := gut.global_position + Vector3(0.0, 0.0, 0.12)
+	opened.hit_at(gut_surface, 40.0, 8.0, "cut", Vector3(0.0, 0.0, -1.0))
+	var torso_wounds := opened.parts["torso"].get_node_or_null("Wounds") as Node3D
+	var cavity_count := 0
+	var cavity_source: Mesh = null
+	if torso_wounds != null:
+		for mark in torso_wounds.get_children():
+			var cavity := mark.get_node_or_null("CavityContents") as MeshInstance3D
+			if cavity != null:
+				cavity_count += 1
+				cavity_source = cavity.get_meta("source_mesh") as Mesh
+	var recorded_organs: Array = (opened.wound_marks.get("torso", []) as Array).map(func(wound): return str((wound as Dictionary).get("organ_id", "")))
+	check(cavity_count == 1 and cavity_source == gut.mesh, "a deep torso wound visibly opens onto the same gut mesh held inside the body (cavities %d, recorded %s, layer %d)" % [cavity_count, str(recorded_organs), opened.exposed_layer("torso")])
+	opened.anatomy.damage_organ("gut", 999.0)
+	opened._refresh_wounds("torso")
+	torso_wounds = opened.parts["torso"].get_node_or_null("Wounds") as Node3D
+	cavity_count = 0
+	if torso_wounds != null:
+		for mark in torso_wounds.get_children():
+			if mark.get_node_or_null("CavityContents") != null:
+				cavity_count += 1
+	check(cavity_count == 0, "the opening no longer shows an organ after that same organ has left the body")
+	opened.queue_free()
+
 	# A club breaks ribs. It does not perforate a liver — if blunt damage
 	# reached organs, every zone hit would be a lethal one.
 	for i in 6:
@@ -256,10 +338,22 @@ func _test_organs() -> void:
 	var gut_bleed: float = gutted.anatomy.bleed_rate
 	gutted.queue_free()
 
+	# Random organ selection in earlier hits (`_test_gore()`'s unaimed torso
+	# shears among others) can already have thrown a "heart" chunk into the
+	# registry by chance — clear it so the check below is unambiguously this
+	# rupture's own chunk rather than a coincidence from a prior test. The
+	# earlier gore tests also leave `live_gore` sitting at its own cap, which
+	# gates a whole-organ spill exactly the way it already gates a thrown limb.
+	GoreChunks.clear()
+	BaselineHuman.live_gore = 0
 	var shot := _rig()
 	shot.hit("torso", 90.0, 20.0, "cut", "heart")
 	check(shot.anatomy.internal_bleed_rate > gutted.anatomy.internal_bleed_rate, "a heart shot bleeds harder inside than a gut wound (%.1f vs %.1f)" % [shot.anatomy.internal_bleed_rate, gutted.anatomy.internal_bleed_rate])
 	check(not shot.organ_parts["heart"].visible, "a ruptured organ leaves the body")
+	# AN6.2: it leaves as a real physics body registered with GoreChunks, not a
+	# hand-integrated blob nothing else in the project could find or pick up.
+	var heart_chunks := GoreChunks.live.filter(func(piece): return is_instance_valid(piece) and str(GoreChunks.identify(piece).get("organ_id", "")) == "heart" and bool(GoreChunks.identify(piece).get("whole_organ", false)))
+	check(heart_chunks.size() == 1 and heart_chunks[0] is RigidBody3D, "the ruptured heart falls out as a real physics body (%d found)" % heart_chunks.size())
 	shot.queue_free()
 
 	var executed := _rig()

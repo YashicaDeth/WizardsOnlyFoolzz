@@ -18,6 +18,10 @@ extends RefCounted
 ## Below this, a target counts as genuinely unseen — the one number that
 ## turns a continuous exposure score into the boolean AE1.1 actually names.
 const UNSEEN_THRESHOLD := 0.35
+## A bright object is easier to notice than the body behind it. Keeping the
+## threshold shared makes "I saw the light" and "I saw the holder" comparable
+## without pretending they are the same sighting.
+const EMITTED_LIGHT_THRESHOLD := 0.2
 
 
 ## 0 (unseen) to 1 (in plain sight).
@@ -40,3 +44,19 @@ static func visibility(light: float, noise: float, cover: float, distance: float
 
 static func is_unseen(light: float, noise: float, cover: float, distance: float, max_range: float) -> bool:
 	return visibility(light, noise, cover, distance, max_range) < UNSEEN_THRESHOLD
+
+
+## C7.1 / AS1.5. Visibility of the source itself, not the person carrying it.
+## A source can be noticed out to twice its useful illumination radius: the
+## beam has stopped lighting a surface well before its bright origin becomes
+## impossible to pick out. Cover still matters, and an exhausted lamp has no
+## signal at all.
+static func emitted_light_signal(distance: float, light_radius: float, cover: float) -> float:
+	if light_radius <= 0.0:
+		return 0.0
+	var range_term := 1.0 - clampf(distance / (light_radius * 2.0), 0.0, 1.0)
+	return clampf(range_term * (1.0 - clampf(cover, 0.0, 1.0) * 0.75), 0.0, 1.0)
+
+
+static func sees_emitted_light(distance: float, light_radius: float, cover: float) -> bool:
+	return emitted_light_signal(distance, light_radius, cover) >= EMITTED_LIGHT_THRESHOLD

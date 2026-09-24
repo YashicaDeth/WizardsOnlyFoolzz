@@ -57,6 +57,7 @@ func _ready() -> void:
 	check((remembered.get("opened", []) as Array).size() == 2, "opening the whole afternoon, not one file (%d entries)" % (remembered.get("opened", []) as Array).size())
 	check(BrainIndex.is_open("the_table") and BrainIndex.is_open("who_held_you"), "both sealed entries under that word are open")
 	check(WorldHistory.event_count("memory_recovered") == 1, "a recovery is a recorded event like anything else")
+	check(PlayerActionLedger.count("memory_recovered") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "remembering is one identified action and closes its ledger transaction")
 	check(not bool(BrainIndex.unlock("RESTRAINT").get("ok", false)), "and it cannot be remembered twice")
 
 	# A threshold keyword is not satisfied by one instance of its evidence.
@@ -88,7 +89,12 @@ func _ready() -> void:
 	check(bool(installed.get("ok", false)), "the chip is installed by somebody else (%s)" % str(installed.get("serial", "")))
 	check(not bool(BrainIndex.install_chip("player").get("ok", false)), "and it cannot be installed twice")
 	check(str(BrainIndex.chip().get("owner_faction", "")) == "celloutz", "it answers to celloutz, not to you")
-	var cybernetics: Array = (WorldHistory.subject("player").get("anatomy_state", {}) as Dictionary).get("cybernetics", [])
+	# There is no live body snapshot yet, so installation belongs to the intake
+	# anatomy. Creating a partial anatomy_state here would suppress the rest of
+	# the factory loadout when the first real rig is built.
+	var installed_subject := WorldHistory.subject("player")
+	check(not installed_subject.has("anatomy_state"), "installation before decanting does not counterfeit a restored body")
+	var cybernetics: Array = (installed_subject.get("anatomy", {}) as Dictionary).get("cybernetics", [])
 	var found_chip := false
 	for implant in cybernetics:
 		if str((implant as Dictionary).get("id", "")) == BrainIndex.CHIP_IMPLANT_ID:
@@ -132,6 +138,7 @@ func _ready() -> void:
 	check(bool(fix.get("found", false)), "five is")
 	check(str(fix.get("place", "")) == "black_mile", "and the fix is the real place of the last crossing")
 	check(WorldHistory.event_count("wetwire_traced") == 1, "being found is a recorded event the world can react to")
+	check(PlayerActionLedger.count("wetwire_bridged") == 6 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "each accepted crossing is one action even when radiation mutates the brain in the same transaction")
 
 	# Going dark is a real reset and a real cost, not a cosmetic flag.
 	check(bool(BrainIndex.go_dark().get("ok", false)), "you can go dark")
@@ -144,6 +151,7 @@ func _ready() -> void:
 	BrainIndex.surface()
 	check(BrainIndex.reach() == 12, "surfacing restores it")
 	check(BrainIndex.trace_level() == 0, "and the old trail stays cut")
+	check(PlayerActionLedger.count("wetwire_went_dark") == 1 and PlayerActionLedger.count("wetwire_surfaced") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "dark and surface are one closed player action each")
 
 	# Revocation. Theirs to take; your memories are not theirs to take.
 	var opened_before := BrainIndex.opened().size()
@@ -171,8 +179,72 @@ func _ready() -> void:
 		if float((rows[i] as Dictionary).alignment) > float((rows[i - 1] as Dictionary).alignment):
 			descending = false
 	check(descending, "re-ranked by Tree alignment rather than by reach")
+
+	# AT1.6, the content half. Real posts, attributed to nobody.
+	var transmissions: Array = above.get("posts", [])
+	check(transmissions.size() >= 3, "and it now carries posts made by something else (%d)" % transmissions.size())
+	var any_human := false
+	for post in transmissions:
+		var row: Dictionary = post
+		if bool(row.get("human", true)) or str(row.get("author", "x")) != "" or str(row.get("handle", "x")) != "":
+			any_human = true
+	check(not any_human, "none of them are attributed to anyone at all")
+
 	BrainIndex.revoke("player", "TERMS")
 	check(not bool(BrainIndex.wire_from_above().get("ok", false)), "with the chip revoked there is no view from above at all")
+
+	# --- AT2: the brain is the file system ----------------------------------
+	# AT2.1. CARRY reads the exact same object C4's own page already reads —
+	# no second inventory dataset for the brain to disagree with.
+	WorldHistory.register_subject("inventory", {"items": []})
+	var carry_before := BrainIndex.carry_listing()
+	check(carry_before.is_empty(), "an empty bag lists nothing")
+	var carry := Carry.new()
+	carry.take_chunk({"layer_name": "organ", "organ_id": "liver", "zone": "torso", "subject_id": "some_body", "condition": 0.8})
+	var carry_after := BrainIndex.carry_listing()
+	check(carry_after.size() == 1, "a carried chunk shows up in the same call")
+	check(str(carry_after[0].title) == "LIVER", "as the real identified object, not a generic slot")
+	check(bool(carry_after[0].open), "and it is never sealed — you know what you are holding")
+	var carry_counts: Dictionary = BrainIndex.folder_counts()
+	check(int((carry_counts.get("carry", {}) as Dictionary).get("total", -1)) == 1, "folder_counts agrees with carry_listing")
+
+	# AT2.4. A dose files itself as a reopenable record without a second log.
+	check(BrainIndex.drug_experiences().is_empty(), "no doses taken yet, nothing to reopen")
+	Substances.take("player", "marrow_dust")
+	var experiences := BrainIndex.drug_experiences()
+	check(experiences.size() == 1, "taking one substance files exactly one experience")
+	var experience_sequence := int(experiences[0].sequence)
+	var reopened := BrainIndex.read_experience(experience_sequence)
+	check(bool(reopened.get("ok", false)) and str(reopened.get("substance_id", "")) == "marrow_dust", "and it can be reopened by that number")
+	check(str(reopened.get("title", "")) == str(experiences[0].title), "reading it back matches the listing's own row")
+	var drugs_listing := BrainIndex.listing("drugs")
+	var found_experience := false
+	for row in drugs_listing:
+		if str((row as Dictionary).get("id", "")) == "experience_%d" % experience_sequence:
+			found_experience = true
+	check(found_experience, "and MATERIA's own listing carries it alongside the static lore entries")
+
+	# AT2.5. Reuses AT1.3's own measure — a dynamic row never counts against it.
+	check(BrainIndex.optional_ratio() > 0.8, "still mostly optional with the chip's file added (%.0f%%)" % (BrainIndex.optional_ratio() * 100.0))
+	check(BrainIndex.required_entries().size() == 3, "still exactly three required entries")
+
+	# AT2.6. What the chip put there is not what you remembered. The chip was
+	# installed (and revoked, twice) earlier in this test — `is_open` for a
+	# chip file only ever asks whether the hardware exists at all, not whether
+	# it is currently live, so it is already true here.
+	check(BrainIndex.is_open("the_terms"), "the chip's own file is there because the chip is, not because of a keyword")
+	WorldHistory.register_subject("unwired_bystander", {"name": "NOBODY IN PARTICULAR", "kind": "person"})
+	check(not BrainIndex.is_open("the_terms", "unwired_bystander"), "and it is absent for anybody who was never wired at all")
+	check(not BrainIndex.opened().has("the_terms"), "and it was never added to what you remembered")
+	var mercy_unlock := BrainIndex.unlock("MERCY")
+	check(bool(mercy_unlock.get("ok", false)) and not (mercy_unlock.get("opened", []) as Array).has("the_terms"), "unlocking a real keyword never touches it either")
+	check(not bool(BrainIndex.forget("the_terms").get("ok", false)), "it cannot be forgotten")
+	check(str(BrainIndex.forget("the_terms").get("reason", "")) == "NOT YOURS TO DELETE", "for the one reason that matters — it was never yours")
+	BrainIndex.revoke("player", "TERMS AGAIN")
+	check(BrainIndex.is_open("the_terms"), "revoking the chip does not delete its paperwork either")
+	check(bool(BrainIndex.forget("the_table").get("ok", false)), "but a real memory can be let go of")
+	check(not BrainIndex.is_open("the_table"), "and it is actually gone")
+	check(not bool(BrainIndex.forget("the_table").get("ok", false)), "not twice")
 
 	print("BRAIN_INDEX_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

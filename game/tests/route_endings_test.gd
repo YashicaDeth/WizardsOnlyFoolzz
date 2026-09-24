@@ -66,6 +66,7 @@ func _ready() -> void:
 	var still_demon := RouteEndings.check("reformed")
 	check(drifted >= RouteEndings.ASCENDANT_THRESHOLD, "and genuinely drifts all the way back up on paper (%.2f)" % drifted)
 	check(still_demon == RouteEndings.ENDING_DEMON, "but the recorded ending does not silently flip to ascendant just because the axis crossed back")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "the permanent ending lock and its one public fact always close together")
 
 	print("ROUTE_ENDINGS_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

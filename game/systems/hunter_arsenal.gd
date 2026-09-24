@@ -11,6 +11,7 @@ signal equipped(weapon_id: String)
 signal fired(weapon_id: String, report: Dictionary)
 signal reload_started(weapon_id: String)
 signal reload_finished(weapon_id: String)
+signal customization_changed(weapon_id: String, customization: Dictionary)
 
 const WEAPONS := {
 	"sword": {
@@ -22,16 +23,67 @@ const WEAPONS := {
 		"label": "BONE YARD 12G", "kind": "firearm", "damage": 16.0,
 		"impulse": 34.0, "range": 42.0, "cooldown": 0.92,
 		"pellets": 10, "spread": 0.075, "magazine": 5, "reserve": 25,
-		"reload": 2.15, "damage_type": "ballistic",
+		"reload": 2.15, "damage_type": "ballistic", "calibre": "buck",
 	},
 	"sidearm": {
-		"label": "MERCY NINE", "kind": "firearm", "damage": 38.0,
+		# A first accurate hit should open a fight, not silently finish it. At
+		# 38 damage this round also delivered 26.6 damage to the nearest organ:
+		# enough to rupture the 18-point brain on contact. Twenty-four leaves it
+		# barely intact, so the first shot makes a severe, readable wound and a
+		# deliberate follow-up finishes the same target through the same anatomy.
+		"label": "MERCY NINE", "kind": "firearm", "damage": 24.0,
 		"impulse": 18.0, "range": 76.0, "cooldown": 0.28,
 		"pellets": 1, "spread": 0.008, "magazine": 10, "reserve": 50,
-		"reload": 1.3, "damage_type": "ballistic",
+		"reload": 1.3, "damage_type": "ballistic", "calibre": "pistol",
+	},
+	"sniper": {
+		# The shot you take once. Everything about it is the opposite of the
+		# shotgun: it reaches across the whole bone yard, it is accurate enough
+		# that the zone you aimed at is the zone you hit, and it makes you pay for
+		# a miss with a bolt cycle you cannot hurry.
+		#
+		# 78 is calibrated against the anatomy rather than picked for feel. The
+		# sidearm's 24 already delivers 26.6 to the nearest organ and the brain
+		# has 18 points, so a head hit ruptures it. At 78 there is no argument: a
+		# clean head or heart hit is over. That is what makes the kill camera
+		# honest when it fires, rather than a flourish played over a wound the
+		# victim would have walked away from.
+		"label": "ASHLINE LONGVIEW", "kind": "firearm", "damage": 78.0,
+		"impulse": 46.0, "range": 240.0, "cooldown": 1.65,
+		"pellets": 1, "spread": 0.0015, "magazine": 4, "reserve": 16,
+		"reload": 3.2, "damage_type": "ballistic", "calibre": "rifle",
+	},
+	"facility_sidearm": {
+		# The first firearm is a guard's service hand-cannon, not the ordinary
+		# surface pistol. One good hit can end a fight; its three rounds cannot
+		# replace the broken tools and melee weapons the escape already taught.
+		"label": "CELL OUTZ BREACH NINE", "kind": "firearm", "damage": 52.0,
+		"impulse": 30.0, "range": 68.0, "cooldown": 0.44,
+		"pellets": 1, "spread": 0.011, "magazine": 3, "reserve": 0,
+		"reload": 1.5, "damage_type": "ballistic", "calibre": "pistol",
 	},
 }
+## The hunter's own three. The sniper is not here for the same reason
+## `facility_sidearm` is not: it is a weapon you come into possession of, and
+## a rifle that reaches across the whole bone yard is not something the game
+## should hand you at spawn.
 const SLOT_ORDER := ["sword", "shotgun", "sidearm"]
+## AF10.10. These are attachment points on the object, not perks on its
+## holder. The future crafting screen may decide where a part comes from, but
+## it must install through this vocabulary so the Hunt, range and cab all read
+## the same weapon-owned record.
+const CUSTOMIZATION_SLOTS := {
+	"shotgun": ["sight", "muzzle", "stock"],
+	"sidearm": ["sight", "muzzle", "grip"],
+}
+const CUSTOMIZATION_SCALES := {
+	"damage_scale": Vector2(0.25, 2.0),
+	"impulse_scale": Vector2(0.25, 2.0),
+	"range_scale": Vector2(0.25, 2.0),
+	"spread_scale": Vector2(0.25, 2.0),
+	"cooldown_scale": Vector2(0.5, 2.0),
+	"reload_scale": Vector2(0.5, 2.0),
+}
 
 var current_id := "sword"
 var cooldown := 0.0
@@ -40,11 +92,24 @@ var shot_serial := 0
 var ammo := {
 	"shotgun": {"loaded": 5, "reserve": 25},
 	"sidearm": {"loaded": 10, "reserve": 50},
+	"facility_sidearm": {"loaded": 0, "reserve": 0, "spare_magazines": []},
 }
+## Weapons picked up rather than issued.
+##
+## Tracked separately and explicitly, because `ammo` cannot answer the
+## question: `facility_sidearm` has an entry in it from the start, at zero
+## rounds, so "has an ammo record" is true for a gun nobody has ever held.
+var acquired: Dictionary = {}
 ## AN2.4. Missing means unworn — a weapon starts at full condition and this
 ## dict only ever gains an entry the first time something actually wears it,
 ## the same lazy shape `ammo` above would use if a fresh magazine were free.
 var condition: Dictionary = {}
+## AF10.10. One dictionary per weapon, then one installed part per physical
+## slot. Nothing is stored on a player, vehicle or range actor: any holder asks
+## `current()`/`weapon_definition()` and receives the numbers belonging to the
+## weapon it actually has. Part records remain data (id, label, provenance and
+## modifiers) so a later crafting/persistence layer can move them intact.
+var customization: Dictionary = {}
 var models: Dictionary = {}
 var hand: Node3D
 
@@ -138,17 +203,190 @@ func _update_reload_visual() -> void:
 		magazine.position = (rest + MAGAZINE_DROP).lerp(rest, (progress - 0.66) / 0.34)
 
 
+## Everything actually in hand: the issued three, then anything picked up.
+##
+## `SLOT_ORDER` is what the hunter is *issued* and stays three, which is what
+## the rack and the loadout are built on. What they are *carrying* is a
+## different question, and it is the one the number keys should have been
+## asking all along.
+func carried() -> Array[String]:
+	var held: Array[String] = []
+	held.assign(SLOT_ORDER)
+	for weapon_id: String in acquired:
+		if not held.has(weapon_id):
+			held.append(weapon_id)
+	return held
+
+
+## Select by position in what you are carrying.
+##
+## This used to index `SLOT_ORDER` and refuse anything past its three entries,
+## and `acquire_sniper()` / `acquire_facility_sidearm()` set `current_id`
+## directly without going through a slot at all. So a rifle you picked up was
+## in your hands right up until you pressed 1, and then it was gone -- still
+## owned, still loaded, still in `models`, and unreachable by any input in the
+## game. Greg: *"you pretty quickly cant reaccess the guns you loaded in on
+## your character"*. That was this line.
+##
+## Positions 0-2 are unchanged, so every existing caller that looks a weapon up
+## with `SLOT_ORDER.find()` still lands on the same index.
 func select_slot(slot: int) -> bool:
-	if slot < 0 or slot >= SLOT_ORDER.size() or reload_remaining > 0.0 or jam_clear_remaining > 0.0:
+	var held := carried()
+	if slot < 0 or slot >= held.size() or reload_remaining > 0.0 or jam_clear_remaining > 0.0:
 		return false
-	current_id = SLOT_ORDER[slot]
+	current_id = held[slot]
 	_update_models()
 	equipped.emit(current_id)
 	return true
 
 
+## The same thing by name, for callers that know what they want rather than
+## where it sits -- a rack pickup, a loadout, a save being restored.
+func select_weapon(weapon_id: String) -> bool:
+	return select_slot(carried().find(weapon_id))
+
+
+## Step through what you are carrying. `step` is +1 or -1 and it wraps, so
+## there is always a way back round to a weapon rather than a dead end.
+func cycle(step: int) -> bool:
+	var held := carried()
+	if held.size() <= 1:
+		return false
+	var at := held.find(current_id)
+	if at < 0:
+		at = 0
+	return select_slot(posmod(at + step, held.size()))
+
+
 func current() -> Dictionary:
-	return WEAPONS[current_id]
+	return weapon_definition(current_id)
+
+
+## The authored definition plus the parts fitted to this particular weapon.
+## Multipliers compose rather than overwrite, so two parts never fight over a
+## copied damage/spread field and removing either one recovers the base value.
+func weapon_definition(weapon_id: String) -> Dictionary:
+	if not WEAPONS.has(weapon_id):
+		return {}
+	var result: Dictionary = (WEAPONS[weapon_id] as Dictionary).duplicate(true)
+	for part_value in weapon_customization(weapon_id).values():
+		var part := part_value as Dictionary
+		var modifiers := part.get("modifiers", {}) as Dictionary
+		for scale_name in CUSTOMIZATION_SCALES:
+			if not modifiers.has(scale_name):
+				continue
+			var property_name := str(scale_name).trim_suffix("_scale")
+			if result.has(property_name):
+				result[property_name] = float(result[property_name]) * float(modifiers[scale_name])
+	return result
+
+
+func weapon_customization(weapon_id: String = "") -> Dictionary:
+	var key := weapon_id if weapon_id != "" else current_id
+	return (customization.get(key, {}) as Dictionary).duplicate(true)
+
+
+## Install a crafted/found part on the weapon itself. Unknown weapon slots are
+## refused instead of becoming silent holder perks. Modifier names are a small
+## mechanical vocabulary and are clamped here once, at the ownership boundary.
+func install_customization(weapon_id: String, slot: String, part: Dictionary) -> bool:
+	if not WEAPONS.has(weapon_id) or not CUSTOMIZATION_SLOTS.has(weapon_id):
+		return false
+	if slot not in (CUSTOMIZATION_SLOTS[weapon_id] as Array) or str(part.get("id", "")).is_empty():
+		return false
+	var fitted := part.duplicate(true)
+	var requested := fitted.get("modifiers", {}) as Dictionary
+	var modifiers: Dictionary = {}
+	for scale_name in requested:
+		if not CUSTOMIZATION_SCALES.has(scale_name):
+			continue
+		var bounds: Vector2 = CUSTOMIZATION_SCALES[scale_name]
+		modifiers[scale_name] = clampf(float(requested[scale_name]), bounds.x, bounds.y)
+	fitted["modifiers"] = modifiers
+	var installed := weapon_customization(weapon_id)
+	installed[slot] = fitted
+	customization[weapon_id] = installed
+	_sync_customization_meta(weapon_id)
+	customization_changed.emit(weapon_id, installed.duplicate(true))
+	return true
+
+
+## AX3.4. Called by the guard's physical loadout, not by player creation. The
+## rounds passed here are the rounds left in that exact gun; no reserve magazine
+## is conjured when ownership changes.
+## Picked up rather than issued, the same way the breach nine is. Takes the
+## rifle and whatever rounds came with it; a found weapon with an empty
+## magazine is still worth carrying, so zero rounds is allowed here where the
+## breach nine refuses it -- that one arrives mid-escape with what it has, and
+## this one can be scavenged for later.
+func acquire_sniper(rounds_left: int = -1) -> bool:
+	var magazine := int(WEAPONS.sniper.magazine)
+	var loaded := magazine if rounds_left < 0 else mini(rounds_left, magazine)
+	ammo["sniper"] = {
+		"loaded": loaded,
+		"reserve": int(WEAPONS.sniper.reserve) if rounds_left < 0 else maxi(0, rounds_left - loaded),
+		"spare_magazines": [],
+	}
+	current_id = "sniper"
+	acquired["sniper"] = true
+	if hand != null and not models.has(current_id):
+		var model := _build_weapon_model(current_id)
+		hand.add_child(model)
+		models[current_id] = model
+		var magazine_node := model.find_child("magazine", true, false) as Node3D
+		if magazine_node != null:
+			_magazine_nodes[current_id] = magazine_node
+			_magazine_rest[current_id] = magazine_node.position
+	_update_models()
+	equipped.emit(current_id)
+	return true
+
+
+func acquire_facility_sidearm(rounds_left: int) -> bool:
+	if rounds_left <= 0:
+		return false
+	ammo["facility_sidearm"] = {
+		"loaded": mini(rounds_left, int(WEAPONS.facility_sidearm.magazine)),
+		"reserve": 0,
+		"spare_magazines": [],
+	}
+	current_id = "facility_sidearm"
+	acquired["facility_sidearm"] = true
+	if hand != null and not models.has(current_id):
+		var model := _build_weapon_model(current_id)
+		hand.add_child(model)
+		models[current_id] = model
+		var magazine := model.find_child("magazine", true, false) as Node3D
+		if magazine != null:
+			_magazine_nodes[current_id] = magazine
+			_magazine_rest[current_id] = magazine.position
+	_update_models()
+	equipped.emit(current_id)
+	return true
+
+
+func remove_customization(weapon_id: String, slot: String) -> Dictionary:
+	var installed := weapon_customization(weapon_id)
+	if not installed.has(slot):
+		return {}
+	var removed := (installed[slot] as Dictionary).duplicate(true)
+	installed.erase(slot)
+	if installed.is_empty():
+		customization.erase(weapon_id)
+	else:
+		customization[weapon_id] = installed
+	_sync_customization_meta(weapon_id)
+	customization_changed.emit(weapon_id, installed.duplicate(true))
+	return removed
+
+
+## Models are consumers too. Keeping the complete record on the weapon mount
+## gives authored attachment geometry a stable seam without teaching the hand,
+## player or vehicle what an optic is.
+func _sync_customization_meta(weapon_id: String) -> void:
+	var model := models.get(weapon_id) as Node3D
+	if model != null and is_instance_valid(model):
+		model.set_meta("weapon_customization", weapon_customization(weapon_id))
 
 
 ## AN2.4. 1.0 is unworn and new; 0.0 has nothing left to give.
@@ -189,6 +427,7 @@ func state() -> Dictionary:
 		"jammed": bool(jammed.get(current_id, false)),
 		"clearing_jam": jam_clear_remaining > 0.0,
 		"jam_clear_ratio": jam_clear_remaining / JAM_CLEAR_TIME if jam_clear_remaining > 0.0 else 0.0,
+		"customization": weapon_customization(current_id),
 	}
 
 
@@ -220,6 +459,7 @@ func begin_attack(heavy := false) -> Dictionary:
 		"damage": float(definition.damage) * (1.55 if heavy and definition.kind == "melee" else 1.0),
 		"impulse": float(definition.impulse) * (1.4 if heavy else 1.0),
 		"damage_type": definition.damage_type,
+		"calibre": str(definition.get("calibre", "")),
 		"windup": float(definition.get("windup", 0.0)) * (1.35 if heavy else 1.0),
 		"stamina": float(definition.get("stamina", 0.0)) * (1.55 if heavy else 1.0),
 		"pellets": int(definition.get("pellets", 1)),
@@ -294,10 +534,10 @@ func reload() -> bool:
 	return true
 
 
-func shot_directions(forward: Vector3, up: Vector3) -> Array[Vector3]:
+func shot_directions(forward: Vector3, up: Vector3, spread_scale := 1.0) -> Array[Vector3]:
 	var definition: Dictionary = current()
 	var count := int(definition.get("pellets", 1))
-	var spread := float(definition.get("spread", 0.0))
+	var spread := float(definition.get("spread", 0.0)) * clampf(spread_scale, 0.0, 1.0)
 	var result: Array[Vector3] = []
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("%s:%d" % [current_id, shot_serial])
@@ -346,6 +586,23 @@ func _update_models() -> void:
 		(models[weapon_id] as Node3D).visible = weapon_id == current_id
 
 
+## Apply one of HeldGear's authored grips to the already-mounted production
+## model. Changing grip moves hands on the same object and never replaces it.
+func apply_grip(grip_name: String) -> bool:
+	if not HeldGear.GRIPS.has(grip_name):
+		return false
+	var mount := models.get(current_id) as Node3D
+	if mount == null or not is_instance_valid(mount):
+		return false
+	var weapon := mount.get_node_or_null("%s_model" % current_id) as Node3D
+	if weapon == null:
+		return false
+	var spec: Dictionary = HeldGear.GRIPS[grip_name]
+	HeldGear.pose_mounted_hand(mount.get_node_or_null("RightGripHand") as Node3D, weapon, spec.right, 1)
+	HeldGear.pose_mounted_hand(mount.get_node_or_null("LeftGripHand") as Node3D, weapon, spec.left, -1)
+	return true
+
+
 ## M4.4 / the first-person pass. This used to build each weapon out of three
 ## `BoxMesh` primitives with hand-tuned counter-rotations cancelling the arm
 ## pose, and every comment in it was about fighting that inheritance rather than
@@ -374,7 +631,8 @@ func _build_weapon_model(weapon_id: String) -> Node3D:
 	# leaves the weapon level in view space, which is what the trim terms were
 	# groping toward while the real rotation was being thrown away.
 	root.rotation = Vector3(-HUNTER_BODY_MOTION.FIRST_PERSON_ARM_RAISE, -0.34, 0.32)
-	var gear := HeldGear.build_weapon(weapon_id)
+	var visual_id := "sidearm" if weapon_id == "facility_sidearm" else weapon_id
+	var gear := HeldGear.build_weapon(visual_id)
 	# Hung off its grip rather than its origin. `HeldGear` builds each weapon
 	# around the shape of the object, so a sword's origin is where the guard
 	# meets the blade and not where a hand closes; mounted at the origin that
@@ -383,4 +641,35 @@ func _build_weapon_model(weapon_id: String) -> Node3D:
 	if grip != null:
 		gear.position = -(gear.transform.basis * grip.position)
 	root.add_child(gear)
+	# Visible fingers are part of the weapon presentation, not an optional body
+	# overlay. The grip anchors already author exactly where those fingers close.
+	var right := HeldGear.build_humiliation_hand(1)
+	right.name = "RightGripHand"
+	HeldGear.set_pose(right, "trigger" if visual_id in ["shotgun", "sidearm"] else "wrap")
+	# Each class seats the palm around a slightly different section. The old one
+	# offset made the trigger hand acceptable on the sword, but buried the pistol
+	# tang in the palm and left the shotgun wrist hovering below its stock.
+	right.position = {
+		"shotgun": Vector3(0.016, -0.010, 0.006),
+		"sidearm": Vector3(0.014, -0.016, 0.008),
+	}.get(visual_id, Vector3(0.019, -0.013, 0.0))
+	right.rotation = Vector3(-PI * 0.5, 0.0, PI * 0.5)
+	right.set_meta("grip_rest_position", right.position)
+	right.set_meta("grip_rest_rotation", right.rotation)
+	right.set_meta("forearm_entry", Vector3(0.47, -0.53, -0.30))
+	root.add_child(right)
+	var off_anchor_name := "forend" if visual_id == "shotgun" else ("grip_support" if visual_id == "sidearm" else "grip_low")
+	var off_anchor := gear.get_node_or_null("anchor_%s" % off_anchor_name) as Node3D
+	if off_anchor != null:
+		var left := HeldGear.build_humiliation_hand(-1)
+		left.name = "LeftGripHand"
+		HeldGear.set_pose(left, "cup" if visual_id == "sidearm" else "wrap")
+		var placed := gear.transform * off_anchor.transform
+		var palm_clearance := Vector3(-0.017, -0.010, 0.005) if visual_id == "shotgun" else Vector3(-0.016, -0.014, 0.006)
+		left.position = placed.origin + palm_clearance
+		left.rotation = placed.basis.get_euler() + Vector3(-PI * 0.5, 0.0, -PI * 0.5)
+		left.set_meta("grip_rest_position", left.position)
+		left.set_meta("grip_rest_rotation", left.rotation)
+		left.set_meta("forearm_entry", Vector3(-0.47, -0.53, -0.31))
+		root.add_child(left)
 	return root

@@ -14,6 +14,7 @@ extends RefCounted
 ## its first members already stood, and moves as the roster changes, on the
 ## same axis (E) rather than a fourth invented one.
 const FACTION_ID := "player_faction"
+const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
 
 
 ## U1.1. "Found something — a name, a mark, a first member." The player is
@@ -27,15 +28,23 @@ static func found(faction_name: String, mark: String = "", player_id: String = "
 	var player := WorldHistory.subject(player_id)
 	if player.is_empty():
 		return {"ok": false, "reason": "NO SUCH FOUNDER"}
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.register_subject(FACTION_ID, {
 		"name": faction_name, "kind": "faction", "role": "Founded, not born",
 		"mark": mark, "threat": "UNKNOWN", "territory": "Wherever the founder has actually been",
 		"doctrine": "Not written yet. It is whatever its members actually do.",
 		"relations": {player_id: {"kind": "command", "strength": 50}},
 	})
-	WorldHistory.update_subject(player_id, {
+	var membership := {
 		"faction_id": FACTION_ID, "faction": faction_name, "faction_rank": "CROWN",
-	}, "faction_founded")
+	}
+	WorldHistory.amend_subject(player_id, membership)
+	PlayerActionLedger.record("faction_founded", {
+		"actor": player_id, "subject_id": player_id, "faction_id": FACTION_ID,
+		"faction_name": faction_name, "mark": mark,
+		"changes": membership.duplicate(true),
+	})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "faction_id": FACTION_ID}
 
 
@@ -53,9 +62,16 @@ static func recruit(subject_id: String) -> Dictionary:
 		return {"ok": false, "reason": "NO SUCH SUBJECT"}
 	if str(subject.get("faction_id", "")) == FACTION_ID:
 		return {"ok": false, "reason": "ALREADY ONE OF YOURS"}
-	WorldHistory.update_subject(subject_id, {
+	var membership := {
 		"faction_id": FACTION_ID, "faction": str(faction.get("name", FACTION_ID)),
-	}, "recruited_to_own_faction")
+	}
+	WorldHistory.begin_ledger_batch()
+	WorldHistory.amend_subject(subject_id, membership)
+	PlayerActionLedger.record("recruited_to_own_faction", {
+		"actor": "player", "subject_id": subject_id, "faction_id": FACTION_ID,
+		"changes": membership.duplicate(true),
+	})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "subject_id": subject_id}
 
 
@@ -67,8 +83,10 @@ static func lose_member(subject_id: String, reason: String) -> Dictionary:
 	var subject := WorldHistory.subject(subject_id)
 	if subject.is_empty() or str(subject.get("faction_id", "")) != FACTION_ID:
 		return {"ok": false, "reason": "NOT ONE OF YOURS"}
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.update_subject(subject_id, {"faction_id": "", "faction": "Unbound"}, "left_own_faction")
 	WorldHistory.record_event("own_faction_lost_member", {"subject_id": subject_id, "reason": reason})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "subject_id": subject_id, "reason": reason}
 
 

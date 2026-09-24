@@ -67,6 +67,7 @@ static func damage(subject_id: String, amount: float, cause: String = "", bands:
 		return {"ok": false, "reason": "NO SUCH SUBJECT"}
 	var before := condition(subject_id)
 	var after := clampf(before - amount, 0.0, 1.0)
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(subject_id, {"condition": after})
 	WorldHistory.record_event("object_damaged", {
 		"subject_id": subject_id,
@@ -74,6 +75,7 @@ static func damage(subject_id: String, amount: float, cause: String = "", bands:
 		"condition": snappedf(after, 0.001),
 		"cause": cause,
 	})
+	WorldHistory.commit_ledger_batch()
 	return {
 		"ok": true,
 		"condition": after,
@@ -92,6 +94,7 @@ static func repair(subject_id: String, amount: float, cause: String = "") -> Dic
 	if WorldHistory.subject(subject_id).is_empty():
 		return {"ok": false, "reason": "NO SUCH SUBJECT"}
 	var after := clampf(condition(subject_id) + amount, 0.0, 1.0)
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(subject_id, {"condition": after})
 	WorldHistory.record_event("object_repaired", {
 		"subject_id": subject_id,
@@ -99,4 +102,5 @@ static func repair(subject_id: String, amount: float, cause: String = "") -> Dic
 		"condition": snappedf(after, 0.001),
 		"cause": cause,
 	})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "condition": after, "band": band(subject_id)}

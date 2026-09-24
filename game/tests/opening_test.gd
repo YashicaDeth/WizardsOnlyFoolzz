@@ -39,9 +39,14 @@ func _ready() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	check(hunt.player_body is CharacterBody3D, "hunter uses collision body")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "the Hunt's authored cast seeds in one closed bootstrap batch")
 	var building: Node3D = hunt.generated_world.generated_buildings[0]
-	var floor_shape: BoxShape3D = building.get_child(5).get_child(0).shape
-	var depth := floor_shape.size.z
+	var dimensions: Vector3 = building.get_meta("dimensions", Vector3.ZERO)
+	var depth := dimensions.z
+	check(depth > 0.0, "generated building exposes its authored dimensions without depending on child order")
+	var shared_collision := building.get_node_or_null("Collision") as StaticBody3D
+	check(shared_collision != null and shared_collision.get_child_count() >= 7,
+		"one building shares one physics body across its detailed wall shapes")
 	hunt.player_body.position = building.position + Vector3(0, 0.92, depth * 0.5 + 2)
 	await get_tree().physics_frame
 	check(not hunt.player_body.test_move(hunt.player_body.global_transform, Vector3(0, 0, -3)), "doorway admits hunter")
@@ -152,9 +157,11 @@ func _ready() -> void:
 	var rig = wrecker.get_node_or_null("DriverRig")
 	check(rig is BaselineHuman, "derby drivers use the shared baseline rig")
 	var driver_subject := str(wrecker.get_meta("driver_subject", ""))
-	derby._injure_driver(wrecker, 60, Vector3(0, 0, 1), false)
+	derby._damage_target(wrecker, 18.0, 1.0, "ledger_probe_ready_msec")
 	var state: Dictionary = WorldHistory.subject(driver_subject).get("anatomy_state", {})
 	check(state.has("zones"), "a derby injury is recorded on the driver's subject")
+	check(WorldHistory.event_count("derby_driver_injured") == 1 and WorldHistory.event_count("derby_vehicle_hit") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")),
+		"one collision closes its driver, vehicle and persistent consequences together")
 	var hurt: Array[String] = []
 	for zone_id in state.get("zones", {}):
 		if float(state.zones[zone_id].health) < float(AnatomyComponent.DEFAULT_ZONES[zone_id].health):

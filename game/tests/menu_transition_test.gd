@@ -29,6 +29,12 @@ func _ready() -> void:
 	var requests: Array[Dictionary] = []
 	menu.travel_request_override = func(scene_path: String, caption: String) -> void:
 		requests.append({"scene": scene_path, "caption": caption})
+	check(WorldLook.quality_name() == "PERFORMANCE" and is_equal_approx(get_viewport().scaling_3d_scale, 0.75),
+		"a cold menu starts on the safe measured graphics contract")
+	check(menu.render_scales.max() == 1.0 and menu.render_scales.min() == 0.67,
+		"render-scale choices cannot accidentally supersample fullscreen")
+	check(menu.get_node("HUD/SettingsPanel/VBox/Resolution").text.contains("75%"),
+		"the settings label tells the truth about the active render scale")
 
 	menu._open_settings()
 	check(menu.settings_panel.visible, "settings opens before departure")

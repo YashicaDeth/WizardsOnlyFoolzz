@@ -111,6 +111,9 @@ static func submit_photo(photo: Dictionary) -> Dictionary:
 		}
 		accepted.append(ritual)
 	if not accepted.is_empty():
+		# One photograph can satisfy more than one authored rite; its evidence
+		# snapshot and every resulting completion are one derived settlement.
+		WorldHistory.begin_ledger_batch()
 		WorldHistory.amend_subject(LEDGER_ID, {"version": 1, "rituals": entries})
 		for ritual in accepted:
 			WorldHistory.record_event("ritual_completed", {
@@ -120,6 +123,7 @@ static func submit_photo(photo: Dictionary) -> Dictionary:
 				"photo_id": str(photo.get("id", "")),
 				"location": str(photo.get("location", "")),
 			})
+		WorldHistory.commit_ledger_batch()
 	return {"completed": accepted, "reports": reports}
 
 
@@ -158,13 +162,19 @@ static func cast(ritual_id: String, subject_id: String = "player") -> Dictionary
 	var photo: Dictionary = entry.get("photo", {}) as Dictionary
 	if photo.is_empty():
 		return {"ok": false, "reason": "THE FILED FRAME IS GONE"}
+	# Casting consumes the filed entitlement and mutates the body/boon ledgers.
+	# Keep RitualApp's nested transaction open through this ledger's cast count
+	# so one successful press has one durable persistence boundary.
+	WorldHistory.begin_ledger_batch()
 	var result := RitualApp.attempt(granted_id, photo, subject_id)
 	if not bool(result.get("ok", false)):
+		WorldHistory.commit_ledger_batch()
 		return result
 	entry["cast"] = int(entry.get("cast", 0)) + 1
 	entry["last_outcome"] = str(result.get("outcome", ""))
 	entries[ritual_id] = entry
 	WorldHistory.amend_subject(LEDGER_ID, {"version": 1, "rituals": entries})
+	WorldHistory.commit_ledger_batch()
 	result["ledger_id"] = ritual_id
 	result["cast"] = int(entry["cast"])
 	return result

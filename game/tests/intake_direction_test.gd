@@ -47,7 +47,8 @@ func _ready() -> void:
 	var intake: Control = VAT_INTAKE.new()
 	add_child(intake)
 	await get_tree().process_frame
-	intake.page = 4
+	# By name: a FACE page moved SCHEDULE from 4 to 5 and this sat on BODY.
+	intake.page = VAT_INTAKE.PAGES.find("SCHEDULE")
 	intake.row = 0
 	var key := str(CharacterSheet.MODIFIERS.keys()[0])
 	intake._commit()
@@ -64,8 +65,9 @@ func _ready() -> void:
 	intake._unhandled_input(event)
 	check(intake.page == page_before, "you cannot page away while it is being done to you")
 
-	# And it hands control back at the end.
-	for _step in 40:
+	# And it hands control back at the end. Each beat is now held long enough
+	# to read (2026-09-24), so the budget is a minute rather than twenty seconds.
+	for _step in 120:
 		intake._process(0.5)
 	check(intake.procedure.is_empty(), "the procedure finishes on its own")
 	intake._unhandled_input(event)

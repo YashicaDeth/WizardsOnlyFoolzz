@@ -27,12 +27,15 @@ extends Node
 ## concern from "these seven factions exist" to earn its own file.
 
 func _ready() -> void:
+	WorldHistory.begin_ledger_batch()
 	_seed()
 	AscentEntities.seed_entities()
 	TheFourHorsemen.seed_horsemen()
+	WorldHistory.commit_ledger_batch()
 
 
 func _seed() -> void:
+	WorldHistory.begin_ledger_batch()
 	_seed_sin(
 		"vanity_row", "Vanity Row", "Augment vanity cult", "MODERATE",
 		"Chrome strip market stalls threaded through the Bone Yard overpass",
@@ -106,6 +109,7 @@ func _seed() -> void:
 		"grudge": 0, "status": "waiting", "memory": "Sent the fee three times before anything answered.",
 		"wounds": [], "anatomy": {"blood_type": "O-", "cybernetics": []}, "relations": {},
 	})
+	WorldHistory.commit_ledger_batch()
 
 
 ## One Sin-faction plus the one captain who currently holds it, in the same

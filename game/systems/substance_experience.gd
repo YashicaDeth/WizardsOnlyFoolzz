@@ -318,11 +318,13 @@ static func begin(subject_id: String, substance_id: String, now: float, potency:
 	doses.append(dose)
 	var history: Dictionary = (subject.get("substance_history", {}) as Dictionary).duplicate()
 	history[substance_id] = held + 1
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(subject_id, {DOSES_KEY: doses, "substance_history": history})
 	WorldHistory.record_event("substance_experience_began", {
 		"subject_id": subject_id, "substance_id": substance_id,
 		"bad": bad, "tolerance": held, "seconds": float(dose["seconds"]),
 	})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "dose": dose}
 
 

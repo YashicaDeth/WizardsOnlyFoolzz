@@ -1,6 +1,8 @@
 class_name FieldCamera
 extends RefCounted
 
+const PlayerActionLedger := preload("res://systems/player_action_ledger.gd")
+
 ## C3. A camera on the handheld, and photographs that are objects rather than
 ## screenshots.
 ##
@@ -172,13 +174,23 @@ static func _satisfies(record: Dictionary, requirement: Dictionary) -> bool:
 
 ## The album. Photographs persist like everything else, so one taken before a
 ## ritual existed can still satisfy it later.
-static func store(photo: Dictionary) -> Dictionary:
+static func store(photo: Dictionary, as_player_action := false) -> Dictionary:
+	if as_player_action:
+		WorldHistory.begin_ledger_batch()
 	var stored: Array = (WorldHistory.subject("photographs").get("frames", []) as Array).duplicate()
 	stored.append(photo)
 	while stored.size() > 40:
 		stored.pop_front()
-	WorldHistory.register_subject("photographs", {"kind": "album", "frames": []})
-	WorldHistory.amend_subject("photographs", {"frames": stored})
+	# amend_subject owns first registration atomically; keep the album schema in
+	# the same mutation instead of flushing an empty album before its frame.
+	WorldHistory.amend_subject("photographs", {"kind": "album", "frames": stored})
+	if as_player_action:
+		PlayerActionLedger.record("photograph_taken", {
+			"photo": str(photo.get("id", "")),
+			"in_frame": (photo.get("contents", []) as Array).size(),
+			"location": str(photo.get("location", "")),
+		})
+		WorldHistory.commit_ledger_batch()
 	return photo
 
 

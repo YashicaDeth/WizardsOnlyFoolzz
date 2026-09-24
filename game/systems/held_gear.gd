@@ -113,6 +113,16 @@ const POSES := {
 	"wrap": {"fingers": [1.18, 1.34, 0.92], "thumb": [0.62, 0.70], "spread": 0.25},
 	# Flatter, and the fingers stay straighter: a blade is a plate, not a rod.
 	"pinch": {"fingers": [0.92, 1.48, 0.55], "thumb": [0.95, 0.35], "spread": 0.35},
+	# A cigarette sits between long, splayed fingers with the palm open toward
+	# the player. Closing the other two into a fist made the object look gripped
+	# like a tool; this is the loose fan visible in the player's reference pose.
+	"smoke": {"fingers": [0.38, 0.52, 0.24], "thumb": [0.24, 0.14], "spread": 1.18,
+		"index": [0.16, 0.24, 0.11], "middle": [0.22, 0.31, 0.14],
+		"ring": [0.30, 0.42, 0.19], "little": [0.52, 0.68, 0.31]},
+	# The Zippo needs a thumb at the wheel and an index curled around its far
+	# shoulder, not the same four-finger cylinder grip used on a sword handle.
+	"lighter": {"fingers": [1.06, 1.30, 0.82], "thumb": [0.28, 0.18], "spread": 0.32,
+		"index": [0.66, 0.82, 0.42]},
 	# Index out, everything else closed. The one pose a player will notice is
 	# wrong, because it is the finger that does the thing.
 	"trigger": {"fingers": [1.30, 1.46, 1.20], "thumb": [0.70, 0.55], "spread": 0.20,
@@ -192,6 +202,101 @@ static func build_hand(side: int, flesh := Color("8a6a55")) -> Node3D:
 	return root
 
 
+## The hunter's hands are issued costume, not bare skin. The ruling elite's
+## joke is a black-wine glove forced through an oversized fool's cuff: readable
+## in first person, humiliating in third, and large enough that the articulated
+## fingers stop looking like detached doll hands beside a full-size weapon.
+static func build_humiliation_hand(side: int) -> Node3D:
+	var hand := build_hand(side, Color("3b2029"))
+	hand.scale = Vector3.ONE * 1.16
+	hand.set_meta("screen_entry_side", side)
+	for child in hand.find_children("*", "MeshInstance3D", true, false):
+		(child as MeshInstance3D).material_override = _leather(Color("28151e"), 70 + side)
+
+	var cuff := Node3D.new()
+	cuff.name = "HumiliationCuff"
+	cuff.position.z = -0.030
+	hand.add_child(cuff)
+	# Six stuffed lobes make the silhouette deliberately theatrical instead of
+	# reading as a tiny naked wrist. Bone and dried-blood alternate like a rank
+	# the wearer never chose.
+	for index in 6:
+		var angle := TAU * float(index) / 6.0
+		var puff := MeshInstance3D.new()
+		puff.name = "CuffPuff%d" % index
+		var puff_mesh := SphereMesh.new()
+		puff_mesh.radius = 0.024
+		puff_mesh.height = 0.040
+		puff_mesh.radial_segments = 10
+		puff_mesh.rings = 6
+		puff.mesh = puff_mesh
+		puff.position = Vector3(cos(angle) * 0.037, sin(angle) * 0.037, 0.0)
+		puff.scale = Vector3(1.0, 1.0, 0.82)
+		puff.material_override = _leather(Color("651d2a") if index % 2 == 0 else Color("c6ae7a"), 90 + index)
+		cuff.add_child(puff)
+
+	var shackle := MeshInstance3D.new()
+	shackle.name = "CuffShackle"
+	var shackle_mesh := TorusMesh.new()
+	shackle_mesh.inner_radius = 0.031
+	shackle_mesh.outer_radius = 0.044
+	shackle_mesh.rings = 12
+	shackle_mesh.ring_segments = 8
+	shackle.mesh = shackle_mesh
+	shackle.rotation.x = PI * 0.5
+	shackle.position.z = -0.015
+	shackle.material_override = _metal(Color("655d55"), 0.32, 113 + side)
+	cuff.add_child(shackle)
+
+	for side_step in [-1.0, 1.0]:
+		var bell := MeshInstance3D.new()
+		bell.name = "CuffBell"
+		var bell_mesh := SphereMesh.new()
+		bell_mesh.radius = 0.008
+		bell_mesh.height = 0.014
+		bell.mesh = bell_mesh
+		bell.position = Vector3(side_step * 0.035, -0.030, -0.018)
+		bell.material_override = _metal(Color("a7772d"), 0.24, 121 + int(side_step))
+		cuff.add_child(bell)
+
+	# The hand is never a floating viewmodel. A tapered costumed forearm carries
+	# it back out through the bottom-left or bottom-right of the frame. Keeping it
+	# under the hand means every smoking, lighter, weapon and inspection pose
+	# inherits one continuous limb without each prop inventing an arm.
+	var forearm := Node3D.new()
+	forearm.name = "FirstPersonForearm"
+	hand.add_child(forearm)
+	var sleeve := MeshInstance3D.new()
+	sleeve.name = "TaperedSleeve"
+	var sleeve_mesh := CylinderMesh.new()
+	sleeve_mesh.top_radius = 0.052
+	sleeve_mesh.bottom_radius = 0.078
+	sleeve_mesh.height = 0.36
+	sleeve_mesh.radial_segments = 12
+	sleeve.mesh = sleeve_mesh
+	# Authored along +Y so the live view can stretch it exactly from a lower
+	# screen edge to the wrist without guessing through the prop's rotations.
+	sleeve.position = Vector3(0.0, 0.18, 0.0)
+	sleeve.material_override = _leather(Color("40121e"), 140 + side)
+	forearm.add_child(sleeve)
+	# A broad entry puff hides the far cap at the screen edge and makes the arm
+	# widen toward the unseen elbow instead of ending as a cut-off tube.
+	for index in 4:
+		var angle := TAU * float(index) / 4.0
+		var entry_puff := MeshInstance3D.new()
+		entry_puff.name = "EntryPuff%d" % index
+		var entry_mesh := SphereMesh.new()
+		entry_mesh.radius = 0.052
+		entry_mesh.height = 0.086
+		entry_mesh.radial_segments = 10
+		entry_mesh.rings = 6
+		entry_puff.mesh = entry_mesh
+		entry_puff.position = Vector3(cos(angle) * 0.040, 0.018, sin(angle) * 0.040)
+		entry_puff.material_override = _leather(Color("651d2a") if index % 2 == 0 else Color("c6ae7a"), 150 + index)
+		forearm.add_child(entry_puff)
+	return hand
+
+
 static func _build_finger(parent: Node3D, length: float, girth: float, flesh: Color, seed_value: int, bones := 3) -> void:
 	# Each bone hangs off the end of the one before it, so curling a knuckle
 	# carries everything past it round with the joint — which is what a finger
@@ -243,6 +348,40 @@ static func set_pose(hand: Node3D, pose_name: String, blend := 1.0) -> void:
 		_curl(thumb, pose.get("thumb", [0.4, 0.4]), blend, 0.0)
 
 
+## Interpolate between two authored grips rather than fading a target grip from
+## a mathematically straight hand. Inspection uses this when a support hand
+## leaves its firing contact to pinch a slide, feel a receiver or trace an edge.
+static func blend_pose(hand: Node3D, from_name: String, to_name: String, weight: float) -> void:
+	if hand == null or not is_instance_valid(hand):
+		return
+	var from_pose: Dictionary = POSES.get(from_name, POSES["open"])
+	var to_pose: Dictionary = POSES.get(to_name, POSES["open"])
+	var amount := clampf(weight, 0.0, 1.0)
+	var from_default: Array = from_pose["fingers"]
+	var to_default: Array = to_pose["fingers"]
+	var spread := lerpf(float(from_pose.get("spread", 0.5)), float(to_pose.get("spread", 0.5)), amount)
+	for index in FINGERS.size():
+		var finger_name: String = FINGERS[index]
+		var knuckle := hand.get_node_or_null(NodePath(finger_name)) as Node3D
+		if knuckle == null:
+			continue
+		var from_curl: Array = from_pose.get(finger_name, from_default)
+		var to_curl: Array = to_pose.get(finger_name, to_default)
+		var curls: Array = []
+		for joint in mini(from_curl.size(), to_curl.size()):
+			curls.append(lerpf(float(from_curl[joint]), float(to_curl[joint]), amount))
+		var fan := (float(index) - 1.5) * 0.09 * spread
+		_curl(knuckle, curls, 1.0, fan)
+	var thumb := hand.get_node_or_null("thumb") as Node3D
+	if thumb != null:
+		var from_thumb: Array = from_pose.get("thumb", [0.4, 0.4])
+		var to_thumb: Array = to_pose.get("thumb", [0.4, 0.4])
+		var thumb_curls: Array = []
+		for joint in mini(from_thumb.size(), to_thumb.size()):
+			thumb_curls.append(lerpf(float(from_thumb[joint]), float(to_thumb[joint]), amount))
+		_curl(thumb, thumb_curls, 1.0, 0.0)
+
+
 static func _curl(joint: Node3D, angles: Array, blend: float, fan: float) -> void:
 	var cursor := joint
 	for index in angles.size():
@@ -266,6 +405,7 @@ static func build_weapon(weapon_id: String) -> Node3D:
 		"sword": _build_sword(root)
 		"shotgun": _build_shotgun(root)
 		"sidearm": _build_sidearm(root)
+		"launcher": _build_launcher(root)
 		_: _build_sword(root)
 	# Every part above is authored muzzle-forward along +Z because that is the
 	# readable way to write a sweep, and a Godot node's forward is -Z. Turning
@@ -274,6 +414,47 @@ static func build_weapon(weapon_id: String) -> Node3D:
 	# anchors round with it so a grip cannot disagree with the shape.
 	root.rotation.y = PI
 	return root
+
+
+## Sandbox breach launcher: a visibly different, heavy single tube rather than
+## an invisible key that detonates the crosshair. It deliberately stays a
+## range-only tool until explosive weapons belong in the production loadout.
+static func _build_launcher(root: Node3D) -> void:
+	var tube := MeshInstance3D.new()
+	tube.name = "launch_tube"
+	tube.mesh = BodyMesh.revolve([
+		Vector3(0.0, 0.052, 0.052),
+		Vector3(0.08, 0.060, 0.060),
+		Vector3(0.62, 0.060, 0.060),
+		Vector3(0.70, 0.068, 0.068),
+	], 14)
+	tube.rotation.x = PI * 0.5
+	tube.position = Vector3(0, 0.015, 0.15)
+	tube.material_override = _metal(Color("3f5145"), 0.42, 109)
+	root.add_child(tube)
+
+	var sight := MeshInstance3D.new()
+	sight.name = "launcher_sight"
+	var sight_mesh := BoxMesh.new()
+	sight_mesh.size = Vector3(0.018, 0.055, 0.11)
+	sight.mesh = sight_mesh
+	sight.position = Vector3(0, 0.083, 0.33)
+	sight.material_override = _metal(Color("a06b31"), 0.35, 111)
+	root.add_child(sight)
+
+	var grip := MeshInstance3D.new()
+	grip.name = "launcher_grip"
+	var grip_mesh := BoxMesh.new()
+	grip_mesh.size = Vector3(0.065, 0.15, 0.075)
+	grip.mesh = grip_mesh
+	grip.position = Vector3(0, -0.075, -0.02)
+	grip.rotation.x = 0.22
+	grip.material_override = _wood(Color("392a20"), 113)
+	root.add_child(grip)
+
+	_anchor(root, "grip", Vector3(0, -0.075, -0.035), Vector3(0.22, 0, 0))
+	_anchor(root, "forend", Vector3(0, -0.035, 0.34), Vector3.ZERO)
+	_anchor(root, "muzzle", Vector3(0, 0.015, 0.85), Vector3.ZERO)
 
 
 ## The Ashline Cleaver. Single-edged, heavy at the front, a blade that is a
@@ -609,17 +790,37 @@ static func _anchor(root: Node3D, anchor_name: String, at: Vector3, turn: Vector
 	root.add_child(node)
 
 
+## The anchor convention belongs to held gear, not only to weapons. Small
+## carried objects use this public seam so hands, smokeables and anything added
+## later agree that `anchor_grip` is the place a palm closes around the object.
+static func add_anchor(root: Node3D, anchor_name: String, at: Vector3, turn := Vector3.ZERO) -> Node3D:
+	_anchor(root, anchor_name, at, turn)
+	return root.get_node("anchor_%s" % anchor_name) as Node3D
+
+
 # ----------------------------------------------------------------- the assembly
 func _init() -> void:
 	name = "HeldGear"
 
 
+## Whether these are the rig gloves or bare hands. Set it before the node
+## enters the tree, because `_ready()` is where the hands get built.
+##
+## `hunter_arsenal._build_weapon_model()` mounts `build_humiliation_hand()` on
+## every weapon the Hunt carries -- dark leather, scaled up -- because the
+## player wakes in the humiliation rig and never takes it off. A `HeldGear`
+## instance built its own out of bare `_flesh` instead, so the gore range put
+## pink hands on the same weapon the world puts gloved ones on. Greg, with the
+## two side by side: *"the hand models arent the same as the ashbloom world"*.
+var gloved := false
+
+
 func _ready() -> void:
 	if right_hand == null:
-		right_hand = build_hand(1, _flesh)
+		right_hand = build_humiliation_hand(1) if gloved else build_hand(1, _flesh)
 		add_child(right_hand)
 	if left_hand == null:
-		left_hand = build_hand(-1, _flesh)
+		left_hand = build_humiliation_hand(-1) if gloved else build_hand(-1, _flesh)
 		add_child(left_hand)
 	take("", "fists")
 
@@ -654,7 +855,30 @@ func _default_grip(weapon_id: String) -> String:
 		"sword": return "two_hand"
 		"shotgun": return "long_gun"
 		"sidearm": return "pistol"
+		"launcher": return "long_gun"
 	return "one_hand"
+
+
+## Re-pose the hands on a production weapon mount without rebuilding it. The
+## Hunt uses lightweight weapon nodes rather than a full HeldGear instance, but
+## the anchors and grip table are the same authored grammar. Keeping this here
+## prevents half-swording from changing only combat numbers while the visible
+## off hand remains wrapped around the pommel.
+static func pose_mounted_hand(hand: Node3D, weapon: Node3D, hand_spec: Dictionary, side: int) -> void:
+	if hand == null or weapon == null or not is_instance_valid(hand) or not is_instance_valid(weapon):
+		return
+	set_pose(hand, str(hand_spec.get("pose", "open")))
+	var anchor_name := str(hand_spec.get("anchor", ""))
+	var anchor := weapon.get_node_or_null("anchor_%s" % anchor_name) as Node3D
+	if anchor == null:
+		hand.position = Vector3(0.085 * float(side), -0.075, -0.02)
+		hand.rotation = Vector3(-0.30, 0.20 * float(side), 0.18 * float(side))
+	else:
+		var placed := weapon.transform * anchor.transform
+		hand.position = placed.origin + Vector3(0.019 * float(side), -0.013, 0.0)
+		hand.rotation = placed.basis.get_euler() + Vector3(-PI * 0.5, 0.0, (PI * 0.5) * float(side))
+	hand.set_meta("grip_rest_position", hand.position)
+	hand.set_meta("grip_rest_rotation", hand.rotation)
 
 
 ## Change how the same thing is held. This is the verb behind half-swording:

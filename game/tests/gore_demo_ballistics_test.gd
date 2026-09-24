@@ -193,6 +193,14 @@ func _ready() -> void:
 		"there is a gun in your hands")
 	check(demo.view_gear.weapon != null and demo.view_gear.get_child_count() > 0,
 		"and it is a built weapon with hands on it")
+	demo._update_view_forearms()
+	var right_forearm := demo.view_gear.right_hand.get_node_or_null("FirstPersonForearm") as Node3D
+	var left_forearm := demo.view_gear.left_hand.get_node_or_null("FirstPersonForearm") as Node3D
+	check(right_forearm != null and left_forearm != null and right_forearm.top_level and left_forearm.top_level,
+		"both viewmodel hands continue into first-person forearms")
+	var right_sleeve := right_forearm.get_node_or_null("TaperedSleeve") as MeshInstance3D
+	check(right_sleeve != null and (right_sleeve.mesh as CylinderMesh).height > 0.08,
+		"the visible sleeve stretches from the screen edge to the live wrist")
 	check(demo.muzzle_point != null and demo.view_gear.is_ancestor_of(demo.view_gear.weapon),
 		"with a muzzle to flash from")
 	aim_at(demo, (demo.bodies[5] as Dictionary)["rig"] as BaselineHuman, "torso", 20.0)

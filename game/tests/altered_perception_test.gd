@@ -36,28 +36,48 @@ func _ready() -> void:
 	check(absf(psychedelic.dial("kaleidoscope_segments")) < 0.001, "and no kaleidoscope fold")
 
 	# A substance or a deep meditation session actually shows.
-	player_rig.anatomy.consciousness = 40.0
+	player_rig.anatomy.consciousness = 20.0
 	hunt.call("_update_altered_perception")
 	var altered_chromatic: float = psychedelic.dial("chromatic_offset")
 	var altered_kaleidoscope: float = psychedelic.dial("kaleidoscope_segments")
+	var altered_displacement: float = psychedelic.dial("displacement_strength")
 	check(altered_chromatic > 0.0, "losing consciousness actually distorts the frame (%.4f)" % altered_chromatic)
 	check(altered_kaleidoscope > 0.0, "deep enough and the kaleidoscope fold engages too (%.2f)" % altered_kaleidoscope)
+	for _frame in 120:
+		hunt.call("_update_altered_perception")
+	check(is_equal_approx(psychedelic.dial("displacement_strength"), altered_displacement),
+		"a held altered state stays bounded instead of recompounding every frame")
+
+	# Blood-loss collapse must remain playable and must not look like a drug.
+	player_rig.anatomy.blood_remaining = player_rig.anatomy.blood_capacity * 0.30
+	player_rig.anatomy.consciousness = 8.0
+	hunt.call("_update_altered_perception")
+	check(psychedelic.dial("displacement_strength") <= 0.0061,
+		"blood-loss displacement is capped below the intentional trip (%.4f)" % psychedelic.dial("displacement_strength"))
+	check(psychedelic.dial("chromatic_offset") <= 0.0016,
+		"blood-loss chromatic separation remains readable (%.4f)" % psychedelic.dial("chromatic_offset"))
+	check(psychedelic.dial("kaleidoscope_segments") < 2.0,
+		"bleeding out never folds the playfield into a psychedelic kaleidoscope")
 
 	# And it relaxes back down rather than freezing at the worst it reached —
 	# the exact failure storm_weather.gd's own flash light had.
+	player_rig.anatomy.blood_remaining = player_rig.anatomy.blood_capacity
+	player_rig.anatomy.critical = false
+	player_rig.anatomy.pain = 0.0
 	player_rig.anatomy.consciousness = 100.0
 	hunt.call("_update_altered_perception")
 	check(absf(psychedelic.dial("chromatic_offset")) < 0.001, "coming back round actually clears the distortion")
 	check(absf(psychedelic.dial("kaleidoscope_segments")) < 0.001, "and the fold, rather than either freezing where it was")
 
-	# Night's own contribution to displacement_strength is not clobbered by
-	# this system running after it — the two causes add rather than compete.
+	# Night uses local light-warp shells and contributes nothing to this
+	# fullscreen dial. Altered consciousness therefore sets the whole value.
 	WorldClock.set_hour(2.0)
 	hunt.call("_update_day_night")
 	var night_only: float = psychedelic.dial("displacement_strength")
 	player_rig.anatomy.consciousness = 20.0
 	hunt.call("_update_altered_perception")
-	check(psychedelic.dial("displacement_strength") > night_only, "altered consciousness adds to night's own warp rather than replacing it (%.4f vs %.4f)" % [psychedelic.dial("displacement_strength"), night_only])
+	check(is_zero_approx(night_only) and psychedelic.dial("displacement_strength") > night_only,
+		"night stays sober while altered consciousness alone raises fullscreen warp (%.4f vs %.4f)" % [psychedelic.dial("displacement_strength"), night_only])
 
 	if failures.is_empty():
 		print("altered perception: the cost finally shows")

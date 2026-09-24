@@ -38,14 +38,100 @@ func _ready() -> void:
 	await _settle(tree, 6)
 	await _shoot(tree, out_dir + "/gore_demo_room.png")
 
+	# AF6.2. Put one live body at a measured distance down the camera axis and
+	# let the ordinary trigger path produce the range lesson. The photographed
+	# HUD has to name the round's own distance, time, drop, retained energy and
+	# penetration result while the struck body remains visible behind it.
+	var measured_holder := (demo.bodies[0] as Dictionary).get("holder") as Node3D
+	measured_holder.global_position = Vector3(0.0, 0.9, -8.0)
+	demo.yaw = 0.0
+	demo.pitch = -0.02
+	await _settle(tree, 4)
+	demo._fire()
+	var flight_frames := 0
+	while demo.last_shot_readout.is_empty() and flight_frames < 90:
+		await tree.physics_frame
+		flight_frames += 1
+	# Let contact shake return the field instrument to its rest transform; the
+	# readout persists, so the evidence frame can be read without erasing impact.
+	await _settle(tree, 24)
+	await _shoot(tree, out_dir + "/gore_sandbox_ballistics_readout.png")
+
+	# AF6.1. Walk up to the shed and face the physical production weapon set.
+	# The capture has to show the rack before a take; the test covers the same
+	# model disappearing into the live held-gear path when E is pressed.
+	demo.eye = Vector3(-4.6, 1.68, 10.4)
+	demo.yaw = 0.0
+	demo.pitch = -0.02
+	await _settle(tree, 5)
+	await _shoot(tree, out_dir + "/gore_sandbox_weapon_rack.png")
+
+	# Put one of the actual anatomy bodies inside reach and take it into the
+	# shared captive pose. This proves C is teaching a physical clinch now, not
+	# toggling an unrelated menu state.
+	var grapple_holder := (demo.bodies[0] as Dictionary).get("holder") as Node3D
+	grapple_holder.global_position = Vector3(demo.eye.x, 0.9, demo.eye.z - 1.5)
+	demo._begin_grapple(0)
+	await _settle(tree, 5)
+	await _shoot(tree, out_dir + "/gore_sandbox_grapple.png")
+	demo._release_grapple()
+
+	# The training room now speaks the same firearm language as the Hunt. Hold
+	# aim long enough for the lens and viewmodel to settle, then photograph the
+	# live stance readout rather than relying on a unit assertion alone.
+	demo.firearm_aiming = true
+	await _settle(tree, 12)
+	await _shoot(tree, out_dir + "/gore_sandbox_aim.png")
+	demo.firearm_aiming = false
+
+	# The old F-key blast had no weapon, ammunition or travel. The replacement
+	# is visible in the same real hands and the reduced essential-controls strip
+	# names where it lives without restoring the former wall of bindings.
+	demo._equip_launcher()
+	await _settle(tree, 4)
+	await _shoot(tree, out_dir + "/gore_sandbox_breach_launcher.png")
+	demo._switch_weapon(HunterArsenal.SLOT_ORDER.find("sidearm"))
+
+	# Capture the middle of an actual paid sidestep. The displaced viewpoint and
+	# DODGE stance are the visual evidence that this is movement, not a label.
+	demo.stamina = 100.0
+	demo.dodge_cooldown = 0.0
+	demo.vertical_velocity = 0.0
+	demo._begin_dodge(Vector3.RIGHT)
+	await _settle(tree, 3)
+	await _shoot(tree, out_dir + "/gore_sandbox_dodge.png")
+
+	# The same range bodies, switched live from passive anatomy targets into a
+	# closing combat drill. Capture the production control and the advancing
+	# bodies together so the mode is not verified by label alone.
+	demo._set_enemies_enabled(true)
+	await _settle(tree, 22)
+	await _shoot(tree, out_dir + "/gore_sandbox_enemy_mode.png")
+	demo._set_enemies_enabled(false)
+
 	# One shot, aimed at the nearest body, so there is a wound before there is
 	# a crater.
 	demo.yaw = 0.55
 	demo.pitch = -0.02
 	await _settle(tree, 4)
 	demo._fire()
-	await _settle(tree, 10)
+	# Three frames preserves the victim's directional recoil; ten frames let the
+	# short hit animation finish before the evidence was photographed.
+	await _settle(tree, 3)
 	await _shoot(tree, out_dir + "/gore_demo_shot.png")
+
+	# A deterministic close target makes the directional lean legible even when
+	# the preceding spread shot happened to miss its distant intended body.
+	var reaction_entry: Dictionary = demo.bodies[1]
+	var reaction_holder := reaction_entry.get("holder") as Node3D
+	var reaction_rig := reaction_entry.get("rig") as BaselineHuman
+	var view_forward: Vector3 = -demo.camera.global_transform.basis.z
+	view_forward.y = 0.0
+	reaction_holder.global_position = demo.eye + view_forward.normalized() * 2.8
+	reaction_holder.global_position.y = 0.9
+	demo._trigger_body_hit_reaction(reaction_rig, Vector3.RIGHT, "torso", 90.0)
+	await _settle(tree, 1)
+	await _shoot(tree, out_dir + "/gore_sandbox_hit_reaction.png")
 
 	# Then the thing it is named after.
 	var centre: Vector3 = (demo.bodies[0] as Dictionary)["rig"].global_position

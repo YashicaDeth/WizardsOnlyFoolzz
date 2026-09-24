@@ -163,6 +163,10 @@ func _run_checks() -> void:
 		[body.get_rid()]
 	)
 	check(camera_clamped.z < 1.8, "third-person camera cannot pass through the doorway wall")
+	check(MOTOR.third_person_clearance_blend(Vector3.ZERO, Vector3(0, 0, 0.4)) < 0.01,
+		"a camera crushed onto the body yields to first-person framing")
+	check(MOTOR.third_person_clearance_blend(Vector3.ZERO, Vector3(0, 0, 2.0)) > 0.99,
+		"a clear shoulder camera preserves full third-person framing")
 	var before := body.position
 	for frame in 35:
 		MOTOR.move_body(body, MOTOR.wish_direction(Vector2(0, -1), 0), 7.0, 1.0 / 60.0)

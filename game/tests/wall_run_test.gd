@@ -119,12 +119,14 @@ func _ready() -> void:
 		check(hunt.player_body.position.distance_to(before) > 0.5, "the body has actually travelled along the wall, not stood still on it")
 		check(absf(hunt.player_body.velocity.dot(surface.get("normal", Vector3.ZERO))) < 2.0, "velocity stays close to the wall's own face rather than drifting into or away from it")
 
+		var kickoffs_before := PlayerActionLedger.count("player_wall_run_kickoff")
 		hunt.wall_run_kickoff_queued = true
 		var pre_kick_y: float = hunt.player_body.velocity.y
 		hunt._update_player(1.0 / 60.0)
 		check(not hunt.wall_run_kickoff_queued, "the kickoff request is consumed")
 		check(hunt.wall_running_time <= 0.0, "...and ends the run")
 		check(hunt.player_body.velocity.y > pre_kick_y, "...with a real upward component, not just a horizontal shove")
+		check(PlayerActionLedger.count("player_wall_run_kickoff") == kickoffs_before + 1, "the deliberate kickoff receives one action receipt")
 
 	print("WALL_RUN_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

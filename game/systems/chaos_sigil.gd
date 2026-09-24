@@ -197,8 +197,10 @@ static func charge(intent: String, subject_id: String = "player") -> Dictionary:
 	if sigil.is_empty():
 		return {"ok": false, "reason": "NOTHING STATED TO CHARGE"}
 	var cost := BLOOD_COST_PER_LETTER * maxf(1.0, float(str(sigil.condensed).length()))
+	WorldHistory.begin_ledger_batch()
 	var payment := Boons.pay(subject_id, "blood", cost)
 	if not bool(payment.get("ok", false)):
+		WorldHistory.commit_ledger_batch()
 		return payment
 	sigil["charged"] = true
 	sigil["subject_id"] = subject_id
@@ -219,6 +221,7 @@ static func charge(intent: String, subject_id: String = "player") -> Dictionary:
 		var corruption := float(maker.get("chaos_corruption", 0.0)) + OVERCHARGE_CORRUPTION
 		WorldHistory.amend_subject(subject_id, {"chaos_corruption": corruption})
 		WorldHistory.record_event("sigil_overcharged", {"subject_id": subject_id, "seed": sigil.seed, "pending": pending + 1, "chaos_corruption": corruption})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "sigil": sigil}
 
 
@@ -261,9 +264,11 @@ static func fire(sigil: Dictionary) -> Dictionary:
 	# AJ2.5. Fired is no longer carried — whatever `charge()` added to
 	# `chaos_pending`, this is the one place it comes back off.
 	var maker := WorldHistory.subject(subject_id)
+	WorldHistory.begin_ledger_batch()
 	if not maker.is_empty():
 		WorldHistory.amend_subject(subject_id, {"chaos_pending": maxi(0, int(maker.get("chaos_pending", 0)) - 1)})
 	WorldHistory.record_event("sigil_fired", {"subject_id": subject_id, "intent": str(sigil.get("intent", "")), "seed": int(sigil.get("seed", 0))})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "sigil": fired}
 
 
@@ -286,6 +291,7 @@ static func resolve(sigil: Dictionary, subject_id: String = "player") -> Diction
 	var seed := int(sigil.get("seed", 0))
 	var resolved := sigil.duplicate(true)
 	resolved["resolved"] = true
+	WorldHistory.begin_ledger_batch()
 	# AJ3.4. Naming a god happens at the level of what was actually said, not
 	# what the working comes to - a misfired or corrupted sigil still said the
 	# name out loud. Every named god gets real, permanent attention regardless
@@ -304,6 +310,7 @@ static func resolve(sigil: Dictionary, subject_id: String = "player") -> Diction
 		WorldHistory.amend_subject(subject_id, {"chaos_corruption": corruption})
 		WorldHistory.record_event("sigil_misfired", {"subject_id": subject_id, "intent": str(sigil.get("intent", "")), "seed": seed, "corrupted": corrupted, "chaos_corruption": corruption})
 		resolved["result"] = "misfired"
+		WorldHistory.commit_ledger_batch()
 		return {"ok": true, "sigil": resolved, "result": "misfired", "family": "", "named_gods": named_gods}
 	var potency := _potency(subject_id, seed)
 	var stat := str(INTENT_FAMILIES[family].stat)
@@ -315,11 +322,13 @@ static func resolve(sigil: Dictionary, subject_id: String = "player") -> Diction
 		# the parsing, but a sigil that does not fire is still a miss.
 		WorldHistory.record_event("sigil_misfired", {"subject_id": subject_id, "intent": str(sigil.get("intent", "")), "seed": seed, "reason": str(granted.get("reason", ""))})
 		resolved["result"] = "misfired"
+		WorldHistory.commit_ledger_batch()
 		return {"ok": true, "sigil": resolved, "result": "misfired", "family": family, "named_gods": named_gods}
 	_bump_potency(subject_id, seed)
 	WorldHistory.record_event("sigil_resolved", {"subject_id": subject_id, "seed": seed, "family": family, "stat": stat, "magnitude": magnitude, "potency": potency + 1, "world_minute": WorldClock.minutes()})
 	resolved["result"] = "resolved"
 	resolved["family"] = family
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "sigil": resolved, "result": "resolved", "family": family, "magnitude": magnitude, "named_gods": named_gods}
 
 
@@ -399,6 +408,7 @@ static func inscribe(sigil: Dictionary, subject_id: String, medium: String, loca
 		return {"ok": false, "reason": "NO SUCH SUBJECT"}
 	var made := int(maker.get("sigil_objects_made", 0))
 	var object_id := "sigil_object:%s:%d" % [subject_id, made]
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.register_subject(object_id, {
 		"kind": "sigil_object",
 		"maker": subject_id,
@@ -411,6 +421,7 @@ static func inscribe(sigil: Dictionary, subject_id: String, medium: String, loca
 	})
 	WorldHistory.amend_subject(subject_id, {"sigil_objects_made": made + 1})
 	WorldHistory.record_event("sigil_inscribed", {"subject_id": subject_id, "object_id": object_id, "medium": medium, "seed": int(sigil.get("seed", 0))})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "object_id": object_id}
 
 
@@ -438,12 +449,14 @@ static func deface(object_id: String, actor_id: String) -> Dictionary:
 	var object: Dictionary = found.object
 	if bool(object.get("defaced", false)):
 		return {"ok": false, "reason": "ALREADY DEFACED"}
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(object_id, {"defaced": true, "defaced_by": actor_id})
 	var maker_id := str(object.get("maker", ""))
 	var maker := WorldHistory.subject(maker_id)
 	if not maker.is_empty():
 		WorldHistory.amend_subject(maker_id, {"grudge": float(maker.get("grudge", 0.0)) + DEFACE_GRUDGE})
 	WorldHistory.record_event("sigil_defaced", {"object_id": object_id, "actor_id": actor_id, "maker": maker_id})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true}
 
 
@@ -460,10 +473,12 @@ static func steal(object_id: String, actor_id: String) -> Dictionary:
 	var current_holder := str(object.get("held_by", object.get("maker", "")))
 	if current_holder == actor_id:
 		return {"ok": false, "reason": "ALREADY IN THEIR OWN HANDS"}
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(object_id, {"held_by": actor_id})
 	var maker_id := str(object.get("maker", ""))
 	var maker := WorldHistory.subject(maker_id)
 	if not maker.is_empty():
 		WorldHistory.amend_subject(maker_id, {"grudge": float(maker.get("grudge", 0.0)) + STEAL_GRUDGE})
 	WorldHistory.record_event("sigil_stolen", {"object_id": object_id, "actor_id": actor_id, "maker": maker_id, "from": current_holder})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true}

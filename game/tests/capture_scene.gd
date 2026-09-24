@@ -160,6 +160,141 @@ func _ready() -> void:
 			await get_tree().physics_frame
 		for _draw_hold in 6:
 			await get_tree().process_frame
+	elif trigger == "swing":
+		# Third person: a real dodge (ash), then a real committed swing, shot
+		# a few frames in so the trail, cable and smear are drawn from the
+		# weapon's actual motion against the Hunt's own light and fog.
+		# Open ground first (the lock trigger's walk): at the spawn a wall pulls
+		# the third-person camera back into the eye.
+		scene.yaw = 2.7
+		for step in 40:
+			scene.player_body.position = scene.player_body.position + Vector3(-0.42, 0, -0.2)
+			scene.player = scene.player_body.position + Vector3.UP * 0.6
+			await get_tree().physics_frame
+		scene.third_person = true
+		# The blend runs on physics frames; wait until the camera has really
+		# pulled back, or the shot is first person.
+		for _settle in 180:
+			await get_tree().physics_frame
+			if scene.perspective_blend >= 0.99:
+				break
+		scene._dodge()
+		for _step in 6:
+			await get_tree().physics_frame
+		scene._attack(true)
+		# SWING_FRAMES picks the instant of the swing to photograph.
+		var swing_frames := int(OS.get_environment("SWING_FRAMES")) if OS.get_environment("SWING_FRAMES") != "" else 9
+		for _swing in swing_frames:
+			# Thrown the way a player throws it: a hard mouse sweep across the
+			# swing, which is what LimbMomentum reads as commitment. A scripted
+			# attack with no look motion has commitment 0 and draws the faintest
+			# possible trail -- invisible in the Hunt's light.
+			scene._look_delta = Vector2(-38.0, 6.0)
+			await get_tree().physics_frame
+		await get_tree().process_frame
+	elif trigger == "reel":
+		# A short played sequence for a video: open ground, third person, two
+		# hostiles, lock on, then dodge-and-swing exchanges thrown with real
+		# mouse sweeps, alternating direction like a player would.
+		scene.yaw = 2.7
+		for step in 40:
+			scene.player_body.position = scene.player_body.position + Vector3(-0.42, 0, -0.2)
+			scene.player = scene.player_body.position + Vector3.UP * 0.6
+			await get_tree().physics_frame
+		scene.third_person = true
+		for _settle in 90:
+			await get_tree().physics_frame
+		var fwd := Vector3(sin(scene.yaw), 0, cos(scene.yaw))
+		var right := Vector3(fwd.z, 0, -fwd.x)
+		for i in 2:
+			var at: Vector3 = scene.player + fwd * 4.0 + right * (1.4 if i == 0 else -1.6) + Vector3.DOWN * 0.6
+			scene._spawn_encounter_actor({"instance_id": "reel_%d" % i, "kind": "hostile"}, at)
+			scene.encounter_actors.back().node.position = at
+		for _look in 30:
+			await get_tree().physics_frame
+		scene._toggle_lock()
+		for exchange in 4:
+			# One dodge in two: five straight ones drained stamina (the last
+			# blow was refused) and carried the hunter into a building.
+			if exchange % 2 == 1:
+				scene._dodge()
+				for _step in 8:
+					await get_tree().physics_frame
+			scene._attack(exchange % 2 == 0)
+			var sweep := Vector2(-38.0 if exchange % 2 == 0 else 38.0, 6.0)
+			for _swing in 12:
+				scene._look_delta = sweep
+				await get_tree().physics_frame
+			for _recover in 40:
+				await get_tree().physics_frame
+		for _hold in 45:
+			await get_tree().physics_frame
+	elif trigger == "holdtool":
+		# The arcade's breach tool, in hand, as picking it up leaves it.
+		LabSurface.hold_in_view(scene.camera, scene.weapon_visual)
+		for _hold in 10:
+			await get_tree().process_frame
+	elif trigger == "track":
+		# Item 4: two enemies that have seen you, a marked hit on one, and a
+		# hurt player, so every kind of tracking box is on screen at once.
+		scene.yaw = 2.7
+		for step in 40:
+			scene.player_body.position = scene.player_body.position + Vector3(-0.42, 0, -0.2)
+			scene.player = scene.player_body.position + Vector3.UP * 0.6
+			await get_tree().physics_frame
+		var fwd := Vector3(sin(scene.yaw), 0, cos(scene.yaw))
+		var right := Vector3(fwd.z, 0, -fwd.x)
+		for i in 2:
+			var at: Vector3 = scene.player + fwd * 4.5 + right * (1.3 if i == 0 else -1.5) + Vector3.DOWN * 0.6
+			scene._spawn_encounter_actor({"instance_id": "track_%d" % i, "kind": "hostile"}, at)
+			scene.encounter_actors.back().node.position = at
+			scene.encounter_actors.back()["tracking_player"] = true
+		for _hold in 20:
+			await get_tree().physics_frame
+		var victim: Dictionary = scene.encounter_actors.back()
+		var arm := victim.rig.parts.get("left_arm") as Node3D
+		scene.block_tracker.report_hit(arm.global_position if arm != null else victim.node.global_position + Vector3.UP, "left_arm", 24.0, "cut")
+		scene.player_rig.anatomy.apply_hit("torso", 40.0, 0.0, "cut")
+		scene.player_rig.anatomy.apply_hit("head", 18.0, 0.0, "blunt")
+		for _hold in 5:
+			await get_tree().process_frame
+	elif trigger == "clicks":
+		# First person, sword, a run of plain LMB swings and a held guard: the
+		# walkthrough's "arms flip back and forth" (2026-09-24).
+		scene.yaw = 2.7
+		for step in 30:
+			scene.player_body.position = scene.player_body.position + Vector3(-0.42, 0, -0.2)
+			scene.player = scene.player_body.position + Vector3.UP * 0.6
+			await get_tree().physics_frame
+		for swing in 4:
+			scene._attack(false)
+			for _f in 24:
+				await get_tree().physics_frame
+		for _f in 40:
+			await get_tree().physics_frame
+	elif trigger == "hub" or trigger == "hub_index":
+		# The Brain Index hub with something in the bag and a part selected.
+		for info in [{"layer_name": "organ", "organ_id": "left_kidney"}, {"layer_name": "bone", "zone": "left_arm"}, {"layer_name": "cybernetic", "implant": "optic relay"}, {"layer_name": "muscle", "zone": "right_leg"}]:
+			scene.handheld.carry.take_chunk(info)
+		scene._toggle_panel("hub")
+		if trigger == "hub_index":
+			scene.brain_hub.tab = 2
+		for _f in 30:
+			await get_tree().process_frame
+		scene.brain_hub.selected_zone = "left_arm"
+		for _f in 5:
+			await get_tree().process_frame
+	elif trigger == "threat":
+		# Three enemies winding up around the player -- behind and due, to the
+		# left mid-swing, ahead-right just starting -- so the ThreatCompass
+		# arcs are seen against the real HUD's edge instruments.
+		var fwd := Vector3(sin(scene.yaw), 0, cos(scene.yaw))
+		var right := Vector3(fwd.z, 0, -fwd.x)
+		for _hold in 20:
+			scene.threat_compass.report("behind", scene.player - fwd * 4.0, 0.95)
+			scene.threat_compass.report("left", scene.player - right * 4.0, 0.5)
+			scene.threat_compass.report("ahead_right", scene.player + (fwd + right) * 3.0, 0.15)
+			await get_tree().process_frame
 	elif trigger == "walk":
 		# Move off the spawn so the shot is the travelling camera, not the
 		# vehicle the player has just climbed out of.
@@ -168,6 +303,20 @@ func _ready() -> void:
 			scene.player_body.position = scene.player_body.position + Vector3(-0.42, 0, -0.2)
 			scene.player = scene.player_body.position + Vector3.UP * 0.6
 			await get_tree().physics_frame
+		for _hold in 10:
+			await get_tree().process_frame
+	elif trigger == "vat_aisle":
+		# P4.3. Skips straight past the locked submerged/voiding/floor beats
+		# into the walkable aisle itself, standing near the door end, so a
+		# change to AISLE_LENGTH or the bay dressing can be looked at without
+		# waiting out ~13s of cutscene per capture.
+		scene.phase = "aisle"
+		scene.can_move = true
+		scene._on_intake_filed({})
+		var aisle_len: float = scene.get("AISLE_LENGTH")
+		scene.player.position = Vector3(0.0, 1.62, -aisle_len + 4.0)
+		scene.yaw = PI
+		scene.player.rotation.y = scene.yaw
 		for _hold in 10:
 			await get_tree().process_frame
 	elif trigger == "killcam":

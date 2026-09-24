@@ -18,6 +18,7 @@ func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		get_tree().quit(2)
 		return
+	WorldHistory.clear_history()
 	var hunt = load("res://bone_yard_hunt.tscn").instantiate()
 	add_child(hunt)
 	hunt.set_physics_process(false)
@@ -26,16 +27,14 @@ func _ready() -> void:
 	check(not hunt.third_person_unlock_announced, "starts unannounced")
 	var prompt_before: String = hunt.prompt.text
 	hunt._update_hud()
-	check(not hunt.third_person_unlock_announced, "a tick with no qualifying kill announces nothing")
+	check(not hunt.third_person_unlock_announced, "a tick before first contact announces nothing")
 	check(hunt.prompt.text == prompt_before, "and leaves the prompt alone")
 	check(WorldHistory.event_count("third_person_unlocked") == 0, "and writes nothing to history")
 
-	# Craft exactly what third_person_unlocked() reads: one melee hit landed,
-	# and a resolution against someone the world already rated dangerous.
+	# The first real body hit is the short, explicit tutorial gate. No boss kill
+	# or hidden resolution requirement sits behind F anymore.
 	WorldHistory.record_event("melee_body_hit", {"target": "test_boss", "location": hunt.HUNT_LOCATION})
-	WorldHistory.register_subject("test_boss", {"name": "Test Boss", "kind": "person", "elo": 1200, "grudge": 0, "rival": true})
-	WorldHistory.record_event("execution", {"subject_id": "test_boss"})
-	check(hunt.third_person_unlocked(), "the read itself is true once a rated kill lands")
+	check(hunt.third_person_unlocked(), "the read itself is true as soon as the first body hit lands")
 
 	var kick_before: Vector2 = hunt.impact_feel.kick
 	hunt._update_hud()
@@ -44,9 +43,13 @@ func _ready() -> void:
 	check(WorldHistory.event_count("third_person_unlocked") == 1, "the moment itself becomes a fact in history")
 	check(hunt.impact_feel.kick != kick_before or hunt.impact_feel.shake > 0.0, "the camera actually moves for it")
 
-	# The permission was never a quiet one — F itself must already work.
+	# The permission was never a quiet one — the actual F route must work.
 	hunt.third_person = false
-	check(hunt.third_person_unlocked(), "and pressing F would now be honoured, not refused")
+	var switch := InputEventKey.new()
+	switch.keycode = KEY_F
+	switch.pressed = true
+	hunt._unhandled_input(switch)
+	check(hunt.third_person, "the actual F binding enters third person after first contact")
 
 	var announced_prompt: String = hunt.prompt.text
 	hunt._update_hud()

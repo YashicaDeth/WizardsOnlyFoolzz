@@ -44,12 +44,22 @@ const UNSEEN_EXPOSURE_THRESHOLD := 0.35
 ## problem answers it within a handful of witnessed acts, not a career's worth.
 const RESPONSE_THRESHOLD := 0.18
 
+## AE10.14. Existing faction standing changes how much remembered unrest a
+## holder tolerates before it sends bodies. This is intentionally a multiplier
+## on the local threshold, not a second reputation score and not forgiveness:
+## the witnessed wrong still enters the place record either way. `0.4` makes a
+## faction that already refuses the actor answer one serious wrong; `1.55`
+## gives somebody it reads as kin a meaningfully longer leash without immunity.
+const HOSTILE_RESPONSE_SCALE := 0.4
+const KIN_RESPONSE_SCALE := 1.55
+
 ## AE1.5. What being sent actually is: the exact `grudge` scalar `wire_net.gd`'s
 ## own channel-contest retaliation (K4.6) and `the_four_horsemen.gd` (K2.5)
 ## already raise on a faction's own record — the same real field the Hunt
 ## System already reads, scaled up from the small 0..1 offence magnitudes here
 ## into that field's own working range.
 const GRUDGE_SCALE := 10.0
+const WANTED_HISTORY_LIMIT := 12
 
 
 ## AE1.1. "Unseen is a real state with real inputs — light, noise, cover,
@@ -102,6 +112,52 @@ static func offence_magnitude(faction_id: String, event: Dictionary) -> float:
 	return maxf(0.0, faction_axis * pull)
 
 
+## The same derived relationship already used by trade, read as enforcement
+## tolerance. `faction_price_factor()` compares the actor's live Tree position
+## (including what their body has visibly become) with the faction's; no local-
+## law-only affinity is stored or displayed.
+static func response_threshold(faction_id: String, actor_id: String) -> float:
+	var actor := WorldHistory.subject(actor_id)
+	var standing := WorldHistory.faction_price_factor(faction_id, actor)
+	var closeness := clampf(standing / 1.2, 0.0, 1.0)
+	return RESPONSE_THRESHOLD * lerpf(HOSTILE_RESPONSE_SCALE, KIN_RESPONSE_SCALE, closeness)
+
+
+## AE10.15. The warrant belongs to the world that issued it; the fact that the
+## continuing spirit was wanted for something belongs to the player. Keep a
+## compact reason on that player record only when law actually dispatches. The
+## record contains attribution, not the old world's active team or unrest, so a
+## quantum restart can differ without pretending the abandoned jurisdiction
+## crossed over wholesale.
+static func _remember_wanted_for(actor_id: String, place_id: String, faction_id: String, event: Dictionary, magnitude: float) -> Dictionary:
+	var actor := WorldHistory.subject(actor_id)
+	if actor.is_empty():
+		return {}
+	var details: Dictionary = event.get("details", {}) if event.get("details", {}) is Dictionary else {}
+	var reason := {
+		"origin_run_salt": WorldHistory.run_salt,
+		"source_sequence": int(event.get("sequence", -1)),
+		"event_type": str(event.get("type", "")),
+		"outcome": str(details.get("outcome", "")),
+		"subject_id": str(details.get("subject_id", "")),
+		"place_id": place_id,
+		"faction_id": faction_id,
+		"magnitude": magnitude,
+	}
+	var history: Array = (actor.get("wanted_history", []) as Array).duplicate(true)
+	var duplicate := history.any(func(entry: Variant):
+		return entry is Dictionary \
+			and int((entry as Dictionary).get("origin_run_salt", 0)) == int(reason.origin_run_salt) \
+			and int((entry as Dictionary).get("source_sequence", -2)) == int(reason.source_sequence) \
+			and str((entry as Dictionary).get("faction_id", "")) == faction_id)
+	if not duplicate:
+		history.append(reason.duplicate(true))
+		while history.size() > WANTED_HISTORY_LIMIT:
+			history.pop_front()
+	WorldHistory.amend_subject(actor_id, {"wanted_for": reason, "wanted_history": history})
+	return reason
+
+
 ## AE1.4/AE1.5. "Law figures respond to what was actually witnessed...
 ## Punishment is local: the holding remembers, and the holding sends them."
 ## Refuses outright unless the faction that holds this ground has actually
@@ -116,22 +172,76 @@ static func offence_magnitude(faction_id: String, event: Dictionary) -> float:
 static func witness_a_wrong(place_id: String, faction_id: String, ledger: WitnessLedger, event: Dictionary, actor_id: String) -> Dictionary:
 	if not ledger.faction_knows(faction_id, int(event.get("sequence", -1))):
 		return {"ok": false, "reason": "THE HOLDER WAS NEVER TOLD"}
+	var place := WorldHistory.subject(place_id)
+	if not place.is_empty() and str(place.get("held_by", faction_id)) != faction_id:
+		return {"ok": false, "reason": "THAT FACTION DOES NOT HOLD THIS GROUND"}
 	var magnitude := offence_magnitude(faction_id, event)
 	if is_zero_approx(magnitude):
 		return {"ok": false, "reason": "NOT AN OFFENCE TO WHOEVER HOLDS THIS GROUND"}
-	var place := WorldHistory.subject(place_id)
+	WorldHistory.begin_ledger_batch()
 	if place.is_empty():
 		WorldHistory.register_subject(place_id, {"kind": "place", "held_by": faction_id, "unrest": 0.0})
 		place = WorldHistory.subject(place_id)
+	var sequence := int(event.get("sequence", -1))
+	var answered: Array = (place.get("law_seen_sequences", []) as Array).duplicate()
+	if sequence >= 0 and answered.has(sequence):
+		WorldHistory.commit_ledger_batch()
+		return {"ok": false, "reason": "THIS WRONG WAS ALREADY ANSWERED HERE"}
+	if sequence >= 0:
+		answered.append(sequence)
+		if answered.size() > 64:
+			answered.pop_front()
 	var unrest := float(place.get("unrest", 0.0)) + magnitude
-	WorldHistory.record_event("local_unrest", {"place_id": place_id, "faction_id": faction_id, "actor_id": actor_id, "magnitude": magnitude, "unrest": unrest})
+	var threshold := response_threshold(faction_id, actor_id)
+	var disposition := WorldHistory.faction_disposition(faction_id, WorldHistory.subject(actor_id))
+	WorldHistory.record_event("local_unrest", {
+		"place_id": place_id, "faction_id": faction_id, "actor_id": actor_id,
+		"source_sequence": sequence, "magnitude": magnitude, "unrest": unrest,
+		"response_threshold": threshold, "disposition": disposition,
+	})
 	var dispatched := false
-	if unrest >= RESPONSE_THRESHOLD:
+	if unrest >= threshold:
 		var faction := WorldHistory.subject(faction_id)
 		if not faction.is_empty():
 			WorldHistory.amend_subject(faction_id, {"grudge": float(faction.get("grudge", 0.0)) + unrest * GRUDGE_SCALE})
-		WorldHistory.record_event("law_dispatched", {"place_id": place_id, "faction_id": faction_id, "actor_id": actor_id, "unrest_spent": unrest})
+		var wanted_for := _remember_wanted_for(actor_id, place_id, faction_id, event, magnitude)
+		WorldHistory.record_event("law_dispatched", {
+			"place_id": place_id, "faction_id": faction_id, "actor_id": actor_id,
+			"source_sequence": sequence, "unrest_spent": unrest,
+			"response_threshold": threshold, "disposition": disposition,
+			"wanted_for": wanted_for,
+		})
 		unrest = 0.0
 		dispatched = true
-	WorldHistory.amend_subject(place_id, {"unrest": unrest})
-	return {"ok": true, "magnitude": magnitude, "unrest": unrest, "dispatched": dispatched}
+	WorldHistory.amend_subject(place_id, {"unrest": unrest, "law_seen_sequences": answered})
+	WorldHistory.commit_ledger_batch()
+	return {
+		"ok": true, "magnitude": magnitude, "unrest": unrest,
+		"dispatched": dispatched, "response_threshold": threshold,
+		"disposition": disposition,
+	}
+
+
+## One report that actually completed WitnessLedger's walk home. Resolution
+## writers attach the jurisdiction that existed at the scene; this accepts the
+## report only when it reached that holder, reconstructs the original event
+## shape used by `event_karma()`, and lets the canonical place remember it.
+static func answer_report(ledger: WitnessLedger, report: Dictionary) -> Dictionary:
+	var details: Dictionary = (report.get("details", {}) as Dictionary).duplicate(true)
+	var place_id := str(details.get("place_id", ""))
+	var holder_id := str(details.get("held_by", ""))
+	if place_id == "" or holder_id == "":
+		return {"ok": false, "reason": "NO LOCAL JURISDICTION ON THE REPORT"}
+	if str(report.get("faction", "")) != holder_id:
+		return {"ok": false, "reason": "THE REPORT WENT SOMEWHERE ELSE"}
+	var event := {
+		"sequence": int(report.get("sequence", -1)),
+		"type": str(report.get("type", "")),
+		"details": details,
+	}
+	var result := witness_a_wrong(place_id, holder_id, ledger, event, str(details.get("actor", details.get("actor_id", "player"))))
+	result["place_id"] = place_id
+	result["faction_id"] = holder_id
+	result["source_sequence"] = int(report.get("sequence", -1))
+	result["at"] = details.get("at", {})
+	return result

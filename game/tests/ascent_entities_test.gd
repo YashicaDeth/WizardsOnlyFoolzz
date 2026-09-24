@@ -24,6 +24,7 @@ func _ready() -> void:
 	WorldHistory.clear_history()
 	WorldHistory.register_subject("player", {"name": "THE HUNTER", "kind": "person"})
 	AscentEntities.seed_entities()
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "both ascent entities seed in one closed schema transaction")
 
 	var seeded := WorldHistory.subject("clear_frequency")
 	check(str(seeded.get("kind", "")) == "entity", "The Clear Frequency is registered as an entity")
@@ -43,6 +44,15 @@ func _ready() -> void:
 	AscentEntities.regard("clear_frequency")
 	check(bool(WorldHistory.subject("clear_frequency").get("has_noticed", false)), "the third act of mercy earns its attention")
 
+	# The live Hunt writes one state-change event and one canonical resolution
+	# for the same spared person. Attention counts the person once, not both rows.
+	WorldHistory.amend_subject("clear_frequency", {"has_noticed": false, "washed_at_sequence": WorldHistory.next_sequence - 1})
+	WorldHistory.record_event("npc_spared", {"subject_id": "same_person", "actor": "player"})
+	WorldHistory.record_event("npc_resolution", {"subject_id": "same_person", "outcome": "spare", "actor": "player"})
+	AscentEntities.regard("clear_frequency")
+	check(not bool(WorldHistory.subject("clear_frequency").get("has_noticed", false)), "duplicate ledger rows for one spared person count as one mercy, not two")
+	WorldHistory.amend_subject("clear_frequency", {"has_noticed": true, "washed_at_sequence": -1})
+
 	# --- washing is refused before notice, real once granted ----------------
 	var refused := AscentEntities.wash("still_ledger")
 	check(not bool(refused.get("ok", false)), "The Still Ledger refuses — it has not noticed you")
@@ -52,6 +62,7 @@ func _ready() -> void:
 	check(bool(granted.get("ok", false)), "The Clear Frequency, having noticed you, will wash")
 	var after_karma := float(WorldHistory.subject("player").get("karma", 0.0))
 	check(after_karma > before_karma, "and it actually moves you up the axis (%.3f -> %.3f)" % [before_karma, after_karma])
+	check(PlayerActionLedger.count("sin_washed") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "the karma event and spent attention close as one identified player act")
 
 	# --- the notice is spent, not free to use twice --------------------------
 	check(not bool(WorldHistory.subject("clear_frequency").get("has_noticed", false)), "attention is spent on use")

@@ -24,6 +24,7 @@ extends RefCounted
 
 const MERCY_EVENTS := ["misfire_bond", "bond_strengthened", "npc_spared"]
 const MERCY_OUTCOMES := ["spare", "recruit"]
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 ## The lower ranks, per COSMOLOGY.md — not gods, the rank below them. Each
 ## entity's `faction_id` is `wizardsonlyfoolz` so pricing and the Tree axis
@@ -41,6 +42,7 @@ const ENTITIES := {
 
 
 static func seed_entities() -> void:
+	WorldHistory.begin_ledger_batch()
 	for entity_id in ENTITIES:
 		var data: Dictionary = ENTITIES[entity_id]
 		WorldHistory.register_subject(entity_id, {
@@ -50,6 +52,7 @@ static func seed_entities() -> void:
 			"has_noticed": false, "washed_at_sequence": -1, "wash_count": 0,
 			"relations": {},
 		})
+	WorldHistory.commit_ledger_batch()
 
 
 ## Draws the same conclusion `RivalRegistry.consider()` draws on the other
@@ -64,20 +67,32 @@ static func regard(entity_id: String, subject_id: String = "player") -> Dictiona
 		return entity
 	var since := int(entity.get("washed_at_sequence", -1))
 	var count := 0
+	var counted_acts: Dictionary = {}
 	for event in WorldHistory.events:
 		if int(event.get("sequence", 0)) <= since:
 			continue
 		if WorldHistory.event_actor(event) != subject_id:
 			continue
 		var event_type := str(event.get("type", ""))
-		var outcome := str((event.get("details", {}) as Dictionary).get("outcome", ""))
+		var details: Dictionary = event.get("details", {}) as Dictionary
+		var outcome := str(details.get("outcome", ""))
 		if MERCY_EVENTS.has(event_type) or (event_type == "npc_resolution" and MERCY_OUTCOMES.has(outcome)):
-			count += 1
+			# Production sparing writes a subject state change (`npc_spared`) and
+			# its canonical witnessed act (`npc_resolution`). Those are two rows
+			# describing one person spared, not two mercies. Prefer the exact
+			# subject as the act key; events without one remain distinct acts.
+			var mercy_subject_id := str(details.get("subject_id", ""))
+			var act_key := "subject:%s" % mercy_subject_id if not mercy_subject_id.is_empty() else "event:%d" % int(event.get("sequence", 0))
+			if not counted_acts.has(act_key):
+				counted_acts[act_key] = true
+				count += 1
 	var threshold := int((ENTITIES.get(entity_id, {}) as Dictionary).get("threshold", 4))
 	if count < threshold:
 		return entity
+	WorldHistory.begin_ledger_batch()
 	var updated := WorldHistory.amend_subject(entity_id, {"has_noticed": true})
 	WorldHistory.record_event("entity_took_notice", {"entity_id": entity_id, "subject_id": subject_id, "mercy_count": count})
+	WorldHistory.commit_ledger_batch()
 	return updated
 
 
@@ -91,12 +106,18 @@ static func wash(entity_id: String, subject_id: String = "player") -> Dictionary
 		return {"ok": false, "reason": "NO SUCH ENTITY"}
 	if not bool(entity.get("has_noticed", false)):
 		return {"ok": false, "reason": "IT HAS NOT NOTICED YOU YET"}
-	WorldHistory.record_event("sin_washed", {"entity_id": entity_id, "subject_id": subject_id, "actor": subject_id})
+	WorldHistory.begin_ledger_batch()
+	var details := {"entity_id": entity_id, "subject_id": subject_id, "actor": subject_id}
+	if subject_id == "player":
+		PLAYER_ACTION_LEDGER.record("sin_washed", details)
+	else:
+		WorldHistory.record_event("sin_washed", details)
 	WorldHistory.amend_subject(entity_id, {
 		"has_noticed": false,
 		"washed_at_sequence": WorldHistory.next_sequence - 1,
 		"wash_count": int(entity.get("wash_count", 0)) + 1,
 	})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "karma_after": float(WorldHistory.subject(subject_id).get("karma", 0.0))}
 
 

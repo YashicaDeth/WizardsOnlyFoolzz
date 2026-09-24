@@ -23,6 +23,7 @@ extends RefCounted
 
 const ImplantCatalog := preload("res://systems/implant_catalog.gd")
 const AnatomyComponent := preload("res://systems/anatomy_component.gd")
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 const SPOIL_SECONDS := 420.0
 ## Kilograms a body will carry before it starts costing movement. Deliberately
@@ -362,6 +363,7 @@ func sell(index: int, buyer_faction: String = "") -> Dictionary:
 	items.remove_at(index)
 	var inventory := WorldHistory.subject("inventory")
 	var wallet := int(inventory.get("rust_scrip", 0)) + price
+	WorldHistory.begin_ledger_batch()
 	# A discovered bug, not a design choice: `update_subject`'s own third
 	# argument already calls `record_event(event_type, ...)` once by itself
 	# (see its definition in `world_history.gd`) — passing "carried_part_sold"
@@ -370,7 +372,8 @@ func sell(index: int, buyer_faction: String = "") -> Dictionary:
 	# within a window, so every real sale has been gluting the market at
 	# double the rate R1.5 actually intended since the day it was written.
 	WorldHistory.update_subject("inventory", {"items": items.duplicate(true), "rust_scrip": wallet}, "carry_changed")
-	WorldHistory.record_event("carried_part_sold", {"part": item.duplicate(true), "price": price, "currency": "rust_scrip", "buyer_faction": buyer_faction})
+	PLAYER_ACTION_LEDGER.record("carried_part_sold", {"part": item.duplicate(true), "price": price, "currency": "rust_scrip", "buyer_faction": buyer_faction})
+	WorldHistory.commit_ledger_batch()
 	return {"item": item, "price": price, "wallet": wallet, "faction": buyer_faction, "disposition": WorldHistory.faction_disposition(buyer_faction, WorldHistory.subject("player")) if not buyer_faction.is_empty() else ""}
 
 
@@ -415,6 +418,7 @@ func accrue_interest(lender_faction: String) -> Dictionary:
 	# Carry the unused fraction forward. Settling after 25 hours charges one day
 	# and leaves the remaining hour on the account instead of forgiving it.
 	anchors[lender_faction] = anchor + float(whole_days) * WorldClock.MINUTES_PER_DAY
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject("inventory", {
 		"player_debt": debts,
 		"player_debt_at_minute": anchors,
@@ -427,6 +431,7 @@ func accrue_interest(lender_faction: String) -> Dictionary:
 		"owed_before": owed,
 		"owed_after": after,
 	})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "interest": interest, "owed": after, "days": whole_days}
 
 
@@ -478,11 +483,13 @@ func borrow(amount: int, lender_faction: String) -> Dictionary:
 	var anchors: Dictionary = (inventory.get("player_debt_at_minute", {}) as Dictionary).duplicate(true)
 	anchors[lender_faction] = WorldClock.minutes()
 	var wallet := int(inventory.get("rust_scrip", 0)) + amount
+	WorldHistory.begin_ledger_batch()
 	# The same double-record `sell()` had: `update_subject`'s own third
 	# argument already writes one event by itself, so repeating the type in
 	# the explicit call below wrote every loan twice into WorldHistory.
 	WorldHistory.update_subject("inventory", {"rust_scrip": wallet, "player_debt": debts, "player_debt_at_minute": anchors}, "carry_changed")
-	WorldHistory.record_event("player_borrowed", {"lender_faction": lender_faction, "amount": amount, "owed_after": debts[lender_faction]})
+	PLAYER_ACTION_LEDGER.record("player_borrowed", {"lender_faction": lender_faction, "amount": amount, "owed_after": debts[lender_faction]})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "wallet": wallet, "owed": int(debts[lender_faction])}
 
 
@@ -501,9 +508,111 @@ func repay(amount: int, lender_faction: String) -> Dictionary:
 	debts[lender_faction] = owed - paid
 	var anchors: Dictionary = (inventory.get("player_debt_at_minute", {}) as Dictionary).duplicate(true)
 	anchors[lender_faction] = WorldClock.minutes()
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.update_subject("inventory", {"rust_scrip": wallet - paid, "player_debt": debts, "player_debt_at_minute": anchors}, "carry_changed")
-	WorldHistory.record_event("player_repaid", {"lender_faction": lender_faction, "amount": paid, "owed_after": debts[lender_faction]})
+	PLAYER_ACTION_LEDGER.record("player_repaid", {"lender_faction": lender_faction, "amount": paid, "owed_after": debts[lender_faction]})
+	WorldHistory.commit_ledger_batch()
 	return {"ok": true, "paid": paid, "owed": int(debts[lender_faction]), "wallet": wallet - paid}
+
+
+## Case winnings land here. Scrip and gold credit the wallet; ammo, patches and
+## implants become items — except patches, which a rig on hand sews straight
+## into its worst zone rather than sitting in the bag waiting for a verb that
+## does not exist yet. Implants arrive shaped for `install_into()`, so a case
+## can genuinely put hardware in you through verbs the game already has.
+func take_case_winnings(receipt: Dictionary, rig: BaselineHuman = null) -> Dictionary:
+	if not bool(receipt.get("ok", false)):
+		return {"ok": false, "reason": str(receipt.get("reason", "BAD RECEIPT"))}
+	var kind := str(receipt.get("kind", ""))
+	var amount := int(receipt.get("amount", 0))
+	var inventory := WorldHistory.subject("inventory")
+	var wallet := int(inventory.get("rust_scrip", 0))
+	var note := ""
+	WorldHistory.begin_ledger_batch()
+	match kind:
+		"scrip", "gold":
+			var gain := amount if kind == "scrip" else amount * LootCase.GOLD_VALUE
+			wallet += gain
+			note = "+%d SCRIP" % gain
+		"patch":
+			var sewn := _sew_patch(rig, amount)
+			if not sewn.is_empty():
+				note = "PATCH SEWN // %s" % sewn
+			else:
+				items.append({"label": "CLOTH PATCH", "kind": "patch", "mass": 0.1, "perishes": false, "age": 0.0, "condition": 1.0})
+				note = "PATCH POCKETED"
+		"ammo":
+			items.append({"label": "%d ROUNDS" % amount, "kind": "ammo", "mass": 0.05 * float(amount), "perishes": false, "age": 0.0, "condition": 1.0, "rounds": amount})
+			note = "%d ROUNDS POCKETED" % amount
+		_:
+			items.append({"label": "SALVAGED IMPLANT", "kind": "cybernetic", "implant": "salvaged hardware", "zone": "torso", "mass": 0.9, "perishes": false, "age": 0.0, "condition": 1.0})
+			note = "HARDWARE POCKETED"
+	WorldHistory.update_subject("inventory", {"rust_scrip": wallet}, "carry_changed")
+	save_to_history()
+	PLAYER_ACTION_LEDGER.record("case_opened", {"case": str(receipt.get("case", "")), "tier": str(receipt.get("tier", "")), "kind": kind, "note": note})
+	WorldHistory.commit_ledger_batch()
+	return {"ok": true, "note": note, "wallet": wallet}
+
+
+## A patch goes into the worst zone it can help, half integrity per patch, and
+## says which zone took it. No rig, no sewing — the caller pockets it instead.
+func _sew_patch(rig: BaselineHuman, amount: int) -> String:
+	if rig == null or not is_instance_valid(rig) or amount <= 0:
+		return ""
+	var worst := ""
+	var worst_cover := 2.0
+	for zone in ClothingShell.ZONES:
+		if not rig.wardrobe.has(zone):
+			continue
+		var cover := clampf(float(rig.wardrobe.get(zone, 0.0)), 0.0, 1.0)
+		if cover < worst_cover:
+			worst_cover = cover
+			worst = zone
+	if worst.is_empty() or worst_cover >= 1.0:
+		return ""
+	ClothingShell.mend(rig.wardrobe, worst, 0.5 * float(amount))
+	rig.dress(rig.wardrobe)
+	return worst.to_upper()
+
+
+## Clothes come back by purchase, and this is the till. Prices the wardrobe's
+## damage through `ClothingShell`, spends rust scrip through the same guarded
+## pattern as `repay()` — capped at the wallet, never below zero — mends every
+## zone it priced, and records the receipt. Nothing owed, nothing to mend, or
+## nothing in the wallet all refuse with a reason instead of half-applying.
+func spend_on_mending(wardrobe: Dictionary) -> Dictionary:
+	var price := ClothingShell.price_to_mend(wardrobe)
+	if price <= 0:
+		return {"ok": false, "reason": "NOTHING TO MEND"}
+	var inventory := WorldHistory.subject("inventory")
+	var wallet := int(inventory.get("rust_scrip", 0))
+	if wallet < price:
+		return {"ok": false, "reason": "NOT ENOUGH SCRIP"}
+	for zone in ClothingShell.ZONES:
+		if wardrobe.has(zone):
+			ClothingShell.mend(wardrobe, zone, 1.0)
+	WorldHistory.begin_ledger_batch()
+	WorldHistory.update_subject("inventory", {"rust_scrip": wallet - price}, "carry_changed")
+	PLAYER_ACTION_LEDGER.record("clothes_mended", {"spent": price, "wallet": wallet - price})
+	WorldHistory.commit_ledger_batch()
+	return {"ok": true, "spent": price, "wallet": wallet - price}
+
+
+## General guarded spend: deducts an amount for a named reason through the same
+## pattern as `repay()`. Refuses empty wallets rather than going negative, and
+## the ledger names what the money was for.
+func spend(amount: int, reason: String) -> Dictionary:
+	if amount <= 0:
+		return {"ok": false, "reason": "NOTHING TO PAY"}
+	var inventory := WorldHistory.subject("inventory")
+	var wallet := int(inventory.get("rust_scrip", 0))
+	if wallet < amount:
+		return {"ok": false, "reason": "NOT ENOUGH SCRIP"}
+	WorldHistory.begin_ledger_batch()
+	WorldHistory.update_subject("inventory", {"rust_scrip": wallet - amount}, "carry_changed")
+	PLAYER_ACTION_LEDGER.record("spent", {"amount": amount, "for": reason, "wallet": wallet - amount})
+	WorldHistory.commit_ledger_batch()
+	return {"ok": true, "spent": amount, "wallet": wallet - amount}
 
 
 ## AL1.2. The bank does not lend against nothing. `borrow()` already writes a
@@ -515,8 +624,13 @@ func repay(amount: int, lender_faction: String) -> Dictionary:
 func borrow_against(amount: int, lender_faction: String, item_index: int) -> Dictionary:
 	if item_index < 0 or item_index >= items.size():
 		return {"ok": false, "reason": "NOTHING TO SECURE IT AGAINST"}
+	# The loan and the lien are one agreement. `borrow()` owns the ordinary
+	# loan receipt; this outer transaction keeps its nested batch open until
+	# the exact collateral has been persisted and named as well.
+	WorldHistory.begin_ledger_batch()
 	var result := borrow(amount, lender_faction)
 	if not bool(result.get("ok", false)):
+		WorldHistory.commit_ledger_batch()
 		return result
 	var item: Dictionary = items[item_index]
 	item["lien"] = "%s // %d %s" % [str(WorldHistory.subject(lender_faction).get("name", lender_faction)).to_upper(), amount, CURRENCY]
@@ -524,6 +638,7 @@ func borrow_against(amount: int, lender_faction: String, item_index: int) -> Dic
 	items[item_index] = item
 	save_to_history()
 	WorldHistory.record_event("bank_lien_written", {"lender_faction": lender_faction, "amount": amount, "item": item.duplicate(true)})
+	WorldHistory.commit_ledger_batch()
 	result["item"] = item
 	return result
 
@@ -539,6 +654,7 @@ func seize_lien(lender_faction: String) -> Dictionary:
 		var item: Dictionary = items[index]
 		if str(item.get("lien_holder", "")) != lender_faction:
 			continue
+		WorldHistory.begin_ledger_batch()
 		var value := sale_value(item, lender_faction)
 		items.remove_at(index)
 		var owed := debt_to(lender_faction)
@@ -552,6 +668,7 @@ func seize_lien(lender_faction: String) -> Dictionary:
 		# caught it.
 		WorldHistory.update_subject("inventory", {"items": items.duplicate(true), "player_debt": debts}, "carry_changed")
 		WorldHistory.record_event("lien_seized", {"lender_faction": lender_faction, "item": item.duplicate(true), "value": value, "owed_after": debts[lender_faction]})
+		WorldHistory.commit_ledger_batch()
 		return {"ok": true, "item": item, "value": value, "owed": int(debts[lender_faction])}
 	return {"ok": false, "reason": "NOTHING LIENED TO THIS LENDER"}
 

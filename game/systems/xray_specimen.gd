@@ -26,6 +26,18 @@ const RIG := preload("res://systems/baseline_human.gd")
 const BONE_TINT := Color(0.78, 0.86, 0.74)
 const ORGAN_TINT := Color(0.72, 0.20, 0.16)
 const FLESH_TINT := Color(0.18, 0.26, 0.22)
+## Greg (2026-09-24): "rough gritty textured but colored correctly according to
+## the body part". Each organ prints its own hue; bone stays the radiograph's
+## cold ivory. Additive film, so overlaps still brighten.
+const ORGAN_TINTS := {
+	"heart": Color(0.92, 0.16, 0.14),
+	"lung": Color(0.86, 0.46, 0.52),
+	"liver": Color(0.55, 0.12, 0.08),
+	"gut": Color(0.78, 0.56, 0.22),
+	"brain": Color(0.74, 0.58, 0.86),
+	"kidney": Color(0.52, 0.18, 0.40),
+}
+static var _grain: NoiseTexture2D
 
 var spin_rate := 0.55
 var clock := 0.0
@@ -119,9 +131,11 @@ func _density_of(mesh_instance: MeshInstance3D) -> Dictionary:
 	var hint := name_hint + " " + parent_hint
 	if hint.contains("bone") or hint.contains("skull") or hint.contains("rib") or hint.contains("spine"):
 		return {"tint": BONE_TINT, "alpha": 0.62}
-	for organ in ["heart", "lung", "liver", "gut", "brain", "kidney", "organ"]:
+	for organ in ORGAN_TINTS:
 		if hint.contains(organ):
-			return {"tint": ORGAN_TINT, "alpha": 0.40}
+			return {"tint": ORGAN_TINTS[organ], "alpha": 0.46}
+	if hint.contains("organ"):
+		return {"tint": ORGAN_TINT, "alpha": 0.40}
 	return {"tint": FLESH_TINT, "alpha": 0.13}
 
 
@@ -137,7 +151,31 @@ func _film(density: Dictionary) -> StandardMaterial3D:
 	material.disable_receive_shadows = true
 	var tint: Color = density["tint"]
 	material.albedo_color = Color(tint.r, tint.g, tint.b, float(density["alpha"]))
+	# Grit: the film is rough, not a clean render.
+	material.albedo_texture = _film_grain()
+	material.uv1_triplanar = true
+	material.uv1_scale = Vector3(6.0, 6.0, 6.0)
 	return material
+
+
+static func _film_grain() -> NoiseTexture2D:
+	if _grain == null:
+		_grain = NoiseTexture2D.new()
+		_grain.width = 256
+		_grain.height = 256
+		_grain.seamless = true
+		var noise := FastNoiseLite.new()
+		noise.noise_type = FastNoiseLite.TYPE_CELLULAR
+		noise.frequency = 0.045
+		noise.fractal_octaves = 3
+		_grain.noise = noise
+		# Mid-grey to white, so the grain darkens the film in pits rather than
+		# blacking it out.
+		var ramp := Gradient.new()
+		ramp.set_color(0, Color(0.35, 0.35, 0.35))
+		ramp.set_color(1, Color(1, 1, 1))
+		_grain.color_ramp = ramp
+	return _grain
 
 
 ## Turned on a table under the beam, and breathing. A specimen that only spins

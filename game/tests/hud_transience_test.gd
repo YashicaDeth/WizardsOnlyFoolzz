@@ -19,6 +19,7 @@ func check(condition: bool, label: String) -> void:
 func _ready() -> void:
 	var hud := GothicFieldHud.new()
 	add_child(hud)
+	check(not hud.location_crest_enabled, "the old centred location banner stays out of field play")
 
 	# --- the location crest announces once, then clears on its own ---------
 	check(hud.location_announce == 0.0, "the crest starts with nothing to announce")

@@ -68,6 +68,7 @@ func _ready() -> void:
 		events.append(str(event.get("type", "")))
 	check(events.count("sigil_defaced") == 1, "one defacement event, not zero and not two")
 	check(events.count("sigil_stolen") == 1, "one theft event, not zero and not two")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "object ownership, maker grudge and each public fact close one transaction")
 
 	print("CHAOS_SIGIL_THEFT_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

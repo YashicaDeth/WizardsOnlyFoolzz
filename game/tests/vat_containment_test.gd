@@ -30,13 +30,15 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	var tree := get_tree()
+	# The root is still adding this test during _ready; add_child would fail.
+	await tree.process_frame
 	var scene: Node = load("res://vat_chamber.tscn").instantiate()
 	tree.root.add_child(scene)
 	tree.current_scene = scene
 	for _settle in 60:
 		await tree.process_frame
 
-	var aisle: float = scene.get("AISLE_LENGTH") if scene.get("AISLE_LENGTH") != null else 34.0
+	var aisle: float = scene.get("AISLE_LENGTH") if scene.get("AISLE_LENGTH") != null else 22.0
 	var escaped := 0
 	for x: float in SAMPLES:
 		var probe := CharacterBody3D.new()

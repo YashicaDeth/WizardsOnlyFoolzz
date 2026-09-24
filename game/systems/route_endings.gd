@@ -58,8 +58,10 @@ static func check(subject_id: String = "player") -> String:
 
 
 static func _record(subject_id: String, ending: String, alignment: float) -> String:
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject(subject_id, {"route_ending_recorded": true, "route_ending": ending})
 	WorldHistory.record_event("route_ending_reached", {"subject_id": subject_id, "ending": ending, "alignment": alignment})
+	WorldHistory.commit_ledger_batch()
 	return ending
 
 

@@ -33,9 +33,12 @@ var splash_glass_layer: CanvasLayer
 var splash_layer: CanvasLayer
 var branch_plate: Control
 var graphics_presets := ["ULTRA", "HIGH", "PERFORMANCE"]
-var graphics_index := 0
-var render_scales := [1.0, 1.25, 1.5, 0.8]
-var render_scale_index := 0
+var graphics_index := 2
+# Resolution is a recovery lever, not a hidden supersampling benchmark. The old
+# 125/150% choices rendered up to 2.25x the window pixels and could combine with
+# 4x MSAA; one accidental click was enough to recreate the reported 13 FPS.
+var render_scales := [0.67, 0.75, 0.9, 1.0]
+var render_scale_index := 1
 var color_modes := ["CELLOUTZ COPPER", "SALVAGE TEAL", "NIGHT BLOOD"]
 var color_index := 0
 var gore_modes := ["FULL", "REDUCED", "OFF"]
@@ -60,8 +63,11 @@ var menu_departing := false
 
 
 func _ready() -> void:
+	# Start on the safe measured preset. This also makes the button truthful:
+	# previously it said ULTRA while WorldLook silently began on HIGH.
+	_apply_graphics_preset(graphics_presets[graphics_index])
 	_build_country_town()
-	$HUD/Play.pressed.connect(_open_continue_runs)
+	$HUD/Play.pressed.connect(_start_demo)
 	$HUD/Settings.pressed.connect(_open_settings)
 	$HUD/Quit.pressed.connect(get_tree().quit)
 	$HUD/SettingsPanel/VBox/Back.pressed.connect(_close_settings)
@@ -79,6 +85,9 @@ func _ready() -> void:
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.mouse_entered.connect(_focus_button.bind(button))
 		button.mouse_exited.connect(_unfocus_button.bind(button))
+	# Y2.1. One door, and it says what it does. "PLAY" is a verb nobody uses
+	# out loud about a game they are about to start.
+	$HUD/Play.text = "START GAME"
 	_build_gore_setting()
 	_build_run_doors()
 	_build_front_door()
@@ -204,47 +213,38 @@ func _play_title_sequence() -> void:
 ## everything below it moves down by exactly one row height.
 func _build_run_doors() -> void:
 	var play: Button = $HUD/Play
-	play.text = "PLAY // SURVIVING WORLDS"
+	# The front door is the playable demo, not a pile of equally-weighted
+	# development routes.  Make the thing Greg can actually start impossible to
+	# miss, then show the larger game honestly as a locked promise.
+	play.text = "DEMO // THE BEST HALF HOUR"
+	play.add_theme_font_size_override("font_size", 30)
 	var row: float = play.offset_bottom - play.offset_top + 8.0
 	for button: Button in [$HUD/Settings, $HUD/Quit, $HUD/CellOutzSite]:
-		button.offset_top += row * 3.0
-		button.offset_bottom += row * 3.0
-	var demo := play.duplicate(0) as Button
-	demo.name = "Demo"
-	demo.text = "DEMO // THE BEST HALF HOUR"
-	demo.offset_top = play.offset_top + row
-	demo.offset_bottom = play.offset_bottom + row
-	demo.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	$HUD.add_child(demo)
-	demo.pressed.connect(_start_demo)
-	demo.mouse_entered.connect(_focus_button.bind(demo))
-	demo.mouse_exited.connect(_unfocus_button.bind(demo))
-	menu_buttons.append(demo)
-	var new_game := play.duplicate(0) as Button
-	new_game.name = "NewGame"
-	new_game.text = "NEW GAME  //  SPLIT THE WORLD"
-	new_game.offset_top = play.offset_top + row * 2.0
-	new_game.offset_bottom = play.offset_bottom + row * 2.0
-	new_game.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	$HUD.add_child(new_game)
-	new_game.pressed.connect(_open_new_game)
-	new_game.mouse_entered.connect(_focus_button.bind(new_game))
-	new_game.mouse_exited.connect(_unfocus_button.bind(new_game))
-	menu_buttons.append(new_game)
-	# Flags cleared on purpose: `duplicate()` copies signal connections by
-	# default, and a copy of Play that is still wired to `_start_game` would send
-	# anyone who pressed it to the decanting floor instead.
+		button.offset_top += row * 2.0
+		button.offset_bottom += row * 2.0
+	var full_game := play.duplicate(0) as Button
+	full_game.name = "FullGame"
+	full_game.text = "FULL GAME  //  LOCKED"
+	full_game.offset_top = play.offset_top + row
+	full_game.offset_bottom = play.offset_bottom + row
+	full_game.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	full_game.disabled = true
+	full_game.focus_mode = Control.FOCUS_NONE
+	full_game.modulate = Color(1, 1, 1, 0.42)
+	$HUD.add_child(full_game)
+	# This duplicate intentionally has no route: the full game does not pretend
+	# to be playable before its real opening and world loop are ready.
 	var sandbox := play.duplicate(0) as Button
-	sandbox.name = "Sandbox"
-	sandbox.text = "GORE SANDBOX"
-	sandbox.offset_top = play.offset_top + row * 3.0
-	sandbox.offset_bottom = play.offset_bottom + row * 3.0
+	sandbox.name = "PsychofreniaSandbox"
+	sandbox.text = "PSYCHOFRENIA SANDBOX"
+	sandbox.offset_top = play.offset_top + row * 2.0
+	sandbox.offset_bottom = play.offset_bottom + row * 2.0
 	sandbox.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	$HUD.add_child(sandbox)
 	sandbox.pressed.connect(_open_gore_sandbox)
 	sandbox.mouse_entered.connect(_focus_button.bind(sandbox))
 	sandbox.mouse_exited.connect(_unfocus_button.bind(sandbox))
-	menu_buttons.append(sandbox)
+	menu_buttons = [play, full_game, sandbox, $HUD/Settings, $HUD/Quit, $HUD/CellOutzSite]
 	# The column is set in the house type from here on. The buttons keep hit
 	# testing, focus, the tween and every signal; they just stop drawing their
 	# own text in the engine's fallback UI font.
@@ -298,7 +298,11 @@ func _start_demo() -> void:
 	if menu_departing:
 		return
 	WorldHistory.begin_demo()
-	_start_game()
+	# DEMO begins at the playable 3D vat/examination.  The old brand splash and
+	# decanting prelude are not another barrier between the player and character
+	# creation.
+	if _prepare_menu_departure():
+		_travel_from_menu("res://vat_chamber.tscn", "the growing floor // decanting")
 
 
 func _open_branch_picker(creating: bool) -> void:
@@ -367,6 +371,91 @@ func _choose_branch(slot: int) -> void:
 			return
 	branch_panel.hide()
 	_start_game()
+
+
+## Y2.2/Y2.3. Two doors that are visible and do not open.
+##
+## Greg: *"a multiplayer and online option should be there but not be selectable
+## and have a message saying soon 'if you have ideas email me in settings'."*
+##
+## The instinct is to leave them out until they work. That is wrong for the same
+## reason a blank save slot is wrong: **a greyed line that says SOON is a
+## promise, and a missing line is nothing at all.** Somebody looking at this menu
+## deciding whether to care learns more from two doors marked shut than from a
+## menu that never mentions them.
+##
+## And a door you cannot open is only worth showing if it tells you where to
+## push instead, which is the whole reason Y4 exists.
+func _build_locked_doors() -> void:
+	var play: Button = $HUD/Play
+	var row: float = play.offset_bottom - play.offset_top + 8.0
+	var sandbox: Button = $HUD/Sandbox
+	for button: Button in [$HUD/Settings, $HUD/Quit, $HUD/CellOutzSite]:
+		button.offset_top += row * 2.0
+		button.offset_bottom += row * 2.0
+
+	var step := 1
+	for locked: String in ["MULTIPLAYER", "ONLINE"]:
+		var door := play.duplicate(0) as Button
+		door.name = locked.capitalize()
+		door.text = "%s   //   SOON" % locked
+		door.offset_top = sandbox.offset_top + row * float(step)
+		door.offset_bottom = sandbox.offset_bottom + row * float(step)
+		door.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		# Not selectable, and it looks it. `disabled` also takes it out of the
+		# focus order, so a controller cannot land on a dead row.
+		door.disabled = true
+		door.focus_mode = Control.FOCUS_NONE
+		door.modulate = Color(1, 1, 1, 0.42)
+		$HUD.add_child(door)
+		step += 1
+
+	# Where to push instead. One line, under both, rather than a tooltip nobody
+	# hovers on a row they cannot click.
+	var note := Label.new()
+	note.name = "SoonNote"
+	note.text = "not yet — if you have ideas, settings ▸ support"
+	note.modulate = Color(1, 1, 1, 0.34)
+	note.offset_left = play.offset_left + 4.0
+	note.offset_top = sandbox.offset_bottom + row * 2.0 - 6.0
+	note.offset_right = note.offset_left + 520.0
+	note.offset_bottom = note.offset_top + 24.0
+	$HUD.add_child(note)
+
+
+## Y4, at the point the player actually reaches it. `support_mail.gd` does the
+## work; this is the row in settings that calls it and the line that says what
+## happened, because Y4.3 is that it never silently fails.
+func _build_support_row() -> void:
+	var box: VBoxContainer = $HUD/SettingsPanel/VBox
+	var back: Button = $HUD/SettingsPanel/VBox/Back
+
+	var support := Button.new()
+	support.name = "Support"
+	support.text = "SUPPORT  /  REPORT A BUG"
+	box.add_child(support)
+	box.move_child(support, back.get_index())
+
+	var result := Label.new()
+	result.name = "SupportResult"
+	result.text = SupportMail.ADDRESS
+	result.modulate = Color(1, 1, 1, 0.45)
+	result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(result)
+	box.move_child(result, back.get_index())
+
+	support.pressed.connect(func() -> void:
+		# The seed goes with it, because Y4.2 is that the player should not have
+		# to write down what the game already knows.
+		var run: Dictionary = WorldHistory.subject("player")
+		var sent: Dictionary = SupportMail.send("support", "", {
+			"run_salt": str(run.get("run_salt", "")),
+			"violence": gore_modes[gore_index],
+		})
+		if bool(sent.get("sent", false)):
+			result.text = "opening your mail app — %s" % SupportMail.ADDRESS
+		else:
+			result.text = "no mail app answered. copy this: %s" % SupportMail.ADDRESS)
 
 ## The front end is a scene with junk falling through it, and the first thing
 ## the player is asked is what they are willing to look at. The violence tiers
@@ -595,17 +684,24 @@ func _cycle_graphics() -> void:
 	# sandbox alike and the three of them stop disagreeing.
 	graphics_index = (graphics_index + 1) % graphics_presets.size()
 	var preset: String = graphics_presets[graphics_index]
+	_apply_graphics_preset(preset)
+
+
+func _apply_graphics_preset(preset: String) -> void:
 	WorldLook.set_quality_name(preset)
 	match preset:
 		"ULTRA":
+			render_scale_index = 3
 			get_viewport().scaling_3d_scale = 1.0
 			get_viewport().msaa_3d = Viewport.MSAA_4X
 			get_viewport().use_taa = true
 		"HIGH":
+			render_scale_index = 2
 			get_viewport().scaling_3d_scale = 0.9
 			get_viewport().msaa_3d = Viewport.MSAA_2X
 			get_viewport().use_taa = true
 		_:
+			render_scale_index = 1
 			get_viewport().scaling_3d_scale = 0.75
 			get_viewport().msaa_3d = Viewport.MSAA_DISABLED
 			get_viewport().use_taa = false
@@ -613,7 +709,12 @@ func _cycle_graphics() -> void:
 	# immediately rather than only after the next scene load.
 	if menu_environment != null:
 		WorldLook.apply_quality(menu_environment, WorldLook.PRESETS.get("front_door", {}))
-	$HUD/SettingsPanel/VBox/Graphics.text = "GRAPHICS: %s" % preset
+	var button := get_node_or_null("HUD/SettingsPanel/VBox/Graphics") as Button
+	if button != null:
+		button.text = "GRAPHICS: %s" % preset
+	var resolution_button := get_node_or_null("HUD/SettingsPanel/VBox/Resolution") as Button
+	if resolution_button != null:
+		resolution_button.text = "RENDER SCALE: %d%%" % roundi(get_viewport().scaling_3d_scale * 100.0)
 
 
 func _cycle_resolution() -> void:

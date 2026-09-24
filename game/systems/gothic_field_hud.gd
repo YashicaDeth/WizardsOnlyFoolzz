@@ -1,6 +1,7 @@
 extends Control
 
 const CellOutzType := preload("res://systems/celloutz_type.gd")
+const PULMONARY_DIAGNOSTIC := preload("res://systems/pulmonary_diagnostic.gd")
 
 const BONE := Color("ead4ad")
 const BLOOD := Color("a81716")
@@ -8,7 +9,33 @@ const COPPER := Color("dc5827")
 const TEAL := Color("278f87")
 const VOID := Color(0.018, 0.008, 0.012, 0.88)
 var health := 100.0
+var blood := 1.0
 var stamina := 100.0
+var pain := 0.0
+var consciousness := 100.0
+var smoking := false
+var lung_inhaling := false
+var lung_fill := 0.0
+var lung_cough := 0.0
+var lung_health := 1.0
+var lung_stain := 0.0
+var lung_linger := 0.0
+var lung_recovery_flash := 0.0
+var _lung_state_initialised := false
+var _lung_fill_target := 0.0
+var _lung_cough_target := 0.0
+var _lung_health_target := 1.0
+var _lung_stain_target := 0.0
+var _lung_fill_visual := 0.0
+var _lung_cough_visual := 0.0
+var _lung_health_visual := 1.0
+var _lung_stain_visual := 0.0
+var magick_unlocked := false
+var magick := 0.0
+var world_stamp := ""
+var air := 0.0
+var minimap_texture: Texture2D
+var minimap_heading := 0.0
 var rival_status := "DORMANT"
 ## Whoever the captain is this save. Set from the record by whoever drives
 ## this panel — the name is generated per save now (`cast_names.gd`), so a
@@ -18,6 +45,10 @@ var location := "LIMBO // ASHBLOOM EXPANSE"
 var menu_open := false
 var menu_mode := ""
 var weapon := {}
+## I4.3v2/I10.9. Damage belongs to the instrument operated by that part of the
+## body: head/portrait, torso/anatomy, arms/held-object well, legs/navigation.
+## Values are loss ratios, not a second health model.
+var wound_regions := {"head": 0.0, "torso": 0.0, "arms": 0.0, "legs": 0.0}
 var elapsed := 0.0
 ## M1.6. The location crest was a permanent banner for information that only
 ## actually matters the moment it changes — I0.6 already killed the same
@@ -28,10 +59,23 @@ var elapsed := 0.0
 const LOCATION_ANNOUNCE_TIME := 4.0
 var _location_seen := ""
 var location_announce := 0.0
+## Dormant rather than deleted: a future authored transition can deliberately
+## call the arrival crest back, but ordinary field play leaves the top clear.
+var location_crest_enabled := false
+var pulmonary_diagnostic: Control
+## Brain, column, hanging CRTs and pocket rack. Replaces the mask-and-ampoules
+## corner; null falls back to `_draw_player_state`.
+var nerve_rig: NerveRig
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pulmonary_diagnostic = PULMONARY_DIAGNOSTIC.new()
+	pulmonary_diagnostic.name = "PulmonaryDiagnostic"
+	add_child(pulmonary_diagnostic)
+	nerve_rig = NerveRig.new()
+	nerve_rig.name = "NerveRig"
+	add_child(nerve_rig)
 
 
 ## The space between a key and the verb it performs. `draw_condensed` returns
@@ -51,11 +95,52 @@ var interact_verb := "act"
 ## plainly stopped needing it — the same rule the derby's dashboard placard
 ## uses — rather than after a timer somebody chose.
 var familiar := 0.0
+## A newly available verb gets one short readout. This is deliberately derived
+## from the same offers as the lower strip: it teaches a change in the live
+## state without adding another permanent objective panel.
+var affordance_notice := ""
+var affordance_notice_time := 0.0
+var _affordances_seen := false
+var _affordance_signature := ""
 
 
 func set_state(values: Dictionary) -> void:
 	health = float(values.get("health", health))
+	blood = clampf(float(values.get("blood", blood)), 0.0, 1.0)
 	stamina = float(values.get("stamina", stamina))
+	pain = clampf(float(values.get("pain", pain)), 0.0, 100.0)
+	consciousness = clampf(float(values.get("consciousness", consciousness)), 0.0, 100.0)
+	smoking = bool(values.get("smoking", smoking))
+	lung_inhaling = bool(values.get("lung_inhaling", lung_inhaling))
+	_lung_fill_target = clampf(float(values.get("lung_fill", _lung_fill_target)), 0.0, 1.0)
+	_lung_cough_target = clampf(float(values.get("lung_cough", _lung_cough_target)), 0.0, 1.0)
+	_lung_health_target = clampf(float(values.get("lung_health", _lung_health_target)), 0.0, 1.0)
+	var next_stain := clampf(float(values.get("lung_stain", _lung_stain_target)), 0.0, 1.0)
+	if _lung_state_initialised and next_stain < _lung_stain_target - 0.002:
+		# A replacement/cleaning event reads as fresh tissue arriving, rather than
+		# the silhouette silently changing colour between frames.
+		lung_recovery_flash = 1.0
+	_lung_stain_target = next_stain
+	# Public state remains the body's exact current reading. Only the drawn organ
+	# lags behind; gameplay, mood and tests must never wait on presentation.
+	lung_fill = _lung_fill_target
+	lung_cough = _lung_cough_target
+	lung_health = _lung_health_target
+	lung_stain = _lung_stain_target
+	if not _lung_state_initialised:
+		_lung_fill_visual = lung_fill
+		_lung_cough_visual = lung_cough
+		_lung_health_visual = lung_health
+		_lung_stain_visual = lung_stain
+		_lung_state_initialised = true
+	magick_unlocked = bool(values.get("magick_unlocked", magick_unlocked))
+	magick = clampf(float(values.get("magick", magick)), 0.0, 1.0)
+	world_stamp = str(values.get("world_stamp", world_stamp))
+	air = clampf(float(values.get("air", air)), 0.0, 1.0)
+	minimap_texture = values.get("minimap_texture", minimap_texture) as Texture2D
+	minimap_heading = float(values.get("minimap_heading", minimap_heading))
+	if smoking or lung_fill > 0.01 or lung_cough > 0.01:
+		lung_linger = 3.2
 	rival_status = str(values.get("rival_status", rival_status)).to_upper()
 	rival_name = str(values.get("rival_name", rival_name))
 	location = str(values.get("location", location))
@@ -65,21 +150,59 @@ func set_state(values: Dictionary) -> void:
 	menu_open = bool(values.get("menu_open", menu_open))
 	menu_mode = str(values.get("menu_mode", menu_mode)).to_upper()
 	weapon = values.get("weapon", weapon)
+	var incoming_regions: Dictionary = values.get("wound_regions", wound_regions)
+	for region in wound_regions:
+		wound_regions[region] = clampf(float(incoming_regions.get(region, wound_regions[region])), 0.0, 1.0)
+	# A torso wound makes the body diagnostic relevant even when no smoke is
+	# currently moving through it. It clears again on the same contextual timer.
+	if region_damage("torso") > 0.08:
+		lung_linger = maxf(lung_linger, 0.35)
 	bare = bool(values.get("bare", bare))
 	firearm = str((weapon as Dictionary).get("kind", "")) == "firearm"
 	can_dodge = bool(values.get("can_dodge", can_dodge))
 	near_something = bool(values.get("near_something", near_something))
 	interact_verb = str(values.get("interact_verb", interact_verb))
 	lock_screen = values.get("lock_screen", lock_screen)
+	_refresh_affordance_notice()
+	if pulmonary_diagnostic != null:
+		pulmonary_diagnostic.set_state(values)
+	if nerve_rig != null:
+		var rig_values := values.duplicate()
+		rig_values["mood"] = mood_name()
+		nerve_rig.set_state(rig_values)
+
+
+func rotate_pulmonary(relative: Vector2) -> void:
+	if pulmonary_diagnostic != null:
+		pulmonary_diagnostic.rotate_by(relative)
+
+
+func zoom_pulmonary(factor: float) -> void:
+	if pulmonary_diagnostic != null:
+		pulmonary_diagnostic.zoom_by(factor)
+
+
+func pulmonary_state() -> Dictionary:
+	return pulmonary_diagnostic.diagnostic_state() if pulmonary_diagnostic != null else {}
 
 
 func _process(delta: float) -> void:
 	elapsed += delta
+	# The organ view has inertia of its own: inhalation fills quickly, exhalation
+	# clears slowly, a cough snaps on and decays, and saved tissue state changes
+	# without one-frame colour pops.
+	_lung_fill_visual = move_toward(_lung_fill_visual, _lung_fill_target, delta * (2.8 if _lung_fill_target > _lung_fill_visual else 0.92))
+	_lung_cough_visual = move_toward(_lung_cough_visual, _lung_cough_target, delta * (5.5 if _lung_cough_target > _lung_cough_visual else 2.2))
+	_lung_health_visual = move_toward(_lung_health_visual, _lung_health_target, delta * 0.65)
+	_lung_stain_visual = move_toward(_lung_stain_visual, _lung_stain_target, delta * 0.38)
+	lung_recovery_flash = maxf(0.0, lung_recovery_flash - delta * 0.7)
 	# Familiarity is earned by playing, not by waiting: it only climbs while the
 	# player is actually doing the things the strip is describing.
 	if not menu_open:
 		familiar = minf(1.0, familiar + delta * 0.0055)
 	location_announce = maxf(0.0, location_announce - delta)
+	lung_linger = maxf(0.0, lung_linger - delta)
+	affordance_notice_time = maxf(0.0, affordance_notice_time - delta)
 	queue_redraw()
 
 
@@ -91,13 +214,105 @@ func _draw() -> void:
 		if menu_mode not in ["MAP", "TREE", "ARTWORK"]:
 			_draw_full_archive_frame()
 		return
-	_draw_location_crest()
+	if location_crest_enabled:
+		_draw_location_crest()
+	_draw_world_condition()
 	_draw_hunt_thread()
-	_draw_weapon()
-	_draw_regal_vitals()
+	if nerve_rig == null:
+		_draw_player_state()
+	_draw_minimap()
+	_draw_lung_xray()
 	_draw_breath()
+	_draw_critical_condition()
+	_draw_affordance_notice()
 	_draw_lock_reticle()
 	_draw_controls()
+	_draw_screen_frame()
+
+
+func _draw_minimap() -> void:
+	if minimap_texture == null:
+		return
+	var leg_damage := region_damage("legs")
+	var hold := Vector2(0, round(sin(elapsed * 5.0) * leg_damage * 4.0))
+	var rect := Rect2(Vector2(24, size.y - 190) + hold, Vector2(202, 146))
+	var screen := rect.grow(-8.0)
+	# The phone's satellite aperture: angular, scarred and compact. The image is
+	# the live region camera, not a decorative radar generated by this HUD.
+	var plate := PackedVector2Array([
+		rect.position + Vector2(13, 0), rect.position + Vector2(rect.size.x - 5, 0),
+		rect.position + Vector2(rect.size.x, 19), rect.end - Vector2(0, 12),
+		rect.end - Vector2(17, 0), rect.position + Vector2(5, rect.size.y),
+		rect.position + Vector2(0, rect.size.y - 20), rect.position + Vector2(0, 12),
+	])
+	draw_colored_polygon(plate, Color(0.018, 0.012, 0.014, 0.88))
+	draw_polyline(plate, TEAL * Color(1, 1, 1, 0.55), 1.5)
+	draw_texture_rect(minimap_texture, screen, false, Color(0.72, 0.82, 0.68, 0.78))
+	# Dirty glass and a moving acquisition line keep it in the same Black Mirror
+	# family as the full map without hiding the actual ground beneath it.
+	for line in 5:
+		var y := screen.position.y + fposmod(float(line * 31) + elapsed * 8.0, screen.size.y)
+		draw_line(Vector2(screen.position.x, y), Vector2(screen.end.x, y), Color(0.08, 0.02, 0.02, 0.16), 1.0)
+	var centre := screen.get_center()
+	var heading := Vector2(sin(minimap_heading), -cos(minimap_heading))
+	var across := heading.orthogonal()
+	var marker := PackedVector2Array([centre + heading * 10, centre - heading * 6 + across * 5, centre - heading * 3, centre - heading * 6 - across * 5])
+	draw_colored_polygon(marker, COPPER)
+	draw_arc(centre, 19.0 + sin(elapsed * 1.5) * 2.0, 0, TAU, 28, BONE * Color(1, 1, 1, 0.28), 1.0)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(12, rect.size.y + 4), "SAT // LOCAL ACQUISITION", 8.0, TEAL, 0.58)
+	if leg_damage > 0.08:
+		# The map loses horizontal registration as the legs feeding its dead
+		# reckoning fail. It is still usable; the missing bands are local to it.
+		for band in 2:
+			var y := screen.position.y + fposmod(17.0 + band * 61.0 + elapsed * (3.0 + band), screen.size.y - 7.0)
+			draw_rect(Rect2(screen.position.x, y, screen.size.x * leg_damage, 3.0 + leg_damage * 3.0), Color(0.01, 0.004, 0.006, 0.82))
+		_draw_wound_crack(rect.position + Vector2(16, 18), Vector2(46, 30), leg_damage)
+
+
+## A screen-edge object, not four rectangular panels. Dark organic cartouches
+## take the corners while the bone/copper rules remain thin enough that the
+## world still reaches the edge. The separate FieldLens bows the world beneath;
+## this frame stays sharp with the rest of the usable interface.
+func _draw_screen_frame() -> void:
+	var pulse := 1.0 + sin(elapsed * 0.8) * 0.04
+	# A quiet smoked-glass lip. The corners carry the visual weight.
+	draw_rect(Rect2(0, 0, size.x, 11), Color(0.025, 0.008, 0.012, 0.68))
+	draw_rect(Rect2(0, size.y - 11, size.x, 11), Color(0.025, 0.008, 0.012, 0.72))
+	draw_rect(Rect2(0, 0, 10, size.y), Color(0.025, 0.008, 0.012, 0.70))
+	draw_rect(Rect2(size.x - 10, 0, 10, size.y), Color(0.025, 0.008, 0.012, 0.70))
+	for sx in [-1.0, 1.0]:
+		for sy in [-1.0, 1.0]:
+			var corner := Vector2(0.0 if sx > 0.0 else size.x, 0.0 if sy > 0.0 else size.y)
+			var mass := PackedVector2Array([
+				corner,
+				corner + Vector2(108 * sx, 0),
+				corner + Vector2(78 * sx, 12 * sy),
+				corner + Vector2(45 * sx, 19 * sy),
+				corner + Vector2(19 * sx, 45 * sy),
+				corner + Vector2(12 * sx, 78 * sy),
+				corner + Vector2(0, 108 * sy),
+			])
+			draw_colored_polygon(mass, Color(0.055, 0.008, 0.016, 0.86))
+			draw_polyline(mass, COPPER * Color(1, 1, 1, 0.48), 1.4)
+			var carving := PackedVector2Array([
+				corner + Vector2(16 * sx, 83 * sy),
+				corner + Vector2(23 * sx, 52 * sy),
+				corner + Vector2(39 * sx, 34 * sy),
+				corner + Vector2(59 * sx, 23 * sy),
+				corner + Vector2(86 * sx, 16 * sy),
+			])
+			draw_polyline(carving, BONE * Color(1, 1, 1, 0.38), 1.5)
+			# Mirrored lobe and thorn: viscera made exact enough to read as regalia.
+			var jewel := corner + Vector2(31 * sx, 31 * sy)
+			draw_circle(jewel, 7.0 * pulse, BLOOD * Color(1, 1, 1, 0.62))
+			draw_arc(jewel, 13.0 * pulse, 0.0, TAU, 20, BONE * Color(1, 1, 1, 0.22), 1.0)
+			draw_line(corner + Vector2(49 * sx, 18 * sy), corner + Vector2(65 * sx, 36 * sy), COPPER * Color(1, 1, 1, 0.36), 1.2)
+	# Rails stop before the cartouches and bow inward by a few pixels, echoing
+	# the fisheye without bending any text.
+	var top_rail := PackedVector2Array([Vector2(106, 12), Vector2(size.x * 0.5, 17), Vector2(size.x - 106, 12)])
+	var bottom_rail := PackedVector2Array([Vector2(106, size.y - 12), Vector2(size.x * 0.5, size.y - 17), Vector2(size.x - 106, size.y - 12)])
+	draw_polyline(top_rail, BONE * Color(1, 1, 1, 0.24), 1.2)
+	draw_polyline(bottom_rail, BONE * Color(1, 1, 1, 0.24), 1.2)
 
 
 ## M1.6. This used to be its own plate in the top-left corner — a second
@@ -149,6 +364,198 @@ func _draw_regal_vitals() -> void:
 		draw_circle(heart, 13.0 + beat * 4.0, BLOOD * Color(1, 1, 1, 0.14))
 
 
+## The player owns the top-right corner. A small expressive mask reports the
+## body state without importing somebody else's portrait-widget design, and
+## the reservoirs underneath are fluids rather than rectangular progress bars:
+## blood, filthy stamina water, and magick only after a ritual has made it real.
+func _draw_player_state() -> void:
+	var head_damage := region_damage("head")
+	var head_slip := Vector2(round(sin(elapsed * 7.0) * head_damage * 4.0), round(cos(elapsed * 5.3) * head_damage * 2.0))
+	var portrait := Vector2(size.x - 74.0, 68.0) + head_slip
+	var mood := mood_name()
+	var mood_tint := TEAL
+	if mood in ["HURTING", "AGONY", "CHOKING"]:
+		mood_tint = BLOOD
+	elif mood in ["WINDED", "FADING"]:
+		mood_tint = COPPER
+	# An asymmetrical cracked reliquary, not a clean app card.
+	var frame := PackedVector2Array([
+		portrait + Vector2(-43, -37), portrait + Vector2(31, -42),
+		portrait + Vector2(44, -18), portrait + Vector2(39, 34),
+		portrait + Vector2(10, 45), portrait + Vector2(-39, 31),
+		portrait + Vector2(-47, -7), portrait + Vector2(-43, -37),
+	])
+	draw_colored_polygon(frame, VOID)
+	draw_polyline(frame, mood_tint * Color(1, 1, 1, 0.72), 2.0)
+	# The issued jester hood frames an actual changing face.
+	draw_circle(portrait, 25.0, Color("26131d"))
+	draw_circle(portrait + Vector2(-18, -23), 12.0, Color("651d2a"))
+	draw_circle(portrait + Vector2(18, -23), 12.0, Color("c6ae7a"))
+	var droop := 5.0 if mood in ["HURTING", "AGONY", "FADING"] else (-2.0 if mood == "ALTERED" else 1.0)
+	var eye_open := 2.0 if consciousness > 35.0 else 0.5
+	for side in [-1.0, 1.0]:
+		var eye := portrait + Vector2(side * 9.0, -4.0 + droop * 0.25)
+		draw_line(eye + Vector2(-5, -eye_open), eye + Vector2(5, eye_open), BONE, 1.6)
+		draw_circle(eye + Vector2(side * 1.5, 0), 1.8, mood_tint)
+	var mouth_curve := -5.0 if mood == "STEADY" else (8.0 if mood in ["HURTING", "AGONY", "CHOKING"] else 2.0)
+	draw_arc(portrait + Vector2(0, 11 - mouth_curve * 0.25), 9.0, 0.25 if mouth_curve > 0 else PI + 0.25, PI - 0.25 if mouth_curve > 0 else TAU - 0.25, 12, BONE, 1.5)
+	var mood_width := CellOutzType.width_condensed(mood, 10.0, 0.9)
+	CellOutzType.draw_condensed(self, portrait + Vector2(-mood_width - 55, -13), mood, 10.0, mood_tint, 0.9)
+	CellOutzType.draw_condensed(self, portrait + Vector2(-mood_width - 55, 4), "THE HUNTER", 8.0, BONE * Color(1, 1, 1, 0.52), 0.7)
+
+	# The reservoirs hang from the portrait like medical ampoules. Their vertical
+	# orientation keeps every player-state read in one narrow silhouette and
+	# makes loss literal: the fluid level falls away from the face above it.
+	var vessel_y := 119.0
+	_draw_vertical_fluid_vessel(Rect2(portrait.x - 36.0, vessel_y, 20, 112), blood, Color("7f080b"), "BLD")
+	# Low stamina is not clean empty glass: sediment takes over as the water is
+	# worked, so the remaining fluid looks increasingly brown and foul.
+	var stamina_ratio := clampf(stamina / 100.0, 0.0, 1.0)
+	var foul_water := Color("70572b").lerp(Color("a58a45"), stamina_ratio)
+	_draw_vertical_fluid_vessel(Rect2(portrait.x - 8.0, vessel_y, 20, 112), stamina_ratio, foul_water, "STA")
+	if magick_unlocked:
+		_draw_vertical_fluid_vessel(Rect2(portrait.x + 20.0, vessel_y, 20, 112), magick, Color("593f87"), "MAG")
+	if head_damage > 0.08:
+		# The face/readout loses registration with a head wound; it does not
+		# globally blur the map, lungs, or the world underneath.
+		var tear_y := portrait.y - 14.0 + fposmod(elapsed * 5.0, 34.0)
+		draw_rect(Rect2(portrait.x - 43.0, tear_y, 86.0 * head_damage, 3.0 + head_damage * 2.0), Color(0.01, 0.004, 0.008, 0.88))
+		_draw_wound_crack(portrait + Vector2(31, -34), Vector2(-36, 42), head_damage)
+
+
+func mood_name() -> String:
+	if lung_cough > 0.12:
+		return "CHOKING"
+	if consciousness < 28.0:
+		return "FADING"
+	if pain >= 72.0:
+		return "AGONY"
+	if pain >= 38.0 or health < 55.0:
+		return "HURTING"
+	if stamina < 22.0:
+		return "WINDED"
+	if magick_unlocked and magick > 0.52:
+		return "ALTERED"
+	return "STEADY"
+
+
+func _draw_vertical_fluid_vessel(rect: Rect2, ratio: float, fluid: Color, label: String) -> void:
+	var amount := clampf(ratio, 0.0, 1.0)
+	# Neck and suspension wire make this an object hanging from the portrait,
+	# not a progress bar turned ninety degrees.
+	var neck_x := rect.position.x + rect.size.x * 0.5
+	draw_line(Vector2(neck_x, rect.position.y - 8), Vector2(neck_x, rect.position.y), BONE * Color(1, 1, 1, 0.28), 1.2)
+	draw_rect(rect, Color(0.01, 0.008, 0.008, 0.76))
+	var inner := rect.grow(-2.0)
+	if amount > 0.001:
+		var filled_height := inner.size.y * amount
+		var surface_y := inner.end.y - filled_height
+		# Near empty, the old fixed-height wave could put one surface corner
+		# below the vessel floor. That turns this otherwise simple quad inside
+		# out and makes CanvasItem reject it every frame. Let the ripple grow
+		# with the available fluid depth so a drained ampoule remains valid.
+		var wave_limit := maxf(0.0, minf(1.1, filled_height * 0.45))
+		var wave := sin(elapsed * 2.2 + rect.position.x * 0.05) * wave_limit
+		var fluid_shape := PackedVector2Array([
+			Vector2(inner.position.x, surface_y + wave),
+			Vector2(inner.end.x, surface_y - wave), inner.end,
+			Vector2(inner.position.x, inner.end.y),
+		])
+		draw_colored_polygon(fluid_shape, fluid * Color(1, 1, 1, 0.82))
+		for sediment in 3:
+			var px := inner.position.x + 3.0 + fposmod(float(sediment * 7) + elapsed * (1.0 + sediment), maxf(inner.size.x - 6.0, 1.0))
+			draw_circle(Vector2(px, inner.end.y - 3.0 - float(sediment % 2) * 3.0), 1.2, Color(0.08, 0.04, 0.01, 0.46))
+	draw_rect(rect, BONE * Color(1, 1, 1, 0.34), false, 1.2)
+	draw_line(rect.position + Vector2(4, 7), rect.position + Vector2(4, rect.size.y - 7), Color(1, 1, 1, 0.08), 1.0)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(1, rect.size.y + 6), label, 7.0, BONE * Color(1, 1, 1, 0.66), 0.48)
+
+
+## The upper-left diagnostic answers the world/threat instrument above it while
+## leaving the lower-left satellite/radar position stable. A future held
+## inspection expands this quick silhouette into the actual 3D organ model.
+## For smoking, the rib window fills while inhaling, empties on exhale and
+## retains the stain stored on the real AnatomyComponent lungs.
+func _draw_lung_xray() -> void:
+	if lung_linger <= 0.0:
+		return
+	var alpha := minf(1.0, lung_linger * 1.4)
+	var visual_fill := _lung_fill_visual
+	var visual_cough := _lung_cough_visual
+	var visual_health := _lung_health_visual
+	var visual_stain := _lung_stain_visual
+	var centre := Vector2(126, 224)
+	var cough_jolt := Vector2(sin(elapsed * 35.0), cos(elapsed * 27.0) * 0.45) * visual_cough * 5.0
+	centre += cough_jolt
+	var breath_scale := 1.0 + sin(elapsed * (2.4 if lung_inhaling else 1.15)) * (0.018 + visual_fill * 0.018)
+	breath_scale -= visual_cough * (0.045 + absf(sin(elapsed * 22.0)) * 0.035)
+	# Broken X-ray aperture and a few ribs establish this as a body view without
+	# putting it in another literal box.
+	for rib in 5:
+		var rib_y := centre.y - 50 + rib * 23.0
+		draw_arc(Vector2(centre.x - 4, rib_y), 72.0 - rib * 4.0, PI * 0.10, PI * 0.90, 18, BONE * Color(1, 1, 1, 0.10 * alpha), 1.2)
+	var tissue := Color("a35b58").lerp(Color("171313"), visual_stain)
+	for side in [-1.0, 1.0]:
+		var lung_center := centre + Vector2(side * 32.0, 2.0)
+		var lung := PackedVector2Array([
+			lung_center + Vector2(-side * 3, -52) * breath_scale, lung_center + Vector2(side * 23, -40) * breath_scale,
+			lung_center + Vector2(side * 31, -8) * breath_scale, lung_center + Vector2(side * 25, 39) * breath_scale,
+			lung_center + Vector2(side * 7, 53) * breath_scale, lung_center + Vector2(-side * 9, 28) * breath_scale,
+			lung_center + Vector2(-side * 12, -18) * breath_scale, lung_center + Vector2(-side * 3, -52) * breath_scale,
+		])
+		# Four translucent depth shells and an offset hilum give the quick X-ray a
+		# volumetric read without inventing a second organ model or viewport.
+		for depth in range(4, 0, -1):
+			var shell := PackedVector2Array()
+			var shell_scale := 1.0 - float(depth) * 0.035
+			for point in lung:
+				shell.append(lung_center + (point - lung_center) * shell_scale + Vector2(-side * depth * 1.2, depth * 1.5))
+			draw_colored_polygon(shell, tissue.darkened(float(depth) * 0.06) * Color(1, 1, 1, 0.055 * alpha))
+		draw_colored_polygon(lung, tissue * Color(1, 1, 1, (0.34 + visual_fill * 0.22) * alpha))
+		draw_polyline(lung, (TEAL if visual_health > 0.45 else BLOOD) * Color(1, 1, 1, 0.72 * alpha), 1.5)
+		var hilum := lung_center + Vector2(-side * 7, -7)
+		draw_circle(hilum, 9.0, Color(0.10, 0.22, 0.20, 0.20 * alpha))
+		for branch in 3:
+			var branch_end := lung_center + Vector2(side * (12 + branch * 5), -20 + branch * 19) * breath_scale
+			draw_line(hilum, branch_end, BONE * Color(1, 1, 1, 0.18 * alpha), 1.2)
+		# Smoke curls remain inside the approximate lobe rather than becoming a
+		# generic particle cloud behind it.
+		for wisp in int(round(visual_fill * 7.0)):
+			var phase: float = elapsed * (0.8 + float(wisp) * 0.07) + float(wisp) * 1.7 + side
+			var at := lung_center + Vector2(side * (5 + sin(phase) * 13), 34 - fposmod(phase * 18.0, 70.0))
+			draw_arc(at, 4.0 + float(wisp % 3), phase, phase + PI * 1.35, 8, Color(0.70, 0.74, 0.68, 0.14 * alpha), 1.4)
+		if lung_recovery_flash > 0.0:
+			draw_arc(lung_center, 47.0 * breath_scale, -PI * 0.78, PI * 0.78, 24, TEAL * Color(1, 1, 1, lung_recovery_flash * 0.38 * alpha), 2.0)
+	draw_line(centre + Vector2(0, -72), centre + Vector2(0, 20), BONE * Color(1, 1, 1, 0.40 * alpha), 4.0)
+	CellOutzType.draw_condensed(self, centre + Vector2(-78, 67), "PULMONARY X-RAY // %s" % ("COUGH" if lung_cough > 0.1 else "DRAW" if lung_inhaling else "CLEARING"), 9.0, (BLOOD if lung_cough > 0.1 else TEAL) * Color(1, 1, 1, alpha), 0.75)
+	var torso_damage := region_damage("torso")
+	if torso_damage > 0.08:
+		var tear_y := centre.y - 36.0 + fposmod(elapsed * 4.0, 76.0)
+		draw_rect(Rect2(centre.x - 79.0, tear_y, 158.0 * torso_damage, 3.0 + torso_damage * 3.0), Color(0.018, 0.004, 0.006, 0.86 * alpha))
+		_draw_wound_crack(centre + Vector2(-67, -52), Vector2(48, 63), torso_damage * alpha)
+
+
+func region_damage(region: String) -> float:
+	return clampf(float(wound_regions.get(region, 0.0)), 0.0, 1.0)
+
+
+func _draw_wound_crack(origin: Vector2, reach: Vector2, amount: float) -> void:
+	var strength := clampf(amount, 0.0, 1.0)
+	if strength <= 0.0:
+		return
+	var elbow := origin + Vector2(reach.x * 0.42, reach.y * 0.36)
+	var end := origin + reach * (0.42 + strength * 0.58)
+	draw_polyline(PackedVector2Array([origin, elbow, end]), BLOOD * Color(1, 1, 1, 0.28 + strength * 0.54), 1.2 + strength)
+	draw_line(elbow, elbow + Vector2(-reach.y, reach.x).normalized() * (7.0 + strength * 9.0), COPPER * Color(1, 1, 1, 0.24 + strength * 0.35), 1.0)
+
+
+func _draw_world_condition() -> void:
+	if world_stamp.is_empty():
+		return
+	CellOutzType.draw_condensed(self, Vector2(30, 30), world_stamp, 9.0, BONE * Color(1, 1, 1, 0.55), 0.75)
+	var air_label := "AIR // %s" % ("FOUL" if air > 0.66 else "TAINTED" if air > 0.25 else "THIN")
+	CellOutzType.draw_condensed(self, Vector2(30, 48), air_label, 8.0, (BLOOD if air > 0.66 else COPPER) * Color(1, 1, 1, 0.64), 0.7)
+
+
 ## AG4.5. Breathing, rather than a meter of breath.
 ##
 ## The frame tightens and releases on a real cycle. Fresh, it is slow and you
@@ -175,6 +582,30 @@ func _draw_breath() -> void:
 	# And a catch at the top of each breath, so it reads as effort.
 	if spent > 0.7 and cycle > 0.94:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.04, 0.0, 0.0, (spent - 0.7) * 0.12))
+
+
+## The playtest mistook blood-loss collapse for getting progressively higher.
+## At the point a fullscreen effect changes play, the body must name the cause
+## in the otherwise unused space between the two lower instruments.
+func _draw_critical_condition() -> void:
+	if pulmonary_diagnostic != null and pulmonary_diagnostic.expanded:
+		return
+	if blood >= 0.55 and consciousness >= 55.0:
+		return
+	# Above the contextual E prompt and control strip, between the stable lower
+	# corner instruments. The first capture caught the earlier position printing
+	# directly through a bedroll prompt—the exact overlap this pass is removing.
+	var centre := Vector2(size.x * 0.5, size.y - 110.0)
+	var blood_percent := roundi(blood * 100.0)
+	var consciousness_percent := roundi(consciousness)
+	var label := "BLOOD LOSS // %02d%%" % blood_percent if blood < 0.55 else "CONSCIOUSNESS // %02d%%" % consciousness_percent
+	var detail := "FADING // HOLD V: SELF CONDITION" if consciousness < 35.0 else "WOUNDED // HOLD V: SELF CONDITION"
+	var width := maxf(CellOutzType.width(label, 13.0, 1.3), CellOutzType.width_condensed(detail, 8.0, 0.7))
+	draw_line(centre + Vector2(-width * 0.5 - 22, -5), centre + Vector2(-width * 0.5 - 5, -5), BLOOD, 2.0)
+	draw_line(centre + Vector2(width * 0.5 + 5, -5), centre + Vector2(width * 0.5 + 22, -5), BLOOD, 2.0)
+	CellOutzType.draw_text(self, centre + Vector2(-width * 0.5, -17), label, 13.0, BLOOD, 1.3)
+	var detail_width := CellOutzType.width_condensed(detail, 8.0, 0.7)
+	CellOutzType.draw_condensed(self, centre + Vector2(-detail_width * 0.5, 7), detail, 8.0, BONE * Color(1, 1, 1, 0.72), 0.7)
 func _draw_location_crest() -> void:
 	if location_announce <= 0.0:
 		return
@@ -202,7 +633,9 @@ func _draw_location_crest() -> void:
 func _draw_hunt_thread() -> void:
 	if rival_status == "DORMANT" or rival_status.is_empty():
 		return
-	var anchor := Vector2(size.x - 260, 48)
+	# Top-right belongs to the player's face and fluids now. A hunt is external
+	# world pressure, so it hangs under the top-left date/air instrument instead.
+	var anchor := Vector2(30, 82)
 	var eye := anchor + Vector2(205, 12)
 	draw_arc(eye, 16, 0, TAU, 24, COPPER * Color(1, 1, 1, 0.45), 2)
 	draw_circle(eye, 4 + sin(elapsed * 3.1), BLOOD)
@@ -320,6 +753,27 @@ func _draw_weapon_silhouette(at: Vector2, weapon_id: String) -> void:
 func _draw_controls() -> void:
 	if familiar >= 0.999:
 		return
+	var offers := _current_offers()
+	if offers.is_empty():
+		return
+
+	# Laid out from the middle, so the strip grows symmetrically rather than
+	# sliding sideways every time an affordance appears or goes.
+	var gap := 26.0
+	var total := 0.0
+	for offer: Array in offers:
+		total += CellOutzType.width_condensed(str(offer[0]), 11.0, 2.0) + KEY_GAP
+		total += CellOutzType.width_condensed(str(offer[1]), 10.0, 1.6) + gap
+	var cursor := size.x * 0.5 - total * 0.5
+	var fade := 1.0 - familiar
+	for offer: Array in offers:
+		var key := str(offer[0])
+		var verb := str(offer[1])
+		cursor += CellOutzType.draw_condensed(self, Vector2(cursor, size.y - 26.0), key, 11.0, Color(COPPER, 0.92 * fade), 2.0) + KEY_GAP
+		cursor += CellOutzType.draw_condensed(self, Vector2(cursor, size.y - 26.0), verb, 10.0, Color(BONE, 0.55 * fade), 1.6) + gap
+
+
+func _current_offers() -> Array:
 	var offers: Array = []
 	var held := str((weapon as Dictionary).get("label", ""))
 	if bare:
@@ -338,21 +792,40 @@ func _draw_controls() -> void:
 	if near_something:
 		offers.append(["E", str(interact_verb).to_upper()])
 	offers.append(["G", "DEVICE"])
+	return offers
 
-	# Laid out from the middle, so the strip grows symmetrically rather than
-	# sliding sideways every time an affordance appears or goes.
-	var gap := 26.0
-	var total := 0.0
+
+func _refresh_affordance_notice() -> void:
+	var offers := _current_offers()
+	var signature_parts := PackedStringArray()
 	for offer: Array in offers:
-		total += CellOutzType.width_condensed(str(offer[0]), 11.0, 2.0) + KEY_GAP
-		total += CellOutzType.width_condensed(str(offer[1]), 10.0, 1.6) + gap
-	var cursor := size.x * 0.5 - total * 0.5
-	var fade := 1.0 - familiar
+		signature_parts.append("%s:%s" % [offer[0], offer[1]])
+	var next_signature := ";".join(signature_parts)
+	if not _affordances_seen:
+		_affordance_signature = next_signature
+		_affordances_seen = true
+		return
+	if next_signature == _affordance_signature:
+		return
+	var previous := _affordance_signature.split(";", false)
+	var additions: Array[String] = []
 	for offer: Array in offers:
-		var key := str(offer[0])
-		var verb := str(offer[1])
-		cursor += CellOutzType.draw_condensed(self, Vector2(cursor, size.y - 26.0), key, 11.0, Color(COPPER, 0.92 * fade), 2.0) + KEY_GAP
-		cursor += CellOutzType.draw_condensed(self, Vector2(cursor, size.y - 26.0), verb, 10.0, Color(BONE, 0.55 * fade), 1.6) + gap
+		var token := "%s:%s" % [offer[0], offer[1]]
+		if token not in previous:
+			additions.append("%s %s" % [offer[0], offer[1]])
+	_affordance_signature = next_signature
+	if not additions.is_empty():
+		affordance_notice = "AVAILABLE // " + "  /  ".join(additions)
+		affordance_notice_time = 2.4
+
+
+func _draw_affordance_notice() -> void:
+	if affordance_notice_time <= 0.0 or affordance_notice.is_empty():
+		return
+	var alpha := clampf(minf(1.0, affordance_notice_time * 2.0), 0.0, 1.0)
+	var width := CellOutzType.width_condensed(affordance_notice, 9.0, 1.2)
+	var at := Vector2(maxf(24.0, size.x * 0.5 - width * 0.5), 168.0)
+	CellOutzType.draw_condensed(self, at, affordance_notice, 9.0, BONE * Color(1, 1, 1, alpha * 0.78), 1.2)
 
 
 func _draw_full_archive_frame() -> void:

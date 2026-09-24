@@ -69,6 +69,7 @@ const REIGNING := "war"
 
 
 static func seed_horsemen() -> void:
+	WorldHistory.begin_ledger_batch()
 	for horseman_id in HORSEMEN:
 		var data: Dictionary = HORSEMEN[horseman_id]
 		WorldHistory.register_subject(horseman_id, {
@@ -80,6 +81,7 @@ static func seed_horsemen() -> void:
 			"wounds": [], "anatomy": {"blood_type": "UNKNOWN", "cybernetics": []},
 			"relations": {str(data.grip): {"kind": "command", "strength": 60}},
 		})
+	WorldHistory.commit_ledger_batch()
 
 
 ## K2.3/K2.4. Each variation keeps CellOutz's own "ownership, downward" line

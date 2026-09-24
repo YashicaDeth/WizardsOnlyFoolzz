@@ -22,6 +22,7 @@ func _ready() -> void:
 	hunt._rival_retreats("TEST VICTORY")
 	check(WorldHistory.event_count("hunt_arc_first_beat_complete") == 1, "the real Hunt win is recorded before the wall")
 	check(WorldHistory.event_count("demo_ending_reached") == 1, "the real Hunt win reaches the demo ending")
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0 and not bool(WorldHistory.get("_ledger_batch_dirty")), "escape, rivalry and the demo ending close as one retreat outcome")
 	check(hunt.demo_wall.visible, "the Hunt displays its authored wall after victory")
 	check(get_tree().paused, "the live Hunt is stopped under the wall")
 	get_tree().paused = false

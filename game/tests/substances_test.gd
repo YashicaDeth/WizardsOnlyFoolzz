@@ -34,6 +34,8 @@ func _ready() -> void:
 	check(blood_after < before_blood, "and it actually cost blood (%.0f -> %.0f)" % [before_blood, blood_after])
 	check(float(taken.get("pain_after", 100.0)) < 100.0, "and pain actually dropped")
 	check(not taken.has("glimpsed"), "marrow dust is not a door substance")
+	var first_dose_events := WorldHistory.events.filter(func(event: Dictionary): return str(event.get("type", "")) == "substance_taken")
+	check(first_dose_events.size() == 1 and str((first_dose_events[0].get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_"), "the body mutation and intake fact share one compact player-action receipt")
 
 	WorldHistory.register_subject("empty_ledger", {"name": "Empty", "kind": "person", "anatomy_state": {"blood": 200.0, "blood_capacity": 5000.0}})
 	var refused := Substances.take("empty_ledger", "marrow_dust")
@@ -51,6 +53,7 @@ func _ready() -> void:
 
 	var events_with_glimpse := WorldHistory.events.filter(func(e): return str(e.get("type", "")) == "entity_glimpsed")
 	check(not events_with_glimpse.is_empty(), "the glimpse is a real recorded event later systems can read")
+	check(PlayerActionLedger.count("substance_taken") == 2 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "both player doses close their nested transaction with one summarized act each")
 
 	# --- E6.4: a substance carries and sells like anything else -------------
 	var carry := Carry.new()

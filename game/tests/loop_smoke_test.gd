@@ -70,6 +70,25 @@ func _edges_from(script_path: String) -> Array[String]:
 	return out
 
 
+## Scene and script basenames are usually paired, but authored scenes are free
+## to share a controller (the underground colosseum deliberately uses
+## `rift_derby.gd`). Read the root node's actual script before falling back to
+## the old naming convention so reachability follows the game, not filenames.
+func _root_script_for(scene_path: String) -> String:
+	var packed := load(scene_path) as PackedScene
+	if packed != null and packed.can_instantiate():
+		var instance := packed.instantiate()
+		var script := instance.get_script() as Script
+		instance.free()
+		if script != null and not script.resource_path.is_empty():
+			return script.resource_path
+	var conventional := scene_path.replace(".tscn", ".gd")
+	if ResourceLoader.exists(conventional):
+		return conventional
+	var system_script := "res://systems/%s" % conventional.get_file()
+	return system_script if ResourceLoader.exists(system_script) else conventional
+
+
 func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		get_tree().quit(2)
@@ -94,22 +113,16 @@ func _ready() -> void:
 	print("  graph: %d edges across %d scripts" % [total_edges, ROOTS.size()])
 	check(total_edges > 0, "reading the source produced a graph, so nothing below passes vacuously")
 
-	# --- what the graph says about the hunt ---------------------------------
-	# Reported rather than asserted. `bone_yard_hunt.gd` has no transition out
-	# of it in any form: you enter the Bone Yard and the only exit is the pause
-	# gate, which is abandoning the run rather than finishing it. That is a real
-	# gap and it is a *known* one - all of T is blocked on "what persists
-	# between runs", and an ending is downstream of that answer.
-	#
-	# It is not a `check()` because a check for "the hunt cannot end" turns red
-	# the day somebody fixes it, and a test that is expected to fail is a test
-	# nobody reads - which is the whole lesson of J5.
+	# --- the hunt has an authored ending -------------------------------------
+	# The demo wall is the first real end of a run. It must leave through the
+	# same visible seam as every other production transition rather than making
+	# the last action of the run a raw scene cut. Keep both claims executable:
+	# there is a way out, and that way goes through the interstitial.
 	var hunt_exits := _edges_from("res://bone_yard_hunt.gd")
-	if hunt_exits.is_empty():
-		print("  NOTE: bone_yard_hunt has no exit transition. The run cannot end, ")
-		print("        only be abandoned through the pause gate. See T, blocked.")
-	else:
-		print("  the hunt now ends somewhere: %s" % ", ".join(PackedStringArray(hunt_exits)))
+	check(hunt_exits.has(ENTRY), "the hunt has an authored ending back at the front door")
+	var hunt_source := FileAccess.get_file_as_string("res://bone_yard_hunt.gd")
+	check(hunt_source.contains('Interstitial.travel("res://country_town_menu.tscn"'),
+		"the hunt ending uses the interstitial rather than a hard scene cut")
 
 	# --- and every one of them actually loads -------------------------------
 	var scenes: Array[String] = [ENTRY]
@@ -136,15 +149,13 @@ func _ready() -> void:
 		if seen.has(here):
 			continue
 		seen.append(here)
-		var as_script := here.replace(".tscn", ".gd")
-		if not ResourceLoader.exists(as_script):
-			as_script = "res://systems/%s" % as_script.get_file()
+		var as_script := _root_script_for(here)
 		for target: String in _edges_from(as_script):
 			if not seen.has(target):
 				queue.append(target)
 	check(seen.has(MUST_REACH),
 		"a stranger can reach the hunt from the front door (visited %d scenes)" % seen.size())
-	check(seen.has("res://rift_derby.tscn"), "by way of the derby")
+	check(seen.has("res://underground_colosseum.tscn"), "by way of the underground tunnel derby")
 	check(seen.has("res://vat_chamber.tscn"), "and the vat, on a fresh run")
 
 	# --- the way back out ----------------------------------------------------

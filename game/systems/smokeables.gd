@@ -1,6 +1,8 @@
 class_name Smokeables
 extends RefCounted
 
+const ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 ## AU1.8. "Smoking is a real act: cigarettes, vapes, joints, spliffs, blunts,
 ## bongs, alien devices."
 ##
@@ -141,6 +143,9 @@ static func hit(subject_id: String, device_id: String, held: float, now: float) 
 	if subject.is_empty():
 		return {"ok": false, "reason": "NO SUCH SUBJECT"}
 
+	# Experience/tolerance, harsh anatomy and the one smoking receipt are one
+	# hit even when this API is used outside the Hunt scene's wider draw batch.
+	WorldHistory.begin_ledger_batch()
 	var substance_id := str(quality["substance"])
 	var potency := clampf(float(quality["strength"]), 0.05, 2.0)
 	var began := SubstanceExperience.begin(subject_id, substance_id, now, potency)
@@ -153,11 +158,12 @@ static func hit(subject_id: String, device_id: String, held: float, now: float) 
 		anatomy["pain"] = clampf(float(anatomy.get("pain", 0.0)) + float(quality["harsh"]) * 6.0, 0.0, 100.0)
 		WorldHistory.amend_subject(subject_id, {"anatomy_state": anatomy})
 
-	WorldHistory.record_event("smoked", {
+	ACTION_LEDGER.record("smoked", {
 		"subject_id": subject_id, "device": device_id,
 		"grade": str(quality["grade"]), "held": held,
 		"strength": float(quality["strength"]), "harsh": float(quality["harsh"]),
 	})
+	WorldHistory.commit_ledger_batch()
 	quality["dose"] = began.get("dose", {})
 	return quality
 
@@ -189,12 +195,36 @@ static func build(device_id: String, spent := 0.0) -> Node3D:
 		"vape": _build_vape(root)
 		"bong": _build_bong(root)
 		_: return root
+	if root.has_meta("parts"):
+		var authored_parts: Dictionary = root.get_meta("parts")
+		authored_parts["device"] = device_id
+		root.set_meta("parts", authored_parts)
+	_add_hold_anchors(root, device_id)
+	root.set_meta("two_handed", bool((CATALOG.get(device_id, {}) as Dictionary).get("two_handed", false)))
 	set_spent(root, spent)
 	# Rest is whatever `set_draw` says rest is. The builder used to carry its own
 	# coal brightness as well, which meant a cigarette straight off the table and
 	# one somebody had just stopped drawing on were visibly different objects.
 	set_draw(root, 0.0)
 	return root
+
+
+## AU7.9. The objects speak HeldGear's anchor language rather than asking the
+## Hunt scene to guess their centres. Rolled objects and the vape are pinched
+## close to the mouthpiece; the bong has a second real support point on its
+## base, which is what makes it a two-hand object rather than a boolean alone.
+static func _add_hold_anchors(root: Node3D, device_id: String) -> void:
+	match device_id:
+		"cigarette", "joint", "spliff":
+			HeldGearRef.add_anchor(root, "grip", Vector3(0.0, 0.0, -0.018))
+			HeldGearRef.add_anchor(root, "mouth", Vector3.ZERO)
+		"vape":
+			HeldGearRef.add_anchor(root, "grip", Vector3(0.0, 0.0, 0.015))
+			HeldGearRef.add_anchor(root, "mouth", Vector3(0.0, 0.0, -0.057))
+		"bong":
+			HeldGearRef.add_anchor(root, "grip", Vector3(0.0, 0.13, 0.0))
+			HeldGearRef.add_anchor(root, "grip_support", Vector3(0.0, 0.035, 0.0))
+			HeldGearRef.add_anchor(root, "mouth", Vector3(0.0, 0.30, 0.0))
 
 
 ## What one clean draw consumes. Falls straight out of the charge count the
@@ -241,6 +271,13 @@ static func _spend_rolled(parts: Dictionary, burn: float) -> void:
 		var part: Node3D = parts[key]
 		var offset := float(parts["%s_offset" % key])
 		part.position = Vector3(0, 0, -live + offset)
+	# Ash belongs to the consumed object, not only to the frame RMB is down.
+	# It slowly collars the live end between flicks and remains visible at rest.
+	var ash: MeshInstance3D = parts["ash"]
+	var ash_mesh := ash.mesh as CylinderMesh
+	var rest_ash := lerpf(0.0045, 0.013, burn)
+	ash_mesh.height = rest_ash
+	parts["ash_rest_height"] = rest_ash
 
 
 static func _spend_vape(parts: Dictionary, burn: float) -> void:
@@ -276,7 +313,7 @@ static func _spend_bong(parts: Dictionary, burn: float) -> void:
 ## `heat` is 0 at rest and 1 at the sweet spot; it keeps climbing past 1 into
 ## the harsh band, and that overshoot is what the object shows you before the
 ## cough tells you.
-static func set_draw(node: Node3D, heat: float) -> void:
+static func set_draw(node: Node3D, heat: float, light_scale := 1.0, pulse := 0.0) -> void:
 	if node == null or not node.has_meta("parts"):
 		return
 	var parts: Dictionary = node.get_meta("parts")
@@ -285,7 +322,29 @@ static func set_draw(node: Node3D, heat: float) -> void:
 			var led: MeshInstance3D = parts["led"]
 			var glow: StandardMaterial3D = led.material_override
 			glow.emission_energy_multiplier = lerpf(0.4, 5.0, clampf(heat, 0.0, 1.0))
-		return
+			return
+		if str(parts.get("kind", "")) == "bong":
+			var pull := clampf(heat, 0.0, 1.4)
+			var pack: MeshInstance3D = parts["pack"]
+			var bowl_coal: StandardMaterial3D = pack.material_override
+			bowl_coal.emission_energy_multiplier = lerpf(0.0, 4.8, clampf(pull, 0.0, 1.0))
+			var bowl_light: OmniLight3D = parts["light"]
+			# The burning bowl is the player's smallest emergency night light:
+			# warm and local, but strong enough to reveal the hands and nearby floor.
+			bowl_light.light_energy = lerpf(0.0, 4.2, clampf(pull, 0.0, 1.0)) * light_scale
+			bowl_light.omni_range = lerpf(1.4, 6.0, clampf(pull, 0.0, 1.0)) * lerpf(0.72, 1.0, light_scale)
+			var chamber: MeshInstance3D = parts["chamber_smoke"]
+			chamber.visible = pull > 0.025
+			var chamber_material: StandardMaterial3D = chamber.material_override
+			chamber_material.albedo_color.a = lerpf(0.0, 0.22, clampf(pull, 0.0, 1.0))
+			var water: MeshInstance3D = parts["water"]
+			water.scale.y = 1.0 + sin(clampf(pull, 0.0, 1.0) * PI) * 0.08
+			var bubbles: Array = parts["bubbles"]
+			for index in bubbles.size():
+				var bubble := bubbles[index] as MeshInstance3D
+				bubble.visible = pull > 0.04
+				bubble.position.y = 0.010 + fmod(pull * (0.019 + index * 0.004) + index * 0.009, 0.045)
+			return
 	var climb := clampf(heat, 0.0, 1.6)
 	var coal: MeshInstance3D = parts["coal"]
 	var ember: StandardMaterial3D = coal.material_override
@@ -293,13 +352,23 @@ static func set_draw(node: Node3D, heat: float) -> void:
 	# which is what an over-pulled cherry actually does and is a different
 	# signal rather than more of the same one.
 	ember.emission = COAL.lerp(Color("ffd9a0"), clampf(climb - 1.0, 0.0, 1.0))
-	ember.emission_energy_multiplier = lerpf(1.4, 7.5, clampf(climb, 0.0, 1.0))
+	var ember_pulse := 1.0 + maxf(0.0, pulse) * lerpf(0.045, 0.11, clampf(climb, 0.0, 1.0))
+	ember.emission_energy_multiplier = lerpf(1.4, 7.5, clampf(climb, 0.0, 1.0)) * ember_pulse
 	var light: OmniLight3D = parts["light"]
-	light.light_energy = lerpf(0.22, 1.5, clampf(climb, 0.0, 1.0))
-	light.omni_range = lerpf(0.28, 0.62, clampf(climb, 0.0, 1.0))
+	# At rest it makes a close amber pool; drawing turns it into a brief usable
+	# torch. The warm omnidirectional spill keeps it distinct from a flashlight.
+	light.light_energy = lerpf(0.85, 4.4, clampf(climb, 0.0, 1.0)) * light_scale
+	light.omni_range = lerpf(1.8, 6.4, clampf(climb, 0.0, 1.0)) * lerpf(0.72, 1.0, light_scale)
 	var ash: MeshInstance3D = parts["ash"]
 	var ash_mesh: CylinderMesh = ash.mesh
-	ash_mesh.height = lerpf(0.006, 0.016, clampf(climb, 0.0, 1.0))
+	var ash_rest := float(parts.get("ash_rest_height", 0.006))
+	ash_mesh.height = lerpf(ash_rest, maxf(0.016, ash_rest + 0.004), clampf(climb, 0.0, 1.0))
+	if str(parts.get("device", "")) == "spliff":
+		ash.rotation.z = sin(clampf(climb, 0.0, 1.0) * PI) * 0.18
+		coal.scale = Vector3.ONE * lerpf(1.0, 1.18, clampf(climb, 0.0, 1.0)) * ember_pulse
+	else:
+		ash.rotation.z = 0.0
+		coal.scale = Vector3.ONE * ember_pulse
 
 
 ## What `set_draw` should be fed, given how long the button has been down. Split
@@ -367,11 +436,10 @@ static func _build_rolled(root: Node3D, length: float, mouth_radius: float, burn
 	var light := OmniLight3D.new()
 	light.name = "ember_light"
 	light.light_color = COAL
-	# A coal lights its own hand and the thing it is resting on, not the room.
-	# At 0.9m every lit end on the bench was throwing onto every other object,
-	# so a filter tip half a metre away photographed as if it were glowing.
-	light.light_energy = 0.5
-	light.omni_range = 0.34
+	# In the field this coal is also the smallest torch the player owns. The
+	# draw curve raises it further; at rest it only makes a local amber pool.
+	light.light_energy = 0.85
+	light.omni_range = 1.8
 	light.position = Vector3(0, 0, -length)
 	root.add_child(light)
 
@@ -471,6 +539,33 @@ static func _build_bong(root: Node3D) -> void:
 	wet.albedo_color = Color(0.16, 0.23, 0.20, 0.72)
 	root.add_child(water)
 
+	# The held pull fills the chamber and draws bubbles through the water every
+	# frame. These are object state, not an effect fired after the hit.
+	var chamber_smoke := _cylinder(0.042, 0.082, Color("b7c1ad"), 0.9)
+	chamber_smoke.position = Vector3(0, 0.071, 0)
+	var chamber_material: StandardMaterial3D = chamber_smoke.material_override
+	chamber_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	chamber_material.albedo_color = Color(0.72, 0.78, 0.68, 0.0)
+	chamber_material.disable_receive_shadows = true
+	chamber_smoke.visible = false
+	root.add_child(chamber_smoke)
+	var bubbles: Array[MeshInstance3D] = []
+	for index in 5:
+		var bubble := MeshInstance3D.new()
+		var bubble_mesh := SphereMesh.new()
+		bubble_mesh.radius = 0.0035 + index * 0.00035
+		bubble_mesh.height = bubble_mesh.radius * 2.0
+		bubble_mesh.radial_segments = 8
+		bubble_mesh.rings = 4
+		bubble.mesh = bubble_mesh
+		bubble.material_override = _plastic(Color(0.68, 0.82, 0.75, 0.48), 0.15)
+		var bubble_material: StandardMaterial3D = bubble.material_override
+		bubble_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		bubble.position = Vector3(-0.022 + index * 0.011, 0.010 + index * 0.007, sin(float(index) * 2.1) * 0.016)
+		bubble.visible = false
+		root.add_child(bubble)
+		bubbles.append(bubble)
+
 	var downstem := _cylinder(0.0085, 0.085, GLASS, 0.06)
 	downstem.rotation = Vector3(deg_to_rad(-45.0), 0, 0)
 	downstem.position = Vector3(0, 0.052, -0.030)
@@ -487,14 +582,28 @@ static func _build_bong(root: Node3D) -> void:
 	packed.rotation = Vector3(deg_to_rad(-45.0), 0, 0)
 	packed.position = Vector3(0, 0.090, -0.068)
 	packed.name = "bowl_pack"
+	var packed_material: StandardMaterial3D = packed.material_override
+	packed_material.emission_enabled = true
+	packed_material.emission = COAL
+	packed_material.emission_energy_multiplier = 0.0
 	root.add_child(packed)
+	var bowl_light := OmniLight3D.new()
+	bowl_light.light_color = COAL
+	bowl_light.light_energy = 0.0
+	bowl_light.omni_range = 0.32
+	bowl_light.position = packed.position
+	root.add_child(bowl_light)
 
 	# Resin, because a clean one belongs to nobody.
 	var ring := _cylinder(0.0505, 0.004, RESIN, 0.9)
 	ring.position = Vector3(0, 0.033, 0)
 	root.add_child(ring)
 
-	root.set_meta("parts", {"kind": "bong", "pack": packed, "pack_height": 0.008})
+	root.set_meta("parts", {
+		"kind": "bong", "pack": packed, "pack_height": 0.008,
+		"light": bowl_light, "water": water, "chamber_smoke": chamber_smoke,
+		"bubbles": bubbles,
+	})
 	root.set_meta("spent", 0.0)
 
 

@@ -30,6 +30,8 @@ func _ready() -> void:
 	check(int(WorldHistory.subject("inventory").rust_scrip) == 9, "currency is not loose carried loot")
 	check(str(WorldHistory.subject("player").name) == identity_before, "the same protagonist returns")
 	check(WorldHistory.event_count("player_deliberate_death") == 1 and WorldHistory.event_count("player_redecanted") == 1, "death and re-decanting both remain in history")
+	var death_event := WorldHistory.events.filter(func(event: Dictionary): return str(event.get("type", "")) == "player_deliberate_death")[0] as Dictionary
+	check(PlayerActionLedger.count("player_deliberate_death") == 1 and str((death_event.get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_") and int(WorldHistory.get("_ledger_batch_depth")) == 0, "forfeit, deliberate death and the resulting body close as one identified player action")
 	check(DefeatRouter.redecant().is_empty(), "re-decanting is only available from captivity")
 	print("DEFEAT_ROUTER_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

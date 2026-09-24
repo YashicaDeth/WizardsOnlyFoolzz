@@ -63,8 +63,17 @@ func _ready() -> void:
 	var at: Vector3 = (first["node"] as Node3D).global_position
 	var near: Dictionary = a.nearest(at)
 	check(near.get("id", "") == first["id"], "standing on a thing puts it in reach")
+	var inspected: Dictionary = a.inspection_nearest(at)
+	check(inspected.get("source") == first["node"], "inspection presents the actual world object rather than a parallel icon")
+	check(inspected.get("item_id", "") == first["id"] and not str(inspected.get("label", "")).is_empty(),
+		"the shared inspection grammar receives a stable identity and readable label")
+	check((a.pickups() as Array).size() == ids.size(), "looking at a pickup does not consume it")
 	var far: Dictionary = a.nearest(at + Vector3(0, 0, 40.0))
 	check(far.is_empty(), "and standing in the next county does not")
+	check(a.inspection_nearest(at + Vector3(0, 0, 40.0)).is_empty(), "nor can a distant object be inspected through the world")
+	var fixture_probe: Dictionary = a.inspection_nearest((a as Node3D).to_global(Vector3(1.04, STATION.TOP_Y, 0.08)), 0.08)
+	check(str(fixture_probe.get("kind", "")) == "fixture" and str(fixture_probe.get("label", "")) == "ASHTRAY",
+		"fixed working objects enter the same inspection contract without becoming takeable")
 
 	var before: int = (a.pickups() as Array).size()
 	var lifted: Dictionary = a.take_nearest(at)

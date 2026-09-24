@@ -8,13 +8,20 @@ const OUTCOMES := {
 	"choir_of_marrow": "stamped",
 	"celloutz": "conscripted",
 }
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 
 static func route(captor_id: String, location: String) -> Dictionary:
 	var captor := WorldHistory.subject(captor_id)
 	var faction_id := str(captor.get("faction_id", ""))
 	var outcome := str(OUTCOMES.get(faction_id, "shackled"))
-	var destination := _destination(faction_id, location)
+	# A commissioned local-law actor already carries the canonical holding that
+	# issued their warrant. Unknown factions used to fall back to the scene id,
+	# so a Gate Lantern arrest claimed the player was "held at bone_yard" and
+	# forgot which jurisdiction had actually taken them. Named faction prisons
+	# still win; the issuing holding is the honest fallback for local custody.
+	var local_custody := str(captor.get("contract_place", ""))
+	var destination := _destination(faction_id, local_custody if not local_custody.is_empty() else location)
 	var player := WorldHistory.subject("player")
 	var defeats := int(player.get("defeats", 0)) + 1
 	var state := {
@@ -27,9 +34,11 @@ static func route(captor_id: String, location: String) -> Dictionary:
 		"defeats": defeats,
 		"memory": "Defeated by %s and taken to %s." % [str(captor.get("name", captor_id)), destination],
 	}
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject("player", state)
 	WorldHistory.record_event("player_defeated", {"actor": captor_id, "subject_id": "player", "outcome": outcome, "destination": destination, "location": location})
 	WorldHistory.record_event("player_captured", {"captor": captor_id, "faction_id": faction_id, "outcome": outcome, "destination": destination})
+	WorldHistory.commit_ledger_batch()
 	return state
 
 
@@ -40,6 +49,7 @@ static func redecant() -> Dictionary:
 	var inventory := WorldHistory.subject("inventory")
 	var forfeited: Array = (inventory.get("items", []) as Array).duplicate(true)
 	var old_body: Dictionary = (player.get("anatomy_state", {}) as Dictionary).duplicate(true)
+	WorldHistory.begin_ledger_batch()
 	WorldHistory.amend_subject("inventory", {"items": []})
 	var result := {
 		"status": "redecanted",
@@ -52,8 +62,9 @@ static func redecant() -> Dictionary:
 		"memory": "Died deliberately in captivity and came back out of the tar empty-handed.",
 	}
 	WorldHistory.amend_subject("player", result)
-	WorldHistory.record_event("player_deliberate_death", {"subject_id": "player", "forfeited": forfeited, "held_at": player.get("held_at", "")})
+	PLAYER_ACTION_LEDGER.record("player_deliberate_death", {"subject_id": "player", "forfeited": forfeited, "held_at": player.get("held_at", "")})
 	WorldHistory.record_event("player_redecanted", {"subject_id": "player", "body_number": result.redecants + 1, "retained_identity": true})
+	WorldHistory.commit_ledger_batch()
 	result["forfeited"] = forfeited
 	return result
 

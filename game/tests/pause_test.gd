@@ -56,6 +56,17 @@ func _ready() -> void:
 	gate._cycle_gore()
 	check(str(WorldHistory.subject("settings").get("gore", "")) != before, "violence cycles from the pause menu too")
 
+	# Restoring saved window state is application, not another player choice.
+	var fullscreen: bool = bool(gate._fullscreen())
+	WorldHistory.amend_subject("settings", {"fullscreen": fullscreen})
+	var screen_events := WorldHistory.event_count("screen_setting_changed")
+	gate._restore_screen()
+	check(WorldHistory.event_count("screen_setting_changed") == screen_events,
+		"restoring saved fullscreen state does not fabricate a player setting event")
+	gate._set_fullscreen(fullscreen)
+	check(WorldHistory.event_count("screen_setting_changed") == screen_events + 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0,
+		"an explicit fullscreen choice still persists once and closes its transaction")
+
 	# Rows are the menu; settings has to be reachable from root.
 	gate.page = "root"
 	gate._build_rows()
@@ -66,6 +77,34 @@ func _ready() -> void:
 	gate.page = "settings"
 	gate._build_rows()
 	check(gate._rows.size() >= gate.BUSES.size() + 2, "settings lists every bus plus violence and back")
+
+	# Y1.1. Controls are rebindable, reachable from the same settings page.
+	var settings_ids: Array = []
+	for row in gate._rows:
+		settings_ids.append(str(row.id))
+	check(settings_ids.has("controls"), "settings offers a way into controls")
+
+	gate.page = "controls"
+	gate._build_rows()
+	var control_ids: Array = []
+	for row in gate._rows:
+		control_ids.append(str(row.id))
+	for action in gate.CONTROL_ACTIONS:
+		check(control_ids.has("bind_%s" % action), "controls lists %s" % action)
+	check(control_ids.has("ctrl_reset") and control_ids.has("ctrl_back"), "controls offers reset and a way back")
+
+	var default_crouch: int = int(gate._default_binds.get("crouch", -1))
+	check(default_crouch != -1, "the crouch default was captured before any rebind")
+	var rebind_event := InputEventKey.new()
+	rebind_event.physical_keycode = KEY_C
+	gate._apply_rebind("crouch", rebind_event)
+	var bound: Array = InputMap.action_get_events("crouch")
+	check(bound.size() == 1 and (bound[0] as InputEventKey).physical_keycode == KEY_C, "rebinding crouch actually changes the InputMap")
+	check(int(WorldHistory.subject("settings").get("keybind_crouch", -1)) == KEY_C, "and the rebind is stored on the settings subject")
+	gate._reset_keybinds()
+	var restored: Array = InputMap.action_get_events("crouch")
+	check(restored.size() == 1 and (restored[0] as InputEventKey).physical_keycode == default_crouch, "reset to default puts crouch back")
+	check(int(WorldHistory.subject("settings").get("keybind_crouch", -1)) == default_crouch, "and the reset is stored too")
 
 	print("PAUSE_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

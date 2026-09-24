@@ -1,5 +1,7 @@
 extends Node
 
+const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
+
 ## D1, D2, D4, D5, D6, D8. The claims worth bounding are the ones the design
 ## makes: every route lands in the same sheet, the chart is a distribution
 ## rather than a bonus, the budget actually constrains, the questionnaire is
@@ -134,6 +136,8 @@ func _ready() -> void:
 	check(str(state.get("race", "")) == "roadborn", "the sheet writes a real player subject")
 	check((state.get("attributes", {}) as Dictionary).has("physical"), "with attributes on it")
 	check(str(WorldHistory.subject("player").get("name", "")) == "SUBJECT 44", "and the world holds it")
+	var filed_events := WorldHistory.events.filter(func(event: Dictionary) -> bool: return str(event.get("type", "")) == "sheet_filed")
+	check(filed_events.size() == 1 and PLAYER_ACTION_LEDGER.count("sheet_filed") == 1 and str((filed_events[0].get("details", {}) as Dictionary).get("action_id", "")).begins_with("action_"), "the sheet and its intake consequences share one identified filing action")
 	var reloaded := CharacterSheet.new()
 	check(reloaded.load_from_world(), "it can be read back")
 	check(reloaded.race == "roadborn" and reloaded.traits.has("doomscroller"), "with the same race and traits")
@@ -188,6 +192,7 @@ func _ready() -> void:
 	check(int(broken_filed.get("overspent_by", 0)) == 1, "and records the real deficit, not just true/false")
 	var achievement_events := WorldHistory.events.filter(func(e): return str(e.get("type", "")) == "achievement_run_started")
 	check(not achievement_events.is_empty(), "a broken run is recorded in the achievement-run register, not silently")
+	check(PLAYER_ACTION_LEDGER.count("sheet_filed") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "a broken sheet still closes one filing transaction")
 
 	WorldHistory.clear_history()
 	var clean_sheet := CharacterSheet.new()
@@ -195,6 +200,7 @@ func _ready() -> void:
 	var clean_filed := clean_sheet.apply_to_world()
 	check(not bool(clean_filed.get("broken_run", false)), "an honest sheet does not file as broken")
 	check(WorldHistory.events.filter(func(e): return str(e.get("type", "")) == "achievement_run_started").is_empty(), "and records no achievement-run event")
+	check(PLAYER_ACTION_LEDGER.count("sheet_filed") == 1 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "an honest sheet follows the same single receipt route")
 
 	print("SHEET_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

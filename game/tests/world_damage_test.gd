@@ -62,6 +62,7 @@ func _ready() -> void:
 	]
 	var door_hit := WORLD_DAMAGE.damage("vault_door_1", 0.6, "charge", door_bands)
 	check(str(door_hit.get("band", "")) == "blown", "a caller's own ladder is what decides the band, not the generic one (\"%s\")" % str(door_hit.get("band", "")))
+	check(WorldHistory.event_count("object_damaged") == 4 and WorldHistory.event_count("object_repaired") == 2 and int(WorldHistory.get("_ledger_batch_depth")) == 0, "every accepted mutation records exactly once and closes its ledger transaction")
 	# Condition is one shared number regardless of which ladder asked about it
 	# last — 0.4 left over from a 0.6 hit reads "wrecked" on the *generic*
 	# ladder even though the door's own ladder called the identical number

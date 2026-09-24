@@ -3,6 +3,23 @@
 The working document. The design has outrun the build, so this is how the build
 catches up: **in segments, one at a time, slowly and surely.**
 
+## Canonical demo checkpoint — 20 September 2026
+
+The playable consolidation now lives on `codex/consolidated-demo`. It combines
+the validated first-30-minute strike with the later anatomy, frame-budget,
+pause/rebinding, handheld/brain-index, Wire/faction, and range/ballistics work.
+Old Orca lanes remain as history and backups; they are not separate builds the
+player must choose between. The stale broad rescue copies were deliberately not
+allowed to overwrite newer core files.
+
+The integrated checkpoint passes the opening, grappling, shipping-controls,
+pause/rebinding, ballistics, body/anatomy, wound-depth, brain-index, handheld
+ownership, derby cab-fire, gore-range, weapon-customisation, and performance
+probe suites. One optional-AI parse failure exposed during consolidation was
+fixed by making the LimboAI fallback genuinely optional. Generated Godot import
+metadata and manual visual/play-feel review are not counted as completed ledger
+work.
+
 ## Versions — how a segment gets better after it is done
 
 Greg, 2026-09-12: *"make it so you can click and change the a1 to a1v2 and its a
@@ -185,8 +202,8 @@ The technique already exists in this project — `xray_specimen.gd` renders a li
 - [x] **A10.4** Street view is the same camera at the bottom of its descent, arriving at 1.68m
 - [x] **A10.5** Unwalked ground is grey and fogged, thinning at the edges of where you have been; walking brings the colour in
 - [x] **A10.9** The reveal is a gradient — clearness is read from the whole 3x3 neighbourhood, eased so the last of it comes off last
-- [x] **A10.6** The chart marks, districts, contacts and title block all still read over the image
-- [ ] **A10.7** It lives in the handheld's MAP page, so it is the black mirror looking down
+- [x] **A10.6** The chart marks, districts, contacts and title block all still read over the image — district ownership, accepted-work objectives and moving contacts now reserve labels against one shared chart-space layout instead of printing through one another; each label tries authored registers around its mark, falls back to the least-overlapping register under genuine density and remains clamped inside the bezel. `map_label_layout_test` proves shared reservation, separation and chart clamping; the live `holding_work_map.png` capture was re-inspected, and `map_perf_test` still measures only 0.01 ms of map cost at the worst tested zoom
+- [x] **A10.7** It lives in the handheld's MAP page, so it is the black mirror looking down — the satellite was built and worked anywhere a scene called `LivingMap.attach_world` itself. The device never did: `HandheldDevice.bind` passed the generator to the map's own `bind` and stopped, so reaching the map through the thing you actually hold left `satellite` null, `_satellite_ready()` false, and the mirror drawing the A6 chart on a dark plate while the satellite worked fine everywhere else. One call, and nothing said so. `_attach_map_world()` now hands the world down at `bind` and retries on every page open, because a device built before its region has no world to take yet. Leaving MAP also calls `close_map()` — A10.8 was true of the map and not of the device, which only ever set `visible`, so the camera kept rendering behind the WIRE page. Nine assertions in `tests/handheld_satellite_test.gd`
 - [x] **A10.8** UPDATE_DISABLED while the map is shut; one frame per open frame otherwise
 
 ### A6 — Living Map as an object `BUILT`
@@ -194,7 +211,7 @@ The technique already exists in this project — `xray_specimen.gd` renders a li
   - v1 — a hand-rolled Environment per scene
   - v2 — one WorldLook preset system every scene goes through
 - [x] ~~**A6.2** Named discovered places with a description panel~~
-- [x] ~~**A6.3** Location-based travel~~
+- [x] ~~**A6.3** Location-based travel~~ — committing the held destination now emits one travel request and one identified `map_travel` player receipt
 - [x] ~~**A6.4** Cracked-screen occlusion over unsurveyed ground~~
 - [x] ~~**A6.5** 2D-to-tilted-3D zoom~~
 
@@ -288,7 +305,7 @@ v5 made the ground materially believable and left the sky a box. AO2.1 says the 
 ### A v7 — the seventh pass
 v6 broke the sky open and put nothing behind it. AO2.2: a god for each planet, the moon and the sun, visible at certain hours.
 - [x] **A7.1** `v7` The gods are up there and `WorldClock.hour()` decides when — `systems/gods.gd`: nine bodies, one per planet plus the moon and the sun, each with its own hour window, its own fixed quarter of the sky and its own colour, so after a few nights a player knows where to look and when. That fixedness is the whole point — a god that could appear anywhere at any time teaches nobody anything, and the sky in this game is a clock face with these as the numbers on it. The hours are read from `WorldClock.hour()` rather than a timer or a roll, windows that cross midnight are handled as windows that cross midnight, and each one fades in over its first half hour so a god arrives rather than being switched on. They are drawn in the same firmament shader v6 built, three slots deep (a sky with everything in it at once is a planetarium, not an omen), as a body with a brightening limb and drifting bands rather than a disc — and added over the dome rather than into it, since a thing that size is not hidden by the shell it is bigger than. Verified at 13:00, where exactly one is up, and at 02:00, where five are (`captures/a7_1_v7_furnace_noon.png`, `a7_1_v7_gods_night.png`)
-- [x] **A7.2** `v7` Seeing one is an event the world records, not decoration — a sighting needs the god near the middle of the frame for a second and a half, so glancing past one while running does not make you a witness, and it is recorded once per god per day: the Witness is up every night and a world that wrote that down nightly would be recording the weather. It goes into `WorldHistory.record_event("god_seen", ...)` with the body, its prayer, the day and the stamp, and — this is the part that makes it not decoration — `god_seen` is in `CHAOS_MAGICK` at 0.05, a third of a completed ritual, so looking up feeds the same charge the ritual system already drains and storms already read. The scene answers on the status line rather than with a bespoke banner, because what this world does with an omen is note it and carry on. Verified by event count across two hours in `tests/night_surface_capture.tscn`: one sighting at 13:00, a second at 02:00, and no repeat for a god already seen that day
+- [x] **A7.2** `v7` Seeing one is an event the world records, not decoration — a sighting needs the god near the middle of the frame for a second and a half, so glancing past one while running does not make you a witness, and it is recorded once per god per day: the Witness is up every night and a world that wrote that down nightly would be recording the weather. It goes into `WorldHistory.record_event("god_seen", ...)` with the body, its prayer, the day and the stamp, and — this is the part that makes it not decoration — `god_seen` is in `CHAOS_MAGICK` at 0.05, a third of a completed ritual, so looking up feeds the same charge the ritual system already drains and storms already read. The daily guard and the sighting event persist as one omen. The scene answers on the status line rather than with a bespoke banner, because what this world does with an omen is note it and carry on. Verified by event count across two hours in `tests/night_surface_capture.tscn`: one sighting at 13:00, a second at 02:00, and no repeat for a god already seen that day
 
 ### A v8 — the eighth pass
 v7 made the sky the most interesting thing on screen, which is wrong when the player is a spirit in bright flame (AP2.2).
@@ -314,7 +331,7 @@ Nine passes of procedural surface, and none of it is Greg's own work. AP3.3: *"c
 - [x] **A10.9** `v10` The stencil face sets every plate, and body copy never uses it — audited on both halves. `CellOutzType` is called 332 times across some twenty systems — the HUD, the index, the map, the kill cam, the keys card, the radial menu, the pin board, the interstitial, the sigils — which is what "sets every plate" looks like in a project that draws its own type. The other half is the one that could quietly rot, and it has not: no string longer than 42 characters is drawn through the face anywhere in the codebase, and the `draw_string` calls that do exist are exactly what A1.3 said they would be — findings, notes, percentages and "NO BODY ON FILE." in a real font, at 9 to 14 points, where a stencil alphabet would be unreadable. `body_inspector.gd` runs both in one panel and is the pattern: the plate is drawn, the copy on it is typed. Audited by sampling rather than exhaustively, so a future plate that quietly uses a system font for its header would not be caught by this
 - [x] **A10.10** `v10` Nothing renders correctly only at one distance — given a number rather than an opinion: the standard deviation of luminance across a fixed window of the same wall, shot at two and a half, eleven and forty-four metres. A surface that only works up close flattens toward a single colour as the mips take over, and a flat colour has no deviation. Relative deviation (deviation over mean) reads 1.08 at 2.5m, 1.16 at 11m and 2.32 at 44m — the generated contamination is still resolving structure at forty-four metres rather than washing out, which is the failure this segment names. One half of it this harness cannot answer: shimmer under motion is temporal and every capture here is a still frame, so a surface that crawls as the player walks would pass this test (`captures/a10_10_v10_wall_at_2m.png`, `a10_10_v10_wall_at_44m.png`)
 - [ ] **A10.11** `v10` A surface somebody destroyed looks destroyed a month later — **blocked, and worth saying why rather than leaving it silent.** Nothing in this game can destroy a surface. Bodies come apart (`baseline_human.gd`), vehicles crumple (`rift_derby.gd`), and the world's geometry is generated from a seed and is not touched again: there are no decals, no scars, no impact marks and no code path anywhere that damages a wall. So this is not a look segment at all in its current form — the look half is perhaps an hour's work (a scar map on the material, aged off `WorldClock.month()`, which already exists), and it has nothing to draw until something can mark a surface in the first place. That belongs to whichever section owns destructible geometry, and this should follow it rather than lead it
-- [ ] **A10.12** `v10` The look survives the quantum restart looking like itself — **blocked on the restart, not on the look.** "Quantum restart" appears exactly three times in this project and all three are checklist lines: here, at B10.1 and at L10.1. There is no implementation, no scene, no flag and no save path for it anywhere in the code. What can be said now is that the look is already built to survive one: every surface, every field and every map in A is generated from a seed and a `run_salt`, so a world rebuilt from the same seed comes back identical and one rebuilt from a new salt wears differently on purpose (A5.6). When the restart exists, this segment is a capture either side of it and a comparison, not a build
+- [x] **A10.12** `v10` The look survives the quantum restart looking like itself — the note this replaces said **blocked on the restart**, and it has been wrong since `systems/quantum_saves.gd` landed. The restart is there: `begin_new()` is the restart proper (history cleared, a fresh `run_salt`, the clock back to 16:30) and `enter()` crosses back into a branch that has been through a file on disk. So this is what the old note said it would be — a capture either side and a comparison, not a build: `tests/quantum_look_test.tscn`, 32/32, both directions. **Same salt across a restart:** a branch saved at 18:45 on the second day, left for a new world, then re-entered off disk, comes back with its interface grime, its cast, its materials, its palette, its region, the hour's effect on every surface and the player's wounded body all identical — and the sky back at the dusk it was saved at rather than the 16:30 a fresh world opens on. Dusk on purpose: `daylight()` is 0.81 there, so every clock-fed dial is caught mid-lerp, where a restore that rounded or defaulted the clock shows. **New salt:** the interfaces wear somewhere else and the world is populated by different people, while the materials, the palette after dark, the hour response and the region are unchanged — which is the half of *looking like itself* that a different world could break, and the half nothing was checking. One correction the old note needs, because it would mislead the next person: it claimed every surface, field and map in A is generated from a seed **and** a `run_salt`. Half true. The salt reaches the interface grime (`CellOutzGrunge._mix()`), the generated cast (`CastNames._seed_for()`) and the roamers seeded off both (`bone_yard_hunt.gd:5444`) — and nothing in the material path: `world_look.surface()` takes an explicit seed from its caller and the region takes a constant one (774013), so a new branch is the same city worn differently rather than a different city. Both halves are asserted, so wiring the salt into the region later fails here loudly rather than quietly shipping five cities. What the capture is, stated because it is not a screenshot: `--headless` has no framebuffer — probed rather than assumed, a headless viewport's `get_image()` returns null — so the comparison is taken one level up, off what the renderer would draw from. The generated contamination and response maps sampled on an 8×8 grid of each 96×96 map, the material scalars, the sky/fog/ambient/exposure dials, the region's every transform and lot, the seed and RNG stream every grime mark is placed from, the cast, and the saved body. Falsifiable rather than decorative, and tried three ways: removing `restore_snapshot()`'s `remember_run()` fails the grime layer, dropping the restored clock fails the sky, dropping the restored salt fails grime and cast. Not covered, and left uncovered on purpose — the rig's gore draws from the global RNG (`baseline_human.gd:587, 1026-1074`), so what is compared is the record the body is rebuilt from rather than a rebuilt body, and shader output, which no headless suite can see
 - [x] **A10.13** `v10` Every effect is one shader with dials rather than a new shader — this one was failed by this very session before it was met. A8.2 shipped `flame_melt.gdshader`, which differed from `light_warp.gdshader` in four numbers and a direction and was otherwise the same measure, the same screen sample and the same falloff shape: exactly the habit the segment names. It is deleted. The displacement shader now carries the dials that make one shader serve both — `falloff` (squared for air off a lamp, cubed for tight around a body), `drag` (the upward pull that is the difference between a shimmer and something melting), `field_scale` and `field_rate` (weather, or a body coming apart), and `tint_add` (a lamp bending air should not brighten it; a body failing must, or the displacement is invisible on a dark frame). Seven shaders to six, with the flame's melt verified unchanged after the merge (`captures/a10_13_v10_one_shader_two_dials.png`)
 - [~] **A10.14** `v10` Performance is part of the look: nothing here costs more than it earns — the harness to answer this is built (`tests/night_surface_capture.tscn` toggles the air, the warp shells and the flame's melt one at a time at 01:00, with everything else running, and averages script time over 150 frames) and it cannot currently answer it. Measured twice in the same configuration the same scene reported 19.9ms and 39.97ms of process time, a factor of two apart, and an earlier cumulative version reported a scene getting *faster* as systems were switched on. The number that is solid: 2,514 draw calls at 01:00 with every system of v3 through v10 running. What this needs is a quiet machine — a second Godot was running another agent's test suite throughout — and GPU frame time rather than `TIME_PROCESS`, which measures script cost and not the shaders this whole ladder is made of. Until then, claiming the cost is earned would be asserting exactly what the segment asks to be measured
 - [x] **A10.15** `v10` Greg's own collaged art is in the world as texture, used with intent — the same requirement as A10.1, stated twice at opposite ends of the v10 list, and answered by the same build: posted bills on the district buildings. Left as its own line rather than folded into A10.1, since the version convention says a version is never deleted
@@ -378,14 +395,14 @@ The most complete system in the project and, until this pass, the least visible.
 - [x] ~~**B5.3** The tool matters: bare hands, blade, or something surgical~~
 - [x] ~~**B5.4** Extracted part enters CARRY with its condition and its lien~~
 - [x] ~~**B5.5** Install a robbed part into yourself~~
-- [x] ~~**B5.6** Someone notices — the Choir price it, the owner remembers~~
+- [x] ~~**B5.6** Someone notices — the Choir price it, the owner remembers~~ — the true extraction fact now carries one player-action receipt whether or not anyone sees it; witness testimony and a living owner's grudge/memory settle in the same transaction
 
 ### B6 — Dismemberment as a combat verb
 - [x] ~~**B6.1** Severing exists on the rig with thrown limbs, stumps and exposed bone, driven by the strike direction~~
 - [x] ~~**B6.2** Sever from a directional blow crossing a limb threshold *mid-fight*~~
 - [x] ~~**B6.3** The fight continues with them still in it, fighting worse~~
-- [x] ~~**B6.4** The severed limb is a chunk: pick it up, carry it, sell it, hit someone with it~~
-- [x] ~~**B6.5** `v2` Reciprocity — the player is dismembered and keeps playing~~
+- [x] ~~**B6.4** The severed limb is a chunk: pick it up, carry it, sell it, hit someone with it~~ — selling now batches inventory removal, wallet payment and the market-readable `carried_part_sold` fact behind one identified player-action receipt; `chunk_test.gd` verifies the transaction closes
+- [x] ~~**B6.5** `v2` Reciprocity — the player is dismembered and keeps playing~~ — each incoming blow now persists its raised-device wear, anatomy change, wound fact, possible severing/forced drop and disarm as one nested-safe injury transaction
   - v1 — losing a limb ends the fight
   - v2 — the fight continues in both directions, and the stump bleeds on everyone's clock
 - [x] ~~**B6.6** Stump behaviour: bleed rate, one-armed movement and attacks~~
@@ -475,8 +492,8 @@ v8 made the player's body exceptional and they can still never look at it. AH1.5
 
 ### B v10 — the tenth pass
 Nine passes on one body, and T1.1 now says the universe restarts and you do not.
-- [ ] **B10.1** `v10` The body is recognisably itself across a quantum restart
-- [ ] **B10.2** `v10` What it carries over is scars, not statistics
+- [x] **B10.1** `v10` ~~The body is recognisably itself across a quantum restart~~ It was not there at all: `begin_new()` calls `clear_history()`, `clear_history()` empties `subjects`, and `subjects` is where bodies live — so the restart erased the person with the world and decanted a new one on the other side. `QuantumSaves.CARRIED_SUBJECTS` is the list of who does not restart when the universe does. "Recognisably itself" then needed something to mean, and the only honest test of it is two bodies built from one record at two different times — impossible to even state while the papers-to-body derivation lived inside the hunt scene, which was the only thing in the game that could build this person. `BaselineHuman.config_from_subject()` is that derivation, moved to the rig, and the audit compares generated head geometry across the restart rather than comparing a record to itself. The branch boundary is atomic now: a new world's blank state, carried body and identified birth receipt persist together; entering an old one joins restored snapshot, active-slot flag and identified crossing receipt in one transaction.
+- [x] **B10.2** `v10` ~~What it carries over is scars, not statistics~~ It carried over exactly the wrong half, and the sharper half of this item is what made that visible. `snapshot()` was eighteen keys of statistics and not one mark: it saved the health the arm had left and lost the hole in the arm, because `wound_marks` — the whole of B10.4's located, permanent record — only ever existed for as long as the rig did. So marks are in the snapshot now, and `scars_of()` is the reduction a *restart* applies and a *load* does not: the holes and where they are, how deep each limb was opened, the limbs that are gone, the hardware in what is left. The health, the blood, the pain, the dose and the running tally toward losing a limb stay in the universe that did them, so you arrive whole in the numbers and marked in the flesh rather than arriving still bleeding from a wound that is not in this world. JSON was the trap underneath: it has no Vector3 and does not fail on one — it writes `"(0.1, 0.2, 0.3)"` and hands that string back — so a scar written straight to a branch file came back as text. `body_restart_test` marks a body, takes an arm off, crosses the restart, reloads the branch off disk and asks the rebuilt *rig* whether the holes are on the limb, not whether a dictionary round-tripped. Mutation-checked both ways: dropping the marks from the carry fails four checks, carrying the statistics fails six
 
 - [x] **B10.3** `v10` ~~Damage is always recorded against a zone, never against a hitbox~~ `zone_nearest()` resolves a world point to the limb it actually landed on, and `hit_at()` files every wound under a zone name — proven rather than asserted: `body_v10_audit` fires at the chest, head and left arm and checks each resolves to its own zone, then checks every key in `wound_marks` is a real member of `ZONES`. A hit that found a collider instead of a body part would fail that
 - [x] **B10.4** `v10` ~~A body carries its whole history visibly and permanently~~ Wounds are recorded at the real impact point in the limb's own local space and rendered there as torn craters, so four hits in four places leave four holes in four places — which is what `hit_at()` could never do while it was converting the impact point to a zone name and discarding it. Audited on both halves: four hits produce four marks *and* four meshes on the limb, and they are still there ninety frames later. Permanent, not a decal that ages out. Local space is why they ride the limb through animation and leave with it when it comes off
@@ -484,7 +501,7 @@ Nine passes on one body, and T1.1 now says the universe restarts and you do not.
 - [x] **B10.6** `v10` ~~Any body can be opened up in the same detail as any other~~ There is no "detailed body" and "cheap body" — one rig, so an NPC nobody will ever inspect carries the same organs, the same zones and the same parts as the one the player is about to dig through. Audited by comparing two independently built bodies key for key rather than by trusting that they came from the same constructor, and by opening one to the organ layer and checking the other did not follow — depth is a ratchet on any body, not a property of authored ones
 - [x] **B10.7** `v10` ~~What is installed in a limb is visible in that limb~~ Installing hardware at a site adds geometry to that limb's own node, so an arm with an industrial limb in it looks like an arm with something in it. Audited by counting the limb's children either side of an install rather than by trusting that the refresh path runs
 - [x] **B10.8** `v10` ~~Radiation, fire, bullets and blades all resolve through the same anatomy~~ All seven damage types — ballistic, cut, shear, blunt, puncture, radiation, caustic — go through one `apply_hit()`, and the audit proves it the only way that means anything: each one has to cost the zone health *and* come back carrying `blood_remaining` and `pain`, which are stamped on by `apply_hit` itself. A type that bypassed the anatomy could not produce them. This is what stops a new damage type quietly skipping organs, bleeding or severing
-- [ ] **B10.9** `v10` A body reacts to the hour, the weather and what it is wearing
+- [x] **B10.9** `v10` ~~A body reacts to the hour, the weather and what it is wearing~~ Two of the three already reached the body and neither was rebuilt: what somebody is wearing has resolved through `Garments.shielding()` since B7.1, and the weather has dosed them through `expose()` since W1.3. **The hour was the gap** — `world_clock.gd` has had `hour()`, `daylight()` and `is_night()` for a while and neither `anatomy_component.gd` nor `baseline_human.gd` contained the string "WorldClock" at all; the only route from the hour to a body was the `(1.0 - daylight())` term folded invisibly inside `contamination()`, which is the *weather* answering the hour, not the body. `chill(cold, delta)` sits beside `expose(severity, delta)` and takes its cold as an argument for the same reason — the anatomy stays testable without a world around it — and reads `warmth` off the same shielding figure `garments.gd` has computed and clamped for every worn set since B7.1 with **nothing reading it**. Deliberately its own number rather than more `pain`: pain never comes down on its own here (only `treat_wound()` and `stabilise()` lower it), so a chill kept there would still be on the body at noon in a coat, and would put the weather into the wound record. It shows with no new rendering, through the two body-wide answers that already exist — `posture().hunch`, which `_apply_pain_posture()` reads every frame, and `mobility_ratio()`, a small multiplier rather than a gate, because a bad night slows you and does not refuse the vault a broken leg refuses. `_update_air()` passes the hour and the air as **two separate factors** so neither hides inside the other, and `body_v10_audit` moves one at a time: 02:00 chills a bare body more than 13:00 with the weather held fixed (0.600 vs 0.000) and dusk lands between them (0.384), so the light going is a curve and not a switch; a coat and leathers cost less than skin at the same hour in the same weather (0.290 vs 0.600); and the same body at the same hour takes exactly nothing from still air and something from a storm
 - [x] **B10.10** `v10` ~~The mirror in the room renders this rig live~~ Same object as B9.1, and "live" is the load-bearing word — proven by mutating the body and checking the reflection is of a mutated body, not by looking at a screenshot once. `watch()` takes any `Node3D` rather than a `BaselineHuman`, so the vat, the shed and a wall mirror are one implementation instead of three
 - [x] **B10.11** `v10` ~~Gore persists, rots on a real clock, and is eaten by things that eat~~ All three halves are real: `GoreChunks` holds pieces on a 240-second rot clock with `rot_ratio()` readable at any moment, and `carrion_scavenger.gd` decides for itself what counts as food through its own `can_eat()`. Checked off the script's own method list rather than by calling into it, since these are static utility classes with no instance to ask
 - [ ] **B10.12** `v10` Nothing about a body is described in text that could be shown on the body
@@ -511,10 +528,10 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 - [x] ~~**C2.5** Custom cursor art~~
 
 ### C3 — Camera mode `BUILT`
-- [x] ~~**C3.1** Raise a camera, frame the world, take a photograph~~
-- [x] ~~**C3.2** Photographs are objects with contents that can be inspected~~
+- [x] ~~**C3.1** Raise a camera, frame the world, take a photograph~~ — one shutter press batches its album frame, identified `photograph_taken` receipt and any ritual consequence
+- [x] ~~**C3.2** Photographs are objects with contents that can be inspected~~ — first storage creates the album schema and its first frame in one mutation rather than flushing an empty album first
 - [x] ~~**C3.3** Verify what is in frame against real anatomy state (required by E3)~~
-- [x] ~~**C3.4** Photographs post to the Wire~~
+- [x] ~~**C3.4** Photographs post to the Wire~~ — publication now carries one player-action receipt, and its public fact plus every depicted subject's grudge/memory persist in one transaction
 
 ### C4 — CARRY `BUILT`
 - [x] ~~**C4.1** Surface the inventory subject that already exists~~
@@ -531,28 +548,49 @@ Six fullscreen panels on six keys is the root cause of "nothing connects".
 
 ### C v2 — the second pass
 - [~] **C1.6** `v2` The device is raised at one angle in one hand, every time — the position half is real: `_device_rect` used to rise dead-centre and perfectly upright, which reads as a menu appearing rather than an object somebody is holding. It now rises to a fixed off-centre point (`HELD_OFFSET_X`), eased in with `raised` itself, deterministic — no per-raise randomness. The angle half was built and reverted: `radial` (the selection wheel, C2) is a child of this same `Control`, so rotating `self` dragged the wheel's own fixed screen-centre geometry along with the phone's tilt — visually confirmed broken in a capture before being pulled back out. A real tilt needs the chassis+screen moved into their own rotated sub-container first, with `radial` staying a sibling rather than a descendant of it — left as the named next step rather than guessed at further. Verified: `handheld_lean_test`/`handheld_impact_test`/`device_wear_test`/`handheld_battery_test` all re-run clean, and a fresh `handheld_capture` shows the offset device beside an unmoved, correctly screen-centred radial wheel
-- [~] **C1.7** `v2` It can be dropped, and it can be taken off you — `HandheldDevice.drop()`/`confiscate(reason)` are the same underlying transition (`possessed` false, forced closed, unraisable) reached through two callers and recorded as two distinct events, so the world can tell a deliberate drop from a robbery apart later even though the player cannot use the device either way meanwhile; `repossess()` is the way back, wear travelling with it since it is the same object, not a fresh one. Reloaded on every `open_device()` the same as condition/battery already are, so a device lost in one scene stays lost the next. `tests/device_possession_test.gd`, 18 checks; `handheld_lean_test`/`handheld_impact_test`/`device_wear_test`/`handheld_battery_test` re-verified clean.
+- [~] **C1.7** `v2` It can be dropped, and it can be taken off you — `HandheldDevice.drop()`/`confiscate(reason)` are the same underlying transition (`possessed` false, forced closed, unraisable) reached through two callers and recorded as two distinct events, so the world can tell a deliberate drop from a robbery apart later even though the player cannot use the device either way meanwhile; `repossess()` is the way back, wear travelling with it since it is the same object, not a fresh one. Reloaded on every `open_device()` the same as condition/battery already are, so a device lost in one scene stays lost the next. The shared loss path now batches device persistence with its correctly attributed event, nested inside the wider wear transaction for a deliberate drop; first device persistence uses that same atomic update instead of flushing an empty record first. `tests/device_possession_test.gd`, 23 checks; `handheld_drop_test`/`handheld_lean_test`/`handheld_impact_test`/`device_wear_test`/`handheld_battery_test` re-verified clean.
 
-      The drop half is now reachable rather than only callable: `DROP_KEY`
-      (`K`), edge-detected the same way `lean_override` is test-overridable,
-      calls `drop()` and fires a new `dropped(payload)` signal carrying the
-      identity `drop()`/`confiscate()` already returned — checked against
-      `possessed` rather than `is_open`, since a pocketed device is still
-      yours to drop. This file still owns no 3D space (the docstring on
-      `_lose_possession` says so directly), so `dropped` is exactly as far as
-      this file can honestly go: it is the seam Lane 1 connects to spawn a
-      pickable object and eventually call `repossess()`, not a silent stub.
-      `tests/handheld_drop_test.gd`, 10 checks — the key firing exactly once
-      per press even held down, a dropped device refusing to reopen, and
-      `repossess()` making it droppable again with a second signal rather
-      than reusing the first.
+      The drop half is now complete in the live Hunt rather than stopping at
+      the signal: `DROP_KEY` (`Delete`) calls `drop()`, and the scene turns that
+      exact payload into a colliding `DroppedHandheld` with rendered case,
+      emissive mirror, lashed rear cell, serial, condition and remaining
+      charge. It tumbles from the real camera, advertises `[E] RECOVER BLACK
+      MIRROR // serial` only in reach, and E calls `repossess()` before the
+      world body leaves. Its settled position is amended into WorldHistory;
+      reloading while it is still lost reconstructs the same pickable serial
+      there instead of trapping the save in `possessed = false`. Verified by
+      `tests/handheld_world_drop_test.gd` (15 checks), plus the existing
+      `handheld_drop_test.gd` and `device_possession_test.gd`; deliberate drop
+      and recovery now route condition/possession persistence and their durable
+      action receipts through one transaction apiece, while confiscation
+      remains a distinct world event with no counterfeit player receipt
+      (`device_possession_test.gd`, 22 checks). Windowed evidence
+      at `captures/c1_7_dropped_black_mirror.png` shows the real world object,
+      its serial and the recovery prompt in the production HUD.
+
+      Control repair (17 September): the first live version accidentally put
+      drop on `K`, which the Hunt already reserves for deliberate re-decanting;
+      a captured player could therefore lose the phone and reset their body on
+      one press. Drop now owns `Delete`, the keys card teaches both actions as
+      separate rows, and `tests/handheld_control_binding_test.gd` (13 checks)
+      prevents the irreversible bindings from collapsing together again.
 
       Still open, and still not this file's to close: nothing calls
       `confiscate()` from real gameplay — that caller is a robbery or defeat
       event belonging to whichever lane owns that consequence, not something
       `handheld_device.gd` can originate on its own.
 - [x] **C1.8** `v2` Wear accumulates in WorldHistory and only ever goes one way — a cracked screen does not heal
-- [x] **C2.6** `v2` F1-F5 reach a page directly; cycling is how you learn the device, not how you use one you know
+- [x] **C2.6** `v2` Every drawn app tab is now an actual control: click it or use F1-F7 to reach its page directly; Tab and the mouse wheel cycle while the Black Mirror is raised. G releases the captured pointer, Escape lowers the hardware and returns the pointer to play, and the keys card states this context change instead of mislabelling Tab as only WORLD INDEX. `handheld_control_binding_test.gd` covers all seven clickable regions, exact selection, G/F7/Escape and pointer release in 13 checks
+
+      Direction correction, 18 September: ordinary Hunt play no longer binds
+      `J` from the Allusions study into Greg's placeholder natal chart. J now
+      opens and closes the actual interactive artwork directly; ordinary Hunt
+      play no longer constructs the natal control at all. NatalSigil and the
+      chart math remain intact for the future vat/character-creation route,
+      where the player can actually supply or choose the data. The live keys
+      card names only the surviving artwork action, and
+      `handheld_control_binding_test.gd` proves both J states and the absence of
+      placeholder birth data alongside the repaired phone controls (16 checks).
 - [x] **C5.5** `v2` Cracks seeded from the device's own serial, at its real condition rather than a constant 0.85
 
 ### C v3 — the third pass
@@ -564,12 +602,14 @@ work created or exposed, not a wish.
       a control nobody discovers is a control nobody has~~ `jump_to_mode()`
       has reached a page directly since C2.6 v2 and nothing on the device
       itself ever said so. Each tab in `_draw_tabs()` now prints the F-key
-      that jumps straight to it — "F1" over INDEX through "F5" over CARRY —
+      that jumps straight to it — "F1" over INDEX through "F7" over FIELD —
       the same register a real handheld prints a function-key legend in,
       rather than a control the player can only ever stumble onto by cycling
-      through with Tab. Verified: a windowed capture
+      through with Tab. The painted rail and its pointer hitboxes now come from
+      one shared layout, so all seven labels are clickable rather than decorative.
+      Verified by `handheld_control_binding_test.gd` and a windowed capture
       (`captures/c2_7_v3_tab_key_hints.png`) showing the legend printed and
-      matching `bone_yard_hunt.gd`'s actual `KEY_F1`.."KEY_F5" bindings.
+      matching `bone_yard_hunt.gd`'s actual `KEY_F1`.."KEY_F7" bindings.
 - [x] ~~**C5.6** `v3` Cracks are per-device but still radiate from one
       authored origin; an impact should crack the glass where it landed~~
       `BlackMirror.draw_cracks()` always forked from the exact same point
@@ -581,10 +621,9 @@ work created or exposed, not a wish.
       impact from its own point rather than one shared authored origin. An
       impact with a genuinely unknown location (an accumulated tick rather
       than a single blow) still lands on a varied point instead of the one
-      shared spot. `take_wear()` itself is not yet called from anywhere in
-      the game — that wiring is a separate, larger gap this does not close —
-      so this is the mechanism working correctly, verified directly rather
-      than through real gameplay impacts. Verified:
+      shared spot. This pass originally had no live `take_wear()` caller;
+      that larger wiring gap has since closed under C10.8, while the mechanism
+      here remains independently verified. Verified:
       `tests/handheld_impact_test.gd` (new, 7/7 — a given location is used
       exactly, two unlocated impacts land on different points and neither is
       the old authored one, the impact list is capped, and it survives a
@@ -607,12 +646,12 @@ v4 made it a lamp, and a lamp that never runs out is a torch, not a resource. *"
 ### C v6 — the sixth pass
 v5 gave the light a cost in charge and none in attention. Raising it should occupy you.
 - [x] ~~**C6.1** `v6` Holding it up is an action, and that hand is not available~~ Already implemented under AS1.2 but left open here: `_attack()` refuses before it asks the arsenal for an action once `handheld.raised > 0.5`, the same physical threshold that makes the screen light live. It therefore spends no ammo, windup or cooldown while that hand is occupied, rather than cancelling a strike after its cost. `tests/handheld_busy_hand_test.gd`, 5 checks in the running Hunt scene: the pocketed control begins a real melee windup, while the identical attempt with the device raised leaves the action, windup and cooldown untouched
-- [ ] **C6.2** `v6` Waving it to see around a corner is a real thing you do
+- [x] ~~**C6.2** `v6` Waving it to see around a corner is a real thing you do~~ Hold `L` to brace an Index/Map/Wire page, then use WASD to carry the Black Mirror around the corresponding screen edge. The gesture is eased through one live `wave` vector: the drawn device and gripping hand visibly travel with the wrist while the camera-mounted `SpotLight3D` moves, yaws and pitches in the same direction, so the beam can cross an edge before the player's viewpoint does. Releasing `L` recentres both; pages without a hosted surface do not claim the posture. The in-world keys card now prints `HOLD L + WASD — LEAN / WAVE DEVICE LIGHT`. `tests/handheld_lean_test.gd` (6 checks), `tests/handheld_world_light_test.gd` (12 checks), and `tests/perception_integration_test.gd` (13 checks) pass headless; `captures/handheld_map_wave.png` was captured at 1280x720 and visually checked for the physical off-axis held pose
 
 ### C v7 — the seventh pass
 v6 made the lamp cost you something; it costs nobody else anything. AS1.5: its light is what gives you away at night.
-- [ ] **C7.1** `v7` Anything hunting you can see the light before it sees you
-- [ ] **C7.2** `v7` Using the map at night is a decision with a price
+- [x] ~~**C7.1** `v7` Anything hunting you can see the light before it sees you~~ The live perception pass now resolves two different sightings for every hostile: the player's body and the handheld's emitted source. At night a clear raised Black Mirror is traceable at 20 m while its holder remains below the unseen threshold; pocketing it removes that trail, a wall blocks it, and an exhausted cell emits nothing. The encounter state machine now reads those verdicts before pursuing or shouldering a launcher, so `player_unseen` is no longer an unused diagnostic and the light can actually draw a hunter before the body is resolved. A first sighting records one `hunter_noticed_handheld_light` history event rather than writing every frame. `tests/perception_test.gd` (15 checks), `tests/perception_integration_test.gd` (11 checks), and `tests/combat_integration_test.gd` (46 checks) pass headless
+- [x] ~~**C7.2** `v7` Using the map at night is a decision with a price~~ The live satellite page now drives the battered panel at twice the Index's battery draw and 1.3 times its emitted-light output. That is one physical cost expressed three ways through existing systems: charge falls twice as fast, the real camera-carried `SpotLight3D` becomes brighter and wider, and at night a hunter can acquire its source at 24 m where the quiet Index remains below the same threshold. The hardware prints `SAT DRAW x2.0` beside the live cell gauge, so the cost is readable before it is paid rather than hidden in a tuning constant. `tests/handheld_battery_test.gd` (17 checks), `tests/handheld_world_light_test.gd` (10 checks), and `tests/perception_integration_test.gd` (13 checks) pass headless; `captures/handheld_map.png` was captured at 1280x720 and visually checked for the unobscured draw warning
 
 ### C v8 — the eighth pass
 v7 made carrying it tactical and putting it away instant. Rule 3: every hard cut is a bug.
@@ -628,21 +667,103 @@ Eight passes on the front of an object nobody has ever turned over. The jester i
 Greg, plainly: *"the entire blackmirror gui needs work"*. Nine passes on what the device *is* and none on how it reads.
 - [ ] **C10.1** `v10` The whole GUI re-authored as one thing rather than six pages
   - First narrow seam: Index/Wire and Map were 16:9 documents letterboxed inside the mirror, while Radio/Carry/Ritual used the full wide glass. All six now occupy one centred 16:9 working aperture with the same device-owned registration edge. This does not claim the line; their internal frames and interaction grammar still need unifying. `tests/handheld_aperture_test.gd`; six inspected captures at `captures/c10_1_aperture_{index,map,wire,radio,carry,ritual}.png`
+  - Second narrow seam: the Ashbloom calendar and live hour are chassis registration rather than app content, so every mode carries the same date in the same place. `handheld_aperture_test.gd` proves all seven modes preserve it; internal interaction grammar remains open.
 - [x] ~~**C10.2** `v10` It is legible in the dark it now creates, which nothing before v4 had to be~~ The six apps now rise through one device-owned phosphor reading bed in `black_mirror.gd`: an inset luminous surface suppresses the holder's reflection only beneath the working aperture while the side gutters remain black, reflective glass. Bone ink, moss instruments and copper registration have explicit contrast floors against that shared surface, rather than each page inventing a brighter box. `tests/handheld_dark_legibility_test.gd` checks the colour contract and all six modes' use of the same surface; `captures/c10_2_dark_{index,map,wire,radio,carry,ritual}.png` inspected at 1280x720.
 
-- [ ] **C10.3** `v10` Its battery is a real resource with a real floor
-- [ ] **C10.4** `v10` Raising it occupies a hand and the game never forgets that
+- [x] **C10.3** `v10` Its battery is a real resource with a real floor — C5.1/C5.2
+      are the finished mechanism rather than a prototype: charge drains only
+      while the physical device is raised, the satellite page costs twice the
+      INDEX draw, zero charge extinguishes the screen and world light, and the
+      exact remainder survives reload (`handheld_battery_test`, 17 checks).
+- [x] **C10.4** `v10` Raising it occupies a hand and the game never forgets that —
+      the same `raised` value that moves and lights the object rejects attacks
+      before ammo, windup or cooldown are spent; lowering it restores the hand
+      only when the movement actually clears the threshold
+      (`handheld_busy_hand_test`, `handheld_pocket_light_test`).
+- [x] **C10.5** `v10` Its glow is what anything hunting you sees first — the live
+      perception pass resolves the emitted source separately from the body, so
+      a clear raised screen at night draws pursuit at ranges where its holder
+      remains unseen; walls, an empty cell and pocketing it all break that trace
+      (`perception_integration_test`, 13 checks).
+- [x] **C10.6** `v10` It has a back, a jester on it, and a condition that shows on
+      the shell — holding O turns the one continuous object through its edge to
+      the recessed rear, where finish loss, plate separation, broken battery
+      ties and impact-position dent rings read the persisted device state
+      (`handheld_back_test`, 15 checks; C9.1/C9.2).
+- [x] **C10.7** `v10` Every page reads correctly in the dark it creates — all
+      seven apps inherit the same glass aperture, phosphor reading bed and
+      device-owned ink contrast floors instead of page-local bright boxes;
+      hosted and native modes are covered together by
+      `handheld_dark_legibility_test` and the six inspected C10.2 captures.
+- [x] ~~**C10.8** `v10` The device wears from what you have actually done to it~~ Two real player actions now reach the existing persistent wear mechanism. A wound taken while the Black Mirror is physically raised reduces its condition in proportion to the incoming damage and projects the attacker's world position onto the glass, so the new crack begins on the side the blow arrived from; the identical wound while it is pocketed cannot touch it. Deliberately dropping the device applies a smaller lower-edge impact before possession leaves, and the dropped payload therefore belongs to the same newly damaged serial rather than a replacement. Both causes enter `wear_log`, persist, and continue to drive the front cracks and rear shell degradation already built. `tests/handheld_live_wear_test.gd` (9 checks), `handheld_drop_test.gd`, `device_possession_test.gd`, and `handheld_impact_test.gd` pass headless; `captures/c10_8_live_device_wear.png` was produced through `_wound_player()` in the real Hunt scene and visually inspected at 1280x720
+- [x] ~~**C10.3** `v10` Its battery is a real resource with a real floor~~
+      Re-verified rather than re-built: this is C5.1 under the v10 framing.
+      `battery` still clamps to `[0.0, 1.0]` in `_process()`, drains only while
+      raised, recharges only while pocketed, and `is_lit()` refuses at exactly
+      0.0. `tests/handheld_battery_test.gd`, 14 checks, re-run clean.
+- [x] ~~**C10.4** `v10` Raising it occupies a hand and the game never forgets
+      that~~ Re-verified: C6.1 under the v10 framing. `_attack()` in
+      `bone_yard_hunt.gd` still refuses before it asks the arsenal for an
+      action once `handheld.raised > 0.5`. `tests/handheld_busy_hand_test.gd`,
+      5 checks, re-run clean.
 - [ ] **C10.5** `v10` Its glow is what anything hunting you sees first
-- [ ] **C10.6** `v10` It has a back, a jester on it, and a condition that shows on the shell
-- [ ] **C10.7** `v10` Every page reads correctly in the dark it creates
-- [ ] **C10.8** `v10` The device wears from what you have actually done to it
+- [x] ~~**C10.6** `v10` It has a back, a jester on it, and a condition that
+      shows on the shell~~ Re-verified: C9.1/C9.2 under the v10 framing. The
+      rear still carries the jester, the stamped `UNIT %06d` serial and
+      condition-driven finish loss/dents seeded from the device's own
+      `impacts`. `tests/handheld_back_test.gd`, 15 checks, re-run clean.
+- [x] ~~**C10.7** `v10` Every page reads correctly in the dark it creates~~
+      Re-verified: C10.2 already proved this for all six modes, not read as a
+      single-page claim — `handheld_dark_legibility_test.gd` cycles every
+      entry in `device.MODES` and checks each one still resolves to the same
+      `_page_rect` reading surface with the same contrast floors, rather than
+      only checking whichever page happened to be open. 9 checks, re-run
+      clean.
+- [~] **C10.8** `v10` The device wears from what you have actually done to it
+      — the mechanism is real (C1.8/C5.6: wear only accumulates, cracks
+      radiate from each impact's actual recorded location) but the honest
+      caveat from C5.6 still stands and is not this item's to close: nothing
+      in the running game calls `take_wear()` yet, so "what you have actually
+      done to it" is not yet reachable from real play. `tests/
+      handheld_impact_test.gd`, 7 checks, re-run clean against the mechanism
+      alone.
 - [ ] **C10.9** `v10` Nothing on it is a list of text in a box
 - [ ] **C10.10** `v10` It is the Wire, the map, the carry and the radio without four designs
-- [ ] **C10.11** `v10` Apps on it are playable and some of them are load-bearing
+- [x] ~~**C10.11** `v10` Apps on it are playable and some of them are
+      load-bearing~~ Re-verified rather than re-built: measured against real
+      consequence, not against whether a page draws. RITUAL calls
+      `RITUAL_LEDGER.reconcile_album()` live every frame the mode is open and
+      reads `outstanding()`/`best_evidence()` off it — completing a rite there
+      actually resolves a real Goetic seal and spends blood through
+      `boons.gd`, not a free grant (`tests/ritual_app_test.gd`, 13/13). WIRE's
+      `act()`/`contest_channel()` are not a readout either:
+      `bone_yard_hunt.gd` calls `WireNet.open_vacancy()` on a worker's real
+      death to fill a faction succession, and `publish_photograph()` raises
+      grudge that the Hunt System's own rival logic reads. CARRY's mechanical
+      weight (C8.2's pocket mass limit) and its item labels are load-bearing
+      gameplay data elsewhere in the project
+      (`DESIGN/INVENTORY_ARCHITECTURE_NOTES.md`: `Extraction.tool_for()`
+      substring-matches on the exact label CARRY shows). `tests/ritual_test.gd`
+      (10/10) and `tests/ritual_app_test.gd` (13/13) re-run clean.
 - [ ] **C10.12** `v10` It can evoke, and evoking through it is dangerous
 - [ ] **C10.13** `v10` It holds an archive that disagrees with the feed
-- [ ] **C10.14** `v10` It survives the restart carrying what you did with it
-- [ ] **C10.15** `v10` Somebody could pick it up and know whose it was
+- [x] ~~**C10.14** `v10` It survives the restart carrying what you did with
+      it~~ Re-verified: `open_device()` calls `load_device()` first thing
+      every time, which reads `serial`/`condition`/`battery`/`wear_log`/
+      `impacts`/`possessed` back off `WorldHistory.subject(DEVICE_ID)` rather
+      than resetting to defaults — a device is exactly as broken, as charged
+      and as lost on the next launch as it was on this one.
+      `tests/handheld_impact_test.gd`'s save/load round trip and
+      `tests/device_possession_test.gd`, re-run clean.
+- [x] ~~**C10.15** `v10` Somebody could pick it up and know whose it was~~
+      `owner_name` is stamped once when a device is first created (from the
+      current player subject, falling back to `carry.gd`'s "THE HUNTER" if
+      there is none) and never rewritten by `drop()`, `confiscate()` or
+      `repossess()` — the case reads "PROPERTY OF" whoever it was made for,
+      not whoever is holding it. Round-trips through `save_device()`/
+      `load_device()`, and a pre-C10.15 save with no `owner_name` field reads
+      the same honest fallback instead of crashing or coming back blank.
+      `tests/handheld_owner_test.gd`, 6/6, new.
 
 ## D — Character creation in the vat
 
@@ -650,7 +771,7 @@ Greg, plainly: *"the entire blackmirror gui needs work"*. Nine passes on what th
 under-directed opening.
 
 ### D1 — The sheet `BUILT`
-- [x] ~~**D1.1** A real player subject built from data, not a hardcoded dict~~
+- [x] ~~**D1.1** A real player subject built from data, not a hardcoded dict~~ — filing the subject, declined modifiers and any broken-run fact now persists as one identified player action, with the first player record created by that same amendment rather than a preceding duplicate registration
 - [x] ~~**D1.2** Everything below writes into it~~
 - [x] ~~**D1.3** Save and load it~~
 
@@ -676,7 +797,10 @@ under-directed opening.
 - [x] ~~**D5.1** Elements to attributes, modality to a commitment axis~~
 - [x] ~~**D5.2** Ascendant sets starting Wire reach~~
 - [x] ~~**D5.3** Ruling House as the Skyrim-standing-stone blessing~~
-- [~] **D5.4** Derived wheel shipped and honest about it. Ephemeris still the open call
+- [~] **D5.4** Derived wheel shipped and honest about it. Greg chose real
+      ephemeris-grade planetary positions on 19 September; integrating that
+      data and letting planetary rulers personalise favour/communication
+      without creating a strictly superior birth remains the unfinished half
 
 ### D6 — The instrument route `BUILT`
 - [x] ~~**D6.1** Original items on real axes — five-factor plus dark triad~~
@@ -908,6 +1032,12 @@ mass-produced by the million.
       `begin_burn()` directly (see E2.4) — binding only ever adds strokes,
       burning only ever removes them, and the two are visually distinct
       (lit copper vs. dark char) rather than the same mark tinted two colours.
+- [x] **E2.8** `v3` The board has two metals — copper is the etched trace, gold is plating, and plating goes exactly where something has to make contact: the edge connector's fourteen fingers and the chip's legs. Greg asked for *"copper and gold wiring"* and the board had only copper, which also meant a seal arriving somewhere new had no way to say so in the material
+- [x] **E2.9** `v3` Each and every one of the seventy-two is infused into the chip, not left on the board — `begin_procession()` walks the Ars Goetia in traditional order, seeding each seal off its own number times 7919 so Bael and Agares are not neighbours and the same demon is the same glyph every run. A seal burns in as before, then the same geometry collapses into the chip, copper going in and gold arriving. Seventy-two burns would have been seventy-two overlapping scars on one patch; seventy-two infusions leave a chip whose legs sit brighter the more it holds. Rendered in `tests/infusion_capture.gd`
+- [x] **E2.10** `v3` The seal's reserved patch is reserved from everything, not only from routing — two capacitors sat inside `SEAL_RADIUS` and every seal ever drawn went straight through them
+- [x] **E2.11** `v4` Copper, gold **and rust** — the third state. Copper oxidises to brown scale and then to green patina, and a board out of the Ashbloom has been doing that for years, so it is a dial rather than a colour: the same board reads as new on a bench and as scrap in a pile. Gold does not corrode, which is why it is on the contacts, and why a rusted board still has bright fingers
+- [x] **E2.12** `v4` The board is TouchDesigner-driven in the sense FINAL_V §16 actually permits — TD cannot run in a shipped game, so being "TD based" means every number worth tuning is reachable from a slider while you watch. `Motherboard.set_dial()` is the same contract `psychedelic_rig.gd` exposes and `OSCBridge.drive()` calls, so `bridge.drive(board)` is the whole wiring. Seven dials: `corrosion`, `patina`, `copper_gloss`, `gold_gloss`, `trace_glow`, `die_glow`, `chip_charge`
+- [x] **E2.13** `v4` The CPU at die scale, delidded on purpose — a heat spreader is a metal lid and hides everything worth seeing. Substrate, land grid, silicon die well under package size (the fact that makes a CPU look like a CPU), Manhattan-routed metal layers in two crossed sets, four functional blocks so the die is not a uniform mesh, and gold bond wires arcing off the die edge to substrate pads: the only curves on the whole board, which is why they read. `tests/cpu_capture.gd`
 - [x] ~~**E2.7** A bound seal keeps working while the board keeps power, and
       a burnt one is gone for the run~~ Decided in `ritual_app.gd`, not the
       board — `attempt()` reads the exact repeat count `Boons.grant()`
@@ -934,20 +1064,20 @@ mass-produced by the million.
 ### E3 — Camera rituals
 - [x] **E3.1** Ritual definitions: what must be done, what must be photographed — `systems/ritual_app.gd`'s `RITUALS`: three rites (including Greg's own worked example, five gored heads), each keyed to a real seal from `goetic_seals.gd` and paying its reward through `boons.gd` — E2/E3/E4 as the one system `RITUAL_AND_KARMA.md` says they are, not three
 - [x] **E3.2** Verify the photograph against real anatomy — reuses the exact `contents: [{severed, ruptured, dead}]` shape `wire_net.gd`'s `publish_photograph()` already verifies, rather than a second evidence system
-- [x] **E3.3** Rituals are playable, never a confirm button — `attempt()` takes no path to a reward without a `photo` argument that actually satisfies the requirement. Covered by `tests/ritual_app_test.gd` (13 checks)
+- [x] **E3.3** Rituals are playable, never a confirm button — `attempt()` takes no path to a reward without a `photo` argument that actually satisfies the requirement. Filing one photograph batches its evidence snapshot with every rite that image completes; a successful player cast then batches body payment, boon state, outcome, possible seal burn and the filed-evidence cast count behind one compact action receipt. Covered by `tests/ritual_test.gd` and `tests/ritual_app_test.gd`
 
 ### E4 — Temporary boosts, real costs
 - [x] **E4.1** Boosts are always temporary — `systems/boons.gd`: `grant()` refuses a zero-or-less duration outright, and `active_boons()` prunes anything past its own duration on every read, so there is no code path that grants a permanent effect
 - [x] **E4.2** Paid in blood, organs, limbs or standing — reuses `AnatomyComponent.ORGANS`/`DEFAULT_ZONES` for real defaults rather than inventing numbers, writes into the same `anatomy_state` shape `snapshot()`/`restore()` already use, and refuses rather than driving a ledger below a safety floor
-- [x] **E4.3** Escalating price on repeat — each further grant of the same `boon_id` costs `1.4^times_taken` more; retaking one refreshes rather than stacks it. Covered by `tests/boons_test.gd` (16 checks). E2/E6 (rituals/drugs) still need to actually call this — nothing here invents that content
+- [x] **E4.3** Escalating price on repeat — each further grant of the same `boon_id` costs `1.4^times_taken` more; retaking one refreshes rather than stacks it. Body payment, boon refresh and the public grant event are now one nested-safe ledger transaction, so ritual callers can include the grant without an intermediate save. Covered by `tests/boons_test.gd` (17 checks). E2/E6 call this shared body-cost route
 
 ### E5 — Ascent entities
 - [x] **E5.1** Entities as subjects on the nemesis machinery, not a shop — `systems/ascent_entities.gd`: The Clear Frequency and The Still Ledger are real subjects under `wizardsonlyfoolz`, and `regard()` draws the same kind of conclusion `RivalRegistry.consider()` draws on the other axis (a pattern in the log, not a scripted appearance), reading recorded mercy instead of harm
-- [x] **E5.2** Wash away sins for positive quests — `wash()` is refused until an entity has actually noticed you, then spends that notice on success (a fresh run of mercy earns it again, never bought twice with the same acts). The "quest" standing in for E2/E3/E6 content that does not exist yet is the same one already used elsewhere: a real recorded pattern. `sin_washed` added to `KARMA`/`event_karma()` in `world_history.gd`. Covered by `tests/ascent_entities_test.gd` (13 checks)
+- [x] **E5.2** Wash away sins for positive quests — `wash()` is refused until an entity has actually noticed you, then spends that notice on success (a fresh run of mercy earns it again, never bought twice with the same acts). Earned notice persists as a world conclusion; washing batches its karma event and spent attention behind one identified player action. The "quest" standing in for E2/E3/E6 content that does not exist yet is the same one already used elsewhere: a real recorded pattern. `sin_washed` remains in `KARMA`/`event_karma()` in `world_history.gd`; both entity schemas seed in one transaction. Covered by `tests/ascent_entities_test.gd` (16 checks)
 - [x] **E5.3** The long route: climbing lets the game continue — `route_endings.gd` (E7.2) is that hand-off, now built: reaching it is named `ascended_continue`, not a terminal state, and nothing in `RouteEndings` ends the game either way
 
 ### E6 — Drugs
-- [x] **E6.1** Substances with real body cost through the anatomy component — `systems/substances.gd`: Marrow Dust, Choir Bloom and Static Hymn, each an Ashbloom-native thing (ground bone, a fungal graft, dead-mast feedback — non-negotiable 1, nothing renamed off a real drug), paying into the same `anatomy_state` ledger `boons.gd` already pays into
+- [x] **E6.1** Substances with real body cost through the anatomy component — `systems/substances.gd`: Marrow Dust, Choir Bloom and Static Hymn, each an Ashbloom-native thing (ground bone, a fungal graft, dead-mast feedback — non-negotiable 1, nothing renamed off a real drug), paying into the same `anatomy_state` ledger `boons.gd` already pays into. A player dose now routes payment, anatomy mutation, its public event and any door glimpse through one nested-safe ledger batch and one compact `PlayerActionLedger` receipt; `tests/substances_test.gd` covers the closed transaction and stable action identity (19 checks)
 - [ ] **E6.2** Preparation and consumption minigames (UI; not attempted here)
 
 ### E8 — Sitting still
@@ -965,14 +1095,14 @@ than outward — and doing it anywhere dangerous is the whole risk.
 - [x] **E8.3** Interrupted is worse than never started — `interrupt()` adds real pain (`shock`, scaled by how deep the session had gotten) distinct from `end()`'s clean, costless stop; verified a session interrupted at 20s ends up with *more* pain than a session that was never held at all
 - [x] **E8.4** Where you sit matters: signal, territory and who is nearby all read — `begin(subject_id, context)` records whatever the caller actually observed (signal grade, territory, nearby subjects) once, at the moment sitting down happened, rather than this file querying a live scene it cannot see
 - [x] **E8.5** Deep enough, it reaches the entity layer the way a door substance does — slower, cheaper, and it cannot be rushed — past `ENTITY_THRESHOLD_SECONDS` (60s of real accumulated time, never a single call), `tick()` calls the exact same `AscentEntities.glimpse()` a door substance does — no attention spent, no `wash()`
-- [x] **E8.6** It is the only route that costs the body nothing, which is why it is slow — verified: a tick that pays down pain leaves blood untouched, unlike every `Boons`/`Substances` grant. Covered by `tests/meditation_test.gd` (20 checks)
+- [x] **E8.6** It is the only route that costs the body nothing, which is why it is slow — verified: a tick that pays down pain leaves blood untouched, unlike every `Boons`/`Substances` grant. Player begin/end/interruption boundaries now batch body state with one compact action receipt while individual hold ticks remain out of history, preventing a held input from flooding the ledger. Covered by `tests/meditation_test.gd` (21 checks)
 - [x] **E6.3** The door to the entity layer — a "door" substance calls `AscentEntities.glimpse()`, a real recorded `entity_glimpsed` contact that costs nothing of the entity's attention and cannot be spent on `wash()` — distinct from `regard()`'s earned notice
 - [x] **E6.4** Production and sale economy — `carry.gd`'s `take_substance()` carries one the same way a robbed part is carried (same wallet, `sale_value()` now prices `kind: "substance"`, same spoil clock). Covered by `tests/substances_test.gd` (16 checks)
 
 ### E7 — Route endings
 - [~] **E7.1** Become a demon; the soul is signed over — `systems/route_endings.gd` detects and permanently records crossing the Descent threshold (`-0.85`, near CellOutz's own `-0.95`) from real accumulated karma. What's missing: any actual consequence of having signed away (locking further karma, a title card) — that needs either scene/UI work or an API request into `world_history.gd`'s `_accumulate_karma()`, which is Codex's file
 - [~] **E7.2** Climb far enough and keep playing — same file, the Ascent threshold (`0.85`). "Keep playing" specifically is already true by default (nothing here ends the game either way); what's missing is anything that reads `route_ending_recorded` to make the moment felt
-- [x] **E7.3** Both endings written into world history — `route_ending_reached` event plus a permanent `route_ending` field, written exactly once (re-checking returns the same answer without re-recording). Covered by `tests/route_endings_test.gd` (9 checks)
+- [x] **E7.3** Both endings written into world history — `route_ending_reached` event plus a permanent `route_ending` field, written exactly once in one ledger transaction (re-checking returns the same answer without re-recording). Covered by `tests/route_endings_test.gd` (15 checks)
 
 ---
 
@@ -1002,7 +1132,7 @@ mechanisms and almost none are built.
 
 ### F1 — Witness records `BUILT`
 - [x] ~~**F1.1** Events record witnesses~~
-- [x] ~~**F1.2** An unwitnessed act never enters faction knowledge~~
+- [x] ~~**F1.2** An unwitnessed act never enters faction knowledge~~ — a delivered report creates/updates the faction knowledge schema and its `faction_learned` event in one atomic update
 - [x] ~~**F1.3** Kill the witness before they report~~
 
 ### F2 — Grudges travel real edges
@@ -1024,39 +1154,132 @@ mechanisms and almost none are built.
 ### F5 — Player defeat routed to shackled
 - [x] ~~**F5.1** Losing is not a reload~~
 - [x] ~~**F5.2** Shackled, conscripted or stamped by whoever won~~
-- [x] ~~**F5.3** Deliberate death: forfeit loot, re-decant out of the tar~~
+- [x] ~~**F5.3** Deliberate death: forfeit loot, re-decant out of the tar~~ — capture state and its two world facts persist atomically; deliberate death batches the inventory forfeit, player-body replacement and both public facts behind one `PlayerActionLedger` identity without pretending the resulting re-decant is a second action
 
 ### F6 — Mind-stamp and the asset list
-- [x] ~~**F6.1** Non-consensual recruitment through the handheld~~
-- [x] ~~**F6.2** Assets listed, taskable, remotely executable~~
+- [x] ~~**F6.1** Non-consensual recruitment through the handheld~~ — the bodily rewrite and public recruitment fact now persist as one identified `PlayerActionLedger` transaction
+- [x] ~~**F6.2** Assets listed, taskable, remotely executable~~ — issuing and executing remote orders each use one ledger receipt; subject state and established world events commit together, with the asset test covering closed nested transactions
 
 ### F7 — The clinch as a social verb
 **Highest value per line of code in the whole list** — four systems that already
 exist start talking to each other.
 - [x] ~~**F7.1** Hold-and-negotiate state out of the existing clinch~~
 - [x] ~~**F7.2** Rob, abuse or persuade from inside the hold~~
-- [x] ~~**F7.3** Feeds the downed-window resolution and recruitment~~
+- [x] ~~**F7.3** Feeds the downed-window resolution and recruitment~~ — taking hold, a completed takedown, persuasion and threats now use the common player-action route. Each social result silently amends memory, debt, consent, body and surrender state behind one established public event instead of `update_subject()` and `record_event()` filing the same clinch twice. A sent proximity-voice contact follows the same rule: one receipt, no raw audio, and one silent listener memory. `grapple_test.gd` and `resolution_test.gd` cover the receipts, closed transactions and absence of duplicate surrender/voice-memory events.
 
 ---
 
 
 ### F v10 — the final pass
 The last rung. Fifteen statements that are true of the hunt when this game is finished, each one an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
-- [ ] **F10.1** `v10` A rival is made by what happened, never spawned as a rival
-- [ ] **F10.2** `v10` Their body remembers the specific damage you did
-- [ ] **F10.3** `v10` Their tactics come from the record, read fresh, never cached
-- [ ] **F10.4** `v10` A rival who fled comes back changed in a way you can see
-- [ ] **F10.5** `v10` Death opens a real succession and somebody takes the place
-- [ ] **F10.6** `v10` Being hunted is the same system pointed at you
-- [ ] **F10.7** `v10` The law is a hunter with a jurisdiction
-- [ ] **F10.8** `v10` Bounty work for the top angels or the top demons is the job market
-- [ ] **F10.9** `v10` A contract is consumable and costs something to take
+- [x] **F10.1** `v10` A rival is made by what happened, never spawned as a rival —
+      `RivalRegistry.consider()` requires both attributed harm and survival on
+      an existing person; a boss label without lived history and an untouched
+      escape both fail. `rival_registry_test.gd` proves emergence preserves
+      population size, cites the exact originating event, and commits the
+      rival mutation with its one-time emergence fact as one transaction.
+- [x] **F10.2** `v10` Their body remembers the specific damage you did — the
+      adaptation is derived from the same persisted anatomy snapshot that
+      movement, combat and INDEX read: severed zone, ruptured organ, or the
+      worst damaged live zone. The registry test takes the left arm and proves
+      both the prosthetic response and written memory name that arm.
+- [x] **F10.3** `v10` Their tactics come from the record, read fresh, never cached —
+      both the authored captain and every ordinary encounter actor now ask
+      `RivalTactics.tactic_for()` only at the live movement decision, after
+      `RivalRegistry` confirms the person actually became a rival. No tactic is
+      stored on the scene or actor. The production integration test proves the
+      same person closes under a front-hit record, then a newly recorded limb
+      severing reverses their very next decision into a stand-off;
+      `rival_tactics_test.gd` still covers every derivation and distance rule,
+      while `enemy_ai_test.gd` proves ordinary crowd spacing is unchanged.
+- [x] **F10.4** `v10` A rival who fled comes back changed in a way you can see —
+      the roaming-population maintenance now spends its next open slot on an
+      escaped earned rival before generating another stranger. The shared
+      encounter builder permits that explicit return, keeps the exact subject,
+      restores their saved wounds and mounts the registry's prosthetic, organ
+      support or impact cage through `BaselineHuman` so both anatomy and mesh
+      own it. The return changes status durably, records one attributable fact
+      and cannot duplicate a person already present. Proven by
+      `hunt_rival_return_integration_test.gd` (10 checks); the real live body,
+      replacement arm and field HUD were rendered and visually inspected in
+      `captures/hunt_rival_return.png`.
+- [x] **F10.5** `v10` Death opens a real succession and somebody takes the place —
+      every production encounter death calls `WireNet.open_vacancy()` and
+      defers `promote_successor()` to the next idle turn. The saved post is
+      filled by an existing faction person using influence, loyalty, debt and
+      wealth rather than ELO. `wire_test.gd` proves the ranking rule;
+      `hunt_succession_integration_test.gd` proves the real anatomical Hunt
+      death opens and fills that post exactly once without generating anybody.
+      Vacancy and promotion are nested-safe on their own; the production idle
+      turn commits promotion, exact hunt transfer and retained player memory as
+      one succession transaction (11 integration checks).
+- [x] **F10.6** `v10` Being hunted is the same system pointed at you — local law
+      commissions named people through `_spawn_encounter_actor()`, so its
+      hunters use ordinary anatomy, perception, pathfinding, wounds, loot,
+      resolution and persistence. Their finishing blow now routes the player
+      into the same defeat/captivity system used by the canonical rival.
+- [x] **F10.7** `v10` The law is a hunter with a jurisdiction — a delayed witness
+      report resolves to the bounded canonical holding that MAP, INDEX and the
+      Board share; that holder sends its own two-person team to the recorded
+      scene rather than the player's live coordinate. Outside the 470×370-metre
+      Ashbloom boundary there is no local jurisdiction. Covered by
+      `local_law_test.gd`, `ashbloom_holdings_test.gd` and the production
+      `hunt_local_law_integration_test.gd`.
+- [x] **F10.8** `v10` Bounty work for the top angels or the top demons is the job market — publishing an offer creates its exact-target job subject and public announcement in one world transaction
+      — `HuntContracts` admits only a noticed
+      ascent entity or the current living CellOutz CROWN holder as patron, and
+      the physical INDEX now has a WORK leaf listing every persisted offer,
+      active contract and completed contract. The page makes patron, exact
+      target, obstruction and body/standing price pointable before acceptance
+      (`captures/hunt_contract_work.png`; 8/8 INDEX integration checks). This
+      is now organic in the production Hunt: the third distinct spared or
+      recruited body makes the Clear Frequency notice the player, then that
+      entity and the current CROWN holder publish reciprocal work against one
+      another's frequency/aura through the same market. The production test
+      drives three real anatomy bodies through `_resolve_downed()` and proves
+      timing, exact dynamic patrons/targets and non-duplication in 7 checks.
+- [x] **F10.9** `v10` A contract is consumable and costs something to take —
+      `HuntContracts` stores each offer as a one-use WorldHistory job. Taking
+      it first pays through `Boons.pay`, so blood, an organ, a limb or standing
+      really changes; only a successful debit consumes the offer, and retrying
+      an active contract cannot charge twice. The acceptance has one compact
+      `PlayerActionLedger` receipt and remains exact about patron and target.
+      `hunt_contracts_test.gd` proves the debit, refusal, one-use transition
+      and nonlethal exact-target resolution in 15 checks.
 - [ ] **F10.10** `v10` Elites cannot really die, which is why hunting them is work not war
-- [ ] **F10.11** `v10` Hunts run while you are elsewhere
-- [ ] **F10.12** `v10` A hunt can be inherited by somebody who never met you
+- [x] **F10.11** `v10` Hunts run while you are elsewhere — the canonical
+      captain registers an exact hunter/target/place clock anchor when the
+      hunt begins. `OffscreenHunts` settles one persistent turn per fifteen
+      world-minutes spent in another scene, moving the same hunt through
+      searching, closing and waiting without keeping its scene loaded. Long
+      absences catch up arithmetically in one event, time spent face-to-face
+      cannot be miscounted later, and a resolved hunter stops. The quarry and
+      Underground Colosseum production clock call the route directly; returning
+      to the Hunt reports how many turns the captain kept working. Proven in
+      `offscreen_hunts_test.gd` (12 checks, including multi-hunt atomic settlement and the production derby seam).
+- [x] **F10.12** `v10` A hunt can be inherited by somebody who never met you —
+      a hunter's ordinary anatomical death opens the existing faction vacancy;
+      once `WireNet` promotes its real socially strongest successor,
+      `OffscreenHunts.inherit()` transfers the exact target, place, phase and
+      elapsed search turns. Prior contact is neither invented nor required:
+      the inherited record explicitly says whether they had met, and the new
+      stranger enters the player's exact `hunted_by` memory. The production
+      succession test proves this full chain through a dead live actor and an
+      heir with no player relation or shared event (10/10 checks).
 - [ ] **F10.13** `v10` Nothing in a hunt is scripted to find you
 - [ ] **F10.14** `v10` The godhead is the last hunter and it does not need to look for you
-- [ ] **F10.15** `v10` Who hunted you is the thing the next universe knows
+- [x] **F10.15** `v10` Who hunted you is the thing the next universe knows —
+      every explicit production hunt now writes the exact person, name,
+      faction, reason, contract and originating run onto the player's bounded
+      `hunted_by` memory: the canonical captain, each local-law officer, each
+      CellOutz repossession contractor and any earned rival who returns. The
+      write is deduplicated per real contract, while different people remain
+      different memories. `QuantumSaves` carries the player rather than the old
+      world, so a fresh universe retains those names even though the hunter
+      subjects themselves are gone. `hunt_memory_test.gd` proves the full
+      production-captain → restart route in 10 checks; the local-law, corporate
+      bounty and rival-return integration suites each prove their exact actors
+      enter the same memory.
 
 ## G — The look
 
@@ -1104,6 +1327,17 @@ Read-only; everything derived lands in `game/art/derived/` via `tools/art_pipeli
       above adds procedural detail on top, but the base mesh itself (bonnet,
       cabin, panels) is only reachable by re-exporting from
       `art/scrap_skiff_v1/scrap_skiff.blend`.
+
+      **Scope widened by Greg, 2026-09-13:** *"this should not only just be for
+      the cars but for the whole hud and gui in the entire game."* The palette
+      is currently a remap applied at vehicle load. Making it the game's
+      palette means one source of colour that the HUD, the handheld pages, the
+      Board and the map all read from, rather than each surface carrying its
+      own constants — `living_map.gd` alone declares nine (`VOID`, `PLATE`,
+      `INK`, `ACID`, `SPORE`, `ARTERIAL`, `BILE`, `SCAN`, `BONE`), and
+      `black_mirror.gd` declares six more. That is a palette module plus a pass
+      over every drawing surface, and it is a bigger job than the re-export it
+      is written under. It should probably be its own segment.
 
 ### G0 — The wreckers cannot land a hit `OPEN BUG`
 Found 2026-09-12 by measurement, not yet fixed. A parked player finishes a
@@ -1223,7 +1457,7 @@ CellOutz leadership. Both poles are already in `FACTION_TREE_AXIS`.
 ### K1 — The two poles
 - [x] **K1.1** CellOutz and wizardsonlyfoolz on the Tree axis as the real ends
 - [x] **K1.2** CellOutz written through the existing branding as deliberate, not coincidence — both poles are now real registered `WorldHistory` subjects (`systems/cosmology_factions.gd`), not just table entries; CellOutz's doctrine and territory state the branding conceit directly ("the brand under every panel you have touched since the vat")
-- [x] **K1.3** wizardsonlyfoolz given a presence — ranks, a Law, a Book, paid grades. Founder (Orrin Vail, "the First Frequency" — three official, mutually contradictory biographies published side by side on purpose), Law ("There is no static, only those who have not yet paid to stop hearing it."), and Book (*The Unbroken Transmission*, a pamphlet subscription revised whenever someone senior enough complains) drafted and approved by Greg 2026-09-12. Paid grades use the order's own signal vocabulary (Static → Carrier → Sideband → Harmonic → Clear, `wire_net.gd`'s `rank_label()`) on the exact same buy-in math every Sin already runs — display-only, not a second rank system. `wren_ashby`, paid into Static, gives the pyramid a real headcount. Covered in `tests/cosmology_factions_test.gd` (25 checks total)
+- [x] **K1.3** wizardsonlyfoolz given a presence — ranks, a Law, a Book, paid grades. Founder (Orrin Vail, "the First Frequency" — three official, mutually contradictory biographies published side by side on purpose), Law ("There is no static, only those who have not yet paid to stop hearing it."), and Book (*The Unbroken Transmission*, a pamphlet subscription revised whenever someone senior enough complains) drafted and approved by Greg 2026-09-12. Paid grades use the order's own signal vocabulary (Static → Carrier → Sideband → Harmonic → Clear, `wire_net.gd`'s `rank_label()`) on the exact same buy-in math every Sin already runs — display-only, not a second rank system. `wren_ashby`, paid into Static, gives the pyramid a real headcount. The complete cosmology boot now coalesces faction, entity and Horseman schemas rather than saving each subject separately. Covered in `tests/cosmology_factions_test.gd` (34 checks total)
 
 ### K2 — The Four Horsemen
 Named by Greg 2026-09-12 — the traditional four, used directly. Built in
@@ -1231,27 +1465,27 @@ Named by Greg 2026-09-12 — the traditional four, used directly. Built in
 - [x] **K2.1** Four named subjects on the nemesis machinery, not health bars in rooms — War, Famine, Pestilence, Death, each a real `WorldHistory` person under CellOutz with their own grip on a real Sin (War/Ashline, Famine/Black Mile, Pestilence/Soft Rot, Death/Choir of Marrow) rather than a stat block
 - [x] **K2.2** Rotating succession: killing the one in power promotes the next (pairs with F3) — deliberately *not* scripted (non-negotiable 2): each Horseman's `loyalty`/`wealth` are real fields, their Sin-grip gives real influence, and `WireNet.promote_successor()`'s existing generic scoring decides who actually takes CROWN. Verified: killing War hands the post to Death, from the numbers alone, not a hardcoded order. Found and fixed along the way: neither `WireNet.promote_successor()` clearing a fallen holder's own `faction_rank`, nor `demon_hierarchy.gd`'s `tier()`, accounted for a dead subject still reading "CROWN" on paper — `current_reign()` and `tier()` now both check status
 - [x] **K2.3** Who holds the post changes what CellOutz does, not just the name — `current_doctrine()` reads whoever actually holds CROWN and returns *their* doctrine/threat variant of CellOutz's own "ownership, downward" line, not one static text
-- [x] **K2.4** The Horseman in power is what makes a run different (answers the roguelike question) — answered by K2.2/K2.3 together: succession is emergent per run and it actually changes what CellOutz's own doctrine reads as, verified in the same test. Covered by `tests/the_four_horsemen_test.gd` (21 checks)
+- [x] **K2.4** The Horseman in power is what makes a run different (answers the roguelike question) — answered by K2.2/K2.3 together: succession is emergent per run and it actually changes what CellOutz's own doctrine reads as, verified in the same test. Covered by `tests/the_four_horsemen_test.gd` (25 checks)
 
 ### K4 — The hierarchy below
 Four tiers, all on existing machinery. See `DESIGN/COSMOLOGY.md`.
 - [x] **K4.1** The Seven Deadly Sins as princes over the factions that embody them — CellOutz now holds a `command` relation over all seven Sin-factions (the four original plus the three below), so the Horsemen/Sins/Captains tiering is a real relation graph, not prose
-- [x] **K4.2** Pride, Lust and Sloth need factions — four Sins already have one. Built: **Vanity Row** (Pride, augment vanity cult), **The Honeyvein** (Lust, intimacy/obligation brokers), **The Long Static** (Sloth, apathy cult holding dead signal), each with a doctrine, territory, a signal `channel`, one named captain, and a `FACTION_TREE_AXIS` entry. Covered by `tests/cosmology_factions_test.gd` (22 checks)
+- [x] **K4.2** Pride, Lust and Sloth need factions — four Sins already have one. Built: **Vanity Row** (Pride, augment vanity cult), **The Honeyvein** (Lust, intimacy/obligation brokers), **The Long Static** (Sloth, apathy cult holding dead signal), each with a doctrine, territory, a signal `channel`, one named captain, and a `FACTION_TREE_AXIS` entry. Covered by `tests/cosmology_factions_test.gd` (34 checks)
 - [x] **K4.3** Lesser demons roaming, generated by F4.1 rather than authored — `systems/demon_hierarchy.gd`'s `is_lesser_demon()`/`lesser_demons()` classify RivalRegistry's existing rivals (any `is_rival` subject with no faction) rather than spawning anything new; also gives K2.2/K4.1 a real read (`tier()` reads whoever actually holds CellOutz's CROWN rank as Leadership and a Sin's own command-edge as its Captain, no name required, so K2 stays unblocked mechanically while the Horsemen's names stay blocked on Greg). Covered by `tests/demon_hierarchy_test.gd` (11 checks)
-- [x] **K4.4** A Sin holds *signal*, not a keep — channels taken by argument, hijack or cut. `wire_net.gd`'s `contest_channel()` builds all five `DESIGN/FACTIONS.md` routes against real state: out-publish requires actually out-reaching the channel's own roster (`_channel_reach()`), discredit requires a real trace/expose already on record against one of its people (reuses `act()`'s own evidence, invents no second system), hijack/cut require physical access (`at_terminal`, for whoever wires the world to pass once a player stands at a mast), flood is always available but only ever dents control. Every success writes `signal_control` on the faction and a `channel_contested` event. Covered by `tests/channel_contest_test.gd` (14 checks)
+- [x] **K4.4** A Sin holds *signal*, not a keep — channels taken by argument, hijack or cut. `wire_net.gd`'s `contest_channel()` builds all five `DESIGN/FACTIONS.md` routes against real state: out-publish requires actually out-reaching the channel's own roster (`_channel_reach()`), discredit requires a real trace/expose already on record against one of its people (reuses `act()`'s own evidence, invents no second system), hijack/cut require physical access (`at_terminal`, for whoever wires the world to pass once a player stands at a mast), flood is always available but only ever dents control. Every success writes `signal_control` on the faction and a `channel_contested` event; a player success carries one action receipt while autonomous contests remain ordinary world events. Control, event and all retaliation grudges persist in one transaction. Covered by `tests/channel_contest_test.gd` (23 checks)
 - [x] **K4.5** Killing a Sin changes what its faction is about, because the principle drives its axis and pricing — already true for the original four by construction, and now verified true for the three new ones too (`faction_price_factor` reads any `FACTION_TREE_AXIS` entry generically)
 
 ### K3 — The player as half of each
 - [~] **K3.1** Decide whether both ladders can be climbed at once or committing closes one — answered by default rather than invented fresh: `route_endings.gd`'s own comment argues both stay climbable right up until one is actually finished, and finishing one then locks (verified: a subject who signs away and later drifts all the way back up on paper still reads as the demon ending). A default worth Greg confirming or overriding, not a closed question
 - [x] **K3.2** The opening reframed: CellOutz grew you, which is why the debt is in the meat — one line added to `vat_chamber.gd`'s `BEATS` (a pure clock-driven subtitle list, decoupled from the phase/movement logic it lives beside), landing as the very next beat after "Debt's in the meat, friend": *"CellOutz grew you. CellOutz owns what it grew. Read your own contract sometime."* Verified visually, not assumed: `tests/opening_capture.gd` now also captures this beat (`game/captures/opening_celloutz_reframe.png`, actually opened and read). `tests/opening_direction_test.gd` extended (3 checks) to assert the line exists, names CellOutz, and lands immediately after the debt line rather than buried elsewhere
-- [x] **K3.3** Getting God's attention as the actual win condition, written into world history — `RouteEndings.forced_gods_attention()` reads the Ascent ending already built (E7.2) as that moment, per `DESIGN/COSMOLOGY.md`'s own framing, rather than inventing a distinct God entity. Covered by `tests/route_endings_test.gd` (14 checks total)
+- [x] **K3.3** Getting God's attention as the actual win condition, written into world history — `RouteEndings.forced_gods_attention()` reads the Ascent ending already built (E7.2) as that moment, per `DESIGN/COSMOLOGY.md`'s own framing, rather than inventing a distinct God entity. Covered by `tests/route_endings_test.gd` (15 checks total)
 
 ### K v2 — the second pass
-- [x] **K2.5** `v2` The Horsemen exist as subjects with no behaviour of their own — `wire_net.gd`'s `_retaliate()` now also raises whoever actually reigns' own `grudge` (half what the Sin's own captain feels — once removed, still real) whenever any Sin CellOutz commands is contested, reusing `TheFourHorsemen.current_reign()`. The same grudge field the Hunt System already reads, so a Horseman who has accumulated enough of it is exactly as meetable as any other rival. Covered in `tests/the_four_horsemen_test.gd` (2 new checks, 23 total)
-- [x] **K4.6** `v2` The Sins are named and placed but do not act on the world — `wire_net.gd`'s `contest_channel()` now retaliates: a successful contest raises the faction's own captain's real `grudge` toward whoever did it, scaled by how much it cost them (flood 4, out-publish 6, discredit 10, hijack 15, cut 20 — a mast cut is remembered harder than an afternoon of flooding). That grudge is not decorative — it is the exact field `RivalRegistry`/F2 propagation already reads, so a Sin acting on the world means a real future rival, not a scripted counter-raid. Only a contest that actually lands retaliates; a refusal does nothing. Covered in `tests/channel_contest_test.gd` (4 new checks, 19 total)
+- [x] **K2.5** `v2` The Horsemen exist as subjects with no behaviour of their own — `wire_net.gd`'s `_retaliate()` now also raises whoever actually reigns' own `grudge` (half what the Sin's own captain feels — once removed, still real) whenever any Sin CellOutz commands is contested, reusing `TheFourHorsemen.current_reign()`. The same grudge field the Hunt System already reads, so a Horseman who has accumulated enough of it is exactly as meetable as any other rival. Covered in `tests/the_four_horsemen_test.gd` (25 checks total)
+- [x] **K4.6** `v2` The Sins are named and placed but do not act on the world — `wire_net.gd`'s `contest_channel()` now retaliates: a successful contest raises the faction's own captain's real `grudge` toward whoever did it, scaled by how much it cost them (flood 4, out-publish 6, discredit 10, hijack 15, cut 20 — a mast cut is remembered harder than an afternoon of flooding). That grudge is not decorative — it is the exact field `RivalRegistry`/F2 propagation already reads, so a Sin acting on the world means a real future rival, not a scripted counter-raid. Only a contest that actually lands retaliates; a refusal does nothing, and the whole landed consequence chain is atomic. Covered in `tests/channel_contest_test.gd` (23 checks total)
 - [ ] **K1.4** `v2` Both poles are real in the ledger and barely felt in the world — a player should know which one they are standing in
 - [x] **K3.2** `v2` Nothing yet stops a player climbing both ladders at once — real friction added, distinct from K3.1's answer: the Tree *axis* stays freely reversible until an ending locks it (deliberate), but `wire_net.gd`'s `_build_account()` now halves `reach` once a subject holds genuine command-relation weight (≥20 strength) in a Descent faction **and** in wizardsonlyfoolz *at the same time* — a small toe in the other ladder is not enough to trigger it, only real simultaneous standing on both. Covered in `tests/dual_ladder_test.gd` (3 checks, isolating the penalty by holding total influence constant and only varying the split)
-- [x] **K5.1** `v2` Lesser demons are rivals reread; they should eventually want something of their own — `systems/demon_ambition.gd`: a first version, derived from real state rather than an authored personality. A demon with a real, strong grudge (≥15) wants to settle it (a recorded escalation each time it's pursued); otherwise it wants patronage from whichever Sin's `signal_control` is currently *weakest* — tying K5.1 into K4.4/K4.6 as one story (weakening a Sin's channel makes it a target for opportunists, not just a number dropping). Succeeding at patronage actually grants the faction affiliation and graduates them out of `DemonHierarchy.is_lesser_demon()` for good — a demon reread upward by its own pursuit, on the same F3/promote_successor track a captain or even a Horseman already runs on. Covered in `tests/demon_ambition_test.gd` (14 checks)
+- [x] **K5.1** `v2` Lesser demons are rivals reread; they should eventually want something of their own — `systems/demon_ambition.gd`: a first version, derived from real state rather than an authored personality. A demon with a real, strong grudge (≥15) wants to settle it (a recorded escalation each time it's pursued); otherwise it wants patronage from whichever Sin's `signal_control` is currently *weakest* — tying K5.1 into K4.4/K4.6 as one story (weakening a Sin's channel makes it a target for opportunists, not just a number dropping). Succeeding at patronage actually grants the faction affiliation and graduates them out of `DemonHierarchy.is_lesser_demon()` for good — a demon reread upward by its own pursuit, on the same F3/promote_successor track a captain or even a Horseman already runs on. The autonomous faction mutation and joined fact persist together without falsely attributing them to the player. Covered in `tests/demon_ambition_test.gd` (15 checks)
 
 
 ### K v3 — the third pass
@@ -1323,18 +1557,18 @@ holds what the *player* thinks — which is allowed to be wrong.
 - [x] **L1.4** Legible from across the room as a shape, up close as cards
 
 ### L2 — Pinning
-- [x] **L2.1** The player pins what they choose, from the index, the camera and CARRY
+- [x] **L2.1** The player pins what they choose, from the index, the camera and CARRY; pin, unpin and release-after-moving each close as one player-action receipt with the saved board state
 - [x] **L2.2** Photographs from `field_camera.gd` pin with their verifiable contents
 - [x] **L2.3** Nothing auto-pins except the first card
 
 ### L3 — Strings are claims
-- [x] **L3.1** Draw a connection between two pinned things
+- [x] **L3.1** Draw a connection between two pinned things; drawing and cutting persist the wall and their player-action receipt atomically
 - [x] **L3.2** A string the world supports becomes a lead and opens work
 - [x] **L3.3** A false string looks exactly as convincing as a true one
 - [x] **L3.4** The board never marks it — what a lead *leads to* lands with L5
 
 ### L4 — Publishing a theory
-- [x] **L4.1** A theory goes to the Wire through `expose` / `fabricate`
+- [x] **L4.1** A theory goes to the Wire through `expose` / `fabricate`; its Wire receipt, board mutation and single public outcome share one transaction (the former duplicate `theory_published` pair is gone)
 - [x] **L4.2** True published = discrediting; false published = fabrication, and it costs
 - [x] **L4.3** Being wrong has a price — the first screen where it does
 
@@ -1540,7 +1774,18 @@ The last rung. Fifteen statements that are true of somewhere of your own when th
 - [ ] **H10.5** `v10` The room with the bed and the mirror is the first one
 - [ ] **H10.6** `v10` The Board is on its wall
 - [ ] **H10.7** `v10` The cloud terminal is to the right of it
-- [ ] **H10.8** `v10` You can sleep, and sleeping moves the clock
+- [x] **H10.8** `v10` You can sleep, and sleeping moves the clock — a physical
+      bedroll now sits within reach of the Hunt's opening route and owns a
+      contextual `[E] REST ... WAKE AT 07:00` interaction. Rest advances the
+      one persisted `WorldClock` forward to the next dawn, immediately updates
+      the world's light, and records the exact elapsed hours, waking stamp and
+      calendar date as `player_slept`; it does not run a second timer or silently
+      edit the sky. The completed rest now receives one durable action-ledger
+      receipt; a living hostile within 18 metres refuses the action without
+      moving time or counterfeiting another receipt. `tests/sleep_site_test.gd`
+      proves the physical site, reach, forward clock movement, ledger receipt,
+      distance gate and danger refusal (9 checks); `world_clock_test` remains green. The live dusk encounter and
+      its prompt were opened at `captures/h10_8_sleep_site.png`.
 - [ ] **H10.9** `v10` What is stored there is really stored, not a menu
 - [ ] **H10.10** `v10` Somebody can be waiting in it when you come back
 - [ ] **H10.11** `v10` Holding it costs something ongoing
@@ -1704,13 +1949,33 @@ finished. Applies to everything below and to A5, A6, C1.
       Verified: `tests/index_wire_glow_test.gd` (3/3) plus
       `captures/i1_5_v2_index_file_no_rain.png` /
       `i1_5_v2_index_wire_has_rain.png`.
-- [ ] **I4.3** `v2` Vitality degrades the panels uniformly; a specific wound should damage a specific part of what you are reading
+- [x] **I4.3** `v2` Vitality degrades the panels uniformly; a specific wound should damage a specific part of what you are reading — the live six-zone anatomy now collapses into four explicit instrument feeds without introducing another health model: head damage slips/cracks only the top-right portrait, torso damage tears and summons the contextual anatomy/X-ray, either arm shakes and breaks registration only in the held-object reliquary, and either leg disrupts only the lower-left satellite/dead-reckoning aperture. Healing the real zone repairs its instrument because the ratios are derived afresh from `AnatomyComponent.zones` every HUD update. `tests/interface_wound_damage_test.gd` proves clean state, all four mappings, exact ratio transfer, contextual torso display and arm/reliquary delivery (8 checks); `smoking_lung_ui_test` and `hud_transience_test` remain green. The four simultaneous local failures were inspected in the live Hunt at `captures/i4_3_region_wound_ui.png`.
 
 
 ### I v3 — the third pass
 v2 made the screens their own medium and the medium is still six separate designs. Greg: *"the entire blackmirror gui needs work"*.
-- [ ] **I3.1** `v3` One GUI with one grammar, not a set of well-drawn pages
-- [ ] **I3.2** `v3` Moving between pages is movement, not a cut
+- [x] **I3.1** `v3` One GUI with one grammar, not a set of well-drawn pages —
+      all seven Black Mirror apps now live inside one chassis-owned page
+      contract: fixed 16:9 glass, inset work surface, persistent header/footer
+      rails, mode/role registration, page number, navigation hint and one
+      page-specific primary verb. Hosted INDEX/MAP/WIRE panels and native
+      RADIO/CARRY/RITUAL/FIELD instruments receive the same content aperture
+      instead of each deciding its own edges. `handheld_page_grammar_test.gd`
+      verifies the shared bounds and complete seven-page contracts; visual
+      evidence: `captures/i3_1_shared_page_grammar.png`.
+- [x] **I3.2** `v3` Moving between pages is movement, not a cut — every direct
+      jump and cyclic page change now drives a 0.52-second ribbed shutter in
+      the shortest travel direction. The old live page remains present while
+      it enters; the destination activates and emits `mode_changed` only at
+      full occlusion; the new live page is revealed as it exits. The
+      deterministic midpoint contract and reversed travel are proven by
+      `handheld_page_grammar_test.gd`; visual evidence:
+      `captures/i3_2_page_shutter.png` and `i3_2_page_arrival.png`.
+      A non-binding decision reel now compares that fallback against equally
+      timed cracked-glass corruption and occult-carousel candidates, each with
+      digital-tear and glass-resonance sound sketches. No candidate silently
+      replaced production: `DESIGN/BLACK_MIRROR_TRANSITION_COMPARISON.md`,
+      `captures/black_mirror_transition_comparison.mp4`.
 
 ### I v4 — the fourth pass
 v3 unified the pages and the weapon is still configured in a list. Greg: *"the slide pops out into a menu if you press shift and lock it, expanding into the weapon customisation, maybe the circle in the middle and 4 boxes around it"*.
@@ -1742,18 +2007,56 @@ v8 made the device dangerous and most objects in the world still cannot be looke
 - [ ] **I9.1** `v9` Anything in the world can be inspected properly, guns included
 - [ ] **I9.2** `v9` Inspection is the same grammar everywhere rather than per-object
 
+      The safe first world-side slice is now live without over-claiming either
+      universal statement: every presently takeable object in the Hunt — each
+      substance and smokeable on the shared station, the dropped Black Mirror,
+      salvage caches and identified gore/whole limbs — can be held under `I`
+      without being picked up. Its actual live mesh enters the same 3D
+      reliquary, prompt grammar and action-ledger route already used by held
+      guns, smokeables and severed limbs; releasing `I` restores the held object
+      and leaves the inspected pickup in the world. `substance_station_test.gd`
+      proves identity, reach and non-consumption; `combat_integration_test.gd`
+      proves all four real Hunt adapters and the reliquary seam. Nearby living,
+      downed and dead encounter subjects now enter that same live-geometry
+      grammar with their identity and current state, but file a distinct
+      `world_subject_inspected` receipt rather than being mislabeled as items;
+      their deeper organs and history remain on the Black Mirror dossier.
+      Visual evidence: `captures/world_item_inspection.png` and
+      `captures/world_subject_inspection.png`. Authored working fixtures now
+      begin the same contract: the station's tray, grinder, scales, ashtray and
+      lighter plus the Hunt bedroll expose live geometry and stable fixture
+      identities without becoming takeable, filing `world_fixture_inspected`
+      rather than item receipts (`substance_station_test.gd`,
+      `sleep_site_test.gd`). Broad architecture and incidental scenery still
+      need adapters before I9.1/I9.2 may be ticked.
+
+      The shared reliquary itself has now been play-read rather than merely
+      fed more classes: it ignores hidden live submeshes (so an ejected or
+      deliberately hidden magazine cannot reappear in the display), copies
+      surface overrides, clears an old specimen synchronously on a rapid
+      class switch, and fits against the orbit's horizontal and vertical
+      envelope instead of shrinking long thin objects by their diagonal.
+      Each new source begins from the same legible three-quarter phase, while
+      long labels and state marks condense independently instead of colliding.
+      `held_item_reliquary_test.gd` pins all five behaviours; the live Marrow
+      Dust render at `P:/GameDev/Temp/reliquary_world.png` verifies the larger,
+      centred result. This improves the common grammar without pretending
+      incidental architecture already has the missing world adapters.
+
 ### I v10 — the tenth pass
 Nine passes designed in a lit room. C v4 made the device the main light source in the world.
 - [ ] **I10.1** `v10` Every screen re-judged as the only light in a dark place
 - [ ] **I10.2** `v10` What the screen throws onto your hands is part of the design
 
 - [ ] **I10.3** `v10` Every screen is a physical object with a surface and a condition
-- [ ] **I10.4** `v10` Moving between pages is movement, never a cut
+- [x] **I10.4** `v10` Moving between pages is movement, never a cut — fulfilled
+      by the same Black Mirror shutter and hidden-midpoint page swap proven
+      under I3.2; the physical casing and glass remain continuous throughout.
 - [ ] **I10.5** `v10` Everything in the world can be inspected with the same verbs
 - [ ] **I10.6** `v10` A screen is legible while you are being attacked
 - [ ] **I10.7** `v10` Screens are readable in the dark and lit by their own emission
 - [ ] **I10.8** `v10` The weapon customisation lives on the weapon
-- [ ] **I10.9** `v10` Damage to you damages the specific part of what you are reading
+- [x] **I10.9** `v10` Damage to you damages the specific part of what you are reading — implemented with I4.3 v2: head/portrait, torso/anatomy, arms/held object and legs/navigation each fail locally from their corresponding live anatomy zone; there is no whole-screen injury filter and no parallel cosmetic damage value.
 - [ ] **I10.10** `v10` Nothing is clickable that does not look clickable
 - [ ] **I10.11** `v10` Every panel works on keyboard and on the pointer equally
 - [ ] **I10.12** `v10` The cursor exists on every screen that hides the OS one
@@ -1809,9 +2112,18 @@ nobody reads, and a real error has nowhere to appear.
       Every one was checked and every one was deliberate — grid rows, id digits,
       halving a point budget. The annotation says so at the site, which leaves the
       warning live for the next one that is not.
-- [ ] **J5.5** A test that fails when the count goes back up — the warnings are
-      editor-only diagnostics and appear in no headless run, so nothing currently
-      stops them accumulating again
+- [x] **J5.5** A test that fails when the count goes back up —
+      `tools/verify-godot-diagnostics.ps1` boots the actual editor headlessly,
+      groups `SCRIPT WARNING`/`SCRIPT ERROR` blocks by their `res://` source,
+      excludes addon-owned and engine-shutdown noise, and fails above the fixed
+      project budget of zero. Its self-test proves shutdown leak noise stays out
+      while a synthetic project warning makes the count rise to one; the real
+      editor scan passes at 0. The first run immediately earned the gate: it
+      caught `the_room.gd` calling the obsolete `BodyMirror.make()` API left by
+      a merge. The wall-reflection camera now has its own `RoomMirrorView`
+      contract while the freestanding body-following `BodyMirror` remains
+      intact. `body_mirror_test` passes 13 checks and the live room diagnostic
+      again places all sampled body points inside the wall mirror frustum.
 
 ---
 
@@ -1900,13 +2212,11 @@ Since it was written, `vehicle_interior.gd`/`dash_cluster.gd` — both Lane
 - [x] ~~**M2.3** The other hand holds a gun, and you shoot out of your own
       car~~ `gun_arm` is real geometry (a grip, a slide, a barrel), LMB
       calls `_fire_from_cab()` in `rift_derby.gd`, and it is a real weapon —
-      a raycast, real ammo (`rounds_left`), a cooldown, and real damage to
-      whatever it hits (`_damage_target`), not a cosmetic muzzle flash.
-      **Not yet true**: this is a second, simpler firearm system
-      (raycast + flat damage) rather than the one AF1/AF1.1 built —
-      `Ballistics`' real projectile and `BaselineHuman.hit_at`'s zone
-      resolution never enter it. That gap is AF1.8's own, named for exactly
-      this reason, and stays open
+      real ammo, reload and jams through the Hunt's own `HunterArsenal`
+      (`cab_arsenal`), and a real travelling round through the Hunt's own
+      `Ballistics` (`ballistics.fire()`), not a cosmetic muzzle flash or an
+      instant raycast. Closed by AF1.8/AF10.8 — see there for what was
+      actually verified and the two bugs that verification found
 - [x] ~~**M2.4** You shoot through your own windscreen, and the glass is
       really there~~ `_windscreen()` is a real `BoxMesh` plane in front of
       the camera, lit by the world, and `punch_through()` marks it exactly
@@ -1931,12 +2241,18 @@ Since it was written, `vehicle_interior.gd`/`dash_cluster.gd` — both Lane
       rival or grudge ≥ 40, not a derby-specific measure like rounds won or
       laps survived. Whether "derby progress" was meant to name a different
       number is Greg's call, not assumed here
-- [ ] **M2.7** No hard cut between the two views (Rule 3) — checked, and it
-      is one: `_toggle_derby_view()` flips `in_cab` and `_apply_view_masks()`
-      swaps `camera.cull_mask` between the cab and bodywork layers on the
-      same frame, with no fade, no camera travel, nothing eased. Rule 3
-      ("every hard cut is a bug") names exactly this. Left open rather than
-      touched — `rift_derby.gd` is Lane 2's file
+- [x] **M2.7** No hard cut between the two views (Rule 3) — the toggle now
+      captures the live camera pose and travels for 0.68 seconds through a
+      smoothstep interpolation to the moving cab/chase target, including its
+      FOV. Both the bodywork and cab shell stay rendered while the eye crosses
+      the car; the destination cull mask is applied only on arrival, so neither
+      side disappears around the player mid-move. The heat now also begins in
+      the cab as M2.6 specifies, rather than exposing its still-locked chase
+      view by default. `tests/derby_view_transition_test.gd` proves both
+      journeys and both arrival masks (9 checks); `derby_cab_test` and
+      `derby_balance_test` remain green. The actual cab, halfway-through-car
+      and chase frames were opened and compared at
+      `captures/m2_7_view_{cab,midway,chase}.png`.
 
 ### M2b — Cars are the horses of this world
 Greg: *"in the car we need to be able to fully exit it like e exit the door type
@@ -2254,7 +2570,18 @@ what that is rather than fixing another symptom.
       schema, so `.duplicate()` carried the stricter type over and
       `wounds.has()`/`.append()` on a plain string were throwing silently in
       the console rather than failing loud enough to notice without a test.
-- [x] **O3.2** A damaged limb changes what that person can do, and now shows it — arms hang, legs trail, the body leans off the bad side
+      A connecting player melee swing now routes its existing
+      `npc_anatomy_hit`/`melee_body_hit` event through the same compact action
+      ledger; wall strikes and rounds cut out of the air use that grammar too.
+      Anatomy and gore events remain consequences rather than extra receipts. The
+      complete landed outcome now shares that boundary too: anatomy snapshot,
+      combat response, maiming, death/loot and Mara's possible retreat commit in
+      one nested-safe batch for either a named-rival swing or a roaming body.
+      `rival_body_health_test.gd` and `combat_integration_test.gd` assert the
+      transactions close after real hits. The prosthetic surge is likewise one
+      `prosthetic_surge_used` action; its `melee_body_hit` remains a world
+      consequence rather than counterfeiting a second player input.
+- [x] **O3.2** A damaged limb changes what that person can do, and now shows it — arms hang, legs trail, the body leans off the bad side. A live severing now amends that body silently and publishes exactly one detailed `limb_severed_in_combat` fact inside the landed-hit transaction; the former `update_subject()` event plus explicit event pair was double-counting the same lost limb for rival tactics and occult attention. `combat_integration_test.gd` fixes the one-event and closed-batch contract.
 - [x] ~~**O3.3** Grappling connects to it — hold, force, rob, recruit~~ Rob and
       recruit already did (F7.2 lets you rob somebody you are holding; F7's
       persuade/threaten already read pain and fading consciousness). Hold and
@@ -2564,33 +2891,35 @@ the game is bigger than you. This project is unusually well set up for the
 second one, because the systems that gate things already exist and are already
 diegetic.
 
-- [ ] **P2b.1** Locked regions are refused by the world, never by a disabled control
-- [ ] **P2b.2** Refusals reuse systems that already exist — signal grade, faction standing, a road nobody will open
-- [ ] **P2b.3** A refusal names what is on the other side, so the player knows what they are missing
-- [ ] **P2b.4** Locked features are absent, not visibly disabled — no ghost buttons
-- [ ] **P2b.5** Everything locked in the demo is genuinely playable in the mainline; nothing is locked because it is unbuilt
-- [ ] **P2b.6** The same code path serves both — the mainline does not get a second implementation
+- [x] **P2b.1** Locked regions are refused by the world, never by a disabled control — `bone_yard_hunt.gd::_enforce_demo_territory()` reads the player's real position every physics frame; crossing from the Bone Yard into a neighbouring Ashbloom holding snaps the player back onto their own ground and zeroes outward velocity, in demo mode only. Nothing is greyed out or blocked by a menu flag; the whole Ashbloom Expanse is physically generated and walkable, the world itself declines to let a demo run stand on it
+- [x] **P2b.2** Refusals reuse systems that already exist — signal grade, faction standing, a road nobody will open — the check is `ASHBLOOM_HOLDINGS.jurisdiction_at()`, the exact Voronoi holding/faction lookup local law and combat already read off world coordinates (`hunt_local_law_integration_test.gd` exercises the same call for a completely different purpose). No parallel demo-only geography was built
+- [x] **P2b.3** A refusal names what is on the other side, so the player knows what they are missing — the prompt reads `"<HOLDING NAME> — <NOTE> // <FACTION> HOLDS THIS GROUND. NO DEMO CONTRACT REACHES IT."`, pulled from the same `DEFINITIONS` table the Board and MAP read (e.g. crossing into Ossuary Works names Choir of Marrow, sealed anatomy industry), not a generic "locked" message
+- [x] **P2b.4** Locked features are absent, not visibly disabled — no ghost buttons — audited rather than built: `WorldHistory.is_demo()`/`run_mode` have exactly two call sites in the whole project outside tests (`bone_yard_hunt.gd:858` for the wall, `bone_yard_hunt.gd:1934` for `_enforce_demo_territory()`), and neither draws a control. `living_map.gd`, `world_index.gd`, `pin_board.gd`, `satellite_view.gd`, `handheld_device.gd` and `radial_menu.gd` never reference demo state at all, so the map, the Board, the Wire and every contract on them render identically in PLAY and DEMO — there is no code path that could grey a row for a demo-locked holding, because none of those screens know they are in a demo. The one deliberately-visible-but-disabled control in the project, `country_town_menu.gd::_build_locked_doors()` (MULTIPLAYER/ONLINE, Y2.2), is a different rule for a different reason — features that do not exist yet, not features the demo withholds — and is itself unconditional on `run_mode`. The lock the player actually meets is P2b.1's physical refusal at the world's edge; nothing above it is disabled
+- [x] **P2b.5** Everything locked in the demo is genuinely playable in the mainline; nothing is locked because it is unbuilt — `_enforce_demo_territory()` returns immediately when `WorldHistory.is_demo()` is false, verified in `demo_border_test.gd`: standing on Ossuary Works ground in PLAY mode is never touched, and the home holding is never even learned outside a demo run
+- [x] **P2b.6** The same code path serves both — the mainline does not get a second implementation — one function, one call site (`_physics_process`), gated by a single `if not WorldHistory.is_demo(): return`; PLAY and DEMO read the identical jurisdiction lookup. `demo_border_test.gd` drives the real `bone_yard_hunt.tscn` through both modes (11/11): learning home ground from real position rather than an assumed name, the border refusal itself (position, velocity, named prompt, one `demo_border_refused` event), no event spam while leaning on the same border, and a fresh event on leaving and re-approaching. `loop_smoke_test` and the existing hunt suites stayed green throughout
 
 ### P3 — The wall
 The part that makes it a demo rather than a trial. It is a designed moment, in
 the game's own voice, not a fade to a store page.
 - [x] **P3.1** The game stops at an authored point, deliberately and visibly — the Hunt freezes under a full-frame `DemoWall` only after its first real story victory
 - [x] **P3.2** The stop is in the register — CellOutz closes the demonstration account with a final invoice and bills the balance as `THE REST OF THE GAME`
-- [x] **P3.3** It arrives *after* a win, not in the middle of one — the only hook is `_rival_retreats()`, after `hunt_arc_first_beat_complete` records that the Ashline captain was forced from the field
+- [x] **P3.3** It arrives *after* a win, not in the middle of one — the only hook is `_rival_retreats()`, after `hunt_arc_first_beat_complete` records that the Ashline captain was forced from the field. Captain status, completed hunt beat, emergent rivalry and the demo ending now close as one nested-safe retreat outcome (`demo_route_test.gd`).
 - [x] **P3.4** What the player loses by stopping is made concrete: the invoice names the outer Ashbloom road, the captain's rebuilt second hunt, and Board/Wire contracts
-- [x] **P3.5** The stop is written into WorldHistory like any other ending — `complete_demo()` writes `demo_run.status = ended`, the ending id, and one idempotent `demo_ending_reached` event to the isolated demo ledger
+- [x] **P3.5** The stop is written into WorldHistory like any other ending — `complete_demo()` writes `demo_run.status = ended`, the ending id, and one idempotent `demo_ending_reached` event to the isolated demo ledger; the ended state and canonical event persist in one transaction without an intermediate active record
 
 ### P4 — The half hour
 - [x] **P4.1** Playable within sixty seconds of launching — `demo_launch_timing_test.gd` skips the boot slate and the decanting prologue the instant each allows it (the same click an eager player makes) and lands control in the Growing Floor at 5.4s
 - [x] **P4.2** Measured, not estimated — a real run timed end to end — `Time.get_ticks_msec()` around the actual scene chain (`boot_splash.tscn` -> `country_town_menu.gd::_start_demo()` -> `decanting_prologue.gd` -> `Interstitial.travel()` -> `vat_chamber.tscn`), never a frame count; prints `DEMO_LAUNCH_ELAPSED_MS`. Scope stated in the file: headless, one machine, floor only — it is not P5.1's "a machine that is not Greg's"
-- [ ] **P4.3** Nothing in it outstays its welcome: the second derby lap, the long walk, the third menu
+- [x] **P4.3** Nothing in it outstays its welcome: the second derby lap, the long walk, the third menu — audited each against the actual code rather than the phrase. The "second derby lap" is not a real mechanic: `rift_derby.gd` runs exactly one pass (`round_state`: countdown -> active -> won/lost, `rift_derby.gd:80,1082-1103`) and both outcomes call `Interstitial.travel()` to `bone_yard_hunt.tscn` exactly once; a loss goes through `DefeatRouter.route()` (relabels captivity, does not replay the scene). Nothing to cut. The "third menu" is `decanting_prologue.gd`, added deliberately for Greg's "lore accurate" opening request and already the most skippable stop in the chain (any key/click ends it immediately, `decanting_prologue.gd:110-119`, and it never plays on a resumed run — `country_town_menu.gd:460-465`); not a real offender either. "The long walk" was real: `vat_chamber.gd`'s aisle forced ~10.6s of unskippable, agency-free walking (34.0-unit `AISLE_LENGTH`, 2.7 u/s at full mobility) after ~19s of locked beats already ahead of it. Cut `AISLE_LENGTH` to 22.0 (`vat_chamber.gd:22`), saving ~4.5s (~42%) of dead time while keeping the "a body fresh out of a tank does not walk well" pacing intentional rather than just making the player faster. The vertebral-arch/dead-tank dressing that lines the aisle was hardcoded to 11 bays regardless of corridor length, so shortening the corridor alone would have left dressing poking past the end wall — `bay_count` is now derived from `AISLE_LENGTH` (`vat_chamber.gd:229-234`) with the same 3.0-unit clearance before the door the original 11/34.0 pairing had. Proven three ways: `vat_containment_test.gd` still passes at the new length (0/9 escaped the corridor), a capture standing in the aisle shows the shortened row of arches intact (`P:/GameDev/Temp/p43_vat_aisle2.png`), and a capture 4 units from the door shows `[E] INTO THE PIT` still triggering at the right distance (`P:/GameDev/Temp/p43_vat_aisle_door.png`). `loop_smoke_test` stayed green (0 failures)
 - [ ] **P4.4** One moment engineered to be the thing a player describes to somebody else
 - [x] **P4.5** A failure state that is interesting rather than a reload — a lost derby heat used to leave through the exact same door a win does, relabelled `WRECKED`, with no captor and no consequence. `_finish_round("lost")` now calls `DEFEAT_ROUTER.route()`, the same F5 mechanism the Bone Yard already uses, before the scene hands off; `bone_yard_hunt.gd::_ready()` reads the resulting captivity status back off `WorldHistory` and starts the player held rather than walked in fresh. `derby_loss_capture_test.gd` drives a real loss into a real hunt-scene arrival (7/7)
 
 ### P5 — Shipping it
-- [ ] **P5.1** Runs on a machine that is not Greg's, from a clean folder
+- [ ] **P5.1** Runs on a machine that is not Greg's, from a clean folder — not yet: no second physical machine to test on. What is now verified instead: a grep of every demo-reachable script (everything outside `game/tests/**`, `game/prototype_lab/**` and the `dialogue_manager` addon settings panel) for this machine's own absolute paths (`P:\GameDev`, `C:\Users\Greg`) turned up nothing — the shipped code carries no dev-machine path that a different install would lack. Then the actual shipped artifact (`WizardsOnlyFools.exe` + `.pck`, copied together per Z1.1) was run from a folder outside the repo and outside `P:\GameDev` entirely, pointed at a brand-new `--user-data-dir` it had never seen (so no reuse of this machine's existing save data, settings, or `.godot` cache), and it reached the main menu — PLAY, DEMO, NEW GAME, GORE SANDBOX, SETTINGS, QUIT, ENTER CELLOUTZ.NET all rendered, no missing-asset placeholders, no console or crash dialog (`P:/GameDev/Temp/p51_clean_folder_run.png`). Still unverified because it cannot be from here: a GPU/driver or VC++ redistributable difference on hardware this machine doesn't have.
+
+  Found in the process, not part of this item: `loop_smoke_test` printed `failures=0` while three `SCRIPT ERROR: Compile Error` lines and one `Parse Error: Could not find type "StreetLight"` scrolled past it uncaught (`ashbloom_world_generator.gd`, cascading into `living_map.gd`, `handheld_device.gd`, `gore_demo.gd`) — a stale class cache in this worktree after `street_light.gd`'s `class_name` merged in, exactly the "rebuild after a new `class_name`" trap `COMMANDS.md` already names. `--import` cleared it and a rerun came back clean with no compile errors. Worth another agent's attention: **the smoke suite's `failures=0` does not currently catch a cascading compile failure in scripts it loads** — P10.6 already leans on `living_map.gd` and `handheld_device.gd` being live in the demo route, and a worktree that skips `--import` after a pull would ship this checklist item green while those two are dark.
 - [x] **P5.2** No debug affordances, no dev keys, no placeholder text (depends on J2) — J2's gate holds: `dev_affordances.gd::available()` requires `OS.is_debug_build()`, false under the release template, and its one caller (`psychedelic_osc.gd`'s OSC bridge) is inert in the shipped exe. `export_presets.cfg` excludes `tests/*`, `captures/*`, `reports/*` and disables the console wrapper. A grep of every demo-reachable script and scene for `placeholder`/`TODO`/`debug` turned up nothing that reaches the player — the only F-key handlers left in `rift_derby.gd`/`bone_yard_hunt.gd` are the keys card and handheld mode-select, real controls. Verified against the actual shipped artifact, not the editor: exported a fresh release build off this HEAD and screenshotted the running window (`P:/GameDev/Temp/p52_window_only.png`) — a clean front door, no console, no dev overlay. GORE SANDBOX on that menu looked like a candidate leak but `gore_demo.gd`'s own header settles it: Greg asked for it directly ("please quickly make a demo playable gore explosions demo") and it is a shipped toy, not a debug room
-- [x] **P5.3** Sound mixed and the sliders working in the built game, not just in the editor — G5.1 already built the bus graph (Master/Music/SFX/Ambience) and routed every processing chain through it; `pause_gate.gd` maps the on-screen sliders straight onto `AudioServer.set_bus_volume_db()` with a linear-to-dB curve so the last tenth of the slider is not dead air, and mutes outright at zero rather than leaving an inaudible floor (`pause_test.gd`, 17/17). Verified in the actual shipped exe rather than the editor: launched `WizardsOnlyFools.exe`, opened the pause gate with Escape over the live front door, and drove the settings page with the real keyboard controls (Down/Left, no mouse). Screenshotted before and after: MASTER/MUSIC/SFX/AMBIENCE all read `080` at rest (`P:/GameDev/Temp/p53_settings_before.png`); five presses of Left on MUSIC alone took it to `030` with only its own slider fill and readout moving (`P:/GameDev/Temp/p53_settings_after.png`) — the other three buses, Violence and Screen rows were untouched, so the control is per-bus rather than global
+- [x] **P5.3** Sound mixed and the sliders working in the built game, not just in the editor — G5.1 already built the bus graph (Master/Music/SFX/Ambience) and routed every processing chain through it; `pause_gate.gd` maps the on-screen sliders straight onto `AudioServer.set_bus_volume_db()` with a linear-to-dB curve so the last tenth of the slider is not dead air, and mutes outright at zero rather than leaving an inaudible floor (`pause_test.gd`, 19/19). Settings now rely on `update_subject`'s atomic first registration rather than flushing an empty subject first, and restoring saved fullscreen state applies it without fabricating a new player-choice event. Verified in the actual shipped exe rather than the editor: launched `WizardsOnlyFools.exe`, opened the pause gate with Escape over the live front door, and drove the settings page with the real keyboard controls (Down/Left, no mouse). Screenshotted before and after: MASTER/MUSIC/SFX/AMBIENCE all read `080` at rest (`P:/GameDev/Temp/p53_settings_before.png`); five presses of Left on MUSIC alone took it to `030` with only its own slider fill and readout moving (`P:/GameDev/Temp/p53_settings_after.png`) — the other three buses, Violence and Screen rows were untouched, so the control is per-bus rather than global
 - [x] **P5.4** Controls learnable without a tutorial screen — I0 still applies — every scene on the demo route already teaches its own controls diegetically rather than through a tutorial screen: `vat_chamber.gd`'s `prompt` label reads "WASD MOVE / MOUSE LOOK / WALK THE AISLE" until the door is close enough for "[E] INTO THE PIT" (matches its `_unhandled_input` exactly — WASD, mouse-look, E); `rift_derby.gd` and `bone_yard_hunt.gd` both hold an on-demand `KeysCard` (F1, closed by default, a corner hint until opened twice) instead of a forced overlay; `country_town_menu.gd` is plain clickable `Button` nodes, needing no legend. Audited each card's rows against the scene's actual `_unhandled_input` match block rather than trusting the card text: `rift_derby.gd`'s card was accurate (every real keycode — E, R, F, F1, I, Enter, Escape — has a row). `bone_yard_hunt.gd`'s was not: `B` (`_cycle_grip()`), `K` (`_deliberate_redecant()`, a real reset that forfeits carried items) and a plain tap of `Q` (`_use_prosthetic_surge()`, a 30-damage stamina-cost attack, distinct from holding Q for X-ray) were all live, working bindings with zero row in the card — a player could never discover them without reading the source. Added the three missing rows to `_build_keys_card()` and confirmed with a real capture (`P:/GameDev/Temp/p54_keys_card.png`, shot at hour 16.50/day, not the dusk-drift trap) that they render cleanly. `loop_smoke_test` stayed green throughout (0 failures)
 - [ ] **P5.5** The last pass is playing it, not reading it
 
@@ -2598,15 +2927,15 @@ the game's own voice, not a fade to a store page.
 ### P v10 — the final pass
 The last rung. Fifteen statements that are true of the demo when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
 - [x] **P10.1** `v10` One build, two doors: PLAY and DEMO on the same menu — both are built into `country_town_menu.gd`, in the executable's existing main-menu scene
-- [ ] **P10.2** `v10` The demo is the real game with exploration locked off
+- [x] **P10.2** `v10` The demo is the real game with exploration locked off — audited against current code rather than re-argued: `country_town_menu.gd::_start_demo()` is `WorldHistory.begin_demo()` followed by the exact same `_start_game()` PLAY calls (`country_town_menu.gd:306-310`), which reads `OpeningDirector.resume_destination()` and hands off through the one shared `_prepare_menu_departure()` path — no demo-only scene or script exists anywhere in the project. A project-wide grep for `is_demo()`/`run_mode` outside `game/tests/` turns up exactly two call sites, both in `bone_yard_hunt.gd` (the wall message and `_enforce_demo_territory()`); nothing else — not the map, the Board, the Wire, combat or any menu — ever asks which mode it is in. So "exploration locked off" is precisely and only `_enforce_demo_territory()`'s physical border refusal (P2b.1-P2b.6); everything else a player can do in PLAY, a demo run can do too
 - [x] **P10.3** `v10` Nothing in it is a special build that can rot — DEMO changes a runtime route/save mode and invokes the same scene transition function as PLAY; no duplicate scene, project or export exists
 - [x] **P10.4** `v10` It ends because the game stops, not because a timer did — victory in the real Hunt is the hinge; no elapsed-time check exists
-- [ ] **P10.5** `v10` It shows the opening: captured, quiz, tortured, festival, derby, out
-- [ ] **P10.6** `v10` Combat, the handheld and the map are all fully present
+- [x] **P10.5** `v10` It shows the opening: captured, quiz, tortured, festival, derby, out — the previously absent festival is a real pre-heat action in `underground_colosseum.tscn`, not a title card or checklist claim. While vehicle control is already locked, a close press in the cab sightline closes on a whole human silhouette, replaces it with three separately numbered, strapped slabs whose faces retain visible bone, then retracts into the roof before the horn. The ordinary surface derby never builds it. The missing later procedure reveal is now physical too: filing intake installs the existing CellOutz wetwire part in the player's real head before `opening_woke`, naming the Growing Floor intake and retaining its generated serial. The first Hunt X-ray includes the player's own rig and catches that tower feeding back from inside the skull — `FOREIGN TOWER IN YOUR SKULL // WW-… // INSTALLED WHILE YOU WERE UNDER` — rather than opening a flashback or lore card. It records one `captivity_procedure_recalled` fact derived from the installed chip, so a world without the procedure gets no substitute exposition and repeated scans cannot invent repeated memories. `gore_festival_test.gd` verifies the festival (11/11); `captivity_procedure_test.gd` verifies installation order, live-head continuity, the player-body sweep and idempotent later recollection (11/11). Production captures were opened for the press before/after (`P:/GameDev/Temp/p10_5_gore_festival_before.png`, `p10_5_gore_festival_after_v2.png`) and the later body read (`P:/GameDev/Temp/lane4_captivity_procedure.png`).
+- [x] **P10.6** `v10` Combat, the handheld and the map are all fully present — audited against the actual demo-route scene rather than the phrase. `bone_yard_hunt.gd` is not a wrapper around combat, it *is* the Hunt: melee, firearm aiming and the momentum arm all live there (`attack_cooldown`, `pending_attack`, `firearm_aiming`), reachable through the same `KEY_Q`/`KEY_B`/`KEY_K`/RMB bindings P5.4 already checked against the keys card. The handheld (`handheld = HANDHELD.new()`, `bone_yard_hunt.gd:800`) opens on `KEY_G` -> `_toggle_handheld_surface()` -> `handheld.open_device()` (`:1507,6723,6736`), lamp and radial menu included. The map (`living_map = LIVING_MAP.new()`, `:836`, added to `$HUD`) opens on `KEY_M` -> `_toggle_panel("map")` (`:1514,6611`) and is bound to the real generated world (`living_map.attach_world`/`bind`, `:6615-6616,7669-7673`), not a placeholder. None of the three is gated behind `is_demo()`/`run_mode` — P10.2's grep already established the only two call sites outside tests are the territory wall in this same file — and `bone_yard_hunt.tscn` is the identical scene PLAY and DEMO both load (P10.3), so nothing here is a demo-only stub. `loop_smoke_test` (0 failures) and `demo_route_test` (7/7) stayed green
 - [ ] **P10.7** `v10` It is playable without anybody explaining anything
 - [ ] **P10.8** `v10` It takes about thirty minutes and does not feel truncated
-- [ ] **P10.9** `v10` What it locks is content, never systems
-- [ ] **P10.10** `v10` A save from the demo opens in the full game
+- [x] **P10.9** `v10` What it locks is content, never systems — `_enforce_demo_territory()` (`bone_yard_hunt.gd:1933-1959`) is the entire lock, and all it does on a border crossing is snap `player`/`player_body` back to the last position inside home ground, zero the velocity, set a prompt string and record one event. It never touches a weapon, a stat, a menu, the HUD, combat or any other script — nothing is disabled, only a patch of geography is unreachable. Combined with P10.2's grep (only two call sites of `is_demo()`/`run_mode` outside tests, both in this one function), every system in the game — combat, the handheld, screens, the Board — runs identically in DEMO and PLAY; only which holdings you can stand on differs
+- [x] **P10.10** `v10` A save from the demo opens in the full game — the authored invoice now offers `CONTINUE THIS WORLD IN PLAY` as its primary focused action rather than treating the demo ledger as a dead end. It snapshots the completed demo, creates an ordinary named PLAY slot, restores the complete portable world into that slot and records one continuation receipt before resuming at `OpeningDirector`'s real destination. The dedicated demo file remains separately ended and untouched, while the PLAY copy carries bodies, wounds, grudges, territory, events, clock, visual seed and opening stage together; its `demo_run` is marked `continued`, so the demo wall cannot reopen on the full-game side. `demo_wall_test` proves the split, persistence and disk reload (22/22); `demo_mode_test`, `demo_route_test`, `opening_stage_wiring_test` and `loop_smoke_test` remain green. The 1280×720 capture was opened and checked (`P:/GameDev/Temp/p1010.png`): the continuation is the clear primary choice and the separate front-door/ESC exit fits without overlap
 - [ ] **P10.11** `v10` It is the thing Greg can hand somebody without being in the room
 - [ ] **P10.12** `v10` It exports and runs on a machine with no Godot on it
 - [ ] **P10.13** `v10` It is recorded and the recording is watchable
@@ -2658,8 +2987,8 @@ ties it together into a reason to get up in the morning.
 - [x] **R1.1** One currency with a name and a reason — rust scrip, and who issues it — `carry.gd`'s `currency_reason()` reads CellOutz's own real doctrine ("ownership, downward") as the reason, rather than an invented lore line
 - [x] **R1.2** What a body is worth, by part, condition and whose it was — audited: `sale_value()` already priced all three (base by kind, `condition`/`freshness`, and `stolen` heat); simply never credited here
 - [x] **R1.3** Buyers with their own appetites, so a market is a set of people and not a price — `FACTION_APPETITES`: the Choir pays more for an organ, Vanity Row pays more for a cybernetic, drawn from what each faction already is rather than an invented preference table
-- [x] **R1.4** Debt you can be in, since `debt_to_player` already runs the other way — `borrow()`/`repay()`/`debt_to()`: real scrip added to the wallet against a real, named debt to a real faction; repaying is capped at what is actually owed and what is actually in the wallet
-- [x] **R1.5** Prices move with what the world has been through — `_market_glut()` reads real recent `carried_part_sold` history: the more of a kind that has actually sold, the less the next one is worth, specific to that kind rather than a global crash. Covered by `tests/money_test.gd` (16 checks)
+- [x] **R1.4** Debt you can be in, since `debt_to_player` already runs the other way — `borrow()`/`repay()`/`debt_to()`: real scrip added to the wallet against a real, named debt to a real faction; repaying is capped at what is actually owed and what is actually in the wallet. Borrowing and repayment now batch their wallet/debt mutation with one compact, identified `PlayerActionLedger` receipt
+- [x] **R1.5** Prices move with what the world has been through — `_market_glut()` reads real recent `carried_part_sold` history: the more of a kind that has actually sold, the less the next one is worth, specific to that kind rather than a global crash. Sales preserve that public event while routing the mutation and receipt through one ledger transaction. Covered by `tests/money_test.gd` (19 checks)
 
 
 ### R v10 — the final pass
@@ -2765,11 +3094,11 @@ Greg: *"how you can persuade them to join your ranks your own faction that you
 start through progressing and exploring around the map"*. E is the two ladders
 that already exist. This is the third one, which is yours.
 
-- [x] **U1.1** Found something — a name, a mark, a first member — `systems/player_faction.gd`'s `found()`: the player becomes a real `WorldHistory` faction's founder, holding CROWN on the exact same rank machinery every other faction uses, with a real recorded `mark` rather than just a name. Refused if one already exists — there is only one
-- [x] **U1.2** Recruits from the clinch and the downed window belong to it — `recruit()`, an API offered for whoever wires the actual clinch/downed resolution (Codex's F5/F6 territory) to call, same relationship this file has to combat as `ritual_app.gd` has to the camera it doesn't hold
+- [x] **U1.1** Found something — a name, a mark, a first member — `systems/player_faction.gd`'s `found()`: the player becomes a real `WorldHistory` faction's founder, holding CROWN on the exact same rank machinery every other faction uses, with a real recorded `mark` rather than just a name. Refused if one already exists — there is only one. Faction creation, founder membership and the founding fact now share one identified player-action transaction
+- [x] **U1.2** Recruits from the clinch and the downed window belong to it — `recruit()`, an API offered for whoever wires the actual clinch/downed resolution (Codex's F5/F6 territory) to call, same relationship this file has to combat as `ritual_app.gd` has to the camera it doesn't hold. Every accepted recruit receives one action receipt; refusals receive none
 - [x] **U1.3** It has standing on the same axis every other faction does — deliberately *not* a `FACTION_TREE_AXIS` entry (that table is authored, for the seven Sins and the two poles); `standing()` computes the real average `tree_alignment()` of whoever has actually joined, so recruiting someone who was climbing genuinely pulls the faction's own standing up
-- [x] **U1.4** It can be attacked, and it can lose people — `lose_member()` records the real reason (killed, walked away, whatever it was) rather than a silent disappearance, and actually drops them from the roster. The "attacked" half is combat wiring, not attempted here
-- [ ] **U1.5** Rank inside it is somebody else's problem too — they have opinions (needs members with individual reactions to rank changes — not attempted here). Covered in `tests/player_faction_test.gd` (19 checks)
+- [x] **U1.4** It can be attacked, and it can lose people — `lose_member()` records the real reason (killed, walked away, whatever it was) rather than a silent disappearance, and actually drops them from the roster in the same world transaction. The "attacked" half is combat wiring, not attempted here
+- [ ] **U1.5** Rank inside it is somebody else's problem too — they have opinions (needs members with individual reactions to rank changes — not attempted here). Covered in `tests/player_faction_test.gd` (23 checks)
 
 
 ### U v10 — the final pass
@@ -2796,19 +3125,39 @@ M2b covers cars as this world's horses. This is everything else about them
 being vehicles rather than set pieces.
 
 - [ ] **V1.1** A car is a thing with a condition, not a state you are in —
-      checked against `DESIGN/DESTRUCTION.md`'s AB1.5 note, which defers
-      exactly this to Lane 2 on the condition that it reuses `world_damage.gd`
-      rather than inventing a third store. Not started this pass, deliberately:
-      `rift_derby.gd`'s `integrity` (a plain scene-local int, reset to 100
-      every heat) is a real second implementation of the same primitive, but
-      migrating it to a persistent, `WorldHistory`-backed condition is only
-      honest once V1.4 (repair) or AB2.4/2.5 (repair via a holding's owner,
-      which needs AA — not built) exists to bring it back up. Doing the
-      migration first would make a wrecked derby car stay wrecked forever
-      with no path back, which is not a technical detail, it is a dead end a
-      player would actually hit. Sequencing this after repair rather than
-      before it.
-- [ ] **V1.2** Damage is physical and visible, and it changes how it drives
+      Updated 2026-09-15: a real, live `condition: float` (0..1) now exists
+      on `ArcadeVehicle` itself (`game/systems/arcade_vehicle.gd`), degraded
+      by real impact closing speed the same way `fuel` (V1.3) already burns
+      off real throttle-held time — `vehicle_condition_test.gd` covers it
+      directly (hard impact drops it measurably, a soft contact doesn't,
+      clamps at 0..1). This is still not the `world_damage.gd`-backed,
+      persistent store this item actually asks for, and the reasoning below
+      for deferring that still holds — a persisted condition with no repair
+      verb is a dead end a player would actually hit, so persistence stays
+      sequenced after V1.4. `rift_derby.gd`'s own `integrity` stays the
+      tuned, authoritative number for the derby (untouched formula, no
+      balance risk) and is mirrored into `condition` after every hit, so the
+      two no longer silently disagree the way this note used to warn about —
+      but `condition` itself still does not survive a scene reload and is
+      not yet the primitive V1.1 is really asking for. Original note, still
+      true: checked against `DESIGN/DESTRUCTION.md`'s AB1.5, which defers
+      the persistent version to Lane 2 on the condition that it reuses
+      `world_damage.gd` rather than inventing a third store — migrating
+      `integrity` itself there is only honest once V1.4 or AB2.4/2.5 (needs
+      AA, not built) exists to bring a wrecked car back up.
+- [ ] **V1.2** Damage is physical and visible, and it changes how it drives —
+      Updated 2026-09-15: it does now, for the player. `_condition_scale()`
+      in `arcade_vehicle.gd` scales tire grip and steering authority by the
+      same `condition` field above (floored at `MIN_CONDITION_SCALE` rather
+      than going inert), and `rift_derby.gd`'s existing crush-visual and
+      detachable-part system already reads the number `condition` is now
+      mirrored from, so damage was already visible and is now also felt.
+      Not yet true universally: nothing sets `condition` on an AI wrecker —
+      they still run on `set_meta("integrity", ...)` alone — so a wrecker's
+      own handling never degrades, only the player's does. No dedicated test
+      asserts the handling numbers themselves; `vehicle_condition_test.gd`
+      only covers the field's own value, not what reading it does to grip or
+      steer.
 - [x] **V1.3** ~~Fuel, or a reason a car is not infinite~~
       No car anywhere in the project burned anything — a derby heat, or in
       principle a whole session, could be driven flat out forever. `fuel`
@@ -2870,7 +3219,7 @@ The last rung. Fifteen statements that are true of the road when this game is fi
 The Expanse has one lighting state, one fog density and no clock. `WorldLook`
 already switches presets by place; nothing switches by time.
 
-- [x] **W1.1** A day cycle the world reads, not only the sky — `world_clock.gd`, a pure function of one persisted number rather than a sixth autoload. Hours, days, months, five named phases, a continuous daylight curve, and sleeping. 28 checks. Unblocks A9.7, W1.4, AB2.4, AJ4.3 and AL1.5, all of which were waiting on it without anybody noticing
+- [x] **W1.1** A day cycle the world reads, not only the sky — `world_clock.gd`, a pure function of one persisted number rather than a sixth autoload. Hours, days, months, five named phases, a continuous daylight curve, and sleeping. The cycle now lasts one real hour instead of 24 minutes, and the same ledger resolves an original 365-day Ashbloom calendar: three seasons, twelve 30-day months in ten-day decans, and five named Uncounted Days outside every month. 33 checks. Unblocks A9.7, W1.4, AB2.4, AJ4.3 and AL1.5, all of which were waiting on it without anybody noticing
 - [x] **W1.2** ~~Contamination has weather — it moves, it settles, it gets worse~~
       A5 made contamination a property of every surface, painted in once at
       authoring time — real, but static, and nothing asked whether the air
@@ -2973,7 +3322,18 @@ already switches presets by place; nothing switches by time.
 - [x] **W1.3** Being caught out in it costs something — `storm_weather.gd`'s
       `exposure_cost()`, drained from stamina in `_update_storm_exposure()`,
       cut by a warm layer (AS3.3/AS4.5).
-- [ ] **W1.4** Factions keep hours; the Wire is busier at some of them
+- [x] **W1.4** Factions keep hours; the Wire is busier at some of them — every
+      known faction now has one communications window on the shared
+      `WorldClock` (with subject-level override support rather than another
+      timer). Cross-midnight shifts remain continuous, CellOutz automation
+      never closes, off-shift accounts name when their channel returns, and
+      the Wire's visible traffic register, active voices, reply volume and
+      proportion of live world reports all rise and fall with the aggregate
+      of factions actually represented on the reachable network.
+      `wire_hours_test` proves distinct day/night shifts, quiet accounts,
+      24-hour automation and denser live reporting at the real aggregate peak;
+      `captures/wire_faction_hours.png` verifies the quiet-hours register and
+      account return time on the live Wire composition.
 - [x] **W1.5** G7's exposure problem is a lighting *state* rather than a
       constant — `_update_day_night()` drives the sun's energy/colour and the
       base environment's ambient/exposure off `WorldClock.daylight()` every
@@ -2986,17 +3346,36 @@ already switches presets by place; nothing switches by time.
 ### W v10 — the final pass
 The last rung. Fifteen statements that are true of weather and the hour when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
 - [ ] **W10.1** `v10` One clock, wound in one place, read by everything
-- [ ] **W10.2** `v10` Light warps at night rather than dimming
-- [ ] **W10.3** `v10` Storm severity is a readout of how much magick is loose
-- [ ] **W10.4** `v10` Anvil crawlers, and red lightning that means something
-- [ ] **W10.5** `v10` Contamination has weather that moves and settles
-- [ ] **W10.6** `v10` Being caught out in it costs something
-- [ ] **W10.7** `v10` Factions keep hours and the Wire is busier at some
-- [ ] **W10.8** `v10` Stations keep schedules
+- [x] **W10.2** `v10` Light warps at night rather than dimming — A3.2's real
+      per-light warp shells answer the shared daylight curve; the handheld's
+      carried spot uses the same system through its own cone measure.
+- [x] **W10.3** `v10` Storm severity is a readout of how much magick is loose —
+      `StormWeather.severity()` is a pure read of decaying
+      `WorldHistory.chaos_magick()` and drives rain, strikes and exposure.
+- [x] **W10.4** `v10` Anvil crawlers, and red lightning that means something —
+      the horizon crawler, real flash light and thunder are one strike; red is
+      possible only above 0.7 severity and becomes less rare toward the maximum.
+- [x] **W10.5** `v10` Contamination has weather that moves and settles — W1.2's
+      motes, fog and slow watermark relief are the live implementation.
+- [x] **W10.6** `v10` Being caught out in it costs something — W1.3/B7.1 dose
+      the real body through garment protection, while severe magick weather
+      also drains stamina through the same storm severity.
+- [x] **W10.7** `v10` Factions keep hours and the Wire is busier at some — W1.4
+      now drives account presence, active voices, reply volume, live-report
+      density and the visible traffic register from faction windows on the one
+      WorldClock (`wire_hours_test`, 10 checks).
+- [x] **W10.8** `v10` Stations keep schedules — A9.7 and `world_clock_test`
+      prove always-on numbers, the daytime pit channel and the 03:00 preacher
+      against the same hour used by the sky and factions.
 - [ ] **W10.9** `v10` Hauntings happen at night and are not permanent
-- [ ] **W10.10** `v10` The gods are visible at their hours
+- [x] **W10.10** `v10` The gods are visible at their hours — A7.1 places all
+      nine bodies on authored windows read directly from `WorldClock.hour()`;
+      the same body's once-per-day sighting enters history under A7.2.
 - [ ] **W10.11** `v10` A month passes and things repair
-- [ ] **W10.12** `v10` Sleeping moves the clock and something can wake you
+- [x] **W10.12** `v10` Sleeping moves the clock and something can wake you —
+      H10.8's physical bedroll advances to 07:00 through WorldClock, while a
+      living hostile inside 18 metres refuses it without time or receipt moving
+      (`sleep_site_test`, 9 checks).
 - [ ] **W10.13** `v10` Weather is audible before it is visible
 - [ ] **W10.14** `v10` Nothing in the game keeps a second clock
 - [ ] **W10.15** `v10` The hour is legible without a clock on screen
@@ -3025,11 +3404,83 @@ pay.
       renderer's own counters and are trusted; the frame-timing pair is not,
       and needs a focused, interactive re-run before anything is budgeted
       against it — left for X1.2 rather than guessed at here.
-- [ ] **X1.2** A frame budget, stated, that the region is held to — blocked on
-      X1.1's frame-timing numbers actually being trustworthy; the draw call
-      and primitive counts alone are not enough to set a budget against.
+- [x] **X1.2** A frame budget, stated, that the region is held to —
+      **closed from Greg's 19 September direction and a fresh current-tree
+      measurement.** Ordinary play is held to **60 FPS / 16.67 ms on Greg's
+      RTX 2060 SUPER**. **30 FPS / 33.33 ms is only the temporary playtest
+      floor** at which combat and gore remain usable, not the intended budget;
+      120 FPS is welcome headroom rather than the baseline contract. X1.1's
+      frame timing is now trustworthy:
+      `tests/frame_bound_test` (`3e6a620`) stops reading the engine's
+      monitors, which disagree with the wall clock by more than the frame
+      is long, and instead changes one thing at a time with a stopwatch
+      either side, vsync off, on the Hunt. Measured across five runs at
+      1280x720 on a 2060 Super: **34-37 ms a frame, 27-29 fps.** That is
+      the honest number and it is a bad one.
+      What it is bound by is settled too. A quarter of the pixels moves the
+      frame by 0-1% and sometimes the wrong way, so **render scale is not a
+      lever here** — worth knowing before another pass is spent on it. A
+      sixth of the physics tick rate makes the frame 47-70% shorter, every
+      run, and silencing the rigs' own processing accounts for 2-9 ms of
+      that. `--soak` rules out accumulation: over five idle minutes nodes
+      plateau at 9275, collision pairs at 520, population at 20, orphans at
+      zero.
+      Re-run on the merged 19 September tree at 1280x720 with vsync off: the
+      Hunt began at **27.51 ms / 36.3 FPS** and its same-scale control reached
+      **40.45 ms / 24.7 FPS** as the world settled. Quartering the pixels did
+      not shorten the frame; dropping physics from 60 Hz to 10 Hz cut it to
+      **17.34 ms**, so the present miss is simulation-bound. Silencing all 22
+      character rigs saved **5.35 ms**; disabling monitoring on 132 anatomy
+      hitboxes remained inside the 4.82 ms noise floor. The census found 681
+      static bodies, 654 owned by `ashbloom_world_generator.gd`. The contract
+      therefore does not authorize reducing render scale or removing anatomy:
+      the next measured work is the world/static-physics route and the work
+      executed at the physics tick.
+- [x] ~~**X1.2** A frame budget, stated, that the region is held to~~ —
+      The isolated rendered-tier harness was also repaired rather than treated
+      as interchangeable with that full Hunt measurement.
+      `WorldLook.FRAME_BUDGET_MS` states the PERFORMANCE contract as 16.67 ms
+      / 60 FPS. The rendered benchmark now measures the complete player-facing
+      tier (post effects, render scale, MSAA and TAA), rotates tier order over
+      three passes so shader warm-up and thermal drift cannot masquerade as a
+      quality win, and reports median plus p95 rather than one order-sensitive
+      mean. On Greg's RTX 2060 SUPER at 1920x1080, the final rendered run gave
+      PERFORMANCE median 4.55 ms / p95 11.52 ms and ULTRA median 5.25 ms;
+      PERFORMANCE held the budget with 12.12 ms of median headroom. A resumed
+      confirmation gave 4.69 ms / p95 10.98 ms and ULTRA 5.88 ms. An honest
+      detached run against unchanged commit `5113e93`, using only the same
+      disposable measurement instrumentation, gave PERFORMANCE 5.03 ms / p95
+      12.51 ms and ULTRA 5.14 ms. Those comparisons prove the new harness is
+      measuring the existing build consistently within ordinary run variance;
+      they do not prove a runtime optimization. The independent sandbox
+      benchmark also enforces the same ceiling. `perf_probe_test.gd` carries
+      the fast contract assertions, while `frame_cost_test.gd` is the rendered
+      hardware gate. This closes a real measurement-fidelity bug: the old
+      benchmark changed only the Environment, omitted the render-scale/AA half
+      of the preset, sampled each tier once in a fixed order, and could report
+      PERFORMANCE slower than ULTRA on the same machine. X1.5 remains open:
+      this is a budget held on Greg's machine, not evidence about lower-spec
+      hardware.
+      the isolated harness meeting budget is not evidence that the populated
+      Hunt currently meets it, nor evidence about lower-spec hardware.
 - [ ] **X1.3** The 238MB plugin referenced by no script (pairs with J1.3)
-- [ ] **X1.4** Bodies are the expensive thing — measure before optimising them
+- [x] **X1.4** Bodies are the expensive thing — measure before optimising them.
+      The owner breakdown first found **654 StaticBody3D nodes** generated by
+      the sixty Ashbloom building shells; each wall, lintel, floor, roof and
+      decorative storey band had been registered as a separate server body.
+      They now retain the same individual BoxShape3D collision and visible
+      geometry but share one StaticBody3D per building. The real-render census
+      falls from **681 to 87 total static bodies**, with the generator's share
+      falling from **654 to 60**. On the same 1280x720/vsync-off Hunt benchmark,
+      the initial sample improved from **27.51 to 26.50 ms** and the same-scale
+      settled control from **40.45 to 36.77 ms**. That is a measured 1.01-3.68
+      ms recovery, not the whole route to 16.67 ms: physics at 10 Hz still cuts
+      the settled frame to 11.40 ms, so the next target remains work performed
+      by the Hunt's 60 Hz tick rather than pixels or anatomy hitboxes.
+      `opening_test.gd` verifies that the shared body preserves detailed wall
+      shapes, door admission and solid frontage; `silhouette_test.gd` verifies
+      the authored building dressing remains intact. The frame harness now has
+      a `--breakdown` owner probe and reports physics bodies by owning script.
 - [ ] **X1.5** It has to hold up on a machine that is not Greg's
 
 
@@ -3056,11 +3507,50 @@ The last rung. Fifteen statements that are true of performance when this game is
 The game currently assumes a player who already knows what it is. It has no
 options a person would actually reach for and no way in that is not "start".
 
-- [ ] **Y1.1** Controls are rebindable
+- [x] **Y1.1** Controls are rebindable
 - [ ] **Y1.2** The violence tier from the warning card actually changes the build
 - [ ] **Y1.3** Text is legible at a normal viewing distance — the stencil is not free
 - [ ] **Y1.4** Colour is not the only carrier of meaning anywhere
 - [ ] **Y1.5** Somebody can put it down and come back a week later
+
+Greg, 2026-09-13, which is most of a section on its own:
+
+> *"fixing up the main menu screen guis and making save files multiples and they
+> are little chambers that change throughout game progression but they are what
+> you start in the pods with a fetus somewhat cell in there with a plug in there
+> mouth and then you go into it and get it out after the initial first part which
+> also needs work so it should just say start game also lowkey a multiplayer and
+> online option should be there but not be selectable and have a message saying
+> soon 'if you have ideas email me in settings'."*
+
+### Y2 — The way in
+- [x] **Y2.1** One door, and it says **START GAME**. Not PLAY and DEMO, not a verb nobody uses out loud
+- [x] **Y2.2** **MULTIPLAYER** and **ONLINE** are on the menu, visible, and not selectable — a greyed line that says SOON is a promise; a missing line is nothing at all. `disabled` also takes them out of the focus order, so a controller cannot land on a dead row
+- [x] **Y2.3** And the SOON card says where to send the idea, which is the only reason to show a door you cannot open yet — one line under both doors rather than a tooltip nobody hovers on a row they cannot click
+- [ ] **Y2.4** The part before you are out of the pod is authored rather than skipped past — it is the first thing anybody plays and it is currently the roughest thing in the build
+
+### Y3 — Saves are chambers
+A save slot is a row in a list in almost every game, and I0 says no screen is a
+list of text in a box. This is the segment where that rule reaches the save menu:
+**a save is a chamber you can look into**, and what is in it is the body that
+save has grown.
+
+- [ ] **Y3.1** More than one save, and choosing one is walking a row of chambers rather than reading their filenames
+- [ ] **Y3.2** A chamber changes with the run inside it — a save forty hours deep does not look like one an hour old, and nothing about that is a progress bar
+- [ ] **Y3.3** A new save is an occupied pod: a body at fetus stage, a cell, a plug in its mouth. You are looking at what you are about to be
+- [ ] **Y3.4** Starting is **going into the chamber and taking it out**, not a fade from a button
+- [ ] **Y3.5** An empty slot is an empty chamber — drained, lit, waiting — and not a blank row with NEW GAME on it
+- [ ] **Y3.6** The machinery is already there: `AG5.11` built real multi-slot saving with a manifest per slot. This is what it looks like, not what it does
+
+### Y4 — Support, from inside the game
+- [x] **Y4.1** Settings can send mail to **wizardsonlyfoolzthegame@gmail.com** — support, bug reports, and the ideas line Y2.3 points at. `support_mail.gd`: three subjects so mail lands sorted, one mechanism. No network, no dependency, no key — it hands a `mailto:` to the machine's own client
+- [x] **Y4.2** A bug report carries the build, the seed and the run with it, because a player should not have to write down what the game already knows — build, engine, platform and timestamp gathered automatically, anything else the caller attaches, and **nothing that nobody asked for**: `context()` is separate from `compose()` so the settings page can show the player exactly what is about to go out under their name
+- [x] **Y4.3** It never silently fails: if there is no mail client it says so and gives the address to copy — `send()` returns `sent` and a `reason`, and the address either way. 23 assertions in `tests/support_mail_test.gd`, including that an ampersand in the note is encoded rather than ending the query string early, and that line breaks are CRLF so the body is not one long line
+
+**Open, and blocking a rename:** Greg does not like **"Bone Yard"**. No
+replacement given. It is the main scene (`bone_yard_hunt.gd`/`.tscn`), a district
+in `living_map.gd`'s `DISTRICTS`, and appears across `CHECKLIST.md` — so this is
+a name to decide once and change everywhere in one commit, not to drift into.
 
 
 ### Y v10 — the final pass
@@ -3175,17 +3665,19 @@ reach, and the survey already tracks what the player has walked. The pieces are
 in; nothing has ever asked the player to *use* them on a map.
 
 ### AA1 — Cleaning the window
-- [ ] **AA1.1** Revealing ground is the satisfying part, not the admin — it should feel like wiping glass
-- [ ] **AA1.2** Colour arrives with weight: a revealed holding is a small event, not a tick
-- [ ] **AA1.3** What is still grey pulls at you — the unrevealed shape is legible enough to want
-- [ ] **AA1.4** Reveal is per holding, not per metre, so it arrives in satisfying pieces
+- [x] **AA1.1** Revealing ground is the satisfying part, not the admin — crossing the real border still triggers one whole-piece reveal automatically, but MAP now treats its 1.4-second development as a glass-cleaning action: the polygon grows monotonically from its settlement under a pale edge that thickens at mid-travel, pulls short wipe streaks behind it and relaxes into the holder-coloured border with no residue. `holding_reveal_profile_test` fixes the timing contract in 4 checks and the mid-wipe production frame is visually recorded at `captures/ashbloom_holding_reveal.png`
+- [x] **AA1.2** Colour arrives with weight: a revealed holding is a small event, not a tick — entering a holding writes one `holding_revealed` event with one durable player-action receipt, and MAP develops the claimed polygon outward from its real settlement over 1.4 seconds rather than flipping one label. The territory row, place, published work and reveal event now persist inside that one border-crossing transaction; walking another metre fragments neither its event nor receipt. The early and settled states are visually recorded at `captures/ashbloom_holding_reveal.png` and `captures/celloutz_target_area.png`
+- [x] **AA1.3** What is still grey pulls at you — the unrevealed shape is legible enough to want — every unknown holding keeps its complete faint border and an `UNSURVEYED SECTOR` centre mark while withholding its name and holder; the map shows the shape of missing knowledge rather than blanking it
+- [x] **AA1.4** Reveal is per holding, not per metre, so it arrives in satisfying pieces — `ashbloom_holdings.gd` resolves the nearest authored settlement and reveals that entire persistent polygon exactly once. Fine cell survey remains underneath for streets/buildings, but it no longer controls whether the land itself has a name
 
 ### AA2 — The split
-- [ ] **AA2.1** The region divides into named holdings with their own edges
+- [x] **AA2.1** The region divides into named holdings with their own edges — the five settlements the world generator already builds now share one definition table with MAP and produce five deterministic convex Voronoi cells clipped to the real 470-by-370-metre region. Every polygon also owns one canonical `kind: place` WorldHistory record, revealed through the same exploration act and consumed unchanged by MAP, INDEX, Board and local jurisdiction; the territory row and all five canonical place schemas seed in one closed persistence batch. `ashbloom_holdings_test` proves all five bounded polygons, settlement containment, whole-piece/idempotent reveal and receipt routing, holder/timestamp persistence, save-safe migration, non-revealing bounded jurisdiction lookup, live map seam and cross-instrument record identity
 - [ ] **AA2.2** A holding can be given to the ascent or given to corruption
 - [ ] **AA2.3** Giving it is an act with a cost, not a menu choice
 - [ ] **AA2.4** A holding remembers who took it and when (WorldHistory, like everything else)
 - [ ] **AA2.5** Neither side is the good one; the karma axis already refuses that framing
+- [ ] **AA2.6** A holding can be reclaimed through connected local work — dismantling fictional bandit camps, trafficker/organ-market networks, cartels, alien installations and other controlling structures — rather than by touching one map icon
+      The safe foundation is now live without falsely checking this off: the canonical place counts its raid and recovery as connected work. One completion records `disrupted`; both record `ready_for_decision` and one `holding_claim_disrupted` event. Neither changes the holder—the still-open costly land-transfer act must do that—so local objectives cannot counterfeit reclamation. Accepting and physically resolving those orders now use `player_action_ledger.gd`'s same receipt route as smoking and inspection; their existing event names remain intact, each gains a durable action id, and the job/place/history changes flush as one transaction rather than several unrelated saves. Physically lifting the recovery cache now routes its inventory acquisition and `loot_collected` receipt through that same outer transaction before nested work resolution, rather than saving the cache and contract as unrelated moments. Restoring its exact raid targets, updating progress and completing the connected place state now also close as one derived maintenance transaction. That intermediate result is visible rather than dossier-only: MAP fractures the territory after one connected job and adds a living decision border after the second, while the walked settlement raises broken claim stakes and a field beacon from the same place state (`holding_work_integration_test`, 26 checks; `combat_integration_test.gd`). Evidence: `captures/holding_work_map.png`, `captures/holding_decision_open_map.png`, `captures/holding_decision_open_world.png`, `captures/holding_decision_open_index.png`, and `captures/ashbloom_holding_board.png`.
 
 ### AA3 — What the land becomes
 - [ ] **AA3.1** Ascended ground: colour, light, weather clearing, things growing back
@@ -3198,13 +3690,13 @@ in; nothing has ever asked the player to *use* them on a map.
 ### AA4 — Consequence
 - [ ] **AA4.1** Who lives there reacts — a corrupted holding loses its people
 - [ ] **AA4.2** Factions care: taking ground moves standing on both ladders
-- [ ] **AA4.3** The Board can pin a holding, so a theory can be about land
+- [x] **AA4.3** The Board can pin a holding, so a theory can be about land — a revealed place appears in INDEX without a fabricated portrait, pins as a filed survey record carrying its live holder and field note, and accepts ordinary red string to `THE SIGNAL IS THE PRAYER`. The real `P` action now reaches the room's persistent Board from either full-size INDEX or the Black Mirror's hosted INDEX; before this pass its signal had no listener and mislabeled land as a human photo. Verified by `ashbloom_holdings_test`, the 12-check `index_board_territory_route_test`, and `captures/ashbloom_holding_index.png` / `captures/ashbloom_holding_board.png`
 - [ ] **AA4.4** An ending can be reached through the map rather than through a person
 
 
 ### AA v10 — the final pass
 The last rung. Fifteen statements that are true of the land taking a side when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
-- [ ] **AA10.1** `v10` Every holding belongs to somebody and the map shows it
+- [x] **AA10.1** `v10` Every holding belongs to somebody and the map shows it — all five surface place records begin with the faction already established by their authored district, and a revealed polygon prints `HELD / <faction>` in that holder's Tree-axis colour. This records the current world without deciding the still-open player act in AA2.2/AA2.3
 - [ ] **AA10.2** `v10` Giving one to the ascent or to corruption is a real, costly act
 - [ ] **AA10.3** `v10` The colour of the region changes with who holds it
 - [ ] **AA10.4** `v10` Weather quality degrades where corruption holds
@@ -3212,11 +3704,11 @@ The last rung. Fifteen statements that are true of the land taking a side when t
 - [ ] **AA10.6** `v10` A holding remembers who gave it away
 - [ ] **AA10.7** `v10` Holdings can be taken back and it is harder the second time
 - [ ] **AA10.8** `v10` Nobody holding a place means nobody repairs it
-- [ ] **AA10.9** `v10` Exploration is what reveals a holding's real state
+- [x] **AA10.9** `v10` Exploration is what reveals a holding's real state — `LivingMap.observe()` hands the player's real X/Z position to the territory authority on the same path that surveys streets; opening a menu or pointing at a polygon cannot reveal it
 - [ ] **AA10.10** `v10` The satellite sees it and the agency has opinions
 - [ ] **AA10.11** `v10` Factions move on the pyramid as holdings change hands
-- [ ] **AA10.12** `v10` The Board can pin a holding to a faction to a person
-- [ ] **AA10.13** `v10` A holding generates work: jobs, raids, collections
+- [x] **AA10.12** `v10` The Board can pin a holding to a faction to a person — `P` on the revealed place files it as a land record on the one persistent Board, the same action on PYRAMID pins its recorded holder, and `P` inside the Black Mirror's hosted FILE pins a real person related to that faction. Ordinary player-laid red string completes place → holder → person; Board support comes from the place's canonical `held_by` relation and the faction's real person edge rather than a special territory-chain exception. `index_board_territory_route_test` drives the production Hunt, both INDEX hosts and the Board in 12 checks
+- [x] **AA10.13** `v10` A holding generates work: jobs, raids, collections — revealing a surface holding now publishes two stable `kind: job` records on that canonical place: a two-person claim-crew raid and a field-cache recovery. Both are pointable actions in the holding's INDEX dossier rather than automatic quest spam. Acceptance persists one active contract; the Hunt restores raid members through its ordinary anatomical encounter pipeline or restores one identified loot cache at the recorded local coordinate. Raid progress comes only from resolving those exact people, collection progress only from physically taking that cache, and rebuilding the scene restores unresolved work rather than completing or duplicating it. MAP then reads those same active records as one hollow raid diamond or bracketed recovery cache at the saved coordinate, removes the objective when it resolves, and never stacks a generic loot marker beneath the recovery. The place itself accumulates both outcomes and opens—but does not make—the later land decision, which INDEX, MAP and its pinned Board card all read from that one place record. `holding_work_integration_test` proves the full dossier → world → MAP → place-state → Board → resolution route in 19 production checks; `captures/ashbloom_holding_index.png` shows both offers and `captures/holding_work_map.png` shows both accepted objectives
 - [ ] **AA10.14** `v10` Every land decision is visible from a distance
 - [ ] **AA10.15** `v10` The distribution of holdings is what the next universe inherits
 
@@ -3300,6 +3792,29 @@ where they are hit, and what comes off them stays.
       vehicle work rather than a second implementation of the same
       primitive, AB3/AB1.6 to once more than one real object exists.
 - [ ] **AB1.2** Structures break where they are struck rather than swapping to a damaged model
+      The loop proved end to end without falsely checking this off: new
+      `systems/street_light.gd` — condition lives in `WorldHistory` through
+      `world_damage.gd` exactly like the handheld's own `condition` field,
+      four authored break states (intact/flickering/sparking/hanging) decide
+      which small authored look is showing rather than any mesh cracking in
+      real time, and the glass sheds once as real `world_debris.gd`-tracked
+      wreckage on crossing into "sparking." That is DESIGN/DESTRUCTION.md's
+      whole AB1.2 shape, proved on the cheapest, most visible target rather
+      than asked to hold up a building first. It was also built and then left
+      wired to nothing — `AshbloomWorldGenerator` now places one at every
+      other lot's street frontage, reachable by a bullet or a car, with a
+      subject id derived from district and lot so regenerating the same seed
+      reads the same fixture back. Walls and building shells are still not
+      struck-and-broken anywhere; that is the real remaining scope, not a
+      second implementation of this same primitive.
+      Verified: `street_light_test.gd` (18/18 — registration, all four
+      band crossings, exactly-once shedding on repeat hits within a band and
+      on overkill straight to worst, WorldHistory event recording, both the
+      direct `strike()` and vehicle `impact()` paths, and quality-scaled
+      debris budgets). `silhouette_test.gd` (rewritten from a bare `--script`
+      harness that never loads autoloads to a real scene; 6/6, confirms 30
+      real fixtures generated across 60 buildings and each one is a genuine
+      WorldHistory subject, not just a class that compiles).
 - [x] ~~**AB1.3** Debris is real, persists, and can be stood on or thrown~~
       New `systems/world_debris.gd`: both places destruction actually throws a
       real `RigidBody3D` — `breakable_prop.gd`'s barricade fragments and
@@ -3332,7 +3847,20 @@ where they are hit, and what comes off them stays.
       Named pools (`barricade_fragment`, `vehicle_part`) keep the two kinds
       of debris from evicting each other just because they now share a file.
 - [ ] **AB1.5** A vehicle deforms rather than losing hit points (pairs with V1.2)
-- [ ] **AB1.6** Measure the cost before committing; X exists because nothing here has been profiled
+- [x] ~~**AB1.6** Measure the cost before committing; X exists because nothing here has been profiled~~
+      `destruction_cost_test.gd` isolates the production destruction load at
+      1920x1080 PERFORMANCE before that load is expanded to walls or buildings:
+      all six derby barricades broken until the shared 14-fragment cap is full,
+      plus all six detachable panels from the player's car (inside the shared
+      eight-panel cap). Three rendered RTX 2060 SUPER runs measured the broken
+      fixture at 6.43, 7.47 and 6.83 ms median, with p95s of 7.67, 9.98 and
+      8.77 ms; all held the explicit 16.67 ms / 60 FPS frame budget. The
+      intact-to-broken deltas were -0.30, -0.71 and -0.41 ms, which is warm-up
+      and run-order noise rather than evidence destruction makes rendering
+      cheaper. The suite therefore reports that delta but does not assert a
+      fiction from it: it gates the absolute broken-state median and both live
+      body caps. This is an isolated cost measurement, not a claim that a full
+      twelve-car heat costs the same; X1.2 owns that whole-scene contract.
 
 ### AB2 — Damage the world keeps
 Greg: *"everything is measurably destroyable in the game and the environment
@@ -3356,7 +3884,7 @@ ledger to avoid that.
 - [x] ~~**AB2.2** Damage is recorded against the place, in WorldHistory, like
       everything else~~ `world_damage.gd`'s `damage()`/`repair()` both
       `record_event()` (`object_damaged`/`object_repaired`, with the subject,
-      the amount and a `cause`) on top of `amend_subject()`'s mutation —
+      the amount and a `cause`) in the same ledger batch as `amend_subject()`'s mutation —
       refused outright for a subject the world does not know about, so a
       typo'd id fails loudly rather than quietly creating a phantom object
       with no owner and no history.
@@ -3526,7 +4054,13 @@ travels, hits something and leaves a mark on it.
       both, plus `ballistics_test`, `firearm_momentum_test`,
       `vault_test`, `wall_run_test`, `jump_test`, `climb_test`,
       `momentum_carry_test`, `anatomy_traversal_test` and `opening_test`,
-      re-verified clean
+      re-verified clean. The intentional boundary is now just as explicit in
+      the compact ledger: one trigger pull produces one `weapon_fired` receipt
+      with a stable action id, while its later per-pellet anatomy/world impacts
+      remain consequences rather than nine counterfeit player actions. Each
+      pellet's later anatomy, response, possible death and loot now commits as
+      one impact-frame transaction of its own (`deferred_damage_test.gd`,
+      `combat_integration_test.gd`).
 - [x] **AF1.2** It hits the world and leaves damage there (pairs with AB2) — a hole where it arrived, lifted off the surface so it does not fight the wall it is drawn on, sized by the round's energy, and recorded to WorldHistory for AB2 to read
 - [x] **AF1.3** Casings eject, bounce, land and stay — out of the port sideways and back, tumbling, two bounces that lose most of their energy, and then lying on their side rather than standing on end, which is the single most obvious tell that nobody simulated them. One case per trigger pull, so a shotgun leaves one for nine pellets
 - [x] **AF1.4** Reloading is physical: the magazine leaves the weapon and a new
@@ -3548,7 +4082,10 @@ travels, hits something and leaves a mark on it.
       visibility all verified) plus a re-run of `magazine_test.gd` and
       `arsenal_test.gd` clean. `tests/held_gear_capture.gd` re-captured for
       both firearms — the new geometry sits where authored, no stray or
-      degenerate shapes.
+      degenerate shapes. Completion now emits one `weapon_reloaded` action
+      receipt carrying the post-swap loaded/reserve counts; refused requests
+      emit nothing because pressing R is not the act. The real Hunt signal seam
+      is protected by `combat_integration_test.gd`.
 - [x] **AF1.5** A magazine dropped half-full is half-full when you pick it up —
       `_finish_reload()` ejects whatever is still loaded as its own discrete
       spare rather than merging it into one reserve number; `tests/magazine_test.gd`
@@ -3556,19 +4093,97 @@ travels, hits something and leaves a mark on it.
       the exact count it left with.
 - [x] **AF1.6** Calibre means something — muzzle velocity, grain and drag per calibre, and drag proportional to speed squared, so buckshot keeps 93.7% of its speed where a slug keeps 97.1% over the same flight. A shotgun stops being a shotgun at range without anybody writing a falloff curve
 - [x] **AF1.7** It reads through the anatomy already built: a round finds a zone, not a hitbox — this was already true and unverified rather than unbuilt: `_trace_actor` raycasts real collision geometry and hands the exact world-space impact point to `BaselineHuman.hit_at`, which resolves it through `zone_nearest(point)` — a live distance comparison against every part's real position — never a name read off whichever collider answered. `tests/zone_precision_test.gd` proves it rather than assuming it: one body, one weapon, one fixed distance, and the only thing that changes between three shots is the pitch, computed from each zone's own real current position (`rig.parts[zone].global_position`) rather than a guessed number. Aiming at where the head actually is wounds head and nothing else; the same for torso and left_leg. A hardcoded or round-robin zone table could not pass this — it would need the shot's outcome to be independent of aim, and it is not. (Building this surfaced a smaller confirmation of the same point: sinking a target far enough below its normal spawn height made shots miss entirely rather than falling back to some default zone, because there was nothing left to hit — a lookup table has no floor to fall through.)
-- [ ] **AF1.8** Firing from a car is the same system (M2.3)
+- [x] **AF1.8** Firing from a car is the same system (M2.3) — the wiring was
+      already in `rift_derby.gd`'s `_fire_from_cab()`/`_on_cab_round_hit()`,
+      landed by an unreviewed, unrun rescue commit (`57f9242`) and never
+      actually exercised. `tests/derby_cab_fire_test.gd` (new) is the first
+      thing to run it: a cab round exists in `Ballistics.rounds` the physics
+      frame after firing rather than resolving instantly, later reaches a
+      frozen wrecker placed directly ahead of the muzzle and reduces its real
+      `integrity` meta, and that landing is what raises the score — the same
+      `_damage_target()` consequence chain a ram already used. Also caught
+      and fixed two real bugs the "unrun" label meant nobody had found yet:
+      `_fire_from_cab()` connected `Ballistics.round_hit` but never
+      `round_expired`, so a cab shot that missed everything leaked its
+      muzzle entry in `_cab_seen` for the rest of the heat — the exact leak
+      `gore_demo.gd`'s own `_on_round_expired()` exists to close, now given
+      the same handler here. And `ballistics.gd`'s own `_step_rounds()`
+      called `look_at(at + velocity, Vector3.UP)` unconditionally, which
+      warns every physics step for any round travelling exactly vertical
+      (velocity colinear with the up vector) — the test's own expiry check
+      fires one straight up to prove the miss path, and hit exactly this;
+      fixed with the same guard `_surface_basis()` already uses for a
+      colinear surface normal. `ballistics_test`, `arsenal_test`,
+      `magazine_test`, `weapon_jam_test`, `deferred_damage_test`,
+      `combat_integration_test`, `derby_exit_test`, `tunnel_test`,
+      `zone_precision_test`, `firearm_momentum_test`, `reload_visual_test`,
+      `gore_demo_test`, `gore_parity_test` and `derby_cab_test` re-run clean.
+      A later live-route regression pass closed the two remaining cab-specific
+      seams: cab bullets no longer inherit the ram self-damage path or its
+      contact debounce, while actual chassis impacts still honour that
+      cooldown. Each landed cab round now creates explicit driver feedback.
+      `derby_cab_fire_test.gd` verifies all three claims alongside score,
+      expiry, and hull-integrity behaviour (2026-09-20).
 
 
 ### AF6 — The range
 The gore sandbox is where a weapon is learned (AU3.5). Same room, same bodies,
 same reset — a range that is a place rather than a menu of guns.
-- [ ] **AF6.1** Every weapon in `hunter_arsenal.gd` is physically present and
-      pick-up-able in the shed
-- [ ] **AF6.2** Bullets are readable here: drop, drag, travel time, penetration
-      shown against real bodies at real distances (AF2)
-- [ ] **AF6.3** The reset restores the bodies without restarting the scene
-- [ ] **AF6.4** What you learn transfers — the range uses the live ballistics
-      and the live arsenal, never a demo copy of either
+- [x] **AF6.1** Every weapon in `hunter_arsenal.gd` is physically present and
+      pick-up-able in the shed — the Gore Sandbox now builds one lit, open
+      weapon shed carrying the sword, shotgun and sidearm as the exact authored
+      `HeldGear.build_weapon()` models used in the player's hands, not display
+      substitutes. They present their real profiles on the rack. Walking within
+      reach and pressing the room's existing `E` take verb equips that same
+      weapon through the live `HunterArsenal`, removes its physical model from
+      the rack and returns it when the drill resets; reaching from across the
+      room or changing weapons during reload/jam recovery is refused. Wheel and
+      hotkeys remain quick practice access, but they are no longer the only way
+      weapons exist in the room. `tests/gore_weapon_rack_test.gd` verifies the
+      complete shared weapon set, authored anchors, distance gate, rack-to-hand
+      transition and reset (15 checks); range, parity, training, arsenal and
+      reload suites remain green. Rendered and inspected at
+      `P:/GameDev/Temp/lane-8-guns-af6-1/gore_sandbox_weapon_rack.png`.
+- [x] **AF6.2** Bullets are readable here: drop, drag, travel time and
+      penetration are shown from the live round against the live body, not
+      copied into range-only numbers. `Ballistics` now carries its origin,
+      initial ray, accumulated distance and simulated flight time to impact;
+      the landing report trims the unused tail of the final physics step, so
+      its metres and milliseconds stop where the collider actually was rather
+      than at the frame's projected endpoint. Drop is measured below the
+      original muzzle ray and retained energy is the same drag-reduced energy
+      the range uses for damage. The sandbox now passes the round's real
+      calibre penetration and exact impact point through `BaselineHuman.hit_at`
+      instead of discarding both in `hit(zone)`, then reads the resulting wound
+      as armour-stopped, lodged by depth, or through. The field instrument
+      presents all five facts beside the body that produced them.
+      `gore_range_ballistics_test.gd` fires one real pistol round down a
+      measured 16-metre lane into a production `BaselineHuman` and verifies
+      travel, drop, drag and the backed wound; `ballistics_test.gd` protects
+      the landing report itself. Rendered and inspected at
+      `P:/GameDev/Temp/lane-8-guns-af6-2/gore_sandbox_ballistics_readout.png`:
+      the target remains visible and the readout resolves `14.2m`, `42ms`,
+      `1.2cm DROP` and `ARMOUR STOP`; inspection also caught energy rounding
+      hiding drag, so retained energy now keeps one decimal place.
+- [x] **AF6.3** The reset restores the bodies without restarting the scene —
+      the implementation was already present and is now protected through its
+      public `R` input rather than rewritten. `gore_range_reset_test.gd`
+      damages a production body's torso, dirties the drill counters and presses
+      `R` through Godot's input queue. The range keeps the same instance, retires
+      all seven old rigs, builds seven new `BaselineHuman` targets with full
+      health in every canonical zone and clears the drill counters. A cosmetic
+      heal, stale array entry or scene reload cannot pass those checks.
+- [x] **AF6.4** What you learn transfers — the range uses the live ballistics
+      and the live arsenal, never a demo copy of either —
+      `gore_demo.gd` used to hardcode its own `SHOT_WEAPON`/`SHOT_GRIP`/
+      `SHOT_CALIBRE`/`SHOT_DAMAGE`/`SHOT_IMPULSE` constants: one weapon's
+      numbers copied in, not a reference to them. It now instantiates a real
+      `HunterArsenal` and fires through `arsenal.begin_attack()`/
+      `shot_directions()`/`current()` directly — the same calls
+      `bone_yard_hunt.gd`'s own `_resolve_firearm()` makes — so a weapon's
+      damage, ammo, jam and reload behaviour in the range is the Hunt's own,
+      not a second copy of it. `ballistics.gd` was already shared. Verified:
+      `gore_demo_test.tscn` and `gore_parity_test.tscn` both clean.
 
 ### AF v10 — the final pass
 The last rung. Fifteen statements that are true of guns when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
@@ -3606,9 +4221,41 @@ The last rung. Fifteen statements that are true of guns when this game is finish
       established this codebase means by the sentence
 - [ ] **AF10.6** `v10` Calibre decides what happens to a body and to a wall
 - [x] **AF10.7** `v10` ~~A round finds a zone, never a hitbox~~ Same proof as B10.3, from the gun's side: a round's impact point resolves through `zone_nearest()` to the limb it struck, and `Penetration` then measures that limb's real thickness at that height to decide how far in it got. A hitbox could not answer either question
-- [ ] **AF10.8** `v10` Firing from a car is the same system
-- [ ] **AF10.9** `v10` A gun is inspectable in full
-- [ ] **AF10.10** `v10` Weapon customisation lives on the weapon
+- [x] **AF10.8** `v10` ~~Firing from a car is the same system~~ Same closure
+      as AF1.8, verified rather than assumed: `tests/derby_cab_fire_test.gd`
+      proves the cab gun fires a real `Ballistics` round that travels,
+      lands on a wrecker and raises the score, not the instant raycast this
+      item used to describe
+- [x] **AF10.9** `v10` A gun is inspectable in full — the Hunt's complete firearm
+      set (shotgun and sidearm) uses the same held `I` verb and live model as
+      combat, but each has physical choreography rather than a canned spin: the
+      shotgun rolls its receiver into view and works the forend while the
+      sidearm cants its ejection port and performs a restrained press-check.
+      Both remain visible in the universal 3D reliquary with their live
+      ammunition state. `combat_integration_test.gd` protects the common seam;
+      `captures/full_use_inspection_demo.mp4` is the gameplay proof.
+- [x] **AF10.10** `v10` ~~Weapon customisation lives on the weapon~~
+      `HunterArsenal.customization` is keyed by weapon and physical slot, in
+      the same instance-owned shape as condition and ammunition rather than a
+      perk on the player, range or vehicle. `install_customization()` accepts
+      only attachment points authored for that firearm, keeps the fitted
+      part's identity/provenance, discards unknown holder bonuses and clamps
+      the small shared modifier vocabulary at the ownership boundary.
+      `weapon_definition()` composes those parts over the authored weapon, so
+      every existing consumer of `current()`, `begin_attack()` and
+      `shot_directions()` — the Hunt, Gore Sandbox and derby cab — reads the
+      same fitted damage, impulse, range, spread, cooldown and reload values.
+      The current state and physical weapon mount expose that same complete
+      attachment record for inventory UI and later authored geometry without
+      teaching the holder what an optic is. Holstering preserves it; another
+      weapon or another arsenal does not inherit it; removing a part returns
+      that same record and restores the base numbers. Verified by the new
+      `tests/weapon_customization_test.gd` (16 checks), plus `arsenal_test`,
+      `magazine_test`, `weapon_jam_test`, `firearm_aim_test`,
+      `firearm_momentum_test`, `reload_visual_test`, `ballistics_test`,
+      `deferred_damage_test`, `combat_integration_test`, `gore_demo_test`,
+      `gore_parity_test`, `derby_cab_fire_test` and `derby_cab_test`, all with
+      real output after restoring this worktree's required gitignored addons
 - [x] **AF10.11** `v10` ~~A gun carries momentum and swivels toward where you look~~
       AN1.7, already proven in `tests/firearm_momentum_test.gd`: `ARM_WEIGHTS`
       carries each firearm's own authored mass and reach, `_carry_current_weapon()`/
@@ -3683,7 +4330,7 @@ M covers which camera you are in and why. AD is what the body can do while you
 are in it.
 
 ### AD1 — The body moves
-- [x] **AD1.1** Jumping worth doing — height, arc and a landing that reads. `HunterMotor.move_body()` already ran real gravity, air acceleration and floor-stick every physics frame and `hunter_body_motion.gd` already had a dormant `landing_time` camera-dip/FOV-kick — nothing had ever given the player an upward velocity to actually reach them with. SPACE now jumps when there is no directional input held (a "dodge in place" makes no sense; `_dodge()` still owns SPACE-with-direction exactly as before), queued through `jump_queued` and consumed in `_update_player()`. Building it surfaced a real one-frame-late bug: the first version applied the impulse *after* `HUNTER_MOTOR.move_body()` returned, which is a whole physics step too late — `move_body()`'s own floor-stick branch reads `is_on_floor()` from the *previous* slide, so next frame it saw the body still (stale-)grounded and stomped the impulse straight back to `-FLOOR_STICK` before `move_and_slide()` ever got to use it. Fixed by giving `move_body()` an optional `jump_impulse` parameter so the impulse rides the same `move_and_slide()` call that has to prove it, not the next one. `game/tests/jump_test.gd` (13 checks) covers: queued-not-immediate, consumed-and-applied-in-the-same-slide, refused while airborne, refused while paneled/grappling, the arc actually leaving and returning to the floor on its own, `landing_time` firing for real, and SPACE-with-direction still dodging without also queuing a jump. `opening_test` and `combat_integration_test` re-verified clean against the `HunterMotor.move_body()` signature change (the one call site).
+- [x] **AD1.1** Jumping worth doing — height, arc and a landing that reads. `HunterMotor.move_body()` already ran real gravity, air acceleration and floor-stick every physics frame and `hunter_body_motion.gd` already had a dormant `landing_time` camera-dip/FOV-kick — nothing had ever given the player an upward velocity to actually reach them with. SPACE now jumps when there is no directional input held (a "dodge in place" makes no sense; `_dodge()` still owns SPACE-with-direction exactly as before), queued through `jump_queued` and consumed in `_update_player()`. Building it surfaced a real one-frame-late bug: the first version applied the impulse *after* `HUNTER_MOTOR.move_body()` returned, which is a whole physics step too late — `move_body()`'s own floor-stick branch reads `is_on_floor()` from the *previous* slide, so next frame it saw the body still (stale-)grounded and stomped the impulse straight back to `-FLOOR_STICK` before `move_and_slide()` ever got to use it. Fixed by giving `move_body()` an optional `jump_impulse` parameter so the impulse rides the same `move_and_slide()` call that has to prove it, not the next one. `game/tests/jump_test.gd` covers: queued-not-immediate, consumed-and-applied-in-the-same-slide, refused while airborne, refused while paneled/grappling, the arc actually leaving and returning to the floor on its own, `landing_time` firing for real, and SPACE-with-direction still dodging without also queuing a jump. A jump is receipted only once it genuinely leaves the floor; an accepted directional dodge gets its own stable receipt, while refused inputs write nothing. `opening_test` and `combat_integration_test` re-verified clean against the `HunterMotor.move_body()` signature change (the one call site).
 - [x] ~~**AD1.2** Vaulting and mantling: waist-high things stop being
       walls~~ Three real raycasts against actual collision geometry decide
       it (`_vault_target()` in `bone_yard_hunt.gd`), not a fixed "step
@@ -3734,7 +4381,9 @@ are in it.
       person's is (`_announce_wall_run_unlock()`, checked in `_update_hud()`
       the frame the count first crosses, an `impact_feel` kick, a
       `wall_run_unlocked` WorldHistory event, a prompt line), not a silent
-      permission flip.
+      permission flip. The automatically detected start remains a derived
+      movement fact; the player's deliberate kickoff now receives exactly one
+      action receipt when its physical impulse is actually consumed.
       \
       The run itself needs no key to start: `_wall_run_surface()` looks to
       both sides of the player whenever they are airborne and moving fast
@@ -4017,7 +4666,9 @@ able to answer a rocket with a blade, and the game should let it.
       `_jump()` refuses an airborne press exactly as it always has. A leg
       with drive hardware gets one kick off nothing, spent on use and reset
       by touching down, so the hardware grants an extra departure rather than
-      flight.
+      flight. That successful airborne press is recorded once as
+      `player_kicked_off`; merely requesting an impossible second departure is
+      not an action receipt.
       `heel anchors` is the catalogue's own right-leg entry and reads exactly
       like the thing that drives a body off the ground, so nothing new had to
       be authored in `implant_catalog.gd` (Lane 5's file) to make this real.
@@ -4110,9 +4761,9 @@ The last rung. Fifteen statements that are true of movement and first person whe
 - [ ] **AD10.10** `v10` Affordances say what you can do right now — **Not fully true**, per AD2.3's own note: the bottom strip shows current verbs but does not announce a *new* one the moment it becomes available. `gothic_field_hud.gd` is Lane 5's file.
 - [x] **AD10.11** `v10` It survives the change to third person without dissolving — See AD2.4. Opened and looked at both again rather than taking the old note on faith: `captures/ad2_4_field_hud_first_person.png` and `_third_person.png` show the identical location crest, hunt thread, vitals-and-weapon gauge and bottom strip over two genuinely different camera positions.
 - [x] **AD10.12** `v10` It is readable while moving, which is when it is needed — See AD2.5: `$HUD` is a `CanvasLayer` with no relationship to the 3D camera's transform, so nothing that shakes or turns the camera touches its position or legibility.
-- [ ] **AD10.13** `v10` Cybernetics change what movement is possible — Not built. See AD3.2, still open.
-- [ ] **AD10.14** `v10` A projectile is a physical thing that can be met — Not built. See AD3.3, still open; AF1.1's round travels but nothing lets a body meet or intercept one.
-- [ ] **AD10.15** `v10` A melee build can close on a launcher and live — Not built. See AD3.1, still open.
+- [ ] **AD10.13** `v10` Cybernetics change what movement is possible — Note corrected 2026-09-15: AD3.2 is now `[x]` closed, not open as this line previously claimed. Not yet re-verified whether it lands as a true v10 statement — needs a real check against AD3.2's implementation, not another status flip.
+- [ ] **AD10.14** `v10` A projectile is a physical thing that can be met — Note corrected 2026-09-15: AD3.3 is now `[x]` closed, not open as this line previously claimed. AF1.1's round-travels-but-nothing-intercepts-it gap was the separate, substantive claim here and has not been re-checked — don't assume it's resolved just because AD3.3 closed.
+- [ ] **AD10.15** `v10` A melee build can close on a launcher and live — Note corrected 2026-09-15: AD3.1 is now `[x]` closed, not open as this line previously claimed. Not yet re-verified whether it lands as a true v10 statement — needs a real check against AD3.1's implementation, not another status flip.
 
 ## AE — Sneaking, assassination and the law
 
@@ -4128,48 +4779,121 @@ arrest anybody.
       values every frame against every live hostile (light from
       `WorldClock.daylight()`/the handheld; noise from sprinting, the one
       input with no other system behind it yet; cover from a real raycast).
-      Unblocks AS1.5 and AU1.10's AE1.4. `player_unseen`/`player_visibility`
-      are computed and correct but nothing reads them yet — see AE1.2/AE1.3.
-- [ ] **AE1.2** An unseen kill differs from a seen one, mechanically and in the record
-- [ ] **AE1.3** Assassination as a verb: reach somebody who does not know you are there
-- [ ] **AE1.4** Law figures respond to what was actually witnessed (`witness_ledger.gd`)
-- [ ] **AE1.5** Punishment is local: the holding remembers, and the holding sends them
-- [ ] **AE1.6** Karma is an axis, not a score — the law reads position, not "evil"
-- [ ] **AE1.7** Being hunted by the law is the Hunt System pointed back at you (F)
-- [x] **AE1.1** Unseen is a real state with real inputs — light, noise, cover, distance — `LocalLaw.unseen_state()`: combines real 0..1 light/noise/cover plus real distance against a real sight range (defaulting to `witness_ledger.gd`'s own `SIGHT_RANGE`, so being unseen and being unwitnessed never quietly disagree about how far is too far). Never a single invented "stealth" stat measured on its own authority
+      `LocalLaw.unseen_state()` uses the same four inputs and defaults to
+      `WitnessLedger.SIGHT_RANGE`, so being unseen and being unwitnessed never
+      quietly disagree about how far is too far. `player_unseen` and
+      `player_visibility` remain diagnostic summaries; each actor's live
+      `tracking_player` / `tracking_light` verdict is what pursuit actually reads.
 - [x] **AE1.2** An unseen kill differs from a seen one, mechanically and in the record — `LocalLaw.assassinate()` routes every kill through `witness_ledger.gd`'s real `record()` (F1), carrying a real `unseen` flag; the mechanical difference is not a second flag anybody has to check, it is that a kill with no witnesses passed in has nothing in flight to ever report it, so it can never reach a faction's knowledge at all
 - [x] **AE1.3** Assassination as a verb: reach somebody who does not know you are there — `LocalLaw.assassinate()`, through the exact same `npc_resolution`/`execute` vocabulary every other execution already uses (`event_karma()`, `route_endings.gd`, `ascent_entities.gd`) so it moves karma and the Tree exactly as hard as any other kill; the only thing that changes is whether anybody was ever there to know
-- [x] **AE1.4** Law figures respond to what was actually witnessed (`witness_ledger.gd`) — `LocalLaw.witness_a_wrong()` refuses outright unless `ledger.faction_knows()` says the answering faction was actually told, real F1 delivery rather than a direct read of the event log every faction can already see
-- [x] **AE1.5** Punishment is local: the holding remembers, and the holding sends them — a real `place` subject (`held_by`, `unrest`) accumulates real offence magnitude per witnessed wrong on its own ground; once it remembers enough (`RESPONSE_THRESHOLD`) it spends that memory and raises the answering faction's own real `grudge` — the exact field `wire_net.gd`'s channel-contest retaliation (K4.6) and `the_four_horsemen.gd` (K2.5) already use for "the world acts on you", not a second consequence channel
+- [x] **AE1.4** Law figures respond to what was actually witnessed (`witness_ledger.gd`) — production Hunt resolutions now record through the live ledger with nearby living witnesses instead of writing around it. `LocalLaw.answer_report()` accepts only a report that completed the real F1 delay and reached the faction holding the scene; the global event log cannot dispatch law by itself. Two witnesses cannot charge one source sequence twice. `hunt_local_law_integration_test` drives a real execute resolution in the production Hunt and proves all seven stages from scene position to delayed faction knowledge
+- [x] **AE1.5** Punishment is local: the holding remembers, and the holding sends them — `AshbloomHoldings.jurisdiction_at()` resolves the act's real X/Z to the same canonical `place` subject MAP, INDEX and Board use without revealing unsurveyed land. That subject (`held_by`, `unrest`, source sequences) accumulates real offence magnitude per witnessed wrong on its own ground; once it remembers enough (`RESPONSE_THRESHOLD`) it spends that memory and raises the answering faction's own real `grudge` — the exact field `wire_net.gd`'s channel-contest retaliation (K4.6) and `the_four_horsemen.gd` (K2.5) already use for "the world acts on you", not a second consequence channel. Unrest, grudge, retained warrant reason, dispatch fact and the holding's spent balance now persist as one transaction. Restoring the two exact physical officers, remembering them as hunters, attaching the active contract and publishing the team dispatch is a second atomic world outcome; if one finishes the job, capture, contract settlement and attributable arrest are a third. Covered by `local_law_test` plus the production-scene integration above.
 - [x] **AE1.6** Karma is an axis, not a score — the law reads position, not "evil" — `LocalLaw.offence_magnitude()`: a faction's own real `FACTION_TREE_AXIS` position decides whether an act was even a wrong to it, read against the same real `event_karma()` every act already carries. Verified both directions: the identical execution is no offence to a faction deep in Descent and a real one to a faction that climbed the other way, and the identical act of mercy inverts which faction is offended — nowhere is there a universal crime score either reads instead
-- [ ] **AE1.7** Being hunted by the law is the Hunt System pointed back at you (F) — needs `rival_registry.gd` (Lane 4's); `witness_a_wrong()`'s real `grudge` rise is already the field that system reads, so wiring it in is additive once asked for as an API, not attempted here
+- [x] **AE1.7** Being hunted by the law is the Hunt System pointed back at you (F) — crossing a holding's real unrest threshold commissions exactly one two-person team from the faction that holds it. Stable generated names become persistent WorldHistory people and enter `_spawn_encounter_actor()`, so they inherit the Hunt's full anatomy, AI, wounds, loot, defeat/resolution and save status rather than existing as police icons. Their warrant carries the recorded scene coordinate and they physically path there; it never tracks the player's current coordinate for free. The active contract persists on the holding itself rather than depending on the rolling event window, so an unresolved team restores when the Hunt scene is rebuilt even after old events age out. `hunt_local_law_integration_test` proves the complete route in 28 production-scene checks
 
-Covered by `tests/local_law_test.gd` (23 checks). `tests/karma_test.gd`, `tests/witness_test.gd`, `tests/route_endings_test.gd`, `tests/ascent_entities_test.gd` and `tests/propagation_test.gd` re-run clean.
+Covered by `tests/local_law_test.gd` (40 checks) and `tests/hunt_local_law_integration_test.gd` (28 checks). `tests/karma_test.gd`, `tests/witness_test.gd`, `tests/route_endings_test.gd`, `tests/ascent_entities_test.gd`, `tests/resolution_test.gd` and `tests/propagation_test.gd` re-run clean.
 
 
 
 ### AE v10 — the final pass
 The last rung. Fifteen statements that are true of sneaking and the law when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
-- [ ] **AE10.1** `v10` Unseen is a real state with real inputs
-- [ ] **AE10.2** `v10` Light, noise, cover and distance all feed it
-- [ ] **AE10.3** `v10` The handheld's glow is the commonest thing that gives you away
-- [ ] **AE10.4** `v10` An unseen kill differs mechanically and in the record
-- [ ] **AE10.5** `v10` Assassination is reaching somebody who does not know you are there
-- [ ] **AE10.6** `v10` Law figures respond to what was actually witnessed
-- [ ] **AE10.7** `v10` Punishment is local and the holding sends them
-- [ ] **AE10.8** `v10` Karma is an axis, not a score
-- [ ] **AE10.9** `v10` Being hunted by the law is the Hunt System pointed at you
-- [ ] **AE10.10** `v10` Witnesses can be wrong, bought or silenced
-- [ ] **AE10.11** `v10` The tunnels are where the satellite cannot see you
-- [ ] **AE10.12** `v10` A crime has a jurisdiction and jurisdictions end
-- [ ] **AE10.13** `v10` You can be arrested rather than killed
-- [ ] **AE10.14** `v10` Standing with a faction changes what the law does
-- [ ] **AE10.15** `v10` What you were wanted for carries into the next universe
+- [x] **AE10.1** `v10` Unseen is a real state with real inputs — AE1.1's live
+      per-hostile `tracking_player` verdict, not a stealth toggle.
+- [x] **AE10.2** `v10` Light, noise, cover and distance all feed it — AE1.1's
+      pure `Perception.visibility()` contract plus production raycast, noise
+      and daylight inputs; `perception_integration_test.gd` proves the live seam.
+- [x] **AE10.3** `v10` The handheld's glow is the commonest thing that gives you away —
+      AS1.5's emitted-source verdict enters real pursuit while the holder is
+      still unseen; pocketing, cover and exhausted charge close the trail, and
+      the harder-driven MAP page broadcasts farther than INDEX.
+- [x] **AE10.4** `v10` An unseen kill differs mechanically and in the record —
+      AE1.2: the canonical execute carries `unseen`, and no witness means no
+      report can ever reach law.
+- [x] **AE10.5** `v10` Assassination is reaching somebody who does not know you are there —
+      AE1.3's ordinary execution/karma route is distinguished by the real
+      perception and witness state rather than bonus damage.
+- [x] **AE10.6** `v10` Law figures respond to what was actually witnessed —
+      AE1.4's delayed `WitnessLedger` report is required; global history alone
+      cannot dispatch law.
+- [x] **AE10.7** `v10` Punishment is local and the holding sends them — AE1.5:
+      the canonical place accumulates and spends its own unrest.
+- [x] **AE10.8** `v10` Karma is an axis, not a score — AE1.6 proves opposite
+      factions judge the identical execution or mercy in opposite directions.
+- [x] **AE10.9** `v10` Being hunted by the law is the Hunt System pointed at you —
+      AE1.7's persistent two-person warrant team uses ordinary named actors,
+      anatomy, AI, wounds, loot and resolution. Re-verified with
+      `local_law_test.gd` (40 checks) and `hunt_local_law_integration_test.gd`
+      (13 production-scene checks).
+- [x] **AE10.10** `v10` Witnesses can be wrong, bought or silenced — the
+      silenced third now works in production rather than only in
+      `witness_test.gd`: every real Hunt death converges on
+      `_kill_encounter_actor()`, which cuts that body's pending testimony before
+      the report delay can deliver it. The true event remains in world history
+      and an attributable `report_cut` is added; the holder never learns the
+      carried account. `hunt_local_law_integration_test.gd` proves this through
+      a live anatomical witness and physical death. The bought third is now a
+      contextual physical exchange too: grapple the exact witness while their
+      account is still pending and `[B] BUY REPORT` spends twelve real rust
+      scrip per account, buries only what that body carries and writes one
+      `report_bought` action receipt. Insufficient funds or already-delivered
+      knowledge cannot be bribed away (`witness_test.gd`). “Wrong” is now a
+      consequence rather than prose: testimony reads the witness body's real
+      consciousness at the act, and below the same visible impairment threshold
+      used by altered perception can confuse an execution with mercy or mercy
+      with execution. WorldHistory retains the true act; faction knowledge gets
+      only the mistaken account and local law judges that account. The game
+      stores no corrective label. `local_law_test.gd` proves CellOutz punishes
+      reported mercy produced by an impaired witness even though the true
+      execution was not an offence to it.
+- [x] **AE10.11** `v10` The tunnels are where the satellite cannot see you —
+      `SignalField.DEAD_ZONES` now closes the complete observation loop: MAP
+      keeps only remembered chart ink, sleeps the orbital camera, hides the
+      live player fix, returns no pocket minimap and suppresses CellOutz target
+      pings until surface carrier coverage returns. `handheld_satellite_test.gd`
+      proves the direct map and real Black Mirror seams; visual evidence:
+      `captures/underground_satellite_occluded.png`.
+- [x] **AE10.12** `v10` A crime has a jurisdiction and jurisdictions end —
+      witnessed acts resolve to the same canonical holding MAP/INDEX/Board use,
+      but `jurisdiction_at()` now clips the Voronoi authority to the authored
+      470×370-metre Ashbloom boundary. An act beyond that edge returns no local
+      holder instead of being silently assigned to whichever settlement is
+      nearest (`ashbloom_holdings_test.gd`, 31 checks; local-law suites green).
+- [x] **AE10.13** `v10` You can be arrested rather than killed — a finishing
+      blow from a commissioned local-law enforcer is the one ordinary encounter
+      hit allowed to cross the old one-health floor. It routes the undying
+      player through the existing persistent defeat/captivity system, records
+      the exact officer and faction, holds them at the canonical jurisdiction
+      that issued the warrant, and settles that warrant instead of re-arresting
+      on later AI ticks. Other roaming enemies retain the one-health floor, so
+      this is an arrest power belonging to law rather than generic enemy death.
+      `hunt_local_law_integration_test.gd` drives the real dispatched team from
+      witnessed offence through pursuit to a physical finishing blow and proves
+      custody, attribution, jurisdiction, warrant settlement and idempotence.
+- [x] **AE10.14** `v10` Standing with a faction changes what the law does —
+      enforcement reads `WorldHistory.faction_price_factor()`, the existing
+      relative Tree position shared with trade, rather than adding a police
+      reputation bar. A witnessed wrong by somebody the holder reads as kin is
+      still written into that place's unrest but receives a longer leash;
+      committing the identical offence while the faction refuses you crosses a
+      much lower response threshold and can commission its team immediately.
+      The faction's axis still decides whether the act was an offence at all.
+      `local_law_test.gd` proves both dispositions, thresholds, retained memory
+      and divergent dispatch outcomes from otherwise identical executions.
+- [x] **AE10.15** `v10` What you were wanted for carries into the next universe —
+      when local unrest genuinely commissions law, the continuing player's
+      record receives an attributable warrant memory: originating universe,
+      source event, act/outcome, victim, issuing faction, jurisdiction and
+      magnitude. `QuantumSaves.begin_new()` carries that bounded history with
+      the player while correctly erasing the old place, unrest and active team;
+      this preserves what happened to the spirit without smuggling the previous
+      world across with it. `local_law_test.gd` proves the live dispatch reason,
+      a genuinely new run salt, exact memory equality after restart, and absence
+      of the abandoned jurisdiction in the new world.
 
 ### AG4 — The third playtest, and what Greg is sick of
 - [x] **AG4.1** *"when running and the stamina bar depletes, the screen becomes super jittery"* — TaKeS was right and so was his guess at the cause. Two thresholds now, not one
 - [x] **AG4.2** *"the blood splatter effects... just being lame asf"* — `blood_veil.gd`: spatter with direction, near glass out of focus against far glass sharp, drops heavy enough to run down the screen, three stages of drying
-- [x] **AG4.3** *"no more mara voss wipe it"* — wiped, and not by find-and-replace: a second hardcoded name is the same fault with different letters. `cast_names.gd` generates the captain from `run_salt`, so they are stable inside a save and different in the next. Eight saves gave eight captains: Vale Rime, Roan Hollow, Halloway Coil, Mera Lockwood, Ash Coil, Kester Cinder, Nix Arden, Reve Arden. F v10.1 already demanded this
+- [x] **AG4.3** *"no more mara voss wipe it"* — wiped, and not by find-and-replace: a second hardcoded name is the same fault with different letters. `cast_names.gd` generates the captain from `run_salt`, so they are stable inside a save and different in the next. Eight saves gave eight captains: Vale Rime, Roan Hollow, Halloway Coil, Mera Lockwood, Ash Coil, Kester Cinder, Nix Arden, Reve Arden. The Hunt's authored supporting people/factions and generated captain schema now seed as one scene-bootstrap batch rather than ten partial saves. F v10.1 already demanded this
 - [x] **AG4.4** *"make this clickable with the mouse not just arrow keys"* — the index tabs are pointable and the footer leads with CLICK ANYTHING instead of listing five keyboard controls
 - [x] **AG4.5** *"no more vessel breath bullshit"* — gone, and replaced by the same information carried by things already in the frame. **Breath became breathing**: the frame tightens and releases on a cycle whose rate climbs and depth falls as stamina empties, so hard breathing is fast and shallow and the edges close in. Nothing to read, which is why it works while you are being attacked — the one moment a stamina bar is least useful. **Vitality became the mark’s own condition**: the crown arc opens, thorns snap off one at a time (four a side at full, countable at a glance), and the pulse goes quick and irregular below 40%. Dressing a progress bar in a crown never stopped it being a progress bar
 - [ ] **AG4.6** The website
@@ -4233,14 +4957,45 @@ Greg sending the first build to friends, and reporting while it ran.
 - [x] **AG5.3** Opening any panel once and closing it left the retired orange HUD stuck over the real interface for the rest of the run — `_toggle_panel` turned `title`, `status` and the vitals box back on, and `_update_hud` re-hid only `status`
 - [x] **AG5.4** **FIX DEVICE SIZING** — both hosted panels were handed `_clip.size` as their own size, so the index laid itself out for a 1074x515 letterbox using measurements authored against 1280x720. Widths survived it, heights did not: the file page ran through the footer and the bottom of the plate was cut off. The panel now gets the viewport's size and is scaled to fit, so hosted and fullscreen are the same layout
 - [x] **AG5.5** The floating sword, third attempt and the first one that found the cause. Two passes retuned the mount and both made it worse, because the value was never reaching the model — `_pose_weapon` assigned `model.rotation` every frame from arm sway alone and discarded the counter-rotation `hunter_arsenal` writes to cancel the arm pitch. With the rest rotation cached the way the rest position already was, the honest value is the pure cancellation of `FIRST_PERSON_ARM_RAISE`
-- [x] **AG5.6** *"fixing the wobbly screen like you smoked weed or nicotine — even tho at the start you get a random drug"* — AS2.1 had nightfall driving the shader's displacement dial, so a sober player after dark had a permanently moving screen and the one state the shader exists to express stopped being legible. The hour no longer touches the dial; substances, meditation and the shadow realms own it
+- [x] **AG5.6** *"fixing the wobbly screen like you smoked weed or nicotine — even tho at the start you get a random drug"* — AS2.1 had nightfall driving the shader's displacement dial, so a sober player after dark had a permanently moving screen and the one state the shader exists to express stopped being legible. The hour no longer touches the dial; substances, meditation and the shadow realms own it. The later consciousness seam repeated the same failure in time instead of by source: it added `altered * 0.05` to the previous frame sixty times a second, so one modestly harsh smoking take liquefied the view before the next inspection. It now assigns the bounded anatomy-derived value every frame; `altered_perception_test` holds the same state for 120 updates and proves it cannot accumulate
 - [x] **AG5.7** The transit plate was acid green, in a register nothing else in the game uses. Blood now, carrying the seal of the place you are arriving at — ring, point count and stride seeded off the destination path — with runnels down the glass
 - [~] **AG5.8** *"i hate the look of this ui it looks ugly"* — the bottom-right cluster specifically, and the fonts generally. Greg wants boxes, dimensional HUD panels, and a grungier biopunk face throughout
   - [x] The fonts. `gothic_field_hud.gd` had three call sites still drawing in `ThemeDB.fallback_font` — the location crest, the hunt-thread readout and the archive-frame header — the exact "tutorial level, same as the font" look `celloutz_type.gd` exists to replace, missed because all three are conditionally hidden and rarely on screen. All three now draw in the stencil face. The crest's em-dash bracketing is gone with it (the stencil alphabet has no glyph for "—"; it drew as two silent gaps) in favour of the "//" register the rest of the HUD already uses. Found in passing: the weapon well's reserve count used "×", also glyph-less and silently blank since it was written — now "x". Verified visually via `hunt_weapon_capture`, regression-checked against `hud_transience_test` (7/7)
-  - [ ] The bottom-right cluster itself. `_draw_weapon`/`_draw_regal_vitals` build a torn-leather recess *by design* — M1.6 and AG4.5's own comments name this as the deliberate alternative to "a fourth corner panel" / "an app widget checking in on you." Greg's ask here reads as a reversal of that call, not a bug in it, so it needs his steer before a rebuild rather than a guess: literal dimensional boxes back over a rig several segments deliberately moved away from, or the same organic register pushed to look less like a debug shape and more "grungier biopunk" on its own terms
+  - [x] Greg supplied the missing steer: corners have separate responsibilities rather than four matching boxes. Top-right is an original cracked mood reliquary with narrow, bottom-filling blood and dirty-water stamina ampoules hanging vertically beneath it; its magick vessel does not exist before unlock. Bottom-left is contextual anatomy, first implemented as a live lung X-ray. Top-left holds the Ashbloom date/hour, contaminated air and hunt threat. Bottom-right remains held weapon and ammunition. `_draw_regal_vitals` is retired from the live draw path rather than restyled into another generic status block (`tests/smoking_lung_ui_test.tscn`, `tests/hud_transience_test.tscn`)
+  - [x] Greg's next refinement supersedes the temporary lower-corner ownership above: the scuffed Black Mirror physically pokes from a pocket at lower-right, its satellite/radar feed owns lower-left consistently, and contextual anatomy lives beneath the top-left world/threat instrument instead of displacing the radar. The last open half is now built rather than checked off by implication: outside a grapple, holding `V` draws the quick X-ray forward into a paired, rotatable 3D pulmonary reliquary; mouse movement turns the live specimen, the wheel zooms it and release returns immediately to play. It reuses `PartViewer`'s authored lobes and reads the exact `AnatomyComponent.lung_state()` health/stain plus the active inhaled fill/cough values every frame — no decorative lung and no parallel damage meter. `V` still persuades inside a clinch. `smoking_lung_ui_test` proves paired geometry, exact state transfer, rotation and zoom; `smoking_act_test` proves the held binding, release and keys-card teaching; the real Hunt render at `captures/pulmonary_reliquary.png` was visually checked after correcting lobe separation and viewport/title overlap
+  - [x] The centred `// LIMBO // ASHBLOOM EXPANSE //` arrival banner is removed from the live field draw. The ordinary world now passes through a dedicated, restrained barrel lens beneath the HUD, while mirrored blood-and-bone cartouches, bowed rails and a dark glass lip frame the screen above it; readable HUD geometry is never distorted with the world
+  - [x] The bottom-right stitched oblong and its hand-drawn weapon silhouettes are retired from the live draw. `held_item_reliquary.gd` extracts render geometry from the object actually in the player's hands, excludes the viewmodel hands, centres and scales it from its complete turning radius, and therefore accepts cigarettes, guns and carried severed limbs through one path without clipping or lopsided placement. Its 22-second idle is a closed 360-degree screensaver orbit: yaw eases through brief reversals instead of endlessly spinning one way, while pitch, roll and breath use 3/5/8 Fibonacci harmonics separated by the golden angle. Ammunition, burn and condition remain as terse object-state marks beneath it
+  - [x] The lower-left field map is the real A10 satellite camera at a local scale, requested at eight frames per second while the full map is closed; it carries player heading and a low-light surveillance grade rather than becoming a second invented radar
+  - [x] The unexplained red `BodyWitnessMirror` no longer stands in the Hunt's opening sightline. Its actual live-body mirror implementation and standalone tests remain for an authored inspection room, but a development fixture is not scenery
 - [ ] **AG5.9** *"the hunt thing hardly works at all zero continuity"* — the Hunt System does not hold together across a session
 - [ ] **AG5.10** The map has to integrate the underground conspiracy network text file, and carry Greg's own art textures
 - [x] **AG5.11** Save files: deletable, continuable, several of them, so somebody can keep a world and generate new stories in it — `WorldHistory` gains `active_slot_id`/`slot_manifest` and `create_slot`/`load_slot`/`delete_slot`/`list_slots`. `SAVE_PATH` stays the untouched legacy file every editor run and headless test always used; a slot is a layer the front-end opts into by setting `active_slot_id`, at which point `_current_path()` redirects load/save at `user://saves/<id>.json` with its own `manifest.json` row. A save from before this existed surfaces as a "Continue" slot the first time `list_slots` runs rather than becoming invisible. `tests/save_slots_test.gd`, 17 checks. Front-end menu wiring (an actual save-select screen) is not built yet — this is the machinery underneath it
+- [x] **AG5.12** G, MAP, INDEX, TREE, BOARD and J now have one interface owner instead of stacking independent surfaces — raising the Black Mirror pockets every full-size reader and sleeps its satellite; opening a reader lowers the phone; switching readers closes the old pointer target immediately. Escape consumes exactly one active-interface close, preventing the same press from falling through and opening `PauseGate`, while a bare Escape still pauses normally. `handheld_control_binding_test.gd` verifies both handoff directions, the J route and real viewport-dispatched Escape behavior; rendered Hunt evidence is `captures/ui_handoff_map_to_phone.png` and `captures/ui_handoff_phone_to_artwork.png`.
+- [x] **AG5.13** RADIO and CARRY no longer advertise dead controls — wheel or arrow input moves the real receiver dial / selected carried object, holding click or Space is now required to build a radio lock, and click or P pins the selected carried object through the existing Board signal. RADIO previously called `hold(delta)` every frame merely because its page was visible, allowing an untouched receiver to discover a lead; releasing the control now explicitly loses partial lock. Native phone input is consumed before Hunt can reinterpret P as opening the standalone Board or Space as dodging. The control grammar is printed on both physical pages and visually checked in `captures/handheld_radio_controls.png` / `handheld_carry_controls.png`; `handheld_control_binding_test.gd` and `radio_test.gd` are green.
+- [x] **AG5.14** September 18 recovery: blood-loss collapse no longer masquerades as becoming progressively more high. `_update_altered_perception()` distinguishes a failing body from healthy-blood altered consciousness: collapse receives a slight capped registration loss and never kaleidoscope-folds the playfield, while an intentional trip retains the deeper shader grammar. Close combat lens blood is roughly halved, capped at 28 marks and clears in 46 rather than 92 seconds. The unused lower centre names `BLOOD LOSS` / `CONSCIOUSNESS` and points to V; holding V preserves the praised paired 3D lungs while adding the live body's blood, consciousness, pain and head/torso/arms/legs integrity. `survival_presentation_test.gd` (7 checks), `altered_perception_test.gd` (11), `smoking_lung_ui_test.gd` (15); real Hunt evidence: `captures/survival_critical_field.png` and `captures/survival_self_condition.png`.
+- [x] **AG5.15** September 18 recovery: Ashbloom contact now has a readable beginning and firearm wounds last long enough to matter. Close bodies cannot attack merely because they are within three metres; they must have a real body/light perception verdict. A new verdict gives a 2.4-second `SPOTS YOU` reaction window before pursuit, while the player's first hit cancels that hesitation immediately. The perception ray now excludes both endpoint anatomy rigs rather than mistaking their own Area3D hitboxes for walls. Mercy Nine damage is 24 rather than 38: the first precise head hit leaves the 18-point brain barely intact and records a located wound, while a deliberate second hit remains lethal—longer and wound-driven, not a sponge. `encounter_pacing_test.gd` (7 checks), `perception_integration_test.gd` (14), `arsenal_test.gd` (11); real Hunt evidence: `captures/encounter_reaction_window.png`.
+- [x] **AG5.16** September 18 recovery: first/third person, grappling and F1 now form one learnable control grammar. F no longer hides behind a rated-rival execution; the first real melee or firearm body hit unlocks it, announces it once and the actual binding switches cameras. Grapple selection scores the body under the reticle instead of taking spawn order, the held actor no longer runs hostile AI in the same tick, and the clinch now advances both real CharacterBodies so WASD genuinely walks the pair; the live prompt names press, walk, talk, lean, take and release. F1 is two 2-column leaves rather than four crushed columns, with Left/Right/Tab paging and explicit first-contact and clinch instructions. `perspective_unlock_test.gd` (12 checks), `grapple_playability_test.gd` (6), `keys_card_test.gd` (5), plus the existing clinch control/limb suites; real Hunt evidence: `captures/controls_movement_combat.png`, `controls_hands_interfaces.png`, `third_person_after_first_contact.png` and `grapple_clinch_controls.png`.
+- [x] **AG5.17** September 18 recovery: a cigarette, joint or spliff parked at the lips now survives drawing a weapon as the same burning object rather than being destroyed by the slot change. The smoking hand releases cleanly, the weapon's authored hands and posture return, LMB/RMB remain weapon controls, and holding Alt draws on the lip-held smokeable before the same automatic exhale; holstering preserves it and Y takes it back only after freeing the weapon hand. The armed shoulder pose is no longer contaminated by the old smoking-hand lift. `smoking_act_test.gd` verifies object identity, both concurrent models, armed inhale, live firearm use and holster continuity; real Hunt evidence: `captures/smoking_feel_cigarette_armed.png`.
+- [x] **AG5.18** September 18 recovery: universal inspection and body looting now agree about what the player's hands own. A mouth-held cigarette no longer steals I, the 3D reliquary or first-person sleeves from the drawn weapon. Corpses remain inspectable after leaving the AI list; I presents the whole live body mesh and names its exact loose manifest before it is touched. E beside that body collects its tied stash in one routed action ahead of overlapping gore fragments, while the corpse remains for deliberate H extraction. `smoking_act_test.gd` and `corpse_loot_inspection_test.gd` verify the concurrent weapon inspection, whole-body selection, exact manifest, one receipt and retained extraction; real Hunt evidence: `captures/corpse_whole_body_inspection.png` and `captures/corpse_one_action_loot.png`.
+- [x] **AG5.19** September 18 recovery: MAP pointer and layer controls are production-routed instead of competing with field controls. While MAP is open, L/F/arrows are delivered to its live sheet; L now changes explicitly between `UNDERGROUND FACILITY` and `SURFACE SATELLITE` instead of falling through to the Black Mirror's washed monochrome field lens. An open map's click cannot recapture weapon aim, and rendered sectors remain selectable by pointer. Player-facing `HOLDING` jargon is replaced by territory, sector and control language while internal persistence IDs remain compatible. `map_access_recovery_test.gd` verifies both layers, lens isolation, sector hit targets, click selection and retained pointer ownership; real Hunt evidence: `captures/map_underground_facility_layer.png` and `captures/map_surface_satellite_layer.png`.
+- [x] **AG5.20** September 18 recovery: the playable opening reaches normal control in under nine seconds after character filing instead of holding the player for roughly thirteen, and its five deliberately spaced beats now separate machine telemetry, attributed Handler speech and the plain first objective `ESCAPE THE FACILITY`. The ownership premise lands once—`Debt's in the meat. CellOutz owns what it grew.`—instead of racing through two consecutive lore speeches. The objective remains on the playable HUD through the aisle. The underground colosseum now has a real collidable roof and structural ribs spanning the bowl and service ring, eliminating the outdoor skybox above the stands while its floodlights remain the room's light source. Existing derby crowding/balance still leaves an idle player alive through the full 30-second harness. `opening_direction_test.gd`, `service_ring_objective_test.gd` and `derby_balance_test.gd`; rendered evidence: `captures/opening_celloutz_reframe.png`, `captures/opening_escape_objective.png` and `captures/opening_underground_colosseum.png`.
+- [x] **AG5.21** September 18 recovery: Gore Sandbox is a controlled training room rather than seven inert outdated targets. Its visible button and C binding switch the same seven live anatomy rigs between safe `DUMMIES` and `ENEMIES`; enemy-mode bodies close distance, stop when downed/dead, land timed strikes against a visible simulation-health readout and return to inert targets immediately when switched back. Space and Ctrl now provide range jump/crouch states, while the overflowing one-line key dump is a legible three-row control card. Its full-screen benchmark no longer measures a 60 Hz VSync ceiling: on the RTX 2060 Super used for verification ULTRA measured 217.7 fps and PERFORMANCE 307.3 fps (1.41x). `gore_sandbox_training_test.gd`, `gore_demo_test.gd`, `gore_parity_test.gd` and `sandbox_perf_test.gd`; rendered evidence: `captures/gore_sandbox_enemy_mode.png`.
+- [x] **AG5.22** September 18 enemy-animation recovery: Hunt enemies and Gore Sandbox targets now own the same articulated body-motion controller as the player. Grounded movement opens into distinct walk/run strides with foot lift, shoulder counter-swing, torso/head response and no bind-pose translation; melee visibly anticipates, cuts and recovers; firearm users shoulder both arms, fire, recoil and return while their lower body keeps moving. The finished arm poses carry their anatomy hitboxes rather than leaving invisible bind-pose targets behind. `body_motion_test.gd`, `enemy_ai_test.gd` and `gore_sandbox_training_test.gd`; visually checked in `P:/GameDev/Temp/gore_sandbox_enemy_mode.png`.
+- [ ] **AG5.24** Mouth-held first-person cigarette composition. The complete horizontal profile floating in open screen space was rejected; so were hiding it against the bottom edge and making it enter from the extreme side. The last neutral pose is restored until Greg marks the intended mouth/filter contact and ember positions on one frame. Third-person mouth attachment, persistent burning and hands-free armed use remain intact.
+- [x] **AG5.25** September 18 narrated-playtest recovery: the grapple now has one physical owner instead of two capsules fighting each other. Starting a hold installs reciprocal player/captive collision exceptions; release (including death, surrender and forced breaks) always removes them. The player moves first, then a ground-height constraint carries the captive in a stable close-contact band, so forward movement no longer jams against an unmoved enemy, the captive is not pulled 0.6 m toward the camera reference each frame, and the procedural arms can visibly bridge the pair. The held actor faces the player and both bodies receive distinct holder/captive clinch silhouettes while ordinary AI and its previous-frame animation are bypassed. First person eases toward the upper body without swinging the exterior placeholder arms through the lens; switching to third person preserves the hold and automatically uses a tighter linked-pair frame without a second lock-on input. `grapple_playability_test.gd` now drives forward/reverse/lateral movement across 48 ticks and verifies collision ownership, floor height, spacing, facing, poses, perspective switching, AI exclusion and clean release (15 checks); the existing clinch control, limb, mass and perspective suites remain green. `controls_recovery_capture.gd` records settled first- and third-person clinch frames for visual inspection.
+- [x] **AG5.26** September 18 narrated-playtest recovery: firearms can actually be aimed. RMB previously called the universal heavy-attack path and immediately spent a round on a slower duplicate shot; it is now a held firearm stance, while LMB remains the trigger, RMB remains heavy melee when a blade or fist is equipped, and the smokeable draw retains RMB when it owns the hands. Aim eases the lens from 78° toward 56° in first person (63° toward 50° outside the body), tightens the real deterministic projectile cone to 38%, shoulders the exterior arms in third person without swinging that large pose through the first-person camera, brings the third-person shoulder closer and reduces aimed footwork without freezing it. Weapon/reload/limb/smoke transitions cancel the stance cleanly, the F1 card names the contextual binding, and every firing receipt records whether it was aimed. `firearm_aim_test.gd` verifies held/released state, no accidental discharge, real spread, eased lens, perspective-specific arm pose and preserved heavy melee; arsenal, smoking, keys-card and combat-integration suites remain green. Rendered evidence: `P:/GameDev/Temp/firearm-aim-v3/combat_playtest_firearm_aim.png`.
+- [x] **AG5.27** September 18 narrated-playtest recovery: Q no longer fires a 35-stamina prosthetic surge and starts the X-ray on the same press. The press now begins one contextual gesture; release before 0.35 s resolves as the combat surge, while crossing the hold threshold cancels that tap and opens the X-ray/radial until the player actually releases Q. The readable scan therefore stays up as long as requested, costs no stamina, and cannot secretly fire the surge on the way down. F1 now says `TAP Q` and `HOLD Q` with their distinct outcomes. `q_context_test.gd` verifies no press cost, persistent held scan/wheel, clean release without a surge, and exactly one paid receipt for a real tap; world-X-ray, rival-body and keys-card suites remain green.
+- [x] **AG5.28** September 18 narrated-playtest recovery: third-person dodging now belongs to the locked exchange instead of whichever way the camera happened to face before it caught up. Left/right circle the live target, forward closes, and an empty input retreats from that target from the first lock frame onward; free movement retains its existing camera-relative dodge. A dodge is grounded and exclusive: it cannot leak through a grapple, resolution, kill camera, another dodge or committed melee wind-up, and accepting one lowers firearm aim and guard before spending its one 25-stamina cost and receipt. Guard cannot silently raise again during the 0.28-second evasion. `third_person_dodge_test.gd` verifies target-relative lateral/retreat vectors, aim/guard ownership, stamina/cooldown/receipt, attack commitment and airborne refusal (12 checks); jump, stamina, firearm-aim, grapple and combat-integration regressions remain green. Rendered evidence: `P:/GameDev/Temp/combat-dodge/combat_playtest_locked_dodge.png`.
+- [x] **AG5.29** September 18 narrated-playtest recovery: ordinary nonlethal hits are no longer invisible between the blood sprite and a full stagger. The shared articulated motion controller now receives a brief directional wound reaction from both melee and delayed ballistic anatomy impacts; incoming side force twists the torso/head while a frontal hit folds them, scales from the struck zone's real health, and returns through a sine envelope to the underlying gait in 0.14–0.30 seconds. This is deliberately presentation-only—combat response still exclusively decides footing loss, interruption and stun—so readability does not make every bullet free crowd control. `enemy_hit_reaction_test.gd` verifies melee and ballistic integration, preserved direction, visible midpoint, clean recovery and no counterfeit stagger (8 checks); body-motion and enemy-AI behavior remain green and diagnostics are zero. Rendered evidence: `P:/GameDev/Temp/combat-hit-reaction-v2/combat_playtest_enemy_hit_reaction.png`.
+- [x] **AG5.30** September 18 narrated-playtest recovery: loot is no longer accessible only by raising the surveillance phone and navigating to CARRY. O opens a direct field inventory over live play with three simultaneous truths: the actual player's six-zone integrity/blood/pain, the exact identified objects in the shared `Carry` instance with mass/condition/provenance/pocket state, and the arsenal's live weapon condition/ammunition. Keyboard and pointer both select exact objects; P routes through the existing pocket capacity/mass rules; Enter on a selected whole limb closes the interface and equips that exact limb rather than whichever happened to occur first in the bag. The Black Mirror CARRY app remains a physical second view of the same data, I remains universal inspection, and all major interfaces still close/handoff through one owner. `field_inventory_test.gd` verifies direct access, phone independence, shared-model identity, live body/arsenal sources, pocket mutation, exact selection/equip and universal close (9 checks); keys-card and handheld-control regressions remain green. Rendered evidence: `P:/GameDev/Temp/field-inventory/field_inventory_final.png`.
+- [x] **AG5.31** September 18 narrated-playtest recovery: entering the Bone Yard no longer starts a five-person fight merely because its named workforce exists. The generic encounter constructor now honours an explicit initial disposition; all five Bonewright workers begin idle/neutral and are excluded from hostile body/light perception, while real roamers, rivals, job targets and CellOutz contractors remain hostile. Neutral does not mean invulnerable: a deliberately aimed melee strike or projectile can still wound a worker, and the exact person hit immediately becomes a tracking combatant and records that the Hunter struck first; nearby workers do not join a global aggro switch. `encounter_pressure_test.gd` verifies staffed population, neutral start, sight-pressure exclusion, deliberate melee provocation, persistent memory and isolated allegiance change (9 checks); perception and full combat-integration regressions remain green and diagnostics are zero.
+- [x] **AG5.32** September 18 narrated-playtest recovery: the Gore Sandbox now teaches the Hunt's firearm and evasive footwork instead of assigning the same buttons unrelated sandbox-only actions. Holding RMB enters a real firearm stance with the shared tightened projectile cone, eased sight lens and movement penalty; releasing it lowers the weapon, while the explosive demonstration remains explicitly on F. Directional Space performs a grounded 25-stamina dodge with a committed movement window and cooldown, overlapping/airborne attempts are refused, and still Space remains jump. The live instruction panel exposes AIM/HEAVY, JUMP/MOVE+DODGE and current stance/stamina. `gore_sandbox_combat_parity_test.gd` verifies aiming, ammunition safety, spread, lens, release, dodge cost/motion/exclusivity/grounding and jump preservation (11 checks); sandbox training, gore parity and arsenal regressions remain green. Rendered evidence: `P:/GameDev/Temp/gore-sandbox-parity/gore_sandbox_aim.png` and `gore_sandbox_dodge.png`.
+- [x] **AG5.33** September 18 narrated-playtest recovery: C in the Gore Sandbox now rehearses the Hunt's contact-range grapple rather than toggling an unrelated training option. A living body must be genuinely within reach; the exact shared anatomy rig enters its captive arm pose, follows a stable body-relative anchor while WASD drags it, accepts LMB pressure through its anatomy, cannot overlap a dodge, drops cleanly if incapacitated, and returns to ordinary ownership when C releases. Dummy/enemy switching remains available on H and the clickable physical control advertises that binding. `gore_sandbox_grapple_test.gd` verifies eligibility, exact rig/pose ownership, dodge exclusion, physical dragging, stable distance, anatomy pressure, clean release, range refusal and the H handoff (10 checks). Rendered evidence: `P:/GameDev/Temp/gore-sandbox-parity/gore_sandbox_grapple.png`.
+- [x] **AG5.34** September 18 narrated-playtest recovery: sandbox bodies no longer absorb a bullet or sword cut as motionless anatomy displays. Both real travelling-round contact and melee contact now hand world-space impact direction, struck-zone-relative severity and the exact victim rig to the shared `HunterBodyMotion` reaction used in the Hunt; opposite sides visibly produce opposite leans, heavy wounds answer more strongly/longer, and the rig immediately favours injured anatomy afterward. `gore_sandbox_hit_reaction_test.gd` verifies exact animator routing, committed hit timing/state, real rig deformation, directional opposition, damage-scaled response and safe missing-target handling (7 checks). Rendered evidence: `P:/GameDev/Temp/gore-sandbox-parity/gore_sandbox_hit_reaction.png`.
+- [x] **AG5.35** September 18 live performance recovery: the catastrophic playtest slowdown was reproduced with eight orphaned Godot test/capture processes simultaneously competing for the GPU and removed without touching the editor. The build now also starts on a truthful PERFORMANCE preset instead of a menu that said ULTRA while the renderer silently used HIGH: fullscreen volumetric fog/SSAO/glow and MSAA are opt-in, render scale starts at a labelled 75%, and the old 125/150% supersampling traps (up to 2.25x window pixels before MSAA) are replaced by honest 67/75/90/100% choices. The Gore Sandbox preserves its key light without duplicating roughly one thousand articulated surfaces through a shadow pass, persistent rigid chunks/transient body effects/blood splats are budgeted at 36/52/96 rather than 90/140/420, and PERFORMANCE gore uses one deepest-layer impact voice with an eight-voice global ceiling rather than overlapping every tissue voice without bound. Measured 1080p sandbox baseline improved from 173.7 FPS / 2,330 draws before the shadow correction to 238.2 FPS / 1,037 draws after it; six full blasts remain 159.8–204.7 FPS and 1,198–1,263 draws. The isolated quality benchmark reports 211.1 FPS on PERFORMANCE. `sandbox_recovery_test.gd`, `sandbox_perf_test.gd`, `gore_load_bench.gd`, gore/audio regressions and zero-warning diagnostics verify the route.
+- [x] **AG5.36** September 18 sandbox/audio recovery: the Gore Sandbox no longer opens beneath an eighteen-binding wall or assigns F to an unexplained instant explosion. It presents eight essential controls by default and puts the complete reference behind F1. Key 9 now raises a visibly distinct two-handed breach launcher; LMB spends one of four warheads and sends a slow physical rocket through shared ballistics before the blast occurs at its impact point. The Windows microphone is no longer opened and streamed for the entire Hunt merely because proximity voice exists: capture initialises lazily on the first deliberate voice attempt, processes only while listening, and removes its bus effect/device cleanly on scene exit. `sandbox_recovery_test.gd` verifies the collapsed reference, harmless F, visible launcher, finite ammunition and travelling explosive payload; `proximity_voice_lazy_test.gd` verifies a cold Hunt leaves microphone capture closed. Rendered evidence: `P:/GameDev/Temp/gore-sandbox-parity/gore_sandbox_breach_launcher.png`.
+- [x] **AG5.37** September 18 keybind recovery: the always-loaded performance probe no longer steals F3/F4 underneath the Black Mirror's own F1–F7 page shortcuts. Diagnostics now live on isolated F10/F11 keys (toggle overlay/write report), so opening a phone page cannot also reveal an unrelated profiler or write a file. `perf_probe_test.gd` exercises both the refused old phone key and the new reversible overlay binding.
+- [x] **AG5.23** September 18 art handoff: `ART-ASSET-LEDGER.md` is the collaborator-facing production ledger that the implementation checklist was never suited to be. It separates claim state, priority, artist, target, delivery rights/source requirements, runtime replacement seams and review history; its initial queue covers the modular body, original face library, forced jester outfit, locomotion/combat/smoking animation, smoking props, weapons, facility/colosseum, smoke FX, UI substrate, Black Mirror shell, vehicle, gore and audio. Six starter cards are concrete enough to hand to friends without asking them to invent game systems or final lore. The art-direction audit and material brief point to this ledger rather than growing competing asset lists.
 
 ### AG v10 — the final pass
 The last rung. Fifteen statements that are true of the playtest record when this game is finished, each an instance of a rule in `DESIGN/FINAL_V.md` applied to this section rather than a wish about it.
@@ -4276,13 +5031,38 @@ you recover it, fragment by fragment, out of a thing that used to know
 everything and has been decaying since before you arrived.
 
 ### AH1 — The room
-- [ ] **AH1.1** Opening the Board puts you in a room rather than on a screen
-- [ ] **AH1.2** A bed, a mirror the size of the wall, and the light of one window
+- [x] **AH1.1** Opening the Board puts you in a room rather than on a screen — `the_room.gd`, four walls the player stands inside, built the way everything else here is: procedural geometry from primitives, nothing imported. `facing()` turns to a wall by name so a caller asks for the Board rather than computing an angle and hoping
+- [x] **AH1.2** A bed, a mirror the size of the wall, and the light of one window — one window, low and off to the side, because a room lit evenly is a menu background and a room lit from a single opening is a place. First aim put the spot into the wall it is set in, which lit nothing and made the mirror black as well: a reflection of an unlit room is an unlit reflection
 - [ ] **AH1.3** Turn to the wall and the Board is there - the corkboard already built (L)
 - [ ] **AH1.4** Turn right and the cloud terminal is there
-- [ ] **AH1.5** The mirror shows your body, current, with everything done to it (pairs with N)
+- [x] **AH1.5** The mirror shows your body, current, with everything done to it (pairs with N) — done, and the bug is worth keeping because it cost an hour of looking at the wrong thing. The reflection was correct the entire time. `tests/room_mirror_diagnostic.gd` asked the camera directly rather than squinting at renders — position, gaze, near plane, cull mask, frustum tests on head, chest and feet, and a count of pieces passing the mask — and every one of them came back right. Dumping the viewport's own texture full frame showed the body standing in the room, perfectly rendered. **The fault was the surface displaying it.** The glass was a `BoxMesh`, which puts the reflection on all six faces with the same UVs and leaves which one the viewer reads up to the geometry. A `QuadMesh` has one face and a normal, so there is nothing to get wrong. Lesson for the next one of these: when a render looks wrong, separate *what is being drawn* from *what is drawing it* before touching either
 - [ ] **AH1.6** The room is yours and it accumulates - what you leave in it stays
 - [ ] **AH1.7** Leaving is a movement, not a menu close
+
+Greg, 2026-09-13, which changes what the room *is* rather than adding to it:
+*"menus or idk index inside the phone maybe like a trapped menu inside the phone
+of a 3d modelled version of my room or using photos."*
+
+Two things follow, and the second is the bigger one. **It is a specific room**,
+not a bedroom — the poster wall is the reference photograph in
+`Art Collections`: Taxi Driver, End of Evangelion, Nausicaä, Mononoke, Silent
+Hill 2, Apocalypse Now, Dark Souls, Postal 2, Vault-Tec, the GTA map, two
+SHADOW WIZARDS sheets and the money-gang print above them, visionary panels
+filling the corner, and a persian rug across the ceiling. That wall is where
+this game's references actually come from, so putting it behind the glass is
+the game admitting what it is made of. And **the index lives there too** — not
+just the tutorial. This is house rule I0 taken to its end: no screen is a list
+of text in a box, and the last screens that still are lists stop being screens
+at all.
+
+"Trapped" is the word worth keeping. You are holding a phone, and inside the
+phone is the room you are sitting in, holding the phone.
+
+- [ ] **AH1.8** The room is a real one — the poster wall, not a generic bedroom
+- [ ] **AH1.9** Every page of the handheld is somewhere in the room; the INDEX is a place you turn to, not a list
+- [ ] **AH1.10** Built from photographs rather than modelled where that reads better — projected planes and depth from the corner, not a scanned mesh
+- [ ] **AH1.11** You are in the room, holding the phone, which contains the room. The recursion is on purpose and is visible in the mirror
+- [ ] **AH1.12** The wall accumulates: what the run does to you gets pinned up there, so the reference wall becomes a record (pairs with AH1.6)
 
 ### AH2 — REMEMBER THE CLOUD
 - [ ] **AH2.1** The cloud is an archive of everything the world used to know, in fragments
@@ -4482,9 +5262,9 @@ steps, which are five real game verbs, and not one of them had to be made up.
 - [~] **AJ1.1** State an intent, in the player's own words — `ChaosSigil.seal_for(intent)` accepts any free text and is the only door in; no screen asks for one yet (that entry point is Lane 5's — a text field on the handheld's RITUAL page, or wherever this gets hosted)
 - [~] **AJ1.2** The letters are stripped and condensed on screen - you watch it become a glyph — `ChaosSigil.condense()` is the real procedure (drop non-letters, keep only the first occurrence of each, drop vowels once consonants survive so a vowel-only intent never condenses to nothing) and `ChaosSigil.draw()` renders the result through `celloutz_type.gd`'s existing seal engine unmodified. The *watching it happen* half — an animated letters-collapsing-into-a-glyph transition — is not built; this produces the finished mark, not the transition into it
 - [x] **AJ1.3** The glyph is deterministic from the intent: the same words make the same sigil, always — seeded off the condensed letters rather than the raw text, so case and whitespace noise never change the mark. `tests/chaos_sigil_test.gd` (11 checks) and a windowed `chaos_sigil_capture` (three different intents, three genuinely different marks, `chaos_sigil_gallery.png`) verify both the seed math and the actual drawn output
-- [~] **AJ1.4** Charging costs something real - blood, stamina, a drug, a death — `ChaosSigil.charge()` spends real blood through the exact ledger `boons.gd` already pays E4 boosts from (`Boons.pay()`, newly exposed as a public wrapper rather than reaching into `_pay()`), scaled by how much the intent actually condensed to, refused outright the same way a boon would be if the body has nothing left to give. `tests/chaos_sigil_charge_test.gd` (9 checks): a real cost lands, a longer ask draws more, a blank intent charges nothing, an empty body refuses, and each successful charge is its own findable `sigil_charged` event. Honestly scoped to one of the four named costs: stamina lives only as a live, unpersisted value in `bone_yard_hunt.gd` (Lane 1's), a drug cost would spend from CARRY (contested with Lane 4's own AL work today), and "a death" is a real consequence system nothing here invents. Blood is the one already fully at home in this ledger
-- [x] **AJ1.5** Forgetting is mechanical: a charged sigil you keep looking at does not fire — `ChaosSigil.can_fire()`/`fire()`/`remember()` read a real clock against `WorldClock`'s own time (`FORGET_HOURS`, 6): charging is itself a moment of attention, so a freshly charged sigil cannot fire on the same breath, and `remember()` (looking at it again) resets the clock rather than letting the delay keep accumulating underneath the looking. Firing consumes it — a second `fire()` on the same sigil is refused as `ALREADY SPENT`, not a free second effect. Covered by `tests/chaos_sigil_forget_test.gd` (14 checks)
-- [x] **AJ1.6** It goes into the world as an object - scratched, burned, carried or worn — `ChaosSigil.inscribe()`: a charged sigil becomes its own real `WorldHistory` subject (`kind: "sigil_object"`), one of the four real media, findable and readable like anything else physical in this world (AJ2.4's future defacing/theft has something real to act on). Refuses an un-charged intent and a made-up medium alike. Deterministic per-maker object ids (`sigil_objects_made` counts up on the maker's own subject) so the same intent can genuinely go into the world twice over in different media without colliding. Covered by `tests/chaos_sigil_object_test.gd` (15 checks)
+- [~] **AJ1.4** Charging costs something real - blood, stamina, a drug, a death — `ChaosSigil.charge()` spends real blood through the exact ledger `boons.gd` already pays E4 boosts from (`Boons.pay()`, newly exposed as a public wrapper rather than reaching into `_pay()`), scaled by how much the intent actually condensed to, refused outright the same way a boon would be if the body has nothing left to give. Body payment, pending count, corruption and public facts now settle in one transaction. `tests/chaos_sigil_charge_test.gd` (9 checks): a real cost lands, a longer ask draws more, a blank intent charges nothing, an empty body refuses, and each successful charge is its own findable `sigil_charged` event. Honestly scoped to one of the four named costs: stamina lives only as a live, unpersisted value in `bone_yard_hunt.gd` (Lane 1's), a drug cost would spend from CARRY (contested with Lane 4's own AL work today), and "a death" is a real consequence system nothing here invents. Blood is the one already fully at home in this ledger
+- [x] **AJ1.5** Forgetting is mechanical: a charged sigil you keep looking at does not fire — `ChaosSigil.can_fire()`/`fire()`/`remember()` read a real clock against `WorldClock`'s own time (`FORGET_HOURS`, 6): charging is itself a moment of attention, so a freshly charged sigil cannot fire on the same breath, and `remember()` (looking at it again) resets the clock rather than letting the delay keep accumulating underneath the looking. Firing consumes it — a second `fire()` on the same sigil is refused as `ALREADY SPENT`, not a free second effect. Pending-count consumption and the fire fact persist atomically. Covered by `tests/chaos_sigil_forget_test.gd` (13 checks)
+- [x] **AJ1.6** It goes into the world as an object - scratched, burned, carried or worn — `ChaosSigil.inscribe()`: a charged sigil becomes its own real `WorldHistory` subject (`kind: "sigil_object"`), one of the four real media, findable and readable like anything else physical in this world (AJ2.4's future defacing/theft has something real to act on). Refuses an un-charged intent and a made-up medium alike. Deterministic per-maker object ids (`sigil_objects_made` counts up on the maker's own subject) so the same intent can genuinely go into the world twice over in different media without colliding; object, maker count and event commit together. Covered by `tests/chaos_sigil_object_test.gd` (14 checks)
 
 ### AJ2 — What a sigil does
 - [x] **AJ2.1** Effects come from the intent, parsed, not from a spell list — `ChaosSigil.resolve()`: five broad semantic word families (`INTENT_FAMILIES` — violence, protection, concealment, fortune, sight), matched against real words in the stated intent, never fifty exact authored phrases. A match grants a real, temporary `Boons` effect on the family's own stat. Effects hang off `fire()`'s own forgetting gate (AJ1.5) rather than duplicating it
@@ -4493,7 +5273,7 @@ steps, which are five real game verbs, and not one of them had to be made up.
 - [x] **AJ2.4** Other people's sigils exist in the world and can be read, defaced or stolen — `read_object()`/`deface()`/`steal()` act on the exact same `sigil_object` subject AJ1.6's `inscribe()` already creates. Defacing and theft both raise the real maker's `grudge` (F2's own field), theft harder than defacing, so an act against a sigil is an act against whoever made it. Only `worn`/`carried` media can actually change hands — `scratched`/`burned` refuse outright as fixed in place
 - [x] **AJ2.5** Corruption is what happens when you charge more than you can carry (AI1.5) — `chaos_pending` tracks real charged-but-unfired sigils on the caster's own record (advanced in `charge()`, returned in `fire()`); past `CARRY_CAPACITY` (3) the next charge still succeeds but comes out corrupted, and a corrupted sigil always misfires on `resolve()` regardless of what it actually asked for. AI1.5's own UI reading of the resulting `chaos_corruption` number is not attempted here — only the real mechanical consequence is
 
-Covered by `tests/chaos_sigil_resolve_test.gd` (19 checks) and `tests/chaos_sigil_theft_test.gd` (16 checks). Full `chaos_sigil` suite (6 files, 84 checks) re-run clean.
+Resolution branches now keep god attention, corruption or boon effects, potency and their public outcome inside one transaction; defacement/theft similarly commit object state, maker grudge and event together. Covered by `tests/chaos_sigil_resolve_test.gd` (18 checks) and `tests/chaos_sigil_theft_test.gd` (17 checks). Full core `chaos_sigil` suite (6 files, 82 checks) re-run clean, plus the skill and god-attention suites.
 
 ### AJ3 — Modern gods
 - [x] **AJ3.1** The gods of this world are what is actually worshipped: markets, metrics, engagement, brands — `systems/modern_gods.gd`: The Engagement, The Market, The Quota, The Brand
@@ -4530,8 +5310,8 @@ as such, and a different god will read the same kill the other way.
 - [x] **AJ5.3** The verdict is computed from the kill: how, where, by whose hand, and what they were carrying — `details` (`witnessed`, `harvested`, `contracted`, `public`), each god reading a different one of them
 - [x] **AJ5.4** Gods disagree. Two verdicts on one death is a normal outcome — verified: the exact same death, asked of two gods, produces opposite labels
 - [x] **AJ5.5** It is an opinion, not a score - nothing in the game adds them up — each god's verdict is returned and recorded separately; nothing sums them
-- [x] **AJ5.6** `v2` Freeing souls and enslaving them both have consequences, and they are different ones — `ModernGods._apply_consequence()` moves the ruling god's own real `relations` toward the killer on FREED and away from them on ENSLAVED (`standing_with()` reads it back), clamped, per-killer, per-god — a genuine `UNDECIDED` verdict moves nothing rather than being silently scored either way. Kept apart from `verdict()` itself so reading an opinion (the Board, a dossier) never moves anything by asking. Still one relationship number, not a differentiated *kind* of consequence per outcome (a real future step — e.g. an enslaved god actively working against you vs a freed one favouring you — is not attempted here). Covered by `tests/modern_gods_consequence_test.gd` (9 checks); `tests/modern_gods_test.gd` re-run clean
-- [x] **AJ5.7** It is recorded in WorldHistory, so the Board can pin it and the pyramid can read it — one `death_verdict` event per god's opinion. Covered by `tests/modern_gods_test.gd` (19 checks)
+- [x] **AJ5.6** `v2` Freeing souls and enslaving them both have consequences, and they are different ones — `ModernGods._apply_consequence()` moves the ruling god's own real `relations` toward the killer on FREED and away from them on ENSLAVED (`standing_with()` reads it back), clamped, per-killer, per-god — a genuine `UNDECIDED` verdict moves nothing rather than being silently scored either way. Kept apart from `verdict()` itself so reading an opinion (the Board, a dossier) never moves anything by asking. Still one relationship number, not a differentiated *kind* of consequence per outcome (a real future step — e.g. an enslaved god actively working against you vs a freed one favouring you — is not attempted here). All gods' attention, verdicts and standing changes now persist as one response to one death. Covered by `tests/modern_gods_consequence_test.gd` (8 checks); `tests/modern_gods_test.gd` re-run clean
+- [x] **AJ5.7** It is recorded in WorldHistory, so the Board can pin it and the pyramid can read it — one `death_verdict` event per god's opinion, retained separately inside one atomic death transaction. All god schemas seed in one transaction. Covered by `tests/modern_gods_test.gd` (21 checks)
 
 
 ### AJ v10 — the final pass
@@ -4750,10 +5530,22 @@ the same button gives 0.013 for a flick and 0.346 for a committed sweep.
       (78.30 vs 66.70) against two-handed, itself steadier than one-handed
       (47.56); a weapon with no `GRIP_CYCLE` entry ignores the key outright;
       and a live `_attack()` reports `cut` two-handed and `puncture`
-      half-sworded from the identical weapon. Full regression suite
+      half-sworded from the identical weapon. Each accepted grip cycle now
+      uses the compact player-action route as well; unsupported weapons still
+      do nothing and therefore record nothing. Full regression suite
       (vault, wall_run, jump, climb, momentum_carry, anatomy_traversal,
       opening, combat_integration, zone_precision, ballistics,
       firearm_momentum, deferred_damage) re-verified clean
+
+      18 September playtest correction: those values previously changed while
+      the production model's hands stayed in their original two-hand pose.
+      `HunterArsenal.apply_grip()` now reapplies `HeldGear.GRIPS` to the live
+      mounted model on cycle/equip, and inspection restores the active grip
+      rather than snapping the support hand back. `two_handing_test.gd` now
+      proves the half-sword hand physically reaches its blade anchor; the
+      production frames `P:/GameDev/Temp/combat_playtest_two_hand.png`,
+      `combat_playtest_one_hand.png` and `combat_playtest_half_sword.png` make
+      the difference visible.
 
 
 ### AN6 — Dismemberment, at the reference standard
@@ -4769,14 +5561,76 @@ ugly and specific and never the same twice. The resolution is that the *skeleton
 and the organs* are simulated and the *surface* is authored — a hole is a real
 opening with real contents behind it, and what the wound looks like at its rim
 is art, not noise.
-- [ ] **AN6.1** A wound is an opening with depth, not a decal — you can see in
-- [ ] **AN6.2** Organs are separate bodies behind that opening and fall out
-      under physics when the cavity is breached
-- [ ] **AN6.3** Fallen organs persist, can be picked up, and are the same
-      objects `carry.gd` and the vat already understand
+- [x] **AN6.1** A wound is an opening with depth, not a decal — you can see in
+      `74c0fe7` first tied the crater's sink to `Penetration.resolve()`'s real
+      depth fraction; this pass finishes the deliberately open half. A wound
+      now remembers the nearest organ behind its exact strike point. Once that
+      same zone is breached to the organ layer, its crater becomes an unfilled
+      tunnel onto a fitted copy of that organ's real mesh, with a dark cavity
+      around it rather than the intact skin surface or another layer tint. If
+      the organ ruptures and leaves as AN6.2's physics body, the window empties
+      on the same state. The post-hit refresh was also moved after exposure
+      depth changes, so the opening appears on the blow that made it rather
+      than one hit late. `wound_marks_test.gd` and `baseline_human_test.gd`
+      cover closed/deep, real-mesh and organ-gone states; the inspected
+      1280x720 `an6_1_cavity_contents.png` holds radius, seed and depth constant
+      beside the former closed crater so the visible interior is the only
+      changed variable.
+- [x] **AN6.2** Organs are separate bodies behind that opening and fall out
+      under physics when the cavity is breached — built in `89c757a` and left
+      unticked there. `_spill_organ()` duplicates the exact mesh the X-ray
+      already shows (not a cosmetic blob on a hand-rolled trajectory), hands it
+      to a real `RigidBody3D` with a collision shape and a scatter impulse, and
+      registers it with `GoreChunks.register_organ()` — the same identity
+      contract `_throw_limb()` already gives a severed limb. Re-verified this
+      pass: `baseline_human_test` 87/87 ("the ruptured heart falls out as a
+      real physics body") and `chunk_test` 37/37 both clean, and the committed
+      `captures/an6_2_organ_physics.png` was reopened and shows the small
+      ruptured organ resting on the floor beside the X-rayed body it left.
+- [x] **AN6.3** Fallen organs persist, can be picked up, and are the same
+      objects `carry.gd` and the vat already understand — also landed in
+      `89c757a` and also left unticked. `register_organ()` gives an organ the
+      same `whole_organ`/`whole_limb`-shaped identity dictionary a severed limb
+      carries, so `carry.gd`'s existing `take_chunk()` resolves its label and a
+      `kind` of `"organ"` with no change on that side, and it rots, marks the
+      ground and obeys the shared `live_gore` budget exactly as every other
+      piece of a body already does — "persist" here means the same thing it
+      means for a severed limb elsewhere in this file: a real object sitting in
+      the world rather than a flash of cosmetic detail. `chunk_test.gd`'s
+      "AN6.2/AN6.3" block covers the full loop — organ ruptures, falls as a
+      `RigidBody3D`, is taken off the floor, and enters CARRY with its
+      `organ_id` intact — and passed clean this pass.
 - [ ] **AN6.4** Severing is at joints and through them — Half Sword's lesson is
-      that a cut that lands between two joints still has to do something
-- [ ] **AN6.5** Weapon and angle decide the wound shape, RDR2's lesson
+      that a cut that lands between two joints still has to do something.
+      Partial: the mechanical half is in. `hit_at()` already keeps the exact
+      local point a blow landed at (AN6.1/AN6.5 both build on it); `LIMB_JOINTS`
+      names where an arm and a leg actually bend on that same axis — the same
+      pinches `ARM_PROFILE`/`LEG_PROFILE` are already sculpted with, an elbow
+      or knee near 0.0/-0.04, a wrist or ankle near -0.8 — and
+      `_joint_alignment_at()` scores a strike by how close it landed to one of
+      them. `_accumulate_sever_stress` now weighs by that score: a joint hit
+      accumulates sever stress at 1.6x, the dead centre of a shaft only 0.7x,
+      never zero. `baseline_human_test.gd`'s new `_test_joint_severing`
+      measures it directly — an identical repeated cut through the elbow
+      severs the arm in 4 swings against 6 through the mid-shaft — and the
+      existing `_test_severing` above it, which never gives `hit()` a real
+      point, is unchanged (87 -> 90 passes, still 0 failures) because a
+      caller with no position keeps the neutral 1.0 it always implicitly had.
+      Still missing: the stump itself does not yet shorten to end at the
+      joint that actually parted — every severed limb still leaves the body
+      as one whole piece regardless of where along it the blow landed, which
+      is the visual half of "at joints and through them" this does not close.
+- [x] **AN6.5** Weapon and angle decide the wound shape, RDR2's lesson —
+      `WoundMarks` keeps authored aspect profiles by damage source: a blade
+      leaves a long cut, a puncture a narrower opening and a ballistic entry a
+      compact hole. The real strike vector is projected onto the struck
+      surface, so a grazing round stretches along its travel while a
+      perpendicular round stays compact; that tangent also rotates the long
+      axis instead of aligning every wound to the body. Aspect and rotation
+      travel through the existing scar record, so loading cannot turn a slash
+      back into a circle. `wound_marks_test.gd`, 20 checks; the matched
+      damage/depth/seed comparison in
+      `captures/an6_5_weapon_angle_wounds.png` was inspected at 1280x720.
 - [ ] **AN6.6** The rig survives it — a body missing a torso section is still
       animating, still falling, still a thing that was alive
 - [ ] **AN6.7** Written up as instructions: the mesh layout, the rig, and the
@@ -4939,6 +5793,47 @@ instead.
 - [ ] **AP1.6** Out, and choosing what happens to the lands (hands over to AA)
 - [ ] **AP1.7** Digestible segment to segment, and a playground if you want it
 
+      18 September continuity pass: the first rendered colosseum frame is now
+      already seated at the live cab transform instead of flashing once from
+      the arena origin. Cab/chase remains the physical 0.68-second crossing
+      proven by `derby_view_transition_test.gd`. The facility cab can no
+      longer bypass the opening: `E` during countdown or an active escape
+      contract is refused visibly and records no departure; a real win releases
+      the same climb-out. During that exit the eye stays inside the cull-safe
+      interior until it clears the body shell, while the driver portrait,
+      instruments, reticle and keys hint fade with distance from the seat
+      instead of remaining as a car HUD on foot. Production captures:
+      `P:/GameDev/Temp/opening_vehicle_arrival_cab.png`,
+      `opening_vehicle_exit_refused.png`, `opening_vehicle_exit_midway.png`
+      and `opening_vehicle_exit_standing.png`. `opening_test`, route wiring,
+      service-ring objective and the complete played-heat derby-to-Hunt exit
+      all remain green. AP1.7 stays open for holistic player pacing rather than
+      being claimed from this repaired seam alone.
+
+### AP4 — Starting-facility territory slice
+
+- [x] **AP4.1** The production opening enters the authored underground colosseum, not the old surface quarry — both the Growing Floor door and `OpeningDirector.resume_destination()` now resolve to `underground_colosseum.tscn`; `opening_stage_wiring_test.gd` drives the real transitions (6/6).
+- [x] **AP4.2** One persistent authority owns the facility holdings — `facility_territory.gd` stores the Growing Floor, Underground Colosseum, Lockdown Grid and Surface Gate under one WorldHistory subject rather than distributing ownership flags across UI and scenes. Its first schema/migration pass is one nested-safe batch.
+- [x] **AP4.3** Exploration changes only what was actually reached — waking reveals the Growing Floor, entering the pit surveys it, and the three existing colosseum tunnels reveal the Lockdown Grid without falsely liberating either.
+- [x] **AP4.4** A real achievement liberates one holding — only `derby_round_won` in the underground venue changes the Colosseum from surveyed to liberated; entry and loss cannot award it. Each canonical facility event batches every sector change, Index unlock and corporate reaction it causes as one transition.
+- [x] **AP4.5** MAP exposes ownership, surveillance, objectives and routes — the Black Mirror's facility sheet draws the four bounded holdings, existing scene adjacency, live owner/state, the next authored objective and approximate CellOutz surveillance from the authority record.
+- [x] **AP4.6** The territory sheet is operable with pointer and keyboard — pointing selects a holding, arrow keys move through revealed holdings, and `L` switches between facility holdings and the Ashbloom satellite; verified by `facility_device_integration_test.gd` (8/8 total integration checks, including the corporate acquisition seam).
+- [x] **AP4.7** Liberation unlocks trustworthy INDEX knowledge — the Underground Colosseum becomes a selectable recovered FILE record with its live ownership and a floor-plan stamp; place records never fabricate human portraits.
+- [x] **AP4.8** CellOutz reacts as the openly evil corporate platform requested — one persistent `REPOSSESSION ORDER 0C-7` circulates against the player as company inventory, appears on the MAP, and cannot duplicate when the win callback repeats.
+- [x] **AP4.9** The loop survives persistence and respects quantum restart — `facility_territory_test.gd` proves normal WorldHistory state, a fresh universe returning the pit to corporate control, and quantum branch restore returning liberation, INDEX file, bounty and last approximate target area together (21/21).
+- [x] **AP4.10** The whole state change is captured, not inferred — `captures/facility_territory_loop.mp4` is a verified 1280×720 30 FPS H.264/AAC reel showing progressive reveal, liberation, INDEX unlock, corporate response, reset and reload; three accepted PNG evidence frames accompany it. Full contract and honest scope: `DESIGN/FACILITY_TERRITORY_SLICE.md`.
+- [x] **AP4.11** The Ringmaster handoff is one durable choice rather than duplicate history — join, escape and challenge each amend the Ringmaster where needed, file exactly one identified player-action receipt, reveal the Surface Gate and advance the opening inside one nested-safe transaction. This also fixes the old join/escape event-name mismatch that silently kept their gate closed. `ringmaster_choice_ledger_test.gd` covers all three routes and rejects unauthored outcomes (16/16); the full derby exit test still survives a played heat, wreck teardown, scene swap and sixteen seconds in the Hunt. A vehicle collision likewise batches driver anatomy, impact, rival memory, cab death and a possible round ending as one derived incident; `opening_test.gd` exercises that boundary.
+- [x] **AP4.12** Walking through the Growing Floor's pit door is one player act — route stage, player status and the two reached territory sectors now commit with one identified `opening_entered_pit` receipt instead of the player update and public event both filing the same event name. A second input during the asynchronous handoff is inert. Filing the intake sheet remains the player act it already was; the wake, facility reveal and wake fact it causes are grouped separately as derived consequences. `vat_route_ledger_test.gd` (6/6), `opening_direction_test.gd`, `opening_stage_wiring_test.gd`, `facility_territory_test.gd` and `sheet_test.gd` pass.
+
+### AP5 — Lockdown Grid liberation
+
+- [x] **AP5.1** The Lockdown Grid exists in the playable world — each of the underground colosseum's three authored tunnel chambers contains one physical CellOutz relay, not a MAP-only objective marker. The old “Service Ring” engineering label survives only in stable save/code identifiers; MAP names the function and says the relays seal the exit.
+- [x] **AP5.2** The relays use verbs the derby already teaches — three travelling cab rounds or three qualifying vehicle impacts disable one; a dead relay stops scanning and cannot award duplicate progress. A cab round's relay/vehicle consequence and its `derby_shot_landed` fact now close as one impact transaction on the frame the shared Ballistics system reports contact.
+- [x] **AP5.3** The escape is a compound objective — eight wreckers clear the bowl but leave the heat active until all three relays are dark, so winning combat alone no longer counterfeits territorial liberation.
+- [x] **AP5.4** Surveillance is readable from the cab — each live head sweeps a real acquisition cone, and the existing physical instrument cluster carries three relay lamps plus the current scan level instead of adding another permanent corner panel.
+- [x] **AP5.5** The world answers the act once — each disabled index persists in `facility_territory`; the third liberates the Lockdown Grid, unseals the surface exit, unlocks its recovered INDEX file and escalates CellOutz's existing order to priority exactly once. `service_ring_relay_test` (7/7) and `service_ring_objective_test` (15/15) cover the target, explanation and integrated objective.
+- [x] **AP5.6** The physical loop is recorded, not inferred — `captures/service_ring_liberation.mp4` is a visually inspected 1280×720, 30 FPS, 14.23-second H.264 reel of the real cab firing nine travelling rounds, all three live relay signatures extinguishing, the cab counter advancing and the final liberation state landing.
+
 ### AP2 — Undying
 - [ ] **AP2.1** The spirit cannot be banished by violence, and the game proves this to you early
 - [ ] **AP2.2** Bright vibrant flame that melts the screen itself — a real shader, not an overlay
@@ -4988,7 +5883,7 @@ the most interesting possible final boss for a game about institutions.
 - [x] **AQ1.2** Visibility builds with what you have done, never on a timer — attention is summed off `WorldHistory` fresh on every read, nothing cached, nothing clocked. Forty melee blows draw 1.6; one god named draws 4.5. Tested: fifty frames of waiting move it by exactly nothing
 - [ ] **AQ1.3** It summons you rather than being travelled to — `can_summon()` gates on 150 attention, deliberately above the last visibility stage: being entirely present and being called are not the same event. The summons itself waits on AQ1.4's shadow realms
 - [ ] **AQ1.4** The shadow realms of the higher realms: the psychedelic register, earned not given (E6/E8 exist)
-- [x] **AQ1.5** It teaches, and the teaching is the trap — every lesson is **true**, and following it genuinely helps. `heed()` is what accepting one costs: it adds directly to attention, so taking good advice is the fastest way to be seen. The trap is stated plainly rather than hidden, and refusing is recorded too, because refusing a true thing over who said it is its own cost
+- [x] **AQ1.5** It teaches, and the teaching is the trap — every lesson is **true**, and following it genuinely helps. `heed()` is what accepting one costs: it adds directly to attention, so taking good advice is the fastest way to be seen. The trap is stated plainly rather than hidden, and refusing is recorded too, because refusing a true thing over who said it is its own cost. Acceptance persists its claim and public fact in one identified player-action transaction; refusal receives its own receipt
 - [ ] **AQ1.6** It is genuinely fightable, and the fight is not a damage race
 - [ ] **AQ1.7** Voice acting — Greg: *"voice acting will also be in the game"*
 - [ ] **AQ1.8** Siding with it is a real option with a real ending
@@ -5085,9 +5980,16 @@ is where power is, the tree is which way you went.** Two charts, one document.
 
 ### AR2 — Jobs and contracts
 - [ ] **AR2.1** A real economy with jobs, because the elites cannot die and war is pointless
-- [ ] **AR2.2** Bounty work for the top angels or the top demons
-- [ ] **AR2.3** Targets are whoever is blocking a frequency or an aura — not "bad guys"
-- [ ] **AR2.4** Contracts are consumable and cost something, Chainsaw Man style
+- [x] **AR2.2** Bounty work for the top angels or the top demons — the shared
+      persisted market, top-patron gates and operable WORK page are fed by
+      earned production notice; see F10.8.
+- [x] **AR2.3** Targets are whoever is blocking a frequency or an aura — not
+      "bad guys" — a publisher must name `frequency` or `aura`, an exact
+      existing subject and a non-empty obstruction. `HuntContracts` has no
+      morality field or wanted-level shortcut, and its test explicitly refuses
+      `crime` as a substitute classification.
+- [x] **AR2.4** Contracts are consumable and cost something, Chainsaw Man
+      style — the same one-use body/standing debit proven at F10.9.
 - [ ] **AR2.5** Consumable progress against bosses and big figures
 - [ ] **AR2.6** Work for the bank (AL1) and work for the agency (AK1) are the same market
 
@@ -5102,9 +6004,15 @@ The last rung. Fifteen statements that are true of the tree and the work when th
 - [ ] **AR10.6** `v10` A path taken shows on the tree
 - [ ] **AR10.7** `v10` Paths open at chapters, never at levels
 - [ ] **AR10.8** `v10` The economy has jobs because the elites cannot die
-- [ ] **AR10.9** `v10` Bounty work for the top angels or the top demons
-- [ ] **AR10.10** `v10` Targets are whoever blocks a frequency or an aura
-- [ ] **AR10.11** `v10` Contracts are consumable and cost something
+- [x] **AR10.9** `v10` Bounty work for the top angels or the top demons — the
+      operable INDEX market and both patron sides are reached from three real
+      Hunt mercy resolutions rather than a fixture; see F10.8.
+- [x] **AR10.10** `v10` Targets are whoever blocks a frequency or an aura —
+      enforced at contract publication, not left to authored quest wording;
+      see AR2.3 and `hunt_contracts_test.gd`.
+- [x] **AR10.11** `v10` Contracts are consumable and cost something — one
+      successful acceptance spends the existing body/standing ledger, removes
+      the offer and writes one action receipt; see F10.9.
 - [ ] **AR10.12** `v10` Consumable progress against bosses and big figures
 - [ ] **AR10.13** `v10` Bank work and agency work are one market
 - [ ] **AR10.14** `v10` The tree and the pyramid are one document
@@ -5151,7 +6059,7 @@ institutions naming the same object differently, which is already this game's
 central rule.
 
 `systems/brain_index.gd` (`BrainIndex`) is the logic half of this section, held
-by `tests/brain_index_test.gd` at 72 checks. The render half — the organ, the
+by `tests/brain_index_test.gd` at 94 checks. The render half — the organ, the
 curved CRT, the wet — is untouched and its three boxes stay open below, honestly.
 
 - [ ] **AT1.1** The brain is a real organ at full detail, not an icon
@@ -5230,18 +6138,21 @@ curved CRT, the wet — is untouched and its three boxes stay open below, honest
       to a plane (§5b's "altitude is the gate" — `bridge()` currently takes
       the plane as a parameter and trusts its caller), and nothing above 8D
       has content behind it.
-- [ ] **AT1.6** The Wire seen from 5D is what that network is
-      — **half built, and half is not a tick.** `wire_from_above()` exists and
-      is tested: it gates on `bridge(5)`, then reaches for the *same*
+- [x] ~~**AT1.6** The Wire seen from 5D is what that network is~~
+      `wire_from_above()` gates on `bridge(5)`, then reaches for the *same*
       `WireNet` accounts the ground-level Wire already has and re-ranks them
-      by `WorldHistory.tree_alignment()` instead of by reach. That is the
-      structurally correct reading of "the Wire seen from 5D *is* that
-      network" — no second dataset, the same people ordered by what they are
-      rather than by how loud they are — and with the chip revoked there is no
-      view from above at all. What is missing is the whole point of the item:
-      "the posts are being made by something else". That is writing and a
-      shader, and until the feed reads differently up there this is a re-sort,
-      not a plane. Left open.
+      by `WorldHistory.tree_alignment()` instead of by reach — no second
+      dataset, the same people ordered by what they are rather than by how
+      loud they are — and with the chip revoked there is no view from above
+      at all. The half that was missing — "the posts are being made by
+      something else" — is now real: `_posts_from_above()` returns a `posts`
+      list beside `accounts`, written so nothing in it could be mistaken for
+      a person talking, with `author`/`handle` left empty and `human: false`
+      on every row rather than a reader having to infer authorship from an
+      absent name. Honestly scoped: the shader that would make the glass
+      itself read differently at 5D is still not built — this closes the
+      writing half only, which is the half the box named as missing.
+      `tests/brain_index_test.gd`, 3 new checks.
 - [x] ~~**AT1.7** It is hardware somebody else installed: revocable,
       traceable, and it can find you~~ All three, mechanically, in
       `brain_index.gd`. **Somebody else's:** `install_chip()` takes an
@@ -5263,7 +6174,10 @@ curved CRT, the wet — is untouched and its three boxes stay open below, honest
       reacting to a recorded event rather than to a flag. `go_dark()` is the
       only counter and it costs exactly the thing it protects — dark, the
       bridge is shut ("YOU CANNOT HIDE FROM IT AND USE IT") and reach falls to
-      4. *Still open:* nothing yet *consumes* `wetwire_traced` — no spawner
+      4. Chip install/revoke/reinstate now batch their state with their public
+      fact; player go-dark/surface and crossings additionally receive one
+      compact action identity without misattributing corporate acts to the
+      player. *Still open:* nothing yet *consumes* `wetwire_traced` — no spawner
       sends anybody to the fix, and no faction logic decides to revoke. The
       state and its consequences exist; the antagonist reading them does not.
 - [x] ~~**AT1.8** Its radiation is what melts you at 8g and 9g — the thing
@@ -5275,7 +6189,9 @@ curved CRT, the wet — is untouched and its three boxes stay open below, honest
       and the only organ in `head` is `brain`. So the connection literally
       eats the organ the index lives in, and it keeps eating after you come
       down, which is what made writing it as dose rather than flat damage the
-      right call. 9g melts faster than 8g for the same seconds (2.4/s against
+      right call. A crossing, its trace fact, and any head-dose/radiation fact
+      now persist in one nested-safe transaction. 9g melts faster than 8g for
+      the same seconds (2.4/s against
       0.9/s, asserted), 7D and below cost nothing at all (asserted — the
       melting starts at 8g exactly), and each dose is recorded as
       `wetwire_radiation` rather than as a wound, because it is weather, not
@@ -5292,14 +6208,58 @@ This collapses four things nobody had a home for — inventory, codex, quest log
 tutorial — into the organ AT1 already says you open. There is no menu because
 the brain is the menu, and WETWIRE/MATERIA is already the naming for exactly
 this (two institutions, one index).
-- [ ] **AT2.1** Inventory is read from the brain, not from a separate bag screen
-- [ ] **AT2.2** Story, canon and quests are files in the same index
+- [x] ~~**AT2.1** Inventory is read from the brain, not from a separate bag screen~~
+      `BrainIndex.listing("carry", ...)` and `folder_counts()` special-case the
+      new CARRY folder to read live off `carry.gd` — the exact object C4's own
+      handheld page already reads — rather than inventing a second inventory
+      dataset for the brain to disagree with. Every row comes back `open`;
+      what is in your hands is never a secret from yourself, so there is
+      nothing to seal. `tests/brain_index_test.gd`, 5 new checks: empty bag
+      lists nothing, a carried chunk appears under its real identified label
+      (`LIVER`, not a generic slot), and `folder_counts` agrees with the
+      listing.
+- [ ] **AT2.2** Story, canon and quests are files in the same index — not
+      attempted; there is no story/quest/canon system anywhere in the project
+      yet for this to read from, and inventing placeholder lore files here
+      would be building the wrong half first.
 - [ ] **AT2.3** The tutorial lives in there as recallable files, not as a
-      first-run overlay you can never see again
-- [ ] **AT2.4** Every drug experience files itself as a record you can reopen
-- [ ] **AT2.5** Most of it is optional and the index says so (AT1.3)
-- [ ] **AT2.6** What the chip put there is distinguishable from what you put
-      there — and you cannot delete the chip's files (AT1.7)
+      first-run overlay you can never see again — not attempted, for the same
+      reason as AT2.2: no tutorial system exists yet to be filed.
+- [x] ~~**AT2.4** Every drug experience files itself as a record you can
+      reopen~~ No second log: `substances.gd`'s `take()` already writes
+      `substance_taken`, and `BrainIndex.drug_experiences()` reads it back as
+      one row per dose actually taken, strain and potency re-derived through
+      the same deterministic `roll_strain()` the carried baggie itself used
+      (keyed off the event's own sequence number, so the record and the item
+      agree without either storing the other's data). `read_experience(
+      sequence)` reopens one by that number; `listing("drugs")` carries these
+      dynamic rows alongside the folder's static lore entries. Kept distinct
+      from `read_entry()` on purpose — one row per dose, not one per
+      substance, because the second Bloom does not read like the first.
+      `tests/brain_index_test.gd`, 5 new checks.
+- [x] ~~**AT2.5** Most of it is optional and the index says so (AT1.3)~~ Reuses
+      AT1.3's own `optional_ratio()`/`required_entries()` rather than a second
+      measure — verified the ratio still holds above 0.8 and exactly three
+      entries are still required after AT2.6's chip file joined `ENTRIES`, and
+      confirmed neither CARRY's nor MATERIA's new dynamic rows are ever
+      counted as required (both mark `optional: true` unconditionally, since
+      what you are holding or have taken is never something the game cannot
+      run without). `tests/brain_index_test.gd`, 2 new checks.
+- [x] ~~**AT2.6** What the chip put there is distinguishable from what you put
+      there — and you cannot delete the chip's files (AT1.7)~~ `ENTRIES` gained
+      a `source` field, `"self"` (default, unchanged) or `"chip"`. A `"chip"`
+      entry (`the_terms`, the wetwire EULA nobody was ever shown past clause
+      one) is never sealed behind a keyword and never enters `wetwire_opened`
+      — `is_open()` reads it straight off whether the hardware exists at all,
+      so it is present the day the chip is and stays present after `revoke()`
+      (that call only flips fields on the same chip record, never clears it).
+      The other half is a genuinely new operation: `forget(entry_id)`, which
+      erases a remembered entry back out of `wetwire_opened` — refused outright
+      for a `"chip"` entry with "NOT YOURS TO DELETE" (there was never
+      anything of yours in `wetwire_opened` for it to remove), and refused for
+      an unremembered `"self"` entry with the ordinary "NOTHING TO FORGET".
+      `tests/brain_index_test.gd`, 9 new checks, including a never-wired
+      subject for whom the chip's file is correctly absent entirely.
 
 ### AT3 — The viewer: the orb, the CRT, and detective mode
 Greg: *"visual nodes of the brain neural networks visualised in TouchDesigner 3D
@@ -5444,7 +6404,10 @@ is a better tutorial for what a substance does than any readout of it.
       which is the failure that line was written against. The contents colour
       comes from the substance and everything else comes from the form, so two
       substances in baggies still read as two different baggies
-      (`tests/substance_objects_capture.tscn`, three sheets looked at)
+      (`tests/substance_objects_capture.tscn`, three sheets looked at). The
+      fixed kit now also enters the universal `I` inspection grammar using its
+      actual live mesh, while deliberately remaining absent from the takeable
+      manifest (`substance_station_test.gd`).
 - [ ] **AU3.2** Every substance in AU is physically set out in the room and
       takeable, not chosen from a list
 - [ ] **AU3.3** The bodies stay killable and the reset stays instant — this is
@@ -5458,7 +6421,11 @@ is a better tutorial for what a substance does than any readout of it.
 - [x] **AU3.6** Reachable in the real world, not only from a dev menu — the Hunt
       Grounds drop the same station under the wrecks, and lifting something off
       it files through the identical `WorldHistory` inventory path a loot cache
-      already uses
+      already uses. That lift is now one ledger-routed act: the inventory
+      mutation and the established `substance_lifted` event persist in one
+      transaction, the event carries a stable action id, and the former second
+      duplicate `substance_lifted` event is gone. `combat_integration_test.gd`
+      proves one press removes one live pickup, adds one event and one receipt.
 - [x] **AU3.7** Three places, one object — `systems/substance_station.gd`. The
       shed, the sandbox and the Hunt Grounds do not lay their own tables out;
       each drops the same node, so **if a substance is reachable in the sandbox
@@ -5505,14 +6472,34 @@ to get right.
       84mm, vape, spliff 98mm, joint, bong 300mm (`systems/smokeables.gd`)
 - [x] **AU7.2** A draw is press-and-hold with a weak / clean / harsh grade, and
       the punishment is reserved for greed - a short draw is thin, never
-      punished (`tests/smokeables_test.gd`, 47 checks)
-- [x] **AU7.3** Harshness is paid into `anatomy_state` where every other body
-      cost is paid, never into a private cough counter
+      punished (`tests/smokeables_test.gd`, 106 checks)
+- [x] **AU7.3** Harshness is paid into the live lung organs in `anatomy_state`
+      where every other body cost is paid, never into a private cough counter.
+      A draw raises a contextual top-left lung X-ray; smoke visibly fills and
+      clears, harsh draws cough, and repeated use leaves a dark `smoke_stain`
+      that survives save/restore until replacement lungs clear it
+      (`tests/smoking_lung_ui_test.tscn`, `tests/smoking_act_test.tscn`). The
+      quick diagnostic now eases its fill, clearing, cough compression, tissue
+      darkness and replacement flash across layered depth shells and a visible
+      bronchial tree; its public values remain the exact anatomy reading rather
+      than presentation-delayed gameplay state
 - [x] **AU7.4** The buzz is a real short dose on `substance_experience.gd`'s own
-      curve, so smoked and swallowed cannot drift into two systems
+      curve, so smoked and swallowed cannot drift into two systems. Experience
+      history/tolerance and its public fact persist together; `Smokeables.hit()`
+      wraps that nested transaction with harsh anatomy and the single smoking
+      receipt, even outside the Hunt scene's wider draw batch
 - [x] **AU7.5** Lit ends are real `OmniLight3D`s, so a cigarette in the dark is
-      a light source and gives you away (pairs with AS)
-- [~] **AU7.6** The bind: press-and-hold, with the hold readable **while** it
+      a light source and gives you away (pairs with AS). The original sub-metre
+      prop light made night captures unreadable; a resting coal now casts a
+      close amber pool, a held draw reaches roughly six metres, and the Zippo
+      reaches farther while its lid is open. These remain warm omni lights,
+      never white flashlight beams. Ember, bong bowl, Zippo and close inspection
+      light are exposure-aware: their cast energy and reach recede sharply in
+      clear daylight, return through dusk/night, and regain some usefulness
+      beneath a severe magick storm rather than bleaching daytime hands or
+      throwing hard noon shadows (`tests/smokeables_test.gd`,
+      `tests/smoking_act_test.gd`)
+- [x] **AU7.6** The bind: press-and-hold, with the hold readable **while** it
       happens. I0 settled where: *no screen is a list of text in a box*, and the
       derby's lesson was that the arena is the interface — so the gauge is the
       object. `set_draw(node, heat)` runs the cherry up the paper: the coal
@@ -5521,10 +6508,26 @@ to get right.
       is a different signal rather than more of the same one, and it is what
       warns you before the cough does. Nothing is drawn on screen, so it reads
       the same in first person, over a shoulder, and in somebody else's hands
-      across the room. Remaining: an actual input action bound to it — the
-      curve, the state and the readout exist and nothing presses the button yet
-- [ ] **AU7.7** Exhale: smoke that leaves you and drifts, on `contaminated_air`'s
-      particle work rather than a second system (Lane 2 owns it - ask)
+      across the room. `bone_yard_hunt.gd` now binds the real held act to RMB:
+      the live HUD counts the pull toward its authored sweet spot, release lands
+      the weak / clean / harsh result, and weapon input cannot fire through it
+      (`tests/smoking_act_test.gd`)
+- [x] **AU7.7** Release automatically exhales from the player's actual mouth
+      into `contaminated_air.gd`: two crossed, low-alpha layers make long wisps
+      rise, tumble, spread and fade without resolving as bright circular beads
+      or accepting the close Zippo as a daylight floodlight. The fresh breath
+      stays playable for a short window;
+      LMB cycles an expanding O, double O and ghost whose particle edges fray
+      as they travel (`tests/smoking_act_test.gd`, `smoking_gameplay_capture`)
+
+      The final daylight play-read caught the implementation still technically
+      satisfying “long” while visually resolving as spaced bright droplets.
+      Exhale cards are now more than eight times as long as wide, individually
+      canted, overlapped more densely and given less than half the former
+      lifetime opacity; the crossed haze is broader and quieter. The result is
+      a continuous layered breath in
+      `P:/GameDev/Temp/smoking_feel_cigarette_exhale.png`, not a dotted particle
+      path. The stronger aspect/opacity contract is now asserted directly.
 - [x] **AU7.8** Charges burn down visibly — a cigarette gets shorter, a bong
       bowl goes to ash and sinks, a vape's tank window drops. `spend_per_hit()`
       is derived from the charge count the catalogue already carries rather than
@@ -5532,9 +6535,62 @@ to get right.
       nothing: you stub it out with a finger of paper left, which is also what
       stops the coal reaching the filter and the geometry inverting. Tested
       monotonic across nine steps, because a thing that got *longer* partway
-      through is a bug nobody would think to look for
-- [ ] **AU7.9** Held in the hand through `held_gear.gd`'s anchors, and the bong
-      takes both hands, so smoking one costs you your weapon
+      through is a bug nobody would think to look for. Rolled ash now grows on
+      the resting consumed object, the ember pulses subtly with breathing, and
+      each third draw produces a deterministic wrist flick with falling ash
+- [x] **AU7.9** Every smokeable is held through `held_gear.gd`'s public anchor
+      convention on the body's real right arm. The draw raises that arm to the
+      mouth; the bong has a second physical grip and support hand, recruits the
+      left-arm pose, and hides the whole weapon set while held
+      (`tests/smokeables_test.gd`, `tests/smoking_act_test.gd`). Cigarettes,
+      joints and spliffs use a distinct open-palm, long splayed-finger grip so
+      the item stays visible between the fingers instead of being swallowed by
+      a fist; the jester sleeves and arms still enter from authored lower-frame
+      points appropriate to the object instead of every wrist growing from one
+      generic corner. The same anatomy pass now reaches firearms and carried
+      limbs: weapon palms are seated per grip, and an improvised severed limb is
+      visibly clenched by a costumed articulated hand with a continuous arm.
+      Holding I is one verb with class-specific physical readings rather than a
+      copied turntable motion: rolled paper exposes seam/ember, a vape presents
+      its cell face, a bong tips bowl/chamber, a sword presents its edge, the
+      shotgun support hand checks the forend/receiver, a pistol support hand
+      pinches the slide, and a severed limb is hefted under dead weight. A short
+      warm inspection glint makes those contacts legible at night without
+      becoming a navigational flashlight (`tests/smoking_act_test.gd`,
+      `tests/combat_integration_test.gd`, `tests/smoking_gameplay_capture.gd`).
+      Y also transfers any one-hand smokeable from fingers to a persistent lip
+      point beneath the reticle through the object's real mouth anchor: the hand
+      carries it on a shallow arc, the item settles with the player's breathing,
+      releases and leaves the frame; RMB still draws hands-free, and Y reverses
+      the transfer. The bong explicitly refuses because its weight and cone-sink
+      require both hands. A draw's dose, tolerance, anatomy, consumed charge and
+      history still emit their normal events/signals, but `WorldHistory` batches
+      their persistence into one disk flush. `player_action_ledger.gd` is now
+      the single receipt route for hit, resolved draw, cough, exhale, trick,
+      mouth transfer, completed consumption and held-item inspection: it keeps
+      every existing event name for current consumers, adds one monotonic action
+      id, maintains cheap per-kind counts and coalesces its summary plus event
+      into one save. Nested draw transactions still flush only at their outer
+      commit. The core `amend_subject()`/`update_subject()` primitives now also
+      batch first-time registration with the mutation/event, removing the
+      redundant first write for every system without changing public facts
+      (`player_action_ledger_test`, 9/9; `smoking_act_test` exercises all
+      eight live routes). The promised complete use-and-inspect reel is now
+      rendered at `captures/full_use_inspection_demo.mp4`: 1280×720, 30 FPS,
+      59.15 seconds, H.264/AAC with live game audio. Its nine labelled chapters
+      drive the production Hunt through cigarette, vape, joint, spliff, bong,
+      sword, shotgun, sidearm and carried-limb use followed by each distinct
+      inspection; a 6-second contact sheet was visually checked across the reel
+
+      18 September hand-occlusion correction: rolled objects rest closer and
+      higher in the lower third, the cigarette receives the smallest of the
+      still-costumed grip hands plus extra finger clearance, and the Zippo hand
+      now withdraws off the opposite lower edge once ignition has caught (or
+      once a bong pull ends) instead of haunting the entire draw, exhale and lip
+      hold. The production rest, draw, exhale, lip-hold and inspection frames
+      are captured under `P:/GameDev/Temp/smoking_feel_cigarette_*.png`;
+      `smoking_act_test.gd` pins the lighter withdrawal and the stricter wisp
+      silhouette alongside the existing anatomy, burn and ledger checks.
 - [ ] **AU7.10** Passing one to somebody is a real act with a real meaning (S)
 
 ### AU5 — The effect taxonomy
@@ -5589,7 +6645,9 @@ is the one that proves it — the Carrier Choir has not noticed you and never
 will, which is what makes autonomy and attention two different things.
 - [x] **AU6.1** A catalogue that survives being drawn — five entities, every
       one with a concrete form, an action, a regard, and what it leaves behind
-      (`systems/contact_entities.gd`, `tests/contact_entities_test.gd`, 40 checks)
+      Contact memory and its public meeting fact persist atomically without
+      falsely adding another player action to the dose that caused it
+      (`systems/contact_entities.gd`, `tests/contact_entities_test.gd`, 80 checks)
 - [x] **AU6.2** Contact is earned, never bought: a weak dose reaches nobody, and
       tolerance closes the door the way it flattens the curve (AU4.5)
 - [x] **AU6.3** Deterministic per subject, substance and dose count, so a save
@@ -5646,7 +6704,9 @@ where the deliriants go.
       folded silently into the entry price. Verified: refused on an empty
       seal, refused on Da'ath, refused above your own altitude, and — once
       genuinely earned — the offering is shown actually leaving the body on
-      both the way in and the way out.
+      both the way in and the way out. Accepted player petitions and
+      departures receive one receipt each; debt collection, offering,
+      crossing fact and remembered standing persist in one transaction.
 - [ ] **AV1.5** Each plane looks like itself, with more of Greg's art the higher it goes
 - [ ] **AV1.6** Hellscape and angelscape are one place in two registers, not two asset sets
 - [ ] **AV1.7** All of it runs on one shader with different dials (FINAL_V section 16)
@@ -5681,6 +6741,7 @@ Greg: *"the higher you have to be to talk or even fight, conjure, evoke etc"*.
       floor gave out. Verified: a subject with nothing taken can still hold
       a Malkuth-tier interaction (needs 0) but fails the same call one plane
       up, and the failure leaves a real recorded event, not a silent `false`.
+      That event and the plane's changed memory share one world transaction.
 - [x] **AV2.4** ~~You cannot fight the godhead sober, and that is not a difficulty setting~~
       Structural rather than a rule someone could toggle: Keter's `fight`
       floor is derived from its `order` the same formula every other floor
@@ -5708,8 +6769,8 @@ Greg: *"the higher you have to be to talk or even fight, conjure, evoke etc"*.
 - [x] **AV3.2** ~~A relationship accumulates across trips~~ `PlaneVoices.standing()` reads every petition, departure and collection a subject has ever made with a plane out of `WorldHistory` and returns one number; `trips()` counts them. Nothing is stored — standing is derived, so it cannot drift out of step with the events that caused it, and a plane you have never petitioned is not a zero row, it is simply absent
 - [x] **AV3.3** ~~Voice is distorted and clears with standing — the whole readout, no meter~~ There is no meter anywhere: `clarity()` feeds `distort()`, which corrupts the entity's actual words — dropping vowels to a consonant skeleton first, then whole words to `_lost()` — so how well you stand with a plane is legible only as how much of it you can read. Deterministic per line and per subject, so the same sentence degrades the same way twice rather than shimmering
 - [x] **AV3.4** ~~Mysterious means withholding, never vague~~ `ask()` resolves a real answer from real world state first and *then* decides how much of it you are given. The answer exists underneath whether or not you can see it, which is the whole distinction — `_known()` returns a fact, and standing decides whether the fact arrives, arrives partially, or is refused. Nothing is generated as a plausible-sounding non-answer
-- [x] **AV3.5** ~~They can be owed, and they collect (AR2.4)~~ `owe()` writes a real debt against a plane; `debt()` reads it; `collect()` calls `Boons.pay()` straight out of the body/standing ledger every other cost in this project uses, so being collected from costs the same currency being hurt does. `collect_due()` is the hook for a caller that wants to sweep everything owed at once
-- [x] **AV3.6** ~~They disagree with each other the way the gods do about a kill~~ `plane_verdict()` and `disagreement()` give two planes genuinely different readings of the same event, driven by each plane's own register rather than by a random roll — so the disagreement is *about* something and stays consistent if you ask twice
+- [x] **AV3.5** ~~They can be owed, and they collect (AR2.4)~~ `owe()` writes a real debt against a plane; `debt()` reads it; `collect()` calls `Boons.pay()` straight out of the body/standing ledger every other cost in this project uses, so being collected from costs the same currency being hurt does. `collect_due()` is the hook for a caller that wants to sweep everything owed at once. Player debt acceptance receives one receipt; each collection/default and a whole creditor sweep persist atomically
+- [x] **AV3.6** ~~They disagree with each other the way the gods do about a kill~~ `plane_verdict()` and `disagreement()` give two planes genuinely different readings of the same event, driven by each plane's own register rather than by a random roll — so the disagreement is *about* something and stays consistent if you ask twice. All separate plane verdicts and remembered relationships persist as one response to one death
 - [x] **AV3.7** ~~Demonic and jesterish is the register; the jester is already on the handheld~~ `handheld_readout()` routes plane speech through the same handheld the jester motif already lives on, so the register arrives on the device the player already reads rather than in a new window of its own
 
 ## AW — Commissioning
@@ -5775,22 +6836,14 @@ underneath either name.
       Falls out of AS1.1's own wiring: the light's energy is read fresh off
       `is_lit()`/`battery` every frame, and lowering the device is the one
       thing that already drops `raised` below the lit threshold.
-- [ ] **AS1.5** Its light is what gives you away at night (pairs with
-      AE1.1) — AE1.1 exists now: `perception.gd`/`_update_perception()`
-      genuinely read `handheld.is_lit()` as the light term in a live
-      `player_visibility`/`player_unseen` verdict against every hostile,
-      so the light really does raise how seen you are. Still not the full
-      claim: every hostile in `_update_encounter_actors()` spawns already
-      `"hunting"` — there is no unaware/idle state for `player_unseen` to
-      hold a hostile out of, so nothing yet decides *whether* a hostile
-      starts hunting off this verdict, only how exposed you'd be if one
-      already were. That is a real change to the encounter state machine,
-      deliberately not made in the same pass that built the verdict it
-      would read.
-      Verified: `tests/handheld_battery_test.gd` (14 checks),
-      `tests/perception_test.gd` and `tests/perception_integration_test.gd`
-      (light term traced end to end from `is_lit()` through a real
-      raycast against a real hostile), plus the full
+- [x] ~~**AS1.5** Its light is what gives you away at night (pairs with
+      AE1.1)~~ Closed with C7.1: the emitted source has its own range-and-cover
+      verdict, hostile pursuit and launcher readiness read it, and the
+      player's body remains a separate sighting. That separation creates a
+      real night interval in which a hunter follows the visible Black Mirror
+      while its holder is still `player_unseen`; cover, charge and pocketing
+      all close the trail. Verified by `tests/perception_test.gd`,
+      `tests/perception_integration_test.gd`, and the full
       `combat_integration_test.gd` regression suite.
 
 ### AS2 — Night
@@ -5805,7 +6858,7 @@ underneath either name.
 - [~] **AS3.2** Pockets hold real things and what is in them matters — the mechanism is built under C8.2 (`carry.gd`: `pocket()`/`unpocket()`/`pocketed_items()`/`search_pockets()`, real identified items rather than a separate abstraction, `tests/pockets_test.gd` 15 checks). What is still AS3's own and not done here: which garment actually provides how many pockets, which needs `garments.gd` (Lane 2's) rather than a capacity constant invented in CARRY, and nothing in the world yet *searches* a body's pockets — that verb belongs to whoever owns grappling and defeat
 - [ ] **AS3.3** What you are wearing is strategy: weather, radiation, who talks to you
 - [ ] **AS3.4** It shows on the body the mirror renders (AH1.5, N)
-- [x] **AS3.1** Layers, and they are part of the world system rather than a paperdoll
+- [x] **AS3.1** Layers, and they are part of the world system rather than a paperdoll — player wear batches the real layer/bias mutation with one identified action; dressing another subject preserves the same `layer_worn` world fact without falsely attributing it to the player
 - [x] **AS3.2** Pockets hold real things and what is in them matters
 - [ ] **AS3.3** What you are wearing is strategy: weather, radiation, who talks to you —
       weather and faction standing are real (a layer cuts storm exposure and
@@ -5903,12 +6956,13 @@ AK1.1 and AK2.1 the same object.
 
 ### AK1 — Whose satellite it is
 - [ ] **AK1.1** The satellite app has an owner, named, with a logo and a licence agreement
-- [ ] **AK1.2** They see what you see - using the map is being seen using the map
+- [x] **AK1.2** They see what you see — after the repossession order exists, opening MAP calls the territory authority with the carrier's live position. The device publishes a coarse acquisition area into the same persistent bounty, so using its satellite view is itself the thing that lets CellOutz reacquire you; staying in one cell cannot spam a cosmetic event. A newly crossed cell now enters the compact player-action ledger with one durable receipt while the bounty mutation and publication persist in one outer transaction; reopening MAP inside that cell creates neither another event nor another receipt. The resulting response sequence, dispatch fact and both named persistent contractors now close as one derived transaction, including a later replacement after the first team is genuinely resolved (`celloutz_bounty_response_test`, 11 checks)
 - [ ] **AK1.3** Standing with them is a real quantity and it moves
 - [ ] **AK1.4** They give you work, on the map, and the work changes the map
 - [ ] **AK1.5** You can work against them, and the sky gets worse for you when you do
 - [ ] **AK1.6** Losing them costs the satellite: back to a paper chart (A10 degrades, it does not vanish)
 - [ ] **AK1.7** They are an institution and the satire stays pointed at institutions
+- [x] **AK1.8** Their target pings publish an approximate area rather than omniscient coordinates; bounties and jobs draw hunters into that area and make the phone's convenience a direct threat to whoever carries it — CellOutz snaps the true position to a 96-metre acquisition grid and publishes a persisted 72-metre uncertainty radius, rendered on the Ashbloom sheet as a broken red ring with the green player offset somewhere inside it (`captures/celloutz_target_area.png`). Crossing a cell boundary updates the order; standing inside one cannot duplicate it. The first area commissions two named Ledger Bailiffs through `_spawn_encounter_actor`, giving the contractors ordinary anatomy, AI, loot and persistent outcomes rather than icon-only existence. A living pair caps the response; only a later ping after both are dead, escaped, spared or recruited can commission replacements. Dispatch state, public fact and exact spawned people persist atomically. `facility_territory_test` proves coarse/idempotent/restored pings, `facility_device_integration_test` proves using MAP publishes one, and `celloutz_bounty_response_test` proves the physical response and spawn cap
 
 ### AK2 — The esoteric chart register
 - [ ] **AK2.1** Their briefings read like the charts: dense, hand-lettered, confident, unsourced
@@ -5932,7 +6986,9 @@ The last rung. Fifteen statements that are true of the agency that owns the sky 
 - [ ] **AK10.9** `v10` Their claims pin onto the Board
 - [ ] **AK10.10** `v10` Their version of the world sits near the top of the pyramid
 - [ ] **AK10.11** `v10` Two records: what the satellite saw and what they published
-- [ ] **AK10.12** `v10` The tunnels are where they cannot see you
+- [x] **AK10.12** `v10` The tunnels are where they cannot see you — same proven
+      observation boundary as AE10.11: a dead-zone MAP consultation cannot
+      publish the corporate acquisition area that surface MAP use does.
 - [ ] **AK10.13** `v10` They are an institution and the satire stays there
 - [ ] **AK10.14** `v10` The subject is occult, never the real-world conspiracy canon
 - [ ] **AK10.15** `v10` They know you across the restart
@@ -5959,9 +7015,9 @@ paperwork over things that used to be people.
 ### AL1 — The bank
 - [x] **AL1.1** Money exists as a real quantity with a real issuer — already built, under R rather than AL: `Carry.CURRENCY` (`rust_scrip`) and `CURRENCY_ISSUER` (`celloutz`, a real registered faction subject with its own doctrine), the wallet living durably at `WorldHistory.subject("inventory").rust_scrip`. Verified by the pre-existing `money_test.gd` (R1.1), re-run clean rather than duplicated
 - [x] **AL1.2** The bank writes the liens the Choir already prices (CARRY, B) — the per-item `lien` field has existed since B5.4 but nothing ever wrote a real one into it; `Carry.borrow_against(amount, lender_faction, item_index)` reuses `borrow()`'s own real debt ledger and additionally stamps the exact carried item with who holds the lien and how much, found on the item itself rather than an abstract number nobody can point at
-- [x] **AL1.3** A debt is secured against something of yours, named, and they will take it — `Carry.seize_lien(lender_faction)` finds the item actually liened to that lender and removes it from CARRY for real, valued by the same `sale_value()` the Choir prices everything by (never a fiction number invented for this one verb), and shrinks the real debt by what the thing was actually worth. `tests/bank_lien_test.gd` covers the lien, seizure, and real balance; `money_test.gd` (R1.1/R1.4) remains on the same ledger. `Carry.send_collector()` now supplies the AL1.7 default visit seam.
+- [x] **AL1.3** A debt is secured against something of yours, named, and they will take it — `Carry.seize_lien(lender_faction)` finds the item actually liened to that lender and removes it from CARRY for real, valued by the same `sale_value()` the Choir prices everything by (never a fiction number invented for this one verb), and shrinks the real debt by what the thing was actually worth. Removed inventory, reduced debt and the seizure event persist as one settlement. `tests/bank_lien_test.gd` covers the lien, seizure, and real balance; `money_test.gd` (R1.1/R1.4) remains on the same ledger. `Carry.send_collector()` now supplies the AL1.7 default visit seam.
 - [ ] **AL1.4** Accounts, in a building, that you can walk into and rob
-- [x] **AL1.5** Interest accrues in game time, and it does not stop while you are away — `Carry.accrue_interest()` settles the account from `WorldClock.minutes()`, not from a bank scene or a per-frame timer, so two full days catch up when a fresh Carry instance next reads the saved ledger. Three percent compounds per whole in-world day; unused hours remain on the account rather than being rounded into a charge or forgiven. Borrowing and repayment reset the lender's real clock anchor, every settlement writes a `bank_interest_accrued` receipt into WorldHistory, and old saves with debt but no timestamp begin honestly at first read instead of receiving invented retroactive charges. `tests/bank_lien_test.gd` expanded from 14 to 23 passing checks; `money_test.gd` and `world_clock_test.gd` remain green
+- [x] **AL1.5** Interest accrues in game time, and it does not stop while you are away — `Carry.accrue_interest()` settles the account from `WorldClock.minutes()`, not from a bank scene or a per-frame timer, so two full days catch up when a fresh Carry instance next reads the saved ledger. Three percent compounds per whole in-world day; unused hours remain on the account rather than being rounded into a charge or forgiven. Borrowing and repayment reset the lender's real clock anchor; every settlement persists the new balance, advanced clock anchor and one `bank_interest_accrued` receipt together, while old saves with debt but no timestamp begin honestly at first read instead of receiving invented retroactive charges. `tests/bank_lien_test.gd`; `money_test.gd` and `world_clock_test.gd` remain green
 - [x] **AL1.6** They are an institution: the satire lands on the paperwork, not on debtors — `Carry.account_statement()` returns the real office, issuer, balance, rate and named collateral beside three clauses in the bank's own procedural voice. The account holder is never characterised or mocked; the office states, in writing, that it records ownership but provides no relief, recovers security without you present, and keeps its own errors payable until it chooses to correct them. The AL1.5 demo typesets the same returned clause rather than carrying separate joke copy, and `bank_lien_test.gd` proves the statement names the responsible office, the actual figures and the exact liver securing the loan
 - [x] **AL1.7** Default has a collector, and the collector is a persisted person with a `BaselineHuman` body record and full anatomy snapshot; `Carry.send_collector()` creates one deterministic lender collector when needed, seizes the named lien, and records `debt_collector_visited`. `tests/bank_lien_test.gd` covers identity, body schema, anatomy, and history.
 
@@ -5970,6 +7026,12 @@ paperwork over things that used to be people.
 - [ ] **AL2.2** It is how the collateral moves - the organ trade has a route
 - [ ] **AL2.3** Entrances are found, not marked: a grate you noticed is a route you own
 - [ ] **AL2.4** Down there the satellite cannot see you (AK1.2), which is the point
+      The observation rule is now real without falsely claiming the underground
+      network around it exists: authored dead zones remove live imagery,
+      minimap, player fix and corporate target ping while preserving the paper
+      chart (`handheld_satellite_test.gd`,
+      `captures/underground_satellite_occluded.png`). AL2.4 remains open until
+      AL2.1 supplies a connected navigable layer for “down there” to mean.
 - [ ] **AL2.5** It connects holdings that are not connected above ground (AA)
 - [ ] **AL2.6** Raiding a vault from underneath is the best version of AB3
 - [ ] **AL2.7** Sound behaves differently down there, and the game lets you hear that (G)
@@ -6161,7 +7223,7 @@ Greg: *"the higher you have to be to talk or even fight, conjure, evoke etc"*.
       jester is already stamped on, so the register arrives in the place the
       item names rather than as a separate presentation.
 
-      All six verified by `tests/plane_voices_test.gd` — **68 checks, 0
+      All six verified by `tests/plane_voices_test.gd` — **71 checks, 0
       failures**, with `tests/sephiroth_test.gd` (AV1/AV2/AV3.1) re-verified
       clean against the change.
       Honest note on provenance: the agent that wrote this hit a session
@@ -6171,20 +7233,89 @@ Greg: *"the higher you have to be to talk or even fight, conjure, evoke etc"*.
       from the implementation rather than authored by the agent that built
       it. Nothing here is ticked on a claim that was not re-run.
 
+## AX — The authored facility escape
+
+Direction locked by Greg's 19 September interview. This is the cross-system
+vertical slice described by `ARCHITECTURE/SYSTEM_MAP.md`: the existing vat,
+Derby and surface are ingredients, not permission to preserve the old automatic
+route. Items below describe connections between their owning systems; they do
+not make AX a second owner of anatomy, inventory, combat or the Black Mirror.
+
+### AX1 — The examination creates the player
+- [x] ~~**AX1.1**  Character creation unfolds through a readable government examination, not one detached setup menu~~ The examination exists and creation happens inside it: the doctor observes each page, the consent notice never leaves the screen, and F plays his verdict before the form is filed (`31d6fbc`, `7b3735b`).
+- [x] ~~**AX1.2**  The unidentified visiting doctor is personally cruel, strangely sympathetic and important enough to have arrived only for this subject~~ `doctor_examination.gd`. Unnamed, outranks the handler, explains rather than gloats. Cruel and sympathetic written as one man rather than two moods (`108ff43`).
+- [x] ~~**AX1.3**  Direct body/face/proportion customisation, origins, anatomy, randomisation, presets, personality and natal data enter through one paced sequence~~ `character_presets.gd` plus anatomy options on the body page. Origins, body/face/proportion, anatomy, randomisation and reusable presets all exist and are exercised. The round-trip test restores every chosen field including the birth TIME -- a preset that drops it sends a repeat player back into the chart without telling them why it is wrong -- and `missing_fields()` fails the suite if a field is ever added to CharacterSheet and not to the preset list (`85d618b`, this commit).
+- [x] ~~**AX1.4**  Player choices remain mechanically true while the government's institutional diagnosis can be insulting or politically wrong~~ The two records are drawn together on the RACE page -- what you chose, and FILED AS what the facility wrote instead, with its reason. `classify()` never touches the sheet and a test fails if it ever does (`108ff43`, `31d6fbc`).
+- [ ] **AX1.5** A deliberate first pass takes roughly 10–15 minutes; a saved preset gives a returning player a fast route without losing the scene
+- [x] ~~**AX1.6**  Explicit anatomy and the mosaic/censorship presentation are equally complete options~~ `anatomy_presentation.gd`. "Equally" is enforced rather than intended: `parity_gaps()` returns any region present in one presentation and not the other, and the suite fails when it is non-empty. The mosaic keeps silhouette and, on deep wounds, blood -- a censored build still has to say this person was opened (AN6 spent a section on that). Mosaic is the default; explicit is the opt-in.
+
+### AX2 — The soul takes the implant
+- [x] ~~**AX2.1**  The doctor's conclusion—that they now know how to break or kill the player—creates the immediate threat rather than a lore subtitle~~ The verdict plays before filing and names the trait the player actually picked, because a generic "we know how to break you" is a villain line (`7b3735b`).
+- [x] ~~**AX2.2**  Accumulated suffering and refusal awaken the player's own soul/inner demon; no external entity grants or enters with the power~~ `soul_breakthrough.gd`. Submission never awakens it: at least one refusal is required regardless of suffering endured, and refusals are counted during the examination and carried out of it (`9d8ce9f`, `7b3735b`).
+- [x] ~~**AX2.3**  Chaos magick visibly rewrites the government's brain implant into the player's interface and first usable ability~~ Same chip, same serial, different owner -- `owner_faction` moves from `celloutz` to `self`. Chaos magick rises through the existing event table, and the test greps the record for any third party and fails if one appears (`9d8ce9f`).
+- [x] ~~**AX2.4**  The vat, restraints and mouth tube fail as one playable physical breakout rather than a cut to the corridor~~ Built on `strike-opening` and merged rather than rebuilt: the player wakes already wounded, the tube comes out, the restraint enters the shared carry model, objective ESCAPE THE FACILITY (`2556b81`).
+- [x] ~~**AX2.5**  Reaching the departing doctor is an urgent optional pursuit, not a forced timer~~ The window opens when the verdict ends, while the player is still in the vat, and closes six in-world minutes later. `urgency()` is for a diegetic cue -- a door, an engine -- never a countdown UI, because a timer on screen is the game admitting this is an objective. Missing him is silent by contract: there is no `missed()`, no failure event, and the suite scans the ledger for one and fails if it appears.
+- [x] ~~**AX2.6**  An apparent doctor kill remains a real victory; later medical reconstruction preserves his scars, memory and rivalry~~ `record_kill()` writes a real victory and `reconstruct()` cannot clear it -- it adds memory, rivalry and a scar derived from the method. The test asserts `was_killed()` is still true after he returns (`b375c77`).
+
+### AX3 — Acquisition teaches the game
+- [ ] **AX3.1** A broken medical restraint/tool is the first inspected and usable object
+- [ ] **AX3.2** Humiliation clothing comes from a dead failed subject and physically teaches body inventory/equipment
+- [ ] **AX3.3** The first biometric barrier accepts coercion, a living/unconscious/dead body, removed anatomy and—later—implant spoofing
+- [ ] **AX3.4** The first firearm is powerful, taken from a guard and ammunition-starved enough that melee still matters
+- [x] ~~**AX3.5**  The Black Mirror is stolen from restricted technology storage as a rare prototype, not issued as an ordinary menu~~ `restricted_storage.gd` (9f6f945). The prototype starts unpossessed and `take_prototype()` is the one theft action, idempotent, raising the same CellOutz repossession order the derby win raises. Verified on trunk before ticking: restricted_storage 12/12.
+- [x] ~~**AX3.3** The first biometric barrier accepts coercion, a living/unconscious/dead body, removed anatomy and—later—implant spoofing~~ `biometric_barrier.gd` authenticates the guard's stable subject identity and deliberately never consults life state. Whole living, unconscious and dead bodies, removed anatomy, and the gated later implant handshake converge on one recorded access path; unauthorized tissue and premature spoofing remain locked.
+- [x] ~~**AX3.4** The first firearm is powerful, taken from a guard and ammunition-starved enough that melee still matters~~ The barrier guard now owns one `CELL OUTZ BREACH NINE`; it transfers only after that exact actor is down, dead or disarmed. Its 52-damage shot is decisive, but the physical gun contains three rounds, has no reserve magazine, cannot reload and cannot be farmed from the same guard twice.
+- [ ] **AX3.5** The Black Mirror is stolen from restricted technology storage as a rare prototype, not issued as an ordinary menu
+- [ ] **AX3.6** Every introduced interface is learned by doing the action that needs it; no permanent all-controls overlay substitutes for staging
+
+### AX4 — The facility is a place with routes
+- [ ] **AX4.1** Stealth/exploration, cooperation/betrayal, direct assault and recapture into the Derby are real routes through one connected facility
+- [ ] **AX4.2** Avoiding the Derby is a mastery route a perceptive first-time player can still discover
+- [ ] **AX4.3** Successful play is never revoked by an arbitrary recapture cutscene; containment has a demonstrated cause
+- [ ] **AX4.4** Different exits can reach different surface positions and relationships while handing into the same persistent world
+- [x] ~~**AX4.5**  Until the player's death fiction is authored, opening death uses an honest ordinary reload rather than a counterfeit immortality explanation~~ `opening_death.gd`. Reloads, says it is a placeholder, records no event and files no permanent death -- a logged death is a death the world has taken a position on. `FICTION_AUTHORED` is false and flipping it makes the suite demand a real implementation, so the flag cannot be flipped quietly. The suite also greps the payload for revived/resurrect/clone/backup/immortal/reborn and fails if the placeholder ever starts explaining itself.
+- [ ] **AX4.6** Every branch records its actions and consequences through the shared ledger and resumes from the correct stage
+
+### AX5 — The slice proves the wider game
+- [x] ~~**AX5.1**  First- and third-person combat share anatomy, wound depth, ballistics and consequences throughout the facility~~ Already true and now guarded. `_resolve_strike`, `_attack`, `_resolve_firearm` and `apply_hit` contain no reference to the camera, there is exactly one `apply_hit` in the game, and `set_perspective()` touches nothing about damage. `perspective_parity_test.gd` reads the source and fails the day one of them starts branching on the view -- which is how this diverges in practice: not as a decision, as one reasonable line about third person needing a bit more reach.
+- [ ] **AX5.2** The implanted external camera is introduced as technology, with cramped-space, darkness, injury and interference failure cases
+- [x] ~~**AX5.3**  Nearby population stays inside the 5–20 fully simulated budget; distant people keep identity while expensive detail reduces smoothly. **Measured, not yet true.** `tests/population_budget_test` seeds the Bone Yard Hunt's roaming population through its own `_spawn_roamer()` and settles at **14 living hostiles**, inside the 5-20 budget, with 22 `BaselineHuman` rigs total in the scene once the yard's standing workers are counted. Toggling every rig's ticking in place found **no frame cost this harness can separate from noise** at that population (control 7.36/7.63 ms vs silent 6.85 ms, inside a 0.75 ms floor) — the budget half is cheap enough to not be the bottleneck. The distant half is not built: `_cull_distant_roamers()` (`bone_yard_hunt.gd`) is a single hard cutoff at 230m, full simulation on one side and gone on the other — no reduced tick rate, no impostor, nothing that keeps identity while shedding detail. Nothing in `game/systems` implements a cheaper distant tier for people. That is the real gap, not a number to chase.~~ Both halves. Near: the settled roamer population is 14, inside the 5-20 budget, reached rather than starved by placement failures (e437ab0). Far: `roamer_detail.gd` replaces a single 230m cliff with four tiers -- distance buys a slower tick rather than worse behaviour, and only the outermost tier frees anything, so a body you shot at 100m is still a body you shot at 200m. The suite asserts the cost curve descends rather than trusting the constants (94b6de9).
+- [ ] **AX5.4** The complete route holds the 60 FPS contract under its authored combat and aftermath load
+- [ ] **AX5.5** One recorded playthrough demonstrates creation, breakout, equipment, biometric choice, combat, Black Mirror theft, at least two routes and surface handoff
+- [ ] **AX5.6** Only after those sockets are proven does AW emit the friend-facing opening asset/model/texture/audio commission list
+
 ## Open questions — only you can answer these
 
 They block nothing else, but they change what gets built.
 
-1. **Where is the art folder?** Blocks G1 entirely — the largest available
-   upgrade to the look.
-2. **celloutz.xyz — mirror or fictionalise?** Blocks I3.
-3. **Ephemeris or derived wheel?** "Most accurate" charts need real planetary
-   longitudes from a table. Affects D5.4.
-4. **Guns: common, or scarce and improvised?** Changes encounter design either
-   way. Built but undecided.
-5. **What persists between runs?** Roguelike structure was asked for, but
-   "bodies remember" is a pillar. These pull against each other.
-6. **Does the chassis roll?** Affects A7.4.
+1. ~~**Where is the art folder?**~~ **Answered 19 September:**
+   `C:\Users\Greg\Desktop\Art Collections`, real and populated with Affinity,
+   Photoshop and After Effects sources. A smaller second set sits under the
+   Desktop's Personal Media Folder. His Instagram is also a source but **the
+   handle is not confirmed** — do not guess it. G1 is unblocked. What he
+   actually wants built is a commissioning ledger: click an entry, see what
+   the thing is, what it looks like now, and what he wants instead. Not
+   urgent; see `DESIGN.md`.
+2. ~~**celloutz.xyz — mirror or fictionalise?**~~ **Fictionalise it**, somewhat
+   rather than wholesale. I3 unblocked.
+3. ~~**Ephemeris or derived wheel?**~~ **Real ephemeris-grade positions**, as
+   an integrated part of creation rather than a separate route. Planetary
+   rulers may personalise favour and communication without making one birth
+   strictly superior. D5.4 remains partially built because the current wheel
+   is derived, not because the direction is still open.
+4. ~~**Guns: common, or scarce and improvised?**~~ **The basic category is
+   available, but value is uneven rather than binary.** Industrial/common
+   firearms exist; reliable high-quality weapons, condition, ammunition,
+   attachments and catastrophic specialist rounds are valuable and scarce.
+   The world is scrap and bionics, crafting is the upgrade path, and most
+   fighting remains physical rather than an endless supply of gunfights.
+5. ~~**What persists between runs?**~~ **There are no runs.** Greg, 19
+   September: it is not a roguelike, it is a save game — your game — with a
+   main story, an end goal and a post-game you can keep playing. The
+   roguelike-versus-"bodies remember" tension was never real. Stop asking.
+6. **Does the chassis roll?** Affects A7.4. Asked again on 19 September;
+   Greg's answer was "I don't know", so it stays open rather than being
+   decided for him.
 7. ~~**How is the dark web gated?**~~ **Answered and built** — `signal_field.gd`
    gates it on physically standing at a terminal. Reversible by changing one
    table; the two terminals are in the Ossuary Works and the Communion.

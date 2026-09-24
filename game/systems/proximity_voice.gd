@@ -23,6 +23,7 @@ var started_msec := 0
 var capture: AudioEffectCapture
 var microphone: AudioStreamPlayer
 var target_anchor: Node3D
+var capture_bus_index := -1
 
 
 func _ready() -> void:
@@ -31,10 +32,18 @@ func _ready() -> void:
 		status = "MIC READY / TEST TRANSPORT"
 		set_process(true)
 		return
-	_setup_capture_bus()
+	# Do not open the operating-system microphone merely because the Hunt scene
+	# exists. On some Windows drivers a permanently streaming input and Godot's
+	# output device fight over the buffer size, producing crackle and avoidable
+	# mixer work before the player has ever attempted to speak.
+	available = false
+	status = "HOLD V TO ENABLE MIC"
+	set_process(false)
 
 
 func _setup_capture_bus() -> void:
+	if microphone != null and is_instance_valid(microphone):
+		return
 	var bus_index := AudioServer.get_bus_index(BUS_NAME)
 	if bus_index < 0:
 		AudioServer.add_bus(AudioServer.bus_count)
@@ -43,6 +52,7 @@ func _setup_capture_bus() -> void:
 		# The capture effect still receives the signal; it is simply not fed back
 		# into the speakers, which would create an immediate echo loop.
 		AudioServer.set_bus_volume_db(bus_index, -80.0)
+	capture_bus_index = bus_index
 	capture = AudioEffectCapture.new()
 	AudioServer.add_bus_effect(bus_index, capture)
 	microphone = AudioStreamPlayer.new()
@@ -59,6 +69,8 @@ func _setup_capture_bus() -> void:
 func begin(subject_id: String, anchor: Node3D) -> bool:
 	if active:
 		return true
+	if not available and OS.get_environment("ATG_TEST_MODE") != "1":
+		_setup_capture_bus()
 	if not available:
 		capture_failed.emit(status)
 		return false
@@ -70,6 +82,7 @@ func begin(subject_id: String, anchor: Node3D) -> bool:
 	if capture != null:
 		capture.clear_buffer()
 	active = true
+	set_process(true)
 	status = "LISTENING / RELEASE V TO SEND"
 	capture_started.emit(target_id)
 	return true
@@ -80,6 +93,7 @@ func finish(send := true) -> Dictionary:
 		return {}
 	_process_capture()
 	active = false
+	set_process(false)
 	var duration := maxf(float(Time.get_ticks_msec() - started_msec) / 1000.0, float(captured_frames) / 44100.0)
 	var result := {
 		"duration": snappedf(duration, 0.01),
@@ -100,6 +114,19 @@ func cancel() -> void:
 	if active:
 		finish(false)
 	status = "MIC READY / HOLD V" if available else "MIC INPUT UNAVAILABLE"
+	set_process(false)
+
+
+func _exit_tree() -> void:
+	if microphone != null and is_instance_valid(microphone):
+		microphone.stop()
+	if capture_bus_index >= 0:
+		for effect_index in range(AudioServer.get_bus_effect_count(capture_bus_index) - 1, -1, -1):
+			if AudioServer.get_bus_effect(capture_bus_index, effect_index) == capture:
+				AudioServer.remove_bus_effect(capture_bus_index, effect_index)
+				break
+	capture = null
+	capture_bus_index = -1
 
 
 func _process(_delta: float) -> void:

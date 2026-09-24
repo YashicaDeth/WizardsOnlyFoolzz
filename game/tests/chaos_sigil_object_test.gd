@@ -55,6 +55,7 @@ func _ready() -> void:
 	for event in WorldHistory.events:
 		events.append(str(event.get("type", "")))
 	check(events.count("sigil_inscribed") == 2, "one findable event per real inscription (%d)" % events.count("sigil_inscribed"))
+	check(int(WorldHistory.get("_ledger_batch_depth")) == 0, "object, maker count and inscription fact close one transaction")
 
 	print("CHAOS_SIGIL_OBJECT_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
