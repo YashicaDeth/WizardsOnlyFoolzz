@@ -31,8 +31,51 @@ func _ready() -> void:
 	opening._update_sequence(0.05)
 	check(opening.phase == "voiding", "the directed camera reaches the voiding beat")
 	check(opening.opening_audio.played_cues.has("drain"), "voiding has its own sound event")
-	opening._breach()
+
+	# The drain no longer breaks the glass by itself. It leaves you hanging in
+	# the wires under END ALL SUFFERING, and you tear them out yourself.
+	opening.clock = opening.DRAINED_AT
+	opening._update_sequence(0.05)
+	check(opening.phase == "wired", "a drained tank leaves the player hanging in the wires")
+	check(opening.title.visible and opening.title.text == "END ALL SUFFERING", "the wired beat opens under END ALL SUFFERING")
+	check(opening.umbilicals.size() == 4 and opening.vat_glass.visible, "the wires are still in and the glass still holds")
+	var held_clock: float = opening.clock
+	var held_line: int = opening.line_index
+	opening._physics_process(3.0)
+	check(opening.clock == held_clock and opening.line_index == held_line, "the handler's lines wait while the player hangs there")
+	check(opening.phase == "wired", "nothing breaks the glass until the player acts")
+
+	var pain_before := float(opening.anatomy.call("snapshot").pain)
+	opening._tug_wire(null)
+	check(opening.umbilicals.size() == 4, "tugging at nothing pulls nothing out")
+	var torn := 0
+	while not opening.umbilicals.is_empty() and torn < 8:
+		var cable: Node3D = opening.umbilicals[0]
+		var link: Node3D = cable.get_child(4)
+		var to_link: Vector3 = (link.global_position - opening.camera.global_position).normalized()
+		opening.yaw = atan2(-to_link.x, -to_link.z)
+		opening.pitch = asin(to_link.y)
+		opening._update_wired(0.0)
+		check(opening._aimed_wire() == cable, "looking at wire %d aims at it" % torn)
+		for tug in opening.WIRE_TUGS - 1:
+			opening._tug_wire(opening._aimed_wire())
+		check(opening.umbilicals.has(cable), "wire %d holds until the last tug" % torn)
+		opening._tug_wire(opening._aimed_wire())
+		check(not opening.umbilicals.has(cable), "wire %d tears out on tug %d" % [torn, opening.WIRE_TUGS])
+		torn += 1
+	check(torn == 4, "all four wires come out, one at a time")
+	check(float(opening.anatomy.call("snapshot").pain) > pain_before, "tearing the wires out hurts")
+	check(opening.opening_audio.played_cues.has("tug") and opening.opening_audio.played_cues.has("rip"), "tugging and tearing have their own sound events")
+	check(opening.title.text == "GET REVENGE" and opening.opening_audio.played_cues.has("revenge"), "the last wire turns the screen to GET REVENGE")
+	check(str(WorldHistory.subject("player").get("memory", "")).contains("Tore its own wires out"), "the player's history remembers tearing the wires out")
+	check(opening.phase == "wired" and opening.vat_glass.visible, "GET REVENGE holds before the glass goes")
+	opening._physics_process(opening.REVENGE_HOLD + 0.1)
+	check(opening.phase == "floor" and not opening.vat_glass.visible, "the glass goes after GET REVENGE")
 	check(opening.opening_audio.played_cues.has("glass"), "the breach has its own sound event")
+	for step in 30:
+		opening._physics_process(0.2)
+	check(opening.phase == "aisle" and opening.can_move, "the player still gets up and walks the aisle")
+	check(not opening.title.visible, "the title clears once the player is on the floor")
 
 	# K3.2. The opening reframed: CellOutz grew you, which is why the debt is
 	# in the meat. Checked as real scene content, not just prose in a design doc.

@@ -1,7 +1,7 @@
 extends Node
 
 ## Visual proof for G6. Captures the three authored opening states from the
-## actual playable scene: handler intake, submerged wake, and the tank voiding.
+## actual playable scene: handler intake, submerged wake, the tank voiding,\n## hanging in the wires, and the last one torn out.
 
 func _ready() -> void:
 	var out_dir := "P:/GameDev/Temp"
@@ -19,6 +19,9 @@ func _ready() -> void:
 	await _hold(45)
 	await _capture("%s/opening_submerged.png" % out_dir)
 
+	# Only this script's own steps move the opening from here, so a slow
+	# renderer's catch-up physics ticks cannot run it past the beat captured.
+	opening.set_physics_process(false)
 	opening.clock = 6.2
 	opening.phase = "voiding"
 	for _frame in 24:
@@ -32,6 +35,26 @@ func _ready() -> void:
 	opening._update_beats()
 	await get_tree().process_frame
 	await _capture("%s/opening_celloutz_reframe.png" % out_dir)
+
+	# Hanging in the drained tank, looking up at a wire under END ALL SUFFERING.
+	opening._begin_wired()
+	var cable: Node3D = opening.umbilicals[0]
+	var to_link: Vector3 = ((cable.get_child(4) as Node3D).global_position - opening.camera.global_position).normalized()
+	opening.yaw = atan2(-to_link.x, -to_link.z)
+	opening.pitch = asin(to_link.y)
+	for _frame in 20:
+		opening._physics_process(1.0 / 30.0)
+		await get_tree().process_frame
+	await _capture("%s/opening_wired.png" % out_dir)
+
+	while not opening.umbilicals.is_empty():
+		cable = opening.umbilicals[0]
+		for _tug in opening.WIRE_TUGS:
+			opening._tug_wire(cable)
+	for _frame in 12:
+		opening._physics_process(1.0 / 30.0)
+		await get_tree().process_frame
+	await _capture("%s/opening_get_revenge.png" % out_dir)
 	get_tree().quit()
 
 

@@ -3,9 +3,11 @@ extends Node3D
 ## THE GROWING FLOOR — the opening.
 ##
 ## The player surfaces inside a vat: submerged, umbilicals in, fluid over the
-## glass, rows of other tanks receding into the dark. The tank voids, the glass
-## goes, and they land on the grating in a spreading puddle. From there they
-## walk the aisle to the pit and are put in a car.
+## glass, rows of other tanks receding into the dark. The tank voids and leaves
+## them hanging on the umbilicals under END ALL SUFFERING; they tear the wires
+## out of themselves one by one, the screen answers GET REVENGE, and the glass
+## goes. They land on the grating in a spreading puddle, walk the aisle to the
+## pit and are put in a car.
 ##
 ## Biomechanical register per ART-DIRECTION.md: ribbed vertebral arches,
 ## conduits that read as gut rather than pipe, wet everything. Built from
@@ -19,6 +21,13 @@ const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const EYE_HEIGHT := 1.62
 const VAT_POSITION := Vector3(0, 0, 0)
 const AISLE_LENGTH := 34.0
+## Tugs it takes to tear one umbilical out. The first ones only hurt.
+const WIRE_TUGS := 3
+## How long GET REVENGE holds before the glass goes.
+const REVENGE_HOLD := 1.8
+## The drained tank's clock time; the breach and floor beats count from here.
+const DRAINED_AT := 8.6
+const UMBILICAL_LINKS := 13
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -36,6 +45,10 @@ var umbilicals: Array[Node3D] = []
 var glass_shards: Array[Dictionary] = []
 var door_marker: Node3D
 var line_index := -1
+var title: Label
+var wired_clock := 0.0
+var revenge_at := -1.0
+var jolt := 0.0
 
 # 0 submerged, 1 voiding, 2 breach, 3 floor, 4 aisle
 const BEATS := [
@@ -63,6 +76,7 @@ func _ready() -> void:
 	_build_vat()
 	_build_player()
 	_build_intake()
+	_build_title()
 	opening_audio = OPENING_AUDIO.new()
 	add_child(opening_audio)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -77,6 +91,20 @@ func _build_intake() -> void:
 	intake.name = "Intake"
 	$HUD.add_child(intake)
 	intake.filed.connect(_on_intake_filed)
+
+
+func _build_title() -> void:
+	title = Label.new()
+	title.name = "Title"
+	title.set_anchors_preset(Control.PRESET_FULL_RECT)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 64)
+	title.add_theme_color_override("font_color", Color("c8321e"))
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title.visible = false
+	$HUD.add_child(title)
+	$HUD.move_child(title, $HUD/Subtitle.get_index())
 
 
 func _on_intake_filed(_state: Dictionary) -> void:
@@ -127,22 +155,33 @@ func _build_player() -> void:
 func _umbilical(index: int) -> Node3D:
 	var root := Node3D.new()
 	add_child(root)
-	var angle := TAU * float(index) / 4.0 + 0.4
-	var anchor := VAT_POSITION + Vector3(cos(angle) * 0.62, 3.05, sin(angle) * 0.62)
-	var target := VAT_POSITION + Vector3(cos(angle) * 0.16, 1.45, sin(angle) * 0.16)
+	root.set_meta("index", index)
 	# Drawn as a chain of segments so it reads as gut, not as a straight pipe.
-	for segment in 7:
-		var t := float(segment) / 6.0
-		var point := anchor.lerp(target, t) + Vector3(sin(t * 5.0) * 0.07, 0, cos(t * 4.0) * 0.07)
+	for segment in UMBILICAL_LINKS:
+		var t := float(segment) / float(UMBILICAL_LINKS - 1)
 		var link := MeshInstance3D.new()
 		var mesh := SphereMesh.new()
 		mesh.radius = 0.055 - t * 0.018
 		mesh.height = mesh.radius * 2.2
 		mesh.material = WorldLook.surface(Color("4a3128") if segment % 2 == 0 else Color("38261f"), "flesh", index * 7 + segment)
 		link.mesh = mesh
-		link.position = point
 		root.add_child(link)
+	_route_umbilical(root, VAT_POSITION + Vector3(0, 1.45, 0), 0.16)
+	root.set_meta("pulls", 0)
 	return root
+
+
+## Lays a wire from its anchor in the tank collar down into the body at
+## `socket`, spread `spread` around it so the four do not enter at one point.
+func _route_umbilical(root: Node3D, socket: Vector3, spread: float) -> void:
+	var angle := TAU * float(root.get_meta("index", 0)) / 4.0 + 0.4
+	var anchor := VAT_POSITION + Vector3(cos(angle) * 0.62, 3.05, sin(angle) * 0.62)
+	var target := socket + Vector3(cos(angle) * spread, 0, sin(angle) * spread)
+	var count := root.get_child_count()
+	for segment in count:
+		var t := float(segment) / float(maxi(1, count - 1))
+		var sway := sin(t * PI) * 0.09
+		(root.get_child(segment) as Node3D).position = anchor.lerp(target, t) + Vector3(sin(t * 5.0) * sway, 0, cos(t * 4.0) * sway)
 
 
 func _build_vat() -> void:
@@ -189,8 +228,9 @@ func _build_vat() -> void:
 		torus.outer_radius = 1.06 + (0.05 if rib % 3 == 0 else 0.0)
 		torus.material = WorldLook.surface(Color("2e2419") if rib % 2 == 0 else Color("241c15"), "bone", rib)
 		ring.mesh = torus
+		# TorusMesh already lies flat around Y; tilting it stood each collar
+		# ring up as a hoop through the tank, a pillar from the inside.
 		ring.position = VAT_POSITION + Vector3(0, height, 0)
-		ring.rotation_degrees = Vector3(90, 0, 0)
 		add_child(ring)
 
 	var glow := OmniLight3D.new()
@@ -307,7 +347,6 @@ func _dead_tank(at: Vector3, seed_value: int) -> void:
 		torus.material = WorldLook.surface(Color("241d15"), "bone", seed_value + rib)
 		ring.mesh = torus
 		ring.position = at + Vector3(0, 0.3 + float(rib) * 0.8, 0)
-		ring.rotation_degrees = Vector3(90, 0, 0)
 		add_child(ring)
 
 
@@ -334,16 +373,28 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
-		_interact()
+		if phase == "wired":
+			_tug_wire(_aimed_wire())
+		else:
+			_interact()
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and phase != "submerged":
 		yaw -= event.relative.x * 0.0026
-		pitch = clampf(pitch - event.relative.y * 0.0024, -1.2, 1.0)
+		# The wires come down from above; hanging in them you have to look up.
+		pitch = clampf(pitch - event.relative.y * 0.0024, -1.2, 1.4 if phase == "wired" else 1.0)
 
 
 func _physics_process(delta: float) -> void:
 	if phase == "intake":
 		if opening_audio != null:
 			opening_audio.set_phase("intake")
+		return
+	if phase == "wired":
+		# The handler's clock stops while you hang here. Nothing moves on
+		# until you do it yourself.
+		wired_clock += delta
+		_update_wired(delta)
+		_update_shards(delta)
+		_update_hud()
 		return
 	clock += delta
 	_update_beats()
@@ -386,11 +437,14 @@ func _update_sequence(_delta: float) -> void:
 			player.position.y = lerpf(1.35, 0.95, ease(t, 0.6))
 			camera.rotation = Vector3(sin(clock * 0.9) * 0.06 * (1.0 - t) - 0.1 * (1.0 - t), sin(clock * 0.5) * 0.1 * (1.0 - t), 0)
 			opening_audio.set_phase("voiding", t)
-			if t >= 1.0:
-				_breach()
+			if clock >= DRAINED_AT:
+				_begin_wired()
 		"floor":
 			# On hands and knees on the grating.
-			var t := clampf((clock - 8.6) / 4.2, 0.0, 1.0)
+			var t := clampf((clock - DRAINED_AT) / 4.2, 0.0, 1.0)
+			if title.visible:
+				title.modulate.a = clampf(1.0 - t * 2.5, 0.0, 1.0)
+				title.visible = title.modulate.a > 0.0
 			player.position.y = lerpf(0.62, EYE_HEIGHT, ease(t, 0.45))
 			camera.rotation = Vector3(lerpf(-0.95, 0.0, ease(t, 0.5)), 0, lerpf(0.22, 0.0, ease(t, 0.5)))
 			camera.fov = lerpf(78.0, 74.0, t) + sin(clock * 2.4) * (1.0 - t) * 4.0
@@ -401,8 +455,115 @@ func _update_sequence(_delta: float) -> void:
 				pitch = 0.0
 
 
+## The drain leaves you hanging in an empty tank with the wires still in you.
+## Ending it is the first thing the player chooses to do.
+func _begin_wired() -> void:
+	phase = "wired"
+	clock = DRAINED_AT
+	wired_clock = 0.0
+	revenge_at = -1.0
+	yaw = 0.0
+	pitch = 0.5
+	# Drained, the body has sunk and the wires hang taut into its chest.
+	player.position.y = 0.95
+	for cable in umbilicals:
+		_route_umbilical(cable, player.position + Vector3(0, -0.38, 0), 0.2)
+	title.text = "END ALL SUFFERING"
+	title.modulate.a = 1.0
+	title.visible = true
+	subtitle.text = "The wires are still in you."
+	opening_audio.set_phase("wired")
+	WorldHistory.record_event("opening_wired", {"tank": "0C-7"})
+
+
+func _update_wired(delta: float) -> void:
+	jolt = maxf(0.0, jolt - delta * 3.0)
+	player.rotation.y = yaw
+	camera.rotation = Vector3(pitch, 0, sin(wired_clock * 41.0) * 0.06 * jolt)
+	camera.fov = 80.0 + jolt * 6.0
+	player.position.y = 0.95 + sin(wired_clock * 1.3) * 0.02
+	if revenge_at < 0.0:
+		# The title flickers like a readout that has been saying this for years.
+		title.modulate.a = 0.55 + 0.45 * absf(sin(wired_clock * 2.2 + sin(wired_clock * 13.0) * 0.4))
+		return
+	title.modulate.a = 1.0
+	if wired_clock - revenge_at >= REVENGE_HOLD:
+		_breach()
+
+
+## The wire nearest the centre of view, or null when none is being looked at.
+func _aimed_wire() -> Node3D:
+	var forward := -camera.global_transform.basis.z
+	var best: Node3D = null
+	var best_dot := 0.94
+	for cable in umbilicals:
+		for link in cable.get_children():
+			var to_link := ((link as Node3D).global_position - camera.global_position).normalized()
+			var dot := forward.dot(to_link)
+			if dot > best_dot:
+				best_dot = dot
+				best = cable
+	return best
+
+
+func _tug_wire(cable: Node3D) -> void:
+	if phase != "wired" or revenge_at >= 0.0 or cable == null or not umbilicals.has(cable):
+		return
+	var pulls := int(cable.get_meta("pulls", 0)) + 1
+	cable.set_meta("pulls", pulls)
+	jolt = 1.0
+	if pulls < WIRE_TUGS:
+		# It stretches toward you and holds. It is anchored in you, too.
+		anatomy.call("apply_hit", "torso", 3.0, 0.0, "blunt")
+		cable.position = (camera.global_position - cable.global_position).normalized() * 0.05 * pulls
+		opening_audio.cue("tug")
+		return
+	_rip_wire(cable)
+
+
+func _rip_wire(cable: Node3D) -> void:
+	umbilicals.erase(cable)
+	anatomy.call("apply_hit", "torso", 7.0, 0.0, "shear")
+	opening_audio.cue("rip")
+	# It comes out wet and whips back up toward its anchor.
+	var tween := create_tween()
+	tween.tween_property(cable, "position", Vector3(0, 1.6, 0), 0.35).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(cable, "scale", Vector3(0.3, 0.3, 0.3), 0.35)
+	tween.tween_callback(cable.queue_free)
+	for index in 7:
+		var drop := MeshInstance3D.new()
+		var mesh := SphereMesh.new()
+		mesh.radius = 0.02 + randf() * 0.025
+		mesh.height = mesh.radius * 2.0
+		mesh.material = WorldLook.surface(Color("5a1410") if index % 2 else Color("1f3a26"), "flesh", index)
+		drop.mesh = mesh
+		drop.position = camera.global_position + Vector3(randf_range(-0.2, 0.2), -0.25, randf_range(-0.2, 0.2))
+		add_child(drop)
+		var out := Vector3(randf_range(-1.0, 1.0), randf_range(0.2, 1.0), randf_range(-1.0, 1.0)).normalized()
+		glass_shards.append({"node": drop, "velocity": out * randf_range(1.2, 3.0), "life": 1.4})
+	WorldHistory.record_event("opening_wire_torn", {"remaining": umbilicals.size()})
+	if umbilicals.is_empty():
+		_all_wires_out()
+
+
+func _all_wires_out() -> void:
+	revenge_at = wired_clock
+	title.text = "GET REVENGE"
+	subtitle.text = ""
+	opening_audio.cue("revenge")
+	WorldHistory.update_subject("player", {
+		"wounds": ["tank scarring", "raw throat", "torn wire sockets"],
+		"memory": "Tore its own wires out in tank 0C-7 and came out of it wanting somebody to pay.",
+	}, "opening_wires_ripped")
+	WorldHistory.record_event("opening_wires_ripped", {"tank": "0C-7"})
+
+
 func _breach() -> void:
 	phase = "floor"
+	clock = maxf(clock, DRAINED_AT)
+	yaw = 0.0
+	pitch = 0.0
+	player.rotation.y = 0.0
 	opening_audio.cue("glass")
 	vat_glass.visible = false
 	fluid.visible = false
@@ -487,8 +648,16 @@ func _update_hud() -> void:
 	vitals.text = "BLOOD %d%%   PAIN %02d   %s" % [
 		roundi(float(snapshot.blood) / maxf(1.0, float(snapshot.blood_capacity)) * 100.0),
 		int(snapshot.pain),
-		"DECANTED",
+		"WIRED" if phase == "wired" else "DECANTED",
 	]
+	if phase == "wired":
+		if revenge_at >= 0.0:
+			prompt.text = ""
+		elif _aimed_wire() != null:
+			prompt.text = "[E] RIP IT OUT   %d LEFT" % umbilicals.size()
+		else:
+			prompt.text = "MOUSE LOOK   FIND THE WIRES   %d LEFT" % umbilicals.size()
+		return
 	if not can_move:
 		prompt.text = ""
 		return
