@@ -502,6 +502,31 @@ another account's organisation and could not be read from this one.
   minutes**: "furthering the tutorial and starting stage of the gameplay".
   Nothing in minutes 30–60 is started before minutes 0–30 are right.
 
+### Answered by Greg in question boxes, 24 September 2026 (cloud session)
+
+- **Hollis's door wants tissue.** The breach ram cannot force the D-section
+  biometric door; only his hand, his body, removed anatomy or (later) an
+  implant spoof opens it.
+- **Hollis escalates.** Asked whether his gun should warn, wound or kill,
+  Greg picked all three; read here as an escalation: warning shots first,
+  wounds if you keep coming, and lethal once dying exists (then vat rebirth,
+  and he remembers you). The current build does wounds only, floored at 25%.
+- **Rebirth: you wake in the vat of whoever claims you.** Whichever faction
+  holds your debt or your body at the time grows you back (CellOutz, a
+  rival, a cult), so where you wake depends on who owns you.
+- **Nothing carried survives death.** Gear, the gun and clothes stay where
+  you died, to be looted or recovered; the body resets. The character
+  preset, memories and the world's record of you carry over.
+- **Hollis's look:** placeholder now; fix clothing so garments actually
+  render on every rig (today they show only as a thin outline); a real
+  CellOutz security model later, one Greg provides or picks.
+- **Build order asked for: all of it.** Death as vat rebirth with the preset
+  saved; the opening's wires beat (END ALL SUFFERING, tear the umbilicals
+  out, GET REVENGE) ported onto the reworked vat; the lab's lighting and
+  floor light glitch; the VFX pack.
+- **Workflow:** merge each verified piece into `claude/dust-to-bones-look`,
+  and send a split-zip Windows build after each piece.
+
 Open: one of Hornee's eyes is a real drink brand's bottle cap with its
 wordmark. Keep it on the shipped model, or swap it for an in-world mark?
 
