@@ -20,6 +20,11 @@ signal arrived()
 ## ResourceLoader rather than on a fixed timer that knew nothing.
 const MIN_HOLD := 0.85
 const ANATOMY_FILM := preload("res://shaders/anatomy_film.gdshader")
+const PLATES := [
+	preload("res://art/plates/xray_plate_painted.png"),
+	preload("res://art/plates/xray_plate_ripple.png"),
+	preload("res://art/plates/xray_plate_twirl.png"),
+]
 const FADE := 0.36
 
 ## The plate used to be lit acid-green, which put the one screen standing
@@ -285,6 +290,15 @@ func _draw_plate() -> void:
 	# over it, which is the whole reason it is drawn first and dim rather than
 	# over the top at full strength.
 	_draw_seal(Vector2(size.x * 0.5, size.y * 0.47), minf(size.x, size.y) * 0.42)
+	# A painted plate of the same scan behind the live one: X-ray frames run
+	# through Photoshop's glow, glass, ripple and twirl filters (art/plates).
+	# One per destination, drifting, so the live film has a ghost behind it.
+	var plate := PLATES[posmod(_seal_seed, PLATES.size())] as Texture2D
+	if plate != null:
+		var drift := 1.06 + sin(clock * 0.21) * 0.05
+		var plate_size := Vector2(size.y * 0.9, size.y * 0.81) * drift
+		var plate_rect := Rect2(Vector2(size.x * 0.5, size.y * 0.47) - plate_size * 0.5 + Vector2(sin(clock * 0.13) * 14.0, 0.0), plate_size)
+		screen.draw_texture_rect(plate, plate_rect, false, Color(1, 1, 1, 0.34 * alpha))
 
 	# The scan itself, composited large and centred. Drawn additively over the
 	# void so the film reads as light coming through a body rather than as a
