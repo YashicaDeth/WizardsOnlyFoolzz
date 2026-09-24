@@ -781,6 +781,9 @@ we can make nudity and censors".
 - **The difficulty tiers are who you fight:** scavengers, hunters, Ashline
   captains, elites. Each has measured block, parry and feint rates, tuned so
   a skilled player can beat each tier. There is no menu setting.
+- **Anyone can block** (Greg, in answer to whether an enemy who hasn't
+  noticed you can defend): the tier decides it whether or not they are
+  aware. A fighter inside their own wind-up is always open.
 
 ## Influence register
 

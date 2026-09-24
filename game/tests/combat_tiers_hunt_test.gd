@@ -22,13 +22,20 @@ func _ready() -> void:
 	add_child(hunt)
 	hunt.set_physics_process(false)
 	await get_tree().physics_frame
+	hunt.third_person = true
+	hunt.lock_target = ""
 	var at: Vector3 = hunt.player + Vector3(0, -0.5, 2.0)
 	hunt._spawn_encounter_actor({"instance_id": "tier_elite", "kind": "hostile", "tier": "elite"}, at)
 	var elite: Dictionary = hunt.encounter_actors.back()
 	elite.node.position = at
 	check(str(elite.get("tier", "")) == "elite", "an encounter can name its tier")
-	hunt._spawn_encounter_actor({"instance_id": "plain_hostile", "kind": "hostile"}, at + Vector3(8, 0, 0))
+	hunt._spawn_encounter_actor({"instance_id": "plain_hostile", "kind": "hostile"}, at + Vector3(30, 0, 30))
 	check(str(hunt.encounter_actors.back().get("tier", "")) == "hunter", "an ordinary hostile fights as a hunter")
+	await get_tree().physics_frame
+	hunt.yaw = 0.0
+	hunt.pitch = 0.0
+	hunt._toggle_lock()
+	hunt.player_unseen = false
 	# The telegraph shows only once the wind-up passes the tier's point.
 	var cycle: float = hunt._actor_attack_cycle(elite)
 	elite["attack_side"] = "left"
@@ -38,7 +45,7 @@ func _ready() -> void:
 	check(mark == null or not mark.visible, "no telegraph early in an elite's wind-up")
 	hunt._show_telegraph(elite, elite.node, true)
 	mark = elite.get("telegraph_mark")
-	check(mark != null and mark.visible and mark.text == "LEFT", "the telegraph names the side (%s)" % (mark.text if mark else "none"))
+	check(mark != null and str(mark.text).contains("LEFT"), "the telegraph names the side (%s)" % (mark.text if mark else "none"))
 	# Mid-swing an elite is open: the blow lands every time.
 	elite["attack_time"] = cycle * 0.95
 	var wounds: int = elite.anatomy.wounds.size()
@@ -57,6 +64,7 @@ func _ready() -> void:
 	hunt._tick_fight(0.05)
 	check(hunt.fight_readout != null and hunt.fight_readout.visible and hunt.fight_readout.text.contains("FIGHT OVER"), "a quiet fight ends in a readout")
 	check(WorldHistory.event_count("fight_summarised") == 1, "and the world keeps it")
-	print(hunt.fight_readout.text)
+	if hunt.fight_readout != null:
+		print(hunt.fight_readout.text)
 	print("COMBAT_TIERS_HUNT_TEST_RESULT failures=%d" % failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

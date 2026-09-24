@@ -5951,23 +5951,23 @@ func _update_encounter_actors(delta: float) -> void:
 ## body-cam's REC: over the head for high, at the knees for low, and on your
 ## left or right of them for the sides. Tiers decide how early it shows.
 func _show_telegraph(actor: Dictionary, node: Node3D, on: bool) -> void:
-	var mark := actor.get("telegraph_mark") as Label3D
+	# On the HUD, pinned to where the fighter is on screen. A 3D label sat
+	# under the body-cam post effect, which paints over the transparent pass.
+	var mark := actor.get("telegraph_mark") as Label
 	if mark == null or not is_instance_valid(mark):
 		if not on:
 			return
-		mark = Label3D.new()
+		mark = Label.new()
 		mark.name = "Telegraph"
-		mark.font_size = 72
-		mark.outline_size = 14
-		mark.modulate = Color("ff3a26")
-		mark.outline_modulate = Color(0, 0, 0, 0.85)
-		mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		mark.no_depth_test = true
-		mark.pixel_size = 0.004
-		add_child(mark)
+		mark.add_theme_font_size_override("font_size", 30)
+		mark.add_theme_color_override("font_color", Color("ff3a26"))
+		mark.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+		mark.add_theme_constant_override("outline_size", 10)
+		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		$HUD.add_child(mark)
 		actor["telegraph_mark"] = mark
-	mark.visible = on
 	if not on:
+		mark.visible = false
 		return
 	var side := str(actor.get("attack_side", BladeRead.HIGH))
 	var toward := node.global_position - player
@@ -5976,19 +5976,26 @@ func _show_telegraph(actor: Dictionary, node: Node3D, on: bool) -> void:
 	var at := node.global_position + Vector3(0, 1.3, 0)
 	match side:
 		BladeRead.HIGH:
-			at = node.global_position + Vector3(0, 2.2, 0)
-			mark.text = "HIGH"
+			at = node.global_position + Vector3(0, 2.15, 0)
+			mark.text = "▼ HIGH"
 		BladeRead.LOW:
 			at = node.global_position + Vector3(0, 0.45, 0)
-			mark.text = "LOW"
+			mark.text = "▲ LOW"
 		BladeRead.LEFT:
-			at += -right * 0.6
-			mark.text = "LEFT"
+			at += -right * 0.55
+			mark.text = "LEFT ▶"
 		_:
-			at += right * 0.6
-			mark.text = "RIGHT"
-	mark.global_position = at
-	mark.modulate.a = 0.55 + 0.45 * absf(sin(Time.get_ticks_msec() * 0.012))
+			at += right * 0.55
+			mark.text = "◀ RIGHT"
+	var view := get_viewport().get_camera_3d()
+	if view == null or view.is_position_behind(at):
+		mark.visible = false
+		return
+	var screen := view.unproject_position(at)
+	mark.reset_size()
+	mark.position = screen - mark.size * 0.5
+	# A blink, so it reads as a warning and not as a name tag.
+	mark.visible = fmod(Time.get_ticks_msec() * 0.001, 0.5) < 0.36
 
 
 func _fight_active() -> void:
