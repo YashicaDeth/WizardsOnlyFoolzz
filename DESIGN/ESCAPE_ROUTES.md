@@ -62,6 +62,91 @@ Decided:
 - The tunnels lead to a **drain exit at a dried-up waterfall**, covered in
   blood and gore, with **rivers of blood and destroyed trees**.
 
+## The opening: END ALL SUFFERING
+
+> "as well as the main task of succerfing the words, END ALL SUFFERING in
+> massive celloutz style fontbloody and bony xray blobtrack dither
+> touchdesigner vfx and intense font animations that makes it move arond 4d
+> inverting going crazy and after that flashes then with your hands you rip
+> out all the wires in the bloody tank filled with bloody liquid filled with
+> gore and ect, make the liquid more red and make you gain access to your
+> hands and then as well ther text has like hakker celloutz.xyz code and
+> sigils breaking apart of the computer with the sigil rituals in the files
+> there are old sigil animation code for doing rituals remaster rthat with
+> the current gamedev skills and agent skills and insnane mengtoe and other
+> generation tools and plugins"
+
+Decided:
+
+- **The main task surfaces as the words END ALL SUFFERING**: massive, in the
+  CellOutz type, bloody and bony, with X-ray, blob-track, dither and
+  TouchDesigner-style VFX. The letters move in 4D, invert and go crazy, then
+  flash.
+- **Hacker text runs through it**: celloutz.xyz code and sigils breaking
+  apart, as if the computer itself is failing.
+- **Then your hands.** In a tank of bloody, gore-filled liquid, redder than
+  now, you rip every wire out with your own hands, and that is when you get
+  control of them.
+- **Remaster the old sigil ritual animations** in the project files with
+  current tools, agent skills and generation tools and plugins. ("mengtoe"
+  is not yet identified.)
+
+### The opening, continued (later the same day)
+
+> "and then you rip out the wires and cord in your mouth and smash the tank
+> and fall out on your knees then you get up get some ui cause of your brain
+> implant being hacked then get up off your knees and look at the locked door
+> which you want to kill him so another task flashes which is "get revenege"
+> in the similiar insane texdt font mission indicator big enouigh to make it
+> drmaaticv and insane ai i can replace with my custom art soon enough, and
+> then with this it seamlessly transitions into gameplay, with you having to
+> go through and down an actual elavator with an elvator and a door to
+> massive hallways that you can break the bingyangas and are tryingf to kill
+> and not alert the guards cause the cameras then film and track you a alarm
+> and alertness for the characters system which then has an animated
+> brainchip flash on there character model as well as blocktracking that you
+> see and dither or possibbly the k tone map or depth map like white xray
+> looking thing on the camera flashing on it for a seocnd, and thern more
+> guards begin piling out the ones that you would of seen later on, and they
+> try to kill you this unlocks the understandining of the blood based combat
+> point and blood fuel xp for weapon combattrees unlocking stuff like that
+> ect"
+
+Decided, in order:
+
+1. Rip out the wires, and the cord in your mouth.
+2. Smash the tank and fall out onto your knees.
+3. **UI appears because your brain implant has been hacked.** The HUD boots
+   as the implant is taken over.
+4. Get up off your knees and look at the locked door. You want to kill him:
+   **a second task, GET REVENGE, flashes** in the same insane type, big
+   enough to be dramatic. It is AI placeholder art that Greg will replace
+   with his own.
+5. It flows straight into play: **through his door and down a real
+   elevator** (a car with doors) to **massive hallways**.
+6. In the hallways you can **break the bingyangas out**, and you're trying
+   not to alert the guards, because **cameras film and track you**.
+7. **Alarm and alertness system.** An alerted character gets an animated
+   brain chip flashing on their model, with block tracking you can see, and
+   a dither or depth-map, white X-ray look flashes over the camera for a
+   second.
+8. **Then more guards pour out** (the ones you would have met later) and
+   try to kill you.
+9. **That fight teaches blood.** Blood-based combat points and blood-fuel
+   XP feed the weapon combat trees and unlock things.
+
+Answered by question box:
+
+- **The elevator is behind the doctor's door.** Revenge is the way on: break
+  his door, cross the examination room, take the elevator down to the
+  hallways. The chase runs through them to his vehicle bay.
+- **Hollis's biometric gate moves to the end of the hallways**, the last
+  checkpoint before the way out.
+- **Blood points come from everything:** kills, damage dealt, your own blood
+  lost, and finishers (which pay the most).
+- **Cameras:** break them (loud, but it stops the tracking), sneak through
+  their blind spots, or hack them later once the implant is rewritten.
+
 ## Assistant proposals, not confirmed
 
 - **The hologram is placeholder until the TouchDesigner piece exists.** The

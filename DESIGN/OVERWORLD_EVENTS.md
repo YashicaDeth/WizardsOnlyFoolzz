@@ -53,6 +53,22 @@ are not.
 - **How their spirits look:** animated as something like holograms, **not**
   rendered as models the way the characters are.
 
+### The monks and the main task (later the same day)
+
+> "they are splinters who think they have reached the final stage of
+> enlightemenet and spirtual ascension and are waiting to be freeed which is
+> apoart of the main task which is end all suffering which is the main task
+> which others spawn from your player choices at the start of the game
+> although playing the game makes them all eccessible not locked"
+
+- **The monks believe they have reached the final stage** of enlightenment
+  and spiritual ascension, and are waiting to be freed.
+- **Freeing them is part of the main task: END ALL SUFFERING.** Other tasks
+  spawn from it according to the player's choices at the start of the game,
+  but playing makes all of them accessible. None are locked.
+- The title moment and the wire-ripping that follow it are in
+  `DESIGN/ESCAPE_ROUTES.md` under "The opening: END ALL SUFFERING".
+
 ## Assistant proposals, not confirmed
 
 - **The reveal uses the exit data that already exists.** Every route in
