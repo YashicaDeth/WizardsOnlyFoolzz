@@ -159,9 +159,21 @@ var _rail_cache: Array = []
 var _dead_pixels: Array = []
 
 
+## Item 5 (Greg, 2026-09-24): the contract prints as a thermal receipt and the
+## Wire as continuous tractor-feed paper. Each is a ThermalPrint laid over the
+## panel, re-printing what the page draws underneath it.
+var _receipt: ThermalPrint
+var _feed: ThermalPrint
+
+
 func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	_receipt = ThermalPrint.make("register")
+	_feed = ThermalPrint.make("feed")
+	for paper in [_receipt, _feed]:
+		paper.visible = false
+		add_child(paper)
 	# Offsets as well as anchors. A Control parented straight to a CanvasLayer
 	# has no parent rect to inherit from, so anchors alone leave it at zero size
 	# and `_draw` bails on its own minimum-size guard without drawing anything.
@@ -280,6 +292,19 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	elapsed += delta
+	# Paper only once the page has fully arrived, so the slide-in stays a
+	# screen and the print lands on it.
+	var settled := page_blend >= 1.0 and open_blend >= 0.99
+	var panel := _panel_rect().grow(10.0)
+	if settled and page == 5:
+		_receipt.cover(Rect2(panel.position - Vector2(16, 0), panel.size + Vector2(32, 0)))
+	else:
+		_receipt.visible = false
+	if settled and page == 2:
+		# The sprocket margins sit outside the text, not over it.
+		_feed.cover(Rect2(panel.position - Vector2(30, 0), panel.size + Vector2(60, 0)))
+	else:
+		_feed.visible = false
 	action_life = maxf(0.0, action_life - delta)
 	page_blend = Motion.blend(page_blend, delta, Motion.PANEL, true)
 	_wire_glow = Motion.blend(_wire_glow, delta, Motion.PANEL, PAGES[page] == "WIRE")
