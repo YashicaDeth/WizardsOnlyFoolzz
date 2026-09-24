@@ -403,6 +403,15 @@ either is how this repository became hard to read.
   through a gate into GTA-style tunnels, out to a drain exit at a dried-up
   waterfall of blood and gore with destroyed trees. Both routes:
   `DESIGN/ESCAPE_ROUTES.md`.
+- **Arriving and exploring.** Every exit gets a real reveal: the camera
+  rises from where you came out, sweeps the overworld and marks the nearby
+  settlements. Hundreds of GTA/RDR2-style random events are generated from
+  written parts, each a mini cutscene that can become a quest, a trade or a
+  boss fight (a crazed driver, wizard monks casting hologram-like spirit
+  visions). The monks are a splinter of the wizardsonlyfoolz, dressed as
+  Orthodox monks in blood-stained, creased habits with destroyed sigils. An
+  in-game curiosity bot plays for hours to learn which exploration is the
+  most fun. See `DESIGN/OVERWORLD_EVENTS.md`.
 
 ## Influence register
 
