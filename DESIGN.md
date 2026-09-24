@@ -547,6 +547,14 @@ another account's organisation and could not be read from this one.
   (the breakout puddle). Fixed: a dark, wet puddle.
 - **Job posters and business cards wait** until minutes 0-30 work end to
   end; they live in the Hunt.
+- *Built 24 September (assistant choices, open to Greg):* the heat
+  elevator surfaces at the old vehicle-sallyport point the derby used; the
+  drain hatch sits on the Lower Works floor east of the lift; the drains are
+  laid out as the three districts `FacilityRoutes` already named for the
+  maintenance ascent (waste gallery, maintenance cistern, storm outfall) and
+  surface where that route always said (west of the start), carrying its
+  relationship changes (Gate Lanterns up, CellOutz down). Nothing threatens
+  the player in the drains yet.
 
 Open: one of Hornee's eyes is a real drink brand's bottle cap with its
 wordmark. Keep it on the shipped model, or swap it for an in-world mark?
