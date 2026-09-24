@@ -1,0 +1,927 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wizards Only Fools</title>
+<meta name="description" content="Wizards Only Fools: a playable demo of the first thirty minutes, preview builds, gameplay footage, roadmap, and a public board for bugs, feedback and art.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;700;900&family=Archivo:wght@400;500;600&family=Courier+Prime:wght@400;700&display=swap">
+
+<style>
+/* WizardsOnlyFoolz — the Ascent side of the same world CellOutz sells out of.
+   It deliberately keeps CellOutz's catalogue grammar: one masthead, one
+   rule, numbered records, hard-edged panels. The inversion is optical rather
+   than structural: an icy hollow signal bleeds in from the right while the
+   CellOutz red plate survives at the left edge. It is the same interface seen
+   through a blown-out negative, not a second unrelated site.
+
+   SWAP POINTS, all marked with [SWAP]:
+     - .switch a[href] — points at wizardsonlyfoolz.net once that domain
+       exists; today it silently falls back to itself, which is correct
+       behaviour for a link with nowhere real to go yet.
+     - #discord-embed — needs a real Discord server ID (see comment there).
+     - The community codex uses the public GitHub Issues board for this
+       repository. Reading is anonymous; creating a thread uses GitHub's own
+       sign-in and form, so this page never handles a player's credentials.
+    No payments or personal data are collected on this page. */
+
+:root {
+  --void:      #03070d;
+  --case:      #07131d;
+  --case-hi:   #0c202b;
+  --bone:      #eaf9ff;
+  --pale:      #e8f8ff;
+  --pale-dim:  #96b9c7;
+  --frequency: #5be8ff;
+  --high:      #d9fbff;
+  --rule:      #1b4656;
+  --edge:      #2c7288;
+  --red:       #ff354b;
+  --red-deep:  #7f1127;
+  --blue-void: #061c2a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(ellipse 72% 104% at -14% 48%, rgba(159,9,37,.36), transparent 60%),
+    radial-gradient(ellipse 70% 110% at 114% 44%, rgba(15,203,255,.28), transparent 60%),
+    linear-gradient(90deg, #10060c 0%, var(--void) 43%, #03141f 61%, #02080e 100%);
+  color: var(--pale);
+  font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The reference's torn red/cyan plate separation, kept behind every live
+   word and control so the shared CellOutz UI stays readable. */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+body::before {
+  opacity: .78;
+  background:
+    linear-gradient(90deg, transparent 0 46.3%, rgba(255,53,75,.34) 47.2%, transparent 48.1%),
+    linear-gradient(90deg, transparent 0 50.2%, rgba(91,232,255,.42) 51.1%, transparent 52%),
+    repeating-linear-gradient(90deg, transparent 0 37px, rgba(91,232,255,.035) 38px 40px, transparent 41px 72px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 6px);
+  mix-blend-mode: screen;
+}
+body::after {
+  opacity: .52;
+  background:
+    radial-gradient(ellipse 30% 55% at 47% 44%, transparent 0 52%, rgba(255,53,75,.16) 53% 55%, transparent 57%),
+    radial-gradient(ellipse 35% 58% at 53% 44%, transparent 0 52%, rgba(91,232,255,.18) 53% 55%, transparent 57%);
+  filter: blur(1px);
+}
+
+.grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(217,251,255,.055) 1px, transparent 0),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.21) 0 1px, transparent 1px 3px);
+  background-size: 4px 4px, 100% 3px;
+  animation: drift 11s linear infinite;
+}
+@keyframes drift { to { background-position: 0 0, 0 60px; } }
+
+/* A slow aurora behind everything — the "higher frequency" the lore keeps
+   naming, never a spotlight, always at the edge of the frame. */
+.aurora {
+  position: fixed;
+  inset: -20%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 52% 54% at 9% 55%, rgba(255,35,64,.24), transparent 64%),
+    radial-gradient(ellipse 52% 60% at 88% 38%, rgba(74,230,255,.25), transparent 62%),
+    repeating-linear-gradient(112deg, transparent 0 25px, rgba(217,251,255,.035) 26px 28px, transparent 29px 58px);
+  filter: blur(2px);
+  animation: sway 22s ease-in-out infinite alternate;
+}
+@keyframes sway {
+  from { transform: translateY(-2%) rotate(0deg); }
+  to   { transform: translateY(2%) rotate(1.2deg); }
+}
+@media (prefers-reduced-motion: reduce) { .grain, .aurora { animation: none; } }
+
+.sheet {
+  position: relative;
+  z-index: 1;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 34px 30px 80px;
+}
+
+/* ---- switch: the bridge back to CellOutz ------------------------------- */
+
+.switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--pale-dim);
+  margin-bottom: 14px;
+}
+.switch a {
+  color: var(--frequency);
+  text-decoration: none;
+  border: 1px solid var(--edge);
+  padding: 6px 12px;
+  transition: background .12s linear, color .12s linear;
+}
+.switch a:hover, .switch a:focus-visible { background: var(--frequency); color: var(--void); }
+
+/* ---- masthead: the CellOutz frame, rendered as an exposed negative ------ */
+
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px 28px;
+  border-bottom: 2px solid var(--frequency);
+  padding: 8px 0 14px;
+  position: relative;
+}
+.masthead::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 31%;
+  height: 2px;
+  background: var(--red);
+  box-shadow: 7px 0 0 rgba(255,53,75,.34), 13px 0 0 rgba(91,232,255,.26);
+}
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 16px;
+}
+
+.mark {
+  width: clamp(62px, 9vw, 94px);
+  height: clamp(62px, 9vw, 94px);
+  flex: 0 0 auto;
+  overflow: visible;
+  filter: drop-shadow(-3px 0 0 rgba(255,53,75,.45)) drop-shadow(3px 0 0 rgba(91,232,255,.52));
+}
+.mark path {
+  fill: none;
+  stroke: var(--bone);
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mark .ring path { stroke: var(--frequency); }
+.mark .spine path { stroke: var(--bone); }
+.mark .spine path:nth-child(2), .mark .spine path:nth-child(4) { stroke: var(--red); }
+
+/* Every stroke is drawn once, in sequence — the ring first (the boundary a
+   seal like this always has one of), then the spine top to bottom. Lengths
+   are approximate per path; a slightly-wrong length just changes how far
+   through the draw the last visible segment sits, which reads as texture
+   rather than a bug. */
+.mark path {
+  stroke-dasharray: 900;
+  stroke-dashoffset: 900;
+  animation: draw 1.6s cubic-bezier(.3,.9,.2,1) forwards;
+}
+.mark .ring path:nth-child(1) { animation-delay: .05s; }
+.mark .ring path:nth-child(2) { animation-delay: .35s; }
+.mark .spine path:nth-child(1) { animation-delay: .75s; }
+.mark .spine path:nth-child(2) { animation-delay: .95s; }
+.mark .spine path:nth-child(3) { animation-delay: 1.05s; }
+.mark .spine path:nth-child(4) { animation-delay: 1.15s; }
+.mark .spine path:nth-child(5) { animation-delay: 1.25s; }
+.mark .spine path:nth-child(6) { animation-delay: 1.35s; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+
+/* The finished mark breathes very slightly — never spins, never pulses hard.
+   A seal that is *watching* rather than performing. */
+.mark { animation: settle 1.6s linear forwards; }
+.mark g.live { animation: breathe 7s ease-in-out 1.8s infinite; transform-origin: center; }
+@keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.018); } }
+@media (prefers-reduced-motion: reduce) {
+  .mark path { animation: none; stroke-dashoffset: 0; }
+  .mark g.live { animation: none; }
+}
+
+.wordwrap { overflow: hidden; min-width: 0; }
+.word {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-weight: 900;
+  font-size: clamp(34px, 6.2vw, 72px);
+  line-height: .8;
+  letter-spacing: -.005em;
+  margin: 0;
+  color: var(--pale);
+  display: flex;
+  justify-content: flex-start;
+  text-shadow: -2px 0 rgba(255,53,75,.72), 2px 0 rgba(91,232,255,.58);
+}
+.word span {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(.25em);
+  animation: rise .5s cubic-bezier(.2,.7,.2,1) forwards;
+}
+/* Staggered per letter, starting once the mark has mostly drawn itself. */
+.word span:nth-child(1)  { animation-delay: 1.55s; }
+.word span:nth-child(2)  { animation-delay: 1.60s; }
+.word span:nth-child(3)  { animation-delay: 1.65s; }
+.word span:nth-child(4)  { animation-delay: 1.70s; }
+.word span:nth-child(5)  { animation-delay: 1.75s; }
+.word span:nth-child(6)  { animation-delay: 1.80s; }
+.word span:nth-child(7)  { animation-delay: 1.85s; }
+.word span:nth-child(8)  { animation-delay: 1.90s; }
+.word span:nth-child(9)  { animation-delay: 1.95s; }
+.word span:nth-child(10) { animation-delay: 2.00s; }
+.word span:nth-child(11) { animation-delay: 2.05s; }
+.word span:nth-child(12) { animation-delay: 2.10s; }
+.word span:nth-child(13) { animation-delay: 2.15s; }
+.word span:nth-child(14) { animation-delay: 2.20s; }
+.word span:nth-child(15) { animation-delay: 2.25s; }
+.word span:nth-child(16) { animation-delay: 2.30s; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .word span { animation: none; opacity: 1; transform: none; } }
+
+.tagline {
+  margin: 8px 0 0;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 12px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--frequency);
+  opacity: 0;
+  animation: rise .6s ease-out 2.5s forwards;
+}
+@media (prefers-reduced-motion: reduce) { .tagline { animation: none; opacity: 1; } }
+
+.stamp {
+  margin: 0;
+  color: var(--pale-dim);
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  line-height: 1.55;
+  text-align: right;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.stamp b { color: var(--high); }
+.strapline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 12px 0 0;
+  color: var(--pale-dim);
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+.strapline span { white-space: nowrap; }
+@media (max-width: 620px) {
+  .masthead { align-items: flex-start; }
+  .stamp { text-align: left; white-space: normal; }
+  .word { font-size: clamp(37px, 11vw, 62px); }
+}
+
+/* ---- doctrine ----------------------------------------------------------- */
+
+.doctrine {
+  display: grid;
+  grid-template-columns: minmax(0,1.2fr) minmax(220px,.8fr);
+  gap: 30px;
+  margin-top: 40px;
+  padding-bottom: 38px;
+  border-bottom: 1px solid var(--rule);
+}
+@media (max-width: 780px) { .doctrine { grid-template-columns: 1fr; } }
+.eyebrow {
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--frequency);
+  margin: 0 0 10px;
+}
+.doctrine h2 {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-weight: 700;
+  font-size: clamp(28px, 4.4vw, 44px);
+  line-height: 1;
+  margin: 0 0 14px;
+}
+.doctrine p { margin: 0 0 14px; max-width: 60ch; color: var(--pale-dim); }
+.doctrine p.lede { color: var(--pale); font-size: 16.5px; }
+.card {
+  border: 1px solid var(--rule);
+  background: linear-gradient(110deg, rgba(255,53,75,.08), transparent 46%, rgba(91,232,255,.09)), var(--case);
+  padding: 20px;
+}
+.card h3 {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-size: 20px;
+  margin: 0 0 8px;
+}
+.card p { margin: 0; color: var(--pale-dim); font-size: 13.5px; }
+
+/* ---- community / bug codex ---------------------------------------------- */
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 50px 0 20px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+.section-head h3 {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-weight: 700;
+  font-size: 28px;
+  margin: 0;
+}
+.section-head .count {
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  color: var(--pale-dim);
+}
+
+.community {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+@media (max-width: 780px) { .community { grid-template-columns: 1fr; } }
+
+.panel {
+  border: 1px solid var(--rule);
+  background: linear-gradient(125deg, rgba(255,53,75,.055), transparent 45%, rgba(91,232,255,.075)), var(--case);
+  display: flex;
+  flex-direction: column;
+}
+.panel-head {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.panel:first-child .panel-head { border-left: 3px solid var(--red); }
+.panel:nth-child(2) .panel-head { border-left: 3px solid var(--frequency); }
+.panel-head h4 {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-size: 20px;
+  margin: 0;
+}
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--frequency);
+  box-shadow: 0 0 0 0 rgba(127,227,216,.6);
+  animation: ping 2.4s ease-out infinite;
+}
+@keyframes ping {
+  0%   { box-shadow: 0 0 0 0 rgba(127,227,216,.5); }
+  70%  { box-shadow: 0 0 0 8px rgba(127,227,216,0); }
+  100% { box-shadow: 0 0 0 0 rgba(127,227,216,0); }
+}
+.panel-body { padding: 18px; flex: 1; }
+.panel-body p { margin: 0 0 12px; color: var(--pale-dim); font-size: 13.5px; }
+
+.embed-slot {
+  border: 1px dashed var(--edge);
+  background: var(--case-hi);
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: var(--pale-dim);
+}
+.embed-slot code {
+  display: block;
+  margin-top: 8px;
+  color: var(--frequency);
+  font-size: 10.5px;
+  word-break: break-word;
+}
+
+/* ---- community codex: a live, read-only relay from the real board ------- */
+
+.forum-status {
+  margin: 0 0 12px;
+  color: var(--pale-dim);
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.forum-list {
+  display: grid;
+  gap: 8px;
+}
+.forum-entry {
+  display: block;
+  border: 1px solid var(--rule);
+  background: rgba(7,8,11,.32);
+  color: var(--pale);
+  padding: 11px 12px;
+  text-decoration: none;
+  transition: border-color .12s linear, background .12s linear;
+}
+.forum-entry:hover, .forum-entry:focus-visible {
+  border-color: var(--frequency);
+  background: rgba(127,227,216,.07);
+}
+.forum-entry-title {
+  display: block;
+  color: var(--pale);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.forum-entry-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+  margin-top: 5px;
+  color: var(--pale-dim);
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.forum-label {
+  color: var(--frequency);
+}
+.forum-empty {
+  margin: 0;
+  color: var(--pale-dim);
+  font-size: 13px;
+}
+.forum-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.cta.secondary {
+  background: transparent;
+  border-color: var(--edge);
+  color: var(--pale);
+}
+.cta.secondary:hover, .cta.secondary:focus-visible {
+  background: var(--case-hi);
+  border-color: var(--frequency);
+  color: var(--frequency);
+}
+
+.cta {
+  display: inline-block;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--void);
+  background: var(--frequency);
+  padding: 9px 16px;
+  border: 1px solid var(--frequency);
+  transition: background .12s linear, color .12s linear;
+}
+.cta:hover, .cta:focus-visible { background: var(--high); border-color: var(--high); }
+.cta.ghost { background: transparent; color: var(--frequency); }
+.cta.ghost:hover, .cta.ghost:focus-visible { background: var(--frequency); color: var(--void); }
+
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.tag {
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border: 1px solid var(--edge);
+  color: var(--pale-dim);
+}
+
+footer {
+  margin-top: 54px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 14px 30px;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--pale-dim);
+}
+footer a { color: var(--frequency); }
+/* ---- demo site additions (wizardsonlyfoolz.net) ------------------------ */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0,1.25fr) minmax(260px,.75fr);
+  gap: 30px;
+  margin-top: 36px;
+  padding-bottom: 36px;
+  border-bottom: 1px solid var(--rule);
+}
+@media (max-width: 780px) { .hero { grid-template-columns: 1fr; } }
+.hero h2 {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-weight: 900;
+  font-size: clamp(32px, 5vw, 54px);
+  line-height: .95;
+  margin: 0 0 14px;
+  text-shadow: -2px 0 rgba(255,53,75,.55), 2px 0 rgba(91,232,255,.45);
+}
+.hero p { margin: 0 0 14px; max-width: 60ch; color: var(--pale-dim); }
+.hero p.lede { color: var(--pale); font-size: 16.5px; }
+.download {
+  border: 1px solid var(--edge);
+  background: linear-gradient(160deg, rgba(91,232,255,.10), transparent 60%), var(--case);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.download .cta.big { font-size: 14px; padding: 16px 18px; text-align: center; }
+.download .version { font-family: "Courier Prime", monospace; font-size: 12px; color: var(--high); letter-spacing: .06em; }
+.download small { color: var(--pale-dim); font-size: 12px; line-height: 1.5; }
+.download ol { margin: 0; padding-left: 18px; color: var(--pale-dim); font-size: 12.5px; }
+.previews { list-style: none; margin: 4px 0 0; padding: 0; font-family: "Courier Prime", monospace; font-size: 11.5px; }
+.previews li { border-top: 1px solid var(--rule); padding: 6px 0; display: flex; justify-content: space-between; gap: 10px; }
+.previews a { color: var(--frequency); text-decoration: none; }
+.reel { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+.reel figure { margin: 0; border: 1px solid var(--rule); background: var(--case); }
+.reel video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; object-fit: cover; }
+.reel figcaption { padding: 10px 14px; font-size: 13px; color: var(--pale-dim); }
+.reel figcaption b { color: var(--pale); font-family: "Big Shoulders Display", Impact, sans-serif; font-size: 17px; display: block; }
+.beats { counter-reset: beat; list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.beats li { counter-increment: beat; border: 1px solid var(--rule); background: var(--case); padding: 14px 14px 14px 52px; position: relative; font-size: 13.5px; color: var(--pale-dim); }
+.beats li::before { content: counter(beat, decimal-leading-zero); position: absolute; left: 14px; top: 12px; font-family: "Big Shoulders Display", Impact, sans-serif; font-weight: 900; font-size: 24px; color: var(--frequency); }
+.beats li b { color: var(--pale); display: block; }
+.roadmap { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.roadmap .col { border: 1px solid var(--rule); background: var(--case); }
+.roadmap h4 { margin: 0; padding: 10px 14px; font-family: "Courier Prime", monospace; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; border-bottom: 1px solid var(--rule); }
+.roadmap .done h4 { color: var(--frequency); border-left: 3px solid var(--frequency); }
+.roadmap .now h4 { color: var(--high); border-left: 3px solid var(--high); }
+.roadmap .next h4 { color: var(--red); border-left: 3px solid var(--red); }
+.roadmap .later h4 { color: var(--pale-dim); border-left: 3px solid var(--edge); }
+.roadmap ul { margin: 0; padding: 12px 14px 14px 30px; font-size: 13px; color: var(--pale-dim); }
+.roadmap li { margin-bottom: 6px; }
+.wanted { list-style: none; margin: 0 0 14px; padding: 0; }
+.wanted li { border-left: 2px solid var(--red); padding: 4px 0 4px 12px; margin-bottom: 8px; font-size: 13.5px; color: var(--pale-dim); }
+.wanted li b { color: var(--pale); }
+</style>
+
+<div class="grain" aria-hidden="true"></div>
+<div class="aurora" aria-hidden="true"></div>
+
+<div class="sheet">
+
+  <nav class="switch">
+    <span>PLAYTEST DEMO · PREVIEW BUILDS · FEEDBACK</span>
+    <a href="https://celloutz.xyz/forum.html">↺ CELLOUTZ.XYZ FORUM</a>
+  </nav>
+
+  <header class="masthead">
+    <div class="brand-lockup">
+      <svg class="mark" viewBox="0 0 300 300" role="img" aria-label="The WizardsOnlyFoolz mark">
+        <g class="live">
+          <g class="ring">
+            <path d="M 124.12 53.41 A 100 100 0 0 1 248.48 132.64" />
+            <path d="M 248.48 167.36 A 100 100 0 1 1 92.64 68.08" />
+          </g>
+          <g class="spine">
+            <path d="M 150 150 L 150 210" />
+            <path d="M 150 150 L 108 90" />
+            <path d="M 150 150 L 192 90" />
+            <path d="M 150 150 L 122 168" />
+            <path d="M 150 150 L 118 192" />
+            <path d="M 150 150 L 182 192" />
+          </g>
+        </g>
+      </svg>
+      <div class="wordwrap">
+        <p class="word" aria-label="WIZARDSONLYFOOLZ">
+          <span>W</span><span>I</span><span>Z</span><span>A</span><span>R</span><span>D</span><span>S</span><span>O</span><span>N</span><span>L</span><span>Y</span><span>F</span><span>O</span><span>O</span><span>L</span><span>Z</span>
+        </p>
+        <p class="tagline">Wizards Only Fools · playable demo</p>
+      </div>
+    </div>
+    <p class="stamp"><b>Demo: minutes 0-30</b><br>Platform: Windows<br>Board: open</p>
+  </header>
+  <p class="strapline"><span>◈ <a href="#demo" style="color:inherit">Download</a></span><span>◈ <a href="#footage" style="color:inherit">Footage</a></span><span>◈ <a href="#roadmap" style="color:inherit">Roadmap</a></span><span>◈ <a href="#feedback" style="color:inherit">Bugs, feedback &amp; art</a></span></p>
+
+  <section class="hero" id="demo">
+    <div>
+      <p class="eyebrow">Playable demo · Windows</p>
+      <h2>You wake up in a vat. Somebody owns you. Get out.</h2>
+      <p class="lede">Wizards Only Fools is a first-person body-horror escape
+        and survival game by Greg. The demo is the first thirty minutes: you
+        get grown, examined, and filed in a CellOutz tank, then you tear out
+        your own wires and fight or talk your way up through the facility
+        to the surface.</p>
+      <p>Every build here is a playtest build. Things will break. Tell us
+        when they do: the board below goes straight to the people building
+        it.</p>
+    </div>
+    <aside class="download" aria-live="polite">
+      <a class="cta big" id="download-link" href="https://github.com/YashicaDeth/WizardsOnlyFoolzz/releases/latest">Download the demo</a>
+      <span class="version" id="download-version">Latest build · checking…</span>
+      <ol>
+        <li>Unzip the download (right-click → Extract All).</li>
+        <li>Double-click <b>WizardsOnlyFools.exe</b>.</li>
+        <li>If Windows warns you: <b>More info → Run anyway</b>. The build is not code-signed yet.</li>
+      </ol>
+      <small>WASD to move, mouse to look, E to use. The body-cam HUD shows every other key next to the thing it works on.</small>
+      <p class="eyebrow" style="margin:6px 0 0">Preview builds</p>
+      <ul class="previews" id="preview-list"><li><span>Loading build history…</span></li></ul>
+    </aside>
+  </section>
+
+  <div class="section-head" id="footage">
+    <h3>Gameplay footage</h3>
+    <span class="count">recorded in the engine · nothing staged</span>
+  </div>
+  <div class="reel">
+    <figure>
+      <video src="media/hunt_trailer.mp4" controls muted playsinline preload="metadata"></video>
+      <figcaption><b>The Hunt</b>The overworld you surface into: lock on, the clinch, downed not dead, and the kill cam reading the real body. Every beat is driven by the same code your keys call.</figcaption>
+    </figure>
+    <figure>
+      <video src="media/spine.mp4" controls muted loop playsinline preload="metadata"></video>
+      <figcaption><b>The cybernetic spine</b>Your vitals HUD: 33 vertebrae in machined housings. The fibre-optic cord is your stamina; lose health and the column tears apart from the bottom.</figcaption>
+    </figure>
+  </div>
+
+  <div class="section-head" id="first-thirty">
+    <h3>What's in the demo</h3>
+    <span class="count">the first thirty minutes</span>
+  </div>
+  <ol class="beats">
+    <li><b>The intake</b>The examiner reads you your file, one receipt at a time. Your answers are who you become.</li>
+    <li><b>The wires</b>END ALL SUFFERING. Tear the umbilicals out yourself, then GET REVENGE and break the glass.</li>
+    <li><b>The Growing Floor</b>Other tanks, other subjects. One of them is wearing clothes you could use.</li>
+    <li><b>Hollis and the door</b>A guard, a gun and a biometric lock that wants his hand. Coerce him or put him down.</li>
+    <li><b>Death is a vat</b>Die and you are regrown in whoever owns you now. Your gear stays on the old body.</li>
+    <li><b>Two ways up</b>Ride the heat elevator past the sentinel, or crawl the old drains with something that hunts by sound.</li>
+    <li><b>The surface</b>Come out over the Hunt: the overworld, its settlements, and everything that wants your blood.</li>
+  </ol>
+
+  <div class="section-head" id="roadmap">
+    <h3>Roadmap</h3>
+    <span class="count">updated with every build</span>
+  </div>
+  <div class="roadmap">
+    <div class="col done"><h4>Done</h4><ul>
+      <li>Vat, intake and the wires breakout</li>
+      <li>Hollis, the biometric door, his escalation</li>
+      <li>Death and rebirth in a claimant's vat</li>
+      <li>Heat elevator and drain routes to the surface</li>
+      <li>Body-cam HUD with pinned key prompts</li>
+    </ul></div>
+    <div class="col now"><h4>Now</h4><ul>
+      <li>The cybernetic spine: 33 vertebrae, fibre-optic stamina</li>
+      <li>Playtest feedback from this site</li>
+      <li>The intake examiner and his lip sync</li>
+    </ul></div>
+    <div class="col next"><h4>Next</h4><ul>
+      <li>Animated intake pages: ink, blood, metal, gears</li>
+      <li>Combat overhaul: swing any direction, a skill you can learn</li>
+      <li>Hollis gets a real model</li>
+    </ul></div>
+    <div class="col later"><h4>Later</h4><ul>
+      <li>Minutes 30 to 60: the tutorial and the first settlement</li>
+      <li>Job posters with tear-off tabs; business cards from people you meet</li>
+      <li>The Discord and the CellOutz forum</li>
+    </ul></div>
+  </div>
+
+  <div class="section-head" id="feedback">
+    <h3>Feedback, bugs and art</h3>
+    <span class="count">public board · anyone can read</span>
+  </div>
+
+  <div class="community">
+
+    <div class="panel">
+      <div class="panel-head">
+        <h4>Report a bug or leave feedback</h4>
+        <span class="live-dot" aria-hidden="true"></span>
+      </div>
+      <div class="panel-body">
+        <p>Say what you did, what you expected and what happened. Put the
+          build version from the download box in the report. A clip or a
+          screenshot is worth ten sentences.</p>
+        <div class="embed-slot" id="codex-embed" aria-live="polite" aria-busy="true">
+          <div style="width:min(100%, 520px)">
+            <p class="forum-status" id="forum-status">Tuning into the public board…</p>
+            <div class="forum-list" id="forum-list"></div>
+          </div>
+        </div>
+        <div class="forum-actions">
+          <a class="cta" href="https://github.com/YashicaDeth/WizardsOnlyFoolzz/issues/new?template=bug_report.yml" target="_blank" rel="noreferrer">Report a bug</a>
+          <a class="cta secondary" href="https://github.com/YashicaDeth/WizardsOnlyFoolzz/issues/new?template=community_thread.yml" target="_blank" rel="noreferrer">Give feedback</a>
+          <a class="cta secondary" href="https://github.com/YashicaDeth/WizardsOnlyFoolzz/issues" target="_blank" rel="noreferrer">Open the whole board</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h4>Art wanted · contact Greg</h4>
+        <span class="live-dot" aria-hidden="true"></span>
+      </div>
+      <div class="panel-body">
+        <p>The game prefers made things over generated ones. If you draw,
+          model, animate or make sound, this is what it needs right now:</p>
+        <ul class="wanted">
+          <li><b>A model for Hollis</b>, the facility guard: rigged, human, worn uniform.</li>
+          <li><b>Intake page animations</b>: ink, blood, metal plates and parts on gears (After Effects or Photoshop pieces are fine).</li>
+          <li><b>Anatomy plates</b> for the X-ray loading screen.</li>
+          <li><b>Posters and business cards</b> for the overworld's walls and its people.</li>
+        </ul>
+        <div class="forum-actions">
+          <a class="cta" href="https://github.com/YashicaDeth/WizardsOnlyFoolzz/issues/new?template=art_offer.yml" target="_blank" rel="noreferrer">Offer art</a>
+          <a class="cta secondary" href="https://github.com/YashicaDeth/WizardsOnlyFoolzz/issues/new?template=contact.yml" target="_blank" rel="noreferrer">Contact Greg</a>
+        </div>
+        <p style="margin-top:12px;font-size:12px">Messages go on the public board. Don't post anything private there; say you'd like to talk and Greg will reply.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    <div style="max-width:46ch">
+      <b>PLAYTEST BUILDS.</b> Nothing here is for sale. Reading the board
+      needs no account; posting opens GitHub's own form, so this site never
+      sees a password.
+    </div>
+    <div>
+      WIZARDS ONLY FOOLS · wizardsonlyfoolz.net<br>
+      Talk, chat and the Discord: <a href="https://celloutz.xyz/forum.html">celloutz.xyz forum</a>
+    </div>
+  </footer>
+</div>
+
+<script>
+/*
+  The public issue tracker is the community forum's source of truth.  This is
+  deliberately read-only in the page: submissions go through GitHub's forms,
+  where they are persistent, moderated, and usable by the people building the
+  game.  It also keeps this static site deployable without a hidden database.
+*/
+(() => {
+  const repository = "YashicaDeth/WizardsOnlyFoolzz";
+  const endpoint = `https://api.github.com/repos/${repository}/issues?state=open&sort=updated&direction=desc&per_page=8`;
+  const list = document.getElementById("forum-list");
+  const status = document.getElementById("forum-status");
+  const slot = document.getElementById("codex-embed");
+
+  const formatWhen = (isoDate) => {
+    const date = new Date(isoDate);
+    if (Number.isNaN(date.getTime())) return "updated recently";
+    return `updated ${new Intl.DateTimeFormat(undefined, {
+      month: "short", day: "numeric", year: "numeric"
+    }).format(date)}`;
+  };
+
+  const showMessage = (message) => {
+    list.replaceChildren();
+    const paragraph = document.createElement("p");
+    paragraph.className = "forum-empty";
+    paragraph.textContent = message;
+    list.append(paragraph);
+  };
+
+  const addThread = (issue) => {
+    const entry = document.createElement("a");
+    entry.className = "forum-entry";
+    entry.href = issue.html_url;
+    entry.target = "_blank";
+    entry.rel = "noreferrer";
+
+    const title = document.createElement("span");
+    title.className = "forum-entry-title";
+    title.textContent = issue.title || "Untitled signal";
+
+    const meta = document.createElement("span");
+    meta.className = "forum-entry-meta";
+    const number = document.createElement("span");
+    number.textContent = `thread #${issue.number}`;
+    const updated = document.createElement("span");
+    updated.textContent = formatWhen(issue.updated_at);
+    meta.append(number, updated);
+
+    (issue.labels || []).slice(0, 2).forEach((label) => {
+      const item = document.createElement("span");
+      item.className = "forum-label";
+      item.textContent = label.name;
+      meta.append(item);
+    });
+
+    entry.append(title, meta);
+    list.append(entry);
+  };
+
+  fetch(endpoint, { headers: { Accept: "application/vnd.github+json" } })
+    .then((response) => {
+      if (!response.ok) throw new Error(`Forum relay returned ${response.status}`);
+      return response.json();
+    })
+    .then((entries) => {
+      // The Issues API also returns pull requests. They are not community threads.
+      const threads = entries.filter((entry) => !entry.pull_request);
+      list.replaceChildren();
+      if (threads.length === 0) {
+        status.textContent = "Public board · no open threads yet";
+        showMessage("No open threads yet. Be the first: a bug, a note from your playtest, or an idea.");
+      } else {
+        status.textContent = `Public board · ${threads.length} latest thread${threads.length === 1 ? "" : "s"}`;
+        threads.forEach(addThread);
+      }
+    })
+    .catch(() => {
+      status.textContent = "Public board temporarily unavailable";
+      showMessage("The live relay could not load. You can still open the board or start a thread directly.");
+    })
+    .finally(() => slot.setAttribute("aria-busy", "false"));
+})();
+</script>
+
+<script>
+/* The download box reads GitHub Releases, so publishing a release with the
+   Windows zip attached is the whole deploy for a new build: the newest full
+   release becomes the Download button, and every release (pre-releases are
+   the previews) is listed underneath with its date. */
+(() => {
+  const repository = "YashicaDeth/WizardsOnlyFoolzz";
+  const link = document.getElementById("download-link");
+  const version = document.getElementById("download-version");
+  const previews = document.getElementById("preview-list");
+  const when = (iso) => new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(iso));
+  const zipOf = (release) => (release.assets || []).find((asset) => /\.zip$/i.test(asset.name));
+  fetch(`https://api.github.com/repos/${repository}/releases?per_page=6`, { headers: { Accept: "application/vnd.github+json" } })
+    .then((response) => { if (!response.ok) throw new Error(response.status); return response.json(); })
+    .then((releases) => {
+      const published = releases.filter((release) => !release.draft);
+      previews.replaceChildren();
+      if (published.length === 0) {
+        version.textContent = "First public build coming soon";
+        previews.innerHTML = "<li><span>No builds published yet</span></li>";
+        return;
+      }
+      const latest = published.find((release) => !release.prerelease && zipOf(release)) || published.find(zipOf) || published[0];
+      const asset = zipOf(latest);
+      link.href = asset ? asset.browser_download_url : latest.html_url;
+      version.textContent = `${latest.name || latest.tag_name} · ${when(latest.published_at)}${asset ? ` · ${(asset.size / 1048576).toFixed(0)} MB` : ""}`;
+      published.forEach((release) => {
+        const item = document.createElement("li");
+        const anchor = document.createElement("a");
+        anchor.href = release.html_url;
+        anchor.target = "_blank";
+        anchor.rel = "noreferrer";
+        anchor.textContent = `${release.prerelease ? "PREVIEW" : "BUILD"} · ${release.name || release.tag_name}`;
+        const date = document.createElement("span");
+        date.textContent = when(release.published_at);
+        item.append(anchor, date);
+        previews.append(item);
+      });
+    })
+    .catch(() => {
+      version.textContent = "Build list unavailable · the button opens the releases page";
+      previews.innerHTML = "<li><span>Could not reach GitHub</span></li>";
+    });
+})();
+</script>

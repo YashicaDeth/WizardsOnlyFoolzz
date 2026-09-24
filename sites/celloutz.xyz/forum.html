@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CellOutz Forum</title>
+<meta name="description" content="The CellOutz forum: feedback, bug reports and chat for Wizards Only Fools, and the way into the Discord.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;700;900&family=Archivo:wght@400;500;600&family=Courier+Prime:wght@400;700&display=swap">
+
+<style>
+/* CellOutz storefront — celloutz.xyz
+   Palette taken from the game: celloutz_hud.gd INK/COPPER/HOT/TEAL + the
+   biopunk contamination hues in ART-DIRECTION.md.
+
+   SWAP POINTS, all marked with [SWAP] below:
+     - every .buy href is "#" — point it at Gumroad / Shopify / itch / Steam
+     - prices and stock states are placeholder
+     - .proof margin stamp: delete that one element to ship for real
+   No payment details are collected on this page by design; checkout belongs
+   on a real processor's domain. */
+
+:root {
+  --tar:      #0d0907;
+  --case:     #16110d;
+  --case-hi:  #1f1913;
+  --bone:     #f1d2a3;
+  --bone-dim: #bfa585;
+  --bone-mid: #8d7962;
+  --copper:   #f06428;
+  --hot:      #ff2b18;
+  --rot:      #7d9b3c;
+  --edge:     #6d5a44;
+  --rule:     #3a2e23;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--tar);
+  color: var(--bone);
+  font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Substrate: halftone dots + toner banding + a slow CRT drift, all under the
+   data layer so live values stay high contrast. */
+.grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(241,210,163,.05) 1px, transparent 0),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px);
+  background-size: 4px 4px, 100% 3px;
+  animation: drift 9s linear infinite;
+}
+@keyframes drift { to { background-position: 0 0, 0 60px; } }
+@media (prefers-reduced-motion: reduce) { .grain { animation: none; } }
+
+.sheet {
+  position: relative;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 34px 30px 80px;
+}
+
+/* Registration marks: printer's crop marks in the margin. */
+.reg { position: absolute; width: 16px; height: 16px; opacity: .5; }
+.reg::before, .reg::after { content: ""; position: absolute; background: var(--copper); }
+.reg::before { left: 7px; top: 0; width: 1px; height: 16px; }
+.reg::after  { top: 7px; left: 0; height: 1px; width: 16px; }
+.reg.tl { left: 10px; top: 10px; } .reg.tr { right: 10px; top: 10px; }
+
+/* ---- switch: the bridge to WizardsOnlyFoolz ---------------------------- */
+
+.switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--bone-mid);
+  margin-bottom: 14px;
+}
+.switch a {
+  color: var(--rot);
+  text-decoration: none;
+  border: 1px solid var(--edge);
+  padding: 6px 12px;
+  transition: background .12s linear, color .12s linear;
+}
+.switch a:hover, .switch a:focus-visible { background: var(--rot); color: var(--tar); }
+
+/* ---- masthead ---------------------------------------------------------- */
+
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px 28px;
+  border-bottom: 2px solid var(--copper);
+  padding-bottom: 14px;
+}
+
+.wordmark {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-weight: 900;
+  font-size: clamp(56px, 12vw, 122px);
+  line-height: .82;
+  letter-spacing: -.015em;
+  margin: 0;
+  color: var(--bone);
+  text-wrap: balance;
+}
+/* Overprint: the copper rule and the fungal bloom cross and make a third
+   colour, the way two plates do when the registration is off. */
+.wordmark em {
+  font-style: normal;
+  color: var(--copper);
+  position: relative;
+}
+.wordmark em::after {
+  content: "";
+  position: absolute;
+  left: -2px; right: -2px; bottom: .14em;
+  height: .1em;
+  background: var(--rot);
+  mix-blend-mode: screen;
+  opacity: .75;
+}
+
+.stamp {
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--bone-mid);
+  text-align: right;
+  white-space: nowrap;
+}
+.stamp b { color: var(--bone-dim); font-weight: 700; }
+
+.strapline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 12px 0 0;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--bone-mid);
+}
+.strapline span { white-space: nowrap; }
+
+/* ---- thesis: the game -------------------------------------------------- */
+
+.thesis {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(240px, .85fr);
+  gap: 30px;
+  align-items: start;
+  margin-top: 40px;
+  padding-bottom: 38px;
+  border-bottom: 1px solid var(--rule);
+}
+@media (max-width: 780px) { .thesis { grid-template-columns: 1fr; } }
+
+.eyebrow {
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--copper);
+  margin: 0 0 10px;
+}
+
+.thesis h2 {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-weight: 700;
+  font-size: clamp(34px, 5.4vw, 58px);
+  line-height: .94;
+  margin: 0 0 14px;
+  text-wrap: balance;
+}
+
+.thesis p { margin: 0 0 14px; max-width: 58ch; color: var(--bone-dim); }
+.thesis p.lede { color: var(--bone); font-size: 17px; }
+
+/* Plate: the catalogue's illustration slot. Authored to the palette so a
+   missing asset reads as a deliberate blank, not a hole. [SWAP] drop an
+   <img> in here. */
+.plate {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background:
+    repeating-linear-gradient(-38deg, rgba(240,100,40,.07) 0 2px, transparent 2px 9px),
+    radial-gradient(ellipse at 42% 34%, #3a2415 0%, #140d09 72%);
+  border: 1px solid var(--rule);
+  overflow: hidden;
+}
+.plate::after {
+  content: attr(data-plate);
+  position: absolute;
+  left: 10px; bottom: 8px;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: .12em;
+  color: var(--edge);
+}
+.plate img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ---- catalogue --------------------------------------------------------- */
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 46px 0 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule);
+}
+.section-head h3 {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-weight: 700;
+  font-size: 30px;
+  letter-spacing: .02em;
+  margin: 0;
+}
+.section-head .count {
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  color: var(--bone-mid);
+}
+
+.catalogue { display: flex; flex-direction: column; }
+
+/* One object repeated: same edges, same baselines, the part number always
+   in the same place. */
+.item {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr) auto;
+  gap: 22px;
+  align-items: start;
+  padding: 22px 4px;
+  border-bottom: 1px solid var(--rule);
+}
+@media (max-width: 680px) {
+  .item { grid-template-columns: 76px minmax(0, 1fr); }
+  .item .order { grid-column: 1 / -1; justify-self: start; }
+}
+
+.item .thumb {
+  aspect-ratio: 1;
+  border: 1px solid var(--rule);
+  background:
+    repeating-linear-gradient(-38deg, rgba(240,100,40,.08) 0 2px, transparent 2px 8px),
+    radial-gradient(circle at 40% 34%, #352013 0%, #130c08 74%);
+}
+
+.sku {
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: .1em;
+  color: var(--copper);
+  margin: 0 0 4px;
+}
+
+.item h4 {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-weight: 700;
+  font-size: 25px;
+  line-height: 1.06;
+  margin: 0 0 6px;
+  letter-spacing: .01em;
+}
+
+.item p { margin: 0 0 8px; color: var(--bone-dim); max-width: 60ch; }
+
+.spec {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--bone-mid);
+  margin: 0;
+}
+
+.order { text-align: right; display: grid; gap: 8px; justify-items: end; }
+
+.price {
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-weight: 700;
+  font-size: 21px;
+  color: var(--bone);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.buy {
+  display: inline-block;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--tar);
+  background: var(--copper);
+  padding: 8px 16px;
+  border: 1px solid var(--copper);
+  transition: background .12s linear, color .12s linear;
+}
+.buy:hover, .buy:focus-visible { background: var(--bone); border-color: var(--bone); }
+.buy:focus-visible { outline: 2px solid var(--rot); outline-offset: 2px; }
+
+/* State encoded in form as well as words. */
+.buy.soon { background: transparent; color: var(--copper); }
+.buy.soon:hover, .buy.soon:focus-visible { background: var(--copper); color: var(--tar); }
+
+.chip {
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.chip.rot { color: var(--rot); }
+.chip.hot { color: var(--hot); }
+
+/* ---- archive ----------------------------------------------------------- */
+
+.archive {
+  margin-top: 52px;
+  padding: 28px;
+  background: var(--case);
+  border-left: 3px solid var(--rot);
+}
+.archive h3 {
+  font-family: "Big Shoulders Display", Impact, sans-serif;
+  font-weight: 900;
+  font-size: 36px;
+  margin: 0 0 10px;
+  letter-spacing: .02em;
+}
+.archive p { margin: 0 0 12px; color: var(--bone-dim); max-width: 64ch; }
+.archive a { color: var(--copper); }
+
+/* ---- footer ------------------------------------------------------------ */
+
+footer {
+  margin-top: 54px;
+  padding-top: 18px;
+  border-top: 2px solid var(--copper);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 14px 30px;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--bone-mid);
+}
+footer a { color: var(--bone-dim); }
+footer .terms { max-width: 46ch; }
+
+/* Annotation layer: someone else's handwriting in the margin. Delete this
+   element and its CSS to ship the real store. [SWAP] */
+.proof {
+  position: fixed;
+  right: -46px;
+  top: 46%;
+  transform: rotate(90deg);
+  transform-origin: center;
+  font-family: "Courier Prime", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: .26em;
+  text-transform: uppercase;
+  color: var(--hot);
+  opacity: .58;
+  pointer-events: none;
+  z-index: 10;
+}
+@media (max-width: 900px) { .proof { display: none; } }
+
+/* ---- forum (celloutz.xyz/forum.html) ----------------------------------- */
+.forum-intro { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(240px,.7fr); gap: 28px; margin: 34px 0 10px; }
+@media (max-width: 780px) { .forum-intro { grid-template-columns: 1fr; } }
+.forum-intro h2 { font-family: "Big Shoulders Display", Impact, sans-serif; font-weight: 900; font-size: clamp(30px, 4.8vw, 50px); line-height: .95; margin: 0 0 12px; }
+.forum-intro p { color: var(--bone-dim); max-width: 60ch; margin: 0 0 12px; }
+.discord { border: 1px solid var(--edge); background: var(--case); padding: 18px; }
+.discord h3 { font-family: "Big Shoulders Display", Impact, sans-serif; font-size: 22px; margin: 0 0 6px; }
+.discord p { font-size: 13.5px; }
+.btn { display: inline-block; font-family: "Courier Prime", monospace; font-weight: 700; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; text-decoration: none; color: var(--tar); background: var(--copper); border: 1px solid var(--copper); padding: 9px 14px; }
+.btn:hover, .btn:focus-visible { background: var(--bone); border-color: var(--bone); }
+.btn.ghost { background: transparent; color: var(--copper); }
+.btn.ghost:hover, .btn.ghost:focus-visible { background: var(--copper); color: var(--tar); }
+.btn[aria-disabled="true"] { opacity: .5; pointer-events: none; }
+.boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 18px; }
+.board { border: 1px solid var(--rule); background: var(--case); display: flex; flex-direction: column; }
+.board header { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--rule); border-left: 3px solid var(--copper); }
+.board.bugs header { border-left-color: var(--hot); }
+.board.chat header { border-left-color: var(--rot); }
+.board h4 { margin: 0; font-family: "Big Shoulders Display", Impact, sans-serif; font-size: 20px; letter-spacing: .02em; }
+.board .count { font-family: "Courier Prime", monospace; font-size: 11px; color: var(--bone-mid); }
+.board .blurb { padding: 10px 14px 0; margin: 0; font-size: 13px; color: var(--bone-dim); }
+.threads { list-style: none; margin: 0; padding: 8px 14px; flex: 1; min-height: 140px; }
+.threads li { border-top: 1px solid var(--rule); }
+.threads li:first-child { border-top: 0; }
+.threads a { display: block; padding: 8px 0; color: var(--bone); text-decoration: none; }
+.threads a:hover, .threads a:focus-visible { color: var(--copper); }
+.threads .meta { display: block; font-family: "Courier Prime", monospace; font-size: 10.5px; color: var(--bone-mid); letter-spacing: .05em; }
+.threads .empty { color: var(--bone-mid); font-size: 12.5px; padding: 10px 0; }
+.board .actions { padding: 12px 14px 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+</style>
+
+<div class="grain" aria-hidden="true"></div>
+
+<div class="sheet">
+  <span class="reg tl" aria-hidden="true"></span>
+  <span class="reg tr" aria-hidden="true"></span>
+
+  <nav class="switch">
+    <span>CELLOUTZ · PUBLIC FORUM</span>
+    <a href="https://wizardsonlyfoolz.net/">PLAY THE DEMO ↺</a>
+  </nav>
+
+  <header class="masthead">
+    <h1 class="wordmark">CELL<em>OUTZ</em></h1>
+    <div class="stamp">
+      FORM CZ&#8209;009&nbsp;/&nbsp;FORUM<br>
+      FEEDBACK · BUGS · CHAT<br>
+      <b>ALL POSTS WITNESSED</b>
+    </div>
+  </header>
+
+  <p class="strapline">
+    <span>Wizards Only Fools community</span>
+    <span>·</span>
+    <span>Read without an account</span>
+    <span>·</span>
+    <span>Post with GitHub</span>
+  </p>
+
+  <section class="forum-intro">
+    <div>
+      <p class="eyebrow">The forum</p>
+      <h2>Tell us what broke. Tell us what you want. Or just talk.</h2>
+      <p>Three boards, one for each kind of post. Anyone can read them. To
+        post, the button opens GitHub's own form, so nobody here ever sees
+        your password.</p>
+      <p>Playing the demo? Put the build version from the download page in
+        your bug report.</p>
+    </div>
+    <aside class="discord">
+      <h3>Discord</h3>
+      <p>Live chat and voice calls with the people making the game. The
+        server opens soon; this button will take you straight in.</p>
+      <!-- [SWAP] Replace href with the invite (https://discord.gg/...) and
+           remove aria-disabled once the server exists. -->
+      <a class="btn" id="discord-invite" href="#" aria-disabled="true">Discord · coming soon</a>
+    </aside>
+  </section>
+
+  <div class="boards">
+    <section class="board feedback" data-board="feedback">
+      <header><h4>Feedback</h4><span class="count" data-count>…</span></header>
+      <p class="blurb">Playtest notes, ideas, what felt good, what didn't.</p>
+      <ul class="threads" data-list><li class="empty">Loading…</li></ul>
+      <div class="actions">
+        <a class="btn" href="https://github.com/YashicaDeth/WizardsOnlyFoolzz/issues/new?template=community_thread.yml" target="_blank" rel="noreferrer">New feedback</a>
+      </div>
+    </section>
+    <section class="board bugs" data-board="bugs">
+      <header><h4>Bugs</h4><span class="count" data-count>…</span></header>
+      <p class="blurb">What you did, what you expected, what happened.</p>
+      <ul class="threads" data-list><li class="empty">Loading…</li></ul>
+      <div class="actions">
+        <a class="btn" href="https://github.com/YashicaDeth/WizardsOnlyFoolzz/issues/new?template=bug_report.yml" target="_blank" rel="noreferrer">Report a bug</a>
+      </div>
+    </section>
+    <section class="board chat" data-board="chat">
+      <header><h4>Chat</h4><span class="count" data-count>…</span></header>
+      <p class="blurb">The world, theories, clips, fan art, anything.</p>
+      <ul class="threads" data-list><li class="empty">Loading…</li></ul>
+      <div class="actions">
+        <a class="btn" href="https://github.com/YashicaDeth/WizardsOnlyFoolzz/issues/new?template=chat.yml" target="_blank" rel="noreferrer">Start a chat</a>
+      </div>
+    </section>
+  </div>
+
+  <p style="margin-top:14px"><a class="btn ghost" href="https://github.com/YashicaDeth/WizardsOnlyFoolzz/issues" target="_blank" rel="noreferrer">Open every thread</a></p>
+
+  <footer>
+    <div class="terms">
+      <b>HOUSE RULES.</b> Be decent. No private information in posts: the
+      boards are public. Spoilers go in Chat with a warning in the title.
+    </div>
+    <div>
+      CELLOUTZ · <a href="https://celloutz.xyz/">celloutz.xyz</a><br>
+      The demo, footage and roadmap: <a href="https://wizardsonlyfoolz.net/">wizardsonlyfoolz.net</a><br>
+      Created by Greg · HAKKER · YASHICADETH
+    </div>
+  </footer>
+</div>
+
+<script>
+/* The boards are the repository's public issues, sorted by the title prefix
+   each form sets ([BUG], [THREAD] or [FEEDBACK], [CHAT]), with labels as a
+   fallback. Read-only here: posting goes through GitHub's own forms. */
+(() => {
+  const repository = "YashicaDeth/WizardsOnlyFoolzz";
+  const boards = {};
+  document.querySelectorAll("[data-board]").forEach((node) => {
+    boards[node.dataset.board] = { list: node.querySelector("[data-list]"), count: node.querySelector("[data-count]"), threads: [] };
+  });
+  const boardOf = (issue) => {
+    const title = (issue.title || "").toUpperCase();
+    const labels = (issue.labels || []).map((label) => (label.name || "").toLowerCase());
+    if (title.startsWith("[BUG]") || labels.includes("bug")) return "bugs";
+    if (title.startsWith("[CHAT]") || labels.includes("chat")) return "chat";
+    if (title.startsWith("[THREAD]") || title.startsWith("[FEEDBACK]") || labels.includes("feedback")) return "feedback";
+    return null;
+  };
+  const when = (iso) => new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(iso));
+  const render = () => {
+    Object.values(boards).forEach((board) => {
+      board.list.replaceChildren();
+      board.count.textContent = `${board.threads.length} open`;
+      if (board.threads.length === 0) {
+        const empty = document.createElement("li");
+        empty.className = "empty";
+        empty.textContent = "Nothing here yet. Be the first.";
+        board.list.append(empty);
+        return;
+      }
+      board.threads.slice(0, 8).forEach((issue) => {
+        const item = document.createElement("li");
+        const anchor = document.createElement("a");
+        anchor.href = issue.html_url;
+        anchor.target = "_blank";
+        anchor.rel = "noreferrer";
+        anchor.textContent = (issue.title || "Untitled").replace(/^\[[A-Z]+\]:?\s*/, "");
+        const meta = document.createElement("span");
+        meta.className = "meta";
+        meta.textContent = `#${issue.number} · ${issue.comments} repl${issue.comments === 1 ? "y" : "ies"} · ${when(issue.updated_at)}`;
+        anchor.append(meta);
+        item.append(anchor);
+        board.list.append(item);
+      });
+    });
+  };
+  fetch(`https://api.github.com/repos/${repository}/issues?state=open&sort=updated&direction=desc&per_page=100`, { headers: { Accept: "application/vnd.github+json" } })
+    .then((response) => { if (!response.ok) throw new Error(response.status); return response.json(); })
+    .then((issues) => {
+      issues.filter((issue) => !issue.pull_request).forEach((issue) => {
+        const key = boardOf(issue);
+        if (key && boards[key]) boards[key].threads.push(issue);
+      });
+      render();
+    })
+    .catch(() => {
+      Object.values(boards).forEach((board) => {
+        board.count.textContent = "offline";
+        board.list.innerHTML = '<li class="empty">Could not reach the board. The buttons still work.</li>';
+      });
+    });
+})();
+</script>

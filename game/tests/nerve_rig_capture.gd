@@ -16,6 +16,9 @@ const PANEL := Vector2(380, 640)
 
 
 func _ready() -> void:
+	if "--reel" in OS.get_cmdline_user_args():
+		_reel()
+		return
 	var out_dir := "P:/GameDev/Temp"
 	var name := "nerve_rig"
 	for argument in OS.get_cmdline_user_args():
@@ -60,4 +63,41 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 	print("CAPTURED: ", path)
+	get_tree().quit()
+
+
+## For the movie writer: one rig, twice size, taking a beating and coming
+## back. `--write-movie clip.avi --fixed-fps 30 ... -- --reel`.
+func _reel() -> void:
+	get_window().size = Vector2i(1280, 720)
+	var back := ColorRect.new()
+	back.color = Color("101213")
+	back.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(back)
+	var holder := Control.new()
+	holder.size = Vector2(700, 440)
+	holder.scale = Vector2(1.55, 1.55)
+	holder.position = Vector2(-180, 8)
+	back.add_child(holder)
+	var rig := NerveRig.new()
+	holder.add_child(rig)
+	rig.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var state := {"health": 100.0, "blood": 1.0, "stamina": 100.0, "pain": 0.0, "consciousness": 100.0}
+	var beats := [
+		[45, {}],
+		[40, {"stamina": 25.0}],
+		[30, {"health": 62.0, "pain": 45.0, "blood": 0.8}],
+		[30, {"health": 30.0, "pain": 80.0, "blood": 0.5, "consciousness": 60.0}],
+		[60, {"stamina": 10.0}],
+		[90, {"health": 70.0, "pain": 20.0, "blood": 0.75, "stamina": 70.0, "consciousness": 95.0}],
+		[60, {"health": 100.0, "pain": 0.0, "blood": 1.0, "stamina": 100.0, "consciousness": 100.0}],
+	]
+	for beat in beats:
+		var target: Dictionary = beat[1]
+		var frames: int = beat[0]
+		for frame in frames:
+			for key in target:
+				state[key] = lerpf(float(state[key]), float(target[key]), 0.12)
+			rig.set_state(state)
+			await get_tree().process_frame
 	get_tree().quit()
