@@ -13,6 +13,14 @@ const CARD_AT := Vector3(-3.8, 0.95, -20.0)
 const WEAPON_AT := Vector3(3.8, 0.78, -11.5)
 const GATE_AT := Vector3(0, 0.0, -48.0)
 const EXIT_AT := Vector3(0, 0.0, -55.0)
+## AX route beat 5. Hollis's biometric door, across the artery between the
+## card and the pressure gate: both tools are behind you when you reach him.
+## Arch 7 stands at z = -29 and arch 8 at -33.5; the side labs sit at -25.7
+## and -34.7, so the wall at -31.5 touches none of them.
+const GUARD_POST_AT := Vector3(0, 0.0, -31.5)
+## His shots bleed you but, like the sentinel's below, do not finish you: the
+## death that would (rebirth in a vat) is not built yet.
+const BLOOD_FLOOR := 25.0
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -29,6 +37,10 @@ var weapon_taken := false
 var weapon_visual: Node3D
 var weapon_label: Label3D
 var lower_works_requested := false
+var guard_post: FacilityGuardPost
+var blood := 100.0
+var post_message := ""
+var post_message_timer := 0.0
 
 @onready var objective: Label = $HUD/Objective
 @onready var prompt: Label = $HUD/Prompt
@@ -38,6 +50,7 @@ func _ready() -> void:
 	$WorldEnvironment.environment = WorldLook.environment("ossuary")
 	_build_shell()
 	_build_landmarks()
+	_build_guard_post()
 	_build_player()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -172,6 +185,15 @@ func _build_landmarks() -> void:
 	gate_light.omni_range = 8.0
 	add_child(gate_light)
 
+func _build_guard_post() -> void:
+	guard_post = FacilityGuardPost.new()
+	guard_post.name = "GuardPost"
+	guard_post.position = GUARD_POST_AT
+	add_child(guard_post)
+	guard_post.build()
+	guard_post.shot.connect(func(damage: float) -> void: blood = maxf(BLOOD_FLOOR, blood - damage))
+
+
 func _slab(dimensions: Vector3, at: Vector3, _kind: String, _color: Color) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = at
@@ -203,7 +225,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and not event.echo and event.keycode == KEY_I:
 		inspect_held = event.pressed
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and weapon_taken:
-		_discharge_at_gate()
+		if not guard_post.strike(player.global_position):
+			_discharge_at_gate()
 
 
 var inspect_held := false
@@ -236,6 +259,8 @@ func _physics_process(delta: float) -> void:
 	# event was swallowed by the transition frame.
 	if card_taken and not gate_open and _flat_distance(GATE_AT) <= 4.4:
 		_open_gate()
+	guard_post.step(delta, player.global_position)
+	post_message_timer = maxf(0.0, post_message_timer - delta)
 	_update_hud()
 
 func _flat_distance(at: Vector3) -> float:
@@ -244,6 +269,11 @@ func _flat_distance(at: Vector3) -> float:
 	return delta.length()
 
 func _interact() -> void:
+	var said := guard_post.interact(player.global_position, weapon_taken)
+	if not said.is_empty():
+		post_message = said
+		post_message_timer = 2.4
+		return
 	if not card_taken and _flat_distance(CARD_AT) <= 2.3:
 		card_taken = true
 		card_visual.visible = false
@@ -297,11 +327,17 @@ func _record_pit_entry() -> void:
 	WorldHistory.commit_ledger_batch()
 
 func _update_hud() -> void:
-	vitals.text = "BLOOD 100%   PAIN 86   DECANTED"
-	objective.text = "OBJECTIVE\n" + ("FOLLOW THE HEAT" if gate_open else ("REACH THE PRESSURE GATE" if card_taken and weapon_taken else ("FIND THE BREACH TOOL" if not weapon_taken else "FIND THE ORANGE STAFF CARD")))
+	vitals.text = "BLOOD %d%%   PAIN 86   DECANTED" % roundi(blood)
+	var past_guard := "REACH THE PRESSURE GATE" if guard_post.door_open else "GET THROUGH THE D-SECTION DOOR"
+	objective.text = "OBJECTIVE\n" + ("FOLLOW THE HEAT" if gate_open else (past_guard if card_taken and weapon_taken else ("FIND THE BREACH TOOL" if not weapon_taken else "FIND THE ORANGE STAFF CARD")))
 	if weapon_taken:
 		vitals.text += "   BREACH TOOL // READY"
-	if inspect_held:
+	var post_prompt := guard_post.prompt_for(player.global_position, weapon_taken)
+	if post_message_timer > 0.0:
+		prompt.text = post_message
+	elif not post_prompt.is_empty() and not inspect_held:
+		prompt.text = post_prompt
+	elif inspect_held:
 		prompt.text = "BREACH TOOL // PNEUMATIC RAM, ONE CHARGE CANISTER // CLICK AT A LOCKED DOOR" if weapon_taken else "NOTHING IN HAND TO INSPECT"
 	elif not card_taken and _flat_distance(CARD_AT) <= 2.3:
 		prompt.text = "[E] TAKE STAFF ACCESS CARD"

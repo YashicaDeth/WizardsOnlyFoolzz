@@ -486,6 +486,14 @@ another account's organisation and could not be read from this one.
   first** (AX route beat 5, AX3.3–AX3.4). `BiometricBarrier` and
   `FacilityGuardLoadout` are written and tested and have no production
   caller. The honest opening death and the mosaic option wait.
+  - *Built 24 September (assistant placement, not yet Greg's call):* Hollis
+    stands at a biometric D-section door across the Service Arcade, between
+    the staff card and the pressure gate. With the ram at his chest he palms
+    the reader himself and drops the gun; rammed down (three swings), his
+    hand is dragged to the reader. Either way his gun goes into Carry with
+    three rounds. His shots bleed the player to 25% and no further until the
+    vat rebirth exists. Removing his hand waits on a blade. Open: where the
+    door should really sit, and whether the ram should be able to force it.
 - **Merge once verified.** Each look lane merges into this branch one at a
   time with the core suite re-run after every step, then this branch goes
   into `codex/primary`. Answers `rebuild-merge`.
