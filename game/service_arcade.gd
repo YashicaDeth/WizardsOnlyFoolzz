@@ -198,6 +198,29 @@ func _unhandled_input(event: InputEvent) -> void:
 		pitch = clampf(pitch - event.relative.y * 0.0024, -1.15, 0.95)
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		_interact()
+	# Greg (2026-09-24): the breach tool should be inspectable and should open
+	# doors, not only interrupt the sentinel further down.
+	if event is InputEventKey and not event.echo and event.keycode == KEY_I:
+		inspect_held = event.pressed
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and weapon_taken:
+		_discharge_at_gate()
+
+
+var inspect_held := false
+
+
+## The ram opens the pressure gate as well as the card does, louder. Recorded
+## as its own act, so the world can tell a forced gate from a keyed one.
+func _discharge_at_gate() -> bool:
+	if gate_open or _flat_distance(GATE_AT) > 3.6:
+		return false
+	WorldHistory.record_event("service_arcade_gate_breached", {"location": "service_arcade"})
+	_open_gate()
+	if weapon_visual != null and is_instance_valid(weapon_visual):
+		var kick := create_tween()
+		kick.tween_property(weapon_visual, "position:z", weapon_visual.position.z - 0.22, 0.05)
+		kick.tween_property(weapon_visual, "position:z", weapon_visual.position.z, 0.25)
+	return true
 
 func _physics_process(delta: float) -> void:
 	var input := Vector3(Input.get_axis("move_left", "move_right"), 0.0, Input.get_axis("move_forward", "move_back"))
@@ -278,13 +301,20 @@ func _update_hud() -> void:
 	objective.text = "OBJECTIVE\n" + ("FOLLOW THE HEAT" if gate_open else ("REACH THE PRESSURE GATE" if card_taken and weapon_taken else ("FIND THE BREACH TOOL" if not weapon_taken else "FIND THE ORANGE STAFF CARD")))
 	if weapon_taken:
 		vitals.text += "   BREACH TOOL // READY"
-	if not card_taken and _flat_distance(CARD_AT) <= 2.3:
+	if inspect_held:
+		prompt.text = "BREACH TOOL // PNEUMATIC RAM, ONE CHARGE CANISTER // CLICK AT A LOCKED DOOR" if weapon_taken else "NOTHING IN HAND TO INSPECT"
+	elif not card_taken and _flat_distance(CARD_AT) <= 2.3:
 		prompt.text = "[E] TAKE STAFF ACCESS CARD"
 	elif not gate_open and _flat_distance(GATE_AT) <= 3.2:
-		prompt.text = "[E] OPEN PRESSURE GATE" if card_taken else "PRESSURE GATE // STAFF CARD REQUIRED"
+		if card_taken:
+			prompt.text = "[E] OPEN PRESSURE GATE"
+		elif weapon_taken:
+			prompt.text = "[LMB] BREACH THE PRESSURE GATE   //   OR FIND THE STAFF CARD"
+		else:
+			prompt.text = "PRESSURE GATE // STAFF CARD REQUIRED"
 	elif gate_open and (_flat_distance(GATE_AT) <= 4.4 or _flat_distance(EXIT_AT) <= 3.0):
 		prompt.text = "[E] ENTER LOWER WORKS"
 	elif gate_open:
 		prompt.text = "PRESSURE GATE UNSEALED // MOVE THROUGH"
 	else:
-		prompt.text = "WASD MOVE   //   MOUSE LOOK   //   E INTERACT"
+		prompt.text = "WASD MOVE   //   MOUSE LOOK   //   E INTERACT" + ("   //   HOLD I INSPECT" if weapon_taken else "")

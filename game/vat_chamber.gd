@@ -1274,6 +1274,13 @@ func _update_hud() -> void:
 	if stuck_tank_opened and CLOTHING.worn("player") == "bare" and _near_first_objects():
 		prompt.text = "[E] TAKE THE CLOTHING OFF SUBJECT 0C-4"
 		return
+	# The door he left by: locked, and it says so (Greg, 2026-09-24: you should
+	# be able to interact with it). Staff access is found further on.
+	var to_staff := STAFF_DOOR_AT - player.global_position
+	to_staff.y = 0.0
+	if to_staff.length() <= 2.4:
+		prompt.text = "STAFF DOOR // SEALED BEHIND HIM // STAFF ACCESS REQUIRED"
+		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0
 	# HOLD I is only offered when something is in hand to look at.

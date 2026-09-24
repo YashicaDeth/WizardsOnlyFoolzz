@@ -35,5 +35,15 @@ func _ready() -> void:
 	arcade._interact()
 	check(arcade.lower_works_requested, "the opened gate's own control threshold carries the player onward instead of leaving them in the arcade")
 	arcade.queue_free()
+	# The breach tool opens the gate without the card (2026-09-24).
+	var forced: Variant = load("res://service_arcade.tscn").instantiate()
+	add_child(forced)
+	await get_tree().physics_frame
+	forced.weapon_taken = true
+	forced.player.global_position = forced.GATE_AT + Vector3(0, 0.9, 2.0)
+	check(forced._discharge_at_gate() and forced.gate_open, "the breach tool forces the pressure gate without the card")
+	check(WorldHistory.event_count("service_arcade_gate_breached") >= 1, "and a forced gate is recorded as forced")
+	forced.queue_free()
+
 	print("SERVICE_ARCADE_ROUTE_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
