@@ -80,24 +80,24 @@ it, it's rendered and looked at, it has a test, and it's merged and built
 - **ASK:** "Keep both publisher cards every launch, or only the first?"
 
 ### A3. The logo, re-animated (Greg: "reanimating the text and graphic of the actual game logo")
-- [ ] The real `wof_stacked.png` is the title, not a redraw.
-- [ ] **The seal assembles.** The Algiz seal's four arc segments slide in
+- [x] The real `wof_stacked.png` is the title, not a redraw (`logo_fx.gdshader`).
+- [x] **The seal assembles.** The Algiz seal's four arc segments slide in
       from off-centre, lock, and spark at each joint.
-- [ ] **Glitch in.** The wordmark arrives through RGB split and
+- [x] **Glitch in.** The wordmark arrives through RGB split and
       scan-slice tearing; the slices settle one by one.
-- [ ] **Burn reveal.** The letters burn in from noise with a hot ember edge,
+- [x] **Burn reveal.** The letters burn in from noise with a hot ember edge,
       not a fade.
-- [ ] **Rust breathing.** The letters' rust texture crawls slowly under a
+- [x] **Rust breathing.** The letters' rust texture crawls slowly under a
       moving noise, as if wet.
-- [ ] **The drips run.** The six blood drips under ONLY FOOLS lengthen, bead
+- [x] **The drips run.** The six blood drips under ONLY FOOLS lengthen, bead
       and fall, then re-form.
-- [ ] **Spikes flare.** The thorn spikes glint in a sweep of light that
+- [x] **Spikes flare.** The thorn spikes glint in a sweep of light that
       crosses the mark every few seconds.
-- [ ] **CRT and VHS.** Scanlines, a rolling bar, and a chromatic fringe,
+- [x] **CRT and VHS.** Scanlines, a rolling bar, and a chromatic fringe,
       held low enough that the name always reads.
-- [ ] **Heartbeat.** The whole mark pulses faintly with a heartbeat, and
+- [x] **Heartbeat.** The whole mark pulses faintly with a heartbeat, and
       the pulse sets the glitch intensity.
-- [ ] **Sparks and embers.** A few embers rise from the letters; sparks fly
+- [x] **Sparks and embers.** (sparks at the lock; rising embers still to do) A few embers rise from the letters; sparks fly
       when the seal locks.
 - [ ] **Sound.** A sub thump when the seal locks, a static crackle with the
       glitch, and a drip tick with each fall.
