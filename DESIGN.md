@@ -524,6 +524,13 @@ another account's organisation and could not be read from this one.
   saved; the opening's wires beat (END ALL SUFFERING, tear the umbilicals
   out, GET REVENGE) ported onto the reworked vat; the lab's lighting and
   floor light glitch; the VFX pack.
+- *Built 24 September (the wires beat):* the drain no longer breaks the glass.
+  The body hangs in the four umbilicals under END ALL SUFFERING while the
+  tank's clock stops; the player looks at a wire and presses E, and the third
+  tug tears it out (pain, blood, its own sound). GET REVENGE follows the last
+  wire, and then the glass goes. A regrown body goes through it too.
+  Assistant choices, open to Greg: three tugs per wire, and that neither title
+  has a speaker (CellOutz's slogan or the player's own impulse is undecided).
 - **Workflow:** merge each verified piece into `claude/dust-to-bones-look`,
   and send a split-zip Windows build after each piece.
 

@@ -104,6 +104,17 @@ func _ready() -> void:
 	while not opening.can_move and elapsed < HANDOFF_BUDGET:
 		await get_tree().physics_frame
 		elapsed += get_physics_process_delta_time()
+		# Hanging in the wires, the player looks at one and presses E.
+		if opening.phase == "wired" and not opening.umbilicals.is_empty():
+			var cable: Node3D = opening.umbilicals[0]
+			var aim: Vector3 = ((cable.get_child(3) as Node3D).global_position - opening.camera.global_position).normalized()
+			opening.yaw = atan2(-aim.x, -aim.z)
+			opening.pitch = asin(aim.y)
+			opening._update_wired(0.0)
+			var key := InputEventKey.new()
+			key.keycode = KEY_E
+			key.pressed = true
+			opening._unhandled_input(key)
 	check(opening.can_move, "one filing reaches free movement on the live route (%.1fs after filing)" % elapsed)
 
 	print("-- and what arrives is someone who can stand and walk --")

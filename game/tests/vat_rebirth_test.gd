@@ -99,6 +99,9 @@ func _ready() -> void:
 	vat.clock = 5.7
 	vat.phase = "voiding"
 	vat._update_sequence(0.05)
+	check(vat.phase == "wired", "a regrown body hangs in the wires too")
+	_tear_all_wires(vat)
+	vat._physics_process(vat.REVENGE_HOLD + 0.1)
 	check(vat.breakout_complete and not VatRebirth.is_pending(), "breaking out completes the rebirth")
 	check(str(WorldHistory.subject("player").get("status", "")) == "regrown", "the record says regrown, not decanted")
 	vat.queue_free()
@@ -133,3 +136,19 @@ func _ready() -> void:
 
 	print("VAT_REBIRTH_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+
+## Aims the real camera at each umbilical and pulls it the way a player does.
+func _tear_all_wires(vat) -> int:
+	var torn := 0
+	while not vat.umbilicals.is_empty() and torn < 8:
+		var cable: Node3D = vat.umbilicals[0]
+		var link: Node3D = cable.get_child(3)
+		var to_link: Vector3 = (link.global_position - vat.camera.global_position).normalized()
+		vat.yaw = atan2(-to_link.x, -to_link.z)
+		vat.pitch = asin(to_link.y)
+		vat._update_wired(0.0)
+		for tug in vat.WIRE_TUGS:
+			vat._tug_wire(vat._aimed_wire())
+		torn += 1
+	return torn

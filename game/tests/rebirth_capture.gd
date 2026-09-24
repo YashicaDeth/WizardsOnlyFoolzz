@@ -41,6 +41,10 @@ func _ready() -> void:
 	vat.clock = 5.7
 	vat.phase = "voiding"
 	vat._update_sequence(0.05)
+	while not vat.umbilicals.is_empty():
+		for _tug in vat.WIRE_TUGS:
+			vat._tug_wire(vat.umbilicals[0])
+	vat._physics_process(vat.REVENGE_HOLD + 0.1)
 	vat.queue_free()
 	await _hold(2)
 

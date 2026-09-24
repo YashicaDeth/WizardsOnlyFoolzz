@@ -47,7 +47,36 @@ func _ready() -> void:
 	opening._update_sequence(0.05)
 	check(opening.phase == "voiding", "the directed camera reaches the voiding beat")
 	check(opening.opening_audio.played_cues.has("drain"), "voiding has its own sound event")
-	opening._breach()
+
+	# The drain does not break the glass by itself. It leaves the body hanging
+	# in the wires under END ALL SUFFERING, and the player tears them out.
+	opening.clock = opening.DRAINED_AT
+	opening._update_sequence(0.05)
+	check(opening.phase == "wired", "a drained tank leaves the player hanging in the wires")
+	check(opening.title.visible and opening.title.text == "END ALL SUFFERING", "the wired beat opens under END ALL SUFFERING")
+	check(opening.umbilicals.size() == 4 and opening.vat_glass.visible and not opening.breakout_complete, "the wires are still in and the glass still holds")
+	var held_clock: float = opening.clock
+	opening._physics_process(3.0)
+	check(opening.clock == held_clock and opening.phase == "wired", "nothing moves on until the player acts")
+	var pain_before := float(opening.anatomy.call("snapshot").pain)
+	opening._tug_wire(null)
+	check(opening.umbilicals.size() == 4, "tugging at nothing pulls nothing out")
+	var first: Node3D = opening.umbilicals[0]
+	var aim: Vector3 = ((first.get_child(3) as Node3D).global_position - opening.camera.global_position).normalized()
+	opening.yaw = atan2(-aim.x, -aim.z)
+	opening.pitch = asin(aim.y)
+	opening._update_wired(0.0)
+	check(opening._aimed_wire() == first, "looking at a wire aims at it")
+	opening._tug_wire(first)
+	opening._tug_wire(first)
+	check(opening.umbilicals.has(first), "a wire holds until the last tug")
+	check(_tear_all_wires(opening) == 4 and opening.umbilicals.is_empty(), "all four wires come out, one at a time")
+	check(float(opening.anatomy.call("snapshot").pain) > pain_before, "tearing the wires out hurts")
+	check(opening.opening_audio.played_cues.has("tug") and opening.opening_audio.played_cues.has("rip"), "tugging and tearing have their own sound events")
+	check(opening.title.text == "GET REVENGE" and opening.opening_audio.played_cues.has("revenge"), "the last wire turns the screen to GET REVENGE")
+	check(opening.vat_glass.visible and not opening.breakout_complete, "GET REVENGE holds before the glass goes")
+	opening._physics_process(opening.REVENGE_HOLD + 0.1)
+	check(opening.phase == "floor" and not opening.vat_glass.visible, "the glass goes after GET REVENGE")
 	check(opening.opening_audio.played_cues.has("glass"), "the breach has its own sound event")
 	check(opening.breakout_complete and opening.first_acquisition_complete, "the soul/implant breakout completes instead of stalling in the vat")
 	check(OpeningDirector.reached("broke_free"), "breakout is persisted as an opening stage")
@@ -98,3 +127,19 @@ func _ready() -> void:
 
 	print("OPENING_DIRECTION_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+
+## Aims the real camera at each umbilical and pulls it the way a player does.
+func _tear_all_wires(vat) -> int:
+	var torn := 0
+	while not vat.umbilicals.is_empty() and torn < 8:
+		var cable: Node3D = vat.umbilicals[0]
+		var link: Node3D = cable.get_child(3)
+		var to_link: Vector3 = (link.global_position - vat.camera.global_position).normalized()
+		vat.yaw = atan2(-to_link.x, -to_link.z)
+		vat.pitch = asin(to_link.y)
+		vat._update_wired(0.0)
+		for tug in vat.WIRE_TUGS:
+			vat._tug_wire(vat._aimed_wire())
+		torn += 1
+	return torn
