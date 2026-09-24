@@ -63,14 +63,25 @@ func _ready() -> void:
 	check(WorldHistory.event_count("lower_works_sentinel_breached") == 1, "the direct encounter records its actual resolution")
 	combat_city.queue_free()
 
-	# Standing at the elevator you can see is enough to be offered the way down.
+	# The drain hatch: the second way out, down into the old drains.
+	city.player.global_position = city.DRAIN_AT + Vector3(0, 0.9, 1.0)
+	city._update_hud()
+	check(city.prompt.text.contains("OLD DRAINS"), "the drain hatch offers the old drains (%s)" % city.prompt.text)
+	city._interact()
+	check(city.drains_requested and WorldHistory.event_count("lower_works_drain_entered") == 1, "dropping through the hatch is recorded and heads for the drains")
+
+	# Greg, 24 September: the heat elevator goes up to the surface now; the
+	# derby is shelved as an exit.
 	city.player.global_position = city.LIFT_AT + Vector3(0, 0.9, 3.2)
 	city._update_hud()
-	check(city.prompt.text.contains("DESCEND"), "the elevator you can see offers the descent (%s)" % city.prompt.text)
-
-	city._record_pit_entry()
-	check(OpeningDirector.reached("entered_pit"), "the elevator handoff records the derby stage")
-	check(WorldHistory.event_count("lower_works_entered_pit") == 1, "and creates one attributable exit event")
+	check(city.prompt.text.contains("HEAT ELEVATOR UP"), "the elevator you can see offers the way up (%s)" % city.prompt.text)
+	city._interact()
+	check(city.lift_requested and OpeningDirector.reached("left_facility"), "riding it up leaves the facility")
+	check(not OpeningDirector.reached("entered_pit") or OpeningDirector.stage() == "left_facility", "without being racked for the derby")
+	var handoff := FacilityRoutes.pending_surface_handoff()
+	check(str(handoff.get("route_id", "")) == FacilityRoutes.ROUTE_HEAT_ELEVATOR and str(handoff.get("exit_id", "")) == "heat_elevator", "the route graph hands the Hunt the heat elevator's arrival")
+	check(str(OpeningDirector.resume_destination().scene) == "res://bone_yard_hunt.tscn", "a world that rode the lift resumes on the surface")
+	check(WorldHistory.event_count("lower_works_heat_elevator_ascended") == 1, "and the ascent is one attributable exit event")
 
 	print("LOWER_WORKS_ROUTE_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

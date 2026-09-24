@@ -10,11 +10,16 @@ const OPENING := preload("res://systems/opening_director.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const RIVAL_TACTICS := preload("res://systems/rival_tactics.gd")
 const LAB_DRESSING := preload("res://systems/lab_dressing.gd")
+const FACILITY_ROUTES := preload("res://systems/facility_routes.gd")
 
 const ENTRY := Vector3(0, 1.0, 16.0)
 const FUSE_AT := Vector3(11.2, 0.85, 1.8)
 const SHORTCUT_AT := Vector3(-10.2, 0.0, -8.0)
 const LIFT_AT := Vector3(0, 0.0, -38.0)
+## The second way out (Greg, 24 September): a hatch into the old drains, on
+## the open floor east of the lift, clear of the galleries and pipe racks.
+const DRAIN_AT := Vector3(9.0, 0.0, -35.0)
+const DRAIN_REACH := 2.4
 ## The trigger is the elevator you can see. It sat 9 m past the cage, at
 ## z -47, so standing at the lift and pressing E did nothing and the prompt
 ## never showed: the run ended here for Greg on first launch (2026-09-24).
@@ -102,6 +107,7 @@ func _ready() -> void:
 	_build_city_shell()
 	_build_gantry()
 	_build_landmark_lift()
+	_build_drain_hatch()
 	_build_fuse_branch()
 	_build_patrol()
 	_build_player()
@@ -386,6 +392,47 @@ func _build_hanging_cable(at: Vector3, seed: int) -> void:
 	add_child(cable)
 
 
+func _build_drain_hatch() -> void:
+	var frame := MeshInstance3D.new()
+	var frame_mesh := BoxMesh.new()
+	frame_mesh.size = Vector3(2.0, 0.08, 2.0)
+	frame_mesh.material = LabSurface.material("rust")
+	frame.mesh = frame_mesh
+	frame.position = DRAIN_AT + Vector3(0, 0.04, 0)
+	add_child(frame)
+	var hole := MeshInstance3D.new()
+	var hole_mesh := BoxMesh.new()
+	hole_mesh.size = Vector3(1.5, 0.09, 1.5)
+	var dark := StandardMaterial3D.new()
+	dark.albedo_color = Color("050605")
+	hole_mesh.material = dark
+	hole.mesh = hole_mesh
+	hole.position = DRAIN_AT + Vector3(0, 0.05, 0)
+	add_child(hole)
+	for bar in 5:
+		var rod := MeshInstance3D.new()
+		var rod_mesh := BoxMesh.new()
+		rod_mesh.size = Vector3(0.07, 0.06, 1.6)
+		rod_mesh.material = LabSurface.material("rust")
+		rod.mesh = rod_mesh
+		rod.position = DRAIN_AT + Vector3(-0.6 + float(bar) * 0.3, 0.11, 0)
+		add_child(rod)
+	var draft := OmniLight3D.new()
+	draft.position = DRAIN_AT + Vector3(0, 0.6, 0)
+	draft.light_color = Color("7fa07a")
+	draft.light_energy = 1.4
+	draft.omni_range = 4.0
+	add_child(draft)
+	var label := Label3D.new()
+	label.text = "OLD DRAIN // STORM OUTFALL"
+	label.font_size = 26
+	label.outline_size = 8
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.modulate = Color("b9c9a4")
+	label.position = DRAIN_AT + Vector3(0, 1.3, 0)
+	add_child(label)
+
+
 func _build_landmark_lift() -> void:
 	# The lift is visible from almost the whole district, so navigation is based
 	# on a real object instead of an arrow.
@@ -612,10 +659,11 @@ func _interact() -> void:
 		_disable_sentinel("relay_disabled")
 		WorldHistory.record_event("lower_works_shortcut_powered", {"location": "lower_works", "sentinel_relay": "disabled"})
 		return
+	if _flat_distance(DRAIN_AT) <= DRAIN_REACH:
+		_enter_drains()
+		return
 	if _flat_distance(EXIT_AT) <= 4.0 and fuse_taken:
-		_record_pit_entry()
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-		Interstitial.travel("res://underground_colosseum.tscn", "lower works elevator // the heat below is awake")
+		_ride_heat_elevator()
 
 
 func _discharge_breach_tool() -> void:
@@ -645,15 +693,40 @@ func _disable_sentinel(reason: String) -> void:
 		eye.light_energy = 0.35
 
 
-func _record_pit_entry() -> void:
-	if OPENING.reached("entered_pit"):
+var lift_requested := false
+var drains_requested := false
+
+
+## Greg, 24 September: with the derby shelved as an exit, the heat elevator
+## goes up, not down. It is a facility route like every other: the route
+## graph hands the Hunt its arrival point.
+func _ride_heat_elevator() -> void:
+	if lift_requested:
 		return
+	lift_requested = true
 	WorldHistory.begin_ledger_batch()
-	OPENING.advance("entered_pit")
-	FACILITY_TERRITORY.apply_event("opening_entered_pit")
-	WorldHistory.amend_subject("player", {"status": "racked for a heat"})
-	WorldHistory.record_event("lower_works_entered_pit", {"location": "lower_works"})
+	if str(FACILITY_ROUTES.ensure().get("active_route", "")) != FACILITY_ROUTES.ROUTE_HEAT_ELEVATOR:
+		FACILITY_ROUTES.begin(FACILITY_ROUTES.ROUTE_HEAT_ELEVATOR)
+	FACILITY_ROUTES.traverse("heat_elevator")
+	OPENING.advance("left_facility")
+	FACILITY_TERRITORY.apply_event("facility_surfaced")
+	WorldHistory.amend_subject("player", {"status": "up the heat elevator", "left_facility_by": "heat_elevator"})
+	WorldHistory.record_event("lower_works_heat_elevator_ascended", {"location": "lower_works"})
 	WorldHistory.commit_ledger_batch()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if OS.get_environment("ATG_TEST_MODE") != "1":
+		Interstitial.travel("res://bone_yard_hunt.tscn", "heat elevator // up into the ashbloom expanse")
+
+
+## The other way out: down into the old drains, which surface somewhere else.
+func _enter_drains() -> void:
+	if drains_requested:
+		return
+	drains_requested = true
+	WorldHistory.record_event("lower_works_drain_entered", {"location": "lower_works"})
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if OS.get_environment("ATG_TEST_MODE") != "1":
+		Interstitial.travel("res://old_drains.tscn", "old drain // follow the water out")
 
 
 func _update_hud() -> void:
@@ -664,8 +737,10 @@ func _update_hud() -> void:
 		prompt.text = "[E] TAKE LIFT FUSE"
 	elif fuse_taken and not shortcut_open and _flat_distance(SHORTCUT_AT) <= 3.0:
 		prompt.text = "[E] POWER SHORTCUT // DISABLE SENTINEL"
+	elif _flat_distance(DRAIN_AT) <= DRAIN_REACH:
+		prompt.text = "[E] DROP INTO THE OLD DRAINS"
 	elif fuse_taken and _flat_distance(EXIT_AT) <= 4.0:
-		prompt.text = "[E] DESCEND TO THE UNDERGROUND HEAT"
+		prompt.text = "[E] RIDE THE HEAT ELEVATOR UP"
 	elif breach_tool_ready and patrol_alert and not patrol_disabled:
 		prompt.text = "[LMB] DISCHARGE BREACH TOOL // INTERRUPT SENTINEL"
 	else:

@@ -155,7 +155,12 @@ func _ready() -> void:
 				queue.append(target)
 	check(seen.has(MUST_REACH),
 		"a stranger can reach the hunt from the front door (visited %d scenes)" % seen.size())
-	check(seen.has("res://underground_colosseum.tscn"), "by way of the underground tunnel derby")
+	# Greg, 24 September: the derby is shelved as an exit. The two routes out
+	# are the heat elevator (Lower Works straight to the Hunt) and the old
+	# drains, so the drains have to be on the walk and the colosseum no longer
+	# is. It still loads (above); it is simply not a way out any more.
+	check(seen.has("res://old_drains.tscn"), "by way of the old drains, the second route out")
+	check(_edges_from(_root_script_for("res://buried_city.tscn")).has(MUST_REACH), "and straight up the heat elevator from the Lower Works")
 	check(seen.has("res://vat_chamber.tscn"), "and the vat, on a fresh run")
 
 	# --- the way back out ----------------------------------------------------
