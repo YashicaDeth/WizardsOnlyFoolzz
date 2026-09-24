@@ -810,6 +810,16 @@ we can make nudity and censors".
   - Each move costs 60 blood (COMBO costs 90) and needs its tree's first
     node. The fight readout counts the moves you used.
 
+### Greg, 24 September 2026 (the examiner's placement)
+
+- **The examiner and his PC stood in the middle of the vat aisle.** Greg
+  asked for somewhere more realistic.
+- *Built (assistant's placement, open to Greg):* the workstation is a
+  monitoring post off the aisle, to the right-front of the tank, turned to
+  face it. The screen is the terminal aimed at the subject, which is what
+  the intake is shown on. He works it from the end of the desk, and walks
+  round its corner and past the tank to his door (`station_placement_test`).
+
 ## Influence register
 
 These entries describe what Greg said he values; proposed extraction is labelled. Liking a reference does not automatically import every mechanic from it.

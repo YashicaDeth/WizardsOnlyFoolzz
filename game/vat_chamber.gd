@@ -96,6 +96,15 @@ var breach_shake := 0.0
 ## way staff leave rather than walking the player's escape route. It is not the
 ## pit door at the far end and it is never openable by the player.
 const STAFF_DOOR_AT := Vector3(6.95, 0.0, -2.49)
+## Greg, 24 September: the examiner and his PC stood in the middle of the vat
+## aisle. The workstation is a monitoring post now, off the aisle to the
+## right-front of the tank and turned to face it: the screen is the
+## subject-facing terminal the intake is shown on, and he works it from the
+## end of the desk rather than standing inside it.
+const STATION_AT := Vector3(2.7, 0.0, -1.3)
+const STATION_YAW := -1.12
+const EXAMINER_AT_DESK := Vector3(-1.45, 0.0, 0.05)
+const EXAMINER_TURN := 0.6
 const DEPARTURE_SECONDS := 4.4
 
 ## AX3.1/AX3.6. The Growing Floor's first two objects: the broken restraint
@@ -277,8 +286,8 @@ func _on_intake_filed(_state: Dictionary) -> void:
 	# terminal even when its arrival beat was skipped.
 	if examiner_node != null:
 		examiner_node.visible = true
-		examiner_node.position.x = -0.16
-		examiner_node.rotation.y = 0.0
+		examiner_node.position = EXAMINER_AT_DESK
+		examiner_node.rotation.y = EXAMINER_TURN
 	phase = "departure"
 	# AP1.3/P10.5. Filing has already written the chosen anatomy by the time this
 	# signal arrives. Install the real head hardware now, while the player is
@@ -642,7 +651,8 @@ func _build_chamber() -> void:
 func _build_examination_station() -> void:
 	var station := Node3D.new()
 	station.name = "UnknownExaminerStation"
-	station.position = Vector3(0.0, 0.0, -2.65)
+	station.position = STATION_AT
+	station.rotation.y = STATION_YAW
 	add_child(station)
 
 	# A low medical desk between the vat and the doctor.
@@ -715,8 +725,9 @@ func _build_examination_station() -> void:
 	keyboard_mesh.size = Vector3(0.86, 0.045, 0.38)
 	keyboard_mesh.material = LabSurface.material("plate")
 	keyboard.mesh = keyboard_mesh
-	# Between the man and the screen, where a hand can actually reach it.
-	keyboard.position = Vector3(0.22, 0.915, 0.54)
+	# At his end of the desk, where his hands actually are.
+	keyboard.position = Vector3(-0.62, 0.915, 0.32)
+	keyboard.rotation.y = 0.35
 	station.add_child(keyboard)
 
 	# One examiner, anonymous and physically present.  He is shaped from the
@@ -729,7 +740,8 @@ func _build_examination_station() -> void:
 	# x -0.36..0.04 and the monitor starts at 0.07: adjacent, never overlapping.
 	# Greg, 21 September: "more to the left of the lap and not directly in
 	# front of it."
-	examiner.position = Vector3(-0.16, 0.0, 0.16)
+	examiner.position = EXAMINER_AT_DESK
+	examiner.rotation.y = EXAMINER_TURN
 	station.add_child(examiner)
 	examiner_node = examiner
 	# The same man the intake's live feed shows (ExaminerFeed): a BaselineHuman
@@ -999,10 +1011,12 @@ func _physics_process(delta: float) -> void:
 ## (`inbound`), or the reverse. `t` is 0..1 along the whole walk.
 func _examiner_path(t: float, inbound: bool) -> Vector3:
 	var door: Vector3 = DoctorRoute.DOOR_AT
+	# From the end of his desk, round its near corner, past the tank on its
+	# right and out through his door behind it.
 	var points: Array[Vector3] = [
 		examiner_post,
-		Vector3(1.9, examiner_post.y, examiner_post.z + 0.6),
-		Vector3(2.0, examiner_post.y, 1.4),
+		Vector3(1.25, examiner_post.y, -1.8),
+		Vector3(1.55, examiner_post.y, 0.2),
 		Vector3(door.x, examiner_post.y, door.z - 0.6),
 		Vector3(door.x, examiner_post.y, door.z + 0.9),
 	]
@@ -1038,7 +1052,7 @@ func _update_arrival(delta: float) -> void:
 	# attention changes before the UI arrives, which makes the intake a result
 	# of something he physically did in the room.
 	var turn := clampf((arrival_clock - 2.55) / 0.85, 0.0, 1.0)
-	examiner_node.rotation.y = lerpf(PI, 0.0, ease(turn, 0.55))
+	examiner_node.rotation.y = lerpf(PI, EXAMINER_TURN, ease(turn, 0.55))
 	if arrival_clock >= 0.70 and arrival_clock < 2.45:
 		subtitle.text = "EXAMINER // SUBJECT CONSCIOUS"
 	elif arrival_clock >= 3.15 and arrival_clock < 5.5:
@@ -1063,7 +1077,7 @@ func _update_departure(delta: float) -> void:
 	# the examiner hangs off the workstation node rather than off the chamber.
 	if examiner_node != null and is_instance_valid(examiner_node):
 		var turn := clampf(departure_clock / 0.50, 0.0, 1.0)
-		examiner_node.rotation.y = lerpf(0.0, -PI * 0.5, ease(turn, 0.6))
+		examiner_node.rotation.y = lerpf(EXAMINER_TURN, EXAMINER_TURN - PI * 0.5, ease(turn, 0.6))
 		var walk := clampf((departure_clock - 0.50) / 2.45, 0.0, 1.0)
 		examiner_node.global_position = _examiner_path(ease(walk, 0.85), false)
 		var heading := _examiner_path(minf(1.0, ease(walk, 0.85) + 0.05), false) - examiner_node.global_position
