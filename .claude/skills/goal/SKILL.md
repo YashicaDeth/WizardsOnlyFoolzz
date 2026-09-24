@@ -40,11 +40,9 @@ answers.
 - [x] **Hollis escalates**: one warning shot, then wounds, then lethal; after
       killing you he knows you ("You again") and skips the warning. Merged at
       `17557ec`.
-- [ ] **The opening's wires beat**: END ALL SUFFERING, the player tears the
-      umbilicals out, GET REVENGE, then the glass goes. A first version for the
-      old vat is commit `f461a93`; port it onto the reworked Growing Floor
-      (examiner departure, re-aimed umbilicals, `_record_breakout`) instead of
-      the automatic breach.
+- [x] **The opening's wires beat**: END ALL SUFFERING, the player tears the
+      umbilicals out (three tugs each), GET REVENGE, then the glass goes,
+      instead of the automatic breach. Merged at `e437d5c`.
 - [ ] **Clothing renders on every rig.** Garments from `ClothingShell` show only
       as a thin outline today, so a dressed body looks bare.
 - [ ] **The lab**: overall lighting and the light glitch on the floor.
