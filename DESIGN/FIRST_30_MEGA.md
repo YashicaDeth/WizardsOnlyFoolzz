@@ -194,7 +194,7 @@ it, it's rendered and looked at, it has a test, and it's merged and built
 - [ ] Resume, settings, the controls sheet, save and quit, quit to the
       title.
 - [ ] Pausing freezes the world, but the body-cam REC keeps blinking.
-- [ ] The pause menu has the same stencil and glitch style as the title.
+- [x] The pause menu has the same stencil and glitch style as the title: the live seal, blood under the chosen row, a tear on open and on each new page, a tick per move (`pause_gate.gd`).
 
 ## C. The intake (minutes 0-4)
 

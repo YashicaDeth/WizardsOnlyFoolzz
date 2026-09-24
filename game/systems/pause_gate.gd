@@ -17,6 +17,7 @@ extends CanvasLayer
 const SETTINGS_ID := "settings"
 const Grunge := preload("res://systems/celloutz_grunge.gd")
 const Motion := preload("res://systems/celloutz_motion.gd")
+const BOOT_SPLASH := preload("res://boot_splash.gd")
 
 const VOID := Color("060b09")
 const SMOKE := Color(0.03, 0.045, 0.038, 0.86)
@@ -57,6 +58,20 @@ var rebinding_action := ""
 var _default_binds: Dictionary = {}
 
 var _rows: Array[Dictionary] = []
+## Greg, 24 September: the menus match the re-animated logo. The row you're on
+## gets blood poured under it with drips; opening or changing page tears the
+## rows sideways for a moment; the live seal sits in the corner; moving ticks.
+const LOGO_FX := preload("res://shaders/logo_fx.gdshader")
+const LOGO_AUDIO := preload("res://systems/logo_audio.gd")
+const SEAL_PATH := "res://art/brand/wof_seal.png"
+const POUR_SECONDS := 0.2
+const TEAR_SECONDS := 0.18
+var pour := 0.0
+var tear := 0.0
+var seal: TextureRect
+var sounds: Node
+var _poured_row := -1
+var _poured_page := ""
 var _factor := 1.0
 var _origin := Vector2.ZERO
 
@@ -71,6 +86,22 @@ func _ready() -> void:
 	screen.draw.connect(_draw_plate)
 	add_child(screen)
 	screen.visible = false
+	seal = TextureRect.new()
+	seal.name = "Seal"
+	seal.texture = load(SEAL_PATH) as Texture2D
+	seal.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	seal.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	seal.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var seal_fx := ShaderMaterial.new()
+	seal_fx.shader = LOGO_FX
+	seal_fx.set_shader_parameter("is_seal", true)
+	seal_fx.set_shader_parameter("drips_on", 0.0)
+	seal_fx.set_shader_parameter("calm", 0.8)
+	seal.material = seal_fx
+	screen.add_child(seal)
+	sounds = LOGO_AUDIO.new()
+	sounds.name = "PauseSounds"
+	add_child(sounds)
 	WorldHistory.register_subject(SETTINGS_ID, {
 		"hud_opacity": 0.9,
 		"hud_style": "rails",
@@ -295,6 +326,9 @@ func open_gate() -> void:
 	clock = 0.0
 	rebinding_action = ""
 	screen.visible = true
+	tear = TEAR_SECONDS
+	if sounds != null:
+		sounds.cue("tear")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	get_tree().paused = true
 
@@ -395,6 +429,17 @@ func _activate() -> void:
 
 func _process(delta: float) -> void:
 	clock += delta
+	# A new row (or a new page) starts a fresh pour; a new page also tears.
+	if highlighted != _poured_row or page != _poured_page:
+		if page != _poured_page and not _poured_page.is_empty():
+			tear = TEAR_SECONDS
+		elif _poured_row >= 0 and open and sounds != null:
+			sounds.cue("drip")
+		_poured_row = highlighted
+		_poured_page = page
+		pour = 0.0
+	pour = minf(1.0, pour + delta / POUR_SECONDS)
+	tear = maxf(0.0, tear - delta)
 	blend = float(Motion.blend(blend, delta, 7.0, open))
 	if blend <= 0.001 and not open:
 		screen.visible = false
@@ -442,8 +487,14 @@ func _draw_plate() -> void:
 		var top := 112.0 + index * row_pitch
 		var lit := index == highlighted
 		var accent := ACID if lit else INK
+		# The tear: rows jump sideways for a moment on opening or a new page.
+		var shove := 0.0
+		if tear > 0.0:
+			shove = (fmod(float(index) * 37.7 + clock * 91.0, 1.0) - 0.5) * 40.0 * (tear / TEAR_SECONDS)
+		screen.draw_set_transform(_origin + Vector2(shove * _factor, (1.0 - eased) * 26.0), 0.0, Vector2(_factor, _factor))
 		if lit:
-			screen.draw_rect(Rect2(24, top - 12, DESIGN.x - 48, minf(40.0, row_pitch - 4.0)), accent * Color(1, 1, 1, 0.12 * eased))
+			screen.draw_rect(Rect2(24, top - 12, DESIGN.x - 48, minf(40.0, row_pitch - 4.0)), accent * Color(1, 1, 1, 0.08 * eased))
+			_draw_blood_under(top + minf(22.0, row_pitch * 0.62), eased, maxf(3.0, row_pitch * 0.28))
 			var slide := 4.0 + sin(clock * 6.0) * 2.0
 			screen.draw_colored_polygon(PackedVector2Array([
 				Vector2(14 - slide, top - 2), Vector2(24 - slide, top + 7), Vector2(14 - slide, top + 16),
@@ -459,8 +510,31 @@ func _draw_plate() -> void:
 			var value_x := DESIGN.x - 34.0 - CellOutzType.width(str(row.value), 15.0, 1.6)
 			CellOutzType.draw_text(screen, Vector2(value_x, top), str(row.value), 15.0, accent * Color(1, 1, 1, 0.9 * eased), 1.6)
 
+	screen.draw_set_transform(_origin + Vector2(0, (1.0 - eased) * 26.0), 0.0, Vector2(_factor, _factor))
 	if page == "hud":
 		CellOutzType.draw_text(screen, Vector2(34, 348), "OPACITY 25-100% / SAVED AUTOMATICALLY", 10.0, INK * Color(1, 1, 1, 0.5 * eased), 1.0)
 		CellOutzType.draw_text(screen, Vector2(34, 374), "REDUCED GLITCH CALMS CAMERA GRAIN", 10.0, INK * Color(1, 1, 1, 0.5 * eased), 1.0)
 	CellOutzType.draw_text(screen, Vector2(30, DESIGN.y - 28), "ESC RESUME  UP/DOWN MOVE  L/R ADJUST  ENTER SELECT", 9.0, INK * Color(1, 1, 1, 0.4 * eased), 1.0)
 	screen.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# The live seal in the plate's corner, sized with it.
+	if seal != null:
+		var side := 78.0 * _factor
+		seal.size = Vector2(side, side)
+		seal.position = _origin + Vector2((DESIGN.x - 96.0) * _factor, 10.0 * _factor + (1.0 - eased) * 26.0)
+		seal.modulate.a = eased
+		(seal.material as ShaderMaterial).set_shader_parameter("beat", BOOT_SPLASH.heartbeat(clock) * 0.5)
+
+
+## Blood poured under the row you're on, left to right, with three drips.
+func _draw_blood_under(y: float, eased: float, drip_room := 14.0) -> void:
+	var width := (DESIGN.x - 48.0) * ease(pour, 0.4)
+	var blood := ARTERIAL * Color(1, 1, 1, 0.9 * eased)
+	screen.draw_rect(Rect2(24, y, width, 3.0), blood)
+	for drip in 3:
+		var x := 24.0 + (DESIGN.x - 48.0) * (0.2 + 0.3 * float(drip))
+		if x > 24.0 + width:
+			continue
+		# Never long enough to run into the row below.
+		var length := minf(drip_room, (pour - (0.2 + 0.3 * float(drip))) * 60.0 + sin(clock * 2.0 + float(drip)) * 1.5 + drip_room * 0.4)
+		screen.draw_line(Vector2(x, y + 2.0), Vector2(x, y + 2.0 + length), blood, 2.0)
+		screen.draw_circle(Vector2(x, y + 3.0 + length), 2.2, blood)
