@@ -643,3 +643,766 @@ Every line below is **(rec)** unless it cites Greg.
 - [ ] A feedback form linked from the end card and the site.
 - [ ] Discord invite once it exists.
 - **ASK:** "itch.io first, Steam next fest, or both?"
+
+---
+
+# Part V: the full inventory
+
+Greg asked for a checklist toward 1,000 lines (24 September, "all of the
+above"). This part lists each real thing in the first 30 minutes, the
+demo and the menus, and asks the same questions of each one. Every line
+is **(rec)**. The questions and the look are Greg's to change.
+
+## V.1 Props: look, sound, break, record, test
+
+### The Growing Floor
+- [ ] Your tank: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] Your tank: **Hit sound**, has its own material sound when struck.
+- [ ] Your tank: **Break**, has break states, or says plainly why it can't break.
+- [ ] Your tank: **Record**, what the player did to it is in WorldHistory.
+- [ ] Your tank: **Test**, is covered by a test or a capture.
+- [ ] The other tanks: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The other tanks: **Hit sound**, has its own material sound when struck.
+- [x] The other tanks: **Break**, has break states, or says plainly why it can't break.
+- [x] The other tanks: **Record**, what the player did to it is in WorldHistory.
+- [x] The other tanks: **Test**, is covered by a test or a capture.
+- [ ] The jammed tank: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The jammed tank: **Hit sound**, has its own material sound when struck.
+- [ ] The jammed tank: **Break**, has break states, or says plainly why it can't break.
+- [ ] The jammed tank: **Record**, what the player did to it is in WorldHistory.
+- [ ] The jammed tank: **Test**, is covered by a test or a capture.
+- [ ] The dead subject's smock: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The dead subject's smock: **Hit sound**, has its own material sound when struck.
+- [ ] The dead subject's smock: **Break**, has break states, or says plainly why it can't break.
+- [ ] The dead subject's smock: **Record**, what the player did to it is in WorldHistory.
+- [ ] The dead subject's smock: **Test**, is covered by a test or a capture.
+- [ ] The examiner's desk: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The examiner's desk: **Hit sound**, has its own material sound when struck.
+- [ ] The examiner's desk: **Break**, has break states, or says plainly why it can't break.
+- [ ] The examiner's desk: **Record**, what the player did to it is in WorldHistory.
+- [ ] The examiner's desk: **Test**, is covered by a test or a capture.
+- [ ] His monitor: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] His monitor: **Hit sound**, has its own material sound when struck.
+- [ ] His monitor: **Break**, has break states, or says plainly why it can't break.
+- [ ] His monitor: **Record**, what the player did to it is in WorldHistory.
+- [ ] His monitor: **Test**, is covered by a test or a capture.
+- [ ] His keyboard: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] His keyboard: **Hit sound**, has its own material sound when struck.
+- [ ] His keyboard: **Break**, has break states, or says plainly why it can't break.
+- [ ] His keyboard: **Record**, what the player did to it is in WorldHistory.
+- [ ] His keyboard: **Test**, is covered by a test or a capture.
+- [ ] The ceiling cables: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The ceiling cables: **Hit sound**, has its own material sound when struck.
+- [ ] The ceiling cables: **Break**, has break states, or says plainly why it can't break.
+- [ ] The ceiling cables: **Record**, what the player did to it is in WorldHistory.
+- [x] The ceiling cables: **Test**, is covered by a test or a capture.
+- [ ] The lit cables: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The lit cables: **Hit sound**, has its own material sound when struck.
+- [ ] The lit cables: **Break**, has break states, or says plainly why it can't break.
+- [ ] The lit cables: **Record**, what the player did to it is in WorldHistory.
+- [ ] The lit cables: **Test**, is covered by a test or a capture.
+- [ ] The wall cameras: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The wall cameras: **Hit sound**, has its own material sound when struck.
+- [ ] The wall cameras: **Break**, has break states, or says plainly why it can't break.
+- [ ] The wall cameras: **Record**, what the player did to it is in WorldHistory.
+- [ ] The wall cameras: **Test**, is covered by a test or a capture.
+- [ ] The staff door: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The staff door: **Hit sound**, has its own material sound when struck.
+- [ ] The staff door: **Break**, has break states, or says plainly why it can't break.
+- [ ] The staff door: **Record**, what the player did to it is in WorldHistory.
+- [ ] The staff door: **Test**, is covered by a test or a capture.
+- [ ] His door behind the vat: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] His door behind the vat: **Hit sound**, has its own material sound when struck.
+- [x] His door behind the vat: **Break**, has break states, or says plainly why it can't break.
+- [x] His door behind the vat: **Record**, what the player did to it is in WorldHistory.
+- [x] His door behind the vat: **Test**, is covered by a test or a capture.
+- [ ] The fire axe: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The fire axe: **Hit sound**, has its own material sound when struck.
+- [ ] The fire axe: **Break**, has break states, or says plainly why it can't break.
+- [ ] The fire axe: **Record**, what the player did to it is in WorldHistory.
+- [ ] The fire axe: **Test**, is covered by a test or a capture.
+- [ ] The observation window: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The observation window: **Hit sound**, has its own material sound when struck.
+- [ ] The observation window: **Break**, has break states, or says plainly why it can't break.
+- [ ] The observation window: **Record**, what the player did to it is in WorldHistory.
+- [ ] The observation window: **Test**, is covered by a test or a capture.
+- [ ] The pit door: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The pit door: **Hit sound**, has its own material sound when struck.
+- [ ] The pit door: **Break**, has break states, or says plainly why it can't break.
+- [ ] The pit door: **Record**, what the player did to it is in WorldHistory.
+- [ ] The pit door: **Test**, is covered by a test or a capture.
+- [ ] The vertebral arches: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The vertebral arches: **Hit sound**, has its own material sound when struck.
+- [ ] The vertebral arches: **Break**, has break states, or says plainly why it can't break.
+- [ ] The vertebral arches: **Record**, what the player did to it is in WorldHistory.
+- [ ] The vertebral arches: **Test**, is covered by a test or a capture.
+- [ ] The jars on the shelves: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The jars on the shelves: **Hit sound**, has its own material sound when struck.
+- [ ] The jars on the shelves: **Break**, has break states, or says plainly why it can't break.
+- [ ] The jars on the shelves: **Record**, what the player did to it is in WorldHistory.
+- [ ] The jars on the shelves: **Test**, is covered by a test or a capture.
+- [ ] The floor grating: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The floor grating: **Hit sound**, has its own material sound when struck.
+- [ ] The floor grating: **Break**, has break states, or says plainly why it can't break.
+- [ ] The floor grating: **Record**, what the player did to it is in WorldHistory.
+- [ ] The floor grating: **Test**, is covered by a test or a capture.
+
+### The Service Arcade
+- [ ] The ram: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The ram: **Hit sound**, has its own material sound when struck.
+- [ ] The ram: **Break**, has break states, or says plainly why it can't break.
+- [ ] The ram: **Record**, what the player did to it is in WorldHistory.
+- [ ] The ram: **Test**, is covered by a test or a capture.
+- [ ] The key card: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The key card: **Hit sound**, has its own material sound when struck.
+- [ ] The key card: **Break**, has break states, or says plainly why it can't break.
+- [ ] The key card: **Record**, what the player did to it is in WorldHistory.
+- [ ] The key card: **Test**, is covered by a test or a capture.
+- [ ] Hollis's post: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] Hollis's post: **Hit sound**, has its own material sound when struck.
+- [ ] Hollis's post: **Break**, has break states, or says plainly why it can't break.
+- [ ] Hollis's post: **Record**, what the player did to it is in WorldHistory.
+- [ ] Hollis's post: **Test**, is covered by a test or a capture.
+- [ ] The biometric reader: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The biometric reader: **Hit sound**, has its own material sound when struck.
+- [ ] The biometric reader: **Break**, has break states, or says plainly why it can't break.
+- [ ] The biometric reader: **Record**, what the player did to it is in WorldHistory.
+- [ ] The biometric reader: **Test**, is covered by a test or a capture.
+- [ ] The D-section door: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The D-section door: **Hit sound**, has its own material sound when struck.
+- [ ] The D-section door: **Break**, has break states, or says plainly why it can't break.
+- [ ] The D-section door: **Record**, what the player did to it is in WorldHistory.
+- [ ] The D-section door: **Test**, is covered by a test or a capture.
+- [ ] The arcade cabinets: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The arcade cabinets: **Hit sound**, has its own material sound when struck.
+- [ ] The arcade cabinets: **Break**, has break states, or says plainly why it can't break.
+- [ ] The arcade cabinets: **Record**, what the player did to it is in WorldHistory.
+- [ ] The arcade cabinets: **Test**, is covered by a test or a capture.
+- [ ] The vending machine: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The vending machine: **Hit sound**, has its own material sound when struck.
+- [ ] The vending machine: **Break**, has break states, or says plainly why it can't break.
+- [ ] The vending machine: **Record**, what the player did to it is in WorldHistory.
+- [ ] The vending machine: **Test**, is covered by a test or a capture.
+- [ ] The pressure gate: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The pressure gate: **Hit sound**, has its own material sound when struck.
+- [ ] The pressure gate: **Break**, has break states, or says plainly why it can't break.
+- [ ] The pressure gate: **Record**, what the player did to it is in WorldHistory.
+- [ ] The pressure gate: **Test**, is covered by a test or a capture.
+- [ ] The arcade cameras: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The arcade cameras: **Hit sound**, has its own material sound when struck.
+- [ ] The arcade cameras: **Break**, has break states, or says plainly why it can't break.
+- [ ] The arcade cameras: **Record**, what the player did to it is in WorldHistory.
+- [ ] The arcade cameras: **Test**, is covered by a test or a capture.
+- [ ] Hollis's gun: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] Hollis's gun: **Hit sound**, has its own material sound when struck.
+- [ ] Hollis's gun: **Break**, has break states, or says plainly why it can't break.
+- [ ] Hollis's gun: **Record**, what the player did to it is in WorldHistory.
+- [ ] Hollis's gun: **Test**, is covered by a test or a capture.
+
+### The Lower Works
+- [ ] The sentinel: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The sentinel: **Hit sound**, has its own material sound when struck.
+- [ ] The sentinel: **Break**, has break states, or says plainly why it can't break.
+- [ ] The sentinel: **Record**, what the player did to it is in WorldHistory.
+- [ ] The sentinel: **Test**, is covered by a test or a capture.
+- [ ] The fuse box: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The fuse box: **Hit sound**, has its own material sound when struck.
+- [ ] The fuse box: **Break**, has break states, or says plainly why it can't break.
+- [ ] The fuse box: **Record**, what the player did to it is in WorldHistory.
+- [ ] The fuse box: **Test**, is covered by a test or a capture.
+- [ ] The heat elevator cage: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The heat elevator cage: **Hit sound**, has its own material sound when struck.
+- [ ] The heat elevator cage: **Break**, has break states, or says plainly why it can't break.
+- [ ] The heat elevator cage: **Record**, what the player did to it is in WorldHistory.
+- [ ] The heat elevator cage: **Test**, is covered by a test or a capture.
+- [ ] The scrap barricades: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The scrap barricades: **Hit sound**, has its own material sound when struck.
+- [ ] The scrap barricades: **Break**, has break states, or says plainly why it can't break.
+- [ ] The scrap barricades: **Record**, what the player did to it is in WorldHistory.
+- [ ] The scrap barricades: **Test**, is covered by a test or a capture.
+- [ ] The steam pipes: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The steam pipes: **Hit sound**, has its own material sound when struck.
+- [ ] The steam pipes: **Break**, has break states, or says plainly why it can't break.
+- [ ] The steam pipes: **Record**, what the player did to it is in WorldHistory.
+- [ ] The steam pipes: **Test**, is covered by a test or a capture.
+- [ ] The gas canisters: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The gas canisters: **Hit sound**, has its own material sound when struck.
+- [ ] The gas canisters: **Break**, has break states, or says plainly why it can't break.
+- [ ] The gas canisters: **Record**, what the player did to it is in WorldHistory.
+- [ ] The gas canisters: **Test**, is covered by a test or a capture.
+- [ ] The drain hatch: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The drain hatch: **Hit sound**, has its own material sound when struck.
+- [ ] The drain hatch: **Break**, has break states, or says plainly why it can't break.
+- [ ] The drain hatch: **Record**, what the player did to it is in WorldHistory.
+- [ ] The drain hatch: **Test**, is covered by a test or a capture.
+- [ ] The gantry rails: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The gantry rails: **Hit sound**, has its own material sound when struck.
+- [ ] The gantry rails: **Break**, has break states, or says plainly why it can't break.
+- [ ] The gantry rails: **Record**, what the player did to it is in WorldHistory.
+- [ ] The gantry rails: **Test**, is covered by a test or a capture.
+
+### The Old Drains
+- [ ] The waste gallery grates: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The waste gallery grates: **Hit sound**, has its own material sound when struck.
+- [ ] The waste gallery grates: **Break**, has break states, or says plainly why it can't break.
+- [ ] The waste gallery grates: **Record**, what the player did to it is in WorldHistory.
+- [ ] The waste gallery grates: **Test**, is covered by a test or a capture.
+- [ ] The cistern walkway: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The cistern walkway: **Hit sound**, has its own material sound when struck.
+- [ ] The cistern walkway: **Break**, has break states, or says plainly why it can't break.
+- [ ] The cistern walkway: **Record**, what the player did to it is in WorldHistory.
+- [ ] The cistern walkway: **Test**, is covered by a test or a capture.
+- [ ] The rotten boards: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The rotten boards: **Hit sound**, has its own material sound when struck.
+- [ ] The rotten boards: **Break**, has break states, or says plainly why it can't break.
+- [ ] The rotten boards: **Record**, what the player did to it is in WorldHistory.
+- [ ] The rotten boards: **Test**, is covered by a test or a capture.
+- [ ] The storm outfall gate: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The storm outfall gate: **Hit sound**, has its own material sound when struck.
+- [ ] The storm outfall gate: **Break**, has break states, or says plainly why it can't break.
+- [ ] The storm outfall gate: **Record**, what the player did to it is in WorldHistory.
+- [ ] The storm outfall gate: **Test**, is covered by a test or a capture.
+- [ ] The drain stalker's nest: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The drain stalker's nest: **Hit sound**, has its own material sound when struck.
+- [ ] The drain stalker's nest: **Break**, has break states, or says plainly why it can't break.
+- [ ] The drain stalker's nest: **Record**, what the player did to it is in WorldHistory.
+- [ ] The drain stalker's nest: **Test**, is covered by a test or a capture.
+
+### The Support Unit
+- [ ] The cells: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The cells: **Hit sound**, has its own material sound when struck.
+- [ ] The cells: **Break**, has break states, or says plainly why it can't break.
+- [ ] The cells: **Record**, what the player did to it is in WorldHistory.
+- [ ] The cells: **Test**, is covered by a test or a capture.
+- [ ] The restraint beds: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The restraint beds: **Hit sound**, has its own material sound when struck.
+- [ ] The restraint beds: **Break**, has break states, or says plainly why it can't break.
+- [ ] The restraint beds: **Record**, what the player did to it is in WorldHistory.
+- [ ] The restraint beds: **Test**, is covered by a test or a capture.
+- [ ] The ward monitors: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The ward monitors: **Hit sound**, has its own material sound when struck.
+- [ ] The ward monitors: **Break**, has break states, or says plainly why it can't break.
+- [ ] The ward monitors: **Record**, what the player did to it is in WorldHistory.
+- [ ] The ward monitors: **Test**, is covered by a test or a capture.
+- [ ] The guard post: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The guard post: **Hit sound**, has its own material sound when struck.
+- [ ] The guard post: **Break**, has break states, or says plainly why it can't break.
+- [ ] The guard post: **Record**, what the player did to it is in WorldHistory.
+- [ ] The guard post: **Test**, is covered by a test or a capture.
+- [ ] The alarm panel: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The alarm panel: **Hit sound**, has its own material sound when struck.
+- [ ] The alarm panel: **Break**, has break states, or says plainly why it can't break.
+- [ ] The alarm panel: **Record**, what the player did to it is in WorldHistory.
+- [ ] The alarm panel: **Test**, is covered by a test or a capture.
+- [ ] The doctor's bay ramp: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The doctor's bay ramp: **Hit sound**, has its own material sound when struck.
+- [ ] The doctor's bay ramp: **Break**, has break states, or says plainly why it can't break.
+- [ ] The doctor's bay ramp: **Record**, what the player did to it is in WorldHistory.
+- [ ] The doctor's bay ramp: **Test**, is covered by a test or a capture.
+- [ ] The hologram emitter: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The hologram emitter: **Hit sound**, has its own material sound when struck.
+- [ ] The hologram emitter: **Break**, has break states, or says plainly why it can't break.
+- [ ] The hologram emitter: **Record**, what the player did to it is in WorldHistory.
+- [ ] The hologram emitter: **Test**, is covered by a test or a capture.
+
+### The derby and the dry falls
+- [ ] The derby cars: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The derby cars: **Hit sound**, has its own material sound when struck.
+- [ ] The derby cars: **Break**, has break states, or says plainly why it can't break.
+- [ ] The derby cars: **Record**, what the player did to it is in WorldHistory.
+- [ ] The derby cars: **Test**, is covered by a test or a capture.
+- [ ] The arena barriers: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The arena barriers: **Hit sound**, has its own material sound when struck.
+- [ ] The arena barriers: **Break**, has break states, or says plainly why it can't break.
+- [ ] The arena barriers: **Record**, what the player did to it is in WorldHistory.
+- [ ] The arena barriers: **Test**, is covered by a test or a capture.
+- [ ] The tunnel gate: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The tunnel gate: **Hit sound**, has its own material sound when struck.
+- [ ] The tunnel gate: **Break**, has break states, or says plainly why it can't break.
+- [ ] The tunnel gate: **Record**, what the player did to it is in WorldHistory.
+- [ ] The tunnel gate: **Test**, is covered by a test or a capture.
+- [ ] The blood waterfall: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The blood waterfall: **Hit sound**, has its own material sound when struck.
+- [ ] The blood waterfall: **Break**, has break states, or says plainly why it can't break.
+- [ ] The blood waterfall: **Record**, what the player did to it is in WorldHistory.
+- [ ] The blood waterfall: **Test**, is covered by a test or a capture.
+- [ ] The smashed trees: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The smashed trees: **Hit sound**, has its own material sound when struck.
+- [ ] The smashed trees: **Break**, has break states, or says plainly why it can't break.
+- [ ] The smashed trees: **Record**, what the player did to it is in WorldHistory.
+- [ ] The smashed trees: **Test**, is covered by a test or a capture.
+
+### Arrival in the Hunt
+- [ ] The yard streetlights: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The yard streetlights: **Hit sound**, has its own material sound when struck.
+- [x] The yard streetlights: **Break**, has break states, or says plainly why it can't break.
+- [x] The yard streetlights: **Record**, what the player did to it is in WorldHistory.
+- [x] The yard streetlights: **Test**, is covered by a test or a capture.
+- [ ] The yard barricades: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The yard barricades: **Hit sound**, has its own material sound when struck.
+- [x] The yard barricades: **Break**, has break states, or says plainly why it can't break.
+- [ ] The yard barricades: **Record**, what the player did to it is in WorldHistory.
+- [x] The yard barricades: **Test**, is covered by a test or a capture.
+- [ ] The sparring post: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The sparring post: **Hit sound**, has its own material sound when struck.
+- [ ] The sparring post: **Break**, has break states, or says plainly why it can't break.
+- [ ] The sparring post: **Record**, what the player did to it is in WorldHistory.
+- [ ] The sparring post: **Test**, is covered by a test or a capture.
+- [ ] The first poster or person: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The first poster or person: **Hit sound**, has its own material sound when struck.
+- [ ] The first poster or person: **Break**, has break states, or says plainly why it can't break.
+- [ ] The first poster or person: **Record**, what the player did to it is in WorldHistory.
+- [ ] The first poster or person: **Test**, is covered by a test or a capture.
+- [ ] The arrival marker: **Look**, reads at a glance in the body-cam light, with no placeholder box.
+- [ ] The arrival marker: **Hit sound**, has its own material sound when struck.
+- [ ] The arrival marker: **Break**, has break states, or says plainly why it can't break.
+- [ ] The arrival marker: **Record**, what the player did to it is in WorldHistory.
+- [ ] The arrival marker: **Test**, is covered by a test or a capture.
+
+## V.2 Sounds: every one generated or authored, placed and mixed
+
+- [ ] The vat heartbeat: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] Fluid in the tube: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] Bubbles: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The examiner's footsteps: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The examiner's voice: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The keyboard: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The intake printer: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The stamp on filing: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The drain gurgle: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The pump fighting air: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A wire tug: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A wire tearing: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The mouth tube: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The glass groaning: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The glass breaking: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] Landing on your knees: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] Wet footsteps on grating: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The smock tearing off: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The restraint prying: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A tank cracking: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A tank draining: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A freed subject climbing out: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A freed subject's first line: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The cables sparking: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A camera turning: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A camera breaking: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The staff door keypad: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] His door taking a blow: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] His door falling: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The lift doors: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The lift ride: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The arcade room tone: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] Hollis's warning shot: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] Hollis's lines: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The biometric reader: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The pressure gate: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A cabinet screen shattering: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The vending machine: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The Lower Works hum: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The sentinel's servos: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The fuse arcing: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The heat elevator chain: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] Steam venting: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A canister exploding: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The drains' water: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The stalker: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The dry falls: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The derby crowd: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A derby crash: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The Hunt wind: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A streetlight shot out: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A barricade bursting: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The case reel: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] Gold dropping: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] The blood tree opening: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A parry: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A feint: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A backstab: a sound exists, it plays at the right moment, and it sits in the mix.
+- [ ] A hip counter: a sound exists, it plays at the right moment, and it sits in the mix.
+- [x] The menu tick: a sound exists, it plays at the right moment, and it sits in the mix.
+- [x] The logo's burn: a sound exists, it plays at the right moment, and it sits in the mix.
+- [x] The logo's clank: a sound exists, it plays at the right moment, and it sits in the mix.
+- [x] The logo's heartbeat: a sound exists, it plays at the right moment, and it sits in the mix.
+
+## V.3 Lines: written, voiced, subtitled, never repeated too soon
+
+Greg writes or approves every line; the generated voice is placeholder.
+
+### The examiner
+- [ ] His greeting at the glass: written.
+- [ ] His greeting at the glass: voiced and subtitled.
+- [ ] Each tab's opener: written.
+- [ ] Each tab's opener: voiced and subtitled.
+- [ ] A refusal: written.
+- [ ] A refusal: voiced and subtitled.
+- [ ] A stare: written.
+- [ ] A stare: voiced and subtitled.
+- [ ] An idle nudge: written.
+- [ ] An idle nudge: voiced and subtitled.
+- [ ] Filing: written.
+- [ ] Filing: voiced and subtitled.
+- [ ] His last line leaving: written.
+- [ ] His last line leaving: voiced and subtitled.
+- [ ] A line if you're reborn and meet him again: written.
+- [ ] A line if you're reborn and meet him again: voiced and subtitled.
+
+### Hollis
+- [ ] The first warning: written.
+- [ ] The first warning: voiced and subtitled.
+- [ ] The warning shot: written.
+- [ ] The warning shot: voiced and subtitled.
+- [ ] The wound: written.
+- [ ] The wound: voiced and subtitled.
+- [ ] The kill: written.
+- [ ] The kill: voiced and subtitled.
+- [ ] "You again": written.
+- [ ] "You again": voiced and subtitled.
+- [ ] Coerced: written.
+- [ ] Coerced: voiced and subtitled.
+- [ ] Begging: written.
+- [ ] Begging: voiced and subtitled.
+- [ ] His hand taken: written.
+- [ ] His hand taken: voiced and subtitled.
+
+### Freed subjects
+- [ ] Freed, friendly: written.
+- [ ] Freed, friendly: voiced and subtitled.
+- [ ] Freed, hostile: written.
+- [ ] Freed, hostile: voiced and subtitled.
+- [ ] A gift: written.
+- [ ] A gift: voiced and subtitled.
+- [ ] A prophecy: written.
+- [ ] A prophecy: voiced and subtitled.
+- [ ] A scream: written.
+- [ ] A scream: voiced and subtitled.
+- [ ] A taunt: written.
+- [ ] A taunt: voiced and subtitled.
+- [ ] Met again in the drains: written.
+- [ ] Met again in the drains: voiced and subtitled.
+- [ ] Met again in the Lower Works: written.
+- [ ] Met again in the Lower Works: voiced and subtitled.
+
+### The doctor
+- [ ] The call's opener: written.
+- [ ] The call's opener: voiced and subtitled.
+- [ ] The reveal: written.
+- [ ] The reveal: voiced and subtitled.
+- [ ] His refusal to answer: written.
+- [ ] His refusal to answer: voiced and subtitled.
+- [ ] His last line on the roof: written.
+- [ ] His last line on the roof: voiced and subtitled.
+
+### The sparring partner
+- [ ] The bout's start: written.
+- [ ] The bout's start: voiced and subtitled.
+- [ ] A clean hit: written.
+- [ ] A clean hit: voiced and subtitled.
+- [ ] A blocked hit: written.
+- [ ] A blocked hit: voiced and subtitled.
+- [ ] A win: written.
+- [ ] A win: voiced and subtitled.
+- [ ] A loss: written.
+- [ ] A loss: voiced and subtitled.
+
+## V.4 Route replays: every checkpoint timed, recorded and reachable
+
+### The heat elevator
+- [ ] The vat: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The breakout: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The smock: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The arcade: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] Hollis: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The gate: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The Lower Works: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The fuse: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The lift: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The surface: reached in the replay, time logged, and recorded in WorldHistory.
+
+### The old drains
+- [ ] The vat: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The breakout: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The arcade: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] Hollis: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The gate: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The Lower Works: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The hatch: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The gallery: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The cistern: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The outfall: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The surface: reached in the replay, time logged, and recorded in WorldHistory.
+
+### The doctor's route
+- [ ] The vat: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The breakout: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] His door: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The lift down: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The Support Unit: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The cells: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The bay: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The call: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The ramp: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The surface: reached in the replay, time logged, and recorded in WorldHistory.
+
+### The derby tunnels
+- [ ] Capture: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The derby: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] A heat: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The win or the wreck: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The tunnels: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The dry falls: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The gorge: reached in the replay, time logged, and recorded in WorldHistory.
+- [ ] The surface: reached in the replay, time logged, and recorded in WorldHistory.
+
+## V.5 Screens in every state
+
+### The boot splash
+- [ ] Reads and works at 720p.
+- [ ] Reads and works at 1080p.
+- [ ] Reads and works at 1440p and ultrawide.
+- [ ] Reads and works with a gamepad only.
+- [ ] Reads and works with reduce-flashing on.
+- [ ] Reads and works with subtitles on.
+
+### The content warning
+- [ ] Reads and works at 720p.
+- [ ] Reads and works at 1080p.
+- [ ] Reads and works at 1440p and ultrawide.
+- [ ] Reads and works with a gamepad only.
+- [ ] Reads and works with reduce-flashing on.
+- [ ] Reads and works with subtitles on.
+
+### The title screen
+- [ ] Reads and works at 720p.
+- [ ] Reads and works at 1080p.
+- [ ] Reads and works at 1440p and ultrawide.
+- [ ] Reads and works with a gamepad only.
+- [ ] Reads and works with reduce-flashing on.
+- [ ] Reads and works with subtitles on.
+
+### The demo door
+- [ ] Reads and works at 720p.
+- [ ] Reads and works at 1080p.
+- [ ] Reads and works at 1440p and ultrawide.
+- [ ] Reads and works with a gamepad only.
+- [ ] Reads and works with reduce-flashing on.
+- [ ] Reads and works with subtitles on.
+
+### The save slots
+- [ ] Reads and works at 720p.
+- [ ] Reads and works at 1080p.
+- [ ] Reads and works at 1440p and ultrawide.
+- [ ] Reads and works with a gamepad only.
+- [ ] Reads and works with reduce-flashing on.
+- [ ] Reads and works with subtitles on.
+
+### Settings
+- [ ] Reads and works at 720p.
+- [ ] Reads and works at 1080p.
+- [ ] Reads and works at 1440p and ultrawide.
+- [ ] Reads and works with a gamepad only.
+- [ ] Reads and works with reduce-flashing on.
+- [ ] Reads and works with subtitles on.
+
+### The pause menu
+- [ ] Reads and works at 720p.
+- [ ] Reads and works at 1080p.
+- [ ] Reads and works at 1440p and ultrawide.
+- [ ] Reads and works with a gamepad only.
+- [ ] Reads and works with reduce-flashing on.
+- [ ] Reads and works with subtitles on.
+
+### The intake
+- [ ] Reads and works at 720p.
+- [ ] Reads and works at 1080p.
+- [ ] Reads and works at 1440p and ultrawide.
+- [ ] Reads and works with a gamepad only.
+- [ ] Reads and works with reduce-flashing on.
+- [ ] Reads and works with subtitles on.
+
+### The body-cam HUD
+- [ ] Reads and works at 720p.
+- [ ] Reads and works at 1080p.
+- [ ] Reads and works at 1440p and ultrawide.
+- [ ] Reads and works with a gamepad only.
+- [ ] Reads and works with reduce-flashing on.
+- [ ] Reads and works with subtitles on.
+
+### The Brain Index hub
+- [ ] Reads and works at 720p.
+- [ ] Reads and works at 1080p.
+- [ ] Reads and works at 1440p and ultrawide.
+- [ ] Reads and works with a gamepad only.
+- [ ] Reads and works with reduce-flashing on.
+- [ ] Reads and works with subtitles on.
+
+### The Wire exchange
+- [ ] Reads and works at 720p.
+- [ ] Reads and works at 1080p.
+- [ ] Reads and works at 1440p and ultrawide.
+- [ ] Reads and works with a gamepad only.
+- [ ] Reads and works with reduce-flashing on.
+- [ ] Reads and works with subtitles on.
+
+### The blood tree
+- [ ] Reads and works at 720p.
+- [ ] Reads and works at 1080p.
+- [ ] Reads and works at 1440p and ultrawide.
+- [ ] Reads and works with a gamepad only.
+- [ ] Reads and works with reduce-flashing on.
+- [ ] Reads and works with subtitles on.
+
+### The fight readout
+- [ ] Reads and works at 720p.
+- [ ] Reads and works at 1080p.
+- [ ] Reads and works at 1440p and ultrawide.
+- [ ] Reads and works with a gamepad only.
+- [ ] Reads and works with reduce-flashing on.
+- [ ] Reads and works with subtitles on.
+
+### The rebirth vat
+- [ ] Reads and works at 720p.
+- [ ] Reads and works at 1080p.
+- [ ] Reads and works at 1440p and ultrawide.
+- [ ] Reads and works with a gamepad only.
+- [ ] Reads and works with reduce-flashing on.
+- [ ] Reads and works with subtitles on.
+
+### The demo end card
+- [ ] Reads and works at 720p.
+- [ ] Reads and works at 1080p.
+- [ ] Reads and works at 1440p and ultrawide.
+- [ ] Reads and works with a gamepad only.
+- [ ] Reads and works with reduce-flashing on.
+- [ ] Reads and works with subtitles on.
+
+## V.6 Scene health
+
+### The boot splash
+- [ ] 60 fps on the reference PC.
+- [ ] Loads in under 3 s.
+- [ ] No errors in the log.
+- [ ] No softlock anywhere.
+- [ ] Every interactable has a prompt.
+- [ ] Saves and reloads to the same state.
+
+### The title screen
+- [ ] 60 fps on the reference PC.
+- [ ] Loads in under 3 s.
+- [ ] No errors in the log.
+- [ ] No softlock anywhere.
+- [ ] Every interactable has a prompt.
+- [ ] Saves and reloads to the same state.
+
+### The Growing Floor
+- [ ] 60 fps on the reference PC.
+- [ ] Loads in under 3 s.
+- [ ] No errors in the log.
+- [ ] No softlock anywhere.
+- [ ] Every interactable has a prompt.
+- [ ] Saves and reloads to the same state.
+
+### The Service Arcade
+- [ ] 60 fps on the reference PC.
+- [ ] Loads in under 3 s.
+- [ ] No errors in the log.
+- [ ] No softlock anywhere.
+- [ ] Every interactable has a prompt.
+- [ ] Saves and reloads to the same state.
+
+### The Lower Works
+- [ ] 60 fps on the reference PC.
+- [ ] Loads in under 3 s.
+- [ ] No errors in the log.
+- [ ] No softlock anywhere.
+- [ ] Every interactable has a prompt.
+- [ ] Saves and reloads to the same state.
+
+### The old drains
+- [ ] 60 fps on the reference PC.
+- [ ] Loads in under 3 s.
+- [ ] No errors in the log.
+- [ ] No softlock anywhere.
+- [ ] Every interactable has a prompt.
+- [ ] Saves and reloads to the same state.
+
+### The dry falls
+- [ ] 60 fps on the reference PC.
+- [ ] Loads in under 3 s.
+- [ ] No errors in the log.
+- [ ] No softlock anywhere.
+- [ ] Every interactable has a prompt.
+- [ ] Saves and reloads to the same state.
+
+### The Support Unit
+- [ ] 60 fps on the reference PC.
+- [ ] Loads in under 3 s.
+- [ ] No errors in the log.
+- [ ] No softlock anywhere.
+- [ ] Every interactable has a prompt.
+- [ ] Saves and reloads to the same state.
+
+### The derby
+- [ ] 60 fps on the reference PC.
+- [ ] Loads in under 3 s.
+- [ ] No errors in the log.
+- [ ] No softlock anywhere.
+- [ ] Every interactable has a prompt.
+- [ ] Saves and reloads to the same state.
+
+### The Hunt arrival
+- [ ] 60 fps on the reference PC.
+- [ ] Loads in under 3 s.
+- [ ] No errors in the log.
+- [ ] No softlock anywhere.
+- [ ] Every interactable has a prompt.
+- [ ] Saves and reloads to the same state.
+
+## V.7 The demo end card: every field
+
+- [ ] Shows the time you took, from the world record, not a separate tally.
+- [ ] Shows the route you chose, from the world record, not a separate tally.
+- [ ] Shows deaths and rebirths, from the world record, not a separate tally.
+- [ ] Shows who you killed, from the world record, not a separate tally.
+- [ ] Shows who you freed, from the world record, not a separate tally.
+- [ ] Shows tanks you smashed, from the world record, not a separate tally.
+- [ ] Shows what you broke, from the world record, not a separate tally.
+- [ ] Shows blood earned per tree, from the world record, not a separate tally.
+- [ ] Shows moves you used, from the world record, not a separate tally.
+- [ ] Shows the case you opened, if any, from the world record, not a separate tally.
+- [ ] Shows the wishlist link, from the world record, not a separate tally.
+- [ ] Shows the Discord link, from the world record, not a separate tally.
+- [ ] Shows the feedback line, from the world record, not a separate tally.
+- [ ] Shows play again, from the world record, not a separate tally.
+- [ ] Shows try another route, from the world record, not a separate tally.
+- [ ] Shows back to the menu, from the world record, not a separate tally.
+
+## V.8 The trailer: one movie-writer clip per shot
+
+- [ ] The seal assembling: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] The wordmark burning in: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] The title menu bleeding: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] Waking in the vat: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] The examiner at the glass: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] The intake pages swinging in: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] END ALL SUFFERING: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] Tearing the wires: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] GET REVENGE: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] The glass breaking: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] The cables overhead: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] Smashing a tank: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] A freed subject climbing out: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] Hollis's warning shot: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] The biometric door: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] The Lower Works sentinel: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] The heat elevator: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] The drains and the stalker: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] The dry falls: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] A derby crash: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] Arriving in the Hunt: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] Shooting out a streetlight: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] A barricade bursting: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] A parry and a riposte: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] A backstab: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] A case reel landing gold: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
+- [ ] The logo, last: a clean 30 fps clip at 1080p, with a 9:16 crop for Reels.
