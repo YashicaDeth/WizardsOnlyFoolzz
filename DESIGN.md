@@ -835,6 +835,40 @@ we can make nudity and censors".
   - more logo detail (embers, sound) at the same strength
   - menus rebuilt to match the logo's style
 
+### Stated by Greg, 25 September 2026: bodies, destruction and chaos magick
+
+Said across one evening of messages, then set as the session goal. Close to
+his words; the assistant's reading is not mixed in.
+
+- **The body in the vat floats.** Suspended in the liquid, limbs loose, a slow
+  drift and bob, "not just sitting, rod up his ass type of look". The same
+  for the specimens in the other vats.
+- **The vat-room computer sits to the left or right of the lab,** not
+  directly in front, so the doctor's feed on the left of the screen has a
+  reason to be there.
+- **The slideable X-ray looks like version 0.1.** It should match the anatomy
+  loading screen, built from the body models with full, accurately
+  proportioned organs "like it's Sniper Elite 4 or 5", with gritty texture.
+- **Penetration is live and shown.** Bullets and weapons destroy organs and
+  break bones in the real anatomy, and the kill cutscenes cut to X-ray inside
+  the body as the round or blade enters, "most accurate and gorey visceral".
+- **Harvest.** You have to cut bodies open in certain ways, or kill them
+  without damaging the body, to steal organs to sell or use, and cybernetics,
+  loot and money. "It's all destructible from how hard you play."
+- **Teardown-style destruction.** The whole world's surfaces have
+  differentiating levels of hardness and destructibility, and this interacts
+  with the in-game body models and gore.
+- **Blood chaos magick.** "The more you mindlessly destroy, the higher the
+  combat and blood chaos magick system rewards you for pushing the limits of
+  combat." Chaos magick spells: holograms, summoning evil skeletons and dead
+  soldiers ("dead souljahs") to fight for you, casting fireballs, with
+  TouchDesigner-style effects replicated as in-game VFX and casting
+  animations similar to Elden Ring and modern spell casting. Spell names and
+  rules are his to give.
+- **The kinship web is overcomplicated.** It should read as a brain neural
+  network with CRT effects and good UI.
+- **The pyramid is not visualised in the index yet.**
+
 ## Influence register
 
 These entries describe what Greg said he values; proposed extraction is labelled. Liking a reference does not automatically import every mechanic from it.
