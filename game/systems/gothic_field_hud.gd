@@ -63,6 +63,9 @@ var location_announce := 0.0
 ## call the arrival crest back, but ordinary field play leaves the top clear.
 var location_crest_enabled := false
 var pulmonary_diagnostic: Control
+## Brain, column, hanging CRTs and pocket rack. Replaces the mask-and-ampoules
+## corner; null falls back to `_draw_player_state`.
+var nerve_rig: NerveRig
 
 
 func _ready() -> void:
@@ -70,6 +73,9 @@ func _ready() -> void:
 	pulmonary_diagnostic = PULMONARY_DIAGNOSTIC.new()
 	pulmonary_diagnostic.name = "PulmonaryDiagnostic"
 	add_child(pulmonary_diagnostic)
+	nerve_rig = NerveRig.new()
+	nerve_rig.name = "NerveRig"
+	add_child(nerve_rig)
 
 
 ## The space between a key and the verb it performs. `draw_condensed` returns
@@ -160,6 +166,10 @@ func set_state(values: Dictionary) -> void:
 	_refresh_affordance_notice()
 	if pulmonary_diagnostic != null:
 		pulmonary_diagnostic.set_state(values)
+	if nerve_rig != null:
+		var rig_values := values.duplicate()
+		rig_values["mood"] = mood_name()
+		nerve_rig.set_state(rig_values)
 
 
 func rotate_pulmonary(relative: Vector2) -> void:
@@ -208,7 +218,8 @@ func _draw() -> void:
 		_draw_location_crest()
 	_draw_world_condition()
 	_draw_hunt_thread()
-	_draw_player_state()
+	if nerve_rig == null:
+		_draw_player_state()
 	_draw_minimap()
 	_draw_lung_xray()
 	_draw_breath()

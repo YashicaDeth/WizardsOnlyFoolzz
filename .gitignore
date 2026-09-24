@@ -20,3 +20,7 @@ artifacts/
 
 # Exported builds. Large, regenerable, and not source.
 /build/
+
+# Vosk model and the voice bridge live outside the repo (Tools/ and Temp/),
+# but guard against a stray copy: a 40MB acoustic model is not source.
+tools/vosk-model-*/

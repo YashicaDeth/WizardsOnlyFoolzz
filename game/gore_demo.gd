@@ -67,6 +67,24 @@ const SMOKEABLES := preload("res://systems/smokeables.gd")
 const PSYCHEDELIC_RIG := preload("res://systems/psychedelic_rig.gd")
 const HELD_GEAR := preload("res://systems/held_gear.gd")
 const BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
+# The range exists to show what the gore systems do, and had none of the ones
+# built since. Greg: *"make the gore sandbox have all the main game changes"*.
+const SKULL_BURST := preload("res://systems/skull_burst.gd")
+const CAVITY := preload("res://systems/cavity.gd")
+const KILL_SHOT := preload("res://systems/kill_shot.gd")
+const KILL_CAM := preload("res://systems/kill_cam.gd")
+const LIMB_MOMENTUM := preload("res://systems/limb_momentum.gd")
+## The Hunt panel. Greg, on the range: it *"dosent have the lungs or the bottom
+## right bottom left and top right person stuff minimap 3d model of the weapon
+## or item your holding"*. All of that is one `Control` the Hunt has had all
+## along and the sandbox drew its own smaller version of -- so the range has
+## been showing a different game to the one it is a range for.
+const FIELD_HUD := preload("res://systems/gothic_field_hud.gd")
+## The satellite the minimap is a picture from. `gothic_field_hud._draw_minimap`
+## returns on the first line when `minimap_texture` is null, so the panel came
+## across with its bottom-left corner simply missing -- the one thing Greg
+## pointed at. The image is the live region camera, not a radar the HUD draws.
+const LIVING_MAP := preload("res://systems/living_map.gd")
 
 const BODY_COUNT := 7
 const ARENA := 26.0
@@ -134,6 +152,27 @@ var bodies: Array = []
 var ballistics: Node3D
 var impact_feel: Node
 var hud: Control
+var kill_cam: KillCam
+var field_hud: Control
+var living_map: Control
+
+## The arm the sword is on. The Hunt has had one since AN1 and the range never
+## did, which is why a swing here landed square across a limb whatever it was
+## doing while the Hunt cut at the angle it was swung at. Same arm now, so the
+## range is where you can actually learn what a blade does.
+var arm: LimbMomentum
+## Mouse movement since the last physics frame, which is what moves the arm.
+## Accumulated rather than read live, because input and physics do not tick
+## together and a swing built from one frame of mouse is not a swing.
+var _look_delta := Vector2.ZERO
+var guarding := false
+var guard_aim := Vector2.ZERO
+var guard_held := 0.0
+var swing_released_side := ""
+var third_person := false
+var last_read: Dictionary = {}
+var pending_melee: Dictionary = {}
+var melee_windup := -1.0
 
 var yaw := 0.0
 var pitch := -0.12
@@ -243,6 +282,9 @@ func _ready() -> void:
 	ballistics.round_expired.connect(_on_round_expired)
 	arsenal = HunterArsenal.new()
 	add_child(arsenal)
+	# The arm exists before the first swing does, same as AN1.2 in the Hunt.
+	arm = LIMB_MOMENTUM.new()
+	arm.carry(1.4, 0.55)
 	# Starts on the sidearm — the same weapon the range always opened on before
 	# AF6, so nobody's muscle memory for "LMB shoots a pistol" breaks. Switching
 	# away from it is the new part, not the default.
@@ -369,6 +411,18 @@ func _build_weapon_rack() -> void:
 		weapon_rack.add_child(model)
 		weapon_pickups.append({"weapon": weapon_id, "model": model, "available": true})
 
+	# The rifle is deliberately not in `SLOT_ORDER` -- `arsenal_test` asserts
+	# the hunter carries three -- so the range had no weapon that could earn
+	# the X-ray finisher, and the finisher is most of what there is to see.
+	# It is found here, which is how it is found in the world too.
+	var rifle := HELD_GEAR.build_weapon("sniper")
+	rifle.name = "sniper_pickup"
+	rifle.position = Vector3(1.12, 0.46, 0.12)
+	rifle.rotation = Vector3(0.0, PI * 0.5, 0.0)
+	rifle.scale = Vector3.ONE * 1.2
+	weapon_rack.add_child(rifle)
+	weapon_pickups.append({"weapon": "sniper", "model": rifle, "available": true})
+
 
 func _rack_box(label: String, at: Vector3, dimensions: Vector3, tint: Color) -> void:
 	var piece := MeshInstance3D.new()
@@ -418,6 +472,12 @@ func _spawn_body(index: int) -> void:
 	# makes, so the two cannot drift apart again. Odd bodies come armed, which is
 	# also what makes the range a place a fight could start rather than a rack.
 	HunterAppearance.style_world_rig(rig, "demo_body_%d" % index, index % 2 == 1)
+	# Clothing landed after the range did, so every dummy here was still bare
+	# and a round hitting one skipped the cloth layer entirely -- the sandbox
+	# was quietly teaching the wrong damage numbers. Every third body wears the
+	# humiliation rig, so the motley is something you can stand in front of and
+	# shoot rather than only a palette in a test.
+	rig.dress(ClothingShell.humiliation_wardrobe() if index % 3 == 0 else ClothingShell.fresh_wardrobe())
 	var motion: HunterBodyMotion = BODY_MOTION.new()
 	motion.name = "BodyMotion"
 	holder.add_child(motion)
@@ -432,6 +492,9 @@ func _spawn_body(index: int) -> void:
 		"motion": motion,
 		"id": "demo_body_%d" % index,
 		"attack_ready": 0.35 + float(index) * 0.12,
+		"guard": BladeRead.SIDES[index % BladeRead.SIDES.size()],
+		"guard_age": 1.0,
+		"guard_hold": 1.4 + float(index % 4) * 0.4,
 	})
 
 
@@ -553,7 +616,12 @@ func _blast_light(at: Vector3, force: float) -> void:
 		if distance > reach or distance < 0.001:
 			continue
 		var lift := (away.normalized() * 0.75 + Vector3.UP * 0.65).normalized()
-		(chunk as RigidBody3D).apply_central_impulse(lift * (1.0 - distance / reach) * force * 0.16)
+		var body := chunk as RigidBody3D
+		# GoreChunks freezes settled evidence to remove its ongoing physics cost.
+		# A new blast is an explicit reason to wake it again.
+		if body.freeze:
+			body.freeze = false
+		body.apply_central_impulse(lift * (1.0 - distance / reach) * force * 0.16)
 
 
 ## The trigger, and nothing but the trigger for a firearm — one real round
@@ -585,7 +653,10 @@ func _fire() -> void:
 	# `_resolve_firearm()` exactly, calibre included, so the range and the Hunt
 	# can never quietly disagree about what "buck" means.
 	var directions: Array[Vector3] = arsenal.shot_directions(along, Vector3.UP, 0.38 if firearm_aiming else 1.0)
-	var calibre := "buck" if directions.size() > 1 else "pistol"
+	# Damage and spread are not the whole gun. The sniper must launch Ballistics'
+	# rifle profile (velocity, drag, mass and penetration), not a pistol round
+	# wearing rifle damage because both happen to fire one projectile.
+	var calibre := str(attack.get("calibre", "buck" if directions.size() > 1 else "pistol"))
 	spent += 1
 	for direction in directions:
 		_shot_serial += 1
@@ -646,22 +717,144 @@ func _fire_launcher() -> void:
 ## blast's own crosshair targeting) rather than growing a second raycast path,
 ## the only new part is holding the hit to the weapon's own `reach` instead of
 ## the blast's much longer `TRACE_RANGE`.
+## The Hunt panel reads one dictionary, so this is the whole of the wiring.
+##
+## Fed with the range own numbers rather than plausible ones: the health is the
+## simulation health the dummies can actually take off you, the weapon is the
+## live arsenal entry, and the lungs are whatever the substance station has
+## done to you. A panel showing invented values would be worse than no panel,
+## because it would look exactly like a working one.
+func _feed_field_hud() -> void:
+	if field_hud == null or not is_instance_valid(field_hud):
+		return
+	var current: Dictionary = arsenal.current() if arsenal != null else {}
+	# `update_minimap` refuses while the full map is open, which it never is
+	# here, and returns null until the satellite has a frame -- the panel
+	# handles null by drawing nothing, so the corner fills in when it is ready
+	# rather than needing to be waited for.
+	var local_map: Texture2D = null
+	if living_map != null and is_instance_valid(living_map):
+		living_map.call("observe", eye, yaw)
+		local_map = living_map.call("update_minimap", get_process_delta_time()) as Texture2D
+	field_hud.call("set_state", {
+		"minimap_texture": local_map,
+		"minimap_heading": yaw,
+		"health": float(simulation_health),
+		"stamina": stamina,
+		"blood": clampf(float(simulation_health) / 100.0, 0.0, 1.0),
+		"weapon": current,
+		"bare": current.is_empty(),
+		"location": "THE GORE RANGE",
+		"world_stamp": "SANDBOX // %d ON THE FLOOR" % GoreChunks.live_count(),
+		"smoking": smoke_draw_slot >= 0,
+		"can_dodge": dodge_cooldown <= 0.0 and stamina >= 25.0,
+		"near_something": _near_pickup_source(),
+		"interact_verb": "take",
+	})
+
+
+## Which way the player guard is held right now, from the mouse.
+func _player_guard() -> String:
+	if not guarding:
+		return ""
+	var side := BladeRead.guard_side(guard_aim)
+	# Neutral until the mouse says otherwise, rather than snapping to whatever
+	# the first pixel of drift happened to be.
+	return side if not side.is_empty() else BladeRead.HIGH
+
+
+## The dummies hold a guard and change it, which is the only way the read is
+## worth anything: a target with no guard means every swing lands and there is
+## nothing to learn. Posed through `CombatStance` so what they are holding is
+## visible on the body rather than only true in a variable.
+func _update_dummy_guards(real_delta: float) -> void:
+	for entry: Dictionary in bodies:
+		var rig := entry.get("rig") as BaselineHuman
+		if rig == null or not is_instance_valid(rig) or rig.anatomy.dead:
+			continue
+		var age := float(entry.get("guard_age", 0.0)) + real_delta
+		var side := str(entry.get("guard", ""))
+		if side.is_empty() or age > float(entry.get("guard_hold", 2.0)):
+			side = BladeRead.SIDES[randi() % BladeRead.SIDES.size()]
+			age = 0.0
+			entry["guard_hold"] = randf_range(1.4, 3.2)
+		entry["guard"] = side
+		entry["guard_age"] = age
+		var motion := entry.get("motion") as HunterBodyMotion
+		if motion != null and is_instance_valid(motion):
+			motion.set_guard(BladeRead.guard_height(side))
+			motion.set_lean(BladeRead.guard_lean(side))
+
+
 func _melee_swing() -> void:
+	if not pending_melee.is_empty():
+		_note("RECOVER THE BLADE")
+		return
 	var attack: Dictionary = arsenal.begin_attack()
 	if not bool(attack.get("accepted", false)):
 		return
 	_gear_recoil = 1.0
+	swing_released_side = BladeRead.swing_side(arm.velocity)
+	attack["released_side"] = swing_released_side
+	pending_melee = attack
+	melee_windup = maxf(0.01, float(attack.get("windup", 0.12)))
+
+
+## Contact resolves after the weapon's real wind-up. Mouse motion received in
+## that interval continues to drive LimbMomentum, so first-person contact can
+## differ from release (a drag); lock-style third person keeps the release read.
+func _resolve_melee_swing() -> void:
+	var attack := pending_melee
+	pending_melee = {}
+	melee_windup = -1.0
+	if attack.is_empty():
+		return
 	var along := -camera.global_transform.basis.z
 	var start := camera.global_position + along * 0.6
 	var reach := float(attack.get("range", 3.0))
 	var found := _trace_body(start, along)
+	var released_side := str(attack.get("released_side", ""))
 	if found.is_empty() or camera.global_position.distance_to(found.get("position", start)) > reach:
-		_note("MISS")
+		# A miss carries through and has to be caught, which is why whiffing a
+		# committed swing is a real cost rather than a free probe.
+		arm.whiff()
+		_note("MISS // %s" % released_side.to_upper() if not released_side.is_empty() else "MISS")
 		return
 	var rig: BaselineHuman = found["rig"]
 	var zone: String = found["zone"]
 	var damage_type := str(attack.get("damage_type", "cut"))
-	var result: Dictionary = rig.hit(zone, float(attack.get("damage", 0.0)), float(attack.get("impulse", 0.0)), damage_type, "", along)
+	var landed: Vector3 = found.get("position", start)
+
+	# Which way this swing is going, off the arm rather than off the camera.
+	# In first person that is read here, at contact, so the mouse is still
+	# steering and a drag lands where it was dragged to. In third person the
+	# direction was locked when it was released and the player is wearing it.
+	var contact_side := BladeRead.swing_side(arm.velocity)
+	var side := BladeRead.committed_side(released_side, contact_side, not third_person)
+	var defender := _entry_for(rig)
+	var read: Dictionary = BladeRead.resolve(
+		str(defender.get("guard", "")), float(defender.get("guard_age", 99.0)), side, arm.head_speed())
+	last_read = {"swing": side, "guard": str(defender.get("guard", "")), "outcome": str(read.get("outcome", "none"))}
+	var through := float(read.get("through", 1.0))
+	if str(read.outcome) == "parry":
+		# Turned. The arm takes the whole of its own commitment back.
+		arm.strike(1.0, -along)
+		_kick(1.0, "cut", false, HITSTOP_SHOT)
+		var defender_motion := defender.get("motion") as HunterBodyMotion
+		if defender_motion != null and is_instance_valid(defender_motion):
+			defender_motion.trigger_parry()
+		_note("PARRIED // %s MET %s" % [str(read.guard).to_upper(), side.to_upper()])
+		return
+	if str(read.outcome) == "block":
+		_note("BLOCKED // %s" % side.to_upper())
+
+	# The cut lands on the plane the edge actually swept, which is what makes
+	# an overhead and a level slash take an arm off along different lines.
+	var commitment := arm.commitment()
+	var earned_damage := float(attack.get("damage", 0.0)) * lerpf(0.35, 1.35, commitment)
+	var result: Dictionary = rig.hit_at(
+		landed, earned_damage * through, float(attack.get("impulse", 0.0)) * through,
+		damage_type, along, -1.0, arm.cut_plane(camera.global_transform.basis, landed))
 	if not bool(result.get("accepted", true)):
 		_note("%s ALREADY GONE" % _spoken(zone))
 		return
@@ -670,7 +863,26 @@ func _melee_swing() -> void:
 	if off:
 		severed_total += 1
 	_kick(0.9, damage_type, off, HITSTOP_SHOT)
-	_note("%s OFF" % _spoken(zone) if off else "HIT // %s" % _spoken(zone))
+	arm.strike(_melee_bite(off), -along)
+	var defender_hit := defender.get("motion") as HunterBodyMotion
+	if defender_hit != null and is_instance_valid(defender_hit):
+		defender_hit.trigger_stagger(rig.to_local(camera.global_position), 1.0 if off else 0.6)
+	_note("%s OFF // %s" % [_spoken(zone), side.to_upper()] if off else "HIT // %s // %s" % [_spoken(zone), side.to_upper()])
+	_try_finisher(rig, str(arsenal.current_id), zone, along, float(result.get("damage", 0.0)), damage_type)
+
+
+## How hard the blade is stopped. Taking a limb off is barely stopped at all;
+## meeting one that stays on is what jars the arm.
+func _melee_bite(severed: bool) -> float:
+	return 0.25 if severed else 0.75
+
+
+## The bodies entry for a rig, so a swing can ask what its target was holding.
+func _entry_for(rig: BaselineHuman) -> Dictionary:
+	for entry: Dictionary in bodies:
+		if entry.get("rig") == rig:
+			return entry
+	return {}
 
 
 ## Where a round of this scene's ended up, on the frame it actually got there.
@@ -780,6 +992,33 @@ func _on_round_hit(hit: Dictionary) -> void:
 		severed_total += 1
 	_kick(0.7 * carried, damage_type, off, HITSTOP_SHOT)
 	_note("%s OFF" % _spoken(zone) if off else "HIT // %s" % _spoken(zone))
+	_try_finisher(rig, str(payload.get("weapon", arsenal.current_id)), zone, direction,
+		float(result.get("damage", damage * carried)), damage_type)
+
+
+## What a lethal round earns, resolved after the rig has answered for the hit.
+##
+## Both of these were wired into the Hunt and neither reached the range, which
+## is the wrong way round: the range is where you find out what a weapon does.
+func _try_finisher(rig: BaselineHuman, weapon: String, zone: String, direction: Vector3, damage: float, damage_type: String) -> void:
+	if rig == null or not is_instance_valid(rig):
+		return
+	var snapshot: Dictionary = rig.snapshot()
+	if not bool(snapshot.get("dead", false)):
+		return
+	# The head comes apart before the camera runs, so the plate plays over a
+	# body already in the state you will walk up to when it ends.
+	if SKULL_BURST.earned(zone, damage, damage_type, snapshot):
+		var burst: Dictionary = SKULL_BURST.open(rig, direction)
+		if not burst.is_empty():
+			_note("CRANIUM OFF // %s" % weapon.to_upper())
+	if kill_cam == null or kill_cam.active:
+		return
+	var finish: Dictionary = KILL_SHOT.earned(weapon, zone, snapshot)
+	if finish.is_empty():
+		return
+	kill_cam.trigger(str(rig.name).to_upper(), str(finish.get("zone", zone)), direction,
+		str(finish.get("label", weapon.to_upper())), snapshot)
 
 
 ## Range bodies already share anatomy with the Hunt; they now share the hit
@@ -843,6 +1082,9 @@ func _unmark_last() -> void:
 func _build_view_gear() -> void:
 	view_gear = HELD_GEAR.new()
 	view_gear.name = "ViewGear"
+	# The same hands the world puts on the same weapons. Set before the node
+	# enters the tree, because that is when they are built.
+	view_gear.gloved = true
 	# On the camera, because in this room the camera *is* the player — there is
 	# no body and so no arm pose for the weapon to be hung off and cancelled
 	# against, which is the only part of the Hunt's viewmodel path that cannot
@@ -850,6 +1092,10 @@ func _build_view_gear() -> void:
 	camera.add_child(view_gear)
 	view_gear.take(arsenal.current_id)
 	_gear_rest = view_gear.position
+	# `HeldGear` already gives the range the production hands and costumed
+	# forearms.  Unlike the Hunt, this scene has no body-motion pass to stretch
+	# those sleeves from the frame edge to the live wrists, so do that here.
+	_update_view_forearms()
 
 	muzzle_point = Node3D.new()
 	muzzle_point.name = "Muzzle"
@@ -894,6 +1140,35 @@ func _refresh_muzzle_anchor() -> void:
 		var anchor := view_gear.weapon.get_node_or_null("anchor_muzzle") as Node3D
 		if anchor != null:
 			muzzle_point.position = view_gear.transform * (view_gear.weapon.transform * anchor.position)
+
+
+## The weapon model is not a floating prop: the same gloves and sleeves used
+## in the Hunt have to reach the bottom of the first-person frame here too.
+## `top_level` makes each sleeve camera-composed after HeldGear moves a hand
+## for recoil or a new grip; recalculating it in `_advance_shot_feel()` keeps
+## that continuity rather than freezing the wrist in the old pose.
+func _update_view_forearms() -> void:
+	if camera == null or not is_instance_valid(camera) or view_gear == null or not is_instance_valid(view_gear):
+		return
+	for hand in [view_gear.right_hand, view_gear.left_hand]:
+		if hand == null or not is_instance_valid(hand):
+			continue
+		var forearm := hand.get_node_or_null("FirstPersonForearm") as Node3D
+		var sleeve := forearm.get_node_or_null("TaperedSleeve") as MeshInstance3D if forearm != null else null
+		if forearm == null or sleeve == null:
+			continue
+		forearm.visible = true
+		forearm.top_level = true
+		var side := int(hand.get_meta("screen_entry_side", 1))
+		var start: Vector3 = camera.to_global(Vector3(0.43 * float(side), -0.49, -0.30))
+		var end: Vector3 = hand.to_global(Vector3(0.0, 0.0, -0.035))
+		var along: Vector3 = end - start
+		var length := maxf(along.length(), 0.08)
+		forearm.global_transform = Transform3D(Basis(Quaternion(Vector3.UP, along.normalized())), start)
+		var sleeve_mesh := sleeve.mesh as CylinderMesh
+		if sleeve_mesh != null:
+			sleeve_mesh.height = length
+		sleeve.position.y = length * 0.5
 
 
 ## AF6.1. Every `HunterArsenal` weapon reachable in the sandbox, not just the
@@ -1057,7 +1332,16 @@ func _advance_shot_feel(real_delta: float) -> void:
 
 	if view_gear != null and is_instance_valid(view_gear):
 		_gear_recoil = maxf(0.0, _gear_recoil - real_delta * GEAR_RETURN)
-		view_gear.position = _gear_rest + Vector3(0.0, 0.006, GEAR_RECOIL) * _gear_recoil
+		var recoil := Vector3(0.0, 0.006, GEAR_RECOIL) * _gear_recoil
+		if arm != null and arsenal != null and str(arsenal.current().get("kind", "")) == "melee":
+			# The visible sword follows the same spring-driven hand that decides
+			# speed, direction and cut plane; it is not a disconnected recoil prop.
+			view_gear.position = _gear_rest + (arm.at - arm.anchor) + recoil
+			view_gear.rotation = Vector3(arm.tilt.x, arm.tilt.y, 0.0)
+		else:
+			view_gear.position = _gear_rest + recoil
+			view_gear.rotation = Vector3.ZERO
+		_update_view_forearms()
 
 	if ballistics == null or not is_instance_valid(ballistics):
 		return
@@ -1091,7 +1375,11 @@ func _cut() -> void:
 		return
 	var rig := found["rig"] as BaselineHuman
 	var zone := str(found["zone"])
-	var result := rig.hit(zone, 58.0, 72.0, "cut", "", along)
+	var landed: Vector3 = found.get("position", rig.global_position)
+	var plane: Variant = null
+	if arm != null and arm.head_speed() > LimbMomentum.IDLE_SPEED:
+		plane = arm.cut_plane(camera.global_transform.basis, landed)
+	var result := rig.hit_at(landed, 58.0, 72.0, "cut", along, -1.0, plane)
 	if not bool(result.get("accepted", true)):
 		_note("%s ALREADY GONE" % _spoken(zone))
 		return
@@ -1178,10 +1466,35 @@ func _note(text: String) -> void:
 
 # ---------------------------------------------------------------- the loop
 func _unhandled_input(event: InputEvent) -> void:
+	# The raised handheld owns the player's attention.  Letting the range keep
+	# interpreting its keys made G look open while mouse, weapon, and movement
+	# commands continued underneath it.
+	if handheld != null and handheld.is_open:
+		if event is InputEventKey and not event.echo:
+			var device_key := event as InputEventKey
+			if device_key.pressed and device_key.keycode in [KEY_G, KEY_ESCAPE]:
+				handheld.close_device()
+				get_viewport().set_input_as_handled()
+				return
+			if handheld.handle_input(event):
+				get_viewport().set_input_as_handled()
+				return
+		# A device page is never a transparent overlay.  Unclaimed keys are
+		# intentionally swallowed instead of firing, dodging, or changing gear.
+		if event is InputEventKey:
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var motion := event as InputEventMouseMotion
-		yaw -= motion.relative.x * 0.0026
-		pitch = clampf(pitch - motion.relative.y * 0.0024, -1.2, 0.9)
+		var turn := Vector2(motion.relative.x * 0.0026, motion.relative.y * 0.0024)
+		yaw -= turn.x
+		pitch = clampf(pitch - turn.y, -1.2, 0.9)
+		# The same movement that turns the head swings the blade. This is the
+		# whole of the Mordhau input model and it costs one line, because
+		# `LimbMomentum.advance()` has always taken a look delta.
+		_look_delta += turn
+		if guarding:
+			guard_aim += motion.relative
 	if event is InputEventMouseButton:
 		var click := event as InputEventMouseButton
 		if click.button_index == MOUSE_BUTTON_LEFT and click.pressed:
@@ -1197,8 +1510,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif click.button_index == MOUSE_BUTTON_RIGHT:
 			if launcher_equipped or str(arsenal.current().get("kind", "")) == "firearm":
 				firearm_aiming = click.pressed
-			elif click.pressed:
-				_melee_swing()
+			else:
+				# Held, and the mouse picks the side while it is held. Right
+				# was the melee swing before; swinging belongs on left with
+				# everything else that attacks, and a blade needs the other
+				# button for the half of a sword fight that is not attacking.
+				guarding = click.pressed
+				guard_aim = Vector2.ZERO
+				guard_held = 0.0
+				if not click.pressed:
+					_note("GUARD DOWN")
 		elif click.pressed and (click.button_index == MOUSE_BUTTON_WHEEL_UP or click.button_index == MOUSE_BUTTON_WHEEL_DOWN):
 			# AF6.1. Cycling rather than reserving three more number keys, since
 			# 1-4 already belong to the carry/substance slots and doubling a key
@@ -1233,9 +1554,17 @@ func _unhandled_input(event: InputEvent) -> void:
 				else:
 					jump_queued = true
 			KEY_E: _take_station_item()
+			KEY_F: _open_nearest_body()
+			KEY_V:
+				third_person = not third_person
+				# The registers differ in when the swing direction is read, so
+				# say which one is running rather than leaving it to be felt.
+				_note("THIRD PERSON // COMMITTED SWINGS" if third_person else "FIRST PERSON // DRAG YOUR SWINGS")
 			KEY_G:
 				if handheld != null:
 					handheld.toggle_device()
+					get_viewport().set_input_as_handled()
+					return
 			KEY_Q: _cut()
 			KEY_R: _reset()
 			KEY_X: _set_xray(not xray)
@@ -1375,10 +1704,71 @@ func _take_station_item() -> void:
 	_note("TAKEN // %s" % str(taken.get("label", "UNMARKED")))
 
 
+## A carry prompt is contextual information, not a permanent watermark.  It
+## appears only when an item can actually be taken or when the player has
+## something in a carried slot to use.
+func _near_pickup_source() -> bool:
+	if station != null and is_instance_valid(station) and eye.distance_to(station.global_position) <= WEAPON_PICKUP_REACH:
+		return true
+	for pickup: Dictionary in weapon_pickups:
+		if not bool(pickup.get("available", false)):
+			continue
+		var model := pickup.get("model") as Node3D
+		if model != null and is_instance_valid(model) and eye.distance_to(model.global_position) <= WEAPON_PICKUP_REACH:
+			return true
+	return false
+
+
 ## AF6.1. E takes the nearest authored gun or blade only when the player has
 ## physically walked into reach. The rack model disappears in the same action
 ## that equips the live arsenal entry, so this cannot read as a display prop
 ## beside a hotkey swap.
+## `Cavity`, on a body you are standing over.
+##
+## The Hunt only reaches this through a timed extraction, so the geometry half
+## of opening somebody -- the wall coming away, the organs behind it becoming
+## visible -- was effectively unreachable anywhere you could stand and look at
+## it. Here it is a key.
+func _open_nearest_body() -> void:
+	var nearest: BaselineHuman = null
+	var nearest_distance := 2.8
+	for entry: Dictionary in bodies:
+		var candidate := entry.get("rig") as BaselineHuman
+		if candidate == null or not is_instance_valid(candidate):
+			continue
+		var distance := eye.distance_to(candidate.global_position)
+		if distance <= nearest_distance:
+			nearest = candidate
+			nearest_distance = distance
+	if nearest == null:
+		_note("NOTHING IN REACH TO OPEN")
+		return
+	# Chest first, then the head, so a second press on the same body does
+	# something rather than refusing.
+	var zone := "torso" if not CAVITY.is_open(nearest, "torso") else "head"
+	if CAVITY.is_open(nearest, zone):
+		_note("ALREADY OPEN // BOTH")
+		return
+	# From the body toward the hands, so the wall that comes away is the one
+	# between you and the inside -- and flattened, because these bodies are
+	# standing. Leaving the vertical in means reaching down into a chest from
+	# above the shoulder, and the plane then takes a cap off the top of the
+	# torso too small to clear `MIN_OPENING_AREA`, so the dig silently did
+	# nothing. `bone_yard_hunt` zeroes the same component for the same reason.
+	var facing := eye - nearest.global_position
+	facing.y = 0.0
+	if facing.length_squared() < 0.0001:
+		facing = Vector3.FORWARD
+	var cut: Dictionary = CAVITY.open_zone(nearest, zone, facing)
+	if cut.is_empty():
+		_note("NOTHING WORTH OPENING THERE")
+		return
+	# The slab is a real piece rather than geometry that stopped existing.
+	CAVITY.shed_wall(nearest, cut, facing, GoreChunks.Layer.MUSCLE)
+	var organs: Array = cut.get("organs", [])
+	_note("OPENED // %s%s" % [_spoken(zone), "" if organs.is_empty() else " // " + ", ".join(organs).to_upper()])
+
+
 func _take_nearest_weapon() -> bool:
 	var nearest: Dictionary = {}
 	var nearest_distance := WEAPON_PICKUP_REACH
@@ -1396,11 +1786,16 @@ func _take_nearest_weapon() -> bool:
 		return false
 	var weapon_id := str(nearest.get("weapon", ""))
 	var slot := HunterArsenal.SLOT_ORDER.find(weapon_id)
-	if slot < 0:
+	if weapon_id == "sniper":
+		# Not a slot. It is acquired rather than selected, which is the same
+		# call the world makes when the rifle is found.
+		if not arsenal.acquire_sniper():
+			return false
+	elif slot < 0:
 		return false
 	# Use the same refusal the hotkeys use: a half-finished reload or jam clear
 	# cannot strand its timer merely because the replacement came off a wall.
-	if weapon_id != arsenal.current_id and not arsenal.select_slot(slot):
+	elif weapon_id != arsenal.current_id and not arsenal.select_slot(slot):
 		_note("CAN'T TAKE // HANDS BUSY")
 		return true
 	launcher_equipped = false
@@ -1492,6 +1887,21 @@ func _physics_process(delta: float) -> void:
 	var move := _sandbox_move_input()
 	var move_speed := 7.0 * (0.68 if firearm_aiming else 1.0)
 	walk = walk.lerp(move * move_speed, clampf(real_delta * 14.0, 0.0, 1.0))
+	# The arm and guard run in real seconds: sandbox slow motion bends the world,
+	# not the player's input. The delta is already radians, matching the Hunt.
+	if arm != null:
+		var forward := Vector3(sin(yaw), 0.0, cos(yaw))
+		var right := Vector3(forward.z, 0.0, -forward.x)
+		arm.advance(real_delta, _look_delta, Vector3(walk.dot(right), walk.y, -walk.dot(forward)))
+		_look_delta = Vector2.ZERO
+	if guarding:
+		guard_held += real_delta
+	_update_dummy_guards(real_delta)
+	_feed_field_hud()
+	if melee_windup >= 0.0:
+		melee_windup -= real_delta
+		if melee_windup < 0.0:
+			_resolve_melee_swing()
 	if dodge_remaining > 0.0:
 		eye += dodge_direction * 16.0 * real_delta
 	else:
@@ -1566,19 +1976,47 @@ func _build_hud() -> void:
 	hud = Control.new()
 	hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Under the sandbox readouts, because it is the room the numbers sit in.
+	field_hud = Control.new()
+	field_hud.set_script(FIELD_HUD)
+	field_hud.name = "FieldInterface"
+	field_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	field_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(field_hud)
+	# Never shown as a full screen here: the range is one room and there is
+	# nowhere to travel to. It is carried purely for the satellite feeding the
+	# corner of the panel.
+	living_map = LIVING_MAP.new()
+	living_map.name = "LivingMap"
+	living_map.visible = false
+	layer.add_child(living_map)
+	living_map.call("attach_world", get_world_3d())
 	hud.draw.connect(_paint_hud)
 	layer.add_child(hud)
+	# Above the readouts, because when it fires it is the only thing to look at.
+	kill_cam = KILL_CAM.new()
+	kill_cam.name = "KillCam"
+	kill_cam.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	kill_cam.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(kill_cam)
 	# Same damaged CellOutz hardware as the Hunt, not a sandbox text panel.
 	handheld = HandheldDevice.new()
 	handheld.name = "SandboxHandheld"
 	layer.add_child(handheld)
+	# The sandbox is a real 3D region, so its handheld gets the same live
+	# satellite feed as the main world instead of falling back to the facility
+	# chart with no world source attached.
+	handheld.bind(self, null, Callable())
 	psychedelic = PSYCHEDELIC_RIG.new()
 	psychedelic.name = "SandboxPsychedelic"
 	layer.add_child(psychedelic)
 	mode_button = Button.new()
 	mode_button.name = "TrainingMode"
-	mode_button.position = Vector2(476, 24)
-	mode_button.size = Vector2(328, 38)
+	mode_button.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	mode_button.offset_left = -164.0
+	mode_button.offset_top = 24.0
+	mode_button.offset_right = 164.0
+	mode_button.offset_bottom = 62.0
 	mode_button.focus_mode = Control.FOCUS_NONE
 	mode_button.add_theme_font_size_override("font_size", 14)
 	var normal := StyleBoxFlat.new()
@@ -1687,21 +2125,34 @@ func _paint_hud() -> void:
 	# A damaged field instrument, not a clean debug overlay. The corners and
 	# centre sigil use the same copper/blood language as the front door and the
 	# handheld so this room reads as part of the game before anything is shot.
-	var frame := Color("862016")
-	hud.draw_line(Vector2(18, 18), Vector2(250, 18), frame * Color(1, 1, 1, 0.82), 2.0)
-	hud.draw_line(Vector2(18, 18), Vector2(18, 104), frame * Color(1, 1, 1, 0.82), 2.0)
-	hud.draw_line(Vector2(size.x - 18, 18), Vector2(size.x - 250, 18), frame * Color(1, 1, 1, 0.82), 2.0)
-	hud.draw_line(Vector2(size.x - 18, 18), Vector2(size.x - 18, 104), frame * Color(1, 1, 1, 0.82), 2.0)
-	hud.draw_line(Vector2(18, size.y - 18), Vector2(250, size.y - 18), frame * Color(1, 1, 1, 0.55), 2.0)
-	hud.draw_line(Vector2(size.x - 18, size.y - 18), Vector2(size.x - 250, size.y - 18), frame * Color(1, 1, 1, 0.55), 2.0)
+	# The corner frame is `gothic_field_hud._draw_screen_frame()` now. Drawing a
+	# second one over it puts two sets of copper corners a few pixels apart,
+	# which is the same mistake the Hunt already fixed once when it had two
+	# control strips (I3).
 	# `CellOutzType.draw_text` takes the top-left and `cap_height` is the cap, so
 	# a 20-cap title at y=34 ends at y=54 and the strapline started at exactly
 	# y=54 — no gap at all, and the title's own 2.6px stroke then ran straight
 	# through the line below it. Set on a real leading instead.
-	CellOutzType.draw_text(hud, Vector2(26, 32), "GORE SANDBOX", 20.0, bone * Color(1, 1, 1, 0.85), 2.0)
-	CellOutzType.draw_condensed(hud, Vector2(26, 62), "WIZARDS ONLY FOOLS  //  NOTHING HERE IS A MOCK-UP", 9.0, bone * Color(1, 1, 1, 0.4), 2.2)
+	# Everything this scene draws that the Hunt does not is reference material,
+	# and it now lives behind F1 rather than on top of the game.
+	#
+	# Greg, looking at the range beside the world: *"remove this green text top
+	# right and the controls at the bottom"*, *"make it all match and the
+	# same"*. The green telemetry sat directly over the vitals vessels
+	# `gothic_field_hud` draws, and the key strip sat directly over the one it
+	# draws too -- the exact double strip the Hunt removed for itself in I3,
+	# rebuilt here by adding the Hunt panel underneath the sandbox one.
+	#
+	# The rule now is simply: if the Hunt does not show it, it is behind F1.
+	if controls_expanded:
+		# Something to read it against. The reference is text over a live 3D
+		# scene, and at a glance the two were indistinguishable.
+		hud.draw_rect(Rect2(0, 0, size.x, size.y), Color(0.02, 0.015, 0.02, 0.86))
+		CellOutzType.draw_text(hud, Vector2(26, 32), "GORE SANDBOX", 20.0, bone * Color(1, 1, 1, 0.85), 2.0)
+		CellOutzType.draw_condensed(hud, Vector2(26, 62), "WIZARDS ONLY FOOLS  //  NOTHING HERE IS A MOCK-UP", 9.0, bone * Color(1, 1, 1, 0.4), 2.2)
 
-	var keys := [
+	var compact := size.x < 900.0 or size.y < 560.0
+	var keys := [["F1", "CONTROLS"], ["G", "DEVICE"], ["H", "DUMMIES"]] if compact else [
 		["WASD", "MOVE/DRAG"], ["LMB", "FIRE/PRESS"], ["RMB", "AIM/HEAVY"],
 		["SPACE", "JUMP/MOVE+DODGE"], ["C", "GRAPPLE/LET GO"], ["H", "DUMMY/ENEMY"],
 		["6-9", "WEAPONS"], ["F1", "MORE CONTROLS"],
@@ -1711,10 +2162,15 @@ func _paint_hud() -> void:
 			["WASD", "MOVE/DRAG"], ["LMB", "FIRE/PRESS"], ["RMB", "AIM/HEAVY"],
 			["SPACE", "JUMP/MOVE+DODGE"], ["C", "GRAPPLE/LET GO"], ["H", "DUMMY/ENEMY"],
 			["6-8", "MELEE/FIREARMS"], ["9", "BREACH LAUNCHER"], ["WHEEL", "CYCLE"], ["T", "RELOAD"],
-			["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"],
+			["SHIFT", "HOLD FOR SLOW"], ["X", "X-RAY"], ["Q", "CUT"], ["E", "TAKE"], ["F", "OPEN BODY"],
+			["RMB", "GUARD (MOUSE PICKS SIDE)"], ["V", "1ST/3RD PERSON"],
 			["1-4", "USE/HOLD SMOKE"], ["G", "DEVICE"], ["R", "RESET"], ["CTRL", "CROUCH"], ["F1", "LESS CONTROLS"],
 		]
-	var row_size := 7 if controls_expanded else 4
+	# Emptied rather than branched around, so the layout below stays one code
+	# path and cannot drift from the expanded one.
+	if not controls_expanded:
+		keys = []
+	var row_size := 3 if compact and not controls_expanded else (7 if controls_expanded else 4)
 	var row_count := ceili(float(keys.size()) / float(row_size))
 	for index in keys.size():
 		var pair: Array = keys[index]
@@ -1772,6 +2228,17 @@ func _paint_hud() -> void:
 		# there for seconds on end while slow motion is held.
 		"IN FLIGHT  %03d" % _rounds_in_flight(),
 	]
+	# At small window sizes the old readout tried to preserve every internal
+	# counter, drew itself outside the screen, and hid the actual game.  The
+	# compact panel says only what a player can act on; F1 remains the route to
+	# the fuller reference rather than a permanent debug flood.
+	if compact:
+		var compact_weapon := "%s // %d" % [str(arsenal.current().get("label", "WEAPON")).to_upper(), int(arsenal_state.get("loaded", 0))] if not launcher_equipped else "BREACH // %d" % launcher_rounds
+		lines = [
+			compact_weapon,
+			"%s // STAMINA %03d" % ["AIM" if firearm_aiming else "READY", roundi(stamina)],
+			"%s // %d UP" % ["ENEMIES" if enemies_enabled else "DUMMIES", standing],
+		]
 	# AF6.2. The last shot, read back rather than only felt: real distance,
 	# real travel time, and how much muzzle energy actually survived the
 	# trip — drag's real effect against a real number, not a cosmetic stat.
@@ -1789,18 +2256,27 @@ func _paint_hud() -> void:
 			float(last_shot_readout.get("drop_cm", 0.0)),
 			str(last_shot_readout.get("penetration", "NO BODY READ")),
 		])
+	# The green block. It is the single worst offender: it drew straight over
+	# the blood and stamina vessels in the top right corner of the Hunt panel,
+	# so the two readouts were legible only in the gaps between each other.
+	if not controls_expanded:
+		lines = []
 	var y := 40.0
+	var telemetry_cap := 8.5 if compact else 11.0
+	var telemetry_spacing := 14.0 if compact else 18.0
 	for line: String in lines:
-		var width := CellOutzType.width_condensed(line, 11.0, 2.0)
-		CellOutzType.draw_condensed(hud, Vector2(right_edge - width, y), line, 11.0, acid * Color(1, 1, 1, 0.8), 2.0)
-		y += 18.0
+		var width := CellOutzType.width_condensed(line, telemetry_cap, 2.0)
+		CellOutzType.draw_condensed(hud, Vector2(right_edge - width, y), line, telemetry_cap, acid * Color(1, 1, 1, 0.8), 2.0)
+		y += telemetry_spacing
 	var carry_line := "CARRY  "
 	for index in carried_substances.size():
 		carry_line += "%d:%s  " % [index + 1, str((carried_substances[index] as Dictionary).get("id", "?")).to_upper()]
-	if carried_substances.is_empty():
-		carry_line += "EMPTY // [E] AT STATION OR WEAPON RACK"
-	var carry_width := CellOutzType.width_condensed(carry_line, 10.0, 1.8)
-	CellOutzType.draw_condensed(hud, Vector2(right_edge - carry_width, y + 10.0), carry_line, 10.0, bone * Color(1, 1, 1, 0.62), 1.8)
+	if carried_substances.is_empty() and _near_pickup_source():
+		carry_line += "EMPTY // [E] TAKE"
+	if controls_expanded and (not carried_substances.is_empty() or _near_pickup_source()):
+		var carry_cap := 8.5 if compact else 10.0
+		var carry_width := CellOutzType.width_condensed(carry_line, carry_cap, 1.8)
+		CellOutzType.draw_condensed(hud, Vector2(right_edge - carry_width, y + 10.0), carry_line, carry_cap, bone * Color(1, 1, 1, 0.62), 1.8)
 
 	if xray:
 		var tag := "X-RAY"
@@ -1813,6 +2289,13 @@ func _paint_hud() -> void:
 		var label_width := CellOutzType.width(label, 26.0, 6.0)
 		CellOutzType.draw_text(hud, Vector2(size.x * 0.5 - label_width * 0.5, size.y * 0.5 - 120.0),
 			label, 26.0, acid * Color(1, 1, 1, slowed * 0.5), 6.0)
+
+	# One line, bottom right, so a scene with its chrome hidden still tells you
+	# the chrome exists. It is the only permanent sandbox-only mark left.
+	var hint := "F1  REFERENCE"
+	var hint_width := CellOutzType.width_condensed(hint, 8.5, 1.6)
+	CellOutzType.draw_condensed(hud, Vector2(size.x - 26.0 - hint_width, size.y - 30.0), hint, 8.5,
+		bone * Color(1, 1, 1, 0.22), 1.6)
 
 	if note_life > 0.0 and last_note != "":
 		var note_width := CellOutzType.width(last_note, 17.0, 3.0)

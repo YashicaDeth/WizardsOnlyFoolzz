@@ -19,6 +19,12 @@ signal arrived()
 ## upper bound is the load itself: the plate now waits on real progress from
 ## ResourceLoader rather than on a fixed timer that knew nothing.
 const MIN_HOLD := 0.85
+const ANATOMY_FILM := preload("res://shaders/anatomy_film.gdshader")
+const PLATES := [
+	preload("res://art/plates/xray_plate_painted.png"),
+	preload("res://art/plates/xray_plate_ripple.png"),
+	preload("res://art/plates/xray_plate_twirl.png"),
+]
 const FADE := 0.36
 
 ## The plate used to be lit acid-green, which put the one screen standing
@@ -82,6 +88,8 @@ var _runnels: Array = []
 ## transition is exactly the hitch a loading screen exists to hide.
 var _specimen: XraySpecimen = null
 var _rain: Array = []
+## The seam wipe (`TransitionKit`). Null falls back to the plain alpha fade.
+var wipe: TransitionKit = null
 
 ## P1.1/P2.4. `OpeningDirector.advance()` had no caller anywhere in real
 ## gameplay — only in tests — so `stage()` never left "none" and
@@ -96,6 +104,14 @@ var _rain: Array = []
 ## what `resume_destination()` actually needs, not literal victory.
 const STAGE_ON_ARRIVAL := {
 	"res://vat_chamber.tscn": "woke",
+	# The arcade sits between the vat and the pit. `vat_chamber.gd` also
+	# advances this stage on its way out, and `advance()` is write-once, so the
+	# two cannot disagree -- but the whole point of this table is that arriving
+	# somewhere records it, rather than every departing scene remembering to.
+	# Without the entry, a second route into the arcade would record nothing and
+	# a resume would drop the player back in the vat they already escaped.
+	"res://service_arcade.tscn": "entered_arcade",
+	"res://buried_city.tscn": "entered_lower_works",
 	"res://rift_derby.tscn": "entered_pit",
 	"res://underground_colosseum.tscn": "entered_pit",
 	"res://bone_yard_hunt.tscn": "won_derby",
@@ -112,6 +128,9 @@ func _ready() -> void:
 	screen.draw.connect(_draw_plate)
 	add_child(screen)
 	screen.visible = false
+	wipe = TransitionKit.new()
+	wipe.name = "Wipe"
+	add_child(wipe)
 
 
 func _ensure_specimen() -> void:
@@ -207,8 +226,38 @@ func release() -> void:
 	screen.visible = false
 
 
+## A seam with nothing to load and nothing to say: the wipe covers, the scene
+## swaps behind it, the wipe opens. No transit plate — for the splash into the
+## menu, where a loading screen would be a pause pretending to be content.
+func wipe_to(scene_path: String) -> void:
+	if travelling:
+		return
+	travelling = true
+	var tree := get_tree()
+	if wipe != null:
+		wipe.set_style(hash(scene_path))
+		await wipe.cover()
+	var error := tree.change_scene_to_file(scene_path)
+	if error != OK:
+		push_error("Interstitial could not reach %s (%d)" % [scene_path, error])
+	await tree.process_frame
+	if wipe != null:
+		await wipe.reveal()
+	travelling = false
+	arrived.emit()
+
+
+## Every seam in the game passes through here, so this is where the wipe lives:
+## cover the old frame, flip the plate underneath, uncover. The style is seeded
+## off the destination, so the same door always opens the same way.
 func _fade(target: float) -> void:
 	var tree := get_tree()
+	if wipe != null:
+		wipe.set_style(_seal_seed)
+		await wipe.cover()
+		alpha = target
+		await wipe.reveal()
+		return
 	while not is_equal_approx(alpha, target):
 		alpha = move_toward(alpha, target, tree.root.get_process_delta_time() / FADE)
 		await tree.process_frame
@@ -232,6 +281,11 @@ func _process(delta: float) -> void:
 
 func _draw_plate() -> void:
 	var size := screen.size
+	# The film is a child node, not a draw call: when the plate stops drawing it
+	# keeps its last frame on screen unless it is hidden here. Greg saw the
+	# X-ray body hang over the new scene after arriving (2026-09-24).
+	if _film != null and is_instance_valid(_film):
+		_film.visible = alpha > 0.01
 	if alpha <= 0.01 or size.x < 1.0:
 		return
 	screen.draw_rect(Rect2(Vector2.ZERO, size), VOID * Color(1, 1, 1, alpha))
@@ -241,6 +295,15 @@ func _draw_plate() -> void:
 	# over it, which is the whole reason it is drawn first and dim rather than
 	# over the top at full strength.
 	_draw_seal(Vector2(size.x * 0.5, size.y * 0.47), minf(size.x, size.y) * 0.42)
+	# A painted plate of the same scan behind the live one: X-ray frames run
+	# through Photoshop's glow, glass, ripple and twirl filters (art/plates).
+	# One per destination, drifting, so the live film has a ghost behind it.
+	var plate := PLATES[posmod(_seal_seed, PLATES.size())] as Texture2D
+	if plate != null:
+		var drift := 1.06 + sin(clock * 0.21) * 0.05
+		var plate_size := Vector2(size.y * 0.9, size.y * 0.81) * drift
+		var plate_rect := Rect2(Vector2(size.x * 0.5, size.y * 0.47) - plate_size * 0.5 + Vector2(sin(clock * 0.13) * 14.0, 0.0), plate_size)
+		screen.draw_texture_rect(plate, plate_rect, false, Color(1, 1, 1, 0.34 * alpha))
 
 	# The scan itself, composited large and centred. Drawn additively over the
 	# void so the film reads as light coming through a body rather than as a
@@ -250,7 +313,9 @@ func _draw_plate() -> void:
 		if texture != null:
 			var span := minf(size.x, size.y) * 1.02
 			var frame := Rect2(Vector2(size.x * 0.5 - span * 0.5, size.y * 0.47 - span * 0.5), Vector2(span, span))
-			screen.draw_texture_rect(texture, frame, false, Color(1, 1, 1, alpha))
+			# The scan is shown through failing film (anatomy_film.gdshader):
+			# sharp, then out of focus and swelling, then moshed and dithered.
+			_film_rect(texture, frame)
 			# A second pass, offset and dimmer: the film's own halation, which
 			# is what stops a rendered mesh looking like a rendered mesh.
 			screen.draw_texture_rect(texture, frame.grow(6.0), false, HAEM * Color(1, 1, 1, 0.22 * alpha))
@@ -303,6 +368,28 @@ func _draw_plate() -> void:
 ## Drawn as three passes of the same path — a wide dim bleed, the line itself,
 ## and a node at every vertex — because one flat polyline reads as a diagram
 ## and this is meant to read as something burnt onto the plate.
+var _film: TextureRect
+
+
+func _film_rect(texture: Texture2D, frame: Rect2) -> void:
+	if _film == null or not is_instance_valid(_film):
+		_film = TextureRect.new()
+		_film.name = "AnatomyFilm"
+		_film.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_film.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_film.stretch_mode = TextureRect.STRETCH_SCALE
+		var material_value := ShaderMaterial.new()
+		material_value.shader = ANATOMY_FILM
+		material_value.set_shader_parameter("seed", randf())
+		_film.material = material_value
+		screen.add_child(_film)
+	_film.texture = texture
+	_film.position = frame.position
+	_film.size = frame.size
+	_film.modulate = Color(1, 1, 1, alpha)
+	(_film.material as ShaderMaterial).set_shader_parameter("rect_size", frame.size)
+
+
 func _draw_seal(centre: Vector2, radius: float) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _seal_seed

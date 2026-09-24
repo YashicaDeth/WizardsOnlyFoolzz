@@ -48,5 +48,33 @@ func _ready() -> void:
 	check(arsenal.select_slot(2) and arsenal.models.sidearm.visible, "slot 3 equips sidearm and updates held model")
 	var pistol: Dictionary = arsenal.begin_attack()
 	check(pistol.accepted and pistol.pellets == 1 and pistol.range > blast.range, "sidearm is precise and longer ranged than shotgun")
+	# --- a weapon you picked up is a weapon you can get back to ----------------
+	#
+	# `select_slot()` indexed SLOT_ORDER and refused anything past its three
+	# entries, while `acquire_sniper()` set `current_id` directly without going
+	# through a slot. So a rifle was in your hands until you pressed 1, and then
+	# it was gone: still owned, still loaded, still in `models`, and unreachable
+	# by any input in the game.
+	check(not arsenal.carried().has("sniper"), "a rifle nobody has found is not being carried")
+	check(arsenal.carried().size() == 3, "so what you carry is what you were issued (%d)" % arsenal.carried().size())
+	check(arsenal.acquire_sniper(), "the rifle can be picked up")
+	check(arsenal.current_id == "sniper", "and picking it up puts it in your hands")
+	check(arsenal.carried().has("sniper"), "now it is something you are carrying")
+
+	# The actual bug: switch away, and try to come back.
+	check(arsenal.select_slot(0) and arsenal.current_id == "sword", "switching to the issued first slot still works")
+	check(arsenal.select_weapon("sniper") and arsenal.current_id == "sniper", "and the rifle can be reached again by name")
+	check(arsenal.select_slot(3) and arsenal.current_id == "sniper", "or by its position in what you carry")
+
+	# Backwards compatibility: everything that looks a weapon up with
+	# SLOT_ORDER.find() has to keep landing on the same index.
+	check(arsenal.select_slot(1) and arsenal.current_id == "shotgun", "the issued slots have not moved")
+	check(arsenal.select_slot(2) and arsenal.current_id == "sidearm", "any of them")
+
+	# Wrapping, so there is never a dead end to get stuck on.
+	check(arsenal.select_slot(0) and arsenal.cycle(-1) and arsenal.current_id == "sniper", "cycling back from the first wraps onto the last")
+	check(arsenal.cycle(1) and arsenal.current_id == "sword", "and forward from the last wraps round again")
+	check(arsenal.select_slot(9) == false, "a slot nobody is carrying is still refused")
+
 	print("ARSENAL_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

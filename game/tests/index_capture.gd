@@ -128,16 +128,16 @@ func _ready() -> void:
 	WorldHistory.update_subject("player", {"anatomy_state": {
 		"blood": 900.0, "blood_capacity": 5000.0, "pain": 88.0, "consciousness": 11.0,
 	}})
-	var pages := ["file", "pyramid", "wire", "wire_archive", "pyramid_xray", "body", "body_organ", "body_xray"]
+	var pages := ["file", "pyramid", "wire", "wire_archive", "pyramid_xray", "body", "body_organ", "body_xray", "work"]
 	for page_index in pages.size():
-		index.page = [0, 1, 2, 2, 1, 3, 3, 3][page_index]
-		index.rail_index = [3, 0, 0, 0, 0, 3, 2, 2][page_index]
+		index.page = [0, 1, 2, 2, 1, 3, 3, 3, 5][page_index]
+		index.rail_index = [3, 0, 0, 0, 0, 3, 2, 2, 0][page_index]
 		index.wire_archive = pages[page_index] == "wire_archive"
 		index.xray = page_index == 4 or page_index == 7
 		for icon in index._icons:
 			icon.set_xray(index.xray)
 		index._rebuild_rail()
-		if page_index >= 6:
+		if page_index == 6 or page_index == 7:
 			# Mara Voss with the heart pulled out: the case the whole page is for.
 			index._inspector.set_subject(WorldHistory.subject("mara_voss"))
 			index._inspector.part_index = 2

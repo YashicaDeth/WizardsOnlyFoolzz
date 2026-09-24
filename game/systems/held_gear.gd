@@ -803,12 +803,24 @@ func _init() -> void:
 	name = "HeldGear"
 
 
+## Whether these are the rig gloves or bare hands. Set it before the node
+## enters the tree, because `_ready()` is where the hands get built.
+##
+## `hunter_arsenal._build_weapon_model()` mounts `build_humiliation_hand()` on
+## every weapon the Hunt carries -- dark leather, scaled up -- because the
+## player wakes in the humiliation rig and never takes it off. A `HeldGear`
+## instance built its own out of bare `_flesh` instead, so the gore range put
+## pink hands on the same weapon the world puts gloved ones on. Greg, with the
+## two side by side: *"the hand models arent the same as the ashbloom world"*.
+var gloved := false
+
+
 func _ready() -> void:
 	if right_hand == null:
-		right_hand = build_hand(1, _flesh)
+		right_hand = build_humiliation_hand(1) if gloved else build_hand(1, _flesh)
 		add_child(right_hand)
 	if left_hand == null:
-		left_hand = build_hand(-1, _flesh)
+		left_hand = build_humiliation_hand(-1) if gloved else build_hand(-1, _flesh)
 		add_child(left_hand)
 	take("", "fists")
 

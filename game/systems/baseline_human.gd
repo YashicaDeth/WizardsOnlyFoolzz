@@ -174,6 +174,9 @@ var severed: Array[String] = []
 ## Cutting force accumulates separately from health. A club can destroy an arm,
 ## but only a directional cutting/ballistic blow can take it off.
 var sever_stress: Dictionary = {}
+## Zones taken by a cut rather than whole: the remainder is still on the body,
+## so it keeps rendering and does not get a capsule stump.
+var cut_zones: Dictionary = {}
 ## Deepest `GoreChunks.Layer` any blow has reached, per zone. A body remembers
 ## how far it has been opened, not just how much health it has left.
 var zone_depth: Dictionary = {}
@@ -190,10 +193,23 @@ var _drip_owed := 0.0
 ## dries the streaks running down it.
 var _bleed_seconds := 0.0
 var gore := true
+## What this body wears, zone to integrity 0..1. Empty is naked: `ClothingShell`
+## passes everything through, so undressed rigs — every existing test — behave
+## exactly as before. Dress a rig with `ClothingShell.fresh_wardrobe()` and the
+## cloth eats the blow before skin does, one way, until something mends it.
+var wardrobe: Dictionary = {}
 ## D4.2. How big this body is, from the race on the sheet. Every body in the
 ## world used to be exactly the same size whatever the sheet said, because the
 ## factor existed and nothing read it.
 var build_factor := 1.0
+
+## AX1.4. Shoulder-to-hip ratio, 0 narrow-shouldered and wide-hipped through
+## 1 broad-shouldered and narrow-hipped, 0.5 neither. The intake's ANATOMY row
+## was the last control on the form that changed nothing anywhere: it was
+## written to the sheet, drawn back to the player, saved into presets, and read
+## by no renderer and no system. It drives this, the same way the BUILD row was
+## wired to `build_factor` when it had the same problem.
+var frame_factor := 0.5
 
 var _layout: Dictionary = {}
 var _flesh := Color("6b5842")
@@ -242,6 +258,7 @@ func build(id: String, config: Dictionary = {}) -> void:
 	_flesh = config.get("flesh", Color("6b5842")) as Color
 	_variation = int(config.get("variation", 0))
 	build_factor = clampf(float(config.get("build", 1.0)), 0.7, 1.4)
+	frame_factor = clampf(float(config.get("frame", 0.5)), 0.0, 1.0)
 	var layout := _scaled_layout(SEATED if _seated else STANDING)
 	_layout = layout
 
@@ -260,6 +277,7 @@ func build(id: String, config: Dictionary = {}) -> void:
 		part.set_meta("rest_scale", part.scale)
 		add_child(part)
 		parts[zone_id] = part
+		_dress_zone(zone_id, spec.size)
 
 		var hitbox := Area3D.new()
 		hitbox.name = "%s_hitbox" % zone_id
@@ -396,15 +414,29 @@ func zone_nearest(global_point: Vector3) -> String:
 ## both grows the whole silhouette upward from the ground rather than sinking
 ## a big body into it.
 func _scaled_layout(source: Dictionary) -> Dictionary:
-	if is_equal_approx(build_factor, 1.0):
+	if is_equal_approx(build_factor, 1.0) and is_equal_approx(frame_factor, 0.5):
 		return source.duplicate(true)
+	# Build scales the whole body. Frame redistributes width between the chest
+	# and the hips without changing the body's mass or its height, so a hitbox
+	# stays a hitbox and every zone keeps its meaning: the shoulders come in as
+	# the stance widens and vice versa. Bounded deliberately tight -- this is a
+	# silhouette the player can recognise, not a character-sheet caricature.
+	var shoulder := lerpf(0.90, 1.10, frame_factor)
+	var hip := lerpf(1.10, 0.92, frame_factor)
 	var out := {}
 	for zone_id in source:
 		var spec: Dictionary = source[zone_id]
-		out[zone_id] = {
-			"at": (spec.at as Vector3) * build_factor,
-			"size": (spec.size as Vector3) * build_factor,
-		}
+		var size := (spec.size as Vector3) * build_factor
+		var at := (spec.at as Vector3) * build_factor
+		match zone_id:
+			"torso":
+				size.x *= shoulder
+			"left_arm", "right_arm":
+				at.x *= shoulder
+			"left_leg", "right_leg":
+				size.x *= hip
+				at.x *= hip
+		out[zone_id] = {"at": at, "size": size}
 	return out
 
 
@@ -542,18 +574,31 @@ func _set_depth_override(piece: MeshInstance3D, enabled: bool) -> void:
 	material.render_priority = 4 if enabled else 0
 
 
-func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "", hit_direction := Vector3.ZERO, joint_alignment := 1.0) -> Dictionary:
+func hit(zone_id: String, damage: float, impulse: float, damage_type := "blunt", organ_id := "", hit_direction := Vector3.ZERO, joint_alignment := 1.0, cut_point: Variant = null, cut_plane: Variant = null) -> Dictionary:
 	var zone := canonical_zone(zone_id)
 	if severed.has(zone) and not anatomy.installed_parts.has(zone):
 		return {"accepted": false, "reason": "severed", "zone": zone, "severed": false}
 	var penetrates := damage_type in ["cut", "puncture", "ballistic", "shear"]
 	if penetrates and organ_id.is_empty():
 		organ_id = _organ_in_zone(zone)
-	var result := anatomy.apply_hit(zone, damage, impulse, damage_type, organ_id)
+	# Cloth before skin. A naked zone passes everything, so this line is free
+	# for every rig that was never dressed — the audit that proves it is
+	# `clothing_shell_test`'s "naked is unchanged" plus the untouched suites.
+	var cloth := ClothingShell.resolve_hit(wardrobe, zone, damage, damage_type)
+	var result := anatomy.apply_hit(zone, damage - float(cloth.absorbed), impulse, damage_type, organ_id)
+	result["cloth_absorbed"] = float(cloth.absorbed)
+	result["cloth_breached"] = bool(cloth.breached)
+	result["cloth_integrity"] = float(cloth.integrity)
+	if float(cloth.absorbed) > 0.0:
+		# Blood that met cloth stays in it. About seven solid hits to a fully
+		# saturated garment — slower than the two hits that tear it, so
+		# soaking is the stain a fight leaves, not the fight itself.
+		ClothingShell.stain(self, zone, damage * 0.005)
+		_dress_zone(zone, (_layout.get(zone, {}) as Dictionary).get("size", Vector3.ONE))
 	var direction := _resolved_hit_direction(zone, hit_direction)
 	var did_sever := _accumulate_sever_stress(zone, float(result.get("damage", 0.0)), damage_type, direction, joint_alignment)
 	if did_sever:
-		_sever_zone(zone, direction, result)
+		_sever_zone(zone, direction, result, cut_point, cut_plane)
 	else:
 		_refresh_zone(zone)
 	result["severed"] = did_sever
@@ -595,7 +640,7 @@ func _accumulate_sever_stress(zone: String, damage: float, damage_type: String, 
 	return not severed.has(zone) and remaining_ratio <= SEVER_HEALTH_RATIO and stress >= ceiling * SEVER_THRESHOLD_RATIO
 
 
-func _sever_zone(zone: String, direction: Vector3, result: Dictionary) -> void:
+func _sever_zone(zone: String, direction: Vector3, result: Dictionary, cut_point: Variant = null, cut_plane: Variant = null) -> void:
 	if severed.has(zone):
 		return
 	var zone_state: Dictionary = anatomy.zones.get(zone, {})
@@ -612,8 +657,13 @@ func _sever_zone(zone: String, direction: Vector3, result: Dictionary) -> void:
 	# off is not a survivable plan for anyone, the player included.
 	anatomy.bleed_rate += float(AnatomyComponent.DEFAULT_ZONES[zone].bleed) * STUMP_BLEED
 	if gore:
-		_throw_limb(zone, direction)
-		_add_stump(zone)
+		# Cut where the blow actually landed, when the caller knew where that
+		# was. The cut face is the stump, so the capsule is only for blows that
+		# arrive without a point behind them.
+		var cut: bool = cut_point is Vector3 and _cut_limb(zone, cut_point as Vector3, direction, cut_plane)
+		if not cut:
+			_throw_limb(zone, direction)
+			_add_stump(zone)
 		_spray(_zone_origin(zone), (direction + Vector3.UP * 0.65).normalized(), 18)
 	_refresh_zone(zone)
 	limb_severed.emit(zone, result.duplicate(true))
@@ -667,7 +717,7 @@ func mark_opened(zone_id: String, layer: int) -> int:
 ## and never read by anything. Left at -1 it is derived from the damage type, so
 ## every existing caller keeps working and a caller that knows what it fired
 ## gets a wound that reflects it.
-func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt", hit_direction := Vector3.ZERO, penetration := -1.0) -> Dictionary:
+func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type := "blunt", hit_direction := Vector3.ZERO, penetration := -1.0, cut_plane: Variant = null) -> Dictionary:
 	var zone := zone_nearest(global_point)
 	# Kept before `hit()` resolves, because `hit()` may sever the limb and the
 	# point has to be recorded against the limb that was actually struck.
@@ -684,7 +734,7 @@ func hit_at(global_point: Vector3, damage: float, impulse: float, damage_type :=
 	# so a range or a HUD is told stopped/grazed/lodged/through instead of
 	# inferring it from the size of a capped wound-mark array. Neither is
 	# optional and neither conflicts with the other.
-	var result := hit(zone, damage, impulse, damage_type, organ_id, hit_direction, _joint_alignment_at(zone, global_point))
+	var result := hit(zone, damage, impulse, damage_type, organ_id, hit_direction, _joint_alignment_at(zone, global_point), global_point, cut_plane)
 	if not penetration_report.is_empty():
 		result["penetration"] = penetration_report
 	return result
@@ -818,10 +868,30 @@ func _on_went_down() -> void:
 func _apply_pain_posture(delta: float) -> void:
 	if anatomy == null or anatomy.downed or anatomy.dead:
 		return
+	# Most bodies in the yard are intact and warm.  Their posture is exactly
+	# upright, yet before this guard every one allocated the posture dictionary
+	# and lerped two zeroes every rendered frame.  Keep the full path alive for
+	# damage, cold, and for the short return-to-neutral after treatment; a calm
+	# neutral rig has no visual work to do.
+	if not _needs_pose_update() and absf(rotation.x) < 0.0005 and absf(rotation.z) < 0.0005:
+		return
 	var posture := anatomy.posture()
 	var ease := clampf(delta * 8.0, 0.0, 1.0)
 	rotation.x = lerpf(rotation.x, float(posture.hunch), ease)
 	rotation.z = lerpf(rotation.z, float(posture.lean), ease)
+
+
+## Kept separate so the idle fast path is testable.  A leg injury matters even
+## if pain has been stabilised: its uneven health is what creates the lean.
+func _needs_pose_update() -> bool:
+	if anatomy == null or anatomy.downed or anatomy.dead:
+		return false
+	if anatomy.pain > 0.01 or anatomy.chilled > 0.01:
+		return true
+	var left_leg: Dictionary = anatomy.zones.get("left_leg", {})
+	var right_leg: Dictionary = anatomy.zones.get("right_leg", {})
+	return float(left_leg.get("health", 0.0)) < float(AnatomyComponent.DEFAULT_ZONES.left_leg.health) \
+		or float(right_leg.get("health", 0.0)) < float(AnatomyComponent.DEFAULT_ZONES.right_leg.health)
 
 
 ## The resolutions the downed window exists for. Each is a different answer to
@@ -1035,18 +1105,51 @@ static func config_from_subject(record: Dictionary) -> Dictionary:
 	var appearance: Dictionary = record.get("appearance", {}) if record.get("appearance") is Dictionary else {}
 	var sheet_anatomy: Dictionary = record.get("anatomy", {}) if record.get("anatomy") is Dictionary else {}
 	var wear := clampf(float(appearance.get("wear", 0.4)), 0.0, 1.0)
+	# Origin gives the body its broad silhouette, while the intake BUILD control
+	# makes a real, bounded difference inside that origin.  Before this, the form
+	# displayed a size setting but the player rig ignored it completely.
+	var selected_build := clampf(float(appearance.get("build", 0.5)), 0.0, 1.0)
+	var combined_build := clampf(float(race.get("build", 1.0)) * lerpf(0.86, 1.18, selected_build), 0.7, 1.4)
+	# Face drives the rig's procedural variation, so two players with
+	# different faces are not the same generated head -- except when the face
+	# has named axes. Then the axes shape the skull themselves, and a skin
+	# re-rolled from their combined scalar made every slider repaint the whole
+	# face (Greg, 2026-09-24: "each slider is changing the entire thing"). The
+	# skin then follows who the person is, and holds still while you edit.
+	var variation := 1 + int(clampf(float(appearance.get("face", 0.5)), 0.0, 1.0) * 24.0)
+	if appearance.get("axes") is Dictionary and not (appearance.axes as Dictionary).is_empty():
+		variation = 1 + posmod(hash(str(appearance.get("name", "THE HUNTER"))), 24)
 	var config := {
-		# Face drives the rig's procedural variation, so two players with
-		# different faces are not the same generated head.
-		"variation": 1 + int(clampf(float(appearance.get("face", 0.5)), 0.0, 1.0) * 24.0),
+		"variation": variation,
 		"flesh": Color("7a6350").darkened(wear * 0.35),
 		"blood": blood_volume(str(sheet_anatomy.get("blood_type", "O-RUST"))),
-		"build": float(race.get("build", 1.0)),
+		"build": combined_build,
+		"frame": frame_from_anatomy_sex(str(record.get("anatomy_sex", "unformed"))),
 		"cybernetics": grown_cybernetics(sheet_anatomy),
 	}
 	if record.get("anatomy_state") is Dictionary:
 		config["restore"] = record.anatomy_state
 	return config
+
+
+## AX1.4. The intake's ANATOMY row, as a silhouette. UNFORMED is the neutral
+## middle because the facility grew it "without the question being asked", and
+## RECONSTRUCTED sits just off-centre because a previous instance was altered
+## and this one inherited the result -- neither is a third shape the rig has to
+## invent. The player's choice drives the body; what the institution writes on
+## the form is `CharacterSheet.ANATOMY_SEX_FILED` and stays a separate lie.
+static func frame_from_anatomy_sex(anatomy_sex: String) -> float:
+	match anatomy_sex:
+		"female":
+			return 0.18
+		"male":
+			return 0.86
+		"intersex":
+			return 0.60
+		"reconstructed":
+			return 0.38
+		_:
+			return 0.5
 
 
 ## Blood type is a choice on the intake sheet, so it has to mean something.
@@ -1134,6 +1237,46 @@ func _leg_points_forward(zone_id: String) -> bool:
 	return _seated and zone_id.ends_with("_leg")
 
 
+## Dress the rig: assign a wardrobe and render every garment it covers. Called
+## after `build()` because wardrobes come from content — loot, presets, the
+## sheet — not from the body itself. Undress by assigning an empty dict.
+func dress(wardrobe_: Dictionary) -> void:
+	wardrobe = wardrobe_
+	for zone_id in ZONES:
+		_dress_zone(zone_id, (_layout.get(zone_id, {}) as Dictionary).get("size", Vector3.ONE))
+
+
+## The garment over a zone, if it has one. A shell child of the part itself so
+## it inherits every transform — including a severed limb's flight, which is
+## how a torn-off clothed arm keeps its sleeve. Rebuilt rather than tweaked
+## because garments are few and hits are sparse; the churn argument that made
+## streaks reuse their node does not apply here either.
+func _dress_zone(zone_id: String, size: Vector3) -> void:
+	var part := parts.get(zone_id) as MeshInstance3D
+	if part == null or not is_instance_valid(part):
+		return
+	var integrity := float(wardrobe.get(zone_id, 0.0))
+	var old := part.get_node_or_null("Garment") as MeshInstance3D
+	if integrity <= 0.0:
+		if old != null and is_instance_valid(old):
+			part.remove_child(old)
+			old.queue_free()
+		return
+	# Reused, not rebuilt: the garment keeps its node identity across hits, so
+	# the streak hanging on it survives a refresh instead of regrowing every
+	# time the cloth takes a hit.
+	var length := size.z if _leg_points_forward(zone_id) else size.y
+	if old != null and is_instance_valid(old):
+		old.mesh = ClothingShell.shell_mesh(zone_id, length * 0.5)
+		old.material_override = ClothingShell.shell_material(integrity, ClothingShell.soak_of(self, zone_id), str(wardrobe.get("style", "plain")), zone_id)
+		return
+	var shell := MeshInstance3D.new()
+	shell.name = "Garment"
+	shell.mesh = ClothingShell.shell_mesh(zone_id, length * 0.5)
+	shell.material_override = ClothingShell.shell_material(integrity, ClothingShell.soak_of(self, zone_id), str(wardrobe.get("style", "plain")), zone_id)
+	part.add_child(shell)
+
+
 func _zone_material(zone_id: String, tint: Color, kind := "flesh") -> StandardMaterial3D:
 	var material := WorldLook.surface(tint, kind, _variation + ZONES.find(zone_id))
 	# Generated surfaces are open where a limb has been taken off, and the
@@ -1199,9 +1342,13 @@ func _refresh_zone(zone_id: String) -> void:
 	if gore and anatomy.fracture_kind(zone_id) == "compound" and ratio > 0.0 and not prosthetic:
 		_add_fracture(zone_id)
 	if severed.has(zone_id) and not prosthetic:
-		if gore:
+		# A zone taken whole leaves nothing to draw and needs a capsule of bone
+		# standing in for the joint. A zone that was *cut* still has the half
+		# nearer the torso on it, and that half's cut face is a better stump
+		# than the capsule ever was -- so it stays visible and gets no stub.
+		if gore and not cut_zones.has(zone_id):
 			_add_stump(zone_id)
-		part.visible = false
+		part.visible = cut_zones.has(zone_id)
 		var hitbox := get_node_or_null("%s_hitbox" % zone_id) as Area3D
 		if hitbox != null:
 			hitbox.monitorable = false
@@ -1345,6 +1492,17 @@ func _bleed(delta: float) -> void:
 	_refresh_streaks(sites)
 
 
+## The body process is called for every standing person.  Keep an intact body
+## out of `_bleed()` entirely: that method walks anatomy and wound collections,
+## but there is nothing to render until a real wound opens.  This predicate is
+## deliberately narrower than "not dead" so a living, untreated wound wakes on
+## the next frame, while loose drops continue to simulate in `_process()`.
+func _needs_bleed_update() -> bool:
+	if not gore or anatomy == null:
+		return false
+	return anatomy.bleed_rate + anatomy.internal_bleed_rate * 0.12 >= BloodFlow.MIN_BLEED
+
+
 ## Every wound currently open enough to run, as {part, at, normal}. A severed
 ## limb is not in here — its stump bleeds, and the stump is its own zone.
 func _bleeding_sites() -> Array:
@@ -1403,16 +1561,30 @@ func _refresh_streaks(sites: Array) -> void:
 	for site: Dictionary in sites:
 		var part := site["part"] as Node3D
 		var wound: Dictionary = site["wound"]
-		var streak := part.get_node_or_null("BloodStreak") as MeshInstance3D
+		# A dressed wound bleeds through cloth: the run hangs on the garment,
+		# one cloth-thickness further out, rather than sinking into the jacket
+		# it should be running down.
+		var holder := part
+		var lift := 0.003
+		var garment := part.get_node_or_null("Garment") as Node3D
+		if garment != null and is_instance_valid(garment):
+			holder = garment
+			lift += ClothingShell.CLOTH_LIFT
+			# The wound was dressed after it started bleeding: the old run on
+			# bare skin is under the jacket now, so it goes rather than doubling.
+			var stale := part.get_node_or_null("BloodStreak") as MeshInstance3D
+			if stale != null and is_instance_valid(stale):
+				stale.queue_free()
+		var streak := holder.get_node_or_null("BloodStreak") as MeshInstance3D
 		if streak == null or not is_instance_valid(streak):
 			streak = BloodFlow.build_streak(BloodFlow.STREAK_WIDTH, length, age)
 			streak.name = "BloodStreak"
-			part.add_child(streak)
+			holder.add_child(streak)
 		else:
 			streak.mesh = BloodFlow.streak_mesh(BloodFlow.STREAK_WIDTH, length)
 			streak.material_override = BloodFlow.streak_material(age)
 		streak.transform = BloodFlow.streak_transform(
-			part, wound.get("at", Vector3.ZERO) as Vector3, wound.get("normal", Vector3.UP) as Vector3, length)
+			holder, wound.get("at", Vector3.ZERO) as Vector3, wound.get("normal", Vector3.UP) as Vector3, length, lift)
 
 
 ## Keep where a round landed, and show it there.
@@ -1613,6 +1785,105 @@ func _throw_limb(zone_id: String, hit_direction := Vector3.ZERO) -> void:
 			limb.queue_free())
 
 
+## Cuts the limb where the blow landed, instead of taking the whole zone off at
+## its joint.
+##
+## `_throw_limb()` duplicates the entire limb and `_add_stump()` puts a capsule
+## of bone at the joint, so a blade through a mid-forearm took the arm off at
+## the shoulder and left behind the same stub a shotgun would. The zone was the
+## smallest thing a body could lose.
+##
+## `BodySlice` is cheap enough to use here for the reason its header sets out:
+## these meshes have no skin weights to rebuild. The half nearer the torso stays
+## on the body and its cut face *is* the stump; the rest is thrown.
+##
+## Returns false when it cannot cut, and the caller falls back to taking the
+## zone whole -- a blast, or any caller using `hit()` rather than `hit_at()`,
+## has no point to put a plane through.
+func _cut_limb(zone_id: String, global_point: Vector3, hit_direction: Vector3, cut_plane: Variant = null) -> bool:
+	var part := parts.get(zone_id) as MeshInstance3D
+	if part == null or not is_instance_valid(part) or not part.is_inside_tree() or part.mesh == null:
+		return false
+	if live_gore >= live_gore_budget():
+		return false
+	# The blade's own plane when the blow reported one, so a cut lands at the
+	# angle it was swung at. Its orientation is the swing's; its position is the
+	# hit point, because that is where the edge actually met the limb.
+	#
+	# Without one, fall back to a cross-section: normal along the limb's own long
+	# axis, which is local +Y for everything `BodyMesh` revolves. That is an
+	# amputation rather than a slash, and it is all a blow with no swing behind
+	# it -- a blast, a fall -- can honestly claim.
+	var plane := Plane(Vector3.UP, part.to_local(global_point))
+	if cut_plane is Plane:
+		var swung := (cut_plane as Plane).normal
+		var local_normal := (part.global_transform.basis.inverse() * swung).normalized()
+		if local_normal.length_squared() > 0.5:
+			plane = Plane(local_normal, part.to_local(global_point))
+	var halves := BodySlice.split(part.mesh, plane)
+	# Whichever side of the cut the torso is on is the side that stays attached.
+	# It has to be the torso's own position and not the rig's origin: the rig is
+	# placed at the feet, which is below an arm, so using it kept the hand and
+	# threw the shoulder.
+	var anchor := global_position
+	var torso_part := parts.get("torso") as MeshInstance3D
+	if torso_part != null and is_instance_valid(torso_part):
+		anchor = torso_part.global_position
+	var keep_above := plane.distance_to(part.to_local(anchor)) >= 0.0
+	var kept: Mesh = halves.above if keep_above else halves.below
+	var lost: Mesh = halves.below if keep_above else halves.above
+	if kept == null or lost == null:
+		# The plane missed the limb, which happens when the hit point sits off
+		# the end of it. Taking the zone whole is the honest fallback.
+		return false
+
+	var limb := RigidBody3D.new()
+	limb.name = "%s_cut" % zone_id
+	limb.mass = 3.2
+	_gore_root().add_child(limb)
+	limb.global_transform = part.global_transform
+	var visual := MeshInstance3D.new()
+	visual.mesh = lost
+	visual.material_override = part.material_override
+	limb.add_child(visual)
+	# B4.1, as `_throw_limb()` has it: ink is on the arm, not on the person. A
+	# mod only travels if it was on the piece that left -- one above the cut
+	# stays on the body, which is the difference a partial cut can express and
+	# taking the whole zone could not.
+	for child in part.get_children():
+		if child is MeshInstance3D and (child as Node).has_meta("body_mod"):
+			var mod := child as MeshInstance3D
+			if (plane.distance_to(mod.position) >= 0.0) == keep_above:
+				continue
+			var carried := mod.duplicate() as MeshInstance3D
+			visual.add_child(carried)
+			carried.transform = mod.transform
+			mod.queue_free()
+
+	var shape_node := CollisionShape3D.new()
+	var shape := CapsuleShape3D.new()
+	var bounds := lost.get_aabb()
+	shape.radius = maxf(0.04, minf(bounds.size.x, bounds.size.z) * 0.5)
+	shape.height = maxf(shape.radius * 2.0 + 0.01, bounds.size.y)
+	shape_node.shape = shape
+	limb.add_child(shape_node)
+	GoreChunks.register_whole_limb(limb, zone_id, anatomy.subject_id)
+	var launch := hit_direction.normalized() if hit_direction.length_squared() > 0.001 else Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)).normalized()
+	limb.apply_central_impulse((launch * 2.25 + Vector3.UP * 1.8) * limb.mass)
+	limb.apply_torque_impulse(Vector3(randf_range(-3.0, 3.0), randf_range(-3.0, 3.0), randf_range(-3.0, 3.0)))
+	live_gore += 1
+	get_tree().create_timer(90.0).timeout.connect(func():
+		live_gore = maxi(0, live_gore - 1)
+		GoreChunks.live.erase(limb)
+		if is_instance_valid(limb):
+			limb.queue_free())
+
+	# What stays on the body is the remainder, cut face and all.
+	part.mesh = kept
+	cut_zones[zone_id] = true
+	return true
+
+
 func _add_stump(zone_id: String) -> void:
 	if has_node("%s_stump" % zone_id):
 		return
@@ -1635,7 +1906,8 @@ func _process(delta: float) -> void:
 	# Everything this rig animates runs on the exchange's clock, not the world's.
 	var own_delta := delta * motion_scale
 	_apply_pain_posture(own_delta)
-	_bleed(own_delta)
+	if _needs_bleed_update():
+		_bleed(own_delta)
 	if _loose.is_empty():
 		return
 	delta = own_delta
@@ -1713,6 +1985,10 @@ func _land_splat(at: Vector3, size: float, velocity := Vector3.DOWN) -> void:
 	)
 	splats.append(splat)
 	_remember_blood(root, splat)
+	# The spatter above and the stain below are one event: every landed drop
+	# also feeds the pool set, which is what finally makes a body bleeding out
+	# onto one spot leave a stain that grows.
+	BloodPool.keep(root, landed, BloodPool.DROP_VOLUME)
 	while splats.size() > splat_budget():
 		var oldest: Node3D = splats.pop_front()
 		if is_instance_valid(oldest):
@@ -1735,6 +2011,7 @@ static func clear_gore() -> void:
 			splat.queue_free()
 	splats.clear()
 	blood_records.clear()
+	BloodPool.clear()
 	live_gore = 0
 
 

@@ -227,6 +227,11 @@ static func build(wound: Dictionary, tint: Color, cavity_contents: Mesh = null) 
 	var radius: float = float(wound.get("radius", 0.04))
 	var depth_fraction: float = clampf(float(wound.get("depth", 1.0)), 0.0, 1.0)
 	var aspect: float = maxf(1.0, float(wound.get("aspect", 1.0)))
+	# A three-centimetre crater sunk into a limb cannot cast a shadow anybody
+	# will ever see, but it costs a full shadow-pass draw every frame like any
+	# other mesh. There are up to MAX_PER_ZONE of these per zone, so a body that
+	# has been in a fight carries a hundred of them.
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	node.mesh = _crater(radius, int(wound.get("seed", 0)), tint, str(wound.get("type", "ballistic")), depth_fraction, aspect, cavity_contents != null)
 
 	var material := StandardMaterial3D.new()
@@ -269,7 +274,10 @@ static func _add_cavity_contents(wound_node: MeshInstance3D, source: Mesh, radiu
 	# Cover the uncut procedural limb surface behind the authored aperture. This
 	# is the dark space around an organ, not the contents themselves; without it
 	# the untouched skin mesh reads as a flesh-coloured floor behind the hole.
+	# Inside the crater, and therefore inside the limb. Nothing it shadows is
+	# visible from outside the body.
 	var cavity_void := MeshInstance3D.new()
+	cavity_void.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	cavity_void.name = "CavityVoid"
 	var void_mesh := SphereMesh.new()
 	# Oversized behind the tunnel; the higher-priority ragged wall masks it back
@@ -289,6 +297,7 @@ static func _add_cavity_contents(wound_node: MeshInstance3D, source: Mesh, radiu
 	wound_node.add_child(cavity_void)
 
 	var contents := MeshInstance3D.new()
+	contents.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	contents.name = "CavityContents"
 	contents.mesh = source.duplicate(true)
 	var bounds := contents.mesh.get_aabb().size

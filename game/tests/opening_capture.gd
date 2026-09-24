@@ -1,7 +1,7 @@
 extends Node
 
-## Visual proof for G6. Captures the three authored opening states from the
-## actual playable scene: handler intake, submerged wake, and the tank voiding.
+## Visual proof for G6. Captures the pre-form laboratory, the live 3D body form,
+## submerged wake, and the tank voiding from the actual playable scene.
 
 func _ready() -> void:
 	var out_dir := "P:/GameDev/Temp"
@@ -13,9 +13,28 @@ func _ready() -> void:
 	add_child(opening)
 	await _hold(30)
 	await _capture("%s/opening_intake.png" % out_dir)
+	# The room has a short beat before the paperwork arrives. Capture the form
+	# separately so a review cannot accidentally approve only the prelude.
+	await _hold(90)
+	await _capture("%s/opening_intake_form.png" % out_dir)
 
 	var state: Dictionary = opening.intake.sheet.apply_to_world()
 	opening.intake.filed.emit(state)
+
+	# Filing now opens the examiner's departure rather than the vat sequence.
+	# Captured mid-walk and again with the panel shut, because "he leaves before
+	# the escape begins" is a claim about two frames, not about a flag.
+	await _hold(100)
+	await _capture("%s/opening_departure.png" % out_dir)
+	# Caught on the seal itself rather than after the phase ends -- by then the
+	# head has turned back to the tank and the door is out of frame, which is
+	# exactly the mistake this capture exists to catch.
+	while opening.phase == "departure" and opening.departure_clock < 3.70:
+		await get_tree().process_frame
+	await _capture("%s/opening_staff_door_sealed.png" % out_dir)
+	while opening.phase == "departure":
+		await get_tree().process_frame
+
 	await _hold(45)
 	await _capture("%s/opening_submerged.png" % out_dir)
 
@@ -35,6 +54,12 @@ func _ready() -> void:
 	opening.clock = 9.1
 	opening.phase = "aisle"
 	opening.can_move = true
+	# The objective is gated on the tank having actually broken, not on movement
+	# alone, so a capture that only grants control now truthfully shows nothing.
+	if not opening.breakout_complete:
+		opening._breach()
+		opening.phase = "aisle"
+		opening.can_move = true
 	opening._update_beats()
 	opening.subtitle.text = ""
 	opening._update_hud()

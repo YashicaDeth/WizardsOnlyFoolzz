@@ -23,7 +23,7 @@ const WEAPONS := {
 		"label": "BONE YARD 12G", "kind": "firearm", "damage": 16.0,
 		"impulse": 34.0, "range": 42.0, "cooldown": 0.92,
 		"pellets": 10, "spread": 0.075, "magazine": 5, "reserve": 25,
-		"reload": 2.15, "damage_type": "ballistic",
+		"reload": 2.15, "damage_type": "ballistic", "calibre": "buck",
 	},
 	"sidearm": {
 		# A first accurate hit should open a fight, not silently finish it. At
@@ -34,7 +34,24 @@ const WEAPONS := {
 		"label": "MERCY NINE", "kind": "firearm", "damage": 24.0,
 		"impulse": 18.0, "range": 76.0, "cooldown": 0.28,
 		"pellets": 1, "spread": 0.008, "magazine": 10, "reserve": 50,
-		"reload": 1.3, "damage_type": "ballistic",
+		"reload": 1.3, "damage_type": "ballistic", "calibre": "pistol",
+	},
+	"sniper": {
+		# The shot you take once. Everything about it is the opposite of the
+		# shotgun: it reaches across the whole bone yard, it is accurate enough
+		# that the zone you aimed at is the zone you hit, and it makes you pay for
+		# a miss with a bolt cycle you cannot hurry.
+		#
+		# 78 is calibrated against the anatomy rather than picked for feel. The
+		# sidearm's 24 already delivers 26.6 to the nearest organ and the brain
+		# has 18 points, so a head hit ruptures it. At 78 there is no argument: a
+		# clean head or heart hit is over. That is what makes the kill camera
+		# honest when it fires, rather than a flourish played over a wound the
+		# victim would have walked away from.
+		"label": "ASHLINE LONGVIEW", "kind": "firearm", "damage": 78.0,
+		"impulse": 46.0, "range": 240.0, "cooldown": 1.65,
+		"pellets": 1, "spread": 0.0015, "magazine": 4, "reserve": 16,
+		"reload": 3.2, "damage_type": "ballistic", "calibre": "rifle",
 	},
 	"facility_sidearm": {
 		# The first firearm is a guard's service hand-cannon, not the ordinary
@@ -43,9 +60,13 @@ const WEAPONS := {
 		"label": "CELL OUTZ BREACH NINE", "kind": "firearm", "damage": 52.0,
 		"impulse": 30.0, "range": 68.0, "cooldown": 0.44,
 		"pellets": 1, "spread": 0.011, "magazine": 3, "reserve": 0,
-		"reload": 1.5, "damage_type": "ballistic",
+		"reload": 1.5, "damage_type": "ballistic", "calibre": "pistol",
 	},
 }
+## The hunter's own three. The sniper is not here for the same reason
+## `facility_sidearm` is not: it is a weapon you come into possession of, and
+## a rifle that reaches across the whole bone yard is not something the game
+## should hand you at spawn.
 const SLOT_ORDER := ["sword", "shotgun", "sidearm"]
 ## AF10.10. These are attachment points on the object, not perks on its
 ## holder. The future crafting screen may decide where a part comes from, but
@@ -73,6 +94,12 @@ var ammo := {
 	"sidearm": {"loaded": 10, "reserve": 50},
 	"facility_sidearm": {"loaded": 0, "reserve": 0, "spare_magazines": []},
 }
+## Weapons picked up rather than issued.
+##
+## Tracked separately and explicitly, because `ammo` cannot answer the
+## question: `facility_sidearm` has an entry in it from the start, at zero
+## rounds, so "has an ammo record" is true for a gun nobody has ever held.
+var acquired: Dictionary = {}
 ## AN2.4. Missing means unworn — a weapon starts at full condition and this
 ## dict only ever gains an entry the first time something actually wears it,
 ## the same lazy shape `ammo` above would use if a fresh magazine were free.
@@ -176,13 +203,59 @@ func _update_reload_visual() -> void:
 		magazine.position = (rest + MAGAZINE_DROP).lerp(rest, (progress - 0.66) / 0.34)
 
 
+## Everything actually in hand: the issued three, then anything picked up.
+##
+## `SLOT_ORDER` is what the hunter is *issued* and stays three, which is what
+## the rack and the loadout are built on. What they are *carrying* is a
+## different question, and it is the one the number keys should have been
+## asking all along.
+func carried() -> Array[String]:
+	var held: Array[String] = []
+	held.assign(SLOT_ORDER)
+	for weapon_id: String in acquired:
+		if not held.has(weapon_id):
+			held.append(weapon_id)
+	return held
+
+
+## Select by position in what you are carrying.
+##
+## This used to index `SLOT_ORDER` and refuse anything past its three entries,
+## and `acquire_sniper()` / `acquire_facility_sidearm()` set `current_id`
+## directly without going through a slot at all. So a rifle you picked up was
+## in your hands right up until you pressed 1, and then it was gone -- still
+## owned, still loaded, still in `models`, and unreachable by any input in the
+## game. Greg: *"you pretty quickly cant reaccess the guns you loaded in on
+## your character"*. That was this line.
+##
+## Positions 0-2 are unchanged, so every existing caller that looks a weapon up
+## with `SLOT_ORDER.find()` still lands on the same index.
 func select_slot(slot: int) -> bool:
-	if slot < 0 or slot >= SLOT_ORDER.size() or reload_remaining > 0.0 or jam_clear_remaining > 0.0:
+	var held := carried()
+	if slot < 0 or slot >= held.size() or reload_remaining > 0.0 or jam_clear_remaining > 0.0:
 		return false
-	current_id = SLOT_ORDER[slot]
+	current_id = held[slot]
 	_update_models()
 	equipped.emit(current_id)
 	return true
+
+
+## The same thing by name, for callers that know what they want rather than
+## where it sits -- a rack pickup, a loadout, a save being restored.
+func select_weapon(weapon_id: String) -> bool:
+	return select_slot(carried().find(weapon_id))
+
+
+## Step through what you are carrying. `step` is +1 or -1 and it wraps, so
+## there is always a way back round to a weapon rather than a dead end.
+func cycle(step: int) -> bool:
+	var held := carried()
+	if held.size() <= 1:
+		return false
+	var at := held.find(current_id)
+	if at < 0:
+		at = 0
+	return select_slot(posmod(at + step, held.size()))
 
 
 func current() -> Dictionary:
@@ -241,6 +314,34 @@ func install_customization(weapon_id: String, slot: String, part: Dictionary) ->
 ## AX3.4. Called by the guard's physical loadout, not by player creation. The
 ## rounds passed here are the rounds left in that exact gun; no reserve magazine
 ## is conjured when ownership changes.
+## Picked up rather than issued, the same way the breach nine is. Takes the
+## rifle and whatever rounds came with it; a found weapon with an empty
+## magazine is still worth carrying, so zero rounds is allowed here where the
+## breach nine refuses it -- that one arrives mid-escape with what it has, and
+## this one can be scavenged for later.
+func acquire_sniper(rounds_left: int = -1) -> bool:
+	var magazine := int(WEAPONS.sniper.magazine)
+	var loaded := magazine if rounds_left < 0 else mini(rounds_left, magazine)
+	ammo["sniper"] = {
+		"loaded": loaded,
+		"reserve": int(WEAPONS.sniper.reserve) if rounds_left < 0 else maxi(0, rounds_left - loaded),
+		"spare_magazines": [],
+	}
+	current_id = "sniper"
+	acquired["sniper"] = true
+	if hand != null and not models.has(current_id):
+		var model := _build_weapon_model(current_id)
+		hand.add_child(model)
+		models[current_id] = model
+		var magazine_node := model.find_child("magazine", true, false) as Node3D
+		if magazine_node != null:
+			_magazine_nodes[current_id] = magazine_node
+			_magazine_rest[current_id] = magazine_node.position
+	_update_models()
+	equipped.emit(current_id)
+	return true
+
+
 func acquire_facility_sidearm(rounds_left: int) -> bool:
 	if rounds_left <= 0:
 		return false
@@ -250,6 +351,7 @@ func acquire_facility_sidearm(rounds_left: int) -> bool:
 		"spare_magazines": [],
 	}
 	current_id = "facility_sidearm"
+	acquired["facility_sidearm"] = true
 	if hand != null and not models.has(current_id):
 		var model := _build_weapon_model(current_id)
 		hand.add_child(model)
@@ -357,6 +459,7 @@ func begin_attack(heavy := false) -> Dictionary:
 		"damage": float(definition.damage) * (1.55 if heavy and definition.kind == "melee" else 1.0),
 		"impulse": float(definition.impulse) * (1.4 if heavy else 1.0),
 		"damage_type": definition.damage_type,
+		"calibre": str(definition.get("calibre", "")),
 		"windup": float(definition.get("windup", 0.0)) * (1.35 if heavy else 1.0),
 		"stamina": float(definition.get("stamina", 0.0)) * (1.55 if heavy else 1.0),
 		"pellets": int(definition.get("pellets", 1)),

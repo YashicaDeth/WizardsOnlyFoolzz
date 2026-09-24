@@ -382,7 +382,231 @@ either is how this repository became hard to read.
 - **A7.4, does the chassis roll**: still open. Greg's answer was "I don't
   know", so it stays unanswered rather than being decided for him.
 
-### Answered by Greg, 24 September 2026
+### Stated by Greg, 24 September 2026: how fighting, growth and trust connect
+
+Said in one message during the Dust to Bones remaster. His words are
+paraphrased closely; the last list is the assistant's reading, not his.
+
+- **Many fighting styles, switched live.** Martial-art stances, swordfighting
+  stances, and gun and weapon classes, each distinct and fluid, with
+  "insane" graphics on top. Switching stance mid-fight is part of it.
+- **Styles open skill trees, fed by use.** Each style or weapon earns its own
+  experience, called **blood**, from killing with it or using it well.
+  Weapons evolve through fighting experience, not shops.
+- **How you fight decides what survives.** Going bloodthirsty blows bodies
+  apart: organs and cybernetics (loot, not weapons) are destroyed with them,
+  and so are the connections that person could have become on the
+  relationship tree. Better-evolved weapons kill more cleanly for less
+  damage, so skill starts to pay back in loot.
+- **Stealth has its own reward.** In a mission, stealth can bring great loot
+  benefit, against many enemies.
+- **Playing safe can pay too:** working instead of fighting, befriending, and
+  building a diplomatic relationship through proximity chat, missions,
+  interaction and pre-written dialogue choices.
+- **Trust can be spent.** Trust earned by diplomacy makes infiltration and
+  betrayal possible, such as suddenly turning on people who trusted you.
+  His example: working for a military camp that has been oppressing the
+  locals, as in Fallout 4's story, then turning on it. They notice, or a
+  cutscene before the fight plays.
+- **Many small authored interactions.** Brief but featured moments like
+  ambushes and betrayals, in the manner of Shadow of Mordor.
+- **Boss rooms that know what you did.** Walking into a Dark Souls-style boss
+  room; because you know or have tripped certain triggers, a character boss
+  fight or custom cutscene written into that map area plays.
+- **The kinship tree needs reworking** and moving somewhere better than its
+  current key (T opens the Living Kinship Web), unless the key itself is
+  reworked.
+- **Hornee the zombie mutant.** Greg's handmade plush: stitched corduroy
+  body, a bottle-cap eye and a metal-cap eye, pins, a black rose, a camo
+  wrap and a charm on one ear. His edited artwork of it is titled "Zombie
+  Minion". Sources: `C:\Users\Greg\Downloads\20260327_2103{04,09,16}.jpg`
+  (front, front, back), the edited still and the animated edit (36 s,
+  colour cycling between green and orange with a slow warp).
+  - A **trading card** in the Brain Index, zoomable, using the artwork's
+    textures, text, colour and type, with TouchDesigner-style effects.
+  - Also a **spinnable 3D recreation** of the plush from his photos,
+    switchable from the card ("the live thing"), with slight effects on the
+    model so the two read as one. He will send more photos if needed.
+  - **A minion that fights:** a small companion mutant or pet. The
+    inventory needs a slot for it, where you customise and look at your pet.
+
+Answers to follow-up questions, same day:
+
+- **Stealth is its own fighting style** with its own blood and its own tree.
+- **The Kinship web becomes a tab in the Tab hub**; T is freed.
+- **Job posters are pasted on walls** in the Hunt, with tear-off tabs you
+  take as a job. **Business cards are handed over by people you meet**,
+  kept in Carry, and add a contact on the Wire.
+
+- **The pyramid becomes 33 tiers** and is rebuilt as a 3D structure in the
+  World Index that you spin, zoom and fly into, heavily inspired by the
+  Shadow of Mordor / Shadow of War Nemesis army screen: "a subtle pyramid of
+  different ranks". The reference is for layout feel only; the art is original.
+  - **33 tiers in total:** 16 up, the waist (you), 16 down, keeping the
+    existing double pyramid (Ascent above, Corruption below).
+  - **Horseshoe power:** the tip at the top holds the most power, and so does
+    the tip at the bottom, "being the most scum or worst of whatever". The wide
+    middle is the crowd.
+  - **Filled with everyone the world simulates, plus generated crowds** so it
+    feels massive, the crowds densest in the middle tiers.
+- **The World Index UI** is too small and cramped, overlaps and clips, is hard
+  to navigate and looks dated. All four, to be fixed in the remaster.
+
+- **The first 30 minutes** (Greg, in a chat with a friend he shared the same
+  evening): "30 minutes of gameplay that leads with a strong story and
+  gameplay bond", made of:
+  - character creation, cutscenes and story;
+  - a gameplay intro that teaches the basics while you escape the facility;
+  - **multiple routes out** of the facility, still to be fully made;
+  - **the derby is soft-scrapped and shelved as a different exit route**:
+    a lower level of tunnels and drain networks, "super old", that brings
+    you out in a different part of the map, so the overworld begins
+    differently depending on how you left.
+
+### Answered by Greg in question boxes, 24 September 2026 (night)
+
+Asked in the Code tab because the Dust to Bones page's saved answers sit in
+another account's organisation and could not be read from this one.
+
+- **Death: you are reborn in a vat.** Whoever owns your body grows you back;
+  the world does **not** rewind, so dying has consequences in it. This
+  answers the page's `story-death` and replaces the opening's ordinary
+  reload once it is built.
+  - **And the character preset is kept**, so a death never costs a trip back
+    through character creation: "don't forget the save character preset so
+    you can reload it if you die without wasting time". `CharacterPresets`
+    already has `save()`, `names()` and `apply()`, and the intake's PRESET
+    route already reads them — but nothing in the game ever *saves* one, so
+    the route answers "NO PRESET ON FILE" for everyone. The work is wiring,
+    not building.
+- **Routes out, for the demo: just the two that are built** — the heat
+  elevator, and the drain tunnels the derby became. More routes later.
+  Answers `rm-routes` for now.
+- **The loose opening pieces: the biometric door and the guard's gun
+  first** (AX route beat 5, AX3.3–AX3.4). `BiometricBarrier` and
+  `FacilityGuardLoadout` are written and tested and have no production
+  caller. The honest opening death and the mosaic option wait.
+  - *Built 24 September (assistant placement, not yet Greg's call):* Hollis
+    stands at a biometric D-section door across the Service Arcade, between
+    the staff card and the pressure gate. With the ram at his chest he palms
+    the reader himself and drops the gun; rammed down (three swings), his
+    hand is dragged to the reader. Either way his gun goes into Carry with
+    three rounds. His shots bleed the player to 25% and no further until the
+    vat rebirth exists. Removing his hand waits on a blade. Open: where the
+    door should really sit, and whether the ram should be able to force it.
+- **Merge once verified.** Each look lane merges into this branch one at a
+  time with the core suite re-run after every step, then this branch goes
+  into `codex/primary`. Answers `rebuild-merge`.
+- **Sequence.** When the first 30 minutes work end to end, both routes
+  included and out into the overworld, the next thing is **the next 30
+  minutes**: "furthering the tutorial and starting stage of the gameplay".
+  Nothing in minutes 30–60 is started before minutes 0–30 are right.
+
+### Answered by Greg in question boxes, 24 September 2026 (cloud session)
+
+- **Hollis's door wants tissue.** The breach ram cannot force the D-section
+  biometric door; only his hand, his body, removed anatomy or (later) an
+  implant spoof opens it.
+- **Hollis escalates.** Asked whether his gun should warn, wound or kill,
+  Greg picked all three; read here as an escalation: warning shots first,
+  wounds if you keep coming, and lethal once dying exists (then vat rebirth,
+  and he remembers you). The current build does wounds only, floored at 25%.
+- **Rebirth: you wake in the vat of whoever claims you.** Whichever faction
+  holds your debt or your body at the time grows you back (CellOutz, a
+  rival, a cult), so where you wake depends on who owns you.
+- **Nothing carried survives death.** Gear, the gun and clothes stay where
+  you died, to be looted or recovered; the body resets. The character
+  preset, memories and the world's record of you carry over.
+- **Hollis's look:** placeholder now; fix clothing so garments actually
+  render on every rig (today they show only as a thin outline); a real
+  CellOutz security model later, one Greg provides or picks.
+- **Build order asked for: all of it.** Death as vat rebirth with the preset
+  saved; the opening's wires beat (END ALL SUFFERING, tear the umbilicals
+  out, GET REVENGE) ported onto the reworked vat; the lab's lighting and
+  floor light glitch; the VFX pack.
+- *Built 24 September (the wires beat):* the drain no longer breaks the glass.
+  The body hangs in the four umbilicals under END ALL SUFFERING while the
+  tank's clock stops; the player looks at a wire and presses E, and the third
+  tug tears it out (pain, blood, its own sound). GET REVENGE follows the last
+  wire, and then the glass goes. A regrown body goes through it too.
+  Assistant choices, open to Greg: three tugs per wire, and that neither title
+  has a speaker (CellOutz's slogan or the player's own impulse is undecided).
+- **Workflow:** merge each verified piece into `claude/dust-to-bones-look`,
+  and send a split-zip Windows build after each piece.
+
+### Answered by Greg in question boxes, 24 September 2026 (routes out)
+
+- **The heat elevator goes up to the overworld.** With the derby shelved
+  as an exit, the Lower Works lift carries the player up and out into the
+  Ashbloom Expanse near the facility, not into the colosseum heat.
+- **The drain tunnels are a new walkable route:** an old ("super old")
+  drain network reached from Lower Works that surfaces in a different part
+  of the map, so the overworld starts differently depending on how you
+  left. These are the demo's two routes out.
+- **The floor light glitch was the pale pixel disc under the broken tank**
+  (the breakout puddle). Fixed: a dark, wet puddle.
+- **Job posters and business cards wait** until minutes 0-30 work end to
+  end; they live in the Hunt.
+- *Built 24 September (assistant choices, open to Greg):* the heat
+  elevator surfaces at the old vehicle-sallyport point the derby used; the
+  drain hatch sits on the Lower Works floor east of the lift; the drains are
+  laid out as the three districts `FacilityRoutes` already named for the
+  maintenance ascent (waste gallery, maintenance cistern, storm outfall) and
+  surface where that route always said (west of the start), carrying its
+  relationship changes (Gate Lanterns up, CellOutz down). Nothing threatens
+  the player in the drains yet.
+
+### Answered by Greg in question boxes, 24 September 2026 (what next)
+
+- **Next, all four, then minutes 30-60:** a better examiner model and the
+  readable name line on the intake; animated, skeuomorphic intake pages;
+  the combat overhaul; and threats in the old drains so the second route
+  costs something. Once these are done, minutes 0-30 count as right enough
+  to start minutes 30-60 (furthering the tutorial and the starting stage).
+
+### Answered by Greg in question boxes, 24 September 2026 (the examiner)
+
+- **The examiner has an ordinary human face**, not the player's grown-wrong
+  tank face: matched eyes, no exposed teeth.
+- **His coat is stained and bloodied** from the procedures, not clean white.
+- **The name line becomes a proper header** over the vat panel, bigger and
+  more prominent than a caption.
+- **Better lip sync now:** jaw and lips move with the vowels and consonants
+  of what he is saying, on the new face.
+
+### Answered by Greg in question boxes, 24 September 2026 (intake GUI)
+
+- The SUBJECT / TANK name header is its own band above the vat picture.
+- The examiner reads well now (ordinary face, stained coat, lip sync): keep.
+- Next on the intake GUI: animated tabs, the answer box and transcript, and
+  the stats strip. Keep the current red/copper palette and CellOutz type.
+
+### Answered by Greg in question boxes, 24 September 2026 (intake GUI detail)
+
+- **Tabs print in:** switching to an intake tab feeds the page out line by
+  line like a thermal receipt printer, ink still wet.
+- **Answer box:** his line bigger and typed out at reading pace with a
+  cursor; answers drawn as blink choices (eye icons), not plain buttons;
+  earlier lines kept above as a faded scrolling transcript.
+- **Stats strip:** each stat a small gauge that fills, animating when a
+  choice changes it, with the change flashing (+0.4).
+- A new Windows build after these three.
+
+Open: one of Hornee's eyes is a real drink brand's bottle cap with its
+wordmark. Keep it on the shipped model, or swap it for an in-world mark?
+
+Assistant reading, not confirmed: this is one loop. Blood XP rewards
+fighting; precise, evolved weapons protect the loot and the people a
+fight would otherwise destroy; kinship and trust are the other currency,
+earned by not fighting and spent by betrayal. The ambiguities worth asking
+about are whether diplomacy has a tree of its own, and whether "many
+enemies" means stealth missions field more of them.
+
+### Answered by Greg, 24 September 2026 (cloud session: lore, routes, the first hour)
+
+Recorded in the lane-6-based cloud session and merged here; where this and
+the sections above disagree (rebirth, where Hollis stands), the sections
+above were built on the remaster and win until Greg says otherwise.
 
 - **Bingyang, bingyangas, bingyangers.** Bingyang is the madness and mutation
   the vats and the torture produce. A **bingyanga** is a mutated vat subject

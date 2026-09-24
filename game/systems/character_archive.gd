@@ -279,8 +279,7 @@ func _draw_relation(from_id: String, to_id: String, relation: Dictionary) -> voi
 	var color := TEAL if kind in ["bond", "ally", "saved"] else BLOOD if kind in ["grudge", "hunts", "enemy"] else COPPER
 	var midpoint := (a + b) * 0.5 + Vector2(0, -28)
 	draw_polyline(PackedVector2Array([a, midpoint, b]), color * Color(1, 1, 1, 0.38), clampf(1.0 + strength / 35.0, 1.0, 4.0))
-	var font := ThemeDB.fallback_font
-	draw_string(font, midpoint + Vector2(-35, -5), kind.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 70, 9, color)
+	CellOutzType.draw_string_compat(self, midpoint + Vector2(-35, -5), kind.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 70, 9, color)
 
 
 func _draw_subject_node(subject_id: String, subject: Dictionary) -> void:
@@ -294,11 +293,10 @@ func _draw_subject_node(subject_id: String, subject: Dictionary) -> void:
 	draw_rect(node_rect, INK * Color(1, 1, 1, 0.95))
 	draw_rect(node_rect, edge if active else edge * Color(1, 1, 1, 0.58), false, 2)
 	_draw_face(center + Vector2(-54, 0), subject_id, edge)
-	var font := ThemeDB.fallback_font
 	var display_name := str(subject.get("name", subject_id.replace("_", " "))).to_upper()
-	draw_string(font, center + Vector2(-30, -6), display_name, HORIZONTAL_ALIGNMENT_LEFT, 100, 11, BONE)
+	CellOutzType.draw_string_compat(self, center + Vector2(-30, -6), display_name, HORIZONTAL_ALIGNMENT_LEFT, 100, 11, BONE)
 	var subtitle := str(subject.get("role", subject.get("kind", "unknown"))).to_upper()
-	draw_string(font, center + Vector2(-30, 12), subtitle, HORIZONTAL_ALIGNMENT_LEFT, 100, 8, edge)
+	CellOutzType.draw_string_compat(self, center + Vector2(-30, 12), subtitle, HORIZONTAL_ALIGNMENT_LEFT, 100, 8, edge)
 
 
 func _draw_face(center: Vector2, seed_text: String, tint: Color) -> void:
@@ -321,10 +319,9 @@ func _draw_dossier() -> void:
 	var panel_rect := Rect2(left, 74, size.x - left - 24, size.y - 98)
 	draw_rect(panel_rect, Color("10070b") * Color(1, 1, 1, 0.97))
 	draw_rect(panel_rect, COPPER * Color(1, 1, 1, 0.75), false, 2)
-	var font := ThemeDB.fallback_font
 	var name := str(subject.get("name", selected_id.replace("_", " "))).to_upper()
-	draw_string(font, Vector2(left + 22, 108), name, HORIZONTAL_ALIGNMENT_LEFT, panel_rect.size.x - 44, 20, BONE)
-	draw_string(font, Vector2(left + 22, 132), str(subject.get("role", "UNRESOLVED")).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, panel_rect.size.x - 44, 11, COPPER)
+	CellOutzType.draw_string_compat(self, Vector2(left + 22, 108), name, HORIZONTAL_ALIGNMENT_LEFT, panel_rect.size.x - 44, 20, BONE)
+	CellOutzType.draw_string_compat(self, Vector2(left + 22, 132), str(subject.get("role", "UNRESOLVED")).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, panel_rect.size.x - 44, 11, COPPER)
 	if str(subject.get("kind", "person")) == "faction":
 		_draw_faction_dossier(subject, panel_rect)
 	else:
@@ -355,18 +352,17 @@ func _draw_person_dossier(subject: Dictionary, panel_rect: Rect2) -> void:
 	draw_line(handle - Vector2(5, 0), handle + Vector2(5, 0), TEAL, 2)
 	draw_line(handle - Vector2(0, 5), handle + Vector2(0, 5), TEAL, 2)
 
-	var font := ThemeDB.fallback_font
-	draw_string(font, body_rect.position + Vector2(12, 20), "VESSEL", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COPPER)
-	draw_string(font, Vector2(body_rect.end.x - 82, body_rect.position.y + 20), "DEEP XRAY", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, TEAL)
-	draw_string(font, Vector2(body_rect.position.x + 12, body_rect.end.y - 8), "DRAG THE SCAN HEAD", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, BONE * Color(1, 1, 1, 0.4))
+	CellOutzType.draw_string_compat(self, body_rect.position + Vector2(12, 20), "VESSEL", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, COPPER)
+	CellOutzType.draw_string_compat(self, Vector2(body_rect.end.x - 82, body_rect.position.y + 20), "DEEP XRAY", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, TEAL)
+	CellOutzType.draw_string_compat(self, Vector2(body_rect.position.x + 12, body_rect.end.y - 8), "DRAG THE SCAN HEAD", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, BONE * Color(1, 1, 1, 0.4))
 	var elo := int(subject.get("elo", 0))
 	var grudge := int(subject.get("grudge", 0))
 	var status := str(subject.get("status", "unknown")).to_upper()
 	var faction := str(subject.get("faction", "Unaffiliated"))
 	var info_y := body_rect.end.y + 26
-	draw_string(font, Vector2(left + 22, info_y), "ELO %04d   %s   GRUDGE %03d" % [elo, _rank_title(elo), grudge], HORIZONTAL_ALIGNMENT_LEFT, panel_rect.size.x - 44, 12, BONE)
-	draw_string(font, Vector2(left + 22, info_y + 22), "FACTION // %s" % faction.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, panel_rect.size.x - 44, 10, SPORE)
-	draw_string(font, Vector2(left + 22, info_y + 43), "STATUS // %s   LASTING MEMORY" % status, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, COPPER)
+	CellOutzType.draw_string_compat(self, Vector2(left + 22, info_y), "ELO %04d   %s   GRUDGE %03d" % [elo, _rank_title(elo), grudge], HORIZONTAL_ALIGNMENT_LEFT, panel_rect.size.x - 44, 12, BONE)
+	CellOutzType.draw_string_compat(self, Vector2(left + 22, info_y + 22), "FACTION // %s" % faction.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, panel_rect.size.x - 44, 10, SPORE)
+	CellOutzType.draw_string_compat(self, Vector2(left + 22, info_y + 43), "STATUS // %s   LASTING MEMORY" % status, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, COPPER)
 	_draw_wrapped(str(subject.get("memory", "No reliable memory recovered.")), Vector2(left + 22, info_y + 62), panel_rect.size.x - 44, 11, BONE * Color(1, 1, 1, 0.72), 3)
 
 
@@ -522,10 +518,9 @@ func _draw_tree_alignment(rect: Rect2, subject: Dictionary) -> void:
 	var top := rect.position.y + 16
 	var bottom := rect.end.y - 12
 	draw_line(Vector2(axis_x, top), Vector2(axis_x, bottom), TEAL * Color(1, 1, 1, 0.4), 2)
-	var font := ThemeDB.fallback_font
-	draw_string(font, Vector2(axis_x - 58, top - 3), "ASCENT", HORIZONTAL_ALIGNMENT_RIGHT, 52, 7, SPORE * Color(1, 1, 1, 0.75))
-	draw_string(font, Vector2(axis_x - 58, (top + bottom) * 0.5 + 3), "LIMBO", HORIZONTAL_ALIGNMENT_RIGHT, 52, 7, BONE * Color(1, 1, 1, 0.5))
-	draw_string(font, Vector2(axis_x - 58, bottom + 10), "DESCENT", HORIZONTAL_ALIGNMENT_RIGHT, 52, 7, BLOOD * Color(1, 1, 1, 0.75))
+	CellOutzType.draw_string_compat(self, Vector2(axis_x - 58, top - 3), "ASCENT", HORIZONTAL_ALIGNMENT_RIGHT, 52, 7, SPORE * Color(1, 1, 1, 0.75))
+	CellOutzType.draw_string_compat(self, Vector2(axis_x - 58, (top + bottom) * 0.5 + 3), "LIMBO", HORIZONTAL_ALIGNMENT_RIGHT, 52, 7, BONE * Color(1, 1, 1, 0.5))
+	CellOutzType.draw_string_compat(self, Vector2(axis_x - 58, bottom + 10), "DESCENT", HORIZONTAL_ALIGNMENT_RIGHT, 52, 7, BLOOD * Color(1, 1, 1, 0.75))
 	var alignment := WorldHistory.tree_alignment(subject)
 	var marker_y := lerpf(top, bottom, (1.0 - alignment) * 0.5)
 	var marker_color := SPORE if alignment > 0.2 else (BLOOD if alignment < -0.2 else BONE)
@@ -533,11 +528,10 @@ func _draw_tree_alignment(rect: Rect2, subject: Dictionary) -> void:
 	draw_circle(Vector2(axis_x, marker_y), 4.0, marker_color)
 	var descriptor := WorldHistory.tree_descriptor(subject)
 	if not descriptor.is_empty():
-		draw_string(font, Vector2(axis_x - 58, marker_y - 11), descriptor.to_upper(), HORIZONTAL_ALIGNMENT_RIGHT, 52, 8, marker_color)
+		CellOutzType.draw_string_compat(self, Vector2(axis_x - 58, marker_y - 11), descriptor.to_upper(), HORIZONTAL_ALIGNMENT_RIGHT, 52, 8, marker_color)
 
 
 func _draw_faction_dossier(subject: Dictionary, panel_rect: Rect2) -> void:
-	var font := ThemeDB.fallback_font
 	var center := panel_rect.get_center() + Vector2(0, -55)
 	for ring in 6:
 		draw_arc(center, 38.0 + ring * 20, elapsed * 0.08 * (1 if ring % 2 == 0 else -1), TAU, 48, SPORE * Color(1, 1, 1, 0.12 + ring * 0.03), 2)
@@ -546,20 +540,21 @@ func _draw_faction_dossier(subject: Dictionary, panel_rect: Rect2) -> void:
 		draw_line(center + Vector2.from_angle(angle) * 38, center + Vector2.from_angle(angle) * 132, TEAL * Color(1, 1, 1, 0.22), 1)
 	draw_circle(center, 28 + sin(elapsed * 2.0) * 3, BLOOD * Color(1, 1, 1, 0.55))
 	var info_y := panel_rect.position.y + 405
-	draw_string(font, Vector2(panel_rect.position.x + 22, info_y), "DOCTRINE", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, COPPER)
+	CellOutzType.draw_string_compat(self, Vector2(panel_rect.position.x + 22, info_y), "DOCTRINE", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, COPPER)
 	_draw_wrapped(str(subject.get("doctrine", "No doctrine recovered.")), Vector2(panel_rect.position.x + 22, info_y + 23), panel_rect.size.x - 44, 12, BONE, 4)
-	draw_string(font, Vector2(panel_rect.position.x + 22, info_y + 105), "THREAT %s   TERRITORY %s" % [str(subject.get("threat", "?")), str(subject.get("territory", "unknown")).to_upper()], HORIZONTAL_ALIGNMENT_LEFT, panel_rect.size.x - 44, 11, SPORE)
+	CellOutzType.draw_string_compat(self, Vector2(panel_rect.position.x + 22, info_y + 105), "THREAT %s   TERRITORY %s" % [str(subject.get("threat", "?")), str(subject.get("territory", "unknown")).to_upper()], HORIZONTAL_ALIGNMENT_LEFT, panel_rect.size.x - 44, 11, SPORE)
 
 
+## Body copy: wrapped prose stays in a real font. The stencil face is for
+## stamps and labels, not paragraphs (the rule world_index.gd states).
 func _draw_wrapped(value: String, at: Vector2, width: float, font_size: int, color: Color, max_lines: int) -> void:
-	var font := ThemeDB.fallback_font
 	var words := value.split(" ")
 	var line := ""
 	var line_index := 0
 	for word in words:
 		var candidate := word if line.is_empty() else line + " " + word
-		if font.get_string_size(candidate, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > width and not line.is_empty():
-			draw_string(font, at + Vector2(0, line_index * (font_size + 5)), line, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, color)
+		if ThemeDB.fallback_font.get_string_size(candidate, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > width and not line.is_empty():
+			draw_string(ThemeDB.fallback_font, at + Vector2(0, line_index * (font_size + 5)), line, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, color)
 			line_index += 1
 			line = word
 			if line_index >= max_lines:
@@ -567,13 +562,15 @@ func _draw_wrapped(value: String, at: Vector2, width: float, font_size: int, col
 		else:
 			line = candidate
 	if line_index < max_lines and not line.is_empty():
-		draw_string(font, at + Vector2(0, line_index * (font_size + 5)), line, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, color)
+		draw_string(ThemeDB.fallback_font, at + Vector2(0, line_index * (font_size + 5)), line, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, color)
 
 
 func _draw_header() -> void:
-	var font := ThemeDB.fallback_font
 	draw_rect(Rect2(0, 0, size.x, 58), Color("13080a"))
 	draw_line(Vector2(0, 58), Vector2(size.x, 58), COPPER, 2)
-	draw_string(font, Vector2(28, 35), "THE LIVING KINSHIP WEB", HORIZONTAL_ALIGNMENT_LEFT, -1, 21, BONE)
-	draw_string(font, Vector2(345, 34), "ASHBLOOM EXPANSE // BLOOD · BOND · COMMAND", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, TEAL)
-	draw_string(font, Vector2(size.x - 390, 34), "WHEEL ZOOM   DRAG PAN   CLICK OPEN   T CLOSE", HORIZONTAL_ALIGNMENT_LEFT, 360, 10, BONE * Color(1, 1, 1, 0.6))
+	CellOutzType.draw_string_compat(self, Vector2(28, 35), "THE LIVING KINSHIP WEB", HORIZONTAL_ALIGNMENT_LEFT, -1, 21, BONE)
+	# Set after the title rather than at a fixed x: in the house face the title
+	# is wider than the engine font made it, and a fixed 345 ran into it.
+	var title_end := 28.0 + CellOutzType.string_size_compat("THE LIVING KINSHIP WEB", HORIZONTAL_ALIGNMENT_LEFT, -1, 21).x
+	CellOutzType.draw_string_compat(self, Vector2(title_end + 24.0, 34), "ASHBLOOM EXPANSE // BLOOD · BOND · COMMAND", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, TEAL)
+	CellOutzType.draw_string_compat(self, Vector2(size.x - 390, 34), "WHEEL ZOOM   DRAG PAN   CLICK OPEN   T CLOSE", HORIZONTAL_ALIGNMENT_LEFT, 360, 10, BONE * Color(1, 1, 1, 0.6))

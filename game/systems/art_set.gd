@@ -15,7 +15,12 @@ extends RefCounted
 ## never a dependency of it.
 
 const ROOT := "res://art/derived"
-const KINDS := ["body", "plate", "wire"]
+## `slab` is architecture: walls, floors, iron, concrete, pipe. It was the
+## missing one. Up to now the only surface in the game that could carry Greg's
+## own art was flesh, so an underground built out of rust and scabbed concrete
+## had nowhere for a hand-made texture to land no matter how much of it existed
+## on disk. Same contract as the rest — absent art changes nothing.
+const KINDS := ["body", "plate", "wire", "slab"]
 
 static var _cache: Dictionary = {}
 static var _scanned := false

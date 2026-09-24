@@ -839,6 +839,11 @@ func restore(state: Dictionary) -> void:
 func _process(delta: float) -> void:
 	if dead:
 		return
+	# Healthy bodies are the common case in the larger sandbox.  Dose and blood
+	# loss are the only autonomous anatomy simulation; do not enter either path
+	# for every intact bystander just to discover both are empty.
+	if not _needs_simulation():
+		return
 	_burn_dose(delta)
 	var total_bleed := bleed_rate + internal_bleed_rate
 	if total_bleed <= 0.001:
@@ -855,6 +860,12 @@ func _process(delta: float) -> void:
 	# Running out of blood is the one thing nobody gets to decide about.
 	if blood_remaining <= 0.0:
 		_die_or_fail({"type": "bleed_out", "subject_id": subject_id, "wounds": wounds.duplicate(true)})
+
+
+## Kept public to make the sleeping-body contract testable.  Any dose or
+## external/internal blood loss wakes the normal simulation on the next frame.
+func _needs_simulation() -> bool:
+	return not dose.is_empty() or bleed_rate + internal_bleed_rate > 0.001
 
 
 ## B3.2. Dose spends itself into the body it is sitting in. This is the half a

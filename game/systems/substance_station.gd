@@ -95,6 +95,12 @@ func build(with_table := true, seed_value := 4093) -> void:
 		entry["node"] = node
 		entry["label"] = _label(entry)
 		_live.append(entry)
+	# The bench keeps its shadow; the things on it do not. 168 of the hunt's
+	# 3133 visible shadow casters were station goods -- 35 grinder parts, 24
+	# baggies, 17 blisters, 16 weights -- and a caster costs a full re-render
+	# into every cascade whether it is a warehouse or a pill packet. Done here
+	# rather than in the scenes so every station in the game gets it.
+	WorldLook.stop_small_shadows(self)
 
 
 func _build_one(entry: Dictionary) -> Node3D:

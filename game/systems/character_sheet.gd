@@ -206,6 +206,13 @@ var face: Dictionary = FaceModel.blank()
 ## step with the axes, so the two records can never disagree.
 func sync_face() -> void:
 	appearance["face"] = FaceModel.scalar(face)
+	# Greg, playing it: "Brow, jaw, none of this actually changes." He was
+	# right. The scalar above only ever reached the rig as a material seed, so
+	# seven named controls moved a texture and nothing else. The axes ride
+	# inside `appearance` now, which is the dictionary both the preview and
+	# `apply_to_world()` already carry, so `HunterAppearance._build_face()` can
+	# put them on the actual skull without a new channel to keep in step.
+	appearance["axes"] = face.duplicate(true)
 var display_name := "THE HUNTER"
 
 
@@ -476,6 +483,10 @@ func apply_to_world() -> Dictionary:
 		# D. What you chose to look like was collected on the sheet and then
 		# never filed, so the body could not read it even in principle.
 		"appearance": appearance.duplicate(),
+		# AX1.4. The same omission, one field over: ANATOMY was collected and
+		# drawn back but never filed, so the overworld body was built without
+		# it. `BaselineHuman.config_from_subject` reads it here.
+		"anatomy_sex": anatomy_sex,
 		# N2.1/N2.2. Marked at creation, in the game's own register rather
 		# than an error state — an overspent build reads as a run the game
 		# already knows is broken, not a mistake nobody flagged.

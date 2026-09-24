@@ -183,9 +183,11 @@ func open_map() -> void:
 	pan = Vector2.ZERO
 	if satellite_available:
 		FACILITY.publish_target_ping(player_at)
+	# The satellite is what you see first (Greg, 2026-09-24); L turns to the
+	# facility sheet once that route exists.
+	facility_sheet = false
 	var territory := WorldHistory.subject(FACILITY.SUBJECT)
-	facility_sheet = not territory.is_empty()
-	if facility_sheet and facility_selected < 0:
+	if not territory.is_empty() and facility_selected < 0:
 		facility_selected = _first_revealed_facility_sector()
 	queue_redraw()
 
@@ -617,7 +619,14 @@ func _draw_unwalked_veil() -> void:
 	var top_left := _to_screen(Vector2(-half_region.x, -half_region.y))
 	var bottom_right := _to_screen(Vector2(half_region.x, half_region.y))
 	var region := Rect2(top_left, bottom_right - top_left).abs()
-	var outside := Color(0.46, 0.47, 0.44, 0.86)
+	# Dark, not bright. At 0.46 grey-green over 0.86 alpha the ground beyond the
+	# surveyed region was the lightest thing on the sheet -- so at any zoom
+	# where the region did not fill the chart, most of the screen was a flat
+	# pale wash and the surveyed part read as a stain on it. The correction for
+	# "the edges looked best-surveyed" overshot into "the unknown is the
+	# brightest". Unknown ground is now near-black: the part you have actually
+	# walked is the part that glows, which is the whole job of a survey sheet.
+	var outside := Color(0.055, 0.065, 0.055, 0.90)
 	if region.position.y > _chart.position.y:
 		draw_rect(Rect2(_chart.position, Vector2(_chart.size.x, region.position.y - _chart.position.y)).intersection(_chart), outside)
 	if region.end.y < _chart.end.y:
@@ -755,7 +764,11 @@ func _draw_districts() -> void:
 		var tint := _holding_tone(str(state.get("held_by", district.held_by))) if charted else INK
 		if not _chart.has_point(screen):
 			continue
-		var label := str(district.name) if charted else "UNSURVEYED SECTOR"
+		# Every uncharted district printed the identical words, so a sheet with
+		# three unknowns said UNSURVEYED SECTOR three times and none of them
+		# told you which was which. A real survey sheet numbers what it has not
+		# been to yet.
+		var label := str(district.name) if charted else "SECTOR %02d / UNSURVEYED" % (DISTRICTS.find(district) + 1)
 		# Held inside the sheet. A name that escapes the chart prints over the
 		# title and reads as a caption on the device instead of a place.
 		var label_width := CellOutzType.width_condensed(label.to_upper(), 11.0, 1.0)

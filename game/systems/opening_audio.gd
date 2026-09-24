@@ -36,6 +36,10 @@ func set_phase(phase_name: String, amount: float = 0.0) -> void:
 		"voiding":
 			room.pitch_scale = 0.92 + amount * 0.18
 			pulse.volume_db = lerpf(-11.0, -23.0, amount)
+		"wired":
+			# Out of the fluid the room goes thin and the pulse is all there is.
+			room.pitch_scale = 0.7
+			pulse.volume_db = -8.0
 		_:
 			room.pitch_scale = 1.0
 			pulse.volume_db = -34.0
@@ -45,8 +49,8 @@ func cue(kind: String) -> void:
 	played_cues.append(kind)
 	if cue_voice == null:
 		return
-	cue_voice.stream = _wave(kind, 0.85 if kind == "drain" else 0.55, false)
-	cue_voice.volume_db = -5.0 if kind == "glass" else -9.0
+	cue_voice.stream = _wave(kind, {"drain": 0.85, "revenge": 1.4}.get(kind, 0.55), false)
+	cue_voice.volume_db = -5.0 if kind in ["glass", "rip", "revenge"] else -9.0
 	cue_voice.play()
 
 
@@ -86,6 +90,16 @@ func _wave(kind: String, duration: float, looping: bool) -> AudioStreamWAV:
 			"glass":
 				var envelope := exp(-t * 9.0)
 				sample = ((_noise(frame * 7) * 2.0 - 1.0) * 0.65 + sin(TAU * 2460.0 * t) * 0.25) * envelope
+			"tug":
+				# Something elastic under load, and it is attached to you.
+				var stretch := lerpf(62.0, 88.0, t / duration)
+				sample = sin(TAU * stretch * t) * 0.5 * exp(-t * 4.0) + (_noise(frame * 5) - 0.5) * 0.12 * exp(-t * 6.0)
+			"rip":
+				var tear := exp(-t * 7.0)
+				sample = ((_noise(frame * 11) * 2.0 - 1.0) * 0.7 + sin(TAU * 140.0 * t) * 0.3) * tear
+			"revenge":
+				var swell := minf(1.0, t * 12.0) * exp(-t * 2.2)
+				sample = (sin(TAU * 41.0 * t) * 0.6 + sin(TAU * 61.5 * t) * 0.25 + (_noise(frame) - 0.5) * 0.1) * swell
 			"door":
 				var envelope := exp(-t * 5.0)
 				sample = (sin(TAU * 51.0 * t) * 0.62 + sin(TAU * 93.0 * t) * 0.2) * envelope

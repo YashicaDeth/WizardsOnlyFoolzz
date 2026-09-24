@@ -39,8 +39,10 @@ func _ready() -> void:
 	await get_tree().process_frame
 	# The fastest real player: a click the instant the slate can take one.
 	splash._finish()
-	await get_tree().process_frame
-	await get_tree().process_frame
+	# The slate wipes into the menu now (no hard cut left in the build), so the
+	# front door is there once the seam arrives, not two frames later. The wipe
+	# is inside the sixty-second budget below.
+	await Interstitial.arrived
 
 	var menu := get_tree().current_scene
 	check(menu != null and menu.has_method("_start_demo"), "the skipped slate lands on the front door")
@@ -49,11 +51,10 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 
+	# DEMO goes straight to the playable vat now: the decanting prologue this
+	# used to click through was removed from the menu on purpose ("not another
+	# barrier between the player and character creation", country_town_menu).
 	menu._start_demo()
-	await get_tree().process_frame
-	check(menu.prologue != null, "DEMO opens the decanting prologue immediately")
-	# Same eager click, on the first screen the prologue can take one.
-	menu.prologue._end()
 	await Interstitial.arrived
 
 	var elapsed_ms := Time.get_ticks_msec() - launch_ms

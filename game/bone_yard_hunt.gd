@@ -130,6 +130,9 @@ const HANDHELD_LAMP_BASE_ROTATION := Vector3(-6.0, 4.0, 0.0)
 const HANDHELD_WAVE_POSITION := Vector2(0.28, 0.16)
 const HANDHELD_WAVE_ANGLE := Vector2(18.0, 10.0)
 const BALLISTICS := preload("res://systems/ballistics.gd")
+const KILL_SHOT := preload("res://systems/kill_shot.gd")
+const CAVITY := preload("res://systems/cavity.gd")
+const SKULL_BURST := preload("res://systems/skull_burst.gd")
 const LIMB_MOMENTUM := preload("res://systems/limb_momentum.gd")
 const HUNTER_ARSENAL := preload("res://systems/hunter_arsenal.gd")
 const HUNTER_BODY_MOTION := preload("res://systems/hunter_body_motion.gd")
@@ -157,6 +160,8 @@ const CARRION_SCAVENGER := preload("res://systems/carrion_scavenger.gd")
 const RITUAL_LEDGER := preload("res://systems/ritual_ledger.gd")
 const SUBSTANCE_STATION := preload("res://systems/substance_station.gd")
 const FIELD_INVENTORY := preload("res://systems/field_inventory.gd")
+const CASE_MENU := preload("res://systems/case_menu.gd")
+const CONTACT_MENU := preload("res://systems/contact_menu.gd")
 const BRAIN_INDEX := preload("res://systems/brain_index.gd")
 
 var player := Vector3(0, 1.5, 19)
@@ -316,6 +321,16 @@ const ARC_STEP_BONUS := 0.25
 var guarding := false
 var guard_raised := 0.0
 var guard_stamina_drain := 14.0
+## Directional guard is chosen with the mouse while the blade is raised. X is
+## retained as a keyboard fallback, but RMB is the production first-person bind.
+var guard_aim := Vector2.ZERO
+var guard_side := ""
+var last_blade_read: Dictionary = {}
+## A timed parry used to change only numbers and text.  Keep the most recent
+## burst as a reference for the tiny presentation test; it is never used as
+## gameplay state.
+var parry_spark_count := 0
+var last_parry_spark: Node3D
 ## AG4.1. Out of breath. Set when stamina bottoms out, cleared only once enough
 ## has come back to be worth spending — see `_move_player`.
 ## AG4.2. Blood on the lens. Fed by `_spawn_blood`, which every blood event in
@@ -334,6 +349,30 @@ var _pending_shots: Dictionary = {}
 ## AN1.2. The arm the weapon hangs off. Fed the same mouse delta the camera
 ## turns by, so the weapon is thrown by you turning rather than by a curve.
 var arm: LimbMomentum = null
+## What a swing leaves in the air, and the wire under a locked target.
+var strike_trail: StrikeTrail = null
+var lock_ring: LockRing = null
+var strike_smear: StrikeSmear = null
+var strike_audio: StrikeAudio = null
+var dust_puff: DustPuff = null
+var hit_flash: HitFlash = null
+## Blob tracking over the fight (item 4): hit markers and enemy awareness.
+var block_tracker: BlockTracker = null
+## Tab: the Brain Index hub (Greg, 2026-09-24).
+var brain_hub: BrainIndexHub = null
+var photo_mode: PhotoMode = null
+## Arriving hurt: the pain of the decant eases over the first minute, unless
+## something new hurts you (Greg, 2026-09-24). Seconds left, and where from.
+const ARRIVAL_EASE_SECONDS := 60.0
+const ARRIVAL_PAIN_FLOOR := 12.0
+var _arrival_ease := -1.0
+var _arrival_pain_from := 0.0
+var threat_compass: ThreatCompass = null
+var lock_readout: LockReadout = null
+## After a strike lands, the body faces it this long (third-person turn-in).
+const STRIKE_FACE_SECONDS := 0.35
+var strike_face_yaw := 0.0
+var strike_face_time := 0.0
 ## Mouse movement this frame, in radians, accumulated in `_unhandled_input` and
 ## spent in `_physics_process`. It has to be a frame total rather than a
 ## per-event value: a 1000Hz mouse delivers several motion events per frame and
@@ -622,6 +661,8 @@ var world_index: Control
 ## CARRY app remains a second physical view of this same data, not the only
 ## route into inventory during ordinary play.
 var field_inventory: FieldInventory
+var case_menu: CaseMenu
+var contact_menu: ContactMenu
 ## L. The Board was built across twenty-odd segments and instantiated only in
 ## tests — there has never been a key that opens it, which is why Greg could not
 ## remember how to reach it. There is one now.
@@ -685,6 +726,41 @@ const PERSPECTIVE_BLEND_RATE := 3.2
 var _unlock_feel_timer := 0.0
 var kill_cam: Control
 var voice_channel: Node
+var spoken: SpokenContact = null
+## Whether the V being held is a sentence rather than the reliquary. Held as
+## state because the release has to go to whichever of the two claimed the
+## press, and the world can change under a held key.
+var talking_to_standing := false
+## The typed half. Built hidden and only ever raised on a machine with no
+## recogniser, which is most machines: Vosk needs a Python process, a model on
+## disk and a microphone, and a demo that cannot be talked to at all on a box
+## missing any of the three is a demo where half this system does not exist.
+var talk_entry: LineEdit
+var talk_entry_subject := ""
+## The panel, and who it is open on.
+##
+## `NPCDialogueUI` has existed and been used only by the conversation lab. The
+## overworld had no way to say anything without a microphone or a keyboard full
+## of prose, which is no way to hand somebody a demo.
+var talk_ui: NPCDialogueUI
+var talk_subject := ""
+
+## What the Hunter can say without typing it.
+##
+## The spec allows this in as many words -- "scripted quest choices can coexist
+## with free speech" -- and these are not a replacement for speaking. They are
+## the same sentences going down the same path: chosen or typed or spoken, the
+## NPC hears a string and rules on it, and `_npc_acted` makes the ruling true.
+## Nothing here surrenders anybody by pressing a button.
+const TALK_OPTIONS: Array[String] = [
+	"Put it down and walk away.",
+	"I am not here for you.",
+	"Who are you with?",
+	"[SPEAK]",
+	"[LEAVE]",
+]
+var downed_talk: NPCConversationComponent = null
+var downed_brain: NPCOllamaBrain = null
 var arsenal: Node
 ## AU7.6/AU7.9. Six cycles through the five smokeables. RMB then belongs to a
 ## real held draw until it is released; selecting a weapon puts the object away.
@@ -906,6 +982,27 @@ func _ready() -> void:
 	# and the panel they opened.
 	# AN1.2. The arm exists before the first swing does.
 	arm = LIMB_MOMENTUM.new()
+	strike_trail = StrikeTrail.new()
+	add_child(strike_trail)
+	lock_ring = LockRing.new()
+	add_child(lock_ring)
+	strike_smear = StrikeSmear.new()
+	add_child(strike_smear)
+	strike_audio = StrikeAudio.new()
+	add_child(strike_audio)
+	dust_puff = DustPuff.new()
+	add_child(dust_puff)
+	hit_flash = HitFlash.new()
+	add_child(hit_flash)
+	threat_compass = ThreatCompass.new()
+	threat_compass.name = "ThreatCompass"
+	$HUD.add_child(threat_compass)
+	block_tracker = BlockTracker.new()
+	block_tracker.name = "BlockTracker"
+	$HUD.add_child(block_tracker)
+	lock_readout = LockReadout.new()
+	lock_readout.name = "LockReadout"
+	$HUD.add_child(lock_readout)
 	_carry_current_weapon()
 	# AF1. Rounds and brass live in the world, not in the HUD.
 	ballistics = BALLISTICS.new()
@@ -968,11 +1065,30 @@ func _ready() -> void:
 	$HUD.add_child(keys_card)
 	_build_keys_card()
 	_order_hud_layers()
-	voice_channel = preload("res://systems/proximity_voice.gd").new()
-	voice_channel.name = "ProximityVoice"
-	add_child(voice_channel)
-	voice_channel.capture_finished.connect(_voice_captured)
-	voice_channel.capture_failed.connect(func(reason: String): resolution_ui.set_voice_state(reason))
+	# SpokenContact owns the capture and adds the recogniser beside it, so a
+	# downed NPC hears the words rather than only the fact of being spoken to.
+	# `voice_channel` still points at the capture half, because the status
+	# string, the positional acknowledgement and the witness recording all read
+	# it directly and none of that changes.
+	spoken = SpokenContact.new()
+	spoken.name = "SpokenContact"
+	add_child(spoken)
+	spoken.configure()
+	voice_channel = spoken.proximity
+	# Delivery goes through SpokenContact rather than straight off the capture:
+	# it waits for the transcript before handing the turn over, and hands over an
+	# empty one rather than nothing when Vosk has nothing to say.
+	spoken.contact.connect(_voice_heard)
+	spoken.failed.connect(func(reason: String): resolution_ui.set_voice_state(reason))
+	# Nothing drawn inside a HUD panel is in the world. The hunt shows 3D
+	# previews in its panels -- an inspected part, a held object, a body
+	# diagram -- and every one of them was casting a real shadow into the
+	# district behind the panel it is drawn in. 72 casters, none of which
+	# anybody could ever have seen the shadow of.
+	WorldLook.stop_all_shadows($HUD)
+	_build_downed_talk()
+	_build_talk_entry()
+	_build_talk_panel()
 	_build_expanse_systems()
 	_register_people()
 	player_body = CharacterBody3D.new()
@@ -1001,12 +1117,29 @@ func _ready() -> void:
 	player_body.add_child(body_motion)
 	body_motion.configure(player_rig)
 	body_motion.set_perspective(not third_person)
+	# Feet cross gore and the floor used to forget. The gait already reports
+	# every footfall and nobody listened — this is the listener.
+	body_motion.foot_planted.connect(_on_player_foot_planted)
 	WorldHistory.register_subject("inventory", {"items": []})
 	field_inventory = FIELD_INVENTORY.new()
 	field_inventory.name = "FieldInventory"
 	$HUD.add_child(field_inventory)
 	field_inventory.close_requested.connect(_toggle_inventory)
 	field_inventory.activate_requested.connect(_activate_inventory_item)
+	brain_hub = BrainIndexHub.new()
+	brain_hub.name = "BrainIndexHub"
+	$HUD.add_child(brain_hub)
+	brain_hub.open_surface.connect(_on_hub_surface)
+	photo_mode = PhotoMode.new()
+	add_child(photo_mode)
+	case_menu = CASE_MENU.new()
+	case_menu.name = "CaseMenu"
+	$HUD.add_child(case_menu)
+	case_menu.close_requested.connect(_toggle_cases)
+	contact_menu = CONTACT_MENU.new()
+	contact_menu.name = "ContactMenu"
+	$HUD.add_child(contact_menu)
+	contact_menu.close_requested.connect(_toggle_contact)
 	_spawn_friend()
 	# AE.1. The captain is still spawned exactly as she always was, and this
 	# runs alongside her rather than instead of her or through her. The order
@@ -1100,6 +1233,16 @@ func _build_player_rig() -> void:
 	config["gore"] = viscera_fx
 	player_rig.gore = viscera_fx
 	player_rig.build("player", config)
+	# DESIGN.md:245. The elites dress you, not the mirror: the player wakes in
+	# the forced humiliation rig, collar already damaged. Re-issued whole on
+	# every build — CellOutz re-dresses its bodies, which is also what keeps a
+	# scene change from having to solve wardrobe persistence today.
+	player_rig.dress(ClothingShell.humiliation_wardrobe())
+	# The same rule the world rigs get through `style_world_rig`. The player
+	# never goes through it -- they are built here rather than styled from a
+	# name -- so their 124 casters were the largest single body in the scene
+	# and the one you see least of, being inside it.
+	WorldLook.stop_small_shadows(player_rig)
 	# B8.1. The one thing that makes this body different from the one lying in
 	# the road: it takes every wound through the same anatomy, and death does not
 	# take. AP2.1, "the spirit cannot be banished by violence."
@@ -1369,7 +1512,16 @@ func _register_people() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if resolution_ui.visible or kill_cam.active:
 		return
+	if panel_mode == "hub" and brain_hub != null and brain_hub.handle_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	if panel_mode == "inventory" and field_inventory != null and field_inventory.handle_input(event):
+		get_viewport().set_input_as_handled()
+		return
+	if panel_mode == "cases" and case_menu != null and case_menu.handle_input(event):
+		get_viewport().set_input_as_handled()
+		return
+	if panel_mode == "contact" and contact_menu != null and contact_menu.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
 	# Full-size readers own their navigation keys. LivingMap is a Control, but it
@@ -1397,11 +1549,33 @@ func _unhandled_input(event: InputEvent) -> void:
 	if handheld != null and handheld.is_open and handheld.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
+	if talk_entry != null and is_instance_valid(talk_entry) and talk_entry.visible:
+		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+			_close_typed_talk()
+			get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.keycode == KEY_V and not event.echo:
-		if event.pressed and grapple_target.is_empty() and panel_mode.is_empty():
+		# V is already contextual here -- in a clinch it persuades, otherwise it
+		# raises the reliquary -- and speaking takes the layer above both. It is
+		# the same key the conversation lab talks on, so the one place in the
+		# game where this already worked and the world now agree.
+		#
+		# Only when somebody is actually in front of you: the reliquary is a
+		# thing you hold up on an empty road and must not be stolen by every
+		# roamer who wanders into range.
+		if event.pressed and grapple_target.is_empty() and panel_mode.is_empty() and not _nearest_standing().is_empty():
+			var heard := _nearest_standing()
+			# The panel first, and the microphone or the typed line from inside
+			# it. Going straight to push-to-talk meant the only way to find out
+			# you could speak to somebody was to already know.
+			_open_talk_panel(str(heard.subject_id))
+		elif event.pressed and grapple_target.is_empty() and panel_mode.is_empty():
 			pulmonary_held = true
 			prompt.text = "PULMONARY RELIQUARY // MOVE MOUSE / WHEEL // RELEASE V"
 		elif not event.pressed:
+			if talking_to_standing:
+				talking_to_standing = false
+				_voice_capture(false)
 			pulmonary_held = false
 	if _pulmonary_diagnostic_active() and event is InputEventMouseButton:
 		if event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -1436,6 +1610,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			_cycle_lock(1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			_cycle_lock(-1)
+	elif event is InputEventMouseButton and event.pressed and arsenal != null:
+		# Unlocked, the wheel is the weapon wheel. The number keys only reach
+		# the three issued slots, so a rifle or a breach nine picked up in the
+		# world had no key at all once you switched off it -- this is the way
+		# back to it, and it wraps, so there is no dead end.
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_cycle_carried_weapon(1)
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_cycle_carried_weapon(-1)
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
 		if smoke_model != null and is_instance_valid(smoke_model) and not smoke_weapon_drawn:
 			if event.pressed:
@@ -1446,8 +1629,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			firearm_aiming = event.pressed
 			if event.pressed:
 				prompt.text = "%s // AIMING" % str(arsenal.current().get("label", "FIREARM"))
-		elif event.pressed:
-			_attack(true)
+		else:
+			# A melee right button belongs to defence. The old heavy-attack call
+			# made the existing guard/parry path unreachable from the mouse.
+			if event.pressed:
+				guard_aim = Vector2.ZERO
+				guard_side = BladeRead.HIGH
 	# Once a cigarette or hand-roll is parked at the lips, the mouse belongs to
 	# the weapon again. Holding Alt is the small, deliberate breathing control:
 	# it draws on the same live object, then release resolves the same exhale.
@@ -1545,20 +1732,46 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_G: _toggle_handheld_surface()
 			KEY_TAB:
 				# The handheld owns Tab while raised: one object, modes on it.
+				# Otherwise Tab is the Brain Index hub; the world index it used
+				# to open is the hub's TASKS tab.
 				if handheld.is_open:
 					handheld.cycle_mode(1)
 				else:
-					_toggle_panel("index")
+					_toggle_panel("hub")
 			KEY_M: _toggle_panel("map")
 			KEY_T: _toggle_panel("tree")
-			KEY_J: _toggle_artwork()
+			# Greg: *"j shouldent be anything if anything j should be the
+			# inventory button not just this other button for nothing"*. J sat
+			# next to the movement hand on a panel nobody reaches for, while the
+			# bag -- the screen you open constantly -- was over on O. O still
+			# works; this is the one under your fingers.
+			KEY_J: _toggle_inventory()
+			# Moved rather than dropped. Every letter on the board is already
+			# spoken for, so the artwork goes to the function row with the other
+			# panels rather than losing its only way in.
+			KEY_F9: _toggle_artwork()
+			# Item 6: photo mode freezes the world around a free camera. F10 is
+			# provisional; every letter is spoken for.
+			KEY_F10:
+				if panel_mode.is_empty():
+					photo_mode.rigs = _all_rigs()
+					photo_mode.location = HUNT_LOCATION
+					photo_mode.enter(camera, player_body.global_position)
 			KEY_P: _toggle_panel("board")
 			KEY_O: _toggle_inventory()
+			KEY_U: _toggle_cases()
+			KEY_F8: _toggle_contact()
 			# Agent 1 brief. The Black Mirror as a lens, not just a shutter — N
 			# still snaps a photo instantly, unchanged; L holds the view amplified
 			# so looking through it is a real choice you can hold rather than a
 			# single instant.
-			KEY_L: _toggle_black_mirror()
+			KEY_L:
+				# Shift+L swaps the raised phone between its low-light sensor and
+				# its depth camera; plain L raises and lowers it.
+				if event.shift_pressed and black_mirror_active and _mirror != null:
+					prompt.text = "BLACK MIRROR // " + _mirror.cycle_mode().to_upper()
+				else:
+					_toggle_black_mirror()
 			KEY_C: _start_grapple()
 			KEY_Z: _toggle_lock()
 			KEY_E: _interact()
@@ -1606,6 +1819,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			field_interface.rotate_pulmonary(event.relative)
 		else:
 			apply_look(Vector2(event.relative.x * 0.0026, event.relative.y * 0.0024))
+			if guarding or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+				guard_aim += event.relative
+				var aimed_side := BladeRead.guard_side(guard_aim)
+				if not aimed_side.is_empty():
+					guard_side = aimed_side
 
 
 func _pulmonary_diagnostic_active() -> bool:
@@ -1633,20 +1851,37 @@ func _physics_process(delta: float) -> void:
 		_update_hud()
 		return
 	pulse += delta
+	# AP1. Charged per call, because nobody knows which of these is the frame.
+	# `process` has sat at 20.16ms against a 16.67ms budget since it was first
+	# measured, the brief has carried "script cost is unattributed" as its
+	# largest open item that whole time, and it has been guessed at twice.
+	# `ScriptCost` is free when off, which it is unless a probe turns it on.
+	var cost := ScriptCost.mark()
 	_update_smoking(delta)
+	cost = ScriptCost.lap("_update_smoking", cost)
 	_update_handheld_lamp(delta)
+	cost = ScriptCost.lap("_update_handheld_lamp", cost)
 	_update_dropped_handheld_persistence(delta)
+	cost = ScriptCost.lap("_update_dropped_handheld_persistence", cost)
 	_update_flame()
+	cost = ScriptCost.lap("_update_flame", cost)
 	_update_air()
+	cost = ScriptCost.lap("_update_air", cost)
 	_update_body_record(delta)
+	cost = ScriptCost.lap("_update_body_record", cost)
 	# W1.1. The world keeps time, and exactly one place advances it — a clock
 	# that two scenes both wind runs at double speed the moment anybody
 	# builds a third.
 	WorldClock.advance(delta)
+	cost = ScriptCost.lap("WorldClock.advance", cost)
 	_update_day_night()
+	cost = ScriptCost.lap("_update_day_night", cost)
 	_update_storm_exposure(delta)
+	cost = ScriptCost.lap("_update_storm_exposure", cost)
 	_update_altered_perception()
+	cost = ScriptCost.lap("_update_altered_perception", cost)
 	_update_perception(delta)
+	cost = ScriptCost.lap("_update_perception", cost)
 	dodge_remaining = maxf(0.0, dodge_remaining - delta)
 	# O2.7 v3. scale_for() only ever reached the encounter loop's actor_delta —
 	# the player is the other half of every exchange they are in and kept
@@ -1654,8 +1889,11 @@ func _physics_process(delta: float) -> void:
 	# whole point of a local freeze is that both bodies in contact feel it.
 	var player_delta: float = delta * impact_feel.scale_for("player")
 	_advance_arm(player_delta)
+	cost = ScriptCost.lap("_advance_arm", cost)
 	_update_held_inspection(delta)
+	cost = ScriptCost.lap("_update_held_inspection", cost)
 	_update_first_person_forearms()
+	cost = ScriptCost.lap("_update_first_person_forearms", cost)
 	# O2.7 v4. And the gore. Greg: *"gore and chunk physics still run at full
 	# speed through a hit, so a limb can leave a body that has not moved
 	# yet"*. The rig's own spray and organs take the exchange's clock;
@@ -1683,46 +1921,73 @@ func _physics_process(delta: float) -> void:
 	# X leans on somebody while a clinch is up, so the guard only claims the key
 	# when there is nobody in your hands. A control that does two things at once
 	# is worse than a control that does nothing.
-	var wants_guard := Input.is_key_pressed(KEY_X) and panel_mode.is_empty() and not resolution_ui.visible and grapple_target.is_empty() and dodge_remaining <= 0.0
+	var holding_melee_guard := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and arsenal != null and str(arsenal.current().get("kind", "")) != "firearm"
+	var wants_guard := (holding_melee_guard or Input.is_key_pressed(KEY_X)) and panel_mode.is_empty() and not resolution_ui.visible and grapple_target.is_empty() and dodge_remaining <= 0.0
 	if wants_guard and guard_strength() > 0.0 and stamina > 1.0 and not stumbling():
 		if not guarding:
 			guard_raised = 0.0
 		guarding = true
 		guard_raised += delta
 		stamina = maxf(0.0, stamina - guard_stamina_drain * delta)
+		if guard_side.is_empty():
+			guard_side = BladeRead.HIGH
+		if body_motion != null:
+			body_motion.set_guard(BladeRead.guard_height(guard_side), "melee")
+			body_motion.set_lean(BladeRead.guard_lean(guard_side))
 	else:
 		guarding = false
 		guard_raised = 0.0
+		if body_motion != null:
+			body_motion.set_guard(0.0, "melee")
+			body_motion.set_lean(0.0)
 	_update_player(delta)
+	cost = ScriptCost.lap("_update_player", cost)
 	_enforce_demo_territory()
+	cost = ScriptCost.lap("_enforce_demo_territory", cost)
 	_update_rival(delta)
+	cost = ScriptCost.lap("_update_rival", cost)
 	_update_encounter_actors(delta)
+	cost = ScriptCost.lap("_update_encounter_actors", cost)
 	_maintain_roamers(delta)
+	cost = ScriptCost.lap("_maintain_roamers", cost)
 	_update_carrion(delta)
+	cost = ScriptCost.lap("_update_carrion", cost)
 	_update_extraction(delta, Input.is_key_pressed(KEY_H))
+	cost = ScriptCost.lap("_update_extraction", cost)
 	# Q, not B. B is a stretch away from WASD with the left hand, and this is a
 	# *hold* — you are meant to be moving while you do it. Greg: "make the b
 	# slider change to like e or idk r or q"; E is interact and R is reload, so
 	# Q is the one of the three that is actually free.
 	_update_xray(delta, Input.is_key_pressed(KEY_Q))
+	cost = ScriptCost.lap("_update_xray", cost)
 	# Reports walk home in real time; F1.3's window only exists if it ticks.
 	# A report that reaches the faction holding the ground is also the only door
 	# into local unrest — the global event log never dispatches law by itself.
 	_answer_local_reports(witness_ledger.tick(delta))
+	cost = ScriptCost.lap("_answer_local_reports", cost)
 	if misfire_director != null:
 		misfire_director.call("update_player_position", player)
 	if not grapple_target.is_empty():
 		_update_grapple(delta)
 	_steer_lock(delta)
+	cost = ScriptCost.lap("_steer_lock", cost)
 	_unlock_feel_timer -= delta
 	if _unlock_feel_timer <= 0.0:
 		_unlock_feel_timer = 1.0
 		_check_third_person_unlock_feel()
 	_update_camera()
+	cost = ScriptCost.lap("_update_camera", cost)
+	_update_strike_fx(delta)
+	_ease_arrival_pain(delta)
 	_update_hud()
+	cost = ScriptCost.lap("_update_hud", cost)
 	_update_sleep_prompt(delta)
+	cost = ScriptCost.lap("_update_sleep_prompt", cost)
 	_update_dropped_handheld_prompt()
+	cost = ScriptCost.lap("_update_dropped_handheld_prompt", cost)
 	_update_world_interactable_prompt()
+	cost = ScriptCost.lap("_update_world_interactable_prompt", cost)
+	ScriptCost.frame()
 
 
 ## B4.10v2. The world notices unattended flesh. This is deliberately part of
@@ -2181,6 +2446,10 @@ func _attack(heavy := false) -> void:
 	if resolution_ui.visible or kill_cam.active or player_rig.is_downed() or player_rig.anatomy.dead:
 		return
 	if smoke_model != null and is_instance_valid(smoke_model) and not smoke_weapon_drawn:
+		# A click with a smokeable in hand used to do nothing at all, which read
+		# as being stuck on it (Greg, 2026-09-24). It pockets the smokeable and
+		# draws the weapon you were carrying; the next click swings.
+		_equip_weapon(maxi(arsenal.carried().find(str(arsenal.current_id)), 0))
 		return
 	# In a clinch the strike button is the press, not a swing.
 	if not grapple_target.is_empty():
@@ -2237,6 +2506,8 @@ func _attack(heavy := false) -> void:
 	# the damage number when `momentum_damage` says so (AN1.8).
 	last_commitment = arm.commitment() if arm != null else 0.0
 	report["commitment"] = last_commitment
+	if str(report.get("kind", "")) != "firearm" and arm != null:
+		report["released_side"] = BladeRead.swing_side(arm.velocity)
 	# AN2.1. Committing to a heavy blow leaves you open whether or not it
 	# lands — the vulnerability is in throwing it, not in missing with it.
 	# Firearms carry no such wind-up; `arm.commitment()` still measures barrel
@@ -2269,6 +2540,51 @@ func _attack(heavy := false) -> void:
 		strike_windup = float(report.windup)
 
 
+## A footfall lands, and wet feet write. The print sits a quarter stride ahead
+## under the stepping foot, offset to its side — alternating with the gait, so
+## the trail reads left-right rather than a centre line.
+func _on_player_foot_planted(side: String) -> void:
+	if body_motion == null or player_body == null or not is_instance_valid(player_body):
+		return
+	var facing := Vector3(sin(yaw), 0.0, cos(yaw))
+	var lateral := Vector3(facing.z, 0.0, -facing.x) * (0.12 if side == "left" else -0.12)
+	Footprints.step(self, player_body, player_body.global_position + facing * 0.25 + lateral, side)
+
+
+## The angle the current swing earns, for the cut it is about to make.##
+## `LimbMomentum.cut_plane()` reported the swept plane with no caller — built
+## and never wired, the failure this project keeps repeating. A still hand
+## earns no plane: standing with a sword is not a swing, and a plane claimed
+## there would cut at whatever angle the spring happened to be settling toward.
+## Null falls back to the honest cross-section in `_cut_limb`.
+func _melee_cut_plane(aim: Vector3) -> Variant:
+	if arm == null or camera == null or not is_instance_valid(camera):
+		return null
+	if arm.head_speed() <= LimbMomentum.IDLE_SPEED:
+		return null
+	return arm.cut_plane(camera.global_transform.basis, aim)
+
+
+## The single FP/TP split. Kept callable so a regression test can prove that
+## contact-time mouse steering remains live without manufacturing a body hit.
+func _committed_attack_side(report: Dictionary) -> String:
+	if arm == null:
+		return str(report.get("released_side", ""))
+	var released_side := str(report.get("released_side", ""))
+	var contact_side := BladeRead.swing_side(arm.velocity)
+	# A lock is the Souls register even if the camera has not yet completed its
+	# shoulder blend. Free first person keeps steering until contact.
+	var first_person_read := not third_person and lock_target.is_empty()
+	var committed := BladeRead.committed_side(released_side, contact_side, first_person_read)
+	last_blade_read = {
+		"released": released_side,
+		"contact": contact_side,
+		"committed": committed,
+		"first_person": first_person_read,
+	}
+	return committed
+
+
 func _resolve_strike() -> void:
 	var report := pending_attack
 	# AN2.1. Whatever happens next, the swing is spent. Landing bounces the
@@ -2278,6 +2594,8 @@ func _resolve_strike() -> void:
 	if report.is_empty():
 		report = {"damage": 24.0, "impulse": 18.0, "damage_type": "cut", "range": 4.1, "weapon": "sword"}
 	pending_attack = {}
+	if not report.is_empty() and str(report.get("kind", "")) != "firearm" and arm != null:
+		report["swing_side"] = _committed_attack_side(report)
 	# AD3.3. A round crossing the arc is a physical thing that can be met.
 	# Checked before anything else the swing could reach, because a round in
 	# the path is the most immediate thing in it — and because a build that
@@ -2348,7 +2666,7 @@ func _resolve_strike() -> void:
 		if lateral.length() > 0.45:
 			lateral = lateral.normalized() * 0.45
 		var aim := enemy.global_position + Vector3(lateral.x, look.y * 4.1 * 1.2, lateral.z)
-		var hit_record := enemy_rig.hit_at(aim, float(damage), float(damage) * 0.8, "cut", look)
+		var hit_record := enemy_rig.hit_at(aim, float(damage), float(damage) * 0.8, "cut", look, -1.0, _melee_cut_plane(aim))
 		body_zone = str(hit_record.get("zone", "torso"))
 		WorldHistory.update_subject(CAST.id_for(CAPTAIN_SLOT), {"anatomy_state": enemy_rig.snapshot()}, "anatomy_changed")
 	if enemy_rig != null and is_instance_valid(enemy_rig):
@@ -2381,6 +2699,8 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	var best_aim_score := INF
 	var reach := float(attack.get("range", 4.1))
 	var view := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)).normalized()
+	# Omnidirectional in third person: the blow follows the push, not the camera.
+	var strike_dir := StrikeHeading.heading(view, HUNTER_MOTOR.wish_direction(Input.get_vector("move_left", "move_right", "move_forward", "move_back"), yaw), third_person)
 	for index in encounter_actors.size():
 		var candidate: Dictionary = encounter_actors[index]
 		var node := candidate.get("node") as Node3D
@@ -2418,7 +2738,7 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		# *zone* on the body already picked — `hit_at()` reads it to tell a head
 		# from a thigh — so folding pitch in here means looking up or down
 		# refuses the body you are standing in front of.
-		var flat_view := Vector3(view.x, 0.0, view.z)
+		var flat_view := strike_dir
 		var flat_to := Vector3(node.global_position.x - player.x, 0.0, node.global_position.z - player.z)
 		var aim_dot := 1.0
 		if flat_view.length_squared() > 0.0001 and flat_to.length_squared() > 0.0001:
@@ -2435,9 +2755,14 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	var actor: Dictionary = encounter_actors[nearest_index]
 	_provoke_actor(actor)
 	var target: Node3D = actor.node as Node3D
-	var facing := Vector3(sin(yaw), 0, cos(yaw)).normalized().dot((target.global_position - player).normalized())
+	var facing := strike_dir.dot((target.global_position - player).normalized())
 	if facing < 0.12:
 		return false
+	# The hunter turns into the blow for a moment, so a strike behind you is
+	# seen landing rather than connecting through your back.
+	var turn := target.global_position - player
+	strike_face_yaw = atan2(turn.x, turn.z) + PI
+	strike_face_time = STRIKE_FACE_SECONDS
 	var anatomy: Node = actor.anatomy as Node
 	var rig := actor.get("rig") as BaselineHuman
 	var zone := "torso"
@@ -2459,7 +2784,7 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		if lateral.length() > 0.45:
 			lateral = lateral.normalized() * 0.45
 		var aim := target.global_position + Vector3(lateral.x, look.y * reach * 1.2, lateral.z)
-		result = rig.hit_at(aim, float(attack.damage), float(attack.impulse), str(attack.damage_type), look)
+		result = rig.hit_at(aim, float(attack.damage), float(attack.impulse), str(attack.damage_type), look, -1.0, _melee_cut_plane(aim))
 		zone = str(result.get("zone", "torso"))
 	else:
 		result = anatomy.call("apply_hit", zone, float(attack.damage), float(attack.impulse), str(attack.damage_type))
@@ -2470,6 +2795,13 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		prompt.text = "%s IS OPENED UP" % str(actor.display_name).to_upper()
 	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": anatomy.call("snapshot")}, "anatomy_changed")
 	_spawn_blood(target.global_position + Vector3(0, 1.1, 0), roundi(float(attack.damage)))
+	if hit_flash != null:
+		hit_flash.burst(target.global_position + Vector3(0, 1.1, 0), strike_dir, float(attack.damage) / 30.0)
+	if block_tracker != null:
+		# Locks onto the part that was actually struck, not the body's middle.
+		var struck := rig.parts.get(zone) as Node3D if rig != null else null
+		var marker_at: Vector3 = struck.global_position if struck != null and is_instance_valid(struck) else target.global_position + Vector3(0, 1.1, 0)
+		block_tracker.report_hit(marker_at, zone, float(result.get("damage", attack.damage)), str(attack.damage_type))
 	var hit_motion := actor.get("motion") as HunterBodyMotion
 	if hit_motion != null and is_instance_valid(hit_motion):
 		var zone_max: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone, {}) as Dictionary).get("health", 100.0))
@@ -2629,7 +2961,8 @@ func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bo
 		hit_motion.trigger_hit(direction, damage / maxf(zone_max, 1.0))
 	if actor.rig != null and is_instance_valid(actor.rig):
 		actor.rig.favour_injuries()
-	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": actor.rig.snapshot()}, "anatomy_changed")
+	var anatomy_snapshot: Dictionary = actor.rig.snapshot()
+	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": anatomy_snapshot}, "anatomy_changed")
 	WorldHistory.record_event("firearm_anatomy_hit", {
 		"subject_id": actor.subject_id, "weapon": weapon, "zones": zones,
 		"damage": snappedf(float(result.get("damage", 0.0)), 0.1), "ruptures": ruptures, "severed": severed,
@@ -2637,6 +2970,8 @@ func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bo
 	})
 	var fake_attack := {"damage": damage, "impulse": impulse, "damage_type": damage_type, "weapon": weapon, "heavy": bool(payload.get("heavy", false))}
 	if actor.anatomy.dead:
+		_try_skull_burst(actor, zone_id, damage, damage_type, direction, anatomy_snapshot)
+		_try_firearm_killcam(actor, weapon, zone_id, direction, anatomy_snapshot)
 		_kill_encounter_actor(encounter_actors.find(actor), weapon)
 	elif actor.anatomy.downed:
 		actor.state = "downed"
@@ -2650,6 +2985,40 @@ func _resolve_body_hit(struck: Node, hit: Dictionary, payload: Dictionary) -> bo
 	_settle_shot(shot_id, true, str(actor.subject_id))
 	WorldHistory.commit_ledger_batch()
 	return true
+
+
+## Before the camera, so the X-ray plate plays over a body that is already in
+## the state the player will walk up to when it ends. The head was the one zone
+## nothing could ever take a piece off -- `BaselineHuman.LIMBS` has four limbs
+## in it and the head is not one of them -- so a rifle round that killed through
+## the brain left an unmarked head on the corpse.
+func _try_skull_burst(actor: Dictionary, zone_id: String, damage: float, damage_type: String, direction: Vector3, snapshot: Dictionary) -> void:
+	var rig := actor.get("rig") as BaselineHuman
+	if rig == null or not is_instance_valid(rig):
+		return
+	if not SKULL_BURST.earned(zone_id, damage, damage_type, snapshot):
+		return
+	# `direction` is where the round was going, so the piece that leaves is the
+	# exit side rather than the face the shooter was looking at.
+	SKULL_BURST.open(rig, direction)
+
+
+## The round decides this only after the rig has resolved the hit.  A sniper
+## camera is earned by a real immediate vital rupture, never merely because a
+## rifle was fired or because somebody was already bleeding out.
+func _try_firearm_killcam(actor: Dictionary, weapon: String, zone_id: String, direction: Vector3, snapshot: Dictionary) -> void:
+	if kill_cam == null or kill_cam.active:
+		return
+	var finish := KILL_SHOT.earned(weapon, zone_id, snapshot)
+	if finish.is_empty():
+		return
+	kill_cam.trigger(
+		str(actor.get("display_name", "UNKNOWN")),
+		str(finish.get("zone", zone_id)),
+		direction,
+		str(finish.get("label", weapon.to_upper())),
+		snapshot
+	)
 
 
 ## AF1.1. One trigger pull can fire several rounds (a shotgun's pellets),
@@ -2715,7 +3084,7 @@ func _resolve_firearm(attack: Dictionary) -> void:
 		# than one stuck pending forever.
 		_pending_shots.erase(shot_id)
 		return
-	var calibre := "buck" if directions.size() > 1 else "pistol"
+	var calibre := str(attack.get("calibre", "buck" if directions.size() > 1 else "pistol"))
 	for direction in directions:
 		var payload := {
 			"shot_id": shot_id,
@@ -2796,6 +3165,7 @@ func _put_the_weapons_down() -> void:
 	_put_smokeable_away(false)
 	_clear_carried_limb_model()
 	bare_handed = true
+	_record_weapon_drawn()
 	if arsenal != null:
 		for model in arsenal.models.values():
 			(model as Node3D).visible = false
@@ -2846,6 +3216,7 @@ func _equip_smokeable(device_id: String) -> void:
 	_clear_carried_limb_model(false)
 	bare_handed = false
 	smoke_weapon_drawn = false
+	_record_weapon_drawn()
 	for model in arsenal.models.values():
 		(model as Node3D).visible = false
 	smoke_model = SMOKEABLES.build(device_id, float(smoke_spent.get(device_id, 0.0)))
@@ -3710,7 +4081,24 @@ func bare_hand_attack(heavy := false) -> Dictionary:
 	}
 
 
+## Step the wheel through everything in hand, issued or found.
+func _cycle_carried_weapon(step: int) -> void:
+	if arsenal == null:
+		return
+	var held: Array[String] = arsenal.carried()
+	if held.size() <= 1:
+		return
+	var at := held.find(str(arsenal.current_id))
+	_equip_weapon(posmod((at if at >= 0 else 0) + step, held.size()))
+
+
 func _equip_weapon(slot: int) -> void:
+	# The same weapon key again while a smoke is kept at the lips puts the
+	# smoke away: the way out of lip-holding that did not exist.
+	if smoke_weapon_drawn and smoke_model != null and is_instance_valid(smoke_model) and arsenal.carried().find(str(arsenal.current_id)) == slot:
+		_put_smokeable_away(false)
+		prompt.text = ""
+		return
 	var preserve_mouth_smoke := false
 	if smoke_model != null and is_instance_valid(smoke_model) and smoke_mouth_held:
 		var smoke_id := str(smoke_model.get_meta("device_id", ""))
@@ -3719,6 +4107,7 @@ func _equip_weapon(slot: int) -> void:
 		_put_smokeable_away(false)
 	bare_handed = false
 	_clear_carried_limb_model()
+	_record_weapon_drawn()
 	if arsenal.select_slot(slot):
 		firearm_aiming = false
 		smoke_weapon_drawn = preserve_mouth_smoke
@@ -3868,7 +4257,7 @@ const GUARD_ARC_DOT := -0.17
 ## thing as flanking the player. Returns the surviving fraction of the
 ## damage, and whether it was parried — a parry is the first moments of the
 ## guard and gives the initiative straight back.
-func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF) -> Dictionary:
+func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF, incoming_side := "") -> Dictionary:
 	if not guarding:
 		return {"damage": damage, "blocked": false, "parried": false}
 	if attacker_position != Vector3.INF:
@@ -3881,10 +4270,23 @@ func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF) -> Di
 			# would have turned goes through whole.
 			prompt.text = "STRUCK FROM OUTSIDE YOUR GUARD"
 			return {"damage": damage, "blocked": false, "parried": false}
-	var parried := guard_raised <= PARRY_WINDOW
+	var side := str(incoming_side)
+	if side.is_empty():
+		# Legacy callers did not classify a swing. Keeping the current guard as
+		# their side preserves their old frontal block while new melee exchanges
+		# require an actual directional match.
+		side = guard_side if not guard_side.is_empty() else BladeRead.HIGH
+	var held_side := guard_side if not guard_side.is_empty() else BladeRead.HIGH
+	var read := BladeRead.resolve(held_side, guard_raised, side, maxf(1.0, damage * 0.5))
+	last_blade_read = {"guard": held_side, "swing": side, "outcome": str(read.outcome)}
+	if str(read.outcome) == "open":
+		prompt.text = "WRONG GUARD // %s CAME THROUGH" % side.to_upper()
+		return {"damage": damage, "blocked": false, "parried": false, "outcome": "open"}
+	var parried := guard_raised <= PARRY_WINDOW and str(read.outcome) == "parry"
 	if parried:
 		# Nothing gets through a parry, and it costs the attacker instead of you.
 		impact_feel.strike(0.85, "cut", false)
+		_emit_parry_spark(attacker_position)
 		prompt.text = "TURNED IT"
 		WorldHistory.record_event("player_parried", {"location": HUNT_LOCATION})
 		return {"damage": 0.0, "blocked": true, "parried": true}
@@ -3892,11 +4294,66 @@ func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF) -> Di
 	# the rest of it still arrives.
 	# Blocking is not standing still: the blow still moves you.
 	lose_footing(FOOTING_BLOCKED * clampf(damage / 20.0, 0.3, 1.6), "")
-	var through: float = damage * lerpf(1.0, GUARD_DAMAGE_SCALE, guard_strength())
+	var through: float = damage * lerpf(1.0, float(read.get("through", GUARD_DAMAGE_SCALE)), guard_strength())
 	stamina = maxf(0.0, stamina - damage * 0.45)
 	impact_feel.strike(0.3, "blunt", false)
 	WorldHistory.record_event("player_blocked", {"location": HUNT_LOCATION})
 	return {"damage": through, "blocked": true, "parried": false}
+
+
+## A parry needs a physical punctuation mark at the contact, otherwise the
+## player reads it as a normal blocked hit with a different damage number.
+## This is deliberately a single short-lived light and seven uncolliding
+## sparks; it adds feedback to a crowded fight without becoming another
+## persistent-gore budget.
+func _emit_parry_spark(attacker_position: Vector3) -> void:
+	var contact := player + Vector3(0.0, 1.05, 0.0)
+	if attacker_position != Vector3.INF:
+		var toward_attacker := attacker_position - player
+		toward_attacker.y = 0.0
+		if toward_attacker.length_squared() > 0.001:
+			contact += toward_attacker.normalized() * 0.42
+	else:
+		contact += Vector3(sin(yaw), 0.0, cos(yaw)) * 0.42
+	var burst := Node3D.new()
+	burst.name = "ParrySpark"
+	add_child(burst)
+	burst.global_position = contact
+	last_parry_spark = burst
+	parry_spark_count += 1
+
+	var light := OmniLight3D.new()
+	light.light_color = Color("ffe09a")
+	light.light_energy = 4.6
+	light.omni_range = 2.5
+	light.shadow_enabled = false
+	burst.add_child(light)
+	var flare_material := StandardMaterial3D.new()
+	flare_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	flare_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	flare_material.albedo_color = Color("fff0bb")
+	flare_material.emission_enabled = true
+	flare_material.emission = Color("ff9c35")
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(light, "light_energy", 0.0, 0.10)
+	for index in 7:
+		var shard := MeshInstance3D.new()
+		var shard_mesh := SphereMesh.new()
+		shard_mesh.radius = 0.026
+		shard_mesh.height = 0.074
+		shard_mesh.radial_segments = 4
+		shard_mesh.rings = 2
+		shard.mesh = shard_mesh
+		shard.material_override = flare_material
+		shard.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		burst.add_child(shard)
+		var angle := TAU * float(index) / 7.0 + 0.23
+		var drift := Vector3(cos(angle), 0.22 + float(index % 3) * 0.09, sin(angle)) * (0.28 + float(index % 2) * 0.10)
+		tween.tween_property(shard, "position", drift, 0.13)
+		tween.tween_property(shard, "scale", Vector3.ZERO, 0.16)
+	tween.chain().tween_callback(func() -> void:
+		if is_instance_valid(burst):
+			burst.queue_free())
 
 
 ## AS1.1/AS1.3. Whether the torch is lit and how strong is entirely
@@ -4206,6 +4663,8 @@ func _dodge() -> void:
 	var move := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	dodge_direction = _combat_dodge_direction(move)
 	dodge_remaining = 0.28
+	if dust_puff != null:
+		dust_puff.burst(player_body.global_position, dodge_direction)
 	# Evasion owns the body for its short window. Do not drag a shouldered gun
 	# or raised guard through it and then snap those poses off a frame later.
 	firearm_aiming = false
@@ -4292,6 +4751,38 @@ func _nearest_corpse_loot_cache(reach: float) -> Node3D:
 	return nearest
 
 
+## E on a body with no tied stash left opens the inventory on them instead of
+## printing a string: pockets and garments take, open cavities show, sealed
+## zones stay sealed. No cache, no collect — the prompt path is untouched.
+func _open_nearest_corpse(reach: float) -> bool:
+	var nearest: Dictionary = {}
+	var nearest_distance := reach
+	for body in dead_bodies:
+		var node := body.get("node") as Node3D
+		var rig := body.get("rig") as BaselineHuman
+		if node == null or not is_instance_valid(node) or rig == null or not is_instance_valid(rig):
+			continue
+		var distance := player.distance_to(node.global_position)
+		if distance <= nearest_distance:
+			nearest_distance = distance
+			nearest = body
+	if nearest.is_empty():
+		return false
+	firearm_aiming = false
+	if handheld.is_open:
+		handheld.close_device()
+	keys_card.close()
+	_close_panel_views()
+	panel_mode = "inventory"
+	field_inventory.open_inventory(handheld.carry, player_rig, arsenal)
+	field_inventory.open_corpse(nearest.get("rig"), nearest.get("loot", []))
+	prompt.visible = false
+	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
+	if _pointer != null and is_instance_valid(_pointer):
+		_pointer.visible = true
+	return true
+
+
 func _collect_loot_cache(cache: Node3D) -> bool:
 	if cache == null or not is_instance_valid(cache) or not loose_loot.has(cache):
 		return false
@@ -4346,6 +4837,8 @@ func _interact() -> void:
 		return
 	var corpse_cache := _nearest_corpse_loot_cache(3.2)
 	if corpse_cache != null and _collect_loot_cache(corpse_cache):
+		return
+	if _open_nearest_corpse(3.2):
 		return
 	var chunk := _nearest_takeable_chunk(3.2)
 	if chunk != null:
@@ -4468,6 +4961,8 @@ func _update_sleep_prompt(delta: float) -> void:
 ## The signal is the seam between them, producing one physical, colliding body
 ## whose payload is the exact serial/condition/charge that just left the HUD.
 func _on_handheld_dropped(payload: Dictionary) -> void:
+	if black_mirror_active:
+		_toggle_black_mirror()
 	if dropped_handheld != null and is_instance_valid(dropped_handheld):
 		return
 	var forward := -camera.global_transform.basis.z.normalized()
@@ -4723,6 +5218,14 @@ func _update_extraction(delta: float, holding: bool) -> void:
 
 func _finish_extraction(body: Dictionary) -> void:
 	var rig := body.rig as BaselineHuman
+	var zone := str(extraction_session.get("zone", ""))
+	# The timer has reached an actual target now.  Turn that completion into a
+	# physical opened cavity before taking the part, so the player sees the
+	# opening and the organ that was inside it rather than looting a closed mesh.
+	if not CAVITY.is_open(rig, zone):
+		var body_node := body.get("node") as Node3D
+		var facing := player - body_node.global_position if body_node != null and is_instance_valid(body_node) else Vector3.FORWARD
+		CAVITY.open_zone(rig, zone, facing)
 	var snapshot: Dictionary = rig.anatomy.snapshot()
 	var extracted := Extraction.extract(extraction_session, snapshot)
 	extraction_session = {}
@@ -5319,13 +5822,20 @@ func _update_encounter_actors(delta: float) -> void:
 			# O5.10 v2. A stumbling fighter cannot wind up an attack at all —
 			# the same "the guard will not hold" rule the player's own footing
 			# already enforces, on the other side of the fight.
+			if float(actor.get("attack_time", 0.0)) <= 0.0:
+				var sequence := int(actor.get("attack_sequence", 0))
+				var side_index := posmod(hash(str(actor.get("subject_id", index))) + sequence, BladeRead.SIDES.size())
+				actor["attack_side"] = BladeRead.SIDES[side_index]
+				actor["attack_sequence"] = sequence + 1
 			var pressing := 2.2 if strike_windup >= 0.0 else 1.0
 			actor["attack_time"] = float(actor.get("attack_time", 0.0)) + actor_delta * pressing
 			var attack_cycle := _actor_attack_cycle(actor)
+			if threat_compass != null:
+				threat_compass.report(str(actor.get("subject_id", index)), node.global_position, float(actor.attack_time) / maxf(attack_cycle, 0.01))
 			if actor_motion != null:
 				actor_motion.set_combat_pose(clampf(float(actor.attack_time) / maxf(attack_cycle * 0.57, 0.01), 0.0, 1.0), "melee")
 			if float(actor.attack_time) > attack_cycle * 0.57:
-				prompt.text = "%s RAISES THEIR WEAPON" % str(actor.display_name).to_upper()
+				prompt.text = "%s RAISES FROM %s" % [str(actor.display_name).to_upper(), str(actor.get("attack_side", BladeRead.HIGH)).to_upper()]
 			if float(actor.attack_time) >= attack_cycle:
 				actor.attack_time = 0.0
 				if actor_motion != null:
@@ -5336,7 +5846,7 @@ func _update_encounter_actors(delta: float) -> void:
 					# hands the initiative back; a block takes the edge off and
 					# spends stamina instead of blood.
 					var incoming := float(_actor_attack_damage(actor))
-					var guarded: Dictionary = guard_absorb(incoming, node.global_position)
+					var guarded: Dictionary = guard_absorb(incoming, node.global_position, str(actor.get("attack_side", "")))
 					if bool(guarded.get("parried", false)):
 						# The attacker eats their own commitment. This wrote to
 						# "stagger" and "cooldown" — neither of which anything
@@ -5345,6 +5855,9 @@ func _update_encounter_actors(delta: float) -> void:
 						_actor_lose_footing(actor, 0.45, "%s LOSES THEIR FOOTING // PRESS THE OPENING" % str(actor.display_name).to_upper())
 					var health_after := health - roundi(float(guarded.get("damage", incoming)))
 					_wound_player(node.global_position, maxf(5.0, 15.0 * _actor_combat_ratio(actor)), "cut")
+					if hit_flash != null and third_person:
+						# `player` is already about eye height (body + 0.6 m); the chest is just below.
+						hit_flash.burst(player + Vector3(0, -0.3, 0), player - node.global_position, incoming / 30.0)
 					# AE10.13. Ordinary hostiles keep the old one-health floor: the
 					# undying player is not silently killed by a roaming damage tick.
 					# A physical law team is different. Its finishing blow performs the
@@ -5612,6 +6125,59 @@ func _actor_by_id(id: String) -> Dictionary:
 			return actor
 	return {}
 
+## How close you have to be to talk to somebody still on their feet, and how
+## nearly you have to be facing them.
+##
+## Both are conversation figures rather than combat ones. The range matches the
+## one the resolution window already uses for a body on the floor, so speaking
+## to the living and the dying reach the same distance. The dot is generous --
+## about a sixty degree cone -- because this is talking to a person, not
+## putting a crosshair on them.
+const TALK_RANGE := 5.5
+const TALK_FACING := 0.45
+
+
+## The person you are addressing when nobody is on the floor in front of you.
+##
+## In front of, not merely near. A fight has people on several sides of you and
+## shouting at whichever one happens to be nearest -- including one behind your
+## back -- is not what the player meant by speaking.
+func _nearest_standing() -> Dictionary:
+	var nearest: Dictionary = {}
+	var distance := TALK_RANGE
+	var facing := -camera.global_transform.basis.z
+	for actor in encounter_actors:
+		if not is_instance_valid(actor.node) or actor.rig == null or not is_instance_valid(actor.rig):
+			continue
+		# The dead do not answer and the downed have their own window.
+		if actor.rig.anatomy.dead or actor.rig.is_downed():
+			continue
+		var toward: Vector3 = actor.node.global_position - player
+		var candidate := toward.length()
+		if candidate > distance or candidate < 0.01:
+			continue
+		if facing.dot(toward.normalized()) < TALK_FACING:
+			continue
+		distance = candidate
+		nearest = actor
+	return nearest
+
+
+## Whoever speaking would reach right now.
+##
+## The window first, because a body you have opened the resolution form over is
+## unambiguously the one you are addressing. Only when there is no such body
+## does this look up at whoever is standing in front of you -- which is the
+## whole of what was missing. `SpokenContact` never restricted anything: it
+## takes the subject id it is handed, and `_voice_capture` only ever handed it
+## `resolution_target`, which is set by the downed window and by nothing else.
+func _addressable_actor() -> Dictionary:
+	var downed := _actor_by_id(resolution_target)
+	if not downed.is_empty() and player.distance_to(downed.node.global_position) <= TALK_RANGE:
+		return downed
+	return _nearest_standing()
+
+
 func _nearest_downed() -> Dictionary:
 	var nearest: Dictionary = {}
 	var distance := 4.0
@@ -5789,31 +6355,495 @@ func _refresh_ascent_job_market() -> void:
 
 
 func _voice_capture(holding: bool) -> void:
-	var actor := _actor_by_id(resolution_target)
-	if actor.is_empty() or player.distance_to(actor.node.global_position) > 5.5:
+	var actor := _addressable_actor()
+	if actor.is_empty():
 		resolution_ui.set_voice_state("NO SUBJECT IN VOICE RANGE")
 		return
 	if holding:
-		voice_channel.begin(str(actor.subject_id), actor.rig.head_anchor)
+		spoken.begin(str(actor.subject_id), actor.rig.head_anchor)
 	else:
-		voice_channel.finish()
+		spoken.finish()
 
 
-func _voice_captured(subject_id: String, result: Dictionary) -> void:
+## One conversation component for whoever is being spoken to, rather than one
+## per actor: roamers spawn and are culled constantly, and a component on each
+## would be a brain and a speaker per body on the road. The relationship is
+## keyed by subject id inside `NPCRelationship`, so reconfiguring it for a
+## different person loses nothing.
+func _build_downed_talk() -> void:
+	downed_brain = NPCOllamaBrain.new({})
+	downed_talk = NPCConversationComponent.new()
+	downed_talk.name = "DownedTalk"
+	# The bubble is for overhearing somebody across a room. This NPC is on the
+	# floor in front of you and the resolution window is already showing their
+	# line, so a second copy floating over them is noise.
+	downed_talk.suppress_bubble = true
+	add_child(downed_talk)
+	downed_talk.answered.connect(_downed_answered)
+	# The half nothing was listening to. See `_npc_acted`.
+	downed_talk.validated_action.connect(_npc_acted)
+
+
+## The panel you talk through.
+##
+## Authored lines rather than only free speech, because a demo handed to
+## somebody who has never played this cannot begin with "type a sentence at the
+## armed man". Everything chosen here goes through `hear()` exactly as a
+## transcript does.
+func _build_talk_panel() -> void:
+	talk_ui = NPCDialogueUI.new()
+	talk_ui.name = "TalkPanel"
+	talk_ui.visible = false
+	$HUD.add_child(talk_ui)
+	talk_ui.option_chosen.connect(_talk_option)
+	talk_ui.closed.connect(_close_talk_panel)
+	talk_ui.speak_pressed.connect(func(held: bool): _talk_speak(held))
+
+
+func _open_talk_panel(subject_id: String) -> void:
+	if talk_ui == null or not is_instance_valid(talk_ui):
+		return
+	talk_subject = subject_id
+	var subject := WorldHistory.subject(subject_id)
+	# The bubble would otherwise repeat every line the panel is already
+	# showing, a foot above the panel.
+	if downed_talk != null and is_instance_valid(downed_talk):
+		downed_talk.suppress_bubble = true
+	talk_ui.open(str(subject.get("name", "THEY")).to_upper(), TALK_OPTIONS)
+	# How close they already are to deciding against you, so the panel can show
+	# it before they say anything.
+	talk_ui.set_aggression(clampf(float(int(subject.get("grudge", 0))) / 100.0, 0.0, 1.0))
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+func _close_talk_panel() -> void:
+	if talk_ui != null and is_instance_valid(talk_ui):
+		talk_ui.close()
+	talk_subject = ""
+	_close_typed_talk()
+	if panel_mode.is_empty():
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+## A line chosen off the panel. It is said, not applied: the NPC still rules on
+## it, and what they decide is what happens.
+func _talk_option(text: String) -> void:
+	if talk_subject.is_empty():
+		return
+	if text.begins_with("[LEAVE]"):
+		_close_talk_panel()
+		return
+	if text.begins_with("[SPEAK]"):
+		_talk_speak(true)
+		return
+	_say_to(talk_subject, text)
+
+
+## Free speech off the panel: the microphone where the machine has one, the
+## typed line where it does not.
+func _talk_speak(held: bool) -> void:
+	if talk_subject.is_empty():
+		return
+	if spoken != null and spoken.transcribes():
+		_voice_capture(held)
+		if talk_ui != null and is_instance_valid(talk_ui):
+			talk_ui.listening = held
+		return
+	if held:
+		_open_typed_talk(talk_subject)
+
+
+## One way in for everything said to somebody, however it was said.
+func _say_to(subject_id: String, said: String) -> void:
+	var words := said.strip_edges()
+	if words.is_empty():
+		return
+	_voice_heard(subject_id, words, {"sent": true, "duration": 1.0, "peak": 1.0})
+
+
+## A line to type when there is no microphone worth using.
+##
+## `npc_conversation_lab` has had this from the start and says why in its own
+## header -- "real microphone where one is usable, typed input where it is not"
+## -- and the overworld never got it, so speaking to anybody in the actual game
+## required a working Vosk install. The words go down exactly the same path a
+## transcript does, because to everything downstream they are the same thing:
+## a string somebody said to somebody.
+func _build_talk_entry() -> void:
+	talk_entry = LineEdit.new()
+	talk_entry.name = "TalkEntry"
+	talk_entry.placeholder_text = "SAY SOMETHING / ENTER TO SPEAK / ESC TO STOP"
+	talk_entry.visible = false
+	talk_entry.anchors_preset = Control.PRESET_BOTTOM_WIDE
+	talk_entry.offset_left = 180.0
+	talk_entry.offset_right = -180.0
+	talk_entry.offset_top = -132.0
+	talk_entry.offset_bottom = -96.0
+	talk_entry.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	talk_entry.add_theme_color_override("font_color", Color(0.95, 0.55, 0.35))
+	$HUD.add_child(talk_entry)
+	talk_entry.text_submitted.connect(_typed_said)
+
+
+## Raise it on whoever is being addressed.
+func _open_typed_talk(subject_id: String) -> void:
+	if talk_entry == null or not is_instance_valid(talk_entry):
+		return
+	talk_entry_subject = subject_id
+	talk_entry.text = ""
+	talk_entry.visible = true
+	talk_entry.grab_focus()
+	# The mouse would otherwise still be turning the head while somebody types.
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	prompt.text = "SPEAKING TO %s // TYPE AND PRESS ENTER" % str(WorldHistory.subject(subject_id).get("name", "THEM")).to_upper()
+
+
+func _close_typed_talk() -> void:
+	if talk_entry == null or not is_instance_valid(talk_entry):
+		return
+	talk_entry.release_focus()
+	talk_entry.visible = false
+	talk_entry_subject = ""
+	if panel_mode.is_empty():
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+## Typed words arrive as a finished contact, because that is what they are.
+##
+## The payload is the shape `_voice_heard` already takes, with the measurements
+## a microphone would have supplied filled in as "yes, and clearly". Empty
+## submissions close the line rather than sending silence at somebody, which is
+## what pressing enter on an empty box plainly means.
+func _typed_said(text: String) -> void:
+	var said := text.strip_edges()
+	var subject_id := talk_entry_subject
+	_close_typed_talk()
+	if said.is_empty() or subject_id.is_empty():
+		return
+	_voice_heard(subject_id, said, {"sent": true, "duration": 1.0, "peak": 1.0})
+
+
+## Whether you are holding something, written where anybody can read it.
+##
+## The single most relevant fact in a conversation with an armed stranger, and
+## nothing in the game recorded it. `NPCConversationComponent.perceive()` has
+## always reported `player_weapon_drawn` off
+## `WorldHistory.subject("player").weapon_drawn`, and nothing ever set that
+## field -- every other match in the codebase is `smoke_weapon_drawn`, which is
+## about cigarettes. So it was permanently false, and the consequences ran the
+## whole length of the conversation system:
+##
+##   - `NPCActionValidator.ALLOWED` gates `consider_robbery_compliance` and
+##     `attack` behind `needs_threat`, so neither could ever be ruled unless
+##     there had already been violence. Surrender at gunpoint was unreachable.
+##   - `MockBrain` has two branches that begin `if armed` and neither could run.
+##   - `npc_dialogue_brain.prompt_for()` never told the model you were armed,
+##     which is why one asked to put it down and walk away answered "Mm." with
+##     intent "smalltalk". It did not know there was a weapon in the room.
+##
+## Written on change rather than per frame, because it changes when your hands
+## do and a field rewritten sixty times a second is a ledger nobody can read.
+## `amend_subject` rather than `update_subject`: this is a fact about the
+## present, not an event worth a line in the history.
+func _record_weapon_drawn() -> void:
+	if arsenal == null:
+		return
+	var drawn := not bare_handed and str(arsenal.current().get("kind", "")) in ["melee", "firearm"]
+	if bool(WorldHistory.subject("player").get("weapon_drawn", false)) == drawn:
+		return
+	WorldHistory.amend_subject("player", {"weapon_drawn": drawn})
+
+
+## What the NPC decided, made true in the world.
+##
+## `NPCConversationComponent` has run the whole loop since it was written --
+## perceive, brain proposes, validator rules, relationship moves, NPC speaks
+## from what actually happened -- and the hunt listened to none of it.
+## `validated_action` had no connection in this scene at all. So somebody could
+## rule that they were going to run, or comply, or shout for help, say so out
+## loud, and then stand exactly where they were. The conversation was a speech
+## bubble over a state machine that could not hear it.
+##
+## Nothing new is invented here. Every outcome is an existing state the
+## encounter loop already drives, reached through `disposition`, which is what
+## line 5559 reads to decide whether somebody is still swinging at you. And
+## every one of them goes into the record the same way sparing and recruiting
+## already do, because a person who yielded to you and a person you spared are
+## the same fact about the world and have to survive a reload identically.
+func _npc_acted(npc_id: String, result: Dictionary) -> void:
+	var actor := _actor_by_id(npc_id)
+	if actor.is_empty() or actor.rig == null or not is_instance_valid(actor.rig):
+		return
+	if actor.rig.anatomy.dead:
+		return
+	var action := str(result.get("action", "none"))
+	var subject := WorldHistory.subject(npc_id)
+	var name := str(subject.get("name", "THEY")).to_upper()
+	match action:
+		"attack":
+			# Talking your way into a fight is a real outcome and the only one
+			# here that costs you something immediately.
+			actor.disposition = "hostile"
+			actor.state = "hunting"
+			actor.tracking_player = true
+			WorldHistory.update_subject(npc_id, {
+				"disposition": "hostile",
+				"grudge": int(subject.get("grudge", 0)) + 10,
+				"memory": "The Hunter spoke to me and I decided to take them.",
+			}, "npc_turned_hostile")
+			prompt.text = "%s // DECIDES AGAINST YOU" % name
+		"flee":
+			# `state == "fleeing"` is already driven at 5585; this is only the
+			# decision to enter it.
+			actor.state = "fleeing"
+			actor.disposition = "neutral"
+			WorldHistory.update_subject(npc_id, {
+				"disposition": "neutral",
+				"memory": "The Hunter spoke to me and I left rather than find out.",
+			}, "npc_fled_conversation")
+			prompt.text = "%s // BREAKS AWAY" % name
+		"comply", "consider_robbery_compliance":
+			# Surrender. The same shape as sparing somebody on the floor, and
+			# deliberately so: `spare()` puts the rig down and `neutral` is what
+			# stops them swinging.
+			actor.rig.spare()
+			actor.disposition = "neutral"
+			actor.state = "spared"
+			actor.attack_time = 0.0
+			WorldHistory.update_subject(npc_id, {
+				"status": "spared",
+				"disposition": "neutral",
+				"memory": "The Hunter spoke to me and I gave it up rather than fight.",
+				"anatomy_state": actor.rig.snapshot(),
+			}, "npc_yielded")
+			prompt.text = "%s // YIELDS" % name
+		"call_for_help":
+			# Everyone still hostile and still close enough to have heard it.
+			var roused := 0
+			for other in encounter_actors:
+				if other == actor or not is_instance_valid(other.get("node") as Node3D):
+					continue
+				if str(other.get("disposition", "hostile")) != "hostile":
+					continue
+				if player.distance_to((other.node as Node3D).global_position) > SHOUT_CARRIES:
+					continue
+				other.tracking_player = true
+				roused += 1
+			WorldHistory.update_subject(npc_id, {
+				"memory": "The Hunter spoke to me and I called the others.",
+			}, "npc_called_for_help")
+			prompt.text = "%s // CALLS OUT" % name if roused == 0 else "%s // CALLS OUT // %d ANSWER" % [name, roused]
+		"end_conversation":
+			prompt.text = "%s // DONE TALKING" % name
+	# Recorded whatever it was, including the refusals that change nothing in
+	# the world, because "I asked and they would not" is a fact about this
+	# person that the next conversation should be able to read.
+	PLAYER_ACTION_LEDGER.record("npc_conversation_ruling", {
+		"speaker": "player", "listener": npc_id, "action": action, "location": HUNT_LOCATION,
+	})
+
+
+## How far a shout carries. Short: this is somebody calling out in the open,
+## not an alarm, and a cry that pulled the whole yard would make talking to
+## anybody strictly worse than shooting them.
+const SHOUT_CARRIES := 18.0
+
+
+## Everything the model is allowed to know about the person on the floor. It is
+## what they could have come by honestly -- their own name, their own grudge,
+## what was done to them -- and nothing about the player's inventory, plans or
+## anything else section 4 keeps out of a prompt.
+func _downed_character(subject_id: String) -> Dictionary:
+	var subject := WorldHistory.subject(subject_id)
+	var rules: Array = [
+		# Spelled out in both directions because one sentence was not enough.
+		# Asked "who are you?", llama3.2 answered "I am the one who left you
+		# here" -- it had read the sentence and taken the speaker's side of it.
+		# A model given two people in one clause will sometimes pick the wrong
+		# one, and the fix is to say which is which rather than to imply it.
+		"You are on the ground and badly hurt. You cannot get up.",
+		"The person speaking is standing over you. They put you here. You are not them and you did not do this to anybody.",
+		"You cannot stand and you both know it. Do not pretend otherwise.",
+		"Two sentences at most. You are in no condition for a speech.",
+	]
+	if int(subject.get("grudge", 0)) >= 40:
+		rules.append("You know this voice and you hate it. Say so plainly rather than threatening at length.")
+	if _accepts_recruitment(subject):
+		rules.append("You would take an offer if one were made. You are not going to beg for it.")
+	return {
+		"name": str(subject.get("name", "UNKNOWN")),
+		"identity": "%s, downed on the road outside Ashbloom." % str(subject.get("name", "Someone")),
+		"voice": "Hurt, short of breath, and not giving anything away for free.",
+		"rules": rules,
+		"location": HUNT_LOCATION,
+	}
+
+
+## The same, for somebody who is not on the floor.
+##
+## Kept apart from `_downed_character()` rather than switched inside it,
+## because almost every line differs: the downed rules are all about being
+## unable to get up and are actively wrong for a person standing in front of
+## you with a weapon. The shared part is what the model is allowed to know,
+## which is their own name, their own grudge, and nothing of the player.
+func _standing_character(subject_id: String) -> Dictionary:
+	var subject := WorldHistory.subject(subject_id)
+	# Somebody the story actually wrote gets answered as themselves.
+	#
+	# The rest of this function generates a person out of what `WorldHistory`
+	# knows, which is right for a roamer on the road and wrong for staff: an
+	# Examiner improvised from a grudge score is not the Examiner. Empty for
+	# everybody the story has not written, which is nearly everybody.
+	var authored := FacilityCharacters.for_role(subject, _hostiles_near(subject_id))
+	if not authored.is_empty():
+		return authored
+	var name := str(subject.get("name", "Someone"))
+	var rules: Array = [
+		# The same naming rule every character gets, said here too because this
+		# one is being handed a name and could reasonably invent a second.
+		"You are standing on the road outside Ashbloom and you are not hurt.",
+		"The person speaking to you is armed and is not your friend. You have not agreed to anything.",
+		"Two sentences at most. This is a exchange in the open, not a speech.",
+	]
+	var grudge := int(subject.get("grudge", 0))
+	if grudge >= 40:
+		rules.append("You know this voice and you hate it. Tell them to leave rather than threatening at length.")
+	elif grudge >= 15:
+		rules.append("You do not trust them and you are not hiding it.")
+	if _accepts_recruitment(subject):
+		rules.append("You would hear an offer out. You are not going to ask for one.")
+	if _recent_hostility():
+		rules.append("There has just been violence nearby. You are watching their hands.")
+	# What the record already knows about them, which is more than "a person".
+	# The roamers are filed with a trade and a post -- a Haul foreman at mid
+	# road west, a Signal keeper on the wreck line -- and none of it was
+	# reaching the prompt, so every one of them answered as an interchangeable
+	# stranger while the game had them written down as somebody.
+	var role := str(subject.get("role", ""))
+	var post := str(subject.get("post", ""))
+	var identity := "%s, on the road outside Ashbloom, on their feet and armed." % name
+	if not role.is_empty():
+		identity = "%s, %s on the road outside Ashbloom, on their feet and armed." % [name, role.to_lower()]
+		rules.append("You are a %s. You were working when they turned up and you would rather be getting on with it." % role.to_lower())
+	if not post.is_empty():
+		rules.append("You work %s and you know this ground better than they do." % post)
+	var faction := str(subject.get("faction", ""))
+	if not faction.is_empty():
+		rules.append("You are %s. You do not speak for them and you are not going to pretend to." % faction)
+	return {
+		"name": name,
+		"identity": identity,
+		"voice": "Wary, economical, and ready to walk away.",
+		"rules": rules,
+		"location": HUNT_LOCATION,
+	}
+
+
+## How many other hostiles are standing close enough to count as being with
+## them. A guard alone talks differently from a guard with three others, and
+## that is the difference between somebody who can be talked down and somebody
+## who does not have to be.
+func _hostiles_near(subject_id: String) -> int:
+	var actor := _actor_by_id(subject_id)
+	if actor.is_empty():
+		return 0
+	var at: Vector3 = (actor.node as Node3D).global_position
+	var count := 0
+	for other in encounter_actors:
+		if other == actor or not is_instance_valid(other.get("node") as Node3D):
+			continue
+		if str(other.get("disposition", "hostile")) != "hostile":
+			continue
+		if at.distance_to((other.node as Node3D).global_position) <= SHOUT_CARRIES:
+			count += 1
+	return count
+
+
+## Whether anything has been killed or downed here recently enough to be
+## standing in the air between you. Read off the ledger rather than a timer,
+## the same way everything else in this scene reads the record.
+func _recent_hostility() -> bool:
+	return WorldHistory.event_count("firearm_anatomy_hit") > 0 or WorldHistory.event_count("execution") > 0
+
+
+## The model answered. The canned line already went up when the player spoke,
+## so this replaces it rather than arriving into silence.
+func _downed_answered(turn: Dictionary) -> void:
+	if not bool(turn.get("ok", false)) or str(turn.get("speech", "")).is_empty():
+		return
+	# The panel is the only place the line appears while it is open, because
+	# opening it suppressed the bubble that would otherwise carry it.
+	if talk_ui != null and is_instance_valid(talk_ui) and not talk_subject.is_empty():
+		talk_ui.say(str(turn.get("speech", "")), str(turn.get("tone", "flat")))
+	resolution_ui.set_voice_state(
+		"VOICE RECEIVED / %s" % ("SPOKEN" if bool(turn.get("from_model", false)) else "POSITIONAL REPLY"),
+		1.0, str(turn.get("speech", "")),
+	)
+
+
+## A completed contact: who was addressed, what they actually said, and what
+## the capture measured. The transcript is empty when there is no recogniser on
+## this machine or Vosk heard nothing it would commit to, and that is a normal
+## outcome -- they were still spoken to.
+func _voice_heard(subject_id: String, transcript: String, result: Dictionary) -> void:
 	var actor := _actor_by_id(subject_id)
 	if actor.is_empty() or not bool(result.get("sent", false)):
 		resolution_ui.set_voice_state(voice_channel.status)
 		return
 	var subject := WorldHistory.subject(subject_id)
-	var reply := "You have my attention. Make the offer." if _accepts_recruitment(subject) else "I heard you. It changes nothing yet."
-	if int(subject.get("grudge", 0)) >= 40:
-		reply = "I know your voice. I still hate you."
+	# On the floor or on their feet. Everything below differs by it: what they
+	# are willing to say, what they remember afterwards, and where the answer
+	# is shown, because a person standing in front of you has no resolution
+	# window open over them to put it in.
+	var downed: bool = actor.rig.is_downed()
+	var grudge := int(subject.get("grudge", 0))
+	var reply := ""
+	if downed:
+		reply = "You have my attention. Make the offer." if _accepts_recruitment(subject) else "I heard you. It changes nothing yet."
+		if grudge >= 40:
+			reply = "I know your voice. I still hate you."
+	else:
+		reply = "Say it, then." if _accepts_recruitment(subject) else "What."
+		if grudge >= 40:
+			reply = "Keep walking."
+	# The lines above are the floor, not the ceiling. They go up immediately so
+	# the player is never answered by silence, and a model-written line
+	# replaces them a second later through `answered` if one arrives.
+	if downed_talk != null and is_instance_valid(downed_talk):
+		downed_talk.global_position = actor.node.global_position
+		# Reconfigured only when the person changes. `configure()` rebuilds the
+		# component's speech bubble, so calling it for every sentence spoken to
+		# the same body would leave a Label3D behind each time.
+		if downed_talk.npc_id != subject_id:
+			# A bubble over a body on the floor in front of you duplicates the
+			# line the resolution window is already showing. Over somebody
+			# standing across the road it is the only place the line appears,
+			# so it is the difference between a conversation and silence.
+			downed_talk.suppress_bubble = downed
+			downed_brain.character = _downed_character(subject_id) if downed else _standing_character(subject_id)
+			downed_talk.configure(subject_id, downed_brain.character, player_body, downed_brain)
+		# What the player actually said, when the machine could hear it. The
+		# bracketed line is the fallback for a box with no recogniser: the NPC is
+		# then answering the fact of being spoken to, which is what this path did
+		# before there were any words at all.
+		var said := transcript.strip_edges()
+		if said.is_empty():
+			said = "[the Hunter stands over you and speaks to you]" if downed else "[the Hunter stops in front of you and speaks]"
+		downed_talk.hear(said)
 	WorldHistory.begin_ledger_batch()
 	var contact := PLAYER_ACTION_LEDGER.record("proximity_voice_addressed", {"speaker": "player", "listener": subject_id, "duration": result.duration, "location": HUNT_LOCATION, "raw_audio_saved": false})
-	WorldHistory.amend_subject(subject_id, {"last_voice_contact": int(contact.get("sequence", WorldHistory.event_count())), "memory": "The Hunter spoke to me while I was downed."})
+	WorldHistory.amend_subject(subject_id, {
+		"last_voice_contact": int(contact.get("sequence", WorldHistory.event_count())),
+		"memory": "The Hunter spoke to me while I was downed." if downed else "The Hunter stopped and spoke to me on the road.",
+	})
 	WorldHistory.commit_ledger_batch()
 	voice_channel.play_positional_acknowledgement(actor.rig.head_anchor)
-	resolution_ui.set_voice_state("VOICE RECEIVED / POSITIONAL REPLY", float(result.peak), reply)
+	if downed:
+		resolution_ui.set_voice_state("VOICE RECEIVED / POSITIONAL REPLY", float(result.peak), reply)
+	else:
+		# No window is open over somebody standing, so the prompt line carries
+		# it until the bubble catches up with the model line.
+		prompt.text = "%s // %s" % [str(subject.get("name", "THEY")).to_upper(), reply]
 
 
 func _rival_retreats(message: String) -> void:
@@ -6316,14 +7346,48 @@ func _black_mirror_environment() -> Environment:
 ## for at night and reads as barely more than a tint at noon, rather than one
 ## fixed amplification regardless of the hour.
 func _toggle_black_mirror() -> void:
+	# Night vision is the phone's camera (Greg, 2026-09-24): no phone in hand,
+	# nothing to raise.
+	if not black_mirror_active and dropped_handheld != null and is_instance_valid(dropped_handheld):
+		prompt.text = "THE BLACK MIRROR IS ON THE GROUND"
+		return
+	if not black_mirror_active and (handheld == null or not is_instance_valid(handheld) or not handheld.possessed):
+		prompt.text = "NO PHONE IN HAND"
+		return
 	black_mirror_active = not black_mirror_active
+	var sensor := _mirror_sensor()
 	if not black_mirror_active:
+		sensor.set_active(false)
 		camera.environment = null
 		return
 	var graded := _black_mirror_environment()
 	var darkness := 1.0 - WorldClock.daylight()
 	graded.adjustment_brightness = lerpf(1.05, 3.4, darkness)
-	camera.environment = graded
+	# The grade is the sensor's source: BlackMirrorCamera copies it and adds its
+	# own exposure, gain noise, focus hunt and battery on top, with the phone
+	# feed drawn over the screen.
+	sensor.bind(camera, graded)
+	sensor.set_active(true)
+	if not sensor.active:
+		# A dead cell still lets you look through the glass, just not amplified.
+		camera.environment = graded
+
+
+## BlackMirrorCamera existed, complete, and nothing ever made one. It lives on
+## the HUD layer and is made the first time the phone is raised.
+var _mirror: BlackMirrorCamera
+
+
+func _mirror_sensor() -> BlackMirrorCamera:
+	if _mirror == null or not is_instance_valid(_mirror):
+		_mirror = BlackMirrorCamera.new()
+		_mirror.name = "BlackMirrorSensor"
+		$HUD.add_child(_mirror)
+		# Directly above the field lens: that is a full-screen screen-reading
+		# pass too, and anything under it is painted over by its copy of the
+		# frame -- which is how the whole feed and its REC overlay went missing.
+		$HUD.move_child(_mirror, field_lens.get_index() + 1 if field_lens != null else 0)
+	return _mirror
 
 
 func _take_photograph() -> Dictionary:
@@ -6675,6 +7739,8 @@ func _build_keys_card() -> void:
 		]},
 		{"group": "WHAT YOU CARRY", "rows": [
 			["O", "FIELD INVENTORY / BODY / LOOT"],
+			["U", "DEAD CLOUD EXCHANGE // CASES"],
+			["F8", "CONTACT // PEOPLE, ENTITIES, MATERIA"],
 			["G", "RAISE / LOWER BLACK MIRROR"],
 			["TAB", "INDEX / NEXT DEVICE APP"],
 			["CLICK / F1-F7", "SELECT DEVICE APP"],
@@ -6723,6 +7789,13 @@ func _order_hud_layers() -> void:
 		slot += 1
 
 
+func _on_hub_surface(surface: String) -> void:
+	if surface == "close":
+		_toggle_panel("hub")
+	else:
+		_toggle_panel(surface)
+
+
 func _toggle_panel(mode: String) -> void:
 	var opening := panel_mode != mode
 	if opening:
@@ -6748,6 +7821,11 @@ func _toggle_panel(mode: String) -> void:
 		world_index.open()
 	elif world_index.visible:
 		world_index.close()
+	if brain_hub != null:
+		if panel_mode == "hub":
+			brain_hub.open(handheld.carry, arsenal, player_rig)
+		else:
+			brain_hub.close()
 	if panel_mode == "board":
 		pin_board.open()
 	elif pin_board.visible:
@@ -6765,6 +7843,9 @@ func _toggle_panel(mode: String) -> void:
 	# nothing breaks on arrival, it breaks the first time you open a panel.
 	var covering: bool = living_map.visible or world_index.visible or pin_board.visible
 	covering = covering or (field_inventory != null and field_inventory.visible)
+	covering = covering or (brain_hub != null and brain_hub.visible)
+	covering = covering or (case_menu != null and case_menu.visible)
+	covering = covering or (contact_menu != null and contact_menu.visible)
 	prompt.visible = not covering
 	# The old ArchivePanel is dead. It was a Label in a box and it is exactly
 	# what "no more of this tutorial look" was about.
@@ -6787,6 +7868,10 @@ func _close_panel_views() -> void:
 	living_map.close_map()
 	if field_inventory != null:
 		field_inventory.close_inventory()
+	if case_menu != null:
+		case_menu.close_menu()
+	if contact_menu != null:
+		contact_menu.close_menu()
 	if world_index.visible:
 		world_index.close()
 		world_index.visible = false
@@ -6811,6 +7896,56 @@ func _toggle_inventory() -> void:
 			_pointer.visible = true
 	else:
 		field_inventory.close_inventory()
+		panel_mode = ""
+		prompt.visible = true
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if _pointer != null and is_instance_valid(_pointer):
+			_pointer.visible = false
+
+
+## The dead cloud's shopfront, on U. Same mutual exclusion as every other
+## full-size reader: opening it shuts the rest, closing it gives the mouse back.
+func _toggle_cases() -> void:
+	var opening := panel_mode != "cases"
+	if opening:
+		firearm_aiming = false
+		if handheld.is_open:
+			handheld.close_device()
+		keys_card.close()
+		_close_panel_views()
+		panel_mode = "cases"
+		case_menu.open_menu(handheld.carry, player_rig)
+		prompt.visible = false
+		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
+		if _pointer != null and is_instance_valid(_pointer):
+			_pointer.visible = true
+	else:
+		case_menu.close_menu()
+		panel_mode = ""
+		prompt.visible = true
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if _pointer != null and is_instance_valid(_pointer):
+			_pointer.visible = false
+
+
+## Who you carry and what noticed you, on F8. Same mutual exclusion as every
+## other full-size reader; the index owns every rule this surface shows.
+func _toggle_contact() -> void:
+	var opening := panel_mode != "contact"
+	if opening:
+		firearm_aiming = false
+		if handheld.is_open:
+			handheld.close_device()
+		keys_card.close()
+		_close_panel_views()
+		panel_mode = "contact"
+		contact_menu.open_menu()
+		prompt.visible = false
+		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
+		if _pointer != null and is_instance_valid(_pointer):
+			_pointer.visible = true
+	else:
+		contact_menu.close_menu()
 		panel_mode = ""
 		prompt.visible = true
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -6956,6 +8091,7 @@ func _update_hud() -> void:
 			"weapon": arsenal.state() if arsenal != null else {},
 			"wound_regions": _interface_wound_regions(),
 			"lock_screen": lock_screen,
+			"pockets": handheld.carry.pocketed_items() if handheld != null and handheld.get("carry") != null else [],
 		})
 
 
@@ -7117,6 +8253,78 @@ func _update_held_reliquary() -> void:
 	held_reliquary.clear_item()
 
 
+## The swing's trail follows whatever is actually in the hand, and the lock
+## ring follows whoever the camera is actually framing. Both only read state.
+func _ease_arrival_pain(delta: float) -> void:
+	if player_rig == null or player_rig.anatomy == null:
+		return
+	var anatomy_now = player_rig.anatomy
+	if _arrival_ease == -1.0:
+		# First frame here: arriving hurting starts the ease, arriving well
+		# never does.
+		_arrival_ease = ARRIVAL_EASE_SECONDS if float(anatomy_now.pain) > ARRIVAL_PAIN_FLOOR + 8.0 else 0.0
+		_arrival_pain_from = float(anatomy_now.pain)
+		return
+	if _arrival_ease <= 0.0:
+		return
+	_arrival_ease = maxf(0.0, _arrival_ease - delta)
+	var target := lerpf(ARRIVAL_PAIN_FLOOR, _arrival_pain_from, _arrival_ease / ARRIVAL_EASE_SECONDS)
+	if float(anatomy_now.pain) > target + 4.0:
+		# Something new hurt you: that pain is yours to keep.
+		_arrival_ease = 0.0
+		return
+	anatomy_now.pain = minf(float(anatomy_now.pain), target)
+
+
+func _update_strike_fx(delta: float) -> void:
+	strike_face_time = maxf(0.0, strike_face_time - delta)
+	if block_tracker != null:
+		block_tracker.camera = camera
+		block_tracker.visible = panel_mode.is_empty() and not resolution_ui.visible
+		var seen_by: Array = []
+		for actor in encounter_actors:
+			if bool(actor.get("tracking_player", false)) and not bool(actor.get("dead", false)) and actor.get("node") != null and is_instance_valid(actor.node):
+				# Framed on the torso, so the box sits on the body, not over the head.
+				var body_rig := actor.get("rig") as BaselineHuman
+				var torso := body_rig.parts.get("torso") as Node3D if body_rig != null else null
+				var centre: Vector3 = torso.global_position if torso != null and is_instance_valid(torso) else (actor.node as Node3D).global_position + Vector3(0, 0.9, 0)
+				seen_by.append({"at": centre, "certainty": 1.0})
+		block_tracker.watch(seen_by)
+	if threat_compass != null:
+		threat_compass.visible = panel_mode.is_empty() and not resolution_ui.visible
+	if strike_trail != null:
+		var held: Node3D = null
+		if carried_limb_index >= 0 and carried_limb_model != null and is_instance_valid(carried_limb_model):
+			held = carried_limb_model
+		elif arsenal != null and not bare_handed and arsenal.models.has(arsenal.current_id):
+			held = arsenal.models[arsenal.current_id] as Node3D
+		var commit := arm.commitment() if arm != null else 0.0
+		strike_trail.feed_weapon(held, delta, commit)
+		# Afterimages are a third-person read of the swing. In first person a
+		# ghost blade flicking over the real one read as the arm itself
+		# jumping back and forth (Greg's walkthrough, 2026-09-24).
+		if strike_smear != null and not body_motion.first_person:
+			var tip := held.global_transform * strike_trail.tip_local(held) if held != null and is_instance_valid(held) else Vector3.ZERO
+			strike_smear.feed(held, tip, delta, commit)
+			if strike_audio != null:
+				strike_audio.feed(tip, delta, commit, held != null and is_instance_valid(held))
+	if lock_readout != null:
+		var locked_actor := _actor_by_id(lock_target) if not lock_target.is_empty() else {}
+		var locked_node := locked_actor.get("node") as Node3D if not locked_actor.is_empty() else null
+		if locked_node != null and camera != null and not camera.is_position_behind(locked_node.global_position) and panel_mode.is_empty():
+			var body_anatomy = locked_actor.get("anatomy")
+			var zones: Dictionary = body_anatomy.zones if body_anatomy != null else {}
+			lock_readout.show_for(camera.unproject_position(locked_node.global_position + Vector3.UP * 1.1), str(locked_actor.get("display_name", "")), zones, ANATOMY_COMPONENT.DEFAULT_ZONES)
+		else:
+			lock_readout.hide_readout()
+	if lock_ring != null:
+		var focus := _camera_combat_focus()
+		if focus != null and is_instance_valid(focus):
+			lock_ring.follow(focus.global_position)
+		else:
+			lock_ring.release()
+
+
 func _update_camera() -> void:
 	if resolution_ui != null and resolution_ui.visible:
 		# M4.5. Was a bare 72.0 — a third FOV value with no relationship to the
@@ -7251,6 +8459,8 @@ func _update_camera() -> void:
 		if locked_body != null and third_person:
 			var toward := locked_body.global_position - player
 			facing = atan2(toward.x, toward.z) + PI
+		elif strike_face_time > 0.0 and third_person:
+			facing = strike_face_yaw
 		player_rig.rotation.y = lerp_angle(player_rig.rotation.y, facing, clampf(get_physics_process_delta_time() * 12.0, 0.0, 1.0))
 		# The first-person camera sits inside the skull, so the head would fill
 		# the view. Fading this on the blend instead of the toggle means the
@@ -7260,6 +8470,11 @@ func _update_camera() -> void:
 		var head := player_rig.parts.get("head") as Node3D
 		if head != null and is_instance_valid(head):
 			head.visible = camera_blend > 0.5
+	# The arms follow the camera actually used, like the head: a room that
+	# forces the eye gets first-person arms, and nothing that sets
+	# third_person without the F key leaves them stretched back to the lens.
+	if body_motion != null:
+		body_motion.set_perspective(camera_blend <= 0.5)
 
 
 ## The pointer, in the project's own hand rather than the operating system's. A
@@ -7403,6 +8618,24 @@ func _build_world() -> void:
 	sun.light_color = Color("c89572")
 	sun.light_energy = 1.4
 	sun.shadow_enabled = true
+	# The sun was left on every Godot default, which is 100 metres of shadow
+	# across four parallel cascades. There are 3133 visible shadow casters in
+	# this scene, so every one of them inside that hundred metres was being
+	# rendered again into as many as four cascades, every frame, on top of the
+	# 5984 draw calls the visible pass already costs.
+	#
+	# Measured rather than assumed: `process` sits at 16.96ms against a 16.67ms
+	# budget with only eighty nodes running `_process` at all, so the frame was
+	# never script cost -- it is the renderer, and this is the largest dial on
+	# it that does not change what the scene contains.
+	#
+	# Fifty-five metres because that is past the far side of any district the
+	# player is standing in, and the fog at this preset has eaten the ground
+	# well before it. Two splits rather than four for the same reason: the
+	# cascades exist to keep near shadows sharp, and the near one is the only
+	# one anybody looks at.
+	sun.directional_shadow_max_distance = 55.0
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	add_child(sun)
 
 
@@ -7970,6 +9203,9 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 		rig_config["restore"] = saved_actor.anatomy_state
 	rig.gore = viscera_fx
 	rig.build(subject_id, rig_config)
+	# The yard is done with naked bodies. Encounter rigs arrive in plain work
+	# cloth — the player alone wears motley, because the punishment is theirs.
+	rig.dress(ClothingShell.fresh_wardrobe())
 	HUNTER_APPEARANCE.style_world_rig(rig, subject_id, str(encounter.kind) == "hostile")
 	var actor_motion: HunterBodyMotion = HUNTER_BODY_MOTION.new()
 	actor_motion.name = "BodyMotion"
@@ -8394,6 +9630,26 @@ func _spawn_roamer(anywhere: bool = false) -> void:
 	# Their own name and their own standing, off the same generator the derby
 	# captain comes from, so a roamer reads as somebody rather than as a copy.
 	var who: Dictionary = CastNames.person("roamer_%d_%d" % [WorldHistory.run_salt, _roamer_serial])
+	# Put them in the record, not just in a summary string.
+	#
+	# `CastNames.person()` already produces a name, a trade and a faction for
+	# every roamer, and all of it but the name was being spent on one line of
+	# flavour text and thrown away. Nothing downstream could see who they were:
+	# `_standing_character()` read an empty subject and answered as "Someone",
+	# the contact menu had nobody to list, and the relationship keyed by
+	# subject id had no person on the other end of it.
+	#
+	# `_spawn_encounter_actor` derives the id the same way and reads any saved
+	# record first, so this only fills in somebody who is genuinely new.
+	var roamer_subject := "roamer_%d_actor" % _roamer_serial
+	if not WorldHistory.subject(roamer_subject).has("kind"):
+		WorldHistory.register_subject(roamer_subject, {
+			"name": str(who.get("name", "Ashline Tollkeeper")),
+			"kind": "person",
+			"role": str(who.get("role", "")),
+			"faction": str(who.get("faction", "")),
+			"faction_id": str(who.get("faction_id", "")),
+		})
 	_spawn_encounter_actor({
 		"instance_id": "roamer_%d" % _roamer_serial,
 		"kind": "hostile",
@@ -8472,6 +9728,9 @@ func _spawn_friend() -> void:
 	if nix.get("anatomy_state") is Dictionary:
 		nix_config["restore"] = nix.anatomy_state
 	friend_rig.build(FRIEND_ID, nix_config)
+	# Nix dresses like the yard: plain work cloth, same as everyone who was
+	# not sentenced to motley.
+	friend_rig.dress(ClothingShell.fresh_wardrobe())
 	HUNTER_APPEARANCE.style_world_rig(friend_rig, FRIEND_ID, false)
 	var label := Label3D.new()
 	label.text = "NIX ARDEN\n[E] TALK"
@@ -8498,6 +9757,8 @@ func _spawn_rival() -> void:
 	if mara_record.get("anatomy_state") is Dictionary:
 		mara_config["restore"] = mara_record.anatomy_state
 	enemy_rig.build(CAST.id_for(CAPTAIN_SLOT), mara_config)
+	# The captain dresses for the yard she hunts in, not the circus.
+	enemy_rig.dress(ClothingShell.fresh_wardrobe())
 	HUNTER_APPEARANCE.style_world_rig(enemy_rig, CAST.id_for(CAPTAIN_SLOT), true)
 	var label := Label3D.new()
 	label.text = "%s // ASHLINE CAPTAIN" % _captain_name()

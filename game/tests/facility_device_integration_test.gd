@@ -29,8 +29,13 @@ func _ready() -> void:
 	map.observe(Vector3(31, 0, -77), 0.0)
 	map.open_map()
 	await get_tree().process_frame
-	check(map.facility_sheet, "MAP defaults to the facility sheet after the opening route exists")
+	check(not map.facility_sheet, "MAP opens on the satellite, even after the opening route exists")
 	check(map.facility_selected >= 0, "MAP selects a revealed holding")
+	var to_facility := InputEventKey.new()
+	to_facility.keycode = KEY_L
+	to_facility.pressed = true
+	map._gui_input(to_facility)
+	check(map.facility_sheet, "L turns to the facility sheet")
 	var first := map.facility_selected
 	var right := InputEventKey.new()
 	right.keycode = KEY_RIGHT

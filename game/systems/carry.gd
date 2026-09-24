@@ -515,6 +515,106 @@ func repay(amount: int, lender_faction: String) -> Dictionary:
 	return {"ok": true, "paid": paid, "owed": int(debts[lender_faction]), "wallet": wallet - paid}
 
 
+## Case winnings land here. Scrip and gold credit the wallet; ammo, patches and
+## implants become items — except patches, which a rig on hand sews straight
+## into its worst zone rather than sitting in the bag waiting for a verb that
+## does not exist yet. Implants arrive shaped for `install_into()`, so a case
+## can genuinely put hardware in you through verbs the game already has.
+func take_case_winnings(receipt: Dictionary, rig: BaselineHuman = null) -> Dictionary:
+	if not bool(receipt.get("ok", false)):
+		return {"ok": false, "reason": str(receipt.get("reason", "BAD RECEIPT"))}
+	var kind := str(receipt.get("kind", ""))
+	var amount := int(receipt.get("amount", 0))
+	var inventory := WorldHistory.subject("inventory")
+	var wallet := int(inventory.get("rust_scrip", 0))
+	var note := ""
+	WorldHistory.begin_ledger_batch()
+	match kind:
+		"scrip", "gold":
+			var gain := amount if kind == "scrip" else amount * LootCase.GOLD_VALUE
+			wallet += gain
+			note = "+%d SCRIP" % gain
+		"patch":
+			var sewn := _sew_patch(rig, amount)
+			if not sewn.is_empty():
+				note = "PATCH SEWN // %s" % sewn
+			else:
+				items.append({"label": "CLOTH PATCH", "kind": "patch", "mass": 0.1, "perishes": false, "age": 0.0, "condition": 1.0})
+				note = "PATCH POCKETED"
+		"ammo":
+			items.append({"label": "%d ROUNDS" % amount, "kind": "ammo", "mass": 0.05 * float(amount), "perishes": false, "age": 0.0, "condition": 1.0, "rounds": amount})
+			note = "%d ROUNDS POCKETED" % amount
+		_:
+			items.append({"label": "SALVAGED IMPLANT", "kind": "cybernetic", "implant": "salvaged hardware", "zone": "torso", "mass": 0.9, "perishes": false, "age": 0.0, "condition": 1.0})
+			note = "HARDWARE POCKETED"
+	WorldHistory.update_subject("inventory", {"rust_scrip": wallet}, "carry_changed")
+	save_to_history()
+	PLAYER_ACTION_LEDGER.record("case_opened", {"case": str(receipt.get("case", "")), "tier": str(receipt.get("tier", "")), "kind": kind, "note": note})
+	WorldHistory.commit_ledger_batch()
+	return {"ok": true, "note": note, "wallet": wallet}
+
+
+## A patch goes into the worst zone it can help, half integrity per patch, and
+## says which zone took it. No rig, no sewing — the caller pockets it instead.
+func _sew_patch(rig: BaselineHuman, amount: int) -> String:
+	if rig == null or not is_instance_valid(rig) or amount <= 0:
+		return ""
+	var worst := ""
+	var worst_cover := 2.0
+	for zone in ClothingShell.ZONES:
+		if not rig.wardrobe.has(zone):
+			continue
+		var cover := clampf(float(rig.wardrobe.get(zone, 0.0)), 0.0, 1.0)
+		if cover < worst_cover:
+			worst_cover = cover
+			worst = zone
+	if worst.is_empty() or worst_cover >= 1.0:
+		return ""
+	ClothingShell.mend(rig.wardrobe, worst, 0.5 * float(amount))
+	rig.dress(rig.wardrobe)
+	return worst.to_upper()
+
+
+## Clothes come back by purchase, and this is the till. Prices the wardrobe's
+## damage through `ClothingShell`, spends rust scrip through the same guarded
+## pattern as `repay()` — capped at the wallet, never below zero — mends every
+## zone it priced, and records the receipt. Nothing owed, nothing to mend, or
+## nothing in the wallet all refuse with a reason instead of half-applying.
+func spend_on_mending(wardrobe: Dictionary) -> Dictionary:
+	var price := ClothingShell.price_to_mend(wardrobe)
+	if price <= 0:
+		return {"ok": false, "reason": "NOTHING TO MEND"}
+	var inventory := WorldHistory.subject("inventory")
+	var wallet := int(inventory.get("rust_scrip", 0))
+	if wallet < price:
+		return {"ok": false, "reason": "NOT ENOUGH SCRIP"}
+	for zone in ClothingShell.ZONES:
+		if wardrobe.has(zone):
+			ClothingShell.mend(wardrobe, zone, 1.0)
+	WorldHistory.begin_ledger_batch()
+	WorldHistory.update_subject("inventory", {"rust_scrip": wallet - price}, "carry_changed")
+	PLAYER_ACTION_LEDGER.record("clothes_mended", {"spent": price, "wallet": wallet - price})
+	WorldHistory.commit_ledger_batch()
+	return {"ok": true, "spent": price, "wallet": wallet - price}
+
+
+## General guarded spend: deducts an amount for a named reason through the same
+## pattern as `repay()`. Refuses empty wallets rather than going negative, and
+## the ledger names what the money was for.
+func spend(amount: int, reason: String) -> Dictionary:
+	if amount <= 0:
+		return {"ok": false, "reason": "NOTHING TO PAY"}
+	var inventory := WorldHistory.subject("inventory")
+	var wallet := int(inventory.get("rust_scrip", 0))
+	if wallet < amount:
+		return {"ok": false, "reason": "NOT ENOUGH SCRIP"}
+	WorldHistory.begin_ledger_batch()
+	WorldHistory.update_subject("inventory", {"rust_scrip": wallet - amount}, "carry_changed")
+	PLAYER_ACTION_LEDGER.record("spent", {"amount": amount, "for": reason, "wallet": wallet - amount})
+	WorldHistory.commit_ledger_batch()
+	return {"ok": true, "spent": amount, "wallet": wallet - amount}
+
+
 ## AL1.2. The bank does not lend against nothing. `borrow()` already writes a
 ## real debt against a real lender; this is the other half — a real lien
 ## written onto one exact carried item, named and found on inspection,

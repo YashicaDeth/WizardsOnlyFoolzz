@@ -9,3 +9,5 @@ Keep dependencies pinned, avoid overlapping editor bridges, and verify changes i
 Keep large tool, temporary, cache and build files under `P:\GameDev`. Do not move or delete unrelated personal files. Do not change global machine or Codex permissions as a shortcut around the current sandbox.
 
 Do not install project development bridges into release builds. Keep design notes updated as user decisions arrive.
+
+Project skills live in `.claude/skills/` (Agent Skills format; each is a folder with a `SKILL.md`). Start with `goal` (the current goal and the ordered work queue; `/goal`). Read the matching one before working: `wof-lane-hygiene` before any edit or commit, `wof-verify-by-looking` for anything visual, `wof-wire-before-polish` before improving a system, `wof-agent-brief` when dispatching work to another agent, `wof-combat-fx` for any fighting visual or sound.

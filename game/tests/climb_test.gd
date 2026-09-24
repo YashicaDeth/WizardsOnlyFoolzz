@@ -9,6 +9,11 @@ extends Node
 ## comes within reach with no key pressed for either half, and ends honestly
 ## — falling, not soft-locking — when the wall it was climbing disappears.
 
+## The generated Hunt Grounds contain real collision.  This test has to own
+## every raycast target or a new district prop can turn a traversal assertion
+## into a test of unrelated scenery.
+const ARENA_Y := 400.0
+
 var failures: Array[String] = []
 
 
@@ -45,7 +50,10 @@ func _ready() -> void:
 	hunt.set_physics_process(false)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	hunt.player_body.position = Vector3(0, 0.9, 19)
+	var arena_floor := _make_wall(Vector3(0, ARENA_Y - 0.5, 19), Vector3(30.0, 1.0, 60.0))
+	add_child(arena_floor)
+	await get_tree().physics_frame
+	hunt.player_body.position = Vector3(0, ARENA_Y + 0.9, 19)
 	hunt.player_body.velocity = Vector3.ZERO
 	hunt.yaw = 0.0
 	await _settle(hunt)
@@ -59,7 +67,7 @@ func _ready() -> void:
 	check(hunt.climb_unlocked(), "unlocked the instant the real count crosses CLIMB_UNLOCK_KICKOFFS (%d)" % hunt.CLIMB_UNLOCK_KICKOFFS)
 
 	print("AD1.4 - a wall too tall to vault, dead ahead, is a real, findable climb")
-	var tall_wall := _make_wall(Vector3(0, 1.5, 19.5), Vector3(2.0, 3.0, 0.4))
+	var tall_wall := _make_wall(Vector3(0, ARENA_Y + 1.5, 19.5), Vector3(2.0, 3.0, 0.4))
 	add_child(tall_wall)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
@@ -71,7 +79,7 @@ func _ready() -> void:
 	print("AD1.4 - a vaultable box is AD1.2's obstacle, not this one's")
 	tall_wall.queue_free()
 	await get_tree().physics_frame
-	var low_box := _make_wall(Vector3(0, 0.4, 19.5), Vector3(2.0, 0.8, 0.4))
+	var low_box := _make_wall(Vector3(0, ARENA_Y + 0.4, 19.5), Vector3(2.0, 0.8, 0.4))
 	add_child(low_box)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
@@ -81,12 +89,12 @@ func _ready() -> void:
 	await get_tree().physics_frame
 
 	print("AD1.4/AD1.5 - triggering one actually ascends, and chains into a mantle with no key pressed for either half")
-	var climb_wall := _make_wall(Vector3(0, 1.5, 19.5), Vector3(2.0, 3.0, 0.4))
+	var climb_wall := _make_wall(Vector3(0, ARENA_Y + 1.5, 19.5), Vector3(2.0, 3.0, 0.4))
 	add_child(climb_wall)
 	# A wall with nothing to land on top of is not a mantle a real building
 	# would offer either — this is the roof `_vault_target()`'s own floor
 	# query is looking for, flush with the wall's own top.
-	var roof := _make_wall(Vector3(0, 2.9, 21.0), Vector3(4.0, 0.2, 4.0))
+	var roof := _make_wall(Vector3(0, ARENA_Y + 2.9, 21.0), Vector3(4.0, 0.2, 4.0))
 	add_child(roof)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
@@ -114,11 +122,11 @@ func _ready() -> void:
 	print("AD1.4 - a wall that disappears mid-climb is falling, not a soft-lock")
 	climb_wall.queue_free()
 	await get_tree().physics_frame
-	var second_wall := _make_wall(Vector3(0, 1.5, 15.5), Vector3(2.0, 3.0, 0.4))
+	var second_wall := _make_wall(Vector3(0, ARENA_Y + 1.5, 15.5), Vector3(2.0, 3.0, 0.4))
 	add_child(second_wall)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	hunt.player_body.position = Vector3(0, 0.9, 15)
+	hunt.player_body.position = Vector3(0, ARENA_Y + 0.9, 15)
 	hunt.player_body.velocity = Vector3.ZERO
 	await _settle(hunt)
 	var second_start: Dictionary = hunt._climb_wall(forward)

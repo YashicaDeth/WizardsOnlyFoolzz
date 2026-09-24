@@ -18,14 +18,34 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 
-	WorldHistory.world_minute = 16.5 * 60.0
-	check(absf(WorldClock.hour() - 16.5) < 0.001, "a world opens in the late afternoon")
+	# Read from the constant rather than repeating it. This said 16.5 in two
+	# places, so the opening hour could move in the game and this would still
+	# pass -- testing a number nothing used any more.
+	WorldHistory.world_minute = WorldClock.OPENING_MINUTE
+	check(absf(WorldClock.hour() - WorldClock.OPENING_MINUTE / 60.0) < 0.001, "a world opens where OPENING_MINUTE says (%.1f)" % WorldClock.hour())
+	check(WorldClock.hour() >= 12.0 and WorldClock.hour() < 18.0, "in the afternoon, which is the register this world is in")
 	check(WorldClock.day() == 1, "on day one")
 	check(WorldClock.phase() == "day", "which is still day")
 
+	# The property that actually matters: the opening chain must not spend all
+	# the light before it hands the player the game. Asserted as hours of
+	# daylight remaining, so moving the opening for a good reason passes and
+	# moving it somewhere that strands a new player in the dark does not.
+	check(WorldClock.daylight() >= 0.999, "a run opens in full daylight (%.2f)" % WorldClock.daylight())
+	var opening_hour := WorldClock.hour()
+	check(18.5 - opening_hour >= 4.0, "with at least four hours of it left for the opening (%.1fh)" % (18.5 - opening_hour))
+	# vat_chamber -> rift_derby -> bone_yard_hunt, which is comfortably four
+	# world hours at 0.4 world-minutes a second.
+	WorldClock.set_hour(opening_hour + 4.0)
+	check(WorldClock.daylight() > 0.0, "so the player surfaces before dark (%.2f at %.1f)" % [WorldClock.daylight(), WorldClock.hour()])
+	WorldHistory.world_minute = WorldClock.OPENING_MINUTE
+
 	# It advances, and it advances at the slower rate it says it does.
 	WorldClock.advance(150.0)
-	check(absf(WorldClock.hour() - 17.5) < 0.01, "two and a half real minutes is a game hour")
+	# Relative to the opening for the same reason as above: this hardcoded
+	# 17.5, which was only ever "the opening hour plus one".
+	var an_hour_on := WorldClock.OPENING_MINUTE / 60.0 + 1.0
+	check(absf(WorldClock.hour() - an_hour_on) < 0.01, "two and a half real minutes is a game hour (%.2f)" % WorldClock.hour())
 
 	# A full day turns over.
 	WorldHistory.world_minute = 0.0

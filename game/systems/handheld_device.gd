@@ -36,6 +36,7 @@ const WORLD_INDEX := preload("res://systems/world_index.gd")
 const LIVING_MAP := preload("res://systems/living_map.gd")
 const WIRE_RADIO := preload("res://systems/wire_radio.gd")
 const CARRY := preload("res://systems/carry.gd")
+const BRAIN_INDEX := preload("res://systems/brain_index.gd")
 const SIGNAL_FIELD := preload("res://systems/signal_field.gd")
 const RADIAL := preload("res://systems/radial_menu.gd")
 const RADIO_AUDIO := preload("res://systems/radio_audio.gd")
@@ -114,6 +115,10 @@ var page_transition_style := "shutter"
 ## Which thing in the bag is under the hand. The CARRY page had no selection at
 ## all, which was fine when it was a table and is not now that it is objects.
 var carry_index := 0
+## The brain is reached through the body shown on the carry page.  It belongs
+## to the player, not to the generic INDEX tabs.
+var brain_index_open := false
+var brain_index_hotspot := Rect2()
 ## A radio lead requires a deliberate continuous hold. Page visibility is not
 ## input: merely looking at RADIO must never finish a lock by itself.
 var radio_lock_held := false
@@ -597,7 +602,11 @@ func _gui_input(event: InputEvent) -> void:
 				radio.release_lock()
 			accept_event()
 		elif button.pressed and _content_rect.has_point(button.position) and displayed_mode() == "CARRY":
-			pin_selected_part()
+			if brain_index_hotspot.has_point(button.position):
+				brain_index_open = not brain_index_open
+				queue_redraw()
+			else:
+				pin_selected_part()
 			accept_event()
 	elif button.pressed and button.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 		var direction := -1 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 1
@@ -1832,133 +1841,153 @@ func _draw_radio_spectrum(rect: Rect2, alpha: float) -> void:
 ## person they came off and throwing that away at the point of carrying it would
 ## break B5, the ritual camera and the organ trade all at once.
 func _draw_carry(rect: Rect2, alpha: float) -> void:
-	CellOutzType.draw_stamped(self, rect.position + Vector2(24, 22), "CARRIED", 18.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.3 * alpha), 1.4)
+	# CARRY is the field inventory rather than a second, clean "menu".  It keeps
+	# the physical device language, but gives the player three immediately legible
+	# jobs: what is equipped, what is selected, and what remains in the bag.
+	var top := rect.position.y + 18.0
+	var nav := ["TASKS", "CARRY", "MAP", "ARCHIVE"]
+	for nav_index in nav.size():
+		var word: String = nav[nav_index]
+		var nav_x := rect.position.x + 28.0 + float(nav_index) * 92.0
+		var active := word == "CARRY"
+		CellOutzType.draw_condensed(self, Vector2(nav_x, top), word, 9.0, (AMBER if active else CASE_EDGE) * Color(1, 1, 1, alpha), 0.72)
+		if active:
+			draw_line(Vector2(nav_x, top + 13), Vector2(nav_x + 54, top + 13), AMBER * Color(1, 1, 1, alpha), 1.2)
+	draw_line(Vector2(rect.position.x + 20, top + 19), Vector2(rect.end.x - 20, top + 19), CASE_EDGE * Color(1, 1, 1, 0.45 * alpha), 1.0)
+	CellOutzType.draw_stamped(self, rect.position + Vector2(24, 50), "CUSTODY / OBJECTS", 15.0, AMBER * Color(1, 1, 1, alpha), ALERT * Color(1, 1, 1, 0.3 * alpha), 1.1)
 	var burden: float = carry.burden()
 	var tone: Color = ALERT if burden > 1.0 else MOSS
 	var load_text := "%0.1f / %0.0f KG" % [carry.total_mass(), Carry.CAPACITY]
 	var load_width := CellOutzType.width_condensed(load_text, 12.0, 0.9)
-	CellOutzType.draw_condensed(self, Vector2(rect.end.x - 26 - load_width, rect.position.y + 26), load_text, 12.0, tone * Color(1, 1, 1, alpha), 0.9)
-	var track := Rect2(rect.position + Vector2(24, 52), Vector2(rect.size.x - 48, 8))
+	CellOutzType.draw_condensed(self, Vector2(rect.end.x - 26 - load_width, rect.position.y + 50), load_text, 12.0, tone * Color(1, 1, 1, alpha), 0.9)
+	var track := Rect2(rect.position + Vector2(24, 72), Vector2(rect.size.x - 48, 6))
 	draw_rect(track, INK * Color(1, 1, 1, 0.10 * alpha))
 	draw_rect(Rect2(track.position, Vector2(track.size.x * minf(burden, 1.0), track.size.y)), tone * Color(1, 1, 1, alpha))
 	if burden > 1.0:
 		draw_rect(Rect2(track.position + Vector2(0, -3), Vector2(track.size.x * clampf(burden - 1.0, 0.0, 1.0), 3)), ALERT * Color(1, 1, 1, alpha))
-	CellOutzType.draw_condensed(self, rect.position + Vector2(24, 70), "WHEEL / ARROWS: SELECT    CLICK / P: PIN TO BOARD", 8.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.62)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(24, 86), "ARROWS / WHEEL: SELECT     P / ENTER: PIN TO BOARD", 8.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.62)
 
-	if carry.items.is_empty():
-		CellOutzType.draw_condensed(self, rect.position + Vector2(24, 88), "NOTHING ON YOU WORTH LISTING.", 12.0, INK * Color(1, 1, 1, 0.4 * alpha), 0.9)
+	var content_top := rect.position.y + 104.0
+	var footer_y := rect.end.y - 42.0
+	var left := Rect2(Vector2(rect.position.x + 22, content_top), Vector2(rect.size.x * 0.25, footer_y - content_top - 8))
+	var centre := Rect2(Vector2(left.end.x + 12, content_top), Vector2(rect.size.x * 0.28, footer_y - content_top - 8))
+	var grid := Rect2(Vector2(centre.end.x + 12, content_top), Vector2(rect.end.x - centre.end.x - 34, footer_y - content_top - 8))
+	_draw_carry_loadout(left, alpha)
+	_draw_carry_inspection(centre, alpha)
+	_draw_carry_grid(grid, alpha)
+	_draw_carry_quick_access(Rect2(Vector2(rect.position.x + 22, footer_y), Vector2(rect.size.x - 44, 31)), alpha)
+
+
+func _draw_carry_loadout(rect: Rect2, alpha: float) -> void:
+	draw_rect(rect, Color(0.02, 0.015, 0.012, 0.36 * alpha))
+	draw_rect(rect, CASE_EDGE * Color(1, 1, 1, 0.38 * alpha), false, 1.0)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(10, 10), "LOADOUT", 10.0, AMBER * Color(1, 1, 1, alpha), 0.75)
+	var slots := [["MAIN HAND", "UNARMED"], ["SIDEARM", "EMPTY"], ["BREACH TOOL", "UNASSIGNED"], ["OUTER LAYER", "PATIENT ISSUE"], ["CARRY RIG", "BODY / 28 KG"]]
+	var row_height := minf(39.0, (rect.size.y - 31.0) / float(slots.size()))
+	for slot_index in slots.size():
+		var at := rect.position + Vector2(8, 28 + float(slot_index) * row_height)
+		var slot_rect := Rect2(at, Vector2(rect.size.x - 16, row_height - 5))
+		draw_rect(slot_rect, Color(0.04, 0.025, 0.019, 0.5 * alpha))
+		draw_rect(slot_rect, CASE_EDGE * Color(1, 1, 1, 0.28 * alpha), false, 1.0)
+		draw_line(slot_rect.position + Vector2(3, slot_rect.size.y * 0.5), slot_rect.position + Vector2(8, slot_rect.size.y * 0.5), AMBER * Color(1, 1, 1, 0.7 * alpha), 1.0)
+		CellOutzType.draw_condensed(self, slot_rect.position + Vector2(12, 5), str(slots[slot_index][0]), 8.0, INK * Color(1, 1, 1, 0.8 * alpha), 0.62)
+		CellOutzType.draw_condensed(self, slot_rect.position + Vector2(12, 17), str(slots[slot_index][1]), 7.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.56)
+
+
+func _draw_carry_inspection(rect: Rect2, alpha: float) -> void:
+	draw_rect(rect, Color(0, 0, 0, 0.24 * alpha))
+	draw_rect(rect, CASE_EDGE * Color(1, 1, 1, 0.38 * alpha), false, 1.0)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(10, 10), "BODY / NEURAL ACCESS", 9.0, AMBER * Color(1, 1, 1, alpha), 0.68)
+	var silhouette := rect.get_center() + Vector2(0, 8)
+	# The player is deliberately present in their own inventory.  The head is a
+	# hardware access point, not decorative character-paper-doll art.
+	brain_index_hotspot = Rect2(silhouette + Vector2(-18, -rect.size.y * 0.31), Vector2(36, 36))
+	draw_circle(brain_index_hotspot.get_center(), 16, Color("55342a") * Color(1, 1, 1, 0.8 * alpha))
+	draw_circle(brain_index_hotspot.get_center(), 16, (AMBER if brain_index_open else CASE_EDGE) * Color(1, 1, 1, alpha), false, 1.0)
+	draw_rect(Rect2(silhouette + Vector2(-14, -rect.size.y * 0.16), Vector2(28, rect.size.y * 0.36)), Color("34221d") * Color(1, 1, 1, 0.82 * alpha))
+	draw_line(silhouette + Vector2(-30, -rect.size.y * 0.09), silhouette + Vector2(30, -rect.size.y * 0.09), CASE_EDGE * Color(1, 1, 1, 0.6 * alpha), 3.0)
+	CellOutzType.draw_condensed(self, brain_index_hotspot.position + Vector2(-12, 39), "BRAIN CHIP", 6.0, AMBER * Color(1, 1, 1, 0.9 * alpha), 0.46)
+	if brain_index_open:
+		_draw_brain_index_overlay(rect, alpha)
 		return
+	if carry.items.is_empty():
+		CellOutzType.draw_condensed(self, rect.position + Vector2(13, rect.end.y - 30), "NO OBJECT SELECTED", 9.0, CASE_EDGE * Color(1, 1, 1, 0.72 * alpha), 0.62)
+		return
+	carry_index = posmod(carry_index, carry.items.size())
+	var item: Dictionary = carry.items[carry_index]
+	var kind := "limb" if bool(item.get("whole_limb", false)) else str(item.get("kind", "goods"))
+	var centre := rect.get_center() + Vector2(0, rect.size.y * 0.19)
+	var radius := minf(rect.size.x, rect.size.y) * 0.17
+	draw_arc(centre, radius + 12, 0.0, TAU, 22, AMBER * Color(1, 1, 1, (0.48 + 0.2 * sin(elapsed * 3.0)) * alpha), 1.2)
+	draw_line(centre + Vector2(-radius - 19, 0), centre + Vector2(radius + 19, 0), CASE_EDGE * Color(1, 1, 1, 0.24 * alpha), 1.0)
+	draw_line(centre + Vector2(0, -radius - 19), centre + Vector2(0, radius + 19), CASE_EDGE * Color(1, 1, 1, 0.24 * alpha), 1.0)
+	_draw_carried(centre, radius, kind, carry.freshness(item), str(item.get("lien", "")), alpha)
+	var name := _fit(str(item.get("label", "UNKNOWN")).to_upper(), rect.size.x - 20, 9.0, 0.65)
+	CellOutzType.draw_condensed(self, Vector2(rect.get_center().x - CellOutzType.width_condensed(name, 9.0, 0.65) * 0.5, rect.end.y - 38), name, 9.0, INK * Color(1, 1, 1, alpha), 0.65)
+	var specimen := "%0.1f KG // %s" % [float(item.get("mass", 0.0)), "POCKET" if bool(item.get("pocketed", false)) else "BAG"]
+	CellOutzType.draw_condensed(self, Vector2(rect.get_center().x - CellOutzType.width_condensed(specimen, 7.0, 0.55) * 0.5, rect.end.y - 23), specimen, 7.0, CASE_EDGE * Color(1, 1, 1, 0.8 * alpha), 0.55)
 
-	# I0.4. This was a spreadsheet: name, condition and weight in aligned
-	# columns with half the page blank. You are carrying pieces of people, and a
-	# packing manifest is the one presentation that makes that ordinary. They are
-	# drawn as objects in a bag now — sized by their real mass, shaped by what
-	# they are, tinted by how fresh they are, and tagged with whose they were.
-	# Playtest, 12 Sep: the first player filled the bag and the page became a
-	# wall of overlapping labels. A bag with fourteen skin chunks in it is not
-	# fourteen things to a person carrying it — it is "skin, fourteen of them".
-	# Grouped by what they are and whose they were, so a full bag reads.
-	var groups: Array = []
-	var seen: Dictionary = {}
-	for item: Dictionary in carry.items:
-		var key := "%s|%s|%s" % [str(item.get("label", "")), str(item.get("from", "")), str(item.get("kind", ""))]
-		if seen.has(key):
-			var existing_index: int = seen[key]
-			var existing_group: Dictionary = groups[existing_index]
-			existing_group["count"] = int(existing_group["count"]) + 1
-			existing_group["mass"] = float(existing_group["mass"]) + float(item.get("mass", 0.5))
-			# The group is as stale as its freshest member is not.
-			existing_group["fresh"] = minf(float(existing_group["fresh"]), carry.freshness(item))
-			continue
-		seen[key] = groups.size()
-		groups.append({
-			"item": item,
-			"count": 1,
-			"mass": float(item.get("mass", 0.5)),
-			"fresh": carry.freshness(item),
-		})
+
+func _draw_brain_index_overlay(rect: Rect2, alpha: float) -> void:
+	var panel := Rect2(rect.position + Vector2(7, 26), rect.size - Vector2(14, 33))
+	draw_rect(panel, Color("120b0a") * Color(1, 1, 1, 0.96 * alpha))
+	draw_rect(panel, AMBER * Color(1, 1, 1, alpha), false, 1.0)
+	CellOutzType.draw_condensed(self, panel.position + Vector2(8, 8), "WETWIRE // BRAIN INDEX", 9.0, AMBER * Color(1, 1, 1, alpha), 0.66)
+	var chip: Dictionary = BRAIN_INDEX.chip("player")
+	var owner := str(chip.get("owner_faction", "NOT DETECTED")).to_upper()
+	CellOutzType.draw_condensed(self, panel.position + Vector2(8, 22), "CHIP OWNER: " + owner, 7.0, CASE_EDGE * Color(1, 1, 1, alpha), 0.54)
+	var folders: Dictionary = BRAIN_INDEX.folder_counts("player")
+	var folder_ids := ["memory", "combat", "people", "places", "carry", "trauma"]
+	for index in folder_ids.size():
+		var folder_id: String = folder_ids[index]
+		var details: Dictionary = folders.get(folder_id, {})
+		var name := str((BRAIN_INDEX.FOLDERS.get(folder_id, {}) as Dictionary).get("label", folder_id)).to_upper()
+		var state := "%02d / %02d" % [int(details.get("open", 0)), int(details.get("total", 0))]
+		var line := panel.position + Vector2(9, 39 + float(index) * 17.0)
+		draw_rect(Rect2(line - Vector2(2, 2), Vector2(panel.size.x - 14, 13)), Color(0.12, 0.06, 0.04, 0.7 * alpha))
+		CellOutzType.draw_condensed(self, line, _fit(name, panel.size.x - 55, 7.0, 0.55), 7.0, INK * Color(1, 1, 1, alpha), 0.55)
+		CellOutzType.draw_condensed(self, Vector2(panel.end.x - 35, line.y), state, 7.0, MOSS * Color(1, 1, 1, alpha), 0.55)
+	CellOutzType.draw_condensed(self, panel.position + Vector2(8, panel.size.y - 15), "CLICK HEAD TO CLOSE", 7.0, CASE_EDGE * Color(1, 1, 1, 0.8 * alpha), 0.52)
+
+
+func _draw_carry_grid(rect: Rect2, alpha: float) -> void:
+	draw_rect(rect, Color(0, 0, 0, 0.28 * alpha))
+	draw_rect(rect, CASE_EDGE * Color(1, 1, 1, 0.38 * alpha), false, 1.0)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(10, 10), "CARRIED / %02d" % carry.items.size(), 9.0, AMBER * Color(1, 1, 1, alpha), 0.7)
 	var columns := 3
-	var rows := maxi(int(ceil(float(groups.size()) / float(columns))), 1)
-	var row_height := 108.0
-	var bag_bottom := rect.end.y - 42.0
-	var bag_top := maxf(rect.position.y + 72.0, bag_bottom - 96.0 - float(rows) * row_height)
-	var bag := Rect2(Vector2(rect.position.x + 24.0, bag_top), Vector2(rect.size.x - 48.0, bag_bottom - bag_top))
-	draw_rect(bag, Color(0, 0, 0, 0.22 * alpha))
-	draw_rect(bag, INK * Color(1, 1, 1, 0.10 * alpha), false, 1.0)
-	# A slack line across the top: the mouth of the bag, sagging under the load.
-	var sag := 6.0 + burden * 16.0
-	var mouth := PackedVector2Array()
-	for step in 13:
-		var t := float(step) / 12.0
-		mouth.append(bag.position + Vector2(bag.size.x * t, sin(t * PI) * sag))
-	draw_polyline(mouth, INK * Color(1, 1, 1, 0.22 * alpha), 1.5)
-	# Things settle to the bottom of a bag. Rows fill upward from the floor, so
-	# the empty space is under the slack mouth rather than below the contents
-	# like unused rows of a table.
-	var floor_y := bag.end.y - 58.0
-	var ceiling := bag.position.y + 40.0
-	if rows > 1:
-		row_height = minf(row_height, (floor_y - ceiling) / float(rows - 1))
-	var top_row := floor_y - float(rows - 1) * row_height
-	var spread := (bag.size.x - 120.0) / float(columns - 1)
-	var cell_width := spread - 14.0
-	for index in groups.size():
-		var group: Dictionary = groups[index]
-		var item: Dictionary = group["item"]
-		var count: int = int(group["count"])
-		var fresh: float = float(group["fresh"])
-		# A pile of ten reads bigger than one, but not ten times bigger.
-		var mass := clampf(float(group["mass"]) / maxf(sqrt(float(count)), 1.0), 0.1, 4.0)
-		# Carry files layer names as kinds, so a severed arm arrives as "muscle"
-		# with whole_limb set. Shape follows what the thing actually is.
-		var kind := str(item.get("kind", "goods"))
-		if bool(item.get("whole_limb", false)):
-			kind = "limb"
-		# Each object takes the room its mass earns rather than a fixed line.
-		var radius := 19.0 + mass * 13.0
-		if kind != "organ" and kind != "cybernetic" and kind != "bone" and kind != "limb":
-			radius = maxf(radius, 23.0)
+	var cell_size := Vector2((rect.size.x - 18) / float(columns), minf(67.0, (rect.size.y - 31) / 3.0))
+	for index in 9:
 		var column := index % columns
 		@warning_ignore("integer_division")
 		var row := index / columns
-		var at := Vector2(bag.position.x + 60.0 + float(column) * spread, top_row + float(row) * row_height)
-		# Nothing in a bag sits on a grid. Nudged off it, deterministically.
-		at += Vector2(sin(float(index) * 2.7) * 13.0, cos(float(index) * 1.9) * 9.0)
-		at.y = clampf(at.y, ceiling, floor_y)
-		if index == posmod(carry_index, maxi(carry.items.size(), 1)):
-			# Under the hand. A ring of pencil round the thing, not a highlight
-			# box — this page has no boxes left in it.
-			draw_arc(at, radius + 11.0, 0.0, TAU, 26, AMBER * Color(1, 1, 1, (0.5 + 0.25 * sin(elapsed * 3.0)) * alpha), 1.4)
-			CellOutzType.draw_condensed(self, at + Vector2(-radius, -radius - 17.0), "P TO PIN", 7.0, AMBER * Color(1, 1, 1, 0.7 * alpha), 0.6)
-		# A shadow underneath, so the thing is resting on something.
-		draw_colored_polygon(_ellipse_points(at + Vector2(0, radius * 0.92), radius * 0.95, radius * 0.22, 14), Color(0, 0, 0, 0.35 * alpha))
-		if count > 1:
-			for behind in mini(count - 1, 3):
-				var shove := Vector2(-4.0 - float(behind) * 3.0, -3.0 - float(behind) * 2.5)
-				_draw_carried(at + shove, radius * (0.94 - float(behind) * 0.05), kind, fresh, "", alpha * 0.45)
-		_draw_carried(at, radius, kind, fresh, str(item.get("lien", "")), alpha)
-		var shown := str(item.get("label", "")).to_upper()
-		if count > 1:
-			shown += "  x%d" % count
-		var label := _fit(shown, cell_width, 9.0, 0.7)
-		var label_width := CellOutzType.width_condensed(label, 9.0, 0.7)
-		CellOutzType.draw_condensed(self, at + Vector2(-label_width * 0.5, radius + 12.0), label, 9.0, INK * Color(1, 1, 1, 0.85 * alpha), 0.7)
-		var from := str(item.get("from", ""))
-		if from != "":
-			# A tag on a short string, low and to the right of the thing it is
-			# tied to. Somebody's name on your property is a label somebody else
-			# tied on, and it has to read as belonging to that object.
-			var origin := _fit(str(WorldHistory.subject(from).get("name", from)).to_upper(), cell_width * 0.8, 7.0, 0.6)
-			var tag_width := CellOutzType.width_condensed(origin, 7.0, 0.6)
-			var tag := Rect2(at + Vector2(radius * 0.86, radius * 0.46), Vector2(tag_width + 11.0, 13.0))
-			var knot := at + Vector2(radius * 0.42, radius * 0.18)
-			if tag.end.x > bag.end.x - 8.0:
-				tag.position.x = at.x - radius * 0.86 - tag.size.x
-				knot = at + Vector2(-radius * 0.42, radius * 0.18)
-			draw_line(knot, tag.position + Vector2(tag.size.x * 0.5, 3), INK * Color(1, 1, 1, 0.3 * alpha), 1.0)
-			draw_rect(tag, Color("d9c49a") * Color(1, 1, 1, 0.13 * alpha))
-			draw_rect(tag, INK * Color(1, 1, 1, 0.22 * alpha), false, 1.0)
-			CellOutzType.draw_condensed(self, tag.position + Vector2(5, 3), origin, 7.0, Color("d9c49a") * Color(1, 1, 1, 0.7 * alpha), 0.6)
+		var cell := Rect2(rect.position + Vector2(7 + float(column) * cell_size.x, 25 + float(row) * cell_size.y), cell_size - Vector2(5, 5))
+		var occupied := index < carry.items.size()
+		draw_rect(cell, Color(0.04, 0.03, 0.025, (0.68 if occupied else 0.26) * alpha))
+		draw_rect(cell, (AMBER if index == carry_index else CASE_EDGE) * Color(1, 1, 1, (0.78 if index == carry_index else 0.32) * alpha), false, 1.0)
+		if not occupied:
+			continue
+		var item: Dictionary = carry.items[index]
+		var kind := "limb" if bool(item.get("whole_limb", false)) else str(item.get("kind", "goods"))
+		var icon_at := cell.position + Vector2(cell.size.x * 0.5, cell.size.y * 0.43)
+		_draw_carried(icon_at, minf(cell.size.x, cell.size.y) * 0.22, kind, carry.freshness(item), "", alpha)
+		var label := _fit(str(item.get("label", "ITEM")).to_upper(), cell.size.x - 8, 7.0, 0.52)
+		CellOutzType.draw_condensed(self, cell.position + Vector2(4, cell.end.y - 13), label, 7.0, INK * Color(1, 1, 1, 0.85 * alpha), 0.52)
+
+
+func _draw_carry_quick_access(rect: Rect2, alpha: float) -> void:
+	draw_line(rect.position, Vector2(rect.end.x, rect.position.y), CASE_EDGE * Color(1, 1, 1, 0.38 * alpha), 1.0)
+	CellOutzType.draw_condensed(self, rect.position + Vector2(0, 10), "POCKET / QUICK ACCESS", 8.0, AMBER * Color(1, 1, 1, alpha), 0.62)
+	var pockets := carry.pocketed_items()
+	for slot in Carry.POCKET_CAPACITY:
+		var at := rect.position + Vector2(132 + float(slot) * 54.0, 4)
+		var slot_rect := Rect2(at, Vector2(47, 23))
+		draw_rect(slot_rect, Color(0.04, 0.025, 0.019, 0.6 * alpha))
+		draw_rect(slot_rect, CASE_EDGE * Color(1, 1, 1, 0.4 * alpha), false, 1.0)
+		CellOutzType.draw_condensed(self, slot_rect.position + Vector2(3, 3), "F%d" % (slot + 1), 6.0, CASE_EDGE * Color(1, 1, 1, 0.7 * alpha), 0.5)
+		if slot < pockets.size():
+			var label := _fit(str((pockets[slot] as Dictionary).get("label", "ITEM")).to_upper(), 34.0, 6.0, 0.45)
+			CellOutzType.draw_condensed(self, slot_rect.position + Vector2(10, 12), label, 6.0, INK * Color(1, 1, 1, alpha), 0.45)
+	CellOutzType.draw_condensed(self, Vector2(rect.end.x - 118, rect.position.y + 10), "P: PIN // 1-3: POCKET", 7.0, CASE_EDGE * Color(1, 1, 1, 0.7 * alpha), 0.5)
 
 
 ## Trims a label to the room its own cell has. Nothing on this page is allowed

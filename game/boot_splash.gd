@@ -374,4 +374,9 @@ func _finish() -> void:
 	if finishing:
 		return
 	finishing = true
-	get_tree().change_scene_to_file(MENU_SCENE)
+	# The last hard cut in the build: the splash now wipes into the menu.
+	var seams := get_node_or_null("/root/Interstitial")
+	if seams != null:
+		seams.wipe_to(MENU_SCENE)
+	else:
+		get_tree().change_scene_to_file(MENU_SCENE)

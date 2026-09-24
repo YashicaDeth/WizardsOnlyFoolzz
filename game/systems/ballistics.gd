@@ -89,13 +89,20 @@ static func casing_budget() -> int:
 	match WorldLook.quality:
 		WorldLook.Quality.ULTRA: return MAX_CASINGS
 		WorldLook.Quality.HIGH: return 120
-		_: return 48
+		_: return 32
+
+
+static func round_budget() -> int:
+	match WorldLook.quality:
+		WorldLook.Quality.ULTRA: return MAX_ROUNDS
+		WorldLook.Quality.HIGH: return 64
+		_: return 32
 
 static func wound_budget() -> int:
 	match WorldLook.quality:
 		WorldLook.Quality.ULTRA: return MAX_CASINGS
 		WorldLook.Quality.HIGH: return 120
-		_: return 96
+		_: return 64
 
 ## Rounds in flight. Plain dictionaries stepped by hand: a RigidBody per bullet
 ## would hand the physics server ninety bodies a second during a shotgun volley
@@ -137,7 +144,7 @@ func _ready() -> void:
 func fire(from: Vector3, along: Vector3, calibre := "pistol", spread := 0.0, count := 1, shooter := "", payload := {}) -> void:
 	var spec: Dictionary = CALIBRES.get(calibre, CALIBRES["pistol"])
 	for index in count:
-		if rounds.size() >= MAX_ROUNDS:
+		if rounds.size() >= round_budget():
 			_retire_round(0)
 		var direction := along.normalized()
 		if spread > 0.0:

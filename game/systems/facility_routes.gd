@@ -13,6 +13,11 @@ const ROUTE_STEALTH := "maintenance_ascent"
 const ROUTE_COOPERATION := "undercroft_compact"
 const ROUTE_ASSAULT := "executive_breach"
 const ROUTE_RECAPTURE := "containment_derby"
+## Greg, 24 September: with the derby shelved as an exit, the Lower Works
+## heat elevator carries the player up to the surface. It is the demo's first
+## route out; the old drains (ROUTE_STEALTH, walked in `old_drains.tscn`) are
+## the second.
+const ROUTE_HEAT_ELEVATOR := "heat_elevator_ascent"
 
 const CONTAINMENT_MECHANISMS := {
 	"implant_suppression_lattice": "The rewritten brain implant is pinned by a tuned suppression lattice.",
@@ -36,6 +41,9 @@ const DISTRICTS := {
 	"underground_colosseum": {"name": "Underground Colosseum", "kind": "occult_entertainment"},
 	"lockdown_grid": {"name": "Lockdown Grid", "kind": "maintenance_network"},
 	"vehicle_sallyport": {"name": "Vehicle Sallyport", "kind": "surface_exit"},
+	# The Lower Works lift. The Service Arcade and Lower Works themselves are
+	# not districts of this graph yet, so it hangs off the facility interior.
+	"heat_elevator": {"name": "Lower Works Heat Elevator", "kind": "surface_exit"},
 }
 
 const CONNECTIONS := [
@@ -53,6 +61,7 @@ const CONNECTIONS := [
 	["processing_chute", "underground_colosseum"],
 	["underground_colosseum", "lockdown_grid"],
 	["lockdown_grid", "vehicle_sallyport"],
+	["growing_floor", "heat_elevator"],
 ]
 
 const ROUTES := {
@@ -95,6 +104,18 @@ const ROUTES := {
 		"surface_relationships": {"celloutz": -30, "ashline_wreckers": 5},
 		"required_control_points": ["concourse", "transit", "shaft"],
 		"mastery_route": true,
+		"avoids_derby": true,
+	},
+	ROUTE_HEAT_ELEVATOR: {
+		"approach": "heat_elevator",
+		"label": "HEAT ELEVATOR",
+		"steps": ["heat_elevator"],
+		"exit": "heat_elevator",
+		# The sallyport's arrival point: the derby used to surface the player
+		# here, and the lift that replaced it as the way up comes out beside it.
+		"surface_position": Vector3(4.0, 0.0, -24.0),
+		"surface_relationships": {},
+		"mastery_route": false,
 		"avoids_derby": true,
 	},
 	ROUTE_RECAPTURE: {

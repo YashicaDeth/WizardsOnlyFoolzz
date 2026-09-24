@@ -192,10 +192,16 @@ func _test_joint_severing() -> void:
 func _test_pain_posture() -> void:
 	var body := _rig()
 	body.gore = false
+	check(not body._needs_pose_update(), "an intact warm body takes the zero-work posture path")
+	check(not body._needs_bleed_update(), "an intact body skips the no-op bleed pass")
+	check(not body.anatomy._needs_simulation(), "an intact body skips autonomous anatomy simulation")
 	var mobility_before := body.anatomy.mobility_ratio()
 	body.hit("torso", 24.0, 10.0, "blunt")
 	var posture := body.anatomy.posture()
 	check(str(posture.state) == "guarded" and float(posture.hunch) < 0.0, "ordinary pain produces a guarded posture before a performance penalty")
+	check(body._needs_pose_update(), "pain wakes the body posture path")
+	check(not body._needs_bleed_update(), "effects disabled still skip bleed updates after a wound")
+	check(body.anatomy._needs_simulation(), "a real wound wakes autonomous anatomy simulation")
 	check(is_equal_approx(body.anatomy.mobility_ratio(), mobility_before), "guarded pain does not yet reduce mobility")
 	body._apply_pain_posture(1.0)
 	check(body.rotation.x < -0.01, "the rig visibly hunches when its anatomy reports pain")
@@ -210,6 +216,18 @@ func _test_pain_posture() -> void:
 			marked += 1
 	check(marked > 0, "the 3D spine carries the same damaged vertebrae the X-ray reports")
 	body.queue_free()
+
+	var cold := _rig()
+	cold.gore = false
+	cold.anatomy.chilled = 0.3
+	check(cold._needs_pose_update(), "cold wakes the body posture path without a combat wound")
+	cold.queue_free()
+
+	var bleeding := _rig()
+	bleeding.gore = true
+	bleeding.hit("torso", 24.0, 10.0, "cut")
+	check(bleeding._needs_bleed_update(), "an open wound wakes the live bleed path")
+	bleeding.queue_free()
 
 
 func _test_downed() -> void:

@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Wizards Only Fools Current Version"
-run/main_scene="res://boot_splash.tscn"
+run/main_scene="res://country_town_menu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
 [audio]

@@ -17,9 +17,6 @@ extends RefCounted
 ## checking a handful of fields somebody remembered.
 
 const STORE_ID := "character_presets"
-## AX4.5. The slot every filing writes, so a death in the opening can grow
-## the same body back without the player filling the form in again.
-const LAST_BODY := "LAST BODY"
 
 ## Everything a player can set during the examination. Adding a field to
 ## CharacterSheet and not to this list is the bug this constant exists to make

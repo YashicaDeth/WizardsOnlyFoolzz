@@ -67,7 +67,7 @@ func _ready() -> void:
 	# previously it said ULTRA while WorldLook silently began on HIGH.
 	_apply_graphics_preset(graphics_presets[graphics_index])
 	_build_country_town()
-	$HUD/Play.pressed.connect(_open_continue_runs)
+	$HUD/Play.pressed.connect(_start_demo)
 	$HUD/Settings.pressed.connect(_open_settings)
 	$HUD/Quit.pressed.connect(get_tree().quit)
 	$HUD/SettingsPanel/VBox/Back.pressed.connect(_close_settings)
@@ -213,47 +213,38 @@ func _play_title_sequence() -> void:
 ## everything below it moves down by exactly one row height.
 func _build_run_doors() -> void:
 	var play: Button = $HUD/Play
-	play.text = "PLAY // SURVIVING WORLDS"
+	# The front door is the playable demo, not a pile of equally-weighted
+	# development routes.  Make the thing Greg can actually start impossible to
+	# miss, then show the larger game honestly as a locked promise.
+	play.text = "DEMO // THE BEST HALF HOUR"
+	play.add_theme_font_size_override("font_size", 30)
 	var row: float = play.offset_bottom - play.offset_top + 8.0
 	for button: Button in [$HUD/Settings, $HUD/Quit, $HUD/CellOutzSite]:
-		button.offset_top += row * 3.0
-		button.offset_bottom += row * 3.0
-	var demo := play.duplicate(0) as Button
-	demo.name = "Demo"
-	demo.text = "DEMO // THE BEST HALF HOUR"
-	demo.offset_top = play.offset_top + row
-	demo.offset_bottom = play.offset_bottom + row
-	demo.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	$HUD.add_child(demo)
-	demo.pressed.connect(_start_demo)
-	demo.mouse_entered.connect(_focus_button.bind(demo))
-	demo.mouse_exited.connect(_unfocus_button.bind(demo))
-	menu_buttons.append(demo)
-	var new_game := play.duplicate(0) as Button
-	new_game.name = "NewGame"
-	new_game.text = "NEW GAME  //  SPLIT THE WORLD"
-	new_game.offset_top = play.offset_top + row * 2.0
-	new_game.offset_bottom = play.offset_bottom + row * 2.0
-	new_game.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	$HUD.add_child(new_game)
-	new_game.pressed.connect(_open_new_game)
-	new_game.mouse_entered.connect(_focus_button.bind(new_game))
-	new_game.mouse_exited.connect(_unfocus_button.bind(new_game))
-	menu_buttons.append(new_game)
-	# Flags cleared on purpose: `duplicate()` copies signal connections by
-	# default, and a copy of Play that is still wired to `_start_game` would send
-	# anyone who pressed it to the decanting floor instead.
+		button.offset_top += row * 2.0
+		button.offset_bottom += row * 2.0
+	var full_game := play.duplicate(0) as Button
+	full_game.name = "FullGame"
+	full_game.text = "FULL GAME  //  LOCKED"
+	full_game.offset_top = play.offset_top + row
+	full_game.offset_bottom = play.offset_bottom + row
+	full_game.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	full_game.disabled = true
+	full_game.focus_mode = Control.FOCUS_NONE
+	full_game.modulate = Color(1, 1, 1, 0.42)
+	$HUD.add_child(full_game)
+	# This duplicate intentionally has no route: the full game does not pretend
+	# to be playable before its real opening and world loop are ready.
 	var sandbox := play.duplicate(0) as Button
-	sandbox.name = "Sandbox"
-	sandbox.text = "GORE SANDBOX"
-	sandbox.offset_top = play.offset_top + row * 3.0
-	sandbox.offset_bottom = play.offset_bottom + row * 3.0
+	sandbox.name = "PsychofreniaSandbox"
+	sandbox.text = "PSYCHOFRENIA SANDBOX"
+	sandbox.offset_top = play.offset_top + row * 2.0
+	sandbox.offset_bottom = play.offset_bottom + row * 2.0
 	sandbox.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	$HUD.add_child(sandbox)
 	sandbox.pressed.connect(_open_gore_sandbox)
 	sandbox.mouse_entered.connect(_focus_button.bind(sandbox))
 	sandbox.mouse_exited.connect(_unfocus_button.bind(sandbox))
-	menu_buttons.append(sandbox)
+	menu_buttons = [play, full_game, sandbox, $HUD/Settings, $HUD/Quit, $HUD/CellOutzSite]
 	# The column is set in the house type from here on. The buttons keep hit
 	# testing, focus, the tween and every signal; they just stop drawing their
 	# own text in the engine's fallback UI font.
@@ -307,7 +298,11 @@ func _start_demo() -> void:
 	if menu_departing:
 		return
 	WorldHistory.begin_demo()
-	_start_game()
+	# DEMO begins at the playable 3D vat/examination.  The old brand splash and
+	# decanting prelude are not another barrier between the player and character
+	# creation.
+	if _prepare_menu_departure():
+		_travel_from_menu("res://vat_chamber.tscn", "the growing floor // decanting")
 
 
 func _open_branch_picker(creating: bool) -> void:

@@ -29,6 +29,13 @@ static func style_world_rig(rig: BaselineHuman, identity: String, armed: bool) -
 		"piercings": 0.15 + float((seed / 31) % 35) / 100.0,
 		"mutation": (0.22 + float((seed / 7) % 35) / 100.0) if armed else 0.08,
 	})
+	# The body casts a shadow; the ink, the piercings and the tooth detail do
+	# not. Styling a world rig adds dozens of centimetre-scale meshes to it --
+	# about seventy-six per person in the hunt -- and every one was being drawn
+	# into the sun cascades every frame at the same cost as a building. The
+	# limbs and torso are well over the threshold and keep theirs, which is the
+	# only shadow of a person anybody actually reads.
+	WorldLook.stop_small_shadows(rig)
 	if not armed:
 		return
 	var arm := rig.parts.get("right_arm") as Node3D
@@ -180,17 +187,106 @@ func _build_body_mods() -> void:
 		zone.add_child(patch)
 
 
+## AX1.3. The seven intake axes, on the skull.
+##
+## Greg, playing the 21 September build: *"Brow, jaw, none of this actually
+## changes."* Every feature below used to be a hardcoded constant, and the only
+## thing an axis reached was `WorldLook.surface()`'s noise seed by way of
+## `_variation` -- so cycling JAW from NARROW to BROAD changed the pattern in
+## the skin and left the jaw exactly where it was. Seven controls that the form
+## described in words and the body ignored.
+##
+## Each axis now owns geometry a player can point at. The ranges are small on
+## purpose: this is a head somebody grew badly in a tank, not a character
+## creator with a caricature slider.
 func _build_face() -> void:
 	var head := rig.parts.head as Node3D
-	_sphere(head, "Eye_L", Vector3(-0.048, 0.035, -0.103), Vector3(0.031, 0.022, 0.014), Color("d1d5ac"), "bone")
-	_sphere(head, "Eye_R", Vector3(0.047, 0.026, -0.106), Vector3(0.022, 0.030, 0.012), Color("83c6bd"), "chrome")
-	_sphere(head, "Pupil_L", Vector3(-0.050, 0.034, -0.116), Vector3(0.008, 0.010, 0.006), Color("12090a"), "dirt")
-	_sphere(head, "Pupil_R", Vector3(0.050, 0.026, -0.118), Vector3(0.006, 0.012, 0.005), Color("8d1b16"), "flesh")
-	_box(head, "Mouth_Upper", Vector3(0, -0.052, -0.112), Vector3(0.105, 0.014, 0.014), Color("451311"), "flesh")
-	_box(head, "Mouth_Lower", Vector3(0.010, -0.078, -0.110), Vector3(0.088, 0.013, 0.014), Color("65201b"), "flesh")
+	var axes: Dictionary = marks.get("axes", {}) if marks.get("axes") is Dictionary else {}
+	var brow := _axis(axes, "brow")
+	var jaw := _axis(axes, "jaw")
+	var cheek := _axis(axes, "cheek")
+	var eyes := _axis(axes, "eyes")
+	var nose := _axis(axes, "nose")
+	var mouth := _axis(axes, "mouth")
+	# GROWN WRONG starts at 0 rather than centred: the facility does not intend
+	# the damage, it just does not prevent it. So this one is a one-sided push.
+	var wrong := clampf(float(axes.get("grown_wrong", 0.0)), 0.0, 1.0)
+
+	# EYES: deep-set through prominent is how far the eye sits out of the skull,
+	# and the brow above it decides how much of that is in shadow.
+	var eye_out := lerpf(-0.008, 0.012, eyes)
+	var eye_high := lerpf(-0.006, 0.006, eyes)
+	# GROWN WRONG puts the two halves of the face out of step with each other.
+	var skew := wrong * 0.016
+	_sphere(head, "Eye_L", Vector3(-0.048, 0.035 + eye_high, -0.103 - eye_out), Vector3(0.031, 0.022, 0.014), Color("d1d5ac"), "bone")
+	_sphere(head, "Eye_R", Vector3(0.047, 0.026 + eye_high - skew, -0.106 - eye_out), Vector3(0.022, 0.030, 0.012), Color("83c6bd"), "chrome")
+	_sphere(head, "Pupil_L", Vector3(-0.050, 0.034 + eye_high, -0.116 - eye_out), Vector3(0.008, 0.010, 0.006), Color("12090a"), "dirt")
+	_sphere(head, "Pupil_R", Vector3(0.050, 0.026 + eye_high - skew, -0.118 - eye_out), Vector3(0.006, 0.012, 0.005), Color("8d1b16"), "flesh")
+
+	# BROW: fine through heavy. A ridge that grows forward and down over the
+	# eyes, which is the single most legible thing on a low-poly head.
+	var brow_depth := lerpf(0.012, 0.034, brow)
+	var brow_drop := lerpf(0.004, -0.004, brow)
+	_box(
+		head, "Brow_Ridge",
+		Vector3(0.0, 0.072 + brow_drop, -0.104 - brow_depth * 0.5),
+		Vector3(0.175, lerpf(0.014, 0.030, brow), brow_depth),
+		Color("6d5643"), "flesh",
+		Vector3(deg_to_rad(lerpf(-4.0, 8.0, brow)), 0.0, deg_to_rad(wrong * 5.0)),
+	)
+
+	# CHEEK: hollow through fed. Two plates that widen and rise.
+	for side in [-1.0, 1.0]:
+		_box(
+			head, "Cheek_%s" % ("L" if side < 0.0 else "R"),
+			Vector3(side * lerpf(0.058, 0.074, cheek), -0.006 + lerpf(-0.010, 0.008, cheek), -0.080),
+			Vector3(lerpf(0.030, 0.052, cheek), lerpf(0.038, 0.062, cheek), 0.048),
+			Color("6b5340"), "flesh",
+			Vector3(0.0, 0.0, deg_to_rad(side * lerpf(10.0, -4.0, cheek))),
+		)
+
+	# NOSE: straight through broken. Broken is not a bigger nose, it is a nose
+	# that stops agreeing with the middle of the face, so the bridge and the tip
+	# go different ways.
+	var bridge_lean := lerpf(0.0, 9.0, nose) + wrong * 6.0
+	_box(
+		head, "Nose_Bridge",
+		Vector3(lerpf(0.0, 0.009, nose), 0.012, -0.118),
+		Vector3(0.030, 0.070, 0.036), Color("70573f"), "flesh",
+		Vector3(0.0, 0.0, deg_to_rad(bridge_lean)),
+	)
+	_box(
+		head, "Nose_Tip",
+		Vector3(lerpf(0.0, -0.011, nose), -0.026, -0.129),
+		Vector3(0.036, 0.028, 0.034), Color("7a5f45"), "flesh",
+		Vector3(0.0, 0.0, deg_to_rad(-bridge_lean * 0.7)),
+	)
+
+	# MOUTH: thin through full, and JAW decides how wide the whole lower face is
+	# for it to sit across.
+	var jaw_wide := lerpf(0.86, 1.18, jaw)
+	var lip := lerpf(0.009, 0.026, mouth)
+	_box(head, "Mouth_Upper", Vector3(0, -0.052, -0.112), Vector3(0.105 * jaw_wide, lip, 0.014), Color("451311"), "flesh")
+	_box(head, "Mouth_Lower", Vector3(0.010, -0.078 - lip * 0.3, -0.110), Vector3(0.088 * jaw_wide, lip * 0.92, 0.014), Color("65201b"), "flesh")
 	for tooth in 5:
 		var tooth_height: float = 0.012 if tooth == 3 else (0.021 if tooth not in [1, 4] else 0.017)
-		_box(head, "Tooth_%d" % tooth, Vector3(-0.038 + tooth * 0.019, -0.063 + (0.008 if tooth in [1, 4] else 0.0), -0.121), Vector3(0.013, tooth_height, 0.009), Color("a99b72"), "bone")
+		_box(head, "Tooth_%d" % tooth, Vector3((-0.038 + tooth * 0.019) * jaw_wide, -0.063 + (0.008 if tooth in [1, 4] else 0.0), -0.121), Vector3(0.013, tooth_height, 0.009), Color("a99b72"), "bone")
+
+	# JAW: narrow through broad, as an actual jaw under the mouth.
+	_box(
+		head, "Jaw_Line",
+		Vector3(0.0, -0.098, -0.066),
+		Vector3(0.132 * jaw_wide, lerpf(0.040, 0.058, jaw), lerpf(0.090, 0.118, jaw)),
+		Color("67503d"), "flesh",
+		Vector3(0.0, deg_to_rad(wrong * 4.0), deg_to_rad(wrong * 3.0)),
+	)
+
+
+## An axis as a 0..1 number, defaulting to the middle so a rig built without a
+## sheet -- an overworld stranger, a test fixture -- still gets a plain face
+## rather than an accidental extreme.
+func _axis(axes: Dictionary, key: String) -> float:
+	return clampf(float(axes.get(key, 0.5)), 0.0, 1.0)
 
 
 func _build_hands() -> void:
