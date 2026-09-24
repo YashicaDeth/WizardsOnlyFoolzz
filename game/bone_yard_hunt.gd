@@ -369,6 +369,8 @@ var _arrival_ease := -1.0
 var _arrival_pain_from := 0.0
 var threat_compass: ThreatCompass = null
 var lock_readout: LockReadout = null
+## Blood: per-weapon, per-style experience from fighting, and its trees (7).
+var blood_ledger: BloodLedger = null
 ## After a strike lands, the body faces it this long (third-person turn-in).
 const STRIKE_FACE_SECONDS := 0.35
 var strike_face_yaw := 0.0
@@ -1112,6 +1114,8 @@ func _ready() -> void:
 	player_body.add_child(arsenal)
 	arsenal.configure(player_rig)
 	arsenal.reload_finished.connect(_on_weapon_reload_finished)
+	blood_ledger = BloodLedger.new()
+	blood_ledger.attach(self)
 	body_motion = HUNTER_BODY_MOTION.new()
 	body_motion.name = "HunterBodyMotion"
 	player_body.add_child(body_motion)
@@ -1686,6 +1690,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_4: _equip_carried_limb()
 			KEY_5: _put_the_weapons_down()
 			KEY_6: _cycle_smokeable()
+			KEY_7: blood_ledger.toggle_tree()
 			KEY_Y: _toggle_mouth_hold()
 			KEY_B:
 				if not grapple_target.is_empty():

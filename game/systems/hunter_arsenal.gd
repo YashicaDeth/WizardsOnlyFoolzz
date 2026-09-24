@@ -110,6 +110,11 @@ var condition: Dictionary = {}
 ## weapon it actually has. Part records remain data (id, label, provenance and
 ## modifiers) so a later crafting/persistence layer can move them intact.
 var customization: Dictionary = {}
+## Greg, 24 September: weapons evolve through fighting, not shops. What a
+## style's blood tree has unlocked for one weapon, as the same scale vocabulary
+## a fitted part uses (`BloodLedger` writes it; nothing else should). Kept apart
+## from `customization` so removing a part never strips a learned skill.
+var blood_modifiers: Dictionary = {}
 var models: Dictionary = {}
 var hand: Node3D
 
@@ -278,7 +283,28 @@ func weapon_definition(weapon_id: String) -> Dictionary:
 			var property_name := str(scale_name).trim_suffix("_scale")
 			if result.has(property_name):
 				result[property_name] = float(result[property_name]) * float(modifiers[scale_name])
+	var learned := blood_modifiers.get(weapon_id, {}) as Dictionary
+	for scale_name in learned:
+		var property_name := str(scale_name).trim_suffix("_scale")
+		if result.has(property_name):
+			result[property_name] = float(result[property_name]) * float(learned[scale_name])
 	return result
+
+
+## The blood tree's side of `install_customization`: same scale names, same
+## clamp, one dictionary per weapon, replaced whole each time.
+func set_blood_modifiers(weapon_id: String, modifiers: Dictionary) -> void:
+	if not WEAPONS.has(weapon_id):
+		return
+	var clamped: Dictionary = {}
+	for scale_name in modifiers:
+		if CUSTOMIZATION_SCALES.has(scale_name):
+			var bounds: Vector2 = CUSTOMIZATION_SCALES[scale_name]
+			clamped[scale_name] = clampf(float(modifiers[scale_name]), bounds.x, bounds.y)
+	if clamped.is_empty():
+		blood_modifiers.erase(weapon_id)
+	else:
+		blood_modifiers[weapon_id] = clamped
 
 
 func weapon_customization(weapon_id: String = "") -> Dictionary:

@@ -592,6 +592,25 @@ another account's organisation and could not be read from this one.
   choice changes it, with the change flashing (+0.4).
 - A new Windows build after these three.
 
+### Answered by Greg in question boxes, 24 September 2026 (blood)
+
+- **Blood comes from all of:** kills, damage dealt, your own blood lost, and
+  finishers, which pay the most. (His earlier words: fighting "unlocks the
+  understanding of the blood based combat point and blood fuel xp for weapon
+  combat trees unlocking stuff".)
+- *Built 24 September (assistant proposal, open to Greg):* `BloodLedger`
+  credits blood per weapon from what `WorldHistory` already records (hits,
+  kills, executions, the player's own blood dropping, Hollis rammed down, the
+  Lower Works sentinel breached), so the first fight pays out on arrival in
+  the Hunt. Four placeholder trees, BLADE / BLUNT, IRON, MEAT and HUSH
+  (stealth, credited when nobody can see you), spend a style's blood as fuel;
+  key 7 in the Hunt opens them. Proposed rates: 1 blood per 4 damage dealt,
+  12 per kill, 15 per takedown, 30 per finisher (replacing the kill), 1 per
+  40 ml of your own blood. Only the blade and gun nodes change numbers so far
+  (cleaver damage and cooldown, every gun's spread, reload and damage); the
+  martial and stealth nodes are recorded but not wired. Open: node names and
+  effects, the numbers, spend-as-fuel versus unlock-at-threshold, and the key.
+
 Open: one of Hornee's eyes is a real drink brand's bottle cap with its
 wordmark. Keep it on the shipped model, or swap it for an in-world mark?
 
