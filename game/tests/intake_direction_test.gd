@@ -65,8 +65,9 @@ func _ready() -> void:
 	intake._unhandled_input(event)
 	check(intake.page == page_before, "you cannot page away while it is being done to you")
 
-	# And it hands control back at the end.
-	for _step in 40:
+	# And it hands control back at the end. Each beat is now held long enough
+	# to read (2026-09-24), so the budget is a minute rather than twenty seconds.
+	for _step in 120:
 		intake._process(0.5)
 	check(intake.procedure.is_empty(), "the procedure finishes on its own")
 	intake._unhandled_input(event)

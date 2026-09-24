@@ -18,6 +18,15 @@ var rig: BaselineHuman
 var last_config: Dictionary = {}
 var _clock := 0.0
 var _signature := ""
+## 0 frames the whole specimen, 1 pushes in to the face. Greg on first launch:
+## the face sliders "are pretty fake" -- the axes do move the skull, by a
+## centimetre or two, on a body framed from three metres away.
+var face_focus := 0.0
+var _focus_target := 0.0
+const BODY_EYE := Vector3(0.0, 1.20, -3.9)
+const BODY_LOOK := Vector3(0.0, 1.05, 0.0)
+const FACE_EYE := Vector3(-0.16, 1.33, -0.98)
+const FACE_LOOK := Vector3(0.0, 1.27, 0.0)
 
 
 func _ready() -> void:
@@ -49,10 +58,10 @@ func _ready() -> void:
 	camera = Camera3D.new()
 	camera.name = "SpecimenCamera"
 	# BaselineHuman's face is built on its local negative-Z side.
-	camera.position = Vector3(0.0, 1.12, -3.0)
+	camera.position = BODY_EYE
 	camera.fov = 34.0
 	stage.add_child(camera)
-	camera.look_at(Vector3(0.0, 0.90, 0.0), Vector3.UP)
+	camera.look_at(BODY_LOOK, Vector3.UP)
 
 	_add_light("WarmKey", Vector3(-1.2, 2.3, -1.6), Color("d76d45"), 2.7, 6.0)
 	_add_light("ColdFill", Vector3(1.3, 1.25, -1.2), Color("728d83"), 1.25, 5.0)
@@ -71,7 +80,7 @@ func _build_tank() -> void:
 	var glass_mesh := CylinderMesh.new()
 	glass_mesh.top_radius = 0.72
 	glass_mesh.bottom_radius = 0.72
-	glass_mesh.height = 2.05
+	glass_mesh.height = 2.75
 	glass_mesh.cap_top = false
 	glass_mesh.cap_bottom = false
 	var glass_material := StandardMaterial3D.new()
@@ -82,14 +91,14 @@ func _build_tank() -> void:
 	glass_material.roughness = 0.12
 	glass_mesh.material = glass_material
 	glass.mesh = glass_mesh
-	glass.position = Vector3(0.0, 0.92, 0.0)
+	glass.position = Vector3(0.0, 1.27, 0.0)
 	stage.add_child(glass)
 
 	var medium := MeshInstance3D.new()
 	var medium_mesh := CylinderMesh.new()
 	medium_mesh.top_radius = 0.67
 	medium_mesh.bottom_radius = 0.67
-	medium_mesh.height = 1.92
+	medium_mesh.height = 2.62
 	medium_mesh.cap_top = false
 	medium_mesh.cap_bottom = false
 	var medium_material := StandardMaterial3D.new()
@@ -101,12 +110,13 @@ func _build_tank() -> void:
 	medium_material.emission_energy_multiplier = 0.55
 	medium_mesh.material = medium_material
 	medium.mesh = medium_mesh
-	medium.position = Vector3(0.0, 0.90, 0.0)
+	medium.position = Vector3(0.0, 1.25, 0.0)
 	stage.add_child(medium)
 
 	# Collar and base only. A ring at the specimen's own head height would sit
 	# straight across its face, which is the one thing this panel exists to show.
-	for rib in [-0.02, 0.10, 1.80, 1.92]:
+	# Elongated (Greg, 2026-09-24): a column taller than the body, not a jar.
+	for rib in [-0.02, 0.10, 2.52, 2.64]:
 		var ring := MeshInstance3D.new()
 		var torus := TorusMesh.new()
 		torus.inner_radius = 0.72
@@ -124,13 +134,13 @@ func _build_tank() -> void:
 	var feed_mesh := CylinderMesh.new()
 	feed_mesh.top_radius = 0.020
 	feed_mesh.bottom_radius = 0.016
-	feed_mesh.height = 0.60
+	feed_mesh.height = 1.25
 	feed_mesh.material = WorldLook.surface(Color("6b5a4a"), "flesh", 944)
 	feed.mesh = feed_mesh
 	# Off the centre line and down to the seated rig's mouth (head sits at y
 	# 1.28 once the rig's own offset is added). Dead centre and thicker, it
 	# bisected the face the panel exists to let the player read.
-	feed.position = Vector3(0.055, 1.60, -0.115)
+	feed.position = Vector3(0.055, 1.92, -0.115)
 	feed.rotation_degrees = Vector3(10, 0, 0)
 	stage.add_child(feed)
 
@@ -189,10 +199,20 @@ func present(record: Dictionary) -> void:
 	appearance_node.configure(rig, normalized.get("appearance", {}) as Dictionary)
 
 
+## True on the FACE tab: the camera eases in to the head and back out.
+func set_face_focus(on: bool) -> void:
+	_focus_target = 1.0 if on else 0.0
+
+
 func _process(delta: float) -> void:
 	_clock += delta
+	face_focus = move_toward(face_focus, _focus_target, delta * 1.8)
+	if camera != null:
+		var t := ease(face_focus, -2.0)
+		camera.position = BODY_EYE.lerp(FACE_EYE, t)
+		camera.look_at(BODY_LOOK.lerp(FACE_LOOK, t), Vector3.UP)
 	if rig != null and is_instance_valid(rig):
 		# Just enough movement to establish this as a body in a vat, not a menu
 		# sprite.  It never spins all the way around or interrupts face reading.
-		rig.rotation.y = sin(_clock * 0.42) * 0.22
+		rig.rotation.y = sin(_clock * 0.42) * 0.22 * (1.0 - face_focus * 0.85)
 		rig.rotation.z = sin(_clock * 0.66) * 0.025

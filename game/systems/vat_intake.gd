@@ -105,6 +105,33 @@ var body_preview: Control
 var intake_armed := false
 var touched_pages: Dictionary = {}
 
+# --- first-launch rework (Greg, 2026-09-24) ---------------------------------
+# The vat fills the right side; the examiner is a live 3D feed top-left; the old
+# text strip is a reply panel you answer from. His words type out and are held
+# long enough to read, in a real font at a readable size, and the form takes
+# the mouse as well as the keys.
+const EXAMINER_FEED := preload("res://systems/examiner_feed.gd")
+const PROSE_SIZE := 17
+## Characters per second his line types out at, and reading speed for the hold
+## after it: a 90-character line used to be gone in about four seconds.
+const REVEAL_RATE := 30.0
+const READ_RATE := 14.0
+var examiner_feed: Control
+var revealed := 0.0
+var _shown_text := ""
+## Answers to the question he is asking right now, if he is asking one.
+var answers: Array = []
+## V: what you thought out loud, typed or heard by the tank's pickup.
+var thought := ""
+var thought_life := 0.0
+var thought_edit: LineEdit
+var voice: Node
+var _board_xform := Transform2D()
+var _board_width := 0.0
+var _tab_hits: Array[Rect2] = []
+var _row_hits: Array[Rect2] = []
+var _answer_hits: Array[Rect2] = []
+
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -116,6 +143,15 @@ func _ready() -> void:
 	body_preview = VAT_BODY_PREVIEW.new()
 	body_preview.name = "LiveVatBodyPreview"
 	add_child(body_preview)
+	examiner_feed = EXAMINER_FEED.new()
+	examiner_feed.name = "ExaminerFeed"
+	add_child(examiner_feed)
+	thought_edit = LineEdit.new()
+	thought_edit.name = "ThinkOutLoud"
+	thought_edit.placeholder_text = "think out loud, then Enter"
+	thought_edit.visible = false
+	thought_edit.text_submitted.connect(_think)
+	add_child(thought_edit)
 	resized.connect(_layout_body_preview)
 	call_deferred("_layout_body_preview")
 	call_deferred("_refresh_body_preview")
@@ -138,9 +174,13 @@ const REACTION_GAP := Vector2(1.6, 2.8)
 
 func _speak(context: String = "idle") -> void:
 	handler_line += 1
+	# Every third idle beat he asks you something you can actually answer.
+	if context == "idle" and handler_line % 3 == 0:
+		context = "ask"
 	var beat := IntakeDirection.line_for(context, handler_line + line_offset)
 	handler_says = str(beat.line)
-	handler_life = float(beat.hold)
+	answers = (beat.get("answers", []) as Array).duplicate()
+	handler_life = maxf(float(beat.hold), _read_time(handler_says)) + (6.0 if not answers.is_empty() else 0.0)
 	# He used to start the next line the instant the last one expired, which
 	# meant he never stopped talking for the whole examination -- the pools just
 	# cycled, forever, whether or not the player had done anything. Silence is
@@ -167,7 +207,8 @@ func _advance_procedure() -> void:
 		return
 	var beat: Dictionary = procedure.pop_front()
 	handler_says = str(beat.get("line", ""))
-	handler_life = float(beat.get("hold", 2.6))
+	handler_life = maxf(float(beat.get("hold", 2.6)), _read_time(handler_says))
+	answers = []
 	shot = str(beat.get("shot", "tank"))
 
 
@@ -219,10 +260,37 @@ func _process(delta: float) -> void:
 		elif handler_quiet <= 0.0:
 			_speak()
 	mirror_settle = Motion.approach(mirror_settle, 1.0 if page == 3 else 0.0, delta, Motion.PANEL)
+	var line := _current_line()
+	if line != _shown_text:
+		_shown_text = line
+		revealed = 0.0
+	revealed = minf(revealed + delta * REVEAL_RATE, float(line.length()))
+	thought_life = maxf(0.0, thought_life - delta)
+	if examiner_feed != null and is_instance_valid(examiner_feed):
+		examiner_feed.call("say", line.left(int(revealed)), revealed < float(line.length()))
+	if body_preview != null and is_instance_valid(body_preview):
+		body_preview.call("set_face_focus", page == 3)
 	queue_redraw()
 
 
+## Long enough to read, whatever the authored hold was.
+func _read_time(text: String) -> float:
+	return 1.4 + float(text.length()) / REVEAL_RATE + float(text.length()) / READ_RATE
+
+
+## What his mouth is saying right now: an observation displaces the patter.
+func _current_line() -> String:
+	if doctor_life > 0.0 and doctor_says != "":
+		return doctor_says
+	return handler_says
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	# V is held, not pressed: the pickup listens while it is down.
+	if event is InputEventKey and event.keycode == KEY_V and not event.echo and intake_armed:
+		_think_key(event.pressed)
+		get_viewport().set_input_as_handled()
+		return
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
 	if not intake_armed:
@@ -249,18 +317,107 @@ func _unhandled_input(event: InputEvent) -> void:
 			row = mini(_rows() - 1, row + 1)
 		KEY_ENTER, KEY_KP_ENTER:
 			_commit()
+		KEY_1, KEY_2, KEY_3:
+			_answer(event.keycode - KEY_1)
 		KEY_F:
 			# AX2.1. He does not let you leave without telling you what it was for.
 			# The verdict plays first; filing happens when he has finished.
 			if not verdict_started and _can_file():
 				_begin_verdict()
 			elif not verdict_started:
-				transcript = "EXAMINATION INCOMPLETE  //  CONFIRM EACH TAB"
-				transcript_life = 3.2
+				transcript = "STILL TO CONFIRM: " + ", ".join(_unconfirmed())
+				transcript_life = 4.5
 		_:
 			return
 	get_viewport().set_input_as_handled()
 	queue_redraw()
+
+
+func _unconfirmed() -> Array[String]:
+	var missing: Array[String] = []
+	for index in PAGES.size():
+		if not touched_pages.has(index):
+			missing.append(str(PAGES[index]))
+	return missing
+
+
+## Mouse: hover picks a row, a click confirms it, the tabs and his answers are
+## buttons. The form is drawn tilted, so clicks are carried into its frame.
+func _gui_input(event: InputEvent) -> void:
+	if not intake_armed or not procedure.is_empty():
+		return
+	if not (event is InputEventMouseMotion or event is InputEventMouseButton):
+		return
+	var click: bool = event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT
+	var at: Vector2 = event.position
+	for index in _answer_hits.size():
+		if _answer_hits[index].has_point(at) and click:
+			_answer(index)
+			accept_event()
+			return
+	var local := _board_xform.affine_inverse() * at
+	for index in _tab_hits.size():
+		if _tab_hits[index].has_point(local) and click and index != page:
+			page = index
+			row = 0
+			_doctor_observe()
+			_speak("page")
+			accept_event()
+			return
+	for index in _row_hits.size():
+		if _row_hits[index].has_point(local):
+			row = index
+			if click:
+				_commit()
+			accept_event()
+			queue_redraw()
+			return
+
+
+func _answer(index: int) -> void:
+	if index < 0 or index >= answers.size():
+		return
+	var choice := str(answers[index])
+	answers = []
+	if choice == "STARE":
+		transcript = "WROTE: YES (UNRESPONSIVE)"
+		transcript_life = 3.2
+		_speak("stared")
+	else:
+		_transcribe(choice)
+
+
+## V down/up. With the tank's pickup running (Vosk) it listens while held;
+## without one it opens a line to type the thought into instead.
+func _think_key(pressed: bool) -> void:
+	if voice == null:
+		voice = VoiceInput.new()
+		voice.name = "TankPickup"
+		add_child(voice)
+		voice.utterance_final.connect(_think)
+		voice.call("start")
+	if voice != null and voice.call("available"):
+		voice.call("set_listening", pressed)
+		if pressed:
+			thought = "..."
+			thought_life = 2.0
+		return
+	if pressed and thought_edit != null:
+		thought_edit.visible = true
+		thought_edit.grab_focus()
+
+
+func _think(text: String) -> void:
+	if thought_edit != null:
+		thought_edit.clear()
+		thought_edit.visible = false
+		thought_edit.release_focus()
+	text = text.strip_edges()
+	if text.is_empty():
+		return
+	thought = text
+	thought_life = 6.0
+	_speak("heard")
 
 
 func _rows() -> int:
@@ -384,10 +541,37 @@ func _refresh_body_preview() -> void:
 func _layout_body_preview() -> void:
 	if body_preview == null or not is_instance_valid(body_preview):
 		return
-	var mirror := Rect2(Vector2(size.x * 0.79, 96), Vector2(size.x * 0.18, size.y * 0.52))
+	var mirror := _vat_rect()
 	body_preview.position = mirror.position + Vector2(8, 8)
 	body_preview.size = Vector2(maxf(1.0, mirror.size.x - 16.0), maxf(1.0, mirror.size.y - 56.0))
 	body_preview.visible = size.x >= 640.0 and size.y >= 400.0
+	if examiner_feed != null and is_instance_valid(examiner_feed):
+		var feed := _feed_rect()
+		examiner_feed.position = feed.position + Vector2(6, 24)
+		examiner_feed.size = Vector2(maxf(1.0, feed.size.x - 12.0), maxf(1.0, feed.size.y - 30.0))
+		examiner_feed.visible = body_preview.visible
+	if thought_edit != null:
+		var reply := _reply_rect()
+		thought_edit.position = reply.position + Vector2(10, reply.size.y - 44)
+		thought_edit.size = Vector2(reply.size.x - 20, 34)
+
+
+## The vat is the whole right side of the screen: the body you are choosing,
+## full height, in an elongated tank.
+func _vat_rect() -> Rect2:
+	return Rect2(Vector2(size.x * 0.72, 24), Vector2(size.x * 0.28 - 24, size.y - 48))
+
+
+## Where the recording notice used to hang alone: the examiner, live.
+func _feed_rect() -> Rect2:
+	return Rect2(Vector2(40, 56), Vector2(size.x * 0.27, size.y * 0.34))
+
+
+## Under him: what he is saying, and what you can say back.
+func _reply_rect() -> Rect2:
+	var feed := _feed_rect()
+	var top := feed.end.y + 14.0
+	return Rect2(Vector2(40, top), Vector2(feed.size.x, size.y - top - 40.0))
 
 
 func _cycle(options: Array, current: String) -> String:
@@ -402,9 +586,9 @@ func _draw() -> void:
 	if viewport.x < 640 or viewport.y < 400:
 		return
 	_draw_tank(viewport)
-	var board := Rect2(Vector2(viewport.x * 0.36, 54), Vector2(viewport.x * 0.40, viewport.y - 150))
+	var board := Rect2(Vector2(viewport.x * 0.325, 54), Vector2(viewport.x * 0.375, viewport.y - 130))
 	_draw_clipboard(board)
-	_draw_mirror(Rect2(Vector2(viewport.x * 0.79, 96), Vector2(viewport.x * 0.18, viewport.y * 0.52)))
+	_draw_mirror(_vat_rect())
 	_draw_handler(viewport)
 	_draw_doctor(viewport)
 
@@ -440,6 +624,10 @@ func _draw_tank(viewport: Vector2) -> void:
 
 func _draw_clipboard(rect: Rect2) -> void:
 	# An invasive terminal, not a clean clipboard.
+	_board_xform = Transform2D(-0.022, rect.position + Vector2(0, 12))
+	_board_width = rect.size.x
+	_tab_hits.clear()
+	_row_hits.clear()
 	draw_set_transform(rect.position + Vector2(0, 12), -0.022, Vector2.ONE)
 	var board := Rect2(Vector2.ZERO, rect.size)
 	draw_rect(board, Color(0.045, 0.022, 0.02, 0.96))
@@ -463,10 +651,17 @@ func _draw_clipboard(rect: Rect2) -> void:
 	for index in PAGES.size():
 		var label: String = PAGES[index]
 		var width := CellOutzType.width_condensed(label, 10.0, 0.8) + 16.0
+		var confirmed := touched_pages.has(index)
+		width += 12.0 if confirmed else 0.0
+		_tab_hits.append(Rect2(Vector2(tab_x - 5, 82), Vector2(width, 24)))
 		if index == page:
 			draw_rect(Rect2(Vector2(tab_x - 5, 86), Vector2(width, 18)), HOT * Color(1, 1, 1, 0.16))
 			draw_line(Vector2(tab_x - 5, 104), Vector2(tab_x - 5 + width, 104), HOT, 1.6)
 		CellOutzType.draw_condensed(self, Vector2(tab_x, 90), label, 10.0, ink * Color(1, 1, 1, 1.0 if index == page else 0.45), 0.8)
+		if confirmed:
+			var tick := Vector2(tab_x + width - 18, 91)
+			draw_line(tick + Vector2(0, 4), tick + Vector2(3, 8), MOSS, 2.0)
+			draw_line(tick + Vector2(3, 8), tick + Vector2(9, 0), MOSS, 2.0)
 		tab_x += width + 6.0
 
 	var y := 124.0
@@ -494,11 +689,15 @@ func _draw_clipboard(rect: Rect2) -> void:
 		CellOutzType.draw_condensed(self, Vector2(column, footer + 12), "%04.1f" % float(values[key]), 14.0, ink, 0.9)
 		column += rect.size.x * 0.22
 	CellOutzType.draw_condensed(self, Vector2(26, footer + 36), "%s // %s RISING // %s" % [sheet.sun_sign(), sheet.ascendant(), sheet.modality().to_upper()], 9.0, ink * Color(1, 1, 1, 0.55), 0.7)
-	CellOutzType.draw_condensed(self, Vector2(rect.size.x - 190, footer + 36), "ENTER CONFIRMS // F FILES", 8.0, HOT, 0.8)
+	var done := touched_pages.size()
+	var hint := ("CONFIRMED %d/%d  //  CLICK OR ENTER CONFIRMS THIS TAB" % [done, PAGES.size()]) if done < PAGES.size() else "ALL %d CONFIRMED  //  F FILES YOU" % PAGES.size()
+	CellOutzType.draw_condensed(self, Vector2(rect.size.x - 26 - CellOutzType.width_condensed(hint, 9.0, 0.8), footer + 52), hint, 9.0, HOT if done < PAGES.size() else MOSS, 0.8)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _row_mark(ink: Color, at: Vector2, active: bool, ticked: bool) -> void:
+	# Every row passes through here, so it is where the row becomes clickable.
+	_row_hits.append(Rect2(Vector2(20, at.y - 6), Vector2(_board_width - 40, 23)))
 	draw_rect(Rect2(at, Vector2(11, 11)), ink * Color(1, 1, 1, 0.55), false, 1.2)
 	if ticked:
 		draw_line(at + Vector2(2, 6), at + Vector2(4.5, 9), ink, 1.8)
@@ -648,7 +847,7 @@ func _doctor_observe() -> void:
 	if beat.is_empty():
 		return
 	doctor_says = str(beat.get("line", ""))
-	doctor_life = float(beat.get("hold", 3.0))
+	doctor_life = maxf(float(beat.get("hold", 3.0)), _read_time(doctor_says))
 
 
 ## He stands on the other side of the glass from the handler, and unlike the
@@ -662,7 +861,7 @@ func _doctor_note_refusal() -> void:
 	if beat.is_empty():
 		return
 	doctor_says = str(beat.get("line", ""))
-	doctor_life = float(beat.get("hold", 3.2))
+	doctor_life = maxf(float(beat.get("hold", 3.2)), _read_time(doctor_says))
 
 
 ## AX2.1. The closing sequence. He explains what the examination was for,
@@ -683,7 +882,7 @@ func _advance_verdict() -> void:
 		return
 	var beat: Dictionary = verdict.pop_front()
 	doctor_says = str(beat.get("line", ""))
-	doctor_life = float(beat.get("hold", 3.2))
+	doctor_life = maxf(float(beat.get("hold", 3.2)), _read_time(doctor_says))
 
 
 ## What the examination produced, plus the two numbers the breakout needs:
@@ -721,46 +920,54 @@ func _draw_doctor(viewport: Vector2) -> void:
 		HOT.lightened(0.25) * Color(1, 1, 1, 0.72 + 0.28 * sin(elapsed * 2.0)), 0.8,
 	)
 
-func _draw_handler(viewport: Vector2) -> void:
-	# The old text-only band was visually unmoored: it could have come from a
-	# radio, a quest system, or nowhere.  This is a deliberately bad live feed
-	# of the one examiner standing across the vat.  His face points back at the
-	# player while the real terminal, live body preview, and form stay readable.
-	var feed := Rect2(Vector2(40, viewport.y * 0.39), Vector2(viewport.x * 0.27, viewport.y * 0.34))
-	draw_rect(feed, Color(0.018, 0.018, 0.015, 0.88))
+func _draw_handler(_viewport: Vector2) -> void:
+	# The live feed's frame; the man inside it is ExaminerFeed, a real 3D body.
+	var feed := _feed_rect()
+	draw_rect(feed, Color(0.018, 0.018, 0.015, 0.92))
 	draw_rect(feed, COPPER * Color(1, 1, 1, 0.56), false, 1.0)
-	# Framed shoulders and an examiner who faces the tank camera.  It is a
-	# terminal view, not a duplicate in-world NPC; the physical man remains by
-	# the workstation behind it.
-	var head := feed.position + Vector2(feed.size.x * 0.5, feed.size.y * 0.30)
-	draw_circle(head, feed.size.x * 0.115, Color("7d4336") * Color(1, 1, 1, 0.72))
-	draw_circle(head + Vector2(-feed.size.x * 0.04, 0), 2.0, PAPER.lightened(0.3))
-	draw_circle(head + Vector2(feed.size.x * 0.04, 0), 2.0, PAPER.lightened(0.3))
-	draw_line(head + Vector2(-feed.size.x * 0.045, feed.size.x * 0.055), head + Vector2(feed.size.x * 0.045, feed.size.x * 0.055), HOT.darkened(0.2), 1.0)
-	var shoulders := PackedVector2Array([
-		head + Vector2(-feed.size.x * 0.18, feed.size.y * 0.16),
-		head + Vector2(feed.size.x * 0.18, feed.size.y * 0.16),
-		feed.position + Vector2(feed.size.x * 0.78, feed.size.y * 0.70),
-		feed.position + Vector2(feed.size.x * 0.22, feed.size.y * 0.70),
-	])
-	draw_colored_polygon(shoulders, Color("211b18") * Color(1, 1, 1, 0.95))
-	draw_line(feed.position + Vector2(8, feed.size.y * 0.72), Vector2(feed.end.x - 8, feed.position.y + feed.size.y * 0.72), Color(0.36, 0.30, 0.22, 0.5), 1.0)
-	# One man, and the game does not know his name yet.  His nameplate belongs
-	# to the feed rather than hovering in world space.
-	CellOutzType.draw_condensed(self, feed.position + Vector2(10, 10), "EXAMINER // LIVE OBSERVATION", 8.0, COPPER, 0.64)
-	CellOutzType.draw_condensed(self, feed.position + Vector2(10, feed.size.y * 0.74), "NAME WITHHELD // WATCHING TANK 0C-7", 7.0, INK * Color(1, 1, 1, 0.55), 0.55)
-	# An observation displaces the form patter -- same mouth, and he is not
-	# going to say both at once. Drawn in the paler ink so the player can hear
-	# the register change from clerk to physician without being told.
+	CellOutzType.draw_condensed(self, feed.position + Vector2(10, 8), "EXAMINER // LIVE OBSERVATION  //  NAME WITHHELD", 9.0, COPPER, 0.7)
+	if fmod(elapsed, 1.6) < 0.8:
+		draw_circle(feed.position + Vector2(feed.size.x - 16, 13), 4.0, HOT)
+
+	# The reply panel: what he is saying, then what you can do about it.
+	var reply := _reply_rect()
+	draw_rect(reply, Color(0.05, 0.028, 0.022, 0.9))
+	draw_rect(reply, COPPER * Color(1, 1, 1, 0.4), false, 1.0)
+	var font := ThemeDB.fallback_font
 	var speaking_as_doctor := doctor_life > 0.0 and doctor_says != ""
-	var line: String = doctor_says if speaking_as_doctor else (handler_says if handler_says != "" else HANDLER_LINES[handler_line % HANDLER_LINES.size()])
-	var life: float = doctor_life if speaking_as_doctor else handler_life
-	var ink_for_line: Color = PAPER if speaking_as_doctor else INK
-	var dialogue := Rect2(feed.position + Vector2(8, feed.size.y * 0.78), Vector2(feed.size.x - 16, feed.size.y * 0.18))
-	draw_rect(dialogue, Color(0.08, 0.045, 0.03, 0.84))
-	CellOutzType.draw_condensed(self, dialogue.position + Vector2(7, 7), _fit_handler_line(line.to_upper(), dialogue.size.x - 12), 8.0, ink_for_line * Color(1, 1, 1, clampf(life, 0.0, 1.0) * 0.95), 0.58)
+	var line := _current_line()
+	var shown := line.left(int(revealed))
+	var voice_ink: Color = Color("cfd9d2") if speaking_as_doctor else INK
+	var fade := clampf((doctor_life if speaking_as_doctor else handler_life) * 1.5, 0.0, 1.0)
+	var text_width := reply.size.x - 24.0
+	var y := reply.position.y + 14.0
+	CellOutzType.draw_condensed(self, Vector2(reply.position.x + 12, y), "HE SAYS", 8.0, COPPER, 0.7)
+	y += 16.0
+	draw_multiline_string(font, Vector2(reply.position.x + 12, y + PROSE_SIZE), shown, HORIZONTAL_ALIGNMENT_LEFT, text_width, PROSE_SIZE, 5, voice_ink * Color(1, 1, 1, fade))
+	y += PROSE_SIZE * 1.35 * 4.0 + 10.0
 	if transcript_life > 0.0:
-		CellOutzType.draw_condensed(self, dialogue.position + Vector2(7, dialogue.size.y - 8), _fit_handler_line(transcript, dialogue.size.x - 12), 7.0, MOSS * Color(1, 1, 1, clampf(transcript_life, 0.0, 1.0)), 0.52)
+		draw_string(font, Vector2(reply.position.x + 12, y), transcript, HORIZONTAL_ALIGNMENT_LEFT, text_width, 13, MOSS * Color(1, 1, 1, clampf(transcript_life, 0.0, 1.0)))
+		y += 22.0
+
+	# Answers, when he has asked something a body in a tank can answer.
+	_answer_hits.clear()
+	var mouse := get_local_mouse_position()
+	for index in answers.size():
+		var button := Rect2(Vector2(reply.position.x + 12, y), Vector2(text_width, 28))
+		_answer_hits.append(button)
+		var hot := button.has_point(mouse)
+		draw_rect(button, HOT * Color(1, 1, 1, 0.28 if hot else 0.12))
+		draw_rect(button, HOT * Color(1, 1, 1, 0.7), false, 1.0)
+		draw_string(font, button.position + Vector2(10, 19), "%d   %s" % [index + 1, str(answers[index])], HORIZONTAL_ALIGNMENT_LEFT, text_width - 20, 15, INK)
+		y += 34.0
+
+	if thought_life > 0.0 and thought != "":
+		CellOutzType.draw_condensed(self, Vector2(reply.position.x + 12, y + 6), "YOU THINK", 8.0, BRUISE.lightened(0.4), 0.7)
+		draw_multiline_string(font, Vector2(reply.position.x + 12, y + 22 + 15), thought, HORIZONTAL_ALIGNMENT_LEFT, text_width, 15, 3, BRUISE.lightened(0.55) * Color(1, 1, 1, clampf(thought_life, 0.0, 1.0)))
+
+	var keys := "[V] THINK OUT LOUD" + ("   //   [1-%d] ANSWER" % answers.size() if not answers.is_empty() else "") + "   //   TUBE IN: YOU CANNOT SPEAK"
+	if thought_edit == null or not thought_edit.visible:
+		CellOutzType.draw_condensed(self, Vector2(reply.position.x + 12, reply.end.y - 18), keys, 8.0, INK * Color(1, 1, 1, 0.55), 0.7)
 
 
 func _fit_handler_line(text: String, width: float) -> String:
