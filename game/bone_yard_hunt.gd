@@ -441,6 +441,16 @@ var body_motion: Node
 var hunter_appearance: Node
 var crouching := false
 var strike_windup := -1.0
+## The blood-tree moves (Greg, 24 September). Riposte: until when the next
+## blow after a parry cannot be stopped. Combo: who the last clean hits went
+## into, how many, and when the last one landed.
+const FEINT_STAMINA := 12.0
+const FEINT_BAIT_RANGE := 4.5
+const RIPOSTE_WINDOW := 1.0
+const COMBO_WINDOW := 1.4
+const BACKSTAB_DAMAGE := 3.0
+var riposte_until := -1.0
+var combo_chain := {"subject": "", "count": 0, "at": -99.0}
 var rival_attack_clock := 0.0
 var dodge_remaining := 0.0
 ## AD1.1. Set on the keypress, consumed the next physics step. Not applied
@@ -1951,6 +1961,8 @@ func _physics_process(delta: float) -> void:
 	# is worse than a control that does nothing.
 	var holding_melee_guard := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and arsenal != null and str(arsenal.current().get("kind", "")) != "firearm"
 	var wants_guard := (holding_melee_guard or Input.is_key_pressed(KEY_X)) and panel_mode.is_empty() and not resolution_ui.visible and grapple_target.is_empty() and dodge_remaining <= 0.0
+	if wants_guard and strike_windup >= 0.0:
+		try_feint()
 	if wants_guard and guard_strength() > 0.0 and stamina > 1.0 and not stumbling():
 		if not guarding:
 			guard_raised = 0.0
@@ -2783,6 +2795,8 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	if nearest_index < 0 or nearest_distance > reach:
 		return false
 	var actor: Dictionary = encounter_actors[nearest_index]
+	# Read before the blow provokes them: were they unaware, facing away?
+	var unaware_behind := _unaware_and_behind(actor)
 	_provoke_actor(actor)
 	var target: Node3D = actor.node as Node3D
 	var facing := strike_dir.dot((target.global_position - player).normalized())
@@ -2796,7 +2810,16 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	var defence_sequence := int(actor.get("defence_sequence", 0))
 	actor["defence_sequence"] = defence_sequence + 1
 	var committed := float(actor.get("attack_time", 0.0)) > _actor_attack_cycle(actor) * float(FighterTier.spec(str(actor.get("tier", "hunter"))).telegraph)
-	var defence := FighterTier.defend(str(actor.get("tier", "hunter")), str(actor.subject_id), defence_sequence, committed or _actor_stumbling(actor))
+	var move := _forced_open(actor, unaware_behind)
+	var defence := "open" if not move.is_empty() else FighterTier.defend(str(actor.get("tier", "hunter")), str(actor.subject_id), defence_sequence, committed or _actor_stumbling(actor))
+	if not move.is_empty():
+		fight_stats[move] = int(fight_stats.get(move, 0)) + 1
+		prompt.text = _MOVE_CALLS[move] % str(actor.display_name).to_upper()
+		if move == "backstab":
+			attack = attack.duplicate()
+			attack["damage"] = float(attack.get("damage", 0.0)) * BACKSTAB_DAMAGE
+		PLAYER_ACTION_LEDGER.record("blood_move", {"move": move, "subject_id": actor.subject_id, "weapon": attack.get("weapon", ""), "location": HUNT_LOCATION})
+	_note_combo(actor, defence, move)
 	if defence == "parry":
 		fight_stats["they_parried"] = int(fight_stats.get("they_parried", 0)) + 1
 		if bool(actor.get("sparring", false)):
@@ -5936,6 +5959,7 @@ func _update_encounter_actors(delta: float) -> void:
 						# ever read — so a parry cost the enemy nothing beyond
 						# the damage it already blocked. Real footing loss now.
 						_actor_lose_footing(actor, 0.45, "%s LOSES THEIR FOOTING // PRESS THE OPENING" % str(actor.display_name).to_upper())
+						_after_parry(actor, index)
 					# A sparring partner's blows are padded: they count, they do
 					# not wound.
 					if bool(actor.get("sparring", false)):
@@ -5955,6 +5979,138 @@ func _update_encounter_actors(delta: float) -> void:
 						_complete_local_law_arrest(actor)
 						return
 					health = maxi(1, health_after)
+
+
+# --- the blood-tree moves (Greg, 24 September) ------------------------------
+# Blade: FEINT and COMBO. Meat: RIPOSTE. Iron: HIP COUNTER. Hush: BACKSTAB.
+# Each is a node bought with blood; without it the fight works as before.
+
+const _MOVE_CALLS := {
+	"backstab": "BACKSTAB // %s NEVER SAW IT",
+	"riposte": "RIPOSTE // STRAIGHT THROUGH %s'S GUARD",
+	"baited": "%s BIT ON THE FEINT // WIDE OPEN",
+	"combo": "COMBO // %s CAN'T KEEP UP",
+}
+
+
+func _move_clock() -> float:
+	return Time.get_ticks_msec() / 1000.0
+
+
+func _has_move(flag: String) -> bool:
+	return blood_ledger != null and blood_ledger.has_flag(flag)
+
+
+## FEINT: raise the guard inside your own wind-up and the swing never comes.
+## It costs stamina, and whoever was reading it is left guarding air.
+func try_feint() -> bool:
+	if strike_windup < 0.0 or not _has_move("melee_feint") or stamina < FEINT_STAMINA:
+		return false
+	if str(pending_attack.get("kind", "melee")) == "firearm":
+		return false
+	strike_windup = -1.0
+	pending_attack = {}
+	stamina -= FEINT_STAMINA
+	if body_motion != null:
+		body_motion.trigger_attack(0.0, "")
+	var baited := 0
+	for candidate in encounter_actors:
+		var node := candidate.get("node") as Node3D
+		if node == null or not is_instance_valid(node) or bool(candidate.get("dead", false)):
+			continue
+		if player.distance_to(node.global_position) <= FEINT_BAIT_RANGE:
+			candidate["baited"] = true
+			baited += 1
+	fight_stats["feints"] = int(fight_stats.get("feints", 0)) + 1
+	prompt.text = "FEINT // THEY BIT" if baited > 0 else "FEINT"
+	PLAYER_ACTION_LEDGER.record("blood_move", {"move": "feint", "baited": baited, "location": HUNT_LOCATION})
+	return true
+
+
+## Hush: they had not noticed you, and you came from behind them.
+func _unaware_and_behind(actor: Dictionary) -> bool:
+	if bool(actor.get("tracking_player", false)) or bool(actor.get("tracking_light", false)):
+		return false
+	if str(actor.get("state", "")) in ["hunting", "noticing", "fleeing"]:
+		return false
+	var node := actor.get("node") as Node3D
+	if node == null or not is_instance_valid(node):
+		return false
+	var ahead := -node.global_transform.basis.z
+	ahead.y = 0.0
+	var to_player := player - node.global_position
+	to_player.y = 0.0
+	if ahead.length_squared() < 0.0001 or to_player.length_squared() < 0.0001:
+		return false
+	return ahead.normalized().dot(to_player.normalized()) < -0.25
+
+
+## Which move, if any, takes the defence away from this blow. Spends it.
+func _forced_open(actor: Dictionary, unaware_behind: bool) -> String:
+	if unaware_behind and _has_move("stealth_backstab"):
+		return "backstab"
+	if riposte_until >= 0.0 and _move_clock() <= riposte_until:
+		riposte_until = -1.0
+		return "riposte"
+	if bool(actor.get("baited", false)):
+		actor["baited"] = false
+		return "baited"
+	if _has_move("melee_combo") and str(combo_chain.subject) == str(actor.subject_id) \
+			and int(combo_chain.count) >= 2 and _move_clock() - float(combo_chain.at) <= COMBO_WINDOW:
+		return "combo"
+	return ""
+
+
+## Counts clean hits into one body; a block or a slow gap breaks the chain,
+## and the combo hit itself starts it again.
+func _note_combo(actor: Dictionary, defence: String, move: String) -> void:
+	var now := _move_clock()
+	if defence != "open":
+		combo_chain = {"subject": "", "count": 0, "at": -99.0}
+		return
+	if move == "combo":
+		combo_chain = {"subject": "", "count": 0, "at": -99.0}
+		return
+	var same := str(combo_chain.subject) == str(actor.subject_id) and now - float(combo_chain.at) <= COMBO_WINDOW
+	combo_chain = {"subject": str(actor.subject_id), "count": int(combo_chain.count) + 1 if same else 1, "at": now}
+
+
+## After you turn a blow: RIPOSTE opens the next one, HIP COUNTER shoots.
+func _after_parry(actor: Dictionary, index: int) -> void:
+	if _has_move("martial_riposte"):
+		riposte_until = _move_clock() + RIPOSTE_WINDOW
+	if _has_move("firearm_hip_counter"):
+		hip_counter(actor, index)
+
+
+## HIP COUNTER: a gun in hand when you parry goes off into them, point blank.
+## It spends a real round; an empty or jammed gun only clicks.
+func hip_counter(actor: Dictionary, index: int) -> bool:
+	if arsenal == null or bool(actor.get("sparring", false)):
+		return false
+	var gun: Dictionary = arsenal.current()
+	if str(gun.get("kind", "")) != "firearm":
+		return false
+	var rounds: Dictionary = arsenal.ammo.get(arsenal.current_id, {})
+	if int(rounds.get("loaded", 0)) <= 0 or bool(arsenal.jammed.get(arsenal.current_id, false)):
+		prompt.text = "HIP COUNTER // CLICK"
+		return false
+	rounds["loaded"] = int(rounds.loaded) - 1
+	arsenal.ammo[arsenal.current_id] = rounds
+	var damage := float(gun.get("damage", 20.0)) * float(maxi(1, int(gun.get("pellets", 1))))
+	var anatomy: Node = actor.anatomy as Node
+	var result: Dictionary = anatomy.call("apply_hit", "torso", damage, float(gun.get("impulse", 10.0)), str(gun.get("damage_type", "ballistic")))
+	var node := actor.node as Node3D
+	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": anatomy.call("snapshot")}, "anatomy_changed")
+	_spawn_blood(node.global_position + Vector3(0, 1.1, 0), roundi(damage))
+	if body_motion != null:
+		body_motion.trigger_recoil(float(gun.get("impulse", 10.0)))
+	fight_stats["hip_counter"] = int(fight_stats.get("hip_counter", 0)) + 1
+	PLAYER_ACTION_LEDGER.record("npc_anatomy_hit", {"subject_id": actor.subject_id, "weapon": arsenal.current_id, "zone": "torso", "result": result, "location": HUNT_LOCATION, "move": "hip_counter"})
+	prompt.text = "HIP COUNTER // POINT BLANK INTO %s" % str(actor.display_name).to_upper()
+	if anatomy.dead:
+		_kill_encounter_actor(index, "combat_trauma")
+	return true
 
 
 # --- telegraphs and the fight readout (Greg, 24 September) ------------------
@@ -6041,6 +6197,12 @@ static func fight_summary(stats: Dictionary) -> String:
 		if worst.is_empty() or int(by_side[side]) > int(by_side[worst]):
 			worst = side
 	lines.append("YOU BLOCKED %d  PARRIED %d  WERE HIT %d  FEINTS SEEN %d" % [int(stats.get("blocks", 0)), int(stats.get("parries", 0)), taken, int(stats.get("feints_seen", 0))])
+	var moves: Array[String] = []
+	for move in ["feints", "baited", "combo", "riposte", "hip_counter", "backstab"]:
+		if int(stats.get(move, 0)) > 0:
+			moves.append("%s %d" % [move.to_upper().replace("_", " "), int(stats[move])])
+	if not moves.is_empty():
+		lines.append("MOVES  " + "  ".join(moves))
 	if not worst.is_empty():
 		lines.append("WHAT BEAT YOU: SWINGS FROM %s. HOLD THE GUARD THAT WAY WHEN IT SHOWS." % worst.to_upper())
 	elif swings > 0 and landed * 2 < swings:

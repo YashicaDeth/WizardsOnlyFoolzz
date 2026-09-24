@@ -789,6 +789,26 @@ we can make nudity and censors".
   they count, they don't wound. First to five clean hits wins, and the next
   partner is a tier higher. After each blow and each bout, the partner says
   what beat you.
+- **The blood-tree moves** (Greg picked one per tree, plus COMBO):
+  - Blade / Blunt: **FEINT** and **COMBO** (under FEINT).
+  - Meat: **RIPOSTE**.
+  - Iron: **HIP COUNTER**.
+  - Hush: **BACKSTAB**.
+- *Built (assistant's reading of each move, open to Greg):*
+  - FEINT: raise your guard during your own wind-up. The swing is cancelled
+    for 12 stamina, and anyone within 4.5 m bites: your next blow on them
+    can't be stopped.
+  - COMBO: after two clean hits on the same fighter, a third within 1.4 s
+    always lands. A blocked hit breaks the chain.
+  - RIPOSTE: after you parry, your next blow within 1 s can't be stopped.
+  - HIP COUNTER: parry with a gun in hand and it fires point blank into the
+    attacker. It spends a real round, and an empty or jammed gun only
+    clicks.
+  - BACKSTAB: a blow from behind on a fighter who hasn't noticed you can't
+    be stopped and does triple damage. This is the one exception to "anyone
+    can block", and only once the node is bought.
+  - Each move costs 60 blood (COMBO costs 90) and needs its tree's first
+    node. The fight readout counts the moves you used.
 
 ## Influence register
 
