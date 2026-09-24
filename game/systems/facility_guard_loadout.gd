@@ -29,7 +29,12 @@ func take_sidearm(guard: Node, arsenal: HunterArsenal) -> Dictionary:
 	var disarmed := bool(guard.get_meta("disarmed", false))
 	if anatomy == null or (not bool(anatomy.downed) and not bool(anatomy.dead) and not disarmed):
 		return {"accepted": false, "reason": "guard_still_holds_it"}
-	if not arsenal.acquire_facility_sidearm(FIRST_GUN_ROUNDS):
+	# A round is an object: whatever he fired at you is not in the gun any more.
+	var rounds := int(guard.get_meta("facility_rounds", FIRST_GUN_ROUNDS))
+	if rounds <= 0:
+		gun_available = false
+		return {"accepted": false, "reason": "empty"}
+	if not arsenal.acquire_facility_sidearm(rounds):
 		return {"accepted": false, "reason": "transfer_failed"}
 	gun_available = false
 	guard.set_meta("facility_weapon", "")
@@ -37,6 +42,6 @@ func take_sidearm(guard: Node, arsenal: HunterArsenal) -> Dictionary:
 	WorldHistory.record_event("facility_guard_weapon_taken", {
 		"subject_id": subject_id,
 		"weapon": "facility_sidearm",
-		"rounds": FIRST_GUN_ROUNDS,
+		"rounds": rounds,
 	})
-	return {"accepted": true, "weapon": "facility_sidearm", "rounds": FIRST_GUN_ROUNDS}
+	return {"accepted": true, "weapon": "facility_sidearm", "rounds": rounds}

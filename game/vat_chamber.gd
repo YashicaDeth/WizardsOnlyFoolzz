@@ -21,6 +21,7 @@ const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const BRAIN_INDEX := preload("res://systems/brain_index.gd")
 const CARRY := preload("res://systems/carry.gd")
 const CLOTHING := preload("res://systems/clothing.gd")
+const CHECKPOINT := preload("res://systems/facility_checkpoint.gd")
 
 const EYE_HEIGHT := 1.62
 const BODY_HALF_HEIGHT := 0.85
@@ -67,6 +68,9 @@ var stuck_tank_shell: MeshInstance3D
 var failed_subject_visual: MeshInstance3D
 var stuck_tank_opened := false
 var inspect_held := false
+## Vertebra 5 (Dust to Bones): the tissue-keyed gate and its guard, between
+## the aisle and the pit door. See `facility_checkpoint.gd`.
+var checkpoint: Node3D
 
 # 0 submerged, 1 voiding, 2 breach, 3 floor, 4 aisle
 const BEATS := [
@@ -93,6 +97,7 @@ func _ready() -> void:
 	_build_vat()
 	_build_first_objects()
 	_build_player()
+	_build_checkpoint()
 	_build_intake()
 	opening_audio = OPENING_AUDIO.new()
 	add_child(opening_audio)
@@ -139,6 +144,18 @@ func _on_intake_filed(_state: Dictionary) -> void:
 	FACILITY_TERRITORY.apply_event("opening_woke")
 	WorldHistory.record_event("opening_woke", {"location": "growing_floor"})
 	WorldHistory.commit_ledger_batch()
+
+
+func _build_checkpoint() -> void:
+	checkpoint = CHECKPOINT.new()
+	checkpoint.name = "DSectionGate"
+	# Just past the last bay of tanks and 2.2 m short of the pit door, so the
+	# door can only be reached through the gate.
+	checkpoint.position = Vector3(0, 0, -AISLE_LENGTH + 3.8)
+	add_child(checkpoint)
+	checkpoint.build(7.35, 4.1)
+	checkpoint.bind_player(player, anatomy)
+	checkpoint.message.connect(func(text: String) -> void: subtitle.text = text)
 
 
 func _build_player() -> void:
@@ -454,6 +471,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if event.pressed and can_move:
+			checkpoint.strike()
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_X and can_move:
+		checkpoint.take_arm()
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		_interact()
 	# AX3.1/AX3.6. The same HOLD-I verb the rest of the game already teaches
@@ -473,6 +494,7 @@ func _physics_process(delta: float) -> void:
 			opening_audio.set_phase("intake")
 		return
 	clock += delta
+	checkpoint.active = can_move and phase != "dead"
 	_update_beats()
 	_update_sequence(delta)
 	_update_shards(delta)
@@ -636,7 +658,8 @@ func _update_movement(delta: float) -> void:
 		Input.get_axis("move_forward", "move_back"),
 	)
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
-	var speed := 2.7 * float(anatomy.call("mobility_ratio"))
+	var crouched := Input.is_action_pressed("crouch")
+	var speed := 2.7 * float(anatomy.call("mobility_ratio")) * float(checkpoint.burden()) * (0.5 if crouched else 1.0)
 	player.velocity.x = move_toward(player.velocity.x, direction.x * speed, 14.0 * delta)
 	player.velocity.z = move_toward(player.velocity.z, direction.z * speed, 14.0 * delta)
 	player.velocity.y = -2.0 if player.is_on_floor() else player.velocity.y - 18.0 * delta
@@ -645,7 +668,7 @@ func _update_movement(delta: float) -> void:
 	camera.rotation = Vector3(pitch, 0, 0)
 	# A body that just came out of a tank does not walk well.
 	var stride := Vector2(player.velocity.x, player.velocity.z).length()
-	camera.position.y = STANDING_EYE_OFFSET + sin(Time.get_ticks_msec() * 0.0055) * stride * 0.016
+	camera.position.y = STANDING_EYE_OFFSET - (0.55 if crouched else 0.0) + sin(Time.get_ticks_msec() * 0.0055) * stride * 0.016
 	camera.rotation.z = sin(Time.get_ticks_msec() * 0.0027) * stride * 0.008
 
 
@@ -655,6 +678,10 @@ func _interact() -> void:
 	if _try_pry_stuck_tank():
 		return
 	if _try_take_garment():
+		return
+	if checkpoint.interact():
+		return
+	if not checkpoint.is_open:
 		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0
@@ -738,6 +765,8 @@ func _update_hud() -> void:
 		int(snapshot.pain),
 		"DECANTED",
 	]
+	if can_move:
+		vitals.text += "   //   " + str(checkpoint.status_text())
 	if not can_move:
 		prompt.text = ""
 		$HUD/Objective.text = ""
@@ -754,9 +783,16 @@ func _update_hud() -> void:
 	if stuck_tank_opened and CLOTHING.worn("player") == "bare" and _near_first_objects():
 		prompt.text = "[E] TAKE THE CLOTHING OFF SUBJECT 0C-4"
 		return
+	var gate_prompt := str(checkpoint.prompt())
+	if gate_prompt != "":
+		prompt.text = gate_prompt
+		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0
-	prompt.text = "[E] ENTER THE UNDERGROUND HEAT" if to_door.length() <= 3.4 else "WASD MOVE   //   MOUSE LOOK   //   E INTERACT   //   HOLD I INSPECT"
+	if checkpoint.is_open and to_door.length() <= 3.4:
+		prompt.text = "[E] ENTER THE UNDERGROUND HEAT"
+		return
+	prompt.text = "WASD MOVE   //   CTRL CROUCH   //   MOUSE LOOK   //   E INTERACT   //   HOLD I INSPECT"
 
 
 ## AX3.1/AX3.6. What HOLD I actually shows — the same held object every time,
