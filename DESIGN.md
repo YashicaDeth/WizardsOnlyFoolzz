@@ -438,6 +438,31 @@ Answers to follow-up questions, same day:
   take as a job. **Business cards are handed over by people you meet**,
   kept in Carry, and add a contact on the Wire.
 
+- **The pyramid becomes 33 tiers** and is rebuilt as a 3D structure in the
+  World Index that you spin, zoom and fly into, heavily inspired by the
+  Shadow of Mordor / Shadow of War Nemesis army screen: "a subtle pyramid of
+  different ranks". The reference is for layout feel only; the art is original.
+  - **33 tiers in total:** 16 up, the waist (you), 16 down, keeping the
+    existing double pyramid (Ascent above, Corruption below).
+  - **Horseshoe power:** the tip at the top holds the most power, and so does
+    the tip at the bottom, "being the most scum or worst of whatever". The wide
+    middle is the crowd.
+  - **Filled with everyone the world simulates, plus generated crowds** so it
+    feels massive, the crowds densest in the middle tiers.
+- **The World Index UI** is too small and cramped, overlaps and clips, is hard
+  to navigate and looks dated. All four, to be fixed in the remaster.
+
+- **The first 30 minutes** (Greg, in a chat with a friend he shared the same
+  evening): "30 minutes of gameplay that leads with a strong story and
+  gameplay bond", made of:
+  - character creation, cutscenes and story;
+  - a gameplay intro that teaches the basics while you escape the facility;
+  - **multiple routes out** of the facility, still to be fully made;
+  - **the derby is soft-scrapped and shelved as a different exit route**:
+    a lower level of tunnels and drain networks, "super old", that brings
+    you out in a different part of the map, so the overworld begins
+    differently depending on how you left.
+
 Open: one of Hornee's eyes is a real drink brand's bottle cap with its
 wordmark. Keep it on the shipped model, or swap it for an in-world mark?
 
