@@ -29,8 +29,12 @@ func _ready() -> void:
 		return
 	WorldHistory.clear_history()
 
+	# Greg, 24 September: the falls are where the derby tunnels come out; the
+	# walking drains keep their storm outfall.
+	var derby_source := FileAccess.get_file_as_string("res://rift_derby.gd")
+	check(derby_source.contains("DERBY_EXIT_SCENE := \"res://blood_waterfall_exit.tscn\""), "the derby's way out leads to the dry falls")
 	var drains_source := FileAccess.get_file_as_string("res://old_drains.gd")
-	check(drains_source.contains("Interstitial.travel(\"res://blood_waterfall_exit.tscn\""), "the storm outfall's grate travels on to the dry falls")
+	check(not drains_source.contains("blood_waterfall_exit"), "and the walking drains keep their own storm outfall")
 
 	# The old drains' route, completed the way `old_drains.gd` files it.
 	check(FacilityRoutes.begin(FacilityRoutes.ROUTE_STEALTH), "the maintenance ascent begins")
