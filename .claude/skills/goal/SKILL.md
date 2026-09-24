@@ -55,12 +55,13 @@ answers.
       paper `1d84e6e`, BlockTracker and Nerve Rig in the Hunt). The one fight in
       minutes 0-30 now has block-tracked hit markers too (`2a7db79`). Job
       posters and business cards wait (below).
-- [ ] **The heat elevator goes up to the overworld** (Greg, 24 September):
-      the Lower Works lift surfaces near the facility instead of dropping into
-      the colosseum derby, which is shelved as an exit.
-- [ ] **The drain tunnels route**: a new walkable "super old" drain network
-      from Lower Works that surfaces in a different part of the map, so the
-      overworld starts differently depending on how you left.
+- [x] **The heat elevator goes up to the overworld** (Greg, 24 September):
+      `FacilityRoutes.ROUTE_HEAT_ELEVATOR`, surfacing at the old sallyport
+      point. Merged at `796903d`.
+- [x] **The drain tunnels route**: `old_drains.tscn` (waste gallery, cistern,
+      storm outfall) walks the existing maintenance ascent and surfaces west of
+      the start. Merged at `796903d`. `first_thirty_route_test` plays both
+      routes end to end, into the Hunt.
 - [ ] **Hollis gets a real model**, one Greg provides or picks (CC-BY credited).
 
 After minutes 0-30 work end to end (Greg, 24 September): job posters with
