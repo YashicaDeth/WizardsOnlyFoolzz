@@ -1,61 +1,66 @@
 class_name OpeningDeath
 extends RefCounted
 
-## AX4.5. "Until the player's death fiction is authored, opening death uses an
-## honest ordinary reload rather than a counterfeit immortality explanation."
+## AX4.5. What happens when the player dies during the facility escape.
 ##
-## This file exists to hold a gap open.
+## Until 24 September this file held the question open with an honest ordinary
+## reload, because the death fiction was not authored. Greg has now answered
+## it: **you are reborn in a vat** -- the soul bound to Earth through repeated
+## rebirth, from the player direction interview -- and, in his words, "dont
+## forget the save character preset so you can reload it if you die without
+## wasting time". So a death sends the player back to the Growing Floor, and
+## the body they filed last is waiting for them on the clipboard instead of a
+## blank form.
 ##
-## The player is "an experimental, repeatedly revived entity whose soul remains
-## bound to Earth", so there is an obvious temptation: have them wake in the
-## vat again, call it canon, and ship it. That would be a counterfeit. The
-## direction doc names death and revival in the opening as "a focused design
-## problem" and says ordinary reload "is the honest implementation rather than
-## pretending the question is solved". Writing the fiction before it is
-## decided is how a placeholder becomes permanent -- nobody revisits a question
-## the game appears to have answered.
-##
-## So this reloads, says that it reloaded, and refuses to explain itself. The
-## test enforces the refusal, which is the only part of this that is difficult
-## to keep true over time.
+## What is still NOT decided stays refused below: rebirth is not a respawn
+## timer, a backup, or a clone, and nothing here says the universe resets. The
+## world keeps what happened (Law 13 is still an open conflict with rebirth).
 
-## Flip this when the death fiction is actually authored, and only then. The
-## suite will start requiring a real one, which is the point: the flag cannot
-## be flipped quietly to unlock a shortcut.
-const FICTION_AUTHORED := false
+const FICTION_AUTHORED := true
+const REBIRTH_SCENE := "res://vat_chamber.tscn"
+const STORE_ID := "opening_rebirth"
 
-## Words that would be an answer to the question this file is keeping open.
-## Not a blacklist for its own sake -- each one is a specific claim about what
-## happens to the player when they die, and none of them has been decided.
+## Claims the authored fiction still does not make. Each is a specific answer
+## to a question Greg has not given, so text that uses one is overreaching.
 const COUNTERFEITS := [
-	"revived", "resurrect", "respawn", "clone", "backup", "reprint",
-	"immortal", "reborn", "another body", "new vessel",
+	"respawn", "resurrect", "clone", "backup", "reprint", "immortal",
 ]
 
 
-## What happens when the player dies during the facility escape. Returns a
-## reload and nothing else. No event is recorded: a death that writes into the
-## ledger is a death the world has taken a position on.
+## The player died in the opening. Records the rebirth, marks one as pending
+## for the vat to pick up, and names the preset the new body is grown from.
 static func handle(cause: String = "") -> Dictionary:
-	if FICTION_AUTHORED:
-		# Deliberately not implemented. When somebody authors the fiction they
-		# will land here, and they should -- this is where it goes, and the
-		# failing suite next door tells them what it has to satisfy.
-		return {"ok": false, "reason": "FICTION MARKED AUTHORED BUT NOT IMPLEMENTED"}
+	var store := WorldHistory.subject(STORE_ID)
+	var count := int(store.get("count", 0)) + 1
+	var preset := CharacterPresets.LAST_BODY if CharacterPresets.names().has(CharacterPresets.LAST_BODY) else ""
+	var changes := {"count": count, "pending": true, "preset": preset, "last_cause": cause}
+	if store.is_empty():
+		changes["kind"] = "rebirth_record"
+		WorldHistory.register_subject(STORE_ID, changes)
+	else:
+		WorldHistory.update_subject(STORE_ID, changes, "opening_rebirth_marked")
+	WorldHistory.record_event("opening_rebirth", {"cause": cause, "count": count, "preset": preset})
 	return {
 		"ok": true,
-		"kind": "reload",
-		"placeholder": true,
+		"kind": "rebirth",
+		"scene": REBIRTH_SCENE,
+		"preset": preset,
+		"count": count,
 		"cause": cause,
-		# Said plainly, because a placeholder that reads as finished is the
-		# failure mode. This string is for a developer and a playtest note; the
-		# player sees a reload, which explains nothing and claims nothing.
-		"note": "Opening death is an ordinary reload. The death fiction is not authored yet and this is not it.",
 	}
 
 
-## Whether any text is quietly answering the question. Used by the suite
-## against the payload and against the ledger.
+## Read once by the vat on load. Returns the pending rebirth (or {}) and
+## clears it, so reloading the scene later is not mistaken for another death.
+static func consume_pending() -> Dictionary:
+	var store := WorldHistory.subject(STORE_ID)
+	if not bool(store.get("pending", false)):
+		return {}
+	WorldHistory.update_subject(STORE_ID, {"pending": false}, "opening_rebirth_decanted")
+	return {"count": int(store.get("count", 0)), "preset": str(store.get("preset", ""))}
+
+
+## Whether any text claims more than the authored fiction does.
 static func counterfeits_in(text: String) -> Array:
 	var found: Array = []
 	var lowered := text.to_lower()

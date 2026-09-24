@@ -99,8 +99,8 @@ func _ready() -> void:
 
 	# --- AX4. Getting out, and dying on the way.
 	var death := OpeningDeath.handle("route check")
-	beat("AX4.5 opening death is an honest reload, not a counterfeit",
-		str(death.kind) == "reload" and bool(death.placeholder)
+	beat("AX4.5 opening death is rebirth in the vat, not a counterfeit",
+		str(death.kind) == "rebirth" and str(death.scene) == "res://vat_chamber.tscn"
 			and OpeningDeath.counterfeits_in(str(death)).is_empty())
 
 	# --- AX5. The contracts the slice has to hold.

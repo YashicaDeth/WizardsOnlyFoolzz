@@ -108,6 +108,11 @@ func _build_intake() -> void:
 	intake.name = "Intake"
 	$HUD.add_child(intake)
 	intake.filed.connect(_on_intake_filed)
+	# AX4.5. Coming back from a death: the body on file is grown again and the
+	# form is skipped, so dying does not cost the player the examination twice.
+	var rebirth := OpeningDeath.consume_pending()
+	if not rebirth.is_empty():
+		intake.refile_from_preset(str(rebirth.get("preset", "")))
 
 
 func _on_intake_filed(_state: Dictionary) -> void:
@@ -155,6 +160,7 @@ func _build_player() -> void:
 	anatomy = ANATOMY.new()
 	player.add_child(anatomy)
 	anatomy.call("configure", "player", 5000.0, {})
+	anatomy.connect("died", _on_player_died)
 	# Nobody comes out of a tank whole.
 	anatomy.call("apply_hit", "torso", 26.0, 0.0, "blunt")
 	anatomy.call("apply_hit", "head", 14.0, 0.0, "blunt")
@@ -166,6 +172,16 @@ func _build_player() -> void:
 	for index in 4:
 		var cable := _umbilical(index)
 		umbilicals.append(cable)
+
+
+## AX4.5. Death in the opening is rebirth in a vat (Greg, 24 September).
+func _on_player_died(report: Dictionary) -> void:
+	if phase == "dead":
+		return
+	phase = "dead"
+	can_move = false
+	var rebirth := OpeningDeath.handle(str(report.get("type", "")))
+	Interstitial.travel(str(rebirth.scene), "the growing floor // grown again")
 
 
 func _umbilical(index: int) -> Node3D:

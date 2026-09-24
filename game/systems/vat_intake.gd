@@ -742,8 +742,21 @@ func _finish_filing() -> void:
 		"examination_seconds": int(elapsed),
 		"examination_route": "preset:" + preset_loaded if preset_loaded != "" else "deliberate",
 	}, "examination_filed")
+	# AX4.5. Greg, 24 September: keep the build so a death can reload it
+	# "without wasting time". Every filing overwrites the one slot.
+	CharacterPresets.save(CharacterPresets.LAST_BODY, sheet)
 	print("EXAMINATION FILED // %d:%02d // %s // %d refusals" % [int(elapsed) / 60, int(elapsed) % 60, ("PRESET " + preset_loaded) if preset_loaded != "" else "DELIBERATE", refusals])
 	filed.emit(state)
+
+
+## AX4.5. A reborn player skips the examination: the last filed body is
+## applied and filed at once. Returns false when there is nothing on file.
+func refile_from_preset(preset_name: String) -> bool:
+	if preset_name.is_empty() or not bool(CharacterPresets.apply(preset_name, sheet).ok):
+		return false
+	preset_loaded = preset_name
+	_finish_filing()
+	return true
 
 
 func _draw_doctor(viewport: Vector2) -> void:
