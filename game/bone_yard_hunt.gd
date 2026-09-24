@@ -1117,9 +1117,12 @@ func _ready() -> void:
 	arsenal.name = "HunterArsenal"
 	player_body.add_child(arsenal)
 	arsenal.configure(player_rig)
+	arsenal.apply_skins()
+	arsenal.fired.connect(_on_skin_fired)
 	arsenal.reload_finished.connect(_on_weapon_reload_finished)
 	blood_ledger = BloodLedger.new()
 	blood_ledger.attach(self)
+	blood_ledger.blood_earned.connect(_on_skin_blood)
 	body_motion = HUNTER_BODY_MOTION.new()
 	body_motion.name = "HunterBodyMotion"
 	player_body.add_child(body_motion)
@@ -1144,6 +1147,7 @@ func _ready() -> void:
 	case_menu.name = "CaseMenu"
 	$HUD.add_child(case_menu)
 	case_menu.close_requested.connect(_toggle_cases)
+	case_menu.loadout_changed.connect(arsenal.apply_skins)
 	contact_menu = CONTACT_MENU.new()
 	contact_menu.name = "ContactMenu"
 	$HUD.add_child(contact_menu)
@@ -1247,6 +1251,10 @@ func _build_player_rig() -> void:
 	# every build — CellOutz re-dresses its bodies, which is also what keeps a
 	# scene change from having to solve wardrobe persistence today.
 	player_rig.dress(ClothingShell.humiliation_wardrobe())
+	# Greg, 24 September: the jester set is four parts you can take off once
+	# the collar's lock is broken. The outfit record says what is worn; a
+	# world that has none yet is the forced set, collar locked, as before.
+	Outfit.dress(player_rig)
 	# The same rule the world rigs get through `style_world_rig`. The player
 	# never goes through it -- they are built here rather than styled from a
 	# name -- so their 124 casters were the largest single body in the scene
@@ -5167,7 +5175,17 @@ func _begin_extraction() -> void:
 	# whatever the body's actual anatomy might also be worth digging for.
 	# The same key finishes the job on a second press if there is still a
 	# real dig left, rather than needing a control of its own to discover.
-	var carried_substance := str(WorldHistory.subject(str(body.subject_id)).get("carried_substance", ""))
+	# Greg, 24 September: cases drop from bodies. About one in sixteen carries
+	# one, decided by who they are, so searching twice does not reroll it.
+	var body_record := WorldHistory.subject(str(body.subject_id))
+	var dropped := SkinCase.drop_for(float(absi(str(body.subject_id).hash()) % 10000) / 10000.0)
+	if not dropped.is_empty() and not bool(body_record.get("case_taken", false)):
+		handheld.carry.items.append(SkinCase.case_item(dropped))
+		handheld.carry.save_to_history()
+		WorldHistory.update_subject(str(body.subject_id), {"case_taken": true}, "robbed")
+		prompt.text = "%s TAKEN FROM THEIR POCKET // [U] OPEN IT AT THE EXCHANGE" % str(SkinCase.CASES[dropped].label)
+		return
+	var carried_substance := str(body_record.get("carried_substance", ""))
 	if not carried_substance.is_empty():
 		var body_node := body.get("node") as Node3D
 		var at := body_node.global_position if body_node != null and is_instance_valid(body_node) else player
@@ -7917,6 +7935,23 @@ func _toggle_inventory() -> void:
 
 ## The dead cloud's shopfront, on U. Same mutual exclusion as every other
 ## full-size reader: opening it shuts the rest, closing it gives the mouse back.
+## Skins wear with use (Greg, 24 September): a shot scuffs the finish, a hit
+## scuffs and bloods it, and a kill is counted on it. Hits and kills arrive
+## through the blood ledger, which already knows which weapon did what.
+func _on_skin_fired(weapon_id: String, _report: Dictionary) -> void:
+	if not SkinLoadout.applied(weapon_id).is_empty():
+		SkinLoadout.scuff(weapon_id, 0.0008)
+		arsenal.apply_skins()
+
+
+func _on_skin_blood(weapon_id: String, _style_id: String, _amount: int, kind: String) -> void:
+	var target := "ram" if weapon_id == "breach_tool" else weapon_id
+	if SkinLoadout.applied(target).is_empty():
+		return
+	SkinLoadout.scuff(target, 0.004, 0.06, kind in ["kill", "finisher", "takedown"])
+	arsenal.apply_skins()
+
+
 func _toggle_cases() -> void:
 	var opening := panel_mode != "cases"
 	if opening:
@@ -7926,6 +7961,7 @@ func _toggle_cases() -> void:
 		keys_card.close()
 		_close_panel_views()
 		panel_mode = "cases"
+		case_menu.weapon_hint = str(arsenal.current_id)
 		case_menu.open_menu(handheld.carry, player_rig)
 		prompt.visible = false
 		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
