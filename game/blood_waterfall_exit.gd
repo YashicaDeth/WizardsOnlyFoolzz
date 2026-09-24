@@ -19,8 +19,8 @@ extends Node3D
 ## completed theirs with `FacilityRoutes` (the old drains file the storm outfall
 ## before sending you on), so the Hunt still consumes that route's handoff and
 ## lands the player at its authored point. A route that ends here without a
-## handoff of its own (the derby tunnels, not built yet) needs one added to
-## `FacilityRoutes.ROUTES`; see `SURFACE_POSITION`.
+## handoff of its own (the derby tunnels) gets one from `_complete`, at
+## `SURFACE_POSITION`.
 ##
 ## Built from primitives and two shaders (`shaders/blood_rock.gdshader`,
 ## `shaders/blood_river.gdshader`): art-directed now, authored later.
@@ -780,6 +780,7 @@ func _complete(by: String) -> void:
 	completed = true
 	completed_by = by
 	WorldHistory.begin_ledger_batch()
+	FacilityRoutes.hand_off_at("blood_waterfall", SURFACE_POSITION)
 	OPENING.advance("left_facility")
 	WorldHistory.amend_subject("player", {"status": "out past the dry falls"})
 	WorldHistory.record_event("blood_waterfall_left", {

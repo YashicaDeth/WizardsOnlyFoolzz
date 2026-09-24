@@ -1,8 +1,8 @@
 extends Node
 
 ## The first 30 minutes, end to end (/goal): the real scenes in order, driven
-## through their own verbs, out by both routes Greg chose, and into the Hunt
-## at each route's own arrival point.
+## through their own verbs, out by all four ways Greg chose, and into the
+## Hunt at each route's own arrival point.
 ##
 ##   vat: examination filed -> the examiner leaves -> the tank drains ->
 ##        END ALL SUFFERING, four wires torn out -> GET REVENGE -> breakout ->
@@ -11,6 +11,8 @@ extends Node
 ##        reader, his gun taken -> the pressure gate
 ##   Lower Works: then either the fuse and the heat elevator up, or the drain
 ##        hatch -> the old drains -> the storm outfall
+##   The doctor's bay: his hologram, the call, and up his ramp.
+##   The derby tunnels: out at the dry falls.
 ##   Hunt: arrives where that route surfaces, with the handoff consumed.
 
 var failures: Array[String] = []
@@ -138,6 +140,37 @@ func _ready() -> void:
 	await _into_the_hunt("old drains", FacilityRoutes.ROUTE_STEALTH)
 	var drain_arrival: Vector3 = FacilityRoutes.route(FacilityRoutes.ROUTE_STEALTH).surface_position
 	check(drain_arrival.distance_to(lift_arrival) > 20.0, "the two routes out surface in different parts of the map")
+
+	# The doctor's route: his bay, the hologram, the call, and up his ramp.
+	WorldHistory.clear_history()
+	WorldHistory.register_subject("player", {"name": "THE HUNTER", "kind": "person", "status": "loose", "anatomy": {"cybernetics": []}})
+	WorldHistory.register_subject("inventory", {"kind": "inventory", "items": []})
+	DoctorExamination.begin_departure()
+	var bay = load("res://doctor_vehicle_bay.tscn").instantiate()
+	add_child(bay)
+	await get_tree().physics_frame
+	bay.player.global_position = bay.DOCTOR_AT + Vector3(0, 0.9, 1.5)
+	bay.attack()
+	bay.step(bay.REVEAL_SECONDS + 0.05)
+	bay.holo_call.skip()
+	bay.player.global_position = Vector3(0, bay.RAMP_RISE + 0.9, bay.RAMP_TOP_Z + 0.5)
+	bay.step(0.05)
+	check(bay.surface_requested, "doctor's route: his bay, the call, and up the ramp")
+	bay.queue_free()
+	await get_tree().process_frame
+	await _into_the_hunt("doctor's route", FacilityRoutes.ROUTE_DOCTOR)
+
+	# The derby's secret route: the tunnels come out at the dry falls, and the
+	# falls send you up with no route of their own.
+	WorldHistory.clear_history()
+	var falls = load("res://blood_waterfall_exit.tscn").instantiate()
+	add_child(falls)
+	await get_tree().process_frame
+	falls._complete("driving")
+	check(falls.travel_requested, "derby tunnels: out of the gorge past the dry falls")
+	falls.queue_free()
+	await get_tree().process_frame
+	await _into_the_hunt("derby tunnels", "derby_tunnels")
 
 	print("FIRST_THIRTY_ROUTE_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

@@ -358,6 +358,29 @@ static func consume_surface_handoff() -> Dictionary:
 	return handoff
 
 
+## A place that sends you up with no route handoff of its own (the dry
+## falls, reached through the derby tunnels) files one here, so the Hunt
+## still lands you where you came out. A route's own handoff always wins.
+static func hand_off_at(exit_id: String, at: Vector3) -> bool:
+	if not pending_surface_handoff().is_empty():
+		return false
+	var record := ensure()
+	var route_id := str(record.get("active_route", ""))
+	if route_id.is_empty():
+		route_id = "derby_tunnels"
+	WorldHistory.amend_subject(SUBJECT, {
+		"active_route": "",
+		"pending_surface_handoff": {
+			"route_id": route_id,
+			"exit_id": exit_id,
+			"surface_position": [at.x, at.y, at.z],
+			"relationships": {},
+			"avoided_derby": false,
+		},
+	})
+	return true
+
+
 static func _complete(route_id: String, definition: Dictionary) -> void:
 	var record := ensure()
 	if bool(definition.get("choice_required", false)):
