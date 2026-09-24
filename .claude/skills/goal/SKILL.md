@@ -43,16 +43,18 @@ answers.
 - [x] **The opening's wires beat**: END ALL SUFFERING, the player tears the
       umbilicals out (three tugs each), GET REVENGE, then the glass goes,
       instead of the automatic breach. Merged at `e437d5c`.
-- [ ] **Clothing renders on every rig.** Garments from `ClothingShell` show only
-      as a thin outline today, so a dressed body looks bare.
-- [ ] **The lab**: overall lighting and the light glitch on the floor. The
-      glitch (the breakout puddle's pale pixel disc) is fixed at `3d03fa6`;
-      Lower Works' darkness is still to judge in the Forward+ renderer.
-- [ ] **The VFX pack**: X-ray anatomy loading screen that blurs into
-      datamosh/CRT/dither, the pixel transition replaced, block-tracked hit
-      markers and wound/brain indicators, receipt-paper pages (Wire, bounties,
-      contracts, job posters, business cards). Night vision only once you hold
-      the phone.
+- [x] **Clothing renders on every rig.** Garments drew only their far inside
+      (inward-wound shells, back-face culled); they now draw both faces.
+      Merged at `1ff6af6`.
+- [x] **The lab**: the floor light glitch (the breakout puddle's pale pixel
+      disc) is a dark wet puddle at `3d03fa6`; Lower Works went from 2.8/255
+      mean luminance (95% near-black, Forward+) to 15.3 at `2a7db79`.
+- [x] **The VFX pack**: already built by earlier lanes (X-ray loading screen
+      on failing film `41b4841`/`78f9071`, datamosh in place of the pixel wipe
+      `6d3f092`, held-phone night vision `20747c2`, Wire and contract receipt
+      paper `1d84e6e`, BlockTracker and Nerve Rig in the Hunt). The one fight in
+      minutes 0-30 now has block-tracked hit markers too (`2a7db79`). Job
+      posters and business cards wait (below).
 - [ ] **The heat elevator goes up to the overworld** (Greg, 24 September):
       the Lower Works lift surfaces near the facility instead of dropping into
       the colosseum derby, which is shelved as an exit.
