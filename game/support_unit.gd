@@ -728,6 +728,7 @@ func _physics_process(delta: float) -> void:
 	var creeping := Input.is_action_pressed("crouch")
 	for lens in cameras:
 		lens.step(delta, chest, player, director.is_alarm())
+	_update_hack(delta)
 	for guard in guards:
 		guard.step(delta, player, creeping)
 	for bingyanger in bingyangers:
@@ -824,12 +825,50 @@ func _update_hud() -> void:
 		prompt.text = post_prompt
 	elif gate_passed and _flat_distance(EXIT_AT) <= EXIT_REACH:
 		prompt.text = "[E] GO DOWN TO THE VEHICLE BAY"
+	elif hack_target != null:
+		prompt.text = "[HOLD Q] LOOP ITS FEED  %s" % ("|".repeat(int(hack_hold / SecurityCamera.HACK_HOLD * 10.0)))
 	elif _facing_camera():
 		prompt.text = "[LMB] SMASH THE CAMERA // LOUD"
 	elif _facing_cell():
 		prompt.text = "[LMB] BREAK THE CELL OPEN // LET IT OUT"
 	else:
 		prompt.text = "WASD MOVE   //   CTRL CREEP   //   SHIFT RUN IS LOUD   //   LMB STRIKE   //   E INTERACT"
+
+
+## Greg: hacking is "look and hold" once earned. Q held on a lens in sight.
+var hack_hold := 0.0
+var hack_target: SecurityCamera
+
+
+func _camera_in_sight() -> SecurityCamera:
+	var best: SecurityCamera = null
+	var best_angle := deg_to_rad(9.0)
+	for lens in cameras:
+		if lens.broken or lens.is_looped():
+			continue
+		var to: Vector3 = lens.eye() - eye()
+		if to.length() > 16.0:
+			continue
+		var angle := look().angle_to(to)
+		if angle < best_angle:
+			best_angle = angle
+			best = lens
+	return best
+
+
+func _update_hack(delta: float) -> void:
+	var target := _camera_in_sight() if SecurityCamera.hack_earned() else null
+	if target == null or not Input.is_key_pressed(KEY_Q) or target != hack_target:
+		hack_hold = 0.0
+		hack_target = target
+		return
+	hack_hold += delta
+	if hack_hold >= SecurityCamera.HACK_HOLD:
+		hack_hold = 0.0
+		var result: Dictionary = target.hack("player")
+		if bool(result.get("accepted", false)):
+			post_message = "THE WETWIRE FEEDS IT AN EMPTY CORRIDOR // %d SECONDS" % int(result.seconds)
+			post_message_timer = 2.5
 
 
 func _facing_camera() -> bool:

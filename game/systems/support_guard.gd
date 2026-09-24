@@ -68,7 +68,9 @@ func build(id: String, at: Vector3, round: Array[Vector3], alarm: AlarmDirector,
 	route = round
 	position = at
 	WorldHistory.register_subject(subject_id, {
-		"name": "CELLOUTZ SECURITY", "kind": "person", "faction": "CellOutz Security",
+		# Greg, 24 September: numbers only. Faceless staff; Hollis is the one
+		# with a name.
+		"name": "CELLOUTZ SECURITY %02d" % (10 + absi(hash(id)) % 90), "kind": "person", "faction": "CellOutz Security",
 		"role": "Support Unit reinforcement" if reinforcement else "Support Unit hallway guard",
 		"status": "on post", "place": "support_unit",
 	})

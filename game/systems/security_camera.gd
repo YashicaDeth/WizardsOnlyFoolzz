@@ -32,6 +32,10 @@ const FORGET_SECONDS := 2.5
 const CALM := Color(0.55, 0.85, 1.0)
 const WARY := Color(1.0, 0.72, 0.22)
 const LOCKED := Color(1.0, 0.16, 0.10)
+const LOOPED := Color(0.72, 0.25, 1.0)
+const LOOP_SECONDS := 20.0
+## How long the look has to be held on a lens to loop it.
+const HACK_HOLD := 1.2
 
 @export var camera_id := "support_camera"
 ## Yaw either side of the mount's facing that the sweep covers.
@@ -41,6 +45,7 @@ var broken := false
 ## 0 nothing, 1 filmed. Rises while the lens holds the player.
 var lock := 0.0
 var tracking := false
+var looped_for := 0.0
 var seen_player := false
 var clock := 0.0
 var head: Node3D
@@ -185,6 +190,18 @@ func step(delta: float, point: Vector3, body: Object = null, alarm := false) -> 
 	if broken:
 		return
 	clock += delta
+	if looped_for > 0.0:
+		# Playing back an empty corridor. It keeps sweeping so nobody watching
+		# the feed notices, and it sees nothing.
+		looped_for = maxf(0.0, looped_for - delta)
+		_yaw = sin(clock * SWEEP_SPEED) * sweep_half
+		head.rotation.y = _yaw
+		var glitch := 0.5 + 0.5 * sin(clock * 31.0 + sin(clock * 7.0) * 3.0)
+		cone_material.albedo_color = Color(LOOPED, 0.05 + 0.08 * glitch)
+		lamp.light_color = LOOPED
+		_lens_material.emission = LOOPED * (0.4 + glitch)
+		tally.visible = false
+		return
 	var seeing := sees(point, body)
 	if seeing:
 		_since_seen = 0.0
@@ -263,8 +280,29 @@ func _show_broken(fresh: bool) -> void:
 
 ## The hack hook (Greg, 24 September: cameras can be "hacked later, earned,
 ## not now"). Nothing grants it yet; what the hack does is his to decide.
-func hack(_by := "player") -> Dictionary:
-	return {"accepted": false, "reason": "NO INTERFACE // NOT YET EARNED"}
+## Greg, 24 September: once earned, "look and hold" -- the rewritten implant
+## loops the camera's footage for LOOP_SECONDS, a sigil glitch on its lens,
+## and then it is back. Earned means the soul actually seized the chip in the
+## breakout (`implant_seized` on the player record); a player who refused
+## nothing in the examination does not get this.
+static func hack_earned() -> bool:
+	return bool(WorldHistory.subject("player").get("implant_seized", false))
+
+
+func hack(by := "player") -> Dictionary:
+	if broken:
+		return {"accepted": false, "reason": "NOTHING LEFT TO LOOP"}
+	if not hack_earned():
+		return {"accepted": false, "reason": "NO INTERFACE // NOT YET EARNED"}
+	looped_for = LOOP_SECONDS
+	lock = 0.0
+	tracking = false
+	WorldHistory.record_event("support_camera_looped", {"camera_id": camera_id, "by": by, "seconds": LOOP_SECONDS})
+	return {"accepted": true, "seconds": LOOP_SECONDS}
+
+
+func is_looped() -> bool:
+	return looped_for > 0.0
 
 
 ## The housing a raycast hit, as the camera it belongs to.

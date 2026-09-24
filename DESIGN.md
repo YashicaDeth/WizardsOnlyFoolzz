@@ -602,6 +602,20 @@ earned by not fighting and spent by betrayal. The ambiguities worth asking
 about are whether diplomacy has a tree of its own, and whether "many
 enemies" means stealth missions field more of them.
 
+### Answered by Greg in question boxes, 24 September 2026 (the Support Unit)
+
+- **Guards are numbers only**: CELLOUTZ SECURITY 04, 11, 17 and so on.
+  Faceless staff; Hollis is the one with a name.
+- **What the Unit does to bingyangas: all four.** Harvesting (organs and
+  fluids, which CellOutz sells back), reconditioning (screens, sound and chip
+  pulses trying to rewrite the mutation into a sellable body), testing
+  (weapons, drugs and implants tried on them first), and keeping them for
+  the derby (fighters and crowd meat for the underground heats).
+- **Camera hacking, once earned, is look and hold**: with the rewritten
+  implant, hold a key on a camera and it loops its feed for 20 seconds with
+  a sigil glitch on the lens. *Built:* Q held 1.2 s; "earned" is read as
+  `implant_seized` from the breakout (assistant reading).
+
 ### Answered by Greg in question boxes, 24 September 2026 (the drains)
 
 - **Something hunts you in the old drains**, so the second route costs
