@@ -19,6 +19,7 @@ signal arrived()
 ## upper bound is the load itself: the plate now waits on real progress from
 ## ResourceLoader rather than on a fixed timer that knew nothing.
 const MIN_HOLD := 0.85
+const ANATOMY_FILM := preload("res://shaders/anatomy_film.gdshader")
 const FADE := 0.36
 
 ## The plate used to be lit acid-green, which put the one screen standing
@@ -293,7 +294,9 @@ func _draw_plate() -> void:
 		if texture != null:
 			var span := minf(size.x, size.y) * 1.02
 			var frame := Rect2(Vector2(size.x * 0.5 - span * 0.5, size.y * 0.47 - span * 0.5), Vector2(span, span))
-			screen.draw_texture_rect(texture, frame, false, Color(1, 1, 1, alpha))
+			# The scan is shown through failing film (anatomy_film.gdshader):
+			# sharp, then out of focus and swelling, then moshed and dithered.
+			_film_rect(texture, frame)
 			# A second pass, offset and dimmer: the film's own halation, which
 			# is what stops a rendered mesh looking like a rendered mesh.
 			screen.draw_texture_rect(texture, frame.grow(6.0), false, HAEM * Color(1, 1, 1, 0.22 * alpha))
@@ -346,6 +349,28 @@ func _draw_plate() -> void:
 ## Drawn as three passes of the same path — a wide dim bleed, the line itself,
 ## and a node at every vertex — because one flat polyline reads as a diagram
 ## and this is meant to read as something burnt onto the plate.
+var _film: TextureRect
+
+
+func _film_rect(texture: Texture2D, frame: Rect2) -> void:
+	if _film == null or not is_instance_valid(_film):
+		_film = TextureRect.new()
+		_film.name = "AnatomyFilm"
+		_film.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_film.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_film.stretch_mode = TextureRect.STRETCH_SCALE
+		var material_value := ShaderMaterial.new()
+		material_value.shader = ANATOMY_FILM
+		material_value.set_shader_parameter("seed", randf())
+		_film.material = material_value
+		screen.add_child(_film)
+	_film.texture = texture
+	_film.position = frame.position
+	_film.size = frame.size
+	_film.modulate = Color(1, 1, 1, alpha)
+	(_film.material as ShaderMaterial).set_shader_parameter("rect_size", frame.size)
+
+
 func _draw_seal(centre: Vector2, radius: float) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _seal_seed
