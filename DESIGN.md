@@ -463,6 +463,37 @@ Answers to follow-up questions, same day:
     you out in a different part of the map, so the overworld begins
     differently depending on how you left.
 
+### Answered by Greg in question boxes, 24 September 2026 (night)
+
+Asked in the Code tab because the Dust to Bones page's saved answers sit in
+another account's organisation and could not be read from this one.
+
+- **Death: you are reborn in a vat.** Whoever owns your body grows you back;
+  the world does **not** rewind, so dying has consequences in it. This
+  answers the page's `story-death` and replaces the opening's ordinary
+  reload once it is built.
+  - **And the character preset is kept**, so a death never costs a trip back
+    through character creation: "don't forget the save character preset so
+    you can reload it if you die without wasting time". `CharacterPresets`
+    already has `save()`, `names()` and `apply()`, and the intake's PRESET
+    route already reads them — but nothing in the game ever *saves* one, so
+    the route answers "NO PRESET ON FILE" for everyone. The work is wiring,
+    not building.
+- **Routes out, for the demo: just the two that are built** — the heat
+  elevator, and the drain tunnels the derby became. More routes later.
+  Answers `rm-routes` for now.
+- **The loose opening pieces: the biometric door and the guard's gun
+  first** (AX route beat 5, AX3.3–AX3.4). `BiometricBarrier` and
+  `FacilityGuardLoadout` are written and tested and have no production
+  caller. The honest opening death and the mosaic option wait.
+- **Merge once verified.** Each look lane merges into this branch one at a
+  time with the core suite re-run after every step, then this branch goes
+  into `codex/primary`. Answers `rebuild-merge`.
+- **Sequence.** When the first 30 minutes work end to end, both routes
+  included and out into the overworld, the next thing is **the next 30
+  minutes**: "furthering the tutorial and starting stage of the gameplay".
+  Nothing in minutes 30–60 is started before minutes 0–30 are right.
+
 Open: one of Hornee's eyes is a real drink brand's bottle cap with its
 wordmark. Keep it on the shipped model, or swap it for an in-world mark?
 
