@@ -823,6 +823,18 @@ we can make nudity and censors".
   the tank; the screen faces the tank; work continues straight down
   `DESIGN/GOAL_LOOP_2.md`.
 
+### Greg, 24 September 2026 (the logo, menus and the big checklist)
+
+- **The real logo re-animated, in the splash and on the title screen.**
+  Built as `logo_fx.gdshader`.
+- **Its strength stays as it is:** strong on the burn-in, calm behind the
+  menu.
+- **Next, all of the above:**
+  - keep working the checklist
+  - grow it toward 1,000+ lines
+  - more logo detail (embers, sound) at the same strength
+  - menus rebuilt to match the logo's style
+
 ## Influence register
 
 These entries describe what Greg said he values; proposed extraction is labelled. Liking a reference does not automatically import every mechanic from it.
