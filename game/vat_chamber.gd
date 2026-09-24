@@ -27,6 +27,7 @@ const BASELINE_HUMAN := preload("res://systems/baseline_human.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const VAT_REBIRTH := preload("res://systems/vat_rebirth.gd")
 const WOUND_CATALOG := preload("res://systems/wound_catalog.gd")
+const DOCTOR_ROUTE := preload("res://systems/doctor_route.gd")
 
 const EYE_HEIGHT := 1.62
 const BODY_HALF_HEIGHT := 0.85
@@ -119,6 +120,8 @@ var mission_card: Control
 var wired_clock := 0.0
 var revenge_at := -1.0
 var jolt := 0.0
+## His door behind the vat, his room and the lift down (DoctorRoute).
+var doctor_route: Node3D
 
 # 0 submerged, 1 voiding, 2 breach, 3 floor, 4 aisle
 const BEATS := [
@@ -169,6 +172,9 @@ func _ready() -> void:
 	_build_vat()
 	_build_first_objects()
 	_build_player()
+	doctor_route = DOCTOR_ROUTE.new()
+	add_child(doctor_route)
+	doctor_route.build(self)
 	_build_title()
 	_build_intake()
 	opening_audio = OPENING_AUDIO.new()
@@ -514,7 +520,8 @@ func _build_chamber() -> void:
 	_slab(Vector3(16.0, 0.35, AISLE_LENGTH + 8.0), Vector3(0, 4.3, -AISLE_LENGTH * 0.4), "rust", Color("100d0b"))
 	_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(-7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
 	_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
-	_slab(Vector3(16.0, 4.4, 0.5), Vector3(0, 2.2, 3.6), "rust", Color("19140f"))
+	# The near wall is DoctorRoute's: the same wall in pieces, around his door
+	# and the observation glass.
 	# Greg, playing the build: "you walk to the end of this room and then
 	# there's just a skybox... I just fell out of the skybox."
 	#
@@ -919,6 +926,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if doctor_route != null and doctor_route.handle_input(event):
+		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		if phase == "wired":
 			_tug_wire(_aimed_wire())
@@ -1500,6 +1509,10 @@ func _update_hud() -> void:
 		return
 	if stuck_tank_opened and CLOTHING.worn("player") == "bare" and CLOTHING.worn(FAILED_SUBJECT_ID) != "bare" and _near_first_objects():
 		prompt.text = "[E] TAKE THE CLOTHING OFF SUBJECT 0C-4"
+		return
+	var route_prompt: String = doctor_route.prompt_text() if doctor_route != null else ""
+	if route_prompt != "":
+		prompt.text = route_prompt
 		return
 	# The door he left by: locked, and it says so (Greg, 2026-09-24: you should
 	# be able to interact with it). Staff access is found further on.
