@@ -356,6 +356,8 @@ var strike_smear: StrikeSmear = null
 var strike_audio: StrikeAudio = null
 var dust_puff: DustPuff = null
 var hit_flash: HitFlash = null
+## Blob tracking over the fight (item 4): hit markers and enemy awareness.
+var block_tracker: BlockTracker = null
 var threat_compass: ThreatCompass = null
 var lock_readout: LockReadout = null
 ## After a strike lands, the body faces it this long (third-person turn-in).
@@ -986,6 +988,9 @@ func _ready() -> void:
 	threat_compass = ThreatCompass.new()
 	threat_compass.name = "ThreatCompass"
 	$HUD.add_child(threat_compass)
+	block_tracker = BlockTracker.new()
+	block_tracker.name = "BlockTracker"
+	$HUD.add_child(block_tracker)
 	lock_readout = LockReadout.new()
 	lock_readout.name = "LockReadout"
 	$HUD.add_child(lock_readout)
@@ -2760,6 +2765,11 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	_spawn_blood(target.global_position + Vector3(0, 1.1, 0), roundi(float(attack.damage)))
 	if hit_flash != null:
 		hit_flash.burst(target.global_position + Vector3(0, 1.1, 0), strike_dir, float(attack.damage) / 30.0)
+	if block_tracker != null:
+		# Locks onto the part that was actually struck, not the body's middle.
+		var struck := rig.parts.get(zone) as Node3D if rig != null else null
+		var marker_at: Vector3 = struck.global_position if struck != null and is_instance_valid(struck) else target.global_position + Vector3(0, 1.1, 0)
+		block_tracker.report_hit(marker_at, zone, float(result.get("damage", attack.damage)), str(attack.damage_type))
 	var hit_motion := actor.get("motion") as HunterBodyMotion
 	if hit_motion != null and is_instance_valid(hit_motion):
 		var zone_max: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone, {}) as Dictionary).get("health", 100.0))
@@ -8196,6 +8206,18 @@ func _update_held_reliquary() -> void:
 ## ring follows whoever the camera is actually framing. Both only read state.
 func _update_strike_fx(delta: float) -> void:
 	strike_face_time = maxf(0.0, strike_face_time - delta)
+	if block_tracker != null:
+		block_tracker.camera = camera
+		block_tracker.visible = panel_mode.is_empty() and not resolution_ui.visible
+		var seen_by: Array = []
+		for actor in encounter_actors:
+			if bool(actor.get("tracking_player", false)) and not bool(actor.get("dead", false)) and actor.get("node") != null and is_instance_valid(actor.node):
+				# Framed on the torso, so the box sits on the body, not over the head.
+				var body_rig := actor.get("rig") as BaselineHuman
+				var torso := body_rig.parts.get("torso") as Node3D if body_rig != null else null
+				var centre: Vector3 = torso.global_position if torso != null and is_instance_valid(torso) else (actor.node as Node3D).global_position + Vector3(0, 0.9, 0)
+				seen_by.append({"at": centre, "certainty": 1.0})
+		block_tracker.watch(seen_by)
 	if threat_compass != null:
 		threat_compass.visible = panel_mode.is_empty() and not resolution_ui.visible
 	if strike_trail != null:

@@ -120,7 +120,44 @@ func _draw() -> void:
 	_draw_monitor(Vector2(size.x - 238.0, 0.0), 1.9, false)
 	_draw_spine()
 	_draw_brain()
+	_draw_tracking()
 	_draw_pockets()
+
+
+# --- blob tracking on the body (item 4) ------------------------------------
+
+## The TouchDesigner-style tracker, turned on yourself: a box on the brain when
+## the mind is off normal, boxes on every vertebra you have lost, one on the
+## bleed. Nothing is drawn while you are whole, so a healthy rig stays clean.
+func _draw_tracking() -> void:
+	var boxes: Array = []
+	var mind_off := pain > 15.0 or consciousness < 90.0 or head_damage > 0.05
+	if mind_off:
+		var centre := _brain_centre()
+		boxes.append({"rect": Rect2(centre - Vector2(52, 40), Vector2(104, 80)), "tag": "PAIN %02d  CONSC %02d" % [roundi(pain), roundi(consciousness)], "ink": TEAL.lightened(0.3) if pain < 60.0 else BLOOD.lightened(0.25)})
+	var seated := intact_vertebrae()
+	for index in range(seated, VERTEBRAE):
+		var at := _spine_point(index) + Vector2(7, 2)
+		boxes.append({"rect": Rect2(at - Vector2(16, 9), Vector2(32, 18)), "tag": "L%02d" % (index + 1), "ink": BLOOD.lightened(0.3)})
+	if blood < 0.9:
+		var bleed := _spine_point(maxi(seated - 1, 0))
+		boxes.append({"rect": Rect2(bleed + Vector2(-20, 10), Vector2(40, 34)), "tag": "BLEED %02d%%" % roundi(blood * 100.0), "ink": BLOOD.lightened(0.15)})
+	var previous := Vector2.INF
+	for box in boxes:
+		var rect: Rect2 = box.rect
+		var ink: Color = box.ink
+		for corner in [rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)]:
+			var sx := 1.0 if corner.x <= rect.get_center().x else -1.0
+			var sy := 1.0 if corner.y <= rect.get_center().y else -1.0
+			draw_line(corner, corner + Vector2(6.0 * sx, 0), ink, 1.2)
+			draw_line(corner, corner + Vector2(0, 6.0 * sy), ink, 1.2)
+		# Tags hang to the left, off the anatomy, where the screen edge is not.
+		var tag := str(box.tag)
+		var width := CellOutzType.width_condensed(tag, 7.0, 0.5)
+		CellOutzType.draw_condensed(self, Vector2(rect.position.x - width - 6, rect.position.y + 2), tag, 7.0, ink, 0.5)
+		if previous != Vector2.INF:
+			draw_line(previous, rect.get_center(), ink * Color(1, 1, 1, 0.35), 1.0)
+		previous = rect.get_center()
 
 
 # --- the brain and the column -------------------------------------------------

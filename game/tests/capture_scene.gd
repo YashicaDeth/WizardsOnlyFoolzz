@@ -234,6 +234,30 @@ func _ready() -> void:
 		LabSurface.hold_in_view(scene.camera, scene.weapon_visual)
 		for _hold in 10:
 			await get_tree().process_frame
+	elif trigger == "track":
+		# Item 4: two enemies that have seen you, a marked hit on one, and a
+		# hurt player, so every kind of tracking box is on screen at once.
+		scene.yaw = 2.7
+		for step in 40:
+			scene.player_body.position = scene.player_body.position + Vector3(-0.42, 0, -0.2)
+			scene.player = scene.player_body.position + Vector3.UP * 0.6
+			await get_tree().physics_frame
+		var fwd := Vector3(sin(scene.yaw), 0, cos(scene.yaw))
+		var right := Vector3(fwd.z, 0, -fwd.x)
+		for i in 2:
+			var at: Vector3 = scene.player + fwd * 4.5 + right * (1.3 if i == 0 else -1.5) + Vector3.DOWN * 0.6
+			scene._spawn_encounter_actor({"instance_id": "track_%d" % i, "kind": "hostile"}, at)
+			scene.encounter_actors.back().node.position = at
+			scene.encounter_actors.back()["tracking_player"] = true
+		for _hold in 20:
+			await get_tree().physics_frame
+		var victim: Dictionary = scene.encounter_actors.back()
+		var arm := victim.rig.parts.get("left_arm") as Node3D
+		scene.block_tracker.report_hit(arm.global_position if arm != null else victim.node.global_position + Vector3.UP, "left_arm", 24.0, "cut")
+		scene.player_rig.anatomy.apply_hit("torso", 40.0, 0.0, "cut")
+		scene.player_rig.anatomy.apply_hit("head", 18.0, 0.0, "blunt")
+		for _hold in 5:
+			await get_tree().process_frame
 	elif trigger == "threat":
 		# Three enemies winding up around the player -- behind and due, to the
 		# left mid-swing, ahead-right just starting -- so the ThreatCompass
