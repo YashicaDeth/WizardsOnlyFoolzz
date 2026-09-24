@@ -61,6 +61,20 @@ the player is what came out whole, and bingyangers are what came out wrong.
   examiner, pitched and distorted per bingyanger. Lines can be written and
   tested now.
 
+### Decided later the same day
+
+- **What they say:** horror (pleading, screaming about what was done to
+  them, praying to nothing), funny-insane (non sequiturs, cheerful about the
+  wrong things) and prophetic (cryptic lore about CellOutz, the vats, the
+  Godhead, sometimes true). Not "about you" as its own register.
+- **Freeing one from a vat, loud or quiet:** smash the glass with the
+  restraint (fast, but the noise brings Hollis), or open the drain valve
+  with E (quiet, but slow).
+- **Look:** each one different, rolling its own mix of ghoul skin, growths
+  (tumours, fused parts, an extra limb) and unfinished, half-grown bodies.
+- **Mortality:** they die like anyone. Same anatomy, the guard can shoot
+  them, the player can kill them, and the world records it.
+
 ## Assistant proposals, not confirmed
 
 - **Freed from either place.** Greg chose both "the Support Unit ward" and

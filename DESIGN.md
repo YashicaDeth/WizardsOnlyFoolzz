@@ -393,6 +393,17 @@ either is how this repository became hard to read.
   meeting. They come from the same vats as the player. Full definitions,
   decisions and open questions: `DESIGN/BINGYANG.md`.
 
+- **A third way out: chasing the doctor.** Break down the door behind your
+  vat with any weapon (destruction physics, wanted as soon as possible),
+  chase him to his vehicle bay, and find he is a hologram. He calls you in
+  3D from the elevator and the roof helicopter, and you come away with
+  information, a task and a cybernetic that lets you call and summon NPCs
+  from the Brain Index, Sims-phone style.
+- **The derby route, in full:** after the crash, get out or keep driving
+  through a gate into GTA-style tunnels, out to a drain exit at a dried-up
+  waterfall of blood and gore with destroyed trees. Both routes:
+  `DESIGN/ESCAPE_ROUTES.md`.
+
 ## Influence register
 
 These entries describe what Greg said he values; proposed extraction is labelled. Liking a reference does not automatically import every mechanic from it.
