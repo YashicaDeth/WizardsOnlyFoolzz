@@ -255,7 +255,7 @@ static func _stand_the_tanks(host: Node3D, near: float, far: float, half_width: 
 		var at := Vector3(side * (half_width - 2.1), 0.0, run)
 
 		# LabVat is the hardware; this tank holds a part rather than a body.
-		LabVat.build(host, at, int(run * 10.0), 2.5, 0.62, false, false)
+		LabVat.build(host, at, int(run * 10.0), 2.5, 0.62, false, false, false)
 
 		# Something in it. `BodyMesh` is already this project's vocabulary for
 		# parts of people, so a tank holds an actual one rather than a blob.

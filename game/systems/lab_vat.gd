@@ -16,7 +16,7 @@ const FLESH := Color("8a6358")
 
 ## `at` is the vat's footprint on the floor. `height` is the glass tube's.
 ## `occupied` false leaves the tube empty (a drained or a waiting vat).
-static func build(host: Node3D, at: Vector3, seed_value: int, height := 2.4, radius := 0.72, occupied := true, lit := true) -> Node3D:
+static func build(host: Node3D, at: Vector3, seed_value: int, height := 2.4, radius := 0.72, occupied := true, lit := true, solid := true) -> Node3D:
 	var root := Node3D.new()
 	root.name = "LabVat_%d" % seed_value
 	root.position = at
@@ -56,6 +56,11 @@ static func build(host: Node3D, at: Vector3, seed_value: int, height := 2.4, rad
 	for line in 3:
 		var angle := TAU * float(line) / 3.0 + float(seed_value)
 		_cylinder(root, "Feed%d" % line, 0.035, 0.035, 1.6, Vector3(cos(angle) * radius * 0.5, plinth_height + height + 1.1, sin(angle) * radius * 0.5), rust)
+	# Solid: Greg walked straight through the vats on his second walkthrough.
+	# One cylinder for the whole column, plinth to crown. Lab dressing passes
+	# solid = false: its contract is decoration that never blocks movement.
+	if solid:
+		_collide(root, radius + 0.18, plinth_height + height + 0.34)
 	if lit:
 		var lamp := OmniLight3D.new()
 		lamp.name = "BaseLamp"
@@ -133,3 +138,16 @@ static func _capsule(parent: Node3D, label: String, radius: float, height: float
 	node.position = at
 	node.rotation_degrees = rotation
 	parent.add_child(node)
+
+
+static func _collide(root: Node3D, radius: float, height: float) -> void:
+	var body := StaticBody3D.new()
+	body.name = "VatCollision"
+	var shape := CollisionShape3D.new()
+	var column := CylinderShape3D.new()
+	column.radius = radius
+	column.height = height
+	shape.shape = column
+	shape.position = Vector3(0, height * 0.5, 0)
+	body.add_child(shape)
+	root.add_child(body)
