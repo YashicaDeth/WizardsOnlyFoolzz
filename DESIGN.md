@@ -382,6 +382,72 @@ either is how this repository became hard to read.
 - **A7.4, does the chassis roll**: still open. Greg's answer was "I don't
   know", so it stays unanswered rather than being decided for him.
 
+### Stated by Greg, 24 September 2026: how fighting, growth and trust connect
+
+Said in one message during the Dust to Bones remaster. His words are
+paraphrased closely; the last list is the assistant's reading, not his.
+
+- **Many fighting styles, switched live.** Martial-art stances, swordfighting
+  stances, and gun and weapon classes, each distinct and fluid, with
+  "insane" graphics on top. Switching stance mid-fight is part of it.
+- **Styles open skill trees, fed by use.** Each style or weapon earns its own
+  experience, called **blood**, from killing with it or using it well.
+  Weapons evolve through fighting experience, not shops.
+- **How you fight decides what survives.** Going bloodthirsty blows bodies
+  apart: organs and cybernetics (loot, not weapons) are destroyed with them,
+  and so are the connections that person could have become on the
+  relationship tree. Better-evolved weapons kill more cleanly for less
+  damage, so skill starts to pay back in loot.
+- **Stealth has its own reward.** In a mission, stealth can bring great loot
+  benefit, against many enemies.
+- **Playing safe can pay too:** working instead of fighting, befriending, and
+  building a diplomatic relationship through proximity chat, missions,
+  interaction and pre-written dialogue choices.
+- **Trust can be spent.** Trust earned by diplomacy makes infiltration and
+  betrayal possible, such as suddenly turning on people who trusted you.
+  His example: working for a military camp that has been oppressing the
+  locals, as in Fallout 4's story, then turning on it. They notice, or a
+  cutscene before the fight plays.
+- **Many small authored interactions.** Brief but featured moments like
+  ambushes and betrayals, in the manner of Shadow of Mordor.
+- **Boss rooms that know what you did.** Walking into a Dark Souls-style boss
+  room; because you know or have tripped certain triggers, a character boss
+  fight or custom cutscene written into that map area plays.
+- **The kinship tree needs reworking** and moving somewhere better than its
+  current key (T opens the Living Kinship Web), unless the key itself is
+  reworked.
+- **Hornee the zombie mutant.** Greg's handmade plush: stitched corduroy
+  body, a bottle-cap eye and a metal-cap eye, pins, a black rose, a camo
+  wrap and a charm on one ear. His edited artwork of it is titled "Zombie
+  Minion". Sources: `C:\Users\Greg\Downloads\20260327_2103{04,09,16}.jpg`
+  (front, front, back), the edited still and the animated edit (36 s,
+  colour cycling between green and orange with a slow warp).
+  - A **trading card** in the Brain Index, zoomable, using the artwork's
+    textures, text, colour and type, with TouchDesigner-style effects.
+  - Also a **spinnable 3D recreation** of the plush from his photos,
+    switchable from the card ("the live thing"), with slight effects on the
+    model so the two read as one. He will send more photos if needed.
+  - **A minion that fights:** a small companion mutant or pet. The
+    inventory needs a slot for it, where you customise and look at your pet.
+
+Answers to follow-up questions, same day:
+
+- **Stealth is its own fighting style** with its own blood and its own tree.
+- **The Kinship web becomes a tab in the Tab hub**; T is freed.
+- **Job posters are pasted on walls** in the Hunt, with tear-off tabs you
+  take as a job. **Business cards are handed over by people you meet**,
+  kept in Carry, and add a contact on the Wire.
+
+Open: one of Hornee's eyes is a real drink brand's bottle cap with its
+wordmark. Keep it on the shipped model, or swap it for an in-world mark?
+
+Assistant reading, not confirmed: this is one loop. Blood XP rewards
+fighting; precise, evolved weapons protect the loot and the people a
+fight would otherwise destroy; kinship and trust are the other currency,
+earned by not fighting and spent by betrayal. The ambiguities worth asking
+about are whether diplomacy has a tree of its own, and whether "many
+enemies" means stealth missions field more of them.
+
 ## Influence register
 
 These entries describe what Greg said he values; proposed extraction is labelled. Liking a reference does not automatically import every mechanic from it.
