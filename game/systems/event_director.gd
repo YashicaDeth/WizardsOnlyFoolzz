@@ -42,8 +42,10 @@ const STATE_DONE := "done"
 
 ## Assistant proposal, not Greg's: the first event after two and a half
 ## minutes in the region, then one every five minutes at most.
-var first_delay := 150.0
-var cooldown := 300.0
+## Greg, 24 September: "often, GTA-style" -- roughly one every one to two
+## minutes, the first a minute in.
+var first_delay := 60.0
+var cooldown := 90.0
 var trade_timeout := 30.0
 var linger_seconds := 45.0
 var autoplay := false

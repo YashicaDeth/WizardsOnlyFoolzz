@@ -167,8 +167,30 @@ func can_unlock(node_id: String) -> bool:
 	return available(str(node.style)) >= int(node.cost)
 
 
+## Greg: small nodes open by themselves once a weapon style has earned
+## enough; they cost nothing. Checked every time that style earns blood.
+func _open_automatic(style_id: String) -> void:
+	var earned := int((state.styles.get(style_id, {}) as Dictionary).get("earned", 0))
+	for node_id in BloodTrees.NODES:
+		var node := BloodTrees.NODES[node_id] as Dictionary
+		if str(node.style) != style_id or not bool(node.get("auto", false)):
+			continue
+		if is_unlocked(str(node_id)) or not requirements_met(str(node_id)) or earned < int(node.cost):
+			continue
+		var opened: Array = (state.unlocked as Array).duplicate()
+		opened.append(str(node_id))
+		state.unlocked = opened
+		_dirty = true
+		PlayerActionLedger.record("blood_node_unlocked", {"node": str(node_id), "style": style_id, "cost": 0, "auto": true})
+		apply_to_arsenal()
+		node_unlocked.emit(str(node_id))
+
+
 ## Blood is fuel: opening a node spends it from that style's own pool.
+## Automatic nodes are never bought; they open themselves.
 func unlock(node_id: String) -> bool:
+	if bool((BloodTrees.NODES.get(node_id, {}) as Dictionary).get("auto", false)):
+		return false
 	if not can_unlock(node_id):
 		return false
 	var node := BloodTrees.NODES[node_id] as Dictionary
@@ -220,6 +242,13 @@ func credit(weapon_id: String, amount: int, kind: String, stealth := false) -> i
 		_catch_totals[weapon_id] = int(_catch_totals.get(weapon_id, 0)) + amount
 	else:
 		blood_earned.emit(weapon_id, style_id, amount, kind)
+	# Opened after the event being read is finished: recording the unlock is
+	# itself an event, and a nested one would move `last_sequence` past facts
+	# the ledger has not read yet (it lost the first fight's breach-tool blood).
+	if not _auto_pending.has(style_id):
+		_auto_pending.append(style_id)
+	if not _reading and not _catching_up:
+		_flush_automatic()
 	# Stealth earns its own blood beside the weapon's, not instead of it.
 	if stealth and style_id != "stealth":
 		credit("unseen", amount, kind)
@@ -233,6 +262,7 @@ func catch_up() -> void:
 	for event in WorldHistory.events:
 		consume(event, false)
 	_catching_up = false
+	_flush_automatic()
 	for weapon_id in _catch_totals:
 		blood_earned.emit(str(weapon_id), BloodTrees.weapon_style(str(weapon_id)), int(_catch_totals[weapon_id]), "record")
 	_catch_totals.clear()
@@ -241,7 +271,21 @@ func catch_up() -> void:
 
 
 func _on_event_recorded(event: Dictionary) -> void:
+	if _reading:
+		return
+	_reading = true
 	consume(event, true)
+	_reading = false
+	_flush_automatic()
+
+
+var _auto_pending: Array[String] = []
+var _reading := false
+
+
+func _flush_automatic() -> void:
+	while not _auto_pending.is_empty():
+		_open_automatic(_auto_pending.pop_front())
 
 
 ## One recorded fact in, any blood it earned out. `live` means it happened this

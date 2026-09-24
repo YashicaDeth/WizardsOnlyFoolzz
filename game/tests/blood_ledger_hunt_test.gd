@@ -60,7 +60,7 @@ func _ready() -> void:
 	# Enough blood for FIRST CUT, then the Hunt's own swing report carries it.
 	ledger.credit("sword", 40, "hit")
 	var base := float(HunterArsenal.WEAPONS.sword.damage)
-	check(ledger.unlock("first_cut"), "FIRST CUT opens in the Hunt")
+	check(ledger.is_unlocked("first_cut"), "FIRST CUT opens by itself in the Hunt")
 	hunt.arsenal.cooldown = 0.0
 	var learned: Dictionary = hunt.arsenal.begin_attack()
 	check(is_equal_approx(float(learned.damage), base * 1.10), "the Hunt's next swing carries the learned damage (%.2f)" % float(learned.damage))

@@ -53,6 +53,10 @@ const EXTRA_WEAPONS := {
 	"unseen": {"label": "UNSEEN", "style": "stealth"},
 }
 
+## Greg, 24 September: blood opens the trees both ways. A node marked
+## `auto` opens by itself, free, once its style has EARNED its cost in total;
+## every other node is bought by spending blood from the style's pool.
+##
 ## Each node: label, style, cost (blood spent from the style's pool), the
 ## nodes it needs first, a one-line effect, and either `scales` (applied to the
 ## named weapons through the arsenal's existing customization scale path) or
@@ -61,7 +65,7 @@ const EXTRA_WEAPONS := {
 const NODES := {
 	# BLADE / BLUNT
 	"first_cut": {
-		"style": "melee", "label": "FIRST CUT", "cost": 20, "requires": [],
+		"style": "melee", "label": "FIRST CUT", "cost": 20, "requires": [], "auto": true,
 		"effect": "CLEAVER BITES DEEPER  +10% DAMAGE",
 		"weapons": ["sword"], "scales": {"damage_scale": 1.10},
 	},
@@ -82,7 +86,7 @@ const NODES := {
 	},
 	# IRON
 	"steady_hand": {
-		"style": "firearm", "label": "STEADY HAND", "cost": 20, "requires": [],
+		"style": "firearm", "label": "STEADY HAND", "cost": 20, "requires": [], "auto": true,
 		"effect": "EVERY GUN  -15% SPREAD",
 		"weapons": ["firearm"], "scales": {"spread_scale": 0.85},
 	},
@@ -103,7 +107,7 @@ const NODES := {
 	},
 	# MEAT
 	"knuckle": {
-		"style": "martial", "label": "KNUCKLE", "cost": 20, "requires": [],
+		"style": "martial", "label": "KNUCKLE", "cost": 20, "requires": [], "auto": true,
 		"effect": "HARDER BARE HANDS  (NOT WIRED YET)",
 		"flag": "martial_knuckle",
 	},
@@ -119,7 +123,7 @@ const NODES := {
 	},
 	# HUSH
 	"soft_foot": {
-		"style": "stealth", "label": "SOFT FOOT", "cost": 20, "requires": [],
+		"style": "stealth", "label": "SOFT FOOT", "cost": 20, "requires": [], "auto": true,
 		"effect": "QUIETER STEPS  (NOT WIRED YET)",
 		"flag": "stealth_soft_foot",
 	},
