@@ -371,6 +371,14 @@ it, it's rendered and looked at, it has a test, and it's merged and built
 
 ## L. The derby (route 3, capture)
 - [x] Wreck = captured, crushed = dead; the tunnels out to the dry falls.
+- [x] The tunnels are driven (Greg: "like its gta tunnels"): the arena gate
+      goes up onto 650 m of lit road bores, two junction halls with dead-end
+      bores, nine barricades to smash through, and the drain mouth; the car
+      goes on to the falls with you, or you get out (E) and walk it.
+      `derby_tunnels_test` drives it gate to gorge at 23 m/s and walks it.
+      Rendered (`derby_tunnels_capture`). Where the route surfaces in the Hunt
+      is an assistant placement, beside the storm outfall.
+- [x] R resets a stuck car onto the road, facing the way out.
 - [ ] A slow-motion kill cam on the real body. **ASK** how slow, how long,
       how often.
 - [ ] The crowd reacts to big wrecks.

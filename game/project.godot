@@ -80,3 +80,4 @@ crouch={
 [rendering]
 
 environment/defaults/default_clear_color=Color(0.06, 0.055, 0.09, 1)
+limits/opengl/max_renderable_lights=128

@@ -62,6 +62,12 @@ answers.
       storm outfall) walks the existing maintenance ascent and surfaces west of
       the start. Merged at `796903d`. `first_thirty_route_test` plays both
       routes end to end, into the Hunt.
+- [x] **The breakout in Greg's order** (25 September): the wires, the cord in
+      your mouth, three blows to the glass, on your knees while the implant
+      boots the HUD piece by piece, SPACE to get up facing his door, then GET
+      REVENGE. `hands_on_breakout_test`. Merged at `033d919`.
+- [x] **The derby tunnels, driven**: gate, 650 m of GTA-style bores, barricades,
+      the drain mouth, the car carried on to the dry falls. `derby_tunnels_test`.
 - [ ] **Hollis gets a real model**, one Greg provides or picks (CC-BY credited).
 
 Then, in this order (Greg, 24 September, "what next"):

@@ -23,6 +23,11 @@ const ROUTE_HEAT_ELEVATOR := "heat_elevator_ascent"
 ## his vehicle bay, where he turns out to be a hologram; the bay's ramp is the
 ## way up. The bay is played in `doctor_vehicle_bay.tscn`.
 const ROUTE_DOCTOR := "doctor_pursuit"
+## Greg, 24 September: the derby comes out through a gate in the arena into old
+## tunnels you drive (`derby_tunnels.tscn`), which empty at the dry blood
+## waterfall (`blood_waterfall_exit.tscn`). Begun at the colosseum, not at the
+## Growing Floor: the pit is where this way out starts.
+const ROUTE_DERBY_TUNNELS := "derby_tunnels"
 
 const CONTAINMENT_MECHANISMS := {
 	"implant_suppression_lattice": "The rewritten brain implant is pinned by a tuned suppression lattice.",
@@ -54,6 +59,9 @@ const DISTRICTS := {
 	"examination_room": {"name": "Examination Room", "kind": "corporate_laboratory"},
 	"support_unit": {"name": "Support Unit", "kind": "maintenance_network"},
 	"doctor_vehicle_bay": {"name": "The Doctor's Vehicle Bay", "kind": "surface_exit"},
+	# Behind the derby's tunnel gate, and where those tunnels empty.
+	"derby_tunnels": {"name": "The Derby Tunnels", "kind": "maintenance_network"},
+	"dry_falls": {"name": "The Dry Falls", "kind": "surface_exit"},
 }
 
 const CONNECTIONS := [
@@ -75,6 +83,8 @@ const CONNECTIONS := [
 	["growing_floor", "examination_room"],
 	["examination_room", "support_unit"],
 	["support_unit", "doctor_vehicle_bay"],
+	["underground_colosseum", "derby_tunnels"],
+	["derby_tunnels", "dry_falls"],
 ]
 
 const ROUTES := {
@@ -144,6 +154,20 @@ const ROUTES := {
 		"mastery_route": false,
 		"avoids_derby": true,
 	},
+	ROUTE_DERBY_TUNNELS: {
+		"approach": "derby_tunnels",
+		"label": "DERBY TUNNELS / THE DRY FALLS",
+		"start": "underground_colosseum",
+		"steps": ["derby_tunnels", "dry_falls"],
+		"exit": "dry_falls",
+		# Assistant placement, not Greg's (blood_waterfall_exit.gd
+		# SURFACE_POSITION): beside the storm outfall, since the drains are
+		# what feed the falls. Relationships as the derby's recapture exit.
+		"surface_position": Vector3(-26.0, 0.0, 12.0),
+		"surface_relationships": {"ashline_wreckers": 12, "celloutz": -18},
+		"mastery_route": false,
+		"avoids_derby": false,
+	},
 	ROUTE_RECAPTURE: {
 		"approach": "recapture_into_derby",
 		"label": "CONTAINMENT / UNDERGROUND DERBY",
@@ -202,7 +226,7 @@ static func begin(route_id: String) -> bool:
 		# Every chosen route starts from the Growing Floor. Without this a
 		# route abandoned halfway left `current_district` deep in another
 		# branch, and the next route's first step was refused as unconnected.
-		"current_district": "growing_floor",
+		"current_district": str(definition.get("start", "growing_floor")),
 		"route_steps": [],
 		"route_choice": "",
 		"assault_control_points": [],

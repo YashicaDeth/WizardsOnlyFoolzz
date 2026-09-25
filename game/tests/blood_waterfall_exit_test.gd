@@ -32,7 +32,7 @@ func _ready() -> void:
 	# Greg, 24 September: the falls are where the derby tunnels come out; the
 	# walking drains keep their storm outfall.
 	var derby_source := FileAccess.get_file_as_string("res://rift_derby.gd")
-	check(derby_source.contains("DERBY_EXIT_SCENE := \"res://blood_waterfall_exit.tscn\""), "the derby's way out leads to the dry falls")
+	check(derby_source.contains("DERBY_EXIT_SCENE := \"res://derby_tunnels.tscn\"") and FileAccess.get_file_as_string("res://derby_tunnels.gd").contains("blood_waterfall_exit.tscn"), "the derby's way out leads through the tunnels to the dry falls")
 	var drains_source := FileAccess.get_file_as_string("res://old_drains.gd")
 	check(not drains_source.contains("blood_waterfall_exit"), "and the walking drains keep their own storm outfall")
 

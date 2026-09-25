@@ -115,8 +115,8 @@ func _ready() -> void:
 	check(not is_instance_valid(derby) or derby.is_queued_for_deletion(), "the derby is gone")
 	var hunt := tree.current_scene
 	# Greg, 24 September: the derby comes out through the old tunnels at the
-	# dry blood waterfall, not straight into the Hunt.
-	check(hunt.scene_file_path == "res://blood_waterfall_exit.tscn", "we come out at the dry falls, not somewhere else")
+	# dry blood waterfall, not straight into the Hunt. The tunnels come first.
+	check(hunt.scene_file_path == "res://derby_tunnels.tscn", "we come out into the old tunnels, not somewhere else")
 
 	# Now keep running. A crash on the far side of a scene swap is usually a
 	# stale reference firing a frame or two later, and the 14 second detach
