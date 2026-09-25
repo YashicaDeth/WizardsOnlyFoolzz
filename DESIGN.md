@@ -994,6 +994,14 @@ The full direction is in `DESIGN/OPENING_TORTURE_INTAKE.md`. In short:
   skills, Mento. How each is used is open (see the questions in the opening
   doc).
 - **The playtest of the 30-minute demo comes first.**
+- **The vat on the right is one big 3D vat you're inside,** full of real,
+  smooth-running liquid (blood, water, fluids), not stacked rings. You're
+  tortured in it: wires in your head, the implant, a tube in your mouth,
+  zaps that flash your organs.
+- **Customization as deep as Bloodborne:** fine face shapes, skin and
+  clothing on Greg's textures, genitalia options (none, asexual, chosen, with
+  size, and the blur), your blood, and your cybernetics. Every choice shows
+  on your body in the vat.
 
 ## Influence register
 

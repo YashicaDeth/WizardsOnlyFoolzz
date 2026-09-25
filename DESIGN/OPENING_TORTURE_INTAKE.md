@@ -105,6 +105,49 @@ open until Greg says yes.
     or bars for each stat that visibly matter, and texture slots named for
     Greg's art.
 
+### 8. The vat on the right is a real vat, and you're in it
+Greg, 25 September (second message):
+
+> your VAT model on the right is like a big three D model of a VAT, and then
+> you're actually in it ... there's no like circles that are going in each
+> other. It's just a big VAT ... there's heaps of blood and like water in it,
+> and the sexual liquid, and it's a real liquid system. And make sure it
+> doesn't lag ... the performance is all perfect.
+
+- The intake's right panel shows a **big 3D vat with you inside it**, not
+  rings stacked on each other.
+- It holds **a real liquid:** blood, water and other fluids that move, lit
+  and refracting. It runs smoothly at full frame rate.
+- **You're being tortured in it:** wires in your head, the brain implant, a
+  tube in your mouth, and electrocution. Each zap flashes your body and
+  organs through, X-ray style.
+  - **Exists:** `VatBodyPreview`, `BaselineHuman` with organs, `WorldXray`,
+    the wetwire implant, and the umbilicals from the wires beat.
+  - **New:** the vat panel rebuilt as one large vat; a fluid surface and
+    volume shader; zaps that flash the X-ray over the body.
+
+### 9. Character customization as deep as Bloodborne
+> as good as Bloodborne customization. Each different like eyebrow, concave
+> and everything is like a complex face model shape, and it's still using my
+> textures, but using skin and clothing models after that. You can make
+> extremely detailed characters.
+
+- **Face:** many fine shape controls (brows, cheek hollows, jaw, nose,
+  eyes, and so on) on a proper face model. Each slider moves only its own
+  feature.
+  - **Exists:** the FACE tab's sliders (each moves only its own feature),
+    `face_model`, and `BaselineHuman`.
+- **Skin and clothing** on top, using Greg's textures.
+- **Genitalia:** none, asexual, or chosen, with size; the censor blur stays
+  an option. Greg: "there will be sexual stuff in the game".
+  - **Exists:** `BodyForms` (chest, groin, buttocks, by anatomy and frame),
+    `AnatomyPresentation` (explicit or mosaic), and the body-cam censor
+    glitch.
+- **Blood:** you choose your blood.
+- **Cybernetics:** you choose them in the vat.
+- **You see every choice on your body in the vat:** blood, ink, build,
+  fighting style, and cybernetics all change the body you see.
+
 ## The look (applies to everything above)
 - **Lighting:** Alien Isolation and Outlast darkness. Pools of light,
   practical lamps, a flashlight or camera light doing the work. (rec) Measure
