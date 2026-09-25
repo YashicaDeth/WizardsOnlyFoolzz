@@ -13,4 +13,5 @@ Entry types:
 
 - CLAIM A torture load-in, doctor at the glass, birthday test, real-mic V, fighting-style choice, New Vegas intake, breakout sequence, vat-room lighting | Lane A files
 - DONE A speedrunnable intake end (F rushes the doctor's lines and his walk out) | 41b02f9
-- NEED A -> GREG: Higgsfield use (prototype-only recommended), what Ponytail and Mento are, who voices the lines
+- NEED A -> GREG: what Ponytail and Mento are, who voices the lines
+- DONE GREG Higgsfield: every lane may generate with it; log each asset in game/art/GENERATED.md

@@ -58,13 +58,19 @@ starting anything new.
   lane's tests. A new behaviour gets one small `game/tests/<name>_test`.
 - **Seen, not claimed:** render it (`--write-movie` or a capture scene),
   open the image, and describe it in the commit.
-- **Assets are human-made:** CC0 or CC-BY only, from Kenney, Quaternius,
-  Poly Haven, ambientCG, OpenGameArt, Freesound, itch.io free packs, or
-  Sketchfab CC-BY. Credit each one in `CREDITS.md`. No generated art ships.
-  Greg's textures replace placeholders when he sends them.
+- **Assets:** Greg, 25 September: "let them all use Higgsfield to
+  generate."
+  - Every agent may generate art, models, textures and sounds with
+    Higgsfield.
+  - Log every generated asset in `game/art/GENERATED.md` (tool, prompt,
+    date, file, what it's for).
+  - Human-made CC0 and CC-BY assets (Kenney, Quaternius, Poly Haven,
+    ambientCG, OpenGameArt, Freesound, Sketchfab CC-BY) are also fine,
+    credited in `CREDITS.md`.
+  - Greg's own art is never overwritten, and replaces generated pieces
+    wherever he supplies it.
 - **Tools:**
-  - (rec, Greg hasn't answered) Higgsfield is for prototypes and reference
-    only; nothing it generates ships.
+  - Higgsfield (its MCP, or the site) for generation.
   - Open-weight models (Qwen and others) are fine as coding helpers.
   - No cracked or pirated software.
 - **Greg decides lore, names, placement and feel.** If a slice needs one of
@@ -97,7 +103,8 @@ starting anything new.
 > 8. the breakout: the sigil, the motherboard hack, BRAIN HACKED, the hands,
 >    the cord, three smashes, the pour, the knees
 >
-> Then Alien Isolation-grade lighting in the vat room.
+> Then Alien Isolation-grade lighting in the vat room. Generate art with
+> Higgsfield where it helps, logging each asset in `game/art/GENERATED.md`.
 >
 > You own only Lane A's files. Use what exists; don't rebuild it. After each
 > beat: tests green, a recording looked at, merged, and a Windows build named
@@ -141,8 +148,9 @@ starting anything new.
 > - `tools/run_tests.sh --core` green
 > - a performance number: the vat panel's frame time at 1080p
 >
-> Human-made assets only, credited in `CREDITS.md`. Report what you couldn't
-> verify. Go.
+> Assets: generate with Higgsfield (log each in `game/art/GENERATED.md`) or
+> use CC0/CC-BY (credit in `CREDITS.md`). Never overwrite Greg's art.
+> Report what you couldn't verify. Go.
 
 ### Lane C: Coda
 > /goal Wizards Only Fools, Lane C (the facility rooms, models, cameras and
@@ -171,8 +179,10 @@ starting anything new.
 > **You own only Lane C's files.** Put a new camera in the vat room by
 > posting `NEED C -> A`.
 >
-> **Assets:** CC0 or CC-BY from Kenney, Quaternius, Poly Haven, ambientCG
-> or Sketchfab CC-BY, each credited in `CREDITS.md`. No generated art.
+> **Assets:** generate models and textures with Higgsfield (log each in
+> `game/art/GENERATED.md`), or use CC0/CC-BY from Kenney, Quaternius, Poly
+> Haven, ambientCG or Sketchfab CC-BY (credit in `CREDITS.md`). Never
+> overwrite Greg's art.
 >
 > **Proof per room:**
 > - before and after captures, opened and described
@@ -209,9 +219,10 @@ starting anything new.
 >
 > **You own only Lane D's files.**
 >
-> **Assets:** sigil and sacred-geometry art drawn in code or human-made
-> (CC0 or CC-BY, credited). No generated images. Greg's own art replaces
-> placeholders when he sends it.
+> **Assets:** generate sigil art, sacred geometry and anatomy plates with
+> Higgsfield (log each in `game/art/GENERATED.md`), draw them in code, or use
+> CC0/CC-BY (credit in `CREDITS.md`). Greg's own art replaces anything when
+> he sends it.
 >
 > **Proof per slice:**
 > - a `--write-movie` clip or capture, opened and described

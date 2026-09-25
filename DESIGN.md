@@ -994,6 +994,15 @@ The full direction is in `DESIGN/OPENING_TORTURE_INTAKE.md`. In short:
   skills, Mento. How each is used is open (see the questions in the opening
   doc).
 - **The playtest of the 30-minute demo comes first.**
+- **Higgsfield: generate with it (Greg, 25 September, overriding the
+  "human-made only" line above).** "Let them all use Higgsfield to
+  generate." Every agent may generate art, models, textures and assets with
+  Higgsfield.
+  - Each generated asset is logged in `game/art/GENERATED.md`: tool, prompt,
+    date, and what it's for.
+  - Greg's own art is never overwritten, and wins wherever it exists.
+  - Human-made CC0 and CC-BY assets are still welcome, credited in
+    `CREDITS.md`.
 - **The vat on the right is one big 3D vat you're inside,** full of real,
   smooth-running liquid (blood, water, fluids), not stacked rings. You're
   tortured in it: wires in your head, the implant, a tube in your mouth,
