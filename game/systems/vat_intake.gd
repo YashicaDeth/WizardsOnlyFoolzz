@@ -47,7 +47,9 @@ const PAPER := Color(0.12, 0.075, 0.06)
 
 const ROUTES := ["PRESET", "RANDOM", "CHART", "INSTRUMENT"]
 ## Greg, 25 September: "then he asks what style of fighting you want to do".
-const PAGES := ["ROUTE", "RACE", "TRAITS", "FACE", "BODY", "SCHEDULE", "STYLE"]
+const PAGES := ["ROUTE", "RACE", "TRAITS", "FACE", "BODY", "BIRTH", "SCHEDULE", "STYLE"]
+const BIRTH_PAGE := 5
+const STYLE_PAGE := 7
 const FORM_REVEAL_AT := 5.5
 const FORM_REVEAL_DURATION := 0.55
 
@@ -279,9 +281,9 @@ func _process(delta: float) -> void:
 		transcript = "NEURALACE ENGAGED  //  EXAMINER TERMINAL CONNECTED"
 		transcript_life = 4.0
 		_speak("page")
-		opening_lines = DoctorExamination.OPENING.duplicate(true)
-		opening_active = true
-		_advance_opening()
+		var greeting: Array = DoctorExamination.OPENING.duplicate(true)
+		greeting[greeting.size() - 1]["event"] = "examiner_greeting"
+		_queue_lines(greeting)
 	handler_life = maxf(0.0, handler_life - delta)
 	handler_quiet = maxf(0.0, handler_quiet - delta)
 	doctor_life = maxf(0.0, doctor_life - delta)
@@ -477,6 +479,12 @@ func _think(text: String) -> void:
 		return
 	thought = text
 	thought_life = 6.0
+	if thought_edit != null:
+		thought_edit.placeholder_text = "think out loud, then Enter"
+	var told := CharacterSheet.parse_birth(text)
+	if not told.is_empty():
+		_give_birth(told)
+		return
 	if not read_thoughts_said:
 		# The first thought you have, he answers. Not the handler: him.
 		read_thoughts_said = true
@@ -502,7 +510,9 @@ func _rows() -> int:
 			# Anatomy sits at the top of the body page, because it is the first
 			# thing the facility decided about you.
 			return 9
-		6:
+		BIRTH_PAGE:
+			return 1
+		STYLE_PAGE:
 			return BloodTrees.STYLE_ORDER.size()
 		_:
 			return CharacterSheet.MODIFIERS.size()
@@ -576,7 +586,13 @@ func _commit() -> void:
 				_:
 					sheet.appearance["piercings"] = fmod(float(sheet.appearance.get("piercings", 0.0)) + 0.25, 1.01)
 			_transcribe("BODY")
-		6:
+		BIRTH_PAGE:
+			# He asked for it; you tell him. Typed here, or said with V.
+			if thought_edit != null:
+				thought_edit.placeholder_text = "your birthday: day month year, and the time if you know it"
+				thought_edit.visible = true
+				thought_edit.grab_focus()
+		STYLE_PAGE:
 			sheet.fighting_style = str(BloodTrees.STYLE_ORDER[row])
 			_transcribe(str((BloodTrees.STYLES[sheet.fighting_style] as Dictionary).label), "style_" + sheet.fighting_style)
 		_:
@@ -733,7 +749,9 @@ func _draw_clipboard(rect: Rect2) -> void:
 			_draw_face(rect, ink, y)
 		4:
 			_draw_body(rect, ink, y)
-		6:
+		BIRTH_PAGE:
+			_draw_birth(rect, ink, y)
+		STYLE_PAGE:
 			_draw_styles(rect, ink, y)
 		_:
 			_draw_schedule(rect, ink, y)
@@ -855,6 +873,35 @@ func _draw_routes(_rect: Rect2, ink: Color, y: float) -> void:
 		var note: String = ["authored, canonical", "the decanting lottery", "birth date, time, place", "the questionnaire"][index]
 		CellOutzType.draw_condensed(self, Vector2(180, y - 8), note.to_upper(), 8.0, ink * Color(1, 1, 1, 0.45), 0.7)
 		y += 26.0
+
+
+## What he knows once you have told him: the date, the wheel it gives, and the
+## element each stat drinks from, as bars.
+func _draw_birth(_rect: Rect2, ink: Color, y: float) -> void:
+	var told := touched_pages.has(BIRTH_PAGE)
+	_row_mark(ink, Vector2(30, y - 9), row == 0, told)
+	CellOutzType.draw_condensed(self, Vector2(50, y - 10), "TELL HIM" if not told else "TOLD HIM", 13.0, ink, 0.9)
+	CellOutzType.draw_condensed(self, Vector2(50, y + 6), "ENTER TO TYPE IT  //  HOLD V TO SAY IT", 7.0, ink * Color(1, 1, 1, 0.5), 0.6)
+	y += 42.0
+	var birth: Dictionary = sheet.birth
+	var date := "%02d %s %d" % [int(birth.get("day", 1)), str(CharacterSheet.MONTH_NAMES[clampi(int(birth.get("month", 1)), 1, 12) - 1]).left(3), int(birth.get("year", 2000))]
+	var time := ("%02d:%02d" % [int(birth.get("hour", 12)), int(birth.get("minute", 0))]) if bool(birth.get("time_known", true)) else "--:--"
+	var dim := ink * Color(1, 1, 1, 1.0 if told else 0.35)
+	CellOutzType.draw_condensed(self, Vector2(50, y), date if told else "?? ??? ????", 20.0, dim, 0.8)
+	CellOutzType.draw_condensed(self, Vector2(260, y + 4), time if told else "--:--", 14.0, dim, 0.8)
+	y += 34.0
+	CellOutzType.draw_condensed(self, Vector2(50, y), "SUN %s  //  %s RISING  //  %s" % [sheet.sun_sign(), sheet.ascendant(), sheet.modality().to_upper()], 10.0, (HOT if told else dim), 0.7)
+	y += 26.0
+	var balance := sheet.element_balance()
+	var total := 0.0
+	for element in balance:
+		total += float(balance[element])
+	for element in ["fire", "earth", "air", "water"]:
+		var share := float(balance[element]) / maxf(total, 0.001)
+		CellOutzType.draw_condensed(self, Vector2(50, y), "%s  >  %s" % [element.to_upper(), str(CharacterSheet.ELEMENT_ATTRIBUTE[element]).to_upper()], 9.0, dim, 0.7)
+		draw_rect(Rect2(Vector2(220, y + 1), Vector2(180, 9)), ink * Color(1, 1, 1, 0.12))
+		draw_rect(Rect2(Vector2(220, y + 1), Vector2(180 * share, 9)), (HOT if told else ink) * Color(1, 1, 1, 0.8 if told else 0.25))
+		y += 18.0
 
 
 ## The four blood trees, with the first node each one opens and what you
@@ -1043,8 +1090,34 @@ func _advance_opening() -> void:
 	var cue := str(beat.get("cue", ""))
 	if cue != "":
 		doctor_cue.emit(cue)
-	if opening_lines.is_empty():
-		WorldHistory.record_event("examiner_greeting", {"lines": DoctorExamination.OPENING.size()})
+	var event := str(beat.get("event", ""))
+	if event != "":
+		WorldHistory.record_event(event, {"line": doctor_says})
+
+
+## Lines he says through, in order, without the patter cutting in.
+func _queue_lines(lines: Array) -> void:
+	opening_lines.append_array(lines.duplicate(true))
+	opening_active = true
+	if doctor_life <= 0.0:
+		_advance_opening()
+
+
+## Beat 5. Your birthday goes on the sheet (and so into the stats, which read
+## the chart), and he reads it back to you.
+func _give_birth(told: Dictionary) -> void:
+	sheet.birth = told
+	touched_pages[BIRTH_PAGE] = true
+	transcript = "WROTE: %02d %s %d  %s" % [int(told.day), str(CharacterSheet.MONTH_NAMES[int(told.month) - 1]).left(3), int(told.year), ("%02d:%02d" % [int(told.hour), int(told.minute)]) if bool(told.time_known) else "TIME UNKNOWN"]
+	transcript_life = 4.0
+	WorldHistory.record_event("birthday_given", {"birth": told.duplicate(), "sun": sheet.sun_sign(), "rising": sheet.ascendant()})
+	var lines: Array = []
+	if not read_thoughts_said:
+		read_thoughts_said = true
+		lines.append(DoctorExamination.READS_THOUGHTS.duplicate())
+	lines.append_array(DoctorExamination.read_chart(sheet))
+	_queue_lines(lines)
+	_refresh_body_preview()
 
 
 func _begin_verdict() -> void:

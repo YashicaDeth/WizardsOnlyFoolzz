@@ -231,6 +231,87 @@ func sun_sign_index() -> int:
 	return index
 
 
+const MONTH_NAMES := ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"]
+
+
+## Greg, 25 September: "you tell them your birthday". What a person says or
+## types when asked for it: "11 1 2007", "11/01/2007 2:30am", "the 3rd of
+## March 1994 at 7:45pm". Day before month, as written in Australia. Returns
+## {} when there is no whole date in it.
+static func parse_birth(text: String) -> Dictionary:
+	var clean := text.to_lower()
+	for mark in ["/", ".", ",", "-", "\\"]:
+		clean = clean.replace(mark, " ")
+	var hour := -1
+	var minute := 0
+	var numbers: Array[int] = []
+	var month := 0
+	var pm := false
+	var am := false
+	for raw in clean.split(" ", false):
+		var token := raw.strip_edges()
+		if token in ["pm", "p m"] or token.ends_with("pm") and token.trim_suffix("pm").is_valid_int():
+			pm = true
+			if token.trim_suffix("pm").is_valid_int():
+				hour = int(token.trim_suffix("pm"))
+			continue
+		if token == "am" or token.ends_with("am") and token.trim_suffix("am").is_valid_int():
+			am = true
+			if token.trim_suffix("am").is_valid_int():
+				hour = int(token.trim_suffix("am"))
+			continue
+		if ":" in token:
+			var parts := token.trim_suffix("pm").trim_suffix("am").split(":")
+			if parts.size() >= 2 and parts[0].is_valid_int() and parts[1].is_valid_int():
+				hour = int(parts[0])
+				minute = clampi(int(parts[1]), 0, 59)
+				pm = pm or token.ends_with("pm")
+				am = am or token.ends_with("am")
+			continue
+		for index in MONTH_NAMES.size():
+			if token.length() >= 3 and MONTH_NAMES[index].to_lower().begins_with(token.left(3)) and MONTH_NAMES[index].to_lower().begins_with(token):
+				month = index + 1
+		var digits := token.trim_suffix("st").trim_suffix("nd").trim_suffix("rd").trim_suffix("th")
+		if digits.is_valid_int():
+			numbers.append(int(digits))
+	var day := 0
+	var year := 0
+	for number in numbers:
+		if number > 31 and year == 0:
+			year = number
+		elif day == 0:
+			day = number
+		elif month == 0 and number <= 12:
+			month = number
+		elif year == 0:
+			year = number
+	if year > 0 and year < 100:
+		year += 1900 if year > 30 else 2000
+	if day < 1 or month < 1 or month > 12 or year < 1900 or year > 2100:
+		return {}
+	var days_in := [31, 29 if (year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+	if day > days_in[month - 1]:
+		return {}
+	var known := hour >= 0
+	if known:
+		if pm and hour < 12:
+			hour += 12
+		if am and hour == 12:
+			hour = 0
+		hour = clampi(hour, 0, 23)
+	return {"year": year, "month": month, "day": day, "hour": hour if known else 12, "minute": minute if known else 0, "time_known": known}
+
+
+## The element the chart runs heaviest in.
+func dominant_element() -> String:
+	var balance := element_balance()
+	var best := "fire"
+	for element in balance:
+		if float(balance[element]) > float(balance[best]):
+			best = element
+	return best
+
+
 func sun_sign() -> String:
 	return SIGNS[sun_sign_index()]
 

@@ -82,6 +82,30 @@ const OPENING := [
 	{"line": "You're going to tell me your birthday, and I'm going to find out everything I need to know. Everything we need to know.", "hold": 4.4},
 	{"line": "Hurry up now. I'm being watched too.", "hold": 3.0, "cue": "watched"},
 ]
+## Beat 5: he reads your birthday back to you, from the numbers on the sheet
+## (sun, rising, modality, and the element that feeds a stat). The last line is
+## Greg's own promise from the opening.
+static func read_chart(sheet) -> Array:
+	var birth: Dictionary = sheet.birth
+	var day := int(birth.get("day", 1))
+	var suffix := "th"
+	if day % 100 < 11 or day % 100 > 13:
+		suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+	var when := "The %d%s of %s, %d" % [day, suffix, str(CharacterSheet.MONTH_NAMES[clampi(int(birth.get("month", 1)), 1, 12) - 1]).capitalize(), int(birth.get("year", 2000))]
+	if bool(birth.get("time_known", true)):
+		when += ", at %02d:%02d." % [int(birth.get("hour", 12)), int(birth.get("minute", 0))]
+	else:
+		when += ". No time. I'll take noon."
+	var element: String = sheet.dominant_element()
+	var attribute := str(CharacterSheet.ELEMENT_ATTRIBUTE.get(element, "presence"))
+	return [
+		{"line": when, "hold": 2.6},
+		{"line": "Sun in %s. %s rising. %s." % [str(sheet.sun_sign()).capitalize(), str(sheet.ascendant()).capitalize(), str(sheet.modality()).capitalize()], "hold": 3.0},
+		{"line": "Mostly %s. That goes to your %s." % [element, attribute], "hold": 2.8},
+		{"line": "Everything I need to know.", "hold": 2.2, "event": "examiner_read_chart"},
+	]
+
+
 ## The first time you think out loud (V). Greg: "because they have a brain chip".
 const READS_THOUGHTS := {"line": "Hey. I can read your thoughts. Don't forget. We own you. Brain chip.", "hold": 3.8}
 
