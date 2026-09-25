@@ -42,5 +42,19 @@ func _ready() -> void:
 	for _step in 20:
 		blood.step(0.05)
 	check(blood.fade <= 0.0, "leaving the item lets it fade")
+	# The real title menu: hovering one option dims the rest.
+	WorldHistory.update_subject("settings", {"gore": "FULL", "violence_acknowledged": "yes"}, "test_setup")
+	var menu = load("res://country_town_menu.tscn").instantiate()
+	add_child(menu)
+	await get_tree().process_frame
+	var buttons: Array = menu.menu_buttons
+	menu._focus_button(buttons[0])
+	for _frame in 20:
+		await get_tree().process_frame
+	check(buttons[0].self_modulate.a > 0.95 and buttons[1].self_modulate.a < 0.6, "hovering one option dims the others (%.2f)" % buttons[1].self_modulate.a)
+	menu._unfocus_button(buttons[0])
+	for _frame in 20:
+		await get_tree().process_frame
+	check(buttons[1].self_modulate.a > 0.95, "and leaving brings them all back")
 	print("MENU_BLOOD_TEST_RESULT failures=%d" % failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

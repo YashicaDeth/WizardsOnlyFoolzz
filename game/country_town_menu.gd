@@ -14,6 +14,8 @@ const MENU_BLOOD := preload("res://systems/menu_blood.gd")
 ## Seconds each menu line takes to type on, and the gap between lines.
 const TYPE_SECONDS := 0.28
 const TYPE_STAGGER := 0.07
+## How far the options you're not on step back while you hover one.
+const DIM_OTHERS := 0.42
 var menu_blood: Control
 var title_embers: Control
 var title_audio: Node
@@ -607,6 +609,10 @@ func _focus_button(button: Button) -> void:
 	tween.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
 	tween.tween_property(button, "position:x", 72.0, 0.18)
 	tween.tween_property(button, "modulate", Color("ff7138"), 0.18)
+	# The rest step back, so the one you're on is the only one lit.
+	for other in menu_buttons:
+		if is_instance_valid(other):
+			tween.tween_property(other, "self_modulate", Color(1, 1, 1, 1.0 if other == button else DIM_OTHERS), 0.18)
 
 
 func _unfocus_button(button: Button) -> void:
@@ -616,6 +622,9 @@ func _unfocus_button(button: Button) -> void:
 	tween.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
 	tween.tween_property(button, "position:x", 50.0, 0.22)
 	tween.tween_property(button, "modulate", Color.WHITE, 0.22)
+	for other in menu_buttons:
+		if is_instance_valid(other):
+			tween.tween_property(other, "self_modulate", Color.WHITE, 0.22)
 
 
 func _start_game() -> void:

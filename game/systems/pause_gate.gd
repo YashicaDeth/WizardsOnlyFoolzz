@@ -71,6 +71,11 @@ var tear := 0.0
 var seal: TextureRect
 var sounds: Node
 var _poured_row := -1
+## The KEYS page: every key the current scene binds, read off its own keys
+## card (or its `keys_groups()`), so one sheet serves every scene and can't
+## drift from what that scene actually does.
+const KEY_LINES_PER_PAGE := 13
+var keys_page := 0
 var _poured_page := ""
 var _factor := 1.0
 var _origin := Vector2.ZERO
@@ -274,7 +279,12 @@ func _build_rows() -> void:
 	if page == "root":
 		_rows.append({"id": "resume", "label": "RESUME", "value": ""})
 		_rows.append({"id": "settings", "label": "SETTINGS", "value": ""})
+		_rows.append({"id": "keys", "label": "KEYS", "value": ""})
 		_rows.append({"id": "menu", "label": "LEAVE TO THE FRONT DOOR", "value": ""})
+		return
+	if page == "keys":
+		var pages := key_page_count()
+		_rows.append({"id": "keys_back", "label": "BACK", "value": "%d / %d  L/R" % [keys_page + 1, pages] if pages > 1 else ""})
 		return
 	if page == "hud":
 		_rows.append({"id": "hud_opacity", "label": "HUD OPACITY", "value": "%03d" % roundi(_hud_opacity() * 100.0), "slider": true})
@@ -378,6 +388,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _nudge(direction: int) -> void:
 	var row: Dictionary = _rows[highlighted]
 	var id := str(row.id)
+	if page == "keys":
+		keys_page = clampi(keys_page + direction, 0, key_page_count() - 1)
+		return
 	if id.begins_with("vol_"):
 		var bus_name := id.trim_prefix("vol_")
 		_set_volume(bus_name, _volume(bus_name) + 0.1 * float(direction))
@@ -412,6 +425,13 @@ func _activate() -> void:
 		"controls":
 			page = "controls"
 			highlighted = 0
+		"keys":
+			page = "keys"
+			keys_page = 0
+			highlighted = 0
+		"keys_back":
+			page = "root"
+			highlighted = 2
 		"ctrl_back":
 			page = "settings"
 			highlighted = 0
@@ -477,7 +497,7 @@ func _draw_plate() -> void:
 	screen.draw_polyline(outline, COPPER * Color(1, 1, 1, 0.62 * eased), 2.0)
 
 	CellOutzType.draw_stamped(screen, Vector2(30, 26), "STOPPED", 30.0, ACID * Color(1, 1, 1, eased), ARTERIAL * Color(1, 1, 1, 0.3 * eased), 4.0)
-	var subtitle := "DISPLAY / HUD" if page == "hud" else "SETTINGS" if page == "settings" else "CELLOUTZ / THE YARD IS STILL THERE"
+	var subtitle := "DISPLAY / HUD" if page == "hud" else "SETTINGS" if page == "settings" else "KEYS // WHAT THIS PLACE ANSWERS TO" if page == "keys" else "CELLOUTZ / THE YARD IS STILL THERE"
 	CellOutzType.draw_text(screen, Vector2(30, 68), subtitle, 10.0, INK * Color(1, 1, 1, 0.45 * eased), 1.4)
 	screen.draw_line(Vector2(30, 84), Vector2(DESIGN.x - 30, 84), COPPER * Color(1, 1, 1, 0.4 * eased), 1.0)
 
@@ -511,6 +531,8 @@ func _draw_plate() -> void:
 			CellOutzType.draw_text(screen, Vector2(value_x, top), str(row.value), 15.0, accent * Color(1, 1, 1, 0.9 * eased), 1.6)
 
 	screen.draw_set_transform(_origin + Vector2(0, (1.0 - eased) * 26.0), 0.0, Vector2(_factor, _factor))
+	if page == "keys":
+		_draw_key_sheet(eased)
 	if page == "hud":
 		CellOutzType.draw_text(screen, Vector2(34, 348), "OPACITY 25-100% / SAVED AUTOMATICALLY", 10.0, INK * Color(1, 1, 1, 0.5 * eased), 1.0)
 		CellOutzType.draw_text(screen, Vector2(34, 374), "REDUCED GLITCH CALMS CAMERA GRAIN", 10.0, INK * Color(1, 1, 1, 0.5 * eased), 1.0)
@@ -523,6 +545,51 @@ func _draw_plate() -> void:
 		seal.position = _origin + Vector2((DESIGN.x - 96.0) * _factor, 10.0 * _factor + (1.0 - eased) * 26.0)
 		seal.modulate.a = eased
 		(seal.material as ShaderMaterial).set_shader_parameter("beat", BOOT_SPLASH.heartbeat(clock) * 0.5)
+
+
+## Where the current scene's keys come from: its keys card if it has one,
+## else its own `keys_groups()`, else the few keys every scene shares.
+func key_groups() -> Array:
+	var scene := get_tree().current_scene
+	if scene != null:
+		var card = scene.get("keys_card")
+		if card != null and is_instance_valid(card) and not (card.groups as Array).is_empty():
+			return card.groups
+		if scene.has_method("keys_groups"):
+			return scene.keys_groups()
+	return [{"group": "EVERYWHERE", "rows": [["WASD", "MOVE"], ["MOUSE", "LOOK"], ["E", "INTERACT"], ["ESC", "PAUSE"], ["F11", "FULLSCREEN"]]}]
+
+
+## The sheet as lines: a group's name, then its keys.
+func key_lines() -> Array:
+	var lines: Array = []
+	for group in key_groups():
+		lines.append({"header": str(group.get("group", ""))})
+		for row in group.get("rows", []):
+			lines.append({"key": str(row[0]), "action": str(row[1])})
+	return lines
+
+
+func key_page_count() -> int:
+	return maxi(1, ceili(float(key_lines().size()) / float(KEY_LINES_PER_PAGE)))
+
+
+func _draw_key_sheet(eased: float) -> void:
+	var lines := key_lines()
+	var first := keys_page * KEY_LINES_PER_PAGE
+	var y := 156.0
+	for index in range(first, mini(first + KEY_LINES_PER_PAGE, lines.size())):
+		var line: Dictionary = lines[index]
+		if line.has("header"):
+			CellOutzType.draw_text(screen, Vector2(34, y), str(line.header), 11.0, ARTERIAL * Color(1, 1, 1, eased), 1.6)
+		else:
+			var cap := str(line.key)
+			var cap_width := CellOutzType.width_condensed(cap, 10.0, 0.8) + 12.0
+			screen.draw_rect(Rect2(34, y - 4, cap_width, 17), INK * Color(1, 1, 1, 0.1 * eased))
+			screen.draw_rect(Rect2(34, y - 4, cap_width, 17), COPPER * Color(1, 1, 1, 0.7 * eased), false, 1.0)
+			CellOutzType.draw_condensed(screen, Vector2(40, y), cap, 10.0, ACID * Color(1, 1, 1, eased), 0.8)
+			CellOutzType.draw_condensed(screen, Vector2(34 + maxf(cap_width, 120.0) + 12.0, y), CellOutzType.fit_condensed(str(line.action), DESIGN.x - 230.0, 10.0, 0.8), 10.0, INK * Color(1, 1, 1, 0.85 * eased), 0.8)
+		y += 19.0
 
 
 ## Blood poured under the row you're on, left to right, with three drips.

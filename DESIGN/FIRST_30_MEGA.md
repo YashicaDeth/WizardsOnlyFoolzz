@@ -192,7 +192,7 @@ it, it's rendered and looked at, it has a test, and it's merged and built
 
 ### B7. The pause menu
 - [ ] Resume, settings, the controls sheet, save and quit, quit to the
-      title.
+      title. (Resume, settings, KEYS and leave are in; save-and-quit is open.)
 - [ ] Pausing freezes the world, but the body-cam REC keeps blinking.
 - [x] The pause menu has the same stencil and glitch style as the title: the live seal, blood under the chosen row, a tear on open and on each new page, a tick per move (`pause_gate.gd`).
 
@@ -397,7 +397,7 @@ it, it's rendered and looked at, it has a test, and it's merged and built
 
 ## Q. The HUD and the body-cam
 - [ ] The REC stamp, time and location, the same in every scene.
-- [ ] Key caps pinned next to things, from one controls sheet.
+- [ ] Key caps pinned next to things, from one controls sheet. (The sheet exists: the pause menu's KEYS page reads each scene's own keys.)
 - [ ] The objective card style is the same everywhere.
 - [ ] The Nerve Rig spine shows health and stamina in the first 30 too.
 - [ ] The censor glitch works in every scene.
@@ -490,7 +490,7 @@ Every line below is **(rec)** unless it cites Greg.
 - [ ] See: the Algiz label pulses in time with the logo's beat, not on its
       own sine.
 - [x] See: the menu items type on, one at a time, after the logo lands.
-- [x] See: the hovered item is underlined in blood, with drips (dimming the others still open).
+- [x] See: the hovered item is underlined in blood, with drips, and the others step back.
 - [ ] See: ENTER CELLOUTZ.NET opens the site, with a confirm.
 - [ ] See: the hexagram panel on the right shows the selected item's
       preview (demo footage, the locked full game, the sandbox).
