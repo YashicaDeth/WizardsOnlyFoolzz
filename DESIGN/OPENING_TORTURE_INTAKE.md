@@ -49,6 +49,7 @@ open until Greg says yes.
     (a generated voice, placeholder only).
   - **New:** the line, recorded by Greg or a voice actor; a glitch-out.
 - You come to, submerged in the vat.
+- **Built (25 September):** `systems/torture_load_in.gd`, before the intake on every new game (not on rebirth). Three screams through fluid, the gag, breathing to the tube, four X-ray film flashes (skull with the chip, ribs, the rune), the broadcast line three times and worse each time, a glitch, then the room. F, Enter, Space or a click cuts to the glitch. Sounds are generated placeholders behind `cue()`, waiting for the Higgsfield voice set. Test: `torture_load_in_test`.
 
 ### 2. The doctor arrives at the glass
 - He walks up to the tank screen and **taps it**. The tap is heard through

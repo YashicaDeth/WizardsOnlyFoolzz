@@ -21,6 +21,7 @@ const LAB_CABLES := preload("res://systems/lab_cables.gd")
 const VAT_SMASH := preload("res://systems/vat_smash.gd")
 const IMPLANT_CATALOG := preload("res://systems/implant_catalog.gd")
 const VAT_INTAKE := preload("res://systems/vat_intake.gd")
+const TORTURE_LOAD_IN := preload("res://systems/torture_load_in.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const BRAIN_INDEX := preload("res://systems/brain_index.gd")
@@ -62,6 +63,9 @@ var clock := 0.0
 var phase := "intake"
 var can_move := false
 var intake: Control
+## Beat 1: the black before the room (`TortureLoadIn`). The examiner does not
+## arrive and the form does not run until it hands over.
+var load_in: Control
 var opening_audio: Node
 var fluid: MeshInstance3D
 var vat_glass: MeshInstance3D
@@ -208,6 +212,9 @@ func _ready() -> void:
 	osd.visible = intake == null
 	opening_audio = OPENING_AUDIO.new()
 	add_child(opening_audio)
+	if load_in != null:
+		# Over everything the HUD built after it, the body-cam included.
+		$HUD.move_child(load_in, -1)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
@@ -241,6 +248,17 @@ func _build_intake() -> void:
 	intake.name = "Intake"
 	$HUD.add_child(intake)
 	intake.filed.connect(_on_intake_filed)
+	if TORTURE_LOAD_IN.wanted():
+		intake.process_mode = Node.PROCESS_MODE_DISABLED
+		load_in = TORTURE_LOAD_IN.new()
+		$HUD.add_child(load_in)
+		load_in.connect("finished", _on_load_in_finished)
+
+
+func _on_load_in_finished(_skipped: bool) -> void:
+	load_in = null
+	if intake != null and is_instance_valid(intake):
+		intake.process_mode = Node.PROCESS_MODE_INHERIT
 
 
 ## Regrown, not examined. The world carried on: the tank opens straight onto
@@ -1014,6 +1032,8 @@ func _physics_process(delta: float) -> void:
 	if phase == "intake":
 		if opening_audio != null:
 			opening_audio.set_phase("intake")
+		if load_in != null:
+			return
 		_update_arrival(delta)
 		return
 	# Departure runs on its own clock so the vat's beat table keeps the timings
