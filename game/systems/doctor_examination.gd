@@ -76,6 +76,8 @@ const VERDICT_CLOSE := [
 	{"line": "You have told me how you are put together.", "hold": 2.6},
 	{"line": "Which means you have told me how to take you apart.", "hold": 3.0},
 	{"line": "Someone will be along. It will not be me.", "hold": 2.8},
+	# Greg, 25 September: once he has what he needs, he says so and goes.
+	{"line": "Okay. Great. We can break you now.", "hold": 2.4},
 ]
 
 ## He records it without asking. The notice is on screen for the player, not

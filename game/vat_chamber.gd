@@ -974,6 +974,15 @@ func _slab(dimensions: Vector3, at: Vector3, _kind: String, _color: Color) -> vo
 func _unhandled_input(event: InputEvent) -> void:
 	if intake != null:
 		return
+	# Greg, 25 September: speedrunners. F, Enter or Space during his walk out
+	# sends him through his door now; the door still shuts and is heard.
+	if phase == "departure" and event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_F, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+		# One frame short, so the next update runs the door and his exit and
+		# then hands over, in the same pass.
+		departure_clock = maxf(departure_clock, DEPARTURE_SECONDS - 0.001)
+		WorldHistory.record_event("opening_departure_skipped", {})
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	# Post creation, any other tank you are looking at up close can be

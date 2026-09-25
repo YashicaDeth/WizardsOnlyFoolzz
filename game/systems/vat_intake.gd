@@ -96,6 +96,8 @@ var verdict: Array = []
 ## "not started" and "finished" otherwise, which used to make a single F press
 ## replay the first beat forever instead of letting the doctor leave.
 var verdict_started := false
+## How many of his closing lines the player hurried past (speedrunners).
+var lines_skipped := 0
 ## D8.3. A procedure in progress: the beats left to play, and the shot each one
 ## wants. Input is suspended while it runs, because it is being done to you.
 var procedure: Array = []
@@ -334,6 +336,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	# D8.3. While he is putting something into you, you are not filling in a
 	# form. The scene runs to the end of its beats before it hands you back.
 	if not procedure.is_empty():
+		get_viewport().set_input_as_handled()
+		return
+	# Greg, 25 September: speedrunners. Once you've filed, F, Enter or Space
+	# moves him to his next line instead of waiting it out. Every line still
+	# plays; you just don't have to sit through it.
+	if verdict_started and event.keycode in [KEY_F, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+		doctor_life = 0.0
+		lines_skipped += 1
 		get_viewport().set_input_as_handled()
 		return
 	match event.keycode:
