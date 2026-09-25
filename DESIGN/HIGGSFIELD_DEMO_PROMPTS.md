@@ -174,3 +174,80 @@ Each persona gets an avatar and a website banner.
 - [ ] Muffled screaming through fluid; a gag forced in; glass cracking three
       times; a vat draining; a phone app click; a radio number station; a
       derby crowd roar; a drain drip echo.
+
+## 10. The true vision: everything combined (25 September)
+Attach the named images as references so the look stays one world. Every
+prompt ends "no text, no letters, no watermark, on pure black background"
+unless it's a full scene.
+
+**Re-runs (defects in what came back)**
+- [ ] **Rune seal, clean:** attach the rune. "Same seal, isolated on pure
+      black, no checkerboard, no background pattern."
+- [ ] **Sri Yantra and septagram plates:** same fix, "on pure black".
+- [ ] **Gibs sheet and spatter:** "same sprites, on pure black background"
+      (they came back on white).
+- [ ] **Liver plate:** "same image, remove the caption text".
+- [ ] **X-ray body:** the chip at the back of the neck, inside the spine
+      (the prompt from chat).
+
+**Key art: the one image that is the game**
+- [ ] **K1** attach rune, vat, examiner, pyramid. "Key art for a PS2-era
+      occult horror game: a naked wired subject suspended in a blood-red
+      vat at the centre, the Algiz rune seal burning in the glass above it,
+      a tired bloodied examiner watching from a green CRT to the left, the
+      33-tier double pyramid faint in the darkness behind, surveillance
+      cameras with red lenses on every wall, Lain cables hanging from the
+      ceiling, cracked phone glass over the whole frame, dithered, 16:9."
+- [ ] **K2** attach jester phone, conspiracy board, wizard-eyes street.
+      "The same subject later: a jester costume stained with blood, the
+      cracked phone glowing green in one hand, a ruined country town at
+      10 am, spirits glowing green only on the phone's screen, 16:9."
+
+**The breakout, frame by frame (drives the cutscene)**
+- [ ] **B1** attach rune. "The rune seal filling the whole frame, cracks
+      glowing, as if seen from inside a skull, veins behind it."
+- [ ] **B2** attach die. "The same seal shrinking into a CPU die, copper
+      traces, one path of acid green racing through it."
+- [ ] **B3** attach die. "The die corrupted: RGB split, tracking boxes,
+      scanlines, the green path has won." (1c)
+- [ ] **B4** "Two bloody hands tearing a thick feed tube out of a mouth,
+      first person, inside red fluid, glass ahead cracking."
+- [ ] **B5** "First person, a fist through thick tank glass on the third
+      blow, the glass bursting outward, red fluid pouring into a dark lab."
+- [ ] **Video B6** from B5: "the glass bursts, fluid floods out, camera
+      falls to its knees on the wet floor."
+
+**The people (one sheet each, same style as the Wire portraits)**
+- [ ] **P1 The examiner, 3 views:** attach the examiner portrait. "Model
+      sheet, front, side, back, same man, bloodied lab coat, grey." (2b)
+- [ ] **P2 Hollis:** "a heavy tired facility guard, flak vest, revolver
+      holstered, same pixel portrait style as the attached."
+- [ ] **P3 A splinter monk:** attach the throne. "A hooded monk in bone
+      and copper robes, no face, the Algiz rune on his chest."
+- [ ] **P4 A bingyanga:** attach the vat subject. "A pale vat-grown human
+      freed from its tank, translucent skin, cable scars, curious not
+      hostile."
+
+**The rooms (one each, matching the vat plate)**
+- [ ] **R1 Growing Floor:** attach vat. "The long aisle of vats, some
+      smashed and drained, Lain cables, the examiner's desk and CRT beside
+      the nearest vat, red camera lenses." (4c)
+- [ ] **R2 Doctor's office + hologram:** attach examiner. "His cramped
+      office, CRTs, a hologram of him flickering blue over the desk."
+- [ ] **R3 The dry falls:** "a dried waterfall of blood down a gorge,
+      smashed trees, a drain outfall above, dusk."
+
+**Loading-screen loops (Seedance, from stills you already have)**
+- [ ] From the Metatron plate: "slow rotation, lines draw themselves in."
+- [ ] From the skull X-ray: "the bullet enters in slow motion, bone
+      fragments drift."
+- [ ] From the conspiracy board: "flashlight sweeps across, strings
+      tremble."
+- [ ] From the natal chart: "the wheel turns to a birthday, one house
+      lights red." (plays behind the birthday reading)
+
+**Sounds, named** (Seed Audio names the file after the prompt; please keep
+the name so I can wire it without guessing)
+- [ ] `scream_fluid`, `gag_tube`, `glass_crack_3`, `vat_drain`,
+      `phone_click`, `broadcast_numbers`, `derby_crowd`, `drain_drip`,
+      and the 6 doctor lines as `doctor_01` to `doctor_06`.
