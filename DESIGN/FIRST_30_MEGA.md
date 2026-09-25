@@ -384,6 +384,13 @@ it, it's rendered and looked at, it has a test, and it's merged and built
 
 ## P. Destruction (see GOAL_LOOP_2 section 0; mirrored here in play order)
 - [x] 0.1 Bullets and blades break things, and the Hunt yard.
+- [x] 0.2 Crates, barrels, lockers, jars, monitors and chairs break in the
+      Hunt, the Service Arcade, the Lower Works and the drains (`8f6559c`).
+      No hit sounds yet (0.8), so the V.1 lines for props stay open.
+- [x] 0.2b A round into the ground leaves an impact hole, sized by the
+      calibre (Greg, 25 September; he kept this version on seeing it).
+- [ ] A blast into the ground leaves a crater, through the same
+      `GroundHole.carve()` (with 0.5, explosions).
 - [ ] Growing Floor: tank glass as physics shards, monitors, the keyboard,
       jars.
 - [ ] Service Arcade: machines, the vending machine, glass, Hollis's

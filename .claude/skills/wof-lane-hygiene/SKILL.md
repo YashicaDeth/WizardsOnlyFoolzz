@@ -32,6 +32,11 @@ three times.
 - GDScript traps: `draw_string` takes a baseline but `CellOutzType` a
   top-left; `event.pressed` off a base `InputEvent` needs an explicit
   `var x: bool =` or the whole file silently fails to compile.
+- Headless never reports a captured mouse: `Input.mouse_mode` reads back
+  `VISIBLE` right after you set `CAPTURED`. The Lower Works and drains
+  attack only fires while captured, so a test that feeds them a click does
+  nothing. Put the action in its own method (`_swing_breach_tool()`) and
+  call that past the gate, as `breakable_props_test` does.
 - Mixed-case text in `CellOutzType` reads as missing glyphs: it is caps only.
 - Labels, headers and numerals go in `CellOutzType`
   (`draw_string_compat` / `string_size_compat` take `draw_string`'s own

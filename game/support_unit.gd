@@ -71,6 +71,9 @@ var blood := 100.0
 var died := false
 var rebirth_request: Dictionary = {}
 var holding_ram := false
+## Which heavy thing is in hand, best first.
+var held_tool := ""
+const HEAVY_TOOLS := ["BREACH TOOL", "FIRE AXE", "BROKEN MEDICAL RESTRAINT"]
 var tool_visual: Node3D
 var director: AlarmDirector
 var cameras: Array[SecurityCamera] = []
@@ -359,7 +362,16 @@ func _build_player() -> void:
 
 
 func _refresh_tool() -> void:
-	holding_ram = VAT_REBIRTH.carries(TOOL_LABEL)
+	# The doctor's route never passes the Service Arcade, where the breach tool
+	# comes from: you arrive with the restraint off your own vat and perhaps his
+	# fire axe. Either is something to meet Hollis with; without this the
+	# third route ended at his gate ("YOU HAVE NOTHING TO MEET HIM WITH").
+	held_tool = ""
+	for label in HEAVY_TOOLS:
+		if VAT_REBIRTH.carries(label):
+			held_tool = label
+			break
+	holding_ram = not held_tool.is_empty()
 	if holding_ram and tool_visual == null:
 		tool_visual = LabSurface.breach_tool()
 		add_child(tool_visual)
@@ -804,7 +816,7 @@ func _update_hud() -> void:
 	for guard in guards:
 		if not guard.is_down():
 			standing += 1
-	status.text = "BLOOD %03d%%   SUPPORT UNIT // %d SECURITY STANDING%s" % [roundi(blood), standing, "   //   BREACH TOOL" if holding_ram else ""]
+	status.text = "BLOOD %03d%%   SUPPORT UNIT // %d SECURITY STANDING%s" % [roundi(blood), standing, ("   //   " + held_tool) if holding_ram else ""]
 	var bars := roundi(director.alertness * 10.0)
 	alert_meter.text = "ALERT [%s%s] %s" % ["|".repeat(bars), ".".repeat(10 - bars), director.level.to_upper()]
 	alert_meter.add_theme_color_override("font_color", Color("ff4a3a") if director.is_alarm() else (Color("f0b050") if director.level == "suspicious" else Color("d8d0c0")))

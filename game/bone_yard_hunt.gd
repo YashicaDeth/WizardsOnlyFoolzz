@@ -2980,12 +2980,22 @@ func _on_round_hit(hit: Dictionary) -> void:
 		var broke: Dictionary = WORLD_BREAK.hit(struck, float(payload.get("damage", 20.0)), "round", hit.get("position", Vector3.ZERO), hit.get("direction", Vector3.FORWARD), str(payload.get("weapon", "")), "firearm")
 		if not broke.is_empty():
 			last_world_break = broke
-	WorldHistory.record_event("round_struck_world", {
+	var struck_world := {
 		"calibre": str(hit.get("calibre", "")),
 		"energy": snappedf(float(hit.get("energy", 0.0)), 0.01),
 		"shooter": str(hit.get("shooter", "")),
 		"location": HUNT_LOCATION,
-	})
+	}
+	# 0.2b: Ballistics has already dug the hole; the world keeps where it is.
+	var at: Vector3 = hit.get("position", Vector3.ZERO)
+	if GroundHole.is_ground(struck, hit.get("normal", Vector3.ZERO)):
+		struck_world["ground_hole"] = {
+			"at": [snappedf(at.x, 0.01), snappedf(at.y, 0.01), snappedf(at.z, 0.01)],
+			"radius": snappedf(GroundHole.radius_for_round(float(hit.get("energy", 0.0))), 0.001),
+		}
+		if dust_puff != null:
+			dust_puff.burst(at, hit.get("direction", Vector3.DOWN), 0.6)
+	WorldHistory.record_event("round_struck_world", struck_world)
 	if not payload.is_empty():
 		_settle_shot(int(payload.get("shot_id", 0)), false)
 
@@ -6293,25 +6303,43 @@ const BREAKABLE_YARD := [
 	["light", "hunt_yard_light_east", Vector3(18.5, 0.0, 4.0)],
 	["barricade", "hunt_yard_barricade_west", Vector3(12.0, 0.0, 11.5)],
 	["barricade", "hunt_yard_barricade_east", Vector3(17.0, 0.0, 11.5)],
+	# 0.2: one of every prop kind behind the barricades, turned to the post.
+	["crate", "hunt_yard_crate_1", Vector3(11.2, 0.0, 13.6), 0.0],
+	["crate", "hunt_yard_crate_2", Vector3(12.1, 0.0, 13.9), 0.35],
+	["barrel", "hunt_yard_barrel_1", Vector3(13.3, 0.0, 13.7), 0.0],
+	["barrel", "hunt_yard_barrel_2", Vector3(14.1, 0.0, 14.2), 0.0],
+	["locker", "hunt_yard_locker", Vector3(15.4, 0.0, 14.0), PI],
+	["monitor", "hunt_yard_monitor", Vector3(16.5, 0.0, 13.5), PI],
+	["chair", "hunt_yard_chair", Vector3(17.4, 0.0, 13.4), PI * 0.8],
+	["jar", "hunt_yard_jar_1", Vector3(18.3, 0.0, 13.6), 0.0],
+	["jar", "hunt_yard_jar_2", Vector3(18.7, 0.0, 13.9), 0.0],
 ]
+## Where the yard's ground actually is. The slab `_build_world()` lays is a
+## metre deep centred at -0.6, so its top is -0.1, not the 0 the AE.2 note
+## says, and everything above stood at 0 hung 10 cm in the air (seen from
+## grass height, 25 September).
+const YARD_GROUND_Y := -0.1
 var breakables: Array[Node3D] = []
 
 
 func _build_breakables() -> void:
 	for spec in BREAKABLE_YARD:
 		var piece: Node3D
+		var at: Vector3 = spec[2] + Vector3(0, YARD_GROUND_Y, 0)
 		if str(spec[0]) == "light":
 			var light = STREET_LIGHT.new()
 			light.name = str(spec[1])
-			light.position = spec[2]
+			light.position = at
 			add_child(light)
 			light.build(str(spec[1]), 4.4)
 			piece = light
+		elif str(spec[0]) != "barricade":
+			piece = BREAKABLE_PROP.place(self, str(spec[0]), str(spec[1]), at, float(spec[3]))
 		else:
 			var prop = BREAKABLE_PROP.new()
 			prop.name = str(spec[1])
 			# Its box is centred on its origin, so it stands on half its height.
-			prop.position = spec[2] + Vector3(0, 1.35 * 0.5, 0)
+			prop.position = at + Vector3(0, 1.35 * 0.5, 0)
 			add_child(prop)
 			prop.build("scrap_barricade", Vector3(2.4, 1.35, 0.42), 28.0)
 			piece = prop
@@ -9072,6 +9100,9 @@ func _build_world() -> void:
 	add_child(air)
 	_add_mesh(BoxMesh.new(), Vector3(0, -0.6, 0), Vector3(470, 1, 370), Color("17150f"), 0.0)
 	var floor_body := StaticBody3D.new()
+	# 0.2b: the ground, so a round fired into it leaves a hole (`GroundHole`).
+	floor_body.name = "Ground"
+	floor_body.add_to_group(GroundHole.GROUP)
 	var floor_collider := CollisionShape3D.new()
 	var floor_shape := BoxShape3D.new()
 	floor_shape.size = Vector3(470, 1, 370)

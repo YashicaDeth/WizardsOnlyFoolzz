@@ -630,6 +630,59 @@ earned by not fighting and spent by betrayal. The ambiguities worth asking
 about are whether diplomacy has a tree of its own, and whether "many
 enemies" means stealth missions field more of them.
 
+### Answered by Greg in question boxes, 25 September 2026 (morning)
+
+- **His Instagram art (Allusions Too Grandeur) gets all four**: a place in
+  the game as found art (facility posters, Wire pages, loading screens, the
+  Allusions artwork panel); a matching post style from the game's look (rune
+  seal, CellOutz type, a number, bloody dither); captions and hashtags in
+  the game's voice; and animated loops for Reels. First piece shared: a
+  burnt-out inverted photo with carved type, "I have gone totally insane
+  and lost the plot... grant me passage through this prison and liberate my
+  soul", and the rune seal.
+- **Menus stay with the PC sessions** (FIRST_30_MEGA owns the title screen,
+  boot, logo and demo end card); the cloud session works on gameplay so the
+  two never edit the same files.
+- **"Partly destructible" means authored damage stages**: walls, floors and
+  building pieces crack, hole and break through in stages with real debris,
+  and shooting or blasting the ground leaves impact holes. Not Teardown-style
+  material removal.
+- **First today: every route out working end to end.**
+
+### Answered by Greg by voice, 25 September 2026 (the overnight questions)
+
+- **The doctor's name is withheld** in minutes 0–30; the name is the reward
+  for following him to the roof. One line of his history can be found in his
+  examination room.
+- **The doctor's lines** (two when questioned, four in the 3D call): Greg
+  writes these himself; he is the story's first villain. Placeholders stay
+  until then.
+- **Bingyanger lines: five per register** (horror, funny-insane, prophetic).
+  "Bingyang" is a joke name for now and may change later.
+- **Blood trees keep the four-style structure** (BLADE/BLUNT, IRON, MEAT,
+  HUSH); the node names get renamed.
+- **The splinter monks trade** visions, map knowledge and hidden things, and
+  also items and companions (for example the zombie minion), for blood and
+  memories.
+- **The spirits stay ambiguous**: the monks call them the light of the dead;
+  the game never confirms it.
+- **Wizard eyes** (new): once earned, a key used with the phone (L or K)
+  switches from phone vision to wizard eyes, which shows every spirit. It is
+  like seeing into the Wire.
+- **The Wire's people** (new): everyone on the Wire has a different online
+  persona: an alias, an account, a custom avatar (procedural pixel art and
+  generated assets) and website lore.
+- **Why the splinter left**: they believe they reached the last stage, and the
+  guild calls it heresy.
+- **Calling rules kept**: anyone you have met; the dead don't answer, the
+  doctor always refuses, enemies refuse and screen you, friends accept.
+- **One Hollis only**, at the end of the Support Unit. The Service Arcade's
+  door guard becomes a numbered CellOutz guard.
+- **The doctor route's surface arrival** stays at (-20, 0, -30), CellOutz -12.
+- **Balance waits** until Greg has played v0.1.
+- **Sketchfab**: Greg can't drop the zips; he asked for them to be found and
+  fetched another way.
+
 ### Answered by Greg in question boxes, 24 September 2026 (after the lanes)
 
 - **The blood waterfall is where the derby tunnels come out**, as he
@@ -834,6 +887,87 @@ we can make nudity and censors".
   - grow it toward 1,000+ lines
   - more logo detail (embers, sound) at the same strength
   - menus rebuilt to match the logo's style
+
+### Stated by Greg, 25 September 2026: bodies, destruction and chaos magick
+
+Said across one evening of messages, then set as the session goal. Close to
+his words; the assistant's reading is not mixed in.
+
+- **The body in the vat floats.** Suspended in the liquid, limbs loose, a slow
+  drift and bob, "not just sitting, rod up his ass type of look". The same
+  for the specimens in the other vats.
+- **The vat-room computer sits to the left or right of the lab,** not
+  directly in front, so the doctor's feed on the left of the screen has a
+  reason to be there.
+- **The slideable X-ray looks like version 0.1.** It should match the anatomy
+  loading screen, built from the body models with full, accurately
+  proportioned organs "like it's Sniper Elite 4 or 5", with gritty texture.
+- **Penetration is live and shown.** Bullets and weapons destroy organs and
+  break bones in the real anatomy, and the kill cutscenes cut to X-ray inside
+  the body as the round or blade enters, "most accurate and gorey visceral".
+- **Harvest.** You have to cut bodies open in certain ways, or kill them
+  without damaging the body, to steal organs to sell or use, and cybernetics,
+  loot and money. "It's all destructible from how hard you play."
+- **Teardown-style destruction.** The whole world's surfaces have
+  differentiating levels of hardness and destructibility, and this interacts
+  with the in-game body models and gore.
+- **Blood chaos magick.** "The more you mindlessly destroy, the higher the
+  combat and blood chaos magick system rewards you for pushing the limits of
+  combat." Chaos magick spells: holograms, summoning evil skeletons and dead
+  soldiers ("dead souljahs") to fight for you, casting fireballs, with
+  TouchDesigner-style effects replicated as in-game VFX and casting
+  animations similar to Elden Ring and modern spell casting. Spell names and
+  rules are his to give.
+- **The kinship web is overcomplicated.** It should read as a brain neural
+  network with CRT effects and good UI.
+- **The pyramid is not visualised in the index yet.**
+
+### Greg, 25 September 2026 (after the breakables): a partly destructible world
+
+Asked what "Teardown-style" should mean now that props break (his words):
+"now all the world will also be partly destructible buildings the ground
+ect, if you shoot downwards with a gun or if you blow up the ground there
+will be an impact hole".
+
+- **The world is partly destructible**: buildings and the ground, not only
+  props.
+- **The ground takes holes**: a round fired down into it leaves an impact
+  hole, and blowing it up leaves one too.
+- *Open (assistant's question, not his rule):* whether "partly" means
+  authored damage stages on each surface (`DESIGN/DESTRUCTION.md`) or
+  material really coming away as in Teardown. Asked alongside the first
+  render of a ground hole.
+- **Answered (question box, 25 September evening), for the ground:** shown
+  buckshot, pistol, slug and rifle holes in the Hunt, he picked "yes, keep
+  these" over bigger and rougher holes or a ground that really deforms. So a
+  hole in the ground is a drawn pit with a dirt lip and thrown clods, sized
+  by the round, and the ground itself does not give way. It agrees with his
+  morning answer (question boxes, 25 September morning, above): "partly
+  destructible" means authored damage stages, and not Teardown-style
+  material removal, for buildings as well as the ground.
+
+### Greg, 25 September 2026: the New Vegas opening, again
+
+He sent the Fallout: New Vegas opening (Doc Mitchell's house) with "this
+whole opening segment from like personality test part is awesome".
+The frames he picked: waking to a blurred, overexposed view; the doctor
+sitting and talking to you; entering a name; building the face in a
+mirror device; setting stats on a carnival strength-tester machine; the
+doctor's word-association and picture questions, whose answers pick your
+skills; then the skills page.
+
+- **What he likes is the shape**, and `DESIGN/CHARACTER_CREATION.md` already
+  names Doc Mitchell as the model for the vat intake: the whole character
+  sheet is built inside a scene that is also the story's first beat, by
+  someone questioning you.
+- **The personality test part is the part he singled out.**
+- *Reference, not layout* (his standing rule): nothing of New Vegas's
+  machines, questions, mascot or rooms is reproduced. Our instrument's items
+  are original and already written (`CharacterSheet.ITEMS`).
+- *Found (assistant):* that instrument is built and scored
+  (`CharacterSheet.score_instrument`, `aptitude_verdict`) but has no caller
+  outside `sheet_test`. Picking INSTRUMENT on the intake form does nothing,
+  and neither does CHART. Proposal in `DESIGN/GOAL_LOOP_2.md` A.
 
 ## Influence register
 

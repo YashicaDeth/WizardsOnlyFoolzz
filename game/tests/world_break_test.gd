@@ -22,7 +22,7 @@ func _ready() -> void:
 	add_child(hunt)
 	hunt.set_physics_process(false)
 	await get_tree().physics_frame
-	check(hunt.breakables.size() == 4, "the Hunt has things that break (%d)" % hunt.breakables.size())
+	check(hunt.breakables.size() == hunt.BREAKABLE_YARD.size() and hunt.breakables.size() >= 4, "the Hunt has things that break (%d)" % hunt.breakables.size())
 	var light: StreetLight = hunt.breakables[0]
 	var barricade: BreakableProp = hunt.breakables[2]
 
