@@ -1,4 +1,5 @@
 extends Node3D
+const LOOK := preload("res://systems/look_settings.gd")
 
 ## THE GROWING FLOOR — the opening.
 ##
@@ -996,8 +997,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and not event.echo and event.keycode == KEY_I:
 		inspect_held = event.pressed
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and phase != "submerged":
-		yaw -= event.relative.x * 0.0026
-		pitch = clampf(pitch - event.relative.y * 0.0024, -1.2, 1.0)
+		yaw -= LOOK.dx(event.relative) * 0.0026
+		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.2, 1.0)
 
 
 func _physics_process(delta: float) -> void:

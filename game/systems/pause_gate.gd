@@ -18,6 +18,7 @@ const SETTINGS_ID := "settings"
 const Grunge := preload("res://systems/celloutz_grunge.gd")
 const Motion := preload("res://systems/celloutz_motion.gd")
 const BOOT_SPLASH := preload("res://boot_splash.gd")
+const LOOK := preload("res://systems/look_settings.gd")
 
 const VOID := Color("060b09")
 const SMOKE := Color(0.03, 0.045, 0.038, 0.86)
@@ -282,6 +283,12 @@ func _build_rows() -> void:
 		_rows.append({"id": "keys", "label": "KEYS", "value": ""})
 		_rows.append({"id": "menu", "label": "LEAVE TO THE FRONT DOOR", "value": ""})
 		return
+	if page == "camera":
+		_rows.append({"id": "look_sensitivity", "label": "MOUSE SENSITIVITY", "value": "%.2f" % LOOK.sensitivity(), "slider": true})
+		_rows.append({"id": "invert_y", "label": "INVERT Y", "value": "ON" if LOOK.invert_y() else "OFF"})
+		_rows.append({"id": "fov_offset", "label": "FIELD OF VIEW", "value": "%+d" % roundi(LOOK.fov_offset()), "slider": true})
+		_rows.append({"id": "camera_back", "label": "BACK", "value": ""})
+		return
 	if page == "keys":
 		var pages := key_page_count()
 		_rows.append({"id": "keys_back", "label": "BACK", "value": "%d / %d  L/R" % [keys_page + 1, pages] if pages > 1 else ""})
@@ -308,6 +315,7 @@ func _build_rows() -> void:
 	# is told about, and it persists like everything else here.
 	_rows.append({"id": "screen", "label": "SCREEN", "value": "FULL" if _fullscreen() else "WINDOWED"})
 	_rows.append({"id": "hud", "label": "DISPLAY / HUD", "value": ">"})
+	_rows.append({"id": "camera", "label": "CAMERA / MOUSE", "value": ">"})
 	# Y1.1. Controls had no door on them anywhere in the project.
 	_rows.append({"id": "controls", "label": "CONTROLS", "value": ""})
 	_rows.append({"id": "back", "label": "BACK", "value": ""})
@@ -404,6 +412,12 @@ func _nudge(direction: int) -> void:
 		_cycle_hud_style()
 	elif id == "reduced_glitch":
 		_toggle_reduced_glitch()
+	elif id == "look_sensitivity":
+		LOOK.set_value("look_sensitivity", clampf(snappedf(LOOK.sensitivity() + 0.1 * float(direction), 0.05), LOOK.SENSITIVITY_RANGE.x, LOOK.SENSITIVITY_RANGE.y))
+	elif id == "invert_y":
+		LOOK.set_value("invert_y", not LOOK.invert_y())
+	elif id == "fov_offset":
+		LOOK.set_value("fov_offset", clampf(LOOK.fov_offset() + 5.0 * float(direction), LOOK.FOV_RANGE.x, LOOK.FOV_RANGE.y))
 
 
 func _activate() -> void:
@@ -417,6 +431,14 @@ func _activate() -> void:
 		"hud":
 			page = "hud"
 			highlighted = 0
+		"camera":
+			page = "camera"
+			highlighted = 0
+		"camera_back":
+			page = "settings"
+			highlighted = 0
+		"look_sensitivity", "invert_y", "fov_offset":
+			_nudge(1)
 		"back":
 			page = "root"
 			highlighted = 0
@@ -497,7 +519,7 @@ func _draw_plate() -> void:
 	screen.draw_polyline(outline, COPPER * Color(1, 1, 1, 0.62 * eased), 2.0)
 
 	CellOutzType.draw_stamped(screen, Vector2(30, 26), "STOPPED", 30.0, ACID * Color(1, 1, 1, eased), ARTERIAL * Color(1, 1, 1, 0.3 * eased), 4.0)
-	var subtitle := "DISPLAY / HUD" if page == "hud" else "SETTINGS" if page == "settings" else "KEYS // WHAT THIS PLACE ANSWERS TO" if page == "keys" else "CELLOUTZ / THE YARD IS STILL THERE"
+	var subtitle := "CAMERA / MOUSE" if page == "camera" else "DISPLAY / HUD" if page == "hud" else "SETTINGS" if page == "settings" else "KEYS // WHAT THIS PLACE ANSWERS TO" if page == "keys" else "CELLOUTZ / THE YARD IS STILL THERE"
 	CellOutzType.draw_text(screen, Vector2(30, 68), subtitle, 10.0, INK * Color(1, 1, 1, 0.45 * eased), 1.4)
 	screen.draw_line(Vector2(30, 84), Vector2(DESIGN.x - 30, 84), COPPER * Color(1, 1, 1, 0.4 * eased), 1.0)
 
@@ -521,7 +543,7 @@ func _draw_plate() -> void:
 			]), accent * Color(1, 1, 1, eased))
 		CellOutzType.draw_text(screen, Vector2(34, top), str(row.label), 17.0, accent * Color(1, 1, 1, (1.0 if lit else 0.7) * eased), 2.2)
 		if bool(row.get("slider", false)):
-			var level := _hud_opacity() if str(row.id) == "hud_opacity" else _volume(str(row.id).trim_prefix("vol_"))
+			var level := _slider_level(str(row.id))
 			var bar := Rect2(DESIGN.x - 210, top + 4, 130, 8)
 			screen.draw_rect(bar, Color(0, 0, 0, 0.5 * eased))
 			screen.draw_rect(Rect2(bar.position, Vector2(bar.size.x * level, bar.size.y)), accent * Color(1, 1, 1, 0.75 * eased))
@@ -545,6 +567,18 @@ func _draw_plate() -> void:
 		seal.position = _origin + Vector2((DESIGN.x - 96.0) * _factor, 10.0 * _factor + (1.0 - eased) * 26.0)
 		seal.modulate.a = eased
 		(seal.material as ShaderMaterial).set_shader_parameter("beat", BOOT_SPLASH.heartbeat(clock) * 0.5)
+
+
+## How full a slider row's bar is, 0..1.
+func _slider_level(id: String) -> float:
+	match id:
+		"hud_opacity":
+			return _hud_opacity()
+		"look_sensitivity":
+			return inverse_lerp(LOOK.SENSITIVITY_RANGE.x, LOOK.SENSITIVITY_RANGE.y, LOOK.sensitivity())
+		"fov_offset":
+			return inverse_lerp(LOOK.FOV_RANGE.x, LOOK.FOV_RANGE.y, LOOK.fov_offset())
+	return _volume(id.trim_prefix("vol_"))
 
 
 ## Where the current scene's keys come from: its keys card if it has one,

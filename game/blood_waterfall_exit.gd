@@ -1,4 +1,5 @@
 extends Node3D
+const LOOK := preload("res://systems/look_settings.gd")
 
 ## THE DRY FALLS: where the drains come out. Greg, 24 September:
 ## "the derby and car route once you crash you can exit the car and or drive
@@ -743,8 +744,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		yaw -= event.relative.x * 0.0026
-		pitch = clampf(pitch - event.relative.y * 0.0024, -1.15, 0.95)
+		yaw -= LOOK.dx(event.relative) * 0.0026
+		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.15, 0.95)
 
 
 func _physics_process(delta: float) -> void:

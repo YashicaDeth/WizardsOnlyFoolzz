@@ -1,4 +1,5 @@
 extends Node3D
+const LOOK := preload("res://systems/look_settings.gd")
 
 # Ashbloom Expanse vertical slice. World Zero is the development milestone;
 # Limbo is the realm; Ashbloom is this first irradiated region.
@@ -1861,7 +1862,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if _pulmonary_diagnostic_active():
 			field_interface.rotate_pulmonary(event.relative)
 		else:
-			apply_look(Vector2(event.relative.x * 0.0026, event.relative.y * 0.0024))
+			apply_look(Vector2(LOOK.dx(event.relative) * 0.0026, LOOK.dy(event.relative) * 0.0024))
 			if guarding or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 				guard_aim += event.relative
 				var aimed_side := BladeRead.guard_side(guard_aim)
@@ -8972,7 +8973,7 @@ func _update_camera() -> void:
 	# nominal third-person blend here made the player's torso fill the complete
 	# frame at the Hunt spawn even though collision avoidance itself was working.
 	var camera_blend := perspective_blend * HUNTER_MOTOR.third_person_clearance_blend(fp_position, tp_position)
-	var base_fov := lerpf(FIRST_PERSON_FOV, THIRD_PERSON_FOV, camera_blend) + fov_add
+	var base_fov := lerpf(FIRST_PERSON_FOV, THIRD_PERSON_FOV, camera_blend) + fov_add + LOOK.fov_offset()
 	var aimed_fov := lerpf(56.0, 50.0, camera_blend)
 	camera.fov = lerpf(base_fov, aimed_fov, firearm_aim_blend)
 	# Locked, the shot is about the pair, so aim between them. Unlocked, aim

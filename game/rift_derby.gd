@@ -1,4 +1,5 @@
 extends Node3D
+const LOOK := preload("res://systems/look_settings.gd")
 
 ## The authored Bone Yard kit was modelled for a 29m bowl, which plays as a
 ## playpen. The whole venue is scaled up together so the geometry still matches.
@@ -324,8 +325,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	# the texture Greg asked for.
 	if event is InputEventMouseMotion and in_cab and not index_open and not leaving_on_foot:
 		var motion := event as InputEventMouseMotion
-		aim_yaw = clampf(aim_yaw - motion.relative.x * 0.0022, -1.15, 1.15)
-		aim_pitch = clampf(aim_pitch - motion.relative.y * 0.0022, -0.5, 0.42)
+		aim_yaw = clampf(aim_yaw - LOOK.dx(motion.relative) * 0.0022, -1.15, 1.15)
+		aim_pitch = clampf(aim_pitch - LOOK.dy(motion.relative) * 0.0022, -0.5, 0.42)
 	if event is InputEventMouseButton and event.pressed and not leaving_on_foot:
 		var click := event as InputEventMouseButton
 		if click.button_index == MOUSE_BUTTON_LEFT and in_cab and not index_open:

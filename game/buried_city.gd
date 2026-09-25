@@ -1,4 +1,5 @@
 extends Node3D
+const LOOK := preload("res://systems/look_settings.gd")
 
 ## THE LOWER WORKS — the first piece of the buried city between the intake
 ## facility and the underground heat.  It is deliberately authored from a
@@ -570,8 +571,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_discharge_breach_tool()
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		yaw -= event.relative.x * 0.0026
-		pitch = clampf(pitch - event.relative.y * 0.0024, -1.15, 0.95)
+		yaw -= LOOK.dx(event.relative) * 0.0026
+		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.15, 0.95)
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		_interact()
 

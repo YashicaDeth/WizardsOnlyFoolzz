@@ -1,4 +1,5 @@
 extends Node3D
+const LOOK := preload("res://systems/look_settings.gd")
 
 ## THE MENTAL AND PHYSICAL SUPPORT UNIT, after the elevator down (Greg, 24
 ## September): "massive hallways that you can break the bingyangas [out] and
@@ -608,8 +609,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			swing()
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		yaw -= event.relative.x * 0.0026
-		pitch = clampf(pitch - event.relative.y * 0.0024, -1.15, 0.95)
+		yaw -= LOOK.dx(event.relative) * 0.0026
+		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.15, 0.95)
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		interact()
 

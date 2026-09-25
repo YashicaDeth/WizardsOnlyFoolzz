@@ -33,6 +33,12 @@ func _ready() -> void:
 			await get_tree().process_frame
 		var shot_name: String = scene_path.get_file().get_basename()
 		get_viewport().get_texture().get_image().save_png("%s/keys_%s.png" % [out_dir, shot_name])
+		# And the CAMERA page, once.
+		gate.page = "camera"
+		gate.highlighted = 0
+		for _frame in 12:
+			await get_tree().process_frame
+		get_viewport().get_texture().get_image().save_png("%s/camera_%s.png" % [out_dir, shot_name])
 		print("CAPTURED keys ", shot_name, " pages ", gate.key_page_count())
 		gate.close()
 		get_tree().paused = false

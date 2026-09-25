@@ -173,7 +173,7 @@ it, it's rendered and looked at, it has a test, and it's merged and built
 - [ ] Every setting applies live, with a preview, and persists.
 - [ ] Audio: master, music, effects, voice, and the examiner's voice volume.
 - [ ] Controls: remap every key, with the key caps shown everywhere updated.
-- [ ] Mouse sensitivity, invert Y, FOV (70-110), and head bob on or off.
+- [x] Mouse sensitivity, invert Y and FOV, in the pause menu's CAMERA page, read by every scene's mouse look (FOV applies in the Hunt). Head bob still open.
 - [ ] Subtitles on or off, and their size.
 - [ ] Accessibility: reduce flashing (tames the glitch and datamosh),
       reduce camera shake, colourblind-safe telegraph colours.
