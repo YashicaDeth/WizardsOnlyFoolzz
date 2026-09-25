@@ -969,6 +969,32 @@ skills; then the skills page.
   outside `sheet_test`. Picking INSTRUMENT on the intake form does nothing,
   and neither does CHART. Proposal in `DESIGN/GOAL_LOOP_2.md` A.
 
+### Greg, 25 September 2026 (the opening, the look, the tools)
+
+The full direction is in `DESIGN/OPENING_TORTURE_INTAKE.md`. In short:
+
+- **Loading in is torture:** muffled screaming, something forced into your
+  mouth, memory flashes, and a voice: "hundreds of years of the perpetual
+  post-apocalypse", glitching out.
+- **The doctor taps the glass,** then appears on the left screen: "you're
+  going to do a psychology test for me ... tell me your birthday ... hurry up
+  now, I'm being watched too." The cameras zoom in, seen on the depth map and
+  the X-ray.
+- **V is your real microphone.** Your spoken thoughts are read through the
+  brain chip: "we own you".
+- **The test is your birthday.** He reads your birth back to you, then asks
+  your fighting style.
+- **The intake GUI** is like Fallout: New Vegas: images, customization, big
+  stat indicators, no wasted space. Greg replaces textures with his art.
+- **The look:** Alien Isolation, Outlast 1 and 2, Resident Evil, Silent Hill
+  1 and 2, Cruelty Squad. Old low-poly horror, old-internet gore, a
+  surveillance state, and blatant esoteric symbolism (sigils, demons, Baal).
+- **Assets are human-made and free, not generated.**
+- **Tools Greg named:** Higgsfield, Ponytail, Agent Skills, game-dev agent
+  skills, Mento. How each is used is open (see the questions in the opening
+  doc).
+- **The playtest of the 30-minute demo comes first.**
+
 ## Influence register
 
 These entries describe what Greg said he values; proposed extraction is labelled. Liking a reference does not automatically import every mechanic from it.
