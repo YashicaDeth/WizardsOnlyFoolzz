@@ -148,6 +148,42 @@ Greg, 25 September (second message):
 - **You see every choice on your body in the vat:** blood, ink, build,
   fighting style, and cybernetics all change the body you see.
 
+### 10. The breakout: your soul takes the chip
+Greg, 25 September (third message), in order:
+1. He leaves the room. **Muffled screaming** starts.
+2. **A sigil takes your brain:** the game's rune (the seal's Algiz, the icon
+   used everywhere), crazy and demonic.
+3. The rune **shrinks into a microscopic motherboard / CPU sigil**, then
+   **gets hacked**: CRT blob tracking, in the same glitched style as the END
+   ALL SUFFERING card.
+4. The card reads **BRAIN HACKED** / **SOUL OVERTAKEN**. You overtake the
+   brain chip.
+   - **Exists:** `motherboard.gd` and `motherboard_sequence` (seal
+     animations), `mission_card.gd` (END ALL SUFFERING, GET REVENGE),
+     `block_tracker`, `SoulBreakthrough`.
+5. **Your hands:** you look at them, they tear free, come straight to your
+   face, both cover it, and **rip the cord out of your mouth**.
+6. You **smash the glass three times** until it cracks completely.
+7. **All the liquid pours out,** you fall to your knees, and you get up.
+   - **Exists:** the wires beat (tugs), the glass break, the puddle, and the
+     stand-up.
+8. Then you play: the paths out we've built. Keep building from there.
+
+### 11. The rooms, the cameras and the X-ray
+- **Fix every placeholder model:** a room still has a "bean" (a capsule
+  body). Replace the capsules, skins and props with real human-made models.
+- **Cameras like Hitman:** smart and strategic. They sweep, track, have
+  blind spots and lines of sight, and report to the alarm, not just a blue
+  light.
+  - **Exists:** `alarm_director.gd`, `camera_hack`, and the Growing Floor's
+    wall cameras.
+- **X-ray like Sniper Elite 4 and 5:** full-body organs in every cutscene
+  and kill, realistic anatomy.
+  - **Exists:** `kill_cam.gd`, `world_xray.gd`, and `BaselineHuman`'s organs.
+- **Loading screens:** not "newbie". Insane sigil art, sacred geometry, and
+  a realistic anatomical X-ray body.
+  - **Exists:** `interstitial.gd` and the X-ray loading screen.
+
 ## The look (applies to everything above)
 - **Lighting:** Alien Isolation and Outlast darkness. Pools of light,
   practical lamps, a flashlight or camera light doing the work. (rec) Measure
