@@ -236,7 +236,9 @@ smallest playable version first.
       dropping.
 - [ ] **A frame-time budget per scene,** measured in Forward+ and written
       down, with the worst scene fixed first.
-- [ ] **One controls sheet:** the same key caps in every scene, and a
+- [x] **One controls sheet:** the pause menu's KEYS page reads the current
+      scene's own keys card (or `keys_groups()`); the vat room has its own list.
+      Still open: the `ControlBindings` decision. the same key caps in every scene, and a
       decision on the `ControlBindings` branch.
 - [ ] **Hitstop and camera on the blood-tree moves:** a feint, a backstab
       and a hip counter each land with their own feel (`wof-combat-fx`).

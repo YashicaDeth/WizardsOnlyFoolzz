@@ -30,6 +30,21 @@ func _ready() -> void:
 	gate.page = "settings"
 	gate._process(0.01)
 	check(gate.tear > 0.0, "a new page tears too")
+	# The KEYS page reads the current scene's own keys.
+	var stand_in := Node.new()
+	var script := GDScript.new()
+	script.source_code = "extends Node\nfunc keys_groups() -> Array:\n\treturn [{\"group\": \"TEST\", \"rows\": [[\"Q\", \"ONE\"], [\"W\", \"TWO\"]]}]\n"
+	script.reload()
+	stand_in.set_script(script)
+	get_tree().root.add_child.call_deferred(stand_in)
+	await get_tree().process_frame
+	var was: Node = get_tree().current_scene
+	get_tree().current_scene = stand_in
+	check(gate.key_lines().size() == 3 and str(gate.key_lines()[1].key) == "Q", "the KEYS page reads the scene's own keys")
+	gate.page = "root"
+	gate._build_rows()
+	check(gate._rows.any(func(row) -> bool: return str(row.id) == "keys"), "and the pause menu has a KEYS row")
+	get_tree().current_scene = was
 	gate.close()
 	get_tree().paused = false
 	print("PAUSE_BLOOD_TEST_RESULT failures=%d" % failures.size())

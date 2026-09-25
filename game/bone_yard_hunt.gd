@@ -8231,6 +8231,7 @@ func _build_keys_card() -> void:
 			["LMB", "ATTACK"],
 			["RMB", "AIM FIREARMS / HEAVY MELEE"],
 			["HOLD X", "GUARD"],
+			["GUARD MID-SWING", "FEINT (BLOOD TREE)"],
 			["Z", "LOCK ON"],
 			["WHEEL", "CYCLE TARGET"],
 			["1 2 3", "SWORD / SHOTGUN / PISTOL"],
@@ -8261,6 +8262,7 @@ func _build_keys_card() -> void:
 		{"group": "WHAT YOU CARRY", "rows": [
 			["O", "FIELD INVENTORY / BODY / LOOT"],
 			["U", "DEAD CLOUD EXCHANGE // CASES"],
+			["7", "BLOOD TREE // SPEND BLOOD"],
 			["F8", "CONTACT // PEOPLE, ENTITIES, MATERIA"],
 			["G", "RAISE / LOWER BLACK MIRROR"],
 			["TAB", "INDEX / NEXT DEVICE APP"],

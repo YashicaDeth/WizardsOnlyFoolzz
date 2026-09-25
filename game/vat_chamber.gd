@@ -899,6 +899,15 @@ func _dead_tank(at: Vector3, seed_value: int) -> void:
 		vat_smash.register(root, at, seed_value, cradled)
 
 
+## The Growing Floor's keys, for the pause menu's KEYS page.
+func keys_groups() -> Array:
+	return [
+		{"group": "IN THE TANK", "rows": [["1 2 3", "BLINK ONCE / TWICE / STARE"], ["V", "THINK OUT LOUD"], ["LEFT / RIGHT", "INTAKE TABS"], ["UP / DOWN", "ROWS"], ["ENTER / CLICK", "CONFIRM"], ["F", "FILE THE SHEET"]]},
+		{"group": "THE WIRES", "rows": [["MOUSE", "FIND A WIRE"], ["E", "RIP IT OUT (THREE TUGS)"]]},
+		{"group": "OUT OF THE TANK", "rows": [["WASD", "MOVE"], ["MOUSE", "LOOK"], ["E", "INTERACT"], ["HOLD I", "INSPECT WHAT YOU HOLD"], ["LMB", "SMASH A TANK / STRIKE HIS DOOR"], ["F", "SHOULDER HIS DOOR"], ["ESC", "PAUSE"]]},
+	]
+
+
 ## A freed subject that turned on you hits the body you just got back.
 func _on_freed_subject_struck(damage: float) -> void:
 	if anatomy != null:
