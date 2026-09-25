@@ -322,9 +322,13 @@ it, it's rendered and looked at, it has a test, and it's merged and built
 ## G. The Service Arcade (minutes 12-17)
 - [x] The ram, the card, Hollis coerced or put down, his hand on the reader,
       his gun in Carry, and the pressure gate.
-- [ ] Hollis's real model. Answered 25 September: a better in-game model;
+- [x] Hollis's real model. Answered 25 September: a better in-game model;
       one Hollis at the Support Unit end, a numbered guard in the arcade.
-      Model sheets for both are in Higgsfield roadmap phase 9.
+      Built: the arcade door is CELLOUTZ SECURITY 47, number stencilled on
+      his vest front and back; Hollis stands only at the Support Unit gate,
+      heavier, in the same flak vest, belt and holster
+      (`facility_guard_post_test`, `guards_capture`). Placeholder geometry
+      until the Higgsfield phase 9 model sheets become models.
 - [ ] Hollis's warning shot, wound and kill read in play; he says "You
       again" after a death.
 - [ ] The arcade machines can be smashed (destruction 0.2).

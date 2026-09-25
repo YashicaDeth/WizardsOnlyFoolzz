@@ -44,11 +44,23 @@ func _ready() -> void:
 	var arcade = _fresh_arcade()
 	await get_tree().process_frame
 	var post: FacilityGuardPost = arcade.guard_post
-	check(post != null and post.guard != null and post.barrier != null, "the arcade places Hollis, his reader and his door")
+	check(post != null and post.guard != null and post.barrier != null, "the arcade places its guard, his reader and his door")
 	check(post.global_position.z < arcade.CARD_AT.z and post.global_position.z < arcade.WEAPON_AT.z and post.global_position.z > arcade.GATE_AT.z,
 		"the door stands between both tools and the pressure gate")
 	check(not post.door_open and _door_blocks(post), "the D-section door is shut and solid")
-	check(str(WorldHistory.subject(FacilityGuardPost.GUARD_ID).get("status", "")) == "on post", "Hollis is a persistent person in the world record")
+	check(str(WorldHistory.subject(FacilityGuardPost.ARCADE_GUARD_ID).get("status", "")) == "on post", "the arcade guard is a persistent person in the world record")
+	# Greg, 25 September: one Hollis, at the Support Unit end; this door has a
+	# numbered guard, his number on his vest.
+	check(post.guard_name == "CELLOUTZ SECURITY 47" and WorldHistory.subject(FacilityGuardPost.GUARD_ID).is_empty(), "the arcade door is a numbered guard, not Hollis")
+	var stencils := post.guard.find_children("*", "Label3D", true, false).filter(func(label) -> bool: return (label as Label3D).text == "47")
+	check(stencils.size() == 2, "his number is stencilled front and back")
+	check(post.guard.find_child("SecurityKit", true, false) != null, "he wears the security kit")
+	var hollis := FacilityGuardPost.new()
+	add_child(hollis)
+	hollis.build()
+	check(hollis.guard_name == "HOLLIS" and hollis.guard.find_children("*", "Label3D", true, false).all(func(label) -> bool: return (label as Label3D).text != "47"), "Hollis, where he stands, is Hollis, with no number")
+	check(float(hollis.guard.get("build_factor")) > float(post.guard.get("build_factor")), "and the heavier man of the two")
+	hollis.queue_free()
 
 	# --- Walking up with nothing in hand. ---
 	var in_range: Vector3 = post.guard.global_position + Vector3(0, 0, 5.0)
@@ -79,7 +91,7 @@ func _ready() -> void:
 	check(not _door_blocks(post), "the opened door no longer blocks the artery")
 	var accesses: Array = WorldHistory.events.filter(func(event): return str(event.get("type", "")) == "facility_biometric_access")
 	check(accesses.size() == 1 and str(accesses[0].get("details", {}).get("method", "")) == "whole_body", "the reader records one whole-body access")
-	check(str(WorldHistory.subject(FacilityGuardPost.GUARD_ID).get("status", "")) == "coerced", "the world remembers that he was coerced, not killed")
+	check(str(WorldHistory.subject(FacilityGuardPost.ARCADE_GUARD_ID).get("status", "")) == "coerced", "the world remembers that he was coerced, not killed")
 	var fired_before := WorldHistory.event_count("facility_guard_fired")
 	for tick in 30:
 		post.fire_cooldown = 0.0
@@ -114,7 +126,7 @@ func _ready() -> void:
 	check(accesses.size() == 1, "and the reader records that access once")
 	arcade._interact()
 	check(not _carried(FacilityGuardPost.GUN_LABEL).is_empty(), "his gun comes off his body into Carry")
-	check(str(WorldHistory.subject(FacilityGuardPost.GUARD_ID).get("status", "")) in ["down", "dead"], "the world remembers him put down at his door")
+	check(str(WorldHistory.subject(FacilityGuardPost.ARCADE_GUARD_ID).get("status", "")) in ["down", "dead"], "the world remembers him put down at his door")
 	fired_before = WorldHistory.event_count("facility_guard_fired")
 	for tick in 30:
 		post.fire_cooldown = 0.0

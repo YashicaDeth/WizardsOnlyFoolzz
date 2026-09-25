@@ -68,7 +68,11 @@ answers.
       REVENGE. `hands_on_breakout_test`. Merged at `033d919`.
 - [x] **The derby tunnels, driven**: gate, 650 m of GTA-style bores, barricades,
       the drain mouth, the car carried on to the dry falls. `derby_tunnels_test`.
-- [ ] **Hollis gets a real model**, one Greg provides or picks (CC-BY credited).
+- [x] **Hollis gets a real model**, one Greg provides or picks (CC-BY credited).
+      Greg, 25 September: a better in-game model, one Hollis at the Support
+      Unit end, a numbered guard in the arcade. Built as placeholder kit on the
+      rig (flak vest, plates, belt, holster, the guard's number); the model
+      sheets from Higgsfield roadmap phase 9 replace it.
 
 Then, in this order (Greg, 24 September, "what next"):
 
