@@ -83,6 +83,11 @@ Then, in this order (Greg, 24 September, "what next"):
 After those, minutes 0-30 count as right enough (Greg): **start minutes 30-60**,
 furthering the tutorial and the starting stage.
 
+After minutes 0-30 work end to end (Greg, 25 September): **wizard eyes**,
+a phone key (L or K) that swaps phone vision for seeing every spirit, "like
+seeing into the Wire"; and **Wire personas**, everyone on the Wire with an
+alias, account, procedurally generated pixel-art avatar and website lore.
+
 After minutes 0-30 work end to end (Greg, 24 September): job posters with
 tear-off tabs pasted on the Hunt's walls, and business cards handed over by
 people you meet (kept in Carry, adding a Wire contact); the receipt-paper

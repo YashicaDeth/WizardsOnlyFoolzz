@@ -84,6 +84,10 @@ are not.
   pull it in; repetition wears it out. It logs time spent, what it walked
   away from and where it got stuck, so a night of runs produces a ranked list
   of events by how long they held it, plus the ones it abandoned.
+  *Built as a measuring tool only (it changes no gameplay):*
+  `game/systems/curiosity_bot.gd`, run with `game/tests/curiosity_run.tscn`
+  (`-- --scene=res://... --seconds=600 --out=DIR`), merged across runs with
+  `tools/curiosity_report.py`. Which of its findings to act on is Greg's call.
 - **Event parts, first cut:** roughly a dozen actors × a dozen wants × a
   handful of places × a handful of escalations gives several thousand
   combinations before any are hand-tuned. The driver and the monks are the

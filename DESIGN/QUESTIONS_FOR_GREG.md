@@ -1,5 +1,15 @@
 # Questions for Greg
 
+**Answered by voice, 25 September 2026** (recorded in DESIGN.md under
+"Answered by Greg by voice"): 1 withheld, name earned at the roof, one line
+of history in his room; 2 Greg writes them; 3 five per register; 4 keep the
+four styles, rename nodes; 5 visions, map knowledge, hidden things, items and
+companions for blood and memories; 6 ambiguous, "the light of the dead"; 7
+heresy; 8 keep; 9 one Hollis at the Support Unit end, numbered guard in the
+Service Arcade; 10 keep; 11 wait for v0.1; 12 Greg opens Sketchfab in the
+environment settings; 13 a better in-game model. Still open: the writing
+itself (Greg's), and the Sketchfab network setting.
+
 Collected overnight (24–25 September 2026) while Greg slept. Everything
 below is currently a **flagged placeholder** in the game; nothing here has
 been decided for him. Each question leads with the assistant's recommended
