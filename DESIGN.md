@@ -869,6 +869,45 @@ his words; the assistant's reading is not mixed in.
   network with CRT effects and good UI.
 - **The pyramid is not visualised in the index yet.**
 
+### Greg, 25 September 2026 (after the breakables): a partly destructible world
+
+Asked what "Teardown-style" should mean now that props break (his words):
+"now all the world will also be partly destructible buildings the ground
+ect, if you shoot downwards with a gun or if you blow up the ground there
+will be an impact hole".
+
+- **The world is partly destructible**: buildings and the ground, not only
+  props.
+- **The ground takes holes**: a round fired down into it leaves an impact
+  hole, and blowing it up leaves one too.
+- *Open (assistant's question, not his rule):* whether "partly" means
+  authored damage stages on each surface (`DESIGN/DESTRUCTION.md`) or
+  material really coming away as in Teardown. Asked alongside the first
+  render of a ground hole.
+
+### Greg, 25 September 2026: the New Vegas opening, again
+
+He sent the Fallout: New Vegas opening (Doc Mitchell's house) with "this
+whole opening segment from like personality test part is awesome".
+The frames he picked: waking to a blurred, overexposed view; the doctor
+sitting and talking to you; entering a name; building the face in a
+mirror device; setting stats on a carnival strength-tester machine; the
+doctor's word-association and picture questions, whose answers pick your
+skills; then the skills page.
+
+- **What he likes is the shape**, and `DESIGN/CHARACTER_CREATION.md` already
+  names Doc Mitchell as the model for the vat intake: the whole character
+  sheet is built inside a scene that is also the story's first beat, by
+  someone questioning you.
+- **The personality test part is the part he singled out.**
+- *Reference, not layout* (his standing rule): nothing of New Vegas's
+  machines, questions, mascot or rooms is reproduced. Our instrument's items
+  are original and already written (`CharacterSheet.ITEMS`).
+- *Found (assistant):* that instrument is built and scored
+  (`CharacterSheet.score_instrument`, `aptitude_verdict`) but has no caller
+  outside `sheet_test`. Picking INSTRUMENT on the intake form does nothing,
+  and neither does CHART. Proposal in `DESIGN/GOAL_LOOP_2.md` A.
+
 ## Influence register
 
 These entries describe what Greg said he values; proposed extraction is labelled. Liking a reference does not automatically import every mechanic from it.

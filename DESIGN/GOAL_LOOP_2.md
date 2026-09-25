@@ -121,16 +121,33 @@ here, so this is the list, and the page should link it.
       melee hit that lands on something other than a body into one
       `WorldDamage` call. Streetlights, doors and props then react to
       gunfire and blows everywhere, not only where one scene wired them.
-- [ ] **0.2 `BreakableProp` out of the derby.** Crates, barrels, lockers,
+- [x] **0.2 `BreakableProp` out of the derby.** Crates, barrels, lockers,
       jars, monitors and chairs in the Hunt, the Service Arcade, the Lower
       Works and the drains, each with its own fragments and the shared
-      debris cap.
+      debris cap. *Built at `8f6559c`:* six kinds, each with its own pieces;
+      34 placed across the four scenes; the breach tool breaks them in the
+      facility through `WorldBreak.swing()`; every hit filed by the prop's
+      own name. `breakable_props_test`, `breakable_props_gallery`.
+- **Greg's answer, 25 September** (`DESIGN.md`): the world is partly
+  destructible, buildings and the ground included, and "if you shoot
+  downwards with a gun or if you blow up the ground there will be an impact
+  hole". So, ahead of glass (rec):
+- [ ] **0.2b Impact holes in the ground.** A round fired into the ground
+      leaves a hole where it hit, sized by the calibre, that stays and is
+      recorded. 0.5's blasts then leave bigger ones through the same call.
+      Built first as the cheapest honest version (a sunken mark with a rim
+      and kicked-up dirt, no terrain editing); the render of it carries the
+      open question below.
+  - **ASK with that render:** "Is this the kind of hole you mean, or should
+    the ground itself give way, Teardown-style?"
 - [ ] **0.3 Glass.** Windows, observation glass, screens and bottles shatter
       into real, persistent shards. The vat shards become physics shards
       instead of scripted ones, landing and staying on the grating.
 - [ ] **0.4 Walls and cover that give.** Plasterboard, fences and
-      barricades take condition and open holes in authored stages. No voxel
-      fracture: the scope in `DESIGN/DESTRUCTION.md` stands.
+      barricades take condition and open holes in authored stages. Greg
+      wants buildings partly destructible too (25 September). Whether that
+      stays inside `DESIGN/DESTRUCTION.md`'s "no voxel fracture" scope is
+      the open question asked at 0.2b.
 - [ ] **0.5 Explosions.** Canisters, gas lines or a grenade: one impulse
       that pushes debris and bodies, damages everything in range through
       `WorldDamage`, and records it.
@@ -145,6 +162,16 @@ here, so this is the list, and the page should link it.
 
 ## A. Close out minutes 0-30
 
+- [ ] **The personality test in the intake (rec).** Greg singled out "the
+      personality test part" of the New Vegas opening (25 September). Ours
+      is already written and scored (`CharacterSheet.ITEMS`,
+      `score_instrument`, `aptitude_verdict`) and nothing calls it: picking
+      INSTRUMENT on the intake form does nothing. Wire it in: the examiner
+      asks the items, the subject answers the only way a tubed body can,
+      his verdict is stamped on the sheet, and the scores set the stats.
+      CHART is unwired the same way.
+  - **ASK before building:** "Does the examiner read the questions aloud,
+    or do they print on the intake pages for you to mark?"
 - [ ] **Stopwatch every route (rec).** A route replay test times each of the
       four ways out, from the first frame to the Hunt. It writes a table
       into `FIRST_30_REBUILD.md`, so pacing changes show up as numbers.
