@@ -26,6 +26,20 @@ const EXIT_AT := Vector3(0, 0.0, -55.0)
 ## Arch 7 stands at z = -29 and arch 8 at -33.5; the side labs sit at -25.7
 ## and -34.7, so the wall at -31.5 touches none of them.
 const GUARD_POST_AT := Vector3(0, 0.0, -31.5)
+const WORLD_BREAK := preload("res://systems/world_break.gd")
+## Things the breach tool breaks (`DESIGN/GOAL_LOOP_2.md` 0.2): all past the
+## tool's pickup and short of Hollis, against the walls or beside the vats,
+## so the artery down the middle stays clear.
+const PROPS := [
+	["crate", "arcade_crate_1", Vector3(-5.2, 0, -13.0), 0.0],
+	["crate", "arcade_crate_2", Vector3(-4.9, 0, -13.95), 0.4],
+	["barrel", "arcade_barrel", Vector3(5.0, 0, -13.4), 0.0],
+	["jar", "arcade_jar_1", Vector3(3.2, 0, -18.0), 0.0],
+	["jar", "arcade_jar_2", Vector3(3.5, 0, -18.3), 0.0],
+	["locker", "arcade_locker", Vector3(-6.55, 0, -22.4), PI * 0.5],
+	["monitor", "arcade_monitor", Vector3(6.4, 0, -22.8), -PI * 0.5],
+	["chair", "arcade_chair", Vector3(5.5, 0, -22.3), -PI * 0.6],
+]
 ## His shots can kill you now. Death is rebirth in the claimant's vat
 ## (`VatRebirth`); what you carried stays here on the body you leave.
 
@@ -71,6 +85,8 @@ func _ready() -> void:
 	_build_shell()
 	_build_landmarks()
 	_build_guard_post()
+	for spec in PROPS:
+		BreakableProp.place(self, spec[0], spec[1], spec[2], spec[3])
 	_build_player()
 	_restore_from_history()
 	_build_remains()
@@ -361,7 +377,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		inspect_held = event.pressed
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and weapon_taken:
 		if not guard_post.strike(player.global_position):
-			_discharge_at_gate()
+			if WORLD_BREAK.swing(camera, FacilityGuardPost.RAM_DAMAGE, "breach_tool", player).is_empty():
+				_discharge_at_gate()
 
 
 var inspect_held := false

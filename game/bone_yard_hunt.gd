@@ -6292,6 +6292,16 @@ const BREAKABLE_YARD := [
 	["light", "hunt_yard_light_east", Vector3(18.5, 0.0, 4.0)],
 	["barricade", "hunt_yard_barricade_west", Vector3(12.0, 0.0, 11.5)],
 	["barricade", "hunt_yard_barricade_east", Vector3(17.0, 0.0, 11.5)],
+	# 0.2: one of every prop kind behind the barricades, turned to the post.
+	["crate", "hunt_yard_crate_1", Vector3(11.2, 0.0, 13.6), 0.0],
+	["crate", "hunt_yard_crate_2", Vector3(12.1, 0.0, 13.9), 0.35],
+	["barrel", "hunt_yard_barrel_1", Vector3(13.3, 0.0, 13.7), 0.0],
+	["barrel", "hunt_yard_barrel_2", Vector3(14.1, 0.0, 14.2), 0.0],
+	["locker", "hunt_yard_locker", Vector3(15.4, 0.0, 14.0), PI],
+	["monitor", "hunt_yard_monitor", Vector3(16.5, 0.0, 13.5), PI],
+	["chair", "hunt_yard_chair", Vector3(17.4, 0.0, 13.4), PI * 0.8],
+	["jar", "hunt_yard_jar_1", Vector3(18.3, 0.0, 13.6), 0.0],
+	["jar", "hunt_yard_jar_2", Vector3(18.7, 0.0, 13.9), 0.0],
 ]
 var breakables: Array[Node3D] = []
 
@@ -6306,6 +6316,8 @@ func _build_breakables() -> void:
 			add_child(light)
 			light.build(str(spec[1]), 4.4)
 			piece = light
+		elif str(spec[0]) != "barricade":
+			piece = BREAKABLE_PROP.place(self, str(spec[0]), str(spec[1]), spec[2], float(spec[3]))
 		else:
 			var prop = BREAKABLE_PROP.new()
 			prop.name = str(spec[1])

@@ -31,7 +31,10 @@ static func hit(collider: Object, damage: float, cause: String, point: Vector3, 
 			break
 		if node is BreakableProp:
 			var prop := node as BreakableProp
-			return _filed(prop.strike(damage * PROP_PER_DAMAGE, direction), "prop", prop.kind, cause, weapon)
+			# Filed under its own name, so the record says which crate, not "a crate".
+			var struck := prop.strike(damage * PROP_PER_DAMAGE, direction)
+			struck["kind"] = prop.kind
+			return _filed(struck, "prop", str(prop.name), cause, weapon)
 		if node.has_method("strike") and node.get("subject_id") != null:
 			var result: Dictionary = node.strike(damage * CONDITION_PER_DAMAGE, cause, direction)
 			return _filed(result, "object", str(node.get("subject_id")), cause, weapon)
@@ -58,7 +61,24 @@ static func _filed(result: Dictionary, what: String, id: String, cause: String, 
 	out["what"] = what
 	out["id"] = id
 	WorldHistory.record_event("world_object_struck", {
-		"what": what, "id": id, "cause": cause, "weapon": weapon,
+		"what": what, "id": id, "kind": str(out.get("kind", what)), "cause": cause, "weapon": weapon,
 		"broke": bool(out.get("broken", false)) or str(out.get("band", "")) in ["sparking", "hanging"] or not str(out.get("broke", "")).is_empty(),
 	})
 	return out
+
+
+## A blow from the player's eye: whatever the held tool meets within `reach`,
+## if it breaks. The facility scenes have no melee of their own, only a ram on
+## the attack button, so this is how that blow reaches a crate there.
+static func swing(camera: Camera3D, damage: float, weapon: String, holder: CollisionObject3D = null, reach := 2.4) -> Dictionary:
+	if camera == null or not camera.is_inside_tree():
+		return {}
+	var from := camera.global_position
+	var direction := -camera.global_basis.z
+	var query := PhysicsRayQueryParameters3D.create(from, from + direction * reach)
+	if holder != null:
+		query.exclude = [holder.get_rid()]
+	var met := camera.get_world_3d().direct_space_state.intersect_ray(query)
+	if met.is_empty():
+		return {}
+	return hit(met.collider, damage, "melee", met.position, direction, weapon, "melee")
