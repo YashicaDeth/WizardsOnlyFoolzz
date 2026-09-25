@@ -16,6 +16,8 @@ extends Node3D
 const OPENING := preload("res://systems/opening_director.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const ANATOMY := preload("res://systems/anatomy_component.gd")
+const LAB_CABLES := preload("res://systems/lab_cables.gd")
+const VAT_SMASH := preload("res://systems/vat_smash.gd")
 const IMPLANT_CATALOG := preload("res://systems/implant_catalog.gd")
 const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
@@ -63,6 +65,10 @@ var opening_audio: Node
 var fluid: MeshInstance3D
 var vat_glass: MeshInstance3D
 var umbilicals: Array[Node3D] = []
+## What the lab's wiring built: cable and mesh counts, and how low it hangs.
+var cable_report: Dictionary = {}
+## The other tanks, which can be smashed once you are out of your own.
+var vat_smash
 var glass_shards: Array[Dictionary] = []
 var door_marker: Node3D
 var line_index := -1
@@ -93,6 +99,15 @@ var breach_shake := 0.0
 ## way staff leave rather than walking the player's escape route. It is not the
 ## pit door at the far end and it is never openable by the player.
 const STAFF_DOOR_AT := Vector3(6.95, 0.0, -2.49)
+## Greg, 24 September: the examiner and his PC stood in the middle of the vat
+## aisle. The workstation is a monitoring post now, off the aisle to the
+## right-front of the tank and turned to face it: the screen is the
+## subject-facing terminal the intake is shown on, and he works it from the
+## end of the desk rather than standing inside it.
+const STATION_AT := Vector3(2.7, 0.0, -1.3)
+const STATION_YAW := -1.12
+const EXAMINER_AT_DESK := Vector3(-1.45, 0.0, 0.05)
+const EXAMINER_TURN := 0.6
 const DEPARTURE_SECONDS := 4.4
 
 ## AX3.1/AX3.6. The Growing Floor's first two objects: the broken restraint
@@ -116,6 +131,8 @@ var inspect_held := false
 var rebirth := false
 var active_beats: Array = BEATS
 var title: Label
+## The HUD as body-cam footage (Greg, 24 September).
+var osd: BodyCamOSD
 ## Greg: the task titles "in massive celloutz style font, bloody and bony ...
 ## moving around 4d, inverting, going crazy, and after that flashes". The
 ## card bursts in over everything; the flickering `title` label is what stays
@@ -167,6 +184,7 @@ func _ready() -> void:
 	# fade to hold the red image together while the player sees the real room,
 	# doctor and terminal behind it; filing may still cut into the later wake-up.
 	fade.color.a = 0.08
+	vat_smash = VAT_SMASH.new(self)
 	_build_chamber()
 	_build_examination_station()
 	# The examiner is not born at the keyboard. He enters after the player wakes.
@@ -181,6 +199,12 @@ func _ready() -> void:
 	doctor_route.build(self)
 	_build_title()
 	_build_intake()
+	osd = BodyCamOSD.new()
+	osd.name = "BodyCamOSD"
+	$HUD.add_child(osd)
+	osd.adopt(vitals, $HUD/Objective, prompt, "SUBLEVEL 0C  //  GROWING FLOOR")
+	osd.camera = camera
+	osd.visible = intake == null
 	opening_audio = OPENING_AUDIO.new()
 	add_child(opening_audio)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -266,8 +290,8 @@ func _on_intake_filed(_state: Dictionary) -> void:
 	# terminal even when its arrival beat was skipped.
 	if examiner_node != null:
 		examiner_node.visible = true
-		examiner_node.position.x = -0.16
-		examiner_node.rotation.y = 0.0
+		examiner_node.position = EXAMINER_AT_DESK
+		examiner_node.rotation.y = EXAMINER_TURN
 	phase = "departure"
 	# AP1.3/P10.5. Filing has already written the chosen anatomy by the time this
 	# signal arrives. Install the real head hardware now, while the player is
@@ -545,6 +569,8 @@ func _build_chamber() -> void:
 	# before the door as the original 11-bay/34.0 layout) so shortening the
 	# aisle cannot leave dressing poking past the end wall or the door.
 	var bay_count := roundi((AISLE_LENGTH - 3.0) / 3.1) + 1
+	var bay_zs: Array = []
+	var tank_centres: Array = []
 	for bay in bay_count:
 		var z := 2.0 - float(bay) * 3.1
 		for side in [-1.0, 1.0]:
@@ -565,22 +591,13 @@ func _build_chamber() -> void:
 				arch.position = Vector3(side * (6.9 - t * 1.5), 0.5 + t * 3.3, z)
 				arch.rotation_degrees = Vector3(0, 0, side * (8.0 + t * 46.0))
 				add_child(arch)
-			# Conduit running the length, sagging between bays.
-			var gut := MeshInstance3D.new()
-			var tube := CylinderMesh.new()
-			tube.top_radius = 0.11
-			tube.bottom_radius = 0.13
-			tube.height = 3.1
-			tube.material = WorldLook.surface(Color("3a2a22"), "flesh", bay + 3)
-			gut.mesh = tube
-			gut.position = Vector3(side * 6.2, 3.55 + sin(float(bay)) * 0.12, z - 1.5)
-			gut.rotation_degrees = Vector3(90, 0, 0)
-			add_child(gut)
 
+		bay_zs.append(z)
 		# Other tanks, most of them failed.
 		if bay > 0:
 			for side in [-1.0, 1.0]:
 				_dead_tank(Vector3(side * 4.4, 0, z), bay)
+				tank_centres.append(Vector3(side * 4.4, 0, z))
 
 		var strip := OmniLight3D.new()
 		strip.position = Vector3(0, 3.8, z)
@@ -588,6 +605,11 @@ func _build_chamber() -> void:
 		strip.light_energy = 1.5
 		strip.omni_range = 6.5
 		add_child(strip)
+
+	# Greg: "intricate Lain / Evangelion wiring, not one long tube". The
+	# conduit that ran the length of each side is now bundles of cable, hung
+	# from every bay, dropping into every tank and swagged across overhead.
+	cable_report = LAB_CABLES.wire(self, bay_zs, tank_centres, 4.12, 7.35, 4417, [STAFF_DOOR_AT])
 
 	# The pit door at the far end.
 	door_marker = Node3D.new()
@@ -633,7 +655,8 @@ func _build_chamber() -> void:
 func _build_examination_station() -> void:
 	var station := Node3D.new()
 	station.name = "UnknownExaminerStation"
-	station.position = Vector3(0.0, 0.0, -2.65)
+	station.position = STATION_AT
+	station.rotation.y = STATION_YAW
 	add_child(station)
 
 	# A low medical desk between the vat and the doctor.
@@ -706,8 +729,9 @@ func _build_examination_station() -> void:
 	keyboard_mesh.size = Vector3(0.86, 0.045, 0.38)
 	keyboard_mesh.material = LabSurface.material("plate")
 	keyboard.mesh = keyboard_mesh
-	# Between the man and the screen, where a hand can actually reach it.
-	keyboard.position = Vector3(0.22, 0.915, 0.54)
+	# At his end of the desk, where his hands actually are.
+	keyboard.position = Vector3(-0.62, 0.915, 0.32)
+	keyboard.rotation.y = 0.35
 	station.add_child(keyboard)
 
 	# One examiner, anonymous and physically present.  He is shaped from the
@@ -720,7 +744,8 @@ func _build_examination_station() -> void:
 	# x -0.36..0.04 and the monitor starts at 0.07: adjacent, never overlapping.
 	# Greg, 21 September: "more to the left of the lap and not directly in
 	# front of it."
-	examiner.position = Vector3(-0.16, 0.0, 0.16)
+	examiner.position = EXAMINER_AT_DESK
+	examiner.rotation.y = EXAMINER_TURN
 	station.add_child(examiner)
 	examiner_node = examiner
 	# The same man the intake's live feed shows (ExaminerFeed): a BaselineHuman
@@ -866,9 +891,28 @@ func _dead_tank(at: Vector3, seed_value: int) -> void:
 	# capsules in them). The nearest three keep their seated adults -- one is
 	# still alive and one has visibly failed -- and the rest hold curled bodies.
 	var near := seed_value <= 2
-	LabVat.build(self, at, seed_value, 2.4, 0.8, not near, seed_value <= 5)
+	var root := LabVat.build(self, at, seed_value, 2.4, 0.8, not near, seed_value <= 5)
+	var cradled: Node3D = null
 	if near:
-		_build_cradled_vat_subject(at + Vector3(0, 0.42, 0), seed_value)
+		cradled = _build_cradled_vat_subject(at + Vector3(0, 0.42, 0), seed_value)
+	if vat_smash != null:
+		vat_smash.register(root, at, seed_value, cradled)
+
+
+## The Growing Floor's keys, for the pause menu's KEYS page.
+func keys_groups() -> Array:
+	return [
+		{"group": "IN THE TANK", "rows": [["1 2 3", "BLINK ONCE / TWICE / STARE"], ["V", "THINK OUT LOUD"], ["LEFT / RIGHT", "INTAKE TABS"], ["UP / DOWN", "ROWS"], ["ENTER / CLICK", "CONFIRM"], ["F", "FILE THE SHEET"]]},
+		{"group": "THE WIRES", "rows": [["MOUSE", "FIND A WIRE"], ["E", "RIP IT OUT (THREE TUGS)"]]},
+		{"group": "OUT OF THE TANK", "rows": [["WASD", "MOVE"], ["MOUSE", "LOOK"], ["E", "INTERACT"], ["HOLD I", "INSPECT WHAT YOU HOLD"], ["LMB", "SMASH A TANK / STRIKE HIS DOOR"], ["F", "SHOULDER HIS DOOR"], ["ESC", "PAUSE"]]},
+	]
+
+
+## A freed subject that turned on you hits the body you just got back.
+func _on_freed_subject_struck(damage: float) -> void:
+	if anatomy != null:
+		anatomy.call("apply_hit", "torso", damage, 0.0, "blunt")
+	breach_shake = maxf(breach_shake, 0.2)
 
 
 ## A seated BaselineHuman makes the first visible other subjects recognisably
@@ -931,6 +975,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	# Post creation, any other tank you are looking at up close can be
+	# smashed open: the glass, the medium, and whoever is inside.
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and breakout_complete and can_move and vat_smash != null:
+		var tank: int = vat_smash.aimed(camera)
+		if tank >= 0:
+			vat_smash.strike(tank, doctor_route.held_weapon() if doctor_route != null else "")
+			return
 	if doctor_route != null and doctor_route.handle_input(event):
 		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
@@ -973,6 +1024,8 @@ func _physics_process(delta: float) -> void:
 	_update_beats()
 	_update_sequence(delta)
 	_update_shards(delta)
+	if vat_smash != null:
+		vat_smash.step(delta)
 	if can_move:
 		_update_movement(delta)
 	# Applied last, on top of whatever the sequence or the movement code just
@@ -990,10 +1043,12 @@ func _physics_process(delta: float) -> void:
 ## (`inbound`), or the reverse. `t` is 0..1 along the whole walk.
 func _examiner_path(t: float, inbound: bool) -> Vector3:
 	var door: Vector3 = DoctorRoute.DOOR_AT
+	# From the end of his desk, round its near corner, past the tank on its
+	# right and out through his door behind it.
 	var points: Array[Vector3] = [
 		examiner_post,
-		Vector3(1.9, examiner_post.y, examiner_post.z + 0.6),
-		Vector3(2.0, examiner_post.y, 1.4),
+		Vector3(1.25, examiner_post.y, -1.8),
+		Vector3(1.55, examiner_post.y, 0.2),
 		Vector3(door.x, examiner_post.y, door.z - 0.6),
 		Vector3(door.x, examiner_post.y, door.z + 0.9),
 	]
@@ -1029,7 +1084,7 @@ func _update_arrival(delta: float) -> void:
 	# attention changes before the UI arrives, which makes the intake a result
 	# of something he physically did in the room.
 	var turn := clampf((arrival_clock - 2.55) / 0.85, 0.0, 1.0)
-	examiner_node.rotation.y = lerpf(PI, 0.0, ease(turn, 0.55))
+	examiner_node.rotation.y = lerpf(PI, EXAMINER_TURN, ease(turn, 0.55))
 	if arrival_clock >= 0.70 and arrival_clock < 2.45:
 		subtitle.text = "EXAMINER // SUBJECT CONSCIOUS"
 	elif arrival_clock >= 3.15 and arrival_clock < 5.5:
@@ -1054,7 +1109,7 @@ func _update_departure(delta: float) -> void:
 	# the examiner hangs off the workstation node rather than off the chamber.
 	if examiner_node != null and is_instance_valid(examiner_node):
 		var turn := clampf(departure_clock / 0.50, 0.0, 1.0)
-		examiner_node.rotation.y = lerpf(0.0, -PI * 0.5, ease(turn, 0.6))
+		examiner_node.rotation.y = lerpf(EXAMINER_TURN, EXAMINER_TURN - PI * 0.5, ease(turn, 0.6))
 		var walk := clampf((departure_clock - 0.50) / 2.45, 0.0, 1.0)
 		examiner_node.global_position = _examiner_path(ease(walk, 0.85), false)
 		var heading := _examiner_path(minf(1.0, ease(walk, 0.85) + 0.05), false) - examiner_node.global_position
@@ -1511,6 +1566,8 @@ func _record_service_arcade_entry() -> bool:
 
 
 func _update_hud() -> void:
+	if osd != null:
+		osd.visible = intake == null
 	var snapshot: Dictionary = anatomy.call("snapshot")
 	vitals.text = "BLOOD %d%%   PAIN %02d   %s" % [
 		roundi(float(snapshot.blood) / maxf(1.0, float(snapshot.blood_capacity)) * 100.0),
@@ -1523,6 +1580,7 @@ func _update_hud() -> void:
 			prompt.text = ""
 		elif _aimed_wire() != null:
 			prompt.text = "[E] RIP IT OUT   //   %d LEFT" % umbilicals.size()
+			osd.point_at((_aimed_wire().get_child(3) as Node3D).global_position)
 		else:
 			prompt.text = "MOUSE LOOK   //   FIND THE WIRES   //   %d LEFT" % umbilicals.size()
 		return
@@ -1542,9 +1600,15 @@ func _update_hud() -> void:
 		return
 	if not stuck_tank_opened and _carries_restraint() and _near_first_objects():
 		prompt.text = "[E] PRY THE JAMMED TANK WITH THE BROKEN RESTRAINT"
+		osd.point_at(stuck_tank_marker.global_position + Vector3(0, 1.3, 0))
 		return
 	if stuck_tank_opened and CLOTHING.worn("player") == "bare" and CLOTHING.worn(FAILED_SUBJECT_ID) != "bare" and _near_first_objects():
 		prompt.text = "[E] TAKE THE CLOTHING OFF SUBJECT 0C-4"
+		osd.point_at(stuck_tank_marker.global_position + Vector3(0, 1.1, 0))
+		return
+	var smash_prompt: String = vat_smash.prompt_for(camera, doctor_route.held_weapon() if doctor_route != null else "") if vat_smash != null and breakout_complete else ""
+	if smash_prompt != "":
+		prompt.text = smash_prompt
 		return
 	var route_prompt: String = doctor_route.prompt_text() if doctor_route != null else ""
 	if route_prompt != "":
@@ -1562,6 +1626,8 @@ func _update_hud() -> void:
 	# HOLD I is only offered when something is in hand to look at.
 	var inspect_hint := "   //   HOLD I INSPECT" if _inspect_text() != "NOTHING IN HAND TO INSPECT" else ""
 	prompt.text = "[E] ENTER THE UNDERGROUND HEAT" if to_door.length() <= 3.4 else "WASD MOVE   //   MOUSE LOOK   //   E INTERACT" + inspect_hint
+	if to_door.length() <= 3.4:
+		osd.point_at(door_marker.global_position + Vector3(0, 1.6, 0))
 
 
 ## AX3.1/AX3.6. What HOLD I actually shows — the same held object every time,

@@ -592,6 +592,15 @@ another account's organisation and could not be read from this one.
   choice changes it, with the change flashing (+0.4).
 - A new Windows build after these three.
 
+### Answered by Greg in question boxes, 24 September 2026 (in-game HUD)
+
+- Next GUI pass: the in-game HUD (vat, arcade, Lower Works, drains).
+- It becomes a **body-cam OSD**: REC dot, timestamp, vitals as a thin
+  readout, the objective as a stamped line; matching the Outlast lab look.
+- Prompts become a **drawn [E] key cap with the verb, placed near the thing**
+  in the world, not a line of text at the bottom.
+- The intake is good for now.
+
 ### Answered by Greg in question boxes, 24 September 2026 (blood)
 
 - **Blood comes from all of:** kills, damage dealt, your own blood lost, and
@@ -727,6 +736,211 @@ above were built on the remaster and win until Greg says otherwise.
   minutes and is itself a subtle tutorial. It bridges into 30 minutes of
   overworld that still teach, quietly, and that segments into complete
   personal exploration.
+
+### Answered by Greg in question boxes, 24 September 2026 (skins, cases, the jester)
+
+Greg: "first thing do clothes and the inventory model weapon and skins and
+cases using textures make a csgo case type thing with gun and knife skin
+raritys with gold being the 0.01% make it sellable on economy for heaps",
+"make the jester outfit clothing parts you can put on", and "then from there
+we can make nudity and censors".
+
+- **This comes first**, ahead of the rest of the first-30 checklist.
+- **Cases come from loot and from the shop:** they drop from bodies,
+  contracts and caches, and can be bought with scrip.
+- **A CS-style rarity ladder**, with the game's own tier names: 79.92%,
+  15.98%, 3.2%, 0.63%, 0.26%, and **gold at 0.01%**.
+- **Skins go on** guns, knives and blades, clothes (jester parts included)
+  and the breach tool / ram.
+- **Skins sell on a market on the Wire** for in-game scrip, priced by
+  rarity, wear and how many exist in the world. Gold sells for a fortune.
+  No real money.
+- **Skins are procedural patterns made in the engine**, each drop with its
+  own pattern seed.
+- **Wear rolls on the drop and keeps wearing:** fighting scuffs and bloods
+  a skin further, and clean ones sell for more.
+- **The jester outfit is four parts you put on:**
+  - the belled cap
+  - the ruff collar with the motley doublet
+  - gloves with sleeves
+  - pantaloons with curled shoes
+- **It is forced on, then yours:** the facility dresses you in it with a
+  locked collar. Once you break the lock, every part is an ordinary item
+  you can wear, remove, skin or sell.
+- **Next after this:** nudity and censors, building on the explicit /
+  mosaic presentation option (`AnatomyPresentation`).
+
+### Answered by Greg in question boxes, 24 September 2026 (what next, the censor)
+
+- **Order:** nudity and censors, then rebirth from every killer in minutes
+  0-30, then the Brain Index hub, then the combat overhaul ("all of that
+  above in that order").
+- **The censor is a body-cam glitch**, not a mosaic or black bars.
+- **It is on by default.** It turns off in the title screen's settings.
+- **Merge the HUD, the spine, the sites and the skins** into
+  `claude/dust-to-bones-look`. Done at `6c09d4c`.
+- *Built (assistant proposal, open to Greg):* the chest, groin and buttocks
+  are simple, clinical forms shaped by the intake's ANATOMY answer and the
+  body's frame. They show only where no clothing covers them (`BodyForms`).
+  When the censor is on, each exposed region sits under a volume that
+  re-reads the screen as a tearing, scanlined body-cam feed
+  (`censor_glitch.gdshader`).
+
+### Answered by Greg in question boxes, 24 September 2026 (derby loss)
+
+- **A wreck in the derby is a capture; a crush is a death.** Losing the
+  derby normally keeps the existing capture: the Captain drags you out
+  alive, and you arrive in the Bone Yard as her prisoner. If the killing
+  blow slams the hull well past zero (a crush), you die, and you regrow in
+  the vat of whoever claims you, now the Captain.
+- *Built:* the Lower Works sentinel and the drain bingyanger no longer stop
+  at a quarter of your blood. They can kill you, and you wake in a vat.
+  Your old body stays where you fell (`RebirthSite`), with what you
+  carried and any jester parts you wore, and E beside it takes them back.
+
+### Answered by Greg in question boxes, 24 September 2026 (the combat overhaul)
+
+- **Swing direction is a mouse flick at the click,** as in Mordhau or
+  Chivalry: the way the mouse is moving sets the swing (overhead, left,
+  right, stab, underhand, anything between), in first and third person.
+- **Blocking is directional, with parry timing.** Hold block and point the
+  mouse toward the incoming swing to stop it. Block just as it lands to
+  parry and stagger. The wrong side goes through.
+- **Learning the skill curve, all four:**
+  - telegraphs you can read (wind-ups show direction; faster fighters
+    telegraph less)
+  - a sparring partner in the Hunt
+  - moves (feints, combos, counters) that unlock through the blood trees
+  - a stats readout after a fight
+- **The difficulty tiers are who you fight:** scavengers, hunters, Ashline
+  captains, elites. Each has measured block, parry and feint rates, tuned so
+  a skilled player can beat each tier. There is no menu setting.
+- **Anyone can block** (Greg, in answer to whether an enemy who hasn't
+  noticed you can defend): the tier decides it whether or not they are
+  aware. A fighter inside their own wind-up is always open.
+- *Built (assistant proposal, open to Greg):* a sparring post near Nix in
+  the Hunt. E brings out a partner of your tier, and blows are padded:
+  they count, they don't wound. First to five clean hits wins, and the next
+  partner is a tier higher. After each blow and each bout, the partner says
+  what beat you.
+- **The blood-tree moves** (Greg picked one per tree, plus COMBO):
+  - Blade / Blunt: **FEINT** and **COMBO** (under FEINT).
+  - Meat: **RIPOSTE**.
+  - Iron: **HIP COUNTER**.
+  - Hush: **BACKSTAB**.
+- *Built (assistant's reading of each move, open to Greg):*
+  - FEINT: raise your guard during your own wind-up. The swing is cancelled
+    for 12 stamina, and anyone within 4.5 m bites: your next blow on them
+    can't be stopped.
+  - COMBO: after two clean hits on the same fighter, a third within 1.4 s
+    always lands. A blocked hit breaks the chain.
+  - RIPOSTE: after you parry, your next blow within 1 s can't be stopped.
+  - HIP COUNTER: parry with a gun in hand and it fires point blank into the
+    attacker. It spends a real round, and an empty or jammed gun only
+    clicks.
+  - BACKSTAB: a blow from behind on a fighter who hasn't noticed you can't
+    be stopped and does triple damage. This is the one exception to "anyone
+    can block", and only once the node is bought.
+  - Each move costs 60 blood (COMBO costs 90) and needs its tree's first
+    node. The fight readout counts the moves you used.
+
+### Greg, 24 September 2026 (the examiner's placement)
+
+- **The examiner and his PC stood in the middle of the vat aisle.** Greg
+  asked for somewhere more realistic.
+- *Built (assistant's placement, open to Greg):* the workstation is a
+  monitoring post off the aisle, to the right-front of the tank, turned to
+  face it. The screen is the terminal aimed at the subject, which is what
+  the intake is shown on. He works it from the end of the desk, and walks
+  round its corner and past the tank to his door (`station_placement_test`).
+- **Greg confirmed (question boxes, 24 September):** keep the desk beside
+  the tank; the screen faces the tank; work continues straight down
+  `DESIGN/GOAL_LOOP_2.md`.
+
+### Greg, 24 September 2026 (the logo, menus and the big checklist)
+
+- **The real logo re-animated, in the splash and on the title screen.**
+  Built as `logo_fx.gdshader`.
+- **Its strength stays as it is:** strong on the burn-in, calm behind the
+  menu.
+- **Next, all of the above:**
+  - keep working the checklist
+  - grow it toward 1,000+ lines
+  - more logo detail (embers, sound) at the same strength
+  - menus rebuilt to match the logo's style
+
+### Stated by Greg, 25 September 2026: bodies, destruction and chaos magick
+
+Said across one evening of messages, then set as the session goal. Close to
+his words; the assistant's reading is not mixed in.
+
+- **The body in the vat floats.** Suspended in the liquid, limbs loose, a slow
+  drift and bob, "not just sitting, rod up his ass type of look". The same
+  for the specimens in the other vats.
+- **The vat-room computer sits to the left or right of the lab,** not
+  directly in front, so the doctor's feed on the left of the screen has a
+  reason to be there.
+- **The slideable X-ray looks like version 0.1.** It should match the anatomy
+  loading screen, built from the body models with full, accurately
+  proportioned organs "like it's Sniper Elite 4 or 5", with gritty texture.
+- **Penetration is live and shown.** Bullets and weapons destroy organs and
+  break bones in the real anatomy, and the kill cutscenes cut to X-ray inside
+  the body as the round or blade enters, "most accurate and gorey visceral".
+- **Harvest.** You have to cut bodies open in certain ways, or kill them
+  without damaging the body, to steal organs to sell or use, and cybernetics,
+  loot and money. "It's all destructible from how hard you play."
+- **Teardown-style destruction.** The whole world's surfaces have
+  differentiating levels of hardness and destructibility, and this interacts
+  with the in-game body models and gore.
+- **Blood chaos magick.** "The more you mindlessly destroy, the higher the
+  combat and blood chaos magick system rewards you for pushing the limits of
+  combat." Chaos magick spells: holograms, summoning evil skeletons and dead
+  soldiers ("dead souljahs") to fight for you, casting fireballs, with
+  TouchDesigner-style effects replicated as in-game VFX and casting
+  animations similar to Elden Ring and modern spell casting. Spell names and
+  rules are his to give.
+- **The kinship web is overcomplicated.** It should read as a brain neural
+  network with CRT effects and good UI.
+- **The pyramid is not visualised in the index yet.**
+
+### Greg, 25 September 2026 (after the breakables): a partly destructible world
+
+Asked what "Teardown-style" should mean now that props break (his words):
+"now all the world will also be partly destructible buildings the ground
+ect, if you shoot downwards with a gun or if you blow up the ground there
+will be an impact hole".
+
+- **The world is partly destructible**: buildings and the ground, not only
+  props.
+- **The ground takes holes**: a round fired down into it leaves an impact
+  hole, and blowing it up leaves one too.
+- *Open (assistant's question, not his rule):* whether "partly" means
+  authored damage stages on each surface (`DESIGN/DESTRUCTION.md`) or
+  material really coming away as in Teardown. Asked alongside the first
+  render of a ground hole.
+
+### Greg, 25 September 2026: the New Vegas opening, again
+
+He sent the Fallout: New Vegas opening (Doc Mitchell's house) with "this
+whole opening segment from like personality test part is awesome".
+The frames he picked: waking to a blurred, overexposed view; the doctor
+sitting and talking to you; entering a name; building the face in a
+mirror device; setting stats on a carnival strength-tester machine; the
+doctor's word-association and picture questions, whose answers pick your
+skills; then the skills page.
+
+- **What he likes is the shape**, and `DESIGN/CHARACTER_CREATION.md` already
+  names Doc Mitchell as the model for the vat intake: the whole character
+  sheet is built inside a scene that is also the story's first beat, by
+  someone questioning you.
+- **The personality test part is the part he singled out.**
+- *Reference, not layout* (his standing rule): nothing of New Vegas's
+  machines, questions, mascot or rooms is reproduced. Our instrument's items
+  are original and already written (`CharacterSheet.ITEMS`).
+- *Found (assistant):* that instrument is built and scored
+  (`CharacterSheet.score_instrument`, `aptitude_verdict`) but has no caller
+  outside `sheet_test`. Picking INSTRUMENT on the intake form does nothing,
+  and neither does CHART. Proposal in `DESIGN/GOAL_LOOP_2.md` A.
 
 ## Influence register
 

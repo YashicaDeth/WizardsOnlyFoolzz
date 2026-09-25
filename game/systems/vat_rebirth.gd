@@ -70,6 +70,12 @@ static func die(location: String, cause: String, killed_by := "", position := Ve
 	var carry := CARRY.new()
 	var items: Array = carry.items.duplicate(true)
 	var worn := CLOTHING.worn("player")
+	# The parts you had on (the jester set) stay on the old body too; the new
+	# one comes out of the vat bare.
+	# Only parts actually put on: before the Hunt dresses you, the outfit
+	# record does not exist yet and there is nothing of it to leave.
+	var outfit_record := WorldHistory.subject(Outfit.SUBJECT)
+	var outfit: Dictionary = (outfit_record.get("parts", {}) as Dictionary).duplicate() if bool(outfit_record.get("initialized", false)) else {}
 	var remains_id := "remains_%d" % count
 
 	WorldHistory.begin_ledger_batch()
@@ -77,12 +83,15 @@ static func die(location: String, cause: String, killed_by := "", position := Ve
 		"kind": "remains", "name": "YOUR OLD BODY", "status": "dead",
 		"location": location, "position": [position.x, position.y, position.z],
 		"items": items, "worn_layer": worn, "worn_condition": CLOTHING.worn_condition("player"),
+		"outfit": outfit,
 		"died_of": cause, "killed_by": killed_by, "body_number": count, "recovered": false,
 	})
 	carry.items.clear()
 	carry.save_to_history()
 	if worn != "bare":
 		WorldHistory.amend_subject("player", {"worn_layer": "bare", "worn_condition": 1.0})
+	if not outfit.is_empty():
+		WorldHistory.update_subject(Outfit.SUBJECT, {"initialized": true, "parts": {}, "locked": false}, "outfit_changed")
 	WorldHistory.amend_subject("player", {
 		"deaths": count,
 		"status": "regrowing",
@@ -140,6 +149,9 @@ static func recover(remains_id: String) -> Dictionary:
 	var items: Array = remains.get("items", [])
 	for item in items:
 		carry.items.append((item as Dictionary).duplicate(true) if item is Dictionary else item)
+	var outfit: Dictionary = remains.get("outfit", {})
+	for part_id: String in outfit:
+		carry.items.append(Outfit.part_item(part_id, float(outfit[part_id])))
 	WorldHistory.begin_ledger_batch()
 	carry.save_to_history()
 	var worn := str(remains.get("worn_layer", "bare"))
@@ -147,10 +159,10 @@ static func recover(remains_id: String) -> Dictionary:
 	if worn != "bare" and CLOTHING.worn("player") == "bare":
 		WorldHistory.amend_subject("player", {"worn_layer": worn, "worn_condition": float(remains.get("worn_condition", 1.0))})
 		dressed = true
-	WorldHistory.amend_subject(remains_id, {"recovered": true, "items": [], "worn_layer": "bare"})
+	WorldHistory.amend_subject(remains_id, {"recovered": true, "items": [], "worn_layer": "bare", "outfit": {}})
 	PLAYER_ACTION_LEDGER.record("player_remains_recovered", {"remains_id": remains_id, "items": items.size(), "dressed": dressed})
 	WorldHistory.commit_ledger_batch()
-	return {"ok": true, "items": items.size(), "dressed": dressed}
+	return {"ok": true, "items": items.size() + outfit.size(), "dressed": dressed}
 
 
 ## Whether the player is carrying something by label. The facility's tools

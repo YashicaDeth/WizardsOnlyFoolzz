@@ -32,7 +32,7 @@ func _ready() -> void:
 	for _frame in 140:
 		vat._physics_process(1.0 / 30.0)
 		await get_tree().process_frame
-	for shot in [["decant_aisle", 0.0, 0.0], ["decant_floor", 0.0, -0.75], ["decant_station", 1.35, -0.2], ["decant_back", PI, -0.25]]:
+	for shot in [["decant_aisle", 0.0, 0.0], ["decant_floor", 0.0, -0.75], ["decant_station", 1.35, -0.2], ["decant_back", PI, -0.25], ["decant_up", 0.0, 0.32]]:
 		vat.yaw = float(shot[1])
 		vat.pitch = float(shot[2])
 		vat._physics_process(1.0 / 30.0)

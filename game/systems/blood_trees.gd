@@ -60,7 +60,8 @@ const EXTRA_WEAPONS := {
 ## Each node: label, style, cost (blood spent from the style's pool), the
 ## nodes it needs first, a one-line effect, and either `scales` (applied to the
 ## named weapons through the arsenal's existing customization scale path) or
-## `flag` (recorded, not yet read by any system: those say so on the tree).
+## `flag` (read by the system that owns the move; a flag nothing reads yet
+## says NOT WIRED YET in its effect, and the tree marks it).
 ## `weapons` may name arsenal ids or a whole kind ("firearm", "melee").
 const NODES := {
 	# BLADE / BLUNT
@@ -84,6 +85,17 @@ const NODES := {
 		"effect": "CLEAVER +10% DAMAGE AGAIN",
 		"weapons": ["sword"], "scales": {"damage_scale": 1.10},
 	},
+	# Greg, 24 September: the moves. Each is read by the Hunt's fight code.
+	"feint": {
+		"style": "melee", "label": "FEINT", "cost": 60, "requires": ["first_cut"],
+		"effect": "GUARD MID WIND-UP CANCELS THE SWING  THEY BITE AND OPEN UP",
+		"flag": "melee_feint",
+	},
+	"combo": {
+		"style": "melee", "label": "COMBO", "cost": 90, "requires": ["feint"],
+		"effect": "THIRD QUICK HIT IN A ROW ON ONE BODY ALWAYS LANDS",
+		"flag": "melee_combo",
+	},
 	# IRON
 	"steady_hand": {
 		"style": "firearm", "label": "STEADY HAND", "cost": 20, "requires": [], "auto": true,
@@ -105,6 +117,11 @@ const NODES := {
 		"effect": "CLEAN HEAD SHOTS  (NOT WIRED YET)",
 		"flag": "firearm_dead_eye",
 	},
+	"hip_counter": {
+		"style": "firearm", "label": "HIP COUNTER", "cost": 60, "requires": ["steady_hand"],
+		"effect": "PARRY WITH A GUN IN HAND  FIRES POINT BLANK INTO THEM",
+		"flag": "firearm_hip_counter",
+	},
 	# MEAT
 	"knuckle": {
 		"style": "martial", "label": "KNUCKLE", "cost": 20, "requires": [], "auto": true,
@@ -121,6 +138,11 @@ const NODES := {
 		"effect": "TAKEDOWNS BREAK LIMBS  (NOT WIRED YET)",
 		"flag": "martial_breaker",
 	},
+	"riposte": {
+		"style": "martial", "label": "RIPOSTE", "cost": 60, "requires": ["knuckle"],
+		"effect": "AFTER YOU PARRY  YOUR NEXT BLOW CANNOT BE STOPPED",
+		"flag": "martial_riposte",
+	},
 	# HUSH
 	"soft_foot": {
 		"style": "stealth", "label": "SOFT FOOT", "cost": 20, "requires": [], "auto": true,
@@ -136,6 +158,11 @@ const NODES := {
 		"style": "stealth", "label": "GHOST", "cost": 80, "requires": ["quiet_kill"],
 		"effect": "LONGER BEFORE THEY NOTICE  (NOT WIRED YET)",
 		"flag": "stealth_ghost",
+	},
+	"backstab": {
+		"style": "stealth", "label": "BACKSTAB", "cost": 60, "requires": ["soft_foot"],
+		"effect": "FROM BEHIND ON SOMEONE WHO HASN'T SEEN YOU  A TAKEDOWN",
+		"flag": "stealth_backstab",
 	},
 }
 

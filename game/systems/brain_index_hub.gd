@@ -29,6 +29,8 @@ const KIND_TINT := {
 }
 
 var tab := 0
+## The blood ledger, when the host has one: the COMBAT tab reads it.
+var blood_ledger: Object
 var carry: Object
 var arsenal: Object
 var player_rig: Node
@@ -68,6 +70,11 @@ func open(carry_model: Object, weapons: Object, rig: Node) -> void:
 	# The body as the world has it now: wounds, build, anatomy.
 	var record: Dictionary = WorldHistory.subject("player").duplicate(true)
 	body.call("present", record)
+	# The body in the vat wears what you wear: the jester parts, their skins,
+	# and the censor where nothing covers you (Greg, 24 September).
+	var preview_rig := body.get("rig") as BaselineHuman
+	if preview_rig != null and is_instance_valid(preview_rig):
+		Outfit.dress(preview_rig)
 	queue_redraw()
 
 
@@ -236,8 +243,28 @@ func _draw_carry(rect: Rect2) -> void:
 	if arsenal != null:
 		for weapon_id in arsenal.carried():
 			var current := str(weapon_id) == str(arsenal.current_id)
-			draw_string(font, Vector2(rect.position.x + 24, y + 14), ("> " if current else "  ") + str(weapon_id).replace("_", " ").to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, INK if current else DIM)
+			var label := str(arsenal.weapon_definition(str(weapon_id)).get("label", str(weapon_id).to_upper())) if arsenal.has_method("weapon_definition") else str(weapon_id).to_upper()
+			draw_string(font, Vector2(rect.position.x + 24, y + 14), ("> " if current else "  ") + label, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.45, 15, INK if current else DIM)
+			# Its skin, in its tier's colour, and how worn it is.
+			var skin := SkinLoadout.applied(str(weapon_id))
+			if not skin.is_empty():
+				var finish := str(skin.get("label", "")).get_slice(" | ", 1)
+				var band := str(WeaponSkins.wear_band(float(skin.get("wear", 0.0))).short)
+				draw_string(font, Vector2(rect.position.x + rect.size.x * 0.48, y + 14), "%s  %s" % [finish, band], HORIZONTAL_ALIGNMENT_LEFT, rect.size.x * 0.5, 13, Color(str(WeaponSkins.tier(str(skin.get("tier", "issue"))).ink)))
 			y += 22.0
+	y += 10.0
+	var worn := Outfit.worn()
+	_heading(Vector2(rect.position.x + 16, y), "WORN  //  " + ("COLLAR LOCKED" if bool(worn.locked) else "YOURS TO TAKE OFF"))
+	y += 28.0
+	if (worn.parts as Dictionary).is_empty():
+		draw_string(font, Vector2(rect.position.x + 24, y + 12), "NOTHING. THE CENSOR COVERS WHAT CLOTH DOES NOT.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 48, 12, DIM)
+		y += 20.0
+	else:
+		var names: Array = []
+		for part_id: String in worn.parts:
+			names.append(str(Outfit.PARTS.get(part_id, {}).get("label", part_id)))
+		draw_string(font, Vector2(rect.position.x + 24, y + 12), "  //  ".join(names), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 48, 12, INK)
+		y += 20.0
 	y += 14.0
 	var items: Array = carry.items if carry != null else []
 	var mass: float = carry.total_mass() if carry != null else 0.0
@@ -246,41 +273,107 @@ func _draw_carry(rect: Rect2) -> void:
 	var bar := Rect2(Vector2(rect.position.x + 24, y), Vector2(rect.size.x - 48, 5))
 	draw_rect(bar, DIM * Color(1, 1, 1, 0.2))
 	draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(mass / 28.0, 0.0, 1.0), bar.size.y)), TEAL)
-	y += 18.0
+	y += 16.0
 	var columns := 2
 	var cell := Vector2((rect.size.x - 48) / columns, 30)
 	for index in items.size():
 		var item: Dictionary = items[index]
 		var at := Vector2(rect.position.x + 24 + (index % columns) * cell.x, y + (index / columns) * cell.y)
-		if at.y > rect.end.y - 30:
+		if at.y > rect.end.y - 44:
+			draw_string(font, Vector2(rect.position.x + 24, rect.end.y - 14), "+%d MORE" % (items.size() - index), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, DIM)
 			break
-		var tint: Color = KIND_TINT.get(str(item.get("kind", "")), DIM)
-		# A jar filled to what it is, instead of the same placeholder bottle.
-		draw_rect(Rect2(at + Vector2(0, 4), Vector2(14, 20)), tint * Color(1, 1, 1, 0.85))
-		draw_rect(Rect2(at + Vector2(0, 4), Vector2(14, 20)), INK * Color(1, 1, 1, 0.4), false, 1.0)
-		draw_string(font, at + Vector2(22, 19), str(item.get("label", "?")), HORIZONTAL_ALIGNMENT_LEFT, cell.x - 30, 13, INK)
+		var kind := str(item.get("kind", ""))
+		var tint: Color = KIND_TINT.get(kind, DIM)
+		if kind == "skin":
+			tint = Color(str(WeaponSkins.tier(str(item.get("tier", "issue"))).ink))
+		_icon(at + Vector2(8, 14), kind, tint)
+		draw_string(font, at + Vector2(24, 19), str(item.get("label", "?")), HORIZONTAL_ALIGNMENT_LEFT, cell.x - 30, 13, INK)
+
+
+## A small drawn icon per kind of thing, so the bag stops being one
+## placeholder shape (Greg's walkthrough: "carry icons are all the same").
+func _icon(c: Vector2, kind: String, tint: Color) -> void:
+	var line := INK * Color(1, 1, 1, 0.55)
+	match kind:
+		"weapon":
+			draw_rect(Rect2(c + Vector2(-8, -5), Vector2(16, 5)), tint)
+			draw_rect(Rect2(c + Vector2(-7, 0), Vector2(5, 8)), tint)
+		"tool":
+			draw_line(c + Vector2(-7, 7), c + Vector2(5, -5), tint, 3.0)
+			draw_circle(c + Vector2(5, -5), 3.5, tint)
+		"ammo":
+			for i in 3:
+				draw_rect(Rect2(c + Vector2(-7 + i * 5, -6), Vector2(3, 12)), tint)
+		"skin":
+			draw_colored_polygon(PackedVector2Array([c + Vector2(0, -8), c + Vector2(7, 0), c + Vector2(0, 8), c + Vector2(-7, 0)]), tint)
+		"case":
+			draw_rect(Rect2(c + Vector2(-8, -5), Vector2(16, 11)), tint)
+			draw_rect(Rect2(c + Vector2(-3, -8), Vector2(6, 3)), tint)
+			draw_line(c + Vector2(-8, 0), c + Vector2(8, 0), Color(0, 0, 0, 0.5), 1.0)
+		"garment":
+			draw_colored_polygon(PackedVector2Array([c + Vector2(-8, -6), c + Vector2(-3, -8), c + Vector2(3, -8), c + Vector2(8, -6), c + Vector2(6, -1), c + Vector2(4, -2), c + Vector2(4, 8), c + Vector2(-4, 8), c + Vector2(-4, -2), c + Vector2(-6, -1)]), tint)
+		"substance", "drug", "smokeable":
+			draw_rect(Rect2(c + Vector2(-3, -8), Vector2(6, 16)), tint)
+			draw_rect(Rect2(c + Vector2(-4, -9), Vector2(8, 3)), line)
+		"cybernetic":
+			draw_rect(Rect2(c + Vector2(-6, -6), Vector2(12, 12)), tint)
+			for i in 3:
+				draw_line(c + Vector2(-9, -4 + i * 4), c + Vector2(-6, -4 + i * 4), tint, 1.0)
+				draw_line(c + Vector2(6, -4 + i * 4), c + Vector2(9, -4 + i * 4), tint, 1.0)
+		"organ", "meat", "chunk", "muscle", "fat", "limb":
+			draw_circle(c + Vector2(-2, 0), 6.0, tint)
+			draw_circle(c + Vector2(3, 2), 5.0, tint)
+		"bone":
+			draw_line(c + Vector2(-6, 6), c + Vector2(6, -6), tint, 3.0)
+			draw_circle(c + Vector2(-6, 6), 2.5, tint)
+			draw_circle(c + Vector2(6, -6), 2.5, tint)
+		_:
+			draw_rect(Rect2(c + Vector2(-5, -8), Vector2(10, 16)), tint * Color(1, 1, 1, 0.85))
+	draw_rect(Rect2(c + Vector2(-10, -10), Vector2(20, 20)), line * Color(1, 1, 1, 0.4), false, 1.0)
 
 
 func _draw_combat(rect: Rect2) -> void:
 	var font := ThemeDB.fallback_font
 	var y := rect.position.y + 18.0
-	_heading(Vector2(rect.position.x + 16, y), "WHAT THE BODY HAS DONE")
+	_heading(Vector2(rect.position.x + 16, y), "BLOOD  //  WHAT FIGHTING HAS EARNED")
 	y += 34.0
-	var rows := [
-		["BODIES OPENED", WorldHistory.event_count("npc_anatomy_hit")],
-		["KILLED", WorldHistory.event_count("npc_killed")],
-		["WEAPONS DRAWN", WorldHistory.event_count("weapon_drawn")],
-	]
+	# Blood per style (the four trees), as bars: earned in total, and what is
+	# left to spend. The ledger owns the numbers.
+	var width := rect.size.x - 280.0
+	for style_id in BloodTrees.STYLE_ORDER:
+		var spec: Dictionary = BloodTrees.STYLES[style_id]
+		var earned := int(blood_ledger.style_earned(style_id)) if blood_ledger != null else 0
+		var left := int(blood_ledger.available(style_id)) if blood_ledger != null else 0
+		draw_string(font, Vector2(rect.position.x + 24, y + 12), str(spec.label), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, INK)
+		var track := Rect2(Vector2(rect.position.x + 170, y + 3), Vector2(width, 10))
+		draw_rect(track, DIM * Color(1, 1, 1, 0.2))
+		var scale_ := maxf(200.0, float(earned))
+		draw_rect(Rect2(track.position, Vector2(track.size.x * clampf(float(earned) / scale_, 0.0, 1.0), track.size.y)), (spec.tone as Color) * Color(1, 1, 1, 0.5))
+		draw_rect(Rect2(track.position, Vector2(track.size.x * clampf(float(left) / scale_, 0.0, 1.0), track.size.y)), spec.tone)
+		draw_string(font, Vector2(track.end.x + 12, y + 12), "%d / %d" % [left, earned], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, DIM)
+		y += 26.0
+	y += 14.0
+	_heading(Vector2(rect.position.x + 16, y), "BY WEAPON")
+	y += 30.0
 	if arsenal != null:
-		rows.append(["IN HAND", str(arsenal.current_id).replace("_", " ").to_upper()])
+		for weapon_id in arsenal.carried():
+			var blood := int(blood_ledger.weapon_blood(str(weapon_id))) if blood_ledger != null else 0
+			var skin := SkinLoadout.applied(str(weapon_id))
+			var kills := int(skin.get("kills", 0))
+			var label := str(arsenal.weapon_definition(str(weapon_id)).get("label", str(weapon_id).to_upper()))
+			draw_string(font, Vector2(rect.position.x + 24, y), label, HORIZONTAL_ALIGNMENT_LEFT, 190, 14, INK if str(weapon_id) == str(arsenal.current_id) else DIM)
+			var tally := ("   //   %d KILL%s ON ITS SKIN" % [kills, "" if kills == 1 else "S"]) if kills > 0 else ""
+			draw_string(font, Vector2(rect.position.x + 220, y), "%d BLOOD%s" % [blood, tally], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, INK)
+			y += 22.0
+	y += 16.0
+	var rows := [["BODIES OPENED", WorldHistory.event_count("npc_anatomy_hit")], ["KILLED", WorldHistory.event_count("npc_killed")]]
 	if player_rig != null and player_rig.get("anatomy") != null:
 		rows.append(["PAIN", "%d" % roundi(float(player_rig.anatomy.pain))])
 	for row in rows:
-		draw_string(font, Vector2(rect.position.x + 24, y), str(row[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, DIM)
-		draw_string(font, Vector2(rect.position.x + 260, y), str(row[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, INK)
-		y += 26.0
-	y += 16.0
-	draw_string(font, Vector2(rect.position.x + 24, y), "Points and weapon specialisation are designed with Greg once these read true.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 48, 12, DIM)
+		draw_string(font, Vector2(rect.position.x + 24, y), str(row[0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, DIM)
+		draw_string(font, Vector2(rect.position.x + 220, y), str(row[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, INK)
+		y += 22.0
+	CellOutzType.draw_condensed(self, Vector2(rect.position.x + 24, rect.end.y - 22), "7 OPENS THE BLOOD TREES  //  U OPENS THE WIRE EXCHANGE: SKINS, CASES, WARDROBE", 9.0, TEAL, 0.8)
 
 
 func _draw_index(rect: Rect2) -> void:

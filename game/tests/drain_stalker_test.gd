@@ -57,7 +57,7 @@ func _ready() -> void:
 	for _second in 60:
 		stalker.global_position = player.global_position
 		_tick(stalker, 1.0)
-	check(is_equal_approx(stalker.blood, DrainStalker.BLOOD_FLOOR), "it can bleed you to the floor and no further, like the sentinel")
+	check(is_equal_approx(stalker.blood, DrainStalker.BLOOD_FLOOR), "it can bleed you all the way out now (Greg: every killer sends you to the vat)")
 
 	# Walk away quietly and it loses the trail.
 	player.global_position = Vector3(0, 0.85, -40)

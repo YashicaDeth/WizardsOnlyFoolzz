@@ -31,6 +31,20 @@ const CISTERN_WIDTH := 16.0
 const CISTERN_HEIGHT := 7.0
 const WALK_SPEED := 3.4
 const EXIT_REACH := 3.2
+const WORLD_BREAK := preload("res://systems/world_break.gd")
+## Things the breach tool breaks (`DESIGN/GOAL_LOOP_2.md` 0.2): dumped on the
+## gallery walkways against the wall, between the ribs (every 4.2 m from
+## z 1.0), leaving a metre and more of walkway beside each.
+const PROPS := [
+	["barrel", "drains_barrel_1", Vector3(2.55, 0, -1.1), 0.0],
+	["crate", "drains_crate_1", Vector3(-2.55, 0, -5.0), 0.0],
+	["crate", "drains_crate_2", Vector3(-2.5, 0, -5.9), 0.3],
+	["locker", "drains_locker", Vector3(2.62, 0, -9.5), -PI * 0.5],
+	["chair", "drains_chair", Vector3(-2.4, 0, -13.7), PI * 0.5],
+	["barrel", "drains_barrel_2", Vector3(2.55, 0, -17.9), 0.0],
+	["jar", "drains_jar", Vector3(-2.6, 0, -17.6), 0.0],
+	["monitor", "drains_monitor", Vector3(-2.55, 0, -22.1), 0.8],
+]
 
 const DISTRICT_LABELS := {
 	"waste_gallery": "WASTE GALLERY",
@@ -45,6 +59,7 @@ var pitch := -0.05
 var objective: Label
 var status: Label
 var prompt: Label
+var osd: BodyCamOSD
 var district := ""
 var district_timer := 0.0
 var surfaced := false
@@ -61,6 +76,8 @@ func _ready() -> void:
 	_build_gallery()
 	_build_cistern()
 	_build_outfall()
+	for spec in PROPS:
+		BreakableProp.place(self, spec[0], spec[1], spec[2], spec[3])
 	_build_player()
 	_build_stalker()
 	_build_hud()
@@ -276,6 +293,11 @@ func _build_stalker() -> void:
 	]
 	stalker.build(round)
 	stalker.bind(player)
+	# Greg, 24 September: it can kill you now, and you wake in the vat.
+	stalker.struck.connect(_on_stalker_struck)
+	rebirth_site = RebirthSite.new()
+	add_child(rebirth_site)
+	rebirth_site.setup("old_drains", player)
 
 
 func _build_hud() -> void:
@@ -301,13 +323,27 @@ func _build_hud() -> void:
 	prompt.add_theme_font_size_override("font_size", 15)
 	prompt.add_theme_color_override("font_color", Color("dd9851"))
 	layer.add_child(prompt)
+	osd = BodyCamOSD.new()
+	osd.name = "BodyCamOSD"
+	layer.add_child(osd)
+	osd.adopt(status, objective, prompt, "BELOW 0C  //  OLD DRAINS")
+	osd.camera = camera
+
+
+## The attack button with the ram in hand: it breaks what it meets, and still
+## stuns the stalker when that is close enough.
+func _swing_breach_tool() -> void:
+	if not VatRebirth.carries("BREACH TOOL"):
+		return
+	WORLD_BREAK.swing(camera, FacilityGuardPost.RAM_DAMAGE, "breach_tool", player)
+	stalker.discharge(player.global_position)
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var clicked: bool = event.pressed
-		if clicked and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and VatRebirth.carries("BREACH TOOL"):
-			stalker.discharge(player.global_position)
+		if clicked and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+			_swing_breach_tool()
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		yaw -= event.relative.x * 0.0026
@@ -352,7 +388,17 @@ func _enter(district_id: String) -> void:
 		district_timer = 3.0
 
 
+var rebirth_site: RebirthSite
+
+
+func _on_stalker_struck(_damage: float) -> void:
+	if stalker.blood <= 0.0:
+		rebirth_site.die("taken by the bingyanger in the old drains", DrainStalker.SUBJECT_ID)
+
+
 func _interact() -> void:
+	if not rebirth_site.try_recover().is_empty():
+		return
 	if surfaced or _flat_distance(EXIT_AT) > EXIT_REACH:
 		return
 	_enter("waste_gallery")
@@ -384,8 +430,11 @@ func _update_hud() -> void:
 	objective.text = "OBJECTIVE // FOLLOW THE WATER OUT"
 	if surfaced:
 		prompt.text = ""
+	elif not rebirth_site.nearest().is_empty():
+		prompt.text = "[E] TAKE BACK WHAT YOUR OLD BODY HOLDS"
 	elif _flat_distance(EXIT_AT) <= EXIT_REACH:
 		prompt.text = "[E] FORCE THE GRATE // CLIMB OUT"
+		osd.point_at(EXIT_AT + Vector3(0, 1.8, -1.2))
 	elif district_timer > 0.0:
 		prompt.text = str(DISTRICT_LABELS.get(district, ""))
 	else:

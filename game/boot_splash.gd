@@ -39,6 +39,16 @@ static func _load_texture(path: String) -> Texture2D:
 
 enum Stage { CELLOUTZ, GRANDEUR, MARK, DONE }
 
+## Greg, 24 September: re-animate the real logo with gfx. The seal and the
+## lockup run `logo_fx.gdshader` on the actual rasters: the seal's arcs
+## assemble and spark as they lock, the wordmark burns and glitches in, then
+## breathes (rust crawl, drips running, a sheen sweep, a heartbeat).
+const LOGO_FX := preload("res://shaders/logo_fx.gdshader")
+const LOGO_EMBERS := preload("res://systems/logo_embers.gd")
+const LOGO_AUDIO := preload("res://systems/logo_audio.gd")
+const HEART_RATE := 1.15
+const SEAL_ASSEMBLE_SECONDS := 1.05
+
 const STAGE_DURATION := {
 	Stage.CELLOUTZ: 2.4,
 	Stage.GRANDEUR: 2.4,
@@ -67,6 +77,16 @@ var seal_rect: TextureRect
 var grandeur_rect: TextureRect
 var collage_rects: Array[TextureRect] = []
 var reveal_material: ShaderMaterial
+var seal_material: ShaderMaterial
+var mark_material: ShaderMaterial
+## Sparks thrown off where the seal's arcs lock: position, velocity, life.
+var sparks: Array[Dictionary] = []
+var seal_locked := false
+var embers: Control
+var logo_audio: Node
+var _burn_cued := false
+var _tear_cued := false
+var _last_beat := -1
 var grandeur_material: ShaderMaterial
 var backdrop: SplashBackdrop
 var frame: RegalFrame
@@ -146,9 +166,26 @@ func _build_mark_layer() -> void:
 	grandeur_material.shader = shader
 	grandeur_material.set_shader_parameter("progress", 0.0)
 
+	seal_material = ShaderMaterial.new()
+	seal_material.shader = LOGO_FX
+	seal_material.set_shader_parameter("is_seal", true)
+	seal_material.set_shader_parameter("drips_on", 0.0)
+	seal_material.set_shader_parameter("reveal", 0.0)
+	seal_material.set_shader_parameter("assemble", 0.0)
+	mark_material = ShaderMaterial.new()
+	mark_material.shader = LOGO_FX
+	mark_material.set_shader_parameter("reveal", 0.0)
+
 	grandeur_rect = _build_reveal_rect(GRANDEUR_PATH, grandeur_material)
-	seal_rect = _build_reveal_rect(WOF_SEAL_PATH, reveal_material)
-	mark_rect = _build_reveal_rect(WOF_STACKED_PATH, reveal_material)
+	seal_rect = _build_reveal_rect(WOF_SEAL_PATH, seal_material)
+	mark_rect = _build_reveal_rect(WOF_STACKED_PATH, mark_material)
+	embers = LOGO_EMBERS.new()
+	embers.name = "Embers"
+	embers.amount = 0.0
+	mark_rect.add_child(embers)
+	logo_audio = LOGO_AUDIO.new()
+	logo_audio.name = "LogoAudio"
+	add_child(logo_audio)
 
 
 func _build_reveal_rect(path: String, material: ShaderMaterial) -> TextureRect:
@@ -192,6 +229,7 @@ func _process(delta: float) -> void:
 	if finishing:
 		return
 	stage_clock += delta
+	_update_sparks(delta)
 	var duration: float = STAGE_DURATION.get(stage, 1.0)
 	_update_grandeur_visibility()
 	_update_mark_visibility()
@@ -258,17 +296,77 @@ func _update_mark_visibility() -> void:
 		# Fade the image as well as tearing it on.  This is still a graphic mark,
 		# but it follows the same soft entrance/exit language as the text cards.
 		seal_rect.modulate = Color(1, 1, 1, seal_reveal * (1.0 - mark_reveal) * out_alpha)
-		seal_rect.material.set_shader_parameter("progress", seal_reveal)
+		var assembled := clampf(stage_clock / SEAL_ASSEMBLE_SECONDS, 0.0, 1.0)
+		seal_material.set_shader_parameter("reveal", seal_reveal)
+		seal_material.set_shader_parameter("assemble", ease(assembled, 0.4))
+		seal_material.set_shader_parameter("beat", heartbeat(stage_clock))
+		# A burst of glitch as it arrives, and a kick when it locks.
+		seal_material.set_shader_parameter("glitch", clampf(0.9 - stage_clock * 1.2, 0.0, 1.0) + (0.6 if assembled >= 1.0 and stage_clock < SEAL_ASSEMBLE_SECONDS + 0.12 else 0.0))
+		if not _burn_cued:
+			_burn_cued = true
+			logo_audio.cue("burn")
+		if assembled >= 1.0 and not seal_locked:
+			seal_locked = true
+			_throw_sparks()
+			logo_audio.cue("lock")
+		var beat_index := floori(stage_clock * HEART_RATE)
+		if beat_index != _last_beat:
+			_last_beat = beat_index
+			logo_audio.cue("beat")
 		var seal_scale := lerpf(0.56, 0.82, seal_reveal) * (1.0 + sin(stage_clock * 1.6) * 0.012)
 		seal_rect.size = seal_rect.texture.get_size() * seal_scale
 		seal_rect.position = size * 0.5 - seal_rect.size * 0.5
 	if mark_rect.texture != null:
 		mark_rect.modulate = Color(1, 1, 1, mark_reveal * out_alpha)
-		mark_rect.material.set_shader_parameter("progress", mark_reveal)
+		var since := stage_clock - mark_start
+		mark_material.set_shader_parameter("reveal", mark_reveal)
+		mark_material.set_shader_parameter("beat", heartbeat(stage_clock))
+		# It tears in hard, then settles to an occasional flicker.
+		mark_material.set_shader_parameter("glitch", clampf(1.0 - since * 0.8, 0.12, 1.0) if since > 0.0 else 0.0)
+		if since > 0.0 and not _tear_cued:
+			_tear_cued = true
+			logo_audio.cue("tear")
+		embers.amount = mark_reveal * out_alpha
 		var mark_size := size.x * 0.52
 		var aspect: float = mark_rect.texture.get_size().y / mark_rect.texture.get_size().x
 		mark_rect.size = Vector2(mark_size, mark_size * aspect)
 		mark_rect.position = size * 0.5 - mark_rect.size * 0.5
+
+
+## A heartbeat, 0..1: a double thump (lub-dub) every beat.
+static func heartbeat(clock: float) -> float:
+	var phase := fmod(clock * HEART_RATE, 1.0)
+	return maxf(exp(-pow((phase - 0.05) * 18.0, 2.0)), 0.7 * exp(-pow((phase - 0.22) * 18.0, 2.0)))
+
+
+## Where the arcs meet: sparks fly out from the four joints of the ring.
+func _throw_sparks() -> void:
+	if seal_rect == null:
+		return
+	var centre := seal_rect.position + seal_rect.size * 0.5
+	var radius := seal_rect.size.x * 0.34
+	for joint in 4:
+		var angle := -PI * 0.75 + PI * 0.5 * float(joint)
+		var at := centre + Vector2(cos(angle), sin(angle)) * radius
+		for spark in 9:
+			var spread := angle + randf_range(-0.9, 0.9)
+			sparks.append({"at": at, "v": Vector2(cos(spread), sin(spread)) * randf_range(120.0, 420.0), "life": randf_range(0.35, 0.8)})
+
+
+func _update_sparks(delta: float) -> void:
+	for spark in sparks.duplicate():
+		spark.v = (spark.v as Vector2) + Vector2(0, 520.0) * delta
+		spark.at = (spark.at as Vector2) + (spark.v as Vector2) * delta
+		spark.life = float(spark.life) - delta
+		if float(spark.life) <= 0.0:
+			sparks.erase(spark)
+
+
+func _draw_sparks() -> void:
+	for spark in sparks:
+		var tail: Vector2 = (spark.at as Vector2) - (spark.v as Vector2) * 0.03
+		var heat := clampf(float(spark.life) * 1.6, 0.0, 1.0)
+		draw_line(tail, spark.at, Color(1.0, 0.55 + heat * 0.4, 0.2 + heat * 0.5, heat), 2.0, true)
 
 
 func _advance_stage() -> void:
@@ -313,6 +411,7 @@ func _draw() -> void:
 			# than fighting it for the centre of the frame.
 			_draw_subtitle("PRESENTS", STAGE_DURATION[Stage.GRANDEUR], size.y * 0.5 + grandeur_rect.size.y * 0.5 + 26.0)
 	_draw_regal_frame()
+	_draw_sparks()
 
 
 ## A physical-looking frame — copper registration, blood-red wet forms and

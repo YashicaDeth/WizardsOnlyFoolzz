@@ -107,3 +107,23 @@ the player is what came out whole, and bingyangers are what came out wrong.
   rebirth that goes wrong?
 - What does killing one cost: karma, or witnesses?
 - What CellOutz calls them officially, and whether the Wire reports on them.
+
+## Built, 24 September: smashing the Growing Floor tanks
+
+Greg: "make sure you're able to smash the glass and let the liquid and the
+yangas out of the vats post creation".
+
+- **When:** once you are out of your own tank.
+- **How:** look at any other tank up close and click.
+  - The broken restraint (or the axe) breaks it in two blows; bare fists
+    take four.
+  - Each blow cracks the glass.
+- **When it goes:** the glass flies, the medium drains out into a dark
+  spill, and the subject climbs out as a loose bingyanger. It rolls
+  friendly or hostile, and a hostile one's blows land on you.
+- **Recorded:** WorldHistory files the cracks, the smash, and the freed
+  subject (`place: growing_floor`).
+- **Covered by:** `systems/vat_smash.gd`, `vat_smash_test`,
+  `vat_smash_capture`.
+- **Still open:** the ones you free turning up again in the drains and the
+  Lower Works.

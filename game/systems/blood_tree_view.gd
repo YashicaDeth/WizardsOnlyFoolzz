@@ -120,11 +120,13 @@ func node_rect(style_id: String, node_id: String, column: Rect2) -> Rect2:
 		if BloodTrees.node_depth(other) == depth:
 			siblings.append(other)
 	var slot := siblings.find(node_id)
-	var gap := 12.0
-	var row_width := siblings.size() * NODE_SIZE.x + (siblings.size() - 1) * gap
-	var x := column.position.x + (column.size.x - row_width) * 0.5 + slot * (NODE_SIZE.x + gap)
+	var gap := 12.0 if siblings.size() < 3 else 6.0
+	# A crowded row narrows its boxes to stay inside the style's column.
+	var width := minf(NODE_SIZE.x, (column.size.x - 16.0 - (siblings.size() - 1) * gap) / float(maxi(1, siblings.size())))
+	var row_width := siblings.size() * width + (siblings.size() - 1) * gap
+	var x := column.position.x + (column.size.x - row_width) * 0.5 + slot * (width + gap)
 	var y := column.position.y + depth * (NODE_SIZE.y + 34.0)
-	return Rect2(Vector2(x, y), NODE_SIZE)
+	return Rect2(Vector2(x, y), Vector2(width, NODE_SIZE.y))
 
 
 func _draw() -> void:
@@ -190,11 +192,15 @@ func _draw_node(rect: Rect2, node_id: String, tone: Color, selected: bool) -> vo
 		var grow := 4.0 + 3.0 * flash
 		draw_rect(rect.grow(grow), BONE, false, 1.5)
 	var text_tone := INK if open else (BONE if reachable else DIM)
-	CellOutzType.draw_text(self, rect.position + Vector2(10.0, 10.0), CellOutzType.fit_condensed(str(node.label), rect.size.x - 20.0, 11.0, 1.1), 11.0, text_tone, 1.1)
+	# A narrow box sets its name smaller before it ever cuts it short.
+	var cap := 11.0
+	while cap > 7.0 and CellOutzType.width(str(node.label), cap, 1.1) > rect.size.x - 20.0:
+		cap -= 0.5
+	CellOutzType.draw_text(self, rect.position + Vector2(10.0, 10.0 + (11.0 - cap) * 0.5), CellOutzType.fit_condensed(str(node.label), rect.size.x - 20.0, cap, 1.1), cap, text_tone, 1.1)
 	var status := "OPEN" if open else "%d BLOOD" % int(node.cost)
 	CellOutzType.draw_text(self, rect.position + Vector2(10.0, 30.0), status, 8.0, text_tone * Color(1, 1, 1, 0.85), 0.9)
-	if node.has("flag") and not open:
-		CellOutzType.draw_text(self, rect.position + Vector2(rect.size.x - 22.0, 30.0), "*", 8.0, DIM, 0.9)
+	if str(node.effect).contains("NOT WIRED") and not open:
+		CellOutzType.draw_text(self, rect.position + Vector2(rect.size.x - 14.0, 10.0), "*", 8.0, DIM, 0.9)
 
 
 func _draw_footer(margin: float) -> void:

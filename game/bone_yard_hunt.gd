@@ -87,6 +87,9 @@ const SLEEP_WAKE_HOUR := 7.0
 const RESTRICTED_STORAGE_POSITION := Vector3(-2.6, 0.0, 18.0)
 const HANDHELD := preload("res://systems/handheld_device.gd")
 const ANATOMY_COMPONENT := preload("res://systems/anatomy_component.gd")
+const WORLD_BREAK := preload("res://systems/world_break.gd")
+const STREET_LIGHT := preload("res://systems/street_light.gd")
+const BREAKABLE_PROP := preload("res://systems/breakable_prop.gd")
 const WORLD_GENERATOR := preload("res://systems/ashbloom_world_generator.gd")
 const MISFIRE_DIRECTOR := preload("res://systems/reality_misfire_director.gd")
 ## AP1.6. Was `preload()` — evaluated at script compile time, which meant
@@ -325,6 +328,13 @@ var guard_stamina_drain := 14.0
 ## retained as a keyboard fallback, but RMB is the production first-person bind.
 var guard_aim := Vector2.ZERO
 var guard_side := ""
+## What happened in the current fight, for the readout when it ends (Greg,
+## 24 September: "a stats readout" is one of the ways to learn the curve).
+var fight_stats: Dictionary = {}
+var _fight_quiet := 0.0
+var fight_readout: Label
+var _fight_readout_time := 0.0
+const FIGHT_QUIET_SECONDS := 6.0
 var last_blade_read: Dictionary = {}
 ## A timed parry used to change only numbers and text.  Keep the most recent
 ## burst as a reference for the tiny presentation test; it is never used as
@@ -434,6 +444,18 @@ var body_motion: Node
 var hunter_appearance: Node
 var crouching := false
 var strike_windup := -1.0
+## The last breakable a blow or round landed on, for the HUD and tests.
+var last_world_break: Dictionary = {}
+## The blood-tree moves (Greg, 24 September). Riposte: until when the next
+## blow after a parry cannot be stopped. Combo: who the last clean hits went
+## into, how many, and when the last one landed.
+const FEINT_STAMINA := 12.0
+const FEINT_BAIT_RANGE := 4.5
+const RIPOSTE_WINDOW := 1.0
+const COMBO_WINDOW := 1.4
+const BACKSTAB_DAMAGE := 3.0
+var riposte_until := -1.0
+var combo_chain := {"subject": "", "count": 0, "at": -99.0}
 var rival_attack_clock := 0.0
 var dodge_remaining := 0.0
 ## AD1.1. Set on the keypress, consumed the next physics step. Not applied
@@ -1117,9 +1139,12 @@ func _ready() -> void:
 	arsenal.name = "HunterArsenal"
 	player_body.add_child(arsenal)
 	arsenal.configure(player_rig)
+	arsenal.apply_skins()
+	arsenal.fired.connect(_on_skin_fired)
 	arsenal.reload_finished.connect(_on_weapon_reload_finished)
 	blood_ledger = BloodLedger.new()
 	blood_ledger.attach(self)
+	blood_ledger.blood_earned.connect(_on_skin_blood)
 	body_motion = HUNTER_BODY_MOTION.new()
 	body_motion.name = "HunterBodyMotion"
 	player_body.add_child(body_motion)
@@ -1138,17 +1163,21 @@ func _ready() -> void:
 	brain_hub.name = "BrainIndexHub"
 	$HUD.add_child(brain_hub)
 	brain_hub.open_surface.connect(_on_hub_surface)
+	brain_hub.blood_ledger = blood_ledger
 	photo_mode = PhotoMode.new()
 	add_child(photo_mode)
 	case_menu = CASE_MENU.new()
 	case_menu.name = "CaseMenu"
 	$HUD.add_child(case_menu)
 	case_menu.close_requested.connect(_toggle_cases)
+	case_menu.loadout_changed.connect(arsenal.apply_skins)
 	contact_menu = CONTACT_MENU.new()
 	contact_menu.name = "ContactMenu"
 	$HUD.add_child(contact_menu)
 	contact_menu.close_requested.connect(_toggle_contact)
 	_spawn_friend()
+	_build_sparring_post()
+	_build_breakables()
 	# AE.1. The captain is still spawned exactly as she always was, and this
 	# runs alongside her rather than instead of her or through her. The order
 	# matters: `_spawn_rival()` owns the Ashline captain and stays untouched,
@@ -1247,6 +1276,10 @@ func _build_player_rig() -> void:
 	# every build — CellOutz re-dresses its bodies, which is also what keeps a
 	# scene change from having to solve wardrobe persistence today.
 	player_rig.dress(ClothingShell.humiliation_wardrobe())
+	# Greg, 24 September: the jester set is four parts you can take off once
+	# the collar's lock is broken. The outfit record says what is worn; a
+	# world that has none yet is the forced set, collar locked, as before.
+	Outfit.dress(player_rig)
 	# The same rule the world rigs get through `style_world_rig`. The player
 	# never goes through it -- they are built here rather than styled from a
 	# name -- so their 124 casters were the largest single body in the scene
@@ -1849,6 +1882,7 @@ func _captain_name() -> String:
 
 
 func _physics_process(delta: float) -> void:
+	_tick_fight(delta)
 	if kill_cam.active:
 		return
 	# The resolution window does not stop the world. Standing over someone
@@ -1933,6 +1967,8 @@ func _physics_process(delta: float) -> void:
 	# is worse than a control that does nothing.
 	var holding_melee_guard := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and arsenal != null and str(arsenal.current().get("kind", "")) != "firearm"
 	var wants_guard := (holding_melee_guard or Input.is_key_pressed(KEY_X)) and panel_mode.is_empty() and not resolution_ui.visible and grapple_target.is_empty() and dodge_remaining <= 0.0
+	if wants_guard and strike_windup >= 0.0:
+		try_feint()
 	if wants_guard and guard_strength() > 0.0 and stamina > 1.0 and not stumbling():
 		if not guarding:
 			guard_raised = 0.0
@@ -2647,6 +2683,11 @@ func _resolve_strike() -> void:
 		ballistics.mark_impact(wall_hit.position, wall_hit.normal, float(report.get("damage", 24.0)) * 0.05)
 		PLAYER_ACTION_LEDGER.record("melee_struck_wall", {"weapon": str(report.get("weapon", "")), "location": HUNT_LOCATION})
 		prompt.text = "STEEL ON STONE"
+		# Whatever the blade met, if it can break, it takes the blow.
+		var broke: Dictionary = WORLD_BREAK.hit(wall_hit.get("collider"), float(report.get("damage", 24.0)), "melee", wall_hit.position, Vector3(sin(yaw), 0.0, cos(yaw)), str(report.get("weapon", "")), "melee")
+		if not broke.is_empty():
+			prompt.text = "IT GIVES" if not bool(broke.get("broken", false)) else "IT BREAKS APART"
+			last_world_break = broke
 		connected = true
 		return
 	if enemy == null or not enemy.visible or enemy_retreating:
@@ -2765,11 +2806,51 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 	if nearest_index < 0 or nearest_distance > reach:
 		return false
 	var actor: Dictionary = encounter_actors[nearest_index]
+	# Read before the blow provokes them: were they unaware, facing away?
+	var unaware_behind := _unaware_and_behind(actor)
 	_provoke_actor(actor)
 	var target: Node3D = actor.node as Node3D
 	var facing := strike_dir.dot((target.global_position - player).normalized())
 	if facing < 0.12:
 		return false
+	# Greg, 24 September: they defend by tier. A fighter inside their own
+	# wind-up is committed and open; otherwise they may block the swing or
+	# turn it, which costs you footing.
+	fight_stats["swings"] = int(fight_stats.get("swings", 0)) + 1
+	_fight_active()
+	var defence_sequence := int(actor.get("defence_sequence", 0))
+	actor["defence_sequence"] = defence_sequence + 1
+	var committed := float(actor.get("attack_time", 0.0)) > _actor_attack_cycle(actor) * float(FighterTier.spec(str(actor.get("tier", "hunter"))).telegraph)
+	var move := _forced_open(actor, unaware_behind)
+	var defence := "open" if not move.is_empty() else FighterTier.defend(str(actor.get("tier", "hunter")), str(actor.subject_id), defence_sequence, committed or _actor_stumbling(actor))
+	if not move.is_empty():
+		fight_stats[move] = int(fight_stats.get(move, 0)) + 1
+		prompt.text = _MOVE_CALLS[move] % str(actor.display_name).to_upper()
+		if move == "backstab":
+			attack = attack.duplicate()
+			attack["damage"] = float(attack.get("damage", 0.0)) * BACKSTAB_DAMAGE
+		PLAYER_ACTION_LEDGER.record("blood_move", {"move": move, "subject_id": actor.subject_id, "weapon": attack.get("weapon", ""), "location": HUNT_LOCATION})
+	_note_combo(actor, defence, move)
+	if defence == "parry":
+		fight_stats["they_parried"] = int(fight_stats.get("they_parried", 0)) + 1
+		if bool(actor.get("sparring", false)):
+			_spar_said(actor, "TURNED. YOU SWUNG INTO MY GUARD. WAIT FOR MY WIND-UP.")
+		lose_footing(0.5, "%s TURNED YOUR BLOW // CATCH THEM MID-SWING" % str(actor.display_name).to_upper())
+		impact_feel.strike(0.7, "cut", false)
+		return true
+	if defence == "block":
+		fight_stats["they_blocked"] = int(fight_stats.get("they_blocked", 0)) + 1
+		attack = attack.duplicate()
+		attack["damage"] = float(attack.get("damage", 0.0)) * 0.25
+		prompt.text = "%s BLOCKED IT" % str(actor.display_name).to_upper()
+	else:
+		fight_stats["landed"] = int(fight_stats.get("landed", 0)) + 1
+		if committed:
+			fight_stats["punished"] = int(fight_stats.get("punished", 0)) + 1
+	# Sparring: a clean hit is a point, a blocked one is not; nobody bleeds.
+	if bool(actor.get("sparring", false)):
+		_spar_landed(actor, defence)
+		return true
 	# The hunter turns into the blow for a moment, so a strike behind you is
 	# seen landing rather than connecting through your back.
 	var turn := target.global_position - player
@@ -2893,6 +2974,11 @@ func _on_round_hit(hit: Dictionary) -> void:
 	# reached, exactly the way `_trace_actor()`'s instant raycast already did.
 	if struck != null and struck is Node and _resolve_body_hit(struck as Node, hit, payload):
 		return
+	# A round that met something breakable breaks it a little, or all the way.
+	if struck != null:
+		var broke: Dictionary = WORLD_BREAK.hit(struck, float(payload.get("damage", 20.0)), "round", hit.get("position", Vector3.ZERO), hit.get("direction", Vector3.FORWARD), str(payload.get("weapon", "")), "firearm")
+		if not broke.is_empty():
+			last_world_break = broke
 	WorldHistory.record_event("round_struck_world", {
 		"calibre": str(hit.get("calibre", "")),
 		"energy": snappedf(float(hit.get("energy", 0.0)), 0.01),
@@ -3153,7 +3239,7 @@ func _attack_wall(reach: float) -> Dictionary:
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
 		return {}
-	return {"position": hit.position, "normal": hit.normal}
+	return {"position": hit.position, "normal": hit.normal, "collider": hit.get("collider")}
 
 
 func _player_collision_exclusions() -> Array[RID]:
@@ -5167,7 +5253,17 @@ func _begin_extraction() -> void:
 	# whatever the body's actual anatomy might also be worth digging for.
 	# The same key finishes the job on a second press if there is still a
 	# real dig left, rather than needing a control of its own to discover.
-	var carried_substance := str(WorldHistory.subject(str(body.subject_id)).get("carried_substance", ""))
+	# Greg, 24 September: cases drop from bodies. About one in sixteen carries
+	# one, decided by who they are, so searching twice does not reroll it.
+	var body_record := WorldHistory.subject(str(body.subject_id))
+	var dropped := SkinCase.drop_for(float(absi(str(body.subject_id).hash()) % 10000) / 10000.0)
+	if not dropped.is_empty() and not bool(body_record.get("case_taken", false)):
+		handheld.carry.items.append(SkinCase.case_item(dropped))
+		handheld.carry.save_to_history()
+		WorldHistory.update_subject(str(body.subject_id), {"case_taken": true}, "robbed")
+		prompt.text = "%s TAKEN FROM THEIR POCKET // [U] OPEN IT AT THE EXCHANGE" % str(SkinCase.CASES[dropped].label)
+		return
+	var carried_substance := str(body_record.get("carried_substance", ""))
 	if not carried_substance.is_empty():
 		var body_node := body.get("node") as Node3D
 		var at := body_node.global_position if body_node != null and is_instance_valid(body_node) else player
@@ -5836,8 +5932,13 @@ func _update_encounter_actors(delta: float) -> void:
 			# already enforces, on the other side of the fight.
 			if float(actor.get("attack_time", 0.0)) <= 0.0:
 				var sequence := int(actor.get("attack_sequence", 0))
-				var side_index := posmod(hash(str(actor.get("subject_id", index))) + sequence, BladeRead.SIDES.size())
-				actor["attack_side"] = BladeRead.SIDES[side_index]
+				var tier := str(actor.get("tier", "hunter"))
+				var fighter_id := str(actor.get("subject_id", index))
+				# Lower tiers work round their sides; higher ones read the guard
+				# you are holding and go for the side it leaves open, and some
+				# wind-ups are feints that change side late.
+				actor["attack_side"] = FighterTier.choose_side(tier, fighter_id, sequence, guard_side if guarding else "")
+				actor["feint_to"] = FighterTier.feint_side(tier, fighter_id, sequence, str(actor.attack_side))
 				actor["attack_sequence"] = sequence + 1
 			var pressing := 2.2 if strike_windup >= 0.0 else 1.0
 			actor["attack_time"] = float(actor.get("attack_time", 0.0)) + actor_delta * pressing
@@ -5846,10 +5947,18 @@ func _update_encounter_actors(delta: float) -> void:
 				threat_compass.report(str(actor.get("subject_id", index)), node.global_position, float(actor.attack_time) / maxf(attack_cycle, 0.01))
 			if actor_motion != null:
 				actor_motion.set_combat_pose(clampf(float(actor.attack_time) / maxf(attack_cycle * 0.57, 0.01), 0.0, 1.0), "melee")
-			if float(actor.attack_time) > attack_cycle * 0.57:
+			var telegraph_from := float(FighterTier.spec(str(actor.get("tier", "hunter"))).telegraph)
+			if not str(actor.get("feint_to", "")).is_empty() and float(actor.attack_time) > attack_cycle * FighterTier.FEINT_AT:
+				actor["attack_side"] = str(actor.feint_to)
+				actor["feint_to"] = ""
+				fight_stats["feints_seen"] = int(fight_stats.get("feints_seen", 0)) + 1
+				prompt.text = "FEINT // %s SWITCHES TO %s" % [str(actor.display_name).to_upper(), str(actor.attack_side).to_upper()]
+			elif float(actor.attack_time) > attack_cycle * telegraph_from:
 				prompt.text = "%s RAISES FROM %s" % [str(actor.display_name).to_upper(), str(actor.get("attack_side", BladeRead.HIGH)).to_upper()]
+			_show_telegraph(actor, node, float(actor.attack_time) / maxf(attack_cycle, 0.01) >= telegraph_from)
 			if float(actor.attack_time) >= attack_cycle:
 				actor.attack_time = 0.0
+				_show_telegraph(actor, node, false)
 				if actor_motion != null:
 					actor_motion.set_combat_pose(0.0, "")
 					actor_motion.trigger_attack(0.62, "melee")
@@ -5859,12 +5968,19 @@ func _update_encounter_actors(delta: float) -> void:
 					# spends stamina instead of blood.
 					var incoming := float(_actor_attack_damage(actor))
 					var guarded: Dictionary = guard_absorb(incoming, node.global_position, str(actor.get("attack_side", "")))
+					_note_incoming(str(actor.get("attack_side", "")), guarded)
 					if bool(guarded.get("parried", false)):
 						# The attacker eats their own commitment. This wrote to
 						# "stagger" and "cooldown" — neither of which anything
 						# ever read — so a parry cost the enemy nothing beyond
 						# the damage it already blocked. Real footing loss now.
 						_actor_lose_footing(actor, 0.45, "%s LOSES THEIR FOOTING // PRESS THE OPENING" % str(actor.display_name).to_upper())
+						_after_parry(actor, index)
+					# A sparring partner's blows are padded: they count, they do
+					# not wound.
+					if bool(actor.get("sparring", false)):
+						_spar_struck(actor, guarded)
+						continue
 					var health_after := health - roundi(float(guarded.get("damage", incoming)))
 					_wound_player(node.global_position, maxf(5.0, 15.0 * _actor_combat_ratio(actor)), "cut")
 					if hit_flash != null and third_person:
@@ -5879,6 +5995,411 @@ func _update_encounter_actors(delta: float) -> void:
 						_complete_local_law_arrest(actor)
 						return
 					health = maxi(1, health_after)
+
+
+# --- the blood-tree moves (Greg, 24 September) ------------------------------
+# Blade: FEINT and COMBO. Meat: RIPOSTE. Iron: HIP COUNTER. Hush: BACKSTAB.
+# Each is a node bought with blood; without it the fight works as before.
+
+const _MOVE_CALLS := {
+	"backstab": "BACKSTAB // %s NEVER SAW IT",
+	"riposte": "RIPOSTE // STRAIGHT THROUGH %s'S GUARD",
+	"baited": "%s BIT ON THE FEINT // WIDE OPEN",
+	"combo": "COMBO // %s CAN'T KEEP UP",
+}
+
+
+func _move_clock() -> float:
+	return Time.get_ticks_msec() / 1000.0
+
+
+func _has_move(flag: String) -> bool:
+	return blood_ledger != null and blood_ledger.has_flag(flag)
+
+
+## FEINT: raise the guard inside your own wind-up and the swing never comes.
+## It costs stamina, and whoever was reading it is left guarding air.
+func try_feint() -> bool:
+	if strike_windup < 0.0 or not _has_move("melee_feint") or stamina < FEINT_STAMINA:
+		return false
+	if str(pending_attack.get("kind", "melee")) == "firearm":
+		return false
+	strike_windup = -1.0
+	pending_attack = {}
+	stamina -= FEINT_STAMINA
+	if body_motion != null:
+		body_motion.trigger_attack(0.0, "")
+	var baited := 0
+	for candidate in encounter_actors:
+		var node := candidate.get("node") as Node3D
+		if node == null or not is_instance_valid(node) or bool(candidate.get("dead", false)):
+			continue
+		if player.distance_to(node.global_position) <= FEINT_BAIT_RANGE:
+			candidate["baited"] = true
+			baited += 1
+	fight_stats["feints"] = int(fight_stats.get("feints", 0)) + 1
+	prompt.text = "FEINT // THEY BIT" if baited > 0 else "FEINT"
+	PLAYER_ACTION_LEDGER.record("blood_move", {"move": "feint", "baited": baited, "location": HUNT_LOCATION})
+	return true
+
+
+## Hush: they had not noticed you, and you came from behind them.
+func _unaware_and_behind(actor: Dictionary) -> bool:
+	if bool(actor.get("tracking_player", false)) or bool(actor.get("tracking_light", false)):
+		return false
+	if str(actor.get("state", "")) in ["hunting", "noticing", "fleeing"]:
+		return false
+	var node := actor.get("node") as Node3D
+	if node == null or not is_instance_valid(node):
+		return false
+	var ahead := -node.global_transform.basis.z
+	ahead.y = 0.0
+	var to_player := player - node.global_position
+	to_player.y = 0.0
+	if ahead.length_squared() < 0.0001 or to_player.length_squared() < 0.0001:
+		return false
+	return ahead.normalized().dot(to_player.normalized()) < -0.25
+
+
+## Which move, if any, takes the defence away from this blow. Spends it.
+func _forced_open(actor: Dictionary, unaware_behind: bool) -> String:
+	if unaware_behind and _has_move("stealth_backstab"):
+		return "backstab"
+	if riposte_until >= 0.0 and _move_clock() <= riposte_until:
+		riposte_until = -1.0
+		return "riposte"
+	if bool(actor.get("baited", false)):
+		actor["baited"] = false
+		return "baited"
+	if _has_move("melee_combo") and str(combo_chain.subject) == str(actor.subject_id) \
+			and int(combo_chain.count) >= 2 and _move_clock() - float(combo_chain.at) <= COMBO_WINDOW:
+		return "combo"
+	return ""
+
+
+## Counts clean hits into one body; a block or a slow gap breaks the chain,
+## and the combo hit itself starts it again.
+func _note_combo(actor: Dictionary, defence: String, move: String) -> void:
+	var now := _move_clock()
+	if defence != "open":
+		combo_chain = {"subject": "", "count": 0, "at": -99.0}
+		return
+	if move == "combo":
+		combo_chain = {"subject": "", "count": 0, "at": -99.0}
+		return
+	var same := str(combo_chain.subject) == str(actor.subject_id) and now - float(combo_chain.at) <= COMBO_WINDOW
+	combo_chain = {"subject": str(actor.subject_id), "count": int(combo_chain.count) + 1 if same else 1, "at": now}
+
+
+## After you turn a blow: RIPOSTE opens the next one, HIP COUNTER shoots.
+func _after_parry(actor: Dictionary, index: int) -> void:
+	if _has_move("martial_riposte"):
+		riposte_until = _move_clock() + RIPOSTE_WINDOW
+	if _has_move("firearm_hip_counter"):
+		hip_counter(actor, index)
+
+
+## HIP COUNTER: a gun in hand when you parry goes off into them, point blank.
+## It spends a real round; an empty or jammed gun only clicks.
+func hip_counter(actor: Dictionary, index: int) -> bool:
+	if arsenal == null or bool(actor.get("sparring", false)):
+		return false
+	var gun: Dictionary = arsenal.current()
+	if str(gun.get("kind", "")) != "firearm":
+		return false
+	var rounds: Dictionary = arsenal.ammo.get(arsenal.current_id, {})
+	if int(rounds.get("loaded", 0)) <= 0 or bool(arsenal.jammed.get(arsenal.current_id, false)):
+		prompt.text = "HIP COUNTER // CLICK"
+		return false
+	rounds["loaded"] = int(rounds.loaded) - 1
+	arsenal.ammo[arsenal.current_id] = rounds
+	var damage := float(gun.get("damage", 20.0)) * float(maxi(1, int(gun.get("pellets", 1))))
+	var anatomy: Node = actor.anatomy as Node
+	var result: Dictionary = anatomy.call("apply_hit", "torso", damage, float(gun.get("impulse", 10.0)), str(gun.get("damage_type", "ballistic")))
+	var node := actor.node as Node3D
+	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": anatomy.call("snapshot")}, "anatomy_changed")
+	_spawn_blood(node.global_position + Vector3(0, 1.1, 0), roundi(damage))
+	if body_motion != null:
+		body_motion.trigger_recoil(float(gun.get("impulse", 10.0)))
+	fight_stats["hip_counter"] = int(fight_stats.get("hip_counter", 0)) + 1
+	PLAYER_ACTION_LEDGER.record("npc_anatomy_hit", {"subject_id": actor.subject_id, "weapon": arsenal.current_id, "zone": "torso", "result": result, "location": HUNT_LOCATION, "move": "hip_counter"})
+	prompt.text = "HIP COUNTER // POINT BLANK INTO %s" % str(actor.display_name).to_upper()
+	if anatomy.dead:
+		_kill_encounter_actor(index, "combat_trauma")
+	return true
+
+
+# --- telegraphs and the fight readout (Greg, 24 September) ------------------
+
+## Where the next swing comes from, on the fighter, in the same red as the
+## body-cam's REC: over the head for high, at the knees for low, and on your
+## left or right of them for the sides. Tiers decide how early it shows.
+func _show_telegraph(actor: Dictionary, node: Node3D, on: bool) -> void:
+	# On the HUD, pinned to where the fighter is on screen. A 3D label sat
+	# under the body-cam post effect, which paints over the transparent pass.
+	var mark := actor.get("telegraph_mark") as Label
+	if mark == null or not is_instance_valid(mark):
+		if not on:
+			return
+		mark = Label.new()
+		mark.name = "Telegraph"
+		mark.add_theme_font_size_override("font_size", 30)
+		mark.add_theme_color_override("font_color", Color("ff3a26"))
+		mark.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+		mark.add_theme_constant_override("outline_size", 10)
+		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		$HUD.add_child(mark)
+		actor["telegraph_mark"] = mark
+	if not on:
+		mark.visible = false
+		return
+	var side := str(actor.get("attack_side", BladeRead.HIGH))
+	var toward := node.global_position - player
+	toward.y = 0.0
+	var right := toward.normalized().cross(Vector3.UP) if toward.length_squared() > 0.001 else Vector3.RIGHT
+	var at := node.global_position + Vector3(0, 1.3, 0)
+	match side:
+		BladeRead.HIGH:
+			at = node.global_position + Vector3(0, 2.15, 0)
+			mark.text = "▼ HIGH"
+		BladeRead.LOW:
+			at = node.global_position + Vector3(0, 0.45, 0)
+			mark.text = "▲ LOW"
+		BladeRead.LEFT:
+			at += -right * 0.55
+			mark.text = "LEFT ▶"
+		_:
+			at += right * 0.55
+			mark.text = "◀ RIGHT"
+	var view := get_viewport().get_camera_3d()
+	if view == null or view.is_position_behind(at):
+		mark.visible = false
+		return
+	var screen := view.unproject_position(at)
+	mark.reset_size()
+	mark.position = screen - mark.size * 0.5
+	# A blink, so it reads as a warning and not as a name tag.
+	mark.visible = fmod(Time.get_ticks_msec() * 0.001, 0.5) < 0.36
+
+
+func _fight_active() -> void:
+	_fight_quiet = FIGHT_QUIET_SECONDS
+
+
+func _note_incoming(side: String, guarded: Dictionary) -> void:
+	_fight_active()
+	if bool(guarded.get("parried", false)):
+		fight_stats["parries"] = int(fight_stats.get("parries", 0)) + 1
+	elif bool(guarded.get("blocked", false)):
+		fight_stats["blocks"] = int(fight_stats.get("blocks", 0)) + 1
+	else:
+		var by_side: Dictionary = fight_stats.get("hit_from", {})
+		by_side[side] = int(by_side.get(side, 0)) + 1
+		fight_stats["hit_from"] = by_side
+
+
+## The readout, once a fight has gone quiet: what you did, what they did, and
+## the side that beat you most, so the next fight has something to fix.
+static func fight_summary(stats: Dictionary) -> String:
+	var swings := int(stats.get("swings", 0))
+	var landed := int(stats.get("landed", 0))
+	var lines := ["FIGHT OVER // YOUR SWINGS %d  LANDED %d  BLOCKED %d  TURNED %d  CAUGHT MID-SWING %d" % [
+		swings, landed, int(stats.get("they_blocked", 0)), int(stats.get("they_parried", 0)), int(stats.get("punished", 0))]]
+	var by_side: Dictionary = stats.get("hit_from", {})
+	var taken := 0
+	var worst := ""
+	for side: String in by_side:
+		taken += int(by_side[side])
+		if worst.is_empty() or int(by_side[side]) > int(by_side[worst]):
+			worst = side
+	lines.append("YOU BLOCKED %d  PARRIED %d  WERE HIT %d  FEINTS SEEN %d" % [int(stats.get("blocks", 0)), int(stats.get("parries", 0)), taken, int(stats.get("feints_seen", 0))])
+	var moves: Array[String] = []
+	for move in ["feints", "baited", "combo", "riposte", "hip_counter", "backstab"]:
+		if int(stats.get(move, 0)) > 0:
+			moves.append("%s %d" % [move.to_upper().replace("_", " "), int(stats[move])])
+	if not moves.is_empty():
+		lines.append("MOVES  " + "  ".join(moves))
+	if not worst.is_empty():
+		lines.append("WHAT BEAT YOU: SWINGS FROM %s. HOLD THE GUARD THAT WAY WHEN IT SHOWS." % worst.to_upper())
+	elif swings > 0 and landed * 2 < swings:
+		lines.append("MOST OF YOUR SWINGS WERE STOPPED. HIT THEM WHILE THEY WIND UP.")
+	return "\n".join(lines)
+
+
+func _tick_fight(delta: float) -> void:
+	if _fight_readout_time > 0.0:
+		_fight_readout_time -= delta
+		if _fight_readout_time <= 0.0 and fight_readout != null:
+			fight_readout.visible = false
+	if _fight_quiet <= 0.0:
+		return
+	_fight_quiet -= delta
+	if _fight_quiet > 0.0:
+		return
+	if int(fight_stats.get("swings", 0)) + (fight_stats.get("hit_from", {}) as Dictionary).size() + int(fight_stats.get("blocks", 0)) == 0:
+		fight_stats.clear()
+		return
+	if fight_readout == null:
+		fight_readout = Label.new()
+		fight_readout.name = "FightReadout"
+		fight_readout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		fight_readout.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+		fight_readout.position = Vector2(-520, 96)
+		fight_readout.size = Vector2(1040, 90)
+		fight_readout.add_theme_font_size_override("font_size", 15)
+		fight_readout.add_theme_color_override("font_color", Color("e8e1d2"))
+		fight_readout.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+		fight_readout.add_theme_constant_override("outline_size", 6)
+		$HUD.add_child(fight_readout)
+	fight_readout.text = fight_summary(fight_stats)
+	fight_readout.visible = true
+	_fight_readout_time = 8.0
+	WorldHistory.record_event("fight_summarised", {"stats": fight_stats.duplicate(true)})
+	fight_stats.clear()
+
+
+# --- sparring (Greg, 24 September: "sparring in the Hunt") ----------------
+
+## A post near Nix where a partner fights you with padded blows: first to
+## five clean hits. Winning moves the next partner up a tier (scavenger,
+## hunter, captain, elite); after each bout they say what beat you.
+const SPAR_SUBJECT := "sparring"
+const SPAR_POINTS := 5
+const SPAR_POST_AT := Vector3(14.5, 0.0, 8.0)
+var spar_bout: Dictionary = {}
+
+
+func spar_tier() -> String:
+	return str(WorldHistory.subject(SPAR_SUBJECT).get("tier", "scavenger"))
+
+
+func _build_sparring_post() -> void:
+	var post := Node3D.new()
+	post.name = "SparringPost"
+	post.position = SPAR_POST_AT
+	add_child(post)
+	_add_mesh_to(post, CylinderMesh.new(), Vector3(0, 1.0, 0), Color("5a4634"), 0.8, Vector3(0.3, 1.0, 0.3))
+	_add_mesh_to(post, BoxMesh.new(), Vector3(0, 1.7, 0), Color("8a2a1e"), 0.6, Vector3(0.9, 0.12, 0.12))
+	_register_interactable(post, "[E] SPAR // PADDED BLOWS, FIRST TO FIVE", _start_spar)
+
+
+## The first things in the Hunt that break (DESIGN/GOAL_LOOP_2.md 0.1): two
+## streetlights and two scrap barricades by the sparring post. Rounds and
+## blades reach them through `WorldBreak`, the lights keep their condition in
+## WorldHistory, and a barricade bursts into capped, persistent fragments.
+const BREAKABLE_YARD := [
+	["light", "hunt_yard_light_west", Vector3(10.5, 0.0, 4.0)],
+	["light", "hunt_yard_light_east", Vector3(18.5, 0.0, 4.0)],
+	["barricade", "hunt_yard_barricade_west", Vector3(12.0, 0.0, 11.5)],
+	["barricade", "hunt_yard_barricade_east", Vector3(17.0, 0.0, 11.5)],
+	# 0.2: one of every prop kind behind the barricades, turned to the post.
+	["crate", "hunt_yard_crate_1", Vector3(11.2, 0.0, 13.6), 0.0],
+	["crate", "hunt_yard_crate_2", Vector3(12.1, 0.0, 13.9), 0.35],
+	["barrel", "hunt_yard_barrel_1", Vector3(13.3, 0.0, 13.7), 0.0],
+	["barrel", "hunt_yard_barrel_2", Vector3(14.1, 0.0, 14.2), 0.0],
+	["locker", "hunt_yard_locker", Vector3(15.4, 0.0, 14.0), PI],
+	["monitor", "hunt_yard_monitor", Vector3(16.5, 0.0, 13.5), PI],
+	["chair", "hunt_yard_chair", Vector3(17.4, 0.0, 13.4), PI * 0.8],
+	["jar", "hunt_yard_jar_1", Vector3(18.3, 0.0, 13.6), 0.0],
+	["jar", "hunt_yard_jar_2", Vector3(18.7, 0.0, 13.9), 0.0],
+]
+var breakables: Array[Node3D] = []
+
+
+func _build_breakables() -> void:
+	for spec in BREAKABLE_YARD:
+		var piece: Node3D
+		if str(spec[0]) == "light":
+			var light = STREET_LIGHT.new()
+			light.name = str(spec[1])
+			light.position = spec[2]
+			add_child(light)
+			light.build(str(spec[1]), 4.4)
+			piece = light
+		elif str(spec[0]) != "barricade":
+			piece = BREAKABLE_PROP.place(self, str(spec[0]), str(spec[1]), spec[2], float(spec[3]))
+		else:
+			var prop = BREAKABLE_PROP.new()
+			prop.name = str(spec[1])
+			# Its box is centred on its origin, so it stands on half its height.
+			prop.position = spec[2] + Vector3(0, 1.35 * 0.5, 0)
+			add_child(prop)
+			prop.build("scrap_barricade", Vector3(2.4, 1.35, 0.42), 28.0)
+			piece = prop
+		breakables.append(piece)
+
+
+func _start_spar() -> void:
+	if not spar_bout.is_empty():
+		return
+	var tier := spar_tier()
+	var at := player + Vector3(sin(yaw), 0.0, cos(yaw)) * 3.0
+	at.y = player.y - 1.6
+	var spawned := _spawn_encounter_actor({
+		"instance_id": "spar_%d" % WorldHistory.event_count("spar_bout_started"),
+		"kind": "hostile", "tier": tier, "name": "SPARRING PARTNER",
+		"loot": ["nothing"],
+	}, at)
+	var partner: Dictionary = encounter_actors.back()
+	partner["sparring"] = true
+	partner["display_name"] = "%s PARTNER" % str(FighterTier.spec(tier).label)
+	spar_bout = {"subject_id": str(partner.subject_id), "tier": tier, "landed": 0, "taken": 0}
+	fight_stats.clear()
+	WorldHistory.record_event("spar_bout_started", {"tier": tier})
+	prompt.text = "SPAR // %s // FIRST TO FIVE CLEAN HITS. WATCH THE RED MARK AND GUARD THAT SIDE." % str(FighterTier.spec(tier).label)
+
+
+func _spar_said(actor: Dictionary, line: String) -> void:
+	prompt.text = "%s: %s" % [str(actor.display_name), line]
+
+
+func _spar_landed(actor: Dictionary, defence: String) -> void:
+	if spar_bout.is_empty() or str(actor.subject_id) != str(spar_bout.subject_id):
+		return
+	if defence == "block":
+		_spar_said(actor, "BLOCKED. I SAW IT COMING FROM THAT SIDE.")
+		return
+	spar_bout["landed"] = int(spar_bout.landed) + 1
+	impact_feel.strike(0.4, "blunt", false)
+	prompt.text = "CLEAN HIT // %d - %d" % [int(spar_bout.landed), int(spar_bout.taken)]
+	if int(spar_bout.landed) >= SPAR_POINTS:
+		_end_spar(actor, true)
+
+
+func _spar_struck(actor: Dictionary, guarded: Dictionary) -> void:
+	if spar_bout.is_empty() or str(actor.subject_id) != str(spar_bout.subject_id):
+		return
+	if bool(guarded.get("parried", false)):
+		_spar_said(actor, "GOOD PARRY. NOW HIT ME WHILE I RECOVER.")
+		return
+	if bool(guarded.get("blocked", false)):
+		_spar_said(actor, "BLOCKED. RIGHT SIDE, RIGHT TIME.")
+		return
+	spar_bout["taken"] = int(spar_bout.taken) + 1
+	lose_footing(0.2, "")
+	_spar_said(actor, "TOUCH. IT CAME FROM %s AND YOUR GUARD WAS NOT THERE." % str(actor.get("attack_side", "high")).to_upper())
+	if int(spar_bout.taken) >= SPAR_POINTS:
+		_end_spar(actor, false)
+
+
+func _end_spar(actor: Dictionary, won: bool) -> void:
+	var tier := str(spar_bout.tier)
+	var next := tier
+	if won:
+		var at := FighterTier.ORDER.find(tier)
+		next = str(FighterTier.ORDER[mini(at + 1, FighterTier.ORDER.size() - 1)])
+		WorldHistory.update_subject(SPAR_SUBJECT, {"tier": next, "best": next}, "spar_tier_up")
+	WorldHistory.record_event("spar_bout_ended", {"tier": tier, "won": won, "landed": int(spar_bout.landed), "taken": int(spar_bout.taken)})
+	var tip := fight_summary(fight_stats).get_slice("\n", 2)
+	prompt.text = ("YOU WIN %d - %d. NEXT PARTNER: %s." % [int(spar_bout.landed), int(spar_bout.taken), str(FighterTier.spec(next).label)] if won else "YOU LOSE %d - %d. %s" % [int(spar_bout.landed), int(spar_bout.taken), tip if not tip.is_empty() else "WATCH THE RED MARK AND GUARD THAT SIDE."])
+	# The partner steps out of the ring.
+	actor["dead"] = true
+	actor["disposition"] = "friendly"
+	var node := actor.get("node") as Node3D
+	if node != null and is_instance_valid(node):
+		node.visible = false
+	_show_telegraph(actor, node, false)
+	spar_bout = {}
 
 
 func _complete_local_law_arrest(actor: Dictionary) -> void:
@@ -5983,7 +6504,7 @@ func _actor_attack_cycle(actor: Dictionary) -> float:
 	# O6.1. A fist comes back faster than a weapon does — the same reason the
 	# player's own bare-hand attacks run at a shorter cooldown than a cleaver.
 	var unarmed := NPC_UNARMED_CYCLE_SCALE if bool(actor.get("disarmed", false)) else 1.0
-	return lerpf(2.4, 1.4, _actor_combat_ratio(actor)) * lerpf(1.6, 1.0, _actor_footing(actor)) * unarmed
+	return lerpf(2.4, 1.4, _actor_combat_ratio(actor)) * lerpf(1.6, 1.0, _actor_footing(actor)) * unarmed * float(FighterTier.spec(str(actor.get("tier", "hunter"))).cycle)
 
 
 func _actor_attack_damage(actor: Dictionary) -> int:
@@ -7722,6 +8243,7 @@ func _build_keys_card() -> void:
 			["LMB", "ATTACK"],
 			["RMB", "AIM FIREARMS / HEAVY MELEE"],
 			["HOLD X", "GUARD"],
+			["GUARD MID-SWING", "FEINT (BLOOD TREE)"],
 			["Z", "LOCK ON"],
 			["WHEEL", "CYCLE TARGET"],
 			["1 2 3", "SWORD / SHOTGUN / PISTOL"],
@@ -7752,6 +8274,7 @@ func _build_keys_card() -> void:
 		{"group": "WHAT YOU CARRY", "rows": [
 			["O", "FIELD INVENTORY / BODY / LOOT"],
 			["U", "DEAD CLOUD EXCHANGE // CASES"],
+			["7", "BLOOD TREE // SPEND BLOOD"],
 			["F8", "CONTACT // PEOPLE, ENTITIES, MATERIA"],
 			["G", "RAISE / LOWER BLACK MIRROR"],
 			["TAB", "INDEX / NEXT DEVICE APP"],
@@ -7917,6 +8440,23 @@ func _toggle_inventory() -> void:
 
 ## The dead cloud's shopfront, on U. Same mutual exclusion as every other
 ## full-size reader: opening it shuts the rest, closing it gives the mouse back.
+## Skins wear with use (Greg, 24 September): a shot scuffs the finish, a hit
+## scuffs and bloods it, and a kill is counted on it. Hits and kills arrive
+## through the blood ledger, which already knows which weapon did what.
+func _on_skin_fired(weapon_id: String, _report: Dictionary) -> void:
+	if not SkinLoadout.applied(weapon_id).is_empty():
+		SkinLoadout.scuff(weapon_id, 0.0008)
+		arsenal.apply_skins()
+
+
+func _on_skin_blood(weapon_id: String, _style_id: String, _amount: int, kind: String) -> void:
+	var target := "ram" if weapon_id == "breach_tool" else weapon_id
+	if SkinLoadout.applied(target).is_empty():
+		return
+	SkinLoadout.scuff(target, 0.004, 0.06, kind in ["kill", "finisher", "takedown"])
+	arsenal.apply_skins()
+
+
 func _toggle_cases() -> void:
 	var opening := panel_mode != "cases"
 	if opening:
@@ -7926,6 +8466,7 @@ func _toggle_cases() -> void:
 		keys_card.close()
 		_close_panel_views()
 		panel_mode = "cases"
+		case_menu.weapon_hint = str(arsenal.current_id)
 		case_menu.open_menu(handheld.carry, player_rig)
 		prompt.visible = false
 		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
@@ -9242,6 +9783,10 @@ func _spawn_encounter_actor(encounter: Dictionary, at: Vector3) -> Dictionary:
 	var initial_state := "hunting" if initial_disposition == "hostile" else "idle"
 	encounter_actors.append({"subject_id": subject_id, "display_name": display_name, "node": actor, "rig": rig, "motion": actor_motion, "anatomy": anatomy, "state": initial_state, "disposition": initial_disposition, "speed": 3.7, "loot": loot, "loot_at_risk": false, "dead": false})
 	encounter_actors.back()["encounter_id"] = str(encounter.get("instance_id", ""))
+	# Greg, 24 September: difficulty is who you fight (`FighterTier`).
+	var tier_source := encounter.duplicate()
+	tier_source["name"] = display_name
+	encounter_actors.back()["tier"] = FighterTier.tier_for(tier_source, returning_rival)
 	if returning_rival:
 		encounter_actors.back()["returning_rival"] = true
 	if str(saved_actor.get("status", "")) in ["spared", "recruited"]:

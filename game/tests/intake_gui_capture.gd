@@ -33,6 +33,23 @@ func _ready() -> void:
 	intake.sheet.race = "roadborn" if intake.sheet.race != "roadborn" else "soft_rot"
 	await _hold(8)
 	await _capture("%s/intake_gauges.png" % out_dir)
+	# The page turns, frame by frame at 30 fps: the arm and gears swing each
+	# page in, ink bleeds behind the head, blood runs from the clip.
+	if "--clip" in OS.get_cmdline_user_args():
+		intake.set_process(false)
+		var frame := 0
+		for next_page in [2, 3, 4, 5]:
+			intake.page = next_page
+			for _step in 34:
+				intake._process(1.0 / 30.0)
+				await _capture("%s/turn_%03d.png" % [out_dir, frame])
+				frame += 1
+		intake.page = 2
+		for _step in 12:
+			intake._process(1.0 / 30.0)
+		intake.page_print = 0.3
+		intake.queue_redraw()
+		await _capture("%s/intake_swing.png" % out_dir)
 	get_tree().quit()
 
 

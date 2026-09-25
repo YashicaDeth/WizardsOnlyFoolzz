@@ -21,11 +21,23 @@ func _ready() -> void:
 	rig.set_state({"health": 100.0})
 	check(rig.intact_vertebrae() == NerveRig.VERTEBRAE, "a whole body seats every vertebra")
 	rig.set_state({"health": 50.0})
-	check(rig.intact_vertebrae() == NerveRig.VERTEBRAE / 2, "half health seats half the column")
+	check(rig.intact_vertebrae() == ceili(NerveRig.VERTEBRAE / 2.0), "half health seats half the column")
 	rig.set_state({"health": 1.0})
 	check(rig.intact_vertebrae() == 1, "one point of health still holds one vertebra")
 	rig.set_state({"health": 0.0})
 	check(rig.intact_vertebrae() == 0, "nothing left seats nothing")
+	# Greg: 33 vertebrae, anatomically accurate.
+	var column := NerveRig.layout()
+	var regions := {}
+	for entry in column:
+		regions[entry.region] = int(regions.get(entry.region, 0)) + 1
+	check(column.size() == 33 and NerveRig.VERTEBRAE == AnatomyComponent.SPINE_VERTEBRAE, "the column has every vertebra the anatomy damages")
+	check(regions == {"cervical": 7, "thoracic": 12, "lumbar": 5, "sacral": 5, "coccygeal": 4}, "7 cervical, 12 thoracic, 5 lumbar, 5 sacral, 4 coccygeal: %s" % regions)
+	check(column[0].label == "C1" and column[7].label == "T1" and column[23].label == "L5" and column[32].label == "Co4", "named C1 at the skull to Co4 at the tail")
+	var descending := true
+	for index in range(1, column.size()):
+		descending = descending and float(column[index].y) > float(column[index - 1].y)
+	check(descending, "each vertebra sits below the one above it")
 	rig.set_state({"pockets": [{"label": "a"}, {"label": "b"}]})
 	check(rig.filled_pockets() == 2, "the rack shows the pockets actually filled")
 	rig.set_state({"pockets": [{}, {}, {}, {}]})
@@ -51,7 +63,7 @@ func _ready() -> void:
 	var hud := preload("res://systems/gothic_field_hud.gd").new()
 	add_child(hud)
 	hud.set_state({"health": 25.0, "pockets": [{"label": "x"}]})
-	check(hud.nerve_rig != null and hud.nerve_rig.intact_vertebrae() == 3, "the field HUD drives the rig from its own state")
+	check(hud.nerve_rig != null and hud.nerve_rig.intact_vertebrae() == ceili(NerveRig.VERTEBRAE * 0.25), "the field HUD drives the rig from its own state")
 
 	print("NERVE_RIG_TEST_RESULT failures=%d" % failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

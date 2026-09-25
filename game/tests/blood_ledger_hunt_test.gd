@@ -40,6 +40,9 @@ func _ready() -> void:
 	hunt._equip_weapon(0)
 	check(str(hunt.arsenal.current_id) == "sword", "the cleaver is in hand")
 	var before := ledger.weapon_blood("sword")
+	# Enemies block by tier now (Greg, 24 September); caught mid-wind-up they
+	# cannot, so this blow is struck into their swing and always lands.
+	actor["attack_time"] = hunt._actor_attack_cycle(actor) * 0.95
 	var swing: Dictionary = hunt.arsenal.begin_attack()
 	swing["range"] = 9.0
 	check(hunt._attack_nearest_encounter_actor(swing), "the swing lands on the marked body")

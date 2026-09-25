@@ -11,8 +11,23 @@ const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const RIVAL_TACTICS := preload("res://systems/rival_tactics.gd")
 const LAB_DRESSING := preload("res://systems/lab_dressing.gd")
 const FACILITY_ROUTES := preload("res://systems/facility_routes.gd")
+const WORLD_BREAK := preload("res://systems/world_break.gd")
 
 const ENTRY := Vector3(0, 1.0, 16.0)
+## Things the breach tool breaks (`DESIGN/GOAL_LOOP_2.md` 0.2), near the way
+## in and off the line from the entry to the lift: the gantry and its ramp
+## are on the west side, so the east floor takes the heavier pieces.
+const PROPS := [
+	["crate", "lower_works_crate_1", Vector3(5.0, 0, 12.5), 0.0],
+	["crate", "lower_works_crate_2", Vector3(5.9, 0, 12.2), 0.3],
+	["barrel", "lower_works_barrel_1", Vector3(6.8, 0, 13.4), 0.0],
+	["barrel", "lower_works_barrel_2", Vector3(4.6, 0, 13.6), 0.0],
+	["locker", "lower_works_locker", Vector3(14.1, 0, 9.6), -PI * 0.5],
+	["monitor", "lower_works_monitor", Vector3(4.2, 0, 3.2), 0.0],
+	["chair", "lower_works_chair", Vector3(4.3, 0, 4.1), PI],
+	["jar", "lower_works_jar_1", Vector3(-3.6, 0, 11.0), 0.0],
+	["jar", "lower_works_jar_2", Vector3(-3.25, 0, 11.35), 0.0],
+]
 const FUSE_AT := Vector3(11.2, 0.85, 1.8)
 const SHORTCUT_AT := Vector3(-10.2, 0.0, -8.0)
 const LIFT_AT := Vector3(0, 0.0, -38.0)
@@ -75,6 +90,7 @@ var camera: Camera3D
 var objective: Label
 var prompt: Label
 var status: Label
+var osd: BodyCamOSD
 var yaw := 0.0
 var pitch := -0.05
 var fuse_taken := false
@@ -89,6 +105,8 @@ var patrol_alert := false
 var patrol_disabled := false
 var patrol_attack_cooldown := 0.0
 var blood := 100.0
+## Where your old bodies lie if the sentinel kills you (`RebirthSite`).
+var rebirth_site: RebirthSite
 var breach_tool_ready := false
 var breach_flash: OmniLight3D
 var sentinel_disable_reason := ""
@@ -110,7 +128,12 @@ func _ready() -> void:
 	_build_drain_hatch()
 	_build_fuse_branch()
 	_build_patrol()
+	for spec in PROPS:
+		BreakableProp.place(self, spec[0], spec[1], spec[2], spec[3])
 	_build_player()
+	rebirth_site = RebirthSite.new()
+	add_child(rebirth_site)
+	rebirth_site.setup("lower_works", player)
 	_build_hud()
 	# The arcade's optional breach tool carries forward as a compact, deliberate
 	# first combat choice.  The fuse remains the quiet route; neither route is
@@ -170,6 +193,11 @@ func _build_hud() -> void:
 	prompt.add_theme_font_size_override("font_size", 15)
 	prompt.add_theme_color_override("font_color", Color("dd9851"))
 	layer.add_child(prompt)
+	osd = BodyCamOSD.new()
+	osd.name = "BodyCamOSD"
+	layer.add_child(osd)
+	osd.adopt(status, objective, prompt, "SUBLEVEL 0C  //  LOWER WORKS")
+	osd.camera = camera
 
 
 func _build_city_shell() -> void:
@@ -556,7 +584,7 @@ func _slab(dimensions: Vector3, at: Vector3, _kind: String, _color: Color) -> St
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-			_discharge_breach_tool()
+			_swing_breach_tool()
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		yaw -= event.relative.x * 0.0026
@@ -633,8 +661,13 @@ func _patrol_step(delta: float) -> void:
 	# bottom of the far ramp.
 	if distance < 2.0 and patrol_attack_cooldown <= 0.0 and overhead <= GANTRY_CLEARANCE:
 		patrol_attack_cooldown = 1.25
-		blood = maxf(25.0, blood - 6.0)
+		# Greg, 24 September: every killer in minutes 0-30 sends you to the
+		# vat. The sentinel used to stop at a quarter of your blood; now it
+		# finishes what it starts, and your old body stays down here.
+		blood = maxf(0.0, blood - 6.0)
 		WorldHistory.record_event("lower_works_sentinel_strike", {"location": "lower_works", "damage": 6})
+		if blood <= 0.0:
+			rebirth_site.die("cut down by the Lower Works sentinel", "lower_works_sentinel")
 
 
 func _flat_distance(at: Vector3) -> float:
@@ -644,6 +677,8 @@ func _flat_distance(at: Vector3) -> float:
 
 
 func _interact() -> void:
+	if not rebirth_site.try_recover().is_empty():
+		return
 	if not fuse_taken and _flat_distance(FUSE_AT) <= 2.4:
 		fuse_taken = true
 		fuse_visual.visible = false
@@ -664,6 +699,14 @@ func _interact() -> void:
 		return
 	if _flat_distance(EXIT_AT) <= 4.0 and fuse_taken:
 		_ride_heat_elevator()
+
+
+## The attack button with the ram in hand: it breaks what it meets, and still
+## interrupts the sentinel when that is close enough.
+func _swing_breach_tool() -> void:
+	if breach_tool_ready:
+		WORLD_BREAK.swing(camera, FacilityGuardPost.RAM_DAMAGE, "breach_tool", player)
+	_discharge_breach_tool()
 
 
 func _discharge_breach_tool() -> void:
@@ -733,14 +776,20 @@ func _update_hud() -> void:
 	var guard_state := ("SENTINEL INTERRUPTED" if sentinel_disable_reason == "breach_interrupted" else "SENTINEL RELAY DOWN") if patrol_disabled else ("SENTINEL ENGAGED" if patrol_alert else "SENTINEL PATROL")
 	status.text = "BLOOD %03d%%   PAIN 86   LOWER WORKS // %s" % [roundi(blood), guard_state]
 	objective.text = "OBJECTIVE // " + ("REACH THE HEAT ELEVATOR" if fuse_taken else "FIND A LIFT FUSE")
-	if not fuse_taken and _flat_distance(FUSE_AT) <= 2.4:
+	if not rebirth_site.nearest().is_empty():
+		prompt.text = "[E] TAKE BACK WHAT YOUR OLD BODY HOLDS"
+	elif not fuse_taken and _flat_distance(FUSE_AT) <= 2.4:
 		prompt.text = "[E] TAKE LIFT FUSE"
+		osd.point_at(FUSE_AT + Vector3(0, 0.3, 0))
 	elif fuse_taken and not shortcut_open and _flat_distance(SHORTCUT_AT) <= 3.0:
 		prompt.text = "[E] POWER SHORTCUT // DISABLE SENTINEL"
+		osd.point_at(SHORTCUT_AT + Vector3(0, 1.4, 0))
 	elif _flat_distance(DRAIN_AT) <= DRAIN_REACH:
 		prompt.text = "[E] DROP INTO THE OLD DRAINS"
+		osd.point_at(DRAIN_AT + Vector3(0, 0.2, 0))
 	elif fuse_taken and _flat_distance(EXIT_AT) <= 4.0:
 		prompt.text = "[E] RIDE THE HEAT ELEVATOR UP"
+		osd.point_at(LIFT_AT + Vector3(0, 2.2, 0))
 	elif breach_tool_ready and patrol_alert and not patrol_disabled:
 		prompt.text = "[LMB] DISCHARGE BREACH TOOL // INTERRUPT SENTINEL"
 	else:

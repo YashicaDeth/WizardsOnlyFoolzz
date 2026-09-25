@@ -26,6 +26,7 @@ const Motion := preload("res://systems/celloutz_motion.gd")
 const SHEET := preload("res://systems/character_sheet.gd")
 const VAT_BODY_PREVIEW := preload("res://systems/vat_body_preview.gd")
 const Branding := preload("res://systems/celloutz_branding.gd")
+const IntakePageMotion := preload("res://systems/intake_page_motion.gd")
 
 signal filed(state: Dictionary)
 
@@ -130,6 +131,11 @@ const HISTORY_LINES := 2
 var page_print := 1.0
 var _printed_page := -1
 const PRINT_SECONDS := 0.85
+## Where the page hangs from, in clipboard space: the drive gear on its left.
+const PAGE_HINGE := Vector2(6, 118)
+## The blood each page change runs down the paper, and how many changes.
+var blood_runs: Array = []
+var page_turns := 0
 ## The stats strip's gauges ease toward the sheet's real values, and a change
 ## flashes its size beside the number.
 var _gauge_shown: Dictionary = {}
@@ -288,6 +294,9 @@ func _process(delta: float) -> void:
 	if page != _printed_page:
 		_printed_page = page
 		page_print = 0.0
+		page_turns += 1
+		blood_runs.append(IntakePageMotion.new_run(page_turns, size.x * 0.375, 30.0, size.y - 220.0))
+	IntakePageMotion.age_runs(blood_runs, delta)
 	page_print = minf(1.0, page_print + delta / PRINT_SECONDS)
 	_update_gauges(delta)
 	revealed = minf(revealed + delta * REVEAL_RATE, float(line.length()))
@@ -671,6 +680,46 @@ func _draw_clipboard(rect: Rect2) -> void:
 	draw_rect(Rect2(Vector2(rect.size.x * 0.5 - 44, 6), Vector2(88, 22)), HOT, false, 1.5)
 
 	var ink := INK
+	var y := 124.0
+	# The page swings in on its arm while it prints, then hangs still.
+	var clip_xform := Transform2D(-0.022, rect.position + Vector2(0, 12))
+	if page_print < 1.0:
+		draw_set_transform_matrix(clip_xform * IntakePageMotion.swing_transform(page_print, PAGE_HINGE))
+	match page:
+		0:
+			_draw_routes(rect, ink, y)
+		1:
+			_draw_races(rect, ink, y)
+		2:
+			_draw_traits(rect, ink, y)
+		3:
+			_draw_face(rect, ink, y)
+		4:
+			_draw_body(rect, ink, y)
+		_:
+			_draw_schedule(rect, ink, y)
+	draw_set_transform_matrix(clip_xform)
+	# The header goes on after the page, over a strip of paper, so a page
+	# swinging in comes out from under it rather than across it.
+	draw_rect(Rect2(Vector2(12, 34), Vector2(rect.size.x - 24, 74)), PAPER)
+	_draw_form_header(rect, ink)
+	IntakePageMotion.draw_runs(self, blood_runs)
+
+	# The running total, at the foot of the form where a clerk would put it.
+	var footer := rect.size.y - 74.0
+	_draw_print_feed(rect, 110.0, footer - 16.0)
+	IntakePageMotion.draw_arm(self, PAGE_HINGE, 64.0, IntakePageMotion.swing_angle(page_print))
+	IntakePageMotion.draw_train(self, PAGE_HINGE, page_print, elapsed)
+	draw_line(Vector2(26, footer - 12), Vector2(rect.size.x - 26, footer - 12), ink * Color(1, 1, 1, 0.3), 1.0)
+	_draw_gauges(rect, ink, footer)
+	CellOutzType.draw_condensed(self, Vector2(26, footer + 36), "%s // %s RISING // %s" % [sheet.sun_sign(), sheet.ascendant(), sheet.modality().to_upper()], 9.0, ink * Color(1, 1, 1, 0.55), 0.7)
+	var done := touched_pages.size()
+	var hint := ("CONFIRMED %d/%d  //  CLICK OR ENTER CONFIRMS THIS TAB" % [done, PAGES.size()]) if done < PAGES.size() else "ALL %d CONFIRMED  //  F FILES YOU" % PAGES.size()
+	CellOutzType.draw_condensed(self, Vector2(rect.size.x - 26 - CellOutzType.width_condensed(hint, 9.0, 0.8), footer + 52), hint, 9.0, HOT if done < PAGES.size() else MOSS, 0.8)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _draw_form_header(rect: Rect2, ink: Color) -> void:
 	CellOutzType.draw_stamped(self, Vector2(26, 46), "NEURAL INTAKE", 20.0, ink, HOT * Color(1, 1, 1, 0.32), 1.6)
 	CellOutzType.draw_condensed(self, Vector2(26, 72), Branding.copy_for("intake", "header"), 9.0, ink * Color(1, 1, 1, 0.6), 0.7)
 
@@ -691,32 +740,6 @@ func _draw_clipboard(rect: Rect2) -> void:
 			draw_line(tick + Vector2(0, 4), tick + Vector2(3, 8), MOSS, 2.0)
 			draw_line(tick + Vector2(3, 8), tick + Vector2(9, 0), MOSS, 2.0)
 		tab_x += width + 6.0
-
-	var y := 124.0
-	match page:
-		0:
-			_draw_routes(rect, ink, y)
-		1:
-			_draw_races(rect, ink, y)
-		2:
-			_draw_traits(rect, ink, y)
-		3:
-			_draw_face(rect, ink, y)
-		4:
-			_draw_body(rect, ink, y)
-		_:
-			_draw_schedule(rect, ink, y)
-
-	# The running total, at the foot of the form where a clerk would put it.
-	var footer := rect.size.y - 74.0
-	_draw_print_feed(rect, 110.0, footer - 16.0)
-	draw_line(Vector2(26, footer - 12), Vector2(rect.size.x - 26, footer - 12), ink * Color(1, 1, 1, 0.3), 1.0)
-	_draw_gauges(rect, ink, footer)
-	CellOutzType.draw_condensed(self, Vector2(26, footer + 36), "%s // %s RISING // %s" % [sheet.sun_sign(), sheet.ascendant(), sheet.modality().to_upper()], 9.0, ink * Color(1, 1, 1, 0.55), 0.7)
-	var done := touched_pages.size()
-	var hint := ("CONFIRMED %d/%d  //  CLICK OR ENTER CONFIRMS THIS TAB" % [done, PAGES.size()]) if done < PAGES.size() else "ALL %d CONFIRMED  //  F FILES YOU" % PAGES.size()
-	CellOutzType.draw_condensed(self, Vector2(rect.size.x - 26 - CellOutzType.width_condensed(hint, 9.0, 0.8), footer + 52), hint, 9.0, HOT if done < PAGES.size() else MOSS, 0.8)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _update_gauges(delta: float) -> void:
@@ -746,6 +769,7 @@ func _draw_print_feed(rect: Rect2, top: float, bottom: float) -> void:
 	var head := lerpf(top, bottom, ease(page_print, 0.7))
 	draw_rect(Rect2(Vector2(14, head), Vector2(rect.size.x - 28, bottom - head)), PAPER)
 	draw_rect(Rect2(Vector2(14, head - 22), Vector2(rect.size.x - 28, 22)), HOT * Color(1, 1, 1, 0.07 * (1.0 - page_print)))
+	IntakePageMotion.draw_ink_bleed(self, rect.size.x, head, page_print, 5150 + page_turns)
 	draw_line(Vector2(14, head), Vector2(rect.size.x - 14, head), HOT, 2.0)
 	draw_line(Vector2(14, head + 3), Vector2(rect.size.x - 14, head + 3), Color(0.02, 0.01, 0.01, 0.8), 3.0)
 

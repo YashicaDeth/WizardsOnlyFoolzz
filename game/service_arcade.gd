@@ -26,6 +26,20 @@ const EXIT_AT := Vector3(0, 0.0, -55.0)
 ## Arch 7 stands at z = -29 and arch 8 at -33.5; the side labs sit at -25.7
 ## and -34.7, so the wall at -31.5 touches none of them.
 const GUARD_POST_AT := Vector3(0, 0.0, -31.5)
+const WORLD_BREAK := preload("res://systems/world_break.gd")
+## Things the breach tool breaks (`DESIGN/GOAL_LOOP_2.md` 0.2): all past the
+## tool's pickup and short of Hollis, against the walls or beside the vats,
+## so the artery down the middle stays clear.
+const PROPS := [
+	["crate", "arcade_crate_1", Vector3(-5.2, 0, -13.0), 0.0],
+	["crate", "arcade_crate_2", Vector3(-4.9, 0, -13.95), 0.4],
+	["barrel", "arcade_barrel", Vector3(5.0, 0, -13.4), 0.0],
+	["jar", "arcade_jar_1", Vector3(3.2, 0, -18.0), 0.0],
+	["jar", "arcade_jar_2", Vector3(3.5, 0, -18.3), 0.0],
+	["locker", "arcade_locker", Vector3(-6.55, 0, -22.4), PI * 0.5],
+	["monitor", "arcade_monitor", Vector3(6.4, 0, -22.8), -PI * 0.5],
+	["chair", "arcade_chair", Vector3(5.5, 0, -22.3), -PI * 0.6],
+]
 ## His shots can kill you now. Death is rebirth in the claimant's vat
 ## (`VatRebirth`); what you carried stays here on the body you leave.
 
@@ -49,6 +63,7 @@ var guard_post: FacilityGuardPost
 ## over the one fight in the first 30 minutes: a box on the part the ram
 ## struck, and a faint amber box on Hollis while he has you in his sights.
 var block_tracker: BlockTracker
+var osd: BodyCamOSD
 var blood := 100.0
 var post_message := ""
 var post_message_timer := 0.0
@@ -70,6 +85,8 @@ func _ready() -> void:
 	_build_shell()
 	_build_landmarks()
 	_build_guard_post()
+	for spec in PROPS:
+		BreakableProp.place(self, spec[0], spec[1], spec[2], spec[3])
 	_build_player()
 	_restore_from_history()
 	_build_remains()
@@ -77,6 +94,11 @@ func _ready() -> void:
 	block_tracker.name = "BlockTracker"
 	$HUD.add_child(block_tracker)
 	block_tracker.camera = camera
+	osd = BodyCamOSD.new()
+	osd.name = "BodyCamOSD"
+	$HUD.add_child(osd)
+	osd.adopt(vitals, objective, prompt, "SUBLEVEL 0C  //  SERVICE ARCADE")
+	osd.camera = camera
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _build_player() -> void:
@@ -355,7 +377,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		inspect_held = event.pressed
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and weapon_taken:
 		if not guard_post.strike(player.global_position):
-			_discharge_at_gate()
+			if WORLD_BREAK.swing(camera, FacilityGuardPost.RAM_DAMAGE, "breach_tool", player).is_empty():
+				_discharge_at_gate()
 
 
 var inspect_held := false
@@ -481,6 +504,9 @@ func _update_hud() -> void:
 	var post_prompt := guard_post.prompt_for(player.global_position, weapon_taken)
 	if not _nearest_remains().is_empty() and (remains_nodes[_nearest_remains()][1] as Label3D).text != "STRIPPED":
 		post_prompt = "[E] TAKE YOUR GEAR BACK OFF YOUR OLD BODY"
+		osd.point_at((remains_nodes[_nearest_remains()][0] as Node3D).global_position + Vector3(0, 0.6, 0))
+	elif post_prompt.begins_with("["):
+		osd.point_at(guard_post.guard.global_position + Vector3(0, 1.3, 0))
 	if post_message_timer > 0.0:
 		prompt.text = post_message
 	elif not post_prompt.is_empty() and not inspect_held:
@@ -489,15 +515,19 @@ func _update_hud() -> void:
 		prompt.text = "BREACH TOOL // PNEUMATIC RAM, ONE CHARGE CANISTER // CLICK AT A LOCKED DOOR" if weapon_taken else "NOTHING IN HAND TO INSPECT"
 	elif card_on_pedestal and _flat_distance(CARD_AT) <= 2.3:
 		prompt.text = "[E] TAKE STAFF ACCESS CARD"
+		osd.point_at(CARD_AT + Vector3(0, 0.3, 0))
 	elif not gate_open and _flat_distance(GATE_AT) <= 3.2:
 		if card_taken:
 			prompt.text = "[E] OPEN PRESSURE GATE"
+			osd.point_at(GATE_AT + Vector3(0, 2.0, 0))
 		elif weapon_taken:
 			prompt.text = "[LMB] BREACH THE PRESSURE GATE   //   OR FIND THE STAFF CARD"
+			osd.point_at(GATE_AT + Vector3(0, 2.0, 0))
 		else:
 			prompt.text = "PRESSURE GATE // STAFF CARD REQUIRED"
 	elif gate_open and (_flat_distance(GATE_AT) <= 4.4 or _flat_distance(EXIT_AT) <= 3.0):
 		prompt.text = "[E] ENTER LOWER WORKS"
+		osd.point_at(GATE_AT + Vector3(0, 1.6, -2.0))
 	elif gate_open:
 		prompt.text = "PRESSURE GATE UNSEALED // MOVE THROUGH"
 	else:
