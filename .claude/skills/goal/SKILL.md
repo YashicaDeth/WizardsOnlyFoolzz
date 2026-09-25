@@ -78,7 +78,9 @@ Then, in this order (Greg, 24 September, "what next"):
 
 - [ ] **Intake: the examiner and the name line.** A better 3D examiner, his
       mouth moving with his voice (first pass `6e5efb0`), and the name / tank
-      line readable on the intake screen.
+      line readable on the intake screen. The name / tank header is built (24
+      September, SUBJECT <name> // TANK 0C-7 over the vat panel). Left: the
+      better examiner model, waiting on the Higgsfield M1 model sheet.
 - [x] **Animated intake pages**: every tab animated and skeuomorphic (ink,
       blood, metal, parts swinging out on gears). After Effects / Photoshop
       pieces allowed. Built on the PC at `0e37324` (gears, a swinging arm, ink
