@@ -132,14 +132,20 @@ here, so this is the list, and the page should link it.
   destructible, buildings and the ground included, and "if you shoot
   downwards with a gun or if you blow up the ground there will be an impact
   hole". So, ahead of glass (rec):
-- [ ] **0.2b Impact holes in the ground.** A round fired into the ground
+- [x] **0.2b Impact holes in the ground.** A round fired into the ground
       leaves a hole where it hit, sized by the calibre, that stays and is
       recorded. 0.5's blasts then leave bigger ones through the same call.
       Built first as the cheapest honest version (a sunken mark with a rim
       and kicked-up dirt, no terrain editing); the render of it carries the
-      open question below.
+      open question below. *Built:* `GroundHole.carve()` from
+      `Ballistics._mark` on anything in the `ground` group (the Hunt's
+      floor), about 5.5 cm of buckshot to 19 cm of rifle; a pit drawn by
+      `ground_hole.gdshader`, a dirt lip, clods in a capped debris pool, a
+      dust kick, and the hole's place and size in `round_struck_world`.
+      `ground_hole_test`.
   - **ASK with that render:** "Is this the kind of hole you mean, or should
-    the ground itself give way, Teardown-style?"
+    the ground itself give way, Teardown-style?" **Greg: yes, keep these**
+    (25 September evening).
 - [ ] **0.3 Glass.** Windows, observation glass, screens and bottles shatter
       into real, persistent shards. The vat shards become physics shards
       instead of scripted ones, landing and staying on the grating.

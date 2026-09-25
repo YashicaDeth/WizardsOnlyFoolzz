@@ -884,6 +884,12 @@ will be an impact hole".
   authored damage stages on each surface (`DESIGN/DESTRUCTION.md`) or
   material really coming away as in Teardown. Asked alongside the first
   render of a ground hole.
+- **Answered (question box, 25 September evening), for the ground:** shown
+  buckshot, pistol, slug and rifle holes in the Hunt, he picked "yes, keep
+  these" over bigger and rougher holes or a ground that really deforms. So a
+  hole in the ground is a drawn pit with a dirt lip and thrown clods, sized
+  by the round, and the ground itself does not give way. This answers the
+  ground only; how far buildings go is still 0.4's question.
 
 ### Greg, 25 September 2026: the New Vegas opening, again
 

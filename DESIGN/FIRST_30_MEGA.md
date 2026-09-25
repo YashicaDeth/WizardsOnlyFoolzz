@@ -387,8 +387,10 @@ it, it's rendered and looked at, it has a test, and it's merged and built
 - [x] 0.2 Crates, barrels, lockers, jars, monitors and chairs break in the
       Hunt, the Service Arcade, the Lower Works and the drains (`8f6559c`).
       No hit sounds yet (0.8), so the V.1 lines for props stay open.
-- [ ] 0.2b A round or a blast into the ground leaves an impact hole (Greg,
-      25 September).
+- [x] 0.2b A round into the ground leaves an impact hole, sized by the
+      calibre (Greg, 25 September; he kept this version on seeing it).
+- [ ] A blast into the ground leaves a crater, through the same
+      `GroundHole.carve()` (with 0.5, explosions).
 - [ ] Growing Floor: tank glass as physics shards, monitors, the keyboard,
       jars.
 - [ ] Service Arcade: machines, the vending machine, glass, Hollis's
