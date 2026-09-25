@@ -46,7 +46,8 @@ const GOO := Color("70150e")
 const PAPER := Color(0.12, 0.075, 0.06)
 
 const ROUTES := ["PRESET", "RANDOM", "CHART", "INSTRUMENT"]
-const PAGES := ["ROUTE", "RACE", "TRAITS", "FACE", "BODY", "SCHEDULE"]
+## Greg, 25 September: "then he asks what style of fighting you want to do".
+const PAGES := ["ROUTE", "RACE", "TRAITS", "FACE", "BODY", "SCHEDULE", "STYLE"]
 const FORM_REVEAL_AT := 5.5
 const FORM_REVEAL_DURATION := 0.55
 
@@ -501,6 +502,8 @@ func _rows() -> int:
 			# Anatomy sits at the top of the body page, because it is the first
 			# thing the facility decided about you.
 			return 9
+		6:
+			return BloodTrees.STYLE_ORDER.size()
 		_:
 			return CharacterSheet.MODIFIERS.size()
 
@@ -573,6 +576,9 @@ func _commit() -> void:
 				_:
 					sheet.appearance["piercings"] = fmod(float(sheet.appearance.get("piercings", 0.0)) + 0.25, 1.01)
 			_transcribe("BODY")
+		6:
+			sheet.fighting_style = str(BloodTrees.STYLE_ORDER[row])
+			_transcribe(str((BloodTrees.STYLES[sheet.fighting_style] as Dictionary).label), "style_" + sheet.fighting_style)
 		_:
 			var key := str(CharacterSheet.MODIFIERS.keys()[row])
 			var accepted := not sheet.modifiers.has(key)
@@ -727,6 +733,8 @@ func _draw_clipboard(rect: Rect2) -> void:
 			_draw_face(rect, ink, y)
 		4:
 			_draw_body(rect, ink, y)
+		6:
+			_draw_styles(rect, ink, y)
 		_:
 			_draw_schedule(rect, ink, y)
 	draw_set_transform_matrix(clip_xform)
@@ -847,6 +855,23 @@ func _draw_routes(_rect: Rect2, ink: Color, y: float) -> void:
 		var note: String = ["authored, canonical", "the decanting lottery", "birth date, time, place", "the questionnaire"][index]
 		CellOutzType.draw_condensed(self, Vector2(180, y - 8), note.to_upper(), 8.0, ink * Color(1, 1, 1, 0.45), 0.7)
 		y += 26.0
+
+
+## The four blood trees, with the first node each one opens and what you
+## would walk into the Hunt holding.
+func _draw_styles(_rect: Rect2, ink: Color, y: float) -> void:
+	for index in BloodTrees.STYLE_ORDER.size():
+		var style_id: String = BloodTrees.STYLE_ORDER[index]
+		var style: Dictionary = BloodTrees.STYLES[style_id]
+		var tone: Color = style.tone
+		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.fighting_style == style_id)
+		draw_rect(Rect2(Vector2(50, y - 12), Vector2(6, 26)), tone)
+		CellOutzType.draw_condensed(self, Vector2(64, y - 10), str(style.label), 13.0, ink, 0.9)
+		var first := BloodTrees.first_node(style_id)
+		var node: Dictionary = BloodTrees.NODES.get(first, {})
+		CellOutzType.draw_condensed(self, Vector2(64, y + 6), ("OPENS %s  //  %s" % [str(node.get("label", "")), str(node.get("effect", ""))]).left(58), 7.0, ink * Color(1, 1, 1, 0.5), 0.6)
+		CellOutzType.draw_condensed(self, Vector2(330, y - 8), "HOLDING  %s" % BloodTrees.weapon_label(BloodTrees.starting_weapon(style_id)), 8.0, tone * Color(1, 1, 1, 0.9), 0.7)
+		y += 36.0
 
 
 func _draw_races(_rect: Rect2, ink: Color, y: float) -> void:

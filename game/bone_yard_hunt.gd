@@ -1140,6 +1140,8 @@ func _ready() -> void:
 	arsenal.name = "HunterArsenal"
 	player_body.add_child(arsenal)
 	arsenal.configure(player_rig)
+	# The fighting style you gave the examiner decides what is in your hand.
+	arsenal.select_weapon(BloodTrees.starting_weapon(str(WorldHistory.subject("player").get("fighting_style", ""))))
 	arsenal.apply_skins()
 	arsenal.fired.connect(_on_skin_fired)
 	arsenal.reload_finished.connect(_on_weapon_reload_finished)

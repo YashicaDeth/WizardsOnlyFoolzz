@@ -80,6 +80,12 @@ func _ready() -> void:
 	# Every remaining tab has to be visited, which is the gate he enforces.
 	# Committing the first row of each is what accepting the defaults looks like.
 	for _page in range(1, opening.intake.PAGES.size()):
+		# A tab can start one of his procedures (SCHEDULE does), and the form
+		# takes no keys until he is done; a player waits, so this does too.
+		var working := 0.0
+		while not opening.intake.procedure.is_empty() and working < 25.0:
+			await get_tree().physics_frame
+			working += get_physics_process_delta_time()
 		press(KEY_RIGHT)
 		press(KEY_ENTER)
 		await get_tree().physics_frame

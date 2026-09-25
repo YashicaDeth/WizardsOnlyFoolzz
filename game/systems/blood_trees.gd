@@ -183,6 +183,39 @@ static func weapon_label(weapon_id: String) -> String:
 	return weapon_id.to_upper().replace("_", " ")
 
 
+## The node a style starts from: its own root, the one that needs nothing.
+static func first_node(style_id: String) -> String:
+	for node_id in NODES:
+		var node: Dictionary = NODES[node_id]
+		if str(node.style) == style_id and (node.get("requires", []) as Array).is_empty():
+			return str(node_id)
+	return ""
+
+
+## What you walk into the Hunt holding for the style you told the examiner.
+## Iron starts on the sidearm; everyone else keeps the sword, because the
+## Hunt's arsenal has no slot yet for meat's hands or hush's unseen kill.
+## Assistant proposal, open to Greg.
+static func starting_weapon(style_id: String) -> String:
+	return {"firearm": "sidearm"}.get(style_id, "sword")
+
+
+## Greg, 25 September: the fighting style you give him opens that style's first
+## node, free, before you have earned a drop of blood with it. Written straight
+## to the ledger's record, because the ledger itself lives in the Hunt.
+static func grant_start(style_id: String) -> String:
+	var first := first_node(style_id)
+	if first == "":
+		return ""
+	var stored := WorldHistory.subject(BloodLedger.SUBJECT)
+	var opened: Array = (stored.get("unlocked", []) as Array).duplicate()
+	if not opened.has(first):
+		opened.append(first)
+	WorldHistory.amend_subject(BloodLedger.SUBJECT, {"unlocked": opened, "chosen_style": style_id})
+	PlayerActionLedger.record("blood_node_unlocked", {"node": first, "style": style_id, "cost": 0, "granted": "intake"})
+	return first
+
+
 static func style_nodes(style_id: String) -> Array[String]:
 	var out: Array[String] = []
 	for node_id in NODES:

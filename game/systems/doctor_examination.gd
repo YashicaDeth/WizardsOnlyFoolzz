@@ -56,6 +56,10 @@ const OBSERVATIONS := {
 		{"line": "A real birth time. You'd be amazed how few of you have one.", "hold": 3.2},
 		{"line": "The chart is not superstition here. That is the unkind part.", "hold": 3.4},
 	],
+	# Greg's line, the moment you reach the page.
+	"style": [
+		{"line": "What style of fighting do you want?", "hold": 2.8},
+	],
 	"declined": [
 		{"line": "Declining is an answer. I have written it down as one.", "hold": 3.2},
 		{"line": "Good. Refusal reads clearly on the instrument. Do it again.", "hold": 3.4},

@@ -99,6 +99,7 @@ open until Greg says yes.
   - **Exists:** the four blood-tree styles and their nodes.
   - **New:** the choice opens that style's first node and sets your starting
     weapon.
+- **Built (25 September):** a STYLE tab after SCHEDULE. Reaching it, he asks "What style of fighting do you want?". Each row shows the node it opens and what you would be holding. Filing opens that style's first node free (`BloodTrees.grant_start`, recorded as `fighting_style_chosen`), and IRON starts the Hunt on the sidearm. (rec, open to Greg) MEAT and HUSH keep the sword until the arsenal has slots for hands and the unseen kill. Test: `fighting_style_test`.
 
 ### 7. The GUI is Fallout: New Vegas, not a checklist
 - Pip-Boy-like: images, big stat indicators, customization, and no wasted

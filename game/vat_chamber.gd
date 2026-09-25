@@ -343,6 +343,11 @@ func _on_intake_filed(_state: Dictionary) -> void:
 	# still captured and before the wake event, so the sheet cannot overwrite it
 	# and the later X-ray discovers something that was already done to the body.
 	BRAIN_INDEX.install_chip("player", "celloutz", "growing_floor_intake")
+	# The style you gave him opens its first node now, before any blood.
+	var style_id := str(filed_state.get("fighting_style", ""))
+	if style_id != "":
+		var opened := BloodTrees.grant_start(style_id)
+		WorldHistory.record_event("fighting_style_chosen", {"style": style_id, "opened": opened, "weapon": BloodTrees.starting_weapon(style_id)})
 	WorldHistory.begin_ledger_batch()
 	OPENING.advance("woke")
 	FACILITY_TERRITORY.apply_event("opening_woke")

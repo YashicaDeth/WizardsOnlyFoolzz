@@ -180,6 +180,8 @@ var route := "preset"
 var race := "decanted"
 var traits: Array = []
 var modifiers: Array = []
+## The blood tree you told him you fight with (the STYLE page).
+var fighting_style := ""
 var birth := {"year": 2007, "month": 1, "day": 11, "hour": 2, "minute": 30}
 var instrument: Dictionary = {}
 ## These choices are physical: the hunt rig reads them when it grows the body,
@@ -471,6 +473,7 @@ func apply_to_world() -> Dictionary:
 		"race": race,
 		"traits": traits.duplicate(),
 		"modifiers": modifiers.duplicate(),
+		"fighting_style": fighting_style,
 		"birth": birth.duplicate(),
 		"sun_sign": sun_sign(),
 		"ascendant": ascendant(),
