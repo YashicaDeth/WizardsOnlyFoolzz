@@ -79,9 +79,12 @@ Then, in this order (Greg, 24 September, "what next"):
 - [ ] **Intake: the examiner and the name line.** A better 3D examiner, his
       mouth moving with his voice (first pass `6e5efb0`), and the name / tank
       line readable on the intake screen.
-- [ ] **Animated intake pages**: every tab animated and skeuomorphic (ink,
+- [x] **Animated intake pages**: every tab animated and skeuomorphic (ink,
       blood, metal, parts swinging out on gears). After Effects / Photoshop
-      pieces allowed.
+      pieces allowed. Built on the PC at `0e37324` (gears, a swinging arm, ink
+      bleed, blood from the clip). A cloud lane's per-tab materials and tool
+      arm (`IntakePageFx`) overlapped it and was not merged; its worktree is
+      kept if Greg wants the per-tab tools later.
 - [ ] **The combat overhaul**: omnidirectional swinging on both sides, a skill
       curve you can learn and read, AI difficulties tuned to what is
       achievable. Big job; `momentum_damage` is already on.
