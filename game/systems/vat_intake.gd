@@ -29,6 +29,8 @@ const Branding := preload("res://systems/celloutz_branding.gd")
 const IntakePageMotion := preload("res://systems/intake_page_motion.gd")
 
 signal filed(state: Dictionary)
+## A beat in his lines the room answers ("watched": the cameras close in).
+signal doctor_cue(kind: String)
 
 const INK := Color("e6d4ac")
 const COPPER := Color("b0552a")
@@ -84,6 +86,10 @@ var handler_says := ""
 ## AX1.2. The doctor is a second presence, not a second mood of the handler.
 ## He speaks rarely and never about paperwork.
 var doctor_says := ""
+## Greg's opening lines, still to say, and whether he is still saying them.
+var opening_lines: Array = []
+var opening_active := false
+var read_thoughts_said := false
 var doctor_life := 0.0
 var doctor_moment := 0
 ## AX2.2. Carried out of the examination and into the breakout.
@@ -272,9 +278,17 @@ func _process(delta: float) -> void:
 		transcript = "NEURALACE ENGAGED  //  EXAMINER TERMINAL CONNECTED"
 		transcript_life = 4.0
 		_speak("page")
+		opening_lines = DoctorExamination.OPENING.duplicate(true)
+		opening_active = true
+		_advance_opening()
 	handler_life = maxf(0.0, handler_life - delta)
 	handler_quiet = maxf(0.0, handler_quiet - delta)
 	doctor_life = maxf(0.0, doctor_life - delta)
+	if opening_active and doctor_life <= 0.0:
+		if opening_lines.is_empty():
+			opening_active = false
+		else:
+			_advance_opening()
 	if doctor_life <= 0.0 and verdict_started:
 		_advance_verdict()
 	transcript_life = maxf(0.0, transcript_life - delta)
@@ -462,6 +476,13 @@ func _think(text: String) -> void:
 		return
 	thought = text
 	thought_life = 6.0
+	if not read_thoughts_said:
+		# The first thought you have, he answers. Not the handler: him.
+		read_thoughts_said = true
+		doctor_says = str(DoctorExamination.READS_THOUGHTS.line)
+		doctor_life = maxf(float(DoctorExamination.READS_THOUGHTS.hold), _read_time(doctor_says))
+		WorldHistory.record_event("examiner_read_thought", {"thought": text.left(120)})
+		return
 	_speak("heard")
 
 
@@ -961,6 +982,9 @@ func _draw_mirror(rect: Rect2) -> void:
 ## AX1.2. He watches the page you are on, not the box you ticked. Arriving at
 ## a page is the beat; choosing within it belongs to the handler and his form.
 func _doctor_observe() -> void:
+	# He finishes what he came in to say before he comments on your paperwork.
+	if opening_active:
+		return
 	doctor_moment += 1
 	var beat := DoctorExamination.observe(str(PAGES[page]).to_lower(), doctor_moment)
 	if beat.is_empty():
@@ -985,8 +1009,23 @@ func _doctor_note_refusal() -> void:
 
 ## AX2.1. The closing sequence. He explains what the examination was for,
 ## which is worse than gloating, and then he starts to leave.
+func _advance_opening() -> void:
+	if opening_lines.is_empty():
+		return
+	var beat: Dictionary = opening_lines.pop_front()
+	doctor_says = str(beat.get("line", ""))
+	doctor_life = maxf(float(beat.get("hold", 3.0)), _read_time(doctor_says))
+	var cue := str(beat.get("cue", ""))
+	if cue != "":
+		doctor_cue.emit(cue)
+	if opening_lines.is_empty():
+		WorldHistory.record_event("examiner_greeting", {"lines": DoctorExamination.OPENING.size()})
+
+
 func _begin_verdict() -> void:
 	verdict_started = true
+	opening_lines.clear()
+	opening_active = false
 	verdict = DoctorExamination.verdict(sheet)
 	_advance_verdict()
 

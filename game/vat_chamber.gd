@@ -22,6 +22,7 @@ const VAT_SMASH := preload("res://systems/vat_smash.gd")
 const IMPLANT_CATALOG := preload("res://systems/implant_catalog.gd")
 const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const TORTURE_LOAD_IN := preload("res://systems/torture_load_in.gd")
+const INTAKE_WATCHERS := preload("res://systems/intake_watchers.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const BRAIN_INDEX := preload("res://systems/brain_index.gd")
@@ -66,6 +67,8 @@ var intake: Control
 ## Beat 1: the black before the room (`TortureLoadIn`). The examiner does not
 ## arrive and the form does not run until it hands over.
 var load_in: Control
+## The Growing Floor's wall cameras; they close in on "I'm being watched too".
+var watchers: Node3D
 var opening_audio: Node
 var fluid: MeshInstance3D
 var vat_glass: MeshInstance3D
@@ -95,6 +98,19 @@ var examiner_door_heard := false
 var departure_clock := 0.0
 var departure_line := -1
 var arrival_clock := 0.0
+## Greg, 25 September: "a doctor walks up to the screen, taps it". Where on
+## his walk in he stops at the glass (a fraction of the whole path), and when
+## each knock lands, in arrival seconds.
+const GLASS_STOP_AT := 2.05
+## Just outside the glass, straight ahead of where you hang.
+const GLASS_FRONT := Vector3(0.3, 0.0, -1.45)
+## Round the tank's curve to it, clear of the glass.
+const GLASS_ROUND := Vector3(1.05, 0.0, -1.0)
+const GLASS_LEAVE_AT := 3.55
+const GLASS_TAPS := [2.45, 2.8, 3.15]
+const TERMINAL_TURN_AT := 4.5
+var examiner_taps := 0
+var _turn_from := 0.0
 var vat_struts: Array[MeshInstance3D] = []
 ## How long the breach still shakes the camera. The glass used to simply stop
 ## being rendered, which Greg described as "I don't even smash out of the glass
@@ -197,6 +213,10 @@ func _ready() -> void:
 		examiner_post = examiner_node.global_position
 		examiner_node.visible = false
 	_build_vat()
+	watchers = INTAKE_WATCHERS.new()
+	watchers.name = "IntakeWatchers"
+	add_child(watchers)
+	watchers.call("build", VAT_POSITION + Vector3(0, 1.55, 0))
 	_build_first_objects()
 	_build_player()
 	doctor_route = DOCTOR_ROUTE.new()
@@ -248,11 +268,17 @@ func _build_intake() -> void:
 	intake.name = "Intake"
 	$HUD.add_child(intake)
 	intake.filed.connect(_on_intake_filed)
+	intake.doctor_cue.connect(_on_doctor_cue)
 	if TORTURE_LOAD_IN.wanted():
 		intake.process_mode = Node.PROCESS_MODE_DISABLED
 		load_in = TORTURE_LOAD_IN.new()
 		$HUD.add_child(load_in)
 		load_in.connect("finished", _on_load_in_finished)
+
+
+func _on_doctor_cue(kind: String) -> void:
+	if kind == "watched" and watchers != null:
+		watchers.call("close_in", $HUD, camera)
 
 
 func _on_load_in_finished(_skipped: bool) -> void:
@@ -778,6 +804,18 @@ func _build_examination_station() -> void:
 	var look := HUNTER_APPEARANCE.new()
 	body.add_child(look)
 	look.configure(body, {"axes": {"brow": 0.7, "jaw": 0.6, "cheek": 0.2, "eyes": 0.3, "nose": 0.55, "mouth": 0.4}})
+	# Dressed as the feed shows him (`ExaminerFeed._dress_as_staff`): a clinical
+	# coat bloodied down the front and the forearms. He was walking up to your
+	# glass naked under the censor.
+	var wardrobe := ClothingShell.fresh_wardrobe()
+	wardrobe.erase("head")
+	wardrobe["style"] = "clinical"
+	ClothingShell.stain(body, "torso", 0.55)
+	ClothingShell.stain(body, "right_arm", 0.5)
+	ClothingShell.stain(body, "left_arm", 0.35)
+	ClothingShell.stain(body, "left_leg", 0.2)
+	ClothingShell.stain(body, "right_leg", 0.15)
+	body.dress(wardrobe)
 	var screen_light := OmniLight3D.new()
 	screen_light.position = Vector3(0.52, 1.6, 0.02)
 	screen_light.light_color = Color("8bbd79")
@@ -792,45 +830,6 @@ func _build_examination_station() -> void:
 	examination_light.omni_range = 5.2
 	station.add_child(examination_light)
 	_build_staff_door()
-	_hang_cameras()
-
-
-## "Cameras everywhere" (Greg, 2026-09-24), and the consent notice says the
-## examination is recorded: four wall cameras, each turned on the vat, with a
-## red tally light.
-func _hang_cameras() -> void:
-	for mount in [Vector3(-7.2, 3.7, 2.8), Vector3(7.2, 3.7, 2.8), Vector3(-7.2, 3.7, -6.5), Vector3(7.2, 3.7, -6.5)]:
-		var rig := Node3D.new()
-		rig.name = "Cctv"
-		add_child(rig)
-		rig.position = mount
-		rig.look_at_from_position(mount, VAT_POSITION + Vector3(0, 1.4, 0), Vector3.UP)
-		var housing := MeshInstance3D.new()
-		var box := BoxMesh.new()
-		box.size = Vector3(0.22, 0.2, 0.46)
-		box.material = LabSurface.material("grime")
-		housing.mesh = box
-		rig.add_child(housing)
-		var lens := MeshInstance3D.new()
-		var lens_mesh := CylinderMesh.new()
-		lens_mesh.top_radius = 0.06
-		lens_mesh.bottom_radius = 0.07
-		lens_mesh.height = 0.08
-		var glass := StandardMaterial3D.new()
-		glass.albedo_color = Color("0a0c0d")
-		glass.metallic = 0.6
-		glass.roughness = 0.1
-		lens_mesh.material = glass
-		lens.mesh = lens_mesh
-		lens.rotation_degrees.x = 90.0
-		lens.position = Vector3(0, 0, -0.26)
-		rig.add_child(lens)
-		var tally := OmniLight3D.new()
-		tally.light_color = Color("ff2a1a")
-		tally.light_energy = 0.6
-		tally.omni_range = 0.6
-		tally.position = Vector3(0.08, 0.08, -0.22)
-		rig.add_child(tally)
 
 
 ## The door he leaves by. A lit frame in the right-hand wall with a panel that
@@ -1078,6 +1077,9 @@ func _examiner_path(t: float, inbound: bool) -> Vector3:
 	var points: Array[Vector3] = [
 		examiner_post,
 		Vector3(1.25, examiner_post.y, -1.8),
+		# In front of your glass, where you can see him: the tap happens here.
+		Vector3(GLASS_FRONT.x, examiner_post.y, GLASS_FRONT.z),
+		Vector3(GLASS_ROUND.x, examiner_post.y, GLASS_ROUND.z),
 		Vector3(1.55, examiner_post.y, 0.2),
 		Vector3(door.x, examiner_post.y, door.z - 0.6),
 		Vector3(door.x, examiner_post.y, door.z + 0.9),
@@ -1096,31 +1098,88 @@ func _examiner_path(t: float, inbound: bool) -> Vector3:
 	return points[-1]
 
 
-## The intake does not begin as a menu. You wake, the examiner enters, looks
-## through the glass, and only then wakes the terminal that engages the chip.
+## The intake does not begin as a menu. You wake, the examiner comes in,
+## stops at your glass, looks at you and taps it three times, then goes to his
+## terminal and wakes the chip.
 func _update_arrival(delta: float) -> void:
 	arrival_clock += delta
 	if examiner_node == null or not is_instance_valid(examiner_node):
 		return
 	if arrival_clock >= 0.35:
 		examiner_node.visible = true
-	var walk := clampf((arrival_clock - 0.35) / 2.15, 0.0, 1.0)
+	var stop := _glass_stop_fraction()
+	var t := 0.0
+	if arrival_clock < GLASS_STOP_AT:
+		t = ease(clampf((arrival_clock - 0.35) / (GLASS_STOP_AT - 0.35), 0.0, 1.0), 0.78) * stop
+	elif arrival_clock < GLASS_LEAVE_AT:
+		t = stop
+	else:
+		t = lerpf(stop, 1.0, ease(clampf((arrival_clock - GLASS_LEAVE_AT) / (TERMINAL_TURN_AT - 0.05 - GLASS_LEAVE_AT), 0.0, 1.0), 0.7))
+	var at := _examiner_path(t, true)
 	# Greg, 24 September: he comes and goes by the door behind the vat -- the
 	# one the player will break down to follow him.
-	examiner_node.global_position = _examiner_path(ease(walk, 0.78), true)
 	if doctor_route != null and doctor_route.door != null:
-		doctor_route.door.set_ajar(1.0 - clampf((walk - 0.08) / 0.14, 0.0, 1.0) if arrival_clock >= 0.2 else 0.0)
-	# He first faces the tank, then turns into his own terminal. The object of
-	# attention changes before the UI arrives, which makes the intake a result
-	# of something he physically did in the room.
-	var turn := clampf((arrival_clock - 2.55) / 0.85, 0.0, 1.0)
-	examiner_node.rotation.y = lerpf(PI, EXAMINER_TURN, ease(turn, 0.55))
-	if arrival_clock >= 0.70 and arrival_clock < 2.45:
+		var opening := clampf((arrival_clock - 0.35) / (GLASS_STOP_AT - 0.35), 0.0, 1.0)
+		doctor_route.door.set_ajar(1.0 - clampf((opening - 0.08) / 0.14, 0.0, 1.0) if arrival_clock >= 0.2 else 0.0)
+	if arrival_clock >= GLASS_STOP_AT and arrival_clock < GLASS_LEAVE_AT:
+		# He looks at you first. Each knock leans him into the glass.
+		var to_tank := VAT_POSITION - at
+		examiner_node.global_rotation.y = atan2(to_tank.x, to_tank.z)
+		var lean := 0.0
+		for knock in GLASS_TAPS:
+			var since := arrival_clock - float(knock)
+			if since >= 0.0 and since < 0.22:
+				lean = maxf(lean, sin(since / 0.22 * PI) * 0.06)
+		at += Vector3(to_tank.x, 0.0, to_tank.z).normalized() * lean
+		while examiner_taps < GLASS_TAPS.size() and arrival_clock >= float(GLASS_TAPS[examiner_taps]):
+			examiner_taps += 1
+			if opening_audio != null:
+				opening_audio.cue("tap")
+			if examiner_taps == GLASS_TAPS.size():
+				WorldHistory.record_event("examiner_tapped_glass", {"taps": examiner_taps})
+		_turn_from = examiner_node.rotation.y
+	elif arrival_clock < TERMINAL_TURN_AT:
+		var heading := _examiner_path(minf(1.0, t + 0.03), true) - at
+		if heading.length() > 0.001:
+			examiner_node.global_rotation.y = atan2(heading.x, heading.z)
+		_turn_from = examiner_node.rotation.y
+	else:
+		# Then he turns into his own terminal. The object of attention changes
+		# before the UI arrives, which makes the intake a result of something he
+		# physically did in the room.
+		var turn := clampf((arrival_clock - TERMINAL_TURN_AT) / 0.7, 0.0, 1.0)
+		examiner_node.rotation.y = lerp_angle(_turn_from, EXAMINER_TURN, ease(turn, 0.55))
+	examiner_node.global_position = at
+	if arrival_clock >= 0.70 and arrival_clock < 2.0:
 		subtitle.text = "EXAMINER // SUBJECT CONSCIOUS"
-	elif arrival_clock >= 3.15 and arrival_clock < 5.5:
+	elif examiner_taps > 0 and arrival_clock < GLASS_LEAVE_AT + 0.3:
+		subtitle.text = "TAP. ".repeat(examiner_taps).strip_edges()
+	elif arrival_clock >= TERMINAL_TURN_AT + 0.1 and arrival_clock < 6.4:
 		subtitle.text = "NEURALACE TERMINAL // LINK ESTABLISHING"
 	else:
 		subtitle.text = ""
+
+
+## How far along his walk in the glass stop is: the waypoint beside the tank.
+func _glass_stop_fraction() -> float:
+	var door: Vector3 = DoctorRoute.DOOR_AT
+	var points: Array[Vector3] = [
+		Vector3(door.x, examiner_post.y, door.z + 0.9),
+		Vector3(door.x, examiner_post.y, door.z - 0.6),
+		Vector3(1.55, examiner_post.y, 0.2),
+		Vector3(GLASS_ROUND.x, examiner_post.y, GLASS_ROUND.z),
+		Vector3(GLASS_FRONT.x, examiner_post.y, GLASS_FRONT.z),
+		Vector3(1.25, examiner_post.y, -1.8),
+		examiner_post,
+	]
+	var total := 0.0
+	var upto := 0.0
+	for index in points.size() - 1:
+		var leg := points[index].distance_to(points[index + 1])
+		total += leg
+		if index < 4:
+			upto += leg
+	return upto / maxf(total, 0.001)
 
 
 ## He turns away, walks out of his own door, and the door shuts. The player is
@@ -1144,7 +1203,7 @@ func _update_departure(delta: float) -> void:
 		examiner_node.global_position = _examiner_path(ease(walk, 0.85), false)
 		var heading := _examiner_path(minf(1.0, ease(walk, 0.85) + 0.05), false) - examiner_node.global_position
 		if walk > 0.02 and heading.length() > 0.001:
-			examiner_node.global_rotation.y = atan2(-heading.x, -heading.z)
+			examiner_node.global_rotation.y = atan2(heading.x, heading.z)
 		# His door swings for him and shuts behind him.
 		if doctor_route != null and doctor_route.door != null:
 			doctor_route.door.set_ajar(clampf((walk - 0.72) / 0.12, 0.0, 1.0) - clampf((departure_clock - 3.1) / 0.5, 0.0, 1.0))

@@ -60,6 +60,7 @@ open until Greg says yes.
 - He goes to his computer, and **appears on the left screen**: the live
   examiner feed.
   - **Exists:** `ExaminerFeed`, the left panel of the intake.
+- **Built (25 September):** he comes round the tank, stops in front of your glass, turns to you and taps three times (a dull knock through the fluid, the subtitle "TAP. TAP. TAP."), then goes to his terminal. He now wears the bloodied lab coat the feed shows; the 3D body was walking up naked under the censor. (He was also facing backwards on every walk; fixed.)
 
 ### 3. "Hurry up now, I'm being watched too"
 - He says: *"Hello. Hey. You're going to do a psychology test for me. You're
@@ -72,6 +73,7 @@ open until Greg says yes.
     (placement only).
   - **New:** cameras that visibly turn and zoom (lens barrels extending), a
     depth-map/X-ray pulse over the room showing them.
+- **Built (25 September):** his three lines play in Greg's words as soon as his terminal is up (`DoctorExamination.OPENING`). "I'm being watched too" turns the Growing Floor's four wall cameras (now real `SecurityCamera`s, `systems/intake_watchers.gd`) onto your tank, runs every lens barrel out, and a depth-scan pulse over the form boxes each one: "CAM 0C-n // ON YOU". Test: `opening_greeting_test`.
 
 ### 4. V is your voice, and they can read it
 - Hold **V** and speak into your real microphone (a HyperX SoloCast or any
@@ -83,6 +85,7 @@ open until Greg says yes.
     a fallback to typing when no mic or model is present.
 - He answers what you thought: *"Hey. I can read your thoughts. Don't forget,
   we own you. Brain chip."*
+- **Built (25 September):** the first thought you type or speak with V, he answers with that line, and it goes on the record (`examiner_read_thought`). The real-mic hookup is still to do.
 
 ### 5. The psychology test is your birthday
 - He asks for your birthday (and time of birth, if you know it).

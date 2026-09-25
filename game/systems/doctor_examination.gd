@@ -71,6 +71,16 @@ const OBSERVATIONS := {
 ## together ran the route to 26 seconds from one keypress, which
 ## `opening_handoff_test` is right to refuse. Same four sentences, less waiting
 ## between them.
+## Greg, 25 September, in his own words: the first thing the examiner says,
+## once his terminal is up. The last line turns the room's cameras on you.
+const OPENING := [
+	{"line": "Hello. Hey. You're going to do a psychology test for me.", "hold": 3.0},
+	{"line": "You're going to tell me your birthday, and I'm going to find out everything I need to know. Everything we need to know.", "hold": 4.4},
+	{"line": "Hurry up now. I'm being watched too.", "hold": 3.0, "cue": "watched"},
+]
+## The first time you think out loud (V). Greg: "because they have a brain chip".
+const READS_THOUGHTS := {"line": "Hey. I can read your thoughts. Don't forget. We own you. Brain chip.", "hold": 3.8}
+
 const VERDICT_CLOSE := [
 	{"line": "That is the examination. Thank you — I mean that.", "hold": 2.6},
 	{"line": "You have told me how you are put together.", "hold": 2.6},

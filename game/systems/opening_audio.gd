@@ -49,8 +49,8 @@ func cue(kind: String) -> void:
 	played_cues.append(kind)
 	if cue_voice == null:
 		return
-	cue_voice.stream = _wave(kind, {"drain": 0.85, "revenge": 1.4}.get(kind, 0.55), false)
-	cue_voice.volume_db = -5.0 if kind in ["glass", "rip", "revenge"] else -9.0
+	cue_voice.stream = _wave(kind, {"drain": 0.85, "revenge": 1.4, "tap": 0.25}.get(kind, 0.55), false)
+	cue_voice.volume_db = -5.0 if kind in ["glass", "rip", "revenge", "tap"] else -9.0
 	cue_voice.play()
 
 
@@ -100,6 +100,11 @@ func _wave(kind: String, duration: float, looping: bool) -> AudioStreamWAV:
 			"revenge":
 				var swell := minf(1.0, t * 12.0) * exp(-t * 2.2)
 				sample = (sin(TAU * 41.0 * t) * 0.6 + sin(TAU * 61.5 * t) * 0.25 + (_noise(frame) - 0.5) * 0.1) * swell
+			"tap":
+				# A knuckle on thick glass, heard from inside the fluid: a dull
+				# knock with the ring taken out of it.
+				var knock := exp(-t * 38.0)
+				sample = (sin(TAU * 170.0 * t) * 0.7 + sin(TAU * 410.0 * t) * 0.18 + (_noise(frame * 9) - 0.5) * 0.3 * exp(-t * 90.0)) * knock
 			"door":
 				var envelope := exp(-t * 5.0)
 				sample = (sin(TAU * 51.0 * t) * 0.62 + sin(TAU * 93.0 * t) * 0.2) * envelope
