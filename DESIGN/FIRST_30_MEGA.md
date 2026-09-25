@@ -258,15 +258,26 @@ it, it's rendered and looked at, it has a test, and it's merged and built
 - [x] END ALL SUFFERING, and three tugs per wire.
 - [x] GET REVENGE, then the glass goes.
 - [ ] Each tug has its own pain flash and a heartbeat spike.
-- [ ] Pulling the mouth tube is a separate, last pull. **ASK:** the beat.
-- [ ] The breakthrough reads as your soul seizing the implant: wetwire
-      feedback, sigils flickering over the HUD as it boots. **ASK.**
-- [ ] The HUD boots as the implant is hacked: REC, time, the location
-      stamp, one piece at a time.
+- [x] Pulling the mouth tube is a separate, last pull: three tugs on E
+      after the wires (Greg: "rip out the wires and cord in your mouth").
+      `hands_on_breakout_test`.
+- [x] The breakthrough reads as your soul seizing the implant: CellOutz
+      firmware lines typed, struck and overwritten while you're on your
+      knees (`implant_boot_hud.gd`). The firmware wording is an assistant
+      placeholder in one table, for Greg to replace. Sigils over the boot
+      wait for Greg's art (the B1-B3 Higgsfield frames).
+- [x] The HUD boots as the implant is hacked: the frame, REC and the
+      location stamp, then vitals, the objective and the prompt, one piece
+      at a time, each glitching on. Rendered (`hands_on_breakout_capture`).
 - [ ] Third person unlocks here or later. **ASK** (Greg's call).
+- [x] You smash the glass yourself: three blows (click or E), the first
+      two crack it where the fist lands, the third goes through (Greg:
+      "smash the tank and fall out on your knees").
 - [ ] The glass break is a physics shatter, with shards that stay (links
       to destruction 0.3).
-- [ ] You fall onto your knees in the puddle, and get up by pressing a key.
+- [x] You fall onto your knees in the puddle, and get up by pressing SPACE
+      once the HUD is up, turning to his door as you rise; only then does
+      GET REVENGE flash (Greg's order, ESCAPE_ROUTES.md).
 
 ## F. The Growing Floor (minutes 8-12)
 
@@ -311,7 +322,9 @@ it, it's rendered and looked at, it has a test, and it's merged and built
 ## G. The Service Arcade (minutes 12-17)
 - [x] The ram, the card, Hollis coerced or put down, his hand on the reader,
       his gun in Carry, and the pressure gate.
-- [ ] Hollis's real model. **ASK** (Greg picks, CC-BY credited).
+- [ ] Hollis's real model. Answered 25 September: a better in-game model;
+      one Hollis at the Support Unit end, a numbered guard in the arcade.
+      Model sheets for both are in Higgsfield roadmap phase 9.
 - [ ] Hollis's warning shot, wound and kill read in play; he says "You
       again" after a death.
 - [ ] The arcade machines can be smashed (destruction 0.2).
@@ -336,8 +349,12 @@ it, it's rendered and looked at, it has a test, and it's merged and built
       hostile.
 - [ ] Guards react to screams and cameras.
 - [ ] The first blood-tree lesson happens here, in the first real fight.
-- [ ] The doctor's bay, the hologram, the call, and the ramp up.
-- [ ] The doctor's name, history and vehicle. **ASK** (Greg decides).
+- [x] The doctor's bay, the hologram, the call, and the ramp up
+      (`doctor_vehicle_bay_test`, and the whole route chained end to end in
+      `doctor_chase_route_test`).
+- [x] The doctor's name, history and vehicle. Answered 25 September: name
+      withheld until the roof, one line of history in his room, he leaves
+      by helicopter from the roof. The line itself is still Greg's to write.
 
 ## J. The heat elevator (route 1)
 - [x] Up to the overworld, surfacing at the sallyport point.
@@ -346,7 +363,8 @@ it, it's rendered and looked at, it has a test, and it's merged and built
 
 ## K. The old drains (route 2)
 - [x] The gallery, the cistern, the outfall, and the drain stalker.
-- [ ] A second threat, or a chase. **ASK.**
+- [x] A second threat: the drain bingyanger, which hunts by sound
+      (`drain_stalker_test`).
 - [ ] Water that ripples around your legs, and sound that echoes.
 - [ ] Freed Growing Floor subjects appear here.
 - [ ] The dry falls: blood waterfall, smashed trees, the gorge track.
