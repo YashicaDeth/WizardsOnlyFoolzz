@@ -1012,6 +1012,13 @@ The full direction is in `DESIGN/OPENING_TORTURE_INTAKE.md`. In short:
     `DESIGN/HIGGSFIELD_PROMPTS.md`.
   - **Ponytail and Mento:** Greg will send links, and wants help writing
     precise prompts for them.
+- **Generated art is masked as code (25 September).** Enhance Higgsfield
+  images, then run every generated image through effects so it reads as
+  code and effects, not AI imagery ("TouchDesigner gfx"). (rec) A Godot
+  shader does it live in the game; Greg may also render loops in
+  TouchDesigner on his PC. Prompts for the rest of the demo (maps, gore,
+  loading screens, the phone and its apps, the Wire personas, the pyramid)
+  are in `DESIGN/HIGGSFIELD_DEMO_PROMPTS.md`.
 - **The vat on the right is one big 3D vat you're inside,** full of real,
   smooth-running liquid (blood, water, fluids), not stacked rings. You're
   tortured in it: wires in your head, the implant, a tube in your mouth,
