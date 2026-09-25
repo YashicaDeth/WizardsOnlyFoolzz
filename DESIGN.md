@@ -1003,6 +1003,15 @@ The full direction is in `DESIGN/OPENING_TORTURE_INTAKE.md`. In short:
   - Greg's own art is never overwritten, and wins wherever it exists.
   - Human-made CC0 and CC-BY assets are still welcome, credited in
     `CREDITS.md`.
+- **Question boxes (25 September):**
+  - **Build first:** all four opening pieces (the torture load-in, the
+    breakout, the birthday test, real-mic V).
+  - **Voices:** generated in Higgsfield.
+  - **Higgsfield makes:** sigils and the rune, the doctor, anatomy X-ray
+    plates, and the vat and lab. The prompts are in
+    `DESIGN/HIGGSFIELD_PROMPTS.md`.
+  - **Ponytail and Mento:** Greg will send links, and wants help writing
+    precise prompts for them.
 - **The vat on the right is one big 3D vat you're inside,** full of real,
   smooth-running liquid (blood, water, fluids), not stacked rings. You're
   tortured in it: wires in your head, the implant, a tube in your mouth,
