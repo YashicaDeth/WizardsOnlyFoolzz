@@ -490,7 +490,7 @@ Every line below is **(rec)** unless it cites Greg.
 - [ ] See: the Algiz label pulses in time with the logo's beat, not on its
       own sine.
 - [x] See: the menu items type on, one at a time, after the logo lands.
-- [x] See: the hovered item is underlined in blood, with drips (dimming the others still open).
+- [x] See: the hovered item is underlined in blood, with drips, and the others step back.
 - [ ] See: ENTER CELLOUTZ.NET opens the site, with a confirm.
 - [ ] See: the hexagram panel on the right shows the selected item's
       preview (demo footage, the locked full game, the sandbox).

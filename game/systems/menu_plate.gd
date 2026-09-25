@@ -80,6 +80,9 @@ func _draw() -> void:
 		# is selected, and means the type arrives with its row rather than
 		# sitting at full strength over a menu that has not appeared yet.
 		var lit := control.modulate
+		# `self_modulate` is how the title steps the other options back while
+		# one is hovered; fold it in so the dim shows in the type.
+		lit.a *= control.self_modulate.a
 		if lit.a <= 0.01:
 			continue
 		# Into this plate's own space. `draw_*` is local, and the settings plate
