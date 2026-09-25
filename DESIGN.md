@@ -630,6 +630,25 @@ earned by not fighting and spent by betrayal. The ambiguities worth asking
 about are whether diplomacy has a tree of its own, and whether "many
 enemies" means stealth missions field more of them.
 
+### Answered by Greg in question boxes, 25 September 2026 (morning)
+
+- **His Instagram art (Allusions Too Grandeur) gets all four**: a place in
+  the game as found art (facility posters, Wire pages, loading screens, the
+  Allusions artwork panel); a matching post style from the game's look (rune
+  seal, CellOutz type, a number, bloody dither); captions and hashtags in
+  the game's voice; and animated loops for Reels. First piece shared: a
+  burnt-out inverted photo with carved type, "I have gone totally insane
+  and lost the plot... grant me passage through this prison and liberate my
+  soul", and the rune seal.
+- **Menus stay with the PC sessions** (FIRST_30_MEGA owns the title screen,
+  boot, logo and demo end card); the cloud session works on gameplay so the
+  two never edit the same files.
+- **"Partly destructible" means authored damage stages**: walls, floors and
+  building pieces crack, hole and break through in stages with real debris,
+  and shooting or blasting the ground leaves impact holes. Not Teardown-style
+  material removal.
+- **First today: every route out working end to end.**
+
 ### Answered by Greg by voice, 25 September 2026 (the overnight questions)
 
 - **The doctor's name is withheld** in minutes 0–30; the name is the reward
