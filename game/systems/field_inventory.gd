@@ -8,6 +8,7 @@ extends Control
 signal close_requested
 signal activate_requested(index: int)
 
+const BRAIN_INDEX := preload("res://systems/brain_index.gd")
 const INK := Color("d9c79a")
 const BLOOD := Color("a92e32")
 const MOSS := Color("8ea85d")
@@ -24,6 +25,8 @@ var row_rects: Array[Dictionary] = []
 var inspect_rig: BaselineHuman = null
 var inspect_pockets: Array = []
 var corpse_rows: Array = []
+var brain_rect := Rect2()
+var brain_index_open := false
 
 
 func _init() -> void:
@@ -39,6 +42,7 @@ func open_inventory(carry_model: Carry, body_rig: BaselineHuman, weapon_model: H
 	arsenal = weapon_model
 	inspect_rig = null
 	inspect_pockets = []
+	brain_index_open = false
 	selected = clampi(selected, 0, maxi(0, carry.items.size() - 1))
 	visible = true
 	queue_redraw()
@@ -79,10 +83,18 @@ func handle_input(event: InputEvent) -> bool:
 				_toggle_pocket()
 			KEY_M:
 				_mend_cloth()
+			KEY_B:
+				if inspect_rig == null:
+					brain_index_open = not brain_index_open
+					queue_redraw()
 			_:
 				return false
 		return true
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if inspect_rig == null and brain_rect.has_point(event.position):
+			brain_index_open = not brain_index_open
+			queue_redraw()
+			return true
 		for row in row_rects:
 			if (row.rect as Rect2).has_point(event.position):
 				selected = int(row.index)
@@ -206,7 +218,7 @@ func _draw() -> void:
 	draw_rect(plate, GLASS)
 	draw_rect(plate, INK * Color(1, 1, 1, 0.56), false, 2.0)
 	draw_string(font, plate.position + Vector2(28, 38), "FIELD INVENTORY // ONE BODY, ONE BAG", HORIZONTAL_ALIGNMENT_LEFT, -1, 21, INK)
-	draw_string(font, plate.position + Vector2(28, 62), "O / ESC CLOSE   UP/DOWN SELECT   ENTER USE OR WIELD   P POCKET   M MEND CLOTH", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, INK * Color(1, 1, 1, 0.65))
+	draw_string(font, plate.position + Vector2(28, 62), "O / ESC CLOSE   UP/DOWN SELECT   ENTER USE OR WIELD   P POCKET   M MEND CLOTH   B BRAIN", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, INK * Color(1, 1, 1, 0.65))
 
 	var body_rect := Rect2(plate.position + Vector2(28, 88), Vector2(250, plate.size.y - 116))
 	var bag_rect := Rect2(Vector2(body_rect.end.x + 24, body_rect.position.y), Vector2(plate.size.x - body_rect.size.x - 330, body_rect.size.y))
@@ -223,7 +235,18 @@ func _draw_body(font: Font, rect: Rect2) -> void:
 	draw_string(font, rect.position + Vector2(18, 28), "BODY", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, BLOOD)
 	if body == null or body.anatomy == null:
 		return
-	var y := rect.position.y + 58.0
+	# The brain chip is a physical head implant, not an abstract tab.  Put the
+	# control above the head/torso rows so it is visibly part of the paper-doll
+	# panel and easy to reach with either the mouse or B.
+	brain_rect = Rect2(rect.position + Vector2(12, 38), Vector2(rect.size.x - 24, 36))
+	draw_rect(brain_rect, Color("210e0d"))
+	draw_rect(brain_rect, BLOOD * Color(1, 1, 1, 0.72), false, 1.0)
+	draw_string(font, brain_rect.position + Vector2(10, 15), "HEAD // WETWIRE BRAIN INDEX", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, INK)
+	draw_string(font, brain_rect.position + Vector2(10, 29), "CLICK HEAD / B TO %s" % ("CLOSE" if brain_index_open else "ACCESS"), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, BLOOD.lightened(0.18))
+	if brain_index_open:
+		_draw_brain_index(font, rect)
+		return
+	var y := rect.position.y + 98.0
 	for zone_id in ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"]:
 		var zone: Dictionary = body.anatomy.zones.get(zone_id, {})
 		var ceiling: float = float((AnatomyComponent.DEFAULT_ZONES.get(zone_id, {}) as Dictionary).get("health", 100.0))
@@ -243,6 +266,29 @@ func _draw_body(font: Font, rect: Rect2) -> void:
 	draw_string(font, Vector2(rect.position.x + 18, rect.end.y - 72), "CLOTH  %d%% // M MEND (%d)" % [roundi(_cloth_mean() * 100.0), ClothingShell.price_to_mend(body.wardrobe)], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, INK)
 	draw_string(font, Vector2(rect.position.x + 18, rect.end.y - 48), "BLOOD  %d ML" % roundi(body.anatomy.blood_remaining), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, BLOOD)
 	draw_string(font, Vector2(rect.position.x + 18, rect.end.y - 24), "PAIN   %d" % roundi(body.anatomy.pain), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, INK)
+
+
+## The inventory does not own another memory system.  This is a small physical
+## reader over the same `BrainIndex` data the handheld uses, so losing a device
+## cannot make a chip embedded in the player's skull stop existing.
+func _draw_brain_index(font: Font, rect: Rect2) -> void:
+	var panel := Rect2(rect.position + Vector2(10, 82), rect.size - Vector2(20, 94))
+	draw_rect(panel, Color("110b0a"))
+	draw_rect(panel, BLOOD * Color(1, 1, 1, 0.82), false, 1.0)
+	draw_string(font, panel.position + Vector2(10, 20), "WETWIRE // BRAIN INDEX", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, BLOOD.lightened(0.28))
+	var chip: Dictionary = BRAIN_INDEX.chip("player")
+	var owner := str(chip.get("owner_faction", "NO CHIP DETECTED")).to_upper()
+	draw_string(font, panel.position + Vector2(10, 39), "CHIP OWNER // " + owner, HORIZONTAL_ALIGNMENT_LEFT, panel.size.x - 20, 10, INK * Color(1, 1, 1, 0.72))
+	var folders: Dictionary = BRAIN_INDEX.folder_counts("player")
+	var y := panel.position.y + 66.0
+	for folder_id in ["memory", "combat", "people", "places", "carry", "trauma"]:
+		var counts: Dictionary = folders.get(folder_id, {})
+		var label := str((BRAIN_INDEX.FOLDERS.get(folder_id, {}) as Dictionary).get("label", folder_id)).to_upper()
+		draw_rect(Rect2(Vector2(panel.position.x + 7, y - 12), Vector2(panel.size.x - 14, 17)), Color("2a1512"))
+		draw_string(font, Vector2(panel.position.x + 12, y), label, HORIZONTAL_ALIGNMENT_LEFT, panel.size.x - 70, 10, INK)
+		draw_string(font, Vector2(panel.end.x - 47, y), "%02d/%02d" % [int(counts.get("open", 0)), int(counts.get("total", 0))], HORIZONTAL_ALIGNMENT_RIGHT, 39, 10, MOSS)
+		y += 24.0
+	draw_string(font, Vector2(panel.position.x + 10, panel.end.y - 12), "B / CLICK HEAD TO RETURN TO BODY", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, INK * Color(1, 1, 1, 0.55))
 
 
 func _draw_bag(font: Font, rect: Rect2) -> void:
