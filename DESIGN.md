@@ -941,8 +941,10 @@ will be an impact hole".
   buckshot, pistol, slug and rifle holes in the Hunt, he picked "yes, keep
   these" over bigger and rougher holes or a ground that really deforms. So a
   hole in the ground is a drawn pit with a dirt lip and thrown clods, sized
-  by the round, and the ground itself does not give way. This answers the
-  ground only; how far buildings go is still 0.4's question.
+  by the round, and the ground itself does not give way. It agrees with his
+  morning answer (question boxes, 25 September morning, above): "partly
+  destructible" means authored damage stages, and not Teardown-style
+  material removal, for buildings as well as the ground.
 
 ### Greg, 25 September 2026: the New Vegas opening, again
 

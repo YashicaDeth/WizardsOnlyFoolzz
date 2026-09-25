@@ -151,9 +151,11 @@ here, so this is the list, and the page should link it.
       instead of scripted ones, landing and staying on the grating.
 - [ ] **0.4 Walls and cover that give.** Plasterboard, fences and
       barricades take condition and open holes in authored stages. Greg
-      wants buildings partly destructible too (25 September). Whether that
-      stays inside `DESIGN/DESTRUCTION.md`'s "no voxel fracture" scope is
-      the open question asked at 0.2b.
+      wants buildings partly destructible too, and answered how (question
+      boxes, 25 September morning): walls, floors and building pieces
+      crack, hole and break through in authored stages with real debris,
+      not Teardown-style material removal. `DESIGN/DESTRUCTION.md`'s "no
+      voxel fracture" scope stands.
 - [ ] **0.5 Explosions.** Canisters, gas lines or a grenade: one impulse
       that pushes debris and bodies, damages everything in range through
       `WorldDamage`, and records it.
