@@ -72,6 +72,7 @@ var sight: Node
 
 
 func _ready() -> void:
+	preload("res://systems/run_timer.gd").enter("old_drains")
 	var environment := WorldEnvironment.new()
 	environment.environment = WorldLook.environment("old_drains")
 	add_child(environment)

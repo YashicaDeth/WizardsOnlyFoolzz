@@ -936,6 +936,12 @@ func _ready() -> void:
 	# Play-Overworld.bat launches this scene directly with --daytime.
 	if "--daytime" in OS.get_cmdline_user_args():
 		WorldHistory.world_minute = WorldClock.OPENING_MINUTE
+	# Surfacing ends the timed run; the card shows how long each area took.
+	var run_summary: Dictionary = preload("res://systems/run_timer.gd").finish()
+	if not run_summary.is_empty():
+		var card := preload("res://systems/run_card.gd").new()
+		add_child(card)
+		card.show_summary(run_summary)
 	# The gore setting was only ever applied in the derby, so OFF did nothing
 	# once the player walked into the Hunt Grounds and REDUCED leaked across as
 	# a static the hunt never reset.
