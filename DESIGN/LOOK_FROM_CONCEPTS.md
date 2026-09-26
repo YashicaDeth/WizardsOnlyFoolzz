@@ -83,3 +83,37 @@ fraction of the frame near black, saturation):
 - Not a setting: always on.
 - Tune next: the doctor's office, the heat lift shaft, the surface, the derby
   and the falls.
+
+## The interface pieces, sorted (26 September, assistant's proposal)
+
+The pieces set aside above belong to the interface. The same test applies to
+them: keep what reads as intentional, and cut anything with generated text,
+gloss, or a baked checkerboard or white ground. Greg marks the final list.
+
+**Keep** (as reference for the UI, redrawn or cleaned before use):
+- The flip phone in the bloody hand: the handheld in first person.
+- The jester costume with the cracked phone in its pocket: the lower-right
+  HUD phone (DESIGN.md: "poking from the jester costume's pocket").
+- The app icon sheet (bone and red pixel icons): the phone's seven apps.
+- The CARRY tray and the ritual-on-the-phone screen: those two pages.
+- The wizard-eyes street (green line art, glowing spirits): wizard eyes.
+- The double pyramid with a figure glowing at each tip: the World Index
+  pyramid. The jester king in the bone room: its bottom tip.
+- The Wire avatars (crowned skull, smiling man, wolf mask, the promoter with
+  the mic): Wire personas. The blood marble and the glitter eye banner: Wire
+  sites only.
+- The spine X-ray with rune corners, the front skull, the kidneys: kill-cam
+  plate style.
+
+**Cut, or keep only the idea:**
+- The Sri Yantra and septagram plates, and the green natal chart: fake glyph
+  text and engraved gloss. The game draws the geometry itself; the natal
+  wheel should be the player's real chart, which the intake already computes.
+- The pink side-view brain skull: the glossiest, most generated-looking
+  image in the set.
+- The liver scan: it has a generated caption in the frame.
+- The satellite map (featureless) and the tiled skin texture (visible repeat).
+- Anything on a checkerboard or white ground, until it is re-run on black.
+
+**The rule that carries over:** no generated writing on screen, ever. All
+text is `CellOutzType`.

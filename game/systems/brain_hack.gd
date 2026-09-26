@@ -1,22 +1,18 @@
-class_name BreakoutSequence
+class_name BrainHack
 extends Control
 
-## Beat 10 of `DESIGN/OPENING_TORTURE_INTAKE.md`, in Greg's order (25
-## September): he leaves, the muffled screaming starts, a sigil takes your
+## Beat 10 of `DESIGN/OPENING_TORTURE_INTAKE.md`, steps 1-4 in Greg's order
+## (25 September): he leaves, the muffled screaming starts, a sigil takes your
 ## brain (the seal's rune, demonic), it shrinks into a microscopic motherboard,
-## it gets hacked (CRT blob tracking, the END ALL SUFFERING card's style) and
-## the card reads BRAIN HACKED / SOUL OVERTAKEN. Later your hands come to your
-## face and rip the cord out of your mouth, and you hit the glass three times
-## until it goes.
+## it gets hacked (CRT blob tracking, the END ALL SUFFERING card's style), and
+## the card reads BRAIN HACKED / SOUL OVERTAKEN. The hands, the cord and the
+## glass that follow are the chamber's hands-on breakout.
 ##
-## One overlay for all of it, drawn as code and effects (Greg: "make it purely
-## look like code and effects"). The chamber owns the phases; this draws them
-## and reports what the player did. Higgsfield's rune and die plates can be
-## laid under it later without changing the timeline.
+## Drawn as code and effects (Greg: "make it purely look like code and
+## effects"). Higgsfield's rune and die plates can be laid under it later
+## without changing the timeline.
 
 signal hack_finished(skipped: bool)
-signal cord_ripped
-signal glass_hit(blow: int)
 
 const BONE := Color("e6d4ac")
 const BLOOD := Color("a8281a")
@@ -36,23 +32,16 @@ const HACK_SECONDS := 6.0
 ## BRAIN HACKED / SOUL OVERTAKEN holds on the chamber's mission card.
 const CARD_SECONDS := 2.6
 
-const CORD_SECONDS := 1.5
-const BLOWS := 3
 
-## The headless route suites predate the breakout and drive the opening on
+## The headless route suites predate the hack and drive the opening on
 ## timers; they skip it unless a test opts in, as with `TortureLoadIn`.
 static var force_in_tests := false
 
 var mode := ""
 var clock := 0.0
 var skipped := false
-var blows := 0
-var crack_seed := 0
 var played: Array[String] = []
-var _cord_clock := -1.0
-var _hit_flash := 0.0
 var _voice: AudioStreamPlayer
-var _cracks: Array = []
 
 
 static func wanted() -> bool:
@@ -86,54 +75,12 @@ func skip_hack() -> void:
 	clock = HACK_END - 0.001
 
 
-## The hands: from here one input rips the cord out.
-func begin_cord() -> void:
-	mode = "cord"
-	_cord_clock = -1.0
-	visible = true
-	set_process(true)
-	queue_redraw()
-
-
-func rip_cord() -> bool:
-	if mode != "cord" or _cord_clock >= 0.0:
-		return false
-	_cord_clock = 0.0
-	_cue("gag")
-	return true
-
-
-## The glass: three blows.
-func begin_smash() -> void:
-	mode = "smash"
-	blows = 0
-	_cracks.clear()
-	visible = true
-	set_process(true)
-	queue_redraw()
-
-
-func hit_glass() -> bool:
-	if mode != "smash" or blows >= BLOWS:
-		return false
-	blows += 1
-	_hit_flash = 1.0
-	_add_cracks(blows)
-	_cue("crack")
-	glass_hit.emit(blows)
-	if blows >= BLOWS:
-		mode = "done"
-		visible = false
-	return true
-
-
 func _process(delta: float) -> void:
 	step(delta)
 
 
 ## Advances whatever is running; tests drive it directly.
 func step(delta: float) -> void:
-	_hit_flash = maxf(0.0, _hit_flash - delta * 4.0)
 	match mode:
 		"hack":
 			var before := clock
@@ -146,12 +93,6 @@ func step(delta: float) -> void:
 				mode = "card"
 				WorldHistory.record_event("brain_hacked", {"skipped": skipped})
 				hack_finished.emit(skipped)
-		"cord":
-			if _cord_clock >= 0.0:
-				_cord_clock += delta
-				if _cord_clock >= CORD_SECONDS:
-					mode = "wait"
-					cord_ripped.emit()
 	queue_redraw()
 
 
@@ -160,11 +101,10 @@ func _cue(kind: String) -> void:
 	if _voice == null:
 		return
 	var maker = TortureLoadIn.new()
-	var wave_kind: String = {"crack": "glitch"}.get(kind, kind)
-	_voice.stream = maker._wave(wave_kind, {"scream": 2.4, "gag": 1.1, "glitch": 0.5, "crack": 0.35}.get(kind, 0.6), false)
+	var wave_kind := kind
+	_voice.stream = maker._wave(wave_kind, {"scream": 2.4, "glitch": 0.5}.get(kind, 0.6), false)
 	maker.free()
-	_voice.volume_db = -6.0 if kind == "crack" else -8.0
-	_voice.pitch_scale = 1.6 if kind == "crack" else 1.0
+	_voice.volume_db = -8.0
 	_voice.play()
 
 
@@ -187,12 +127,6 @@ func _draw() -> void:
 	match mode:
 		"hack":
 			_draw_hack(view)
-		"cord":
-			_draw_hands(view)
-		"smash":
-			_draw_glass(view)
-	if _hit_flash > 0.0:
-		draw_rect(Rect2(Vector2.ZERO, view), Color(BONE, 0.25 * _hit_flash))
 
 
 func _draw_hack(view: Vector2) -> void:
@@ -303,72 +237,3 @@ func _draw_tracking(view: Vector2, centre: Vector2, ring: float, hack: float) ->
 		var y := rng.randf_range(0.0, view.y)
 		var h := rng.randf_range(4.0, 18.0)
 		draw_rect(Rect2(Vector2(rng.randf_range(-40.0, 40.0), y), Vector2(view.x, h)), Color(ACID if band % 2 else BLOOD, 0.12 + 0.2 * hack))
-
-
-## Your hands: up from below, both over your face, then the cord comes out.
-func _draw_hands(view: Vector2) -> void:
-	var t := 0.0 if _cord_clock < 0.0 else clampf(_cord_clock / CORD_SECONDS, 0.0, 1.0)
-	var idle := sin(Time.get_ticks_msec() * 0.003) * 6.0
-	# Before you act they are already there at the bottom of the frame,
-	# shaking; the press brings them to your face.
-	var rise := lerpf(0.3, 1.0, ease(clampf(t / 0.35, 0.0, 1.0), 0.5))
-	var pull := clampf((t - 0.45) / 0.45, 0.0, 1.0)
-	var skin := Color("6a3a2c")
-	var blood := Color(BLOOD, 0.9)
-	for side in [-1.0, 1.0]:
-		var base := Vector2(view.x * (0.5 + side * 0.34), view.y + 60.0)
-		var face := Vector2(view.x * (0.5 + side * 0.09), view.y * 0.55)
-		var palm := base.lerp(face, rise) + Vector2(0, idle if t <= 0.0 else 0.0)
-		# The pull: both hands go down and out, taking the cord with them.
-		palm += Vector2(side * 70.0, view.y * 0.12) * pull
-		var arm := PackedVector2Array([base + Vector2(-side * 40.0, 60.0), base + Vector2(side * 40.0, 60.0), palm + Vector2(side * 36.0, 40.0), palm + Vector2(-side * 36.0, 40.0)])
-		draw_colored_polygon(arm, skin.darkened(0.3))
-		var hand := PackedVector2Array()
-		for k in 12:
-			var a := float(k) / 12.0 * TAU
-			hand.append(palm + Vector2(cos(a) * 78.0, sin(a) * 92.0))
-		draw_colored_polygon(hand, skin)
-		for finger in 4:
-			var root := palm + Vector2((float(finger) - 1.5) * 32.0, -76.0)
-			draw_line(root, root + Vector2(side * (float(finger) - 1.5) * 5.0, -70.0), skin, 24.0)
-			draw_circle(root + Vector2(side * (float(finger) - 1.5) * 5.0, -70.0), 12.0, skin)
-			draw_line(root + Vector2(0, -20.0), root + Vector2(0, -30.0), blood, 6.0)
-		draw_circle(palm + Vector2(-side * 20.0, 20.0), 16.0, blood)
-	if pull > 0.0:
-		# The cord: a thick wet tube dragged out of you, longer than it should be.
-		var mouth := Vector2(view.x * 0.5, view.y * 0.62)
-		var tube := PackedVector2Array()
-		for k in 16:
-			var s := float(k) / 15.0
-			tube.append(mouth + Vector2(sin(s * 7.0 + pull * 4.0) * 30.0 * s, s * view.y * 0.5 * pull))
-		draw_polyline(tube, Color("2a3a2c"), 26.0)
-		draw_polyline(tube, Color(BLOOD, 0.8), 8.0)
-	if _cord_clock < 0.0:
-		CellOutzType.draw_string_compat(self, Vector2(0, view.y * 0.2), "E  //  RIP IT OUT", HORIZONTAL_ALIGNMENT_CENTER, view.x, 22, Color(BONE, 0.9))
-
-
-## Cracks across the glass in front of you; each blow adds more, and the
-## count tells you how many it will take.
-func _add_cracks(blow: int) -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7000 + blow + crack_seed
-	var origin := Vector2(0.5, 0.5) + Vector2(rng.randf_range(-0.08, 0.08), rng.randf_range(-0.08, 0.08))
-	for line in 6 + blow * 5:
-		var points := PackedVector2Array([origin])
-		var heading := rng.randf() * TAU
-		var at := origin
-		for k in 4 + blow:
-			heading += rng.randf_range(-0.5, 0.5)
-			at += Vector2(cos(heading), sin(heading)) * rng.randf_range(0.03, 0.09) * (0.6 + 0.4 * blow)
-			points.append(at)
-		_cracks.append(points)
-
-
-func _draw_glass(view: Vector2) -> void:
-	for points in _cracks:
-		var line := PackedVector2Array()
-		for p in points:
-			line.append(p * view)
-		draw_polyline(line, Color(BONE, 0.7), 2.0)
-		draw_polyline(line, Color(1, 1, 1, 0.25), 5.0)
-	CellOutzType.draw_string_compat(self, Vector2(0, view.y * 0.82), "E / CLICK  //  HIT THE GLASS  %d/%d" % [blows, BLOWS], HORIZONTAL_ALIGNMENT_CENTER, view.x, 20, Color(BONE, 0.9))

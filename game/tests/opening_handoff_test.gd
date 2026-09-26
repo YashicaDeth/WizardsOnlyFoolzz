@@ -30,6 +30,8 @@ extends Node
 ## enough to read (Greg: the text went by too fast), not a flat three seconds.
 const HANDOFF_BUDGET := 75.0
 
+const BRAIN_HACK := preload("res://systems/brain_hack.gd")
+
 var failures: Array[String] = []
 var opening: Node
 
@@ -52,6 +54,8 @@ func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		get_tree().quit(2)
 		return
+	# The whole live route, the brain hack included (Greg, 25 September).
+	BRAIN_HACK.force_in_tests = true
 	WorldHistory.clear_history()
 	opening = load("res://vat_chamber.tscn").instantiate()
 	add_child(opening)

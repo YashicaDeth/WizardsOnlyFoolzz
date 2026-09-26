@@ -23,6 +23,7 @@ const IMPLANT_CATALOG := preload("res://systems/implant_catalog.gd")
 const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const TORTURE_LOAD_IN := preload("res://systems/torture_load_in.gd")
 const INTAKE_WATCHERS := preload("res://systems/intake_watchers.gd")
+const BRAIN_HACK := preload("res://systems/brain_hack.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const BRAIN_INDEX := preload("res://systems/brain_index.gd")
@@ -91,6 +92,8 @@ var intake: Control
 var load_in: Control
 ## The Growing Floor's wall cameras; they close in on "I'm being watched too".
 var watchers: Node3D
+## Greg's breakout, steps 1-4: the sigil takes the brain (`BrainHack`).
+var brain_hack: Control
 var opening_audio: Node
 var fluid: MeshInstance3D
 var vat_glass: MeshInstance3D
@@ -254,6 +257,9 @@ func _ready() -> void:
 	osd.visible = intake == null
 	opening_audio = OPENING_AUDIO.new()
 	add_child(opening_audio)
+	brain_hack = BRAIN_HACK.new()
+	$HUD.add_child(brain_hack)
+	brain_hack.connect("hack_finished", _on_hack_finished)
 	if load_in != null:
 		# Over everything the HUD built after it, the body-cam included.
 		$HUD.move_child(load_in, -1)
@@ -1036,6 +1042,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		if tank >= 0:
 			vat_smash.strike(tank, doctor_route.held_weapon() if doctor_route != null else "")
 			return
+	if phase == "hacked" and event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_F, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+		brain_hack.call("skip_hack")
+		get_viewport().set_input_as_handled()
+		return
 	if doctor_route != null and doctor_route.handle_input(event):
 		return
 	if phase == "knees" and event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_SPACE, KEY_E]:
@@ -1072,6 +1082,11 @@ func _physics_process(delta: float) -> void:
 		if load_in != null:
 			return
 		_update_arrival(delta)
+		return
+	# The hack draws itself; the body just hangs in the fluid under it.
+	if phase == "hacked":
+		camera.rotation = Vector3(-0.1 + sin(Time.get_ticks_msec() * 0.0007) * 0.03, 0, 0)
+		_update_hud()
 		return
 	# Departure runs on its own clock so the vat's beat table keeps the timings
 	# it was tuned with instead of every entry needing a +4.4 offset.
@@ -1281,11 +1296,25 @@ func _update_departure(delta: float) -> void:
 		camera.rotation.x = -0.1 + sin(departure_clock * 0.7) * 0.03
 
 	if departure_clock >= DEPARTURE_SECONDS:
-		phase = "submerged"
-		clock = 0.0
-		line_index = -1
 		subtitle.text = ""
 		WorldHistory.record_event("opening_examiner_departed", {"location": "growing_floor"})
+		# Greg: he leaves, the screaming starts, and the sigil takes your brain.
+		if BRAIN_HACK.wanted():
+			phase = "hacked"
+			brain_hack.call("begin_hack")
+		else:
+			phase = "submerged"
+			clock = 0.0
+			line_index = -1
+
+
+## BRAIN HACKED / SOUL OVERTAKEN on the END ALL SUFFERING card, and the tank
+## starts to fail under it.
+func _on_hack_finished(_skipped: bool) -> void:
+	mission_card.play("brain_hacked", "BRAIN HACKED SOUL OVERTAKEN", BRAIN_HACK.CARD_SECONDS)
+	phase = "submerged"
+	clock = 0.0
+	line_index = -1
 
 
 func _update_beats() -> void:
