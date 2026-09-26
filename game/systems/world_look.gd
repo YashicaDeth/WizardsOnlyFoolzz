@@ -191,13 +191,35 @@ const PRESETS := {
 		"fog": "1d1a16", "fog_density": 0.0065, "volumetric": 0.010,
 		"ambient": 0.46, "saturation": 0.96, "contrast": 1.26, "exposure": 1.05,
 	},
+	# The Growing Floor (Greg, 26 September, the Higgsfield vat renders: a
+	# black room, the colour held in the red vat glow, a faint green haze at
+	# the walls). It ran `ossuary`, and the vat room measured a pastel mauve
+	# median of 90/255 under 0.02 violet fog -- the same wash `front_door` and
+	# `lower_works` above were cut loose from. Dark red-brown air at under half
+	# the density, so the lamps and the tank do the colouring.
+	"growing_floor": {
+		"zenith": "060404", "horizon": "1e0c0a", "ground": "0c0606",
+		"fog": "2a110d", "fog_density": 0.009, "volumetric": 0.012,
+		"ambient": 0.42, "saturation": 1.0, "contrast": 1.22, "exposure": 1.0,
+	},
+	# The old drains (the brick drain and the bingyanger renders): wet brick
+	# under green-brown air, not the sodium orange the lamps pushed them to.
+	"old_drains": {
+		"zenith": "070907", "horizon": "1a1d14", "ground": "0b0c09",
+		"fog": "262a1c", "fog_density": 0.0075, "volumetric": 0.011,
+		"ambient": 0.5, "saturation": 0.9, "contrast": 1.2, "exposure": 1.05,
+	},
 }
+
+## The preset the scene on screen last asked for. HouseLook grades by it.
+static var current_preset := ""
 
 static var _noise_cache: Dictionary = {}
 
 
 static func environment(preset_name: String = "bone_yard") -> Environment:
 	var preset: Dictionary = PRESETS.get(preset_name, PRESETS.bone_yard)
+	current_preset = preset_name
 	var env := Environment.new()
 
 	# A6.1. The sky was a `ProceduralSkyMaterial` for five passes: a two-colour

@@ -218,7 +218,7 @@ const DEPARTURE_BEATS := [
 
 
 func _ready() -> void:
-	$WorldEnvironment.environment = WorldLook.environment("ossuary")
+	$WorldEnvironment.environment = WorldLook.environment("growing_floor")
 	# The form itself already lays a translucent blood veil over the first shot.
 	# Leaving this at the old opaque value made the real examiner and laboratory
 	# disappear beneath two stacked UI tints before the player could meet them.

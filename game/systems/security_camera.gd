@@ -123,7 +123,7 @@ func build(id: String, phase := 0.0) -> void:
 	cone_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	cone_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	cone_material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
-	cone_material.albedo_color = Color(CALM, 0.14)
+	cone_material.albedo_color = Color(CALM, 0.07)
 	cone_mesh.material = cone_material
 	cone.mesh = cone_mesh
 	cone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -239,7 +239,9 @@ func _tint() -> void:
 	elif lock > 0.0:
 		colour = CALM.lerp(WARY, clampf(lock * 2.0, 0.0, 1.0))
 	var blink := 0.5 + 0.5 * sin(clock * 18.0) if tracking else 1.0
-	cone_material.albedo_color = Color(colour, 0.13 + 0.1 * lock * blink)
+	# Quiet while calm (was 0.13 flat), as loud as before once it is on you:
+	# the idle wash is what drowned the Growing Floor, the warning is the cue.
+	cone_material.albedo_color = Color(colour, 0.07 + 0.16 * lock * blink)
 	lamp.light_color = colour
 	_lens_material.emission = colour
 	tally.light_energy = 2.5 * blink if tracking else 0.0

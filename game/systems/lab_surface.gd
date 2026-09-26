@@ -12,7 +12,9 @@ const ROOT := "res://art/textures/lab/"
 ## role -> [texture set, world metres per repeat, tint, has metalness map]
 const ROLES := {
 	"floor": ["Tiles074", 1.6, Color(0.62, 0.60, 0.56), false],
-	"wall": ["Concrete034", 2.4, Color(0.50, 0.53, 0.50), false],
+	# Warm red-brown concrete (Greg, 26 September, the Higgsfield hall and
+	# doorway renders), not the green-grey the scan tinted to.
+	"wall": ["Concrete034", 2.4, Color(0.55, 0.47, 0.43), false],
 	"ceiling": ["Concrete034", 3.0, Color(0.26, 0.26, 0.25), false],
 	"grime": ["PaintedMetal009", 2.0, Color(0.70, 0.68, 0.60), true],
 	"plate": ["MetalPlates006", 1.2, Color(0.80, 0.82, 0.80), true],
@@ -45,7 +47,11 @@ static func material(role: String) -> StandardMaterial3D:
 	material.uv1_world_triplanar = true
 	var repeat := 1.0 / float(spec[1])
 	material.uv1_scale = Vector3(repeat, repeat, repeat)
-	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	# Texels you can see, like every in-world concept render (Greg, 26
+	# September): photo scans filtered smooth are what made the lab read as a
+	# clean engine demo. Nearest within a mip level, mipmapped so distance
+	# does not shimmer.
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST_WITH_MIPMAPS
 	_cache[role] = material
 	return material
 
