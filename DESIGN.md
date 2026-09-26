@@ -1133,6 +1133,13 @@ World rules; realm identity and transition rules; what persists across realms; d
   to Greg):** power lines glow and pulse in K/J toward what they feed; once
   seen, E at the junction cuts one. Vat room strips go dark; Support Unit
   cameras go blind without the noise of smashing them.
+- **Hidden things (Greg, 26 September, question boxes 6-9):** stashes hold
+  meds and ammo; secret doors open with E once seen; five to eight hidden
+  things in the first 30 minutes; plain eyes get a faint hint (a hairline
+  seam). *Built:* seven (the weak wall; stashes in the vat room, Support Unit,
+  drains and Service Arcade; a Support Unit closet behind a secret door with
+  a second stash). A stash gives a field dressing and four rounds, into the
+  gun if you carry it, otherwise loose.
 - **No zip files (Greg, 26 September):** "stop making zip files, it's
   pointless". Builds reach him as merges into `claude/dust-to-bones-look`;
   `Play-Latest.bat` pulls that branch into `P:\GameDev\playtest` and runs it

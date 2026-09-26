@@ -26,6 +26,7 @@ const INTAKE_WATCHERS := preload("res://systems/intake_watchers.gd")
 const BRAIN_HACK := preload("res://systems/brain_hack.gd")
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
 const SERVICE_ARCADE := preload("res://service_arcade.gd")
+const HIDDEN_CACHE := preload("res://systems/hidden_cache.gd")
 const SIGNAL_SIGHT := preload("res://systems/signal_sight.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
@@ -112,6 +113,8 @@ var sight: Node
 var weak_wall_body: StaticBody3D
 ## Each bay's ceiling strip and the power line feeding it down the left wall.
 var strip_lights: Array = []
+## Stashes and secret doors (HiddenCache records).
+var caches: Array = []
 var weak_wall_found := false
 var weak_wall_broken := false
 var shortcut_taken := false
@@ -296,6 +299,8 @@ func _ready() -> void:
 		wires.append({"id": "growing_floor_strip_%d" % index, "points": [Vector3(-7.3, 1.3, z), Vector3(-7.3, 3.9, z), Vector3(0, 3.9, z)],
 			"on_cut": func() -> void: strip.visible = false})
 	sight.set("wires", wires)
+	# A stash in the left wall between the second and third bays.
+	caches.append(HIDDEN_CACHE.place_stash(self, sight, "growing_floor_stash", Vector3(-7.35, 1.0, -5.75), Vector3.RIGHT))
 	brain_hack = BRAIN_HACK.new()
 	$HUD.add_child(brain_hack)
 	brain_hack.connect("hack_finished", _on_hack_finished)
@@ -1089,6 +1094,9 @@ func _near_weak_wall() -> bool:
 
 
 func _on_hidden_seen(id: String) -> void:
+	if HIDDEN_CACHE.mark_found(caches, id):
+		subtitle.text = "A HATCH IN THE WALL  //  SOMETHING KEPT BEHIND IT"
+		return
 	if id != WEAK_WALL_ID or weak_wall_found:
 		return
 	weak_wall_found = true
@@ -1956,6 +1964,9 @@ func _interact() -> void:
 		return
 	if break_weak_wall() or (_near_weak_wall() and take_shortcut()):
 		return
+	if HIDDEN_CACHE.open_near(caches, player.global_position, sight) == "stash":
+		subtitle.text = "A FIELD DRESSING AND FOUR ROUNDS  //  SOMEBODY HID THESE"
+		return
 	if sight != null and sight.call("cut_wire_near", player.global_position) != "":
 		subtitle.text = "THE LINE SPITS AND DIES  //  THAT BAY GOES DARK"
 		opening_audio.cue("door")
@@ -2104,6 +2115,9 @@ func _update_hud() -> void:
 		return
 	if weak_wall_broken and _near_weak_wall():
 		prompt.text = "[E] CRAWL IN   //   A WAY PAST THE PRESSURE GATE"
+		return
+	if not HIDDEN_CACHE.nearest(caches, player.global_position).is_empty():
+		prompt.text = "[E] OPEN THE HATCH"
 		return
 	if sight != null and sight.call("wire_in_reach", player.global_position):
 		prompt.text = "[E] CUT THE POWER LINE"
