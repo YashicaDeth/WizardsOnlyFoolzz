@@ -6,6 +6,16 @@ cloud. Everything they make is **placeholder** until Greg's own art replaces
 it ("without making things feel really AI gen"). Pick with a grain of salt,
 and bring in only what fits.
 
+## One click: models into ComfyUI
+
+`Setup-ComfyModels.bat` (repo root) runs `tools/fetch_comfy_models.py`. It
+downloads Juggernaut XL v9, xinsir openpose SDXL (pinned to `25bcee1b`,
+renamed to include "openpose"), TRELLIS.2-4B and DINOv3 into ComfyUI's
+`models` folders, then queues one vat-aisle image in the running ComfyUI
+(port 8188 or 8000) as proof. DINOv3 is gated: accept its licence on
+Hugging Face and run `hf auth login` first, or the script says so and
+carries on with the rest.
+
 ## The flow
 
 1. Run a tool on the PC. Its output goes in `P:\GameDev\gen\<tool>\`, never
