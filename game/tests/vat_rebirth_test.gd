@@ -86,7 +86,7 @@ func _ready() -> void:
 	check(_labels().is_empty() and not arcade.weapon_taken, "you die with nothing in your hands")
 	var left_here := VatRebirth.remains_at("service_arcade")
 	check(left_here.size() == 1 and (left_here[0].get("items", []) as Array).size() == 2, "your old body lies in the arcade holding the ram and the card")
-	check(int(WorldHistory.subject(FacilityGuardPost.GUARD_ID).get("killed_player", 0)) == 1, "Hollis remembers that he killed you")
+	check(int(WorldHistory.subject(FacilityGuardPost.ARCADE_GUARD_ID).get("killed_player", 0)) == 1, "the arcade guard remembers that he killed you")
 	arcade.queue_free()
 	await get_tree().process_frame
 

@@ -62,16 +62,31 @@ answers.
       storm outfall) walks the existing maintenance ascent and surfaces west of
       the start. Merged at `796903d`. `first_thirty_route_test` plays both
       routes end to end, into the Hunt.
-- [ ] **Hollis gets a real model**, one Greg provides or picks (CC-BY credited).
+- [x] **The breakout in Greg's order** (25 September): the wires, the cord in
+      your mouth, three blows to the glass, on your knees while the implant
+      boots the HUD piece by piece, SPACE to get up facing his door, then GET
+      REVENGE. `hands_on_breakout_test`. Merged at `033d919`.
+- [x] **The derby tunnels, driven**: gate, 650 m of GTA-style bores, barricades,
+      the drain mouth, the car carried on to the dry falls. `derby_tunnels_test`.
+- [x] **Hollis gets a real model**, one Greg provides or picks (CC-BY credited).
+      Greg, 25 September: a better in-game model, one Hollis at the Support
+      Unit end, a numbered guard in the arcade. Built as placeholder kit on the
+      rig (flak vest, plates, belt, holster, the guard's number); the model
+      sheets from Higgsfield roadmap phase 9 replace it.
 
 Then, in this order (Greg, 24 September, "what next"):
 
 - [ ] **Intake: the examiner and the name line.** A better 3D examiner, his
       mouth moving with his voice (first pass `6e5efb0`), and the name / tank
-      line readable on the intake screen.
-- [ ] **Animated intake pages**: every tab animated and skeuomorphic (ink,
+      line readable on the intake screen. The name / tank header is built (24
+      September, SUBJECT <name> // TANK 0C-7 over the vat panel). Left: the
+      better examiner model, waiting on the Higgsfield M1 model sheet.
+- [x] **Animated intake pages**: every tab animated and skeuomorphic (ink,
       blood, metal, parts swinging out on gears). After Effects / Photoshop
-      pieces allowed.
+      pieces allowed. Built on the PC at `0e37324` (gears, a swinging arm, ink
+      bleed, blood from the clip). A cloud lane's per-tab materials and tool
+      arm (`IntakePageFx`) overlapped it and was not merged; its worktree is
+      kept if Greg wants the per-tab tools later.
 - [ ] **The combat overhaul**: omnidirectional swinging on both sides, a skill
       curve you can learn and read, AI difficulties tuned to what is
       achievable. Big job; `momentum_damage` is already on.

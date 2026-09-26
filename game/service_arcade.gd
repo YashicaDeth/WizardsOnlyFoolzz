@@ -237,6 +237,9 @@ func _build_guard_post() -> void:
 	guard_post = FacilityGuardPost.new()
 	guard_post.name = "GuardPost"
 	guard_post.position = GUARD_POST_AT
+	# Greg, 25 September: one Hollis, at the Support Unit end; this door gets
+	# a numbered guard.
+	guard_post.as_arcade_guard()
 	add_child(guard_post)
 	guard_post.build()
 	guard_post.shot.connect(_on_shot)
@@ -250,7 +253,7 @@ func _on_shot(damage: float) -> void:
 		return
 	blood = maxf(0.0, blood - damage)
 	if blood <= 0.0:
-		_die("shot by Hollis at the D-section door", FacilityGuardPost.GUARD_ID)
+		_die("shot by %s at the D-section door" % guard_post.guard_name, guard_post.guard_id)
 
 
 ## Everything carried and worn stays here on the body; the claimant's vat grows
@@ -260,7 +263,7 @@ func _die(cause: String, killed_by: String) -> void:
 	var at := player.global_position
 	at.y = 0.0
 	rebirth_request = VAT_REBIRTH.die(LOCATION, cause, killed_by, at)
-	if killed_by == FacilityGuardPost.GUARD_ID:
+	if killed_by == guard_post.guard_id:
 		guard_post.player_killed()
 	card_taken = false
 	if weapon_taken and weapon_visual != null and is_instance_valid(weapon_visual):

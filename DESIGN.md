@@ -1027,6 +1027,17 @@ The full direction is in `DESIGN/OPENING_TORTURE_INTAKE.md`. In short:
   clothing on Greg's textures, genitalia options (none, asexual, chosen, with
   size, and the blur), your blood, and your cybernetics. Every choice shows
   on your body in the vat.
+- **The look comes from the concepts, not the concept images (26 September).**
+  "Reconceptualise the current look of the game" from the Higgsfield set
+  "without making things feel really AI gen"; "pick the distinct and similar
+  enough ... with a grain of salt, there's a lot I don't like, but a lot I do
+  like". Which were kept and set aside, and what was measured:
+  `DESIGN/LOOK_FROM_CONCEPTS.md`. Answered the same day:
+  - **Subtler**: the world renders at full resolution, and the dither only
+    shows in fog and light falloff (not the chunky 2x or 3x framebuffer).
+  - **Not a setting**: the look is the game, always on, like the fog.
+  - **Tune next**, in order: the doctor's office, the heat lift shaft, the
+    surface once played, the derby and the dry falls.
 
 ## Influence register
 

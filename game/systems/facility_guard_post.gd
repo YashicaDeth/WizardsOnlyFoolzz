@@ -32,6 +32,12 @@ const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 
 const GUARD_ID := "guard_hollis"
 const GUARD_NAME := "HOLLIS"
+## Greg, 25 September: one Hollis, at the end of the Support Unit; the
+## Service Arcade's door gets a numbered guard instead. Same post, same rules;
+## the host sets who stands at it before `build`.
+const ARCADE_GUARD_ID := "guard_celloutz_47"
+const ARCADE_GUARD_NAME := "CELLOUTZ SECURITY 47"
+const ARCADE_GUARD_NUMBER := "47"
 const GUN_LABEL := "CELL OUTZ BREACH NINE"
 ## The artery the post is built across: the Service Arcade's walls sit at
 ## x = +/-7.25, so the security wall spans exactly that and nothing leaks round
@@ -56,6 +62,13 @@ const SHOT_DAMAGE := 18.0
 ## One swing of the ram. Blunt, to the chest; three put a man down.
 const RAM_DAMAGE := 55.0
 
+var guard_id := GUARD_ID
+var guard_name := GUARD_NAME
+## Stencilled on the vest, front and back, for a numbered guard; empty for
+## Hollis, whose face is the one to remember.
+var guard_number := ""
+var guard_role := "Support Unit checkpoint guard"
+var guard_memory := "Holds the last biometric gate in the Support Unit."
 var guard: Node3D
 var barrier: Node3D
 var loadout: RefCounted
@@ -84,9 +97,9 @@ func build() -> void:
 	muzzle.omni_range = 5.0
 	muzzle.position = GUARD_AT + Vector3(0.3, 1.2, 0.4)
 	add_child(muzzle)
-	WorldHistory.register_subject(GUARD_ID, {
-		"name": GUARD_NAME, "kind": "person", "role": "D-section door guard", "faction": "CellOutz Security",
-		"status": "on post", "memory": "Holds the biometric door in the Service Arcade.",
+	WorldHistory.register_subject(guard_id, {
+		"name": guard_name, "kind": "person", "role": guard_role, "faction": "CellOutz Security",
+		"status": "on post", "memory": guard_memory,
 	})
 	_restore_from_history()
 
@@ -95,7 +108,7 @@ func build() -> void:
 ## walks back into the arcade Hollis left, not a fresh one. His body, his gun,
 ## his door and whether he has killed you before all come from the record.
 func _restore_from_history() -> void:
-	var record := WorldHistory.subject(GUARD_ID)
+	var record := WorldHistory.subject(guard_id)
 	var saved: Dictionary = record.get("anatomy_state", {})
 	if not saved.is_empty():
 		guard.anatomy.restore(saved)
@@ -160,7 +173,7 @@ func _build_reader() -> void:
 	barrier = BARRIER.new()
 	barrier.name = "Reader"
 	barrier.barrier_id = "service_arcade_d_section"
-	var authorized: Array[String] = [GUARD_ID]
+	var authorized: Array[String] = [guard_id]
 	barrier.authorized_subject_ids = authorized
 	barrier.position = READER_AT
 	add_child(barrier)
@@ -186,22 +199,35 @@ func _build_reader() -> void:
 	_refresh_reader()
 
 
+## The Service Arcade's door: a numbered CellOutz guard rather than Hollis.
+func as_arcade_guard() -> void:
+	guard_id = ARCADE_GUARD_ID
+	guard_name = ARCADE_GUARD_NAME
+	guard_number = ARCADE_GUARD_NUMBER
+	guard_role = "D-section door guard"
+	guard_memory = "Holds the biometric door in the Service Arcade."
+
+
 func _build_guard() -> void:
 	guard = BODY.new()
-	guard.name = "Hollis"
+	guard.name = "Hollis" if guard_number.is_empty() else "Guard%s" % guard_number
 	add_child(guard)
-	guard.build(GUARD_ID, {"flesh": Color("5c4a3a"), "variation": 3})
-	# Dressed in plain cloth, the rig's default garment; a real CellOutz
-	# security model waits on Greg (DESIGN.md, 24 September).
+	# Greg, 25 September: "a better in-game model" for Hollis. Heavy and
+	# tired; the numbered guard is leaner and younger.
+	if guard_number.is_empty():
+		guard.build(guard_id, {"flesh": Color("5c4a3a"), "variation": 3, "build": 1.3})
+	else:
+		guard.build(guard_id, {"flesh": Color("7a5f48"), "variation": 11, "build": 1.05})
 	var uniform := ClothingShell.fresh_wardrobe()
 	# Bare-headed: a full wardrobe hoods the head too, and the man whose face
 	# the player has to remember should have one.
 	uniform.erase("head")
 	guard.dress(uniform)
+	_kit_out()
 	guard.position = GUARD_AT
 	# The rig's forward is -z; he faces the way the player comes.
 	guard.rotation.y = PI
-	loadout = LOADOUT.new(GUARD_ID)
+	loadout = LOADOUT.new(guard_id)
 	loadout.attach_to(guard)
 	speech = Label3D.new()
 	speech.font_size = 30
@@ -268,9 +294,9 @@ func step(delta: float, player_position: Vector3) -> void:
 	if not warned:
 		warned = true
 		if knows_player:
-			_say("%s: \"You again. They grew you back.\"" % GUARD_NAME, 2.8)
+			_say("%s: \"You again. They grew you back.\"" % guard_name, 2.8)
 		else:
-			_say("%s: \"Back in your tank, meat.\"" % GUARD_NAME)
+			_say("%s: \"Back in your tank, meat.\"" % guard_name)
 	if distance <= FIRE_RANGE and fire_cooldown <= 0.0:
 		fire_cooldown = FIRE_COOLDOWN
 		if muzzle != null:
@@ -278,23 +304,23 @@ func step(delta: float, player_position: Vector3) -> void:
 		if warning_shots_left > 0:
 			# Over your head. The only one you get.
 			warning_shots_left -= 1
-			_say("%s: \"Next one's in you.\"" % GUARD_NAME, 1.6)
-			WorldHistory.record_event("facility_guard_fired", {"subject_id": GUARD_ID, "damage": 0.0, "warning": true})
+			_say("%s: \"Next one's in you.\"" % guard_name, 1.6)
+			WorldHistory.record_event("facility_guard_fired", {"subject_id": guard_id, "damage": 0.0, "warning": true})
 			return
-		_say("%s FIRES" % GUARD_NAME, 0.7)
-		WorldHistory.record_event("facility_guard_fired", {"subject_id": GUARD_ID, "damage": SHOT_DAMAGE})
+		_say("%s FIRES" % guard_name, 0.7)
+		WorldHistory.record_event("facility_guard_fired", {"subject_id": guard_id, "damage": SHOT_DAMAGE})
 		shot.emit(SHOT_DAMAGE)
 
 
 ## The host tells him when his shooting killed the player. He remembers it,
 ## and he will know them when the vat sends them back.
 func player_killed() -> void:
-	var record := WorldHistory.subject(GUARD_ID)
-	WorldHistory.amend_subject(GUARD_ID, {
+	var record := WorldHistory.subject(guard_id)
+	WorldHistory.amend_subject(guard_id, {
 		"killed_player": int(record.get("killed_player", 0)) + 1,
 		"memory": "Shot the decanted subject dead at his door. CellOutz will grow it back.",
 	})
-	_say("%s: \"Stay down.\"" % GUARD_NAME, 2.0)
+	_say("%s: \"Stay down.\"" % guard_name, 2.0)
 
 
 func _torso_position() -> Vector3:
@@ -319,17 +345,17 @@ func strike(player_position: Vector3) -> bool:
 	direction.y = 0.0
 	var result: Dictionary = guard.hit("torso", RAM_DAMAGE, 12.0, "blunt", "", direction.normalized())
 	struck.emit(_torso_position(), "torso", float(result.get("damage", RAM_DAMAGE)), "blunt")
-	WorldHistory.record_event("facility_guard_rammed", {"subject_id": GUARD_ID, "downed": guard_down()})
-	WorldHistory.amend_subject(GUARD_ID, {"anatomy_state": guard.anatomy.snapshot()})
+	WorldHistory.record_event("facility_guard_rammed", {"subject_id": guard_id, "downed": guard_down()})
+	WorldHistory.amend_subject(guard_id, {"anatomy_state": guard.anatomy.snapshot()})
 	if guard_down():
 		coerced = false
-		WorldHistory.amend_subject(GUARD_ID, {
+		WorldHistory.amend_subject(guard_id, {
 			"status": "dead" if guard.anatomy.dead else "down",
 			"memory": "Put down at his own door by a decanted subject with a breach ram.",
 		})
 		_say("")
 	else:
-		_say("%s: \"Hh--\"" % GUARD_NAME, 1.0)
+		_say("%s: \"Hh--\"" % guard_name, 1.0)
 	return true
 
 
@@ -355,14 +381,14 @@ func interact(player_position: Vector3, holding_ram: bool, arsenal: Node = null)
 func _coerce() -> String:
 	coerced = true
 	guard.set_meta("disarmed", true)
-	_say("%s: \"Easy. Easy. It's my hand it wants.\"" % GUARD_NAME, 2.6)
-	WorldHistory.amend_subject(GUARD_ID, {
+	_say("%s: \"Easy. Easy. It's my hand it wants.\"" % guard_name, 2.6)
+	WorldHistory.amend_subject(guard_id, {
 		"status": "coerced",
 		"memory": "Opened his own door with a breach ram at his chest, and dropped the gun.",
 	})
-	PLAYER_ACTION_LEDGER.record("facility_guard_coerced", {"subject_id": GUARD_ID, "location": "service_arcade"})
+	PLAYER_ACTION_LEDGER.record("facility_guard_coerced", {"subject_id": guard_id, "location": "service_arcade"})
 	var result: Dictionary = barrier.present_body(guard)
-	return "%s PALMS THE READER" % GUARD_NAME if bool(result.get("accepted", false)) else str(result.get("reason", ""))
+	return "%s PALMS THE READER" % guard_name if bool(result.get("accepted", false)) else str(result.get("reason", ""))
 
 
 ## Down or dead, his hand is still his. Dragged to the reader it opens the door.
@@ -389,10 +415,10 @@ func _take_gun(arsenal: Node) -> String:
 	carry.items.append({
 		"label": GUN_LABEL, "kind": "weapon", "weapon": "facility_sidearm",
 		"rounds": int(result.get("rounds", 0)), "mass": 1.1, "perishes": false, "age": 0.0,
-		"from": GUARD_ID,
+		"from": guard_id,
 	})
 	carry.save_to_history()
-	PLAYER_ACTION_LEDGER.record("facility_first_firearm", {"subject_id": GUARD_ID, "rounds": int(result.get("rounds", 0))})
+	PLAYER_ACTION_LEDGER.record("facility_first_firearm", {"subject_id": guard_id, "rounds": int(result.get("rounds", 0))})
 	return "%s // %d ROUNDS // NO RESERVE" % [GUN_LABEL, int(result.get("rounds", 0))]
 
 
@@ -438,7 +464,7 @@ func prompt_for(player_position: Vector3, holding_ram: bool) -> String:
 		if distance <= REACH and holding_ram:
 			return "[E] RAM TO HIS CHEST: MAKE HIM OPEN IT   //   [LMB] RAM HIM"
 		if distance <= FIRE_RANGE:
-			return "%s // ARMED // THE READER WANTS HIS HAND" % GUARD_NAME if holding_ram else "%s // ARMED // YOU HAVE NOTHING TO MEET HIM WITH" % GUARD_NAME
+			return "%s // ARMED // THE READER WANTS HIS HAND" % guard_name if holding_ram else "%s // ARMED // YOU HAVE NOTHING TO MEET HIM WITH" % guard_name
 		if distance <= WARN_RANGE:
 			return "D-SECTION DOOR // GUARDED"
 		return ""
@@ -449,3 +475,56 @@ func prompt_for(player_position: Vector3, holding_ram: bool) -> String:
 	if bool(loadout.gun_available):
 		return "[E] TAKE HIS GUN"
 	return ""
+
+
+## CellOutz security kit over the cloth: a flak vest with plates, a belt and
+## a holster on the right hip, and for a numbered guard his number stencilled
+## front and back. Hung on the rig's own torso so it moves and falls with him.
+## Placeholder geometry in the house palette; Greg's model sheets (Higgsfield
+## roadmap phase 9) replace it.
+func _kit_out() -> void:
+	var parts: Dictionary = guard.get("parts")
+	var torso := parts.get("torso") as Node3D
+	if torso == null:
+		return
+	var kit := Node3D.new()
+	kit.name = "SecurityKit"
+	torso.add_child(kit)
+	var scale := float(guard.get("build_factor")) if "build_factor" in guard else 1.0
+	var vest_colour := Color("3a3d2c")
+	_kit_box(kit, Vector3(0.42, 0.48, 0.25) * Vector3(scale, 1.0, scale), Vector3(0, 0.02, 0), vest_colour, "paint")
+	# Front and back trauma plates, proud of the vest.
+	_kit_box(kit, Vector3(0.3, 0.3, 0.04) * Vector3(scale, 1.0, 1.0), Vector3(0, 0.06, -0.135 * scale), vest_colour.darkened(0.3), "paint")
+	_kit_box(kit, Vector3(0.3, 0.3, 0.04) * Vector3(scale, 1.0, 1.0), Vector3(0, 0.06, 0.135 * scale), vest_colour.darkened(0.3), "paint")
+	# Belt and holster.
+	_kit_box(kit, Vector3(0.48 * scale, 0.07, 0.32 * scale), Vector3(0, -0.27, 0), Color("1c1612"), "paint")
+	_kit_box(kit, Vector3(0.08, 0.2, 0.12), Vector3(0.27 * scale, -0.36, -0.02), Color("241a14"), "paint")
+	if guard_number.is_empty():
+		return
+	for side in [-1.0, 1.0]:
+		var stencil := Label3D.new()
+		stencil.text = guard_number
+		stencil.font_size = 96
+		stencil.pixel_size = 0.0022
+		stencil.modulate = Color("d8cfb4")
+		stencil.outline_size = 0
+		stencil.position = Vector3(0, 0.08, side * (0.16 * scale))
+		# The rig faces -z: the front plate is at -z, read from in front.
+		stencil.rotation.y = 0.0 if side > 0.0 else PI
+		kit.add_child(stencil)
+
+
+func _kit_box(parent: Node3D, size: Vector3, at: Vector3, colour: Color, surface: String) -> void:
+	var piece := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = size
+	# Plain and matte: WorldLook's painted surface throws a bright pixel
+	# pattern that read as green camouflage on a vest.
+	var material := StandardMaterial3D.new()
+	material.albedo_color = colour
+	material.roughness = 0.9
+	material.metallic = 0.15 if surface == "plate" else 0.0
+	box.material = material
+	piece.mesh = box
+	piece.position = at
+	parent.add_child(piece)

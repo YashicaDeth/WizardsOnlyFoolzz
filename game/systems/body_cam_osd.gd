@@ -66,13 +66,49 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
+## Which pieces are on screen. All of them normally; the implant boot
+## (`ImplantBootHud`) brings them up one at a time after the tank.
+var pieces := {"frame": true, "rec": true, "vitals": true, "objective": true, "prompt": true}
+
+
+func show_piece(piece: String, on: bool) -> void:
+	pieces[piece] = on
+	queue_redraw()
+
+
+func all_pieces(on: bool) -> void:
+	for piece in pieces:
+		pieces[piece] = on
+	queue_redraw()
+
+
+## Roughly where a piece sits, for effects drawn over it.
+func piece_rect(piece: String) -> Rect2:
+	var view := size
+	match piece:
+		"rec":
+			return Rect2(26, 22, 240, 40)
+		"vitals":
+			return Rect2(26, view.y - 64, 260, 44)
+		"objective":
+			return Rect2(view.x * 0.6, 14, view.x * 0.4 - 26, 50)
+		"prompt":
+			return Rect2(view.x * 0.25, view.y - 110, view.x * 0.5, 44)
+	return Rect2(Vector2.ZERO, view)
+
+
 func _draw() -> void:
 	var view := size
-	_draw_frame(view)
-	_draw_rec(view)
-	_draw_objective(view)
-	_draw_vitals(view)
-	_draw_prompt(view)
+	if pieces.frame:
+		_draw_frame(view)
+	if pieces.rec:
+		_draw_rec(view)
+	if pieces.objective:
+		_draw_objective(view)
+	if pieces.vitals:
+		_draw_vitals(view)
+	if pieces.prompt:
+		_draw_prompt(view)
 
 
 ## Thin corner brackets: the camera's own frame, not a border.

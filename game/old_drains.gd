@@ -72,7 +72,7 @@ var stalker: DrainStalker
 
 func _ready() -> void:
 	var environment := WorldEnvironment.new()
-	environment.environment = WorldLook.environment("lower_works")
+	environment.environment = WorldLook.environment("old_drains")
 	add_child(environment)
 	_build_gallery()
 	_build_cistern()
@@ -178,7 +178,7 @@ func _build_gallery() -> void:
 		add_child(beam)
 		# Every rib, not every other: the first render measured 8.4/255 here,
 		# darker than the Lower Works Greg already called too dark.
-		_lamp(Vector3(0, TUNNEL_HEIGHT - 0.6, z - 1.0), Color("d08a3c"), 4.0, 10.0)
+		_lamp(Vector3(0, TUNNEL_HEIGHT - 0.6, z - 1.0), Color("a99a62"), 4.0, 10.0)
 
 
 ## The cistern opens out: a tall hall of standing water crossed by one
@@ -219,7 +219,7 @@ func _build_cistern() -> void:
 	_lamp(Vector3(0, CISTERN_HEIGHT - 1.0, mid - 5.0), Color("7f9f7a"), 9.0, 18.0)
 	for index in 3:
 		var side := -1.0 if index % 2 == 0 else 1.0
-		_lamp(Vector3(side * 3.0, 2.0, CISTERN_Z - 4.0 - float(index) * 6.0), Color("c86a2c"), 5.0, 9.0)
+		_lamp(Vector3(side * 3.0, 2.0, CISTERN_Z - 4.0 - float(index) * 6.0), Color("9a7a44"), 5.0, 9.0)
 
 
 ## The outfall climbs toward daylight and ends at a rusted grate onto the

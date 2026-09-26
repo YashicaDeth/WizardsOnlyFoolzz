@@ -5,8 +5,8 @@ const LOOK := preload("res://systems/look_settings.gd")
 ## playpen. The whole venue is scaled up together so the geometry still matches.
 ## Greg, 24 September: the derby comes out through the old tunnels at the dry
 ## blood waterfall, not straight onto the surface. The drivable tunnel stretch
-## between them is its own piece; until it exists the derby lands at the falls.
-const DERBY_EXIT_SCENE := "res://blood_waterfall_exit.tscn"
+## between them is its own piece (`derby_tunnels.tscn`), which goes on to the falls.
+const DERBY_EXIT_SCENE := "res://derby_tunnels.tscn"
 const DERBY_EXIT_CAPTION := "through the old tunnels // out over the dry falls"
 const ARENA_SCALE := 1.85
 ## Kept equal to ARENA_SCALE for now. Greg asked for a bigger arena and a

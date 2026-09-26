@@ -19,8 +19,11 @@ const LOOK := preload("res://systems/look_settings.gd")
 ## This scene does not own a route. Whoever sends the player here has already
 ## completed theirs with `FacilityRoutes` (the old drains file the storm outfall
 ## before sending you on), so the Hunt still consumes that route's handoff and
-## lands the player at its authored point. A route that ends here without a
-## handoff of its own (the derby tunnels) gets one from `_complete`, at
+## lands the player at its authored point. The derby tunnels
+## (`derby_tunnels.tscn`) file `FacilityRoutes.ROUTE_DERBY_TUNNELS` at their
+## drain mouth and hand their car over (`VehicleDriver.carry`); it arrives in
+## the culvert and is driven out with the same controls. A route that ends
+## here without a handoff of its own gets one from `_complete`, at
 ## `SURFACE_POSITION`.
 ##
 ## Built from primitives and two shaders (`shaders/blood_rock.gdshader`,
@@ -74,6 +77,9 @@ var status: Label
 var prompt: Label
 ## A car handed in from a route that drove here (see `hand_in_vehicle`).
 var vehicle: Node3D = null
+## Hands on it, when it is a real arcade chassis rather than a stand-in.
+var driver: VehicleDriver = null
+var player_collider: CollisionShape3D
 var completed := false
 var completed_by := ""
 var travel_requested := false
@@ -106,6 +112,9 @@ func _ready() -> void:
 	_build_exit()
 	_build_player()
 	_build_hud()
+	var arriving := VehicleDriver.take_carried()
+	if arriving != null:
+		hand_in_vehicle(arriving)
 	var handoff := FacilityRoutes.pending_surface_handoff()
 	WorldHistory.record_event("blood_waterfall_reached", {
 		"location": LOCATION,
@@ -694,6 +703,7 @@ func _build_player() -> void:
 	capsule.height = 1.7
 	collider.shape = capsule
 	player.add_child(collider)
+	player_collider = collider
 	camera = Camera3D.new()
 	camera.position.y = 0.77
 	camera.fov = 80.0
@@ -731,13 +741,51 @@ func _build_hud() -> void:
 # --- play --------------------------------------------------------------------------
 
 ## A route that drove here hands its car in. It is placed at the drain mouth
-## facing out; driving it is the car's own business (the vehicle lane), and
-## this scene only watches for it reaching the way out.
+## facing out. A real arcade chassis gets a `VehicleDriver`, so the player is
+## in it and drives it out with the move actions (E to get out and walk); a
+## stand-in is only watched for reaching the way out.
 func hand_in_vehicle(car: Node3D) -> void:
 	vehicle = car
 	if car.get_parent() == null:
 		add_child(car)
 	car.global_transform = Transform3D(Basis.IDENTITY, Vector3(0.0, 0.9, 5.0))
+	if car is RigidBody3D and "throttle" in car:
+		(car as RigidBody3D).linear_velocity = Vector3.ZERO
+		(car as RigidBody3D).angular_velocity = Vector3.ZERO
+		driver = VehicleDriver.new()
+		driver.name = "Driver"
+		add_child(driver)
+		driver.got_out.connect(_on_got_out)
+		driver.got_in.connect(_on_got_in)
+		driver.attach(car as RigidBody3D, true)
+
+
+## In the car: a handed-in stand-in always counts as driven.
+func in_car() -> bool:
+	return vehicle != null and is_instance_valid(vehicle) and (driver == null or driver.driving)
+
+
+func toggle_vehicle() -> bool:
+	if completed or driver == null:
+		return false
+	if driver.driving:
+		return driver.get_out()
+	if driver.can_get_in(player.global_position):
+		return driver.get_in()
+	return false
+
+
+func _on_got_out(standing: Vector3, facing_yaw: float) -> void:
+	player.global_position = standing
+	player.velocity = Vector3.ZERO
+	player_collider.disabled = false
+	yaw = facing_yaw
+	player.rotation.y = yaw
+	camera.current = true
+
+
+func _on_got_in() -> void:
+	player_collider.disabled = true
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -746,10 +794,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		yaw -= LOOK.dx(event.relative) * 0.0026
 		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.15, 0.95)
+	if event is InputEventKey:
+		var key := event as InputEventKey
+		if key.pressed and not key.echo and key.keycode == KEY_E:
+			toggle_vehicle()
 
 
 func _physics_process(delta: float) -> void:
-	if vehicle == null:
+	if in_car():
+		if driver != null:
+			player.global_position = vehicle.global_position + Vector3.UP * 0.4
+	else:
 		var input := Vector3(Input.get_axis("move_left", "move_right"), 0.0, Input.get_axis("move_forward", "move_back"))
 		var direction := (Basis(Vector3.UP, yaw) * input).normalized()
 		var pace := WALK_SPEED * (1.6 if Input.is_action_pressed("sprint") else 1.0)
@@ -766,7 +821,7 @@ func _physics_process(delta: float) -> void:
 func _check_exit() -> void:
 	if completed:
 		return
-	if vehicle != null and is_instance_valid(vehicle):
+	if in_car():
 		if _flat_distance(vehicle.global_position, EXIT_AT) <= VEHICLE_EXIT_REACH:
 			_complete("driving")
 		return
@@ -787,7 +842,7 @@ func _complete(by: String) -> void:
 	WorldHistory.record_event("blood_waterfall_left", {
 		"location": LOCATION,
 		"by": by,
-		"vehicle": str(vehicle.name) if vehicle != null and is_instance_valid(vehicle) else "",
+		"vehicle": str(vehicle.name) if by == "driving" and vehicle != null and is_instance_valid(vehicle) else "",
 		"destination": DESTINATION,
 		"route_id": str(FacilityRoutes.pending_surface_handoff().get("route_id", "")),
 	})
@@ -805,12 +860,16 @@ func _flat_distance(a: Vector3, b: Vector3) -> float:
 func _update_hud() -> void:
 	objective.text = "OBJECTIVE // FOLLOW THE BLOOD DOWN AND OUT"
 	status.text = "THE DRY FALLS // WHERE THE OLD DRAINS EMPTY"
-	var body := vehicle if vehicle != null and is_instance_valid(vehicle) else player
+	var body := vehicle if in_car() else player
 	if completed:
 		prompt.text = ""
 	elif _flat_distance(body.global_position, EXIT_AT) <= 20.0:
 		prompt.text = "THE TRACK OUT // KEEP GOING"
 	elif body.global_position.z > LIP_Z + 1.0 and body.global_position.y > -1.0:
 		prompt.text = "THE TRACK DOWN IS ON YOUR RIGHT"
+	elif driver != null and driver.driving:
+		prompt.text = "WASD DRIVE   //   E GET OUT"
+	elif driver != null and driver.can_get_in(player.global_position):
+		prompt.text = "E // GET IN"
 	else:
 		prompt.text = "WASD MOVE   //   SHIFT RUN"

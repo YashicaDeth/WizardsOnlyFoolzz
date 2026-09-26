@@ -34,6 +34,7 @@ const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
 const VAT_REBIRTH := preload("res://systems/vat_rebirth.gd")
 const WOUND_CATALOG := preload("res://systems/wound_catalog.gd")
 const DOCTOR_ROUTE := preload("res://systems/doctor_route.gd")
+const IMPLANT_BOOT_HUD := preload("res://systems/implant_boot_hud.gd")
 
 const EYE_HEIGHT := 1.62
 const BODY_HALF_HEIGHT := 0.85
@@ -55,6 +56,27 @@ const WIRE_TUGS := 3
 const REVENGE_HOLD := 2.8
 ## How long END ALL SUFFERING owns the screen before the wires can be seen.
 const END_CARD_SECONDS := 3.4
+## Greg's order (DESIGN/ESCAPE_ROUTES.md, "The opening, continued"): rip out
+## the wires and the cord in your mouth, smash the tank, fall out on your
+## knees, the HUD comes up because the implant has been hacked, get up and
+## look at the locked door, and GET REVENGE flashes. The player does each of
+## those. Older suites drive the earlier automatic breach (GET REVENGE, then
+## the glass goes by itself) and leave this off; the game always has it on.
+var hands_on_breakout := OS.get_environment("ATG_TEST_MODE") != "1"
+## Tugs it takes to get the cord out of your throat, after the wires.
+const CORD_TUGS := 3
+## Blows it takes to break the glass. The third one goes through.
+const GLASS_BLOWS := 3
+## How long getting up off your knees takes, turning to his door as you rise.
+const RISE_SECONDS := 2.2
+var cord_pulls := 0
+var glass_blows := 0
+var mouth_cord: Node3D
+var glass_cracks: Array[Node3D] = []
+var boot_hud
+var rise_clock := 0.0
+var rise_from_yaw := 0.0
+var _seizure: Dictionary = {}
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -199,7 +221,7 @@ const DEPARTURE_BEATS := [
 
 
 func _ready() -> void:
-	$WorldEnvironment.environment = WorldLook.environment("ossuary")
+	$WorldEnvironment.environment = WorldLook.environment("growing_floor")
 	# The form itself already lays a translucent blood veil over the first shot.
 	# Leaving this at the old opaque value made the real examiner and laboratory
 	# disappear beneath two stacked UI tints before the player could meet them.
@@ -1035,9 +1057,20 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if doctor_route != null and doctor_route.handle_input(event):
 		return
+	if phase == "knees" and event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_SPACE, KEY_E]:
+		get_up()
+		get_viewport().set_input_as_handled()
+		return
+	if phase == "smash" and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		strike_glass()
+		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		if phase == "wired":
 			_tug_wire(_aimed_wire())
+		elif phase == "cord":
+			tug_cord()
+		elif phase == "smash":
+			strike_glass()
 		else:
 			_interact()
 	# AX3.1/AX3.6. The same HOLD-I verb the rest of the game already teaches
@@ -1080,10 +1113,23 @@ func _physics_process(delta: float) -> void:
 		return
 	# The tank's clock stops while you hang in the wires. Nothing moves on
 	# until the player does it themselves.
-	if phase == "wired":
+	if phase in ["wired", "cord", "smash"]:
 		wired_clock += delta
 		_update_wired(delta)
 		_update_shards(delta)
+		_update_hud()
+		return
+	if boot_hud != null:
+		boot_hud.step(delta)
+	if phase in ["knees", "rising"]:
+		clock += delta
+		_update_knees(delta)
+		_update_shards(delta)
+		if breach_shake > 0.0:
+			breach_shake = maxf(0.0, breach_shake - delta)
+			var force := breach_shake * breach_shake * 0.16
+			camera.rotation.x += sin(clock * 47.0) * force
+			camera.rotation.z += sin(clock * 53.0) * force * 1.4
 		_update_hud()
 		return
 	clock += delta
@@ -1466,12 +1512,20 @@ func _rip_wire(cable: Node3D) -> void:
 		glass_shards.append({"node": drop, "velocity": out * randf_range(1.2, 3.0), "life": 1.4})
 	WorldHistory.record_event("opening_wire_torn", {"remaining": umbilicals.size()})
 	if umbilicals.is_empty():
-		_all_wires_out()
+		if hands_on_breakout:
+			_begin_cord()
+		else:
+			_all_wires_out()
 
 
 func _all_wires_out() -> void:
 	revenge_at = wired_clock
 	title.text = "GET REVENGE"
+	_get_revenge()
+
+
+## The second task, in the insane type (Greg): you want to kill him.
+func _get_revenge() -> void:
 	mission_card.play("get_revenge", "GET REVENGE", REVENGE_HOLD)
 	subtitle.text = ""
 	opening_audio.cue("revenge")
@@ -1486,10 +1540,162 @@ func _all_wires_out() -> void:
 	PLAYER_ACTION_LEDGER.record("opening_wires_torn_out", {"tank": "0C-7", "location": "growing_floor"})
 
 
+## The wires are out; the cord down your throat is last. It hangs out of
+## your mouth, just under the view.
+func _begin_cord() -> void:
+	phase = "cord"
+	cord_pulls = 0
+	title.visible = false
+	subtitle.text = "The cord is still down your throat."
+	mouth_cord = MeshInstance3D.new()
+	mouth_cord.name = "MouthCord"
+	var tube := CylinderMesh.new()
+	tube.top_radius = 0.03
+	tube.bottom_radius = 0.045
+	tube.height = 1.4
+	tube.material = WorldLook.surface(Color("3b1c16"), "flesh", 77)
+	(mouth_cord as MeshInstance3D).mesh = tube
+	# From the mouth, down and away to where it anchors in the tank floor.
+	mouth_cord.position = Vector3(0.04, -0.5, -0.62)
+	mouth_cord.rotation.x = 0.9
+	camera.add_child(mouth_cord)
+	# Looking down the length of it.
+	pitch = -0.8
+	WorldHistory.record_event("opening_wires_out", {"next": "mouth_cord"})
+
+
+func tug_cord() -> void:
+	if phase != "cord":
+		return
+	cord_pulls += 1
+	jolt = 1.2
+	anatomy.call("apply_hit", "head", 2.0, 0.0, "blunt")
+	if cord_pulls < CORD_TUGS:
+		# It comes up out of you a hand at a time.
+		opening_audio.cue("tug")
+		mouth_cord.position.z += 0.08
+		mouth_cord.position.y += 0.05
+		return
+	opening_audio.cue("rip")
+	var tween := create_tween()
+	tween.tween_property(mouth_cord, "position", mouth_cord.position + Vector3(0.3, -1.4, -0.8), 0.4).set_ease(Tween.EASE_IN)
+	tween.tween_callback(mouth_cord.queue_free)
+	mouth_cord = null
+	WorldHistory.record_event("opening_mouth_cord_torn", {"tank": "0C-7"})
+	_begin_smash()
+
+
+## Nothing holds you now but the glass.
+func _begin_smash() -> void:
+	phase = "smash"
+	glass_blows = 0
+	pitch = 0.0
+	subtitle.text = ""
+	WorldHistory.record_event("opening_glass_faced", {"tank": "0C-7"})
+
+
+## One blow at the glass in front of you. The first two crack it; the third
+## goes through.
+func strike_glass() -> void:
+	if phase != "smash":
+		return
+	glass_blows += 1
+	jolt = 1.4
+	anatomy.call("apply_hit", "right_arm", 4.0, 0.0, "blunt")
+	WorldHistory.record_event("opening_glass_struck", {"blow": glass_blows})
+	if glass_blows < GLASS_BLOWS:
+		opening_audio.cue("tug")
+		_crack_glass(glass_blows)
+		return
+	_breach()
+
+
+## Cracks radiating from where the fist landed, on the tank wall ahead.
+func _crack_glass(blow: int) -> void:
+	var forward := -camera.global_transform.basis.z
+	forward.y = 0.0
+	if forward.length() < 0.01:
+		forward = Vector3(0, 0, -1)
+	forward = forward.normalized()
+	var hit := VAT_POSITION + forward * 0.9 + Vector3(0, camera.global_position.y - 0.1, 0)
+	var crack_material := StandardMaterial3D.new()
+	crack_material.albedo_color = Color(0.95, 0.85, 0.8, 0.8)
+	crack_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	crack_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	for index in 5 + blow * 4:
+		var line := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(0.006, 0.12 + randf() * 0.22 * blow, 0.004)
+		mesh.material = crack_material
+		line.mesh = mesh
+		add_child(line)
+		line.global_position = hit - forward * 0.01
+		line.look_at(hit + forward, Vector3.UP)
+		line.rotate_object_local(Vector3(0, 0, 1), TAU * randf())
+		line.translate_object_local(Vector3(0, mesh.size.y * 0.5, 0))
+		glass_cracks.append(line)
+
+
+## Out of the tank and down on your knees in what came out with you. The
+## implant is taken while you are down there, and the HUD boots.
+func _begin_knees() -> void:
+	clock = DRAINED_AT
+	player.position.y = BODY_HALF_HEIGHT
+	camera.position.y = 0.62 - BODY_HALF_HEIGHT
+	# Down on the grating, the broken tank around you and the aisle ahead.
+	pitch = -0.55
+	breach_shake = 0.9
+	subtitle.text = ""
+	boot_hud = IMPLANT_BOOT_HUD.new()
+	boot_hud.driven = true
+	$HUD.add_child(boot_hud)
+	boot_hud.attach(osd)
+	boot_hud.begin(_seizure)
+	WorldHistory.record_event("opening_on_knees", {"location": "growing_floor"})
+
+
+func _update_knees(delta: float) -> void:
+	player.rotation.y = yaw
+	if phase == "knees":
+		# Heaving on the grating, looking at the puddle.
+		camera.position.y = 0.62 - BODY_HALF_HEIGHT + sin(clock * 2.6) * 0.02
+		camera.rotation = Vector3(pitch + sin(clock * 2.6) * 0.03, 0, 0.12 + sin(clock * 1.3) * 0.04)
+		return
+	rise_clock += delta
+	var t := clampf(rise_clock / RISE_SECONDS, 0.0, 1.0)
+	var eased := ease(t, 0.45)
+	# Up off your knees, turning to the door he left by.
+	yaw = lerp_angle(rise_from_yaw, _door_yaw(), eased)
+	player.rotation.y = yaw
+	camera.position.y = lerpf(0.62, EYE_HEIGHT, eased) - BODY_HALF_HEIGHT
+	camera.rotation = Vector3(lerpf(-0.55, 0.05, eased), 0, lerpf(0.12, 0.0, eased))
+	if t >= 1.0:
+		phase = "aisle"
+		pitch = 0.05
+		can_move = true
+		_get_revenge()
+
+
+## Facing his door from where you stand.
+func _door_yaw() -> float:
+	var to_door: Vector3 = DoctorRoute.DOOR_AT - player.global_position
+	return atan2(-to_door.x, -to_door.z)
+
+
+## Up off your knees. Only once the implant has put the HUD up.
+func get_up() -> void:
+	if phase != "knees" or boot_hud == null or not boot_hud.done:
+		return
+	phase = "rising"
+	rise_clock = 0.0
+	rise_from_yaw = yaw
+	WorldHistory.record_event("opening_got_up", {"location": "growing_floor"})
+
+
 func _breach() -> void:
 	if breakout_complete:
 		return
-	phase = "floor"
+	phase = "knees" if hands_on_breakout else "floor"
 	clock = maxf(clock, DRAINED_AT)
 	# Hanging in the wires turned the body; the stand-up faces down the aisle.
 	yaw = 0.0
@@ -1561,7 +1767,12 @@ func _breach() -> void:
 	puddle.mesh = disc
 	puddle.position = VAT_POSITION + Vector3(0, 0.02, 0)
 	add_child(puddle)
+	for crack in glass_cracks:
+		crack.queue_free()
+	glass_cracks.clear()
 	_record_breakout()
+	if hands_on_breakout:
+		_begin_knees()
 
 
 ## The first supernatural act remains physical: the player's suffering seizes
@@ -1593,6 +1804,7 @@ func _record_breakout() -> void:
 	var endured := int(player_state.get("torture_cycles", 4))
 	var refused := int(player_state.get("examination_refusals", 0))
 	var seizure := SoulBreakthrough.seize("player", endured, refused)
+	_seizure = seizure
 	var memory := "The soul seized the wetwire and broke the vat."
 	if not bool(seizure.get("ok", false)):
 		# It still breaks -- the glass is physical and the tube comes out either
@@ -1751,6 +1963,22 @@ func _update_hud() -> void:
 		else:
 			prompt.text = "MOUSE LOOK   //   FIND THE WIRES   //   %d LEFT" % umbilicals.size()
 		return
+	match phase:
+		"cord":
+			$HUD/Objective.text = ""
+			prompt.text = "[E] TEAR THE CORD OUT OF YOUR MOUTH   //   %d" % (CORD_TUGS - cord_pulls)
+			return
+		"smash":
+			$HUD/Objective.text = ""
+			prompt.text = "[CLICK] SMASH THE GLASS   //   %d" % (GLASS_BLOWS - glass_blows)
+			return
+		"knees":
+			$HUD/Objective.text = ""
+			prompt.text = "[SPACE] GET UP" if boot_hud != null and boot_hud.done else ""
+			return
+		"rising":
+			prompt.text = ""
+			return
 	# The objective belongs to the escape, and the escape does not exist until
 	# the tank has actually broken. Gated on the breakout rather than on
 	# movement alone so no future phase can hand back control early and put
