@@ -128,6 +128,12 @@ const UPKEEP_INTERVAL := 0.25
 const HANDHELD_BODY_LIGHT := 0.25
 const PSYCHEDELIC_OSC := preload("res://systems/psychedelic_osc.gd")
 const KEYS_CARD := preload("res://systems/keys_card.gd")
+const SIGNAL_SIGHT := preload("res://systems/signal_sight.gd")
+## Greg, 26 September: "inventory to Tab; re-decant to holding K". A tap of K
+## is wizard eyes, as everywhere since the brain hack; held this long it
+## re-decants.
+const REDECANT_HOLD_SECONDS := 1.2
+const WIZARD_TAP_SECONDS := 0.35
 ## AS1.1. Bright enough to actually read as a light source against
 ## `world_look.gd`'s low-ambient presets rather than a glow nobody would notice.
 const HANDHELD_LAMP_ENERGY := 6.0
@@ -1095,6 +1101,7 @@ func _ready() -> void:
 	keys_card.name = "KeysCard"
 	$HUD.add_child(keys_card)
 	_build_keys_card()
+	_build_sight()
 	_order_hud_layers()
 	# SpokenContact owns the capture and adds the recogniser beside it, so a
 	# downed NPC hears the words rather than only the fact of being spoken to.
@@ -1725,6 +1732,19 @@ func _unhandled_input(event: InputEvent) -> void:
 				})
 		else:
 			inspected_world_item.clear()
+	# J held is the depth scan; K tapped is wizard eyes, K held re-decants.
+	if event is InputEventKey and not event.echo and event.keycode == KEY_J and sight != null:
+		sight.call("hold_depth", event.pressed and panel_mode.is_empty())
+		return
+	if event is InputEventKey and not event.echo and event.keycode == KEY_K:
+		if event.pressed:
+			_k_held_for = 0.0
+			_k_fired = false
+		else:
+			if not _k_fired and _k_held_for >= 0.0 and _k_held_for < WIZARD_TAP_SECONDS and sight != null and panel_mode.is_empty():
+				sight.call("toggle_wizard")
+			_k_held_for = -1.0
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_1: _equip_weapon(0)
@@ -1780,20 +1800,20 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_G: _toggle_handheld_surface()
 			KEY_TAB:
 				# The handheld owns Tab while raised: one object, modes on it.
-				# Otherwise Tab is the Brain Index hub; the world index it used
-				# to open is the hub's TASKS tab.
+				# Otherwise, Greg, 26 September: "inventory to Tab". The Brain
+				# Index hub (the world index is its TASKS tab) moves to
+				# Shift+Tab, next to it.
 				if handheld.is_open:
 					handheld.cycle_mode(1)
-				else:
+				elif event.shift_pressed:
 					_toggle_panel("hub")
+				else:
+					_toggle_inventory()
 			KEY_M: _toggle_panel("map")
 			KEY_T: _toggle_panel("tree")
-			# Greg: *"j shouldent be anything if anything j should be the
-			# inventory button not just this other button for nothing"*. J sat
-			# next to the movement hand on a panel nobody reaches for, while the
-			# bag -- the screen you open constantly -- was over on O. O still
-			# works; this is the one under your fingers.
-			KEY_J: _toggle_inventory()
+			# J was the inventory (Greg: "j should be the inventory button");
+			# on 26 September he moved the inventory to Tab and gave J to the
+			# depth scan, handled above the match because it is held.
 			# Moved rather than dropped. Every letter on the board is already
 			# spoken for, so the artwork goes to the function row with the other
 			# panels rather than losing its only way in.
@@ -1861,7 +1881,6 @@ func _unhandled_input(event: InputEvent) -> void:
 						_dodge()
 					else:
 						_jump()
-			KEY_K: _deliberate_redecant()
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if _pulmonary_diagnostic_active():
 			field_interface.rotate_pulmonary(event.relative)
@@ -1887,6 +1906,7 @@ func _captain_name() -> String:
 
 
 func _physics_process(delta: float) -> void:
+	_tick_k_hold(delta)
 	_tick_fight(delta)
 	if kill_cam.active:
 		return
@@ -5712,6 +5732,36 @@ func _enter_captivity(result: Dictionary) -> void:
 	prompt.text = "%s // HELD AT %s // [K] DIE DELIBERATELY" % [str(result.outcome).to_upper(), str(result.destination).replace("_", " ").to_upper()]
 
 
+## K held long enough re-decants; the tap is read on release instead.
+func _tick_k_hold(delta: float) -> void:
+	if _k_held_for < 0.0 or _k_fired:
+		return
+	_k_held_for += delta
+	if _k_held_for >= WIZARD_TAP_SECONDS:
+		prompt.text = "HOLD K // RE-DECANT  %d%%" % int(clampf(_k_held_for / REDECANT_HOLD_SECONDS, 0.0, 1.0) * 100.0)
+	if _k_held_for >= REDECANT_HOLD_SECONDS:
+		_k_fired = true
+		_deliberate_redecant()
+
+
+## K and J from the brain hack on: camera signals, the dead where they fell,
+## the living through walls. The Hunt reads the keys itself (see above).
+func _build_sight() -> void:
+	sight = SIGNAL_SIGHT.new()
+	sight.name = "SignalSight"
+	add_child(sight)
+	sight.call("setup", camera)
+	sight.set("handle_keys", false)
+	sight.set("enabled", true)
+	sight.set("bodies", func() -> Array:
+		var out: Array = []
+		for actor: Dictionary in encounter_actors:
+			var node := actor.get("node") as Node3D
+			if node != null and is_instance_valid(node) and not bool(actor.get("dead", false)):
+				out.append(node.global_position - Vector3.UP * 0.9)
+		return out)
+
+
 func _deliberate_redecant() -> void:
 	var result := DEFEAT_ROUTER.redecant()
 	if result.is_empty():
@@ -8299,20 +8349,23 @@ func _build_keys_card() -> void:
 			["LMB EXHALE", "O / DOUBLE O / GHOST"],
 		]},
 		{"group": "WHAT YOU CARRY", "rows": [
-			["O", "FIELD INVENTORY / BODY / LOOT"],
+			["TAB / O", "FIELD INVENTORY / BODY / LOOT"],
 			["U", "DEAD CLOUD EXCHANGE // CASES"],
 			["7", "BLOOD TREE // SPEND BLOOD"],
 			["F8", "CONTACT // PEOPLE, ENTITIES, MATERIA"],
 			["G", "RAISE / LOWER BLACK MIRROR"],
-			["TAB", "INDEX / NEXT DEVICE APP"],
+			["SHIFT+TAB", "INDEX"],
+			["TAB (DEVICE UP)", "NEXT DEVICE APP"],
 			["CLICK / F1-F7", "SELECT DEVICE APP"],
 			["M", "LIVING MAP"],
 			["T", "CHARACTER TREE"],
 			["P", "THE BOARD"],
-			["J", "ALLUSIONS ARTWORK"],
+			["F9", "ALLUSIONS ARTWORK"],
+			["K", "WIZARD EYES // SIGNALS, SPIRITS, HIDDEN THINGS"],
+			["HOLD J", "DEPTH SCAN // BODIES THROUGH WALLS"],
 			["HOLD L + WASD", "LEAN / WAVE DEVICE LIGHT"],
 			[HANDHELD.DROP_KEY_LABEL, "DROP DEVICE"],
-			["K", "RE-DECANT // A RESET THAT COSTS YOU"],
+			["HOLD K", "RE-DECANT // A RESET THAT COSTS YOU"],
 			["ESC", "CLOSE"],
 		]},
 	])
@@ -9523,6 +9576,9 @@ func _update_storm_exposure(delta: float) -> void:
 ## way reads as a clear sightline, anything else in the way reads as full
 ## cover.
 var _upkeep_clock := 0.0
+var sight: Node
+var _k_held_for := -1.0
+var _k_fired := false
 var _perception_player_cache: Array[RID] = []
 var _perception_player_stamp := -1000000
 

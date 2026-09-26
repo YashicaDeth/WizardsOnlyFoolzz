@@ -30,6 +30,9 @@ const STRAIN_SECONDS := 22.0
 const RECOVER_SECONDS := 6.0
 
 var enabled := false
+## False when the host reads K and J itself (the Hunt: tap K for wizard eyes,
+## hold K to re-decant).
+var handle_keys := true
 var mode := ""  # "", "wizard", "depth"
 var strain := 0.0
 var clock := 0.0
@@ -71,7 +74,7 @@ func setup(camera: Camera3D) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not (event is InputEventKey) or event.echo:
+	if not handle_keys or not (event is InputEventKey) or event.echo:
 		return
 	var key := event as InputEventKey
 	if key.keycode == KEY_K and key.pressed:
@@ -147,7 +150,7 @@ func _draw_marks() -> void:
 		else:
 			_draw_bodies()
 		_draw_hidden()
-		CellOutzType.draw_string_compat(marks, Vector2(24, marks.size.y * 0.2), "WIZARD EYES  //  K" if mode == "wizard" else "DEPTH  //  J", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ACID if mode == "wizard" else COLD)
+		CellOutzType.draw_string_compat(marks, Vector2(marks.size.x * 0.05, marks.size.y * 0.2), "WIZARD EYES  //  K" if mode == "wizard" else "DEPTH  //  J", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ACID if mode == "wizard" else COLD)
 	# The nosebleed: past halfway, blood runs down from the top of the view.
 	if strain > 0.5:
 		var run := clampf((strain - 0.5) / 0.5, 0.0, 1.0)

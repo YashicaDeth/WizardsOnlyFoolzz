@@ -33,6 +33,7 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [ ] A real-GPU benchmark on Greg's PC (the cloud renders on the CPU, so absolute fps here means nothing).
 - [ ] Fix `standing_contact_test`: the talk panel's close calls itself forever (it already failed before this pass).
 - [ ] Make `sandbox_perf_test` skip itself headless instead of reporting a false failure.
+- [ ] Fix Hunt tests that were already failing before 26 September: `firearm_aim_test`, `handheld_world_light_test`, `melee_cut_plane_test`, `vault_test`, `grapple_playability_test` (parse error: `released_from` declared twice), `handheld_world_drop_test`.
 
 ## The opening, beat by beat (OPENING_TORTURE_INTAKE.md)
 
@@ -62,9 +63,10 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [x] Strain: static, blur, nosebleed; clears when you leave the mode.
 - [x] Only hacked cameras notice.
 - [x] Vat chamber, Support Unit and drains wired.
-- [ ] The Hunt: K/J wired.
-- [ ] Hunt keys: inventory to Tab.
-- [ ] Hunt keys: re-decant to hold-K.
+- [x] The Hunt: K/J wired (tap K wizard eyes, hold J depth; enemies show through walls).
+- [x] Hunt keys: inventory to Tab (the Brain Index hub moved to Shift+Tab).
+- [ ] **(Greg)** Is Shift+Tab right for the Brain Index hub?
+- [x] Hunt keys: re-decant to hold-K (1.2 s, with a progress prompt).
 - [ ] The phone camera vision shows signals too.
 - [ ] Wires and power shown in wizard eyes.
 - [x] Hidden things shown in wizard eyes and the depth scan (a general list any scene can fill).

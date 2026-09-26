@@ -1120,6 +1120,11 @@ World rules; realm identity and transition rules; what persists across realms; d
     episodes (Greg's reference; the art is original, not copied).
   - **Detection:** only hacked cameras notice you using the modes.
   - **Hunt keys move:** inventory to Tab; re-decant to holding K.
+    *Built:* Tab = inventory (O still works; Tab still cycles the phone's
+    apps while it is raised). Tap K = wizard eyes, hold K 1.2 s = re-decant,
+    hold J = depth scan, in the Hunt as in the opening. *Assistant's choice,
+    open:* the Brain Index hub moved from Tab to Shift+Tab, and the Allusions
+    artwork is on F9 only.
 - **Performance (Greg, 26 September):** asked for "60 fps to 160 fps". After
   the performance pass, build `a866957` reads about 160 fps on the F10 counter
   everywhere (vat room, Support Unit, sewers, Hunt, menu) on his NVIDIA RTX at
