@@ -325,3 +325,16 @@ smallest playable version first.
 - The sky agency.
 - How humiliating the jester outfit is.
 - The map glitching (Walkthrough 2).
+
+## J. For the Dust page — depth camera
+
+A second ledger, kept separate from section I on purpose: section I is added by
+`opencode/base-model-kit` and this branch does not have it, so using the same
+heading here would make the two branches collide on merge. Copy both rows
+across.
+
+| Done | What | Proof |
+|---|---|---|
+| 26 Sep | **The depth camera stopped being graded like a photograph.** The Black Mirror's second mode (LiDAR-style depth, Shift+L) worked on the first raise and broke on every raise after that: it came back with the night sensor's exposure and contrast, so the depth image blew out to a flat white sheet. `_apply_mode` now has the last word on the camera's environment. | `black_mirror_depth_mode_test`, new. On the unfixed code it fails exactly four checks, all on the second raise, while the first-raise depth path and the night path pass — so it isolates the bug. Now failures=0. `black_mirror_lens`, `phone_night_vision`, `hud_night_camera`, `body_mirror`, `live_body_mirror`, `mirror_body_state`, `day_night` all green. |
+| 26 Sep | **Seen, not just asserted.** Captured on an RTX 2060 SUPER, same camera position, only the fix differing. | Before: exposure 4.2, the lower two thirds one flat white sheet, buildings as hard black cutouts, the sensor's dot grid gone, no ground detail — unreadable as depth. After: near ground, mid buildings and far skyline separate, the dot grid is visible, the moon reads as a disc. |
+| 26 Sep | **The lens capture stopped lying about success.** `black_mirror_lens_capture` printed `CAPTURED` whether or not the file was written, and Godot will not create the output directory — so a run could report four frames and write nothing. It now makes the directory, checks the save, and exits non-zero on failure. | Hit for real during this item: a run printed four `CAPTURED` lines and produced no files at all. |
