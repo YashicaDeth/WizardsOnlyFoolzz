@@ -88,6 +88,9 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [x] One shared jump/climb component (`JumpClimb`); the drains use it too.
 - [x] A climb test on a built stage (`jump_climb_test`), plus the drains climb test.
 - [x] Lower Works: ledge climbing as well as its jump.
+- [x] Sprint in the vat room (weak, grows as the body recovers) and in the Service Arcade.
+- [x] Crouch-slide everywhere in the opening: sprint + Ctrl, about 1 s, the view drops; a little noise in the Support Unit and drains.
+- [x] Small fall damage: only over 2.5 m, at most 15 blood, never lethal.
 
 ## Art and look
 

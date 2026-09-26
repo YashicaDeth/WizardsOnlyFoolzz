@@ -439,10 +439,21 @@ func _physics_process(delta: float) -> void:
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
 	# Mid-climb the haul owns the body; the gate check below still runs.
 	if not JUMP_CLIMB.busy(player):
-		player.velocity.x = move_toward(player.velocity.x, direction.x * 3.4, 16.0 * delta)
-		player.velocity.z = move_toward(player.velocity.z, direction.z * 3.4, 16.0 * delta)
+		# Sprint here too (Greg, 26 September), and sprint + Ctrl slides.
+		var sprinting := Input.is_action_pressed("sprint")
+		var pace := 3.4 * (1.6 if sprinting else 1.0)
+		if Input.is_action_just_pressed("crouch"):
+			JUMP_CLIMB.try_slide(player, yaw, sprinting)
+		if not JUMP_CLIMB.slide_step(player, delta):
+			player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
+			player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
+		# The view drops low for the slide.
+		camera.position.y = move_toward(camera.position.y, 0.3 if JUMP_CLIMB.sliding(player) else 0.77, get_physics_process_delta_time() * 4.0)
 		JUMP_CLIMB.fall(player, delta)
 		player.move_and_slide()
+		var fall_hurt := JUMP_CLIMB.landing_damage(player)
+		if fall_hurt > 0.0:
+			blood = maxf(1.0, blood - fall_hurt)
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	# The arcade is a route, not a lockout puzzle. If the card was collected,

@@ -1940,18 +1940,31 @@ func _update_movement(delta: float) -> void:
 		Input.get_axis("move_forward", "move_back"),
 	)
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
-	var speed := 2.7 * float(anatomy.call("mobility_ratio"))
-	player.velocity.x = move_toward(player.velocity.x, direction.x * speed, 14.0 * delta)
-	player.velocity.z = move_toward(player.velocity.z, direction.z * speed, 14.0 * delta)
+	var mobility := float(anatomy.call("mobility_ratio"))
+	var speed := 2.7 * mobility
+	# Greg, 26 September: sprint here too, weak at first and growing as the
+	# new body recovers (the same mobility the jump reads); sprint + Ctrl slides.
+	var sprinting := Input.is_action_pressed("sprint")
+	if sprinting:
+		speed *= lerpf(1.15, 1.6, mobility)
+	if Input.is_action_just_pressed("crouch"):
+		JUMP_CLIMB.try_slide(player, yaw, sprinting)
+	if not JUMP_CLIMB.slide_step(player, delta):
+		player.velocity.x = move_toward(player.velocity.x, direction.x * speed, 14.0 * delta)
+		player.velocity.z = move_toward(player.velocity.z, direction.z * speed, 14.0 * delta)
 	JUMP_CLIMB.fall(player, delta)
 	player.move_and_slide()
+	var fall_hurt := JUMP_CLIMB.landing_damage(player)
+	if fall_hurt > 0.0:
+		anatomy.call("apply_hit", "left_leg", fall_hurt * 0.5, 0.0, "blunt")
+		anatomy.call("apply_hit", "right_leg", fall_hurt * 0.5, 0.0, "blunt")
 	if weak_wall_broken and player.global_position.x < DUCT_DEPTH_X:
 		take_shortcut()
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	# A body that just came out of a tank does not walk well.
 	var stride := Vector2(player.velocity.x, player.velocity.z).length()
-	camera.position.y = STANDING_EYE_OFFSET + sin(Time.get_ticks_msec() * 0.0055) * stride * 0.016
+	camera.position.y = STANDING_EYE_OFFSET + sin(Time.get_ticks_msec() * 0.0055) * stride * 0.016 - (0.5 if JUMP_CLIMB.sliding(player) else 0.0)
 	camera.rotation.z = sin(Time.get_ticks_msec() * 0.0027) * stride * 0.008
 
 

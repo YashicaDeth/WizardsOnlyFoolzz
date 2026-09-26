@@ -394,10 +394,17 @@ func _physics_process(delta: float) -> void:
 	var creeping := Input.is_action_pressed("crouch")
 	var pace := WALK_SPEED * (1.6 if Input.is_action_pressed("sprint") else 1.0) * (0.45 if creeping else 1.0)
 	camera.position.y = move_toward(camera.position.y, 0.3 if creeping else 0.77, delta * 3.0)
-	player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
-	player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
+	# Greg, 26 September: sprint + Ctrl slides (loud: it hunts by sound).
+	if Input.is_action_just_pressed("crouch"):
+		JUMP_CLIMB.try_slide(player, yaw, Input.is_action_pressed("sprint"))
+	if not JUMP_CLIMB.slide_step(player, delta):
+		player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
+		player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
 	JUMP_CLIMB.fall(player, delta)
 	player.move_and_slide()
+	var fall_hurt := JUMP_CLIMB.landing_damage(player)
+	if fall_hurt > 0.0:
+		stalker.blood = maxf(1.0, stalker.blood - fall_hurt)
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	_file_progress()

@@ -850,10 +850,18 @@ func _move(delta: float) -> void:
 	var running := Input.is_action_pressed("sprint")
 	var pace := WALK_SPEED * (1.6 if running else 1.0) * (0.45 if creeping else 1.0)
 	camera.position.y = move_toward(camera.position.y, 0.3 if creeping else 0.77, delta * 3.0)
-	player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
-	player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
+	# Greg, 26 September: sprint + Ctrl slides, with a little noise, like running.
+	if Input.is_action_just_pressed("crouch") and JUMP_CLIMB.try_slide(player, yaw, running):
+		_on_noise(player.global_position, 0.45)
+	if not JUMP_CLIMB.slide_step(player, delta):
+		player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
+		player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
 	JUMP_CLIMB.fall(player, delta)
 	player.move_and_slide()
+	# Small falls: they sting, never kill.
+	var fall_hurt := JUMP_CLIMB.landing_damage(player)
+	if fall_hurt > 0.0:
+		blood = maxf(1.0, blood - fall_hurt)
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	# Running on tile carries; walking does not.
