@@ -68,6 +68,7 @@ var surface_requested := false
 ## Greg, 24 September: something hunts you down here, "a bingyanger, freed
 ## long ago". See `systems/drain_stalker.gd`.
 var stalker: DrainStalker
+var sight: Node
 
 
 func _ready() -> void:
@@ -82,6 +83,7 @@ func _ready() -> void:
 	_build_player()
 	_build_stalker()
 	_build_hud()
+	_build_sight()
 	# The route begins when you drop in. A world that already started it (a
 	# resumed run) keeps its steps; begin() refuses a second start.
 	if str(FACILITY_ROUTES.ensure().get("active_route", "")) != ROUTE:
@@ -280,6 +282,17 @@ func _build_player() -> void:
 	LabSurface.attach_body_cam(camera)
 	if VatRebirth.carries("BREACH TOOL"):
 		LabSurface.hold_in_view(camera, LabSurface.breach_tool())
+
+
+## K wizard eyes / J depth scan: the thing in the water, through the walls.
+func _build_sight() -> void:
+	sight = preload("res://systems/signal_sight.gd").new()
+	sight.name = "SignalSight"
+	add_child(sight)
+	sight.call("setup", camera)
+	sight.set("enabled", true)
+	sight.set("bodies", func() -> Array:
+		return [stalker.global_position] if stalker != null and is_instance_valid(stalker) else [])
 
 
 func _build_stalker() -> void:

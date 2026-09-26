@@ -24,6 +24,7 @@ const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const TORTURE_LOAD_IN := preload("res://systems/torture_load_in.gd")
 const INTAKE_WATCHERS := preload("res://systems/intake_watchers.gd")
 const BRAIN_HACK := preload("res://systems/brain_hack.gd")
+const SIGNAL_SIGHT := preload("res://systems/signal_sight.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const BRAIN_INDEX := preload("res://systems/brain_index.gd")
@@ -94,6 +95,8 @@ var load_in: Control
 var watchers: Node3D
 ## Greg's breakout, steps 1-4: the sigil takes the brain (`BrainHack`).
 var brain_hack: Control
+## K wizard eyes / J depth scan, from the brain hack on (`SignalSight`).
+var sight: Node
 var opening_audio: Node
 var fluid: MeshInstance3D
 var vat_glass: MeshInstance3D
@@ -257,6 +260,12 @@ func _ready() -> void:
 	osd.visible = intake == null
 	opening_audio = OPENING_AUDIO.new()
 	add_child(opening_audio)
+	sight = SIGNAL_SIGHT.new()
+	sight.name = "SignalSight"
+	add_child(sight)
+	sight.call("setup", camera)
+	# The failed subject in the jammed tank died here.
+	sight.set("spirits", [Vector3(-3.4, 0.0, 2.6)])
 	brain_hack = BRAIN_HACK.new()
 	$HUD.add_child(brain_hack)
 	brain_hack.connect("hack_finished", _on_hack_finished)
@@ -1314,6 +1323,8 @@ func _update_departure(delta: float) -> void:
 ## BRAIN HACKED / SOUL OVERTAKEN on the END ALL SUFFERING card, and the tank
 ## starts to fail under it.
 func _on_hack_finished(_skipped: bool) -> void:
+	# The chip is yours now, and so are its senses.
+	sight.set("enabled", true)
 	mission_card.play("brain_hacked", "BRAIN HACKED SOUL OVERTAKEN", BRAIN_HACK.CARD_SECONDS)
 	phase = "submerged"
 	clock = 0.0
@@ -1652,6 +1663,8 @@ func get_up() -> void:
 
 
 func _breach() -> void:
+	if sight != null:
+		sight.set("enabled", true)
 	if breakout_complete:
 		return
 	phase = "knees" if hands_on_breakout else "floor"

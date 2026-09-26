@@ -78,6 +78,8 @@ var tool_visual: Node3D
 var director: AlarmDirector
 var cameras: Array[SecurityCamera] = []
 var guards: Array = []
+## K wizard eyes / J depth scan.
+var sight: Node
 var cells: Array[BingyangCell] = []
 var bingyangers: Array = []
 var guard_post: FacilityGuardPost
@@ -122,6 +124,7 @@ func _ready() -> void:
 	_build_guards()
 	_build_remains()
 	_build_hud()
+	_build_sight()
 	_build_klaxon()
 	director.doors = DOORS.duplicate()
 	director.spawner = _spawn_reinforcement
@@ -456,6 +459,28 @@ func _build_remains() -> void:
 		tag.position = body.position + Vector3(0, 0.9, 0)
 		add_child(tag)
 		remains_nodes[str(remains.id)] = [body, tag]
+
+
+func _build_sight() -> void:
+	sight = preload("res://systems/signal_sight.gd").new()
+	sight.name = "SignalSight"
+	add_child(sight)
+	sight.call("setup", camera)
+	# By the Support Unit the chip has long been yours.
+	sight.set("enabled", true)
+	sight.set("bodies", func() -> Array:
+		var out: Array = []
+		for guard in guards:
+			if is_instance_valid(guard):
+				out.append((guard as Node3D).global_position)
+		for occupant in bingyangers:
+			if occupant != null and is_instance_valid(occupant):
+				out.append((occupant as Node3D).global_position)
+		return out)
+	var dead: Array = []
+	for remains_id in remains_nodes:
+		dead.append((remains_nodes[remains_id][0] as Node3D).global_position)
+	sight.set("spirits", dead)
 
 
 func _build_hud() -> void:

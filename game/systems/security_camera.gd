@@ -258,6 +258,19 @@ func _tint() -> void:
 	tally.visible = tracking
 
 
+## Every live camera, for the vision modes to draw.
+static func all_cameras() -> Array:
+	var alive: Array = []
+	var refs: Array = []
+	for ref in _all:
+		var lens = ref.get_ref()
+		if lens != null and is_instance_valid(lens) and lens.is_inside_tree():
+			alive.append(lens)
+			refs.append(ref)
+	_all = refs
+	return alive
+
+
 ## Every camera's signal on or off at once (a vision mode calls this).
 static func show_signals(on: bool) -> void:
 	signals_visible = on
