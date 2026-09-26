@@ -1026,7 +1026,12 @@ func _build_cradled_vat_subject(at: Vector3, seed_value: int, parent_node: Node3
 	var host: Node3D = self if parent_node == null else parent_node
 	host.add_child(rig)
 	rig.build(identity, {
-		"gore": false,
+		# Greg, 26 Sep (Q24): the tank specimens bleed. This was a flat `false`,
+		# so a body in the game's opening image could be opened up and not bleed
+		# while the identical rig bled everywhere else -- gore working in three
+		# of the four places it is supposed to. It now reads the same global
+		# setting the other scenes read, so OFF still turns it off.
+		"gore": BASELINE_HUMAN.apply_gore_setting(),
 		"seated": true,
 		"flesh": Color("6a4a43") if seed_value == 1 else Color("4d3833"),
 		"variation": 4 + seed_value * 5 + int(absf(at.x)),
