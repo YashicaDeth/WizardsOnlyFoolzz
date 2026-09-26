@@ -1983,6 +1983,9 @@ func _interact() -> void:
 		return
 	if sight != null and sight.call("cut_wire_near", player.global_position) != "":
 		subtitle.text = "THE LINE SPITS AND DIES  //  THAT BAY GOES DARK"
+		if bool(sight.get("last_cut_shocked")):
+			anatomy.call("apply_hit", "right_arm", sight.SHOCK_BLOOD, 0.0, "blunt")
+			subtitle.text = "IT WAS LIVE  //  THE SHOCK THROWS YOUR ARM BACK"
 		opening_audio.cue("door")
 		return
 	var to_door := door_marker.global_position - player.global_position

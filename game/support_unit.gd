@@ -496,7 +496,9 @@ func _build_sight() -> void:
 		var eye: Vector3 = lens.eye()
 		var wall_x := signf(eye.x if absf(eye.x) > 0.01 else 1.0) * (HALF_WIDTH - 0.15)
 		wires.append({"id": "%s_feed" % lens.camera_id, "points": [Vector3(wall_x, 1.3, eye.z), Vector3(wall_x, eye.y, eye.z), eye],
-			"on_cut": func() -> void: lens.smash("wire_cut")})
+			"on_cut": func() -> void:
+				lens.smash("wire_cut")
+				_send_guard_to_check(lens)})
 	sight.set("wires", wires)
 	_build_hidden()
 
@@ -528,6 +530,26 @@ func _build_hidden() -> void:
 	sight.connect("hidden_seen", func(id: String) -> void:
 		if HIDDEN_CACHE.mark_found(caches, id):
 			_flash_message("SOMETHING HIDDEN THERE // THE MODES SEE THE SEAM"))
+
+
+## Greg, 26 September: a dead camera brings one guard to check it for about
+## twenty seconds, then back to his round. A lure you can use.
+const DEAD_FEED_CHECK_SECONDS := 20.0
+
+
+func _send_guard_to_check(lens: Node3D) -> void:
+	var nearest: Node = null
+	var best := INF
+	for guard in guards:
+		if guard.is_down():
+			continue
+		var distance := (guard.global_position - lens.global_position).length()
+		if distance < best:
+			best = distance
+			nearest = guard
+	if nearest != null:
+		nearest.distract(lens, DEAD_FEED_CHECK_SECONDS)
+		WorldHistory.record_event("guard_checks_dead_camera", {"camera_id": str(lens.get("camera_id")), "guard": str(nearest.name)})
 
 
 func _build_hud() -> void:
@@ -794,7 +816,11 @@ func interact() -> String:
 			_flash_message("THE BULKHEAD SWINGS // A CLOSET BEHIND IT")
 			return "secret_door"
 	if sight != null and sight.call("cut_wire_near", player.global_position) != "":
-		_flash_message("THE FEED DIES // THAT CAMERA IS BLIND")
+		if bool(sight.get("last_cut_shocked")):
+			blood = maxf(1.0, blood - sight.SHOCK_BLOOD)
+			_flash_message("IT WAS LIVE // THE SHOCK BITES // THE FEED DIES")
+		else:
+			_flash_message("THE FEED DIES // THAT CAMERA IS BLIND // SOMEONE WILL COME LOOK")
 		return "wire"
 	if gate_passed and _flat_distance(EXIT_AT) <= EXIT_REACH:
 		_leave()
