@@ -351,9 +351,55 @@ func _unhandled_input(event: InputEvent) -> void:
 		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.15, 0.95)
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		_interact()
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE:
+		jump_or_climb()
+
+
+## Greg, 26 September: "you can't jump out of here in the sewers, it's dumb."
+## SPACE jumps; facing a ledge up to MANTLE_REACH above your feet (the
+## walkway lip out of the channel, the causeway out of the deep cistern) it
+## pulls you up onto it instead. Returns what it did.
+const JUMP_SPEED := 5.2
+const MANTLE_REACH := 1.55
+const MANTLE_SECONDS := 0.4
+var mantling := false
+
+
+func jump_or_climb() -> String:
+	if mantling or not player.is_on_floor():
+		return ""
+	var feet := player.global_position.y - 0.85
+	var forward := Basis(Vector3.UP, yaw) * Vector3.FORWARD
+	var space := player.get_world_3d().direct_space_state
+	# Look down onto whatever is just ahead, from above head height.
+	for reach: float in [0.55, 0.8]:
+		var top: Vector3 = player.global_position + forward * reach
+		var query := PhysicsRayQueryParameters3D.create(Vector3(top.x, feet + 1.95, top.z), Vector3(top.x, feet + 0.15, top.z))
+		query.exclude = [player.get_rid()]
+		var hit := space.intersect_ray(query)
+		if hit.is_empty() or (hit.normal as Vector3).y < 0.7:
+			continue
+		var rise: float = (hit.position as Vector3).y - feet
+		if rise < 0.2 or rise > MANTLE_REACH:
+			continue
+		mantling = true
+		player.velocity = Vector3.ZERO
+		var land: Vector3 = (hit.position as Vector3) + Vector3(0, 0.87, 0) + forward * 0.1
+		var tween := create_tween()
+		tween.tween_property(player, "global_position", Vector3(player.global_position.x, land.y + 0.1, player.global_position.z), MANTLE_SECONDS * 0.6).set_ease(Tween.EASE_OUT)
+		tween.tween_property(player, "global_position", land, MANTLE_SECONDS * 0.4)
+		tween.tween_callback(func() -> void: mantling = false)
+		WorldHistory.record_event("drains_climbed_out", {"rise": snappedf(rise, 0.01)})
+		return "climb"
+	player.velocity.y = JUMP_SPEED
+	return "jump"
 
 
 func _physics_process(delta: float) -> void:
+	if mantling:
+		camera.rotation = Vector3(pitch, 0, 0)
+		_update_hud()
+		return
 	var input := Vector3(Input.get_axis("move_left", "move_right"), 0.0, Input.get_axis("move_forward", "move_back"))
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
 	var creeping := Input.is_action_pressed("crouch")
@@ -361,7 +407,10 @@ func _physics_process(delta: float) -> void:
 	camera.position.y = move_toward(camera.position.y, 0.3 if creeping else 0.77, delta * 3.0)
 	player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
 	player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
-	player.velocity.y = -2.0 if player.is_on_floor() else player.velocity.y - 18.0 * delta
+	if player.is_on_floor() and player.velocity.y > 0.0:
+		pass  # a jump just left the ground this frame
+	else:
+		player.velocity.y = -2.0 if player.is_on_floor() else player.velocity.y - 18.0 * delta
 	player.move_and_slide()
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
@@ -439,4 +488,4 @@ func _update_hud() -> void:
 	elif district_timer > 0.0:
 		prompt.text = str(DISTRICT_LABELS.get(district, ""))
 	else:
-		prompt.text = "WASD MOVE   //   CTRL CREEP, IT HUNTS BY SOUND   //   E INTERACT" + ("   //   LMB DISCHARGE THE BREACH TOOL" if VatRebirth.carries("BREACH TOOL") else "")
+		prompt.text = "WASD MOVE   //   SPACE JUMP / CLIMB   //   CTRL CREEP, IT HUNTS BY SOUND   //   E INTERACT" + ("   //   LMB DISCHARGE THE BREACH TOOL" if VatRebirth.carries("BREACH TOOL") else "")

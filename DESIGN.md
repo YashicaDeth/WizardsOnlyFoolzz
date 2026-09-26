@@ -1106,3 +1106,21 @@ World rules; realm identity and transition rules; what persists across realms; d
 - User's shared conversation: https://chatgpt.com/share/6aa02558-6538-83ec-8ddc-96f57f5ba58d
 - Clarifications and references in the current Codex conversation.
 - HAVKER-MAN X developer description: https://store.steampowered.com/app/3645540/HAVKERMAN_X/
+
+- **Camera signals and the vision modes (Greg, 26 September).** "The blue CCTV
+  camera things are not it, make it send invisible signals that you can only
+  see in those special K and J modes." Question boxes, same day:
+  - **K = wizard eyes**, a toggle. **J = depth / X-ray scan**, held. The phone's
+    camera vision shows the signals too. Both modes unlock at the brain hack.
+  - **They reveal** camera signals, spirits (wizard eyes), bodies through walls
+    (depth), hidden things (secret doors, stashes, weak walls), and wires and
+    power.
+  - **Cost:** free, but the view degrades the longer you stay in.
+  - **Wizard eyes look** like the wizard eyes in Adventure Time's Ice King
+    episodes (Greg's reference; the art is original, not copied).
+  - **Detection:** only hacked cameras notice you using the modes.
+  - **Hunt keys move:** inventory to Tab; re-decant to holding K.
+- **The drains:** SPACE jumps, and climbs out of the channel and the cistern
+  onto a ledge up to 1.5 m ("you can't jump out of here, it's dumb").
+- **Art is placeholder until Greg's own:** curated Higgsfield pieces stand in
+  where they fit; everything is replaced when Greg's art lands.
