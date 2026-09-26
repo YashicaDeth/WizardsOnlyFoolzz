@@ -1120,6 +1120,10 @@ World rules; realm identity and transition rules; what persists across realms; d
     episodes (Greg's reference; the art is original, not copied).
   - **Detection:** only hacked cameras notice you using the modes.
   - **Hunt keys move:** inventory to Tab; re-decant to holding K.
+- **Performance (Greg, 26 September):** asked for "60 fps to 160 fps". After
+  the performance pass, build `a866957` reads about 160 fps on the F10 counter
+  everywhere (vat room, Support Unit, sewers, Hunt, menu) on his NVIDIA RTX at
+  144 Hz+. Hold that as the floor for new work on his machine.
 - **The drains:** SPACE jumps, and climbs out of the channel and the cistern
   onto a ledge up to 1.5 m ("you can't jump out of here, it's dumb").
 - **Art is placeholder until Greg's own:** curated Higgsfield pieces stand in

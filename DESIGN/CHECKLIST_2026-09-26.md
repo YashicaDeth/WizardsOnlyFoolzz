@@ -21,10 +21,10 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [x] Hunt world bookkeeping at 4 times a second instead of 60 (2.1 ms → off the table).
 - [x] Hunt script cost: 7.3 ms → 3.5 ms per physics tick.
 - [x] Checked by eye: the lab renders the same after the cuts.
-- [ ] **(Greg)** Press F10 in the build and read the FPS in the vat room, Support Unit, drains and Hunt.
+- [x] **(Greg)** F10 on build `a866957`: about 160 fps in the vat room, Support Unit, sewers, Hunt and menu (NVIDIA RTX, 144 Hz+).
 - [ ] **(Greg)** Press F11 anywhere it drops under 60 and send the dump file next to the exe.
 - [ ] **(Greg)** Check whether VSync is on in Settings. VSync locks fps to your monitor's refresh (60, 144 or 165).
-- [ ] **(Greg)** Tell me your GPU and monitor refresh rate.
+- [x] **(Greg)** GPU and refresh: NVIDIA RTX, 144 Hz+.
 - [ ] Merge the vat room's static props into fewer draw calls (1,146). Parked until Greg's F10 numbers: each prop's material is deliberately unique, so merging changes the look, and 1,146 calls is about 1 ms on a real GPU.
 - [ ] Hunt: `_update_encounter_actors` is now the biggest script cost (1.3 ms).
 - [ ] Hunt HUD redraw (0.6 ms) should only redraw on change.
