@@ -45,8 +45,10 @@ const GRADES := {
 	# saturation 0.6; the colour is in the vat glow and the checker floor.
 	# The game measured a pastel median of 90, saturation 0.26.
 	"growing_floor": {
-		"black_point": 0.06, "gamma": 1.2, "exposure": 0.92, "saturation": 1.08,
-		"shadow_balance": Color(0.47, 0.52, 0.49), "mid_balance": Color(0.6, 0.47, 0.45),
+		# Greg, 26 September: darker, red only in the glow. Mids were pushed
+		# red here, which reddened the whole room; now neutral.
+		"black_point": 0.07, "gamma": 1.25, "exposure": 0.8, "saturation": 0.72,
+		"shadow_balance": Color(0.47, 0.52, 0.49), "mid_balance": Color(0.5, 0.5, 0.49),
 		"high_balance": Color(0.56, 0.53, 0.47), "balance_amount": 0.4,
 	},
 	# Support Unit hallways. Ref: the concrete hall with two guards. Median 15,

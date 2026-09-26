@@ -202,10 +202,13 @@ const PRESETS := {
 	# median of 90/255 under 0.02 violet fog -- the same wash `front_door` and
 	# `lower_works` above were cut loose from. Dark red-brown air at under half
 	# the density, so the lamps and the tank do the colouring.
+	# Greg, 26 September: the vat room "darker, red only in the glow". The sky
+	# and fog were blood-brown, which tinted every surface red; now they are
+	# near-neutral black, and the red comes only from the vat's own light.
 	"growing_floor": {
-		"zenith": "060404", "horizon": "1e0c0a", "ground": "0c0606",
-		"fog": "2a110d", "fog_density": 0.009, "volumetric": 0.012,
-		"ambient": 0.42, "saturation": 1.0, "contrast": 1.22, "exposure": 1.0,
+		"zenith": "050505", "horizon": "121010", "ground": "080707",
+		"fog": "151312", "fog_density": 0.009, "volumetric": 0.012,
+		"ambient": 0.24, "saturation": 1.0, "contrast": 1.22, "exposure": 0.95,
 	},
 	# The old drains (the brick drain and the bingyanger renders): wet brick
 	# under green-brown air, not the sodium orange the lamps pushed them to.

@@ -597,8 +597,10 @@ func _build_vat() -> void:
 
 	var glow := OmniLight3D.new()
 	glow.position = VAT_POSITION + Vector3(0, 2.85, 0)
-	glow.light_color = Color("b22a19")
-	glow.light_energy = 3.4
+	# The one red in the room (Greg, 26 September), pushed to hold its colour
+	# through the lower saturation of the grade.
+	glow.light_color = Color("c4180c")
+	glow.light_energy = 4.6
 	glow.omni_range = 6.0
 	add_child(glow)
 
@@ -721,8 +723,9 @@ func _build_chamber() -> void:
 
 		var strip := OmniLight3D.new()
 		strip.position = Vector3(0, 3.8, z)
-		strip.light_color = Color("7fbf95") if bay % 3 else Color("c0703a")
-		strip.light_energy = 1.5
+		# Cold and low: red belongs to the vat's glow alone (Greg, 26 September).
+		strip.light_color = Color("7fbf95") if bay % 3 else Color("a8b4a4")
+		strip.light_energy = 1.0
 		strip.omni_range = 6.5
 		add_child(strip)
 		strip_lights.append(strip)
@@ -763,8 +766,8 @@ func _build_chamber() -> void:
 	add_child(sign)
 	var exit_glow := OmniLight3D.new()
 	exit_glow.position = Vector3(0, 1.2, -AISLE_LENGTH + 2.6)
-	exit_glow.light_color = Color("ff8f3c")
-	exit_glow.light_energy = 5.5
+	exit_glow.light_color = Color("e2d6bc")
+	exit_glow.light_energy = 3.6
 	exit_glow.omni_range = 8.0
 	add_child(exit_glow)
 

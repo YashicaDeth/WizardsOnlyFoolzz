@@ -48,7 +48,8 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [x] The watchers replace the static hung cameras.
 - [ ] The examiner model from the M1 sheet.
 - [ ] Real-mic V, the New Vegas intake (from the opening vision).
-- [ ] Vat room darker, red only in the glow (coordinate with the HouseLook lane).
+- [x] Vat room darker, red only in the glow: neutral black sky and fog, lower ambient, a desaturated grade (a data-only change to HouseLook's vat-room entry), a neutral exit light, a stronger red vat glow. The red checker floor and the pillars keep their own texture colour.
+- [ ] **(Greg)** Is the vat room dark enough, or too dark?
 - [ ] Every opening overlay tested in the real route, not only in the test scenes.
 - [ ] A timed run through minutes 0 to 30 with nothing skipped.
 
