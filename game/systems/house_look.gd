@@ -71,28 +71,43 @@ const GRADES := {
 	},
 	# Derby tunnels. Ref: the driver's view down the sodium-lit bore. Median
 	# 47, bone-white highlights (e5dabf) off orange lamps, saturation 0.39.
+	# NOT YET MEASURED AGAINST THAT: the only capture of this area shoots from
+	# the spawn apron outside the mouth, where the ground is unlit black, so the
+	# frame's median is a property of where the camera stands and not of the
+	# grade. A 2.3 exposure was tried against that number and reverted -- it
+	# brightens nothing that matters and clips the lamps. Re-shoot from inside
+	# the bore before touching these values.
 	"derby_tunnels": {
 		"black_point": 0.03, "saturation": 0.78,
 		"mid_balance": Color(0.55, 0.5, 0.45), "high_balance": Color(0.54, 0.52, 0.47),
 	},
 	# The derby pit. Ref: the floodlit arena. 62% near black, warm white
-	# floodlight highlights, saturation 0.33.
+	# floodlight highlights, saturation 0.33. The first look measured 0.62
+	# saturation against that 0.33: the whole pit was pink, so the floodlight
+	# had no grey to be warm against, and the median of 10 said it was still
+	# too dark to read the track.
 	"rift_derby": {
-		"black_point": 0.05, "gamma": 1.2, "saturation": 0.65,
+		"black_point": 0.05, "gamma": 1.1, "exposure": 1.3, "saturation": 0.5,
 		"high_balance": Color(0.54, 0.52, 0.49),
 	},
 	# The dry falls. Ref: blood from the outfall pipe down the gorge. Grey-
 	# brown rock (351c1b mids), saturation 0.33, with the blood the only
-	# saturated thing.
+	# saturated thing. The first look measured 0.77: the rock had taken the
+	# blood's colour too, so the one saturated thing in the frame stopped being
+	# the blood.
 	"blood_waterfall_exit": {
-		"black_point": 0.03, "saturation": 0.72,
+		"black_point": 0.03, "exposure": 1.1, "saturation": 0.45,
 		"mid_balance": Color(0.53, 0.49, 0.48), "high_balance": Color(0.5, 0.5, 0.5),
 	},
 	# The surface. Refs: the ruined town under the black sphere and the
 	# bingyanga on the cracked flats. Median 81-106, only 11-12% near black,
 	# khaki mids (72654a), yellowed highlights (a59c6f), saturation 0.32.
+	# The first look measured a median of 29 at saturation 0.55: the ashbloom
+	# flats were coming back as another night scene with a colour cast, when
+	# every surface concept is the one bright, bleached, near-grey place in the
+	# game. It is the only area whose grade lifts rather than crushes.
 	"ashbloom": {
-		"black_point": 0.0, "gamma": 0.97, "saturation": 0.68,
+		"black_point": 0.0, "gamma": 0.78, "exposure": 1.75, "saturation": 0.48,
 		"shadow_balance": Color(0.51, 0.5, 0.48), "mid_balance": Color(0.53, 0.51, 0.45),
 		"high_balance": Color(0.54, 0.53, 0.44),
 	},
