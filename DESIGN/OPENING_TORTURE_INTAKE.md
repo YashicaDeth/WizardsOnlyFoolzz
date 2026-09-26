@@ -173,6 +173,8 @@ Greg, 25 September (third message), in order:
    - **Exists:** the wires beat (tugs), the glass break, the puddle, and the
      stand-up.
 8. Then you play: the paths out we've built. Keep building from there.
+- **Built (25 September):** `systems/breakout_sequence.gd`. His door shuts, the screaming starts, the rune (seal and Algiz, ember cracks, dripping) grows until it fills your view, shrinks into a die with copper traces and pads, an acid-green path races through it under CRT tracking boxes, and the END ALL SUFFERING-style card reads BRAIN HACKED SOUL OVERTAKEN (F skips). The tank then fails and the wires beat runs as before. After GET REVENGE your hands come up; E rips the cord out of your mouth; E or a click hits the glass, cracks spread, and the third blow breaks it. Test: `breakout_sequence_test`; `opening_handoff_test` plays the whole live route through it.
+- **Open, for Greg:** in your order the liquid pours out after the glass breaks. The tank still drains first (the wires beat, 24 September, happens in the drained tank), so the fluid left at the break is shallow. Say if the drain should wait for the third blow.
 
 ### 11. The rooms, the cameras and the X-ray
 - **Fix every placeholder model:** a room still has a "bean" (a capsule

@@ -30,6 +30,8 @@ extends Node
 ## enough to read (Greg: the text went by too fast), not a flat three seconds.
 const HANDOFF_BUDGET := 75.0
 
+const BREAKOUT := preload("res://systems/breakout_sequence.gd")
+
 var failures: Array[String] = []
 var opening: Node
 
@@ -52,6 +54,8 @@ func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		get_tree().quit(2)
 		return
+	# The whole live route, the breakout included (Greg, 25 September).
+	BREAKOUT.force_in_tests = true
 	WorldHistory.clear_history()
 	opening = load("res://vat_chamber.tscn").instantiate()
 	add_child(opening)
@@ -110,6 +114,12 @@ func _ready() -> void:
 	while not opening.can_move and elapsed < HANDOFF_BUDGET:
 		await get_tree().physics_frame
 		elapsed += get_physics_process_delta_time()
+		# After GET REVENGE: E rips the cord out, then three blows on the glass.
+		if opening.phase in ["cord", "smash"] and Engine.get_physics_frames() % 20 == 0:
+			var hit := InputEventKey.new()
+			hit.keycode = KEY_E
+			hit.pressed = true
+			opening._unhandled_input(hit)
 		# Hanging in the wires, the player looks at one and presses E.
 		if opening.phase == "wired" and not opening.umbilicals.is_empty():
 			var cable: Node3D = opening.umbilicals[0]

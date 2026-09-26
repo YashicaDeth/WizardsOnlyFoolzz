@@ -23,6 +23,7 @@ const IMPLANT_CATALOG := preload("res://systems/implant_catalog.gd")
 const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const TORTURE_LOAD_IN := preload("res://systems/torture_load_in.gd")
 const INTAKE_WATCHERS := preload("res://systems/intake_watchers.gd")
+const BREAKOUT_SEQUENCE := preload("res://systems/breakout_sequence.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const BRAIN_INDEX := preload("res://systems/brain_index.gd")
@@ -69,6 +70,8 @@ var intake: Control
 var load_in: Control
 ## The Growing Floor's wall cameras; they close in on "I'm being watched too".
 var watchers: Node3D
+## Greg's breakout (beat 10): the brain hack, the cord, the three blows.
+var breakout: Control
 var opening_audio: Node
 var fluid: MeshInstance3D
 var vat_glass: MeshInstance3D
@@ -232,6 +235,11 @@ func _ready() -> void:
 	osd.visible = intake == null
 	opening_audio = OPENING_AUDIO.new()
 	add_child(opening_audio)
+	breakout = BREAKOUT_SEQUENCE.new()
+	$HUD.add_child(breakout)
+	breakout.connect("hack_finished", _on_hack_finished)
+	breakout.connect("cord_ripped", _on_cord_ripped)
+	breakout.connect("glass_hit", _on_glass_hit)
 	if load_in != null:
 		# Over everything the HUD built after it, the body-cam included.
 		$HUD.move_child(load_in, -1)
@@ -1014,6 +1022,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		if tank >= 0:
 			vat_smash.strike(tank, doctor_route.held_weapon() if doctor_route != null else "")
 			return
+	if phase == "hacked" and event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_F, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+		breakout.call("skip_hack")
+		get_viewport().set_input_as_handled()
+		return
+	var act: bool = (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E) or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT)
+	if act and phase == "cord":
+		breakout.call("rip_cord")
+		return
+	if act and phase == "smash":
+		breakout.call("hit_glass")
+		return
 	if doctor_route != null and doctor_route.handle_input(event):
 		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
@@ -1039,6 +1058,19 @@ func _physics_process(delta: float) -> void:
 		if load_in != null:
 			return
 		_update_arrival(delta)
+		return
+	# The hack draws itself; the body just hangs in the fluid under it.
+	if phase == "hacked":
+		camera.rotation = Vector3(-0.1 + sin(Time.get_ticks_msec() * 0.0007) * 0.03, 0, 0)
+		_update_hud()
+		return
+	# Your hands and the glass: still hanging, still able to look.
+	if phase == "cord" or phase == "smash":
+		jolt = maxf(0.0, jolt - delta * 3.0)
+		player.rotation.y = yaw
+		camera.rotation = Vector3(pitch, 0, sin(Time.get_ticks_msec() * 0.04) * 0.05 * jolt)
+		_update_shards(delta)
+		_update_hud()
 		return
 	# Departure runs on its own clock so the vat's beat table keeps the timings
 	# it was tuned with instead of every entry needing a +4.4 offset.
@@ -1235,11 +1267,49 @@ func _update_departure(delta: float) -> void:
 		camera.rotation.x = -0.1 + sin(departure_clock * 0.7) * 0.03
 
 	if departure_clock >= DEPARTURE_SECONDS:
-		phase = "submerged"
-		clock = 0.0
-		line_index = -1
 		subtitle.text = ""
 		WorldHistory.record_event("opening_examiner_departed", {"location": "growing_floor"})
+		# Greg: he leaves, the screaming starts, and the sigil takes your brain.
+		if BREAKOUT_SEQUENCE.wanted():
+			phase = "hacked"
+			breakout.call("begin_hack")
+		else:
+			phase = "submerged"
+			clock = 0.0
+			line_index = -1
+
+
+## BRAIN HACKED / SOUL OVERTAKEN on the END ALL SUFFERING card, and the tank
+## starts to fail under it.
+func _on_hack_finished(_skipped: bool) -> void:
+	mission_card.play("brain_hacked", "BRAIN HACKED SOUL OVERTAKEN", BREAKOUT_SEQUENCE.CARD_SECONDS)
+	phase = "submerged"
+	clock = 0.0
+	line_index = -1
+
+
+## After GET REVENGE: your hands, and the cord in your mouth.
+func _begin_cord() -> void:
+	phase = "cord"
+	title.visible = false
+	breakout.call("begin_cord")
+
+
+func _on_cord_ripped() -> void:
+	anatomy.call("apply_hit", "head", 4.0, 0.0, "shear")
+	PLAYER_ACTION_LEDGER.record("opening_cord_ripped", {"tank": "0C-7"})
+	phase = "smash"
+	breakout.call("begin_smash")
+
+
+## Three blows. The first two crack it; the third takes it out.
+func _on_glass_hit(blow: int) -> void:
+	jolt = 1.0
+	breach_shake = 0.25 * blow
+	anatomy.call("apply_hit", "right_arm", 2.0, 0.0, "blunt")
+	WorldHistory.record_event("opening_glass_hit", {"blow": blow})
+	if blow >= BREAKOUT_SEQUENCE.BLOWS:
+		_breach()
 
 
 func _update_beats() -> void:
@@ -1334,7 +1404,10 @@ func _update_wired(delta: float) -> void:
 		return
 	title.modulate.a = 1.0
 	if wired_clock - revenge_at >= REVENGE_HOLD:
-		_breach()
+		if BREAKOUT_SEQUENCE.wanted():
+			_begin_cord()
+		else:
+			_breach()
 
 
 ## The wire nearest the centre of view, or null when none is being looked at.
