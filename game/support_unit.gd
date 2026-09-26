@@ -1,4 +1,5 @@
 extends Node3D
+const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
 const LOOK := preload("res://systems/look_settings.gd")
 
 ## THE MENTAL AND PHYSICAL SUPPORT UNIT, after the elevator down (Greg, 24
@@ -650,6 +651,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.15, 0.95)
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		interact()
+	# Greg, 26 September: jump and climb everywhere.
+	if not died and JUMP_CLIMB.is_jump_key(event):
+		JUMP_CLIMB.press(player, yaw, 1.0, "support_unit_climbed")
 
 
 func eye() -> Vector3:
@@ -781,6 +785,9 @@ func _physics_process(delta: float) -> void:
 
 
 func _move(delta: float) -> void:
+	if JUMP_CLIMB.busy(player):
+		camera.rotation = Vector3(pitch, 0, 0)
+		return
 	var input := Vector3(Input.get_axis("move_left", "move_right"), 0.0, Input.get_axis("move_forward", "move_back"))
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
 	var creeping := Input.is_action_pressed("crouch")
@@ -789,7 +796,7 @@ func _move(delta: float) -> void:
 	camera.position.y = move_toward(camera.position.y, 0.3 if creeping else 0.77, delta * 3.0)
 	player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
 	player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
-	player.velocity.y = -2.0 if player.is_on_floor() else player.velocity.y - 18.0 * delta
+	JUMP_CLIMB.fall(player, delta)
 	player.move_and_slide()
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)

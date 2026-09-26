@@ -24,6 +24,7 @@ const VAT_INTAKE := preload("res://systems/vat_intake.gd")
 const TORTURE_LOAD_IN := preload("res://systems/torture_load_in.gd")
 const INTAKE_WATCHERS := preload("res://systems/intake_watchers.gd")
 const BRAIN_HACK := preload("res://systems/brain_hack.gd")
+const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
 const SIGNAL_SIGHT := preload("res://systems/signal_sight.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
@@ -1067,6 +1068,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if phase == "smash" and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		strike_glass()
 		return
+	# Greg, 26 September: jump and climb everywhere. Only once he's on his
+	# feet; SPACE belongs to the scripted beats before that.
+	if can_move and JUMP_CLIMB.is_jump_key(event):
+		JUMP_CLIMB.press(player, yaw, float(anatomy.call("mobility_ratio")), "vat_room_climbed")
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		if phase == "wired":
 			_tug_wire(_aimed_wire())
@@ -1808,6 +1813,9 @@ func _update_shards(delta: float) -> void:
 
 
 func _update_movement(delta: float) -> void:
+	if JUMP_CLIMB.busy(player):
+		camera.rotation = Vector3(pitch, 0, 0)
+		return
 	var input := Vector3(
 		Input.get_axis("move_left", "move_right"),
 		0.0,
@@ -1817,7 +1825,7 @@ func _update_movement(delta: float) -> void:
 	var speed := 2.7 * float(anatomy.call("mobility_ratio"))
 	player.velocity.x = move_toward(player.velocity.x, direction.x * speed, 14.0 * delta)
 	player.velocity.z = move_toward(player.velocity.z, direction.z * speed, 14.0 * delta)
-	player.velocity.y = -2.0 if player.is_on_floor() else player.velocity.y - 18.0 * delta
+	JUMP_CLIMB.fall(player, delta)
 	player.move_and_slide()
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)

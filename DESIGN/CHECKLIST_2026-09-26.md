@@ -25,7 +25,7 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [ ] **(Greg)** Press F11 anywhere it drops under 60 and send the dump file next to the exe.
 - [ ] **(Greg)** Check whether VSync is on in Settings. VSync locks fps to your monitor's refresh (60, 144 or 165).
 - [ ] **(Greg)** Tell me your GPU and monitor refresh rate.
-- [ ] Merge the vat room's static props into fewer draw calls (1,146 is the next biggest cost).
+- [ ] Merge the vat room's static props into fewer draw calls (1,146). Parked until Greg's F10 numbers: each prop's material is deliberately unique, so merging changes the look, and 1,146 calls is about 1 ms on a real GPU.
 - [ ] Hunt: `_update_encounter_actors` is now the biggest script cost (1.3 ms).
 - [ ] Hunt HUD redraw (0.6 ms) should only redraw on change.
 - [ ] Hunt: 98 lights. Cull the far ones by distance.
@@ -75,13 +75,14 @@ still open. **(Greg)** marks something only Greg can do or decide.
 ## Jump and climb everywhere
 
 - [x] Drains: SPACE jumps, climbs out of the channel and the cistern.
-- [ ] Vat chamber aisle.
-- [ ] Support Unit.
+- [x] Vat chamber (once you are on your feet; a body fresh out of the tank jumps weakly).
+- [x] Support Unit.
 - [ ] Service Arcade.
-- [ ] Lower Works.
+- [x] Lower Works (already had a jump).
 - [ ] The Hunt.
-- [ ] One shared jump/climb component instead of per-scene code.
-- [ ] A climb test per scene.
+- [x] One shared jump/climb component (`JumpClimb`); the drains use it too.
+- [x] A climb test on a built stage (`jump_climb_test`), plus the drains climb test.
+- [ ] Lower Works: ledge climbing (it jumps but does not haul up yet).
 
 ## Art and look
 
