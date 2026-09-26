@@ -55,6 +55,8 @@ func _ready() -> void:
 		check(said.has(str(beat.line)), "he says: %s" % str(beat.line).left(40))
 	check(said.find(str(DoctorExamination.OPENING[0].line)) < said.find(str(DoctorExamination.OPENING[2].line)), "in order")
 	check(watched_at > 0.0, "\"I'm being watched too\" turns the cameras on you")
+	var scan: Control = vat.watchers.scan
+	check(scan != null and scan.size.x > 100.0 and scan.size.y > 100.0, "the depth scan covers the screen, not 0x0 (%s)" % (str(scan.size) if scan != null else "none"))
 	for i in 60:
 		vat.watchers._process(0.05)
 	check(vat.watchers.zoom_amount() > 0.95, "every lens barrel runs out (%.2f)" % vat.watchers.zoom_amount())

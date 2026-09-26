@@ -780,23 +780,34 @@ func _draw_form_header(rect: Rect2, ink: Color) -> void:
 	CellOutzType.draw_stamped(self, Vector2(26, 46), "NEURAL INTAKE", 20.0, ink, HOT * Color(1, 1, 1, 0.32), 1.6)
 	CellOutzType.draw_condensed(self, Vector2(26, 72), Branding.copy_for("intake", "header"), 9.0, ink * Color(1, 1, 1, 0.6), 0.7)
 
-	# Page tabs along the top of the paper.
+	# Page tabs along the top of the paper. Eight tabs no longer fit at the
+	# old size, so the row shrinks until the last one (STYLE) is on the paper.
 	var tab_x := 26.0
+	var tab_size := 10.0
+	var tab_pad := 16.0
+	var room := rect.size.x - 52.0
+	var needed := 0.0
+	for label in PAGES:
+		needed += CellOutzType.width_condensed(str(label), 10.0, 0.8) + 16.0 + 12.0 + 6.0
+	if needed > room:
+		var squeeze := room / needed
+		tab_size = 10.0 * squeeze
+		tab_pad = 16.0 * squeeze
 	for index in PAGES.size():
 		var label: String = PAGES[index]
-		var width := CellOutzType.width_condensed(label, 10.0, 0.8) + 16.0
+		var width := CellOutzType.width_condensed(label, tab_size, 0.8) + tab_pad
 		var confirmed := touched_pages.has(index)
 		width += 12.0 if confirmed else 0.0
 		_tab_hits.append(Rect2(Vector2(tab_x - 5, 82), Vector2(width, 24)))
 		if index == page:
 			draw_rect(Rect2(Vector2(tab_x - 5, 86), Vector2(width, 18)), HOT * Color(1, 1, 1, 0.16))
 			draw_line(Vector2(tab_x - 5, 104), Vector2(tab_x - 5 + width, 104), HOT, 1.6)
-		CellOutzType.draw_condensed(self, Vector2(tab_x, 90), label, 10.0, ink * Color(1, 1, 1, 1.0 if index == page else 0.45), 0.8)
+		CellOutzType.draw_condensed(self, Vector2(tab_x, 90), label, tab_size, ink * Color(1, 1, 1, 1.0 if index == page else 0.45), 0.8)
 		if confirmed:
 			var tick := Vector2(tab_x + width - 18, 91)
 			draw_line(tick + Vector2(0, 4), tick + Vector2(3, 8), MOSS, 2.0)
 			draw_line(tick + Vector2(3, 8), tick + Vector2(9, 0), MOSS, 2.0)
-		tab_x += width + 6.0
+		tab_x += width + 6.0 * tab_size / 10.0
 
 
 func _update_gauges(delta: float) -> void:
@@ -917,7 +928,7 @@ func _draw_styles(_rect: Rect2, ink: Color, y: float) -> void:
 		var first := BloodTrees.first_node(style_id)
 		var node: Dictionary = BloodTrees.NODES.get(first, {})
 		CellOutzType.draw_condensed(self, Vector2(64, y + 6), ("OPENS %s  //  %s" % [str(node.get("label", "")), str(node.get("effect", ""))]).left(58), 7.0, ink * Color(1, 1, 1, 0.5), 0.6)
-		CellOutzType.draw_condensed(self, Vector2(330, y - 8), "HOLDING  %s" % BloodTrees.weapon_label(BloodTrees.starting_weapon(style_id)), 8.0, tone * Color(1, 1, 1, 0.9), 0.7)
+		CellOutzType.draw_condensed(self, Vector2(330, y - 4), "HOLDING  %s" % BloodTrees.weapon_label(BloodTrees.starting_weapon(style_id)), 8.0, tone * Color(1, 1, 1, 0.9), 0.7)
 		y += 36.0
 
 

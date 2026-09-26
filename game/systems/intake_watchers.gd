@@ -68,9 +68,11 @@ func close_in(hud: Control, eye: Camera3D) -> void:
 		scan = Control.new()
 		scan.name = "WatcherScan"
 		scan.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		scan.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		scan.draw.connect(_draw_scan)
+		# Sized after it is in the tree: a preset applied to a Control with no
+		# parent yet resolves against nothing and leaves it 0x0, invisible.
 		hud.add_child(scan)
+		scan.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	WorldHistory.record_event("intake_cameras_closed_in", {"cameras": cameras.size(), "place": "growing_floor"})
 
 
