@@ -325,3 +325,20 @@ smallest playable version first.
 - The sky agency.
 - How humiliating the jester outfit is.
 - The map glitching (Walkthrough 2).
+- **The anatomy X-ray: buy the one good model, or assemble from NIH 3D.** The
+  full list, with licences checked on each model's own page, is in
+  `DESIGN/ANATOMY_ASSETS.md`. One asset is a paid Sketchfab Store product and
+  would be much faster; the recommendation is to assemble it inside the rule
+  instead, and that is Greg's call.
+
+## K. For the Dust page — anatomy assets
+
+Section K, not I: `opencode/base-model-kit` adds section I and
+`opencode/depth-mode-environment` adds section J, so this branch uses its own
+heading and all three can merge. Copy all of them across.
+
+| Done | What | Proof |
+|---|---|---|
+| 26 Sep | **The anatomy asset list is written, with licences checked rather than assumed.** `DESIGN/ANATOMY_ASSETS.md` says what to drop into `P:\GameDev\Incoming\anatomy`, in what structure, and what the game needs each asset for. Nothing was downloaded. | Every licence was read on the model's own page. One is cleared: projectkaizen's Male Skeleton, CC Attribution, 67.5k tris, rigged, labelled bones. The recommended organ source is NIH 3D, whose licence is per model and has to be checked per model. |
+| 26 Sep | **Three plausible-looking models are ruled out, with the reason each.** Two have no licence line and no download button, so there is nothing to attribute. One is a **paid** Sketchfab Store product. | Search results present all three as free community models. A missing licence is not a permissive one, and the paid one is titled "Buy Royalty Free 3D model" on the Store, not the community. |
+| Open | **Greg's decision:** buy the paid all-in-one anatomy model (much faster, breaks the CC-BY-only rule visibly), or assemble from NIH 3D and projectkaizen (stays inside the rule, more work). Recommendation is to assemble. | Also on the ledger as a question, not a decision taken. |
