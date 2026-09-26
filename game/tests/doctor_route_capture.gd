@@ -17,8 +17,16 @@ func _ready() -> void:
 	get_window().size = Vector2i(1280, 720)
 	WorldHistory.clear_history()
 	vat = load("res://vat_chamber.tscn").instantiate()
+	# This capture drives the automatic breach; the hands-on one has its own.
+	vat.hands_on_breakout = false
 	add_child(vat)
 	await get_tree().process_frame
+	# The load-in card owns the screen until it is dismissed; without this
+	# every frame below was the card on black.
+	if vat.load_in != null:
+		vat.load_in.skip()
+		for _frame in 3:
+			await get_tree().process_frame
 	vat.intake._finish_filing()
 	await get_tree().process_frame
 	vat.departure_clock = vat.DEPARTURE_SECONDS

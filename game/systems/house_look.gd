@@ -25,7 +25,10 @@ static var enabled := true
 
 ## Every grade starts from this and overrides what it needs.
 const BASE := {
-	"strength": 1.0, "pixel_size": 2.0, "levels": 26.0, "dither_strength": 1.0,
+	# Greg, 26 September: "subtler". Full resolution, and enough colour
+	# steps that the dither only shows where the image is a smooth ramp: fog,
+	# light falloff, the haze round a lamp.
+	"strength": 1.0, "pixel_size": 1.0, "levels": 40.0, "dither_strength": 1.0,
 	"black_point": 0.03, "gamma": 1.05, "exposure": 1.0, "saturation": 0.9,
 	"shadow_balance": Color(0.5, 0.5, 0.5), "mid_balance": Color(0.52, 0.5, 0.48),
 	"high_balance": Color(0.52, 0.51, 0.48), "balance_amount": 0.35,
@@ -93,6 +96,15 @@ const GRADES := {
 		"shadow_balance": Color(0.51, 0.5, 0.48), "mid_balance": Color(0.53, 0.51, 0.45),
 		"high_balance": Color(0.54, 0.53, 0.44),
 	},
+	# The doctor's office, inside the Growing Floor's scene (set as an area by
+	# DoctorRoute). Ref: the green CRT office with the axe and the lift.
+	# Median 62, 25% near black, olive mids (3a4125), pale green highlights
+	# (cae2ae), saturation 0.41.
+	"doctor_office": {
+		"black_point": 0.02, "gamma": 0.95, "exposure": 1.08, "saturation": 0.85,
+		"shadow_balance": Color(0.49, 0.51, 0.49), "mid_balance": Color(0.49, 0.54, 0.46),
+		"high_balance": Color(0.5, 0.55, 0.49),
+	},
 	# The title backdrop: graded lightly so the logo scene keeps its reds.
 	"front_door": {
 		"black_point": 0.02, "saturation": 1.0, "grain": 0.02,
@@ -102,6 +114,10 @@ const GRADES := {
 var rect: ColorRect
 var look: ShaderMaterial
 var current_key := ""
+## A part of a scene with its own light (the doctor's office inside the
+## Growing Floor) asks for its grade here; cleared on a scene change.
+var area_key := ""
+var _area_scene_id := 0
 
 
 func _ready() -> void:
@@ -131,6 +147,8 @@ func _process(_delta: float) -> void:
 ## environment preset), then the WorldLook preset the scene asked for.
 func key_for_screen() -> String:
 	var scene := get_tree().current_scene if is_inside_tree() else null
+	if not area_key.is_empty() and scene != null and scene.get_instance_id() == _area_scene_id and GRADES.has(area_key):
+		return area_key
 	if scene != null:
 		var candidates: Array[Node] = [scene]
 		candidates.append_array(scene.get_children())
@@ -141,6 +159,13 @@ func key_for_screen() -> String:
 	if GRADES.has(WorldLook.current_preset):
 		return WorldLook.current_preset
 	return "house"
+
+
+## Empty clears it.
+func set_area(key: String) -> void:
+	area_key = key
+	var scene := get_tree().current_scene if is_inside_tree() else null
+	_area_scene_id = scene.get_instance_id() if scene != null else 0
 
 
 static func grade_for(key: String) -> Dictionary:

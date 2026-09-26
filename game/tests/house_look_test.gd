@@ -44,6 +44,6 @@ func _ready() -> void:
 	check(look.current_key == "old_drains", "and the grade follows the screen on its own")
 	drains.queue_free()
 	var growing: Dictionary = look.grade_for("growing_floor")
-	check(float(growing.black_point) > float(look.BASE.black_point) and float(growing.pixel_size) == 2.0, "grades override the base and keep the rest")
+	check(float(growing.black_point) > float(look.BASE.black_point) and float(growing.pixel_size) == 1.0, "grades override the base and keep the rest")
 	print("HOUSE_LOOK_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

@@ -72,6 +72,7 @@ var held_axe: Node3D
 var carrying_axe := false
 var cooldown := 0.0
 var room_entered := false
+var _graded_as_office := false
 var last_hit: Dictionary = {}
 
 ## Set by a test to see the hand-off without leaving the scene.
@@ -255,6 +256,13 @@ func _physics_process(delta: float) -> void:
 		FacilityRoutes.traverse(ROOM_DISTRICT)
 		WorldHistory.record_event("doctor_route_room_entered", {"location": ROOM_DISTRICT})
 		chamber.subtitle.text = "HIS ROOM  //  THE GLASS HE WATCHED YOU THROUGH"
+	# His room has its own light, so its own grade (HouseLook).
+	var in_office := _in_room() or _in_car(true)
+	if in_office != _graded_as_office:
+		_graded_as_office = in_office
+		var look := get_node_or_null("/root/HouseLook")
+		if look != null:
+			look.set_area("doctor_office" if in_office else "")
 	_update_lift(delta)
 
 
@@ -589,8 +597,9 @@ func _axe_mesh() -> Node3D:
 	return axe
 
 
-## His room: the desk facing the glass, the monitor on the vat feed, a lamp.
-## Nothing else until Greg says what else is in it.
+## His room: the desk facing the glass, the monitor on the vat feed, a lamp,
+## and (Greg's office concept, 26 September) the rest of a working office:
+## see `_dress_room`.
 func _build_room() -> void:
 	var width := ROOM_X.y - ROOM_X.x
 	var centre_x := (ROOM_X.x + ROOM_X.y) * 0.5
@@ -667,6 +676,88 @@ func _build_room() -> void:
 	tube.mesh = tube_mesh
 	tube.position = lamp.position + Vector3(0, 0.25, 0)
 	add_child(tube)
+	# The tube is tired and green, not clinical white: the CRTs are what light
+	# this room.
+	lamp.light_color = Color("b9d3a6")
+	lamp.light_energy = 1.5
+	_dress_room()
+
+
+## What Greg's office concept (26 September) has in it, built from the game's
+## own boxes and surfaces rather than taken from the picture: a bank of green
+## CRTs on a steel bench with a keyboard, a corkboard of his notes above it,
+## filing cabinets by the lift, a gurney with an IV stand, and his blood on
+## the floor. All against the walls: the way from his door to the lift stays
+## clear. Placeholder geometry in the house palette, to swap for authored
+## props.
+func _dress_room() -> void:
+	var crt_green := Color("8bbd79")
+	# The bench along the left wall, halfway down the room.
+	var bench_at := Vector3(ROOM_X.x + 0.42, 0.0, 7.4)
+	_block(Vector3(0.8, 0.9, 2.2), bench_at + Vector3(0, 0.45, 0), _flat(Color("2c2a26")))
+	var crt_spots := [Vector3(0, 1.14, -0.55), Vector3(0, 1.14, 0.1), Vector3(0, 1.6, -0.22)]
+	for index in crt_spots.size():
+		var at: Vector3 = bench_at + crt_spots[index]
+		_block(Vector3(0.46, 0.44, 0.5), at, _flat(Color("9c9580")), false)
+		var glass := MeshInstance3D.new()
+		var glass_mesh := QuadMesh.new()
+		glass_mesh.size = Vector2(0.4, 0.3)
+		var glow := StandardMaterial3D.new()
+		glow.albedo_color = crt_green.darkened(0.55)
+		glow.emission_enabled = true
+		glow.emission = crt_green
+		glow.emission_energy_multiplier = 0.75 - 0.12 * index
+		glass_mesh.material = glow
+		glass.mesh = glass_mesh
+		# Facing into the room (+X).
+		glass.rotation_degrees.y = 90.0
+		glass.position = at + Vector3(0.24, 0.02, 0)
+		add_child(glass)
+	_block(Vector3(0.22, 0.03, 0.62), bench_at + Vector3(0.18, 0.915, 0.9), _flat(Color("3a3632")), false)
+	var screens := OmniLight3D.new()
+	screens.name = "CrtGlow"
+	screens.light_color = crt_green
+	screens.light_energy = 2.6
+	screens.omni_range = 4.2
+	screens.position = bench_at + Vector3(0.9, 1.3, -0.2)
+	add_child(screens)
+	# His notes above the bench.
+	var board_at := Vector3(ROOM_X.x + 0.04, 2.05, 7.4)
+	_block(Vector3(0.04, 0.8, 1.3), board_at, _flat(Color("4e3620")), false)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1316
+	for index in 6:
+		var note := _block(Vector3(0.01, 0.2 + rng.randf() * 0.1, 0.16 + rng.randf() * 0.08), board_at + Vector3(0.03, rng.randf_range(-0.25, 0.25), rng.randf_range(-0.5, 0.5)), _flat(Color("b9ab8a")), false)
+		note.rotation.x = rng.randf_range(-0.12, 0.12)
+	# Filing cabinets by the lift, on the right.
+	for index in 2:
+		var cabinet_at := Vector3(ROOM_X.y - 0.34, 0.0, ROOM_Z.y - 0.45 - 0.62 * index)
+		_block(Vector3(0.6, 1.32, 0.58), cabinet_at + Vector3(0, 0.66, 0), LabSurface.material("plate"))
+		for drawer in 4:
+			_block(Vector3(0.02, 0.03, 0.4), cabinet_at + Vector3(-0.31, 0.2 + 0.31 * drawer, 0), _flat(Color("1a1816")), false)
+	# The gurney along the right wall, and the drip beside it.
+	var gurney_at := Vector3(ROOM_X.y - 0.5, 0.0, 6.2)
+	_block(Vector3(0.8, 0.12, 1.9), gurney_at + Vector3(0, 0.68, 0), LabSurface.material("plate"))
+	_block(Vector3(0.72, 0.1, 1.8), gurney_at + Vector3(0, 0.79, 0), _flat(Color("6f675a")), false)
+	for corner in [Vector2(-0.34, -0.85), Vector2(0.34, -0.85), Vector2(-0.34, 0.85), Vector2(0.34, 0.85)]:
+		_block(Vector3(0.04, 0.62, 0.04), gurney_at + Vector3(corner.x, 0.31, corner.y), LabSurface.material("grime"), false)
+	var drip_at := gurney_at + Vector3(-0.55, 0.0, 1.15)
+	_block(Vector3(0.03, 1.9, 0.03), drip_at + Vector3(0, 0.95, 0), LabSurface.material("plate"), false)
+	var bag := _block(Vector3(0.16, 0.26, 0.05), drip_at + Vector3(0.1, 1.72, 0), _flat(Color("4a0c08"), 0.3), false)
+	bag.rotation.y = 0.3
+	# His blood, old: where he worked and where he lay.
+	for spot in [Vector3(-1.2, 0.012, 5.6), Vector3(3.2, 0.012, 6.6), Vector3(0.9, 0.012, 8.9)]:
+		var stain := _block(Vector3(0.5 + rng.randf() * 0.4, 0.004, 0.3 + rng.randf() * 0.3), spot, _flat(Color("1c0504"), 0.25), false)
+		stain.rotation.y = rng.randf() * TAU
+
+
+## A plain authored colour: the procedural paint grain reads as camouflage
+## under the CRT light at this size.
+func _flat(colour: Color, roughness := 0.85) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = colour
+	material.roughness = roughness
+	return material
 
 
 func _build_lift() -> void:

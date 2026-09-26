@@ -47,9 +47,9 @@ light and the haze):
 - **`HouseLook` (autoload) + `shaders/dust_to_bones_look.gdshader`.** A full
   screen pass on a CanvasLayer at -50, below every HUD, so the world is
   graded and text is not. It gives the world:
-  - a 2x coarse framebuffer (about 640x360 at 720p);
-  - 26 steps per channel with a 4x4 Bayer dither, the dither screen in every
-    kept render;
+  - full resolution (Greg chose "subtler" over a 2x or 3x framebuffer);
+  - 40 steps per channel with a 4x4 Bayer dither, so the dither screen from
+    the kept renders shows only in fog and light falloff;
   - a black point, a gamma and exposure, saturation;
   - shadow, mid and highlight colour balance;
   - stepped 12 fps grain and a vignette.
@@ -77,9 +77,9 @@ fraction of the frame near black, saturation):
 `WOF_LOOK=clean` turns the pass off for a session (before/after captures).
 `house_look_test` checks it is on, below the HUD, and picks each area's grade.
 
-## Open (Greg)
+## Answered (Greg, 26 September)
 
-- How chunky: the pixel size (2 now), and whether the dither should show more
-  or less.
-- Whether it is a setting the player can turn off.
-- The doctor's office and the lift shaft grades, and the surface once played.
+- Subtler: full resolution, dither only in fog and light falloff.
+- Not a setting: always on.
+- Tune next: the doctor's office, the heat lift shaft, the surface, the derby
+  and the falls.
