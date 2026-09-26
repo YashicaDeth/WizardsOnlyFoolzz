@@ -15,6 +15,10 @@ func _ready() -> void:
 	get_window().size = Vector2i(1280, 720)
 	var tree := get_tree()
 	await tree.process_frame
+	# A capture that cannot be written is not a capture. Godot will not create
+	# the directory, and this harness used to print CAPTURED either way, which
+	# is how a run can report three frames and leave nothing on disk.
+	DirAccess.make_dir_recursive_absolute(out_dir)
 
 	var hunt = HUNT.instantiate()
 	tree.root.add_child(hunt)
@@ -50,4 +54,18 @@ func _ready() -> void:
 	depth.save_png("%s/black_mirror_depth.png" % out_dir)
 	print("CAPTURED: %s/black_mirror_depth.png" % out_dir)
 
-	tree.quit()
+	# The case the environment fix is about: the phone lowered and raised again
+	# with the depth camera still selected. Nothing resets the mode, so this is
+	# ordinary play, and before the fix the night grade came back with it and
+	# was applied to a depth image that is meant to be neither graded nor
+	# tonemapped.
+	hunt._toggle_black_mirror()
+	hunt._toggle_black_mirror()
+	for _frame in 10:
+		await tree.process_frame
+	await RenderingServer.frame_post_draw
+	var depth_raised_again := get_viewport().get_texture().get_image()
+	var again_error := depth_raised_again.save_png("%s/black_mirror_depth_raised_again.png" % out_dir)
+	print("CAPTURED: " if again_error == OK else "CAPTURE_FAILED: ", "%s/black_mirror_depth_raised_again.png" % out_dir)
+
+	tree.quit(0 if again_error == OK else 1)

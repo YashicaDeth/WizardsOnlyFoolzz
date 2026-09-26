@@ -45,7 +45,6 @@ func bind(camera: Camera3D, environment: Environment) -> void:
 func set_active(enabled: bool) -> void:
 	active = enabled and float(sensor.battery) > 0.001
 	visible = active
-	_apply_mode()
 	if is_instance_valid(source_camera):
 		if active and source_environment != null:
 			sensor_environment = source_environment.duplicate(true)
@@ -56,6 +55,11 @@ func set_active(enabled: bool) -> void:
 			source_camera.environment = sensor_environment
 		else:
 			source_camera.environment = null
+	# Last, so that it has the last word on the camera's environment. Called
+	# before the block above, the night grade overwrote the flat depth
+	# environment every time the phone came back up in depth mode -- and nothing
+	# resets `mode`, so lowering and raising the phone is all it took.
+	_apply_mode()
 	if not active:
 		WorldHistory.amend_subject("mirror_power", {"kind": "device", "charge": sensor.battery})
 
