@@ -543,7 +543,7 @@ func _send_guard_to_check(lens: Node3D) -> void:
 	for guard in guards:
 		if guard.is_down():
 			continue
-		var distance := (guard.global_position - lens.global_position).length()
+		var distance: float = ((guard as Node3D).global_position - lens.global_position).length()
 		if distance < best:
 			best = distance
 			nearest = guard
