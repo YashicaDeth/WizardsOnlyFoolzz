@@ -1,5 +1,6 @@
 extends Node3D
 const LOOK := preload("res://systems/look_settings.gd")
+const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
 
 ## THE SERVICE ARCADE — the first real district after the Growing Floor.
 ## A short, original hub-and-spoke slice: the vat corridor opens into a tall
@@ -375,6 +376,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.15, 0.95)
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		_interact()
+	# Greg, 26 September: jump and climb everywhere.
+	if JUMP_CLIMB.is_jump_key(event):
+		JUMP_CLIMB.press(player, yaw, 1.0, "service_arcade_climbed")
 	# Greg (2026-09-24): the breach tool should be inspectable and should open
 	# doors, not only interrupt the sentinel further down.
 	if event is InputEventKey and not event.echo and event.keycode == KEY_I:
@@ -404,10 +408,12 @@ func _discharge_at_gate() -> bool:
 func _physics_process(delta: float) -> void:
 	var input := Vector3(Input.get_axis("move_left", "move_right"), 0.0, Input.get_axis("move_forward", "move_back"))
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
-	player.velocity.x = move_toward(player.velocity.x, direction.x * 3.4, 16.0 * delta)
-	player.velocity.z = move_toward(player.velocity.z, direction.z * 3.4, 16.0 * delta)
-	player.velocity.y = -2.0 if player.is_on_floor() else player.velocity.y - 18.0 * delta
-	player.move_and_slide()
+	# Mid-climb the haul owns the body; the gate check below still runs.
+	if not JUMP_CLIMB.busy(player):
+		player.velocity.x = move_toward(player.velocity.x, direction.x * 3.4, 16.0 * delta)
+		player.velocity.z = move_toward(player.velocity.z, direction.z * 3.4, 16.0 * delta)
+		JUMP_CLIMB.fall(player, delta)
+		player.move_and_slide()
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	# The arcade is a route, not a lockout puzzle. If the card was collected,

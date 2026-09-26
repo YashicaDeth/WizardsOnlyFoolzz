@@ -77,12 +77,12 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [x] Drains: SPACE jumps, climbs out of the channel and the cistern.
 - [x] Vat chamber (once you are on your feet; a body fresh out of the tank jumps weakly).
 - [x] Support Unit.
-- [ ] Service Arcade.
+- [x] Service Arcade.
 - [x] Lower Works (already had a jump).
-- [ ] The Hunt.
+- [x] The Hunt (it already had its own jump, vault, wall-run and climb).
 - [x] One shared jump/climb component (`JumpClimb`); the drains use it too.
 - [x] A climb test on a built stage (`jump_climb_test`), plus the drains climb test.
-- [ ] Lower Works: ledge climbing (it jumps but does not haul up yet).
+- [x] Lower Works: ledge climbing as well as its jump.
 
 ## Art and look
 

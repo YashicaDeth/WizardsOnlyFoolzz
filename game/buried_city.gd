@@ -1,4 +1,5 @@
 extends Node3D
+const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
 const LOOK := preload("res://systems/look_settings.gd")
 
 ## THE LOWER WORKS — the first piece of the buried city between the intake
@@ -603,17 +604,21 @@ func _physics_process(delta: float) -> void:
 	# follows them. `sprint` is already an action in the project; jump is Space,
 	# read directly the way every other key in this scene is.
 	var pace := WALK_SPEED * (SPRINT_SCALE if Input.is_action_pressed("sprint") else 1.0)
-	player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 17.0 * delta)
-	player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 17.0 * delta)
-	if player.is_on_floor():
-		# The downward bias keeps them on slopes rather than skipping off the
-		# ramps, so the jump has to be written after it rather than into it.
-		player.velocity.y = -2.0
-		if Input.is_key_pressed(KEY_SPACE):
-			player.velocity.y = JUMP_SPEED
-	else:
-		player.velocity.y -= 18.0 * delta
-	player.move_and_slide()
+	# Mid-climb the haul owns the body; the rest of the frame still runs.
+	if not JUMP_CLIMB.busy(player):
+		player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 17.0 * delta)
+		player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 17.0 * delta)
+		if player.is_on_floor():
+			# The downward bias keeps them on slopes rather than skipping off the
+			# ramps, so the jump has to be written after it rather than into it.
+			player.velocity.y = -2.0
+			if Input.is_key_pressed(KEY_SPACE):
+				# Greg, 26 September: climb as well as jump. A ledge up to chest
+				# height ahead is hauled onto; otherwise this is the same jump.
+				JUMP_CLIMB.press(player, yaw, JUMP_SPEED / JUMP_CLIMB.JUMP_SPEED, "lower_works_climbed")
+		else:
+			player.velocity.y -= 18.0 * delta
+		player.move_and_slide()
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	patrol_phase += delta
