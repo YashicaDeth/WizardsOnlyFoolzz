@@ -115,6 +115,7 @@ var sentinel_disable_reason := ""
 
 
 func _ready() -> void:
+	preload("res://systems/run_timer.gd").enter("lower_works")
 	var environment := WorldEnvironment.new()
 	# Not `ossuary`. It is mauve from zenith to ground and carries the densest
 	# fog of any preset in `world_look.gd`, and the note beside that preset

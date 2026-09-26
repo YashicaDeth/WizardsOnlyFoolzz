@@ -245,6 +245,10 @@ const DEPARTURE_BEATS := [
 
 
 func _ready() -> void:
+	# Greg, 26 September: minutes 0-30 are timed, hidden until you surface.
+	# A rebirth here mid-run carries on the same clock.
+	preload("res://systems/run_timer.gd").start()
+	preload("res://systems/run_timer.gd").enter("growing_floor")
 	$WorldEnvironment.environment = WorldLook.environment("growing_floor")
 	# The form itself already lays a translucent blood veil over the first shot.
 	# Leaving this at the old opaque value made the real examiner and laboratory

@@ -51,7 +51,8 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [x] Vat room darker, red only in the glow: neutral black sky and fog, lower ambient, a desaturated grade (a data-only change to HouseLook's vat-room entry), a neutral exit light, a stronger red vat glow. The red checker floor and the pillars keep their own texture colour.
 - [ ] **(Greg)** Is the vat room dark enough, or too dark?
 - [ ] Every opening overlay tested in the real route, not only in the test scenes.
-- [ ] A timed run through minutes 0 to 30 with nothing skipped.
+- [x] Minutes 0-30 are timed (hidden); surfacing into the Hunt shows a card with the time per area and whether it was under 30. A death does not restart the clock.
+- [ ] **(Greg)** Play a full run and read your card.
 
 ## K and J vision modes
 
