@@ -1137,3 +1137,8 @@ World rules; realm identity and transition rules; what persists across realms; d
     leaving the mode clears it.
   - **First hidden thing:** a weak wall in the Growing Floor, a shortcut found
     with wizard eyes.
+    *Built (assistant's layout, open to change):* a 1.4 m panel of the left
+    wall between two bays, identical to plain eyes. K shows its outline and
+    cracks; J shows it as HOLLOW. Once seen, E shoulders through; the
+    crawlway behind drops you into the Service Arcade past its pressure gate,
+    skipping the staff card. The gate itself stays shut.

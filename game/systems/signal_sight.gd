@@ -12,7 +12,13 @@ extends Node
 ##  signals and bodies through walls.
 ##
 ## One component per scene: `add_child`, then `setup(camera)`. The host feeds
-## `spirits` (world positions) and `bodies` (a Callable returning positions).
+## `spirits` (world positions), `bodies` (a Callable returning positions) and
+## `hidden`: things only the modes show (weak walls, stashes, secret doors),
+## each {"id", "at" (centre), "size" (Vector2 width, height), "across"
+## (Vector3 along the width)}. `hidden_seen(id)` fires the first time one is
+## on screen and near in either mode.
+
+signal hidden_seen(id: String)
 
 const SHADER := preload("res://shaders/signal_sight.gdshader")
 const BONE := Color("e6d4ac")
@@ -29,6 +35,10 @@ var strain := 0.0
 var clock := 0.0
 var spirits: Array = []
 var bodies: Callable = Callable()
+var hidden: Array = []
+var seen: Dictionary = {}
+## How close a hidden thing has to be to be noticed, in metres.
+const HIDDEN_RANGE := 9.0
 var view: Camera3D
 var layer: CanvasLayer
 var screen: ColorRect
@@ -112,6 +122,8 @@ func _process(delta: float) -> void:
 		layer.visible = active
 	if not active:
 		return
+	if mode != "":
+		_notice_hidden()
 	if _material != null:
 		_material.set_shader_parameter("mode", {"": 0, "wizard": 1, "depth": 2}[mode])
 		_material.set_shader_parameter("strain", strain)
@@ -134,6 +146,7 @@ func _draw_marks() -> void:
 			_draw_spirits()
 		else:
 			_draw_bodies()
+		_draw_hidden()
 		CellOutzType.draw_string_compat(marks, Vector2(24, marks.size.y * 0.2), "WIZARD EYES  //  K" if mode == "wizard" else "DEPTH  //  J", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ACID if mode == "wizard" else COLD)
 	# The nosebleed: past halfway, blood runs down from the top of the view.
 	if strain > 0.5:
@@ -201,3 +214,71 @@ func _draw_bodies() -> void:
 		var w := height * 0.2
 		marks.draw_rect(Rect2((head as Vector2) - Vector2(w, 0), Vector2(w * 2.0, height)), Color(COLD, 0.9), false, 2.0)
 		marks.draw_circle((head as Vector2) + Vector2(0, height * 0.1), height * 0.08, Color(COLD, 0.6))
+
+
+## Hidden things: the outline of what is really there, cracks in wizard eyes,
+## the hollow behind it in the depth scan. Noticed once on screen and near.
+func _draw_hidden() -> void:
+	var tone := ACID if mode == "wizard" else COLD
+	var pulse := 0.55 + 0.45 * absf(sin(clock * 3.0))
+	for thing: Dictionary in hidden:
+		if bool(thing.get("gone", false)):
+			continue
+		var at: Vector3 = thing.get("at", Vector3.ZERO)
+		if view == null or not is_instance_valid(view) or view.global_position.distance_to(at) > HIDDEN_RANGE:
+			continue
+		var size: Vector2 = thing.get("size", Vector2.ONE)
+		var across: Vector3 = (thing.get("across", Vector3.RIGHT) as Vector3).normalized()
+		var corners: Array = []
+		for c in [Vector2(-0.5, -0.5), Vector2(0.5, -0.5), Vector2(0.5, 0.5), Vector2(-0.5, 0.5)]:
+			var p = _project(at + across * c.x * size.x + Vector3.UP * c.y * size.y)
+			if p == null:
+				corners.clear()
+				break
+			corners.append(p)
+		if corners.is_empty():
+			continue
+		var outline := PackedVector2Array(corners)
+		outline.append(corners[0])
+		marks.draw_polyline(outline, Color(tone, 0.9 * pulse), 3.0)
+		var centre: Vector2 = (corners[0] + corners[2]) * 0.5
+		if mode == "wizard":
+			# Cracks out from the middle, jagged, each forking once: the plaster
+			# is already failing, you just could not see it.
+			var span := (corners[2] as Vector2).distance_to(corners[0])
+			for index in 4:
+				var corner: Vector2 = corners[index]
+				var line := PackedVector2Array([centre])
+				for step in range(1, 6):
+					var t := float(step) / 6.0
+					var side := (corner - centre).orthogonal().normalized()
+					var kink := sin(float(index * 7 + step) * 2.9) * span * 0.05
+					line.append(centre.lerp(corner, t) + side * kink)
+				line.append(corner)
+				marks.draw_polyline(line, Color(tone, 0.65 * pulse), 2.0)
+				var fork_from: Vector2 = line[3]
+				var fork_to := fork_from + (corner - centre).rotated(0.7 if index % 2 == 0 else -0.7) * 0.22
+				marks.draw_line(fork_from, fork_to, Color(tone, 0.45 * pulse), 1.5)
+		else:
+			marks.draw_colored_polygon(PackedVector2Array(corners), Color(0, 0, 0, 0.55))
+			CellOutzType.draw_string_compat(marks, centre + Vector2(-26, 5), "HOLLOW", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(tone, pulse))
+
+
+## Noticed the first time one is near and its middle is on screen in a mode.
+func _notice_hidden() -> void:
+	if view == null or not is_instance_valid(view):
+		return
+	var screen_rect := Rect2(Vector2.ZERO, view.get_viewport().get_visible_rect().size)
+	for thing: Dictionary in hidden:
+		var id := str(thing.get("id", ""))
+		if seen.has(id) or bool(thing.get("gone", false)):
+			continue
+		var at: Vector3 = thing.get("at", Vector3.ZERO)
+		if view.global_position.distance_to(at) > HIDDEN_RANGE:
+			continue
+		var centre = _project(at)
+		if centre == null or not screen_rect.has_point(centre):
+			continue
+		seen[id] = true
+		WorldHistory.record_event("signal_sight_found_hidden", {"id": id, "mode": mode})
+		hidden_seen.emit(id)

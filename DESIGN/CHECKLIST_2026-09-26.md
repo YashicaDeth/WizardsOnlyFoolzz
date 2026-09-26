@@ -67,8 +67,10 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [ ] Hunt keys: re-decant to hold-K.
 - [ ] The phone camera vision shows signals too.
 - [ ] Wires and power shown in wizard eyes.
-- [ ] Hidden things shown in wizard eyes.
-- [ ] The weak wall in the Growing Floor, revealed by wizard eyes, as a shortcut.
+- [x] Hidden things shown in wizard eyes and the depth scan (a general list any scene can fill).
+- [ ] More hidden things: stashes, secret doors.
+- [x] The weak wall in the Growing Floor: wizard eyes show cracks, depth shows HOLLOW, E breaks it, the crawlway drops you past the Service Arcade gate.
+- [ ] **(Greg)** Is past-the-arcade-gate the right place for the shortcut to lead?
 - [ ] Wizard-eyes shader pass against the Ice King / green line-art reference.
 - [ ] **(Greg)** Play K and J and say if the look is right.
 

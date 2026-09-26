@@ -25,6 +25,7 @@ const TORTURE_LOAD_IN := preload("res://systems/torture_load_in.gd")
 const INTAKE_WATCHERS := preload("res://systems/intake_watchers.gd")
 const BRAIN_HACK := preload("res://systems/brain_hack.gd")
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const SERVICE_ARCADE := preload("res://service_arcade.gd")
 const SIGNAL_SIGHT := preload("res://systems/signal_sight.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
@@ -47,6 +48,16 @@ const VAT_POSITION := Vector3(0, 0, 0)
 ## ~19s of locked beats already ahead of it. Cut to the shortest length that
 ## still reads as a receding row of tanks (see the bay-count derivation below).
 const AISLE_LENGTH := 22.0
+## Greg, 26 September: the first hidden thing is a weak wall in the Growing
+## Floor, a shortcut found with wizard eyes. A panel of the left wall between
+## two bays is plaster over a crawlway; behind it the duct drops past the
+## Service Arcade's pressure gate.
+const WEAK_WALL_ID := "growing_floor_weak_wall"
+const WEAK_WALL_AT := Vector3(-7.6, 1.05, -11.95)
+const WEAK_WALL_SIZE := Vector2(1.4, 2.1)
+const WEAK_WALL_REACH := 1.9
+## Past this x, inside the duct, the crawl takes you.
+const DUCT_DEPTH_X := -8.5
 ## The wires beat (Greg, via the handoff and 24 September: END ALL SUFFERING,
 ## tear the wires out, GET REVENGE, instead of the glass breaking by itself).
 ## The tank is drained at this clock time; the breach and floor beats count
@@ -98,6 +109,10 @@ var watchers: Node3D
 var brain_hack: Control
 ## K wizard eyes / J depth scan, from the brain hack on (`SignalSight`).
 var sight: Node
+var weak_wall_body: StaticBody3D
+var weak_wall_found := false
+var weak_wall_broken := false
+var shortcut_taken := false
 var opening_audio: Node
 var fluid: MeshInstance3D
 var vat_glass: MeshInstance3D
@@ -267,6 +282,8 @@ func _ready() -> void:
 	sight.call("setup", camera)
 	# The failed subject in the jammed tank died here.
 	sight.set("spirits", [Vector3(-3.4, 0.0, 2.6)])
+	sight.set("hidden", [{"id": WEAK_WALL_ID, "at": WEAK_WALL_AT + Vector3(0.26, 0, 0), "size": WEAK_WALL_SIZE, "across": Vector3.BACK}])
+	sight.connect("hidden_seen", _on_hidden_seen)
 	brain_hack = BRAIN_HACK.new()
 	$HUD.add_child(brain_hack)
 	brain_hack.connect("hack_finished", _on_hack_finished)
@@ -637,7 +654,7 @@ func _build_chamber() -> void:
 	# Grated floor and a low wet ceiling.
 	_slab(Vector3(16.0, 0.4, AISLE_LENGTH + 8.0), Vector3(0, -0.2, -AISLE_LENGTH * 0.4), "dirt", Color("15120f"))
 	_slab(Vector3(16.0, 0.35, AISLE_LENGTH + 8.0), Vector3(0, 4.3, -AISLE_LENGTH * 0.4), "rust", Color("100d0b"))
-	_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(-7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
+	_build_left_wall()
 	_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
 	# The near wall is DoctorRoute's: the same wall in pieces, around his door
 	# and the observation glass.
@@ -1014,6 +1031,83 @@ func _build_cradled_vat_subject(at: Vector3, seed_value: int, parent_node: Node3
 	if seed_value == 2:
 		rig.behead()
 	return rig
+
+
+## The left wall in three pieces around the weak panel, and the crawlway
+## behind it. The panel looks like every other stretch of wall; only the
+## vision modes show it for what it is.
+func _build_left_wall() -> void:
+	var near_end := -AISLE_LENGTH * 0.4 + (AISLE_LENGTH + 8.0) * 0.5
+	var far_end := -AISLE_LENGTH * 0.4 - (AISLE_LENGTH + 8.0) * 0.5
+	var hole_near := WEAK_WALL_AT.z + WEAK_WALL_SIZE.x * 0.5
+	var hole_far := WEAK_WALL_AT.z - WEAK_WALL_SIZE.x * 0.5
+	_slab(Vector3(0.5, 4.4, near_end - hole_near), Vector3(-7.6, 2.2, (near_end + hole_near) * 0.5), "rust", Color("1c1712"))
+	_slab(Vector3(0.5, 4.4, hole_far - far_end), Vector3(-7.6, 2.2, (hole_far + far_end) * 0.5), "rust", Color("1c1712"))
+	var lintel := 4.4 - WEAK_WALL_SIZE.y
+	_slab(Vector3(0.5, lintel, WEAK_WALL_SIZE.x), Vector3(-7.6, WEAK_WALL_SIZE.y + lintel * 0.5, WEAK_WALL_AT.z), "rust", Color("1c1712"))
+	_slab(Vector3(0.5, WEAK_WALL_SIZE.y, WEAK_WALL_SIZE.x), WEAK_WALL_AT, "rust", Color("1c1712"))
+	weak_wall_body = get_child(get_child_count() - 1) as StaticBody3D
+	weak_wall_body.name = "WeakWall"
+	# The crawlway: floor, roof, two sides and a blind end.
+	var duct_x := -7.85 - 1.1
+	_slab(Vector3(2.2, 0.4, WEAK_WALL_SIZE.x), Vector3(duct_x, -0.2, WEAK_WALL_AT.z), "dirt", Color("15120f"))
+	_slab(Vector3(2.2, 0.3, WEAK_WALL_SIZE.x), Vector3(duct_x, WEAK_WALL_SIZE.y + 0.15, WEAK_WALL_AT.z), "rust", Color("100d0b"))
+	for side in [-1.0, 1.0]:
+		_slab(Vector3(2.2, WEAK_WALL_SIZE.y, 0.2), Vector3(duct_x, WEAK_WALL_SIZE.y * 0.5, WEAK_WALL_AT.z + side * (WEAK_WALL_SIZE.x * 0.5 + 0.1)), "rust", Color("100d0b"))
+	_slab(Vector3(0.3, WEAK_WALL_SIZE.y, WEAK_WALL_SIZE.x + 0.4), Vector3(duct_x - 1.25, WEAK_WALL_SIZE.y * 0.5, WEAK_WALL_AT.z), "rust", Color("100d0b"))
+	# A draught of warm light from further down, seen only once it is open.
+	var draught := OmniLight3D.new()
+	draught.position = Vector3(duct_x - 0.6, 0.4, WEAK_WALL_AT.z)
+	draught.light_color = Color("c0703a")
+	draught.light_energy = 0.8
+	draught.omni_range = 2.2
+	add_child(draught)
+
+
+func _near_weak_wall() -> bool:
+	if player == null:
+		return false
+	var to_wall := WEAK_WALL_AT - player.global_position
+	to_wall.y = 0.0
+	return to_wall.length() <= WEAK_WALL_REACH
+
+
+func _on_hidden_seen(id: String) -> void:
+	if id != WEAK_WALL_ID or weak_wall_found:
+		return
+	weak_wall_found = true
+	subtitle.text = "THE WALL IS HOLLOW THERE  //  PLASTER OVER A DUCT"
+
+
+## Shouldered through. Only once the modes have shown it: to plain eyes it
+## is the same wall as the rest.
+func break_weak_wall() -> bool:
+	if not weak_wall_found or weak_wall_broken or not _near_weak_wall():
+		return false
+	weak_wall_broken = true
+	if weak_wall_body != null and is_instance_valid(weak_wall_body):
+		weak_wall_body.queue_free()
+	for thing: Dictionary in sight.get("hidden"):
+		if str(thing.get("id", "")) == WEAK_WALL_ID:
+			thing["gone"] = true
+	opening_audio.cue("door")
+	subtitle.text = "THE PLASTER GIVES  //  A CRAWLWAY, WARM AIR COMING UP"
+	WorldHistory.record_event("growing_floor_weak_wall_broken", {"location": "growing_floor"})
+	return true
+
+
+## Into the duct: the Service Arcade, arriving past its pressure gate.
+func take_shortcut() -> bool:
+	if not weak_wall_broken or shortcut_taken:
+		return false
+	shortcut_taken = true
+	_record_service_arcade_entry()
+	WorldHistory.record_event("growing_floor_shortcut_taken", {"location": "growing_floor", "destination": "service_arcade"})
+	SERVICE_ARCADE.arrive_by_duct = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if OS.get_environment("ATG_TEST_MODE") != "1":
+		Interstitial.travel("res://service_arcade.tscn", "a crawlway behind the plaster // it drops past the pressure gate")
+	return true
 
 
 func _slab(dimensions: Vector3, at: Vector3, _kind: String, _color: Color) -> void:
@@ -1827,6 +1921,8 @@ func _update_movement(delta: float) -> void:
 	player.velocity.z = move_toward(player.velocity.z, direction.z * speed, 14.0 * delta)
 	JUMP_CLIMB.fall(player, delta)
 	player.move_and_slide()
+	if weak_wall_broken and player.global_position.x < DUCT_DEPTH_X:
+		take_shortcut()
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	# A body that just came out of a tank does not walk well.
@@ -1841,6 +1937,8 @@ func _interact() -> void:
 	if _try_pry_stuck_tank():
 		return
 	if _try_take_garment():
+		return
+	if break_weak_wall() or (_near_weak_wall() and take_shortcut()):
 		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0
@@ -1980,6 +2078,12 @@ func _update_hud() -> void:
 	if stuck_tank_opened and CLOTHING.worn("player") == "bare" and CLOTHING.worn(FAILED_SUBJECT_ID) != "bare" and _near_first_objects():
 		prompt.text = "[E] TAKE THE CLOTHING OFF SUBJECT 0C-4"
 		osd.point_at(stuck_tank_marker.global_position + Vector3(0, 1.1, 0))
+		return
+	if weak_wall_found and not weak_wall_broken and _near_weak_wall():
+		prompt.text = "[E] SHOULDER THROUGH THE HOLLOW WALL"
+		return
+	if weak_wall_broken and _near_weak_wall():
+		prompt.text = "[E] CRAWL IN   //   A WAY PAST THE PRESSURE GATE"
 		return
 	var smash_prompt: String = vat_smash.prompt_for(camera, doctor_route.held_weapon() if doctor_route != null else "") if vat_smash != null and breakout_complete else ""
 	if smash_prompt != "":

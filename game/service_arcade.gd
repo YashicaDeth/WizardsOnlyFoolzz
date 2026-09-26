@@ -51,6 +51,13 @@ var yaw := 0.0
 var pitch := -0.04
 var card_taken := false
 var gate_open := false
+## Greg, 26 September: the first hidden thing is a weak wall in the Growing
+## Floor, found with wizard eyes. Behind it a crawlway drops past this arcade's
+## pressure gate. Set by the vat room just before the scene change and spent on
+## arrival, so an ordinary entry is untouched.
+static var arrive_by_duct := false
+const DUCT_ARRIVAL := Vector3(1.6, 1.0, -51.5)
+var duct_arrival := false
 var gate_body: StaticBody3D
 var gate_panel: Node3D
 var card_visual: MeshInstance3D
@@ -90,6 +97,11 @@ func _ready() -> void:
 	for spec in PROPS:
 		BreakableProp.place(self, spec[0], spec[1], spec[2], spec[3])
 	_build_player()
+	if arrive_by_duct:
+		arrive_by_duct = false
+		duct_arrival = true
+		player.position = DUCT_ARRIVAL
+		WorldHistory.record_event("service_arcade_arrived_by_duct", {"location": LOCATION})
 	_restore_from_history()
 	_build_remains()
 	block_tracker = BlockTracker.new()
@@ -467,8 +479,15 @@ func _interact() -> void:
 	# pressure gate has visibly opened.  The control panel and the threshold both
 	# lead onward; this is especially important when the original E press was
 	# consumed by the gate-opening frame.
-	if gate_open and (_flat_distance(GATE_AT) <= 4.4 or _flat_distance(EXIT_AT) <= 3.0):
+	if _onward_open():
 		_enter_lower_works()
+
+## Through the opened gate, or already past it by the crawlway.
+func _onward_open() -> bool:
+	if gate_open and (_flat_distance(GATE_AT) <= 4.4 or _flat_distance(EXIT_AT) <= 3.0):
+		return true
+	return duct_arrival and _flat_distance(EXIT_AT) <= 3.0
+
 
 func _open_gate() -> void:
 	if gate_open:
@@ -535,7 +554,7 @@ func _update_hud() -> void:
 			osd.point_at(GATE_AT + Vector3(0, 2.0, 0))
 		else:
 			prompt.text = "PRESSURE GATE // STAFF CARD REQUIRED"
-	elif gate_open and (_flat_distance(GATE_AT) <= 4.4 or _flat_distance(EXIT_AT) <= 3.0):
+	elif _onward_open():
 		prompt.text = "[E] ENTER LOWER WORKS"
 		osd.point_at(GATE_AT + Vector3(0, 1.6, -2.0))
 	elif gate_open:
