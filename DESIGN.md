@@ -1124,3 +1124,16 @@ World rules; realm identity and transition rules; what persists across realms; d
   onto a ledge up to 1.5 m ("you can't jump out of here, it's dumb").
 - **Art is placeholder until Greg's own:** curated Higgsfield pieces stand in
   where they fit; everything is replaced when Greg's art lands.
+- **Question boxes (26 September, second set):**
+  - **Jump and climb everywhere** in the first 30 minutes, not just the drains.
+  - **Placeholder art first:** all of it (breakout frames, loading screens,
+    phone and Wire, kill-cam X-rays) as soon as the files can be pushed.
+  - **GFX:** all of the above: Godot shaders now, Greg's TouchDesigner loops
+    layered over or replacing them later.
+  - **Vat room:** darker, red only in the vat's glow.
+  - **Spirits** in wizard eyes are glowing green figures where people died.
+  - **Camera signals** show as pulsing wave rings out of each lens.
+  - **Degrading view:** static from the edges, blur, and a nosebleed drip;
+    leaving the mode clears it.
+  - **First hidden thing:** a weak wall in the Growing Floor, a shortcut found
+    with wizard eyes.
