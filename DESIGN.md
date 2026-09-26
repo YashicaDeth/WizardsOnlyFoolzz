@@ -1129,6 +1129,11 @@ World rules; realm identity and transition rules; what persists across realms; d
   the performance pass, build `a866957` reads about 160 fps on the F10 counter
   everywhere (vat room, Support Unit, sewers, Hunt, menu) on his NVIDIA RTX at
   144 Hz+. Hold that as the floor for new work on his machine.
+- **No zip files (Greg, 26 September):** "stop making zip files, it's
+  pointless". Builds reach him as merges into `claude/dust-to-bones-look`;
+  `Play-Latest.bat` pulls that branch into `P:\GameDev\playtest` and runs it
+  from source. He also asked for one master prompt for every agent, with
+  question boxes: `DESIGN/MASTER_PROMPT_2026-09-26.md`.
 - **The drains:** SPACE jumps, and climbs out of the channel and the cistern
   onto a ledge up to 1.5 m ("you can't jump out of here, it's dumb").
 - **Art is placeholder until Greg's own:** curated Higgsfield pieces stand in

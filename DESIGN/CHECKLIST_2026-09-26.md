@@ -105,12 +105,13 @@ still open. **(Greg)** marks something only Greg can do or decide.
 ## Branches and handoff
 
 - [ ] Merge `opencode/base-model-kit` once OpenCode pushes it.
+- [ ] Hand `DESIGN/MASTER_PROMPT_2026-09-26.md` Part 1 + a lane to each agent (Claude, Codex, OpenCode, Qoder, Freebuff, Qwen).
 - [ ] Keep `claude/dust-to-bones-look` merged after every piece.
-- [ ] A Windows build after every piece, each with a PLAY bat.
+- [x] No more zips (Greg, 26 September: "stop making zip files, it's pointless"). `Play-Latest.bat` in the repo root pulls the newest integration branch and plays it from source.
 
 ## For Greg, the playtest
 
-- [ ] **(Greg)** Run the newest `PLAY-<hash>.bat`.
+- [ ] **(Greg)** Double-click `Play-Latest.bat` in the repo folder on your PC.
 - [ ] **(Greg)** F10 on, note fps in each room.
 - [ ] **(Greg)** Try K and J after the brain hack.
 - [ ] **(Greg)** Jump out of the drains channel.
