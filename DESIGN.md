@@ -1140,6 +1140,33 @@ World rules; realm identity and transition rules; what persists across realms; d
   drains and Service Arcade; a Support Unit closet behind a secret door with
   a second stash). A stash gives a field dressing and four rounds, into the
   gun if you carry it, otherwise loose.
+- **Question boxes, 26 September (third set, Greg's answers):**
+  - *Movement:* climb stays 1.55 m. Sprint in the vat room, weaker and growing
+    as the body recovers. A crouch-slide: sprint + Ctrl, about a second, a
+    little noise. Fall damage: small, only over 2.5 m, at most 15 blood.
+  - *Timed run:* "working" means no crash, no dead end, under 30 minutes. The
+    run timer is hidden, shown on a card at the end with time per area.
+  - *Kept as built:* the weak wall leads past the arcade gate; the Hunt's
+    Brain Index hub stays on Shift+Tab; the nosebleed stays.
+  - *Sound:* K = a low choir hum that swells with strain; J = a sonar ping
+    with the sweep; the weak wall crumbles with a dust puff, hatches creak,
+    wires spit sparks.
+  - *Wires:* cutting a live one can shock you (8 blood and a flash) unless
+    you saw it in K first. A dead camera or light brings one guard to check
+    for about 20 seconds, then back: a lure.
+  - *The examiner:* an optional fight (revenge OR escape) in his office past
+    the staff door. Surgical tools and a syringe that slows you. Win: his
+    keycard and coat. Lose: back in the vat, and he keeps the coat.
+  - *Meds:* hold 4 to bandage, a few seconds, heals 20, no fighting while
+    you do it. Loose rounds load into any gun you find.
+  - *Gore:* full by default; everywhere (vat room and Support Unit too);
+    remains stay, capped, oldest removed first; hitstop as it is.
+  - *Art:* all four placeholder categories; media through LFS once
+    `lfs.github.com` is allowed in the cloud environment; terrain_3d
+    restored, pinned.
+  - *Process:* merge to Play-Latest after every finished piece. Next in the
+    Claude lane: "all above" (sounds, phone signals, more opening beats,
+    the wizard-eyes look).
 - **No zip files (Greg, 26 September):** "stop making zip files, it's
   pointless". Builds reach him as merges into `claude/dust-to-bones-look`;
   `Play-Latest.bat` pulls that branch into `P:\GameDev\playtest` and runs it
