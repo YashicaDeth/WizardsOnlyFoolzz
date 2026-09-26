@@ -746,6 +746,13 @@ func _build_examination_station() -> void:
 	desk_mesh.size = Vector3(2.25, 0.07, 0.78)
 	desk_mesh.material = LabSurface.material("plate")
 	desk.mesh = desk_mesh
+	# The desk stays where it is. What was wrong was not the desk but the
+	# terminal sitting at the far end of it: the man stands at local x -1.45 and
+	# the screen sat at 0.60, so his own workstation was 2.06 m of table away
+	# from him -- a man beside a computer rather than at one. The screen now
+	# sits at his end, 0.90 m away, over the desk and clear of his body.
+	# `vat_station_clearance_test` holds all three of those numbers.
+	const MONITOR_X := -0.55
 	desk.position = Vector3(0.05, 0.86, 0.25)
 	station.add_child(desk)
 	# Greg, first launch (2026-09-24): "this floating table". It stands now.
@@ -761,26 +768,29 @@ func _build_examination_station() -> void:
 	# The physical monitor gives the player a point of attention in the room;
 	# its green code strips are geometry, not a flat title card.
 	var monitor := MeshInstance3D.new()
+	# Named so the clearance between the terminal and the man is a thing a test
+	# can measure and an artist can find, rather than an anonymous box in a list.
+	monitor.name = "ExaminerMonitor"
 	var monitor_mesh := BoxMesh.new()
-	monitor_mesh.size = Vector3(1.10, 0.76, 0.16)
+	monitor_mesh.size = Vector3(0.88, 0.62, 0.16)
 	monitor_mesh.material = LabSurface.material("plate")
 	monitor.mesh = monitor_mesh
 	# The screen takes the right half of the desk, the examiner the left, and
 	# the keyboard sits between them under his hand. He used to stand 1.7m off
 	# to the side, which read as a man near a computer he had nothing to do
 	# with; the two now occupy one workstation without overlapping at all.
-	monitor.position = Vector3(0.60, 1.50, 0.28)
+	monitor.position = Vector3(MONITOR_X, 1.43, 0.28)
 	station.add_child(monitor)
 	var screen := MeshInstance3D.new()
 	var screen_mesh := QuadMesh.new()
-	screen_mesh.size = Vector2(0.96, 0.62)
+	screen_mesh.size = Vector2(0.76, 0.49)
 	var screen_material := StandardMaterial3D.new()
 	screen_material.albedo_color = Color("07120c")
 	screen_material.emission_enabled = true
 	screen_material.emission = Color("0d2a1a")
 	screen_mesh.material = screen_material
 	screen.mesh = screen_mesh
-	screen.position = Vector3(0.60, 1.50, 0.365)
+	screen.position = Vector3(MONITOR_X, 1.43, 0.365)
 	screen.rotation_degrees.y = 180.0
 	station.add_child(screen)
 	var stand := MeshInstance3D.new()
@@ -788,7 +798,7 @@ func _build_examination_station() -> void:
 	stand_mesh.size = Vector3(0.10, 0.30, 0.10)
 	stand_mesh.material = LabSurface.material("grime")
 	stand.mesh = stand_mesh
-	stand.position = Vector3(0.60, 1.03, 0.22)
+	stand.position = Vector3(MONITOR_X, 1.03, 0.22)
 	station.add_child(stand)
 	for line_index in 9:
 		var code := MeshInstance3D.new()
@@ -803,7 +813,7 @@ func _build_examination_station() -> void:
 		code.mesh = code_mesh
 		# The text sits on the monitor's camera-facing surface, aligned inside its
 		# frame rather than accidentally hovering behind it.
-		code.position = Vector3(0.20 + code_width * 0.5, 1.72 - float(line_index) * 0.055, 0.375)
+		code.position = Vector3(MONITOR_X - 0.32 + code_width * 0.5, 1.62 - float(line_index) * 0.045, 0.375)
 		station.add_child(code)
 	var keyboard := MeshInstance3D.new()
 	var keyboard_mesh := BoxMesh.new()
@@ -853,7 +863,7 @@ func _build_examination_station() -> void:
 	ClothingShell.stain(body, "right_leg", 0.15)
 	body.dress(wardrobe)
 	var screen_light := OmniLight3D.new()
-	screen_light.position = Vector3(0.52, 1.6, 0.02)
+	screen_light.position = Vector3(MONITOR_X, 1.5, 0.02)
 	screen_light.light_color = Color("8bbd79")
 	screen_light.light_energy = 4.4
 	screen_light.omni_range = 3.4

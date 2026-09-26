@@ -325,3 +325,13 @@ smallest playable version first.
 - The sky agency.
 - How humiliating the jester outfit is.
 - The map glitching (Walkthrough 2).
+## I. For the Dust page
+
+
+The Dust to Bones goal page lives in another account and cannot be edited from
+this repo. Copy this row across when it next opens.
+
+| Done | What | Proof |
+|---|---|---|
+| 26 Sep | **Base model kit for the opening, and the examination station moved.** A shared low-poly base kit (`OpeningBaseModelKit`) with a gallery to judge it in (`opening_base_model_gallery`), so the examiner, the doctor and the guard stop being separate blocky placeholders. The desk and its terminal shift so they read as one workstation and the screen no longer eclipses the man from inside the tank. | `vat_station_clearance_test` measures it rather than eyeballing it: monitor clearance in world space, operator reach in the station's own local space. `station_placement_test` and `opening_greeting_test` still green, so the doctor's walk to the glass is unchanged. |
+| Open | The kit is geometry-only: no authored art has replaced it yet, and the examiner model still waits on the Higgsfield M1 sheet. | |
