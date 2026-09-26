@@ -26,6 +26,7 @@ signal hidden_seen(id: String)
 signal wire_cut(id: String)
 
 const SHADER := preload("res://shaders/signal_sight.gdshader")
+const SIGHT_AUDIO := preload("res://systems/sight_audio.gd")
 const BONE := Color("e6d4ac")
 const ACID := Color("b4da48")
 const BLOOD := Color("a8281a")
@@ -55,6 +56,9 @@ var layer: CanvasLayer
 var screen: ColorRect
 var marks: Control
 var _material: ShaderMaterial
+## K's choir hum and J's sonar ping (Greg, 26 September).
+var choir: AudioStreamPlayer
+var sonar: AudioStreamPlayer
 var _wizard_on := false
 var _depth_held := false
 
@@ -78,6 +82,18 @@ func setup(camera: Camera3D) -> void:
 	layer.add_child(marks)
 	marks.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	marks.draw.connect(_draw_marks)
+	var bus := "SFX" if AudioServer.get_bus_index("SFX") >= 0 else "Master"
+	choir = AudioStreamPlayer.new()
+	choir.name = "WizardEyesChoir"
+	choir.stream = SIGHT_AUDIO.stream("choir")
+	choir.bus = bus
+	add_child(choir)
+	sonar = AudioStreamPlayer.new()
+	sonar.name = "DepthSonar"
+	sonar.stream = SIGHT_AUDIO.stream("sonar")
+	sonar.bus = bus
+	sonar.volume_db = -12.0
+	add_child(sonar)
 	_apply()
 
 
@@ -131,6 +147,7 @@ func _process(delta: float) -> void:
 	var active := mode != "" or strain > 0.0
 	if layer != null:
 		layer.visible = active
+	_update_audio()
 	if not active:
 		return
 	if mode != "":
@@ -376,6 +393,7 @@ func cut_wire_near(position: Vector3) -> String:
 	var on_cut: Callable = best.get("on_cut", Callable())
 	if on_cut.is_valid():
 		on_cut.call()
+	SIGHT_AUDIO.play_at(self, "spark", (best.get("points", [position]) as Array)[0])
 	WorldHistory.record_event("power_wire_cut", {"id": id})
 	wire_cut.emit(id)
 	return id
@@ -388,3 +406,20 @@ func wire_in_reach(position: Vector3) -> bool:
 			if Vector2(supply.x - position.x, supply.z - position.z).length() <= WIRE_REACH:
 				return true
 	return false
+
+
+## The hum swells as the strain builds; the ping runs only while J is held.
+func _update_audio() -> void:
+	if choir == null:
+		return
+	var wizard := mode == "wizard"
+	if wizard and not choir.playing:
+		choir.play()
+	elif not wizard and choir.playing:
+		choir.stop()
+	choir.volume_db = lerpf(-20.0, -8.0, strain)
+	var depth := mode == "depth"
+	if depth and not sonar.playing:
+		sonar.play()
+	elif not depth and sonar.playing:
+		sonar.stop()

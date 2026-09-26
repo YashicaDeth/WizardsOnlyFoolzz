@@ -11,6 +11,7 @@ extends RefCounted
 ## scene's SignalSight, whose `hidden_seen` marks it found.
 
 const REACH := 1.9
+const SIGHT_AUDIO := preload("res://systems/sight_audio.gd")
 ## Only a shade darker than the wall: a hairline you catch, not a drawn box.
 const SEAM := Color("4a403a")
 const GUN_LABEL := "CELL OUTZ BREACH NINE"
@@ -160,6 +161,8 @@ static func open_near(records: Array, position: Vector3, sight: Node = null) -> 
 		for thing: Dictionary in sight.get("hidden"):
 			if str(thing.get("id", "")) == str(record.id):
 				thing["gone"] = true
+	# Hatches creak; a secret door grinds and sheds plaster.
+	SIGHT_AUDIO.play_at(sight, "creak" if str(record.kind) == "stash" else "crumble", record.at)
 	if str(record.kind) == "stash":
 		(record.hinge as Node3D).rotation.y = -1.9
 		(record.goods as Node3D).visible = true

@@ -91,6 +91,8 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [x] Sprint in the vat room (weak, grows as the body recovers) and in the Service Arcade.
 - [x] Crouch-slide everywhere in the opening: sprint + Ctrl, about 1 s, the view drops; a little noise in the Support Unit and drains.
 - [x] Small fall damage: only over 2.5 m, at most 15 blood, never lethal.
+- [x] Sounds, made in code: K choir hum that swells with strain, J sonar ping, weak-wall and secret-door crumble, hatch creak, wire spark.
+- [ ] **(Greg)** Listen to the five WAVs and say which to change.
 
 ## Art and look
 

@@ -1116,6 +1116,7 @@ func break_weak_wall() -> bool:
 			thing["gone"] = true
 	opening_audio.cue("door")
 	subtitle.text = "THE PLASTER GIVES  //  A CRAWLWAY, WARM AIR COMING UP"
+	preload("res://systems/sight_audio.gd").play_at(self, "crumble", WEAK_WALL_AT, 0.0)
 	WorldHistory.record_event("growing_floor_weak_wall_broken", {"location": "growing_floor"})
 	return true
 
