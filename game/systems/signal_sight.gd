@@ -19,6 +19,11 @@ extends Node
 ## on screen and near in either mode.
 
 signal hidden_seen(id: String)
+## Wires and power (Greg, 26 September: the modes reveal "wires and power").
+## `wires`: each {"id", "points" (Array of Vector3, from the supply to what
+## it feeds), "on_cut" (Callable)}. Seen in either mode, a wire can then be
+## cut at its supply end with `cut_wire_near()`; the host binds that to E.
+signal wire_cut(id: String)
 
 const SHADER := preload("res://shaders/signal_sight.gdshader")
 const BONE := Color("e6d4ac")
@@ -39,6 +44,9 @@ var clock := 0.0
 var spirits: Array = []
 var bodies: Callable = Callable()
 var hidden: Array = []
+var wires: Array = []
+## How close the supply end of a seen wire must be to cut it, in metres.
+const WIRE_REACH := 1.7
 var seen: Dictionary = {}
 ## How close a hidden thing has to be to be noticed, in metres.
 const HIDDEN_RANGE := 9.0
@@ -127,6 +135,7 @@ func _process(delta: float) -> void:
 		return
 	if mode != "":
 		_notice_hidden()
+		_notice_wires()
 	if _material != null:
 		_material.set_shader_parameter("mode", {"": 0, "wizard": 1, "depth": 2}[mode])
 		_material.set_shader_parameter("strain", strain)
@@ -150,6 +159,7 @@ func _draw_marks() -> void:
 		else:
 			_draw_bodies()
 		_draw_hidden()
+		_draw_wires()
 		CellOutzType.draw_string_compat(marks, Vector2(marks.size.x * 0.05, marks.size.y * 0.2), "WIZARD EYES  //  K" if mode == "wizard" else "DEPTH  //  J", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ACID if mode == "wizard" else COLD)
 	# The nosebleed: past halfway, blood runs down from the top of the view.
 	if strain > 0.5:
@@ -285,3 +295,96 @@ func _notice_hidden() -> void:
 		seen[id] = true
 		WorldHistory.record_event("signal_sight_found_hidden", {"id": id, "mode": mode})
 		hidden_seen.emit(id)
+
+
+## Power along each wire: pulses running from the supply to what it feeds.
+## A cut wire hangs dark red with a gap where it was cut.
+func _draw_wires() -> void:
+	var tone := ACID if mode == "wizard" else COLD
+	for wire: Dictionary in wires:
+		var points: Array = wire.get("points", [])
+		if points.size() < 2 or view == null or view.global_position.distance_to(points[0]) > HIDDEN_RANGE * 2.0:
+			continue
+		var cut := bool(wire.get("cut", false))
+		var flat := PackedVector2Array()
+		for point in points:
+			var at = _project(point)
+			if at == null:
+				flat.clear()
+				break
+			flat.append(at)
+		if flat.size() < 2:
+			continue
+		if cut:
+			var gap := flat.duplicate()
+			gap[0] = flat[0].lerp(flat[1], 0.25)
+			marks.draw_polyline(gap, Color(BLOOD, 0.6), 2.0)
+			continue
+		marks.draw_polyline(flat, Color(tone, 0.35), 5.0)
+		marks.draw_polyline(flat, Color(tone, 0.85), 1.6)
+		# Three pulses travelling toward the load.
+		var lengths: Array = [0.0]
+		for index in range(1, flat.size()):
+			lengths.append(float(lengths[index - 1]) + flat[index - 1].distance_to(flat[index]))
+		var total: float = lengths[lengths.size() - 1]
+		if total <= 1.0:
+			continue
+		for pulse in 3:
+			var along := fmod(clock * 0.6 + float(pulse) / 3.0, 1.0) * total
+			for index in range(1, flat.size()):
+				if along <= float(lengths[index]):
+					var t := (along - float(lengths[index - 1])) / maxf(0.001, float(lengths[index]) - float(lengths[index - 1]))
+					marks.draw_circle(flat[index - 1].lerp(flat[index], t), 4.0, Color(tone, 0.95))
+					break
+		marks.draw_circle(flat[0], 7.0, Color(tone, 0.5 + 0.4 * absf(sin(clock * 5.0))))
+
+
+func _notice_wires() -> void:
+	var screen_rect := Rect2(Vector2.ZERO, view.get_viewport().get_visible_rect().size)
+	for wire: Dictionary in wires:
+		if bool(wire.get("seen", false)):
+			continue
+		var points: Array = wire.get("points", [])
+		if points.is_empty() or view.global_position.distance_to(points[0]) > HIDDEN_RANGE:
+			continue
+		var at = _project(points[0])
+		if at != null and screen_rect.has_point(at):
+			wire["seen"] = true
+			WorldHistory.record_event("signal_sight_found_wire", {"id": str(wire.get("id", "")), "mode": mode})
+
+
+## Cuts the nearest seen, live wire whose supply end is within reach.
+## Returns its id, or "" when there is none.
+func cut_wire_near(position: Vector3) -> String:
+	var best: Dictionary = {}
+	var best_distance := WIRE_REACH
+	for wire: Dictionary in wires:
+		if not bool(wire.get("seen", false)) or bool(wire.get("cut", false)):
+			continue
+		var points: Array = wire.get("points", [])
+		if points.is_empty():
+			continue
+		var supply: Vector3 = points[0]
+		var flat := Vector2(supply.x - position.x, supply.z - position.z).length()
+		if flat <= best_distance:
+			best_distance = flat
+			best = wire
+	if best.is_empty():
+		return ""
+	best["cut"] = true
+	var id := str(best.get("id", ""))
+	var on_cut: Callable = best.get("on_cut", Callable())
+	if on_cut.is_valid():
+		on_cut.call()
+	WorldHistory.record_event("power_wire_cut", {"id": id})
+	wire_cut.emit(id)
+	return id
+
+
+func wire_in_reach(position: Vector3) -> bool:
+	for wire: Dictionary in wires:
+		if bool(wire.get("seen", false)) and not bool(wire.get("cut", false)):
+			var supply: Vector3 = (wire.get("points", [Vector3.INF]) as Array)[0]
+			if Vector2(supply.x - position.x, supply.z - position.z).length() <= WIRE_REACH:
+				return true
+	return false

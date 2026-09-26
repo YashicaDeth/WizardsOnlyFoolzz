@@ -110,6 +110,8 @@ var brain_hack: Control
 ## K wizard eyes / J depth scan, from the brain hack on (`SignalSight`).
 var sight: Node
 var weak_wall_body: StaticBody3D
+## Each bay's ceiling strip and the power line feeding it down the left wall.
+var strip_lights: Array = []
 var weak_wall_found := false
 var weak_wall_broken := false
 var shortcut_taken := false
@@ -284,6 +286,16 @@ func _ready() -> void:
 	sight.set("spirits", [Vector3(-3.4, 0.0, 2.6)])
 	sight.set("hidden", [{"id": WEAK_WALL_ID, "at": WEAK_WALL_AT + Vector3(0.26, 0, 0), "size": WEAK_WALL_SIZE, "across": Vector3.BACK}])
 	sight.connect("hidden_seen", _on_hidden_seen)
+	# Wires and power (Greg, 26 September): each strip is fed from a junction
+	# low on the left wall, up the wall and across the ceiling. Seen in the
+	# modes, cut at the junction with E: that bay goes dark.
+	var wires: Array = []
+	for index in strip_lights.size():
+		var strip: OmniLight3D = strip_lights[index]
+		var z := strip.position.z
+		wires.append({"id": "growing_floor_strip_%d" % index, "points": [Vector3(-7.3, 1.3, z), Vector3(-7.3, 3.9, z), Vector3(0, 3.9, z)],
+			"on_cut": func() -> void: strip.visible = false})
+	sight.set("wires", wires)
 	brain_hack = BRAIN_HACK.new()
 	$HUD.add_child(brain_hack)
 	brain_hack.connect("hack_finished", _on_hack_finished)
@@ -713,6 +725,7 @@ func _build_chamber() -> void:
 		strip.light_energy = 1.5
 		strip.omni_range = 6.5
 		add_child(strip)
+		strip_lights.append(strip)
 
 	# Greg: "intricate Lain / Evangelion wiring, not one long tube". The
 	# conduit that ran the length of each side is now bundles of cable, hung
@@ -1940,6 +1953,10 @@ func _interact() -> void:
 		return
 	if break_weak_wall() or (_near_weak_wall() and take_shortcut()):
 		return
+	if sight != null and sight.call("cut_wire_near", player.global_position) != "":
+		subtitle.text = "THE LINE SPITS AND DIES  //  THAT BAY GOES DARK"
+		opening_audio.cue("door")
+		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0
 	if to_door.length() > 3.4:
@@ -2084,6 +2101,9 @@ func _update_hud() -> void:
 		return
 	if weak_wall_broken and _near_weak_wall():
 		prompt.text = "[E] CRAWL IN   //   A WAY PAST THE PRESSURE GATE"
+		return
+	if sight != null and sight.call("wire_in_reach", player.global_position):
+		prompt.text = "[E] CUT THE POWER LINE"
 		return
 	var smash_prompt: String = vat_smash.prompt_for(camera, doctor_route.held_weapon() if doctor_route != null else "") if vat_smash != null and breakout_complete else ""
 	if smash_prompt != "":

@@ -1129,6 +1129,10 @@ World rules; realm identity and transition rules; what persists across realms; d
   the performance pass, build `a866957` reads about 160 fps on the F10 counter
   everywhere (vat room, Support Unit, sewers, Hunt, menu) on his NVIDIA RTX at
   144 Hz+. Hold that as the floor for new work on his machine.
+- **Wires and power (built on the master prompt's recommended answers, open
+  to Greg):** power lines glow and pulse in K/J toward what they feed; once
+  seen, E at the junction cuts one. Vat room strips go dark; Support Unit
+  cameras go blind without the noise of smashing them.
 - **No zip files (Greg, 26 September):** "stop making zip files, it's
   pointless". Builds reach him as merges into `claude/dust-to-bones-look`;
   `Play-Latest.bat` pulls that branch into `P:\GameDev\playtest` and runs it

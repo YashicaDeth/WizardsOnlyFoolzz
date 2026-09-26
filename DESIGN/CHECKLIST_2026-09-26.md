@@ -68,7 +68,7 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [ ] **(Greg)** Is Shift+Tab right for the Brain Index hub?
 - [x] Hunt keys: re-decant to hold-K (1.2 s, with a progress prompt).
 - [ ] The phone camera vision shows signals too.
-- [ ] Wires and power shown in wizard eyes.
+- [x] Wires and power in wizard eyes and depth: pulses run along each line; seen once, E at the junction cuts it. Vat room: that bay goes dark. Support Unit: that camera goes blind, quietly.
 - [x] Hidden things shown in wizard eyes and the depth scan (a general list any scene can fill).
 - [ ] More hidden things: stashes, secret doors.
 - [x] The weak wall in the Growing Floor: wizard eyes show cracks, depth shows HOLLOW, E breaks it, the crawlway drops you past the Service Arcade gate.

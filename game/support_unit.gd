@@ -482,6 +482,16 @@ func _build_sight() -> void:
 	for remains_id in remains_nodes:
 		dead.append((remains_nodes[remains_id][0] as Node3D).global_position)
 	sight.set("spirits", dead)
+	# Wires and power: each camera's feed runs down the nearest wall to a
+	# junction at hand height. Seen in the modes, cut it with E and the camera
+	# dies quietly, where smashing it is loud.
+	var wires: Array = []
+	for lens in cameras:
+		var eye: Vector3 = lens.eye()
+		var wall_x := signf(eye.x if absf(eye.x) > 0.01 else 1.0) * (HALF_WIDTH - 0.15)
+		wires.append({"id": "%s_feed" % lens.camera_id, "points": [Vector3(wall_x, 1.3, eye.z), Vector3(wall_x, eye.y, eye.z), eye],
+			"on_cut": func() -> void: lens.smash("wire_cut")})
+	sight.set("wires", wires)
 
 
 func _build_hud() -> void:
@@ -740,6 +750,9 @@ func interact() -> String:
 			_refresh_tool()
 			_flash_message("TAKEN BACK // %s" % label)
 			return "take_back"
+	if sight != null and sight.call("cut_wire_near", player.global_position) != "":
+		_flash_message("THE FEED DIES // THAT CAMERA IS BLIND")
+		return "wire"
 	if gate_passed and _flat_distance(EXIT_AT) <= EXIT_REACH:
 		_leave()
 		return "exit"
@@ -870,6 +883,8 @@ func _update_hud() -> void:
 		prompt.text = post_prompt
 	elif gate_passed and _flat_distance(EXIT_AT) <= EXIT_REACH:
 		prompt.text = "[E] GO DOWN TO THE VEHICLE BAY"
+	elif sight != null and sight.call("wire_in_reach", player.global_position):
+		prompt.text = "[E] CUT THE CAMERA FEED // QUIET"
 	elif hack_target != null:
 		prompt.text = "[HOLD Q] LOOP ITS FEED  %s" % ("|".repeat(int(hack_hold / SecurityCamera.HACK_HOLD * 10.0)))
 	elif _facing_camera():
