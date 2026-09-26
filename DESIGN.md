@@ -1167,6 +1167,17 @@ World rules; realm identity and transition rules; what persists across realms; d
   - *Process:* merge to Play-Latest after every finished piece. Next in the
     Claude lane: "all above" (sounds, phone signals, more opening beats,
     the wizard-eyes look).
+- **Question boxes, 26 September (fourth set, Greg's answers):**
+  - *Real-mic V intake:* speak answers aloud with V, optional; typing still
+    works.
+  - *The examiner looks* tall and gaunt, bloodied coat, surgical mask and
+    loupe glasses.
+  - *Intake length:* 2-4 minutes, all eight pages, F skips.
+  - *The hack card* stays 2.6 s, skippable.
+  - *The Hunt:* roamer count as now; a full day about 40 real minutes;
+    extraction stays H at a point; escaped rivals return when a slot opens.
+  - *Screen:* body-cam minimal HUD; FOV 88, adjustable; subtitles on by
+    default; shake and bob as now, with a Settings slider.
 - **No zip files (Greg, 26 September):** "stop making zip files, it's
   pointless". Builds reach him as merges into `claude/dust-to-bones-look`;
   `Play-Latest.bat` pulls that branch into `P:\GameDev\playtest` and runs it
