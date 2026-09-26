@@ -72,7 +72,12 @@ func _ready() -> void:
 
 func _cameras() -> void:
 	var lens: SecurityCamera = unit.cameras[0]
-	check(lens.cone.visible and lens.lamp.visible, "a camera shows its cone, drawn and lit")
+	# Greg, 26 September: the signal is invisible unless a vision mode shows it.
+	check(not lens.cone.visible and not lens.lamp.visible, "a camera's signal is invisible by default")
+	SecurityCamera.show_signals(true)
+	check(lens.cone.visible and lens.lamp.visible, "a vision mode shows its cone, drawn and lit")
+	SecurityCamera.show_signals(false)
+	check(not lens.cone.visible, "and hides it again")
 	# Sweeping: the head's yaw is not the same a few seconds apart.
 	lens.step(STEP, Vector3(0, -50, 0), unit.player)
 	var before: float = lens.head.rotation.y

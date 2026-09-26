@@ -41,6 +41,13 @@ const HACK_HOLD := 1.2
 ## Yaw either side of the mount's facing that the sweep covers.
 @export var sweep_half := deg_to_rad(38.0)
 
+## Greg, 26 September: "the blue cctv camera things are not it, make it send
+## invisible signals that you can only see in those special K and J modes".
+## The cone and the beam are the signal: hidden unless a vision mode turns
+## them on. Detection does not change; only whether you can see it.
+static var signals_visible := false
+static var _all: Array = []
+
 var broken := false
 ## 0 nothing, 1 filmed. Rises while the lens holds the player.
 var lock := 0.0
@@ -149,6 +156,8 @@ func build(id: String, phase := 0.0) -> void:
 	tally.position = Vector3(0, 0.16, -0.1)
 	head.add_child(tally)
 	head.rotation.x = PITCH
+	_all.append(weakref(self))
+	_apply_signal_visibility()
 	if str(WorldHistory.subject(camera_id).get("state", "")) == "broken":
 		_show_broken(false)
 
@@ -243,9 +252,31 @@ func _tint() -> void:
 	# the idle wash is what drowned the Growing Floor, the warning is the cue.
 	cone_material.albedo_color = Color(colour, 0.07 + 0.16 * lock * blink)
 	lamp.light_color = colour
-	_lens_material.emission = colour
+	# Without the signal showing, the lens is just dark glass until it has you.
+	_lens_material.emission = colour if (signals_visible or tracking) else Color(0, 0, 0)
 	tally.light_energy = 2.5 * blink if tracking else 0.0
 	tally.visible = tracking
+
+
+## Every camera's signal on or off at once (a vision mode calls this).
+static func show_signals(on: bool) -> void:
+	signals_visible = on
+	var alive: Array = []
+	for ref in _all:
+		var lens = ref.get_ref()
+		if lens != null and is_instance_valid(lens):
+			lens._apply_signal_visibility()
+			alive.append(ref)
+	_all = alive
+
+
+func _apply_signal_visibility() -> void:
+	if broken:
+		return
+	if cone != null:
+		cone.visible = signals_visible
+	if lamp != null:
+		lamp.visible = signals_visible
 
 
 ## LMB with something heavy. Loud, final and recorded. `from` is where the
