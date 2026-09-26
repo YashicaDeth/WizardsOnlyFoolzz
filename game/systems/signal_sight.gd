@@ -105,6 +105,13 @@ func _process(delta: float) -> void:
 		strain = minf(1.0, strain + delta / STRAIN_SECONDS)
 	else:
 		strain = maxf(0.0, strain - delta / RECOVER_SECONDS)
+	# Off, the whole layer sleeps: a screen-reading shader copies the frame
+	# every frame it is visible, even when it draws nothing.
+	var active := mode != "" or strain > 0.0
+	if layer != null:
+		layer.visible = active
+	if not active:
+		return
 	if _material != null:
 		_material.set_shader_parameter("mode", {"": 0, "wizard": 1, "depth": 2}[mode])
 		_material.set_shader_parameter("strain", strain)

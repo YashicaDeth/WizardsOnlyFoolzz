@@ -120,6 +120,8 @@ const GLITCH_SPIDER := preload("res://systems/glitch_spider.gd")
 ## verdict at all — the same reason `storm_weather.gd`'s exposure only
 ## starts mattering past a real severity, not from the first drop of rain.
 const PERCEPTION_MAX_RANGE := 30.0
+const PERCEPTION_RID_REFRESH_MS := 1000
+const UPKEEP_INTERVAL := 0.25
 ## The screen spills some light back onto its holder, but much less than the
 ## beam broadcasts its own source. That gap is C7.1's warning interval: a
 ## hunter can notice the light before resolving the body behind it.
@@ -1997,7 +1999,13 @@ func _physics_process(delta: float) -> void:
 	cost = ScriptCost.lap("_update_rival", cost)
 	_update_encounter_actors(delta)
 	cost = ScriptCost.lap("_update_encounter_actors", cost)
-	_maintain_roamers(delta)
+	# World bookkeeping (holding work, contractor teams, roamer detail tiers,
+	# spawns) reads the ledger and walks every actor. Four times a second is
+	# as often as any of it changes; sixty was a sixth of the Hunt's frame.
+	_upkeep_clock += delta
+	if _upkeep_clock >= UPKEEP_INTERVAL:
+		_maintain_roamers(_upkeep_clock)
+		_upkeep_clock = 0.0
 	cost = ScriptCost.lap("_maintain_roamers", cost)
 	_update_carrion(delta)
 	cost = ScriptCost.lap("_update_carrion", cost)
@@ -9514,6 +9522,36 @@ func _update_storm_exposure(delta: float) -> void:
 ## `_update_camera()`'s own obstruction check already uses: nothing in the
 ## way reads as a clear sightline, anything else in the way reads as full
 ## cover.
+var _upkeep_clock := 0.0
+var _perception_player_cache: Array[RID] = []
+var _perception_player_stamp := -1000000
+
+
+func _perception_player_rids() -> Array[RID]:
+	var now := Time.get_ticks_msec()
+	if now - _perception_player_stamp > PERCEPTION_RID_REFRESH_MS or _perception_player_cache.is_empty():
+		_perception_player_stamp = now
+		_perception_player_cache = [player_body.get_rid()]
+		for zone in player_body.find_children("*", "CollisionObject3D", true, false):
+			_perception_player_cache.append((zone as CollisionObject3D).get_rid())
+	return _perception_player_cache
+
+
+func _perception_rig_rids(actor: Dictionary, hostile: Node3D) -> Array[RID]:
+	var now := Time.get_ticks_msec()
+	if actor.get("_perception_rig") == hostile and now - int(actor.get("_perception_stamp", -1000000)) <= PERCEPTION_RID_REFRESH_MS:
+		return actor["_perception_rids"]
+	var rids: Array[RID] = []
+	if hostile is CollisionObject3D:
+		rids.append((hostile as CollisionObject3D).get_rid())
+	for zone in hostile.find_children("*", "CollisionObject3D", true, false):
+		rids.append((zone as CollisionObject3D).get_rid())
+	actor["_perception_rig"] = hostile
+	actor["_perception_stamp"] = now
+	actor["_perception_rids"] = rids
+	return rids
+
+
 func _update_perception(delta: float) -> void:
 	var sprinting_now := Input.is_action_pressed("sprint") and player_body.velocity.length() > 0.5
 	player_noise = move_toward(player_noise, 1.0 if sprinting_now else 0.0, delta * 2.0)
@@ -9537,18 +9575,17 @@ func _update_perception(delta: float) -> void:
 			continue
 		var eye := hostile.global_position + Vector3.UP * 1.5
 		var distance := eye.distance_to(target)
-		var excluded: Array[RID] = [player_body.get_rid()]
 		# The ray starts at one anatomical rig and ends inside another. Excluding
 		# only the two CharacterBody roots left every Area3D zone in both rigs as
 		# fake "cover", so a hunter looking straight at a raised screen read their
 		# own chest hitbox as a wall. Real walls remain in the query; body zones at
 		# either endpoint do not.
-		for player_collider_node in player_body.find_children("*", "CollisionObject3D", true, false):
-			excluded.append((player_collider_node as CollisionObject3D).get_rid())
-		if hostile is CollisionObject3D:
-			excluded.append((hostile as CollisionObject3D).get_rid())
-		for hostile_collider_node in hostile.find_children("*", "CollisionObject3D", true, false):
-			excluded.append((hostile_collider_node as CollisionObject3D).get_rid())
+		# Greg, 26 September, "60 to 160 fps": walking both rigs for their zones
+		# was redone for every hunter on every physics frame, the largest single
+		# cost in the Hunt's script. The zones are collected once per rig and
+		# refreshed every second, which still catches a rig rebuilt mid-fight.
+		var excluded: Array[RID] = _perception_player_rids().duplicate()
+		excluded.append_array(_perception_rig_rids(actor, hostile))
 		var query := PhysicsRayQueryParameters3D.create(eye, target)
 		query.exclude = excluded
 		var obstruction := get_world_3d().direct_space_state.intersect_ray(query)

@@ -79,6 +79,9 @@ static func set_quality_name(value: String) -> void:
 		"ULTRA": quality = Quality.ULTRA
 		"PERFORMANCE": quality = Quality.PERFORMANCE
 		_: quality = Quality.HIGH
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null:
+		apply_viewport_quality(tree.root)
 
 
 ## Applies the part of a graphics tier owned by the viewport rather than its
@@ -88,6 +91,8 @@ static func apply_viewport_quality(viewport: Viewport) -> void:
 	if viewport == null:
 		return
 	viewport.scaling_3d_scale = float(QUALITY_RENDER_SCALE[quality])
+	# Below native, FSR 1 sharpens the upscale where bilinear would smear it.
+	viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR if viewport.scaling_3d_scale < 1.0 else Viewport.SCALING_3D_MODE_BILINEAR
 	viewport.msaa_3d = int(QUALITY_MSAA[quality]) as Viewport.MSAA
 	viewport.use_taa = quality != Quality.PERFORMANCE
 
