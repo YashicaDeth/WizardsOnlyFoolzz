@@ -6,9 +6,17 @@ extends Node
 ## Filing the intake is what puts the examiner at his post and opens the room,
 ## so that is what this does. The chamber's own camera is the player's eye at 88
 ## degrees inside a dark tank, which frames the workstation too loosely to
-## judge, so it is freed and replaced with a fixed look-check camera square to
-## the post. These are look-check frames: they are about the geometry of the
-## workstation and claim nothing about gameplay framing or staging.
+## judge, so it is moved to a fixed look-check position square to the post.
+## These are look-check frames: they are about the geometry of the workstation
+## and claim nothing about gameplay framing or staging.
+##
+## KNOWN, 26 September: this harness runs and writes its PNGs, but every angle
+## tried so far comes back near-black -- from the player's eye, from inside the
+## tank, and from both sides square to the post, at 8 frames and at 100 after
+## filing. So the station currently has NO visual proof, and its clearance is
+## proven numerically by `vat_station_clearance_test` instead. Whoever picks this
+## up should treat the room's lighting at the departure beat as the thing to fix,
+## not the camera placement.
 
 var out_dir := "P:/GameDev/Temp"
 
@@ -24,10 +32,12 @@ func _ready() -> void:
 	add_child(vat)
 	await get_tree().process_frame
 
-	# Filing opens his departure from the terminal, with him standing at it.
+	# Filing opens his departure from the terminal, with him standing at it. The
+	# room is not lit on the first frames -- the working opening capture holds a
+	# hundred of them before it shoots anything.
 	var state: Dictionary = vat.intake.sheet.apply_to_world()
 	vat.intake.filed.emit(state)
-	for _frame in 8:
+	for _frame in 100:
 		await get_tree().process_frame
 
 	var station := vat.get_node("UnknownExaminerStation") as Node3D
@@ -45,7 +55,7 @@ func _ready() -> void:
 	# back at his door and re-aims the camera before the shot.
 	vat.set_process(false)
 	vat.set_physics_process(false)
-	var look := vat.camera
+	var look: Camera3D = vat.camera
 	look.fov = 50.0
 	look.global_position = post + side * 2.5 + Vector3(0.0, 1.45, 0.0)
 	look.look_at(aim, Vector3.UP)
