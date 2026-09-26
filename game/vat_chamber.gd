@@ -273,6 +273,9 @@ func _build_title() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 64)
+	# Above the middle, where the E prompts and the aim sit: the flickering
+	# END ALL SUFFERING was drawn straight through "E // RIP IT OUT".
+	title.offset_bottom = -260.0
 	title.add_theme_color_override("font_color", Color("c8321e"))
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	title.visible = false

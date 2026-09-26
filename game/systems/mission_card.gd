@@ -107,6 +107,12 @@ func _inverted() -> bool:
 func _draw_title(view: Vector2, inverted: bool) -> void:
 	var words := text.split(" ")
 	var cap := minf(view.y * 0.2, view.x / maxf(6.0, float(_longest(words)) * 0.9))
+	# Letter count undersizes wide words (OVERTAKEN ran off the left edge):
+	# fit the widest word's real drawn width, tracking included, to 88%.
+	for word in words:
+		var drawn := CellOutzType.width(word, cap, cap * 0.08) + cap * 0.3
+		if drawn > view.x * 0.88:
+			cap *= view.x * 0.88 / drawn
 	var line_gap := cap * 1.25
 	var total := line_gap * float(words.size())
 	var top := view.y * 0.5 - total * 0.5 + cap * 0.1
