@@ -71,7 +71,7 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [ ] The phone camera vision shows signals too.
 - [x] Wires and power in wizard eyes and depth: pulses run along each line; seen once, E at the junction cuts it. Vat room: that bay goes dark. Support Unit: that camera goes blind, quietly.
 - [x] Hidden things shown in wizard eyes and the depth scan (a general list any scene can fill).
-- [ ] More hidden things: stashes, secret doors.
+- [x] Stashes and secret doors: 7 hidden things across the opening (Greg: 5-8), faint seam for plain eyes, found in K/J, opened with E; meds and ammo.
 - [x] The weak wall in the Growing Floor: wizard eyes show cracks, depth shows HOLLOW, E breaks it, the crawlway drops you past the Service Arcade gate.
 - [ ] **(Greg)** Is past-the-arcade-gate the right place for the shortcut to lead?
 - [ ] Wizard-eyes shader pass against the Ice King / green line-art reference.
@@ -88,6 +88,11 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [x] One shared jump/climb component (`JumpClimb`); the drains use it too.
 - [x] A climb test on a built stage (`jump_climb_test`), plus the drains climb test.
 - [x] Lower Works: ledge climbing as well as its jump.
+- [x] Sprint in the vat room (weak, grows as the body recovers) and in the Service Arcade.
+- [x] Crouch-slide everywhere in the opening: sprint + Ctrl, about 1 s, the view drops; a little noise in the Support Unit and drains.
+- [x] Small fall damage: only over 2.5 m, at most 15 blood, never lethal.
+- [x] Sounds, made in code: K choir hum that swells with strain, J sonar ping, weak-wall and secret-door crumble, hatch creak, wire spark.
+- [ ] **(Greg)** Listen to the five WAVs and say which to change.
 
 ## Art and look
 

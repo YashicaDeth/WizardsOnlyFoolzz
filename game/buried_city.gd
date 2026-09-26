@@ -606,8 +606,12 @@ func _physics_process(delta: float) -> void:
 	var pace := WALK_SPEED * (SPRINT_SCALE if Input.is_action_pressed("sprint") else 1.0)
 	# Mid-climb the haul owns the body; the rest of the frame still runs.
 	if not JUMP_CLIMB.busy(player):
-		player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 17.0 * delta)
-		player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 17.0 * delta)
+		# Greg, 26 September: sprint + Ctrl slides.
+		if Input.is_action_just_pressed("crouch"):
+			JUMP_CLIMB.try_slide(player, yaw, Input.is_action_pressed("sprint"))
+		if not JUMP_CLIMB.slide_step(player, delta):
+			player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 17.0 * delta)
+			player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 17.0 * delta)
 		if player.is_on_floor():
 			# The downward bias keeps them on slopes rather than skipping off the
 			# ramps, so the jump has to be written after it rather than into it.
@@ -618,7 +622,13 @@ func _physics_process(delta: float) -> void:
 				JUMP_CLIMB.press(player, yaw, JUMP_SPEED / JUMP_CLIMB.JUMP_SPEED, "lower_works_climbed")
 		else:
 			player.velocity.y -= 18.0 * delta
+		# The view drops low for the slide.
+		camera.position.y = move_toward(camera.position.y, 0.3 if JUMP_CLIMB.sliding(player) else 0.77, get_physics_process_delta_time() * 4.0)
 		player.move_and_slide()
+		# Small falls: they sting, never kill (the gantries are high here).
+		var fall_hurt := JUMP_CLIMB.landing_damage(player)
+		if fall_hurt > 0.0:
+			blood = maxf(1.0, blood - fall_hurt)
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	patrol_phase += delta

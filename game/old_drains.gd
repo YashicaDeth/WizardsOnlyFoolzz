@@ -293,6 +293,9 @@ func _build_sight() -> void:
 	sight.set("enabled", true)
 	sight.set("bodies", func() -> Array:
 		return [stalker.global_position] if stalker != null and is_instance_valid(stalker) else [])
+	# Greg, 26 September: a stash in the gallery wall, found in K or J.
+	caches.append(HIDDEN_CACHE.place_stash(self, sight, "old_drains_stash", Vector3(TUNNEL_WIDTH * 0.5, 1.5, -8.0), Vector3.LEFT))
+	sight.connect("hidden_seen", func(id: String) -> void: HIDDEN_CACHE.mark_found(caches, id))
 
 
 func _build_stalker() -> void:
@@ -373,6 +376,8 @@ func _unhandled_input(event: InputEvent) -> void:
 ## walkway lip out of the channel, the causeway out of the deep cistern) it
 ## pulls you up onto it instead. Returns what it did.
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const HIDDEN_CACHE := preload("res://systems/hidden_cache.gd")
+var caches: Array = []
 
 
 func jump_or_climb() -> String:
@@ -389,10 +394,17 @@ func _physics_process(delta: float) -> void:
 	var creeping := Input.is_action_pressed("crouch")
 	var pace := WALK_SPEED * (1.6 if Input.is_action_pressed("sprint") else 1.0) * (0.45 if creeping else 1.0)
 	camera.position.y = move_toward(camera.position.y, 0.3 if creeping else 0.77, delta * 3.0)
-	player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
-	player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
+	# Greg, 26 September: sprint + Ctrl slides (loud: it hunts by sound).
+	if Input.is_action_just_pressed("crouch"):
+		JUMP_CLIMB.try_slide(player, yaw, Input.is_action_pressed("sprint"))
+	if not JUMP_CLIMB.slide_step(player, delta):
+		player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
+		player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
 	JUMP_CLIMB.fall(player, delta)
 	player.move_and_slide()
+	var fall_hurt := JUMP_CLIMB.landing_damage(player)
+	if fall_hurt > 0.0:
+		stalker.blood = maxf(1.0, stalker.blood - fall_hurt)
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	_file_progress()
@@ -430,6 +442,8 @@ func _on_stalker_struck(_damage: float) -> void:
 func _interact() -> void:
 	if not rebirth_site.try_recover().is_empty():
 		return
+	if HIDDEN_CACHE.open_near(caches, player.global_position, sight) != "":
+		return
 	if surfaced or _flat_distance(EXIT_AT) > EXIT_REACH:
 		return
 	_enter("waste_gallery")
@@ -463,6 +477,8 @@ func _update_hud() -> void:
 		prompt.text = ""
 	elif not rebirth_site.nearest().is_empty():
 		prompt.text = "[E] TAKE BACK WHAT YOUR OLD BODY HOLDS"
+	elif not HIDDEN_CACHE.nearest(caches, player.global_position).is_empty():
+		prompt.text = "[E] OPEN THE HATCH"
 	elif _flat_distance(EXIT_AT) <= EXIT_REACH:
 		prompt.text = "[E] FORCE THE GRATE // CLIMB OUT"
 		osd.point_at(EXIT_AT + Vector3(0, 1.8, -1.2))

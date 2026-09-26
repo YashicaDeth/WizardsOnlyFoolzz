@@ -325,3 +325,15 @@ smallest playable version first.
 - The sky agency.
 - How humiliating the jester outfit is.
 - The map glitching (Walkthrough 2).
+## I. For the Dust page
+
+
+The Dust to Bones goal page lives in another account and cannot be edited from
+this repo. Copy this row across when it next opens.
+
+| Done | What | Proof |
+|---|---|---|
+| 26 Sep | **Base model kit for the opening, and the examiner's terminal moved to his end of the desk.** A shared low-poly base kit (`OpeningBaseModelKit`) with a gallery to judge it in (`opening_base_model_gallery`), so the examiner, the doctor and the guard stop being separate blocky placeholders. The terminal was 2.06 m from the man who uses it — a man beside a computer rather than at one — and now sits 0.93 m away at his end of the desk. **The desk itself did not move.** | `vat_station_clearance_test` measures it rather than eyeballing it: monitor clearance in world space, operator reach in the station's own local space. It fails on the old layout (2.06 m) and passes on the new (0.93 m), so it discriminates. `station_placement_test`, `opening_greeting_test`, `opening_handoff_test`, `opening_direction_test` and `captivity_procedure_test` all still green, so the doctor's walk to the glass is unchanged. |
+| 26 Sep | **The earlier desk/terminal values were wrong for this branch and were re-derived.** A rescue pass had moved the desk to x -0.80 and the monitor to x -1.15, computed against an older `vat_chamber.gd` where the examiner stood at x -0.16. On the current file he stands at x -1.45, so those values put the monitor *inside his body* — measured overlap on all three axes. Kept the intent, dropped the desk move, re-derived the monitor position. | Both value sets were run through `vat_station_clearance_test`: the rescue's fail on overlap (`-0.53, -0.68, -0.34` per-axis gap), the new one passes. |
+| Open | The station has **no visual proof yet.** `vat_station_sightline` runs and writes PNGs but every angle tried returns near-black, so the move is proven by measurement only. Someone still has to look at the room and confirm the screen reads well from inside the tank. | Harness and its known issue are documented in the file's header. |
+| Open | The kit is geometry-only: no authored art has replaced it yet, and the examiner model still waits on the Higgsfield M1 sheet. | |

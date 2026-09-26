@@ -26,6 +26,7 @@ signal hidden_seen(id: String)
 signal wire_cut(id: String)
 
 const SHADER := preload("res://shaders/signal_sight.gdshader")
+const SIGHT_AUDIO := preload("res://systems/sight_audio.gd")
 const BONE := Color("e6d4ac")
 const ACID := Color("b4da48")
 const BLOOD := Color("a8281a")
@@ -47,6 +48,12 @@ var hidden: Array = []
 var wires: Array = []
 ## How close the supply end of a seen wire must be to cut it, in metres.
 const WIRE_REACH := 1.7
+## Greg, 26 September: a live wire cut blind shocks you (8 blood and a flash)
+## unless you saw it in wizard eyes first. The depth scan shows the line but
+## not whether it is live.
+const SHOCK_BLOOD := 8.0
+var last_cut_shocked := false
+var shock_flash := 0.0
 var seen: Dictionary = {}
 ## How close a hidden thing has to be to be noticed, in metres.
 const HIDDEN_RANGE := 9.0
@@ -55,6 +62,9 @@ var layer: CanvasLayer
 var screen: ColorRect
 var marks: Control
 var _material: ShaderMaterial
+## K's choir hum and J's sonar ping (Greg, 26 September).
+var choir: AudioStreamPlayer
+var sonar: AudioStreamPlayer
 var _wizard_on := false
 var _depth_held := false
 
@@ -78,6 +88,18 @@ func setup(camera: Camera3D) -> void:
 	layer.add_child(marks)
 	marks.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	marks.draw.connect(_draw_marks)
+	var bus := "SFX" if AudioServer.get_bus_index("SFX") >= 0 else "Master"
+	choir = AudioStreamPlayer.new()
+	choir.name = "WizardEyesChoir"
+	choir.stream = SIGHT_AUDIO.stream("choir")
+	choir.bus = bus
+	add_child(choir)
+	sonar = AudioStreamPlayer.new()
+	sonar.name = "DepthSonar"
+	sonar.stream = SIGHT_AUDIO.stream("sonar")
+	sonar.bus = bus
+	sonar.volume_db = -12.0
+	add_child(sonar)
 	_apply()
 
 
@@ -128,9 +150,11 @@ func _process(delta: float) -> void:
 		strain = maxf(0.0, strain - delta / RECOVER_SECONDS)
 	# Off, the whole layer sleeps: a screen-reading shader copies the frame
 	# every frame it is visible, even when it draws nothing.
-	var active := mode != "" or strain > 0.0
+	shock_flash = maxf(0.0, shock_flash - delta)
+	var active := mode != "" or strain > 0.0 or shock_flash > 0.0
 	if layer != null:
 		layer.visible = active
+	_update_audio()
 	if not active:
 		return
 	if mode != "":
@@ -150,6 +174,8 @@ func _project(point: Vector3) -> Variant:
 
 
 func _draw_marks() -> void:
+	if shock_flash > 0.0:
+		marks.draw_rect(Rect2(Vector2.ZERO, marks.size), Color(0.85, 0.95, 1.0, shock_flash * 1.6))
 	if mode == "" and strain <= 0.0:
 		return
 	if mode != "":
@@ -342,15 +368,18 @@ func _draw_wires() -> void:
 func _notice_wires() -> void:
 	var screen_rect := Rect2(Vector2.ZERO, view.get_viewport().get_visible_rect().size)
 	for wire: Dictionary in wires:
-		if bool(wire.get("seen", false)):
+		if bool(wire.get("seen", false)) and (bool(wire.get("seen_in_wizard", false)) or mode != "wizard"):
 			continue
 		var points: Array = wire.get("points", [])
 		if points.is_empty() or view.global_position.distance_to(points[0]) > HIDDEN_RANGE:
 			continue
 		var at = _project(points[0])
 		if at != null and screen_rect.has_point(at):
-			wire["seen"] = true
-			WorldHistory.record_event("signal_sight_found_wire", {"id": str(wire.get("id", "")), "mode": mode})
+			if mode == "wizard":
+				wire["seen_in_wizard"] = true
+			if not bool(wire.get("seen", false)):
+				wire["seen"] = true
+				WorldHistory.record_event("signal_sight_found_wire", {"id": str(wire.get("id", "")), "mode": mode})
 
 
 ## Cuts the nearest seen, live wire whose supply end is within reach.
@@ -373,9 +402,14 @@ func cut_wire_near(position: Vector3) -> String:
 		return ""
 	best["cut"] = true
 	var id := str(best.get("id", ""))
+	last_cut_shocked = not bool(best.get("seen_in_wizard", false))
+	if last_cut_shocked:
+		shock_flash = 0.35
+		WorldHistory.record_event("power_wire_shock", {"id": id, "blood": SHOCK_BLOOD})
 	var on_cut: Callable = best.get("on_cut", Callable())
 	if on_cut.is_valid():
 		on_cut.call()
+	SIGHT_AUDIO.play_at(self, "spark", (best.get("points", [position]) as Array)[0])
 	WorldHistory.record_event("power_wire_cut", {"id": id})
 	wire_cut.emit(id)
 	return id
@@ -388,3 +422,20 @@ func wire_in_reach(position: Vector3) -> bool:
 			if Vector2(supply.x - position.x, supply.z - position.z).length() <= WIRE_REACH:
 				return true
 	return false
+
+
+## The hum swells as the strain builds; the ping runs only while J is held.
+func _update_audio() -> void:
+	if choir == null:
+		return
+	var wizard := mode == "wizard"
+	if wizard and not choir.playing:
+		choir.play()
+	elif not wizard and choir.playing:
+		choir.stop()
+	choir.volume_db = lerpf(-20.0, -8.0, strain)
+	var depth := mode == "depth"
+	if depth and not sonar.playing:
+		sonar.play()
+	elif not depth and sonar.playing:
+		sonar.stop()

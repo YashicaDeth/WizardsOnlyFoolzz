@@ -1,5 +1,9 @@
 extends Node3D
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const HIDDEN_CACHE := preload("res://systems/hidden_cache.gd")
+## The closet behind the secret door: against the right wall, clear of the
+## cells (-18, -58), the reinforcement doors (-47, -88) and the gate.
+const CLOSET_Z := -36.0
 const LOOK := preload("res://systems/look_settings.gd")
 
 ## THE MENTAL AND PHYSICAL SUPPORT UNIT, after the elevator down (Greg, 24
@@ -81,6 +85,8 @@ var cameras: Array[SecurityCamera] = []
 var guards: Array = []
 ## K wizard eyes / J depth scan.
 var sight: Node
+## Stashes and secret doors (HiddenCache records).
+var caches: Array = []
 var cells: Array[BingyangCell] = []
 var bingyangers: Array = []
 var guard_post: FacilityGuardPost
@@ -490,8 +496,60 @@ func _build_sight() -> void:
 		var eye: Vector3 = lens.eye()
 		var wall_x := signf(eye.x if absf(eye.x) > 0.01 else 1.0) * (HALF_WIDTH - 0.15)
 		wires.append({"id": "%s_feed" % lens.camera_id, "points": [Vector3(wall_x, 1.3, eye.z), Vector3(wall_x, eye.y, eye.z), eye],
-			"on_cut": func() -> void: lens.smash("wire_cut")})
+			"on_cut": func() -> void:
+				lens.smash("wire_cut")
+				_send_guard_to_check(lens)})
 	sight.set("wires", wires)
+	_build_hidden()
+
+
+## Greg, 26 September: stashes and secret doors, found in K or J, opened with
+## E. A hatch in the left wall; and on the right, a bulkhead that is really a
+## closet door, with a second stash inside.
+func _build_hidden() -> void:
+	caches.append(HIDDEN_CACHE.place_stash(self, sight, "support_unit_stash", Vector3(-HALF_WIDTH, 1.2, -40.0), Vector3.RIGHT))
+	var front_x := HALF_WIDTH - 2.15
+	var half := 1.5
+	var door_half := 0.6
+	var tall := 2.8
+	# Front wall either side of the door, a lintel over it, two sides, a roof.
+	for side in [-1.0, 1.0]:
+		var piece := half - door_half
+		_slab(Vector3(0.3, tall, piece), Vector3(front_x, tall * 0.5, CLOSET_Z + side * (door_half + piece * 0.5)), "wall")
+		_slab(Vector3(2.15, tall, 0.3), Vector3(front_x + 1.075, tall * 0.5, CLOSET_Z + side * (half + 0.15)), "wall")
+	_slab(Vector3(0.3, tall - 2.1, door_half * 2.0), Vector3(front_x, 2.1 + (tall - 2.1) * 0.5, CLOSET_Z), "wall")
+	_slab(Vector3(2.15, 0.2, half * 2.0 + 0.6), Vector3(front_x + 1.075, tall + 0.1, CLOSET_Z), "ceiling")
+	caches.append(HIDDEN_CACHE.place_door(self, sight, "support_unit_closet", Vector3(front_x, 0.0, CLOSET_Z), Vector3.LEFT))
+	caches.append(HIDDEN_CACHE.place_stash(self, sight, "support_unit_closet_stash", Vector3(HALF_WIDTH, 1.1, CLOSET_Z), Vector3.LEFT))
+	var bulb := OmniLight3D.new()
+	bulb.position = Vector3(front_x + 1.2, 2.3, CLOSET_Z)
+	bulb.light_color = Color("c9b98f")
+	bulb.light_energy = 0.7
+	bulb.omni_range = 2.4
+	add_child(bulb)
+	sight.connect("hidden_seen", func(id: String) -> void:
+		if HIDDEN_CACHE.mark_found(caches, id):
+			_flash_message("SOMETHING HIDDEN THERE // THE MODES SEE THE SEAM"))
+
+
+## Greg, 26 September: a dead camera brings one guard to check it for about
+## twenty seconds, then back to his round. A lure you can use.
+const DEAD_FEED_CHECK_SECONDS := 20.0
+
+
+func _send_guard_to_check(lens: Node3D) -> void:
+	var nearest: Node = null
+	var best := INF
+	for guard in guards:
+		if guard.is_down():
+			continue
+		var distance: float = ((guard as Node3D).global_position - lens.global_position).length()
+		if distance < best:
+			best = distance
+			nearest = guard
+	if nearest != null:
+		nearest.distract(lens, DEAD_FEED_CHECK_SECONDS)
+		WorldHistory.record_event("guard_checks_dead_camera", {"camera_id": str(lens.get("camera_id")), "guard": str(nearest.name)})
 
 
 func _build_hud() -> void:
@@ -750,8 +808,19 @@ func interact() -> String:
 			_refresh_tool()
 			_flash_message("TAKEN BACK // %s" % label)
 			return "take_back"
+	match HIDDEN_CACHE.open_near(caches, player.global_position, sight):
+		"stash":
+			_flash_message("A FIELD DRESSING AND FOUR ROUNDS // SOMEBODY HID THESE")
+			return "stash"
+		"door":
+			_flash_message("THE BULKHEAD SWINGS // A CLOSET BEHIND IT")
+			return "secret_door"
 	if sight != null and sight.call("cut_wire_near", player.global_position) != "":
-		_flash_message("THE FEED DIES // THAT CAMERA IS BLIND")
+		if bool(sight.get("last_cut_shocked")):
+			blood = maxf(1.0, blood - sight.SHOCK_BLOOD)
+			_flash_message("IT WAS LIVE // THE SHOCK BITES // THE FEED DIES")
+		else:
+			_flash_message("THE FEED DIES // THAT CAMERA IS BLIND // SOMEONE WILL COME LOOK")
 		return "wire"
 	if gate_passed and _flat_distance(EXIT_AT) <= EXIT_REACH:
 		_leave()
@@ -807,10 +876,18 @@ func _move(delta: float) -> void:
 	var running := Input.is_action_pressed("sprint")
 	var pace := WALK_SPEED * (1.6 if running else 1.0) * (0.45 if creeping else 1.0)
 	camera.position.y = move_toward(camera.position.y, 0.3 if creeping else 0.77, delta * 3.0)
-	player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
-	player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
+	# Greg, 26 September: sprint + Ctrl slides, with a little noise, like running.
+	if Input.is_action_just_pressed("crouch") and JUMP_CLIMB.try_slide(player, yaw, running):
+		_on_noise(player.global_position, 0.45)
+	if not JUMP_CLIMB.slide_step(player, delta):
+		player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
+		player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
 	JUMP_CLIMB.fall(player, delta)
 	player.move_and_slide()
+	# Small falls: they sting, never kill.
+	var fall_hurt := JUMP_CLIMB.landing_damage(player)
+	if fall_hurt > 0.0:
+		blood = maxf(1.0, blood - fall_hurt)
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	# Running on tile carries; walking does not.
@@ -883,6 +960,8 @@ func _update_hud() -> void:
 		prompt.text = post_prompt
 	elif gate_passed and _flat_distance(EXIT_AT) <= EXIT_REACH:
 		prompt.text = "[E] GO DOWN TO THE VEHICLE BAY"
+	elif not HIDDEN_CACHE.nearest(caches, player.global_position).is_empty():
+		prompt.text = "[E] OPEN IT" if str(HIDDEN_CACHE.nearest(caches, player.global_position).kind) == "door" else "[E] OPEN THE HATCH"
 	elif sight != null and sight.call("wire_in_reach", player.global_position):
 		prompt.text = "[E] CUT THE CAMERA FEED // QUIET"
 	elif hack_target != null:

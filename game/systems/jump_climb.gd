@@ -78,3 +78,62 @@ static func fall(body: CharacterBody3D, delta: float) -> void:
 
 static func is_jump_key(event: InputEvent) -> bool:
 	return event is InputEventKey and event.pressed and not event.echo and (event as InputEventKey).keycode == KEY_SPACE
+
+
+# --- Greg, 26 September (question boxes): a crouch-slide, and small falls. ---
+
+## Sprint + Ctrl: a burst forward that slows over about a second.
+const SLIDE_SECONDS := 1.0
+const SLIDE_SPEED := 7.0
+## Falls hurt only past this drop, and never more than FALL_MAX blood.
+const FALL_SAFE_METRES := 2.5
+const FALL_MAX := 15.0
+
+
+static func sliding(body: CharacterBody3D) -> bool:
+	return body != null and float(body.get_meta("slide_left", 0.0)) > 0.0
+
+
+## Starts a slide when the body is on the floor and sprinting. The direction
+## is where it is already moving, or where it faces if it is barely moving.
+static func try_slide(body: CharacterBody3D, yaw: float, sprinting: bool) -> bool:
+	if body == null or busy(body) or sliding(body) or not sprinting or not body.is_on_floor():
+		return false
+	var flat := Vector3(body.velocity.x, 0.0, body.velocity.z)
+	var along := flat.normalized() if flat.length() > 1.0 else Basis(Vector3.UP, yaw) * Vector3.FORWARD
+	body.set_meta("slide_left", SLIDE_SECONDS)
+	body.set_meta("slide_dir", along)
+	WorldHistory.record_event("player_slid", {})
+	return true
+
+
+## While sliding the slide owns the body's horizontal speed; returns true
+## so the host skips its own steering this frame.
+static func slide_step(body: CharacterBody3D, delta: float) -> bool:
+	if not sliding(body):
+		return false
+	var left := maxf(0.0, float(body.get_meta("slide_left", 0.0)) - delta)
+	body.set_meta("slide_left", left)
+	var along: Vector3 = body.get_meta("slide_dir", Vector3.FORWARD)
+	var speed := SLIDE_SPEED * lerpf(0.35, 1.0, left / SLIDE_SECONDS)
+	body.velocity.x = along.x * speed
+	body.velocity.z = along.z * speed
+	return true
+
+
+## Call after move_and_slide. Tracks the fastest fall while airborne and, on
+## landing, returns the blood it costs (0 for anything under 2.5 m).
+static func landing_damage(body: CharacterBody3D) -> float:
+	if body == null or busy(body):
+		return 0.0
+	if not body.is_on_floor():
+		body.set_meta("fall_speed", maxf(float(body.get_meta("fall_speed", 0.0)), -body.velocity.y))
+		return 0.0
+	var speed := float(body.get_meta("fall_speed", 0.0))
+	body.set_meta("fall_speed", 0.0)
+	var drop := speed * speed / (2.0 * GRAVITY)
+	if drop <= FALL_SAFE_METRES:
+		return 0.0
+	var hurt := clampf((drop - FALL_SAFE_METRES) * 6.0, 1.0, FALL_MAX)
+	WorldHistory.record_event("player_fall_hurt", {"drop": snappedf(drop, 0.1), "blood": snappedf(hurt, 0.1)})
+	return hurt

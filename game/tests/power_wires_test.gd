@@ -57,6 +57,7 @@ func _ready() -> void:
 	key(vat, KEY_E)
 	check(bool(wire.get("cut", false)) and not strip.visible, "E cuts it and that bay goes dark")
 	check(WorldHistory.event_count("power_wire_cut") == 1, "the cut is recorded")
+	check(not vat.sight.last_cut_shocked, "seen in wizard eyes, it does not shock")
 	vat.queue_free()
 	await get_tree().process_frame
 
@@ -71,8 +72,23 @@ func _ready() -> void:
 	feed["seen"] = true
 	var at: Vector3 = feed.points[0]
 	unit.player.global_position = Vector3(at.x - signf(at.x) * 0.9, 0.9, at.z)
+	var blood_before: float = unit.blood
 	check(unit.interact() == "wire", "E at the junction cuts the camera feed")
 	check(lens.broken, "and the camera is blind")
 	check(str(WorldHistory.subject(lens.camera_id).get("broken_by", "")) == "wire_cut", "broken by the wire, on record")
+	check(unit.sight.last_cut_shocked and is_equal_approx(unit.blood, blood_before - unit.sight.SHOCK_BLOOD), "cut without seeing it in K: the live wire shocks you (%.0f -> %.0f)" % [blood_before, unit.blood])
+	var checking := false
+	for guard in unit.guards:
+		if guard.distraction == lens:
+			checking = true
+	check(checking and WorldHistory.event_count("guard_checks_dead_camera") == 1, "a guard comes to check the dead camera")
+	var second: Dictionary = feeds[1]
+	second["seen"] = true
+	second["seen_in_wizard"] = true
+	var at2: Vector3 = second.points[0]
+	unit.player.global_position = Vector3(at2.x - signf(at2.x) * 0.9, 0.9, at2.z)
+	var blood_mid: float = unit.blood
+	unit.interact()
+	check(not unit.sight.last_cut_shocked and is_equal_approx(unit.blood, blood_mid), "seen in K first: no shock")
 	print("POWER_WIRES_TEST_RESULT failures=%d" % failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

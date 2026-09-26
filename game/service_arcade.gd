@@ -1,6 +1,8 @@
 extends Node3D
 const LOOK := preload("res://systems/look_settings.gd")
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const HIDDEN_CACHE := preload("res://systems/hidden_cache.gd")
+const SIGNAL_SIGHT := preload("res://systems/signal_sight.gd")
 
 ## THE SERVICE ARCADE — the first real district after the Growing Floor.
 ## A short, original hub-and-spoke slice: the vat corridor opens into a tall
@@ -58,6 +60,8 @@ var gate_open := false
 static var arrive_by_duct := false
 const DUCT_ARRIVAL := Vector3(1.6, 1.0, -51.5)
 var duct_arrival := false
+var sight: Node
+var caches: Array = []
 var gate_body: StaticBody3D
 var gate_panel: Node3D
 var card_visual: MeshInstance3D
@@ -113,7 +117,20 @@ func _ready() -> void:
 	$HUD.add_child(osd)
 	osd.adopt(vitals, objective, prompt, "SUBLEVEL 0C  //  SERVICE ARCADE")
 	osd.camera = camera
+	_build_sight()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+## K and J here too (they are yours from the brain hack on), and a stash in
+## the left wall between the first two arches.
+func _build_sight() -> void:
+	sight = SIGNAL_SIGHT.new()
+	sight.name = "SignalSight"
+	add_child(sight)
+	sight.call("setup", camera)
+	sight.set("enabled", true)
+	caches.append(HIDDEN_CACHE.place_stash(self, sight, "service_arcade_stash", Vector3(-7.025, 1.2, -4.2), Vector3.RIGHT))
+	sight.connect("hidden_seen", func(id: String) -> void: HIDDEN_CACHE.mark_found(caches, id))
+
 
 func _build_player() -> void:
 	player = CharacterBody3D.new()
@@ -422,10 +439,21 @@ func _physics_process(delta: float) -> void:
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
 	# Mid-climb the haul owns the body; the gate check below still runs.
 	if not JUMP_CLIMB.busy(player):
-		player.velocity.x = move_toward(player.velocity.x, direction.x * 3.4, 16.0 * delta)
-		player.velocity.z = move_toward(player.velocity.z, direction.z * 3.4, 16.0 * delta)
+		# Sprint here too (Greg, 26 September), and sprint + Ctrl slides.
+		var sprinting := Input.is_action_pressed("sprint")
+		var pace := 3.4 * (1.6 if sprinting else 1.0)
+		if Input.is_action_just_pressed("crouch"):
+			JUMP_CLIMB.try_slide(player, yaw, sprinting)
+		if not JUMP_CLIMB.slide_step(player, delta):
+			player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
+			player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
+		# The view drops low for the slide.
+		camera.position.y = move_toward(camera.position.y, 0.3 if JUMP_CLIMB.sliding(player) else 0.77, get_physics_process_delta_time() * 4.0)
 		JUMP_CLIMB.fall(player, delta)
 		player.move_and_slide()
+		var fall_hurt := JUMP_CLIMB.landing_damage(player)
+		if fall_hurt > 0.0:
+			blood = maxf(1.0, blood - fall_hurt)
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	# The arcade is a route, not a lockout puzzle. If the card was collected,
@@ -448,6 +476,8 @@ func _interact() -> void:
 		return
 	var remains_id := _nearest_remains()
 	if not remains_id.is_empty() and _recover_remains(remains_id):
+		return
+	if HIDDEN_CACHE.open_near(caches, player.global_position, sight) != "":
 		return
 	var said := guard_post.interact(player.global_position, weapon_taken)
 	if not said.is_empty():
@@ -542,6 +572,8 @@ func _update_hud() -> void:
 		prompt.text = post_prompt
 	elif inspect_held:
 		prompt.text = "BREACH TOOL // PNEUMATIC RAM, ONE CHARGE CANISTER // CLICK AT A LOCKED DOOR" if weapon_taken else "NOTHING IN HAND TO INSPECT"
+	elif not HIDDEN_CACHE.nearest(caches, player.global_position).is_empty():
+		prompt.text = "[E] OPEN THE HATCH"
 	elif card_on_pedestal and _flat_distance(CARD_AT) <= 2.3:
 		prompt.text = "[E] TAKE STAFF ACCESS CARD"
 		osd.point_at(CARD_AT + Vector3(0, 0.3, 0))

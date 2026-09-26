@@ -26,6 +26,7 @@ const INTAKE_WATCHERS := preload("res://systems/intake_watchers.gd")
 const BRAIN_HACK := preload("res://systems/brain_hack.gd")
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
 const SERVICE_ARCADE := preload("res://service_arcade.gd")
+const HIDDEN_CACHE := preload("res://systems/hidden_cache.gd")
 const SIGNAL_SIGHT := preload("res://systems/signal_sight.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
@@ -112,6 +113,8 @@ var sight: Node
 var weak_wall_body: StaticBody3D
 ## Each bay's ceiling strip and the power line feeding it down the left wall.
 var strip_lights: Array = []
+## Stashes and secret doors (HiddenCache records).
+var caches: Array = []
 var weak_wall_found := false
 var weak_wall_broken := false
 var shortcut_taken := false
@@ -296,6 +299,8 @@ func _ready() -> void:
 		wires.append({"id": "growing_floor_strip_%d" % index, "points": [Vector3(-7.3, 1.3, z), Vector3(-7.3, 3.9, z), Vector3(0, 3.9, z)],
 			"on_cut": func() -> void: strip.visible = false})
 	sight.set("wires", wires)
+	# A stash in the left wall between the second and third bays.
+	caches.append(HIDDEN_CACHE.place_stash(self, sight, "growing_floor_stash", Vector3(-7.35, 1.0, -5.75), Vector3.RIGHT))
 	brain_hack = BRAIN_HACK.new()
 	$HUD.add_child(brain_hack)
 	brain_hack.connect("hack_finished", _on_hack_finished)
@@ -789,6 +794,13 @@ func _build_examination_station() -> void:
 	desk_mesh.size = Vector3(2.25, 0.07, 0.78)
 	desk_mesh.material = LabSurface.material("plate")
 	desk.mesh = desk_mesh
+	# The desk stays where it is. What was wrong was not the desk but the
+	# terminal sitting at the far end of it: the man stands at local x -1.45 and
+	# the screen sat at 0.60, so his own workstation was 2.06 m of table away
+	# from him -- a man beside a computer rather than at one. The screen now
+	# sits at his end, 0.90 m away, over the desk and clear of his body.
+	# `vat_station_clearance_test` holds all three of those numbers.
+	const MONITOR_X := -0.55
 	desk.position = Vector3(0.05, 0.86, 0.25)
 	station.add_child(desk)
 	# Greg, first launch (2026-09-24): "this floating table". It stands now.
@@ -804,26 +816,29 @@ func _build_examination_station() -> void:
 	# The physical monitor gives the player a point of attention in the room;
 	# its green code strips are geometry, not a flat title card.
 	var monitor := MeshInstance3D.new()
+	# Named so the clearance between the terminal and the man is a thing a test
+	# can measure and an artist can find, rather than an anonymous box in a list.
+	monitor.name = "ExaminerMonitor"
 	var monitor_mesh := BoxMesh.new()
-	monitor_mesh.size = Vector3(1.10, 0.76, 0.16)
+	monitor_mesh.size = Vector3(0.88, 0.62, 0.16)
 	monitor_mesh.material = LabSurface.material("plate")
 	monitor.mesh = monitor_mesh
 	# The screen takes the right half of the desk, the examiner the left, and
 	# the keyboard sits between them under his hand. He used to stand 1.7m off
 	# to the side, which read as a man near a computer he had nothing to do
 	# with; the two now occupy one workstation without overlapping at all.
-	monitor.position = Vector3(0.60, 1.50, 0.28)
+	monitor.position = Vector3(MONITOR_X, 1.43, 0.28)
 	station.add_child(monitor)
 	var screen := MeshInstance3D.new()
 	var screen_mesh := QuadMesh.new()
-	screen_mesh.size = Vector2(0.96, 0.62)
+	screen_mesh.size = Vector2(0.76, 0.49)
 	var screen_material := StandardMaterial3D.new()
 	screen_material.albedo_color = Color("07120c")
 	screen_material.emission_enabled = true
 	screen_material.emission = Color("0d2a1a")
 	screen_mesh.material = screen_material
 	screen.mesh = screen_mesh
-	screen.position = Vector3(0.60, 1.50, 0.365)
+	screen.position = Vector3(MONITOR_X, 1.43, 0.365)
 	screen.rotation_degrees.y = 180.0
 	station.add_child(screen)
 	var stand := MeshInstance3D.new()
@@ -831,7 +846,7 @@ func _build_examination_station() -> void:
 	stand_mesh.size = Vector3(0.10, 0.30, 0.10)
 	stand_mesh.material = LabSurface.material("grime")
 	stand.mesh = stand_mesh
-	stand.position = Vector3(0.60, 1.03, 0.22)
+	stand.position = Vector3(MONITOR_X, 1.03, 0.22)
 	station.add_child(stand)
 	for line_index in 9:
 		var code := MeshInstance3D.new()
@@ -846,7 +861,7 @@ func _build_examination_station() -> void:
 		code.mesh = code_mesh
 		# The text sits on the monitor's camera-facing surface, aligned inside its
 		# frame rather than accidentally hovering behind it.
-		code.position = Vector3(0.20 + code_width * 0.5, 1.72 - float(line_index) * 0.055, 0.375)
+		code.position = Vector3(MONITOR_X - 0.32 + code_width * 0.5, 1.62 - float(line_index) * 0.045, 0.375)
 		station.add_child(code)
 	var keyboard := MeshInstance3D.new()
 	var keyboard_mesh := BoxMesh.new()
@@ -896,7 +911,7 @@ func _build_examination_station() -> void:
 	ClothingShell.stain(body, "right_leg", 0.15)
 	body.dress(wardrobe)
 	var screen_light := OmniLight3D.new()
-	screen_light.position = Vector3(0.52, 1.6, 0.02)
+	screen_light.position = Vector3(MONITOR_X, 1.5, 0.02)
 	screen_light.light_color = Color("8bbd79")
 	screen_light.light_energy = 4.4
 	screen_light.omni_range = 3.4
@@ -1026,7 +1041,12 @@ func _build_cradled_vat_subject(at: Vector3, seed_value: int, parent_node: Node3
 	var host: Node3D = self if parent_node == null else parent_node
 	host.add_child(rig)
 	rig.build(identity, {
-		"gore": false,
+		# Greg, 26 Sep (Q24): the tank specimens bleed. This was a flat `false`,
+		# so a body in the game's opening image could be opened up and not bleed
+		# while the identical rig bled everywhere else -- gore working in three
+		# of the four places it is supposed to. It now reads the same global
+		# setting the other scenes read, so OFF still turns it off.
+		"gore": BASELINE_HUMAN.apply_gore_setting(),
 		"seated": true,
 		"flesh": Color("6a4a43") if seed_value == 1 else Color("4d3833"),
 		"variation": 4 + seed_value * 5 + int(absf(at.x)),
@@ -1089,6 +1109,9 @@ func _near_weak_wall() -> bool:
 
 
 func _on_hidden_seen(id: String) -> void:
+	if HIDDEN_CACHE.mark_found(caches, id):
+		subtitle.text = "A HATCH IN THE WALL  //  SOMETHING KEPT BEHIND IT"
+		return
 	if id != WEAK_WALL_ID or weak_wall_found:
 		return
 	weak_wall_found = true
@@ -1108,6 +1131,7 @@ func break_weak_wall() -> bool:
 			thing["gone"] = true
 	opening_audio.cue("door")
 	subtitle.text = "THE PLASTER GIVES  //  A CRAWLWAY, WARM AIR COMING UP"
+	preload("res://systems/sight_audio.gd").play_at(self, "crumble", WEAK_WALL_AT, 0.0)
 	WorldHistory.record_event("growing_floor_weak_wall_broken", {"location": "growing_floor"})
 	return true
 
@@ -1932,18 +1956,31 @@ func _update_movement(delta: float) -> void:
 		Input.get_axis("move_forward", "move_back"),
 	)
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
-	var speed := 2.7 * float(anatomy.call("mobility_ratio"))
-	player.velocity.x = move_toward(player.velocity.x, direction.x * speed, 14.0 * delta)
-	player.velocity.z = move_toward(player.velocity.z, direction.z * speed, 14.0 * delta)
+	var mobility := float(anatomy.call("mobility_ratio"))
+	var speed := 2.7 * mobility
+	# Greg, 26 September: sprint here too, weak at first and growing as the
+	# new body recovers (the same mobility the jump reads); sprint + Ctrl slides.
+	var sprinting := Input.is_action_pressed("sprint")
+	if sprinting:
+		speed *= lerpf(1.15, 1.6, mobility)
+	if Input.is_action_just_pressed("crouch"):
+		JUMP_CLIMB.try_slide(player, yaw, sprinting)
+	if not JUMP_CLIMB.slide_step(player, delta):
+		player.velocity.x = move_toward(player.velocity.x, direction.x * speed, 14.0 * delta)
+		player.velocity.z = move_toward(player.velocity.z, direction.z * speed, 14.0 * delta)
 	JUMP_CLIMB.fall(player, delta)
 	player.move_and_slide()
+	var fall_hurt := JUMP_CLIMB.landing_damage(player)
+	if fall_hurt > 0.0:
+		anatomy.call("apply_hit", "left_leg", fall_hurt * 0.5, 0.0, "blunt")
+		anatomy.call("apply_hit", "right_leg", fall_hurt * 0.5, 0.0, "blunt")
 	if weak_wall_broken and player.global_position.x < DUCT_DEPTH_X:
 		take_shortcut()
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	# A body that just came out of a tank does not walk well.
 	var stride := Vector2(player.velocity.x, player.velocity.z).length()
-	camera.position.y = STANDING_EYE_OFFSET + sin(Time.get_ticks_msec() * 0.0055) * stride * 0.016
+	camera.position.y = STANDING_EYE_OFFSET + sin(Time.get_ticks_msec() * 0.0055) * stride * 0.016 - (0.5 if JUMP_CLIMB.sliding(player) else 0.0)
 	camera.rotation.z = sin(Time.get_ticks_msec() * 0.0027) * stride * 0.008
 
 
@@ -1956,8 +1993,14 @@ func _interact() -> void:
 		return
 	if break_weak_wall() or (_near_weak_wall() and take_shortcut()):
 		return
+	if HIDDEN_CACHE.open_near(caches, player.global_position, sight) == "stash":
+		subtitle.text = "A FIELD DRESSING AND FOUR ROUNDS  //  SOMEBODY HID THESE"
+		return
 	if sight != null and sight.call("cut_wire_near", player.global_position) != "":
 		subtitle.text = "THE LINE SPITS AND DIES  //  THAT BAY GOES DARK"
+		if bool(sight.get("last_cut_shocked")):
+			anatomy.call("apply_hit", "right_arm", sight.SHOCK_BLOOD, 0.0, "blunt")
+			subtitle.text = "IT WAS LIVE  //  THE SHOCK THROWS YOUR ARM BACK"
 		opening_audio.cue("door")
 		return
 	var to_door := door_marker.global_position - player.global_position
@@ -2104,6 +2147,9 @@ func _update_hud() -> void:
 		return
 	if weak_wall_broken and _near_weak_wall():
 		prompt.text = "[E] CRAWL IN   //   A WAY PAST THE PRESSURE GATE"
+		return
+	if not HIDDEN_CACHE.nearest(caches, player.global_position).is_empty():
+		prompt.text = "[E] OPEN THE HATCH"
 		return
 	if sight != null and sight.call("wire_in_reach", player.global_position):
 		prompt.text = "[E] CUT THE POWER LINE"

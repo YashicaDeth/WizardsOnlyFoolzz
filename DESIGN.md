@@ -1133,6 +1133,51 @@ World rules; realm identity and transition rules; what persists across realms; d
   to Greg):** power lines glow and pulse in K/J toward what they feed; once
   seen, E at the junction cuts one. Vat room strips go dark; Support Unit
   cameras go blind without the noise of smashing them.
+- **Hidden things (Greg, 26 September, question boxes 6-9):** stashes hold
+  meds and ammo; secret doors open with E once seen; five to eight hidden
+  things in the first 30 minutes; plain eyes get a faint hint (a hairline
+  seam). *Built:* seven (the weak wall; stashes in the vat room, Support Unit,
+  drains and Service Arcade; a Support Unit closet behind a secret door with
+  a second stash). A stash gives a field dressing and four rounds, into the
+  gun if you carry it, otherwise loose.
+- **Question boxes, 26 September (third set, Greg's answers):**
+  - *Movement:* climb stays 1.55 m. Sprint in the vat room, weaker and growing
+    as the body recovers. A crouch-slide: sprint + Ctrl, about a second, a
+    little noise. Fall damage: small, only over 2.5 m, at most 15 blood.
+  - *Timed run:* "working" means no crash, no dead end, under 30 minutes. The
+    run timer is hidden, shown on a card at the end with time per area.
+  - *Kept as built:* the weak wall leads past the arcade gate; the Hunt's
+    Brain Index hub stays on Shift+Tab; the nosebleed stays.
+  - *Sound:* K = a low choir hum that swells with strain; J = a sonar ping
+    with the sweep; the weak wall crumbles with a dust puff, hatches creak,
+    wires spit sparks.
+  - *Wires:* cutting a live one can shock you (8 blood and a flash) unless
+    you saw it in K first. A dead camera or light brings one guard to check
+    for about 20 seconds, then back: a lure.
+  - *The examiner:* an optional fight (revenge OR escape) in his office past
+    the staff door. Surgical tools and a syringe that slows you. Win: his
+    keycard and coat. Lose: back in the vat, and he keeps the coat.
+  - *Meds:* hold 4 to bandage, a few seconds, heals 20, no fighting while
+    you do it. Loose rounds load into any gun you find.
+  - *Gore:* full by default; everywhere (vat room and Support Unit too);
+    remains stay, capped, oldest removed first; hitstop as it is.
+  - *Art:* all four placeholder categories; media through LFS once
+    `lfs.github.com` is allowed in the cloud environment; terrain_3d
+    restored, pinned.
+  - *Process:* merge to Play-Latest after every finished piece. Next in the
+    Claude lane: "all above" (sounds, phone signals, more opening beats,
+    the wizard-eyes look).
+- **Question boxes, 26 September (fourth set, Greg's answers):**
+  - *Real-mic V intake:* speak answers aloud with V, optional; typing still
+    works.
+  - *The examiner looks* tall and gaunt, bloodied coat, surgical mask and
+    loupe glasses.
+  - *Intake length:* 2-4 minutes, all eight pages, F skips.
+  - *The hack card* stays 2.6 s, skippable.
+  - *The Hunt:* roamer count as now; a full day about 40 real minutes;
+    extraction stays H at a point; escaped rivals return when a slot opens.
+  - *Screen:* body-cam minimal HUD; FOV 88, adjustable; subtitles on by
+    default; shake and bob as now, with a Settings slider.
 - **No zip files (Greg, 26 September):** "stop making zip files, it's
   pointless". Builds reach him as merges into `claude/dust-to-bones-look`;
   `Play-Latest.bat` pulls that branch into `P:\GameDev\playtest` and runs it
