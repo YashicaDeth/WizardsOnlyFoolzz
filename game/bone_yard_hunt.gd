@@ -932,6 +932,10 @@ var _black_mirror_env: Environment
 
 
 func _ready() -> void:
+	# Greg, 26 September: "start me at the day time in the overworld".
+	# Play-Overworld.bat launches this scene directly with --daytime.
+	if "--daytime" in OS.get_cmdline_user_args():
+		WorldHistory.world_minute = WorldClock.OPENING_MINUTE
 	# The gore setting was only ever applied in the derby, so OFF did nothing
 	# once the player walked into the Hunt Grounds and REDUCED leaked across as
 	# a static the hunt never reset.
@@ -1775,7 +1779,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 			KEY_F:
 				if not third_person and not third_person_unlocked():
-					prompt.text = third_person_refusal()
+					_feedback(third_person_refusal())
 				else:
 					third_person = not third_person
 					body_motion.set_perspective(not third_person)
@@ -2413,11 +2417,12 @@ func _cycle_grip() -> void:
 	var id := str(arsenal.current_id) if arsenal != null else ""
 	var options: Array = GRIP_CYCLE.get(id, [])
 	if options.is_empty():
+		_feedback("ONLY THE BLADE CHANGES GRIP // 1 FOR THE SWORD")
 		return
 	var index := options.find(current_grip)
 	current_grip = options[(index + 1) % options.size()] if index >= 0 else options[0]
 	var spec: Dictionary = HeldGear.GRIPS.get(current_grip, {})
-	prompt.text = "%s // %s GRIP" % [str(arsenal.current().label), current_grip.to_upper().replace("_", "-")]
+	_feedback("%s // %s GRIP" % [str(arsenal.current().label), current_grip.to_upper().replace("_", "-")])
 	arsenal.apply_grip(current_grip)
 	PLAYER_ACTION_LEDGER.record("grip_changed", {"weapon": id, "grip": current_grip, "location": HUNT_LOCATION})
 	_carry_current_weapon(true)
@@ -3326,10 +3331,11 @@ func _cycle_smokeable() -> void:
 
 func _toggle_mouth_hold() -> void:
 	if smoke_model == null or not is_instance_valid(smoke_model) or smoke_drawing:
+		_feedback("NOTHING TO HOLD IN YOUR MOUTH // 6 PICKS A SMOKEABLE")
 		return
 	var device_id := str(smoke_model.get_meta("device_id", ""))
 	if device_id == "bong":
-		prompt.text = "THE BONG NEEDS BOTH HANDS"
+		_feedback("THE BONG NEEDS BOTH HANDS")
 		return
 	# Taking it back requires the hand that currently owns the weapon. Holster
 	# first, then let the existing transfer animation bring the same object back
@@ -5287,7 +5293,7 @@ func _begin_extraction() -> void:
 		return
 	var body := _nearest_robbable()
 	if body.is_empty():
-		prompt.text = "NOTHING WITHIN REACH WORTH OPENING"
+		_feedback("NOTHING WITHIN REACH WORTH OPENING")
 		extraction_session = {}
 		return
 	# AU1.2. A pocket, not a wound: checked and taken in one motion, before
@@ -5557,7 +5563,7 @@ func _nearest_takeable_chunk(radius: float) -> Node3D:
 func _equip_carried_limb() -> void:
 	var index: int = handheld.carry.first_index("limb")
 	if index < 0:
-		prompt.text = "CARRY HAS NO WHOLE LIMB"
+		_feedback("CARRY HAS NO WHOLE LIMB // CUT ONE OFF AND PICK IT UP")
 		return
 	_equip_carried_limb_index(index)
 
@@ -5738,7 +5744,7 @@ func _tick_k_hold(delta: float) -> void:
 		return
 	_k_held_for += delta
 	if _k_held_for >= WIZARD_TAP_SECONDS:
-		prompt.text = "HOLD K // RE-DECANT  %d%%" % int(clampf(_k_held_for / REDECANT_HOLD_SECONDS, 0.0, 1.0) * 100.0)
+		_feedback("HOLD K // RE-DECANT  %d%%" % int(clampf(_k_held_for / REDECANT_HOLD_SECONDS, 0.0, 1.0) * 100.0))
 	if _k_held_for >= REDECANT_HOLD_SECONDS:
 		_k_fired = true
 		_deliberate_redecant()
@@ -5765,6 +5771,7 @@ func _build_sight() -> void:
 func _deliberate_redecant() -> void:
 	var result := DEFEAT_ROUTER.redecant()
 	if result.is_empty():
+		_feedback("RE-DECANT ONLY WORKS WHILE YOU ARE HELD CAPTIVE")
 		return
 	health = 65
 	stamina = 70.0
@@ -7574,11 +7581,11 @@ func _lock_candidates() -> Array:
 func _toggle_lock() -> void:
 	if not lock_target.is_empty():
 		lock_target = ""
-		prompt.text = "LOCK RELEASED"
+		_feedback("LOCK RELEASED")
 		return
 	var candidates := _lock_candidates()
 	if candidates.is_empty():
-		prompt.text = "NOTHING TO LOCK"
+		_feedback("NOTHING TO LOCK ONTO")
 		return
 	# Prefer what the player is already looking at; fall back to the nearest.
 	var forward := Vector3(sin(yaw), 0, cos(yaw)).normalized()
@@ -7959,10 +7966,10 @@ func _toggle_black_mirror() -> void:
 	# Night vision is the phone's camera (Greg, 2026-09-24): no phone in hand,
 	# nothing to raise.
 	if not black_mirror_active and dropped_handheld != null and is_instance_valid(dropped_handheld):
-		prompt.text = "THE BLACK MIRROR IS ON THE GROUND"
+		_feedback("THE BLACK MIRROR IS ON THE GROUND")
 		return
 	if not black_mirror_active and (handheld == null or not is_instance_valid(handheld) or not handheld.possessed):
-		prompt.text = "NO PHONE IN HAND"
+		_feedback("NO PHONE IN HAND // THE BLACK MIRROR IS IN RESTRICTED STORAGE")
 		return
 	black_mirror_active = not black_mirror_active
 	var sensor := _mirror_sensor()
@@ -8340,7 +8347,7 @@ func _build_keys_card() -> void:
 			["CLINCH SPACE", "LET GO"],
 			["HOLD V", "LUNGS / CLINCH: PERSUADE"],
 			["X", "THREATEN"],
-			["H", "EXTRACTION"],
+			["H", "SEARCH A BODY"],
 			["N", "PHOTOGRAPH"],
 			["6", "CYCLE SMOKEABLE"],
 			["Y", "HAND / LIP-HOLD SMOKEABLE"],
@@ -8361,7 +8368,7 @@ func _build_keys_card() -> void:
 			["T", "CHARACTER TREE"],
 			["P", "THE BOARD"],
 			["F9", "ALLUSIONS ARTWORK"],
-			["K", "WIZARD EYES // SIGNALS, SPIRITS, HIDDEN THINGS"],
+			["K", "WIZARD EYES // WHAT HIDES, WHAT IS LIVE"],
 			["HOLD J", "DEPTH SCAN // BODIES THROUGH WALLS"],
 			["HOLD L + WASD", "LEAN / WAVE DEVICE LIGHT"],
 			[HANDHELD.DROP_KEY_LABEL, "DROP DEVICE"],
@@ -8492,6 +8499,10 @@ func _close_panel_views() -> void:
 		world_index.visible = false
 	if pin_board.visible:
 		pin_board.close()
+	# The Brain Index was the one surface this missed, so closing "everything"
+	# (raising the phone, Escape from code) left it hanging over play.
+	if brain_hub != null and brain_hub.visible:
+		brain_hub.close()
 	panel.visible = false
 
 
@@ -8618,10 +8629,22 @@ func _close_active_interface() -> bool:
 	return false
 
 
+## Greg, 26 September: every key on the F1 card answers. A refusal or a
+## result is held on the prompt line for a moment, where before the next
+## frame's context prompt wrote over it and the key seemed to do nothing.
+func _feedback(text: String) -> void:
+	prompt.visible = true
+	prompt.text = text
+	sleep_prompt_hold = maxf(sleep_prompt_hold, 1.8)
+
+
 func _toggle_handheld_surface() -> void:
 	if handheld.is_open:
 		handheld.close_device()
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		return
+	if not handheld.possessed:
+		_feedback("NO PHONE IN HAND // THE BLACK MIRROR IS IN RESTRICTED STORAGE")
 		return
 	firearm_aiming = false
 	# Pocket every other reader before raising the physical device. This also

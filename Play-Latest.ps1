@@ -1,3 +1,4 @@
+param([switch]$Overworld)
 $ErrorActionPreference = 'Stop'
 # Greg, 26 September: "stop making zip files, it's pointless."
 # Plays the newest integration branch straight from source. No zips, no parts.
@@ -21,4 +22,9 @@ if (-not (Test-Path (Join-Path $play '.git'))) {
 if ($LASTEXITCODE -ne 0) { throw "Could not update $play (exit $LASTEXITCODE)." }
 $commit = git -C $play rev-parse --short HEAD
 Write-Host "Playing $commit. The first run imports assets and takes a few minutes."
-& $toolState.godot --path (Join-Path $play 'game')
+if ($Overworld) {
+    # Straight into the Hunt (the overworld) at 13:00, daylight.
+    & $toolState.godot --path (Join-Path $play 'game') 'res://bone_yard_hunt.tscn' -- --daytime
+} else {
+    & $toolState.godot --path (Join-Path $play 'game')
+}
