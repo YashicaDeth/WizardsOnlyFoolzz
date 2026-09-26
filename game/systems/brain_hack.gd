@@ -23,9 +23,9 @@ const EMBER := Color("ff7a2a")
 const BLACK := Color("030504")
 
 ## Phase 3 of DESIGN/HIGGSFIELD_ROADMAP.md, laid under the drawn rune on the
-## beat the header asks for. B3 carries the baked line "THE DIE HACKED:
-## TERMINAL FAILURE DETECTED", which is not one of the canon lines; Greg has
-## not yet said whether to keep it, re-roll it or crop it.
+## beat the header asks for. PLATE_HACKED is a stand-in: its baked line is not
+## canon, so a text-free re-roll is queued in art/GENERATED.md and drops in
+## under the same filename. The card is drawn here, never baked into the art.
 const PLATE_SEAL := "res://art/higgsfield/breakout/b1_seal_in_skull.png"
 const PLATE_DIE := "res://art/higgsfield/breakout/b2_seal_to_die.png"
 const PLATE_HACKED := "res://art/higgsfield/breakout/b3_die_hacked.png"

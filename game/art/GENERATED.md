@@ -48,7 +48,7 @@ Source IDs are the untouched Higgsfield filenames.
 |---|---|---|---|---|---|
 | `higgsfield/breakout/b1_seal_in_skull.png` | Higgsfield | B1 | 2026-09-26 | D | Seal inside a skull, veins, cracks glowing. Wired under the rune-in beat of `systems/brain_hack.gd`. |
 | `higgsfield/breakout/b2_seal_to_die.png` | Higgsfield | B2 | 2026-09-26 | D | Seal shrinking into a CPU die, one acid-green path. Wired under the shrink beat. |
-| `higgsfield/breakout/b3_die_hacked.png` | Higgsfield | B3 | 2026-09-26 | D | Die hacked, RGB split, tracking boxes. Wired under the hack beat. **Not cleared**: carries baked text "THE DIE HACKED: TERMINAL FAILURE DETECTED" plus garbled readouts, which breaks roadmap rule 2 (canon lines only) and contradicts the in-game card. Awaiting keep / re-roll / crop from Greg. |
+| `higgsfield/breakout/b3_die_hacked.png` | Higgsfield | B3 | 2026-09-26 | D | Die hacked, RGB split, tracking boxes. Wired under the hack beat. **To be replaced**: Greg chose a re-roll rather than keeping or painting out its baked line "THE DIE HACKED: TERMINAL FAILURE DETECTED", which broke roadmap rule 2. The game already draws the canon card "BRAIN HACKED SOUL OVERTAKEN" over this beat, so the plate needs no text at all. Drop the re-roll over this same filename and the wiring picks it up unchanged. |
 | `higgsfield/breakout/b4_feed_cord.png` | Higgsfield | B4 | 2026-09-26 | D | Hands tearing the feed cord. Imported, **not wired** - see note below. |
 | `higgsfield/breakout/b4b_forearm_wires.png` | Higgsfield | B4b | 2026-09-26 | D | Hands ripping forearm wires. Imported, **not wired**. |
 | `higgsfield/breakout/b5_glass_burst.png` | Higgsfield | B5 | 2026-09-26 | D | Fist through tank glass. Imported, **not wired**. |
@@ -57,6 +57,25 @@ B4, B4b and B5 are first-person shots of hands doing the thing the player is
 about to do in real 3D (`CORD_TUGS`, `WIRE_TUGS`, `GLASS_BLOWS` in
 `vat_chamber.gd`). Dropping a still over those beats would hide the player's
 own actions, so they are staged as material and the call is left to Greg.
+Greg, 26 September: leave them unwired. They stay here as material.
+
+### B3 re-roll prompt
+
+Roadmap B3 asks for the card "BRAIN HACKED / SOUL OVERTAKEN", but the game
+already draws that card over this beat, so the plate should carry no words.
+Paste-ready:
+
+> Extreme close-up of a biological CPU die suspended in dark red fluid, seen
+> straight on. The organic seal that covered it has burned away into a single
+> acid-green conductive path that has won across the whole surface. Heavy RGB
+> channel separation on the die edges, horizontal scanlines, CRT digital
+> decay, thin white optical-tracking corner brackets around the die with no
+> text in them. PS2-era occult horror, dithered 8-bit colour, film grain,
+> practical grime and blood. Absolutely no lettering, no words, no numbers, no
+> captions, no watermarks, no readouts. 16:9.
+
+The current `b3_die_hacked.png` stays in place until this lands so the hack
+beat is never empty.
 
 ## Proof
 
