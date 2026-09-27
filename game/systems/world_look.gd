@@ -471,7 +471,16 @@ static func surface(color: Color, kind: String = "paint", variation_seed: int = 
 			# is what makes a limb with a lamp behind it glow at all.
 			material.backlight_enabled = true
 			material.backlight = Color(0.46, 0.11, 0.09)
-			_apply_grain(material, 2.2, 0.3, "flesh", variation_seed)
+			# Skin takes no contamination at all. `_apply_grain` is the rust and
+			# grime path: it lerps the tint toward growth and stain colours,
+			# posterises to seven steps, emits wherever the bloom is, filters
+			# NEAREST, and tiles a derived-art sheet over the top. On a wall that
+			# reads as a PS2 surface. On a body, at the triplanar scale flesh
+			# used, it showed up as a camouflage of hard-edged blocks a few
+			# decimetres across, which is what Greg read as "random pieces of
+			# squares" and as skin going black. Roughness, rim, transmittance and
+			# backlight above are what make it read as a body; they need no
+			# texture, and these meshes have no UVs to texture anyway.
 		"bone":
 			material.metallic = 0.0
 			material.roughness = 0.74
@@ -620,17 +629,10 @@ static func _apply_grain(material: StandardMaterial3D, scale: float, strength: f
 	if _material_hour >= 0.0:
 		material.emission_energy_multiplier = float(maps["glow"]) * lerpf(2.4, 0.45, _material_hour)
 	# G1.3. Greg's own artwork, as a detail layer over the procedural
-	# contamination rather than instead of it. Flesh only: the body is where a
-	# hand-made surface reads, and putting the same sheets on every wall would
-	# turn a texture set into wallpaper. Absent art changes nothing.
-	if kind == "flesh":
-		var sheet: Texture2D = ArtSet.pick("body", seed_value)
-		if sheet != null:
-			material.detail_enabled = true
-			material.detail_albedo = sheet
-			material.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MIX
-			material.detail_uv_layer = BaseMaterial3D.DETAIL_UV_1
-	elif kind in ["rust", "dirt", "bone", "paint"]:
+	# contamination. Architecture only now: flesh used to take a body sheet here
+	# and stopped, for the reason written at the "flesh" case above. Absent art
+	# changes nothing.
+	if kind in ["rust", "dirt", "bone", "paint"]:
 		# The architecture half of the same idea. Flesh was the only surface in
 		# the game that could carry hand-made art, which was fine while the
 		# game was one room and wrong the moment it became a buried city: the

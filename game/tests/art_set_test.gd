@@ -45,10 +45,19 @@ func _ready() -> void:
 	var other: Texture2D = ArtSet.pick("body", 6)
 	check(other != null, "a different seed still returns a sheet")
 
-	# G1.3: it reaches a real material.
+	# G1.3: it reaches a real material. Architecture still wears the sheets.
 	var flesh := WorldLook.surface(Color("6b5842"), "flesh", 4)
-	check(flesh.detail_enabled and flesh.detail_albedo != null, "flesh materials carry an art detail layer")
-	# Architecture takes its own sheets from `slab`, not the body's. Asserting
+	# Skin is clean by decision, not by omission. Greg, 27 September, on the
+	# bodies: "random pieces of squares... just fix our body model so it's a
+	# nice clean slim body." Contamination, a derived-art sheet, a seven-step
+	# posterise and NEAREST filtering at body scale were the squares, so flesh
+	# takes none of them. These four checks are the tripwire that stops the
+	# treatment creeping back onto a body.
+	check(not flesh.detail_enabled and flesh.detail_albedo == null, "flesh wears no art sheet")
+	check(flesh.albedo_texture == null, "flesh carries no procedural contamination")
+	check(not flesh.emission_enabled, "flesh does not glow where a bloom would be")
+	check(flesh.texture_filter != BaseMaterial3D.TEXTURE_FILTER_NEAREST, "flesh is not block-filtered")
+	# A wall still takes its sheets from `slab`, not the body's. Asserting
 	# "structural surfaces are left alone" was right while flesh was the only
 	# kind that could carry art, and becomes a tripwire the moment a single PNG
 	# lands in `art/derived/slab` -- so it checks the rule that actually holds:
@@ -63,8 +72,6 @@ func _ready() -> void:
 	# over chrome or pressure glass reads as dirt on the lens, not a surface.
 	var chrome := WorldLook.surface(Color("6b5842"), "chrome", 4)
 	check(not chrome.detail_enabled, "chrome is never given a grime sheet")
-	# The procedural contamination is still underneath it, not replaced.
-	check(flesh.albedo_texture != null, "the generated contamination still sits under the art")
 
 	# An unknown kind returns nothing rather than erroring, which is the same
 	# path a worktree without the pipeline output takes.
