@@ -481,6 +481,12 @@ func _think(text: String) -> void:
 	thought_life = 6.0
 	if thought_edit != null:
 		thought_edit.placeholder_text = "think out loud, then Enter"
+	# Greg, 26 September: speak the answers aloud with V (optional; the keys
+	# still work). A spoken answer, page turn, row or "confirm" is acted on
+	# like its key; anything else is a thought, as before.
+	if _voice_command(text):
+		queue_redraw()
+		return
 	var told := CharacterSheet.parse_birth(text)
 	if not told.is_empty():
 		_give_birth(told)
@@ -493,6 +499,55 @@ func _think(text: String) -> void:
 		WorldHistory.record_event("examiner_read_thought", {"thought": text.left(120)})
 		return
 	_speak("heard")
+
+
+const SPOKEN_NUMBERS := {"one": 0, "first": 0, "1": 0, "two": 1, "second": 1, "2": 1, "three": 2, "third": 2, "3": 2,
+	"four": 3, "fourth": 3, "4": 3, "five": 4, "fifth": 4, "5": 4, "six": 5, "sixth": 5, "6": 5}
+
+
+## A spoken line as a form action. True when it was one.
+func _voice_command(text: String) -> bool:
+	var said := text.to_lower().strip_edges().trim_suffix(".")
+	var words := said.split(" ", false)
+	if not answers.is_empty():
+		for index in answers.size():
+			if said == str(answers[index]).to_lower() or said.contains(str(answers[index]).to_lower()):
+				_answer(index)
+				return true
+		for word in words:
+			if SPOKEN_NUMBERS.has(word) and int(SPOKEN_NUMBERS[word]) < answers.size():
+				_answer(int(SPOKEN_NUMBERS[word]))
+				return true
+	if not procedure.is_empty():
+		return false
+	if said in ["next", "next page", "next one", "turn the page"]:
+		page = wrapi(page + 1, 0, PAGES.size())
+		_doctor_observe()
+		row = 0
+		_speak("page")
+		return true
+	if said in ["back", "previous", "previous page", "go back"]:
+		page = wrapi(page - 1, 0, PAGES.size())
+		_doctor_observe()
+		row = 0
+		return true
+	if said in ["confirm", "yes", "that one", "okay", "ok"]:
+		_commit()
+		return true
+	if said in ["file", "file it", "done", "i'm done", "finished"]:
+		if not verdict_started and _can_file():
+			_begin_verdict()
+		elif not verdict_started:
+			transcript = "STILL TO CONFIRM: " + ", ".join(_unconfirmed())
+			transcript_life = 4.5
+		return true
+	if words.size() <= 2:
+		for word in words:
+			if SPOKEN_NUMBERS.has(word) and int(SPOKEN_NUMBERS[word]) < _rows():
+				row = int(SPOKEN_NUMBERS[word])
+				_commit()
+				return true
+	return false
 
 
 func _rows() -> int:
@@ -771,7 +826,7 @@ func _draw_clipboard(rect: Rect2) -> void:
 	_draw_gauges(rect, ink, footer)
 	CellOutzType.draw_condensed(self, Vector2(26, footer + 36), "%s // %s RISING // %s" % [sheet.sun_sign(), sheet.ascendant(), sheet.modality().to_upper()], 9.0, ink * Color(1, 1, 1, 0.55), 0.7)
 	var done := touched_pages.size()
-	var hint := ("CONFIRMED %d/%d  //  CLICK OR ENTER CONFIRMS THIS TAB" % [done, PAGES.size()]) if done < PAGES.size() else "ALL %d CONFIRMED  //  F FILES YOU" % PAGES.size()
+	var hint := ("CONFIRMED %d/%d  //  CLICK OR ENTER CONFIRMS THIS TAB  //  OR HOLD V: \"NEXT\", \"TWO\", \"CONFIRM\"" % [done, PAGES.size()]) if done < PAGES.size() else "ALL %d CONFIRMED  //  F FILES YOU" % PAGES.size()
 	CellOutzType.draw_condensed(self, Vector2(rect.size.x - 26 - CellOutzType.width_condensed(hint, 9.0, 0.8), footer + 52), hint, 9.0, HOT if done < PAGES.size() else MOSS, 0.8)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
