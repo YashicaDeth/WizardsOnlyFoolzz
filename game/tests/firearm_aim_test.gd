@@ -68,8 +68,10 @@ func _ready() -> void:
 	hunt._toggle_panel("index")
 	hunt._equip_weapon(0)
 	hunt._unhandled_input(_mouse(MOUSE_BUTTON_RIGHT, true))
-	check(not hunt.pending_attack.is_empty() and bool(hunt.pending_attack.get("heavy", false)),
-		"RMB still commits a heavy melee attack when a firearm is not equipped")
+	# The combat overhaul gave a melee right button to defence (guard/parry),
+	# so without a firearm RMB raises the guard instead of swinging.
+	check(hunt.pending_attack.is_empty() and not hunt.firearm_aiming and hunt.guard_side == preload("res://systems/blade_read.gd").HIGH,
+		"without a firearm RMB raises the melee guard, not an aim or a swing")
 
 	print("FIREARM_AIM_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)
