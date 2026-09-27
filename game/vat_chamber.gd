@@ -1176,6 +1176,9 @@ func _slab(dimensions: Vector3, at: Vector3, _kind: String, _color: Color) -> vo
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# No fighting while a dressing goes on (hold 4).
+	if meds.busy() and event is InputEventMouseButton and event.pressed:
+		return
 	if intake != null:
 		return
 	# Greg, 25 September: speedrunners. F, Enter or Space during his walk out

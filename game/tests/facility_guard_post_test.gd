@@ -97,9 +97,12 @@ func _ready() -> void:
 		post.fire_cooldown = 0.0
 		arcade._physics_process(0.016)
 	check(WorldHistory.event_count("facility_guard_fired") == fired_before, "a coerced guard does not shoot")
+	# Greg, 26 September: loose rounds from a stash load into any gun you find.
+	WorldHistory.update_subject("inventory", {"items": [{"label": "LOOSE ROUNDS", "kind": "ammo", "rounds": 4}]}, "carry_changed")
 	arcade._interact()
 	var gun := _carried(FacilityGuardPost.GUN_LABEL)
-	check(not gun.is_empty() and int(gun.get("rounds", 0)) == 3, "his dropped gun goes into Carry with three rounds")
+	check(not gun.is_empty() and int(gun.get("rounds", 0)) == 7, "his dropped gun goes into Carry with three rounds, plus the four loose ones loaded (%d)" % int(gun.get("rounds", 0)))
+	check(_carried("LOOSE ROUNDS").is_empty(), "the loose rounds are in the gun now, not carried apart")
 	check(not bool(post.loadout.gun_available) and WorldHistory.event_count("facility_guard_weapon_taken") == 1, "the gun transfer is the loadout's own, recorded once")
 	arcade._interact()
 	check(WorldHistory.event_count("facility_guard_weapon_taken") == 1 and WorldHistory.subject("inventory").get("items", []).size() == 1, "he cannot be farmed for a second gun")

@@ -588,6 +588,9 @@ func _slab(dimensions: Vector3, at: Vector3, _kind: String, _color: Color) -> St
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# No fighting while a dressing goes on (hold 4).
+	if meds.busy() and event is InputEventMouseButton and event.pressed:
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 			_swing_breach_tool()

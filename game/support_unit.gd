@@ -713,6 +713,9 @@ func _die(cause: String, killed_by: String) -> void:
 # --- Input and the frame.
 
 func _unhandled_input(event: InputEvent) -> void:
+	# No fighting while a dressing goes on (hold 4).
+	if meds.busy() and event is InputEventMouseButton and event.pressed:
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var clicked: bool = event.pressed
 		if clicked and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:

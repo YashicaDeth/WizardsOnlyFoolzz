@@ -45,9 +45,11 @@ func _ready() -> void:
 	check(meds.tick(0.0, false) == "tap", "letting go early is a tap, nothing spent")
 	check(FIELD_MEDS.count() == 2, "a tap spends nothing")
 	var result := ""
-	for i in 6:
+	for i in 14:
 		result = meds.tick(0.2, true)
-	check(result == "used" or FIELD_MEDS.count() == 1, "a full second held spends one")
+		if i == 3:
+			check(meds.busy(), "while the bar fills you are busy (no fighting)")
+	check(result == "used" or FIELD_MEDS.count() == 1, "a full hold (2.5 s) spends one")
 	check(FIELD_MEDS.count() == 1, "one left")
 	check(meds.tick(0.5, true) == "", "still holding does not spend a second one")
 	meds.tick(0.0, false)
@@ -77,7 +79,7 @@ func _ready() -> void:
 		await get_tree().physics_frame
 	unit.blood = 50.0
 	hold_four(true)
-	for i in 80:
+	for i in 190:
 		await get_tree().physics_frame
 	hold_four(false)
 	await get_tree().physics_frame
@@ -97,7 +99,7 @@ func _ready() -> void:
 		await get_tree().physics_frame
 	hunt.health = 40
 	hold_four(true)
-	for i in 80:
+	for i in 190:
 		await get_tree().physics_frame
 	hold_four(false)
 	await get_tree().physics_frame

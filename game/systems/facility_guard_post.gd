@@ -412,14 +412,26 @@ func _take_gun(arsenal: Node) -> String:
 	if not bool(result.get("accepted", false)):
 		return ""
 	var carry := CARRY.new()
+	# Greg, 26 September: loose rounds from the stashes load into any gun you
+	# find.
+	var rounds := int(result.get("rounds", 0))
+	var loaded_loose := 0
+	for index in range(carry.items.size() - 1, -1, -1):
+		var entry = carry.items[index]
+		if entry is Dictionary and str((entry as Dictionary).get("label", "")) == "LOOSE ROUNDS":
+			loaded_loose += int((entry as Dictionary).get("rounds", 0))
+			carry.items.remove_at(index)
+	rounds += loaded_loose
 	carry.items.append({
 		"label": GUN_LABEL, "kind": "weapon", "weapon": "facility_sidearm",
-		"rounds": int(result.get("rounds", 0)), "mass": 1.1, "perishes": false, "age": 0.0,
+		"rounds": rounds, "mass": 1.1, "perishes": false, "age": 0.0,
 		"from": guard_id,
 	})
 	carry.save_to_history()
-	PLAYER_ACTION_LEDGER.record("facility_first_firearm", {"subject_id": guard_id, "rounds": int(result.get("rounds", 0))})
-	return "%s // %d ROUNDS // NO RESERVE" % [GUN_LABEL, int(result.get("rounds", 0))]
+	PLAYER_ACTION_LEDGER.record("facility_first_firearm", {"subject_id": guard_id, "rounds": rounds})
+	if loaded_loose > 0:
+		return "%s // %d ROUNDS // %d LOOSE LOADED" % [GUN_LABEL, rounds, loaded_loose]
+	return "%s // %d ROUNDS // NO RESERVE" % [GUN_LABEL, rounds]
 
 
 func _on_access_granted(_subject_id: String, method: String) -> void:

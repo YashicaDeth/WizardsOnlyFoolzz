@@ -2543,6 +2543,9 @@ func _pose_weapon() -> void:
 func _attack(heavy := false) -> void:
 	if resolution_ui.visible or kill_cam.active or player_rig.is_downed() or player_rig.anatomy.dead:
 		return
+	# No fighting while a dressing goes on (hold 4).
+	if field_meds.busy():
+		return
 	if smoke_model != null and is_instance_valid(smoke_model) and not smoke_weapon_drawn:
 		# A click with a smokeable in hand used to do nothing at all, which read
 		# as being stuck on it (Greg, 2026-09-24). It pockets the smokeable and

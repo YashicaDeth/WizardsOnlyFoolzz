@@ -12,7 +12,8 @@ extends RefCounted
 ## "used" on the frame a dressing is spent (the scene heals then), "none" once
 ## when 4 is held with nothing to open, and "tap" when 4 is released early.
 
-const HOLD_SECONDS := 1.0
+## "A few seconds ... no fighting while you do it" (DESIGN.md, 26 September).
+const HOLD_SECONDS := 2.5
 const HEALS := 20.0
 const LABEL := "FIELD DRESSING"
 
@@ -24,7 +25,7 @@ var _spent_this_hold := false
 ## plain "field dressing" string; both count.
 static func _is_dressing(entry: Variant) -> bool:
 	if entry is Dictionary:
-		return str((entry as Dictionary).get("label", "")) == LABEL
+		return str((entry as Dictionary).get("label", "")).to_upper() == LABEL
 	return entry is String and (entry as String).to_upper() == LABEL
 
 
@@ -72,6 +73,11 @@ static func heal_anatomy(anatomy: Node) -> void:
 		zone["health"] = minf(top, float(zone.get("health", top)) + HEALS)
 		zones[worst] = zone
 		anatomy.call("treat_wound", worst, 0.7)
+
+
+## True while a dressing is being put on: the scene holds its attacks.
+func busy() -> bool:
+	return held > 0.0 and not _spent_this_hold
 
 
 ## 0..1 of the hold, for the prompt bar.
