@@ -93,7 +93,8 @@ in this order:
 3. the phone and the Wire
 4. kill-cam X-rays
 Use Greg's Higgsfield downloads (tools/Import-Higgsfield.ps1 puts them on
-their own branch). Pick distinct pieces "with a grain of salt": Greg likes a
+their own branch) and the generators in DESIGN/ASSET_TOOLS.md, run on Greg's
+RTX. Bring every file in with tools/import_generated_asset.py, which logs it. Pick distinct pieces "with a grain of salt": Greg likes a
 lot and dislikes a lot. Nothing that looks generic or AI-slick.
 
 RULES: media goes through Git LFS; never convert formats to dodge it. Log

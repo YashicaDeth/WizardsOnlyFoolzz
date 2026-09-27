@@ -27,7 +27,7 @@ func _ready() -> void:
 	hunt._toggle_black_mirror()
 	check(not hunt.black_mirror_active, "no phone in hand, no night vision")
 	check(hunt.camera.environment == null, "the camera keeps the naked-eye view")
-	check(hunt.prompt.text == "NO PHONE IN HAND", "and says why")
+	check(str(hunt.prompt.text).begins_with("NO PHONE IN HAND"), "and says why, and where the phone is (%s)" % hunt.prompt.text)
 
 	hunt.handheld.possessed = true
 	hunt._toggle_black_mirror()
