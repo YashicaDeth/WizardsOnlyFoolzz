@@ -67,6 +67,14 @@ var choir: AudioStreamPlayer
 var sonar: AudioStreamPlayer
 var _wizard_on := false
 var _depth_held := false
+## Greg, 26 September: "the phone camera vision shows signals too". While the
+## host says its phone camera is up, the camera signals and the phone's own
+## carriers (masts, terminals) show in the phone's infrared tone. No strain:
+## it is the phone seeing, not your head.
+var phone_lens := false
+## Callable returning [{"at": Vector3 (the transmitter), "name", "reach"}].
+var emitters: Callable = Callable()
+const INFRARED := Color("d65ad8")
 
 
 func setup(camera: Camera3D) -> void:
@@ -151,9 +159,12 @@ func _process(delta: float) -> void:
 	# Off, the whole layer sleeps: a screen-reading shader copies the frame
 	# every frame it is visible, even when it draws nothing.
 	shock_flash = maxf(0.0, shock_flash - delta)
-	var active := mode != "" or strain > 0.0 or shock_flash > 0.0
+	var active := mode != "" or strain > 0.0 or shock_flash > 0.0 or phone_lens
 	if layer != null:
 		layer.visible = active
+		# Through the phone the marks sit over its feed (the HUD layer, 1);
+		# otherwise under every HUD, over the world.
+		layer.layer = 2 if phone_lens and mode == "" else -40
 	_update_audio()
 	if not active:
 		return
@@ -176,6 +187,9 @@ func _project(point: Vector3) -> Variant:
 func _draw_marks() -> void:
 	if shock_flash > 0.0:
 		marks.draw_rect(Rect2(Vector2.ZERO, marks.size), Color(0.85, 0.95, 1.0, shock_flash * 1.6))
+	if mode == "" and phone_lens:
+		_draw_signals(INFRARED)
+		_draw_carriers()
 	if mode == "" and strain <= 0.0:
 		return
 	if mode != "":
@@ -196,8 +210,8 @@ func _draw_marks() -> void:
 
 
 ## Each camera's signal: rings pulsing out of the lens along what it sees.
-func _draw_signals() -> void:
-	var tone := ACID if mode == "wizard" else COLD
+func _draw_signals(tone_override: Variant = null) -> void:
+	var tone: Color = tone_override if tone_override != null else (ACID if mode == "wizard" else COLD)
 	for lens in SecurityCamera.all_cameras():
 		if lens.broken:
 			continue
@@ -220,6 +234,25 @@ func _draw_signals() -> void:
 			var pulse := 5.0 + 3.0 * absf(sin(clock * 4.0))
 			marks.draw_circle(lens_at, pulse + 4.0, Color(tone, 0.25))
 			marks.draw_circle(lens_at, pulse, Color(tone, 0.95))
+
+
+## The phone's carriers through its camera: each transmitter pulses rings
+## out of its top, with its name and how far it is.
+func _draw_carriers() -> void:
+	if not emitters.is_valid() or view == null:
+		return
+	for emitter: Dictionary in emitters.call():
+		var top: Vector3 = emitter.get("at", Vector3.ZERO)
+		var at = _project(top)
+		if at == null:
+			continue
+		var distance := view.global_position.distance_to(top)
+		var scale := clampf(900.0 / maxf(distance, 1.0), 6.0, 90.0)
+		for ring in 4:
+			var along := fmod(float(ring) / 4.0 + clock * 0.5, 1.0)
+			marks.draw_arc(at, scale * (0.3 + along * 1.6), 0.0, TAU, 40, Color(INFRARED, (1.0 - along) * 0.8), 2.0)
+		marks.draw_circle(at, 4.0 + 2.0 * absf(sin(clock * 3.0)), Color(INFRARED, 0.95))
+		CellOutzType.draw_string_compat(marks, (at as Vector2) + Vector2(10, -10), "%s  //  %d M" % [str(emitter.get("name", "SIGNAL")), roundi(distance)], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(INFRARED, 0.9))
 
 
 ## Where people died: soft green figures standing there.

@@ -40,5 +40,14 @@ func _ready() -> void:
 	check(sensor.depth_quad != null and sensor.depth_quad.visible and not sensor.effect.visible, "depth mode draws the depth pass instead of the low-light one")
 	check(sensor.cycle_mode() == "night" and not sensor.depth_quad.visible and sensor.effect.visible, "and cycles back to night vision")
 
+	# Greg, 26 September: the phone camera shows signals too.
+	check(bool(hunt.sight.phone_lens), "raising the phone shows its signals (the phone lens on SignalSight)")
+	await get_tree().process_frame
+	check(hunt.sight.layer.visible, "the signal layer is drawn while the phone is up")
+	check((hunt.sight.emitters.call() as Array).size() == SignalField.EMITTERS.size(), "every carrier the phone reads is shown (%d)" % (hunt.sight.emitters.call() as Array).size())
+	check(hunt.sight.strain == 0.0, "the phone sees for you: no strain")
+	hunt._toggle_black_mirror()
+	check(not bool(hunt.sight.phone_lens), "lowering it hides them")
+
 	print("PHONE_NIGHT_VISION_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

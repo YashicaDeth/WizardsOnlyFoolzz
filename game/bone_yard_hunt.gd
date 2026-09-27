@@ -5776,6 +5776,14 @@ func _build_sight() -> void:
 	sight.call("setup", camera)
 	sight.set("handle_keys", false)
 	sight.set("enabled", true)
+	# What the phone camera sees: the carriers its signal comes from. A mast's
+	# transmitter sits at its top; a terminal at head height.
+	sight.set("emitters", func() -> Array:
+		var out: Array = []
+		for emitter: Dictionary in SignalField.EMITTERS:
+			var flat: Vector2 = emitter.at
+			out.append({"at": Vector3(flat.x, 18.0 if str(emitter.kind) == "mast" else 1.6, flat.y), "name": str(emitter.name), "reach": float(emitter.reach)})
+		return out)
 	sight.set("bodies", func() -> Array:
 		var out: Array = []
 		for actor: Dictionary in encounter_actors:
@@ -8008,6 +8016,9 @@ func _toggle_black_mirror() -> void:
 		_feedback("NO PHONE IN HAND // THE BLACK MIRROR IS IN RESTRICTED STORAGE")
 		return
 	black_mirror_active = not black_mirror_active
+	# Greg, 26 September: the phone camera shows signals too (SignalSight).
+	if sight != null and is_instance_valid(sight):
+		sight.set("phone_lens", black_mirror_active)
 	var sensor := _mirror_sensor()
 	if not black_mirror_active:
 		sensor.set_active(false)
