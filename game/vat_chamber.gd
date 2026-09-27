@@ -26,6 +26,7 @@ const INTAKE_WATCHERS := preload("res://systems/intake_watchers.gd")
 const BRAIN_HACK := preload("res://systems/brain_hack.gd")
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
 const SERVICE_ARCADE := preload("res://service_arcade.gd")
+const HIDDEN_CACHE := preload("res://systems/hidden_cache.gd")
 const SIGNAL_SIGHT := preload("res://systems/signal_sight.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
@@ -112,6 +113,8 @@ var sight: Node
 var weak_wall_body: StaticBody3D
 ## Each bay's ceiling strip and the power line feeding it down the left wall.
 var strip_lights: Array = []
+## Stashes and secret doors (HiddenCache records).
+var caches: Array = []
 var weak_wall_found := false
 var weak_wall_broken := false
 var shortcut_taken := false
@@ -242,6 +245,10 @@ const DEPARTURE_BEATS := [
 
 
 func _ready() -> void:
+	# Greg, 26 September: minutes 0-30 are timed, hidden until you surface.
+	# A rebirth here mid-run carries on the same clock.
+	preload("res://systems/run_timer.gd").start()
+	preload("res://systems/run_timer.gd").enter("growing_floor")
 	$WorldEnvironment.environment = WorldLook.environment("growing_floor")
 	# The form itself already lays a translucent blood veil over the first shot.
 	# Leaving this at the old opaque value made the real examiner and laboratory
@@ -296,6 +303,8 @@ func _ready() -> void:
 		wires.append({"id": "growing_floor_strip_%d" % index, "points": [Vector3(-7.3, 1.3, z), Vector3(-7.3, 3.9, z), Vector3(0, 3.9, z)],
 			"on_cut": func() -> void: strip.visible = false})
 	sight.set("wires", wires)
+	# A stash in the left wall between the second and third bays.
+	caches.append(HIDDEN_CACHE.place_stash(self, sight, "growing_floor_stash", Vector3(-7.35, 1.0, -5.75), Vector3.RIGHT))
 	brain_hack = BRAIN_HACK.new()
 	$HUD.add_child(brain_hack)
 	brain_hack.connect("hack_finished", _on_hack_finished)
@@ -1104,6 +1113,9 @@ func _near_weak_wall() -> bool:
 
 
 func _on_hidden_seen(id: String) -> void:
+	if HIDDEN_CACHE.mark_found(caches, id):
+		subtitle.text = "A HATCH IN THE WALL  //  SOMETHING KEPT BEHIND IT"
+		return
 	if id != WEAK_WALL_ID or weak_wall_found:
 		return
 	weak_wall_found = true
@@ -1123,6 +1135,7 @@ func break_weak_wall() -> bool:
 			thing["gone"] = true
 	opening_audio.cue("door")
 	subtitle.text = "THE PLASTER GIVES  //  A CRAWLWAY, WARM AIR COMING UP"
+	preload("res://systems/sight_audio.gd").play_at(self, "crumble", WEAK_WALL_AT, 0.0)
 	WorldHistory.record_event("growing_floor_weak_wall_broken", {"location": "growing_floor"})
 	return true
 
@@ -1947,18 +1960,31 @@ func _update_movement(delta: float) -> void:
 		Input.get_axis("move_forward", "move_back"),
 	)
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
-	var speed := 2.7 * float(anatomy.call("mobility_ratio"))
-	player.velocity.x = move_toward(player.velocity.x, direction.x * speed, 14.0 * delta)
-	player.velocity.z = move_toward(player.velocity.z, direction.z * speed, 14.0 * delta)
+	var mobility := float(anatomy.call("mobility_ratio"))
+	var speed := 2.7 * mobility
+	# Greg, 26 September: sprint here too, weak at first and growing as the
+	# new body recovers (the same mobility the jump reads); sprint + Ctrl slides.
+	var sprinting := Input.is_action_pressed("sprint")
+	if sprinting:
+		speed *= lerpf(1.15, 1.6, mobility)
+	if Input.is_action_just_pressed("crouch"):
+		JUMP_CLIMB.try_slide(player, yaw, sprinting)
+	if not JUMP_CLIMB.slide_step(player, delta):
+		player.velocity.x = move_toward(player.velocity.x, direction.x * speed, 14.0 * delta)
+		player.velocity.z = move_toward(player.velocity.z, direction.z * speed, 14.0 * delta)
 	JUMP_CLIMB.fall(player, delta)
 	player.move_and_slide()
+	var fall_hurt := JUMP_CLIMB.landing_damage(player)
+	if fall_hurt > 0.0:
+		anatomy.call("apply_hit", "left_leg", fall_hurt * 0.5, 0.0, "blunt")
+		anatomy.call("apply_hit", "right_leg", fall_hurt * 0.5, 0.0, "blunt")
 	if weak_wall_broken and player.global_position.x < DUCT_DEPTH_X:
 		take_shortcut()
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	# A body that just came out of a tank does not walk well.
 	var stride := Vector2(player.velocity.x, player.velocity.z).length()
-	camera.position.y = STANDING_EYE_OFFSET + sin(Time.get_ticks_msec() * 0.0055) * stride * 0.016
+	camera.position.y = STANDING_EYE_OFFSET + sin(Time.get_ticks_msec() * 0.0055) * stride * 0.016 - (0.5 if JUMP_CLIMB.sliding(player) else 0.0)
 	camera.rotation.z = sin(Time.get_ticks_msec() * 0.0027) * stride * 0.008
 
 
@@ -1971,8 +1997,14 @@ func _interact() -> void:
 		return
 	if break_weak_wall() or (_near_weak_wall() and take_shortcut()):
 		return
+	if HIDDEN_CACHE.open_near(caches, player.global_position, sight) == "stash":
+		subtitle.text = "A FIELD DRESSING AND FOUR ROUNDS  //  SOMEBODY HID THESE"
+		return
 	if sight != null and sight.call("cut_wire_near", player.global_position) != "":
 		subtitle.text = "THE LINE SPITS AND DIES  //  THAT BAY GOES DARK"
+		if bool(sight.get("last_cut_shocked")):
+			anatomy.call("apply_hit", "right_arm", sight.SHOCK_BLOOD, 0.0, "blunt")
+			subtitle.text = "IT WAS LIVE  //  THE SHOCK THROWS YOUR ARM BACK"
 		opening_audio.cue("door")
 		return
 	var to_door := door_marker.global_position - player.global_position
@@ -2119,6 +2151,9 @@ func _update_hud() -> void:
 		return
 	if weak_wall_broken and _near_weak_wall():
 		prompt.text = "[E] CRAWL IN   //   A WAY PAST THE PRESSURE GATE"
+		return
+	if not HIDDEN_CACHE.nearest(caches, player.global_position).is_empty():
+		prompt.text = "[E] OPEN THE HATCH"
 		return
 	if sight != null and sight.call("wire_in_reach", player.global_position):
 		prompt.text = "[E] CUT THE POWER LINE"
