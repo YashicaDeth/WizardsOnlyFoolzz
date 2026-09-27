@@ -10,6 +10,7 @@ extends RefCounted
 ## `open_near(records, player_position)`. Placing one registers it with the
 ## scene's SignalSight, whose `hidden_seen` marks it found.
 
+const FIELD_MEDS := preload("res://systems/field_meds.gd")
 const REACH := 1.9
 const SIGHT_AUDIO := preload("res://systems/sight_audio.gd")
 ## Only a shade darker than the wall: a hairline you catch, not a drawn box.
@@ -168,6 +169,9 @@ static func open_near(records: Array, position: Vector3, sight: Node = null) -> 
 		(record.goods as Node3D).visible = true
 		var given := give_stash()
 		WorldHistory.record_event("hidden_stash_opened", {"id": str(record.id), "meds": 1, "rounds": ROUNDS, "rounds_to": given})
+		var hinge := record.hinge as Node3D
+		if hinge.is_inside_tree() and hinge.get_tree().current_scene != null:
+			FIELD_MEDS.line(hinge.get_tree().current_scene, "HOLD 4 TO DRESS A WOUND  //  %d FIELD DRESSING%s" % [FIELD_MEDS.count(), "" if FIELD_MEDS.count() == 1 else "S"], 3.5)
 		return "stash"
 	var body := record.body as StaticBody3D
 	if body != null and is_instance_valid(body):

@@ -246,6 +246,8 @@ const EYE_ABOVE_CENTRE := 0.78
 const STANDING_HEIGHT := 1.8
 var stamina := 100.0
 var health := 100
+const FIELD_MEDS := preload("res://systems/field_meds.gd")
+var field_meds := FIELD_MEDS.new()
 var attack_cooldown := 0.0
 ## O2.4. Guarding. Dodging already existed and was already consulted on
 ## incoming damage, which made evasion real — but it was the *only* defensive
@@ -1930,6 +1932,12 @@ func _physics_process(delta: float) -> void:
 		_update_hud()
 		return
 	pulse += delta
+	# Hold 4: a FIELD DRESSING (Greg, 26 September). A tap of 4 still takes the
+	# carried limb on the key press, as before.
+	field_meds.step(self, delta, func() -> void:
+		health = mini(100, health + int(FIELD_MEDS.HEALS))
+		if player_rig != null and is_instance_valid(player_rig):
+			FIELD_MEDS.heal_anatomy(player_rig.anatomy))
 	# AP1. Charged per call, because nobody knows which of these is the frame.
 	# `process` has sat at 20.16ms against a 16.67ms budget since it was first
 	# measured, the brief has carried "script cost is unattributed" as its
@@ -8357,6 +8365,7 @@ func _build_keys_card() -> void:
 			["WHEEL", "CYCLE TARGET"],
 			["1 2 3", "SWORD / SHOTGUN / PISTOL"],
 			["4", "CARRIED LIMB"],
+			["HOLD 4", "FIELD DRESSING // +20 BLOOD"],
 			["5", "PUT THEM DOWN"],
 			["B", "CYCLE GRIP"],
 			["R", "RELOAD"],

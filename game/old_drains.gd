@@ -377,6 +377,9 @@ func _unhandled_input(event: InputEvent) -> void:
 ## walkway lip out of the channel, the causeway out of the deep cistern) it
 ## pulls you up onto it instead. Returns what it did.
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const FIELD_MEDS := preload("res://systems/field_meds.gd")
+## Hold 4: a FIELD DRESSING, +20 blood (Greg, 26 September).
+var meds := FIELD_MEDS.new()
 const HIDDEN_CACHE := preload("res://systems/hidden_cache.gd")
 var caches: Array = []
 
@@ -406,6 +409,7 @@ func _physics_process(delta: float) -> void:
 	var fall_hurt := JUMP_CLIMB.landing_damage(player)
 	if fall_hurt > 0.0:
 		stalker.blood = maxf(1.0, stalker.blood - fall_hurt)
+	meds.step(self, delta, func() -> void: stalker.blood = minf(100.0, stalker.blood + FIELD_MEDS.HEALS))
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	_file_progress()

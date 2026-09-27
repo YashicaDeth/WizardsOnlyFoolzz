@@ -1,6 +1,9 @@
 extends Node3D
 const LOOK := preload("res://systems/look_settings.gd")
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const FIELD_MEDS := preload("res://systems/field_meds.gd")
+## Hold 4: a FIELD DRESSING, +20 blood (Greg, 26 September).
+var meds := FIELD_MEDS.new()
 const HIDDEN_CACHE := preload("res://systems/hidden_cache.gd")
 const SIGNAL_SIGHT := preload("res://systems/signal_sight.gd")
 
@@ -455,6 +458,7 @@ func _physics_process(delta: float) -> void:
 		var fall_hurt := JUMP_CLIMB.landing_damage(player)
 		if fall_hurt > 0.0:
 			blood = maxf(1.0, blood - fall_hurt)
+	meds.step(self, delta, func() -> void: blood = minf(100.0, blood + FIELD_MEDS.HEALS))
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	# The arcade is a route, not a lockout puzzle. If the card was collected,

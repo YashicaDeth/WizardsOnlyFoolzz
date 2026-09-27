@@ -25,6 +25,9 @@ const TORTURE_LOAD_IN := preload("res://systems/torture_load_in.gd")
 const INTAKE_WATCHERS := preload("res://systems/intake_watchers.gd")
 const BRAIN_HACK := preload("res://systems/brain_hack.gd")
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const FIELD_MEDS := preload("res://systems/field_meds.gd")
+## Hold 4: a FIELD DRESSING, +20 blood (Greg, 26 September).
+var meds := FIELD_MEDS.new()
 const SERVICE_ARCADE := preload("res://service_arcade.gd")
 const HIDDEN_CACHE := preload("res://systems/hidden_cache.gd")
 const SIGNAL_SIGHT := preload("res://systems/signal_sight.gd")
@@ -1978,6 +1981,7 @@ func _update_movement(delta: float) -> void:
 	if fall_hurt > 0.0:
 		anatomy.call("apply_hit", "left_leg", fall_hurt * 0.5, 0.0, "blunt")
 		anatomy.call("apply_hit", "right_leg", fall_hurt * 0.5, 0.0, "blunt")
+	meds.step(self, delta, func() -> void: FIELD_MEDS.heal_anatomy(anatomy))
 	if weak_wall_broken and player.global_position.x < DUCT_DEPTH_X:
 		take_shortcut()
 	player.rotation.y = yaw

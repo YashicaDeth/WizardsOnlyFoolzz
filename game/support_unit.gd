@@ -1,5 +1,8 @@
 extends Node3D
 const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const FIELD_MEDS := preload("res://systems/field_meds.gd")
+## Hold 4: a FIELD DRESSING, +20 blood (Greg, 26 September).
+var meds := FIELD_MEDS.new()
 const HIDDEN_CACHE := preload("res://systems/hidden_cache.gd")
 ## The closet behind the secret door: against the right wall, clear of the
 ## cells (-18, -58), the reinforcement doors (-47, -88) and the gate.
@@ -889,6 +892,7 @@ func _move(delta: float) -> void:
 	var fall_hurt := JUMP_CLIMB.landing_damage(player)
 	if fall_hurt > 0.0:
 		blood = maxf(1.0, blood - fall_hurt)
+	meds.step(self, delta, func() -> void: blood = minf(100.0, blood + FIELD_MEDS.HEALS))
 	player.rotation.y = yaw
 	camera.rotation = Vector3(pitch, 0, 0)
 	# Running on tile carries; walking does not.
