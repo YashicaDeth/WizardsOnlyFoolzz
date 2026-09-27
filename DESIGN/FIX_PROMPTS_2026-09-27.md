@@ -256,3 +256,100 @@ Do not start it now. When he returns, the order is:
 
 Every one of those is a defect above. The playtest is how we find out whether
 the fixes are actually fixes.
+
+---
+
+## Addendum, same afternoon: what happened after this file was written
+
+### Lane C — C0 comes before C1: merge `claude/fix-gore-release` first.
+
+Greg played `integrate/opencode-gore` and the log filled with, every physics
+frame:
+
+```
+SCRIPT ERROR: Trying to cast a freed object.
+   at: release (res://systems/gore_chunks.gd:419)
+       [1] _physics_process (res://bone_yard_hunt.gd:1984)
+```
+
+A chunk freed during a hit-pause made `entry["body"] as RigidBody3D` throw,
+which aborted `GoreChunks.release()` before its `clear()`. The Hunt calls it
+every frame, so it errored forever and every other held chunk stayed frozen in
+the air. Fixed on `claude/fix-gore-release` (validity check before the cast);
+`gore_hitstop_test` gained the case and fails on the old code with the same
+error. **Merge that branch before touching the sandbox**, or C1's play-through
+will be judging frozen limbs.
+
+### Lane D1c correction — the 3D models are downloaded.
+
+Greg confirms MoGe, Hunyuan3D 2.0 MV Turbo and Hunyuan3D 2.1 all finished.
+MoGe is verified: `moge_2_vitl_normal_fp16` produced a clean depth map of
+`art/bone_yard_v1/bone_yard_preview.png` in about 5 s through the ComfyUI API
+on port 8188. Neither Hunyuan has been run yet. Rule 4 still holds for all
+three: mesh output is blockout and reference, not shipping geometry.
+
+### Lane G — the memory projection (Claude, desktop)
+
+**Goal.** Greg: *"a little node button and you click into it and it zooms in
+and that projects the full memory."*
+
+**Exists.** Branch `claude/memory-projection`, unmerged:
+`game/systems/memory_projection.gd` + `.gdshader` (a painting plus its MoGe
+depth map; grows out of the clicked rect, builds near-to-far, sways with the
+eye, click or Esc folds it back), `tests/memory_projection_demo.tscn`,
+`tests/memory_projection_test` (green), one memory in `game/art/memories/`.
+Seen in a real window, not only headless. The MEMORY folder it belongs in is
+`BrainIndex.FOLDERS["memory"]` (`systems/brain_index.gd`), rendered by
+`brain_crt_display.gd` inside `part_viewer.gd`.
+
+**Owns.** `memory_projection.*`, `game/art/memories/`, and one call from the
+MEMORY entry's open action. `brain_index.gd` and `part_viewer.gd` are
+read-only apart from that call.
+
+**Proof.** Open the brain, open MEMORY, click an entry, capture mid-open and
+open, both PNGs looked at.
+
+**Open — Greg's.** Which memories exist and what art each one is. The bone
+yard render is a test image, not a decision; do not invent memories to fill
+the folder.
+
+### Lane F — the ledger (`CHECKLIST.md`), triage only
+
+**Goal.** Greg: *"all of the unworked on lines that I haven't even mentioned,
+the thousands and thousands of words that you could spare me from, still
+existing in that ledger document."* He wants the ledger worked without having
+to read it.
+
+**Exists.** `CHECKLIST.md`: 7,329 lines, 953 ticked, **922 open**.
+
+**Owns.** `CHECKLIST.md` only, and a new `DESIGN/LEDGER_TRIAGE_2026-09-27.md`.
+No game code — this lane sorts, it does not build.
+
+**Do.** For each open line, one of:
+- **DONE, unticked** — the code exists and a test or capture proves it. Tick
+  it and cite the file and test. No proof, no tick.
+- **LANE A–G** — real, unbuilt, and owned by a named lane. Add it to that
+  lane's queue in the triage file; do not do it.
+- **STALE** — superseded or contradicted by a later Greg decision. Cite the
+  decision; do not delete the line, mark it.
+- **NEEDS GREG** — cannot be sorted without a design call.
+
+**Proof.** The triage file opens with counts per bucket, then **at most 20
+NEEDS GREG lines** as yes/no or pick-one questions. That short list is the
+only part Greg should have to read.
+
+**Out.** Implementing anything. Rewording lines. Ticking on a hunch.
+
+### Open for Greg — which branch is "the game"?
+
+Three answers exist and they disagree, which is why "launch the current game"
+opened the wrong build twice today:
+
+- `PLAY.cmd` launches `P:\GameDev\AllusionsTooGrandeur` on `codex/primary`,
+  last changed 25 Sept.
+- Rule 3 above merges into `claude/dust-to-bones-look` (what `Play-Latest.ps1`
+  plays).
+- The newest work is on `integrate/opencode-gore` (`worktrees\merge-kit`),
+  which has already merged `claude/dust-to-bones-look`.
+
+Pick one. Then `PLAY.cmd` and rule 3 get pointed at it, and nothing else counts.
