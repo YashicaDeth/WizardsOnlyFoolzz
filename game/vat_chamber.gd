@@ -28,6 +28,9 @@ const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
 const FIELD_MEDS := preload("res://systems/field_meds.gd")
 ## Hold 4: a FIELD DRESSING, +20 blood (Greg, 26 September).
 var meds := FIELD_MEDS.new()
+## Seconds left of the examiner's syringe, and how slow it makes you.
+var slowed_left := 0.0
+const SLOWED_SCALE := 0.5
 const SERVICE_ARCADE := preload("res://service_arcade.gd")
 const HIDDEN_CACHE := preload("res://systems/hidden_cache.gd")
 const SIGNAL_SIGHT := preload("res://systems/signal_sight.gd")
@@ -143,6 +146,11 @@ var objective_text := "ESCAPE THE FACILITY"
 ## it, and only then does the vat fail.
 var examiner_node: Node3D
 var staff_door_panel: Node3D
+## Greg, 26 September: beat the examiner and his keycard opens this door, on
+## his staff cupboard (two dressings and rounds).
+var staff_door_open := false
+var staff_cupboard: Node3D
+const STAFF_KEYCARD := "STAFF KEYCARD"
 ## Where the examiner stands at his terminal, and whether his door has been
 ## heard shutting behind him.
 var examiner_post := Vector3.ZERO
@@ -908,15 +916,8 @@ func _build_examination_station() -> void:
 	# Dressed as the feed shows him (`ExaminerFeed._dress_as_staff`): a clinical
 	# coat bloodied down the front and the forearms. He was walking up to your
 	# glass naked under the censor.
-	var wardrobe := ClothingShell.fresh_wardrobe()
-	wardrobe.erase("head")
-	wardrobe["style"] = "clinical"
-	ClothingShell.stain(body, "torso", 0.55)
-	ClothingShell.stain(body, "right_arm", 0.5)
-	ClothingShell.stain(body, "left_arm", 0.35)
-	ClothingShell.stain(body, "left_leg", 0.2)
-	ClothingShell.stain(body, "right_leg", 0.15)
-	body.dress(wardrobe)
+	# Tall, gaunt, mask at his throat while he talks, loupes up (ExaminerLook).
+	ExaminerLook.dress(body, false)
 	var screen_light := OmniLight3D.new()
 	screen_light.position = Vector3(MONITOR_X, 1.5, 0.02)
 	screen_light.light_color = Color("8bbd79")
@@ -982,6 +983,85 @@ func _build_staff_door() -> void:
 	panel.mesh = panel_mesh
 	panel.position = Vector3(0, 1.18, 0)
 	staff_door_panel.add_child(panel)
+	if WorldHistory.event_count("staff_door_opened") > 0:
+		_open_staff_door(false)
+
+
+## E at the staff door: the keycard opens it; open, E takes what his cupboard
+## holds (once).
+func _try_staff_door() -> bool:
+	var to_staff := STAFF_DOOR_AT - player.global_position
+	to_staff.y = 0.0
+	if to_staff.length() > 2.4:
+		return false
+	if not staff_door_open:
+		if not VAT_REBIRTH.carries(STAFF_KEYCARD):
+			return false
+		_open_staff_door(true)
+		WorldHistory.record_event("staff_door_opened", {"location": "growing_floor", "with": STAFF_KEYCARD})
+		subtitle.text = "HIS KEYCARD OPENS IT  //  HIS CUPBOARD"
+		return true
+	if _cupboard_taken():
+		return false
+	HIDDEN_CACHE.give_stash()
+	HIDDEN_CACHE.give_stash()
+	WorldHistory.record_event("examiner_cupboard_taken", {"meds": 2, "rounds": HIDDEN_CACHE.ROUNDS * 2})
+	for child in staff_cupboard.get_children():
+		if child.name.begins_with("Goods"):
+			child.visible = false
+	subtitle.text = "TWO FIELD DRESSINGS AND EIGHT ROUNDS  //  HOLD 4 TO DRESS A WOUND"
+	return true
+
+
+func _cupboard_taken() -> bool:
+	return WorldHistory.event_count("examiner_cupboard_taken") > 0
+
+
+## The panel slides along the wall; behind it, a shallow lit cupboard set in
+## front of the wall slab.
+func _open_staff_door(animated: bool) -> void:
+	staff_door_open = true
+	var open_at := STAFF_DOOR_AT + Vector3(0.30, 0.0, 1.5)
+	if animated and is_inside_tree():
+		create_tween().tween_property(staff_door_panel, "position", open_at, 0.9).set_trans(Tween.TRANS_SINE)
+		if opening_audio != null:
+			opening_audio.cue("door")
+	else:
+		staff_door_panel.position = open_at
+	if staff_cupboard != null:
+		return
+	staff_cupboard = Node3D.new()
+	staff_cupboard.name = "StaffCupboard"
+	staff_cupboard.position = STAFF_DOOR_AT + Vector3(0.28, 0.0, 0.0)
+	add_child(staff_cupboard)
+	var back := WorldLook.surface(Color("1d1914"), "paint", 932)
+	var shelf := WorldLook.surface(Color("4a3f33"), "rust", 933)
+	_cupboard_box(Vector3(0.05, 2.3, 1.36), Vector3(0.04, 1.16, 0), back, "Back")
+	for y in [0.55, 1.15, 1.75]:
+		_cupboard_box(Vector3(0.14, 0.03, 1.34), Vector3(-0.02, y, 0), shelf, "Shelf")
+	# His spare scrubs folded on the top shelf; the goods below, until taken.
+	_cupboard_box(Vector3(0.1, 0.1, 0.4), Vector3(-0.02, 1.82, -0.3), WorldLook.surface(Color("7f978f"), "paint", 934), "Scrubs")
+	if not _cupboard_taken():
+		_cupboard_box(Vector3(0.09, 0.07, 0.16), Vector3(-0.02, 1.2, 0.2), WorldLook.surface(Color("d9d1bf"), "paint", 935), "GoodsDressing1")
+		_cupboard_box(Vector3(0.09, 0.07, 0.16), Vector3(-0.02, 1.2, -0.05), WorldLook.surface(Color("d9d1bf"), "paint", 936), "GoodsDressing2")
+		_cupboard_box(Vector3(0.08, 0.06, 0.12), Vector3(-0.02, 0.6, 0.1), WorldLook.surface(Color("6a5a3a"), "chrome", 937), "GoodsRounds")
+	var light := OmniLight3D.new()
+	light.position = Vector3(-0.35, 2.1, 0)
+	light.light_color = Color("e8d09a")
+	light.light_energy = 1.4
+	light.omni_range = 2.2
+	staff_cupboard.add_child(light)
+
+
+func _cupboard_box(size: Vector3, at: Vector3, material: Material, label: String) -> void:
+	var node := MeshInstance3D.new()
+	node.name = label
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	mesh.material = material
+	node.mesh = mesh
+	node.position = at
+	staff_cupboard.add_child(node)
 
 
 ## Open steel bands at a vat's foot and crown. Open-ended so the view from
@@ -1973,6 +2053,10 @@ func _update_movement(delta: float) -> void:
 	var sprinting := Input.is_action_pressed("sprint")
 	if sprinting:
 		speed *= lerpf(1.15, 1.6, mobility)
+	# The examiner's syringe (ExaminerFight) slows you for a while.
+	if slowed_left > 0.0:
+		slowed_left = maxf(0.0, slowed_left - delta)
+		speed *= SLOWED_SCALE
 	if Input.is_action_just_pressed("crouch"):
 		JUMP_CLIMB.try_slide(player, yaw, sprinting)
 	if not JUMP_CLIMB.slide_step(player, delta):
@@ -2001,6 +2085,8 @@ func _interact() -> void:
 	if _try_pry_stuck_tank():
 		return
 	if _try_take_garment():
+		return
+	if _try_staff_door():
 		return
 	if break_weak_wall() or (_near_weak_wall() and take_shortcut()):
 		return
@@ -2178,7 +2264,12 @@ func _update_hud() -> void:
 	var to_staff := STAFF_DOOR_AT - player.global_position
 	to_staff.y = 0.0
 	if to_staff.length() <= 2.4:
-		prompt.text = "STAFF DOOR // SEALED // STAFF ACCESS REQUIRED"
+		if staff_door_open:
+			prompt.text = "HIS CUPBOARD // EMPTY" if _cupboard_taken() else "[E] HIS CUPBOARD"
+		elif VAT_REBIRTH.carries(STAFF_KEYCARD):
+			prompt.text = "[E] STAFF KEYCARD // OPEN THE STAFF DOOR"
+		else:
+			prompt.text = "STAFF DOOR // SEALED // STAFF ACCESS REQUIRED"
 		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0

@@ -72,6 +72,7 @@ var held_axe: Node3D
 var carrying_axe := false
 var cooldown := 0.0
 var room_entered := false
+var fight: ExaminerFight
 var _graded_as_office := false
 var last_hit: Dictionary = {}
 
@@ -123,6 +124,14 @@ func handle_input(event: InputEvent) -> bool:
 		var button := event as InputEventMouseButton
 		if not button.pressed:
 			return false
+		# In his office, a click is for him first.
+		if fight != null and fight.is_active() and _in_room():
+			if button.button_index == MOUSE_BUTTON_LEFT and fight.player_strike(held_weapon()):
+				_swing_held()
+				return true
+			if button.button_index == MOUSE_BUTTON_RIGHT and _gun_rounds() > 0 and fight.player_strike("gun"):
+				_spend_round()
+				return true
 		if button.button_index == MOUSE_BUTTON_LEFT:
 			return strike(held_weapon())
 		if button.button_index == MOUSE_BUTTON_RIGHT and _gun_rounds() > 0:
@@ -681,6 +690,10 @@ func _build_room() -> void:
 	lamp.light_color = Color("b9d3a6")
 	lamp.light_energy = 1.5
 	_dress_room()
+	# Greg, 26 September: he is in here, and you can fight him (ExaminerFight).
+	fight = ExaminerFight.new()
+	add_child(fight)
+	fight.setup(self, Vector3(ROOM_X.x + 0.42, 0.0, 7.4), ROOM_X, ROOM_Z)
 
 
 ## What Greg's office concept (26 September) has in it, built from the game's

@@ -61,6 +61,12 @@ const CATALOG := {
 		"tint": "5c4636", "warmth": 0.1, "radiation_resist": 0.0, "faction_bias": -0.06,
 		"tag": "humiliation",
 	},
+	# Greg, 26 September: beat the examiner in his office and his coat is
+	# yours (lose, and he keeps it).
+	"examiner_coat": {
+		"label": "Examiner's Coat", "role": "Clinical white gone brown down the front; still warm",
+		"tint": "b9ad92", "warmth": 0.3, "radiation_resist": 0.0, "faction_bias": -0.1,
+	},
 }
 
 ## AX3.2. "The outfit begins as institutional degradation." Any catalog entry

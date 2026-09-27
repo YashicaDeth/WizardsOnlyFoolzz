@@ -121,6 +121,9 @@ func _dress_as_staff(appearance: Node) -> void:
 	ClothingShell.stain(rig, "left_leg", 0.2)
 	ClothingShell.stain(rig, "right_leg", 0.15)
 	rig.dress(wardrobe)
+	# Greg, 26 September: the surgical mask (at his throat while he talks) and
+	# the loupe glasses.
+	ExaminerLook.add_gear(rig, false)
 	var coat := Color("d8d4c6").lerp(Color("5a1a12"), 0.38)
 	var pieces: Dictionary = appearance.get("details")
 	for piece_name in ["Coat_Front", "Collar_L", "Collar_R"]:
