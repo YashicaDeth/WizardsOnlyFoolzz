@@ -5820,6 +5820,10 @@ func _fresh_rival_tactic(subject_id: String) -> Dictionary:
 	return RIVAL_TACTICS.tactic_for(subject_id)
 
 
+const FAR_POSE_DISTANCE := 35.0
+const FAR_POSE_EVERY := 4
+
+
 func _update_encounter_actors(delta: float) -> void:
 	var melee_slot_taken := _melee_slot_taken()
 	for index in range(encounter_actors.size() - 1, -1, -1):
@@ -5864,7 +5868,22 @@ func _update_encounter_actors(delta: float) -> void:
 			actor_motion.set_combat_pose(prior_windup, prior_kind)
 			var actor_velocity := (node as CharacterBody3D).velocity
 			var actor_horizontal_speed := Vector2(actor_velocity.x, actor_velocity.z).length()
-			actor_motion.update(actor_delta, actor_velocity, true, actor_horizontal_speed > 3.2, false, false)
+			# 26 September perf: posing every limb of a body 35 m away, every
+			# tick, was the Hunt's biggest script cost. Far bodies pose a
+			# quarter as often on the time they saved up; close ones as before.
+			var motion_delta := actor_delta
+			if player.distance_squared_to(node.global_position) > FAR_POSE_DISTANCE * FAR_POSE_DISTANCE:
+				motion_delta = float(actor.get("pose_saved", 0.0)) + actor_delta
+				var ticks := int(actor.get("pose_ticks", 0)) + 1
+				if ticks < FAR_POSE_EVERY:
+					actor["pose_saved"] = motion_delta
+					actor["pose_ticks"] = ticks
+					motion_delta = -1.0
+				else:
+					actor["pose_saved"] = 0.0
+					actor["pose_ticks"] = 0
+			if motion_delta >= 0.0:
+				actor_motion.update(motion_delta, actor_velocity, true, actor_horizontal_speed > 3.2, false, false)
 		if anatomy.dead and not bool(actor.get("dead", false)):
 			_kill_encounter_actor(index, "bleed_out")
 			continue
@@ -8331,7 +8350,7 @@ func _build_keys_card() -> void:
 		]},
 		{"group": "FIGHTING", "rows": [
 			["LMB", "ATTACK"],
-			["RMB", "AIM FIREARMS / HEAVY MELEE"],
+			["RMB", "AIM FIREARMS / GUARD (MOUSE PICKS SIDE)"],
 			["HOLD X", "GUARD"],
 			["GUARD MID-SWING", "FEINT (BLOOD TREE)"],
 			["Z", "LOCK ON"],

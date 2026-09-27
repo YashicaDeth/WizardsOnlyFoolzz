@@ -43,5 +43,17 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_check(live_mesh.radial_segments < 64, "a mesh entering the tree is trimmed by the autoload hook (%d)" % live_mesh.radial_segments)
 
+	var lamp := OmniLight3D.new()
+	lamp.omni_range = 5.0
+	add_child(lamp)
+	var kept := SpotLight3D.new()
+	kept.distance_fade_enabled = true
+	kept.distance_fade_begin = 7.0
+	add_child(kept)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check(lamp.distance_fade_enabled and is_equal_approx(lamp.distance_fade_begin, 36.0), "a light entering the tree fades out past its reach (%.0f m)" % lamp.distance_fade_begin)
+	_check(is_equal_approx(kept.distance_fade_begin, 7.0), "a light someone already gave a fade keeps it")
+
 	print("MESH_BUDGET_TEST_RESULT failures=%d" % failures)
 	get_tree().quit(1 if failures > 0 else 0)

@@ -80,6 +80,32 @@ static func on_node_added(node: Node) -> void:
 		_trim_multi.call_deferred(weakref(node))
 	elif node is CSGSphere3D or node is CSGCylinder3D:
 		_trim_csg.call_deferred(weakref(node))
+	elif node is OmniLight3D or node is SpotLight3D:
+		_fade_light.call_deferred(weakref(node))
+
+
+## The Hunt placed 98 lights and every one was shaded at any distance. A
+## light well past its own reach from the camera lights nothing you can see
+## at that size, so it fades out and stops costing (Godot culls it past the
+## fade). Lights someone already gave a fade keep theirs; shadows go first.
+const LIGHT_FADE_MIN := 36.0
+const LIGHT_FADE_PER_RANGE := 4.0
+const LIGHT_FADE_LENGTH := 10.0
+
+static var faded := 0
+
+
+static func _fade_light(ref: WeakRef) -> void:
+	var light := ref.get_ref() as Light3D
+	if light == null or light.distance_fade_enabled:
+		return
+	var reach: float = (light as OmniLight3D).omni_range if light is OmniLight3D else (light as SpotLight3D).spot_range
+	var begin := maxf(LIGHT_FADE_MIN, reach * LIGHT_FADE_PER_RANGE)
+	light.distance_fade_enabled = true
+	light.distance_fade_begin = begin
+	light.distance_fade_length = LIGHT_FADE_LENGTH
+	light.distance_fade_shadow = begin * 0.5
+	faded += 1
 
 
 static func _trim_instance(ref: WeakRef) -> void:

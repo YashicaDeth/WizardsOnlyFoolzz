@@ -785,8 +785,7 @@ func _current_offers() -> Array:
 			offers.append(["R", "RELOAD"])
 	else:
 		offers.append(["LMB", held.to_upper() if held != "" else "STRIKE"])
-		offers.append(["RMB", "HEAVY"])
-		offers.append(["X", "GUARD"])
+		offers.append(["RMB", "GUARD"])
 	if can_dodge:
 		offers.append(["SPACE", "DODGE"])
 	if near_something:
