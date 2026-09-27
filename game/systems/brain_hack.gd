@@ -9,8 +9,8 @@ extends Control
 ## glass that follow are the chamber's hands-on breakout.
 ##
 ## Drawn as code and effects (Greg: "make it purely look like code and
-## effects"). Higgsfield's rune and die plates sit under the drawing on the
-## same timeline; the code still carries the beat on its own.
+## effects"). Higgsfield's rune and die plates can be laid under it later
+## without changing the timeline.
 
 signal hack_finished(skipped: bool)
 
@@ -22,14 +22,6 @@ const ACID := Color("b4da48")
 const EMBER := Color("ff7a2a")
 const BLACK := Color("030504")
 
-## Phase 3 of DESIGN/HIGGSFIELD_ROADMAP.md, laid under the drawn rune on the
-## beat the header asks for. PLATE_HACKED is a stand-in: its baked line is not
-## canon, so a text-free re-roll is queued in art/GENERATED.md and drops in
-## under the same filename. The card is drawn here, never baked into the art.
-const PLATE_SEAL := "res://art/higgsfield/breakout/b1_seal_in_skull.png"
-const PLATE_DIE := "res://art/higgsfield/breakout/b2_seal_to_die.png"
-const PLATE_HACKED := "res://art/higgsfield/breakout/b3_die_hacked.png"
-
 ## The hack, in seconds from his door shutting.
 const SCREAM_AT := 0.1
 const RUNE_IN := 0.5
@@ -37,8 +29,6 @@ const RUNE_FULL := 2.2
 const SHRINK_END := 3.6
 const HACK_END := 5.6
 const HACK_SECONDS := 6.0
-## Seconds each plate takes to trade places with the next.
-const PLATE_FADE := 0.5
 ## BRAIN HACKED / SOUL OVERTAKEN holds on the chamber's mission card.
 const CARD_SECONDS := 2.6
 
@@ -52,7 +42,6 @@ var clock := 0.0
 var skipped := false
 var played: Array[String] = []
 var _voice: AudioStreamPlayer
-var _plates: Array[Texture2D] = []
 
 
 static func wanted() -> bool:
@@ -67,8 +56,6 @@ func _ready() -> void:
 	if AudioServer.get_bus_index("SFX") != -1:
 		_voice.bus = "SFX"
 	add_child(_voice)
-	for path in [PLATE_SEAL, PLATE_DIE, PLATE_HACKED]:
-		_plates.append(load(path))
 	visible = false
 
 
@@ -135,32 +122,6 @@ func hack_amount() -> float:
 	return clampf((clock - SHRINK_END) / (HACK_END - SHRINK_END), 0.0, 1.0)
 
 
-## Seal, die and hacked-die weights across the existing timeline: the seal
-## carries the rune, the die takes it as it shrinks, the hacked die takes it
-## as the green path wins.
-func plate_weights() -> PackedFloat32Array:
-	var w := PackedFloat32Array([0.0, 0.0, 0.0])
-	if clock < RUNE_IN:
-		return w
-	var rising := clampf((clock - RUNE_IN) / PLATE_FADE, 0.0, 1.0)
-	var to_die := clampf((clock - RUNE_FULL) / (SHRINK_END - RUNE_FULL), 0.0, 1.0)
-	var won := hack_amount()
-	w[0] = rising * (1.0 - to_die)
-	w[1] = rising * minf(to_die, 1.0 - won)
-	w[2] = won
-	return w
-
-
-func _draw_plates(view: Vector2) -> void:
-	var weights := plate_weights()
-	for i in _plates.size():
-		if weights[i] <= 0.0:
-			continue
-		var src := _plates[i].get_size()
-		var size := src * maxf(view.x / src.x, view.y / src.y)
-		draw_texture_rect(_plates[i], Rect2((view - size) * 0.5, size), false, Color(1, 1, 1, weights[i]))
-
-
 func _draw() -> void:
 	var view := size
 	match mode:
@@ -173,7 +134,6 @@ func _draw_hack(view: Vector2) -> void:
 	var unit := minf(view.x, view.y)
 	# The screaming drowns the room first.
 	draw_rect(Rect2(Vector2.ZERO, view), Color(BLACK, clampf(clock / 0.6, 0.0, 0.92)))
-	_draw_plates(view)
 	var pulse := pow(maxf(0.0, sin(clock * TAU / 0.9)), 6.0)
 	var scale := rune_scale()
 	if scale <= 0.0:
