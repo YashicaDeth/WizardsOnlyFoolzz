@@ -113,6 +113,7 @@ var alert_meter: Label
 
 
 func _ready() -> void:
+	preload("res://systems/run_timer.gd").enter("support_unit")
 	var environment := WorldEnvironment.new()
 	environment.environment = WorldLook.environment("lower_works")
 	add_child(environment)

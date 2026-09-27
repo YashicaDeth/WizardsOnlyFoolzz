@@ -1178,6 +1178,12 @@ World rules; realm identity and transition rules; what persists across realms; d
     extraction stays H at a point; escaped rivals return when a slot opens.
   - *Screen:* body-cam minimal HUD; FOV 88, adjustable; subtitles on by
     default; shake and bob as now, with a Settings slider.
+- **Asset tools (Greg, 26 September): "use all these in game creation."**
+  Six repos, pinned, in `DESIGN/ASSET_TOOLS.md`. The Godot agent skills are
+  installed under `.claude/skills/godot-*`. The generators run on Greg's RTX,
+  and their output is placeholder, curated, and imported only through
+  `tools/import_generated_asset.py` (it logs `GENERATED.md` and refuses
+  Hunyuan output without an explicit licence flag).
 - **No zip files (Greg, 26 September):** "stop making zip files, it's
   pointless". Builds reach him as merges into `claude/dust-to-bones-look`;
   `Play-Latest.bat` pulls that branch into `P:\GameDev\playtest` and runs it

@@ -94,6 +94,7 @@ var rebirth_request: Dictionary = {}
 @onready var vitals: Label = $HUD/Vitals
 
 func _ready() -> void:
+	preload("res://systems/run_timer.gd").enter("service_arcade")
 	$WorldEnvironment.environment = WorldLook.environment("ossuary")
 	_build_shell()
 	_build_landmarks()

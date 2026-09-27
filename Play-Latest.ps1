@@ -1,3 +1,4 @@
+param([switch]$Overworld)
 $ErrorActionPreference = 'Stop'
 # Greg, 26 September: "stop making zip files, it's pointless."
 # Plays the newest integration branch straight from source. No zips, no parts.
@@ -20,5 +21,14 @@ if (-not (Test-Path (Join-Path $play '.git'))) {
 }
 if ($LASTEXITCODE -ne 0) { throw "Could not update $play (exit $LASTEXITCODE)." }
 $commit = git -C $play rev-parse --short HEAD
-Write-Host "Playing $commit. The first run imports assets and takes a few minutes."
-& $toolState.godot --path (Join-Path $play 'game')
+Write-Host "Playing $commit. Importing first (a few minutes the first time, seconds after)..."
+# A fresh checkout has no import cache, so the game's named scripts are not
+# registered yet and the title screen's own script fails to run (bare menu, no
+# DEMO button). The editor normally does this; a headless import does it here.
+& $toolState.godot --headless --path (Join-Path $play 'game') --import | Out-Null
+if ($Overworld) {
+    # Straight into the Hunt (the overworld) at 13:00, daylight.
+    & $toolState.godot --path (Join-Path $play 'game') 'res://bone_yard_hunt.tscn' -- --daytime
+} else {
+    & $toolState.godot --path (Join-Path $play 'game')
+}
