@@ -1211,3 +1211,20 @@ World rules; realm identity and transition rules; what persists across realms; d
     cracks; J shows it as HOLLOW. Once seen, E shoulders through; the
     crawlway behind drops you into the Service Arcade past its pressure gate,
     skipping the staff card. The gate itself stays shut.
+
+### Built 27 September (Claude lane), assistant's choices open to Greg
+
+- *The examiner fight* is in the office behind his door (the room you break
+  into with the axe, restraint or shoulder), not behind the sealed staff
+  door. He is at his bench with his back turned; he turns if you come
+  close, hit him or stay about 10 s. Scalpel cuts, every third move the
+  syringe (half speed for 6 s). You lose under 45% blood or downed.
+- *His keycard* opens the sealed staff door in the Growing Floor, on a
+  shallow staff cupboard: two field dressings and eight rounds, once.
+- *Meds*: 2.5 s hold. Tap 4 in the Hunt still takes the carried limb.
+- *Phone signals*: in the Hunt the phone camera shows the Wire's carriers
+  (masts, terminals) as infrared rings with name and distance; the
+  opening's camera signals would show the same way.
+- *Voice intake*: "next", "back", a number, "confirm", "file it", or the
+  words of his question's options.
+- *The checklist* is now 100 boxes (Greg: "add 100 overall").

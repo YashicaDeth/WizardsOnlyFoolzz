@@ -1,7 +1,7 @@
 # The checklist, 26 September
 
 Greg asked for "a checklist with heaps of boxes". It covers everything open
-across the first thirty minutes, as of build `perf` (the commit after
+across the first thirty minutes (100 boxes since 27 September, at Greg's ask), as of build `perf` (the commit after
 `0883665`). A ticked box was done and checked in this repo. An unticked box is
 still open. **(Greg)** marks something only Greg can do or decide.
 
@@ -24,16 +24,15 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [x] **(Greg)** F10 on build `a866957`: about 160 fps in the vat room, Support Unit, sewers, Hunt and menu (NVIDIA RTX, 144 Hz+).
 - [ ] **(Greg)** Press F11 anywhere it drops under 60 and send the dump file next to the exe.
 - [ ] **(Greg)** Check whether VSync is on in Settings. VSync locks fps to your monitor's refresh (60, 144 or 165).
-- [x] **(Greg)** GPU and refresh: NVIDIA RTX, 144 Hz+.
-- [ ] Merge the vat room's static props into fewer draw calls (1,146). Parked until Greg's F10 numbers: each prop's material is deliberately unique, so merging changes the look, and 1,146 calls is about 1 ms on a real GPU.
-- [ ] Hunt: `_update_encounter_actors` is now the biggest script cost (1.3 ms).
-- [ ] Hunt HUD redraw (0.6 ms) should only redraw on change.
-- [ ] Hunt: 98 lights. Cull the far ones by distance.
-- [ ] Hunt physics server: 184 collision pairs, 144 islands. Find the idle ones.
-- [ ] A real-GPU benchmark on Greg's PC (the cloud renders on the CPU, so absolute fps here means nothing).
-- [ ] Fix `standing_contact_test`: the talk panel's close calls itself forever (it already failed before this pass).
-- [ ] Make `sandbox_perf_test` skip itself headless instead of reporting a false failure.
-- [ ] Fix Hunt tests that were already failing before 26 September: `firearm_aim_test`, `handheld_world_light_test`, `melee_cut_plane_test`, `vault_test`, `grapple_playability_test` (parse error: `released_from` declared twice), `handheld_world_drop_test`.
+- [x] Vat room draw calls (1,146): decided not to merge. Greg's F10 reads about 160 fps there, and merging would change the look (each prop's material is unique) and break props the scene still drives (the weak wall, the dark bays).
+- [x] Hunt: bodies over 35 m pose every 4th tick on saved-up time (`_update_encounter_actors` 0.90 → 0.69 ms, 12 actors).
+- [x] Hunt HUD: the held-item reliquary only redraws on change (it was redrawing 9 times a frame).
+- [x] Hunt lights: every light without its own fade fades out past 36 m or 4× its reach (59 of 100). Rendered with and without: the same near you.
+- [x] Hunt physics checked: the 184 pairs are characters on floors and props, 1 active object; nothing idle to cut.
+- [x] A real-GPU benchmark on Greg's PC: his F10 reading, about 160 fps everywhere (the cloud renders on the CPU).
+- [x] `standing_contact_test`: the talk panel's close only announces the first close now.
+- [x] `sandbox_perf_test` skips itself headless.
+- [x] The six Hunt tests failing before 26 September all pass: `firearm_aim`, `handheld_world_light`, `melee_cut_plane`, `vault`, `grapple_playability`, `handheld_world_drop`.
 
 ## The opening, beat by beat (OPENING_TORTURE_INTAKE.md)
 
@@ -46,10 +45,13 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [x] The hands-on breakout: cord, three blows, the glass.
 - [x] The examiner in the bloodied coat, tapping the glass.
 - [x] The watchers replace the static hung cameras.
-- [ ] The examiner model from the M1 sheet.
-- [ ] Real-mic V, the New Vegas intake (from the opening vision).
+- [x] The examiner's look from Greg's answers: tall, gaunt, bloodied coat, surgical mask (at his throat while he talks, up to fight) and loupe glasses. Same man at the glass, on the intake feed and in his office.
+- [ ] The authored examiner model from the M1 sheet replaces the stand-in body.
+- [x] Real-mic V intake (optional): hold V and say the answer, the page ("next"), a row ("two"), "confirm" or "file it"; typing still works.
 - [x] Vat room darker, red only in the glow: neutral black sky and fog, lower ambient, a desaturated grade (a data-only change to HouseLook's vat-room entry), a neutral exit light, a stronger red vat glow. The red checker floor and the pillars keep their own texture colour.
 - [ ] **(Greg)** Is the vat room dark enough, or too dark?
+- [x] The examiner fight in his office (behind the door you break): scalpel cuts and a syringe that slows you. Win: his keycard and coat. Lose: back in the vat, he keeps the coat, your old body stays in his office. His keycard opens the staff door on his cupboard (two dressings, eight rounds).
+- [x] Meds on hold-4: a FIELD DRESSING takes 2.5 s, heals 20, no fighting while you bandage; in every opening area and the Hunt. Loose rounds load into the gun you take.
 - [ ] Every opening overlay tested in the real route, not only in the test scenes.
 - [x] Minutes 0-30 are timed (hidden); surfacing into the Hunt shows a card with the time per area and whether it was under 30. A death does not restart the clock.
 - [ ] **(Greg)** Play a full run and read your card.
@@ -69,7 +71,7 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [x] Hunt keys: inventory to Tab (the Brain Index hub moved to Shift+Tab).
 - [ ] **(Greg)** Is Shift+Tab right for the Brain Index hub?
 - [x] Hunt keys: re-decant to hold-K (1.2 s, with a progress prompt).
-- [ ] The phone camera vision shows signals too.
+- [x] The phone camera shows signals too: raise the Black Mirror and its masts, terminals and any camera signals pulse in infrared, named with their distance.
 - [x] Wires and power in wizard eyes and depth: pulses run along each line; seen once, E at the junction cuts it. Vat room: that bay goes dark. Support Unit: that camera goes blind, quietly.
 - [x] Hidden things shown in wizard eyes and the depth scan (a general list any scene can fill).
 - [x] Stashes and secret doors: 7 hidden things across the opening (Greg: 5-8), faint seam for plain eyes, found in K/J, opened with E; meds and ammo.
@@ -111,9 +113,9 @@ still open. **(Greg)** marks something only Greg can do or decide.
 
 ## Branches and handoff
 
-- [ ] Merge `opencode/base-model-kit` once OpenCode pushes it.
+- [x] `opencode/base-model-kit` (and `opencode/gore`) are in the playtest branch.
 - [ ] Hand `DESIGN/MASTER_PROMPT_2026-09-26.md` Part 1 + a lane to each agent (Claude, Codex, OpenCode, Qoder, Freebuff, Qwen).
-- [ ] Keep `claude/dust-to-bones-look` merged after every piece.
+- [x] `claude/dust-to-bones-look` merged after every piece.
 - [x] No more zips (Greg, 26 September: "stop making zip files, it's pointless"). `Play-Latest.bat` in the repo root pulls the newest integration branch and plays it from source.
 
 ## For Greg, the playtest
