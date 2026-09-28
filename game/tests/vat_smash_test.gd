@@ -79,6 +79,12 @@ func _ready() -> void:
 	check(loose.attitude in ["friendly", "hostile"], "friendly or hostile by its own roll (%s)" % loose.attitude)
 	var record := WorldHistory.subject("growing_floor_subject_%d" % int(tank.seed))
 	check(str(record.get("status", "")) == "loose" and str(record.get("place", "")) == "growing_floor", "and the world knows it was freed from the Growing Floor")
+	check(not loose.exits.is_empty(), "it knows the ways out")
+	for _tick in 400:
+		if loose.state == "escaped":
+			break
+		loose.step(0.1)
+	check(loose.state == "escaped" and str(WorldHistory.subject(loose.subject_id).get("status", "")) == "escaped", "it bolts for the pit door and is gone")
 	var curled = tank.curled
 	check(curled == null or not (curled as Node3D).visible, "nothing is left floating in the empty tank")
 	check(smash.aimed(vat.camera) != 3, "a broken tank can't be broken again")

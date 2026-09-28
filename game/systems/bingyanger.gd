@@ -145,6 +145,9 @@ var _label: Label3D
 var _line_life := 0.0
 var _mutter_in := 3.0
 var _clock := 0.0
+## Greg's playtest: freed subjects bolt for the nearest way out, and only
+## fight when you stand in it. Empty = the old meet-and-act behaviour.
+var exits: Array = []
 var _pace := 0.0
 var _rng := RandomNumberGenerator.new()
 
@@ -259,7 +262,7 @@ func _restrain() -> void:
 
 
 func is_down() -> bool:
-	return state == "dead" or rig == null or rig.anatomy.downed or rig.anatomy.dead
+	return state in ["dead", "escaped"] or rig == null or rig.anatomy.downed or rig.anatomy.dead
 
 
 func bind(target: Node3D, alarm: AlarmDirector, guard_list: Array) -> void:
@@ -323,6 +326,9 @@ func step(delta: float) -> void:
 		if _mutter_in <= 0.0 and distance < 9.0:
 			_mutter_in = 5.0 + _rng.randf() * 4.0
 			_say("held")
+		return
+	if not exits.is_empty():
+		_flee(delta, distance)
 		return
 	# A new meeting after time apart.
 	if distance > APART_DISTANCE:
@@ -513,6 +519,31 @@ func _nearest_guard(within: float) -> Node3D:
 			best_distance = distance
 			best = guard
 	return best
+
+
+func _flee(delta: float, distance: float) -> void:
+	var goal: Vector3 = exits[0]
+	for exit: Vector3 in exits:
+		if _flat(exit - global_position).length() < _flat(goal - global_position).length():
+			goal = exit
+	var way := _flat(goal - global_position)
+	if way.length() <= 0.6:
+		state = "escaped"
+		visible = false
+		WorldHistory.amend_subject(subject_id, {"status": "escaped", "last_act": "fled"})
+		WorldHistory.record_event("bingyanger_escaped", {"subject_id": subject_id})
+		return
+	# Cornered: you are close and standing between it and the door.
+	var toward_you := _flat(player.global_position - global_position)
+	if distance <= REACH and toward_you.normalized().dot(way.normalized()) > 0.5:
+		_face(player.global_position)
+		if _cooldown <= 0.0:
+			_cooldown = STRIKE_COOLDOWN
+			_say("attack")
+			WorldHistory.record_event("bingyanger_attacked_player", {"subject_id": subject_id, "damage": PLAYER_STRIKE, "cornered": true})
+			struck_player.emit(PLAYER_STRIKE)
+		return
+	_go(goal, RUN, delta, 0.0)
 
 
 func _wander(delta: float) -> void:
