@@ -3490,7 +3490,7 @@ The last rung. Fifteen statements that are true of performance when this game is
 - [ ] **X10.2** `v10` A panel costs less than the game it is drawn over
 - [ ] **X10.3** `v10` Nothing iterates the world when it could iterate the screen
 - [ ] **X10.4** `v10` Static registries are swept at every seam
-- [ ] **X10.5** `v10` Gore, brass and debris are capped and recycled
+- [x] ~~**X10.5** `v10` Gore, brass and debris are capped and recycled~~ Audited 29 Sep, every spawner has a ceiling that scales with quality: live gore `BaselineHuman.MAX_LIVE_GORE` 140 and splats 420, severed chunks `GoreChunks.MAX_CHUNKS` 72, casings `Ballistics.MAX_CASINGS` 180, wound marks 14 per zone, door/prop/lamp/vehicle fragments through `WorldDebris.register`'s per-pool budget (oldest freed first), and blood pools merge by volume (`BloodPool.keep`) rather than stacking.
 - [ ] **X10.6** `v10` Every subviewport renders only when somebody is looking
 - [ ] **X10.7** `v10` The region streams rather than existing all at once
 - [ ] **X10.8** `v10` Crowds are cheap enough to be crowds
