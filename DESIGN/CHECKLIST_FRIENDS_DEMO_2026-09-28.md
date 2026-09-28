@@ -92,8 +92,8 @@ at 100. **(Greg)** marks what only Greg can do.
 - [x] Your heartbeat, speeding up with panic
 - [x] Your breathing bubbles
 - [x] His voice muffled through the glass
-- [ ] Look down: your grown body and the cords in it
-- [ ] Body horror on your body by intake choices
+- [x] Look down: your grown body and the cords in it (29 Sep; readability to check in playtest)
+- [x] Body horror on your body by intake choices (TankBodyMarks)
 
 ### The breakout
 
@@ -108,7 +108,7 @@ at 100. **(Greg)** marks what only Greg can do.
 
 - [ ] Shorter
 - [ ] Clearer
-- [ ] Scarier
+- [x] Scarier (flash stabs, heartbeat, cut scream, one subliminal frame)
 - [ ] Looks finished
 
 ### Guidance through wizard eyes
@@ -143,12 +143,12 @@ at 100. **(Greg)** marks what only Greg can do.
 ### Combat
 
 - [x] The shiv as a Hunt weapon: fast, bleeds, weak against armour
-- [ ] Controller support (bindings for every action)
+- [x] Controller support: PlayStation pad via PadBridge (keyboard glyphs still shown)
 
 ### Brain Index
 
-- [ ] Hovering the inventory body's head glows it and previews stats
-- [ ] Clicking zooms into the skull and opens the Brain Index
+- [x] Hovering the inventory body's head glows it and previews stats
+- [x] Clicking zooms into the skull and opens the Brain Index
 
 ### The friends' run
 
@@ -156,7 +156,7 @@ at 100. **(Greg)** marks what only Greg can do.
 - [x] The pause KEYS page lists middle mouse and hold 4
 - [x] A first-minute controls card when the Hunt opens
 - [x] Surfacing into the Hunt feels like the payoff: daylight, open sky
-- [ ] A 15-minute friends' run with no dead ends, as a test
+- [x] A first run with no dead ends, as a test (first_run_walk_test)
 
 ### Greg's
 
