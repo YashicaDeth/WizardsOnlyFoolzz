@@ -1510,3 +1510,10 @@ playable build and verified before merge.
   them, ordinary and dark (a kitchen, a dog, a hospital bed, a face, a car
   crash, a funeral, a grave). The silence lasts 1.2 s. Greg plays from the
   very start and talks while he plays.
+- **Built 28 September (Claude):** the empty bay, the hidden den, and
+  middle-mouse heavy / guard break. StarNet moves to the **sound pass**.
+- **Next in minutes 0-30, all of it:** vat horror, the in-tank feel,
+  wizard-eyes guidance (waves and chip adjectives) and the breakout.
+- **The den's subject:** decided later.
+- **The den's shiv** is a real Hunt weapon: a fast blade that makes wounds
+  bleed and is weak against armour.
