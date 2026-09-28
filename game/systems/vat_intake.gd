@@ -991,10 +991,13 @@ func _draw_routes(_rect: Rect2, ink: Color, y: float) -> void:
 	for index in ROUTES.size():
 		var label: String = ROUTES[index]
 		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.route == label.to_lower())
-		CellOutzType.draw_condensed(self, Vector2(50, y - 10), label, 13.0, ink, 0.9)
+		# Walkthrough 2: the blank space used, the text larger. Four routes had
+		# the bottom half of the form to themselves; the note now sits under
+		# the name at a size that can be read.
+		CellOutzType.draw_condensed(self, Vector2(50, y - 13), label, 17.0, ink, 1.0)
 		var note: String = ["quick start: enter and go", "the decanting lottery", "birth date, time, place", "the questionnaire"][index]
-		CellOutzType.draw_condensed(self, Vector2(180, y - 8), note.to_upper(), 8.0, ink * Color(1, 1, 1, 0.45), 0.7)
-		y += 26.0
+		CellOutzType.draw_condensed(self, Vector2(50, y + 10), note.to_upper(), 10.0, ink * Color(1, 1, 1, 0.5), 0.7)
+		y += 58.0
 
 
 ## What he knows once you have told him: the date, the wheel it gives, and the
@@ -1048,8 +1051,8 @@ func _draw_races(_rect: Rect2, ink: Color, y: float) -> void:
 	for index in keys.size():
 		var data: Dictionary = CharacterSheet.RACES[keys[index]]
 		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.race == str(keys[index]))
-		CellOutzType.draw_condensed(self, Vector2(50, y - 10), str(data.name), 12.0, ink, 0.9)
-		CellOutzType.draw_condensed(self, Vector2(50, y + 4), str(data.price).to_upper(), 7.0, ink * Color(1, 1, 1, 0.42), 0.6)
+		CellOutzType.draw_condensed(self, Vector2(50, y - 12), str(data.name), 15.0, ink, 0.9)
+		CellOutzType.draw_condensed(self, Vector2(50, y + 6), str(data.price).to_upper(), 8.5, ink * Color(1, 1, 1, 0.48), 0.6)
 		# AX1.4. What you picked, and what the facility wrote down instead. Shown
 		# together on purpose: the doc is explicit that the player's choice stays
 		# accurate and it is the institution's diagnosis that is distorted.
@@ -1057,21 +1060,24 @@ func _draw_races(_rect: Rect2, ink: Color, y: float) -> void:
 			var filed := DoctorExamination.classify(sheet)
 			CellOutzType.draw_condensed(self, Vector2(300, y - 10), "FILED AS " + str(filed.label), 9.0, HOT * Color(1, 1, 1, 0.8), 0.7)
 			CellOutzType.draw_condensed(self, Vector2(300, y + 4), str(filed.note).to_upper(), 7.0, HOT * Color(1, 1, 1, 0.45), 0.6)
-		y += 30.0
+		y += 42.0
 
 
 func _draw_traits(rect: Rect2, ink: Color, y: float) -> void:
 	CellOutzType.draw_condensed(self, Vector2(30, y - 14), "BUDGET %02d" % sheet.points_left(), 11.0, HOT if sheet.points_left() <= 0 else ink, 0.8)
-	y += 12.0
+	y += 20.0
 	var keys: Array = CharacterSheet.TRAITS.keys()
 	for index in keys.size():
 		var data: Dictionary = CharacterSheet.TRAITS[keys[index]]
 		var cost := int(data.get("cost", 0))
 		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.traits.has(str(keys[index])))
-		CellOutzType.draw_condensed(self, Vector2(50, y - 10), str(data.name), 11.0, ink, 0.8)
+		# Walkthrough 2: "the intake's blank space used and its text larger".
+		# Eight traits left a third of the form empty at 24 px; they take the
+		# room the body page's nine rows already fill.
+		CellOutzType.draw_condensed(self, Vector2(50, y - 12), str(data.name), 14.0, ink, 0.9)
 		var cost_text := ("+%d" % -cost) if cost < 0 else "-%d" % cost
-		CellOutzType.draw_condensed(self, Vector2(rect.size.x - 62, y - 10), cost_text, 11.0, (MOSS if cost < 0 else HOT).darkened(0.35), 0.8)
-		y += 24.0
+		CellOutzType.draw_condensed(self, Vector2(rect.size.x - 66, y - 12), cost_text, 13.0, (MOSS if cost < 0 else HOT).darkened(0.35), 0.8)
+		y += 34.0
 
 
 ## AX1.3. Seven axes, each read back in the facility's own words rather than
