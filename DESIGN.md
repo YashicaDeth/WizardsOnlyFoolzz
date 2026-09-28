@@ -1506,3 +1506,7 @@ playable build and verified before merge.
   (keyboard and mouse only). The one-time key hints show keyboard keys for
   now. Controller support is its own job: bindings for every action, then
   hints that follow the last device used.
+- **The brain hack, answered 28 September:** the memory flashes are all of
+  them, ordinary and dark (a kitchen, a dog, a hospital bed, a face, a car
+  crash, a funeral, a grave). The silence lasts 1.2 s. Greg plays from the
+  very start and talks while he plays.

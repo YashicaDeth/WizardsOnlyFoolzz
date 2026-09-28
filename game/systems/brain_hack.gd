@@ -28,7 +28,16 @@ const RUNE_IN := 0.5
 const RUNE_FULL := 2.2
 const SHRINK_END := 3.6
 const HACK_END := 5.6
-const HACK_SECONDS := 6.0
+## Greg, 28 September: dead silence and black after the hack, then BRAIN
+## HACKED SOUL OVERTAKEN slams in (the chamber's card on `hack_finished`).
+const HACK_SECONDS := 6.8
+## The screen cracks and tears before the rune; the donor's life flashes
+## past while the rune takes hold.
+const BREAK_END := 0.9
+const MEMORY_AT := 0.7
+const MEMORY_SLOT := 0.22
+## Greg, 28 September: "all of the above": the ordinary and the dark.
+const MEMORIES := ["kitchen", "dog", "hospital", "face", "crash", "funeral", "grave"]
 ## BRAIN HACKED / SOUL OVERTAKEN holds on the chamber's mission card.
 const CARD_SECONDS := 2.6
 
@@ -72,7 +81,10 @@ func skip_hack() -> void:
 	if mode != "hack" or clock >= HACK_END:
 		return
 	skipped = true
-	clock = HACK_END - 0.001
+	# Straight into a short silence, not the full 1.2 s: a skip is a skip.
+	clock = HACK_SECONDS - 0.4
+	if _voice != null:
+		_voice.stop()
 
 
 func _process(delta: float) -> void:
@@ -89,6 +101,9 @@ func step(delta: float) -> void:
 				_cue("scream")
 			if before < RUNE_FULL and clock >= RUNE_FULL:
 				_cue("glitch")
+			if before < HACK_END and clock >= HACK_END and _voice != null:
+				# The silence: everything stops at once.
+				_voice.stop()
 			if clock >= HACK_SECONDS:
 				mode = "card"
 				# The card itself is the mission card's; this control draws
@@ -107,9 +122,10 @@ func _cue(kind: String) -> void:
 		return
 	var maker = TortureLoadIn.new()
 	var wave_kind := kind
-	_voice.stream = maker._wave(wave_kind, {"scream": 2.4, "glitch": 0.5}.get(kind, 0.6), false)
+	# Greg, 28 September: the scream louder and longer.
+	_voice.stream = maker._wave(wave_kind, {"scream": 3.8, "glitch": 0.5}.get(kind, 0.6), false)
 	maker.free()
-	_voice.volume_db = -8.0
+	_voice.volume_db = -1.0 if kind == "scream" else -8.0
 	_voice.play()
 
 
@@ -137,9 +153,14 @@ func _draw() -> void:
 func _draw_hack(view: Vector2) -> void:
 	var centre := view * 0.5
 	var unit := minf(view.x, view.y)
+	if clock >= HACK_END:
+		draw_rect(Rect2(Vector2.ZERO, view), BLACK)
+		return
 	# The screaming drowns the room first.
 	draw_rect(Rect2(Vector2.ZERO, view), Color(BLACK, clampf(clock / 0.6, 0.0, 0.92)))
 	_draw_frames(view, centre, unit)
+	_draw_break(view, centre, unit)
+	_draw_memory(view, centre, unit)
 	var pulse := pow(maxf(0.0, sin(clock * TAU / 0.9)), 6.0)
 	var scale := rune_scale()
 	if scale <= 0.0:
@@ -231,6 +252,105 @@ func _draw_frames(view: Vector2, centre: Vector2, unit: float) -> void:
 			var end := bend + turn * unit * 0.2 * chip
 			draw_polyline(PackedVector2Array([first, bend, end]), Color(COPPER, 0.45 * chip), 1.5)
 			draw_rect(Rect2(end - Vector2(3, 3), Vector2(6, 6)), Color(COPPER, 0.4 * chip), true)
+
+
+## The screen breaking: cracks spread from a point near the centre, the view
+## tears in bands and the pieces sit a little out of place.
+func _draw_break(view: Vector2, centre: Vector2, unit: float) -> void:
+	if clock > BREAK_END:
+		return
+	var grow := clampf(clock / 0.45, 0.0, 1.0)
+	var fade := clampf((BREAK_END - clock) / 0.3, 0.0, 1.0)
+	var origin := centre + Vector2(unit * 0.08, -unit * 0.05)
+	for crack in 11:
+		var angle := float(crack) * TAU / 11.0 + sin(float(crack) * 7.1) * 0.3
+		var points := PackedVector2Array([origin])
+		var at := origin
+		for step in 5:
+			var turn := angle + sin(float(crack * 13 + step) * 3.7) * 0.5
+			at += Vector2.from_angle(turn) * unit * 0.14 * grow
+			points.append(at)
+		draw_polyline(points, Color(0, 0, 0, 0.9 * fade), 7.0)
+		draw_polyline(points, Color(BONE, 0.85 * fade), 1.5)
+	# Tearing bands, jumping every twentieth of a second.
+	var tick := floorf(clock * 20.0)
+	for band in 6:
+		var y := _fract(sin(tick * 3.1 + band * 17.7) * 9731.0) * view.y
+		var tall := 6.0 + _fract(sin(tick + band) * 431.0) * 26.0
+		var shift := (_fract(sin(tick * 1.7 + band) * 173.0) - 0.5) * 60.0
+		draw_rect(Rect2(Vector2(shift, y), Vector2(view.x, tall)), Color(BLOOD if band % 2 == 0 else BLACK, 0.55 * fade))
+
+
+## The donor's life, a frame at a time: a kitchen, a dog, a funeral, a face.
+## Overexposed and gone before you can hold on to it.
+func _draw_memory(view: Vector2, centre: Vector2, unit: float) -> void:
+	if clock < MEMORY_AT or clock >= MEMORY_AT + MEMORY_SLOT * MEMORIES.size():
+		return
+	var slot := int((clock - MEMORY_AT) / MEMORY_SLOT)
+	var within := fmod(clock - MEMORY_AT, MEMORY_SLOT)
+	# On for the first part of each slot only: a flicker, not a slideshow.
+	if within > MEMORY_SLOT * 0.55:
+		return
+	var light := Color("d8c7a4")
+	var ink := Color("3a2418")
+	draw_rect(Rect2(Vector2.ZERO, view), Color(light, 0.82))
+	var s := unit * 0.5
+	var c := centre
+	match MEMORIES[slot]:
+		"kitchen":
+			draw_rect(Rect2(c + Vector2(-s * 0.9, s * 0.2), Vector2(s * 1.8, s * 0.08)), ink)
+			for leg in [-0.8, 0.8]:
+				draw_rect(Rect2(c + Vector2(s * leg - s * 0.03, s * 0.28), Vector2(s * 0.06, s * 0.5)), ink)
+			draw_rect(Rect2(c + Vector2(-s * 0.4, -s * 0.9), Vector2(s * 0.8, s * 0.7)), ink, false, 6.0)
+			draw_line(c + Vector2(0, -s * 0.9), c + Vector2(0, -s * 0.2), ink, 4.0)
+			draw_line(c + Vector2(-s * 0.4, -s * 0.55), c + Vector2(s * 0.4, -s * 0.55), ink, 4.0)
+		"dog":
+			draw_colored_polygon(PackedVector2Array([
+				c + Vector2(-s * 0.7, 0), c + Vector2(s * 0.4, 0), c + Vector2(s * 0.55, -s * 0.25),
+				c + Vector2(s * 0.8, -s * 0.3), c + Vector2(s * 0.75, -s * 0.05), c + Vector2(s * 0.5, s * 0.05),
+				c + Vector2(s * 0.45, s * 0.5), c + Vector2(s * 0.35, s * 0.5), c + Vector2(s * 0.3, s * 0.15),
+				c + Vector2(-s * 0.5, s * 0.15), c + Vector2(-s * 0.55, s * 0.5), c + Vector2(-s * 0.65, s * 0.5),
+				c + Vector2(-s * 0.7, s * 0.1), c + Vector2(-s * 0.95, -s * 0.2)]), ink)
+		"funeral":
+			draw_colored_polygon(PackedVector2Array([
+				c + Vector2(-s * 0.8, s * 0.1), c + Vector2(-s * 0.6, -s * 0.12), c + Vector2(s * 0.8, -s * 0.12),
+				c + Vector2(s * 0.8, s * 0.3), c + Vector2(-s * 0.6, s * 0.3)]), ink)
+			for figure in [-1.2, 1.15, 1.45]:
+				var feet := c + Vector2(s * figure, s * 0.6)
+				draw_rect(Rect2(feet - Vector2(s * 0.08, s * 0.7), Vector2(s * 0.16, s * 0.7)), ink)
+				draw_circle(feet - Vector2(0, s * 0.8), s * 0.09, ink)
+		"face":
+			draw_arc(c, s * 0.55, 0.0, TAU, 40, ink, 6.0)
+			for eye in [-1.0, 1.0]:
+				draw_circle(c + Vector2(eye * s * 0.2, -s * 0.1), s * 0.05, ink)
+			draw_arc(c + Vector2(0, s * 0.18), s * 0.18, 0.3, PI - 0.3, 12, ink, 4.0)
+		"hospital":
+			# A bed, a body under the sheet, the drip stand.
+			draw_rect(Rect2(c + Vector2(-s * 0.9, s * 0.05), Vector2(s * 1.8, s * 0.12)), ink)
+			draw_colored_polygon(PackedVector2Array([
+				c + Vector2(-s * 0.8, s * 0.05), c + Vector2(-s * 0.6, -s * 0.15), c + Vector2(s * 0.5, -s * 0.12),
+				c + Vector2(s * 0.8, s * 0.05)]), ink)
+			draw_circle(c + Vector2(-s * 0.72, -s * 0.12), s * 0.1, ink)
+			draw_line(c + Vector2(s * 1.0, s * 0.5), c + Vector2(s * 1.0, -s * 0.7), ink, 4.0)
+			draw_rect(Rect2(c + Vector2(s * 0.92, -s * 0.7), Vector2(s * 0.16, s * 0.22)), ink, false, 3.0)
+		"crash":
+			# A car on its roof, one wheel still turning.
+			draw_colored_polygon(PackedVector2Array([
+				c + Vector2(-s * 0.9, 0), c + Vector2(s * 0.9, 0), c + Vector2(s * 0.7, s * 0.3),
+				c + Vector2(s * 0.3, s * 0.3), c + Vector2(s * 0.15, s * 0.5), c + Vector2(-s * 0.45, s * 0.5),
+				c + Vector2(-s * 0.6, s * 0.3), c + Vector2(-s * 0.9, s * 0.3)]), ink)
+			for wheel in [-0.55, 0.55]:
+				draw_arc(c + Vector2(s * wheel, -s * 0.08), s * 0.16, 0.0, TAU, 20, ink, 5.0)
+			draw_line(c + Vector2(-s * 1.2, s * 0.52), c + Vector2(s * 1.2, s * 0.52), ink, 3.0)
+		"grave":
+			draw_colored_polygon(PackedVector2Array([
+				c + Vector2(-s * 0.35, s * 0.5), c + Vector2(-s * 0.35, -s * 0.4), c + Vector2(-s * 0.2, -s * 0.6),
+				c + Vector2(s * 0.2, -s * 0.6), c + Vector2(s * 0.35, -s * 0.4), c + Vector2(s * 0.35, s * 0.5)]), ink)
+			draw_line(c + Vector2(-s * 1.2, s * 0.5), c + Vector2(s * 1.2, s * 0.5), ink, 4.0)
+	# Grain over the memory, so it reads as a remembered image, not a drawing.
+	for speck in 140:
+		var at := Vector2(_fract(sin(float(speck) * 12.9 + clock * 40.0) * 43758.5) * view.x, _fract(sin(float(speck) * 78.2 + clock * 31.0) * 12345.7) * view.y)
+		draw_rect(Rect2(at, Vector2(2, 2)), Color(ink, 0.35))
 
 
 static func _fract(x: float) -> float:
