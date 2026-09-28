@@ -25,13 +25,26 @@ const BLACK := Color("030504")
 const SCREAM_AT := [1.1, 3.9, 6.6]
 const GAG_AT := 2.5
 const TUBE_AT := 3.2
+## Greg, 28 September, all four: the surgical lamp overhead with masked
+## faces leaning in, your body opened (censored per the setting), your
+## vitals flatlining then a jolt, and the warning spirits' faces.
 const FLASHES := [
-	{"at": 4.6, "kind": "skull"},
-	{"at": 6.1, "kind": "ribs"},
-	{"at": 7.9, "kind": "rune"},
-	{"at": 9.4, "kind": "skull"},
+	{"at": 4.6, "kind": "lamp"},
+	{"at": 6.1, "kind": "opened"},
+	{"at": 7.9, "kind": "vitals"},
+	{"at": 9.4, "kind": "spirits"},
 ]
-const FLASH_SECONDS := 0.16
+## Long enough to read what it was (Greg's checklist: clearer), still a cut.
+const FLASH_SECONDS := 0.3
+## The whispers are spirit voices, and they are warning you (Greg, 28
+## September, his words). Placed around the screen, so they come from around
+## you rather than from the broadcast's line.
+const WHISPERS := [
+	{"at": 1.7, "text": "DON'T WAKE UP", "where": Vector2(0.22, 0.3)},
+	{"at": 3.5, "text": "THEY'LL TAKE YOU APART", "where": Vector2(0.72, 0.22)},
+	{"at": 9.8, "text": "DON'T WAKE UP", "where": Vector2(0.3, 0.6)},
+]
+const WHISPER_SECONDS := 1.5
 ## Greg's checklist: scarier. One frame of a masked face in the black, the
 ## last scream cut off dead, a stab on every flash, your heart under it all.
 const FACE_AT := 8.65
@@ -116,6 +129,8 @@ func step(delta: float) -> void:
 		_heart.pitch_scale = lerpf(0.85, 1.7, clampf(clock / GLITCH_AT, 0.0, 1.0))
 		if clock >= GLITCH_AT:
 			_heart.volume_db = move_toward(_heart.volume_db, -60.0, delta * 60.0)
+	for whisper in WHISPERS:
+		_cue_between(before, float(whisper.at), "whisper")
 	_cue_between(before, GAG_AT, "gag")
 	if before < TUBE_AT and clock >= TUBE_AT:
 		_breath.stream = _wave("breath_tube", 2.4, true)
@@ -140,8 +155,8 @@ func _cue_between(before: float, at: float, kind: String) -> void:
 func cue(kind: String) -> void:
 	played.append(kind)
 	var player: AudioStreamPlayer = _voices[played.size() % _voices.size()]
-	player.stream = _wave(kind, {"scream": 1.6, "gag": 1.1, "broadcast": 1.8, "glitch": 0.9}.get(kind, 0.6), false)
-	player.volume_db = {"scream": -9.0, "gag": -6.0, "broadcast": -11.0, "glitch": -7.0}.get(kind, -10.0)
+	player.stream = _wave(kind, {"scream": 1.6, "gag": 1.1, "broadcast": 1.8, "glitch": 0.9, "whisper": 1.3}.get(kind, 0.6), false)
+	player.volume_db = {"scream": -9.0, "gag": -6.0, "broadcast": -11.0, "glitch": -7.0, "whisper": -8.0}.get(kind, -10.0)
 	player.pitch_scale = 1.0 - 0.06 * float(played.count(kind) - 1) if kind == "broadcast" else 1.0
 	player.play()
 
@@ -219,6 +234,17 @@ func broadcast_text() -> String:
 	return eaten + "..."
 
 
+## The whispers on screen now: [text, where (0-1), alpha].
+func whispers_now() -> Array:
+	var now: Array = []
+	for whisper in WHISPERS:
+		var since := clock - float(whisper.at)
+		if since >= 0.0 and since < WHISPER_SECONDS:
+			var alpha := minf(since / 0.25, 1.0) * clampf((WHISPER_SECONDS - since) / 0.6, 0.0, 1.0)
+			now.append([str(whisper.text), whisper.where, alpha])
+	return now
+
+
 func broadcast_pass() -> int:
 	return mini(2, int((clock - BROADCAST_AT) / BROADCAST_PASS)) if clock >= BROADCAST_AT else -1
 
@@ -251,6 +277,11 @@ func _draw() -> void:
 		_draw_film(flash_kind(), centre, unit, amount)
 	if clock >= FACE_AT and clock < FACE_AT + FACE_SECONDS:
 		_draw_face(centre, unit)
+	for whisper: Array in whispers_now():
+		var w_size := clampf(unit * 0.03, 14.0, 26.0)
+		var drift := Vector2(sin(clock * 3.1) * 4.0, (1.0 - float(whisper[2])) * -8.0)
+		var w_at: Vector2 = (whisper[1] as Vector2) * size + drift
+		CellOutzType.draw_string_compat(self, w_at - Vector2(size.x * 0.5, 0.0), str(whisper[0]), HORIZONTAL_ALIGNMENT_CENTER, size.x, int(w_size), Color(FILM, 0.62 * float(whisper[2])))
 	var line := broadcast_text()
 	if line != "":
 		var pass_index := broadcast_pass()
@@ -293,49 +324,175 @@ func _draw_film(kind: String, centre: Vector2, unit: float, amount: float) -> vo
 	var film := Color(FILM, 0.8 * amount)
 	var dim := Color(FILM, 0.3 * amount)
 	draw_rect(Rect2(centre - Vector2(unit * 0.34, unit * 0.44), Vector2(unit * 0.68, unit * 0.88)), Color(FILM, 0.06 * amount))
-	match kind:
-		"skull":
-			# Side-on skull: cranium, the eye socket, nasal cut, jaw and teeth,
-			# with the chip at the back where the spine goes in.
-			var c := centre + Vector2(unit * 0.02, -unit * 0.08)
-			var r := unit * 0.2
-			draw_arc(c, r, PI * 0.72, TAU + PI * 0.08, 56, film, 5.0)
-			var brow := c + Vector2(-r * 0.97, r * 0.2)
-			var cheek := c + Vector2(-r * 0.95, r * 0.72)
-			draw_polyline(PackedVector2Array([brow, brow + Vector2(-r * 0.12, r * 0.18), cheek + Vector2(-r * 0.1, 0), cheek + Vector2(-r * 0.02, r * 0.22)]), film, 4.0)
-			draw_circle(c + Vector2(-r * 0.62, r * 0.36), r * 0.2, Color(BLACK, amount))
-			draw_arc(c + Vector2(-r * 0.62, r * 0.36), r * 0.22, 0, TAU, 24, dim, 2.0)
-			draw_colored_polygon(PackedVector2Array([c + Vector2(-r * 0.92, r * 0.6), c + Vector2(-r * 0.78, r * 0.62), c + Vector2(-r * 0.86, r * 0.82)]), Color(BLACK, amount))
-			var jaw := PackedVector2Array([cheek + Vector2(0, r * 0.22), c + Vector2(-r * 0.78, r * 1.22), c + Vector2(-r * 0.2, r * 1.3), c + Vector2(r * 0.12, r * 0.98), c + Vector2(r * 0.18, r * 0.66)])
-			draw_polyline(jaw, film, 4.0)
-			for tooth in 6:
-				var x := c.x - r * 0.9 + tooth * r * 0.1
-				draw_line(Vector2(x, c.y + r * 0.9), Vector2(x, c.y + r * 1.02), dim, 2.0)
-			var base := c + Vector2(r * 0.55, r * 0.78)
-			for bone in 4:
-				draw_rect(Rect2(base + Vector2(-r * 0.12, r * (0.12 + bone * 0.24)), Vector2(r * 0.24, r * 0.16)), dim, false, 2.0)
-			draw_circle(base, unit * 0.017, Color(0.5, 1.0, 0.9, amount))
-			draw_line(base, base + Vector2(0, r * 1.1), Color(0.5, 1.0, 0.9, 0.6 * amount), 2.0)
-		"ribs":
-			draw_line(centre + Vector2(0, -unit * 0.32), centre + Vector2(0, unit * 0.3), film, 6.0)
-			for rib in 8:
-				var y := -unit * 0.26 + rib * unit * 0.065
-				var reach := unit * (0.14 + 0.09 * sin(float(rib + 1) / 9.0 * PI))
-				for side in [-1.0, 1.0]:
-					draw_arc(centre + Vector2(side * reach * 0.5, y + unit * 0.04), reach * 0.55, -PI * 0.5 - side * 0.9, -PI * 0.5 + side * 0.9, 16, film, 3.0)
-			draw_circle(centre + Vector2(-unit * 0.04, -unit * 0.05), unit * 0.05, Color(BLOOD, 0.5 * amount))
-		"rune":
-			var ring := unit * 0.26
-			for quarter in 4:
-				var start := quarter * PI * 0.5 + 0.18
-				draw_arc(centre, ring, start, start + PI * 0.5 - 0.36, 24, Color(BLOOD, amount), 10.0)
-			draw_line(centre + Vector2(0, ring * 0.8), centre + Vector2(0, -ring * 0.8), Color(BLOOD, amount), 10.0)
-			draw_line(centre + Vector2(0, -ring * 0.05), centre + Vector2(-ring * 0.55, -ring * 0.62), Color(BLOOD, amount), 10.0)
-			draw_line(centre + Vector2(0, -ring * 0.05), centre + Vector2(ring * 0.55, -ring * 0.62), Color(BLOOD, amount), 10.0)
+	# Double exposure: the frame printed twice more, offset and faint, so it
+	# reads as failing film and not as a clean drawing.
+	for echo in [Vector2(-unit * 0.018, unit * 0.01), Vector2(unit * 0.012, -unit * 0.014)]:
+		draw_set_transform(echo)
+		_draw_flash(kind, centre, unit, amount * 0.22, Color(FILM, 0.8 * amount * 0.22), Color(FILM, 0.3 * amount * 0.22))
+	draw_set_transform(Vector2.ZERO)
+	_draw_flash(kind, centre, unit, amount, film, dim)
 	# Scratches down the film.
 	for scratch in 5:
 		var x := centre.x + (float(scratch) / 4.0 - 0.5) * unit * 0.6 + _rng.randf_range(-6.0, 6.0)
 		draw_line(Vector2(x, centre.y - unit * 0.44), Vector2(x + _rng.randf_range(-8.0, 8.0), centre.y + unit * 0.44), Color(FILM, 0.12 * amount), 1.0)
+
+
+func _draw_flash(kind: String, centre: Vector2, unit: float, amount: float, film: Color, dim: Color) -> void:
+	match kind:
+		"lamp":
+			_draw_lamp(centre, unit, amount, film, dim)
+		"opened":
+			_draw_opened(centre, unit, amount, film, dim)
+		"vitals":
+			_draw_vitals(centre, unit, amount)
+		"spirits":
+			_draw_spirits(centre, unit, amount)
+
+
+## Flat on your back under the surgical lamp; masked heads lean in over it.
+func _draw_lamp(centre: Vector2, unit: float, amount: float, film: Color, dim: Color) -> void:
+	var lamp := centre + Vector2(0, -unit * 0.05)
+	var r := unit * 0.16
+	draw_circle(lamp, r * 1.25, Color(FILM, 0.12 * amount))
+	draw_arc(lamp, r, 0, TAU, 48, film, 6.0)
+	for bulb in 7:
+		var a := TAU * float(bulb) / 7.0
+		draw_circle(lamp + Vector2(cos(a), sin(a)) * r * 0.58, r * 0.2, Color(BONE, 0.9 * amount))
+	draw_circle(lamp, r * 0.24, Color(BONE, amount))
+	# Three heads at the rim of the light, too close: the eyes and a mask.
+	for side in [-1.0, 0.0, 1.0]:
+		var head := lamp + Vector2(side * unit * 0.3, -unit * 0.02 + absf(side) * unit * 0.14)
+		if side == 0.0:
+			head = lamp + Vector2(0, -unit * 0.3)
+		var hr := unit * 0.11
+		draw_circle(head, hr, Color(BLACK, 0.92 * amount))
+		draw_arc(head, hr, PI * 1.05, PI * 1.95, 20, dim, 3.0)
+		for eye in [-1.0, 1.0]:
+			draw_circle(head + Vector2(eye * hr * 0.35, -hr * 0.1), hr * 0.07, Color(BONE, 0.85 * amount))
+		# A surgical mask: over the nose, square to the jaw, loops to the ears.
+		var mask := PackedVector2Array([head + Vector2(-hr * 0.62, hr * 0.02), head + Vector2(0, -hr * 0.06), head + Vector2(hr * 0.62, hr * 0.02),
+			head + Vector2(hr * 0.56, hr * 0.62), head + Vector2(-hr * 0.56, hr * 0.62)])
+		draw_colored_polygon(mask, Color(FILM, 0.3 * amount))
+		for pleat in 3:
+			var y := hr * (0.18 + pleat * 0.14)
+			draw_line(head + Vector2(-hr * 0.56, y), head + Vector2(hr * 0.56, y), Color(BLACK, 0.35 * amount), 1.5)
+		for loop_side in [-1.0, 1.0]:
+			draw_line(head + Vector2(loop_side * hr * 0.62, hr * 0.06), head + Vector2(loop_side * hr * 0.96, -hr * 0.05), Color(FILM, 0.35 * amount), 1.5)
+			draw_line(head + Vector2(loop_side * hr * 0.56, hr * 0.56), head + Vector2(loop_side * hr * 0.9, hr * 0.3), Color(FILM, 0.35 * amount), 1.5)
+	# The drill, coming in from the side.
+	var drill := centre + Vector2(unit * 0.36, unit * 0.3)
+	draw_line(drill, drill + Vector2(-unit * 0.14, -unit * 0.12), film, 7.0)
+	draw_line(drill + Vector2(-unit * 0.14, -unit * 0.12), drill + Vector2(-unit * 0.2, -unit * 0.17), Color(BONE, amount), 2.0)
+
+
+## Your body opened, seen from the table. Censored (the default), the cavity
+## is a mosaic that keeps the silhouette and the blood (AX1.6's rule).
+func _draw_opened(centre: Vector2, unit: float, amount: float, film: Color, dim: Color) -> void:
+	var torso := PackedVector2Array([
+		centre + Vector2(-unit * 0.2, -unit * 0.32), centre + Vector2(unit * 0.2, -unit * 0.32),
+		centre + Vector2(unit * 0.16, unit * 0.34), centre + Vector2(-unit * 0.16, unit * 0.34)])
+	draw_colored_polygon(torso, Color(FILM, 0.08 * amount))
+	var closed := torso.duplicate()
+	closed.append(torso[0])
+	draw_polyline(closed, film, 4.0)
+	var cavity := Rect2(centre + Vector2(-unit * 0.1, -unit * 0.2), Vector2(unit * 0.2, unit * 0.36))
+	# Ribs spread back like a cage opened.
+	for rib in 6:
+		var y := cavity.position.y + rib * cavity.size.y / 6.0
+		for side in [-1.0, 1.0]:
+			var from := Vector2(centre.x + side * cavity.size.x * 0.5, y)
+			draw_line(from, from + Vector2(side * unit * 0.1, -unit * 0.03), film, 3.0)
+	# Clamps holding it open.
+	for side in [-1.0, 1.0]:
+		var at := Vector2(centre.x + side * (cavity.size.x * 0.5 + unit * 0.02), centre.y)
+		draw_rect(Rect2(at - Vector2(unit * 0.012, unit * 0.06), Vector2(unit * 0.024, unit * 0.12)), Color(BONE, 0.9 * amount))
+	if AnatomyPresentation.is_explicit():
+		draw_rect(cavity, Color(BLOOD, 0.75 * amount))
+		for organ in 5:
+			var at := cavity.position + Vector2(cavity.size.x * (0.3 + 0.4 * float(organ % 2)), cavity.size.y * (0.15 + organ * 0.17))
+			draw_circle(at, unit * 0.028, Color(BLOOD.lightened(0.25), amount))
+			draw_arc(at, unit * 0.028, 0, TAU, 16, dim, 1.5)
+	else:
+		var cell := unit * 0.034
+		var cells := Vector2i(int(cavity.size.x / cell), int(cavity.size.y / cell))
+		var noise := RandomNumberGenerator.new()
+		noise.seed = 1717
+		for x in cells.x:
+			for y in cells.y:
+				var shade := noise.randf()
+				draw_rect(Rect2(cavity.position + Vector2(x, y) * cell, Vector2(cell, cell)), Color(BLOOD.lerp(BONE, shade * 0.3).darkened(shade * 0.5), amount))
+	# Blood running off the table either way.
+	for drip in 4:
+		var x := centre.x - unit * 0.12 + drip * unit * 0.08
+		draw_line(Vector2(x, cavity.end.y), Vector2(x, cavity.end.y + unit * (0.06 + 0.04 * (drip % 2))), Color(BLOOD, amount), 3.0)
+
+
+## The monitor: a pulse, the line going flat, then the jolt throwing it back.
+func _draw_vitals(centre: Vector2, unit: float, amount: float) -> void:
+	var trace_ink := Color(0.55, 1.0, 0.8, amount)
+	var screen := Rect2(centre - Vector2(unit * 0.46, unit * 0.2), Vector2(unit * 0.92, unit * 0.4))
+	draw_rect(screen, Color(FILM, 0.05 * amount))
+	draw_rect(screen, Color(FILM, 0.35 * amount), false, 2.0)
+	var jolted := flash_since() > FLASH_SECONDS * 0.6
+	var trace := PackedVector2Array()
+	var base := screen.position.y + screen.size.y * 0.55
+	var steps := 240
+	for i in steps + 1:
+		var u := float(i) / steps
+		var y := base
+		if u < 0.4:
+			var beat := fmod(u, 0.13) / 0.13
+			var h := screen.size.y
+			y -= h * 0.05 * exp(-pow((beat - 0.22) / 0.04, 2.0))
+			y += h * 0.07 * exp(-pow((beat - 0.40) / 0.012, 2.0))
+			y -= h * 0.42 * exp(-pow((beat - 0.44) / 0.014, 2.0))
+			y += h * 0.12 * exp(-pow((beat - 0.48) / 0.012, 2.0))
+			y -= h * 0.09 * exp(-pow((beat - 0.66) / 0.06, 2.0))
+		elif jolted and u > 0.86 and u < 0.92:
+			# The jolt: the whole line thrown off the top of the screen.
+			y -= screen.size.y * 0.62 * sin((u - 0.86) / 0.06 * PI)
+		trace.append(Vector2(screen.position.x + u * screen.size.x, y))
+	draw_polyline(trace, trace_ink, 3.0)
+	CellOutzType.draw_string_compat(self, screen.position + Vector2(18, 16), "BPM 212" if jolted else "BPM 000", HORIZONTAL_ALIGNMENT_LEFT, -1, int(unit * 0.04), trace_ink)
+	# The jolt lands as white across the whole frame.
+	if jolted:
+		draw_rect(Rect2(Vector2.ZERO, size), Color(BONE, 0.35 * amount))
+
+
+## The spirits warning you: long pale faces, mouths open on the words.
+func _draw_spirits(centre: Vector2, unit: float, amount: float) -> void:
+	for face in 4:
+		var at := centre + Vector2((float(face) - 1.5) * unit * 0.24, sin(float(face) * 2.1) * unit * 0.06)
+		var w := unit * 0.075
+		var h := unit * 0.17
+		var outline := PackedVector2Array()
+		for step in 41:
+			var a := TAU * float(step) / 40.0
+			var ragged := 1.0 + 0.08 * sin(a * 7.0 + face * 1.7) + 0.05 * sin(a * 13.0 - face)
+			# The lower half trails off, as if the face is being pulled down.
+			var trail := 1.0 + 0.35 * maxf(0.0, sin(a))
+			outline.append(at + Vector2(cos(a) * w * ragged, sin(a) * h * ragged * trail))
+		draw_colored_polygon(outline, Color(FILM, 0.12 * amount))
+		draw_polyline(outline, Color(FILM, 0.45 * amount), 2.0)
+		for eye in [-1.0, 1.0]:
+			var socket := PackedVector2Array()
+			for step in 17:
+				var a := TAU * float(step) / 16.0
+				socket.append(at + Vector2(eye * w * 0.4, -h * 0.25) + Vector2(cos(a) * w * 0.22, sin(a) * w * (0.3 + 0.5 * maxf(0.0, sin(a)))))
+			draw_colored_polygon(socket, Color(BLACK, amount))
+		# Mouths stretched open, longer than a mouth should go.
+		var mouth := PackedVector2Array([at + Vector2(-w * 0.16, h * 0.02), at + Vector2(w * 0.16, h * 0.02),
+			at + Vector2(w * 0.26, h * 0.35), at + Vector2(w * 0.1, h * 0.72), at + Vector2(-w * 0.1, h * 0.72), at + Vector2(-w * 0.26, h * 0.35)])
+		draw_colored_polygon(mouth, Color(BLACK, amount))
+
+
+## Seconds into the flash showing now, or -1.
+func flash_since() -> float:
+	for flash in FLASHES:
+		var since := clock - float(flash.at)
+		if since >= 0.0 and since < FLASH_SECONDS:
+			return since
+	return -1.0
 
 
 ## The broadcast tears: blocks of dead signal and colour splits, then gone.
@@ -403,6 +560,12 @@ func _wave(kind: String, duration: float, looping: bool) -> AudioStreamWAV:
 				sample = voice * syllable * 0.8 + sin(TAU * 1020.0 * t) * 0.05 + (_noise(frame) - 0.5) * 0.08
 				if int(t * 11.0) % 7 == 3:
 					sample *= 0.1
+			"whisper":
+				# Breath shaped into syllables, high and close, no voice under it.
+				var syllable := pow(maxf(0.0, sin(TAU * 3.2 * t)), 3.0) * sin(PI * t / duration)
+				var hiss := _noise(frame * 17) - 0.5
+				low += (hiss - low) * 0.35
+				sample = (hiss - low) * syllable * 1.6
 			"glitch":
 				var chunk := int(t * 40.0)
 				var tone := 80.0 + float(chunk % 9) * 140.0

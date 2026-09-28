@@ -6,7 +6,7 @@ func _ready() -> void:
 	var load_in = TortureLoadIn.new()
 	add_child(load_in)
 	load_in.set_process(false)
-	for shot in [[7.3, "loadin_1_broadcast_pass2"], [8.67, "loadin_2_face"], [9.45, "loadin_3_flash"]]:
+	for shot in [[4.7, "loadin_1_lamp"], [6.2, "loadin_2_opened"], [8.15, "loadin_3_vitals_jolt"], [9.5, "loadin_4_spirits"], [3.9, "loadin_5_whisper"], [8.67, "loadin_6_face"]]:
 		load_in.clock = float(shot[0])
 		load_in.queue_redraw()
 		await get_tree().process_frame

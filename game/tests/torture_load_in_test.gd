@@ -30,16 +30,27 @@ func _ready() -> void:
 	vat._physics_process(0.5)
 	check(vat.arrival_clock == 0.0, "the examiner does not arrive in the black")
 	var texts: Array[String] = []
+	var kinds: Array[String] = []
+	var whispered: Array[String] = []
 	var t := 0.0
 	while t < 10.7:
 		load_in.step(0.05)
 		t += 0.05
+		if load_in.flash_kind() != "" and not kinds.has(load_in.flash_kind()):
+			kinds.append(load_in.flash_kind())
+		for whisper: Array in load_in.whispers_now():
+			if not whispered.has(str(whisper[0])):
+				whispered.append(str(whisper[0]))
 		var line: String = load_in.broadcast_text()
 		if line.length() > 40 and not texts.has(line):
 			texts.append(line)
 	check(load_in.played.count("scream") == 3, "three screams through the fluid (%d)" % load_in.played.count("scream"))
 	check(load_in.played.has("gag") and load_in.played.has("tube"), "the gag goes in and the breathing goes to the tube")
 	check(load_in.played.count("broadcast") == 3, "the broadcast repeats three times")
+	check(kinds == ["lamp", "opened", "vitals", "spirits"], "Greg's four flashes in order: lamp, opened, vitals, spirits (%s)" % [kinds])
+	check(whispered.has("DON'T WAKE UP") and whispered.has("THEY'LL TAKE YOU APART"), "the spirits whisper their warnings (%s)" % [whispered])
+	check(load_in.played.count("whisper") == 3, "each whisper is heard (%d)" % load_in.played.count("whisper"))
+	check(load_in.TOTAL <= 15.0, "about 15 s or less, Greg's length (%.1f s)" % load_in.TOTAL)
 	check(texts.any(func(x): return x.begins_with("HUNDREDS OF YEARS OF THE PERPETUAL POST-APOCALYPSE")), "the first pass is whole")
 	check(texts.any(func(x): return x.contains("#") or x.contains("/") or x.contains("_")), "later passes degrade")
 	load_in.step(0.2)

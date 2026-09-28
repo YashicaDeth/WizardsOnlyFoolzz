@@ -106,10 +106,10 @@ at 100. **(Greg)** marks what only Greg can do.
 
 ### The load-in
 
-- [ ] Shorter
-- [ ] Clearer
+- [x] Shorter (13 s from black to the room; Greg's length is about 15 s)
+- [x] Clearer (Greg's four flashes, each held 0.3 s: the lamp and masked faces, your body opened and censored, vitals flat then the jolt, the spirits; their whispers on screen)
 - [x] Scarier (flash stabs, heartbeat, cut scream, one subliminal frame)
-- [ ] Looks finished
+- [ ] Looks finished (29 Sep: double-exposed film, pleated masks, ragged spirits, a real heartbeat; still code-drawn, Greg to judge)
 
 ### Guidance through wizard eyes
 
