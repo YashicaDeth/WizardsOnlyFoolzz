@@ -138,7 +138,7 @@ at 100. **(Greg)** marks what only Greg can do.
 - [x] Vat room lighting pass
 - [x] Service Arcade lighting pass
 - [x] Support Unit lighting pass
-- [ ] Lower Works and drains lighting pass
+- [x] Lower Works and drains lighting pass (29 September: pools, measured)
 
 ### Combat
 

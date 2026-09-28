@@ -17,7 +17,7 @@ func _ready() -> void:
 	# Growing Floor: the fight. His keycard is what opens the pit door.
 	var vat = load("res://vat_chamber.gd").new()
 	check(not vat._pit_door_open(), "first run: the pit door is sealed without his keycard")
-	check(vat._first_run_objective().contains("BREAK IT DOWN"), "the objective sends you through his door")
+	check(vat._first_run_objective().contains("HE LEFT THROUGH THAT DOOR"), "the objective sends you through his door")
 	var carry := Carry.new()
 	carry.items.append({"label": vat.STAFF_KEYCARD, "kind": "key", "mass": 0.05, "perishes": false, "age": 0.0})
 	carry.save_to_history()

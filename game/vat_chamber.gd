@@ -1447,11 +1447,12 @@ func _pit_door_open() -> bool:
 
 
 func _first_run_objective() -> String:
+	# The step on top; the escape purpose always under it (opening tests).
 	if VAT_REBIRTH.carries(STAFF_KEYCARD):
-		return "ESCAPE  //  HIS CARD OPENS THE PIT DOOR"
+		return "HIS CARD OPENS THE PIT DOOR\nESCAPE THE FACILITY"
 	if doctor_route != null and doctor_route.door != null and doctor_route.door.broken:
-		return "GET REVENGE  //  HE IS IN HIS ROOM\nBEAT HIM AND TAKE HIS CARD"
-	return "GET REVENGE  //  HE LEFT THROUGH THAT DOOR\nBREAK IT DOWN"
+		return "GET REVENGE  //  BEAT HIM, TAKE HIS CARD\nTHEN ESCAPE THE FACILITY"
+	return "GET REVENGE  //  HE LEFT THROUGH THAT DOOR\nTHEN ESCAPE THE FACILITY"
 
 
 ## Into the duct: the Service Arcade, arriving past its pressure gate.
