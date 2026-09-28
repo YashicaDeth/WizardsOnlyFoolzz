@@ -8595,6 +8595,7 @@ func _toggle_panel(mode: String) -> void:
 	if brain_hub != null:
 		if panel_mode == "hub":
 			brain_hub.open(handheld.carry, arsenal, player_rig)
+			brain_hub.body.hold("" if bare_handed else str(arsenal.current_id))
 		else:
 			brain_hub.close()
 	if panel_mode == "board":

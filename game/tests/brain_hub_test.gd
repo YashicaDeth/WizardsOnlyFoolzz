@@ -33,6 +33,8 @@ func _ready() -> void:
 	key(hunt, KEY_TAB, true)
 	check(hunt.panel_mode == "hub" and hunt.brain_hub.visible, "Shift+Tab opens the Brain Index hub")
 	check(BrainIndexHub.TABS == ["CARRY", "COMBAT", "BRAIN INDEX", "TASKS", "MAP"] and hunt.brain_hub.tab == 0, "tabs in Greg's order, opening on CARRY")
+	var hub_arm: Node3D = hunt.brain_hub.body.rig.parts.get("right_arm")
+	check(hub_arm != null and hub_arm.get_node_or_null("HeldWeapon") != null, "the body in the vat holds the weapon you have out")
 	key(hunt, KEY_RIGHT)
 	check(hunt.brain_hub.tab == 1, "arrows move between tabs")
 	hunt.brain_hub.tab = BrainIndexHub.TABS.find("MAP")

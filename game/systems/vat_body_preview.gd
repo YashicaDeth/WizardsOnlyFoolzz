@@ -203,6 +203,31 @@ func present(record: Dictionary) -> void:
 	appearance_node.configure(rig, normalized.get("appearance", {}) as Dictionary)
 
 
+## N4.2: the weapon you have out is in this body's hand, on the hunters'
+## wrist (HunterAppearance), parented to the arm.
+## Empty puts it away.
+func hold(weapon_id: String) -> void:
+	if rig == null or not is_instance_valid(rig):
+		return
+	var arm := rig.parts.get("right_arm") as Node3D
+	if arm == null:
+		return
+	var old := arm.get_node_or_null("HeldWeapon")
+	if old != null:
+		old.free()
+	if weapon_id.is_empty():
+		return
+	var weapon := HeldGear.build_weapon("sidearm" if weapon_id == "facility_sidearm" else weapon_id)
+	if weapon == null:
+		return
+	weapon.name = "HeldWeapon"
+	# Hanging from the fist and out to the side, facing the glass: the
+	# hunters' forward mount points it straight at this camera.
+	weapon.position = Vector3(0.0, -0.34, -0.07)
+	weapon.rotation = Vector3(0.0, 0.0, PI * 0.62)
+	arm.add_child(weapon)
+
+
 ## True on the FACE tab: the camera eases in to the head and back out.
 func set_face_focus(on: bool) -> void:
 	_focus_target = 1.0 if on else 0.0
