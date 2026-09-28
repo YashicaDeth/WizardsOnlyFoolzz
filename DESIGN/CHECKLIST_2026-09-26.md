@@ -103,7 +103,7 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [x] Interface curation from the Higgsfield concepts (LOOK_FROM_CONCEPTS.md).
 - [ ] **(Greg)** Allow `lfs.github.com` in the environment, or run `tools\Import-Higgsfield.ps1`, so media can be pushed.
 - [ ] Placeholder: breakout frames.
-- [ ] Placeholder: loading screens.
+- [x] Placeholder: loading screens. The code-drawn transit plate (seal, X-ray film, code rain) now names where it leads: a route strip of the first thirty minutes with the next stop lit. Rendered.
 - [ ] Placeholder: phone / the Wire.
 - [ ] Placeholder: kill-cam X-rays.
 - [ ] Log every placed piece in `game/art/GENERATED.md`.

@@ -327,6 +327,7 @@ func _draw_plate() -> void:
 	CodeRain.draw_field(screen, Rect2(Vector2.ZERO, size), _rain, HAEM * Color(1, 1, 1, alpha), 0.0, clock, [
 		Rect2(30, 24, 520, 66),
 		Rect2(30, size.y - 100, size.x - 60, 76),
+		Rect2(size.x - 250, 22, 230, 212),
 	])
 
 	# Scan banding over the whole plate, so the image reads as something being
@@ -340,6 +341,7 @@ func _draw_plate() -> void:
 	# the readout is printed on the far side of the pane from whatever ran down
 	# this one.
 	_draw_runnels(size)
+	_draw_route(size)
 
 	CellOutzType.draw_stamped(screen, Vector2(44, 36), "CELLOUTZ TRANSIT", 20.0, HOT * Color(1, 1, 1, alpha), SHADOW * Color(1, 1, 1, 0.75 * alpha), 3.2)
 	CellOutzType.draw_condensed(screen, Vector2(44, 64), "SPECIMEN IN MOTION / DO NOT OPEN THE CASE", 9.0, INK * Color(1, 1, 1, 0.45 * alpha), 0.8)
@@ -388,6 +390,45 @@ func _film_rect(texture: Texture2D, frame: Rect2) -> void:
 	_film.size = frame.size
 	_film.modulate = Color(1, 1, 1, alpha)
 	(_film.material as ShaderMaterial).set_shader_parameter("rect_size", frame.size)
+
+
+## The first thirty minutes as a strip of stops, top right, with where you are
+## going lit: every loading plate says where it leads (checklist, placeholder
+## loading screens). Code-drawn; Greg's own plates replace it when ready.
+const ROUTE_STOPS := [
+	["res://vat_chamber.tscn", "GROWING FLOOR"],
+	["res://service_arcade.tscn", "SERVICE ARCADE"],
+	["res://support_unit.tscn", "SUPPORT UNIT"],
+	["res://buried_city.tscn", "LOWER WORKS"],
+	["res://old_drains.tscn", "OLD DRAINS"],
+	["res://doctor_vehicle_bay.tscn", "VEHICLE BAY"],
+	["res://bone_yard_hunt.tscn", "THE HUNT"],
+]
+
+
+func _draw_route(size: Vector2) -> void:
+	var at := -1
+	for index in ROUTE_STOPS.size():
+		if str(ROUTE_STOPS[index][0]) == destination:
+			at = index
+	if at < 0:
+		return
+	var right := size.x - 44.0
+	var top := 40.0
+	var step := 26.0
+	CellOutzType.draw_condensed(screen, Vector2(right - 190.0, top - 6.0), "NEXT", 9.0, HOT * Color(1, 1, 1, 0.9 * alpha), 1.2)
+	for index in ROUTE_STOPS.size():
+		var y := top + 14.0 + step * float(index)
+		var node := Vector2(right, y)
+		if index < ROUTE_STOPS.size() - 1:
+			screen.draw_line(node + Vector2(0, 5), node + Vector2(0, step - 5), INK * Color(1, 1, 1, 0.22 * alpha), 1.0)
+		var here := index == at
+		var tone: Color = HOT if here else (INK * Color(1, 1, 1, 0.5) if index < at else INK * Color(1, 1, 1, 0.22))
+		var box := Rect2(node - Vector2(4, 4), Vector2(8, 8))
+		screen.draw_rect(box, tone * Color(1, 1, 1, alpha), here)
+		if here:
+			screen.draw_rect(box.grow(4.0 + 2.0 * absf(sin(clock * 3.0))), HOT * Color(1, 1, 1, 0.35 * alpha), false, 1.0)
+		CellOutzType.draw_condensed(screen, Vector2(right - 190.0, y + 4.0), str(ROUTE_STOPS[index][1]), 10.0 if here else 8.0, tone * Color(1, 1, 1, alpha), 1.0)
 
 
 func _draw_seal(centre: Vector2, radius: float) -> void:
