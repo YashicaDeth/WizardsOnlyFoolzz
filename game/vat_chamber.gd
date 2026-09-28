@@ -445,6 +445,7 @@ func _on_intake_filed(_state: Dictionary) -> void:
 	var filed_state := WorldHistory.subject("player")
 	var filed_anatomy: Dictionary = filed_state.get("anatomy", {})
 	anatomy.call("configure", "player", 5000.0, filed_anatomy.get("cybernetics", []))
+	_build_tank_body(filed_state)
 	anatomy.call("apply_hit", "torso", 26.0, 0.0, "blunt")
 	anatomy.call("apply_hit", "head", 14.0, 0.0, "blunt")
 	WorldHistory.register_subject("inventory", {"kind": "inventory", "items": []})
@@ -2196,7 +2197,42 @@ func _update_knees(delta: float) -> void:
 
 
 ## The medium floods out across the grating with you in it.
+## Greg's checklist: look down in the tank and see your grown body, the
+## cords going into it, and what your answers grew on it (TankBodyMarks).
+## Headless, so it never sits over the lens; gone when the tank floods out.
+var tank_body: Node3D
+var tank_body_marks: Dictionary = {}
+
+
+func _build_tank_body(subject: Dictionary) -> void:
+	if tank_body != null and is_instance_valid(tank_body):
+		tank_body.queue_free()
+	var config: Dictionary = BASELINE_HUMAN.config_from_subject(subject)
+	config["gore"] = false
+	var rig = BASELINE_HUMAN.new()
+	rig.name = "YourGrownBody"
+	add_child(rig)
+	rig.build("player_tank_body", config)
+	rig.position = VAT_POSITION + Vector3(0.0, -0.25, 0.0)
+	rig.rotation.y = yaw
+	var head := (rig.parts as Dictionary).get("head") as Node3D
+	if head != null:
+		head.visible = false
+	# Floating: arms drifting out from the sides, not hanging at attention.
+	for side in ["left_arm", "right_arm"]:
+		var arm := (rig.parts as Dictionary).get(side) as Node3D
+		if arm != null:
+			arm.rotation.z = 0.35 if side == "left_arm" else -0.35
+	tank_body = rig
+	tank_body_marks = preload("res://systems/tank_body_marks.gd").dress(rig, subject)
+
+
 func _flood() -> void:
+	# You are out of the tank now; the body you looked down at is the one
+	# standing up.
+	if tank_body != null and is_instance_valid(tank_body):
+		tank_body.queue_free()
+		tank_body = null
 	var pool := MeshInstance3D.new()
 	pool.name = "SpilledMedium"
 	# Greg's playtest: this was a 1 m plane glowing green, scaled into a 5.5 m
