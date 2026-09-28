@@ -1439,3 +1439,10 @@ playable build and verified before merge.
 - **Controls:** the Hunt's scheme is master and every scene matches it:
   - LMB attack, RMB guard or aim, MMB heavy (hold: guard break)
   - Z lock-on, K/J the sight modes, hold 4 meds, E use
+- **Lore (confirmed):** the examiner is a staff doctor, not the boss; he
+  answers to someone above him. The player is a decanted clone, owned by
+  debt, and each death regrows them.
+- **Look:** crunchy, not retro-kitsch. Low-poly and grainy with modern
+  lighting, and no vertex wobble.
+- **Agents stop and ask Greg** for lore and names, the look of anything
+  new (render and ask), and anything that removes a feature.
