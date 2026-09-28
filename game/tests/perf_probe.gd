@@ -58,19 +58,21 @@ func _count_meshes(node: Node) -> int:
 func _sample(frames := SAMPLE) -> Dictionary:
 	var script := 0.0
 	var physics := 0.0
-	var frame := 0.0
 	var render_cpu := 0.0
 	var gpu := 0.0
 	var rid := get_viewport().get_viewport_rid()
+	# Wall clock, not TIME_FPS: that monitor updates once a second, so a short
+	# sample read 1 fps (1000 ms) on scenes that were running fine.
+	await get_tree().process_frame
+	var start := Time.get_ticks_usec()
 	for _frame in frames:
 		await get_tree().process_frame
 		script += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
 		physics += Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
-		frame += Performance.get_monitor(Performance.TIME_FPS)
 		render_cpu += RenderingServer.viewport_get_measured_render_time_cpu(rid) + RenderingServer.get_frame_setup_time_cpu()
 		gpu += RenderingServer.viewport_get_measured_render_time_gpu(rid)
 	return {
-		"frame": 1000.0 / maxf(1.0, frame / frames), "render_cpu": render_cpu / frames, "gpu": gpu / frames, "script": script / frames, "physics": physics / frames,
+		"frame": float(Time.get_ticks_usec() - start) / 1000.0 / frames, "render_cpu": render_cpu / frames, "gpu": gpu / frames, "script": script / frames, "physics": physics / frames,
 		"draws": int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
 		"objects": int(Performance.get_monitor(Performance.OBJECT_COUNT)),
 		"nodes": int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
