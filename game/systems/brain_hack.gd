@@ -91,6 +91,11 @@ func step(delta: float) -> void:
 				_cue("glitch")
 			if clock >= HACK_SECONDS:
 				mode = "card"
+				# The card itself is the mission card's; this control draws
+				# nothing in "card" mode, so it steps aside instead of
+				# redrawing an empty screen every frame.
+				visible = false
+				set_process(false)
 				WorldHistory.record_event("brain_hacked", {"skipped": skipped})
 				hack_finished.emit(skipped)
 	queue_redraw()
