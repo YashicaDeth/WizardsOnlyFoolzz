@@ -1582,6 +1582,7 @@ func _physics_process(delta: float) -> void:
 		thought_life = maxf(0.0, thought_life - delta)
 		thought_label.modulate.a = clampf(thought_life / 0.8, 0.0, 1.0)
 	# Greg, 28 September: the tank you are in (TankView) until it drains.
+	_pin_tank_body()
 	if tank_view != null:
 		tank_view.in_tank = TANK_PANIC.has(phase)
 		tank_view.panic = float(TANK_PANIC.get(phase, 0.0))
@@ -2225,6 +2226,21 @@ func _build_tank_body(subject: Dictionary) -> void:
 			arm.rotation.z = 0.35 if side == "left_arm" else -0.35
 	tank_body = rig
 	tank_body_marks = preload("res://systems/tank_body_marks.gd").dress(rig, subject)
+
+
+## The body's missing head sits where your eyes are, a little behind them,
+## so looking down shows chest, belly and legs rather than skin at the lens.
+## It was placed at the tank floor, which put the camera inside the torso.
+func _pin_tank_body() -> void:
+	if tank_body == null or not is_instance_valid(tank_body):
+		return
+	var head := (tank_body.get("parts") as Dictionary).get("head") as Node3D
+	var head_y := head.position.y if head != null else 1.62
+	# Floating, not standing: the legs drift forward, so a look down finds
+	# belly, groin and legs rather than a column hidden under the chest.
+	var basis := Basis.from_euler(Vector3(0.35, yaw, 0.0))
+	var back := Vector3(sin(yaw), 0.0, cos(yaw)) * 0.28
+	tank_body.global_transform = Transform3D(basis, camera.global_position + back - basis * Vector3(0.0, head_y + 0.04, 0.0))
 
 
 func _flood() -> void:

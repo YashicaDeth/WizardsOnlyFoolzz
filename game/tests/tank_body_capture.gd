@@ -21,9 +21,15 @@ func _ready() -> void:
 	for node in vat.get_node("HUD").get_children():
 		if node is CanvasItem and node.name != "Objective":
 			(node as CanvasItem).visible = false
-	vat.pitch = -0.8
-	vat.camera.rotation.x = -0.8
+	vat.pitch = -1.3
+	vat.camera.rotation.x = -1.3
 	await get_tree().create_timer(1.0).timeout
-	print("TANK_BODY marks=%s phase=%s" % [vat.tank_body_marks, vat.phase])
+	var torso: Node3D = vat.tank_body.parts.get("torso")
+	print("TANK_BODY cam=%s torso=%s marks=%s phase=%s" % [vat.camera.global_position, torso.global_position if torso else null, vat.tank_body_marks, vat.phase])
 	get_viewport().get_texture().get_image().save_png("P:/GameDev/Temp/lighting/tank_body_down.png")
-	get_tree().quit()
+	# The camera sat inside this torso (0.08 m above its centre), which read
+	# as a mirrored "kaleidoscope" of skin texture filling the view.
+	var gap: float = vat.camera.global_position.y - torso.global_position.y
+	var failures := 0 if gap > 0.3 else 1
+	print("TANK_BODY_RESULT failures=%d gap=%.2f" % [failures, gap])
+	get_tree().quit(failures)
