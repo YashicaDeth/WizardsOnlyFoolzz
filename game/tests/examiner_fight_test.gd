@@ -29,6 +29,8 @@ func stand_up(vat) -> void:
 		for _tug in vat.WIRE_TUGS:
 			vat._tug_wire(vat.umbilicals[0])
 	vat._physics_process(vat.REVENGE_HOLD + 0.1)
+	# His door only gives once you are dressed (Greg's playtest gate).
+	preload("res://systems/clothing.gd").wear("player", "scavenged_coat")
 	for _step in 80:
 		if vat.can_move:
 			break
@@ -109,6 +111,15 @@ func _win_world() -> void:
 	check(vat.slowed_left > 0.0, "the syringe (every third) slows you (%.1f s left)" % vat.slowed_left)
 	check(WorldHistory.event_count("examiner_fight_wound") >= 3, "every wound is on the record")
 	check(fight.state == "fighting", "you are still standing")
+	# Greg's playtest: the fight is in his room. Step out and it stops.
+	var inside: Vector3 = vat.player.global_position
+	var taken: int = fight.hits_taken
+	vat.player.global_position = route.DOOR_AT + Vector3(0, vat.player.global_position.y, -1.4)
+	for _tick in 40:
+		fight._physics_process(0.1)
+	check(fight.hits_taken == taken and not fight.player_strike("axe"), "out on the floor, neither of you lands a blow")
+	check(fight.global_position.distance_to(fight.post) < 0.5, "and he goes back to his bench")
+	vat.player.global_position = inside
 
 	# Now hit him. Keep your blood up so this is about your blows.
 	var clicks := 0

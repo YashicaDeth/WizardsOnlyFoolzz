@@ -229,6 +229,18 @@ func _shards(tank: Dictionary) -> void:
 
 # --- the yanga inside ---------------------------------------------------------
 
+## The Growing Floor's ways out for a freed subject: the pit door, and his
+## door once it is down.
+func _exits() -> Array:
+	var out := []
+	var marker = host.get("door_marker")
+	if marker != null:
+		out.append((marker as Node3D).global_position)
+	var route = host.get("doctor_route")
+	if route != null and route.get("door") != null and bool(route.door.broken):
+		out.append(route.DOOR_AT)
+	return out
+
 ## The subject climbs out over the rim: whatever floated in there is gone from
 ## the tank, and a loose bingyanger stands in the spill, facing the aisle.
 func _free(tank: Dictionary) -> void:
@@ -246,6 +258,7 @@ func _free(tank: Dictionary) -> void:
 	loose.build(id, 9100 + int(tank.seed) * 17, true)
 	var player = host.get("player")
 	loose.bind(player, null, [])
+	loose.exits = _exits()
 	loose.release("vat_smashed")
 	WorldHistory.update_subject(id, {
 		"place": "growing_floor", "role": "Broken out of a Growing Floor vat",

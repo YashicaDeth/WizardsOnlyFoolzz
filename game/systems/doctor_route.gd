@@ -163,6 +163,9 @@ func prompt_text() -> String:
 	if _axe_in_reach():
 		return "[E] TAKE THE FIRE AXE"
 	if not door.broken and _flat_distance(DOOR_AT) <= REACH + 0.6:
+		if not _dressed():
+			return "HIS DOOR  //  NOT LIKE THIS  //  NAKED AND SHAKING
+FIND SOMETHING TO WEAR FIRST"
 		var tool := held_weapon()
 		var line := "[F] SHOULDER IT"
 		if tool == "axe":
@@ -187,7 +190,7 @@ func held_weapon() -> String:
 ## in shoulder first along the way they face; everything else lands where the
 ## crosshair meets the leaf.
 func strike(weapon: String) -> bool:
-	if weapon == "" or door == null or door.broken or cooldown > 0.0:
+	if weapon == "" or door == null or door.broken or cooldown > 0.0 or not _dressed():
 		return false
 	var camera: Camera3D = chamber.camera
 	var eye := camera.global_position
@@ -383,6 +386,12 @@ func _carry_player() -> void:
 
 func _can_act() -> bool:
 	return chamber != null and bool(chamber.can_move) and bool(chamber.breakout_complete)
+
+
+## Greg's playtest: his door stays shut to you until you are out and dressed
+## (0C-4's clothing), so he cannot be reached before the breakout beats.
+func _dressed() -> bool:
+	return preload("res://systems/clothing.gd").worn("player") != "bare"
 
 
 func _flat_distance(to: Vector3) -> float:
@@ -762,6 +771,110 @@ func _dress_room() -> void:
 	for spot in [Vector3(-1.2, 0.012, 5.6), Vector3(3.2, 0.012, 6.6), Vector3(0.9, 0.012, 8.9)]:
 		var stain := _block(Vector3(0.5 + rng.randf() * 0.4, 0.004, 0.3 + rng.randf() * 0.3), spot, _flat(Color("1c0504"), 0.25), false)
 		stain.rotation.y = rng.randf() * TAU
+	_dress_his_life(gurney_at, rng)
+
+
+## Greg's playtest (the room felt empty): a surgery, his records, his
+## specimens and a life of his own. Still against the walls, still boxes.
+func _dress_his_life(gurney_at: Vector3, rng: RandomNumberGenerator) -> void:
+	var steel := LabSurface.material("plate")
+	var strap := _flat(Color("2a1a12"), 0.6)
+	# Surgery: straps across the gurney, a tray of his tools, the lamp over it
+	# and the drain under it.
+	for z in [-0.6, 0.0, 0.6]:
+		_block(Vector3(0.76, 0.03, 0.08), gurney_at + Vector3(0, 0.86, z), strap, false)
+	var tray_at := gurney_at + Vector3(-0.85, 0.0, 1.0)
+	_block(Vector3(0.03, 0.95, 0.03), tray_at + Vector3(0, 0.47, 0), steel, false)
+	_block(Vector3(0.5, 0.02, 0.34), tray_at + Vector3(0, 0.96, 0), steel, false)
+	for index in 5:
+		var tool := _block(Vector3(0.012, 0.008, 0.14 + rng.randf() * 0.06), tray_at + Vector3(-0.18 + index * 0.09, 0.98, rng.randf_range(-0.05, 0.05)), _flat(Color("b8bcb6"), 0.25), false)
+		tool.rotation.y = rng.randf_range(-0.2, 0.2)
+	_block(Vector3(0.12, 0.004, 0.08), tray_at + Vector3(0.12, 0.975, 0.1), _flat(Color("3b0806"), 0.2), false)
+	var lamp_at := gurney_at + Vector3(0, ROOM_HEIGHT - 0.9, 0)
+	_block(Vector3(0.03, 0.9, 0.03), lamp_at + Vector3(0, 0.45, 0), steel, false)
+	var dish := MeshInstance3D.new()
+	var dish_mesh := CylinderMesh.new()
+	dish_mesh.top_radius = 0.12
+	dish_mesh.bottom_radius = 0.3
+	dish_mesh.height = 0.14
+	dish_mesh.material = steel
+	dish.mesh = dish_mesh
+	dish.position = lamp_at
+	add_child(dish)
+	var surgery := SpotLight3D.new()
+	surgery.name = "SurgeryLamp"
+	surgery.light_color = Color("e8efe0")
+	surgery.light_energy = 3.0
+	surgery.spot_range = 3.2
+	surgery.spot_angle = 26.0
+	surgery.rotation_degrees.x = -90.0
+	surgery.position = lamp_at + Vector3(0, -0.08, 0)
+	add_child(surgery)
+	var drain := MeshInstance3D.new()
+	var grate := CylinderMesh.new()
+	grate.top_radius = 0.14
+	grate.bottom_radius = 0.14
+	grate.height = 0.01
+	grate.material = _flat(Color("0d0b0a"), 0.4)
+	drain.mesh = grate
+	drain.position = gurney_at + Vector3(-0.2, 0.008, 0.2)
+	add_child(drain)
+	# His records: a wall of subjects on the left, yours in the middle, ringed.
+	var wall_at := Vector3(ROOM_X.x + 0.03, 1.7, 5.1)
+	_block(Vector3(0.02, 1.0, 1.6), wall_at, _flat(Color("30261b")), false)
+	for row in 3:
+		for column in 5:
+			var at := wall_at + Vector3(0.02, 0.3 - row * 0.3, -0.6 + column * 0.3)
+			var yours := row == 1 and column == 2
+			_block(Vector3(0.01, 0.2, 0.15), at, _flat(Color("c8c1ae") if yours else Color("8d8676")), false)
+			_block(Vector3(0.012, 0.11, 0.09), at + Vector3(0.002, 0.03, 0), _flat(Color("3a302a")), false)
+			if yours:
+				for side in [-1.0, 1.0]:
+					_block(Vector3(0.014, 0.26, 0.012), at + Vector3(0.004, 0, side * 0.1), _flat(Color("8a0f0b"), 0.4), false)
+					_block(Vector3(0.014, 0.012, 0.21), at + Vector3(0.004, side * 0.13, 0), _flat(Color("8a0f0b"), 0.4), false)
+	# Specimens: shelves of jars on the left wall past the bench, labelled.
+	var shelf_at := Vector3(ROOM_X.x + 0.22, 0.0, 9.7)
+	for level in 3:
+		var y := 0.55 + level * 0.55
+		_block(Vector3(0.4, 0.03, 1.2), shelf_at + Vector3(0, y, 0), steel)
+		for jar_index in 4:
+			var jar_at := shelf_at + Vector3(0, y + 0.13, -0.45 + jar_index * 0.3)
+			var jar := MeshInstance3D.new()
+			var jar_mesh := CylinderMesh.new()
+			jar_mesh.top_radius = 0.08
+			jar_mesh.bottom_radius = 0.08
+			jar_mesh.height = 0.24
+			var fluid := StandardMaterial3D.new()
+			fluid.albedo_color = Color(0.45, 0.4, 0.22, 0.45)
+			fluid.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			fluid.roughness = 0.05
+			jar_mesh.material = fluid
+			jar.mesh = jar_mesh
+			jar.position = jar_at
+			add_child(jar)
+			var part := _block(Vector3(0.07, 0.06 + rng.randf() * 0.06, 0.06), jar_at + Vector3(0, -0.03, 0), _flat(Color("5a2a22").lerp(Color("8a6a55"), rng.randf()), 0.5), false)
+			part.rotation = Vector3(rng.randf(), rng.randf(), rng.randf())
+			_block(Vector3(0.005, 0.05, 0.08), jar_at + Vector3(0.082, 0, 0), _flat(Color("d6ceb8")), false)
+	# A life: his own jacket on a hook by the door, a cold coffee and a photo on the desk.
+	var hook_at := Vector3(ROOM_X.y - 0.05, 1.75, 4.6)
+	_block(Vector3(0.08, 0.03, 0.03), hook_at, steel, false)
+	_block(Vector3(0.1, 0.95, 0.5), hook_at + Vector3(-0.07, -0.5, 0), _flat(Color("3b3530"), 0.9), false)
+	var desk_top := Vector3((WINDOW_X.x + WINDOW_X.y) * 0.5, 0.875, ROOM_Z.x + 0.75)
+	var mug := MeshInstance3D.new()
+	var mug_mesh := CylinderMesh.new()
+	mug_mesh.top_radius = 0.045
+	mug_mesh.bottom_radius = 0.04
+	mug_mesh.height = 0.1
+	mug_mesh.material = _flat(Color("e4ded0"), 0.4)
+	mug.mesh = mug_mesh
+	mug.position = desk_top + Vector3(0.6, 0.05, 0.15)
+	add_child(mug)
+	_block(Vector3(0.07, 0.002, 0.07), desk_top + Vector3(0.6, 0.101, 0.15), _flat(Color("1a0e08"), 0.1), false)
+	var frame := _block(Vector3(0.16, 0.2, 0.02), desk_top + Vector3(-0.7, 0.1, 0.25), _flat(Color("2a2320")), false)
+	frame.rotation.x = -0.25
+	frame.rotation.y = PI + 0.3
+	var picture := _block(Vector3(0.12, 0.15, 0.004), Vector3(0, 0, -0.012), _flat(Color("a39579")), false, frame)
+	picture.position = Vector3(0, 0, -0.012)
 
 
 ## A plain authored colour: the procedural paint grain reads as camouflage

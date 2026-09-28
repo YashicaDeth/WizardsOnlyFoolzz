@@ -47,6 +47,8 @@ func _through_the_facility(route_name: String) -> Node:
 		for _tug in vat.WIRE_TUGS:
 			vat._tug_wire(vat.umbilicals[0])
 	vat._physics_process(vat.REVENGE_HOLD + 0.1)
+	# His door only gives once you are dressed (Greg's playtest gate).
+	preload("res://systems/clothing.gd").wear("player", "scavenged_coat")
 	for step in 40:
 		vat._physics_process(0.1)
 	check(vat.breakout_complete and vat.can_move, "%s: GET REVENGE, the glass goes, and you stand" % route_name)

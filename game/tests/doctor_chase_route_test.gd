@@ -53,6 +53,8 @@ func _vat_to_lift() -> void:
 		for _tug in vat.WIRE_TUGS:
 			vat._tug_wire(vat.umbilicals[0])
 	vat._physics_process(vat.REVENGE_HOLD + 0.1)
+	# His door only gives once you are dressed (Greg's playtest gate).
+	preload("res://systems/clothing.gd").wear("player", "scavenged_coat")
 	for _step in 80:
 		if vat.can_move:
 			break

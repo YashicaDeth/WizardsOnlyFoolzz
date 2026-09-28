@@ -38,6 +38,7 @@ func _ready() -> void:
 		for _tug in vat.WIRE_TUGS:
 			vat._tug_wire(vat.umbilicals[0])
 	vat._physics_process(vat.REVENGE_HOLD + 0.1)
+	preload("res://systems/clothing.gd").wear("player", "scavenged_coat")
 	for _step in 60:
 		if vat.can_move:
 			break
@@ -67,6 +68,10 @@ func _ready() -> void:
 
 	await _look_from(Vector3(1.4, 0.0, 8.4), Vector3(-1.4, 1.2, 4.3))
 	await _capture("%s/doctor_route_4_exam_room.png" % out_dir)
+	await _look_from(Vector3(0.8, 0.0, 6.6), Vector3(-3.5, 1.3, 7.6))
+	await _capture("%s/doctor_route_4b_records_and_jars.png" % out_dir)
+	await _look_from(Vector3(1.0, 0.0, 7.8), Vector3(4.0, 0.9, 6.0))
+	await _capture("%s/doctor_route_4c_surgery.png" % out_dir)
 
 	await _look_from(Vector3(route.CAR_AT.x, 0.0, route.ROOM_Z.y - 2.2), route.CAR_AT + Vector3(0, 1.2, 0))
 	route._use()

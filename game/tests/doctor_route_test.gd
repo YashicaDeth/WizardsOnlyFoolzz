@@ -46,6 +46,8 @@ func _opening() -> Node:
 		for _tug in vat.WIRE_TUGS:
 			vat._tug_wire(vat.umbilicals[0])
 	vat._physics_process(vat.REVENGE_HOLD + 0.1)
+	# His door only gives once you are dressed (Greg's playtest gate).
+	preload("res://systems/clothing.gd").wear("player", "scavenged_coat")
 	for _step in 60:
 		if vat.can_move:
 			break
@@ -121,6 +123,9 @@ func _restraint_then_room_then_lift() -> void:
 	check(vat.player.global_position.z < route.WALL_Z - 0.2 and not route.room_entered, "the intact door keeps you out (z %.2f)" % vat.player.global_position.z)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
+	preload("res://systems/clothing.gd").wear("player", "bare")
+	check(route.prompt_text().contains("NAKED") and not route.strike("restraint"), "naked, his door will not take a blow")
+	preload("res://systems/clothing.gd").wear("player", "scavenged_coat")
 	check(route.prompt_text().contains("RESTRAINT") and vat.prompt.text.contains("[F] SHOULDER IT"), "the prompt line offers the restraint and a shoulder at the door")
 
 	var clicks := await _batter(vat, func() -> void: _click(vat), 80)

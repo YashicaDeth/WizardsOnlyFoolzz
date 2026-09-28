@@ -26,7 +26,8 @@ const LOCATION := "examination_room"
 const KEYCARD := "STAFF KEYCARD"
 const COAT := "examiner_coat"
 
-const HEALTH := 100.0
+## Greg's playtest: too easy. More to get through, quicker to come again.
+const HEALTH := 150.0
 ## What each thing you can hit him with takes off him.
 const DAMAGE := {"axe": 30.0, "restraint": 16.0, "": 9.0, "gun": 45.0}
 const PLAYER_REACH := 2.3
@@ -35,15 +36,19 @@ const SPEED := 2.3
 const NOTICE_DISTANCE := 2.6
 const NOTICE_LINGER := 10.0
 const TURN_SECONDS := 1.4
-const COOLDOWN := 1.25
+const COOLDOWN := 0.95
 const SCALPEL_WINDUP := 0.5
 const SYRINGE_WINDUP := 0.85
 ## A scalpel cut: a real cut on the anatomy plus 6% of your blood.
-const SCALPEL_DAMAGE := 11.0
+const SCALPEL_DAMAGE := 14.0
 const SCALPEL_BLOOD := 0.06
 const SYRINGE_DAMAGE := 5.0
 const SYRINGE_SLOW := 6.0
 const STAGGER := 0.45
+## Between blows he circles you instead of standing still.
+const CIRCLE_SPEED := 1.1
+## The blade darts in with the cut: the last part of the wind-up closes distance.
+const LUNGE := 2.6
 ## Lose when your blood is under this share, or your body goes down.
 const LOSE_AT := 0.45
 
@@ -70,11 +75,18 @@ var room_max := Vector2.ZERO
 var bar: CanvasLayer
 var _bar_fill: ColorRect
 var _fall := 0.0
+## Where he works, and goes back to when you leave his room.
+var post := Vector3.ZERO
+var _circle_side := 1.0
+var _recoil := 0.0
+## The house hitstop: only he catches on your blow, not the world.
+var feel := ImpactFeel.new()
 
 
 ## `owner_route` is the DoctorRoute (for its room bounds and `_can_act`).
 func setup(owner_route: Node3D, bench_at: Vector3, room_x: Vector2, room_z: Vector2) -> void:
 	name = "ExaminerFight"
+	add_child(feel)
 	route = owner_route
 	chamber = owner_route.get("chamber")
 	room_min = Vector2(room_x.x + 0.45, room_z.x + 0.6)
@@ -98,6 +110,7 @@ func setup(owner_route: Node3D, bench_at: Vector3, room_x: Vector2, room_z: Vect
 		return
 	# At his bench, his back to the door, working.
 	position = bench_at + Vector3(0.8, 0.0, 0.0)
+	post = position
 	body.rotation.y = -PI * 0.5
 	_build_bar()
 
@@ -113,7 +126,7 @@ func player_strike(weapon: String) -> bool:
 	var player: Node3D = chamber.player
 	var to_him := global_position - player.global_position
 	to_him.y = 0.0
-	if to_him.length() > PLAYER_REACH:
+	if to_him.length() > PLAYER_REACH or not bool(route.call("_in_room")):
 		return false
 	var forward: Vector3 = -chamber.camera.global_transform.basis.z
 	forward.y = 0.0
@@ -127,6 +140,13 @@ func player_strike(weapon: String) -> bool:
 	windup = 0.0
 	# His body shows the hit where it lands (the rig's own wound and blood).
 	body.hit("torso" if hits_landed % 2 == 1 else "right_arm", damage * 0.5, 2.0, "cut" if weapon == "axe" else "blunt")
+	# Greg's playtest: hits felt weightless. The world catches, he reels, you feel it.
+	_recoil = 1.0
+	_circle_side = -_circle_side
+	BodyCamFeel.hit(chamber.camera, 0.03 + damage * 0.001)
+	if chamber.get("opening_audio") != null and chamber.opening_audio != null:
+		chamber.opening_audio.cue("rip" if weapon == "axe" else "tap")
+	feel.strike(clampf(damage / 45.0, 0.3, 1.0), "cut" if weapon == "axe" else "blunt", false, [SUBJECT])
 	if chamber.get("breach_shake") != null:
 		chamber.breach_shake = maxf(float(chamber.breach_shake), 0.18)
 	WorldHistory.record_event("examiner_fight_hit", {"weapon": weapon if weapon != "" else "fists", "damage": damage, "left": health})
@@ -139,6 +159,7 @@ func player_strike(weapon: String) -> bool:
 
 
 func _physics_process(delta: float) -> void:
+	delta *= feel.scale_for(SUBJECT)
 	if state == "won":
 		if _fall < 1.0:
 			_fall = minf(1.0, _fall + delta * 1.6)
@@ -163,6 +184,22 @@ func _physics_process(delta: float) -> void:
 				state = "fighting"
 				_say("HE COMES AT YOU  //  CLICK TO HIT HIM  //  HOLD 4 TO DRESS A WOUND")
 		"fighting":
+			# Greg's playtest: the fight is in his room. Step out and he stops,
+			# goes back to his bench and waits; step back in and he comes again.
+			if not bool(route.call("_in_room")):
+				winding = ""
+				windup = 0.0
+				var home := post - global_position
+				home.y = 0.0
+				if home.length() > 0.1:
+					walk_phase += delta * 8.0
+					_step(home.normalized() * SPEED * delta)
+					_face(home, delta * 6.0)
+					_pose(0.0, 1.0)
+				else:
+					_face(to_player, delta * 4.0)
+					_pose(0.0, 0.0)
+				return
 			_fight(delta, to_player, distance)
 
 
@@ -174,13 +211,15 @@ func _fight(delta: float, to_player: Vector3, distance: float) -> void:
 	if stagger_left > 0.0:
 		stagger_left = maxf(0.0, stagger_left - delta)
 		# Knocked back a step.
-		_step(-to_player.normalized() * 1.2 * delta)
+		_step(-to_player.normalized() * 1.8 * delta)
 		_pose(0.0, 0.0)
 		return
 	if winding != "":
 		windup += delta
 		var needed := SYRINGE_WINDUP if winding == "syringe" else SCALPEL_WINDUP
-		_pose(windup / needed, 0.0)
+		_pose(ease(windup / needed, 2.4), 0.0)
+		if windup > needed * 0.7 and distance > REACH * 0.7:
+			_step(to_player.normalized() * LUNGE * delta)
 		if windup >= needed:
 			_land(winding, distance)
 			winding = ""
@@ -193,7 +232,10 @@ func _fight(delta: float, to_player: Vector3, distance: float) -> void:
 		_step(to_player.normalized() * SPEED * delta)
 		_pose(0.0, 1.0)
 	else:
-		_pose(0.0, 0.0)
+		# Circling, not standing: a sidestep round you while he waits.
+		walk_phase += delta * 6.0
+		_step(to_player.normalized().cross(Vector3.UP) * _circle_side * CIRCLE_SPEED * delta)
+		_pose(0.0, 0.6)
 		if attack_clock >= COOLDOWN:
 			attacks_made += 1
 			winding = "syringe" if attacks_made % 3 == 0 else "scalpel"
@@ -292,6 +334,10 @@ func _step(move: Vector3) -> void:
 
 ## Arms: 0..1 of a wind-up (tools raised back) and a walk swing.
 func _pose(raise: float, walking: float) -> void:
+	# Reeling from your last blow: the whole body rocks back, then settles.
+	if _recoil > 0.0:
+		_recoil = move_toward(_recoil, 0.0, get_physics_process_delta_time() * 3.0)
+		body.rotation.x = -0.3 * ease(_recoil, 0.6)
 	var right := body.parts.get("right_arm") as Node3D
 	var left := body.parts.get("left_arm") as Node3D
 	var swing := sin(walk_phase) * 0.35 * walking
