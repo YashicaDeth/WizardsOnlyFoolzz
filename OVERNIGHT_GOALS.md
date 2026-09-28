@@ -152,6 +152,41 @@ purpose.
 104. Record one Movie Maker MP4 of the first-run walk for Greg to watch.
 105. Core suite + first-run walk green at the end; results at the bottom of this file.
 
+## Status of every item (keep this current; the heartbeat reads it)
+
+DONE = committed tonight. ALREADY = true before tonight, verified.
+BLOCKED = needs Greg (reason under Blocked). BRANCH = work sits on a look
+branch (item 73). TODO = still open for this run.
+
+| # | status | # | status | # | status |
+|---|---|---|---|---|---|
+| 1-3 | DONE 7e167bda | 36 | ALREADY | 71 | DONE ed4e4840 |
+| 4-7 | DONE 17e81b65 | 37 | ALREADY | 72 | BLOCKED (photo as proof) |
+| 8 | DONE 8d15b724 | 38 | BLOCKED | 73 | DONE |
+| 9-13 | BLOCKED (restructure) | 39-40 | ALREADY | 74-77 | DONE 6fa54756 |
+| 14 | BLOCKED | 41 | TODO | 78-83 | ALREADY, ticked 834d5cb4 |
+| 15-16 | BLOCKED | 42-43 | ALREADY, ticked 961654e7 | 84-86 | BRANCH look-styles |
+| 17 | BLOCKED (vision state) | 44 | BLOCKED (camera failures) | 87 | DONE 410cd924 |
+| 18 | DONE 6518f624 | 45 | TODO | 88 | ALREADY, ticked 98796545 |
+| 19 | ALREADY | 46 | TODO | 89 | CHECKED, left open |
+| 20 | TODO | 47 | ALREADY | 90 | TODO |
+| 21 | TODO | 48 | TODO | 91 | ALREADY, ticked b83df383 |
+| 22 | NOT DUST | 49-50 | TODO | 92-93 | DONE d6b1a406 |
+| 23 | TODO | 51 | BRANCH look-cables | 94 | DONE 9c774b13 |
+| 24 | TODO | 52-53 | ALREADY | 95 | TODO |
+| 25 | BLOCKED (look) | 54 | TODO | 96 | TODO |
+| 26 | TODO | 55 | ALREADY (darkness is Greg's call) | 97 | HALF (no missing-limb option) |
+| 27 | BLOCKED (the Board) | 56 | ALREADY | 98 | BLOCKED |
+| 28 | TODO | 57 | BRANCH look-kinship | 99-100 | BLOCKED |
+| 29 | BLOCKED (tier names) | 58 | ALREADY | 101 | SKIP (ledger is in main checkout) |
+| 30 | with each wiring | 59 | DONE 2fdddf4b | 102 | SKIP (CHANGELOG unused since 12 Sep) |
+| 31 | DONE 2b0d6c3a | 60 | TODO | 103-104 | TODO |
+| 32-33 | TODO | 61-62 | TODO | 105 | TODO (last) |
+| 34-35 | ALREADY | 63-68 | BRANCH look-prints | 69 | TODO |
+| | | | | 70 | DONE 30ce303c |
+
+Also done, not on the list: friends' demo load-in (5740c77a).
+
 ## Blocked (fill in during the run)
 
 - 9-13 (Hunt to 6.25 ms): hidden viewers fixed (8d15b724), frame 14.4 -> ~14 ms.
@@ -175,6 +210,21 @@ purpose.
   Which implants are under the skin versus replace the limb is a design
   call; once made, _throw_limb should carry InstalledHardware and the
   chunk's "implant" field (both are left behind now).
+- 17 ContactEntities into the Brain Index: what a vision shows you is the
+  open question rm-vision-shows; filing entities before it is answered
+  would answer it.
+- 27 TheRoom: the room and its mirror are the Board's home in AH; whether
+  the Board is a wall or on the Black Mirror is open (world-board).
+- 29 PyramidSociety tiers: names and one-vs-many pyramids are open
+  (rm-rank-names).
+- 44 AX5.2 camera failures: only the cramped case exists (camera clearance).
+  What darkness, injury and interference do to the outside view is design.
+- 72 photo evidence: whether a composed photo counts as proof is open
+  (rm-photo-proof).
+- 89 X10.4: registries self-prune (GoreChunks.prune before recycle, splat
+  budget pops stale ones, WorldDebris._prune, SecurityCamera weakrefs), so
+  nothing leaks; a literal sweep at the seam would clear blood_records,
+  which is how the world keeps blood between visits. Left open.
 - 25 AudioReactive: what the radio should move in the Hunt (the trip dials
   are owned by altered perception every frame) is a look decision.
 
