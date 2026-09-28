@@ -28,6 +28,7 @@ func _ready() -> void:
 	demo._set_enemies_enabled(true)
 	demo._update_training_bodies(0.5)
 	check(demo.mode_button.text.contains("ENEMIES"), "the same physical control visibly switches to ENEMIES")
+	check(demo.reticle != null and demo.reticle.in_combat, "the algiz sight turns over (death) once enemies fight back")
 	check(holder.global_position.distance_to(demo.eye) < before.distance_to(demo.eye), "a live enemy body physically closes on the player")
 	check(motion.gait_phase > 0.0 and absf(subject.rig.parts.left_leg.rotation.x) > 0.05,
 		"closing distance drives a visible running stride through the real limbs")

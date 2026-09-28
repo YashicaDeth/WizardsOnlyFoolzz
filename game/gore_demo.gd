@@ -152,6 +152,7 @@ var bodies: Array = []
 var ballistics: Node3D
 var impact_feel: Node
 var hud: Control
+var reticle: AlgizReticle
 var kill_cam: KillCam
 var field_hud: Control
 var living_map: Control
@@ -2025,6 +2026,13 @@ func _build_hud() -> void:
 	living_map.call("attach_world", get_world_3d())
 	hud.draw.connect(_paint_hud)
 	layer.add_child(hud)
+	# The sight is the logo's algiz: upright while nothing fights back,
+	# reversed (death) once sparring is on. Replaces the hand-drawn cross.
+	reticle = AlgizReticle.new()
+	reticle.name = "AlgizReticle"
+	reticle.mark_size = 22.0
+	layer.add_child(reticle)
+	reticle.snap_state(enemies_enabled)
 	# Above the readouts, because when it fires it is the only thing to look at.
 	kill_cam = KILL_CAM.new()
 	kill_cam.name = "KillCam"
@@ -2066,6 +2074,8 @@ func _build_hud() -> void:
 
 
 func _set_enemies_enabled(enabled: bool) -> void:
+	if reticle != null:
+		reticle.set_in_combat(enabled)
 	enemies_enabled = enabled
 	if enabled:
 		simulation_health = 100
@@ -2429,12 +2439,3 @@ func _paint_hud() -> void:
 		CellOutzType.draw_text(hud, Vector2(size.x * 0.5 - note_width * 0.5, size.y - 112.0),
 			last_note, 17.0, rust * Color(1, 1, 1, clampf(note_life, 0.0, 1.0)), 3.0)
 
-	# An Algiz-like sight: a cross at the centre rather than an OS pointer,
-	# with branches that pulse during slow time. It stays precise enough to aim.
-	var centre := size * 0.5
-	var sight := rust.lerp(acid, slowed * 0.55) * Color(1, 1, 1, 0.88)
-	hud.draw_circle(centre, 2.0, sight)
-	hud.draw_line(centre + Vector2(0, 15), centre + Vector2(0, -15), sight, 1.5)
-	hud.draw_line(centre + Vector2(0, -9), centre + Vector2(-8, -1), sight, 1.5)
-	hud.draw_line(centre + Vector2(0, -9), centre + Vector2(8, -1), sight, 1.5)
-	hud.draw_arc(centre, 17.0, 0.22, PI - 0.22, 16, sight * Color(1, 1, 1, 0.55), 1.0)
