@@ -31,6 +31,7 @@ func _carries(label: String) -> bool:
 ## Everything up to standing in the Lower Works, shared by both routes.
 func _through_the_facility(route_name: String) -> Node:
 	WorldHistory.clear_history()
+	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})  # a returning run: this walks every route, not the first-run lessons
 	print("--- %s: the vat ---" % route_name)
 	var vat = load("res://vat_chamber.tscn").instantiate()
 	add_child(vat)
@@ -122,7 +123,6 @@ func _ready() -> void:
 	var lift_arrival: Vector3 = FacilityRoutes.route(FacilityRoutes.ROUTE_HEAT_ELEVATOR).surface_position
 
 	city = await _through_the_facility("old drains")
-	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})  # a returning run: side exits open
 	city.player.global_position = city.DRAIN_AT + Vector3(0, 0.9, 1.0)
 	city._interact()
 	check(city.drains_requested, "old drains: the hatch drops you into the drains")
@@ -144,6 +144,7 @@ func _ready() -> void:
 
 	# The doctor's route: his bay, the hologram, the call, and up his ramp.
 	WorldHistory.clear_history()
+	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})  # a returning run: this walks every route, not the first-run lessons
 	WorldHistory.register_subject("player", {"name": "THE HUNTER", "kind": "person", "status": "loose", "anatomy": {"cybernetics": []}})
 	WorldHistory.register_subject("inventory", {"kind": "inventory", "items": []})
 	DoctorExamination.begin_departure()
@@ -164,6 +165,7 @@ func _ready() -> void:
 	# The derby's secret route: the tunnels come out at the dry falls, and the
 	# falls send you up with no route of their own.
 	WorldHistory.clear_history()
+	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})  # a returning run: this walks every route, not the first-run lessons
 	var falls = load("res://blood_waterfall_exit.tscn").instantiate()
 	add_child(falls)
 	await get_tree().process_frame

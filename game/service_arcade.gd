@@ -63,6 +63,9 @@ var gate_open := false
 ## pressure gate. Set by the vat room just before the scene change and spent on
 ## arrival, so an ordinary entry is untouched.
 static var arrive_by_duct := false
+const CRAWL_ID := "service_arcade_crawlway"
+## Low in the left wall, just short of the gate.
+const CRAWL_AT := Vector3(-7.025, 0.0, GATE_AT.z + 3.0)
 const DUCT_ARRIVAL := Vector3(1.6, 1.0, -51.5)
 var duct_arrival := false
 var sight: Node
@@ -141,6 +144,9 @@ func _build_sight() -> void:
 	sight.call("setup", camera)
 	sight.set("enabled", true)
 	caches.append(HIDDEN_CACHE.place_stash(self, sight, "service_arcade_stash", Vector3(-7.025, 1.2, -4.2), Vector3.RIGHT))
+	# Greg's playtest: the first run's lesson here is sight. The gate is jammed;
+	# a depth scan shows the maintenance crawlway round it.
+	caches.append(HIDDEN_CACHE.place_door(self, sight, CRAWL_ID, CRAWL_AT, Vector3.RIGHT, Vector2(0.9, 0.9)))
 	sight.connect("hidden_seen", func(id: String) -> void: HIDDEN_CACHE.mark_found(caches, id))
 
 
@@ -490,6 +496,19 @@ func _physics_process(delta: float) -> void:
 	post_message_timer = maxf(0.0, post_message_timer - delta)
 	_update_hud()
 
+## First run only (Greg's playtest): nothing opens the gate; the crawlway does.
+func _gate_jammed() -> bool:
+	return not preload("res://systems/facility_routes.gd").escaped_once()
+
+
+func _crawl_round_gate() -> void:
+	player.global_position = GATE_AT + Vector3(0.0, player.global_position.y, -3.0)
+	post_message = "ON YOUR BELLY THROUGH THE CRAWLWAY  //  OUT PAST THE GATE"
+	post_message_timer = 2.4
+	duct_arrival = true
+	WorldHistory.record_event("service_arcade_crawlway_taken", {"location": "service_arcade"})
+
+
 func _flat_distance(at: Vector3) -> float:
 	var delta := at - player.global_position
 	delta.y = 0.0
@@ -504,7 +523,12 @@ func _interact() -> void:
 	var remains_id := _nearest_remains()
 	if not remains_id.is_empty() and _recover_remains(remains_id):
 		return
-	if HIDDEN_CACHE.open_near(caches, player.global_position, sight) != "":
+	var hidden := HIDDEN_CACHE.nearest(caches, player.global_position)
+	var opened := HIDDEN_CACHE.open_near(caches, player.global_position, sight)
+	if opened == "door" and str(hidden.get("id", "")) == CRAWL_ID:
+		_crawl_round_gate()
+		return
+	if opened != "":
 		return
 	var said := guard_post.interact(player.global_position, weapon_taken)
 	if not said.is_empty():
@@ -548,6 +572,10 @@ func _onward_open() -> bool:
 
 func _open_gate() -> void:
 	if gate_open:
+		return
+	if _gate_jammed():
+		post_message = "THE PRESSURE SEAL IS JAMMED  //  THERE IS ANOTHER WAY  //  HOLD J TO SCAN THE WALLS"
+		post_message_timer = 2.4
 		return
 	gate_open = true
 	if gate_body != null:

@@ -108,6 +108,11 @@ var patrol_phase := 0.0
 var patrol_tactic: Dictionary = {}
 var patrol_tree: Resource
 var patrol_alert := false
+## Greg's playtest: this room's lesson is stealth. Holding Ctrl (not
+## sprinting) creeps: slower, and the sentinel only catches you close.
+var creeping := false
+const HEAR_WALKING := 11.0
+const HEAR_CREEPING := 4.5
 var patrol_disabled := false
 var patrol_attack_cooldown := 0.0
 var blood := 100.0
@@ -125,6 +130,7 @@ func _ready() -> void:
 		add_child(ambient_bed_script.new().setup("city"))
 	# Greg, 28 September: each new key shown once (KeyHints).
 	KeyHints.offer_opening_keys(self)
+	KeyHints.offer_in(self, "creep", KEY_CTRL, "HOLD CTRL", "creep past it")
 	preload("res://systems/run_timer.gd").enter("lower_works")
 	var environment := WorldEnvironment.new()
 	# Not `ossuary`. It is mauve from zenith to ground and carries the densest
@@ -620,6 +626,9 @@ func _physics_process(delta: float) -> void:
 	# follows them. `sprint` is already an action in the project; jump is Space,
 	# read directly the way every other key in this scene is.
 	var pace := WALK_SPEED * (SPRINT_SCALE if Input.is_action_pressed("sprint") else 1.0)
+	creeping = Input.is_action_pressed("crouch") and not Input.is_action_pressed("sprint")
+	if creeping:
+		pace *= 0.45
 	# Mid-climb the haul owns the body; the rest of the frame still runs.
 	if not JUMP_CLIMB.busy(player):
 		# Greg, 26 September: sprint + Ctrl slides.
@@ -673,7 +682,8 @@ func _patrol_step(delta: float) -> void:
 	var overhead: float = player.global_position.y - patrol.global_position.y
 	difference.y = 0.0
 	var distance := difference.length()
-	patrol_alert = distance < 11.0
+	# Once it has you it keeps you; creeping only helps before it notices.
+	patrol_alert = distance < (HEAR_CREEPING if creeping and not patrol_alert else HEAR_WALKING)
 	if not patrol_alert:
 		patrol.position.x = sin(patrol_phase * 0.55) * 6.2
 		patrol.rotation.y = cos(patrol_phase * 0.55) * 0.45
@@ -735,6 +745,9 @@ func _interact() -> void:
 		_enter_drains()
 		return
 	if _flat_distance(EXIT_AT) <= 4.0 and fuse_taken:
+		if patrol_alert and not patrol_disabled:
+			objective.text = "OBJECTIVE // IT IS ON YOU  //  LOSE IT OR PUT IT DOWN FIRST"
+			return
 		_ride_heat_elevator()
 
 

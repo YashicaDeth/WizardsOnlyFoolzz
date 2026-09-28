@@ -1408,9 +1408,31 @@ func break_weak_wall() -> bool:
 	return true
 
 
+## Greg's playtest: the first run is one guided breakout, and this room's
+## lesson is the fight. He is on the path: his keycard opens the pit door.
+## After one escape the world is yours and every door works as before.
+func _first_run() -> bool:
+	return not preload("res://systems/facility_routes.gd").escaped_once()
+
+
+func _pit_door_open() -> bool:
+	return not _first_run() or VAT_REBIRTH.carries(STAFF_KEYCARD)
+
+
+func _first_run_objective() -> String:
+	if VAT_REBIRTH.carries(STAFF_KEYCARD):
+		return "ESCAPE  //  HIS CARD OPENS THE PIT DOOR"
+	if doctor_route != null and doctor_route.door != null and doctor_route.door.broken:
+		return "GET REVENGE  //  HE IS IN HIS ROOM\nBEAT HIM AND TAKE HIS CARD"
+	return "GET REVENGE  //  HE LEFT THROUGH THAT DOOR\nBREAK IT DOWN"
+
+
 ## Into the duct: the Service Arcade, arriving past its pressure gate.
 func take_shortcut() -> bool:
 	if not weak_wall_broken or shortcut_taken:
+		return false
+	if _first_run():
+		subtitle.text = "THE DUCT IS CAVED IN FURTHER ON  //  NOT THIS WAY, NOT YET"
 		return false
 	shortcut_taken = true
 	_record_service_arcade_entry()
@@ -2398,6 +2420,9 @@ func _interact() -> void:
 	to_door.y = 0.0
 	if to_door.length() > 3.4:
 		return
+	if not _pit_door_open():
+		subtitle.text = "THE PIT DOOR  //  A CARD READER, RED  //  HE CARRIES THE CARD"
+		return
 	# Filing the stage can legitimately refuse -- it is write-once and a resumed
 	# world may already have it -- but that is not a reason to refuse the door.
 	# It used to `return` here, which left a player whose world already recorded
@@ -2519,7 +2544,7 @@ func _update_hud() -> void:
 		prompt.text = ""
 		$HUD/Objective.text = ""
 		return
-	$HUD/Objective.text = "OBJECTIVE\n" + objective_text
+	$HUD/Objective.text = "OBJECTIVE\n" + (_first_run_objective() if _first_run() else objective_text)
 	# AX3.1/AX3.6. INSPECT is a held state, not a menu, so it wins the prompt
 	# line for as long as it is held rather than opening anything separate.
 	if inspect_held:
@@ -2578,7 +2603,8 @@ func _update_hud() -> void:
 	to_door.y = 0.0
 	# HOLD I is only offered when something is in hand to look at.
 	var inspect_hint := "   //   HOLD I INSPECT" if _inspect_text() != "NOTHING IN HAND TO INSPECT" else ""
-	prompt.text = "[E] ENTER THE UNDERGROUND HEAT" if to_door.length() <= 3.4 else "WASD MOVE   //   MOUSE LOOK   //   E INTERACT" + inspect_hint
+	var pit_line := "[E] ENTER THE UNDERGROUND HEAT" if _pit_door_open() else "PIT DOOR  //  SEALED  //  HIS KEYCARD OPENS IT"
+	prompt.text = pit_line if to_door.length() <= 3.4 else "WASD MOVE   //   MOUSE LOOK   //   E INTERACT" + inspect_hint
 	if to_door.length() <= 3.4:
 		osd.point_at(door_marker.global_position + Vector3(0, 1.6, 0))
 
