@@ -105,7 +105,7 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [ ] Placeholder: breakout frames.
 - [x] Placeholder: loading screens. The code-drawn transit plate (seal, X-ray film, code rain) now names where it leads: a route strip of the first thirty minutes with the next stop lit. Rendered.
 - [ ] Placeholder: phone / the Wire.
-- [ ] Placeholder: kill-cam X-rays.
+- [x] Placeholder: kill-cam X-rays. Cold blue film: a skeleton in line art (skull, ribs, clavicles, limb bones, pelvis) with the blade or round path drawn across the struck zone. Rendered.
 - [ ] Log every placed piece in `game/art/GENERATED.md`.
 - [ ] Code-and-effects GFX pass over the placeholder art (Godot shaders).
 - [ ] TouchDesigner loops (later).
