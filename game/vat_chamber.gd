@@ -408,6 +408,8 @@ func _on_intake_filed(_state: Dictionary) -> void:
 		return
 	intake.queue_free()
 	intake = null
+	Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	var filed_state := WorldHistory.subject("player")
 	var filed_anatomy: Dictionary = filed_state.get("anatomy", {})
 	anatomy.call("configure", "player", 5000.0, filed_anatomy.get("cybernetics", []))

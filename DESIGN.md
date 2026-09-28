@@ -1228,3 +1228,90 @@ World rules; realm identity and transition rules; what persists across realms; d
 - *Voice intake*: "next", "back", a number, "confirm", "file it", or the
   words of his question's options.
 - *The checklist* is now 100 boxes (Greg: "add 100 overall").
+## Stated by Greg, 28 September 2026: loose-thread decisions
+
+These decisions came from reviewing the complete loose-thread cutter. They
+replace “compare or rebuild” ambiguity for the named systems, but do not waive
+the project rule that old branches are ported selectively into the current
+playable build and verified before merge.
+
+- **The intake pointer is a jester hand.** The cursor is a pointing jester's
+  finger with the frilled wrist visible, not a generic arrow.
+- **The breach tool must be obvious and reachable.** Its sign clearly says to
+  take it and the normal interaction reaches it from three metres.
+- **The drains route must not softlock.** Restore the exit regression coverage,
+  reproduce the current route, and fix any failure to walk out.
+- **The title/front door remains silent.** Opening Pause or Escape over it must
+  not start ambient crackle, drips, or game-world audio. Treat the old series
+  of commits as one behavior plus one regression test.
+- **Voice listeners die with their owner.** Leaving an intake or voice-input
+  scene must terminate its listener process. No orphaned listeners accumulate.
+- **The heat elevator and sallyport emerge onto usable open ground,** not inside
+  a gate wall or blocked geometry.
+- **The intake always tells the player how to continue,** legibly at 720p,
+  1080p, ultrawide, keyboard/mouse, and controller scale.
+- **Picking things up is a general game verb.** Ordinary items, severed limbs,
+  individual bones and gore chunks can be picked up, held in the hand, rotated
+  or inspected, carried, and dropped whenever their size permits. The rule is
+  shared rather than special-cased to one severed limb.
+- **Vat subjects float visibly.** The player and other specimens drift and
+  slowly rebound around their available tank volume, like a very slow screen
+  saver rather than a rigid seated pose. A tank can be smashed to free its
+  subject; a freed subject may help, flee, panic, or attack according to who it
+  is and what happened to it.
+- **The mouth tube and skull leads are real parts of the opening body.** Rebuild
+  them to the current body/anatomy quality rather than restoring an old scene
+  wholesale.
+- **Save and load belong to the one game.** The menu offers a normal New Game
+  and load flow. “Demo” is a build milestone, not a separate reduced game or a
+  second product door.
+- **The playable game has gore-sandbox parity.** The anatomy, damage, pickup,
+  inspection and destruction verbs proven in the sandbox must work in the real
+  routes; the sandbox is not an isolated feature island.
+- **The old combat-style lane is approved in direction.** Rebuild switchable
+  styles, blood growth and loot preservation against the current combat and
+  body systems, one tested subsystem at a time.
+- **Printed work objects are approved.** Receipt-paper job posters and business
+  cards belong in the 30–60 minute job loop after the first-job structure is
+  settled.
+- **Kinship stays in the Brain Index.** Reconcile its neural-network/CRT hub
+  presentation with the current hub; do not restore stale Hunt edits.
+- **Hornee becomes a real companion.** Preserve Greg's authored plush sources,
+  rebuild and verify the card/model, then make Hornee a summonable companion
+  who can travel and fight alongside the player rather than remaining only a
+  collectible view.
+- **Lab cables are a wiring network, not one decorative tube.** Port the old
+  lane's useful cable system into the current lab after conflicts and frame
+  cost are resolved.
+- **The sky belongs to the Sidereal Concordance.** Port only that chosen result
+  from the old sky-agency branch.
+- **Substances use the real world clock.** Tolerance and comedown remain wanted,
+  but the world map and enterable buildings come first. Their teaching scene
+  belongs in a club or underground party populated by characters using
+  different substances, not in a detached menu tutorial.
+- **Connected underground routes remain wanted.** Review topology, liened-organ
+  routing, discovered-entrance persistence and occlusion as one modern bundle.
+- **Generated Higgsfield or ComfyUI imagery does not ship as final art.** It can
+  guide authored models, textures, composition and effects. Any old generated
+  plate wired directly into the game must be replaced or deliberately kept as
+  temporary reference-only material outside the shipped build.
+- **Controller is the primary combat tuning device, not an exclusive input.**
+  Tune movement, camera pressure, target switching, dodge timing, triggers and
+  feedback on a DualSense first, while keyboard and mouse remain full peers on
+  the same action layer. VR is a later interaction and comfort redesign, not a
+  control preset for the opening milestone.
+- **The Black Mirror is a canonical opening acquisition.** Every escape route
+  gives the player the same actual Black Mirror before its route-specific
+  divergence. Finding it establishes the handheld menu and the interface the
+  rest of the game teaches through.
+- **Routes share learning outcomes, not necessarily props.** A route may omit
+  the service arcade's access card or breach tool, but it must teach the same
+  core movement, interaction, combat and body-management verbs in authored
+  situations. Picking up the first weapon opens the relevant combat/weapon
+  section of the Brain Index, then the route immediately asks the player to use
+  what it revealed.
+- **Polish proceeds as a repeated playable build, not mechanic accumulation.**
+  Finish one golden opening route beat-by-beat, play it on controller and
+  keyboard/mouse, fix the largest observed friction, rebuild, and repeat. Other
+  routes come to parity against that proven spine; new mechanics do not enter
+  the opening merely because a branch contains them.

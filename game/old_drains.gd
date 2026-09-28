@@ -159,6 +159,14 @@ func _build_gallery() -> void:
 	# The channel bed sits lower; the water lies in it.
 	_slab(Vector3(2.0, 0.4, length), Vector3(0, -0.55, mid), floor_material)
 	_water(Vector2(2.0, length), Vector3(0, -0.32, mid))
+	# The player lands in the sunk channel. Its old square end stopped the
+	# capsule dead at the cistern even while forward was held, making this route
+	# a softlock unless the player discovered the separate mantle action. Give
+	# the original drainage channel a shallow physical run-up onto the causeway.
+	# The cistern causeway collider begins slightly before its nominal Z. Finish
+	# the rise there, rather than leaving even a small square lip at its face.
+	var causeway_ramp := _slab(Vector3(2.0, 0.4, 2.4), Vector3(0, -0.37, CISTERN_Z + 1.5), floor_material)
+	causeway_ramp.rotation_degrees.x = 10.0
 	_slab(Vector3(TUNNEL_WIDTH + 1.0, 0.4, length), Vector3(0, TUNNEL_HEIGHT + 0.2, mid), wall)
 	# Ribs every few metres: the vault is old masonry, not a poured pipe.
 	var rust := _stained("rust", Color(0.55, 0.45, 0.36))

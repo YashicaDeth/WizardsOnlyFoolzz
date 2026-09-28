@@ -15,8 +15,24 @@ $out = 'P:\GameDev\build\windows'
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 $exe = Join-Path $out 'WizardsOnlyFools.exe'
 
-& $toolState.godot --headless --path (Join-Path $PSScriptRoot 'game') --export-release 'Windows Desktop' $exe
-if ($LASTEXITCODE -ne 0 -or -not (Test-Path $exe)) { throw "Export failed (exit $LASTEXITCODE)." }
+# `setup-state.json` may point at the GUI Godot executable. Invoking a GUI
+# executable with `&` can return control before export has finished, which made
+# the old script test for the EXE while Godot was still writing it. An explicit
+# process wait makes the artifact check truthful for either GUI or console Godot.
+$project = Join-Path $PSScriptRoot 'game'
+$godotArgs = @('--headless', '--path', $project, '--export-release', 'Windows Desktop', $exe)
+$export = Start-Process -FilePath $toolState.godot -ArgumentList $godotArgs -Wait -NoNewWindow -PassThru
+if ($export.ExitCode -ne 0 -or -not (Test-Path $exe)) { throw "Export failed (exit $($export.ExitCode))." }
+
+# Put the identity beside the executable so a playtest report can always name
+# the exact source it came from. A dirty suffix is deliberate: it prevents a
+# local experimental build from masquerading as its last committed revision.
+$commit = (& git -C $PSScriptRoot rev-parse --short=12 HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($commit)) { throw 'Could not identify the source commit.' }
+$dirty = if (& git -C $PSScriptRoot status --porcelain) { '+dirty' } else { '' }
+$buildIdentity = "Wizards Only Fools $commit$dirty"
+$buildTime = Get-Date -Format 'yyyy-MM-dd HH:mm:ss K'
+Set-Content -LiteralPath (Join-Path $out 'BUILD-IDENTITY.txt') -Value @($buildIdentity, "Built $buildTime")
 
 $zip = 'P:\GameDev\build\WizardsOnlyFools-windows.zip'
 Compress-Archive -Path (Join-Path $out '*') -DestinationPath $zip -Force

@@ -43,6 +43,21 @@ func _ready() -> void:
 	set_process(false)
 
 
+## A recogniser belongs to this node, not to the Windows session. Scene changes
+## used to strand the Python child because only callers that explicitly awaited
+## `stop()` released it. There is no safe await during tree teardown, so signal
+## a clean quit and then make termination certain before the node disappears.
+func _exit_tree() -> void:
+	if _pid <= 0:
+		return
+	_write(_bridge("state.txt"), "quit")
+	_terminate_process(_pid)
+	_pid = -1
+	listening = false
+	status = "off"
+	set_process(false)
+
+
 ## True when a recogniser is actually running and has reported itself ready.
 ## Deliberately not "the files exist" -- a listener that failed to load its
 ## model leaves the files behind and would otherwise look healthy.
@@ -102,7 +117,7 @@ func stop() -> void:
 	# on a clean exit; a bare kill can leave the device held.
 	await get_tree().create_timer(0.35).timeout
 	if _pid > 0:
-		OS.kill(_pid)
+		_terminate_process(_pid)
 	_pid = -1
 	listening = false
 	status = "off"
@@ -184,3 +199,9 @@ func _read(path: String) -> String:
 	var body := handle.get_as_text()
 	handle.close()
 	return body
+
+
+## Kept behind a seam so lifecycle behavior can be proved without a test ever
+## terminating an unrelated operating-system process.
+func _terminate_process(process_id: int) -> void:
+	OS.kill(process_id)

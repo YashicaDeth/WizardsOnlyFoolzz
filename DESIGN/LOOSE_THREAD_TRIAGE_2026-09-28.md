@@ -143,3 +143,17 @@ Split work by subsystem, never by alternating commit numbers. One person owns
 a bundle from comparison through tests and capture; the other person works a
 different bundle. Only the coordinator merges into the playable demo.
 
+## Greg's review decisions — 28 September
+
+The following suspended areas are now **approved to rebuild selectively** on
+the current demo: vat floating and body hardware; intake pointer and guidance;
+breach-tool reach; drains exit; front-door silence; listener cleanup; route
+placement; save/load as one full-game flow; universal object/body-part pickup
+and inspection; combat styles and blood growth; printed job objects; kinship;
+Hornee as a fighting companion; lab cable networks; Sidereal Concordance sky
+ownership; connected underground routes; real-clock substance tolerance and
+comedown; and current-route gore-sandbox parity.
+
+The map and enterable buildings precede the substance tutorial. Generated
+Higgsfield/ComfyUI output remains reference-only and does not become shipped
+final art. The four cut/superseded commits above remain cut.

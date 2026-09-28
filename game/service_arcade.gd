@@ -26,6 +26,7 @@ const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const ENTRY := Vector3(0, 1.0, 4.0)
 const CARD_AT := Vector3(-3.8, 0.95, -20.0)
 const WEAPON_AT := Vector3(3.8, 0.78, -11.5)
+const TOOL_REACH := 3.0
 const GATE_AT := Vector3(0, 0.0, -48.0)
 const EXIT_AT := Vector3(0, 0.0, -55.0)
 ## AX route beat 5. Hollis's biometric door, across the artery between the
@@ -241,7 +242,7 @@ func _build_landmarks() -> void:
 	weapon_visual.rotation_degrees = Vector3(0, 34.0, 90.0)
 	add_child(weapon_visual)
 	weapon_label = Label3D.new()
-	weapon_label.text = "BREACH TOOL\n[ E ] ARM"
+	weapon_label.text = "[E] TAKE THE BREACH TOOL"
 	weapon_label.font_size = 36
 	weapon_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	weapon_label.modulate = Color("e58b42")
@@ -479,6 +480,9 @@ func _flat_distance(at: Vector3) -> float:
 	delta.y = 0.0
 	return delta.length()
 
+func _tool_in_reach() -> bool:
+	return weapon_on_floor and _flat_distance(WEAPON_AT) <= TOOL_REACH
+
 func _interact() -> void:
 	if died:
 		return
@@ -501,7 +505,7 @@ func _interact() -> void:
 		_carry_add({"label": CARD_LABEL, "kind": "key", "mass": 0.02, "perishes": false, "age": 0.0, "from": LOCATION})
 		WorldHistory.record_event("service_arcade_keycard_taken", {"location": "service_arcade"})
 		return
-	if weapon_on_floor and _flat_distance(WEAPON_AT) <= 2.3:
+	if _tool_in_reach():
 		weapon_on_floor = false
 		weapon_taken = true
 		# Taking it puts it in your hands, where you can see it.
@@ -585,6 +589,9 @@ func _update_hud() -> void:
 	elif card_on_pedestal and _flat_distance(CARD_AT) <= 2.3:
 		prompt.text = "[E] TAKE STAFF ACCESS CARD"
 		osd.point_at(CARD_AT + Vector3(0, 0.3, 0))
+	elif _tool_in_reach():
+		prompt.text = "[E] TAKE THE BREACH TOOL"
+		osd.point_at(WEAPON_AT)
 	elif not gate_open and _flat_distance(GATE_AT) <= 3.2:
 		if card_taken:
 			prompt.text = "[E] OPEN PRESSURE GATE"

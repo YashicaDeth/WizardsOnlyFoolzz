@@ -47,6 +47,7 @@ func _ready() -> void:
 	var intake: Control = VAT_INTAKE.new()
 	add_child(intake)
 	await get_tree().process_frame
+	intake.intake_armed = true
 	# By name: a FACE page moved SCHEDULE from 4 to 5 and this sat on BODY.
 	intake.page = VAT_INTAKE.PAGES.find("SCHEDULE")
 	intake.row = 0
@@ -65,13 +66,27 @@ func _ready() -> void:
 	intake._unhandled_input(event)
 	check(intake.page == page_before, "you cannot page away while it is being done to you")
 
-	# And it hands control back at the end. Each beat is now held long enough
-	# to read (2026-09-24), so the budget is a minute rather than twenty seconds.
-	for _step in 120:
-		intake._process(0.5)
-	check(intake.procedure.is_empty(), "the procedure finishes on its own")
+	# But the authored scene is never a hard lock: a deliberate Escape cancels
+	# its remaining beats while retaining the choice that was already signed.
+	var escape := InputEventKey.new()
+	escape.keycode = KEY_ESCAPE
+	escape.pressed = true
+	intake._unhandled_input(escape)
+	check(intake.procedure.is_empty(), "Escape returns control immediately during a procedure")
+	check(intake.sheet.modifiers.has(key), "interrupting the scene does not silently undo the signed selection")
+
+	# Space is an explicit no-change confirmation, not an accidental row edit.
+	intake.page = VAT_INTAKE.PAGES.find("MIND")
+	var confirmed_before: int = intake.touched_pages.size()
+	var space := InputEventKey.new()
+	space.keycode = KEY_SPACE
+	space.pressed = true
+	intake._unhandled_input(space)
+	check(intake.touched_pages.size() == confirmed_before + 1, "Space confirms the current page as-is")
+
+	# And input works again immediately after the interruption.
 	intake._unhandled_input(event)
-	check(intake.page != page_before, "and then you have the form back")
+	check(intake.page != VAT_INTAKE.PAGES.find("MIND"), "and then you have the form back")
 
 	print("INTAKE_DIRECTION_TEST_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

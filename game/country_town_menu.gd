@@ -9,7 +9,6 @@ const REGAL_FRAME := preload("res://systems/regal_frame.gd")
 const LOGO_FX := preload("res://shaders/logo_fx.gdshader")
 const BOOT_SPLASH := preload("res://boot_splash.gd")
 const LOGO_EMBERS := preload("res://systems/logo_embers.gd")
-const LOGO_AUDIO := preload("res://systems/logo_audio.gd")
 const MENU_BLOOD := preload("res://systems/menu_blood.gd")
 ## Seconds each menu line takes to type on, and the gap between lines.
 const TYPE_SECONDS := 0.28
@@ -18,8 +17,6 @@ const TYPE_STAGGER := 0.07
 const DIM_OTHERS := 0.42
 var menu_blood: Control
 var title_embers: Control
-var title_audio: Node
-var _title_tearing := false
 ## Seconds between the title logo's short glitch tears.
 const TITLE_GLITCH_EVERY := 5.5
 var title_fx: ShaderMaterial
@@ -200,9 +197,8 @@ func _play_title_sequence() -> void:
 	title_embers.name = "Embers"
 	title_embers.amount = 0.45
 	$HUD/TitleLogo.add_child(title_embers)
-	title_audio = LOGO_AUDIO.new()
-	title_audio.name = "TitleLogoAudio"
-	add_child(title_audio)
+	# The front door is deliberately silent. World ambience begins only after
+	# START GAME; hover and the periodic logo tear remain visual feedback.
 	menu_blood = MENU_BLOOD.new()
 	menu_blood.name = "MenuBlood"
 	$HUD.add_child(menu_blood)
@@ -585,9 +581,6 @@ func _process(delta: float) -> void:
 		# A short tear every few seconds, so the name keeps reading between.
 		var burst := fmod(ui_time, TITLE_GLITCH_EVERY) < 0.22 and ui_time > 2.0
 		title_fx.set_shader_parameter("glitch", 0.75 if burst else 0.05)
-		if burst and not _title_tearing:
-			title_audio.cue("tear")
-		_title_tearing = burst
 	$HUD/Algiz.modulate.a = 0.72 + sin(ui_time * 2.1) * 0.18
 
 
@@ -603,8 +596,6 @@ static func typed(full: String, shown: float) -> String:
 func _focus_button(button: Button) -> void:
 	if menu_blood != null:
 		menu_blood.point_at(button)
-	if title_audio != null:
-		title_audio.cue("drip")
 	var tween := create_tween().set_parallel(true)
 	tween.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
 	tween.tween_property(button, "position:x", 72.0, 0.18)

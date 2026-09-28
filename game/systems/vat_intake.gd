@@ -165,6 +165,8 @@ var _board_width := 0.0
 var _tab_hits: Array[Rect2] = []
 var _row_hits: Array[Rect2] = []
 var _answer_hits: Array[Rect2] = []
+var _keep_hit := Rect2()
+const JESTER_POINTER := preload("res://art/ui/jester_pointer.svg")
 
 
 func _ready() -> void:
@@ -278,6 +280,8 @@ func _process(delta: float) -> void:
 	modulate.a = clampf((elapsed - FORM_REVEAL_AT) / FORM_REVEAL_DURATION, 0.0, 1.0)
 	if not intake_armed and elapsed >= FORM_REVEAL_AT:
 		intake_armed = true
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		Input.set_custom_mouse_cursor(JESTER_POINTER, Input.CURSOR_ARROW, Vector2(4, 3))
 		transcript = "NEURALACE ENGAGED  //  EXAMINER TERMINAL CONNECTED"
 		transcript_life = 4.0
 		_speak("page")
@@ -353,6 +357,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	# D8.3. While he is putting something into you, you are not filling in a
 	# form. The scene runs to the end of its beats before it hands you back.
 	if not procedure.is_empty():
+		# A procedure is a scene, not a trap. Space/Enter/F skips the current
+		# authored beat; Escape interrupts the remaining beats and returns to the
+		# form. The selected modifier remains on the signed sheet.
+		if event.keycode in [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER, KEY_F]:
+			handler_life = 0.0
+		elif event.keycode == KEY_ESCAPE:
+			procedure.clear()
+			shot = "tank"
+			transcript = "PROCEDURE INTERRUPTED // SELECTION REMAINS FILED"
+			transcript_life = 4.0
+			_speak("chose")
 		get_viewport().set_input_as_handled()
 		return
 	# Greg, 25 September: speedrunners. Once you've filed, F, Enter or Space
@@ -379,6 +394,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			row = mini(_rows() - 1, row + 1)
 		KEY_ENTER, KEY_KP_ENTER:
 			_commit()
+		KEY_SPACE:
+			_confirm_as_is()
 		KEY_1, KEY_2, KEY_3:
 			_answer(event.keycode - KEY_1)
 		KEY_F:
@@ -426,6 +443,11 @@ func _gui_input(event: InputEvent) -> void:
 			_speak("page")
 			accept_event()
 			return
+	if _keep_hit.has_point(local):
+		if click:
+			_confirm_as_is()
+		accept_event()
+		return
 	for index in _row_hits.size():
 		if _row_hits[index].has_point(local):
 			row = index
@@ -673,6 +695,11 @@ func _can_file() -> bool:
 	return touched_pages.size() == PAGES.size() and sheet.route != "" and sheet.race != ""
 
 
+func _confirm_as_is() -> void:
+	touched_pages[page] = true
+	_transcribe(str(PAGES[page]) + " AS IS")
+
+
 ## This is a visual construction only.  The preview never applies the sheet to
 ## WorldHistory; the actual filing path remains the sole place that commits a
 ## person to the game.
@@ -824,10 +851,19 @@ func _draw_clipboard(rect: Rect2) -> void:
 	IntakePageMotion.draw_train(self, PAGE_HINGE, page_print, elapsed)
 	draw_line(Vector2(26, footer - 12), Vector2(rect.size.x - 26, footer - 12), ink * Color(1, 1, 1, 0.3), 1.0)
 	_draw_gauges(rect, ink, footer)
+	_keep_hit = Rect2(Vector2(26, footer - 70), Vector2(rect.size.x - 52, 28))
+	var keep_hot := _keep_hit.has_point(_board_xform.affine_inverse() * get_local_mouse_position())
+	draw_rect(_keep_hit, HOT * Color(1, 1, 1, 0.28 if keep_hot else 0.12))
+	draw_rect(_keep_hit, (MOSS if touched_pages.has(page) else HOT) * Color(1, 1, 1, 0.7), false, 1.0)
+	var keep := "[SPACE]  CONFIRM %s AS IS" % PAGES[page]
+	var keep_size := minf(15.0, 15.0 * (_keep_hit.size.x - 20.0) / CellOutzType.width_condensed(keep, 15.0, 0.8))
+	CellOutzType.draw_condensed(self, _keep_hit.position + Vector2(10, (_keep_hit.size.y - keep_size) * 0.5), keep, keep_size, ink, 0.8)
 	CellOutzType.draw_condensed(self, Vector2(26, footer + 36), "%s // %s RISING // %s" % [sheet.sun_sign(), sheet.ascendant(), sheet.modality().to_upper()], 9.0, ink * Color(1, 1, 1, 0.55), 0.7)
 	var done := touched_pages.size()
-	var hint := ("CONFIRMED %d/%d  //  CLICK OR ENTER CONFIRMS THIS TAB  //  OR HOLD V: \"NEXT\", \"TWO\", \"CONFIRM\"" % [done, PAGES.size()]) if done < PAGES.size() else "ALL %d CONFIRMED  //  F FILES YOU" % PAGES.size()
-	CellOutzType.draw_condensed(self, Vector2(rect.size.x - 26 - CellOutzType.width_condensed(hint, 9.0, 0.8), footer + 52), hint, 9.0, HOT if done < PAGES.size() else MOSS, 0.8)
+	var hint := ("CONFIRMED %d/%d  //  ENTER OR CLICK CHANGES A ROW  //  HOLD V TO SPEAK" % [done, PAGES.size()]) if done < PAGES.size() else "ALL %d CONFIRMED  //  F FILES YOU" % PAGES.size()
+	var hint_room := rect.size.x - 52.0
+	var hint_size := minf(15.0, 15.0 * hint_room / CellOutzType.width_condensed(hint, 15.0, 0.8))
+	CellOutzType.draw_condensed(self, Vector2(rect.size.x - 26 - CellOutzType.width_condensed(hint, hint_size, 0.8), footer + 50), hint, hint_size, HOT if done < PAGES.size() else MOSS, 0.8)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 

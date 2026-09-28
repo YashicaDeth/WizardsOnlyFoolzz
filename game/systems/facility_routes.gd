@@ -136,7 +136,7 @@ const ROUTES := {
 		"exit": "heat_elevator",
 		# The sallyport's arrival point: the derby used to surface the player
 		# here, and the lift that replaced it as the way up comes out beside it.
-		"surface_position": Vector3(4.0, 0.0, -24.0),
+		"surface_position": Vector3(-2.0, 0.0, -31.0),
 		"surface_relationships": {},
 		"mastery_route": false,
 		"avoids_derby": true,
@@ -173,7 +173,7 @@ const ROUTES := {
 		"label": "CONTAINMENT / UNDERGROUND DERBY",
 		"steps": ["processing_chute", "underground_colosseum", "lockdown_grid", "vehicle_sallyport"],
 		"exit": "vehicle_sallyport",
-		"surface_position": Vector3(4.0, 0.0, -24.0),
+		"surface_position": Vector3(4.0, 0.0, -33.0),
 		"surface_relationships": {"ashline_wreckers": 12, "celloutz": -18},
 		"mastery_route": false,
 		"avoids_derby": false,

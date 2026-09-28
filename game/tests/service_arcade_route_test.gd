@@ -20,6 +20,8 @@ func _ready() -> void:
 	arcade.player.global_position = arcade.CARD_AT
 	arcade._interact()
 	check(arcade.card_taken and not arcade.card_visual.visible and not arcade.card_label.visible, "the orange card can be collected at its physical pedestal without leaving a stale take prompt")
+	arcade.player.global_position = arcade.WEAPON_AT + Vector3(0, 0, arcade.TOOL_REACH - 0.05)
+	check(arcade._tool_in_reach(), "the breach tool has the promised three-metre interaction reach")
 	arcade.player.global_position = arcade.WEAPON_AT
 	arcade._interact()
 	# It leaves the floor for your hands rather than vanishing (2026-09-24).

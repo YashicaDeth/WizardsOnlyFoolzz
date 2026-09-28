@@ -216,7 +216,7 @@ func _draw_prompt(view: Vector2) -> void:
 		return
 	var origin := Vector2(view.x * 0.5, view.y - 96)
 	var pinned := false
-	if (_anchor_time > 0.0 or _anchor_frames > 0) and camera != null and is_instance_valid(camera) and not camera.is_position_behind(_anchor):
+	if view.x > 80.0 and view.y > 80.0 and (_anchor_time > 0.0 or _anchor_frames > 0) and camera != null and is_instance_valid(camera) and not camera.is_position_behind(_anchor):
 		var projected := camera.unproject_position(_anchor)
 		if Rect2(Vector2.ZERO, view).grow(-40).has_point(projected):
 			origin = projected + Vector2(0, -34)
