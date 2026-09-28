@@ -166,6 +166,9 @@ purpose.
   death question.
 - 22 CabScreens: deliberately removed from the derby; derby_clean_hud_capture
   asserts it stays gone. Not dust.
+- 38 severed hand at the reader: the barrier accepts it, but the facility
+  hands over no blade yet (FacilityGuardPost notes). Where the first blade
+  comes from is a level decision.
 - 25 AudioReactive: what the radio should move in the Hunt (the trip dials
   are owned by altered perception every frame) is a look decision.
 
@@ -175,5 +178,12 @@ purpose.
 - 4-7 pad prompts: 17e81b65
 - 8, 87 hidden viewers: 8d15b724
 - 18 algiz sight in the Gore Sandbox: 6518f624
+- 74-77 combat keys rebindable: 6fa54756
+- 31 AX duplicates removed from CHECKLIST: this commit
+- 34-37, 39-40 already done before tonight (ledger was stale): FacilityGuardPost
+  places Hollis, the reader and the door in the Support Unit and the arcade;
+  facility_guard_post_test covers coerced, downed and dragged-hand access and
+  the three-round BREACH NINE; BiometricBarrier ignores life state, so a
+  corpse opens it (biometric_barrier_test).
 - 19 WofLockup: already used -- store_assets_capture draws every Steam/itch
   plate with it (the ledger's scan skipped tests/). No change.
