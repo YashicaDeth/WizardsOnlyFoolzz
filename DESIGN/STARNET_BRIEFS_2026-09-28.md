@@ -1,5 +1,11 @@
 # StarNet agent briefs, 28 September
 
+**Status (28 September, late):** briefs 1-5 and tasks A, B, C (heavy on
+middle mouse, the empty bay, the hidden den) were all done by Claude (cloud).
+Brief 6 waits on Greg (keep the stand-in examiner). The only open StarNet
+job is the SOUND PASS (see DESIGN.md, 28 September). StarNet usage is out for
+now; Claude (cloud) keeps building the opening.
+
 Greg: every StarNet agent should be progressing Wizards Only Fools (and the
 Foundry, lighter). One brief per agent, one open box from
 `DESIGN/CHECKLIST_2026-09-26.md` each. Paste one brief into one agent.
