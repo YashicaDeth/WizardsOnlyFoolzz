@@ -171,7 +171,7 @@ branch (item 73). TODO = still open for this run.
 | 19 | ALREADY | 46 | N/A (door is not on the guided path) | 89 | CHECKED, left open |
 | 20 | TODO | 47 | ALREADY | 90 | TODO |
 | 21 | TODO | 48 | ALREADY (ram vs Hollis) | 91 | ALREADY, ticked b83df383 |
-| 22 | NOT DUST | 49-50 | TODO | 92-93 | DONE d6b1a406 |
+| 22 | NOT DUST | 49-50 | DONE b6f55e7b | 92-93 | DONE d6b1a406 |
 | 23 | TODO | 51 | BRANCH look-cables | 94 | DONE 9c774b13 |
 | 24 | TODO | 52-53 | ALREADY | 95 | TODO |
 | 25 | BLOCKED (look) | 54 | TODO | 96 | TODO |
