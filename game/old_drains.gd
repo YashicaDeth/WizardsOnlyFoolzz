@@ -72,6 +72,8 @@ var sight: Node
 
 
 func _ready() -> void:
+	# Greg, 28 September: each new key shown once (KeyHints).
+	KeyHints.offer_opening_keys(self)
 	preload("res://systems/run_timer.gd").enter("old_drains")
 	var environment := WorldEnvironment.new()
 	environment.environment = WorldLook.environment("old_drains")

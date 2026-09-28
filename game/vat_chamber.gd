@@ -1127,7 +1127,8 @@ func keys_groups() -> Array:
 	return [
 		{"group": "IN THE TANK", "rows": [["1 2 3", "BLINK ONCE / TWICE / STARE"], ["V", "THINK OUT LOUD"], ["LEFT / RIGHT", "INTAKE TABS"], ["UP / DOWN", "ROWS"], ["ENTER / CLICK", "CONFIRM"], ["F", "FILE THE SHEET"]]},
 		{"group": "THE WIRES", "rows": [["MOUSE", "FIND A WIRE"], ["E", "RIP IT OUT (THREE TUGS)"]]},
-		{"group": "OUT OF THE TANK", "rows": [["WASD", "MOVE"], ["MOUSE", "LOOK"], ["E", "INTERACT"], ["HOLD I", "INSPECT WHAT YOU HOLD"], ["LMB", "SMASH A TANK / STRIKE HIS DOOR"], ["F", "SHOULDER HIS DOOR"], ["ESC", "PAUSE"]]},
+		{"group": "OUT OF THE TANK", "rows": [["WASD", "MOVE"], ["MOUSE", "LOOK"], ["E", "INTERACT"], ["SPACE", "JUMP / CLIMB"], ["SHIFT + CTRL", "SPRINT, THEN SLIDE"], ["HOLD I", "INSPECT WHAT YOU HOLD"], ["LMB", "SMASH A TANK / STRIKE HIS DOOR / HIT HIM"], ["F", "SHOULDER HIS DOOR"], ["ESC", "PAUSE"]]},
+		{"group": "THE CHIP", "rows": [["K", "WIZARD EYES (WAVES SHOW THE WAY)"], ["HOLD J", "DEPTH SCAN"], ["HOLD 4", "DRESS A WOUND"]]},
 	]
 
 

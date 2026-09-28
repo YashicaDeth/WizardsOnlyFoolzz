@@ -99,6 +99,8 @@ var rebirth_request: Dictionary = {}
 @onready var vitals: Label = $HUD/Vitals
 
 func _ready() -> void:
+	# Greg, 28 September: each new key shown once (KeyHints).
+	KeyHints.offer_opening_keys(self)
 	preload("res://systems/run_timer.gd").enter("service_arcade")
 	$WorldEnvironment.environment = WorldLook.environment("ossuary")
 	_build_shell()

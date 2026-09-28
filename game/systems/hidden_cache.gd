@@ -171,6 +171,7 @@ static func open_near(records: Array, position: Vector3, sight: Node = null) -> 
 		WorldHistory.record_event("hidden_stash_opened", {"id": str(record.id), "meds": 1, "rounds": ROUNDS, "rounds_to": given})
 		var hinge := record.hinge as Node3D
 		if hinge.is_inside_tree() and hinge.get_tree().current_scene != null:
+			KeyHints.offer_in(hinge.get_tree().current_scene, "field_dressing", KEY_4, "HOLD 4", "dress a wound")
 			FIELD_MEDS.line(hinge.get_tree().current_scene, "HOLD 4 TO DRESS A WOUND  //  %d FIELD DRESSING%s" % [FIELD_MEDS.count(), "" if FIELD_MEDS.count() == 1 else "S"], 3.5)
 		return "stash"
 	var body := record.body as StaticBody3D

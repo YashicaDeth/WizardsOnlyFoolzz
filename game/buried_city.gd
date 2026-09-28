@@ -119,6 +119,8 @@ var sentinel_disable_reason := ""
 
 
 func _ready() -> void:
+	# Greg, 28 September: each new key shown once (KeyHints).
+	KeyHints.offer_opening_keys(self)
 	preload("res://systems/run_timer.gd").enter("lower_works")
 	var environment := WorldEnvironment.new()
 	# Not `ossuary`. It is mauve from zenith to ground and carries the densest

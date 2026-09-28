@@ -23,6 +23,28 @@ var _verb: Label
 var _panel: Panel
 
 
+## The scene's KeyHints, made on first use: any opening scene can offer a key
+## without owning a field for it.
+static func offer_in(host: Node, id: String, keycode: Key, key: String, verb: String) -> void:
+	if host == null or seen(id):
+		return
+	var hints := host.get_node_or_null("KeyHints") as KeyHints
+	if hints == null:
+		hints = new()
+		host.add_child(hints)
+	hints.offer(id, keycode, key, verb)
+
+
+## What every opening scene after the vat room offers on arrival (each only
+## if not already seen in this world).
+static func offer_opening_keys(host: Node) -> void:
+	offer_in(host, "use", KEY_E, "E", "use / open / tear")
+	offer_in(host, "jump", KEY_SPACE, "SPACE", "jump and climb")
+	offer_in(host, "wizard_eyes", KEY_K, "K", "wizard eyes")
+	offer_in(host, "depth_scan", KEY_J, "HOLD J", "depth scan")
+	offer_in(host, "slide", KEY_CTRL, "SHIFT + CTRL", "sprint, then slide")
+
+
 static func seen(id: String) -> bool:
 	return (WorldHistory.subject(SUBJECT).get("seen", []) as Array).has(id)
 
