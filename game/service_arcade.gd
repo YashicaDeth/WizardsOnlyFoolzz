@@ -289,6 +289,8 @@ func _build_guard_post() -> void:
 	guard_post.as_arcade_guard()
 	add_child(guard_post)
 	guard_post.build()
+	# Greg, 29 September: a faint silhouette between the pools of light.
+	SilhouetteRim.dress(guard_post)
 	guard_post.shot.connect(_on_shot)
 	guard_post.struck.connect(func(at: Vector3, zone: String, damage: float, kind: String) -> void:
 		if block_tracker != null:
