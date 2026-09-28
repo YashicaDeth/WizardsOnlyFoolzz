@@ -158,9 +158,22 @@ purpose.
   The Hunt's own calls are 2.6 ms; the rest of physics is the engine, and
   geometry is already fog-culled and batched. Getting to 6.25 ms is a
   restructure of the Hunt, not a night's item.
+- 14 RunLifecycle: it is the permanent-death recorder held for the death
+  fiction. Retiring or renaming it answers "what happens when you die".
+- 15-16 OpeningDeath: the facility already dies into VatRebirth ("death is
+  rebirth in the claimant's vat", support_unit._die). OpeningDeath's suite
+  calls that kind of explanation a counterfeit. Which one stands is the
+  death question.
+- 22 CabScreens: deliberately removed from the derby; derby_clean_hud_capture
+  asserts it stays gone. Not dust.
+- 25 AudioReactive: what the radio should move in the Hunt (the trip dials
+  are owned by altered perception every frame) is a look decision.
 
 ## Results (fill in at the end)
 
 - 1-3 tank body: 7e167bda
 - 4-7 pad prompts: 17e81b65
 - 8, 87 hidden viewers: 8d15b724
+- 18 algiz sight in the Gore Sandbox: 6518f624
+- 19 WofLockup: already used -- store_assets_capture draws every Steam/itch
+  plate with it (the ledger's scan skipped tests/). No change.
