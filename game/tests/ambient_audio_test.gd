@@ -69,6 +69,8 @@ func _ready() -> void:
 		await get_tree().physics_frame
 	check(steps >= 3 and feet.stream == AMBIENT_AUDIO.stream("step_metal"), "running on metal: metal steps (%d)" % steps)
 	check(feet.volume_db > -10.0, "running is louder")
+	var skin := camera.get_node_or_null("FootSkin") as AudioStreamPlayer
+	check(skin != null and skin.stream == AMBIENT_AUDIO.stream("step_bare"), "bare wet slap on top of the metal")
 
 	check(AMBIENT_AUDIO.hit(self, Vector3.ZERO, {"fracture": "closed"}, false) == ["impact", "crack", "grunt"], "a break cracks and they cry out")
 	check(AMBIENT_AUDIO.hit(self, Vector3.ZERO, {}, true) == ["impact"], "the dead only take the impact")
@@ -87,7 +89,8 @@ func _ready() -> void:
 	vat.tension = 1.0
 	for i in 120:
 		vat._process(0.1)
-	check(calm <= -59.0 and (vat.music["industrial"] as AudioStreamPlayer).volume_db > -16.0, "the industrial layer rises only with tension")
+	check(calm <= -59.0 and (vat.music["industrial"] as AudioStreamPlayer).volume_db > -26.0, "the industrial layer rises only with tension")
+	check(vat.heart.pitch_scale > 1.5 and vat.heart.volume_db > -12.0, "your heartbeat races with tension")
 	check(vat.screams_heard >= 1, "far screams in the vat room")
 
 	print("AMBIENT_AUDIO_TEST_RESULT failures=%d" % failures.size())

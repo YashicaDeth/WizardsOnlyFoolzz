@@ -368,6 +368,8 @@ func _build_player() -> void:
 	player.name = "Player"
 	player.position = ENTRY
 	add_child(player)
+	# Greg, 28 September: what your bare feet land on here.
+	player.set_meta("surface", "concrete")
 	var collider := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
 	capsule.radius = 0.34

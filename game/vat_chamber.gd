@@ -482,6 +482,8 @@ func _build_player() -> void:
 	collider.shape = capsule
 	player.add_child(collider)
 	add_child(player)
+	# Greg, 28 September: what your bare feet land on here.
+	player.set_meta("surface", "tile")
 	player.position = VAT_POSITION + Vector3(0, 1.35, 0)
 
 	camera = Camera3D.new()
@@ -1528,6 +1530,7 @@ func _physics_process(delta: float) -> void:
 	var bed := get_node_or_null("AmbientBed")
 	if bed != null:
 		bed.set("tension", float(VAT_TENSION.get(phase, 0.35)))
+		bed.set("heart_muted", tank_view != null and TANK_PANIC.has(phase))
 	if phase == "intake":
 		if opening_audio != null:
 			opening_audio.set_phase("intake")

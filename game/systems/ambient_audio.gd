@@ -170,4 +170,18 @@ static func step(camera: Camera3D, body: CharacterBody3D, delta: float) -> bool:
 	player.pitch_scale = 0.9 + _noise(int(walked * 1000.0) + Time.get_ticks_msec()) * 0.2
 	if player.is_inside_tree():
 		player.play()
+	# Greg, 28 September: the surface, with the bare wet slap on top until
+	# you have something on your feet.
+	if surface != "bare" and bool(body.get_meta("barefoot", true)):
+		var skin := camera.get_node_or_null("FootSkin") as AudioStreamPlayer
+		if skin == null:
+			skin = AudioStreamPlayer.new()
+			skin.name = "FootSkin"
+			skin.bus = player.bus
+			skin.stream = stream("step_bare")
+			camera.add_child(skin)
+		skin.volume_db = player.volume_db - 5.0
+		skin.pitch_scale = player.pitch_scale
+		if skin.is_inside_tree():
+			skin.play()
 	return true

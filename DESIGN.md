@@ -1534,6 +1534,30 @@ playable build and verified before merge.
   scene sets the body's `surface` meta), enemies' steps within 24 m, and on
   every Hunt hit a wet impact, a bone crack on breaks and the victim's voice.
   All synthesized; Greg can replace any of it with recorded sound later.
+
+### Question boxes, 28 September (late): light, sound mix, body, load-in
+
+- **Lighting (vat, Service Arcade, Support Unit, vehicle bay):** pools of
+  light: mostly black, harsh pools under lamps, you move between them.
+  Sick green-white lab light; red emergency strobes and a klaxon start when
+  the glass bursts. Lights flicker more as tension rises, and some die for
+  good.
+- **Footstep surfaces per room:** vat wet tile, bay metal grating, drains
+  water, arcade and support concrete, with the bare-feet sound on top.
+- **Sound mix: near silence.** Clearly heard: your breathing and heartbeat,
+  footsteps (yours and enemies'), the far screams (every 16-38 s, kept).
+  Room beds and music sit low; Greg did not pick "music only at peaks", so
+  the bed stays but quiet.
+- **Looking down in the tank:** cords into your skin, twitching hands,
+  surgical scars and stitches, and something wrong.
+- **The something wrong comes from your race and traits,** so every
+  character is wrong differently. Body horror stays unsettling, not gross:
+  extra fingers, mismatched skin, cords under the skin, eyes too dark.
+- **Load-in:** about 15 s. The whispers are spirit voices, and they are
+  warning you ("don't wake up", "they'll take you apart").
+- **Brain Index through the inventory head:** clicking the head zooms into
+  the brain; the lobes glow as groups: body stats, the chip, recovered
+  memories, spirit sight.
 - **Controller support:** later; friends use keyboard and mouse.
 - **Body horror** comes from your race and traits: each adds its own
   wrongness (extra fingers, mismatched skin, cords under the skin).

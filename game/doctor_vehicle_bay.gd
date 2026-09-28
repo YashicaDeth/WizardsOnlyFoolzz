@@ -470,6 +470,8 @@ func _build_player() -> void:
 	player.position = ENTRY
 	player.floor_max_angle = deg_to_rad(40.0)
 	add_child(player)
+	# Greg, 28 September: what your bare feet land on here.
+	player.set_meta("surface", "metal")
 	var collider := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
 	capsule.radius = 0.34

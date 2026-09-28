@@ -9,15 +9,17 @@ extends Node
 const AMBIENT_AUDIO := preload("res://systems/ambient_audio.gd")
 ## Per room: loop layers with their volume, and whether screams carry here.
 const PROFILES := {
-	"vat": {"layers": {"pumps": -14.0, "bubbling": -16.0, "hum": -20.0, "monitor": -24.0, "drip": -20.0}, "screams": true},
-	"bay": {"layers": {"hum": -20.0, "industrial": -18.0, "drip": -22.0}, "screams": true},
-	"drains": {"layers": {"drip": -14.0, "noise_bed": -16.0, "pumps": -26.0}, "screams": false},
-	"arcade": {"layers": {"hum": -16.0, "monitor": -26.0}, "screams": false},
-	"city": {"layers": {"noise_bed": -14.0, "drip": -24.0}, "screams": true},
-	"support": {"layers": {"hum": -18.0, "industrial": -22.0}, "screams": false},
+	"vat": {"layers": {"pumps": -22.0, "bubbling": -24.0, "hum": -28.0, "monitor": -30.0, "drip": -26.0}, "screams": true},
+	"bay": {"layers": {"hum": -28.0, "industrial": -26.0, "drip": -28.0}, "screams": true},
+	"drains": {"layers": {"drip": -20.0, "noise_bed": -26.0, "pumps": -32.0}, "screams": false},
+	"arcade": {"layers": {"hum": -26.0, "monitor": -32.0}, "screams": false},
+	"city": {"layers": {"noise_bed": -22.0, "drip": -30.0}, "screams": true},
+	"support": {"layers": {"hum": -26.0, "industrial": -30.0}, "screams": false},
 }
-## The music bed: each layer fades in above its tension threshold.
-const MUSIC := {"drone": [0.0, -22.0, -10.0], "industrial": [0.45, -30.0, -14.0], "noise_bed": [0.7, -30.0, -16.0]}
+## The music bed: each layer fades in above its tension threshold. Greg, 28
+## September: near silence. The bed stays, but low, under breath, heartbeat,
+## footsteps and the far screams.
+const MUSIC := {"drone": [0.0, -32.0, -20.0], "industrial": [0.45, -36.0, -24.0], "noise_bed": [0.7, -36.0, -26.0]}
 const SCREAM_GAP := Vector2(16.0, 38.0)
 
 static var force_in_tests := false
@@ -27,6 +29,11 @@ var tension := 0.2
 var layers: Dictionary = {}
 var music: Dictionary = {}
 var scream_player: AudioStreamPlayer
+## Your heartbeat, always there, faster and louder with tension (Greg: near
+## silence, but breath and heartbeat stay clear).
+var heart: AudioStreamPlayer
+## The tank has its own heartbeat (TankView); the vat mutes this one then.
+var heart_muted := false
 var scream_in := 12.0
 var screams_heard := 0
 
@@ -53,6 +60,12 @@ func _ready() -> void:
 	scream_player.bus = bus
 	scream_player.stream = AMBIENT_AUDIO.stream("scream_far")
 	add_child(scream_player)
+	heart = AudioStreamPlayer.new()
+	heart.name = "Heart"
+	heart.bus = bus
+	heart.stream = preload("res://systems/sight_audio.gd").stream("heartbeat")
+	add_child(heart)
+	heart.play()
 
 
 func _loop(kind: String, volume: float, bus: String) -> AudioStreamPlayer:
@@ -68,6 +81,8 @@ func _loop(kind: String, volume: float, bus: String) -> AudioStreamPlayer:
 
 func _process(delta: float) -> void:
 	tension = clampf(tension, 0.0, 1.0)
+	heart.pitch_scale = lerpf(0.9, 1.7, tension)
+	heart.volume_db = -80.0 if heart_muted else lerpf(-24.0, -10.0, tension)
 	for kind: String in MUSIC:
 		var shape: Array = MUSIC[kind]
 		var rise := clampf((tension - float(shape[0])) / maxf(0.01, 1.0 - float(shape[0])), 0.0, 1.0)
