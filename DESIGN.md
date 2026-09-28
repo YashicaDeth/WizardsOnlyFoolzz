@@ -1312,3 +1312,14 @@ World rules; realm identity and transition rules; what persists across realms; d
   current objectives, and nearby sine waves act as distress signals and
   quest/task indicators, like RDR2's hunting mode or The Last of Us's
   listen mode.
+- **Guidance waves** (28 September, later set):
+  - They rise like smoke from their source, visible through walls.
+  - Acid = objective, red = distress, bone = task.
+  - They cost the same strain as the rest of wizard eyes.
+- **The chip's "current objectives" are adjectives on things.** It works
+  like the Hunt's block tracker: the brain chip analyses what you look at
+  as if an AI model in your head were reading it, and labels it.
+- **The spirit view shows faces:** spirits, demons and angels, like the
+  Ice King sees them in Adventure Time. Greg's reference is the episode
+  where Finn becomes the lamb / statue idol and is trapped in the spirit
+  realm. The reference is for the quality only; the art is original.
