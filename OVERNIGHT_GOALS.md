@@ -152,6 +152,15 @@ purpose.
 104. Record one Movie Maker MP4 of the first-run walk for Greg to watch.
 105. Core suite + first-run walk green at the end; results at the bottom of this file.
 
+## RUN COMPLETE, 29 September ~07:00
+
+No item is left TODO: each is DONE, ALREADY, on a look branch, or waiting
+on Greg for the reason given under Blocked. Final checks: core 32/32 green;
+the 22 suites touched or added tonight green (first_run_walk included);
+`tools/run_tests.sh --perf` green (route frame budget, windowed).
+Also run: sky_agency_test on claude/integrate-sol-agent-1 (merge-probe
+worktree) is green -- the ledger's "still to run" for the sky agency.
+
 ## Status of every item (keep this current; the heartbeat reads it)
 
 DONE = committed tonight. ALREADY = true before tonight, verified.
@@ -181,7 +190,7 @@ branch (item 73). TODO = still open for this run.
 | 29 | BLOCKED (tier names) | 58 | ALREADY | 101 | SKIP (ledger is in main checkout) |
 | 30 | with each wiring | 59 | DONE 2fdddf4b | 102 | SKIP (CHANGELOG unused since 12 Sep) |
 | 31 | DONE 2b0d6c3a | 60 | LEFT (needs a list) | 103-104 | 103 Greg's; 104 DONE (loadin.mp4) |
-| 32-33 | ALREADY, tested+ticked ecdb8047 | 61-62 | DONE b7d45eb5 | 105 | TODO (last) |
+| 32-33 | ALREADY, tested+ticked ecdb8047 | 61-62 | DONE b7d45eb5 | 105 | DONE |
 | 34-35 | ALREADY | 63-68 | BRANCH look-prints | 69 | LEFT (design) |
 | | | | | 70 | DONE 30ce303c |
 
