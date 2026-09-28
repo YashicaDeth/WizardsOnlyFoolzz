@@ -86,7 +86,7 @@ static func dress(host: Node3D, from_z: float, to_z: float, half_width: float, c
 ## both walls, which is what stops a flat slab reading as a grey box.
 static func _panel_the_walls(host: Node3D, near: float, far: float, half_width: float, rng: RandomNumberGenerator, built: Dictionary) -> void:
 	var panel := BoxMesh.new()
-	panel.size = Vector3(0.09, 2.3, 2.6)
+	panel.size = Vector3(0.09, 1.12, 2.6)
 	panel.material = WorldLook.surface(LAB_ENAMEL, "metal", 4100)
 	var rivet := SphereMesh.new()
 	rivet.radius = 0.035
@@ -100,15 +100,18 @@ static func _panel_the_walls(host: Node3D, near: float, far: float, half_width: 
 	var run := near
 	while run < far:
 		for side in [-1.0, 1.0]:
-			# Two courses, so the wall has a waist rather than one flat face.
-			for course in 2:
-				var height := 1.35 + float(course) * 2.35
+			# Greg's playtest: two courses of 2.3 m panels read as doors that
+			# never opened. Four short courses, each set half a panel along
+			# from the one below like brickwork, so no seams frame a doorway.
+			for course in 4:
+				var height := 0.8 + float(course) * 1.17
+				var along := run + 1.3 + (1.35 if course % 2 == 1 else 0.0)
+				if along + 1.3 > far:
+					continue
 				var jitter := rng.randf_range(-0.03, 0.03)
-				panels.append(Transform3D(Basis.IDENTITY, Vector3(side * (half_width - 0.12), height + jitter, run + 1.3)))
-				for stud in 4:
-					var stud_y := height - 1.0 + float(stud) * 0.66
-					rivets.append(Transform3D(Basis.IDENTITY, Vector3(side * (half_width - 0.19), stud_y, run + 0.15)))
-					rivets.append(Transform3D(Basis.IDENTITY, Vector3(side * (half_width - 0.19), stud_y, run + 2.45)))
+				panels.append(Transform3D(Basis.IDENTITY, Vector3(side * (half_width - 0.12), height + jitter, along)))
+				for end in [-1.15, 1.15]:
+					rivets.append(Transform3D(Basis.IDENTITY, Vector3(side * (half_width - 0.19), height, along + end)))
 		run += 2.7
 
 	_count(built, scatter(host, panel, panels, "WallPanels"), panels.size())

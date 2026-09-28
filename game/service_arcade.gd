@@ -326,8 +326,8 @@ func _die(cause: String, killed_by: String) -> void:
 		weapon_visual.visible = false
 	weapon_taken = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	if OS.get_environment("ATG_TEST_MODE") != "1":
-		Interstitial.travel(str(rebirth_request.scene), "you died // %s grows you back" % str(rebirth_request.vat.label).to_lower())
+	# Greg's playtest: a beat to know you died, of what, and what now.
+	preload("res://systems/death_beat.gd").play(self, rebirth_request, cause)
 
 
 ## The arcade is the same place the second time. Pedestals stay empty once

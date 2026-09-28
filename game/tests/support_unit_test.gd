@@ -62,6 +62,7 @@ func _ready() -> void:
 	await _cameras()
 	await _alarm()
 	_bingyanga()
+	_duct()
 	_gate()
 	_death()
 
@@ -252,3 +253,14 @@ func _death() -> void:
 		if str(event.type) == "player_died" and str((event.details as Dictionary).get("location", "")) == "support_unit":
 			found = true
 	check(found, "the death is recorded where it happened")
+
+
+## Greg's playtest: the hatch is a crawl duct, a shortcut past the cameras.
+func _duct() -> void:
+	_place(unit.DUCT_IN + Vector3(1.0, 0.9, 0))
+	unit.post_message_timer = 0.0
+	unit._update_hud()
+	check(unit.prompt.text.contains("VENT GRILLE"), "the vent grille says what it is (%s)" % unit.prompt.text)
+	check(unit.interact() == "duct" and unit.player.global_position.z < -75.0, "crawling it comes out in hallway B")
+	check(unit.player.global_position.z > unit.GATE_Z, "still short of Hollis's gate")
+	check(WorldHistory.event_count("support_unit_duct_crawled") == 1, "the crawl is on the record")

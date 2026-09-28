@@ -76,6 +76,6 @@ func die(cause: String, killed_by: String) -> Dictionary:
 	at.y = 0.0
 	rebirth_request = VAT_REBIRTH.die(location, cause, killed_by, at)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	if OS.get_environment("ATG_TEST_MODE") != "1":
-		Interstitial.travel(str(rebirth_request.scene), "you died // %s grows you back" % str(rebirth_request.vat.label).to_lower())
+	# Greg's playtest: a beat to know you died, of what, and what now.
+	preload("res://systems/death_beat.gd").play(self, rebirth_request, cause)
 	return rebirth_request
