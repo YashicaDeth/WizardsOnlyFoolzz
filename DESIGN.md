@@ -1315,3 +1315,98 @@ playable build and verified before merge.
   keyboard/mouse, fix the largest observed friction, rebuild, and repeat. Other
   routes come to parity against that proven spine; new mechanics do not enter
   the opening merely because a branch contains them.
+
+### Open questions for Greg (28 September)
+
+- **Heavy melee has no key.** Since the combat overhaul made the right
+  mouse button the guard in melee, nothing in the Hunt starts a heavy
+  swing (`_attack(true)` has no caller). Options: hold the left mouse
+  button to charge a heavy; guard (right mouse) then left mouse for a
+  guard-breaking heavy; or a key of its own.
+- **The examiner you beat, then his hologram.** Beat him in his office
+  and the vehicle bay still shows him "by his car" as light from an
+  emitter. Keep both (he was never only one body), or does beating him
+  change what the bay shows?
+
+### Answered by Greg in question boxes, 28 September
+
+- **Heavy melee:** middle mouse. Tap = heavy swing; hold = guard break,
+  which randomly either knocks the guard open (stagger, a free hit) or
+  throws them down. Lock-on stays on Z.
+- **The vehicle bay after you beat the examiner:** an empty bay; his car
+  is there and the hologram emitter lies dark on the floor. The ramp
+  route still works.
+- **The examiner's model:** keep the stand-in until Greg says the M1 sheet
+  is final.
+- **Git:** ignore Godot's `.import` / `.uid` files repo-wide.
+- **Next:** polish minutes 0-30 before minutes 30-60. All four at once:
+  the feel of movement and combat (too floaty, the camera, jump/climb),
+  sound (room ambience, footsteps, combat hits, music beds), look and
+  lighting, and pacing/clarity.
+- **The vat room's darkness:** Greg says after playing.
+- **Brain Index:** keep Shift+Tab, and make it clickable through the
+  inventory body's head: hover glows the head and previews its stats,
+  click zooms into the skull and opens the Brain Index.
+- **The weak wall leads to a hidden room instead of the shortcut:** a
+  failed subject's den (who they were: later) with their notes, a stash,
+  a weapon and a spirit that K shows.
+
+### Answered by Greg in question boxes, 28 September
+
+- **Heavy melee:** middle mouse. Tap = heavy swing; hold = guard break,
+  which randomly either knocks the guard open (stagger, a free hit) or
+  throws them down. Lock-on stays on Z.
+- **The vehicle bay after you beat the examiner:** an empty bay; his car
+  is there and the hologram emitter lies dark on the floor. The ramp
+  route still works.
+- **The examiner's model:** keep the stand-in until Greg says the M1 sheet
+  is final.
+- **Git:** ignore Godot's `.import` / `.uid` files repo-wide.
+- **Next:** polish minutes 0-30 before minutes 30-60, on all four fronts:
+  feel, sound, look and lighting, and pacing/clarity.
+- **The vat room's darkness:** Greg says after playing.
+- **Brain Index:** keep Shift+Tab, and make it clickable through the
+  inventory body's head. Hovering glows the head and previews its stats;
+  clicking zooms into the skull and opens the Brain Index.
+- **The weak wall leads to a hidden room, not the shortcut:** a failed
+  subject's den with their notes, a stash, a weapon and a spirit that K
+  shows. Who they were: decided later.
+- **Room ambience, vat room:** pumps and bubbling, distant screams,
+  electrical hum, heart monitors from the tanks.
+- **Music beds:** dark ambient drones, industrial, and Silent Hill-style
+  sparse noise, blended.
+- **Weight:** grounded, with quick stops. Faster acceleration and stops,
+  stronger gravity, and a dip on landing.
+- **Camera:**
+  - less head bob
+  - more body-cam sway
+  - a kick on landings and hits
+  - a lean with strafing
+- **Footsteps:**
+  - by surface
+  - bare, wet feet in the opening
+  - louder when running
+  - enemies' steps audible too
+- **Combat hits:**
+  - a bone crack on breaks
+  - wet flesh impacts
+  - a weapon whoosh scaled to the weapon
+  - the victim's voice
+- **Look and lighting:** every opening room needs attention: the vat
+  room, the Service Arcade, the Support Unit, Lower Works and the drains.
+- **Guidance:** the waypoint comes through the wizard eyes "chaos magick"
+  view, a blend of the spirit view and the hacked brain-chip UI. It shows
+  current objectives, and nearby sine waves act as distress signals and
+  quest/task indicators, like RDR2's hunting mode or The Last of Us's
+  listen mode.
+- **Guidance waves** (28 September, later set):
+  - They rise like smoke from their source, visible through walls.
+  - Acid = objective, red = distress, bone = task.
+  - They cost the same strain as the rest of wizard eyes.
+- **The chip's "current objectives" are adjectives on things.** It works
+  like the Hunt's block tracker: the brain chip analyses what you look at
+  as if an AI model in your head were reading it, and labels it.
+- **The spirit view shows faces:** spirits, demons and angels, like the
+  Ice King sees them in Adventure Time. Greg's reference is the episode
+  where Finn becomes the lamb / statue idol and is trapped in the spirit
+  realm. The reference is for the quality only; the art is original.
