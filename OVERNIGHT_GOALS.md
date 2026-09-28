@@ -211,5 +211,6 @@ purpose.
 - 99-100 BONES.md / front door: blocked, it is the ledger's first open
   question ("should this skeleton become the single front door?").
 - 94 the hub body holds your weapon: 9c774b13
+- 59 derby kill cam: slow-motion shot of the real crushed driver: 2fdddf4b
 - 19 WofLockup: already used -- store_assets_capture draws every Steam/itch
   plate with it (the ledger's scan skipped tests/). No change.
