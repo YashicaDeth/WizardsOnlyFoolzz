@@ -136,8 +136,9 @@ A line is ticked only when all of these hold:
       the derby route, so all four exits are played end to end.
 - [ ] The derby:
   - brings every new system into it
-  - its kill cam becomes a slow-motion cutscene of the real body being
-    gored, not the green X-ray card (Walkthrough 2)
+  - ~~its kill cam becomes a slow-motion cutscene of the real body being
+    gored, not the green X-ray card (Walkthrough 2)~~ Done 29 Sep: GoreCam,
+    slow motion around the crushed driver in the cab, dash put away.
 
 ### 8. The surface handoff
 - [x] Every route rises over the overworld and marks nearby settlements. The

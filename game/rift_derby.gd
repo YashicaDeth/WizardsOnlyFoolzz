@@ -40,7 +40,6 @@ const AI_DRIVER := preload("res://systems/derby_ai_driver.gd")
 const MAX_ENGAGED := 3
 const ENGAGE_RAMP := 13.0
 const REASSIGN_EVERY := 2.6
-const KILL_CAM := preload("res://systems/kill_cam.gd")
 const PIT_RADIO := preload("res://systems/pit_radio.gd")
 const WORLD_INDEX := preload("res://systems/world_index.gd")
 const SILHOUETTE := preload("res://systems/silhouette.gd")
@@ -196,7 +195,9 @@ var _cab_tracers: Array = []
 const CAB_TRACER_LIFE := 0.16
 const CAB_TRACER_WIDTH := 0.03
 var derby_audio: Node
-var kill_cam: Control
+## Walkthrough 2: a driver's death is a slow-motion shot of the real body in
+## the cab, not the X-ray card (the Hunt keeps the card).
+var gore_cam: GoreCam
 var pit_radio: Control
 
 @onready var camera: Camera3D = $Camera3D
@@ -235,9 +236,9 @@ func _ready() -> void:
 	derby_audio.name = "DerbyAudio"
 	add_child(derby_audio)
 	derby_audio.attach_engine_to(boat)
-	kill_cam = KILL_CAM.new()
-	kill_cam.name = "KillCam"
-	$HUD.add_child(kill_cam)
+	gore_cam = GoreCam.new()
+	gore_cam.name = "GoreCam"
+	add_child(gore_cam)
 	pit_radio = PIT_RADIO.new()
 	pit_radio.name = "PitRadio"
 	$HUD.add_child(pit_radio)
@@ -2364,12 +2365,8 @@ func _crush_driver(target: Node3D, subject_id: String, impact_direction: Vector3
 		dynamic_interface.announce_impact(999, false)
 	mode_label.visible = true
 	mode_label.text = "DRIVER CRUSHED IN THE CAB" if ram_crush else "DRIVER KILLED"
-	if kill_cam != null:
-		var zone := "torso" if ram_crush else "head"
-		kill_cam.trigger(
-			"DERBY DRIVER", zone, impact_direction,
-			"FRONT END THROUGH THE CAB" if ram_crush else "IMPACT TRAUMA",
-		)
+	if gore_cam != null:
+		gore_cam.trigger(origin, impact_direction, $HUD as CanvasLayer)
 	WorldHistory.update_subject(subject_id, {
 		"name": "Derby driver", "kind": "person", "status": "dead",
 		"memory": "Crushed in the cab of their own wrecker at the Bone Yard.",
