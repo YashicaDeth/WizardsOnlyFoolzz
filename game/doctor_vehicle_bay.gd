@@ -92,6 +92,10 @@ var last_call_result: Dictionary = {}
 
 
 func _ready() -> void:
+	# Greg, 28 September: every room has its own ambience and a music bed.
+	var ambient_bed_script := preload("res://systems/ambient_bed.gd")
+	if ambient_bed_script.wanted():
+		add_child(ambient_bed_script.new().setup("bay"))
 	preload("res://systems/run_timer.gd").enter("vehicle_bay")
 	var environment := WorldEnvironment.new()
 	environment.environment = WorldLook.environment("lower_works")

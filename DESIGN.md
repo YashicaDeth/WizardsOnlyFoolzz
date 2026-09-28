@@ -1527,7 +1527,13 @@ playable build and verified before merge.
   - the facility hum cuts to silence, then open air and wind
   - the title drop, WIZARDS ONLY FOOLS, over the first view of the world
   - the run card, as now
-- **Sound:** Claude does the sound pass (StarNet is out of usage).
+- **Sound:** Claude does the sound pass (StarNet is out of usage). Done:
+  a room bed per opening room (the vat: pumps, bubbling, hum, heart monitor,
+  drips, far screams), a music bed (drone, industrial, noise) that rises with
+  the vat's phases, footsteps a stride apart (bare wet feet by default, a
+  scene sets the body's `surface` meta), enemies' steps within 24 m, and on
+  every Hunt hit a wet impact, a bone crack on breaks and the victim's voice.
+  All synthesized; Greg can replace any of it with recorded sound later.
 - **Controller support:** later; friends use keyboard and mouse.
 - **Body horror** comes from your race and traits: each adds its own
   wrongness (extra fingers, mismatched skin, cords under the skin).

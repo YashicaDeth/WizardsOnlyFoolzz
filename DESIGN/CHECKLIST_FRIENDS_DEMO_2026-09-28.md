@@ -120,18 +120,18 @@ at 100. **(Greg)** marks what only Greg can do.
 - [x] Faces of spirits, demons and angels in the spirit view
 - [x] The way out lit once you stand
 
-### Sound (the StarNet sound pass)
+### Sound (done by Claude, 28 September; StarNet was out of usage)
 
-- [ ] Vat room ambience: pumps, bubbling, screams, hum, heart monitors
-- [ ] Ambience in every other opening room
-- [ ] Footsteps by surface
-- [ ] Bare wet feet in the opening
-- [ ] Enemies' footsteps
-- [ ] Bone crack on breaks
-- [ ] Wet flesh impacts
-- [ ] Weapon whoosh
-- [ ] The victim's voice when hit
-- [ ] Music beds: drones, industrial, sparse noise
+- [x] Vat room ambience: pumps, bubbling, screams, hum, heart monitors
+- [x] Ambience in every other opening room
+- [x] Footsteps by surface
+- [x] Bare wet feet in the opening
+- [x] Enemies' footsteps
+- [x] Bone crack on breaks
+- [x] Wet flesh impacts
+- [x] Weapon whoosh
+- [x] The victim's voice when hit
+- [x] Music beds: drones, industrial, sparse noise
 
 ### Looks
 

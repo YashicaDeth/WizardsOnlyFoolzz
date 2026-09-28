@@ -72,6 +72,10 @@ var sight: Node
 
 
 func _ready() -> void:
+	# Greg, 28 September: every room has its own ambience and a music bed.
+	var ambient_bed_script := preload("res://systems/ambient_bed.gd")
+	if ambient_bed_script.wanted():
+		add_child(ambient_bed_script.new().setup("drains"))
 	# Greg, 28 September: each new key shown once (KeyHints).
 	KeyHints.offer_opening_keys(self)
 	preload("res://systems/run_timer.gd").enter("old_drains")

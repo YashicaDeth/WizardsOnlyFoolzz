@@ -2,9 +2,10 @@
 
 **Status (28 September, late):** briefs 1-5 and tasks A, B, C (heavy on
 middle mouse, the empty bay, the hidden den) were all done by Claude (cloud).
-Brief 6 waits on Greg (keep the stand-in examiner). The only open StarNet
-job is the SOUND PASS (see DESIGN.md, 28 September). StarNet usage is out for
-now; Claude (cloud) keeps building the opening.
+Brief 6 waits on Greg (keep the stand-in examiner). The sound pass is done
+too (Claude, `systems/ambient_audio.gd` and `systems/ambient_bed.gd`), so no
+StarNet job is open. StarNet usage is out for now; Claude (cloud) keeps
+building the opening.
 
 Greg: every StarNet agent should be progressing Wizards Only Fools (and the
 Foundry, lighter). One brief per agent, one open box from

@@ -1,5 +1,6 @@
 extends Node3D
 const LOOK := preload("res://systems/look_settings.gd")
+const AMBIENT_AUDIO := preload("res://systems/ambient_audio.gd")
 
 # Ashbloom Expanse vertical slice. World Zero is the development milestone;
 # Limbo is the realm; Ashbloom is this first irradiated region.
@@ -2964,6 +2965,7 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 		prompt.text = "%s IS OPENED UP" % str(actor.display_name).to_upper()
 	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": anatomy.call("snapshot")}, "anatomy_changed")
 	_spawn_blood(target.global_position + Vector3(0, 1.1, 0), roundi(float(attack.damage)))
+	AMBIENT_AUDIO.hit(self, target.global_position + Vector3(0, 1.1, 0), result, anatomy.dead)
 	if hit_flash != null:
 		hit_flash.burst(target.global_position + Vector3(0, 1.1, 0), strike_dir, float(attack.damage) / 30.0)
 	if block_tracker != null:
@@ -5864,6 +5866,7 @@ func _fresh_rival_tactic(subject_id: String) -> Dictionary:
 
 const FAR_POSE_DISTANCE := 35.0
 const FAR_POSE_EVERY := 4
+const ENEMY_STEP_RANGE := 24.0
 
 
 func _update_encounter_actors(delta: float) -> void:
@@ -5910,6 +5913,14 @@ func _update_encounter_actors(delta: float) -> void:
 			actor_motion.set_combat_pose(prior_windup, prior_kind)
 			var actor_velocity := (node as CharacterBody3D).velocity
 			var actor_horizontal_speed := Vector2(actor_velocity.x, actor_velocity.z).length()
+			# Greg, 28 September: you hear them coming. A step each stride,
+			# only within earshot, heavier when they run.
+			if actor_horizontal_speed > 0.6 and player.distance_squared_to(node.global_position) < ENEMY_STEP_RANGE * ENEMY_STEP_RANGE:
+				var strode := float(actor.get("step_walked", 0.0)) + actor_horizontal_speed * actor_delta
+				if strode >= AMBIENT_AUDIO.STRIDE:
+					strode -= AMBIENT_AUDIO.STRIDE
+					AMBIENT_AUDIO.play_at(self, "step_concrete", node.global_position, -6.0 if actor_horizontal_speed > 3.2 else -12.0, randf_range(0.8, 1.0))
+				actor["step_walked"] = strode
 			# 26 September perf: posing every limb of a body 35 m away, every
 			# tick, was the Hunt's biggest script cost. Far bodies pose a
 			# quarter as often on the time they saved up; close ones as before.
@@ -6264,6 +6275,7 @@ func hip_counter(actor: Dictionary, index: int) -> bool:
 	var node := actor.node as Node3D
 	WorldHistory.update_subject(str(actor.subject_id), {"anatomy_state": anatomy.call("snapshot")}, "anatomy_changed")
 	_spawn_blood(node.global_position + Vector3(0, 1.1, 0), roundi(damage))
+	AMBIENT_AUDIO.hit(self, node.global_position + Vector3(0, 1.1, 0), result, anatomy.dead)
 	if body_motion != null:
 		body_motion.trigger_recoil(float(gun.get("impulse", 10.0)))
 	fight_stats["hip_counter"] = int(fight_stats.get("hip_counter", 0)) + 1

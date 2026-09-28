@@ -7,6 +7,8 @@ extends RefCounted
 ## after `move_and_slide()`, in place of setting the camera's rotation itself.
 ## State lives on the camera as metadata, so a scene needs no new fields.
 
+const AMBIENT_AUDIO := preload("res://systems/ambient_audio.gd")
+
 ## A slow handheld drift, always on, a little more while moving.
 const SWAY := 0.006
 const SWAY_MOVING := 0.01
@@ -23,6 +25,7 @@ const KICK_RECOVER := 6.0
 static func apply(camera: Camera3D, body: CharacterBody3D, delta: float, pitch: float) -> void:
 	if camera == null or body == null:
 		return
+	AMBIENT_AUDIO.step(camera, body, delta)
 	var clock := float(camera.get_meta("feel_clock", 0.0)) + delta
 	camera.set_meta("feel_clock", clock)
 	# Landing: the frame the body touches down after falling.

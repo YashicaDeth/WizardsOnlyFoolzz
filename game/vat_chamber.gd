@@ -267,6 +267,10 @@ const DEPARTURE_BEATS := [
 
 
 func _ready() -> void:
+	# Greg, 28 September: every room has its own ambience and a music bed.
+	var ambient_bed_script := preload("res://systems/ambient_bed.gd")
+	if ambient_bed_script.wanted():
+		add_child(ambient_bed_script.new().setup("vat"))
 	# Greg, 26 September: minutes 0-30 are timed, hidden until you surface.
 	# A rebirth here mid-run carries on the same clock.
 	preload("res://systems/run_timer.gd").start()
@@ -1504,6 +1508,8 @@ var thought_label: Label
 var thought_phase := ""
 var thought_life := 0.0
 
+## The music bed rises through the escape (Greg, 28 September).
+const VAT_TENSION := {"intake": 0.25, "departure": 0.4, "hacked": 0.9, "submerged": 0.6, "voiding": 0.55, "wired": 0.7, "cord": 0.8, "smash": 0.95, "rising": 0.6, "knees": 0.45, "floor": 0.45, "aisle": 0.35}
 const TANK_PANIC := {"intake": 0.2, "departure": 0.45, "hacked": 1.0, "submerged": 0.75}
 
 
@@ -1519,6 +1525,9 @@ func _physics_process(delta: float) -> void:
 	if tank_view != null:
 		tank_view.in_tank = TANK_PANIC.has(phase)
 		tank_view.panic = float(TANK_PANIC.get(phase, 0.0))
+	var bed := get_node_or_null("AmbientBed")
+	if bed != null:
+		bed.set("tension", float(VAT_TENSION.get(phase, 0.35)))
 	if phase == "intake":
 		if opening_audio != null:
 			opening_audio.set_phase("intake")
