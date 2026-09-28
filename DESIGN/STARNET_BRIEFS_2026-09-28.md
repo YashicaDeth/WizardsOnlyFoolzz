@@ -24,7 +24,7 @@ Foundry, lighter). One brief per agent, one open box from
 
 ---
 
-## 1. `starnet/overlay-route`: every opening overlay in the real route
+## 1. `starnet/overlay-route`: DONE by Claude (cloud), 28 September
 
 - **GOAL:** Checklist box "Every opening overlay tested in the real route,
   not only in the test scenes."

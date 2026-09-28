@@ -52,7 +52,7 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [ ] **(Greg)** Is the vat room dark enough, or too dark?
 - [x] The examiner fight in his office (behind the door you break): scalpel cuts and a syringe that slows you. Win: his keycard and coat. Lose: back in the vat, he keeps the coat, your old body stays in his office. His keycard opens the staff door on his cupboard (two dressings, eight rounds).
 - [x] Meds on hold-4: a FIELD DRESSING takes 2.5 s, heals 20, no fighting while you bandage; in every opening area and the Hunt. Loose rounds load into the gun you take.
-- [ ] Every opening overlay tested in the real route, not only in the test scenes.
+- [x] Every opening overlay tested in the real route (`opening_overlays_route_test`): hack card, intake, K/J, meds line, examiner bar, run card; each shows, goes, and nothing left eats the mouse. It found the hack control staying up drawing nothing; fixed.
 - [x] Minutes 0-30 are timed (hidden); surfacing into the Hunt shows a card with the time per area and whether it was under 30. A death does not restart the clock.
 - [ ] **(Greg)** Play a full run and read your card.
 
