@@ -73,7 +73,7 @@ Foundry, lighter). One brief per agent, one open box from
 - **PROOF:** code-drawn frames under each beat, keeping the existing
   timeline and the 2.6 s hack card. Render each beat.
 
-## 5. `starnet/placeholder-wire`: phone / the Wire
+## 5. `starnet/placeholder-wire`: DONE by Claude (cloud), 28 September
 
 - **GOAL:** Checklist "Placeholder: phone / the Wire".
 - **EXISTS:** `systems/handheld_device.gd` (pages INDEX, MAP, WIRE),
