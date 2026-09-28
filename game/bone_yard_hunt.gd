@@ -383,6 +383,7 @@ var strike_smear: StrikeSmear = null
 var strike_audio: StrikeAudio = null
 var dust_puff: DustPuff = null
 var hit_flash: HitFlash = null
+var parry_spark: ParrySpark = null
 ## Blob tracking over the fight (item 4): hit markers and enemy awareness.
 var block_tracker: BlockTracker = null
 ## Tab: the Brain Index hub (Greg, 2026-09-24).
@@ -1051,6 +1052,8 @@ func _ready() -> void:
 	add_child(dust_puff)
 	hit_flash = HitFlash.new()
 	add_child(hit_flash)
+	parry_spark = ParrySpark.new()
+	add_child(parry_spark)
 	threat_compass = ThreatCompass.new()
 	threat_compass.name = "ThreatCompass"
 	$HUD.add_child(threat_compass)
@@ -2914,6 +2917,11 @@ func _attack_nearest_encounter_actor(attack: Dictionary = {}) -> bool:
 			_spar_said(actor, "TURNED. YOU SWUNG INTO MY GUARD. WAIT FOR MY WIND-UP.")
 		lose_footing(0.5, "%s TURNED YOUR BLOW // CATCH THEM MID-SWING" % str(actor.display_name).to_upper())
 		impact_feel.strike(0.7, "cut", false)
+		if parry_spark != null:
+			# Your blade turned on their guard: the bind is in front of them.
+			var to_you := player - target.global_position
+			to_you.y = 0.0
+			parry_spark.burst(target.global_position + Vector3(0, 1.3, 0) + to_you.normalized() * 0.45, strike_dir + Vector3.UP * 0.5, 0.8)
 		return true
 	if defence == "block":
 		fight_stats["they_blocked"] = int(fight_stats.get("they_blocked", 0)) + 1
@@ -4473,7 +4481,7 @@ func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF, incom
 	if parried:
 		# Nothing gets through a parry, and it costs the attacker instead of you.
 		impact_feel.strike(0.85, "cut", false)
-		_emit_parry_spark(attacker_position)
+		_emit_parry_spark(attacker_position, side)
 		prompt.text = "TURNED IT"
 		WorldHistory.record_event("player_parried", {"location": HUNT_LOCATION})
 		return {"damage": 0.0, "blocked": true, "parried": true}
@@ -4490,57 +4498,38 @@ func guard_absorb(damage: float, attacker_position: Vector3 = Vector3.INF, incom
 
 ## A parry needs a physical punctuation mark at the contact, otherwise the
 ## player reads it as a normal blocked hit with a different damage number.
-## This is deliberately a single short-lived light and seven uncolliding
-## sparks; it adds feedback to a crowded fight without becoming another
-## persistent-gore budget.
-func _emit_parry_spark(attacker_position: Vector3) -> void:
-	var contact := player + Vector3(0.0, 1.05, 0.0)
+## `ParrySpark` draws it and rings (pooled); this finds where the blades met and
+## which way the attacking blade was going.
+func _emit_parry_spark(attacker_position: Vector3, side := "") -> void:
+	var toward := Vector3(sin(yaw), 0.0, cos(yaw))
 	if attacker_position != Vector3.INF:
-		var toward_attacker := attacker_position - player
-		toward_attacker.y = 0.0
-		if toward_attacker.length_squared() > 0.001:
-			contact += toward_attacker.normalized() * 0.42
-	else:
-		contact += Vector3(sin(yaw), 0.0, cos(yaw)) * 0.42
-	var burst := Node3D.new()
-	burst.name = "ParrySpark"
-	add_child(burst)
-	burst.global_position = contact
-	last_parry_spark = burst
+		var flat := attacker_position - player
+		flat.y = 0.0
+		if flat.length_squared() > 0.001:
+			toward = flat.normalized()
+	# `player` is already eye height (body + 0.6 m). This used to add another
+	# metre on top, which put the spark over your head and off the screen in
+	# first person. The guard meets the blow a forearm out and under the eye,
+	# on the side it came in on.
+	var right := toward.cross(Vector3.UP).normalized()
+	var contact := player + toward * 0.6 + Vector3.DOWN * 0.2
+	var along := right
+	match side:
+		BladeRead.LEFT:
+			contact -= right * 0.22
+		BladeRead.RIGHT:
+			contact += right * 0.22
+			along = -right
+		BladeRead.HIGH:
+			contact += Vector3.UP * 0.18
+			along = Vector3.DOWN
+		BladeRead.LOW:
+			contact += Vector3.DOWN * 0.3
+			along = Vector3.UP
+	if parry_spark != null:
+		parry_spark.burst(contact, along)
+	last_parry_spark = parry_spark
 	parry_spark_count += 1
-
-	var light := OmniLight3D.new()
-	light.light_color = Color("ffe09a")
-	light.light_energy = 4.6
-	light.omni_range = 2.5
-	light.shadow_enabled = false
-	burst.add_child(light)
-	var flare_material := StandardMaterial3D.new()
-	flare_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	flare_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	flare_material.albedo_color = Color("fff0bb")
-	flare_material.emission_enabled = true
-	flare_material.emission = Color("ff9c35")
-	var tween := create_tween().set_parallel(true)
-	tween.tween_property(light, "light_energy", 0.0, 0.10)
-	for index in 7:
-		var shard := MeshInstance3D.new()
-		var shard_mesh := SphereMesh.new()
-		shard_mesh.radius = 0.026
-		shard_mesh.height = 0.074
-		shard_mesh.radial_segments = 4
-		shard_mesh.rings = 2
-		shard.mesh = shard_mesh
-		shard.material_override = flare_material
-		shard.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		burst.add_child(shard)
-		var angle := TAU * float(index) / 7.0 + 0.23
-		var drift := Vector3(cos(angle), 0.22 + float(index % 3) * 0.09, sin(angle)) * (0.28 + float(index % 2) * 0.10)
-		tween.tween_property(shard, "position", drift, 0.13)
-		tween.tween_property(shard, "scale", Vector3.ZERO, 0.16)
-	tween.chain().tween_callback(func() -> void:
-		if is_instance_valid(burst):
-			burst.queue_free())
 
 
 ## AS1.1/AS1.3. Whether the torch is lit and how strong is entirely
