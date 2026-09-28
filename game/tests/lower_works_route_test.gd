@@ -41,7 +41,7 @@ func _ready() -> void:
 	var bay_lamps: Array = city.get_children().filter(func(node): return node is OmniLight3D and str(node.name).begins_with("BayLamp"))
 	check(bay_lamps.size() >= 11 and bay_lamps.all(func(lamp): return (lamp as OmniLight3D).light_energy >= 9.0), "every bay lamp is strong enough to light the floor it hangs over")
 	check(city.patrol_disabled, "and disables the sentinel relay")
-	check(city.shortcut_gate.is_queued_for_deletion(), "the shortcut collision gate is removed")
+	check(city.shortcut_gate.get_children().filter(func(c): return c is CollisionShape3D and not c.disabled).is_empty(), "the shortcut gate stops blocking (it grinds up, not blinks out)")
 	city._physics_process(0.1)
 	check(not city.patrol_alert, "a disabled sentinel cannot re-engage")
 

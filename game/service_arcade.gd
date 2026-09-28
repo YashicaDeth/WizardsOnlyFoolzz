@@ -285,6 +285,24 @@ func _build_landmarks() -> void:
 	gate_light.light_energy = 5.0
 	gate_light.omni_range = 8.0
 	add_child(gate_light)
+	# Greg's playtest: the way down was an invisible trigger. A doorway you can
+	# see from the gate: a frame round the stair head, a sign and a lamp.
+	for side in [-1.0, 1.0]:
+		_slab(Vector3(0.3, 3.0, 0.3), EXIT_AT + Vector3(side * 1.4, 1.5, -0.6), "metal", Color("2a1c16"))
+	_slab(Vector3(3.1, 0.35, 0.3), EXIT_AT + Vector3(0, 3.1, -0.6), "metal", Color("2a1c16"))
+	var down_sign := Label3D.new()
+	down_sign.text = "LOWER WORKS  //  STAIRS DOWN"
+	down_sign.font_size = 30
+	down_sign.outline_size = 7
+	down_sign.modulate = Color("efa755")
+	down_sign.position = EXIT_AT + Vector3(0, 3.6, -0.4)
+	add_child(down_sign)
+	var down_light := OmniLight3D.new()
+	down_light.position = EXIT_AT + Vector3(0, 2.6, 0.2)
+	down_light.light_color = Color("efa755")
+	down_light.light_energy = 2.0
+	down_light.omni_range = 5.0
+	add_child(down_light)
 
 func _build_guard_post() -> void:
 	guard_post = FacilityGuardPost.new()
