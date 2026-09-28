@@ -467,7 +467,9 @@ func _draw_brain() -> void:
 		draw_polyline(crack, Color(0.05, 0.0, 0.0, 0.9), 2.0 + head_damage * 2.0)
 	var width := CellOutzType.width_condensed(mood, 10.0, 0.9)
 	var mood_tone := BLOOD if mood in ["HURTING", "AGONY", "CHOKING"] else (COPPER if mood in ["WINDED", "FADING"] else TEAL)
-	CellOutzType.draw_condensed(self, centre + Vector2(-width - 58, -8), mood, 10.0, mood_tone, 0.9)
+	# Greg's playtest: it sat under the EEG monitor. Below the monitors now,
+	# just left of the spine.
+	CellOutzType.draw_condensed(self, centre + Vector2(-width - 34, 96), mood, 10.0, mood_tone, 0.9)
 
 
 # --- hanging CRTs ---------------------------------------------------------------

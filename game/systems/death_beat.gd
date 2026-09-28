@@ -34,7 +34,7 @@ static func play(host: Node, request: Dictionary, cause_text: String) -> CanvasL
 
 func _ready() -> void:
 	name = "DeathBeat"
-	layer = 90
+	layer = 120
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_camera = get_viewport().get_camera_3d()
 	if _camera != null:
