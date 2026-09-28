@@ -185,5 +185,16 @@ purpose.
   facility_guard_post_test covers coerced, downed and dragged-hand access and
   the three-round BREACH NINE; BiometricBarrier ignores life state, so a
   corpse opens it (biometric_barrier_test).
+- 73 look branches (all "WIP rescue", none merged, none finished):
+  look-cables 4 commits (lab wiring: item 51), look-kinship 3 (kinship as a
+  hub tab: 57), look-prints 3 (receipt posters and cards: 63-68),
+  look-styles 4 (switchable styles, blood growth, loot kept: 84-86),
+  look-hornee 3 (Hornee plush art), look-intake 3, look-index 1,
+  qoder/look-tuning 2 (surface lighting). Those items are left to their
+  branches rather than built twice here.
+- Friends' demo checklist, the load-in (the live backlog: 92/100 done before
+  tonight): Greg's four flashes + whispers, shorter and clearer ticked: 5740c77a
+- 47, 56, 58 already done before tonight: hub draws an icon per kind; Tab is
+  the carry view (Greg 26 Sep); F1 card names I (inspect) and U (cases).
 - 19 WofLockup: already used -- store_assets_capture draws every Steam/itch
   plate with it (the ledger's scan skipped tests/). No change.
