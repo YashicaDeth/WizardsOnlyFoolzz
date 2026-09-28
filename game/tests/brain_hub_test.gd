@@ -29,10 +29,15 @@ func _ready() -> void:
 	add_child(hunt)
 	for _f in 5:
 		await get_tree().physics_frame
+	# N4.5: a wound taken just now shows on the body in the vat.
+	hunt.player_rig.anatomy.apply_hit("left_arm", 40.0, 0.0, "slash")
+	var hurt: float = hunt.player_rig.zone_health("left_arm")
 	# Greg, 26 September: the inventory is on Tab; the hub moved to Shift+Tab.
 	key(hunt, KEY_TAB, true)
 	check(hunt.panel_mode == "hub" and hunt.brain_hub.visible, "Shift+Tab opens the Brain Index hub")
 	check(BrainIndexHub.TABS == ["CARRY", "COMBAT", "BRAIN INDEX", "TASKS", "MAP"] and hunt.brain_hub.tab == 0, "tabs in Greg's order, opening on CARRY")
+	var hub_rig: BaselineHuman = hunt.brain_hub.body.rig
+	check(hub_rig.zone_health("left_arm") <= hurt + 0.5 and hurt < 60.0, "the arm you were just cut on is hurt on the body in the vat (%.0f, %.0f)" % [hub_rig.zone_health("left_arm"), hurt])
 	var hub_arm: Node3D = hunt.brain_hub.body.rig.parts.get("right_arm")
 	check(hub_arm != null and hub_arm.get_node_or_null("HeldWeapon") != null, "the body in the vat holds the weapon you have out")
 	key(hunt, KEY_RIGHT)

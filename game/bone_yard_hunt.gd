@@ -8594,6 +8594,10 @@ func _toggle_panel(mode: String) -> void:
 		world_index.close()
 	if brain_hub != null:
 		if panel_mode == "hub":
+			# N4.5: the body record is only kept current while the phone is up,
+			# so take it now -- the hub shows the body as it is, wounds and all.
+			if player_rig != null and is_instance_valid(player_rig):
+				WorldHistory.amend_subject("player", {"anatomy_state": player_rig.snapshot()})
 			brain_hub.open(handheld.carry, arsenal, player_rig)
 			brain_hub.body.hold("" if bare_handed else str(arsenal.current_id))
 		else:

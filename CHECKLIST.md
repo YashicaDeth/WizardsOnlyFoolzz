@@ -2413,10 +2413,10 @@ a live `BaselineHuman` into a SubViewport, and `hunter_arsenal.gd` already build
 a model for every weapon.
 
 - [ ] **N4.1** A live 3D body on the right, not an icon
-- [ ] **N4.2** Equipping a weapon puts it in that body's hand, visibly
+- [x] ~~**N4.2** Equipping a weapon puts it in that body's hand, visibly~~ 29 Sep (9c774b13): the hub's vat body holds the weapon you have out, empty when put away.
 - [ ] **N4.3** Every item has a model rather than a name in a row (I0 applies)
 - [ ] **N4.4** A short description per item — one line, in the game's voice, not a stat block
-- [ ] **N4.5** Wounds, prosthetics and grown cybernetics show on the body here too
+- [x] ~~**N4.5** Wounds, prosthetics and grown cybernetics show on the body here too~~ 29 Sep: the hub's vat body is built from the player's record, which the Hunt only refreshed while the phone was up, so a fresh wound was missing from it (arm 65 in the vat, 25 on you). The record is taken as the hub opens; installed hardware already rode the same record. `brain_hub_test`: "the arm you were just cut on is hurt on the body in the vat".
 - [ ] **N4.6** It is the same rig the world spawns, so what you see is what walks out
 
 ### N5 — The slots, and what you are not supposed to touch
