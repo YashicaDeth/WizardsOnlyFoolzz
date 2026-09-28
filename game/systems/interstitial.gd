@@ -253,7 +253,9 @@ func wipe_to(scene_path: String) -> void:
 func _fade(target: float) -> void:
 	var tree := get_tree()
 	if wipe != null:
-		wipe.set_style(_seal_seed)
+		# Greg's playtest: the hash put the front door on ELEVATOR's yellow
+		# hazard bands. The vat chamber opens on black, so it sinks to black.
+		wipe.set_style("datamosh" if destination == "res://vat_chamber.tscn" else _seal_seed)
 		await wipe.cover()
 		alpha = target
 		await wipe.reveal()
