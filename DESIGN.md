@@ -1228,3 +1228,15 @@ World rules; realm identity and transition rules; what persists across realms; d
 - *Voice intake*: "next", "back", a number, "confirm", "file it", or the
   words of his question's options.
 - *The checklist* is now 100 boxes (Greg: "add 100 overall").
+
+### Open questions for Greg (28 September)
+
+- **Heavy melee has no key.** Since the combat overhaul made the right
+  mouse button the guard in melee, nothing in the Hunt starts a heavy
+  swing (`_attack(true)` has no caller). Options: hold the left mouse
+  button to charge a heavy; guard (right mouse) then left mouse for a
+  guard-breaking heavy; or a key of its own.
+- **The examiner you beat, then his hologram.** Beat him in his office
+  and the vehicle bay still shows him "by his car" as light from an
+  emitter. Keep both (he was never only one body), or does beating him
+  change what the bay shows?
