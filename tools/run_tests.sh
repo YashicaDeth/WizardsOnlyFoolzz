@@ -18,6 +18,8 @@
 #   tools/run_tests.sh --core             the ones worth running before a commit
 #   tools/run_tests.sh --all              all 495, which takes hours
 #   tools/run_tests.sh --list npc_        show what would run, run nothing
+#   tools/run_tests.sh --perf             windowed frame budget over the route
+#                                         (X10.11; headless draws nothing)
 
 set -uo pipefail
 
@@ -45,12 +47,14 @@ CORE=(
 )
 
 list_only=0
+windowed=0
 patterns=()
 for arg in "$@"; do
   case "$arg" in
     --list) list_only=1 ;;
     --core) patterns+=("${CORE[@]}") ;;
     --all)  patterns+=("") ;;
+    --perf) patterns+=("route_frame_budget_test"); windowed=1 ;;
     *)      patterns+=("$arg") ;;
   esac
 done
@@ -92,7 +96,11 @@ printf '%.0s-' {1..78}; echo
 broken=0
 ran=0
 for name in "${scenes[@]}"; do
-  output="$(timeout "$TIMEOUT" "$GODOT" --headless --path "$ROOT/game" "res://tests/$name.tscn" 2>&1)"
+  if [ "$windowed" = "1" ]; then
+    output="$(timeout "$TIMEOUT" "$GODOT" --path "$ROOT/game" "res://tests/$name.tscn" 2>&1)"
+  else
+    output="$(timeout "$TIMEOUT" "$GODOT" --headless --path "$ROOT/game" "res://tests/$name.tscn" 2>&1)"
+  fi
   code=$?
   fails="$(printf '%s' "$output" | grep -c '^FAIL' || true)"
   # Whatever it chose to say about itself, if it said anything.

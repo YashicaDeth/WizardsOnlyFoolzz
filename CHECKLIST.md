@@ -3496,7 +3496,7 @@ The last rung. Fifteen statements that are true of performance when this game is
 - [ ] **X10.8** `v10` Crowds are cheap enough to be crowds
 - [ ] **X10.9** `v10` No shader costs more than it earns
 - [ ] **X10.10** `v10` Load is covered and covered loads are not idle
-- [ ] **X10.11** `v10` A profile run is part of the test suite
+- [x] ~~**X10.11** `v10` A profile run is part of the test suite~~ 29 Sep: `tools/run_tests.sh --perf` runs `route_frame_budget_test` windowed (headless draws nothing, so it skips there): nine scenes of the first thirty minutes, each timed by wall clock with vsync off, failing any over 16.7 ms. First run: vat 4.5, Support Unit 4.0, arcade 2.8, drains 2.0, buried city 2.6, tunnels 2.7, waterfall 3.4, derby 14.3, Hunt 16.5 -- the Hunt is at the edge when measured after the others in one process (13.6 alone).
 - [ ] **X10.12** `v10` It holds sixty on the machine Greg actually has
 - [ ] **X10.13** `v10` It degrades gracefully rather than stuttering
 - [ ] **X10.14** `v10` Nothing is optimised before it is measured
