@@ -1421,3 +1421,21 @@ playable build and verified before merge.
     generated" (procedural).
   - Not for minutes 0-30. The opening only shows the first sight of it:
     faces in the spirit view.
+
+### Quality control, answered by Greg, 28 September
+
+- **A room is done when:** it holds 144+ fps on Greg's RTX (F10), Greg
+  played it and it felt right, no placeholder boxes are visible, and
+  every beat has sound.
+- **Ugly but working:** ship to the playtest build and mark it as ugly.
+- **Gore:** full, as set on 26 September.
+- **Unsure how something looks:** render it and ask Greg with a question
+  box.
+- **Continuity:** lore and characters, controls, look rules and Greg's
+  answers are all at risk of getting lost between agents. One master
+  bible, `DESIGN/BIBLE.md`, holds every decision grouped by topic; every
+  agent reads it first. Where two answers conflict, the newest wins and
+  the old one is marked replaced.
+- **Controls:** the Hunt's scheme is master and every scene matches it:
+  - LMB attack, RMB guard or aim, MMB heavy (hold: guard break)
+  - Z lock-on, K/J the sight modes, hold 4 meds, E use
