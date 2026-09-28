@@ -1240,3 +1240,26 @@ World rules; realm identity and transition rules; what persists across realms; d
   and the vehicle bay still shows him "by his car" as light from an
   emitter. Keep both (he was never only one body), or does beating him
   change what the bay shows?
+
+### Answered by Greg in question boxes, 28 September
+
+- **Heavy melee:** middle mouse. Tap = heavy swing; hold = guard break,
+  which randomly either knocks the guard open (stagger, a free hit) or
+  throws them down. Lock-on stays on Z.
+- **The vehicle bay after you beat the examiner:** an empty bay; his car
+  is there and the hologram emitter lies dark on the floor. The ramp
+  route still works.
+- **The examiner's model:** keep the stand-in until Greg says the M1 sheet
+  is final.
+- **Git:** ignore Godot's `.import` / `.uid` files repo-wide.
+- **Next:** polish minutes 0-30 before minutes 30-60. All four at once:
+  the feel of movement and combat (too floaty, the camera, jump/climb),
+  sound (room ambience, footsteps, combat hits, music beds), look and
+  lighting, and pacing/clarity.
+- **The vat room's darkness:** Greg says after playing.
+- **Brain Index:** keep Shift+Tab, and make it clickable through the
+  inventory body's head: hover glows the head and previews its stats,
+  click zooms into the skull and opens the Brain Index.
+- **The weak wall leads to a hidden room instead of the shortcut:** a
+  failed subject's den (who they were: later) with their notes, a stash,
+  a weapon and a spirit that K shows.
