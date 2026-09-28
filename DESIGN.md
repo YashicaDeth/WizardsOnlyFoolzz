@@ -1263,3 +1263,52 @@ World rules; realm identity and transition rules; what persists across realms; d
 - **The weak wall leads to a hidden room instead of the shortcut:** a
   failed subject's den (who they were: later) with their notes, a stash,
   a weapon and a spirit that K shows.
+
+### Answered by Greg in question boxes, 28 September
+
+- **Heavy melee:** middle mouse. Tap = heavy swing; hold = guard break,
+  which randomly either knocks the guard open (stagger, a free hit) or
+  throws them down. Lock-on stays on Z.
+- **The vehicle bay after you beat the examiner:** an empty bay; his car
+  is there and the hologram emitter lies dark on the floor. The ramp
+  route still works.
+- **The examiner's model:** keep the stand-in until Greg says the M1 sheet
+  is final.
+- **Git:** ignore Godot's `.import` / `.uid` files repo-wide.
+- **Next:** polish minutes 0-30 before minutes 30-60, on all four fronts:
+  feel, sound, look and lighting, and pacing/clarity.
+- **The vat room's darkness:** Greg says after playing.
+- **Brain Index:** keep Shift+Tab, and make it clickable through the
+  inventory body's head. Hovering glows the head and previews its stats;
+  clicking zooms into the skull and opens the Brain Index.
+- **The weak wall leads to a hidden room, not the shortcut:** a failed
+  subject's den with their notes, a stash, a weapon and a spirit that K
+  shows. Who they were: decided later.
+- **Room ambience, vat room:** pumps and bubbling, distant screams,
+  electrical hum, heart monitors from the tanks.
+- **Music beds:** dark ambient drones, industrial, and Silent Hill-style
+  sparse noise, blended.
+- **Weight:** grounded, with quick stops. Faster acceleration and stops,
+  stronger gravity, and a dip on landing.
+- **Camera:**
+  - less head bob
+  - more body-cam sway
+  - a kick on landings and hits
+  - a lean with strafing
+- **Footsteps:**
+  - by surface
+  - bare, wet feet in the opening
+  - louder when running
+  - enemies' steps audible too
+- **Combat hits:**
+  - a bone crack on breaks
+  - wet flesh impacts
+  - a weapon whoosh scaled to the weapon
+  - the victim's voice
+- **Look and lighting:** every opening room needs attention: the vat
+  room, the Service Arcade, the Support Unit, Lower Works and the drains.
+- **Guidance:** the waypoint comes through the wizard eyes "chaos magick"
+  view, a blend of the spirit view and the hacked brain-chip UI. It shows
+  current objectives, and nearby sine waves act as distress signals and
+  quest/task indicators, like RDR2's hunting mode or The Last of Us's
+  listen mode.
