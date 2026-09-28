@@ -10,11 +10,14 @@ const RATE := 22050
 static var _cache := {}
 
 
+static var _wind_level := 0.0
+
+
 static func stream(kind: String) -> AudioStreamWAV:
 	if _cache.has(kind):
 		return _cache[kind]
-	var looping := kind in ["choir", "sonar", "heartbeat", "tank_breath"]
-	var duration: float = {"choir": 4.0, "sonar": 1.0 / 0.35, "crumble": 1.1, "creak": 0.7, "spark": 0.45, "heartbeat": 1.0, "tank_breath": 3.2}.get(kind, 0.5)
+	var looping := kind in ["choir", "sonar", "heartbeat", "tank_breath", "wind"]
+	var duration: float = {"choir": 4.0, "sonar": 1.0 / 0.35, "crumble": 1.1, "creak": 0.7, "spark": 0.45, "heartbeat": 1.0, "tank_breath": 3.2, "wind": 6.0}.get(kind, 0.5)
 	var frames := roundi(duration * RATE)
 	var bytes := PackedByteArray()
 	bytes.resize(frames * 2)
@@ -41,6 +44,11 @@ static func stream(kind: String) -> AudioStreamWAV:
 				var pitch := lerpf(180.0, 260.0, t / duration) + sin(TAU * 23.0 * t) * 20.0
 				sample = sin(TAU * pitch * t) * 0.4 * sin(PI * t / duration)
 				sample += (_noise(frame * 3) - 0.5) * 0.08
+			"wind":
+				# Open air: filtered noise rising and falling in gusts.
+				var gust := 0.55 + 0.45 * sin(TAU * t / duration * 2.0) * sin(TAU * t / duration * 3.0 + 1.0)
+				_wind_level = lerpf(_wind_level, _noise(frame) * 2.0 - 1.0, 0.04)
+				sample = _wind_level * gust * 0.9
 			"heartbeat":
 				# Lub-dub, once a second at pitch 1.0 (the tank speeds it up).
 				for beat in [[0.0, 1.0], [0.24, 0.7]]:

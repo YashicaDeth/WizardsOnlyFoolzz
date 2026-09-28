@@ -61,7 +61,16 @@ func _ready() -> void:
 	var surfaced = load("res://bone_yard_hunt.tscn").instantiate()
 	add_child(surfaced)
 	await get_tree().process_frame
+	# Greg, 28 September: the payoff first (daylight, wind, title, keys), then
+	# the run card.
+	var payoff = surfaced.get_node_or_null("Surfacing")
+	check(payoff != null, "surfacing plays the payoff: daylight, wind, the title, the keys")
+	check(_cards(surfaced) == 0, "the run card waits for it")
+	payoff.clock = payoff.KEYS_AT + payoff.KEYS_HOLD
+	await get_tree().process_frame
+	await get_tree().process_frame
 	check(_cards(surfaced) == 1, "surfacing from a run shows the card")
+	check(payoff._wind.playing, "and the wind is up")
 	check(not RUN_TIMER.running() and WorldHistory.event_count("opening_run_finished") == 1, "and the run is closed on record")
 	print("RUN_TIMER_TEST_RESULT failures=%d" % failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

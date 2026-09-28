@@ -946,9 +946,11 @@ func _ready() -> void:
 	# Surfacing ends the timed run; the card shows how long each area took.
 	var run_summary: Dictionary = preload("res://systems/run_timer.gd").finish()
 	if not run_summary.is_empty():
-		var card := preload("res://systems/run_card.gd").new()
-		add_child(card)
-		card.show_summary(run_summary)
+		# Greg, 28 September: surfacing is the payoff (Surfacing): daylight,
+		# silence then wind, the title, the keys, then the run card.
+		var surfacing := preload("res://systems/surfacing.gd").new()
+		add_child(surfacing)
+		surfacing.begin(run_summary)
 	# The gore setting was only ever applied in the derby, so OFF did nothing
 	# once the player walked into the Hunt Grounds and REDUCED leaked across as
 	# a static the hunt never reset.

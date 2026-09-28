@@ -154,8 +154,8 @@ at 100. **(Greg)** marks what only Greg can do.
 
 - [x] Key hints in every opening room, not only the vat
 - [x] The pause KEYS page lists middle mouse and hold 4
-- [ ] A first-minute controls card when the Hunt opens
-- [ ] Surfacing into the Hunt feels like the payoff: daylight, open sky
+- [x] A first-minute controls card when the Hunt opens
+- [x] Surfacing into the Hunt feels like the payoff: daylight, open sky
 - [ ] A 15-minute friends' run with no dead ends, as a test
 
 ### Greg's
