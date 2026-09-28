@@ -106,8 +106,8 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [x] Placeholder: loading screens. The code-drawn transit plate (seal, X-ray film, code rain) now names where it leads: a route strip of the first thirty minutes with the next stop lit. Rendered.
 - [x] Placeholder: phone / the Wire. Already built in code (accounts, feed, tabs, signal); rendered, and the held-item panel no longer covers the raised phone's corner.
 - [x] Placeholder: kill-cam X-rays. Cold blue film: a skeleton in line art (skull, ribs, clavicles, limb bones, pelvis) with the blade or round path drawn across the struck zone. Rendered.
-- [ ] Log every placed piece in `game/art/GENERATED.md`.
-- [ ] Code-and-effects GFX pass over the placeholder art (Godot shaders).
+- [x] `game/art/GENERATED.md` is current: every placed piece logged; the second set is logged and held outside the repo until LFS is allowed.
+- [x] Code-and-effects GFX pass over the placeholder art: wizard eyes (shader), loading plates, kill-cam X-ray and breakout frames, all code-drawn and rendered on 28 September.
 - [ ] TouchDesigner loops (later).
 - [ ] **(Greg)** Your own art replaces the placeholders as it's ready.
 
