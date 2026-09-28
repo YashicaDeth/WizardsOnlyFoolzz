@@ -169,20 +169,20 @@ branch (item 73). TODO = still open for this run.
 | 17 | BLOCKED (vision state) | 44 | BLOCKED (camera failures) | 87 | DONE 410cd924 |
 | 18 | DONE 6518f624 | 45 | SKIP (needs a person timing it) | 88 | ALREADY, ticked 98796545 |
 | 19 | ALREADY | 46 | N/A (door is not on the guided path) | 89 | CHECKED, left open |
-| 20 | TODO | 47 | ALREADY | 90 | DONE be6dad78 |
-| 21 | TODO | 48 | ALREADY (ram vs Hollis) | 91 | ALREADY, ticked b83df383 |
+| 20 | LEFT (see Blocked) | 47 | ALREADY | 90 | DONE be6dad78 |
+| 21 | LEFT (see Blocked) | 48 | ALREADY (ram vs Hollis) | 91 | ALREADY, ticked b83df383 |
 | 22 | NOT DUST | 49-50 | DONE b6f55e7b | 92-93 | DONE d6b1a406 |
-| 23 | TODO | 51 | BRANCH look-cables | 94 | DONE 9c774b13 |
-| 24 | TODO | 52-53 | ALREADY | 95 | TODO |
+| 23 | LEFT (see Blocked) | 51 | BRANCH look-cables | 94 | DONE 9c774b13 |
+| 24 | LEFT (see Blocked) | 52-53 | ALREADY | 95 | LEFT (Greg's voice) |
 | 25 | BLOCKED (look) | 54 | ALREADY 3d03fa68 | 96 | DONE 009b0e42 |
-| 26 | TODO | 55 | ALREADY (darkness is Greg's call) | 97 | HALF (no missing-limb option) |
+| 26 | LEFT (see Blocked) | 55 | ALREADY (darkness is Greg's call) | 97 | HALF (no missing-limb option) |
 | 27 | BLOCKED (the Board) | 56 | ALREADY | 98 | BLOCKED |
-| 28 | TODO | 57 | BRANCH look-kinship | 99-100 | BLOCKED |
+| 28 | LEFT (see Blocked) | 57 | BRANCH look-kinship | 99-100 | BLOCKED |
 | 29 | BLOCKED (tier names) | 58 | ALREADY | 101 | SKIP (ledger is in main checkout) |
 | 30 | with each wiring | 59 | DONE 2fdddf4b | 102 | SKIP (CHANGELOG unused since 12 Sep) |
-| 31 | DONE 2b0d6c3a | 60 | TODO | 103-104 | TODO |
+| 31 | DONE 2b0d6c3a | 60 | LEFT (needs a list) | 103-104 | 103 Greg's; 104 DONE (loadin.mp4) |
 | 32-33 | ALREADY, tested+ticked ecdb8047 | 61-62 | DONE b7d45eb5 | 105 | TODO (last) |
-| 34-35 | ALREADY | 63-68 | BRANCH look-prints | 69 | TODO |
+| 34-35 | ALREADY | 63-68 | BRANCH look-prints | 69 | LEFT (design) |
 | | | | | 70 | DONE 30ce303c |
 
 Also done, not on the list: friends' demo load-in (5740c77a).
@@ -225,6 +225,21 @@ Also done, not on the list: friends' demo load-in (5740c77a).
   budget pops stale ones, WorldDebris._prune, SecurityCamera weakrefs), so
   nothing leaks; a literal sweep at the seam would clear blood_records,
   which is how the world keeps blood between visits. Left open.
+- 20, 21, 23, 24, 28 (AshbloomSeals on the map, ParticlePortrait in the hub,
+  RabbitHoleNavigator on the Wire, DemonAmbition in the World Index,
+  PlayerFaction after the handoff): each is a choice of which screen shows
+  what, and the ledger's "wire the loose bones in first?" question
+  (rebuild-wire) is still unanswered. Nothing was wired on a guess.
+- 26 WeaponBody: routing melee through it changes mass, reach and disarm
+  numbers, and the combat-tuning brief reserves those for Greg's hands.
+- 60 "bring every new system into the derby": no list of which systems;
+  the kill cam half is done (59).
+- 69 unaware-enemy boxes: whether an unseen enemy is marked at all is a
+  stealth design call.
+- 95 one-line item descriptions "in the game's voice": copy in Greg's voice.
+- 103 the M1 examiner sheet is Greg's to call final.
+- 104 recording: P:/GameDev/Temp/overnight/loadin.mp4 (the load-in, 16 s),
+  sent to Greg.
 - 25 AudioReactive: what the radio should move in the Hunt (the trip dials
   are owned by altered perception every frame) is a look decision.
 
