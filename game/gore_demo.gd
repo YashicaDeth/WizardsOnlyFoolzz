@@ -197,6 +197,19 @@ var note_life := 0.0
 ## player-owned switch, not an invisible sandbox argument.
 var enemies_enabled := false
 var simulation_health := 100
+## Sparring (N cycles): how often a body swings, and how much of the weapon in
+## its hand reaches you.
+const SPAR_LEVELS := [
+	{"name": "EASY", "cadence": 1.6, "damage": 0.25},
+	{"name": "FAIR", "cadence": 1.05, "damage": 0.5},
+	{"name": "BRUTAL", "cadence": 0.7, "damage": 1.0},
+]
+## The side an armed body's blow comes in on, a pattern you can learn:
+## forehand, overhead, forehand, backhand. It leans into it as it winds up.
+const SWING_PATTERN := [BladeRead.LEFT, BladeRead.HIGH, BladeRead.LEFT, BladeRead.RIGHT]
+const FISTS := {"label": "FISTS", "damage": 8.0, "damage_type": "blunt"}
+var spar_level := 1
+var parry_spark: ParrySpark
 var mode_button: Button
 var jump_queued := false
 var vertical_velocity := 0.0
@@ -280,6 +293,8 @@ func _ready() -> void:
 	# The whole of the fix. A round decides what it did when it gets there.
 	ballistics.round_hit.connect(_on_round_hit)
 	ballistics.round_expired.connect(_on_round_expired)
+	parry_spark = ParrySpark.new()
+	add_child(parry_spark)
 	arsenal = HunterArsenal.new()
 	add_child(arsenal)
 	# The arm exists before the first swing does, same as AN1.2 in the Hunt.
@@ -495,6 +510,10 @@ func _spawn_body(index: int) -> void:
 		"guard": BladeRead.SIDES[index % BladeRead.SIDES.size()],
 		"guard_age": 1.0,
 		"guard_hold": 1.4 + float(index % 4) * 0.4,
+		# Greg, 29 September: a weapon in a hand is a weapon. The cleaver odd
+		# bodies hold is what they strike with, and it drops when they do.
+		"weapon": "sword" if index % 2 == 1 else "",
+		"weapon_node": rig.find_child("HeldAshlineCleaver", true, false),
 	})
 
 
@@ -843,9 +862,11 @@ func _resolve_melee_swing() -> void:
 		var defender_motion := defender.get("motion") as HunterBodyMotion
 		if defender_motion != null and is_instance_valid(defender_motion):
 			defender_motion.trigger_parry()
+		parry_spark.burst(landed - along * 0.25, camera.global_transform.basis * arm.velocity)
 		_note("PARRIED // %s MET %s" % [str(read.guard).to_upper(), side.to_upper()])
 		return
 	if str(read.outcome) == "block":
+		parry_spark.burst(landed - along * 0.2, camera.global_transform.basis * arm.velocity, 0.5)
 		_note("BLOCKED // %s" % side.to_upper())
 
 	# The cut lands on the plane the edge actually swept, which is what makes
@@ -1547,6 +1568,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_note("FULL CONTROL REFERENCE" if controls_expanded else "ESSENTIAL CONTROLS ONLY")
 			KEY_C: _toggle_grapple()
 			KEY_H: _set_enemies_enabled(not enemies_enabled)
+			KEY_N:
+				spar_level = (spar_level + 1) % SPAR_LEVELS.size()
+				_note("SPARRING // %s" % str(SPAR_LEVELS[spar_level].name))
+				_update_mode_button()
 			KEY_SPACE:
 				var move := _sandbox_move_input()
 				if move.length_squared() > 0.01:
@@ -1805,11 +1830,18 @@ func _take_nearest_weapon() -> bool:
 	_refresh_muzzle_anchor()
 	nearest["available"] = false
 	(nearest.get("model") as Node3D).visible = false
-	_note("TAKEN FROM RACK // %s" % str(arsenal.current().get("label", weapon_id)).to_upper())
+	_note("%s // %s" % ["TAKEN OFF THE FLOOR" if bool(nearest.get("dropped", false)) else "TAKEN FROM RACK", str(arsenal.current().get("label", weapon_id)).to_upper()])
 	return true
 
 
 func _restore_weapon_rack() -> void:
+	# What the bodies dropped goes with them; they come back holding their own.
+	for index in range(weapon_pickups.size() - 1, -1, -1):
+		if bool(weapon_pickups[index].get("dropped", false)):
+			var dropped := weapon_pickups[index].get("model") as Node3D
+			if dropped != null and is_instance_valid(dropped):
+				dropped.queue_free()
+			weapon_pickups.remove_at(index)
 	for pickup: Dictionary in weapon_pickups:
 		pickup["available"] = true
 		var model := pickup.get("model") as Node3D
@@ -2043,10 +2075,100 @@ func _set_enemies_enabled(enabled: bool) -> void:
 	_update_mode_button()
 
 
+## A body's blow lands with the weapon actually in its hand: that weapon's
+## damage and cut, fists if it holds nothing. Your guard reads it the way
+## theirs reads yours: the right side inside the parry window turns it and
+## knocks an armed hand open, so the weapon flies; the right side late blocks
+## most of it; anything else is open.
+func _enemy_strike(entry: Dictionary, holder: Node3D) -> void:
+	var armed := _holds_weapon(entry)
+	var stats: Dictionary = HunterArsenal.WEAPONS.get(str(entry.get("weapon", "")), FISTS) if armed else FISTS
+	var side := str(entry.get("swing", BladeRead.HIGH))
+	var read: Dictionary = BladeRead.resolve(_player_guard(), guard_held, side, 6.0)
+	var bind := _bind_point(holder.global_position, side)
+	match str(read.outcome):
+		"parry":
+			parry_spark.burst(bind[0], bind[1])
+			_kick(0.5, "cut", false, 0.0)
+			var motion := entry.get("motion") as HunterBodyMotion
+			if motion != null and is_instance_valid(motion):
+				motion.trigger_parry()
+			if armed:
+				_drop_weapon(entry, (holder.global_position - eye).normalized() * 1.4)
+			_note("PARRIED // %s TURNED%s" % [side.to_upper(), " // DISARMED" if armed else ""])
+		"block":
+			parry_spark.burst(bind[0], bind[1], 0.5)
+			_take_training_hit(stats, side, float(read.through), "BLOCKED")
+		_:
+			_take_training_hit(stats, side, 1.0, "HIT")
+
+
+func _take_training_hit(stats: Dictionary, side: String, through: float, label: String) -> void:
+	var damage := float(stats.damage) * float(SPAR_LEVELS[spar_level].damage) * through
+	simulation_health = maxi(0, simulation_health - roundi(damage))
+	_kick(clampf(damage / 40.0, 0.12, 0.6), str(stats.damage_type), false, HITSTOP_SHOT)
+	_note("%s // %s %s // %d // SIM HEALTH %03d" % [label, str(stats.label), side.to_upper(), roundi(damage), simulation_health])
+	if simulation_health <= 0:
+		simulation_health = 100
+		eye = Vector3(0.0, stance_height, 9.0)
+		_note("SIMULATION BODY RESET // TARGETS RETAIN DAMAGE")
+
+
+## Where your guard meets their blow: a forearm out from the eye toward them,
+## under it, on the side it came in on; and which way their blade was going.
+func _bind_point(attacker: Vector3, side: String) -> Array:
+	var toward := attacker - eye
+	toward.y = 0.0
+	toward = toward.normalized() if toward.length_squared() > 0.001 else -camera.global_transform.basis.z
+	var right := toward.cross(Vector3.UP).normalized()
+	var at := eye + toward * 0.6 + Vector3.DOWN * 0.2
+	var along := right
+	match side:
+		BladeRead.LEFT:
+			at -= right * 0.22
+		BladeRead.RIGHT:
+			at += right * 0.22
+			along = -right
+		BladeRead.HIGH:
+			at += Vector3.UP * 0.18
+			along = Vector3.DOWN
+		BladeRead.LOW:
+			at += Vector3.DOWN * 0.3
+			along = Vector3.UP
+	return [at, along]
+
+
+func _holds_weapon(entry: Dictionary) -> bool:
+	var weapon := entry.get("weapon_node") as Node3D
+	var rig := entry.get("rig") as BaselineHuman
+	if bool(entry.get("dropped", false)) or weapon == null or not is_instance_valid(weapon):
+		return false
+	return rig != null and is_instance_valid(rig) and rig.is_ancestor_of(weapon)
+
+
+## The weapon leaves the hand (disarmed, dead, or the arm came off with it)
+## and lands on the floor as a pickup like the rack's: E takes it, same stats.
+func _drop_weapon(entry: Dictionary, fling := Vector3.ZERO) -> void:
+	var weapon := entry.get("weapon_node") as Node3D
+	if bool(entry.get("dropped", false)) or str(entry.get("weapon", "")).is_empty() or weapon == null or not is_instance_valid(weapon):
+		return
+	entry["dropped"] = true
+	var from := weapon.global_transform
+	weapon.get_parent().remove_child(weapon)
+	add_child(weapon)
+	weapon.global_transform = from
+	fling.y = 0.0
+	var rest := Vector3(from.origin.x + fling.x, 0.05, from.origin.z + fling.z)
+	var fall := create_tween().set_parallel(true)
+	fall.tween_property(weapon, "global_position", rest, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	fall.tween_property(weapon, "rotation", Vector3(0.0, randf() * TAU, PI * 0.5), 0.35)
+	weapon_pickups.append({"weapon": str(entry.weapon), "model": weapon, "available": true, "dropped": true})
+
+
 func _update_mode_button() -> void:
 	if mode_button == null or not is_instance_valid(mode_button):
 		return
-	mode_button.text = "[H] TRAINING MODE  //  %s" % ("ENEMIES" if enemies_enabled else "DUMMIES")
+	mode_button.text = "[H] TRAINING MODE  //  %s" % ("ENEMIES  //  [N] %s" % str(SPAR_LEVELS[spar_level].name) if enemies_enabled else "DUMMIES")
 	mode_button.add_theme_color_override("font_color", Color("e05032") if enemies_enabled else Color("d7c69e"))
 
 
@@ -2064,6 +2186,9 @@ func _update_training_bodies(real_delta: float) -> void:
 		var motion := entry.get("motion") as HunterBodyMotion
 		if holder == null or rig == null or not is_instance_valid(holder) or not is_instance_valid(rig):
 			continue
+		if rig.anatomy.dead or not _holds_weapon(entry):
+			# Dead, or the arm holding it came off: the weapon is on the floor.
+			_drop_weapon(entry)
 		if rig.anatomy.dead or rig.anatomy.downed:
 			if index == grapple_index:
 				_release_grapple("THE BODY DROPS OUT OF YOUR HOLD")
@@ -2097,23 +2222,25 @@ func _update_training_bodies(real_delta: float) -> void:
 			holder.global_position += step
 			holder.look_at(Vector3(eye.x, holder.global_position.y, eye.z), Vector3.UP)
 			visual_velocity = step / maxf(real_delta, 0.0001)
+		var cadence := float(SPAR_LEVELS[spar_level].cadence)
 		entry["attack_ready"] = float(entry.get("attack_ready", 0.0)) - real_delta
-		var windup := clampf(1.0 - float(entry["attack_ready"]) / 1.05, 0.0, 1.0) if distance <= 1.65 else 0.0
+		var windup := clampf(1.0 - float(entry["attack_ready"]) / cadence, 0.0, 1.0) if distance <= 1.65 else 0.0
+		if str(entry.get("swing", "")).is_empty():
+			entry["swing"] = SWING_PATTERN[int(entry.get("swings", 0)) % SWING_PATTERN.size()]
 		if motion != null:
 			motion.set_combat_pose(windup, "melee")
+			# The telegraph: the body leans into the side the blow comes in on.
+			if windup > 0.0:
+				motion.set_lean(BladeRead.guard_lean(str(entry.swing)))
 			motion.update(real_delta, visual_velocity, true, visual_velocity.length() > 3.0, false, false)
 		if distance <= 1.65 and float(entry["attack_ready"]) <= 0.0:
-			entry["attack_ready"] = 1.05
+			entry["attack_ready"] = cadence
 			if motion != null:
 				motion.set_combat_pose(0.0, "")
 				motion.trigger_attack(0.62, "melee")
-			simulation_health = maxi(0, simulation_health - 8)
-			_kick(0.24, "blunt", false, HITSTOP_SHOT)
-			_note("TRAINING HIT // SIM HEALTH %03d" % simulation_health)
-			if simulation_health <= 0:
-				simulation_health = 100
-				eye = Vector3(0.0, stance_height, 9.0)
-				_note("SIMULATION BODY RESET // TARGETS RETAIN DAMAGE")
+			_enemy_strike(entry, holder)
+			entry["swings"] = int(entry.get("swings", 0)) + 1
+			entry["swing"] = ""
 
 
 func _paint_hud() -> void:

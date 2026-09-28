@@ -1,6 +1,9 @@
 extends Node3D
 
-## The bench. The gore sandbox with TouchDesigner wired into its look.
+## The bench, now the fighting sandbox (Greg, 29 September: "reworked to be
+## a combat testing and fighting sandbox"). The gore sandbox underneath, with
+## sparring partners that strike with what they hold, a readout down the left
+## that measures every frame against 160 fps, and TouchDesigner still wired in.
 ##
 ## FINAL_V.md §16: TD is the lab, Godot is the engine, and Path C is the live
 ## link that stops porting a TD graph from being an afternoon. This scene is
@@ -30,6 +33,9 @@ var port := OSCBridge.DEFAULT_PORT
 var packets := 0
 var recent: Array[String] = []
 var shown := true
+## 160 fps is 6.25 ms a frame (Greg, 29 September).
+const BUDGET_MS := 1000.0 / 160.0
+var _frame_ms := 0.0
 
 
 func _ready() -> void:
@@ -63,6 +69,9 @@ func _ready() -> void:
 	readout.draw.connect(_paint)
 	top.add_child(readout)
 	set_process(true)
+	# The GPU's own time, not frame minus script: the split that says where
+	# a slow frame actually goes.
+	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
 
 
 func _on_message(address: String, args: Array) -> void:
@@ -84,7 +93,8 @@ func _input(event: InputEvent) -> void:
 			shown = not shown
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_frame_ms = lerpf(_frame_ms, delta * 1000.0, 0.1)
 	if readout != null and is_instance_valid(readout):
 		readout.queue_redraw()
 
@@ -96,48 +106,31 @@ func _paint() -> void:
 	var acid := Color("9bf01a")
 	var rust := Color("b0552a")
 	var dead := Color("7a3b3b")
-	var y := 96.0
 	var x := 26.0
-
-	CellOutzType.draw_condensed(readout, Vector2(x, y), "TOUCHDESIGNER", 13.0, bone * Color(1, 1, 1, 0.75), 3.0)
-	y += 20.0
-	if bridge != null and bridge.listening:
-		CellOutzType.draw_condensed(readout, Vector2(x, y), "LISTENING	UDP %d" % port, 10.0, acid * Color(1, 1, 1, 0.8), 2.0)
-	else:
-		# The failure that costs the most time, said plainly.
-		CellOutzType.draw_condensed(readout, Vector2(x, y), "PORT %d NOT OPEN" % port, 10.0, dead, 2.0)
-	y += 16.0
-	CellOutzType.draw_condensed(readout, Vector2(x, y), "PACKETS  %05d" % packets, 10.0,
-		(acid if packets > 0 else dead) * Color(1, 1, 1, 0.8), 2.0)
-	y += 16.0
-	if packets == 0 and bridge != null and bridge.listening:
-		CellOutzType.draw_condensed(readout, Vector2(x, y), "NOTHING ARRIVING YET", 9.0, bone * Color(1, 1, 1, 0.35), 2.0)
-		y += 14.0
-		CellOutzType.draw_condensed(readout, Vector2(x, y), "RUN tools/touchdesigner/build_psy_dials.py", 9.0, bone * Color(1, 1, 1, 0.35), 1.6)
-		y += 14.0
-		CellOutzType.draw_condensed(readout, Vector2(x, y), "IN THE TEXTPORT  (ALT+T)", 9.0, bone * Color(1, 1, 1, 0.35), 1.6)
-
-	y += 12.0
-	for line: String in recent:
-		CellOutzType.draw_condensed(readout, Vector2(x, y), line, 9.0, rust * Color(1, 1, 1, 0.8), 1.8)
-		y += 13.0
-
-	# What the shader is actually set to, which is not always what was sent —
-	# a dial this build does not have is dropped on the way in.
-	if rig != null and is_instance_valid(rig):
-		var right := readout.size.x - 26.0
-		var dial_y := 96.0
-		CellOutzType.draw_condensed(readout, Vector2(right - CellOutzType.width_condensed("SHADER", 13.0, 3.0), dial_y),
-			"SHADER", 13.0, bone * Color(1, 1, 1, 0.75), 3.0)
-		dial_y += 20.0
-		for key: String in PsychedelicRig.NEUTRAL:
-			var value := rig.dial(key)
-			var neutral := absf(value - float(PsychedelicRig.NEUTRAL[key])) < 0.0001
-			var line := "%s	 %.3f" % [key.to_upper().replace("_", " "), value]
-			var width := CellOutzType.width_condensed(line, 9.0, 1.8)
-			CellOutzType.draw_condensed(readout, Vector2(right - width, dial_y), line, 9.0,
-				(bone * Color(1, 1, 1, 0.3)) if neutral else acid, 1.8)
-			dial_y += 13.0
-
-	CellOutzType.draw_condensed(readout, Vector2(x, readout.size.y - 44.0), "F1", 10.0, rust, 2.0)
-	CellOutzType.draw_condensed(readout, Vector2(x + 20.0, readout.size.y - 44.0), "HIDE THIS", 9.0, bone * Color(1, 1, 1, 0.5), 1.6)
+	var y := 96.0
+	var rid := get_viewport().get_viewport_rid()
+	var gpu := RenderingServer.viewport_get_measured_render_time_gpu(rid)
+	var lines: Array = [
+		["COMBAT SANDBOX", 13.0, bone * Color(1, 1, 1, 0.75)],
+		["FRAME  %5.2f MS  %4d FPS  / 6.25" % [_frame_ms, roundi(1000.0 / maxf(_frame_ms, 0.01))], 10.0, acid if _frame_ms <= BUDGET_MS else rust],
+		["GPU %5.2f   SCRIPT %5.2f   PHYSICS %5.2f" % [gpu, Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
+			Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0], 10.0, bone * Color(1, 1, 1, 0.7)],
+		["DRAWS %d   PRIMS %.2fM" % [RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
+			RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME) / 1000000.0], 10.0, bone * Color(1, 1, 1, 0.7)],
+	]
+	if demo != null and is_instance_valid(demo):
+		var sandbox = demo
+		var standing := 0
+		for entry: Dictionary in sandbox.bodies:
+			var body := entry.get("rig") as BaselineHuman
+			if body != null and is_instance_valid(body) and not body.anatomy.dead and not body.anatomy.downed:
+				standing += 1
+		var mode: String = "ENEMIES // %s" % str(sandbox.SPAR_LEVELS[sandbox.spar_level].name) if sandbox.enemies_enabled else "DUMMIES"
+		lines.append(["%s   STANDING %d/%d   SIM HEALTH %03d" % [mode, standing, sandbox.bodies.size(), sandbox.simulation_health], 10.0, bone * Color(1, 1, 1, 0.7)])
+	lines.append(["TD UDP %d  %s  PACKETS %05d" % [port, "OPEN" if bridge != null and bridge.listening else "CLOSED", packets], 9.0,
+		(acid if packets > 0 else dead) * Color(1, 1, 1, 0.6)])
+	for line: Array in lines:
+		CellOutzType.draw_condensed(readout, Vector2(x, y), str(line[0]), float(line[1]), line[2], 2.0)
+		y += float(line[1]) + 8.0
+	var keys := "LMB SWING  RMB GUARD  H ENEMIES  N DIFFICULTY  R RESPAWN  E TAKE  X XRAY  Q CUT  F OPEN  F1 HIDE"
+	CellOutzType.draw_condensed(readout, Vector2(x, readout.size.y - 44.0), keys, 9.0, bone * Color(1, 1, 1, 0.5), 1.6)

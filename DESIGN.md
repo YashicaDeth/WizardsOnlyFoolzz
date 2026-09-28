@@ -1576,9 +1576,19 @@ playable build and verified before merge.
 - **Lighting:** darker, with pools of light that lead you; red only on
   danger.
 
-### Answered by Greg in a question box, 29 September
+### Answered by Greg in question boxes, 29 September
 
 - **In the dark rooms, enemies keep a faint readable silhouette** between the
   pools of light: a thin cold rim, so a fight can always be read, while the
   rooms stay black and bodies never disappear. Chosen over a rim only when
   close, and over true near-black.
+- **Psychophrenia (psy_lab) is the fighting sandbox:** sparring partners that
+  fight back, the weapon rack, body-cutting targets, and a live frame readout
+  measured against 160 fps.
+- **A weapon in a hand is a weapon, all three ways:** a character fights with
+  exactly what it holds (its reach, damage and cut); it drops when they die
+  or are disarmed and you can take it; and it is physical (blocked, parried,
+  knocked out of a hand).
+- **The placeholder coat slab and strap come off world bodies** ("deleting
+  this chunky shit from the middle of his torso") so real clothes, skin,
+  wounds, cutting, organs, cybernetics and blood can be built on the body.

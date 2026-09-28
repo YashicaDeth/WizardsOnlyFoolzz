@@ -1841,7 +1841,8 @@ func _begin_ringmaster_encounter() -> void:
 	ringmaster_rig.build(RINGMASTER_SLOT, {
 		"flesh": Color("6a5240"), "variation": 41, "gore": false, "blood": 4300.0,
 	})
-	HunterAppearance.style_world_rig(ringmaster_rig, RINGMASTER_SLOT, true)
+	# No garments on him: the coat is his clothing.
+	HunterAppearance.style_world_rig(ringmaster_rig, RINGMASTER_SLOT, true, true)
 	WorldHistory.record_event("ringmaster_encountered", {"venue": "underground_colosseum"})
 
 
