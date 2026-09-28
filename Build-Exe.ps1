@@ -27,16 +27,21 @@ $quotedProject = '"' + $project + '"'
 $quotedPreset = '"Windows Desktop"'
 $quotedExe = '"' + $exe + '"'
 $godotArgs = @('--headless', '--path', $quotedProject, '--export-release', $quotedPreset, $quotedExe)
+
+# Capture source identity before Godot scans the project. The editor may create
+# disposable import metadata during export; that must not falsely brand a clean
+# source revision as dirty.
+$commit = (& git -C $PSScriptRoot rev-parse --short=12 HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($commit)) { throw 'Could not identify the source commit.' }
+$dirty = if (& git -C $PSScriptRoot status --porcelain) { '+dirty' } else { '' }
+$buildIdentity = "Wizards Only Fools $commit$dirty"
+
 $export = Start-Process -FilePath $toolState.godot -ArgumentList $godotArgs -Wait -NoNewWindow -PassThru
 if ($export.ExitCode -ne 0 -or -not (Test-Path $exe)) { throw "Export failed (exit $($export.ExitCode))." }
 
 # Put the identity beside the executable so a playtest report can always name
 # the exact source it came from. A dirty suffix is deliberate: it prevents a
 # local experimental build from masquerading as its last committed revision.
-$commit = (& git -C $PSScriptRoot rev-parse --short=12 HEAD).Trim()
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($commit)) { throw 'Could not identify the source commit.' }
-$dirty = if (& git -C $PSScriptRoot status --porcelain) { '+dirty' } else { '' }
-$buildIdentity = "Wizards Only Fools $commit$dirty"
 $buildTime = Get-Date -Format 'yyyy-MM-dd HH:mm:ss K'
 Set-Content -LiteralPath (Join-Path $out 'BUILD-IDENTITY.txt') -Value @($buildIdentity, "Built $buildTime")
 
