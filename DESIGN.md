@@ -1410,3 +1410,14 @@ playable build and verified before merge.
   Ice King sees them in Adventure Time. Greg's reference is the episode
   where Finn becomes the lamb / statue idol and is trapped in the spirit
   realm. The reference is for the quality only; the art is original.
+- **Where wizard eyes grows (Greg, 28 September, long-term vision):**
+  - As the brain-chip UI is upgraded through character progression,
+    wizard eyes can see into lower and higher realms and dimensions,
+    starting with the shadow realm.
+  - With it you can call on or contact entities in other realms, and
+    hunt them, evoke them, do their quests, befriend them or ally with
+    them.
+  - The earth realm's own spirits, angels and demons are "weirdly
+    generated" (procedural).
+  - Not for minutes 0-30. The opening only shows the first sight of it:
+    faces in the spirit view.
