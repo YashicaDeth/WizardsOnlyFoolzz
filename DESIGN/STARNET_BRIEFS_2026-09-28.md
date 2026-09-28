@@ -63,7 +63,7 @@ Foundry, lighter). One brief per agent, one open box from
   - A gallery PNG, looked at.
   - A frame-cost number (`wof-combat-fx`).
 
-## 4. `starnet/placeholder-breakout`: breakout frames
+## 4. `starnet/placeholder-breakout`: DONE by Claude (cloud), 28 September
 
 - **GOAL:** Checklist "Placeholder: breakout frames".
 - **EXISTS:** `brain_hack` beats (the rune, the die, the hack). Qoder took

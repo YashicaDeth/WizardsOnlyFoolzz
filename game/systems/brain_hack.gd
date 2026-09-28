@@ -139,6 +139,7 @@ func _draw_hack(view: Vector2) -> void:
 	var unit := minf(view.x, view.y)
 	# The screaming drowns the room first.
 	draw_rect(Rect2(Vector2.ZERO, view), Color(BLACK, clampf(clock / 0.6, 0.0, 0.92)))
+	_draw_frames(view, centre, unit)
 	var pulse := pow(maxf(0.0, sin(clock * TAU / 0.9)), 6.0)
 	var scale := rune_scale()
 	if scale <= 0.0:
@@ -182,6 +183,60 @@ func _draw_hack(view: Vector2) -> void:
 
 ## The motherboard under the rune: a die, a transistor grid, copper traces
 ## laid along the rune's strokes, and an acid-green path eating through them.
+## The breakout frames, code-drawn under each beat now that the generated
+## plates are out of the build (rule 4): the tank glass and its bubbles while
+## the screaming starts, the brain the rune takes as it arrives, then the
+## chip's traces as the die lands. Dim, so the rune stays the loudest thing.
+func _draw_frames(view: Vector2, centre: Vector2, unit: float) -> void:
+	# The glass: two bowed edges and the medium rising.
+	var glass := clampf(1.0 - (clock - RUNE_FULL) / 1.0, 0.0, 1.0) * clampf(clock / 0.4, 0.0, 1.0)
+	if glass > 0.0:
+		for side in [-1.0, 1.0]:
+			var x: float = centre.x + side * unit * 0.62
+			var bow := PackedVector2Array()
+			for step in 13:
+				var t := float(step) / 12.0
+				bow.append(Vector2(x - side * sin(t * PI) * unit * 0.06, view.y * t))
+			draw_polyline(bow, Color(BLOOD, 0.55 * glass), 2.0)
+		for bubble in 26:
+			var salt := float(bubble) * 12.9898
+			var bx := centre.x + (_fract(sin(salt) * 43758.5) - 0.5) * unit * 1.1
+			var rise := _fract(_fract(sin(salt * 1.7) * 9631.3) + clock * (0.08 + 0.05 * _fract(salt)))
+			var by := view.y * (1.0 - rise)
+			draw_arc(Vector2(bx, by), 2.0 + 4.0 * _fract(salt * 3.1), 0.0, TAU, 10, Color(BONE, 0.32 * glass), 1.2)
+	# The brain the rune is taking: two hemispheres and their folds.
+	var brain := clampf((clock - RUNE_IN) / (RUNE_FULL - RUNE_IN), 0.0, 1.0) * clampf((SHRINK_END - clock) / 0.8, 0.0, 1.0)
+	if brain > 0.0:
+		var r := unit * 0.34
+		for side in [-1.0, 1.0]:
+			var lobe := centre + Vector2(side * r * 0.36, -r * 0.05)
+			draw_arc(lobe, r * 0.62, 0.0, TAU, 40, Color(DRIED.lerp(BLOOD, 0.45), 0.9 * brain), 3.0)
+			for fold in 5:
+				var y := -r * 0.4 + fold * r * 0.2
+				var sweep := PackedVector2Array()
+				for step in 9:
+					var t := float(step) / 8.0
+					sweep.append(lobe + Vector2(side * (t - 0.5) * r * 0.9, y + sin(t * TAU * 1.5 + fold) * r * 0.05))
+				draw_polyline(sweep, Color(DRIED.lerp(BLOOD, 0.45), 0.75 * brain), 2.0)
+	# The chip's traces once the die lands: right-angled runs out of the
+	# centre, ending in pads.
+	var chip := clampf((clock - RUNE_FULL) / 1.2, 0.0, 1.0)
+	if chip > 0.0:
+		for trace in 16:
+			var angle := float(trace) * TAU / 16.0
+			var out := Vector2.from_angle(angle)
+			var first := centre + out * unit * 0.3
+			var bend := first + out * unit * 0.12 * chip
+			var turn := Vector2(out.x, 0.0).normalized() if absf(out.x) > absf(out.y) else Vector2(0.0, out.y).normalized()
+			var end := bend + turn * unit * 0.2 * chip
+			draw_polyline(PackedVector2Array([first, bend, end]), Color(COPPER, 0.45 * chip), 1.5)
+			draw_rect(Rect2(end - Vector2(3, 3), Vector2(6, 6)), Color(COPPER, 0.4 * chip), true)
+
+
+static func _fract(x: float) -> float:
+	return x - floor(x)
+
+
 func _draw_die(centre: Vector2, ring: float, amount: float) -> void:
 	var half := ring * 1.25
 	var body := Rect2(centre - Vector2(half, half), Vector2(half, half) * 2.0)
