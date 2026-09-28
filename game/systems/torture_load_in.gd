@@ -32,6 +32,11 @@ const FLASHES := [
 	{"at": 9.4, "kind": "skull"},
 ]
 const FLASH_SECONDS := 0.16
+## Greg's checklist: scarier. One frame of a masked face in the black, the
+## last scream cut off dead, a stab on every flash, your heart under it all.
+const FACE_AT := 8.65
+const FACE_SECONDS := 0.07
+const SCREAM_CUT_AT := 7.15
 const BROADCAST_AT := 5.0
 const BROADCAST_PASS := 1.9
 const GLITCH_AT := 10.8
@@ -49,6 +54,7 @@ var done := false
 var played: Array[String] = []
 var _voices: Array[AudioStreamPlayer] = []
 var _breath: AudioStreamPlayer
+var _heart: AudioStreamPlayer
 var _rng := RandomNumberGenerator.new()
 
 
@@ -76,6 +82,12 @@ func _ready() -> void:
 		_breath.bus = "SFX"
 	add_child(_breath)
 	_breath.play()
+	_heart = AudioStreamPlayer.new()
+	_heart.name = "Heart"
+	_heart.stream = preload("res://systems/sight_audio.gd").stream("heartbeat")
+	_heart.volume_db = -10.0
+	add_child(_heart)
+	_heart.play()
 	set_process(true)
 
 
@@ -91,6 +103,19 @@ func step(delta: float) -> void:
 	clock += delta
 	for at in SCREAM_AT:
 		_cue_between(before, float(at), "scream")
+	# Each flash lands with a stab, not in silence.
+	for flash in FLASHES:
+		if before < float(flash.at) and clock >= float(flash.at):
+			cue("glitch")
+	# The last scream stops mid-breath.
+	if before < SCREAM_CUT_AT and clock >= SCREAM_CUT_AT:
+		for voice in _voices:
+			voice.stop()
+	# Your heart speeds up as it goes on.
+	if _heart != null:
+		_heart.pitch_scale = lerpf(0.85, 1.7, clampf(clock / GLITCH_AT, 0.0, 1.0))
+		if clock >= GLITCH_AT:
+			_heart.volume_db = move_toward(_heart.volume_db, -60.0, delta * 60.0)
 	_cue_between(before, GAG_AT, "gag")
 	if before < TUBE_AT and clock >= TUBE_AT:
 		_breath.stream = _wave("breath_tube", 2.4, true)
@@ -224,6 +249,8 @@ func _draw() -> void:
 	var amount := flash_amount()
 	if amount > 0.0:
 		_draw_film(flash_kind(), centre, unit, amount)
+	if clock >= FACE_AT and clock < FACE_AT + FACE_SECONDS:
+		_draw_face(centre, unit)
 	var line := broadcast_text()
 	if line != "":
 		var pass_index := broadcast_pass()
@@ -235,6 +262,30 @@ func _draw() -> void:
 		CellOutzType.draw_string_compat(self, at, line, HORIZONTAL_ALIGNMENT_CENTER, size.x, font_size, Color(BONE, 0.82 - 0.14 * pass_index))
 	if clock >= GLITCH_AT:
 		_draw_glitch(area, clamp((clock - GLITCH_AT) / GLITCH_SECONDS, 0.0, 1.0))
+
+
+## Him, for one frame: the surgical mask, the eyes above it, too close.
+func _draw_face(centre: Vector2, unit: float) -> void:
+	# Pale film on black, like the X-rays: no outline, only what the light
+	# catches. Hollow sockets with a pinprick in each, the mask's pleats, a
+	# brow pressed too close to the glass.
+	var r := unit * 0.5
+	var film := Color(FILM, 0.32)
+	draw_arc(centre + Vector2(0, -r * 0.35), r * 0.95, PI * 1.08, PI * 1.92, 40, film, 5.0)
+	for side in [-1.0, 1.0]:
+		var socket := centre + Vector2(side * r * 0.33, -r * 0.22)
+		var ring := PackedVector2Array()
+		for step in 25:
+			var a := TAU * float(step) / 24.0
+			ring.append(socket + Vector2(cos(a) * r * 0.2, sin(a) * r * 0.13))
+		draw_colored_polygon(ring, BLACK)
+		draw_polyline(ring, film, 2.0)
+		draw_circle(socket + Vector2(side * -r * 0.03, r * 0.01), r * 0.018, Color(BONE, 0.95))
+	var mask := PackedVector2Array([centre + Vector2(-r * 0.7, r * 0.02), centre + Vector2(r * 0.7, r * 0.02), centre + Vector2(r * 0.55, r * 0.62), centre + Vector2(-r * 0.55, r * 0.62)])
+	draw_colored_polygon(mask, Color(FILM, 0.18))
+	for pleat in 3:
+		var y := r * (0.16 + pleat * 0.15)
+		draw_line(centre + Vector2(-r * 0.64 + pleat * r * 0.04, y), centre + Vector2(r * 0.64 - pleat * r * 0.04, y), Color(FILM, 0.4), 2.0)
 
 
 ## One frame of failing X-ray film: pale on black, scratched.
