@@ -39,7 +39,7 @@ Foundry, lighter). One brief per agent, one open box from
 - **TESTS:** the two route tests above stay green.
 - **OUT:** changing any overlay's look.
 
-## 2. `starnet/placeholder-loading`: loading screens
+## 2. `starnet/placeholder-loading`: DONE by Claude (cloud), 28 September
 
 - **GOAL:** Checklist "Placeholder: loading screens".
 - **EXISTS:** `Interstitial.travel(scene, line)` shows between scenes. Find
