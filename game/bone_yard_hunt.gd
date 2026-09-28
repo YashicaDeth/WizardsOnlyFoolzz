@@ -947,10 +947,17 @@ func _ready() -> void:
 		WorldHistory.world_minute = WorldClock.OPENING_MINUTE
 	# Surfacing ends the timed run; the card shows how long each area took.
 	var run_summary: Dictionary = preload("res://systems/run_timer.gd").finish()
-	if not run_summary.is_empty():
+	# Greg's playtest: surfacing never played on a resumed run, because only
+	# the run timer asked for it. Coming up out of a facility route is what
+	# surfacing is. The first time ever, it is day: the world opens at 13:00.
+	var came_up := not FACILITY_ROUTES.pending_surface_handoff().is_empty()
+	var surfacing: Node = null
+	if came_up and WorldHistory.event_count("surfaced") == 0:
+		WorldHistory.world_minute = WorldClock.OPENING_MINUTE
+	if came_up or not run_summary.is_empty():
 		# Greg, 28 September: surfacing is the payoff (Surfacing): daylight,
 		# silence then wind, the title, the keys, then the run card.
-		var surfacing := preload("res://systems/surfacing.gd").new()
+		surfacing = preload("res://systems/surfacing.gd").new()
 		add_child(surfacing)
 		surfacing.begin(run_summary)
 	# The gore setting was only ever applied in the derby, so OFF did nothing
@@ -1244,7 +1251,12 @@ func _ready() -> void:
 		}, player + Vector3(4.0, 0, -6.0))
 	_update_camera()
 	WorldHistory.record_event("player_entered_hunt_ground", {"location": HUNT_LOCATION, "hunt_id": CAST.id_for(CAPTAIN_SLOT)})
-	exit_reveal = ExitReveal.attach(self, facility_handoff, camera)
+	# Greg's playtest: white-out, the title in full, then the aerial reveal --
+	# not both at once. Surfacing says when its title is done.
+	if surfacing != null and not facility_handoff.is_empty():
+		surfacing.title_done.connect(func() -> void: exit_reveal = ExitReveal.attach(self, facility_handoff, camera), CONNECT_ONE_SHOT)
+	else:
+		exit_reveal = ExitReveal.attach(self, facility_handoff, camera)
 	# A wreck in the derby already routed the player through `DefeatRouter`
 	# before this scene loaded (`rift_derby.gd::_finish_round`), so a lost heat
 	# and a lost fight land in the same captivity rather than one of them being

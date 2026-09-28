@@ -8,6 +8,12 @@ const HIDDEN_CACHE := preload("res://systems/hidden_cache.gd")
 ## The closet behind the secret door: against the right wall, clear of the
 ## cells (-18, -58), the reinforcement doors (-47, -88) and the gate.
 const CLOSET_Z := -36.0
+## Greg's playtest: a crawl duct, a shortcut past the first stretch of
+## cameras and guards. In at a vent grille low in the left wall, out in
+## hallway B -- still short of Hollis's gate, the last checkpoint.
+const DUCT_IN := Vector3(-HALF_WIDTH, 0.0, -43.0)
+const DUCT_OUT := Vector3(-HALF_WIDTH + 1.4, 0.0, -80.0)
+const DUCT_REACH := 1.8
 const LOOK := preload("res://systems/look_settings.gd")
 
 ## THE MENTAL AND PHYSICAL SUPPORT UNIT, after the elevator down (Greg, 24
@@ -524,10 +530,47 @@ func _build_sight() -> void:
 	_build_hidden()
 
 
+## A slatted vent low on the wall, lit from inside so it reads from the aisle.
+func _build_duct_grille() -> void:
+	var frame := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.1, 0.9, 1.1)
+	var steel := StandardMaterial3D.new()
+	steel.albedo_color = Color("3a3833")
+	steel.metallic = 0.6
+	steel.roughness = 0.5
+	box.material = steel
+	frame.mesh = box
+	frame.position = DUCT_IN + Vector3(0.05, 0.5, 0)
+	add_child(frame)
+	for slat in 6:
+		var bar := MeshInstance3D.new()
+		var bar_mesh := BoxMesh.new()
+		bar_mesh.size = Vector3(0.06, 0.05, 1.0)
+		bar_mesh.material = steel
+		bar.mesh = bar_mesh
+		bar.position = DUCT_IN + Vector3(0.12, 0.15 + slat * 0.13, 0)
+		bar.rotation.z = -0.5
+		add_child(bar)
+	var draught := OmniLight3D.new()
+	draught.light_color = Color("7f9f7a")
+	draught.light_energy = 1.2
+	draught.omni_range = 2.2
+	draught.position = DUCT_IN + Vector3(0.4, 0.5, 0)
+	add_child(draught)
+
+
+func _crawl_duct() -> void:
+	player.global_position = DUCT_OUT + Vector3(0, player.global_position.y, 0)
+	_flash_message("ON YOUR BELLY THROUGH THE DUCT  //  OUT PAST THE CAMERAS")
+	WorldHistory.record_event("support_unit_duct_crawled", {"location": "support_unit"})
+
+
 ## Greg, 26 September: stashes and secret doors, found in K or J, opened with
 ## E. A hatch in the left wall; and on the right, a bulkhead that is really a
 ## closet door, with a second stash inside.
 func _build_hidden() -> void:
+	_build_duct_grille()
 	caches.append(HIDDEN_CACHE.place_stash(self, sight, "support_unit_stash", Vector3(-HALF_WIDTH, 1.2, -40.0), Vector3.RIGHT))
 	var front_x := HALF_WIDTH - 2.15
 	var half := 1.5
@@ -724,8 +767,8 @@ func _die(cause: String, killed_by: String) -> void:
 		guard_post.player_killed()
 	_refresh_tool()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	if OS.get_environment("ATG_TEST_MODE") != "1":
-		Interstitial.travel(str(rebirth_request.scene), "you died // %s grows you back" % str(rebirth_request.vat.label).to_lower())
+	# Greg's playtest: a beat to know you died, of what, and what now.
+	preload("res://systems/death_beat.gd").play(self, rebirth_request, cause)
 
 
 # --- Input and the frame.
@@ -833,6 +876,9 @@ func interact() -> String:
 			_refresh_tool()
 			_flash_message("TAKEN BACK // %s" % label)
 			return "take_back"
+	if _flat_distance(DUCT_IN) <= DUCT_REACH:
+		_crawl_duct()
+		return "duct"
 	match HIDDEN_CACHE.open_near(caches, player.global_position, sight):
 		"stash":
 			_flash_message("A FIELD DRESSING AND FOUR ROUNDS // SOMEBODY HID THESE")
@@ -988,6 +1034,8 @@ func _update_hud() -> void:
 		prompt.text = post_prompt
 	elif gate_passed and _flat_distance(EXIT_AT) <= EXIT_REACH:
 		prompt.text = "[E] GO DOWN TO THE VEHICLE BAY"
+	elif _flat_distance(DUCT_IN) <= DUCT_REACH:
+		prompt.text = "[E] PRY THE VENT GRILLE  //  CRAWL THROUGH"
 	elif not HIDDEN_CACHE.nearest(caches, player.global_position).is_empty():
 		prompt.text = "[E] OPEN IT" if str(HIDDEN_CACHE.nearest(caches, player.global_position).kind) == "door" else "[E] OPEN THE HATCH"
 	elif sight != null and sight.call("wire_in_reach", player.global_position):

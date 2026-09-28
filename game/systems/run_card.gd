@@ -44,7 +44,8 @@ func _draw_sheet() -> void:
 	var alpha := clampf(age / 0.4, 0.0, 1.0) * clampf((HOLD_SECONDS + FADE_SECONDS - age) / FADE_SECONDS, 0.0, 1.0)
 	var rows: Array = summary.get("rows", [])
 	var plate := Vector2(520.0, 132.0 + 26.0 * rows.size())
-	var origin := Vector2((sheet.size.x - plate.x) * 0.5, sheet.size.y * 0.22)
+	# Greg's playtest: top-left under the status, not over the middle of the view.
+	var origin := Vector2(24.0, 128.0)
 	sheet.draw_rect(Rect2(origin, plate), Color(0.02, 0.01, 0.012, 0.9 * alpha))
 	sheet.draw_rect(Rect2(origin, plate), Color(COPPER, 0.8 * alpha), false, 1.5)
 	CellOutzType.draw_stamped(sheet, origin + Vector2(28.0, 40.0), "SURFACED", 22.0, Color(COPPER, alpha), Color(BLOOD, 0.5 * alpha))

@@ -49,7 +49,8 @@ func _play_through(label: String, handoff: Dictionary) -> Array:
 	var exit_point := Vector3(float(at[0]), 0.0, float(at[2]))
 	var start_flat := Vector2(reveal.cam.global_position.x - exit_point.x, reveal.cam.global_position.z - exit_point.z).length()
 	check(start_flat <= Vector2(ExitReveal.SHOULDER_BACK, ExitReveal.SHOULDER_SIDE).length() + 0.01 and absf(reveal.cam.global_position.y - (ExitReveal.EYE + ExitReveal.SHOULDER_UP)) < 0.01, "%s: it starts over the shoulder, on the exact spot the player came out of" % label)
-	check(reveal.duration >= 8.0 and reveal.duration <= 12.5, "%s: it runs 8-12 seconds (%.1f)" % [label, reveal.duration])
+	# Greg's playtest (29 September): arrival was too long; about five seconds.
+	check(reveal.duration >= 4.0 and reveal.duration <= 6.5, "%s: it runs 4-6.5 seconds (%.1f)" % [label, reveal.duration])
 	var marks: Array = []
 	var highest := 0.0
 	var steps := 0
@@ -141,11 +142,16 @@ func _ready() -> void:
 	var hunt = load("res://bone_yard_hunt.tscn").instantiate()
 	add_child(hunt)
 	await get_tree().process_frame
-	await get_tree().physics_frame
+	check(hunt.exit_reveal == null, "the white-out and the title come first; the reveal waits")
+	# Surfacing hands over when its title is done (under four seconds).
+	for _wait in 60:
+		if hunt.exit_reveal != null:
+			break
+		await get_tree().create_timer(0.1).timeout
 	await get_tree().process_frame
 	var in_hunt: ExitReveal = hunt.exit_reveal
 	check(in_hunt != null and in_hunt.active and get_tree().paused, "the Hunt plays the reveal when a route surfaces into it, holding the world")
-	check(in_hunt != null and in_hunt.exit_at.distance_to(Vector3(-26.0, 0.0, 12.0)) < 0.01, "from the storm outfall's own arrival point")
+	check(in_hunt != null and in_hunt.exit_at.distance_to(FacilityRoutes.ROUTES[FacilityRoutes.ROUTE_STEALTH].surface_position) < 0.01, "from the storm outfall's own arrival point")
 	if in_hunt != null:
 		in_hunt.finish(true)
 	check(not get_tree().paused and get_viewport().get_camera_3d() == hunt.camera, "and hands the Hunt its camera and world back")

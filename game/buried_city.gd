@@ -102,12 +102,24 @@ var pitch := -0.05
 var fuse_taken := false
 var shortcut_open := false
 var shortcut_gate: StaticBody3D
+var shortcut_label: Label3D
+## Greg's playtest: the heat elevator had no doors and no collision -- you
+## walked into the cage. Two leaves on its front, a lamp that says whether
+## it will take you, and they slide apart once the fuse is in and you come.
+var lift_doors: Array[Node3D] = []
+var lift_lamp: OmniLight3D
+var lift_doors_open := 0.0
 var fuse_visual: MeshInstance3D
 var patrol: Node3D
 var patrol_phase := 0.0
 var patrol_tactic: Dictionary = {}
 var patrol_tree: Resource
 var patrol_alert := false
+## Greg's playtest: this room's lesson is stealth. Holding Ctrl (not
+## sprinting) creeps: slower, and the sentinel only catches you close.
+var creeping := false
+const HEAR_WALKING := 11.0
+const HEAR_CREEPING := 4.5
 var patrol_disabled := false
 var patrol_attack_cooldown := 0.0
 var blood := 100.0
@@ -125,6 +137,7 @@ func _ready() -> void:
 		add_child(ambient_bed_script.new().setup("city"))
 	# Greg, 28 September: each new key shown once (KeyHints).
 	KeyHints.offer_opening_keys(self)
+	KeyHints.offer_in(self, "creep", KEY_CTRL, "HOLD CTRL", "creep past it")
 	preload("res://systems/run_timer.gd").enter("lower_works")
 	var environment := WorldEnvironment.new()
 	# Not `ossuary`. It is mauve from zenith to ground and carries the densest
@@ -253,7 +266,7 @@ func _build_city_shell() -> void:
 		# to the floor. At 9.5 (sconces 6.4) it averages 15.3 with half the
 		# frame still in shadow -- vaults, galleries and the lift read, and it
 		# stays darker than the decant room (30-45).
-		light.light_energy = 9.5
+		light.light_energy = 14.0
 		light.omni_range = BAY_LAMP_RANGE
 		light.shadow_enabled = false
 		add_child(light)
@@ -267,7 +280,7 @@ func _build_city_shell() -> void:
 			sconce.name = "WallSconce%d" % bay
 			sconce.position = Vector3(side * 13.4, 3.4, z)
 			sconce.light_color = Color("c2662f")
-			sconce.light_energy = 6.4
+			sconce.light_energy = 10.0
 			sconce.omni_range = 9.5
 			sconce.shadow_enabled = false
 			add_child(sconce)
@@ -499,6 +512,32 @@ func _build_landmark_lift() -> void:
 	cage.mesh = cage_mesh
 	cage.position = LIFT_AT + Vector3(0, 3.5, 0)
 	add_child(cage)
+	var solid := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	var cylinder := CylinderShape3D.new()
+	cylinder.radius = 2.7
+	cylinder.height = 7.0
+	shape.shape = cylinder
+	solid.add_child(shape)
+	solid.position = cage.position
+	add_child(solid)
+	# The doors face back up the hall, the way you come at it.
+	for side in [-1.0, 1.0]:
+		var leaf := MeshInstance3D.new()
+		var leaf_mesh := BoxMesh.new()
+		leaf_mesh.size = Vector3(1.2, 2.8, 0.12)
+		leaf_mesh.material = WorldLook.surface(Color("5a3a26"), "metal", 2500)
+		leaf.mesh = leaf_mesh
+		leaf.position = LIFT_AT + Vector3(side * 0.6, 1.4, 2.78)
+		leaf.set_meta("side", side)
+		add_child(leaf)
+		lift_doors.append(leaf)
+	lift_lamp = OmniLight3D.new()
+	lift_lamp.position = LIFT_AT + Vector3(0, 3.2, 3.0)
+	lift_lamp.light_color = Color("c0392b")
+	lift_lamp.light_energy = 2.5
+	lift_lamp.omni_range = 4.0
+	add_child(lift_lamp)
 	var beam := OmniLight3D.new()
 	beam.position = LIFT_AT + Vector3(0, 8.4, 0)
 	beam.light_color = Color("d36f34")
@@ -513,6 +552,19 @@ func _build_landmark_lift() -> void:
 	label.modulate = Color("e8a55a")
 	label.position = LIFT_AT + Vector3(0, 8.1, 1.0)
 	add_child(label)
+
+
+## Fuse in and you close: the leaves part with a groan. Otherwise they shut.
+func _update_lift_doors(delta: float) -> void:
+	if lift_doors.is_empty() or player == null:
+		return
+	var want := 1.0 if fuse_taken and _flat_distance(LIFT_AT) < 7.5 else 0.0
+	if want > lift_doors_open and lift_doors_open <= 0.0:
+		preload("res://systems/sight_audio.gd").play_at(self, "creak", LIFT_AT + Vector3(0, 1.4, 2.8), 0.0)
+	lift_doors_open = move_toward(lift_doors_open, want, delta / 1.2)
+	for leaf in lift_doors:
+		var side: float = leaf.get_meta("side")
+		leaf.position.x = LIFT_AT.x + side * (0.6 + 1.15 * ease(lift_doors_open, -2.0))
 
 
 func _build_fuse_branch() -> void:
@@ -538,13 +590,13 @@ func _build_fuse_branch() -> void:
 	fuse_label.position = FUSE_AT + Vector3(0, 0.75, 0)
 	add_child(fuse_label)
 	shortcut_gate = _slab(Vector3(4.4, 4.6, 0.42), SHORTCUT_AT + Vector3(0, 2.3, 0), "metal", Color("42221a"))
-	var gate_label := Label3D.new()
-	gate_label.text = "SERVICE SHORTCUT\nLIFT FUSE REQUIRED"
-	gate_label.font_size = 28
-	gate_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	gate_label.modulate = Color("c76a3e")
-	gate_label.position = SHORTCUT_AT + Vector3(0, 4.8, 0.4)
-	add_child(gate_label)
+	shortcut_label = Label3D.new()
+	shortcut_label.text = "SERVICE SHORTCUT\nLOCKED  //  NEEDS A LIFT FUSE"
+	shortcut_label.font_size = 28
+	shortcut_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	shortcut_label.modulate = Color("c0392b")
+	shortcut_label.position = SHORTCUT_AT + Vector3(0, 4.8, 0.4)
+	add_child(shortcut_label)
 
 
 func _build_patrol() -> void:
@@ -612,6 +664,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_update_lift_doors(delta)
 	var input := Vector3(Input.get_axis("move_left", "move_right"), 0.0, Input.get_axis("move_forward", "move_back"))
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
 	# Greg: *"maybe jumping and running should maybe be unlocked"*. They should.
@@ -620,6 +673,9 @@ func _physics_process(delta: float) -> void:
 	# follows them. `sprint` is already an action in the project; jump is Space,
 	# read directly the way every other key in this scene is.
 	var pace := WALK_SPEED * (SPRINT_SCALE if Input.is_action_pressed("sprint") else 1.0)
+	creeping = Input.is_action_pressed("crouch") and not Input.is_action_pressed("sprint")
+	if creeping:
+		pace *= 0.45
 	# Mid-climb the haul owns the body; the rest of the frame still runs.
 	if not JUMP_CLIMB.busy(player):
 		# Greg, 26 September: sprint + Ctrl slides.
@@ -673,7 +729,8 @@ func _patrol_step(delta: float) -> void:
 	var overhead: float = player.global_position.y - patrol.global_position.y
 	difference.y = 0.0
 	var distance := difference.length()
-	patrol_alert = distance < 11.0
+	# Once it has you it keeps you; creeping only helps before it notices.
+	patrol_alert = distance < (HEAR_CREEPING if creeping and not patrol_alert else HEAR_WALKING)
 	if not patrol_alert:
 		patrol.position.x = sin(patrol_phase * 0.55) * 6.2
 		patrol.rotation.y = cos(patrol_phase * 0.55) * 0.45
@@ -716,11 +773,21 @@ func _interact() -> void:
 	if not fuse_taken and _flat_distance(FUSE_AT) <= 2.4:
 		fuse_taken = true
 		fuse_visual.visible = false
+		shortcut_label.text = "SERVICE SHORTCUT\n[E] SHUNT THE FUSE  //  OPEN IT"
+		shortcut_label.modulate = Color("efa755")
+		lift_lamp.light_color = Color("5fbf6a")
 		WorldHistory.record_event("lower_works_lift_fuse_taken", {"location": "lower_works"})
 		return
 	if fuse_taken and not shortcut_open and _flat_distance(SHORTCUT_AT) <= 3.0:
 		shortcut_open = true
-		shortcut_gate.queue_free()
+		# It grinds up into the lintel instead of blinking out.
+		for child in shortcut_gate.get_children():
+			if child is CollisionShape3D:
+				(child as CollisionShape3D).disabled = true
+		create_tween().tween_property(shortcut_gate, "position:y", shortcut_gate.position.y + 4.4, 1.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+		preload("res://systems/sight_audio.gd").play_at(self, "creak", SHORTCUT_AT, 2.0)
+		shortcut_label.text = "SERVICE SHORTCUT\nOPEN"
+		shortcut_label.modulate = Color("5fbf6a")
 		# The fuse has a tactical job as well as a route job: shunting this
 		# side circuit drops the only sentinel's local relay.  It turns the
 		# optional walk to the west gallery into a real safer route, instead of
@@ -729,9 +796,15 @@ func _interact() -> void:
 		WorldHistory.record_event("lower_works_shortcut_powered", {"location": "lower_works", "sentinel_relay": "disabled"})
 		return
 	if _flat_distance(DRAIN_AT) <= DRAIN_REACH:
+		if not FACILITY_ROUTES.escaped_once():
+			objective.text = "OBJECTIVE // THE GRATE IS RUSTED SHUT  //  REACH THE HEAT ELEVATOR"
+			return
 		_enter_drains()
 		return
 	if _flat_distance(EXIT_AT) <= 4.0 and fuse_taken:
+		if patrol_alert and not patrol_disabled:
+			objective.text = "OBJECTIVE // IT IS ON YOU  //  LOSE IT OR PUT IT DOWN FIRST"
+			return
 		_ride_heat_elevator()
 
 
@@ -819,7 +892,7 @@ func _update_hud() -> void:
 		prompt.text = "[E] POWER SHORTCUT // DISABLE SENTINEL"
 		osd.point_at(SHORTCUT_AT + Vector3(0, 1.4, 0))
 	elif _flat_distance(DRAIN_AT) <= DRAIN_REACH:
-		prompt.text = "[E] DROP INTO THE OLD DRAINS"
+		prompt.text = "[E] DROP INTO THE OLD DRAINS" if FACILITY_ROUTES.escaped_once() else "A DRAIN GRATE  //  RUSTED SHUT"
 		osd.point_at(DRAIN_AT + Vector3(0, 0.2, 0))
 	elif fuse_taken and _flat_distance(EXIT_AT) <= 4.0:
 		prompt.text = "[E] RIDE THE HEAT ELEVATOR UP"

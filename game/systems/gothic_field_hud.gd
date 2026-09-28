@@ -636,12 +636,14 @@ func _draw_hunt_thread() -> void:
 	# Top-right belongs to the player's face and fluids now. A hunt is external
 	# world pressure, so it hangs under the top-left date/air instrument instead.
 	var anchor := Vector2(30, 82)
-	var eye := anchor + Vector2(205, 12)
-	draw_arc(eye, 16, 0, TAU, 24, COPPER * Color(1, 1, 1, 0.45), 2)
-	draw_circle(eye, 4 + sin(elapsed * 3.1), BLOOD)
 	# AG5.8. `ThemeDB.fallback_font` again — the engine face standing in a
 	# panel that otherwise reads in CellOutz's own stencil cut.
-	CellOutzType.draw_text(self, anchor + Vector2(0, -13), "HUNT // %s" % rival_name.to_upper(), 13.0, COPPER)
+	var tag := "HUNT // %s" % rival_name.to_upper()
+	CellOutzType.draw_text(self, anchor + Vector2(0, -13), tag, 13.0, COPPER)
+	# The eye follows the name (it sat at a fixed x and long names ran into it).
+	var eye := anchor + Vector2(CellOutzType.width(tag, 13.0) + 26.0, -5.0)
+	draw_arc(eye, 16, 0, TAU, 24, COPPER * Color(1, 1, 1, 0.45), 2)
+	draw_circle(eye, 4 + sin(elapsed * 3.1), BLOOD)
 	CellOutzType.draw_text(self, anchor + Vector2(0, 8), rival_status, 11.0, BONE * Color(1, 1, 1, 0.65))
 
 

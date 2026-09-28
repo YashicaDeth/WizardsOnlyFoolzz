@@ -55,6 +55,7 @@ func _vat_to_lift() -> void:
 	vat._physics_process(vat.REVENGE_HOLD + 0.1)
 	# His door only gives once you are dressed (Greg's playtest gate).
 	preload("res://systems/clothing.gd").wear("player", "scavenged_coat")
+	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})  # a returning run: side exits open
 	for _step in 80:
 		if vat.can_move:
 			break

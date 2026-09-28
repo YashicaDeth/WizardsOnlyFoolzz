@@ -14,6 +14,7 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	WorldHistory.clear_history()
+	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})  # a returning run: the gate is not jammed
 	var arcade = ARCADE.instantiate()
 	add_child(arcade)
 	await get_tree().process_frame
@@ -40,6 +41,7 @@ func _ready() -> void:
 	# The breach tool opens the gate without the card (2026-09-24). A fresh
 	# world: the arcade now remembers its open gate and empty pedestals.
 	WorldHistory.clear_history()
+	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})  # a returning run: the gate is not jammed
 	var forced: Variant = load("res://service_arcade.tscn").instantiate()
 	add_child(forced)
 	await get_tree().physics_frame

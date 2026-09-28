@@ -87,13 +87,18 @@ const CONNECTIONS := [
 	["derby_tunnels", "dry_falls"],
 ]
 
+## Greg's playtest (29 September): every way out comes up somewhere of its
+## own. The heat elevator, the first-run exit, stays by the pit gate; the
+## rest are spread over the 470 x 370 m expanse, one quarter each:
+##   drains west, dry falls south-west, lantern lift south, freight spur
+##   south-east, doctor's bay east, blast shaft north-east, sallyport north-west.
 const ROUTES := {
 	ROUTE_STEALTH: {
 		"approach": "stealth_exploration",
 		"label": "MAINTENANCE ASCENT",
 		"steps": ["waste_gallery", "maintenance_cistern", "storm_outfall"],
 		"exit": "storm_outfall",
-		"surface_position": Vector3(-26.0, 0.0, 12.0),
+		"surface_position": Vector3(-110.0, 0.0, 10.0),
 		"surface_relationships": {"gate_lanterns": 4, "celloutz": -8},
 		"mastery_route": true,
 		"avoids_derby": true,
@@ -108,12 +113,12 @@ const ROUTES := {
 		"outcomes": {
 			"honour": {
 				"final_step": "lantern_lift", "exit": "lantern_lift",
-				"surface_position": Vector3(-8.0, 0.0, 26.0),
+				"surface_position": Vector3(-20.0, 0.0, 120.0),
 				"surface_relationships": {"gate_lanterns": 14, "undercroft_freehold": 10, "celloutz": -6},
 			},
 			"betray": {
 				"final_step": "stolen_freight_spur", "exit": "stolen_freight_spur",
-				"surface_position": Vector3(18.0, 0.0, 20.0),
+				"surface_position": Vector3(60.0, 0.0, 110.0),
 				"surface_relationships": {"gate_lanterns": -12, "undercroft_freehold": -20, "ashline_wreckers": 8},
 			},
 		},
@@ -123,7 +128,7 @@ const ROUTES := {
 		"label": "EXECUTIVE BREACH",
 		"steps": ["containment_concourse", "executive_transit", "blast_shaft"],
 		"exit": "blast_shaft",
-		"surface_position": Vector3(30.0, 0.0, -14.0),
+		"surface_position": Vector3(120.0, 0.0, -100.0),
 		"surface_relationships": {"celloutz": -30, "ashline_wreckers": 5},
 		"required_control_points": ["concourse", "transit", "shaft"],
 		"mastery_route": true,
@@ -148,7 +153,7 @@ const ROUTES := {
 		"exit": "doctor_vehicle_bay",
 		# Assistant placement, not Greg's: north-west of the start, clear of
 		# the outfall (west), the sallyport (south) and the ridge (east).
-		"surface_position": Vector3(-20.0, 0.0, -30.0),
+		"surface_position": Vector3(110.0, 0.0, -10.0),
 		# Breaking into a CellOutz officer's private bay is noticed.
 		"surface_relationships": {"celloutz": -12},
 		"mastery_route": false,
@@ -163,7 +168,7 @@ const ROUTES := {
 		# Assistant placement, not Greg's (blood_waterfall_exit.gd
 		# SURFACE_POSITION): beside the storm outfall, since the drains are
 		# what feed the falls. Relationships as the derby's recapture exit.
-		"surface_position": Vector3(-26.0, 0.0, 12.0),
+		"surface_position": Vector3(-90.0, 0.0, 100.0),
 		"surface_relationships": {"ashline_wreckers": 12, "celloutz": -18},
 		"mastery_route": false,
 		"avoids_derby": false,
@@ -173,7 +178,7 @@ const ROUTES := {
 		"label": "CONTAINMENT / UNDERGROUND DERBY",
 		"steps": ["processing_chute", "underground_colosseum", "lockdown_grid", "vehicle_sallyport"],
 		"exit": "vehicle_sallyport",
-		"surface_position": Vector3(4.0, 0.0, -33.0),
+		"surface_position": Vector3(-80.0, 0.0, -120.0),
 		"surface_relationships": {"ashline_wreckers": 12, "celloutz": -18},
 		"mastery_route": false,
 		"avoids_derby": false,
@@ -198,6 +203,12 @@ static func ensure() -> Dictionary:
 			"containment_mechanism": "",
 		})
 	return record
+
+
+## Greg's playtest: the first run is one guided breakout out of the heat
+## elevator. Side exits (his lift, the drains) open once you have got out once.
+static func escaped_once() -> bool:
+	return not (ensure().get("completed_routes", []) as Array).is_empty()
 
 
 static func route(route_id: String) -> Dictionary:

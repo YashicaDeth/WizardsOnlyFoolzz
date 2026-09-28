@@ -313,8 +313,7 @@ func _lose() -> void:
 	at.y = 0.0
 	var request := VAT_REBIRTH.die(LOCATION, "the examiner's scalpel", "the_examiner", at)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	if OS.get_environment("ATG_TEST_MODE") != "1":
-		Interstitial.travel(str(request.scene), "he puts you back // %s grows you again" % str(request.vat.label).to_lower())
+	preload("res://systems/death_beat.gd").play(chamber, request, "cut open by the examiner's scalpel")
 
 
 func _face(toward: Vector3, weight: float) -> void:

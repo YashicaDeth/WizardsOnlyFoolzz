@@ -193,9 +193,12 @@ func _build_gallery() -> void:
 		beam.mesh = beam_mesh
 		beam.position = Vector3(0, TUNNEL_HEIGHT - 0.15, z)
 		add_child(beam)
-		# Every rib, not every other: the first render measured 8.4/255 here,
-		# darker than the Lower Works Greg already called too dark.
-		_lamp(Vector3(0, TUNNEL_HEIGHT - 0.6, z - 1.0), Color("a99a62"), 4.0, 10.0)
+		# Greg's playtest: too dark to play, and it has to stay scary. Pools
+		# you move between: a hard lamp on every other rib, a dim one between.
+		if rib % 2 == 0:
+			_lamp(Vector3(0, TUNNEL_HEIGHT - 0.6, z - 1.0), Color("a99a62"), 8.0, 7.5)
+		else:
+			_lamp(Vector3(0, TUNNEL_HEIGHT - 0.6, z - 1.0), Color("a99a62"), 1.2, 6.0)
 
 
 ## The cistern opens out: a tall hall of standing water crossed by one

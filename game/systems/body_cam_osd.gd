@@ -187,8 +187,10 @@ func _draw_vitals(view: Vector2) -> void:
 		draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(float(blood) / 100.0, 0.0, 1.0), bar.size.y)), REC)
 	if pain >= 0:
 		CellOutzType.draw_condensed(self, at + Vector2(188, 0), "PN %02d" % pain, 12.0, INK if pain < 70 else REC, 0.8)
+	# Greg's playtest: under BLD this ran into the centred key hints. Above it,
+	# the left column stays clear of the hint band.
 	if not rest.is_empty():
-		CellOutzType.draw_condensed(self, at + Vector2(0, 18), rest, 10.0, DIM, 0.7)
+		CellOutzType.draw_condensed(self, at + Vector2(0, -18), rest, 10.0, DIM, 0.7)
 
 
 ## A prompt is "[KEY] VERB", possibly several joined by "//". Key prompts
