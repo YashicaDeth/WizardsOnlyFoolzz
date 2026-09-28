@@ -102,7 +102,7 @@ at 100. **(Greg)** marks what only Greg can do.
 - [x] Cracks spread with every blow until the glass bursts
 - [x] The medium floods out and you fall with it
 - [x] Crawl through the spill, pull up on the tank, stand
-- [ ] One line saying why it is happening, at each beat
+- [x] One line saying why it is happening, at each beat
 
 ### The load-in
 

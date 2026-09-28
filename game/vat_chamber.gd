@@ -1488,10 +1488,33 @@ func _unhandled_input(event: InputEvent) -> void:
 		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.2, 1.0)
 
 
+## Greg, 28 September: one line at each beat, in your own head, first
+## person, short and panicked. It says why, what you are, and what to do.
+const THOUGHTS := {
+	"departure": "I WAS GROWN HERE.  THEY WOKE ME EARLY.",
+	"submerged": "SOMETHING IS IN MY HEAD.  IT'S MINE NOW.",
+	"voiding": "THE WATER'S GOING.  BREATHE.",
+	"wired": "THEY'RE IN ME.  GET THEM OUT.",
+	"cord": "IT'S DOWN MY THROAT.  PULL.",
+	"smash": "THE GLASS.  HIT THE GLASS.",
+	"knees": "I'M OUT.  I'M OUT.  GET UP.",
+	"aisle": "HE WENT THROUGH THAT DOOR.",
+}
+var thought_label: Label
+var thought_phase := ""
+var thought_life := 0.0
+
 const TANK_PANIC := {"intake": 0.2, "departure": 0.45, "hacked": 1.0, "submerged": 0.75}
 
 
 func _physics_process(delta: float) -> void:
+	if phase != thought_phase:
+		thought_phase = phase
+		if THOUGHTS.has(phase):
+			_think_aloud(str(THOUGHTS[phase]))
+	if thought_label != null:
+		thought_life = maxf(0.0, thought_life - delta)
+		thought_label.modulate.a = clampf(thought_life / 0.8, 0.0, 1.0)
 	# Greg, 28 September: the tank you are in (TankView) until it drains.
 	if tank_view != null:
 		tank_view.in_tank = TANK_PANIC.has(phase)
@@ -1730,6 +1753,27 @@ func _update_departure(delta: float) -> void:
 
 ## BRAIN HACKED / SOUL OVERTAKEN on the END ALL SUFFERING card, and the tank
 ## starts to fail under it.
+func _think_aloud(line: String) -> void:
+	if thought_label == null:
+		thought_label = Label.new()
+		thought_label.name = "Thought"
+		thought_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+		thought_label.offset_left = -480.0
+		thought_label.offset_right = 480.0
+		thought_label.offset_top = 196.0
+		thought_label.offset_bottom = 226.0
+		thought_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		thought_label.add_theme_font_size_override("font_size", 22)
+		thought_label.add_theme_color_override("font_color", Color("ead4ad"))
+		thought_label.add_theme_color_override("font_outline_color", Color(0.05, 0.01, 0.01))
+		thought_label.add_theme_constant_override("outline_size", 6)
+		thought_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		$HUD.add_child(thought_label)
+	thought_label.text = line
+	thought_life = 4.5
+	thought_label.modulate.a = 1.0
+
+
 func _offer_standing_hints() -> void:
 	key_hints.offer("use", KEY_E, "E", "use / open / tear")
 	key_hints.offer("jump", KEY_SPACE, "SPACE", "jump and climb")
