@@ -31,6 +31,9 @@ const FIELD_MEDS := preload("res://systems/field_meds.gd")
 var meds := FIELD_MEDS.new()
 ## Greg, 28 September: each new key shown once, big, bottom centre.
 var key_hints: KeyHints
+## Greg, 28 September: the next tanks and a colder examiner (VatHorror).
+var horror_subjects: Array = []
+var horror: VatHorror
 ## Seconds left of the examiner's syringe, and how slow it makes you.
 var slowed_left := 0.0
 const SLOWED_SCALE := 0.5
@@ -322,6 +325,10 @@ func _ready() -> void:
 	_build_den()
 	key_hints = KeyHints.new()
 	add_child(key_hints)
+	if VatHorror.wanted():
+		horror = VatHorror.new()
+		add_child(horror)
+		horror.setup(self, horror_subjects)
 	brain_hack = BRAIN_HACK.new()
 	$HUD.add_child(brain_hack)
 	brain_hack.connect("hack_finished", _on_hack_finished)
@@ -1102,6 +1109,7 @@ func _dead_tank(at: Vector3, seed_value: int) -> void:
 	var cradled: Node3D = null
 	if near:
 		cradled = _build_cradled_vat_subject(at + Vector3(0, 0.42, 0), seed_value)
+		horror_subjects.append({"rig": cradled, "at": at, "seed": seed_value})
 	if vat_smash != null:
 		vat_smash.register(root, at, seed_value, cradled)
 
