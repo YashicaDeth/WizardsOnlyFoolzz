@@ -78,7 +78,8 @@ const DUCT_DEPTH_X := -8.5
 ## from it exactly as they did when the drain broke the glass on its own.
 const DRAINED_AT := 5.6
 ## Tugs it takes to tear one umbilical out. The first ones only hurt.
-const WIRE_TUGS := 3
+## Greg, 28 September: the cords resist; mash to tear them.
+const WIRE_TUGS := 4
 ## How long GET REVENGE holds before the glass goes.
 const REVENGE_HOLD := 2.8
 ## How long END ALL SUFFERING owns the screen before the wires can be seen.
@@ -91,11 +92,14 @@ const END_CARD_SECONDS := 3.4
 ## the glass goes by itself) and leave this off; the game always has it on.
 var hands_on_breakout := OS.get_environment("ATG_TEST_MODE") != "1"
 ## Tugs it takes to get the cord out of your throat, after the wires.
-const CORD_TUGS := 3
+const CORD_TUGS := 4
 ## Blows it takes to break the glass. The third one goes through.
-const GLASS_BLOWS := 3
+const GLASS_BLOWS := 4
 ## How long getting up off your knees takes, turning to his door as you rise.
-const RISE_SECONDS := 2.2
+## Crawl through the spill, then pull yourself up on the tank (28 September).
+const RISE_SECONDS := 3.4
+const CRAWL_SHARE := 0.4
+const CRAWL_DISTANCE := 1.3
 var cord_pulls := 0
 var glass_blows := 0
 var mouth_cord: Node3D
@@ -1828,6 +1832,8 @@ func _tug_wire(cable: Node3D) -> void:
 		# It stretches toward you and holds. It is anchored in you, too.
 		anatomy.call("apply_hit", "torso", 3.0, 0.0, "blunt")
 		cable.position = (camera.global_position - cable.global_position).normalized() * 0.05 * pulls
+		if tank_view != null:
+			tank_view.bleed(0.08)
 		opening_audio.cue("tug")
 		return
 	_rip_wire(cable)
@@ -1836,6 +1842,8 @@ func _tug_wire(cable: Node3D) -> void:
 func _rip_wire(cable: Node3D) -> void:
 	umbilicals.erase(cable)
 	anatomy.call("apply_hit", "torso", 7.0, 0.0, "shear")
+	if tank_view != null:
+		tank_view.pain()
 	opening_audio.cue("rip")
 	# It comes out wet and whips back up toward its anchor.
 	var tween := create_tween()
@@ -1919,6 +1927,8 @@ func tug_cord() -> void:
 		mouth_cord.position.z += 0.08
 		mouth_cord.position.y += 0.05
 		return
+	if tank_view != null:
+		tank_view.pain()
 	opening_audio.cue("rip")
 	var tween := create_tween()
 	tween.tween_property(mouth_cord, "position", mouth_cord.position + Vector3(0.3, -1.4, -0.8), 0.4).set_ease(Tween.EASE_IN)
@@ -2006,6 +2016,16 @@ func _update_knees(delta: float) -> void:
 		return
 	rise_clock += delta
 	var t := clampf(rise_clock / RISE_SECONDS, 0.0, 1.0)
+	# First crawl through the spill, low, toward the aisle...
+	if t < CRAWL_SHARE:
+		var crawl := t / CRAWL_SHARE
+		var ahead := Vector3(-sin(rise_from_yaw), 0.0, -cos(rise_from_yaw))
+		player.global_position += ahead * (CRAWL_DISTANCE / (RISE_SECONDS * CRAWL_SHARE)) * delta
+		camera.position.y = 0.45 - BODY_HALF_HEIGHT + absf(sin(crawl * TAU * 3.0)) * 0.04
+		camera.rotation = Vector3(-0.35, 0, sin(crawl * TAU * 3.0) * 0.06)
+		return
+	# ...then pull yourself up on the tank.
+	t = (t - CRAWL_SHARE) / (1.0 - CRAWL_SHARE)
 	var eased := ease(t, 0.45)
 	# Up off your knees, turning to the door he left by.
 	yaw = lerp_angle(rise_from_yaw, _door_yaw(), eased)
@@ -2018,6 +2038,30 @@ func _update_knees(delta: float) -> void:
 		can_move = true
 		_offer_standing_hints()
 		_get_revenge()
+
+
+## The medium floods out across the grating with you in it.
+func _flood() -> void:
+	var pool := MeshInstance3D.new()
+	pool.name = "SpilledMedium"
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(1.0, 1.0)
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.36, 0.44, 0.22, 0.8)
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.roughness = 0.02
+	material.metallic = 0.5
+	# A faint glow of its own, so the spill reads in the dark room.
+	material.emission_enabled = true
+	material.emission = Color(0.2, 0.28, 0.1)
+	material.emission_energy_multiplier = 0.35
+	plane.material = material
+	pool.mesh = plane
+	pool.position = Vector3(VAT_POSITION.x, 0.015, VAT_POSITION.z)
+	pool.scale = Vector3(0.5, 1.0, 0.5)
+	add_child(pool)
+	var tween := create_tween()
+	tween.tween_property(pool, "scale", Vector3(5.5, 1.0, 5.5), 1.6).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
 
 
 ## Facing his door from where you stand.
@@ -2054,6 +2098,7 @@ func _breach() -> void:
 		cable.queue_free()
 	umbilicals.clear()
 	WorldHistory.record_event("opening_tank_breached", {"tank": "0C-7"})
+	_flood()
 	# Glass and fluid go outward across the grating.
 	#
 	# This used to be 22 pale two-centimetre boxes in desaturated green, thrown

@@ -27,6 +27,10 @@ var breath: AudioStreamPlayer
 var _material: ShaderMaterial
 var _muffle: AudioEffectLowPassFilter
 var _muffle_bus := -1
+## Blood clouding the medium (0..1) and the red of a pain flash.
+var blood := 0.0
+var pain_flash := 0.0
+var scream: AudioStreamPlayer
 
 
 func _ready() -> void:
@@ -55,6 +59,10 @@ func _ready() -> void:
 	breath.bus = bus
 	breath.volume_db = -10.0
 	add_child(breath)
+	scream = AudioStreamPlayer.new()
+	scream.bus = bus
+	scream.volume_db = -3.0
+	add_child(scream)
 	_muffle = AudioEffectLowPassFilter.new()
 	_muffle.cutoff_hz = MUFFLE_HZ
 
@@ -62,9 +70,11 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	clock += delta
 	amount = move_toward(amount, 1.0 if in_tank else 0.0, delta / FADE)
-	visible = amount > 0.001
+	visible = amount > 0.001 or pain_flash > 0.0
 	_material.set_shader_parameter("amount", amount)
 	_material.set_shader_parameter("panic", panic)
+	_material.set_shader_parameter("blood", blood)
+	pain_flash = maxf(0.0, pain_flash - delta * 2.5)
 	bubbles.queue_redraw()
 	_set_muffled(amount > 0.5)
 	if amount > 0.05:
@@ -104,8 +114,25 @@ func muffled() -> bool:
 	return _muffle_bus >= 0
 
 
+## Greg, 28 September: every cord torn out hurts: a red flash, a scream,
+## and your blood in the water.
+func pain() -> void:
+	pain_flash = 1.0
+	bleed(0.18)
+	var maker = TortureLoadIn.new()
+	scream.stream = maker._wave("scream", 0.8, false)
+	maker.free()
+	scream.play()
+
+
+func bleed(amount_added: float) -> void:
+	blood = clampf(blood + amount_added, 0.0, 0.85)
+
+
 ## Bubbles rising from the regulator and your skin, more when you panic.
 func _draw_bubbles() -> void:
+	if pain_flash > 0.0:
+		bubbles.draw_rect(Rect2(Vector2.ZERO, bubbles.size), Color(0.7, 0.02, 0.02, 0.45 * pain_flash))
 	if amount <= 0.01:
 		return
 	var view := bubbles.size

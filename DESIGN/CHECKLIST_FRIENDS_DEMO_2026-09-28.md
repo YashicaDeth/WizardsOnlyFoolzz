@@ -97,11 +97,11 @@ at 100. **(Greg)** marks what only Greg can do.
 
 ### The breakout
 
-- [ ] Mash to tear the cords; they resist
-- [ ] Pain on each cord: flash, scream, blood
-- [ ] Cracks spread with every blow until the glass bursts
-- [ ] The medium floods out and you fall with it
-- [ ] Crawl through the spill, pull up on the tank, stand
+- [x] Mash to tear the cords; they resist
+- [x] Pain on each cord: flash, scream, blood
+- [x] Cracks spread with every blow until the glass bursts
+- [x] The medium floods out and you fall with it
+- [x] Crawl through the spill, pull up on the tank, stand
 - [ ] One line saying why it is happening, at each beat
 
 ### The load-in
