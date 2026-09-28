@@ -343,6 +343,7 @@ func _build_gate() -> void:
 	guard_post.position = Vector3(0, 0, GATE_Z)
 	add_child(guard_post)
 	guard_post.build()
+	SilhouetteRim.dress(guard_post)
 	guard_post.shot.connect(_on_hollis_shot)
 	guard_post.door_opened.connect(_on_gate_opened)
 	guard_post.struck.connect(_on_hollis_struck)
@@ -441,6 +442,8 @@ func _build_guards() -> void:
 
 func _wire_guard(guard: SupportGuard) -> void:
 	guards.append(guard)
+	# Greg, 29 September: a faint silhouette between the pools of light.
+	SilhouetteRim.dress(guard)
 	director.register(guard)
 	guard.shot.connect(_on_guard_shot.bind(guard))
 

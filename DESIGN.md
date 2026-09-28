@@ -1575,3 +1575,10 @@ playable build and verified before merge.
   flatlining and restarting, and whispers.
 - **Lighting:** darker, with pools of light that lead you; red only on
   danger.
+
+### Answered by Greg in a question box, 29 September
+
+- **In the dark rooms, enemies keep a faint readable silhouette** between the
+  pools of light: a thin cold rim, so a fight can always be read, while the
+  rooms stay black and bodies never disappear. Chosen over a rim only when
+  close, and over true near-black.
