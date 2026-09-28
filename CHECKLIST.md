@@ -3491,7 +3491,7 @@ The last rung. Fifteen statements that are true of performance when this game is
 - [ ] **X10.3** `v10` Nothing iterates the world when it could iterate the screen
 - [ ] **X10.4** `v10` Static registries are swept at every seam
 - [x] ~~**X10.5** `v10` Gore, brass and debris are capped and recycled~~ Audited 29 Sep, every spawner has a ceiling that scales with quality: live gore `BaselineHuman.MAX_LIVE_GORE` 140 and splats 420, severed chunks `GoreChunks.MAX_CHUNKS` 72, casings `Ballistics.MAX_CASINGS` 180, wound marks 14 per zone, door/prop/lamp/vehicle fragments through `WorldDebris.register`'s per-pool budget (oldest freed first), and blood pools merge by volume (`BloodPool.keep`) rather than stacking.
-- [ ] **X10.6** `v10` Every subviewport renders only when somebody is looking
+- [x] ~~**X10.6** `v10` Every subviewport renders only when somebody is looking~~ 29 Sep (8d15b724): the Hunt had 16 part viewers and subject icons rendering a 3D pass every frame inside closed panels; they now render only while their panel is open. `tests/viewport_audit` lists any SubViewport set to UPDATE_ALWAYS behind a hidden owner and exits with the count: 0 in the Hunt, vat chamber, derby, Gore Sandbox, Support Unit and drains.
 - [ ] **X10.7** `v10` The region streams rather than existing all at once
 - [ ] **X10.8** `v10` Crowds are cheap enough to be crowds
 - [ ] **X10.9** `v10` No shader costs more than it earns
