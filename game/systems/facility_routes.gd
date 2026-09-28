@@ -37,8 +37,8 @@ const CONTAINMENT_MECHANISMS := {
 
 const DISTRICTS := {
 	"growing_floor": {"name": "Growing Floor", "kind": "occult_laboratory"},
-	"waste_gallery": {"name": "Waste Gallery", "kind": "trafficking_tunnel"},
-	"maintenance_cistern": {"name": "Maintenance Cistern", "kind": "maintenance_network"},
+	"waste_gallery": {"name": "The Old Drains", "kind": "trafficking_tunnel"},
+	"maintenance_cistern": {"name": "The Drain Cistern", "kind": "maintenance_network"},
 	"storm_outfall": {"name": "Storm Outfall", "kind": "surface_exit"},
 	"ossuary_exchange": {"name": "Ossuary Exchange", "kind": "catacombs"},
 	"undercroft_settlement": {"name": "Undercroft Settlement", "kind": "underground_settlement"},
@@ -95,7 +95,8 @@ const CONNECTIONS := [
 const ROUTES := {
 	ROUTE_STEALTH: {
 		"approach": "stealth_exploration",
-		"label": "MAINTENANCE ASCENT",
+		# Greg: named for what you walk (ids kept for saves).
+		"label": "THE OLD DRAINS",
 		"steps": ["waste_gallery", "maintenance_cistern", "storm_outfall"],
 		"exit": "storm_outfall",
 		"surface_position": Vector3(-110.0, 0.0, 10.0),
@@ -316,6 +317,20 @@ static func apply_recapture(mechanism_id: String, demonstrated_in_play: bool) ->
 	})
 	WorldHistory.commit_ledger_batch()
 	return true
+
+
+## Greg's playtest: the colosseum was unreachable on a fresh run. After your
+## first escape, a facility guard who puts you down takes you alive: the
+## implant flash pins you (the suppression lattice) and you go to the chute
+## and the derby instead of the vat. Returns the travel request, or {}.
+static func recapture_on_guard_kill() -> Dictionary:
+	if not escaped_once() or not apply_recapture("implant_suppression_lattice", true):
+		return {}
+	return {
+		"scene": "res://underground_colosseum.tscn",
+		"next": "THEY TAKE YOU ALIVE  //  THE REPROCESSING CHUTE",
+		"after": "YOU WAKE IN THE DERBY PIT",
+	}
 
 
 static func earn_derby_exit(demonstrated_cause: String) -> bool:

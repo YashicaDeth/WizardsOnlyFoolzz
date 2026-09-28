@@ -53,8 +53,11 @@ func zone_ratio(zone_id: String) -> float:
 
 
 func _process(delta: float) -> void:
+	var was := _fade
 	_fade = move_toward(_fade, 1.0 if shown else 0.0, delta * 6.0)
-	queue_redraw()
+	# Nothing to draw once it has faded out (it redrew empty every frame).
+	if _fade > 0.001 or was > 0.001:
+		queue_redraw()
 
 
 func _draw() -> void:

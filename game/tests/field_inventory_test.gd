@@ -39,6 +39,8 @@ func _ready() -> void:
 
 	print("AG5.31 - the inventory head opens the one real Wetwire index")
 	hunt.field_inventory.handle_input(key(KEY_B))
+	check(hunt.field_inventory.zoom >= 0.0 and not hunt.field_inventory.brain_index_open, "B first zooms into the skull")
+	hunt.field_inventory._process(hunt.field_inventory.ZOOM_SECONDS + 0.05)
 	check(hunt.field_inventory.visible and hunt.field_inventory.brain_index_open, "B on the inventory head opens the built-in Wetwire Brain Index")
 	check(not hunt.handheld.is_open, "the brain remains reachable even when the handheld is not raised")
 	hunt.field_inventory.handle_input(key(KEY_B))

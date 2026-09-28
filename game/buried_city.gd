@@ -528,16 +528,17 @@ func _build_landmark_lift() -> void:
 		leaf_mesh.size = Vector3(1.2, 2.8, 0.12)
 		leaf_mesh.material = WorldLook.surface(Color("5a3a26"), "metal", 2500)
 		leaf.mesh = leaf_mesh
-		leaf.position = LIFT_AT + Vector3(side * 0.6, 1.4, 2.78)
+		leaf.position = LIFT_AT + Vector3(side * 0.6, 1.4, CAR_FRONT + 0.06)
 		leaf.set_meta("side", side)
 		add_child(leaf)
 		lift_doors.append(leaf)
 	lift_lamp = OmniLight3D.new()
-	lift_lamp.position = LIFT_AT + Vector3(0, 3.2, 3.0)
+	lift_lamp.position = LIFT_AT + Vector3(0, 3.3, CAR_FRONT + 0.3)
 	lift_lamp.light_color = Color("c0392b")
 	lift_lamp.light_energy = 2.5
 	lift_lamp.omni_range = 4.0
 	add_child(lift_lamp)
+	_build_lift_car()
 	var beam := OmniLight3D.new()
 	beam.position = LIFT_AT + Vector3(0, 8.4, 0)
 	beam.light_color = Color("d36f34")
@@ -552,6 +553,76 @@ func _build_landmark_lift() -> void:
 	label.modulate = Color("e8a55a")
 	label.position = LIFT_AT + Vector3(0, 8.1, 1.0)
 	add_child(label)
+
+
+## Greg's playtest: behind the doors was the shaft's blank skin. A car stands
+## out of the shaft now -- walls, a grated floor, a warm lamp, the call panel
+## and a rail -- and you step in to ride (E within reach of the shaft centre).
+const CAR_FRONT := 4.1
+const CAR_HALF := 1.25
+const CAR_HEIGHT := 3.0
+
+
+func _build_lift_car() -> void:
+	var depth := CAR_FRONT - 2.6
+	var mid_z := LIFT_AT.z + 2.6 + depth * 0.5
+	for side in [-1.0, 1.0]:
+		_slab(Vector3(0.12, CAR_HEIGHT, depth), Vector3(LIFT_AT.x + side * CAR_HALF, CAR_HEIGHT * 0.5, mid_z), "metal", Color("3a2a20"))
+	_slab(Vector3(CAR_HALF * 2.0 + 0.12, 0.12, depth), Vector3(LIFT_AT.x, CAR_HEIGHT, mid_z), "metal", Color("2a1f19"))
+	var grate := MeshInstance3D.new()
+	var grate_mesh := BoxMesh.new()
+	grate_mesh.size = Vector3(CAR_HALF * 2.0, 0.04, depth)
+	grate_mesh.material = WorldLook.surface(Color("4a4038"), "metal", 2510)
+	grate.mesh = grate_mesh
+	grate.position = Vector3(LIFT_AT.x, 0.03, mid_z)
+	add_child(grate)
+	# The back of the car: a lit steel wall with a rail across it.
+	var back := MeshInstance3D.new()
+	var back_mesh := BoxMesh.new()
+	back_mesh.size = Vector3(CAR_HALF * 2.0, CAR_HEIGHT, 0.08)
+	back_mesh.material = WorldLook.surface(Color("6a5646"), "metal", 2511)
+	back.mesh = back_mesh
+	# In front of the shaft's bulge (2.7 m at the centre), or it shows through.
+	back.position = Vector3(LIFT_AT.x, CAR_HEIGHT * 0.5, LIFT_AT.z + 2.76)
+	add_child(back)
+	var rail := MeshInstance3D.new()
+	var rail_mesh := CylinderMesh.new()
+	rail_mesh.top_radius = 0.025
+	rail_mesh.bottom_radius = 0.025
+	rail_mesh.height = CAR_HALF * 1.8
+	rail_mesh.material = WorldLook.surface(Color("b8a88c"), "metal", 2512)
+	rail.mesh = rail_mesh
+	rail.rotation_degrees.z = 90.0
+	rail.position = Vector3(LIFT_AT.x, 1.0, LIFT_AT.z + 2.86)
+	add_child(rail)
+	# The call panel on the right wall, two buttons: UP lit.
+	var panel := MeshInstance3D.new()
+	var panel_mesh := BoxMesh.new()
+	panel_mesh.size = Vector3(0.04, 0.4, 0.22)
+	panel_mesh.material = WorldLook.surface(Color("1c1814"), "metal", 2513)
+	panel.mesh = panel_mesh
+	panel.position = Vector3(LIFT_AT.x + CAR_HALF - 0.08, 1.35, mid_z + 0.2)
+	add_child(panel)
+	for index in 2:
+		var button := MeshInstance3D.new()
+		var button_mesh := SphereMesh.new()
+		button_mesh.radius = 0.03
+		button_mesh.height = 0.06
+		var glow := StandardMaterial3D.new()
+		glow.albedo_color = Color("efa755") if index == 0 else Color("3a2a20")
+		glow.emission_enabled = index == 0
+		glow.emission = Color("efa755")
+		glow.emission_energy_multiplier = 2.0
+		button_mesh.material = glow
+		button.mesh = button_mesh
+		button.position = panel.position + Vector3(-0.03, 0.08 - index * 0.16, 0)
+		add_child(button)
+	var inside := OmniLight3D.new()
+	inside.light_color = Color("e2b57a")
+	inside.light_energy = 1.8
+	inside.omni_range = 3.2
+	inside.position = Vector3(LIFT_AT.x, CAR_HEIGHT - 0.3, mid_z)
+	add_child(inside)
 
 
 ## Fuse in and you close: the leaves part with a groan. Otherwise they shut.

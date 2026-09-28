@@ -63,7 +63,15 @@ func _process(delta: float) -> void:
 	footage += delta
 	_anchor_time = maxf(0.0, _anchor_time - delta)
 	_anchor_frames = maxi(0, _anchor_frames - 1)
-	queue_redraw()
+	# Greg's playtest (frame rate): HUD redraws at 30 Hz, not every frame. The
+	# house typeface draws glyphs as polygons; this canvas cost 1.8 ms a frame.
+	_redraw_clock += delta
+	if _redraw_clock >= 1.0 / 30.0:
+		_redraw_clock = 0.0
+		queue_redraw()
+
+
+var _redraw_clock := 0.0
 
 
 ## Which pieces are on screen. All of them normally; the implant boot

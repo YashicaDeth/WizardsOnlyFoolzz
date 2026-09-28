@@ -336,7 +336,8 @@ func _die(cause: String, killed_by: String) -> void:
 	died = true
 	var at := player.global_position
 	at.y = 0.0
-	rebirth_request = VAT_REBIRTH.die(LOCATION, cause, killed_by, at)
+	var taken := FacilityRoutes.recapture_on_guard_kill() if killed_by == guard_post.guard_id else {}
+	rebirth_request = taken if not taken.is_empty() else VAT_REBIRTH.die(LOCATION, cause, killed_by, at)
 	if killed_by == guard_post.guard_id:
 		guard_post.player_killed()
 	card_taken = false

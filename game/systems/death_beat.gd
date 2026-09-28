@@ -13,6 +13,7 @@ const BLOOD := Color(0.55, 0.02, 0.02)
 
 var cause := ""
 var next_line := ""
+var after_line := ""
 var scene := ""
 var clock := 0.0
 var _camera: Camera3D
@@ -26,7 +27,8 @@ static func play(host: Node, request: Dictionary, cause_text: String) -> CanvasL
 	var beat = load("res://systems/death_beat.gd").new()
 	beat.cause = cause_text.to_upper()
 	var vat_label := str(request.get("vat", {}).get("label", "a vat")).to_upper()
-	beat.next_line = "%s GROWS YOU BACK" % vat_label
+	beat.next_line = str(request.get("next", "%s GROWS YOU BACK" % vat_label))
+	beat.after_line = str(request.get("after", "WHAT YOU CARRIED STAYS ON THIS BODY"))
 	beat.scene = str(request.get("scene", ""))
 	host.add_child(beat)
 	return beat
@@ -77,7 +79,7 @@ func _draw_beat() -> void:
 	_canvas.draw_rect(area, Color(BLOOD, 0.55 * red))
 	_canvas.draw_rect(area, Color(0, 0, 0, black))
 	var centre_y := _canvas.size.y * 0.42
-	for line in [[1.0, "YOU DIED", 54.0, Color("d8c7a8")], [1.6, cause, 22.0, Color("c0392b")], [2.2, next_line, 18.0, Color("9c9480")], [2.4, "WHAT YOU CARRIED STAYS ON THIS BODY", 16.0, Color("9c9480")]]:
+	for line in [[1.0, "YOU DIED", 54.0, Color("d8c7a8")], [1.6, cause, 22.0, Color("c0392b")], [2.2, next_line, 18.0, Color("9c9480")], [2.4, after_line, 16.0, Color("9c9480")]]:
 		var alpha := clampf((clock - float(line[0])) / 0.4, 0.0, 1.0)
 		if alpha <= 0.0:
 			continue

@@ -30,5 +30,12 @@ func _ready() -> void:
 	check(not FacilityRoutes.escaped_once(), "a fresh world has not escaped")
 	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})
 	check(FacilityRoutes.escaped_once(), "after the heat elevator, the side exits open")
+	# Greg: the colosseum is reached by being taken alive, after a first escape.
+	WorldHistory.clear_history()
+	check(FacilityRoutes.recapture_on_guard_kill().is_empty(), "first run: a guard kill is a death, back to the vat")
+	WorldHistory.amend_subject(FacilityRoutes.SUBJECT, {"completed_routes": [FacilityRoutes.ROUTE_HEAT_ELEVATOR]})
+	var taken := FacilityRoutes.recapture_on_guard_kill()
+	check(str(taken.get("scene", "")) == "res://underground_colosseum.tscn", "after an escape, a guard takes you alive to the derby")
+	check(str(FacilityRoutes.ensure().get("active_route", "")) == FacilityRoutes.ROUTE_RECAPTURE, "and the recapture route is running")
 	print("ROUTE_SURFACING_TEST_RESULT failures=%d" % failures)
 	get_tree().quit(1 if failures > 0 else 0)

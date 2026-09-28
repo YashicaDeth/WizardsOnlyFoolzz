@@ -27,6 +27,11 @@ var inspect_pockets: Array = []
 var corpse_rows: Array = []
 var brain_rect := Rect2()
 var brain_index_open := false
+## Greg's checklist: hovering the head glows it and previews what is in the
+## chip; clicking zooms into the skull before the index opens.
+var head_hover := false
+var zoom := -1.0
+const ZOOM_SECONDS := 0.35
 
 
 func _init() -> void:
@@ -85,15 +90,13 @@ func handle_input(event: InputEvent) -> bool:
 				_mend_cloth()
 			KEY_B:
 				if inspect_rig == null:
-					brain_index_open = not brain_index_open
-					queue_redraw()
+					_toggle_brain_index()
 			_:
 				return false
 		return true
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if inspect_rig == null and brain_rect.has_point(event.position):
-			brain_index_open = not brain_index_open
-			queue_redraw()
+			_toggle_brain_index()
 			return true
 		for row in row_rects:
 			if (row.rect as Rect2).has_point(event.position):
@@ -102,7 +105,19 @@ func handle_input(event: InputEvent) -> bool:
 				queue_redraw()
 				return true
 		return true
-	return event is InputEventMouseMotion
+	if event is InputEventMouseMotion:
+		head_hover = inspect_rig == null and brain_rect.has_point(event.position)
+		return true
+	return false
+
+
+## Opening zooms into the skull first; closing is immediate.
+func _toggle_brain_index() -> void:
+	if brain_index_open:
+		brain_index_open = false
+	elif zoom < 0.0:
+		zoom = 0.0
+	queue_redraw()
 
 
 func _step(by: int) -> void:
@@ -203,7 +218,12 @@ func _mend_cloth() -> void:
 	queue_redraw()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if zoom >= 0.0:
+		zoom += delta / ZOOM_SECONDS
+		if zoom >= 1.0:
+			zoom = -1.0
+			brain_index_open = true
 	if visible:
 		queue_redraw()
 
@@ -272,13 +292,19 @@ func _draw_body(rect: Rect2) -> void:
 	# control above the head/torso rows so it is visibly part of the paper-doll
 	# panel and easy to reach with either the mouse or B.
 	brain_rect = Rect2(rect.position + Vector2(12, 38), Vector2(rect.size.x - 24, 36))
-	draw_rect(brain_rect, Color("210e0d"))
-	draw_rect(brain_rect, BLOOD * Color(1, 1, 1, 0.72), false, 1.0)
+	var glow := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006) if head_hover and not brain_index_open else 0.0
+	draw_rect(brain_rect, Color("210e0d").lerp(Color("3a1512"), glow))
+	draw_rect(brain_rect, BLOOD.lightened(0.35 * glow) * Color(1, 1, 1, 0.72 + 0.28 * glow), false, 1.0 + 2.0 * glow)
 	_t(brain_rect.position + Vector2(10, 15), "HEAD // WETWIRE BRAIN INDEX", 12, INK, brain_rect.size.x - 20)
 	_t(brain_rect.position + Vector2(10, 29), "CLICK HEAD / B TO %s" % ("CLOSE" if brain_index_open else "ACCESS"), 10, BLOOD.lightened(0.18), brain_rect.size.x - 20)
 	if brain_index_open:
 		_draw_brain_index(rect)
 		return
+	if zoom >= 0.0:
+		_draw_skull_zoom(rect)
+		return
+	if head_hover:
+		_draw_head_preview()
 	var y := rect.position.y + 98.0
 	for zone_id in ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"]:
 		var zone: Dictionary = body.anatomy.zones.get(zone_id, {})
@@ -304,6 +330,34 @@ func _draw_body(rect: Rect2) -> void:
 ## The inventory does not own another memory system.  This is a small physical
 ## reader over the same `BrainIndex` data the handheld uses, so losing a device
 ## cannot make a chip embedded in the player's skull stop existing.
+## What the chip holds, at a glance, under the hovered head.
+func _draw_head_preview() -> void:
+	var box := Rect2(brain_rect.position + Vector2(0, brain_rect.size.y + 4), Vector2(brain_rect.size.x, 38))
+	draw_rect(box, Color("110b0a"))
+	draw_rect(box, BLOOD * Color(1, 1, 1, 0.6), false, 1.0)
+	var chip: Dictionary = BRAIN_INDEX.chip("player")
+	var opened := 0
+	var total := 0
+	for counts: Dictionary in (BRAIN_INDEX.folder_counts("player") as Dictionary).values():
+		opened += int(counts.get("open", 0))
+		total += int(counts.get("total", 0))
+	_t(box.position + Vector2(10, 15), "CHIP // %s" % str(chip.get("owner_faction", "NO CHIP DETECTED")).to_upper(), 10, INK, box.size.x - 20)
+	_t(box.position + Vector2(10, 30), "FILES OPEN %02d / %02d" % [opened, total], 10, MOSS, box.size.x - 20)
+
+
+## Into the skull: it swells from the head row to fill the panel.
+func _draw_skull_zoom(rect: Rect2) -> void:
+	var t := ease(clampf(zoom, 0.0, 1.0), 0.4)
+	var centre := brain_rect.get_center().lerp(rect.get_center(), t)
+	var radius := lerpf(16.0, minf(rect.size.x, rect.size.y) * 0.42, t)
+	draw_circle(centre, radius, Color("d8c7a8") * Color(1, 1, 1, 0.9))
+	draw_circle(centre, radius * 0.93, Color("110b0a"))
+	for side in [-1.0, 1.0]:
+		draw_circle(centre + Vector2(side * radius * 0.36, -radius * 0.05), radius * 0.2, Color("d8c7a8") * Color(1, 1, 1, 0.8))
+		draw_circle(centre + Vector2(side * radius * 0.36, -radius * 0.05), radius * 0.15, Color("110b0a"))
+	draw_arc(centre, radius * 0.6, PI * 0.15, PI * 0.85, 16, BLOOD * Color(1, 1, 1, t), 2.0 + 3.0 * t)
+
+
 func _draw_brain_index(rect: Rect2) -> void:
 	var panel := Rect2(rect.position + Vector2(10, 82), rect.size - Vector2(20, 94))
 	draw_rect(panel, Color("110b0a"))

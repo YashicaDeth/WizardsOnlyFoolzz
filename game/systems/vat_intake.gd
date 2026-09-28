@@ -330,7 +330,16 @@ func _process(delta: float) -> void:
 		examiner_feed.call("say", line.left(int(revealed)), revealed < float(line.length()))
 	if body_preview != null and is_instance_valid(body_preview):
 		body_preview.call("set_face_focus", page == 3)
-	queue_redraw()
+	# Greg's playtest (frame rate): HUD redraws at 30 Hz, not every frame. The
+	# house typeface draws glyphs as polygons; this canvas cost 8.7 ms a frame.
+	# Nothing to draw at all while it is still fully faded out.
+	_redraw_clock += delta
+	if modulate.a > 0.0 and _redraw_clock >= 1.0 / 30.0:
+		_redraw_clock = 0.0
+		queue_redraw()
+
+
+var _redraw_clock := 0.0
 
 
 ## Long enough to read, whatever the authored hold was.

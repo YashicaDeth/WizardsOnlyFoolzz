@@ -203,7 +203,15 @@ func _process(delta: float) -> void:
 	location_announce = maxf(0.0, location_announce - delta)
 	lung_linger = maxf(0.0, lung_linger - delta)
 	affordance_notice_time = maxf(0.0, affordance_notice_time - delta)
-	queue_redraw()
+	# Greg's playtest (frame rate): HUD redraws at 30 Hz, not every frame. The
+	# house typeface draws glyphs as polygons; this canvas cost 2.7 ms a frame.
+	_redraw_clock += delta
+	if _redraw_clock >= 1.0 / 30.0:
+		_redraw_clock = 0.0
+		queue_redraw()
+
+
+var _redraw_clock := 0.0
 
 
 func _draw() -> void:
@@ -218,8 +226,9 @@ func _draw() -> void:
 		_draw_location_crest()
 	_draw_world_condition()
 	_draw_hunt_thread()
-	if nerve_rig == null:
-		_draw_player_state()
+	# Greg: the face should be visible. With the nerve rig up it is the face
+	# only, hung below the monitors; the rig owns the fluids and the mood word.
+	_draw_player_state(nerve_rig != null)
 	_draw_minimap()
 	_draw_lung_xray()
 	_draw_breath()
@@ -368,10 +377,10 @@ func _draw_regal_vitals() -> void:
 ## body state without importing somebody else's portrait-widget design, and
 ## the reservoirs underneath are fluids rather than rectangular progress bars:
 ## blood, filthy stamina water, and magick only after a ritual has made it real.
-func _draw_player_state() -> void:
+func _draw_player_state(face_only := false) -> void:
 	var head_damage := region_damage("head")
 	var head_slip := Vector2(round(sin(elapsed * 7.0) * head_damage * 4.0), round(cos(elapsed * 5.3) * head_damage * 2.0))
-	var portrait := Vector2(size.x - 74.0, 68.0) + head_slip
+	var portrait := (Vector2(size.x - 205.0, 215.0) if face_only else Vector2(size.x - 74.0, 68.0)) + head_slip
 	var mood := mood_name()
 	var mood_tint := TEAL
 	if mood in ["HURTING", "AGONY", "CHOKING"]:
@@ -399,13 +408,18 @@ func _draw_player_state() -> void:
 		draw_circle(eye + Vector2(side * 1.5, 0), 1.8, mood_tint)
 	var mouth_curve := -5.0 if mood == "STEADY" else (8.0 if mood in ["HURTING", "AGONY", "CHOKING"] else 2.0)
 	draw_arc(portrait + Vector2(0, 11 - mouth_curve * 0.25), 9.0, 0.25 if mouth_curve > 0 else PI + 0.25, PI - 0.25 if mouth_curve > 0 else TAU - 0.25, 12, BONE, 1.5)
-	var mood_width := CellOutzType.width_condensed(mood, 10.0, 0.9)
-	CellOutzType.draw_condensed(self, portrait + Vector2(-mood_width - 55, -13), mood, 10.0, mood_tint, 0.9)
-	CellOutzType.draw_condensed(self, portrait + Vector2(-mood_width - 55, 4), "THE HUNTER", 8.0, BONE * Color(1, 1, 1, 0.52), 0.7)
+	if not face_only:
+		var mood_width := CellOutzType.width_condensed(mood, 10.0, 0.9)
+		CellOutzType.draw_condensed(self, portrait + Vector2(-mood_width - 55, -13), mood, 10.0, mood_tint, 0.9)
+		CellOutzType.draw_condensed(self, portrait + Vector2(-mood_width - 55, 4), "THE HUNTER", 8.0, BONE * Color(1, 1, 1, 0.52), 0.7)
 
 	# The reservoirs hang from the portrait like medical ampoules. Their vertical
 	# orientation keeps every player-state read in one narrow silhouette and
 	# makes loss literal: the fluid level falls away from the face above it.
+	if face_only:
+		if head_damage > 0.08:
+			_draw_wound_crack(portrait + Vector2(31, -34), Vector2(-36, 42), head_damage)
+		return
 	var vessel_y := 119.0
 	_draw_vertical_fluid_vessel(Rect2(portrait.x - 36.0, vessel_y, 20, 112), blood, Color("7f080b"), "BLD")
 	# Low stamina is not clean empty glass: sediment takes over as the water is

@@ -123,7 +123,15 @@ func _process(delta: float) -> void:
 		_drips[i].y += delta * 160.0
 		if _drips[i].y > size.y:
 			_drips.remove_at(i)
-	queue_redraw()
+	# Greg's playtest (frame rate): HUD redraws at 30 Hz, not every frame. The
+	# house typeface draws glyphs as polygons; this canvas cost 6.8 ms a frame.
+	_redraw_clock += delta
+	if _redraw_clock >= 1.0 / 20.0:
+		_redraw_clock = 0.0
+		queue_redraw()
+
+
+var _redraw_clock := 0.0
 
 
 func _draw() -> void:

@@ -148,6 +148,9 @@ var _clock := 0.0
 ## Greg's playtest: freed subjects bolt for the nearest way out, and only
 ## fight when you stand in it. Empty = the old meet-and-act behaviour.
 var exits: Array = []
+## Things to run round, not through (tank centres on the Growing Floor).
+var avoid: Array = []
+const AVOID_RADIUS := 1.6
 var _pace := 0.0
 var _rng := RandomNumberGenerator.new()
 
@@ -543,7 +546,13 @@ func _flee(delta: float, distance: float) -> void:
 			WorldHistory.record_event("bingyanger_attacked_player", {"subject_id": subject_id, "damage": PLAYER_STRIKE, "cornered": true})
 			struck_player.emit(PLAYER_STRIKE)
 		return
-	_go(goal, RUN, delta, 0.0)
+	# ponytail: push-away steering, no navmesh; good for a row of tanks.
+	var heading := way.normalized()
+	for obstacle: Vector3 in avoid:
+		var off := _flat(global_position - obstacle)
+		if off.length() < AVOID_RADIUS and off.length() > 0.01:
+			heading += off.normalized() * (AVOID_RADIUS - off.length()) * 2.5
+	_go(global_position + heading.normalized() * maxf(1.0, way.length()), RUN, delta, 0.0)
 
 
 func _wander(delta: float) -> void:

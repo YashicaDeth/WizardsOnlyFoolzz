@@ -259,6 +259,7 @@ func _free(tank: Dictionary) -> void:
 	var player = host.get("player")
 	loose.bind(player, null, [])
 	loose.exits = _exits()
+	loose.avoid = tanks.filter(func(other: Dictionary) -> bool: return other != tank).map(func(other: Dictionary) -> Vector3: return other.at)
 	loose.release("vat_smashed")
 	WorldHistory.update_subject(id, {
 		"place": "growing_floor", "role": "Broken out of a Growing Floor vat",

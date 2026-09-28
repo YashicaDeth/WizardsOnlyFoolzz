@@ -27,6 +27,7 @@ Interstitial="*res://systems/interstitial.gd"
 PauseGate="*res://systems/pause_gate.gd"
 PerfProbe="*res://systems/perf_probe.gd"
 HouseLook="*res://systems/house_look.gd"
+PadBridge="*res://systems/pad_bridge.gd"
 
 [debug]
 
