@@ -46,6 +46,8 @@ const GOO := Color("70150e")
 const PAPER := Color(0.12, 0.075, 0.06)
 
 const ROUTES := ["PRESET", "RANDOM", "CHART", "INSTRUMENT"]
+## The quick start's one fixed character (the same body every time).
+const QUICK_START_SEED := 2026
 ## Greg, 25 September: "then he asks what style of fighting you want to do".
 const PAGES := ["ROUTE", "RACE", "TRAITS", "FACE", "BODY", "BIRTH", "SCHEDULE", "STYLE"]
 const BIRTH_PAGE := 5
@@ -606,17 +608,26 @@ func _commit() -> void:
 				# AX1.5. The fast route for a repeat player. PRESET has been the
 				# first option on the first page since this screen was written and
 				# did nothing at all, which is a poor first promise to break.
+				# Greg, 28 September: the quick start for friends. Your saved
+				# character if there is one, otherwise one fixed strong default;
+				# either way every page is filled and he files you straight on.
 				var saved: Array = CharacterPresets.names()
 				if saved.is_empty():
-					_speak("slipped")
-					transcript = "WROTE: NO PRESET ON FILE"
-					transcript_life = 3.2
+					sheet.randomise(QUICK_START_SEED)
+					sheet.route = "preset"
+					preset_loaded = "QUICK START"
 				else:
 					CharacterPresets.apply(str(saved[0]), sheet)
 					preset_loaded = str(saved[0])
-					transcript = "WROTE: ON FILE ALREADY // %s" % preset_loaded
-					transcript_life = 3.6
-					_doctor_observe()
+				transcript = "WROTE: QUICK START // %s" % preset_loaded
+				transcript_life = 3.6
+				_doctor_observe()
+				for index in PAGES.size():
+					touched_pages[index] = true
+				_transcribe(ROUTES[row])
+				if not verdict_started and _can_file():
+					_begin_verdict()
+				return
 			_transcribe(ROUTES[row])
 		1:
 			sheet.race = str(CharacterSheet.RACES.keys()[row])
@@ -972,7 +983,7 @@ func _draw_routes(_rect: Rect2, ink: Color, y: float) -> void:
 		var label: String = ROUTES[index]
 		_row_mark(ink, Vector2(30, y - 9), index == row, sheet.route == label.to_lower())
 		CellOutzType.draw_condensed(self, Vector2(50, y - 10), label, 13.0, ink, 0.9)
-		var note: String = ["authored, canonical", "the decanting lottery", "birth date, time, place", "the questionnaire"][index]
+		var note: String = ["quick start: enter and go", "the decanting lottery", "birth date, time, place", "the questionnaire"][index]
 		CellOutzType.draw_condensed(self, Vector2(180, y - 8), note.to_upper(), 8.0, ink * Color(1, 1, 1, 0.45), 0.7)
 		y += 26.0
 
