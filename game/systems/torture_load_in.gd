@@ -230,9 +230,8 @@ func _draw() -> void:
 		var jitter := Vector2(_rng.randf_range(-1.0, 1.0), 0.0) * 3.0 * pass_index
 		var font_size := int(clampf(unit * 0.036, 18.0, 36.0))
 		var at := Vector2(0.0, size.y * 0.72) + jitter
-		if pass_index > 0:
-			CellOutzType.draw_string_compat(self, at + Vector2(-2.0 * pass_index, 0), line, HORIZONTAL_ALIGNMENT_CENTER, size.x, font_size, Color(1, 0.1, 0.1, 0.35))
-			CellOutzType.draw_string_compat(self, at + Vector2(2.0 * pass_index, 0), line, HORIZONTAL_ALIGNMENT_CENTER, size.x, font_size, Color(0.1, 0.8, 1, 0.3))
+		# One line only: the red/cyan split copies read as the line doubled
+		# (Greg's playtest). Jitter and eaten letters carry the decay.
 		CellOutzType.draw_string_compat(self, at, line, HORIZONTAL_ALIGNMENT_CENTER, size.x, font_size, Color(BONE, 0.82 - 0.14 * pass_index))
 	if clock >= GLITCH_AT:
 		_draw_glitch(area, clamp((clock - GLITCH_AT) / GLITCH_SECONDS, 0.0, 1.0))
