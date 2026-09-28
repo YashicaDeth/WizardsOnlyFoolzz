@@ -84,6 +84,9 @@ var revealed_by := ""
 var question_index := 0
 var emitter_taken := false
 var ramp_open := false
+## Greg, 28 September: beat the examiner in his office and his bay is empty.
+## His car is here, the emitter lies dark on the floor, the ramp still opens.
+var empty_bay := false
 var surface_requested := false
 var last_call_result: Dictionary = {}
 
@@ -102,6 +105,8 @@ func _ready() -> void:
 	_build_hud()
 	_file_approach()
 	WorldHistory.record_event("doctor_vehicle_bay_entered", {"location": "doctor_vehicle_bay"})
+	if str(WorldHistory.subject("examiner_fight").get("status", "")) == "won":
+		_empty_bay()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
@@ -572,12 +577,12 @@ func _physics_process(delta: float) -> void:
 	var input := Vector3.ZERO if busy else Vector3(Input.get_axis("move_left", "move_right"), 0.0, Input.get_axis("move_forward", "move_back"))
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
 	var pace := WALK_SPEED * (1.6 if Input.is_action_pressed("sprint") else 1.0)
-	player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 16.0 * delta)
-	player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 16.0 * delta)
+	player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 26.0 * delta)
+	player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 26.0 * delta)
 	player.velocity.y = -2.0 if player.is_on_floor() else player.velocity.y - 18.0 * delta
 	player.move_and_slide()
 	player.rotation.y = yaw
-	camera.rotation = Vector3(pitch, 0, 0)
+	preload("res://systems/body_cam_feel.gd").apply(camera, player, delta, pitch)
 	step(delta)
 	_update_hud()
 
@@ -604,7 +609,7 @@ func step(delta: float) -> void:
 				ramp_door.position.y = minf(BAY_HEIGHT + 1.1, ramp_door.position.y + delta * 1.6)
 			if state == "after" and player.global_position.z < RAMP_TOP_Z + 1.0 and player.global_position.y > RAMP_RISE - 0.5:
 				surface()
-	if state in ["reveal", "call", "after"]:
+	if state in ["reveal", "call", "after"] and not empty_bay:
 		# Light that forgets to be steady: he stutters out for a frame or two.
 		doctor_rig.visible = fmod(state_clock * 7.3, 1.0) > 0.06
 	if hologram_material != null and state in ["call", "after"]:
@@ -729,6 +734,21 @@ func _on_call_finished(_call_id: String) -> void:
 	open_ramp()
 
 
+func _empty_bay() -> void:
+	empty_bay = true
+	state = "after"
+	state_clock = 0.0
+	doctor.visible = false
+	if doctor_rig != null:
+		doctor_rig.visible = false
+	if screen_split != null:
+		screen_split.visible = false
+	emitter_light.light_energy = 0.0
+	speech.text = "HE IS NOT HERE  //  YOU LEFT HIM ON HIS OFFICE FLOOR"
+	WorldHistory.record_event("doctor_bay_found_empty", {"location": "doctor_vehicle_bay"})
+	open_ramp()
+
+
 func open_ramp() -> void:
 	if ramp_open:
 		return
@@ -819,7 +839,7 @@ func _update_hud() -> void:
 		"reveal", "call":
 			objective.text = "OBJECTIVE // ..."
 		_:
-			objective.text = "OBJECTIVE // " + TASK_TEXT
+			objective.text = "OBJECTIVE // THE RAMP // UP AND OUT" if empty_bay else "OBJECTIVE // " + TASK_TEXT
 	if state == "questioning":
 		speech.text = "\"%s\"" % QUESTION_LINES[mini(question_index, QUESTION_LINES.size() - 1)]
 	var near_doctor := _flat_distance(DOCTOR_AT)
