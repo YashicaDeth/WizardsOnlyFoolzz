@@ -1446,3 +1446,30 @@ playable build and verified before merge.
   lighting, and no vertex wobble.
 - **Agents stop and ask Greg** for lore and names, the look of anything
   new (render and ask), and anything that removes a feature.
+
+### The first 15 minutes for Greg's friends, answered 28 September
+
+- **The first 15 minutes end on surfacing into the Hunt.**
+- **Onboarding:** each new key shows its hint once, then goes (E, K, J,
+  hold 4, Space, Ctrl).
+- **The intake gets a quick-start preset:** one strong default character,
+  one button at the intake's start. The full intake stays optional.
+- **The moment friends must remember is the brain hack.** It should land
+  with a louder, longer scream; the screen breaking apart; a flash of
+  memories from a life that isn't yours; then dead silence before BRAIN
+  HACKED SOUL OVERTAKEN slams in.
+- **The vat part needs work in every beat:** the load-in and intake, the
+  examiner at the glass, the brain hack and the breakout. Right now it is
+  confusing, too slow, looks unfinished and doesn't hit hard enough.
+- **Target length:** about 4 minutes from the load-in to standing up.
+- **Always clear on screen in the vat:** what key to press now (a big
+  prompt at each beat), why it is happening (one line), what you are (a
+  grown clone woken early), and where to go once you stand (the way out
+  lit).
+- **Inside the tank:** liquid distortion through the medium and the glass,
+  bubbles and muffled sound, your own grown body with the cords in it when
+  you look down, and panic (heartbeat, blur).
+- **Scarier:** other subjects twitching and dying in the next tanks; a
+  colder examiner who talks about you like meat and cuts or injects you;
+  body horror on your own body (extra fingers, open wounds, cords under
+  the skin); and sound (screams, alarms, wet noises).
