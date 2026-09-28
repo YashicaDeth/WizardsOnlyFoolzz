@@ -154,4 +154,13 @@ purpose.
 
 ## Blocked (fill in during the run)
 
+- 9-13 (Hunt to 6.25 ms): hidden viewers fixed (8d15b724), frame 14.4 -> ~14 ms.
+  The Hunt's own calls are 2.6 ms; the rest of physics is the engine, and
+  geometry is already fog-culled and batched. Getting to 6.25 ms is a
+  restructure of the Hunt, not a night's item.
+
 ## Results (fill in at the end)
+
+- 1-3 tank body: 7e167bda
+- 4-7 pad prompts: 17e81b65
+- 8, 87 hidden viewers: 8d15b724
