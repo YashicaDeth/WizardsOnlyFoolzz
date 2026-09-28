@@ -34,6 +34,7 @@ var key_hints: KeyHints
 ## Greg, 28 September: the next tanks and a colder examiner (VatHorror).
 var horror_subjects: Array = []
 var horror: VatHorror
+var tank_view: TankView
 ## Seconds left of the examiner's syringe, and how slow it makes you.
 var slowed_left := 0.0
 const SLOWED_SCALE := 0.5
@@ -325,6 +326,8 @@ func _ready() -> void:
 	_build_den()
 	key_hints = KeyHints.new()
 	add_child(key_hints)
+	tank_view = TankView.new()
+	add_child(tank_view)
 	if VatHorror.wanted():
 		horror = VatHorror.new()
 		add_child(horror)
@@ -1441,7 +1444,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.2, 1.0)
 
 
+const TANK_PANIC := {"intake": 0.2, "departure": 0.45, "hacked": 1.0, "submerged": 0.75}
+
+
 func _physics_process(delta: float) -> void:
+	# Greg, 28 September: the tank you are in (TankView) until it drains.
+	if tank_view != null:
+		tank_view.in_tank = TANK_PANIC.has(phase)
+		tank_view.panic = float(TANK_PANIC.get(phase, 0.0))
 	if phase == "intake":
 		if opening_audio != null:
 			opening_audio.set_phase("intake")

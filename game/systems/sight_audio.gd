@@ -13,8 +13,8 @@ static var _cache := {}
 static func stream(kind: String) -> AudioStreamWAV:
 	if _cache.has(kind):
 		return _cache[kind]
-	var looping := kind in ["choir", "sonar"]
-	var duration: float = {"choir": 4.0, "sonar": 1.0 / 0.35, "crumble": 1.1, "creak": 0.7, "spark": 0.45}.get(kind, 0.5)
+	var looping := kind in ["choir", "sonar", "heartbeat", "tank_breath"]
+	var duration: float = {"choir": 4.0, "sonar": 1.0 / 0.35, "crumble": 1.1, "creak": 0.7, "spark": 0.45, "heartbeat": 1.0, "tank_breath": 3.2}.get(kind, 0.5)
 	var frames := roundi(duration * RATE)
 	var bytes := PackedByteArray()
 	bytes.resize(frames * 2)
@@ -41,6 +41,21 @@ static func stream(kind: String) -> AudioStreamWAV:
 				var pitch := lerpf(180.0, 260.0, t / duration) + sin(TAU * 23.0 * t) * 20.0
 				sample = sin(TAU * pitch * t) * 0.4 * sin(PI * t / duration)
 				sample += (_noise(frame * 3) - 0.5) * 0.08
+			"heartbeat":
+				# Lub-dub, once a second at pitch 1.0 (the tank speeds it up).
+				for beat in [[0.0, 1.0], [0.24, 0.7]]:
+					var local := t - float(beat[0])
+					if local >= 0.0:
+						sample += sin(TAU * 48.0 * local) * exp(-local * 18.0) * float(beat[1]) * 0.9
+			"tank_breath":
+				# Breathing through the regulator: a slow inhale, a bubbling exhale.
+				var cycle := t / duration
+				var inhale := sin(PI * clampf(cycle / 0.45, 0.0, 1.0)) * 0.12 * (_noise(frame) - 0.5)
+				var exhale := 0.0
+				if cycle > 0.5:
+					var pop := 1.0 if _noise(frame / 300) > 0.55 else 0.0
+					exhale = sin(TAU * (380.0 + 200.0 * _noise(frame / 300)) * t) * exp(-fmod(t * 9.0, 1.0) * 5.0) * pop * 0.3
+				sample = inhale + exhale
 			"spark":
 				var crackle := 1.0 if _noise(frame / 40) > 0.6 else 0.0
 				sample = (_noise(frame * 7) * 2.0 - 1.0) * crackle * exp(-t * 6.0) * 0.7

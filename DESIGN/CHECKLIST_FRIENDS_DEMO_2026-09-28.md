@@ -86,12 +86,12 @@ at 100. **(Greg)** marks what only Greg can do.
 
 ### In the tank
 
-- [ ] Liquid distortion through the medium and glass
-- [ ] Bubbles rising
-- [ ] The room muffled as if underwater
-- [ ] Your heartbeat, speeding up with panic
-- [ ] Your breathing bubbles
-- [ ] His voice muffled through the glass
+- [x] Liquid distortion through the medium and glass
+- [x] Bubbles rising
+- [x] The room muffled as if underwater
+- [x] Your heartbeat, speeding up with panic
+- [x] Your breathing bubbles
+- [x] His voice muffled through the glass
 - [ ] Look down: your grown body and the cords in it
 - [ ] Body horror on your body by intake choices
 
