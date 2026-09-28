@@ -535,20 +535,23 @@ func _umbilical(index: int) -> Node3D:
 		lerpf(0.95, 0.52, forwardness),
 		sin(angle) * lerpf(0.58, 0.74, forwardness),
 	)
-	# Drawn as a chain of segments so it reads as gut, not as a straight pipe.
-	for segment in 7:
-		var t := float(segment) / 6.0
-		var point := anchor.lerp(target, t) + Vector3(sin(t * 5.0) * 0.07, 0, cos(t * 4.0) * 0.07)
-		var link := MeshInstance3D.new()
-		var mesh := SphereMesh.new()
-		# Tapering harder toward the body: the wide end is the one hanging from
-		# the ceiling, far away, and the near end is the one entering the skin.
-		mesh.radius = 0.055 - t * 0.030
-		mesh.height = mesh.radius * 2.2
-		mesh.material = WorldLook.surface(Color("4a3128") if segment % 2 == 0 else Color("38261f"), "flesh", index * 7 + segment)
-		link.mesh = mesh
-		link.position = point
-		root.add_child(link)
+	# Greg's playtest: real cables, not a string of beads. One sagging tube,
+	# the same sheath as the room's wiring (LabCables). The markers along it
+	# are what `_aimed_wire` looks for.
+	var points := PackedVector3Array()
+	for segment in 15:
+		var t := float(segment) / 14.0
+		var point := anchor.lerp(target, t) + Vector3(sin(t * 5.0) * 0.07, -0.18 * 4.0 * t * (1.0 - t), cos(t * 4.0) * 0.07)
+		points.append(point - anchor)
+		if segment % 2 == 0:
+			var mark := Marker3D.new()
+			mark.position = point
+			root.add_child(mark)
+	var tube := MeshInstance3D.new()
+	tube.mesh = LAB_CABLES._tube_mesh([{"points": points, "radius": 0.028}])
+	tube.material_override = LAB_CABLES._material("black" if index % 2 == 0 else "rust")
+	tube.position = anchor
+	root.add_child(tube)
 	return root
 
 
@@ -1290,6 +1293,21 @@ func _build_den() -> void:
 	shiv.position = Vector3(back_x + 0.55, 0.05, z - 0.7)
 	shiv.rotation.y = 0.8
 	add_child(shiv)
+	# Greg's playtest: their Black Mirror lies beside them. Face down, the
+	# screen's glow leaking round the edge.
+	var mirror := MeshInstance3D.new()
+	mirror.name = "DenMirror"
+	var slab := BoxMesh.new()
+	slab.size = Vector3(0.075, 0.012, 0.155)
+	var glass := WorldLook.surface(Color("0b0c0e"), "chrome", 949)
+	glass.emission_enabled = true
+	glass.emission = Color(0.25, 0.55, 0.5)
+	glass.emission_energy_multiplier = 0.25
+	slab.material = glass
+	mirror.mesh = slab
+	mirror.position = Vector3(back_x + 0.5, 0.05, z + 0.55)
+	mirror.rotation.y = -0.5
+	add_child(mirror)
 	# A stash under the bedroll's corner, and the spirit K shows where they lay.
 	caches.append(HIDDEN_CACHE.place_stash(self, sight, "growing_floor_den_stash", Vector3(inner_x - 0.25, 0.5, z - DEN_HALF + 0.2), Vector3.BACK))
 	var spirits: Array = (sight.get("spirits") as Array).duplicate()
@@ -1345,7 +1363,7 @@ func _in_den() -> bool:
 	return weak_wall_broken and player != null and player.global_position.x < -7.85 and absf(player.global_position.z - WEAK_WALL_AT.z) < DEN_HALF + 0.2
 
 
-## E in the den: the notes, then the shiv.
+## E in the den: the notes, the shiv, then their Black Mirror.
 func _try_den() -> bool:
 	if not _in_den():
 		return false
@@ -1368,6 +1386,15 @@ func _try_den() -> bool:
 			carry.save_to_history()
 			subtitle.text = "A SHIV  //  THEY MADE IT THEMSELVES"
 			WorldHistory.record_event("growing_floor_den_shiv_taken", {"location": "growing_floor"})
+			return true
+	var mirror_node := get_node_or_null("DenMirror") as Node3D
+	if mirror_node != null and mirror_node.visible:
+		var to_mirror := mirror_node.global_position - player.global_position
+		to_mirror.y = 0.0
+		if to_mirror.length() < 1.6:
+			mirror_node.visible = false
+			subtitle.text = "THEIR BLACK MIRROR  //  STILL WARM  //  IT UNLOCKS FOR YOU"
+			WorldHistory.record_event("growing_floor_den_mirror_taken", {"location": "growing_floor"})
 			return true
 	return false
 
@@ -2149,16 +2176,20 @@ func _update_knees(delta: float) -> void:
 func _flood() -> void:
 	var pool := MeshInstance3D.new()
 	pool.name = "SpilledMedium"
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(1.0, 1.0)
+	# Greg's playtest: this was a 1 m plane glowing green, scaled into a 5.5 m
+	# green square. A spill is round, and the medium is bloody (see above).
+	var plane := CylinderMesh.new()
+	plane.top_radius = 0.5
+	plane.bottom_radius = 0.5
+	plane.height = 0.01
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.36, 0.44, 0.22, 0.8)
+	material.albedo_color = Color(0.2, 0.03, 0.03, 0.85)
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.roughness = 0.02
 	material.metallic = 0.5
 	# A faint glow of its own, so the spill reads in the dark room.
 	material.emission_enabled = true
-	material.emission = Color(0.2, 0.28, 0.1)
+	material.emission = Color(0.12, 0.02, 0.02)
 	material.emission_energy_multiplier = 0.35
 	plane.material = material
 	pool.mesh = plane
@@ -2542,6 +2573,8 @@ func _update_hud() -> void:
 			prompt.text = "[E] READ THEIR NOTES"
 		elif shiv_node != null and shiv_node.visible:
 			prompt.text = "[E] TAKE THE SHIV"
+		elif (get_node("DenMirror") as Node3D).visible:
+			prompt.text = "[E] TAKE THEIR BLACK MIRROR"
 		else:
 			prompt.text = "THEIR DEN  //  K SHOWS WHO STAYED"
 		return

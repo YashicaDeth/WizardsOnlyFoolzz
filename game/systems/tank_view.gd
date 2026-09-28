@@ -136,7 +136,8 @@ func _draw_bubbles() -> void:
 	if amount <= 0.01:
 		return
 	var view := bubbles.size
-	var count := int(lerpf(14.0, 46.0, panic))
+	# Greg's playtest: subtler. Fewer, smaller, fainter; panic still thickens them.
+	var count := int(lerpf(6.0, 20.0, panic))
 	for bubble in count:
 		var salt := float(bubble) * 12.9898
 		var x := _fract(sin(salt) * 43758.5) * view.x
@@ -144,9 +145,9 @@ func _draw_bubbles() -> void:
 		var rise := _fract(_fract(sin(salt * 2.3) * 3141.6) + clock * speed * (1.0 + panic))
 		var y := view.y * (1.05 - rise * 1.1)
 		var wobble := sin(clock * 3.0 + salt) * 6.0
-		var radius := 2.0 + 7.0 * _fract(sin(salt * 3.1) * 777.7)
-		bubbles.draw_arc(Vector2(x + wobble, y), radius, 0.0, TAU, 14, Color(0.85, 0.95, 0.85, 0.35 * amount), 1.3)
-		bubbles.draw_circle(Vector2(x + wobble - radius * 0.3, y - radius * 0.3), radius * 0.2, Color(1, 1, 1, 0.3 * amount))
+		var radius := 1.5 + 4.0 * _fract(sin(salt * 3.1) * 777.7)
+		bubbles.draw_arc(Vector2(x + wobble, y), radius, 0.0, TAU, 14, Color(0.85, 0.95, 0.85, 0.18 * amount), 1.0)
+		bubbles.draw_circle(Vector2(x + wobble - radius * 0.3, y - radius * 0.3), radius * 0.2, Color(1, 1, 1, 0.15 * amount))
 
 
 static func _fract(x: float) -> float:
