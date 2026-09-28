@@ -1495,3 +1495,10 @@ playable build and verified before merge.
 - **Tank sound:** the room muffled as if underwater, your heartbeat loud
   and speeding up, your breathing bubbles, and the examiner's voice
   muffled through the glass.
+- **The load-in** stays a loading screen, made horror: scarier, shorter
+  and clearer.
+- **First seen:** the title, then NEW GAME straight into the load-in, with
+  no menus in the way.
+- **One-time key hints:** bottom centre and big, a key glyph plus the verb,
+  fading once used. They show keyboard or controller buttons, whichever
+  was used last (Greg: "you can choose").
