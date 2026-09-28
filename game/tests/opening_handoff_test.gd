@@ -26,7 +26,11 @@ extends Node
 
 ## Long enough for the whole authored opening with headroom, short enough that a
 ## sequence which stops advancing fails rather than hanging the suite.
-const HANDOFF_BUDGET := 45.0
+## 75 s since 2026-09-24: every line of his closing verdict is now held long
+## enough to read (Greg: the text went by too fast), not a flat three seconds.
+const HANDOFF_BUDGET := 75.0
+
+const BRAIN_HACK := preload("res://systems/brain_hack.gd")
 
 var failures: Array[String] = []
 var opening: Node
@@ -50,6 +54,8 @@ func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		get_tree().quit(2)
 		return
+	# The whole live route, the brain hack included (Greg, 25 September).
+	BRAIN_HACK.force_in_tests = true
 	WorldHistory.clear_history()
 	opening = load("res://vat_chamber.tscn").instantiate()
 	add_child(opening)
@@ -78,6 +84,12 @@ func _ready() -> void:
 	# Every remaining tab has to be visited, which is the gate he enforces.
 	# Committing the first row of each is what accepting the defaults looks like.
 	for _page in range(1, opening.intake.PAGES.size()):
+		# A tab can start one of his procedures (SCHEDULE does), and the form
+		# takes no keys until he is done; a player waits, so this does too.
+		var working := 0.0
+		while not opening.intake.procedure.is_empty() and working < 25.0:
+			await get_tree().physics_frame
+			working += get_physics_process_delta_time()
 		press(KEY_RIGHT)
 		press(KEY_ENTER)
 		await get_tree().physics_frame
@@ -102,6 +114,17 @@ func _ready() -> void:
 	while not opening.can_move and elapsed < HANDOFF_BUDGET:
 		await get_tree().physics_frame
 		elapsed += get_physics_process_delta_time()
+		# Hanging in the wires, the player looks at one and presses E.
+		if opening.phase == "wired" and not opening.umbilicals.is_empty():
+			var cable: Node3D = opening.umbilicals[0]
+			var aim: Vector3 = ((cable.get_child(3) as Node3D).global_position - opening.camera.global_position).normalized()
+			opening.yaw = atan2(-aim.x, -aim.z)
+			opening.pitch = asin(aim.y)
+			opening._update_wired(0.0)
+			var key := InputEventKey.new()
+			key.keycode = KEY_E
+			key.pressed = true
+			opening._unhandled_input(key)
 	check(opening.can_move, "one filing reaches free movement on the live route (%.1fs after filing)" % elapsed)
 
 	print("-- and what arrives is someone who can stand and walk --")

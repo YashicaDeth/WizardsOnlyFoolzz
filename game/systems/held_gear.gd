@@ -406,6 +406,7 @@ static func build_weapon(weapon_id: String) -> Node3D:
 		"shotgun": _build_shotgun(root)
 		"sidearm": _build_sidearm(root)
 		"launcher": _build_launcher(root)
+		"shiv": _build_shiv(root)
 		_: _build_sword(root)
 	# Every part above is authored muzzle-forward along +Z because that is the
 	# readable way to write a sweep, and a Godot node's forward is -Z. Turning
@@ -460,6 +461,29 @@ static func _build_launcher(root: Node3D) -> void:
 ## The Ashline Cleaver. Single-edged, heavy at the front, a blade that is a
 ## wedge in section rather than a plank — the spine carries the mass and the
 ## edge is where it runs out.
+## The shiv from the den (Greg, 28 September): a short scrap blade bound to a
+## rag-wrapped handle. Built along +Z like the others.
+static func _build_shiv(root: Node3D) -> void:
+	var blade := MeshInstance3D.new()
+	blade.name = "blade"
+	blade.mesh = _blade(0.2, 0.034, 0.008)
+	blade.position = Vector3(0, 0, 0.02)
+	blade.material_override = _metal(Color("8c8f86"), 0.4, 23)
+	root.add_child(blade)
+	var handle := MeshInstance3D.new()
+	handle.name = "handle"
+	var wrap := BoxMesh.new()
+	wrap.size = Vector3(0.03, 0.03, 0.12)
+	var rag := StandardMaterial3D.new()
+	rag.albedo_color = Color("5b4a36")
+	rag.roughness = 0.95
+	wrap.material = rag
+	handle.mesh = wrap
+	handle.position = Vector3(0, 0, -0.07)
+	root.add_child(handle)
+	_anchor(root, "grip", Vector3(0, 0, -0.07), Vector3.ZERO)
+
+
 static func _build_sword(root: Node3D) -> void:
 	var steel := Color("9aa0a4")
 	var blade := MeshInstance3D.new()

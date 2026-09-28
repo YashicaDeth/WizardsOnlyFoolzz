@@ -320,7 +320,7 @@ func _land(round_data: Dictionary, hit: Dictionary, step_delta: float) -> void:
 		"shooter": round_data["shooter"],
 		"payload": round_data.get("payload", {}),
 	}
-	_mark(at, normal, energy)
+	_mark(at, normal, energy, hit.get("collider"), velocity.normalized())
 	round_hit.emit(report)
 
 
@@ -390,7 +390,10 @@ func rounds_in_flight() -> Array[Vector3]:
 ## before AB's destruction pass lands properly.  This deliberately is not a
 ## QuadMesh: a dark, untextured quad is a black square wherever a player shoots
 ## the floor, which reads as a broken decal rather than a struck surface.
-func _mark(at: Vector3, normal: Vector3, energy: float) -> void:
+##
+## 0.2b: a round into the ground (`GroundHole.is_ground`) leaves a hole instead,
+## sized by the energy it arrived with, in the same capped pool as the scars.
+func _mark(at: Vector3, normal: Vector3, energy: float, collider: Object = null, direction := Vector3.DOWN) -> void:
 	if marks.size() >= wound_budget():
 		var oldest: Node3D = marks.pop_front()
 		if is_instance_valid(oldest):
@@ -398,6 +401,9 @@ func _mark(at: Vector3, normal: Vector3, energy: float) -> void:
 	var surface_normal := normal.normalized()
 	if surface_normal.length_squared() < 0.001:
 		surface_normal = Vector3.UP
+	if GroundHole.is_ground(collider, surface_normal):
+		marks.append(GroundHole.carve(self, at, surface_normal, GroundHole.radius_for_round(energy), direction))
+		return
 	var radius := clampf(0.030 + energy * 0.012, 0.028, 0.135)
 
 	# A tiny two-layer cylinder scar gives the hit a real, circular outline at

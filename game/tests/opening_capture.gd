@@ -62,6 +62,12 @@ func _ready() -> void:
 		opening.can_move = true
 	opening._update_beats()
 	opening.subtitle.text = ""
+	# Breaking the tank directly skips the wires; in play GET REVENGE has
+	# already replaced the END ALL SUFFERING card by now.
+	if opening.mission_card != null and opening.mission_card.playing:
+		opening.mission_card.skip()
+	# And the title fades while you get up off the floor, which this skips.
+	opening.title.visible = false
 	opening._update_hud()
 	await get_tree().process_frame
 	await _capture("%s/opening_escape_objective.png" % out_dir)

@@ -33,6 +33,12 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	var tree := get_tree()
+	# Headless the dummy renderer draws nothing, so the two presets cost the
+	# same and the comparison is noise. It needs a real renderer.
+	if DisplayServer.get_name() == "headless":
+		print("frame cost: skipped headless (needs a real renderer)")
+		tree.quit(0)
+		return
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	Engine.max_fps = 0
 	get_window().size = Vector2i(1920, 1080)

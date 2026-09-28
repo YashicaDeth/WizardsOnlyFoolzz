@@ -1,0 +1,42 @@
+name: Offer art
+description: You draw, model, animate or make sound and want to make something for the game.
+title: "[ART]: "
+labels: ["art"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. The game prefers made things over generated ones. This board is public, so share links, not private details.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What do you make?
+      options:
+        - 3D models
+        - 2D art or illustration
+        - Animation or motion graphics
+        - Sound or music
+        - Writing
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: offer
+    attributes:
+      label: What would you like to make?
+      description: One of the things on the "art wanted" list, or your own idea.
+    validations:
+      required: true
+  - type: input
+    id: portfolio
+    attributes:
+      label: Portfolio or examples (link)
+      placeholder: "ArtStation, Sketchfab, Instagram, a folder link..."
+  - type: dropdown
+    id: licence
+    attributes:
+      label: How would you share it?
+      options:
+        - Credited, free to use in the game (CC-BY or similar)
+        - I'd like to talk about payment
+        - Not sure yet

@@ -9,6 +9,10 @@ extends Node
 ## back the run that led into the climb, not the climb loop's small
 ## into-the-wall vector.
 
+## Off the district's centre line: a prop at (0.4, 2, 21.4) now stands
+## where x=0 used to be open ground, and blocked the vault's high ray.
+const LANE_X := -4.0
+
 var failures: Array[String] = []
 
 
@@ -45,14 +49,14 @@ func _ready() -> void:
 	hunt.set_physics_process(false)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	hunt.player_body.position = Vector3(0, 0.9, 19)
+	hunt.player_body.position = Vector3(LANE_X, 0.9, 19)
 	hunt.player_body.velocity = Vector3.ZERO
 	hunt.yaw = 0.0
 	await _settle(hunt)
 	var forward: Vector3 = hunt.HUNTER_MOTOR.wish_direction(Vector2(0, -1), hunt.yaw)
 
 	print("AD1.5 - a vault hands back the run it interrupted, not a dead stop")
-	var low_box := _make_wall(Vector3(0, 0.4, 19.5), Vector3(2.0, 0.8, 0.4))
+	var low_box := _make_wall(Vector3(LANE_X, 0.4, 19.5), Vector3(2.0, 0.8, 0.4))
 	add_child(low_box)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
@@ -79,16 +83,16 @@ func _ready() -> void:
 	# The vault above already carried the body past z=19.5 — reset to a
 	# fresh approach rather than testing a climb wall the player is
 	# standing behind.
-	hunt.player_body.position = Vector3(0, 0.9, 19)
+	hunt.player_body.position = Vector3(LANE_X, 0.9, 19)
 	hunt.player_body.velocity = Vector3.ZERO
 	await _settle(hunt)
-	var climb_wall := _make_wall(Vector3(0, 1.5, 19.5), Vector3(2.0, 3.0, 0.4))
+	var climb_wall := _make_wall(Vector3(LANE_X, 1.5, 19.5), Vector3(2.0, 3.0, 0.4))
 	add_child(climb_wall)
 	# Flush with the wall's own top — without a real roof to land on,
 	# `_vault_target()`'s floor query has nothing to find no matter how
 	# far the climb gets, since it searches close to the height the climb
 	# has actually reached, not all the way down to the ground far below.
-	var roof := _make_wall(Vector3(0, 2.9, 21.0), Vector3(4.0, 0.2, 4.0))
+	var roof := _make_wall(Vector3(LANE_X, 2.9, 21.0), Vector3(4.0, 0.2, 4.0))
 	add_child(roof)
 	await get_tree().physics_frame
 	await get_tree().physics_frame

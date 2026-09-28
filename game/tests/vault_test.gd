@@ -42,7 +42,8 @@ func _ready() -> void:
 	hunt.set_physics_process(false)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	hunt.player_body.position = Vector3(0, 0.9, 19)
+	# x = 3: the Hunt map now has a prop standing at x = 0, z = 19.5.
+	hunt.player_body.position = Vector3(3, 0.9, 19)
 	hunt.player_body.velocity = Vector3.ZERO
 	hunt.yaw = 0.0
 	await _settle(hunt)
@@ -53,7 +54,7 @@ func _ready() -> void:
 	check(hunt._vault_target(forward).is_empty(), "open ground ahead returns no target")
 
 	print("AD1.2 - a waist-high box in front is a real, findable vault")
-	var low_wall := _make_box(Vector3(0, 0.4, 19.5), Vector3(2.0, 0.8, 0.4))
+	var low_wall := _make_box(Vector3(3, 0.4, 19.5), Vector3(2.0, 0.8, 0.4))
 	add_child(low_wall)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
@@ -67,7 +68,7 @@ func _ready() -> void:
 	print("AD1.2 - a real wall stays a wall")
 	low_wall.queue_free()
 	await get_tree().physics_frame
-	var tall_wall := _make_box(Vector3(0, 1.1, 19.5), Vector3(2.0, 2.2, 0.4))
+	var tall_wall := _make_box(Vector3(3, 1.1, 19.5), Vector3(2.0, 2.2, 0.4))
 	add_child(tall_wall)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
@@ -76,7 +77,7 @@ func _ready() -> void:
 	await get_tree().physics_frame
 
 	print("AD1.2 - triggering one actually carries the body across, over real time")
-	var low_wall2 := _make_box(Vector3(0, 0.4, 19.5), Vector3(2.0, 0.8, 0.4))
+	var low_wall2 := _make_box(Vector3(3, 0.4, 19.5), Vector3(2.0, 0.8, 0.4))
 	add_child(low_wall2)
 	await get_tree().physics_frame
 	await get_tree().physics_frame

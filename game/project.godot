@@ -26,6 +26,7 @@ CosmologyFactions="*res://systems/cosmology_factions.gd"
 Interstitial="*res://systems/interstitial.gd"
 PauseGate="*res://systems/pause_gate.gd"
 PerfProbe="*res://systems/perf_probe.gd"
+HouseLook="*res://systems/house_look.gd"
 
 [debug]
 
@@ -80,3 +81,4 @@ crouch={
 [rendering]
 
 environment/defaults/default_clear_color=Color(0.06, 0.055, 0.09, 1)
+limits/opengl/max_renderable_lights=128

@@ -147,5 +147,10 @@ func _ready() -> void:
 				found_event = true
 	check(found_event, "and a real event names the player and what they declined, the same way N2.2 acknowledges an overspent build")
 
+	# One face slider shapes one feature: the skin does not re-roll under it.
+	var before_axes := {"appearance": {"name": "THE HUNTER", "face": 0.2, "axes": {"brow": 0.2, "jaw": 0.5}}}
+	var after_axes := {"appearance": {"name": "THE HUNTER", "face": 0.8, "axes": {"brow": 0.9, "jaw": 0.5}}}
+	check(BaselineHuman.config_from_subject(before_axes).variation == BaselineHuman.config_from_subject(after_axes).variation, "moving the brow does not repaint the whole face")
+
 	print("INTAKE_BODY_RESULT failures=", failures.size())
 	get_tree().quit(0 if failures.is_empty() else 1)

@@ -14,6 +14,11 @@ const RED := Color("a82920")
 const ACID := Color("8da839")
 const DESIGN := Vector2(880, 620)
 
+## Greg, 24 September: the demo end card carries your run, read from the
+## world record rather than a separate tally, and the live seal as a stamp.
+const LOGO_FX := preload("res://shaders/logo_fx.gdshader")
+const SEAL_PATH := "res://art/brand/wof_seal.png"
+var seal: TextureRect
 var clock := 0.0
 var _factor := 1.0
 var _origin := Vector2.ZERO
@@ -32,6 +37,19 @@ func _ready() -> void:
 	_front_button = _make_button("FrontDoor", Vector2(566, 532), Vector2(244, 54))
 	_front_button.pressed.connect(_request_front_door)
 	add_child(_front_button)
+	seal = TextureRect.new()
+	seal.name = "Seal"
+	seal.texture = load(SEAL_PATH) as Texture2D
+	seal.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	seal.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	seal.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var fx := ShaderMaterial.new()
+	fx.shader = LOGO_FX
+	fx.set_shader_parameter("is_seal", true)
+	fx.set_shader_parameter("drips_on", 0.0)
+	fx.set_shader_parameter("calm", 0.7)
+	seal.material = fx
+	add_child(seal)
 	hide()
 
 
@@ -123,6 +141,12 @@ func _process(delta: float) -> void:
 		var button: Button = entry[0]
 		button.scale = Vector2.ONE * _factor
 		button.position = _origin + (entry[1] as Vector2) * _factor
+	# The seal stamps down onto the invoice's corner as the card opens.
+	var stamp := clampf(clock / 0.5, 0.0, 1.0)
+	seal.size = Vector2.ONE * 118.0 * _factor * lerpf(1.6, 1.0, ease(stamp, 0.3))
+	seal.position = _origin + Vector2(DESIGN.x - 150.0, 14.0) * _factor - (seal.size - Vector2.ONE * 118.0 * _factor) * 0.5
+	seal.modulate.a = stamp
+	(seal.material as ShaderMaterial).set_shader_parameter("assemble", clampf(clock / 0.6, 0.0, 1.0))
 	queue_redraw()
 
 
@@ -146,6 +170,12 @@ func _draw() -> void:
 	CellOutzType.draw_condensed(self, Vector2(58, 172), "ASHLINE CAPTAIN FORCED FROM THE FIELD", 15.0, INK, 1.3)
 	CellOutzType.draw_condensed(self, Vector2(58, 199), "YOUR BODY AND THEIR GRUDGE REMAIN ON FILE", 11.0, INK * Color(1, 1, 1, 0.78), 1.1)
 
+	# Your run, off the record.
+	CellOutzType.draw_text(self, Vector2(560, 143), "YOUR RECORD", 13.0, RED, 1.8)
+	var line_y := 170.0
+	for line in record_lines():
+		CellOutzType.draw_condensed(self, Vector2(560, line_y), line, 10.0, INK, 1.0)
+		line_y += 19.0
 	CellOutzType.draw_text(self, Vector2(58, 244), "WITHHELD AFTER PAYMENT FAILURE", 13.0, RED, 1.8)
 	_draw_line_item(278, "01", "OUTER ASHBLOOM ROAD / LIVE REGION ACCESS")
 	_draw_line_item(316, "02", "ASHLINE CAPTAIN / SECOND HUNT / REBUILT BODY")
@@ -157,6 +187,26 @@ func _draw() -> void:
 	CellOutzType.draw_text(self, Vector2(92, 548), "CONTINUE THIS WORLD IN PLAY", 14.0, INK, 1.8)
 	CellOutzType.draw_text(self, Vector2(588, 548), "FRONT DOOR", 14.0, INK, 1.8)
 	CellOutzType.draw_condensed(self, Vector2(775, 553), "ESC", 9.0, RED, 1.0)
+
+
+## The run as the world recorded it: how you got out, and what you did.
+static func record_lines() -> Array[String]:
+	var routes: Array = WorldHistory.subject(FacilityRoutes.SUBJECT).get("completed_routes", [])
+	var route_id := str(routes.back()) if not routes.is_empty() else ""
+	var route_label := str(FacilityRoutes.route(route_id).get("label", route_id.to_upper().replace("_", " "))) if not route_id.is_empty() else "NOT YET OUT"
+	var broke := 0
+	for event in WorldHistory.events:
+		if str(event.get("type", "")) == "world_object_struck" and bool((event.get("details", event) as Dictionary).get("broke", false)):
+			broke += 1
+	return [
+		"OUT BY  %s" % route_label,
+		"DIED  %d" % WorldHistory.event_count("player_died"),
+		"KILLED  %d" % WorldHistory.event_count("npc_killed"),
+		"FREED  %d" % WorldHistory.event_count("bingyanga_released"),
+		"TANKS SMASHED  %d" % WorldHistory.event_count("growing_floor_vat_smashed"),
+		"THINGS BROKEN  %d" % broke,
+		"BLOOD MOVES  %d" % WorldHistory.event_count("blood_move"),
+	]
 
 
 func _draw_line_item(y: float, number: String, label: String) -> void:

@@ -1,11 +1,14 @@
 extends Node3D
+const LOOK := preload("res://systems/look_settings.gd")
 
 ## THE GROWING FLOOR — the opening.
 ##
 ## The player surfaces inside a vat: submerged, umbilicals in, fluid over the
-## glass, rows of other tanks receding into the dark. The tank voids, the glass
-## goes, and they land on the grating in a spreading puddle. From there they
-## walk the aisle to the pit and are put in a car.
+## glass, rows of other tanks receding into the dark. The tank voids and leaves
+## them hanging in the umbilicals under END ALL SUFFERING; they tear the wires
+## out of themselves one by one, the screen answers GET REVENGE, and only then
+## does the glass go. They land on the grating in a spreading puddle and walk
+## the aisle toward the Service Arcade.
 ##
 ## Biomechanical register per ART-DIRECTION.md: ribbed vertebral arches,
 ## conduits that read as gut rather than pipe, wet everything. Built from
@@ -14,8 +17,30 @@ extends Node3D
 const OPENING := preload("res://systems/opening_director.gd")
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const ANATOMY := preload("res://systems/anatomy_component.gd")
+const LAB_CABLES := preload("res://systems/lab_cables.gd")
+const VAT_SMASH := preload("res://systems/vat_smash.gd")
 const IMPLANT_CATALOG := preload("res://systems/implant_catalog.gd")
 const VAT_INTAKE := preload("res://systems/vat_intake.gd")
+const TORTURE_LOAD_IN := preload("res://systems/torture_load_in.gd")
+const INTAKE_WATCHERS := preload("res://systems/intake_watchers.gd")
+const BRAIN_HACK := preload("res://systems/brain_hack.gd")
+const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const BODY_CAM := preload("res://systems/body_cam_feel.gd")
+const FIELD_MEDS := preload("res://systems/field_meds.gd")
+## Hold 4: a FIELD DRESSING, +20 blood (Greg, 26 September).
+var meds := FIELD_MEDS.new()
+## Greg, 28 September: each new key shown once, big, bottom centre.
+var key_hints: KeyHints
+## Greg, 28 September: the next tanks and a colder examiner (VatHorror).
+var horror_subjects: Array = []
+var horror: VatHorror
+var tank_view: TankView
+## Seconds left of the examiner's syringe, and how slow it makes you.
+var slowed_left := 0.0
+const SLOWED_SCALE := 0.5
+const SERVICE_ARCADE := preload("res://service_arcade.gd")
+const HIDDEN_CACHE := preload("res://systems/hidden_cache.gd")
+const SIGNAL_SIGHT := preload("res://systems/signal_sight.gd")
 const OPENING_AUDIO := preload("res://systems/opening_audio.gd")
 const PLAYER_ACTION_LEDGER := preload("res://systems/player_action_ledger.gd")
 const BRAIN_INDEX := preload("res://systems/brain_index.gd")
@@ -23,6 +48,10 @@ const CARRY := preload("res://systems/carry.gd")
 const CLOTHING := preload("res://systems/clothing.gd")
 const BASELINE_HUMAN := preload("res://systems/baseline_human.gd")
 const HUNTER_APPEARANCE := preload("res://systems/hunter_appearance.gd")
+const VAT_REBIRTH := preload("res://systems/vat_rebirth.gd")
+const WOUND_CATALOG := preload("res://systems/wound_catalog.gd")
+const DOCTOR_ROUTE := preload("res://systems/doctor_route.gd")
+const IMPLANT_BOOT_HUD := preload("res://systems/implant_boot_hud.gd")
 
 const EYE_HEIGHT := 1.62
 const BODY_HALF_HEIGHT := 0.85
@@ -33,6 +62,52 @@ const VAT_POSITION := Vector3(0, 0, 0)
 ## ~19s of locked beats already ahead of it. Cut to the shortest length that
 ## still reads as a receding row of tanks (see the bay-count derivation below).
 const AISLE_LENGTH := 22.0
+## Greg, 26 September: the first hidden thing is a weak wall in the Growing
+## Floor, a shortcut found with wizard eyes. A panel of the left wall between
+## two bays is plaster over a crawlway; behind it the duct drops past the
+## Service Arcade's pressure gate.
+const WEAK_WALL_ID := "growing_floor_weak_wall"
+const WEAK_WALL_AT := Vector3(-7.6, 1.05, -11.95)
+const WEAK_WALL_SIZE := Vector2(1.4, 2.1)
+const WEAK_WALL_REACH := 1.9
+## Past this x, inside the duct, the crawl takes you.
+const DUCT_DEPTH_X := -8.5
+## The wires beat (Greg, via the handoff and 24 September: END ALL SUFFERING,
+## tear the wires out, GET REVENGE, instead of the glass breaking by itself).
+## The tank is drained at this clock time; the breach and floor beats count
+## from it exactly as they did when the drain broke the glass on its own.
+const DRAINED_AT := 5.6
+## Tugs it takes to tear one umbilical out. The first ones only hurt.
+## Greg, 28 September: the cords resist; mash to tear them.
+const WIRE_TUGS := 4
+## How long GET REVENGE holds before the glass goes.
+const REVENGE_HOLD := 2.8
+## How long END ALL SUFFERING owns the screen before the wires can be seen.
+const END_CARD_SECONDS := 3.4
+## Greg's order (DESIGN/ESCAPE_ROUTES.md, "The opening, continued"): rip out
+## the wires and the cord in your mouth, smash the tank, fall out on your
+## knees, the HUD comes up because the implant has been hacked, get up and
+## look at the locked door, and GET REVENGE flashes. The player does each of
+## those. Older suites drive the earlier automatic breach (GET REVENGE, then
+## the glass goes by itself) and leave this off; the game always has it on.
+var hands_on_breakout := OS.get_environment("ATG_TEST_MODE") != "1"
+## Tugs it takes to get the cord out of your throat, after the wires.
+const CORD_TUGS := 4
+## Blows it takes to break the glass. The third one goes through.
+const GLASS_BLOWS := 4
+## How long getting up off your knees takes, turning to his door as you rise.
+## Crawl through the spill, then pull yourself up on the tank (28 September).
+const RISE_SECONDS := 3.4
+const CRAWL_SHARE := 0.4
+const CRAWL_DISTANCE := 1.3
+var cord_pulls := 0
+var glass_blows := 0
+var mouth_cord: Node3D
+var glass_cracks: Array[Node3D] = []
+var boot_hud
+var rise_clock := 0.0
+var rise_from_yaw := 0.0
+var _seizure: Dictionary = {}
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -43,10 +118,31 @@ var clock := 0.0
 var phase := "intake"
 var can_move := false
 var intake: Control
+## Beat 1: the black before the room (`TortureLoadIn`). The examiner does not
+## arrive and the form does not run until it hands over.
+var load_in: Control
+## The Growing Floor's wall cameras; they close in on "I'm being watched too".
+var watchers: Node3D
+## Greg's breakout, steps 1-4: the sigil takes the brain (`BrainHack`).
+var brain_hack: Control
+## K wizard eyes / J depth scan, from the brain hack on (`SignalSight`).
+var sight: Node
+var weak_wall_body: StaticBody3D
+## Each bay's ceiling strip and the power line feeding it down the left wall.
+var strip_lights: Array = []
+## Stashes and secret doors (HiddenCache records).
+var caches: Array = []
+var weak_wall_found := false
+var weak_wall_broken := false
+var shortcut_taken := false
 var opening_audio: Node
 var fluid: MeshInstance3D
 var vat_glass: MeshInstance3D
 var umbilicals: Array[Node3D] = []
+## What the lab's wiring built: cable and mesh counts, and how low it hangs.
+var cable_report: Dictionary = {}
+## The other tanks, which can be smashed once you are out of your own.
+var vat_smash
 var glass_shards: Array[Dictionary] = []
 var door_marker: Node3D
 var line_index := -1
@@ -61,9 +157,31 @@ var objective_text := "ESCAPE THE FACILITY"
 ## it, and only then does the vat fail.
 var examiner_node: Node3D
 var staff_door_panel: Node3D
+## Greg, 26 September: beat the examiner and his keycard opens this door, on
+## his staff cupboard (two dressings and rounds).
+var staff_door_open := false
+var staff_cupboard: Node3D
+const STAFF_KEYCARD := "STAFF KEYCARD"
+## Where the examiner stands at his terminal, and whether his door has been
+## heard shutting behind him.
+var examiner_post := Vector3.ZERO
+var examiner_door_heard := false
 var departure_clock := 0.0
 var departure_line := -1
 var arrival_clock := 0.0
+## Greg, 25 September: "a doctor walks up to the screen, taps it". Where on
+## his walk in he stops at the glass (a fraction of the whole path), and when
+## each knock lands, in arrival seconds.
+const GLASS_STOP_AT := 2.05
+## Just outside the glass, straight ahead of where you hang.
+const GLASS_FRONT := Vector3(0.3, 0.0, -1.45)
+## Round the tank's curve to it, clear of the glass.
+const GLASS_ROUND := Vector3(1.05, 0.0, -1.0)
+const GLASS_LEAVE_AT := 3.55
+const GLASS_TAPS := [2.45, 2.8, 3.15]
+const TERMINAL_TURN_AT := 4.5
+var examiner_taps := 0
+var _turn_from := 0.0
 var vat_struts: Array[MeshInstance3D] = []
 ## How long the breach still shakes the camera. The glass used to simply stop
 ## being rendered, which Greg described as "I don't even smash out of the glass
@@ -73,6 +191,15 @@ var breach_shake := 0.0
 ## way staff leave rather than walking the player's escape route. It is not the
 ## pit door at the far end and it is never openable by the player.
 const STAFF_DOOR_AT := Vector3(6.95, 0.0, -2.49)
+## Greg, 24 September: the examiner and his PC stood in the middle of the vat
+## aisle. The workstation is a monitoring post now, off the aisle to the
+## right-front of the tank and turned to face it: the screen is the
+## subject-facing terminal the intake is shown on, and he works it from the
+## end of the desk rather than standing inside it.
+const STATION_AT := Vector3(2.7, 0.0, -1.3)
+const STATION_YAW := -1.12
+const EXAMINER_AT_DESK := Vector3(-1.45, 0.0, 0.05)
+const EXAMINER_TURN := 0.6
 const DEPARTURE_SECONDS := 4.4
 
 ## AX3.1/AX3.6. The Growing Floor's first two objects: the broken restraint
@@ -91,6 +218,23 @@ var stuck_tank_culture: MeshInstance3D
 var failed_subject_visual: Node3D
 var stuck_tank_opened := false
 var inspect_held := false
+## Death is rebirth in a vat (Greg, 24 September). A regrown body wakes here
+## with no examination: the record, the preset and the memories are kept.
+var rebirth := false
+var active_beats: Array = BEATS
+var title: Label
+## The HUD as body-cam footage (Greg, 24 September).
+var osd: BodyCamOSD
+## Greg: the task titles "in massive celloutz style font, bloody and bony ...
+## moving around 4d, inverting, going crazy, and after that flashes". The
+## card bursts in over everything; the flickering `title` label is what stays
+## on screen while the player works at the wires.
+var mission_card: Control
+var wired_clock := 0.0
+var revenge_at := -1.0
+var jolt := 0.0
+## His door behind the vat, his room and the lift down (DoctorRoute).
+var doctor_route: Node3D
 
 # 0 submerged, 1 voiding, 2 breach, 3 floor, 4 aisle
 const BEATS := [
@@ -123,7 +267,15 @@ const DEPARTURE_BEATS := [
 
 
 func _ready() -> void:
-	$WorldEnvironment.environment = WorldLook.environment("ossuary")
+	# Greg, 28 September: every room has its own ambience and a music bed.
+	var ambient_bed_script := preload("res://systems/ambient_bed.gd")
+	if ambient_bed_script.wanted():
+		add_child(ambient_bed_script.new().setup("vat"))
+	# Greg, 26 September: minutes 0-30 are timed, hidden until you surface.
+	# A rebirth here mid-run carries on the same clock.
+	preload("res://systems/run_timer.gd").start()
+	preload("res://systems/run_timer.gd").enter("growing_floor")
+	$WorldEnvironment.environment = WorldLook.environment("growing_floor")
 	# The form itself already lays a translucent blood veil over the first shot.
 	# Leaving this at the old opaque value made the real examiner and laboratory
 	# disappear beneath two stacked UI tints before the player could meet them.
@@ -132,19 +284,91 @@ func _ready() -> void:
 	# fade to hold the red image together while the player sees the real room,
 	# doctor and terminal behind it; filing may still cut into the later wake-up.
 	fade.color.a = 0.08
+	vat_smash = VAT_SMASH.new(self)
 	_build_chamber()
 	_build_examination_station()
 	# The examiner is not born at the keyboard. He enters after the player wakes.
 	if examiner_node != null:
-		examiner_node.position.x = STAFF_DOOR_AT.x
+		examiner_post = examiner_node.global_position
 		examiner_node.visible = false
 	_build_vat()
+	watchers = INTAKE_WATCHERS.new()
+	watchers.name = "IntakeWatchers"
+	add_child(watchers)
+	watchers.call("build", VAT_POSITION + Vector3(0, 1.55, 0))
 	_build_first_objects()
 	_build_player()
+	doctor_route = DOCTOR_ROUTE.new()
+	add_child(doctor_route)
+	doctor_route.build(self)
+	_build_title()
 	_build_intake()
+	osd = BodyCamOSD.new()
+	osd.name = "BodyCamOSD"
+	$HUD.add_child(osd)
+	osd.adopt(vitals, $HUD/Objective, prompt, "SUBLEVEL 0C  //  GROWING FLOOR")
+	osd.camera = camera
+	osd.visible = intake == null
 	opening_audio = OPENING_AUDIO.new()
 	add_child(opening_audio)
+	sight = SIGNAL_SIGHT.new()
+	sight.name = "SignalSight"
+	add_child(sight)
+	sight.call("setup", camera)
+	# The failed subject in the jammed tank died here.
+	sight.set("spirits", [Vector3(-3.4, 0.0, 2.6)])
+	sight.set("hidden", [{"id": WEAK_WALL_ID, "at": WEAK_WALL_AT + Vector3(0.26, 0, 0), "size": WEAK_WALL_SIZE, "across": Vector3.BACK}])
+	sight.connect("hidden_seen", _on_hidden_seen)
+	# Wires and power (Greg, 26 September): each strip is fed from a junction
+	# low on the left wall, up the wall and across the ceiling. Seen in the
+	# modes, cut at the junction with E: that bay goes dark.
+	var wires: Array = []
+	for index in strip_lights.size():
+		var strip: OmniLight3D = strip_lights[index]
+		var z := strip.position.z
+		wires.append({"id": "growing_floor_strip_%d" % index, "points": [Vector3(-7.3, 1.3, z), Vector3(-7.3, 3.9, z), Vector3(0, 3.9, z)],
+			"on_cut": func() -> void: strip.visible = false})
+	sight.set("wires", wires)
+	# A stash in the left wall between the second and third bays.
+	caches.append(HIDDEN_CACHE.place_stash(self, sight, "growing_floor_stash", Vector3(-7.35, 1.0, -5.75), Vector3.RIGHT))
+	_build_den()
+	_wire_guidance()
+	key_hints = KeyHints.new()
+	add_child(key_hints)
+	tank_view = TankView.new()
+	add_child(tank_view)
+	if VatHorror.wanted():
+		horror = VatHorror.new()
+		add_child(horror)
+		horror.setup(self, horror_subjects)
+	brain_hack = BRAIN_HACK.new()
+	$HUD.add_child(brain_hack)
+	brain_hack.connect("hack_finished", _on_hack_finished)
+	if load_in != null:
+		# Over everything the HUD built after it, the body-cam included.
+		$HUD.move_child(load_in, -1)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _build_title() -> void:
+	title = Label.new()
+	title.name = "Title"
+	title.set_anchors_preset(Control.PRESET_FULL_RECT)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 64)
+	# Above the middle, where the E prompts and the aim sit: the flickering
+	# END ALL SUFFERING was drawn straight through "E // RIP IT OUT".
+	title.offset_bottom = -260.0
+	title.add_theme_color_override("font_color", Color("c8321e"))
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title.visible = false
+	$HUD.add_child(title)
+	$HUD.move_child(title, $HUD/Subtitle.get_index())
+	mission_card = MissionCard.new()
+	mission_card.name = "MissionCard"
+	mission_card.visible = false
+	$HUD.add_child(mission_card)
 
 
 ## G6.1/G6.3. Character creation was built but never connected to the opening:
@@ -152,10 +376,56 @@ func _ready() -> void:
 ## handler now owns the first beat, and filing the sheet is what starts the
 ## camera sequence rather than a timer running behind the form.
 func _build_intake() -> void:
+	if VAT_REBIRTH.is_pending():
+		_begin_rebirth()
+		return
 	intake = VAT_INTAKE.new()
 	intake.name = "Intake"
 	$HUD.add_child(intake)
 	intake.filed.connect(_on_intake_filed)
+	intake.doctor_cue.connect(_on_doctor_cue)
+	if TORTURE_LOAD_IN.wanted():
+		intake.process_mode = Node.PROCESS_MODE_DISABLED
+		load_in = TORTURE_LOAD_IN.new()
+		$HUD.add_child(load_in)
+		load_in.connect("finished", _on_load_in_finished)
+
+
+func _on_doctor_cue(kind: String) -> void:
+	if kind == "watched" and watchers != null:
+		watchers.call("close_in", $HUD, camera)
+
+
+func _on_load_in_finished(_skipped: bool) -> void:
+	load_in = null
+	if intake != null and is_instance_valid(intake):
+		intake.process_mode = Node.PROCESS_MODE_INHERIT
+
+
+## Regrown, not examined. The world carried on: the tank opens straight onto
+## the voiding, and whatever this body's last life opened stays open.
+func _begin_rebirth() -> void:
+	rebirth = true
+	var player_state := WorldHistory.subject("player")
+	var body_anatomy: Dictionary = player_state.get("anatomy", {})
+	anatomy.call("configure", "player", 5000.0, body_anatomy.get("cybernetics", []))
+	anatomy.call("apply_hit", "torso", 26.0, 0.0, "blunt")
+	anatomy.call("apply_hit", "head", 14.0, 0.0, "blunt")
+	var vat := VAT_REBIRTH.vat_for(VAT_REBIRTH.claimant())
+	active_beats = [
+		{"at": 0.4, "text": "REGROWTH COMPLETE  //  BODY %d" % int(player_state.get("body_number", 2))},
+		{"at": 1.8, "text": "%s  //  YOUR OLD BODY IS WHERE YOU LEFT IT" % str(vat.label)},
+		{"at": 3.2, "text": "TANK 0C-7  //  CYCLE ABORTED  //  VOIDING"},
+	]
+	if WorldHistory.event_count("opening_first_object_used") > 0 and stuck_tank_shell != null:
+		stuck_tank_opened = true
+		stuck_tank_shell.visible = false
+		if stuck_tank_culture != null:
+			stuck_tank_culture.visible = false
+	clock = 0.0
+	line_index = -1
+	phase = "submerged"
+	WorldHistory.record_event("opening_regrown", {"location": "growing_floor", "claimant": VAT_REBIRTH.claimant(), "body_number": int(player_state.get("body_number", 2))})
 
 
 func _on_intake_filed(_state: Dictionary) -> void:
@@ -163,6 +433,8 @@ func _on_intake_filed(_state: Dictionary) -> void:
 		return
 	intake.queue_free()
 	intake = null
+	Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	var filed_state := WorldHistory.subject("player")
 	var filed_anatomy: Dictionary = filed_state.get("anatomy", {})
 	anatomy.call("configure", "player", 5000.0, filed_anatomy.get("cybernetics", []))
@@ -180,14 +452,19 @@ func _on_intake_filed(_state: Dictionary) -> void:
 	# terminal even when its arrival beat was skipped.
 	if examiner_node != null:
 		examiner_node.visible = true
-		examiner_node.position.x = -0.16
-		examiner_node.rotation.y = 0.0
+		examiner_node.position = EXAMINER_AT_DESK
+		examiner_node.rotation.y = EXAMINER_TURN
 	phase = "departure"
 	# AP1.3/P10.5. Filing has already written the chosen anatomy by the time this
 	# signal arrives. Install the real head hardware now, while the player is
 	# still captured and before the wake event, so the sheet cannot overwrite it
 	# and the later X-ray discovers something that was already done to the body.
 	BRAIN_INDEX.install_chip("player", "celloutz", "growing_floor_intake")
+	# The style you gave him opens its first node now, before any blood.
+	var style_id := str(filed_state.get("fighting_style", ""))
+	if style_id != "":
+		var opened := BloodTrees.grant_start(style_id)
+		WorldHistory.record_event("fighting_style_chosen", {"style": style_id, "opened": opened, "weapon": BloodTrees.starting_weapon(style_id)})
 	WorldHistory.begin_ledger_batch()
 	OPENING.advance("woke")
 	FACILITY_TERRITORY.apply_event("opening_woke")
@@ -205,11 +482,14 @@ func _build_player() -> void:
 	collider.shape = capsule
 	player.add_child(collider)
 	add_child(player)
+	# Greg, 28 September: what your bare feet land on here.
+	player.set_meta("surface", "tile")
 	player.position = VAT_POSITION + Vector3(0, 1.35, 0)
 
 	camera = Camera3D.new()
 	camera.fov = 88.0
 	player.add_child(camera)
+	LabSurface.attach_body_cam(camera)
 
 	anatomy = ANATOMY.new()
 	player.add_child(anatomy)
@@ -332,19 +612,9 @@ func _build_vat() -> void:
 	# floating ribs". They are a collar and a base now, with the eye's band
 	# left clear, and they sit tight against the glass instead of hovering
 	# 11cm off it.
-	for rib in 9:
-		var height := 0.2 + float(rib) * 0.36
-		if height > 0.95 and height < 2.55:
-			continue
-		var ring := MeshInstance3D.new()
-		var torus := TorusMesh.new()
-		torus.inner_radius = 0.95
-		torus.outer_radius = 1.01 + (0.03 if rib % 3 == 0 else 0.0)
-		torus.material = WorldLook.surface(Color("2e2419") if rib % 2 == 0 else Color("241c15"), "bone", rib)
-		ring.mesh = torus
-		ring.position = VAT_POSITION + Vector3(0, height, 0)
-		ring.rotation_degrees = Vector3(90, 0, 0)
-		add_child(ring)
+	# Greg, first launch (2026-09-24): no more stacked rings. A plate-steel
+	# base band and crown band, the same hardware as every LabVat.
+	_vat_bands(self, VAT_POSITION, 1.02, 3.1)
 
 	# High in the column, not at eye level. An omni light sitting on the
 	# cylinder's own axis at the camera's exact height lights the inner wall
@@ -376,8 +646,10 @@ func _build_vat() -> void:
 
 	var glow := OmniLight3D.new()
 	glow.position = VAT_POSITION + Vector3(0, 2.85, 0)
-	glow.light_color = Color("b22a19")
-	glow.light_energy = 3.4
+	# The one red in the room (Greg, 26 September), pushed to hold its colour
+	# through the lower saturation of the grade.
+	glow.light_color = Color("c4180c")
+	glow.light_energy = 4.6
 	glow.omni_range = 6.0
 	add_child(glow)
 
@@ -428,16 +700,7 @@ func _build_first_objects() -> void:
 	stuck_tank_culture.position = Vector3(0, 1.38, 0)
 	stuck_tank_marker.add_child(stuck_tank_culture)
 
-	for rib in 4:
-		var ring := MeshInstance3D.new()
-		var torus := TorusMesh.new()
-		torus.inner_radius = 0.8
-		torus.outer_radius = 0.88
-		torus.material = WorldLook.surface(Color("241d15"), "bone", 41 + rib)
-		ring.mesh = torus
-		ring.position = Vector3(0, 0.3 + float(rib) * 0.8, 0)
-		ring.rotation_degrees = Vector3(90, 0, 0)
-		stuck_tank_marker.add_child(ring)
+	_vat_bands(stuck_tank_marker, Vector3.ZERO, 0.86, 2.8)
 
 	# AX3.2. Registered now so the subject exists to strip clothing off of the
 	# moment the tank opens — non-destructive on repeat `_ready()` calls
@@ -454,9 +717,10 @@ func _build_chamber() -> void:
 	# Grated floor and a low wet ceiling.
 	_slab(Vector3(16.0, 0.4, AISLE_LENGTH + 8.0), Vector3(0, -0.2, -AISLE_LENGTH * 0.4), "dirt", Color("15120f"))
 	_slab(Vector3(16.0, 0.35, AISLE_LENGTH + 8.0), Vector3(0, 4.3, -AISLE_LENGTH * 0.4), "rust", Color("100d0b"))
-	_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(-7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
+	_build_left_wall()
 	_slab(Vector3(0.5, 4.4, AISLE_LENGTH + 8.0), Vector3(7.6, 2.2, -AISLE_LENGTH * 0.4), "rust", Color("1c1712"))
-	_slab(Vector3(16.0, 4.4, 0.5), Vector3(0, 2.2, 3.6), "rust", Color("19140f"))
+	# The near wall is DoctorRoute's: the same wall in pieces, around his door
+	# and the observation glass.
 	# Greg, playing the build: "you walk to the end of this room and then
 	# there's just a skybox... I just fell out of the skybox."
 	#
@@ -476,6 +740,8 @@ func _build_chamber() -> void:
 	# before the door as the original 11-bay/34.0 layout) so shortening the
 	# aisle cannot leave dressing poking past the end wall or the door.
 	var bay_count := roundi((AISLE_LENGTH - 3.0) / 3.1) + 1
+	var bay_zs: Array = []
+	var tank_centres: Array = []
 	for bay in bay_count:
 		var z := 2.0 - float(bay) * 3.1
 		for side in [-1.0, 1.0]:
@@ -496,39 +762,61 @@ func _build_chamber() -> void:
 				arch.position = Vector3(side * (6.9 - t * 1.5), 0.5 + t * 3.3, z)
 				arch.rotation_degrees = Vector3(0, 0, side * (8.0 + t * 46.0))
 				add_child(arch)
-			# Conduit running the length, sagging between bays.
-			var gut := MeshInstance3D.new()
-			var tube := CylinderMesh.new()
-			tube.top_radius = 0.11
-			tube.bottom_radius = 0.13
-			tube.height = 3.1
-			tube.material = WorldLook.surface(Color("3a2a22"), "flesh", bay + 3)
-			gut.mesh = tube
-			gut.position = Vector3(side * 6.2, 3.55 + sin(float(bay)) * 0.12, z - 1.5)
-			gut.rotation_degrees = Vector3(90, 0, 0)
-			add_child(gut)
 
+		bay_zs.append(z)
 		# Other tanks, most of them failed.
 		if bay > 0:
 			for side in [-1.0, 1.0]:
 				_dead_tank(Vector3(side * 4.4, 0, z), bay)
+				tank_centres.append(Vector3(side * 4.4, 0, z))
 
 		var strip := OmniLight3D.new()
 		strip.position = Vector3(0, 3.8, z)
-		strip.light_color = Color("7fbf95") if bay % 3 else Color("c0703a")
-		strip.light_energy = 1.5
+		# Cold and low: red belongs to the vat's glow alone (Greg, 26 September).
+		strip.light_color = Color("7fbf95") if bay % 3 else Color("a8b4a4")
+		strip.light_energy = 1.0
 		strip.omni_range = 6.5
 		add_child(strip)
+		strip_lights.append(strip)
+
+	# Greg: "intricate Lain / Evangelion wiring, not one long tube". The
+	# conduit that ran the length of each side is now bundles of cable, hung
+	# from every bay, dropping into every tank and swagged across overhead.
+	cable_report = LAB_CABLES.wire(self, bay_zs, tank_centres, 4.12, 7.35, 4417, [STAFF_DOOR_AT])
 
 	# The pit door at the far end.
 	door_marker = Node3D.new()
 	door_marker.position = Vector3(0, 0, -AISLE_LENGTH + 2.0)
 	add_child(door_marker)
 	_slab(Vector3(3.4, 3.4, 0.3), Vector3(0, 1.7, -AISLE_LENGTH + 1.6), "rust", Color("3d2a19"))
+	# A door you can read (Greg, 2026-09-24: "just supposed to walk through
+	# this big white light?"): plate panel, a frame, and a lit sign.
+	var panel := MeshInstance3D.new()
+	var panel_mesh := BoxMesh.new()
+	panel_mesh.size = Vector3(2.2, 2.9, 0.08)
+	panel_mesh.material = LabSurface.material("plate")
+	panel.mesh = panel_mesh
+	panel.position = Vector3(0, 1.45, -AISLE_LENGTH + 1.8)
+	add_child(panel)
+	for side in [-1.0, 1.0]:
+		var post := MeshInstance3D.new()
+		var post_mesh := BoxMesh.new()
+		post_mesh.size = Vector3(0.18, 3.2, 0.24)
+		post_mesh.material = LabSurface.material("grime")
+		post.mesh = post_mesh
+		post.position = Vector3(side * 1.2, 1.6, -AISLE_LENGTH + 1.85)
+		add_child(post)
+	var sign := Label3D.new()
+	sign.text = "SERVICE ARCADE  //  STAFF ONLY\nPIT ACCESS BELOW"
+	sign.font_size = 42
+	sign.outline_size = 8
+	sign.modulate = Color("ff9a4a")
+	sign.position = Vector3(0, 3.35, -AISLE_LENGTH + 1.9)
+	add_child(sign)
 	var exit_glow := OmniLight3D.new()
 	exit_glow.position = Vector3(0, 1.2, -AISLE_LENGTH + 2.6)
-	exit_glow.light_color = Color("ff8f3c")
-	exit_glow.light_energy = 5.5
+	exit_glow.light_color = Color("e2d6bc")
+	exit_glow.light_energy = 3.6
 	exit_glow.omni_range = 8.0
 	add_child(exit_glow)
 
@@ -540,31 +828,70 @@ func _build_chamber() -> void:
 func _build_examination_station() -> void:
 	var station := Node3D.new()
 	station.name = "UnknownExaminerStation"
-	station.position = Vector3(0.0, 0.0, -2.65)
+	station.position = STATION_AT
+	station.rotation.y = STATION_YAW
 	add_child(station)
 
 	# A low medical desk between the vat and the doctor.
 	var desk := MeshInstance3D.new()
 	var desk_mesh := BoxMesh.new()
-	desk_mesh.size = Vector3(2.25, 0.16, 0.72)
-	desk_mesh.material = WorldLook.surface(Color("241a16"), "rust", 913)
+	desk_mesh.size = Vector3(2.25, 0.07, 0.78)
+	desk_mesh.material = LabSurface.material("plate")
 	desk.mesh = desk_mesh
-	desk.position = Vector3(0.05, 1.05, 0.25)
+	# The desk stays where it is. What was wrong was not the desk but the
+	# terminal sitting at the far end of it: the man stands at local x -1.45 and
+	# the screen sat at 0.60, so his own workstation was 2.06 m of table away
+	# from him -- a man beside a computer rather than at one. The screen now
+	# sits at his end, 0.90 m away, over the desk and clear of his body.
+	# `vat_station_clearance_test` holds all three of those numbers.
+	const MONITOR_X := -0.55
+	desk.position = Vector3(0.05, 0.86, 0.25)
 	station.add_child(desk)
+	# Greg, first launch (2026-09-24): "this floating table". It stands now.
+	for corner in [Vector2(-1.0, -0.33), Vector2(1.1, -0.33), Vector2(-1.0, 0.6), Vector2(1.1, 0.6)]:
+		var leg := MeshInstance3D.new()
+		var leg_mesh := BoxMesh.new()
+		leg_mesh.size = Vector3(0.06, 0.84, 0.06)
+		leg_mesh.material = LabSurface.material("grime")
+		leg.mesh = leg_mesh
+		leg.position = Vector3(corner.x, 0.42, corner.y)
+		station.add_child(leg)
 
 	# The physical monitor gives the player a point of attention in the room;
 	# its green code strips are geometry, not a flat title card.
 	var monitor := MeshInstance3D.new()
+	# Named so the clearance between the terminal and the man is a thing a test
+	# can measure and an artist can find, rather than an anonymous box in a list.
+	monitor.name = "ExaminerMonitor"
 	var monitor_mesh := BoxMesh.new()
-	monitor_mesh.size = Vector3(1.06, 0.72, 0.10)
-	monitor_mesh.material = WorldLook.surface(Color("171b16"), "metal", 914)
+	monitor_mesh.size = Vector3(0.88, 0.62, 0.16)
+	monitor_mesh.material = LabSurface.material("plate")
 	monitor.mesh = monitor_mesh
 	# The screen takes the right half of the desk, the examiner the left, and
 	# the keyboard sits between them under his hand. He used to stand 1.7m off
 	# to the side, which read as a man near a computer he had nothing to do
 	# with; the two now occupy one workstation without overlapping at all.
-	monitor.position = Vector3(0.60, 1.88, 0.28)
+	monitor.position = Vector3(MONITOR_X, 1.43, 0.28)
 	station.add_child(monitor)
+	var screen := MeshInstance3D.new()
+	var screen_mesh := QuadMesh.new()
+	screen_mesh.size = Vector2(0.76, 0.49)
+	var screen_material := StandardMaterial3D.new()
+	screen_material.albedo_color = Color("07120c")
+	screen_material.emission_enabled = true
+	screen_material.emission = Color("0d2a1a")
+	screen_mesh.material = screen_material
+	screen.mesh = screen_mesh
+	screen.position = Vector3(MONITOR_X, 1.43, 0.365)
+	screen.rotation_degrees.y = 180.0
+	station.add_child(screen)
+	var stand := MeshInstance3D.new()
+	var stand_mesh := BoxMesh.new()
+	stand_mesh.size = Vector3(0.10, 0.30, 0.10)
+	stand_mesh.material = LabSurface.material("grime")
+	stand.mesh = stand_mesh
+	stand.position = Vector3(MONITOR_X, 1.03, 0.22)
+	station.add_child(stand)
 	for line_index in 9:
 		var code := MeshInstance3D.new()
 		var code_mesh := BoxMesh.new()
@@ -578,15 +905,16 @@ func _build_examination_station() -> void:
 		code.mesh = code_mesh
 		# The text sits on the monitor's camera-facing surface, aligned inside its
 		# frame rather than accidentally hovering behind it.
-		code.position = Vector3(0.20 + code_width * 0.5, 2.10 - float(line_index) * 0.055, 0.345)
+		code.position = Vector3(MONITOR_X - 0.32 + code_width * 0.5, 1.62 - float(line_index) * 0.045, 0.375)
 		station.add_child(code)
 	var keyboard := MeshInstance3D.new()
 	var keyboard_mesh := BoxMesh.new()
 	keyboard_mesh.size = Vector3(0.86, 0.045, 0.38)
-	keyboard_mesh.material = WorldLook.surface(Color("181612"), "metal", 921)
+	keyboard_mesh.material = LabSurface.material("plate")
 	keyboard.mesh = keyboard_mesh
-	# Between the man and the screen, where a hand can actually reach it.
-	keyboard.position = Vector3(0.22, 1.16, 0.54)
+	# At his end of the desk, where his hands actually are.
+	keyboard.position = Vector3(-0.62, 0.915, 0.32)
+	keyboard.rotation.y = 0.35
 	station.add_child(keyboard)
 
 	# One examiner, anonymous and physically present.  He is shaped from the
@@ -599,103 +927,28 @@ func _build_examination_station() -> void:
 	# x -0.36..0.04 and the monitor starts at 0.07: adjacent, never overlapping.
 	# Greg, 21 September: "more to the left of the lap and not directly in
 	# front of it."
-	examiner.position = Vector3(-0.16, 0.0, 0.16)
+	examiner.position = EXAMINER_AT_DESK
+	examiner.rotation.y = EXAMINER_TURN
 	station.add_child(examiner)
 	examiner_node = examiner
-	var torso := MeshInstance3D.new()
-	var torso_mesh := CapsuleMesh.new()
-	torso_mesh.radius = 0.24
-	torso_mesh.height = 1.34
-	torso_mesh.material = WorldLook.surface(Color("171118"), "cloth", 915)
-	torso.mesh = torso_mesh
-	torso.position = Vector3(0, 1.35, 0)
-	# Leaning in over the keyboard: the posture of somebody filling in a form
-	# about a person who is in the room. A narrower capsule under the coat also
-	# stops the silhouette reading as a bean.
-	torso.rotation_degrees.x = 18.0
-	examiner.add_child(torso)
-	# A formal, almost ecclesiastical government coat: dark body, hard collar,
-	# and a state seal that reads as occult bureaucracy rather than a generic
-	# lab coat.  This is intentionally an example texture slot for the future
-	# authored uniform, not a second unnamed character.
-	var coat := MeshInstance3D.new()
-	var coat_mesh := CylinderMesh.new()
-	coat_mesh.top_radius = 0.30
-	coat_mesh.bottom_radius = 0.40
-	coat_mesh.height = 1.20
-	coat_mesh.material = WorldLook.surface(Color("21101b"), "cloth", 919)
-	coat.mesh = coat_mesh
-	coat.position = Vector3(0.0, 1.26, 0.025)
-	coat.rotation_degrees.x = 18.0
-	examiner.add_child(coat)
-	var collar := MeshInstance3D.new()
-	var collar_mesh := TorusMesh.new()
-	collar_mesh.inner_radius = 0.16
-	collar_mesh.outer_radius = 0.225
-	collar_mesh.material = WorldLook.surface(Color("5a3b20"), "metal", 920)
-	collar.mesh = collar_mesh
-	collar.position = Vector3(0.0, 1.91, 0.24)
-	collar.rotation_degrees.x = 90.0
-	examiner.add_child(collar)
-	# A deliberately neutral state seal: copper geometry on a severe coat, not
-	# an unrelated faction logo pasted onto the doctor.  It marks an example
-	# texture/insignia zone for later authored government art.
-	# Six radial spokes inside a ring is a ship's wheel, which is what it read
-	# as on screen. Greg, 21 September: "no steering-wheel-like prop." The
-	# restrained version is a breast badge, not a medallion: a small dark plate,
-	# one thin ring, and a single vertical bar crossed near the top. Esoteric
-	# because of what it omits, and small enough to stay a costume detail.
-	var seal_material := WorldLook.surface(Color("9a5730"), "metal", 922)
-	var badge := MeshInstance3D.new()
-	var badge_mesh := BoxMesh.new()
-	badge_mesh.size = Vector3(0.115, 0.145, 0.016)
-	badge_mesh.material = WorldLook.surface(Color("14090f"), "metal", 923)
-	badge.mesh = badge_mesh
-	badge.position = Vector3(-0.115, 1.54, 0.345)
-	examiner.add_child(badge)
-	var seal_ring := MeshInstance3D.new()
-	var seal_ring_mesh := TorusMesh.new()
-	seal_ring_mesh.inner_radius = 0.030
-	seal_ring_mesh.outer_radius = 0.040
-	seal_ring_mesh.material = seal_material
-	seal_ring.mesh = seal_ring_mesh
-	seal_ring.position = Vector3(-0.115, 1.565, 0.356)
-	seal_ring.rotation_degrees.x = 90.0
-	examiner.add_child(seal_ring)
-	var seal_stem := MeshInstance3D.new()
-	var seal_stem_mesh := BoxMesh.new()
-	seal_stem_mesh.size = Vector3(0.010, 0.095, 0.012)
-	seal_stem_mesh.material = seal_material
-	seal_stem.mesh = seal_stem_mesh
-	seal_stem.position = Vector3(-0.115, 1.518, 0.356)
-	examiner.add_child(seal_stem)
-	var seal_bar := MeshInstance3D.new()
-	var seal_bar_mesh := BoxMesh.new()
-	seal_bar_mesh.size = Vector3(0.052, 0.010, 0.012)
-	seal_bar_mesh.material = seal_material
-	seal_bar.mesh = seal_bar_mesh
-	seal_bar.position = Vector3(-0.115, 1.500, 0.356)
-	examiner.add_child(seal_bar)
-	var head := MeshInstance3D.new()
-	var head_mesh := SphereMesh.new()
-	head_mesh.radius = 0.20
-	head_mesh.height = 0.42
-	head_mesh.material = WorldLook.surface(Color("5a4235"), "flesh", 916)
-	head.mesh = head_mesh
-	head.position = Vector3(-0.08, 2.13, 0.15)
-	examiner.add_child(head)
-	for side in [-1.0, 1.0]:
-		var arm := MeshInstance3D.new()
-		var arm_mesh := CapsuleMesh.new()
-		arm_mesh.radius = 0.09
-		arm_mesh.height = 0.78
-		arm_mesh.material = WorldLook.surface(Color("24201a"), "cloth", 917 + int(side))
-		arm.mesh = arm_mesh
-		arm.position = Vector3(side * 0.31, 1.45, 0.10)
-		arm.rotation_degrees = Vector3(72.0, 0.0, side * 12.0)
-		examiner.add_child(arm)
+	# The same man the intake's live feed shows (ExaminerFeed): a BaselineHuman
+	# in the same build, turned half round because its face is built on -Z and
+	# this node's "working" facing is +Z.
+	var body := BASELINE_HUMAN.new()
+	body.name = "ExaminerBody"
+	body.rotation.y = PI
+	examiner.add_child(body)
+	body.build("intake_examiner", BASELINE_HUMAN.config_from_subject({"race": "decanted"}).merged({"gore": false}, true))
+	var look := HUNTER_APPEARANCE.new()
+	body.add_child(look)
+	look.configure(body, {"axes": {"brow": 0.7, "jaw": 0.6, "cheek": 0.2, "eyes": 0.3, "nose": 0.55, "mouth": 0.4}})
+	# Dressed as the feed shows him (`ExaminerFeed._dress_as_staff`): a clinical
+	# coat bloodied down the front and the forearms. He was walking up to your
+	# glass naked under the censor.
+	# Tall, gaunt, mask at his throat while he talks, loupes up (ExaminerLook).
+	ExaminerLook.dress(body, false)
 	var screen_light := OmniLight3D.new()
-	screen_light.position = Vector3(0.52, 1.6, 0.02)
+	screen_light.position = Vector3(MONITOR_X, 1.5, 0.02)
 	screen_light.light_color = Color("8bbd79")
 	screen_light.light_energy = 4.4
 	screen_light.omni_range = 3.4
@@ -749,7 +1002,8 @@ func _build_staff_door() -> void:
 	staff_door_panel.name = "StaffDoorPanel"
 	# Parked clear of the opening. `_update_sequence`'s departure beat slides it
 	# back across once he is through.
-	staff_door_panel.position = STAFF_DOOR_AT + Vector3(0.30, 0.0, -1.42)
+	# Shut: since 24 September he comes and goes by his own door behind the vat.
+	staff_door_panel.position = STAFF_DOOR_AT + Vector3(0.30, 0.0, 0.0)
 	add_child(staff_door_panel)
 	var panel := MeshInstance3D.new()
 	var panel_mesh := BoxMesh.new()
@@ -758,64 +1012,137 @@ func _build_staff_door() -> void:
 	panel.mesh = panel_mesh
 	panel.position = Vector3(0, 1.18, 0)
 	staff_door_panel.add_child(panel)
+	if WorldHistory.event_count("staff_door_opened") > 0:
+		_open_staff_door(false)
+
+
+## E at the staff door: the keycard opens it; open, E takes what his cupboard
+## holds (once).
+func _try_staff_door() -> bool:
+	var to_staff := STAFF_DOOR_AT - player.global_position
+	to_staff.y = 0.0
+	if to_staff.length() > 2.4:
+		return false
+	if not staff_door_open:
+		if not VAT_REBIRTH.carries(STAFF_KEYCARD):
+			return false
+		_open_staff_door(true)
+		WorldHistory.record_event("staff_door_opened", {"location": "growing_floor", "with": STAFF_KEYCARD})
+		subtitle.text = "HIS KEYCARD OPENS IT  //  HIS CUPBOARD"
+		return true
+	if _cupboard_taken():
+		return false
+	HIDDEN_CACHE.give_stash()
+	HIDDEN_CACHE.give_stash()
+	WorldHistory.record_event("examiner_cupboard_taken", {"meds": 2, "rounds": HIDDEN_CACHE.ROUNDS * 2})
+	for child in staff_cupboard.get_children():
+		if child.name.begins_with("Goods"):
+			child.visible = false
+	subtitle.text = "TWO FIELD DRESSINGS AND EIGHT ROUNDS  //  HOLD 4 TO DRESS A WOUND"
+	return true
+
+
+func _cupboard_taken() -> bool:
+	return WorldHistory.event_count("examiner_cupboard_taken") > 0
+
+
+## The panel slides along the wall; behind it, a shallow lit cupboard set in
+## front of the wall slab.
+func _open_staff_door(animated: bool) -> void:
+	staff_door_open = true
+	var open_at := STAFF_DOOR_AT + Vector3(0.30, 0.0, 1.5)
+	if animated and is_inside_tree():
+		create_tween().tween_property(staff_door_panel, "position", open_at, 0.9).set_trans(Tween.TRANS_SINE)
+		if opening_audio != null:
+			opening_audio.cue("door")
+	else:
+		staff_door_panel.position = open_at
+	if staff_cupboard != null:
+		return
+	staff_cupboard = Node3D.new()
+	staff_cupboard.name = "StaffCupboard"
+	staff_cupboard.position = STAFF_DOOR_AT + Vector3(0.28, 0.0, 0.0)
+	add_child(staff_cupboard)
+	var back := WorldLook.surface(Color("1d1914"), "paint", 932)
+	var shelf := WorldLook.surface(Color("4a3f33"), "rust", 933)
+	_cupboard_box(Vector3(0.05, 2.3, 1.36), Vector3(0.04, 1.16, 0), back, "Back")
+	for y in [0.55, 1.15, 1.75]:
+		_cupboard_box(Vector3(0.14, 0.03, 1.34), Vector3(-0.02, y, 0), shelf, "Shelf")
+	# His spare scrubs folded on the top shelf; the goods below, until taken.
+	_cupboard_box(Vector3(0.1, 0.1, 0.4), Vector3(-0.02, 1.82, -0.3), WorldLook.surface(Color("7f978f"), "paint", 934), "Scrubs")
+	if not _cupboard_taken():
+		_cupboard_box(Vector3(0.09, 0.07, 0.16), Vector3(-0.02, 1.2, 0.2), WorldLook.surface(Color("d9d1bf"), "paint", 935), "GoodsDressing1")
+		_cupboard_box(Vector3(0.09, 0.07, 0.16), Vector3(-0.02, 1.2, -0.05), WorldLook.surface(Color("d9d1bf"), "paint", 936), "GoodsDressing2")
+		_cupboard_box(Vector3(0.08, 0.06, 0.12), Vector3(-0.02, 0.6, 0.1), WorldLook.surface(Color("6a5a3a"), "chrome", 937), "GoodsRounds")
+	var light := OmniLight3D.new()
+	light.position = Vector3(-0.35, 2.1, 0)
+	light.light_color = Color("e8d09a")
+	light.light_energy = 1.4
+	light.omni_range = 2.2
+	staff_cupboard.add_child(light)
+
+
+func _cupboard_box(size: Vector3, at: Vector3, material: Material, label: String) -> void:
+	var node := MeshInstance3D.new()
+	node.name = label
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	mesh.material = material
+	node.mesh = mesh
+	node.position = at
+	staff_cupboard.add_child(node)
+
+
+## Open steel bands at a vat's foot and crown. Open-ended so the view from
+## inside the tank is through them, not into a lid.
+func _vat_bands(parent: Node3D, at: Vector3, radius: float, glass_top: float) -> void:
+	var plate := LabSurface.material("plate")
+	for band in [[0.2, 0.4], [glass_top - 0.1, 0.36]]:
+		var node := MeshInstance3D.new()
+		var tube := CylinderMesh.new()
+		tube.top_radius = radius
+		tube.bottom_radius = radius
+		tube.height = band[1]
+		tube.cap_top = false
+		tube.cap_bottom = false
+		tube.radial_segments = 28
+		var material := plate.duplicate() as StandardMaterial3D
+		material.cull_mode = BaseMaterial3D.CULL_DISABLED
+		tube.material = material
+		node.mesh = tube
+		node.position = at + Vector3(0, band[0], 0)
+		parent.add_child(node)
 
 
 func _dead_tank(at: Vector3, seed_value: int) -> void:
-	var shell := MeshInstance3D.new()
-	var cylinder := CylinderMesh.new()
-	cylinder.top_radius = 0.8
-	cylinder.bottom_radius = 0.8
-	cylinder.height = 2.8
-	var shell_material := StandardMaterial3D.new()
-	shell_material.albedo_color = Color(0.31, 0.055, 0.035, 0.35)
-	shell_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	shell_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	shell_material.roughness = 0.4
-	cylinder.material = shell_material
-	shell.mesh = cylinder
-	shell.position = at + Vector3(0, 1.4, 0)
-	add_child(shell)
-	var culture := MeshInstance3D.new()
-	var culture_column := CylinderMesh.new()
-	culture_column.top_radius = 0.74
-	culture_column.bottom_radius = 0.74
-	culture_column.height = 2.58
-	var culture_material := StandardMaterial3D.new()
-	culture_material.albedo_color = Color(0.38, 0.018, 0.011, 0.28)
-	culture_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	culture_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	culture_material.emission_enabled = true
-	culture_material.emission = Color(0.14, 0.004, 0.002)
-	culture_column.material = culture_material
-	culture.mesh = culture_column
-	culture.position = at + Vector3(0, 1.38, 0)
-	add_child(culture)
-	# The closest four tanks use the exact same body rig and appearance grammar
-	# as people in the overworld.  Farther down the corridor they deliberately
-	# collapse back to cheap silhouettes; they are too distant to justify full
-	# anatomy and that keeps the opening inside the performance budget.
-	if seed_value <= 2:
-		_build_cradled_vat_subject(at, seed_value)
-	else:
-		var occupant := MeshInstance3D.new()
-		var body := CapsuleMesh.new()
-		body.radius = 0.26
-		body.height = 1.5 - float(seed_value % 3) * 0.2
-		body.material = WorldLook.surface(Color("241a16"), "flesh", seed_value)
-		occupant.mesh = body
-		occupant.position = at + Vector3(0, 1.1, 0)
-		occupant.rotation_degrees = Vector3(float(seed_value % 5) * 4.0, 0, float(seed_value % 7) * 3.0)
-		add_child(occupant)
-	for rib in 4:
-		var ring := MeshInstance3D.new()
-		var torus := TorusMesh.new()
-		torus.inner_radius = 0.8
-		torus.outer_radius = 0.88
-		torus.material = WorldLook.surface(Color("241d15"), "bone", seed_value + rib)
-		ring.mesh = torus
-		ring.position = at + Vector3(0, 0.3 + float(rib) * 0.8, 0)
-		ring.rotation_degrees = Vector3(90, 0, 0)
-		add_child(ring)
+	# LabVat is the hardware (Greg, 2026-09-24: no more ringed cylinders with
+	# capsules in them). The nearest three keep their seated adults -- one is
+	# still alive and one has visibly failed -- and the rest hold curled bodies.
+	var near := seed_value <= 2
+	var root := LabVat.build(self, at, seed_value, 2.4, 0.8, not near, seed_value <= 5)
+	var cradled: Node3D = null
+	if near:
+		cradled = _build_cradled_vat_subject(at + Vector3(0, 0.42, 0), seed_value)
+		horror_subjects.append({"rig": cradled, "at": at, "seed": seed_value})
+	if vat_smash != null:
+		vat_smash.register(root, at, seed_value, cradled)
+
+
+## The Growing Floor's keys, for the pause menu's KEYS page.
+func keys_groups() -> Array:
+	return [
+		{"group": "IN THE TANK", "rows": [["1 2 3", "BLINK ONCE / TWICE / STARE"], ["V", "THINK OUT LOUD"], ["LEFT / RIGHT", "INTAKE TABS"], ["UP / DOWN", "ROWS"], ["ENTER / CLICK", "CONFIRM"], ["F", "FILE THE SHEET"]]},
+		{"group": "THE WIRES", "rows": [["MOUSE", "FIND A WIRE"], ["E", "RIP IT OUT (THREE TUGS)"]]},
+		{"group": "OUT OF THE TANK", "rows": [["WASD", "MOVE"], ["MOUSE", "LOOK"], ["E", "INTERACT"], ["SPACE", "JUMP / CLIMB"], ["SHIFT + CTRL", "SPRINT, THEN SLIDE"], ["HOLD I", "INSPECT WHAT YOU HOLD"], ["LMB", "SMASH A TANK / STRIKE HIS DOOR / HIT HIM"], ["F", "SHOULDER HIS DOOR"], ["ESC", "PAUSE"]]},
+		{"group": "THE CHIP", "rows": [["K", "WIZARD EYES (WAVES SHOW THE WAY)"], ["HOLD J", "DEPTH SCAN"], ["HOLD 4", "DRESS A WOUND"]]},
+	]
+
+
+## A freed subject that turned on you hits the body you just got back.
+func _on_freed_subject_struck(damage: float) -> void:
+	if anatomy != null:
+		anatomy.call("apply_hit", "torso", damage, 0.0, "blunt")
+	breach_shake = maxf(breach_shake, 0.2)
 
 
 ## A seated BaselineHuman makes the first visible other subjects recognisably
@@ -832,7 +1159,12 @@ func _build_cradled_vat_subject(at: Vector3, seed_value: int, parent_node: Node3
 	var host: Node3D = self if parent_node == null else parent_node
 	host.add_child(rig)
 	rig.build(identity, {
-		"gore": false,
+		# Greg, 26 Sep (Q24): the tank specimens bleed. This was a flat `false`,
+		# so a body in the game's opening image could be opened up and not bleed
+		# while the identical rig bled everywhere else -- gore working in three
+		# of the four places it is supposed to. It now reads the same global
+		# setting the other scenes read, so OFF still turns it off.
+		"gore": BASELINE_HUMAN.apply_gore_setting(),
 		"seated": true,
 		"flesh": Color("6a4a43") if seed_value == 1 else Color("4d3833"),
 		"variation": 4 + seed_value * 5 + int(absf(at.x)),
@@ -855,14 +1187,243 @@ func _build_cradled_vat_subject(at: Vector3, seed_value: int, parent_node: Node3
 	return rig
 
 
-func _slab(dimensions: Vector3, at: Vector3, kind: String, color: Color) -> void:
+## The left wall in three pieces around the weak panel, and the crawlway
+## behind it. The panel looks like every other stretch of wall; only the
+## vision modes show it for what it is.
+func _build_left_wall() -> void:
+	var near_end := -AISLE_LENGTH * 0.4 + (AISLE_LENGTH + 8.0) * 0.5
+	var far_end := -AISLE_LENGTH * 0.4 - (AISLE_LENGTH + 8.0) * 0.5
+	var hole_near := WEAK_WALL_AT.z + WEAK_WALL_SIZE.x * 0.5
+	var hole_far := WEAK_WALL_AT.z - WEAK_WALL_SIZE.x * 0.5
+	_slab(Vector3(0.5, 4.4, near_end - hole_near), Vector3(-7.6, 2.2, (near_end + hole_near) * 0.5), "rust", Color("1c1712"))
+	_slab(Vector3(0.5, 4.4, hole_far - far_end), Vector3(-7.6, 2.2, (hole_far + far_end) * 0.5), "rust", Color("1c1712"))
+	var lintel := 4.4 - WEAK_WALL_SIZE.y
+	_slab(Vector3(0.5, lintel, WEAK_WALL_SIZE.x), Vector3(-7.6, WEAK_WALL_SIZE.y + lintel * 0.5, WEAK_WALL_AT.z), "rust", Color("1c1712"))
+	_slab(Vector3(0.5, WEAK_WALL_SIZE.y, WEAK_WALL_SIZE.x), WEAK_WALL_AT, "rust", Color("1c1712"))
+	weak_wall_body = get_child(get_child_count() - 1) as StaticBody3D
+	weak_wall_body.name = "WeakWall"
+	# Greg, 28 September: behind the plaster is a hidden den, not a
+	# shortcut (`_build_den`, built once the sight and stashes exist).
+
+
+const DEN_DEPTH := 3.6
+const DEN_HALF := 1.8
+const DEN_HEIGHT := 2.6
+const DEN_NOTES_LABEL := "SMEARED NOTES"
+const DEN_WEAPON_LABEL := "SHIV"
+var den_centre := Vector3.ZERO
+var den_notes_read := false
+
+
+func _build_den() -> void:
+	var inner_x := -7.85
+	var cx := inner_x - DEN_DEPTH * 0.5
+	var z := WEAK_WALL_AT.z
+	den_centre = Vector3(cx, 0.0, z)
+	_slab(Vector3(DEN_DEPTH, 0.4, DEN_HALF * 2.0), Vector3(cx, -0.2, z), "dirt", Color("15120f"))
+	_slab(Vector3(DEN_DEPTH, 0.3, DEN_HALF * 2.0), Vector3(cx, DEN_HEIGHT + 0.15, z), "rust", Color("100d0b"))
+	for side in [-1.0, 1.0]:
+		_slab(Vector3(DEN_DEPTH, DEN_HEIGHT, 0.2), Vector3(cx, DEN_HEIGHT * 0.5, z + side * (DEN_HALF + 0.1)), "rust", Color("100d0b"))
+	_slab(Vector3(0.3, DEN_HEIGHT, DEN_HALF * 2.0 + 0.4), Vector3(inner_x - DEN_DEPTH - 0.15, DEN_HEIGHT * 0.5, z), "rust", Color("100d0b"))
+	# Their bedroll against the back wall, and them on it.
+	var back_x := inner_x - DEN_DEPTH + 0.6
+	var bedroll := MeshInstance3D.new()
+	var roll := BoxMesh.new()
+	roll.size = Vector3(0.9, 0.08, 2.0)
+	roll.material = WorldLook.surface(Color("3b3228"), "paint", 941)
+	bedroll.mesh = roll
+	bedroll.position = Vector3(back_x, 0.04, z)
+	add_child(bedroll)
+	var remains := BASELINE_HUMAN.new()
+	remains.name = "DenRemains"
+	add_child(remains)
+	remains.build("den_remains", {"flesh": Color("5e4c3a"), "variation": 7})
+	# Along the bedroll, lengthways across the den.
+	remains.position = Vector3(back_x, 0.14, z + 0.85)
+	# Laid out the way RebirthSite lays old bodies: dead, flat on its back.
+	remains.anatomy.dead = true
+	remains.rotation.x = -PI * 0.46
+	# Tally marks scratched into the side wall: days counted, then stopped.
+	for mark in 23:
+		var tick := MeshInstance3D.new()
+		var line := BoxMesh.new()
+		line.size = Vector3(0.012, 0.16, 0.012) if mark % 5 != 4 else Vector3(0.012, 0.012, 0.2)
+		line.material = WorldLook.surface(Color("a89880"), "paint", 942)
+		tick.mesh = line
+		var group := mark / 5
+		tick.position = Vector3(inner_x - 0.8 - group * 0.3 - (mark % 5) * 0.04, 1.3, z - DEN_HALF + 0.02)
+		if mark % 5 == 4:
+			tick.position.x += 0.08
+			tick.rotation.y = 0.5
+		add_child(tick)
+	# Their notes on a crate, and the shiv they made.
+	var crate := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.5, 0.45, 0.5)
+	box.material = WorldLook.surface(Color("4a3b2a"), "rust", 943)
+	crate.mesh = box
+	crate.position = Vector3(inner_x - 1.1, 0.225, z + DEN_HALF - 0.45)
+	add_child(crate)
+	for sheet in 4:
+		var paper := MeshInstance3D.new()
+		var page := BoxMesh.new()
+		page.size = Vector3(0.21, 0.006, 0.28)
+		page.material = WorldLook.surface(Color("cfc3a6"), "paint", 944 + sheet)
+		paper.mesh = page
+		paper.position = crate.position + Vector3(-0.08 + sheet * 0.05, 0.23 + sheet * 0.004, -0.05 + sheet * 0.03)
+		paper.rotation.y = sheet * 0.4
+		paper.name = "DenNote%d" % sheet
+		add_child(paper)
+	var shiv := MeshInstance3D.new()
+	shiv.name = "DenShiv"
+	var blade := BoxMesh.new()
+	blade.size = Vector3(0.03, 0.01, 0.26)
+	blade.material = WorldLook.surface(Color("9aa0a0"), "chrome", 948)
+	shiv.mesh = blade
+	shiv.position = Vector3(back_x + 0.55, 0.05, z - 0.7)
+	shiv.rotation.y = 0.8
+	add_child(shiv)
+	# A stash under the bedroll's corner, and the spirit K shows where they lay.
+	caches.append(HIDDEN_CACHE.place_stash(self, sight, "growing_floor_den_stash", Vector3(inner_x - 0.25, 0.5, z - DEN_HALF + 0.2), Vector3.BACK))
+	var spirits: Array = (sight.get("spirits") as Array).duplicate()
+	spirits.append(Vector3(back_x + 0.3, 0.0, z))
+	sight.set("spirits", spirits)
+	var lamp := OmniLight3D.new()
+	lamp.position = Vector3(cx + 0.4, DEN_HEIGHT - 0.5, z + 0.5)
+	lamp.light_color = Color("d08a4a")
+	lamp.light_energy = 2.2
+	lamp.omni_range = 4.6
+	add_child(lamp)
+
+
+## Greg, 28 September: wizard eyes guides. Acid waves rise from where to go
+## (his door, the way out), red from the one awake in the next tank, bone from
+## stashes and the hollow wall; the chip labels what it recognises.
+func _wire_guidance() -> void:
+	sight.set("beacons", func() -> Array:
+		var out: Array = []
+		if doctor_route != null and doctor_route.door != null and not doctor_route.door.broken:
+			out.append({"at": DoctorRoute.DOOR_AT, "kind": "objective"})
+		if door_marker != null:
+			out.append({"at": door_marker.global_position, "kind": "objective"})
+		if horror != null and not horror._entry(1).is_empty() and phase != "intake":
+			out.append({"at": horror._entry(1).at, "kind": "distress"})
+		for record: Dictionary in caches:
+			if not bool(record.get("opened", false)):
+				out.append({"at": record.at, "kind": "task"})
+		if weak_wall_found and not weak_wall_broken:
+			out.append({"at": WEAK_WALL_AT - Vector3(0, 1.0, 0), "kind": "task"})
+		return out)
+	sight.set("labels", func() -> Array:
+		var out: Array = []
+		if doctor_route != null and doctor_route.door != null and not doctor_route.door.broken:
+			out.append({"at": DoctorRoute.DOOR_AT + Vector3(0, 1.3, 0), "word": "his door // weak hinge"})
+		out.append({"at": STAFF_DOOR_AT + Vector3(0, 1.3, 0), "word": "open" if staff_door_open else "locked // staff"})
+		if not weak_wall_broken:
+			out.append({"at": WEAK_WALL_AT, "word": "hollow"})
+		for record: Dictionary in caches:
+			if not bool(record.get("opened", false)):
+				out.append({"at": record.at, "word": "medicine // ammo"})
+		if horror != null:
+			var awake := horror._entry(1)
+			if not awake.is_empty():
+				out.append({"at": (awake.at as Vector3) + Vector3(0, 1.4, 0), "word": "awake // afraid"})
+			var failed := horror._entry(2)
+			if not failed.is_empty():
+				out.append({"at": (failed.at as Vector3) + Vector3(0, 1.4, 0), "word": "dead" if horror.drained else "failing"})
+		return out)
+
+
+func _in_den() -> bool:
+	return weak_wall_broken and player != null and player.global_position.x < -7.85 and absf(player.global_position.z - WEAK_WALL_AT.z) < DEN_HALF + 0.2
+
+
+## E in the den: the notes, then the shiv.
+func _try_den() -> bool:
+	if not _in_den():
+		return false
+	var notes_at := Vector3(-7.85 - 1.1, 0.0, WEAK_WALL_AT.z + DEN_HALF - 0.45)
+	var shiv_node := get_node_or_null("DenShiv") as Node3D
+	var to_notes := notes_at - player.global_position
+	to_notes.y = 0.0
+	if not den_notes_read and to_notes.length() < 1.6:
+		den_notes_read = true
+		subtitle.text = "THEIR NOTES  //  DAYS COUNTED ON THE WALL, THEN NOTHING  //  THE WRITING IS TOO SMEARED TO READ"
+		WorldHistory.record_event("growing_floor_den_notes_read", {"location": "growing_floor"})
+		return true
+	if shiv_node != null and shiv_node.visible:
+		var to_shiv := shiv_node.global_position - player.global_position
+		to_shiv.y = 0.0
+		if to_shiv.length() < 1.6:
+			shiv_node.visible = false
+			var carry := preload("res://systems/carry.gd").new()
+			carry.items.append({"label": DEN_WEAPON_LABEL, "kind": "weapon", "weapon": "shiv", "mass": 0.2, "perishes": false, "age": 0.0})
+			carry.save_to_history()
+			subtitle.text = "A SHIV  //  THEY MADE IT THEMSELVES"
+			WorldHistory.record_event("growing_floor_den_shiv_taken", {"location": "growing_floor"})
+			return true
+	return false
+
+
+func _near_weak_wall() -> bool:
+	if player == null:
+		return false
+	var to_wall := WEAK_WALL_AT - player.global_position
+	to_wall.y = 0.0
+	return to_wall.length() <= WEAK_WALL_REACH
+
+
+func _on_hidden_seen(id: String) -> void:
+	if HIDDEN_CACHE.mark_found(caches, id):
+		subtitle.text = "A HATCH IN THE WALL  //  SOMETHING KEPT BEHIND IT"
+		return
+	if id != WEAK_WALL_ID or weak_wall_found:
+		return
+	weak_wall_found = true
+	subtitle.text = "THE WALL IS HOLLOW THERE  //  PLASTER OVER A DUCT"
+
+
+## Shouldered through. Only once the modes have shown it: to plain eyes it
+## is the same wall as the rest.
+func break_weak_wall() -> bool:
+	if not weak_wall_found or weak_wall_broken or not _near_weak_wall():
+		return false
+	weak_wall_broken = true
+	if weak_wall_body != null and is_instance_valid(weak_wall_body):
+		weak_wall_body.queue_free()
+	for thing: Dictionary in sight.get("hidden"):
+		if str(thing.get("id", "")) == WEAK_WALL_ID:
+			thing["gone"] = true
+	opening_audio.cue("door")
+	subtitle.text = "THE PLASTER GIVES  //  SOMEONE LIVED BEHIND THIS WALL"
+	preload("res://systems/sight_audio.gd").play_at(self, "crumble", WEAK_WALL_AT, 0.0)
+	WorldHistory.record_event("growing_floor_weak_wall_broken", {"location": "growing_floor"})
+	return true
+
+
+## Into the duct: the Service Arcade, arriving past its pressure gate.
+func take_shortcut() -> bool:
+	if not weak_wall_broken or shortcut_taken:
+		return false
+	shortcut_taken = true
+	_record_service_arcade_entry()
+	WorldHistory.record_event("growing_floor_shortcut_taken", {"location": "growing_floor", "destination": "service_arcade"})
+	SERVICE_ARCADE.arrive_by_duct = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if OS.get_environment("ATG_TEST_MODE") != "1":
+		Interstitial.travel("res://service_arcade.tscn", "a crawlway behind the plaster // it drops past the pressure gate")
+	return true
+
+
+func _slab(dimensions: Vector3, at: Vector3, _kind: String, _color: Color) -> void:
 	var body := StaticBody3D.new()
 	body.position = at
 	add_child(body)
 	var mesh_instance := MeshInstance3D.new()
 	var box := BoxMesh.new()
 	box.size = dimensions
-	box.material = WorldLook.surface(color, kind, int(at.x * 31.0 + at.z * 17.0))
+	# Real lab surfaces (Greg, 2026-09-24), chosen by the slab's shape.
+	box.material = LabSurface.for_slab(dimensions, at)
 	mesh_instance.mesh = box
 	body.add_child(mesh_instance)
 	var collision := CollisionShape3D.new()
@@ -873,12 +1434,55 @@ func _slab(dimensions: Vector3, at: Vector3, kind: String, color: Color) -> void
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# No fighting while a dressing goes on (hold 4).
+	if meds.busy() and event is InputEventMouseButton and event.pressed:
+		return
 	if intake != null:
+		return
+	# Greg, 25 September: speedrunners. F, Enter or Space during his walk out
+	# sends him through his door now; the door still shuts and is heard.
+	if phase == "departure" and event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_F, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+		# One frame short, so the next update runs the door and his exit and
+		# then hands over, in the same pass.
+		departure_clock = maxf(departure_clock, DEPARTURE_SECONDS - 0.001)
+		WorldHistory.record_event("opening_departure_skipped", {})
+		get_viewport().set_input_as_handled()
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	# Post creation, any other tank you are looking at up close can be
+	# smashed open: the glass, the medium, and whoever is inside.
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and breakout_complete and can_move and vat_smash != null:
+		var tank: int = vat_smash.aimed(camera)
+		if tank >= 0:
+			vat_smash.strike(tank, doctor_route.held_weapon() if doctor_route != null else "")
+			return
+	if phase == "hacked" and event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_F, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+		brain_hack.call("skip_hack")
+		get_viewport().set_input_as_handled()
+		return
+	if doctor_route != null and doctor_route.handle_input(event):
+		return
+	if phase == "knees" and event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_SPACE, KEY_E]:
+		get_up()
+		get_viewport().set_input_as_handled()
+		return
+	if phase == "smash" and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		strike_glass()
+		return
+	# Greg, 26 September: jump and climb everywhere. Only once he's on his
+	# feet; SPACE belongs to the scripted beats before that.
+	if can_move and JUMP_CLIMB.is_jump_key(event):
+		JUMP_CLIMB.press(player, yaw, float(anatomy.call("mobility_ratio")), "vat_room_climbed")
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
-		_interact()
+		if phase == "wired":
+			_tug_wire(_aimed_wire())
+		elif phase == "cord":
+			tug_cord()
+		elif phase == "smash":
+			strike_glass()
+		else:
+			_interact()
 	# AX3.1/AX3.6. The same HOLD-I verb the rest of the game already teaches
 	# with (see `bone_yard_hunt.gd`'s keys card), introduced here for the
 	# first time by doing rather than by that card, since the card belongs to
@@ -886,15 +1490,58 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and not event.echo and event.keycode == KEY_I:
 		inspect_held = event.pressed
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and phase != "submerged":
-		yaw -= event.relative.x * 0.0026
-		pitch = clampf(pitch - event.relative.y * 0.0024, -1.2, 1.0)
+		yaw -= LOOK.dx(event.relative) * 0.0026
+		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.2, 1.0)
+
+
+## Greg, 28 September: one line at each beat, in your own head, first
+## person, short and panicked. It says why, what you are, and what to do.
+const THOUGHTS := {
+	"departure": "I WAS GROWN HERE.  THEY WOKE ME EARLY.",
+	"submerged": "SOMETHING IS IN MY HEAD.  IT'S MINE NOW.",
+	"voiding": "THE WATER'S GOING.  BREATHE.",
+	"wired": "THEY'RE IN ME.  GET THEM OUT.",
+	"cord": "IT'S DOWN MY THROAT.  PULL.",
+	"smash": "THE GLASS.  HIT THE GLASS.",
+	"knees": "I'M OUT.  I'M OUT.  GET UP.",
+	"aisle": "HE WENT THROUGH THAT DOOR.",
+}
+var thought_label: Label
+var thought_phase := ""
+var thought_life := 0.0
+
+## The music bed rises through the escape (Greg, 28 September).
+const VAT_TENSION := {"intake": 0.25, "departure": 0.4, "hacked": 0.9, "submerged": 0.6, "voiding": 0.55, "wired": 0.7, "cord": 0.8, "smash": 0.95, "rising": 0.6, "knees": 0.45, "floor": 0.45, "aisle": 0.35}
+const TANK_PANIC := {"intake": 0.2, "departure": 0.45, "hacked": 1.0, "submerged": 0.75}
 
 
 func _physics_process(delta: float) -> void:
+	if phase != thought_phase:
+		thought_phase = phase
+		if THOUGHTS.has(phase):
+			_think_aloud(str(THOUGHTS[phase]))
+	if thought_label != null:
+		thought_life = maxf(0.0, thought_life - delta)
+		thought_label.modulate.a = clampf(thought_life / 0.8, 0.0, 1.0)
+	# Greg, 28 September: the tank you are in (TankView) until it drains.
+	if tank_view != null:
+		tank_view.in_tank = TANK_PANIC.has(phase)
+		tank_view.panic = float(TANK_PANIC.get(phase, 0.0))
+	var bed := get_node_or_null("AmbientBed")
+	if bed != null:
+		bed.set("tension", float(VAT_TENSION.get(phase, 0.35)))
+		bed.set("heart_muted", tank_view != null and TANK_PANIC.has(phase))
 	if phase == "intake":
 		if opening_audio != null:
 			opening_audio.set_phase("intake")
+		if load_in != null:
+			return
 		_update_arrival(delta)
+		return
+	# The hack draws itself; the body just hangs in the fluid under it.
+	if phase == "hacked":
+		camera.rotation = Vector3(-0.1 + sin(Time.get_ticks_msec() * 0.0007) * 0.03, 0, 0)
+		_update_hud()
 		return
 	# Departure runs on its own clock so the vat's beat table keeps the timings
 	# it was tuned with instead of every entry needing a +4.4 offset.
@@ -902,10 +1549,33 @@ func _physics_process(delta: float) -> void:
 		_update_departure(delta)
 		_update_hud()
 		return
+	# The tank's clock stops while you hang in the wires. Nothing moves on
+	# until the player does it themselves.
+	if phase in ["wired", "cord", "smash"]:
+		wired_clock += delta
+		_update_wired(delta)
+		_update_shards(delta)
+		_update_hud()
+		return
+	if boot_hud != null:
+		boot_hud.step(delta)
+	if phase in ["knees", "rising"]:
+		clock += delta
+		_update_knees(delta)
+		_update_shards(delta)
+		if breach_shake > 0.0:
+			breach_shake = maxf(0.0, breach_shake - delta)
+			var force := breach_shake * breach_shake * 0.16
+			camera.rotation.x += sin(clock * 47.0) * force
+			camera.rotation.z += sin(clock * 53.0) * force * 1.4
+		_update_hud()
+		return
 	clock += delta
 	_update_beats()
 	_update_sequence(delta)
 	_update_shards(delta)
+	if vat_smash != null:
+		vat_smash.step(delta)
 	if can_move:
 		_update_movement(delta)
 	# Applied last, on top of whatever the sequence or the movement code just
@@ -919,27 +1589,118 @@ func _physics_process(delta: float) -> void:
 		camera.rotation.z += sin(clock * 53.0) * force * 1.4
 	_update_hud()
 
-## The intake does not begin as a menu. You wake, the examiner enters, looks
-## through the glass, and only then wakes the terminal that engages the chip.
+## From his door behind the vat, round the tank's right side, to his terminal
+## (`inbound`), or the reverse. `t` is 0..1 along the whole walk.
+func _examiner_path(t: float, inbound: bool) -> Vector3:
+	var door: Vector3 = DoctorRoute.DOOR_AT
+	# From the end of his desk, round its near corner, past the tank on its
+	# right and out through his door behind it.
+	var points: Array[Vector3] = [
+		examiner_post,
+		Vector3(1.25, examiner_post.y, -1.8),
+		# In front of your glass, where you can see him: the tap happens here.
+		Vector3(GLASS_FRONT.x, examiner_post.y, GLASS_FRONT.z),
+		Vector3(GLASS_ROUND.x, examiner_post.y, GLASS_ROUND.z),
+		Vector3(1.55, examiner_post.y, 0.2),
+		Vector3(door.x, examiner_post.y, door.z - 0.6),
+		Vector3(door.x, examiner_post.y, door.z + 0.9),
+	]
+	if inbound:
+		points.reverse()
+	var total := 0.0
+	for index in points.size() - 1:
+		total += points[index].distance_to(points[index + 1])
+	var along := clampf(t, 0.0, 1.0) * total
+	for index in points.size() - 1:
+		var leg := points[index].distance_to(points[index + 1])
+		if along <= leg or index == points.size() - 2:
+			return points[index].lerp(points[index + 1], clampf(along / maxf(leg, 0.001), 0.0, 1.0))
+		along -= leg
+	return points[-1]
+
+
+## The intake does not begin as a menu. You wake, the examiner comes in,
+## stops at your glass, looks at you and taps it three times, then goes to his
+## terminal and wakes the chip.
 func _update_arrival(delta: float) -> void:
 	arrival_clock += delta
 	if examiner_node == null or not is_instance_valid(examiner_node):
 		return
 	if arrival_clock >= 0.35:
 		examiner_node.visible = true
-	var walk := clampf((arrival_clock - 0.35) / 2.15, 0.0, 1.0)
-	examiner_node.position.x = lerpf(STAFF_DOOR_AT.x, -0.16, ease(walk, 0.78))
-	# He first faces the tank, then turns into his own terminal. The object of
-	# attention changes before the UI arrives, which makes the intake a result
-	# of something he physically did in the room.
-	var turn := clampf((arrival_clock - 2.55) / 0.85, 0.0, 1.0)
-	examiner_node.rotation.y = lerpf(PI, 0.0, ease(turn, 0.55))
-	if arrival_clock >= 0.70 and arrival_clock < 2.45:
+	var stop := _glass_stop_fraction()
+	var t := 0.0
+	if arrival_clock < GLASS_STOP_AT:
+		t = ease(clampf((arrival_clock - 0.35) / (GLASS_STOP_AT - 0.35), 0.0, 1.0), 0.78) * stop
+	elif arrival_clock < GLASS_LEAVE_AT:
+		t = stop
+	else:
+		t = lerpf(stop, 1.0, ease(clampf((arrival_clock - GLASS_LEAVE_AT) / (TERMINAL_TURN_AT - 0.05 - GLASS_LEAVE_AT), 0.0, 1.0), 0.7))
+	var at := _examiner_path(t, true)
+	# Greg, 24 September: he comes and goes by the door behind the vat -- the
+	# one the player will break down to follow him.
+	if doctor_route != null and doctor_route.door != null:
+		var opening := clampf((arrival_clock - 0.35) / (GLASS_STOP_AT - 0.35), 0.0, 1.0)
+		doctor_route.door.set_ajar(1.0 - clampf((opening - 0.08) / 0.14, 0.0, 1.0) if arrival_clock >= 0.2 else 0.0)
+	if arrival_clock >= GLASS_STOP_AT and arrival_clock < GLASS_LEAVE_AT:
+		# He looks at you first. Each knock leans him into the glass.
+		var to_tank := VAT_POSITION - at
+		examiner_node.global_rotation.y = atan2(to_tank.x, to_tank.z)
+		var lean := 0.0
+		for knock in GLASS_TAPS:
+			var since := arrival_clock - float(knock)
+			if since >= 0.0 and since < 0.22:
+				lean = maxf(lean, sin(since / 0.22 * PI) * 0.06)
+		at += Vector3(to_tank.x, 0.0, to_tank.z).normalized() * lean
+		while examiner_taps < GLASS_TAPS.size() and arrival_clock >= float(GLASS_TAPS[examiner_taps]):
+			examiner_taps += 1
+			if opening_audio != null:
+				opening_audio.cue("tap")
+			if examiner_taps == GLASS_TAPS.size():
+				WorldHistory.record_event("examiner_tapped_glass", {"taps": examiner_taps})
+		_turn_from = examiner_node.rotation.y
+	elif arrival_clock < TERMINAL_TURN_AT:
+		var heading := _examiner_path(minf(1.0, t + 0.03), true) - at
+		if heading.length() > 0.001:
+			examiner_node.global_rotation.y = atan2(heading.x, heading.z)
+		_turn_from = examiner_node.rotation.y
+	else:
+		# Then he turns into his own terminal. The object of attention changes
+		# before the UI arrives, which makes the intake a result of something he
+		# physically did in the room.
+		var turn := clampf((arrival_clock - TERMINAL_TURN_AT) / 0.7, 0.0, 1.0)
+		examiner_node.rotation.y = lerp_angle(_turn_from, EXAMINER_TURN, ease(turn, 0.55))
+	examiner_node.global_position = at
+	if arrival_clock >= 0.70 and arrival_clock < 2.0:
 		subtitle.text = "EXAMINER // SUBJECT CONSCIOUS"
-	elif arrival_clock >= 3.15 and arrival_clock < 5.5:
+	elif examiner_taps > 0 and arrival_clock < GLASS_LEAVE_AT + 0.3:
+		subtitle.text = "TAP. ".repeat(examiner_taps).strip_edges()
+	elif arrival_clock >= TERMINAL_TURN_AT + 0.1 and arrival_clock < 6.4:
 		subtitle.text = "NEURALACE TERMINAL // LINK ESTABLISHING"
 	else:
 		subtitle.text = ""
+
+
+## How far along his walk in the glass stop is: the waypoint beside the tank.
+func _glass_stop_fraction() -> float:
+	var door: Vector3 = DoctorRoute.DOOR_AT
+	var points: Array[Vector3] = [
+		Vector3(door.x, examiner_post.y, door.z + 0.9),
+		Vector3(door.x, examiner_post.y, door.z - 0.6),
+		Vector3(1.55, examiner_post.y, 0.2),
+		Vector3(GLASS_ROUND.x, examiner_post.y, GLASS_ROUND.z),
+		Vector3(GLASS_FRONT.x, examiner_post.y, GLASS_FRONT.z),
+		Vector3(1.25, examiner_post.y, -1.8),
+		examiner_post,
+	]
+	var total := 0.0
+	var upto := 0.0
+	for index in points.size() - 1:
+		var leg := points[index].distance_to(points[index + 1])
+		total += leg
+		if index < 4:
+			upto += leg
+	return upto / maxf(total, 0.001)
 
 
 ## He turns away, walks out of his own door, and the door shuts. The player is
@@ -958,21 +1719,23 @@ func _update_departure(delta: float) -> void:
 	# the examiner hangs off the workstation node rather than off the chamber.
 	if examiner_node != null and is_instance_valid(examiner_node):
 		var turn := clampf(departure_clock / 0.50, 0.0, 1.0)
-		examiner_node.rotation.y = lerpf(0.0, -PI * 0.5, ease(turn, 0.6))
+		examiner_node.rotation.y = lerpf(EXAMINER_TURN, EXAMINER_TURN - PI * 0.5, ease(turn, 0.6))
 		var walk := clampf((departure_clock - 0.50) / 2.45, 0.0, 1.0)
-		examiner_node.position.x = lerpf(-0.16, STAFF_DOOR_AT.x, ease(walk, 0.85))
+		examiner_node.global_position = _examiner_path(ease(walk, 0.85), false)
+		var heading := _examiner_path(minf(1.0, ease(walk, 0.85) + 0.05), false) - examiner_node.global_position
+		if walk > 0.02 and heading.length() > 0.001:
+			examiner_node.global_rotation.y = atan2(heading.x, heading.z)
+		# His door swings for him and shuts behind him.
+		if doctor_route != null and doctor_route.door != null:
+			doctor_route.door.set_ajar(clampf((walk - 0.72) / 0.12, 0.0, 1.0) - clampf((departure_clock - 3.1) / 0.5, 0.0, 1.0))
+		if walk >= 0.97 and not examiner_door_heard:
+			examiner_door_heard = true
+			if opening_audio != null:
+				opening_audio.cue("door")
 		# Through the doorway and out of the room, rather than standing in it
 		# while the panel closes across him.
 		if walk >= 1.0:
 			examiner_node.visible = false
-
-	# The panel slides back across once he is through.
-	if staff_door_panel != null and is_instance_valid(staff_door_panel):
-		# Starts the instant he is through at 2.95 and is shut by 3.70, so the
-		# seal happens while the player is still looking at it rather than
-		# behind a head that has already turned back to the tank.
-		var shut := clampf((departure_clock - 2.95) / 0.75, 0.0, 1.0)
-		staff_door_panel.position.z = STAFF_DOOR_AT.z + lerpf(-1.42, 0.0, ease(shut, 0.4))
 
 	# You are still tied into the tank, so you cannot look away from it, but the
 	# head does turn to watch the one person in the room leave.
@@ -988,18 +1751,63 @@ func _update_departure(delta: float) -> void:
 		camera.rotation.x = -0.1 + sin(departure_clock * 0.7) * 0.03
 
 	if departure_clock >= DEPARTURE_SECONDS:
-		phase = "submerged"
-		clock = 0.0
-		line_index = -1
 		subtitle.text = ""
 		WorldHistory.record_event("opening_examiner_departed", {"location": "growing_floor"})
+		# Greg: he leaves, the screaming starts, and the sigil takes your brain.
+		if BRAIN_HACK.wanted():
+			phase = "hacked"
+			brain_hack.call("begin_hack")
+		else:
+			phase = "submerged"
+			clock = 0.0
+			line_index = -1
+
+
+## BRAIN HACKED / SOUL OVERTAKEN on the END ALL SUFFERING card, and the tank
+## starts to fail under it.
+func _think_aloud(line: String) -> void:
+	if thought_label == null:
+		thought_label = Label.new()
+		thought_label.name = "Thought"
+		thought_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+		thought_label.offset_left = -480.0
+		thought_label.offset_right = 480.0
+		thought_label.offset_top = 196.0
+		thought_label.offset_bottom = 226.0
+		thought_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		thought_label.add_theme_font_size_override("font_size", 22)
+		thought_label.add_theme_color_override("font_color", Color("ead4ad"))
+		thought_label.add_theme_color_override("font_outline_color", Color(0.05, 0.01, 0.01))
+		thought_label.add_theme_constant_override("outline_size", 6)
+		thought_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		$HUD.add_child(thought_label)
+	thought_label.text = line
+	thought_life = 4.5
+	thought_label.modulate.a = 1.0
+
+
+func _offer_standing_hints() -> void:
+	key_hints.offer("use", KEY_E, "E", "use / open / tear")
+	key_hints.offer("jump", KEY_SPACE, "SPACE", "jump and climb")
+	key_hints.offer("slide", KEY_CTRL, "SHIFT + CTRL", "sprint, then slide")
+
+
+func _on_hack_finished(_skipped: bool) -> void:
+	# The chip is yours now, and so are its senses.
+	sight.set("enabled", true)
+	key_hints.offer("wizard_eyes", KEY_K, "K", "wizard eyes")
+	key_hints.offer("depth_scan", KEY_J, "HOLD J", "depth scan")
+	mission_card.play("brain_hacked", "BRAIN HACKED SOUL OVERTAKEN", BRAIN_HACK.CARD_SECONDS)
+	phase = "submerged"
+	clock = 0.0
+	line_index = -1
 
 
 func _update_beats() -> void:
-	for index in BEATS.size():
-		if clock >= float(BEATS[index].at) and index > line_index:
+	for index in active_beats.size():
+		if clock >= float(active_beats[index].at) and index > line_index:
 			line_index = index
-			subtitle.text = str(BEATS[index].text)
+			subtitle.text = str(active_beats[index].text)
 
 
 func _update_sequence(_delta: float) -> void:
@@ -1032,8 +1840,8 @@ func _update_sequence(_delta: float) -> void:
 			player.position.y = lerpf(1.35, 0.95, ease(t, 0.6))
 			camera.rotation = Vector3(sin(clock * 0.9) * 0.06 * (1.0 - t) - 0.1 * (1.0 - t), sin(clock * 0.5) * 0.1 * (1.0 - t), 0)
 			opening_audio.set_phase("voiding", t)
-			if t >= 1.0:
-				_breach()
+			if clock >= DRAINED_AT:
+				_begin_wired()
 		"floor":
 			# On hands and knees on the grating.
 			var t := clampf((clock - 5.6) / 3.2, 0.0, 1.0)
@@ -1044,18 +1852,341 @@ func _update_sequence(_delta: float) -> void:
 			camera.position.y = lerpf(0.62, EYE_HEIGHT, ease(t, 0.45)) - BODY_HALF_HEIGHT
 			camera.rotation = Vector3(lerpf(-0.95, 0.0, ease(t, 0.5)), 0, lerpf(0.22, 0.0, ease(t, 0.5)))
 			camera.fov = lerpf(78.0, 74.0, t) + sin(clock * 2.4) * (1.0 - t) * 4.0
+			if title.visible:
+				title.modulate.a = clampf(1.0 - t * 2.5, 0.0, 1.0)
+				title.visible = title.modulate.a > 0.0
 			if t >= 1.0:
 				phase = "aisle"
 				can_move = true
+				_offer_standing_hints()
 				subtitle.text = ""
 				yaw = 0.0
 				pitch = 0.0
 
 
+## The drain leaves the body hanging in an empty tank with the wires still in
+## it. Ending that is the first thing the player chooses to do.
+func _begin_wired() -> void:
+	phase = "wired"
+	clock = DRAINED_AT
+	wired_clock = 0.0
+	revenge_at = -1.0
+	yaw = 0.0
+	# The umbilicals enter low on the abdomen; the head is already bowed to them.
+	pitch = -0.55
+	player.position.y = 0.95
+	title.text = "END ALL SUFFERING"
+	title.modulate.a = 1.0
+	title.visible = true
+	mission_card.play("end_all_suffering", "END ALL SUFFERING", END_CARD_SECONDS)
+	subtitle.text = "The wires are still in you."
+	opening_audio.set_phase("wired")
+	WorldHistory.record_event("opening_wired", {"tank": "0C-7"})
+
+
+func _update_wired(delta: float) -> void:
+	jolt = maxf(0.0, jolt - delta * 3.0)
+	player.rotation.y = yaw
+	camera.rotation = Vector3(pitch, 0, sin(wired_clock * 41.0) * 0.06 * jolt)
+	camera.fov = 80.0 + jolt * 6.0
+	player.position.y = 0.95 + sin(wired_clock * 1.3) * 0.02
+	if revenge_at < 0.0:
+		# It flickers like a readout that has been saying this for years.
+		title.modulate.a = 0.55 + 0.45 * absf(sin(wired_clock * 2.2 + sin(wired_clock * 13.0) * 0.4))
+		return
+	title.modulate.a = 1.0
+	if wired_clock - revenge_at >= REVENGE_HOLD:
+		_breach()
+
+
+## The wire nearest the centre of view, or null when none is being looked at.
+func _aimed_wire() -> Node3D:
+	var forward := -camera.global_transform.basis.z
+	var best: Node3D = null
+	var best_dot := 0.94
+	for cable in umbilicals:
+		for link in cable.get_children():
+			var to_link := ((link as Node3D).global_position - camera.global_position).normalized()
+			var dot := forward.dot(to_link)
+			if dot > best_dot:
+				best_dot = dot
+				best = cable
+	return best
+
+
+func _tug_wire(cable: Node3D) -> void:
+	if phase != "wired" or revenge_at >= 0.0 or cable == null or not umbilicals.has(cable):
+		return
+	# Reaching for a wire cuts the card short: the player acting beats the
+	# screen telling them to.
+	if mission_card != null and mission_card.playing:
+		mission_card.skip()
+	var pulls := int(cable.get_meta("pulls", 0)) + 1
+	cable.set_meta("pulls", pulls)
+	jolt = 1.0
+	if pulls < WIRE_TUGS:
+		# It stretches toward you and holds. It is anchored in you, too.
+		anatomy.call("apply_hit", "torso", 3.0, 0.0, "blunt")
+		cable.position = (camera.global_position - cable.global_position).normalized() * 0.05 * pulls
+		if tank_view != null:
+			tank_view.bleed(0.08)
+		opening_audio.cue("tug")
+		return
+	_rip_wire(cable)
+
+
+func _rip_wire(cable: Node3D) -> void:
+	umbilicals.erase(cable)
+	anatomy.call("apply_hit", "torso", 7.0, 0.0, "shear")
+	if tank_view != null:
+		tank_view.pain()
+	opening_audio.cue("rip")
+	# It comes out wet and whips back up toward its anchor.
+	var tween := create_tween()
+	tween.tween_property(cable, "position", Vector3(0, 1.6, 0), 0.35).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(cable, "scale", Vector3(0.3, 0.3, 0.3), 0.35)
+	tween.tween_callback(cable.queue_free)
+	for index in 7:
+		var drop := MeshInstance3D.new()
+		var mesh := SphereMesh.new()
+		mesh.radius = 0.02 + randf() * 0.025
+		mesh.height = mesh.radius * 2.0
+		mesh.material = WorldLook.surface(Color("5a1410") if index % 2 else Color("1f3a26"), "flesh", index)
+		drop.mesh = mesh
+		drop.position = camera.global_position + Vector3(randf_range(-0.2, 0.2), -0.25, randf_range(-0.2, 0.2))
+		add_child(drop)
+		var out := Vector3(randf_range(-1.0, 1.0), randf_range(0.2, 1.0), randf_range(-1.0, 1.0)).normalized()
+		glass_shards.append({"node": drop, "velocity": out * randf_range(1.2, 3.0), "life": 1.4})
+	WorldHistory.record_event("opening_wire_torn", {"remaining": umbilicals.size()})
+	if umbilicals.is_empty():
+		if hands_on_breakout:
+			_begin_cord()
+		else:
+			_all_wires_out()
+
+
+func _all_wires_out() -> void:
+	revenge_at = wired_clock
+	title.text = "GET REVENGE"
+	_get_revenge()
+
+
+## The second task, in the insane type (Greg): you want to kill him.
+func _get_revenge() -> void:
+	mission_card.play("get_revenge", "GET REVENGE", REVENGE_HOLD)
+	subtitle.text = ""
+	opening_audio.cue("revenge")
+	# Wounds are catalogue dictionaries once WorldHistory has normalised them
+	# (WoundCatalog), not prose strings; a string here is rejected by the typed
+	# array and the wound silently never lands.
+	var wounds: Array = (WorldHistory.subject("player").get("wounds", []) as Array).duplicate(true)
+	var has_sockets := wounds.any(func(wound) -> bool: return WOUND_CATALOG.label(wound) == "torn wire sockets")
+	if not has_sockets:
+		wounds.append({"label": "torn wire sockets", "zone": "torso", "type": "tear", "severity": 0.3})
+	WorldHistory.amend_subject("player", {"wounds": wounds})
+	PLAYER_ACTION_LEDGER.record("opening_wires_torn_out", {"tank": "0C-7", "location": "growing_floor"})
+
+
+## The wires are out; the cord down your throat is last. It hangs out of
+## your mouth, just under the view.
+func _begin_cord() -> void:
+	phase = "cord"
+	cord_pulls = 0
+	title.visible = false
+	subtitle.text = "The cord is still down your throat."
+	mouth_cord = MeshInstance3D.new()
+	mouth_cord.name = "MouthCord"
+	var tube := CylinderMesh.new()
+	tube.top_radius = 0.03
+	tube.bottom_radius = 0.045
+	tube.height = 1.4
+	tube.material = WorldLook.surface(Color("3b1c16"), "flesh", 77)
+	(mouth_cord as MeshInstance3D).mesh = tube
+	# From the mouth, down and away to where it anchors in the tank floor.
+	mouth_cord.position = Vector3(0.04, -0.5, -0.62)
+	mouth_cord.rotation.x = 0.9
+	camera.add_child(mouth_cord)
+	# Looking down the length of it.
+	pitch = -0.8
+	WorldHistory.record_event("opening_wires_out", {"next": "mouth_cord"})
+
+
+func tug_cord() -> void:
+	if phase != "cord":
+		return
+	cord_pulls += 1
+	jolt = 1.2
+	anatomy.call("apply_hit", "head", 2.0, 0.0, "blunt")
+	if cord_pulls < CORD_TUGS:
+		# It comes up out of you a hand at a time.
+		opening_audio.cue("tug")
+		mouth_cord.position.z += 0.08
+		mouth_cord.position.y += 0.05
+		return
+	if tank_view != null:
+		tank_view.pain()
+	opening_audio.cue("rip")
+	var tween := create_tween()
+	tween.tween_property(mouth_cord, "position", mouth_cord.position + Vector3(0.3, -1.4, -0.8), 0.4).set_ease(Tween.EASE_IN)
+	tween.tween_callback(mouth_cord.queue_free)
+	mouth_cord = null
+	WorldHistory.record_event("opening_mouth_cord_torn", {"tank": "0C-7"})
+	_begin_smash()
+
+
+## Nothing holds you now but the glass.
+func _begin_smash() -> void:
+	phase = "smash"
+	glass_blows = 0
+	pitch = 0.0
+	subtitle.text = ""
+	WorldHistory.record_event("opening_glass_faced", {"tank": "0C-7"})
+
+
+## One blow at the glass in front of you. The first two crack it; the third
+## goes through.
+func strike_glass() -> void:
+	if phase != "smash":
+		return
+	glass_blows += 1
+	jolt = 1.4
+	anatomy.call("apply_hit", "right_arm", 4.0, 0.0, "blunt")
+	WorldHistory.record_event("opening_glass_struck", {"blow": glass_blows})
+	if glass_blows < GLASS_BLOWS:
+		opening_audio.cue("tug")
+		_crack_glass(glass_blows)
+		return
+	_breach()
+
+
+## Cracks radiating from where the fist landed, on the tank wall ahead.
+func _crack_glass(blow: int) -> void:
+	var forward := -camera.global_transform.basis.z
+	forward.y = 0.0
+	if forward.length() < 0.01:
+		forward = Vector3(0, 0, -1)
+	forward = forward.normalized()
+	var hit := VAT_POSITION + forward * 0.9 + Vector3(0, camera.global_position.y - 0.1, 0)
+	var crack_material := StandardMaterial3D.new()
+	crack_material.albedo_color = Color(0.95, 0.85, 0.8, 0.8)
+	crack_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	crack_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	for index in 5 + blow * 4:
+		var line := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(0.006, 0.12 + randf() * 0.22 * blow, 0.004)
+		mesh.material = crack_material
+		line.mesh = mesh
+		add_child(line)
+		line.global_position = hit - forward * 0.01
+		line.look_at(hit + forward, Vector3.UP)
+		line.rotate_object_local(Vector3(0, 0, 1), TAU * randf())
+		line.translate_object_local(Vector3(0, mesh.size.y * 0.5, 0))
+		glass_cracks.append(line)
+
+
+## Out of the tank and down on your knees in what came out with you. The
+## implant is taken while you are down there, and the HUD boots.
+func _begin_knees() -> void:
+	clock = DRAINED_AT
+	player.position.y = BODY_HALF_HEIGHT
+	camera.position.y = 0.62 - BODY_HALF_HEIGHT
+	# Down on the grating, the broken tank around you and the aisle ahead.
+	pitch = -0.55
+	breach_shake = 0.9
+	subtitle.text = ""
+	boot_hud = IMPLANT_BOOT_HUD.new()
+	boot_hud.driven = true
+	$HUD.add_child(boot_hud)
+	boot_hud.attach(osd)
+	boot_hud.begin(_seizure)
+	WorldHistory.record_event("opening_on_knees", {"location": "growing_floor"})
+
+
+func _update_knees(delta: float) -> void:
+	player.rotation.y = yaw
+	if phase == "knees":
+		# Heaving on the grating, looking at the puddle.
+		camera.position.y = 0.62 - BODY_HALF_HEIGHT + sin(clock * 2.6) * 0.02
+		camera.rotation = Vector3(pitch + sin(clock * 2.6) * 0.03, 0, 0.12 + sin(clock * 1.3) * 0.04)
+		return
+	rise_clock += delta
+	var t := clampf(rise_clock / RISE_SECONDS, 0.0, 1.0)
+	# First crawl through the spill, low, toward the aisle...
+	if t < CRAWL_SHARE:
+		var crawl := t / CRAWL_SHARE
+		var ahead := Vector3(-sin(rise_from_yaw), 0.0, -cos(rise_from_yaw))
+		player.global_position += ahead * (CRAWL_DISTANCE / (RISE_SECONDS * CRAWL_SHARE)) * delta
+		camera.position.y = 0.45 - BODY_HALF_HEIGHT + absf(sin(crawl * TAU * 3.0)) * 0.04
+		camera.rotation = Vector3(-0.35, 0, sin(crawl * TAU * 3.0) * 0.06)
+		return
+	# ...then pull yourself up on the tank.
+	t = (t - CRAWL_SHARE) / (1.0 - CRAWL_SHARE)
+	var eased := ease(t, 0.45)
+	# Up off your knees, turning to the door he left by.
+	yaw = lerp_angle(rise_from_yaw, _door_yaw(), eased)
+	player.rotation.y = yaw
+	camera.position.y = lerpf(0.62, EYE_HEIGHT, eased) - BODY_HALF_HEIGHT
+	camera.rotation = Vector3(lerpf(-0.55, 0.05, eased), 0, lerpf(0.12, 0.0, eased))
+	if t >= 1.0:
+		phase = "aisle"
+		pitch = 0.05
+		can_move = true
+		_offer_standing_hints()
+		_get_revenge()
+
+
+## The medium floods out across the grating with you in it.
+func _flood() -> void:
+	var pool := MeshInstance3D.new()
+	pool.name = "SpilledMedium"
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(1.0, 1.0)
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.36, 0.44, 0.22, 0.8)
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.roughness = 0.02
+	material.metallic = 0.5
+	# A faint glow of its own, so the spill reads in the dark room.
+	material.emission_enabled = true
+	material.emission = Color(0.2, 0.28, 0.1)
+	material.emission_energy_multiplier = 0.35
+	plane.material = material
+	pool.mesh = plane
+	pool.position = Vector3(VAT_POSITION.x, 0.015, VAT_POSITION.z)
+	pool.scale = Vector3(0.5, 1.0, 0.5)
+	add_child(pool)
+	var tween := create_tween()
+	tween.tween_property(pool, "scale", Vector3(5.5, 1.0, 5.5), 1.6).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+
+
+## Facing his door from where you stand.
+func _door_yaw() -> float:
+	var to_door: Vector3 = DoctorRoute.DOOR_AT - player.global_position
+	return atan2(-to_door.x, -to_door.z)
+
+
+## Up off your knees. Only once the implant has put the HUD up.
+func get_up() -> void:
+	if phase != "knees" or boot_hud == null or not boot_hud.done:
+		return
+	phase = "rising"
+	rise_clock = 0.0
+	rise_from_yaw = yaw
+	WorldHistory.record_event("opening_got_up", {"location": "growing_floor"})
+
+
 func _breach() -> void:
+	if sight != null:
+		sight.set("enabled", true)
 	if breakout_complete:
 		return
-	phase = "floor"
+	phase = "knees" if hands_on_breakout else "floor"
+	clock = maxf(clock, DRAINED_AT)
+	# Hanging in the wires turned the body; the stand-up faces down the aisle.
+	yaw = 0.0
+	pitch = 0.0
+	player.rotation.y = 0.0
 	opening_audio.cue("glass")
 	vat_glass.visible = false
 	fluid.visible = false
@@ -1063,6 +2194,7 @@ func _breach() -> void:
 		cable.queue_free()
 	umbilicals.clear()
 	WorldHistory.record_event("opening_tank_breached", {"tank": "0C-7"})
+	_flood()
 	# Glass and fluid go outward across the grating.
 	#
 	# This used to be 22 pale two-centimetre boxes in desaturated green, thrown
@@ -1107,11 +2239,27 @@ func _breach() -> void:
 	disc.top_radius = 1.7
 	disc.bottom_radius = 1.7
 	disc.height = 0.02
-	disc.material = WorldLook.surface(Color("101a13"), "dirt", 4)
+	# The floor light glitch Greg saw (Dust to Bones, 24 September): this used
+	# WorldLook's "dirt", whose unfiltered grain and rim light turned a
+	# near-black puddle into a pale disc of green and yellow pixel blocks under
+	# the body-cam lamp. What spilled out of a tank is fluid: dark, and wet
+	# enough to hold the lamp as one highlight instead of lighting up.
+	var spill := StandardMaterial3D.new()
+	spill.albedo_color = Color("0b120d")
+	spill.roughness = 0.07
+	spill.metallic = 0.25
+	spill.metallic_specular = 0.7
+	disc.material = spill
+	puddle.name = "Puddle"
 	puddle.mesh = disc
 	puddle.position = VAT_POSITION + Vector3(0, 0.02, 0)
 	add_child(puddle)
+	for crack in glass_cracks:
+		crack.queue_free()
+	glass_cracks.clear()
 	_record_breakout()
+	if hands_on_breakout:
+		_begin_knees()
 
 
 ## The first supernatural act remains physical: the player's suffering seizes
@@ -1143,6 +2291,7 @@ func _record_breakout() -> void:
 	var endured := int(player_state.get("torture_cycles", 4))
 	var refused := int(player_state.get("examination_refusals", 0))
 	var seizure := SoulBreakthrough.seize("player", endured, refused)
+	_seizure = seizure
 	var memory := "The soul seized the wetwire and broke the vat."
 	if not bool(seizure.get("ok", false)):
 		# It still breaks -- the glass is physical and the tube comes out either
@@ -1158,6 +2307,7 @@ func _record_breakout() -> void:
 	OPENING.advance("broke_free")
 	WorldHistory.record_event("opening_breakout", {"location": "growing_floor", "implant": "wetwire chip", "item": item})
 	WorldHistory.commit_ledger_batch()
+	VAT_REBIRTH.complete()
 	subtitle.text = "THE WETWIRE ANSWERS  //  RESTRAINT BROKEN"
 
 
@@ -1173,23 +2323,42 @@ func _update_shards(delta: float) -> void:
 
 
 func _update_movement(delta: float) -> void:
+	if JUMP_CLIMB.busy(player):
+		camera.rotation = Vector3(pitch, 0, 0)
+		return
 	var input := Vector3(
 		Input.get_axis("move_left", "move_right"),
 		0.0,
 		Input.get_axis("move_forward", "move_back"),
 	)
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
-	var speed := 2.7 * float(anatomy.call("mobility_ratio"))
-	player.velocity.x = move_toward(player.velocity.x, direction.x * speed, 14.0 * delta)
-	player.velocity.z = move_toward(player.velocity.z, direction.z * speed, 14.0 * delta)
-	player.velocity.y = -2.0 if player.is_on_floor() else player.velocity.y - 18.0 * delta
+	var mobility := float(anatomy.call("mobility_ratio"))
+	var speed := 2.7 * mobility
+	# Greg, 26 September: sprint here too, weak at first and growing as the
+	# new body recovers (the same mobility the jump reads); sprint + Ctrl slides.
+	var sprinting := Input.is_action_pressed("sprint")
+	if sprinting:
+		speed *= lerpf(1.15, 1.6, mobility)
+	# The examiner's syringe (ExaminerFight) slows you for a while.
+	if slowed_left > 0.0:
+		slowed_left = maxf(0.0, slowed_left - delta)
+		speed *= SLOWED_SCALE
+	if Input.is_action_just_pressed("crouch"):
+		JUMP_CLIMB.try_slide(player, yaw, sprinting)
+	if not JUMP_CLIMB.slide_step(player, delta):
+		player.velocity.x = move_toward(player.velocity.x, direction.x * speed, 26.0 * delta)
+		player.velocity.z = move_toward(player.velocity.z, direction.z * speed, 26.0 * delta)
+	JUMP_CLIMB.fall(player, delta)
 	player.move_and_slide()
+	var fall_hurt := JUMP_CLIMB.landing_damage(player)
+	if fall_hurt > 0.0:
+		anatomy.call("apply_hit", "left_leg", fall_hurt * 0.5, 0.0, "blunt")
+		anatomy.call("apply_hit", "right_leg", fall_hurt * 0.5, 0.0, "blunt")
+	meds.step(self, delta, func() -> void: FIELD_MEDS.heal_anatomy(anatomy))
 	player.rotation.y = yaw
-	camera.rotation = Vector3(pitch, 0, 0)
-	# A body that just came out of a tank does not walk well.
-	var stride := Vector2(player.velocity.x, player.velocity.z).length()
-	camera.position.y = STANDING_EYE_OFFSET + sin(Time.get_ticks_msec() * 0.0055) * stride * 0.016
-	camera.rotation.z = sin(Time.get_ticks_msec() * 0.0027) * stride * 0.008
+	# Greg, 28 September: less bob, body-cam sway, landing kick, strafe lean.
+	BODY_CAM.apply(camera, player, delta, pitch)
+	camera.position.y = STANDING_EYE_OFFSET + BODY_CAM.bob(player, Time.get_ticks_msec() * 0.001) - (0.5 if JUMP_CLIMB.sliding(player) else 0.0)
 
 
 func _interact() -> void:
@@ -1198,6 +2367,21 @@ func _interact() -> void:
 	if _try_pry_stuck_tank():
 		return
 	if _try_take_garment():
+		return
+	if _try_staff_door():
+		return
+	if break_weak_wall() or _try_den():
+		return
+	if HIDDEN_CACHE.open_near(caches, player.global_position, sight) == "stash":
+		key_hints.offer("field_dressing", KEY_4, "HOLD 4", "dress a wound")
+		subtitle.text = "A FIELD DRESSING AND FOUR ROUNDS  //  SOMEBODY HID THESE"
+		return
+	if sight != null and sight.call("cut_wire_near", player.global_position) != "":
+		subtitle.text = "THE LINE SPITS AND DIES  //  THAT BAY GOES DARK"
+		if bool(sight.get("last_cut_shocked")):
+			anatomy.call("apply_hit", "right_arm", sight.SHOCK_BLOOD, 0.0, "blunt")
+			subtitle.text = "IT WAS LIVE  //  THE SHOCK THROWS YOUR ARM BACK"
+		opening_audio.cue("door")
 		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0
@@ -1282,12 +2466,40 @@ func _record_service_arcade_entry() -> bool:
 
 
 func _update_hud() -> void:
+	if osd != null:
+		osd.visible = intake == null
 	var snapshot: Dictionary = anatomy.call("snapshot")
 	vitals.text = "BLOOD %d%%   PAIN %02d   %s" % [
 		roundi(float(snapshot.blood) / maxf(1.0, float(snapshot.blood_capacity)) * 100.0),
 		int(snapshot.pain),
-		"DECANTED",
+		"WIRED" if phase == "wired" else "DECANTED",
 	]
+	if phase == "wired":
+		$HUD/Objective.text = ""
+		if revenge_at >= 0.0:
+			prompt.text = ""
+		elif _aimed_wire() != null:
+			prompt.text = "[E] RIP IT OUT   //   %d LEFT" % umbilicals.size()
+			osd.point_at((_aimed_wire().get_child(3) as Node3D).global_position)
+		else:
+			prompt.text = "MOUSE LOOK   //   FIND THE WIRES   //   %d LEFT" % umbilicals.size()
+		return
+	match phase:
+		"cord":
+			$HUD/Objective.text = ""
+			prompt.text = "[E] TEAR THE CORD OUT OF YOUR MOUTH   //   %d" % (CORD_TUGS - cord_pulls)
+			return
+		"smash":
+			$HUD/Objective.text = ""
+			prompt.text = "[CLICK] SMASH THE GLASS   //   %d" % (GLASS_BLOWS - glass_blows)
+			return
+		"knees":
+			$HUD/Objective.text = ""
+			prompt.text = "[SPACE] GET UP" if boot_hud != null and boot_hud.done else ""
+			return
+		"rising":
+			prompt.text = ""
+			return
 	# The objective belongs to the escape, and the escape does not exist until
 	# the tank has actually broken. Gated on the breakout rather than on
 	# movement alone so no future phase can hand back control early and put
@@ -1304,13 +2516,60 @@ func _update_hud() -> void:
 		return
 	if not stuck_tank_opened and _carries_restraint() and _near_first_objects():
 		prompt.text = "[E] PRY THE JAMMED TANK WITH THE BROKEN RESTRAINT"
+		osd.point_at(stuck_tank_marker.global_position + Vector3(0, 1.3, 0))
 		return
-	if stuck_tank_opened and CLOTHING.worn("player") == "bare" and _near_first_objects():
+	if stuck_tank_opened and CLOTHING.worn("player") == "bare" and CLOTHING.worn(FAILED_SUBJECT_ID) != "bare" and _near_first_objects():
 		prompt.text = "[E] TAKE THE CLOTHING OFF SUBJECT 0C-4"
+		osd.point_at(stuck_tank_marker.global_position + Vector3(0, 1.1, 0))
+		return
+	if weak_wall_found and not weak_wall_broken and _near_weak_wall():
+		prompt.text = "[E] SHOULDER THROUGH THE HOLLOW WALL"
+		return
+	if _in_den():
+		var shiv_node := get_node_or_null("DenShiv") as Node3D
+		if not den_notes_read:
+			prompt.text = "[E] READ THEIR NOTES"
+		elif shiv_node != null and shiv_node.visible:
+			prompt.text = "[E] TAKE THE SHIV"
+		else:
+			prompt.text = "THEIR DEN  //  K SHOWS WHO STAYED"
+		return
+	if weak_wall_broken and _near_weak_wall():
+		prompt.text = "SOMEONE LIVED BEHIND THIS WALL"
+		return
+	if not HIDDEN_CACHE.nearest(caches, player.global_position).is_empty():
+		prompt.text = "[E] OPEN THE HATCH"
+		return
+	if sight != null and sight.call("wire_in_reach", player.global_position):
+		prompt.text = "[E] CUT THE POWER LINE"
+		return
+	var smash_prompt: String = vat_smash.prompt_for(camera, doctor_route.held_weapon() if doctor_route != null else "") if vat_smash != null and breakout_complete else ""
+	if smash_prompt != "":
+		prompt.text = smash_prompt
+		return
+	var route_prompt: String = doctor_route.prompt_text() if doctor_route != null else ""
+	if route_prompt != "":
+		prompt.text = route_prompt
+		return
+	# The door he left by: locked, and it says so (Greg, 2026-09-24: you should
+	# be able to interact with it). Staff access is found further on.
+	var to_staff := STAFF_DOOR_AT - player.global_position
+	to_staff.y = 0.0
+	if to_staff.length() <= 2.4:
+		if staff_door_open:
+			prompt.text = "HIS CUPBOARD // EMPTY" if _cupboard_taken() else "[E] HIS CUPBOARD"
+		elif VAT_REBIRTH.carries(STAFF_KEYCARD):
+			prompt.text = "[E] STAFF KEYCARD // OPEN THE STAFF DOOR"
+		else:
+			prompt.text = "STAFF DOOR // SEALED // STAFF ACCESS REQUIRED"
 		return
 	var to_door := door_marker.global_position - player.global_position
 	to_door.y = 0.0
-	prompt.text = "[E] ENTER THE UNDERGROUND HEAT" if to_door.length() <= 3.4 else "WASD MOVE   //   MOUSE LOOK   //   E INTERACT   //   HOLD I INSPECT"
+	# HOLD I is only offered when something is in hand to look at.
+	var inspect_hint := "   //   HOLD I INSPECT" if _inspect_text() != "NOTHING IN HAND TO INSPECT" else ""
+	prompt.text = "[E] ENTER THE UNDERGROUND HEAT" if to_door.length() <= 3.4 else "WASD MOVE   //   MOUSE LOOK   //   E INTERACT" + inspect_hint
+	if to_door.length() <= 3.4:
+		osd.point_at(door_marker.global_position + Vector3(0, 1.6, 0))
 
 
 ## AX3.1/AX3.6. What HOLD I actually shows — the same held object every time,

@@ -79,6 +79,11 @@ func open(who: String, choices: Array[String]) -> void:
 
 
 func close() -> void:
+	# The host's `closed` handler closes the panel too; only the first close
+	# tells anyone, or the two call each other forever.
+	if not visible:
+		listening = false
+		return
 	visible = false
 	listening = false
 	closed.emit()

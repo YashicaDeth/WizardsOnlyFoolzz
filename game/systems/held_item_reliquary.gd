@@ -87,9 +87,16 @@ func show_item(source: Node3D, item_label: String, item_detail := "") -> void:
 	if source == null or not is_instance_valid(source):
 		clear_item()
 		return
-	label = item_label.to_upper()
-	detail = item_detail.to_upper()
+	var new_label := item_label.to_upper()
+	var new_detail := item_detail.to_upper()
 	var source_id := source.get_instance_id()
+	# Called every physics tick by the Hunt; each deferred redraw is flushed
+	# per tick, so an unchanged item must not ask for one (the orbit in
+	# `_process` already redraws once a frame while visible).
+	if visible and source_id == displayed_source_id and new_label == label and new_detail == detail:
+		return
+	label = new_label
+	detail = new_detail
 	if source_id != displayed_source_id:
 		displayed_source_id = source_id
 		# Every newly presented object begins at the same readable three-quarter
@@ -103,6 +110,8 @@ func show_item(source: Node3D, item_label: String, item_detail := "") -> void:
 
 
 func clear_item() -> void:
+	if displayed_source_id == 0 and not visible:
+		return
 	displayed_source_id = 0
 	label = ""
 	detail = ""
@@ -114,7 +123,10 @@ func clear_item() -> void:
 
 
 func set_arm_damage(value: float) -> void:
-	arm_damage = clampf(value, 0.0, 1.0)
+	var next := clampf(value, 0.0, 1.0)
+	if is_equal_approx(next, arm_damage):
+		return
+	arm_damage = next
 	queue_redraw()
 
 

@@ -20,6 +20,13 @@ func _ready() -> void:
 	Interstitial.progress = 0.62
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png("%s/interstitial_plate.png" % out_dir)
+	# The anatomy film's cycle, pinned: sharp, soft and swelling, moshed, dithered.
+	for stage in [["sharp", 0.2], ["soft", 0.5], ["mosh", 0.62], ["dither", 0.8]]:
+		(Interstitial._film.material as ShaderMaterial).set_shader_parameter("phase_override", stage[1])
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/interstitial_film_%s.png" % [out_dir, stage[0]])
+	(Interstitial._film.material as ShaderMaterial).set_shader_parameter("phase_override", -1.0)
 
 	# A second destination, to prove the seal is the door's and not the screen's.
 	Interstitial._seal_seed = hash("res://vat_chamber.tscn")

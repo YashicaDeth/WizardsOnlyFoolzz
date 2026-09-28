@@ -24,6 +24,12 @@ func _ready() -> void:
 		get_tree().quit(2)
 		return
 	var tree := get_tree()
+	# Headless there is no renderer to measure (the dummy draws nothing), so
+	# every level reports the same noise. Say so and pass, not a false FAIL.
+	if DisplayServer.get_name() == "headless":
+		print("sandbox perf: skipped headless (needs a real renderer)")
+		tree.quit(0)
+		return
 	get_window().size = Vector2i(1920, 1080)
 	# Measuring three quality levels behind a 60 Hz present cap only measures
 	# the monitor: all three report ~16.6ms and tiny scheduling noise can make

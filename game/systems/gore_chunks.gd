@@ -416,9 +416,11 @@ static func hold() -> void:
 
 static func release() -> void:
 	for entry: Dictionary in _held_chunks:
-		var body := entry["body"] as RigidBody3D
-		if body == null or not is_instance_valid(body):
+		# Validity first: casting a chunk that was freed mid-hold is itself the
+		# error, and it aborted the loop before `clear()`, every frame after.
+		if not is_instance_valid(entry["body"]):
 			continue
+		var body := entry["body"] as RigidBody3D
 		body.freeze = false
 		# Put the arc back. Without this a limb stops dead in the air and then
 		# falls straight down, which is worse than not holding it at all.

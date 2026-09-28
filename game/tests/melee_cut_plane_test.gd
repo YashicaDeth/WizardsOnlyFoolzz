@@ -37,7 +37,10 @@ func _ready() -> void:
 	# DESIGN.md:245 — the elites dress you. Asserted here rather than in a
 	# clothing unit because the build site is the thing being tested.
 	var player_rig = hunt.get("player_rig")
-	check(player_rig != null and str(player_rig.wardrobe.get("style", "")) == "jester", "the player wakes in the humiliation rig")
+	# The jester set is four wearable parts now (Greg, 24 September): each
+	# dressed zone carries its part's style instead of one wardrobe-wide style.
+	var styles: Dictionary = player_rig.wardrobe.get("styles", {}) if player_rig != null else {}
+	check(player_rig != null and not styles.is_empty() and bool(player_rig.wardrobe.get("locked", false)), "the player wakes in the humiliation rig, collar locked")
 	if player_rig != null:
 		var p_torso := (player_rig as BaselineHuman).parts.get("torso") as Node3D
 		check(p_torso != null and p_torso.get_node_or_null("Garment") != null, "with the motley rendered over the flesh")

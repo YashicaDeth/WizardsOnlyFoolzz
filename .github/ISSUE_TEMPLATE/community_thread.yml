@@ -1,7 +1,7 @@
 name: Community thread
 description: Share an idea, a playtest note, a clip, or a collaboration thought.
 title: "[THREAD]: "
-labels: []
+labels: ["feedback"]
 body:
   - type: dropdown
     id: kind

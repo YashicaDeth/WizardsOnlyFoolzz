@@ -1,6 +1,9 @@
 extends Node
 
-const FieldHUD := preload("res://systems/gothic_field_hud.gd")
+## The black mirror's night-vision sensor. Its first half once tested a field
+## HUD (idle meters receding, portrait, map chart) that was rescued in df72937
+## but never kept; the live HUD has none of those, so only the sensor remains.
+
 const Mirror := preload("res://systems/black_mirror.gd")
 
 var failures: Array[String] = []
@@ -16,28 +19,6 @@ func _ready() -> void:
 	if OS.get_environment("ATG_TEST_MODE") != "1":
 		get_tree().quit(2)
 		return
-
-	var hud := FieldHUD.new()
-	hud.size = Vector2(1280, 720)
-	add_child(hud)
-	check(hud.meter_opacity("health") < 0.25, "full idle health recedes")
-	hud.set_state({
-		"health": 46.0,
-		"magic": 73.0,
-		"stamina": 88.0,
-		"portrait": {"name": "THE HUNTER", "tint": "56352f"},
-		"map_context": {"label": "BONE YARD EAST", "player": Vector2(44, 31), "heading": 0.4},
-		"weapon": {"id": "sword"},
-	})
-	check(is_equal_approx(hud.magic, 73.0), "optional magic telemetry is accepted")
-	check(hud.meter_opacity("health") > 0.95, "damaged health stays prominent")
-	check(hud.portrait.name == "THE HUNTER", "portrait telemetry reaches the top-right cluster")
-	check(hud.map_context.label == "BONE YARD EAST", "map context telemetry reaches the top-left chart")
-	# Existing callers may continue sending only the original contract.
-	hud.set_state({"health": 90.0, "stamina": 50.0, "weapon": {}})
-	check(is_equal_approx(hud.magic, 73.0), "legacy state updates preserve omitted magic")
-	await get_tree().process_frame
-	await RenderingServer.frame_post_draw
 
 	var sensor := Mirror.night_vision_state({"enabled": true, "battery": 0.8})
 	for frame in 60:

@@ -20,6 +20,7 @@ extends CanvasLayer
 ## on a timer rather than every frame. A profiler that costs frames tells you
 ## about itself.
 
+const MESH_BUDGET := preload("res://systems/mesh_budget.gd")
 const SAMPLE_WINDOW := 90
 const REFRESH_SECONDS := 0.25
 
@@ -34,6 +35,11 @@ var _worst_age := 0.0
 
 func _ready() -> void:
 	layer = 200
+	# The frame budget is set here, the one autoload that owns performance:
+	# every mesh built from now on is held to MeshBudget's segment caps, and the
+	# window gets the graphics tier's render scale.
+	get_tree().node_added.connect(MESH_BUDGET.on_node_added)
+	WorldLook.apply_viewport_quality(get_tree().root)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_panel = PanelContainer.new()
 	_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)

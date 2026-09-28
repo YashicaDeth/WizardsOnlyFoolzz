@@ -385,7 +385,9 @@ func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: 
 		var right_action := rig.parts.get("right_arm") as Node3D
 		var left_action := rig.parts.get("left_arm") as Node3D
 		if attack_kind == "firearm":
-			var shoulder := sin(clampf(progress * 1.8, 0.0, 1.0) * PI * 0.5)
+			# Settles back before the action ends, so the last frame hands over to
+			# the idle pose instead of snapping down from the shoulder.
+			var shoulder := sin(clampf(progress * 1.8, 0.0, 1.0) * PI * 0.5) * (1.0 - smoothstep(0.78, 1.0, progress))
 			if right_action != null:
 				right_action.rotation.x = lerpf(right_action.rotation.x, 1.10, shoulder)
 				right_action.rotation.z = lerpf(right_action.rotation.z, -0.18, shoulder)
@@ -398,9 +400,13 @@ func _pose(horizontal_speed: float, sprinting: bool, _crouching: bool, dodging: 
 			var anticipation := smoothstep(0.0, 0.28, progress) * (1.0 - smoothstep(0.28, 0.48, progress))
 			var cut := smoothstep(0.30, 0.58, progress)
 			var recover := smoothstep(0.72, 1.0, progress)
+			# The recovery takes back the whole cut. It used to take back a third,
+			# so every swing ended a radian away from rest and snapped there on
+			# the frame the action expired -- the arm "flipping back and forth"
+			# Greg saw in every view (2026-09-24).
 			if right_action != null:
-				right_action.rotation.x += anticipation * 0.62 - cut * 0.38 + recover * 0.20
-				right_action.rotation.z += anticipation * -0.92 + cut * 1.42 - recover * 0.50
+				right_action.rotation.x += anticipation * 0.62 - cut * 0.38 + recover * 0.38
+				right_action.rotation.z += anticipation * -0.92 + cut * 1.42 - recover * 1.42
 	if recoil_time > 0.0:
 		var kick := recoil_time * 2.8
 		for zone_id in ["left_arm", "right_arm"]:

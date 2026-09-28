@@ -1,4 +1,12 @@
 extends Node3D
+const LOOK := preload("res://systems/look_settings.gd")
+const JUMP_CLIMB := preload("res://systems/jump_climb.gd")
+const BODY_CAM := preload("res://systems/body_cam_feel.gd")
+const FIELD_MEDS := preload("res://systems/field_meds.gd")
+## Hold 4: a FIELD DRESSING, +20 blood (Greg, 26 September).
+var meds := FIELD_MEDS.new()
+const HIDDEN_CACHE := preload("res://systems/hidden_cache.gd")
+const SIGNAL_SIGHT := preload("res://systems/signal_sight.gd")
 
 ## THE SERVICE ARCADE — the first real district after the Growing Floor.
 ## A short, original hub-and-spoke slice: the vat corridor opens into a tall
@@ -7,12 +15,42 @@ extends Node3D
 ## a readable piece of facility geography.
 
 const OPENING := preload("res://systems/opening_director.gd")
+const CARRY := preload("res://systems/carry.gd")
+const VAT_REBIRTH := preload("res://systems/vat_rebirth.gd")
+## Both tools live in Carry, so dying really does leave them on the old body
+## (Greg, 24 September: nothing carried survives a death).
+const CARD_LABEL := "STAFF ACCESS CARD"
+const TOOL_LABEL := "BREACH TOOL"
+const LOCATION := "service_arcade"
+const REMAINS_REACH := 2.4
 const FACILITY_TERRITORY := preload("res://systems/facility_territory.gd")
 const ENTRY := Vector3(0, 1.0, 4.0)
 const CARD_AT := Vector3(-3.8, 0.95, -20.0)
 const WEAPON_AT := Vector3(3.8, 0.78, -11.5)
+const TOOL_REACH := 3.0
 const GATE_AT := Vector3(0, 0.0, -48.0)
 const EXIT_AT := Vector3(0, 0.0, -55.0)
+## AX route beat 5. Hollis's biometric door, across the artery between the
+## card and the pressure gate: both tools are behind you when you reach him.
+## Arch 7 stands at z = -29 and arch 8 at -33.5; the side labs sit at -25.7
+## and -34.7, so the wall at -31.5 touches none of them.
+const GUARD_POST_AT := Vector3(0, 0.0, -31.5)
+const WORLD_BREAK := preload("res://systems/world_break.gd")
+## Things the breach tool breaks (`DESIGN/GOAL_LOOP_2.md` 0.2): all past the
+## tool's pickup and short of Hollis, against the walls or beside the vats,
+## so the artery down the middle stays clear.
+const PROPS := [
+	["crate", "arcade_crate_1", Vector3(-5.2, 0, -13.0), 0.0],
+	["crate", "arcade_crate_2", Vector3(-4.9, 0, -13.95), 0.4],
+	["barrel", "arcade_barrel", Vector3(5.0, 0, -13.4), 0.0],
+	["jar", "arcade_jar_1", Vector3(3.2, 0, -18.0), 0.0],
+	["jar", "arcade_jar_2", Vector3(3.5, 0, -18.3), 0.0],
+	["locker", "arcade_locker", Vector3(-6.55, 0, -22.4), PI * 0.5],
+	["monitor", "arcade_monitor", Vector3(6.4, 0, -22.8), -PI * 0.5],
+	["chair", "arcade_chair", Vector3(5.5, 0, -22.3), -PI * 0.6],
+]
+## His shots can kill you now. Death is rebirth in the claimant's vat
+## (`VatRebirth`); what you carried stays here on the body you leave.
 
 var player: CharacterBody3D
 var camera: Camera3D
@@ -20,31 +58,98 @@ var yaw := 0.0
 var pitch := -0.04
 var card_taken := false
 var gate_open := false
+## Greg, 26 September: the first hidden thing is a weak wall in the Growing
+## Floor, found with wizard eyes. Behind it a crawlway drops past this arcade's
+## pressure gate. Set by the vat room just before the scene change and spent on
+## arrival, so an ordinary entry is untouched.
+static var arrive_by_duct := false
+const DUCT_ARRIVAL := Vector3(1.6, 1.0, -51.5)
+var duct_arrival := false
+var sight: Node
+var caches: Array = []
 var gate_body: StaticBody3D
 var gate_panel: Node3D
 var card_visual: MeshInstance3D
 var card_beacon: OmniLight3D
 var card_label: Label3D
 var weapon_taken := false
-var weapon_visual: MeshInstance3D
+var weapon_visual: Node3D
 var weapon_label: Label3D
 var lower_works_requested := false
+var guard_post: FacilityGuardPost
+## The Hunt's block-tracked hit markers (Greg, 24 September: the VFX pack),
+## over the one fight in the first 30 minutes: a box on the part the ram
+## struck, and a faint amber box on Hollis while he has you in his sights.
+var block_tracker: BlockTracker
+var osd: BodyCamOSD
+var blood := 100.0
+var post_message := ""
+var post_message_timer := 0.0
+## Whether each tool is still lying where the facility left it. Separate from
+## carrying it: a tool taken and then lost to a death is on your old body, not
+## back on its pedestal.
+var card_on_pedestal := true
+var weapon_on_floor := true
+var remains_nodes: Dictionary = {}
+var died := false
+var rebirth_request: Dictionary = {}
 
 @onready var objective: Label = $HUD/Objective
 @onready var prompt: Label = $HUD/Prompt
 @onready var vitals: Label = $HUD/Vitals
 
 func _ready() -> void:
+	# Greg, 28 September: every room has its own ambience and a music bed.
+	var ambient_bed_script := preload("res://systems/ambient_bed.gd")
+	if ambient_bed_script.wanted():
+		add_child(ambient_bed_script.new().setup("arcade"))
+	# Greg, 28 September: each new key shown once (KeyHints).
+	KeyHints.offer_opening_keys(self)
+	preload("res://systems/run_timer.gd").enter("service_arcade")
 	$WorldEnvironment.environment = WorldLook.environment("ossuary")
 	_build_shell()
 	_build_landmarks()
+	_build_guard_post()
+	for spec in PROPS:
+		BreakableProp.place(self, spec[0], spec[1], spec[2], spec[3])
 	_build_player()
+	if arrive_by_duct:
+		arrive_by_duct = false
+		duct_arrival = true
+		player.position = DUCT_ARRIVAL
+		WorldHistory.record_event("service_arcade_arrived_by_duct", {"location": LOCATION})
+	_restore_from_history()
+	_build_remains()
+	block_tracker = BlockTracker.new()
+	block_tracker.name = "BlockTracker"
+	$HUD.add_child(block_tracker)
+	block_tracker.camera = camera
+	osd = BodyCamOSD.new()
+	osd.name = "BodyCamOSD"
+	$HUD.add_child(osd)
+	osd.adopt(vitals, objective, prompt, "SUBLEVEL 0C  //  SERVICE ARCADE")
+	osd.camera = camera
+	_build_sight()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+## K and J here too (they are yours from the brain hack on), and a stash in
+## the left wall between the first two arches.
+func _build_sight() -> void:
+	sight = SIGNAL_SIGHT.new()
+	sight.name = "SignalSight"
+	add_child(sight)
+	sight.call("setup", camera)
+	sight.set("enabled", true)
+	caches.append(HIDDEN_CACHE.place_stash(self, sight, "service_arcade_stash", Vector3(-7.025, 1.2, -4.2), Vector3.RIGHT))
+	sight.connect("hidden_seen", func(id: String) -> void: HIDDEN_CACHE.mark_found(caches, id))
+
 
 func _build_player() -> void:
 	player = CharacterBody3D.new()
 	player.position = ENTRY
 	add_child(player)
+	# Greg, 28 September: what your bare feet land on here.
+	player.set_meta("surface", "concrete")
 	var collider := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
 	capsule.radius = 0.34
@@ -55,6 +160,7 @@ func _build_player() -> void:
 	camera.fov = 88.0
 	camera.position.y = 0.77
 	player.add_child(camera)
+	LabSurface.attach_body_cam(camera)
 
 func _build_shell() -> void:
 	# Collision is intentionally simpler than dressing: one stable floor and
@@ -77,53 +183,31 @@ func _build_shell() -> void:
 		light.omni_range = 8.5
 		add_child(light)
 
-func _build_arch(z: float, index: int) -> void:
+func _build_arch(z: float, _index: int) -> void:
 	# Two tall piers plus a raised beam read as a vault from the playable floor;
 	# the beam is decoration so it cannot snag the player.
 	for side in [-1.0, 1.0]:
 		var pier := MeshInstance3D.new()
 		var mesh := BoxMesh.new()
 		mesh.size = Vector3(0.55, 5.5, 0.55)
-		mesh.material = WorldLook.surface(Color("34291e"), "bone", 120 + index)
+		mesh.material = LabSurface.material("grime")
 		pier.mesh = mesh
 		pier.position = Vector3(side * 5.85, 2.75, z)
 		add_child(pier)
 	var lintel := MeshInstance3D.new()
 	var top := BoxMesh.new()
 	top.size = Vector3(12.2, 0.52, 0.55)
-	top.material = WorldLook.surface(Color("34291e"), "bone", 220 + index)
+	top.material = LabSurface.material("plate")
 	lintel.mesh = top
 	lintel.position = Vector3(0, 5.45, z)
 	add_child(lintel)
 
 func _build_side_lab(z: float, seed: int) -> void:
+	# Real vats with curled bodies in them (Greg, 2026-09-24), not red columns
+	# around pill-shaped silhouettes.
 	for side in [-1.0, 1.0]:
-		var tank := MeshInstance3D.new()
-		var cylinder := CylinderMesh.new()
-		cylinder.top_radius = 0.78
-		cylinder.bottom_radius = 0.78
-		cylinder.height = 2.9
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color(0.28, 0.045, 0.03, 0.34)
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-		mat.emission_enabled = true
-		mat.emission = Color(0.14, 0.004, 0.002)
-		cylinder.material = mat
-		tank.mesh = cylinder
-		tank.position = Vector3(side * 4.25, 1.45, z)
-		add_child(tank)
-		# A body-shaped silhouette, intentionally static and distant: ambience,
-		# not an expensive crowd system.
-		var subject := MeshInstance3D.new()
-		var body := CapsuleMesh.new()
-		body.radius = 0.25
-		body.height = 1.55
-		body.material = WorldLook.surface(Color("4d322d"), "flesh", seed * 9 + int(side))
-		subject.mesh = body
-		subject.position = tank.position + Vector3(0, -0.12, 0)
-		subject.rotation_degrees.z = side * 13.0
-		add_child(subject)
+		LabVat.build(self, Vector3(side * 4.25, 0.0, z), seed * 2 + (1 if side > 0.0 else 0), 2.3, 0.72)
+
 
 func _build_landmarks() -> void:
 	# Card station — a clearly lit side objective with a physical, original card.
@@ -161,16 +245,13 @@ func _build_landmarks() -> void:
 	card_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	card_label.position = CARD_AT + Vector3(0, 0.85, 0)
 	add_child(card_label)
-	weapon_visual = MeshInstance3D.new()
-	var weapon_mesh := BoxMesh.new()
-	weapon_mesh.size = Vector3(0.16, 0.16, 1.15)
-	weapon_mesh.material = WorldLook.surface(Color("6d3a22"), "metal", 710)
-	weapon_visual.mesh = weapon_mesh
-	weapon_visual.position = WEAPON_AT
-	weapon_visual.rotation_degrees.y = 34.0
+	# The real tool, lying where it was dropped (Greg, 2026-09-24).
+	weapon_visual = LabSurface.breach_tool()
+	weapon_visual.position = WEAPON_AT + Vector3(0, 0.08, 0)
+	weapon_visual.rotation_degrees = Vector3(0, 34.0, 90.0)
 	add_child(weapon_visual)
 	weapon_label = Label3D.new()
-	weapon_label.text = "BREACH TOOL\n[ E ] ARM"
+	weapon_label.text = "[E] TAKE THE BREACH TOOL"
 	weapon_label.font_size = 36
 	weapon_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	weapon_label.modulate = Color("e58b42")
@@ -196,14 +277,132 @@ func _build_landmarks() -> void:
 	gate_light.omni_range = 8.0
 	add_child(gate_light)
 
-func _slab(dimensions: Vector3, at: Vector3, kind: String, color: Color) -> StaticBody3D:
+func _build_guard_post() -> void:
+	guard_post = FacilityGuardPost.new()
+	guard_post.name = "GuardPost"
+	guard_post.position = GUARD_POST_AT
+	# Greg, 25 September: one Hollis, at the Support Unit end; this door gets
+	# a numbered guard.
+	guard_post.as_arcade_guard()
+	add_child(guard_post)
+	guard_post.build()
+	guard_post.shot.connect(_on_shot)
+	guard_post.struck.connect(func(at: Vector3, zone: String, damage: float, kind: String) -> void:
+		if block_tracker != null:
+			block_tracker.report_hit(at, zone, damage, kind))
+
+
+func _on_shot(damage: float) -> void:
+	if died:
+		return
+	blood = maxf(0.0, blood - damage)
+	BODY_CAM.hit(camera, 0.06)
+	if blood <= 0.0:
+		_die("shot by %s at the D-section door" % guard_post.guard_name, guard_post.guard_id)
+
+
+## Everything carried and worn stays here on the body; the claimant's vat grows
+## the player back. The world keeps what they did.
+func _die(cause: String, killed_by: String) -> void:
+	died = true
+	var at := player.global_position
+	at.y = 0.0
+	rebirth_request = VAT_REBIRTH.die(LOCATION, cause, killed_by, at)
+	if killed_by == guard_post.guard_id:
+		guard_post.player_killed()
+	card_taken = false
+	if weapon_taken and weapon_visual != null and is_instance_valid(weapon_visual):
+		weapon_visual.visible = false
+	weapon_taken = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if OS.get_environment("ATG_TEST_MODE") != "1":
+		Interstitial.travel(str(rebirth_request.scene), "you died // %s grows you back" % str(rebirth_request.vat.label).to_lower())
+
+
+## The arcade is the same place the second time. Pedestals stay empty once
+## their tool has gone, the gate stays open, and what the player still carries
+## decides what is in their hands.
+func _restore_from_history() -> void:
+	if WorldHistory.event_count("service_arcade_keycard_taken") > 0:
+		card_on_pedestal = false
+		card_visual.visible = false
+		card_beacon.visible = false
+		card_label.visible = false
+	card_taken = VAT_REBIRTH.carries(CARD_LABEL)
+	if WorldHistory.event_count("service_arcade_breach_tool_taken") > 0:
+		weapon_on_floor = false
+		weapon_label.visible = false
+		weapon_visual.visible = false
+	if VAT_REBIRTH.carries(TOOL_LABEL):
+		weapon_taken = true
+		weapon_visual.visible = true
+		LabSurface.hold_in_view(camera, weapon_visual)
+	if WorldHistory.event_count("service_arcade_pressure_gate_opened") > 0:
+		_open_gate()
+
+
+## Each body the player left here lies where they fell, holding what they held.
+func _build_remains() -> void:
+	for remains in VAT_REBIRTH.remains_at(LOCATION):
+		var body := BaselineHuman.new()
+		body.name = str(remains.id)
+		add_child(body)
+		body.build(str(remains.id), {"flesh": Color("6b5842"), "variation": int(remains.get("body_number", 1))})
+		body.position = VAT_REBIRTH.remains_position(remains)
+		# A corpse, not a sleeper: a living rig eases itself back upright every
+		# frame (seen on the first capture, where the old body stood up).
+		body.anatomy.dead = true
+		body.rotation.x = -PI * 0.46
+		var tag := Label3D.new()
+		tag.text = "YOUR OLD BODY"
+		tag.font_size = 30
+		tag.outline_size = 8
+		tag.modulate = Color("d9c3a4")
+		tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		tag.position = body.position + Vector3(0, 0.9, 0)
+		add_child(tag)
+		remains_nodes[str(remains.id)] = [body, tag]
+
+
+func _nearest_remains() -> String:
+	for remains_id in remains_nodes:
+		var body: Node3D = remains_nodes[remains_id][0]
+		if _flat_distance(body.global_position) <= REMAINS_REACH:
+			return str(remains_id)
+	return ""
+
+
+func _recover_remains(remains_id: String) -> bool:
+	var result := VAT_REBIRTH.recover(remains_id)
+	if not bool(result.get("ok", false)):
+		return false
+	card_taken = VAT_REBIRTH.carries(CARD_LABEL)
+	if VAT_REBIRTH.carries(TOOL_LABEL) and not weapon_taken:
+		weapon_taken = true
+		weapon_visual.visible = true
+		LabSurface.hold_in_view(camera, weapon_visual)
+	var tag: Label3D = remains_nodes[remains_id][1]
+	tag.text = "STRIPPED"
+	post_message = "TAKEN BACK OFF YOUR OLD BODY // %d THINGS" % int(result.get("items", 0))
+	post_message_timer = 2.4
+	return true
+
+
+func _carry_add(item: Dictionary) -> void:
+	var carry := CARRY.new()
+	carry.items.append(item)
+	carry.save_to_history()
+
+
+func _slab(dimensions: Vector3, at: Vector3, _kind: String, _color: Color) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = at
 	add_child(body)
 	var visual := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = dimensions
-	mesh.material = WorldLook.surface(color, kind, int(at.x * 13.0 + at.z * 17.0))
+	# Real lab surfaces (Greg, 2026-09-24), chosen by the slab's shape.
+	mesh.material = LabSurface.for_slab(dimensions, at)
 	visual.mesh = mesh
 	body.add_child(visual)
 	var collider := CollisionShape3D.new()
@@ -214,28 +413,76 @@ func _slab(dimensions: Vector3, at: Vector3, kind: String, color: Color) -> Stat
 	return body
 
 func _unhandled_input(event: InputEvent) -> void:
+	# No fighting while a dressing goes on (hold 4).
+	if meds.busy() and event is InputEventMouseButton and event.pressed:
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		yaw -= event.relative.x * 0.0026
-		pitch = clampf(pitch - event.relative.y * 0.0024, -1.15, 0.95)
+		yaw -= LOOK.dx(event.relative) * 0.0026
+		pitch = clampf(pitch - LOOK.dy(event.relative) * 0.0024, -1.15, 0.95)
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		_interact()
+	# Greg, 26 September: jump and climb everywhere.
+	if JUMP_CLIMB.is_jump_key(event):
+		JUMP_CLIMB.press(player, yaw, 1.0, "service_arcade_climbed")
+	# Greg (2026-09-24): the breach tool should be inspectable and should open
+	# doors, not only interrupt the sentinel further down.
+	if event is InputEventKey and not event.echo and event.keycode == KEY_I:
+		inspect_held = event.pressed
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and weapon_taken:
+		if not guard_post.strike(player.global_position):
+			if WORLD_BREAK.swing(camera, FacilityGuardPost.RAM_DAMAGE, "breach_tool", player).is_empty():
+				_discharge_at_gate()
+
+
+var inspect_held := false
+
+
+## The ram opens the pressure gate as well as the card does, louder. Recorded
+## as its own act, so the world can tell a forced gate from a keyed one.
+func _discharge_at_gate() -> bool:
+	if gate_open or _flat_distance(GATE_AT) > 3.6:
+		return false
+	WorldHistory.record_event("service_arcade_gate_breached", {"location": "service_arcade"})
+	_open_gate()
+	if weapon_visual != null and is_instance_valid(weapon_visual):
+		var kick := create_tween()
+		kick.tween_property(weapon_visual, "position:z", weapon_visual.position.z - 0.22, 0.05)
+		kick.tween_property(weapon_visual, "position:z", weapon_visual.position.z, 0.25)
+	return true
 
 func _physics_process(delta: float) -> void:
 	var input := Vector3(Input.get_axis("move_left", "move_right"), 0.0, Input.get_axis("move_forward", "move_back"))
 	var direction := (Basis(Vector3.UP, yaw) * input).normalized()
-	player.velocity.x = move_toward(player.velocity.x, direction.x * 3.4, 16.0 * delta)
-	player.velocity.z = move_toward(player.velocity.z, direction.z * 3.4, 16.0 * delta)
-	player.velocity.y = -2.0 if player.is_on_floor() else player.velocity.y - 18.0 * delta
-	player.move_and_slide()
+	# Mid-climb the haul owns the body; the gate check below still runs.
+	if not JUMP_CLIMB.busy(player):
+		# Sprint here too (Greg, 26 September), and sprint + Ctrl slides.
+		var sprinting := Input.is_action_pressed("sprint")
+		var pace := 3.4 * (1.6 if sprinting else 1.0)
+		if Input.is_action_just_pressed("crouch"):
+			JUMP_CLIMB.try_slide(player, yaw, sprinting)
+		if not JUMP_CLIMB.slide_step(player, delta):
+			player.velocity.x = move_toward(player.velocity.x, direction.x * pace, 26.0 * delta)
+			player.velocity.z = move_toward(player.velocity.z, direction.z * pace, 26.0 * delta)
+		# The view drops low for the slide.
+		camera.position.y = move_toward(camera.position.y, 0.3 if JUMP_CLIMB.sliding(player) else 0.77, get_physics_process_delta_time() * 4.0)
+		JUMP_CLIMB.fall(player, delta)
+		player.move_and_slide()
+		var fall_hurt := JUMP_CLIMB.landing_damage(player)
+		if fall_hurt > 0.0:
+			blood = maxf(1.0, blood - fall_hurt)
+	meds.step(self, delta, func() -> void: blood = minf(100.0, blood + FIELD_MEDS.HEALS))
 	player.rotation.y = yaw
-	camera.rotation = Vector3(pitch, 0, 0)
+	BODY_CAM.apply(camera, player, delta, pitch)
 	# The arcade is a route, not a lockout puzzle. If the card was collected,
 	# entering the obvious pressure-gate threshold opens it even if an input
 	# event was swallowed by the transition frame.
 	if card_taken and not gate_open and _flat_distance(GATE_AT) <= 4.4:
 		_open_gate()
+	guard_post.step(delta, player.global_position)
+	block_tracker.watch(guard_post.watcher_entries())
+	post_message_timer = maxf(0.0, post_message_timer - delta)
 	_update_hud()
 
 func _flat_distance(at: Vector3) -> float:
@@ -243,18 +490,38 @@ func _flat_distance(at: Vector3) -> float:
 	delta.y = 0.0
 	return delta.length()
 
+func _tool_in_reach() -> bool:
+	return weapon_on_floor and _flat_distance(WEAPON_AT) <= TOOL_REACH
+
 func _interact() -> void:
-	if not card_taken and _flat_distance(CARD_AT) <= 2.3:
+	if died:
+		return
+	var remains_id := _nearest_remains()
+	if not remains_id.is_empty() and _recover_remains(remains_id):
+		return
+	if HIDDEN_CACHE.open_near(caches, player.global_position, sight) != "":
+		return
+	var said := guard_post.interact(player.global_position, weapon_taken)
+	if not said.is_empty():
+		post_message = said
+		post_message_timer = 2.4
+		return
+	if card_on_pedestal and _flat_distance(CARD_AT) <= 2.3:
+		card_on_pedestal = false
 		card_taken = true
 		card_visual.visible = false
 		card_beacon.visible = false
 		card_label.visible = false
+		_carry_add({"label": CARD_LABEL, "kind": "key", "mass": 0.02, "perishes": false, "age": 0.0, "from": LOCATION})
 		WorldHistory.record_event("service_arcade_keycard_taken", {"location": "service_arcade"})
 		return
-	if not weapon_taken and _flat_distance(WEAPON_AT) <= 2.3:
+	if _tool_in_reach():
+		weapon_on_floor = false
 		weapon_taken = true
-		weapon_visual.visible = false
+		# Taking it puts it in your hands, where you can see it.
+		LabSurface.hold_in_view(camera, weapon_visual)
 		weapon_label.visible = false
+		_carry_add({"label": TOOL_LABEL, "kind": "tool", "mass": 4.0, "perishes": false, "age": 0.0, "from": LOCATION})
 		WorldHistory.record_event("service_arcade_breach_tool_taken", {"location": "service_arcade"})
 		return
 	if not gate_open and _flat_distance(GATE_AT) <= 3.2 and card_taken:
@@ -264,8 +531,15 @@ func _interact() -> void:
 	# pressure gate has visibly opened.  The control panel and the threshold both
 	# lead onward; this is especially important when the original E press was
 	# consumed by the gate-opening frame.
-	if gate_open and (_flat_distance(GATE_AT) <= 4.4 or _flat_distance(EXIT_AT) <= 3.0):
+	if _onward_open():
 		_enter_lower_works()
+
+## Through the opened gate, or already past it by the crawlway.
+func _onward_open() -> bool:
+	if gate_open and (_flat_distance(GATE_AT) <= 4.4 or _flat_distance(EXIT_AT) <= 3.0):
+		return true
+	return duct_arrival and _flat_distance(EXIT_AT) <= 3.0
+
 
 func _open_gate() -> void:
 	if gate_open:
@@ -274,7 +548,8 @@ func _open_gate() -> void:
 	if gate_body != null:
 		gate_body.queue_free()
 	gate_panel.position.y = 5.8
-	WorldHistory.record_event("service_arcade_pressure_gate_opened", {"location": "service_arcade"})
+	if WorldHistory.event_count("service_arcade_pressure_gate_opened") == 0:
+		WorldHistory.record_event("service_arcade_pressure_gate_opened", {"location": "service_arcade"})
 
 func _enter_lower_works() -> void:
 	if lower_works_requested:
@@ -296,17 +571,50 @@ func _record_pit_entry() -> void:
 	WorldHistory.commit_ledger_batch()
 
 func _update_hud() -> void:
-	vitals.text = "BLOOD 100%   PAIN 86   DECANTED"
-	objective.text = "OBJECTIVE\n" + ("FOLLOW THE HEAT" if gate_open else ("REACH THE PRESSURE GATE" if card_taken and weapon_taken else ("FIND THE BREACH TOOL" if not weapon_taken else "FIND THE ORANGE STAFF CARD")))
+	vitals.text = "BLOOD %d%%   PAIN 86   DECANTED" % roundi(blood)
+	var past_guard := "REACH THE PRESSURE GATE" if guard_post.door_open else "GET THROUGH THE D-SECTION DOOR"
+	var has_remains := false
+	for remains_id in remains_nodes:
+		has_remains = has_remains or (remains_nodes[remains_id][1] as Label3D).text != "STRIPPED"
+	if has_remains and not (card_taken and weapon_taken):
+		objective.text = "OBJECTIVE\nRECOVER YOUR GEAR FROM YOUR OLD BODY"
+	else:
+		objective.text = "OBJECTIVE\n" + ("FOLLOW THE HEAT" if gate_open else (past_guard if card_taken and weapon_taken else ("FIND THE BREACH TOOL" if not weapon_taken else "FIND THE ORANGE STAFF CARD")))
 	if weapon_taken:
 		vitals.text += "   BREACH TOOL // READY"
-	if not card_taken and _flat_distance(CARD_AT) <= 2.3:
+	var post_prompt := guard_post.prompt_for(player.global_position, weapon_taken)
+	if not _nearest_remains().is_empty() and (remains_nodes[_nearest_remains()][1] as Label3D).text != "STRIPPED":
+		post_prompt = "[E] TAKE YOUR GEAR BACK OFF YOUR OLD BODY"
+		osd.point_at((remains_nodes[_nearest_remains()][0] as Node3D).global_position + Vector3(0, 0.6, 0))
+	elif post_prompt.begins_with("["):
+		osd.point_at(guard_post.guard.global_position + Vector3(0, 1.3, 0))
+	if post_message_timer > 0.0:
+		prompt.text = post_message
+	elif not post_prompt.is_empty() and not inspect_held:
+		prompt.text = post_prompt
+	elif inspect_held:
+		prompt.text = "BREACH TOOL // PNEUMATIC RAM, ONE CHARGE CANISTER // CLICK AT A LOCKED DOOR" if weapon_taken else "NOTHING IN HAND TO INSPECT"
+	elif not HIDDEN_CACHE.nearest(caches, player.global_position).is_empty():
+		prompt.text = "[E] OPEN THE HATCH"
+	elif card_on_pedestal and _flat_distance(CARD_AT) <= 2.3:
 		prompt.text = "[E] TAKE STAFF ACCESS CARD"
+		osd.point_at(CARD_AT + Vector3(0, 0.3, 0))
+	elif _tool_in_reach():
+		prompt.text = "[E] TAKE THE BREACH TOOL"
+		osd.point_at(WEAPON_AT)
 	elif not gate_open and _flat_distance(GATE_AT) <= 3.2:
-		prompt.text = "[E] OPEN PRESSURE GATE" if card_taken else "PRESSURE GATE // STAFF CARD REQUIRED"
-	elif gate_open and (_flat_distance(GATE_AT) <= 4.4 or _flat_distance(EXIT_AT) <= 3.0):
+		if card_taken:
+			prompt.text = "[E] OPEN PRESSURE GATE"
+			osd.point_at(GATE_AT + Vector3(0, 2.0, 0))
+		elif weapon_taken:
+			prompt.text = "[LMB] BREACH THE PRESSURE GATE   //   OR FIND THE STAFF CARD"
+			osd.point_at(GATE_AT + Vector3(0, 2.0, 0))
+		else:
+			prompt.text = "PRESSURE GATE // STAFF CARD REQUIRED"
+	elif _onward_open():
 		prompt.text = "[E] ENTER LOWER WORKS"
+		osd.point_at(GATE_AT + Vector3(0, 1.6, -2.0))
 	elif gate_open:
 		prompt.text = "PRESSURE GATE UNSEALED // MOVE THROUGH"
 	else:
-		prompt.text = "WASD MOVE   //   MOUSE LOOK   //   E INTERACT"
+		prompt.text = "WASD MOVE   //   MOUSE LOOK   //   E INTERACT" + ("   //   HOLD I INSPECT" if weapon_taken else "")

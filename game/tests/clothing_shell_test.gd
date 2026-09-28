@@ -145,6 +145,9 @@ func _ready() -> void:
 	var cloth: StandardMaterial3D = GARMENT.shell_material(0.0)
 	var whole: StandardMaterial3D = GARMENT.shell_material(1.0)
 	check(cloth.albedo_color.v > whole.albedo_color.v, "a shredded garment reads threadbare beside a whole one")
+	# The revolve winds inward; culled, only the far inside of the shell drew
+	# and every garment read as a thin outline around bare skin.
+	check(whole.cull_mode == BaseMaterial3D.CULL_DISABLED, "cloth draws both faces, so the garment covers the body instead of outlining it")
 
 	# --- the humiliation rig arrives already punished ---------------------------------
 	var motley := GARMENT.humiliation_wardrobe()
