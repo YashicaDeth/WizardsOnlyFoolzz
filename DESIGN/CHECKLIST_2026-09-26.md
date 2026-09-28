@@ -77,7 +77,7 @@ still open. **(Greg)** marks something only Greg can do or decide.
 - [x] Stashes and secret doors: 7 hidden things across the opening (Greg: 5-8), faint seam for plain eyes, found in K/J, opened with E; meds and ammo.
 - [x] The weak wall in the Growing Floor: wizard eyes show cracks, depth shows HOLLOW, E breaks it, the crawlway drops you past the Service Arcade gate.
 - [ ] **(Greg)** Is past-the-arcade-gate the right place for the shortcut to lead?
-- [ ] Wizard-eyes shader pass against the Ice King / green line-art reference.
+- [x] Wizard-eyes shader pass against the Ice King / green line-art reference: glowing green lines with a soft halo and a white-hot core on green-black; camera rings stay acid so they stand out. Rendered before and after.
 - [ ] **(Greg)** Play K and J and say if the look is right.
 
 ## Jump and climb everywhere

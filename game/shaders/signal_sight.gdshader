@@ -15,6 +15,8 @@ const vec3 BONE = vec3(0.90, 0.83, 0.67);
 const vec3 ACID = vec3(0.71, 0.85, 0.28);
 const vec3 NIGHT = vec3(0.02, 0.035, 0.03);
 const vec3 COLD = vec3(0.35, 0.85, 0.95);
+// The wizard-eyes line colour: greener than ACID (which stays for spirits).
+const vec3 LINE = vec3(0.42, 0.95, 0.38);
 
 float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 
@@ -57,10 +59,27 @@ void fragment() {
 		float y = lum(c);
 		vec3 outc;
 		if (mode == 1) {
-			outc = mix(NIGHT, BONE * 0.85, edge);
-			// Whatever is lit glows sick green, softly.
-			outc += ACID * smoothstep(0.35, 0.9, y) * 0.45;
-			outc += ACID * 0.05 * (0.5 + 0.5 * sin(TIME * 2.0 + uv.y * 40.0));
+			// The Ice King reference (Greg, 26 September; the concept "green
+			// line art, glowing spirits"): the world drawn in glowing green
+			// lines on green-black, a white-hot core where lines are strongest,
+			// a soft halo around every line, lit things a faint green wash.
+			float gx2 = 0.0;
+			float gy2 = 0.0;
+			vec2 wide = px * 2.2;
+			float wl = lum(textureLod(screen_tex, uv + vec2(-1.0, 0.0) * wide, lod + 1.0).rgb);
+			float wr = lum(textureLod(screen_tex, uv + vec2(1.0, 0.0) * wide, lod + 1.0).rgb);
+			float wt = lum(textureLod(screen_tex, uv + vec2(0.0, -1.0) * wide, lod + 1.0).rgb);
+			float wb = lum(textureLod(screen_tex, uv + vec2(0.0, 1.0) * wide, lod + 1.0).rgb);
+			gx2 = wr - wl;
+			gy2 = wb - wt;
+			float halo = smoothstep(0.03, 0.2, length(vec2(gx2, gy2)));
+			vec3 ground = vec3(0.008, 0.03, 0.014);
+			outc = ground + LINE * smoothstep(0.35, 0.9, y) * 0.16;
+			outc += LINE * halo * 0.3;
+			outc = mix(outc, LINE * 1.05, edge);
+			outc += vec3(0.8, 1.0, 0.75) * smoothstep(0.6, 1.0, edge) * 0.3;
+			// A slow shimmer running up the lines.
+			outc += LINE * edge * 0.12 * (0.5 + 0.5 * sin(TIME * 3.0 - uv.y * 60.0));
 		} else {
 			outc = vec3(y * 0.22) + COLD * edge * 0.8;
 			float scan = step(0.5, fract(uv.y / px.y / 3.0));
