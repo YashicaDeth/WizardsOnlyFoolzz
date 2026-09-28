@@ -52,7 +52,7 @@ Foundry, lighter). One brief per agent, one open box from
   - Open one render per plate.
 - **OUT:** generated images. Those wait for LFS and Greg's picks.
 
-## 3. `starnet/placeholder-killcam`: kill-cam X-rays
+## 3. `starnet/placeholder-killcam`: DONE by Claude (cloud), 28 September
 
 - **GOAL:** Checklist "Placeholder: kill-cam X-rays".
 - **EXISTS:** `kill_cam` in `bone_yard_hunt.gd`; the anatomy has organs and
